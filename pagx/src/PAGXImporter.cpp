@@ -899,8 +899,8 @@ static TextModifier* parseTextModifier(const XMLNode* node, PAGXDocument* doc) {
   if (!modifier) {
     return nullptr;
   }
-  auto anchorStr = getAttribute(node, "anchorPoint", "0,0");
-  modifier->anchorPoint = parsePoint(anchorStr);
+  auto anchorStr = getAttribute(node, "anchor", "0,0");
+  modifier->anchor = parsePoint(anchorStr);
   auto positionStr = getAttribute(node, "position", "0,0");
   modifier->position = parsePoint(positionStr);
   modifier->rotation = getFloatAttribute(node, "rotation", 0);
@@ -984,8 +984,8 @@ static Repeater* parseRepeater(const XMLNode* node, PAGXDocument* doc) {
   repeater->copies = getFloatAttribute(node, "copies", 3);
   repeater->offset = getFloatAttribute(node, "offset", 0);
   repeater->order = RepeaterOrderFromString(getAttribute(node, "order", "belowOriginal"));
-  auto anchorStr = getAttribute(node, "anchorPoint", "0,0");
-  repeater->anchorPoint = parsePoint(anchorStr);
+  auto anchorStr = getAttribute(node, "anchor", "0,0");
+  repeater->anchor = parsePoint(anchorStr);
   auto positionStr = getAttribute(node, "position", "100,100");
   repeater->position = parsePoint(positionStr);
   repeater->rotation = getFloatAttribute(node, "rotation", 0);
@@ -1002,8 +1002,8 @@ static Group* parseGroup(const XMLNode* node, PAGXDocument* doc) {
     return nullptr;
   }
   // group->name (removed) = getAttribute(node, "name");
-  auto anchorStr = getAttribute(node, "anchorPoint", "0,0");
-  group->anchorPoint = parsePoint(anchorStr);
+  auto anchorStr = getAttribute(node, "anchor", "0,0");
+  group->anchor = parsePoint(anchorStr);
   auto positionStr = getAttribute(node, "position", "0,0");
   group->position = parsePoint(positionStr);
   group->rotation = getFloatAttribute(node, "rotation", 0);
@@ -1283,6 +1283,7 @@ static Glyph* parseGlyph(const XMLNode* node, PAGXDocument* doc) {
   if (!offsetStr.empty()) {
     glyph->offset = parsePoint(offsetStr);
   }
+  glyph->advance = getFloatAttribute(node, "advance", 0);
   return glyph;
 }
 
@@ -1301,6 +1302,7 @@ static GlyphRun* parseGlyphRun(const XMLNode* node, PAGXDocument* doc) {
     }
   }
   run->fontSize = getFloatAttribute(node, "fontSize", 12);
+  run->x = getFloatAttribute(node, "x", 0);
   run->y = getFloatAttribute(node, "y", 0);
 
   // Parse glyphs only if font is valid
@@ -1314,16 +1316,15 @@ static GlyphRun* parseGlyphRun(const XMLNode* node, PAGXDocument* doc) {
     }
   }
 
-  // Parse xPositions (comma-separated x coordinates for Horizontal mode)
-  auto xPosStr = getAttribute(node, "xPositions");
-  if (!xPosStr.empty()) {
-    run->xPositions = parseFloatList(xPosStr);
+  // Parse xOffsets (comma-separated x offsets)
+  auto xOffsetsStr = getAttribute(node, "xOffsets");
+  if (!xOffsetsStr.empty()) {
+    run->xOffsets = parseFloatList(xOffsetsStr);
   }
 
-  // Parse positions (semicolon-separated x,y pairs for Point mode)
+  // Parse positions (semicolon-separated x,y pairs)
   auto posStr = getAttribute(node, "positions");
   if (!posStr.empty()) {
-    // Split by semicolon
     size_t start = 0;
     size_t end = posStr.find(';');
     while (start < posStr.size()) {
@@ -1345,64 +1346,64 @@ static GlyphRun* parseGlyphRun(const XMLNode* node, PAGXDocument* doc) {
     }
   }
 
-  // Parse xforms (semicolon-separated scos,ssin,tx,ty for RSXform mode)
-  auto xformsStr = getAttribute(node, "xforms");
-  if (!xformsStr.empty()) {
+  // Parse anchors (semicolon-separated x,y pairs)
+  auto anchorsStr = getAttribute(node, "anchors");
+  if (!anchorsStr.empty()) {
     size_t start = 0;
-    size_t end = xformsStr.find(';');
-    while (start < xformsStr.size()) {
-      std::string group = {};
+    size_t end = anchorsStr.find(';');
+    while (start < anchorsStr.size()) {
+      std::string pair = {};
       if (end == std::string::npos) {
-        group = xformsStr.substr(start);
+        pair = anchorsStr.substr(start);
       } else {
-        group = xformsStr.substr(start, end - start);
+        pair = anchorsStr.substr(start, end - start);
       }
-      auto vals = ParseFloatList(group);
-      if (vals.size() >= 4) {
-        RSXform xform = {};
-        xform.scos = vals[0];
-        xform.ssin = vals[1];
-        xform.tx = vals[2];
-        xform.ty = vals[3];
-        run->xforms.push_back(xform);
+      auto coords = ParseFloatList(pair);
+      if (coords.size() >= 2) {
+        run->anchors.push_back({coords[0], coords[1]});
       }
       if (end == std::string::npos) {
         break;
       }
       start = end + 1;
-      end = xformsStr.find(';', start);
+      end = anchorsStr.find(';', start);
     }
   }
 
-  // Parse matrices (semicolon-separated a,b,c,d,tx,ty for Matrix mode)
-  auto matricesStr = getAttribute(node, "matrices");
-  if (!matricesStr.empty()) {
+  // Parse scales (semicolon-separated sx,sy pairs)
+  auto scalesStr = getAttribute(node, "scales");
+  if (!scalesStr.empty()) {
     size_t start = 0;
-    size_t end = matricesStr.find(';');
-    while (start < matricesStr.size()) {
-      std::string group = {};
+    size_t end = scalesStr.find(';');
+    while (start < scalesStr.size()) {
+      std::string pair = {};
       if (end == std::string::npos) {
-        group = matricesStr.substr(start);
+        pair = scalesStr.substr(start);
       } else {
-        group = matricesStr.substr(start, end - start);
+        pair = scalesStr.substr(start, end - start);
       }
-      auto vals = ParseFloatList(group);
-      if (vals.size() >= 6) {
-        Matrix m = {};
-        m.a = vals[0];
-        m.b = vals[1];
-        m.c = vals[2];
-        m.d = vals[3];
-        m.tx = vals[4];
-        m.ty = vals[5];
-        run->matrices.push_back(m);
+      auto coords = ParseFloatList(pair);
+      if (coords.size() >= 2) {
+        run->scales.push_back({coords[0], coords[1]});
       }
       if (end == std::string::npos) {
         break;
       }
       start = end + 1;
-      end = matricesStr.find(';', start);
+      end = scalesStr.find(';', start);
     }
+  }
+
+  // Parse rotations (comma-separated angles in degrees)
+  auto rotationsStr = getAttribute(node, "rotations");
+  if (!rotationsStr.empty()) {
+    run->rotations = parseFloatList(rotationsStr);
+  }
+
+  // Parse skews (comma-separated angles in degrees)
+  auto skewsStr = getAttribute(node, "skews");
+  if (!skewsStr.empty()) {
+    run->skews = parseFloatList(skewsStr);
   }
 
   return run;

@@ -48,6 +48,10 @@ std::string SafeConvertToStdString(JNIEnv* env, jstring jText) {
   auto encoding = env->NewStringUTF("utf-8");
   auto jBytes = (jbyteArray)env->CallObjectMethod(jText, GetBytesID, encoding);
   env->DeleteLocalRef(encoding);
+  if (jBytes == nullptr || env->ExceptionCheck()) {
+    env->ExceptionClear();
+    return "";
+  }
   auto textLength = env->GetArrayLength(jBytes);
   if (textLength > 0) {
     char* bytes = new char[textLength];

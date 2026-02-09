@@ -120,7 +120,7 @@
     <Group position="580,0">
       <Ellipse center="25,0" size="10,10"/>
       <Fill color="@cyan"/>
-      <Repeater copies="8" rotation="45" anchorPoint="0,0" startAlpha="1" endAlpha="0.15"/>
+      <Repeater copies="8" rotation="45" anchor="0,0" startAlpha="1" endAlpha="0.15"/>
     </Group>
     
     <!-- Mask Example (shape without mask) -->

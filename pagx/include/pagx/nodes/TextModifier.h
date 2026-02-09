@@ -38,7 +38,7 @@ class TextModifier : public Element {
   /**
    * The anchor point for transformations.
    */
-  Point anchorPoint = {};
+  Point anchor = {};
 
   /**
    * The position offset applied to selected characters.

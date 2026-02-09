@@ -323,7 +323,7 @@ Color sources define colors that can be used for fills and strokes, supporting t
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `color` | color | (required) | Color value |
+| `color` | Color | (required) | Color value |
 
 ##### LinearGradient
 
@@ -346,9 +346,9 @@ Linear gradients interpolate along the direction from start point to end point.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `startPoint` | point | (required) | Start point |
-| `endPoint` | point | (required) | End point |
-| `matrix` | string | identity matrix | Transform matrix |
+| `startPoint` | Point | (required) | Start point |
+| `endPoint` | Point | (required) | End point |
+| `matrix` | Matrix | identity matrix | Transform matrix |
 
 **Calculation**: For a point P, its color is determined by the projection position of P onto the line connecting start and end points.
 
@@ -373,9 +373,9 @@ Radial gradients radiate outward from the center.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | point | 0,0 | Center point |
+| `center` | Point | 0,0 | Center point |
 | `radius` | float | (required) | Gradient radius |
-| `matrix` | string | identity matrix | Transform matrix |
+| `matrix` | Matrix | identity matrix | Transform matrix |
 
 **Calculation**: For a point P, its color is determined by `distance(P, center) / radius`.
 
@@ -402,10 +402,10 @@ Conic gradients (also known as sweep gradients) interpolate along the circumfere
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | point | 0,0 | Center point |
+| `center` | Point | 0,0 | Center point |
 | `startAngle` | float | 0 | Start angle |
 | `endAngle` | float | 360 | End angle |
-| `matrix` | string | identity matrix | Transform matrix |
+| `matrix` | Matrix | identity matrix | Transform matrix |
 
 **Calculation**: For a point P, its color is determined by the ratio of `atan2(P.y - center.y, P.x - center.x)` within the `[startAngle, endAngle]` range.
 
@@ -430,9 +430,9 @@ Diamond gradients radiate from the center toward the four corners.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | point | 0,0 | Center point |
+| `center` | Point | 0,0 | Center point |
 | `radius` | float | (required) | Gradient radius |
-| `matrix` | string | identity matrix | Transform matrix |
+| `matrix` | Matrix | identity matrix | Transform matrix |
 
 **Calculation**: For a point P, its color is determined by the Manhattan distance `(|P.x - center.x| + |P.y - center.y|) / radius`.
 
@@ -445,7 +445,7 @@ Diamond gradients radiate from the center toward the four corners.
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `offset` | float | (required) | Position 0.0~1.0 |
-| `color` | color | (required) | Stop color |
+| `color` | Color | (required) | Stop color |
 
 **Common Gradient Rules**:
 
@@ -471,7 +471,7 @@ Image patterns use an image as a color source.
 | `tileModeY` | TileMode | clamp | Y-direction tile mode |
 | `filterMode` | FilterMode | linear | Texture filter mode |
 | `mipmapMode` | MipmapMode | linear | Mipmap mode |
-| `matrix` | string | identity matrix | Transform matrix |
+| `matrix` | Matrix | identity matrix | Transform matrix |
 
 **TileMode**: `clamp`, `repeat`, `mirror`, `decal`
 
@@ -576,14 +576,14 @@ Font defines embedded font resources containing subsetted glyph data (vector out
 ```xml
 <!-- Embedded vector font -->
 <Font id="myFont" unitsPerEm="1000">
-  <Glyph path="M 50 0 L 300 700 L 550 0 Z"/>
-  <Glyph path="M 100 0 L 100 700 L 400 700 C 550 700 550 400 400 400 Z"/>
+  <Glyph advance="600" path="M 50 0 L 300 700 L 550 0 Z"/>
+  <Glyph advance="550" path="M 100 0 L 100 700 L 400 700 C 550 700 550 400 400 400 Z"/>
 </Font>
 
 <!-- Embedded bitmap font (Emoji) -->
 <Font id="emojiFont" unitsPerEm="136">
-  <Glyph image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA..."/>
-  <Glyph image="emoji/heart.png" offset="0,-5"/>
+  <Glyph advance="136" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA..."/>
+  <Glyph advance="136" image="emoji/heart.png" offset="0,-5"/>
 </Font>
 ```
 
@@ -603,9 +603,10 @@ Glyph defines rendering data for a single glyph. Either `path` or `image` must b
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
+| `advance` | float | (required) | Horizontal advance width in design space coordinates (unitsPerEm units) |
 | `path` | string | - | SVG path data (vector outline) |
 | `image` | string | - | Image data (base64 data URI) or external file path |
-| `offset` | point | 0,0 | Glyph offset in design space coordinates (typically used for bitmap glyphs) |
+| `offset` | Point | 0,0 | Glyph offset in design space coordinates (typically used for bitmap glyphs) |
 
 **Glyph Types**:
 - **Vector glyph**: Specifies the `path` attribute using SVG path syntax to describe the outline
@@ -739,14 +740,14 @@ Layer child elements are automatically categorized into four collections by type
 | `blendMode` | BlendMode | normal | Blend mode |
 | `x` | float | 0 | X position |
 | `y` | float | 0 | Y position |
-| `matrix` | string | identity matrix | 2D transform "a,b,c,d,tx,ty" |
-| `matrix3D` | string | - | 3D transform (16 values, column-major) |
+| `matrix` | Matrix | identity matrix | 2D transform "a,b,c,d,tx,ty" |
+| `matrix3D` | Matrix | - | 3D transform (16 values, column-major) |
 | `preserve3D` | bool | false | Preserve 3D transform |
 | `antiAlias` | bool | true | Edge anti-aliasing |
 | `groupOpacity` | bool | false | Group opacity |
 | `passThroughBackground` | bool | true | Whether to pass background through to child layers |
 | `excludeChildEffectsInLayerStyle` | bool | false | Whether layer styles exclude child layer effects |
-| `scrollRect` | string | - | Scroll clipping region "x,y,w,h" |
+| `scrollRect` | Rect | - | Scroll clipping region "x,y,w,h" |
 | `mask` | idref | - | Mask layer reference "@id" |
 | `maskType` | MaskType | alpha | Mask type |
 | `composition` | idref | - | Composition reference "@id" |
@@ -827,7 +828,7 @@ Draws a drop shadow **below** the layer. Computes shadow shape based on opaque l
 | `offsetY` | float | 0 | Y offset |
 | `blurX` | float | 0 | X blur radius |
 | `blurY` | float | 0 | Y blur radius |
-| `color` | color | #000000 | Shadow color |
+| `color` | Color | #000000 | Shadow color |
 | `showBehindLayer` | bool | true | Whether shadow shows behind layer |
 
 **Rendering Steps**:
@@ -865,7 +866,7 @@ Draws an inner shadow **above** the layer, appearing inside the layer content. C
 | `offsetY` | float | 0 | Y offset |
 | `blurX` | float | 0 | X blur radius |
 | `blurY` | float | 0 | Y blur radius |
-| `color` | color | #000000 | Shadow color |
+| `color` | Color | #000000 | Shadow color |
 
 **Rendering Steps**:
 1. Get opaque layer content and offset by `(offsetX, offsetY)`
@@ -909,7 +910,7 @@ Generates shadow effect based on filter input. Unlike DropShadowStyle, the filte
 | `offsetY` | float | 0 | Y offset |
 | `blurX` | float | 0 | X blur radius |
 | `blurY` | float | 0 | Y blur radius |
-| `color` | color | #000000 | Shadow color |
+| `color` | Color | #000000 | Shadow color |
 | `shadowOnly` | bool | false | Show shadow only |
 
 **Rendering Steps**:
@@ -928,7 +929,7 @@ Draws shadow inside the filter input.
 | `offsetY` | float | 0 | Y offset |
 | `blurX` | float | 0 | X blur radius |
 | `blurY` | float | 0 | Y blur radius |
-| `color` | color | #000000 | Shadow color |
+| `color` | Color | #000000 | Shadow color |
 | `shadowOnly` | bool | false | Show shadow only |
 
 **Rendering Steps**:
@@ -943,7 +944,7 @@ Overlays a specified color onto the layer using a specified blend mode.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `color` | color | (required) | Blend color |
+| `color` | Color | (required) | Blend color |
 | `blendMode` | BlendMode | normal | Blend mode (see Section 4.1) |
 
 #### 4.4.5 ColorMatrixFilter
@@ -952,7 +953,7 @@ Transforms colors using a 4×5 color matrix.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `matrix` | string | (required) | 4x5 color matrix (20 comma-separated floats) |
+| `matrix` | Matrix | (required) | 4x5 color matrix (20 comma-separated floats) |
 
 **Matrix Format** (20 values, row-major):
 ```
@@ -1084,8 +1085,8 @@ Rectangles are defined from center point with uniform corner rounding support.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | point | 0,0 | Center point |
-| `size` | size | 100,100 | Dimensions "width,height" |
+| `center` | Point | 0,0 | Center point |
+| `size` | Size | 100,100 | Dimensions "width,height" |
 | `roundness` | float | 0 | Corner radius |
 | `reversed` | bool | false | Reverse path direction |
 
@@ -1113,8 +1114,8 @@ Ellipses are defined from center point.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | point | 0,0 | Center point |
-| `size` | size | 100,100 | Dimensions "width,height" |
+| `center` | Point | 0,0 | Center point |
+| `size` | Size | 100,100 | Dimensions "width,height" |
 | `reversed` | bool | false | Reverse path direction |
 
 **Calculation Rules**:
@@ -1137,7 +1138,7 @@ Supports both regular polygon and star modes.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | point | 0,0 | Center point |
+| `center` | Point | 0,0 | Center point |
 | `type` | PolystarType | star | Type (see below) |
 | `pointCount` | float | 5 | Number of points (supports decimals) |
 | `outerRadius` | float | 100 | Outer radius |
@@ -1208,7 +1209,7 @@ Text elements provide geometric shapes for text content. Unlike shape elements t
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `text` | string | "" | Text content |
-| `position` | point | 0,0 | Text start position, y is baseline (may be overridden by TextLayout) |
+| `position` | Point | 0,0 | Text start position, y is baseline (may be overridden by TextLayout) |
 | `fontFamily` | string | system default | Font family |
 | `fontStyle` | string | "Regular" | Font variant (Regular, Bold, Italic, Bold Italic, etc.) |
 | `fontSize` | float | 12 | Font size |
@@ -1251,73 +1252,138 @@ GlyphRun defines pre-layout data for a group of glyphs, each GlyphRun independen
 | `font` | idref | (required) | Font resource reference `@id` |
 | `fontSize` | float | 12 | Rendering font size. Actual scale = `fontSize / font.unitsPerEm` |
 | `glyphs` | string | (required) | GlyphID sequence, comma-separated (0 means missing glyph) |
-| `y` | float | 0 | Shared y coordinate (Horizontal mode only) |
-| `xPositions` | string | - | x coordinate sequence, comma-separated (Horizontal mode) |
-| `positions` | string | - | (x,y) coordinate sequence, semicolon-separated (Point mode) |
-| `xforms` | string | - | RSXform sequence (scos,ssin,tx,ty), semicolon-separated (RSXform mode) |
-| `matrices` | string | - | Matrix sequence (a,b,c,d,tx,ty), semicolon-separated (Matrix mode) |
+| `x` | float | 0 | Overall X offset |
+| `y` | float | 0 | Overall Y offset |
+| `xOffsets` | string | - | Per-glyph X offset, comma-separated |
+| `positions` | string | - | Per-glyph (x,y) offset, semicolon-separated |
+| `anchors` | string | - | Per-glyph anchor offset (x,y), semicolon-separated. The anchor is the center point for scale, rotation, and skew transforms. Default anchor is (advance×0.5, 0) |
+| `scales` | string | - | Per-glyph scale (sx,sy), semicolon-separated. Scaling is applied around the anchor point. Default 1,1 |
+| `rotations` | string | - | Per-glyph rotation angle (degrees), comma-separated. Rotation is applied around the anchor point. Default 0 |
+| `skews` | string | - | Per-glyph skew angle (degrees), comma-separated. Skewing is applied around the anchor point. Default 0 |
 
-**Positioning Mode Selection** (priority from high to low):
-1. Has `matrices` → Matrix mode: Each glyph has full 2D affine transform
-2. Has `xforms` → RSXform mode: Each glyph has rotation+scale+translation (path text)
-3. Has `positions` → Point mode: Each glyph has independent (x,y) position (multi-line/complex layout)
-4. Has `xPositions` → Horizontal mode: Each glyph has x coordinate, sharing `y` value (single-line horizontal text)
-5. Only `glyphs` → Not supported; position data must be provided
+All attributes are optional and can be combined. When an attribute array is shorter than the glyph count, missing values use defaults.
 
-**RSXform**:
-RSXform is a compressed rotation+scale matrix with four components (scos, ssin, tx, ty):
-```
-| scos  -ssin   tx |
-| ssin   scos   ty |
-|   0      0     1 |
-```
-Where scos = scale × cos(angle), ssin = scale × sin(angle).
+**Position Calculation**:
 
-**Matrix**:
-Matrix is a full 2D affine transformation matrix with six components (a, b, c, d, tx, ty):
 ```
-|  a   c   tx |
-|  b   d   ty |
-|  0   0    1 |
+finalX[i] = x + xOffsets[i] + positions[i].x
+finalY[i] = y + positions[i].y
 ```
+
+- When `xOffsets` is not specified, `xOffsets[i]` is treated as 0
+- When `positions` is not specified, `positions[i]` is treated as (0, 0)
+- When neither `xOffsets` nor `positions` is specified: First glyph positioned at (x, y), subsequent glyphs positioned by accumulating each Glyph's `advance` attribute
+
+**Transform Application Order**:
+
+When a glyph has scale, rotation, or skew transforms, they are applied in the following order (consistent with TextModifier):
+
+1. Translate to anchor (`translate(-anchor)`)
+2. Scale (`scale`)
+3. Skew (`skew`, along vertical axis)
+4. Rotate (`rotation`)
+5. Translate back from anchor (`translate(anchor)`)
+6. Translate to position (`translate(position)`)
+
+**Anchor**:
+
+- Each glyph's **default anchor** is at `(advance × 0.5, 0)`, the horizontal center at baseline
+- The `anchors` attribute records offsets relative to the default anchor, final anchor = default anchor + anchors[i]
 
 **Pre-layout Examples**:
 
 ```xml
-<Resources>
-  <!-- Embedded font: contains glyphs for H, e, l, o -->
-  <Font id="myFont" unitsPerEm="1000">
-    <Glyph path="M 0 0 L 0 700 M 0 350 L 400 350 M 400 0 L 400 700"/>
-    <Glyph path="M 50 250 C 50 450 350 450 350 250 C 350 50 50 50 50 250 Z"/>
-    <Glyph path="M 100 0 L 100 700 L 350 700"/>
-    <Glyph path="M 200 350 C 200 550 0 550 0 350 C 0 150 200 150 200 350 Z"/>
-  </Font>
-</Resources>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="200">
+  <Resources>
+    <!-- Embedded font: contains glyphs for H, e, l, o -->
+    <Font id="myFont" unitsPerEm="1000">
+      <Glyph path="M 0 0 L 0 700 M 0 350 L 400 350 M 400 0 L 400 700" advance="500"/>
+      <Glyph path="M 50 250 C 50 450 350 450 350 250 C 350 50 50 50 50 250 Z" advance="400"/>
+      <Glyph path="M 100 0 L 100 700 L 350 700" advance="350"/>
+      <Glyph path="M 200 350 C 200 550 0 550 0 350 C 0 150 200 150 200 350 Z" advance="400"/>
+    </Font>
+  </Resources>
 
-<Layer>
-  <!-- Pre-layout text "Hello": Horizontal mode (single-line horizontal text) -->
-  <Text fontFamily="Arial" fontSize="24">
-    <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" y="100" xPositions="0,30,55,70,85"/>
-  </Text>
-  <Fill color="#333333"/>
-</Layer>
+  <!-- Example 1: Basic usage (sequentially accumulating advance) -->
+  <Layer>
+    <Text fontFamily="Arial" fontSize="24">
+      <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" x="20" y="50"/>
+    </Text>
+    <Fill color="#333333"/>
+  </Layer>
 
-<Layer>
-  <!-- Pre-layout text: Point mode (multi-line text) -->
-  <Text fontFamily="Arial" fontSize="24">
-    <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" positions="0,50;30,50;55,50;0,100;30,100"/>
-  </Text>
-  <Fill color="#333333"/>
-</Layer>
+  <!-- Example 2: Custom X offsets for single-line horizontal text -->
+  <Layer>
+    <Text fontFamily="Arial" fontSize="24">
+      <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" 
+                y="100" xOffsets="20,50,75,90,105"/>
+    </Text>
+    <Fill color="#333333"/>
+  </Layer>
 
-<Layer>
-  <!-- Pre-layout text: RSXform mode (path text, each glyph rotated) -->
-  <Text fontFamily="Arial" fontSize="24">
-    <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" 
-              xforms="1,0,0,50;0.98,0.17,30,48;0.94,0.34,60,42;0.87,0.5,90,32;0.77,0.64,120,18"/>
-  </Text>
-  <Fill color="#333333"/>
-</Layer>
+  <!-- Example 3: Free positioning for multi-line text -->
+  <Layer>
+    <Text fontFamily="Arial" fontSize="24">
+      <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" 
+                positions="20,150;50,150;75,150;20,180;50,180"/>
+    </Text>
+    <Fill color="#333333"/>
+  </Layer>
+</pagx>
+```
+
+**Pre-layout Example with Transforms** (path text scenario):
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="150">
+  <Resources>
+    <Font id="myFont" unitsPerEm="1000">
+      <Glyph path="M 0 0 L 0 700 M 0 350 L 400 350 M 400 0 L 400 700" advance="500"/>
+      <Glyph path="M 50 250 C 50 450 350 450 350 250 C 350 50 50 50 50 250 Z" advance="400"/>
+      <Glyph path="M 100 0 L 100 700 L 350 700" advance="350"/>
+      <Glyph path="M 200 350 C 200 550 0 550 0 350 C 0 150 200 150 200 350 Z" advance="400"/>
+    </Font>
+  </Resources>
+
+  <Layer>
+    <!-- Text arranged along an arc: each glyph has different position and rotation -->
+    <Text fontFamily="Arial" fontSize="24">
+      <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4"
+                positions="30,100;70,80;120,70;170,80;210,100"
+                rotations="-30,-15,0,15,30"/>
+    </Text>
+    <Fill color="#3366FF"/>
+  </Layer>
+</pagx>
+```
+
+**Example with Scale and Skew**:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="100">
+  <Resources>
+    <Font id="myFont" unitsPerEm="1000">
+      <Glyph path="M 0 0 L 0 700 M 0 350 L 400 350 M 400 0 L 400 700" advance="500"/>
+      <Glyph path="M 50 250 C 50 450 350 450 350 250 C 350 50 50 50 50 250 Z" advance="400"/>
+      <Glyph path="M 100 0 L 100 700 L 350 700" advance="350"/>
+      <Glyph path="M 200 350 C 200 550 0 550 0 350 C 0 150 200 150 200 350 Z" advance="400"/>
+    </Font>
+  </Resources>
+
+  <Layer>
+    <!-- Text with scale and skew effects -->
+    <Text fontFamily="Arial" fontSize="24">
+      <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4"
+                y="50" xOffsets="20,55,95,125,160"
+                scales="1,1;1.2,1.2;1.5,1.5;1.2,1.2;1,1"
+                skews="0,5,10,5,0"/>
+    </Text>
+    <Fill color="#FF6600"/>
+  </Layer>
+</pagx>
 ```
 
 ### 5.3 Painters
@@ -1361,7 +1427,7 @@ Fill draws the interior region of geometry using a specified color source.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `color` | color/idref | #000000 | Color value or color source reference, default black |
+| `color` | Color/idref | #000000 | Color value or color source reference, default black |
 | `alpha` | float | 1 | Opacity 0~1 |
 | `blendMode` | BlendMode | normal | Blend mode (see Section 4.1) |
 | `fillRule` | FillRule | winding | Fill rule (see below) |
@@ -1413,7 +1479,7 @@ Stroke draws lines along geometry boundaries.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `color` | color/idref | #000000 | Color value or color source reference, default black |
+| `color` | Color/idref | #000000 | Color value or color source reference, default black |
 | `width` | float | 1 | Stroke width |
 | `alpha` | float | 1 | Opacity 0~1 |
 | `blendMode` | BlendMode | normal | Blend mode (see Section 4.1) |
@@ -1644,7 +1710,7 @@ Text Element           Shape Modifier          Subsequent Modifiers
 Applies transforms and style overrides to glyphs within selected ranges. TextModifier may contain multiple RangeSelector child elements.
 
 ```xml
-<TextModifier anchorPoint="0,0" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1" fillColor="#FF0000" strokeColor="#000000" strokeWidth="1">
+<TextModifier anchor="0,0" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1" fillColor="#FF0000" strokeColor="#000000" strokeWidth="1">
   <RangeSelector start="0" end="0.5" shape="rampUp"/>
   <RangeSelector start="0.5" end="1" shape="rampDown"/>
 </TextModifier>
@@ -1652,15 +1718,15 @@ Applies transforms and style overrides to glyphs within selected ranges. TextMod
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `anchorPoint` | point | 0,0 | Anchor point offset |
-| `position` | point | 0,0 | Position offset |
+| `anchor` | Point | 0,0 | Anchor point offset, relative to glyph's default anchor position. Each glyph's default anchor is at `(advance × 0.5, 0)`, the horizontal center at baseline |
+| `position` | Point | 0,0 | Position offset |
 | `rotation` | float | 0 | Rotation |
-| `scale` | point | 1,1 | Scale |
+| `scale` | Point | 1,1 | Scale |
 | `skew` | float | 0 | Skew |
 | `skewAxis` | float | 0 | Skew axis |
 | `alpha` | float | 1 | Opacity |
-| `fillColor` | color | - | Fill color override |
-| `strokeColor` | color | - | Stroke color override |
+| `fillColor` | Color | - | Fill color override |
+| `strokeColor` | Color | - | Stroke color override |
 | `strokeWidth` | float | - | Stroke width override |
 
 **Selector Calculation**:
@@ -1676,11 +1742,11 @@ The `factor` calculated by the selector ranges from [-1, 1] and controls the deg
 factor = clamp(selectorFactor × weight, -1, 1)
 
 // Position and rotation: apply factor linearly
-transform = translate(-anchorPoint × factor) 
+transform = translate(-anchor × factor) 
           × scale(1 + (scale - 1) × factor)  // Scale interpolates from 1 to target value
           × skew(skew × factor, skewAxis)
           × rotate(rotation × factor)
-          × translate(anchorPoint × factor)
+          × translate(anchor × factor)
           × translate(position × factor)
 
 // Opacity: use absolute value of factor
@@ -1821,7 +1887,7 @@ During rendering, an attached text typesetting module performs pre-layout, recal
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `position` | point | 0,0 | Layout origin |
+| `position` | Point | 0,0 | Layout origin |
 | `width` | float | auto | Layout width (auto-wraps when specified) |
 | `height` | float | auto | Layout height (enables vertical alignment when specified) |
 | `textAlign` | TextAlign | start | Horizontal alignment |
@@ -1889,7 +1955,7 @@ Rich text is achieved through multiple Text elements within a Group, each Text h
 Repeater duplicates accumulated content and rendered styles, applying progressive transforms to each copy. Repeater affects both Paths and glyph lists simultaneously, and does not trigger text-to-shape conversion.
 
 ```xml
-<Repeater copies="5" offset="1" order="belowOriginal" anchorPoint="0,0" position="50,0" rotation="0" scale="1,1" startAlpha="1" endAlpha="0.2"/>
+<Repeater copies="5" offset="1" order="belowOriginal" anchor="0,0" position="50,0" rotation="0" scale="1,1" startAlpha="1" endAlpha="0.2"/>
 ```
 
 | Attribute | Type | Default | Description |
@@ -1897,21 +1963,21 @@ Repeater duplicates accumulated content and rendered styles, applying progressiv
 | `copies` | float | 3 | Number of copies |
 | `offset` | float | 0 | Start offset |
 | `order` | RepeaterOrder | belowOriginal | Stacking order |
-| `anchorPoint` | point | 0,0 | Anchor point |
-| `position` | point | 100,100 | Position offset per copy |
+| `anchor` | Point | 0,0 | Anchor point |
+| `position` | Point | 100,100 | Position offset per copy |
 | `rotation` | float | 0 | Rotation per copy |
-| `scale` | point | 1,1 | Scale per copy |
+| `scale` | Point | 1,1 | Scale per copy |
 | `startAlpha` | float | 1 | First copy opacity |
 | `endAlpha` | float | 1 | Last copy opacity |
 
 **Transform Calculation** (i-th copy, i starts from 0):
 ```
 progress = i + offset
-matrix = translate(-anchorPoint) 
+matrix = translate(-anchor) 
        × scale(scale^progress)      // Exponential scaling
        × rotate(rotation × progress) // Linear rotation
        × translate(position × progress) // Linear translation
-       × translate(anchorPoint)
+       × translate(anchor)
 ```
 
 **Opacity Interpolation**:
@@ -1970,7 +2036,7 @@ Group is a VectorElement container with transform properties.
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="200" height="200">
   <Layer>
-    <Group anchorPoint="50,50" position="100,100" rotation="45" scale="1,1" alpha="0.8">
+    <Group anchor="50,50" position="100,100" rotation="45" scale="1,1" alpha="0.8">
       <Rectangle center="50,50" size="80,80"/>
       <Fill color="#FF6600"/>
     </Group>
@@ -1980,10 +2046,10 @@ Group is a VectorElement container with transform properties.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `anchorPoint` | point | 0,0 | Anchor point "x,y" |
-| `position` | point | 0,0 | Position "x,y" |
+| `anchor` | Point | 0,0 | Anchor point "x,y" |
+| `position` | Point | 0,0 | Position "x,y" |
 | `rotation` | float | 0 | Rotation angle |
-| `scale` | point | 1,1 | Scale "sx,sy" |
+| `scale` | Point | 1,1 | Scale "sx,sy" |
 | `skew` | float | 0 | Skew amount |
 | `skewAxis` | float | 0 | Skew axis angle |
 | `alpha` | float | 1 | Opacity 0~1 |
@@ -1992,7 +2058,7 @@ Group is a VectorElement container with transform properties.
 
 Transforms are applied in the following order:
 
-1. Translate to negative anchor point (`translate(-anchorPoint)`)
+1. Translate to negative anchor point (`translate(-anchor)`)
 2. Scale (`scale`)
 3. Skew (`skew` along `skewAxis` direction)
 4. Rotate (`rotation`)
@@ -2000,7 +2066,7 @@ Transforms are applied in the following order:
 
 **Transform Matrix**:
 ```
-M = translate(position) × rotate(rotation) × skew(skew, skewAxis) × scale(scale) × translate(-anchorPoint)
+M = translate(position) × rotate(rotation) × skew(skew, skewAxis) × scale(scale) × translate(-anchor)
 ```
 
 **Skew Transform**:
@@ -2330,7 +2396,7 @@ The following example covers all major node types in PAGX, demonstrating complet
     <Group position="580,0">
       <Ellipse center="25,0" size="10,10"/>
       <Fill color="@cyan"/>
-      <Repeater copies="8" rotation="45" anchorPoint="0,0" startAlpha="1" endAlpha="0.15"/>
+      <Repeater copies="8" rotation="45" anchor="0,0" startAlpha="1" endAlpha="0.15"/>
     </Group>
     
     <!-- Mask Example -->
@@ -2551,23 +2617,24 @@ Child elements: `Glyph`*
 
 | Attribute | Type | Default |
 |-----------|------|---------|
+| `advance` | float | (required) |
 | `path` | string | - |
 | `image` | string | - |
-| `offset` | point | 0,0 |
+| `offset` | Point | 0,0 |
 
 #### SolidColor
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `color` | color | (required) |
+| `color` | Color | (required) |
 
 #### LinearGradient
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `startPoint` | point | (required) |
-| `endPoint` | point | (required) |
-| `matrix` | string | identity matrix |
+| `startPoint` | Point | (required) |
+| `endPoint` | Point | (required) |
+| `matrix` | Matrix | identity matrix |
 
 Child elements: `ColorStop`+
 
@@ -2575,9 +2642,9 @@ Child elements: `ColorStop`+
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `center` | point | 0,0 |
+| `center` | Point | 0,0 |
 | `radius` | float | (required) |
-| `matrix` | string | identity matrix |
+| `matrix` | Matrix | identity matrix |
 
 Child elements: `ColorStop`+
 
@@ -2585,10 +2652,10 @@ Child elements: `ColorStop`+
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `center` | point | 0,0 |
+| `center` | Point | 0,0 |
 | `startAngle` | float | 0 |
 | `endAngle` | float | 360 |
-| `matrix` | string | identity matrix |
+| `matrix` | Matrix | identity matrix |
 
 Child elements: `ColorStop`+
 
@@ -2596,9 +2663,9 @@ Child elements: `ColorStop`+
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `center` | point | 0,0 |
+| `center` | Point | 0,0 |
 | `radius` | float | (required) |
-| `matrix` | string | identity matrix |
+| `matrix` | Matrix | identity matrix |
 
 Child elements: `ColorStop`+
 
@@ -2607,7 +2674,7 @@ Child elements: `ColorStop`+
 | Attribute | Type | Default |
 |-----------|------|---------|
 | `offset` | float | (required) |
-| `color` | color | (required) |
+| `color` | Color | (required) |
 
 #### ImagePattern
 
@@ -2618,7 +2685,7 @@ Child elements: `ColorStop`+
 | `tileModeY` | TileMode | clamp |
 | `filterMode` | FilterMode | linear |
 | `mipmapMode` | MipmapMode | linear |
-| `matrix` | string | identity matrix |
+| `matrix` | Matrix | identity matrix |
 
 ### C.3 Layer Node
 
@@ -2632,14 +2699,14 @@ Child elements: `ColorStop`+
 | `blendMode` | BlendMode | normal |
 | `x` | float | 0 |
 | `y` | float | 0 |
-| `matrix` | string | identity matrix |
-| `matrix3D` | string | - |
+| `matrix` | Matrix | identity matrix |
+| `matrix3D` | Matrix | - |
 | `preserve3D` | bool | false |
 | `antiAlias` | bool | true |
 | `groupOpacity` | bool | false |
 | `passThroughBackground` | bool | true |
 | `excludeChildEffectsInLayerStyle` | bool | false |
-| `scrollRect` | string | - |
+| `scrollRect` | Rect | - |
 | `mask` | idref | - |
 | `maskType` | MaskType | alpha |
 | `composition` | idref | - |
@@ -2656,7 +2723,7 @@ Child elements: `VectorElement`*, `LayerStyle`*, `LayerFilter`*, `Layer`* (autom
 | `offsetY` | float | 0 |
 | `blurX` | float | 0 |
 | `blurY` | float | 0 |
-| `color` | color | #000000 |
+| `color` | Color | #000000 |
 | `showBehindLayer` | bool | true |
 | `blendMode` | BlendMode | normal |
 
@@ -2668,7 +2735,7 @@ Child elements: `VectorElement`*, `LayerStyle`*, `LayerFilter`*, `Layer`* (autom
 | `offsetY` | float | 0 |
 | `blurX` | float | 0 |
 | `blurY` | float | 0 |
-| `color` | color | #000000 |
+| `color` | Color | #000000 |
 | `blendMode` | BlendMode | normal |
 
 #### BackgroundBlurStyle
@@ -2698,7 +2765,7 @@ Child elements: `VectorElement`*, `LayerStyle`*, `LayerFilter`*, `Layer`* (autom
 | `offsetY` | float | 0 |
 | `blurX` | float | 0 |
 | `blurY` | float | 0 |
-| `color` | color | #000000 |
+| `color` | Color | #000000 |
 | `shadowOnly` | bool | false |
 
 #### InnerShadowFilter
@@ -2709,21 +2776,21 @@ Child elements: `VectorElement`*, `LayerStyle`*, `LayerFilter`*, `Layer`* (autom
 | `offsetY` | float | 0 |
 | `blurX` | float | 0 |
 | `blurY` | float | 0 |
-| `color` | color | #000000 |
+| `color` | Color | #000000 |
 | `shadowOnly` | bool | false |
 
 #### BlendFilter
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `color` | color | (required) |
+| `color` | Color | (required) |
 | `blendMode` | BlendMode | normal |
 
 #### ColorMatrixFilter
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `matrix` | string | (required) |
+| `matrix` | Matrix | (required) |
 
 ### C.6 Geometry Element Nodes
 
@@ -2731,8 +2798,8 @@ Child elements: `VectorElement`*, `LayerStyle`*, `LayerFilter`*, `Layer`* (autom
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `center` | point | 0,0 |
-| `size` | size | 100,100 |
+| `center` | Point | 0,0 |
+| `size` | Size | 100,100 |
 | `roundness` | float | 0 |
 | `reversed` | bool | false |
 
@@ -2740,15 +2807,15 @@ Child elements: `VectorElement`*, `LayerStyle`*, `LayerFilter`*, `Layer`* (autom
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `center` | point | 0,0 |
-| `size` | size | 100,100 |
+| `center` | Point | 0,0 |
+| `size` | Size | 100,100 |
 | `reversed` | bool | false |
 
 #### Polystar
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `center` | point | 0,0 |
+| `center` | Point | 0,0 |
 | `type` | PolystarType | star |
 | `pointCount` | float | 5 |
 | `outerRadius` | float | 100 |
@@ -2770,7 +2837,7 @@ Child elements: `VectorElement`*, `LayerStyle`*, `LayerFilter`*, `Layer`* (autom
 | Attribute | Type | Default |
 |-----------|------|---------|
 | `text` | string | "" |
-| `position` | point | 0,0 |
+| `position` | Point | 0,0 |
 | `fontFamily` | string | system default |
 | `fontStyle` | string | "Regular" |
 | `fontSize` | float | 12 |
@@ -2786,11 +2853,14 @@ Child elements: `CDATA` text, `GlyphRun`*
 | `font` | idref | (required) |
 | `fontSize` | float | 12 |
 | `glyphs` | string | (required) |
+| `x` | float | 0 |
 | `y` | float | 0 |
-| `xPositions` | string | - |
+| `xOffsets` | string | - |
 | `positions` | string | - |
-| `xforms` | string | - |
-| `matrices` | string | - |
+| `anchors` | string | - |
+| `scales` | string | - |
+| `rotations` | string | - |
+| `skews` | string | - |
 
 ### C.7 Painter Nodes
 
@@ -2798,7 +2868,7 @@ Child elements: `CDATA` text, `GlyphRun`*
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `color` | color/idref | #000000 |
+| `color` | Color/idref | #000000 |
 | `alpha` | float | 1 |
 | `blendMode` | BlendMode | normal |
 | `fillRule` | FillRule | winding |
@@ -2808,7 +2878,7 @@ Child elements: `CDATA` text, `GlyphRun`*
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `color` | color/idref | #000000 |
+| `color` | Color/idref | #000000 |
 | `width` | float | 1 |
 | `alpha` | float | 1 |
 | `blendMode` | BlendMode | normal |
@@ -2849,15 +2919,15 @@ Child elements: `CDATA` text, `GlyphRun`*
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `anchorPoint` | point | 0,0 |
-| `position` | point | 0,0 |
+| `anchor` | Point | 0,0 |
+| `position` | Point | 0,0 |
 | `rotation` | float | 0 |
-| `scale` | point | 1,1 |
+| `scale` | Point | 1,1 |
 | `skew` | float | 0 |
 | `skewAxis` | float | 0 |
 | `alpha` | float | 1 |
-| `fillColor` | color | - |
-| `strokeColor` | color | - |
+| `fillColor` | Color | - |
+| `strokeColor` | Color | - |
 | `strokeWidth` | float | - |
 
 Child elements: `RangeSelector`*
@@ -2893,7 +2963,7 @@ Child elements: `RangeSelector`*
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `position` | point | 0,0 |
+| `position` | Point | 0,0 |
 | `width` | float | auto |
 | `height` | float | auto |
 | `textAlign` | TextAlign | start |
@@ -2910,10 +2980,10 @@ Child elements: `RangeSelector`*
 | `copies` | float | 3 |
 | `offset` | float | 0 |
 | `order` | RepeaterOrder | belowOriginal |
-| `anchorPoint` | point | 0,0 |
-| `position` | point | 100,100 |
+| `anchor` | Point | 0,0 |
+| `position` | Point | 100,100 |
 | `rotation` | float | 0 |
-| `scale` | point | 1,1 |
+| `scale` | Point | 1,1 |
 | `startAlpha` | float | 1 |
 | `endAlpha` | float | 1 |
 
@@ -2921,10 +2991,10 @@ Child elements: `RangeSelector`*
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `anchorPoint` | point | 0,0 |
-| `position` | point | 0,0 |
+| `anchor` | Point | 0,0 |
+| `position` | Point | 0,0 |
 | `rotation` | float | 0 |
-| `scale` | point | 1,1 |
+| `scale` | Point | 1,1 |
 | `skew` | float | 0 |
 | `skewAxis` | float | 0 |
 | `alpha` | float | 1 |

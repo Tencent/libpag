@@ -139,8 +139,8 @@ if (-not $?) {
     Write-Host "Build H264EncoderTools-x64 failed" -ForegroundColor Red
     exit 1
 }
-& $VSDevEnv $EncoderToolsSlnPath /Rebuild "Release|x64"
-if (-not $?) {
+$process = Start-Process -FilePath $VSDevEnv -ArgumentList "`"$EncoderToolsSlnPath`" /Rebuild `"Release|x64`"" -Wait -PassThru
+if ($process.ExitCode -ne 0) {
     Write-Host "Build H264EncoderTools-x64 failed" -ForegroundColor Red
     exit 1
 }
@@ -179,6 +179,10 @@ Copy-Item -Path $LibFfaudioPath -Destination $ExeDir -Force
 $GeneratedEncorderToolsPath = Join-Path $EncoderToolsSourceDir -ChildPath "x64" |
                               Join-Path -ChildPath "Release" |
                               Join-Path -ChildPath "H264EncoderTools.exe"
+if (-not (Test-Path $GeneratedEncorderToolsPath)) {
+    Write-Host "H264EncoderTools.exe not found at $GeneratedEncorderToolsPath" -ForegroundColor Red
+    exit 1
+}
 Copy-Item -Path $GeneratedEncorderToolsPath -Destination $ExeDir -Force
 
 # 3.3 Copy symbol files

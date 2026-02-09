@@ -492,35 +492,17 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
             xml.addRequiredAttribute("glyphs", glyphsStr);
           }
 
-          // Determine positioning mode
-          if (!run->matrices.empty()) {
-            // Matrix mode: semicolon-separated groups of 6 values
-            std::string matStr = {};
-            char buf[32] = {};
-            for (size_t i = 0; i < run->matrices.size(); i++) {
-              if (i > 0) {
-                matStr += ";";
-              }
-              const auto& m = run->matrices[i];
-              snprintf(buf, sizeof(buf), "%g,%g,%g,%g,%g,%g", m.a, m.b, m.c, m.d, m.tx, m.ty);
-              matStr += buf;
-            }
-            xml.addRequiredAttribute("matrices", matStr);
-          } else if (!run->xforms.empty()) {
-            // RSXform mode: semicolon-separated groups of 4 values
-            std::string xformsStr = {};
-            char buf[64] = {};
-            for (size_t i = 0; i < run->xforms.size(); i++) {
-              if (i > 0) {
-                xformsStr += ";";
-              }
-              const auto& x = run->xforms[i];
-              snprintf(buf, sizeof(buf), "%g,%g,%g,%g", x.scos, x.ssin, x.tx, x.ty);
-              xformsStr += buf;
-            }
-            xml.addRequiredAttribute("xforms", xformsStr);
-          } else if (!run->positions.empty()) {
-            // Point mode: semicolon-separated x,y pairs
+          // Write x/y overall offsets (only if non-zero)
+          xml.addAttribute("x", run->x, 0.0f);
+          xml.addAttribute("y", run->y, 0.0f);
+
+          // Write xOffsets (comma-separated)
+          if (!run->xOffsets.empty()) {
+            xml.addRequiredAttribute("xOffsets", floatListToString(run->xOffsets));
+          }
+
+          // Write positions (semicolon-separated x,y pairs)
+          if (!run->positions.empty()) {
             std::string posStr = {};
             char buf[32] = {};
             for (size_t i = 0; i < run->positions.size(); i++) {
@@ -531,10 +513,44 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
               posStr += buf;
             }
             xml.addRequiredAttribute("positions", posStr);
-          } else if (!run->xPositions.empty()) {
-            // Horizontal mode
-            xml.addAttribute("y", run->y);
-            xml.addRequiredAttribute("xPositions", floatListToString(run->xPositions));
+          }
+
+          // Write anchors (semicolon-separated x,y pairs)
+          if (!run->anchors.empty()) {
+            std::string anchorsStr = {};
+            char buf[32] = {};
+            for (size_t i = 0; i < run->anchors.size(); i++) {
+              if (i > 0) {
+                anchorsStr += ";";
+              }
+              snprintf(buf, sizeof(buf), "%g,%g", run->anchors[i].x, run->anchors[i].y);
+              anchorsStr += buf;
+            }
+            xml.addRequiredAttribute("anchors", anchorsStr);
+          }
+
+          // Write scales (semicolon-separated sx,sy pairs)
+          if (!run->scales.empty()) {
+            std::string scalesStr = {};
+            char buf[32] = {};
+            for (size_t i = 0; i < run->scales.size(); i++) {
+              if (i > 0) {
+                scalesStr += ";";
+              }
+              snprintf(buf, sizeof(buf), "%g,%g", run->scales[i].x, run->scales[i].y);
+              scalesStr += buf;
+            }
+            xml.addRequiredAttribute("scales", scalesStr);
+          }
+
+          // Write rotations (comma-separated angles in degrees)
+          if (!run->rotations.empty()) {
+            xml.addRequiredAttribute("rotations", floatListToString(run->rotations));
+          }
+
+          // Write skews (comma-separated angles in degrees)
+          if (!run->skews.empty()) {
+            xml.addRequiredAttribute("skews", floatListToString(run->skews));
           }
 
           xml.closeElementSelfClosing();
@@ -662,8 +678,8 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::TextModifier: {
       auto modifier = static_cast<const TextModifier*>(node);
       xml.openElement("TextModifier");
-      if (modifier->anchorPoint.x != 0 || modifier->anchorPoint.y != 0) {
-        xml.addAttribute("anchorPoint", pointToString(modifier->anchorPoint));
+      if (modifier->anchor.x != 0 || modifier->anchor.y != 0) {
+        xml.addAttribute("anchor", pointToString(modifier->anchor));
       }
       if (modifier->position.x != 0 || modifier->position.y != 0) {
         xml.addAttribute("position", pointToString(modifier->position));
@@ -766,8 +782,8 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       if (repeater->order != RepeaterOrder::BelowOriginal) {
         xml.addAttribute("order", RepeaterOrderToString(repeater->order));
       }
-      if (repeater->anchorPoint.x != 0 || repeater->anchorPoint.y != 0) {
-        xml.addAttribute("anchorPoint", pointToString(repeater->anchorPoint));
+      if (repeater->anchor.x != 0 || repeater->anchor.y != 0) {
+        xml.addAttribute("anchor", pointToString(repeater->anchor));
       }
       if (repeater->position.x != 100 || repeater->position.y != 100) {
         xml.addAttribute("position", pointToString(repeater->position));
@@ -784,8 +800,8 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Group: {
       auto group = static_cast<const Group*>(node);
       xml.openElement("Group");
-      if (group->anchorPoint.x != 0 || group->anchorPoint.y != 0) {
-        xml.addAttribute("anchorPoint", pointToString(group->anchorPoint));
+      if (group->anchor.x != 0 || group->anchor.y != 0) {
+        xml.addAttribute("anchor", pointToString(group->anchor));
       }
       if (group->position.x != 0 || group->position.y != 0) {
         xml.addAttribute("position", pointToString(group->position));
@@ -1010,6 +1026,7 @@ static void writeResource(XMLBuilder& xml, const Node* node, const Options& opti
           if (glyph->offset.x != 0 || glyph->offset.y != 0) {
             xml.addAttribute("offset", pointToString(glyph->offset));
           }
+          xml.addRequiredAttribute("advance", glyph->advance);
           xml.closeElementSelfClosing();
         }
         xml.closeElement();

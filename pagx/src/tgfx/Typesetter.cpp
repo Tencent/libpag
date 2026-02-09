@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/Typesetter.h"
-#include <cmath>
 #include "Base64.h"
+#include "MathUtil.h"
 #include "SVGPathParser.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Font.h"
@@ -120,6 +120,8 @@ class TypesetterContext {
     tgfx::Font font = {};
     std::vector<tgfx::GlyphID> glyphIDs = {};
     std::vector<float> xPositions = {};
+    float startX = 0;
+    bool canUseDefaultMode = true;
   };
 
   // Shaped text information for a single Text element.
@@ -290,9 +292,15 @@ class TypesetterContext {
         continue;
       }
 
-      auto& buffer = builder.allocRunPosH(run.font, run.glyphIDs.size(), 0);
-      memcpy(buffer.glyphs, run.glyphIDs.data(), run.glyphIDs.size() * sizeof(tgfx::GlyphID));
-      memcpy(buffer.positions, run.xPositions.data(), run.xPositions.size() * sizeof(float));
+      if (run.canUseDefaultMode) {
+        // Default mode: use font's advance values to position glyphs, starting at run.startX
+        auto& buffer = builder.allocRun(run.font, run.glyphIDs.size(), run.startX, 0);
+        memcpy(buffer.glyphs, run.glyphIDs.data(), run.glyphIDs.size() * sizeof(tgfx::GlyphID));
+      } else {
+        auto& buffer = builder.allocRunPosH(run.font, run.glyphIDs.size(), 0);
+        memcpy(buffer.glyphs, run.glyphIDs.data(), run.glyphIDs.size() * sizeof(tgfx::GlyphID));
+        memcpy(buffer.positions, run.xPositions.data(), run.xPositions.size() * sizeof(float));
+      }
     }
 
     auto textBlob = builder.build();
@@ -324,39 +332,35 @@ class TypesetterContext {
       tgfx::Font font(typeface, fontSizeForTypeface);
       size_t count = run->glyphs.size();
 
-      // Determine positioning mode
-      if (!run->matrices.empty() && run->matrices.size() >= count) {
-        auto& buffer = builder.allocRunMatrix(font, count);
-        memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
-        auto* matrices = reinterpret_cast<float*>(buffer.positions);
-        for (size_t i = 0; i < count; i++) {
-          const auto& m = run->matrices[i];
-          matrices[i * 6 + 0] = m.a;
-          matrices[i * 6 + 1] = m.b;
-          matrices[i * 6 + 2] = m.c;
-          matrices[i * 6 + 3] = m.d;
-          matrices[i * 6 + 4] = m.tx;
-          matrices[i * 6 + 5] = m.ty;
-        }
-      } else if (!run->xforms.empty() && run->xforms.size() >= count) {
-        auto& buffer = builder.allocRunRSXform(font, count);
-        memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
-        auto* xforms = reinterpret_cast<tgfx::RSXform*>(buffer.positions);
-        for (size_t i = 0; i < count; i++) {
-          const auto& x = run->xforms[i];
-          xforms[i] = tgfx::RSXform::Make(x.scos, x.ssin, x.tx, x.ty);
-        }
-      } else if (!run->positions.empty() && run->positions.size() >= count) {
+      // Note: scales, rotations, skews, anchors are NOT processed here.
+      // These transform attributes should be handled by tgfx layer (similar to TextModifier).
+      // Typesetter only computes position information for TextBlob.
+
+      if (!run->positions.empty() && run->positions.size() >= count) {
+        // Point mode: each glyph has (x, y) offset combined with overall x/y
         auto& buffer = builder.allocRunPos(font, count);
         memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
         auto* positions = reinterpret_cast<tgfx::Point*>(buffer.positions);
         for (size_t i = 0; i < count; i++) {
-          positions[i] = tgfx::Point::Make(run->positions[i].x, run->positions[i].y);
+          float posX = run->x + run->positions[i].x;
+          float posY = run->y + run->positions[i].y;
+          if (i < run->xOffsets.size()) {
+            posX += run->xOffsets[i];
+          }
+          positions[i] = tgfx::Point::Make(posX, posY);
         }
-      } else if (!run->xPositions.empty() && run->xPositions.size() >= count) {
+      } else if (!run->xOffsets.empty() && run->xOffsets.size() >= count) {
+        // Horizontal mode: x offsets + shared y
         auto& buffer = builder.allocRunPosH(font, count, run->y);
         memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
-        memcpy(buffer.positions, run->xPositions.data(), count * sizeof(float));
+        for (size_t i = 0; i < count; i++) {
+          buffer.positions[i] = run->x + run->xOffsets[i];
+        }
+      } else {
+        // Default mode: use font's advance values to position glyphs
+        auto& buffer = builder.allocRun(font, count, run->x, run->y);
+        memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
+        // No positions to fill - tgfx will compute from font advances
       }
     }
 
@@ -394,7 +398,7 @@ class TypesetterContext {
           if (glyph->offset.x != 0 || glyph->offset.y != 0) {
             path.transform(tgfx::Matrix::MakeTrans(glyph->offset.x, glyph->offset.y));
           }
-          builder.addGlyph(path);
+          builder.addGlyph(path, glyph->advance);
         }
       }
       typeface = builder.detach();
@@ -423,7 +427,7 @@ class TypesetterContext {
           }
 
           if (codec) {
-            builder.addGlyph(codec, ToTGFXPoint(glyph->offset));
+            builder.addGlyph(codec, ToTGFXPoint(glyph->offset), glyph->advance);
           }
         }
       }
@@ -445,10 +449,12 @@ class TypesetterContext {
     tgfx::Font primaryFont(primaryTypeface, text->fontSize);
     float currentX = 0;
     const std::string& content = text->text;
+    bool hasLetterSpacing = !FloatNearlyEqual(text->letterSpacing, 0.0f);
 
     // Current run being built
     ShapedGlyphRun* currentRun = nullptr;
     std::shared_ptr<tgfx::Typeface> currentTypeface = nullptr;
+    float runStartX = 0;
 
     size_t i = 0;
     while (i < content.size()) {
@@ -523,6 +529,10 @@ class TypesetterContext {
           currentRun = &info.runs.back();
           currentRun->font = glyphFont;
           currentTypeface = glyphTypeface;
+          runStartX = currentX;
+          currentRun->startX = runStartX;
+          // Can use Default mode if no letterSpacing (positions follow advance values)
+          currentRun->canUseDefaultMode = !hasLetterSpacing;
         }
 
         currentRun->xPositions.push_back(currentX);

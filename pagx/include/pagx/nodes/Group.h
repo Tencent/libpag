@@ -35,7 +35,7 @@ class Group : public Element {
   /**
    * The anchor point for transformations.
    */
-  Point anchorPoint = {};
+  Point anchor = {};
 
   /**
    * The position offset of the group.

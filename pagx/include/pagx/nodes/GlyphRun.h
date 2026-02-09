@@ -21,25 +21,10 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include "pagx/types/Matrix.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Point.h"
 
 namespace pagx {
-
-/**
- * RSXform represents a compressed rotation+scale matrix with four components (scos, ssin, tx, ty):
- * | scos  -ssin   tx |
- * | ssin   scos   ty |
- * |   0      0     1 |
- * where scos = scale × cos(angle), ssin = scale × sin(angle).
- */
-struct RSXform {
-  float scos = 1.0f;
-  float ssin = 0.0f;
-  float tx = 0.0f;
-  float ty = 0.0f;
-};
 
 class Font;
 
@@ -65,29 +50,51 @@ class GlyphRun : public Node {
   std::vector<uint16_t> glyphs = {};
 
   /**
-   * Shared y coordinate for Horizontal positioning mode. The default value is 0.
+   * Overall X offset. The default value is 0.
+   */
+  float x = 0.0f;
+
+  /**
+   * Overall Y offset. The default value is 0.
    */
   float y = 0.0f;
 
   /**
-   * X coordinates for Horizontal positioning mode (each glyph has x, shares y).
+   * Per-glyph X offsets. Can be combined with positions.
+   * Final X = x + xOffsets[i] + positions[i].x
    */
-  std::vector<float> xPositions = {};
+  std::vector<float> xOffsets = {};
 
   /**
-   * (x, y) coordinates for Point positioning mode.
+   * Per-glyph (x, y) offsets. Can be combined with x, y, and xOffsets.
+   * Final X = x + xOffsets[i] + positions[i].x
+   * Final Y = y + positions[i].y
    */
   std::vector<Point> positions = {};
 
   /**
-   * RSXform transforms for RSXform positioning mode (path text).
+   * Per-glyph anchor point offsets relative to the default anchor (advance * 0.5, 0).
+   * The anchor is the center point for scale, rotation, and skew transforms.
    */
-  std::vector<RSXform> xforms = {};
+  std::vector<Point> anchors = {};
 
   /**
-   * Full 2D affine matrices for Matrix positioning mode.
+   * Per-glyph scale factors (scaleX, scaleY). Default is (1, 1).
+   * Scaling is applied around the anchor point.
    */
-  std::vector<Matrix> matrices = {};
+  std::vector<Point> scales = {};
+
+  /**
+   * Per-glyph rotation angles in degrees. Default is 0.
+   * Rotation is applied around the anchor point.
+   */
+  std::vector<float> rotations = {};
+
+  /**
+   * Per-glyph skew angles in degrees (along vertical axis). Default is 0.
+   * Skewing is applied around the anchor point.
+   */
+  std::vector<float> skews = {};
 
   NodeType nodeType() const override {
     return NodeType::GlyphRun;

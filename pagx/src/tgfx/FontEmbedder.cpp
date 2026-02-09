@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
+#include "../MathUtil.h"
 #include "SVGPathParser.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/Image.h"
@@ -32,7 +33,7 @@
 
 namespace pagx {
 
-static constexpr int kVectorFontUnitsPerEm = 1000;
+static constexpr int VectorFontUnitsPerEm = 1000;
 
 static std::string PathToSVGString(const tgfx::Path& path) {
   std::string result = {};
@@ -137,17 +138,21 @@ static void CollectVectorGlyph(PAGXDocument* document, const tgfx::Font& font,
     return;
   }
 
-  float scale = static_cast<float>(kVectorFontUnitsPerEm) / font.getSize();
+  float scale = static_cast<float>(VectorFontUnitsPerEm) / font.getSize();
   glyphPath.transform(tgfx::Matrix::MakeScale(scale, scale));
 
   if (builder.font == nullptr) {
     builder.font = document->makeNode<Font>();
-    builder.font->unitsPerEm = kVectorFontUnitsPerEm;
+    builder.font->unitsPerEm = VectorFontUnitsPerEm;
   }
 
   auto glyph = document->makeNode<Glyph>();
   glyph->path = document->makeNode<PathData>();
   *glyph->path = PathDataFromSVGString(PathToSVGString(glyphPath));
+
+  // Get advance in font size space and scale to unitsPerEm space
+  float advance = font.getAdvance(glyphID);
+  glyph->advance = advance * scale;
 
   builder.font->glyphs.push_back(glyph);
   builder.glyphMapping[key] = static_cast<tgfx::GlyphID>(builder.font->glyphs.size());
@@ -216,6 +221,10 @@ static void CollectBitmapGlyph(
   glyph->offset.x = imageMatrix.getTranslateX() / fontSize * backingSize;
   glyph->offset.y = imageMatrix.getTranslateY() / fontSize * backingSize;
 
+  // Get advance in font size space and scale to unitsPerEm (backingSize) space
+  float advance = font.getAdvance(glyphID);
+  glyph->advance = advance / fontSize * backingSize;
+
   builder.font->glyphs.push_back(glyph);
   builder.glyphMapping[key] = static_cast<tgfx::GlyphID>(builder.font->glyphs.size());
 }
@@ -223,6 +232,51 @@ static void CollectBitmapGlyph(
 static bool IsVectorGlyph(const tgfx::Font& font, tgfx::GlyphID glyphID) {
   tgfx::Path glyphPath = {};
   return font.getPath(glyphID, &glyphPath) && !glyphPath.isEmpty();
+}
+
+static bool CanUseDefaultMode(const tgfx::GlyphRun& run, const std::vector<size_t>& indices,
+                              Font* font,
+                              const std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash>& map,
+                              float fontSize, float* outOffsetX, float* outOffsetY) {
+  if (run.positioning != tgfx::GlyphPositioning::Horizontal &&
+      run.positioning != tgfx::GlyphPositioning::Default) {
+    return false;
+  }
+  if (run.positioning == tgfx::GlyphPositioning::Default) {
+    // Default mode doesn't have explicit positions, so we can't extract startX from positions.
+    // This case is already Default mode, just pass through.
+    *outOffsetX = 0;
+    *outOffsetY = run.offsetY;
+    return true;
+  }
+  if (indices.empty()) {
+    return false;
+  }
+  float scale = fontSize / static_cast<float>(font->unitsPerEm);
+  // Use first glyph's x position as the starting point
+  float startX = run.positions[indices[0]];
+  float expectedX = startX;
+  auto* typeface = run.font.getTypeface().get();
+  for (size_t i : indices) {
+    float actualX = run.positions[i];
+    if (!FloatNearlyEqual(actualX, expectedX)) {
+      return false;
+    }
+    GlyphKey key = {typeface, run.glyphs[i]};
+    auto it = map.find(key);
+    if (it == map.end() || it->second == 0) {
+      return false;
+    }
+    tgfx::GlyphID mappedID = it->second;
+    if (mappedID > font->glyphs.size()) {
+      return false;
+    }
+    float advance = font->glyphs[mappedID - 1]->advance * scale;
+    expectedX += advance;
+  }
+  *outOffsetX = startX;
+  *outOffsetY = run.offsetY;
+  return true;
 }
 
 static GlyphRun* CreateGlyphRunForIndices(
@@ -244,11 +298,22 @@ static GlyphRun* CreateGlyphRunForIndices(
     }
   }
 
+  // Try to use Default mode if positions match advance-based layout
+  float offsetX = 0.0f;
+  float offsetY = 0.0f;
+  if (CanUseDefaultMode(run, indices, font, glyphMapping, fontSize, &offsetX, &offsetY)) {
+    glyphRun->x = offsetX;
+    glyphRun->y = offsetY;
+    return glyphRun;
+  }
+
+  float advanceScale = fontSize / static_cast<float>(font->unitsPerEm);
+
   switch (run.positioning) {
     case tgfx::GlyphPositioning::Horizontal: {
       glyphRun->y = run.offsetY;
       for (size_t i : indices) {
-        glyphRun->xPositions.push_back(run.positions[i]);
+        glyphRun->xOffsets.push_back(run.positions[i]);
       }
       break;
     }
@@ -260,31 +325,136 @@ static GlyphRun* CreateGlyphRunForIndices(
       break;
     }
     case tgfx::GlyphPositioning::RSXform: {
+      // Decompose RSXform into position, scale, and rotation
       auto* xforms = reinterpret_cast<const tgfx::RSXform*>(run.positions);
-      for (size_t i : indices) {
-        RSXform xform = {};
-        xform.scos = xforms[i].scos;
-        xform.ssin = xforms[i].ssin;
-        xform.tx = xforms[i].tx;
-        xform.ty = xforms[i].ty;
-        glyphRun->xforms.push_back(xform);
+      bool hasNonDefaultScale = false;
+      bool hasNonDefaultRotation = false;
+
+      // First pass: check if we have non-default values
+      for (size_t idx = 0; idx < indices.size(); idx++) {
+        size_t i = indices[idx];
+        const auto& xform = xforms[i];
+        float scale = std::sqrt(xform.scos * xform.scos + xform.ssin * xform.ssin);
+        float rotation = RadiansToDegrees(std::atan2(xform.ssin, xform.scos));
+        if (!FloatNearlyEqual(scale, 1.0f)) {
+          hasNonDefaultScale = true;
+        }
+        if (!FloatNearlyEqual(rotation, 0.0f)) {
+          hasNonDefaultRotation = true;
+        }
+      }
+
+      // Second pass: extract values
+      for (size_t idx = 0; idx < indices.size(); idx++) {
+        size_t i = indices[idx];
+        const auto& xform = xforms[i];
+
+        // Get glyph advance for anchor calculation
+        float glyphAdvance = 0.0f;
+        if (glyphRun->glyphs[idx] > 0 && glyphRun->glyphs[idx] <= font->glyphs.size()) {
+          glyphAdvance = font->glyphs[glyphRun->glyphs[idx] - 1]->advance * advanceScale;
+        }
+        float defaultAnchorX = glyphAdvance * 0.5f;
+
+        // Decompose: scale = sqrt(scos^2 + ssin^2), rotation = atan2(ssin, scos)
+        float scale = std::sqrt(xform.scos * xform.scos + xform.ssin * xform.ssin);
+        float rotation = RadiansToDegrees(std::atan2(xform.ssin, xform.scos));
+
+        // The RSXform position (tx, ty) is the position after the anchor transform
+        // We need to reverse-calculate the original position
+        // Original transform: translate(-anchor) -> scale -> rotate -> translate(anchor) -> translate(pos)
+        // RSXform encodes: scale*rotate matrix + final position
+        // So tx, ty = anchor + pos - rotatedScaledAnchor
+        // pos = tx - anchor + rotatedScaledAnchor - anchor... this is complex
+        // For simplicity, just store position as tx, ty (the final transformed position)
+        glyphRun->positions.push_back({xform.tx, xform.ty});
+
+        if (hasNonDefaultScale) {
+          glyphRun->scales.push_back({scale, scale});
+        }
+        if (hasNonDefaultRotation) {
+          glyphRun->rotations.push_back(rotation);
+        }
       }
       break;
     }
     case tgfx::GlyphPositioning::Matrix: {
+      // Decompose full matrix into position, scale, rotation, skew
       auto* matrices = reinterpret_cast<const float*>(run.positions);
-      for (size_t i : indices) {
-        Matrix m = {};
-        m.a = matrices[i * 6 + 0];
-        m.b = matrices[i * 6 + 1];
-        m.c = matrices[i * 6 + 2];
-        m.d = matrices[i * 6 + 3];
-        m.tx = matrices[i * 6 + 4];
-        m.ty = matrices[i * 6 + 5];
-        glyphRun->matrices.push_back(m);
+      bool hasNonDefaultScale = false;
+      bool hasNonDefaultRotation = false;
+      bool hasNonDefaultSkew = false;
+
+      // First pass: check if we have non-default values
+      for (size_t idx = 0; idx < indices.size(); idx++) {
+        size_t i = indices[idx];
+        float a = matrices[i * 6 + 0];
+        float b = matrices[i * 6 + 1];
+        float c = matrices[i * 6 + 2];
+        float d = matrices[i * 6 + 3];
+
+        // Decompose matrix: M = T * R * S * Skew
+        // For a uniform scale + rotation matrix: a = s*cos, b = s*sin, c = -s*sin, d = s*cos
+        float scaleX = std::sqrt(a * a + b * b);
+        float scaleY = std::sqrt(c * c + d * d);
+        float rotation = RadiansToDegrees(std::atan2(b, a));
+
+        // Check for skew (non-orthogonal matrix)
+        float dotProduct = a * c + b * d;
+        float skew = 0.0f;
+        if (scaleX > 0.001f && scaleY > 0.001f) {
+          skew = RadiansToDegrees(std::atan2(dotProduct, scaleX * scaleY));
+        }
+
+        if (!FloatNearlyEqual(scaleX, 1.0f) || !FloatNearlyEqual(scaleY, 1.0f)) {
+          hasNonDefaultScale = true;
+        }
+        if (!FloatNearlyEqual(rotation, 0.0f)) {
+          hasNonDefaultRotation = true;
+        }
+        if (!FloatNearlyEqual(skew, 0.0f)) {
+          hasNonDefaultSkew = true;
+        }
+      }
+
+      // Second pass: extract values
+      for (size_t idx = 0; idx < indices.size(); idx++) {
+        size_t i = indices[idx];
+        float a = matrices[i * 6 + 0];
+        float b = matrices[i * 6 + 1];
+        float c = matrices[i * 6 + 2];
+        float d = matrices[i * 6 + 3];
+        float tx = matrices[i * 6 + 4];
+        float ty = matrices[i * 6 + 5];
+
+        // Store position
+        glyphRun->positions.push_back({tx, ty});
+
+        // Decompose matrix
+        float scaleX = std::sqrt(a * a + b * b);
+        float scaleY = std::sqrt(c * c + d * d);
+        float rotation = RadiansToDegrees(std::atan2(b, a));
+
+        float dotProduct = a * c + b * d;
+        float skew = 0.0f;
+        if (scaleX > 0.001f && scaleY > 0.001f) {
+          skew = RadiansToDegrees(std::atan2(dotProduct, scaleX * scaleY));
+        }
+
+        if (hasNonDefaultScale) {
+          glyphRun->scales.push_back({scaleX, scaleY});
+        }
+        if (hasNonDefaultRotation) {
+          glyphRun->rotations.push_back(rotation);
+        }
+        if (hasNonDefaultSkew) {
+          glyphRun->skews.push_back(skew);
+        }
       }
       break;
     }
+    default:
+      break;
   }
 
   return glyphRun;
