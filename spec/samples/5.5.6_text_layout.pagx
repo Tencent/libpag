@@ -8,7 +8,7 @@
   </Layer>
   <!-- Title: point text, center aligned -->
   <Layer>
-    <Text text="Layout Demo" fontFamily="Arial" fontStyle="Bold" fontSize="40"/>
+    <Text text="Text Layout" fontFamily="Arial" fontStyle="Bold" fontSize="40"/>
     <TextLayout position="200,60" textAlign="center"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="280,0">
