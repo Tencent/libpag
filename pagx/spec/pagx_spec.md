@@ -2319,11 +2319,11 @@ The following example covers all major node types in PAGX, demonstrating complet
       <Fill color="#FFFFFF08"/>
       <Stroke color="#FFFFFF15" width="1"/>
     </Group>
-    <Group position="100,0">
+    <Layer x="100" y="0">
       <Rectangle center="0,0" size="50,35" roundness="6"/>
       <Fill color="@coral"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#E7524080"/>
-    </Group>
+    </Layer>
     
     <!-- Card 2: Ellipse -->
     <Group position="230,0">
@@ -2331,11 +2331,11 @@ The following example covers all major node types in PAGX, demonstrating complet
       <Fill color="#FFFFFF08"/>
       <Stroke color="#FFFFFF15" width="1"/>
     </Group>
-    <Group position="230,0">
+    <Layer x="230" y="0">
       <Ellipse center="0,0" size="50,35"/>
       <Fill color="@purple"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#A855F780"/>
-    </Group>
+    </Layer>
     
     <!-- Card 3: Star -->
     <Group position="360,0">
@@ -2343,11 +2343,11 @@ The following example covers all major node types in PAGX, demonstrating complet
       <Fill color="#FFFFFF08"/>
       <Stroke color="#FFFFFF15" width="1"/>
     </Group>
-    <Group position="360,0">
+    <Layer x="360" y="0">
       <Polystar center="0,0" type="star" pointCount="5" outerRadius="22" innerRadius="10" rotation="-90"/>
       <Fill color="@amber"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#F59E0B80"/>
-    </Group>
+    </Layer>
     
     <!-- Card 4: Hexagon -->
     <Group position="490,0">
@@ -2355,11 +2355,11 @@ The following example covers all major node types in PAGX, demonstrating complet
       <Fill color="#FFFFFF08"/>
       <Stroke color="#FFFFFF15" width="1"/>
     </Group>
-    <Group position="490,0">
+    <Layer x="490" y="0">
       <Polystar center="0,0" type="polygon" pointCount="6" outerRadius="24"/>
       <Fill color="@teal"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#14B8A680"/>
-    </Group>
+    </Layer>
     
     <!-- Card 5: Custom Path -->
     <Group position="620,0">
@@ -2367,11 +2367,11 @@ The following example covers all major node types in PAGX, demonstrating complet
       <Fill color="#FFFFFF08"/>
       <Stroke color="#FFFFFF15" width="1"/>
     </Group>
-    <Group position="620,0">
+    <Layer x="620" y="0">
       <Path data="M -20 -15 L 0 -25 L 20 -15 L 20 15 L 0 25 L -20 15 Z"/>
       <Fill color="@orange"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#F9731680"/>
-    </Group>
+    </Layer>
   </Layer>
   
   <!-- ===== Modifier Area y=270 ===== -->
@@ -2423,52 +2423,52 @@ The following example covers all major node types in PAGX, demonstrating complet
   <!-- ===== Filter Area y=360 ===== -->
   <Layer name="FilterCards" y="360">
     <!-- Blur Filter -->
-    <Group position="130,0">
+    <Layer x="130" y="0">
       <Rectangle center="0,0" size="80,60" roundness="10"/>
       <Fill color="@emerald"/>
       <BlurFilter blurX="3" blurY="3"/>
-    </Group>
+    </Layer>
     
     <!-- Drop Shadow Filter -->
-    <Group position="260,0">
+    <Layer x="260" y="0">
       <Rectangle center="0,0" size="80,60" roundness="10"/>
       <Fill color="@cyan"/>
       <DropShadowFilter offsetX="4" offsetY="4" blurX="10" blurY="10" color="#00000080"/>
-    </Group>
+    </Layer>
     
     <!-- Color Matrix (Grayscale) -->
-    <Group position="390,0">
+    <Layer x="390" y="0">
       <Ellipse center="0,0" size="55,55"/>
       <Fill color="@purple"/>
       <ColorMatrixFilter matrix="0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0,0,0,1,0"/>
-    </Group>
+    </Layer>
     
     <!-- Blend Filter -->
-    <Group position="520,0">
+    <Layer x="520" y="0">
       <Rectangle center="0,0" size="80,60" roundness="10"/>
       <Fill color="@coral"/>
       <BlendFilter color="#3B82F660" blendMode="overlay"/>
-    </Group>
+    </Layer>
     
     <!-- Image Fill + Drop Shadow Style -->
-    <Group position="670,0">
+    <Layer x="670" y="0">
       <Rectangle center="0,0" size="90,60" roundness="8"/>
       <Fill>
         <ImagePattern image="@photo" tileModeX="clamp" tileModeY="clamp"/>
       </Fill>
       <Stroke color="#FFFFFF30" width="1"/>
       <DropShadowStyle offsetX="0" offsetY="6" blurX="12" blurY="12" color="#00000060"/>
-    </Group>
+    </Layer>
   </Layer>
   
   <!-- ===== Footer Area y=450 ===== -->
   <Layer name="Footer" y="455">
     <!-- Button Component -->
-    <Group position="200,0">
+    <Layer x="200" y="0">
       <Rectangle center="0,0" size="120,36" roundness="18"/>
       <Fill color="@buttonGradient"/>
       <InnerShadowStyle offsetX="0" offsetY="1" blurX="2" blurY="2" color="#FFFFFF30"/>
-    </Group>
+    </Layer>
     <Group position="200,0">
       <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
       <TextLayout position="0,0" textAlign="center"/>
@@ -2478,7 +2478,7 @@ The following example covers all major node types in PAGX, demonstrating complet
     <!-- Pre-layout Text -->
     <Group position="400,0">
       <Text fontFamily="Arial" fontSize="18">
-        <GlyphRun font="@iconFont" glyphs="1,2,3" y="0" xPositions="0,28,56"/>
+        <GlyphRun font="@iconFont" glyphs="1,2,3" y="0" xOffsets="0,28,56"/>
       </Text>
       <Fill color="#FFFFFF60"/>
     </Group>
@@ -2500,9 +2500,9 @@ The following example covers all major node types in PAGX, demonstrating complet
     <PathData id="wavePath" data="M 0 0 Q 30 -20 60 0 T 120 0 T 180 0"/>
     <!-- Embedded Vector Font (Icons) -->
     <Font id="iconFont">
-      <Glyph path="M 0 -8 L 8 8 L -8 8 Z"/>
-      <Glyph path="M -8 -8 L 8 -8 L 8 8 L -8 8 Z"/>
-      <Glyph path="M 0 -10 A 10 10 0 1 1 0 10 A 10 10 0 1 1 0 -10"/>
+      <Glyph advance="20" path="M 0 -8 L 8 8 L -8 8 Z"/>
+      <Glyph advance="20" path="M -8 -8 L 8 -8 L 8 8 L -8 8 Z"/>
+      <Glyph advance="24" path="M 0 -10 A 10 10 0 1 1 0 10 A 10 10 0 1 1 0 -10"/>
     </Font>
     <!-- Background Gradient -->
     <LinearGradient id="bgGradient" startPoint="0,0" endPoint="800,520">
@@ -3020,12 +3020,6 @@ Child elements: `VectorElement`* (recursive including Group)
 | **TileMode** | `clamp`, `repeat`, `mirror`, `decal` |
 | **FilterMode** | `nearest`, `linear` |
 | **MipmapMode** | `none`, `nearest`, `linear` |
-
-#### Color Related
-
-| Enum | Values |
-|------|--------|
-| **ColorSpace** | `sRGB`, `displayP3` |
 
 #### Painter Related
 

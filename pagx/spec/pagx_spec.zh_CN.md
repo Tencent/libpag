@@ -469,15 +469,15 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 | `image` | idref | (必填) | 图片引用 "@id" |
 | `tileModeX` | TileMode | clamp | X 方向平铺模式 |
 | `tileModeY` | TileMode | clamp | Y 方向平铺模式 |
-| `filterMode` | FilterMode | linear | 纹理滤镜模式 |
-| `mipmapMode` | MipmapMode | linear | 多级渐远纹理模式 |
+| `filterMode` | FilterMode | linear | 纹理过滤模式 |
+| `mipmapMode` | MipmapMode | linear | Mipmap 模式 |
 | `matrix` | Matrix | 单位矩阵 | 变换矩阵 |
 
 **TileMode（平铺模式）**：`clamp`（钳制）、`repeat`（重复）、`mirror`（镜像）、`decal`（贴花）
 
-**FilterMode（滤镜模式）**：`nearest`（最近邻）、`linear`（双线性插值）
+**FilterMode（纹理过滤模式）**：`nearest`（最近邻）、`linear`（双线性插值）
 
-**MipmapMode（多级渐远模式）**：`none`（禁用）、`nearest`（最近级别）、`linear`（线性插值）
+**MipmapMode（Mipmap 模式）**：`none`（禁用）、`nearest`（最近级别）、`linear`（线性插值）
 
 **完整示例**：演示不同平铺模式的图片填充
 
@@ -603,10 +603,10 @@ Glyph 定义单个字形的渲染数据。`path` 和 `image` 二选一必填，�
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
+| `advance` | float | (必填) | 水平步进宽度，设计空间坐标（unitsPerEm 单位） |
 | `path` | string | - | SVG 路径数据（矢量轮廓） |
 | `image` | string | - | 图片数据（base64 数据 URI）或外部文件路径 |
 | `offset` | Point | 0,0 | 字形偏移量，设计空间坐标（通常用于位图字形） |
-| `advance` | float | (必填) | 水平步进宽度，设计空间坐标 |
 
 **字形类型**：
 - **矢量字形**：指定 `path` 属性，使用 SVG 路径语法描述轮廓
@@ -796,7 +796,7 @@ Layer 的子元素按类型自动归类为四个集合：
 
 **图层样式的输入源**：
 
-所有图层样式都基于**图层内容**计算效果。在图层样式中，图层内容会自动转换为 **Opaque 模式**：使用正常的填充方式渲染几何形状，然后将所有半透明像素转换为完全不透明（完全透明的像素保留）。这意味着半透明填充产生的阴影效果与完全不透明填充相同。
+所有图层样式都基于**图层内容**计算效果。在图层样式中，图层内容会自动转换为 **不透明模式**：使用正常的填充方式渲染几何形状，然后将所有半透明像素转换为完全不透明（完全透明的像素保留）。这意味着半透明填充产生的阴影效果与完全不透明填充相同。
 
 部分图层样式还会额外使用**图层轮廓**或**图层背景**作为输入（详见各样式说明）。图层轮廓和图层背景的定义参见 4.1 节。
 
@@ -2314,11 +2314,11 @@ Layer / Group
       <Fill color="#FFFFFF08"/>
       <Stroke color="#FFFFFF15" width="1"/>
     </Group>
-    <Group position="100,0">
+    <Layer x="100" y="0">
       <Rectangle center="0,0" size="50,35" roundness="6"/>
       <Fill color="@coral"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#E7524080"/>
-    </Group>
+    </Layer>
     
     <!-- 卡片2：椭圆 -->
     <Group position="230,0">
@@ -2326,11 +2326,11 @@ Layer / Group
       <Fill color="#FFFFFF08"/>
       <Stroke color="#FFFFFF15" width="1"/>
     </Group>
-    <Group position="230,0">
+    <Layer x="230" y="0">
       <Ellipse center="0,0" size="50,35"/>
       <Fill color="@purple"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#A855F780"/>
-    </Group>
+    </Layer>
     
     <!-- 卡片3：星形 -->
     <Group position="360,0">
@@ -2338,11 +2338,11 @@ Layer / Group
       <Fill color="#FFFFFF08"/>
       <Stroke color="#FFFFFF15" width="1"/>
     </Group>
-    <Group position="360,0">
+    <Layer x="360" y="0">
       <Polystar center="0,0" type="star" pointCount="5" outerRadius="22" innerRadius="10" rotation="-90"/>
       <Fill color="@amber"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#F59E0B80"/>
-    </Group>
+    </Layer>
     
     <!-- 卡片4：六边形 -->
     <Group position="490,0">
@@ -2350,11 +2350,11 @@ Layer / Group
       <Fill color="#FFFFFF08"/>
       <Stroke color="#FFFFFF15" width="1"/>
     </Group>
-    <Group position="490,0">
+    <Layer x="490" y="0">
       <Polystar center="0,0" type="polygon" pointCount="6" outerRadius="24"/>
       <Fill color="@teal"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#14B8A680"/>
-    </Group>
+    </Layer>
     
     <!-- 卡片5：自定义路径 -->
     <Group position="620,0">
@@ -2362,11 +2362,11 @@ Layer / Group
       <Fill color="#FFFFFF08"/>
       <Stroke color="#FFFFFF15" width="1"/>
     </Group>
-    <Group position="620,0">
+    <Layer x="620" y="0">
       <Path data="M -20 -15 L 0 -25 L 20 -15 L 20 15 L 0 25 L -20 15 Z"/>
       <Fill color="@orange"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#F9731680"/>
-    </Group>
+    </Layer>
   </Layer>
   
   <!-- ===== 修改器区 y=270 ===== -->
@@ -2418,52 +2418,52 @@ Layer / Group
   <!-- ===== 滤镜区 y=360 ===== -->
   <Layer name="FilterCards" y="360">
     <!-- 模糊滤镜 -->
-    <Group position="130,0">
+    <Layer x="130" y="0">
       <Rectangle center="0,0" size="80,60" roundness="10"/>
       <Fill color="@emerald"/>
       <BlurFilter blurX="3" blurY="3"/>
-    </Group>
+    </Layer>
     
     <!-- 投影滤镜 -->
-    <Group position="260,0">
+    <Layer x="260" y="0">
       <Rectangle center="0,0" size="80,60" roundness="10"/>
       <Fill color="@cyan"/>
       <DropShadowFilter offsetX="4" offsetY="4" blurX="10" blurY="10" color="#00000080"/>
-    </Group>
+    </Layer>
     
     <!-- 颜色矩阵（灰度） -->
-    <Group position="390,0">
+    <Layer x="390" y="0">
       <Ellipse center="0,0" size="55,55"/>
       <Fill color="@purple"/>
       <ColorMatrixFilter matrix="0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0,0,0,1,0"/>
-    </Group>
+    </Layer>
     
     <!-- 混合滤镜 -->
-    <Group position="520,0">
+    <Layer x="520" y="0">
       <Rectangle center="0,0" size="80,60" roundness="10"/>
       <Fill color="@coral"/>
       <BlendFilter color="#3B82F660" blendMode="overlay"/>
-    </Group>
+    </Layer>
     
     <!-- 图片填充 + 投影样式 -->
-    <Group position="670,0">
+    <Layer x="670" y="0">
       <Rectangle center="0,0" size="90,60" roundness="8"/>
       <Fill>
         <ImagePattern image="@photo" tileModeX="clamp" tileModeY="clamp"/>
       </Fill>
       <Stroke color="#FFFFFF30" width="1"/>
       <DropShadowStyle offsetX="0" offsetY="6" blurX="12" blurY="12" color="#00000060"/>
-    </Group>
+    </Layer>
   </Layer>
   
   <!-- ===== 底部区 y=450 ===== -->
   <Layer name="Footer" y="455">
     <!-- 按钮组件 -->
-    <Group position="200,0">
+    <Layer x="200" y="0">
       <Rectangle center="0,0" size="120,36" roundness="18"/>
       <Fill color="@buttonGradient"/>
       <InnerShadowStyle offsetX="0" offsetY="1" blurX="2" blurY="2" color="#FFFFFF30"/>
-    </Group>
+    </Layer>
     <Group position="200,0">
       <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
       <TextLayout position="0,0" textAlign="center"/>
@@ -2495,9 +2495,9 @@ Layer / Group
     <PathData id="wavePath" data="M 0 0 Q 30 -20 60 0 T 120 0 T 180 0"/>
     <!-- 嵌入矢量字体（图标） -->
     <Font id="iconFont">
-      <Glyph path="M 0 -8 L 8 8 L -8 8 Z"/>
-      <Glyph path="M -8 -8 L 8 -8 L 8 8 L -8 8 Z"/>
-      <Glyph path="M 0 -10 A 10 10 0 1 1 0 10 A 10 10 0 1 1 0 -10"/>
+      <Glyph advance="20" path="M 0 -8 L 8 8 L -8 8 Z"/>
+      <Glyph advance="20" path="M -8 -8 L 8 -8 L 8 8 L -8 8 Z"/>
+      <Glyph advance="24" path="M 0 -10 A 10 10 0 1 1 0 10 A 10 10 0 1 1 0 -10"/>
     </Font>
     <!-- 背景渐变 -->
     <LinearGradient id="bgGradient" startPoint="0,0" endPoint="800,520">
@@ -2620,10 +2620,10 @@ Layer / Group
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
+| `advance` | float | (必填) |
 | `path` | string | - |
 | `image` | string | - |
 | `offset` | Point | 0,0 |
-| `advance` | float | (必填) |
 
 #### SolidColor
 
@@ -3017,12 +3017,6 @@ Layer / Group
 | **TileMode** | `clamp`, `repeat`, `mirror`, `decal` |
 | **FilterMode** | `nearest`, `linear` |
 | **MipmapMode** | `none`, `nearest`, `linear` |
-
-#### 颜色相关
-
-| 枚举 | 值 |
-|------|------|
-| **ColorSpace** | `sRGB`, `displayP3` |
 
 #### 绘制器相关
 
