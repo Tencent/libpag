@@ -25,8 +25,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 
-const viewerDir = path.dirname(__dirname);
-process.chdir(viewerDir);
+const playgroundDir = path.dirname(__dirname);
+process.chdir(playgroundDir);
 
 process.argv.push("-s");
 process.argv.push("./");
@@ -34,7 +34,7 @@ process.argv.push("-o");
 process.argv.push("./");
 process.argv.push("-p");
 process.argv.push("web");
-process.argv.push("pagx-viewer");
+process.argv.push("pagx-playground");
 
 // Use vendor_tools from libpag
-require("../../../third_party/vendor_tools/lib-build");
+require("../../third_party/vendor_tools/lib-build");

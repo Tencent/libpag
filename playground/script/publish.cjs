@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * PAGX Viewer Publisher
+ * PAGX Playground Publisher
  *
- * Builds and copies the PAGX Viewer to the public directory.
+ * Builds and copies the PAGX Playground to the public directory.
  *
  * Source files:
  *     index.html
@@ -26,11 +26,10 @@ const { execSync } = require('child_process');
 
 // Default paths
 const SCRIPT_DIR = __dirname;
-const VIEWER_DIR = path.dirname(SCRIPT_DIR);
-const PAGX_DIR = path.dirname(VIEWER_DIR);
-const LIBPAG_DIR = path.dirname(PAGX_DIR);
+const PLAYGROUND_DIR = path.dirname(SCRIPT_DIR);
+const LIBPAG_DIR = path.dirname(PLAYGROUND_DIR);
 const RESOURCES_FONT_DIR = path.join(LIBPAG_DIR, 'resources', 'font');
-const DEFAULT_OUTPUT_DIR = path.join(PAGX_DIR, 'public');
+const DEFAULT_OUTPUT_DIR = path.join(LIBPAG_DIR, 'public');
 
 /**
  * Parse command line arguments.
@@ -45,13 +44,13 @@ function parseArgs() {
       i++;
     } else if (args[i] === '-h' || args[i] === '--help') {
       console.log(`
-PAGX Viewer Publisher
+PAGX Playground Publisher
 
 Usage:
     npm run publish [-- -o <output-dir>]
 
 Options:
-    -o, --output <dir>  Output directory (default: ../public/viewer)
+    -o, --output <dir>  Output directory (default: ../public)
     -h, --help          Show this help message
 `);
       process.exit(0);
@@ -85,33 +84,33 @@ function runCommand(command, cwd) {
 function main() {
   const { outputDir } = parseArgs();
 
-  console.log('Publishing PAGX Viewer...');
+  console.log('Publishing PAGX Playground...');
   console.log(`Output: ${outputDir}\n`);
 
   // Build release (uses cache if available)
   console.log('Step 1: Build release...');
-  runCommand('npm run build:release', VIEWER_DIR);
+  runCommand('npm run build:release', PLAYGROUND_DIR);
 
   // Copy index.html
   console.log('\nStep 2: Copy files...');
   copyFile(
-    path.join(VIEWER_DIR, 'index.html'),
+    path.join(PLAYGROUND_DIR, 'index.html'),
     path.join(outputDir, 'index.html')
   );
 
   // Copy index.css
   copyFile(
-    path.join(VIEWER_DIR, 'index.css'),
+    path.join(PLAYGROUND_DIR, 'index.css'),
     path.join(outputDir, 'index.css')
   );
 
   // Copy favicon and logo
   copyFile(
-    path.join(VIEWER_DIR, 'favicon.png'),
+    path.join(PLAYGROUND_DIR, 'favicon.png'),
     path.join(outputDir, 'favicon.png')
   );
   copyFile(
-    path.join(VIEWER_DIR, 'logo.png'),
+    path.join(PLAYGROUND_DIR, 'logo.png'),
     path.join(outputDir, 'logo.png')
   );
 
@@ -128,19 +127,19 @@ function main() {
 
   // Copy wasm-mt directory
   console.log('\n  Copying wasm-mt...');
-  const wasmDir = path.join(VIEWER_DIR, 'wasm-mt');
+  const wasmDir = path.join(PLAYGROUND_DIR, 'wasm-mt');
   const wasmOutputDir = path.join(outputDir, 'wasm-mt');
   copyFile(
     path.join(wasmDir, 'index.js'),
     path.join(wasmOutputDir, 'index.js')
   );
   copyFile(
-    path.join(wasmDir, 'pagx-viewer.js'),
-    path.join(wasmOutputDir, 'pagx-viewer.js')
+    path.join(wasmDir, 'pagx-playground.js'),
+    path.join(wasmOutputDir, 'pagx-playground.js')
   );
   copyFile(
-    path.join(wasmDir, 'pagx-viewer.wasm'),
-    path.join(wasmOutputDir, 'pagx-viewer.wasm')
+    path.join(wasmDir, 'pagx-playground.wasm'),
+    path.join(wasmOutputDir, 'pagx-playground.wasm')
   );
 
   console.log('\nDone!');

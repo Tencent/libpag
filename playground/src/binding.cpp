@@ -21,7 +21,7 @@
 
 using namespace emscripten;
 
-EMSCRIPTEN_BINDINGS(PAGXViewer) {
+EMSCRIPTEN_BINDINGS(PAGXPlayground) {
   class_<pagx::PAGXView>("PAGXView")
       .smart_ptr<std::shared_ptr<pagx::PAGXView>>("PAGXView")
       .class_function("MakeFrom", optional_override([](const std::string& canvasID) {

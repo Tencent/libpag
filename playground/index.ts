@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 import { PAGXModule, PAGXView } from './types';
-import PAGXWasm from './wasm-mt/pagx-viewer';
+import PAGXWasm from './wasm-mt/pagx-playground';
 import { TGFXBind } from '@tgfx/binding';
 
 interface I18nStrings {
@@ -95,14 +95,14 @@ const MAX_ZOOM = 1000.0;
 // Font URLs for preloading
 const FONT_URL = './fonts/NotoSansSC-Regular.otf';
 const EMOJI_FONT_URL = './fonts/NotoColorEmoji.ttf';
-const WASM_URL = './wasm-mt/pagx-viewer.wasm';
+const WASM_URL = './wasm-mt/pagx-playground.wasm';
 
 // Estimated sizes for progress calculation (in bytes)
 const ESTIMATED_WASM_SIZE = 2400000;
 const ESTIMATED_FONT_SIZE = 8800000;
 const ESTIMATED_EMOJI_FONT_SIZE = 10300000;
 
-class ViewerState {
+class PlaygroundState {
     module: PAGXModule | null = null;
     pagxView: PAGXView | null = null;
     animationFrameId: number | null = null;
@@ -162,7 +162,7 @@ enum ErrorType {
     NETWORK = 'network',
 }
 
-class ViewerError extends Error {
+class PlaygroundError extends Error {
     type: ErrorType;
     constructor(type: ErrorType, message?: string) {
         super(message);
@@ -221,7 +221,7 @@ class GestureManager {
     private handleScrollEvent(
         event: WheelEvent,
         state: ScrollGestureState,
-        viewerState: ViewerState,
+        playgroundState: PlaygroundState,
     ) {
         if (state === ScrollGestureState.SCROLL_CHANGE) {
             this.scaleStartZoom = this.zoom;
@@ -232,7 +232,7 @@ class GestureManager {
                 this.offsetX -= event.deltaX * window.devicePixelRatio;
                 this.offsetY -= event.deltaY * window.devicePixelRatio;
             }
-            viewerState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
+            playgroundState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
         }
     }
 
@@ -240,7 +240,7 @@ class GestureManager {
         event: WheelEvent,
         state: ScaleGestureState,
         canvas: HTMLElement,
-        viewerState: ViewerState,
+        playgroundState: PlaygroundState,
     ) {
         if (state === ScaleGestureState.SCALE_START) {
             this.scaleY = 1.0;
@@ -259,7 +259,7 @@ class GestureManager {
             this.scaleY = 1.0;
             this.scaleStartZoom = this.zoom;
         }
-        viewerState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
+        playgroundState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
     }
 
     public clearState() {
@@ -267,22 +267,22 @@ class GestureManager {
         this.timer = undefined;
     }
 
-    public resetTransform(viewerState: ViewerState) {
+    public resetTransform(playgroundState: PlaygroundState) {
         this.zoom = 1.0;
         this.offsetX = 0;
         this.offsetY = 0;
         this.clearState();
-        viewerState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
+        playgroundState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
     }
 
     private resetScrollTimeout(
         event: WheelEvent,
-        viewerState: ViewerState,
+        playgroundState: PlaygroundState,
     ) {
         clearTimeout(this.timer);
         this.timer = window.setTimeout(() => {
             this.timer = undefined;
-            this.handleScrollEvent(event, ScrollGestureState.SCROLL_END, viewerState);
+            this.handleScrollEvent(event, ScrollGestureState.SCROLL_END, playgroundState);
             this.clearState();
         }, this.pinchTimeout);
     }
@@ -290,12 +290,12 @@ class GestureManager {
     private resetScaleTimeout(
         event: WheelEvent,
         canvas: HTMLElement,
-        viewerState: ViewerState,
+        playgroundState: PlaygroundState,
     ) {
         clearTimeout(this.timer);
         this.timer = window.setTimeout(() => {
             this.timer = undefined;
-            this.handleScaleEvent(event, ScaleGestureState.SCALE_END, canvas, viewerState);
+            this.handleScaleEvent(event, ScaleGestureState.SCALE_END, canvas, playgroundState);
             this.clearState();
         }, this.pinchTimeout);
     }
@@ -315,20 +315,20 @@ class GestureManager {
         return isTouchpad ? DeviceType.TOUCH : DeviceType.MOUSE;
     }
 
-    public onWheel(event: WheelEvent, canvas: HTMLElement, viewerState: ViewerState) {
+    public onWheel(event: WheelEvent, canvas: HTMLElement, playgroundState: PlaygroundState) {
         const deviceType = this.getDeviceType(event);
         let wheelRatio = (deviceType === DeviceType.MOUSE ? this.mouseWheelRatio : this.touchWheelRatio);
         if (!event.deltaY || (!event.ctrlKey && !event.metaKey)) {
-            this.resetScrollTimeout(event, viewerState);
-            this.handleScrollEvent(event, ScrollGestureState.SCROLL_CHANGE, viewerState);
+            this.resetScrollTimeout(event, playgroundState);
+            this.handleScrollEvent(event, ScrollGestureState.SCROLL_CHANGE, playgroundState);
         } else {
             this.scaleY *= Math.exp(-(event.deltaY) / wheelRatio);
             if (!this.timer) {
-                this.resetScaleTimeout(event, canvas, viewerState);
-                this.handleScaleEvent(event, ScaleGestureState.SCALE_START, canvas, viewerState);
+                this.resetScaleTimeout(event, canvas, playgroundState);
+                this.handleScaleEvent(event, ScaleGestureState.SCALE_START, canvas, playgroundState);
             } else {
-                this.resetScaleTimeout(event, canvas, viewerState);
-                this.handleScaleEvent(event, ScaleGestureState.SCALE_CHANGE, canvas, viewerState);
+                this.resetScaleTimeout(event, canvas, playgroundState);
+                this.handleScaleEvent(event, ScaleGestureState.SCALE_CHANGE, canvas, playgroundState);
             }
         }
     }
@@ -347,7 +347,7 @@ class GestureManager {
         canvas.style.cursor = 'grabbing';
     }
 
-    public onMouseMove(event: MouseEvent, viewerState: ViewerState) {
+    public onMouseMove(event: MouseEvent, playgroundState: PlaygroundState) {
         if (!this.isDragging) {
             return;
         }
@@ -355,7 +355,7 @@ class GestureManager {
         const deltaY = (event.clientY - this.dragStartY) * window.devicePixelRatio;
         this.offsetX = this.dragStartOffsetX + deltaX;
         this.offsetY = this.dragStartOffsetY + deltaY;
-        viewerState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
+        playgroundState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
     }
 
     public onMouseUp(canvas: HTMLElement) {
@@ -406,14 +406,14 @@ class GestureManager {
         }
     }
 
-    public onTouchMove(event: TouchEvent, canvas: HTMLElement, viewerState: ViewerState) {
+    public onTouchMove(event: TouchEvent, canvas: HTMLElement, playgroundState: PlaygroundState) {
         if (event.touches.length === 1 && this.isTouchPanning) {
             // Single finger pan
             const deltaX = (event.touches[0].clientX - this.dragStartX) * window.devicePixelRatio;
             const deltaY = (event.touches[0].clientY - this.dragStartY) * window.devicePixelRatio;
             this.offsetX = this.dragStartOffsetX + deltaX;
             this.offsetY = this.dragStartOffsetY + deltaY;
-            viewerState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
+            playgroundState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
         } else if (event.touches.length === 2 && this.isTouchZooming) {
             // Two finger zoom and pan
             const currentDistance = this.getTouchDistance(event.touches);
@@ -443,7 +443,7 @@ class GestureManager {
             this.lastTouchCenterX = center.x;
             this.lastTouchCenterY = center.y;
 
-            viewerState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
+            playgroundState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
         }
     }
 
@@ -463,7 +463,7 @@ class GestureManager {
     }
 }
 
-const viewerState = new ViewerState();
+const playgroundState = new PlaygroundState();
 const gestureManager = new GestureManager();
 const loadingProgress = new LoadingProgress();
 let animationLoopRunning = false;
@@ -577,8 +577,8 @@ async function loadFonts(): Promise<void> {
             () => { loadingProgress.emojiFontDone = true; }
         ),
     ]);
-    viewerState.fontData = fontData;
-    viewerState.emojiFontData = emojiFontData;
+    playgroundState.fontData = fontData;
+    playgroundState.emojiFontData = emojiFontData;
 }
 
 async function loadWasm(): Promise<void> {
@@ -595,18 +595,18 @@ async function loadWasm(): Promise<void> {
     // Then instantiate the module with the pre-fetched WASM
     const module = await PAGXWasm({
         locateFile: (file: string) => './wasm-mt/' + file,
-        mainScriptUrlOrBlob: './wasm-mt/pagx-viewer.js',
+        mainScriptUrlOrBlob: './wasm-mt/pagx-playground.js',
         wasmBinary: wasmBuffer,
     });
-    viewerState.module = module as PAGXModule;
-    TGFXBind(viewerState.module as any);
-    const pagxView = viewerState.module.PAGXView.MakeFrom('#pagx-canvas');
+    playgroundState.module = module as PAGXModule;
+    TGFXBind(playgroundState.module as any);
+    const pagxView = playgroundState.module.PAGXView.MakeFrom('#pagx-canvas');
     if (!pagxView) {
         throw new Error('Failed to create PAGXView');
     }
-    viewerState.pagxView = pagxView;
+    playgroundState.pagxView = pagxView;
     updateSize();
-    viewerState.pagxView.updateZoomScaleAndOffset(1.0, 0, 0);
+    playgroundState.pagxView.updateZoomScaleAndOffset(1.0, 0, 0);
     const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
     bindCanvasEvents(canvas);
     animationLoop();
@@ -614,19 +614,19 @@ async function loadWasm(): Promise<void> {
 }
 
 function registerFontsToView(): void {
-    if (!viewerState.pagxView) {
+    if (!playgroundState.pagxView) {
         return;
     }
-    const fontData = viewerState.fontData || new Uint8Array(0);
-    const emojiFontData = viewerState.emojiFontData || new Uint8Array(0);
-    viewerState.pagxView.registerFonts(fontData, emojiFontData);
+    const fontData = playgroundState.fontData || new Uint8Array(0);
+    const emojiFontData = playgroundState.emojiFontData || new Uint8Array(0);
+    playgroundState.pagxView.registerFonts(fontData, emojiFontData);
 }
 
 function updateSize() {
-    if (!viewerState.pagxView) {
+    if (!playgroundState.pagxView) {
         return;
     }
-    viewerState.resized = false;
+    playgroundState.resized = false;
     const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
     const container = document.getElementById('container') as HTMLDivElement;
     const screenRect = container.getBoundingClientRect();
@@ -635,11 +635,11 @@ function updateSize() {
     canvas.height = screenRect.height * scaleFactor;
     canvas.style.width = screenRect.width + "px";
     canvas.style.height = screenRect.height + "px";
-    viewerState.pagxView.updateSize();
+    playgroundState.pagxView.updateSize();
 }
 
 function draw() {
-    viewerState.pagxView?.draw();
+    playgroundState.pagxView?.draw();
 }
 
 function animationLoop() {
@@ -648,20 +648,20 @@ function animationLoop() {
     }
     animationLoopRunning = true;
     const frame = () => {
-        if (!viewerState.pagxView || !viewerState.isPageVisible) {
+        if (!playgroundState.pagxView || !playgroundState.isPageVisible) {
             animationLoopRunning = false;
-            viewerState.animationFrameId = null;
+            playgroundState.animationFrameId = null;
             return;
         }
         draw();
-        viewerState.animationFrameId = requestAnimationFrame(frame);
+        playgroundState.animationFrameId = requestAnimationFrame(frame);
     };
-    viewerState.animationFrameId = requestAnimationFrame(frame);
+    playgroundState.animationFrameId = requestAnimationFrame(frame);
 }
 
 function handleVisibilityChange() {
-    viewerState.isPageVisible = !document.hidden;
-    if (viewerState.isPageVisible && viewerState.animationFrameId === null) {
+    playgroundState.isPageVisible = !document.hidden;
+    if (playgroundState.isPageVisible && playgroundState.animationFrameId === null) {
         animationLoop();
     }
 }
@@ -669,9 +669,9 @@ function handleVisibilityChange() {
 function setupVisibilityListeners() {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', () => {
-        if (viewerState.animationFrameId !== null) {
-            cancelAnimationFrame(viewerState.animationFrameId);
-            viewerState.animationFrameId = null;
+        if (playgroundState.animationFrameId !== null) {
+            cancelAnimationFrame(playgroundState.animationFrameId);
+            playgroundState.animationFrameId = null;
         }
     });
 }
@@ -683,7 +683,7 @@ function bindCanvasEvents(canvas: HTMLElement) {
     // Wheel events for scroll and zoom
     canvas.addEventListener('wheel', (e: WheelEvent) => {
         e.preventDefault();
-        gestureManager.onWheel(e, canvas, viewerState);
+        gestureManager.onWheel(e, canvas, playgroundState);
     }, { passive: false });
 
     // Mouse drag events
@@ -692,7 +692,7 @@ function bindCanvasEvents(canvas: HTMLElement) {
         gestureManager.onMouseDown(e, canvas);
     });
     canvas.addEventListener('mousemove', (e: MouseEvent) => {
-        gestureManager.onMouseMove(e, viewerState);
+        gestureManager.onMouseMove(e, playgroundState);
     });
     canvas.addEventListener('mouseup', () => {
         gestureManager.onMouseUp(canvas);
@@ -708,7 +708,7 @@ function bindCanvasEvents(canvas: HTMLElement) {
     }, { passive: false });
     canvas.addEventListener('touchmove', (e: TouchEvent) => {
         e.preventDefault();
-        gestureManager.onTouchMove(e, canvas, viewerState);
+        gestureManager.onTouchMove(e, canvas, playgroundState);
     }, { passive: false });
     canvas.addEventListener('touchend', (e: TouchEvent) => {
         gestureManager.onTouchEnd(e, canvas);
@@ -777,16 +777,16 @@ function hideDropZone(): void {
     }
 }
 
-const DEFAULT_TITLE = 'PAGX Viewer';
+const DEFAULT_TITLE = 'PAGX Playground';
 
 function goHome(): void {
     const toolbar = document.getElementById('toolbar') as HTMLDivElement;
     const specBtn = document.getElementById('spec-btn') as HTMLAnchorElement;
     const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
 
-    if (viewerState.pagxView) {
-        viewerState.pagxView.loadPAGX(new Uint8Array(0));
-        gestureManager.resetTransform(viewerState);
+    if (playgroundState.pagxView) {
+        playgroundState.pagxView.loadPAGX(new Uint8Array(0));
+        gestureManager.resetTransform(playgroundState);
     }
     canvas.classList.add('hidden');
     toolbar.classList.add('hidden');
@@ -800,19 +800,19 @@ async function loadPAGXData(data: Uint8Array, name: string) {
     const toolbar = document.getElementById('toolbar') as HTMLDivElement;
     const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
 
-    if (!viewerState.pagxView) {
+    if (!playgroundState.pagxView) {
         throw new Error('PAGXView not initialized');
     }
 
     registerFontsToView();
-    viewerState.pagxView.loadPAGX(data);
-    gestureManager.resetTransform(viewerState);
+    playgroundState.pagxView.loadPAGX(data);
+    gestureManager.resetTransform(playgroundState);
     updateSize();
     hideDropZone();
     canvas.classList.remove('hidden');
     toolbar.classList.remove('hidden');
     specBtn.classList.add('hidden');
-    document.title = 'PAGX Viewer - ' + name;
+    document.title = 'PAGX Playground - ' + name;
 }
 
 async function loadPAGXFile(file: File) {
@@ -969,7 +969,7 @@ function setupDragAndDrop() {
     });
 
     resetBtn.addEventListener('click', () => {
-        gestureManager.resetTransform(viewerState);
+        gestureManager.resetTransform(playgroundState);
     });
 
     fileInput.addEventListener('change', () => {
@@ -1070,10 +1070,10 @@ if (typeof window !== 'undefined') {
     };
 
     window.onresize = () => {
-        if (!viewerState.pagxView || viewerState.resized) {
+        if (!playgroundState.pagxView || playgroundState.resized) {
             return;
         }
-        viewerState.resized = true;
+        playgroundState.resized = true;
         window.setTimeout(() => {
             updateSize();
         }, 300);

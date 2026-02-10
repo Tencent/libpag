@@ -9,7 +9,7 @@
  *     pagx_spec.zh_CN.md  - Chinese version
  *
  * Usage:
- *     cd pagx/spec && npm run publish
+ *     cd spec && npm run publish
  */
 
 const fs = require('fs');
@@ -22,12 +22,12 @@ const hljs = require('highlight.js');
 // Paths
 const SCRIPT_DIR = __dirname;
 const SPEC_DIR = path.dirname(SCRIPT_DIR);
-const PAGX_DIR = path.dirname(SPEC_DIR);
+const LIBPAG_DIR = path.dirname(SPEC_DIR);
 const SPEC_FILE_EN = path.join(SPEC_DIR, 'pagx_spec.md');
 const SPEC_FILE_ZH = path.join(SPEC_DIR, 'pagx_spec.zh_CN.md');
 const PACKAGE_FILE = path.join(SPEC_DIR, 'package.json');
 const TEMPLATE_FILE = path.join(SCRIPT_DIR, 'template.html');
-const DEFAULT_SITE_DIR = path.join(PAGX_DIR, 'public');
+const DEFAULT_SITE_DIR = path.join(LIBPAG_DIR, 'public');
 
 // Base URL for the spec site
 const BASE_URL = 'https://pag.io/pagx';

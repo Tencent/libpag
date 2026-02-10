@@ -2,6 +2,6 @@
 wasm-mt/
 
 # Build cache
-build-pagx-viewer/
+build-pagx-playground/
 .*.md5
 .build.lock

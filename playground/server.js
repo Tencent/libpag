@@ -23,7 +23,7 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const libpagDir = path.resolve(__dirname, '../..');
+const libpagDir = path.resolve(__dirname, '..');
 
 const app = express();
 
@@ -54,5 +54,5 @@ app.listen(port, () => {
   const url = `http://localhost:${port}/`;
   const start = (process.platform === 'darwin' ? 'open' : 'start');
   exec(start + ' ' + url);
-  console.log(`PAGX Viewer running at ${url}`);
+  console.log(`PAGX Playground running at ${url}`);
 });

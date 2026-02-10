@@ -28,7 +28,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const fileHeaderPath = path.resolve(__dirname, '../../../.idea/fileTemplates/includes/PAG File Header.h');
+const fileHeaderPath = path.resolve(__dirname, '../../.idea/fileTemplates/includes/PAG File Header.h');
 const banner = readFileSync(fileHeaderPath, 'utf-8');
 const isRelease = process.env.BUILD_MODE === 'release';
 
@@ -53,7 +53,7 @@ const plugins = [
     resolve({ extensions: ['.ts', '.js'] }),
     commonJs(),
     alias({
-        entries: [{ find: '@tgfx', replacement: path.resolve(__dirname, '../../../third_party/tgfx/web/src') }],
+        entries: [{ find: '@tgfx', replacement: path.resolve(__dirname, '../../third_party/tgfx/web/src') }],
     }),
     {
         name: 'preserve-import-meta-url',
