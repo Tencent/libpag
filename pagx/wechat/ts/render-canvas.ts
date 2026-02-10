@@ -57,7 +57,7 @@ export class RenderCanvas {
       alpha: true,
       depth: false,
       stencil: false,
-      antialias: false,
+      antialias: true,
       powerPreference: 'high-performance',
       preserveDrawingBuffer: false,
       failIfMajorPerformanceCaveat: false,

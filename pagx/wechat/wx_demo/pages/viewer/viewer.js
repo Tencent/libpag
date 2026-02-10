@@ -9,23 +9,31 @@ import {
 import { WXGestureManager } from '../../utils/gesture-manager';
 import { PerformanceMonitor } from '../../utils/performance-monitor';
 
+// Font CDN URLs
+const FONT_URL = 'https://pag.qq.com/wx_pagx_demo/fonts/NotoSansSC-Regular.otf';
+const EMOJI_FONT_URL = 'https://pag.qq.com/wx_pagx_demo/fonts/NotoColorEmoji.ttf';
+
 // PAGX sample files configuration
 const SAMPLE_FILES = [
   { 
     name: 'Guidelines', 
-    url: 'https://pag.io/wx_pagx_demo/Guidelines.pagx'
+    url: 'https://pag.qq.com/wx_pagx_demo/Guidelines.pagx'
   },
   { 
     name: 'ColorPicker', 
-    url: 'https://pag.io/wx_pagx_demo/ColorPicker.pagx'
+    url: 'https://pag.qq.com/wx_pagx_demo/ColorPicker.pagx'
   },
   { 
     name: 'Baseline', 
-    url: 'https://pag.io/wx_pagx_demo/Baseline.pagx'
+    url: 'https://pag.qq.com/wx_pagx_demo/Baseline.pagx'
   },
   { 
     name: 'Overview', 
-    url: 'https://pag.io/wx_pagx_demo/Overview.pagx'
+    url: 'https://pag.qq.com/wx_pagx_demo/Overview.pagx'
+  },
+  { 
+    name: 'UIkit', 
+    url: 'https://pag.qq.com/wx_pagx_demo/UIkit.pagx'
   },
 ];
 
@@ -57,6 +65,8 @@ Page({
   perfMonitor: null,
   dpr: 2,
   gestureJustStarted: false,
+  fontData: null,
+  emojiFontData: null,
 
   async onLoad(options) {
     try {
@@ -80,7 +90,12 @@ Page({
         }
       }
       
-      await this.initializeViewer();
+      // Load fonts and initialize viewer in parallel
+      await Promise.all([
+        this.loadFonts(),
+        this.initializeViewer()
+      ]);
+
       await this.loadCurrentFile();
       
       // Initialize gesture manager with canvas (physical pixels) and content dimensions
@@ -202,6 +217,9 @@ Page({
     // Download from CDN
     const data = await this.downloadFile(sample.url);
     
+    // Register fonts before loading PAGX to ensure fonts are available during layout
+    this.registerFontsToView();
+    
     // Load into View
     this.View.loadPAGX(data);
     
@@ -252,6 +270,45 @@ Page({
     } finally {
       this.setData({ loadingFile: false });
     }
+  },
+
+  async loadFonts() {
+    const [fontData, emojiFontData] = await Promise.all([
+      this.downloadFontFile(FONT_URL),
+      this.downloadFontFile(EMOJI_FONT_URL)
+    ]);
+    this.fontData = fontData;
+    this.emojiFontData = emojiFontData;
+  },
+
+  downloadFontFile(url) {
+    return new Promise((resolve) => {
+      wx.request({
+        url: url,
+        responseType: 'arraybuffer',
+        success: (res) => {
+          if (res.statusCode === 200) {
+            resolve(new Uint8Array(res.data));
+          } else {
+            console.warn(`Font download failed: HTTP ${res.statusCode} for ${url}`);
+            resolve(null);
+          }
+        },
+        fail: (err) => {
+          console.warn(`Font download failed: ${err.errMsg} for ${url}`);
+          resolve(null);
+        }
+      });
+    });
+  },
+
+  registerFontsToView() {
+    if (!this.View) {
+      return;
+    }
+    const fontData = this.fontData || new Uint8Array(0);
+    const emojiFontData = this.emojiFontData || new Uint8Array(0);
+    this.View.registerFonts(fontData, emojiFontData);
   },
 
   downloadFile(url) {

@@ -3,6 +3,7 @@ import type {TGFX} from '@tgfx/types';
 export interface PAGXViewNative {
     width: () => number;
     height: () => number;
+    registerFonts: (fontData: Uint8Array, emojiFontData: Uint8Array) => void;
     loadPAGX: (data: Uint8Array) => boolean;
     updateSize: (width: number, height: number) => void;
     updateZoomScaleAndOffset: (zoom: number, offsetX: number, offsetY: number) => void;

@@ -28,6 +28,7 @@ EMSCRIPTEN_BINDINGS(PAGXView) {
   class_<PAGXView>("PAGXView")
       .smart_ptr<std::shared_ptr<PAGXView>>("PAGXView")
       .class_function("MakeFrom", &PAGXView::MakeFrom)
+      .function("registerFonts", &PAGXView::registerFonts)
       .function("width", &PAGXView::width)
       .function("height", &PAGXView::height)
       .function("loadPAGX", &PAGXView::loadPAGX)

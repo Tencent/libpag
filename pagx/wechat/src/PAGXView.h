@@ -44,6 +44,8 @@ class PAGXView {
 
   PAGXView(std::shared_ptr<tgfx::Device> device, int width, int height);
 
+  void registerFonts(const emscripten::val& fontVal, const emscripten::val& emojiFontVal);
+
   void loadPAGX(const emscripten::val& pagxData);
 
   /**
@@ -125,6 +127,7 @@ class PAGXView {
   float pagxHeight = 0.0f;
   int _width = 0;
   int _height = 0;
+  Typesetter typesetter = {};
 
   // Performance monitoring
   struct FrameRecord {

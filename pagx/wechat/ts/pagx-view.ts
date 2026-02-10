@@ -108,6 +108,22 @@ export class View {
   }
 
   /**
+   * Register fallback fonts for text rendering.
+   * Must be called before loadPAGX() to ensure fonts are available during layout.
+   * @param fontData Font file data (e.g. NotoSansSC-Regular.otf) as Uint8Array.
+   * @param emojiFontData Emoji font file data (e.g. NotoColorEmoji.ttf) as Uint8Array.
+   */
+  public registerFonts(fontData: Uint8Array, emojiFontData: Uint8Array): void {
+    this.checkDestroyed();
+    if (!this.nativeView) {
+      throw new Error('Native view not initialized');
+    }
+    this.backendContext!.makeCurrent(this.module);
+    this.nativeView.registerFonts(fontData, emojiFontData);
+    this.backendContext!.clearCurrent(this.module);
+  }
+
+  /**
    * Load PAGX file data.
    * @param pagxData PAGX file data
    */
