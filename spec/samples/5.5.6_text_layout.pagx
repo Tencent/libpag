@@ -9,7 +9,7 @@
   <!-- Title: point text, center aligned -->
   <Layer>
     <Text text="Text Layout" fontFamily="Arial" fontStyle="Bold" fontSize="40"/>
-    <TextLayout position="200,60" textAlign="center"/>
+    <TextLayout position="200,80" textAlign="center"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="280,0">
         <ColorStop offset="0" color="#6366F1"/>
@@ -19,40 +19,40 @@
   </Layer>
   <!-- Vertical line to show the anchor at x=200 -->
   <Layer>
-    <Path data="M 200,100 L 200,380"/>
+    <Path data="M 200,120 L 200,375"/>
     <Stroke color="#475569" width="1" dashes="6,4"/>
   </Layer>
   <!-- Start aligned: text starts at anchor point -->
   <Layer>
     <Text text="Start" fontFamily="Arial" fontStyle="Bold" fontSize="36"/>
-    <TextLayout position="200,160" textAlign="start"/>
+    <TextLayout position="200,145" textAlign="start"/>
     <Fill color="#F43F5E"/>
   </Layer>
   <Layer>
     <Text text="text begins at anchor" fontFamily="Arial" fontSize="14"/>
-    <TextLayout position="200,190" textAlign="start"/>
+    <TextLayout position="200,175" textAlign="start"/>
     <Fill color="#64748B"/>
   </Layer>
   <!-- Center aligned: text centered on anchor point -->
   <Layer>
     <Text text="Center" fontFamily="Arial" fontStyle="Bold" fontSize="36"/>
-    <TextLayout position="200,250" textAlign="center"/>
+    <TextLayout position="200,240" textAlign="center"/>
     <Fill color="#10B981"/>
   </Layer>
   <Layer>
     <Text text="text centered on anchor" fontFamily="Arial" fontSize="14"/>
-    <TextLayout position="200,280" textAlign="center"/>
+    <TextLayout position="200,270" textAlign="center"/>
     <Fill color="#64748B"/>
   </Layer>
   <!-- End aligned: text ends at anchor point -->
   <Layer>
     <Text text="End" fontFamily="Arial" fontStyle="Bold" fontSize="36"/>
-    <TextLayout position="200,340" textAlign="end"/>
+    <TextLayout position="200,335" textAlign="end"/>
     <Fill color="#06B6D4"/>
   </Layer>
   <Layer>
     <Text text="text ends at anchor" fontFamily="Arial" fontSize="14"/>
-    <TextLayout position="200,370" textAlign="end"/>
+    <TextLayout position="200,365" textAlign="end"/>
     <Fill color="#64748B"/>
   </Layer>
 </pagx>
