@@ -40,36 +40,42 @@ static std::string PathToSVGString(const tgfx::Path& path) {
   result.reserve(256);
   char buf[64] = {};
 
-  path.decompose([&](tgfx::PathVerb verb, const tgfx::Point pts[4], void*) {
-    switch (verb) {
+  for (const auto& segment : path) {
+    switch (segment.verb) {
       case tgfx::PathVerb::Move:
-        snprintf(buf, sizeof(buf), "M%d %d", static_cast<int>(std::round(pts[0].x)),
-                 static_cast<int>(std::round(pts[0].y)));
+        snprintf(buf, sizeof(buf), "M%d %d", static_cast<int>(std::round(segment.points[0].x)),
+                 static_cast<int>(std::round(segment.points[0].y)));
         result += buf;
         break;
       case tgfx::PathVerb::Line:
-        snprintf(buf, sizeof(buf), "L%d %d", static_cast<int>(std::round(pts[1].x)),
-                 static_cast<int>(std::round(pts[1].y)));
+        snprintf(buf, sizeof(buf), "L%d %d", static_cast<int>(std::round(segment.points[1].x)),
+                 static_cast<int>(std::round(segment.points[1].y)));
         result += buf;
         break;
       case tgfx::PathVerb::Quad:
-        snprintf(buf, sizeof(buf), "Q%d %d %d %d", static_cast<int>(std::round(pts[1].x)),
-                 static_cast<int>(std::round(pts[1].y)), static_cast<int>(std::round(pts[2].x)),
-                 static_cast<int>(std::round(pts[2].y)));
+        snprintf(buf, sizeof(buf), "Q%d %d %d %d", static_cast<int>(std::round(segment.points[1].x)),
+                 static_cast<int>(std::round(segment.points[1].y)),
+                 static_cast<int>(std::round(segment.points[2].x)),
+                 static_cast<int>(std::round(segment.points[2].y)));
         result += buf;
         break;
       case tgfx::PathVerb::Cubic:
-        snprintf(buf, sizeof(buf), "C%d %d %d %d %d %d", static_cast<int>(std::round(pts[1].x)),
-                 static_cast<int>(std::round(pts[1].y)), static_cast<int>(std::round(pts[2].x)),
-                 static_cast<int>(std::round(pts[2].y)), static_cast<int>(std::round(pts[3].x)),
-                 static_cast<int>(std::round(pts[3].y)));
+        snprintf(buf, sizeof(buf), "C%d %d %d %d %d %d",
+                 static_cast<int>(std::round(segment.points[1].x)),
+                 static_cast<int>(std::round(segment.points[1].y)),
+                 static_cast<int>(std::round(segment.points[2].x)),
+                 static_cast<int>(std::round(segment.points[2].y)),
+                 static_cast<int>(std::round(segment.points[3].x)),
+                 static_cast<int>(std::round(segment.points[3].y)));
         result += buf;
         break;
       case tgfx::PathVerb::Close:
         result += "Z";
         break;
+      default:
+        break;
     }
-  });
+  }
 
   return result;
 }
