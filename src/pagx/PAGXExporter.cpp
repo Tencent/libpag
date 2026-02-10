@@ -21,7 +21,6 @@
 #include "Base64.h"
 #include "StringParser.h"
 #include "SVGPathParser.h"
-#include "tgfx/core/Data.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"

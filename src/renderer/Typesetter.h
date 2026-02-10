@@ -22,7 +22,7 @@
 #include <unordered_map>
 #include <vector>
 #include "pagx/PAGXDocument.h"
-#include "pagx/ShapedText.h"
+#include "ShapedText.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {

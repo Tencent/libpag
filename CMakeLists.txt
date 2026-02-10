@@ -161,8 +161,10 @@ list(APPEND PAG_FILES ${PAG_HEADERS})
 file(GLOB_RECURSE SRC_FILES
         src/base/*.*
         src/codec/*.*
-        src/rendering/*.*)
+        src/rendering/*.*
+        src/renderer/*.*)
 list(APPEND PAG_FILES ${SRC_FILES})
+list(APPEND PAG_INCLUDES src/renderer src/pagx)
 file(GLOB COMMON_FILES src/platform/*.*)
 list(APPEND PAG_FILES ${COMMON_FILES})
 
@@ -635,8 +637,21 @@ if (PAG_BUILD_TESTS)
         endif ()
     endif ()
 
-    # Add pagx library for testing
-    add_subdirectory(pagx)
+    # Build pagx static library (format module, no tgfx dependency)
+    file(GLOB PAGX_CORE_SOURCES src/pagx/*.cpp)
+    file(GLOB_RECURSE PAGX_XML_SOURCES src/pagx/xml/*.cpp)
+    file(GLOB_RECURSE PAGX_SVG_SOURCES src/pagx/svg/*.cpp)
+    add_library(pagx STATIC ${PAGX_CORE_SOURCES} ${PAGX_XML_SOURCES} ${PAGX_SVG_SOURCES})
+    target_include_directories(pagx PUBLIC include)
+    target_include_directories(pagx PRIVATE src/pagx
+            ${CMAKE_CURRENT_SOURCE_DIR}/third_party/expat/expat/lib)
+    if(WIN32)
+        target_compile_definitions(pagx PRIVATE XML_STATIC)
+    endif()
+    add_vendor_target(pagx-vendor STATIC_VENDORS expat)
+    find_vendor_libraries(pagx-vendor STATIC PAGX_VENDOR_STATIC_LIBRARIES)
+    add_dependencies(pagx pagx-vendor)
+    merge_libraries_into(pagx ${PAGX_VENDOR_STATIC_LIBRARIES})
 
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
     list(APPEND PAG_TEST_FILES ${SRC_FILES})
@@ -645,7 +660,7 @@ if (PAG_BUILD_TESTS)
     list(APPEND PAG_TEST_INCLUDES ${PAG_INCLUDES} test/src
             ${GOOGLE_TEST_DIR} ${GOOGLE_TEST_DIR}/include
             ${TGFX_DIR}/third_party/json/include
-            pagx/include pagx/src/layers pagx/src/svg)
+            src/renderer src/pagx src/pagx/svg)
 
     add_vendor_target(test-vendor STATIC_VENDORS googletest CONFIG_DIR ${TGFX_DIR})
     find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)

@@ -28,7 +28,6 @@
 #include "SVGPathParser.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
-#include "tgfx/platform/Print.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
@@ -421,7 +420,7 @@ static void parseResources(const XMLNode* node, PAGXDocument* doc) {
       continue;
     }
     // Unknown resource type - report error.
-    tgfx::PrintError("PAGXImporter: Unknown element '%s' in Resources.\n", child->tag.c_str());
+    fprintf(stderr, "PAGXImporter: Unknown element '%s' in Resources.\n", child->tag.c_str());
   }
 }
 
@@ -532,7 +531,7 @@ static Layer* parseLayer(const XMLNode* node, PAGXDocument* doc) {
       continue;
     }
     // Unknown node type - report error.
-    tgfx::PrintError("PAGXImporter: Unknown element '%s' in Layer.\n", child->tag.c_str());
+    fprintf(stderr, "PAGXImporter: Unknown element '%s' in Layer.\n", child->tag.c_str());
   }
 
   return layer;
@@ -544,7 +543,7 @@ static void parseContents(const XMLNode* node, Layer* layer, PAGXDocument* doc) 
     if (element) {
       layer->contents.push_back(element);
     } else {
-      tgfx::PrintError("PAGXImporter: Unknown element '%s' in contents.\n", child->tag.c_str());
+      fprintf(stderr, "PAGXImporter: Unknown element '%s' in contents.\n", child->tag.c_str());
     }
   }
 }
@@ -555,7 +554,7 @@ static void parseStyles(const XMLNode* node, Layer* layer, PAGXDocument* doc) {
     if (style) {
       layer->styles.push_back(style);
     } else {
-      tgfx::PrintError("PAGXImporter: Unknown element '%s' in styles.\n", child->tag.c_str());
+      fprintf(stderr, "PAGXImporter: Unknown element '%s' in styles.\n", child->tag.c_str());
     }
   }
 }
@@ -566,7 +565,7 @@ static void parseFilters(const XMLNode* node, Layer* layer, PAGXDocument* doc) {
     if (filter) {
       layer->filters.push_back(filter);
     } else {
-      tgfx::PrintError("PAGXImporter: Unknown element '%s' in filters.\n", child->tag.c_str());
+      fprintf(stderr, "PAGXImporter: Unknown element '%s' in filters.\n", child->tag.c_str());
     }
   }
 }
@@ -1021,7 +1020,7 @@ static Group* parseGroup(const XMLNode* node, PAGXDocument* doc) {
     if (element) {
       group->elements.push_back(element);
     } else {
-      tgfx::PrintError("PAGXImporter: Unknown element '%s' in Group.\n", child->tag.c_str());
+      fprintf(stderr, "PAGXImporter: Unknown element '%s' in Group.\n", child->tag.c_str());
     }
   }
 
@@ -1300,7 +1299,7 @@ static GlyphRun* parseGlyphRun(const XMLNode* node, PAGXDocument* doc) {
     auto fontId = fontAttr.substr(1);
     run->font = doc->findNode<Font>(fontId);
     if (!run->font) {
-      tgfx::PrintError("PAGXImporter: Font resource '%s' not found, GlyphRun will be empty.\n",
+      fprintf(stderr, "PAGXImporter: Font resource '%s' not found, GlyphRun will be empty.\n",
                        fontId.c_str());
     }
   }

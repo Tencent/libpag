@@ -20,7 +20,7 @@
 
 #include <memory>
 #include "pagx/PAGXDocument.h"
-#include "pagx/Typesetter.h"
+#include "Typesetter.h"
 #include "tgfx/layers/Layer.h"
 
 namespace pagx {

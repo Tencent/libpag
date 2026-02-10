@@ -20,16 +20,16 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
-#include "pagx/LayerBuilder.h"
+#include "LayerBuilder.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/SVGImporter.h"
-#include "pagx/Typesetter.h"
-#include "pagx/FontEmbedder.h"
-#include "pagx/ShapedText.h"
-#include "../../pagx/src/StringParser.h"
-#include "../../pagx/src/SVGPathParser.h"
+#include "Typesetter.h"
+#include "FontEmbedder.h"
+#include "ShapedText.h"
+#include "StringParser.h"
+#include "SVGPathParser.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
@@ -1616,7 +1616,7 @@ PAG_TEST(PAGXTest, CompleteExample) {
 }
 
 /**
- * Test all PAGX sample files in pagx/spec/samples directory.
+ * Test all PAGX sample files in spec/samples directory.
  * Renders each sample and compares with baseline screenshots.
  */
 PAG_TEST(PAGXTest, SampleFiles) {
@@ -1625,7 +1625,7 @@ PAG_TEST(PAGXTest, SampleFiles) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
 
-  auto samplesDir = ProjectPath::Absolute("pagx/spec/samples");
+  auto samplesDir = ProjectPath::Absolute("spec/samples");
   std::vector<std::string> sampleFiles;
 
   for (const auto& entry : std::filesystem::directory_iterator(samplesDir)) {

@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/Typesetter.h"
+#include "Typesetter.h"
 #include "Base64.h"
 #include "MathUtil.h"
 #include "SVGPathParser.h"

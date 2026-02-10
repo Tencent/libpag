@@ -19,8 +19,8 @@
 #pragma once
 
 #include <emscripten/bind.h>
-#include "pagx/LayerBuilder.h"
-#include "pagx/Typesetter.h"
+#include "LayerBuilder.h"
+#include "Typesetter.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
 #include "tgfx/layers/DisplayList.h"

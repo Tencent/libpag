@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/LayerBuilder.h"
+#include "LayerBuilder.h"
 #include <tuple>
 #include <unordered_map>
 #include "pagx/nodes/BackgroundBlurStyle.h"
@@ -27,7 +27,6 @@
 #include "pagx/types/Data.h"
 #include "pagx/nodes/DiamondGradient.h"
 #include "Base64.h"
-#include "StringParser.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
@@ -97,135 +96,6 @@
 #endif
 
 namespace pagx {
-
-// Parse a single hex digit (0-9, a-f, A-F) to its integer value.
-static int ParseHexDigit(char c) {
-  if (c >= '0' && c <= '9') {
-    return c - '0';
-  }
-  if (c >= 'a' && c <= 'f') {
-    return c - 'a' + 10;
-  }
-  if (c >= 'A' && c <= 'F') {
-    return c - 'A' + 10;
-  }
-  return 0;
-}
-
-// Parse a hex color string (#RGB, #RRGGBB, or #RRGGBBAA) to tgfx::Color.
-static tgfx::Color ParseHexColor(const std::string& str) {
-  if (str.empty() || str[0] != '#') {
-    return tgfx::Color::Black();
-  }
-  auto hex = str.substr(1);
-  if (hex.size() == 3) {
-    int r = ParseHexDigit(hex[0]);
-    int g = ParseHexDigit(hex[1]);
-    int b = ParseHexDigit(hex[2]);
-    return {static_cast<float>(r * 17) / 255.0f, static_cast<float>(g * 17) / 255.0f,
-            static_cast<float>(b * 17) / 255.0f, 1.0f};
-  }
-  if (hex.size() == 6) {
-    int r = ParseHexDigit(hex[0]) * 16 + ParseHexDigit(hex[1]);
-    int g = ParseHexDigit(hex[2]) * 16 + ParseHexDigit(hex[3]);
-    int b = ParseHexDigit(hex[4]) * 16 + ParseHexDigit(hex[5]);
-    return {static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f,
-            static_cast<float>(b) / 255.0f, 1.0f};
-  }
-  if (hex.size() == 8) {
-    int r = ParseHexDigit(hex[0]) * 16 + ParseHexDigit(hex[1]);
-    int g = ParseHexDigit(hex[2]) * 16 + ParseHexDigit(hex[3]);
-    int b = ParseHexDigit(hex[4]) * 16 + ParseHexDigit(hex[5]);
-    int a = ParseHexDigit(hex[6]) * 16 + ParseHexDigit(hex[7]);
-    return {static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f,
-            static_cast<float>(b) / 255.0f, static_cast<float>(a) / 255.0f};
-  }
-  return tgfx::Color::Black();
-}
-
-// Parse a color string to pagx::Color. Supports:
-// - Hex format: #RGB, #RRGGBB, #RRGGBBAA
-// - sRGB float format: srgb(r, g, b) or srgb(r, g, b, a)
-// - Display P3 format: p3(r, g, b) or p3(r, g, b, a)
-static Color ParseColorString(const std::string& str) {
-  if (str.empty()) {
-    return {};
-  }
-  // Hex format
-  if (str[0] == '#') {
-    auto hex = str.substr(1);
-    Color color = {};
-    color.colorSpace = ColorSpace::SRGB;
-    if (hex.size() == 3) {
-      int r = ParseHexDigit(hex[0]);
-      int g = ParseHexDigit(hex[1]);
-      int b = ParseHexDigit(hex[2]);
-      color.red = static_cast<float>(r * 17) / 255.0f;
-      color.green = static_cast<float>(g * 17) / 255.0f;
-      color.blue = static_cast<float>(b * 17) / 255.0f;
-      color.alpha = 1.0f;
-      return color;
-    }
-    if (hex.size() == 6) {
-      int r = ParseHexDigit(hex[0]) * 16 + ParseHexDigit(hex[1]);
-      int g = ParseHexDigit(hex[2]) * 16 + ParseHexDigit(hex[3]);
-      int b = ParseHexDigit(hex[4]) * 16 + ParseHexDigit(hex[5]);
-      color.red = static_cast<float>(r) / 255.0f;
-      color.green = static_cast<float>(g) / 255.0f;
-      color.blue = static_cast<float>(b) / 255.0f;
-      color.alpha = 1.0f;
-      return color;
-    }
-    if (hex.size() == 8) {
-      int r = ParseHexDigit(hex[0]) * 16 + ParseHexDigit(hex[1]);
-      int g = ParseHexDigit(hex[2]) * 16 + ParseHexDigit(hex[3]);
-      int b = ParseHexDigit(hex[4]) * 16 + ParseHexDigit(hex[5]);
-      int a = ParseHexDigit(hex[6]) * 16 + ParseHexDigit(hex[7]);
-      color.red = static_cast<float>(r) / 255.0f;
-      color.green = static_cast<float>(g) / 255.0f;
-      color.blue = static_cast<float>(b) / 255.0f;
-      color.alpha = static_cast<float>(a) / 255.0f;
-      return color;
-    }
-  }
-  // sRGB float format: srgb(r, g, b) or srgb(r, g, b, a)
-  if (str.size() > 5 && str.substr(0, 5) == "srgb(") {
-    auto start = str.find('(');
-    auto end = str.find(')');
-    if (start != std::string::npos && end != std::string::npos) {
-      auto inner = str.substr(start + 1, end - start - 1);
-      auto components = ParseFloatList(inner);
-      if (components.size() >= 3) {
-        Color color = {};
-        color.red = components[0];
-        color.green = components[1];
-        color.blue = components[2];
-        color.alpha = components.size() >= 4 ? components[3] : 1.0f;
-        color.colorSpace = ColorSpace::SRGB;
-        return color;
-      }
-    }
-  }
-  // Display P3 format: p3(r, g, b) or p3(r, g, b, a)
-  if (str.size() > 3 && str.substr(0, 3) == "p3(") {
-    auto start = str.find('(');
-    auto end = str.find(')');
-    if (start != std::string::npos && end != std::string::npos) {
-      auto inner = str.substr(start + 1, end - start - 1);
-      auto components = ParseFloatList(inner);
-      if (components.size() >= 3) {
-        Color color = {};
-        color.red = components[0];
-        color.green = components[1];
-        color.blue = components[2];
-        color.alpha = components.size() >= 4 ? components[3] : 1.0f;
-        color.colorSpace = ColorSpace::DisplayP3;
-        return color;
-      }
-    }
-  }
-  return {};
-}
 
 // Type converter from pagx::Data to tgfx::Data
 static std::shared_ptr<tgfx::Data> ToTGFX(const std::shared_ptr<pagx::Data>& data) {

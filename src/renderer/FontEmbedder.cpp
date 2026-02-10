@@ -16,11 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/FontEmbedder.h"
+#include "FontEmbedder.h"
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
-#include "../MathUtil.h"
+#include "MathUtil.h"
 #include "SVGPathParser.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/Image.h"
@@ -313,8 +313,6 @@ static GlyphRun* CreateGlyphRunForIndices(
     return glyphRun;
   }
 
-  float advanceScale = fontSize / static_cast<float>(font->unitsPerEm);
-
   switch (run.positioning) {
     case tgfx::GlyphPositioning::Horizontal: {
       glyphRun->y = run.offsetY;
@@ -354,13 +352,6 @@ static GlyphRun* CreateGlyphRunForIndices(
       for (size_t idx = 0; idx < indices.size(); idx++) {
         size_t i = indices[idx];
         const auto& xform = xforms[i];
-
-        // Get glyph advance for anchor calculation
-        float glyphAdvance = 0.0f;
-        if (glyphRun->glyphs[idx] > 0 && glyphRun->glyphs[idx] <= font->glyphs.size()) {
-          glyphAdvance = font->glyphs[glyphRun->glyphs[idx] - 1]->advance * advanceScale;
-        }
-        float defaultAnchorX = glyphAdvance * 0.5f;
 
         // Decompose: scale = sqrt(scos^2 + ssin^2), rotation = atan2(ssin, scos)
         float scale = std::sqrt(xform.scos * xform.scos + xform.ssin * xform.ssin);

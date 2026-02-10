@@ -19,7 +19,7 @@
 #pragma once
 
 #include "pagx/PAGXDocument.h"
-#include "pagx/ShapedText.h"
+#include "ShapedText.h"
 
 namespace pagx {
 
