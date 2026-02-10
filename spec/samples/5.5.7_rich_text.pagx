@@ -10,7 +10,7 @@
   <!-- Title -->
   <Layer>
     <Text text="Rich Text" fontFamily="Arial" fontStyle="Bold" fontSize="42"/>
-    <TextLayout position="200,55" textAlign="center"/>
+    <TextLayout position="200,105" textAlign="center"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="200,0">
         <ColorStop offset="0" color="#8B5CF6"/>
@@ -49,7 +49,7 @@
       <Text text=" text." fontFamily="Arial" fontSize="20"/>
       <Fill color="#94A3B8"/>
     </Group>
-    <TextLayout position="30,115" textAlign="start"/>
+    <TextLayout position="30,165" textAlign="start"/>
   </Layer>
 
   <!-- Second paragraph: mixed sizes -->
@@ -74,7 +74,7 @@
       <Text text=" within one line." fontFamily="Arial" fontSize="16"/>
       <Fill color="#64748B"/>
     </Group>
-    <TextLayout position="30,175" textAlign="start"/>
+    <TextLayout position="30,215" textAlign="start"/>
   </Layer>
 
   <!-- Center aligned rich text -->
@@ -91,13 +91,13 @@
       <Text text=" rich text." fontFamily="Arial" fontSize="20"/>
       <Fill color="#64748B"/>
     </Group>
-    <TextLayout position="200,235" textAlign="center"/>
+    <TextLayout position="200,265" textAlign="center"/>
   </Layer>
 
   <!-- Gradient fill text -->
   <Layer>
     <Text text="Gradient Fill" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
-    <TextLayout position="200,300" textAlign="center"/>
+    <TextLayout position="200,310" textAlign="center"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="240,0">
         <ColorStop offset="0" color="#F43F5E"/>

@@ -30,7 +30,15 @@
   <Layer name="Subtitle">
     <Text text="Portable Animated Graphics XML" fontFamily="Arial" fontSize="14"/>
     <TextLayout position="400,93" textAlign="center"/>
-    <Fill color="#94A3B8"/>
+    <TextModifier scale="1.4,1.4" fillColor="#E2E8F0">
+      <RangeSelector start="0" end="1" shape="rampUp"/>
+    </TextModifier>
+    <Fill color="#64748B"/>
+  </Layer>
+  <Layer name="TextPathDecor">
+    <Text text="PAGX·XML" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+    <TextPath path="M 585,18 Q 690,50 715,130" firstMargin="10"/>
+    <Fill color="#475569"/>
   </Layer>
   
   <!-- ===== Shape Area y=150 ===== -->
@@ -173,7 +181,7 @@
   <Layer y="360" x="670">
     <Rectangle center="0,0" size="90,60" roundness="8"/>
     <Fill>
-      <ImagePattern image="@photo" tileModeX="clamp" tileModeY="clamp"/>
+      <ImagePattern image="@photo" tileModeX="clamp" tileModeY="clamp" matrix="0.35,0,0,0.35,-45,-45"/>
     </Fill>
     <Stroke color="#FFFFFF20" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="6" blurX="16" blurY="16" color="#00000060"/>
@@ -211,7 +219,7 @@
   <!-- ==================== Resources ==================== -->
   <Resources>
     <!-- Image Resource (using a real image path from project) -->
-    <Image id="photo" source="resources/apitest/imageReplacement.png"/>
+    <Image id="photo" source="pag_logo.png"/>
     <!-- Path Data -->
     <PathData id="wavePath" data="M 0 0 Q 30 -20 60 0 T 120 0 T 180 0"/>
     <!-- Embedded Vector Font (Icons) -->
