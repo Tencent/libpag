@@ -7,7 +7,7 @@
     <Fill color="#0F172A"/>
   </Layer>
   <!-- Clipped content showing scrollRect effect -->
-  <Layer scrollRect="0,0,200,200">
+  <Layer x="100" y="100" scrollRect="100,100,200,200">
     <Ellipse center="200,200" size="320,320"/>
     <Fill>
       <RadialGradient center="200,200" radius="160">
@@ -19,7 +19,7 @@
   </Layer>
   <!-- Visible clip region indicator (dashed border) -->
   <Layer>
-    <Rectangle center="100,100" size="200,200" roundness="16"/>
+    <Rectangle center="200,200" size="200,200" roundness="16"/>
     <Stroke color="#475569" width="3" dashes="10,6"/>
   </Layer>
 </pagx>

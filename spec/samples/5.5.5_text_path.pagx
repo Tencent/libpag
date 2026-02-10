@@ -1,33 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates text layout with positioning -->
+<!-- Demonstrates TextPath for arranging text along a curve -->
 <pagx version="1.0" width="400" height="400">
   <!-- Dark background -->
   <Layer>
     <Rectangle center="200,200" size="400,400"/>
     <Fill color="#0F172A"/>
   </Layer>
-  <!-- Main title text -->
+  <!-- Text along an arc path with force alignment -->
   <Layer>
-    <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="84"/>
-    <TextLayout position="200,140" textAlign="center"/>
+    <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="56"/>
+    <TextPath path="M 60,240 Q 200,20 340,240" forceAlignment="true"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="280,0">
+      <LinearGradient startPoint="0,0" endPoint="300,0">
         <ColorStop offset="0" color="#06B6D4"/>
         <ColorStop offset="0.5" color="#8B5CF6"/>
         <ColorStop offset="1" color="#EC4899"/>
       </LinearGradient>
     </Fill>
   </Layer>
-  <!-- Subtitle -->
+  <!-- Guide path (dashed) to visualize the curve -->
   <Layer>
-    <Text text="Text Demo" fontFamily="Arial" fontSize="36"/>
-    <TextLayout position="200,240" textAlign="center"/>
+    <Path data="M 60,240 Q 200,20 340,240"/>
+    <Stroke color="#47556960" width="1" dashes="6,4"/>
+  </Layer>
+  <!-- Text along a lower curve -->
+  <Layer>
+    <Text text="TextPath" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+    <TextPath path="M 80,330 Q 200,240 320,330" forceAlignment="true"/>
     <Fill color="#94A3B8"/>
   </Layer>
-  <!-- Description -->
+  <!-- Guide path for lower curve -->
   <Layer>
-    <Text text="Beautiful Typography" fontFamily="Arial" fontSize="24"/>
-    <TextLayout position="200,320" textAlign="center"/>
-    <Fill color="#64748B"/>
+    <Path data="M 80,330 Q 200,240 320,330"/>
+    <Stroke color="#33415540" width="1" dashes="4,4"/>
   </Layer>
 </pagx>

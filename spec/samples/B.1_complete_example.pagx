@@ -27,7 +27,7 @@
   </Layer>
   <Layer name="Subtitle">
     <Text text="Portable Animated Graphics XML" fontFamily="Arial" fontSize="14"/>
-    <TextLayout position="400,95" textAlign="center"/>
+    <TextLayout position="400,93" textAlign="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
   
@@ -186,14 +186,14 @@
   </Layer>
   <Layer y="455" x="200">
     <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
-    <TextLayout position="0,-5" textAlign="center"/>
+    <TextLayout position="0,7" textAlign="center"/>
     <Fill color="#FFFFFF"/>
   </Layer>
   
   <!-- Pre-layout Text -->
   <Layer y="455" x="400">
     <Text fontFamily="Arial" fontSize="18">
-      <GlyphRun font="@iconFont" glyphs="1,2,3" y="0" xPositions="0,28,56"/>
+      <GlyphRun font="@iconFont" glyphs="1,2,3" y="0" xOffsets="0,28,56"/>
     </Text>
     <Fill color="#64748B"/>
   </Layer>
@@ -204,7 +204,7 @@
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
   </Layer>
-  <Layer composition="@badgeComp" x="600" y="455"/>
+  <Layer composition="@badgeComp" x="550" y="437"/>
   
   <!-- ==================== Resources ==================== -->
   <Resources>
@@ -214,9 +214,9 @@
     <PathData id="wavePath" data="M 0 0 Q 30 -20 60 0 T 120 0 T 180 0"/>
     <!-- Embedded Vector Font (Icons) -->
     <Font id="iconFont">
-      <Glyph path="M 0 -8 L 8 8 L -8 8 Z"/>
-      <Glyph path="M -8 -8 L 8 -8 L 8 8 L -8 8 Z"/>
-      <Glyph path="M 0 -10 A 10 10 0 1 1 0 10 A 10 10 0 1 1 0 -10"/>
+      <Glyph advance="20" path="M 0 -8 L 8 8 L -8 8 Z"/>
+      <Glyph advance="20" path="M -8 -8 L 8 -8 L 8 8 L -8 8 Z"/>
+      <Glyph advance="24" path="M 0 -10 A 10 10 0 1 1 0 10 A 10 10 0 1 1 0 -10"/>
     </Font>
     <!-- Background Gradient -->
     <LinearGradient id="bgGradient" startPoint="0,0" endPoint="800,520">
@@ -264,7 +264,7 @@
     <Composition id="badgeComp" width="100" height="36">
       <Layer>
         <Text text="v1.0" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
-        <TextLayout position="50,-5" textAlign="center"/>
+        <TextLayout position="50,22" textAlign="center"/>
         <Fill color="#94A3B8"/>
       </Layer>
     </Composition>
