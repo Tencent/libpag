@@ -118,13 +118,6 @@
       <Fill color="@purple"/>
     </Group>
     
-    <!-- Repeater: rotating squares forming a cross pattern -->
-    <Group position="580,0">
-      <Rectangle center="20,0" size="12,12" roundness="2"/>
-      <Fill color="@cyan"/>
-      <Repeater copies="4" rotation="90" anchor="0,0"/>
-    </Group>
-    
     <!-- Mask Example (shape without mask) -->
     <Group position="700,0">
       <Rectangle center="0,0" size="50,50"/>
@@ -138,6 +131,18 @@
   <Layer name="MaskedLayer" x="700" y="270" mask="@circleMask" maskType="alpha">
     <Rectangle center="0,0" size="50,50"/>
     <Fill color="@rainbow"/>
+  </Layer>
+  
+  <!-- Repeater (independent card) -->
+  <Layer y="270" x="560">
+    <Rectangle center="0,0" size="100,80" roundness="12"/>
+    <Fill color="#1E293B"/>
+    <Stroke color="#334155" width="1"/>
+  </Layer>
+  <Layer y="270" x="560">
+    <Ellipse center="22,0" size="12,12"/>
+    <Fill color="@cyan"/>
+    <Repeater copies="5" rotation="72" anchor="0,0" position="0,0"/>
   </Layer>
   
   <!-- ===== Filter Area y=360 ===== -->
