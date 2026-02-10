@@ -1814,14 +1814,16 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 #### 5.5.5 文本路径（TextPath）
 
-将文本沿指定路径排列。路径可以通过引用 Resources 中定义的 PathData，也可以内联路径数据。
+将文本沿指定路径排列。路径可以通过引用 Resources 中定义的 PathData，也可以内联路径数据。TextPath 使用
+基线（由 baselineOrigin 和 baselineAngle 定义的直线）作为文本的参考线：字形从基线上的位置映射到路径曲线上
+的对应位置，保持相对间距和偏移。当 forceAlignment 启用时，忽略原始字形位置，将字形均匀分布以填满可用路径长度。
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="250" height="150">
   <Layer>
     <Text text="Hello Path" fontFamily="Arial" fontSize="20"/>
-    <TextPath path="M 20,100 Q 125,20 230,100" textAlign="center"/>
+    <TextPath path="M 20,100 Q 125,20 230,100"/>
     <Fill color="#3366FF"/>
   </Layer>
 </pagx>
@@ -1830,24 +1832,25 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `path` | string/idref | (必填) | SVG 路径数据或 PathData 资源引用 "@id" |
-| `textAlign` | TextAlign | start | 对齐模式（见下方） |
+| `baselineOrigin` | Point | 0,0 | 基线原点，文本参考线的起点坐标 |
+| `baselineAngle` | float | 0 | 基线角度（度），0 为水平，90 为垂直 |
 | `firstMargin` | float | 0 | 起始边距 |
 | `lastMargin` | float | 0 | 结束边距 |
 | `perpendicular` | bool | true | 垂直于路径 |
 | `reversed` | bool | false | 反转方向 |
+| `forceAlignment` | bool | false | 强制拉伸文本填满路径 |
 
-**TextAlign 在 TextPath 中的含义**：
-
-| 值 | 说明 |
-|------|------|
-| `start` | 从路径起点开始排列 |
-| `center` | 文本居中于路径 |
-| `end` | 文本结束于路径终点 |
-| `justify` | 强制填满路径，自动调整字间距以填满可用路径长度（减去边距） |
+**基线**：
+- `baselineOrigin`：基线的起点坐标，相对于 TextPath 的本地坐标空间
+- `baselineAngle`：基线的角度（度数），0 表示水平基线（文本从左到右沿 X 轴），90 表示垂直基线（文本从上到下沿 Y 轴）
+- 字形沿基线的距离决定其在曲线上的位置，字形垂直于基线的偏移量保持为垂直于曲线的偏移量
 
 **边距**：
 - `firstMargin`：起点边距（从路径起点向内偏移）
 - `lastMargin`：终点边距（从路径终点向内偏移）
+
+**强制对齐**：
+- 当 `forceAlignment="true"` 时，字形按其推进宽度依次排列，然后按比例调整间距以填满 firstMargin 和 lastMargin 之间的路径区域
 
 **字形定位**：
 1. 计算字形中心在路径上的位置
@@ -2953,11 +2956,13 @@ Layer / Group
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `path` | string/idref | (必填) |
-| `textAlign` | TextAlign | start |
+| `baselineOrigin` | Point | 0,0 |
+| `baselineAngle` | float | 0 |
 | `firstMargin` | float | 0 |
 | `lastMargin` | float | 0 |
 | `perpendicular` | bool | true |
 | `reversed` | bool | false |
+| `forceAlignment` | bool | false |
 
 #### TextLayout
 

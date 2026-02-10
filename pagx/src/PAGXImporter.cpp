@@ -951,11 +951,13 @@ static TextPath* parseTextPath(const XMLNode* node, PAGXDocument* doc) {
       *textPath->path = PathDataFromSVGString(pathAttr);
     }
   }
-  textPath->textAlign = TextAlignFromString(getAttribute(node, "textAlign", "start"));
+  textPath->baselineOrigin = parsePoint(getAttribute(node, "baselineOrigin", "0,0"));
+  textPath->baselineAngle = getFloatAttribute(node, "baselineAngle", 0);
   textPath->firstMargin = getFloatAttribute(node, "firstMargin", 0);
   textPath->lastMargin = getFloatAttribute(node, "lastMargin", 0);
   textPath->perpendicular = getBoolAttribute(node, "perpendicular", true);
   textPath->reversed = getBoolAttribute(node, "reversed", false);
+  textPath->forceAlignment = getBoolAttribute(node, "forceAlignment", false);
   return textPath;
 }
 

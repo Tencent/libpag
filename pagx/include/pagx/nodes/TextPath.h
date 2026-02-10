@@ -21,7 +21,7 @@
 #include <string>
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/PathData.h"
-#include "pagx/types/TextAlign.h"
+#include "pagx/types/Point.h"
 
 namespace pagx {
 
@@ -37,13 +37,19 @@ class TextPath : public Element {
   PathData* path = nullptr;
 
   /**
-   * The alignment of text along the path. The default value is Start.
-   * - Start: Align text to the path start.
-   * - Center: Center text along the path.
-   * - End: Align text to the path end.
-   * - Justify: Force text to fill the path by adjusting letter spacing.
+   * The origin point of the baseline in the TextPath's local coordinate space. The baseline is a
+   * straight line starting from this origin at the angle specified by baselineAngle. Each glyph's
+   * distance along the baseline determines where it lands on the curve, and its perpendicular offset
+   * from the baseline is preserved as a perpendicular offset from the curve. Default is (0, 0).
    */
-  TextAlign textAlign = TextAlign::Start;
+  Point baselineOrigin = {};
+
+  /**
+   * The angle of the baseline in degrees. 0 means a horizontal baseline (text flows left to right
+   * along the X axis), 90 means a vertical baseline (text flows top to bottom along the Y axis).
+   * The default value is 0.
+   */
+  float baselineAngle = 0;
 
   /**
    * The margin from the start of the path in pixels. The default value is 0.
@@ -64,6 +70,13 @@ class TextPath : public Element {
    * Whether to reverse the direction of the path. The default value is false.
    */
   bool reversed = false;
+
+  /**
+   * Whether text is stretched to fit the available path length. When enabled, glyphs are laid out
+   * consecutively using their advance widths, then spacing is adjusted proportionally to fill the
+   * path region between firstMargin and lastMargin. The default value is false.
+   */
+  bool forceAlignment = false;
 
   NodeType nodeType() const override {
     return NodeType::TextPath;

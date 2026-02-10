@@ -1816,14 +1816,19 @@ Range selectors define the glyph range and influence degree for TextModifier.
 
 #### 5.5.5 TextPath
 
-Arranges text along a specified path. The path can reference a PathData defined in Resources, or use inline path data.
+Arranges text along a specified path. The path can reference a PathData defined in Resources, or use
+inline path data. TextPath uses a baseline (a straight line defined by baselineOrigin and
+baselineAngle) as the text's reference line: glyphs are mapped from their positions along this
+baseline onto corresponding positions on the path curve, preserving their relative spacing and
+offsets. When forceAlignment is enabled, original glyph positions are ignored and glyphs are
+redistributed evenly to fill the available path length.
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="250" height="150">
   <Layer>
     <Text text="Hello Path" fontFamily="Arial" fontSize="20"/>
-    <TextPath path="M 20,100 Q 125,20 230,100" textAlign="center"/>
+    <TextPath path="M 20,100 Q 125,20 230,100"/>
     <Fill color="#3366FF"/>
   </Layer>
 </pagx>
@@ -1832,24 +1837,25 @@ Arranges text along a specified path. The path can reference a PathData defined 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `path` | string/idref | (required) | SVG path data or PathData resource reference "@id" |
-| `textAlign` | TextAlign | start | Alignment mode |
+| `baselineOrigin` | Point | 0,0 | Baseline origin, the starting point of the text reference line |
+| `baselineAngle` | float | 0 | Baseline angle in degrees, 0 for horizontal, 90 for vertical |
 | `firstMargin` | float | 0 | Start margin |
 | `lastMargin` | float | 0 | End margin |
 | `perpendicular` | bool | true | Perpendicular to path |
 | `reversed` | bool | false | Reverse direction |
+| `forceAlignment` | bool | false | Force stretch text to fill path |
 
-**TextAlign in TextPath Context**:
-
-| Value | Description |
-|-------|-------------|
-| `start` | Arrange from path start |
-| `center` | Center text on path |
-| `end` | Text ends at path end |
-| `justify` | Force fill path, automatically adjusting letter spacing to fill available path length (minus margins) |
+**Baseline**:
+- `baselineOrigin`: The starting point of the baseline in the TextPath's local coordinate space
+- `baselineAngle`: The angle of the baseline in degrees. 0 means a horizontal baseline (text flows left to right along X axis), 90 means a vertical baseline (text flows top to bottom along Y axis)
+- Each glyph's distance along the baseline determines where it lands on the curve, and its perpendicular offset from the baseline is preserved as a perpendicular offset from the curve
 
 **Margins**:
 - `firstMargin`: Start margin (offset inward from path start)
 - `lastMargin`: End margin (offset inward from path end)
+
+**Force Alignment**:
+- When `forceAlignment="true"`, glyphs are laid out consecutively using their advance widths, then spacing is adjusted proportionally to fill the path region between firstMargin and lastMargin
 
 **Glyph Positioning**:
 1. Calculate glyph center position on path
@@ -2953,11 +2959,13 @@ Child elements: `RangeSelector`*
 | Attribute | Type | Default |
 |-----------|------|---------|
 | `path` | string/idref | (required) |
-| `textAlign` | TextAlign | start |
+| `baselineOrigin` | Point | 0,0 |
+| `baselineAngle` | float | 0 |
 | `firstMargin` | float | 0 |
 | `lastMargin` | float | 0 |
 | `perpendicular` | bool | true |
 | `reversed` | bool | false |
+| `forceAlignment` | bool | false |
 
 #### TextLayout
 

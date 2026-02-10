@@ -760,11 +760,13 @@ class LayerBuilderContext {
     if (node->path != nullptr) {
       textPath->setPath(ToTGFX(*node->path));
     }
-    textPath->setTextAlign(static_cast<tgfx::TextAlign>(node->textAlign));
+    textPath->setBaselineOrigin(ToTGFX(node->baselineOrigin));
+    textPath->setBaselineAngle(node->baselineAngle);
     textPath->setFirstMargin(node->firstMargin);
     textPath->setLastMargin(node->lastMargin);
     textPath->setPerpendicular(node->perpendicular);
     textPath->setReversed(node->reversed);
+    textPath->setForceAlignment(node->forceAlignment);
     return textPath;
   }
 

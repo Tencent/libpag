@@ -743,13 +743,15 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
         // Inline the path data.
         xml.addAttribute("path", PathDataToSVGString(*textPath->path));
       }
-      if (textPath->textAlign != TextAlign::Start) {
-        xml.addAttribute("textAlign", TextAlignToString(textPath->textAlign));
+      if (textPath->baselineOrigin.x != 0 || textPath->baselineOrigin.y != 0) {
+        xml.addAttribute("baselineOrigin", pointToString(textPath->baselineOrigin));
       }
+      xml.addAttribute("baselineAngle", textPath->baselineAngle);
       xml.addAttribute("firstMargin", textPath->firstMargin);
       xml.addAttribute("lastMargin", textPath->lastMargin);
       xml.addAttribute("perpendicular", textPath->perpendicular, true);
       xml.addAttribute("reversed", textPath->reversed);
+      xml.addAttribute("forceAlignment", textPath->forceAlignment);
       xml.closeElementSelfClosing();
       break;
     }
