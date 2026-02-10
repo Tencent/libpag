@@ -1,44 +1,130 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates rich text with multiple styled Text elements -->
+<!-- Demonstrates rich text with mixed styles, sizes, and decorations -->
 <pagx version="1.0" width="400" height="400">
   <!-- Dark background -->
   <Layer>
     <Rectangle center="200,200" size="400,400"/>
     <Fill color="#0F172A"/>
   </Layer>
-  <!-- Title -->
+
+  <!-- Title: Rich Text -->
   <Layer>
-    <Text text="Rich Text" fontFamily="Arial" fontStyle="Bold" fontSize="52"/>
-    <TextLayout position="200,80" textAlign="center"/>
+    <Text text="Rich Text" fontFamily="Arial" fontStyle="Bold" fontSize="42"/>
+    <TextLayout position="200,55" textAlign="center"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="260,0">
+      <LinearGradient startPoint="0,0" endPoint="200,0">
         <ColorStop offset="0" color="#8B5CF6"/>
         <ColorStop offset="1" color="#EC4899"/>
       </LinearGradient>
     </Fill>
   </Layer>
-  <!-- Multi-color text line: Hello -->
+
+  <!-- Line 1: Mixed bold and regular -->
   <Layer>
-    <Text text="Hello " fontFamily="Arial" fontSize="44"/>
-    <TextLayout position="80,190" textAlign="left"/>
+    <Text text="This is " fontFamily="Arial" fontSize="24"/>
+    <TextLayout position="30,120" textAlign="start"/>
     <Fill color="#94A3B8"/>
   </Layer>
-  <!-- Multi-color text line: World -->
   <Layer>
-    <Text text="World" fontFamily="Arial" fontStyle="Bold" fontSize="44"/>
-    <TextLayout position="215,190" textAlign="left"/>
+    <Text text="bold" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+    <TextLayout position="122,120" textAlign="start"/>
     <Fill color="#F43F5E"/>
   </Layer>
-  <!-- Another styled line: PAGX -->
   <Layer>
-    <Text text="PAGX " fontFamily="Arial" fontStyle="Bold" fontSize="40"/>
-    <TextLayout position="80,290" textAlign="left"/>
-    <Fill color="#6366F1"/>
+    <Text text=" and " fontFamily="Arial" fontSize="24"/>
+    <TextLayout position="177,120" textAlign="start"/>
+    <Fill color="#94A3B8"/>
   </Layer>
-  <!-- Format -->
   <Layer>
-    <Text text="Format" fontFamily="Arial" fontSize="40"/>
-    <TextLayout position="205,290" textAlign="left"/>
+    <Text text="italic" fontFamily="Arial" fontStyle="Italic" fontSize="24"/>
+    <TextLayout position="235,120" textAlign="start"/>
+    <Fill color="#10B981"/>
+  </Layer>
+  <Layer>
+    <Text text=" text" fontFamily="Arial" fontSize="24"/>
+    <TextLayout position="290,120" textAlign="start"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Line 2: Different sizes -->
+  <Layer>
+    <Text text="Small" fontFamily="Arial" fontSize="16"/>
+    <TextLayout position="30,175" textAlign="start"/>
+    <Fill color="#64748B"/>
+  </Layer>
+  <Layer>
+    <Text text="Medium" fontFamily="Arial" fontSize="24"/>
+    <TextLayout position="90,175" textAlign="start"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+  <Layer>
+    <Text text="Large" fontFamily="Arial" fontStyle="Bold" fontSize="36"/>
+    <TextLayout position="200,175" textAlign="start"/>
     <Fill color="#06B6D4"/>
+  </Layer>
+
+  <!-- Line 3: Superscript and subscript simulation -->
+  <Layer>
+    <Text text="H" fontFamily="Arial" fontStyle="Bold" fontSize="32"/>
+    <TextLayout position="30,245" textAlign="start"/>
+    <Fill color="#F59E0B"/>
+  </Layer>
+  <Layer>
+    <Text text="2" fontFamily="Arial" fontSize="18"/>
+    <TextLayout position="55,258" textAlign="start"/>
+    <Fill color="#F59E0B"/>
+  </Layer>
+  <Layer>
+    <Text text="O" fontFamily="Arial" fontStyle="Bold" fontSize="32"/>
+    <TextLayout position="70,245" textAlign="start"/>
+    <Fill color="#F59E0B"/>
+  </Layer>
+  <Layer>
+    <Text text="E=mc" fontFamily="Arial" fontStyle="Italic" fontSize="28"/>
+    <TextLayout position="130,245" textAlign="start"/>
+    <Fill color="#8B5CF6"/>
+  </Layer>
+  <Layer>
+    <Text text="2" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
+    <TextLayout position="220,228" textAlign="start"/>
+    <Fill color="#8B5CF6"/>
+  </Layer>
+
+  <!-- Line 4: Underline effect (simulated with path) -->
+  <Layer>
+    <Text text="Underlined" fontFamily="Arial" fontSize="24"/>
+    <TextLayout position="30,310" textAlign="start"/>
+    <Fill color="#EC4899"/>
+  </Layer>
+  <Layer>
+    <Path data="M 30,318 L 155,318"/>
+    <Stroke color="#EC4899" width="2"/>
+  </Layer>
+
+  <!-- Strikethrough effect -->
+  <Layer>
+    <Text text="Strikethrough" fontFamily="Arial" fontSize="24"/>
+    <TextLayout position="180,310" textAlign="start"/>
+    <Fill color="#64748B"/>
+  </Layer>
+  <Layer>
+    <Path data="M 180,302 L 340,302"/>
+    <Stroke color="#F43F5E" width="2"/>
+  </Layer>
+
+  <!-- Line 5: Highlighted text -->
+  <Layer>
+    <Rectangle center="100,360" size="130,32" roundness="4"/>
+    <Fill color="#F59E0B30"/>
+  </Layer>
+  <Layer>
+    <Text text="Highlighted" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
+    <TextLayout position="35,358" textAlign="start"/>
+    <Fill color="#F59E0B"/>
+  </Layer>
+  <Layer>
+    <Text text=" text sample" fontFamily="Arial" fontSize="22"/>
+    <TextLayout position="165,358" textAlign="start"/>
+    <Fill color="#94A3B8"/>
   </Layer>
 </pagx>

@@ -9,7 +9,7 @@
   <!-- Text along an arc path with force alignment -->
   <Layer>
     <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="56"/>
-    <TextPath path="M 60,240 Q 200,20 340,240" forceAlignment="true"/>
+    <TextPath path="M 60,260 Q 200,60 340,260" forceAlignment="true"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="300,0">
         <ColorStop offset="0" color="#06B6D4"/>
@@ -20,18 +20,18 @@
   </Layer>
   <!-- Guide path (dashed) to visualize the curve -->
   <Layer>
-    <Path data="M 60,240 Q 200,20 340,240"/>
+    <Path data="M 60,260 Q 200,60 340,260"/>
     <Stroke color="#47556960" width="1" dashes="6,4"/>
   </Layer>
   <!-- Text along a lower curve -->
   <Layer>
     <Text text="TextPath" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
-    <TextPath path="M 80,330 Q 200,240 320,330" forceAlignment="true"/>
+    <TextPath path="M 80,350 Q 200,280 320,350" forceAlignment="true"/>
     <Fill color="#94A3B8"/>
   </Layer>
   <!-- Guide path for lower curve -->
   <Layer>
-    <Path data="M 80,330 Q 200,240 320,330"/>
+    <Path data="M 80,350 Q 200,280 320,350"/>
     <Stroke color="#33415540" width="1" dashes="4,4"/>
   </Layer>
 </pagx>

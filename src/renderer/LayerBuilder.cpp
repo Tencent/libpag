@@ -52,6 +52,8 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/nodes/TextModifier.h"
+#include "pagx/nodes/RangeSelector.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Data.h"
@@ -86,6 +88,8 @@
 #include "tgfx/layers/vectors/Text.h"
 #include "tgfx/layers/vectors/TextPath.h"
 #include "tgfx/layers/vectors/TrimPath.h"
+#include "tgfx/layers/vectors/TextModifier.h"
+#include "tgfx/layers/vectors/TextSelector.h"
 #include "tgfx/layers/vectors/VectorGroup.h"
 
 #ifdef DEBUG
@@ -362,6 +366,8 @@ class LayerBuilderContext {
         return convertMergePath(static_cast<const MergePath*>(node));
       case NodeType::Repeater:
         return convertRepeater(static_cast<const Repeater*>(node));
+      case NodeType::TextModifier:
+        return convertTextModifier(static_cast<const TextModifier*>(node));
       case NodeType::Group:
         return convertGroup(static_cast<const Group*>(node));
       case NodeType::TextLayout:
@@ -664,6 +670,54 @@ class LayerBuilderContext {
     repeater->setStartAlpha(node->startAlpha);
     repeater->setEndAlpha(node->endAlpha);
     return repeater;
+  }
+
+  std::shared_ptr<tgfx::TextModifier> convertTextModifier(const TextModifier* node) {
+    auto modifier = tgfx::TextModifier::Make();
+
+    // Convert transform properties
+    modifier->setAnchor(ToTGFX(node->anchor));
+    modifier->setPosition(ToTGFX(node->position));
+    modifier->setRotation(node->rotation);
+    modifier->setScale(ToTGFX(node->scale));
+    modifier->setSkew(node->skew);
+    modifier->setSkewAxis(node->skewAxis);
+    modifier->setAlpha(node->alpha);
+
+    // Convert paint properties
+    if (node->fillColor.has_value()) {
+      modifier->setFillColor(ToTGFX(node->fillColor.value()));
+    }
+    if (node->strokeColor.has_value()) {
+      modifier->setStrokeColor(ToTGFX(node->strokeColor.value()));
+    }
+    if (node->strokeWidth.has_value()) {
+      modifier->setStrokeWidth(node->strokeWidth.value());
+    }
+
+    // Convert selectors
+    std::vector<std::shared_ptr<tgfx::TextSelector>> tgfxSelectors;
+    for (const auto* selector : node->selectors) {
+      if (selector->nodeType() == NodeType::RangeSelector) {
+        auto rangeSelector = static_cast<const RangeSelector*>(selector);
+        auto tgfxSelector = std::make_shared<tgfx::RangeSelector>();
+        tgfxSelector->setStart(rangeSelector->start);
+        tgfxSelector->setEnd(rangeSelector->end);
+        tgfxSelector->setOffset(rangeSelector->offset);
+        tgfxSelector->setUnit(static_cast<tgfx::SelectorUnit>(rangeSelector->unit));
+        tgfxSelector->setShape(static_cast<tgfx::SelectorShape>(rangeSelector->shape));
+        tgfxSelector->setEaseIn(rangeSelector->easeIn);
+        tgfxSelector->setEaseOut(rangeSelector->easeOut);
+        tgfxSelector->setMode(static_cast<tgfx::SelectorMode>(rangeSelector->mode));
+        tgfxSelector->setWeight(rangeSelector->weight);
+        tgfxSelector->setRandomOrder(rangeSelector->randomOrder);
+        tgfxSelector->setRandomSeed(static_cast<uint16_t>(rangeSelector->randomSeed));
+        tgfxSelectors.push_back(tgfxSelector);
+      }
+    }
+    modifier->setSelectors(std::move(tgfxSelectors));
+
+    return modifier;
   }
 
   std::shared_ptr<tgfx::VectorGroup> convertGroup(const Group* node) {

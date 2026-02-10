@@ -13,10 +13,12 @@
   <Layer name="GlowTopLeft" blendMode="screen">
     <Ellipse center="80,60" size="320,320"/>
     <Fill color="@glowPurple"/>
+    <BlurFilter blurX="30" blurY="30"/>
   </Layer>
   <Layer name="GlowBottomRight" blendMode="screen">
     <Ellipse center="720,460" size="400,400"/>
     <Fill color="@glowCyan"/>
+    <BlurFilter blurX="40" blurY="40"/>
   </Layer>
   
   <!-- ===== Title Area y=60 ===== -->
@@ -116,11 +118,11 @@
       <Fill color="@purple"/>
     </Group>
     
-    <!-- Repeater Ring -->
+    <!-- Repeater: rotating squares forming a cross pattern -->
     <Group position="580,0">
-      <Ellipse center="25,0" size="10,10"/>
+      <Rectangle center="20,0" size="12,12" roundness="2"/>
       <Fill color="@cyan"/>
-      <Repeater copies="8" rotation="45" anchor="0,0" startAlpha="1" endAlpha="0.15"/>
+      <Repeater copies="4" rotation="90" anchor="0,0"/>
     </Group>
     
     <!-- Mask Example (shape without mask) -->
@@ -226,11 +228,11 @@
     </LinearGradient>
     <!-- Glow Gradients (center relative to ellipse geometry) -->
     <RadialGradient id="glowPurple" center="160,160" radius="160">
-      <ColorStop offset="0" color="#8B5CF625"/>
+      <ColorStop offset="0" color="#8B5CF660"/>
       <ColorStop offset="1" color="#8B5CF600"/>
     </RadialGradient>
     <RadialGradient id="glowCyan" center="200,200" radius="200">
-      <ColorStop offset="0" color="#06B6D418"/>
+      <ColorStop offset="0" color="#06B6D450"/>
       <ColorStop offset="1" color="#06B6D400"/>
     </RadialGradient>
     <!-- Title Gradient -->
