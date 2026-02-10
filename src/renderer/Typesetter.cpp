@@ -149,12 +149,37 @@ class TypesetterContext {
     const TextLayout* textLayout = nullptr;
     std::vector<Text*> textElements = {};
 
+    // First pass: find TextLayout and collect direct Text elements
     for (auto* element : contents) {
       if (element->nodeType() == NodeType::TextLayout) {
         textLayout = static_cast<const TextLayout*>(element);
       } else if (element->nodeType() == NodeType::Text) {
         textElements.push_back(static_cast<Text*>(element));
-      } else if (element->nodeType() == NodeType::Group) {
+      }
+    }
+
+    // Rich text mode: when TextLayout exists and there are Groups containing Text,
+    // collect Text elements from Groups for unified typography.
+    if (textLayout != nullptr && textElements.empty()) {
+      for (auto* element : contents) {
+        if (element->nodeType() == NodeType::Group) {
+          auto* group = static_cast<Group*>(element);
+          for (auto* child : group->elements) {
+            if (child->nodeType() == NodeType::Text) {
+              textElements.push_back(static_cast<Text*>(child));
+            }
+          }
+        }
+      }
+      if (!textElements.empty()) {
+        processRichTextWithLayout(textElements, textLayout);
+        return;
+      }
+    }
+
+    // Normal mode: process Groups independently
+    for (auto* element : contents) {
+      if (element->nodeType() == NodeType::Group) {
         processGroup(static_cast<Group*>(element));
       }
     }
@@ -184,6 +209,87 @@ class TypesetterContext {
 
     if (!textElements.empty()) {
       processTextWithLayout(textElements, textLayout);
+    }
+  }
+
+  void processRichTextWithLayout(std::vector<Text*>& textElements,
+                                   const TextLayout* textLayout) {
+    // If all Text elements have embedded GlyphRun data, use them directly.
+    bool allHaveEmbeddedData = true;
+    for (auto* text : textElements) {
+      if (text->glyphRuns.empty()) {
+        allHaveEmbeddedData = false;
+        break;
+      }
+    }
+    if (allHaveEmbeddedData) {
+      for (auto* text : textElements) {
+        auto shapedText = buildShapedTextFromEmbeddedGlyphRuns(text);
+        if (shapedText.textBlob != nullptr) {
+          result[text] = std::move(shapedText);
+        }
+      }
+      return;
+    }
+
+    // Shape each Text element individually, then concatenate them into a continuous paragraph.
+    std::vector<ShapedInfo> shapedInfos = {};
+    float totalWidth = 0;
+
+    for (auto* text : textElements) {
+      ShapedInfo info = {};
+      info.text = text;
+      if (!text->text.empty()) {
+        shapeText(text, info);
+      }
+      // Shift all glyph positions by the accumulated width so far
+      for (auto& run : info.runs) {
+        run.startX += totalWidth;
+        for (auto& x : run.xPositions) {
+          x += totalWidth;
+        }
+        run.canUseDefaultMode = false;
+      }
+      totalWidth += info.totalWidth;
+      shapedInfos.push_back(std::move(info));
+    }
+
+    // Calculate alignment offset based on total concatenated width
+    float alignOffset = calculateLayoutOffset(textLayout, totalWidth);
+    float baseX = textLayout->position.x;
+    float baseY = textLayout->position.y;
+
+    // Build TextBlob for each Text element with correct offsets
+    for (auto& info : shapedInfos) {
+      if (info.runs.empty()) {
+        continue;
+      }
+
+      tgfx::TextBlobBuilder builder = {};
+
+      for (auto& run : info.runs) {
+        if (run.glyphIDs.empty()) {
+          continue;
+        }
+
+        std::vector<float> adjustedPositions = {};
+        adjustedPositions.reserve(run.xPositions.size());
+        for (float x : run.xPositions) {
+          adjustedPositions.push_back(x + alignOffset + baseX);
+        }
+
+        auto& buffer = builder.allocRunPosH(run.font, run.glyphIDs.size(), baseY);
+        memcpy(buffer.glyphs, run.glyphIDs.data(), run.glyphIDs.size() * sizeof(tgfx::GlyphID));
+        memcpy(buffer.positions, adjustedPositions.data(),
+               adjustedPositions.size() * sizeof(float));
+      }
+
+      auto textBlob = builder.build();
+      if (textBlob != nullptr) {
+        ShapedText shapedText = {};
+        shapedText.textBlob = textBlob;
+        result[info.text] = std::move(shapedText);
+      }
     }
   }
 

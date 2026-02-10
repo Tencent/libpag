@@ -55,7 +55,7 @@
   <Layer y="150" x="280">
     <Ellipse center="0,0" size="50,35"/>
     <Fill color="@purple"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#8B5CF680"/>
+    <InnerShadowStyle offsetX="2" offsetY="2" blurX="6" blurY="6" color="#00000080"/>
   </Layer>
   
   <!-- Card 3: Star -->
@@ -78,7 +78,7 @@
   </Layer>
   <Layer y="150" x="520">
     <Polystar center="0,0" type="polygon" pointCount="6" outerRadius="26"/>
-    <Fill color="@teal"/>
+    <Fill color="@diamond"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#14B8A680"/>
   </Layer>
   
@@ -97,21 +97,21 @@
   <!-- ===== Modifier Area y=270 ===== -->
   <Layer name="Modifiers" y="270">
     <!-- TrimPath Wave -->
-    <Group position="100,0">
+    <Group position="160,0">
       <Path data="@wavePath"/>
       <TrimPath start="0" end="0.75"/>
       <Stroke color="@cyan" width="3" cap="round"/>
     </Group>
     
     <!-- RoundCorner -->
-    <Group position="250,0">
+    <Group position="280,0">
       <Rectangle center="0,0" size="60,40"/>
       <RoundCorner radius="10"/>
       <Fill color="@emerald"/>
     </Group>
     
     <!-- MergePath -->
-    <Group position="380,0">
+    <Group position="400,0">
       <Rectangle center="-10,0" size="35,35"/>
       <Ellipse center="10,0" size="35,35"/>
       <MergePath mode="xor"/>
@@ -119,14 +119,14 @@
     </Group>
     
     <!-- Repeater -->
-    <Group position="510,0">
+    <Group position="520,0">
       <Ellipse center="22,0" size="12,12"/>
       <Fill color="@cyan"/>
       <Repeater copies="5" rotation="72" anchor="0,0" position="0,0"/>
     </Group>
     
     <!-- Mask Example (shape without mask) -->
-    <Group position="650,0">
+    <Group position="640,0">
       <Rectangle center="0,0" size="50,50"/>
       <Fill color="@rainbow"/>
     </Group>
@@ -135,7 +135,7 @@
     <Ellipse center="0,0" size="45,45"/>
     <Fill color="#FFFFFF"/>
   </Layer>
-  <Layer name="MaskedLayer" x="650" y="270" mask="@circleMask" maskType="alpha">
+  <Layer name="MaskedLayer" x="640" y="270" mask="@circleMask" maskType="alpha">
     <Rectangle center="0,0" size="50,50"/>
     <Fill color="@rainbow"/>
   </Layer>
@@ -188,7 +188,7 @@
   </Layer>
   <Layer y="455" x="200">
     <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
-    <TextLayout position="0,7" textAlign="center"/>
+    <TextLayout position="0,4" textAlign="center"/>
     <Fill color="#FFFFFF"/>
   </Layer>
   
@@ -262,6 +262,11 @@
     <SolidColor id="orange" color="#F97316"/>
     <SolidColor id="cyan" color="#06B6D4"/>
     <SolidColor id="emerald" color="#10B981"/>
+    <!-- Diamond Gradient -->
+    <DiamondGradient id="diamond" center="26,26" radius="26">
+      <ColorStop offset="0" color="#14B8A6"/>
+      <ColorStop offset="1" color="#0F766E"/>
+    </DiamondGradient>
     <!-- Composition Component -->
     <Composition id="badgeComp" width="100" height="36">
       <Layer>

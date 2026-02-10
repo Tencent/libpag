@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates rich text with mixed styles: bold, italic, sizes, and colors -->
+<!-- Demonstrates rich text with mixed styles via shared TextLayout -->
 <pagx version="1.0" width="400" height="400">
   <!-- Dark background -->
   <Layer>
@@ -19,86 +19,91 @@
     </Fill>
   </Layer>
 
-  <!-- Row 1: Bold + Regular mixed -->
+  <!-- Rich text paragraph: multiple Groups with shared TextLayout -->
   <Layer>
-    <Text text="Bold" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
-    <TextLayout position="30,120" textAlign="start"/>
-    <Fill color="#F43F5E"/>
-  </Layer>
-  <Layer>
-    <Text text="and Regular" fontFamily="Arial" fontSize="28"/>
-    <TextLayout position="100,120" textAlign="start"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
-
-  <!-- Row 2: Italic -->
-  <Layer>
-    <Text text="Italic" fontFamily="Arial" fontStyle="Italic" fontSize="28"/>
-    <TextLayout position="30,170" textAlign="start"/>
-    <Fill color="#10B981"/>
-  </Layer>
-  <Layer>
-    <Text text="Style" fontFamily="Arial" fontStyle="Bold Italic" fontSize="28"/>
-    <TextLayout position="110,170" textAlign="start"/>
-    <Fill color="#06B6D4"/>
-  </Layer>
-
-  <!-- Row 3: Different sizes on same baseline -->
-  <Layer>
-    <Text text="Big" fontFamily="Arial" fontStyle="Bold" fontSize="36"/>
-    <TextLayout position="30,228" textAlign="start"/>
-    <Fill color="#F59E0B"/>
-  </Layer>
-  <Layer>
-    <Text text="Medium" fontFamily="Arial" fontSize="22"/>
-    <TextLayout position="100,228" textAlign="start"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
-  <Layer>
-    <Text text="Small" fontFamily="Arial" fontSize="14"/>
-    <TextLayout position="210,228" textAlign="start"/>
-    <Fill color="#64748B"/>
+    <Group>
+      <Text text="Supports " fontFamily="Arial" fontSize="20"/>
+      <Fill color="#94A3B8"/>
+    </Group>
+    <Group>
+      <Text text="bold" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+      <Fill color="#F43F5E"/>
+    </Group>
+    <Group>
+      <Text text=", " fontFamily="Arial" fontSize="20"/>
+      <Fill color="#94A3B8"/>
+    </Group>
+    <Group>
+      <Text text="italic" fontFamily="Arial" fontStyle="Italic" fontSize="20"/>
+      <Fill color="#10B981"/>
+    </Group>
+    <Group>
+      <Text text=" and " fontFamily="Arial" fontSize="20"/>
+      <Fill color="#94A3B8"/>
+    </Group>
+    <Group>
+      <Text text="colored" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+      <Fill color="#06B6D4"/>
+    </Group>
+    <Group>
+      <Text text=" text." fontFamily="Arial" fontSize="20"/>
+      <Fill color="#94A3B8"/>
+    </Group>
+    <TextLayout position="30,130" textAlign="start"/>
   </Layer>
 
-  <!-- Row 4: Colored keywords -->
+  <!-- Second paragraph: mixed sizes -->
   <Layer>
-    <Text text="Red" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-    <TextLayout position="30,280" textAlign="start"/>
-    <Fill color="#F43F5E"/>
-  </Layer>
-  <Layer>
-    <Text text="Green" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-    <TextLayout position="90,280" textAlign="start"/>
-    <Fill color="#10B981"/>
-  </Layer>
-  <Layer>
-    <Text text="Blue" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-    <TextLayout position="190,280" textAlign="start"/>
-    <Fill color="#3B82F6"/>
-  </Layer>
-  <Layer>
-    <Text text="Purple" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-    <TextLayout position="260,280" textAlign="start"/>
-    <Fill color="#8B5CF6"/>
+    <Group>
+      <Text text="Mix " fontFamily="Arial" fontSize="16"/>
+      <Fill color="#64748B"/>
+    </Group>
+    <Group>
+      <Text text="different" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+      <Fill color="#F59E0B"/>
+    </Group>
+    <Group>
+      <Text text=" sizes " fontFamily="Arial" fontSize="16"/>
+      <Fill color="#64748B"/>
+    </Group>
+    <Group>
+      <Text text="freely" fontFamily="Arial" fontStyle="Bold Italic" fontSize="24"/>
+      <Fill color="#8B5CF6"/>
+    </Group>
+    <Group>
+      <Text text=" within one line." fontFamily="Arial" fontSize="16"/>
+      <Fill color="#64748B"/>
+    </Group>
+    <TextLayout position="30,200" textAlign="start"/>
   </Layer>
 
-  <!-- Row 5: Gradient text -->
+  <!-- Center aligned rich text -->
   <Layer>
-    <Text text="Gradient Fill Text" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
-    <TextLayout position="200,340" textAlign="center"/>
+    <Group>
+      <Text text="Center " fontFamily="Arial" fontSize="20"/>
+      <Fill color="#64748B"/>
+    </Group>
+    <Group>
+      <Text text="aligned" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+      <Fill color="#EC4899"/>
+    </Group>
+    <Group>
+      <Text text=" rich text." fontFamily="Arial" fontSize="20"/>
+      <Fill color="#64748B"/>
+    </Group>
+    <TextLayout position="200,270" textAlign="center"/>
+  </Layer>
+
+  <!-- Gradient fill text -->
+  <Layer>
+    <Text text="Gradient Fill" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+    <TextLayout position="200,350" textAlign="center"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="300,0">
+      <LinearGradient startPoint="0,0" endPoint="240,0">
         <ColorStop offset="0" color="#F43F5E"/>
         <ColorStop offset="0.5" color="#F59E0B"/>
         <ColorStop offset="1" color="#10B981"/>
       </LinearGradient>
     </Fill>
-  </Layer>
-
-  <!-- Row 6: Stroke outline text -->
-  <Layer>
-    <Text text="Outline" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
-    <TextLayout position="200,385" textAlign="center"/>
-    <Stroke color="#06B6D4" width="2"/>
   </Layer>
 </pagx>
