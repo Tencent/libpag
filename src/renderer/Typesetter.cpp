@@ -640,27 +640,19 @@ class TypesetterContext {
 
       float advance = glyphFont.getAdvance(glyphID);
 
-      // Check if glyph has renderable content
-      tgfx::Path testPath = {};
-      bool hasOutline = glyphFont.getPath(glyphID, &testPath) && !testPath.isEmpty();
-      bool hasImage = glyphFont.getImage(glyphID, nullptr, nullptr) != nullptr;
-
-      if (hasOutline || hasImage) {
-        // Start new run if typeface changed
-        if (currentTypeface != glyphTypeface) {
-          info.runs.emplace_back();
-          currentRun = &info.runs.back();
-          currentRun->font = glyphFont;
-          currentTypeface = glyphTypeface;
-          runStartX = currentX;
-          currentRun->startX = runStartX;
-          // Can use Default mode if no letterSpacing (positions follow advance values)
-          currentRun->canUseDefaultMode = !hasLetterSpacing;
-        }
-
-        currentRun->xPositions.push_back(currentX);
-        currentRun->glyphIDs.push_back(glyphID);
+      // Start new run if typeface changed
+      if (currentTypeface != glyphTypeface) {
+        info.runs.emplace_back();
+        currentRun = &info.runs.back();
+        currentRun->font = glyphFont;
+        currentTypeface = glyphTypeface;
+        runStartX = currentX;
+        currentRun->startX = runStartX;
+        currentRun->canUseDefaultMode = !hasLetterSpacing;
       }
+
+      currentRun->xPositions.push_back(currentX);
+      currentRun->glyphIDs.push_back(glyphID);
 
       currentX += advance + text->letterSpacing;
     }

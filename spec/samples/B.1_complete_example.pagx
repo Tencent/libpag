@@ -3,11 +3,6 @@
   
   <!-- ==================== Layer Content ==================== -->
   
-  <!-- Background layer: dark gradient -->
-  <Layer name="Background">
-    <Rectangle center="400,260" size="800,520"/>
-    <Fill color="@bgGradient"/>
-  </Layer>
   
   <!-- Decorative glow effects -->
   <Layer name="GlowTopLeft" blendMode="screen">
@@ -36,7 +31,7 @@
     <Fill color="#64748B"/>
   </Layer>
   <Layer name="TextPathDecor">
-    <Text text="PAGX·XML" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+    <Text text="PAGX FORMAT" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
     <TextPath path="M 585,18 Q 690,50 715,130" firstMargin="10"/>
     <Fill color="#475569"/>
   </Layer>
