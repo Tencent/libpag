@@ -595,6 +595,7 @@ class LayerBuilderContext {
     if (!node->dashes.empty()) {
       stroke->setDashes(node->dashes);
       stroke->setDashOffset(node->dashOffset);
+      stroke->setDashAdaptive(node->dashAdaptive);
     }
 
     return stroke;

@@ -632,6 +632,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
         xml.addAttribute("dashes", floatListToString(stroke->dashes));
       }
       xml.addAttribute("dashOffset", stroke->dashOffset);
+      xml.addAttribute("dashAdaptive", stroke->dashAdaptive);
       if (stroke->align != StrokeAlign::Center) {
         xml.addAttribute("align", StrokeAlignToString(stroke->align));
       }

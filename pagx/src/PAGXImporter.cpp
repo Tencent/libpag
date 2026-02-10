@@ -845,6 +845,7 @@ static Stroke* parseStroke(const XMLNode* node, PAGXDocument* doc) {
     stroke->dashes = parseFloatList(dashesStr);
   }
   stroke->dashOffset = getFloatAttribute(node, "dashOffset", 0);
+  stroke->dashAdaptive = getBoolAttribute(node, "dashAdaptive", false);
   stroke->align = StrokeAlignFromString(getAttribute(node, "align", "center"));
   stroke->placement = LayerPlacementFromString(getAttribute(node, "placement", "background"));
 

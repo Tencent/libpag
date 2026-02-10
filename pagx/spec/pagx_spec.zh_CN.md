@@ -1488,6 +1488,7 @@ finalY[i] = y + positions[i].y
 | `miterLimit` | float | 4 | 斜接限制 |
 | `dashes` | string | - | 虚线模式 "d1,d2,..." |
 | `dashOffset` | float | 0 | 虚线偏移 |
+| `dashAdaptive` | bool | false | 等长虚线段缩放 |
 | `align` | StrokeAlign | center | 描边对齐（见下方） |
 | `placement` | LayerPlacement | background | 绘制位置（见 5.3.3 节） |
 
@@ -1522,6 +1523,7 @@ finalY[i] = y + positions[i].y
 **虚线模式**：
 - `dashes`：定义虚线段长度序列，如 `"5,3"` 表示 5px 实线 + 3px 空白
 - `dashOffset`：虚线起始偏移量
+- `dashAdaptive`：为 true 时，缩放虚线间隔使各虚线段保持等长
 
 #### 5.3.3 绘制位置（LayerPlacement）
 
@@ -2890,6 +2892,7 @@ Layer / Group
 | `miterLimit` | float | 4 |
 | `dashes` | string | - |
 | `dashOffset` | float | 0 |
+| `dashAdaptive` | bool | false |
 | `align` | StrokeAlign | center |
 | `placement` | LayerPlacement | background |
 

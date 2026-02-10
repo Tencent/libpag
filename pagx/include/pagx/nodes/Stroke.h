@@ -84,6 +84,12 @@ class Stroke : public Element {
   float dashOffset = 0;
 
   /**
+   * Whether to scale the dash intervals so that the dash segments have the same length. The default
+   * value is false.
+   */
+  bool dashAdaptive = false;
+
+  /**
    * The alignment of the stroke relative to the path (Center, Inner, or Outer). The default value
    * is Center.
    */

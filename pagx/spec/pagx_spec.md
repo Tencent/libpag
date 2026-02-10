@@ -1488,6 +1488,7 @@ Stroke draws lines along geometry boundaries.
 | `miterLimit` | float | 4 | Miter limit |
 | `dashes` | string | - | Dash pattern "d1,d2,..." |
 | `dashOffset` | float | 0 | Dash offset |
+| `dashAdaptive` | bool | false | Scale dashes to equal length |
 | `align` | StrokeAlign | center | Stroke alignment (see below) |
 | `placement` | LayerPlacement | background | Rendering position (see Section 5.3.3) |
 
@@ -1522,6 +1523,7 @@ Inside/outside stroke is achieved by:
 **Dash Pattern**:
 - `dashes`: Defines dash segment length sequence, e.g., `"5,3"` means 5px solid + 3px gap
 - `dashOffset`: Dash start offset
+- `dashAdaptive`: When true, scales the dash intervals so that the dash segments have the same length
 
 #### 5.3.3 LayerPlacement
 
@@ -2893,6 +2895,7 @@ Child elements: `CDATA` text, `GlyphRun`*
 | `miterLimit` | float | 4 |
 | `dashes` | string | - |
 | `dashOffset` | float | 0 |
+| `dashAdaptive` | bool | false |
 | `align` | StrokeAlign | center |
 | `placement` | LayerPlacement | background |
 
