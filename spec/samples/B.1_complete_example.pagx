@@ -35,60 +35,60 @@
   
   <!-- ===== Shape Area y=150 ===== -->
   <!-- Card 1: Rounded Rectangle -->
-  <Layer y="150" x="100">
+  <Layer y="150" x="160">
     <Rectangle center="0,0" size="100,80" roundness="12"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
   </Layer>
-  <Layer y="150" x="100">
+  <Layer y="150" x="160">
     <Rectangle center="0,0" size="50,35" roundness="8"/>
     <Fill color="@coral"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#F43F5E80"/>
   </Layer>
   
   <!-- Card 2: Ellipse -->
-  <Layer y="150" x="230">
+  <Layer y="150" x="280">
     <Rectangle center="0,0" size="100,80" roundness="12"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
   </Layer>
-  <Layer y="150" x="230">
+  <Layer y="150" x="280">
     <Ellipse center="0,0" size="50,35"/>
     <Fill color="@purple"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#8B5CF680"/>
   </Layer>
   
   <!-- Card 3: Star -->
-  <Layer y="150" x="360">
+  <Layer y="150" x="400">
     <Rectangle center="0,0" size="100,80" roundness="12"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
   </Layer>
-  <Layer y="150" x="360">
+  <Layer y="150" x="400">
     <Polystar center="0,0" type="star" pointCount="5" outerRadius="24" innerRadius="11" rotation="-90"/>
     <Fill color="@amber"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#F59E0B80"/>
   </Layer>
   
   <!-- Card 4: Hexagon -->
-  <Layer y="150" x="490">
+  <Layer y="150" x="520">
     <Rectangle center="0,0" size="100,80" roundness="12"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
   </Layer>
-  <Layer y="150" x="490">
+  <Layer y="150" x="520">
     <Polystar center="0,0" type="polygon" pointCount="6" outerRadius="26"/>
     <Fill color="@teal"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#14B8A680"/>
   </Layer>
   
   <!-- Card 5: Custom Path -->
-  <Layer y="150" x="620">
+  <Layer y="150" x="640">
     <Rectangle center="0,0" size="100,80" roundness="12"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
   </Layer>
-  <Layer y="150" x="620">
+  <Layer y="150" x="640">
     <Path data="M -20 -15 L 0 -25 L 20 -15 L 20 15 L 0 25 L -20 15 Z"/>
     <Fill color="@orange"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#F9731680"/>
@@ -97,29 +97,36 @@
   <!-- ===== Modifier Area y=270 ===== -->
   <Layer name="Modifiers" y="270">
     <!-- TrimPath Wave -->
-    <Group position="120,0">
+    <Group position="100,0">
       <Path data="@wavePath"/>
       <TrimPath start="0" end="0.75"/>
       <Stroke color="@cyan" width="3" cap="round"/>
     </Group>
     
     <!-- RoundCorner -->
-    <Group position="280,0">
+    <Group position="250,0">
       <Rectangle center="0,0" size="60,40"/>
       <RoundCorner radius="10"/>
       <Fill color="@emerald"/>
     </Group>
     
     <!-- MergePath -->
-    <Group position="420,0">
+    <Group position="380,0">
       <Rectangle center="-10,0" size="35,35"/>
       <Ellipse center="10,0" size="35,35"/>
       <MergePath mode="xor"/>
       <Fill color="@purple"/>
     </Group>
     
+    <!-- Repeater -->
+    <Group position="510,0">
+      <Ellipse center="22,0" size="12,12"/>
+      <Fill color="@cyan"/>
+      <Repeater copies="5" rotation="72" anchor="0,0" position="0,0"/>
+    </Group>
+    
     <!-- Mask Example (shape without mask) -->
-    <Group position="700,0">
+    <Group position="650,0">
       <Rectangle center="0,0" size="50,50"/>
       <Fill color="@rainbow"/>
     </Group>
@@ -128,21 +135,9 @@
     <Ellipse center="0,0" size="45,45"/>
     <Fill color="#FFFFFF"/>
   </Layer>
-  <Layer name="MaskedLayer" x="700" y="270" mask="@circleMask" maskType="alpha">
+  <Layer name="MaskedLayer" x="650" y="270" mask="@circleMask" maskType="alpha">
     <Rectangle center="0,0" size="50,50"/>
     <Fill color="@rainbow"/>
-  </Layer>
-  
-  <!-- Repeater (independent card) -->
-  <Layer y="270" x="560">
-    <Rectangle center="0,0" size="100,80" roundness="12"/>
-    <Fill color="#1E293B"/>
-    <Stroke color="#334155" width="1"/>
-  </Layer>
-  <Layer y="270" x="560">
-    <Ellipse center="22,0" size="12,12"/>
-    <Fill color="@cyan"/>
-    <Repeater copies="5" rotation="72" anchor="0,0" position="0,0"/>
   </Layer>
   
   <!-- ===== Filter Area y=360 ===== -->
