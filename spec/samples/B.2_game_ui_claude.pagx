@@ -198,12 +198,12 @@
         <Fill color="#F87171"/>
       </Layer>
       <Layer>
-        <Rectangle center="105,6" size="190,12" roundness="6"/>
+        <Rectangle center="105,7" size="190,14" roundness="7"/>
         <Fill color="#1E293B"/>
         <Stroke color="#374151" width="1"/>
       </Layer>
       <Layer>
-        <Rectangle center="82,6" size="142,10" roundness="5"/>
+        <Rectangle center="82,7" size="142,12" roundness="6"/>
         <Fill color="@hpFill"/>
         <InnerShadowStyle offsetX="0" offsetY="-1" blurX="2" blurY="2" color="#FFFFFF40"/>
       </Layer>
@@ -227,7 +227,7 @@
         <Stroke color="#374151" width="1"/>
       </Layer>
       <Layer>
-        <Rectangle center="72,6" size="124,10" roundness="5"/>
+        <Rectangle center="72,7" size="124,12" roundness="6"/>
         <Fill color="@mpFill"/>
         <InnerShadowStyle offsetX="0" offsetY="-1" blurX="2" blurY="2" color="#FFFFFF40"/>
       </Layer>
@@ -430,7 +430,7 @@
           <Fill color="@starGrad"/>
           <Repeater copies="5" position="18,0"/>
         </Group>
-        <Group position="-20,0"/>
+        <Group position="-10,0"/>
       </Layer>
     </Layer>
 
@@ -510,7 +510,7 @@
     <!-- Power rating -->
     <Layer>
       <Text text="POWER" fontFamily="Arial" fontSize="11"/>
-      <TextLayout position="130,425" textAlign="center"/>
+      <TextLayout position="130,418" textAlign="center"/>
       <Fill color="#94A3B8"/>
     </Layer>
     <Layer>
@@ -522,16 +522,16 @@
   </Layer>
 
   <!-- ==================== RIGHT AREA: EQUIPMENT GRID ==================== -->
-  <Layer name="EquipArea" x="310" y="80">
+  <Layer name="EquipArea" x="310" y="95">
 
     <!-- Section title -->
     <Layer>
       <Text text="EQUIPMENT" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-      <TextLayout position="0,30" textAlign="start"/>
+      <TextLayout position="0,15" textAlign="start"/>
       <Fill color="@titleGrad"/>
     </Layer>
     <Layer>
-      <Path data="M 0 40 L 460 40"/>
+      <Path data="M 0 25 L 460 25"/>
       <Stroke color="#F59E0B60" width="1"/>
     </Layer>
 
@@ -760,7 +760,7 @@
   </Layer>
 
   <!-- ==================== NOTIFICATION TOAST ==================== -->
-  <Layer name="Toast" x="310" y="496">
+  <Layer name="Toast" x="310" y="516">
     <Layer>
       <Rectangle center="230,18" size="460,36" roundness="8"/>
       <Fill color="#10B981E0"/>
