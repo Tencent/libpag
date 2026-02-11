@@ -265,7 +265,7 @@
   </Layer>
 
   <!-- ==================== LEFT PANEL: CHARACTER ==================== -->
-  <Layer name="CharPanel" x="30" y="95">
+  <Layer name="CharPanel" x="30" y="80">
     <!-- Panel background -->
     <Layer>
       <Rectangle center="130,237" size="260,470" roundness="16"/>
