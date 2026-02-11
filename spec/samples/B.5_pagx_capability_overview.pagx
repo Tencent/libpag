@@ -66,38 +66,38 @@
     </Layer>
   </Layer>
 
-  <!-- Connectors: Core(800,520) to each card edge -->
+  <!-- Connectors: radiate from Core(800,520) edge to each card -->
   <Layer name="Connectors" alpha="0.5">
-    <!-- to Readable (800,150) top -->
+    <!-- to Readable (800,90) top: straight up -->
     <Group>
-      <Path data="M 800 388 L 800 240"/>
+      <Path data="M 800 365 L 800 170"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
-    <!-- to Comprehensive (1170,400) right-upper -->
+    <!-- to Comprehensive (1209,387) right-upper: angle ~18deg above horizontal -->
     <Group>
-      <Path data="M 956 452 L 960 400"/>
+      <Path data="M 947 488 L 1000 400"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
-    <!-- to Expressive (1030,830) right-lower -->
+    <!-- to Expressive (1053,868) right-lower: angle ~54deg below horizontal -->
     <Group>
-      <Path data="M 900 652 L 820 740"/>
+      <Path data="M 870 639 L 920 788"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
-    <!-- to Portable (570,830) left-lower -->
+    <!-- to Portable (547,868) left-lower: angle ~54deg below horizontal -->
     <Group>
-      <Path data="M 700 652 L 780 740"/>
+      <Path data="M 730 639 L 680 788"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
-    <!-- to Deployable (430,400) left-upper -->
+    <!-- to Deployable (391,387) left-upper: angle ~18deg above horizontal -->
     <Group>
-      <Path data="M 644 452 L 640 400"/>
+      <Path data="M 653 488 L 600 400"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
   </Layer>
 
   <!-- Card 1: Readable (top center) -->
-  <Layer name="CardReadable" x="800" y="150">
-    <Rectangle center="0,0" size="420,180" roundness="20"/>
+  <Layer name="CardReadable" x="800" y="90">
+    <Rectangle center="0,0" size="420,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="8" blurX="16" blurY="16" color="#00000040"/>
@@ -139,8 +139,8 @@
   </Layer>
 
   <!-- Card 2: Comprehensive (right-upper) -->
-  <Layer name="CardComprehensive" x="1170" y="400">
-    <Rectangle center="0,0" size="420,180" roundness="20"/>
+  <Layer name="CardComprehensive" x="1209" y="387">
+    <Rectangle center="0,0" size="420,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="8" blurX="16" blurY="16" color="#00000040"/>
@@ -179,8 +179,8 @@
   </Layer>
 
   <!-- Card 3: Expressive (right-lower) -->
-  <Layer name="CardExpressive" x="1030" y="830">
-    <Rectangle center="0,0" size="420,180" roundness="20"/>
+  <Layer name="CardExpressive" x="1053" y="868">
+    <Rectangle center="0,0" size="420,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="8" blurX="16" blurY="16" color="#00000040"/>
@@ -223,8 +223,8 @@
   </Layer>
 
   <!-- Card 4: Portable (left-lower) -->
-  <Layer name="CardPortable" x="570" y="830">
-    <Rectangle center="0,0" size="420,180" roundness="20"/>
+  <Layer name="CardPortable" x="547" y="868">
+    <Rectangle center="0,0" size="420,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="8" blurX="16" blurY="16" color="#00000040"/>
@@ -264,8 +264,8 @@
   </Layer>
 
   <!-- Card 5: Deployable (left-upper) -->
-  <Layer name="CardDeployable" x="430" y="400">
-    <Rectangle center="0,0" size="420,180" roundness="20"/>
+  <Layer name="CardDeployable" x="391" y="387">
+    <Rectangle center="0,0" size="420,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="8" blurX="16" blurY="16" color="#00000040"/>
