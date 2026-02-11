@@ -424,7 +424,7 @@
       </Layer>
 
       <!-- Rarity stars -->
-      <Layer y="112">
+      <Layer y="82">
         <Group>
           <Polystar center="0,0" type="star" pointCount="5" outerRadius="7" innerRadius="3" rotation="0"/>
           <Fill color="@starGrad"/>
@@ -435,7 +435,7 @@
     </Layer>
 
     <!-- Stats section -->
-    <Layer x="25" y="305">
+    <Layer x="25" y="290">
       <!-- ATK -->
       <Layer>
         <Polystar center="12,0" type="star" pointCount="4" outerRadius="7" innerRadius="2" rotation="45"/>
@@ -503,14 +503,14 @@
 
     <!-- Separator -->
     <Layer>
-      <Path data="M 25 410 L 235 410"/>
+      <Path data="M 25 395 L 235 395"/>
       <Stroke color="#374151" width="1"/>
     </Layer>
 
     <!-- Power rating -->
     <Layer>
       <Text text="POWER" fontFamily="Arial" fontSize="11"/>
-      <TextLayout position="85,280" textAlign="end"/>
+      <TextLayout position="85,250" textAlign="end"/>
       <Fill color="#94A3B8"/>
     </Layer>
     <Layer>
