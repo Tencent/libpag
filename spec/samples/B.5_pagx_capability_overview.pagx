@@ -101,7 +101,7 @@
       <DropShadowStyle offsetX="0" offsetY="6" blurX="12" blurY="12" color="#00000060"/>
     </Layer>
     <Layer x="0" y="50">
-      <Text text="Vector + Text + Effects" fontFamily="Arial" fontSize="18"/>
+      <Text text="Vector + Text + Effects" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="center"/>
       <Fill color="#94A3B8"/>
     </Layer>
@@ -133,7 +133,7 @@
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="10" blurX="20" blurY="20" color="#00000040"/>
-    <Layer x="-118" y="-6">
+    <Layer x="-118" y="-2">
       <Group>
         <Path data="M -28 -38 L 8 -38 L 28 -18 L 28 42 L -28 42 Z"/>
         <Stroke color="#F43F5E" width="2" join="round"/>
@@ -153,17 +153,17 @@
         <Fill color="#F43F5E"/>
       </Layer>
     </Layer>
-    <Layer x="-47" y="-30">
+    <Layer x="-47" y="-38">
       <Text text="Open &amp; Readable" fontFamily="Arial" fontStyle="Bold" fontSize="26"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#F43F5E"/>
     </Layer>
-    <Layer x="-47" y="2">
+    <Layer x="-47" y="-4">
       <Text text="Plain XML format" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-47" y="30">
+    <Layer x="-47" y="22">
       <Text text="Easy diff &amp; review" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
@@ -176,7 +176,7 @@
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="10" blurX="20" blurY="20" color="#00000040"/>
-    <Layer x="-118" y="-6">
+    <Layer x="-118" y="-2">
       <Group>
         <Rectangle center="-5,-18" size="52,32" roundness="6"/>
         <Stroke color="#38BDF8" width="2"/>
@@ -193,17 +193,17 @@
         <Fill color="#38BDF810"/>
       </Group>
     </Layer>
-    <Layer x="-47" y="-30">
+    <Layer x="-47" y="-38">
       <Text text="Feature Complete" fontFamily="Arial" fontStyle="Bold" fontSize="26"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#38BDF8"/>
     </Layer>
-    <Layer x="-47" y="2">
+    <Layer x="-47" y="-4">
       <Text text="Vectors, text, effects" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-47" y="30">
+    <Layer x="-47" y="22">
       <Text text="Masking and blending" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
@@ -216,7 +216,7 @@
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="10" blurX="20" blurY="20" color="#00000040"/>
-    <Layer x="-118" y="-4">
+    <Layer x="-118" y="0">
       <Group>
         <Ellipse center="-18,0" size="40,40"/>
         <Stroke color="#A855F7" width="2"/>
@@ -234,30 +234,30 @@
         <Stroke color="#A855F7" width="1" dashes="3,3"/>
       </Group>
     </Layer>
-    <Layer x="-47" y="-30">
+    <Layer x="-47" y="-38">
       <Text text="Eco-Compatible" fontFamily="Arial" fontStyle="Bold" fontSize="26"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#A855F7"/>
     </Layer>
-    <Layer x="-47" y="2">
+    <Layer x="-47" y="-4">
       <Text text="AE / Figma interchange" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-47" y="30">
+    <Layer x="-47" y="22">
       <Text text="Seamless asset pipeline" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
     </Layer>
   </Layer>
 
-  <!-- Card: Efficient Deployment -->
+  <!-- Card: Fast Deployment -->
   <Layer name="CardDeploy" x="1240" y="916">
     <Rectangle center="0,0" size="480,220" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="10" blurX="20" blurY="20" color="#00000040"/>
-    <Layer x="-118" y="-6">
+    <Layer x="-118" y="-2">
       <!-- Rocket body -->
       <Group>
         <Path data="M 0 -40 C 10 -35 18 -20 18 0 L 18 22 L -18 22 L -18 0 C -18 -20 -10 -35 0 -40 Z"/>
@@ -287,17 +287,17 @@
         <Stroke color="#10B981" width="2" cap="round" join="round"/>
       </Group>
     </Layer>
-    <Layer x="-47" y="-30">
+    <Layer x="-47" y="-38">
       <Text text="Fast Deployment" fontFamily="Arial" fontStyle="Bold" fontSize="26"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#10B981"/>
     </Layer>
-    <Layer x="-47" y="2">
+    <Layer x="-47" y="-4">
       <Text text="Binary PAG export" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-47" y="30">
+    <Layer x="-47" y="22">
       <Text text="High compression ratio" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
