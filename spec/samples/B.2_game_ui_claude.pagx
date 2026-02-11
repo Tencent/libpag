@@ -424,13 +424,13 @@
       </Layer>
 
       <!-- Rarity stars -->
-      <Layer y="82">
+      <Layer y="90">
         <Group>
           <Polystar center="0,0" type="star" pointCount="5" outerRadius="7" innerRadius="3" rotation="0"/>
           <Fill color="@starGrad"/>
           <Repeater copies="5" position="18,0"/>
         </Group>
-        <Group position="-36,0"/>
+        <Group position="-20,0"/>
       </Layer>
     </Layer>
 
@@ -510,7 +510,7 @@
     <!-- Power rating -->
     <Layer>
       <Text text="POWER" fontFamily="Arial" fontSize="11"/>
-      <TextLayout position="85,250" textAlign="end"/>
+      <TextLayout position="130,425" textAlign="center"/>
       <Fill color="#94A3B8"/>
     </Layer>
     <Layer>
@@ -527,11 +527,11 @@
     <!-- Section title -->
     <Layer>
       <Text text="EQUIPMENT" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-      <TextLayout position="0,15" textAlign="start"/>
+      <TextLayout position="0,30" textAlign="start"/>
       <Fill color="@titleGrad"/>
     </Layer>
     <Layer>
-      <Path data="M 0 25 L 460 25"/>
+      <Path data="M 0 40 L 460 40"/>
       <Stroke color="#F59E0B60" width="1"/>
     </Layer>
 
