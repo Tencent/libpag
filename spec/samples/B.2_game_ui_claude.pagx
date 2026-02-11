@@ -191,10 +191,10 @@
     </Layer>
 
     <!-- HP bar -->
-    <Layer name="HPBar" x="190" y="14">
+    <Layer name="HPBar" x="190" y="16">
       <Layer>
         <Text text="HP" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-        <TextLayout position="-10,7" textAlign="start"/>
+        <TextLayout position="-10,8" textAlign="start"/>
         <Fill color="#F87171"/>
       </Layer>
       <Layer>
@@ -203,22 +203,22 @@
         <Stroke color="#374151" width="1"/>
       </Layer>
       <Layer>
-        <Rectangle center="82,5" size="142,10" roundness="5"/>
+        <Rectangle center="83,5" size="142,10" roundness="5"/>
         <Fill color="@hpFill"/>
         <InnerShadowStyle offsetX="0" offsetY="-1" blurX="2" blurY="2" color="#FFFFFF40"/>
       </Layer>
       <Layer>
         <Text text="2,847 / 3,800" fontFamily="Arial" fontSize="9"/>
-        <TextLayout position="105,7" textAlign="center"/>
+        <TextLayout position="105,8" textAlign="center"/>
         <Fill color="#FFFFFFD0"/>
       </Layer>
     </Layer>
 
     <!-- MP bar -->
-    <Layer name="MPBar" x="190" y="36">
+    <Layer name="MPBar" x="190" y="38">
       <Layer>
         <Text text="MP" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-        <TextLayout position="-10,7" textAlign="start"/>
+        <TextLayout position="-10,8" textAlign="start"/>
         <Fill color="#60A5FA"/>
       </Layer>
       <Layer>
@@ -227,13 +227,13 @@
         <Stroke color="#374151" width="1"/>
       </Layer>
       <Layer>
-        <Rectangle center="72,5" size="124,10" roundness="5"/>
+        <Rectangle center="74,5" size="124,10" roundness="5"/>
         <Fill color="@mpFill"/>
         <InnerShadowStyle offsetX="0" offsetY="-1" blurX="2" blurY="2" color="#FFFFFF40"/>
       </Layer>
       <Layer>
         <Text text="1,250 / 2,000" fontFamily="Arial" fontSize="9"/>
-        <TextLayout position="105,7" textAlign="center"/>
+        <TextLayout position="105,8" textAlign="center"/>
         <Fill color="#FFFFFFD0"/>
       </Layer>
     </Layer>
@@ -424,13 +424,13 @@
       </Layer>
 
       <!-- Rarity stars -->
-      <Layer y="90">
+      <Layer y="83">
         <Group>
           <Polystar center="0,0" type="star" pointCount="5" outerRadius="7" innerRadius="3" rotation="0"/>
           <Fill color="@starGrad"/>
           <Repeater copies="5" position="18,0"/>
         </Group>
-        <Group position="-10,0"/>
+        <Group position="11,0"/>
       </Layer>
     </Layer>
 
@@ -537,7 +537,7 @@
 
     <!-- Equipment slot row 1 -->
     <!-- Slot 1: Weapon -->
-    <Layer name="Slot1" x="25" y="45">
+    <Layer name="Slot1" x="10" y="45">
       <Layer>
         <Rectangle center="65,65" size="130,130" roundness="12"/>
         <Fill color="#1E293BE8"/>
@@ -573,7 +573,7 @@
     </Layer>
 
     <!-- Slot 2: Shield -->
-    <Layer name="Slot2" x="180" y="45">
+    <Layer name="Slot2" x="165" y="45">
       <Layer>
         <Rectangle center="65,65" size="130,130" roundness="12"/>
         <Fill color="#1E293BE8"/>
@@ -605,7 +605,7 @@
     </Layer>
 
     <!-- Slot 3: Helmet -->
-    <Layer name="Slot3" x="335" y="45">
+    <Layer name="Slot3" x="320" y="45">
       <Layer>
         <Rectangle center="65,65" size="130,130" roundness="12"/>
         <Fill color="#1E293BE8"/>
@@ -638,7 +638,7 @@
 
     <!-- Equipment slot row 2 -->
     <!-- Slot 4: Potion -->
-    <Layer name="Slot4" x="25" y="195">
+    <Layer name="Slot4" x="10" y="195">
       <Layer>
         <Rectangle center="65,65" size="130,130" roundness="12"/>
         <Fill color="#1E293BE8"/>
@@ -670,7 +670,7 @@
     </Layer>
 
     <!-- Slot 5: Empty -->
-    <Layer name="Slot5" x="180" y="195">
+    <Layer name="Slot5" x="165" y="195">
       <Layer>
         <Rectangle center="65,65" size="130,130" roundness="12"/>
         <Fill color="#1E293B80"/>
@@ -689,7 +689,7 @@
     </Layer>
 
     <!-- Slot 6: Empty -->
-    <Layer name="Slot6" x="335" y="195">
+    <Layer name="Slot6" x="320" y="195">
       <Layer>
         <Rectangle center="65,65" size="130,130" roundness="12"/>
         <Fill color="#1E293B80"/>
@@ -708,7 +708,7 @@
     </Layer>
 
     <!-- Action buttons -->
-    <Layer name="Actions" x="25" y="355">
+    <Layer name="Actions" x="0" y="355">
       <!-- Upgrade button -->
       <Layer>
         <Rectangle center="110,22" size="200,44" roundness="22"/>
@@ -747,7 +747,7 @@
     </Layer>
     <!-- Fill (65%) -->
     <Layer>
-      <Rectangle center="280,10" size="500,12" roundness="6"/>
+      <Rectangle center="282,10" size="500,12" roundness="6"/>
       <Fill color="@expFill"/>
       <InnerShadowStyle offsetX="0" offsetY="-1" blurX="3" blurY="3" color="#FFFFFF30"/>
     </Layer>
