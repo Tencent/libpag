@@ -15,7 +15,7 @@
   <!-- Vertical line to show the anchor at x=200 -->
   <Layer>
     <Path data="M 200,120 L 200,375"/>
-    <Stroke color="#94A3B8" width="1" dashes="6,4"/>
+    <Stroke color="#64748B" width="1" dashes="6,4"/>
   </Layer>
   <!-- Start aligned: text starts at anchor point -->
   <Layer>
@@ -24,8 +24,8 @@
     <Fill color="#F43F5E"/>
   </Layer>
   <Layer>
-    <Text text="text begins at anchor" fontFamily="Arial" fontSize="14"/>
-    <TextLayout position="200,175" textAlign="start"/>
+    <Text text="text begins at anchor" fontFamily="Arial" fontSize="18"/>
+    <TextLayout position="200,180" textAlign="start"/>
     <Fill color="#475569"/>
   </Layer>
   <!-- Center aligned: text centered on anchor point -->
@@ -35,8 +35,8 @@
     <Fill color="#10B981"/>
   </Layer>
   <Layer>
-    <Text text="text centered on anchor" fontFamily="Arial" fontSize="14"/>
-    <TextLayout position="200,270" textAlign="center"/>
+    <Text text="text centered on anchor" fontFamily="Arial" fontSize="18"/>
+    <TextLayout position="200,275" textAlign="center"/>
     <Fill color="#475569"/>
   </Layer>
   <!-- End aligned: text ends at anchor point -->
@@ -46,8 +46,8 @@
     <Fill color="#06B6D4"/>
   </Layer>
   <Layer>
-    <Text text="text ends at anchor" fontFamily="Arial" fontSize="14"/>
-    <TextLayout position="200,365" textAlign="end"/>
+    <Text text="text ends at anchor" fontFamily="Arial" fontSize="18"/>
+    <TextLayout position="200,370" textAlign="end"/>
     <Fill color="#475569"/>
   </Layer>
 </pagx>

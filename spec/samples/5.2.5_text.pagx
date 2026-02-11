@@ -1,28 +1,60 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates Text shape -->
+<!-- Demonstrates Text shape properties: Font family, style, and size -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Main title text -->
+  
+  <!-- Section 1: Font Styles -->
   <Layer>
-    <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="84"/>
-    <TextLayout position="200,140" textAlign="center"/>
+    <Text text="Font Styles" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+    <TextLayout position="40,60"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+  
+  <Layer>
+    <Text text="Regular" fontFamily="Arial" fontSize="32"/>
+    <TextLayout position="40,100"/>
+    <Fill color="#334155"/>
+  </Layer>
+  
+  <Layer>
+    <Text text="Bold" fontFamily="Arial" fontStyle="Bold" fontSize="32"/>
+    <TextLayout position="170,100"/>
+    <Fill color="#334155"/>
+  </Layer>
+  
+  <Layer>
+    <Text text="Italic" fontFamily="Arial" fontStyle="Italic" fontSize="32"/>
+    <TextLayout position="280,100"/>
+    <Fill color="#334155"/>
+  </Layer>
+
+  <!-- Section 2: Font Families -->
+  <Layer>
+    <Text text="Font Families" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+    <TextLayout position="40,180"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <Layer>
+    <Text text="Serif Font (Times)" fontFamily="Times New Roman" fontSize="32"/>
+    <TextLayout position="40,220"/>
+    <Fill color="#334155"/>
+  </Layer>
+  
+  <Layer>
+    <Text text="Sans-Serif (Arial)" fontFamily="Arial" fontSize="32"/>
+    <TextLayout position="40,265"/>
+    <Fill color="#334155"/>
+  </Layer>
+
+  <!-- Section 3: Large Title with Gradient -->
+  <Layer>
+    <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="64"/>
+    <TextLayout position="40,360"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="280,0">
+      <LinearGradient startPoint="0,0" endPoint="200,0">
         <ColorStop offset="0" color="#6366F1"/>
-        <ColorStop offset="0.5" color="#8B5CF6"/>
         <ColorStop offset="1" color="#EC4899"/>
       </LinearGradient>
     </Fill>
-  </Layer>
-  <!-- Subtitle -->
-  <Layer>
-    <Text text="Text Shape" fontFamily="Arial" fontSize="36"/>
-    <TextLayout position="200,220" textAlign="center"/>
-    <Fill color="#334155"/>
-  </Layer>
-  <!-- Small description -->
-  <Layer>
-    <Text text="Beautiful Typography" fontFamily="Arial" fontSize="24"/>
-    <TextLayout position="200,300" textAlign="center"/>
-    <Fill color="#475569"/>
   </Layer>
 </pagx>

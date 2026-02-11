@@ -16,7 +16,7 @@
   <!-- Guide path (dashed) to visualize the curve -->
   <Layer>
     <Path data="M 60,230 Q 200,30 340,230"/>
-    <Stroke color="#94A3B8" width="1" dashes="6,4"/>
+    <Stroke color="#64748B" width="1" dashes="6,4"/>
   </Layer>
   <!-- Text along a lower curve -->
   <Layer>
@@ -25,8 +25,4 @@
     <Fill color="#475569"/>
   </Layer>
   <!-- Guide path for lower curve -->
-  <Layer>
-    <Path data="M 80,320 Q 200,250 320,320"/>
-    <Stroke color="#94A3B8" width="1" dashes="6,4"/>
-  </Layer>
 </pagx>
