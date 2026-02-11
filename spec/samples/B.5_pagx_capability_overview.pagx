@@ -196,7 +196,7 @@
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="8" blurX="16" blurY="16" color="#00000040"/>
-    <Layer x="-120" y="-2">
+    <Layer x="-110" y="-2">
       <!-- Small code block on left -->
       <Group>
         <Rectangle center="-22,0" size="32,76" roundness="5"/>
@@ -250,7 +250,7 @@
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="8" blurX="16" blurY="16" color="#00000040"/>
-    <Layer x="-120" y="0">
+    <Layer x="-110" y="0">
       <Group>
         <Ellipse center="-18,0" size="40,40"/>
         <Stroke color="#10B981" width="2"/>
@@ -274,7 +274,7 @@
       <Fill color="#10B981"/>
     </Layer>
     <Layer x="-50" y="11">
-      <Text text="AE, Figma, TD interchange" fontFamily="Arial" fontSize="16"/>
+      <Text text="TD, AE, Figma interchange" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
