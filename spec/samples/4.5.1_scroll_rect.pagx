@@ -15,6 +15,6 @@
   <!-- Visible clip region indicator (dashed border) -->
   <Layer>
     <Rectangle center="200,200" size="200,200" roundness="16"/>
-    <Stroke color="#475569" width="3" dashes="10,6"/>
+    <Stroke color="#94A3B840" width="2" dashes="4,4"/>
   </Layer>
 </pagx>

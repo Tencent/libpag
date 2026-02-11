@@ -4,7 +4,7 @@
   <!-- Original sharp rectangle (reference) -->
   <Layer>
     <Rectangle center="120,120" size="140,140"/>
-    <Stroke color="#475569" width="3" dashes="8,5"/>
+    <Stroke color="#94A3B840" width="2" dashes="4,4"/>
   </Layer>
   <!-- RoundCorner applied to sharp rectangle -->
   <Layer>
@@ -21,7 +21,7 @@
   <!-- Original star (reference) -->
   <Layer>
     <Polystar center="290,120" type="star" pointCount="5" outerRadius="70" innerRadius="32" rotation="-90"/>
-    <Stroke color="#475569" width="3" dashes="8,5"/>
+    <Stroke color="#94A3B840" width="2" dashes="4,4"/>
   </Layer>
   <!-- RoundCorner applied to star -->
   <Layer>

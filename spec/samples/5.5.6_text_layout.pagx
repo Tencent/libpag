@@ -15,7 +15,7 @@
   <!-- Vertical line to show the anchor at x=200 -->
   <Layer>
     <Path data="M 200,120 L 200,375"/>
-    <Stroke color="#475569" width="1" dashes="6,4"/>
+    <Stroke color="#94A3B840" width="1" dashes="4,4"/>
   </Layer>
   <!-- Start aligned: text starts at anchor point -->
   <Layer>
