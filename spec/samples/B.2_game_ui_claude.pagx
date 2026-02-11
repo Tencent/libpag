@@ -179,37 +179,37 @@
     </Layer>
 
     <!-- Player name & level -->
-    <Layer x="80" y="18">
+    <Layer x="80" y="24">
       <Text text="Aethon" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#F8FAFC"/>
     </Layer>
-    <Layer x="80" y="38">
+    <Layer x="80" y="44">
       <Text text="Lv. 72  Paladin" fontFamily="Arial" fontSize="12"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
     </Layer>
 
     <!-- HP bar -->
-    <Layer name="HPBar" x="200" y="14">
+    <Layer name="HPBar" x="200" y="10">
       <Layer>
-        <Text text="HP" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
-        <TextLayout position="0,8" textAlign="start"/>
+        <Text text="HP" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+        <TextLayout position="0,16" textAlign="start"/>
         <Fill color="#F87171"/>
       </Layer>
       <Layer>
-        <Rectangle center="105,5" size="180,10" roundness="5"/>
+        <Rectangle center="110,11" size="190,22" roundness="11"/>
         <Fill color="#1E293B"/>
         <Stroke color="#374151" width="1"/>
       </Layer>
       <Layer>
-        <Rectangle center="82,5" size="134,8" roundness="4"/>
+        <Rectangle center="86,11" size="142,20" roundness="10"/>
         <Fill color="@hpFill"/>
         <InnerShadowStyle offsetX="0" offsetY="-1" blurX="2" blurY="2" color="#FFFFFF40"/>
       </Layer>
       <Layer>
-        <Text text="2,847 / 3,800" fontFamily="Arial" fontSize="9"/>
-        <TextLayout position="105,8" textAlign="center"/>
+        <Text text="2,847 / 3,800" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
+        <TextLayout position="110,16" textAlign="center"/>
         <Fill color="#FFFFFFD0"/>
       </Layer>
     </Layer>
@@ -217,23 +217,23 @@
     <!-- MP bar -->
     <Layer name="MPBar" x="200" y="36">
       <Layer>
-        <Text text="MP" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
-        <TextLayout position="0,8" textAlign="start"/>
+        <Text text="MP" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+        <TextLayout position="0,16" textAlign="start"/>
         <Fill color="#60A5FA"/>
       </Layer>
       <Layer>
-        <Rectangle center="105,5" size="180,10" roundness="5"/>
+        <Rectangle center="110,11" size="190,22" roundness="11"/>
         <Fill color="#1E293B"/>
         <Stroke color="#374151" width="1"/>
       </Layer>
       <Layer>
-        <Rectangle center="72,5" size="114,8" roundness="4"/>
+        <Rectangle center="77,11" size="124,20" roundness="10"/>
         <Fill color="@mpFill"/>
         <InnerShadowStyle offsetX="0" offsetY="-1" blurX="2" blurY="2" color="#FFFFFF40"/>
       </Layer>
       <Layer>
-        <Text text="1,250 / 2,000" fontFamily="Arial" fontSize="9"/>
-        <TextLayout position="105,8" textAlign="center"/>
+        <Text text="1,250 / 2,000" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
+        <TextLayout position="110,16" textAlign="center"/>
         <Fill color="#FFFFFFD0"/>
       </Layer>
     </Layer>
@@ -738,23 +738,23 @@
   </Layer>
 
   <!-- ==================== BOTTOM EXP BAR ==================== -->
-  <Layer name="ExpBar" y="568">
+  <Layer name="ExpBar" y="566">
     <!-- Bar background -->
     <Layer>
-      <Rectangle center="400,10" size="740,16" roundness="8"/>
+      <Rectangle center="400,12" size="740,24" roundness="12"/>
       <Fill color="#1E293B"/>
       <Stroke color="#374151" width="1"/>
     </Layer>
     <!-- Fill (65%) -->
     <Layer>
-      <Rectangle center="280,10" size="500,12" roundness="6"/>
+      <Rectangle center="280,12" size="500,20" roundness="10"/>
       <Fill color="@expFill"/>
       <InnerShadowStyle offsetX="0" offsetY="-1" blurX="3" blurY="3" color="#FFFFFF30"/>
     </Layer>
     <!-- Label -->
     <Layer>
-      <Text text="EXP  12,500 / 18,000" fontFamily="Arial" fontSize="8"/>
-      <TextLayout position="400,13" textAlign="center"/>
+      <Text text="EXP  12,500 / 18,000" fontFamily="Arial" fontSize="11"/>
+      <TextLayout position="400,16" textAlign="center"/>
       <Fill color="#FFFFFFC0"/>
     </Layer>
   </Layer>
