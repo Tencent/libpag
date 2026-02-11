@@ -133,7 +133,7 @@
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="10" blurX="20" blurY="20" color="#00000040"/>
-    <Layer x="-118" y="0">
+    <Layer x="-118" y="-6">
       <Group>
         <Path data="M -28 -38 L 8 -38 L 28 -18 L 28 42 L -28 42 Z"/>
         <Stroke color="#F43F5E" width="2" join="round"/>
@@ -176,7 +176,7 @@
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="10" blurX="20" blurY="20" color="#00000040"/>
-    <Layer x="-118" y="0">
+    <Layer x="-118" y="-6">
       <Group>
         <Rectangle center="-5,-18" size="52,32" roundness="6"/>
         <Stroke color="#38BDF8" width="2"/>
@@ -216,7 +216,7 @@
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="10" blurX="20" blurY="20" color="#00000040"/>
-    <Layer x="-118" y="0">
+    <Layer x="-118" y="-4">
       <Group>
         <Ellipse center="-18,0" size="40,40"/>
         <Stroke color="#A855F7" width="2"/>
@@ -257,7 +257,7 @@
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="10" blurX="20" blurY="20" color="#00000040"/>
-    <Layer x="-118" y="0">
+    <Layer x="-118" y="-6">
       <!-- Rocket body -->
       <Group>
         <Path data="M 0 -40 C 10 -35 18 -20 18 0 L 18 22 L -18 22 L -18 0 C -18 -20 -10 -35 0 -40 Z"/>
