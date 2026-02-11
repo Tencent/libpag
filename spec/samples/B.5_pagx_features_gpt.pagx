@@ -22,9 +22,9 @@
   </Layer>
 
   <Layer name="GlowBand" alpha="0.4">
-    <Rectangle center="800,540" size="1200,220" roundness="110"/>
+    <Rectangle center="800,580" size="1200,220" roundness="110"/>
     <Fill>
-      <LinearGradient startPoint="200,540" endPoint="1400,540">
+      <LinearGradient startPoint="200,580" endPoint="1400,580">
         <ColorStop offset="0" color="#0EA5E940"/>
         <ColorStop offset="0.5" color="#3B82F620"/>
         <ColorStop offset="1" color="#8B5CF620"/>
@@ -74,7 +74,7 @@
   </Layer>
 
   <!-- Core -->
-  <Layer name="Core" x="800" y="560">
+  <Layer name="Core" x="800" y="600">
     <Layer>
       <Ellipse center="0,0" size="520,520"/>
       <Fill color="@coreGlow"/>
@@ -110,25 +110,25 @@
   <!-- Connectors -->
   <Layer name="Connectors" alpha="0.5">
     <Group>
-      <Path data="M 620 460 L 410 360"/>
+      <Path data="M 620 500 L 410 400"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
     <Group>
-      <Path data="M 980 460 L 1190 360"/>
+      <Path data="M 980 500 L 1190 400"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
     <Group>
-      <Path data="M 620 660 L 410 820"/>
+      <Path data="M 620 700 L 410 860"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
     <Group>
-      <Path data="M 980 660 L 1190 820"/>
+      <Path data="M 980 700 L 1190 860"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
   </Layer>
 
   <!-- Card: Open & Readable -->
-  <Layer name="CardOpen" x="360" y="360">
+  <Layer name="CardOpen" x="360" y="400">
     <Rectangle center="0,0" size="420,220" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -171,7 +171,7 @@
   </Layer>
 
   <!-- Card: Feature Complete -->
-  <Layer name="CardFeature" x="1240" y="360">
+  <Layer name="CardFeature" x="1240" y="400">
     <Rectangle center="0,0" size="420,220" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -211,7 +211,7 @@
   </Layer>
 
   <!-- Card: Ecosystem Compatible -->
-  <Layer name="CardEcosystem" x="360" y="820">
+  <Layer name="CardEcosystem" x="360" y="860">
     <Rectangle center="0,0" size="420,220" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -252,7 +252,7 @@
   </Layer>
 
   <!-- Card: Efficient Deployment -->
-  <Layer name="CardDeploy" x="1240" y="820">
+  <Layer name="CardDeploy" x="1240" y="860">
     <Rectangle center="0,0" size="420,220" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -305,7 +305,7 @@
   </Layer>
 
   <!-- Footer Tags -->
-  <Layer name="Footer" x="800" y="1040">
+  <Layer name="Footer" x="800" y="1060">
     <Layer x="-390" y="0">
       <Rectangle center="0,0" size="220,44" roundness="22"/>
       <Stroke color="#1F2937" width="1"/>
