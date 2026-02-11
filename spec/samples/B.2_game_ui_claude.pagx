@@ -194,7 +194,7 @@
     <Layer name="HPBar" x="190" y="14">
       <Layer>
         <Text text="HP" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-        <TextLayout position="-10,9" textAlign="start"/>
+        <TextLayout position="-10,7" textAlign="start"/>
         <Fill color="#F87171"/>
       </Layer>
       <Layer>
@@ -209,7 +209,7 @@
       </Layer>
       <Layer>
         <Text text="2,847 / 3,800" fontFamily="Arial" fontSize="9"/>
-        <TextLayout position="105,9" textAlign="center"/>
+        <TextLayout position="105,7" textAlign="center"/>
         <Fill color="#FFFFFFD0"/>
       </Layer>
     </Layer>
@@ -218,11 +218,11 @@
     <Layer name="MPBar" x="190" y="36">
       <Layer>
         <Text text="MP" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-        <TextLayout position="-10,9" textAlign="start"/>
+        <TextLayout position="-10,7" textAlign="start"/>
         <Fill color="#60A5FA"/>
       </Layer>
       <Layer>
-        <Rectangle center="105,7" size="190,14" roundness="7"/>
+        <Rectangle center="105,5" size="190,14" roundness="7"/>
         <Fill color="#1E293B"/>
         <Stroke color="#374151" width="1"/>
       </Layer>
@@ -233,13 +233,13 @@
       </Layer>
       <Layer>
         <Text text="1,250 / 2,000" fontFamily="Arial" fontSize="9"/>
-        <TextLayout position="105,9" textAlign="center"/>
+        <TextLayout position="105,7" textAlign="center"/>
         <Fill color="#FFFFFFD0"/>
       </Layer>
     </Layer>
 
     <!-- Gold currency -->
-    <Layer name="Gold" x="620" y="16">
+    <Layer name="Gold" x="640" y="16">
       <Layer>
         <Rectangle center="70,16" size="160,32" roundness="16"/>
         <Fill color="#00000060"/>
