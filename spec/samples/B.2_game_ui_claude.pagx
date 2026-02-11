@@ -179,37 +179,37 @@
     </Layer>
 
     <!-- Player name & level -->
-    <Layer x="80" y="24">
+    <Layer x="80" y="28">
       <Text text="Aethon" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#F8FAFC"/>
     </Layer>
-    <Layer x="80" y="44">
+    <Layer x="80" y="48">
       <Text text="Lv. 72  Paladin" fontFamily="Arial" fontSize="12"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
     </Layer>
 
     <!-- HP bar -->
-    <Layer name="HPBar" x="200" y="10">
+    <Layer name="HPBar" x="200" y="12">
       <Layer>
-        <Text text="HP" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <TextLayout position="0,16" textAlign="start"/>
+        <Text text="HP" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
+        <TextLayout position="0,13" textAlign="start"/>
         <Fill color="#F87171"/>
       </Layer>
       <Layer>
-        <Rectangle center="110,11" size="190,22" roundness="11"/>
+        <Rectangle center="110,9" size="190,18" roundness="9"/>
         <Fill color="#1E293B"/>
         <Stroke color="#374151" width="1"/>
       </Layer>
       <Layer>
-        <Rectangle center="86,11" size="142,20" roundness="10"/>
+        <Rectangle center="86,9" size="142,16" roundness="8"/>
         <Fill color="@hpFill"/>
         <InnerShadowStyle offsetX="0" offsetY="-1" blurX="2" blurY="2" color="#FFFFFF40"/>
       </Layer>
       <Layer>
-        <Text text="2,847 / 3,800" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
-        <TextLayout position="110,16" textAlign="center"/>
+        <Text text="2,847 / 3,800" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
+        <TextLayout position="110,13" textAlign="center"/>
         <Fill color="#FFFFFFD0"/>
       </Layer>
     </Layer>
@@ -217,23 +217,23 @@
     <!-- MP bar -->
     <Layer name="MPBar" x="200" y="36">
       <Layer>
-        <Text text="MP" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <TextLayout position="0,16" textAlign="start"/>
+        <Text text="MP" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
+        <TextLayout position="0,13" textAlign="start"/>
         <Fill color="#60A5FA"/>
       </Layer>
       <Layer>
-        <Rectangle center="110,11" size="190,22" roundness="11"/>
+        <Rectangle center="110,9" size="190,18" roundness="9"/>
         <Fill color="#1E293B"/>
         <Stroke color="#374151" width="1"/>
       </Layer>
       <Layer>
-        <Rectangle center="77,11" size="124,20" roundness="10"/>
+        <Rectangle center="77,9" size="124,16" roundness="8"/>
         <Fill color="@mpFill"/>
         <InnerShadowStyle offsetX="0" offsetY="-1" blurX="2" blurY="2" color="#FFFFFF40"/>
       </Layer>
       <Layer>
-        <Text text="1,250 / 2,000" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
-        <TextLayout position="110,16" textAlign="center"/>
+        <Text text="1,250 / 2,000" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
+        <TextLayout position="110,13" textAlign="center"/>
         <Fill color="#FFFFFFD0"/>
       </Layer>
     </Layer>
@@ -268,7 +268,7 @@
   <Layer name="CharPanel" x="30" y="80">
     <!-- Panel background -->
     <Layer>
-      <Rectangle center="130,250" size="260,470" roundness="16"/>
+      <Rectangle center="130,237" size="260,470" roundness="16"/>
       <Fill color="@panelBg"/>
       <Stroke color="#FFFFFF15" width="1"/>
       <DropShadowStyle offsetX="0" offsetY="8" blurX="24" blurY="24" color="#00000080"/>
