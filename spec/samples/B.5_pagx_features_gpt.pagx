@@ -22,9 +22,9 @@
   </Layer>
 
   <Layer name="GlowBand" alpha="0.4">
-    <Rectangle center="800,580" size="1200,220" roundness="110"/>
+    <Rectangle center="800,636" size="1200,220" roundness="110"/>
     <Fill>
-      <LinearGradient startPoint="200,580" endPoint="1400,580">
+      <LinearGradient startPoint="200,636" endPoint="1400,636">
         <ColorStop offset="0" color="#0EA5E940"/>
         <ColorStop offset="0.5" color="#3B82F620"/>
         <ColorStop offset="1" color="#8B5CF620"/>
@@ -49,7 +49,7 @@
   </Layer>
 
   <!-- Header -->
-  <Layer name="Header" x="150" y="140">
+  <Layer name="Header" x="150" y="120">
     <Layer>
       <Text text="PAGX Capability Overview" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
       <TextLayout position="0,0" textAlign="start"/>
@@ -62,7 +62,7 @@
     </Layer>
   </Layer>
 
-  <Layer name="HeaderBadge" x="1350" y="140">
+  <Layer name="HeaderBadge" x="1350" y="120">
     <Rectangle center="0,0" size="200,40" roundness="20"/>
     <Stroke color="#38BDF8" width="1"/>
     <Fill color="#0B1222"/>
@@ -74,7 +74,7 @@
   </Layer>
 
   <!-- Core -->
-  <Layer name="Core" x="800" y="600">
+  <Layer name="Core" x="800" y="636">
     <Layer>
       <Ellipse center="0,0" size="520,520"/>
       <Fill color="@coreGlow"/>
@@ -110,25 +110,25 @@
   <!-- Connectors -->
   <Layer name="Connectors" alpha="0.5">
     <Group>
-      <Path data="M 620 500 L 410 400"/>
+      <Path data="M 620 536 L 410 406"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
     <Group>
-      <Path data="M 980 500 L 1190 400"/>
+      <Path data="M 980 536 L 1190 406"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
     <Group>
-      <Path data="M 620 700 L 410 860"/>
+      <Path data="M 620 736 L 410 866"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
     <Group>
-      <Path data="M 980 700 L 1190 860"/>
+      <Path data="M 980 736 L 1190 866"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
   </Layer>
 
   <!-- Card: Open & Readable -->
-  <Layer name="CardOpen" x="360" y="400">
+  <Layer name="CardOpen" x="360" y="406">
     <Rectangle center="0,0" size="420,220" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -171,7 +171,7 @@
   </Layer>
 
   <!-- Card: Feature Complete -->
-  <Layer name="CardFeature" x="1240" y="400">
+  <Layer name="CardFeature" x="1240" y="406">
     <Rectangle center="0,0" size="420,220" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -211,7 +211,7 @@
   </Layer>
 
   <!-- Card: Ecosystem Compatible -->
-  <Layer name="CardEcosystem" x="360" y="860">
+  <Layer name="CardEcosystem" x="360" y="866">
     <Rectangle center="0,0" size="420,220" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -252,7 +252,7 @@
   </Layer>
 
   <!-- Card: Efficient Deployment -->
-  <Layer name="CardDeploy" x="1240" y="860">
+  <Layer name="CardDeploy" x="1240" y="866">
     <Rectangle center="0,0" size="420,220" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -305,7 +305,7 @@
   </Layer>
 
   <!-- Footer Tags -->
-  <Layer name="Footer" x="800" y="1060">
+  <Layer name="Footer" x="800" y="1098">
     <Layer x="-390" y="0">
       <Rectangle center="0,0" size="220,44" roundness="22"/>
       <Stroke color="#1F2937" width="1"/>
