@@ -240,6 +240,14 @@ static bool IsVectorGlyph(const tgfx::Font& font, tgfx::GlyphID glyphID) {
   return font.getPath(glyphID, &glyphPath) && !glyphPath.isEmpty();
 }
 
+static bool IsInvisibleSpacing(const tgfx::Font& font, tgfx::GlyphID glyphID) {
+  tgfx::Path glyphPath = {};
+  if (font.getPath(glyphID, &glyphPath) && !glyphPath.isEmpty()) {
+    return false;
+  }
+  return font.getAdvance(glyphID) > 0;
+}
+
 static bool CanUseDefaultMode(const tgfx::GlyphRun& run, const std::vector<size_t>& indices,
                               Font* font,
                               const std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash>& map,
@@ -506,6 +514,36 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
   for (auto& [typeface, builder] : bitmapBuilders) {
     if (builder.font != nullptr) {
       builder.font->id = "font" + std::to_string(fontIndex++);
+    }
+  }
+
+  // Second-and-a-half pass: embed invisible spacing glyphs (e.g. space) into the vector font so
+  // that GlyphRuns preserve word spacing. These glyphs have no outline path but carry advance width.
+  if (vectorBuilder.font != nullptr) {
+    for (const auto& [text, shapedText] : shapedTextMap) {
+      if (shapedText.textBlob == nullptr) {
+        continue;
+      }
+      for (const auto& run : *shapedText.textBlob) {
+        auto* typeface = run.font.getTypeface().get();
+        float fontSize = run.font.getSize();
+        float scale = static_cast<float>(VectorFontUnitsPerEm) / fontSize;
+        for (size_t i = 0; i < run.glyphCount; ++i) {
+          tgfx::GlyphID glyphID = run.glyphs[i];
+          if (!IsInvisibleSpacing(run.font, glyphID)) {
+            continue;
+          }
+          GlyphKey key = {typeface, glyphID};
+          if (vectorBuilder.glyphMapping.count(key) > 0) {
+            continue;
+          }
+          auto glyph = document->makeNode<Glyph>();
+          glyph->advance = run.font.getAdvance(glyphID) * scale;
+          vectorBuilder.font->glyphs.push_back(glyph);
+          vectorBuilder.glyphMapping[key] =
+              static_cast<tgfx::GlyphID>(vectorBuilder.font->glyphs.size());
+        }
+      }
     }
   }
 

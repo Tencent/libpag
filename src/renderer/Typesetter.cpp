@@ -522,6 +522,9 @@ class TypesetterContext {
             path.transform(tgfx::Matrix::MakeTrans(glyph->offset.x, glyph->offset.y));
           }
           builder.addGlyph(path, glyph->advance);
+        } else {
+          // Invisible spacing glyph (e.g. space): add with empty path to preserve advance width.
+          builder.addGlyph(tgfx::Path(), glyph->advance);
         }
       }
       typeface = builder.detach();
