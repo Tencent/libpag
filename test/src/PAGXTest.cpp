@@ -1352,7 +1352,7 @@ PAG_TEST(PAGXTest, SampleFiles) {
     displayList.root()->addChild(layer);
     displayList.render(surface.get(), false);
 
-    EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/Samples/" + baseName));
+    EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/" + baseName));
   }
 
   device->unlock();
