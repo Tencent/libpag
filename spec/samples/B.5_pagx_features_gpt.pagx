@@ -133,39 +133,39 @@
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="10" blurX="20" blurY="20" color="#00000040"/>
-    <Layer x="-130" y="0" scale="1.2,1.2">
+    <Layer x="-108" y="0">
       <Group>
-        <Path data="M -30 -40 L 5 -40 L 30 -15 L 30 50 L -30 50 Z"/>
+        <Path data="M -22 -30 L 6 -30 L 22 -14 L 22 34 L -22 34 Z"/>
         <Stroke color="#F43F5E" width="2" join="round"/>
         <Fill color="#F43F5E20"/>
       </Group>
       <Group>
-        <Path data="M 5 -40 L 5 -15 L 30 -15"/>
+        <Path data="M 6 -30 L 6 -14 L 22 -14"/>
         <Stroke color="#F43F5E" width="1" join="round"/>
       </Group>
       <Group>
-        <Path data="M -18 -10 L 10 -10 M -18 5 L 18 5 M -18 20 L 12 20"/>
+        <Path data="M -12 -6 L 10 -6 M -12 6 L 14 6 M -12 18 L 8 18"/>
         <Stroke color="#F43F5E" width="1" cap="round"/>
       </Group>
       <Layer>
-        <Text text="&lt; &gt;" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <TextLayout position="20,30" textAlign="center"/>
+        <Text text="&lt; &gt;" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
+        <TextLayout position="16,22" textAlign="center"/>
         <Fill color="#FFFFFF"/>
       </Layer>
     </Layer>
-    <Layer x="90" y="-26">
+    <Layer x="-47" y="-26">
       <Text text="Open &amp; Readable" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
-      <TextLayout position="0,0" textAlign="center"/>
+      <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#F43F5E"/>
     </Layer>
-    <Layer x="90" y="4">
+    <Layer x="-47" y="4">
       <Text text="Plain XML format" fontFamily="Arial" fontSize="16"/>
-      <TextLayout position="0,0" textAlign="center"/>
+      <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="90" y="30">
+    <Layer x="-47" y="30">
       <Text text="Easy diff &amp; review" fontFamily="Arial" fontSize="16"/>
-      <TextLayout position="0,0" textAlign="center"/>
+      <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
     </Layer>
   </Layer>
@@ -176,36 +176,36 @@
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="10" blurX="20" blurY="20" color="#00000040"/>
-    <Layer x="-130" y="0" scale="1.2,1.2">
+    <Layer x="-108" y="0">
       <Group>
-        <Rectangle center="0,-12" size="50,30" roundness="6"/>
+        <Rectangle center="-4,-14" size="42,26" roundness="5"/>
         <Stroke color="#38BDF8" width="2"/>
         <Fill color="#38BDF820"/>
       </Group>
       <Group>
-        <Rectangle center="8,8" size="50,30" roundness="6"/>
+        <Rectangle center="4,2" size="42,26" roundness="5"/>
         <Stroke color="#38BDF8" width="2"/>
         <Fill color="#38BDF815"/>
       </Group>
       <Group>
-        <Rectangle center="16,28" size="50,30" roundness="6"/>
+        <Rectangle center="12,18" size="42,26" roundness="5"/>
         <Stroke color="#38BDF8" width="2"/>
         <Fill color="#38BDF810"/>
       </Group>
     </Layer>
-    <Layer x="90" y="-26">
+    <Layer x="-47" y="-26">
       <Text text="Feature Complete" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
-      <TextLayout position="0,0" textAlign="center"/>
+      <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#38BDF8"/>
     </Layer>
-    <Layer x="90" y="4">
+    <Layer x="-47" y="4">
       <Text text="Vectors, text, effects" fontFamily="Arial" fontSize="16"/>
-      <TextLayout position="0,0" textAlign="center"/>
+      <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="90" y="30">
+    <Layer x="-47" y="30">
       <Text text="Masking and blending" fontFamily="Arial" fontSize="16"/>
-      <TextLayout position="0,0" textAlign="center"/>
+      <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
     </Layer>
   </Layer>
@@ -216,37 +216,37 @@
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="10" blurX="20" blurY="20" color="#00000040"/>
-    <Layer x="-130" y="0" scale="1.2,1.2">
+    <Layer x="-108" y="0">
       <Group>
-        <Ellipse center="-12,0" size="28,28"/>
+        <Ellipse center="-14,0" size="32,32"/>
         <Stroke color="#A855F7" width="2"/>
       </Group>
       <Group>
-        <Ellipse center="22,0" size="28,28"/>
+        <Ellipse center="14,0" size="32,32"/>
         <Stroke color="#A855F7" width="2"/>
       </Group>
       <Group>
-        <Path data="M 2 0 L 8 0"/>
+        <Path data="M -2 0 L 2 0"/>
         <Stroke color="#A855F7" width="2" cap="round"/>
       </Group>
       <Group>
-        <Path data="M -30 -18 L -46 -34 M 30 18 L 46 34"/>
+        <Path data="M -28 -20 L -38 -30 M 28 20 L 38 30"/>
         <Stroke color="#A855F7" width="1" dashes="3,3"/>
       </Group>
     </Layer>
-    <Layer x="90" y="-26">
+    <Layer x="-47" y="-26">
       <Text text="Ecosystem Compatible" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
-      <TextLayout position="0,0" textAlign="center"/>
+      <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#A855F7"/>
     </Layer>
-    <Layer x="90" y="4">
+    <Layer x="-47" y="4">
       <Text text="AE / Figma interchange" fontFamily="Arial" fontSize="16"/>
-      <TextLayout position="0,0" textAlign="center"/>
+      <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="90" y="30">
+    <Layer x="-47" y="30">
       <Text text="Seamless asset pipeline" fontFamily="Arial" fontSize="16"/>
-      <TextLayout position="0,0" textAlign="center"/>
+      <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
     </Layer>
   </Layer>
@@ -257,34 +257,34 @@
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="10" blurX="20" blurY="20" color="#00000040"/>
-    <Layer x="-130" y="0" scale="1.2,1.2">
+    <Layer x="-108" y="0">
       <Group>
-        <Path data="M -24 -10 L 24 0 L -24 10 L -12 0 Z"/>
+        <Path data="M 0 -30 L 20 -4 L 10 -4 L 10 24 L -10 24 L -10 -4 L -20 -4 Z"/>
         <Stroke color="#10B981" width="2" join="round"/>
         <Fill color="#10B98120"/>
       </Group>
       <Group>
-        <Path data="M -6 0 L 22 0"/>
+        <Path data="M -6 28 L -6 32 M 6 28 L 6 32"/>
         <Stroke color="#10B981" width="2" cap="round"/>
       </Group>
       <Group>
-        <Ellipse center="-26,0" size="6,6"/>
-        <Fill color="#10B981"/>
+        <Path data="M -14 -14 L -22 -4 M 14 -14 L 22 -4"/>
+        <Stroke color="#10B981" width="2" cap="round"/>
       </Group>
     </Layer>
-    <Layer x="90" y="-26">
+    <Layer x="-47" y="-26">
       <Text text="Efficient Deployment" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
-      <TextLayout position="0,0" textAlign="center"/>
+      <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#10B981"/>
     </Layer>
-    <Layer x="90" y="4">
+    <Layer x="-47" y="4">
       <Text text="Binary PAG export" fontFamily="Arial" fontSize="16"/>
-      <TextLayout position="0,0" textAlign="center"/>
+      <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="90" y="30">
+    <Layer x="-47" y="30">
       <Text text="High compression ratio" fontFamily="Arial" fontSize="16"/>
-      <TextLayout position="0,0" textAlign="center"/>
+      <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
     </Layer>
   </Layer>
