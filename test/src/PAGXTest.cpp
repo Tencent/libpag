@@ -1559,6 +1559,7 @@ PAG_TEST(PAGXTest, SampleFiles) {
     DisplayList displayList;
     displayList.root()->addChild(layer);
     displayList.render(surface.get(), false);
+
     EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/Samples/" + baseName));
   }
 
