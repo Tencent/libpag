@@ -128,27 +128,33 @@
     </Group>
 
     <!-- Icon Circle -->
-    <Group position="30, 30">
+    <Group position="30, 35">
         <Ellipse center="0,0" size="44,44"/>
         <Fill color="#00F2FF20"/>
         <Stroke color="#00F2FF" width="1"/>
     </Group>
-    <Group position="-5, -5">
+    <Group position="-5, 0">
         <Path data="@iconOpen"/>
         <Fill color="@accentCyan"/>
     </Group>
 
     <!-- Title -->
-    <Group position="20, 70">
-        <Text text="Open &amp; Readable" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+    <Group position="65, 41">
+        <Text text="Open &amp; Readable" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#FFFFFF"/>
     </Group>
 
-    <!-- Body Text: Manual wrapping -->
-    <Group position="20, 100">
-        <Text text="XML-based plain text format." position="0,0" fontFamily="Arial" fontSize="12"/>
-        <Text text="Native version control friendly." position="0,18" fontFamily="Arial" fontSize="12"/>
-        <Text text="Optimized for AI generation." position="0,36" fontFamily="Arial" fontSize="12"/>
+    <!-- Body Text: Centered -->
+    <Group position="0, 85">
+        <Text text="XML-based plain text format." fontFamily="Arial" fontSize="12"/>
+        <TextLayout position="110,0" textAlign="center"/>
+        
+        <Text text="Native version control friendly." fontFamily="Arial" fontSize="12"/>
+        <TextLayout position="110,18" textAlign="center"/>
+        
+        <Text text="Optimized for AI generation." fontFamily="Arial" fontSize="12"/>
+        <TextLayout position="110,36" textAlign="center"/>
+        
         <Fill color="#FFFFFFCC"/>
     </Group>
   </Layer>
@@ -166,24 +172,30 @@
             </LinearGradient>
         </Stroke>
     </Group>
-    <Group position="30, 30">
+    <Group position="30, 35">
         <Ellipse center="0,0" size="44,44"/>
         <Fill color="#BD00FF20"/>
         <Stroke color="#BD00FF" width="1"/>
     </Group>
-    <Group position="-5, -5">
+    <Group position="-5, 0">
         <Path data="@iconFeature"/>
         <Fill color="@accentPurple"/>
     </Group>
-    <Group position="20, 70">
-        <Text text="Feature Complete" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+    <Group position="65, 41">
+        <Text text="Feature Complete" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#FFFFFF"/>
     </Group>
-    <!-- Body Text: Manual wrapping -->
-    <Group position="20, 100">
-        <Text text="Vectors, images, &amp; rich text." position="0,0" fontFamily="Arial" fontSize="12"/>
-        <Text text="Advanced filters &amp; blending." position="0,18" fontFamily="Arial" fontSize="12"/>
-        <Text text="Supports complex motion." position="0,36" fontFamily="Arial" fontSize="12"/>
+    <!-- Body Text: Centered -->
+    <Group position="0, 85">
+        <Text text="Vectors, images, &amp; rich text." fontFamily="Arial" fontSize="12"/>
+        <TextLayout position="110,0" textAlign="center"/>
+        
+        <Text text="Advanced filters &amp; blending." fontFamily="Arial" fontSize="12"/>
+        <TextLayout position="110,18" textAlign="center"/>
+        
+        <Text text="Supports complex motion." fontFamily="Arial" fontSize="12"/>
+        <TextLayout position="110,36" textAlign="center"/>
+        
         <Fill color="#FFFFFFCC"/>
     </Group>
   </Layer>
@@ -201,24 +213,30 @@
             </LinearGradient>
         </Stroke>
     </Group>
-    <Group position="30, 30">
+    <Group position="30, 35">
         <Ellipse center="0,0" size="44,44"/>
         <Fill color="#FF990020"/>
         <Stroke color="#FF9900" width="1"/>
     </Group>
-    <Group position="-5, -5">
+    <Group position="-5, 0">
         <Path data="@iconConcise"/>
         <Fill color="@accentOrange"/>
     </Group>
-    <Group position="20, 70">
-        <Text text="Concise &amp; Efficient" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+    <Group position="65, 41">
+        <Text text="Concise &amp; Efficient" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#FFFFFF"/>
     </Group>
-    <!-- Body Text: Manual wrapping -->
-    <Group position="20, 100">
-        <Text text="Compact unified structure." position="0,0" fontFamily="Arial" fontSize="12"/>
-        <Text text="Efficient binary conversion." position="0,18" fontFamily="Arial" fontSize="12"/>
-        <Text text="Extensible architecture." position="0,36" fontFamily="Arial" fontSize="12"/>
+    <!-- Body Text: Centered -->
+    <Group position="0, 85">
+        <Text text="Compact unified structure." fontFamily="Arial" fontSize="12"/>
+        <TextLayout position="110,0" textAlign="center"/>
+        
+        <Text text="Efficient binary conversion." fontFamily="Arial" fontSize="12"/>
+        <TextLayout position="110,18" textAlign="center"/>
+        
+        <Text text="Extensible architecture." fontFamily="Arial" fontSize="12"/>
+        <TextLayout position="110,36" textAlign="center"/>
+        
         <Fill color="#FFFFFFCC"/>
     </Group>
   </Layer>
@@ -236,24 +254,30 @@
             </LinearGradient>
         </Stroke>
     </Group>
-    <Group position="30, 30">
+    <Group position="30, 35">
         <Ellipse center="0,0" size="44,44"/>
         <Fill color="#00FF9D20"/>
         <Stroke color="#00FF9D" width="1"/>
     </Group>
-    <Group position="-5, -5">
+    <Group position="-5, 0">
         <Path data="@iconEco"/>
         <Fill color="@accentGreen"/>
     </Group>
-    <Group position="20, 70">
-        <Text text="Ecosystem Compatible" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+    <Group position="65, 41">
+        <Text text="Ecosystem Compatible" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#FFFFFF"/>
     </Group>
-    <!-- Body Text: Manual wrapping -->
-    <Group position="20, 100">
-        <Text text="Universal interchange format." position="0,0" fontFamily="Arial" fontSize="12"/>
-        <Text text="Supports AE, Figma, &amp; more." position="0,18" fontFamily="Arial" fontSize="12"/>
-        <Text text="Seamless asset workflow." position="0,36" fontFamily="Arial" fontSize="12"/>
+    <!-- Body Text: Centered -->
+    <Group position="0, 85">
+        <Text text="Universal interchange format." fontFamily="Arial" fontSize="12"/>
+        <TextLayout position="140,0" textAlign="center"/>
+        
+        <Text text="Supports AE, Figma, &amp; more." fontFamily="Arial" fontSize="12"/>
+        <TextLayout position="140,18" textAlign="center"/>
+        
+        <Text text="Seamless asset workflow." fontFamily="Arial" fontSize="12"/>
+        <TextLayout position="140,36" textAlign="center"/>
+        
         <Fill color="#FFFFFFCC"/>
     </Group>
   </Layer>
@@ -271,24 +295,30 @@
             </LinearGradient>
         </Stroke>
     </Group>
-    <Group position="30, 30">
+    <Group position="30, 35">
         <Ellipse center="0,0" size="44,44"/>
         <Fill color="#FF008020"/>
         <Stroke color="#FF0080" width="1"/>
     </Group>
-    <Group position="-5, -5">
+    <Group position="-5, 0">
         <Path data="@iconDeploy"/>
         <Fill color="@accentPink"/>
     </Group>
-    <Group position="20, 70">
-        <Text text="Efficient Deployment" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+    <Group position="65, 41">
+        <Text text="Efficient Deployment" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#FFFFFF"/>
     </Group>
-    <!-- Body Text: Manual wrapping -->
-    <Group position="20, 100">
-        <Text text="One-click production export." position="0,0" fontFamily="Arial" fontSize="12"/>
-        <Text text="High compression ratio." position="0,18" fontFamily="Arial" fontSize="12"/>
-        <Text text="High performance runtime." position="0,36" fontFamily="Arial" fontSize="12"/>
+    <!-- Body Text: Centered -->
+    <Group position="0, 85">
+        <Text text="One-click production export." fontFamily="Arial" fontSize="12"/>
+        <TextLayout position="140,0" textAlign="center"/>
+        
+        <Text text="High compression ratio." fontFamily="Arial" fontSize="12"/>
+        <TextLayout position="140,18" textAlign="center"/>
+        
+        <Text text="High performance runtime." fontFamily="Arial" fontSize="12"/>
+        <TextLayout position="140,36" textAlign="center"/>
+        
         <Fill color="#FFFFFFCC"/>
     </Group>
   </Layer>
