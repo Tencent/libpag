@@ -21,8 +21,15 @@
     <Fill color="@bgGradient"/>
   </Layer>
 
+  <!-- Top Description -->
+  <Layer name="Description" x="800" y="22">
+    <Text text="An XML-based markup language for describing animated vector graphics." fontFamily="Arial" fontSize="14"/>
+    <TextLayout position="0,0" textAlign="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <Layer name="GlowBand" alpha="0.4">
-    <Ellipse center="800,520" size="900,900"/>
+    <Ellipse center="800,540" size="900,900"/>
     <Fill>
       <RadialGradient center="0,0" radius="450">
         <ColorStop offset="0" color="#3B82F618"/>
@@ -33,7 +40,7 @@
   </Layer>
 
   <!-- Core -->
-  <Layer name="Core" x="800" y="520">
+  <Layer name="Core" x="800" y="540">
     <Layer>
       <Ellipse center="0,0" size="460,460"/>
       <Fill color="@coreGlow"/>
@@ -66,37 +73,37 @@
     </Layer>
   </Layer>
 
-  <!-- Connectors: radiate from Core(800,520) edge to each card -->
+  <!-- Connectors: radiate from Core(800,540) edge along radial direction to each card -->
   <Layer name="Connectors" alpha="0.5">
-    <!-- to Readable (800,90) top: straight up -->
+    <!-- to Readable (800,110): direction (0,-1), start (800,385), end (800,190) -->
     <Group>
-      <Path data="M 800 365 L 800 170"/>
+      <Path data="M 800 385 L 800 190"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
-    <!-- to Comprehensive (1209,387) right-upper: angle ~18deg above horizontal -->
+    <!-- to Comprehensive (1209,407): direction (0.951,-0.309), start (947,492), end (999,423) -->
     <Group>
-      <Path data="M 947 488 L 1000 400"/>
+      <Path data="M 947 492 L 999 423"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
-    <!-- to Expressive (1053,868) right-lower: angle ~54deg below horizontal -->
+    <!-- to Expressive (1053,888): direction (0.588,0.809), start (891,665), end (843,733) -->
     <Group>
-      <Path data="M 870 639 L 920 788"/>
+      <Path data="M 891 665 L 843 808"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
-    <!-- to Portable (547,868) left-lower: angle ~54deg below horizontal -->
+    <!-- to Portable (547,888): direction (-0.588,0.809), start (709,665), end (757,808) -->
     <Group>
-      <Path data="M 730 639 L 680 788"/>
+      <Path data="M 709 665 L 757 808"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
-    <!-- to Deployable (391,387) left-upper: angle ~18deg above horizontal -->
+    <!-- to Deployable (391,407): direction (-0.951,-0.309), start (653,492), end (601,423) -->
     <Group>
-      <Path data="M 653 488 L 600 400"/>
+      <Path data="M 653 492 L 601 423"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
   </Layer>
 
   <!-- Card 1: Readable (top center) -->
-  <Layer name="CardReadable" x="800" y="90">
+  <Layer name="CardReadable" x="800" y="110">
     <Rectangle center="0,0" size="420,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -139,7 +146,7 @@
   </Layer>
 
   <!-- Card 2: Comprehensive (right-upper) -->
-  <Layer name="CardComprehensive" x="1209" y="387">
+  <Layer name="CardComprehensive" x="1209" y="407">
     <Rectangle center="0,0" size="420,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -179,7 +186,7 @@
   </Layer>
 
   <!-- Card 3: Expressive (right-lower) -->
-  <Layer name="CardExpressive" x="1053" y="868">
+  <Layer name="CardExpressive" x="1053" y="888">
     <Rectangle center="0,0" size="420,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -233,7 +240,7 @@
   </Layer>
 
   <!-- Card 4: Portable (left-lower) -->
-  <Layer name="CardPortable" x="547" y="868">
+  <Layer name="CardPortable" x="547" y="888">
     <Rectangle center="0,0" size="420,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -267,14 +274,14 @@
       <Fill color="#CBD5E1"/>
     </Layer>
     <Layer x="-30" y="35">
-      <Text text="Cross-platform asset exchange" fontFamily="Arial" fontSize="16"/>
+      <Text text="Cross-platform exchange" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
     </Layer>
   </Layer>
 
   <!-- Card 5: Deployable (left-upper) -->
-  <Layer name="CardDeployable" x="391" y="387">
+  <Layer name="CardDeployable" x="391" y="407">
     <Rectangle center="0,0" size="420,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -320,7 +327,7 @@
       <Fill color="#CBD5E1"/>
     </Layer>
     <Layer x="-30" y="35">
-      <Text text="High compression &amp; performance" fontFamily="Arial" fontSize="16"/>
+      <Text text="High compression &amp; speed" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
     </Layer>
