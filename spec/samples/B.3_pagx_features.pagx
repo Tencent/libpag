@@ -157,7 +157,7 @@
   </Layer>
 
   <!-- ==================== DECORATIVE ORBITING RING ==================== -->
-  <Layer name="OrbitalRing" x="400" y="58" alpha="0.2">
+  <Layer name="OrbitalRing" x="400" y="72" alpha="0.2">
     <Ellipse center="0,0" size="180,30"/>
     <TrimPath start="0" end="0.65"/>
     <Stroke width="2" cap="round" color="@ringGrad"/>
@@ -174,7 +174,7 @@
   </Layer>
 
   <!-- ==================== HEADER SECTION ==================== -->
-  <Layer name="TitlePAGX" x="400" y="42">
+  <Layer name="TitlePAGX" x="400" y="56">
     <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="52"/>
     <TextLayout position="0,0" textAlign="center"/>
     <Fill color="@titleGrad"/>
@@ -183,13 +183,13 @@
 
   <Layer name="Subtitle">
     <Text text="Portable Animated Graphics XML" fontFamily="Arial" fontSize="14"/>
-    <TextLayout position="400,84" textAlign="center"/>
+    <TextLayout position="400,94" textAlign="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
 
   <!-- Decorative accent line -->
   <Layer name="AccentLine" alpha="0.6">
-    <Path data="M 280 104 L 520 104"/>
+    <Path data="M 280 114 L 520 114"/>
     <Stroke width="2" cap="round">
       <LinearGradient startPoint="280,0" endPoint="520,0">
         <ColorStop offset="0" color="#6366F100"/>
@@ -203,7 +203,7 @@
 
   <Layer name="Tagline">
     <Text text="The Next-Gen Vector Animation Standard" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-    <TextLayout position="400,116" textAlign="center"/>
+    <TextLayout position="400,126" textAlign="center"/>
     <Fill color="@subtitleGrad"/>
   </Layer>
 
@@ -213,7 +213,7 @@
   <!-- Card dimensions: 200x140, spacing ~25, total ~650, left margin ~75 -->
 
   <!-- Card 1: Open & Readable -->
-  <Layer name="Card1" x="75" y="148">
+  <Layer name="Card1" x="75" y="158">
     <Layer>
       <Rectangle center="100,72" size="200,144" roundness="14"/>
       <Fill color="@card1Grad"/>
@@ -264,7 +264,7 @@
   </Layer>
 
   <!-- Card 2: Feature-Complete -->
-  <Layer name="Card2" x="300" y="148">
+  <Layer name="Card2" x="300" y="158">
     <Layer>
       <Rectangle center="100,72" size="200,144" roundness="14"/>
       <Fill color="@card2Grad"/>
@@ -313,7 +313,7 @@
   </Layer>
 
   <!-- Card 3: Concise & Efficient -->
-  <Layer name="Card3" x="525" y="148">
+  <Layer name="Card3" x="525" y="158">
     <Layer>
       <Rectangle center="100,72" size="200,144" roundness="14"/>
       <Fill color="@card3Grad"/>
@@ -355,7 +355,7 @@
   <!-- ===== ROW 2: 2 cards centered at y=310 ===== -->
 
   <!-- Card 4: Ecosystem Compatible -->
-  <Layer name="Card4" x="175" y="316">
+  <Layer name="Card4" x="175" y="326">
     <Layer>
       <Rectangle center="100,72" size="200,144" roundness="14"/>
       <Fill color="@card4Grad"/>
@@ -396,7 +396,7 @@
   </Layer>
 
   <!-- Card 5: Efficient Deployment -->
-  <Layer name="Card5" x="425" y="316">
+  <Layer name="Card5" x="425" y="326">
     <Layer>
       <Rectangle center="100,72" size="200,144" roundness="14"/>
       <Fill color="@card5Grad"/>
@@ -453,71 +453,71 @@
 
   <!-- Decorative separator line -->
   <Layer name="BottomAccent">
-    <Path data="M 120 486 L 680 486"/>
+    <Path data="M 120 496 L 680 496"/>
     <Stroke color="@bottomBarGrad" width="1"/>
   </Layer>
 
   <!-- Pipeline: .pagx -> .pag -> Production (all absolute coordinates) -->
   <!-- PAGX badge -->
   <Layer name="PagxBadge">
-    <Rectangle center="260,514" size="80,28" roundness="14"/>
+    <Rectangle center="280,524" size="80,28" roundness="14"/>
     <Fill color="#6366F130"/>
     <Stroke color="#6366F160" width="1"/>
   </Layer>
   <Layer>
     <Text text=".pagx" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
-    <TextLayout position="260,508" textAlign="center"/>
+    <TextLayout position="280,528" textAlign="center"/>
     <Fill color="#A78BFA"/>
   </Layer>
 
   <!-- Arrow 1 -->
   <Layer name="Arrow1">
-    <Path data="M 310 514 L 340 514"/>
+    <Path data="M 330 524 L 360 524"/>
     <Stroke color="#64748B" width="2" cap="round"/>
   </Layer>
   <Layer>
-    <Path data="M 334 508 L 342 514 L 334 520"/>
+    <Path data="M 354 518 L 362 524 L 354 530"/>
     <Stroke color="#64748B" width="2" cap="round" join="round"/>
   </Layer>
 
   <!-- PAG badge -->
   <Layer name="PagBadge">
-    <Rectangle center="390,514" size="72,28" roundness="14"/>
+    <Rectangle center="400,524" size="72,28" roundness="14"/>
     <Fill color="#EC489930"/>
     <Stroke color="#EC489960" width="1"/>
   </Layer>
   <Layer>
     <Text text=".pag" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
-    <TextLayout position="390,508" textAlign="center"/>
+    <TextLayout position="400,528" textAlign="center"/>
     <Fill color="#F472B6"/>
   </Layer>
 
   <!-- Arrow 2 -->
   <Layer name="Arrow2">
-    <Path data="M 436 514 L 466 514"/>
+    <Path data="M 446 524 L 476 524"/>
     <Stroke color="#64748B" width="2" cap="round"/>
   </Layer>
   <Layer>
-    <Path data="M 460 508 L 468 514 L 460 520"/>
+    <Path data="M 470 518 L 478 524 L 470 530"/>
     <Stroke color="#64748B" width="2" cap="round" join="round"/>
   </Layer>
 
   <!-- Production badge -->
   <Layer name="ProdBadge">
-    <Rectangle center="530,514" size="100,28" roundness="14"/>
+    <Rectangle center="530,524" size="100,28" roundness="14"/>
     <Fill color="#34D39920"/>
     <Stroke color="#34D39960" width="1"/>
   </Layer>
   <Layer>
     <Text text="Production" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
-    <TextLayout position="530,508" textAlign="center"/>
+    <TextLayout position="530,528" textAlign="center"/>
     <Fill color="#34D399"/>
   </Layer>
 
   <!-- Bottom tagline -->
   <Layer name="BottomDesc">
     <Text text="Design  -  Develop  -  Deploy" fontFamily="Arial" fontSize="12"/>
-    <TextLayout position="400,550" textAlign="center"/>
+    <TextLayout position="400,558" textAlign="center"/>
     <Fill color="#64748B"/>
   </Layer>
 
