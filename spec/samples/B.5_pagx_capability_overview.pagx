@@ -121,17 +121,17 @@
         <Fill color="#F43F5E"/>
       </Layer>
     </Layer>
-    <Layer x="-30" y="-22">
+    <Layer x="-30" y="-17">
       <Text text="Readable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#F43F5E"/>
     </Layer>
-    <Layer x="-30" y="6">
+    <Layer x="-30" y="11">
       <Text text="XML plain-text format" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-30" y="30">
+    <Layer x="-30" y="35">
       <Text text="Git-friendly &amp; AI-native" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
@@ -161,17 +161,17 @@
         <Fill color="#38BDF810"/>
       </Group>
     </Layer>
-    <Layer x="-30" y="-22">
+    <Layer x="-30" y="-17">
       <Text text="Comprehensive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#38BDF8"/>
     </Layer>
-    <Layer x="-30" y="6">
+    <Layer x="-30" y="11">
       <Text text="Vector, text, effects" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-30" y="30">
+    <Layer x="-30" y="35">
       <Text text="Masks, blending &amp; filters" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
@@ -205,17 +205,17 @@
         <Fill color="#A855F7"/>
       </Group>
     </Layer>
-    <Layer x="-30" y="-22">
+    <Layer x="-30" y="-17">
       <Text text="Expressive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#A855F7"/>
     </Layer>
-    <Layer x="-30" y="6">
+    <Layer x="-30" y="11">
       <Text text="Compact yet powerful" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-30" y="30">
+    <Layer x="-30" y="35">
       <Text text="Static &amp; animation unified" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
@@ -246,17 +246,17 @@
         <Stroke color="#10B981" width="1" dashes="3,3"/>
       </Group>
     </Layer>
-    <Layer x="-30" y="-22">
+    <Layer x="-30" y="-17">
       <Text text="Portable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#10B981"/>
     </Layer>
-    <Layer x="-30" y="6">
+    <Layer x="-30" y="11">
       <Text text="AE, Figma, TD bridge" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-30" y="30">
+    <Layer x="-30" y="35">
       <Text text="Seamless asset exchange" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
@@ -299,17 +299,17 @@
         <Stroke color="#FB923C" width="2" cap="round" join="round"/>
       </Group>
     </Layer>
-    <Layer x="-30" y="-22">
+    <Layer x="-30" y="-17">
       <Text text="Deployable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#FBBF24"/>
     </Layer>
-    <Layer x="-30" y="6">
+    <Layer x="-30" y="11">
       <Text text="One-click to production" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-30" y="30">
+    <Layer x="-30" y="35">
       <Text text="High compression binary" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
