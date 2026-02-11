@@ -89,7 +89,7 @@
   </Layer>
 
   <!-- Title Section -->
-  <Layer name="Header" y="60">
+  <Layer name="Header" y="90">
     <!-- Main Title -->
     <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="72"/>
     <TextLayout position="400,0" textAlign="center"/>
@@ -112,7 +112,7 @@
   <!-- Layout: 3 Top, 2 Bottom -->
   
     <!-- Card 1: Open & Readable -->
-  <Layer name="Card1" x="50" y="160">
+  <Layer name="Card1" x="50" y="190">
     <DropShadowStyle offsetX="0" offsetY="8" blurX="20" blurY="20" color="#00000060"/>
     
     <!-- Card Background -->
@@ -146,21 +146,24 @@
 
     <!-- Body Text: Centered -->
     <Group position="0, 85">
-        <Text text="XML-based plain text format." fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="110,0" textAlign="center"/>
-        
-        <Text text="Native version control friendly." fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="110,18" textAlign="center"/>
-        
-        <Text text="Optimized for AI generation." fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="110,36" textAlign="center"/>
-        
+        <Group>
+            <Text text="XML-based plain text format." fontFamily="Arial" fontSize="12"/>
+            <TextLayout position="110,0" textAlign="center"/>
+        </Group>
+        <Group>
+            <Text text="Native version control friendly." fontFamily="Arial" fontSize="12"/>
+            <TextLayout position="110,18" textAlign="center"/>
+        </Group>
+        <Group>
+            <Text text="Optimized for AI generation." fontFamily="Arial" fontSize="12"/>
+            <TextLayout position="110,36" textAlign="center"/>
+        </Group>
         <Fill color="#FFFFFFCC"/>
     </Group>
   </Layer>
 
   <!-- Card 2: Feature Complete -->
-  <Layer name="Card2" x="290" y="160">
+  <Layer name="Card2" x="290" y="190">
     <DropShadowStyle offsetX="0" offsetY="8" blurX="20" blurY="20" color="#00000060"/>
     <Group>
         <Rectangle center="110,75" size="220,150" roundness="16"/>
@@ -187,21 +190,24 @@
     </Group>
     <!-- Body Text: Centered -->
     <Group position="0, 85">
-        <Text text="Vectors, images, &amp; rich text." fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="110,0" textAlign="center"/>
-        
-        <Text text="Advanced filters &amp; blending." fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="110,18" textAlign="center"/>
-        
-        <Text text="Supports complex motion." fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="110,36" textAlign="center"/>
-        
+        <Group>
+            <Text text="Vectors, images, &amp; rich text." fontFamily="Arial" fontSize="12"/>
+            <TextLayout position="110,0" textAlign="center"/>
+        </Group>
+        <Group>
+            <Text text="Advanced filters &amp; blending." fontFamily="Arial" fontSize="12"/>
+            <TextLayout position="110,18" textAlign="center"/>
+        </Group>
+        <Group>
+            <Text text="Supports complex motion." fontFamily="Arial" fontSize="12"/>
+            <TextLayout position="110,36" textAlign="center"/>
+        </Group>
         <Fill color="#FFFFFFCC"/>
     </Group>
   </Layer>
 
   <!-- Card 3: Concise -->
-  <Layer name="Card3" x="530" y="160">
+  <Layer name="Card3" x="530" y="190">
     <DropShadowStyle offsetX="0" offsetY="8" blurX="20" blurY="20" color="#00000060"/>
     <Group>
         <Rectangle center="110,75" size="220,150" roundness="16"/>
@@ -228,21 +234,24 @@
     </Group>
     <!-- Body Text: Centered -->
     <Group position="0, 85">
-        <Text text="Compact unified structure." fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="110,0" textAlign="center"/>
-        
-        <Text text="Efficient binary conversion." fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="110,18" textAlign="center"/>
-        
-        <Text text="Extensible architecture." fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="110,36" textAlign="center"/>
-        
+        <Group>
+            <Text text="Compact unified structure." fontFamily="Arial" fontSize="12"/>
+            <TextLayout position="110,0" textAlign="center"/>
+        </Group>
+        <Group>
+            <Text text="Efficient binary conversion." fontFamily="Arial" fontSize="12"/>
+            <TextLayout position="110,18" textAlign="center"/>
+        </Group>
+        <Group>
+            <Text text="Extensible architecture." fontFamily="Arial" fontSize="12"/>
+            <TextLayout position="110,36" textAlign="center"/>
+        </Group>
         <Fill color="#FFFFFFCC"/>
     </Group>
   </Layer>
 
   <!-- Card 4: Ecosystem (Bottom Left, wider) -->
-  <Layer name="Card4" x="110" y="340">
+  <Layer name="Card4" x="110" y="370">
     <DropShadowStyle offsetX="0" offsetY="8" blurX="20" blurY="20" color="#00000060"/>
     <Group>
         <Rectangle center="140,75" size="280,150" roundness="16"/>
@@ -269,21 +278,24 @@
     </Group>
     <!-- Body Text: Centered -->
     <Group position="0, 85">
-        <Text text="Universal interchange format." fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="140,0" textAlign="center"/>
-        
-        <Text text="Supports AE, Figma, &amp; more." fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="140,18" textAlign="center"/>
-        
-        <Text text="Seamless asset workflow." fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="140,36" textAlign="center"/>
-        
+        <Group>
+            <Text text="Universal interchange format." fontFamily="Arial" fontSize="12"/>
+            <TextLayout position="140,0" textAlign="center"/>
+        </Group>
+        <Group>
+            <Text text="Supports AE, Figma, &amp; more." fontFamily="Arial" fontSize="12"/>
+            <TextLayout position="140,18" textAlign="center"/>
+        </Group>
+        <Group>
+            <Text text="Seamless asset workflow." fontFamily="Arial" fontSize="12"/>
+            <TextLayout position="140,36" textAlign="center"/>
+        </Group>
         <Fill color="#FFFFFFCC"/>
     </Group>
   </Layer>
 
   <!-- Card 5: Deployment (Bottom Right, wider) -->
-  <Layer name="Card5" x="410" y="340">
+  <Layer name="Card5" x="410" y="370">
     <DropShadowStyle offsetX="0" offsetY="8" blurX="20" blurY="20" color="#00000060"/>
     <Group>
         <Rectangle center="140,75" size="280,150" roundness="16"/>
@@ -310,15 +322,18 @@
     </Group>
     <!-- Body Text: Centered -->
     <Group position="0, 85">
-        <Text text="One-click production export." fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="140,0" textAlign="center"/>
-        
-        <Text text="High compression ratio." fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="140,18" textAlign="center"/>
-        
-        <Text text="High performance runtime." fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="140,36" textAlign="center"/>
-        
+        <Group>
+            <Text text="One-click production export." fontFamily="Arial" fontSize="12"/>
+            <TextLayout position="140,0" textAlign="center"/>
+        </Group>
+        <Group>
+            <Text text="High compression ratio." fontFamily="Arial" fontSize="12"/>
+            <TextLayout position="140,18" textAlign="center"/>
+        </Group>
+        <Group>
+            <Text text="High performance runtime." fontFamily="Arial" fontSize="12"/>
+            <TextLayout position="140,36" textAlign="center"/>
+        </Group>
         <Fill color="#FFFFFFCC"/>
     </Group>
   </Layer>
