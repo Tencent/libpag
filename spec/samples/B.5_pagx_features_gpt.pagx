@@ -258,18 +258,33 @@
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="10" blurX="20" blurY="20" color="#00000040"/>
     <Layer x="-108" y="0">
+      <!-- Rocket body -->
       <Group>
-        <Path data="M 0 -30 L 20 -4 L 10 -4 L 10 24 L -10 24 L -10 -4 L -20 -4 Z"/>
+        <Path data="M 0 -32 C 8 -28 14 -16 14 0 L 14 18 L -14 18 L -14 0 C -14 -16 -8 -28 0 -32 Z"/>
         <Stroke color="#10B981" width="2" join="round"/>
         <Fill color="#10B98120"/>
       </Group>
+      <!-- Left fin -->
       <Group>
-        <Path data="M -6 28 L -6 32 M 6 28 L 6 32"/>
-        <Stroke color="#10B981" width="2" cap="round"/>
+        <Path data="M -14 10 L -24 24 L -14 20 Z"/>
+        <Stroke color="#10B981" width="2" join="round"/>
+        <Fill color="#10B98115"/>
       </Group>
+      <!-- Right fin -->
       <Group>
-        <Path data="M -14 -14 L -22 -4 M 14 -14 L 22 -4"/>
-        <Stroke color="#10B981" width="2" cap="round"/>
+        <Path data="M 14 10 L 24 24 L 14 20 Z"/>
+        <Stroke color="#10B981" width="2" join="round"/>
+        <Fill color="#10B98115"/>
+      </Group>
+      <!-- Window -->
+      <Group>
+        <Ellipse center="0,-8" size="10,10"/>
+        <Stroke color="#10B981" width="2"/>
+      </Group>
+      <!-- Flame -->
+      <Group>
+        <Path data="M -8 18 L -4 30 L 0 24 L 4 30 L 8 18"/>
+        <Stroke color="#10B981" width="2" cap="round" join="round"/>
       </Group>
     </Layer>
     <Layer x="-47" y="-26">
