@@ -23,8 +23,8 @@
 
   <!-- Description along circular path between outer ring and GlowBand -->
   <Layer name="Description" x="800" y="540" alpha="0.5">
-    <Text text="An XML-based markup language for describing animated vector graphics.  ·  " fontFamily="Arial" fontSize="12"/>
-    <TextPath path="M 0 -210 A 210 210 0 1 1 0 210 A 210 210 0 1 1 0 -210 Z" forceAlignment="true"/>
+    <Text text="An XML-based markup language for describing animated vector graphics " fontFamily="Arial" fontSize="12"/>
+    <TextPath path="M 0 -185 A 185 185 0 1 1 0 185 A 185 185 0 1 1 0 -185 Z" forceAlignment="true"/>
     <Fill color="#64748B"/>
   </Layer>
 
