@@ -3,86 +3,86 @@
 
   <!-- ==================== RESOURCES ==================== -->
   <Resources>
-    <!-- Background: Deep Space / Midnight -->
+    <!-- Background: Dark Fantasy -->
     <LinearGradient id="bgGrad" startPoint="0,0" endPoint="800,600">
-      <ColorStop offset="0" color="#020617"/>
-      <ColorStop offset="0.6" color="#0F172A"/>
-      <ColorStop offset="1" color="#1E293B"/>
+      <ColorStop offset="0" color="#0A0A12"/>
+      <ColorStop offset="0.6" color="#12101E"/>
+      <ColorStop offset="1" color="#1A1428"/>
     </LinearGradient>
 
     <!-- Ambient glow -->
     <RadialGradient id="glowGold" center="400,300" radius="400">
-      <ColorStop offset="0" color="#F59E0B12"/>
-      <ColorStop offset="1" color="#F59E0B00"/>
+      <ColorStop offset="0" color="#FFD70020"/>
+      <ColorStop offset="1" color="#FFD70000"/>
     </RadialGradient>
-    <RadialGradient id="glowBlue" center="200,500" radius="300">
-      <ColorStop offset="0" color="#3B82F60A"/>
-      <ColorStop offset="1" color="#3B82F600"/>
+    <RadialGradient id="glowPurple" center="200,500" radius="300">
+      <ColorStop offset="0" color="#7C3AED0A"/>
+      <ColorStop offset="1" color="#7C3AED00"/>
     </RadialGradient>
 
-    <!-- Panel background: Glassmorphism / Subtle Gradient -->
+    <!-- Panel background: Dark Fantasy -->
     <LinearGradient id="panelBg" startPoint="0,0" endPoint="0,400">
-      <ColorStop offset="0" color="#1E293BF2"/>
-      <ColorStop offset="1" color="#0F172AF2"/>
+      <ColorStop offset="0" color="#1A1428E8"/>
+      <ColorStop offset="1" color="#0E0B18E8"/>
     </LinearGradient>
     
-    <!-- Panel Border: Subtle Metallic -->
+    <!-- Panel Border: Gold Metallic -->
     <LinearGradient id="panelBorder" startPoint="0,0" endPoint="0,400">
-      <ColorStop offset="0" color="#475569"/>
-      <ColorStop offset="0.5" color="#334155"/>
-      <ColorStop offset="1" color="#1E293B"/>
+      <ColorStop offset="0" color="#8B6914"/>
+      <ColorStop offset="0.5" color="#5C4510"/>
+      <ColorStop offset="1" color="#3D2E08"/>
     </LinearGradient>
 
-    <!-- HP bar: Smooth Red -->
+    <!-- HP bar: Blood Red -->
     <LinearGradient id="hpFill" startPoint="0,0" endPoint="200,0">
-      <ColorStop offset="0" color="#F43F5E"/>
-      <ColorStop offset="1" color="#E11D48"/>
+      <ColorStop offset="0" color="#FF2D2D"/>
+      <ColorStop offset="1" color="#CC0000"/>
     </LinearGradient>
 
-    <!-- MP bar: Smooth Blue -->
+    <!-- MP bar: Arcane Blue -->
     <LinearGradient id="mpFill" startPoint="0,0" endPoint="200,0">
-      <ColorStop offset="0" color="#38BDF8"/>
-      <ColorStop offset="1" color="#0284C7"/>
+      <ColorStop offset="0" color="#4488FF"/>
+      <ColorStop offset="1" color="#2255CC"/>
     </LinearGradient>
 
-    <!-- EXP bar: Smooth Violet -->
+    <!-- EXP bar: Golden -->
     <LinearGradient id="expFill" startPoint="0,0" endPoint="500,0">
-      <ColorStop offset="0" color="#C084FC"/>
-      <ColorStop offset="1" color="#9333EA"/>
+      <ColorStop offset="0" color="#FFD700"/>
+      <ColorStop offset="1" color="#FF8C00"/>
     </LinearGradient>
 
-    <!-- Button gradients (Updated) -->
+    <!-- Button gradients -->
     <LinearGradient id="btnGold" startPoint="0,0" endPoint="0,44">
-      <ColorStop offset="0" color="#5EEAD4"/>
-      <ColorStop offset="0.5" color="#2DD4BF"/>
-      <ColorStop offset="1" color="#14B8A6"/>
+      <ColorStop offset="0" color="#FFD700"/>
+      <ColorStop offset="0.5" color="#DAA520"/>
+      <ColorStop offset="1" color="#B8860B"/>
     </LinearGradient>
     <LinearGradient id="btnRed" startPoint="0,0" endPoint="0,44">
-      <ColorStop offset="0" color="#FB7185"/>
-      <ColorStop offset="0.5" color="#E11D48"/>
-      <ColorStop offset="1" color="#BE123C"/>
+      <ColorStop offset="0" color="#FF4444"/>
+      <ColorStop offset="0.5" color="#CC0000"/>
+      <ColorStop offset="1" color="#990000"/>
     </LinearGradient>
 
     <!-- Star / rank gradient -->
     <LinearGradient id="starGrad" startPoint="0,-12" endPoint="0,12">
-      <ColorStop offset="0" color="#FDE68A"/>
-      <ColorStop offset="1" color="#F59E0B"/>
+      <ColorStop offset="0" color="#FFE880"/>
+      <ColorStop offset="1" color="#FFD700"/>
     </LinearGradient>
 
-    <!-- Title gradient: Champagne Gold -->
+    <!-- Title gradient: Bright Gold -->
     <LinearGradient id="titleGrad" startPoint="0,0" endPoint="250,0">
-      <ColorStop offset="0" color="#FEF3C7"/>
-      <ColorStop offset="0.5" color="#FDE68A"/>
-      <ColorStop offset="1" color="#F59E0B"/>
+      <ColorStop offset="0" color="#FFE880"/>
+      <ColorStop offset="0.5" color="#FFD700"/>
+      <ColorStop offset="1" color="#CC8800"/>
     </LinearGradient>
 
     <!-- Avatar ring gradient -->
     <ConicGradient id="avatarRing" center="0,0" startAngle="0" endAngle="360">
-      <ColorStop offset="0" color="#FBBF24"/>
-      <ColorStop offset="0.25" color="#D97706"/>
-      <ColorStop offset="0.5" color="#F59E0B"/>
-      <ColorStop offset="0.75" color="#D97706"/>
-      <ColorStop offset="1" color="#FBBF24"/>
+      <ColorStop offset="0" color="#FFD700"/>
+      <ColorStop offset="0.25" color="#B8860B"/>
+      <ColorStop offset="0.5" color="#FFD700"/>
+      <ColorStop offset="0.75" color="#B8860B"/>
+      <ColorStop offset="1" color="#FFD700"/>
     </ConicGradient>
 
     <!-- Decorative diamond path -->
@@ -118,7 +118,7 @@
   <Layer name="StarDust" alpha="0.15">
     <Group>
       <Path data="@diamondPath"/>
-      <Fill color="#FBBF24"/>
+      <Fill color="#FFD700"/>
       <Repeater copies="12" position="65,0" startAlpha="1" endAlpha="0.3"/>
     </Group>
     <Group position="400,40"/>
@@ -129,12 +129,12 @@
     <!-- Bar background (Simplified) -->
     <Layer>
       <Rectangle center="400,32" size="800,64"/>
-      <Fill color="#0F172A80"/>
+      <Fill color="#0E0B1880"/>
     </Layer>
     <!-- Bottom border line -->
     <Layer>
       <Path data="M 0 64 L 800 64"/>
-      <Stroke color="#334155" width="1"/>
+      <Stroke color="#5C451080" width="1"/>
     </Layer>
 
     <!-- Avatar area -->
@@ -147,12 +147,12 @@
       <!-- Avatar inner -->
       <Layer>
         <Ellipse center="0,0" size="46,46"/>
-        <Fill color="#1E293B"/>
+        <Fill color="#1A1428"/>
       </Layer>
       <!-- Avatar silhouette -->
       <Layer>
         <Path data="@helmetIcon"/>
-        <Fill color="#94A3B8"/>
+        <Fill color="#A89878"/>
       </Layer>
     </Layer>
 
@@ -165,7 +165,7 @@
     <Layer x="80" y="48">
       <Text text="Lv. 72  Paladin" fontFamily="Arial" fontSize="12"/>
       <TextLayout position="0,0" textAlign="start"/>
-      <Fill color="#94A3B8"/>
+      <Fill color="#A89878"/>
     </Layer>
 
     <!-- HP bar -->
@@ -173,12 +173,12 @@
       <Layer>
         <Text text="HP" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
         <TextLayout position="-10,9" textAlign="start"/>
-        <Fill color="#F43F5E"/>
+        <Fill color="#FF2D2D"/>
       </Layer>
       <Layer>
         <Rectangle center="105,5" size="190,14" roundness="7"/>
-        <Fill color="#0F172A"/>
-        <Stroke color="#334155" width="1"/>
+        <Fill color="#0E0B18"/>
+        <Stroke color="#5C451080" width="1"/>
       </Layer>
       <Layer>
         <Rectangle center="83,5" size="142,10" roundness="5"/>
@@ -197,12 +197,12 @@
       <Layer>
         <Text text="MP" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
         <TextLayout position="-10,9" textAlign="start"/>
-        <Fill color="#38BDF8"/>
+        <Fill color="#4488FF"/>
       </Layer>
       <Layer>
         <Rectangle center="105,5" size="190,14" roundness="7"/>
-        <Fill color="#0F172A"/>
-        <Stroke color="#334155" width="1"/>
+        <Fill color="#0E0B18"/>
+        <Stroke color="#5C451080" width="1"/>
       </Layer>
       <Layer>
         <Rectangle center="74,5" size="124,10" roundness="5"/>
@@ -221,12 +221,12 @@
       <Layer>
         <Rectangle center="70,16" size="160,32" roundness="16"/>
         <Fill color="#00000040"/>
-        <Stroke color="#F59E0B60" width="1"/>
+        <Stroke color="#FFD70060" width="1"/>
       </Layer>
       <!-- Coin icon -->
       <Layer x="10" y="16">
         <Ellipse center="0,0" size="22,22"/>
-        <Fill color="#FBBF24"/>
+        <Fill color="#FFD700"/>
         <InnerShadowStyle offsetX="-2" offsetY="-2" blurX="3" blurY="3" color="#FFFFFF60"/>
       </Layer>
       <Layer x="10" y="16">
@@ -237,7 +237,7 @@
       <Layer>
         <Text text="128,450" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <TextLayout position="70,22" textAlign="center"/>
-        <Fill color="#FDE68A"/>
+        <Fill color="#FFE880"/>
       </Layer>
     </Layer>
   </Layer>
@@ -255,7 +255,7 @@
     <!-- Panel title -->
     <Layer>
       <Path data="M 20 40 L 240 40"/>
-      <Stroke color="#334155" width="1"/>
+      <Stroke color="#5C451080" width="1"/>
     </Layer>
     <Layer>
       <Text text="CHARACTER" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
@@ -268,16 +268,16 @@
       <!-- Portrait frame -->
       <Layer>
         <Rectangle center="0,0" size="200,200" roundness="12"/>
-        <Fill color="#0F172A80"/>
-        <Stroke color="#334155" width="1"/>
+        <Fill color="#0E0B1880"/>
+        <Stroke color="#5C451080" width="1"/>
       </Layer>
       <!-- Character glow behind -->
       <Layer>
         <Ellipse center="0,0" size="140,140"/>
         <Fill>
           <RadialGradient center="0,0" radius="70">
-            <ColorStop offset="0" color="#F59E0B10"/>
-            <ColorStop offset="1" color="#F59E0B00"/>
+            <ColorStop offset="0" color="#FFD70010"/>
+            <ColorStop offset="1" color="#FFD70000"/>
           </RadialGradient>
         </Fill>
       </Layer>
@@ -294,25 +294,25 @@
           <Path data="M 0 -65 Q 28 -65 32 -38 L 36 10 L 18 10 L 14 -18 Q 10 -28 0 -28 Q -10 -28 -14 -18 L -18 10 L -36 10 L -32 -38 Q -28 -65 0 -65 Z"/>
           <Fill>
             <LinearGradient startPoint="0,-65" endPoint="0,10">
-              <ColorStop offset="0" color="#475569"/>
-              <ColorStop offset="1" color="#334155"/>
+              <ColorStop offset="0" color="#3D3555"/>
+              <ColorStop offset="1" color="#2A2040"/>
             </LinearGradient>
           </Fill>
-          <Stroke color="#F59E0B30" width="1"/>
+          <Stroke color="#B8860B30" width="1"/>
         </Group>
         <!-- Armor plate lines -->
         <Group>
           <Path data="M -12 -15 L 12 -15"/>
-          <Stroke color="#F59E0B20" width="1"/>
+          <Stroke color="#B8860B20" width="1"/>
         </Group>
         <Group>
           <Path data="M -14 -5 L 14 -5"/>
-          <Stroke color="#F59E0B20" width="1"/>
+          <Stroke color="#B8860B20" width="1"/>
         </Group>
         <!-- Chest emblem -->
         <Group>
           <Path data="M 0 -50 L 6 -40 L -6 -40 Z"/>
-          <Fill color="#F59E0B60"/>
+          <Fill color="#FFD70060"/>
         </Group>
         <!-- Belt -->
         <Group>
@@ -322,62 +322,62 @@
         </Group>
         <Group>
           <Rectangle center="0,8" size="10,10" roundness="1"/>
-          <Fill color="#FBBF24"/>
+          <Fill color="#FFD700"/>
         </Group>
         <Group>
           <Rectangle center="0,8" size="5,5" roundness="1"/>
-          <Fill color="#F59E0B"/>
+          <Fill color="#FFD700"/>
         </Group>
         <!-- Legs -->
         <Group>
           <Path data="M -15 12 L -18 55 L -8 55 L -5 12 Z"/>
-          <Fill color="#374151"/>
+          <Fill color="#2E2545"/>
         </Group>
         <Group>
           <Path data="M 5 12 L 8 55 L 18 55 L 15 12 Z"/>
-          <Fill color="#374151"/>
+          <Fill color="#2E2545"/>
         </Group>
         <!-- Knee guards -->
         <Group>
           <Ellipse center="-12,32" size="10,8"/>
-          <Fill color="#475569"/>
-          <Stroke color="#F59E0B30" width="1"/>
+          <Fill color="#3D3555"/>
+          <Stroke color="#B8860B30" width="1"/>
         </Group>
         <Group>
           <Ellipse center="12,32" size="10,8"/>
-          <Fill color="#475569"/>
-          <Stroke color="#F59E0B30" width="1"/>
+          <Fill color="#3D3555"/>
+          <Stroke color="#B8860B30" width="1"/>
         </Group>
         <!-- Boots -->
         <Group>
           <Path data="M -20 50 L -6 50 L -5 62 L -22 62 Z"/>
-          <Fill color="#4B5563"/>
-          <Stroke color="#F59E0B20" width="1"/>
+          <Fill color="#4B3D5A"/>
+          <Stroke color="#B8860B20" width="1"/>
         </Group>
         <Group>
           <Path data="M 6 50 L 20 50 L 22 62 L 5 62 Z"/>
-          <Fill color="#4B5563"/>
-          <Stroke color="#F59E0B20" width="1"/>
+          <Fill color="#4B3D5A"/>
+          <Stroke color="#B8860B20" width="1"/>
         </Group>
         <!-- Boot cuffs -->
         <Group>
           <Path data="M -20 50 L -6 50 L -6 53 L -20 53 Z"/>
-          <Fill color="#475569"/>
+          <Fill color="#3D3555"/>
         </Group>
         <Group>
           <Path data="M 6 50 L 20 50 L 20 53 L 6 53 Z"/>
-          <Fill color="#475569"/>
+          <Fill color="#3D3555"/>
         </Group>
         <!-- Head -->
         <Group>
           <Ellipse center="0,-76" size="32,36"/>
           <Fill color="#64748B"/>
-          <Stroke color="#F59E0B20" width="1"/>
+          <Stroke color="#B8860B20" width="1"/>
         </Group>
         <!-- Helmet visor -->
         <Group>
           <Path data="M -10 -78 L 10 -78 L 8 -70 L -8 -70 Z"/>
-          <Fill color="#1E293B"/>
+          <Fill color="#1A1428"/>
         </Group>
         <!-- Visor glow -->
         <Group>
@@ -387,39 +387,39 @@
         <!-- Helmet crest -->
         <Group>
           <Path data="M -4 -95 Q 0 -112 4 -95"/>
-          <Stroke color="#F59E0B" width="3" cap="round"/>
+          <Stroke color="#FFD700" width="3" cap="round"/>
         </Group>
         <Group>
           <Path data="M -2 -96 Q 0 -104 2 -96"/>
-          <Stroke color="#FBBF24" width="2" cap="round"/>
+          <Stroke color="#FFD700" width="2" cap="round"/>
         </Group>
         <!-- Shoulders -->
         <Group>
           <Ellipse center="-32,-42" size="24,18"/>
-          <Fill color="#475569"/>
-          <Stroke color="#F59E0B50" width="1"/>
+          <Fill color="#3D3555"/>
+          <Stroke color="#B8860B50" width="1"/>
         </Group>
         <Group>
           <Ellipse center="-32,-42" size="12,8"/>
-          <Fill color="#F59E0B20"/>
+          <Fill color="#B8860B20"/>
         </Group>
         <Group>
           <Ellipse center="32,-42" size="24,18"/>
-          <Fill color="#475569"/>
-          <Stroke color="#F59E0B50" width="1"/>
+          <Fill color="#3D3555"/>
+          <Stroke color="#B8860B50" width="1"/>
         </Group>
         <Group>
           <Ellipse center="32,-42" size="12,8"/>
-          <Fill color="#F59E0B20"/>
+          <Fill color="#B8860B20"/>
         </Group>
         <!-- Arms -->
         <Group>
           <Path data="M -36 -32 L -40 -10 L -34 -10 L -30 -32 Z"/>
-          <Fill color="#374151"/>
+          <Fill color="#2E2545"/>
         </Group>
         <Group>
           <Path data="M 30 -32 L 34 -10 L 40 -10 L 36 -32 Z"/>
-          <Fill color="#374151"/>
+          <Fill color="#2E2545"/>
         </Group>
         <!-- Shield (left arm) -->
         <Group>
@@ -460,7 +460,7 @@
         <!-- Sword pommel -->
         <Group>
           <Ellipse center="46,-15" size="6,6"/>
-          <Fill color="#FBBF24"/>
+          <Fill color="#FFD700"/>
         </Group>
       </Layer>
 
@@ -481,72 +481,72 @@
       <!-- ATK -->
       <Layer>
         <Polystar center="10,0" type="star" pointCount="4" outerRadius="7" innerRadius="2" rotation="45"/>
-        <Fill color="#FB7185"/>
+        <Fill color="#FF4444"/>
       </Layer>
       <Layer>
         <Text text="ATK" fontFamily="Arial" fontSize="12"/>
         <TextLayout position="28,4" textAlign="start"/>
-        <Fill color="#94A3B8"/>
+        <Fill color="#A89878"/>
       </Layer>
       <Layer>
         <Text text="4,256" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
         <TextLayout position="198,5" textAlign="end"/>
-        <Fill color="#FB7185"/>
+        <Fill color="#FF4444"/>
       </Layer>
 
       <!-- DEF -->
       <Layer y="28">
         <Ellipse center="10,0" size="14,14"/>
-        <Fill color="#38BDF8"/>
+        <Fill color="#4488FF"/>
       </Layer>
       <Layer y="28">
         <Text text="DEF" fontFamily="Arial" fontSize="12"/>
         <TextLayout position="28,4" textAlign="start"/>
-        <Fill color="#94A3B8"/>
+        <Fill color="#A89878"/>
       </Layer>
       <Layer y="28">
         <Text text="3,180" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
         <TextLayout position="198,5" textAlign="end"/>
-        <Fill color="#38BDF8"/>
+        <Fill color="#4488FF"/>
       </Layer>
 
       <!-- SPD -->
       <Layer y="56">
         <Polystar center="10,0" type="star" pointCount="4" outerRadius="8" innerRadius="3" rotation="0"/>
-        <Fill color="#34D399"/>
+        <Fill color="#44DD88"/>
       </Layer>
       <Layer y="56">
         <Text text="SPD" fontFamily="Arial" fontSize="12"/>
         <TextLayout position="28,4" textAlign="start"/>
-        <Fill color="#94A3B8"/>
+        <Fill color="#A89878"/>
       </Layer>
       <Layer y="56">
         <Text text="186" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
         <TextLayout position="198,5" textAlign="end"/>
-        <Fill color="#34D399"/>
+        <Fill color="#44DD88"/>
       </Layer>
 
       <!-- CRT -->
       <Layer y="84">
         <Path data="M 10 -7 L 16 0 L 10 7 L 4 0 Z"/>
-        <Fill color="#FBBF24"/>
+        <Fill color="#FFD700"/>
       </Layer>
       <Layer y="84">
         <Text text="CRT" fontFamily="Arial" fontSize="12"/>
         <TextLayout position="28,4" textAlign="start"/>
-        <Fill color="#94A3B8"/>
+        <Fill color="#A89878"/>
       </Layer>
       <Layer y="84">
         <Text text="42.5%" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
         <TextLayout position="198,5" textAlign="end"/>
-        <Fill color="#FBBF24"/>
+        <Fill color="#FFD700"/>
       </Layer>
     </Layer>
 
     <!-- Separator -->
     <Layer>
       <Path data="M 30 413 L 230 413"/>
-      <Stroke color="#334155" width="1"/>
+      <Stroke color="#5C451080" width="1"/>
     </Layer>
 
     <!-- Power number -->
@@ -554,7 +554,7 @@
       <Text text="52,847" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
       <TextLayout position="130,450" textAlign="center"/>
       <Fill color="@titleGrad"/>
-      <DropShadowStyle offsetX="0" offsetY="2" blurX="8" blurY="8" color="#F59E0B40"/>
+      <DropShadowStyle offsetX="0" offsetY="2" blurX="8" blurY="8" color="#FFD70040"/>
     </Layer>
   </Layer>
 
@@ -569,7 +569,7 @@
     </Layer>
     <Layer>
       <Path data="M 0 25 L 460 25"/>
-      <Stroke color="#334155" width="1"/>
+      <Stroke color="#5C451080" width="1"/>
     </Layer>
 
     <!-- Equipment slot row 1 -->
@@ -578,7 +578,7 @@
       <Layer>
         <Rectangle center="65,65" size="130,130" roundness="12"/>
         <Fill color="@panelBg"/>
-        <Stroke color="#FB718580" width="1.5"/>
+        <Stroke color="#FF8C0080" width="1.5"/>
         <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#00000060"/>
       </Layer>
       <!-- Item glow -->
@@ -586,15 +586,15 @@
         <Ellipse center="0,0" size="60,60"/>
         <Fill>
           <RadialGradient center="0,0" radius="30">
-            <ColorStop offset="0" color="#FB718530"/>
-            <ColorStop offset="1" color="#FB718500"/>
+            <ColorStop offset="0" color="#FF8C0030"/>
+            <ColorStop offset="1" color="#FF8C0000"/>
           </RadialGradient>
         </Fill>
       </Layer>
       <!-- Item icon -->
       <Layer x="65" y="50">
         <Path data="@swordBig"/>
-        <Fill color="#FB7185"/>
+        <Fill color="#FF8C00"/>
       </Layer>
       <!-- Item name -->
       <Layer>
@@ -605,7 +605,7 @@
       <!-- Rarity indicator -->
       <Layer>
         <Rectangle center="65,120" size="50,3" roundness="2"/>
-        <Fill color="#FB7185"/>
+        <Fill color="#FF8C00"/>
       </Layer>
     </Layer>
 
@@ -614,21 +614,21 @@
       <Layer>
         <Rectangle center="65,65" size="130,130" roundness="12"/>
         <Fill color="@panelBg"/>
-        <Stroke color="#38BDF880" width="1.5"/>
+        <Stroke color="#A855F780" width="1.5"/>
         <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#00000060"/>
       </Layer>
       <Layer x="65" y="50">
         <Ellipse center="0,0" size="60,60"/>
         <Fill>
           <RadialGradient center="0,0" radius="30">
-            <ColorStop offset="0" color="#38BDF830"/>
-            <ColorStop offset="1" color="#38BDF800"/>
+            <ColorStop offset="0" color="#A855F730"/>
+            <ColorStop offset="1" color="#A855F700"/>
           </RadialGradient>
         </Fill>
       </Layer>
       <Layer x="65" y="50">
         <Path data="@shieldBig"/>
-        <Fill color="#38BDF8"/>
+        <Fill color="#A855F7"/>
       </Layer>
       <Layer>
         <Text text="Aegis" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
@@ -637,7 +637,7 @@
       </Layer>
       <Layer>
         <Rectangle center="65,120" size="50,3" roundness="2"/>
-        <Fill color="#38BDF8"/>
+        <Fill color="#A855F7"/>
       </Layer>
     </Layer>
 
@@ -646,21 +646,21 @@
       <Layer>
         <Rectangle center="65,65" size="130,130" roundness="12"/>
         <Fill color="@panelBg"/>
-        <Stroke color="#34D39980" width="1.5"/>
+        <Stroke color="#3B82F680" width="1.5"/>
         <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#00000060"/>
       </Layer>
       <Layer x="65" y="50">
         <Ellipse center="0,0" size="60,60"/>
         <Fill>
           <RadialGradient center="0,0" radius="30">
-            <ColorStop offset="0" color="#34D39930"/>
-            <ColorStop offset="1" color="#34D39900"/>
+            <ColorStop offset="0" color="#3B82F630"/>
+            <ColorStop offset="1" color="#3B82F600"/>
           </RadialGradient>
         </Fill>
       </Layer>
       <Layer x="65" y="50">
         <Path data="@helmetBig"/>
-        <Fill color="#34D399"/>
+        <Fill color="#3B82F6"/>
       </Layer>
       <Layer>
         <Text text="Crown Helm" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
@@ -669,7 +669,7 @@
       </Layer>
       <Layer>
         <Rectangle center="65,120" size="50,3" roundness="2"/>
-        <Fill color="#34D399"/>
+        <Fill color="#3B82F6"/>
       </Layer>
     </Layer>
 
@@ -679,21 +679,21 @@
       <Layer>
         <Rectangle center="65,65" size="130,130" roundness="12"/>
         <Fill color="@panelBg"/>
-        <Stroke color="#A78BFA80" width="1.5"/>
+        <Stroke color="#22C55E80" width="1.5"/>
         <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#00000060"/>
       </Layer>
       <Layer x="65" y="50">
         <Ellipse center="0,0" size="60,60"/>
         <Fill>
           <RadialGradient center="0,0" radius="30">
-            <ColorStop offset="0" color="#A78BFA30"/>
-            <ColorStop offset="1" color="#A78BFA00"/>
+            <ColorStop offset="0" color="#22C55E30"/>
+            <ColorStop offset="1" color="#22C55E00"/>
           </RadialGradient>
         </Fill>
       </Layer>
       <Layer x="65" y="50">
         <Path data="@potionBig"/>
-        <Fill color="#A78BFA"/>
+        <Fill color="#22C55E"/>
       </Layer>
       <Layer>
         <Text text="Elixir" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
@@ -702,7 +702,7 @@
       </Layer>
       <Layer>
         <Rectangle center="65,120" size="50,3" roundness="2"/>
-        <Fill color="#A78BFA"/>
+        <Fill color="#22C55E"/>
       </Layer>
     </Layer>
 
@@ -710,18 +710,18 @@
     <Layer name="Slot5" x="165" y="195">
       <Layer>
         <Rectangle center="65,65" size="130,130" roundness="12"/>
-        <Fill color="#1E293B80"/>
-        <Stroke color="#33415580" width="1" dashes="8,4"/>
+        <Fill color="#1A142880"/>
+        <Stroke color="#5C451040" width="1" dashes="8,4"/>
       </Layer>
       <Layer x="65" y="50">
         <Text text="+" fontFamily="Arial" fontSize="36"/>
         <TextLayout position="0,0" textAlign="center"/>
-        <Fill color="#47556940"/>
+        <Fill color="#8B691440"/>
       </Layer>
       <Layer>
         <Text text="Empty" fontFamily="Arial" fontSize="11"/>
         <TextLayout position="65,108" textAlign="center"/>
-        <Fill color="#47556980"/>
+        <Fill color="#5C451060"/>
       </Layer>
     </Layer>
 
@@ -729,18 +729,18 @@
     <Layer name="Slot6" x="320" y="195">
       <Layer>
         <Rectangle center="65,65" size="130,130" roundness="12"/>
-        <Fill color="#1E293B80"/>
-        <Stroke color="#33415580" width="1" dashes="8,4"/>
+        <Fill color="#1A142880"/>
+        <Stroke color="#5C451040" width="1" dashes="8,4"/>
       </Layer>
       <Layer x="65" y="50">
         <Text text="+" fontFamily="Arial" fontSize="36"/>
         <TextLayout position="0,0" textAlign="center"/>
-        <Fill color="#47556940"/>
+        <Fill color="#8B691440"/>
       </Layer>
       <Layer>
         <Text text="Empty" fontFamily="Arial" fontSize="11"/>
         <TextLayout position="65,108" textAlign="center"/>
-        <Fill color="#47556980"/>
+        <Fill color="#5C451060"/>
       </Layer>
     </Layer>
 
@@ -750,20 +750,20 @@
       <Layer>
         <Rectangle center="110,22" size="200,44" roundness="22"/>
         <Fill color="@btnGold"/>
-        <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#14B8A660"/>
+        <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#DAA52060"/>
         <InnerShadowStyle offsetX="0" offsetY="-1" blurX="2" blurY="2" color="#FFFFFF30"/>
       </Layer>
       <Layer>
         <Text text="UPGRADE" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <TextLayout position="110,28" textAlign="center"/>
-        <Fill color="#042F2E"/>
+        <Fill color="#3D2200"/>
       </Layer>
 
       <!-- Battle button -->
       <Layer x="240">
         <Rectangle center="110,22" size="200,44" roundness="22"/>
         <Fill color="@btnRed"/>
-        <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#E11D4860"/>
+        <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#CC000060"/>
         <InnerShadowStyle offsetX="0" offsetY="-1" blurX="2" blurY="2" color="#FFFFFF40"/>
       </Layer>
       <Layer x="240">
@@ -779,8 +779,8 @@
     <!-- Bar background -->
     <Layer>
       <Rectangle center="400,10" size="740,16" roundness="8"/>
-      <Fill color="#0F172A"/>
-      <Stroke color="#334155" width="1"/>
+      <Fill color="#0E0B18"/>
+      <Stroke color="#5C451080" width="1"/>
     </Layer>
     <!-- Fill (65%) -->
     <Layer>
@@ -800,7 +800,7 @@
   <Layer name="Toast" x="310" y="516">
     <Layer>
       <Rectangle center="230,18" size="460,36" roundness="8"/>
-      <Fill color="#0D9488E0"/>
+      <Fill color="#8B6914E0"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="10" blurY="10" color="#00000040"/>
     </Layer>
     <Layer>
