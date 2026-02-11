@@ -239,44 +239,44 @@
   </Layer>
 
   <Layer name="CoinChip">
-    <Rectangle center="640,57" size="150,28" roundness="14"/>
+    <Rectangle center="691,48" size="150,28" roundness="14"/>
     <Fill>
-      <LinearGradient startPoint="565,57" endPoint="715,57">
+      <LinearGradient startPoint="616,48" endPoint="766,48">
         <ColorStop offset="0" color="#0F1A33CC"/>
         <ColorStop offset="1" color="#14244ACC"/>
       </LinearGradient>
     </Fill>
     <Stroke color="#334155" width="1"/>
     <Group>
-      <Ellipse center="585,57" size="16,16"/>
+      <Ellipse center="636,48" size="16,16"/>
       <Fill>
-        <LinearGradient startPoint="577,57" endPoint="593,57">
+        <LinearGradient startPoint="628,48" endPoint="644,48">
           <ColorStop offset="0" color="#FFE29A"/>
           <ColorStop offset="1" color="#F59E0B"/>
         </LinearGradient>
       </Fill>
     </Group>
     <Group>
-      <Ellipse center="585,57" size="8,8"/>
+      <Ellipse center="636,48" size="8,8"/>
       <Stroke color="#F8D477" width="1"/>
     </Group>
     <Layer>
       <Text text="12,450" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
-      <TextLayout position="605,61" textAlign="start"/>
+      <TextLayout position="656,52" textAlign="start"/>
       <Fill color="#F8FAFC"/>
     </Layer>
   </Layer>
 
   <Layer name="DiamondChip">
-    <Rectangle center="640,91" size="150,28" roundness="14"/>
+    <Rectangle center="691,82" size="150,28" roundness="14"/>
     <Fill>
-      <LinearGradient startPoint="565,91" endPoint="715,91">
+      <LinearGradient startPoint="616,82" endPoint="766,82">
         <ColorStop offset="0" color="#0F1A33CC"/>
         <ColorStop offset="1" color="#14244ACC"/>
       </LinearGradient>
     </Fill>
     <Stroke color="#334155" width="1"/>
-    <Layer x="577" y="83">
+    <Layer x="628" y="74">
       <Path data="@IconDiamond"/>
       <Fill>
         <LinearGradient startPoint="0,8" endPoint="16,8">
@@ -287,7 +287,7 @@
     </Layer>
     <Layer>
       <Text text="860" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
-      <TextLayout position="605,95" textAlign="start"/>
+      <TextLayout position="656,86" textAlign="start"/>
       <Fill color="#F8FAFC"/>
     </Layer>
   </Layer>
