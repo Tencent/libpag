@@ -115,8 +115,7 @@
 
     <!-- Large icons for equipment slots -->
     <PathData id="swordBig" data="M 0 -40 L 5 -36 L 5 0 L 10 0 L 26 16 L 24 19 L 20 22 L 17 20 L 5 8 L 5 16 L 3 20 L 0 32 L -3 20 L -5 16 L -5 8 L -17 20 L -20 22 L -24 19 L -26 16 L -10 0 L -5 0 L -5 -36 Z M -4 -32 L 4 -32 L 4 -28 L -4 -28 Z M -3 -28 L 3 -28 L 3 -2 L -3 -2 Z"/>
-    <PathData id="shieldBig" data="M 0 -36 L 32 -24 L 32 4 Q 32 20 24 28 Q 14 36 0 40 Q -14 36 -24 28 Q -32 20 -32 4 L -32 -24 Z M 0 -28 L 24 -18 L 24 2 Q 24 16 18 22 Q 10 28 0 32 Q -10 28 -18 22 Q -24 16 -24 2 L -24 -18 Z"/>
-    <PathData id="shieldCross" data="M -3 -20 L -3 -8 L -18 -8 L -18 8 L -3 8 L -3 26 L 3 26 L 3 8 L 18 8 L 18 -8 L 3 -8 L 3 -20 Z"/>
+    <PathData id="shieldBig" data="M 0 -36 L 32 -24 L 32 4 Q 32 20 24 28 Q 14 36 0 40 Q -14 36 -24 28 Q -32 20 -32 4 L -32 -24 Z M 0 -28 L 24 -18 L 24 2 Q 24 16 18 22 Q 10 28 0 32 Q -10 28 -18 22 Q -24 16 -24 2 L -24 -18 Z M -3 -20 L -3 -8 L -18 -8 L -18 8 L -3 8 L -3 26 L 3 26 L 3 8 L 18 8 L 18 -8 L 3 -8 L 3 -20 Z"/>
     <PathData id="helmetBig" data="M 0 -38 Q -32 -38 -32 -8 L -32 4 L -22 4 L -22 -8 Q -22 -28 0 -28 Q 22 -28 22 -8 L 22 4 L 32 4 L 32 -8 Q 32 -38 0 -38 Z M -34 8 L 34 8 L 34 16 L 26 16 L 20 24 L 14 24 L 14 16 L -14 16 L -14 24 L -20 24 L -26 16 L -34 16 Z M -30 28 L 30 28 Q 30 38 20 38 L -20 38 Q -30 38 -30 28 Z M -10 -20 L -4 -20 L -4 -10 L -10 -10 Z M 4 -20 L 10 -20 L 10 -10 L 4 -10 Z"/>
     <PathData id="potionBig" data="M -5 -38 L 5 -38 L 5 -36 L 7 -36 L 7 -34 L -7 -34 L -7 -36 L -5 -36 Z M -9 -34 L 9 -34 L 9 -30 L -9 -30 Z M -11 -30 L 11 -30 L 11 -26 L -11 -26 Z M -6 -26 L 6 -26 L 6 -20 L 16 -6 Q 24 10 22 22 Q 18 34 8 38 Q 4 40 0 40 Q -4 40 -8 38 Q -18 34 -22 22 Q -24 10 -16 -6 L -6 -20 Z M -3 -26 L 3 -26 L 3 -20 L -3 -20 Z M -14 8 Q -14 20 -6 24 Q 0 28 6 24 Q 14 20 14 8 Q 14 -2 6 -4 Q 0 -8 -6 -4 Q -14 -2 -14 8 Z M -10 10 Q -10 18 0 18 Q 10 18 10 10 Q 10 4 0 4 Q -10 4 -10 10 Z M -6 12 Q -6 16 0 16 Q 6 16 6 12 Q 6 8 0 8 Q -6 8 -6 12 Z"/>
   </Resources>
@@ -490,7 +489,7 @@
     </Layer>
 
     <!-- Rarity stars (below portrait) -->
-    <Layer x="145" y="277">
+    <Layer x="148" y="276">
       <Group>
         <Polystar center="0,0" type="star" pointCount="5" outerRadius="7" innerRadius="3" rotation="0"/>
         <Fill color="@starGrad"/>
@@ -503,65 +502,65 @@
     <Layer x="30" y="305">
       <!-- ATK -->
       <Layer>
-        <Polystar center="7,0" type="star" pointCount="4" outerRadius="7" innerRadius="2" rotation="45"/>
+        <Polystar center="12,0" type="star" pointCount="4" outerRadius="7" innerRadius="2" rotation="45"/>
         <Fill color="#EF4444"/>
       </Layer>
       <Layer>
         <Text text="ATK" fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="25,4" textAlign="start"/>
+        <TextLayout position="30,4" textAlign="start"/>
         <Fill color="#94A3B8"/>
       </Layer>
       <Layer>
         <Text text="4,256" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <TextLayout position="200,5" textAlign="end"/>
+        <TextLayout position="198,5" textAlign="end"/>
         <Fill color="#EF4444"/>
       </Layer>
 
       <!-- DEF -->
       <Layer y="28">
-        <Ellipse center="7,0" size="14,14"/>
+        <Ellipse center="12,0" size="14,14"/>
         <Fill color="#3B82F6"/>
       </Layer>
       <Layer y="28">
         <Text text="DEF" fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="25,4" textAlign="start"/>
+        <TextLayout position="30,4" textAlign="start"/>
         <Fill color="#94A3B8"/>
       </Layer>
       <Layer y="28">
         <Text text="3,180" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <TextLayout position="200,5" textAlign="end"/>
+        <TextLayout position="198,5" textAlign="end"/>
         <Fill color="#3B82F6"/>
       </Layer>
 
       <!-- SPD -->
       <Layer y="56">
-        <Polystar center="7,0" type="star" pointCount="4" outerRadius="8" innerRadius="3" rotation="0"/>
+        <Polystar center="12,0" type="star" pointCount="4" outerRadius="8" innerRadius="3" rotation="0"/>
         <Fill color="#10B981"/>
       </Layer>
       <Layer y="56">
         <Text text="SPD" fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="25,4" textAlign="start"/>
+        <TextLayout position="30,4" textAlign="start"/>
         <Fill color="#94A3B8"/>
       </Layer>
       <Layer y="56">
         <Text text="186" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <TextLayout position="200,5" textAlign="end"/>
+        <TextLayout position="198,5" textAlign="end"/>
         <Fill color="#10B981"/>
       </Layer>
 
       <!-- CRT -->
       <Layer y="84">
-        <Path data="M 7 -7 L 13 0 L 7 7 L 1 0 Z"/>
+        <Path data="M 12 -7 L 18 0 L 12 7 L 6 0 Z"/>
         <Fill color="#F59E0B"/>
       </Layer>
       <Layer y="84">
         <Text text="CRT" fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="25,4" textAlign="start"/>
+        <TextLayout position="30,4" textAlign="start"/>
         <Fill color="#94A3B8"/>
       </Layer>
       <Layer y="84">
         <Text text="42.5%" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <TextLayout position="200,5" textAlign="end"/>
+        <TextLayout position="198,5" textAlign="end"/>
         <Fill color="#F59E0B"/>
       </Layer>
     </Layer>
@@ -652,10 +651,6 @@
       <Layer x="65" y="50">
         <Path data="@shieldBig"/>
         <Fill color="#60A5FA"/>
-      </Layer>
-      <Layer x="65" y="50">
-        <Path data="@shieldCross"/>
-        <Fill color="#2563EB"/>
       </Layer>
       <Layer>
         <Text text="Aegis" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
