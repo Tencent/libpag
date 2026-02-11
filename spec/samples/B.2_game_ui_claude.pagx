@@ -115,7 +115,7 @@
 
     <!-- Large icons for equipment slots -->
     <PathData id="swordBig" data="M 0 -38 L 6 -36 L 8 -32 L 6 -30 L 6 -4 L 10 0 L 24 14 L 26 16 L 24 20 L 20 22 L 18 20 L 8 10 L 6 10 L 6 18 L 4 22 L 0 34 L -4 22 L -6 18 L -6 10 L -8 10 L -18 20 L -20 22 L -24 20 L -26 16 L -24 14 L -10 0 L -6 -4 L -6 -30 L -8 -32 L -6 -36 Z M -4 -32 L 4 -32 L 4 -28 L -4 -28 Z M -3 -26 L 3 -26 L 3 -4 L -3 -4 Z M -1 -24 L 1 -24 L 1 -8 L -1 -8 Z M -6 -36 L -4 -38 L 0 -40 L 4 -38 L 6 -36 L 4 -34 L -4 -34 Z M 10 0 L 12 -2 L 26 12 L 24 14 Z M -10 0 L -12 -2 L -26 12 L -24 14 Z"/>
-    <PathData id="shieldBig" data="M 0 -36 L 32 -24 L 32 4 Q 32 20 24 28 Q 14 36 0 40 Q -14 36 -24 28 Q -32 20 -32 4 L -32 -24 Z M 0 -28 L 24 -18 L 24 2 Q 24 16 18 22 Q 10 28 0 32 Q -10 28 -18 22 Q -24 16 -24 2 L -24 -18 Z M -2 -18 L -2 -4 L -16 -4 L -16 4 L -2 4 L -2 24 L 2 24 L 2 4 L 16 4 L 16 -4 L 2 -4 L 2 -18 Z M -26 -20 L -24 -22 L -22 -20 L -24 -18 Z M 22 -20 L 24 -22 L 26 -20 L 24 -18 Z M -28 -8 L -26 -10 L -24 -8 L -26 -6 Z M 24 -8 L 26 -10 L 28 -8 L 26 -6 Z M -24 12 L -22 10 L -20 12 L -22 14 Z M 20 12 L 22 10 L 24 12 L 22 14 Z"/>
+    <PathData id="shieldBig" data="M 0 -36 L 32 -24 L 32 4 Q 32 20 24 28 Q 14 36 0 40 Q -14 36 -24 28 Q -32 20 -32 4 L -32 -24 Z M 0 -28 L 24 -18 L 24 2 Q 24 16 18 22 Q 10 28 0 32 Q -10 28 -18 22 Q -24 16 -24 2 L -24 -18 Z M -3 -20 L -3 -6 L -18 -6 L -18 6 L -3 6 L -3 26 L 3 26 L 3 6 L 18 6 L 18 -6 L 3 -6 L 3 -20 Z M -16 -16 L -12 -16 L -12 -12 L -16 -12 Z M 12 -16 L 16 -16 L 16 -12 L 12 -12 Z M -20 8 L -16 8 L -16 12 L -20 12 Z M 16 8 L 20 8 L 20 12 L 16 12 Z M -2 -24 L 2 -24 L 2 -20 L -2 -20 Z M -10 16 L -6 16 L -6 20 L -10 20 Z M 6 16 L 10 16 L 10 20 L 6 20 Z"/>
     <PathData id="helmetBig" data="M 0 -38 Q -32 -38 -32 -8 L -32 4 L -22 4 L -22 -8 Q -22 -28 0 -28 Q 22 -28 22 -8 L 22 4 L 32 4 L 32 -8 Q 32 -38 0 -38 Z M -34 8 L 34 8 L 34 16 L 26 16 L 20 24 L 14 24 L 14 16 L -14 16 L -14 24 L -20 24 L -26 16 L -34 16 Z M -30 28 L 30 28 Q 30 38 20 38 L -20 38 Q -30 38 -30 28 Z M -10 -20 L -4 -20 L -4 -10 L -10 -10 Z M 4 -20 L 10 -20 L 10 -10 L 4 -10 Z"/>
     <PathData id="potionBig" data="M -6 -38 L 6 -38 L 6 -36 L -6 -36 Z M -8 -36 L 8 -36 L 8 -32 L -8 -32 Z M -10 -32 L 10 -32 L 10 -28 L -10 -28 Z M -6 -28 L 6 -28 L 6 -20 L 16 -8 Q 24 8 22 20 Q 18 32 8 38 Q 4 40 0 40 Q -4 40 -8 38 Q -18 32 -22 20 Q -24 8 -16 -8 L -6 -20 Z M -3 -28 L 3 -28 L 3 -22 L -3 -22 Z M -14 8 Q -14 18 -6 22 Q 0 26 6 22 Q 14 18 14 8 Q 14 0 6 -4 Q 0 -6 -6 -4 Q -14 0 -14 8 Z M -10 10 Q -10 16 0 16 Q 10 16 10 10 Q 10 4 0 4 Q -10 4 -10 10 Z M -4 -36 L -2 -38 L 2 -38 L 4 -36 L 2 -34 L -2 -34 Z M 6 -20 L 8 -18 L 6 -16 L 4 -18 Z M -6 -20 L -4 -18 L -6 -16 L -8 -18 Z"/>
   </Resources>
@@ -504,19 +504,14 @@
 
     <!-- Separator -->
     <Layer>
-      <Path data="M 30 406 L 230 406"/>
+      <Path data="M 30 418 L 230 418"/>
       <Stroke color="#374151" width="1"/>
     </Layer>
 
-    <!-- Power rating -->
-    <Layer>
-      <Text text="POWER" fontFamily="Arial" fontSize="11"/>
-      <TextLayout position="130,418" textAlign="center"/>
-      <Fill color="#94A3B8"/>
-    </Layer>
+    <!-- Power number -->
     <Layer>
       <Text text="52,847" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
-      <TextLayout position="130,453" textAlign="center"/>
+      <TextLayout position="130,450" textAlign="center"/>
       <Fill color="@titleGrad"/>
       <DropShadowStyle offsetX="0" offsetY="2" blurX="8" blurY="8" color="#F59E0B40"/>
     </Layer>
