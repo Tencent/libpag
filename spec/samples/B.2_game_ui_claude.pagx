@@ -510,7 +510,7 @@
     <!-- Power rating -->
     <Layer>
       <Text text="POWER" fontFamily="Arial" fontSize="11"/>
-      <TextLayout position="130,267" textAlign="center"/>
+      <TextLayout position="85,280" textAlign="end"/>
       <Fill color="#94A3B8"/>
     </Layer>
     <Layer>
