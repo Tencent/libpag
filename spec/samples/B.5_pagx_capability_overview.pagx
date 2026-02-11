@@ -153,17 +153,17 @@
         <Fill color="#F43F5E"/>
       </Layer>
     </Layer>
-    <Layer x="-47" y="-34">
+    <Layer x="-47" y="-25">
       <Text text="Open &amp; Readable" fontFamily="Arial" fontStyle="Bold" fontSize="26"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#F43F5E"/>
     </Layer>
-    <Layer x="-47" y="-1">
+    <Layer x="-47" y="5">
       <Text text="XML plain-text format" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-47" y="26">
+    <Layer x="-47" y="32">
       <Text text="Git-friendly &amp; AI-native" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
@@ -193,17 +193,17 @@
         <Fill color="#38BDF810"/>
       </Group>
     </Layer>
-    <Layer x="-47" y="-34">
+    <Layer x="-47" y="-25">
       <Text text="Feature Complete" fontFamily="Arial" fontStyle="Bold" fontSize="26"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#38BDF8"/>
     </Layer>
-    <Layer x="-47" y="-1">
+    <Layer x="-47" y="5">
       <Text text="Vectors, text, effects" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-47" y="26">
+    <Layer x="-47" y="32">
       <Text text="Masks, blending &amp; filters" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
@@ -234,17 +234,17 @@
         <Stroke color="#A855F7" width="1" dashes="3,3"/>
       </Group>
     </Layer>
-    <Layer x="-47" y="-34">
+    <Layer x="-47" y="-25">
       <Text text="Eco-Compatible" fontFamily="Arial" fontStyle="Bold" fontSize="26"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#A855F7"/>
     </Layer>
-    <Layer x="-47" y="-1">
+    <Layer x="-47" y="5">
       <Text text="Common interchange format" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-47" y="26">
+    <Layer x="-47" y="32">
       <Text text="Seamless asset exchange" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
@@ -287,17 +287,17 @@
         <Stroke color="#10B981" width="2" cap="round" join="round"/>
       </Group>
     </Layer>
-    <Layer x="-47" y="-34">
+    <Layer x="-47" y="-25">
       <Text text="Fast Deployment" fontFamily="Arial" fontStyle="Bold" fontSize="26"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#10B981"/>
     </Layer>
-    <Layer x="-47" y="-1">
+    <Layer x="-47" y="5">
       <Text text="One-click to production" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-47" y="26">
+    <Layer x="-47" y="32">
       <Text text="High compression binary" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
