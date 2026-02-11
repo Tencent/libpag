@@ -159,12 +159,12 @@
       <Fill color="#F43F5E"/>
     </Layer>
     <Layer x="-47" y="-1">
-      <Text text="Plain XML format" fontFamily="Arial" fontSize="18"/>
+      <Text text="XML plain-text format" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
     <Layer x="-47" y="26">
-      <Text text="Easy diff &amp; review" fontFamily="Arial" fontSize="18"/>
+      <Text text="Git-friendly &amp; AI-native" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
     </Layer>
@@ -204,7 +204,7 @@
       <Fill color="#CBD5E1"/>
     </Layer>
     <Layer x="-47" y="26">
-      <Text text="Masking and blending" fontFamily="Arial" fontSize="18"/>
+      <Text text="Masks, blending &amp; filters" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
     </Layer>
@@ -240,12 +240,12 @@
       <Fill color="#A855F7"/>
     </Layer>
     <Layer x="-47" y="-1">
-      <Text text="Design tool interchange" fontFamily="Arial" fontSize="18"/>
+      <Text text="Common interchange format" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
     <Layer x="-47" y="26">
-      <Text text="Cross-platform exchange" fontFamily="Arial" fontSize="18"/>
+      <Text text="Seamless asset exchange" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
     </Layer>
@@ -293,12 +293,12 @@
       <Fill color="#10B981"/>
     </Layer>
     <Layer x="-47" y="-1">
-      <Text text="Binary PAG export" fontFamily="Arial" fontSize="18"/>
+      <Text text="One-click to production" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
     <Layer x="-47" y="26">
-      <Text text="High compression ratio" fontFamily="Arial" fontSize="18"/>
+      <Text text="High compression binary" fontFamily="Arial" fontSize="18"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
     </Layer>
