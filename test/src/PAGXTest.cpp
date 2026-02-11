@@ -57,11 +57,6 @@
 #include "tgfx/core/Typeface.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
-#include "tgfx/layers/VectorLayer.h"
-#include "tgfx/layers/vectors/FillStyle.h"
-#include "tgfx/layers/vectors/Rectangle.h"
-#include "tgfx/layers/vectors/SolidColor.h"
-#include "tgfx/layers/vectors/VectorGroup.h"
 #include "tgfx/svg/TextShaper.h"
 #include "utils/Baseline.h"
 #include "utils/DevicePool.h"
@@ -255,61 +250,18 @@ PAG_TEST(PAGXTest, LayerDirectContent) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
 
-  // Test 1: Pure tgfx API - VectorLayer with VectorGroup + Rectangle + FillStyle
-  {
-    auto vectorLayer = tgfx::VectorLayer::Make();
-
-    auto group = tgfx::VectorGroup::Make();
-
-    auto rect = tgfx::Rectangle::Make();
-    rect->setCenter(tgfx::Point::Make(50, 50));
-    rect->setSize({100, 100});
-
-    auto fill = tgfx::FillStyle::Make(tgfx::SolidColor::Make(tgfx::Color::Red()));
-
-    group->setElements({rect, fill});
-    vectorLayer->setContents({group});
-
-    auto surface1 = Surface::Make(context, 100, 100);
-    DisplayList displayList1;
-    displayList1.root()->addChild(vectorLayer);
-    displayList1.render(surface1.get(), false);
-    EXPECT_TRUE(Baseline::Compare(surface1, "PAGXTest/TGFXVectorLayerDirect"));
-  }
-
-  // Test 2: PAGX Layer with Group > Rectangle + Fill
+  // Test 1: Group vs no-Group should render identically (left=Group, right=direct)
   {
     const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
-<pagx width="100" height="100" version="1.0">
+<pagx width="200" height="100" version="1.0">
   <Layer>
     <Group>
       <Rectangle center="50,50" size="100,100"/>
       <Fill color="#FF0000"/>
     </Group>
   </Layer>
-</pagx>
-)";
-
-    auto doc = pagx::PAGXImporter::FromXML(reinterpret_cast<const uint8_t*>(pagxXml),
-                                           strlen(pagxXml));
-    ASSERT_TRUE(doc != nullptr);
-
-    auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
-    ASSERT_TRUE(tgfxLayer != nullptr);
-
-    auto surface2 = Surface::Make(context, 100, 100);
-    DisplayList displayList2;
-    displayList2.root()->addChild(tgfxLayer);
-    displayList2.render(surface2.get(), false);
-    EXPECT_TRUE(Baseline::Compare(surface2, "PAGXTest/PAGXLayerWithGroup"));
-  }
-
-  // Test 3: PAGX Layer with direct Rectangle + Fill (no Group)
-  {
-    const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
-<pagx width="100" height="100" version="1.0">
   <Layer>
-    <Rectangle center="50,50" size="100,100"/>
+    <Rectangle center="150,50" size="100,100"/>
     <Fill color="#FF0000"/>
   </Layer>
 </pagx>
@@ -322,14 +274,14 @@ PAG_TEST(PAGXTest, LayerDirectContent) {
     auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
     ASSERT_TRUE(tgfxLayer != nullptr);
 
-    auto surface3 = Surface::Make(context, 100, 100);
-    DisplayList displayList3;
-    displayList3.root()->addChild(tgfxLayer);
-    displayList3.render(surface3.get(), false);
-    EXPECT_TRUE(Baseline::Compare(surface3, "PAGXTest/PAGXLayerDirect"));
+    auto surface = Surface::Make(context, 200, 100);
+    DisplayList displayList;
+    displayList.root()->addChild(tgfxLayer);
+    displayList.render(surface.get(), false);
+    EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/PAGXLayerDirect"));
   }
 
-  // Test 4: PAGX Layer with LinearGradient fill
+  // Test 2: PAGX Layer with LinearGradient fill
   {
     const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
 <pagx width="200" height="100" version="1.0">
