@@ -754,7 +754,7 @@
     <!-- Label -->
     <Layer>
       <Text text="EXP  12,500 / 18,000" fontFamily="Arial" fontSize="8"/>
-      <TextLayout position="30,2" width="740" height="16" textAlign="center" verticalAlign="center"/>
+      <TextLayout position="400,13" textAlign="center"/>
       <Fill color="#FFFFFFC0"/>
     </Layer>
   </Layer>
@@ -772,7 +772,7 @@
     </Layer>
     <Layer>
       <Text text="New legendary item discovered in the Ancient Ruins!" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
-      <TextLayout position="0,0" width="460" height="36" textAlign="center" verticalAlign="center"/>
+      <TextLayout position="230,23" textAlign="center"/>
       <Fill color="#FFFFFF"/>
     </Layer>
   </Layer>
