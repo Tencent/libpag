@@ -194,7 +194,7 @@
     <Layer name="HPBar" x="200" y="14">
       <Layer>
         <Text text="HP" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
-        <TextLayout position="0,-2" textAlign="start"/>
+        <TextLayout position="0,8" textAlign="start"/>
         <Fill color="#F87171"/>
       </Layer>
       <Layer>
@@ -209,7 +209,7 @@
       </Layer>
       <Layer>
         <Text text="2,847 / 3,800" fontFamily="Arial" fontSize="9"/>
-        <TextLayout position="15,-2" width="180" height="10" verticalAlign="center" textAlign="center"/>
+        <TextLayout position="105,8" textAlign="center"/>
         <Fill color="#FFFFFFD0"/>
       </Layer>
     </Layer>
@@ -218,7 +218,7 @@
     <Layer name="MPBar" x="200" y="36">
       <Layer>
         <Text text="MP" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
-        <TextLayout position="0,-2" textAlign="start"/>
+        <TextLayout position="0,8" textAlign="start"/>
         <Fill color="#60A5FA"/>
       </Layer>
       <Layer>
@@ -233,7 +233,7 @@
       </Layer>
       <Layer>
         <Text text="1,250 / 2,000" fontFamily="Arial" fontSize="9"/>
-        <TextLayout position="15,-2" width="180" height="10" verticalAlign="center" textAlign="center"/>
+        <TextLayout position="105,8" textAlign="center"/>
         <Fill color="#FFFFFFD0"/>
       </Layer>
     </Layer>
@@ -253,12 +253,12 @@
       </Layer>
       <Layer x="10" y="16">
         <Text text="G" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
-        <TextLayout position="-11,-11" width="22" height="22" textAlign="center" verticalAlign="center"/>
+        <TextLayout position="0,4" textAlign="center"/>
         <Fill color="#78350F"/>
       </Layer>
       <Layer>
         <Text text="128,450" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
-        <TextLayout position="-10,0" width="160" height="32" textAlign="center" verticalAlign="center"/>
+        <TextLayout position="70,22" textAlign="center"/>
         <Fill color="#FDE68A"/>
       </Layer>
     </Layer>
@@ -443,12 +443,12 @@
       </Layer>
       <Layer>
         <Text text="ATK" fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="30,0" textAlign="start"/>
+        <TextLayout position="30,4" textAlign="start"/>
         <Fill color="#94A3B8"/>
       </Layer>
       <Layer>
         <Text text="4,256" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <TextLayout position="225,0" textAlign="end"/>
+        <TextLayout position="225,5" textAlign="end"/>
         <Fill color="#F8FAFC"/>
       </Layer>
 
@@ -459,12 +459,12 @@
       </Layer>
       <Layer y="28">
         <Text text="DEF" fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="30,0" textAlign="start"/>
+        <TextLayout position="30,4" textAlign="start"/>
         <Fill color="#94A3B8"/>
       </Layer>
       <Layer y="28">
         <Text text="3,180" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <TextLayout position="225,0" textAlign="end"/>
+        <TextLayout position="225,5" textAlign="end"/>
         <Fill color="#F8FAFC"/>
       </Layer>
 
@@ -475,12 +475,12 @@
       </Layer>
       <Layer y="56">
         <Text text="SPD" fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="30,0" textAlign="start"/>
+        <TextLayout position="30,4" textAlign="start"/>
         <Fill color="#94A3B8"/>
       </Layer>
       <Layer y="56">
         <Text text="186" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <TextLayout position="225,0" textAlign="end"/>
+        <TextLayout position="225,5" textAlign="end"/>
         <Fill color="#F8FAFC"/>
       </Layer>
 
@@ -491,12 +491,12 @@
       </Layer>
       <Layer y="84">
         <Text text="CRT" fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="30,0" textAlign="start"/>
+        <TextLayout position="30,4" textAlign="start"/>
         <Fill color="#94A3B8"/>
       </Layer>
       <Layer y="84">
         <Text text="42.5%" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <TextLayout position="225,0" textAlign="end"/>
+        <TextLayout position="225,5" textAlign="end"/>
         <Fill color="#FBBF24"/>
       </Layer>
     </Layer>
@@ -718,7 +718,7 @@
       </Layer>
       <Layer>
         <Text text="UPGRADE" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
-        <TextLayout position="10,0" width="200" height="44" textAlign="center" verticalAlign="center"/>
+        <TextLayout position="110,28" textAlign="center"/>
         <Fill color="#422006"/>
       </Layer>
 
@@ -731,7 +731,7 @@
       </Layer>
       <Layer x="240">
         <Text text="BATTLE" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
-        <TextLayout position="10,0" width="200" height="44" textAlign="center" verticalAlign="center"/>
+        <TextLayout position="110,28" textAlign="center"/>
         <Fill color="#FFFFFF"/>
       </Layer>
     </Layer>
