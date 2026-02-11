@@ -10,7 +10,7 @@
 
 - **Feature Complete**: Fully covers vector graphics, raster images, rich text, filter effects, blending modes, masking, and related capabilities, meeting the requirements for complex animated graphics.
 
-- **Compact Efficient**: Defines a compact yet expressive unified structure that optimizes the description of both static vector content and animations, while reserving extensibility for future interaction and scripting.
+- **Compact Expressive**: Defines a compact yet expressive unified structure that optimizes the description of both static vector content and animations, while reserving extensibility for future interaction and scripting.
 
 - **Ecosystem Compatible**: Can serve as a common interchange format for design tools such as After Effects, Figma, and Tencent Design, enabling seamless asset exchange across platforms.
 
