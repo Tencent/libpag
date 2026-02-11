@@ -148,9 +148,9 @@
         <Stroke color="#F43F5E" width="1" cap="round"/>
       </Group>
       <Layer>
-        <Text text="&lt; &gt;" fontFamily="Arial" fontStyle="Bold" fontSize="15"/>
+        <Text text="&lt; &gt;" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
         <TextLayout position="20,28" textAlign="center"/>
-        <Fill color="#FFFFFF"/>
+        <Fill color="#F43F5E"/>
       </Layer>
     </Layer>
     <Layer x="-47" y="-30">
@@ -235,7 +235,7 @@
       </Group>
     </Layer>
     <Layer x="-47" y="-30">
-      <Text text="Ecosystem Compatible" fontFamily="Arial" fontStyle="Bold" fontSize="26"/>
+      <Text text="Eco-Compatible" fontFamily="Arial" fontStyle="Bold" fontSize="26"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#A855F7"/>
     </Layer>
@@ -288,7 +288,7 @@
       </Group>
     </Layer>
     <Layer x="-47" y="-30">
-      <Text text="Efficient Deployment" fontFamily="Arial" fontStyle="Bold" fontSize="26"/>
+      <Text text="Fast Deployment" fontFamily="Arial" fontStyle="Bold" fontSize="26"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#10B981"/>
     </Layer>
