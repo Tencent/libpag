@@ -37,27 +37,31 @@ const DEFAULT_OUTPUT_DIR = path.join(LIBPAG_DIR, 'public');
 function parseArgs() {
   const args = process.argv.slice(2);
   let outputDir = DEFAULT_OUTPUT_DIR;
+  let skipBuild = false;
 
   for (let i = 0; i < args.length; i++) {
     if ((args[i] === '-o' || args[i] === '--output') && args[i + 1]) {
       outputDir = path.resolve(args[i + 1]);
       i++;
+    } else if (args[i] === '--skip-build') {
+      skipBuild = true;
     } else if (args[i] === '-h' || args[i] === '--help') {
       console.log(`
 PAGX Playground Publisher
 
 Usage:
-    npm run publish [-- -o <output-dir>]
+    npm run publish [-- -o <output-dir>] [-- --skip-build]
 
 Options:
     -o, --output <dir>  Output directory (default: ../public)
+    --skip-build        Skip build step (use pre-built wasm-mt directory)
     -h, --help          Show this help message
 `);
       process.exit(0);
     }
   }
 
-  return { outputDir };
+  return { outputDir, skipBuild };
 }
 
 /**
@@ -71,25 +75,49 @@ function copyFile(src, dest) {
 }
 
 /**
- * Run a command and print output.
+ * Run a command with timeout and improved error handling.
  */
-function runCommand(command, cwd) {
+function runCommand(command, cwd, timeout = 600000) {
   console.log(`  Running: ${command}`);
-  execSync(command, { cwd, stdio: 'inherit' });
+  try {
+    execSync(command, { 
+      cwd, 
+      stdio: 'inherit',
+      timeout: timeout  // 10 minutes default
+    });
+  } catch (error) {
+    if (error.killed) {
+      console.error(`  ERROR: Command timed out after ${timeout/1000} seconds`);
+      console.error(`  If build is taking longer, run directly:`);
+      console.error(`    cd ${cwd}`);
+      console.error(`    npm run build:release`);
+    } else {
+      console.error(`  ERROR: Command failed with exit code ${error.status}`);
+    }
+    process.exit(1);
+  }
 }
 
 /**
  * Main function.
  */
 function main() {
-  const { outputDir } = parseArgs();
+  const { outputDir, skipBuild } = parseArgs();
 
   console.log('Publishing PAGX Playground...');
   console.log(`Output: ${outputDir}\n`);
 
   // Build release (uses cache if available)
-  console.log('Step 1: Build release...');
-  runCommand('npm run build:release', PLAYGROUND_DIR);
+  if (!skipBuild) {
+    console.log('Step 1: Build release...');
+    runCommand('npm run build:release', PLAYGROUND_DIR, 600000);  // 10 minute timeout
+  } else {
+    console.log('Step 1: Skipping build (--skip-build flag set)');
+    if (!fs.existsSync(path.join(PLAYGROUND_DIR, 'wasm-mt', 'pagx-playground.wasm'))) {
+      console.error('ERROR: wasm-mt/pagx-playground.wasm not found. Run build first or remove --skip-build flag');
+      process.exit(1);
+    }
+  }
 
   // Copy index.html
   console.log('\nStep 2: Copy files...');
