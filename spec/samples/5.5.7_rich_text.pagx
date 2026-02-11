@@ -44,7 +44,7 @@
       <Text text=" text." fontFamily="Arial" fontSize="20"/>
       <Fill color="#475569"/>
     </Group>
-    <TextLayout position="30,165" textAlign="start"/>
+    <TextLayout position="30,165"/>
   </Layer>
 
   <!-- Second paragraph: mixed sizes -->
@@ -69,7 +69,7 @@
       <Text text=" within one line." fontFamily="Arial" fontSize="16"/>
       <Fill color="#475569"/>
     </Group>
-    <TextLayout position="30,215" textAlign="start"/>
+    <TextLayout position="30,215"/>
   </Layer>
 
   <!-- Center aligned rich text -->

@@ -12,6 +12,6 @@
         <ColorStop offset="1" color="#1E293B"/>
       </RadialGradient>
     </Fill>
-    <DropShadowStyle offsetX="0" offsetY="8" blurX="32" blurY="32" color="#06B6D450"/>
+    <DropShadowStyle offsetY="8" blurX="32" blurY="32" color="#06B6D450"/>
   </Layer>
 </pagx>

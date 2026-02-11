@@ -11,7 +11,7 @@
           <ColorStop offset="1" color="#8B5CF6"/>
         </LinearGradient>
       </Fill>
-      <Repeater copies="5" position="70,0" startAlpha="1" endAlpha="0.15"/>
+      <Repeater copies="5" position="70,0" endAlpha="0.15"/>
     </Group>
   </Layer>
 </pagx>

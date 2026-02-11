@@ -5,7 +5,7 @@
   <Layer>
     <Rectangle center="110,110" size="140,140" roundness="24"/>
     <Fill color="#F43F5E"/>
-    <DropShadowStyle offsetX="0" offsetY="8" blurX="24" blurY="24" color="#F43F5E50"/>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F43F5E50"/>
   </Layer>
   <!-- Linear gradient fill -->
   <Layer>
@@ -16,7 +16,7 @@
         <ColorStop offset="1" color="#8B5CF6"/>
       </LinearGradient>
     </Fill>
-    <DropShadowStyle offsetX="0" offsetY="8" blurX="24" blurY="24" color="#8B5CF650"/>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#8B5CF650"/>
   </Layer>
   <!-- Radial gradient fill -->
   <Layer>
@@ -28,6 +28,6 @@
         <ColorStop offset="1" color="#0891B2"/>
       </RadialGradient>
     </Fill>
-    <DropShadowStyle offsetX="0" offsetY="8" blurX="24" blurY="24" color="#06B6D450"/>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D450"/>
   </Layer>
 </pagx>

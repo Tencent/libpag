@@ -10,7 +10,7 @@
         <ColorStop offset="1" color="#0891B2"/>
       </LinearGradient>
     </Fill>
-    <DropShadowStyle offsetX="0" offsetY="16" blurX="48" blurY="48" color="#06B6D480"/>
+    <DropShadowStyle offsetY="16" blurX="48" blurY="48" color="#06B6D480"/>
     <InnerShadowStyle offsetX="8" offsetY="8" blurX="24" blurY="24" color="#00000040"/>
   </Layer>
 </pagx>

@@ -13,6 +13,6 @@
     </Fill>
     <!-- Semi-transparent overlay -->
     <Fill color="#8B5CF640"/>
-    <DropShadowStyle offsetX="0" offsetY="12" blurX="40" blurY="40" color="#F43F5E50"/>
+    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#F43F5E50"/>
   </Layer>
 </pagx>

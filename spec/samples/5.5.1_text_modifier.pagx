@@ -6,7 +6,7 @@
     <Text text="WAVE" fontFamily="Arial" fontStyle="Bold" fontSize="72"/>
     <TextLayout position="200,120" textAlign="center"/>
     <TextModifier position="0,-30">
-      <RangeSelector start="0" end="1" shape="triangle"/>
+      <RangeSelector shape="triangle"/>
     </TextModifier>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="280,0">
@@ -20,7 +20,7 @@
     <Text text="ROTATE" fontFamily="Arial" fontStyle="Bold" fontSize="56"/>
     <TextLayout position="200,240" textAlign="center"/>
     <TextModifier rotation="30">
-      <RangeSelector start="0" end="1" shape="rampUp"/>
+      <RangeSelector shape="rampUp"/>
     </TextModifier>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="280,0">
@@ -34,7 +34,7 @@
     <Text text="COLOR" fontFamily="Arial" fontStyle="Bold" fontSize="64"/>
     <TextLayout position="200,350" textAlign="center"/>
     <TextModifier fillColor="#EC4899">
-      <RangeSelector start="0" end="1" shape="triangle"/>
+      <RangeSelector shape="triangle"/>
     </TextModifier>
     <Fill color="#8B5CF6"/>
   </Layer>

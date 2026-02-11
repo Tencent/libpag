@@ -9,9 +9,9 @@
   <!-- Trimmed arc showing progress -->
   <Layer>
     <Ellipse center="200,200" size="260,260"/>
-    <TrimPath start="0" end="0.75" type="continuous"/>
+    <TrimPath end="0.75" type="continuous"/>
     <Stroke width="24" cap="round">
-      <ConicGradient center="200,200" startAngle="0" endAngle="270">
+      <ConicGradient center="200,200" endAngle="270">
         <ColorStop offset="0" color="#06B6D4"/>
         <ColorStop offset="1" color="#8B5CF6"/>
       </ConicGradient>
@@ -22,13 +22,13 @@
     <Ellipse center="330,200" size="24,24"/>
     <Fill color="#06B6D4"/>
     <Stroke color="#FFFFFF" width="4"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#06B6D460"/>
+    <DropShadowStyle offsetY="4" blurX="8" blurY="8" color="#06B6D460"/>
   </Layer>
   <!-- End indicator dot -->
   <Layer>
     <Ellipse center="108,108" size="24,24"/>
     <Fill color="#8B5CF6"/>
     <Stroke color="#FFFFFF" width="4"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#8B5CF660"/>
+    <DropShadowStyle offsetY="4" blurX="8" blurY="8" color="#8B5CF660"/>
   </Layer>
 </pagx>

@@ -10,7 +10,7 @@
         <ColorStop offset="1" color="#E11D48"/>
       </LinearGradient>
     </Fill>
-    <DropShadowStyle offsetX="0" offsetY="8" blurX="24" blurY="24" color="#F43F5E50"/>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F43F5E50"/>
   </Layer>
   <!-- Medium rounded rectangle -->
   <Layer>
@@ -21,7 +21,7 @@
         <ColorStop offset="1" color="#7C3AED"/>
       </LinearGradient>
     </Fill>
-    <DropShadowStyle offsetX="0" offsetY="8" blurX="24" blurY="24" color="#8B5CF650"/>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#8B5CF650"/>
   </Layer>
   <!-- Fully rounded rectangle (pill shape) -->
   <Layer>
@@ -32,7 +32,7 @@
         <ColorStop offset="1" color="#0891B2"/>
       </LinearGradient>
     </Fill>
-    <DropShadowStyle offsetX="0" offsetY="8" blurX="24" blurY="24" color="#06B6D450"/>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D450"/>
   </Layer>
   <!-- Wide rectangle -->
   <Layer>
@@ -43,6 +43,6 @@
         <ColorStop offset="1" color="#059669"/>
       </LinearGradient>
     </Fill>
-    <DropShadowStyle offsetX="0" offsetY="8" blurX="24" blurY="24" color="#10B98150"/>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#10B98150"/>
   </Layer>
 </pagx>

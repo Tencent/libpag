@@ -72,17 +72,17 @@
 
   <Layer name="StarBursts">
     <Layer>
-      <Polystar center="220,130" type="star" pointCount="4" outerRadius="8" innerRadius="3" rotation="45"/>
+      <Polystar center="220,130" pointCount="4" outerRadius="8" innerRadius="3" rotation="45"/>
       <Fill color="#FFFFFFEE"/>
       <DropShadowStyle blurX="6" blurY="6" color="#7DD3FC80"/>
     </Layer>
     <Layer>
-      <Polystar center="620,210" type="star" pointCount="4" outerRadius="7" innerRadius="3" rotation="45"/>
+      <Polystar center="620,210" pointCount="4" outerRadius="7" innerRadius="3" rotation="45"/>
       <Fill color="#FFFFFFDD"/>
       <DropShadowStyle blurX="6" blurY="6" color="#C084FC80"/>
     </Layer>
     <Layer>
-      <Polystar center="700,420" type="star" pointCount="4" outerRadius="6" innerRadius="2" rotation="45"/>
+      <Polystar center="700,420" pointCount="4" outerRadius="6" innerRadius="2" rotation="45"/>
       <Fill color="#FFFFFFCC"/>
       <DropShadowStyle blurX="5" blurY="5" color="#22D3EE80"/>
     </Layer>
@@ -98,7 +98,7 @@
       <Ellipse center="0,0" size="420,420"/>
       <TrimPath start="0.1" end="0.4" offset="40"/>
       <Stroke width="4" cap="round">
-        <ConicGradient center="0,0" startAngle="0" endAngle="360">
+        <ConicGradient center="0,0">
           <ColorStop offset="0" color="#38BDF8"/>
           <ColorStop offset="0.5" color="#22D3EE"/>
           <ColorStop offset="1" color="#7C3AED"/>
@@ -130,7 +130,7 @@
       </LinearGradient>
     </Stroke>
     <BackgroundBlurStyle blurX="24" blurY="24" tileMode="mirror"/>
-    <DropShadowStyle offsetX="0" offsetY="12" blurX="20" blurY="20" color="#00000066"/>
+    <DropShadowStyle offsetY="12" blurX="20" blurY="20" color="#00000066"/>
   </Layer>
 
   <!-- ==================== Top Bar ==================== -->
@@ -142,13 +142,13 @@
         <ColorStop offset="1" color="#10284CEE"/>
       </LinearGradient>
     </Fill>
-    <Stroke width="1">
+    <Stroke>
       <LinearGradient startPoint="20,65" endPoint="780,65">
         <ColorStop offset="0" color="#1D4ED8AA"/>
         <ColorStop offset="1" color="#38BDF8AA"/>
       </LinearGradient>
     </Stroke>
-    <DropShadowStyle offsetX="0" offsetY="8" blurX="16" blurY="16" color="#00000055"/>
+    <DropShadowStyle offsetY="8" blurX="16" blurY="16" color="#00000055"/>
   </Layer>
 
   <Layer name="Avatar">
@@ -179,14 +179,14 @@
 
   <Layer name="PlayerName">
     <Text text="NEBULA CADET" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
-    <TextLayout position="120,45" textAlign="start"/>
+    <TextLayout position="120,45"/>
     <Fill color="#E2E8F0"/>
   </Layer>
 
   <Layer name="PlayerIdRow">
     <Layer name="PlayerId">
       <Text text="#A17X9" fontFamily="Arial" fontSize="11"/>
-      <TextLayout position="120,63" textAlign="start"/>
+      <TextLayout position="120,63"/>
       <Fill color="#7DD3FC"/>
     </Layer>
     <Layer name="LevelBadge">
@@ -197,7 +197,7 @@
           <ColorStop offset="1" color="#22D3EE"/>
         </LinearGradient>
       </Fill>
-      <Stroke color="#7DD3FC" width="1"/>
+      <Stroke color="#7DD3FC"/>
       <Layer>
         <Text text="LV 27" fontFamily="Arial" fontStyle="Bold" fontSize="9"/>
         <TextLayout position="195,64" textAlign="center"/>
@@ -246,7 +246,7 @@
         <ColorStop offset="1" color="#14244ACC"/>
       </LinearGradient>
     </Fill>
-    <Stroke color="#334155" width="1"/>
+    <Stroke color="#334155"/>
     <Group>
       <Ellipse center="636,48" size="16,16"/>
       <Fill>
@@ -258,11 +258,11 @@
     </Group>
     <Group>
       <Ellipse center="636,48" size="8,8"/>
-      <Stroke color="#F8D477" width="1"/>
+      <Stroke color="#F8D477"/>
     </Group>
     <Layer>
       <Text text="12,450" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
-      <TextLayout position="656,52" textAlign="start"/>
+      <TextLayout position="656,52"/>
       <Fill color="#F8FAFC"/>
     </Layer>
   </Layer>
@@ -275,7 +275,7 @@
         <ColorStop offset="1" color="#14244ACC"/>
       </LinearGradient>
     </Fill>
-    <Stroke color="#334155" width="1"/>
+    <Stroke color="#334155"/>
     <Layer x="628" y="74">
       <Path data="@IconDiamond"/>
       <Fill>
@@ -287,7 +287,7 @@
     </Layer>
     <Layer>
       <Text text="860" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
-      <TextLayout position="656,86" textAlign="start"/>
+      <TextLayout position="656,86"/>
       <Fill color="#F8FAFC"/>
     </Layer>
   </Layer>
@@ -315,9 +315,9 @@
       <Text text="START" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <TextLayout position="400,227" textAlign="center"/>
       <Fill color="#F0FFFD"/>
-      <DropShadowStyle offsetX="0" offsetY="2" blurX="6" blurY="6" color="#0F172A80"/>
+      <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#0F172A80"/>
     </Layer>
-    <DropShadowStyle offsetX="0" offsetY="12" blurX="18" blurY="18" color="#00FFC066"/>
+    <DropShadowStyle offsetY="12" blurX="18" blurY="18" color="#00FFC066"/>
   </Layer>
 
   <Layer name="ShopButton">
@@ -338,7 +338,7 @@
       <TextLayout position="400,319" textAlign="center"/>
       <Fill color="#FFF7ED"/>
     </Layer>
-    <DropShadowStyle offsetX="0" offsetY="10" blurX="16" blurY="16" color="#F59E0B66"/>
+    <DropShadowStyle offsetY="10" blurX="16" blurY="16" color="#F59E0B66"/>
   </Layer>
 
   <Layer name="RankButton">
@@ -359,7 +359,7 @@
       <TextLayout position="400,411" textAlign="center"/>
       <Fill color="#FDF2F8"/>
     </Layer>
-    <DropShadowStyle offsetX="0" offsetY="10" blurX="16" blurY="16" color="#C084FC66"/>
+    <DropShadowStyle offsetY="10" blurX="16" blurY="16" color="#C084FC66"/>
   </Layer>
 
   <!-- ==================== Bottom Bar ==================== -->
@@ -371,7 +371,7 @@
         <ColorStop offset="1" color="#10284ECC"/>
       </LinearGradient>
     </Fill>
-    <Stroke color="#1D4ED8AA" width="1"/>
+    <Stroke color="#1D4ED8AA"/>
   </Layer>
 
   <Layer name="BottomButtonSettings">
@@ -382,10 +382,10 @@
         <ColorStop offset="1" color="#162B4DCC"/>
       </LinearGradient>
     </Fill>
-    <Stroke color="#3B82F6" width="1"/>
+    <Stroke color="#3B82F6"/>
     <Layer x="228" y="533">
       <Group>
-        <Polystar center="12,12" type="star" pointCount="8" outerRadius="10" innerRadius="6" rotation="0"/>
+        <Polystar center="12,12" pointCount="8" outerRadius="10" innerRadius="6" rotation="0"/>
         <Stroke color="#93C5FD" width="2"/>
       </Group>
       <Group>
@@ -403,7 +403,7 @@
         <ColorStop offset="1" color="#162B4DCC"/>
       </LinearGradient>
     </Fill>
-    <Stroke color="#3B82F6" width="1"/>
+    <Stroke color="#3B82F6"/>
     <Layer x="388" y="533">
       <Path data="@IconQuestion"/>
       <Fill color="#93C5FD"/>
@@ -418,7 +418,7 @@
         <ColorStop offset="1" color="#162B4DCC"/>
       </LinearGradient>
     </Fill>
-    <Stroke color="#3B82F6" width="1"/>
+    <Stroke color="#3B82F6"/>
     <Layer x="548" y="533">
       <Path data="@IconShare"/>
       <Fill color="#93C5FD"/>
@@ -429,38 +429,38 @@
   <Layer name="TechLines" alpha="0.6">
     <Group>
       <Path data="M 80 130 L 160 130 L 200 170"/>
-      <Stroke color="#38BDF8" width="1"/>
+      <Stroke color="#38BDF8"/>
     </Group>
     <Group>
       <Path data="M 720 130 L 640 130 L 600 170"/>
-      <Stroke color="#A78BFA" width="1"/>
+      <Stroke color="#A78BFA"/>
     </Group>
     <Group>
       <Path data="M 90 460 L 170 460 L 210 420"/>
-      <Stroke color="#22D3EE" width="1"/>
+      <Stroke color="#22D3EE"/>
     </Group>
     <Group>
       <Path data="M 710 460 L 630 460 L 590 420"/>
-      <Stroke color="#C084FC" width="1"/>
+      <Stroke color="#C084FC"/>
     </Group>
   </Layer>
 
   <Layer name="HexDecor" alpha="0.6">
     <Group>
       <Polystar center="120,200" type="polygon" pointCount="6" outerRadius="14" rotation="30"/>
-      <Stroke color="#1D4ED8" width="1"/>
+      <Stroke color="#1D4ED8"/>
     </Group>
     <Group>
       <Polystar center="680,240" type="polygon" pointCount="6" outerRadius="12" rotation="30"/>
-      <Stroke color="#38BDF8" width="1"/>
+      <Stroke color="#38BDF8"/>
     </Group>
     <Group>
       <Polystar center="180,420" type="polygon" pointCount="6" outerRadius="10" rotation="30"/>
-      <Stroke color="#22D3EE" width="1"/>
+      <Stroke color="#22D3EE"/>
     </Group>
     <Group>
       <Polystar center="640,420" type="polygon" pointCount="6" outerRadius="12" rotation="30"/>
-      <Stroke color="#A78BFA" width="1"/>
+      <Stroke color="#A78BFA"/>
     </Group>
   </Layer>
 

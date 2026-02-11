@@ -3,7 +3,7 @@
 <pagx version="1.0" width="400" height="400">
   <!-- Mask shape (invisible but used for masking) -->
   <Layer id="maskShape" visible="false">
-    <Polystar center="200,200" type="star" pointCount="5" outerRadius="150" innerRadius="70" rotation="-90"/>
+    <Polystar center="200,200" outerRadius="150" innerRadius="70" rotation="-90"/>
     <Fill color="#FFFFFF"/>
   </Layer>
   <!-- Masked content with gradient - the rectangle will be clipped to star shape -->

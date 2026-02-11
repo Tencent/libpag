@@ -10,12 +10,12 @@
         <ColorStop offset="1" color="#EC4899"/>
       </LinearGradient>
     </Fill>
-    <DropShadowStyle offsetX="0" offsetY="16" blurX="40" blurY="40" color="#F43F5E60"/>
+    <DropShadowStyle offsetY="16" blurX="40" blurY="40" color="#F43F5E60"/>
     <!-- Nested child layer -->
     <Layer name="Child">
       <Ellipse center="150,150" size="120,120"/>
       <Fill color="#FFFFFF"/>
-      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#00000030"/>
+      <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#00000030"/>
     </Layer>
   </Layer>
 </pagx>
