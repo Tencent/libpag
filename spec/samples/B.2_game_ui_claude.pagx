@@ -191,7 +191,7 @@
     </Layer>
 
     <!-- HP bar -->
-    <Layer name="HPBar" x="200" y="14">
+    <Layer name="HPBar" x="190" y="14">
       <Layer>
         <Text text="HP" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
         <TextLayout position="-20,9" textAlign="start"/>
@@ -215,7 +215,7 @@
     </Layer>
 
     <!-- MP bar -->
-    <Layer name="MPBar" x="200" y="36">
+    <Layer name="MPBar" x="190" y="36">
       <Layer>
         <Text text="MP" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
         <TextLayout position="-22,9" textAlign="start"/>
@@ -426,7 +426,7 @@
       <!-- Rarity stars -->
       <Layer y="112">
         <Group>
-          <Polystar center="0,0" type="star" pointCount="5" outerRadius="7" innerRadius="3" rotation="-90"/>
+          <Polystar center="0,0" type="star" pointCount="5" outerRadius="7" innerRadius="3" rotation="0"/>
           <Fill color="@starGrad"/>
           <Repeater copies="5" position="18,0"/>
         </Group>
@@ -510,7 +510,7 @@
     <!-- Power rating -->
     <Layer>
       <Text text="POWER" fontFamily="Arial" fontSize="11"/>
-      <TextLayout position="130,425" textAlign="center"/>
+      <TextLayout position="130,267" textAlign="center"/>
       <Fill color="#94A3B8"/>
     </Layer>
     <Layer>
