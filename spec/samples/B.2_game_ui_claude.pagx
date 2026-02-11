@@ -286,7 +286,7 @@
     </Layer>
 
     <!-- Character portrait area -->
-    <Layer x="130" y="165">
+    <Layer x="130" y="145">
       <!-- Portrait frame -->
       <Layer>
         <Rectangle center="0,0" size="200,200" roundness="12"/>
@@ -423,19 +423,20 @@
         </Group>
       </Layer>
 
-      <!-- Rarity stars -->
-      <Layer y="92">
-        <Group>
-          <Polystar center="0,0" type="star" pointCount="5" outerRadius="7" innerRadius="3" rotation="0"/>
-          <Fill color="@starGrad"/>
-          <Repeater copies="5" position="18,0"/>
-        </Group>
-        <Group position="20,0"/>
-      </Layer>
+    </Layer>
+
+    <!-- Rarity stars (below portrait) -->
+    <Layer x="130" y="258">
+      <Group>
+        <Polystar center="0,0" type="star" pointCount="5" outerRadius="7" innerRadius="3" rotation="0"/>
+        <Fill color="@starGrad"/>
+        <Repeater copies="5" position="18,0"/>
+      </Group>
+      <Group position="20,0"/>
     </Layer>
 
     <!-- Stats section -->
-    <Layer x="25" y="290">
+    <Layer x="25" y="300">
       <!-- ATK -->
       <Layer>
         <Polystar center="12,0" type="star" pointCount="4" outerRadius="7" innerRadius="2" rotation="45"/>
