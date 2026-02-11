@@ -47,17 +47,17 @@
     </Layer>
 
     <!-- Main Text -->
-    <Layer y="-10">
+    <Group position="0, -10">
       <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
       <TextLayout position="0,10" textAlign="center"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#00000040"/>
-    </Layer>
-    <Layer y="30">
+    </Group>
+    <Group position="0, 30">
       <Text text="Portable Animated Graphics" fontFamily="Arial" fontSize="12"/>
       <TextLayout position="0,0" textAlign="center"/>
       <Fill color="#94A3B8"/>
-    </Layer>
+    </Group>
   </Layer>
 
   <!-- ==================== Feature Cards ==================== -->
@@ -78,21 +78,21 @@
     </Layer>
     
     <!-- Text -->
-    <Layer x="10" y="-15">
+    <Group position="10, -15">
       <Text text="Human Readable" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
       <TextLayout position="0,0"/>
       <Fill color="#F43F5E"/>
-    </Layer>
-    <Layer x="10" y="10">
+    </Group>
+    <Group position="10, 10">
       <Text text="XML-based format" fontFamily="Arial" fontSize="12"/>
       <TextLayout position="0,0"/>
       <Fill color="#CBD5E1"/>
-    </Layer>
-    <Layer x="10" y="26">
+    </Group>
+    <Group position="10, 26">
       <Text text="Easy to read &amp; edit" fontFamily="Arial" fontSize="12"/>
       <TextLayout position="0,0"/>
       <Fill color="#94A3B8"/>
-    </Layer>
+    </Group>
   </Layer>
 
   <!-- Top Right: Vector Based (Bezier Icon) -->
@@ -115,21 +115,21 @@
     </Layer>
     
     <!-- Text -->
-    <Layer x="10" y="-15">
+    <Group position="10, -15">
       <Text text="Vector Based" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
       <TextLayout position="0,0"/>
       <Fill color="#38BDF8"/>
-    </Layer>
-    <Layer x="10" y="10">
+    </Group>
+    <Group position="10, 10">
       <Text text="Infinite Scalability" fontFamily="Arial" fontSize="12"/>
       <TextLayout position="0,0"/>
       <Fill color="#CBD5E1"/>
-    </Layer>
-    <Layer x="10" y="26">
+    </Group>
+    <Group position="10, 26">
       <Text text="Small File Size" fontFamily="Arial" fontSize="12"/>
       <TextLayout position="0,0"/>
       <Fill color="#94A3B8"/>
-    </Layer>
+    </Group>
   </Layer>
 
   <!-- Bottom Left: Animation (Motion Icon) -->
@@ -148,21 +148,21 @@
     </Layer>
     
     <!-- Text -->
-    <Layer x="10" y="-15">
+    <Group position="10, -15">
       <Text text="Rich Animation" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
       <TextLayout position="0,0"/>
       <Fill color="#A855F7"/>
-    </Layer>
-    <Layer x="10" y="10">
+    </Group>
+    <Group position="10, 10">
       <Text text="Text Modifiers" fontFamily="Arial" fontSize="12"/>
       <TextLayout position="0,0"/>
       <Fill color="#CBD5E1"/>
-    </Layer>
-    <Layer x="10" y="26">
+    </Group>
+    <Group position="10, 26">
       <Text text="Path Operations" fontFamily="Arial" fontSize="12"/>
       <TextLayout position="0,0"/>
       <Fill color="#94A3B8"/>
-    </Layer>
+    </Group>
   </Layer>
 
   <!-- Bottom Right: Cross Platform (Devices Icon) -->
@@ -181,21 +181,21 @@
     </Layer>
     
     <!-- Text -->
-    <Layer x="10" y="-15">
+    <Group position="10, -15">
       <Text text="Cross Platform" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
       <TextLayout position="0,0"/>
       <Fill color="#10B981"/>
-    </Layer>
-    <Layer x="10" y="10">
+    </Group>
+    <Group position="10, 10">
       <Text text="Web / iOS / Android" fontFamily="Arial" fontSize="12"/>
       <TextLayout position="0,0"/>
       <Fill color="#CBD5E1"/>
-    </Layer>
-    <Layer x="10" y="26">
+    </Group>
+    <Group position="10, 26">
       <Text text="Unified Rendering" fontFamily="Arial" fontSize="12"/>
       <TextLayout position="0,0"/>
       <Fill color="#94A3B8"/>
-    </Layer>
+    </Group>
   </Layer>
 
   <!-- ==================== Connectors ==================== -->
