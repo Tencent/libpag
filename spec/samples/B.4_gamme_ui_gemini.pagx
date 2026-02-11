@@ -1,191 +1,357 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="800" height="600">
-  <!-- Background Grid -->
-  <Layer name="BackgroundGrid" alpha="0.3">
+  <Resources>
+    <PathData id="hex" data="M 10 0 L 5 8.66 L -5 8.66 L -10 0 L -5 -8.66 L 5 -8.66 Z"/>
+    <PathData id="bracket" data="M 10 0 L 30 0 L 30 80 L 10 80"/>
+  </Resources>
+
+  <!-- Mask Definitions -->
+  <Layer id="triangleMask" visible="false">
+      <Polystar center="0,0" type="polygon" pointCount="3" outerRadius="80" rotation="90"/>
+      <Fill color="#ffffff"/>
+  </Layer>
+
+  <!-- Background Layer -->
+  <Layer name="Background">
+    <!-- Base Gradient -->
+    <Layer>
+      <Rectangle center="400,300" size="800,600"/>
+      <Fill>
+        <RadialGradient center="400,300" radius="500">
+          <ColorStop offset="0" color="#001122"/>
+          <ColorStop offset="0.7" color="#000811"/>
+          <ColorStop offset="1" color="#000000"/>
+        </RadialGradient>
+      </Fill>
+    </Layer>
+    
+    <!-- Hex Grid Pattern -->
+    <Layer alpha="0.3">
+      <Group>
+        <Path data="@hex"/>
+        <Stroke color="#0066aa" width="1"/>
+        <Repeater copies="40" position="20,0"/> 
+      </Group>
+      <Repeater copies="35" position="10, 17.32"/>
+    </Layer>
+    
+    <!-- Vignette -->
     <Layer>
         <Rectangle center="400,300" size="800,600"/>
         <Fill>
-            <RadialGradient center="400,300" radius="500">
-                <ColorStop offset="0" color="#001a33"/>
-                <ColorStop offset="1" color="#000000"/>
+            <RadialGradient center="400,300" radius="600">
+                <ColorStop offset="0.6" color="#00000000"/>
+                <ColorStop offset="1" color="#00000080"/>
             </RadialGradient>
         </Fill>
     </Layer>
-    <!-- Grid Lines using Repeater -->
-    <Layer>
-        <Path data="M 0 0 L 800 0"/>
-        <Stroke color="#004488" width="1" alpha="0.5"/>
-        <Repeater copies="13" position="0,50"/>
-    </Layer>
-    <Layer>
-        <Path data="M 0 0 L 0 600"/>
-        <Stroke color="#004488" width="1" alpha="0.5"/>
-        <Repeater copies="17" position="50,0"/>
-    </Layer>
   </Layer>
 
-  <!-- Main Center Reticle -->
-  <Layer name="Reticle" x="400" y="300">
-    <!-- Outer Ring with Glow -->
+  <!-- Central Reticle Complex -->
+  <Layer name="ReticleComplex" x="400" y="300">
+    <!-- Outer Scale Ring (Tick Marks) -->
+    <Layer>
+      <Rectangle center="0,-220" size="2,15"/>
+      <Fill color="#00ccff" alpha="0.6"/>
+      <Repeater copies="60" rotation="6" anchor="0,0"/> 
+    </Layer>
+    
+    <!-- Secondary Scale (Smaller Ticks) -->
+    <Layer>
+      <Rectangle center="0,-215" size="1,8"/>
+      <Fill color="#00ccff" alpha="0.3"/>
+      <Repeater copies="120" rotation="3" anchor="0,0"/>
+    </Layer>
+
+    <!-- Rotating Tech Ring 1 -->
+    <Layer rotation="15">
+      <Ellipse center="0,0" size="380,380"/>
+      <Stroke width="1" color="#00ffff" dashes="60, 40" alpha="0.4"/>
+    </Layer>
+    
+    <!-- Rotating Tech Ring 2 (Counter-rotate) -->
+    <Layer rotation="-20">
+      <Ellipse center="0,0" size="360,360"/>
+      <Stroke width="2" color="#0088ff" dashes="10, 80" alpha="0.5"/>
+    </Layer>
+
+    <!-- Main HUD Ring -->
     <Layer>
       <Ellipse center="0,0" size="300,300"/>
-      <Stroke width="2" color="#00ccff"/>
-      <DropShadowStyle blurX="10" blurY="10" color="#00ccff"/>
-    </Layer>
-    
-    <!-- Rotating Dashed Ring -->
-    <Layer>
-      <Ellipse center="0,0" size="260,260"/>
-      <Stroke width="4" color="#0088ff" dashes="20,10" cap="round"/>
+      <Stroke width="3" color="#00ccff"/>
+      <DropShadowStyle blurX="8" blurY="8" color="#00ccff80"/>
     </Layer>
 
-    <!-- Inner Triangle Markers -->
+    <!-- Center Triangle Target -->
     <Layer>
-      <Polystar center="0,0" type="polygon" pointCount="3" outerRadius="100" rotation="30"/>
-      <Stroke width="2" color="#ffaa00"/>
-      <DropShadowStyle blurX="5" blurY="5" color="#ffaa0080"/>
-    </Layer>
-    <!-- Inner Triangle Fill (Low Opacity) -->
-    <Layer>
-      <Polystar center="0,0" type="polygon" pointCount="3" outerRadius="90" rotation="30"/>
-      <Fill color="#ffaa00" alpha="0.1"/>
+      <Polystar center="0,0" type="polygon" pointCount="3" outerRadius="80" rotation="90"/>
+      <Stroke width="4" color="#ffaa00"/>
+      <Fill>
+        <RadialGradient center="0,0" radius="80">
+            <ColorStop offset="0" color="#ffaa0040"/>
+            <ColorStop offset="1" color="#ffaa0010"/>
+        </RadialGradient>
+      </Fill>
+      <DropShadowStyle blurX="25" blurY="25" color="#ffaa00"/>
     </Layer>
     
-    <!-- Center Dot -->
+    <!-- Inner scanning lines inside triangle (Masked) -->
+    <Layer mask="@triangleMask" maskType="alpha">
+         <Rectangle center="0,0" size="100,100"/>
+         <Fill>
+            <LinearGradient startPoint="-50,0" endPoint="50,0">
+                <ColorStop offset="0" color="#ffaa0000"/>
+                <ColorStop offset="0.5" color="#ffaa0040"/>
+                <ColorStop offset="1" color="#ffaa0000"/>
+            </LinearGradient>
+         </Fill>
+    </Layer>
+    
+    <!-- Center Dot with crosshair lines -->
     <Layer>
-        <Ellipse center="0,0" size="10,10"/>
+        <Ellipse center="0,0" size="6,6"/>
         <Fill color="#ffffff"/>
-        <DropShadowStyle blurX="4" blurY="4" color="#ffffff"/>
+        <Path data="M -20 0 L 20 0 M 0 -20 L 0 20"/>
+        <Stroke width="1" color="#ffffff" alpha="0.5"/>
     </Layer>
   </Layer>
 
-  <!-- Left Health Bar (Curved) -->
-  <Layer name="HealthBar" x="400" y="300">
-     <!-- Background Track -->
+  <!-- Left Side: Health & Systems -->
+  <Layer name="LeftSide" x="400" y="300">
+    <!-- Curved Health Bar Track -->
     <Layer>
-      <Path data="M -160 80 A 180 180 0 0 0 -160 -80"/>
-      <Stroke width="20" color="#333333" cap="round"/>
+      <Path data="M -180 100 A 200 200 0 0 0 -180 -100"/>
+      <Stroke width="24" color="#002233" cap="butt"/>
     </Layer>
-    <!-- Filled Bar -->
+    
+    <!-- Segmented Health Bar -->
     <Layer>
-      <Path data="M -160 80 A 180 180 0 0 0 -160 -80"/>
-      <TrimPath start="0" end="0.75"/>
-      <Stroke width="16" cap="round">
-         <LinearGradient startPoint="-160,80" endPoint="-160,-80">
-            <ColorStop offset="0" color="#ff3333"/>
-            <ColorStop offset="1" color="#ff9933"/>
+      <Path data="M -180 100 A 200 200 0 0 0 -180 -100"/>
+      <Stroke width="20" cap="butt" dashes="4, 2">
+         <LinearGradient startPoint="-180,100" endPoint="-180,-100">
+            <ColorStop offset="0" color="#ff0000"/>
+            <ColorStop offset="0.5" color="#ffff00"/>
+            <ColorStop offset="1" color="#00ff00"/>
          </LinearGradient>
       </Stroke>
-      <DropShadowStyle blurX="8" blurY="8" color="#ff333380"/>
+      <TrimPath start="0" end="0.85"/>
+      <DropShadowStyle blurX="5" blurY="5" color="#ff000040"/>
     </Layer>
-    <!-- Label -->
+    
+    <!-- Health Text -->
     <Layer>
-        <Text text="HEALTH" fontFamily="Arial" fontSize="14" position="-200, 0" fontStyle="Bold"/>
-        <Fill color="#ff9933"/>
-        <TextLayout position="-220, 5" textAlign="end"/>
+        <Text text="100%" fontFamily="Arial" fontSize="24" fontStyle="Bold" position="-230, 0"/>
+        <Fill color="#ffffff"/>
+        <TextLayout position="-240, 10" textAlign="end"/>
+    </Layer>
+    <Layer>
+        <Text text="STRUCTURAL INTEGRITY" fontFamily="Arial" fontSize="10" position="-230, 20"/>
+        <Fill color="#0088ff"/>
+        <TextLayout position="-240, 25" textAlign="end"/>
+    </Layer>
+    
+    <!-- Data Column -->
+    <Layer x="-350" y="-100">
+        <Layer>
+            <Text fontFamily="Arial" fontSize="9">
+<![CDATA[CPU: 45%
+GPU: 88%
+NET: ON
+MEM: OK]]>
+            </Text>
+            <TextLayout lineHeight="1.5" textAlign="end"/>
+            <Fill color="#00ccff" alpha="0.7"/>
+        </Layer>
+        <Layer>
+            <Rectangle center="10, 25" size="2, 60"/>
+            <Fill color="#004488"/>
+        </Layer>
     </Layer>
   </Layer>
 
-  <!-- Right Energy Bar (Curved) -->
-  <Layer name="EnergyBar" x="400" y="300">
-    <!-- Background Track -->
+  <!-- Right Side: Energy & Ammo -->
+  <Layer name="RightSide" x="400" y="300">
+    <!-- Curved Energy Bar Track -->
     <Layer>
-      <Path data="M 160 -80 A 180 180 0 0 0 160 80"/>
-      <Stroke width="20" color="#333333" cap="round"/>
+      <Path data="M 180 -100 A 200 200 0 0 0 180 100"/>
+      <Stroke width="24" color="#002233" cap="butt"/>
     </Layer>
-    <!-- Filled Bar -->
+    
+    <!-- Segmented Energy Bar -->
     <Layer>
-      <Path data="M 160 -80 A 180 180 0 0 0 160 80"/>
-      <TrimPath start="0" end="0.9"/>
-      <Stroke width="16" cap="round">
-         <LinearGradient startPoint="160,-80" endPoint="160,80">
+      <Path data="M 180 -100 A 200 200 0 0 0 180 100"/>
+      <Stroke width="20" cap="butt" dashes="10, 2">
+         <LinearGradient startPoint="180,-100" endPoint="180,100">
             <ColorStop offset="0" color="#00ffff"/>
-            <ColorStop offset="1" color="#0088ff"/>
+            <ColorStop offset="1" color="#0044ff"/>
          </LinearGradient>
       </Stroke>
-      <DropShadowStyle blurX="8" blurY="8" color="#00ffff80"/>
+      <TrimPath start="0" end="0.6"/>
+      <DropShadowStyle blurX="5" blurY="5" color="#00ffff40"/>
     </Layer>
-     <!-- Label -->
+    
+    <!-- Energy Text -->
     <Layer>
-        <Text text="ENERGY" fontFamily="Arial" fontSize="14" position="200, 0" fontStyle="Bold"/>
-        <Fill color="#00ccff"/>
-        <TextLayout position="220, 5" textAlign="start"/>
+        <Text text="60%" fontFamily="Arial" fontSize="24" fontStyle="Bold" position="230, 0"/>
+        <Fill color="#ffffff"/>
+        <TextLayout position="240, 10" textAlign="start"/>
+    </Layer>
+    <Layer>
+        <Text text="PLASMA RESERVES" fontFamily="Arial" fontSize="10" position="230, 20"/>
+        <Fill color="#0088ff"/>
+        <TextLayout position="240, 25" textAlign="start"/>
+    </Layer>
+    
+    <!-- Ammo Icons Strip -->
+    <Layer x="250" y="50">
+        <Layer>
+            <!-- Bullet Icon -->
+            <Path data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
+            <Fill color="#ffaa00"/>
+            <Stroke color="#000000" width="1"/>
+            <Repeater copies="15" position="10, 0"/>
+        </Layer>
+        <Layer>
+            <!-- Depleted Bullets -->
+            <Path data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
+            <Fill color="#331100"/>
+            <Stroke color="#442200" width="1"/>
+            <Repeater copies="5" position="10, 0" offset="15"/> 
+        </Layer>
     </Layer>
   </Layer>
 
-  <!-- Bottom Weapon Info -->
-  <Layer name="WeaponInfo" x="400" y="520">
-    <!-- Frame -->
+  <!-- Bottom: Weapon & Radar -->
+  <Layer name="Bottom" x="400" y="520">
+    <!-- Complex Frame -->
     <Layer>
-        <!-- More complex frame shape -->
-        <Path data="M -160 0 L -140 -35 L 140 -35 L 160 0 L 140 10 L -140 10 Z"/>
+        <Path data="M -200 0 L -180 -40 L 180 -40 L 200 0 L 180 20 L -180 20 Z"/>
+        <Fill color="#001122" alpha="0.95"/>
+        <Stroke color="#0066aa" width="2"/>
+        <DropShadowStyle blurX="15" blurY="15" color="#000000"/>
+    </Layer>
+    
+    <!-- Weapon Name -->
+    <Layer>
+        <Text text="MK-IV RAILGUN" fontFamily="Arial" fontSize="20" fontStyle="Bold"/>
+        <Fill color="#ffffff"/>
+        <TextLayout position="0, -15" textAlign="center"/>
+    </Layer>
+    
+    <!-- Fire Mode -->
+    <Layer>
+        <Text text="[ BURST MODE ]" fontFamily="Arial" fontSize="12"/>
+        <Fill color="#ffaa00"/>
+        <TextLayout position="0, 5" textAlign="center"/>
+    </Layer>
+    
+    <!-- Decorative Tech Bits under frame -->
+    <Layer y="30">
+        <Layer>
+            <Rectangle center="0,0" size="40, 4"/>
+            <Fill color="#004488"/>
+        </Layer>
+        <Layer>
+            <Rectangle center="-30,0" size="10, 4"/>
+            <Fill color="#002244"/>
+        </Layer>
+        <Layer>
+            <Rectangle center="30,0" size="10, 4"/>
+            <Fill color="#002244"/>
+        </Layer>
+    </Layer>
+  </Layer>
+
+  <!-- Minimap / Radar (Bottom Left) -->
+  <Layer name="Radar" x="100" y="500">
+     <!-- Background -->
+     <Layer>
+        <Ellipse center="0,0" size="140,140"/>
         <Fill color="#001122" alpha="0.9"/>
         <Stroke color="#0066aa" width="2"/>
-        <DropShadowStyle blurX="10" blurY="10" color="#000000"/>
-    </Layer>
-    <!-- Tech Lines -->
-    <Layer>
-        <Path data="M -130 -25 L 130 -25"/>
+     </Layer>
+     <!-- Grid Circles -->
+     <Layer>
+        <Ellipse center="0,0" size="100,100"/>
         <Stroke color="#004488" width="1"/>
-    </Layer>
-    <!-- Text Info -->
-    <Layer>
-        <Text text="WEAPON: PLASMA RIFLE" fontFamily="Arial" fontSize="18" fontStyle="Bold"/>
-        <TextLayout position="0, -10" textAlign="center"/>
+     </Layer>
+     <Layer>
+        <Ellipse center="0,0" size="50,50"/>
+        <Stroke color="#004488" width="1"/>
+     </Layer>
+     <!-- Crosshairs -->
+     <Layer>
+        <Path data="M -70 0 L 70 0 M 0 -70 L 0 70"/>
+        <Stroke color="#004488" width="1"/>
+     </Layer>
+     <!-- Sweep (Conic Gradient) -->
+     <Layer rotation="-45">
+        <Ellipse center="0,0" size="130,130"/>
+        <Fill>
+            <ConicGradient center="0,0" startAngle="0" endAngle="90">
+                <ColorStop offset="0" color="#00ff0000"/>
+                <ColorStop offset="1" color="#00ff0080"/>
+            </ConicGradient>
+        </Fill>
+     </Layer>
+     <!-- Enemy Blips -->
+     <Layer>
+        <Layer>
+            <Ellipse center="30, -20" size="6,6"/>
+            <Fill color="#ff0000"/>
+            <DropShadowStyle blurX="4" blurY="4" color="#ff0000"/>
+        </Layer>
+        <Layer>
+            <Ellipse center="-40, 10" size="6,6"/>
+            <Fill color="#ff0000"/>
+            <DropShadowStyle blurX="4" blurY="4" color="#ff0000"/>
+        </Layer>
+        <Layer>
+            <Ellipse center="0, 0" size="4,4"/>
+            <Fill color="#ffffff"/> <!-- Player -->
+        </Layer>
+     </Layer>
+  </Layer>
+
+  <!-- Objective Markers (Top Right) -->
+  <Layer name="Objectives" x="700" y="100">
+     <Layer>
+        <Text fontFamily="Arial" fontSize="12" fontStyle="Bold">
+<![CDATA[MISSION OBJECTIVES:
+[ ] INFILTRATE BASE
+[ ] HACK TERMINAL
+[x] SECURE PERIMETER]]>
+        </Text>
         <Fill color="#ffffff"/>
-    </Layer>
-    <!-- Ammo Counter -->
+        <TextLayout position="0,0" textAlign="end" lineHeight="1.6"/>
+        <DropShadowStyle blurX="2" blurY="2" color="#000000"/>
+     </Layer>
+     <!-- Checkbox accents -->
+     <Layer x="10" y="5">
+        <Rectangle center="0,0" size="8,8"/>
+        <Stroke color="#ffaa00" width="1"/>
+        <Repeater copies="3" position="0, 19"/>
+     </Layer>
+  </Layer>
+
+  <!-- Corners -->
+  <Layer name="Corners">
     <Layer>
-         <Text text="99 / 100" fontFamily="Arial" fontSize="24" fontStyle="Bold"/>
-         <TextLayout position="0, -50" textAlign="center"/>
-         <Fill color="#00ffcc"/>
-         <DropShadowStyle blurX="5" blurY="5" color="#00ffcc80"/>
+        <Path data="M 40 100 L 40 40 L 100 40"/>
+        <Stroke width="4" color="#00ccff"/>
+    </Layer>
+    <Layer>
+        <Path data="M 760 100 L 760 40 L 700 40"/>
+        <Stroke width="4" color="#00ccff"/>
+    </Layer>
+    <Layer>
+        <Path data="M 40 500 L 40 560 L 100 560"/>
+        <Stroke width="4" color="#00ccff"/>
+    </Layer>
+    <Layer>
+        <Path data="M 760 500 L 760 560 L 700 560"/>
+        <Stroke width="4" color="#00ccff"/>
     </Layer>
   </Layer>
 
-  <!-- Corner Decorative Elements -->
-  <Layer name="Decorations">
-    <!-- Top Left Corner -->
-    <Layer>
-        <Path data="M 50 150 L 50 50 L 150 50"/>
-        <Stroke width="4" color="#00ccff" cap="square"/>
-        <DropShadowStyle blurX="5" blurY="5" color="#00ccff"/>
-    </Layer>
-    <!-- Top Right Corner -->
-    <Layer>
-        <Path data="M 750 150 L 750 50 L 650 50"/>
-        <Stroke width="4" color="#00ccff" cap="square"/>
-        <DropShadowStyle blurX="5" blurY="5" color="#00ccff"/>
-    </Layer>
-    <!-- Bottom Left Corner -->
-    <Layer>
-        <Path data="M 50 450 L 50 550 L 150 550"/>
-        <Stroke width="4" color="#00ccff" cap="square"/>
-        <DropShadowStyle blurX="5" blurY="5" color="#00ccff"/>
-    </Layer>
-     <!-- Bottom Right Corner -->
-    <Layer>
-        <Path data="M 750 450 L 750 550 L 650 550"/>
-        <Stroke width="4" color="#00ccff" cap="square"/>
-        <DropShadowStyle blurX="5" blurY="5" color="#00ccff"/>
-    </Layer>
-  </Layer>
-  
-  <!-- Target Markers (Repeater for randomness look) -->
-  <Layer name="Targets">
-      <Layer>
-        <Rectangle center="0,0" size="20,20"/>
-        <Stroke width="2" color="#ff0000"/>
-        <Repeater copies="4" position="150, 100" scale="1.2, 1.2"/>
-        <Fill color="#ff0000" alpha="0.3"/>
-      </Layer>
-      <Layer>
-         <Ellipse center="600, 200" size="30,30"/>
-         <Stroke width="2" color="#ffaa00" dashes="5,5"/>
-         <Text text="TARGET LOCK" fontFamily="Arial" fontSize="12" fontStyle="Bold"/>
-         <TextLayout position="600, 240" textAlign="center"/>
-         <Fill color="#ffaa00"/>
-         <DropShadowStyle blurX="4" blurY="4" color="#ffaa00"/>
-      </Layer>
-  </Layer>
 </pagx>

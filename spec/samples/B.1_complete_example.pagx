@@ -46,14 +46,23 @@
       </Stroke>
     </Layer>
 
+    <!-- Inner Core Orb (Logo) -->
+    <Layer>
+      <Ellipse center="0,0" size="100,100"/>
+      <Fill>
+        <ImagePattern image="@photo" tileModeX="clamp" tileModeY="clamp" matrix="0.35,0,0,0.35,-45,-45"/>
+      </Fill>
+      <DropShadowStyle offsetX="0" offsetY="0" blurX="30" blurY="30" color="#6366F180"/>
+    </Layer>
+    
     <!-- Main Text -->
-    <Layer x="0" y="-10">
+    <Layer x="0" y="60">
       <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
       <TextLayout position="0,10" textAlign="center"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#00000040"/>
     </Layer>
-    <Layer x="0" y="35">
+    <Layer x="0" y="95">
       <Text text="Portable Animated Graphics" fontFamily="Arial" fontSize="12"/>
       <TextLayout position="0,0" textAlign="center"/>
       <Fill color="#94A3B8"/>
@@ -71,7 +80,7 @@
     <DropShadowStyle offsetX="0" offsetY="8" blurX="16" blurY="16" color="#00000040"/>
     
     <!-- Detailed Icon: XML Document -->
-    <Layer x="-70" y="0">
+    <Layer x="-60" y="0">
       <!-- Doc Shape -->
       <Group>
         <Path data="M -15 -20 L 5 -20 L 15 -10 L 15 20 L -15 20 Z"/>
@@ -97,19 +106,19 @@
     </Layer>
     
     <!-- Text -->
-    <Layer x="10" y="-20">
+    <Layer x="-20" y="-20">
       <Text text="Human Readable" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
-      <TextLayout position="0,0"/>
+      <TextLayout/>
       <Fill color="#F43F5E"/>
     </Layer>
-    <Layer x="10" y="5">
+    <Layer x="-20" y="5">
       <Text text="XML-based format" fontFamily="Arial" fontSize="12"/>
-      <TextLayout position="0,0"/>
+      <TextLayout/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="10" y="22">
+    <Layer x="-20" y="22">
       <Text text="Easy to read &amp; edit" fontFamily="Arial" fontSize="12"/>
-      <TextLayout position="0,0"/>
+      <TextLayout/>
       <Fill color="#94A3B8"/>
     </Layer>
   </Layer>
@@ -122,7 +131,7 @@
     <DropShadowStyle offsetX="0" offsetY="8" blurX="16" blurY="16" color="#00000040"/>
     
     <!-- Detailed Icon: Pen Tool & Bezier -->
-    <Layer x="-70" y="0">
+    <Layer x="-60" y="0">
       <!-- Bezier Curve -->
       <Group>
         <Path data="M -20 10 Q 0 -20 20 10"/>
@@ -150,19 +159,19 @@
     </Layer>
     
     <!-- Text -->
-    <Layer x="10" y="-20">
+    <Layer x="-20" y="-20">
       <Text text="Vector Based" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
-      <TextLayout position="0,0"/>
+      <TextLayout/>
       <Fill color="#38BDF8"/>
     </Layer>
-    <Layer x="10" y="5">
+    <Layer x="-20" y="5">
       <Text text="Infinite Scalability" fontFamily="Arial" fontSize="12"/>
-      <TextLayout position="0,0"/>
+      <TextLayout/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="10" y="22">
+    <Layer x="-20" y="22">
       <Text text="Small File Size" fontFamily="Arial" fontSize="12"/>
-      <TextLayout position="0,0"/>
+      <TextLayout/>
       <Fill color="#94A3B8"/>
     </Layer>
   </Layer>
@@ -175,7 +184,7 @@
     <DropShadowStyle offsetX="0" offsetY="8" blurX="16" blurY="16" color="#00000040"/>
     
     <!-- Detailed Icon: Motion Path -->
-    <Layer x="-70" y="0">
+    <Layer x="-60" y="0">
       <!-- Trajectory -->
       <Group>
         <Path data="M -20 10 Q -10 -20 0 0 T 20 -10"/>
@@ -196,19 +205,19 @@
     </Layer>
     
     <!-- Text -->
-    <Layer x="10" y="-20">
+    <Layer x="-20" y="-20">
       <Text text="Rich Animation" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
-      <TextLayout position="0,0"/>
+      <TextLayout/>
       <Fill color="#A855F7"/>
     </Layer>
-    <Layer x="10" y="5">
+    <Layer x="-20" y="5">
       <Text text="Text Modifiers" fontFamily="Arial" fontSize="12"/>
-      <TextLayout position="0,0"/>
+      <TextLayout/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="10" y="22">
+    <Layer x="-20" y="22">
       <Text text="Path Operations" fontFamily="Arial" fontSize="12"/>
-      <TextLayout position="0,0"/>
+      <TextLayout/>
       <Fill color="#94A3B8"/>
     </Layer>
   </Layer>
@@ -221,7 +230,7 @@
     <DropShadowStyle offsetX="0" offsetY="8" blurX="16" blurY="16" color="#00000040"/>
     
     <!-- Detailed Icon: Monitor + Phone -->
-    <Layer x="-70" y="0">
+    <Layer x="-60" y="0">
       <!-- Monitor -->
       <Group>
         <Rectangle center="-5,-5" size="36,24" roundness="2"/>
@@ -242,19 +251,19 @@
     </Layer>
     
     <!-- Text -->
-    <Layer x="10" y="-20">
+    <Layer x="-20" y="-20">
       <Text text="Cross Platform" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
-      <TextLayout position="0,0"/>
+      <TextLayout/>
       <Fill color="#10B981"/>
     </Layer>
-    <Layer x="10" y="5">
+    <Layer x="-20" y="5">
       <Text text="Web / iOS / Android" fontFamily="Arial" fontSize="12"/>
-      <TextLayout position="0,0"/>
+      <TextLayout/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="10" y="22">
+    <Layer x="-20" y="22">
       <Text text="Unified Rendering" fontFamily="Arial" fontSize="12"/>
-      <TextLayout position="0,0"/>
+      <TextLayout/>
       <Fill color="#94A3B8"/>
     </Layer>
   </Layer>
@@ -282,5 +291,10 @@
       <Stroke color="#10B981" width="1"/>
     </Group>
   </Layer>
+
+  <!-- ==================== Resources ==================== -->
+  <Resources>
+    <Image id="photo" source="pag_logo.png"/>
+  </Resources>
 
 </pagx>
