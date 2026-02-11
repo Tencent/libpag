@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates TextLayout for text positioning and alignment -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Dark background -->
-  <Layer>
-    <Rectangle center="200,200" size="400,400"/>
-    <Fill color="#0F172A"/>
-  </Layer>
   <!-- Title: point text, center aligned -->
   <Layer>
     <Text text="Text Layout" fontFamily="Arial" fontStyle="Bold" fontSize="40"/>
@@ -31,7 +26,7 @@
   <Layer>
     <Text text="text begins at anchor" fontFamily="Arial" fontSize="14"/>
     <TextLayout position="200,175" textAlign="start"/>
-    <Fill color="#64748B"/>
+    <Fill color="#475569"/>
   </Layer>
   <!-- Center aligned: text centered on anchor point -->
   <Layer>
@@ -42,7 +37,7 @@
   <Layer>
     <Text text="text centered on anchor" fontFamily="Arial" fontSize="14"/>
     <TextLayout position="200,270" textAlign="center"/>
-    <Fill color="#64748B"/>
+    <Fill color="#475569"/>
   </Layer>
   <!-- End aligned: text ends at anchor point -->
   <Layer>
@@ -53,6 +48,6 @@
   <Layer>
     <Text text="text ends at anchor" fontFamily="Arial" fontSize="14"/>
     <TextLayout position="200,365" textAlign="end"/>
-    <Fill color="#64748B"/>
+    <Fill color="#475569"/>
   </Layer>
 </pagx>

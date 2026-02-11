@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates Fill and Stroke combined on same shape -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Dark background -->
-  <Layer>
-    <Rectangle center="200,200" size="400,400"/>
-    <Fill color="#0F172A"/>
-  </Layer>
   <!-- Rectangle with fill and stroke -->
   <Layer>
     <Rectangle center="200,200" size="260,260" roundness="32"/>

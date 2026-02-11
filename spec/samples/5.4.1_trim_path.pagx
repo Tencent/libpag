@@ -1,22 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates TrimPath modifier: partially drawing a path -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Dark background -->
-  <Layer>
-    <Rectangle center="200,200" size="400,400"/>
-    <Fill color="#0F172A"/>
-  </Layer>
-  <!-- Background circle (full reference) -->
+  <!-- Background circle (track) -->
   <Layer>
     <Ellipse center="200,200" size="260,260"/>
-    <Stroke color="#334155" width="20" cap="round"/>
+    <Stroke color="#E2E8F0" width="10"/>
   </Layer>
   <!-- Trimmed arc showing progress -->
   <Layer>
     <Ellipse center="200,200" size="260,260"/>
     <TrimPath start="0" end="0.75" type="continuous"/>
-    <Stroke width="20" cap="round">
-      <ConicGradient center="130,130" startAngle="0" endAngle="270">
+    <Stroke width="24" cap="round">
+      <ConicGradient center="200,200" startAngle="0" endAngle="270">
         <ColorStop offset="0" color="#06B6D4"/>
         <ColorStop offset="1" color="#8B5CF6"/>
       </ConicGradient>
@@ -24,14 +19,16 @@
   </Layer>
   <!-- Start indicator dot -->
   <Layer>
-    <Ellipse center="330,200" size="28,28"/>
+    <Ellipse center="330,200" size="24,24"/>
     <Fill color="#06B6D4"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#06B6D480"/>
+    <Stroke color="#FFFFFF" width="4"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#06B6D460"/>
   </Layer>
   <!-- End indicator dot -->
   <Layer>
-    <Ellipse center="108,108" size="28,28"/>
+    <Ellipse center="108,108" size="24,24"/>
     <Fill color="#8B5CF6"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#8B5CF680"/>
+    <Stroke color="#FFFFFF" width="4"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#8B5CF660"/>
   </Layer>
 </pagx>

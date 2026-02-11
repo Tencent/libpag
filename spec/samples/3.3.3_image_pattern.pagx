@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates ImagePattern fill with different tile modes -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Dark background -->
-  <Layer>
-    <Rectangle center="200,200" size="400,400"/>
-    <Fill color="#0F172A"/>
-  </Layer>
   
   <!-- Clamp mode: original size, centered in 140x140 rect -->
   <!-- Rectangle center=110,110 size=140,140: left-top=(40,40), right-bottom=(180,180) -->
@@ -16,7 +11,7 @@
     <Fill>
       <ImagePattern image="@logo" tileModeX="clamp" tileModeY="clamp" matrix="0.5,0,0,0.5,46,46"/>
     </Fill>
-    <Stroke color="#334155" width="2"/>
+    <Stroke color="#FFFFFF" width="2"/>
   </Layer>
   
   <!-- Repeat mode: tiled pattern -->
@@ -25,7 +20,7 @@
     <Fill>
       <ImagePattern image="@logo" tileModeX="repeat" tileModeY="repeat" matrix="0.24,0,0,0.24,0,0"/>
     </Fill>
-    <Stroke color="#334155" width="2"/>
+    <Stroke color="#FFFFFF" width="2"/>
   </Layer>
   
   <!-- Mirror mode: mirrored tiles -->
@@ -34,7 +29,7 @@
     <Fill>
       <ImagePattern image="@logo" tileModeX="mirror" tileModeY="mirror" matrix="0.24,0,0,0.24,0,0"/>
     </Fill>
-    <Stroke color="#334155" width="2"/>
+    <Stroke color="#FFFFFF" width="2"/>
   </Layer>
   
   <!-- Repeat mode: scaled pattern -->
@@ -43,7 +38,7 @@
     <Fill>
       <ImagePattern image="@logo" tileModeX="repeat" tileModeY="repeat" matrix="0.35,0,0,0.35,0,0"/>
     </Fill>
-    <Stroke color="#334155" width="2"/>
+    <Stroke color="#FFFFFF" width="2"/>
   </Layer>
   
   <Resources>

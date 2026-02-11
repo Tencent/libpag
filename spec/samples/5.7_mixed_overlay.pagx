@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates mixed Fill and Stroke on same shape -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Dark background -->
-  <Layer>
-    <Rectangle center="200,200" size="400,400"/>
-    <Fill color="#0F172A"/>
-  </Layer>
   <!-- Circle with fill and stroke -->
   <Layer>
     <Ellipse center="200,200" size="280,280"/>

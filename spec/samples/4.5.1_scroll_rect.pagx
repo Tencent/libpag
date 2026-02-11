@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates scrollRect clipping -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Dark background -->
-  <Layer>
-    <Rectangle center="200,200" size="400,400"/>
-    <Fill color="#0F172A"/>
-  </Layer>
   <!-- Clipped content showing scrollRect effect -->
   <Layer x="100" y="100" scrollRect="100,100,200,200">
     <Ellipse center="200,200" size="320,320"/>

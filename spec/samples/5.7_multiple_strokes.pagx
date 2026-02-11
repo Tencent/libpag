@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates multiple Stroke styles creating glow/outline effect -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Dark background -->
-  <Layer>
-    <Rectangle center="200,200" size="400,400"/>
-    <Fill color="#0F172A"/>
-  </Layer>
   <!-- Path with multiple glow strokes -->
   <Layer>
     <Path data="M 60,200 Q 200,60 340,200 Q 200,340 60,200"/>

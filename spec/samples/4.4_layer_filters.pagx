@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates layer filters: Blur and DropShadow -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Dark background -->
-  <Layer>
-    <Rectangle center="200,200" size="400,400"/>
-    <Fill color="#0F172A"/>
-  </Layer>
   <!-- Shape with blur and drop shadow filters -->
   <Layer x="70" y="70">
     <Rectangle center="130,130" size="260,260" roundness="40"/>

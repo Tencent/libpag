@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates rich text with mixed styles via shared TextLayout -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Dark background -->
-  <Layer>
-    <Rectangle center="200,200" size="400,400"/>
-    <Fill color="#0F172A"/>
-  </Layer>
 
   <!-- Title -->
   <Layer>
@@ -23,7 +18,7 @@
   <Layer>
     <Group>
       <Text text="Supports " fontFamily="Arial" fontSize="20"/>
-      <Fill color="#94A3B8"/>
+      <Fill color="#475569"/>
     </Group>
     <Group>
       <Text text="bold" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
@@ -31,7 +26,7 @@
     </Group>
     <Group>
       <Text text=", " fontFamily="Arial" fontSize="20"/>
-      <Fill color="#94A3B8"/>
+      <Fill color="#475569"/>
     </Group>
     <Group>
       <Text text="italic" fontFamily="Arial" fontStyle="Italic" fontSize="20"/>
@@ -39,7 +34,7 @@
     </Group>
     <Group>
       <Text text=" and " fontFamily="Arial" fontSize="20"/>
-      <Fill color="#94A3B8"/>
+      <Fill color="#475569"/>
     </Group>
     <Group>
       <Text text="colored" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
@@ -47,7 +42,7 @@
     </Group>
     <Group>
       <Text text=" text." fontFamily="Arial" fontSize="20"/>
-      <Fill color="#94A3B8"/>
+      <Fill color="#475569"/>
     </Group>
     <TextLayout position="30,165" textAlign="start"/>
   </Layer>
@@ -56,7 +51,7 @@
   <Layer>
     <Group>
       <Text text="Mix " fontFamily="Arial" fontSize="16"/>
-      <Fill color="#64748B"/>
+      <Fill color="#475569"/>
     </Group>
     <Group>
       <Text text="different" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
@@ -64,7 +59,7 @@
     </Group>
     <Group>
       <Text text=" sizes " fontFamily="Arial" fontSize="16"/>
-      <Fill color="#64748B"/>
+      <Fill color="#475569"/>
     </Group>
     <Group>
       <Text text="freely" fontFamily="Arial" fontStyle="Bold Italic" fontSize="24"/>
@@ -72,7 +67,7 @@
     </Group>
     <Group>
       <Text text=" within one line." fontFamily="Arial" fontSize="16"/>
-      <Fill color="#64748B"/>
+      <Fill color="#475569"/>
     </Group>
     <TextLayout position="30,215" textAlign="start"/>
   </Layer>
@@ -81,7 +76,7 @@
   <Layer>
     <Group>
       <Text text="Center " fontFamily="Arial" fontSize="20"/>
-      <Fill color="#64748B"/>
+      <Fill color="#475569"/>
     </Group>
     <Group>
       <Text text="aligned" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
@@ -89,7 +84,7 @@
     </Group>
     <Group>
       <Text text=" rich text." fontFamily="Arial" fontSize="20"/>
-      <Fill color="#64748B"/>
+      <Fill color="#475569"/>
     </Group>
     <TextLayout position="200,265" textAlign="center"/>
   </Layer>

@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates layer properties and nesting -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Dark background -->
-  <Layer>
-    <Rectangle center="200,200" size="400,400"/>
-    <Fill color="#0F172A"/>
-  </Layer>
   <!-- Parent layer with nested child -->
   <Layer name="Parent" x="50" y="50">
     <Rectangle center="150,150" size="260,260" roundness="32"/>

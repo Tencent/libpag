@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates Text shape -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Dark background -->
-  <Layer>
-    <Rectangle center="200,200" size="400,400"/>
-    <Fill color="#0F172A"/>
-  </Layer>
   <!-- Main title text -->
   <Layer>
     <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="84"/>
@@ -22,12 +17,12 @@
   <Layer>
     <Text text="Text Shape" fontFamily="Arial" fontSize="36"/>
     <TextLayout position="200,220" textAlign="center"/>
-    <Fill color="#94A3B8"/>
+    <Fill color="#334155"/>
   </Layer>
   <!-- Small description -->
   <Layer>
     <Text text="Beautiful Typography" fontFamily="Arial" fontSize="24"/>
     <TextLayout position="200,300" textAlign="center"/>
-    <Fill color="#64748B"/>
+    <Fill color="#475569"/>
   </Layer>
 </pagx>

@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates composition (reusable component) -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Dark background -->
-  <Layer>
-    <Rectangle center="200,200" size="400,400"/>
-    <Fill color="#0F172A"/>
-  </Layer>
   <!-- Multiple instances of the same composition to demonstrate reusability -->
   <Layer composition="@buttonComp" x="100" y="60"/>
   <Layer composition="@buttonComp" x="100" y="170"/>

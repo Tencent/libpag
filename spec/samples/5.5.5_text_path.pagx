@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates TextPath for arranging text along a curve -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Dark background -->
-  <Layer>
-    <Rectangle center="200,200" size="400,400"/>
-    <Fill color="#0F172A"/>
-  </Layer>
   <!-- Text along an arc path with force alignment -->
   <Layer>
     <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="56"/>
@@ -27,7 +22,7 @@
   <Layer>
     <Text text="TextPath" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
     <TextPath path="M 80,320 Q 200,250 320,320" forceAlignment="true"/>
-    <Fill color="#94A3B8"/>
+    <Fill color="#475569"/>
   </Layer>
   <!-- Guide path for lower curve -->
   <Layer>
