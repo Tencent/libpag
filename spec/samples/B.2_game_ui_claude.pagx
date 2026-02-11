@@ -194,7 +194,7 @@
     <Layer name="HPBar" x="200" y="14">
       <Layer>
         <Text text="HP" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-        <TextLayout position="-20,8" textAlign="start"/>
+        <TextLayout position="-20,9" textAlign="start"/>
         <Fill color="#F87171"/>
       </Layer>
       <Layer>
@@ -209,7 +209,7 @@
       </Layer>
       <Layer>
         <Text text="2,847 / 3,800" fontFamily="Arial" fontSize="9"/>
-        <TextLayout position="105,8" textAlign="center"/>
+        <TextLayout position="105,9" textAlign="center"/>
         <Fill color="#FFFFFFD0"/>
       </Layer>
     </Layer>
@@ -218,7 +218,7 @@
     <Layer name="MPBar" x="200" y="36">
       <Layer>
         <Text text="MP" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-        <TextLayout position="-22,8" textAlign="start"/>
+        <TextLayout position="-22,9" textAlign="start"/>
         <Fill color="#60A5FA"/>
       </Layer>
       <Layer>
@@ -233,7 +233,7 @@
       </Layer>
       <Layer>
         <Text text="1,250 / 2,000" fontFamily="Arial" fontSize="9"/>
-        <TextLayout position="105,8" textAlign="center"/>
+        <TextLayout position="105,9" textAlign="center"/>
         <Fill color="#FFFFFFD0"/>
       </Layer>
     </Layer>
@@ -286,7 +286,7 @@
     </Layer>
 
     <!-- Character portrait area -->
-    <Layer x="130" y="175">
+    <Layer x="130" y="165">
       <!-- Portrait frame -->
       <Layer>
         <Rectangle center="0,0" size="200,200" roundness="12"/>
@@ -435,7 +435,7 @@
     </Layer>
 
     <!-- Stats section -->
-    <Layer x="25" y="315">
+    <Layer x="25" y="305">
       <!-- ATK -->
       <Layer>
         <Polystar center="12,0" type="star" pointCount="4" outerRadius="7" innerRadius="2" rotation="45"/>
@@ -503,19 +503,19 @@
 
     <!-- Separator -->
     <Layer>
-      <Path data="M 25 420 L 235 420"/>
+      <Path data="M 25 410 L 235 410"/>
       <Stroke color="#374151" width="1"/>
     </Layer>
 
     <!-- Power rating -->
     <Layer>
       <Text text="POWER" fontFamily="Arial" fontSize="11"/>
-      <TextLayout position="130,435" textAlign="center"/>
+      <TextLayout position="130,425" textAlign="center"/>
       <Fill color="#94A3B8"/>
     </Layer>
     <Layer>
       <Text text="52,847" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
-      <TextLayout position="130,463" textAlign="center"/>
+      <TextLayout position="130,453" textAlign="center"/>
       <Fill color="@titleGrad"/>
       <DropShadowStyle offsetX="0" offsetY="2" blurX="8" blurY="8" color="#F59E0B40"/>
     </Layer>
@@ -754,7 +754,7 @@
     <!-- Label -->
     <Layer>
       <Text text="EXP  12,500 / 18,000" fontFamily="Arial" fontSize="9"/>
-      <TextLayout position="400,12" textAlign="center"/>
+      <TextLayout position="400,13" textAlign="center"/>
       <Fill color="#FFFFFFC0"/>
     </Layer>
   </Layer>
