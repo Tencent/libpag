@@ -102,7 +102,7 @@ void PAGXView::loadPAGX(const val& pagxData) {
   if (!document) {
     return;
   }
-  contentLayer = LayerBuilder::Build(document.get());
+  contentLayer = LayerBuilder::Build(document.get(), &typesetter);
   if (!contentLayer) {
     return;
   }
