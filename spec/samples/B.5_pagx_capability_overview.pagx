@@ -73,37 +73,37 @@
     </Layer>
   </Layer>
 
-  <!-- Connectors: from outer ring (r=155) edge to card edge -->
+  <!-- Connectors: from outer text ring (r=195) edge to card edge -->
   <Layer name="Connectors" alpha="0.5">
-    <!-- to Readable (800,130) -->
+    <!-- to Readable (800,170) -->
     <Group>
-      <Path data="M 800 385 L 800 210"/>
+      <Path data="M 800 345 L 800 250"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
-    <!-- to Comprehensive (1297,395) -->
+    <!-- to Comprehensive (1259,406) -->
     <Group>
-      <Path data="M 949 497 L 1097 453"/>
+      <Path data="M 987 485 L 1059 464"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
-    <!-- to Deployable (1127,910) -->
+    <!-- to Deployable (1101,880) -->
     <Group>
-      <Path data="M 903 656 L 1056 830"/>
+      <Path data="M 929 686 L 1030 800"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
-    <!-- to Portable (473,910) -->
+    <!-- to Portable (499,880) -->
     <Group>
-      <Path data="M 697 656 L 544 830"/>
+      <Path data="M 671 686 L 570 800"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
-    <!-- to Expressive (303,395) -->
+    <!-- to Expressive (341,406) -->
     <Group>
-      <Path data="M 651 497 L 503 453"/>
+      <Path data="M 613 485 L 541 464"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
   </Layer>
 
   <!-- Card 1: Readable (top center) -->
-  <Layer name="CardReadable" x="800" y="130">
+  <Layer name="CardReadable" x="800" y="170">
     <Rectangle center="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -151,7 +151,7 @@
   </Layer>
 
   <!-- Card 2: Comprehensive (right-upper) -->
-  <Layer name="CardComprehensive" x="1297" y="395">
+  <Layer name="CardComprehensive" x="1259" y="406">
     <Rectangle center="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -191,7 +191,7 @@
   </Layer>
 
   <!-- Card 3: Expressive (left-upper) -->
-  <Layer name="CardExpressive" x="303" y="395">
+  <Layer name="CardExpressive" x="341" y="406">
     <Rectangle center="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -245,7 +245,7 @@
   </Layer>
 
   <!-- Card 4: Portable (left-lower) -->
-  <Layer name="CardPortable" x="473" y="910">
+  <Layer name="CardPortable" x="499" y="880">
     <Rectangle center="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -286,7 +286,7 @@
   </Layer>
 
   <!-- Card 5: Deployable (right-lower) -->
-  <Layer name="CardDeployable" x="1127" y="910">
+  <Layer name="CardDeployable" x="1101" y="880">
     <Rectangle center="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
