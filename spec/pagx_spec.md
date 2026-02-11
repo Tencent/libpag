@@ -12,7 +12,7 @@
 
 - **Expressive**: Defines a compact yet expressive unified structure that optimizes the description of both static vector content and animations, while reserving extensibility for future interaction and scripting.
 
-- **Portable**: Can serve as a common interchange format for design tools such as After Effects, Figma, and Tencent Design, enabling seamless asset exchange across platforms.
+- **Interoperable**: Can serve as a common interchange format for design tools such as After Effects, Figma, and Tencent Design, enabling seamless asset exchange across platforms.
 
 - **Deployable**: Design assets can be exported and deployed to production environments with a single action, achieving high compression ratios and excellent runtime performance after conversion to the binary PAG format.
 
