@@ -23,8 +23,8 @@
 
   <!-- Description along circular path between outer ring and GlowBand -->
   <Layer name="Description" x="800" y="540" alpha="0.5">
-    <Text text="An XML-based markup language for describing animated vector graphics " fontFamily="Arial" fontSize="12"/>
-    <TextPath path="M 0 -185 A 185 185 0 1 1 0 185 A 185 185 0 1 1 0 -185 Z" forceAlignment="true"/>
+    <Text text="An XML-based markup language for describing animated vector graphics. " fontFamily="Arial" fontSize="17"/>
+    <TextPath path="M 0 -210 A 210 210 0 1 1 0 210 A 210 210 0 1 1 0 -210 Z" forceAlignment="true" firstMargin="-5"/>
     <Fill color="#64748B"/>
   </Layer>
 
@@ -73,31 +73,31 @@
     </Layer>
   </Layer>
 
-  <!-- Connectors: from outer text ring (r=195) edge to card edge -->
+  <!-- Connectors: from outer text ring (r=220) edge to card edge -->
   <Layer name="Connectors" alpha="0.5">
     <!-- to Readable (800,170) -->
     <Group>
-      <Path data="M 800 345 L 800 250"/>
+      <Path data="M 800 320 L 800 250"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
-    <!-- to Comprehensive (1259,406) -->
+    <!-- to Comprehensive (1289,406) -->
     <Group>
-      <Path data="M 987 485 L 1059 464"/>
+      <Path data="M 1012 482 L 1089 468"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
     <!-- to Deployable (1101,880) -->
     <Group>
-      <Path data="M 929 686 L 1030 800"/>
+      <Path data="M 946 705 L 1030 800"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
     <!-- to Portable (499,880) -->
     <Group>
-      <Path data="M 671 686 L 570 800"/>
+      <Path data="M 654 705 L 570 800"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
-    <!-- to Expressive (341,406) -->
+    <!-- to Expressive (311,406) -->
     <Group>
-      <Path data="M 613 485 L 541 464"/>
+      <Path data="M 588 482 L 511 468"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
   </Layer>
@@ -151,7 +151,7 @@
   </Layer>
 
   <!-- Card 2: Comprehensive (right-upper) -->
-  <Layer name="CardComprehensive" x="1259" y="406">
+  <Layer name="CardComprehensive" x="1289" y="406">
     <Rectangle center="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -191,7 +191,7 @@
   </Layer>
 
   <!-- Card 3: Expressive (left-upper) -->
-  <Layer name="CardExpressive" x="341" y="406">
+  <Layer name="CardExpressive" x="311" y="406">
     <Rectangle center="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -214,16 +214,16 @@
       </Group>
       <!-- Rich output shapes on right -->
       <Group>
-        <Ellipse center="30,-22" size="20,20"/>
+        <Ellipse center="22,-22" size="18,18"/>
         <Stroke color="#A855F7" width="1.5"/>
       </Group>
       <Group>
-        <Path data="M 30 12 L 22 32 L 38 32 Z"/>
+        <Path data="M 22 12 L 15 30 L 29 30 Z"/>
         <Stroke color="#A855F7" width="1.5" join="round"/>
         <Fill color="#A855F715"/>
       </Group>
       <Group>
-        <Path data="M 22 0 L 30 -8 L 38 0 L 30 8 Z"/>
+        <Path data="M 15 0 L 22 -7 L 29 0 L 22 7 Z"/>
         <Fill color="#A855F7"/>
       </Group>
     </Layer>
