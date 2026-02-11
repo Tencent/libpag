@@ -93,9 +93,9 @@
       <Path data="M 800 300 L 800 250"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
-    <!-- to Comprehensive (1339,406) -->
+    <!-- to Comprehensive (1319,426) -->
     <Group>
-      <Path data="M 1028 466 L 1139 430"/>
+      <Path data="M 1028 466 L 1119 438"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
     <!-- to Deployable (1101,880) -->
@@ -108,9 +108,9 @@
       <Path data="M 659 734 L 611 800"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
-    <!-- to Expressive (261,406) -->
+    <!-- to Expressive (281,426) -->
     <Group>
-      <Path data="M 572 466 L 461 430"/>
+      <Path data="M 572 466 L 481 438"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
   </Layer>
@@ -164,7 +164,7 @@
   </Layer>
 
   <!-- Card 2: Comprehensive (right-upper) -->
-  <Layer name="CardComprehensive" x="1339" y="406">
+  <Layer name="CardComprehensive" x="1319" y="426">
     <Rectangle center="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -204,7 +204,7 @@
   </Layer>
 
   <!-- Card 3: Expressive (left-upper) -->
-  <Layer name="CardExpressive" x="261" y="406">
+  <Layer name="CardExpressive" x="281" y="426">
     <Rectangle center="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
