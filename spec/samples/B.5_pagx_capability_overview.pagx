@@ -104,7 +104,7 @@
 
   <!-- Card 1: Readable (top center) -->
   <Layer name="CardReadable" x="800" y="170">
-    <Rectangle center="0,0" size="420,160" roundness="20"/>
+    <Rectangle center="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="8" blurX="16" blurY="16" color="#00000040"/>
@@ -152,7 +152,7 @@
 
   <!-- Card 2: Comprehensive (right-upper) -->
   <Layer name="CardComprehensive" x="1209" y="407">
-    <Rectangle center="0,0" size="420,160" roundness="20"/>
+    <Rectangle center="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="8" blurX="16" blurY="16" color="#00000040"/>
@@ -192,7 +192,7 @@
 
   <!-- Card 3: Expressive (left-upper) -->
   <Layer name="CardExpressive" x="391" y="407">
-    <Rectangle center="0,0" size="420,160" roundness="20"/>
+    <Rectangle center="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="8" blurX="16" blurY="16" color="#00000040"/>
@@ -246,7 +246,7 @@
 
   <!-- Card 4: Portable (left-lower) -->
   <Layer name="CardPortable" x="547" y="828">
-    <Rectangle center="0,0" size="420,160" roundness="20"/>
+    <Rectangle center="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="8" blurX="16" blurY="16" color="#00000040"/>
@@ -287,7 +287,7 @@
 
   <!-- Card 5: Deployable (right-lower) -->
   <Layer name="CardDeployable" x="1053" y="828">
-    <Rectangle center="0,0" size="420,160" roundness="20"/>
+    <Rectangle center="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="8" blurX="16" blurY="16" color="#00000040"/>
