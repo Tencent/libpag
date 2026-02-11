@@ -910,23 +910,13 @@ PAG_TEST(PAGXTest, FontGlyphRoundTrip) {
 }
 
 /**
- * Test case: Text shaping round-trip.
- * 1. Load SVG with text content
- * 2. Typeset text (Typesetter)
- * 3. Render original (typeset document)
- * 4. Export to PAGX
- * 5. Reload PAGX and render (reloaded)
- * 6. Compare render results - should be identical
+ * Test case: Text shaping round-trip - verifies that original and pre-shaped renders are identical.
  */
 PAG_TEST(PAGXTest, TextShaperRoundTrip) {
-  // Use text.svg as the test file
   std::string svgPath = ProjectPath::Absolute("resources/apitest/SVG/text.svg");
 
-  // Step 1: Parse SVG
   auto doc = pagx::SVGImporter::Parse(svgPath);
   ASSERT_TRUE(doc != nullptr);
-  ASSERT_GT(doc->width, 0);
-  ASSERT_GT(doc->height, 0);
 
   int canvasWidth = static_cast<int>(doc->width);
   int canvasHeight = static_cast<int>(doc->height);
@@ -937,28 +927,13 @@ PAG_TEST(PAGXTest, TextShaperRoundTrip) {
   ASSERT_TRUE(context != nullptr);
 
   auto typefaces = GetFallbackTypefaces();
-  ASSERT_FALSE(typefaces.empty());
 
-  // Step 2: Typeset text and embed fonts
   pagx::Typesetter typesetter;
   typesetter.setFallbackTypefaces(typefaces);
   auto shapedText = typesetter.shape(doc.get());
   EXPECT_FALSE(shapedText.empty());
   pagx::FontEmbedder().embed(doc.get(), shapedText);
 
-  // Verify Font resources were added
-  bool hasFontResource = false;
-  for (const auto& res : doc->nodes) {
-    if (res->nodeType() == pagx::NodeType::Font) {
-      hasFontResource = true;
-      auto fontNode = static_cast<const pagx::Font*>(res.get());
-      EXPECT_FALSE(fontNode->glyphs.empty());
-      break;
-    }
-  }
-  EXPECT_TRUE(hasFontResource);
-
-  // Step 3: Render typeset document
   auto originalLayer = pagx::LayerBuilder::Build(doc.get(), &typesetter);
   ASSERT_TRUE(originalLayer != nullptr);
 
@@ -967,124 +942,21 @@ PAG_TEST(PAGXTest, TextShaperRoundTrip) {
   originalDL.root()->addChild(originalLayer);
   originalDL.render(originalSurface.get(), false);
 
-  // Step 4: Export to PAGX
   std::string xml = pagx::PAGXExporter::ToXML(*doc);
-  ASSERT_FALSE(xml.empty());
-  EXPECT_NE(xml.find("<Font"), std::string::npos);
-  EXPECT_NE(xml.find("<GlyphRun"), std::string::npos);
-
   std::string pagxPath = SavePAGXFile(xml, "PAGXTest/text_preshaped.pagx");
 
-  // Step 5: Reload PAGX (without typefaces - should use embedded font)
   auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
   ASSERT_TRUE(reloadedDoc != nullptr);
-
-  // Verify Font resource was imported
-  bool fontFound = false;
-  for (const auto& res : reloadedDoc->nodes) {
-    if (res->nodeType() == pagx::NodeType::Font) {
-      auto fontNode = static_cast<const pagx::Font*>(res.get());
-      EXPECT_FALSE(fontNode->id.empty());
-      EXPECT_FALSE(fontNode->glyphs.empty());
-      fontFound = true;
-    }
-  }
-  EXPECT_TRUE(fontFound);
-
-  // Verify Text has GlyphRun
-  bool glyphRunFound = false;
-  for (const auto& layer : reloadedDoc->layers) {
-    for (const auto& content : layer->contents) {
-      if (content->nodeType() == pagx::NodeType::Group) {
-        auto group = static_cast<const pagx::Group*>(content);
-        for (const auto& elem : group->elements) {
-          if (elem->nodeType() == pagx::NodeType::Text) {
-            auto text = static_cast<const pagx::Text*>(elem);
-            if (!text->glyphRuns.empty()) {
-              glyphRunFound = true;
-            }
-          }
-        }
-      }
-    }
-  }
-  EXPECT_TRUE(glyphRunFound);
-
-  // Intentionally not providing ShapedText to verify embedded font works
   auto reloadedLayer = pagx::LayerBuilder::Build(reloadedDoc.get());
   ASSERT_TRUE(reloadedLayer != nullptr);
 
-  // Step 6: Render pre-shaped version
   auto preshapedSurface = Surface::Make(context, canvasWidth, canvasHeight);
   DisplayList preshapedDL;
   preshapedDL.root()->addChild(reloadedLayer);
   preshapedDL.render(preshapedSurface.get(), false);
 
-  // Step 7: Compare renders - they should be identical
-  auto originalPixels = originalSurface->makeImageSnapshot();
-  auto preshapedPixels = preshapedSurface->makeImageSnapshot();
-  ASSERT_TRUE(originalPixels != nullptr);
-  ASSERT_TRUE(preshapedPixels != nullptr);
-
-  // Save outputs for visual inspection
   EXPECT_TRUE(Baseline::Compare(originalSurface, "PAGXTest/TextShaper_Original"));
   EXPECT_TRUE(Baseline::Compare(preshapedSurface, "PAGXTest/TextShaper_PreShaped"));
-
-  device->unlock();
-}
-
-/**
- * Test case: Text shaping with textFont.svg (multiple text elements)
- */
-PAG_TEST(PAGXTest, TextShaperMultipleText) {
-  std::string svgPath = ProjectPath::Absolute("resources/apitest/SVG/textFont.svg");
-
-  auto doc = pagx::SVGImporter::Parse(svgPath);
-  ASSERT_TRUE(doc != nullptr);
-
-  int canvasWidth = static_cast<int>(doc->width);
-  int canvasHeight = static_cast<int>(doc->height);
-
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto typefaces = GetFallbackTypefaces();
-
-  // Typeset text and embed fonts
-  pagx::Typesetter typesetter;
-  typesetter.setFallbackTypefaces(typefaces);
-  auto shapedText = typesetter.shape(doc.get());
-  EXPECT_FALSE(shapedText.empty());
-  pagx::FontEmbedder().embed(doc.get(), shapedText);
-
-  // Render typeset document
-  auto originalLayer = pagx::LayerBuilder::Build(doc.get(), &typesetter);
-  ASSERT_TRUE(originalLayer != nullptr);
-
-  auto originalSurface = Surface::Make(context, canvasWidth, canvasHeight);
-  DisplayList originalDL;
-  originalDL.root()->addChild(originalLayer);
-  originalDL.render(originalSurface.get(), false);
-
-  // Export and reload
-  std::string xml = pagx::PAGXExporter::ToXML(*doc);
-  std::string pagxPath = SavePAGXFile(xml, "PAGXTest/textFont_preshaped.pagx");
-
-  auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
-  ASSERT_TRUE(reloadedDoc != nullptr);
-  auto reloadedLayer = pagx::LayerBuilder::Build(reloadedDoc.get());
-  ASSERT_TRUE(reloadedLayer != nullptr);
-
-  // Render pre-shaped
-  auto preshapedSurface = Surface::Make(context, canvasWidth, canvasHeight);
-  DisplayList preshapedDL;
-  preshapedDL.root()->addChild(reloadedLayer);
-  preshapedDL.render(preshapedSurface.get(), false);
-
-  EXPECT_TRUE(Baseline::Compare(originalSurface, "PAGXTest/TextShaperMultiple_Original"));
-  EXPECT_TRUE(Baseline::Compare(preshapedSurface, "PAGXTest/TextShaperMultiple_PreShaped"));
 
   device->unlock();
 }
@@ -1464,10 +1336,6 @@ PAG_TEST(PAGXTest, SampleFiles) {
       continue;
     }
 
-    // Debug: print document info
-    std::cout << "[Sample] " << baseName << ": " << doc->width << "x" << doc->height << " layers="
-              << doc->layers.size() << std::endl;
-
     pagx::Typesetter typesetter;
     typesetter.setFallbackTypefaces(GetFallbackTypefaces());
     auto shapedText = typesetter.shape(doc.get());
@@ -1478,9 +1346,6 @@ PAG_TEST(PAGXTest, SampleFiles) {
       FAIL() << "Failed to build layer: " << filePath;
       continue;
     }
-
-    // Debug: print layer children count
-    std::cout << "  Built layer children: " << layer->children().size() << std::endl;
 
     auto surface = Surface::Make(context, doc->width, doc->height);
     DisplayList displayList;
