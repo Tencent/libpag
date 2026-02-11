@@ -114,10 +114,10 @@
     <PathData id="potionIcon" data="M -4 -16 L 4 -16 L 4 -12 L 8 -4 Q 10 4 8 10 Q 4 16 -4 16 Q -10 16 -10 10 Q -10 4 -8 -4 L -4 -12 Z M -6 2 Q -6 8 0 8 Q 6 8 6 2 Z"/>
 
     <!-- Large icons for equipment slots -->
-    <PathData id="swordBig" data="M 0 -38 L 6 -36 L 8 -32 L 6 -30 L 6 -4 L 10 0 L 24 14 L 26 16 L 24 20 L 20 22 L 18 20 L 8 10 L 6 10 L 6 18 L 4 22 L 0 34 L -4 22 L -6 18 L -6 10 L -8 10 L -18 20 L -20 22 L -24 20 L -26 16 L -24 14 L -10 0 L -6 -4 L -6 -30 L -8 -32 L -6 -36 Z M -4 -32 L 4 -32 L 4 -28 L -4 -28 Z M -3 -26 L 3 -26 L 3 -4 L -3 -4 Z M -1 -24 L 1 -24 L 1 -8 L -1 -8 Z"/>
-    <PathData id="shieldBig" data="M 0 -36 L 32 -24 L 32 4 Q 32 20 24 28 Q 14 36 0 40 Q -14 36 -24 28 Q -32 20 -32 4 L -32 -24 Z M 0 -28 L 24 -18 L 24 2 Q 24 16 18 22 Q 10 28 0 32 Q -10 28 -18 22 Q -24 16 -24 2 L -24 -18 Z M -2 -18 L -2 -4 L -16 -4 L -16 4 L -2 4 L -2 24 L 2 24 L 2 4 L 16 4 L 16 -4 L 2 -4 L 2 -18 Z"/>
+    <PathData id="swordBig" data="M 0 -38 L 6 -36 L 8 -32 L 6 -30 L 6 -4 L 10 0 L 24 14 L 26 16 L 24 20 L 20 22 L 18 20 L 8 10 L 6 10 L 6 18 L 4 22 L 0 34 L -4 22 L -6 18 L -6 10 L -8 10 L -18 20 L -20 22 L -24 20 L -26 16 L -24 14 L -10 0 L -6 -4 L -6 -30 L -8 -32 L -6 -36 Z M -4 -32 L 4 -32 L 4 -28 L -4 -28 Z M -3 -26 L 3 -26 L 3 -4 L -3 -4 Z M -1 -24 L 1 -24 L 1 -8 L -1 -8 Z M -6 -36 L -4 -38 L 0 -40 L 4 -38 L 6 -36 L 4 -34 L -4 -34 Z M 10 0 L 12 -2 L 26 12 L 24 14 Z M -10 0 L -12 -2 L -26 12 L -24 14 Z"/>
+    <PathData id="shieldBig" data="M 0 -36 L 32 -24 L 32 4 Q 32 20 24 28 Q 14 36 0 40 Q -14 36 -24 28 Q -32 20 -32 4 L -32 -24 Z M 0 -28 L 24 -18 L 24 2 Q 24 16 18 22 Q 10 28 0 32 Q -10 28 -18 22 Q -24 16 -24 2 L -24 -18 Z M -2 -18 L -2 -4 L -16 -4 L -16 4 L -2 4 L -2 24 L 2 24 L 2 4 L 16 4 L 16 -4 L 2 -4 L 2 -18 Z M -26 -20 L -24 -22 L -22 -20 L -24 -18 Z M 22 -20 L 24 -22 L 26 -20 L 24 -18 Z M -28 -8 L -26 -10 L -24 -8 L -26 -6 Z M 24 -8 L 26 -10 L 28 -8 L 26 -6 Z M -24 12 L -22 10 L -20 12 L -22 14 Z M 20 12 L 22 10 L 24 12 L 22 14 Z"/>
     <PathData id="helmetBig" data="M 0 -38 Q -32 -38 -32 -8 L -32 4 L -22 4 L -22 -8 Q -22 -28 0 -28 Q 22 -28 22 -8 L 22 4 L 32 4 L 32 -8 Q 32 -38 0 -38 Z M -34 8 L 34 8 L 34 16 L 26 16 L 20 24 L 14 24 L 14 16 L -14 16 L -14 24 L -20 24 L -26 16 L -34 16 Z M -30 28 L 30 28 Q 30 38 20 38 L -20 38 Q -30 38 -30 28 Z M -10 -20 L -4 -20 L -4 -10 L -10 -10 Z M 4 -20 L 10 -20 L 10 -10 L 4 -10 Z"/>
-    <PathData id="potionBig" data="M -6 -38 L 6 -38 L 6 -36 L -6 -36 Z M -8 -36 L 8 -36 L 8 -32 L -8 -32 Z M -10 -32 L 10 -32 L 10 -28 L -10 -28 Z M -6 -28 L 6 -28 L 6 -20 L 16 -8 Q 24 8 22 20 Q 18 32 8 38 Q 4 40 0 40 Q -4 40 -8 38 Q -18 32 -22 20 Q -24 8 -16 -8 L -6 -20 Z M -3 -28 L 3 -28 L 3 -22 L -3 -22 Z M -14 8 Q -14 18 -6 22 Q 0 26 6 22 Q 14 18 14 8 Q 14 0 6 -4 Q 0 -6 -6 -4 Q -14 0 -14 8 Z M -10 10 Q -10 16 0 16 Q 10 16 10 10 Q 10 4 0 4 Q -10 4 -10 10 Z"/>
+    <PathData id="potionBig" data="M -6 -38 L 6 -38 L 6 -36 L -6 -36 Z M -8 -36 L 8 -36 L 8 -32 L -8 -32 Z M -10 -32 L 10 -32 L 10 -28 L -10 -28 Z M -6 -28 L 6 -28 L 6 -20 L 16 -8 Q 24 8 22 20 Q 18 32 8 38 Q 4 40 0 40 Q -4 40 -8 38 Q -18 32 -22 20 Q -24 8 -16 -8 L -6 -20 Z M -3 -28 L 3 -28 L 3 -22 L -3 -22 Z M -14 8 Q -14 18 -6 22 Q 0 26 6 22 Q 14 18 14 8 Q 14 0 6 -4 Q 0 -6 -6 -4 Q -14 0 -14 8 Z M -10 10 Q -10 16 0 16 Q 10 16 10 10 Q 10 4 0 4 Q -10 4 -10 10 Z M -4 -36 L -2 -38 L 2 -38 L 4 -36 L 2 -34 L -2 -34 Z M 6 -20 L 8 -18 L 6 -16 L 4 -18 Z M -6 -20 L -4 -18 L -6 -16 L -8 -18 Z"/>
   </Resources>
 
   <!-- ==================== BACKGROUND ==================== -->
@@ -436,7 +436,7 @@
     </Layer>
 
     <!-- Stats section -->
-    <Layer x="25" y="300">
+    <Layer x="30" y="300">
       <!-- ATK -->
       <Layer>
         <Polystar center="12,0" type="star" pointCount="4" outerRadius="7" innerRadius="2" rotation="45"/>
@@ -449,7 +449,7 @@
       </Layer>
       <Layer>
         <Text text="4,256" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <TextLayout position="210,5" textAlign="end"/>
+        <TextLayout position="200,5" textAlign="end"/>
         <Fill color="#EF4444"/>
       </Layer>
 
@@ -465,7 +465,7 @@
       </Layer>
       <Layer y="28">
         <Text text="3,180" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <TextLayout position="210,5" textAlign="end"/>
+        <TextLayout position="200,5" textAlign="end"/>
         <Fill color="#3B82F6"/>
       </Layer>
 
@@ -481,7 +481,7 @@
       </Layer>
       <Layer y="56">
         <Text text="186" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <TextLayout position="210,5" textAlign="end"/>
+        <TextLayout position="200,5" textAlign="end"/>
         <Fill color="#10B981"/>
       </Layer>
 
@@ -497,14 +497,14 @@
       </Layer>
       <Layer y="84">
         <Text text="42.5%" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <TextLayout position="210,5" textAlign="end"/>
+        <TextLayout position="200,5" textAlign="end"/>
         <Fill color="#F59E0B"/>
       </Layer>
     </Layer>
 
     <!-- Separator -->
     <Layer>
-      <Path data="M 25 395 L 235 395"/>
+      <Path data="M 30 395 L 230 395"/>
       <Stroke color="#374151" width="1"/>
     </Layer>
 
@@ -563,7 +563,7 @@
       <!-- Item name -->
       <Layer>
         <Text text="Excalibur" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-        <TextLayout position="65,100" textAlign="center"/>
+        <TextLayout position="65,108" textAlign="center"/>
         <Fill color="#F8FAFC"/>
       </Layer>
       <!-- Rarity indicator -->
@@ -596,7 +596,7 @@
       </Layer>
       <Layer>
         <Text text="Aegis" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-        <TextLayout position="65,100" textAlign="center"/>
+        <TextLayout position="65,108" textAlign="center"/>
         <Fill color="#F8FAFC"/>
       </Layer>
       <Layer>
@@ -628,7 +628,7 @@
       </Layer>
       <Layer>
         <Text text="Crown Helm" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-        <TextLayout position="65,100" textAlign="center"/>
+        <TextLayout position="65,108" textAlign="center"/>
         <Fill color="#F8FAFC"/>
       </Layer>
       <Layer>
@@ -661,7 +661,7 @@
       </Layer>
       <Layer>
         <Text text="Elixir" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-        <TextLayout position="65,100" textAlign="center"/>
+        <TextLayout position="65,108" textAlign="center"/>
         <Fill color="#F8FAFC"/>
       </Layer>
       <Layer>
@@ -684,7 +684,7 @@
       </Layer>
       <Layer>
         <Text text="Empty" fontFamily="Arial" fontSize="11"/>
-        <TextLayout position="65,100" textAlign="center"/>
+        <TextLayout position="65,108" textAlign="center"/>
         <Fill color="#47556980"/>
       </Layer>
     </Layer>
@@ -703,7 +703,7 @@
       </Layer>
       <Layer>
         <Text text="Empty" fontFamily="Arial" fontSize="11"/>
-        <TextLayout position="65,100" textAlign="center"/>
+        <TextLayout position="65,108" textAlign="center"/>
         <Fill color="#47556980"/>
       </Layer>
     </Layer>
