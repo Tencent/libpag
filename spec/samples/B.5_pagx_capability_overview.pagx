@@ -73,31 +73,31 @@
     </Layer>
   </Layer>
 
-  <!-- Connectors: radiate from Core(800,540) edge along radial direction to each card -->
+  <!-- Connectors: radiate from Core center (800,540) to each card edge -->
   <Layer name="Connectors" alpha="0.5">
-    <!-- to Readable (800,110): direction (0,-1), start (800,385), end (800,190) -->
+    <!-- to Readable (800,110): straight up to bottom edge -->
     <Group>
-      <Path data="M 800 385 L 800 190"/>
+      <Path data="M 800 540 L 800 190"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
-    <!-- to Comprehensive (1209,407): direction (0.951,-0.309), start (947,492), end (999,423) -->
+    <!-- to Comprehensive (1209,407): to left edge -->
     <Group>
-      <Path data="M 947 492 L 999 423"/>
+      <Path data="M 800 540 L 999 475"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
-    <!-- to Expressive (1053,888): direction (0.588,0.809), start (891,665), end (843,733) -->
+    <!-- to Expressive (1053,888): to top edge -->
     <Group>
-      <Path data="M 891 665 L 843 808"/>
+      <Path data="M 800 540 L 995 808"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
-    <!-- to Portable (547,888): direction (-0.588,0.809), start (709,665), end (757,808) -->
+    <!-- to Portable (547,888): to top edge -->
     <Group>
-      <Path data="M 709 665 L 757 808"/>
+      <Path data="M 800 540 L 605 808"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
-    <!-- to Deployable (391,407): direction (-0.951,-0.309), start (653,492), end (601,423) -->
+    <!-- to Deployable (391,407): to right edge -->
     <Group>
-      <Path data="M 653 492 L 601 423"/>
+      <Path data="M 800 540 L 601 475"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
   </Layer>
