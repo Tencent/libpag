@@ -78,42 +78,42 @@
     <Stroke color="#334155" width="2"/>
     
     <!-- Circular Progress -->
-    <Group position="100,80">
+    <Layer x="100" y="80">
       <Ellipse center="0,0" size="100,100"/>
       <Stroke color="#1E293B" width="10"/>
-    </Group>
-    <Group position="100,80">
+    </Layer>
+    <Layer x="100" y="80">
       <Ellipse center="0,0" size="100,100"/>
       <TrimPath start="0" end="0.75" type="continuous"/>
       <Stroke color="#F43F5E" width="10" cap="round"/>
       <Text text="75%" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <TextLayout position="0,8" textAlign="center"/>
       <Fill color="#F43F5E"/>
-    </Group>
+    </Layer>
 
     <!-- Bar Charts (Custom Path) -->
-    <Group position="40,180">
+    <Layer x="40" y="180">
       <Path data="M 0 0 L 120 0"/>
       <Stroke color="#1E293B" width="8" cap="round"/>
-    </Group>
-    <Group position="40,180">
+    </Layer>
+    <Layer x="40" y="180">
       <Path data="M 0 0 L 120 0"/>
       <TrimPath start="0" end="0.6"/>
       <Stroke color="#10B981" width="8" cap="round"/>
-    </Group>
+    </Layer>
     
-    <Group position="40,210">
+    <Layer x="40" y="210">
       <Path data="M 0 0 L 120 0"/>
       <Stroke color="#1E293B" width="8" cap="round"/>
-    </Group>
-    <Group position="40,210">
+    </Layer>
+    <Layer x="40" y="210">
       <Path data="M 0 0 L 120 0"/>
       <TrimPath start="0" end="0.85"/>
       <Stroke color="#F59E0B" width="8" cap="round"/>
-    </Group>
+    </Layer>
 
     <!-- Mask Example -->
-    <Layer position="100,260">
+    <Layer x="100" y="260">
        <ImagePattern image="@photo" tileModeX="clamp" tileModeY="clamp" matrix="0.2,0,0,0.2,-30,-30"/>
        <Rectangle center="0,0" size="160,60" roundness="8"/> <!-- Mask shape -->
        <ColorMatrixFilter matrix="0.33,0.33,0.33,0,0, 0.33,0.33,0.33,0,0, 0.33,0.33,0.33,0,0, 0,0,0,1,0"/> <!-- Grayscale -->
@@ -128,7 +128,7 @@
     <Stroke color="#334155" width="2"/>
 
     <!-- Rich Text Title -->
-    <Layer position="100,40">
+    <Layer x="100" y="40">
       <Group>
         <Text text="SYS" fontFamily="Arial" fontStyle="Bold" fontSize="32"/>
         <Fill color="#FFFFFF"/>
@@ -141,14 +141,14 @@
     </Layer>
 
     <!-- TextPath -->
-    <Layer position="100,80">
+    <Layer x="100" y="80">
        <Text text="DIAGNOSTICS ONLINE" fontFamily="Arial" fontSize="10"/>
        <TextPath path="M -60,20 Q 0,-10 60,20"/>
        <Fill color="#94A3B8"/>
     </Layer>
 
     <!-- Text Modifier -->
-    <Layer position="100,140">
+    <Layer x="100" y="140">
       <Text text="LOADING..." fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
       <TextLayout position="0,0" textAlign="center"/>
       <Fill color="#FFFFFF"/>
@@ -161,7 +161,7 @@
     <Layer composition="@badgeComp" x="50" y="220"/>
     
     <!-- Blend Filter Text -->
-    <Layer position="100,270">
+    <Layer x="100" y="270">
       <Text text="OVERLAY" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <TextLayout position="0,0" textAlign="center"/>
       <Fill color="#E11D48"/>
@@ -171,7 +171,7 @@
 
   <!-- ==================== Header (Linear Gradient + Glow) ==================== -->
   <Layer name="Header" x="400" y="60">
-    <Text text="PAGX 4.0" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
+    <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
     <TextLayout position="0,16" textAlign="center"/>
     <Fill>
       <LinearGradient startPoint="-100,0" endPoint="100,0">
