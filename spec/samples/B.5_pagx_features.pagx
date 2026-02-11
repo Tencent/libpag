@@ -292,7 +292,7 @@
       <Fill color="#CBD5E1"/>
     </Layer>
     <Layer x="-50" y="35">
-      <Text text="Cross-platform exchange" fontFamily="Arial" fontSize="16"/>
+      <Text text="Cross-format exchange" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
     </Layer>
