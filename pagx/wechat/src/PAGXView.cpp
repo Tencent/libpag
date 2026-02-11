@@ -18,6 +18,7 @@
 
 #include "PAGXView.h"
 #include <emscripten/html5.h>
+#include <GLES3/gl31.h>
 #include <tgfx/gpu/opengl/GLDevice.h>
 #include "GridBackground.h"
 #include "tgfx/core/Data.h"
@@ -202,61 +203,40 @@ bool PAGXView::draw() {
     return false;
   }
 
-  auto context = device->lockContext();
-  if (context == nullptr) {
-    return false;
-  }
-
-  context->setCacheLimit(MAX_CACHE_LIMIT);
-  context->setResourceExpirationFrames(EXPIRATION_FRAMES);
-
-  if (surface == nullptr || surface->width() != _width || surface->height() != _height) {
-    tgfx::GLFrameBufferInfo glInfo = {};
-    glInfo.id = 0;
-    glInfo.format = 0x8058;
-    tgfx::BackendRenderTarget renderTarget(glInfo, _width, _height);
-    surface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::ImageOrigin::BottomLeft);
-    if (surface == nullptr) {
-      device->unlock();
-      return false;
-    }
-  }
   double frameStartMs = emscripten_get_now();
 
-  auto canvas = surface->getCanvas();
-  canvas->clear();
+  if (displayList.hasContentChanged()) {
+    auto context = device->lockContext();
+    if (context == nullptr) {
+      return false;
+    }
 
-  DrawBackground(canvas, _width, _height, 1.0f);
+    if (surface == nullptr || surface->width() != _width || surface->height() != _height) {
+      context->setCacheLimit(MAX_CACHE_LIMIT);
+      context->setResourceExpirationFrames(EXPIRATION_FRAMES);
+      tgfx::GLFrameBufferInfo glInfo = {};
+      glInfo.id = 0;
+      glInfo.format = GL_RGBA8;
+      tgfx::BackendRenderTarget renderTarget(glInfo, _width, _height);
+      surface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::ImageOrigin::BottomLeft);
+      if (surface == nullptr) {
+        device->unlock();
+        return false;
+      }
+    }
 
-  displayList.render(surface.get(), false);
+    auto canvas = surface->getCanvas();
+    canvas->clear();
 
-  auto recording = context->flush();
-  auto t1 = emscripten_get_now();
-  if (recording) {
-    context->submit(std::move(recording));
-  }
-  device->unlock();
-  auto t2 = emscripten_get_now();
+    DrawBackground(canvas, _width, _height, 1.0f);
 
-  if ((t2-t1)>20) {
-    char logBuffer[256];
-    snprintf(logBuffer, sizeof(logBuffer),
-         "[Context] submit:  Total: %.2f ms | displayList.maxTilesRefinedPerFrame:%d | isZooming:%s | zoom:%.2f",
-         t2-t1, displayList.maxTilesRefinedPerFrame(),isZooming?"true":"false",lastZoom);
-    val::global("console").call<void>("log", std::string(logBuffer));
-  }
+    displayList.render(surface.get(), false);
 
-  static double lastLogTime = 0.0;
-  double now = emscripten_get_now();
-  if (now - lastLogTime > 1000.0) {
-    size_t cacheLimit = context->cacheLimit();
-    size_t expirationFrames = context->resourceExpirationFrames();
-    char logBuffer[256];
-    snprintf(logBuffer, sizeof(logBuffer),
-             "[Context] cacheLimit: %zu bytes (%.2f MB) | resourceExpirationFrames: %zu",
-             cacheLimit, static_cast<double>(cacheLimit) / (1024.0 * 1024.0), expirationFrames);
-    val::global("console").call<void>("log", std::string(logBuffer));
-    lastLogTime = now;
+    auto recording = context->flush();
+    if (recording) {
+      context->submit(std::move(recording));
+    }
+    device->unlock();
   }
 
   double frameEndMs = emscripten_get_now();
