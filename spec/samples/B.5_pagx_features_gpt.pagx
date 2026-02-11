@@ -110,25 +110,25 @@
   <!-- Connectors -->
   <Layer name="Connectors" alpha="0.5">
     <Group>
-      <Path data="M 620 536 L 410 366"/>
+      <Path data="M 620 536 L 410 356"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
     <Group>
-      <Path data="M 980 536 L 1190 366"/>
+      <Path data="M 980 536 L 1190 356"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
     <Group>
-      <Path data="M 620 736 L 410 906"/>
+      <Path data="M 620 736 L 410 916"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
     <Group>
-      <Path data="M 980 736 L 1190 906"/>
+      <Path data="M 980 736 L 1190 916"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
   </Layer>
 
   <!-- Card: Open & Readable -->
-  <Layer name="CardOpen" x="360" y="366">
+  <Layer name="CardOpen" x="360" y="356">
     <Rectangle center="0,0" size="420,220" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -171,7 +171,7 @@
   </Layer>
 
   <!-- Card: Feature Complete -->
-  <Layer name="CardFeature" x="1240" y="366">
+  <Layer name="CardFeature" x="1240" y="356">
     <Rectangle center="0,0" size="420,220" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -211,7 +211,7 @@
   </Layer>
 
   <!-- Card: Ecosystem Compatible -->
-  <Layer name="CardEcosystem" x="360" y="906">
+  <Layer name="CardEcosystem" x="360" y="916">
     <Rectangle center="0,0" size="420,220" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -252,7 +252,7 @@
   </Layer>
 
   <!-- Card: Efficient Deployment -->
-  <Layer name="CardDeploy" x="1240" y="906">
+  <Layer name="CardDeploy" x="1240" y="916">
     <Rectangle center="0,0" size="420,220" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
