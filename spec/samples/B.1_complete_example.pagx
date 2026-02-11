@@ -32,7 +32,7 @@
   </Layer>
   <Layer name="Subtitle">
     <Text text="Portable Animated Graphics XML" fontFamily="Arial" fontSize="14"/>
-    <TextPath path="M 220,100 Q 400,50 580,100" forceAlignment="true"/>
+    <TextPath path="M 220,135 Q 400,85 580,135" forceAlignment="true"/>
     <Fill color="#64748B"/>
   </Layer>
   
