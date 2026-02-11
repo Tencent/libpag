@@ -54,9 +54,9 @@
 
     <!-- Button gradients -->
     <LinearGradient id="btnGold" startPoint="0,0" endPoint="0,44">
-      <ColorStop offset="0" color="#FBBF24"/>
-      <ColorStop offset="0.5" color="#F59E0B"/>
-      <ColorStop offset="1" color="#D97706"/>
+      <ColorStop offset="0" color="#5EEAD4"/>
+      <ColorStop offset="0.5" color="#2DD4BF"/>
+      <ColorStop offset="1" color="#14B8A6"/>
     </LinearGradient>
     <LinearGradient id="btnBlue" startPoint="0,0" endPoint="0,44">
       <ColorStop offset="0" color="#60A5FA"/>
@@ -64,9 +64,9 @@
       <ColorStop offset="1" color="#2563EB"/>
     </LinearGradient>
     <LinearGradient id="btnRed" startPoint="0,0" endPoint="0,44">
-      <ColorStop offset="0" color="#F87171"/>
-      <ColorStop offset="0.5" color="#EF4444"/>
-      <ColorStop offset="1" color="#DC2626"/>
+      <ColorStop offset="0" color="#FB7185"/>
+      <ColorStop offset="0.5" color="#E11D48"/>
+      <ColorStop offset="1" color="#BE123C"/>
     </LinearGradient>
 
     <!-- Star / rank gradient -->
@@ -772,20 +772,20 @@
       <Layer>
         <Rectangle center="110,22" size="200,44" roundness="22"/>
         <Fill color="@btnGold"/>
-        <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#F59E0B60"/>
-        <InnerShadowStyle offsetX="0" offsetY="-1" blurX="2" blurY="2" color="#FFFFFF40"/>
+        <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#14B8A660"/>
+        <InnerShadowStyle offsetX="0" offsetY="-1" blurX="2" blurY="2" color="#FFFFFF30"/>
       </Layer>
       <Layer>
         <Text text="UPGRADE" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <TextLayout position="110,28" textAlign="center"/>
-        <Fill color="#422006"/>
+        <Fill color="#042F2E"/>
       </Layer>
 
       <!-- Battle button -->
       <Layer x="240">
         <Rectangle center="110,22" size="200,44" roundness="22"/>
         <Fill color="@btnRed"/>
-        <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#EF444460"/>
+        <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#E11D4860"/>
         <InnerShadowStyle offsetX="0" offsetY="-1" blurX="2" blurY="2" color="#FFFFFF40"/>
       </Layer>
       <Layer x="240">
@@ -822,7 +822,7 @@
   <Layer name="Toast" x="310" y="516">
     <Layer>
       <Rectangle center="230,18" size="460,36" roundness="8"/>
-      <Fill color="#10B981E0"/>
+      <Fill color="#0D9488E0"/>
       <DropShadowStyle offsetX="0" offsetY="4" blurX="10" blurY="10" color="#00000040"/>
     </Layer>
     <Layer>
