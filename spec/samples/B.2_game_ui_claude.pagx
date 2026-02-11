@@ -198,12 +198,12 @@
         <Fill color="#F87171"/>
       </Layer>
       <Layer>
-        <Rectangle center="105,7" size="190,14" roundness="7"/>
+        <Rectangle center="105,5" size="190,14" roundness="7"/>
         <Fill color="#1E293B"/>
         <Stroke color="#374151" width="1"/>
       </Layer>
       <Layer>
-        <Rectangle center="82,7" size="142,12" roundness="6"/>
+        <Rectangle center="82,5" size="142,10" roundness="5"/>
         <Fill color="@hpFill"/>
         <InnerShadowStyle offsetX="0" offsetY="-1" blurX="2" blurY="2" color="#FFFFFF40"/>
       </Layer>
@@ -227,7 +227,7 @@
         <Stroke color="#374151" width="1"/>
       </Layer>
       <Layer>
-        <Rectangle center="72,7" size="124,12" roundness="6"/>
+        <Rectangle center="72,5" size="124,10" roundness="5"/>
         <Fill color="@mpFill"/>
         <InnerShadowStyle offsetX="0" offsetY="-1" blurX="2" blurY="2" color="#FFFFFF40"/>
       </Layer>
