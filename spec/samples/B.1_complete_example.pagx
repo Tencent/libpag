@@ -2,8 +2,16 @@
 <pagx version="1.0" width="800" height="520">
   
   <!-- ==================== Layer Content ==================== -->
-  
-  
+  <!-- Background with subtle gradient -->
+  <Layer name="background">
+    <Rectangle center="400,260" size="800,520"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="800,520">
+        <ColorStop offset="0" color="#0F172A"/>
+        <ColorStop offset="1" color="#1E293B"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
   <!-- Decorative glow effects -->
   <Layer name="GlowTopLeft" blendMode="screen">
     <Ellipse center="80,60" size="320,320"/>

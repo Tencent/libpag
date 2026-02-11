@@ -914,6 +914,17 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
   float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
   float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
 
+  // Resolve font size early so that em-based dx/dy can be computed correctly.
+  std::string fontSizeStr = getAttribute(element, "font-size");
+  if (fontSizeStr.empty()) {
+    fontSizeStr = inheritedStyle.fontSize;
+  }
+  float currentFontSize = fontSizeStr.empty() ? 16.0f : parseLength(fontSizeStr, _viewBoxHeight);
+
+  // Parse dx/dy offsets. SVG dx/dy provide relative offsets to the text position.
+  x += parseLengthEm(getAttribute(element, "dx"), _viewBoxWidth, currentFontSize);
+  y += parseLengthEm(getAttribute(element, "dy"), _viewBoxHeight, currentFontSize);
+
   // Parse text-anchor attribute for horizontal alignment (use inherited if not set).
   // SVG values: start (default), middle, end.
   std::string anchor = getAttribute(element, "text-anchor");
@@ -928,7 +939,10 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     if (child->type == DOMNodeType::Text) {
       textContent += child->name;
     } else if (child->name == "tspan") {
-      // Handle tspan element: extract text content from its children.
+      // Handle tspan element: parse dx/dy offsets for positioning.
+      x += parseLengthEm(getAttribute(child, "dx"), _viewBoxWidth, currentFontSize);
+      y += parseLengthEm(getAttribute(child, "dy"), _viewBoxHeight, currentFontSize);
+      // Extract text content from tspan children.
       auto tspanChild = child->getFirstChild();
       while (tspanChild) {
         if (tspanChild->type == DOMNodeType::Text) {
@@ -939,6 +953,32 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     }
     child = child->getNextSibling();
   }
+
+  // SVG whitespace normalization: replace newlines and tabs with spaces,
+  // collapse consecutive spaces, and trim leading/trailing spaces.
+  for (auto& ch : textContent) {
+    if (ch == '\n' || ch == '\r' || ch == '\t') {
+      ch = ' ';
+    }
+  }
+  std::string normalized;
+  normalized.reserve(textContent.size());
+  bool previousWasSpace = true;
+  for (char ch : textContent) {
+    if (ch == ' ') {
+      if (!previousWasSpace) {
+        normalized += ch;
+      }
+      previousWasSpace = true;
+    } else {
+      normalized += ch;
+      previousWasSpace = false;
+    }
+  }
+  if (!normalized.empty() && normalized.back() == ' ') {
+    normalized.pop_back();
+  }
+  textContent = normalized;
 
   if (!textContent.empty()) {
     auto text = _document->makeNode<Text>();
@@ -954,14 +994,8 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
       text->fontFamily = fontFamily;
     }
 
-    // Font size: element attribute > inherited style.
-    std::string fontSize = getAttribute(element, "font-size");
-    if (fontSize.empty()) {
-      fontSize = inheritedStyle.fontSize;
-    }
-    if (!fontSize.empty()) {
-      text->fontSize = parseLength(fontSize, _viewBoxHeight);
-    }
+    // Font size already resolved above.
+    text->fontSize = currentFontSize;
 
     // Font weight: element attribute > inherited style.
     // SVG font-weight maps to fontStyle in PAGX (e.g., "Bold", "Light").
@@ -2146,6 +2180,20 @@ float SVGParserContext::parseLength(const std::string& value, float containerSiz
   }
 
   return num;
+}
+
+float SVGParserContext::parseLengthEm(const std::string& value, float containerSize,
+                                      float fontSize) {
+  if (value.empty()) {
+    return 0;
+  }
+  size_t idx = 0;
+  float num = std::stof(value, &idx);
+  std::string unit = value.substr(idx);
+  if (unit == "em" || unit == "rem") {
+    return num * fontSize;
+  }
+  return parseLength(value, containerSize);
 }
 
 std::vector<float> SVGParserContext::parseViewBox(const std::string& value) {

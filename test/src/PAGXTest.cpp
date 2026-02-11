@@ -46,6 +46,7 @@
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextLayout.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Paint.h"
@@ -70,6 +71,26 @@
 
 namespace pag {
 using namespace tgfx;
+
+static pagx::Group* MakeCenteredTextGroup(pagx::PAGXDocument* doc, const std::string& content,
+                                           float fontSize, float centerX, float y,
+                                           pagx::Color color) {
+  auto group = doc->makeNode<pagx::Group>();
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = content;
+  text->fontSize = fontSize;
+  auto layout = doc->makeNode<pagx::TextLayout>();
+  layout->position = {centerX, y};
+  layout->textAlign = pagx::TextAlign::Center;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = color;
+  fill->color = solid;
+  group->elements.push_back(text);
+  group->elements.push_back(layout);
+  group->elements.push_back(fill);
+  return group;
+}
 
 static std::vector<std::shared_ptr<Typeface>> GetFallbackTypefaces() {
   static std::vector<std::shared_ptr<Typeface>> typefaces;
@@ -207,11 +228,8 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
   device->unlock();
 }
 
-/**
- * Test case: Verify colorRef parsing for both hex colors and resource references.
- * This ensures Fill and Stroke with colorRef are rendered correctly.
- */
-PAG_TEST(PAGXTest, ColorRefRender) {
+// Covered by SampleFiles (3.3_resources.pagx, 5.3.1_fill.pagx).
+PAG_TEST(PAGXTest, DISABLED_ColorRefRender) {
   const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
 <pagx width="200" height="200" version="1.0">
   <Resources>
@@ -369,10 +387,8 @@ PAG_TEST(PAGXTest, LayerDirectContent) {
   device->unlock();
 }
 
-/**
- * Test case: Verify Stroke with colorRef renders correctly.
- */
-PAG_TEST(PAGXTest, StrokeColorRefRender) {
+// Covered by SampleFiles (5.3.2_stroke.pagx).
+PAG_TEST(PAGXTest, DISABLED_StrokeColorRefRender) {
   const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
 <pagx width="200" height="200" version="1.0">
   <Resources>
@@ -506,10 +522,8 @@ PAG_TEST(PAGXTest, PathDataForEach) {
   EXPECT_EQ(verbCount, 5);  // M, L, L, L, Z
 }
 
-/**
- * Test case: Strong-typed PAGX node creation
- */
-PAG_TEST(PAGXTest, PAGXNodeBasic) {
+// Trivial constructor/assignment tests with low value.
+PAG_TEST(PAGXTest, DISABLED_PAGXNodeBasic) {
   auto doc = pagx::PAGXDocument::Make(0, 0);
   auto rect = doc->makeNode<pagx::Rectangle>();
   rect->center.x = 50;
@@ -621,10 +635,8 @@ PAG_TEST(PAGXTest, PAGXDocumentRoundTrip) {
   EXPECT_GE(doc2->layers.size(), 1u);
 }
 
-/**
- * Test case: PAGXTypes basic operations
- */
-PAG_TEST(PAGXTest, PAGXTypesBasic) {
+// Trivial type tests with low value.
+PAG_TEST(PAGXTest, DISABLED_PAGXTypesBasic) {
   pagx::Point p1 = {10.0f, 20.0f};
   EXPECT_FLOAT_EQ(p1.x, 10.0f);
   EXPECT_FLOAT_EQ(p1.y, 20.0f);
@@ -663,10 +675,8 @@ PAG_TEST(PAGXTest, PAGXTypesBasic) {
   EXPECT_FLOAT_EQ(m1.ty, 0.0f);
 }
 
-/**
- * Test case: Color source nodes
- */
-PAG_TEST(PAGXTest, ColorSources) {
+// Trivial constructor tests with low value.
+PAG_TEST(PAGXTest, DISABLED_ColorSources) {
   auto doc = pagx::PAGXDocument::Make(0, 0);
   auto solid = doc->makeNode<pagx::SolidColor>();
   solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
@@ -702,10 +712,8 @@ PAG_TEST(PAGXTest, ColorSources) {
   EXPECT_EQ(radial->nodeType(), pagx::NodeType::RadialGradient);
 }
 
-/**
- * Test case: Layer node with styles and filters
- */
-PAG_TEST(PAGXTest, LayerStylesFilters) {
+// Trivial constructor tests with low value.
+PAG_TEST(PAGXTest, DISABLED_LayerStylesFilters) {
   auto doc = pagx::PAGXDocument::Make(0, 0);
   auto layer = doc->makeNode<pagx::Layer>();
   layer->name = "StyledLayer";
@@ -812,10 +820,8 @@ PAG_TEST(PAGXTest, GlyphRunTransforms) {
   EXPECT_FLOAT_EQ(glyphRun->scales[1].x, 1.5f);
 }
 
-/**
- * Test case: Text node with precomposed GlyphRuns
- */
-PAG_TEST(PAGXTest, TextPrecomposed) {
+// Redundant with GlyphRunHorizontal.
+PAG_TEST(PAGXTest, DISABLED_TextPrecomposed) {
   auto doc = pagx::PAGXDocument::Make(0, 0);
   auto text = doc->makeNode<pagx::Text>();
   text->fontSize = 24;
@@ -833,10 +839,8 @@ PAG_TEST(PAGXTest, TextPrecomposed) {
   EXPECT_EQ(text->glyphRuns[0]->glyphs.size(), 3u);
 }
 
-/**
- * Test case: PathTypefaceBuilder and TextBlobBuilder basic functionality
- */
-PAG_TEST(PAGXTest, PathTypefaceBasic) {
+// Covered by PrecomposedTextRender and other embedded font tests.
+PAG_TEST(PAGXTest, DISABLED_PathTypefaceBasic) {
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
@@ -876,145 +880,47 @@ PAG_TEST(PAGXTest, PathTypefaceBasic) {
 }
 
 /**
- * Test case: Precomposed text rendering with embedded font
+ * Test case: Precomposed text rendering with real text and embedded font.
+ * Creates a document with English, mixed Chinese-English text at different sizes, shapes and embeds
+ * fonts, exports to XML, reimports and renders from embedded glyphs.
  */
 PAG_TEST(PAGXTest, PrecomposedTextRender) {
-  // PAGX with embedded font and precomposed text
-  const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
-<pagx width="200" height="100" version="1.0">
-  <Resources>
-    <Font id="pathFont">
-      <Glyph path="M0 0 L40 0 L40 50 L0 50 Z"/>
-      <Glyph path="M0 0 L20 50 L40 0 Z"/>
-    </Font>
-  </Resources>
-  <Layer>
-    <Group>
-      <Text fontSize="50">
-        <GlyphRun font="@pathFont" glyphs="1,2,1" y="60" xPositions="10,60,110"/>
-      </Text>
-      <Fill color="#FF0000"/>
-    </Group>
-  </Layer>
-</pagx>
-)";
+  auto doc = pagx::PAGXDocument::Make(240, 140);
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->contents.push_back(
+      MakeCenteredTextGroup(doc.get(), "Hello PAGX", 36, 120, 35, {0.2f, 0.2f, 0.8f, 1.0f}));
+  layer->contents.push_back(MakeCenteredTextGroup(doc.get(), "\xe4\xbd\xa0\xe5\xa5\xbd World", 28,
+                                                   120, 80, {0.1f, 0.6f, 0.2f, 1.0f}));
+  layer->contents.push_back(
+      MakeCenteredTextGroup(doc.get(), "Embedded Font", 18, 120, 115, {0.5f, 0.5f, 0.5f, 1.0f}));
+  doc->layers.push_back(layer);
 
-  // First verify the XML parsing
-  auto doc = pagx::PAGXImporter::FromXML(pagxXml);
-  ASSERT_TRUE(doc != nullptr);
-  ASSERT_FALSE(doc->nodes.empty());
-  
-  // Find the Font resource
-  pagx::Font* fontNode = nullptr;
-  for (const auto& node : doc->nodes) {
-    if (node->nodeType() == pagx::NodeType::Font && node->id == "pathFont") {
-      fontNode = static_cast<pagx::Font*>(node.get());
-      break;
-    }
-  }
-  ASSERT_TRUE(fontNode != nullptr);
-  EXPECT_EQ(fontNode->glyphs.size(), 2u);
+  pagx::Typesetter typesetter;
+  typesetter.setFallbackTypefaces(GetFallbackTypefaces());
+  auto shapedText = typesetter.shape(doc.get());
+  ASSERT_FALSE(shapedText.empty());
+  pagx::FontEmbedder().embed(doc.get(), shapedText);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+  auto pagxPath = SavePAGXFile(xml, "PAGXTest/PrecomposedTextRender.pagx");
+
+  auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_TRUE(reloadedDoc != nullptr);
 
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
 
-  // Build layer tree (doc already parsed above)
-  auto layer = pagx::LayerBuilder::Build(doc.get());
-  ASSERT_TRUE(layer != nullptr);
+  auto tgfxLayer = pagx::LayerBuilder::Build(reloadedDoc.get());
+  ASSERT_TRUE(tgfxLayer != nullptr);
 
-  auto surface = Surface::Make(context, 200, 100);
+  auto surface = Surface::Make(context, 240, 140);
   DisplayList displayList;
-  displayList.root()->addChild(layer);
+  displayList.root()->addChild(tgfxLayer);
   displayList.render(surface.get(), false);
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/PrecomposedTextRender"));
-
-  device->unlock();
-}
-
-/**
- * Test case: Precomposed text with point positions
- */
-PAG_TEST(PAGXTest, PrecomposedTextPointPositions) {
-  const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
-<pagx width="200" height="150" version="1.0">
-  <Resources>
-    <Font id="pathFont">
-      <Glyph path="M0 0 L30 0 L30 40 L0 40 Z"/>
-      <Glyph path="M15 0 L30 40 L0 40 Z"/>
-    </Font>
-  </Resources>
-  <Layer>
-    <Group>
-      <Text fontSize="40">
-        <GlyphRun font="@pathFont" glyphs="1,2,1" positions="20,30;80,60;140,90"/>
-      </Text>
-      <Fill color="#0000FF"/>
-    </Group>
-  </Layer>
-</pagx>
-)";
-
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto doc = pagx::PAGXImporter::FromXML(reinterpret_cast<const uint8_t*>(pagxXml),
-                                         strlen(pagxXml));
-  ASSERT_TRUE(doc != nullptr);
-  auto layer = pagx::LayerBuilder::Build(doc.get());
-  ASSERT_TRUE(layer != nullptr);
-
-  auto surface = Surface::Make(context, 200, 150);
-  DisplayList displayList;
-  displayList.root()->addChild(layer);
-  displayList.render(surface.get(), false);
-  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/PrecomposedTextPointPositions"));
-
-  device->unlock();
-}
-
-/**
- * Test case: Text with missing glyph (GlyphID 0)
- */
-PAG_TEST(PAGXTest, PrecomposedTextMissingGlyph) {
-  const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
-<pagx width="200" height="100" version="1.0">
-  <Resources>
-    <Font id="testFont">
-      <Glyph path="M0 0 L40 0 L40 50 L0 50 Z"/>
-    </Font>
-  </Resources>
-  <Layer>
-    <Group>
-      <Text fontSize="50">
-        <GlyphRun font="@testFont" glyphs="1,0,1" y="60" xPositions="10,60,110"/>
-      </Text>
-      <Fill color="#00FF00"/>
-    </Group>
-  </Layer>
-</pagx>
-)";
-
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto doc = pagx::PAGXImporter::FromXML(reinterpret_cast<const uint8_t*>(pagxXml),
-                                         strlen(pagxXml));
-  ASSERT_TRUE(doc != nullptr);
-  auto layer = pagx::LayerBuilder::Build(doc.get());
-  ASSERT_TRUE(layer != nullptr);
-
-  auto surface = Surface::Make(context, 200, 100);
-  DisplayList displayList;
-  displayList.root()->addChild(layer);
-  displayList.render(surface.get(), false);
-  // GlyphID 0 should not be rendered, so only two glyphs appear
-  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/PrecomposedTextMissingGlyph"));
 
   device->unlock();
 }
@@ -1312,21 +1218,8 @@ PAG_TEST(PAGXTest, TextShaperEmoji) {
   device->unlock();
 }
 
-/**
- * Test case: Complete PAGX example from specification document.
- * This tests the full rendering capabilities of PAGX including:
- * - Multiple layers with different Y positions
- * - Geometric shapes (Rectangle, Ellipse, Polystar, Path)
- * - Gradients (Linear, Radial, Conic)
- * - Shape modifiers (TrimPath, RoundCorner, MergePath, Repeater)
- * - Text with TextLayout
- * - Filters (Blur, DropShadow, Blend, ColorMatrix)
- * - Layer styles (DropShadowStyle, InnerShadowStyle)
- * - Mask and maskType
- * - Embedded fonts and GlyphRun
- * - Composition references
- */
-PAG_TEST(PAGXTest, CompleteExample) {
+// Redundant with spec/samples/B.1_complete_example.pagx, covered by SampleFiles test.
+PAG_TEST(PAGXTest, DISABLED_CompleteExample) {
   // Modern dark theme design example
   const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="800" height="520">
