@@ -47,11 +47,11 @@
   </Layer>
 
   <Layer name="HeaderBadge" x="1350" y="120">
-    <Rectangle center="0,0" size="200,40" roundness="20"/>
+    <Rectangle center="0,0" size="160,48" roundness="24"/>
     <Stroke color="#38BDF8" width="1"/>
     <Fill color="#0B1222"/>
-    <Layer x="0" y="6">
-      <Text text="Version 1.0" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+    <Layer x="0" y="7">
+      <Text text="Version 1.0" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
       <TextLayout position="0,0" textAlign="center"/>
       <Fill color="#38BDF8"/>
     </Layer>
@@ -147,7 +147,7 @@
       </Layer>
     </Layer>
     <Layer x="-30" y="-25">
-      <Text text="Open &amp; Readable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+      <Text text="Readable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#F43F5E"/>
     </Layer>
@@ -187,7 +187,7 @@
       </Group>
     </Layer>
     <Layer x="-30" y="-25">
-      <Text text="Feature-Complete" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+      <Text text="Comprehensive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#38BDF8"/>
     </Layer>
@@ -203,59 +203,45 @@
     </Layer>
   </Layer>
 
-  <!-- Card 3: Concise & Efficient (top-right) -->
-  <Layer name="CardConcise" x="1320" y="310">
+  <!-- Card 3: Expressive (top-right) -->
+  <Layer name="CardExpressive" x="1320" y="310">
     <Rectangle center="0,0" size="420,200" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="10" blurX="20" blurY="20" color="#00000040"/>
     <Layer x="-100" y="-2">
-      <!-- Inner compact block -->
+      <!-- Left curly brace -->
       <Group>
-        <Rectangle center="0,0" size="28,28" roundness="4"/>
-        <Stroke color="#A855F7" width="2"/>
-        <Fill color="#A855F720"/>
+        <Path data="M -8 -36 Q -18 -36 -18 -24 L -18 -6 Q -18 0 -24 0 Q -18 0 -18 6 L -18 24 Q -18 36 -8 36"/>
+        <Stroke color="#A855F7" width="2.5" cap="round"/>
       </Group>
-      <!-- Code lines inside block -->
+      <!-- Right curly brace -->
       <Group>
-        <Path data="M -8 -4 L 8 -4 M -8 4 L 4 4"/>
+        <Path data="M 8 -36 Q 18 -36 18 -24 L 18 -6 Q 18 0 24 0 Q 18 0 18 6 L 18 24 Q 18 36 8 36"/>
+        <Stroke color="#A855F7" width="2.5" cap="round"/>
+      </Group>
+      <!-- Star burst in center -->
+      <Group>
+        <Path data="M 0 -14 L 0 14 M -12 -7 L 12 7 M -12 7 L 12 -7"/>
         <Stroke color="#A855F7" width="2" cap="round"/>
       </Group>
-      <!-- Outer expanding frame -->
       <Group>
-        <Rectangle center="0,0" size="56,56" roundness="8"/>
-        <Stroke color="#A855F7" width="1.5" dashes="6,4"/>
-      </Group>
-      <!-- Expansion arrows at four corners -->
-      <Group>
-        <Path data="M -20 -20 L -30 -30 M -30 -30 L -22 -30 M -30 -30 L -30 -22"/>
-        <Stroke color="#A855F7" width="2" cap="round" join="round"/>
-      </Group>
-      <Group>
-        <Path data="M 20 -20 L 30 -30 M 30 -30 L 22 -30 M 30 -30 L 30 -22"/>
-        <Stroke color="#A855F7" width="2" cap="round" join="round"/>
-      </Group>
-      <Group>
-        <Path data="M -20 20 L -30 30 M -30 30 L -22 30 M -30 30 L -30 22"/>
-        <Stroke color="#A855F7" width="2" cap="round" join="round"/>
-      </Group>
-      <Group>
-        <Path data="M 20 20 L 30 30 M 30 30 L 22 30 M 30 30 L 30 22"/>
-        <Stroke color="#A855F7" width="2" cap="round" join="round"/>
+        <Ellipse center="0,0" size="6,6"/>
+        <Fill color="#A855F7"/>
       </Group>
     </Layer>
     <Layer x="-30" y="-25">
-      <Text text="Compact Expressive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+      <Text text="Expressive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#A855F7"/>
     </Layer>
     <Layer x="-30" y="5">
-      <Text text="Compact expression" fontFamily="Arial" fontSize="16"/>
+      <Text text="Compact yet powerful" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
     <Layer x="-30" y="30">
-      <Text text="Static &amp; animated unified" fontFamily="Arial" fontSize="16"/>
+      <Text text="Static &amp; animation unified" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#94A3B8"/>
     </Layer>
@@ -286,7 +272,7 @@
       </Group>
     </Layer>
     <Layer x="-47" y="-25">
-      <Text text="Ecosystem Compatible" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+      <Text text="Portable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#10B981"/>
     </Layer>
@@ -339,7 +325,7 @@
       </Group>
     </Layer>
     <Layer x="-47" y="-25">
-      <Text text="Efficient Deployment" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+      <Text text="Deployable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#FBBF24"/>
     </Layer>
