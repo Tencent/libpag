@@ -153,12 +153,12 @@
       <Fill color="#F43F5E"/>
     </Layer>
     <Layer x="-50" y="14">
-      <Text text="Plain-text XML, easy to diff," fontFamily="Arial" fontSize="16"/>
+      <Text text="Plain-text XML, easy to" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
     <Layer x="-50" y="36">
-      <Text text="debug, and AI-generate." fontFamily="Arial" fontSize="16"/>
+      <Text text="diff, debug, and AI-generate." fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
@@ -193,12 +193,12 @@
       <Fill color="#38BDF8"/>
     </Layer>
     <Layer x="-50" y="14">
-      <Text text="Covers vectors, images, text," fontFamily="Arial" fontSize="16"/>
+      <Text text="Covers vectors, images," fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
     <Layer x="-50" y="36">
-      <Text text="effects, and masks." fontFamily="Arial" fontSize="16"/>
+      <Text text="text, effects, and masks." fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
@@ -247,12 +247,12 @@
       <Fill color="#A855F7"/>
     </Layer>
     <Layer x="-50" y="14">
-      <Text text="Compact structure for both static" fontFamily="Arial" fontSize="16"/>
+      <Text text="Compact structure for both" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
     <Layer x="-50" y="36">
-      <Text text="and animated content." fontFamily="Arial" fontSize="16"/>
+      <Text text="static and animated content." fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
@@ -288,12 +288,12 @@
       <Fill color="#10B981"/>
     </Layer>
     <Layer x="-50" y="14">
-      <Text text="Bridges AE, Figma, SVG, PDF," fontFamily="Arial" fontSize="16"/>
+      <Text text="Bridges AE, Figma, SVG," fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
     <Layer x="-50" y="36">
-      <Text text="and more seamlessly." fontFamily="Arial" fontSize="16"/>
+      <Text text="PDF, and more seamlessly." fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
@@ -341,12 +341,12 @@
       <Fill color="#FBBF24"/>
     </Layer>
     <Layer x="-50" y="14">
-      <Text text="One-click export to binary PAG" fontFamily="Arial" fontSize="16"/>
+      <Text text="One-click export to binary" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
     <Layer x="-50" y="36">
-      <Text text="with high performance." fontFamily="Arial" fontSize="16"/>
+      <Text text="PAG with high performance." fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
