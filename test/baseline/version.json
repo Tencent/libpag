@@ -8574,13 +8574,12 @@
             "5.7_multiple_fills": "f40e23b6",
             "5.7_multiple_painters": "f40e23b6",
             "5.7_multiple_strokes": "f40e23b6",
-            "B.1_complete_example": "f40e23b6",
-            "B.2_game_ui_claude": "cebebb5e",
+            "B.1_complete_example": "51b48f89",
+            "B.2_rpg_character_panel": "51b48f89",
             "B.3_pagx_features_claude": "f40e23b6",
-            "B.4_gamme_ui_gemini": "cebebb5e",
-            "B.4_pagx_features_gemini": "cfc36f16",
-            "B.5_pagx_features_gpt": "cebebb5e",
-            "B.6_gamme_ui_gpt": "cebebb5e"
+            "B.4_game_hud": "51b48f89",
+            "B.5_pagx_capability_overview": "51b48f89",
+            "B.6_nebula_cadet": "51b48f89"
         },
         "Switch": "cfc36f16",
         "TGFXVectorLayerDirect": "f40e23b6",
