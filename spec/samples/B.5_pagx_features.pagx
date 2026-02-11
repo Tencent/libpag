@@ -50,20 +50,19 @@
       <Ellipse center="0,0" size="260,260"/>
       <Stroke color="#334155" width="2"/>
     </Layer>
+    <!-- Accelerating tick marks hugging the inner circle, starting from 12 o'clock -->
+    <Layer alpha="0.4">
+      <Path data="M 0 -133 L 0 -142 M 12 -132 L 12 -141 M 23 -131 L 25 -140 M 36 -128 L 38 -137 M 48 -124 L 51 -133 M 60 -119 L 64 -127 M 72 -112 L 77 -119 M 84 -104 L 89 -111 M 94 -94 L 101 -100 M 105 -82 L 112 -88 M 114 -69 L 121 -74 M 121 -55 L 129 -58 M 127 -39 L 136 -41 M 131 -22 L 140 -23 M 133 -4 L 142 -4 M 132 15 L 141 16 M 129 34 L 137 36 M 122 53 L 130 57 M 112 71 L 120 76 M 99 89 L 106 95 M 83 104 L 89 111 M 64 117 L 68 125 M 42 126 L 45 135 M 18 132 L 19 141 M -8 133 L -8 142 M -34 129 L -36 137 M -59 119 L -64 127 M -83 104 L -89 111 M -104 83 L -111 88 M -120 57 L -128 61"/>
+      <Stroke width="2.5" cap="round">
+        <ConicGradient center="0,0" startAngle="-90" endAngle="270">
+          <ColorStop offset="0" color="#06B6D4"/>
+          <ColorStop offset="0.3" color="#3B82F6"/>
+          <ColorStop offset="0.68" color="#3B82F600"/>
+          <ColorStop offset="1" color="#06B6D400"/>
+        </ConicGradient>
+      </Stroke>
+    </Layer>
     <Layer rotation="-30">
-      <!-- Accelerating tick marks around the arc -->
-      <Layer alpha="0.4">
-        <Path data="M 155 41 L 162 43 M 152 49 L 160 52 M 149 58 L 157 61 M 146 66 L 153 69 M 142 74 L 149 78 M 137 83 L 144 87 M 131 92 L 138 96 M 125 100 L 131 105 M 118 108 L 124 114 M 110 117 L 115 122 M 101 124 L 106 131 M 91 132 L 95 138 M 80 139 L 84 146 M 68 145 L 71 152 M 55 150 L 58 158 M 41 155 L 43 162 M 26 158 L 28 166 M 11 160 L 11 168 M -5 160 L -6 168 M -22 158 L -23 166 M -40 155 L -42 163 M -57 149 L -60 157 M -74 142 L -78 149 M -91 131 L -96 138 M -108 118 L -113 124 M -122 103 L -129 108 M -136 85 L -142 89 M -146 64 L -154 68 M -154 42 L -162 44 M -159 17 L -167 18 M -160 -9 L -168 -10 M -156 -36 L -164 -38 M -147 -63 L -155 -66 M -133 -89 L -140 -93 M -114 -112 L -120 -118"/>
-        <Stroke width="1.5" cap="round">
-          <ConicGradient center="0,0" startAngle="0" endAngle="360">
-            <ColorStop offset="0" color="#06B6D4"/>
-            <ColorStop offset="0.03" color="#06B6D4"/>
-            <ColorStop offset="0.35" color="#3B82F6"/>
-            <ColorStop offset="0.63" color="#3B82F600"/>
-            <ColorStop offset="1" color="#06B6D400"/>
-          </ConicGradient>
-        </Stroke>
-      </Layer>
       <Ellipse center="0,0" size="310,310"/>
       <TrimPath start="0" end="0.7"/>
       <Stroke width="3" cap="round">
@@ -95,7 +94,7 @@
     </Group>
     <!-- to Comprehensive (1319,456) -->
     <Group>
-      <Path data="M 1028 466 L 1119 458"/>
+      <Path data="M 1028 466 L 1119 488"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
     <!-- to Deployable (1101,880) -->
@@ -110,7 +109,7 @@
     </Group>
     <!-- to Expressive (281,456) -->
     <Group>
-      <Path data="M 572 466 L 481 458"/>
+      <Path data="M 572 466 L 481 488"/>
       <Stroke color="@accentLine" width="2" dashes="6,10"/>
     </Group>
   </Layer>
