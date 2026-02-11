@@ -152,15 +152,15 @@
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#F43F5E"/>
     </Layer>
-    <Layer x="-50" y="11">
-      <Text text="Plain-text XML, easy to diff" fontFamily="Arial" fontSize="16"/>
+    <Layer x="-50" y="14">
+      <Text text="Plain-text XML, easy to diff," fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-50" y="35">
-      <Text text="AI-friendly, version control" fontFamily="Arial" fontSize="16"/>
+    <Layer x="-50" y="36">
+      <Text text="debug, and AI-generate." fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
-      <Fill color="#94A3B8"/>
+      <Fill color="#CBD5E1"/>
     </Layer>
   </Layer>
 
@@ -192,15 +192,15 @@
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#38BDF8"/>
     </Layer>
-    <Layer x="-50" y="11">
-      <Text text="Vector, image, text, filters" fontFamily="Arial" fontSize="16"/>
+    <Layer x="-50" y="14">
+      <Text text="Covers vectors, images, text," fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-50" y="35">
-      <Text text="Blending, masking &amp; effects" fontFamily="Arial" fontSize="16"/>
+    <Layer x="-50" y="36">
+      <Text text="effects, and masks." fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
-      <Fill color="#94A3B8"/>
+      <Fill color="#CBD5E1"/>
     </Layer>
   </Layer>
 
@@ -228,17 +228,17 @@
       </Group>
       <!-- Rich output shapes on right -->
       <Group>
-        <Ellipse center="22,-22" size="18,18"/>
+        <Ellipse center="22,-28" size="18,18"/>
         <Stroke color="#A855F7" width="1.5"/>
-      </Group>
-      <Group>
-        <Path data="M 22 12 L 15 30 L 29 30 Z"/>
-        <Stroke color="#A855F7" width="1.5" join="round"/>
-        <Fill color="#A855F715"/>
       </Group>
       <Group>
         <Path data="M 15 0 L 22 -7 L 29 0 L 22 7 Z"/>
         <Fill color="#A855F7"/>
+      </Group>
+      <Group>
+        <Path data="M 22 18 L 15 36 L 29 36 Z"/>
+        <Stroke color="#A855F7" width="1.5" join="round"/>
+        <Fill color="#A855F715"/>
       </Group>
     </Layer>
     <Layer x="-50" y="-17">
@@ -246,20 +246,20 @@
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#A855F7"/>
     </Layer>
-    <Layer x="-50" y="11">
-      <Text text="Compact unified structure" fontFamily="Arial" fontSize="16"/>
+    <Layer x="-50" y="14">
+      <Text text="Compact structure for both static" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-50" y="35">
-      <Text text="Static &amp; animated in one" fontFamily="Arial" fontSize="16"/>
+    <Layer x="-50" y="36">
+      <Text text="and animated content." fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
-      <Fill color="#94A3B8"/>
+      <Fill color="#CBD5E1"/>
     </Layer>
   </Layer>
 
-  <!-- Card 4: Portable (left-lower) -->
-  <Layer name="CardPortable" x="499" y="880">
+  <!-- Card 4: Interoperable (left-lower) -->
+  <Layer name="CardInteroperable" x="499" y="880">
     <Rectangle center="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
@@ -283,19 +283,19 @@
       </Group>
     </Layer>
     <Layer x="-50" y="-17">
-      <Text text="Portable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+      <Text text="Interoperable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#10B981"/>
     </Layer>
-    <Layer x="-50" y="11">
-      <Text text="TD, AE, Figma interchange" fontFamily="Arial" fontSize="16"/>
+    <Layer x="-50" y="14">
+      <Text text="Bridges AE, Figma, SVG, PDF," fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-50" y="35">
-      <Text text="Cross-format exchange" fontFamily="Arial" fontSize="16"/>
+    <Layer x="-50" y="36">
+      <Text text="and more seamlessly." fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
-      <Fill color="#94A3B8"/>
+      <Fill color="#CBD5E1"/>
     </Layer>
   </Layer>
 
@@ -340,15 +340,15 @@
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#FBBF24"/>
     </Layer>
-    <Layer x="-50" y="11">
-      <Text text="Export to binary PAG format" fontFamily="Arial" fontSize="16"/>
+    <Layer x="-50" y="14">
+      <Text text="One-click export to binary PAG" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-50" y="35">
-      <Text text="High compression &amp; speed" fontFamily="Arial" fontSize="16"/>
+    <Layer x="-50" y="36">
+      <Text text="with high performance." fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
-      <Fill color="#94A3B8"/>
+      <Fill color="#CBD5E1"/>
     </Layer>
   </Layer>
 
