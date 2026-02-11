@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="1280" height="720">
+  <Resources>
+    <!-- Palette -->
+    <SolidColor id="c_bg" color="#0A0A12"/>
+    <SolidColor id="c_panel_bg" color="#141420E6"/> <!-- 90% opacity -->
+    <SolidColor id="c_cyan" color="#00F0FF"/>
+    <SolidColor id="c_pink" color="#FF0055"/>
+    <SolidColor id="c_amber" color="#FFD700"/>
+    <SolidColor id="c_white" color="#FFFFFF"/>
+    <SolidColor id="c_dim" color="#FFFFFF40"/>
+    
+    <!-- Gradients -->
+    <LinearGradient id="g_health" startPoint="0,0" endPoint="300,0">
+      <ColorStop offset="0" color="#FF0055"/>
+      <ColorStop offset="1" color="#FF55AA"/>
+    </LinearGradient>
+    <LinearGradient id="g_energy" startPoint="0,0" endPoint="250,0">
+      <ColorStop offset="0" color="#00F0FF"/>
+      <ColorStop offset="1" color="#55FFFF"/>
+    </LinearGradient>
+    <RadialGradient id="g_vignette" center="640,360" radius="800">
+        <ColorStop offset="0.6" color="#00000000"/>
+        <ColorStop offset="1" color="#000000CC"/>
+    </RadialGradient>
+    
+    <!-- Reusable Paths -->
+    <!-- Hexagon Frame: 100x116 (approx) -->
+    <PathData id="p_hex" data="M 50 0 L 100 29 L 100 87 L 50 116 L 0 87 L 0 29 Z"/>
+    
+    <!-- Tech Decor Lines -->
+    <PathData id="p_tech_line" data="M 0 0 L 10 0 L 15 5 L 100 5 L 105 0 L 115 0"/>
+  </Resources>
+
+  <!-- ========================================= -->
+  <!-- Layer: Background & Grid -->
+  <!-- ========================================= -->
+  <Layer name="Background">
+    <Rectangle center="640,360" size="1280,720"/>
+    <Fill color="@c_bg"/>
+    
+    <!-- Grid Lines (Vertical) -->
+    <Group>
+        <Path data="M 0 0 L 0 720" />
+        <Stroke color="#FFFFFF05" width="1"/>
+        <Repeater copies="21" position="64,0"/> <!-- 1280 / 20 = 64 -->
+    </Group>
+    <!-- Grid Lines (Horizontal) -->
+    <Group>
+        <Path data="M 0 0 L 1280 0" />
+        <Stroke color="#FFFFFF05" width="1"/>
+        <Repeater copies="12" position="0,60"/> <!-- 720 / 12 = 60 -->
+    </Group>
+    
+    <!-- Vignette Overlay -->
+    <Group>
+        <Rectangle center="640,360" size="1280,720"/>
+        <Fill color="@g_vignette"/>
+    </Group>
+  </Layer>
+
+  <!-- ========================================= -->
+  <!-- Layer: Top HUD (Score & Time) -->
+  <!-- ========================================= -->
+  <Layer name="TopHUD" y="30">
+    <!-- Center Score Panel -->
+    <Layer x="640" y="40">
+       <!-- Main Trapezoid Frame -->
+       <!-- Top width 300, Bottom width 260, Height 60 -->
+       <Path data="M -150 -30 L 150 -30 L 130 30 L -130 30 Z"/>
+       <Fill color="@c_panel_bg"/>
+       <Stroke color="@c_cyan" width="2"/>
+       <DropShadowStyle color="#00F0FF66" blurX="15" blurY="15"/>
+       
+       <!-- Inner Tech Lines -->
+       <Path data="M -120 20 L -80 20 M 80 20 L 120 20"/>
+       <Stroke color="@c_cyan" width="1" alpha="0.5"/>
+       
+       <!-- Score Text -->
+       <Text text="SCORE" fontFamily="Arial" fontSize="12" position="0,-18" letterSpacing="2"/>
+       <TextLayout textAlign="center"/>
+       <Fill color="@c_cyan"/>
+       
+       <Text text="1,245,090" fontFamily="Arial" fontSize="36" fontStyle="Bold" position="0,15"/>
+       <TextLayout textAlign="center"/>
+       <Fill color="@c_white"/>
+    </Layer>
+    
+    <!-- Time Panel (Right) -->
+    <Layer x="1150" y="40">
+        <Rectangle center="0,0" size="180,40" roundness="0"/>
+        <!-- Slanted edge rect simulation via path -->
+        <Path data="M -90 -20 L 70 -20 L 90 20 L -70 20 Z"/>
+        <Fill color="@c_panel_bg"/>
+        <Stroke color="@c_white" width="1" alpha="0.2"/>
+        
+        <Text text="TIME 04:23" fontFamily="Arial" fontSize="24" fontStyle="Bold" position="0,8"/>
+        <TextLayout textAlign="center"/>
+        <Fill color="@c_white"/>
+    </Layer>
+  </Layer>
+
+  <!-- ========================================= -->
+  <!-- Layer: Bottom Left (Status) -->
+  <!-- ========================================= -->
+  <Layer name="StatusPanel" x="50" y="580">
+     <!-- HP Bar Frame -->
+     <Group>
+        <Path data="M 0 0 L 320 0 L 340 30 L 320 60 L 0 60 L -20 30 Z"/>
+        <Fill color="@c_panel_bg"/>
+        <Stroke color="@c_white" width="1" alpha="0.3"/>
+     </Group>
+     
+     <!-- HP Bar Fill -->
+     <Layer x="10" y="15">
+        <Rectangle center="150,15" size="300,20" roundness="2"/> <!-- Partial fill -->
+        <Fill color="#00000080"/>
+        <!-- Actual Fill -->
+        <Rectangle center="120,15" size="240,20" roundness="2"/>
+        <Fill color="@g_health"/>
+        <DropShadowStyle color="#FF005580" blurX="10" blurY="10"/>
+     </Layer>
+     
+     <!-- HP Label -->
+     <Group>
+        <Text text="HP" fontFamily="Arial" fontSize="20" fontStyle="Bold" position="15,38"/>
+        <Fill color="@c_pink"/>
+        
+        <Text text="75%" fontFamily="Arial" fontSize="16" fontStyle="Bold" position="290,36"/>
+        <TextLayout textAlign="start"/>
+        <Fill color="@c_white"/>
+     </Group>
+     
+     <!-- Energy Bar Group (Below) -->
+     <Layer x="20" y="70">
+        <!-- Decoration Line -->
+        <Path data="M 0 0 L 280 0 L 290 10"/>
+        <Stroke color="@c_cyan" width="2"/>
+        
+        <!-- Energy Label -->
+        <Text text="ENG" fontFamily="Arial" fontSize="16" fontStyle="Bold" position="0,30"/>
+        <Fill color="@c_cyan"/>
+        
+        <!-- Energy Bar segments -->
+        <Layer x="40" y="25">
+            <Rectangle center="0,0" size="15,10" roundness="2"/>
+            <Fill color="@c_cyan"/>
+            <Repeater copies="10" position="20,0"/> <!-- 10 segments -->
+            <DropShadowStyle color="#00F0FF80" blurX="6" blurY="6"/>
+        </Layer>
+     </Layer>
+  </Layer>
+
+  <!-- ========================================= -->
+  <!-- Layer: Bottom Right (Weapon) -->
+  <!-- ========================================= -->
+  <Layer name="WeaponPanel" x="900" y="550">
+     <!-- Weapon Name & Lines -->
+     <Layer x="0" y="60">
+        <Path data="M 0 0 L 200 0 L 220 20"/>
+        <Stroke color="@c_amber" width="2" alpha="0.6"/>
+        
+        <Text text="PLASMA RIFLE" fontFamily="Arial" fontSize="24" fontStyle="Bold" position="210,-10"/>
+        <TextLayout textAlign="end"/>
+        <Fill color="@c_white"/>
+        
+        <Text text="AUTO MODE" fontFamily="Arial" fontSize="14" position="210,35"/>
+        <TextLayout textAlign="end"/>
+        <Fill color="@c_dim"/>
+     </Layer>
+
+     <!-- Hexagon Icon container -->
+     <Layer x="280" y="60">
+        <Path data="@p_hex"/> <!-- Uses resource -->
+        <Fill color="#141420CC"/>
+        <Stroke color="@c_amber" width="3"/>
+        <DropShadowStyle color="#FFD70066" blurX="10" blurY="10"/>
+        
+        <!-- Ammo Count -->
+        <Text text="30" fontFamily="Arial" fontSize="42" fontStyle="Bold" position="50,65"/>
+        <TextLayout textAlign="center"/>
+        <Fill color="@c_amber"/>
+        
+        <Text text="AMMO" fontFamily="Arial" fontSize="10" position="50,85"/>
+        <TextLayout textAlign="center"/>
+        <Fill color="@c_amber"/>
+     </Layer>
+  </Layer>
+
+  <!-- ========================================= -->
+  <!-- Layer: Center Reticle -->
+  <!-- ========================================= -->
+  <Layer name="Reticle" x="640" y="360">
+     <!-- Outer Ring (Rotating) -->
+     <Layer>
+        <Ellipse center="0,0" size="120,120"/>
+        <Stroke color="@c_cyan" width="2" dashes="20,20"/>
+        <DropShadowStyle color="#00F0FF40" blurX="4" blurY="4"/>
+     </Layer>
+     
+     <!-- Inner Circle -->
+     <Layer>
+        <Ellipse center="0,0" size="6,6"/>
+        <Fill color="@c_pink"/>
+        <DropShadowStyle color="#FF0055CC" blurX="6" blurY="6"/>
+     </Layer>
+     
+     <!-- Brackets -->
+     <Layer>
+        <Path data="M -40 -20 L -50 -20 L -50 20 L -40 20"/> <!-- Left bracket -->
+        <Path data="M 40 -20 L 50 -20 L 50 20 L 40 20"/>   <!-- Right bracket -->
+        <Stroke color="@c_white" width="2" alpha="0.8"/>
+     </Layer>
+  </Layer>
+  
+  <!-- ========================================= -->
+  <!-- Layer: Warning Overlay (Corner) -->
+  <!-- ========================================= -->
+  <Layer name="Warning" x="50" y="150">
+      <Layer>
+        <Rectangle center="0,0" size="120,30" roundness="4"/>
+        <Fill color="#FF000033"/> <!-- Red transparent bg -->
+        <Stroke color="#FF0000" width="1"/>
+        
+        <Text text="! WARNING" fontFamily="Arial" fontSize="14" fontStyle="Bold" position="0,5"/>
+        <TextLayout textAlign="center"/>
+        <Fill color="#FF0000"/>
+        
+        <!-- Blink effect simulated with Glow -->
+        <DropShadowStyle color="#FF000080" blurX="10" blurY="10"/>
+      </Layer>
+  </Layer>
+
+</pagx>
