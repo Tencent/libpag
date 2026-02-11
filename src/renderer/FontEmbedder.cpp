@@ -519,6 +519,7 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
 
   // Second-and-a-half pass: embed invisible spacing glyphs (e.g. space) into the vector font so
   // that GlyphRuns preserve word spacing. These glyphs have no outline path but carry advance width.
+  // Skip glyphs already collected into a bitmap font (e.g. emoji) to avoid misclassification.
   if (vectorBuilder.font != nullptr) {
     for (const auto& [text, shapedText] : shapedTextMap) {
       if (shapedText.textBlob == nullptr) {
@@ -535,6 +536,10 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
           }
           GlyphKey key = {typeface, glyphID};
           if (vectorBuilder.glyphMapping.count(key) > 0) {
+            continue;
+          }
+          auto bitmapIt = bitmapBuilders.find(typeface);
+          if (bitmapIt != bitmapBuilders.end() && bitmapIt->second.glyphMapping.count(key) > 0) {
             continue;
           }
           auto glyph = document->makeNode<Glyph>();
