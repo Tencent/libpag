@@ -149,36 +149,31 @@
         <Fill color="#0088ff"/>
         <TextLayout position="-240, 25" textAlign="end"/>
     </Layer>
-    
-    <!-- Data Column -->
-    <Layer x="-350" y="-100">
+  </Layer>
+
+  <!-- System Stats (Moved to Top Left Corner) -->
+  <Layer name="SystemStats" x="60" y="60">
+        <!-- Individual Data Lines -->
         <Layer>
-            <Rectangle center="10, 25" size="2, 60"/>
-            <Fill color="#004488"/>
-        </Layer>
-        
-        <!-- Individual Data Lines to ensure correct layout -->
-        <Layer>
-            <Text text="CPU: 45%" fontFamily="Arial" fontSize="9"/>
+            <Text text="CORE: 98%" fontFamily="Arial" fontSize="9"/>
             <Fill color="#00ccff" alpha="0.7"/>
-            <TextLayout position="0, 0" textAlign="end"/>
+            <TextLayout position="0, 0" textAlign="start"/>
         </Layer>
         <Layer>
-            <Text text="GPU: 88%" fontFamily="Arial" fontSize="9"/>
+            <Text text="PWR: 88%" fontFamily="Arial" fontSize="9"/>
             <Fill color="#00ccff" alpha="0.7"/>
-            <TextLayout position="0, 14" textAlign="end"/>
+            <TextLayout position="0, 14" textAlign="start"/>
         </Layer>
         <Layer>
-            <Text text="NET: ON" fontFamily="Arial" fontSize="9"/>
+            <Text text="RADAR: ACT" fontFamily="Arial" fontSize="9"/>
             <Fill color="#00ccff" alpha="0.7"/>
-            <TextLayout position="0, 28" textAlign="end"/>
+            <TextLayout position="0, 28" textAlign="start"/>
         </Layer>
         <Layer>
-            <Text text="MEM: OK" fontFamily="Arial" fontSize="9"/>
+            <Text text="SHIELD: OK" fontFamily="Arial" fontSize="9"/>
             <Fill color="#00ccff" alpha="0.7"/>
-            <TextLayout position="0, 42" textAlign="end"/>
+            <TextLayout position="0, 42" textAlign="start"/>
         </Layer>
-    </Layer>
   </Layer>
 
   <!-- Right Side: Energy & Ammo -->
@@ -212,35 +207,6 @@
         <Text text="PLASMA RESERVES" fontFamily="Arial" fontSize="10" position="230, 20"/>
         <Fill color="#0088ff"/>
         <TextLayout position="240, 25" textAlign="start"/>
-    </Layer>
-    
-    <!-- Ammo Icons Strip (Wrapped) -->
-    <Layer x="240" y="50">
-        <!-- Row 1 -->
-        <Layer>
-            <!-- Bullet Icon -->
-            <Path data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
-            <Fill color="#ffaa00"/>
-            <Stroke color="#000000" width="1"/>
-            <Repeater copies="10" position="10, 0"/>
-        </Layer>
-        <!-- Row 2 -->
-        <Layer y="15">
-             <Layer>
-                <!-- Bullet Icon -->
-                <Path data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
-                <Fill color="#ffaa00"/>
-                <Stroke color="#000000" width="1"/>
-                <Repeater copies="5" position="10, 0"/>
-             </Layer>
-             <Layer>
-                <!-- Depleted Bullets -->
-                <Path data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
-                <Fill color="#331100"/>
-                <Stroke color="#442200" width="1"/>
-                <Repeater copies="5" position="10, 0" offset="5"/> 
-             </Layer>
-        </Layer>
     </Layer>
   </Layer>
 
@@ -289,27 +255,27 @@
   <Layer name="Radar" x="100" y="500">
      <!-- Background -->
      <Layer>
-        <Ellipse center="0,0" size="140,140"/>
+        <Ellipse center="0,0" size="100,100"/>
         <Fill color="#001122" alpha="0.9"/>
         <Stroke color="#0066aa" width="2"/>
      </Layer>
      <!-- Grid Circles -->
      <Layer>
-        <Ellipse center="0,0" size="100,100"/>
+        <Ellipse center="0,0" size="70,70"/>
         <Stroke color="#004488" width="1"/>
      </Layer>
      <Layer>
-        <Ellipse center="0,0" size="50,50"/>
+        <Ellipse center="0,0" size="35,35"/>
         <Stroke color="#004488" width="1"/>
      </Layer>
      <!-- Crosshairs -->
      <Layer>
-        <Path data="M -70 0 L 70 0 M 0 -70 L 0 70"/>
+        <Path data="M -50 0 L 50 0 M 0 -50 L 0 50"/>
         <Stroke color="#004488" width="1"/>
      </Layer>
      <!-- Sweep (Conic Gradient) -->
      <Layer rotation="-45">
-        <Ellipse center="0,0" size="130,130"/>
+        <Ellipse center="0,0" size="90,90"/>
         <Fill>
             <ConicGradient center="0,0" startAngle="0" endAngle="90">
                 <ColorStop offset="0" color="#00ff0000"/>
@@ -349,6 +315,42 @@
         <TextLayout position="0,0" textAlign="center" lineHeight="1.6"/>
         <DropShadowStyle blurX="2" blurY="2" color="#000000"/>
      </Layer>
+  </Layer>
+
+  <!-- Yellow Status Indicators (Restored in Top Right) -->
+  <Layer name="StatusIcons" x="700" y="80">
+      <Rectangle center="0,0" size="8,8"/>
+      <Stroke color="#ffaa00" width="1"/>
+      <Repeater copies="3" position="15, 0"/>
+      <DropShadowStyle blurX="5" blurY="5" color="#ffaa00"/>
+  </Layer>
+
+  <!-- Ammo Display (Moved to Bottom Right) -->
+  <Layer name="AmmoDisplay" x="640" y="540">
+      <Layer>
+          <!-- Bullet Icon -->
+          <Path data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
+          <Fill color="#ffaa00"/>
+          <Stroke color="#000000" width="1"/>
+          <Repeater copies="10" position="10, 0"/>
+      </Layer>
+      <!-- Row 2 -->
+      <Layer y="15">
+           <Layer>
+              <!-- Bullet Icon -->
+              <Path data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
+              <Fill color="#ffaa00"/>
+              <Stroke color="#000000" width="1"/>
+              <Repeater copies="5" position="10, 0"/>
+           </Layer>
+           <Layer>
+              <!-- Depleted Bullets -->
+              <Path data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
+              <Fill color="#331100"/>
+              <Stroke color="#442200" width="1"/>
+              <Repeater copies="5" position="10, 0" offset="5"/> 
+           </Layer>
+      </Layer>
   </Layer>
 
   <!-- Corners -->
