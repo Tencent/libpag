@@ -194,7 +194,7 @@
     <Layer name="HPBar" x="190" y="16">
       <Layer>
         <Text text="HP" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-        <TextLayout position="-10,8" textAlign="start"/>
+        <TextLayout position="-10,9" textAlign="start"/>
         <Fill color="#F87171"/>
       </Layer>
       <Layer>
@@ -218,7 +218,7 @@
     <Layer name="MPBar" x="190" y="38">
       <Layer>
         <Text text="MP" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-        <TextLayout position="-10,8" textAlign="start"/>
+        <TextLayout position="-10,9" textAlign="start"/>
         <Fill color="#60A5FA"/>
       </Layer>
       <Layer>
@@ -286,7 +286,7 @@
     </Layer>
 
     <!-- Character portrait area -->
-    <Layer x="130" y="145">
+    <Layer x="130" y="155">
       <!-- Portrait frame -->
       <Layer>
         <Rectangle center="0,0" size="200,200" roundness="12"/>
@@ -426,7 +426,7 @@
     </Layer>
 
     <!-- Rarity stars (below portrait) -->
-    <Layer x="145" y="268">
+    <Layer x="145" y="282">
       <Group>
         <Polystar center="0,0" type="star" pointCount="5" outerRadius="7" innerRadius="3" rotation="0"/>
         <Fill color="@starGrad"/>
@@ -436,7 +436,7 @@
     </Layer>
 
     <!-- Stats section -->
-    <Layer x="30" y="300">
+    <Layer x="30" y="310">
       <!-- ATK -->
       <Layer>
         <Polystar center="12,0" type="star" pointCount="4" outerRadius="7" innerRadius="2" rotation="45"/>
@@ -504,7 +504,7 @@
 
     <!-- Separator -->
     <Layer>
-      <Path data="M 30 395 L 230 395"/>
+      <Path data="M 30 406 L 230 406"/>
       <Stroke color="#374151" width="1"/>
     </Layer>
 
