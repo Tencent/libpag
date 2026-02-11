@@ -194,7 +194,7 @@
     <Layer name="HPBar" x="190" y="14">
       <Layer>
         <Text text="HP" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-        <TextLayout position="-20,9" textAlign="start"/>
+        <TextLayout position="-10,9" textAlign="start"/>
         <Fill color="#F87171"/>
       </Layer>
       <Layer>
@@ -218,11 +218,11 @@
     <Layer name="MPBar" x="190" y="36">
       <Layer>
         <Text text="MP" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-        <TextLayout position="-22,9" textAlign="start"/>
+        <TextLayout position="-10,9" textAlign="start"/>
         <Fill color="#60A5FA"/>
       </Layer>
       <Layer>
-        <Rectangle center="105,6" size="190,12" roundness="6"/>
+        <Rectangle center="105,7" size="190,14" roundness="7"/>
         <Fill color="#1E293B"/>
         <Stroke color="#374151" width="1"/>
       </Layer>
@@ -537,7 +537,7 @@
 
     <!-- Equipment slot row 1 -->
     <!-- Slot 1: Weapon -->
-    <Layer name="Slot1" x="0" y="45">
+    <Layer name="Slot1" x="25" y="45">
       <Layer>
         <Rectangle center="65,65" size="130,130" roundness="12"/>
         <Fill color="#1E293BE8"/>
@@ -573,7 +573,7 @@
     </Layer>
 
     <!-- Slot 2: Shield -->
-    <Layer name="Slot2" x="155" y="45">
+    <Layer name="Slot2" x="180" y="45">
       <Layer>
         <Rectangle center="65,65" size="130,130" roundness="12"/>
         <Fill color="#1E293BE8"/>
@@ -605,7 +605,7 @@
     </Layer>
 
     <!-- Slot 3: Helmet -->
-    <Layer name="Slot3" x="310" y="45">
+    <Layer name="Slot3" x="335" y="45">
       <Layer>
         <Rectangle center="65,65" size="130,130" roundness="12"/>
         <Fill color="#1E293BE8"/>
@@ -638,7 +638,7 @@
 
     <!-- Equipment slot row 2 -->
     <!-- Slot 4: Potion -->
-    <Layer name="Slot4" x="0" y="195">
+    <Layer name="Slot4" x="25" y="195">
       <Layer>
         <Rectangle center="65,65" size="130,130" roundness="12"/>
         <Fill color="#1E293BE8"/>
@@ -670,7 +670,7 @@
     </Layer>
 
     <!-- Slot 5: Empty -->
-    <Layer name="Slot5" x="155" y="195">
+    <Layer name="Slot5" x="180" y="195">
       <Layer>
         <Rectangle center="65,65" size="130,130" roundness="12"/>
         <Fill color="#1E293B80"/>
@@ -689,7 +689,7 @@
     </Layer>
 
     <!-- Slot 6: Empty -->
-    <Layer name="Slot6" x="310" y="195">
+    <Layer name="Slot6" x="335" y="195">
       <Layer>
         <Rectangle center="65,65" size="130,130" roundness="12"/>
         <Fill color="#1E293B80"/>
@@ -708,7 +708,7 @@
     </Layer>
 
     <!-- Action buttons -->
-    <Layer name="Actions" y="355">
+    <Layer name="Actions" x="25" y="355">
       <!-- Upgrade button -->
       <Layer>
         <Rectangle center="110,22" size="200,44" roundness="22"/>
