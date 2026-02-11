@@ -1,34 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates Text shape: fontFamily, fontStyle, and fontSize -->
+<!-- Demonstrates Text shape -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Regular style -->
+  <!-- Main title text -->
   <Layer>
-    <Text text="Regular" fontFamily="Arial" fontSize="36"/>
-    <TextLayout position="200,80" textAlign="center"/>
+    <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="84"/>
+    <TextLayout position="200,140" textAlign="center"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="280,0">
+        <ColorStop offset="0" color="#6366F1"/>
+        <ColorStop offset="0.5" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#EC4899"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+  <!-- Subtitle -->
+  <Layer>
+    <Text text="Text Shape" fontFamily="Arial" fontSize="36"/>
+    <TextLayout position="200,220" textAlign="center"/>
     <Fill color="#334155"/>
   </Layer>
-  <!-- Bold style -->
+  <!-- Small description -->
   <Layer>
-    <Text text="Bold" fontFamily="Arial" fontStyle="Bold" fontSize="36"/>
-    <TextLayout position="200,140" textAlign="center"/>
-    <Fill color="#6366F1"/>
-  </Layer>
-  <!-- Italic style -->
-  <Layer>
-    <Text text="Italic" fontFamily="Arial" fontStyle="Italic" fontSize="36"/>
-    <TextLayout position="200,200" textAlign="center"/>
-    <Fill color="#EC4899"/>
-  </Layer>
-  <!-- Serif font family -->
-  <Layer>
-    <Text text="Serif" fontFamily="Times New Roman" fontSize="36"/>
-    <TextLayout position="200,280" textAlign="center"/>
-    <Fill color="#059669"/>
-  </Layer>
-  <!-- Large font size -->
-  <Layer>
-    <Text text="Big" fontFamily="Arial" fontStyle="Bold" fontSize="72"/>
-    <TextLayout position="200,370" textAlign="center"/>
-    <Fill color="#8B5CF6"/>
+    <Text text="Beautiful Typography" fontFamily="Arial" fontSize="24"/>
+    <TextLayout position="200,300" textAlign="center"/>
+    <Fill color="#475569"/>
   </Layer>
 </pagx>
