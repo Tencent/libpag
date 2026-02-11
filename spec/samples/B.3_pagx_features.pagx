@@ -1,0 +1,569 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="800" height="600">
+
+  <!-- ==================== RESOURCES ==================== -->
+  <Resources>
+    <!-- Background gradient: deep blue to dark -->
+    <LinearGradient id="bgGrad" startPoint="0,0" endPoint="800,600">
+      <ColorStop offset="0" color="#0A0F1E"/>
+      <ColorStop offset="0.4" color="#0F1B3D"/>
+      <ColorStop offset="1" color="#060A14"/>
+    </LinearGradient>
+
+    <!-- Decorative glow -->
+    <RadialGradient id="glowCenter" center="400,300" radius="350">
+      <ColorStop offset="0" color="#6366F120"/>
+      <ColorStop offset="0.5" color="#8B5CF610"/>
+      <ColorStop offset="1" color="#6366F100"/>
+    </RadialGradient>
+    <RadialGradient id="glowTopLeft" center="0,0" radius="300">
+      <ColorStop offset="0" color="#3B82F618"/>
+      <ColorStop offset="1" color="#3B82F600"/>
+    </RadialGradient>
+    <RadialGradient id="glowBottomRight" center="800,600" radius="350">
+      <ColorStop offset="0" color="#EC489918"/>
+      <ColorStop offset="1" color="#EC489900"/>
+    </RadialGradient>
+
+    <!-- Title gradient -->
+    <LinearGradient id="titleGrad" startPoint="0,0" endPoint="350,0">
+      <ColorStop offset="0" color="#FFFFFF"/>
+      <ColorStop offset="0.4" color="#A78BFA"/>
+      <ColorStop offset="1" color="#6366F1"/>
+    </LinearGradient>
+
+    <!-- Subtitle gradient -->
+    <LinearGradient id="subtitleGrad" startPoint="0,0" endPoint="400,0">
+      <ColorStop offset="0" color="#C4B5FD"/>
+      <ColorStop offset="0.5" color="#818CF8"/>
+      <ColorStop offset="1" color="#A78BFA"/>
+    </LinearGradient>
+
+    <!-- Card gradients -->
+    <LinearGradient id="card1Grad" startPoint="0,0" endPoint="0,140">
+      <ColorStop offset="0" color="#FB718518"/>
+      <ColorStop offset="1" color="#FB718506"/>
+    </LinearGradient>
+    <LinearGradient id="card1Border" startPoint="0,0" endPoint="200,140">
+      <ColorStop offset="0" color="#FB718555"/>
+      <ColorStop offset="1" color="#FB718518"/>
+    </LinearGradient>
+
+    <LinearGradient id="card2Grad" startPoint="0,0" endPoint="0,140">
+      <ColorStop offset="0" color="#38BDF818"/>
+      <ColorStop offset="1" color="#38BDF806"/>
+    </LinearGradient>
+    <LinearGradient id="card2Border" startPoint="0,0" endPoint="200,140">
+      <ColorStop offset="0" color="#38BDF855"/>
+      <ColorStop offset="1" color="#38BDF818"/>
+    </LinearGradient>
+
+    <LinearGradient id="card3Grad" startPoint="0,0" endPoint="0,140">
+      <ColorStop offset="0" color="#A78BFA18"/>
+      <ColorStop offset="1" color="#A78BFA06"/>
+    </LinearGradient>
+    <LinearGradient id="card3Border" startPoint="0,0" endPoint="200,140">
+      <ColorStop offset="0" color="#A78BFA55"/>
+      <ColorStop offset="1" color="#A78BFA18"/>
+    </LinearGradient>
+
+    <LinearGradient id="card4Grad" startPoint="0,0" endPoint="0,140">
+      <ColorStop offset="0" color="#34D39918"/>
+      <ColorStop offset="1" color="#34D39906"/>
+    </LinearGradient>
+    <LinearGradient id="card4Border" startPoint="0,0" endPoint="200,140">
+      <ColorStop offset="0" color="#34D39955"/>
+      <ColorStop offset="1" color="#34D39918"/>
+    </LinearGradient>
+
+    <LinearGradient id="card5Grad" startPoint="0,0" endPoint="0,140">
+      <ColorStop offset="0" color="#FBBF2418"/>
+      <ColorStop offset="1" color="#FBBF2406"/>
+    </LinearGradient>
+    <LinearGradient id="card5Border" startPoint="0,0" endPoint="200,140">
+      <ColorStop offset="0" color="#FBBF2455"/>
+      <ColorStop offset="1" color="#FBBF2418"/>
+    </LinearGradient>
+
+    <!-- Bottom bar gradient -->
+    <LinearGradient id="bottomBarGrad" startPoint="0,0" endPoint="800,0">
+      <ColorStop offset="0" color="#6366F100"/>
+      <ColorStop offset="0.2" color="#6366F140"/>
+      <ColorStop offset="0.5" color="#8B5CF660"/>
+      <ColorStop offset="0.8" color="#EC489940"/>
+      <ColorStop offset="1" color="#EC489900"/>
+    </LinearGradient>
+
+    <!-- Decorative ring gradient -->
+    <ConicGradient id="ringGrad" center="0,0" startAngle="0" endAngle="360">
+      <ColorStop offset="0" color="#6366F1"/>
+      <ColorStop offset="0.25" color="#8B5CF6"/>
+      <ColorStop offset="0.5" color="#EC4899"/>
+      <ColorStop offset="0.75" color="#3B82F6"/>
+      <ColorStop offset="1" color="#6366F1"/>
+    </ConicGradient>
+
+    <!-- Icon paths -->
+    <PathData id="xmlDocIcon" data="M -14 -18 L 6 -18 L 16 -8 L 16 18 L -14 18 Z"/>
+    <PathData id="xmlDocFold" data="M 6 -18 L 6 -8 L 16 -8"/>
+    <PathData id="xmlBracket" data="M -8 -3 L -13 4 L -8 11 M 4 -3 L 9 4 L 4 11"/>
+
+    <PathData id="layersIcon" data="M 0 -12 L 18 -4 L 0 4 L -18 -4 Z"/>
+    <PathData id="layersMid" data="M -18 2 L 0 10 L 18 2"/>
+    <PathData id="layersBot" data="M -18 8 L 0 16 L 18 8"/>
+
+    <PathData id="boltIcon" data="M 2 -18 L -6 0 L 2 0 L -2 18 L 10 0 L 2 0 Z"/>
+
+    <PathData id="puzzleIcon" data="M -14 -6 L -4 -6 Q -4 -14 0 -14 Q 4 -14 4 -6 L 14 -6 L 14 4 Q 6 4 6 8 Q 6 12 14 12 L 14 18 L -14 18 L -14 12 Q -6 12 -6 8 Q -6 4 -14 4 Z"/>
+
+    <PathData id="rocketBody" data="M 0 -18 Q 8 -14 10 -2 L 10 8 L -10 8 L -10 -2 Q -8 -14 0 -18 Z"/>
+    <PathData id="rocketFin" data="M -10 2 L -16 10 L -10 8 Z M 10 2 L 16 10 L 10 8 Z"/>
+    <PathData id="rocketFlame" data="M -6 8 Q -4 16 0 20 Q 4 16 6 8"/>
+    <PathData id="rocketWindow" data="M 0 -6 A 4 4 0 1 1 0 2 A 4 4 0 1 1 0 -6 Z"/>
+  </Resources>
+
+  <!-- ==================== BACKGROUND ==================== -->
+  <Layer name="Background">
+    <Rectangle center="400,300" size="800,600"/>
+    <Fill color="@bgGrad"/>
+  </Layer>
+
+  <!-- Ambient glows -->
+  <Layer name="GlowCenter" blendMode="screen">
+    <Ellipse center="400,300" size="700,700"/>
+    <Fill color="@glowCenter"/>
+  </Layer>
+  <Layer name="GlowTL" blendMode="screen">
+    <Ellipse center="0,0" size="600,600"/>
+    <Fill color="@glowTopLeft"/>
+  </Layer>
+  <Layer name="GlowBR" blendMode="screen">
+    <Ellipse center="800,600" size="700,700"/>
+    <Fill color="@glowBottomRight"/>
+  </Layer>
+
+  <!-- ==================== DECORATIVE GRID ==================== -->
+  <Layer name="Grid" alpha="0.04">
+    <Group>
+      <Path data="M 0 0 L 800 0"/>
+      <Stroke color="#FFFFFF" width="1"/>
+      <Repeater copies="12" position="0,50"/>
+    </Group>
+    <Group>
+      <Path data="M 0 0 L 0 600"/>
+      <Stroke color="#FFFFFF" width="1"/>
+      <Repeater copies="16" position="50,0"/>
+    </Group>
+  </Layer>
+
+  <!-- ==================== DECORATIVE ORBITING RING ==================== -->
+  <Layer name="OrbitalRing" x="400" y="58" alpha="0.2">
+    <Ellipse center="0,0" size="180,30"/>
+    <TrimPath start="0" end="0.65"/>
+    <Stroke width="2" cap="round" color="@ringGrad"/>
+  </Layer>
+
+  <!-- ==================== TOP DECORATIVE DIAMOND CHAIN ==================== -->
+  <Layer name="DiamondChain" alpha="0.1">
+    <Group>
+      <Path data="M 0 -4 L 3 0 L 0 4 L -3 0 Z"/>
+      <Fill color="#A78BFA"/>
+      <Repeater copies="20" position="40,0" startAlpha="1" endAlpha="0.3"/>
+    </Group>
+    <Group position="10,16"/>
+  </Layer>
+
+  <!-- ==================== HEADER SECTION ==================== -->
+  <Layer name="TitlePAGX" x="400" y="42">
+    <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="52"/>
+    <TextLayout position="0,0" textAlign="center"/>
+    <Fill color="@titleGrad"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#6366F160"/>
+  </Layer>
+
+  <Layer name="Subtitle">
+    <Text text="Portable Animated Graphics XML" fontFamily="Arial" fontSize="14"/>
+    <TextLayout position="400,84" textAlign="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Decorative accent line -->
+  <Layer name="AccentLine" alpha="0.6">
+    <Path data="M 280 104 L 520 104"/>
+    <Stroke width="2" cap="round">
+      <LinearGradient startPoint="280,0" endPoint="520,0">
+        <ColorStop offset="0" color="#6366F100"/>
+        <ColorStop offset="0.15" color="#6366F1"/>
+        <ColorStop offset="0.5" color="#EC4899"/>
+        <ColorStop offset="0.85" color="#6366F1"/>
+        <ColorStop offset="1" color="#6366F100"/>
+      </LinearGradient>
+    </Stroke>
+  </Layer>
+
+  <Layer name="Tagline">
+    <Text text="The Next-Gen Vector Animation Standard" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
+    <TextLayout position="400,116" textAlign="center"/>
+    <Fill color="@subtitleGrad"/>
+  </Layer>
+
+  <!-- ==================== FEATURE CARDS (5 cards, 2 rows) ==================== -->
+
+  <!-- ===== ROW 1: 3 cards at y=150 ===== -->
+  <!-- Card dimensions: 200x140, spacing ~25, total ~650, left margin ~75 -->
+
+  <!-- Card 1: Open & Readable -->
+  <Layer name="Card1" x="75" y="148">
+    <Layer>
+      <Rectangle center="100,72" size="200,144" roundness="14"/>
+      <Fill color="@card1Grad"/>
+      <Stroke color="@card1Border" width="1"/>
+      <DropShadowStyle offsetX="0" offsetY="6" blurX="20" blurY="20" color="#00000050"/>
+    </Layer>
+    <!-- Icon centered at top of card -->
+    <Layer x="100" y="36">
+      <Layer>
+        <Ellipse center="0,0" size="44,44"/>
+        <Fill>
+          <RadialGradient center="0,0" radius="22">
+            <ColorStop offset="0" color="#FB718530"/>
+            <ColorStop offset="1" color="#FB718500"/>
+          </RadialGradient>
+        </Fill>
+      </Layer>
+      <Layer>
+        <Path data="@xmlDocIcon"/>
+        <Fill color="#FB718520"/>
+        <Stroke color="#FB7185" width="2" join="round"/>
+      </Layer>
+      <Layer>
+        <Path data="@xmlDocFold"/>
+        <Stroke color="#FB7185" width="1.5" join="round"/>
+      </Layer>
+      <Layer>
+        <Path data="@xmlBracket"/>
+        <Stroke color="#FB7185" width="2" cap="round"/>
+      </Layer>
+    </Layer>
+    <!-- Text centered -->
+    <Layer>
+      <Text text="Open &amp; Readable" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+      <TextLayout position="100,78" textAlign="center"/>
+      <Fill color="#FB7185"/>
+    </Layer>
+    <Layer>
+      <Text text="XML plain-text format" fontFamily="Arial" fontSize="11"/>
+      <TextLayout position="100,98" textAlign="center"/>
+      <Fill color="#CBD5E1"/>
+    </Layer>
+    <Layer>
+      <Text text="Git-friendly &amp; AI-native" fontFamily="Arial" fontSize="11"/>
+      <TextLayout position="100,114" textAlign="center"/>
+      <Fill color="#94A3B8"/>
+    </Layer>
+  </Layer>
+
+  <!-- Card 2: Feature-Complete -->
+  <Layer name="Card2" x="300" y="148">
+    <Layer>
+      <Rectangle center="100,72" size="200,144" roundness="14"/>
+      <Fill color="@card2Grad"/>
+      <Stroke color="@card2Border" width="1"/>
+      <DropShadowStyle offsetX="0" offsetY="6" blurX="20" blurY="20" color="#00000050"/>
+    </Layer>
+    <Layer x="100" y="32">
+      <Layer>
+        <Ellipse center="0,0" size="44,44"/>
+        <Fill>
+          <RadialGradient center="0,0" radius="22">
+            <ColorStop offset="0" color="#38BDF830"/>
+            <ColorStop offset="1" color="#38BDF800"/>
+          </RadialGradient>
+        </Fill>
+      </Layer>
+      <Layer>
+        <Path data="@layersIcon"/>
+        <Fill color="#38BDF830"/>
+        <Stroke color="#38BDF8" width="2" join="round"/>
+      </Layer>
+      <Layer>
+        <Path data="@layersMid"/>
+        <Stroke color="#38BDF8" width="2" cap="round" join="round"/>
+      </Layer>
+      <Layer>
+        <Path data="@layersBot"/>
+        <Stroke color="#38BDF8" width="2" cap="round" join="round"/>
+      </Layer>
+    </Layer>
+    <Layer>
+      <Text text="Feature-Complete" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+      <TextLayout position="100,78" textAlign="center"/>
+      <Fill color="#38BDF8"/>
+    </Layer>
+    <Layer>
+      <Text text="Vector, text, effects" fontFamily="Arial" fontSize="11"/>
+      <TextLayout position="100,98" textAlign="center"/>
+      <Fill color="#CBD5E1"/>
+    </Layer>
+    <Layer>
+      <Text text="Masks, blending &amp; filters" fontFamily="Arial" fontSize="11"/>
+      <TextLayout position="100,114" textAlign="center"/>
+      <Fill color="#94A3B8"/>
+    </Layer>
+  </Layer>
+
+  <!-- Card 3: Concise & Efficient -->
+  <Layer name="Card3" x="525" y="148">
+    <Layer>
+      <Rectangle center="100,72" size="200,144" roundness="14"/>
+      <Fill color="@card3Grad"/>
+      <Stroke color="@card3Border" width="1"/>
+      <DropShadowStyle offsetX="0" offsetY="6" blurX="20" blurY="20" color="#00000050"/>
+    </Layer>
+    <Layer x="100" y="36">
+      <Layer>
+        <Ellipse center="0,0" size="44,44"/>
+        <Fill>
+          <RadialGradient center="0,0" radius="22">
+            <ColorStop offset="0" color="#A78BFA30"/>
+            <ColorStop offset="1" color="#A78BFA00"/>
+          </RadialGradient>
+        </Fill>
+      </Layer>
+      <Layer>
+        <Path data="@boltIcon"/>
+        <Fill color="#A78BFA"/>
+      </Layer>
+    </Layer>
+    <Layer>
+      <Text text="Concise &amp; Efficient" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+      <TextLayout position="100,78" textAlign="center"/>
+      <Fill color="#A78BFA"/>
+    </Layer>
+    <Layer>
+      <Text text="Compact expression" fontFamily="Arial" fontSize="11"/>
+      <TextLayout position="100,98" textAlign="center"/>
+      <Fill color="#CBD5E1"/>
+    </Layer>
+    <Layer>
+      <Text text="Static &amp; animated unified" fontFamily="Arial" fontSize="11"/>
+      <TextLayout position="100,114" textAlign="center"/>
+      <Fill color="#94A3B8"/>
+    </Layer>
+  </Layer>
+
+  <!-- ===== ROW 2: 2 cards centered at y=310 ===== -->
+
+  <!-- Card 4: Ecosystem Compatible -->
+  <Layer name="Card4" x="175" y="316">
+    <Layer>
+      <Rectangle center="100,72" size="200,144" roundness="14"/>
+      <Fill color="@card4Grad"/>
+      <Stroke color="@card4Border" width="1"/>
+      <DropShadowStyle offsetX="0" offsetY="6" blurX="20" blurY="20" color="#00000050"/>
+    </Layer>
+    <Layer x="100" y="36">
+      <Layer>
+        <Ellipse center="0,0" size="44,44"/>
+        <Fill>
+          <RadialGradient center="0,0" radius="22">
+            <ColorStop offset="0" color="#34D39930"/>
+            <ColorStop offset="1" color="#34D39900"/>
+          </RadialGradient>
+        </Fill>
+      </Layer>
+      <Layer>
+        <Path data="@puzzleIcon"/>
+        <Fill color="#34D39930"/>
+        <Stroke color="#34D399" width="2" join="round"/>
+      </Layer>
+    </Layer>
+    <Layer>
+      <Text text="Ecosystem Compatible" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+      <TextLayout position="100,78" textAlign="center"/>
+      <Fill color="#34D399"/>
+    </Layer>
+    <Layer>
+      <Text text="AE, Figma, TD bridge" fontFamily="Arial" fontSize="11"/>
+      <TextLayout position="100,98" textAlign="center"/>
+      <Fill color="#CBD5E1"/>
+    </Layer>
+    <Layer>
+      <Text text="Seamless asset exchange" fontFamily="Arial" fontSize="11"/>
+      <TextLayout position="100,114" textAlign="center"/>
+      <Fill color="#94A3B8"/>
+    </Layer>
+  </Layer>
+
+  <!-- Card 5: Efficient Deployment -->
+  <Layer name="Card5" x="425" y="316">
+    <Layer>
+      <Rectangle center="100,72" size="200,144" roundness="14"/>
+      <Fill color="@card5Grad"/>
+      <Stroke color="@card5Border" width="1"/>
+      <DropShadowStyle offsetX="0" offsetY="6" blurX="20" blurY="20" color="#00000050"/>
+    </Layer>
+    <Layer x="100" y="36">
+      <Layer>
+        <Ellipse center="0,0" size="44,44"/>
+        <Fill>
+          <RadialGradient center="0,0" radius="22">
+            <ColorStop offset="0" color="#FBBF2430"/>
+            <ColorStop offset="1" color="#FBBF2400"/>
+          </RadialGradient>
+        </Fill>
+      </Layer>
+      <Layer>
+        <Path data="@rocketBody"/>
+        <Fill color="#FBBF2430"/>
+        <Stroke color="#FBBF24" width="2" join="round"/>
+      </Layer>
+      <Layer>
+        <Path data="@rocketFin"/>
+        <Fill color="#FBBF24"/>
+      </Layer>
+      <Layer>
+        <Path data="@rocketWindow"/>
+        <Fill color="#0F172A"/>
+        <Stroke color="#FBBF24" width="1"/>
+      </Layer>
+      <Layer>
+        <Path data="@rocketFlame"/>
+        <Stroke color="#FB923C" width="2" cap="round"/>
+      </Layer>
+    </Layer>
+    <Layer>
+      <Text text="Efficient Deployment" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+      <TextLayout position="100,78" textAlign="center"/>
+      <Fill color="#FBBF24"/>
+    </Layer>
+    <Layer>
+      <Text text="One-click to production" fontFamily="Arial" fontSize="11"/>
+      <TextLayout position="100,98" textAlign="center"/>
+      <Fill color="#CBD5E1"/>
+    </Layer>
+    <Layer>
+      <Text text="High compression binary" fontFamily="Arial" fontSize="11"/>
+      <TextLayout position="100,114" textAlign="center"/>
+      <Fill color="#94A3B8"/>
+    </Layer>
+  </Layer>
+
+  <!-- ==================== BOTTOM PIPELINE SECTION ==================== -->
+
+  <!-- Decorative separator line -->
+  <Layer name="BottomAccent">
+    <Path data="M 120 486 L 680 486"/>
+    <Stroke color="@bottomBarGrad" width="1"/>
+  </Layer>
+
+  <!-- Pipeline: .pagx -> .pag -> Production (all absolute coordinates) -->
+  <!-- PAGX badge -->
+  <Layer name="PagxBadge">
+    <Rectangle center="260,514" size="80,28" roundness="14"/>
+    <Fill color="#6366F130"/>
+    <Stroke color="#6366F160" width="1"/>
+  </Layer>
+  <Layer>
+    <Text text=".pagx" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+    <TextLayout position="260,508" textAlign="center"/>
+    <Fill color="#A78BFA"/>
+  </Layer>
+
+  <!-- Arrow 1 -->
+  <Layer name="Arrow1">
+    <Path data="M 310 514 L 340 514"/>
+    <Stroke color="#64748B" width="2" cap="round"/>
+  </Layer>
+  <Layer>
+    <Path data="M 334 508 L 342 514 L 334 520"/>
+    <Stroke color="#64748B" width="2" cap="round" join="round"/>
+  </Layer>
+
+  <!-- PAG badge -->
+  <Layer name="PagBadge">
+    <Rectangle center="390,514" size="72,28" roundness="14"/>
+    <Fill color="#EC489930"/>
+    <Stroke color="#EC489960" width="1"/>
+  </Layer>
+  <Layer>
+    <Text text=".pag" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+    <TextLayout position="390,508" textAlign="center"/>
+    <Fill color="#F472B6"/>
+  </Layer>
+
+  <!-- Arrow 2 -->
+  <Layer name="Arrow2">
+    <Path data="M 436 514 L 466 514"/>
+    <Stroke color="#64748B" width="2" cap="round"/>
+  </Layer>
+  <Layer>
+    <Path data="M 460 508 L 468 514 L 460 520"/>
+    <Stroke color="#64748B" width="2" cap="round" join="round"/>
+  </Layer>
+
+  <!-- Production badge -->
+  <Layer name="ProdBadge">
+    <Rectangle center="530,514" size="100,28" roundness="14"/>
+    <Fill color="#34D39920"/>
+    <Stroke color="#34D39960" width="1"/>
+  </Layer>
+  <Layer>
+    <Text text="Production" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+    <TextLayout position="530,508" textAlign="center"/>
+    <Fill color="#34D399"/>
+  </Layer>
+
+  <!-- Bottom tagline -->
+  <Layer name="BottomDesc">
+    <Text text="Design  -  Develop  -  Deploy" fontFamily="Arial" fontSize="12"/>
+    <TextLayout position="400,550" textAlign="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- ==================== DECORATIVE ELEMENTS ==================== -->
+
+  <!-- Floating dots -->
+  <Layer name="FloatingDots" alpha="0.15">
+    <Group>
+      <Ellipse center="0,0" size="4,4"/>
+      <Fill color="#6366F1"/>
+      <Repeater copies="8" position="100,0" startAlpha="1" endAlpha="0.2"/>
+    </Group>
+    <Group position="50,142"/>
+    <Group>
+      <Ellipse center="0,0" size="4,4"/>
+      <Fill color="#EC4899"/>
+      <Repeater copies="8" position="100,0" startAlpha="0.2" endAlpha="1"/>
+    </Group>
+    <Group position="50,464"/>
+  </Layer>
+
+  <!-- Corner decorations -->
+  <Layer name="CornerTL" alpha="0.1">
+    <Path data="M 20 40 L 20 20 L 40 20"/>
+    <Stroke color="#6366F1" width="2" cap="round"/>
+  </Layer>
+  <Layer name="CornerTR" alpha="0.1">
+    <Path data="M 760 20 L 780 20 L 780 40"/>
+    <Stroke color="#3B82F6" width="2" cap="round"/>
+  </Layer>
+  <Layer name="CornerBL" alpha="0.1">
+    <Path data="M 20 560 L 20 580 L 40 580"/>
+    <Stroke color="#A78BFA" width="2" cap="round"/>
+  </Layer>
+  <Layer name="CornerBR" alpha="0.1">
+    <Path data="M 760 580 L 780 580 L 780 560"/>
+    <Stroke color="#EC4899" width="2" cap="round"/>
+  </Layer>
+
+  <!-- Central decorative hex pattern -->
+  <Layer name="HexPattern" x="400" y="300" alpha="0.04">
+    <Group>
+      <Polystar center="0,0" type="polygon" pointCount="6" outerRadius="50"/>
+      <Stroke color="#FFFFFF" width="1"/>
+      <Repeater copies="3" scale="1.5,1.5" anchor="0,0"/>
+    </Group>
+  </Layer>
+
+</pagx>
