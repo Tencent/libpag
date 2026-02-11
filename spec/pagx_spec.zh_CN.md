@@ -409,6 +409,15 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 
 **计算**：对于点 P，其颜色由 `atan2(P.y - center.y, P.x - center.x)` 在 `[startAngle, endAngle]` 范围内的比例决定。
 
+**角度约定**：遵循全局坐标系约定（见 §3.1）：0° 指向**右侧**（X 轴正方向），角度沿**顺时针**递增。这与 CSS `conic-gradient`（0° 指向顶部）不同。常用参考角度：
+
+| 角度 | 方向 |
+|------|------|
+| 0°   | 右 (3 点钟) |
+| 90°  | 下 (6 点钟) |
+| 180° | 左 (9 点钟) |
+| 270° | 上 (12 点钟) |
+
 ##### 菱形渐变（DiamondGradient）
 
 菱形渐变从中心向四角辐射。
@@ -434,7 +443,7 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 | `radius` | float | (必填) | 渐变半径 |
 | `matrix` | Matrix | 单位矩阵 | 变换矩阵 |
 
-**计算**：对于点 P，其颜色由曼哈顿距离 `(|P.x - center.x| + |P.y - center.y|) / radius` 决定。
+**计算**：对于点 P，其颜色由切比雪夫距离 `max(|P.x - center.x|, |P.y - center.y|) / radius` 决定。
 
 ##### 渐变色标（ColorStop）
 

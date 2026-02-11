@@ -409,6 +409,15 @@ Conic gradients (also known as sweep gradients) interpolate along the circumfere
 
 **Calculation**: For a point P, its color is determined by the ratio of `atan2(P.y - center.y, P.x - center.x)` within the `[startAngle, endAngle]` range.
 
+**Angle convention**: Follows the global coordinate system convention (see §3.1): 0° points to the **right** (positive X-axis), and angles increase **clockwise**. This differs from CSS `conic-gradient` where 0° points to the top. Common reference angles:
+
+| Angle | Direction |
+|-------|-----------|
+| 0°    | Right (3 o'clock) |
+| 90°   | Down (6 o'clock) |
+| 180°  | Left (9 o'clock) |
+| 270°  | Up (12 o'clock) |
+
 ##### DiamondGradient
 
 Diamond gradients radiate from the center toward the four corners.
@@ -434,7 +443,7 @@ Diamond gradients radiate from the center toward the four corners.
 | `radius` | float | (required) | Gradient radius |
 | `matrix` | Matrix | identity matrix | Transform matrix |
 
-**Calculation**: For a point P, its color is determined by the Manhattan distance `(|P.x - center.x| + |P.y - center.y|) / radius`.
+**Calculation**: For a point P, its color is determined by the Chebyshev distance `max(|P.x - center.x|, |P.y - center.y|) / radius`.
 
 ##### ColorStop
 
