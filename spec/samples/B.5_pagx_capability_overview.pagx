@@ -109,6 +109,7 @@
     <Stroke color="#334155" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="8" blurX="16" blurY="16" color="#00000040"/>
     <Layer x="-100" y="-2">
+      <!-- Document outline with folded corner -->
       <Group>
         <Path data="M -28 -38 L 8 -38 L 28 -18 L 28 42 L -28 42 Z"/>
         <Stroke color="#F43F5E" width="2" join="round"/>
@@ -118,15 +119,19 @@
         <Path data="M 8 -38 L 8 -18 L 28 -18"/>
         <Stroke color="#F43F5E" width="1" join="round"/>
       </Group>
+      <!-- </> code symbol drawn with paths -->
       <Group>
-        <Path data="M -15 -8 L 12 -8 M -15 8 L 18 8 M -15 22 L 10 22"/>
-        <Stroke color="#F43F5E" width="1" cap="round"/>
+        <Path data="M -12 -4 L -22 8 L -12 20"/>
+        <Stroke color="#F43F5E" width="2.5" cap="round" join="round"/>
       </Group>
-      <Layer>
-        <Text text="&lt; &gt;" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
-        <TextLayout position="20,28" textAlign="center"/>
-        <Fill color="#F43F5E"/>
-      </Layer>
+      <Group>
+        <Path data="M 12 -4 L 22 8 L 12 20"/>
+        <Stroke color="#F43F5E" width="2.5" cap="round" join="round"/>
+      </Group>
+      <Group>
+        <Path data="M 5 -8 L -5 24"/>
+        <Stroke color="#F43F5E" width="2" cap="round"/>
+      </Group>
     </Layer>
     <Layer x="-30" y="-17">
       <Text text="Readable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
