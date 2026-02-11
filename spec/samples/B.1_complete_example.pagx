@@ -1,186 +1,248 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="800" height="600">
   
-  <!-- ==================== 1. Background Layer ==================== -->
-  <Layer name="Background">
+  <!-- ==================== 1. Atmosphere Background ==================== -->
+  <Layer name="BgBase">
     <Rectangle center="400,300" size="800,600"/>
-    <Fill color="#0F172A"/> <!-- Slate 900 -->
+    <Fill color="#0B0F19"/> <!-- Deep Space Black -->
   </Layer>
 
-  <!-- Grid Pattern (Full Screen) -->
-  <Layer name="Grid" alpha="0.1">
-    <Group>
-      <Path data="M 0 0 L 800 0"/>
-      <Stroke color="#38BDF8" width="1"/>
-      <Repeater copies="13" position="0,50"/>
-    </Group>
-    <Group>
-      <Path data="M 0 0 L 0 600"/>
-      <Stroke color="#38BDF8" width="1"/>
-      <Repeater copies="17" position="50,0"/>
-    </Group>
-  </Layer>
-
-  <!-- ==================== 2. Top Header Bar ==================== -->
-  <Layer name="Header" x="0" y="0">
-    <!-- Header Bg -->
-    <Rectangle center="400,40" size="800,80"/>
+  <!-- Ambient Glows (Gradients) -->
+  <Layer name="AmbientGlowTopLeft" x="0" y="0" blendMode="screen">
+    <Ellipse center="200,100" size="600,600"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="0,80">
-        <ColorStop offset="0" color="#1E293B"/>
-        <ColorStop offset="1" color="#0F172A00"/>
-      </LinearGradient>
+      <RadialGradient center="200,100" radius="300">
+        <ColorStop offset="0" color="#4F46E540"/> <!-- Indigo Low Opacity -->
+        <ColorStop offset="1" color="#4F46E500"/>
+      </RadialGradient>
     </Fill>
-    
-    <!-- Logo Text with Modifier -->
-    <Layer x="60" y="40">
-      <Text text="PAGX SYSTEM" fontFamily="Arial" fontStyle="Bold" fontSize="32"/>
-      <TextLayout position="0,10" textAlign="start"/>
-      <Fill color="#FFFFFF"/>
-      <TextModifier scale="1.1,1.1">
-        <RangeSelector start="0" end="0.3" shape="rampDown"/>
-      </TextModifier>
-    </Layer>
-
-    <!-- Version Badge (Composition) -->
-    <Layer composition="@badgeComp" x="680" y="25"/>
+  </Layer>
+  <Layer name="AmbientGlowBottomRight" x="0" y="0" blendMode="screen">
+    <Ellipse center="600,500" size="600,600"/>
+    <Fill>
+      <RadialGradient center="600,500" radius="300">
+        <ColorStop offset="0" color="#EC489930"/> <!-- Pink Low Opacity -->
+        <ColorStop offset="1" color="#EC489900"/>
+      </RadialGradient>
+    </Fill>
   </Layer>
 
-  <!-- ==================== 3. Left Sidebar (Repeater) ==================== -->
-  <Layer name="Sidebar" x="40" y="150">
-    <!-- Menu Items -->
-    <Group>
-      <Rectangle center="60,25" size="120,40" roundness="8"/>
-      <Fill color="#1E293B"/>
-      <Stroke color="#334155" width="1"/>
-      <Repeater copies="6" position="0,60"/>
-    </Group>
-    
-    <!-- Active Indicator -->
-    <Layer x="0" y="0">
-      <Rectangle center="10,25" size="4,24" roundness="2"/>
-      <Fill color="#38BDF8"/>
-      <DropShadowStyle offsetX="0" offsetY="0" blurX="8" blurY="8" color="#38BDF8"/>
-    </Layer>
+  <!-- Subtle Grid (Dashed Lines) -->
+  <Layer name="GridLines" alpha="0.1">
+    <Path data="M 100 0 L 100 600 M 700 0 L 700 600"/>
+    <Stroke color="#FFFFFF" width="1" dashes="8,16"/>
   </Layer>
 
-  <!-- ==================== 4. Main Content: Data Widget (Center) ==================== -->
-  <Layer name="DataWidget" x="220" y="150">
-    <Rectangle center="270,140" size="540,280" roundness="16"/>
-    <Fill color="#1E293B80"/>
-    <Stroke color="#334155" width="1"/>
-
-    <!-- Chart Title -->
-    <Layer x="40" y="40">
-      <Text text="Performance Metrics" fontFamily="Arial" fontSize="18"/>
-      <Fill color="#94A3B8"/>
-    </Layer>
-
-    <!-- Wave Graph (Path + Gradient Stroke) -->
-    <Layer x="40" y="150">
-      <Path data="M 0 50 Q 80 0 160 50 T 320 50 T 480 50"/>
-      <Stroke width="4" cap="round">
-        <LinearGradient startPoint="0,0" endPoint="480,0">
-          <ColorStop offset="0" color="#10B981"/>
-          <ColorStop offset="1" color="#3B82F6"/>
-        </LinearGradient>
+  <!-- ==================== 2. Central Core (The "Engine") ==================== -->
+  <Layer name="Core" x="400" y="300">
+    
+    <!-- Outer Glow Ring -->
+    <Layer>
+      <Ellipse center="0,0" size="180,180"/>
+      <Stroke width="2">
+        <ConicGradient center="0,0" startAngle="0" endAngle="360">
+          <ColorStop offset="0" color="#3B82F600"/>
+          <ColorStop offset="0.5" color="#3B82F6"/>
+          <ColorStop offset="1" color="#3B82F600"/>
+        </ConicGradient>
       </Stroke>
-      <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#10B98160"/>
+      <BlurFilter blurX="4" blurY="4"/>
     </Layer>
 
-    <!-- Trimmed Progress Circle -->
-    <Layer x="420" y="140">
-      <Group>
-        <Ellipse center="0,0" size="120,120"/>
-        <Stroke color="#334155" width="12"/>
-      </Group>
-      <Group>
-        <Ellipse center="0,0" size="120,120"/>
-        <TrimPath start="0" end="0.75" type="continuous"/>
-        <Stroke color="#F43F5E" width="12" cap="round"/>
-      </Group>
-      <Group>
-        <Text text="75%" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
-        <TextLayout position="0,10" textAlign="center"/>
-        <Fill color="#FFFFFF"/>
-      </Group>
+    <!-- Rotating Interface Rings -->
+    <Layer>
+      <Ellipse center="0,0" size="140,140"/>
+      <Stroke color="#FFFFFF20" width="1"/>
     </Layer>
-  </Layer>
+    <Layer rotation="45">
+      <Ellipse center="0,0" size="160,160"/>
+      <TrimPath start="0" end="0.25"/>
+      <Stroke color="#38BDF8" width="4" cap="round"/>
+    </Layer>
+    <Layer rotation="225">
+      <Ellipse center="0,0" size="160,160"/>
+      <TrimPath start="0" end="0.25"/>
+      <Stroke color="#F472B6" width="4" cap="round"/>
+    </Layer>
 
-  <!-- ==================== 5. Main Content: Visual Widget (Bottom Right) ==================== -->
-  <Layer name="VisualWidget" x="500" y="450">
-    <!-- Complex Shape: Polystar with RoundCorner -->
-    <Group>
-      <Polystar type="star" pointCount="5" outerRadius="60" innerRadius="30"/>
-      <RoundCorner radius="10"/>
+    <!-- Inner Core Orb -->
+    <Layer>
+      <Ellipse center="0,0" size="80,80"/>
       <Fill>
-        <DiamondGradient center="0,0" radius="60">
-          <ColorStop offset="0" color="#F59E0B"/>
-          <ColorStop offset="1" color="#D97706"/>
-        </DiamondGradient>
+        <RadialGradient center="-20,-20" radius="80">
+          <ColorStop offset="0" color="#FFFFFF"/>
+          <ColorStop offset="0.4" color="#6366F1"/>
+          <ColorStop offset="1" color="#1E1B4B"/>
+        </RadialGradient>
       </Fill>
-      <!-- Blur Filter for Bloom -->
-      <BlurFilter blurX="20" blurY="20"/>
-    </Group>
-    
-    <!-- Crisp Foreground Shape -->
-    <Group>
-      <Polystar type="star" pointCount="5" outerRadius="60" innerRadius="30"/>
-      <RoundCorner radius="10"/>
-      <Stroke color="#FFFFFF" width="2"/>
-      <Fill color="#F59E0B80"/>
-    </Group>
-  </Layer>
-
-  <!-- ==================== 6. Footer: TextPath & Rich Text (Bottom) ==================== -->
-  <Layer name="Footer" x="0" y="520">
-    <!-- Scrolling Text Path -->
-    <Layer x="220" y="40">
-      <Text text="PROCESSING VECTORS..." fontFamily="Arial" fontSize="14"/>
-      <TextPath path="M 0,0 Q 150,-20 300,0"/>
-      <Fill color="#64748B"/>
+      <DropShadowStyle offsetX="0" offsetY="0" blurX="30" blurY="30" color="#6366F180"/>
     </Layer>
-
-    <!-- Rich Text Status -->
-    <Layer x="600" y="40">
-      <Group>
-        <Text text="Status: " fontFamily="Arial" fontSize="14"/>
-        <Fill color="#94A3B8"/>
-      </Group>
-      <Group>
-        <Text text="ONLINE" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <Fill color="#22C55E"/>
-      </Group>
-      <TextLayout position="0,0" textAlign="end"/>
+    
+    <!-- Core Logo Text -->
+    <Layer>
+      <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+      <TextLayout position="0,7" textAlign="center"/>
+      <Fill color="#FFFFFF"/>
     </Layer>
   </Layer>
 
-  <!-- ==================== 7. Image Mask (Floating) ==================== -->
-  <Layer name="ImagePreview" x="60" y="450">
-    <ImagePattern image="@photo" tileModeX="clamp" tileModeY="clamp" matrix="0.2,0,0,0.2,-25,-25"/>
-    <Rectangle center="60,60" size="120,120" roundness="60"/> <!-- Circle Mask -->
-    <Stroke color="#FFFFFF" width="4"/>
-    <ColorMatrixFilter matrix="1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, 0,0,0,1,0"/>
+  <!-- ==================== 3. Floating Glass Cards (Feature Nodes) ==================== -->
+  
+  <!-- Connector Lines -->
+  <Layer name="Connectors" alpha="0.3">
+    <!-- Top Left to Center -->
+    <Path data="M 180 150 C 180 250 300 300 400 300"/>
+    <Stroke color="#38BDF8" width="1"/>
+    <!-- Top Right to Center -->
+    <Path data="M 620 150 C 620 250 500 300 400 300"/>
+    <Stroke color="#A855F7" width="1"/>
+    <!-- Bottom Left to Center -->
+    <Path data="M 180 450 C 180 350 300 300 400 300"/>
+    <Stroke color="#F472B6" width="1"/>
+    <!-- Bottom Right to Center -->
+    <Path data="M 620 450 C 620 350 500 300 400 300"/>
+    <Stroke color="#34D399" width="1"/>
   </Layer>
 
-  <!-- ==================== Resources ==================== -->
-  <Resources>
-    <Image id="photo" source="pag_logo.png"/>
+  <!-- Node 1: VECTOR (Top Left) -->
+  <Layer name="NodeVector" x="180" y="150">
+    <!-- Glass Card -->
+    <Rectangle center="0,0" size="160,120" roundness="16"/>
+    <Fill color="#1E293B80"/> <!-- Semi-transparent -->
+    <Stroke color="#FFFFFF20" width="1"/>
+    <DropShadowStyle offsetX="0" offsetY="10" blurX="20" blurY="20" color="#00000060"/>
     
-    <Composition id="badgeComp" width="100" height="30">
-      <Rectangle center="50,15" size="80,26" roundness="13"/>
+    <!-- Content: Geometric Shape -->
+    <Layer y="-10">
+      <Polystar type="polygon" pointCount="6" outerRadius="24"/>
+      <RoundCorner radius="4"/>
       <Fill>
-        <LinearGradient startPoint="0,0" endPoint="80,0">
-          <ColorStop offset="0" color="#6366F1"/>
-          <ColorStop offset="1" color="#8B5CF6"/>
+        <LinearGradient startPoint="0,-24" endPoint="0,24">
+          <ColorStop offset="0" color="#38BDF8"/>
+          <ColorStop offset="1" color="#0284C7"/>
         </LinearGradient>
       </Fill>
-      <Layer>
-        <Text text="v2.4" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
-        <TextLayout position="50,19" textAlign="center"/>
-        <Fill color="#FFFFFF"/>
-      </Layer>
-    </Composition>
-  </Resources>
+    </Layer>
+    <Layer y="35">
+      <Text text="Vector" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+      <TextLayout position="0,0" textAlign="center"/>
+      <Fill color="#E2E8F0"/>
+    </Layer>
+  </Layer>
+
+  <!-- Node 2: TYPOGRAPHY (Top Right) -->
+  <Layer name="NodeText" x="620" y="150">
+    <!-- Glass Card -->
+    <Rectangle center="0,0" size="160,120" roundness="16"/>
+    <Fill color="#1E293B80"/>
+    <Stroke color="#FFFFFF20" width="1"/>
+    <DropShadowStyle offsetX="0" offsetY="10" blurX="20" blurY="20" color="#00000060"/>
+    
+    <!-- Content: Text Path -->
+    <Layer y="-10">
+      <Text text="Aa" fontFamily="Arial" fontStyle="Bold" fontSize="40"/>
+      <TextLayout position="0,14" textAlign="center"/>
+      <Fill>
+        <LinearGradient startPoint="0,-20" endPoint="0,20">
+          <ColorStop offset="0" color="#A855F7"/>
+          <ColorStop offset="1" color="#7E22CE"/>
+        </LinearGradient>
+      </Fill>
+    </Layer>
+    <Layer y="35">
+      <Text text="Typography" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+      <TextLayout position="0,0" textAlign="center"/>
+      <Fill color="#E2E8F0"/>
+    </Layer>
+  </Layer>
+
+  <!-- Node 3: EFFECTS (Bottom Left) -->
+  <Layer name="NodeFX" x="180" y="450">
+    <!-- Glass Card -->
+    <Rectangle center="0,0" size="160,120" roundness="16"/>
+    <Fill color="#1E293B80"/>
+    <Stroke color="#FFFFFF20" width="1"/>
+    <DropShadowStyle offsetX="0" offsetY="10" blurX="20" blurY="20" color="#00000060"/>
+    
+    <!-- Content: Blur & Blend -->
+    <Layer y="-10">
+      <Ellipse center="-10,-5" size="30,30"/>
+      <Fill color="#F472B6"/>
+      <BlurFilter blurX="10" blurY="10"/>
+    </Layer>
+    <Layer y="-10" blendMode="overlay">
+      <Ellipse center="10,5" size="30,30"/>
+      <Fill color="#FFFFFF"/>
+    </Layer>
+    <Layer y="35">
+      <Text text="Visual Effects" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+      <TextLayout position="0,0" textAlign="center"/>
+      <Fill color="#E2E8F0"/>
+    </Layer>
+  </Layer>
+
+  <!-- Node 4: LOGIC (Bottom Right) -->
+  <Layer name="NodeLogic" x="620" y="450">
+    <!-- Glass Card -->
+    <Rectangle center="0,0" size="160,120" roundness="16"/>
+    <Fill color="#1E293B80"/>
+    <Stroke color="#FFFFFF20" width="1"/>
+    <DropShadowStyle offsetX="0" offsetY="10" blurX="20" blurY="20" color="#00000060"/>
+    
+    <!-- Content: Repeater -->
+    <Layer y="-10">
+      <Group>
+        <Rectangle center="0,0" size="8,24" roundness="4"/>
+        <Fill color="#34D399"/>
+        <Repeater copies="5" position="12,0" rotation="10"/>
+      </Group>
+      <!-- Center the repeater group -->
+      <Group position="-24,0"/>
+    </Layer>
+    <Layer y="35">
+      <Text text="Modifiers" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+      <TextLayout position="0,0" textAlign="center"/>
+      <Fill color="#E2E8F0"/>
+    </Layer>
+  </Layer>
+
+  <!-- ==================== 4. Header & Footer ==================== -->
+  
+  <Layer name="Header" x="400" y="60">
+    <Text text="PAGX INFOGRAPHIC" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+    <TextLayout position="0,0" textAlign="center"/>
+    <Fill color="#FFFFFF"/>
+    <TextModifier scale="1.1,1.1">
+        <RangeSelector start="0" end="1" shape="triangle"/>
+    </TextModifier>
+  </Layer>
+
+  <Layer name="SubHeader" x="400" y="90">
+    <Text text="High-Performance Render Engine" fontFamily="Arial" fontSize="14"/>
+    <TextLayout position="0,0" textAlign="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Footer Stats -->
+  <Layer name="Footer" x="400" y="550">
+    <Rectangle center="0,0" size="300,1" roundness="0.5"/>
+    <Fill color="#FFFFFF20"/>
+    
+    <Layer x="-100" y="20">
+      <Text text="60 FPS" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
+      <TextLayout position="0,0" textAlign="center"/>
+      <Fill color="#38BDF8"/>
+    </Layer>
+    <Layer x="0" y="20">
+      <Text text="4K READY" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
+      <TextLayout position="0,0" textAlign="center"/>
+      <Fill color="#A855F7"/>
+    </Layer>
+    <Layer x="100" y="20">
+      <Text text="TINY SIZE" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
+      <TextLayout position="0,0" textAlign="center"/>
+      <Fill color="#34D399"/>
+    </Layer>
+  </Layer>
 
 </pagx>
