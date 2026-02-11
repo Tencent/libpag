@@ -178,39 +178,43 @@
   </Layer>
 
   <Layer name="PlayerName">
-    <Text text="NEBULA CADET" fontFamily="Arial" fontStyle="Bold" fontSize="18" position="130,58"/>
+    <Text text="NEBULA CADET" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
+    <TextLayout position="120,40" textAlign="start"/>
     <Fill color="#E2E8F0"/>
   </Layer>
-  <Layer name="PlayerId">
-    <Text text="#A17X9" fontFamily="Arial" fontSize="12" position="130,76"/>
-    <Fill color="#7DD3FC"/>
-  </Layer>
 
-  <Layer name="LevelBadge">
-    <Rectangle center="175,70" size="70,24" roundness="12"/>
-    <Fill>
-      <LinearGradient startPoint="140,70" endPoint="210,70">
-        <ColorStop offset="0" color="#0EA5E9"/>
-        <ColorStop offset="1" color="#22D3EE"/>
-      </LinearGradient>
-    </Fill>
-    <Stroke color="#7DD3FC" width="1"/>
-    <Layer>
-      <Text text="LV 27" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
-      <TextLayout position="175,74" textAlign="center"/>
-      <Fill color="#E0F2FE"/>
+  <Layer name="PlayerIdRow">
+    <Layer name="PlayerId">
+      <Text text="#A17X9" fontFamily="Arial" fontSize="11"/>
+      <TextLayout position="120,58" textAlign="start"/>
+      <Fill color="#7DD3FC"/>
+    </Layer>
+    <Layer name="LevelBadge">
+      <Rectangle center="195,55" size="48,14" roundness="7"/>
+      <Fill>
+        <LinearGradient startPoint="171,55" endPoint="219,55">
+          <ColorStop offset="0" color="#0EA5E9"/>
+          <ColorStop offset="1" color="#22D3EE"/>
+        </LinearGradient>
+      </Fill>
+      <Stroke color="#7DD3FC" width="1"/>
+      <Layer>
+        <Text text="LV 27" fontFamily="Arial" fontStyle="Bold" fontSize="9"/>
+        <TextLayout position="195,59" textAlign="center"/>
+        <Fill color="#E0F2FE"/>
+      </Layer>
     </Layer>
   </Layer>
 
   <Layer name="ExpBar">
     <Group>
-      <Rectangle center="300,86" size="220,12" roundness="6"/>
+      <Rectangle center="260,74" size="280,10" roundness="5"/>
       <Fill color="#1E293B"/>
     </Group>
     <Group>
-      <Rectangle center="265,86" size="150,8" roundness="4"/>
+      <Rectangle center="215,74" size="190,6" roundness="3"/>
       <Fill>
-        <LinearGradient startPoint="190,86" endPoint="340,86">
+        <LinearGradient startPoint="120,74" endPoint="310,74">
           <ColorStop offset="0" color="#22D3EE"/>
           <ColorStop offset="1" color="#3B82F6"/>
         </LinearGradient>
@@ -220,22 +224,18 @@
 
   <Layer name="EnergyBar">
     <Group>
-      <Rectangle center="300,104" size="200,10" roundness="5"/>
+      <Rectangle center="260,90" size="280,10" roundness="5"/>
       <Fill color="#172437"/>
     </Group>
     <Group>
-      <Rectangle center="260,104" size="120,6" roundness="3"/>
+      <Rectangle center="200,90" size="160,6" roundness="3"/>
       <Fill>
-        <LinearGradient startPoint="200,104" endPoint="320,104">
+        <LinearGradient startPoint="120,90" endPoint="280,90">
           <ColorStop offset="0" color="#34D399"/>
           <ColorStop offset="1" color="#10B981"/>
         </LinearGradient>
       </Fill>
     </Group>
-    <Layer x="180" y="92">
-      <Path data="@IconBolt"/>
-      <Fill color="#34D399"/>
-    </Layer>
   </Layer>
 
   <Layer name="CoinChip">
@@ -248,16 +248,16 @@
     </Fill>
     <Stroke color="#334155" width="1"/>
     <Group>
-      <Ellipse center="575,52" size="18,18"/>
+      <Ellipse center="585,52" size="16,16"/>
       <Fill>
-        <LinearGradient startPoint="566,52" endPoint="584,52">
+        <LinearGradient startPoint="577,52" endPoint="593,52">
           <ColorStop offset="0" color="#FFE29A"/>
           <ColorStop offset="1" color="#F59E0B"/>
         </LinearGradient>
       </Fill>
     </Group>
     <Group>
-      <Ellipse center="575,52" size="10,10"/>
+      <Ellipse center="585,52" size="8,8"/>
       <Stroke color="#F8D477" width="1"/>
     </Group>
     <Layer>
@@ -276,10 +276,10 @@
       </LinearGradient>
     </Fill>
     <Stroke color="#334155" width="1"/>
-    <Layer x="563" y="74">
+    <Layer x="577" y="78">
       <Path data="@IconDiamond"/>
       <Fill>
-        <LinearGradient startPoint="0,12" endPoint="24,12">
+        <LinearGradient startPoint="0,8" endPoint="16,8">
           <ColorStop offset="0" color="#7DD3FC"/>
           <ColorStop offset="1" color="#A78BFA"/>
         </LinearGradient>
@@ -294,9 +294,9 @@
 
   <!-- ==================== Buttons ==================== -->
   <Layer name="StartButton">
-    <Rectangle center="400,280" size="340,78" roundness="28"/>
+    <Rectangle center="400,228" size="340,78" roundness="28"/>
     <Fill>
-      <LinearGradient startPoint="230,280" endPoint="570,280">
+      <LinearGradient startPoint="230,228" endPoint="570,228">
         <ColorStop offset="0" color="#00FFC6"/>
         <ColorStop offset="0.5" color="#00C2FF"/>
         <ColorStop offset="1" color="#00FFA6"/>
@@ -304,16 +304,16 @@
     </Fill>
     <Stroke color="#5AFADF" width="2"/>
     <Layer>
-      <Rectangle center="400,270" size="310,34" roundness="18"/>
+      <Rectangle center="400,218" size="310,34" roundness="18"/>
       <Fill color="#FFFFFF22"/>
     </Layer>
-    <Layer x="280" y="268">
+    <Layer x="280" y="216">
       <Path data="@IconPlay"/>
       <Fill color="#ECFEFF"/>
     </Layer>
     <Layer>
       <Text text="START" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-      <TextLayout position="400,289" textAlign="center"/>
+      <TextLayout position="400,237" textAlign="center"/>
       <Fill color="#F0FFFD"/>
       <DropShadowStyle offsetX="0" offsetY="2" blurX="6" blurY="6" color="#0F172A80"/>
     </Layer>
@@ -321,42 +321,42 @@
   </Layer>
 
   <Layer name="ShopButton">
-    <Rectangle center="400,372" size="340,78" roundness="28"/>
+    <Rectangle center="400,320" size="340,78" roundness="28"/>
     <Fill>
-      <LinearGradient startPoint="230,372" endPoint="570,372">
+      <LinearGradient startPoint="230,320" endPoint="570,320">
         <ColorStop offset="0" color="#FFD166"/>
         <ColorStop offset="1" color="#FF8C42"/>
       </LinearGradient>
     </Fill>
     <Stroke color="#FFD166" width="1.5"/>
-    <Layer x="280" y="360">
+    <Layer x="280" y="308">
       <Path data="@IconCart"/>
       <Fill color="#FFF7ED"/>
     </Layer>
     <Layer>
       <Text text="SHOP" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
-      <TextLayout position="400,381" textAlign="center"/>
+      <TextLayout position="400,329" textAlign="center"/>
       <Fill color="#FFF7ED"/>
     </Layer>
     <DropShadowStyle offsetX="0" offsetY="10" blurX="16" blurY="16" color="#F59E0B66"/>
   </Layer>
 
   <Layer name="RankButton">
-    <Rectangle center="400,464" size="340,78" roundness="28"/>
+    <Rectangle center="400,412" size="340,78" roundness="28"/>
     <Fill>
-      <LinearGradient startPoint="230,464" endPoint="570,464">
+      <LinearGradient startPoint="230,412" endPoint="570,412">
         <ColorStop offset="0" color="#7C3AED"/>
         <ColorStop offset="1" color="#EC4899"/>
       </LinearGradient>
     </Fill>
     <Stroke color="#C084FC" width="1.5"/>
-    <Layer x="280" y="452">
+    <Layer x="280" y="400">
       <Path data="@IconCrown"/>
       <Fill color="#FDF2F8"/>
     </Layer>
     <Layer>
       <Text text="RANK" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
-      <TextLayout position="400,473" textAlign="center"/>
+      <TextLayout position="400,421" textAlign="center"/>
       <Fill color="#FDF2F8"/>
     </Layer>
     <DropShadowStyle offsetX="0" offsetY="10" blurX="16" blurY="16" color="#C084FC66"/>
@@ -470,7 +470,7 @@
     <PathData id="IconCart" data="M 5 6 L 20 6 L 18 14 L 7 14 Z M 9 18 A 2 2 0 1 0 9 22 A 2 2 0 1 0 9 18 Z M 16 18 A 2 2 0 1 0 16 22 A 2 2 0 1 0 16 18 Z"/>
     <PathData id="IconCrown" data="M 2 16 L 6 6 L 12 12 L 18 6 L 22 16 Z M 4 16 L 4 20 L 20 20 L 20 16 Z"/>
     <PathData id="IconBolt" data="M 10 0 L 4 12 L 11 12 L 8 24 L 20 10 L 13 10 L 16 0 Z"/>
-    <PathData id="IconDiamond" data="M 12 0 L 22 12 L 12 24 L 2 12 Z"/>
+    <PathData id="IconDiamond" data="M 8 0 L 16 4 L 16 12 L 8 16 L 0 12 L 0 4 Z"/>
     <PathData id="IconQuestion" data="M 12 4 C 8 4 6 6 6 9 L 9 9 C 9 7.5 10 6.5 12 6.5 C 14 6.5 15 7.5 15 9 C 15 10.5 13.5 11 12 12 C 10.5 13 10 14 10 16 L 14 16 C 14 14.5 14.5 13.5 16 12.5 C 18 11.5 19 10 19 8 C 19 5 16 4 12 4 Z M 12 18 A 2 2 0 1 0 12 22 A 2 2 0 1 0 12 18 Z"/>
     <PathData id="IconShare" data="M 14 4 L 22 12 L 14 20 L 14 15 L 4 15 L 4 9 L 14 9 Z"/>
   </Resources>
