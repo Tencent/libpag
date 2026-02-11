@@ -26,13 +26,13 @@
     </Layer>
     
     <!-- Hex Grid Pattern -->
-    <Layer alpha="0.3">
-      <Group>
+    <Layer alpha="0.15">
+      <Group x="-400">
         <Path data="@hex"/>
         <Stroke color="#0066aa" width="1"/>
-        <Repeater copies="40" position="20,0"/> 
+        <Repeater copies="70" position="20,0"/> 
       </Group>
-      <Repeater copies="35" position="10, 17.32"/>
+      <Repeater copies="40" position="10, 17.32"/>
     </Layer>
     
     <!-- Vignette -->
@@ -153,18 +153,30 @@
     <!-- Data Column -->
     <Layer x="-350" y="-100">
         <Layer>
-            <Text fontFamily="Arial" fontSize="9">
-<![CDATA[CPU: 45%
-GPU: 88%
-NET: ON
-MEM: OK]]>
-            </Text>
-            <TextLayout lineHeight="1.5" textAlign="end"/>
-            <Fill color="#00ccff" alpha="0.7"/>
-        </Layer>
-        <Layer>
             <Rectangle center="10, 25" size="2, 60"/>
             <Fill color="#004488"/>
+        </Layer>
+        
+        <!-- Individual Data Lines to ensure correct layout -->
+        <Layer>
+            <Text text="CPU: 45%" fontFamily="Arial" fontSize="9"/>
+            <Fill color="#00ccff" alpha="0.7"/>
+            <TextLayout position="0, 0" textAlign="end"/>
+        </Layer>
+        <Layer>
+            <Text text="GPU: 88%" fontFamily="Arial" fontSize="9"/>
+            <Fill color="#00ccff" alpha="0.7"/>
+            <TextLayout position="0, 14" textAlign="end"/>
+        </Layer>
+        <Layer>
+            <Text text="NET: ON" fontFamily="Arial" fontSize="9"/>
+            <Fill color="#00ccff" alpha="0.7"/>
+            <TextLayout position="0, 28" textAlign="end"/>
+        </Layer>
+        <Layer>
+            <Text text="MEM: OK" fontFamily="Arial" fontSize="9"/>
+            <Fill color="#00ccff" alpha="0.7"/>
+            <TextLayout position="0, 42" textAlign="end"/>
         </Layer>
     </Layer>
   </Layer>
@@ -202,21 +214,32 @@ MEM: OK]]>
         <TextLayout position="240, 25" textAlign="start"/>
     </Layer>
     
-    <!-- Ammo Icons Strip -->
-    <Layer x="250" y="50">
+    <!-- Ammo Icons Strip (Wrapped) -->
+    <Layer x="240" y="50">
+        <!-- Row 1 -->
         <Layer>
             <!-- Bullet Icon -->
             <Path data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
             <Fill color="#ffaa00"/>
             <Stroke color="#000000" width="1"/>
-            <Repeater copies="15" position="10, 0"/>
+            <Repeater copies="10" position="10, 0"/>
         </Layer>
-        <Layer>
-            <!-- Depleted Bullets -->
-            <Path data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
-            <Fill color="#331100"/>
-            <Stroke color="#442200" width="1"/>
-            <Repeater copies="5" position="10, 0" offset="15"/> 
+        <!-- Row 2 -->
+        <Layer y="15">
+             <Layer>
+                <!-- Bullet Icon -->
+                <Path data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
+                <Fill color="#ffaa00"/>
+                <Stroke color="#000000" width="1"/>
+                <Repeater copies="5" position="10, 0"/>
+             </Layer>
+             <Layer>
+                <!-- Depleted Bullets -->
+                <Path data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
+                <Fill color="#331100"/>
+                <Stroke color="#442200" width="1"/>
+                <Repeater copies="5" position="10, 0" offset="5"/> 
+             </Layer>
         </Layer>
     </Layer>
   </Layer>
@@ -313,8 +336,8 @@ MEM: OK]]>
      </Layer>
   </Layer>
 
-  <!-- Objective Markers (Top Right) -->
-  <Layer name="Objectives" x="700" y="100">
+  <!-- Objective Markers (Top Center) -->
+  <Layer name="Objectives" x="400" y="50">
      <Layer>
         <Text fontFamily="Arial" fontSize="12" fontStyle="Bold">
 <![CDATA[MISSION OBJECTIVES:
@@ -323,14 +346,8 @@ MEM: OK]]>
 [x] SECURE PERIMETER]]>
         </Text>
         <Fill color="#ffffff"/>
-        <TextLayout position="0,0" textAlign="end" lineHeight="1.6"/>
+        <TextLayout position="0,0" textAlign="center" lineHeight="1.6"/>
         <DropShadowStyle blurX="2" blurY="2" color="#000000"/>
-     </Layer>
-     <!-- Checkbox accents -->
-     <Layer x="10" y="5">
-        <Rectangle center="0,0" size="8,8"/>
-        <Stroke color="#ffaa00" width="1"/>
-        <Repeater copies="3" position="0, 19"/>
      </Layer>
   </Layer>
 
