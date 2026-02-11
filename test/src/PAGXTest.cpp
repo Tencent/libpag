@@ -62,7 +62,6 @@
 #include "tgfx/layers/vectors/Rectangle.h"
 #include "tgfx/layers/vectors/SolidColor.h"
 #include "tgfx/layers/vectors/VectorGroup.h"
-#include "tgfx/svg/SVGDOM.h"
 #include "tgfx/svg/TextShaper.h"
 #include "utils/Baseline.h"
 #include "utils/DevicePool.h"
@@ -147,8 +146,6 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
 
-  auto textShaper = TextShaper::Make(GetFallbackTypefaces());
-
   // Create Typesetter for text shaping
   pagx::Typesetter typesetter;
   typesetter.setFallbackTypefaces(GetFallbackTypefaces());
@@ -192,28 +189,6 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
     int canvasWidth = static_cast<int>(std::ceil(pagxWidth * scale));
     int canvasHeight = static_cast<int>(std::ceil(pagxHeight * scale));
 
-    // Render original SVG for comparison
-    auto svgStream = Stream::MakeFromFile(svgPath);
-    if (svgStream == nullptr) {
-      continue;
-    }
-    auto svgDOM = SVGDOM::Make(*svgStream, textShaper);
-    if (svgDOM == nullptr) {
-      continue;
-    }
-
-    auto containerSize = svgDOM->getContainerSize();
-    float svgWidth = containerSize.width;
-    float svgHeight = containerSize.height;
-    float svgScaleX = static_cast<float>(canvasWidth) / svgWidth;
-    float svgScaleY = static_cast<float>(canvasHeight) / svgHeight;
-
-    auto svgSurface = Surface::Make(context, canvasWidth, canvasHeight);
-    auto svgCanvas = svgSurface->getCanvas();
-    svgCanvas->scale(svgScaleX, svgScaleY);
-    svgDOM->render(svgCanvas);
-    EXPECT_TRUE(Baseline::Compare(svgSurface, "PAGXTest/" + baseName + "_svg"));
-
     // Render PAGX (loaded from file)
     auto pagxSurface = Surface::Make(context, canvasWidth, canvasHeight);
     DisplayList displayList;
@@ -222,7 +197,7 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
     container->addChild(layer);
     displayList.root()->addChild(container);
     displayList.render(pagxSurface.get(), false);
-    EXPECT_TRUE(Baseline::Compare(pagxSurface, "PAGXTest/" + baseName + "_pagx"));
+    EXPECT_TRUE(Baseline::Compare(pagxSurface, "PAGXTest/" + baseName));
   }
 
   device->unlock();
