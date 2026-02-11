@@ -25,7 +25,7 @@
   </Layer>
   <Layer>
     <Text text="text begins at anchor" fontFamily="Arial" fontSize="18"/>
-    <TextLayout position="200,180" textAlign="start"/>
+    <TextLayout position="200,170" textAlign="start"/>
     <Fill color="#475569"/>
   </Layer>
   <!-- Center aligned: text centered on anchor point -->
@@ -36,7 +36,7 @@
   </Layer>
   <Layer>
     <Text text="text centered on anchor" fontFamily="Arial" fontSize="18"/>
-    <TextLayout position="200,275" textAlign="center"/>
+    <TextLayout position="200,265" textAlign="center"/>
     <Fill color="#475569"/>
   </Layer>
   <!-- End aligned: text ends at anchor point -->
@@ -47,7 +47,7 @@
   </Layer>
   <Layer>
     <Text text="text ends at anchor" fontFamily="Arial" fontSize="18"/>
-    <TextLayout position="200,370" textAlign="end"/>
+    <TextLayout position="200,360" textAlign="end"/>
     <Fill color="#475569"/>
   </Layer>
 </pagx>
