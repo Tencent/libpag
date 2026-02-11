@@ -209,12 +209,9 @@
   <!-- ==================== 4. Header & Footer ==================== -->
   
   <Layer name="Header" x="400" y="60">
-    <Text text="PAGX INFOGRAPHIC" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+    <Text text="PAGX INFOGRAPHIC" fontFamily="Arial" fontStyle="Bold" fontSize="32"/>
     <TextLayout position="0,0" textAlign="center"/>
     <Fill color="#FFFFFF"/>
-    <TextModifier scale="1.1,1.1">
-        <RangeSelector start="0" end="1" shape="triangle"/>
-    </TextModifier>
   </Layer>
 
   <Layer name="SubHeader" x="400" y="90">
