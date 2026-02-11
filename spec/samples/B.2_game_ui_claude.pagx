@@ -511,7 +511,7 @@
     <!-- Power number -->
     <Layer>
       <Text text="52,847" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
-      <TextLayout position="130,450" textAlign="center"/>
+      <TextLayout position="130,442" textAlign="center"/>
       <Fill color="@titleGrad"/>
       <DropShadowStyle offsetX="0" offsetY="2" blurX="8" blurY="8" color="#F59E0B40"/>
     </Layer>
