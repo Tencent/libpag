@@ -1,60 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates Text shape properties: Font family, style, and size -->
+<!-- Demonstrates Text shape: fontFamily, fontStyle, and fontSize -->
 <pagx version="1.0" width="400" height="400">
-  
-  <!-- Section 1: Font Styles -->
+  <!-- Regular style -->
   <Layer>
-    <Text text="Font Styles" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
-    <TextLayout position="40,60"/>
-    <Fill color="#94A3B8"/>
-  </Layer>
-  
-  <Layer>
-    <Text text="Regular" fontFamily="Arial" fontSize="32"/>
-    <TextLayout position="40,100"/>
+    <Text text="Regular" fontFamily="Arial" fontSize="36"/>
+    <TextLayout position="200,80" textAlign="center"/>
     <Fill color="#334155"/>
   </Layer>
-  
+  <!-- Bold style -->
   <Layer>
-    <Text text="Bold" fontFamily="Arial" fontStyle="Bold" fontSize="32"/>
-    <TextLayout position="170,100"/>
-    <Fill color="#334155"/>
+    <Text text="Bold" fontFamily="Arial" fontStyle="Bold" fontSize="36"/>
+    <TextLayout position="200,140" textAlign="center"/>
+    <Fill color="#6366F1"/>
   </Layer>
-  
+  <!-- Italic style -->
   <Layer>
-    <Text text="Italic" fontFamily="Arial" fontStyle="Italic" fontSize="32"/>
-    <TextLayout position="280,100"/>
-    <Fill color="#334155"/>
+    <Text text="Italic" fontFamily="Arial" fontStyle="Italic" fontSize="36"/>
+    <TextLayout position="200,200" textAlign="center"/>
+    <Fill color="#EC4899"/>
   </Layer>
-
-  <!-- Section 2: Font Families -->
+  <!-- Serif font family -->
   <Layer>
-    <Text text="Font Families" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
-    <TextLayout position="40,180"/>
-    <Fill color="#94A3B8"/>
+    <Text text="Serif" fontFamily="Times New Roman" fontSize="36"/>
+    <TextLayout position="200,280" textAlign="center"/>
+    <Fill color="#059669"/>
   </Layer>
-
+  <!-- Large font size -->
   <Layer>
-    <Text text="Serif Font (Times)" fontFamily="Times New Roman" fontSize="32"/>
-    <TextLayout position="40,220"/>
-    <Fill color="#334155"/>
-  </Layer>
-  
-  <Layer>
-    <Text text="Sans-Serif (Arial)" fontFamily="Arial" fontSize="32"/>
-    <TextLayout position="40,265"/>
-    <Fill color="#334155"/>
-  </Layer>
-
-  <!-- Section 3: Large Title with Gradient -->
-  <Layer>
-    <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="64"/>
-    <TextLayout position="40,360"/>
-    <Fill>
-      <LinearGradient startPoint="0,0" endPoint="200,0">
-        <ColorStop offset="0" color="#6366F1"/>
-        <ColorStop offset="1" color="#EC4899"/>
-      </LinearGradient>
-    </Fill>
+    <Text text="Big" fontFamily="Arial" fontStyle="Bold" fontSize="72"/>
+    <TextLayout position="200,370" textAlign="center"/>
+    <Fill color="#8B5CF6"/>
   </Layer>
 </pagx>
