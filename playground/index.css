@@ -388,12 +388,18 @@ html, body {
 .samples-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     padding: 16px 0;
     position: sticky;
     top: 0;
     background: #1a1a2e;
     z-index: 10;
+}
+
+.samples-header-btns {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
 }
 
 .samples-title {
@@ -415,40 +421,35 @@ html, body {
 .samples-list > a {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 10px;
-    border-radius: 10px;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 8px;
     text-decoration: none;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    transition: all 0.2s ease;
-    overflow: hidden;
+    transition: background 0.15s ease;
 }
 
 .samples-list > a:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.2);
-    transform: translateY(-4px);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+    background: rgba(255, 255, 255, 0.06);
 }
 
 .samples-list > a.active {
-    background: rgba(0, 82, 217, 0.15);
-    border-color: rgba(0, 82, 217, 0.4);
+    background: rgba(0, 82, 217, 0.12);
 }
 
 .samples-list .sample-image {
     width: 100%;
     aspect-ratio: 1 / 1;
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(255, 255, 255, 0.04);
     border-radius: 6px;
     object-fit: contain;
 }
 
 .samples-list .sample-name {
-    color: #ccc;
-    font-size: 13px;
+    color: #999;
+    font-size: 12px;
     font-weight: 400;
     text-align: center;
-    word-break: break-word;
+    word-break: break-all;
+    line-height: 1.3;
 }

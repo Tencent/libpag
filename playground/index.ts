@@ -802,6 +802,11 @@ function goHome(): void {
     navBtns.classList.remove('hidden');
     document.title = DEFAULT_TITLE;
     showDropZoneUI();
+
+    if (currentPlayingFile) {
+        currentPlayingFile = null;
+        window.location.hash = '#samples';
+    }
 }
 
 async function loadExternalFiles(baseURL: string): Promise<void> {
@@ -1085,6 +1090,9 @@ function applyI18n(): void {
     if (samplesBtn) samplesBtn.title = strings.samplesTitle;
     if (samplesBtnText) samplesBtnText.textContent = strings.samples;
 
+    const toolbarSamplesBtn = document.getElementById('toolbar-samples-btn');
+    if (toolbarSamplesBtn) toolbarSamplesBtn.title = strings.samplesTitle;
+
     const samplesTitle = document.querySelector('.samples-title');
     if (samplesTitle) samplesTitle.textContent = strings.samplesTitle;
 
@@ -1105,27 +1113,7 @@ function applyI18n(): void {
 
 let sampleFiles: string[] = [];
 let currentSampleFile: string | null = null;
-
-function formatSampleName(filename: string): string {
-    // Remove .pagx extension and replace underscores/dots with spaces
-    let name = filename.replace(/\.pagx$/, '');
-    // Replace underscores and dots with spaces, but keep section numbering (e.g., 3.2 -> 3.2)
-    name = name.replace(/_/g, ' ');
-    // Capitalize first letter of each word
-    name = name.split(' ').map(word => {
-        if (/^\d+\.\d+/.test(word)) {
-            return word;
-        }
-        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-    }).join(' ');
-    return name;
-}
-
-function getImageNameFromFile(filename: string): string {
-    // Convert sample filename to image filename
-    // 3.2_document_structure.pagx -> 3.2_document_structure
-    return filename.replace(/\.pagx$/, '');
-}
+let currentPlayingFile: string | null = null;
 
 async function loadSampleList(): Promise<void> {
     if (sampleFiles.length > 0) {
@@ -1143,26 +1131,18 @@ function renderSampleList(): void {
     list.innerHTML = '';
     for (const file of sampleFiles) {
         const a = document.createElement('a');
-        a.href = '#';
-        
-        const imageName = getImageNameFromFile(file);
-        const imageUrl = `./samples/images/${imageName}.webp`;
-        const displayName = formatSampleName(file);
-        
+        a.href = '#play/' + encodeURIComponent(file);
+
+        const baseName = file.replace(/\.pagx$/, '');
+        const imageUrl = `./samples/images/${baseName}.webp`;
+
         a.innerHTML = `
-            <img class="sample-image" src="${imageUrl}" alt="${displayName}" loading="lazy">
-            <span class="sample-name">${displayName}</span>
+            <img class="sample-image" src="${imageUrl}" alt="${baseName}" loading="lazy">
+            <span class="sample-name">${file}</span>
         `;
         if (file === currentSampleFile) {
             a.classList.add('active');
         }
-        a.addEventListener('click', (e) => {
-            e.preventDefault();
-            currentSampleFile = file;
-            window.location.hash = '';
-            loadPAGXFromURL('./samples/' + file);
-            renderSampleList();
-        });
         list.appendChild(a);
     }
 }
@@ -1170,6 +1150,21 @@ function renderSampleList(): void {
 function showSamplesPage(): void {
     const container = document.getElementById('container') as HTMLDivElement;
     const samplesPage = document.getElementById('samples-page') as HTMLDivElement;
+
+    // Clean up playing state if navigating back from player
+    if (currentPlayingFile) {
+        currentPlayingFile = null;
+        const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
+        const toolbar = document.getElementById('toolbar') as HTMLDivElement;
+        if (playgroundState.pagxView) {
+            playgroundState.pagxView.loadPAGX(new Uint8Array(0));
+            gestureManager.resetTransform(playgroundState);
+        }
+        canvas.classList.add('hidden');
+        toolbar.classList.add('hidden');
+        showDropZoneUI();
+    }
+
     container.classList.add('hidden');
     samplesPage.classList.remove('hidden');
     document.title = t().samplesTitle;
@@ -1189,6 +1184,16 @@ function handleRoute(): void {
     const hash = window.location.hash;
     if (hash === '#samples') {
         showSamplesPage();
+    } else if (hash.startsWith('#play/')) {
+        const filename = decodeURIComponent(hash.substring(6));
+        if (filename !== currentPlayingFile) {
+            currentSampleFile = filename;
+            currentPlayingFile = filename;
+            hideSamplesPage();
+            loadPAGXFromURL('./samples/' + filename);
+        } else {
+            hideSamplesPage();
+        }
     } else {
         hideSamplesPage();
     }
