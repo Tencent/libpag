@@ -52,19 +52,7 @@ class DOMParser : public XMLParser {
     _needToFlush = false;
     --_level;
 
-    auto parent = _parentStack.top();
     _parentStack.pop();
-
-    // Reverse children to correct order (they were added in reverse).
-    auto child = parent->firstChild;
-    std::shared_ptr<DOMNode> prev = nullptr;
-    while (child) {
-      auto next = child->nextSibling;
-      child->nextSibling = prev;
-      prev = child;
-      child = next;
-    }
-    parent->firstChild = prev;
     return false;
   }
 
@@ -89,12 +77,17 @@ class DOMParser : public XMLParser {
       node->nextSibling = nullptr;
       _root = node;
     } else {
-      // Add siblings in reverse order; gets corrected in onEndElement().
-      auto parent = _parentStack.top();
-      node->nextSibling = parent->firstChild;
-      parent->firstChild = node;
+      // Append to the end of the parent's child list (tail insertion).
+      auto& parent = _parentStack.top();
+      node->nextSibling = nullptr;
+      if (parent.lastChild != nullptr) {
+        parent.lastChild->nextSibling = node;
+      } else {
+        parent.node->firstChild = node;
+      }
+      parent.lastChild = node;
     }
-    _parentStack.push(node);
+    _parentStack.push({node, nullptr});
     _attributes.clear();
   }
 
@@ -108,7 +101,12 @@ class DOMParser : public XMLParser {
     ++_level;
   }
 
-  std::stack<std::shared_ptr<DOMNode>> _parentStack;
+  struct ParentEntry {
+    std::shared_ptr<DOMNode> node = nullptr;
+    std::shared_ptr<DOMNode> lastChild = nullptr;
+  };
+
+  std::stack<ParentEntry> _parentStack;
   std::shared_ptr<DOMNode> _root = nullptr;
   bool _needToFlush = true;
 

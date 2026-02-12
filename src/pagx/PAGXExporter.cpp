@@ -238,6 +238,19 @@ static std::string floatListToString(const std::vector<float>& values) {
   return result;
 }
 
+static std::string floatListToString(const float* values, size_t count) {
+  std::string result;
+  char buf[32] = {};
+  for (size_t i = 0; i < count; i++) {
+    if (i > 0) {
+      result += ",";
+    }
+    snprintf(buf, sizeof(buf), "%g", values[i]);
+    result += buf;
+  }
+  return result;
+}
+
 //==============================================================================
 // Forward declarations
 //==============================================================================
@@ -940,8 +953,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
     case NodeType::ColorMatrixFilter: {
       auto filter = static_cast<const ColorMatrixFilter*>(node);
       xml.openElement("ColorMatrixFilter");
-      std::vector<float> values(filter->matrix.begin(), filter->matrix.end());
-      xml.addAttribute("matrix", floatListToString(values));
+      xml.addAttribute("matrix", floatListToString(filter->matrix.data(), filter->matrix.size()));
       xml.closeElementSelfClosing();
       break;
     }

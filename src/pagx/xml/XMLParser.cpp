@@ -19,6 +19,7 @@
 #include "XMLParser.h"
 #include <cstdio>
 #include <cstdlib>
+#include <limits>
 #include <memory>
 #include <string>
 #include "expat.h"
@@ -141,6 +142,10 @@ bool XMLParser::parse(const uint8_t* data, size_t length) {
   XML_SetElementHandler(parsingContext._XMLParser, start_element_handler, end_element_handler);
   XML_SetCharacterDataHandler(parsingContext._XMLParser, text_handler);
   XML_SetEntityDeclHandler(parsingContext._XMLParser, entity_decl_handler);
+
+  if (length > static_cast<size_t>(std::numeric_limits<int>::max())) {
+    return false;
+  }
 
   auto status =
       XML_Parse(parsingContext._XMLParser, reinterpret_cast<const char*>(data),

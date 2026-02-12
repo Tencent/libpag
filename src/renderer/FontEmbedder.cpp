@@ -305,6 +305,7 @@ static GlyphRun* CreateGlyphRunForIndices(
   glyphRun->fontSize = fontSize;
 
   auto* typeface = run.font.getTypeface().get();
+  glyphRun->glyphs.reserve(indices.size());
   for (size_t i : indices) {
     GlyphKey key = {typeface, run.glyphs[i]};
     auto it = glyphMapping.find(key);

@@ -33,8 +33,9 @@ int PathData::PointsPerVerb(PathVerb verb) {
       return 3;
     case PathVerb::Close:
       return 0;
+    default:
+      return 0;
   }
-  return 0;
 }
 
 void PathData::moveTo(float x, float y) {

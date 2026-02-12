@@ -35,6 +35,7 @@ Node* PAGXDocument::findNode(const std::string& id) const {
 
 std::vector<std::string> PAGXDocument::getExternalFilePaths() const {
   std::vector<std::string> paths = {};
+  paths.reserve(nodes.size());
   for (auto& node : nodes) {
     if (node->nodeType() != NodeType::Image) {
       continue;

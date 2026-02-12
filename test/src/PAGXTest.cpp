@@ -768,7 +768,7 @@ PAG_TEST(PAGXTest, SampleFiles) {
       continue;
     }
 
-    auto surface = Surface::Make(context, doc->width, doc->height);
+    auto surface = Surface::Make(context, static_cast<int>(doc->width), static_cast<int>(doc->height));
     DisplayList displayList;
     displayList.root()->addChild(layer);
     displayList.render(surface.get(), false);

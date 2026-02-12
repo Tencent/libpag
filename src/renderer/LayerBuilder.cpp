@@ -830,6 +830,7 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::VectorGroup> convertGroup(const Group* node) {
     auto group = tgfx::VectorGroup::Make();
     std::vector<std::shared_ptr<tgfx::VectorElement>> elements;
+    elements.reserve(node->elements.size());
 
     for (const auto& element : node->elements) {
       // Skip TextLayout modifier - layout has been baked into GlyphRun positions by Typesetter
