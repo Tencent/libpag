@@ -1165,26 +1165,31 @@ readability.
 approximate complex shapes (e.g., hexagons, stars) as rectangles — visual fidelity takes
 priority.
 
-#### 15.9 Decompose Polygon Grid into Parallel Line Sets
+#### 15.9 Replace PathData with Simple Geometry Combinations
 
-**Problem**: A common pattern is a polygon (hexagon, triangle, etc.) repeated in a 2D grid
-via nested Repeaters. This creates massive element counts because each polygon is a full Path
-cloned independently. For example, a hexagonal grid covering 800×600 at spacing 20 needs
-~1500 hexagons, each with 6 path segments — totaling ~9000 segments rendered.
+**Problem**: PathData is the most expensive geometry type — it requires general-purpose
+tessellation per instance, and Repeaters multiply this cost. Many patterns built from repeated
+PathData can be expressed equivalently using combinations of primitive geometry (Rectangle,
+Ellipse) with Repeater and Group transforms, which are far cheaper to render.
 
-**Key insight**: Any regular polygon grid, when viewed as a whole, is visually equivalent to
-several sets of parallel lines. A hexagonal grid = 3 sets of lines at 0°, 60°, and -60°. A
-triangular grid = the same 3 sets. A square grid = 2 sets at 0° and 90°.
+**Key insight**: Rather than looking at individual elements, examine the **overall visual
+result** of the pattern. Ask: "Can this visual effect be constructed from simple rectangles
+or ellipses?" Often the answer is yes, especially for decorative backgrounds.
 
-**When to apply**: A Repeater (especially nested) produces a regular polygon grid used as a
-decorative background pattern, particularly at low opacity where individual polygon shapes are
-not prominent.
+**When to apply**: PathData appears inside a Repeater (especially nested Repeaters) producing
+a decorative pattern, and the overall visual can be replicated by primitive geometry
+combinations.
 
-**How**: Replace the polygon + nested Repeater with one Rectangle per line direction, each
-repeated via a single (non-nested) Repeater. Use Group `rotation` to orient diagonal lines.
+**How**: Decompose the visual effect into its simplest geometric components. Use Rectangle /
+Ellipse with single-level Repeaters, and Group `rotation` / `position` for orientation.
+
+**Example — hexagonal grid → 3 sets of parallel lines**:
+
+A hexagonal grid built from repeated Path hexagons is visually equivalent to 3 sets of
+parallel lines (0°, 60°, -60°), each expressible as a Rectangle + Repeater:
 
 ```xml
-<!-- Before: ~1500 hexagons via nested Repeater (expensive) -->
+<!-- Before: ~1500 hexagon Paths via nested Repeater -->
 <Layer alpha="0.15" scrollRect="0,0,800,600">
   <Group x="-10">
     <Path data="@hex"/>
@@ -1194,17 +1199,14 @@ repeated via a single (non-nested) Repeater. Use Group `rotation` to orient diag
   <Repeater copies="36" position="10,17.32"/>
 </Layer>
 
-<!-- After: 3 sets of parallel lines (~155 rectangles total, much cheaper) -->
+<!-- After: 3 sets of Rectangle lines (~155 total) -->
 <Layer alpha="0.15" scrollRect="0,0,800,600">
-  <!-- Horizontal lines -->
   <Rectangle center="400,0" size="800,1"/>
   <Repeater copies="35" position="0,17"/>
-  <!-- 60° diagonal lines -->
   <Group position="400,300" rotation="60">
     <Rectangle center="0,-510" size="1200,1"/>
     <Repeater copies="60" position="0,17"/>
   </Group>
-  <!-- -60° diagonal lines -->
   <Group position="400,300" rotation="-60">
     <Rectangle center="0,-510" size="1200,1"/>
     <Repeater copies="60" position="0,17"/>
@@ -1213,16 +1215,9 @@ repeated via a single (non-nested) Repeater. Use Group `rotation` to orient diag
 </Layer>
 ```
 
-**Parameter calculation**:
-- Line spacing = polygon row height (hexagon edge length 10 → row height ≈ 17)
-- Diagonal line length = canvas diagonal ≈ 1200 to ensure full coverage after rotation
-- Diagonal line start offset = half the coverage range in the perpendicular direction
-- Group `position` = canvas center, so rotation pivots around the center
-- `scrollRect` clips all lines to canvas bounds
-
-**Suggest to user**: This changes the visual from true polygon outlines to intersecting lines.
-At low opacity the difference is subtle, but at higher opacity individual polygon shapes would
-be lost. Ask user for approval before applying.
+**Suggest to user**: Replacing PathData with simple geometry combinations may change fine
+details (e.g., hexagon outlines become intersecting lines). At low opacity the difference is
+subtle, but it may be noticeable at higher opacity. Always ask for approval before applying.
 
 ---
 
