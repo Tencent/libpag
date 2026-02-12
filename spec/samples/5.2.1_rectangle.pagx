@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates Rectangle shape with various roundness values -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Sharp rectangle -->
   <Layer>
     <Rectangle center="110,110" size="140,140"/>
     <Fill>
@@ -12,7 +10,6 @@
     </Fill>
     <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F43F5E50"/>
   </Layer>
-  <!-- Medium rounded rectangle -->
   <Layer>
     <Rectangle center="290,110" size="140,140" roundness="24"/>
     <Fill>
@@ -23,7 +20,6 @@
     </Fill>
     <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#8B5CF650"/>
   </Layer>
-  <!-- Fully rounded rectangle (pill shape) -->
   <Layer>
     <Rectangle center="110,290" size="140,140" roundness="70"/>
     <Fill>
@@ -34,7 +30,6 @@
     </Fill>
     <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D450"/>
   </Layer>
-  <!-- Wide rectangle -->
   <Layer>
     <Rectangle center="290,290" size="140,100" roundness="16"/>
     <Fill>
