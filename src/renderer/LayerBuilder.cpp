@@ -26,6 +26,9 @@
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/types/Data.h"
 #include "pagx/nodes/DiamondGradient.h"
+#include "pagx/types/FillRule.h"
+#include "pagx/types/LayerPlacement.h"
+#include "pagx/types/MergePathMode.h"
 #include "Base64.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
@@ -66,6 +69,8 @@
 #include "tgfx/svg/SVGPathParser.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/LayerMaskType.h"
+#include "tgfx/layers/LayerPaint.h"
+#include "tgfx/layers/StrokeAlign.h"
 #include "tgfx/layers/VectorLayer.h"
 #include "tgfx/layers/filters/BlurFilter.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
@@ -213,6 +218,85 @@ static tgfx::LineJoin ToTGFX(LineJoin join) {
       return tgfx::LineJoin::Bevel;
   }
   return tgfx::LineJoin::Miter;
+}
+
+static tgfx::BlendMode ToTGFX(BlendMode mode) {
+  switch (mode) {
+    case BlendMode::Normal:
+      return tgfx::BlendMode::SrcOver;
+    case BlendMode::Multiply:
+      return tgfx::BlendMode::Multiply;
+    case BlendMode::Screen:
+      return tgfx::BlendMode::Screen;
+    case BlendMode::Overlay:
+      return tgfx::BlendMode::Overlay;
+    case BlendMode::Darken:
+      return tgfx::BlendMode::Darken;
+    case BlendMode::Lighten:
+      return tgfx::BlendMode::Lighten;
+    case BlendMode::ColorDodge:
+      return tgfx::BlendMode::ColorDodge;
+    case BlendMode::ColorBurn:
+      return tgfx::BlendMode::ColorBurn;
+    case BlendMode::HardLight:
+      return tgfx::BlendMode::HardLight;
+    case BlendMode::SoftLight:
+      return tgfx::BlendMode::SoftLight;
+    case BlendMode::Difference:
+      return tgfx::BlendMode::Difference;
+    case BlendMode::Exclusion:
+      return tgfx::BlendMode::Exclusion;
+    case BlendMode::Hue:
+      return tgfx::BlendMode::Hue;
+    case BlendMode::Saturation:
+      return tgfx::BlendMode::Saturation;
+    case BlendMode::Color:
+      return tgfx::BlendMode::Color;
+    case BlendMode::Luminosity:
+      return tgfx::BlendMode::Luminosity;
+    case BlendMode::PlusLighter:
+      return tgfx::BlendMode::PlusLighter;
+    case BlendMode::PlusDarker:
+      return tgfx::BlendMode::PlusDarker;
+  }
+  return tgfx::BlendMode::SrcOver;
+}
+
+static tgfx::FillRule ToTGFX(FillRule rule) {
+  return rule == FillRule::EvenOdd ? tgfx::FillRule::EvenOdd : tgfx::FillRule::Winding;
+}
+
+static tgfx::LayerPlacement ToTGFX(LayerPlacement placement) {
+  return placement == LayerPlacement::Foreground ? tgfx::LayerPlacement::Foreground
+                                                 : tgfx::LayerPlacement::Background;
+}
+
+static tgfx::StrokeAlign ToTGFX(StrokeAlign align) {
+  switch (align) {
+    case StrokeAlign::Center:
+      return tgfx::StrokeAlign::Center;
+    case StrokeAlign::Inside:
+      return tgfx::StrokeAlign::Inside;
+    case StrokeAlign::Outside:
+      return tgfx::StrokeAlign::Outside;
+  }
+  return tgfx::StrokeAlign::Center;
+}
+
+static tgfx::MergePathOp ToTGFX(MergePathMode mode) {
+  switch (mode) {
+    case MergePathMode::Append:
+      return tgfx::MergePathOp::Append;
+    case MergePathMode::Union:
+      return tgfx::MergePathOp::Union;
+    case MergePathMode::Intersect:
+      return tgfx::MergePathOp::Intersect;
+    case MergePathMode::Xor:
+      return tgfx::MergePathOp::XOR;
+    case MergePathMode::Difference:
+      return tgfx::MergePathOp::Difference;
+  }
+  return tgfx::MergePathOp::Append;
 }
 
 static tgfx::LayerMaskType ToTGFXMaskType(MaskType type) {
@@ -418,6 +502,9 @@ class LayerBuilderContext {
     if (node->data) {
       shapePath->setPath(ToTGFX(*node->data));
     }
+    if (node->reversed) {
+      shapePath->setReversed(true);
+    }
     return shapePath;
   }
 
@@ -446,6 +533,15 @@ class LayerBuilderContext {
     auto fill = tgfx::FillStyle::Make(colorSource);
     if (fill) {
       fill->setAlpha(node->alpha);
+      if (node->blendMode != BlendMode::Normal) {
+        fill->setBlendMode(ToTGFX(node->blendMode));
+      }
+      if (node->fillRule != FillRule::Winding) {
+        fill->setFillRule(ToTGFX(node->fillRule));
+      }
+      if (node->placement != LayerPlacement::Background) {
+        fill->setPlacement(ToTGFX(node->placement));
+      }
     }
     return fill;
   }
@@ -472,6 +568,15 @@ class LayerBuilderContext {
       stroke->setDashes(node->dashes);
       stroke->setDashOffset(node->dashOffset);
       stroke->setDashAdaptive(node->dashAdaptive);
+    }
+    if (node->blendMode != BlendMode::Normal) {
+      stroke->setBlendMode(ToTGFX(node->blendMode));
+    }
+    if (node->align != StrokeAlign::Center) {
+      stroke->setStrokeAlign(ToTGFX(node->align));
+    }
+    if (node->placement != LayerPlacement::Background) {
+      stroke->setPlacement(ToTGFX(node->placement));
     }
 
     return stroke;
@@ -526,8 +631,12 @@ class LayerBuilderContext {
       positions = {0.0f, 1.0f};
     }
 
-    return tgfx::Gradient::MakeLinear(ToTGFX(node->startPoint), ToTGFX(node->endPoint), colors,
-                                      positions);
+    auto gradient = tgfx::Gradient::MakeLinear(ToTGFX(node->startPoint), ToTGFX(node->endPoint),
+                                               colors, positions);
+    if (gradient && !node->matrix.isIdentity()) {
+      gradient->setMatrix(ToTGFX(node->matrix));
+    }
+    return gradient;
   }
 
   std::shared_ptr<tgfx::ColorSource> convertRadialGradient(const RadialGradient* node) {
@@ -544,7 +653,11 @@ class LayerBuilderContext {
       positions = {0.0f, 1.0f};
     }
 
-    return tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions);
+    auto gradient = tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions);
+    if (gradient && !node->matrix.isIdentity()) {
+      gradient->setMatrix(ToTGFX(node->matrix));
+    }
+    return gradient;
   }
 
   std::shared_ptr<tgfx::ColorSource> convertConicGradient(const ConicGradient* node) {
@@ -561,8 +674,12 @@ class LayerBuilderContext {
       positions = {0.0f, 1.0f};
     }
 
-    return tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle, node->endAngle, colors,
-                                     positions);
+    auto gradient = tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle, node->endAngle,
+                                              colors, positions);
+    if (gradient && !node->matrix.isIdentity()) {
+      gradient->setMatrix(ToTGFX(node->matrix));
+    }
+    return gradient;
   }
 
   std::shared_ptr<tgfx::ColorSource> convertDiamondGradient(const DiamondGradient* node) {
@@ -579,7 +696,12 @@ class LayerBuilderContext {
       positions = {0.0f, 1.0f};
     }
 
-    return tgfx::Gradient::MakeDiamond(ToTGFX(node->center), node->radius, colors, positions);
+    auto gradient =
+        tgfx::Gradient::MakeDiamond(ToTGFX(node->center), node->radius, colors, positions);
+    if (gradient && !node->matrix.isIdentity()) {
+      gradient->setMatrix(ToTGFX(node->matrix));
+    }
+    return gradient;
   }
 
   std::shared_ptr<tgfx::ColorSource> convertImagePattern(const ImagePattern* node) {
@@ -656,8 +778,11 @@ class LayerBuilderContext {
     return round;
   }
 
-  std::shared_ptr<tgfx::MergePath> convertMergePath(const MergePath*) {
+  std::shared_ptr<tgfx::MergePath> convertMergePath(const MergePath* node) {
     auto merge = tgfx::MergePath::Make();
+    if (node->mode != MergePathMode::Append) {
+      merge->setMode(ToTGFX(node->mode));
+    }
     return merge;
   }
 
@@ -873,15 +998,15 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, Typeset
   }
 
   // Create ShapedTextMap using provided or default Typesetter
-  ShapedTextMap shapedTextMap;
+  TypesetterResult typesetterResult = {};
   if (typesetter != nullptr) {
-    shapedTextMap = typesetter->shape(document);
+    typesetterResult = typesetter->shape(document);
   } else {
     Typesetter defaultTypesetter;
-    shapedTextMap = defaultTypesetter.shape(document);
+    typesetterResult = defaultTypesetter.shape(document);
   }
 
-  LayerBuilderContext context(shapedTextMap);
+  LayerBuilderContext context(typesetterResult.shapedTextMap);
   return context.build(*document);
 }
 
