@@ -15,14 +15,14 @@
       </Fill>
     </Layer>
 
-    <!-- Hex Grid Pattern (reduced density for performance) -->
+    <!-- Hex Grid Pattern (clipped to canvas bounds for performance) -->
     <Layer alpha="0.15">
-      <Group x="-20">
+      <Group x="-10">
         <Path data="@hex"/>
         <Stroke color="#0066AA" width="1"/>
-        <Repeater copies="21" position="40,0"/>
+        <Repeater copies="41" position="20,0"/>
       </Group>
-      <Repeater copies="18" position="20,34.64"/>
+      <Repeater copies="36" position="10,17.32"/>
     </Layer>
 
     <!-- Vignette -->
@@ -82,7 +82,7 @@
           <ColorStop offset="1" color="#FFAA0010"/>
         </RadialGradient>
       </Fill>
-      <DropShadowStyle blurX="12" blurY="12" color="#FFAA00"/>
+      <DropShadowStyle blurX="25" blurY="25" color="#FFAA00"/>
     </Layer>
 
     <!-- Inner scanning lines inside triangle (Masked) -->
@@ -202,7 +202,7 @@
       <Path data="M -200 0 L -180 -40 L 180 -40 L 200 0 L 180 20 L -180 20 Z"/>
       <Fill color="#001122" alpha="0.95"/>
       <Stroke color="#0066AA" width="2"/>
-      <DropShadowStyle blurX="8" blurY="8" color="#000"/>
+      <DropShadowStyle blurX="15" blurY="15" color="#000"/>
     </Layer>
 
     <!-- Weapon Name -->
@@ -290,7 +290,7 @@
     <Rectangle size="8,8"/>
     <Stroke color="#FFAA00" width="1"/>
     <Repeater copies="3" position="15,0"/>
-    <DropShadowStyle blurX="3" blurY="3" color="#FFAA00"/>
+    <DropShadowStyle blurX="5" blurY="5" color="#FFAA00"/>
   </Layer>
 
   <!-- Ammo Display (Moved to Bottom Right) -->

@@ -791,6 +791,12 @@ This section describes performance-related optimizations. They are grouped into 
 equivalent transformations that do not change rendering (safe to auto-apply), and
 approximation-based optimizations that may change visual details (require user confirmation).
 
+**Core principle**: Performance optimization must preserve the original design intent. Only
+remove invisible/off-canvas content or make structurally equivalent substitutions. Never change
+visual parameters (blur radius, spacing, density, colors, alpha) without explicit user approval.
+Acceptable auto-optimizations are limited to eliminating provably invisible work (off-canvas
+elements, fully occluded content, unused resources).
+
 ### Background: Rendering Cost Model
 
 Understanding the PAGX renderer's cost model helps identify performance bottlenecks:
@@ -856,8 +862,8 @@ consume rendering resources.
 beyond the canvas bounds.
 
 **How**: Adjust the starting position and `copies` count so generated content just covers the
-canvas, with minimal overflow. For staggered patterns (e.g., hex grids where odd rows offset),
-include one extra column/row to account for the offset.
+canvas, with minimal overflow. **Keep the original spacing/density unchanged** — only reduce
+the extent of the pattern to the visible area.
 
 ```xml
 <!-- Before: generates 70×40 = 2800 hexagons, ~40% outside 800×600 canvas -->
@@ -870,22 +876,23 @@ include one extra column/row to account for the offset.
   <Repeater copies="40" position="10,17.32"/>
 </Layer>
 
-<!-- After: generates ~21×18 = 378 hexagons, covers canvas adequately -->
+<!-- After: generates ~41×36 = 1476 hexagons, same density, clipped to canvas -->
 <Layer>
-  <Group x="-20">
+  <Group x="-10">
     <Path data="@hex"/>
     <Stroke color="#0066AA" width="1"/>
-    <Repeater copies="21" position="40,0"/>
+    <Repeater copies="41" position="20,0"/>
   </Group>
-  <Repeater copies="18" position="20,34.64"/>
+  <Repeater copies="36" position="10,17.32"/>
 </Layer>
 ```
 
 **Caveats**:
 - If the file is animated and elements scroll or move, ensure the clipped area still covers all
   animation frames.
-- For purely decorative background patterns, reducing density (larger spacing) simultaneously
-  is often acceptable and gives a bigger performance win than just clipping.
+- For staggered patterns (hex grids), include one extra column/row for the offset.
+- This optimization preserves the original density and spacing — only the extent changes.
+  Within the canvas area, the rendered result should be visually identical.
 
 #### 15.3 Reduce Nested Repeater Element Count
 
