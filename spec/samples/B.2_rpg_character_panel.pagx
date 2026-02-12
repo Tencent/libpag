@@ -111,7 +111,7 @@
   </Layer>
   <Layer name="GlowBlue" blendMode="screen">
     <Ellipse center="200,500" size="600,600"/>
-    <Fill color="@glowBlue"/>
+    <Fill color="@glowPurple"/>
   </Layer>
 
   <!-- Subtle star dust decoration -->
@@ -302,11 +302,7 @@
         </Group>
         <!-- Armor plate lines -->
         <Group>
-          <Path data="M -12 -15 L 12 -15"/>
-          <Stroke color="#B8860B20" width="1"/>
-        </Group>
-        <Group>
-          <Path data="M -14 -5 L 14 -5"/>
+          <Path data="M -12 -15 L 12 -15 M -14 -5 L 14 -5"/>
           <Stroke color="#B8860B20" width="1"/>
         </Group>
         <!-- Chest emblem -->
@@ -322,50 +318,30 @@
         </Group>
         <Group>
           <Rectangle center="0,8" size="10,10" roundness="1"/>
-          <Fill color="#FFD700"/>
-        </Group>
-        <Group>
           <Rectangle center="0,8" size="5,5" roundness="1"/>
           <Fill color="#FFD700"/>
         </Group>
         <!-- Legs -->
         <Group>
-          <Path data="M -15 12 L -18 55 L -8 55 L -5 12 Z"/>
-          <Fill color="#2E2545"/>
-        </Group>
-        <Group>
-          <Path data="M 5 12 L 8 55 L 18 55 L 15 12 Z"/>
+          <Path data="M -15 12 L -18 55 L -8 55 L -5 12 Z M 5 12 L 8 55 L 18 55 L 15 12 Z"/>
           <Fill color="#2E2545"/>
         </Group>
         <!-- Knee guards -->
         <Group>
           <Ellipse center="-12,32" size="10,8"/>
-          <Fill color="#3D3555"/>
-          <Stroke color="#B8860B30" width="1"/>
-        </Group>
-        <Group>
           <Ellipse center="12,32" size="10,8"/>
           <Fill color="#3D3555"/>
           <Stroke color="#B8860B30" width="1"/>
         </Group>
         <!-- Boots -->
         <Group>
-          <Path data="M -20 50 L -6 50 L -5 62 L -22 62 Z"/>
-          <Fill color="#4B3D5A"/>
-          <Stroke color="#B8860B20" width="1"/>
-        </Group>
-        <Group>
-          <Path data="M 6 50 L 20 50 L 22 62 L 5 62 Z"/>
+          <Path data="M -20 50 L -6 50 L -5 62 L -22 62 Z M 6 50 L 20 50 L 22 62 L 5 62 Z"/>
           <Fill color="#4B3D5A"/>
           <Stroke color="#B8860B20" width="1"/>
         </Group>
         <!-- Boot cuffs -->
         <Group>
-          <Path data="M -20 50 L -6 50 L -6 53 L -20 53 Z"/>
-          <Fill color="#3D3555"/>
-        </Group>
-        <Group>
-          <Path data="M 6 50 L 20 50 L 20 53 L 6 53 Z"/>
+          <Path data="M -20 50 L -6 50 L -6 53 L -20 53 Z M 6 50 L 20 50 L 20 53 L 6 53 Z"/>
           <Fill color="#3D3555"/>
         </Group>
         <!-- Head -->
@@ -396,29 +372,18 @@
         <!-- Shoulders -->
         <Group>
           <Ellipse center="-32,-42" size="24,18"/>
-          <Fill color="#3D3555"/>
-          <Stroke color="#B8860B50" width="1"/>
-        </Group>
-        <Group>
-          <Ellipse center="-32,-42" size="12,8"/>
-          <Fill color="#B8860B20"/>
-        </Group>
-        <Group>
           <Ellipse center="32,-42" size="24,18"/>
           <Fill color="#3D3555"/>
           <Stroke color="#B8860B50" width="1"/>
         </Group>
         <Group>
+          <Ellipse center="-32,-42" size="12,8"/>
           <Ellipse center="32,-42" size="12,8"/>
           <Fill color="#B8860B20"/>
         </Group>
         <!-- Arms -->
         <Group>
-          <Path data="M -36 -32 L -40 -10 L -34 -10 L -30 -32 Z"/>
-          <Fill color="#2E2545"/>
-        </Group>
-        <Group>
-          <Path data="M 30 -32 L 34 -10 L 40 -10 L 36 -32 Z"/>
+          <Path data="M -36 -32 L -40 -10 L -34 -10 L -30 -32 Z M 30 -32 L 34 -10 L 40 -10 L 36 -32 Z"/>
           <Fill color="#2E2545"/>
         </Group>
         <!-- Shield (left arm) -->
@@ -441,10 +406,6 @@
         <Group>
           <Path data="M 46 -30 L 48 -78 L 44 -78 Z"/>
           <Fill color="#E2E8F0"/>
-        </Group>
-        <!-- Sword glow -->
-        <Group>
-          <Path data="M 46 -30 L 48 -78 L 44 -78 Z"/>
           <Stroke color="#FFFFFF40" width="1"/>
         </Group>
         <!-- Sword guard -->
