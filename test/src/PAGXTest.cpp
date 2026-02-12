@@ -50,7 +50,6 @@
 #include "tgfx/layers/Layer.h"
 #include "tgfx/svg/TextShaper.h"
 #include "utils/Baseline.h"
-#include "utils/DevicePool.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
 
@@ -113,7 +112,7 @@ static std::string SavePAGXFile(const std::string& xml, const std::string& key) 
  * Test case: Convert all SVG files to PAGX format, save as files, then load and render.
  * This tests the complete round-trip: SVG -> PAGX file -> Load -> Render
  */
-PAG_TEST(PAGXTest, SVGToPAGXAll) {
+PAGX_TEST(PAGXTest, SVGToPAGXAll) {
   constexpr int MinCanvasEdge = 400;
 
   std::string svgDir = ProjectPath::Absolute("resources/apitest/SVG");
@@ -126,11 +125,6 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
   }
 
   std::sort(svgFiles.begin(), svgFiles.end());
-
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
-  ASSERT_TRUE(context != nullptr);
 
   // Create Typesetter for text shaping
   pagx::Typesetter typesetter;
@@ -186,38 +180,16 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
     displayList.render(pagxSurface.get(), false);
     EXPECT_TRUE(Baseline::Compare(pagxSurface, "PAGXTest/" + baseName)) << baseName;
   }
-
-  device->unlock();
 }
 
 /**
  * Test case: Verify Layer can directly contain Shape + Fill without Group wrapper.
  */
-PAG_TEST(PAGXTest, LayerDirectContent) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
-  ASSERT_TRUE(context != nullptr);
-
+PAGX_TEST(PAGXTest, LayerDirectContent) {
   // Test 1: Group vs no-Group should render identically (left=Group, right=direct)
   {
-    const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
-<pagx width="200" height="100" version="1.0">
-  <Layer>
-    <Group>
-      <Rectangle center="50,50" size="100,100"/>
-      <Fill color="#FF0000"/>
-    </Group>
-  </Layer>
-  <Layer>
-    <Rectangle center="150,50" size="100,100"/>
-    <Fill color="#FF0000"/>
-  </Layer>
-</pagx>
-)";
-
-    auto doc = pagx::PAGXImporter::FromXML(reinterpret_cast<const uint8_t*>(pagxXml),
-                                           strlen(pagxXml));
+    auto pagxPath = ProjectPath::Absolute("resources/pagx/layer_direct_content.pagx");
+    auto doc = pagx::PAGXImporter::FromFile(pagxPath);
     ASSERT_TRUE(doc != nullptr);
 
     auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
@@ -232,59 +204,26 @@ PAG_TEST(PAGXTest, LayerDirectContent) {
 
   // Test 2: PAGX Layer with LinearGradient fill
   {
-    const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
-<pagx width="200" height="100" version="1.0">
-  <Layer>
-    <Rectangle center="100,50" size="200,100"/>
-    <Fill>
-      <LinearGradient startPoint="0,0" endPoint="200,0">
-        <ColorStop offset="0" color="#FF0000"/>
-        <ColorStop offset="1" color="#0000FF"/>
-      </LinearGradient>
-    </Fill>
-  </Layer>
-</pagx>
-)";
-
-    auto doc = pagx::PAGXImporter::FromXML(reinterpret_cast<const uint8_t*>(pagxXml),
-                                           strlen(pagxXml));
+    auto pagxPath = ProjectPath::Absolute("resources/pagx/linear_gradient.pagx");
+    auto doc = pagx::PAGXImporter::FromFile(pagxPath);
     ASSERT_TRUE(doc != nullptr);
 
     auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
     ASSERT_TRUE(tgfxLayer != nullptr);
 
-    auto surface4 = Surface::Make(context, 200, 100);
-    DisplayList displayList4;
-    displayList4.root()->addChild(tgfxLayer);
-    displayList4.render(surface4.get(), false);
-    EXPECT_TRUE(Baseline::Compare(surface4, "PAGXTest/PAGXLinearGradient"));
+    auto surface = Surface::Make(context, 200, 100);
+    DisplayList displayList;
+    displayList.root()->addChild(tgfxLayer);
+    displayList.render(surface.get(), false);
+    EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/PAGXLinearGradient"));
   }
-
-  device->unlock();
 }
 
 /**
  * Test case: Verify PAGXImporter::FromFile and FromXML produce identical results when rendered.
  */
-PAG_TEST(PAGXTest, LayerBuilderAPIConsistency) {
-  const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
-<pagx width="100" height="100" version="1.0">
-  <Layer>
-    <Group>
-      <Rectangle center="50,50" size="60,60"/>
-      <Fill color="#FF5500"/>
-    </Group>
-  </Layer>
-</pagx>
-)";
-
-  // Save to file
-  std::string pagxPath = SavePAGXFile(pagxXml, "PAGXTest/api_test.pagx");
-
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
-  ASSERT_TRUE(context != nullptr);
+PAGX_TEST(PAGXTest, LayerBuilderAPIConsistency) {
+  auto pagxPath = ProjectPath::Absolute("resources/pagx/api_consistency.pagx");
 
   // Load via FromFile
   auto docFromFile = pagx::PAGXImporter::FromFile(pagxPath);
@@ -292,9 +231,11 @@ PAG_TEST(PAGXTest, LayerBuilderAPIConsistency) {
   auto layerFromFile = pagx::LayerBuilder::Build(docFromFile.get());
   ASSERT_TRUE(layerFromFile != nullptr);
 
-  // Load via FromXML
-  auto docFromData = pagx::PAGXImporter::FromXML(reinterpret_cast<const uint8_t*>(pagxXml),
-                                                  strlen(pagxXml));
+  // Load via FromXML (read raw bytes from the same file)
+  auto fileData = tgfx::Data::MakeFromFile(pagxPath);
+  ASSERT_TRUE(fileData != nullptr);
+  auto docFromData =
+      pagx::PAGXImporter::FromXML(fileData->bytes(), static_cast<size_t>(fileData->size()));
   ASSERT_TRUE(docFromData != nullptr);
   auto layerFromData = pagx::LayerBuilder::Build(docFromData.get());
   ASSERT_TRUE(layerFromData != nullptr);
@@ -313,14 +254,12 @@ PAG_TEST(PAGXTest, LayerBuilderAPIConsistency) {
   // Both should match the same baseline
   EXPECT_TRUE(Baseline::Compare(surfaceFile, "PAGXTest/LayerBuilderAPIConsistency"));
   EXPECT_TRUE(Baseline::Compare(surfaceData, "PAGXTest/LayerBuilderAPIConsistency"));
-
-  device->unlock();
 }
 
 /**
  * Test case: PathData public API for path construction
  */
-PAG_TEST(PAGXTest, PathDataConstruction) {
+PAGX_TEST(PAGXTest, PathDataConstruction) {
   pagx::PathData pathData;
   pathData.moveTo(10, 20);
   pathData.lineTo(30, 40);
@@ -341,7 +280,7 @@ PAG_TEST(PAGXTest, PathDataConstruction) {
 /**
  * Test case: PathData forEach iteration
  */
-PAG_TEST(PAGXTest, PathDataForEach) {
+PAGX_TEST(PAGXTest, PathDataForEach) {
   pagx::PathData pathData;
   pathData.moveTo(0, 0);
   pathData.lineTo(100, 0);
@@ -358,7 +297,7 @@ PAG_TEST(PAGXTest, PathDataForEach) {
 /**
  * Test case: PAGXDocument creation and XML export
  */
-PAG_TEST(PAGXTest, PAGXDocumentXMLExport) {
+PAGX_TEST(PAGXTest, PAGXDocumentXMLExport) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   ASSERT_TRUE(doc != nullptr);
   EXPECT_EQ(doc->width, 400.0f);
@@ -399,7 +338,7 @@ PAG_TEST(PAGXTest, PAGXDocumentXMLExport) {
 /**
  * Test case: PAGXDocument XML round-trip (create -> export -> parse)
  */
-PAG_TEST(PAGXTest, PAGXDocumentRoundTrip) {
+PAGX_TEST(PAGXTest, PAGXDocumentRoundTrip) {
   auto doc1 = pagx::PAGXDocument::Make(200, 150);
   ASSERT_TRUE(doc1 != nullptr);
 
@@ -435,7 +374,7 @@ PAG_TEST(PAGXTest, PAGXDocumentRoundTrip) {
 /**
  * Test case: Font and Glyph node creation
  */
-PAG_TEST(PAGXTest, FontGlyphNodes) {
+PAGX_TEST(PAGXTest, FontGlyphNodes) {
   auto doc = pagx::PAGXDocument::Make(0, 0);
   auto font = doc->makeNode<pagx::Font>();
   font->id = "testFont";
@@ -460,7 +399,7 @@ PAG_TEST(PAGXTest, FontGlyphNodes) {
 /**
  * Test case: GlyphRun node with horizontal positioning
  */
-PAG_TEST(PAGXTest, GlyphRunHorizontal) {
+PAGX_TEST(PAGXTest, GlyphRunHorizontal) {
   auto doc = pagx::PAGXDocument::Make(0, 0);
   auto font = doc->makeNode<pagx::Font>("testFont");
   auto glyphRun = doc->makeNode<pagx::GlyphRun>();
@@ -479,7 +418,7 @@ PAG_TEST(PAGXTest, GlyphRunHorizontal) {
 /**
  * Test case: GlyphRun node with point positions
  */
-PAG_TEST(PAGXTest, GlyphRunPointPositions) {
+PAGX_TEST(PAGXTest, GlyphRunPointPositions) {
   auto doc = pagx::PAGXDocument::Make(0, 0);
   auto font = doc->makeNode<pagx::Font>("testFont");
   auto glyphRun = doc->makeNode<pagx::GlyphRun>();
@@ -496,7 +435,7 @@ PAG_TEST(PAGXTest, GlyphRunPointPositions) {
 /**
  * Test case: GlyphRun node with rotations and scales
  */
-PAG_TEST(PAGXTest, GlyphRunTransforms) {
+PAGX_TEST(PAGXTest, GlyphRunTransforms) {
   auto doc = pagx::PAGXDocument::Make(0, 0);
   auto font = doc->makeNode<pagx::Font>("testFont");
   auto glyphRun = doc->makeNode<pagx::GlyphRun>();
@@ -518,7 +457,7 @@ PAG_TEST(PAGXTest, GlyphRunTransforms) {
  * Creates a document with English, mixed Chinese-English text at different sizes, shapes and embeds
  * fonts, exports to XML, reimports and renders from embedded glyphs.
  */
-PAG_TEST(PAGXTest, PrecomposedTextRender) {
+PAGX_TEST(PAGXTest, PrecomposedTextRender) {
   auto doc = pagx::PAGXDocument::Make(240, 140);
   auto layer = doc->makeNode<pagx::Layer>();
   layer->contents.push_back(
@@ -543,11 +482,6 @@ PAG_TEST(PAGXTest, PrecomposedTextRender) {
   auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
   ASSERT_TRUE(reloadedDoc != nullptr);
 
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
-  ASSERT_TRUE(context != nullptr);
-
   auto tgfxLayer = pagx::LayerBuilder::Build(reloadedDoc.get());
   ASSERT_TRUE(tgfxLayer != nullptr);
 
@@ -556,14 +490,12 @@ PAG_TEST(PAGXTest, PrecomposedTextRender) {
   displayList.root()->addChild(tgfxLayer);
   displayList.render(surface.get(), false);
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/PrecomposedTextRender"));
-
-  device->unlock();
 }
 
 /**
  * Test case: Font and GlyphRun XML round-trip
  */
-PAG_TEST(PAGXTest, FontGlyphRoundTrip) {
+PAGX_TEST(PAGXTest, FontGlyphRoundTrip) {
   auto doc = pagx::PAGXDocument::Make(200, 100);
   ASSERT_TRUE(doc != nullptr);
 
@@ -620,7 +552,7 @@ PAG_TEST(PAGXTest, FontGlyphRoundTrip) {
 /**
  * Test case: Text shaping round-trip - verifies that original and pre-shaped renders are identical.
  */
-PAG_TEST(PAGXTest, TextShaperRoundTrip) {
+PAGX_TEST(PAGXTest, TextShaperRoundTrip) {
   std::string svgPath = ProjectPath::Absolute("resources/apitest/SVG/text.svg");
 
   auto doc = pagx::SVGImporter::Parse(svgPath);
@@ -628,11 +560,6 @@ PAG_TEST(PAGXTest, TextShaperRoundTrip) {
 
   int canvasWidth = static_cast<int>(doc->width);
   int canvasHeight = static_cast<int>(doc->height);
-
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
-  ASSERT_TRUE(context != nullptr);
 
   auto typefaces = GetFallbackTypefaces();
 
@@ -666,14 +593,12 @@ PAG_TEST(PAGXTest, TextShaperRoundTrip) {
 
   EXPECT_TRUE(Baseline::Compare(originalSurface, "PAGXTest/TextShaper_Original"));
   EXPECT_TRUE(Baseline::Compare(preshapedSurface, "PAGXTest/TextShaper_PreShaped"));
-
-  device->unlock();
 }
 
 /**
  * Test case: Text shaping with emoji (mixed vector and bitmap fonts)
  */
-PAG_TEST(PAGXTest, TextShaperEmoji) {
+PAGX_TEST(PAGXTest, TextShaperEmoji) {
   std::string svgPath = ProjectPath::Absolute("resources/apitest/SVG/emoji.svg");
 
   auto doc = pagx::SVGImporter::Parse(svgPath);
@@ -681,11 +606,6 @@ PAG_TEST(PAGXTest, TextShaperEmoji) {
 
   int canvasWidth = static_cast<int>(doc->width);
   int canvasHeight = static_cast<int>(doc->height);
-
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
-  ASSERT_TRUE(context != nullptr);
 
   auto typefaces = GetFallbackTypefaces();
 
@@ -723,20 +643,13 @@ PAG_TEST(PAGXTest, TextShaperEmoji) {
 
   EXPECT_TRUE(Baseline::Compare(originalSurface, "PAGXTest/TextShaperEmoji_Original"));
   EXPECT_TRUE(Baseline::Compare(preshapedSurface, "PAGXTest/TextShaperEmoji_PreShaped"));
-
-  device->unlock();
 }
 
 /**
  * Test all PAGX sample files in spec/samples directory.
  * Renders each sample and compares with baseline screenshots.
  */
-PAG_TEST(PAGXTest, SampleFiles) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
-  ASSERT_TRUE(context != nullptr);
-
+PAGX_TEST(PAGXTest, SampleFiles) {
   auto samplesDir = ProjectPath::Absolute("spec/samples");
   std::vector<std::string> sampleFiles;
 
@@ -768,15 +681,14 @@ PAG_TEST(PAGXTest, SampleFiles) {
       continue;
     }
 
-    auto surface = Surface::Make(context, static_cast<int>(doc->width), static_cast<int>(doc->height));
+    auto surface =
+        Surface::Make(context, static_cast<int>(doc->width), static_cast<int>(doc->height));
     DisplayList displayList;
     displayList.root()->addChild(layer);
     displayList.render(surface.get(), false);
 
     EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/" + baseName)) << baseName;
   }
-
-  device->unlock();
 }
 
 }  // namespace pag
