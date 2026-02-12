@@ -258,6 +258,25 @@ function generateHtml(content, title, tocHtml, lang, langSwitchUrl, viewerUrl, f
 }
 
 /**
+ * Embed sample file contents into Markdown content. Replaces lines matching
+ * `> [Sample](samples/xxx.pagx)` with the file content as an xml code block
+ * followed by a Preview link.
+ */
+function embedSampleFiles(mdContent, specDir) {
+  const samplePattern = /^> \[Sample\]\((samples\/[^\s)]+\.pagx)\)$/gm;
+  return mdContent.replace(samplePattern, (match, samplePath) => {
+    const filePath = path.join(specDir, samplePath);
+    if (!fs.existsSync(filePath)) {
+      console.warn(`  Warning: sample file not found: ${filePath}`);
+      return match;
+    }
+    const content = fs.readFileSync(filePath, 'utf-8').trimEnd();
+    const previewUrl = `${BASE_URL}/?file=./${samplePath}`;
+    return '```xml\n' + content + '\n```\n\n> [Preview](' + previewUrl + ')';
+  });
+}
+
+/**
  * Publish a single spec file.
  */
 function publishSpec(specFile, outputDir, lang, langSwitchUrl, viewerUrl, faviconUrl, englishSlugs = null) {
@@ -267,7 +286,8 @@ function publishSpec(specFile, outputDir, lang, langSwitchUrl, viewerUrl, favico
   }
 
   console.log(`  Reading: ${specFile}`);
-  const mdContent = fs.readFileSync(specFile, 'utf-8');
+  let mdContent = fs.readFileSync(specFile, 'utf-8');
+  mdContent = embedSampleFiles(mdContent, SPEC_DIR);
 
   const titleMatch = mdContent.match(/^#\s+(.+)$/m);
   const title = titleMatch ? titleMatch[1] : 'PAGX Format Specification';
