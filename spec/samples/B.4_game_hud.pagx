@@ -222,7 +222,7 @@
     <!-- Decorative Tech Bits under frame -->
     <Layer y="30">
       <Layer>
-        <Rectangle size="40,4"/>
+        <Rectangle center="0,0" size="40,4"/>
         <Fill color="#004488"/>
       </Layer>
       <Layer>
