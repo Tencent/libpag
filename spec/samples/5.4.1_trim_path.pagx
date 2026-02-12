@@ -4,17 +4,17 @@
   <!-- === Top row: Separate mode === -->
   <!-- Track -->
   <Layer>
-    <Ellipse center="120,105" size="120,120"/>
-    <Ellipse center="280,105" size="120,120"/>
+    <Ellipse center="120,95" size="100,100"/>
+    <Ellipse center="280,95" size="100,100"/>
     <Stroke color="#E2E8F0" width="8"/>
   </Layer>
   <!-- Trimmed: each ellipse trimmed independently to 0.2~0.9 -->
   <Layer>
-    <Ellipse center="120,105" size="120,120"/>
-    <Ellipse center="280,105" size="120,120"/>
+    <Ellipse center="120,95" size="100,100"/>
+    <Ellipse center="280,95" size="100,100"/>
     <TrimPath start="0.2" end="0.9" type="separate"/>
     <Stroke width="10" cap="round">
-      <LinearGradient startPoint="60,40" endPoint="340,170">
+      <LinearGradient startPoint="70,40" endPoint="330,150">
         <ColorStop offset="0" color="#06B6D4"/>
         <ColorStop offset="1" color="#8B5CF6"/>
       </LinearGradient>
@@ -23,24 +23,24 @@
   <!-- Label -->
   <Layer>
     <Text text="Separate (0.2–0.9)" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
-    <TextLayout position="200,192" textAlign="center"/>
+    <TextLayout position="200,187" textAlign="center"/>
     <Fill color="#475569"/>
   </Layer>
 
   <!-- === Bottom row: Continuous mode === -->
   <!-- Track -->
   <Layer>
-    <Ellipse center="120,275" size="120,120"/>
-    <Ellipse center="280,275" size="120,120"/>
+    <Ellipse center="120,265" size="100,100"/>
+    <Ellipse center="280,265" size="100,100"/>
     <Stroke color="#E2E8F0" width="8"/>
   </Layer>
   <!-- Trimmed: both ellipses treated as one path, 0.2~0.9 of total length -->
   <Layer>
-    <Ellipse center="120,275" size="120,120"/>
-    <Ellipse center="280,275" size="120,120"/>
+    <Ellipse center="120,265" size="100,100"/>
+    <Ellipse center="280,265" size="100,100"/>
     <TrimPath start="0.2" end="0.9" type="continuous"/>
     <Stroke width="10" cap="round">
-      <LinearGradient startPoint="60,210" endPoint="340,340">
+      <LinearGradient startPoint="70,210" endPoint="330,320">
         <ColorStop offset="0" color="#F59E0B"/>
         <ColorStop offset="1" color="#F43F5E"/>
       </LinearGradient>
@@ -49,7 +49,7 @@
   <!-- Label -->
   <Layer>
     <Text text="Continuous (0.2–0.9)" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
-    <TextLayout position="200,362" textAlign="center"/>
+    <TextLayout position="200,357" textAlign="center"/>
     <Fill color="#475569"/>
   </Layer>
 </pagx>
