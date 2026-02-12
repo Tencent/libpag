@@ -176,6 +176,9 @@ function main() {
   // Copy samples directory and generate index.json
   console.log('\n  Copying samples...');
   const samplesOutputDir = path.join(outputDir, 'samples');
+  if (fs.existsSync(samplesOutputDir)) {
+    fs.rmSync(samplesOutputDir, { recursive: true });
+  }
   const sampleFiles = fs.readdirSync(SAMPLES_DIR)
     .filter(f => !f.startsWith('.'))
     .sort();
