@@ -785,6 +785,166 @@ root element's dimensions, and the mask reference is on a Layer that does not ne
 
 ---
 
+## 15. Performance Optimization
+
+Performance optimizations may produce visually similar but not pixel-identical results.
+**Always confirm with the user before applying these optimizations.**
+
+### 15.1 Clip Repeater Content to Canvas Bounds
+
+**Problem**: Repeaters positioned outside the canvas generate invisible elements that still
+consume rendering resources.
+
+**When to apply**: A Repeater (or nested Repeaters) generates content that extends significantly
+beyond the canvas bounds.
+
+**How**: Adjust the starting position and `copies` count so generated content just covers the
+canvas, with minimal overflow.
+
+**Analysis method**:
+1. Calculate the total span: `copies × position_offset`
+2. Compare with canvas dimensions
+3. If starting position is negative and content extends beyond canvas, adjust to minimize waste
+
+```xml
+<!-- Before: generates 70×40 = 2800 hexagons, ~40% outside 800×600 canvas -->
+<Layer>
+  <Group x="-400">
+    <Path data="@hex"/>
+    <Stroke color="#0066AA" width="1"/>
+    <Repeater copies="70" position="20,0"/>
+  </Group>
+  <Repeater copies="40" position="10,17.32"/>
+</Layer>
+
+<!-- After: generates ~42×36 = 1512 hexagons, covers canvas with minimal overflow -->
+<Layer>
+  <Group x="-20">
+    <Path data="@hex"/>
+    <Stroke color="#0066AA" width="1"/>
+    <Repeater copies="42" position="20,0"/>
+  </Group>
+  <Repeater copies="36" position="10,17.32"/>
+</Layer>
+```
+
+**Caveats**:
+- If the file is animated and elements scroll or move, ensure the clipped area still covers all
+  animation frames.
+- This changes the exact pattern distribution. Confirm visual acceptability with user.
+
+### 15.2 Avoid Nested Repeaters with Large Copy Counts
+
+**Problem**: Nested Repeaters multiply element counts exponentially. A seemingly innocent
+`copies="70"` nested inside `copies="40"` generates 2800 elements.
+
+**Performance guideline**:
+- Single Repeater: up to ~200 copies is typically fine
+- Nested Repeaters: product of copies should ideally stay under ~500 for smooth rendering
+- Above 1000 elements: expect noticeable performance impact
+
+**Alternatives**:
+1. **Pre-render to image**: For static decorative patterns (grids, backgrounds), consider
+   pre-rendering to a static image asset
+2. **Reduce density**: Increase spacing to reduce copy count while maintaining visual effect
+3. **Limit to visible area**: See 15.1 above
+
+### 15.3 Evaluate Low-Opacity Elements
+
+**Problem**: Elements with very low alpha (e.g., `alpha="0.15"`) are nearly invisible but still
+fully rendered.
+
+**When to apply**: An element or layer has `alpha` below ~0.2 and generates significant
+rendering cost (many children, complex effects, Repeaters).
+
+**Questions to ask user**:
+1. Is this element visually necessary?
+2. Can alpha be increased to make rendering cost worthwhile?
+3. Can complexity be reduced (fewer copies, simpler geometry)?
+
+```xml
+<!-- Example: 2800 hexagons at 15% opacity — barely visible, very expensive -->
+<Layer alpha="0.15">
+  <!-- complex Repeater structure -->
+</Layer>
+```
+
+### 15.4 Optimize DropShadowStyle on Repeater Content
+
+**Problem**: When DropShadowStyle is applied to a Layer containing a Repeater, the shadow is
+computed once for the combined silhouette — this is efficient. However, if each repeated
+element needs individual shadow, the cost multiplies.
+
+**Efficient pattern** (shadow on container):
+```xml
+<Layer>
+  <Rectangle size="8,8"/>
+  <Stroke color="#FFAA00" width="1"/>
+  <Repeater copies="3" position="15,0"/>
+  <DropShadowStyle blurX="5" blurY="5" color="#FFAA00"/>
+</Layer>
+```
+
+The shadow encompasses all 3 rectangles as one silhouette.
+
+**When this may not match intent**: If the user wants each repeated element to cast its own
+distinct shadow (e.g., overlapping shadows), the current structure is correct but inherently
+expensive. Ask user if combined shadow is acceptable.
+
+### 15.5 Reduce Large Blur Radius Values
+
+**Problem**: Blur effects (DropShadowStyle, GaussianBlur, etc.) have computational cost
+proportional to blur radius squared. A `blur="25"` is ~6× more expensive than `blur="10"`.
+
+**When to apply**: Blur radius exceeds ~15 pixels.
+
+**Optimization approaches**:
+1. Reduce blur radius if visual difference is acceptable
+2. For DropShadowStyle, consider if the shadow is even visible (small elements with large blur
+   may have imperceptible shadows)
+3. For background blur effects, consider using a pre-blurred image asset
+
+### 15.6 Merge Redundant Scale Marks / Tick Marks
+
+**Problem**: UI elements like gauges often have multiple overlapping scale rings (e.g., major
+ticks every 6° and minor ticks every 3°). Half of the minor ticks overlap with major ticks.
+
+**When to apply**: Two Repeaters generate marks at intervals where one is a multiple of the
+other.
+
+**How**: Adjust the finer Repeater to skip positions covered by the coarser one.
+
+```xml
+<!-- Before: 60 major ticks + 120 minor ticks, half overlap -->
+<Layer>
+  <Rectangle center="0,-220" size="2,15"/>
+  <Fill color="#00CCFF" alpha="0.6"/>
+  <Repeater copies="60" rotation="6"/>
+</Layer>
+<Layer>
+  <Rectangle center="0,-215" size="1,8"/>
+  <Fill color="#00CCFF" alpha="0.3"/>
+  <Repeater copies="120" rotation="3"/>
+</Layer>
+
+<!-- After: 60 major + 60 non-overlapping minor = same visual, fewer elements -->
+<Layer>
+  <Rectangle center="0,-220" size="2,15"/>
+  <Fill color="#00CCFF" alpha="0.6"/>
+  <Repeater copies="60" rotation="6"/>
+</Layer>
+<Layer>
+  <Rectangle center="0,-215" size="1,8"/>
+  <Fill color="#00CCFF" alpha="0.3"/>
+  <Repeater copies="60" rotation="6" offset="0.5"/>
+</Layer>
+```
+
+**Caveats**: This changes the exact visual — minor ticks no longer appear at major tick
+positions. Confirm with user.
+
+---
+
 ## Appendix: Key Concepts Quick Reference
 
 ### Painter Scope
