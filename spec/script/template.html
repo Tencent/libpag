@@ -134,6 +134,35 @@
         pre code { background-color: transparent; padding: 0; border-radius: 0; font-size: 100%; }
         .hljs { background: var(--code-bg) !important; }
         
+        /* Code block with preview button */
+        .code-block-wrapper { position: relative; }
+        .code-block-wrapper pre { margin-top: 0; margin-bottom: 16px; }
+        .preview-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: #666;
+            opacity: 0;
+            transition: all 0.2s;
+            z-index: 1;
+        }
+        .preview-btn svg { width: 14px; height: 14px; }
+        .code-block-wrapper:hover .preview-btn { opacity: 1; }
+        .preview-btn:hover {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+            text-decoration: none;
+        }
+        
         /* Table */
         table { border-collapse: collapse; width: 100%; margin: 16px 0; display: block; overflow-x: auto; }
         th, td { border: 1px solid var(--border-color); padding: 8px 13px; text-align: left; white-space: nowrap; }

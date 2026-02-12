@@ -260,7 +260,7 @@ function generateHtml(content, title, tocHtml, lang, langSwitchUrl, viewerUrl, f
 /**
  * Embed sample file contents into Markdown content. Replaces lines matching
  * `> [Sample](samples/xxx.pagx)` with the file content as an xml code block
- * followed by a Preview link.
+ * followed by an HTML comment marker for preview button post-processing.
  */
 function embedSampleFiles(mdContent, specDir) {
   const samplePattern = /^> \[Sample\]\((samples\/[^\s)]+\.pagx)\)$/gm;
@@ -271,8 +271,23 @@ function embedSampleFiles(mdContent, specDir) {
       return match;
     }
     const content = fs.readFileSync(filePath, 'utf-8').trimEnd();
-    const previewUrl = `${BASE_URL}/?file=./${samplePath}`;
-    return '```xml\n' + content + '\n```\n\n> [Preview](' + previewUrl + ')';
+    return '```xml\n' + content + '\n```\n\n<!-- preview:' + samplePath + ' -->';
+  });
+}
+
+/**
+ * Post-process HTML to convert preview comment markers into floating preview
+ * buttons overlaid on code blocks. Each `<!-- preview:samples/xxx.pagx -->` after
+ * a `</pre>` is replaced by wrapping the `<pre>` in a container with a floating
+ * button linking to the viewer.
+ */
+function addPreviewButtons(html, viewerUrl) {
+  const previewPattern = /(<pre><code class="hljs language-xml">[\s\S]*?<\/code><\/pre>)\s*<!-- preview:(samples\/[^\s]+\.pagx) -->/g;
+  return html.replace(previewPattern, (match, preBlock, samplePath) => {
+    const previewUrl = viewerUrl + '?file=./' + samplePath;
+    const button = '<a class="preview-btn" href="' + previewUrl + '" target="_blank" title="Preview">' +
+      '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></a>';
+    return '<div class="code-block-wrapper">' + button + preBlock + '</div>';
   });
 }
 
@@ -301,6 +316,8 @@ function publishSpec(specFile, outputDir, lang, langSwitchUrl, viewerUrl, favico
   if (englishSlugs) {
     htmlContent = replaceHeadingIds(htmlContent, englishSlugs);
   }
+
+  htmlContent = addPreviewButtons(htmlContent, viewerUrl);
 
   const html = generateHtml(htmlContent, title, tocHtml, lang, langSwitchUrl, viewerUrl, faviconUrl);
 
