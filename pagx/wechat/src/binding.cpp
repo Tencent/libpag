@@ -20,10 +20,9 @@
 #include "PAGXView.h"
 
 using namespace emscripten;
-
-using namespace emscripten;
 using namespace pagx;
 
+// Registers PAGXView class and its public methods for JavaScript access via Emscripten bindings.
 EMSCRIPTEN_BINDINGS(PAGXView) {
   class_<PAGXView>("PAGXView")
       .smart_ptr<std::shared_ptr<PAGXView>>("PAGXView")
@@ -36,6 +35,7 @@ EMSCRIPTEN_BINDINGS(PAGXView) {
       .function("updateZoomScaleAndOffset", &PAGXView::updateZoomScaleAndOffset)
       .function("onZoomEnd", &PAGXView::onZoomEnd)
       .function("draw", &PAGXView::draw)
+      .function("firstFrameRendered", &PAGXView::firstFrameRendered)
       .function("contentWidth", &PAGXView::contentWidth)
       .function("contentHeight", &PAGXView::contentHeight)
       .function("setPerformanceAdaptationEnabled", &PAGXView::setPerformanceAdaptationEnabled)

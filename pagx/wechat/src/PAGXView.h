@@ -36,16 +36,28 @@ class PAGXView {
  *
  * Note: Before calling this method, the JavaScript code must:
  * 1. Get the Canvas object from WeChat API
- * 2. Call canvas.getContext('webgl') to get WebGLRenderingContext
+ * 2. Call canvas.getContext('webgl2') to get WebGL2RenderingContext
  * 3. Register the context via GL.registerContext(gl)
  */
   static std::shared_ptr<PAGXView> MakeFrom(int width, int height);
 
 
+  /**
+   * Constructs a PAGXView with the given device and canvas dimensions.
+   */
   PAGXView(std::shared_ptr<tgfx::Device> device, int width, int height);
 
+  /**
+   * Registers fallback fonts for text rendering.
+   * @param fontVal Font file data as a JavaScript Uint8Array (e.g. NotoSansSC-Regular.otf).
+   * @param emojiFontVal Emoji font file data as a JavaScript Uint8Array (e.g. NotoColorEmoji.ttf).
+   */
   void registerFonts(const emscripten::val& fontVal, const emscripten::val& emojiFontVal);
 
+  /**
+   * Loads a PAGX file from the given data and builds the layer tree for rendering.
+   * @param pagxData PAGX file data as a JavaScript Uint8Array.
+   */
   void loadPAGX(const emscripten::val& pagxData);
 
   /**
@@ -55,6 +67,12 @@ class PAGXView {
    */
   void updateSize(int width, int height);
 
+  /**
+   * Updates the zoom scale and content offset for the display list.
+   * @param zoom The current zoom scale factor.
+   * @param offsetX The horizontal content offset in pixels.
+   * @param offsetY The vertical content offset in pixels.
+   */
   void updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY);
 
   /**
@@ -63,12 +81,26 @@ class PAGXView {
    */
   void onZoomEnd();
 
+  /**
+   * Renders the current frame to the canvas. Returns true if the rendering succeeds.
+   */
   bool draw();
 
+  /**
+   * Returns true if the first frame has been rendered successfully.
+   */
+  bool firstFrameRendered() const;
+
+  /**
+   * Returns the width of the PAGX content in content pixels.
+   */
   float contentWidth() const {
     return pagxWidth;
   }
 
+  /**
+   * Returns the height of the PAGX content in content pixels.
+   */
   float contentHeight() const {
     return pagxHeight;
   }
@@ -104,19 +136,10 @@ class PAGXView {
  private:
   void applyCenteringTransform();
 
-  /**
-   * Update performance state based on frame duration.
-   */
   void updatePerformanceState(double frameDurationMs);
 
-  /**
-   * Update adaptive tile refinement based on current state.
-   */
   void updateAdaptiveTileRefinement();
 
-  /**
-   * Calculate target tile refinement count based on zoom and performance.
-   */
   int calculateTargetTileRefinement(float zoom) const;
 
   std::shared_ptr<tgfx::Device> device = nullptr;
@@ -149,6 +172,8 @@ class PAGXView {
   size_t minRecoveryFramesZoomEnd = 10; // Minimum frames to confirm recovery after zoom ends
 
   // State tracking
+  bool hasRenderedFirstFrame = false;
+
   float lastZoom = 1.0f;
   float zoomStartValue = 1.0f;          // Zoom value at gesture start
   float accumulatedZoomChange = 0.0f;   // Accumulated zoom change during gesture

@@ -18,6 +18,7 @@
 
 import { RenderCanvas, WxCanvas } from './render-canvas';
 import { BackendContext } from './backend-context';
+import { destroyVerify } from './decorators';
 import type { PAGX, PAGXViewNative } from './types';
 import type { wx } from './interfaces';
 
@@ -39,12 +40,18 @@ export interface PAGXViewOptions {
    * Can be used for performance monitoring or custom rendering logic.
    */
   onAfterRender?: () => void;
+  /**
+   * Called once when the first frame is rendered successfully.
+   * Useful for hiding loading indicators after content becomes visible.
+   */
+  onFirstFrame?: () => void;
 }
 
 /**
  * PAGXView for WeChat MiniProgram.
  * Manages canvas, WebGL context, and C++ PAGXViewWechat instance.
  */
+@destroyVerify
 export class View {
   /**
    * Create PAGXView.
@@ -100,6 +107,7 @@ export class View {
   };
   private isDestroyed = false;
   private isRendering = false;
+  private firstFrameCallbackFired = false;
   private animationFrameId: number = 0;
 
   private constructor(module: PAGX, canvas: WxCanvas) {
@@ -114,7 +122,6 @@ export class View {
    * @param emojiFontData Emoji font file data (e.g. NotoColorEmoji.ttf) as Uint8Array.
    */
   public registerFonts(fontData: Uint8Array, emojiFontData: Uint8Array): void {
-    this.checkDestroyed();
     if (!this.nativeView) {
       throw new Error('Native view not initialized');
     }
@@ -128,10 +135,10 @@ export class View {
    * @param pagxData PAGX file data
    */
   public loadPAGX(pagxData: Uint8Array): void {
-    this.checkDestroyed();
     if (!this.nativeView) {
       throw new Error('Native view not initialized');
     }
+    this.firstFrameCallbackFired = false;
     this.nativeView.loadPAGX(pagxData);
   }
 
@@ -141,8 +148,6 @@ export class View {
    * @param height New height
    */
   public updateSize(width?: number, height?: number): void {
-    this.checkDestroyed();
-
     if (!this.canvas) {
       throw new Error('Canvas element is not found!');
     }
@@ -168,7 +173,6 @@ export class View {
    * @param offsetY Y offset
    */
   public updateZoomScaleAndOffset(zoom: number, offsetX: number, offsetY: number): void {
-    this.checkDestroyed();
     this.nativeView!.updateZoomScaleAndOffset(zoom, offsetX, offsetY);
   }
 
@@ -179,7 +183,6 @@ export class View {
    * @deprecated Automatic detection is enabled, manual call is optional.
    */
   public onZoomEnd(): void {
-    this.checkDestroyed();
     this.nativeView!.onZoomEnd();
   }
 
@@ -187,7 +190,6 @@ export class View {
    * Get content width.
    */
   public contentWidth(): number {
-    this.checkDestroyed();
     return this.nativeView!.contentWidth();
   }
 
@@ -195,8 +197,14 @@ export class View {
    * Get content height.
    */
   public contentHeight(): number {
-    this.checkDestroyed();
     return this.nativeView!.contentHeight();
+  }
+
+  /**
+   * Returns true if the first frame has been rendered successfully.
+   */
+  public isFirstFrameRendered(): boolean {
+    return this.nativeView!.firstFrameRendered();
   }
 
   /**
@@ -204,7 +212,6 @@ export class View {
    * This will continuously call draw() using requestAnimationFrame.
    */
   public startRendering(): void {
-    this.checkDestroyed();
     if (this.isRendering) {
       return;
     }
@@ -290,12 +297,6 @@ export class View {
     this.canvas.height = displayHeight * dpr;
   }
 
-  private checkDestroyed(): void {
-    if (this.isDestroyed) {
-      throw new Error('PAGXView has been destroyed');
-    }
-  }
-
   private renderLoop(): void {
     if (!this.isRendering || this.isDestroyed) {
       return;
@@ -312,6 +313,13 @@ export class View {
     this.backendContext.makeCurrent(this.module);
     this.nativeView!.draw();
     this.backendContext.clearCurrent(this.module);
+
+    if (!this.firstFrameCallbackFired && this.nativeView!.firstFrameRendered()) {
+      this.firstFrameCallbackFired = true;
+      if (this.pagViewOptions.onFirstFrame) {
+        this.pagViewOptions.onFirstFrame();
+      }
+    }
 
     if (this.pagViewOptions.onAfterRender) {
       this.pagViewOptions.onAfterRender();

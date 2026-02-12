@@ -26,56 +26,56 @@ export interface FileSystemManager {
 export interface VideoDecoder {
   getFrameData: () => FrameDataOptions;
   seek: (
-    /** 跳转的解码位置，单位 ms */
+    /** Seek position in milliseconds. */
     position: number,
   ) => Promise<void>;
   start: (option: VideoDecoderStartOption) => Promise<any>;
   remove: () => Promise<any>;
   off: (
-    /** 事件名 */
+    /** Event name. */
     eventName: string,
-    /** 事件触发时执行的回调函数 */
+    /** Callback function triggered when the event fires. */
     callback: (...args: any[]) => any,
   ) => void;
   on: (
-    /** 事件名
+    /** Event name.
      *
-     * 参数 eventName 可选值：
-     * - 'start': 开始事件。返回 \{ width, height \};
-     * - 'stop': 结束事件。;
-     * - 'seek': seek 完成事件。;
-     * - 'bufferchange': 缓冲区变化事件。;
-     * - 'ended': 解码结束事件。; */
+     * Possible values for eventName:
+     * - 'start': Start event. Returns \{ width, height \}.
+     * - 'stop': Stop event.
+     * - 'seek': Seek completion event.
+     * - 'bufferchange': Buffer change event.
+     * - 'ended': Decoding ended event. */
     eventName: 'start' | 'stop' | 'seek' | 'bufferchange' | 'ended',
-    /** 事件触发时执行的回调函数 */
+    /** Callback function triggered when the event fires. */
     callback: (...args: any[]) => any,
   ) => void;
 }
 
-/** 视频帧数据，若取不到则返回 null。当缓冲区为空的时候可能暂停取不到数据。 */
+/** Video frame data. Returns null if unavailable. May pause when the buffer is empty. */
 export interface FrameDataOptions {
-  /** 帧数据 */
+  /** Frame data. */
   data: ArrayBuffer;
-  /** 帧数据高度 */
+  /** Frame data height. */
   height: number;
-  /** 帧原始 dts */
+  /** Original DTS of the frame. */
   pkDts: number;
-  /** 帧原始 pts */
+  /** Original PTS of the frame. */
   pkPts: number;
-  /** 帧数据宽度 */
+  /** Frame data width. */
   width: number;
 }
 
 export interface VideoDecoderStartOption {
-  /** 需要解码的视频源文件。基础库 2.13.0 以下的版本只支持本地路径。 2.13.0 开始支持 http:// 和 https:// 协议的远程路径。 */
+  /** Video source file to decode. Versions below 2.13.0 only support local paths. From 2.13.0 onwards, http:// and https:// remote paths are also supported. */
   source: string;
-  /** 解码模式。0：按 pts 解码；1：以最快速度解码 */
+  /** Decoding mode. 0: decode by PTS; 1: decode at maximum speed. */
   mode?: number;
 }
 
 export interface SystemInfo {
-  /** 客户端平台     */
+  /** Client platform. */
   platform: 'ios' | 'android' | 'windows' | 'mac' | 'devtools';
-  /** 设备像素比 */
+  /** Device pixel ratio. */
   pixelRatio: number;
 }

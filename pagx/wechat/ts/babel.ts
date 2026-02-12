@@ -1,4 +1,6 @@
 /* global globalThis */
+// Polyfills for WeChat Mini Program environment: registers WXWebAssembly as WebAssembly
+// and ensures globalThis/window are available for Emscripten module initialization.
 import type { wx } from './interfaces';
 
 declare const WXWebAssembly: typeof WebAssembly;

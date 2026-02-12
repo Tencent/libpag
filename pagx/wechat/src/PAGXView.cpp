@@ -30,9 +30,9 @@ using namespace emscripten;
 
 namespace pagx {
 
-// 最大缓存限制为 1GB
+// Maximum cache limit: 1GB
 constexpr size_t MAX_CACHE_LIMIT = 1U * 1024 * 1024 * 1024;
-// GPU 有效帧的过期时间，超过该帧数未使用的资源将被释放
+// GPU resource expiration in frames. Resources unused beyond this threshold will be released.
 constexpr size_t EXPIRATION_FRAMES = 10 * 60;
 
 std::shared_ptr<PAGXView> PAGXView::MakeFrom(int width, int height) {
@@ -48,6 +48,7 @@ std::shared_ptr<PAGXView> PAGXView::MakeFrom(int width, int height) {
   return std::shared_ptr<PAGXView>(new PAGXView(device, width, height));
 }
 
+// Copies data from a JavaScript Uint8Array into a tgfx::Data object.
 static std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenData) {
   if (emscriptenData.isUndefined()) {
     return nullptr;
@@ -107,6 +108,7 @@ void PAGXView::loadPAGX(const val& pagxData) {
   if (!contentLayer) {
     return;
   }
+  hasRenderedFirstFrame = false;
   pagxWidth = document->width;
   pagxHeight = document->height;
   displayList.root()->removeChildren();
@@ -235,6 +237,9 @@ bool PAGXView::draw() {
     auto recording = context->flush();
     if (recording) {
       context->submit(std::move(recording));
+      if (!hasRenderedFirstFrame) {
+        hasRenderedFirstFrame = true;
+      }
     }
     device->unlock();
   }
@@ -279,6 +284,10 @@ int PAGXView::width() const {
 
 int PAGXView::height() const {
   return _height;
+}
+
+bool PAGXView::firstFrameRendered() const {
+  return hasRenderedFirstFrame;
 }
 
 void PAGXView::updatePerformanceState(double frameDurationMs) {
