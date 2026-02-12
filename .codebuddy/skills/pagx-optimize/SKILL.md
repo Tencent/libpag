@@ -807,7 +807,8 @@ A Path's data is a simple axis-aligned rectangle (4 lines forming a box) or a ci
 - Only apply when the path is clearly a standard shape. Do not convert rounded rectangles
   described via Bezier curves unless you can accurately extract the roundness parameter.
 - Paths with transforms applied may not map cleanly to primitive attributes.
-- This optimization prioritizes readability; file size savings are minimal.
+- This optimization improves readability. It also benefits rendering performance — see
+  §15.8 for details on when shape choice affects render cost.
 
 ---
 
@@ -1098,6 +1099,37 @@ replacing with a solid stroke at reduced alpha, or a simpler visual treatment.
 
 **Suggest to user**: Report the dashed stroke + Repeater combination and ask if replacing
 with a solid stroke or other treatment is acceptable.
+
+#### 15.8 Prefer Primitive Geometry over Path under Repeater
+
+**Problem**: Rectangle and Ellipse are primitive geometry types with dedicated fast paths in
+the renderer. Path requires general-purpose tessellation for every shape instance. When a
+Repeater multiplies a shape hundreds or thousands of times, the per-instance cost difference
+becomes significant.
+
+**When to apply**: A `<Path .../>` appears in the same scope as a Repeater (especially nested
+Repeaters) and the path describes a shape that can be expressed as Rectangle, Ellipse, or
+RoundRect.
+
+**How**: Replace the Path with the equivalent primitive geometry element. This is the same
+transformation as §13, but here the motivation is rendering performance rather than
+readability.
+
+```xml
+<!-- Expensive: Path tessellated 500 times -->
+<Path data="M 0 0 L 20 0 L 20 10 L 0 10 Z"/>
+<Fill color="#004488"/>
+<Repeater copies="500" position="0,12"/>
+
+<!-- Faster: Rectangle uses optimized render path -->
+<Rectangle center="10,5" size="20,10"/>
+<Fill color="#004488"/>
+<Repeater copies="500" position="0,12"/>
+```
+
+**Note**: This only applies when the Path is geometrically equivalent to a primitive. Do not
+approximate complex shapes (e.g., hexagons, stars) as rectangles — visual fidelity takes
+priority.
 
 ---
 
