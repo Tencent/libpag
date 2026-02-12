@@ -87,7 +87,7 @@
 
     <!-- Inner scanning lines inside triangle (Masked) -->
     <Layer mask="@triangleMask">
-      <Rectangle size="100,100"/>
+      <Rectangle center="0,0" size="100,100"/>
       <Fill>
         <LinearGradient startPoint="-50,0" endPoint="50,0">
           <ColorStop offset="0" color="#FFAA0000"/>
