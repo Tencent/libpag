@@ -3724,7 +3724,7 @@ The following example covers all major node types in PAGX, demonstrating complet
 </pagx>
 ```
 
-> [Preview](https://pag.io/pagx/?file=./samples/B.1_complete_example.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/C.1_complete_example.pagx)
 
 ### C.2 RPG Character Panel
 
@@ -4495,7 +4495,7 @@ A fantasy RPG-style character status panel demonstrating complex UI composition 
 </pagx>
 ```
 
-> [Preview](https://pag.io/pagx/?file=./samples/B.2_rpg_character_panel.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/C.2_rpg_character_panel.pagx)
 
 ### C.3 Nebula Cadet
 
@@ -4972,7 +4972,7 @@ A space-themed cadet profile card showcasing nebula effects, star fields, and mo
 </pagx>
 ```
 
-> [Preview](https://pag.io/pagx/?file=./samples/B.3_nebula_cadet.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/C.3_nebula_cadet.pagx)
 
 ### C.4 Game HUD
 
@@ -5330,7 +5330,7 @@ A game heads-up display (HUD) demonstrating health bars, score displays, and gam
 </pagx>
 ```
 
-> [Preview](https://pag.io/pagx/?file=./samples/B.4_game_hud.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/C.4_game_hud.pagx)
 
 ### C.5 PAGX Features Overview
 
@@ -5813,5 +5813,5 @@ A comprehensive showcase of PAGX format capabilities including gradients, effect
 </pagx>
 ```
 
-> [Preview](https://pag.io/pagx/?file=./samples/B.5_pagx_features.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/C.5_pagx_features.pagx)
 

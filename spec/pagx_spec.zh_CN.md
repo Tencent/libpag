@@ -3719,7 +3719,7 @@ Layer / Group
 </pagx>
 ```
 
-> [预览](https://pag.io/pagx/?file=./samples/B.1_complete_example.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/C.1_complete_example.pagx)
 
 ### C.2 RPG 角色面板
 
@@ -4490,7 +4490,7 @@ Layer / Group
 </pagx>
 ```
 
-> [预览](https://pag.io/pagx/?file=./samples/B.2_rpg_character_panel.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/C.2_rpg_character_panel.pagx)
 
 ### C.3 星云学员
 
@@ -4967,7 +4967,7 @@ Layer / Group
 </pagx>
 ```
 
-> [预览](https://pag.io/pagx/?file=./samples/B.3_nebula_cadet.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/C.3_nebula_cadet.pagx)
 
 ### C.4 游戏 HUD
 
@@ -5325,7 +5325,7 @@ Layer / Group
 </pagx>
 ```
 
-> [预览](https://pag.io/pagx/?file=./samples/B.4_game_hud.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/C.4_game_hud.pagx)
 
 ### C.5 PAGX 特性概览
 
@@ -5808,5 +5808,5 @@ PAGX 格式能力的综合展示，包括渐变、效果、文本样式和矢量
 </pagx>
 ```
 
-> [预览](https://pag.io/pagx/?file=./samples/B.5_pagx_features.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/C.5_pagx_features.pagx)
 
