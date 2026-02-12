@@ -32,8 +32,8 @@ PAGX 是纯 XML 文件（`.pagx`），可引用外部资源文件（图片、视
 **附录**（方便速查）：
 
 - **附录 A**：节点层级与包含关系
-- **附录 B**：常见用法示例
-- **附录 C**：节点与属性速查
+- **附录 B**：节点与属性速查
+- **附录 C**：常见用法示例
 
 ---
 
@@ -2984,9 +2984,488 @@ Layer / Group
 
 ---
 
-## 附录 B. 常见用法示例（Examples）
+## 附录 B. 节点与属性速查（Node and Attribute Reference）
 
-### B.1 完整示例
+本附录列出所有节点的属性定义，省略详细说明。
+
+**注意**：`id` 和 `data-*` 属性为通用属性，可用于任意元素（见 2.3 节），各表中不再重复列出。
+
+### B.1 文档结构节点
+
+#### pagx
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `version` | string | (必填) |
+| `width` | float | (必填) |
+| `height` | float | (必填) |
+
+#### Composition
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `width` | float | (必填) |
+| `height` | float | (必填) |
+
+### B.2 资源节点
+
+#### Image
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `source` | string | (必填) |
+
+#### PathData
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `data` | string | (必填) |
+
+#### Font
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `unitsPerEm` | int | 1000 |
+
+子元素：`Glyph`*
+
+#### Glyph
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `advance` | float | (必填) |
+| `path` | string | - |
+| `image` | string | - |
+| `offset` | Point | 0,0 |
+
+#### SolidColor
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `color` | Color | (必填) |
+
+#### LinearGradient
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `startPoint` | Point | (必填) |
+| `endPoint` | Point | (必填) |
+| `matrix` | Matrix | 单位矩阵 |
+
+子元素：`ColorStop`+
+
+#### RadialGradient
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `center` | Point | 0,0 |
+| `radius` | float | (必填) |
+| `matrix` | Matrix | 单位矩阵 |
+
+子元素：`ColorStop`+
+
+#### ConicGradient
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `center` | Point | 0,0 |
+| `startAngle` | float | 0 |
+| `endAngle` | float | 360 |
+| `matrix` | Matrix | 单位矩阵 |
+
+子元素：`ColorStop`+
+
+#### DiamondGradient
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `center` | Point | 0,0 |
+| `radius` | float | (必填) |
+| `matrix` | Matrix | 单位矩阵 |
+
+子元素：`ColorStop`+
+
+#### ColorStop
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `offset` | float | (必填) |
+| `color` | Color | (必填) |
+
+#### ImagePattern
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `image` | idref | (必填) |
+| `tileModeX` | TileMode | clamp |
+| `tileModeY` | TileMode | clamp |
+| `filterMode` | FilterMode | linear |
+| `mipmapMode` | MipmapMode | linear |
+| `matrix` | Matrix | 单位矩阵 |
+
+### B.3 图层节点
+
+#### Layer
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `name` | string | "" |
+| `visible` | bool | true |
+| `alpha` | float | 1 |
+| `blendMode` | BlendMode | normal |
+| `x` | float | 0 |
+| `y` | float | 0 |
+| `matrix` | Matrix | 单位矩阵 |
+| `matrix3D` | Matrix | - |
+| `preserve3D` | bool | false |
+| `antiAlias` | bool | true |
+| `groupOpacity` | bool | false |
+| `passThroughBackground` | bool | true |
+| `excludeChildEffectsInLayerStyle` | bool | false |
+| `scrollRect` | Rect | - |
+| `mask` | idref | - |
+| `maskType` | MaskType | alpha |
+| `composition` | idref | - |
+
+子元素：`VectorElement`*、`LayerStyle`*、`LayerFilter`*、`Layer`*（按类型自动归类）
+
+### B.4 图层样式节点
+
+#### DropShadowStyle
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `offsetX` | float | 0 |
+| `offsetY` | float | 0 |
+| `blurX` | float | 0 |
+| `blurY` | float | 0 |
+| `color` | Color | #000000 |
+| `showBehindLayer` | bool | true |
+| `blendMode` | BlendMode | normal |
+
+#### InnerShadowStyle
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `offsetX` | float | 0 |
+| `offsetY` | float | 0 |
+| `blurX` | float | 0 |
+| `blurY` | float | 0 |
+| `color` | Color | #000000 |
+| `blendMode` | BlendMode | normal |
+
+#### BackgroundBlurStyle
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `blurX` | float | 0 |
+| `blurY` | float | 0 |
+| `tileMode` | TileMode | mirror |
+| `blendMode` | BlendMode | normal |
+
+### B.5 滤镜节点
+
+#### BlurFilter
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `blurX` | float | (必填) |
+| `blurY` | float | (必填) |
+| `tileMode` | TileMode | decal |
+
+#### DropShadowFilter
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `offsetX` | float | 0 |
+| `offsetY` | float | 0 |
+| `blurX` | float | 0 |
+| `blurY` | float | 0 |
+| `color` | Color | #000000 |
+| `shadowOnly` | bool | false |
+
+#### InnerShadowFilter
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `offsetX` | float | 0 |
+| `offsetY` | float | 0 |
+| `blurX` | float | 0 |
+| `blurY` | float | 0 |
+| `color` | Color | #000000 |
+| `shadowOnly` | bool | false |
+
+#### BlendFilter
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `color` | Color | (必填) |
+| `blendMode` | BlendMode | normal |
+
+#### ColorMatrixFilter
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `matrix` | Matrix | (必填) |
+
+### B.6 几何元素节点
+
+#### Rectangle
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `center` | Point | 0,0 |
+| `size` | Size | 100,100 |
+| `roundness` | float | 0 |
+| `reversed` | bool | false |
+
+#### Ellipse
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `center` | Point | 0,0 |
+| `size` | Size | 100,100 |
+| `reversed` | bool | false |
+
+#### Polystar
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `center` | Point | 0,0 |
+| `type` | PolystarType | star |
+| `pointCount` | float | 5 |
+| `outerRadius` | float | 100 |
+| `innerRadius` | float | 50 |
+| `rotation` | float | 0 |
+| `outerRoundness` | float | 0 |
+| `innerRoundness` | float | 0 |
+| `reversed` | bool | false |
+
+#### Path
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `data` | string/idref | (必填) |
+| `reversed` | bool | false |
+
+#### Text
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `text` | string | "" |
+| `position` | Point | 0,0 |
+| `fontFamily` | string | 系统默认 |
+| `fontStyle` | string | "Regular" |
+| `fontSize` | float | 12 |
+| `letterSpacing` | float | 0 |
+| `baselineShift` | float | 0 |
+
+子元素：`CDATA` 文本、`GlyphRun`*
+
+#### GlyphRun
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `font` | idref | (必填) |
+| `fontSize` | float | 12 |
+| `glyphs` | string | (必填) |
+| `x` | float | 0 |
+| `y` | float | 0 |
+| `xOffsets` | string | - |
+| `positions` | string | - |
+| `anchors` | string | - |
+| `scales` | string | - |
+| `rotations` | string | - |
+| `skews` | string | - |
+
+### B.7 绘制器节点
+
+#### Fill
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `color` | Color/idref | #000000 |
+| `alpha` | float | 1 |
+| `blendMode` | BlendMode | normal |
+| `fillRule` | FillRule | winding |
+| `placement` | LayerPlacement | background |
+
+#### Stroke
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `color` | Color/idref | #000000 |
+| `width` | float | 1 |
+| `alpha` | float | 1 |
+| `blendMode` | BlendMode | normal |
+| `cap` | LineCap | butt |
+| `join` | LineJoin | miter |
+| `miterLimit` | float | 4 |
+| `dashes` | string | - |
+| `dashOffset` | float | 0 |
+| `dashAdaptive` | bool | false |
+| `align` | StrokeAlign | center |
+| `placement` | LayerPlacement | background |
+
+### B.8 形状修改器节点
+
+#### TrimPath
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `start` | float | 0 |
+| `end` | float | 1 |
+| `offset` | float | 0 |
+| `type` | TrimType | separate |
+
+#### RoundCorner
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `radius` | float | 10 |
+
+#### MergePath
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `mode` | MergePathOp | append |
+
+### B.9 文本修改器节点
+
+#### TextModifier
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `anchor` | Point | 0,0 |
+| `position` | Point | 0,0 |
+| `rotation` | float | 0 |
+| `scale` | Point | 1,1 |
+| `skew` | float | 0 |
+| `skewAxis` | float | 0 |
+| `alpha` | float | 1 |
+| `fillColor` | Color | - |
+| `strokeColor` | Color | - |
+| `strokeWidth` | float | - |
+
+子元素：`RangeSelector`*
+
+#### RangeSelector
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `start` | float | 0 |
+| `end` | float | 1 |
+| `offset` | float | 0 |
+| `unit` | SelectorUnit | percentage |
+| `shape` | SelectorShape | square |
+| `easeIn` | float | 0 |
+| `easeOut` | float | 0 |
+| `mode` | SelectorMode | add |
+| `weight` | float | 1 |
+| `randomOrder` | bool | false |
+| `randomSeed` | int | 0 |
+
+#### TextPath
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `path` | string/idref | (必填) |
+| `baselineOrigin` | Point | 0,0 |
+| `baselineAngle` | float | 0 |
+| `firstMargin` | float | 0 |
+| `lastMargin` | float | 0 |
+| `perpendicular` | bool | true |
+| `reversed` | bool | false |
+| `forceAlignment` | bool | false |
+
+#### TextLayout
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `position` | Point | 0,0 |
+| `width` | float | auto |
+| `height` | float | auto |
+| `textAlign` | TextAlign | start |
+| `verticalAlign` | VerticalAlign | top |
+| `writingMode` | WritingMode | horizontal |
+| `lineHeight` | float | 1.2 |
+
+### B.10 其他节点
+
+#### Repeater
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `copies` | float | 3 |
+| `offset` | float | 0 |
+| `order` | RepeaterOrder | belowOriginal |
+| `anchor` | Point | 0,0 |
+| `position` | Point | 100,100 |
+| `rotation` | float | 0 |
+| `scale` | Point | 1,1 |
+| `startAlpha` | float | 1 |
+| `endAlpha` | float | 1 |
+
+#### Group
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `anchor` | Point | 0,0 |
+| `position` | Point | 0,0 |
+| `rotation` | float | 0 |
+| `scale` | Point | 1,1 |
+| `skew` | float | 0 |
+| `skewAxis` | float | 0 |
+| `alpha` | float | 1 |
+
+子元素：`VectorElement`*（递归包含 Group）
+
+### B.11 枚举类型
+
+#### 图层相关
+
+| 枚举 | 值 |
+|------|------|
+| **BlendMode** | `normal`, `multiply`, `screen`, `overlay`, `darken`, `lighten`, `colorDodge`, `colorBurn`, `hardLight`, `softLight`, `difference`, `exclusion`, `hue`, `saturation`, `color`, `luminosity`, `plusLighter`, `plusDarker` |
+| **MaskType** | `alpha`, `luminance`, `contour` |
+| **TileMode** | `clamp`, `repeat`, `mirror`, `decal` |
+| **FilterMode** | `nearest`, `linear` |
+| **MipmapMode** | `none`, `nearest`, `linear` |
+
+#### 绘制器相关
+
+| 枚举 | 值 |
+|------|------|
+| **FillRule** | `winding`, `evenOdd` |
+| **LineCap** | `butt`, `round`, `square` |
+| **LineJoin** | `miter`, `round`, `bevel` |
+| **StrokeAlign** | `center`, `inside`, `outside` |
+| **LayerPlacement** | `background`, `foreground` |
+
+#### 几何元素相关
+
+| 枚举 | 值 |
+|------|------|
+| **PolystarType** | `polygon`, `star` |
+
+#### 修改器相关
+
+| 枚举 | 值 |
+|------|------|
+| **TrimType** | `separate`, `continuous` |
+| **MergePathOp** | `append`, `union`, `intersect`, `xor`, `difference` |
+| **SelectorUnit** | `index`, `percentage` |
+| **SelectorShape** | `square`, `rampUp`, `rampDown`, `triangle`, `round`, `smooth` |
+| **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
+| **TextAlign** | `start`, `center`, `end`, `justify` |
+| **VerticalAlign** | `top`, `center`, `bottom` |
+| **WritingMode** | `horizontal`, `vertical` |
+| **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |
+---
+
+## 附录 C. 常见用法示例（Examples）
+
+### C.1 完整示例
 
 以下示例涵盖 PAGX 的所有主要节点类型，展示完整的文档结构。
 
@@ -3242,7 +3721,7 @@ Layer / Group
 
 > [预览](https://pag.io/pagx/?file=./samples/B.1_complete_example.pagx)
 
-### B.2 RPG 角色面板
+### C.2 RPG 角色面板
 
 一个奇幻 RPG 风格的角色状态面板，展示了复杂的 UI 组合，包含嵌套图层、渐变和装饰元素。
 
@@ -4013,7 +4492,7 @@ Layer / Group
 
 > [预览](https://pag.io/pagx/?file=./samples/B.2_rpg_character_panel.pagx)
 
-### B.3 星云学员
+### C.3 星云学员
 
 一个太空主题的学员资料卡片，展示了星云效果、星空背景和现代 UI 设计模式。
 
@@ -4490,7 +4969,7 @@ Layer / Group
 
 > [预览](https://pag.io/pagx/?file=./samples/B.3_nebula_cadet.pagx)
 
-### B.4 游戏 HUD
+### C.4 游戏 HUD
 
 一个游戏平视显示器（HUD），展示了血条、分数显示和游戏界面元素。
 
@@ -4848,7 +5327,7 @@ Layer / Group
 
 > [预览](https://pag.io/pagx/?file=./samples/B.4_game_hud.pagx)
 
-### B.5 PAGX 特性概览
+### C.5 PAGX 特性概览
 
 PAGX 格式能力的综合展示，包括渐变、效果、文本样式和矢量图形。
 
@@ -5331,482 +5810,3 @@ PAGX 格式能力的综合展示，包括渐变、效果、文本样式和矢量
 
 > [预览](https://pag.io/pagx/?file=./samples/B.5_pagx_features.pagx)
 
----
-
-## 附录 C. 节点与属性速查（Node and Attribute Reference）
-
-本附录列出所有节点的属性定义，省略详细说明。
-
-**注意**：`id` 和 `data-*` 属性为通用属性，可用于任意元素（见 2.3 节），各表中不再重复列出。
-
-### C.1 文档结构节点
-
-#### pagx
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `version` | string | (必填) |
-| `width` | float | (必填) |
-| `height` | float | (必填) |
-
-#### Composition
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `width` | float | (必填) |
-| `height` | float | (必填) |
-
-### C.2 资源节点
-
-#### Image
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `source` | string | (必填) |
-
-#### PathData
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `data` | string | (必填) |
-
-#### Font
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `unitsPerEm` | int | 1000 |
-
-子元素：`Glyph`*
-
-#### Glyph
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `advance` | float | (必填) |
-| `path` | string | - |
-| `image` | string | - |
-| `offset` | Point | 0,0 |
-
-#### SolidColor
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `color` | Color | (必填) |
-
-#### LinearGradient
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `startPoint` | Point | (必填) |
-| `endPoint` | Point | (必填) |
-| `matrix` | Matrix | 单位矩阵 |
-
-子元素：`ColorStop`+
-
-#### RadialGradient
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `center` | Point | 0,0 |
-| `radius` | float | (必填) |
-| `matrix` | Matrix | 单位矩阵 |
-
-子元素：`ColorStop`+
-
-#### ConicGradient
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `center` | Point | 0,0 |
-| `startAngle` | float | 0 |
-| `endAngle` | float | 360 |
-| `matrix` | Matrix | 单位矩阵 |
-
-子元素：`ColorStop`+
-
-#### DiamondGradient
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `center` | Point | 0,0 |
-| `radius` | float | (必填) |
-| `matrix` | Matrix | 单位矩阵 |
-
-子元素：`ColorStop`+
-
-#### ColorStop
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `offset` | float | (必填) |
-| `color` | Color | (必填) |
-
-#### ImagePattern
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `image` | idref | (必填) |
-| `tileModeX` | TileMode | clamp |
-| `tileModeY` | TileMode | clamp |
-| `filterMode` | FilterMode | linear |
-| `mipmapMode` | MipmapMode | linear |
-| `matrix` | Matrix | 单位矩阵 |
-
-### C.3 图层节点
-
-#### Layer
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `name` | string | "" |
-| `visible` | bool | true |
-| `alpha` | float | 1 |
-| `blendMode` | BlendMode | normal |
-| `x` | float | 0 |
-| `y` | float | 0 |
-| `matrix` | Matrix | 单位矩阵 |
-| `matrix3D` | Matrix | - |
-| `preserve3D` | bool | false |
-| `antiAlias` | bool | true |
-| `groupOpacity` | bool | false |
-| `passThroughBackground` | bool | true |
-| `excludeChildEffectsInLayerStyle` | bool | false |
-| `scrollRect` | Rect | - |
-| `mask` | idref | - |
-| `maskType` | MaskType | alpha |
-| `composition` | idref | - |
-
-子元素：`VectorElement`*、`LayerStyle`*、`LayerFilter`*、`Layer`*（按类型自动归类）
-
-### C.4 图层样式节点
-
-#### DropShadowStyle
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `offsetX` | float | 0 |
-| `offsetY` | float | 0 |
-| `blurX` | float | 0 |
-| `blurY` | float | 0 |
-| `color` | Color | #000000 |
-| `showBehindLayer` | bool | true |
-| `blendMode` | BlendMode | normal |
-
-#### InnerShadowStyle
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `offsetX` | float | 0 |
-| `offsetY` | float | 0 |
-| `blurX` | float | 0 |
-| `blurY` | float | 0 |
-| `color` | Color | #000000 |
-| `blendMode` | BlendMode | normal |
-
-#### BackgroundBlurStyle
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `blurX` | float | 0 |
-| `blurY` | float | 0 |
-| `tileMode` | TileMode | mirror |
-| `blendMode` | BlendMode | normal |
-
-### C.5 滤镜节点
-
-#### BlurFilter
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `blurX` | float | (必填) |
-| `blurY` | float | (必填) |
-| `tileMode` | TileMode | decal |
-
-#### DropShadowFilter
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `offsetX` | float | 0 |
-| `offsetY` | float | 0 |
-| `blurX` | float | 0 |
-| `blurY` | float | 0 |
-| `color` | Color | #000000 |
-| `shadowOnly` | bool | false |
-
-#### InnerShadowFilter
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `offsetX` | float | 0 |
-| `offsetY` | float | 0 |
-| `blurX` | float | 0 |
-| `blurY` | float | 0 |
-| `color` | Color | #000000 |
-| `shadowOnly` | bool | false |
-
-#### BlendFilter
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `color` | Color | (必填) |
-| `blendMode` | BlendMode | normal |
-
-#### ColorMatrixFilter
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `matrix` | Matrix | (必填) |
-
-### C.6 几何元素节点
-
-#### Rectangle
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `center` | Point | 0,0 |
-| `size` | Size | 100,100 |
-| `roundness` | float | 0 |
-| `reversed` | bool | false |
-
-#### Ellipse
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `center` | Point | 0,0 |
-| `size` | Size | 100,100 |
-| `reversed` | bool | false |
-
-#### Polystar
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `center` | Point | 0,0 |
-| `type` | PolystarType | star |
-| `pointCount` | float | 5 |
-| `outerRadius` | float | 100 |
-| `innerRadius` | float | 50 |
-| `rotation` | float | 0 |
-| `outerRoundness` | float | 0 |
-| `innerRoundness` | float | 0 |
-| `reversed` | bool | false |
-
-#### Path
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `data` | string/idref | (必填) |
-| `reversed` | bool | false |
-
-#### Text
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `text` | string | "" |
-| `position` | Point | 0,0 |
-| `fontFamily` | string | 系统默认 |
-| `fontStyle` | string | "Regular" |
-| `fontSize` | float | 12 |
-| `letterSpacing` | float | 0 |
-| `baselineShift` | float | 0 |
-
-子元素：`CDATA` 文本、`GlyphRun`*
-
-#### GlyphRun
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `font` | idref | (必填) |
-| `fontSize` | float | 12 |
-| `glyphs` | string | (必填) |
-| `x` | float | 0 |
-| `y` | float | 0 |
-| `xOffsets` | string | - |
-| `positions` | string | - |
-| `anchors` | string | - |
-| `scales` | string | - |
-| `rotations` | string | - |
-| `skews` | string | - |
-
-### C.7 绘制器节点
-
-#### Fill
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `color` | Color/idref | #000000 |
-| `alpha` | float | 1 |
-| `blendMode` | BlendMode | normal |
-| `fillRule` | FillRule | winding |
-| `placement` | LayerPlacement | background |
-
-#### Stroke
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `color` | Color/idref | #000000 |
-| `width` | float | 1 |
-| `alpha` | float | 1 |
-| `blendMode` | BlendMode | normal |
-| `cap` | LineCap | butt |
-| `join` | LineJoin | miter |
-| `miterLimit` | float | 4 |
-| `dashes` | string | - |
-| `dashOffset` | float | 0 |
-| `dashAdaptive` | bool | false |
-| `align` | StrokeAlign | center |
-| `placement` | LayerPlacement | background |
-
-### C.8 形状修改器节点
-
-#### TrimPath
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `start` | float | 0 |
-| `end` | float | 1 |
-| `offset` | float | 0 |
-| `type` | TrimType | separate |
-
-#### RoundCorner
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `radius` | float | 10 |
-
-#### MergePath
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `mode` | MergePathOp | append |
-
-### C.9 文本修改器节点
-
-#### TextModifier
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `anchor` | Point | 0,0 |
-| `position` | Point | 0,0 |
-| `rotation` | float | 0 |
-| `scale` | Point | 1,1 |
-| `skew` | float | 0 |
-| `skewAxis` | float | 0 |
-| `alpha` | float | 1 |
-| `fillColor` | Color | - |
-| `strokeColor` | Color | - |
-| `strokeWidth` | float | - |
-
-子元素：`RangeSelector`*
-
-#### RangeSelector
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `start` | float | 0 |
-| `end` | float | 1 |
-| `offset` | float | 0 |
-| `unit` | SelectorUnit | percentage |
-| `shape` | SelectorShape | square |
-| `easeIn` | float | 0 |
-| `easeOut` | float | 0 |
-| `mode` | SelectorMode | add |
-| `weight` | float | 1 |
-| `randomOrder` | bool | false |
-| `randomSeed` | int | 0 |
-
-#### TextPath
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `path` | string/idref | (必填) |
-| `baselineOrigin` | Point | 0,0 |
-| `baselineAngle` | float | 0 |
-| `firstMargin` | float | 0 |
-| `lastMargin` | float | 0 |
-| `perpendicular` | bool | true |
-| `reversed` | bool | false |
-| `forceAlignment` | bool | false |
-
-#### TextLayout
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `position` | Point | 0,0 |
-| `width` | float | auto |
-| `height` | float | auto |
-| `textAlign` | TextAlign | start |
-| `verticalAlign` | VerticalAlign | top |
-| `writingMode` | WritingMode | horizontal |
-| `lineHeight` | float | 1.2 |
-
-### C.10 其他节点
-
-#### Repeater
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `copies` | float | 3 |
-| `offset` | float | 0 |
-| `order` | RepeaterOrder | belowOriginal |
-| `anchor` | Point | 0,0 |
-| `position` | Point | 100,100 |
-| `rotation` | float | 0 |
-| `scale` | Point | 1,1 |
-| `startAlpha` | float | 1 |
-| `endAlpha` | float | 1 |
-
-#### Group
-
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `anchor` | Point | 0,0 |
-| `position` | Point | 0,0 |
-| `rotation` | float | 0 |
-| `scale` | Point | 1,1 |
-| `skew` | float | 0 |
-| `skewAxis` | float | 0 |
-| `alpha` | float | 1 |
-
-子元素：`VectorElement`*（递归包含 Group）
-
-### C.11 枚举类型
-
-#### 图层相关
-
-| 枚举 | 值 |
-|------|------|
-| **BlendMode** | `normal`, `multiply`, `screen`, `overlay`, `darken`, `lighten`, `colorDodge`, `colorBurn`, `hardLight`, `softLight`, `difference`, `exclusion`, `hue`, `saturation`, `color`, `luminosity`, `plusLighter`, `plusDarker` |
-| **MaskType** | `alpha`, `luminance`, `contour` |
-| **TileMode** | `clamp`, `repeat`, `mirror`, `decal` |
-| **FilterMode** | `nearest`, `linear` |
-| **MipmapMode** | `none`, `nearest`, `linear` |
-
-#### 绘制器相关
-
-| 枚举 | 值 |
-|------|------|
-| **FillRule** | `winding`, `evenOdd` |
-| **LineCap** | `butt`, `round`, `square` |
-| **LineJoin** | `miter`, `round`, `bevel` |
-| **StrokeAlign** | `center`, `inside`, `outside` |
-| **LayerPlacement** | `background`, `foreground` |
-
-#### 几何元素相关
-
-| 枚举 | 值 |
-|------|------|
-| **PolystarType** | `polygon`, `star` |
-
-#### 修改器相关
-
-| 枚举 | 值 |
-|------|------|
-| **TrimType** | `separate`, `continuous` |
-| **MergePathOp** | `append`, `union`, `intersect`, `xor`, `difference` |
-| **SelectorUnit** | `index`, `percentage` |
-| **SelectorShape** | `square`, `rampUp`, `rampDown`, `triangle`, `round`, `smooth` |
-| **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
-| **TextAlign** | `start`, `center`, `end`, `justify` |
-| **VerticalAlign** | `top`, `center`, `bottom` |
-| **WritingMode** | `horizontal`, `vertical` |
-| **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |

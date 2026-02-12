@@ -32,8 +32,8 @@ This specification is organized in the following order:
 **Appendices** (for quick reference):
 
 - **Appendix A**: Node hierarchy and containment relationships
-- **Appendix B**: Common usage examples
-- **Appendix C**: Node and attribute reference
+- **Appendix B**: Node and attribute reference
+- **Appendix C**: Common usage examples
 
 ---
 
@@ -2991,9 +2991,486 @@ Layer / Group
 
 ---
 
-## Appendix B. Common Usage Examples
+## Appendix B. Node and Attribute Reference
 
-### B.1 Complete Example
+This appendix lists all node attribute definitions. The `id` and `data-*` attributes are common attributes available on any element (see Section 2.3) and are not repeated in each table.
+
+### B.1 Document Structure Nodes
+
+#### pagx
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `version` | string | (required) |
+| `width` | float | (required) |
+| `height` | float | (required) |
+
+#### Composition
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `width` | float | (required) |
+| `height` | float | (required) |
+
+### B.2 Resource Nodes
+
+#### Image
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `source` | string | (required) |
+
+#### PathData
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `data` | string | (required) |
+
+#### Font
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `unitsPerEm` | int | 1000 |
+
+Child elements: `Glyph`*
+
+#### Glyph
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `advance` | float | (required) |
+| `path` | string | - |
+| `image` | string | - |
+| `offset` | Point | 0,0 |
+
+#### SolidColor
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `color` | Color | (required) |
+
+#### LinearGradient
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `startPoint` | Point | (required) |
+| `endPoint` | Point | (required) |
+| `matrix` | Matrix | identity matrix |
+
+Child elements: `ColorStop`+
+
+#### RadialGradient
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `center` | Point | 0,0 |
+| `radius` | float | (required) |
+| `matrix` | Matrix | identity matrix |
+
+Child elements: `ColorStop`+
+
+#### ConicGradient
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `center` | Point | 0,0 |
+| `startAngle` | float | 0 |
+| `endAngle` | float | 360 |
+| `matrix` | Matrix | identity matrix |
+
+Child elements: `ColorStop`+
+
+#### DiamondGradient
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `center` | Point | 0,0 |
+| `radius` | float | (required) |
+| `matrix` | Matrix | identity matrix |
+
+Child elements: `ColorStop`+
+
+#### ColorStop
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `offset` | float | (required) |
+| `color` | Color | (required) |
+
+#### ImagePattern
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `image` | idref | (required) |
+| `tileModeX` | TileMode | clamp |
+| `tileModeY` | TileMode | clamp |
+| `filterMode` | FilterMode | linear |
+| `mipmapMode` | MipmapMode | linear |
+| `matrix` | Matrix | identity matrix |
+
+### B.3 Layer Node
+
+#### Layer
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `name` | string | "" |
+| `visible` | bool | true |
+| `alpha` | float | 1 |
+| `blendMode` | BlendMode | normal |
+| `x` | float | 0 |
+| `y` | float | 0 |
+| `matrix` | Matrix | identity matrix |
+| `matrix3D` | Matrix | - |
+| `preserve3D` | bool | false |
+| `antiAlias` | bool | true |
+| `groupOpacity` | bool | false |
+| `passThroughBackground` | bool | true |
+| `excludeChildEffectsInLayerStyle` | bool | false |
+| `scrollRect` | Rect | - |
+| `mask` | idref | - |
+| `maskType` | MaskType | alpha |
+| `composition` | idref | - |
+
+Child elements: `VectorElement`*, `LayerStyle`*, `LayerFilter`*, `Layer`* (automatically categorized by type)
+
+### B.4 Layer Style Nodes
+
+#### DropShadowStyle
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `offsetX` | float | 0 |
+| `offsetY` | float | 0 |
+| `blurX` | float | 0 |
+| `blurY` | float | 0 |
+| `color` | Color | #000000 |
+| `showBehindLayer` | bool | true |
+| `blendMode` | BlendMode | normal |
+
+#### InnerShadowStyle
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `offsetX` | float | 0 |
+| `offsetY` | float | 0 |
+| `blurX` | float | 0 |
+| `blurY` | float | 0 |
+| `color` | Color | #000000 |
+| `blendMode` | BlendMode | normal |
+
+#### BackgroundBlurStyle
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `blurX` | float | 0 |
+| `blurY` | float | 0 |
+| `tileMode` | TileMode | mirror |
+| `blendMode` | BlendMode | normal |
+
+### B.5 Filter Nodes
+
+#### BlurFilter
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `blurX` | float | (required) |
+| `blurY` | float | (required) |
+| `tileMode` | TileMode | decal |
+
+#### DropShadowFilter
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `offsetX` | float | 0 |
+| `offsetY` | float | 0 |
+| `blurX` | float | 0 |
+| `blurY` | float | 0 |
+| `color` | Color | #000000 |
+| `shadowOnly` | bool | false |
+
+#### InnerShadowFilter
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `offsetX` | float | 0 |
+| `offsetY` | float | 0 |
+| `blurX` | float | 0 |
+| `blurY` | float | 0 |
+| `color` | Color | #000000 |
+| `shadowOnly` | bool | false |
+
+#### BlendFilter
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `color` | Color | (required) |
+| `blendMode` | BlendMode | normal |
+
+#### ColorMatrixFilter
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `matrix` | Matrix | (required) |
+
+### B.6 Geometry Element Nodes
+
+#### Rectangle
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `center` | Point | 0,0 |
+| `size` | Size | 100,100 |
+| `roundness` | float | 0 |
+| `reversed` | bool | false |
+
+#### Ellipse
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `center` | Point | 0,0 |
+| `size` | Size | 100,100 |
+| `reversed` | bool | false |
+
+#### Polystar
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `center` | Point | 0,0 |
+| `type` | PolystarType | star |
+| `pointCount` | float | 5 |
+| `outerRadius` | float | 100 |
+| `innerRadius` | float | 50 |
+| `rotation` | float | 0 |
+| `outerRoundness` | float | 0 |
+| `innerRoundness` | float | 0 |
+| `reversed` | bool | false |
+
+#### Path
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `data` | string/idref | (required) |
+| `reversed` | bool | false |
+
+#### Text
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `text` | string | "" |
+| `position` | Point | 0,0 |
+| `fontFamily` | string | system default |
+| `fontStyle` | string | "Regular" |
+| `fontSize` | float | 12 |
+| `letterSpacing` | float | 0 |
+| `baselineShift` | float | 0 |
+
+Child elements: `CDATA` text, `GlyphRun`*
+
+#### GlyphRun
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `font` | idref | (required) |
+| `fontSize` | float | 12 |
+| `glyphs` | string | (required) |
+| `x` | float | 0 |
+| `y` | float | 0 |
+| `xOffsets` | string | - |
+| `positions` | string | - |
+| `anchors` | string | - |
+| `scales` | string | - |
+| `rotations` | string | - |
+| `skews` | string | - |
+
+### B.7 Painter Nodes
+
+#### Fill
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `color` | Color/idref | #000000 |
+| `alpha` | float | 1 |
+| `blendMode` | BlendMode | normal |
+| `fillRule` | FillRule | winding |
+| `placement` | LayerPlacement | background |
+
+#### Stroke
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `color` | Color/idref | #000000 |
+| `width` | float | 1 |
+| `alpha` | float | 1 |
+| `blendMode` | BlendMode | normal |
+| `cap` | LineCap | butt |
+| `join` | LineJoin | miter |
+| `miterLimit` | float | 4 |
+| `dashes` | string | - |
+| `dashOffset` | float | 0 |
+| `dashAdaptive` | bool | false |
+| `align` | StrokeAlign | center |
+| `placement` | LayerPlacement | background |
+
+### B.8 Shape Modifier Nodes
+
+#### TrimPath
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `start` | float | 0 |
+| `end` | float | 1 |
+| `offset` | float | 0 |
+| `type` | TrimType | separate |
+
+#### RoundCorner
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `radius` | float | 10 |
+
+#### MergePath
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `mode` | MergePathOp | append |
+
+### B.9 Text Modifier Nodes
+
+#### TextModifier
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `anchor` | Point | 0,0 |
+| `position` | Point | 0,0 |
+| `rotation` | float | 0 |
+| `scale` | Point | 1,1 |
+| `skew` | float | 0 |
+| `skewAxis` | float | 0 |
+| `alpha` | float | 1 |
+| `fillColor` | Color | - |
+| `strokeColor` | Color | - |
+| `strokeWidth` | float | - |
+
+Child elements: `RangeSelector`*
+
+#### RangeSelector
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `start` | float | 0 |
+| `end` | float | 1 |
+| `offset` | float | 0 |
+| `unit` | SelectorUnit | percentage |
+| `shape` | SelectorShape | square |
+| `easeIn` | float | 0 |
+| `easeOut` | float | 0 |
+| `mode` | SelectorMode | add |
+| `weight` | float | 1 |
+| `randomOrder` | bool | false |
+| `randomSeed` | int | 0 |
+
+#### TextPath
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `path` | string/idref | (required) |
+| `baselineOrigin` | Point | 0,0 |
+| `baselineAngle` | float | 0 |
+| `firstMargin` | float | 0 |
+| `lastMargin` | float | 0 |
+| `perpendicular` | bool | true |
+| `reversed` | bool | false |
+| `forceAlignment` | bool | false |
+
+#### TextLayout
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `position` | Point | 0,0 |
+| `width` | float | auto |
+| `height` | float | auto |
+| `textAlign` | TextAlign | start |
+| `verticalAlign` | VerticalAlign | top |
+| `writingMode` | WritingMode | horizontal |
+| `lineHeight` | float | 1.2 |
+
+### B.10 Other Nodes
+
+#### Repeater
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `copies` | float | 3 |
+| `offset` | float | 0 |
+| `order` | RepeaterOrder | belowOriginal |
+| `anchor` | Point | 0,0 |
+| `position` | Point | 100,100 |
+| `rotation` | float | 0 |
+| `scale` | Point | 1,1 |
+| `startAlpha` | float | 1 |
+| `endAlpha` | float | 1 |
+
+#### Group
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `anchor` | Point | 0,0 |
+| `position` | Point | 0,0 |
+| `rotation` | float | 0 |
+| `scale` | Point | 1,1 |
+| `skew` | float | 0 |
+| `skewAxis` | float | 0 |
+| `alpha` | float | 1 |
+
+Child elements: `VectorElement`* (recursive including Group)
+
+### B.11 Enumeration Types
+
+#### Layer Related
+
+| Enum | Values |
+|------|--------|
+| **BlendMode** | `normal`, `multiply`, `screen`, `overlay`, `darken`, `lighten`, `colorDodge`, `colorBurn`, `hardLight`, `softLight`, `difference`, `exclusion`, `hue`, `saturation`, `color`, `luminosity`, `plusLighter`, `plusDarker` |
+| **MaskType** | `alpha`, `luminance`, `contour` |
+| **TileMode** | `clamp`, `repeat`, `mirror`, `decal` |
+| **FilterMode** | `nearest`, `linear` |
+| **MipmapMode** | `none`, `nearest`, `linear` |
+
+#### Painter Related
+
+| Enum | Values |
+|------|--------|
+| **FillRule** | `winding`, `evenOdd` |
+| **LineCap** | `butt`, `round`, `square` |
+| **LineJoin** | `miter`, `round`, `bevel` |
+| **StrokeAlign** | `center`, `inside`, `outside` |
+| **LayerPlacement** | `background`, `foreground` |
+
+#### Geometry Element Related
+
+| Enum | Values |
+|------|--------|
+| **PolystarType** | `polygon`, `star` |
+
+#### Modifier Related
+
+| Enum | Values |
+|------|--------|
+| **TrimType** | `separate`, `continuous` |
+| **MergePathOp** | `append`, `union`, `intersect`, `xor`, `difference` |
+| **SelectorUnit** | `index`, `percentage` |
+| **SelectorShape** | `square`, `rampUp`, `rampDown`, `triangle`, `round`, `smooth` |
+| **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
+| **TextAlign** | `start`, `center`, `end`, `justify` |
+| **VerticalAlign** | `top`, `center`, `bottom` |
+| **WritingMode** | `horizontal`, `vertical` |
+| **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |
+---
+
+## Appendix C. Common Usage Examples
+
+### C.1 Complete Example
 
 The following example covers all major node types in PAGX, demonstrating complete document structure.
 
@@ -3249,7 +3726,7 @@ The following example covers all major node types in PAGX, demonstrating complet
 
 > [Preview](https://pag.io/pagx/?file=./samples/B.1_complete_example.pagx)
 
-### B.2 RPG Character Panel
+### C.2 RPG Character Panel
 
 A fantasy RPG-style character status panel demonstrating complex UI composition with nested layers, gradients, and decorative elements.
 
@@ -4020,7 +4497,7 @@ A fantasy RPG-style character status panel demonstrating complex UI composition 
 
 > [Preview](https://pag.io/pagx/?file=./samples/B.2_rpg_character_panel.pagx)
 
-### B.3 Nebula Cadet
+### C.3 Nebula Cadet
 
 A space-themed cadet profile card showcasing nebula effects, star fields, and modern UI design patterns.
 
@@ -4497,7 +4974,7 @@ A space-themed cadet profile card showcasing nebula effects, star fields, and mo
 
 > [Preview](https://pag.io/pagx/?file=./samples/B.3_nebula_cadet.pagx)
 
-### B.4 Game HUD
+### C.4 Game HUD
 
 A game heads-up display (HUD) demonstrating health bars, score displays, and game interface elements.
 
@@ -4855,7 +5332,7 @@ A game heads-up display (HUD) demonstrating health bars, score displays, and gam
 
 > [Preview](https://pag.io/pagx/?file=./samples/B.4_game_hud.pagx)
 
-### B.5 PAGX Features Overview
+### C.5 PAGX Features Overview
 
 A comprehensive showcase of PAGX format capabilities including gradients, effects, text styling, and vector graphics.
 
@@ -5338,480 +5815,3 @@ A comprehensive showcase of PAGX format capabilities including gradients, effect
 
 > [Preview](https://pag.io/pagx/?file=./samples/B.5_pagx_features.pagx)
 
----
-
-## Appendix C. Node and Attribute Reference
-
-This appendix lists all node attribute definitions. The `id` and `data-*` attributes are common attributes available on any element (see Section 2.3) and are not repeated in each table.
-
-### C.1 Document Structure Nodes
-
-#### pagx
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `version` | string | (required) |
-| `width` | float | (required) |
-| `height` | float | (required) |
-
-#### Composition
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `width` | float | (required) |
-| `height` | float | (required) |
-
-### C.2 Resource Nodes
-
-#### Image
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `source` | string | (required) |
-
-#### PathData
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `data` | string | (required) |
-
-#### Font
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `unitsPerEm` | int | 1000 |
-
-Child elements: `Glyph`*
-
-#### Glyph
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `advance` | float | (required) |
-| `path` | string | - |
-| `image` | string | - |
-| `offset` | Point | 0,0 |
-
-#### SolidColor
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `color` | Color | (required) |
-
-#### LinearGradient
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `startPoint` | Point | (required) |
-| `endPoint` | Point | (required) |
-| `matrix` | Matrix | identity matrix |
-
-Child elements: `ColorStop`+
-
-#### RadialGradient
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `center` | Point | 0,0 |
-| `radius` | float | (required) |
-| `matrix` | Matrix | identity matrix |
-
-Child elements: `ColorStop`+
-
-#### ConicGradient
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `center` | Point | 0,0 |
-| `startAngle` | float | 0 |
-| `endAngle` | float | 360 |
-| `matrix` | Matrix | identity matrix |
-
-Child elements: `ColorStop`+
-
-#### DiamondGradient
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `center` | Point | 0,0 |
-| `radius` | float | (required) |
-| `matrix` | Matrix | identity matrix |
-
-Child elements: `ColorStop`+
-
-#### ColorStop
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `offset` | float | (required) |
-| `color` | Color | (required) |
-
-#### ImagePattern
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `image` | idref | (required) |
-| `tileModeX` | TileMode | clamp |
-| `tileModeY` | TileMode | clamp |
-| `filterMode` | FilterMode | linear |
-| `mipmapMode` | MipmapMode | linear |
-| `matrix` | Matrix | identity matrix |
-
-### C.3 Layer Node
-
-#### Layer
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `name` | string | "" |
-| `visible` | bool | true |
-| `alpha` | float | 1 |
-| `blendMode` | BlendMode | normal |
-| `x` | float | 0 |
-| `y` | float | 0 |
-| `matrix` | Matrix | identity matrix |
-| `matrix3D` | Matrix | - |
-| `preserve3D` | bool | false |
-| `antiAlias` | bool | true |
-| `groupOpacity` | bool | false |
-| `passThroughBackground` | bool | true |
-| `excludeChildEffectsInLayerStyle` | bool | false |
-| `scrollRect` | Rect | - |
-| `mask` | idref | - |
-| `maskType` | MaskType | alpha |
-| `composition` | idref | - |
-
-Child elements: `VectorElement`*, `LayerStyle`*, `LayerFilter`*, `Layer`* (automatically categorized by type)
-
-### C.4 Layer Style Nodes
-
-#### DropShadowStyle
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `offsetX` | float | 0 |
-| `offsetY` | float | 0 |
-| `blurX` | float | 0 |
-| `blurY` | float | 0 |
-| `color` | Color | #000000 |
-| `showBehindLayer` | bool | true |
-| `blendMode` | BlendMode | normal |
-
-#### InnerShadowStyle
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `offsetX` | float | 0 |
-| `offsetY` | float | 0 |
-| `blurX` | float | 0 |
-| `blurY` | float | 0 |
-| `color` | Color | #000000 |
-| `blendMode` | BlendMode | normal |
-
-#### BackgroundBlurStyle
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `blurX` | float | 0 |
-| `blurY` | float | 0 |
-| `tileMode` | TileMode | mirror |
-| `blendMode` | BlendMode | normal |
-
-### C.5 Filter Nodes
-
-#### BlurFilter
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `blurX` | float | (required) |
-| `blurY` | float | (required) |
-| `tileMode` | TileMode | decal |
-
-#### DropShadowFilter
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `offsetX` | float | 0 |
-| `offsetY` | float | 0 |
-| `blurX` | float | 0 |
-| `blurY` | float | 0 |
-| `color` | Color | #000000 |
-| `shadowOnly` | bool | false |
-
-#### InnerShadowFilter
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `offsetX` | float | 0 |
-| `offsetY` | float | 0 |
-| `blurX` | float | 0 |
-| `blurY` | float | 0 |
-| `color` | Color | #000000 |
-| `shadowOnly` | bool | false |
-
-#### BlendFilter
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `color` | Color | (required) |
-| `blendMode` | BlendMode | normal |
-
-#### ColorMatrixFilter
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `matrix` | Matrix | (required) |
-
-### C.6 Geometry Element Nodes
-
-#### Rectangle
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `center` | Point | 0,0 |
-| `size` | Size | 100,100 |
-| `roundness` | float | 0 |
-| `reversed` | bool | false |
-
-#### Ellipse
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `center` | Point | 0,0 |
-| `size` | Size | 100,100 |
-| `reversed` | bool | false |
-
-#### Polystar
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `center` | Point | 0,0 |
-| `type` | PolystarType | star |
-| `pointCount` | float | 5 |
-| `outerRadius` | float | 100 |
-| `innerRadius` | float | 50 |
-| `rotation` | float | 0 |
-| `outerRoundness` | float | 0 |
-| `innerRoundness` | float | 0 |
-| `reversed` | bool | false |
-
-#### Path
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `data` | string/idref | (required) |
-| `reversed` | bool | false |
-
-#### Text
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `text` | string | "" |
-| `position` | Point | 0,0 |
-| `fontFamily` | string | system default |
-| `fontStyle` | string | "Regular" |
-| `fontSize` | float | 12 |
-| `letterSpacing` | float | 0 |
-| `baselineShift` | float | 0 |
-
-Child elements: `CDATA` text, `GlyphRun`*
-
-#### GlyphRun
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `font` | idref | (required) |
-| `fontSize` | float | 12 |
-| `glyphs` | string | (required) |
-| `x` | float | 0 |
-| `y` | float | 0 |
-| `xOffsets` | string | - |
-| `positions` | string | - |
-| `anchors` | string | - |
-| `scales` | string | - |
-| `rotations` | string | - |
-| `skews` | string | - |
-
-### C.7 Painter Nodes
-
-#### Fill
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `color` | Color/idref | #000000 |
-| `alpha` | float | 1 |
-| `blendMode` | BlendMode | normal |
-| `fillRule` | FillRule | winding |
-| `placement` | LayerPlacement | background |
-
-#### Stroke
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `color` | Color/idref | #000000 |
-| `width` | float | 1 |
-| `alpha` | float | 1 |
-| `blendMode` | BlendMode | normal |
-| `cap` | LineCap | butt |
-| `join` | LineJoin | miter |
-| `miterLimit` | float | 4 |
-| `dashes` | string | - |
-| `dashOffset` | float | 0 |
-| `dashAdaptive` | bool | false |
-| `align` | StrokeAlign | center |
-| `placement` | LayerPlacement | background |
-
-### C.8 Shape Modifier Nodes
-
-#### TrimPath
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `start` | float | 0 |
-| `end` | float | 1 |
-| `offset` | float | 0 |
-| `type` | TrimType | separate |
-
-#### RoundCorner
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `radius` | float | 10 |
-
-#### MergePath
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `mode` | MergePathOp | append |
-
-### C.9 Text Modifier Nodes
-
-#### TextModifier
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `anchor` | Point | 0,0 |
-| `position` | Point | 0,0 |
-| `rotation` | float | 0 |
-| `scale` | Point | 1,1 |
-| `skew` | float | 0 |
-| `skewAxis` | float | 0 |
-| `alpha` | float | 1 |
-| `fillColor` | Color | - |
-| `strokeColor` | Color | - |
-| `strokeWidth` | float | - |
-
-Child elements: `RangeSelector`*
-
-#### RangeSelector
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `start` | float | 0 |
-| `end` | float | 1 |
-| `offset` | float | 0 |
-| `unit` | SelectorUnit | percentage |
-| `shape` | SelectorShape | square |
-| `easeIn` | float | 0 |
-| `easeOut` | float | 0 |
-| `mode` | SelectorMode | add |
-| `weight` | float | 1 |
-| `randomOrder` | bool | false |
-| `randomSeed` | int | 0 |
-
-#### TextPath
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `path` | string/idref | (required) |
-| `baselineOrigin` | Point | 0,0 |
-| `baselineAngle` | float | 0 |
-| `firstMargin` | float | 0 |
-| `lastMargin` | float | 0 |
-| `perpendicular` | bool | true |
-| `reversed` | bool | false |
-| `forceAlignment` | bool | false |
-
-#### TextLayout
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `position` | Point | 0,0 |
-| `width` | float | auto |
-| `height` | float | auto |
-| `textAlign` | TextAlign | start |
-| `verticalAlign` | VerticalAlign | top |
-| `writingMode` | WritingMode | horizontal |
-| `lineHeight` | float | 1.2 |
-
-### C.10 Other Nodes
-
-#### Repeater
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `copies` | float | 3 |
-| `offset` | float | 0 |
-| `order` | RepeaterOrder | belowOriginal |
-| `anchor` | Point | 0,0 |
-| `position` | Point | 100,100 |
-| `rotation` | float | 0 |
-| `scale` | Point | 1,1 |
-| `startAlpha` | float | 1 |
-| `endAlpha` | float | 1 |
-
-#### Group
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `anchor` | Point | 0,0 |
-| `position` | Point | 0,0 |
-| `rotation` | float | 0 |
-| `scale` | Point | 1,1 |
-| `skew` | float | 0 |
-| `skewAxis` | float | 0 |
-| `alpha` | float | 1 |
-
-Child elements: `VectorElement`* (recursive including Group)
-
-### C.11 Enumeration Types
-
-#### Layer Related
-
-| Enum | Values |
-|------|--------|
-| **BlendMode** | `normal`, `multiply`, `screen`, `overlay`, `darken`, `lighten`, `colorDodge`, `colorBurn`, `hardLight`, `softLight`, `difference`, `exclusion`, `hue`, `saturation`, `color`, `luminosity`, `plusLighter`, `plusDarker` |
-| **MaskType** | `alpha`, `luminance`, `contour` |
-| **TileMode** | `clamp`, `repeat`, `mirror`, `decal` |
-| **FilterMode** | `nearest`, `linear` |
-| **MipmapMode** | `none`, `nearest`, `linear` |
-
-#### Painter Related
-
-| Enum | Values |
-|------|--------|
-| **FillRule** | `winding`, `evenOdd` |
-| **LineCap** | `butt`, `round`, `square` |
-| **LineJoin** | `miter`, `round`, `bevel` |
-| **StrokeAlign** | `center`, `inside`, `outside` |
-| **LayerPlacement** | `background`, `foreground` |
-
-#### Geometry Element Related
-
-| Enum | Values |
-|------|--------|
-| **PolystarType** | `polygon`, `star` |
-
-#### Modifier Related
-
-| Enum | Values |
-|------|--------|
-| **TrimType** | `separate`, `continuous` |
-| **MergePathOp** | `append`, `union`, `intersect`, `xor`, `difference` |
-| **SelectorUnit** | `index`, `percentage` |
-| **SelectorShape** | `square`, `rampUp`, `rampDown`, `triangle`, `round`, `smooth` |
-| **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
-| **TextAlign** | `start`, `center`, `end`, `justify` |
-| **VerticalAlign** | `top`, `center`, `bottom` |
-| **WritingMode** | `horizontal`, `vertical` |
-| **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |
