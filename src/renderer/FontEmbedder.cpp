@@ -21,8 +21,8 @@
 #include <cmath>
 #include <unordered_map>
 #include "MathUtil.h"
-#include "SVGPathParser.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/types/Data.h"
@@ -35,49 +35,31 @@ namespace pagx {
 
 static constexpr int VectorFontUnitsPerEm = 1000;
 
-static std::string PathToSVGString(const tgfx::Path& path) {
-  std::string result = {};
-  result.reserve(256);
-  char buf[64] = {};
-
+static void PathToPathData(const tgfx::Path& path, PathData* pathData) {
   for (const auto& segment : path) {
     switch (segment.verb) {
       case tgfx::PathVerb::Move:
-        snprintf(buf, sizeof(buf), "M%d %d", static_cast<int>(std::round(segment.points[0].x)),
-                 static_cast<int>(std::round(segment.points[0].y)));
-        result += buf;
+        pathData->moveTo(std::round(segment.points[0].x), std::round(segment.points[0].y));
         break;
       case tgfx::PathVerb::Line:
-        snprintf(buf, sizeof(buf), "L%d %d", static_cast<int>(std::round(segment.points[1].x)),
-                 static_cast<int>(std::round(segment.points[1].y)));
-        result += buf;
+        pathData->lineTo(std::round(segment.points[1].x), std::round(segment.points[1].y));
         break;
       case tgfx::PathVerb::Quad:
-        snprintf(buf, sizeof(buf), "Q%d %d %d %d", static_cast<int>(std::round(segment.points[1].x)),
-                 static_cast<int>(std::round(segment.points[1].y)),
-                 static_cast<int>(std::round(segment.points[2].x)),
-                 static_cast<int>(std::round(segment.points[2].y)));
-        result += buf;
+        pathData->quadTo(std::round(segment.points[1].x), std::round(segment.points[1].y),
+                         std::round(segment.points[2].x), std::round(segment.points[2].y));
         break;
       case tgfx::PathVerb::Cubic:
-        snprintf(buf, sizeof(buf), "C%d %d %d %d %d %d",
-                 static_cast<int>(std::round(segment.points[1].x)),
-                 static_cast<int>(std::round(segment.points[1].y)),
-                 static_cast<int>(std::round(segment.points[2].x)),
-                 static_cast<int>(std::round(segment.points[2].y)),
-                 static_cast<int>(std::round(segment.points[3].x)),
-                 static_cast<int>(std::round(segment.points[3].y)));
-        result += buf;
+        pathData->cubicTo(std::round(segment.points[1].x), std::round(segment.points[1].y),
+                          std::round(segment.points[2].x), std::round(segment.points[2].y),
+                          std::round(segment.points[3].x), std::round(segment.points[3].y));
         break;
       case tgfx::PathVerb::Close:
-        result += "Z";
+        pathData->close();
         break;
       default:
         break;
     }
   }
-
-  return result;
 }
 
 struct GlyphKey {
@@ -154,7 +136,7 @@ static void CollectVectorGlyph(PAGXDocument* document, const tgfx::Font& font,
 
   auto glyph = document->makeNode<Glyph>();
   glyph->path = document->makeNode<PathData>();
-  *glyph->path = PathDataFromSVGString(PathToSVGString(glyphPath));
+  PathToPathData(glyphPath, glyph->path);
 
   // Get advance in font size space and scale to unitsPerEm space
   float advance = font.getAdvance(glyphID);
