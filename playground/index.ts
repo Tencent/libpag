@@ -1108,6 +1108,27 @@ const SAMPLE_FILE_ICON_SVG = '<svg class="sample-icon" viewBox="0 0 24 24" fill=
 let sampleFiles: string[] = [];
 let currentSampleFile: string | null = null;
 
+function formatSampleName(filename: string): string {
+    // Remove .pagx extension and replace underscores/dots with spaces
+    let name = filename.replace(/\.pagx$/, '');
+    // Replace underscores and dots with spaces, but keep section numbering (e.g., 3.2 -> 3.2)
+    name = name.replace(/_/g, ' ');
+    // Capitalize first letter of each word
+    name = name.split(' ').map(word => {
+        if (/^\d+\.\d+/.test(word)) {
+            return word;
+        }
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    }).join(' ');
+    return name;
+}
+
+function getImageNameFromFile(filename: string): string {
+    // Convert sample filename to image filename
+    // 3.2_document_structure.pagx -> 3.2_document_structure
+    return filename.replace(/\.pagx$/, '');
+}
+
 async function loadSampleList(): Promise<void> {
     if (sampleFiles.length > 0) {
         return;
@@ -1120,13 +1141,20 @@ async function loadSampleList(): Promise<void> {
 }
 
 function renderSampleList(): void {
-    const list = document.getElementById('samples-list') as HTMLUListElement;
+    const list = document.getElementById('samples-list') as HTMLDivElement;
     list.innerHTML = '';
     for (const file of sampleFiles) {
-        const li = document.createElement('li');
         const a = document.createElement('a');
         a.href = '#';
-        a.innerHTML = SAMPLE_FILE_ICON_SVG + '<span>' + file + '</span>';
+        
+        const imageName = getImageNameFromFile(file);
+        const imageUrl = `./samples/images/${imageName}.webp`;
+        const displayName = formatSampleName(file);
+        
+        a.innerHTML = `
+            <img class="sample-image" src="${imageUrl}" alt="${displayName}" loading="lazy">
+            <span class="sample-name">${displayName}</span>
+        `;
         if (file === currentSampleFile) {
             a.classList.add('active');
         }
@@ -1137,8 +1165,7 @@ function renderSampleList(): void {
             loadPAGXFromURL('./samples/' + file);
             renderSampleList();
         });
-        li.appendChild(a);
-        list.appendChild(li);
+        list.appendChild(a);
     }
 }
 
