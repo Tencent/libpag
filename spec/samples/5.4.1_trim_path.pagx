@@ -1,35 +1,55 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates TrimPath modifier: partially drawing a path -->
+<!-- Demonstrates TrimPath: separate vs continuous mode comparison -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Background circle (track) -->
+  <!-- === Top row: Separate mode === -->
+  <!-- Track -->
   <Layer>
-    <Ellipse center="200,200" size="260,260"/>
-    <Stroke color="#E2E8F0" width="10"/>
+    <Ellipse center="120,105" size="120,120"/>
+    <Ellipse center="280,105" size="120,120"/>
+    <Stroke color="#E2E8F0" width="8"/>
   </Layer>
-  <!-- Trimmed arc showing progress -->
+  <!-- Trimmed: each ellipse trimmed independently to 50% -->
   <Layer>
-    <Ellipse center="200,200" size="260,260"/>
-    <TrimPath start="0" end="0.75"/>
-    <Stroke width="24" cap="round">
-      <LinearGradient startPoint="330,200" endPoint="70,200">
+    <Ellipse center="120,105" size="120,120"/>
+    <Ellipse center="280,105" size="120,120"/>
+    <TrimPath start="0" end="0.75" type="separate"/>
+    <Stroke width="10" cap="round">
+      <LinearGradient startPoint="60,40" endPoint="340,170">
         <ColorStop offset="0" color="#06B6D4"/>
-        <ColorStop offset="0.5" color="#6366F1"/>
         <ColorStop offset="1" color="#8B5CF6"/>
       </LinearGradient>
     </Stroke>
   </Layer>
-  <!-- Start indicator dot -->
+  <!-- Label -->
   <Layer>
-    <Ellipse center="330,200" size="24,24"/>
-    <Fill color="#06B6D4"/>
-    <Stroke color="#FFFFFF" width="4"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#06B6D460"/>
+    <Text text="Separate" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+    <TextLayout position="200,192" textAlign="center"/>
+    <Fill color="#475569"/>
   </Layer>
-  <!-- End indicator dot -->
+
+  <!-- === Bottom row: Continuous mode === -->
+  <!-- Track -->
   <Layer>
-    <Ellipse center="108,108" size="24,24"/>
-    <Fill color="#8B5CF6"/>
-    <Stroke color="#FFFFFF" width="4"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#8B5CF660"/>
+    <Ellipse center="120,275" size="120,120"/>
+    <Ellipse center="280,275" size="120,120"/>
+    <Stroke color="#E2E8F0" width="8"/>
+  </Layer>
+  <!-- Trimmed: both ellipses treated as one path, first 50% of total length -->
+  <Layer>
+    <Ellipse center="120,275" size="120,120"/>
+    <Ellipse center="280,275" size="120,120"/>
+    <TrimPath start="0" end="0.75" type="continuous"/>
+    <Stroke width="10" cap="round">
+      <LinearGradient startPoint="60,210" endPoint="340,340">
+        <ColorStop offset="0" color="#F59E0B"/>
+        <ColorStop offset="1" color="#F43F5E"/>
+      </LinearGradient>
+    </Stroke>
+  </Layer>
+  <!-- Label -->
+  <Layer>
+    <Text text="Continuous" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+    <TextLayout position="200,362" textAlign="center"/>
+    <Fill color="#475569"/>
   </Layer>
 </pagx>
