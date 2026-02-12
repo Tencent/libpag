@@ -1597,6 +1597,39 @@ Line 3]]>
 3. Apply typography parameters: `fontSize`, `letterSpacing`, `baselineShift`
 4. Construct glyph list and accumulate to rendering context
 
+**Runtime Layout Example**:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates Text shape -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Main title text -->
+  <Layer>
+    <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="84"/>
+    <TextLayout position="200,145" textAlign="center"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="280,0">
+        <ColorStop offset="0" color="#6366F1"/>
+        <ColorStop offset="0.5" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#EC4899"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+  <!-- Subtitle -->
+  <Layer>
+    <Text text="Text Shape" fontFamily="Arial" fontSize="36"/>
+    <TextLayout position="200,230" textAlign="center"/>
+    <Fill color="#334155"/>
+  </Layer>
+  <!-- Small description -->
+  <Layer>
+    <Text text="Beautiful Typography" fontFamily="Arial" fontSize="24"/>
+    <TextLayout position="200,310" textAlign="center"/>
+    <Fill color="#475569"/>
+  </Layer>
+</pagx>
+```
+
 ##### GlyphRun (Pre-layout Data)
 
 GlyphRun defines pre-layout data for a group of glyphs, each GlyphRun independently referencing one font resource.
@@ -2205,6 +2238,52 @@ Color override uses the absolute value of `factor` for alpha blending:
 ```
 blendFactor = overrideColor.alpha × |factor|
 finalColor = blend(originalColor, overrideColor, blendFactor)
+```
+
+**Example**:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates TextModifier for character-level text styling -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Wave effect: triangle selector shifts characters vertically -->
+  <Layer>
+    <Text text="WAVE" fontFamily="Arial" fontStyle="Bold" fontSize="72"/>
+    <TextLayout position="200,120" textAlign="center"/>
+    <TextModifier position="0,-30">
+      <RangeSelector start="0" end="1" shape="triangle"/>
+    </TextModifier>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="280,0">
+        <ColorStop offset="0" color="#06B6D4"/>
+        <ColorStop offset="1" color="#3B82F6"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+  <!-- Rotation effect: each character rotated with rampUp selector -->
+  <Layer>
+    <Text text="ROTATE" fontFamily="Arial" fontStyle="Bold" fontSize="56"/>
+    <TextLayout position="200,240" textAlign="center"/>
+    <TextModifier rotation="30">
+      <RangeSelector start="0" end="1" shape="rampUp"/>
+    </TextModifier>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="280,0">
+        <ColorStop offset="0" color="#F59E0B"/>
+        <ColorStop offset="1" color="#F43F5E"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+  <!-- Color override effect: characters with gradient color override -->
+  <Layer>
+    <Text text="COLOR" fontFamily="Arial" fontStyle="Bold" fontSize="64"/>
+    <TextLayout position="200,350" textAlign="center"/>
+    <TextModifier fillColor="#EC4899">
+      <RangeSelector start="0" end="1" shape="triangle"/>
+    </TextModifier>
+    <Fill color="#8B5CF6"/>
+  </Layer>
+</pagx>
 ```
 
 > [Preview](https://pag.io/pagx/?file=./samples/5.5.3_text_modifier.pagx)
