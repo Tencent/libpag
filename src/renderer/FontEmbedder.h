@@ -46,9 +46,11 @@ class FontEmbedder {
    *
    * @param document The document to embed fonts into (modified in place).
    * @param shapedTextMap The typesetting results containing Text -> ShapedText mappings.
+   * @param textOrder Stable Text iteration order from typesetting.
    * @return true if embedding succeeded, false otherwise.
    */
-  bool embed(PAGXDocument* document, const ShapedTextMap& shapedTextMap);
+  bool embed(PAGXDocument* document, const ShapedTextMap& shapedTextMap,
+             const std::vector<Text*>& textOrder);
 };
 
 }  // namespace pagx

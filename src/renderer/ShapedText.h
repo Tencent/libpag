@@ -48,4 +48,12 @@ struct ShapedText {
  */
 using ShapedTextMap = std::unordered_map<Text*, ShapedText>;
 
+/**
+ * Typesetter output containing shaped text and stable Text iteration order.
+ */
+struct TypesetterResult {
+  ShapedTextMap shapedTextMap = {};
+  std::vector<Text*> textOrder = {};
+};
+
 }  // namespace pagx

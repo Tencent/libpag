@@ -166,7 +166,8 @@ static void CollectVectorGlyph(PAGXDocument* document, const tgfx::Font& font,
 
 static void CollectBitmapGlyph(
     PAGXDocument* document, const tgfx::Font& font, tgfx::GlyphID glyphID,
-    std::unordered_map<const tgfx::Typeface*, BitmapFontBuilder>& builders) {
+    std::unordered_map<const tgfx::Typeface*, BitmapFontBuilder>& builders,
+    std::vector<const tgfx::Typeface*>* typefaceOrder) {
   auto* typeface = font.getTypeface().get();
   auto& builder = builders[typeface];
 
@@ -190,6 +191,9 @@ static void CollectBitmapGlyph(
     builder.typeface = typeface;
     builder.font = document->makeNode<Font>();
     builder.font->unitsPerEm = builder.backingSize;
+    if (typefaceOrder != nullptr) {
+      typefaceOrder->push_back(typeface);
+    }
   }
 
   int width = imageCodec->width();
@@ -243,6 +247,17 @@ static bool IsVectorGlyph(const tgfx::Font& font, tgfx::GlyphID glyphID) {
 static bool IsBitmapGlyph(const tgfx::Font& font, tgfx::GlyphID glyphID) {
   tgfx::Matrix imageMatrix = {};
   return font.getImage(glyphID, nullptr, &imageMatrix) != nullptr;
+}
+
+static const ShapedText* FindShapedText(const ShapedTextMap& shapedTextMap, Text* text) {
+  if (text == nullptr) {
+    return nullptr;
+  }
+  auto it = shapedTextMap.find(text);
+  if (it == shapedTextMap.end()) {
+    return nullptr;
+  }
+  return &it->second;
 }
 
 static bool CanUseDefaultMode(const tgfx::GlyphRun& run, const std::vector<size_t>& indices,
@@ -462,7 +477,8 @@ static GlyphRun* CreateGlyphRunForIndices(
   return glyphRun;
 }
 
-bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedTextMap) {
+bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedTextMap,
+                          const std::vector<Text*>& textOrder) {
   if (document == nullptr) {
     return false;
   }
@@ -470,13 +486,15 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
   std::unordered_map<GlyphKey, float, GlyphKeyHash> maxFontSizes = {};
   VectorFontBuilder vectorBuilder = {};
   std::unordered_map<const tgfx::Typeface*, BitmapFontBuilder> bitmapBuilders = {};
+  std::vector<const tgfx::Typeface*> bitmapTypefaces = {};
 
   // First pass: collect max font size for each vector glyph
-  for (const auto& [text, shapedText] : shapedTextMap) {
-    if (shapedText.textBlob == nullptr) {
+  for (auto* text : textOrder) {
+    auto shapedText = FindShapedText(shapedTextMap, text);
+    if (shapedText == nullptr || shapedText->textBlob == nullptr) {
       continue;
     }
-    for (const auto& run : *shapedText.textBlob) {
+    for (const auto& run : *shapedText->textBlob) {
       for (size_t i = 0; i < run.glyphCount; ++i) {
         tgfx::GlyphID glyphID = run.glyphs[i];
         if (IsVectorGlyph(run.font, glyphID)) {
@@ -489,17 +507,18 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
   // Second pass: collect all glyphs. Each glyph with a valid glyphID is written with its advance.
   // Path and image data are optional - vector glyphs carry path, bitmap glyphs carry image, and
   // spacing glyphs (e.g. space) carry only advance.
-  for (const auto& [text, shapedText] : shapedTextMap) {
-    if (shapedText.textBlob == nullptr) {
+  for (auto* text : textOrder) {
+    auto shapedText = FindShapedText(shapedTextMap, text);
+    if (shapedText == nullptr || shapedText->textBlob == nullptr) {
       continue;
     }
-    for (const auto& run : *shapedText.textBlob) {
+    for (const auto& run : *shapedText->textBlob) {
       for (size_t i = 0; i < run.glyphCount; ++i) {
         tgfx::GlyphID glyphID = run.glyphs[i];
         if (IsVectorGlyph(run.font, glyphID)) {
           CollectVectorGlyph(document, run.font, glyphID, maxFontSizes, vectorBuilder);
         } else if (IsBitmapGlyph(run.font, glyphID)) {
-          CollectBitmapGlyph(document, run.font, glyphID, bitmapBuilders);
+          CollectBitmapGlyph(document, run.font, glyphID, bitmapBuilders, &bitmapTypefaces);
         }
       }
     }
@@ -507,11 +526,12 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
 
   // Third pass: collect spacing glyphs (no path, no image, but has advance). Each spacing glyph
   // is assigned to the same font as other visible glyphs from its typeface.
-  for (const auto& [text, shapedText] : shapedTextMap) {
-    if (shapedText.textBlob == nullptr) {
+  for (auto* text : textOrder) {
+    auto shapedText = FindShapedText(shapedTextMap, text);
+    if (shapedText == nullptr || shapedText->textBlob == nullptr) {
       continue;
     }
-    for (const auto& run : *shapedText.textBlob) {
+    for (const auto& run : *shapedText->textBlob) {
       auto* typeface = run.font.getTypeface().get();
       for (size_t i = 0; i < run.glyphCount; ++i) {
         tgfx::GlyphID glyphID = run.glyphs[i];
@@ -554,21 +574,26 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
   if (vectorBuilder.font != nullptr) {
     vectorBuilder.font->id = "font" + std::to_string(fontIndex++);
   }
-  for (auto& [typeface, builder] : bitmapBuilders) {
-    if (builder.font != nullptr) {
-      builder.font->id = "font" + std::to_string(fontIndex++);
+  for (auto* typeface : bitmapTypefaces) {
+    if (typeface == nullptr) {
+      continue;
+    }
+    auto builderIt = bitmapBuilders.find(typeface);
+    if (builderIt != bitmapBuilders.end() && builderIt->second.font != nullptr) {
+      builderIt->second.font->id = "font" + std::to_string(fontIndex++);
     }
   }
 
   // Fourth pass: create GlyphRuns for each Text
-  for (const auto& [text, shapedText] : shapedTextMap) {
-    if (shapedText.textBlob == nullptr) {
+  for (auto* text : textOrder) {
+    auto shapedText = FindShapedText(shapedTextMap, text);
+    if (shapedText == nullptr || shapedText->textBlob == nullptr) {
       continue;
     }
 
     text->glyphRuns.clear();
 
-    for (const auto& run : *shapedText.textBlob) {
+    for (const auto& run : *shapedText->textBlob) {
       if (run.glyphCount == 0) {
         continue;
       }

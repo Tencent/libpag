@@ -91,9 +91,9 @@ class TypesetterContext {
       : typesetter(typesetter), document(document) {
   }
 
-  ShapedTextMap run() {
+  TypesetterResult run() {
     if (document == nullptr) {
-      return result;
+      return {};
     }
 
     // Process all layers
@@ -111,7 +111,10 @@ class TypesetterContext {
       }
     }
 
-    return std::move(result);
+    TypesetterResult output = {};
+    output.shapedTextMap = std::move(result);
+    output.textOrder = std::move(textOrder);
+    return output;
   }
 
  private:
@@ -132,6 +135,42 @@ class TypesetterContext {
   };
 
   using FontKey = Typesetter::FontKey;
+
+  void StoreShapedText(Text* text, ShapedText&& shapedText) {
+    if (text == nullptr || shapedText.textBlob == nullptr) {
+      return;
+    }
+    auto it = result.find(text);
+    if (it == result.end()) {
+      textOrder.push_back(text);
+    }
+    result[text] = std::move(shapedText);
+  }
+
+  static int StylePriority(const std::string& style) {
+    if (style == "Regular") {
+      return 0;
+    }
+    if (style == "Medium") {
+      return 1;
+    }
+    if (style == "Normal") {
+      return 2;
+    }
+    return 3;
+  }
+
+  static bool IsPreferredFontKey(const FontKey& candidate, const FontKey& current) {
+    int candidatePriority = StylePriority(candidate.style);
+    int currentPriority = StylePriority(current.style);
+    if (candidatePriority != currentPriority) {
+      return candidatePriority < currentPriority;
+    }
+    if (candidate.style != current.style) {
+      return candidate.style < current.style;
+    }
+    return candidate.family < current.family;
+  }
 
   void processLayer(Layer* layer) {
     if (layer == nullptr) {
@@ -225,9 +264,7 @@ class TypesetterContext {
     if (allHaveEmbeddedData) {
       for (auto* text : textElements) {
         auto shapedText = buildShapedTextFromEmbeddedGlyphRuns(text);
-        if (shapedText.textBlob != nullptr) {
-          result[text] = std::move(shapedText);
-        }
+        StoreShapedText(text, std::move(shapedText));
       }
       return;
     }
@@ -288,7 +325,7 @@ class TypesetterContext {
       if (textBlob != nullptr) {
         ShapedText shapedText = {};
         shapedText.textBlob = textBlob;
-        result[info.text] = std::move(shapedText);
+        StoreShapedText(info.text, std::move(shapedText));
       }
     }
   }
@@ -311,9 +348,7 @@ class TypesetterContext {
       for (auto* text : textElements) {
         if (!text->glyphRuns.empty()) {
           auto shapedText = buildShapedTextFromEmbeddedGlyphRuns(text);
-          if (shapedText.textBlob != nullptr) {
-            result[text] = std::move(shapedText);
-          }
+          StoreShapedText(text, std::move(shapedText));
         } else {
           processTextWithoutLayout(text);
         }
@@ -375,7 +410,7 @@ class TypesetterContext {
       if (textBlob != nullptr) {
         ShapedText shapedText = {};
         shapedText.textBlob = textBlob;
-        result[info.text] = std::move(shapedText);
+        StoreShapedText(info.text, std::move(shapedText));
       }
     }
   }
@@ -415,7 +450,7 @@ class TypesetterContext {
     if (textBlob != nullptr) {
       ShapedText shapedText = {};
       shapedText.textBlob = textBlob;
-      result[text] = std::move(shapedText);
+      StoreShapedText(text, std::move(shapedText));
     }
   }
 
@@ -691,10 +726,26 @@ class TypesetterContext {
       }
 
       // Try matching family only (any style)
+      std::shared_ptr<tgfx::Typeface> bestTypeface = nullptr;
+      FontKey bestKey = {};
+      bool hasBest = false;
       for (const auto& pair : typesetter->registeredTypefaces) {
-        if (pair.first.family == fontFamily) {
-          return pair.second;
+        if (pair.first.family != fontFamily) {
+          continue;
         }
+        if (!hasBest) {
+          bestKey = pair.first;
+          bestTypeface = pair.second;
+          hasBest = true;
+          continue;
+        }
+        if (IsPreferredFontKey(pair.first, bestKey)) {
+          bestKey = pair.first;
+          bestTypeface = pair.second;
+        }
+      }
+      if (hasBest) {
+        return bestTypeface;
       }
     }
 
@@ -723,10 +774,11 @@ class TypesetterContext {
   const Typesetter* typesetter = nullptr;
   PAGXDocument* document = nullptr;
   ShapedTextMap result = {};
+  std::vector<Text*> textOrder = {};
   std::unordered_map<const Font*, std::shared_ptr<tgfx::Typeface>> fontCache = {};
 };
 
-ShapedTextMap Typesetter::shape(PAGXDocument* document) {
+TypesetterResult Typesetter::shape(PAGXDocument* document) {
   TypesetterContext context(this, document);
   return context.run();
 }

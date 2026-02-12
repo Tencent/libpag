@@ -54,9 +54,9 @@ class Typesetter {
    * shaping using registered/fallback typefaces. TextLayout modifiers are processed to apply
    * alignment, line breaking, and other layout properties.
    * @param document The document containing Text nodes to typeset.
-   * @return ShapedTextMap containing Text -> ShapedText mappings.
+   * @return TypesetterResult containing shaped text and stable iteration order.
    */
-  ShapedTextMap shape(PAGXDocument* document);
+  TypesetterResult shape(PAGXDocument* document);
 
  private:
   friend class TypesetterContext;
