@@ -1395,6 +1395,8 @@ finalY[i] = y + positions[i].y
 </pagx>
 ```
 
+> 完整可运行示例：[文本排版](samples/5.2.5_text.pagx)、[嵌入字体与 GlyphRun](samples/5.2.5_glyph_run.pagx)
+
 ### 5.3 绘制器（Painters）
 
 绘制器（Fill、Stroke）对**当前时刻**累积的所有几何（Path 和字形列表）进行渲染。
@@ -1574,15 +1576,24 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 - 支持环绕：当裁剪范围超出 [0,1] 时，自动环绕到路径另一端
 - 路径总长度为 0 时，不执行任何操作
 
-**连续模式示例**：
+**示例**（separate 与 continuous 模式对比，[示例文件](samples/5.4.1_trim_path.pagx)）：
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="100">
+<pagx version="1.0" width="400" height="400">
+  <!-- 独立模式：每个椭圆独立裁剪 -->
   <Layer>
-    <Path data="M 20,50 L 100,50"/>
-    <Path data="M 100,50 L 180,50"/>
-    <TrimPath start="0.25" end="0.75" type="continuous"/>
-    <Stroke color="#3366FF" width="4" cap="round"/>
+    <Ellipse center="120,95" size="100,100"/>
+    <Ellipse center="280,95" size="100,100"/>
+    <TrimPath start="0.2" end="0.9" type="separate"/>
+    <Stroke color="#06B6D4" width="10" cap="round"/>
+  </Layer>
+
+  <!-- 连续模式：两个椭圆视为一条连续路径 -->
+  <Layer>
+    <Ellipse center="120,265" size="100,100"/>
+    <Ellipse center="280,265" size="100,100"/>
+    <TrimPath start="0.2" end="0.9" type="continuous"/>
+    <Stroke color="#F59E0B" width="10" cap="round"/>
   </Layer>
 </pagx>
 ```
@@ -1771,6 +1782,8 @@ finalAlpha = originalAlpha × max(0, alphaFactor)
 blendFactor = overrideColor.alpha × |factor|
 finalColor = blend(originalColor, overrideColor, blendFactor)
 ```
+
+> 完整可运行示例：[TextModifier 效果](samples/5.5.3_text_modifier.pagx)
 
 #### 5.5.4 范围选择器（RangeSelector）
 

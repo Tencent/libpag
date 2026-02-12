@@ -1395,6 +1395,8 @@ When a glyph has scale, rotation, or skew transforms, they are applied in the fo
 </pagx>
 ```
 
+> Complete runnable samples: [text layout](samples/5.2.5_text.pagx), [embedded font with GlyphRun](samples/5.2.5_glyph_run.pagx)
+
 ### 5.3 Painters
 
 Painters (Fill, Stroke) render all geometry (Paths and glyph lists) accumulated at the **current moment**.
@@ -1574,15 +1576,24 @@ Trims paths to a specified start/end range.
 - Supports wrapping: When trim range exceeds [0,1], automatically wraps to other end of path
 - When total path length is 0, no operation is performed
 
-**Continuous Mode Example**:
+**Example** (separate vs continuous comparison, [sample file](samples/5.4.1_trim_path.pagx)):
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="100">
+<pagx version="1.0" width="400" height="400">
+  <!-- Separate mode: each ellipse trimmed independently -->
   <Layer>
-    <Path data="M 20,50 L 100,50"/>
-    <Path data="M 100,50 L 180,50"/>
-    <TrimPath start="0.25" end="0.75" type="continuous"/>
-    <Stroke color="#3366FF" width="4" cap="round"/>
+    <Ellipse center="120,95" size="100,100"/>
+    <Ellipse center="280,95" size="100,100"/>
+    <TrimPath start="0.2" end="0.9" type="separate"/>
+    <Stroke color="#06B6D4" width="10" cap="round"/>
+  </Layer>
+
+  <!-- Continuous mode: both ellipses treated as one path -->
+  <Layer>
+    <Ellipse center="120,265" size="100,100"/>
+    <Ellipse center="280,265" size="100,100"/>
+    <TrimPath start="0.2" end="0.9" type="continuous"/>
+    <Stroke color="#F59E0B" width="10" cap="round"/>
   </Layer>
 </pagx>
 ```
@@ -1773,6 +1784,8 @@ Color override uses the absolute value of `factor` for alpha blending:
 blendFactor = overrideColor.alpha × |factor|
 finalColor = blend(originalColor, overrideColor, blendFactor)
 ```
+
+> Complete runnable sample: [TextModifier effects](samples/5.5.3_text_modifier.pagx)
 
 #### 5.5.4 RangeSelector
 
