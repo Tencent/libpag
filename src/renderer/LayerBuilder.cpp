@@ -173,7 +173,7 @@ static tgfx::Rect ToTGFX(const Rect& r) {
 }
 
 static tgfx::Path ToTGFX(const PathData& pathData) {
-  tgfx::Path path;
+  tgfx::Path path = {};
   pathData.forEach([&](PathVerb verb, const Point* pts) {
     switch (verb) {
       case PathVerb::Move:

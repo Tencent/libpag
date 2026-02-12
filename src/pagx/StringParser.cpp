@@ -268,6 +268,14 @@ ColorSpace ColorSpaceFromString(const std::string& str) {
   return ColorSpace::SRGB;
 }
 
+static std::string ToHex(float v) {
+  int i = static_cast<int>(std::round(v * 255.0f));
+  i = std::max(0, std::min(255, i));
+  char buf[3] = {};
+  snprintf(buf, sizeof(buf), "%02X", i);
+  return std::string(buf);
+}
+
 std::string ColorToHexString(const Color& color, bool withAlpha) {
   if (color.colorSpace == ColorSpace::DisplayP3) {
     char buf[64] = {};
@@ -279,16 +287,9 @@ std::string ColorToHexString(const Color& color, bool withAlpha) {
     }
     return std::string(buf);
   }
-  auto toHex = [](float v) -> std::string {
-    int i = static_cast<int>(std::round(v * 255.0f));
-    i = std::max(0, std::min(255, i));
-    char buf[3] = {};
-    snprintf(buf, sizeof(buf), "%02X", i);
-    return std::string(buf);
-  };
-  std::string result = "#" + toHex(color.red) + toHex(color.green) + toHex(color.blue);
+  std::string result = "#" + ToHex(color.red) + ToHex(color.green) + ToHex(color.blue);
   if (withAlpha && color.alpha < 1.0f) {
-    result += toHex(color.alpha);
+    result += ToHex(color.alpha);
   }
   return result;
 }

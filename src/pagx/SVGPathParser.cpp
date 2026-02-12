@@ -130,6 +130,20 @@ static bool ParseFlag(const char*& ptr, const char* end, bool& result) {
   return false;
 }
 
+static float VectorAngle(float ux, float uy, float vx, float vy) {
+  float n = std::sqrt(ux * ux + uy * uy) * std::sqrt(vx * vx + vy * vy);
+  if (n == 0) {
+    return 0;
+  }
+  float c = (ux * vx + uy * vy) / n;
+  c = std::max(-1.0f, std::min(1.0f, c));
+  float angle = std::acos(c);
+  if (ux * vy - uy * vx < 0) {
+    angle = -angle;
+  }
+  return angle;
+}
+
 static void ArcToCubics(PathData& path, float x1, float y1, float rx, float ry, float angle,
                         bool largeArc, bool sweep, float x2, float y2) {
   if (rx == 0 || ry == 0) {
@@ -176,22 +190,8 @@ static void ArcToCubics(PathData& path, float x1, float y1, float rx, float ry, 
   float cx = cosAngle * cxp - sinAngle * cyp + (x1 + x2) / 2.0f;
   float cy = sinAngle * cxp + cosAngle * cyp + (y1 + y2) / 2.0f;
 
-  auto vectorAngle = [](float ux, float uy, float vx, float vy) -> float {
-    float n = std::sqrt(ux * ux + uy * uy) * std::sqrt(vx * vx + vy * vy);
-    if (n == 0) {
-      return 0;
-    }
-    float c = (ux * vx + uy * vy) / n;
-    c = std::max(-1.0f, std::min(1.0f, c));
-    float angle = std::acos(c);
-    if (ux * vy - uy * vx < 0) {
-      angle = -angle;
-    }
-    return angle;
-  };
-
-  float theta1 = vectorAngle(1.0f, 0.0f, (x1p - cxp) / rx, (y1p - cyp) / ry);
-  float dtheta = vectorAngle((x1p - cxp) / rx, (y1p - cyp) / ry, (-x1p - cxp) / rx,
+  float theta1 = VectorAngle(1.0f, 0.0f, (x1p - cxp) / rx, (y1p - cyp) / ry);
+  float dtheta = VectorAngle((x1p - cxp) / rx, (y1p - cyp) / ry, (-x1p - cxp) / rx,
                              (-y1p - cyp) / ry);
 
   if (!sweep && dtheta > 0) {

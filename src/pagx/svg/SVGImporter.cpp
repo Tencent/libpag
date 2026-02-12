@@ -1175,7 +1175,7 @@ LinearGradient* SVGParserContext::convertLinearGradient(
   // Check gradientUnits - determines how gradient coordinates are interpreted.
   // Default is objectBoundingBox, meaning values are 0-1 ratios of the shape bounds.
   std::string gradientUnits = getAttribute(element, "gradientUnits", "objectBoundingBox");
-  bool useOBB = (gradientUnits == "objectBoundingBox");
+  bool useObjectBoundingBox = (gradientUnits == "objectBoundingBox");
 
   // Parse gradient coordinates.
   float x1 = parseLength(getAttribute(element, "x1", "0%"), 1.0f);
@@ -1188,7 +1188,7 @@ LinearGradient* SVGParserContext::convertLinearGradient(
   Matrix transformMatrix = gradientTransform.empty() ? Matrix::Identity()
                                                      : parseTransform(gradientTransform);
 
-  if (useOBB) {
+  if (useObjectBoundingBox) {
     // For objectBoundingBox, coordinates are normalized 0-1.
     // Convert to actual coordinates based on shape bounds.
     Point start = {shapeBounds.x + x1 * shapeBounds.width, shapeBounds.y + y1 * shapeBounds.height};
@@ -1234,7 +1234,7 @@ RadialGradient* SVGParserContext::convertRadialGradient(
 
   // Check gradientUnits - determines how gradient coordinates are interpreted.
   std::string gradientUnits = getAttribute(element, "gradientUnits", "objectBoundingBox");
-  bool useOBB = (gradientUnits == "objectBoundingBox");
+  bool useObjectBoundingBox = (gradientUnits == "objectBoundingBox");
 
   // Parse gradient coordinates.
   float cx = parseLength(getAttribute(element, "cx", "50%"), 1.0f);
@@ -1246,7 +1246,7 @@ RadialGradient* SVGParserContext::convertRadialGradient(
   Matrix transformMatrix = gradientTransform.empty() ? Matrix::Identity()
                                                      : parseTransform(gradientTransform);
 
-  if (useOBB) {
+  if (useObjectBoundingBox) {
     // For objectBoundingBox, convert normalized coordinates to actual coordinates.
     gradient->center = {shapeBounds.x + cx * shapeBounds.width,
                         shapeBounds.y + cy * shapeBounds.height};
@@ -1295,12 +1295,12 @@ ImagePattern* SVGParserContext::convertPattern(
   // Check patternUnits - determines how pattern x/y/width/height are interpreted.
   // Default is objectBoundingBox, meaning values are relative to the shape bounds.
   std::string patternUnitsStr = getAttribute(element, "patternUnits", "objectBoundingBox");
-  bool patternUnitsOBB = (patternUnitsStr == "objectBoundingBox");
+  bool patternUnitsIsObjectBoundingBox = (patternUnitsStr == "objectBoundingBox");
 
   // Determine tile mode based on whether pattern covers the full shape.
   // When patternUnits is objectBoundingBox and width/height are 1.0 (100%),
   // the pattern covers the entire shape and should not repeat.
-  if (patternUnitsOBB && patternWidth >= 1.0f && patternHeight >= 1.0f) {
+  if (patternUnitsIsObjectBoundingBox && patternWidth >= 1.0f && patternHeight >= 1.0f) {
     pattern->tileModeX = TileMode::Clamp;
     pattern->tileModeY = TileMode::Clamp;
   } else {
@@ -1312,12 +1312,12 @@ ImagePattern* SVGParserContext::convertPattern(
   // Check patternContentUnits - determines how pattern content coordinates are interpreted.
   // Default is userSpaceOnUse, meaning content uses absolute coordinates.
   std::string contentUnitsStr = getAttribute(element, "patternContentUnits", "userSpaceOnUse");
-  bool contentUnitsOBB = (contentUnitsStr == "objectBoundingBox");
+  bool contentUnitsIsObjectBoundingBox = (contentUnitsStr == "objectBoundingBox");
 
   // Calculate the actual tile size in user space.
   // When patternUnits is objectBoundingBox, pattern dimensions are 0-1 ratios of shape bounds.
-  float tileWidth = patternUnitsOBB ? patternWidth * shapeBounds.width : patternWidth;
-  float tileHeight = patternUnitsOBB ? patternHeight * shapeBounds.height : patternHeight;
+  float tileWidth = patternUnitsIsObjectBoundingBox ? patternWidth * shapeBounds.width : patternWidth;
+  float tileHeight = patternUnitsIsObjectBoundingBox ? patternHeight * shapeBounds.height : patternHeight;
 
   // Look for image reference inside the pattern.
   auto child = element->getFirstChild();
@@ -1365,7 +1365,7 @@ ImagePattern* SVGParserContext::convertPattern(
         // 3. Translate by shapeBounds.origin positions the pattern at the shape location
 
         Matrix forwardMatrix = Matrix::Identity();
-        if (contentUnitsOBB) {
+        if (contentUnitsIsObjectBoundingBox) {
           // Pattern content is in objectBoundingBox coordinates (0-1).
           // Build the complete forward transform: image pixels → screen pixels
           forwardMatrix = Matrix::Translate(shapeBounds.x, shapeBounds.y) *
@@ -1393,7 +1393,7 @@ ImagePattern* SVGParserContext::convertPattern(
       float imageWidth = parseLength(getAttribute(child, "width"), 1.0f);
       float imageHeight = parseLength(getAttribute(child, "height"), 1.0f);
 
-      if (contentUnitsOBB) {
+      if (contentUnitsIsObjectBoundingBox) {
         // Image dimensions are 0-1 ratios, scale by shape bounds.
         pattern->matrix = Matrix::Translate(shapeBounds.x, shapeBounds.y) *
                           Matrix::Scale(shapeBounds.width, shapeBounds.height);
@@ -1664,6 +1664,33 @@ Rect SVGParserContext::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
   return Rect::MakeXYWH(0, 0, 0, 0);
 }
 
+static void SkipWhitespace(const char*& ptr, const char* end) {
+  while (ptr < end && (std::isspace(*ptr) || *ptr == ',')) {
+    ++ptr;
+  }
+}
+
+static float ReadNumber(const char*& ptr, const char* end) {
+  SkipWhitespace(ptr, end);
+  const char* start = ptr;
+  if (*ptr == '-' || *ptr == '+') {
+    ++ptr;
+  }
+  while (ptr < end && (std::isdigit(*ptr) || *ptr == '.')) {
+    ++ptr;
+  }
+  if (ptr < end && (*ptr == 'e' || *ptr == 'E')) {
+    ++ptr;
+    if (*ptr == '-' || *ptr == '+') {
+      ++ptr;
+    }
+    while (ptr < end && std::isdigit(*ptr)) {
+      ++ptr;
+    }
+  }
+  return std::stof(std::string(start, ptr));
+}
+
 Matrix SVGParserContext::parseTransform(const std::string& value) {
   Matrix result = Matrix::Identity();
   if (value.empty()) {
@@ -1673,35 +1700,8 @@ Matrix SVGParserContext::parseTransform(const std::string& value) {
   const char* ptr = value.c_str();
   const char* end = ptr + value.length();
 
-  auto skipWS = [&]() {
-    while (ptr < end && (std::isspace(*ptr) || *ptr == ',')) {
-      ++ptr;
-    }
-  };
-
-  auto readNumber = [&]() -> float {
-    skipWS();
-    const char* start = ptr;
-    if (*ptr == '-' || *ptr == '+') {
-      ++ptr;
-    }
-    while (ptr < end && (std::isdigit(*ptr) || *ptr == '.')) {
-      ++ptr;
-    }
-    if (ptr < end && (*ptr == 'e' || *ptr == 'E')) {
-      ++ptr;
-      if (*ptr == '-' || *ptr == '+') {
-        ++ptr;
-      }
-      while (ptr < end && std::isdigit(*ptr)) {
-        ++ptr;
-      }
-    }
-    return std::stof(std::string(start, ptr));
-  };
-
   while (ptr < end) {
-    skipWS();
+    SkipWhitespace(ptr, end);
     if (ptr >= end) {
       break;
     }
@@ -1711,7 +1711,7 @@ Matrix SVGParserContext::parseTransform(const std::string& value) {
       func += *ptr++;
     }
 
-    skipWS();
+    SkipWhitespace(ptr, end);
     if (*ptr != '(') {
       break;
     }
@@ -1720,49 +1720,49 @@ Matrix SVGParserContext::parseTransform(const std::string& value) {
     Matrix m = Matrix::Identity();
 
     if (func == "translate") {
-      float tx = readNumber();
-      skipWS();
+      float tx = ReadNumber(ptr, end);
+      SkipWhitespace(ptr, end);
       float ty = 0;
       if (ptr < end && *ptr != ')') {
-        ty = readNumber();
+        ty = ReadNumber(ptr, end);
       }
       m = Matrix::Translate(tx, ty);
     } else if (func == "scale") {
-      float sx = readNumber();
-      skipWS();
+      float sx = ReadNumber(ptr, end);
+      SkipWhitespace(ptr, end);
       float sy = sx;
       if (ptr < end && *ptr != ')') {
-        sy = readNumber();
+        sy = ReadNumber(ptr, end);
       }
       m = Matrix::Scale(sx, sy);
     } else if (func == "rotate") {
-      float angle = readNumber();
-      skipWS();
+      float angle = ReadNumber(ptr, end);
+      SkipWhitespace(ptr, end);
       if (ptr < end && *ptr != ')') {
-        float cx = readNumber();
-        float cy = readNumber();
+        float cx = ReadNumber(ptr, end);
+        float cy = ReadNumber(ptr, end);
         m = Matrix::Translate(cx, cy) * Matrix::Rotate(angle) * Matrix::Translate(-cx, -cy);
       } else {
         m = Matrix::Rotate(angle);
       }
     } else if (func == "skewX") {
-      float angle = readNumber();
+      float angle = ReadNumber(ptr, end);
       float radians = angle * 3.14159265358979323846f / 180.0f;
       m.c = std::tan(radians);
     } else if (func == "skewY") {
-      float angle = readNumber();
+      float angle = ReadNumber(ptr, end);
       float radians = angle * 3.14159265358979323846f / 180.0f;
       m.b = std::tan(radians);
     } else if (func == "matrix") {
-      m.a = readNumber();
-      m.b = readNumber();
-      m.c = readNumber();
-      m.d = readNumber();
-      m.tx = readNumber();
-      m.ty = readNumber();
+      m.a = ReadNumber(ptr, end);
+      m.b = ReadNumber(ptr, end);
+      m.c = ReadNumber(ptr, end);
+      m.d = ReadNumber(ptr, end);
+      m.tx = ReadNumber(ptr, end);
+      m.ty = ReadNumber(ptr, end);
     }
 
-    skipWS();
+    SkipWhitespace(ptr, end);
     if (*ptr == ')') {
       ++ptr;
     }
@@ -2150,18 +2150,8 @@ std::string SVGParserContext::colorToHex(const std::string& value) {
   }
   // Parse the color (handles named colors, rgb, rgba, etc.) and convert to hex.
   Color color = parseColor(value);
-  // Convert to hex string.
-  auto toHex = [](float v) {
-    int i = static_cast<int>(std::round(v * 255.0f));
-    i = std::max(0, std::min(255, i));
-    char buf[3] = {};
-    snprintf(buf, sizeof(buf), "%02X", i);
-    return std::string(buf);
-  };
-  std::string result = "#" + toHex(color.red) + toHex(color.green) + toHex(color.blue);
-  if (color.alpha < 1.0f) {
-    result += toHex(color.alpha);
-  }
+  // Convert color to hex string using existing utility.
+  std::string result = ColorToHexString(color, true);
   return result;
 }
 
