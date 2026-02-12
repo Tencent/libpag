@@ -281,12 +281,13 @@ function embedSampleFiles(mdContent, specDir) {
  * a `</pre>` is replaced by wrapping the `<pre>` in a container with a floating
  * button linking to the viewer.
  */
-function addPreviewButtons(html, viewerUrl) {
+function addPreviewButtons(html, viewerUrl, lang) {
   const previewPattern = /(<pre><code class="hljs language-xml">[\s\S]*?<\/code><\/pre>)\s*<!-- preview:(samples\/[^\s]+\.pagx) -->/g;
   return html.replace(previewPattern, (match, preBlock, samplePath) => {
     const previewUrl = viewerUrl + '?file=./' + samplePath;
-    const button = '<a class="preview-btn" href="' + previewUrl + '" target="_blank" title="Preview">' +
-      '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></a>';
+    const label = lang === 'zh' ? '预览' : 'Preview';
+    const button = '<a class="preview-btn" href="' + previewUrl + '" target="_blank" title="' + label + '">' +
+      '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' + label + '</a>';
     return '<div class="code-block-wrapper">' + button + preBlock + '</div>';
   });
 }
@@ -317,7 +318,7 @@ function publishSpec(specFile, outputDir, lang, langSwitchUrl, viewerUrl, favico
     htmlContent = replaceHeadingIds(htmlContent, englishSlugs);
   }
 
-  htmlContent = addPreviewButtons(htmlContent, viewerUrl);
+  htmlContent = addPreviewButtons(htmlContent, viewerUrl, lang);
 
   const html = generateHtml(htmlContent, title, tocHtml, lang, langSwitchUrl, viewerUrl, faviconUrl);
 
