@@ -260,7 +260,7 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 | `height` | float | (必填) | 画布高度 |
 
 **图层渲染顺序**：图层按文档顺序依次渲染，文档中靠前的图层先渲染（位于下方），靠后的图层后渲染（位于上方）。
-> 📄 [示例](samples/3.2_document_structure.pagx) | [预览](https://pag.io/pagx/?file=./samples/3.2_document_structure.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/3.2_document_structure.pagx)
 
 ### 3.3 资源区（Resources）
 
@@ -292,7 +292,7 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
   </Resources>
 </pagx>
 ```
-> 📄 [示例](samples/3.3_resources.pagx) | [预览](https://pag.io/pagx/?file=./samples/3.3_resources.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/3.3_resources.pagx)
 
 #### 3.3.1 图片（Image）
 
@@ -608,8 +608,7 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 - 对该图层应用 `scale(2, 2)` 变换：矩形变为 200×200，渐变也随之放大，视觉效果保持一致
 - 直接将 Rectangle 的 size 改为 200,200：矩形变为 200×200，但渐变坐标不变，只覆盖矩形的左半部分
 
-> 📄 Samples: [LinearGradient](samples/3.3.3_linear_gradient.pagx) | [RadialGradient](samples/3.3.3_radial_gradient.pagx) | [ConicGradient](samples/3.3.3_conic_gradient.pagx) | [DiamondGradient](samples/3.3.3_diamond_gradient.pagx) | [ImagePattern](samples/3.3.3_image_pattern.pagx) | [Coordinates](samples/3.3.3_color_source_coordinates.pagx)
-> 🔗 Preview: [Linear](https://pag.io/pagx/?file=./samples/3.3.3_linear_gradient.pagx) | [Radial](https://pag.io/pagx/?file=./samples/3.3.3_radial_gradient.pagx) | [Conic](https://pag.io/pagx/?file=./samples/3.3.3_conic_gradient.pagx) | [Diamond](https://pag.io/pagx/?file=./samples/3.3.3_diamond_gradient.pagx) | [Pattern](https://pag.io/pagx/?file=./samples/3.3.3_image_pattern.pagx) | [Coords](https://pag.io/pagx/?file=./samples/3.3.3_color_source_coordinates.pagx)
+> Preview: [Linear](https://pag.io/pagx/?file=./samples/3.3.3_linear_gradient.pagx) | [Radial](https://pag.io/pagx/?file=./samples/3.3.3_radial_gradient.pagx) | [Conic](https://pag.io/pagx/?file=./samples/3.3.3_conic_gradient.pagx) | [Diamond](https://pag.io/pagx/?file=./samples/3.3.3_diamond_gradient.pagx) | [Pattern](https://pag.io/pagx/?file=./samples/3.3.3_image_pattern.pagx) | [Coords](https://pag.io/pagx/?file=./samples/3.3.3_color_source_coordinates.pagx)
 
 #### 3.3.4 合成（Composition）
 
@@ -650,7 +649,7 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 | `width` | float | (必填) | 合成宽度 |
 | `height` | float | (必填) | 合成高度 |
 
-> 📄 [示例](samples/3.3.4_composition.pagx) | [预览](https://pag.io/pagx/?file=./samples/3.3.4_composition.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/3.3.4_composition.pagx)
 
 #### 3.3.5 字体（Font）
 
@@ -882,7 +881,7 @@ Layer 的子元素按类型自动归类为四个集合：
 | `plusLighter` | S + D | 相加（趋向白色） |
 | `plusDarker` | S + D - 1 | 相加减一（趋向黑色） |
 
-> 📄 [示例](samples/4.2_layer.pagx) | [预览](https://pag.io/pagx/?file=./samples/4.2_layer.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/4.2_layer.pagx)
 
 ### 4.3 图层样式（Layer Styles）
 
@@ -975,7 +974,7 @@ Layer 的子元素按类型自动归类为四个集合：
 3. 使用 `color` 的颜色填充阴影区域
 4. 与不透明图层内容求交集，仅保留内容内部的阴影
 
-> 📄 [示例](samples/4.3_layer_styles.pagx) | [预览](https://pag.io/pagx/?file=./samples/4.3_layer_styles.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/4.3_layer_styles.pagx)
 
 ### 4.4 图层滤镜（Layer Filters）
 
@@ -1074,7 +1073,7 @@ Layer 的子元素按类型自动归类为四个集合：
                                             | 1 |
 ```
 
-> 📄 [示例](samples/4.4_layer_filters.pagx) | [预览](https://pag.io/pagx/?file=./samples/4.4_layer_filters.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/4.4_layer_filters.pagx)
 
 ### 4.5 裁剪与遮罩（Clipping and Masking）
 
@@ -1105,7 +1104,7 @@ Layer 的子元素按类型自动归类为四个集合：
 </pagx>
 ```
 
-> 📄 [示例](samples/4.5.1_scroll_rect.pagx) | [预览](https://pag.io/pagx/?file=./samples/4.5.1_scroll_rect.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/4.5.1_scroll_rect.pagx)
 
 #### 4.5.2 遮罩（Masking）
 
@@ -1139,7 +1138,7 @@ Layer 的子元素按类型自动归类为四个集合：
 - 遮罩图层自身不渲染（`visible` 属性被忽略）
 - 遮罩图层的变换不影响被遮罩图层
 
-> 📄 [示例](samples/4.5.2_masking.pagx) | [预览](https://pag.io/pagx/?file=./samples/4.5.2_masking.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/4.5.2_masking.pagx)
 
 ---
 
@@ -1294,7 +1293,7 @@ rect.bottom = center.y + size.height / 2
 </pagx>
 ```
 
-> 📄 [示例](samples/5.2.1_rectangle.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.2.1_rectangle.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/5.2.1_rectangle.pagx)
 
 **路径起点**：矩形路径从**右上角**开始，顺时针方向绘制（`reversed="false"` 时）。
 
@@ -1373,7 +1372,7 @@ boundingRect.bottom = center.y + size.height / 2
 </pagx>
 ```
 
-> 📄 [示例](samples/5.2.2_ellipse.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.2.2_ellipse.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/5.2.2_ellipse.pagx)
 
 **路径起点**：椭圆路径从**右侧中点**（3 点钟方向）开始。
 
@@ -1483,7 +1482,7 @@ y = center.y + outerRadius * sin(angle)
 </pagx>
 ```
 
-> 📄 [示例](samples/5.2.3_polystar.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.2.3_polystar.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/5.2.3_polystar.pagx)
 
 #### 5.2.4 路径（Path）
 
@@ -1549,7 +1548,7 @@ y = center.y + outerRadius * sin(angle)
 </pagx>
 ```
 
-> 📄 [示例](samples/5.2.4_path.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.2.4_path.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/5.2.4_path.pagx)
 
 #### 5.2.5 文本（Text）
 
@@ -1704,8 +1703,7 @@ finalY[i] = y + positions[i].y
 </pagx>
 ```
 
-> 📄 Samples: [文本排版](samples/5.2.5_text.pagx) | [嵌入字体与 GlyphRun](samples/5.2.5_glyph_run.pagx)
-> 🔗 Preview: [Text](https://pag.io/pagx/?file=./samples/5.2.5_text.pagx) | [GlyphRun](https://pag.io/pagx/?file=./samples/5.2.5_glyph_run.pagx)
+> Preview: [Text](https://pag.io/pagx/?file=./samples/5.2.5_text.pagx) | [GlyphRun](https://pag.io/pagx/?file=./samples/5.2.5_glyph_run.pagx)
 
 ### 5.3 绘制器（Painters）
 
@@ -1773,7 +1771,7 @@ finalY[i] = y + positions[i].y
 - 支持通过 TextModifier 对单个字形应用颜色覆盖
 - 颜色覆盖采用 alpha 混合：`finalColor = lerp(originalColor, overrideColor, overrideAlpha)`
 
-> 📄 [示例](samples/5.3.1_fill.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.3.1_fill.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/5.3.1_fill.pagx)
 
 #### 5.3.2 描边（Stroke）
 
@@ -1855,7 +1853,7 @@ finalY[i] = y + positions[i].y
 - `dashOffset`：虚线起始偏移量
 - `dashAdaptive`：为 true 时，缩放虚线间隔使各虚线段保持等长
 
-> 📄 [示例](samples/5.3.2_stroke.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.3.2_stroke.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/5.3.2_stroke.pagx)
 
 #### 5.3.3 绘制位置（LayerPlacement）
 
@@ -1956,7 +1954,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 </pagx>
 ```
 
-> 📄 [示例](samples/5.4.1_trim_path.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.4.1_trim_path.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/5.4.1_trim_path.pagx)
 
 #### 5.4.2 圆角（RoundCorner）
 
@@ -2030,7 +2028,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 </pagx>
 ```
 
-> 📄 [示例](samples/5.4.2_round_corner.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.4.2_round_corner.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/5.4.2_round_corner.pagx)
 
 #### 5.4.3 路径合并（MergePath）
 
@@ -2082,7 +2080,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 </pagx>
 ```
 
-> 📄 [示例](samples/5.4.3_merge_path.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.4.3_merge_path.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/5.4.3_merge_path.pagx)
 
 ### 5.5 文本修改器（Text Modifiers）
 
@@ -2211,7 +2209,7 @@ blendFactor = overrideColor.alpha × |factor|
 finalColor = blend(originalColor, overrideColor, blendFactor)
 ```
 
-> 📄 [示例](samples/5.5.3_text_modifier.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.5.3_text_modifier.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/5.5.3_text_modifier.pagx)
 
 #### 5.5.4 范围选择器（RangeSelector）
 
@@ -2331,7 +2329,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 **闭合路径**：对于闭合路径，超出范围的字形会环绕到路径另一端。
 
-> 📄 [示例](samples/5.5.5_text_path.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.5.5_text_path.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/5.5.5_text_path.pagx)
 
 #### 5.5.6 文本排版（TextLayout）
 
@@ -2432,7 +2430,7 @@ TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会
 | `horizontal` | 横排文本 |
 | `vertical` | 竖排文本（列从右到左排列，传统中日文竖排） |
 
-> 📄 [示例](samples/5.5.6_text_layout.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.5.6_text_layout.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/5.5.6_text_layout.pagx)
 
 #### 5.5.7 富文本
 
@@ -2545,7 +2543,7 @@ TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会
 </pagx>
 ```
 
-> 📄 [示例](samples/5.5.7_rich_text.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.5.7_rich_text.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/5.5.7_rich_text.pagx)
 
 **说明**：每个 Group 内的 Text + Fill/Stroke 定义一段样式独立的文本片段，TextLayout 将所有片段作为整体进行排版，实现自动换行和对齐。
 
@@ -2632,7 +2630,7 @@ alpha = lerp(startAlpha, endAlpha, t)
 </pagx>
 ```
 
-> 📄 [示例](samples/5.6_repeater.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.6_repeater.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/5.6_repeater.pagx)
 
 ### 5.7 容器（Group）
 
@@ -2840,8 +2838,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 
 **渲染顺序**：多个绘制器按文档顺序渲染，先出现的位于下方。
 
-> 📄 Samples: [Group](samples/5.7_group.pagx) | [Isolation](samples/5.7_group_isolation.pagx) | [Propagation](samples/5.7_group_propagation.pagx) | [Multiple Painters](samples/5.7_multiple_painters.pagx) | [Multiple Fills](samples/5.7_multiple_fills.pagx) | [Multiple Strokes](samples/5.7_multiple_strokes.pagx) | [Mixed Overlay](samples/5.7_mixed_overlay.pagx)
-> 🔗 Preview: [Group](https://pag.io/pagx/?file=./samples/5.7_group.pagx) | [Isolation](https://pag.io/pagx/?file=./samples/5.7_group_isolation.pagx) | [Propagation](https://pag.io/pagx/?file=./samples/5.7_group_propagation.pagx) | [Painters](https://pag.io/pagx/?file=./samples/5.7_multiple_painters.pagx) | [Fills](https://pag.io/pagx/?file=./samples/5.7_multiple_fills.pagx) | [Strokes](https://pag.io/pagx/?file=./samples/5.7_multiple_strokes.pagx) | [Mixed](https://pag.io/pagx/?file=./samples/5.7_mixed_overlay.pagx)
+> Preview: [Group](https://pag.io/pagx/?file=./samples/5.7_group.pagx) | [Isolation](https://pag.io/pagx/?file=./samples/5.7_group_isolation.pagx) | [Propagation](https://pag.io/pagx/?file=./samples/5.7_group_propagation.pagx) | [Painters](https://pag.io/pagx/?file=./samples/5.7_multiple_painters.pagx) | [Fills](https://pag.io/pagx/?file=./samples/5.7_multiple_fills.pagx) | [Strokes](https://pag.io/pagx/?file=./samples/5.7_multiple_strokes.pagx) | [Mixed](https://pag.io/pagx/?file=./samples/5.7_mixed_overlay.pagx)
 
 ---
 
@@ -3189,7 +3186,7 @@ Layer / Group
 | **文本修改器** | TextModifier/RangeSelector、TextPath、TextLayout、GlyphRun |
 | **其他** | Repeater、Group、遮罩（mask/maskType）、合成引用 |
 
-> 📄 [示例](samples/B.1_complete_example.pagx) | [预览](https://pag.io/pagx/?file=./samples/B.1_complete_example.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/B.1_complete_example.pagx)
 
 ### B.2 RPG 角色面板
 
@@ -3960,7 +3957,7 @@ Layer / Group
 </pagx>
 ```
 
-> 📄 [示例](samples/B.2_rpg_character_panel.pagx) | [预览](https://pag.io/pagx/?file=./samples/B.2_rpg_character_panel.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/B.2_rpg_character_panel.pagx)
 
 ### B.3 星云学员
 
@@ -4437,7 +4434,7 @@ Layer / Group
 </pagx>
 ```
 
-> 📄 [示例](samples/B.3_nebula_cadet.pagx) | [预览](https://pag.io/pagx/?file=./samples/B.3_nebula_cadet.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/B.3_nebula_cadet.pagx)
 
 ### B.4 游戏 HUD
 
@@ -4795,7 +4792,7 @@ Layer / Group
 </pagx>
 ```
 
-> 📄 [示例](samples/B.4_game_hud.pagx) | [预览](https://pag.io/pagx/?file=./samples/B.4_game_hud.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/B.4_game_hud.pagx)
 
 ### B.5 PAGX 特性概览
 
@@ -5278,7 +5275,7 @@ PAGX 格式能力的综合展示，包括渐变、效果、文本样式和矢量
 </pagx>
 ```
 
-> 📄 [示例](samples/B.5_pagx_features.pagx) | [预览](https://pag.io/pagx/?file=./samples/B.5_pagx_features.pagx)
+> [预览](https://pag.io/pagx/?file=./samples/B.5_pagx_features.pagx)
 
 ---
 
