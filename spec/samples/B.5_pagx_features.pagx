@@ -90,8 +90,8 @@
     </Layer>
     <!-- Curved definition caption -->
     <Layer x="0" y="0">
-      <Text text="An XML-based markup language for describing animated vector graphics." fontFamily="Arial" fontSize="11"/>
-      <TextPath path="M -138 0 A 138 138 0 0 0 138 0" forceAlignment="true"/>
+      <Text text="An XML-based markup language for describing animated vector graphics." fontFamily="Arial" fontSize="12"/>
+      <TextPath path="M -140 0 A 140 140 0 0 0 140 0" forceAlignment="true"/>
       <Fill color="#64748B60"/>
     </Layer>
   </Layer>
