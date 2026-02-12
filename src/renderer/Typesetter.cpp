@@ -303,13 +303,14 @@ class TypesetterContext {
       }
 
       tgfx::TextBlobBuilder builder = {};
+      std::vector<float> adjustedPositions = {};
 
       for (auto& run : info.runs) {
         if (run.glyphIDs.empty()) {
           continue;
         }
 
-        std::vector<float> adjustedPositions = {};
+        adjustedPositions.clear();
         adjustedPositions.reserve(run.xPositions.size());
         for (float x : run.xPositions) {
           adjustedPositions.push_back(x + alignOffset + baseX);
@@ -387,6 +388,7 @@ class TypesetterContext {
 
       // Build TextBlob with multiple runs
       tgfx::TextBlobBuilder builder = {};
+      std::vector<float> adjustedPositions = {};
 
       for (auto& run : info.runs) {
         if (run.glyphIDs.empty()) {
@@ -394,7 +396,7 @@ class TypesetterContext {
         }
 
         // Apply offsets to positions
-        std::vector<float> adjustedPositions = {};
+        adjustedPositions.clear();
         adjustedPositions.reserve(run.xPositions.size());
         for (float x : run.xPositions) {
           adjustedPositions.push_back(x + xOffset);
@@ -482,9 +484,9 @@ class TypesetterContext {
       if (!run->anchors.empty()) {
         for (size_t i = 0; i < count; i++) {
           if (i < run->anchors.size()) {
-          shapedText.anchors.push_back(tgfx::Point::Make(run->anchors[i].x, run->anchors[i].y));
-        } else {
-          shapedText.anchors.push_back(tgfx::Point::Zero());
+            shapedText.anchors.push_back(tgfx::Point::Make(run->anchors[i].x, run->anchors[i].y));
+          } else {
+            shapedText.anchors.push_back(tgfx::Point::Zero());
           }
         }
       }

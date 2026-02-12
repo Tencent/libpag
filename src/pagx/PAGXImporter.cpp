@@ -284,7 +284,7 @@ class XMLTokenizer {
         break;
       }
       auto attrValue = parseAttributeValue();
-      node->attributes[attrName] = attrValue;
+      node->attributes[std::move(attrName)] = std::move(attrValue);
     }
 
     while (true) {
@@ -341,7 +341,6 @@ static Point parsePoint(const std::string& str);
 static Size parseSize(const std::string& str);
 static Rect parseRect(const std::string& str);
 static Color parseColor(const std::string& str);
-static std::vector<float> parseFloatList(const std::string& str);
 
 // Forward declarations for parse functions
 static void parseDocument(const XMLNode* root, PAGXDocument* doc);
@@ -476,7 +475,7 @@ static Layer* parseLayer(const XMLNode* node, PAGXDocument* doc) {
   }
   auto matrix3DStr = getAttribute(node, "matrix3D");
   if (!matrix3DStr.empty()) {
-    layer->matrix3D = parseFloatList(matrix3DStr);
+    layer->matrix3D = ParseFloatList(matrix3DStr);
   }
   layer->preserve3D = getBoolAttribute(node, "preserve3D", false);
   layer->antiAlias = getBoolAttribute(node, "antiAlias", true);
@@ -503,7 +502,7 @@ static Layer* parseLayer(const XMLNode* node, PAGXDocument* doc) {
 
   // Parse data-* custom attributes.
   for (const auto& [key, value] : node->attributes) {
-    if (key.length() > 5 && key.substr(0, 5) == "data-") {
+    if (key.length() > 5 && key.compare(0, 5, "data-") == 0) {
       layer->customData[key.substr(5)] = value;
     }
   }
@@ -859,7 +858,7 @@ static Stroke* parseStroke(const XMLNode* node, PAGXDocument* doc) {
   stroke->miterLimit = getFloatAttribute(node, "miterLimit", 4);
   auto dashesStr = getAttribute(node, "dashes");
   if (!dashesStr.empty()) {
-    stroke->dashes = parseFloatList(dashesStr);
+    stroke->dashes = ParseFloatList(dashesStr);
   }
   stroke->dashOffset = getFloatAttribute(node, "dashOffset", 0);
   stroke->dashAdaptive = getBoolAttribute(node, "dashAdaptive", false);
@@ -1089,24 +1088,27 @@ static SolidColor* parseSolidColor(const XMLNode* node, PAGXDocument* doc) {
   return solid;
 }
 
+static void parseGradientCommon(const XMLNode* node, Matrix& matrix,
+                                std::vector<ColorStop>& colorStops) {
+  auto matrixStr = getAttribute(node, "matrix");
+  if (!matrixStr.empty()) {
+    matrix = MatrixFromString(matrixStr);
+  }
+  for (const auto& child : node->children) {
+    if (child->tag == "ColorStop") {
+      colorStops.push_back(parseColorStop(child.get()));
+    }
+  }
+}
+
 static LinearGradient* parseLinearGradient(const XMLNode* node, PAGXDocument* doc) {
   auto gradient = doc->makeNode<LinearGradient>(getAttribute(node, "id"));
   if (!gradient) {
     return nullptr;
   }
-  auto startPointStr = getAttribute(node, "startPoint", "0,0");
-  gradient->startPoint = parsePoint(startPointStr);
-  auto endPointStr = getAttribute(node, "endPoint", "0,0");
-  gradient->endPoint = parsePoint(endPointStr);
-  auto matrixStr = getAttribute(node, "matrix");
-  if (!matrixStr.empty()) {
-    gradient->matrix = MatrixFromString(matrixStr);
-  }
-  for (const auto& child : node->children) {
-    if (child->tag == "ColorStop") {
-      gradient->colorStops.push_back(parseColorStop(child.get()));
-    }
-  }
+  gradient->startPoint = parsePoint(getAttribute(node, "startPoint", "0,0"));
+  gradient->endPoint = parsePoint(getAttribute(node, "endPoint", "0,0"));
+  parseGradientCommon(node, gradient->matrix, gradient->colorStops);
   return gradient;
 }
 
@@ -1115,18 +1117,9 @@ static RadialGradient* parseRadialGradient(const XMLNode* node, PAGXDocument* do
   if (!gradient) {
     return nullptr;
   }
-  auto centerStr = getAttribute(node, "center", "0,0");
-  gradient->center = parsePoint(centerStr);
+  gradient->center = parsePoint(getAttribute(node, "center", "0,0"));
   gradient->radius = getFloatAttribute(node, "radius", 0);
-  auto matrixStr = getAttribute(node, "matrix");
-  if (!matrixStr.empty()) {
-    gradient->matrix = MatrixFromString(matrixStr);
-  }
-  for (const auto& child : node->children) {
-    if (child->tag == "ColorStop") {
-      gradient->colorStops.push_back(parseColorStop(child.get()));
-    }
-  }
+  parseGradientCommon(node, gradient->matrix, gradient->colorStops);
   return gradient;
 }
 
@@ -1135,19 +1128,10 @@ static ConicGradient* parseConicGradient(const XMLNode* node, PAGXDocument* doc)
   if (!gradient) {
     return nullptr;
   }
-  auto centerStr = getAttribute(node, "center", "0,0");
-  gradient->center = parsePoint(centerStr);
+  gradient->center = parsePoint(getAttribute(node, "center", "0,0"));
   gradient->startAngle = getFloatAttribute(node, "startAngle", 0);
   gradient->endAngle = getFloatAttribute(node, "endAngle", 360);
-  auto matrixStr = getAttribute(node, "matrix");
-  if (!matrixStr.empty()) {
-    gradient->matrix = MatrixFromString(matrixStr);
-  }
-  for (const auto& child : node->children) {
-    if (child->tag == "ColorStop") {
-      gradient->colorStops.push_back(parseColorStop(child.get()));
-    }
-  }
+  parseGradientCommon(node, gradient->matrix, gradient->colorStops);
   return gradient;
 }
 
@@ -1156,18 +1140,9 @@ static DiamondGradient* parseDiamondGradient(const XMLNode* node, PAGXDocument* 
   if (!gradient) {
     return nullptr;
   }
-  auto centerStr = getAttribute(node, "center", "0,0");
-  gradient->center = parsePoint(centerStr);
+  gradient->center = parsePoint(getAttribute(node, "center", "0,0"));
   gradient->radius = getFloatAttribute(node, "radius", 0);
-  auto matrixStr = getAttribute(node, "matrix");
-  if (!matrixStr.empty()) {
-    gradient->matrix = MatrixFromString(matrixStr);
-  }
-  for (const auto& child : node->children) {
-    if (child->tag == "ColorStop") {
-      gradient->colorStops.push_back(parseColorStop(child.get()));
-    }
-  }
+  parseGradientCommon(node, gradient->matrix, gradient->colorStops);
   return gradient;
 }
 
@@ -1308,7 +1283,7 @@ static Glyph* parseGlyph(const XMLNode* node, PAGXDocument* doc) {
   return glyph;
 }
 
-static std::vector<Point> ParseSemicolonSeparatedPoints(const std::string& str) {
+static std::vector<Point> parseSemicolonSeparatedPoints(const std::string& str) {
   std::vector<Point> result = {};
   size_t start = 0;
   size_t end = str.find(';');
@@ -1354,7 +1329,7 @@ static GlyphRun* parseGlyphRun(const XMLNode* node, PAGXDocument* doc) {
   if (run->font) {
     auto glyphsStr = getAttribute(node, "glyphs");
     if (!glyphsStr.empty()) {
-      auto glyphList = parseFloatList(glyphsStr);
+      auto glyphList = ParseFloatList(glyphsStr);
       for (auto g : glyphList) {
         run->glyphs.push_back(static_cast<uint16_t>(g));
       }
@@ -1364,37 +1339,37 @@ static GlyphRun* parseGlyphRun(const XMLNode* node, PAGXDocument* doc) {
   // Parse xOffsets (comma-separated x offsets)
   auto xOffsetsStr = getAttribute(node, "xOffsets");
   if (!xOffsetsStr.empty()) {
-    run->xOffsets = parseFloatList(xOffsetsStr);
+    run->xOffsets = ParseFloatList(xOffsetsStr);
   }
 
   // Parse positions
   auto posStr = getAttribute(node, "positions");
   if (!posStr.empty()) {
-    run->positions = ParseSemicolonSeparatedPoints(posStr);
+    run->positions = parseSemicolonSeparatedPoints(posStr);
   }
 
   // Parse anchors
   auto anchorsStr = getAttribute(node, "anchors");
   if (!anchorsStr.empty()) {
-    run->anchors = ParseSemicolonSeparatedPoints(anchorsStr);
+    run->anchors = parseSemicolonSeparatedPoints(anchorsStr);
   }
 
   // Parse scales
   auto scalesStr = getAttribute(node, "scales");
   if (!scalesStr.empty()) {
-    run->scales = ParseSemicolonSeparatedPoints(scalesStr);
+    run->scales = parseSemicolonSeparatedPoints(scalesStr);
   }
 
   // Parse rotations (comma-separated angles in degrees)
   auto rotationsStr = getAttribute(node, "rotations");
   if (!rotationsStr.empty()) {
-    run->rotations = parseFloatList(rotationsStr);
+    run->rotations = ParseFloatList(rotationsStr);
   }
 
   // Parse skews (comma-separated angles in degrees)
   auto skewsStr = getAttribute(node, "skews");
   if (!skewsStr.empty()) {
-    run->skews = parseFloatList(skewsStr);
+    run->skews = ParseFloatList(skewsStr);
   }
 
   return run;
@@ -1404,20 +1379,26 @@ static GlyphRun* parseGlyphRun(const XMLNode* node, PAGXDocument* doc) {
 // Layer style parsing
 //==============================================================================
 
+static void parseShadowAttributes(const XMLNode* node, float& offsetX, float& offsetY,
+                                  float& blurX, float& blurY, Color& color) {
+  offsetX = getFloatAttribute(node, "offsetX", 0);
+  offsetY = getFloatAttribute(node, "offsetY", 0);
+  blurX = getFloatAttribute(node, "blurX", 0);
+  blurY = getFloatAttribute(node, "blurY", 0);
+  auto colorStr = getAttribute(node, "color");
+  if (!colorStr.empty()) {
+    color = parseColor(colorStr);
+  }
+}
+
 static DropShadowStyle* parseDropShadowStyle(const XMLNode* node, PAGXDocument* doc) {
   auto style = doc->makeNode<DropShadowStyle>(getAttribute(node, "id"));
   if (!style) {
     return nullptr;
   }
   style->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
-  style->offsetX = getFloatAttribute(node, "offsetX", 0);
-  style->offsetY = getFloatAttribute(node, "offsetY", 0);
-  style->blurX = getFloatAttribute(node, "blurX", 0);
-  style->blurY = getFloatAttribute(node, "blurY", 0);
-  auto colorStr = getAttribute(node, "color");
-  if (!colorStr.empty()) {
-    style->color = parseColor(colorStr);
-  }
+  parseShadowAttributes(node, style->offsetX, style->offsetY, style->blurX, style->blurY,
+                         style->color);
   style->showBehindLayer = getBoolAttribute(node, "showBehindLayer", true);
   return style;
 }
@@ -1428,14 +1409,8 @@ static InnerShadowStyle* parseInnerShadowStyle(const XMLNode* node, PAGXDocument
     return nullptr;
   }
   style->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
-  style->offsetX = getFloatAttribute(node, "offsetX", 0);
-  style->offsetY = getFloatAttribute(node, "offsetY", 0);
-  style->blurX = getFloatAttribute(node, "blurX", 0);
-  style->blurY = getFloatAttribute(node, "blurY", 0);
-  auto colorStr = getAttribute(node, "color");
-  if (!colorStr.empty()) {
-    style->color = parseColor(colorStr);
-  }
+  parseShadowAttributes(node, style->offsetX, style->offsetY, style->blurX, style->blurY,
+                         style->color);
   return style;
 }
 
@@ -1472,14 +1447,8 @@ static DropShadowFilter* parseDropShadowFilter(const XMLNode* node, PAGXDocument
   if (!filter) {
     return nullptr;
   }
-  filter->offsetX = getFloatAttribute(node, "offsetX", 0);
-  filter->offsetY = getFloatAttribute(node, "offsetY", 0);
-  filter->blurX = getFloatAttribute(node, "blurX", 0);
-  filter->blurY = getFloatAttribute(node, "blurY", 0);
-  auto colorStr = getAttribute(node, "color");
-  if (!colorStr.empty()) {
-    filter->color = parseColor(colorStr);
-  }
+  parseShadowAttributes(node, filter->offsetX, filter->offsetY, filter->blurX, filter->blurY,
+                         filter->color);
   filter->shadowOnly = getBoolAttribute(node, "shadowOnly", false);
   return filter;
 }
@@ -1489,14 +1458,8 @@ static InnerShadowFilter* parseInnerShadowFilter(const XMLNode* node, PAGXDocume
   if (!filter) {
     return nullptr;
   }
-  filter->offsetX = getFloatAttribute(node, "offsetX", 0);
-  filter->offsetY = getFloatAttribute(node, "offsetY", 0);
-  filter->blurX = getFloatAttribute(node, "blurX", 0);
-  filter->blurY = getFloatAttribute(node, "blurY", 0);
-  auto colorStr = getAttribute(node, "color");
-  if (!colorStr.empty()) {
-    filter->color = parseColor(colorStr);
-  }
+  parseShadowAttributes(node, filter->offsetX, filter->offsetY, filter->blurX, filter->blurY,
+                         filter->color);
   filter->shadowOnly = getBoolAttribute(node, "shadowOnly", false);
   return filter;
 }
@@ -1521,7 +1484,7 @@ static ColorMatrixFilter* parseColorMatrixFilter(const XMLNode* node, PAGXDocume
   }
   auto matrixStr = getAttribute(node, "matrix");
   if (!matrixStr.empty()) {
-    auto values = parseFloatList(matrixStr);
+    auto values = ParseFloatList(matrixStr);
     for (size_t i = 0; i < std::min(values.size(), size_t(20)); i++) {
       filter->matrix[i] = values[i];
     }
@@ -1628,34 +1591,33 @@ static Color parseColor(const std::string& str) {
   }
   // Hex format: #RGB, #RRGGBB, #RRGGBBAA (sRGB)
   if (str[0] == '#') {
-    auto hex = str.substr(1);
     Color color = {};
     color.colorSpace = ColorSpace::SRGB;
-    if (hex.size() == 3) {
-      int r = parseHexDigit(hex[0]);
-      int g = parseHexDigit(hex[1]);
-      int b = parseHexDigit(hex[2]);
+    if (str.size() == 4) {
+      int r = parseHexDigit(str[1]);
+      int g = parseHexDigit(str[2]);
+      int b = parseHexDigit(str[3]);
       color.red = static_cast<float>(r * 17) / 255.0f;
       color.green = static_cast<float>(g * 17) / 255.0f;
       color.blue = static_cast<float>(b * 17) / 255.0f;
       color.alpha = 1.0f;
       return color;
     }
-    if (hex.size() == 6) {
-      int r = parseHexDigit(hex[0]) * 16 + parseHexDigit(hex[1]);
-      int g = parseHexDigit(hex[2]) * 16 + parseHexDigit(hex[3]);
-      int b = parseHexDigit(hex[4]) * 16 + parseHexDigit(hex[5]);
+    if (str.size() == 7) {
+      int r = parseHexDigit(str[1]) * 16 + parseHexDigit(str[2]);
+      int g = parseHexDigit(str[3]) * 16 + parseHexDigit(str[4]);
+      int b = parseHexDigit(str[5]) * 16 + parseHexDigit(str[6]);
       color.red = static_cast<float>(r) / 255.0f;
       color.green = static_cast<float>(g) / 255.0f;
       color.blue = static_cast<float>(b) / 255.0f;
       color.alpha = 1.0f;
       return color;
     }
-    if (hex.size() == 8) {
-      int r = parseHexDigit(hex[0]) * 16 + parseHexDigit(hex[1]);
-      int g = parseHexDigit(hex[2]) * 16 + parseHexDigit(hex[3]);
-      int b = parseHexDigit(hex[4]) * 16 + parseHexDigit(hex[5]);
-      int a = parseHexDigit(hex[6]) * 16 + parseHexDigit(hex[7]);
+    if (str.size() == 9) {
+      int r = parseHexDigit(str[1]) * 16 + parseHexDigit(str[2]);
+      int g = parseHexDigit(str[3]) * 16 + parseHexDigit(str[4]);
+      int b = parseHexDigit(str[5]) * 16 + parseHexDigit(str[6]);
+      int a = parseHexDigit(str[7]) * 16 + parseHexDigit(str[8]);
       color.red = static_cast<float>(r) / 255.0f;
       color.green = static_cast<float>(g) / 255.0f;
       color.blue = static_cast<float>(b) / 255.0f;
@@ -1664,7 +1626,7 @@ static Color parseColor(const std::string& str) {
     }
   }
   // sRGB float format: srgb(r, g, b) or srgb(r, g, b, a)
-  if (str.substr(0, 5) == "srgb(") {
+  if (str.compare(0, 5, "srgb(") == 0) {
     auto start = str.find('(');
     auto end = str.find(')');
     if (start != std::string::npos && end != std::string::npos) {
@@ -1682,7 +1644,7 @@ static Color parseColor(const std::string& str) {
     }
   }
   // Display P3 format: p3(r, g, b) or p3(r, g, b, a)
-  if (str.substr(0, 3) == "p3(") {
+  if (str.compare(0, 3, "p3(") == 0) {
     auto start = str.find('(');
     auto end = str.find(')');
     if (start != std::string::npos && end != std::string::npos) {
@@ -1702,9 +1664,6 @@ static Color parseColor(const std::string& str) {
   return {};
 }
 
-static std::vector<float> parseFloatList(const std::string& str) {
-  return ParseFloatList(str);
-}
 
 //==============================================================================
 // Public API implementation

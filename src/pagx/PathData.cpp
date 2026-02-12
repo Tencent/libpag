@@ -69,7 +69,7 @@ void PathData::close() {
   _verbs.push_back(PathVerb::Close);
 }
 
-Rect PathData::getBounds() {
+Rect PathData::getBounds() const {
   if (!_boundsDirty) {
     return _cachedBounds;
   }

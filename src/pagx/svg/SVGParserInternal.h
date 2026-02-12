@@ -100,8 +100,6 @@ class SVGParserContext {
                        const InheritedStyle& inheritedStyle,
                        ShadowOnlyType shadowOnlyType = ShadowOnlyType::None);
   Element* convertElement(const std::shared_ptr<DOMNode>& element);
-  Group* convertG(const std::shared_ptr<DOMNode>& element,
-                                      const InheritedStyle& inheritedStyle);
   Element* convertRect(const std::shared_ptr<DOMNode>& element);
   Element* convertCircle(const std::shared_ptr<DOMNode>& element);
   Element* convertEllipse(const std::shared_ptr<DOMNode>& element);
