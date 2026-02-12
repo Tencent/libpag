@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates style propagation: Fill outside Groups applies to all shapes -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Groups with shared overlay fill -->
   <Layer>
     <Group>
       <Rectangle center="140,200" size="160,160" roundness="24"/>

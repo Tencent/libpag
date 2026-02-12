@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates Repeater modifier with position and alpha fade -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Repeated rectangles with fade -->
   <Layer>
     <Rectangle center="60,200" size="56,56" roundness="12"/>
     <Fill>

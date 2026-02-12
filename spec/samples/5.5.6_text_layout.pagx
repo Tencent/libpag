@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates TextLayout for text positioning and alignment -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Title: point text, center aligned -->
   <Layer>
     <Text text="Text Layout" fontFamily="Arial" fontStyle="Bold" fontSize="40"/>
     <TextLayout position="200,74" textAlign="center"/>

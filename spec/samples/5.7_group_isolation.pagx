@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates Group isolation: alpha applied to group, not individual shapes -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Group with alpha isolation -->
   <Layer>
     <Group alpha="0.7">
       <Rectangle center="140,200" size="200,200" roundness="24"/>

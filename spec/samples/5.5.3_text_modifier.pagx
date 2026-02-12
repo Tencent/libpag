@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates TextModifier for character-level text styling -->
 <pagx version="1.0" width="400" height="400">
   <!-- Wave effect: triangle selector shifts characters vertically -->
   <Layer>

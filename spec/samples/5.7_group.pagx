@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates Group with transform properties -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Transformed group -->
   <Layer>
     <Group anchor="110,110" position="200,200" rotation="12">
       <Rectangle center="110,110" size="220,220" roundness="32"/>

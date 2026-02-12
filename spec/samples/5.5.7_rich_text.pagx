@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates rich text with mixed styles via shared TextLayout -->
 <pagx version="1.0" width="400" height="400">
-
-  <!-- Title -->
   <Layer>
     <Text text="Rich Text" fontFamily="Arial" fontStyle="Bold" fontSize="42"/>
     <TextLayout position="200,105" textAlign="center"/>
@@ -47,7 +45,6 @@
     <TextLayout position="30,165" textAlign="start"/>
   </Layer>
 
-  <!-- Second paragraph: mixed sizes -->
   <Layer>
     <Group>
       <Text text="Mix " fontFamily="Arial" fontSize="16"/>
@@ -72,7 +69,6 @@
     <TextLayout position="30,215" textAlign="start"/>
   </Layer>
 
-  <!-- Center aligned rich text -->
   <Layer>
     <Group>
       <Text text="Center " fontFamily="Arial" fontSize="20"/>
@@ -89,7 +85,6 @@
     <TextLayout position="200,265" textAlign="center"/>
   </Layer>
 
-  <!-- Gradient fill text -->
   <Layer>
     <Text text="Gradient Fill" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
     <TextLayout position="200,310" textAlign="center"/>
