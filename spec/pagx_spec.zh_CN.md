@@ -344,15 +344,19 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="100">
+<!-- Demonstrates linear gradient -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Linear gradient rectangle -->
   <Layer>
-    <Rectangle center="100,50" size="200,100"/>
+    <Rectangle center="200,200" size="320,320" roundness="32"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="200,0">
-        <ColorStop offset="0" color="#FF0000"/>
-        <ColorStop offset="1" color="#0000FF"/>
+      <LinearGradient startPoint="0,0" endPoint="320,320">
+        <ColorStop offset="0" color="#6366F1"/>
+        <ColorStop offset="0.5" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#EC4899"/>
       </LinearGradient>
     </Fill>
+    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#8B5CF650"/>
   </Layer>
 </pagx>
 ```
@@ -371,15 +375,20 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="200">
+<!-- Demonstrates radial gradient -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Radial gradient circle -->
   <Layer>
-    <Rectangle center="100,100" size="200,200"/>
+    <Ellipse center="200,200" size="320,320"/>
     <Fill>
-      <RadialGradient center="100,100" radius="100">
-        <ColorStop offset="0" color="#FFFFFF"/>
-        <ColorStop offset="1" color="#000000"/>
+      <RadialGradient center="140,140" radius="260">
+        <ColorStop offset="0" color="#FFF"/>
+        <ColorStop offset="0.3" color="#06B6D4"/>
+        <ColorStop offset="0.7" color="#3B82F6"/>
+        <ColorStop offset="1" color="#1E293B"/>
       </RadialGradient>
     </Fill>
+    <DropShadowStyle offsetY="8" blurX="32" blurY="32" color="#06B6D450"/>
   </Layer>
 </pagx>
 ```
@@ -398,17 +407,22 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="200">
+<!-- Demonstrates conic (sweep) gradient -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Conic gradient circle -->
   <Layer>
-    <Ellipse center="100,100" size="180,180"/>
+    <Ellipse center="200,200" size="320,320"/>
     <Fill>
-      <ConicGradient center="100,100" startAngle="0" endAngle="360">
-        <ColorStop offset="0" color="#FF0000"/>
-        <ColorStop offset="0.33" color="#00FF00"/>
-        <ColorStop offset="0.66" color="#0000FF"/>
-        <ColorStop offset="1" color="#FF0000"/>
+      <ConicGradient center="200,200">
+        <ColorStop offset="0" color="#F43F5E"/>
+        <ColorStop offset="0.2" color="#F59E0B"/>
+        <ColorStop offset="0.4" color="#10B981"/>
+        <ColorStop offset="0.6" color="#06B6D4"/>
+        <ColorStop offset="0.8" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#F43F5E"/>
       </ConicGradient>
     </Fill>
+    <DropShadowStyle offsetY="8" blurX="32" blurY="32" color="#8B5CF650"/>
   </Layer>
 </pagx>
 ```
@@ -437,15 +451,21 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="200">
+<!-- Demonstrates diamond gradient -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Diamond gradient shape -->
+  <!-- Rectangle size=320x320, half=160. Diamond radius=160 so corners touch rect edges exactly -->
   <Layer>
-    <Rectangle center="100,100" size="180,180"/>
+    <Rectangle center="200,200" size="320,320" roundness="24"/>
     <Fill>
-      <DiamondGradient center="100,100" radius="90">
-        <ColorStop offset="0" color="#FFFFFF"/>
-        <ColorStop offset="1" color="#000000"/>
+      <DiamondGradient center="200,200" radius="160">
+        <ColorStop offset="0" color="#FBBF24"/>
+        <ColorStop offset="0.4" color="#F59E0B"/>
+        <ColorStop offset="0.7" color="#D97706"/>
+        <ColorStop offset="1" color="#1E293B"/>
       </DiamondGradient>
     </Fill>
+    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#F59E0B50"/>
   </Layer>
 </pagx>
 ```
@@ -505,29 +525,46 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="400" height="300">
-  <!-- clamp 模式：图片边缘颜色延伸 -->
-  <Layer name="ClampFill" x="100" y="80">
-    <Rectangle center="0,0" size="150,120" roundness="8"/>
+<!-- Demonstrates ImagePattern fill with different tile modes -->
+<pagx version="1.0" width="400" height="400">
+  
+  <!-- Clamp mode: original size, centered in 140x140 rect -->
+  <!-- Rectangle center=110,110 size=140,140: left-top=(40,40), right-bottom=(180,180) -->
+  <!-- Image 256x256, scale 0.5 = 128x128 -->
+  <!-- Center in rect: image left-top = 40 + (140-128)/2 = 46 -->
+  <Layer name="ClampFill">
+    <Rectangle center="110,110" size="140,140" roundness="24"/>
     <Fill>
-      <ImagePattern image="@logo" tileModeX="clamp" tileModeY="clamp"/>
+      <ImagePattern image="@logo" tileModeX="clamp" tileModeY="clamp" matrix="0.5,0,0,0.5,46,46"/>
     </Fill>
+    <Stroke color="#FFF" width="2"/>
   </Layer>
   
-  <!-- repeat 模式：图片重复平铺 -->
-  <Layer name="RepeatFill" x="300" y="80">
-    <Rectangle center="0,0" size="150,120" roundness="8"/>
+  <!-- Repeat mode: tiled pattern -->
+  <Layer name="RepeatFill">
+    <Rectangle center="290,110" size="140,140" roundness="24"/>
     <Fill>
-      <ImagePattern image="@logo" tileModeX="repeat" tileModeY="repeat" matrix="0.25,0,0,0.25,0,0"/>
+      <ImagePattern image="@logo" tileModeX="repeat" tileModeY="repeat" matrix="0.24,0,0,0.24,0,0"/>
     </Fill>
+    <Stroke color="#FFF" width="2"/>
   </Layer>
   
-  <!-- mirror 模式：图片镜像平铺 -->
-  <Layer name="MirrorFill" x="100" y="220">
-    <Rectangle center="0,0" size="150,120" roundness="8"/>
+  <!-- Mirror mode: mirrored tiles -->
+  <Layer name="MirrorFill">
+    <Rectangle center="110,290" size="140,140" roundness="24"/>
     <Fill>
-      <ImagePattern image="@logo" tileModeX="mirror" tileModeY="mirror" matrix="0.25,0,0,0.25,0,0"/>
+      <ImagePattern image="@logo" tileModeX="mirror" tileModeY="mirror" matrix="0.24,0,0,0.24,0,0"/>
     </Fill>
+    <Stroke color="#FFF" width="2"/>
+  </Layer>
+  
+  <!-- Repeat mode: scaled pattern -->
+  <Layer name="RepeatScaled">
+    <Rectangle center="290,290" size="140,140" roundness="24"/>
+    <Fill>
+      <ImagePattern image="@logo" tileModeX="repeat" tileModeY="repeat" matrix="0.35,0,0,0.35,0,0"/>
+    </Fill>
+    <Stroke color="#FFF" width="2"/>
   </Layer>
   
   <Resources>
@@ -550,15 +587,19 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="200">
+<!-- Demonstrates that color source coordinates are relative to geometry origin -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Gradient showing coordinate system -->
   <Layer>
-    <Rectangle center="100,100" size="100,100"/>
+    <Rectangle center="200,200" size="300,300" roundness="24"/>
     <Fill color="@grad"/>
+    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#EC489950"/>
   </Layer>
   <Resources>
-    <LinearGradient id="grad" startPoint="0,0" endPoint="100,0">
-      <ColorStop offset="0" color="#FF0000"/>
-      <ColorStop offset="1" color="#0000FF"/>
+    <LinearGradient id="grad" startPoint="0,0" endPoint="300,300">
+      <ColorStop offset="0" color="#EC4899"/>
+      <ColorStop offset="0.5" color="#8B5CF6"/>
+      <ColorStop offset="1" color="#6366F1"/>
     </LinearGradient>
   </Resources>
 </pagx>
@@ -576,13 +617,28 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="300" height="200">
-  <Layer composition="@buttonComp" x="100" y="75"/>
+<!-- Demonstrates composition (reusable component) -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Multiple instances of the same composition to demonstrate reusability -->
+  <Layer composition="@buttonComp" x="100" y="60"/>
+  <Layer composition="@buttonComp" x="100" y="170"/>
+  <Layer composition="@buttonComp" x="100" y="280"/>
   <Resources>
-    <Composition id="buttonComp" width="100" height="50">
+    <Composition id="buttonComp" width="200" height="60">
       <Layer name="button">
-        <Rectangle center="50,25" size="100,50" roundness="10"/>
-        <Fill color="#007AFF"/>
+        <Rectangle center="100,30" size="200,60" roundness="30"/>
+        <Fill>
+          <LinearGradient startPoint="0,0" endPoint="200,0">
+            <ColorStop offset="0" color="#6366F1"/>
+            <ColorStop offset="1" color="#8B5CF6"/>
+          </LinearGradient>
+        </Fill>
+        <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F180"/>
+      </Layer>
+      <Layer name="label">
+        <Text text="Button" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
+        <TextLayout position="100,36" textAlign="center"/>
+        <Fill color="#FFF"/>
       </Layer>
     </Composition>
   </Resources>
@@ -731,14 +787,23 @@ PAGX 文档采用层级结构组织内容：
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="200">
-  <Layer name="MyLayer" visible="true" alpha="1" blendMode="normal" x="20" y="20" antiAlias="true">
-    <Rectangle center="50,50" size="100,100"/>
-    <Fill color="#FF0000"/>
-    <DropShadowStyle offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080"/>
+<!-- Demonstrates layer properties and nesting -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Parent layer with nested child -->
+  <Layer name="Parent" x="50" y="50">
+    <Rectangle center="150,150" size="260,260" roundness="32"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="260,260">
+        <ColorStop offset="0" color="#F43F5E"/>
+        <ColorStop offset="1" color="#EC4899"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetY="16" blurX="40" blurY="40" color="#F43F5E60"/>
+    <!-- Nested child layer -->
     <Layer name="Child">
-      <Ellipse center="60,60" size="60,60"/>
-      <Fill color="#00FF00"/>
+      <Ellipse center="150,150" size="120,120"/>
+      <Fill color="#FFF"/>
+      <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#00000030"/>
     </Layer>
   </Layer>
 </pagx>
@@ -817,6 +882,8 @@ Layer 的子元素按类型自动归类为四个集合：
 | `plusLighter` | S + D | 相加（趋向白色） |
 | `plusDarker` | S + D - 1 | 相加减一（趋向黑色） |
 
+> 📄 [示例](samples/4.2_layer.pagx) | [预览](https://pag.io/pagx/?file=./samples/4.2_layer.pagx)
+
 ### 4.3 图层样式（Layer Styles）
 
 图层样式在图层内容的上方或下方添加视觉效果，不会替换原有内容。
@@ -829,12 +896,19 @@ Layer 的子元素按类型自动归类为四个集合：
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="200">
-  <Layer x="50" y="50">
-    <Rectangle center="50,50" size="100,100"/>
-    <Fill color="#FF0000"/>
-    <DropShadowStyle offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080" showBehindLayer="true"/>
-    <InnerShadowStyle offsetX="2" offsetY="2" blurX="5" blurY="5" color="#00000040"/>
+<!-- Demonstrates layer styles: DropShadow and InnerShadow -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Shape with both drop shadow and inner shadow -->
+  <Layer x="70" y="70">
+    <Rectangle center="130,130" size="260,260" roundness="40"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="260,260">
+        <ColorStop offset="0" color="#06B6D4"/>
+        <ColorStop offset="1" color="#0891B2"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetY="16" blurX="48" blurY="48" color="#06B6D480"/>
+    <InnerShadowStyle offsetX="8" offsetY="8" blurX="24" blurY="24" color="#00000040"/>
   </Layer>
 </pagx>
 ```
@@ -901,6 +975,8 @@ Layer 的子元素按类型自动归类为四个集合：
 3. 使用 `color` 的颜色填充阴影区域
 4. 与不透明图层内容求交集，仅保留内容内部的阴影
 
+> 📄 [示例](samples/4.3_layer_styles.pagx) | [预览](https://pag.io/pagx/?file=./samples/4.3_layer_styles.pagx)
+
 ### 4.4 图层滤镜（Layer Filters）
 
 图层滤镜是图层渲染的最后一个环节，所有之前按顺序渲染的结果（包含图层样式）累积起来作为滤镜的输入。滤镜按文档顺序链式应用，每个滤镜的输出作为下一个滤镜的输入。
@@ -909,12 +985,19 @@ Layer 的子元素按类型自动归类为四个集合：
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="200">
-  <Layer x="50" y="50">
-    <Rectangle center="50,50" size="100,100"/>
-    <Fill color="#FF0000"/>
-    <BlurFilter blurX="5" blurY="5"/>
-    <DropShadowFilter offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080"/>
+<!-- Demonstrates layer filters: Blur and DropShadow -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Shape with blur and drop shadow filters -->
+  <Layer x="70" y="70">
+    <Rectangle center="130,130" size="260,260" roundness="40"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="260,260">
+        <ColorStop offset="0" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#6366F1"/>
+      </LinearGradient>
+    </Fill>
+    <BlurFilter blurX="4" blurY="4"/>
+    <DropShadowFilter offsetX="0" offsetY="16" blurX="48" blurY="48" color="#8B5CF680"/>
   </Layer>
 </pagx>
 ```
@@ -991,6 +1074,8 @@ Layer 的子元素按类型自动归类为四个集合：
                                             | 1 |
 ```
 
+> 📄 [示例](samples/4.4_layer_filters.pagx) | [预览](https://pag.io/pagx/?file=./samples/4.4_layer_filters.pagx)
+
 ### 4.5 裁剪与遮罩（Clipping and Masking）
 
 #### 4.5.1 scrollRect（滚动裁剪）
@@ -999,13 +1084,28 @@ Layer 的子元素按类型自动归类为四个集合：
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="200">
-  <Layer scrollRect="50,50,100,100">
-    <Rectangle center="100,100" size="200,200"/>
-    <Fill color="#FF0000"/>
+<!-- Demonstrates scrollRect clipping -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Clipped content showing scrollRect effect -->
+  <Layer x="100" y="100" scrollRect="100,100,200,200">
+    <Ellipse center="200,200" size="320,320"/>
+    <Fill>
+      <RadialGradient center="200,200" radius="160">
+        <ColorStop offset="0" color="#F43F5E"/>
+        <ColorStop offset="0.6" color="#EC4899"/>
+        <ColorStop offset="1" color="#8B5CF6"/>
+      </RadialGradient>
+    </Fill>
+  </Layer>
+  <!-- Visible clip region indicator (dashed border) -->
+  <Layer>
+    <Rectangle center="200,200" size="200,200" roundness="16"/>
+    <Stroke color="#94A3B840" width="2" dashes="4,4"/>
   </Layer>
 </pagx>
 ```
+
+> 📄 [示例](samples/4.5.1_scroll_rect.pagx) | [预览](https://pag.io/pagx/?file=./samples/4.5.1_scroll_rect.pagx)
 
 #### 4.5.2 遮罩（Masking）
 
@@ -1013,14 +1113,24 @@ Layer 的子元素按类型自动归类为四个集合：
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="200">
+<!-- Demonstrates alpha masking -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Mask shape (invisible but used for masking) -->
   <Layer id="maskShape" visible="false">
-    <Ellipse center="100,100" size="150,150"/>
-    <Fill color="#FFFFFF"/>
+    <Polystar center="200,200" type="star" pointCount="5" outerRadius="150" innerRadius="70" rotation="-90"/>
+    <Fill color="#FFF"/>
   </Layer>
-  <Layer mask="@maskShape" maskType="alpha">
-    <Rectangle center="100,100" size="200,200"/>
-    <Fill color="#FF0000"/>
+  <!-- Masked content with gradient - the rectangle will be clipped to star shape -->
+  <Layer mask="@maskShape">
+    <Rectangle center="200,200" size="360,360"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="360,360">
+        <ColorStop offset="0" color="#6366F1"/>
+        <ColorStop offset="0.33" color="#8B5CF6"/>
+        <ColorStop offset="0.66" color="#EC4899"/>
+        <ColorStop offset="1" color="#F43F5E"/>
+      </LinearGradient>
+    </Fill>
   </Layer>
 </pagx>
 ```
@@ -1028,6 +1138,8 @@ Layer 的子元素按类型自动归类为四个集合：
 **遮罩规则**：
 - 遮罩图层自身不渲染（`visible` 属性被忽略）
 - 遮罩图层的变换不影响被遮罩图层
+
+> 📄 [示例](samples/4.5.2_masking.pagx) | [预览](https://pag.io/pagx/?file=./samples/4.5.2_masking.pagx)
 
 ---
 
@@ -1129,6 +1241,61 @@ rect.bottom = center.y + size.height / 2
 - `roundness` 值自动限制为 `min(roundness, size.width/2, size.height/2)`
 - 当 `roundness >= min(size.width, size.height) / 2` 时，短边方向呈半圆形
 
+**示例**:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates Rectangle shape with various roundness values -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Sharp rectangle -->
+  <Layer>
+    <Rectangle center="110,110" size="140,140"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="140,140">
+        <ColorStop offset="0" color="#F43F5E"/>
+        <ColorStop offset="1" color="#E11D48"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F43F5E50"/>
+  </Layer>
+  <!-- Medium rounded rectangle -->
+  <Layer>
+    <Rectangle center="290,110" size="140,140" roundness="24"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="140,140">
+        <ColorStop offset="0" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#7C3AED"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#8B5CF650"/>
+  </Layer>
+  <!-- Fully rounded rectangle (pill shape) -->
+  <Layer>
+    <Rectangle center="110,290" size="140,140" roundness="70"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="140,140">
+        <ColorStop offset="0" color="#06B6D4"/>
+        <ColorStop offset="1" color="#0891B2"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D450"/>
+  </Layer>
+  <!-- Wide rectangle -->
+  <Layer>
+    <Rectangle center="290,290" size="140,100" roundness="16"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="140,100">
+        <ColorStop offset="0" color="#10B981"/>
+        <ColorStop offset="1" color="#059669"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#10B98150"/>
+  </Layer>
+</pagx>
+```
+
+> 📄 [示例](samples/5.2.1_rectangle.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.2.1_rectangle.pagx)
+
 **路径起点**：矩形路径从**右上角**开始，顺时针方向绘制（`reversed="false"` 时）。
 
 #### 5.2.2 椭圆（Ellipse）
@@ -1152,6 +1319,61 @@ boundingRect.top    = center.y - size.height / 2
 boundingRect.right  = center.x + size.width / 2
 boundingRect.bottom = center.y + size.height / 2
 ```
+
+**示例**:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates Ellipse shape -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Perfect circle -->
+  <Layer>
+    <Ellipse center="120,120" size="140,140"/>
+    <Fill>
+      <RadialGradient center="50,50" radius="100">
+        <ColorStop offset="0" color="#FBBF24"/>
+        <ColorStop offset="1" color="#F59E0B"/>
+      </RadialGradient>
+    </Fill>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F59E0B60"/>
+  </Layer>
+  <!-- Horizontal ellipse -->
+  <Layer>
+    <Ellipse center="290,110" size="160,100"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="160,100">
+        <ColorStop offset="0" color="#EC4899"/>
+        <ColorStop offset="1" color="#DB2777"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#EC489950"/>
+  </Layer>
+  <!-- Vertical ellipse -->
+  <Layer>
+    <Ellipse center="110,290" size="100,160"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="100,160">
+        <ColorStop offset="0" color="#06B6D4"/>
+        <ColorStop offset="1" color="#0891B2"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D450"/>
+  </Layer>
+  <!-- Large ellipse -->
+  <Layer>
+    <Ellipse center="290,280" size="150,150"/>
+    <Fill>
+      <RadialGradient center="55,55" radius="100">
+        <ColorStop offset="0" color="#A78BFA"/>
+        <ColorStop offset="1" color="#8B5CF6"/>
+      </RadialGradient>
+    </Fill>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#8B5CF650"/>
+  </Layer>
+</pagx>
+```
+
+> 📄 [示例](samples/5.2.2_ellipse.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.2.2_ellipse.pagx)
 
 **路径起点**：椭圆路径从**右侧中点**（3 点钟方向）开始。
 
@@ -1208,6 +1430,61 @@ y = center.y + outerRadius * sin(angle)
 - 0 表示尖角，1 表示完全圆滑
 - 圆度通过在顶点处添加贝塞尔控制点实现
 
+**示例**:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates Polystar shape (star and polygon) -->
+<pagx version="1.0" width="400" height="400">
+  <!-- 5-pointed star -->
+  <Layer>
+    <Polystar center="110,110" type="star" pointCount="5" outerRadius="60" innerRadius="28" rotation="-90"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="120,120">
+        <ColorStop offset="0" color="#FBBF24"/>
+        <ColorStop offset="1" color="#F59E0B"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F59E0B60"/>
+  </Layer>
+  <!-- 6-pointed star -->
+  <Layer>
+    <Polystar center="290,110" type="star" pointCount="6" outerRadius="60" innerRadius="32" rotation="-90"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="120,120">
+        <ColorStop offset="0" color="#F43F5E"/>
+        <ColorStop offset="1" color="#E11D48"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F43F5E50"/>
+  </Layer>
+  <!-- Hexagon (polygon) -->
+  <Layer>
+    <Polystar center="110,290" type="polygon" pointCount="6" outerRadius="64"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="128,128">
+        <ColorStop offset="0" color="#06B6D4"/>
+        <ColorStop offset="1" color="#0891B2"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D450"/>
+  </Layer>
+  <!-- Pentagon (polygon) -->
+  <Layer>
+    <Polystar center="290,290" type="polygon" pointCount="5" outerRadius="64" rotation="-90"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="128,128">
+        <ColorStop offset="0" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#7C3AED"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#8B5CF650"/>
+  </Layer>
+</pagx>
+```
+
+> 📄 [示例](samples/5.2.3_polystar.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.2.3_polystar.pagx)
+
 #### 5.2.4 路径（Path）
 
 使用 SVG 路径语法定义任意形状，支持内联数据或引用 Resources 中定义的 PathData。
@@ -1224,6 +1501,55 @@ y = center.y + outerRadius * sin(angle)
 |------|------|--------|------|
 | `data` | string/idref | (必填) | SVG 路径数据或 PathData 资源引用 "@id" |
 | `reversed` | bool | false | 反转路径方向 |
+
+**示例**:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates Path shape with custom bezier curves -->
+<pagx version="1.0" width="400" height="400">
+  
+  <!-- Heart shape (top-left quadrant: 0-200 x 0-200, center at 100,100) -->
+  <Layer>
+    <Path data="M 100,80 C 100,60 120,50 140,50 C 160,50 170,60 170,80 C 170,100 140,140 100,170 C 60,140 30,100 30,80 C 30,60 40,50 60,50 C 80,50 100,60 100,80 Z"/>
+    <Fill>
+      <LinearGradient startPoint="30,50" endPoint="170,170">
+        <ColorStop offset="0" color="#F43F5E"/>
+        <ColorStop offset="1" color="#EC4899"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#F43F5E60"/>
+  </Layer>
+  
+  <!-- Lightning bolt (top-right quadrant: 200-400 x 0-200, center at 300,100) -->
+  <Layer>
+    <Path data="M 310,45 L 275,110 L 305,110 L 270,195 L 340,100 L 310,100 L 340,45 Z"/>
+    <Fill>
+      <LinearGradient startPoint="270,45" endPoint="340,195">
+        <ColorStop offset="0" color="#FBBF24"/>
+        <ColorStop offset="1" color="#F59E0B"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#F59E0B60"/>
+  </Layer>
+  
+  <!-- Arrow (bottom-left quadrant: 0-200 x 200-400, center at 100,300) -->
+  <Layer>
+    <Path data="M 30,290 L 130,290 L 130,260 L 180,300 L 130,340 L 130,310 L 30,310 Z"/>
+    <Fill color="#06B6D4"/>
+    <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#06B6D460"/>
+  </Layer>
+  
+  <!-- Star (bottom-right quadrant: 200-400 x 200-400, center at 300,300) -->
+  <Layer>
+    <Path data="M 300,220 L 318,270 L 370,270 L 328,300 L 343,350 L 300,322 L 257,350 L 272,300 L 230,270 L 282,270 Z"/>
+    <Fill color="#8B5CF6"/>
+    <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#8B5CF660"/>
+  </Layer>
+</pagx>
+```
+
+> 📄 [示例](samples/5.2.4_path.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.2.4_path.pagx)
 
 #### 5.2.5 文本（Text）
 
@@ -1321,99 +1647,65 @@ finalY[i] = y + positions[i].y
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="300" height="200">
+<pagx version="1.0" width="400" height="400">
+  <Layer>
+    <Text text="GlyphRun" fontFamily="Arial" fontStyle="Bold" fontSize="72">
+      <GlyphRun font="@font1" fontSize="72" glyphs="14,15,16,17,18,19,20,21" x="34" y="145"/>
+    </Text>
+    <TextLayout position="200,145" textAlign="center"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="280,0">
+        <ColorStop offset="0" color="#6366F1"/>
+        <ColorStop offset="0.5" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#EC4899"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+  <Layer>
+    <Text text="Embedded Font" fontFamily="Arial" fontSize="36">
+      <GlyphRun font="@font1" fontSize="36" glyphs="6,7,8,9,10,10,9,10,22,11,12,21,13" y="230" xOffsets="66,87,120,142,162,184,206,226,248,256,276,298,320"/>
+    </Text>
+    <TextLayout position="200,230" textAlign="center"/>
+    <Fill color="#334155"/>
+  </Layer>
+  <Layer>
+    <Text text="Pre-shaped Glyphs" fontFamily="Arial" fontSize="24">
+      <GlyphRun font="@font1" fontSize="24" glyphs="1,2,9,3,4,18,5,17,9,10,22,14,15,16,17,18,4" y="310" xOffsets="94.5,109.5,118.5,131.5,139.5,150.5,165.5,179.5,194.5,207.5,222.5,227.5,244.5,251.5,264.5,279.5,294.5"/>
+    </Text>
+    <TextLayout position="200,310" textAlign="center"/>
+    <Fill color="#475569"/>
+  </Layer>
   <Resources>
-    <!-- 嵌入字体：包含 H, e, l, o 四个字形 -->
-    <Font id="myFont" unitsPerEm="1000">
-      <Glyph path="M 0 0 L 0 700 M 0 350 L 400 350 M 400 0 L 400 700" advance="500"/>
-      <Glyph path="M 50 250 C 50 450 350 450 350 250 C 350 50 50 50 50 250 Z" advance="400"/>
-      <Glyph path="M 100 0 L 100 700 L 350 700" advance="350"/>
-      <Glyph path="M 200 350 C 200 550 0 550 0 350 C 0 150 200 150 200 350 Z" advance="400"/>
+    <Font id="font1">
+      <Glyph path="M100 0L193 0L193 -299L314 -299C475 -299 584 -372 584 -531C584 -693 474 -750 310 -750L100 -750L100 0ZM193 -375L193 -674L298 -674C426 -674 492 -639 492 -531C492 -423 431 -375 301 -375L193 -375Z" advance="625"/>
+      <Glyph path="M92 0L183 0L183 -337C219 -427 275 -458 320 -458C342 -458 355 -456 372 -450L390 -542C372 -538 355 -542 331 -542C271 -542 215 -497 178 -429L174 -429L167 -542L92 -542L92 0Z" advance="375"/>
+      <Glyph path="M46 -250L301 -250L301 -320L46 -320L46 -250Z" advance="333.333"/>
+      <Glyph path="M234 0C362 0 432 -72 432 -155C432 -251 344 -281 266 -309C204 -330 148 -348 148 -396C148 -436 181 -469 250 -469C298 -469 336 -451 372 -424L417 -480C375 -513 316 -542 249 -542C131 -542 61 -473 61 -393C61 -307 144 -272 219 -246C280 -225 344 -202 344 -150C344 -106 309 -71 237 -71C172 -71 122 -95 76 -130L31 -74C83 -32 157 0 234 0Z" advance="458.333"/>
+      <Glyph path="M217 0C284 0 344 -35 396 -77L400 -77L408 0L482 0L482 -323C482 -453 426 -542 295 -542C208 -542 131 -503 81 -470L117 -410C160 -438 217 -465 280 -465C368 -465 392 -400 392 -333C161 -307 58 -251 58 -136C58 -56 126 0 217 0ZM243 -73C189 -73 146 -96 146 -154C146 -219 209 -261 392 -282L392 -140C339 -96 296 -73 243 -73Z" advance="583.333"/>
+      <Glyph path="M100 0L534 0L534 -79L193 -79L193 -338L471 -338L471 -417L193 -417L193 -643L523 -643L523 -722L100 -722L100 0Z" advance="583.333"/>
+      <Glyph path="M92 0L183 0L183 -392C233 -448 279 -475 320 -475C389 -475 421 -432 421 -331L421 0L512 0L512 -392C563 -448 607 -475 649 -475C718 -475 750 -432 750 -331L750 0L841 0L841 -343C841 -481 788 -556 676 -556C610 -556 553 -512 497 -451C475 -515 430 -556 347 -556C282 -556 225 -514 178 -462L175 -462L167 -556L92 -556L92 0Z" advance="916.667"/>
+      <Glyph path="M331 0C456 0 567 -106 567 -286C567 -447 491 -556 350 -556C290 -556 229 -521 180 -478L183 -576L183 -794L92 -794L92 0L165 0L173 -69L177 -69C224 -26 281 0 331 0ZM316 -76C280 -76 231 -90 183 -131L183 -406C235 -453 283 -478 329 -478C432 -478 472 -400 472 -284C472 -154 406 -76 316 -76Z" advance="611.111"/>
+      <Glyph path="M311 0C385 0 443 -25 491 -56L458 -113C418 -88 375 -73 322 -73C219 -73 148 -142 142 -250L508 -250C510 -263 512 -282 512 -302C512 -456 434 -556 296 -556C170 -556 51 -446 51 -271C51 -102 167 0 311 0ZM141 -316C152 -421 220 -482 297 -482C382 -482 432 -424 432 -316L141 -316Z" advance="555.556"/>
+      <Glyph path="M277 0C342 0 399 -35 442 -77L445 -77L453 0L527 0L527 -794L437 -794L437 -586L441 -491C393 -531 352 -556 288 -556C164 -556 53 -445 53 -270C53 -102 141 0 277 0ZM297 -76C201 -76 147 -151 147 -278C147 -397 216 -478 304 -478C349 -478 390 -463 437 -423L437 -148C391 -100 347 -76 297 -76Z" advance="611.111"/>
+      <Glyph path="M100 0L193 0L193 -333L473 -333L473 -411L193 -411L193 -643L523 -643L523 -722L100 -722L100 0Z" advance="555.556"/>
+      <Glyph path="M303 0C436 0 555 -103 555 -276C555 -451 436 -556 303 -556C170 -556 51 -451 51 -276C51 -103 170 0 303 0ZM303 -76C209 -76 146 -156 146 -276C146 -397 209 -479 303 -479C397 -479 461 -397 461 -276C461 -156 397 -76 303 -76Z" advance="611.111"/>
+      <Glyph path="M263 0C296 0 332 -10 363 -20L345 -88C327 -81 302 -74 283 -74C220 -74 199 -112 199 -179L199 -481L346 -481L346 -556L199 -556L199 -708L123 -708L112 -556L27 -550L27 -481L108 -481L108 -181C108 -73 147 0 263 0Z" advance="388.889"/>
+      <Glyph path="M388 14C487 14 568 -22 615 -71L615 -382L375 -382L375 -306L530 -306L530 -111C501 -83 450 -67 398 -67C240 -67 153 -185 153 -372C153 -555 249 -669 396 -669C471 -669 518 -638 555 -599L605 -659C563 -704 496 -750 394 -750C200 -750 58 -606 58 -368C58 -128 196 14 388 14Z" advance="694.444"/>
+      <Glyph path="M188 14C213 14 228 11 241 6L228 -64C218 -62 214 -62 209 -62C195 -62 183 -73 183 -101L183 -795L92 -795L92 -107C92 -30 120 14 188 14Z" advance="291.667"/>
+      <Glyph path="M101 236C209 236 266 154 303 47L508 -542L419 -542L322 -239C307 -191 291 -136 276 -87L271 -87C254 -136 235 -192 219 -239L108 -542L13 -542L231 3L219 44C197 111 158 161 96 161C82 161 66 156 55 152L37 225C54 232 75 236 101 236Z" advance="527.778"/>
+      <Glyph path="M92 222L183 222L183 45L181 -49C230 -9 282 14 331 14C456 14 567 -93 567 -279C567 -446 491 -556 351 -556C288 -556 227 -520 178 -479L175 -479L167 -542L92 -542L92 222ZM316 -62C280 -62 232 -77 183 -119L183 -403C236 -452 283 -479 329 -479C432 -479 472 -398 472 -278C472 -143 406 -62 316 -62Z" advance="625"/>
+      <Glyph path="M92 0L183 0L183 -393C238 -447 276 -475 332 -475C404 -475 435 -433 435 -331L435 0L526 0L526 -343C526 -481 474 -556 360 -556C286 -556 230 -515 180 -464L183 -576L183 -794L92 -794L92 0Z" advance="611.111"/>
+      <Glyph path="M100 0L193 0L193 -314L325 -314L503 0L608 0L420 -324C520 -348 586 -416 586 -529C586 -682 479 -736 330 -736L100 -736L100 0ZM193 -389L193 -660L316 -660C431 -660 494 -626 494 -529C494 -435 431 -389 316 -389L193 -389Z" advance="638.889"/>
+      <Glyph path="M250 14C325 14 379 -25 430 -84L433 -84L440 0L516 0L516 -542L425 -542L425 -157C373 -92 334 -65 278 -65C206 -65 176 -108 176 -209L176 -542L85 -542L85 -198C85 -60 136 14 250 14Z" advance="611.111"/>
+      <Glyph path="M92 0L183 0L183 -393C238 -447 276 -475 332 -475C404 -475 435 -433 435 -331L435 0L526 0L526 -343C526 -481 474 -556 360 -556C286 -556 230 -515 178 -464L175 -464L167 -542L92 -542L92 0Z" advance="611.111"/>
+      <Glyph advance="208.333"/>
     </Font>
   </Resources>
-
-  <!-- 示例 1：基本用法（依次累加 advance） -->
-  <Layer>
-    <Text fontFamily="Arial" fontSize="24">
-      <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" x="20" y="50"/>
-    </Text>
-    <Fill color="#333333"/>
-  </Layer>
-
-  <!-- 示例 2：自定义 X 偏移的单行水平文本 -->
-  <Layer>
-    <Text fontFamily="Arial" fontSize="24">
-      <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" 
-                y="100" xOffsets="20,50,75,90,105"/>
-    </Text>
-    <Fill color="#333333"/>
-  </Layer>
-
-  <!-- 示例 3：自由定位的多行文本 -->
-  <Layer>
-    <Text fontFamily="Arial" fontSize="24">
-      <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" 
-                positions="20,150;50,150;75,150;20,180;50,180"/>
-    </Text>
-    <Fill color="#333333"/>
-  </Layer>
 </pagx>
 ```
 
-**带变换的预排版示例**（路径文本场景）：
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="300" height="150">
-  <Resources>
-    <Font id="myFont" unitsPerEm="1000">
-      <Glyph path="M 0 0 L 0 700 M 0 350 L 400 350 M 400 0 L 400 700" advance="500"/>
-      <Glyph path="M 50 250 C 50 450 350 450 350 250 C 350 50 50 50 50 250 Z" advance="400"/>
-      <Glyph path="M 100 0 L 100 700 L 350 700" advance="350"/>
-      <Glyph path="M 200 350 C 200 550 0 550 0 350 C 0 150 200 150 200 350 Z" advance="400"/>
-    </Font>
-  </Resources>
-
-  <Layer>
-    <!-- 沿弧线排列的文本：每个字形有不同的位置和旋转 -->
-    <Text fontFamily="Arial" fontSize="24">
-      <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4"
-                positions="30,100;70,80;120,70;170,80;210,100"
-                rotations="-30,-15,0,15,30"/>
-    </Text>
-    <Fill color="#3366FF"/>
-  </Layer>
-</pagx>
-```
-
-**带缩放和斜切的示例**：
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="300" height="100">
-  <Resources>
-    <Font id="myFont" unitsPerEm="1000">
-      <Glyph path="M 0 0 L 0 700 M 0 350 L 400 350 M 400 0 L 400 700" advance="500"/>
-      <Glyph path="M 50 250 C 50 450 350 450 350 250 C 350 50 50 50 50 250 Z" advance="400"/>
-      <Glyph path="M 100 0 L 100 700 L 350 700" advance="350"/>
-      <Glyph path="M 200 350 C 200 550 0 550 0 350 C 0 150 200 150 200 350 Z" advance="400"/>
-    </Font>
-  </Resources>
-
-  <Layer>
-    <!-- 带缩放和斜切效果的文本 -->
-    <Text fontFamily="Arial" fontSize="24">
-      <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4"
-                y="50" xOffsets="20,55,95,125,160"
-                scales="1,1;1.2,1.2;1.5,1.5;1.2,1.2;1,1"
-                skews="0,5,10,5,0"/>
-    </Text>
-    <Fill color="#FF6600"/>
-  </Layer>
-</pagx>
-```
-
-> 完整可运行示例：[文本排版](samples/5.2.5_text.pagx)、[嵌入字体与 GlyphRun](samples/5.2.5_glyph_run.pagx)
+> 📄 Samples: [文本排版](samples/5.2.5_text.pagx) | [嵌入字体与 GlyphRun](samples/5.2.5_glyph_run.pagx)
+> 🔗 Preview: [Text](https://pag.io/pagx/?file=./samples/5.2.5_text.pagx) | [GlyphRun](https://pag.io/pagx/?file=./samples/5.2.5_glyph_run.pagx)
 
 ### 5.3 绘制器（Painters）
 
@@ -1425,31 +1717,36 @@ finalY[i] = y + positions[i].y
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="200">
+<!-- Demonstrates different fill types -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Solid color fill -->
   <Layer>
-    <!-- 纯色填充 -->
-    <Rectangle center="50,50" size="80,80"/>
-    <Fill color="#FF0000" alpha="0.8"/>
+    <Rectangle center="110,110" size="140,140" roundness="24"/>
+    <Fill color="#F43F5E"/>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F43F5E50"/>
   </Layer>
+  <!-- Linear gradient fill -->
   <Layer>
-    <!-- 内联线性渐变 -->
-    <Rectangle center="150,50" size="80,80"/>
+    <Rectangle center="290,110" size="140,140" roundness="24"/>
     <Fill>
-      <LinearGradient startPoint="110,10" endPoint="190,90">
-        <ColorStop offset="0" color="#FF0000"/>
-        <ColorStop offset="1" color="#0000FF"/>
+      <LinearGradient startPoint="0,0" endPoint="140,140">
+        <ColorStop offset="0" color="#6366F1"/>
+        <ColorStop offset="1" color="#8B5CF6"/>
       </LinearGradient>
     </Fill>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#8B5CF650"/>
   </Layer>
+  <!-- Radial gradient fill -->
   <Layer>
-    <!-- 内联径向渐变 -->
-    <Ellipse center="100,150" size="160,80"/>
+    <Ellipse center="200,300" size="320,140"/>
     <Fill>
-      <RadialGradient center="100,150" radius="80">
-        <ColorStop offset="0" color="#FFFFFF"/>
-        <ColorStop offset="1" color="#3366FF"/>
+      <RadialGradient center="160,70" radius="170">
+        <ColorStop offset="0" color="#FFF"/>
+        <ColorStop offset="0.5" color="#06B6D4"/>
+        <ColorStop offset="1" color="#0891B2"/>
       </RadialGradient>
     </Fill>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D450"/>
   </Layer>
 </pagx>
 ```
@@ -1476,30 +1773,34 @@ finalY[i] = y + positions[i].y
 - 支持通过 TextModifier 对单个字形应用颜色覆盖
 - 颜色覆盖采用 alpha 混合：`finalColor = lerp(originalColor, overrideColor, overrideAlpha)`
 
+> 📄 [示例](samples/5.3.1_fill.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.3.1_fill.pagx)
+
 #### 5.3.2 描边（Stroke）
 
 描边沿几何边界绘制线条。
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="200">
+<!-- Demonstrates different stroke styles -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Basic solid stroke -->
   <Layer>
-    <!-- 基础描边 -->
-    <Rectangle center="50,50" size="60,60"/>
-    <Stroke color="#000000" width="3" cap="round" join="round"/>
+    <Rectangle center="110,110" size="130,130" roundness="20"/>
+    <Stroke color="#06B6D4" width="8" cap="round" join="round"/>
   </Layer>
+  <!-- Dashed stroke -->
   <Layer>
-    <!-- 虚线描边 -->
-    <Rectangle center="150,50" size="60,60"/>
-    <Stroke color="#0000FF" width="2" dashes="8,4" dashOffset="0"/>
+    <Rectangle center="290,110" size="130,130" roundness="20"/>
+    <Stroke color="#8B5CF6" width="6" dashes="12,8" cap="round"/>
   </Layer>
+  <!-- Gradient stroke on curve -->
   <Layer>
-    <!-- 内联渐变描边 -->
-    <Path data="M 20,150 Q 100,100 180,150"/>
-    <Stroke width="4" cap="round">
-      <LinearGradient startPoint="20,150" endPoint="180,150">
-        <ColorStop offset="0" color="#FF0000"/>
-        <ColorStop offset="1" color="#0000FF"/>
+    <Path data="M 50,300 Q 200,180 350,300"/>
+    <Stroke width="10" cap="round">
+      <LinearGradient startPoint="0,0" endPoint="300,0">
+        <ColorStop offset="0" color="#F43F5E"/>
+        <ColorStop offset="0.5" color="#EC4899"/>
+        <ColorStop offset="1" color="#8B5CF6"/>
       </LinearGradient>
     </Stroke>
   </Layer>
@@ -1554,6 +1855,8 @@ finalY[i] = y + positions[i].y
 - `dashOffset`：虚线起始偏移量
 - `dashAdaptive`：为 true 时，缩放虚线间隔使各虚线段保持等长
 
+> 📄 [示例](samples/5.3.2_stroke.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.3.2_stroke.pagx)
+
 #### 5.3.3 绘制位置（LayerPlacement）
 
 Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
@@ -1594,27 +1897,66 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 - 支持环绕：当裁剪范围超出 [0,1] 时，自动环绕到路径另一端
 - 路径总长度为 0 时，不执行任何操作
 
-**示例**（separate 与 continuous 模式对比，[示例文件](samples/5.4.1_trim_path.pagx)）：
+**示例**（separate 与 continuous 模式对比）：
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates TrimPath: separate vs continuous mode comparison -->
 <pagx version="1.0" width="400" height="400">
-  <!-- 独立模式：每个椭圆独立裁剪 -->
+  <!-- === Top row: Separate mode === -->
+  <!-- Track -->
   <Layer>
     <Ellipse center="120,95" size="100,100"/>
     <Ellipse center="280,95" size="100,100"/>
-    <TrimPath start="0.2" end="0.9" type="separate"/>
-    <Stroke color="#06B6D4" width="10" cap="round"/>
+    <Stroke color="#E2E8F0" width="8"/>
+  </Layer>
+  <!-- Trimmed: each ellipse trimmed independently to 0.2~0.9 -->
+  <Layer>
+    <Ellipse center="120,95" size="100,100"/>
+    <Ellipse center="280,95" size="100,100"/>
+    <TrimPath start="0.2" end="0.9"/>
+    <Stroke width="10" cap="round">
+      <LinearGradient startPoint="70,40" endPoint="330,150">
+        <ColorStop offset="0" color="#06B6D4"/>
+        <ColorStop offset="1" color="#8B5CF6"/>
+      </LinearGradient>
+    </Stroke>
+  </Layer>
+  <!-- Label -->
+  <Layer>
+    <Text text="Separate (0.2–0.9)" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+    <TextLayout position="200,187" textAlign="center"/>
+    <Fill color="#475569"/>
   </Layer>
 
-  <!-- 连续模式：两个椭圆视为一条连续路径 -->
+  <!-- === Bottom row: Continuous mode === -->
+  <!-- Track -->
+  <Layer>
+    <Ellipse center="120,265" size="100,100"/>
+    <Ellipse center="280,265" size="100,100"/>
+    <Stroke color="#E2E8F0" width="8"/>
+  </Layer>
+  <!-- Trimmed: both ellipses treated as one path, 0.2~0.9 of total length -->
   <Layer>
     <Ellipse center="120,265" size="100,100"/>
     <Ellipse center="280,265" size="100,100"/>
     <TrimPath start="0.2" end="0.9" type="continuous"/>
-    <Stroke color="#F59E0B" width="10" cap="round"/>
+    <Stroke width="10" cap="round">
+      <LinearGradient startPoint="70,210" endPoint="330,320">
+        <ColorStop offset="0" color="#F59E0B"/>
+        <ColorStop offset="1" color="#F43F5E"/>
+      </LinearGradient>
+    </Stroke>
+  </Layer>
+  <!-- Label -->
+  <Layer>
+    <Text text="Continuous (0.2–0.9)" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+    <TextLayout position="200,357" textAlign="center"/>
+    <Fill color="#475569"/>
   </Layer>
 </pagx>
 ```
+
+> 📄 [示例](samples/5.4.1_trim_path.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.4.1_trim_path.pagx)
 
 #### 5.4.2 圆角（RoundCorner）
 
@@ -1632,6 +1974,63 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 - 只影响尖角（非平滑连接的顶点）
 - 圆角半径自动限制为不超过相邻边长度的一半
 - `radius <= 0` 时不执行任何操作
+
+**示例**:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates RoundCorner modifier -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Original sharp rectangle (reference) -->
+  <Layer>
+    <Rectangle center="120,120" size="140,140"/>
+    <Stroke color="#94A3B840" width="2" dashes="4,4"/>
+  </Layer>
+  <!-- RoundCorner applied to sharp rectangle -->
+  <Layer>
+    <Rectangle center="120,120" size="140,140"/>
+    <RoundCorner radius="30"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="140,140">
+        <ColorStop offset="0" color="#10B981"/>
+        <ColorStop offset="1" color="#059669"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#10B98160"/>
+  </Layer>
+  <!-- Original star (reference) -->
+  <Layer>
+    <Polystar center="290,120" type="star" pointCount="5" outerRadius="70" innerRadius="32" rotation="-90"/>
+    <Stroke color="#94A3B840" width="2" dashes="4,4"/>
+  </Layer>
+  <!-- RoundCorner applied to star -->
+  <Layer>
+    <Polystar center="290,120" type="star" pointCount="5" outerRadius="70" innerRadius="32" rotation="-90"/>
+    <RoundCorner radius="12"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="140,140">
+        <ColorStop offset="0" color="#F59E0B"/>
+        <ColorStop offset="1" color="#D97706"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F59E0B60"/>
+  </Layer>
+  <!-- Large rounded hexagon -->
+  <Layer>
+    <Polystar center="200,300" type="polygon" pointCount="6" outerRadius="80"/>
+    <RoundCorner radius="20"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="160,160">
+        <ColorStop offset="0" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#7C3AED"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#8B5CF660"/>
+  </Layer>
+</pagx>
+```
+
+> 📄 [示例](samples/5.4.2_round_corner.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.4.2_round_corner.pagx)
 
 #### 5.4.3 路径合并（MergePath）
 
@@ -1664,15 +2063,26 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="200">
+<!-- Demonstrates MergePath modifier with different modes -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Union mode: combining shapes -->
   <Layer>
-    <Rectangle center="70,70" size="100,100"/>
-    <Ellipse center="130,130" size="100,100"/>
+    <Rectangle center="150,150" size="180,180" roundness="24"/>
+    <Ellipse center="250,250" size="180,180"/>
     <MergePath mode="union"/>
-    <Fill color="#3366FF"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="280,280">
+        <ColorStop offset="0" color="#6366F1"/>
+        <ColorStop offset="0.5" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#EC4899"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#8B5CF660"/>
   </Layer>
 </pagx>
 ```
+
+> 📄 [示例](samples/5.4.3_merge_path.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.4.3_merge_path.pagx)
 
 ### 5.5 文本修改器（Text Modifiers）
 
@@ -1862,12 +2272,32 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="250" height="150">
+<!-- Demonstrates TextPath for arranging text along a curve -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Text along an arc path with force alignment -->
   <Layer>
-    <Text text="Hello Path" fontFamily="Arial" fontSize="20"/>
-    <TextPath path="M 20,100 Q 125,20 230,100"/>
-    <Fill color="#3366FF"/>
+    <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="56"/>
+    <TextPath path="M 60,230 Q 200,30 340,230" forceAlignment="true"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="300,0">
+        <ColorStop offset="0" color="#06B6D4"/>
+        <ColorStop offset="0.5" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#EC4899"/>
+      </LinearGradient>
+    </Fill>
   </Layer>
+  <!-- Guide path (dashed) to visualize the curve -->
+  <Layer>
+    <Path data="M 60,230 Q 200,30 340,230"/>
+    <Stroke color="#64748B" width="1" dashes="6,4"/>
+  </Layer>
+  <!-- Text along a lower curve -->
+  <Layer>
+    <Text text="TextPath" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+    <TextPath path="M 80,320 Q 200,250 320,320" forceAlignment="true"/>
+    <Fill color="#475569"/>
+  </Layer>
+  <!-- Guide path for lower curve -->
 </pagx>
 ```
 
@@ -1901,6 +2331,8 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 **闭合路径**：对于闭合路径，超出范围的字形会环绕到路径另一端。
 
+> 📄 [示例](samples/5.5.5_text_path.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.5.5_text_path.pagx)
+
 #### 5.5.6 文本排版（TextLayout）
 
 TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会覆盖 Text 元素的原始位置（类似 TextPath 覆盖位置的行为）。支持两种模式：
@@ -1912,18 +2344,56 @@ TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="300" height="150">
-  <!-- 点文本：居中对齐 -->
+<!-- Demonstrates TextLayout for text positioning and alignment -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Title: point text, center aligned -->
   <Layer>
-    <Text text="Hello World" fontFamily="Arial" fontSize="24"/>
-    <TextLayout position="150,40" textAlign="center"/>
-    <Fill color="#333333"/>
+    <Text text="Text Layout" fontFamily="Arial" fontStyle="Bold" fontSize="40"/>
+    <TextLayout position="200,74" textAlign="center"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="280,0">
+        <ColorStop offset="0" color="#6366F1"/>
+        <ColorStop offset="1" color="#8B5CF6"/>
+      </LinearGradient>
+    </Fill>
   </Layer>
-  <!-- 段落文本：自动换行 -->
+  <!-- Vertical line to show the anchor at x=200 -->
   <Layer>
-    <Text text="This is a longer text that demonstrates auto-wrap within a specified width." fontFamily="Arial" fontSize="14"/>
-    <TextLayout position="20,70" width="260" textAlign="start" lineHeight="1.5"/>
-    <Fill color="#666666"/>
+    <Path data="M 200,110 L 200,358"/>
+    <Stroke color="#64748B" width="1" dashes="6,4"/>
+  </Layer>
+  <!-- Start aligned: text starts at anchor point -->
+  <Layer>
+    <Text text="Start" fontFamily="Arial" fontStyle="Bold" fontSize="36"/>
+    <TextLayout position="200,139" textAlign="start"/>
+    <Fill color="#F43F5E"/>
+  </Layer>
+  <Layer>
+    <Text text="text begins at anchor" fontFamily="Arial" fontSize="18"/>
+    <TextLayout position="200,164" textAlign="start"/>
+    <Fill color="#475569"/>
+  </Layer>
+  <!-- Center aligned: text centered on anchor point -->
+  <Layer>
+    <Text text="Center" fontFamily="Arial" fontStyle="Bold" fontSize="36"/>
+    <TextLayout position="200,234" textAlign="center"/>
+    <Fill color="#10B981"/>
+  </Layer>
+  <Layer>
+    <Text text="text centered on anchor" fontFamily="Arial" fontSize="18"/>
+    <TextLayout position="200,259" textAlign="center"/>
+    <Fill color="#475569"/>
+  </Layer>
+  <!-- End aligned: text ends at anchor point -->
+  <Layer>
+    <Text text="End" fontFamily="Arial" fontStyle="Bold" fontSize="36"/>
+    <TextLayout position="200,329" textAlign="end"/>
+    <Fill color="#06B6D4"/>
+  </Layer>
+  <Layer>
+    <Text text="text ends at anchor" fontFamily="Arial" fontSize="18"/>
+    <TextLayout position="200,354" textAlign="end"/>
+    <Fill color="#475569"/>
   </Layer>
 </pagx>
 ```
@@ -1962,34 +2432,120 @@ TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会
 | `horizontal` | 横排文本 |
 | `vertical` | 竖排文本（列从右到左排列，传统中日文竖排） |
 
+> 📄 [示例](samples/5.5.6_text_layout.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.5.6_text_layout.pagx)
+
 #### 5.5.7 富文本
 
 富文本通过 Group 内的多个 Text 元素组合，每个 Text 可以有独立的 Fill/Stroke 样式。使用 TextLayout 进行统一排版。
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="350" height="80">
+<!-- Demonstrates rich text with mixed styles via shared TextLayout -->
+<pagx version="1.0" width="400" height="400">
+
+  <!-- Title -->
   <Layer>
-    <!-- 常规文本 -->
+    <Text text="Rich Text" fontFamily="Arial" fontStyle="Bold" fontSize="42"/>
+    <TextLayout position="200,105" textAlign="center"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="200,0">
+        <ColorStop offset="0" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#EC4899"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+
+  <!-- Rich text paragraph: multiple Groups with shared TextLayout -->
+  <Layer>
     <Group>
-      <Text text="This is " fontFamily="Arial" fontSize="18"/>
-      <Fill color="#333333"/>
+      <Text text="Supports " fontFamily="Arial" fontSize="20"/>
+      <Fill color="#475569"/>
     </Group>
-    <!-- 加粗红色文本 -->
     <Group>
-      <Text text="important" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
-      <Fill color="#FF0000"/>
+      <Text text="bold" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+      <Fill color="#F43F5E"/>
     </Group>
-    <!-- 常规文本 -->
     <Group>
-      <Text text=" information." fontFamily="Arial" fontSize="18"/>
-      <Fill color="#333333"/>
+      <Text text=", " fontFamily="Arial" fontSize="20"/>
+      <Fill color="#475569"/>
     </Group>
-    <!-- TextLayout 统一排版 -->
-    <TextLayout position="20,50" width="310" textAlign="start"/>
+    <Group>
+      <Text text="italic" fontFamily="Arial" fontStyle="Italic" fontSize="20"/>
+      <Fill color="#10B981"/>
+    </Group>
+    <Group>
+      <Text text=" and " fontFamily="Arial" fontSize="20"/>
+      <Fill color="#475569"/>
+    </Group>
+    <Group>
+      <Text text="colored" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+      <Fill color="#06B6D4"/>
+    </Group>
+    <Group>
+      <Text text=" text." fontFamily="Arial" fontSize="20"/>
+      <Fill color="#475569"/>
+    </Group>
+    <TextLayout position="30,165" textAlign="start"/>
+  </Layer>
+
+  <!-- Second paragraph: mixed sizes -->
+  <Layer>
+    <Group>
+      <Text text="Mix " fontFamily="Arial" fontSize="16"/>
+      <Fill color="#475569"/>
+    </Group>
+    <Group>
+      <Text text="different" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+      <Fill color="#F59E0B"/>
+    </Group>
+    <Group>
+      <Text text=" sizes " fontFamily="Arial" fontSize="16"/>
+      <Fill color="#475569"/>
+    </Group>
+    <Group>
+      <Text text="freely" fontFamily="Arial" fontStyle="Bold Italic" fontSize="24"/>
+      <Fill color="#8B5CF6"/>
+    </Group>
+    <Group>
+      <Text text=" within one line." fontFamily="Arial" fontSize="16"/>
+      <Fill color="#475569"/>
+    </Group>
+    <TextLayout position="30,215" textAlign="start"/>
+  </Layer>
+
+  <!-- Center aligned rich text -->
+  <Layer>
+    <Group>
+      <Text text="Center " fontFamily="Arial" fontSize="20"/>
+      <Fill color="#475569"/>
+    </Group>
+    <Group>
+      <Text text="aligned" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+      <Fill color="#EC4899"/>
+    </Group>
+    <Group>
+      <Text text=" rich text." fontFamily="Arial" fontSize="20"/>
+      <Fill color="#475569"/>
+    </Group>
+    <TextLayout position="200,265" textAlign="center"/>
+  </Layer>
+
+  <!-- Gradient fill text -->
+  <Layer>
+    <Text text="Gradient Fill" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+    <TextLayout position="200,310" textAlign="center"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="240,0">
+        <ColorStop offset="0" color="#F43F5E"/>
+        <ColorStop offset="0.5" color="#F59E0B"/>
+        <ColorStop offset="1" color="#10B981"/>
+      </LinearGradient>
+    </Fill>
   </Layer>
 </pagx>
 ```
+
+> 📄 [示例](samples/5.5.7_rich_text.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.5.7_rich_text.pagx)
 
 **说明**：每个 Group 内的 Text + Fill/Stroke 定义一段样式独立的文本片段，TextLayout 将所有片段作为整体进行排版，实现自动换行和对齐。
 
@@ -2060,16 +2616,23 @@ alpha = lerp(startAlpha, endAlpha, t)
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="300" height="100">
+<!-- Demonstrates Repeater modifier with position and alpha fade -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Repeated rectangles with fade -->
   <Layer>
-    <Group>
-      <Rectangle center="30,50" size="40,40"/>
-      <Fill color="#3366FF"/>
-      <Repeater copies="5" position="50,0" startAlpha="1" endAlpha="0.2"/>
-    </Group>
+    <Rectangle center="60,200" size="56,56" roundness="12"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="56,56">
+        <ColorStop offset="0" color="#6366F1"/>
+        <ColorStop offset="1" color="#8B5CF6"/>
+      </LinearGradient>
+    </Fill>
+    <Repeater copies="5" position="70,0" endAlpha="0.15"/>
   </Layer>
 </pagx>
 ```
+
+> 📄 [示例](samples/5.6_repeater.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.6_repeater.pagx)
 
 ### 5.7 容器（Group）
 
@@ -2077,12 +2640,21 @@ Group 是带变换属性的矢量元素容器。
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="200">
+<!-- Demonstrates Group with transform properties -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Transformed group -->
   <Layer>
-    <Group anchor="50,50" position="100,100" rotation="45" scale="1,1" alpha="0.8">
-      <Rectangle center="50,50" size="80,80"/>
-      <Fill color="#FF6600"/>
+    <Group anchor="110,110" position="200,200" rotation="12">
+      <Rectangle center="110,110" size="220,220" roundness="32"/>
+      <Fill>
+        <LinearGradient startPoint="0,0" endPoint="220,220">
+          <ColorStop offset="0" color="#F43F5E"/>
+          <ColorStop offset="0.5" color="#EC4899"/>
+          <ColorStop offset="1" color="#8B5CF6"/>
+        </LinearGradient>
+      </Fill>
     </Group>
+    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#EC489960"/>
   </Layer>
 </pagx>
 ```
@@ -2138,14 +2710,16 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 **示例 1 - 基本隔离**：
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="100">
+<!-- Demonstrates Group isolation: alpha applied to group, not individual shapes -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Group with alpha isolation -->
   <Layer>
-    <Group alpha="0.5">
-      <Rectangle center="50,50" size="80,80"/>
-      <Fill color="#FF0000"/>
+    <Group alpha="0.7">
+      <Rectangle center="140,200" size="200,200" roundness="24"/>
+      <Fill color="#F43F5E"/>
     </Group>
-    <Ellipse center="150,50" size="80,80"/>
-    <Fill color="#0000FF"/>
+    <Ellipse center="260,200" size="200,200"/>
+    <Fill color="#06B6D4"/>
   </Layer>
 </pagx>
 ```
@@ -2153,17 +2727,20 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 **示例 2 - 子 Group 几何向上累积**：
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="100">
+<!-- Demonstrates style propagation: Fill outside Groups applies to all shapes -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Groups with shared overlay fill -->
   <Layer>
     <Group>
-      <Rectangle center="50,50" size="80,80"/>
-      <Fill color="#FF0000"/>
+      <Rectangle center="140,200" size="160,160" roundness="24"/>
+      <Fill color="#F43F5E"/>
     </Group>
     <Group>
-      <Ellipse center="150,50" size="80,80"/>
-      <Fill color="#00FF00"/>
+      <Ellipse center="260,200" size="160,160"/>
+      <Fill color="#06B6D4"/>
     </Group>
-    <Fill color="#0000FF40"/>
+    <!-- Semi-transparent overlay applied to both shapes -->
+    <Fill color="#8B5CF630"/>
   </Layer>
 </pagx>
 ```
@@ -2171,11 +2748,19 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 **示例 3 - 多个绘制器复用几何**：
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="150" height="150">
+<!-- Demonstrates Fill and Stroke combined on same shape -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Rectangle with fill and stroke -->
   <Layer>
-    <Rectangle center="75,75" size="100,100"/>
-    <Fill color="#FF0000"/>
-    <Stroke color="#000000" width="3"/>
+    <Rectangle center="200,200" size="260,260" roundness="32"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="260,260">
+        <ColorStop offset="0" color="#F43F5E"/>
+        <ColorStop offset="1" color="#E11D48"/>
+      </LinearGradient>
+    </Fill>
+    <Stroke color="#BE123C" width="8"/>
+    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#F43F5E60"/>
   </Layer>
 </pagx>
 ```
@@ -2187,16 +2772,21 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 **示例 4 - 多重填充**：
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="200">
+<!-- Demonstrates multiple Fill layers on same shape -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Shape with multiple fills -->
   <Layer>
-    <Rectangle center="100,100" size="160,100" roundness="10"/>
+    <Rectangle center="200,200" size="300,200" roundness="32"/>
+    <!-- Base gradient fill -->
     <Fill>
-      <LinearGradient startPoint="20,50" endPoint="180,150">
-        <ColorStop offset="0" color="#FFCC00"/>
-        <ColorStop offset="1" color="#FF6600"/>
+      <LinearGradient startPoint="0,0" endPoint="300,200">
+        <ColorStop offset="0" color="#F59E0B"/>
+        <ColorStop offset="1" color="#F43F5E"/>
       </LinearGradient>
     </Fill>
-    <Fill color="#FF000040"/>
+    <!-- Semi-transparent overlay -->
+    <Fill color="#8B5CF640"/>
+    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#F43F5E50"/>
   </Layer>
 </pagx>
 ```
@@ -2204,12 +2794,23 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 **示例 5 - 多重描边**：
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="100">
+<!-- Demonstrates multiple Stroke styles creating glow/outline effect -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Path with multiple glow strokes -->
   <Layer>
-    <Path data="M 20,50 Q 100,10 180,50"/>
-    <Stroke color="#0088FF40" width="12" cap="round" join="round"/>
-    <Stroke color="#0088FF80" width="6" cap="round" join="round"/>
-    <Stroke color="#0088FF" width="2" cap="round" join="round"/>
+    <Path data="M 60,200 Q 200,60 340,200 Q 200,340 60,200"/>
+    <!-- Outer glow -->
+    <Stroke color="#8B5CF615" width="48" cap="round" join="round"/>
+    <!-- Middle glow -->
+    <Stroke color="#8B5CF640" width="28" cap="round" join="round"/>
+    <!-- Core stroke -->
+    <Stroke width="8" cap="round" join="round">
+      <LinearGradient startPoint="0,0" endPoint="280,0">
+        <ColorStop offset="0" color="#6366F1"/>
+        <ColorStop offset="0.5" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#EC4899"/>
+      </LinearGradient>
+    </Stroke>
   </Layer>
 </pagx>
 ```
@@ -2217,21 +2818,30 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 **示例 6 - 混合叠加**：
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="200">
+<!-- Demonstrates mixed Fill and Stroke on same shape -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Circle with fill and stroke -->
   <Layer>
-    <Ellipse center="100,100" size="160,160"/>
+    <Ellipse center="200,200" size="280,280"/>
     <Fill>
-      <RadialGradient center="100,100" radius="80">
-        <ColorStop offset="0" color="#FFFFFF"/>
-        <ColorStop offset="1" color="#3366FF"/>
+      <!-- RadialGradient uses canvas coordinates. Ellipse center is at 200,200, 
+           highlight offset should be relative to that. 140,140 creates top-left highlight -->
+      <RadialGradient center="140,140" radius="200">
+        <ColorStop offset="0" color="#FFF"/>
+        <ColorStop offset="0.4" color="#06B6D4"/>
+        <ColorStop offset="1" color="#0891B2"/>
       </RadialGradient>
     </Fill>
-    <Stroke color="#1a3366" width="3"/>
+    <Stroke color="#0E7490" width="8"/>
+    <DropShadowStyle offsetX="0" offsetY="8" blurX="32" blurY="32" color="#06B6D460"/>
   </Layer>
 </pagx>
 ```
 
 **渲染顺序**：多个绘制器按文档顺序渲染，先出现的位于下方。
+
+> 📄 Samples: [Group](samples/5.7_group.pagx) | [Isolation](samples/5.7_group_isolation.pagx) | [Propagation](samples/5.7_group_propagation.pagx) | [Multiple Painters](samples/5.7_multiple_painters.pagx) | [Multiple Fills](samples/5.7_multiple_fills.pagx) | [Multiple Strokes](samples/5.7_multiple_strokes.pagx) | [Mixed Overlay](samples/5.7_mixed_overlay.pagx)
+> 🔗 Preview: [Group](https://pag.io/pagx/?file=./samples/5.7_group.pagx) | [Isolation](https://pag.io/pagx/?file=./samples/5.7_group_isolation.pagx) | [Propagation](https://pag.io/pagx/?file=./samples/5.7_group_propagation.pagx) | [Painters](https://pag.io/pagx/?file=./samples/5.7_multiple_painters.pagx) | [Fills](https://pag.io/pagx/?file=./samples/5.7_multiple_fills.pagx) | [Strokes](https://pag.io/pagx/?file=./samples/5.7_multiple_strokes.pagx) | [Mixed](https://pag.io/pagx/?file=./samples/5.7_mixed_overlay.pagx)
 
 ---
 
