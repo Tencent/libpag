@@ -169,33 +169,34 @@ class XMLBuilder {
   int indentLevel = 0;
 
   void writeIndent() {
-    for (int i = 0; i < indentLevel; i++) {
-      buffer += "  ";
-    }
+    buffer.append(static_cast<size_t>(indentLevel * 2), ' ');
   }
 
-  static std::string escapeXML(const std::string& str) {
-    std::string result = {};
-    for (char c : str) {
+  static std::string escapeXML(const std::string& input) {
+    size_t extraSize = 0;
+    for (char c : input) {
       switch (c) {
-        case '<':
-          result += "&lt;";
-          break;
-        case '>':
-          result += "&gt;";
-          break;
-        case '&':
-          result += "&amp;";
-          break;
-        case '"':
-          result += "&quot;";
-          break;
-        case '\'':
-          result += "&apos;";
-          break;
-        default:
-          result += c;
-          break;
+        case '&':  extraSize += 4; break;
+        case '<':  extraSize += 3; break;
+        case '>':  extraSize += 3; break;
+        case '"': extraSize += 5; break;
+        case '\'': extraSize += 5; break;
+        default: break;
+      }
+    }
+    if (extraSize == 0) {
+      return input;
+    }
+    std::string result;
+    result.reserve(input.size() + extraSize);
+    for (char c : input) {
+      switch (c) {
+        case '&':  result += "&amp;";  break;
+        case '<':  result += "&lt;";   break;
+        case '>':  result += "&gt;";   break;
+        case '"': result += "&quot;"; break;
+        case '\'': result += "&apos;"; break;
+        default:   result += c;         break;
       }
     }
     return result;
