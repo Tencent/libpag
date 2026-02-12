@@ -10,7 +10,7 @@
       <Layer name="button">
         <Rectangle center="100,30" size="200,60" roundness="30"/>
         <Fill>
-          <LinearGradient endPoint="200,0">
+          <LinearGradient startPoint="0,0" endPoint="200,0">
             <ColorStop offset="0" color="#6366F1"/>
             <ColorStop offset="1" color="#8B5CF6"/>
           </LinearGradient>

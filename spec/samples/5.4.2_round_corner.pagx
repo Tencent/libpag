@@ -11,7 +11,7 @@
     <Rectangle center="120,120" size="140,140"/>
     <RoundCorner radius="30"/>
     <Fill>
-      <LinearGradient endPoint="140,140">
+      <LinearGradient startPoint="0,0" endPoint="140,140">
         <ColorStop offset="0" color="#10B981"/>
         <ColorStop offset="1" color="#059669"/>
       </LinearGradient>
@@ -28,7 +28,7 @@
     <Polystar center="290,120" type="star" pointCount="5" outerRadius="70" innerRadius="32" rotation="-90"/>
     <RoundCorner radius="12"/>
     <Fill>
-      <LinearGradient endPoint="140,140">
+      <LinearGradient startPoint="0,0" endPoint="140,140">
         <ColorStop offset="0" color="#F59E0B"/>
         <ColorStop offset="1" color="#D97706"/>
       </LinearGradient>
@@ -40,7 +40,7 @@
     <Polystar center="200,300" type="polygon" pointCount="6" outerRadius="80"/>
     <RoundCorner radius="20"/>
     <Fill>
-      <LinearGradient endPoint="160,160">
+      <LinearGradient startPoint="0,0" endPoint="160,160">
         <ColorStop offset="0" color="#8B5CF6"/>
         <ColorStop offset="1" color="#7C3AED"/>
       </LinearGradient>

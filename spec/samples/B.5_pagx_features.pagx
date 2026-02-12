@@ -460,7 +460,7 @@
   </Layer>
 
   <Resources>
-    <LinearGradient id="bgGradient" endPoint="0,1200">
+    <LinearGradient id="bgGradient" startPoint="0,0" endPoint="0,1200">
       <ColorStop offset="0" color="#0F172A"/>
       <ColorStop offset="0.4" color="#0B1228"/>
       <ColorStop offset="1" color="#0F172A"/>

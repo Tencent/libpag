@@ -6,7 +6,7 @@
     <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="84"/>
     <TextLayout position="200,145" textAlign="center"/>
     <Fill>
-      <LinearGradient endPoint="280,0">
+      <LinearGradient startPoint="0,0" endPoint="280,0">
         <ColorStop offset="0" color="#6366F1"/>
         <ColorStop offset="0.5" color="#8B5CF6"/>
         <ColorStop offset="1" color="#EC4899"/>

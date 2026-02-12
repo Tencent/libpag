@@ -15,7 +15,7 @@
   <Layer>
     <Path data="M 50,300 Q 200,180 350,300"/>
     <Stroke width="10" cap="round">
-      <LinearGradient endPoint="300,0">
+      <LinearGradient startPoint="0,0" endPoint="300,0">
         <ColorStop offset="0" color="#F43F5E"/>
         <ColorStop offset="0.5" color="#EC4899"/>
         <ColorStop offset="1" color="#8B5CF6"/>

@@ -4,7 +4,7 @@
   <Layer name="Background">
     <Rectangle center="400,300" size="800,600"/>
     <Fill>
-      <LinearGradient endPoint="0,600">
+      <LinearGradient startPoint="0,0" endPoint="0,600">
         <ColorStop offset="0" color="#0B1026"/>
         <ColorStop offset="0.6" color="#0F1C3D"/>
         <ColorStop offset="1" color="#1B1140"/>

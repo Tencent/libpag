@@ -14,7 +14,7 @@
   </Layer>
   <Resources>
     <SolidColor id="coral" color="#F43F5E"/>
-    <LinearGradient id="oceanGradient" endPoint="320,320">
+    <LinearGradient id="oceanGradient" startPoint="0,0" endPoint="320,320">
       <ColorStop offset="0" color="#06B6D4"/>
       <ColorStop offset="1" color="#3B82F6"/>
     </LinearGradient>

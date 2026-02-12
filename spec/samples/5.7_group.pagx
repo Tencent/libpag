@@ -6,7 +6,7 @@
     <Group anchor="110,110" position="200,200" rotation="12">
       <Rectangle center="110,110" size="220,220" roundness="32"/>
       <Fill>
-        <LinearGradient endPoint="220,220">
+        <LinearGradient startPoint="0,0" endPoint="220,220">
           <ColorStop offset="0" color="#F43F5E"/>
           <ColorStop offset="0.5" color="#EC4899"/>
           <ColorStop offset="1" color="#8B5CF6"/>

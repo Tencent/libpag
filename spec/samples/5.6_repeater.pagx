@@ -5,7 +5,7 @@
   <Layer>
     <Rectangle center="60,200" size="56,56" roundness="12"/>
     <Fill>
-      <LinearGradient endPoint="56,56">
+      <LinearGradient startPoint="0,0" endPoint="56,56">
         <ColorStop offset="0" color="#6366F1"/>
         <ColorStop offset="1" color="#8B5CF6"/>
       </LinearGradient>

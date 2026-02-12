@@ -7,7 +7,7 @@
     <Ellipse center="250,250" size="180,180"/>
     <MergePath mode="union"/>
     <Fill>
-      <LinearGradient endPoint="280,280">
+      <LinearGradient startPoint="0,0" endPoint="280,280">
         <ColorStop offset="0" color="#6366F1"/>
         <ColorStop offset="0.5" color="#8B5CF6"/>
         <ColorStop offset="1" color="#EC4899"/>

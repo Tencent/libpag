@@ -647,7 +647,7 @@
   <!-- ==================== RESOURCES ==================== -->
   <Resources>
     <!-- Background: Dark Fantasy -->
-    <LinearGradient id="bgGrad" endPoint="800,600">
+    <LinearGradient id="bgGrad" startPoint="0,0" endPoint="800,600">
       <ColorStop offset="0" color="#0A0A12"/>
       <ColorStop offset="0.6" color="#12101E"/>
       <ColorStop offset="1" color="#1A1428"/>
@@ -664,43 +664,43 @@
     </RadialGradient>
 
     <!-- Panel background: Dark Fantasy -->
-    <LinearGradient id="panelBg" endPoint="0,400">
+    <LinearGradient id="panelBg" startPoint="0,0" endPoint="0,400">
       <ColorStop offset="0" color="#1A1428E8"/>
       <ColorStop offset="1" color="#0E0B18E8"/>
     </LinearGradient>
     
     <!-- Panel Border: Gold Metallic -->
-    <LinearGradient id="panelBorder" endPoint="0,400">
+    <LinearGradient id="panelBorder" startPoint="0,0" endPoint="0,400">
       <ColorStop offset="0" color="#8B6914"/>
       <ColorStop offset="0.5" color="#5C4510"/>
       <ColorStop offset="1" color="#3D2E08"/>
     </LinearGradient>
 
     <!-- HP bar: Blood Red -->
-    <LinearGradient id="hpFill" endPoint="200,0">
+    <LinearGradient id="hpFill" startPoint="0,0" endPoint="200,0">
       <ColorStop offset="0" color="#FF2D2D"/>
       <ColorStop offset="1" color="#CC0000"/>
     </LinearGradient>
 
     <!-- MP bar: Arcane Blue -->
-    <LinearGradient id="mpFill" endPoint="200,0">
+    <LinearGradient id="mpFill" startPoint="0,0" endPoint="200,0">
       <ColorStop offset="0" color="#4488FF"/>
       <ColorStop offset="1" color="#2255CC"/>
     </LinearGradient>
 
     <!-- EXP bar: Golden -->
-    <LinearGradient id="expFill" endPoint="500,0">
+    <LinearGradient id="expFill" startPoint="0,0" endPoint="500,0">
       <ColorStop offset="0" color="#FFD700"/>
       <ColorStop offset="1" color="#FF8C00"/>
     </LinearGradient>
 
     <!-- Button gradients -->
-    <LinearGradient id="btnGold" endPoint="0,44">
+    <LinearGradient id="btnGold" startPoint="0,0" endPoint="0,44">
       <ColorStop offset="0" color="#FFD700"/>
       <ColorStop offset="0.5" color="#DAA520"/>
       <ColorStop offset="1" color="#B8860B"/>
     </LinearGradient>
-    <LinearGradient id="btnRed" endPoint="0,44">
+    <LinearGradient id="btnRed" startPoint="0,0" endPoint="0,44">
       <ColorStop offset="0" color="#FF4444"/>
       <ColorStop offset="0.5" color="#CC0000"/>
       <ColorStop offset="1" color="#990000"/>
@@ -713,7 +713,7 @@
     </LinearGradient>
 
     <!-- Title gradient: Bright Gold -->
-    <LinearGradient id="titleGrad" endPoint="250,0">
+    <LinearGradient id="titleGrad" startPoint="0,0" endPoint="250,0">
       <ColorStop offset="0" color="#FFE880"/>
       <ColorStop offset="0.5" color="#FFD700"/>
       <ColorStop offset="1" color="#CC8800"/>
