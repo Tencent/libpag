@@ -235,24 +235,6 @@ PAGX uses a standard 2D Cartesian coordinate system:
 
 `<pagx>` is the root element of a PAGX document, defining the canvas dimensions and directly containing the layer list.
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates basic PAGX document structure -->
-<pagx version="1.0" width="400" height="400">
-  <!-- Main content card with modern gradient -->
-  <Layer name="content">
-    <Rectangle center="200,200" size="240,240" roundness="40"/>
-    <Fill>
-      <LinearGradient startPoint="0,0" endPoint="240,240">
-        <ColorStop offset="0" color="#6366F1"/>
-        <ColorStop offset="1" color="#8B5CF6"/>
-      </LinearGradient>
-    </Fill>
-    <DropShadowStyle offsetY="16" blurX="48" blurY="48" color="#6366F160"/>
-  </Layer>
-</pagx>
-```
-
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `version` | string | (required) | Format version |
@@ -261,7 +243,7 @@ PAGX uses a standard 2D Cartesian coordinate system:
 
 **Layer Rendering Order**: Layers are rendered sequentially in document order; layers earlier in the document render first (below); later layers render last (above).
 
-> [Preview](https://pag.io/pagx/?file=./samples/3.2_document_structure.pagx)
+> [Sample](samples/3.2_document_structure.pagx)
 
 ### 3.3 Resources
 
@@ -269,32 +251,7 @@ PAGX uses a standard 2D Cartesian coordinate system:
 
 **Element Position**: The Resources element may be placed anywhere within the root element; there are no restrictions on its position. Parsers must support forward references—elements that reference resources or layers defined later in the document.
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates resource definitions and references -->
-<pagx version="1.0" width="400" height="400">
-  <!-- Main shape using gradient resource reference -->
-  <Layer>
-    <Rectangle center="200,200" size="320,320" roundness="32"/>
-    <Fill color="@oceanGradient"/>
-    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#06B6D450"/>
-  </Layer>
-  <!-- Shape using solid color resource reference -->
-  <Layer>
-    <Ellipse center="200,200" size="120,120"/>
-    <Fill color="@coral"/>
-  </Layer>
-  <Resources>
-    <SolidColor id="coral" color="#F43F5E"/>
-    <LinearGradient id="oceanGradient" startPoint="0,0" endPoint="320,320">
-      <ColorStop offset="0" color="#06B6D4"/>
-      <ColorStop offset="1" color="#3B82F6"/>
-    </LinearGradient>
-  </Resources>
-</pagx>
-```
-
-> [Preview](https://pag.io/pagx/?file=./samples/3.3_resources.pagx)
+> [Sample](samples/3.3_resources.pagx)
 
 #### 3.3.1 Image
 
@@ -344,24 +301,7 @@ Color sources define colors that can be used for fills and strokes, supporting t
 
 Linear gradients interpolate along the direction from start point to end point.
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates linear gradient -->
-<pagx version="1.0" width="400" height="400">
-  <!-- Linear gradient rectangle -->
-  <Layer>
-    <Rectangle center="200,200" size="320,320" roundness="32"/>
-    <Fill>
-      <LinearGradient startPoint="0,0" endPoint="320,320">
-        <ColorStop offset="0" color="#6366F1"/>
-        <ColorStop offset="0.5" color="#8B5CF6"/>
-        <ColorStop offset="1" color="#EC4899"/>
-      </LinearGradient>
-    </Fill>
-    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#8B5CF650"/>
-  </Layer>
-</pagx>
-```
+> [Sample](samples/3.3.3_linear_gradient.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -375,25 +315,7 @@ Linear gradients interpolate along the direction from start point to end point.
 
 Radial gradients radiate outward from the center.
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates radial gradient -->
-<pagx version="1.0" width="400" height="400">
-  <!-- Radial gradient circle -->
-  <Layer>
-    <Ellipse center="200,200" size="320,320"/>
-    <Fill>
-      <RadialGradient center="140,140" radius="260">
-        <ColorStop offset="0" color="#FFF"/>
-        <ColorStop offset="0.3" color="#06B6D4"/>
-        <ColorStop offset="0.7" color="#3B82F6"/>
-        <ColorStop offset="1" color="#1E293B"/>
-      </RadialGradient>
-    </Fill>
-    <DropShadowStyle offsetY="8" blurX="32" blurY="32" color="#06B6D450"/>
-  </Layer>
-</pagx>
-```
+> [Sample](samples/3.3.3_radial_gradient.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -407,27 +329,7 @@ Radial gradients radiate outward from the center.
 
 Conic gradients (also known as sweep gradients) interpolate along the circumference.
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates conic (sweep) gradient -->
-<pagx version="1.0" width="400" height="400">
-  <!-- Conic gradient circle -->
-  <Layer>
-    <Ellipse center="200,200" size="320,320"/>
-    <Fill>
-      <ConicGradient center="200,200">
-        <ColorStop offset="0" color="#F43F5E"/>
-        <ColorStop offset="0.2" color="#F59E0B"/>
-        <ColorStop offset="0.4" color="#10B981"/>
-        <ColorStop offset="0.6" color="#06B6D4"/>
-        <ColorStop offset="0.8" color="#8B5CF6"/>
-        <ColorStop offset="1" color="#F43F5E"/>
-      </ConicGradient>
-    </Fill>
-    <DropShadowStyle offsetY="8" blurX="32" blurY="32" color="#8B5CF650"/>
-  </Layer>
-</pagx>
-```
+> [Sample](samples/3.3.3_conic_gradient.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -451,26 +353,7 @@ Conic gradients (also known as sweep gradients) interpolate along the circumfere
 
 Diamond gradients radiate from the center toward the four corners.
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates diamond gradient -->
-<pagx version="1.0" width="400" height="400">
-  <!-- Diamond gradient shape -->
-  <!-- Rectangle size=320x320, half=160. Diamond radius=160 so corners touch rect edges exactly -->
-  <Layer>
-    <Rectangle center="200,200" size="320,320" roundness="24"/>
-    <Fill>
-      <DiamondGradient center="200,200" radius="160">
-        <ColorStop offset="0" color="#FBBF24"/>
-        <ColorStop offset="0.4" color="#F59E0B"/>
-        <ColorStop offset="0.7" color="#D97706"/>
-        <ColorStop offset="1" color="#1E293B"/>
-      </DiamondGradient>
-    </Fill>
-    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#F59E0B50"/>
-  </Layer>
-</pagx>
-```
+> [Sample](samples/3.3.3_diamond_gradient.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -525,55 +408,7 @@ Image patterns use an image as a color source.
 
 **Complete Example**: Demonstrates ImagePattern fill with different tile modes
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates ImagePattern fill with different tile modes -->
-<pagx version="1.0" width="400" height="400">
-  
-  <!-- Clamp mode: original size, centered in 140x140 rect -->
-  <!-- Rectangle center=110,110 size=140,140: left-top=(40,40), right-bottom=(180,180) -->
-  <!-- Image 256x256, scale 0.5 = 128x128 -->
-  <!-- Center in rect: image left-top = 40 + (140-128)/2 = 46 -->
-  <Layer name="ClampFill">
-    <Rectangle center="110,110" size="140,140" roundness="24"/>
-    <Fill>
-      <ImagePattern image="@logo" tileModeX="clamp" tileModeY="clamp" matrix="0.5,0,0,0.5,46,46"/>
-    </Fill>
-    <Stroke color="#FFF" width="2"/>
-  </Layer>
-  
-  <!-- Repeat mode: tiled pattern -->
-  <Layer name="RepeatFill">
-    <Rectangle center="290,110" size="140,140" roundness="24"/>
-    <Fill>
-      <ImagePattern image="@logo" tileModeX="repeat" tileModeY="repeat" matrix="0.24,0,0,0.24,0,0"/>
-    </Fill>
-    <Stroke color="#FFF" width="2"/>
-  </Layer>
-  
-  <!-- Mirror mode: mirrored tiles -->
-  <Layer name="MirrorFill">
-    <Rectangle center="110,290" size="140,140" roundness="24"/>
-    <Fill>
-      <ImagePattern image="@logo" tileModeX="mirror" tileModeY="mirror" matrix="0.24,0,0,0.24,0,0"/>
-    </Fill>
-    <Stroke color="#FFF" width="2"/>
-  </Layer>
-  
-  <!-- Repeat mode: scaled pattern -->
-  <Layer name="RepeatScaled">
-    <Rectangle center="290,290" size="140,140" roundness="24"/>
-    <Fill>
-      <ImagePattern image="@logo" tileModeX="repeat" tileModeY="repeat" matrix="0.35,0,0,0.35,0,0"/>
-    </Fill>
-    <Stroke color="#FFF" width="2"/>
-  </Layer>
-  
-  <Resources>
-    <Image id="logo" source="pag_logo.png"/>
-  </Resources>
-</pagx>
-```
+> [Sample](samples/3.3.3_image_pattern.pagx)
 
 ##### Color Source Coordinate System
 
@@ -587,71 +422,21 @@ Except for solid colors, all color sources (gradients, image patterns) operate w
 
 **Example**: Drawing a diagonal linear gradient within a 300×300 region:
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates that color source coordinates are relative to geometry origin -->
-<pagx version="1.0" width="400" height="400">
-  <!-- Gradient showing coordinate system -->
-  <Layer>
-    <Rectangle center="200,200" size="300,300" roundness="24"/>
-    <Fill color="@grad"/>
-    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#EC489950"/>
-  </Layer>
-  <Resources>
-    <LinearGradient id="grad" startPoint="0,0" endPoint="300,300">
-      <ColorStop offset="0" color="#EC4899"/>
-      <ColorStop offset="0.5" color="#8B5CF6"/>
-      <ColorStop offset="1" color="#6366F1"/>
-    </LinearGradient>
-  </Resources>
-</pagx>
-```
+> [Sample](samples/3.3.3_color_source_coordinates.pagx)
 
 - Applying `scale(2, 2)` transform to this layer: The rectangle becomes 600×600, and the gradient scales accordingly, maintaining consistent visual appearance
 - Directly changing Rectangle's size to 600,600: The rectangle becomes 600×600, but the gradient coordinates remain unchanged, covering only the top-left quarter of the rectangle
-
-> Preview: [Linear](https://pag.io/pagx/?file=./samples/3.3.3_linear_gradient.pagx) | [Radial](https://pag.io/pagx/?file=./samples/3.3.3_radial_gradient.pagx) | [Conic](https://pag.io/pagx/?file=./samples/3.3.3_conic_gradient.pagx) | [Diamond](https://pag.io/pagx/?file=./samples/3.3.3_diamond_gradient.pagx) | [Pattern](https://pag.io/pagx/?file=./samples/3.3.3_image_pattern.pagx) | [Coords](https://pag.io/pagx/?file=./samples/3.3.3_color_source_coordinates.pagx)
 
 #### 3.3.4 Composition
 
 Compositions are used for content reuse (similar to After Effects pre-comps).
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates composition (reusable component) -->
-<pagx version="1.0" width="400" height="400">
-  <!-- Multiple instances of the same composition to demonstrate reusability -->
-  <Layer composition="@buttonComp" x="100" y="60"/>
-  <Layer composition="@buttonComp" x="100" y="170"/>
-  <Layer composition="@buttonComp" x="100" y="280"/>
-  <Resources>
-    <Composition id="buttonComp" width="200" height="60">
-      <Layer name="button">
-        <Rectangle center="100,30" size="200,60" roundness="30"/>
-        <Fill>
-          <LinearGradient startPoint="0,0" endPoint="200,0">
-            <ColorStop offset="0" color="#6366F1"/>
-            <ColorStop offset="1" color="#8B5CF6"/>
-          </LinearGradient>
-        </Fill>
-        <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F180"/>
-      </Layer>
-      <Layer name="label">
-        <Text text="Button" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
-        <TextLayout position="100,36" textAlign="center"/>
-        <Fill color="#FFF"/>
-      </Layer>
-    </Composition>
-  </Resources>
-</pagx>
-```
+> [Sample](samples/3.3.4_composition.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `width` | float | (required) | Composition width |
 | `height` | float | (required) | Composition height |
-
-> [Preview](https://pag.io/pagx/?file=./samples/3.3.4_composition.pagx)
 
 #### 3.3.5 Font
 
@@ -786,29 +571,7 @@ Layer background is primarily used for:
 
 `<Layer>` is the basic container for content and child layers.
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates layer properties and nesting -->
-<pagx version="1.0" width="400" height="400">
-  <!-- Parent layer with nested child -->
-  <Layer name="Parent" x="50" y="50">
-    <Rectangle center="150,150" size="260,260" roundness="32"/>
-    <Fill>
-      <LinearGradient startPoint="0,0" endPoint="260,260">
-        <ColorStop offset="0" color="#F43F5E"/>
-        <ColorStop offset="1" color="#EC4899"/>
-      </LinearGradient>
-    </Fill>
-    <DropShadowStyle offsetY="16" blurX="40" blurY="40" color="#F43F5E60"/>
-    <!-- Nested child layer -->
-    <Layer name="Child">
-      <Ellipse center="150,150" size="120,120"/>
-      <Fill color="#FFF"/>
-      <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#00000030"/>
-    </Layer>
-  </Layer>
-</pagx>
-```
+> [Sample](samples/4.2_layer.pagx)
 
 #### Child Elements
 
@@ -883,7 +646,6 @@ Blend modes define how source color (S) combines with destination color (D).
 | `plusLighter` | S + D | Plus Lighter (toward white) |
 | `plusDarker` | S + D - 1 | Plus Darker (toward black) |
 
-> [Preview](https://pag.io/pagx/?file=./samples/4.2_layer.pagx)
 
 ### 4.3 Layer Styles
 
@@ -895,24 +657,7 @@ All layer styles compute effects based on **layer content**. In layer styles, la
 
 Some layer styles additionally use **layer contour** or **layer background** as input (see individual style descriptions). Definitions of layer contour and layer background are in Section 4.1.
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates layer styles: DropShadow and InnerShadow -->
-<pagx version="1.0" width="400" height="400">
-  <!-- Shape with both drop shadow and inner shadow -->
-  <Layer x="70" y="70">
-    <Rectangle center="130,130" size="260,260" roundness="40"/>
-    <Fill>
-      <LinearGradient startPoint="0,0" endPoint="260,260">
-        <ColorStop offset="0" color="#06B6D4"/>
-        <ColorStop offset="1" color="#0891B2"/>
-      </LinearGradient>
-    </Fill>
-    <DropShadowStyle offsetY="16" blurX="48" blurY="48" color="#06B6D480"/>
-    <InnerShadowStyle offsetX="8" offsetY="8" blurX="24" blurY="24" color="#00000040"/>
-  </Layer>
-</pagx>
-```
+> [Sample](samples/4.3_layer_styles.pagx)
 
 **Common LayerStyle Attributes**:
 
@@ -976,32 +721,13 @@ Draws an inner shadow **above** the layer, appearing inside the layer content. C
 3. Fill the shadow region with `color`
 4. Intersect with opaque layer content, keeping only shadow inside content
 
-> [Preview](https://pag.io/pagx/?file=./samples/4.3_layer_styles.pagx)
-
 ### 4.4 Layer Filters
 
 Layer filters are the final stage of layer rendering. All previously rendered results (including layer styles) accumulated in order serve as filter input. Filters are applied in chain fashion according to document order, with each filter's output becoming the next filter's input.
 
 Unlike layer styles (Section 4.3), which **independently render** visual effects above or below layer content, filters **modify** the layer's overall rendering output. Layer styles are applied before filters.
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates layer filters: Blur and DropShadow -->
-<pagx version="1.0" width="400" height="400">
-  <!-- Shape with blur and drop shadow filters -->
-  <Layer x="70" y="70">
-    <Rectangle center="130,130" size="260,260" roundness="40"/>
-    <Fill>
-      <LinearGradient startPoint="0,0" endPoint="260,260">
-        <ColorStop offset="0" color="#8B5CF6"/>
-        <ColorStop offset="1" color="#6366F1"/>
-      </LinearGradient>
-    </Fill>
-    <BlurFilter blurX="4" blurY="4"/>
-    <DropShadowFilter offsetX="0" offsetY="16" blurX="48" blurY="48" color="#8B5CF680"/>
-  </Layer>
-</pagx>
-```
+> [Sample](samples/4.4_layer_filters.pagx)
 
 #### 4.4.1 BlurFilter
 
@@ -1075,72 +801,23 @@ Transforms colors using a 4×5 color matrix.
                                             | 1 |
 ```
 
-> [Preview](https://pag.io/pagx/?file=./samples/4.4_layer_filters.pagx)
-
 ### 4.5 Clipping and Masking
 
 #### 4.5.1 scrollRect
 
 The `scrollRect` attribute defines the layer's visible region; content outside this region is clipped.
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates scrollRect clipping -->
-<pagx version="1.0" width="400" height="400">
-  <!-- Clipped content showing scrollRect effect -->
-  <Layer x="100" y="100" scrollRect="100,100,200,200">
-    <Ellipse center="200,200" size="320,320"/>
-    <Fill>
-      <RadialGradient center="200,200" radius="160">
-        <ColorStop offset="0" color="#F43F5E"/>
-        <ColorStop offset="0.6" color="#EC4899"/>
-        <ColorStop offset="1" color="#8B5CF6"/>
-      </RadialGradient>
-    </Fill>
-  </Layer>
-  <!-- Visible clip region indicator (dashed border) -->
-  <Layer>
-    <Rectangle center="200,200" size="200,200" roundness="16"/>
-    <Stroke color="#94A3B840" width="2" dashes="4,4"/>
-  </Layer>
-</pagx>
-```
-
-> [Preview](https://pag.io/pagx/?file=./samples/4.5.1_scroll_rect.pagx)
+> [Sample](samples/4.5.1_scroll_rect.pagx)
 
 #### 4.5.2 Masking
 
 Reference another layer as a mask using the `mask` attribute.
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates alpha masking -->
-<pagx version="1.0" width="400" height="400">
-  <!-- Mask shape (invisible but used for masking) -->
-  <Layer id="maskShape" visible="false">
-    <Polystar center="200,200" type="star" pointCount="5" outerRadius="150" innerRadius="70" rotation="-90"/>
-    <Fill color="#FFF"/>
-  </Layer>
-  <!-- Masked content with gradient - the rectangle will be clipped to star shape -->
-  <Layer mask="@maskShape">
-    <Rectangle center="200,200" size="360,360"/>
-    <Fill>
-      <LinearGradient startPoint="0,0" endPoint="360,360">
-        <ColorStop offset="0" color="#6366F1"/>
-        <ColorStop offset="0.33" color="#8B5CF6"/>
-        <ColorStop offset="0.66" color="#EC4899"/>
-        <ColorStop offset="1" color="#F43F5E"/>
-      </LinearGradient>
-    </Fill>
-  </Layer>
-</pagx>
-```
+> [Sample](samples/4.5.2_masking.pagx)
 
 **Masking Rules**:
 - The mask layer itself is not rendered (the `visible` attribute is ignored)
 - The mask layer's transforms do not affect the masked layer
-
-> [Preview](https://pag.io/pagx/?file=./samples/4.5.2_masking.pagx)
 
 ---
 
@@ -1246,58 +923,7 @@ rect.bottom = center.y + size.height / 2
 
 **Example**:
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates Rectangle shape with various roundness values -->
-<pagx version="1.0" width="400" height="400">
-  <!-- Sharp rectangle -->
-  <Layer>
-    <Rectangle center="110,110" size="140,140"/>
-    <Fill>
-      <LinearGradient startPoint="0,0" endPoint="140,140">
-        <ColorStop offset="0" color="#F43F5E"/>
-        <ColorStop offset="1" color="#E11D48"/>
-      </LinearGradient>
-    </Fill>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F43F5E50"/>
-  </Layer>
-  <!-- Medium rounded rectangle -->
-  <Layer>
-    <Rectangle center="290,110" size="140,140" roundness="24"/>
-    <Fill>
-      <LinearGradient startPoint="0,0" endPoint="140,140">
-        <ColorStop offset="0" color="#8B5CF6"/>
-        <ColorStop offset="1" color="#7C3AED"/>
-      </LinearGradient>
-    </Fill>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#8B5CF650"/>
-  </Layer>
-  <!-- Fully rounded rectangle (pill shape) -->
-  <Layer>
-    <Rectangle center="110,290" size="140,140" roundness="70"/>
-    <Fill>
-      <LinearGradient startPoint="0,0" endPoint="140,140">
-        <ColorStop offset="0" color="#06B6D4"/>
-        <ColorStop offset="1" color="#0891B2"/>
-      </LinearGradient>
-    </Fill>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D450"/>
-  </Layer>
-  <!-- Wide rectangle -->
-  <Layer>
-    <Rectangle center="290,290" size="140,100" roundness="16"/>
-    <Fill>
-      <LinearGradient startPoint="0,0" endPoint="140,100">
-        <ColorStop offset="0" color="#10B981"/>
-        <ColorStop offset="1" color="#059669"/>
-      </LinearGradient>
-    </Fill>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#10B98150"/>
-  </Layer>
-</pagx>
-```
-
-> [Preview](https://pag.io/pagx/?file=./samples/5.2.1_rectangle.pagx)
+> [Sample](samples/5.2.1_rectangle.pagx)
 
 #### 5.2.2 Ellipse
 
@@ -1325,58 +951,7 @@ boundingRect.bottom = center.y + size.height / 2
 
 **Example**:
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates Ellipse shape -->
-<pagx version="1.0" width="400" height="400">
-  <!-- Perfect circle -->
-  <Layer>
-    <Ellipse center="120,120" size="140,140"/>
-    <Fill>
-      <RadialGradient center="50,50" radius="100">
-        <ColorStop offset="0" color="#FBBF24"/>
-        <ColorStop offset="1" color="#F59E0B"/>
-      </RadialGradient>
-    </Fill>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F59E0B60"/>
-  </Layer>
-  <!-- Horizontal ellipse -->
-  <Layer>
-    <Ellipse center="290,110" size="160,100"/>
-    <Fill>
-      <LinearGradient startPoint="0,0" endPoint="160,100">
-        <ColorStop offset="0" color="#EC4899"/>
-        <ColorStop offset="1" color="#DB2777"/>
-      </LinearGradient>
-    </Fill>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#EC489950"/>
-  </Layer>
-  <!-- Vertical ellipse -->
-  <Layer>
-    <Ellipse center="110,290" size="100,160"/>
-    <Fill>
-      <LinearGradient startPoint="0,0" endPoint="100,160">
-        <ColorStop offset="0" color="#06B6D4"/>
-        <ColorStop offset="1" color="#0891B2"/>
-      </LinearGradient>
-    </Fill>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D450"/>
-  </Layer>
-  <!-- Large ellipse -->
-  <Layer>
-    <Ellipse center="290,280" size="150,150"/>
-    <Fill>
-      <RadialGradient center="55,55" radius="100">
-        <ColorStop offset="0" color="#A78BFA"/>
-        <ColorStop offset="1" color="#8B5CF6"/>
-      </RadialGradient>
-    </Fill>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#8B5CF650"/>
-  </Layer>
-</pagx>
-```
-
-> [Preview](https://pag.io/pagx/?file=./samples/5.2.2_ellipse.pagx)
+> [Sample](samples/5.2.2_ellipse.pagx)
 
 #### 5.2.3 Polystar
 
@@ -1433,58 +1008,7 @@ y = center.y + outerRadius * sin(angle)
 
 **Example**:
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates Polystar shape (star and polygon) -->
-<pagx version="1.0" width="400" height="400">
-  <!-- 5-pointed star -->
-  <Layer>
-    <Polystar center="110,110" type="star" pointCount="5" outerRadius="60" innerRadius="28" rotation="-90"/>
-    <Fill>
-      <LinearGradient startPoint="0,0" endPoint="120,120">
-        <ColorStop offset="0" color="#FBBF24"/>
-        <ColorStop offset="1" color="#F59E0B"/>
-      </LinearGradient>
-    </Fill>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F59E0B60"/>
-  </Layer>
-  <!-- 6-pointed star -->
-  <Layer>
-    <Polystar center="290,110" type="star" pointCount="6" outerRadius="60" innerRadius="32" rotation="-90"/>
-    <Fill>
-      <LinearGradient startPoint="0,0" endPoint="120,120">
-        <ColorStop offset="0" color="#F43F5E"/>
-        <ColorStop offset="1" color="#E11D48"/>
-      </LinearGradient>
-    </Fill>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F43F5E50"/>
-  </Layer>
-  <!-- Hexagon (polygon) -->
-  <Layer>
-    <Polystar center="110,290" type="polygon" pointCount="6" outerRadius="64"/>
-    <Fill>
-      <LinearGradient startPoint="0,0" endPoint="128,128">
-        <ColorStop offset="0" color="#06B6D4"/>
-        <ColorStop offset="1" color="#0891B2"/>
-      </LinearGradient>
-    </Fill>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D450"/>
-  </Layer>
-  <!-- Pentagon (polygon) -->
-  <Layer>
-    <Polystar center="290,290" type="polygon" pointCount="5" outerRadius="64" rotation="-90"/>
-    <Fill>
-      <LinearGradient startPoint="0,0" endPoint="128,128">
-        <ColorStop offset="0" color="#8B5CF6"/>
-        <ColorStop offset="1" color="#7C3AED"/>
-      </LinearGradient>
-    </Fill>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#8B5CF650"/>
-  </Layer>
-</pagx>
-```
-
-> [Preview](https://pag.io/pagx/?file=./samples/5.2.3_polystar.pagx)
+> [Sample](samples/5.2.3_polystar.pagx)
 
 #### 5.2.4 Path
 
@@ -1505,52 +1029,7 @@ Defines arbitrary shapes using SVG path syntax, supporting inline data or refere
 
 **Example**:
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates Path shape with custom bezier curves -->
-<pagx version="1.0" width="400" height="400">
-  
-  <!-- Heart shape (top-left quadrant: 0-200 x 0-200, center at 100,100) -->
-  <Layer>
-    <Path data="M 100,80 C 100,60 120,50 140,50 C 160,50 170,60 170,80 C 170,100 140,140 100,170 C 60,140 30,100 30,80 C 30,60 40,50 60,50 C 80,50 100,60 100,80 Z"/>
-    <Fill>
-      <LinearGradient startPoint="30,50" endPoint="170,170">
-        <ColorStop offset="0" color="#F43F5E"/>
-        <ColorStop offset="1" color="#EC4899"/>
-      </LinearGradient>
-    </Fill>
-    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#F43F5E60"/>
-  </Layer>
-  
-  <!-- Lightning bolt (top-right quadrant: 200-400 x 0-200, center at 300,100) -->
-  <Layer>
-    <Path data="M 310,45 L 275,110 L 305,110 L 270,195 L 340,100 L 310,100 L 340,45 Z"/>
-    <Fill>
-      <LinearGradient startPoint="270,45" endPoint="340,195">
-        <ColorStop offset="0" color="#FBBF24"/>
-        <ColorStop offset="1" color="#F59E0B"/>
-      </LinearGradient>
-    </Fill>
-    <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#F59E0B60"/>
-  </Layer>
-  
-  <!-- Arrow (bottom-left quadrant: 0-200 x 200-400, center at 100,300) -->
-  <Layer>
-    <Path data="M 30,290 L 130,290 L 130,260 L 180,300 L 130,340 L 130,310 L 30,310 Z"/>
-    <Fill color="#06B6D4"/>
-    <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#06B6D460"/>
-  </Layer>
-  
-  <!-- Star (bottom-right quadrant: 200-400 x 200-400, center at 300,300) -->
-  <Layer>
-    <Path data="M 300,220 L 318,270 L 370,270 L 328,300 L 343,350 L 300,322 L 257,350 L 272,300 L 230,270 L 282,270 Z"/>
-    <Fill color="#8B5CF6"/>
-    <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#8B5CF660"/>
-  </Layer>
-</pagx>
-```
-
-> [Preview](https://pag.io/pagx/?file=./samples/5.2.4_path.pagx)
+> [Sample](samples/5.2.4_path.pagx)
 
 #### 5.2.5 Text
 
