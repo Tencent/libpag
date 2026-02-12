@@ -22,7 +22,7 @@
   </Layer>
   <!-- Label -->
   <Layer>
-    <Text text="Separate" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+    <Text text="Separate (0.2–0.9)" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
     <TextLayout position="200,192" textAlign="center"/>
     <Fill color="#475569"/>
   </Layer>
@@ -48,7 +48,7 @@
   </Layer>
   <!-- Label -->
   <Layer>
-    <Text text="Continuous" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+    <Text text="Continuous (0.2–0.9)" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
     <TextLayout position="200,362" textAlign="center"/>
     <Fill color="#475569"/>
   </Layer>
