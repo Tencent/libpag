@@ -1165,6 +1165,65 @@ readability.
 approximate complex shapes (e.g., hexagons, stars) as rectangles — visual fidelity takes
 priority.
 
+#### 15.9 Decompose Polygon Grid into Parallel Line Sets
+
+**Problem**: A common pattern is a polygon (hexagon, triangle, etc.) repeated in a 2D grid
+via nested Repeaters. This creates massive element counts because each polygon is a full Path
+cloned independently. For example, a hexagonal grid covering 800×600 at spacing 20 needs
+~1500 hexagons, each with 6 path segments — totaling ~9000 segments rendered.
+
+**Key insight**: Any regular polygon grid, when viewed as a whole, is visually equivalent to
+several sets of parallel lines. A hexagonal grid = 3 sets of lines at 0°, 60°, and -60°. A
+triangular grid = the same 3 sets. A square grid = 2 sets at 0° and 90°.
+
+**When to apply**: A Repeater (especially nested) produces a regular polygon grid used as a
+decorative background pattern, particularly at low opacity where individual polygon shapes are
+not prominent.
+
+**How**: Replace the polygon + nested Repeater with one Rectangle per line direction, each
+repeated via a single (non-nested) Repeater. Use Group `rotation` to orient diagonal lines.
+
+```xml
+<!-- Before: ~1500 hexagons via nested Repeater (expensive) -->
+<Layer alpha="0.15" scrollRect="0,0,800,600">
+  <Group x="-10">
+    <Path data="@hex"/>
+    <Stroke color="#0066AA" width="1"/>
+    <Repeater copies="41" position="20,0"/>
+  </Group>
+  <Repeater copies="36" position="10,17.32"/>
+</Layer>
+
+<!-- After: 3 sets of parallel lines (~155 rectangles total, much cheaper) -->
+<Layer alpha="0.15" scrollRect="0,0,800,600">
+  <!-- Horizontal lines -->
+  <Rectangle center="400,0" size="800,1"/>
+  <Repeater copies="35" position="0,17"/>
+  <!-- 60° diagonal lines -->
+  <Group position="400,300" rotation="60">
+    <Rectangle center="0,-510" size="1200,1"/>
+    <Repeater copies="60" position="0,17"/>
+  </Group>
+  <!-- -60° diagonal lines -->
+  <Group position="400,300" rotation="-60">
+    <Rectangle center="0,-510" size="1200,1"/>
+    <Repeater copies="60" position="0,17"/>
+  </Group>
+  <Fill color="#0066AA"/>
+</Layer>
+```
+
+**Parameter calculation**:
+- Line spacing = polygon row height (hexagon edge length 10 → row height ≈ 17)
+- Diagonal line length = canvas diagonal ≈ 1200 to ensure full coverage after rotation
+- Diagonal line start offset = half the coverage range in the perpendicular direction
+- Group `position` = canvas center, so rotation pivots around the center
+- `scrollRect` clips all lines to canvas bounds
+
+**Suggest to user**: This changes the visual from true polygon outlines to intersecting lines.
+At low opacity the difference is subtle, but at higher opacity individual polygon shapes would
+be lost. Ask user for approval before applying.
+
 ---
 
 ## Appendix: Key Concepts Quick Reference
