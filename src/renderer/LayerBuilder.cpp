@@ -617,19 +617,25 @@ class LayerBuilderContext {
     }
   }
 
+  static void ExtractGradientStops(const std::vector<ColorStop>& colorStops,
+                                   std::vector<tgfx::Color>* colors,
+                                   std::vector<float>* positions) {
+    colors->reserve(colorStops.size());
+    positions->reserve(colorStops.size());
+    for (const auto& stop : colorStops) {
+      colors->push_back(ToTGFX(stop.color));
+      positions->push_back(stop.offset);
+    }
+    if (colors->empty()) {
+      *colors = {tgfx::Color::Black(), tgfx::Color::White()};
+      *positions = {0.0f, 1.0f};
+    }
+  }
+
   std::shared_ptr<tgfx::ColorSource> convertLinearGradient(const LinearGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
-
-    for (const auto& stop : node->colorStops) {
-      colors.push_back(ToTGFX(stop.color));
-      positions.push_back(stop.offset);
-    }
-
-    if (colors.empty()) {
-      colors = {tgfx::Color::Black(), tgfx::Color::White()};
-      positions = {0.0f, 1.0f};
-    }
+    ExtractGradientStops(node->colorStops, &colors, &positions);
 
     auto gradient = tgfx::Gradient::MakeLinear(ToTGFX(node->startPoint), ToTGFX(node->endPoint),
                                                colors, positions);
@@ -642,16 +648,7 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::ColorSource> convertRadialGradient(const RadialGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
-
-    for (const auto& stop : node->colorStops) {
-      colors.push_back(ToTGFX(stop.color));
-      positions.push_back(stop.offset);
-    }
-
-    if (colors.empty()) {
-      colors = {tgfx::Color::Black(), tgfx::Color::White()};
-      positions = {0.0f, 1.0f};
-    }
+    ExtractGradientStops(node->colorStops, &colors, &positions);
 
     auto gradient = tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions);
     if (gradient && !node->matrix.isIdentity()) {
@@ -663,16 +660,7 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::ColorSource> convertConicGradient(const ConicGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
-
-    for (const auto& stop : node->colorStops) {
-      colors.push_back(ToTGFX(stop.color));
-      positions.push_back(stop.offset);
-    }
-
-    if (colors.empty()) {
-      colors = {tgfx::Color::Black(), tgfx::Color::White()};
-      positions = {0.0f, 1.0f};
-    }
+    ExtractGradientStops(node->colorStops, &colors, &positions);
 
     auto gradient = tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle, node->endAngle,
                                               colors, positions);
@@ -685,16 +673,7 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::ColorSource> convertDiamondGradient(const DiamondGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
-
-    for (const auto& stop : node->colorStops) {
-      colors.push_back(ToTGFX(stop.color));
-      positions.push_back(stop.offset);
-    }
-
-    if (colors.empty()) {
-      colors = {tgfx::Color::Black(), tgfx::Color::White()};
-      positions = {0.0f, 1.0f};
-    }
+    ExtractGradientStops(node->colorStops, &colors, &positions);
 
     auto gradient =
         tgfx::Gradient::MakeDiamond(ToTGFX(node->center), node->radius, colors, positions);
