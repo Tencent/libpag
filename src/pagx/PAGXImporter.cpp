@@ -919,7 +919,8 @@ static TextModifier* parseTextModifier(const XMLNode* node, PAGXDocument* doc) {
   }
   auto strokeWidthAttr = getAttribute(node, "strokeWidth");
   if (!strokeWidthAttr.empty()) {
-    modifier->strokeWidth = std::stof(strokeWidthAttr);
+    char* endPtr = nullptr;
+    modifier->strokeWidth = strtof(strokeWidthAttr.c_str(), &endPtr);
   }
 
   for (const auto& child : node->children) {
@@ -1556,11 +1557,12 @@ static float getFloatAttribute(const XMLNode* node, const std::string& name,
   if (str.empty()) {
     return defaultValue;
   }
-  try {
-    return std::stof(str);
-  } catch (...) {
+  char* endPtr = nullptr;
+  float value = strtof(str.c_str(), &endPtr);
+  if (endPtr == str.c_str()) {
     return defaultValue;
   }
+  return value;
 }
 
 static int getIntAttribute(const XMLNode* node, const std::string& name, int defaultValue) {
@@ -1568,11 +1570,12 @@ static int getIntAttribute(const XMLNode* node, const std::string& name, int def
   if (str.empty()) {
     return defaultValue;
   }
-  try {
-    return std::stoi(str);
-  } catch (...) {
+  char* endPtr = nullptr;
+  long value = strtol(str.c_str(), &endPtr, 10);
+  if (endPtr == str.c_str()) {
     return defaultValue;
   }
+  return static_cast<int>(value);
 }
 
 static bool getBoolAttribute(const XMLNode* node, const std::string& name,

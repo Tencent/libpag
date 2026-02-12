@@ -20,6 +20,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <string>
 
 namespace pagx {
@@ -106,8 +107,8 @@ static bool ParseNumber(const char*& ptr, const char* end, float& result) {
     return false;
   }
 
-  std::string numStr(start, ptr);
-  result = std::stof(numStr);
+  char* endPtr = nullptr;
+  result = strtof(start, &endPtr);
   return true;
 }
 
