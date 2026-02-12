@@ -133,6 +133,7 @@
         }
         pre code { background-color: transparent; padding: 0; border-radius: 0; font-size: 100%; }
         .hljs { background: var(--code-bg) !important; }
+        pre:has(> code.language-xml) { border-left: 3px solid #22863a; }
         
         /* Code block with preview header */
         .code-block-wrapper { position: relative; }
@@ -142,7 +143,6 @@
             border-top-left-radius: 0;
             border-top-right-radius: 0;
             border-top: none;
-            border-left: 3px solid #22863a;
         }
         .code-header {
             display: flex;
