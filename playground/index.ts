@@ -791,7 +791,7 @@ function hideDropZone(): void {
 
 const DEFAULT_TITLE = 'PAGX Playground';
 
-function goHome(): void {
+function goHome(pushHistory: boolean = true): void {
     if (playgroundState.pagxView) {
         playgroundState.pagxView.loadPAGX(new Uint8Array(0));
         gestureManager.resetTransform(playgroundState);
@@ -807,7 +807,9 @@ function goHome(): void {
     currentPlayingFile = null;
 
     // Clear file parameter from URL
-    history.replaceState(null, '', window.location.pathname);
+    if (pushHistory) {
+        history.pushState(null, '', window.location.pathname);
+    }
 }
 
 async function loadExternalFiles(baseURL: string): Promise<void> {
@@ -909,7 +911,7 @@ async function loadPAGXFile(file: File) {
     }
 }
 
-async function loadPAGXFromURL(url: string) {
+async function loadPAGXFromURL(url: string, pushHistory: boolean = true) {
     // Show loading UI with progress reset to 0%
     const loadingStartTime = Date.now();
     showLoadingUI();
@@ -955,7 +957,9 @@ async function loadPAGXFromURL(url: string) {
 
         // Update URL with file parameter (without page reload)
         const cleanUrl = window.location.pathname + '?file=' + url;
-        history.replaceState(null, '', cleanUrl);
+        if (pushHistory) {
+            history.pushState(null, '', cleanUrl);
+        }
     } catch (error) {
         console.error('Failed to load PAGX from URL:', error);
         const message = error instanceof Error ? error.message : 'Unknown error';
@@ -1122,7 +1126,6 @@ function applyI18n(): void {
 }
 
 let sampleFiles: string[] = [];
-let currentSampleFile: string | null = null;
 let currentPlayingFile: string | null = null;
 
 async function loadSampleList(): Promise<void> {
@@ -1150,12 +1153,8 @@ function renderSampleList(): void {
             <img class="sample-image" src="${imageUrl}" alt="${baseName}" loading="lazy">
             <span class="sample-name">${file}</span>
         `;
-        if (file === currentSampleFile) {
-            a.classList.add('active');
-        }
         a.addEventListener('click', (e) => {
             e.preventDefault();
-            currentSampleFile = file;
             // Clear hash before loading so replaceState won't carry #samples
             history.replaceState(null, '', window.location.pathname + window.location.search);
             hideSamplesPage();
@@ -1184,6 +1183,18 @@ function hideSamplesPage(): void {
     samplesPage.classList.add('hidden');
 }
 
+function handlePopState(): void {
+    const pagxUrl = getPAGXUrlFromParams();
+    if (pagxUrl) {
+        if (pagxUrl !== currentPlayingFile) {
+            loadPAGXFromURL(pagxUrl, false);
+        }
+    } else {
+        goHome(false);
+    }
+    handleRoute();
+}
+
 function handleRoute(): void {
     const hash = window.location.hash;
     if (hash === '#samples') {
@@ -1200,6 +1211,7 @@ if (typeof window !== 'undefined') {
 
         // Setup routing
         window.addEventListener('hashchange', handleRoute);
+        window.addEventListener('popstate', handlePopState);
         handleRoute();
 
         // Setup samples back button

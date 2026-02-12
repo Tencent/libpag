@@ -150,7 +150,7 @@ html, body {
     align-items: center;
     justify-content: center;
     gap: 6px;
-    min-width: 100px;
+    min-width: 80px;
     padding: 8px 12px;
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
@@ -396,10 +396,13 @@ html, body {
 }
 
 .samples-header-btns {
+    position: fixed;
+    top: 16px;
+    right: 16px;
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-left: auto;
+    z-index: 10;
 }
 
 .samples-title {
@@ -426,22 +429,19 @@ html, body {
     padding: 8px;
     border-radius: 8px;
     text-decoration: none;
+    background: rgba(255, 255, 255, 0.04);
     transition: background 0.15s ease;
 }
 
 .samples-list > a:hover {
-    background: rgba(255, 255, 255, 0.06);
-}
-
-.samples-list > a.active {
-    background: rgba(0, 82, 217, 0.12);
+    background: rgba(255, 255, 255, 0.12);
 }
 
 .samples-list .sample-image {
     width: 100%;
     aspect-ratio: 1 / 1;
     background:
-        repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 0 0 / 32px 32px;
+        repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 0 0 / 16px 16px;
     border-radius: 6px;
     object-fit: contain;
 }
