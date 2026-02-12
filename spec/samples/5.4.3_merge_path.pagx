@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates MergePath modifier with different modes -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Union mode: combining shapes -->
   <Layer>
     <Rectangle center="150,150" size="180,180" roundness="24"/>
     <Ellipse center="250,250" size="180,180"/>

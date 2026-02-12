@@ -2,7 +2,6 @@
 <!-- Demonstrates TrimPath: separate vs continuous mode comparison -->
 <pagx version="1.0" width="400" height="400">
   <!-- === Top row: Separate mode === -->
-  <!-- Track -->
   <Layer>
     <Ellipse center="120,95" size="100,100"/>
     <Ellipse center="280,95" size="100,100"/>
@@ -20,7 +19,6 @@
       </LinearGradient>
     </Stroke>
   </Layer>
-  <!-- Label -->
   <Layer>
     <Text text="Separate (0.2–0.9)" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
     <TextLayout position="200,187" textAlign="center"/>
@@ -28,7 +26,6 @@
   </Layer>
 
   <!-- === Bottom row: Continuous mode === -->
-  <!-- Track -->
   <Layer>
     <Ellipse center="120,265" size="100,100"/>
     <Ellipse center="280,265" size="100,100"/>
@@ -46,7 +43,6 @@
       </LinearGradient>
     </Stroke>
   </Layer>
-  <!-- Label -->
   <Layer>
     <Text text="Continuous (0.2–0.9)" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
     <TextLayout position="200,357" textAlign="center"/>

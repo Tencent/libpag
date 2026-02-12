@@ -1,13 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates different fill types -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Solid color fill -->
   <Layer>
     <Rectangle center="110,110" size="140,140" roundness="24"/>
     <Fill color="#F43F5E"/>
     <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F43F5E50"/>
   </Layer>
-  <!-- Linear gradient fill -->
   <Layer>
     <Rectangle center="290,110" size="140,140" roundness="24"/>
     <Fill>
@@ -18,7 +15,6 @@
     </Fill>
     <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#8B5CF650"/>
   </Layer>
-  <!-- Radial gradient fill -->
   <Layer>
     <Ellipse center="200,300" size="320,140"/>
     <Fill>

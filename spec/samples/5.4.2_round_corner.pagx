@@ -1,12 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates RoundCorner modifier -->
 <pagx version="1.0" width="400" height="400">
   <!-- Original sharp rectangle (reference) -->
   <Layer>
     <Rectangle center="120,120" size="140,140"/>
     <Stroke color="#94A3B840" width="2" dashes="4,4"/>
   </Layer>
-  <!-- RoundCorner applied to sharp rectangle -->
   <Layer>
     <Rectangle center="120,120" size="140,140"/>
     <RoundCorner radius="30"/>
@@ -23,7 +21,6 @@
     <Polystar center="290,120" type="star" pointCount="5" outerRadius="70" innerRadius="32" rotation="-90"/>
     <Stroke color="#94A3B840" width="2" dashes="4,4"/>
   </Layer>
-  <!-- RoundCorner applied to star -->
   <Layer>
     <Polystar center="290,120" type="star" pointCount="5" outerRadius="70" innerRadius="32" rotation="-90"/>
     <RoundCorner radius="12"/>
@@ -35,7 +32,6 @@
     </Fill>
     <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F59E0B60"/>
   </Layer>
-  <!-- Large rounded hexagon -->
   <Layer>
     <Polystar center="200,300" type="polygon" pointCount="6" outerRadius="80"/>
     <RoundCorner radius="20"/>
