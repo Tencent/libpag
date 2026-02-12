@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates basic PAGX document structure -->
 <pagx version="1.0" width="400" height="400">
+  <!-- Main content card with modern gradient -->
   <Layer name="content">
     <Rectangle center="200,200" size="240,240" roundness="40"/>
     <Fill>

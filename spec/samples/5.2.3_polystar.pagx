@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates Polystar shape (star and polygon) -->
 <pagx version="1.0" width="400" height="400">
+  <!-- 5-pointed star -->
   <Layer>
     <Polystar center="110,110" type="star" pointCount="5" outerRadius="60" innerRadius="28" rotation="-90"/>
     <Fill>
@@ -10,6 +12,7 @@
     </Fill>
     <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F59E0B60"/>
   </Layer>
+  <!-- 6-pointed star -->
   <Layer>
     <Polystar center="290,110" type="star" pointCount="6" outerRadius="60" innerRadius="32" rotation="-90"/>
     <Fill>
@@ -20,6 +23,7 @@
     </Fill>
     <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F43F5E50"/>
   </Layer>
+  <!-- Hexagon (polygon) -->
   <Layer>
     <Polystar center="110,290" type="polygon" pointCount="6" outerRadius="64"/>
     <Fill>
@@ -30,6 +34,7 @@
     </Fill>
     <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D450"/>
   </Layer>
+  <!-- Pentagon (polygon) -->
   <Layer>
     <Polystar center="290,290" type="polygon" pointCount="5" outerRadius="64" rotation="-90"/>
     <Fill>

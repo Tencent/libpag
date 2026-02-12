@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates Ellipse shape -->
 <pagx version="1.0" width="400" height="400">
+  <!-- Perfect circle -->
   <Layer>
     <Ellipse center="120,120" size="140,140"/>
     <Fill>
@@ -10,6 +12,7 @@
     </Fill>
     <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F59E0B60"/>
   </Layer>
+  <!-- Horizontal ellipse -->
   <Layer>
     <Ellipse center="290,110" size="160,100"/>
     <Fill>
@@ -20,6 +23,7 @@
     </Fill>
     <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#EC489950"/>
   </Layer>
+  <!-- Vertical ellipse -->
   <Layer>
     <Ellipse center="110,290" size="100,160"/>
     <Fill>
@@ -30,6 +34,7 @@
     </Fill>
     <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D450"/>
   </Layer>
+  <!-- Large ellipse -->
   <Layer>
     <Ellipse center="290,280" size="150,150"/>
     <Fill>

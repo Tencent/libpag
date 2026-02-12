@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates alpha masking -->
 <pagx version="1.0" width="400" height="400">
   <!-- Mask shape (invisible but used for masking) -->
   <Layer id="maskShape" visible="false">
