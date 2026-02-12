@@ -440,7 +440,8 @@ html, body {
 .samples-list .sample-image {
     width: 100%;
     aspect-ratio: 1 / 1;
-    background: rgba(255, 255, 255, 0.04);
+    background:
+        repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 0 0 / 32px 32px;
     border-radius: 6px;
     object-fit: contain;
 }
