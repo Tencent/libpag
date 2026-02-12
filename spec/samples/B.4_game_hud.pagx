@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="800" height="600">
   <Resources>
-    <PathData id="hex" data="M 10 0 L 5 8.66 L -5 8.66 L -10 0 L -5 -8.66 L 5 -8.66 Z"/>
     <PathData id="bullet" data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
     <PathData id="healthArc" data="M -180 100 A 200 200 0 0 0 -180 -100"/>
     <PathData id="energyArc" data="M 180 -100 A 200 200 0 0 0 180 100"/>
@@ -27,14 +26,26 @@
       </Fill>
     </Layer>
 
-    <!-- Hex Grid Pattern -->
+    <!-- Hex Grid Pattern (3 sets of parallel lines forming hexagonal grid) -->
     <Layer alpha="0.15" scrollRect="0,0,800,600">
-      <Group x="-10">
-        <Path data="@hex"/>
-        <Stroke color="#0066AA" width="1"/>
-        <Repeater copies="41" position="20,0"/>
-      </Group>
-      <Repeater copies="36" position="10,17.32"/>
+      <!-- Horizontal lines -->
+      <Layer>
+        <Rectangle size="800,1"/>
+        <Fill color="#0066AA"/>
+        <Repeater copies="35" position="0,17"/>
+      </Layer>
+      <!-- 60° diagonal lines -->
+      <Layer x="400" y="300" rotation="60">
+        <Rectangle center="0,-510" size="1200,1"/>
+        <Fill color="#0066AA"/>
+        <Repeater copies="60" position="0,17"/>
+      </Layer>
+      <!-- -60° diagonal lines -->
+      <Layer x="400" y="300" rotation="-60">
+        <Rectangle center="0,-510" size="1200,1"/>
+        <Fill color="#0066AA"/>
+        <Repeater copies="60" position="0,17"/>
+      </Layer>
     </Layer>
 
     <!-- Vignette -->
