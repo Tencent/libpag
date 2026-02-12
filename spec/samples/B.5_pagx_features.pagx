@@ -18,53 +18,30 @@
     <Fill color="@bgGradient"/>
   </Layer>
 
-  <!-- Background aurora glow (3 compact blobs, cold-warm contrast) -->
-  <Layer name="GlowA" alpha="0.35">
-    <Ellipse center="30,-20" size="450,380"/>
-    <Fill color="#A855F7"/>
-    <BlurFilter blurX="160" blurY="140"/>
-  </Layer>
-  <Layer name="GlowB" alpha="0.35">
+  <!-- Background aurora glow (2 compact blobs, cool contrast) -->
+  <Layer name="GlowB" alpha="0.22">
     <Ellipse center="1560,300" size="700,550"/>
     <Fill color="#38BDF8"/>
     <BlurFilter blurX="220" blurY="200"/>
   </Layer>
-  <Layer name="GlowC" alpha="0.35">
+  <Layer name="GlowC" alpha="0.18">
     <Ellipse center="350,1050" size="500,350"/>
     <Fill color="#10B981"/>
     <BlurFilter blurX="180" blurY="130"/>
   </Layer>
 
-  <!-- Background diagonal decoration lines -->
-  <Layer name="DiagLines" alpha="0.06">
-    <Path data="M 0 200 L 900 0"/>
-    <Stroke color="#475569" width="1" dashes="12,20"/>
-  </Layer>
-  <Layer name="DiagLines2" alpha="0.04">
-    <Path data="M 1600 250 L 700 0"/>
-    <Stroke color="#475569" width="1" dashes="12,20"/>
-  </Layer>
-  <Layer name="DiagLines3" alpha="0.05">
-    <Path data="M 0 1000 L 1100 800"/>
-    <Stroke color="#475569" width="1" dashes="12,20"/>
-  </Layer>
-  <Layer name="DiagLines4" alpha="0.04">
-    <Path data="M 1600 900 L 500 1200"/>
-    <Stroke color="#475569" width="1" dashes="12,20"/>
-  </Layer>
 
-  <!-- Large text orbit ring as background decoration -->
-  <Layer name="TextOrbit" x="800" y="530" alpha="0.3">
-    <Text text="An XML-based markup language for describing animated vector graphics. " fontFamily="Arial" fontSize="30"/>
-    <TextPath path="M 0 -380 A 380 380 0 1 1 0 380 A 380 380 0 1 1 0 -380 Z" forceAlignment="true" firstMargin="-5"/>
-    <Fill color="#64748B"/>
+  <!-- Subtle orbit ring decoration -->
+  <Layer name="OrbitRing" x="800" y="530" alpha="0.18">
+    <Ellipse center="0,0" size="760,760"/>
+    <Stroke color="#334155" width="1"/>
   </Layer>
 
 
   <!-- Background grid pattern -->
-  <Layer name="Grid" alpha="0.12">
+  <Layer name="Grid" alpha="0.05">
     <Path data="M 56 60 L 64 60 M 60 56 L 60 64 M 176 60 L 184 60 M 180 56 L 180 64 M 296 60 L 304 60 M 300 56 L 300 64 M 416 60 L 424 60 M 420 56 L 420 64 M 536 60 L 544 60 M 540 56 L 540 64 M 656 60 L 664 60 M 660 56 L 660 64 M 776 60 L 784 60 M 780 56 L 780 64 M 896 60 L 904 60 M 900 56 L 900 64 M 1016 60 L 1024 60 M 1020 56 L 1020 64 M 1136 60 L 1144 60 M 1140 56 L 1140 64 M 1256 60 L 1264 60 M 1260 56 L 1260 64 M 1376 60 L 1384 60 M 1380 56 L 1380 64 M 1496 60 L 1504 60 M 1500 56 L 1500 64 M 56 180 L 64 180 M 60 176 L 60 184 M 176 180 L 184 180 M 180 176 L 180 184 M 296 180 L 304 180 M 300 176 L 300 184 M 416 180 L 424 180 M 420 176 L 420 184 M 536 180 L 544 180 M 540 176 L 540 184 M 656 180 L 664 180 M 660 176 L 660 184 M 776 180 L 784 180 M 780 176 L 780 184 M 896 180 L 904 180 M 900 176 L 900 184 M 1016 180 L 1024 180 M 1020 176 L 1020 184 M 1136 180 L 1144 180 M 1140 176 L 1140 184 M 1256 180 L 1264 180 M 1260 176 L 1260 184 M 1376 180 L 1384 180 M 1380 176 L 1380 184 M 1496 180 L 1504 180 M 1500 176 L 1500 184 M 56 300 L 64 300 M 60 296 L 60 304 M 176 300 L 184 300 M 180 296 L 180 304 M 296 300 L 304 300 M 300 296 L 300 304 M 416 300 L 424 300 M 420 296 L 420 304 M 536 300 L 544 300 M 540 296 L 540 304 M 656 300 L 664 300 M 660 296 L 660 304 M 776 300 L 784 300 M 780 296 L 780 304 M 896 300 L 904 300 M 900 296 L 900 304 M 1016 300 L 1024 300 M 1020 296 L 1020 304 M 1136 300 L 1144 300 M 1140 296 L 1140 304 M 1256 300 L 1264 300 M 1260 296 L 1260 304 M 1376 300 L 1384 300 M 1380 296 L 1380 304 M 1496 300 L 1504 300 M 1500 296 L 1500 304 M 56 420 L 64 420 M 60 416 L 60 424 M 176 420 L 184 420 M 180 416 L 180 424 M 296 420 L 304 420 M 300 416 L 300 424 M 416 420 L 424 420 M 420 416 L 420 424 M 536 420 L 544 420 M 540 416 L 540 424 M 656 420 L 664 420 M 660 416 L 660 424 M 776 420 L 784 420 M 780 416 L 780 424 M 896 420 L 904 420 M 900 416 L 900 424 M 1016 420 L 1024 420 M 1020 416 L 1020 424 M 1136 420 L 1144 420 M 1140 416 L 1140 424 M 1256 420 L 1264 420 M 1260 416 L 1260 424 M 1376 420 L 1384 420 M 1380 416 L 1380 424 M 1496 420 L 1504 420 M 1500 416 L 1500 424 M 56 540 L 64 540 M 60 536 L 60 544 M 176 540 L 184 540 M 180 536 L 180 544 M 296 540 L 304 540 M 300 536 L 300 544 M 416 540 L 424 540 M 420 536 L 420 544 M 536 540 L 544 540 M 540 536 L 540 544 M 656 540 L 664 540 M 660 536 L 660 544 M 776 540 L 784 540 M 780 536 L 780 544 M 896 540 L 904 540 M 900 536 L 900 544 M 1016 540 L 1024 540 M 1020 536 L 1020 544 M 1136 540 L 1144 540 M 1140 536 L 1140 544 M 1256 540 L 1264 540 M 1260 536 L 1260 544 M 1376 540 L 1384 540 M 1380 536 L 1380 544 M 1496 540 L 1504 540 M 1500 536 L 1500 544 M 56 660 L 64 660 M 60 656 L 60 664 M 176 660 L 184 660 M 180 656 L 180 664 M 296 660 L 304 660 M 300 656 L 300 664 M 416 660 L 424 660 M 420 656 L 420 664 M 536 660 L 544 660 M 540 656 L 540 664 M 656 660 L 664 660 M 660 656 L 660 664 M 776 660 L 784 660 M 780 656 L 780 664 M 896 660 L 904 660 M 900 656 L 900 664 M 1016 660 L 1024 660 M 1020 656 L 1020 664 M 1136 660 L 1144 660 M 1140 656 L 1140 664 M 1256 660 L 1264 660 M 1260 656 L 1260 664 M 1376 660 L 1384 660 M 1380 656 L 1380 664 M 1496 660 L 1504 660 M 1500 656 L 1500 664 M 56 780 L 64 780 M 60 776 L 60 784 M 176 780 L 184 780 M 180 776 L 180 784 M 296 780 L 304 780 M 300 776 L 300 784 M 416 780 L 424 780 M 420 776 L 420 784 M 536 780 L 544 780 M 540 776 L 540 784 M 656 780 L 664 780 M 660 776 L 660 784 M 776 780 L 784 780 M 780 776 L 780 784 M 896 780 L 904 780 M 900 776 L 900 784 M 1016 780 L 1024 780 M 1020 776 L 1020 784 M 1136 780 L 1144 780 M 1140 776 L 1140 784 M 1256 780 L 1264 780 M 1260 776 L 1260 784 M 1376 780 L 1384 780 M 1380 776 L 1380 784 M 1496 780 L 1504 780 M 1500 776 L 1500 784 M 56 900 L 64 900 M 60 896 L 60 904 M 176 900 L 184 900 M 180 896 L 180 904 M 296 900 L 304 900 M 300 896 L 300 904 M 416 900 L 424 900 M 420 896 L 420 904 M 536 900 L 544 900 M 540 896 L 540 904 M 656 900 L 664 900 M 660 896 L 660 904 M 776 900 L 784 900 M 780 896 L 780 904 M 896 900 L 904 900 M 900 896 L 900 904 M 1016 900 L 1024 900 M 1020 896 L 1020 904 M 1136 900 L 1144 900 M 1140 896 L 1140 904 M 1256 900 L 1264 900 M 1260 896 L 1260 904 M 1376 900 L 1384 900 M 1380 896 L 1380 904 M 1496 900 L 1504 900 M 1500 896 L 1500 904 M 56 1020 L 64 1020 M 60 1016 L 60 1024 M 176 1020 L 184 1020 M 180 1016 L 180 1024 M 296 1020 L 304 1020 M 300 1016 L 300 1024 M 416 1020 L 424 1020 M 420 1016 L 420 1024 M 536 1020 L 544 1020 M 540 1016 L 540 1024 M 656 1020 L 664 1020 M 660 1016 L 660 1024 M 776 1020 L 784 1020 M 780 1016 L 780 1024 M 896 1020 L 904 1020 M 900 1016 L 900 1024 M 1016 1020 L 1024 1020 M 1020 1016 L 1020 1024 M 1136 1020 L 1144 1020 M 1140 1016 L 1140 1024 M 1256 1020 L 1264 1020 M 1260 1016 L 1260 1024 M 1376 1020 L 1384 1020 M 1380 1016 L 1380 1024 M 1496 1020 L 1504 1020 M 1500 1016 L 1500 1024 M 56 1140 L 64 1140 M 60 1136 L 60 1144 M 176 1140 L 184 1140 M 180 1136 L 180 1144 M 296 1140 L 304 1140 M 300 1136 L 300 1144 M 416 1140 L 424 1140 M 420 1136 L 420 1144 M 536 1140 L 544 1140 M 540 1136 L 540 1144 M 656 1140 L 664 1140 M 660 1136 L 660 1144 M 776 1140 L 784 1140 M 780 1136 L 780 1144 M 896 1140 L 904 1140 M 900 1136 L 900 1144 M 1016 1140 L 1024 1140 M 1020 1136 L 1020 1144 M 1136 1140 L 1144 1140 M 1140 1136 L 1140 1144 M 1256 1140 L 1264 1140 M 1260 1136 L 1260 1144 M 1376 1140 L 1384 1140 M 1380 1136 L 1380 1144 M 1496 1140 L 1504 1140 M 1500 1136 L 1500 1144"/>
-    <Stroke color="#64748B" width="1" cap="round"/>
+    <Stroke color="#475569" width="1" cap="round"/>
   </Layer>
 
   <!-- Core -->
@@ -78,10 +55,10 @@
     <!-- Main ring -->
     <Layer>
       <Ellipse center="0,0" size="260,260"/>
-      <Stroke color="#475569" width="1.5"/>
+      <Stroke color="#475569" width="2"/>
     </Layer>
     <!-- Gradient arc decoration -->
-    <Layer>
+    <Layer alpha="0.7">
       <Ellipse center="0,0" size="310,310"/>
       <TrimPath start="0" end="0.77"/>
       <Stroke width="2.5" cap="round">
@@ -113,28 +90,65 @@
   </Layer>
 
   <!-- Connector endpoint dots -->
-  <Layer name="ConnectorDots" alpha="0.8">
-    <Ellipse center="800,375" size="8,8"/>
-    <Ellipse center="954,511" size="8,8"/>
-    <Ellipse center="903,646" size="8,8"/>
-    <Ellipse center="697,646" size="8,8"/>
-    <Ellipse center="646,511" size="8,8"/>
-    <Fill color="#06B6D4"/>
+  <Layer name="ConnectorDots" alpha="0.7">
+    <Group>
+      <Ellipse center="800,375" size="6,6"/>
+      <Fill color="#06B6D4"/>
+    </Group>
+    <Group>
+      <Ellipse center="954,511" size="6,6"/>
+      <Fill color="#06B6D4"/>
+    </Group>
+    <Group>
+      <Ellipse center="903,646" size="6,6"/>
+      <Fill color="#06B6D4"/>
+    </Group>
+    <Group>
+      <Ellipse center="697,646" size="6,6"/>
+      <Fill color="#06B6D4"/>
+    </Group>
+    <Group>
+      <Ellipse center="646,511" size="6,6"/>
+      <Fill color="#06B6D4"/>
+    </Group>
   </Layer>
 
   <!-- Connectors -->
-  <Layer name="Connectors" alpha="0.5">
-    <Path data="M 800 375 L 800 240 M 954 511 L 1119 466 M 903 646 L 989 790 M 697 646 L 611 790 M 646 511 L 481 466"/>
-    <Stroke color="@accentLine" width="2" dashes="6,10"/>
+  <Layer name="Connectors" alpha="0.35">
+    <!-- to Readable (800,170) -->
+    <Group>
+      <Path data="M 800 375 L 800 240"/>
+      <Stroke color="@accentLine" width="2" dashes="8,14"/>
+    </Group>
+    <!-- to Comprehensive (1319,476) -->
+    <Group>
+      <Path data="M 954 511 L 1119 466"/>
+      <Stroke color="@accentLine" width="2" dashes="8,14"/>
+    </Group>
+    <!-- to Deployable (1101,880) -->
+    <Group>
+      <Path data="M 903 646 L 989 790"/>
+      <Stroke color="@accentLine" width="2" dashes="8,14"/>
+    </Group>
+    <!-- to Interoperable (499,880) -->
+    <Group>
+      <Path data="M 697 646 L 611 790"/>
+      <Stroke color="@accentLine" width="2" dashes="8,14"/>
+    </Group>
+    <!-- to Expressive (281,476) -->
+    <Group>
+      <Path data="M 646 511 L 481 466"/>
+      <Stroke color="@accentLine" width="2" dashes="8,14"/>
+    </Group>
   </Layer>
 
   <!-- Card 1: Readable (top center) -->
   <Layer name="CardReadable" x="800" y="160">
     <Rectangle center="0,0" size="400,160" roundness="20"/>
-    <Fill color="#1E293B90"/>
-    <Stroke color="#334155" width="1"/>
+    <Fill color="#1E293B80"/>
+    <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="24" blurY="24" color="#00000060"/>
-    <Layer alpha="0.15">
+    <Layer alpha="0.08">
       <Path data="M -180 -80 L 180 -80"/>
       <Stroke width="1">
         <LinearGradient startPoint="-180,-80" endPoint="180,-80">
@@ -165,17 +179,17 @@
         <Stroke color="#F43F5E" width="1.5" cap="round"/>
       </Group>
     </Layer>
-    <Layer x="-50" y="-17">
+    <Layer x="-50" y="-20">
       <Text text="Readable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#F43F5E"/>
     </Layer>
-    <Layer x="-50" y="14">
+    <Layer x="-50" y="10">
       <Text text="Plain-text XML, easy to" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-50" y="36">
+    <Layer x="-50" y="32">
       <Text text="diff, debug, and AI-generate." fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
@@ -185,10 +199,10 @@
   <!-- Card 2: Comprehensive (right-upper) -->
   <Layer name="CardComprehensive" x="1319" y="466">
     <Rectangle center="0,0" size="400,160" roundness="20"/>
-    <Fill color="#1E293B90"/>
-    <Stroke color="#334155" width="1"/>
+    <Fill color="#1E293B80"/>
+    <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="24" blurY="24" color="#00000060"/>
-    <Layer alpha="0.15">
+    <Layer alpha="0.08">
       <Path data="M -180 -80 L 180 -80"/>
       <Stroke width="1">
         <LinearGradient startPoint="-180,-80" endPoint="180,-80">
@@ -215,17 +229,17 @@
         <Fill color="#38BDF810"/>
       </Group>
     </Layer>
-    <Layer x="-50" y="-17">
+    <Layer x="-50" y="-20">
       <Text text="Comprehensive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#38BDF8"/>
     </Layer>
-    <Layer x="-50" y="14">
+    <Layer x="-50" y="10">
       <Text text="Covers vectors, images," fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-50" y="36">
+    <Layer x="-50" y="32">
       <Text text="text, effects, and masks." fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
@@ -235,10 +249,10 @@
   <!-- Card 3: Expressive (left-upper) -->
   <Layer name="CardExpressive" x="281" y="466">
     <Rectangle center="0,0" size="400,160" roundness="20"/>
-    <Fill color="#1E293B90"/>
-    <Stroke color="#334155" width="1"/>
+    <Fill color="#1E293B80"/>
+    <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="24" blurY="24" color="#00000060"/>
-    <Layer alpha="0.15">
+    <Layer alpha="0.08">
       <Path data="M -180 -80 L 180 -80"/>
       <Stroke width="1">
         <LinearGradient startPoint="-180,-80" endPoint="180,-80">
@@ -279,17 +293,17 @@
         <Fill color="#A855F715"/>
       </Group>
     </Layer>
-    <Layer x="-50" y="-17">
+    <Layer x="-50" y="-20">
       <Text text="Expressive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#A855F7"/>
     </Layer>
-    <Layer x="-50" y="14">
+    <Layer x="-50" y="10">
       <Text text="Compact structure for both" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-50" y="36">
+    <Layer x="-50" y="32">
       <Text text="static and animated content." fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
@@ -299,10 +313,10 @@
   <!-- Card 4: Interoperable (left-lower) -->
   <Layer name="CardInteroperable" x="499" y="870">
     <Rectangle center="0,0" size="400,160" roundness="20"/>
-    <Fill color="#1E293B90"/>
-    <Stroke color="#334155" width="1"/>
+    <Fill color="#1E293B80"/>
+    <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="24" blurY="24" color="#00000060"/>
-    <Layer alpha="0.15">
+    <Layer alpha="0.08">
       <Path data="M -180 -80 L 180 -80"/>
       <Stroke width="1">
         <LinearGradient startPoint="-180,-80" endPoint="180,-80">
@@ -327,17 +341,17 @@
         <Stroke color="#10B981" width="1" dashes="3,3"/>
       </Group>
     </Layer>
-    <Layer x="-50" y="-17">
+    <Layer x="-50" y="-20">
       <Text text="Interoperable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#10B981"/>
     </Layer>
-    <Layer x="-50" y="14">
+    <Layer x="-50" y="10">
       <Text text="Bridges AE, Figma, SVG," fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-50" y="36">
+    <Layer x="-50" y="32">
       <Text text="PDF, and more seamlessly." fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
@@ -347,10 +361,10 @@
   <!-- Card 5: Deployable (right-lower) -->
   <Layer name="CardDeployable" x="1101" y="870">
     <Rectangle center="0,0" size="400,160" roundness="20"/>
-    <Fill color="#1E293B90"/>
-    <Stroke color="#334155" width="1"/>
+    <Fill color="#1E293B80"/>
+    <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetX="0" offsetY="4" blurX="24" blurY="24" color="#00000060"/>
-    <Layer alpha="0.15">
+    <Layer alpha="0.08">
       <Path data="M -180 -80 L 180 -80"/>
       <Stroke width="1">
         <LinearGradient startPoint="-180,-80" endPoint="180,-80">
@@ -384,17 +398,17 @@
         <Stroke color="#FB923C" width="2" cap="round" join="round"/>
       </Group>
     </Layer>
-    <Layer x="-50" y="-17">
+    <Layer x="-50" y="-20">
       <Text text="Deployable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#FBBF24"/>
     </Layer>
-    <Layer x="-50" y="14">
+    <Layer x="-50" y="10">
       <Text text="One-click export to binary" fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
-    <Layer x="-50" y="36">
+    <Layer x="-50" y="32">
       <Text text="PAG with high performance." fontFamily="Arial" fontSize="16"/>
       <TextLayout position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
@@ -404,7 +418,7 @@
   <!-- Pipeline Section -->
   <Layer name="Pipeline" x="800" y="1070">
     <!-- Separator line -->
-    <Layer alpha="0.3">
+    <Layer alpha="0.18">
       <Path data="M -400 -40 L 400 -40"/>
       <Stroke width="1">
         <LinearGradient startPoint="-400,0" endPoint="400,0">
