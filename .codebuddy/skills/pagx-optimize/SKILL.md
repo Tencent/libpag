@@ -922,13 +922,20 @@ the rendered image within the canvas bounds. Safe to auto-apply.
 **When to apply**: A Repeater (or nested Repeaters) generates content that extends significantly
 beyond the canvas bounds.
 
-**How**: Adjust the starting position and `copies` count so generated content just covers the
-canvas, with minimal overflow. **Keep the original spacing/density unchanged** — only reduce
-the extent of the pattern to the visible area.
+**How**: Combine two techniques for best results:
+
+1. **Reduce copies**: Adjust the starting position and `copies` count so generated content just
+   covers the canvas, with minimal overflow. **Keep the original spacing/density unchanged** —
+   only reduce the extent of the pattern. This reduces file size and element traversal cost.
+
+2. **Add scrollRect**: Add `scrollRect="0,0,{width},{height}"` (matching the canvas dimensions)
+   to the Layer containing the Repeater. The renderer skips elements outside the scrollRect
+   during rendering, and scrollRect precisely clips edge elements that partially overflow. This
+   ensures pixel-exact canvas-bound clipping even when copies cannot be reduced to fit exactly.
 
 ```xml
 <!-- Before: generates 70×40 = 2800 hexagons, ~40% outside 800×600 canvas -->
-<Layer>
+<Layer alpha="0.15">
   <Group x="-400">
     <Path data="@hex"/>
     <Stroke color="#0066AA" width="1"/>
@@ -937,8 +944,8 @@ the extent of the pattern to the visible area.
   <Repeater copies="40" position="10,17.32"/>
 </Layer>
 
-<!-- After: generates ~41×36 = 1476 hexagons, same density, clipped to canvas -->
-<Layer>
+<!-- After: reduced copies + scrollRect for precise clipping -->
+<Layer alpha="0.15" scrollRect="0,0,800,600">
   <Group x="-10">
     <Path data="@hex"/>
     <Stroke color="#0066AA" width="1"/>
