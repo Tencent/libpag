@@ -9,12 +9,14 @@
  *     index.css
  *     wasm-mt/
  *     ../../resources/font/  (from libpag root)
+ *     ../../spec/samples/    (from libpag root)
  *
  * Output structure:
  *     <output>/index.html
  *     <output>/index.css
  *     <output>/fonts/
  *     <output>/wasm-mt/
+ *     <output>/samples/          (.pagx files, images, and generated index.json)
  *
  * Usage:
  *     npm run publish [-- -o <output-dir>]
@@ -29,6 +31,7 @@ const SCRIPT_DIR = __dirname;
 const PLAYGROUND_DIR = path.dirname(SCRIPT_DIR);
 const LIBPAG_DIR = path.dirname(PLAYGROUND_DIR);
 const RESOURCES_FONT_DIR = path.join(LIBPAG_DIR, 'resources', 'font');
+const SAMPLES_DIR = path.join(LIBPAG_DIR, 'spec', 'samples');
 const DEFAULT_OUTPUT_DIR = path.join(LIBPAG_DIR, 'public');
 
 /**
@@ -169,6 +172,24 @@ function main() {
     path.join(wasmDir, 'pagx-playground.wasm'),
     path.join(wasmOutputDir, 'pagx-playground.wasm')
   );
+
+  // Copy samples directory and generate index.json
+  console.log('\n  Copying samples...');
+  const samplesOutputDir = path.join(outputDir, 'samples');
+  const sampleFiles = fs.readdirSync(SAMPLES_DIR)
+    .filter(f => !f.startsWith('.'))
+    .sort();
+  for (const file of sampleFiles) {
+    copyFile(
+      path.join(SAMPLES_DIR, file),
+      path.join(samplesOutputDir, file)
+    );
+  }
+  const pagxFiles = sampleFiles.filter(f => f.endsWith('.pagx'));
+  const indexJsonPath = path.join(samplesOutputDir, 'index.json');
+  fs.mkdirSync(path.dirname(indexJsonPath), { recursive: true });
+  fs.writeFileSync(indexJsonPath, JSON.stringify(pagxFiles, null, 2) + '\n');
+  console.log(`  Generated: ${indexJsonPath}`);
 
   console.log('\nDone!');
 }

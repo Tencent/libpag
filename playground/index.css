@@ -16,6 +16,10 @@ html, body {
     background: #1a1a2e;
 }
 
+.container.hidden {
+    display: none;
+}
+
 .canvas {
     cursor: grab;
     position: absolute;
@@ -127,11 +131,21 @@ html, body {
     margin: 0;
 }
 
-.spec-btn {
+.nav-btns {
     position: absolute;
     top: 16px;
     right: 16px;
     z-index: 150;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.nav-btns.hidden {
+    display: none;
+}
+
+.nav-btn {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -143,32 +157,28 @@ html, body {
     transition: all 0.2s ease;
 }
 
-.spec-btn:hover {
+.nav-btn:hover {
     background: rgba(255, 255, 255, 0.15);
     border-color: rgba(255, 255, 255, 0.3);
 }
 
-.spec-btn svg {
+.nav-btn svg {
     width: 16px;
     height: 16px;
     color: #aaa;
 }
 
-.spec-btn:hover svg {
+.nav-btn:hover svg {
     color: #ccc;
 }
 
-.spec-btn span {
+.nav-btn span {
     color: #aaa;
     font-size: 13px;
 }
 
-.spec-btn:hover span {
+.nav-btn:hover span {
     color: #ccc;
-}
-
-.spec-btn.hidden {
-    display: none;
 }
 
 .loading-content {
@@ -354,4 +364,91 @@ html, body {
     .file-name {
         max-width: 150px;
     }
+}
+
+/* Samples page */
+.samples-page {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 200;
+    background: #1a1a2e;
+    overflow-y: auto;
+    padding: 0 24px 40px;
+}
+
+.samples-page.hidden {
+    display: none;
+}
+
+.samples-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0;
+    position: sticky;
+    top: 0;
+    background: #1a1a2e;
+    z-index: 10;
+}
+
+.samples-title {
+    color: #fff;
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.samples-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 auto;
+    max-width: 720px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.samples-list li {
+    display: flex;
+}
+
+.samples-list a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #ccc;
+    font-size: 15px;
+    transition: background 0.15s ease;
+}
+
+.samples-list a:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+}
+
+.samples-list a.active {
+    background: rgba(0, 82, 217, 0.2);
+    color: #5b9aff;
+}
+
+.samples-list .sample-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    color: #666;
+}
+
+.samples-list a:hover .sample-icon {
+    color: #888;
+}
+
+.samples-list a.active .sample-icon {
+    color: #5b9aff;
 }
