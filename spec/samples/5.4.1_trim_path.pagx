@@ -1,34 +1,68 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates TrimPath modifier: partially drawing a path -->
+<!-- Demonstrates TrimPath with separate and continuous modes -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Background circle (track) -->
+  <!-- Title -->
   <Layer>
-    <Ellipse center="200,200" size="260,260"/>
-    <Stroke color="#E2E8F0" width="10"/>
+    <Text text="TrimPath" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
+    <TextLayout position="200,70" textAlign="center"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="280,0">
+        <ColorStop offset="0" color="#6366F1"/>
+        <ColorStop offset="0.5" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#EC4899"/>
+      </LinearGradient>
+    </Fill>
   </Layer>
-  <!-- Trimmed arc showing progress -->
+
+  <!-- Section 1: Separate mode (50% top) -->
+  <!-- Background tracks for separate mode -->
   <Layer>
-    <Ellipse center="200,200" size="260,260"/>
-    <TrimPath start="0" end="0.75" type="continuous"/>
-    <Stroke width="24" cap="round">
-      <ConicGradient center="200,200" startAngle="0" endAngle="270">
+    <Path data="M 80,140 L 200,190"/>
+    <Path data="M 200,190 L 320,140"/>
+    <Stroke color="#E2E8F0" width="8" cap="round"/>
+  </Layer>
+  <!-- Trimmed paths in separate mode (each 50% independently) -->
+  <Layer>
+    <Path data="M 80,140 L 200,190"/>
+    <Path data="M 200,190 L 320,140"/>
+    <TrimPath start="0" end="0.5" type="separate"/>
+    <Stroke width="8" cap="round">
+      <LinearGradient startPoint="80,140" endPoint="320,140">
         <ColorStop offset="0" color="#06B6D4"/>
-        <ColorStop offset="1" color="#8B5CF6"/>
-      </ConicGradient>
+        <ColorStop offset="1" color="#0891B2"/>
+      </LinearGradient>
     </Stroke>
   </Layer>
-  <!-- Start indicator dot -->
+  <!-- Label: separate mode -->
   <Layer>
-    <Ellipse center="330,200" size="24,24"/>
-    <Fill color="#06B6D4"/>
-    <Stroke color="#FFFFFF" width="4"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#06B6D460"/>
+    <Text text="Separate" fontFamily="Arial" fontSize="18"/>
+    <TextLayout position="200,220" textAlign="center"/>
+    <Fill color="#475569"/>
   </Layer>
-  <!-- End indicator dot -->
+
+  <!-- Section 2: Continuous mode (50% bottom) -->
+  <!-- Background tracks for continuous mode -->
   <Layer>
-    <Ellipse center="108,108" size="24,24"/>
-    <Fill color="#8B5CF6"/>
-    <Stroke color="#FFFFFF" width="4"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#8B5CF660"/>
+    <Path data="M 80,280 L 200,330"/>
+    <Path data="M 200,330 L 320,280"/>
+    <Stroke color="#E2E8F0" width="8" cap="round"/>
+  </Layer>
+  <!-- Trimmed paths in continuous mode (middle 50% of combined path) -->
+  <Layer>
+    <Path data="M 80,280 L 200,330"/>
+    <Path data="M 200,330 L 320,280"/>
+    <TrimPath start="0.25" end="0.75" type="continuous"/>
+    <Stroke width="8" cap="round">
+      <LinearGradient startPoint="80,280" endPoint="320,280">
+        <ColorStop offset="0" color="#F59E0B"/>
+        <ColorStop offset="1" color="#F43F5E"/>
+      </LinearGradient>
+    </Stroke>
+  </Layer>
+  <!-- Label: continuous mode -->
+  <Layer>
+    <Text text="Continuous" fontFamily="Arial" fontSize="18"/>
+    <TextLayout position="200,370" textAlign="center"/>
+    <Fill color="#475569"/>
   </Layer>
 </pagx>
