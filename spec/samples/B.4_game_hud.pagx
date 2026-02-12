@@ -3,6 +3,9 @@
   <Resources>
     <PathData id="hex" data="M 10 0 L 5 8.66 L -5 8.66 L -10 0 L -5 -8.66 L 5 -8.66 Z"/>
     <PathData id="bracket" data="M 10 0 L 30 0 L 30 80 L 10 80"/>
+    <PathData id="bullet" data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
+    <PathData id="healthArc" data="M -180 100 A 200 200 0 0 0 -180 -100"/>
+    <PathData id="energyArc" data="M 180 -100 A 200 200 0 0 0 180 100"/>
   </Resources>
 
   <!-- Mask Definitions -->
@@ -120,13 +123,13 @@
   <Layer name="LeftSide" x="400" y="300">
     <!-- Curved Health Bar Track -->
     <Layer>
-      <Path data="M -180 100 A 200 200 0 0 0 -180 -100"/>
+      <Path data="@healthArc"/>
       <Stroke width="24" color="#002233" cap="butt"/>
     </Layer>
     
     <!-- Segmented Health Bar -->
     <Layer>
-      <Path data="M -180 100 A 200 200 0 0 0 -180 -100"/>
+      <Path data="@healthArc"/>
       <Stroke width="20" cap="butt" dashes="4, 2">
          <LinearGradient startPoint="-180,100" endPoint="-180,-100">
             <ColorStop offset="0" color="#ff0000"/>
@@ -175,13 +178,13 @@
   <Layer name="RightSide" x="400" y="300">
     <!-- Curved Energy Bar Track -->
     <Layer>
-      <Path data="M 180 -100 A 200 200 0 0 0 180 100"/>
+      <Path data="@energyArc"/>
       <Stroke width="24" color="#002233" cap="butt"/>
     </Layer>
     
     <!-- Segmented Energy Bar -->
     <Layer>
-      <Path data="M 180 -100 A 200 200 0 0 0 180 100"/>
+      <Path data="@energyArc"/>
       <Stroke width="20" cap="butt" dashes="10, 2">
          <LinearGradient startPoint="180,-100" endPoint="180,100">
             <ColorStop offset="0" color="#00ffff"/>
@@ -307,7 +310,7 @@
   <Layer name="AmmoDisplay" x="630" y="496">
       <Layer>
           <!-- Bullet Icon -->
-          <Path data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
+          <Path data="@bullet"/>
           <Fill color="#ffaa00"/>
           <Stroke color="#000000" width="1"/>
           <Repeater copies="10" position="10, 0"/>
@@ -316,14 +319,14 @@
       <Layer y="15">
            <Layer>
               <!-- Bullet Icon -->
-              <Path data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
+              <Path data="@bullet"/>
               <Fill color="#ffaa00"/>
               <Stroke color="#000000" width="1"/>
               <Repeater copies="5" position="10, 0"/>
            </Layer>
            <Layer>
               <!-- Depleted Bullets -->
-              <Path data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
+              <Path data="@bullet"/>
               <Fill color="#331100"/>
               <Stroke color="#442200" width="1"/>
               <Repeater copies="5" position="10, 0" offset="5"/> 
