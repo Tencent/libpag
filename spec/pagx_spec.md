@@ -261,7 +261,7 @@ PAGX uses a standard 2D Cartesian coordinate system:
 
 **Layer Rendering Order**: Layers are rendered sequentially in document order; layers earlier in the document render first (below); later layers render last (above).
 
-> 📄 [Source](samples/3.2_document_structure.pagx) | [Preview](https://pag.io/pagx/?file=./samples/3.2_document_structure.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/3.2_document_structure.pagx)
 
 ### 3.3 Resources
 
@@ -294,7 +294,7 @@ PAGX uses a standard 2D Cartesian coordinate system:
 </pagx>
 ```
 
-> 📄 [Source](samples/3.3_resources.pagx) | [Preview](https://pag.io/pagx/?file=./samples/3.3_resources.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/3.3_resources.pagx)
 
 #### 3.3.1 Image
 
@@ -610,9 +610,7 @@ Except for solid colors, all color sources (gradients, image patterns) operate w
 - Applying `scale(2, 2)` transform to this layer: The rectangle becomes 200×200, and the gradient scales accordingly, maintaining consistent visual appearance
 - Directly changing Rectangle's size to 200,200: The rectangle becomes 200×200, but the gradient coordinates remain unchanged, covering only the left half of the rectangle
 
-> 📄 Samples: [LinearGradient](samples/3.3.3_linear_gradient.pagx) | [RadialGradient](samples/3.3.3_radial_gradient.pagx) | [ConicGradient](samples/3.3.3_conic_gradient.pagx) | [DiamondGradient](samples/3.3.3_diamond_gradient.pagx) | [ImagePattern](samples/3.3.3_image_pattern.pagx) | [Coordinates](samples/3.3.3_color_source_coordinates.pagx)
->
-> 🔗 Preview: [Linear](https://pag.io/pagx/?file=./samples/3.3.3_linear_gradient.pagx) | [Radial](https://pag.io/pagx/?file=./samples/3.3.3_radial_gradient.pagx) | [Conic](https://pag.io/pagx/?file=./samples/3.3.3_conic_gradient.pagx) | [Diamond](https://pag.io/pagx/?file=./samples/3.3.3_diamond_gradient.pagx) | [Pattern](https://pag.io/pagx/?file=./samples/3.3.3_image_pattern.pagx) | [Coords](https://pag.io/pagx/?file=./samples/3.3.3_color_source_coordinates.pagx)
+> Preview: [Linear](https://pag.io/pagx/?file=./samples/3.3.3_linear_gradient.pagx) | [Radial](https://pag.io/pagx/?file=./samples/3.3.3_radial_gradient.pagx) | [Conic](https://pag.io/pagx/?file=./samples/3.3.3_conic_gradient.pagx) | [Diamond](https://pag.io/pagx/?file=./samples/3.3.3_diamond_gradient.pagx) | [Pattern](https://pag.io/pagx/?file=./samples/3.3.3_image_pattern.pagx) | [Coords](https://pag.io/pagx/?file=./samples/3.3.3_color_source_coordinates.pagx)
 
 #### 3.3.4 Composition
 
@@ -653,7 +651,7 @@ Compositions are used for content reuse (similar to After Effects pre-comps).
 | `width` | float | (required) | Composition width |
 | `height` | float | (required) | Composition height |
 
-> 📄 [Source](samples/3.3.4_composition.pagx) | [Preview](https://pag.io/pagx/?file=./samples/3.3.4_composition.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/3.3.4_composition.pagx)
 
 #### 3.3.5 Font
 
@@ -885,7 +883,7 @@ Blend modes define how source color (S) combines with destination color (D).
 | `plusLighter` | S + D | Plus Lighter (toward white) |
 | `plusDarker` | S + D - 1 | Plus Darker (toward black) |
 
-> 📄 [Source](samples/4.2_layer.pagx) | [Preview](https://pag.io/pagx/?file=./samples/4.2_layer.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/4.2_layer.pagx)
 
 ### 4.3 Layer Styles
 
@@ -978,7 +976,7 @@ Draws an inner shadow **above** the layer, appearing inside the layer content. C
 3. Fill the shadow region with `color`
 4. Intersect with opaque layer content, keeping only shadow inside content
 
-> 📄 [Source](samples/4.3_layer_styles.pagx) | [Preview](https://pag.io/pagx/?file=./samples/4.3_layer_styles.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/4.3_layer_styles.pagx)
 
 ### 4.4 Layer Filters
 
@@ -1077,7 +1075,7 @@ Transforms colors using a 4×5 color matrix.
                                             | 1 |
 ```
 
-> 📄 [Source](samples/4.4_layer_filters.pagx) | [Preview](https://pag.io/pagx/?file=./samples/4.4_layer_filters.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/4.4_layer_filters.pagx)
 
 ### 4.5 Clipping and Masking
 
@@ -1108,7 +1106,7 @@ The `scrollRect` attribute defines the layer's visible region; content outside t
 </pagx>
 ```
 
-> 📄 [Source](samples/4.5.1_scroll_rect.pagx) | [Preview](https://pag.io/pagx/?file=./samples/4.5.1_scroll_rect.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/4.5.1_scroll_rect.pagx)
 
 #### 4.5.2 Masking
 
@@ -1142,7 +1140,7 @@ Reference another layer as a mask using the `mask` attribute.
 - The mask layer itself is not rendered (the `visible` attribute is ignored)
 - The mask layer's transforms do not affect the masked layer
 
-> 📄 [Source](samples/4.5.2_masking.pagx) | [Preview](https://pag.io/pagx/?file=./samples/4.5.2_masking.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/4.5.2_masking.pagx)
 
 ---
 
@@ -1299,7 +1297,7 @@ rect.bottom = center.y + size.height / 2
 </pagx>
 ```
 
-> 📄 [Source](samples/5.2.1_rectangle.pagx) | [Preview](https://pag.io/pagx/?file=./samples/5.2.1_rectangle.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/5.2.1_rectangle.pagx)
 
 #### 5.2.2 Ellipse
 
@@ -1378,7 +1376,7 @@ boundingRect.bottom = center.y + size.height / 2
 </pagx>
 ```
 
-> 📄 [Source](samples/5.2.2_ellipse.pagx) | [Preview](https://pag.io/pagx/?file=./samples/5.2.2_ellipse.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/5.2.2_ellipse.pagx)
 
 #### 5.2.3 Polystar
 
@@ -1486,7 +1484,7 @@ y = center.y + outerRadius * sin(angle)
 </pagx>
 ```
 
-> 📄 [Source](samples/5.2.3_polystar.pagx) | [Preview](https://pag.io/pagx/?file=./samples/5.2.3_polystar.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/5.2.3_polystar.pagx)
 
 #### 5.2.4 Path
 
@@ -1552,7 +1550,7 @@ Defines arbitrary shapes using SVG path syntax, supporting inline data or refere
 </pagx>
 ```
 
-> 📄 [Source](samples/5.2.4_path.pagx) | [Preview](https://pag.io/pagx/?file=./samples/5.2.4_path.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/5.2.4_path.pagx)
 
 #### 5.2.5 Text
 
@@ -1707,8 +1705,7 @@ When a glyph has scale, rotation, or skew transforms, they are applied in the fo
 </pagx>
 ```
 
-> 📄 Samples: [Text Layout](samples/5.2.5_text.pagx) | [GlyphRun](samples/5.2.5_glyph_run.pagx)
-> 🔗 Preview: [Text Layout](https://pag.io/pagx/?file=./samples/5.2.5_text.pagx) | [GlyphRun](https://pag.io/pagx/?file=./samples/5.2.5_glyph_run.pagx)
+> Preview: [Text Layout](https://pag.io/pagx/?file=./samples/5.2.5_text.pagx) | [GlyphRun](https://pag.io/pagx/?file=./samples/5.2.5_glyph_run.pagx)
 
 ### 5.3 Painters
 
@@ -1776,7 +1773,7 @@ Child elements: May embed one color source (SolidColor, LinearGradient, RadialGr
 - Supports color override for individual glyphs via TextModifier
 - Color override uses alpha blending: `finalColor = lerp(originalColor, overrideColor, overrideAlpha)`
 
-> 📄 [Source](samples/5.3.1_fill.pagx) | [Preview](https://pag.io/pagx/?file=./samples/5.3.1_fill.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/5.3.1_fill.pagx)
 
 #### 5.3.2 Stroke
 
@@ -1858,7 +1855,7 @@ Inside/outside stroke is achieved by:
 - `dashOffset`: Dash start offset
 - `dashAdaptive`: When true, scales the dash intervals so that the dash segments have the same length
 
-> 📄 [Source](samples/5.3.2_stroke.pagx) | [Preview](https://pag.io/pagx/?file=./samples/5.3.2_stroke.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/5.3.2_stroke.pagx)
 
 #### 5.3.3 LayerPlacement
 
@@ -1900,7 +1897,7 @@ Trims paths to a specified start/end range.
 - Supports wrapping: When trim range exceeds [0,1], automatically wraps to other end of path
 - When total path length is 0, no operation is performed
 
-> 📄 [Source](samples/5.4.1_trim_path.pagx) | [Preview](https://pag.io/pagx/?file=./samples/5.4.1_trim_path.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/5.4.1_trim_path.pagx)
 
 **Example** (separate vs continuous comparison):
 ```xml
@@ -2033,7 +2030,7 @@ Converts sharp corners of paths to rounded corners.
 </pagx>
 ```
 
-> 📄 [Source](samples/5.4.2_round_corner.pagx) | [Preview](https://pag.io/pagx/?file=./samples/5.4.2_round_corner.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/5.4.2_round_corner.pagx)
 
 #### 5.4.3 MergePath
 
@@ -2085,7 +2082,7 @@ Merges all shapes into a single shape.
 </pagx>
 ```
 
-> 📄 [Source](samples/5.4.3_merge_path.pagx) | [Preview](https://pag.io/pagx/?file=./samples/5.4.3_merge_path.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/5.4.3_merge_path.pagx)
 
 ### 5.5 Text Modifiers
 
@@ -2216,7 +2213,7 @@ blendFactor = overrideColor.alpha × |factor|
 finalColor = blend(originalColor, overrideColor, blendFactor)
 ```
 
-> 📄 [Source](samples/5.5.3_text_modifier.pagx) | [Preview](https://pag.io/pagx/?file=./samples/5.5.3_text_modifier.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/5.5.3_text_modifier.pagx)
 
 #### 5.5.4 RangeSelector
 
@@ -2339,7 +2336,7 @@ redistributed evenly to fill the available path length.
 
 **Closed Paths**: For closed paths, glyphs exceeding the range wrap to the other end of the path.
 
-> 📄 [Source](samples/5.5.5_text_path.pagx) | [Preview](https://pag.io/pagx/?file=./samples/5.5.5_text_path.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/5.5.5_text_path.pagx)
 
 #### 5.5.6 TextLayout
 
@@ -2440,7 +2437,7 @@ During rendering, an attached text typesetting module performs pre-layout, recal
 | `horizontal` | Horizontal text |
 | `vertical` | Vertical text (columns arranged right-to-left, traditional CJK vertical layout) |
 
-> 📄 [Source](samples/5.5.6_text_layout.pagx) | [Preview](https://pag.io/pagx/?file=./samples/5.5.6_text_layout.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/5.5.6_text_layout.pagx)
 
 #### 5.5.7 Rich Text
 
@@ -2555,7 +2552,7 @@ Rich text is achieved through multiple Text elements within a Group, each Text h
 
 **Note**: Each Group's Text + Fill/Stroke defines a text segment with independent styling. TextLayout treats all segments as a single unit for typography, enabling auto-wrapping and alignment.
 
-> 📄 [Source](samples/5.5.7_rich_text.pagx) | [Preview](https://pag.io/pagx/?file=./samples/5.5.7_rich_text.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/5.5.7_rich_text.pagx)
 
 ### 5.6 Repeater
 
@@ -2640,7 +2637,7 @@ When `copies` is a decimal (e.g., `3.5`), partial copies are achieved through **
 </pagx>
 ```
 
-> 📄 [Source](samples/5.6_repeater.pagx) | [Preview](https://pag.io/pagx/?file=./samples/5.6_repeater.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/5.6_repeater.pagx)
 
 ### 5.7 Group
 
@@ -2848,8 +2845,7 @@ Since painters do not clear the geometry list, the same geometry can have multip
 
 **Rendering Order**: Multiple painters render in document order; those appearing earlier are below.
 
-> 📄 Samples: [Group](samples/5.7_group.pagx) | [Isolation](samples/5.7_group_isolation.pagx) | [Propagation](samples/5.7_group_propagation.pagx) | [Multiple Painters](samples/5.7_multiple_painters.pagx) | [Multiple Fills](samples/5.7_multiple_fills.pagx) | [Multiple Strokes](samples/5.7_multiple_strokes.pagx) | [Mixed Overlay](samples/5.7_mixed_overlay.pagx)
-> 🔗 Preview: [Group](https://pag.io/pagx/?file=./samples/5.7_group.pagx) | [Isolation](https://pag.io/pagx/?file=./samples/5.7_group_isolation.pagx) | [Propagation](https://pag.io/pagx/?file=./samples/5.7_group_propagation.pagx) | [Multiple Painters](https://pag.io/pagx/?file=./samples/5.7_multiple_painters.pagx) | [Multiple Fills](https://pag.io/pagx/?file=./samples/5.7_multiple_fills.pagx) | [Multiple Strokes](https://pag.io/pagx/?file=./samples/5.7_multiple_strokes.pagx) | [Mixed Overlay](https://pag.io/pagx/?file=./samples/5.7_mixed_overlay.pagx)
+> Preview: [Group](https://pag.io/pagx/?file=./samples/5.7_group.pagx) | [Isolation](https://pag.io/pagx/?file=./samples/5.7_group_isolation.pagx) | [Propagation](https://pag.io/pagx/?file=./samples/5.7_group_propagation.pagx) | [Multiple Painters](https://pag.io/pagx/?file=./samples/5.7_multiple_painters.pagx) | [Multiple Fills](https://pag.io/pagx/?file=./samples/5.7_multiple_fills.pagx) | [Multiple Strokes](https://pag.io/pagx/?file=./samples/5.7_multiple_strokes.pagx) | [Mixed Overlay](https://pag.io/pagx/?file=./samples/5.7_mixed_overlay.pagx)
 
 ---
 
@@ -3197,7 +3193,7 @@ This example demonstrates the complete feature set of PAGX with a modern dark th
 | **Text Modifiers** | TextModifier/RangeSelector, TextPath, TextLayout, GlyphRun |
 | **Other** | Repeater, Group, Masking (mask/maskType), Composition reference |
 
-> 📄 [Source](samples/B.1_complete_example.pagx) | [Preview](https://pag.io/pagx/?file=./samples/B.1_complete_example.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/B.1_complete_example.pagx)
 
 ### B.2 RPG Character Panel
 
@@ -3968,7 +3964,7 @@ A fantasy RPG-style character status panel demonstrating complex UI composition 
 </pagx>
 ```
 
-> 📄 [Source](samples/B.2_rpg_character_panel.pagx) | [Preview](https://pag.io/pagx/?file=./samples/B.2_rpg_character_panel.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/B.2_rpg_character_panel.pagx)
 
 ### B.3 Nebula Cadet
 
@@ -4445,7 +4441,7 @@ A space-themed cadet profile card showcasing nebula effects, star fields, and mo
 </pagx>
 ```
 
-> 📄 [Source](samples/B.3_nebula_cadet.pagx) | [Preview](https://pag.io/pagx/?file=./samples/B.3_nebula_cadet.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/B.3_nebula_cadet.pagx)
 
 ### B.4 Game HUD
 
@@ -4803,7 +4799,7 @@ A game heads-up display (HUD) demonstrating health bars, score displays, and gam
 </pagx>
 ```
 
-> 📄 [Source](samples/B.4_game_hud.pagx) | [Preview](https://pag.io/pagx/?file=./samples/B.4_game_hud.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/B.4_game_hud.pagx)
 
 ### B.5 PAGX Features Overview
 
@@ -5286,7 +5282,7 @@ A comprehensive showcase of PAGX format capabilities including gradients, effect
 </pagx>
 ```
 
-> 📄 [Source](samples/B.5_pagx_features.pagx) | [Preview](https://pag.io/pagx/?file=./samples/B.5_pagx_features.pagx)
+> [Preview](https://pag.io/pagx/?file=./samples/B.5_pagx_features.pagx)
 
 ---
 
