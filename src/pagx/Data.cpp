@@ -28,12 +28,22 @@ std::shared_ptr<Data> Data::MakeWithCopy(const void* data, size_t length) {
   return std::shared_ptr<Data>(new Data(data, length));
 }
 
+std::shared_ptr<Data> Data::MakeAdopt(uint8_t* data, size_t length) {
+  if (data == nullptr || length == 0) {
+    return nullptr;
+  }
+  return std::shared_ptr<Data>(new Data(data, length, true));
+}
+
 Data::Data(const void* data, size_t length) : _size(length) {
   if (data != nullptr && length > 0) {
     auto* buffer = new uint8_t[length];
     std::memcpy(buffer, data, length);
     _data = buffer;
   }
+}
+
+Data::Data(uint8_t* data, size_t length, bool) : _data(data), _size(length) {
 }
 
 Data::~Data() {

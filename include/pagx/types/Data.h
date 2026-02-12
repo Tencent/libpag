@@ -34,6 +34,13 @@ class Data {
    */
   static std::shared_ptr<Data> MakeWithCopy(const void* data, size_t length);
 
+  /**
+   * Creates a Data object that takes ownership of the given buffer.
+   * @param data A buffer allocated with new[]. Data takes ownership and will delete[] it.
+   * @param length The byte size of the buffer.
+   */
+  static std::shared_ptr<Data> MakeAdopt(uint8_t* data, size_t length);
+
   ~Data();
 
   /**
@@ -66,6 +73,7 @@ class Data {
 
  private:
   Data(const void* data, size_t length);
+  Data(uint8_t* data, size_t length, bool adopt);
 
   const uint8_t* _data = nullptr;
   size_t _size = 0;
