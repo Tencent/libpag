@@ -440,10 +440,10 @@ Fill / Stroke declaration.
 
 ### 8.3 Cross-Layer Merging
 
-**When to apply**: Multiple adjacent Layers have no individual styles / filters / mask /
-blendMode / alpha / name, and their geometry uses identical painters.
+**When to apply**: Multiple adjacent Layers have identical painters and identical styles (or no
+styles), with no individual filters / mask / blendMode / alpha / name.
 
-**How**: Merge multiple Layers into one, with geometry sharing painters.
+**How**: Merge multiple Layers into one, with geometry sharing painters and styles.
 
 ```xml
 <!-- Before: 3 Layers, each drawing a circle with the same Stroke -->
@@ -459,6 +459,52 @@ blendMode / alpha / name, and their geometry uses identical painters.
   <Stroke color="#00FF0040" width="1"/>
 </Layer>
 ```
+
+### 8.4 Cross-Layer Style Merging
+
+**When to apply**: Multiple adjacent Layers have identical painters AND identical
+DropShadowStyle / InnerShadowStyle parameters, and the elements do not overlap or are spaced
+far enough apart that their individual shadows do not interact.
+
+DropShadowStyle computes the shadow from the entire Layer's opaque silhouette. When elements do
+not overlap, the shadow of the combined silhouette equals the union of individual shadows —
+merging is visually equivalent.
+
+**How**: Merge the Layers into one, with geometry sharing painters and one shared style.
+
+```xml
+<!-- Before: 3 Layers, each with same Stroke + same DropShadowStyle -->
+<Layer>
+  <Ellipse center="100,200" size="60,60"/>
+  <Stroke color="#00CCFF" width="2"/>
+  <DropShadowStyle blurX="8" blurY="8" color="#00CCFF80"/>
+</Layer>
+<Layer>
+  <Ellipse center="250,200" size="60,60"/>
+  <Stroke color="#00CCFF" width="2"/>
+  <DropShadowStyle blurX="8" blurY="8" color="#00CCFF80"/>
+</Layer>
+<Layer>
+  <Ellipse center="400,200" size="60,60"/>
+  <Stroke color="#00CCFF" width="2"/>
+  <DropShadowStyle blurX="8" blurY="8" color="#00CCFF80"/>
+</Layer>
+
+<!-- After: 1 Layer, shared Stroke + one DropShadowStyle -->
+<Layer>
+  <Ellipse center="100,200" size="60,60"/>
+  <Ellipse center="250,200" size="60,60"/>
+  <Ellipse center="400,200" size="60,60"/>
+  <Stroke color="#00CCFF" width="2"/>
+  <DropShadowStyle blurX="8" blurY="8" color="#00CCFF80"/>
+</Layer>
+```
+
+**Equivalence condition**: The elements must not overlap and the gap between adjacent elements
+must be larger than the blur radius. When this holds, individual shadows are independent and
+the merged shadow is identical. When elements overlap or are very close, the merged shadow
+produces a single connected silhouette instead of multiple separate shadows — this changes the
+rendering and requires user confirmation.
 
 ### Caveats — Painter Scope Isolation
 
