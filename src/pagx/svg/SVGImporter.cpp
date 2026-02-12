@@ -340,11 +340,15 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<D
     child = child->getNextSibling();
   }
 
-  // Add collected mask layers (invisible, used as mask references).
-  for (auto& maskLayer : _maskLayers) {
-    convertedLayers.insert(convertedLayers.begin(), maskLayer);
+  // Add collected mask layers (invisible, used as mask references) before other layers.
+  if (!_maskLayers.empty()) {
+    std::vector<Layer*> allLayers;
+    allLayers.reserve(_maskLayers.size() + convertedLayers.size());
+    allLayers.insert(allLayers.end(), _maskLayers.begin(), _maskLayers.end());
+    allLayers.insert(allLayers.end(), convertedLayers.begin(), convertedLayers.end());
+    convertedLayers = std::move(allLayers);
+    _maskLayers.clear();
   }
-  _maskLayers.clear();
 
   // Merge adjacent layers with the same geometry (optimize Fill + Stroke into one Layer).
   mergeAdjacentLayers(convertedLayers);
@@ -1407,8 +1411,9 @@ ImagePattern* SVGParserContext::convertPattern(
 void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
                                   std::vector<Element*>& contents,
                                   const InheritedStyle& inheritedStyle) {
-  // Get shape bounds for pattern calculations (computed once, used if needed).
-  Rect shapeBounds = getShapeBounds(element);
+  // Lazily compute shape bounds only when needed (for gradient/pattern references).
+  bool boundsComputed = false;
+  Rect shapeBounds = {};
 
   // Determine effective fill value (element attribute overrides inherited).
   std::string fill = getAttribute(element, "fill");
@@ -1431,6 +1436,10 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       auto fillNode = _document->makeNode<Fill>();
       std::string refId = resolveUrl(fill);
       // Use getColorSourceForRef which handles reference counting.
+      if (!boundsComputed) {
+        shapeBounds = getShapeBounds(element);
+        boundsComputed = true;
+      }
       fillNode->color = getColorSourceForRef(refId, shapeBounds);
       // Apply fill-opacity even for url() fills.
       std::string fillOpacity = getAttribute(element, "fill-opacity");
@@ -1499,6 +1508,10 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
     if (stroke.find("url(") == 0) {
       std::string refId = resolveUrl(stroke);
       // Use getColorSourceForRef which handles reference counting.
+      if (!boundsComputed) {
+        shapeBounds = getShapeBounds(element);
+        boundsComputed = true;
+      }
       strokeNode->color = getColorSourceForRef(refId, shapeBounds);
     } else {
       // Determine effective stroke-opacity.
@@ -2321,7 +2334,8 @@ static bool isSameGeometry(const Element* a, const Element* b) {
     case NodeType::Path: {
       auto pathA = static_cast<const Path*>(a);
       auto pathB = static_cast<const Path*>(b);
-      return PathDataToSVGString(*pathA->data) == PathDataToSVGString(*pathB->data);
+      return pathA->data->verbs() == pathB->data->verbs() &&
+             pathA->data->points() == pathB->data->points();
     }
     default:
       return false;
