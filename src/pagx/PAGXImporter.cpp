@@ -1308,6 +1308,30 @@ static Glyph* parseGlyph(const XMLNode* node, PAGXDocument* doc) {
   return glyph;
 }
 
+static std::vector<Point> ParseSemicolonSeparatedPoints(const std::string& str) {
+  std::vector<Point> result = {};
+  size_t start = 0;
+  size_t end = str.find(';');
+  while (start < str.size()) {
+    std::string pair = {};
+    if (end == std::string::npos) {
+      pair = str.substr(start);
+    } else {
+      pair = str.substr(start, end - start);
+    }
+    auto coords = ParseFloatList(pair);
+    if (coords.size() >= 2) {
+      result.push_back({coords[0], coords[1]});
+    }
+    if (end == std::string::npos) {
+      break;
+    }
+    start = end + 1;
+    end = str.find(';', start);
+  }
+  return result;
+}
+
 static GlyphRun* parseGlyphRun(const XMLNode* node, PAGXDocument* doc) {
   auto run = doc->makeNode<GlyphRun>(getAttribute(node, "id"));
   if (!run) {
@@ -1343,76 +1367,22 @@ static GlyphRun* parseGlyphRun(const XMLNode* node, PAGXDocument* doc) {
     run->xOffsets = parseFloatList(xOffsetsStr);
   }
 
-  // Parse positions (semicolon-separated x,y pairs)
+  // Parse positions
   auto posStr = getAttribute(node, "positions");
   if (!posStr.empty()) {
-    size_t start = 0;
-    size_t end = posStr.find(';');
-    while (start < posStr.size()) {
-      std::string pair = {};
-      if (end == std::string::npos) {
-        pair = posStr.substr(start);
-      } else {
-        pair = posStr.substr(start, end - start);
-      }
-      auto coords = ParseFloatList(pair);
-      if (coords.size() >= 2) {
-        run->positions.push_back({coords[0], coords[1]});
-      }
-      if (end == std::string::npos) {
-        break;
-      }
-      start = end + 1;
-      end = posStr.find(';', start);
-    }
+    run->positions = ParseSemicolonSeparatedPoints(posStr);
   }
 
-  // Parse anchors (semicolon-separated x,y pairs)
+  // Parse anchors
   auto anchorsStr = getAttribute(node, "anchors");
   if (!anchorsStr.empty()) {
-    size_t start = 0;
-    size_t end = anchorsStr.find(';');
-    while (start < anchorsStr.size()) {
-      std::string pair = {};
-      if (end == std::string::npos) {
-        pair = anchorsStr.substr(start);
-      } else {
-        pair = anchorsStr.substr(start, end - start);
-      }
-      auto coords = ParseFloatList(pair);
-      if (coords.size() >= 2) {
-        run->anchors.push_back({coords[0], coords[1]});
-      }
-      if (end == std::string::npos) {
-        break;
-      }
-      start = end + 1;
-      end = anchorsStr.find(';', start);
-    }
+    run->anchors = ParseSemicolonSeparatedPoints(anchorsStr);
   }
 
-  // Parse scales (semicolon-separated sx,sy pairs)
+  // Parse scales
   auto scalesStr = getAttribute(node, "scales");
   if (!scalesStr.empty()) {
-    size_t start = 0;
-    size_t end = scalesStr.find(';');
-    while (start < scalesStr.size()) {
-      std::string pair = {};
-      if (end == std::string::npos) {
-        pair = scalesStr.substr(start);
-      } else {
-        pair = scalesStr.substr(start, end - start);
-      }
-      auto coords = ParseFloatList(pair);
-      if (coords.size() >= 2) {
-        run->scales.push_back({coords[0], coords[1]});
-      }
-      if (end == std::string::npos) {
-        break;
-      }
-      start = end + 1;
-      end = scalesStr.find(';', start);
-    }
+    run->scales = ParseSemicolonSeparatedPoints(scalesStr);
   }
 
   // Parse rotations (comma-separated angles in degrees)
