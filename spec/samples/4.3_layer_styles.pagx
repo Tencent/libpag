@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates layer styles: DropShadow and InnerShadow -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Shape with both drop shadow and inner shadow -->
   <Layer x="70" y="70">
     <Rectangle center="130,130" size="260,260" roundness="40"/>
     <Fill>
