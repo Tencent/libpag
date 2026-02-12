@@ -191,23 +191,19 @@ function main() {
   fs.writeFileSync(indexJsonPath, JSON.stringify(pagxFiles, null, 2) + '\n');
   console.log(`  Generated: ${indexJsonPath}`);
 
-  // Copy and rename baseline images from test output
+  // Copy baseline images that match sample pagx files
   console.log('\n  Copying sample images...');
   const testOutputDir = path.join(LIBPAG_DIR, 'test', 'out', 'PAGXTest');
   if (fs.existsSync(testOutputDir)) {
     const imagesOutputDir = path.join(samplesOutputDir, 'images');
     fs.mkdirSync(imagesOutputDir, { recursive: true });
-    
-    const testFiles = fs.readdirSync(testOutputDir);
-    for (const file of testFiles) {
-      // Match baseline images: *_base.webp
-      if (file.endsWith('_base.webp')) {
-        // Remove _base suffix: 3.2_document_structure_base.webp -> 3.2_document_structure.webp
-        const newName = file.replace('_base.webp', '.webp');
-        copyFile(
-          path.join(testOutputDir, file),
-          path.join(imagesOutputDir, newName)
-        );
+
+    for (const pagxFile of pagxFiles) {
+      const baseName = pagxFile.replace(/\.pagx$/, '');
+      const baselineFile = baseName + '_base.webp';
+      const src = path.join(testOutputDir, baselineFile);
+      if (fs.existsSync(src)) {
+        copyFile(src, path.join(imagesOutputDir, baseName + '.webp'));
       }
     }
   } else {
