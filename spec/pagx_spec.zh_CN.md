@@ -237,14 +237,18 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="400" height="300">
-  <Layer name="background">
-    <Rectangle center="200,150" size="400,300"/>
-    <Fill color="#F0F0F0"/>
-  </Layer>
+<!-- Demonstrates basic PAGX document structure -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Main content card with modern gradient -->
   <Layer name="content">
-    <Rectangle center="200,150" size="200,100" roundness="10"/>
-    <Fill color="#3366FF"/>
+    <Rectangle center="200,200" size="240,240" roundness="40"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="240,240">
+        <ColorStop offset="0" color="#6366F1"/>
+        <ColorStop offset="1" color="#8B5CF6"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetY="16" blurX="48" blurY="48" color="#6366F160"/>
   </Layer>
 </pagx>
 ```
@@ -256,6 +260,7 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 | `height` | float | (必填) | 画布高度 |
 
 **图层渲染顺序**：图层按文档顺序依次渲染，文档中靠前的图层先渲染（位于下方），靠后的图层后渲染（位于上方）。
+> 📄 [示例](samples/3.2_document_structure.pagx) | [预览](https://pag.io/pagx/?file=./samples/3.2_document_structure.pagx)
 
 ### 3.3 资源区（Resources）
 
@@ -265,21 +270,29 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="300" height="200">
+<!-- Demonstrates resource definitions and references -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Main shape using gradient resource reference -->
   <Layer>
-    <Rectangle center="150,100" size="200,120"/>
-    <Fill color="@skyGradient"/>
+    <Rectangle center="200,200" size="320,320" roundness="32"/>
+    <Fill color="@oceanGradient"/>
+    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#06B6D450"/>
+  </Layer>
+  <!-- Shape using solid color resource reference -->
+  <Layer>
+    <Ellipse center="200,200" size="120,120"/>
+    <Fill color="@coral"/>
   </Layer>
   <Resources>
-    <PathData id="curvePath" data="M 0 0 C 50 0 50 100 100 100"/>
-    <SolidColor id="brandRed" color="#FF0000"/>
-    <LinearGradient id="skyGradient" startPoint="0,0" endPoint="0,200">
-      <ColorStop offset="0" color="#87CEEB"/>
-      <ColorStop offset="1" color="#E0F6FF"/>
+    <SolidColor id="coral" color="#F43F5E"/>
+    <LinearGradient id="oceanGradient" startPoint="0,0" endPoint="320,320">
+      <ColorStop offset="0" color="#06B6D4"/>
+      <ColorStop offset="1" color="#3B82F6"/>
     </LinearGradient>
   </Resources>
 </pagx>
 ```
+> 📄 [示例](samples/3.3_resources.pagx) | [预览](https://pag.io/pagx/?file=./samples/3.3_resources.pagx)
 
 #### 3.3.1 图片（Image）
 
@@ -554,6 +567,9 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 - 对该图层应用 `scale(2, 2)` 变换：矩形变为 200×200，渐变也随之放大，视觉效果保持一致
 - 直接将 Rectangle 的 size 改为 200,200：矩形变为 200×200，但渐变坐标不变，只覆盖矩形的左半部分
 
+> 📄 Samples: [SolidColor](samples/3.3.3_color_solid.pagx) | [LinearGradient](samples/3.3.3_color_linear.pagx) | [RadialGradient](samples/3.3.3_color_radial.pagx) | [ConicGradient](samples/3.3.3_color_conic.pagx) | [DiamondGradient](samples/3.3.3_color_diamond.pagx) | [ImagePattern](samples/3.3.3_color_image.pagx)
+> 🔗 Preview: [SolidColor](https://pag.io/pagx/?file=./samples/3.3.3_color_solid.pagx) | [LinearGradient](https://pag.io/pagx/?file=./samples/3.3.3_color_linear.pagx) | [RadialGradient](https://pag.io/pagx/?file=./samples/3.3.3_color_radial.pagx) | [ConicGradient](https://pag.io/pagx/?file=./samples/3.3.3_color_conic.pagx) | [DiamondGradient](https://pag.io/pagx/?file=./samples/3.3.3_color_diamond.pagx) | [ImagePattern](https://pag.io/pagx/?file=./samples/3.3.3_color_image.pagx)
+
 #### 3.3.4 合成（Composition）
 
 合成用于内容复用（类似 After Effects 的 Pre-comp）。
@@ -577,6 +593,8 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 |------|------|--------|------|
 | `width` | float | (必填) | 合成宽度 |
 | `height` | float | (必填) | 合成高度 |
+
+> 📄 [示例](samples/3.3.4_composition.pagx) | [预览](https://pag.io/pagx/?file=./samples/3.3.4_composition.pagx)
 
 #### 3.3.5 字体（Font）
 
