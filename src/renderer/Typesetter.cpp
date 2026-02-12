@@ -687,6 +687,10 @@ class TypesetterContext {
         runStartX = currentX;
         currentRun->startX = runStartX;
         currentRun->canUseDefaultMode = !hasLetterSpacing;
+        // Reserve using remaining bytes as an upper bound for glyph count.
+        auto remaining = content.size() - i + charLen;
+        currentRun->glyphIDs.reserve(remaining);
+        currentRun->xPositions.reserve(remaining);
       }
 
       currentRun->xPositions.push_back(currentX);

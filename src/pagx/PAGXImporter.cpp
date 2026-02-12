@@ -136,20 +136,20 @@ class XMLTokenizer {
   }
 
   std::string parseTagName() {
-    std::string name = {};
+    size_t start = pos;
     while (pos < length && !isspace(data[pos]) && data[pos] != '>' && data[pos] != '/') {
-      name += data[pos++];
+      pos++;
     }
-    return name;
+    return std::string(data + start, pos - start);
   }
 
   std::string parseAttributeName() {
-    std::string name = {};
+    size_t start = pos;
     while (pos < length && !isspace(data[pos]) && data[pos] != '=' && data[pos] != '>' &&
            data[pos] != '/') {
-      name += data[pos++];
+      pos++;
     }
-    return name;
+    return std::string(data + start, pos - start);
   }
 
   std::string parseAttributeValue() {
@@ -163,6 +163,24 @@ class XMLTokenizer {
     if (quote != '"' && quote != '\'') {
       return "";
     }
+    size_t start = pos;
+    bool hasEntity = false;
+    while (pos < length && data[pos] != quote) {
+      if (data[pos] == '&') {
+        hasEntity = true;
+        break;
+      }
+      pos++;
+    }
+    if (!hasEntity) {
+      std::string value(data + start, pos - start);
+      if (pos < length) {
+        pos++;
+      }
+      return value;
+    }
+    // Slow path: has entity references
+    pos = start;
     std::string value = {};
     while (pos < length && data[pos] != quote) {
       if (data[pos] == '&') {
