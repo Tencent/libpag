@@ -9,7 +9,7 @@
   <Layer name="ClampFill">
     <Rectangle center="110,110" size="140,140" roundness="24"/>
     <Fill>
-      <ImagePattern image="@logo" matrix="0.5,0,0,0.5,46,46"/>
+      <ImagePattern image="@logo" tileModeX="clamp" tileModeY="clamp" matrix="0.5,0,0,0.5,46,46"/>
     </Fill>
     <Stroke color="#FFFFFF" width="2"/>
   </Layer>

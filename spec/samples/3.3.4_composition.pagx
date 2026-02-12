@@ -15,7 +15,7 @@
             <ColorStop offset="1" color="#8B5CF6"/>
           </LinearGradient>
         </Fill>
-        <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F180"/>
+        <DropShadowStyle offsetX="0" offsetY="8" blurX="24" blurY="24" color="#6366F180"/>
       </Layer>
       <Layer name="label">
         <Text text="Button" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>

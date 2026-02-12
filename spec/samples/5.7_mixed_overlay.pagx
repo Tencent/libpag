@@ -14,6 +14,6 @@
       </RadialGradient>
     </Fill>
     <Stroke color="#0E7490" width="8"/>
-    <DropShadowStyle offsetY="8" blurX="32" blurY="32" color="#06B6D460"/>
+    <DropShadowStyle offsetX="0" offsetY="8" blurX="32" blurY="32" color="#06B6D460"/>
   </Layer>
 </pagx>

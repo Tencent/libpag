@@ -11,6 +11,6 @@
       </LinearGradient>
     </Fill>
     <BlurFilter blurX="4" blurY="4"/>
-    <DropShadowFilter offsetY="16" blurX="48" blurY="48" color="#8B5CF680"/>
+    <DropShadowFilter offsetX="0" offsetY="16" blurX="48" blurY="48" color="#8B5CF680"/>
   </Layer>
 </pagx>

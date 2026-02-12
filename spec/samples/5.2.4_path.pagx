@@ -11,7 +11,7 @@
         <ColorStop offset="1" color="#EC4899"/>
       </LinearGradient>
     </Fill>
-    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#F43F5E60"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#F43F5E60"/>
   </Layer>
   
   <!-- Lightning bolt (top-right quadrant: 200-400 x 0-200, center at 300,100) -->
@@ -23,20 +23,20 @@
         <ColorStop offset="1" color="#F59E0B"/>
       </LinearGradient>
     </Fill>
-    <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#F59E0B60"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#F59E0B60"/>
   </Layer>
   
   <!-- Arrow (bottom-left quadrant: 0-200 x 200-400, center at 100,300) -->
   <Layer>
     <Path data="M 30,290 L 130,290 L 130,260 L 180,300 L 130,340 L 130,310 L 30,310 Z"/>
     <Fill color="#06B6D4"/>
-    <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#06B6D460"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#06B6D460"/>
   </Layer>
   
   <!-- Star (bottom-right quadrant: 200-400 x 200-400, center at 300,300) -->
   <Layer>
     <Path data="M 300,220 L 318,270 L 370,270 L 328,300 L 343,350 L 300,322 L 257,350 L 272,300 L 230,270 L 282,270 Z"/>
     <Fill color="#8B5CF6"/>
-    <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#8B5CF660"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#8B5CF660"/>
   </Layer>
 </pagx>

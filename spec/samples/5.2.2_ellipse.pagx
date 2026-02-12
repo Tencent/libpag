@@ -10,7 +10,7 @@
         <ColorStop offset="1" color="#F59E0B"/>
       </RadialGradient>
     </Fill>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F59E0B60"/>
+    <DropShadowStyle offsetX="0" offsetY="8" blurX="24" blurY="24" color="#F59E0B60"/>
   </Layer>
   <!-- Horizontal ellipse -->
   <Layer>
@@ -21,7 +21,7 @@
         <ColorStop offset="1" color="#DB2777"/>
       </LinearGradient>
     </Fill>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#EC489950"/>
+    <DropShadowStyle offsetX="0" offsetY="8" blurX="24" blurY="24" color="#EC489950"/>
   </Layer>
   <!-- Vertical ellipse -->
   <Layer>
@@ -32,7 +32,7 @@
         <ColorStop offset="1" color="#0891B2"/>
       </LinearGradient>
     </Fill>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D450"/>
+    <DropShadowStyle offsetX="0" offsetY="8" blurX="24" blurY="24" color="#06B6D450"/>
   </Layer>
   <!-- Large ellipse -->
   <Layer>
@@ -43,6 +43,6 @@
         <ColorStop offset="1" color="#8B5CF6"/>
       </RadialGradient>
     </Fill>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#8B5CF650"/>
+    <DropShadowStyle offsetX="0" offsetY="8" blurX="24" blurY="24" color="#8B5CF650"/>
   </Layer>
 </pagx>

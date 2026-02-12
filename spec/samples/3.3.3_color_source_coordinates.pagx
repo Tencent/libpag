@@ -5,7 +5,7 @@
   <Layer>
     <Rectangle center="200,200" size="300,300" roundness="24"/>
     <Fill color="@grad"/>
-    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#EC489950"/>
+    <DropShadowStyle offsetX="0" offsetY="12" blurX="40" blurY="40" color="#EC489950"/>
   </Layer>
   <Resources>
     <LinearGradient id="grad" startPoint="0,0" endPoint="300,300">

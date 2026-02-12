@@ -5,7 +5,7 @@
   <Layer>
     <Rectangle center="200,200" size="320,320" roundness="32"/>
     <Fill color="@oceanGradient"/>
-    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#06B6D450"/>
+    <DropShadowStyle offsetX="0" offsetY="12" blurX="40" blurY="40" color="#06B6D450"/>
   </Layer>
   <!-- Shape using solid color resource reference -->
   <Layer>

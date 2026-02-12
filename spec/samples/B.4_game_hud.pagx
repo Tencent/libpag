@@ -29,7 +29,7 @@
     <Layer alpha="0.15">
       <Group x="-400">
         <Path data="@hex"/>
-        <Stroke color="#0066aa"/>
+        <Stroke color="#0066aa" width="1"/>
         <Repeater copies="70" position="20,0"/> 
       </Group>
       <Repeater copies="40" position="10, 17.32"/>
@@ -53,20 +53,20 @@
     <Layer>
       <Rectangle center="0,-220" size="2,15"/>
       <Fill color="#00ccff" alpha="0.6"/>
-      <Repeater copies="60" rotation="6"/> 
+      <Repeater copies="60" rotation="6" anchor="0,0"/> 
     </Layer>
     
     <!-- Secondary Scale (Smaller Ticks) -->
     <Layer>
       <Rectangle center="0,-215" size="1,8"/>
       <Fill color="#00ccff" alpha="0.3"/>
-      <Repeater copies="120" rotation="3"/>
+      <Repeater copies="120" rotation="3" anchor="0,0"/>
     </Layer>
 
     <!-- Rotating Tech Ring 1 -->
     <Layer rotation="15">
       <Ellipse center="0,0" size="380,380"/>
-      <Stroke color="#00ffff" dashes="60, 40" alpha="0.4"/>
+      <Stroke width="1" color="#00ffff" dashes="60, 40" alpha="0.4"/>
     </Layer>
     
     <!-- Rotating Tech Ring 2 (Counter-rotate) -->
@@ -112,7 +112,7 @@
         <Ellipse center="0,0" size="6,6"/>
         <Fill color="#ffffff"/>
         <Path data="M -20 0 L 20 0 M 0 -20 L 0 20"/>
-        <Stroke color="#ffffff" alpha="0.5"/>
+        <Stroke width="1" color="#ffffff" alpha="0.5"/>
     </Layer>
   </Layer>
 
@@ -134,7 +134,7 @@
             <ColorStop offset="1" color="#00ff00"/>
          </LinearGradient>
       </Stroke>
-      <TrimPath end="0.85"/>
+      <TrimPath start="0" end="0.85"/>
       <DropShadowStyle blurX="5" blurY="5" color="#ff000040"/>
     </Layer>
     
@@ -157,17 +157,17 @@
         <Layer>
             <Text text="PWR: 88%" fontFamily="Arial" fontSize="12"/>
             <Fill color="#00ccff" alpha="0.7"/>
-            <TextLayout position="0, 0"/>
+            <TextLayout position="0, 0" textAlign="start"/>
         </Layer>
         <Layer>
             <Text text="RADAR: ACT" fontFamily="Arial" fontSize="12"/>
             <Fill color="#00ccff" alpha="0.7"/>
-            <TextLayout position="0, 18"/>
+            <TextLayout position="0, 18" textAlign="start"/>
         </Layer>
         <Layer>
             <Text text="SHIELD: OK" fontFamily="Arial" fontSize="12"/>
             <Fill color="#00ccff" alpha="0.7"/>
-            <TextLayout position="0, 36"/>
+            <TextLayout position="0, 36" textAlign="start"/>
         </Layer>
   </Layer>
 
@@ -188,7 +188,7 @@
             <ColorStop offset="1" color="#0044ff"/>
          </LinearGradient>
       </Stroke>
-      <TrimPath end="0.6"/>
+      <TrimPath start="0" end="0.6"/>
       <DropShadowStyle blurX="5" blurY="5" color="#00ffff40"/>
     </Layer>
     
@@ -196,12 +196,12 @@
     <Layer>
         <Text text="60%" fontFamily="Arial" fontSize="24" fontStyle="Bold" position="230, 0"/>
         <Fill color="#ffffff"/>
-        <TextLayout position="240, 10"/>
+        <TextLayout position="240, 10" textAlign="start"/>
     </Layer>
     <Layer>
         <Text text="PLASMA RESERVES" fontFamily="Arial" fontSize="10" position="230, 20"/>
         <Fill color="#0088ff"/>
-        <TextLayout position="240, 25"/>
+        <TextLayout position="240, 25" textAlign="start"/>
     </Layer>
   </Layer>
 
@@ -257,22 +257,22 @@
      <!-- Grid Circles -->
      <Layer>
         <Ellipse center="0,0" size="100,100"/>
-        <Stroke color="#004488"/>
+        <Stroke color="#004488" width="1"/>
      </Layer>
      <Layer>
         <Ellipse center="0,0" size="50,50"/>
-        <Stroke color="#004488"/>
+        <Stroke color="#004488" width="1"/>
      </Layer>
      <!-- Crosshairs -->
      <Layer>
         <Path data="M -70 0 L 70 0 M 0 -70 L 0 70"/>
-        <Stroke color="#004488"/>
+        <Stroke color="#004488" width="1"/>
      </Layer>
      <!-- Sweep (Conic Gradient) -->
      <Layer rotation="-45">
         <Ellipse center="0,0" size="130,130"/>
         <Fill>
-            <ConicGradient center="0,0" endAngle="90">
+            <ConicGradient center="0,0" startAngle="0" endAngle="90">
                 <ColorStop offset="0" color="#00ff0000"/>
                 <ColorStop offset="1" color="#00ff0080"/>
             </ConicGradient>
@@ -315,7 +315,7 @@
   <!-- Yellow Status Indicators (Restored in Top Right) -->
   <Layer name="StatusIcons" x="706" y="70">
       <Rectangle center="0,0" size="8,8"/>
-      <Stroke color="#ffaa00"/>
+      <Stroke color="#ffaa00" width="1"/>
       <Repeater copies="3" position="15, 0"/>
       <DropShadowStyle blurX="5" blurY="5" color="#ffaa00"/>
   </Layer>
@@ -326,7 +326,7 @@
           <!-- Bullet Icon -->
           <Path data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
           <Fill color="#ffaa00"/>
-          <Stroke color="#000000"/>
+          <Stroke color="#000000" width="1"/>
           <Repeater copies="10" position="10, 0"/>
       </Layer>
       <!-- Row 2 -->
@@ -335,14 +335,14 @@
               <!-- Bullet Icon -->
               <Path data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
               <Fill color="#ffaa00"/>
-              <Stroke color="#000000"/>
+              <Stroke color="#000000" width="1"/>
               <Repeater copies="5" position="10, 0"/>
            </Layer>
            <Layer>
               <!-- Depleted Bullets -->
               <Path data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
               <Fill color="#331100"/>
-              <Stroke color="#442200"/>
+              <Stroke color="#442200" width="1"/>
               <Repeater copies="5" position="10, 0" offset="5"/> 
            </Layer>
       </Layer>

@@ -3,7 +3,7 @@
 <pagx version="1.0" width="400" height="400">
   <!-- Transformed group -->
   <Layer>
-    <Group anchor="110,110" position="200,200" rotation="12">
+    <Group anchor="110,110" position="200,200" rotation="12" scale="1,1">
       <Rectangle center="110,110" size="220,220" roundness="32"/>
       <Fill>
         <LinearGradient startPoint="0,0" endPoint="220,220">
@@ -13,6 +13,6 @@
         </LinearGradient>
       </Fill>
     </Group>
-    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#EC489960"/>
+    <DropShadowStyle offsetX="0" offsetY="12" blurX="40" blurY="40" color="#EC489960"/>
   </Layer>
 </pagx>
