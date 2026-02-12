@@ -567,8 +567,8 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 - 对该图层应用 `scale(2, 2)` 变换：矩形变为 200×200，渐变也随之放大，视觉效果保持一致
 - 直接将 Rectangle 的 size 改为 200,200：矩形变为 200×200，但渐变坐标不变，只覆盖矩形的左半部分
 
-> 📄 Samples: [SolidColor](samples/3.3.3_color_solid.pagx) | [LinearGradient](samples/3.3.3_color_linear.pagx) | [RadialGradient](samples/3.3.3_color_radial.pagx) | [ConicGradient](samples/3.3.3_color_conic.pagx) | [DiamondGradient](samples/3.3.3_color_diamond.pagx) | [ImagePattern](samples/3.3.3_color_image.pagx)
-> 🔗 Preview: [SolidColor](https://pag.io/pagx/?file=./samples/3.3.3_color_solid.pagx) | [LinearGradient](https://pag.io/pagx/?file=./samples/3.3.3_color_linear.pagx) | [RadialGradient](https://pag.io/pagx/?file=./samples/3.3.3_color_radial.pagx) | [ConicGradient](https://pag.io/pagx/?file=./samples/3.3.3_color_conic.pagx) | [DiamondGradient](https://pag.io/pagx/?file=./samples/3.3.3_color_diamond.pagx) | [ImagePattern](https://pag.io/pagx/?file=./samples/3.3.3_color_image.pagx)
+> 📄 Samples: [LinearGradient](samples/3.3.3_linear_gradient.pagx) | [RadialGradient](samples/3.3.3_radial_gradient.pagx) | [ConicGradient](samples/3.3.3_conic_gradient.pagx) | [DiamondGradient](samples/3.3.3_diamond_gradient.pagx) | [ImagePattern](samples/3.3.3_image_pattern.pagx) | [Coordinates](samples/3.3.3_color_source_coordinates.pagx)
+> 🔗 Preview: [Linear](https://pag.io/pagx/?file=./samples/3.3.3_linear_gradient.pagx) | [Radial](https://pag.io/pagx/?file=./samples/3.3.3_radial_gradient.pagx) | [Conic](https://pag.io/pagx/?file=./samples/3.3.3_conic_gradient.pagx) | [Diamond](https://pag.io/pagx/?file=./samples/3.3.3_diamond_gradient.pagx) | [Pattern](https://pag.io/pagx/?file=./samples/3.3.3_image_pattern.pagx) | [Coords](https://pag.io/pagx/?file=./samples/3.3.3_color_source_coordinates.pagx)
 
 #### 3.3.4 合成（Composition）
 
