@@ -22,8 +22,8 @@
 
 namespace pagx {
 
-static constexpr float FloatNearlyZero = 1.0f / (1 << 12);
-static constexpr float Pi = 3.14159265358979323846f;
+inline constexpr float FloatNearlyZero = 1.0f / (1 << 12);
+inline constexpr float Pi = 3.14159265358979323846f;
 
 inline bool FloatNearlyEqual(float x, float y) {
   return std::abs(x - y) <= FloatNearlyZero;

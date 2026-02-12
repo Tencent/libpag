@@ -22,6 +22,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include "MathUtil.h"
 
 namespace pagx {
 
@@ -154,7 +155,7 @@ static void ArcToCubics(PathData& path, float x1, float y1, float rx, float ry, 
   rx = std::abs(rx);
   ry = std::abs(ry);
 
-  float radians = angle * 3.14159265358979323846f / 180.0f;
+  float radians = angle * Pi / 180.0f;
   float cosAngle = std::cos(radians);
   float sinAngle = std::sin(radians);
 
@@ -195,12 +196,12 @@ static void ArcToCubics(PathData& path, float x1, float y1, float rx, float ry, 
                              (-y1p - cyp) / ry);
 
   if (!sweep && dtheta > 0) {
-    dtheta -= 2.0f * 3.14159265358979323846f;
+    dtheta -= 2.0f * Pi;
   } else if (sweep && dtheta < 0) {
-    dtheta += 2.0f * 3.14159265358979323846f;
+    dtheta += 2.0f * Pi;
   }
 
-  int segments = static_cast<int>(std::ceil(std::abs(dtheta) / (3.14159265358979323846f / 2.0f)));
+  int segments = static_cast<int>(std::ceil(std::abs(dtheta) / (Pi / 2.0f)));
   float segmentAngle = dtheta / segments;
 
   float t = std::tan(segmentAngle / 2.0f);
