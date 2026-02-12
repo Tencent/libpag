@@ -114,55 +114,18 @@
 
   <!-- Connector endpoint dots -->
   <Layer name="ConnectorDots" alpha="0.8">
-    <Group>
-      <Ellipse center="800,375" size="8,8"/>
-      <Fill color="#06B6D4"/>
-    </Group>
-    <Group>
-      <Ellipse center="954,511" size="8,8"/>
-      <Fill color="#06B6D4"/>
-    </Group>
-    <Group>
-      <Ellipse center="903,646" size="8,8"/>
-      <Fill color="#06B6D4"/>
-    </Group>
-    <Group>
-      <Ellipse center="697,646" size="8,8"/>
-      <Fill color="#06B6D4"/>
-    </Group>
-    <Group>
-      <Ellipse center="646,511" size="8,8"/>
-      <Fill color="#06B6D4"/>
-    </Group>
+    <Ellipse center="800,375" size="8,8"/>
+    <Ellipse center="954,511" size="8,8"/>
+    <Ellipse center="903,646" size="8,8"/>
+    <Ellipse center="697,646" size="8,8"/>
+    <Ellipse center="646,511" size="8,8"/>
+    <Fill color="#06B6D4"/>
   </Layer>
 
   <!-- Connectors -->
   <Layer name="Connectors" alpha="0.5">
-    <!-- to Readable (800,170) -->
-    <Group>
-      <Path data="M 800 375 L 800 240"/>
-      <Stroke color="@accentLine" width="2" dashes="6,10"/>
-    </Group>
-    <!-- to Comprehensive (1319,476) -->
-    <Group>
-      <Path data="M 954 511 L 1119 466"/>
-      <Stroke color="@accentLine" width="2" dashes="6,10"/>
-    </Group>
-    <!-- to Deployable (1101,880) -->
-    <Group>
-      <Path data="M 903 646 L 989 790"/>
-      <Stroke color="@accentLine" width="2" dashes="6,10"/>
-    </Group>
-    <!-- to Interoperable (499,880) -->
-    <Group>
-      <Path data="M 697 646 L 611 790"/>
-      <Stroke color="@accentLine" width="2" dashes="6,10"/>
-    </Group>
-    <!-- to Expressive (281,476) -->
-    <Group>
-      <Path data="M 646 511 L 481 466"/>
-      <Stroke color="@accentLine" width="2" dashes="6,10"/>
-    </Group>
+    <Path data="M 800 375 L 800 240 M 954 511 L 1119 466 M 903 646 L 989 790 M 697 646 L 611 790 M 646 511 L 481 466"/>
+    <Stroke color="@accentLine" width="2" dashes="6,10"/>
   </Layer>
 
   <!-- Card 1: Readable (top center) -->
@@ -194,11 +157,7 @@
       </Group>
       <!-- </> symbol -->
       <Group>
-        <Path data="M -10 -4 L -16 4 L -10 12"/>
-        <Stroke color="#F43F5E" width="2" cap="round" join="round"/>
-      </Group>
-      <Group>
-        <Path data="M 10 -4 L 16 4 L 10 12"/>
+        <Path data="M -10 -4 L -16 4 L -10 12 M 10 -4 L 16 4 L 10 12"/>
         <Stroke color="#F43F5E" width="2" cap="round" join="round"/>
       </Group>
       <Group>
@@ -356,9 +315,6 @@
     <Layer x="-110" y="0">
       <Group>
         <Ellipse center="-18,0" size="40,40"/>
-        <Stroke color="#10B981" width="2"/>
-      </Group>
-      <Group>
         <Ellipse center="18,0" size="40,40"/>
         <Stroke color="#10B981" width="2"/>
       </Group>
@@ -411,15 +367,9 @@
         <Stroke color="#FBBF24" width="2" join="round"/>
         <Fill color="#FBBF2420"/>
       </Group>
-      <!-- Left fin -->
+      <!-- Fins -->
       <Group>
-        <Path data="M -18 12 L -30 30 L -18 25 Z"/>
-        <Stroke color="#FBBF24" width="2" join="round"/>
-        <Fill color="#FBBF2415"/>
-      </Group>
-      <!-- Right fin -->
-      <Group>
-        <Path data="M 18 12 L 30 30 L 18 25 Z"/>
+        <Path data="M -18 12 L -30 30 L -18 25 Z M 18 12 L 30 30 L 18 25 Z"/>
         <Stroke color="#FBBF24" width="2" join="round"/>
         <Fill color="#FBBF2415"/>
       </Group>
@@ -479,11 +429,7 @@
     </Layer>
     <!-- Arrow 1 -->
     <Layer x="-80" y="0">
-      <Path data="M -15 0 L 10 0"/>
-      <Stroke color="#64748B" width="2" cap="round"/>
-    </Layer>
-    <Layer x="-80" y="0">
-      <Path data="M 4 -6 L 12 0 L 4 6"/>
+      <Path data="M -15 0 L 10 0 M 4 -6 L 12 0 L 4 6"/>
       <Stroke color="#64748B" width="2" cap="round" join="round"/>
     </Layer>
     <!-- .pag badge -->
@@ -499,11 +445,7 @@
     </Layer>
     <!-- Arrow 2 -->
     <Layer x="90" y="0">
-      <Path data="M -15 0 L 10 0"/>
-      <Stroke color="#64748B" width="2" cap="round"/>
-    </Layer>
-    <Layer x="90" y="0">
-      <Path data="M 4 -6 L 12 0 L 4 6"/>
+      <Path data="M -15 0 L 10 0 M 4 -6 L 12 0 L 4 6"/>
       <Stroke color="#64748B" width="2" cap="round" join="round"/>
     </Layer>
     <!-- Production badge -->
@@ -527,36 +469,15 @@
   </Layer>
 
   <!-- Corner decorative brackets -->
-  <Layer name="CornerTopLeft" alpha="0.2">
-    <Path data="M 50 110 L 50 50 L 110 50"/>
-    <Stroke color="#64748B" width="1" cap="round" join="round"/>
+  <Layer name="Corners" alpha="0.2">
     <Group>
-      <Ellipse center="50,50" size="4,4"/>
-      <Fill color="#64748B"/>
+      <Path data="M 50 110 L 50 50 L 110 50 M 1490 50 L 1550 50 L 1550 110 M 50 1090 L 50 1150 L 110 1150 M 1490 1150 L 1550 1150 L 1550 1090"/>
+      <Stroke color="#64748B" width="1" cap="round" join="round"/>
     </Group>
-  </Layer>
-  <Layer name="CornerTopRight" alpha="0.2">
-    <Path data="M 1490 50 L 1550 50 L 1550 110"/>
-    <Stroke color="#64748B" width="1" cap="round" join="round"/>
-    <Group>
-      <Ellipse center="1550,50" size="4,4"/>
-      <Fill color="#64748B"/>
-    </Group>
-  </Layer>
-  <Layer name="CornerBottomLeft" alpha="0.2">
-    <Path data="M 50 1090 L 50 1150 L 110 1150"/>
-    <Stroke color="#64748B" width="1" cap="round" join="round"/>
-    <Group>
-      <Ellipse center="50,1150" size="4,4"/>
-      <Fill color="#64748B"/>
-    </Group>
-  </Layer>
-  <Layer name="CornerBottomRight" alpha="0.2">
-    <Path data="M 1490 1150 L 1550 1150 L 1550 1090"/>
-    <Stroke color="#64748B" width="1" cap="round" join="round"/>
-    <Group>
-      <Ellipse center="1550,1150" size="4,4"/>
-      <Fill color="#64748B"/>
-    </Group>
+    <Ellipse center="50,50" size="4,4"/>
+    <Ellipse center="1550,50" size="4,4"/>
+    <Ellipse center="50,1150" size="4,4"/>
+    <Ellipse center="1550,1150" size="4,4"/>
+    <Fill color="#64748B"/>
   </Layer>
 </pagx>
