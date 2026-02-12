@@ -20,6 +20,7 @@
 #include <emscripten/html5.h>
 #include "GridBackground.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/types/Data.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Typeface.h"
 
@@ -72,11 +73,39 @@ void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
 }
 
 void PAGXView::loadPAGX(const val& pagxData) {
+  parsePAGX(pagxData);
+  buildLayers();
+}
+
+void PAGXView::parsePAGX(const val& pagxData) {
+  document = nullptr;
   auto data = GetDataFromEmscripten(pagxData);
   if (!data) {
     return;
   }
-  auto document = PAGXImporter::FromXML(data->bytes(), data->size());
+  document = PAGXImporter::FromXML(data->bytes(), data->size());
+}
+
+std::vector<std::string> PAGXView::getExternalFilePaths() const {
+  if (!document) {
+    return {};
+  }
+  return document->getExternalFilePaths();
+}
+
+bool PAGXView::loadFileData(const std::string& filePath, const val& fileData) {
+  if (!document) {
+    return false;
+  }
+  auto data = GetDataFromEmscripten(fileData);
+  if (!data) {
+    return false;
+  }
+  auto pagxData = pagx::Data::MakeWithCopy(data->bytes(), data->size());
+  return document->loadFileData(filePath, std::move(pagxData));
+}
+
+void PAGXView::buildLayers() {
   if (!document) {
     return;
   }

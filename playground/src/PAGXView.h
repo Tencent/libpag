@@ -21,6 +21,7 @@
 #include <emscripten/bind.h>
 #include "LayerBuilder.h"
 #include "Typesetter.h"
+#include "pagx/PAGXDocument.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
 #include "tgfx/layers/DisplayList.h"
@@ -34,6 +35,14 @@ class PAGXView {
   void registerFonts(const emscripten::val& fontVal, const emscripten::val& emojiFontVal);
 
   void loadPAGX(const emscripten::val& pagxData);
+
+  void parsePAGX(const emscripten::val& pagxData);
+
+  std::vector<std::string> getExternalFilePaths() const;
+
+  bool loadFileData(const std::string& filePath, const emscripten::val& fileData);
+
+  void buildLayers();
 
   void updateSize();
 
@@ -63,6 +72,7 @@ class PAGXView {
   float pagxWidth = 0.0f;
   float pagxHeight = 0.0f;
   Typesetter typesetter = {};
+  std::shared_ptr<PAGXDocument> document = nullptr;
 };
 
 }  // namespace pagx

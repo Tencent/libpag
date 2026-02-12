@@ -25,6 +25,7 @@
 #include <vector>
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
+#include "pagx/types/Data.h"
 
 namespace pagx {
 
@@ -102,6 +103,19 @@ class PAGXDocument {
    * All nodes in the document (owned by the document).
    */
   std::vector<std::unique_ptr<Node>> nodes = {};
+
+  /**
+   * Returns a list of external file paths referenced by Image nodes that have no embedded data.
+   * Data URIs (paths starting with "data:") are excluded.
+   */
+  std::vector<std::string> getExternalFilePaths() const;
+
+  /**
+   * Loads external file data for an Image node matching the given file path. Once loaded, the
+   * Image's data field is populated and its filePath is cleared, so the renderer uses embedded data
+   * instead of file I/O.
+   */
+  bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
 
  private:
   PAGXDocument() = default;

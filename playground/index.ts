@@ -804,7 +804,41 @@ function goHome(): void {
     showDropZoneUI();
 }
 
-async function loadPAGXData(data: Uint8Array, name: string) {
+async function loadExternalFiles(baseURL: string): Promise<void> {
+    if (!playgroundState.pagxView) {
+        return;
+    }
+    const paths = playgroundState.pagxView.getExternalFilePaths();
+    const count = paths.size();
+    if (count === 0) {
+        paths.delete();
+        return;
+    }
+    const fetches: Promise<void>[] = [];
+    for (let i = 0; i < count; i++) {
+        const filePath = paths.get(i);
+        const fileURL = baseURL + filePath;
+        fetches.push(
+            fetch(fileURL)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch ${fileURL}: ${response.status}`);
+                    }
+                    return response.arrayBuffer();
+                })
+                .then(buffer => {
+                    playgroundState.pagxView?.loadFileData(filePath, new Uint8Array(buffer));
+                })
+                .catch(error => {
+                    console.warn(`Failed to load external file ${filePath}:`, error);
+                })
+        );
+    }
+    paths.delete();
+    await Promise.all(fetches);
+}
+
+async function loadPAGXData(data: Uint8Array, name: string, baseURL: string) {
     const navBtns = document.getElementById('nav-btns') as HTMLDivElement;
     const toolbar = document.getElementById('toolbar') as HTMLDivElement;
     const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
@@ -814,7 +848,9 @@ async function loadPAGXData(data: Uint8Array, name: string) {
     }
 
     registerFontsToView();
-    playgroundState.pagxView.loadPAGX(data);
+    playgroundState.pagxView.parsePAGX(data);
+    await loadExternalFiles(baseURL);
+    playgroundState.pagxView.buildLayers();
     gestureManager.resetTransform(playgroundState);
     updateSize();
     hideDropZone();
@@ -856,7 +892,7 @@ async function loadPAGXFile(file: File) {
         const fileBuffer = await file.arrayBuffer();
 
         // Register fonts and load PAGX file
-        await loadPAGXData(new Uint8Array(fileBuffer), file.name);
+        await loadPAGXData(new Uint8Array(fileBuffer), file.name, '');
     } catch (error) {
         console.error('Failed to load PAGX file:', error);
         showErrorUI(t().errorFormat);
@@ -898,12 +934,13 @@ async function loadPAGXFromURL(url: string) {
         }
         const fileBuffer = await response.arrayBuffer();
 
-        // Extract filename from URL
-        const urlPath = new URL(url).pathname;
-        const name = urlPath.substring(urlPath.lastIndexOf('/') + 1) || 'remote.pagx';
+        // Extract filename and base URL
+        const lastSlash = url.lastIndexOf('/');
+        const baseURL = lastSlash >= 0 ? url.substring(0, lastSlash + 1) : '';
+        const name = url.substring(lastSlash + 1) || 'remote.pagx';
 
         // Register fonts and load PAGX file
-        await loadPAGXData(new Uint8Array(fileBuffer), name);
+        await loadPAGXData(new Uint8Array(fileBuffer), name, baseURL);
     } catch (error) {
         console.error('Failed to load PAGX from URL:', error);
         const message = error instanceof Error ? error.message : 'Unknown error';
