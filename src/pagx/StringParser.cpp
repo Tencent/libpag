@@ -350,17 +350,26 @@ std::vector<std::string> SplitString(const std::string& str, char delimiter) {
 }
 
 std::vector<float> ParseFloatList(const std::string& str) {
-  std::vector<float> values;
-  auto tokens = SplitString(str, ',');
-  values.reserve(tokens.size());
-  for (const auto& token : tokens) {
-    char* endPtr = nullptr;
-    float val = strtof(token.c_str(), &endPtr);
-    if (endPtr != token.c_str()) {
-      values.push_back(val);
+  std::vector<float> result = {};
+  const char* ptr = str.c_str();
+  const char* end = ptr + str.size();
+  while (ptr < end) {
+    // Skip whitespace and commas
+    while (ptr < end && (*ptr == ' ' || *ptr == '\t' || *ptr == '\n' || *ptr == '\r' || *ptr == ',')) {
+      ++ptr;
     }
+    if (ptr >= end) {
+      break;
+    }
+    char* endPtr = nullptr;
+    float value = strtof(ptr, &endPtr);
+    if (endPtr == ptr) {
+      break;
+    }
+    result.push_back(value);
+    ptr = endPtr;
   }
-  return values;
+  return result;
 }
 
 std::vector<float> ParseSpaceSeparatedFloats(const std::string& str) {
