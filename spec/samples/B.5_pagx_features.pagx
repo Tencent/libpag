@@ -88,6 +88,12 @@
       <TextLayout position="0,0" textAlign="center"/>
       <Fill color="#94A3B8"/>
     </Layer>
+    <!-- Curved definition caption -->
+    <Layer x="0" y="0">
+      <Text text="An XML-based markup language for describing animated vector graphics." fontFamily="Arial" fontSize="11"/>
+      <TextPath path="M -145 120 A 145 145 0 0 1 145 120" forceAlignment="true"/>
+      <Fill color="#64748B80"/>
+    </Layer>
   </Layer>
 
   <!-- Connector endpoint dots -->
