@@ -4,7 +4,7 @@
   <!-- Main title text -->
   <Layer>
     <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="84"/>
-    <TextLayout position="200,170" textAlign="center"/>
+    <TextLayout position="200,145" textAlign="center"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="280,0">
         <ColorStop offset="0" color="#6366F1"/>
@@ -16,13 +16,13 @@
   <!-- Subtitle -->
   <Layer>
     <Text text="Text Shape" fontFamily="Arial" fontSize="36"/>
-    <TextLayout position="200,255" textAlign="center"/>
+    <TextLayout position="200,230" textAlign="center"/>
     <Fill color="#334155"/>
   </Layer>
   <!-- Small description -->
   <Layer>
     <Text text="Beautiful Typography" fontFamily="Arial" fontSize="24"/>
-    <TextLayout position="200,335" textAlign="center"/>
+    <TextLayout position="200,310" textAlign="center"/>
     <Fill color="#475569"/>
   </Layer>
 </pagx>
