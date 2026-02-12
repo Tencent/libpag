@@ -286,10 +286,11 @@ function addPreviewButtons(html, viewerUrl, lang) {
     const previewUrl = viewerUrl + '?file=./' + samplePath;
     const label = lang === 'zh' ? '预览' : 'Preview';
     const header = '<div class="code-header">' +
-      '<span class="code-header-label">PAGX</span>' +
       '<a class="preview-btn" href="' + previewUrl + '" target="_blank">' +
       '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
-      label + '</a></div>';
+      label + '</a>' +
+      '<span class="code-header-label">PAGX</span>' +
+      '</div>';
     return '<div class="code-block-wrapper">' + header + preBlock + '</div>';
   });
 }
