@@ -1249,7 +1249,7 @@ if (typeof window !== 'undefined') {
         // Check for URL parameter and auto-load if present
         const pagxUrl = getPAGXUrlFromParams();
         if (pagxUrl) {
-            loadPAGXFromURL(pagxUrl);
+            loadPAGXFromURL(pagxUrl, false);
         }
     };
 
