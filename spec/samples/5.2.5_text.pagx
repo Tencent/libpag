@@ -12,8 +12,13 @@
     </Fill>
   </Layer>
   <Layer>
-    <Text text="PAGX is an XML-based markup language for describing animated vector graphics, designed to be readable, comprehensive, and interoperable." fontFamily="Arial" fontSize="20"/>
-    <TextLayout position="50,220" width="300" textAlign="start" lineHeight="1.5"/>
+    <Text text="Text Shape" fontFamily="Arial" fontSize="36"/>
+    <TextLayout position="200,230" textAlign="center"/>
+    <Fill color="#334155"/>
+  </Layer>
+  <Layer>
+    <Text text="Beautiful Typography" fontFamily="Arial" fontSize="24"/>
+    <TextLayout position="200,310" textAlign="center"/>
     <Fill color="#475569"/>
   </Layer>
 </pagx>

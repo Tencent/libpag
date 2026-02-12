@@ -1601,9 +1601,7 @@ Line 3]]>
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates Text shape -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Main title text -->
   <Layer>
     <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="84"/>
     <TextLayout position="200,145" textAlign="center"/>
@@ -1615,13 +1613,11 @@ Line 3]]>
       </LinearGradient>
     </Fill>
   </Layer>
-  <!-- Subtitle -->
   <Layer>
     <Text text="Text Shape" fontFamily="Arial" fontSize="36"/>
     <TextLayout position="200,230" textAlign="center"/>
     <Fill color="#334155"/>
   </Layer>
-  <!-- Small description -->
   <Layer>
     <Text text="Beautiful Typography" fontFamily="Arial" fontSize="24"/>
     <TextLayout position="200,310" textAlign="center"/>
