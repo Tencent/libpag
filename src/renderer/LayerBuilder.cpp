@@ -629,6 +629,9 @@ class LayerBuilderContext {
     trim->setStart(node->start);
     trim->setEnd(node->end);
     trim->setOffset(node->offset);
+    if (node->type == TrimType::Continuous) {
+      trim->setTrimType(tgfx::TrimPathType::Continuous);
+    }
     return trim;
   }
 
