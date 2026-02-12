@@ -787,10 +787,67 @@ root element's dimensions, and the mask reference is on a Layer that does not ne
 
 ## 15. Performance Optimization
 
-Performance optimizations may produce visually similar but not pixel-identical results.
-**Always confirm with the user before applying these optimizations.**
+This section describes performance-related optimizations. They are grouped into two categories:
+equivalent transformations that do not change rendering (safe to auto-apply), and
+approximation-based optimizations that may change visual details (require user confirmation).
 
-### 15.1 Clip Repeater Content to Canvas Bounds
+### Background: Rendering Cost Model
+
+Understanding the PAGX renderer's cost model helps identify performance bottlenecks:
+
+- **Repeater**: Expands at render time by fully cloning every Geometry and Painter per copy. No
+  GPU instancing or batching. Each copy independently computes Stroke, dash patterns, and
+  transforms. Cost is strictly linear: N copies = N× full rendering cost.
+- **Nested Repeaters**: Multiplicative. `copies="A"` containing `copies="B"` produces A×B
+  elements. This is the most common source of performance problems.
+- **BlurFilter / DropShadowStyle**: Computational cost is proportional to blur radius. Large
+  blur values are expensive.
+- **DropShadowStyle**: Applied once per Layer on the composited silhouette — not per Repeater
+  copy. This makes container-level shadows efficient.
+- **Dashed Stroke**: Dash pattern is computed per Geometry independently. When combined with
+  Repeater, each copy incurs dash computation overhead on top of the basic stroke cost.
+- **Layer vs Group**: Layer is heavier — it creates an independent rendering surface that must
+  be composited back. Group only creates a painter scope boundary with no extra surface.
+
+### Equivalent Optimizations (No Visual Change — Auto-apply)
+
+#### 15.1 Downgrade Layer to Group
+
+**Problem**: Layer creates an independent rendering surface that must be composited back into
+the parent. When a Layer does not use any Layer-exclusive features, replacing it with Group
+eliminates this overhead.
+
+**When to apply**: A Layer has no styles (DropShadowStyle, InnerShadowStyle,
+BackgroundBlurStyle), no filters (BlurFilter, etc.), no mask, no blendMode, no composition
+reference, no alpha, and no name attribute that matters for debugging.
+
+**How**: Replace `<Layer>` with `<Group>`. Convert `x`/`y` to `position`.
+
+```xml
+<!-- Before: Layer used only for grouping -->
+<Layer x="100" y="50">
+  <Rectangle size="40,30"/>
+  <Fill color="#F00"/>
+</Layer>
+
+<!-- After: Group is lighter weight -->
+<Group position="100,50">
+  <Rectangle size="40,30"/>
+  <Fill color="#F00"/>
+</Group>
+```
+
+**Caveats**:
+- Group geometry **propagates upward** to the parent scope. If the parent scope has painters
+  that should not affect this geometry, the Layer isolation is needed. Verify that converting to
+  Group does not cause unintended painter leakage.
+- Layer with `alpha` cannot simply become Group because Group does not support alpha.
+- Layer with child Layers cannot become Group because Group cannot contain Layers.
+- Only apply when the Layer is a leaf (contains only geometry + painters, no child Layers).
+
+### Approximation Optimizations (May Change Visual — Confirm with User)
+
+#### 15.2 Clip Repeater Content to Canvas Bounds
 
 **Problem**: Repeaters positioned outside the canvas generate invisible elements that still
 consume rendering resources.
@@ -799,12 +856,8 @@ consume rendering resources.
 beyond the canvas bounds.
 
 **How**: Adjust the starting position and `copies` count so generated content just covers the
-canvas, with minimal overflow.
-
-**Analysis method**:
-1. Calculate the total span: `copies × position_offset`
-2. Compare with canvas dimensions
-3. If starting position is negative and content extends beyond canvas, adjust to minimize waste
+canvas, with minimal overflow. For staggered patterns (e.g., hex grids where odd rows offset),
+include one extra column/row to account for the offset.
 
 ```xml
 <!-- Before: generates 70×40 = 2800 hexagons, ~40% outside 800×600 canvas -->
@@ -817,26 +870,27 @@ canvas, with minimal overflow.
   <Repeater copies="40" position="10,17.32"/>
 </Layer>
 
-<!-- After: generates ~42×36 = 1512 hexagons, covers canvas with minimal overflow -->
+<!-- After: generates ~21×18 = 378 hexagons, covers canvas adequately -->
 <Layer>
   <Group x="-20">
     <Path data="@hex"/>
     <Stroke color="#0066AA" width="1"/>
-    <Repeater copies="42" position="20,0"/>
+    <Repeater copies="21" position="40,0"/>
   </Group>
-  <Repeater copies="36" position="10,17.32"/>
+  <Repeater copies="18" position="20,34.64"/>
 </Layer>
 ```
 
 **Caveats**:
 - If the file is animated and elements scroll or move, ensure the clipped area still covers all
   animation frames.
-- This changes the exact pattern distribution. Confirm visual acceptability with user.
+- For purely decorative background patterns, reducing density (larger spacing) simultaneously
+  is often acceptable and gives a bigger performance win than just clipping.
 
-### 15.2 Avoid Nested Repeaters with Large Copy Counts
+#### 15.3 Reduce Nested Repeater Element Count
 
-**Problem**: Nested Repeaters multiply element counts exponentially. A seemingly innocent
-`copies="70"` nested inside `copies="40"` generates 2800 elements.
+**Problem**: Nested Repeaters multiply element counts. A seemingly innocent `copies="70"`
+nested inside `copies="40"` generates 2800 elements, each fully cloned at render time.
 
 **Performance guideline**:
 - Single Repeater: up to ~200 copies is typically fine
@@ -844,78 +898,71 @@ canvas, with minimal overflow.
 - Above 1000 elements: expect noticeable performance impact
 
 **Alternatives**:
-1. **Pre-render to image**: For static decorative patterns (grids, backgrounds), consider
-   pre-rendering to a static image asset
-2. **Reduce density**: Increase spacing to reduce copy count while maintaining visual effect
-3. **Limit to visible area**: See 15.1 above
+1. **Reduce density**: Increase spacing to reduce copy count while maintaining visual effect.
+   For decorative grids and patterns, doubling the spacing halves element count while preserving
+   the visual impression.
+2. **Limit to visible area**: See 15.2 above.
+3. **Simplify geometry**: Use a simpler shape (e.g., a dot instead of a hexagon) to reduce
+   per-element cost.
 
-### 15.3 Evaluate Low-Opacity Elements
+#### 15.4 Evaluate Low-Opacity Expensive Elements
 
 **Problem**: Elements with very low alpha (e.g., `alpha="0.15"`) are nearly invisible but still
-fully rendered.
+fully rendered. When combined with Repeaters or blur effects, the cost-to-visibility ratio is
+extremely poor.
 
-**When to apply**: An element or layer has `alpha` below ~0.2 and generates significant
-rendering cost (many children, complex effects, Repeaters).
+**When to apply**: An element or layer has `alpha` below ~0.2 AND generates significant
+rendering cost (Repeaters with many copies, blur filters, complex geometry trees).
 
-**Questions to ask user**:
-1. Is this element visually necessary?
-2. Can alpha be increased to make rendering cost worthwhile?
-3. Can complexity be reduced (fewer copies, simpler geometry)?
+**How to optimize**:
+1. Reduce complexity under the low-alpha layer (fewer copies, simpler geometry)
+2. Increase alpha to make the element more visible, justifying the render cost
+3. Ask user if the element can be removed entirely
 
 ```xml
-<!-- Example: 2800 hexagons at 15% opacity — barely visible, very expensive -->
+<!-- Example: 378 hexagons at 15% opacity — barely visible, moderately expensive -->
 <Layer alpha="0.15">
-  <!-- complex Repeater structure -->
+  <Group x="-20">
+    <Path data="@hex"/>
+    <Stroke color="#0066AA" width="1"/>
+    <Repeater copies="21" position="40,0"/>
+  </Group>
+  <Repeater copies="18" position="20,34.64"/>
 </Layer>
 ```
 
-### 15.4 Optimize DropShadowStyle on Repeater Content
+#### 15.5 Reduce Large Blur Radius Values
 
-**Problem**: When DropShadowStyle is applied to a Layer containing a Repeater, the shadow is
-computed once for the combined silhouette — this is efficient. However, if each repeated
-element needs individual shadow, the cost multiplies.
+**Problem**: Blur effects have computational cost that grows with blur radius. Large values
+(e.g., `blurX="220"`) are significantly more expensive than moderate values (e.g.,
+`blurX="40"`).
 
-**Efficient pattern** (shadow on container):
-```xml
-<Layer>
-  <Rectangle size="8,8"/>
-  <Stroke color="#FFAA00" width="1"/>
-  <Repeater copies="3" position="15,0"/>
-  <DropShadowStyle blurX="5" blurY="5" color="#FFAA00"/>
-</Layer>
-```
+**Two categories**:
 
-The shadow encompasses all 3 rectangles as one silhouette.
+1. **DropShadowStyle / InnerShadowStyle**: These operate on the layer's composited silhouette.
+   For small elements with large blur, the shadow may be imperceptible. Reducing blur radius
+   or removing the style entirely can save significant cost.
 
-**When this may not match intent**: If the user wants each repeated element to cast its own
-distinct shadow (e.g., overlapping shadows), the current structure is correct but inherently
-expensive. Ask user if combined shadow is acceptable.
+2. **BlurFilter**: Used for intentional artistic effects (glows, bokeh, frosted glass). These
+   are often more visually significant and harder to reduce. But for background glows
+   (`alpha="0.2"` with `blurX="220"`), consider whether a lower blur radius achieves a
+   similar visual at fraction of the cost.
 
-### 15.5 Reduce Large Blur Radius Values
+**When to apply**: `blurX` or `blurY` exceeds ~30 pixels.
 
-**Problem**: Blur effects (DropShadowStyle, GaussianBlur, etc.) have computational cost
-proportional to blur radius squared. A `blur="25"` is ~6× more expensive than `blur="10"`.
-
-**When to apply**: Blur radius exceeds ~15 pixels.
-
-**Optimization approaches**:
-1. Reduce blur radius if visual difference is acceptable
-2. For DropShadowStyle, consider if the shadow is even visible (small elements with large blur
-   may have imperceptible shadows)
-3. For background blur effects, consider using a pre-blurred image asset
-
-### 15.6 Merge Redundant Scale Marks / Tick Marks
+#### 15.6 Merge Redundant Overlapping Repeaters
 
 **Problem**: UI elements like gauges often have multiple overlapping scale rings (e.g., major
-ticks every 6° and minor ticks every 3°). Half of the minor ticks overlap with major ticks.
+ticks every 6° and minor ticks every 3°). Half of the minor ticks overlap with major ticks,
+rendering twice at the same position.
 
 **When to apply**: Two Repeaters generate marks at intervals where one is a multiple of the
 other.
 
-**How**: Adjust the finer Repeater to skip positions covered by the coarser one.
+**How**: Adjust the finer Repeater to skip positions covered by the coarser one using `offset`.
 
 ```xml
-<!-- Before: 60 major ticks + 120 minor ticks, half overlap -->
+<!-- Before: 60 major ticks + 120 minor ticks, 60 overlap -->
 <Layer>
   <Rectangle center="0,-220" size="2,15"/>
   <Fill color="#00CCFF" alpha="0.6"/>
@@ -940,8 +987,31 @@ other.
 </Layer>
 ```
 
-**Caveats**: This changes the exact visual — minor ticks no longer appear at major tick
-positions. Confirm with user.
+#### 15.7 Avoid Dashed Stroke under Repeater
+
+**Problem**: Stroke with `dashes` attribute has extra overhead (dash pattern computation) on
+each geometry independently. When combined with Repeater, this cost multiplies: each of N
+copies independently computes dash decomposition.
+
+**When to apply**: A `<Stroke ... dashes="..."/>` appears in the same scope as a Repeater
+with many copies.
+
+**How**: For decorative patterns where exact dash alignment per-copy is not critical, consider
+replacing with a solid stroke at reduced alpha, or a simpler visual treatment.
+
+```xml
+<!-- Expensive: 120 copies × dashed stroke computation -->
+<Ellipse size="380,380"/>
+<Stroke width="1" color="#0FF" dashes="60,40"/>
+<Repeater copies="120" rotation="3"/>
+
+<!-- Alternative: solid stroke, fewer copies, similar decorative effect -->
+<Ellipse size="380,380"/>
+<Stroke width="1" color="#0FF" alpha="0.4"/>
+```
+
+**Caveats**: Dashes on single elements or small Repeaters (< 20 copies) are fine. This
+optimization only matters when dashes combine with high copy counts.
 
 ---
 

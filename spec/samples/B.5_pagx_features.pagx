@@ -55,7 +55,7 @@
       <Ellipse size="310,310"/>
       <TrimPath end="0.77"/>
       <Stroke width="2.5" cap="round">
-        <ConicGradient startAngle="0" endAngle="360">
+        <ConicGradient>
           <ColorStop offset="0" color="#06B6D400"/>
           <ColorStop offset="0.77" color="#06B6D4"/>
           <ColorStop offset="1" color="#06B6D400"/>
