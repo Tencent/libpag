@@ -902,6 +902,13 @@ async function loadPAGXFile(file: File) {
 
         // Register fonts and load PAGX file
         await loadPAGXData(new Uint8Array(fileBuffer), file.name, '');
+        currentPlayingFile = null;
+
+        // Clear file parameter from URL (local files have no URL)
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('file');
+        newUrl.hash = '';
+        history.replaceState(null, '', newUrl.toString());
     } catch (error) {
         console.error('Failed to load PAGX file:', error);
         showErrorUI(t().errorFormat);
