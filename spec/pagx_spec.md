@@ -1601,9 +1601,9 @@ Line 3]]>
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates Text shape: point text and paragraph text with auto-wrap -->
+<!-- Demonstrates Text shape -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Point text: title centered without width constraint -->
+  <!-- Main title text -->
   <Layer>
     <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="84"/>
     <TextLayout position="200,145" textAlign="center"/>
@@ -1615,10 +1615,16 @@ Line 3]]>
       </LinearGradient>
     </Fill>
   </Layer>
-  <!-- Paragraph text: auto-wrapping within a fixed width -->
+  <!-- Subtitle -->
   <Layer>
-    <Text text="PAGX is an XML-based markup language for describing animated vector graphics, designed to be readable, comprehensive, and interoperable." fontFamily="Arial" fontSize="20"/>
-    <TextLayout position="50,220" width="300" textAlign="start" lineHeight="1.5"/>
+    <Text text="Text Shape" fontFamily="Arial" fontSize="36"/>
+    <TextLayout position="200,230" textAlign="center"/>
+    <Fill color="#334155"/>
+  </Layer>
+  <!-- Small description -->
+  <Layer>
+    <Text text="Beautiful Typography" fontFamily="Arial" fontSize="24"/>
+    <TextLayout position="200,310" textAlign="center"/>
     <Fill color="#475569"/>
   </Layer>
 </pagx>
