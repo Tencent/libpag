@@ -1244,47 +1244,20 @@ RadialGradient* SVGParserContext::convertRadialGradient(
 
   if (useOBB) {
     // For objectBoundingBox, convert normalized coordinates to actual coordinates.
-    Point center = {shapeBounds.x + cx * shapeBounds.width,
-                    shapeBounds.y + cy * shapeBounds.height};
+    gradient->center = {shapeBounds.x + cx * shapeBounds.width,
+                        shapeBounds.y + cy * shapeBounds.height};
     // Radius is scaled by the average of width and height.
-    float actualRadius = r * (shapeBounds.width + shapeBounds.height) / 2.0f;
+    gradient->radius = r * (shapeBounds.width + shapeBounds.height) / 2.0f;
 
-    // Apply gradientTransform after converting to actual coordinates.
-    center = transformMatrix.mapPoint(center);
-    // For radius, account for scaling in the transform.
-    float scaleX = std::sqrt(transformMatrix.a * transformMatrix.a +
-                             transformMatrix.b * transformMatrix.b);
-    float scaleY = std::sqrt(transformMatrix.c * transformMatrix.c +
-                             transformMatrix.d * transformMatrix.d);
-    actualRadius *= (scaleX + scaleY) / 2.0f;
-
-    gradient->center = center;
-    gradient->radius = actualRadius;
-
-    // Store the matrix for non-uniform scaling (rotation, skew, etc.).
     if (!transformMatrix.isIdentity()) {
       gradient->matrix = transformMatrix;
     }
   } else {
     // For userSpaceOnUse, coordinates are in user space.
-    if (!gradientTransform.empty()) {
-      Point center = {cx, cy};
-      center = transformMatrix.mapPoint(center);
-      gradient->center = center;
-
-      float scaleX = std::sqrt(transformMatrix.a * transformMatrix.a +
-                               transformMatrix.b * transformMatrix.b);
-      float scaleY = std::sqrt(transformMatrix.c * transformMatrix.c +
-                               transformMatrix.d * transformMatrix.d);
-      gradient->radius = r * (scaleX + scaleY) / 2.0f;
-
-      if (!transformMatrix.isIdentity()) {
-        gradient->matrix = transformMatrix;
-      }
-    } else {
-      gradient->center.x = cx;
-      gradient->center.y = cy;
-      gradient->radius = r;
+    gradient->center = {cx, cy};
+    gradient->radius = r;
+    if (!transformMatrix.isIdentity()) {
+      gradient->matrix = transformMatrix;
     }
   }
 
