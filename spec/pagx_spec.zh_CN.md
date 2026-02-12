@@ -583,7 +583,7 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 
 2. **修改几何属性不影响颜色源**：直接修改几何元素的属性（如 Rectangle 的 width/height、Path 的路径数据）只改变几何内容本身，不会影响颜色源的坐标系。
 
-**示例**：在 100×100 的区域内绘制一个从左到右的线性渐变：
+**示例**：在 300×300 的区域内绘制一个对角线方向的线性渐变：
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -605,8 +605,8 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 </pagx>
 ```
 
-- 对该图层应用 `scale(2, 2)` 变换：矩形变为 200×200，渐变也随之放大，视觉效果保持一致
-- 直接将 Rectangle 的 size 改为 200,200：矩形变为 200×200，但渐变坐标不变，只覆盖矩形的左半部分
+- 对该图层应用 `scale(2, 2)` 变换：矩形变为 600×600，渐变也随之放大，视觉效果保持一致
+- 直接将 Rectangle 的 size 改为 600,600：矩形变为 600×600，但渐变坐标不变，只覆盖矩形的左上四分之一
 
 > Preview: [Linear](https://pag.io/pagx/?file=./samples/3.3.3_linear_gradient.pagx) | [Radial](https://pag.io/pagx/?file=./samples/3.3.3_radial_gradient.pagx) | [Conic](https://pag.io/pagx/?file=./samples/3.3.3_conic_gradient.pagx) | [Diamond](https://pag.io/pagx/?file=./samples/3.3.3_diamond_gradient.pagx) | [Pattern](https://pag.io/pagx/?file=./samples/3.3.3_image_pattern.pagx) | [Coords](https://pag.io/pagx/?file=./samples/3.3.3_color_source_coordinates.pagx)
 
@@ -3239,21 +3239,6 @@ Layer / Group
   
 </pagx>
 ```
-
-**示例说明**：
-
-本示例展示了 PAGX 的完整功能集，采用现代深色主题设计：
-
-| 类别 | 涵盖节点 |
-|------|---------|
-| **资源** | Image、PathData、Font/Glyph、SolidColor、LinearGradient、RadialGradient、ConicGradient、Composition |
-| **几何元素** | Rectangle、Ellipse、Polystar（star/polygon）、Path、Text |
-| **绘制器** | Fill（纯色/渐变/图片）、Stroke |
-| **图层样式** | DropShadowStyle、InnerShadowStyle |
-| **滤镜** | BlurFilter、DropShadowFilter、BlendFilter、ColorMatrixFilter |
-| **形状修改器** | TrimPath、RoundCorner、MergePath |
-| **文本修改器** | TextModifier/RangeSelector、TextPath、TextLayout、GlyphRun |
-| **其他** | Repeater、Group、遮罩（mask/maskType）、合成引用 |
 
 > [预览](https://pag.io/pagx/?file=./samples/B.1_complete_example.pagx)
 

@@ -585,7 +585,7 @@ Except for solid colors, all color sources (gradients, image patterns) operate w
 
 2. **Modifying geometry properties does not affect the color source**: Directly modifying geometry element properties (such as Rectangle's width/height or Path's path data) only changes the geometry content itself without affecting the color source coordinate system.
 
-**Example**: Drawing a linear gradient from left to right within a 100×100 region:
+**Example**: Drawing a diagonal linear gradient within a 300×300 region:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -607,8 +607,8 @@ Except for solid colors, all color sources (gradients, image patterns) operate w
 </pagx>
 ```
 
-- Applying `scale(2, 2)` transform to this layer: The rectangle becomes 200×200, and the gradient scales accordingly, maintaining consistent visual appearance
-- Directly changing Rectangle's size to 200,200: The rectangle becomes 200×200, but the gradient coordinates remain unchanged, covering only the left half of the rectangle
+- Applying `scale(2, 2)` transform to this layer: The rectangle becomes 600×600, and the gradient scales accordingly, maintaining consistent visual appearance
+- Directly changing Rectangle's size to 600,600: The rectangle becomes 600×600, but the gradient coordinates remain unchanged, covering only the top-left quarter of the rectangle
 
 > Preview: [Linear](https://pag.io/pagx/?file=./samples/3.3.3_linear_gradient.pagx) | [Radial](https://pag.io/pagx/?file=./samples/3.3.3_radial_gradient.pagx) | [Conic](https://pag.io/pagx/?file=./samples/3.3.3_conic_gradient.pagx) | [Diamond](https://pag.io/pagx/?file=./samples/3.3.3_diamond_gradient.pagx) | [Pattern](https://pag.io/pagx/?file=./samples/3.3.3_image_pattern.pagx) | [Coords](https://pag.io/pagx/?file=./samples/3.3.3_color_source_coordinates.pagx)
 
@@ -3246,21 +3246,6 @@ The following example covers all major node types in PAGX, demonstrating complet
   
 </pagx>
 ```
-
-**Example Description**:
-
-This example demonstrates the complete feature set of PAGX with a modern dark theme design:
-
-| Category | Nodes Covered |
-|----------|--------------|
-| **Resources** | Image, PathData, Font/Glyph, SolidColor, LinearGradient, RadialGradient, ConicGradient, Composition |
-| **Geometry Elements** | Rectangle, Ellipse, Polystar (star/polygon), Path, Text |
-| **Painters** | Fill (solid/gradient/image), Stroke |
-| **Layer Styles** | DropShadowStyle, InnerShadowStyle |
-| **Filters** | BlurFilter, DropShadowFilter, BlendFilter, ColorMatrixFilter |
-| **Shape Modifiers** | TrimPath, RoundCorner, MergePath |
-| **Text Modifiers** | TextModifier/RangeSelector, TextPath, TextLayout, GlyphRun |
-| **Other** | Repeater, Group, Masking (mask/maskType), Composition reference |
 
 > [Preview](https://pag.io/pagx/?file=./samples/B.1_complete_example.pagx)
 
