@@ -1,5 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="800" height="600">
+  <Resources>
+    <PathData id="hex" data="M 10 0 L 5 8.66 L -5 8.66 L -10 0 L -5 -8.66 L 5 -8.66 Z"/>
+    <PathData id="bullet" data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
+    <PathData id="healthArc" data="M -180 100 A 200 200 0 0 0 -180 -100"/>
+    <PathData id="energyArc" data="M 180 -100 A 200 200 0 0 0 180 100"/>
+  </Resources>
+
+  <!-- Mask Definitions -->
+  <Layer id="triangleMask" visible="false">
+    <Polystar type="polygon" pointCount="3" outerRadius="80" rotation="90"/>
+    <Fill color="#FFF"/>
+  </Layer>
 
   <!-- Background Layer -->
   <Layer name="Background">
@@ -326,18 +338,5 @@
     <Path data="M 40 100 L 40 40 L 100 40 M 760 100 L 760 40 L 700 40 M 40 500 L 40 560 L 100 560 M 760 500 L 760 560 L 700 560"/>
     <Stroke width="4" color="#00CCFF"/>
   </Layer>
-
-  <!-- Mask Definitions -->
-  <Layer id="triangleMask" visible="false">
-    <Polystar type="polygon" pointCount="3" outerRadius="80" rotation="90"/>
-    <Fill color="#FFF"/>
-  </Layer>
-
-  <Resources>
-    <PathData id="hex" data="M 10 0 L 5 8.66 L -5 8.66 L -10 0 L -5 -8.66 L 5 -8.66 Z"/>
-    <PathData id="bullet" data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
-    <PathData id="healthArc" data="M -180 100 A 200 200 0 0 0 -180 -100"/>
-    <PathData id="energyArc" data="M 180 -100 A 200 200 0 0 0 180 100"/>
-  </Resources>
 
 </pagx>
