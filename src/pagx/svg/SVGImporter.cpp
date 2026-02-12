@@ -242,6 +242,14 @@ std::string SVGParserContext::getAttribute(const std::shared_ptr<DOMNode>& node,
   return defaultValue;
 }
 
+std::string SVGParserContext::getHrefAttribute(const std::shared_ptr<DOMNode>& node) const {
+  auto href = getAttribute(node, "href");
+  if (!href.empty()) {
+    return href;
+  }
+  return getAttribute(node, "xlink:href");
+}
+
 std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<DOM>& dom) {
   auto root = dom->getRootNode();
   if (!root || root->name != "svg") {
@@ -375,90 +383,31 @@ InheritedStyle SVGParserContext::computeInheritedStyle(const std::shared_ptr<DOM
                                                     const InheritedStyle& parentStyle) {
   InheritedStyle style = parentStyle;
 
-  std::string fill = getAttribute(element, "fill");
-  if (!fill.empty()) {
-    style.fill = fill;
-  }
+  static const std::pair<const char*, std::string InheritedStyle::*> StyleProperties[] = {
+      {"fill", &InheritedStyle::fill},
+      {"stroke", &InheritedStyle::stroke},
+      {"fill-opacity", &InheritedStyle::fillOpacity},
+      {"stroke-opacity", &InheritedStyle::strokeOpacity},
+      {"fill-rule", &InheritedStyle::fillRule},
+      {"stroke-dasharray", &InheritedStyle::strokeDasharray},
+      {"stroke-dashoffset", &InheritedStyle::strokeDashoffset},
+      {"stroke-width", &InheritedStyle::strokeWidth},
+      {"stroke-linecap", &InheritedStyle::strokeLinecap},
+      {"stroke-linejoin", &InheritedStyle::strokeLinejoin},
+      {"stroke-miterlimit", &InheritedStyle::strokeMiterlimit},
+      {"font-family", &InheritedStyle::fontFamily},
+      {"font-size", &InheritedStyle::fontSize},
+      {"font-weight", &InheritedStyle::fontWeight},
+      {"font-style", &InheritedStyle::fontStyle},
+      {"letter-spacing", &InheritedStyle::letterSpacing},
+      {"text-anchor", &InheritedStyle::textAnchor},
+  };
 
-  std::string stroke = getAttribute(element, "stroke");
-  if (!stroke.empty()) {
-    style.stroke = stroke;
-  }
-
-  std::string fillOpacity = getAttribute(element, "fill-opacity");
-  if (!fillOpacity.empty()) {
-    style.fillOpacity = fillOpacity;
-  }
-
-  std::string strokeOpacity = getAttribute(element, "stroke-opacity");
-  if (!strokeOpacity.empty()) {
-    style.strokeOpacity = strokeOpacity;
-  }
-
-  std::string fillRule = getAttribute(element, "fill-rule");
-  if (!fillRule.empty()) {
-    style.fillRule = fillRule;
-  }
-
-  std::string strokeDasharray = getAttribute(element, "stroke-dasharray");
-  if (!strokeDasharray.empty()) {
-    style.strokeDasharray = strokeDasharray;
-  }
-
-  std::string strokeDashoffset = getAttribute(element, "stroke-dashoffset");
-  if (!strokeDashoffset.empty()) {
-    style.strokeDashoffset = strokeDashoffset;
-  }
-
-  std::string strokeWidth = getAttribute(element, "stroke-width");
-  if (!strokeWidth.empty()) {
-    style.strokeWidth = strokeWidth;
-  }
-
-  std::string strokeLinecap = getAttribute(element, "stroke-linecap");
-  if (!strokeLinecap.empty()) {
-    style.strokeLinecap = strokeLinecap;
-  }
-
-  std::string strokeLinejoin = getAttribute(element, "stroke-linejoin");
-  if (!strokeLinejoin.empty()) {
-    style.strokeLinejoin = strokeLinejoin;
-  }
-
-  std::string strokeMiterlimit = getAttribute(element, "stroke-miterlimit");
-  if (!strokeMiterlimit.empty()) {
-    style.strokeMiterlimit = strokeMiterlimit;
-  }
-
-  // Text properties.
-  std::string fontFamily = getAttribute(element, "font-family");
-  if (!fontFamily.empty()) {
-    style.fontFamily = fontFamily;
-  }
-
-  std::string fontSize = getAttribute(element, "font-size");
-  if (!fontSize.empty()) {
-    style.fontSize = fontSize;
-  }
-
-  std::string fontWeight = getAttribute(element, "font-weight");
-  if (!fontWeight.empty()) {
-    style.fontWeight = fontWeight;
-  }
-
-  std::string fontStyle = getAttribute(element, "font-style");
-  if (!fontStyle.empty()) {
-    style.fontStyle = fontStyle;
-  }
-
-  std::string letterSpacing = getAttribute(element, "letter-spacing");
-  if (!letterSpacing.empty()) {
-    style.letterSpacing = letterSpacing;
-  }
-
-  std::string textAnchor = getAttribute(element, "text-anchor");
-  if (!textAnchor.empty()) {
-    style.textAnchor = textAnchor;
+  for (const auto& [propName, memberPtr] : StyleProperties) {
+    auto value = getAttribute(element, propName);
+    if (!value.empty()) {
+      style.*memberPtr = value;
+    }
   }
 
   return style;
@@ -724,11 +673,7 @@ void SVGParserContext::convertChildren(const std::shared_ptr<DOMNode>& element,
   // In that case, we don't add fill/stroke because the image already has its own fill.
   bool skipFillStroke = false;
   if (tag == "use") {
-    std::string href = getAttribute(element, "xlink:href");
-    if (href.empty()) {
-      href = getAttribute(element, "href");
-    }
-    std::string refId = resolveUrl(href);
+    std::string refId = resolveUrl(getHrefAttribute(element));
     auto it = _defs.find(refId);
     if (it != _defs.end() && it->second->name == "image") {
       skipFillStroke = true;
@@ -1085,12 +1030,7 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
 
 Element* SVGParserContext::convertUse(
     const std::shared_ptr<DOMNode>& element) {
-  std::string href = getAttribute(element, "xlink:href");
-  if (href.empty()) {
-    href = getAttribute(element, "href");
-  }
-
-  std::string refId = resolveUrl(href);
+  std::string refId = resolveUrl(getHrefAttribute(element));
   auto it = _defs.find(refId);
   if (it == _defs.end()) {
     return nullptr;
@@ -1102,10 +1042,7 @@ Element* SVGParserContext::convertUse(
 
   // Check if referenced element is an image.
   if (it->second->name == "image") {
-    std::string imageHref = getAttribute(it->second, "xlink:href");
-    if (imageHref.empty()) {
-      imageHref = getAttribute(it->second, "href");
-    }
+    std::string imageHref = getHrefAttribute(it->second);
     if (imageHref.empty()) {
       return nullptr;
     }
@@ -1323,19 +1260,12 @@ ImagePattern* SVGParserContext::convertPattern(
   auto child = element->getFirstChild();
   while (child) {
     if (child->name == "use") {
-      std::string href = getAttribute(child, "xlink:href");
-      if (href.empty()) {
-        href = getAttribute(child, "href");
-      }
-      std::string imageId = resolveUrl(href);
+      std::string imageId = resolveUrl(getHrefAttribute(child));
 
       // Find the referenced image in defs.
       auto imgIt = _defs.find(imageId);
       if (imgIt != _defs.end() && imgIt->second->name == "image") {
-        std::string imageHref = getAttribute(imgIt->second, "xlink:href");
-        if (imageHref.empty()) {
-          imageHref = getAttribute(imgIt->second, "href");
-        }
+        std::string imageHref = getHrefAttribute(imgIt->second);
 
         // Register the image resource and use the reference pointer.
         auto imageNode = registerImageResource(imageHref);
@@ -1381,10 +1311,7 @@ ImagePattern* SVGParserContext::convertPattern(
       }
     } else if (child->name == "image") {
       // Direct image element inside pattern.
-      std::string imageHref = getAttribute(child, "xlink:href");
-      if (imageHref.empty()) {
-        imageHref = getAttribute(child, "href");
-      }
+      std::string imageHref = getHrefAttribute(child);
 
       // Register the image resource and use the reference pointer.
       auto imageNode = registerImageResource(imageHref);
@@ -1647,11 +1574,7 @@ Rect SVGParserContext::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
 
   // For use element, get bounds of the referenced element and apply x/y offset.
   if (tag == "use") {
-    std::string href = getAttribute(element, "xlink:href");
-    if (href.empty()) {
-      href = getAttribute(element, "href");
-    }
-    std::string refId = resolveUrl(href);
+    std::string refId = resolveUrl(getHrefAttribute(element));
     auto it = _defs.find(refId);
     if (it != _defs.end()) {
       Rect refBounds = getShapeBounds(it->second);
@@ -1773,6 +1696,71 @@ Matrix SVGParserContext::parseTransform(const std::string& value) {
   return result;
 }
 
+// Parse CSS Color Level 4 color() function: color(display-p3 r g b) or color(display-p3 r g b / a).
+// Returns a Color with alpha=-1 on parse failure.
+static Color ParseCSSColorFunction(const std::string& value) {
+  auto start = value.find('(');
+  auto end = value.find(')');
+  if (start == std::string::npos || end == std::string::npos) {
+    return {0, 0, 0, -1};
+  }
+  auto inner = value.substr(start + 1, end - start - 1);
+  // Trim leading whitespace.
+  inner.erase(0, inner.find_first_not_of(" \t"));
+
+  // Detect color space identifier.
+  ColorSpace colorSpace = ColorSpace::SRGB;
+  if (inner.find("display-p3") == 0) {
+    colorSpace = ColorSpace::DisplayP3;
+    inner = inner.substr(10);
+  } else if (inner.find("a98-rgb") == 0) {
+    inner = inner.substr(7);
+  } else if (inner.find("rec2020") == 0) {
+    inner = inner.substr(7);
+  } else if (inner.find("srgb") == 0) {
+    inner = inner.substr(4);
+  }
+
+  // Trim whitespace after color space name.
+  inner.erase(0, inner.find_first_not_of(" \t"));
+  inner.erase(inner.find_last_not_of(" \t") + 1);
+
+  // Parse space-separated values and optional "/ alpha".
+  std::vector<float> components;
+  float alpha = 1.0f;
+  const char* ptr = inner.c_str();
+  const char* endPtr = ptr + inner.size();
+  bool foundSlash = false;
+  while (ptr < endPtr) {
+    while (ptr < endPtr && std::isspace(*ptr)) {
+      ++ptr;
+    }
+    if (ptr >= endPtr) {
+      break;
+    }
+    if (*ptr == '/') {
+      foundSlash = true;
+      ++ptr;
+      continue;
+    }
+    char* numEnd = nullptr;
+    float val = strtof(ptr, &numEnd);
+    if (numEnd == ptr) {
+      break;
+    }
+    if (foundSlash) {
+      alpha = val;
+    } else {
+      components.push_back(val);
+    }
+    ptr = numEnd;
+  }
+  if (components.size() >= 3) {
+    return {components[0], components[1], components[2], alpha, colorSpace};
+  }
+  return {0, 0, 0, -1};
+}
+
 Color SVGParserContext::parseColor(const std::string& value) {
   if (value.empty() || value == "none") {
     return {0, 0, 0, 0, ColorSpace::SRGB};
@@ -1832,76 +1820,9 @@ Color SVGParserContext::parseColor(const std::string& value) {
 
   // CSS Color Level 4: color(display-p3 r g b) or color(display-p3 r g b / a)
   if (value.find("color(") == 0) {
-    auto start = value.find('(');
-    auto end = value.find(')');
-    if (start != std::string::npos && end != std::string::npos) {
-      auto inner = value.substr(start + 1, end - start - 1);
-      // Trim leading whitespace
-      inner.erase(0, inner.find_first_not_of(" \t"));
-
-      // Detect color space identifier
-      ColorSpace colorSpace = ColorSpace::SRGB;
-      if (inner.find("display-p3") == 0) {
-        colorSpace = ColorSpace::DisplayP3;
-        inner = inner.substr(10);  // Skip "display-p3"
-      } else if (inner.find("a98-rgb") == 0) {
-        // Adobe RGB 1998 - convert to sRGB approximation
-        colorSpace = ColorSpace::SRGB;
-        inner = inner.substr(7);  // Skip "a98-rgb"
-      } else if (inner.find("rec2020") == 0) {
-        // Rec.2020 - convert to sRGB approximation
-        colorSpace = ColorSpace::SRGB;
-        inner = inner.substr(7);  // Skip "rec2020"
-      } else if (inner.find("srgb") == 0) {
-        colorSpace = ColorSpace::SRGB;
-        inner = inner.substr(4);  // Skip "srgb"
-      }
-
-      // Trim whitespace after color space name
-      inner.erase(0, inner.find_first_not_of(" \t"));
-      inner.erase(inner.find_last_not_of(" \t") + 1);
-
-      // Parse space-separated values and optional "/ alpha"
-      std::vector<float> components;
-      float alpha = 1.0f;
-      const char* ptr = inner.c_str();
-      const char* endPtr = ptr + inner.size();
-      bool foundSlash = false;
-      while (ptr < endPtr) {
-        // Skip whitespace.
-        while (ptr < endPtr && std::isspace(*ptr)) {
-          ++ptr;
-        }
-        if (ptr >= endPtr) {
-          break;
-        }
-        // Check for slash separator.
-        if (*ptr == '/') {
-          foundSlash = true;
-          ++ptr;
-          continue;
-        }
-        char* numEnd = nullptr;
-        float val = strtof(ptr, &numEnd);
-        if (numEnd == ptr) {
-          break;
-        }
-        if (foundSlash) {
-          alpha = val;
-        } else {
-          components.push_back(val);
-        }
-        ptr = numEnd;
-      }
-      if (components.size() >= 3) {
-        Color color = {};
-        color.red = components[0];
-        color.green = components[1];
-        color.blue = components[2];
-        color.alpha = alpha;
-        color.colorSpace = colorSpace;
-        return color;
-      }
+    auto color = ParseCSSColorFunction(value);
+    if (color.alpha >= 0) {
+      return color;
     }
   }
 
@@ -2097,55 +2018,17 @@ std::string SVGParserContext::colorToHex(const std::string& value) {
     return value;
   }
   // CSS Color Level 4: color(display-p3 r g b) -> p3(r, g, b)
-  if (value.find("color(display-p3") == 0) {
-    auto start = value.find("display-p3");
-    auto end = value.find(')');
-    if (start != std::string::npos && end != std::string::npos) {
-      auto inner = value.substr(start + 10, end - start - 10);  // skip "display-p3"
-      // Trim whitespace
-      inner.erase(0, inner.find_first_not_of(" \t"));
-      inner.erase(inner.find_last_not_of(" \t") + 1);
-      // Parse space-separated values and optional "/ alpha"
-      std::vector<float> components;
-      float alpha = 1.0f;
-      const char* ptr = inner.c_str();
-      const char* endPtr = ptr + inner.size();
-      bool foundSlash = false;
-      while (ptr < endPtr) {
-        while (ptr < endPtr && std::isspace(*ptr)) {
-          ++ptr;
-        }
-        if (ptr >= endPtr) {
-          break;
-        }
-        if (*ptr == '/') {
-          foundSlash = true;
-          ++ptr;
-          continue;
-        }
-        char* numEnd = nullptr;
-        float val = strtof(ptr, &numEnd);
-        if (numEnd == ptr) {
-          break;
-        }
-        if (foundSlash) {
-          alpha = val;
-        } else {
-          components.push_back(val);
-        }
-        ptr = numEnd;
+  if (value.find("color(") == 0) {
+    auto color = ParseCSSColorFunction(value);
+    if (color.alpha >= 0 && color.colorSpace == ColorSpace::DisplayP3) {
+      char buf[64] = {};
+      if (color.alpha < 1.0f) {
+        snprintf(buf, sizeof(buf), "p3(%.4g, %.4g, %.4g, %.4g)", color.red, color.green, color.blue,
+                 color.alpha);
+      } else {
+        snprintf(buf, sizeof(buf), "p3(%.4g, %.4g, %.4g)", color.red, color.green, color.blue);
       }
-      if (components.size() >= 3) {
-        char buf[64] = {};
-        if (alpha < 1.0f) {
-          snprintf(buf, sizeof(buf), "p3(%.4g, %.4g, %.4g, %.4g)", components[0], components[1],
-                   components[2], alpha);
-        } else {
-          snprintf(buf, sizeof(buf), "p3(%.4g, %.4g, %.4g)", components[0], components[1],
-                   components[2]);
-        }
-        return std::string(buf);
-      }
+      return std::string(buf);
     }
   }
   // Parse the color (handles named colors, rgb, rgba, etc.) and convert to hex.

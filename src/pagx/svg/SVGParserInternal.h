@@ -158,6 +158,9 @@ class SVGParserContext {
   std::string getAttribute(const std::shared_ptr<DOMNode>& node, const std::string& name,
                            const std::string& defaultValue = "") const;
 
+  // Get href attribute from DOMNode, checking both "href" and "xlink:href".
+  std::string getHrefAttribute(const std::shared_ptr<DOMNode>& node) const;
+
   // Register an image resource and return its node pointer.
   // If the image source (data URI or path) has already been registered, returns the existing node.
   Image* registerImageResource(const std::string& imageSource);
