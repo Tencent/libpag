@@ -805,6 +805,12 @@ function goHome(): void {
     document.title = DEFAULT_TITLE;
     showDropZoneUI();
     currentPlayingFile = null;
+
+    // Clear file parameter from URL
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.delete('file');
+    newUrl.hash = '';
+    history.replaceState(null, '', newUrl.toString());
 }
 
 async function loadExternalFiles(baseURL: string): Promise<void> {
@@ -944,6 +950,13 @@ async function loadPAGXFromURL(url: string) {
 
         // Register fonts and load PAGX file
         await loadPAGXData(new Uint8Array(fileBuffer), name, baseURL);
+        currentPlayingFile = url;
+
+        // Update URL with file parameter (without page reload)
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.set('file', url);
+        newUrl.hash = '';
+        history.replaceState(null, '', newUrl.toString());
     } catch (error) {
         console.error('Failed to load PAGX from URL:', error);
         const message = error instanceof Error ? error.message : 'Unknown error';
@@ -1010,7 +1023,7 @@ function setupDragAndDrop() {
     });
 
     leaveBtn.addEventListener('click', () => {
-        window.location.hash = '';
+        goHome();
     });
 
     openBtn.addEventListener('click', () => {
@@ -1129,7 +1142,7 @@ function renderSampleList(): void {
     list.innerHTML = '';
     for (const file of sampleFiles) {
         const a = document.createElement('a');
-        a.href = '#play/' + encodeURIComponent(file);
+        a.href = '#';
 
         const baseName = file.replace(/\.pagx$/, '');
         const imageUrl = `./samples/images/${baseName}.webp`;
@@ -1141,6 +1154,12 @@ function renderSampleList(): void {
         if (file === currentSampleFile) {
             a.classList.add('active');
         }
+        a.addEventListener('click', (e) => {
+            e.preventDefault();
+            currentSampleFile = file;
+            hideSamplesPage();
+            loadPAGXFromURL('./samples/' + file);
+        });
         list.appendChild(a);
     }
 }
@@ -1151,14 +1170,6 @@ function showSamplesPage(): void {
     container.classList.add('hidden');
     samplesPage.classList.remove('hidden');
     document.title = t().samplesTitle;
-
-    // Update back button: return to player if playing, otherwise to home
-    const backBtn = document.getElementById('samples-back-btn') as HTMLAnchorElement;
-    if (backBtn) {
-        backBtn.href = currentPlayingFile
-            ? '#play/' + encodeURIComponent(currentPlayingFile)
-            : '#';
-    }
 
     loadSampleList().then(renderSampleList).catch((error) => {
         console.error('Failed to load samples:', error);
@@ -1176,19 +1187,8 @@ function handleRoute(): void {
     const hash = window.location.hash;
     if (hash === '#samples') {
         showSamplesPage();
-    } else if (hash.startsWith('#play/')) {
-        const filename = decodeURIComponent(hash.substring(6));
-        hideSamplesPage();
-        if (filename !== currentPlayingFile) {
-            currentSampleFile = filename;
-            currentPlayingFile = filename;
-            loadPAGXFromURL('./samples/' + filename);
-        }
     } else {
         hideSamplesPage();
-        if (currentPlayingFile) {
-            goHome();
-        }
     }
 }
 
