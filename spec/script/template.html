@@ -152,12 +152,6 @@
             background: #22863a;
             border-radius: 6px 6px 0 0;
         }
-        .code-header.stuck {
-            position: fixed;
-            top: 0;
-            border-radius: 0;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-        }
         .code-header-label {
             font-size: 12px;
             font-weight: 600;
@@ -388,48 +382,32 @@
                 if (window.innerWidth <= 900) toggleSidebar();
             });
         });
-        // Sticky code headers: fix header to viewport top while code block is visible
+        // Update URL hash to match the current visible heading while scrolling.
+        // Only activates if the URL already contains a hash anchor.
         (function() {
-            var headers = document.querySelectorAll('.code-header');
-            if (!headers.length) return;
-            var placeholders = new Map();
-            function updateHeaders() {
-                var isMobile = window.innerWidth <= 900;
-                var sidebar = document.querySelector('.sidebar');
-                var sidebarWidth = isMobile ? 0 : (sidebar ? sidebar.offsetWidth : 0);
-                var contentEl = document.querySelector('.content');
-                var contentPadding = contentEl ? parseInt(getComputedStyle(contentEl).paddingLeft) || 0 : 0;
-                headers.forEach(function(header) {
-                    var wrapper = header.parentElement;
-                    var pre = wrapper.querySelector('pre');
-                    if (!pre) return;
-                    var wrapperRect = wrapper.getBoundingClientRect();
-                    var preRect = pre.getBoundingClientRect();
-                    var headerHeight = header.offsetHeight;
-                    var shouldStick = wrapperRect.top < 0 && preRect.bottom > headerHeight;
-                    if (shouldStick) {
-                        if (!placeholders.has(header)) {
-                            var ph = document.createElement('div');
-                            ph.style.height = headerHeight + 'px';
-                            wrapper.insertBefore(ph, pre);
-                            placeholders.set(header, ph);
+            if (!location.hash) return;
+            var headings = document.querySelectorAll('.content h1[id], .content h2[id], .content h3[id], .content h4[id], .content h5[id], .content h6[id]');
+            if (!headings.length) return;
+            var updating = false;
+            window.addEventListener('scroll', function() {
+                if (!updating) {
+                    updating = true;
+                    requestAnimationFrame(function() {
+                        var current = '';
+                        for (var i = 0; i < headings.length; i++) {
+                            if (headings[i].getBoundingClientRect().top <= 20) {
+                                current = headings[i].id;
+                            } else {
+                                break;
+                            }
                         }
-                        header.classList.add('stuck');
-                        header.style.left = sidebarWidth + 'px';
-                        header.style.right = '0';
-                    } else {
-                        if (placeholders.has(header)) {
-                            placeholders.get(header).remove();
-                            placeholders.delete(header);
+                        if (current && location.hash !== '#' + current) {
+                            history.replaceState(null, '', '#' + current);
                         }
-                        header.classList.remove('stuck');
-                        header.style.left = '';
-                        header.style.right = '';
-                    }
-                });
-            }
-            window.addEventListener('scroll', updateHeaders, { passive: true });
-            window.addEventListener('resize', updateHeaders, { passive: true });
+                        updating = false;
+                    });
+                }
+            }, { passive: true });
         })();
     </script>
 </body>
