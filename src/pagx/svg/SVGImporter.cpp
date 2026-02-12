@@ -622,14 +622,32 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
     std::string clipId = resolveUrl(clipPathAttr);
     auto clipIt = _defs.find(clipId);
     if (clipIt != _defs.end()) {
-      // Convert clipPath element to a mask layer.
-      auto clipLayer = convertMaskElement(clipIt->second, inheritedStyle);
-      if (clipLayer) {
-        layer->mask = clipLayer;
-        // SVG clip-path uses alpha (shape outline) for clipping.
-        layer->maskType = MaskType::Alpha;
-        // Add clip layer as invisible layer to the document.
-        _maskLayers.push_back(clipLayer);
+      // Check if the clipPath is a single full-canvas rect, which has no visual effect.
+      bool isFullCanvasClip = false;
+      auto clipElement = clipIt->second;
+      auto firstChild = clipElement->getFirstChild();
+      if (firstChild && !firstChild->getNextSibling() && firstChild->name == "rect") {
+        std::string rectTransform = getAttribute(firstChild, "transform");
+        if (rectTransform.empty()) {
+          float cx = parseLength(getAttribute(firstChild, "x"), _viewBoxWidth);
+          float cy = parseLength(getAttribute(firstChild, "y"), _viewBoxHeight);
+          float cw = parseLength(getAttribute(firstChild, "width"), _viewBoxWidth);
+          float ch = parseLength(getAttribute(firstChild, "height"), _viewBoxHeight);
+          if (cx <= 0 && cy <= 0 && cw >= _viewBoxWidth && ch >= _viewBoxHeight) {
+            isFullCanvasClip = true;
+          }
+        }
+      }
+      if (!isFullCanvasClip) {
+        // Convert clipPath element to a mask layer.
+        auto clipLayer = convertMaskElement(clipElement, inheritedStyle);
+        if (clipLayer) {
+          layer->mask = clipLayer;
+          // SVG clip-path uses alpha (shape outline) for clipping.
+          layer->maskType = MaskType::Alpha;
+          // Add clip layer as invisible layer to the document.
+          _maskLayers.push_back(clipLayer);
+        }
       }
     }
   }
@@ -668,6 +686,11 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
         layer->children.push_back(childLayer);
       }
       child = child->getNextSibling();
+    }
+    // Skip empty <g> elements that have no renderable content and no visual effects.
+    if (tag == "g" && layer->children.empty() && layer->contents.empty() &&
+        layer->mask == nullptr && layer->filters.empty() && layer->styles.empty()) {
+      return nullptr;
     }
   } else {
     // Shape element: convert to vector contents.
@@ -1484,6 +1507,20 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
   }
 
   if (!stroke.empty() && stroke != "none") {
+    // Check stroke width first. A zero-width stroke is invisible and should be skipped.
+    std::string strokeWidth = getAttribute(element, "stroke-width");
+    if (strokeWidth.empty()) {
+      strokeWidth = inheritedStyle.strokeWidth;
+    }
+    float parsedStrokeWidth = 1;
+    if (!strokeWidth.empty()) {
+      parsedStrokeWidth = parseLength(strokeWidth, _viewBoxWidth);
+    }
+    if (parsedStrokeWidth <= 0) {
+      // Skip creating an invisible zero-width stroke.
+      return;
+    }
+
     auto strokeNode = _document->makeNode<Stroke>();
 
     if (stroke.find("url(") == 0) {
@@ -1508,13 +1545,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       strokeNode->color = solidColor;
     }
 
-    std::string strokeWidth = getAttribute(element, "stroke-width");
-    if (strokeWidth.empty()) {
-      strokeWidth = inheritedStyle.strokeWidth;
-    }
-    if (!strokeWidth.empty()) {
-      strokeNode->width = parseLength(strokeWidth, _viewBoxWidth);
-    }
+    strokeNode->width = parsedStrokeWidth;
 
     std::string strokeLinecap = getAttribute(element, "stroke-linecap");
     if (strokeLinecap.empty()) {
