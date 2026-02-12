@@ -18,6 +18,7 @@
 
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { exec } from 'child_process';
 import { fileURLToPath } from 'url';
 
@@ -36,6 +37,18 @@ app.use((req, res, next) => {
 
 // Map /fonts to resources/font directory
 app.use('/fonts', express.static(path.join(libpagDir, 'resources', 'font')));
+
+// Generate samples/index.json dynamically for development
+app.get('/samples/index.json', (req, res) => {
+  const samplesDir = path.join(libpagDir, 'spec', 'samples');
+  const files = fs.readdirSync(samplesDir)
+    .filter(f => f.endsWith('.pagx'))
+    .sort();
+  res.json(files);
+});
+
+// Map /samples to spec/samples directory
+app.use('/samples', express.static(path.join(libpagDir, 'spec', 'samples')));
 
 app.use('', express.static(__dirname, {
   setHeaders: (res, filePath) => {
