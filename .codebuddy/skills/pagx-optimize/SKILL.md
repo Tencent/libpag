@@ -33,20 +33,20 @@ tag.
 
 ```xml
 <!-- Before -->
-<PAGXFile width="800" height="600">
+<pagx width="800" height="600">
   <Resources>
     <PathData id="arrow" data="M 0 0 L 10 0"/>
   </Resources>
   <Layer name="Main">...</Layer>
-</PAGXFile>
+</pagx>
 
 <!-- After -->
-<PAGXFile width="800" height="600">
+<pagx width="800" height="600">
   <Layer name="Main">...</Layer>
   <Resources>
     <PathData id="arrow" data="M 0 0 L 10 0"/>
   </Resources>
-</PAGXFile>
+</pagx>
 ```
 
 ### Caveats
@@ -55,7 +55,220 @@ None. Resource position does not affect rendering. This is purely a readability 
 
 ---
 
-## 2. Remove Unused Resources
+## 2. Remove Empty and Dead Elements
+
+### Principle
+
+Empty elements and invisible painters are dead code and should be removed.
+
+### When to Apply
+
+- Empty `<Layer/>` tags with no children and no meaningful attributes
+- Empty `<Resources></Resources>` blocks with no resource definitions
+- `<Stroke ... width="0"/>` — zero-width strokes are invisible and have no effect
+
+### Example
+
+```xml
+<!-- Before -->
+<Layer>
+  <Path data="@path0"/>
+  <Fill color="#5AAEF3"/>
+  <Stroke color="#5AAEF3" width="0"/>  <!-- invisible, remove -->
+</Layer>
+<Layer/>                                <!-- empty, remove -->
+<Resources></Resources>                 <!-- empty, remove -->
+
+<!-- After -->
+<Layer>
+  <Path data="@path0"/>
+  <Fill color="#5AAEF3"/>
+</Layer>
+```
+
+### Caveats
+
+- An empty Layer may serve as a mask target (`id` referenced elsewhere via `mask="@id"`).
+  Verify it is truly unreferenced before removing.
+- A Layer with `visible="false"` is not "empty" — it is likely a mask/clip definition.
+
+---
+
+## 3. Omit Default Attribute Values
+
+### Principle
+
+The PAGX spec defines default values for most optional attributes. Attributes explicitly set
+to their default value are redundant and should be omitted to reduce noise.
+
+### Common Defaults to Omit
+
+**Layer**: `alpha="1"`, `visible="true"`, `blendMode="normal"`, `x="0"`, `y="0"`,
+`antiAlias="true"`, `groupOpacity="false"`, `maskType="alpha"`
+
+**Rectangle / Ellipse**: `center="0,0"`, `size="100,100"`, `reversed="false"`.
+Also `roundness="0"` for Rectangle.
+
+**Fill**: `color="#000000"`, `alpha="1"`, `blendMode="normal"`, `fillRule="winding"`,
+`placement="background"`
+
+**Stroke**: `color="#000000"`, `width="1"`, `alpha="1"`, `blendMode="normal"`, `cap="butt"`,
+`join="miter"`, `miterLimit="4"`, `dashOffset="0"`, `align="center"`,
+`placement="background"`
+
+**Path**: `reversed="false"`
+
+**Group**: `alpha="1"`, `position="0,0"`, `rotation="0"`, `scale="1,1"`, `skew="0"`,
+`skewAxis="0"`
+
+**DropShadowStyle**: `showBehindLayer="true"`, `blendMode="normal"`.
+All offsets and blur values default to `0`, color defaults to `#000000`.
+
+**Gradient**: `matrix` defaults to identity. RadialGradient/ConicGradient/DiamondGradient
+`center` defaults to `0,0`. ConicGradient `startAngle` defaults to `0`, `endAngle` to `360`.
+
+**TrimPath**: `start="0"`, `end="1"`, `offset="0"`, `type="separate"`
+
+**Repeater**: `offset="0"`, `anchor="0,0"`, `rotation="0"`, `scale="1,1"`,
+`startAlpha="1"`, `endAlpha="1"`
+
+### Example
+
+```xml
+<!-- Before -->
+<Layer alpha="1" visible="true" blendMode="normal" x="0" y="0">
+  <Rectangle center="0,0" size="200,150" roundness="0" reversed="false"/>
+  <Fill color="#FF0000" alpha="1" fillRule="winding" placement="background"/>
+  <Stroke color="#000000" width="2" cap="butt" join="miter" miterLimit="4"/>
+</Layer>
+
+<!-- After -->
+<Layer>
+  <Rectangle size="200,150"/>
+  <Fill color="#FF0000"/>
+  <Stroke width="2"/>
+</Layer>
+```
+
+### Caveats
+
+- Only omit when the value **exactly matches** the spec default. When in doubt, keep it.
+- `ColorStop offset` is always required (no default) — do not omit even `offset="0"`.
+
+---
+
+## 4. Simplify Transform Attributes
+
+### Principle
+
+Use the simplest representation for transforms. Prefer `x`/`y` over `matrix` when the matrix
+only represents translation.
+
+### 4.1 Translation-Only Matrix to x/y
+
+When a Layer's matrix is `1,0,0,1,tx,ty` (identity + translation), replace with `x`/`y`.
+
+```xml
+<!-- Before -->
+<Layer matrix="1,0,0,1,200,150">
+
+<!-- After -->
+<Layer x="200" y="150">
+```
+
+### 4.2 Identity Matrix Removal
+
+A matrix of `1,0,0,1,0,0` is identity and should be removed entirely.
+
+```xml
+<!-- Before -->
+<Layer matrix="1,0,0,1,0,0">
+
+<!-- After -->
+<Layer>
+```
+
+### 4.3 Cascaded Translation Merging
+
+When nested Layers each only apply translation (no rotation/scale), their matrices can be
+merged and intermediate Layers removed.
+
+```xml
+<!-- Before: nested translations that cancel or combine -->
+<Layer matrix="1,0,0,1,-500,-300">
+  <Layer matrix="1,0,0,1,500,300">
+    <Layer matrix="1,0,0,1,10,20">
+      <!-- content -->
+
+<!-- After: net translation is 10,20 -->
+<Layer x="10" y="20">
+  <!-- content -->
+```
+
+### Caveats
+
+- Only merge translations when intermediate Layers have no other attributes (no styles,
+  filters, mask, alpha, blendMode, etc.).
+- Matrices with rotation or scale (`a != 1` or `b != 0` or `c != 0` or `d != 1`) cannot be
+  simplified to x/y.
+
+---
+
+## 5. Normalize Numeric Values
+
+### Principle
+
+Use the simplest numeric representation for readability and smaller file size.
+
+### 5.1 Near-Zero Scientific Notation
+
+Values like `-2.18557e-06` are effectively zero and should be written as `0`.
+
+```xml
+<!-- Before -->
+<LinearGradient startPoint="375,-2.99354e-05" endPoint="-7.13666e-06,280">
+
+<!-- After -->
+<LinearGradient startPoint="375,0" endPoint="0,280">
+```
+
+### 5.2 Integer Values
+
+Whole numbers should not have trailing `.0` or unnecessary decimal places.
+
+```xml
+<!-- Before -->
+<Rectangle center="100.0,200.0" size="50.0,50.0"/>
+
+<!-- After -->
+<Rectangle center="100,200" size="50,50"/>
+```
+
+### 5.3 Short Hex Colors
+
+The spec supports `#RGB` shorthand that expands to `#RRGGBB`. Use it when possible.
+
+```xml
+<!-- Before -->
+<Fill color="#FF0000"/>
+<Fill color="#FFFFFF"/>
+
+<!-- After -->
+<Fill color="#F00"/>
+<Fill color="#FFF"/>
+```
+
+### Caveats
+
+- Only simplify scientific notation when the value is negligibly small (absolute value
+  < 0.001). Larger values must be preserved.
+- Only use short hex when each pair of digits is identical (`FF` → `F`, `00` → `0`).
+  `#F43F5E` cannot be shortened.
+- Standardize to uppercase hex for consistency.
+
+---
+
+## 6. Remove Unused Resources
 
 ### Principle
 
@@ -93,7 +306,7 @@ Delete the entire resource definition.
 
 ---
 
-## 3. Remove Redundant Group / Layer Wrappers
+## 7. Remove Redundant Group / Layer Wrappers
 
 ### Principle
 
@@ -137,12 +350,12 @@ Promote the inner content to the parent scope and delete the wrapper element.
   blendMode. If a Layer carries any of these, it must stay.
 - **Groups with transforms cannot be removed**: A Group's transform applies to all its
   contents. Removing it changes the rendering.
-- **Groups for scope isolation**: If a Group exists to isolate painter scope (see Section 4),
+- **Groups for scope isolation**: If a Group exists to isolate painter scope (see Section 8),
   it must not be removed.
 
 ---
 
-## 4. Merge Geometry Sharing Identical Painters
+## 8. Merge Geometry Sharing Identical Painters
 
 This is the most common and highest-impact optimization.
 
@@ -152,7 +365,7 @@ In PAGX, painters (Fill / Stroke) render **all geometry accumulated in the curre
 Therefore, multiple geometry elements using identical painters can share a single painter
 declaration within the same scope.
 
-### 4.1 Path Merging — Multi-M Subpaths
+### 8.1 Path Merging — Multi-M Subpaths
 
 **When to apply**: Multiple Paths have identical Fill and/or Stroke.
 
@@ -179,7 +392,7 @@ single Path.
 
 **Typical scenarios**: Symmetrical character parts, corner decorations, repeated small icons.
 
-### 4.2 Shape Merging — Multiple Ellipses / Rectangles Sharing Painters
+### 8.2 Shape Merging — Multiple Ellipses / Rectangles Sharing Painters
 
 **When to apply**: Multiple independent Ellipses or Rectangles have identical painters.
 
@@ -205,7 +418,7 @@ Fill / Stroke declaration.
 </Group>
 ```
 
-### 4.3 Cross-Layer Merging
+### 8.3 Cross-Layer Merging
 
 **When to apply**: Multiple adjacent Layers have no individual styles / filters / mask /
 blendMode / alpha / name, and their geometry uses identical painters.
@@ -259,7 +472,7 @@ Stroke only, or Fill + Stroke). Only geometry with identical painter sets can sh
 
 ---
 
-## 5. Merge Multiple Painters on Identical Geometry
+## 9. Merge Multiple Painters on Identical Geometry
 
 ### Principle
 
@@ -302,7 +515,7 @@ parameters) but different painters.
 
 ---
 
-## 6. Composition Resource Reuse
+## 10. Composition Resource Reuse
 
 ### Principle
 
@@ -415,7 +628,7 @@ element's local coordinate system origin**.
 
 ---
 
-## 7. PathData Resource Reuse
+## 11. PathData Resource Reuse
 
 ### Principle
 
@@ -455,7 +668,7 @@ Search all `<Path data="..."/>` elements and find identical data strings.
 
 ---
 
-## 8. Color Source Resource Sharing
+## 12. Color Source Resource Sharing
 
 ### Principle
 
@@ -497,6 +710,77 @@ DiamondGradient definitions with identical parameters.
 - **Do not extract single-use gradients**: The PAGX spec supports both modes — shared
   definitions for multiple references and inline definitions for single use. Not every
   gradient needs to be in Resources.
+
+---
+
+## 13. Replace Path with Primitive Geometry
+
+### Principle
+
+When a Path's data describes a shape that can be expressed as a Rectangle or Ellipse, prefer
+the primitive geometry element. Primitives are more readable, more compact, and convey
+semantic intent.
+
+### When to Apply
+
+A Path's data is a simple axis-aligned rectangle (4 lines forming a box) or a circle/ellipse
+(can be detected by arc commands forming a full closed shape).
+
+### Example
+
+```xml
+<!-- Before: rectangular path -->
+<Path data="M 7 51 L 24 51 L 24 210 L 7 210 Z"/>
+
+<!-- After: Rectangle (center and size computed from path bounds) -->
+<Rectangle center="15,130" size="17,159"/>
+```
+
+### Caveats
+
+- Only apply when the path is clearly a standard shape. Do not convert rounded rectangles
+  described via Bezier curves unless you can accurately extract the roundness parameter.
+- Paths with transforms applied may not map cleanly to primitive attributes.
+- This optimization prioritizes readability; file size savings are minimal.
+
+---
+
+## 14. Remove Full-Canvas Clip Masks
+
+### Principle
+
+A clip mask that covers the entire canvas (or exceeds the masked content's bounds) has no
+clipping effect and can be removed along with the mask reference.
+
+### When to Apply
+
+A `visible="false"` Layer used as a mask contains a Rectangle whose bounds equal or exceed the
+root element's dimensions, and the mask reference is on a Layer that does not need clipping.
+
+### Example
+
+```xml
+<!-- Before: clip mask covers entire 800x600 canvas -->
+<Layer id="clip0" visible="false">
+  <Rectangle center="400,300" size="800,600"/>
+  <Fill color="#FFF"/>
+</Layer>
+<Layer mask="@clip0">
+  <!-- content that fits within 800x600 anyway -->
+</Layer>
+
+<!-- After: remove mask definition and reference -->
+<Layer>
+  <!-- content unchanged -->
+</Layer>
+```
+
+### Caveats
+
+- Verify that the masked content truly fits within the mask bounds. If content extends beyond
+  the canvas, the clip mask may still be needed.
+- Some full-canvas clips exist because the SVG source had `overflow: hidden` on the root.
+  Removing them is safe when the PAGX root already clips to its own dimensions.
 
 ---
 
