@@ -192,7 +192,7 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
     container->addChild(layer);
     displayList.root()->addChild(container);
     displayList.render(pagxSurface.get(), false);
-    EXPECT_TRUE(Baseline::Compare(pagxSurface, "PAGXTest/" + baseName));
+    EXPECT_TRUE(Baseline::Compare(pagxSurface, "PAGXTest/" + baseName)) << baseName;
   }
 
   device->unlock();
@@ -1352,7 +1352,7 @@ PAG_TEST(PAGXTest, SampleFiles) {
     displayList.root()->addChild(layer);
     displayList.render(surface.get(), false);
 
-    EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/" + baseName));
+    EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/" + baseName)) << baseName;
   }
 
   device->unlock();
