@@ -10,6 +10,7 @@
       <ColorStop offset="0" color="#06B6D4"/>
       <ColorStop offset="1" color="#3B82F6"/>
     </LinearGradient>
+    <PathData id="arrowRight" data="M -15 0 L 10 0 M 4 -6 L 12 0 L 4 6"/>
   </Resources>
 
   <!-- Background -->
@@ -443,7 +444,7 @@
     </Layer>
     <!-- Arrow 1 -->
     <Layer x="-80" y="0">
-      <Path data="M -15 0 L 10 0 M 4 -6 L 12 0 L 4 6"/>
+      <Path data="@arrowRight"/>
       <Stroke color="#64748B" width="2" cap="round" join="round"/>
     </Layer>
     <!-- .pag badge -->
@@ -459,7 +460,7 @@
     </Layer>
     <!-- Arrow 2 -->
     <Layer x="90" y="0">
-      <Path data="M -15 0 L 10 0 M 4 -6 L 12 0 L 4 6"/>
+      <Path data="@arrowRight"/>
       <Stroke color="#64748B" width="2" cap="round" join="round"/>
     </Layer>
     <!-- Production badge -->
