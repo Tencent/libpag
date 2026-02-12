@@ -1156,6 +1156,8 @@ function renderSampleList(): void {
         a.addEventListener('click', (e) => {
             e.preventDefault();
             currentSampleFile = file;
+            // Clear hash before loading so replaceState won't carry #samples
+            history.replaceState(null, '', window.location.pathname + window.location.search);
             hideSamplesPage();
             loadPAGXFromURL('./samples/' + file);
         });
@@ -1199,6 +1201,16 @@ if (typeof window !== 'undefined') {
         // Setup routing
         window.addEventListener('hashchange', handleRoute);
         handleRoute();
+
+        // Setup samples back button
+        const samplesBackBtn = document.getElementById('samples-back-btn');
+        if (samplesBackBtn) {
+            samplesBackBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                history.replaceState(null, '', window.location.pathname + window.location.search);
+                hideSamplesPage();
+            });
+        }
 
         // Setup drag and drop early so UI is responsive
         setupDragAndDrop();
