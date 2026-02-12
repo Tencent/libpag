@@ -176,10 +176,6 @@ All offsets and blur values default to `0`, color defaults to `#000000`.
 ### Caveats
 
 - Only omit when the value **exactly matches** the spec default. When in doubt, keep it.
-- **Always check the PAGX spec for required attributes** — some attributes have no default
-  value even though the Importer code provides a fallback. For example,
-  `LinearGradient startPoint` and `endPoint` are both **(required)** in the spec.
-  Never omit them even when the value is `"0,0"`.
 - `ColorStop offset` is always required (no default) — do not omit even `offset="0"`.
 
 ### Non-Obvious Defaults (Easy to Forget)
@@ -197,6 +193,18 @@ The following defaults are counter-intuitive and easy to misremember:
 | **TextLayout** | `lineHeight` | `1.2` | Often assumed to be `1.0` |
 | **RoundCorner** | `radius` | `10` | Often assumed to be `0` |
 | **Stroke** | `miterLimit` | `4` | Often assumed to be `10` (SVG default) |
+
+### Required Attributes That Look Like They Have Defaults
+
+The following attributes are **(required)** in the PAGX spec — they have **no default value**.
+Even when their value is `"0,0"` or `"0"`, they must **never** be omitted.
+
+| Element | Attribute | Typical Value | Why It Looks Optional |
+|---------|-----------|--------------|----------------------|
+| **LinearGradient** | `startPoint` | `0,0` | Looks like a `0,0` default, but the spec marks it as (required) |
+| **LinearGradient** | `endPoint` | varies | Also (required) |
+| **ColorStop** | `offset` | `0` | Looks like a zero default, but (required) per spec |
+| **ColorStop** | `color` | varies | Also (required) |
 
 **Tip**: When optimizing files, always verify against the PAGX spec (Appendix C) if unsure.
 
