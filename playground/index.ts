@@ -36,9 +36,6 @@ interface I18nStrings {
     spec: string;
     specTitle: string;
     leave: string;
-    samples: string;
-    samplesTitle: string;
-    home: string;
 }
 
 const i18n: Record<string, I18nStrings> = {
@@ -58,9 +55,6 @@ const i18n: Record<string, I18nStrings> = {
         spec: 'Spec',
         specTitle: 'PAGX Specification',
         leave: 'Leave',
-        samples: 'Samples',
-        samplesTitle: 'PAGX Samples',
-        home: 'Home',
     },
     zh: {
         dropText: '拖放 PAGX 文件到此处',
@@ -78,9 +72,6 @@ const i18n: Record<string, I18nStrings> = {
         spec: 'Spec',
         specTitle: 'PAGX 格式规范',
         leave: '离开',
-        samples: '示例',
-        samplesTitle: 'PAGX 示例',
-        home: '首页',
     },
 };
 
@@ -790,7 +781,7 @@ const DEFAULT_TITLE = 'PAGX Playground';
 
 function goHome(): void {
     const toolbar = document.getElementById('toolbar') as HTMLDivElement;
-    const navBtns = document.getElementById('nav-btns') as HTMLDivElement;
+    const specBtn = document.getElementById('spec-btn') as HTMLAnchorElement;
     const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
 
     if (playgroundState.pagxView) {
@@ -799,13 +790,13 @@ function goHome(): void {
     }
     canvas.classList.add('hidden');
     toolbar.classList.add('hidden');
-    navBtns.classList.remove('hidden');
+    specBtn.classList.remove('hidden');
     document.title = DEFAULT_TITLE;
     showDropZoneUI();
 }
 
 async function loadPAGXData(data: Uint8Array, name: string) {
-    const navBtns = document.getElementById('nav-btns') as HTMLDivElement;
+    const specBtn = document.getElementById('spec-btn') as HTMLAnchorElement;
     const toolbar = document.getElementById('toolbar') as HTMLDivElement;
     const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
 
@@ -820,7 +811,7 @@ async function loadPAGXData(data: Uint8Array, name: string) {
     hideDropZone();
     canvas.classList.remove('hidden');
     toolbar.classList.remove('hidden');
-    navBtns.classList.add('hidden');
+    specBtn.classList.add('hidden');
     document.title = 'PAGX Playground - ' + name;
 }
 
@@ -1042,104 +1033,12 @@ function applyI18n(): void {
     const specBtnText = document.getElementById('spec-btn-text');
     if (specBtn) specBtn.title = strings.specTitle;
     if (specBtnText) specBtnText.textContent = strings.spec;
-
-    const samplesBtn = document.getElementById('samples-btn');
-    const samplesBtnText = document.getElementById('samples-btn-text');
-    if (samplesBtn) samplesBtn.title = strings.samplesTitle;
-    if (samplesBtnText) samplesBtnText.textContent = strings.samples;
-
-    const samplesTitle = document.querySelector('.samples-title');
-    if (samplesTitle) samplesTitle.textContent = strings.samplesTitle;
-
-    const samplesHomeBtn = document.getElementById('samples-home-btn');
-    if (samplesHomeBtn) {
-        samplesHomeBtn.title = strings.home;
-        const span = samplesHomeBtn.querySelector('span');
-        if (span) span.textContent = strings.home;
-    }
-
-    const samplesSpecBtn = document.getElementById('samples-spec-btn');
-    if (samplesSpecBtn) {
-        samplesSpecBtn.title = strings.specTitle;
-        const span = samplesSpecBtn.querySelector('span');
-        if (span) span.textContent = strings.spec;
-    }
-}
-
-const SAMPLE_FILE_ICON_SVG = '<svg class="sample-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>';
-
-let sampleFiles: string[] = [];
-let currentSampleFile: string | null = null;
-
-async function loadSampleList(): Promise<void> {
-    if (sampleFiles.length > 0) {
-        return;
-    }
-    const response = await fetch('./samples/index.json');
-    if (!response.ok) {
-        throw new Error('Failed to load samples index');
-    }
-    sampleFiles = await response.json();
-}
-
-function renderSampleList(): void {
-    const list = document.getElementById('samples-list') as HTMLUListElement;
-    list.innerHTML = '';
-    for (const file of sampleFiles) {
-        const li = document.createElement('li');
-        const a = document.createElement('a');
-        a.href = '#';
-        a.innerHTML = SAMPLE_FILE_ICON_SVG + '<span>' + file + '</span>';
-        if (file === currentSampleFile) {
-            a.classList.add('active');
-        }
-        a.addEventListener('click', (e) => {
-            e.preventDefault();
-            currentSampleFile = file;
-            window.location.hash = '';
-            loadPAGXFromURL('./samples/' + file);
-            renderSampleList();
-        });
-        li.appendChild(a);
-        list.appendChild(li);
-    }
-}
-
-function showSamplesPage(): void {
-    const container = document.getElementById('container') as HTMLDivElement;
-    const samplesPage = document.getElementById('samples-page') as HTMLDivElement;
-    container.classList.add('hidden');
-    samplesPage.classList.remove('hidden');
-    document.title = t().samplesTitle;
-    loadSampleList().then(renderSampleList).catch((error) => {
-        console.error('Failed to load samples:', error);
-    });
-}
-
-function hideSamplesPage(): void {
-    const container = document.getElementById('container') as HTMLDivElement;
-    const samplesPage = document.getElementById('samples-page') as HTMLDivElement;
-    container.classList.remove('hidden');
-    samplesPage.classList.add('hidden');
-}
-
-function handleRoute(): void {
-    const hash = window.location.hash;
-    if (hash === '#samples') {
-        showSamplesPage();
-    } else {
-        hideSamplesPage();
-    }
 }
 
 if (typeof window !== 'undefined') {
     window.onload = async () => {
         // Apply i18n texts
         applyI18n();
-
-        // Setup routing
-        window.addEventListener('hashchange', handleRoute);
-        handleRoute();
 
         // Setup drag and drop early so UI is responsive
         setupDragAndDrop();
