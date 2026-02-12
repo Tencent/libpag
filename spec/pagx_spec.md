@@ -2093,19 +2093,13 @@ Text modifiers transform individual glyphs within text.
 When a text modifier is encountered, **all glyph lists** accumulated in the context are combined into a unified glyph list for the operation:
 
 ```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="300" height="100">
-  <Layer>
-    <Group>
-      <Text text="Hello " fontFamily="Arial" fontSize="24" position="20,50"/>
-      <Text text="World" fontFamily="Arial" fontSize="24" position="90,50"/>
-      <TextModifier position="0,-5">
-        <RangeSelector start="0" end="1" shape="triangle"/>
-      </TextModifier>
-      <Fill color="#333333"/>
-    </Group>
-  </Layer>
-</pagx>
+<Group>
+  <Text text="Hello " fontFamily="Arial" fontSize="24"/>
+  <Text text="World" fontFamily="Arial" fontSize="24"/>
+  <TextModifier position="0,-5"/>
+  <TextLayout position="100,50" textAlign="center"/>
+  <Fill color="#333333"/>
+</Group>
 ```
 
 #### 5.5.2 Text to Shape Conversion
