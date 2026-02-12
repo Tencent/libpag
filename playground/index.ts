@@ -39,6 +39,7 @@ interface I18nStrings {
     samples: string;
     samplesTitle: string;
     home: string;
+    back: string;
 }
 
 const i18n: Record<string, I18nStrings> = {
@@ -61,6 +62,7 @@ const i18n: Record<string, I18nStrings> = {
         samples: 'Samples',
         samplesTitle: 'PAGX Samples',
         home: 'Home',
+        back: 'Back',
     },
     zh: {
         dropText: '拖放 PAGX 文件到此处',
@@ -81,6 +83,7 @@ const i18n: Record<string, I18nStrings> = {
         samples: '示例',
         samplesTitle: 'PAGX 示例',
         home: '首页',
+        back: '返回',
     },
 };
 
@@ -789,24 +792,19 @@ function hideDropZone(): void {
 const DEFAULT_TITLE = 'PAGX Playground';
 
 function goHome(): void {
-    const toolbar = document.getElementById('toolbar') as HTMLDivElement;
-    const navBtns = document.getElementById('nav-btns') as HTMLDivElement;
-    const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
-
     if (playgroundState.pagxView) {
         playgroundState.pagxView.loadPAGX(new Uint8Array(0));
         gestureManager.resetTransform(playgroundState);
     }
+    const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
+    const toolbar = document.getElementById('toolbar') as HTMLDivElement;
+    const navBtns = document.getElementById('nav-btns') as HTMLDivElement;
     canvas.classList.add('hidden');
     toolbar.classList.add('hidden');
     navBtns.classList.remove('hidden');
     document.title = DEFAULT_TITLE;
     showDropZoneUI();
-
-    if (currentPlayingFile) {
-        currentPlayingFile = null;
-        window.location.hash = '#samples';
-    }
+    currentPlayingFile = null;
 }
 
 async function loadExternalFiles(baseURL: string): Promise<void> {
@@ -1012,7 +1010,7 @@ function setupDragAndDrop() {
     });
 
     leaveBtn.addEventListener('click', () => {
-        goHome();
+        window.location.hash = '';
     });
 
     openBtn.addEventListener('click', () => {
@@ -1096,11 +1094,11 @@ function applyI18n(): void {
     const samplesTitle = document.querySelector('.samples-title');
     if (samplesTitle) samplesTitle.textContent = strings.samplesTitle;
 
-    const samplesHomeBtn = document.getElementById('samples-home-btn');
-    if (samplesHomeBtn) {
-        samplesHomeBtn.title = strings.home;
-        const span = samplesHomeBtn.querySelector('span');
-        if (span) span.textContent = strings.home;
+    const samplesBackBtn = document.getElementById('samples-back-btn');
+    if (samplesBackBtn) {
+        samplesBackBtn.title = strings.back;
+        const span = samplesBackBtn.querySelector('span');
+        if (span) span.textContent = strings.back;
     }
 
     const samplesSpecBtn = document.getElementById('samples-spec-btn');
@@ -1150,24 +1148,18 @@ function renderSampleList(): void {
 function showSamplesPage(): void {
     const container = document.getElementById('container') as HTMLDivElement;
     const samplesPage = document.getElementById('samples-page') as HTMLDivElement;
-
-    // Clean up playing state if navigating back from player
-    if (currentPlayingFile) {
-        currentPlayingFile = null;
-        const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
-        const toolbar = document.getElementById('toolbar') as HTMLDivElement;
-        if (playgroundState.pagxView) {
-            playgroundState.pagxView.loadPAGX(new Uint8Array(0));
-            gestureManager.resetTransform(playgroundState);
-        }
-        canvas.classList.add('hidden');
-        toolbar.classList.add('hidden');
-        showDropZoneUI();
-    }
-
     container.classList.add('hidden');
     samplesPage.classList.remove('hidden');
     document.title = t().samplesTitle;
+
+    // Update back button: return to player if playing, otherwise to home
+    const backBtn = document.getElementById('samples-back-btn') as HTMLAnchorElement;
+    if (backBtn) {
+        backBtn.href = currentPlayingFile
+            ? '#play/' + encodeURIComponent(currentPlayingFile)
+            : '#';
+    }
+
     loadSampleList().then(renderSampleList).catch((error) => {
         console.error('Failed to load samples:', error);
     });
@@ -1186,16 +1178,17 @@ function handleRoute(): void {
         showSamplesPage();
     } else if (hash.startsWith('#play/')) {
         const filename = decodeURIComponent(hash.substring(6));
+        hideSamplesPage();
         if (filename !== currentPlayingFile) {
             currentSampleFile = filename;
             currentPlayingFile = filename;
-            hideSamplesPage();
             loadPAGXFromURL('./samples/' + filename);
-        } else {
-            hideSamplesPage();
         }
     } else {
         hideSamplesPage();
+        if (currentPlayingFile) {
+            goHome();
+        }
     }
 }
 
