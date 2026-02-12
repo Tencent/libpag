@@ -174,6 +174,24 @@ All offsets and blur values default to `0`, color defaults to `#000000`.
 - Only omit when the value **exactly matches** the spec default. When in doubt, keep it.
 - `ColorStop offset` is always required (no default) — do not omit even `offset="0"`.
 
+### Non-Obvious Defaults (Easy to Forget)
+
+The following defaults are counter-intuitive and easy to misremember:
+
+| Element | Attribute | Default | Common Misconception |
+|---------|-----------|---------|---------------------|
+| **Repeater** | `position` | `100,100` | Often assumed to be `0,0` |
+| **Repeater** | `copies` | `3` | Often assumed to be `1` |
+| **Rectangle/Ellipse** | `size` | `100,100` | May forget there is a default |
+| **Polystar** | `type` | `star` | May assume `polygon` |
+| **Polystar** | `outerRadius` | `100` | May forget there is a default |
+| **Polystar** | `innerRadius` | `50` | May forget there is a default |
+| **TextLayout** | `lineHeight` | `1.2` | Often assumed to be `1.0` |
+| **RoundCorner** | `radius` | `10` | Often assumed to be `0` |
+| **Stroke** | `miterLimit` | `4` | Often assumed to be `10` (SVG default) |
+
+**Tip**: When optimizing files, always verify against the PAGX spec (Appendix C) if unsure.
+
 ---
 
 ## 4. Simplify Transform Attributes
