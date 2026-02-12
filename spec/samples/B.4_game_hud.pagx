@@ -29,23 +29,19 @@
     <!-- Hex Grid Pattern (3 sets of parallel lines forming hexagonal grid) -->
     <Layer alpha="0.15" scrollRect="0,0,800,600">
       <!-- Horizontal lines -->
-      <Layer>
-        <Rectangle size="800,1"/>
-        <Fill color="#0066AA"/>
-        <Repeater copies="35" position="0,17"/>
-      </Layer>
+      <Rectangle size="800,1"/>
+      <Repeater copies="35" position="0,17"/>
       <!-- 60° diagonal lines -->
-      <Layer x="400" y="300" rotation="60">
+      <Group position="400,300" rotation="60">
         <Rectangle center="0,-510" size="1200,1"/>
-        <Fill color="#0066AA"/>
         <Repeater copies="60" position="0,17"/>
-      </Layer>
+      </Group>
       <!-- -60° diagonal lines -->
-      <Layer x="400" y="300" rotation="-60">
+      <Group position="400,300" rotation="-60">
         <Rectangle center="0,-510" size="1200,1"/>
-        <Fill color="#0066AA"/>
         <Repeater copies="60" position="0,17"/>
-      </Layer>
+      </Group>
+      <Fill color="#0066AA"/>
     </Layer>
 
     <!-- Vignette -->
