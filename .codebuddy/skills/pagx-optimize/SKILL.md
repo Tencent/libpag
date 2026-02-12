@@ -110,6 +110,10 @@ Empty elements and invisible painters are dead code and should be removed.
 - An empty Layer may serve as a mask target (`id` referenced elsewhere via `mask="@id"`).
   Verify it is truly unreferenced before removing.
 - A Layer with `visible="false"` is not "empty" — it is likely a mask/clip definition.
+- **Mask layers must not be moved to a different position in the layer tree.** A mask layer
+  (e.g. `<Layer id="xxx" visible="false">`) is a regular layer in the rendering tree, not a
+  Resources-level asset. Its position relative to other layers affects rendering behavior
+  (e.g. DropShadowStyle clipping). Only `<Resources>` can be freely relocated.
 
 ---
 
@@ -172,6 +176,10 @@ All offsets and blur values default to `0`, color defaults to `#000000`.
 ### Caveats
 
 - Only omit when the value **exactly matches** the spec default. When in doubt, keep it.
+- **Always check the PAGX spec for required attributes** — some attributes have no default
+  value even though the Importer code provides a fallback. For example,
+  `LinearGradient startPoint` and `endPoint` are both **(required)** in the spec.
+  Never omit them even when the value is `"0,0"`.
 - `ColorStop offset` is always required (no default) — do not omit even `offset="0"`.
 
 ### Non-Obvious Defaults (Easy to Forget)
