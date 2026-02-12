@@ -8,11 +8,11 @@
     <Ellipse center="280,105" size="120,120"/>
     <Stroke color="#E2E8F0" width="8"/>
   </Layer>
-  <!-- Trimmed: each ellipse trimmed independently to 50% -->
+  <!-- Trimmed: each ellipse trimmed independently to 0.2~0.8 -->
   <Layer>
     <Ellipse center="120,105" size="120,120"/>
     <Ellipse center="280,105" size="120,120"/>
-    <TrimPath start="0" end="0.75" type="separate"/>
+    <TrimPath start="0.2" end="0.8" type="separate"/>
     <Stroke width="10" cap="round">
       <LinearGradient startPoint="60,40" endPoint="340,170">
         <ColorStop offset="0" color="#06B6D4"/>
@@ -34,11 +34,11 @@
     <Ellipse center="280,275" size="120,120"/>
     <Stroke color="#E2E8F0" width="8"/>
   </Layer>
-  <!-- Trimmed: both ellipses treated as one path, first 50% of total length -->
+  <!-- Trimmed: both ellipses treated as one path, 0.2~0.8 of total length -->
   <Layer>
     <Ellipse center="120,275" size="120,120"/>
     <Ellipse center="280,275" size="120,120"/>
-    <TrimPath start="0" end="0.75" type="continuous"/>
+    <TrimPath start="0.2" end="0.8" type="continuous"/>
     <Stroke width="10" cap="round">
       <LinearGradient startPoint="60,210" endPoint="340,340">
         <ColorStop offset="0" color="#F59E0B"/>
