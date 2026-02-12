@@ -8,7 +8,7 @@
       <!-- RadialGradient uses canvas coordinates. Ellipse center is at 200,200, 
            highlight offset should be relative to that. 140,140 creates top-left highlight -->
       <RadialGradient center="140,140" radius="200">
-        <ColorStop offset="0" color="#FFFFFF"/>
+        <ColorStop offset="0" color="#FFF"/>
         <ColorStop offset="0.4" color="#06B6D4"/>
         <ColorStop offset="1" color="#0891B2"/>
       </RadialGradient>

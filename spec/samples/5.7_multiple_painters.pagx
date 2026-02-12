@@ -5,12 +5,12 @@
   <Layer>
     <Rectangle center="200,200" size="260,260" roundness="32"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="260,260">
+      <LinearGradient endPoint="260,260">
         <ColorStop offset="0" color="#F43F5E"/>
         <ColorStop offset="1" color="#E11D48"/>
       </LinearGradient>
     </Fill>
     <Stroke color="#BE123C" width="8"/>
-    <DropShadowStyle offsetX="0" offsetY="12" blurX="40" blurY="40" color="#F43F5E60"/>
+    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#F43F5E60"/>
   </Layer>
 </pagx>

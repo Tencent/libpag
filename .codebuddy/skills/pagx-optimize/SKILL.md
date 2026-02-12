@@ -129,8 +129,8 @@ All offsets and blur values default to `0`, color defaults to `#000000`.
 
 **TrimPath**: `start="0"`, `end="1"`, `offset="0"`, `type="separate"`
 
-**Repeater**: `offset="0"`, `anchor="0,0"`, `rotation="0"`, `scale="1,1"`,
-`startAlpha="1"`, `endAlpha="1"`
+**Repeater**: `copies="3"`, `offset="0"`, `order="belowOriginal"`, `anchor="0,0"`,
+`position="100,100"`, `rotation="0"`, `scale="1,1"`, `startAlpha="1"`, `endAlpha="1"`
 
 ### Example
 
@@ -265,6 +265,7 @@ The spec supports `#RGB` shorthand that expands to `#RRGGBB`. Use it when possib
 - Only use short hex when each pair of digits is identical (`FF` → `F`, `00` → `0`).
   `#F43F5E` cannot be shortened.
 - Standardize to uppercase hex for consistency.
+- Remove spaces after commas in coordinate attribute values: `"30, -20"` → `"30,-20"`.
 
 ---
 

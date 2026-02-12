@@ -6,7 +6,7 @@
     <Text text="Text Layout" fontFamily="Arial" fontStyle="Bold" fontSize="40"/>
     <TextLayout position="200,74" textAlign="center"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="280,0">
+      <LinearGradient endPoint="280,0">
         <ColorStop offset="0" color="#6366F1"/>
         <ColorStop offset="1" color="#8B5CF6"/>
       </LinearGradient>

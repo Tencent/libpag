@@ -5,7 +5,7 @@
   <Layer>
     <Ellipse center="200,200" size="320,320"/>
     <Fill>
-      <ConicGradient center="200,200" startAngle="0" endAngle="360">
+      <ConicGradient center="200,200">
         <ColorStop offset="0" color="#F43F5E"/>
         <ColorStop offset="0.2" color="#F59E0B"/>
         <ColorStop offset="0.4" color="#10B981"/>
@@ -14,6 +14,6 @@
         <ColorStop offset="1" color="#F43F5E"/>
       </ConicGradient>
     </Fill>
-    <DropShadowStyle offsetX="0" offsetY="8" blurX="32" blurY="32" color="#8B5CF650"/>
+    <DropShadowStyle offsetY="8" blurX="32" blurY="32" color="#8B5CF650"/>
   </Layer>
 </pagx>

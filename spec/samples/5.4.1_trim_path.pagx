@@ -12,7 +12,7 @@
   <Layer>
     <Ellipse center="120,95" size="100,100"/>
     <Ellipse center="280,95" size="100,100"/>
-    <TrimPath start="0.2" end="0.9" type="separate"/>
+    <TrimPath start="0.2" end="0.9"/>
     <Stroke width="10" cap="round">
       <LinearGradient startPoint="70,40" endPoint="330,150">
         <ColorStop offset="0" color="#06B6D4"/>

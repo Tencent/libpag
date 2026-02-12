@@ -7,7 +7,7 @@
     <Text text="Rich Text" fontFamily="Arial" fontStyle="Bold" fontSize="42"/>
     <TextLayout position="200,105" textAlign="center"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="200,0">
+      <LinearGradient endPoint="200,0">
         <ColorStop offset="0" color="#8B5CF6"/>
         <ColorStop offset="1" color="#EC4899"/>
       </LinearGradient>
@@ -94,7 +94,7 @@
     <Text text="Gradient Fill" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
     <TextLayout position="200,310" textAlign="center"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="240,0">
+      <LinearGradient endPoint="240,0">
         <ColorStop offset="0" color="#F43F5E"/>
         <ColorStop offset="0.5" color="#F59E0B"/>
         <ColorStop offset="1" color="#10B981"/>

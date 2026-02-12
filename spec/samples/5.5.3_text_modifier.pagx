@@ -9,7 +9,7 @@
       <RangeSelector start="0" end="1" shape="triangle"/>
     </TextModifier>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="280,0">
+      <LinearGradient endPoint="280,0">
         <ColorStop offset="0" color="#06B6D4"/>
         <ColorStop offset="1" color="#3B82F6"/>
       </LinearGradient>
@@ -23,7 +23,7 @@
       <RangeSelector start="0" end="1" shape="rampUp"/>
     </TextModifier>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="280,0">
+      <LinearGradient endPoint="280,0">
         <ColorStop offset="0" color="#F59E0B"/>
         <ColorStop offset="1" color="#F43F5E"/>
       </LinearGradient>

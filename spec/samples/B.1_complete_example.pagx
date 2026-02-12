@@ -6,7 +6,7 @@
   <Layer name="background">
     <Rectangle center="400,260" size="800,520"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="800,520">
+      <LinearGradient endPoint="800,520">
         <ColorStop offset="0" color="#0F172A"/>
         <ColorStop offset="1" color="#1E293B"/>
       </LinearGradient>
@@ -42,7 +42,7 @@
   <Layer y="195" x="160">
     <Rectangle center="0,0" size="50,35" roundness="8"/>
     <Fill color="@coral"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#F43F5E80"/>
+    <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#F43F5E80"/>
   </Layer>
   
   <!-- Card 2: Ellipse -->
@@ -58,7 +58,7 @@
   <Layer y="195" x="400">
     <Polystar center="0,0" type="star" pointCount="5" outerRadius="24" innerRadius="11" rotation="-90"/>
     <Fill color="@amber"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#F59E0B80"/>
+    <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#F59E0B80"/>
   </Layer>
   
   <!-- Card 4: Hexagon -->
@@ -66,7 +66,7 @@
   <Layer y="195" x="520">
     <Polystar center="0,0" type="polygon" pointCount="6" outerRadius="26"/>
     <Fill color="@diamond"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#14B8A680"/>
+    <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#14B8A680"/>
   </Layer>
   
   <!-- Card 5: Custom Path -->
@@ -74,7 +74,7 @@
   <Layer y="195" x="640">
     <Path data="M -20 -15 L 0 -25 L 20 -15 L 20 15 L 0 25 L -20 15 Z"/>
     <Fill color="@orange"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#F9731680"/>
+    <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#F9731680"/>
   </Layer>
   
   <!-- ===== Modifier Area y=325 (Get Started + 5 modifiers, centered) ===== -->
@@ -82,18 +82,18 @@
   <Layer y="325" x="148">
     <Rectangle center="0,0" size="120,36" roundness="18"/>
     <Fill color="@buttonGradient"/>
-    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#6366F180"/>
+    <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#6366F180"/>
   </Layer>
   <Layer y="325" x="148">
     <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
     <TextLayout position="0,4" textAlign="center"/>
-    <Fill color="#FFFFFF"/>
+    <Fill color="#FFF"/>
   </Layer>
   <Layer name="Modifiers" y="325">
     <!-- TrimPath Wave -->
     <Group position="258,0">
       <Path data="@wavePath"/>
-      <TrimPath start="0" end="0.75"/>
+      <TrimPath end="0.75"/>
       <Stroke color="@cyan" width="3" cap="round"/>
     </Group>
     
@@ -116,7 +116,7 @@
     <Group position="588,0">
       <Ellipse center="22,0" size="12,12"/>
       <Fill color="@cyan"/>
-      <Repeater copies="5" rotation="72" anchor="0,0" position="0,0"/>
+      <Repeater copies="5" rotation="72" position="0,0"/>
     </Group>
     
     <!-- Mask Example (shape without mask) -->
@@ -127,9 +127,9 @@
   </Layer>
   <Layer id="circleMask" visible="false">
     <Ellipse center="0,0" size="45,45"/>
-    <Fill color="#FFFFFF"/>
+    <Fill color="#FFF"/>
   </Layer>
-  <Layer name="MaskedLayer" x="688" y="325" mask="@circleMask" maskType="alpha">
+  <Layer name="MaskedLayer" x="688" y="325" mask="@circleMask">
     <Rectangle center="0,0" size="50,50"/>
     <Fill color="@rainbow"/>
   </Layer>
@@ -170,7 +170,7 @@
       <ImagePattern image="@photo" tileModeX="clamp" tileModeY="clamp" matrix="0.23,0,0,0.23,-30,-30"/>
     </Fill>
     <Stroke color="#FFFFFF20" width="1"/>
-    <DropShadowStyle offsetX="0" offsetY="6" blurX="16" blurY="16" color="#00000060"/>
+    <DropShadowStyle offsetY="6" blurX="16" blurY="16" color="#00000060"/>
   </Layer>
   
   <!-- ===== Footer Area y=500 ===== -->
@@ -204,18 +204,18 @@
       <ColorStop offset="1" color="#06B6D400"/>
     </RadialGradient>
     <!-- Title Gradient -->
-    <LinearGradient id="titleGradient" startPoint="0,0" endPoint="200,0">
-      <ColorStop offset="0" color="#FFFFFF"/>
+    <LinearGradient id="titleGradient" endPoint="200,0">
+      <ColorStop offset="0" color="#FFF"/>
       <ColorStop offset="0.5" color="#8B5CF6"/>
       <ColorStop offset="1" color="#06B6D4"/>
     </LinearGradient>
     <!-- Button Gradient -->
-    <LinearGradient id="buttonGradient" startPoint="0,0" endPoint="120,0">
+    <LinearGradient id="buttonGradient" endPoint="120,0">
       <ColorStop offset="0" color="#6366F1"/>
       <ColorStop offset="1" color="#8B5CF6"/>
     </LinearGradient>
     <!-- Conic Gradient (center relative to rectangle geometry: size 50x50, center at 0,0, so geometry origin is -25,-25) -->
-    <ConicGradient id="rainbow" center="25,25" startAngle="0" endAngle="360">
+    <ConicGradient id="rainbow" center="25,25">
       <ColorStop offset="0" color="#F43F5E"/>
       <ColorStop offset="0.25" color="#8B5CF6"/>
       <ColorStop offset="0.5" color="#06B6D4"/>

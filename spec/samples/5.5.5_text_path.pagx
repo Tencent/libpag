@@ -6,7 +6,7 @@
     <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="56"/>
     <TextPath path="M 60,230 Q 200,30 340,230" forceAlignment="true"/>
     <Fill>
-      <LinearGradient startPoint="0,0" endPoint="300,0">
+      <LinearGradient endPoint="300,0">
         <ColorStop offset="0" color="#06B6D4"/>
         <ColorStop offset="0.5" color="#8B5CF6"/>
         <ColorStop offset="1" color="#EC4899"/>

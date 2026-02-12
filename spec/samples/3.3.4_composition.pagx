@@ -10,17 +10,17 @@
       <Layer name="button">
         <Rectangle center="100,30" size="200,60" roundness="30"/>
         <Fill>
-          <LinearGradient startPoint="0,0" endPoint="200,0">
+          <LinearGradient endPoint="200,0">
             <ColorStop offset="0" color="#6366F1"/>
             <ColorStop offset="1" color="#8B5CF6"/>
           </LinearGradient>
         </Fill>
-        <DropShadowStyle offsetX="0" offsetY="8" blurX="24" blurY="24" color="#6366F180"/>
+        <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F180"/>
       </Layer>
       <Layer name="label">
         <Text text="Button" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
         <TextLayout position="100,36" textAlign="center"/>
-        <Fill color="#FFFFFF"/>
+        <Fill color="#FFF"/>
       </Layer>
     </Composition>
   </Resources>
