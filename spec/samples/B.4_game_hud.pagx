@@ -15,8 +15,8 @@
       </Fill>
     </Layer>
 
-    <!-- Hex Grid Pattern (clipped to canvas bounds for performance) -->
-    <Layer alpha="0.15">
+    <!-- Hex Grid Pattern -->
+    <Layer alpha="0.15" scrollRect="0,0,800,600">
       <Group x="-10">
         <Path data="@hex"/>
         <Stroke color="#0066AA" width="1"/>
