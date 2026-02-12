@@ -375,14 +375,7 @@
   </Layer>
 
   <Layer name="BottomButtonSettings">
-    <Ellipse center="240,545" size="46,46"/>
-    <Fill>
-      <LinearGradient startPoint="217,545" endPoint="263,545">
-        <ColorStop offset="0" color="#0D2038CC"/>
-        <ColorStop offset="1" color="#162B4DCC"/>
-      </LinearGradient>
-    </Fill>
-    <Stroke color="#3B82F6" width="1"/>
+    <Layer composition="@navButton" x="217" y="522"/>
     <Layer x="228" y="533">
       <Group>
         <Polystar center="12,12" type="star" pointCount="8" outerRadius="10" innerRadius="6" rotation="0"/>
@@ -396,14 +389,7 @@
   </Layer>
 
   <Layer name="BottomButtonHelp">
-    <Ellipse center="400,545" size="46,46"/>
-    <Fill>
-      <LinearGradient startPoint="377,545" endPoint="423,545">
-        <ColorStop offset="0" color="#0D2038CC"/>
-        <ColorStop offset="1" color="#162B4DCC"/>
-      </LinearGradient>
-    </Fill>
-    <Stroke color="#3B82F6" width="1"/>
+    <Layer composition="@navButton" x="377" y="522"/>
     <Layer x="388" y="533">
       <Path data="@IconQuestion"/>
       <Fill color="#93C5FD"/>
@@ -411,14 +397,7 @@
   </Layer>
 
   <Layer name="BottomButtonShare">
-    <Ellipse center="560,545" size="46,46"/>
-    <Fill>
-      <LinearGradient startPoint="537,545" endPoint="583,545">
-        <ColorStop offset="0" color="#0D2038CC"/>
-        <ColorStop offset="1" color="#162B4DCC"/>
-      </LinearGradient>
-    </Fill>
-    <Stroke color="#3B82F6" width="1"/>
+    <Layer composition="@navButton" x="537" y="522"/>
     <Layer x="548" y="533">
       <Path data="@IconShare"/>
       <Fill color="#93C5FD"/>
@@ -472,5 +451,18 @@
     <PathData id="IconDiamond" data="M 8 0 L 16 4 L 16 12 L 8 16 L 0 12 L 0 4 Z"/>
     <PathData id="IconQuestion" data="M 12 4 C 8 4 6 6 6 9 L 9 9 C 9 7.5 10 6.5 12 6.5 C 14 6.5 15 7.5 15 9 C 15 10.5 13.5 11 12 12 C 10.5 13 10 14 10 16 L 14 16 C 14 14.5 14.5 13.5 16 12.5 C 18 11.5 19 10 19 8 C 19 5 16 4 12 4 Z M 12 18 A 2 2 0 1 0 12 22 A 2 2 0 1 0 12 18 Z"/>
     <PathData id="IconShare" data="M 14 4 L 22 12 L 14 20 L 14 15 L 4 15 L 4 9 L 14 9 Z"/>
+    <!-- Navigation Button Shell -->
+    <Composition id="navButton" width="46" height="46">
+      <Layer>
+        <Ellipse center="23,23" size="46,46"/>
+        <Fill>
+          <LinearGradient startPoint="0,23" endPoint="46,23">
+            <ColorStop offset="0" color="#0D2038CC"/>
+            <ColorStop offset="1" color="#162B4DCC"/>
+          </LinearGradient>
+        </Fill>
+        <Stroke color="#3B82F6" width="1"/>
+      </Layer>
+    </Composition>
   </Resources>
 </pagx>
