@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates ImagePattern fill with different tile modes -->
 <pagx version="1.0" width="400" height="400">
-  
   <!-- Clamp mode: original size, centered in 140x140 rect -->
   <!-- Rectangle center=110,110 size=140,140: left-top=(40,40), right-bottom=(180,180) -->
   <!-- Image 256x256, scale 0.5 = 128x128 -->
@@ -13,8 +11,7 @@
     </Fill>
     <Stroke color="#FFF" width="2"/>
   </Layer>
-  
-  <!-- Repeat mode: tiled pattern -->
+
   <Layer name="RepeatFill">
     <Rectangle center="290,110" size="140,140" roundness="24"/>
     <Fill>
@@ -22,8 +19,7 @@
     </Fill>
     <Stroke color="#FFF" width="2"/>
   </Layer>
-  
-  <!-- Mirror mode: mirrored tiles -->
+
   <Layer name="MirrorFill">
     <Rectangle center="110,290" size="140,140" roundness="24"/>
     <Fill>
@@ -31,8 +27,7 @@
     </Fill>
     <Stroke color="#FFF" width="2"/>
   </Layer>
-  
-  <!-- Repeat mode: scaled pattern -->
+
   <Layer name="RepeatScaled">
     <Rectangle center="290,290" size="140,140" roundness="24"/>
     <Fill>

@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates composition (reusable component) -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Multiple instances of the same composition to demonstrate reusability -->
   <Layer composition="@buttonComp" x="100" y="60"/>
   <Layer composition="@buttonComp" x="100" y="170"/>
   <Layer composition="@buttonComp" x="100" y="280"/>

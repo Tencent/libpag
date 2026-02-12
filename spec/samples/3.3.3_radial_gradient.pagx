@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates radial gradient -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Radial gradient circle -->
   <Layer>
     <Ellipse center="200,200" size="320,320"/>
     <Fill>
