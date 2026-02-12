@@ -2211,7 +2211,7 @@ blendFactor = overrideColor.alpha × |factor|
 finalColor = blend(originalColor, overrideColor, blendFactor)
 ```
 
-> 完整可运行示例：[TextModifier 效果](samples/5.5.3_text_modifier.pagx)
+> 📄 [示例](samples/5.5.3_text_modifier.pagx) | [预览](https://pag.io/pagx/?file=./samples/5.5.3_text_modifier.pagx)
 
 #### 5.5.4 范围选择器（RangeSelector）
 
@@ -3188,6 +3188,8 @@ Layer / Group
 | **形状修改器** | TrimPath、RoundCorner、MergePath |
 | **文本修改器** | TextModifier/RangeSelector、TextPath、TextLayout、GlyphRun |
 | **其他** | Repeater、Group、遮罩（mask/maskType）、合成引用 |
+
+> 📄 [示例](samples/B.1_complete_example.pagx) | [预览](https://pag.io/pagx/?file=./samples/B.1_complete_example.pagx)
 
 ### B.2 RPG 角色面板
 
