@@ -148,7 +148,9 @@ html, body {
 .nav-btn {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
+    min-width: 100px;
     padding: 8px 12px;
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
@@ -402,24 +404,23 @@ html, body {
 }
 
 .samples-list {
-    list-style: none;
     padding: 0;
     margin: 0 auto;
     max-width: 1200px;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
 }
 
 .samples-list > a {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 16px;
-    border-radius: 12px;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 10px;
     text-decoration: none;
     background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     transition: all 0.2s ease;
     overflow: hidden;
 }
@@ -438,15 +439,16 @@ html, body {
 
 .samples-list .sample-image {
     width: 100%;
-    aspect-ratio: 16 / 9;
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 8px;
-    object-fit: cover;
+    aspect-ratio: 1 / 1;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
+    object-fit: contain;
 }
 
 .samples-list .sample-name {
-    color: #fff;
-    font-size: 14px;
-    font-weight: 500;
+    color: #ccc;
+    font-size: 13px;
+    font-weight: 400;
+    text-align: center;
     word-break: break-word;
 }
