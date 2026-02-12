@@ -807,10 +807,7 @@ function goHome(): void {
     currentPlayingFile = null;
 
     // Clear file parameter from URL
-    const newUrl = new URL(window.location.href);
-    newUrl.searchParams.delete('file');
-    newUrl.hash = '';
-    history.replaceState(null, '', newUrl.toString());
+    history.replaceState(null, '', window.location.pathname);
 }
 
 async function loadExternalFiles(baseURL: string): Promise<void> {
@@ -905,10 +902,7 @@ async function loadPAGXFile(file: File) {
         currentPlayingFile = null;
 
         // Clear file parameter from URL (local files have no URL)
-        const newUrl = new URL(window.location.href);
-        newUrl.searchParams.delete('file');
-        newUrl.hash = '';
-        history.replaceState(null, '', newUrl.toString());
+        history.replaceState(null, '', window.location.pathname);
     } catch (error) {
         console.error('Failed to load PAGX file:', error);
         showErrorUI(t().errorFormat);
@@ -960,10 +954,8 @@ async function loadPAGXFromURL(url: string) {
         currentPlayingFile = url;
 
         // Update URL with file parameter (without page reload)
-        const newUrl = new URL(window.location.href);
-        newUrl.searchParams.set('file', url);
-        newUrl.hash = '';
-        history.replaceState(null, '', newUrl.toString());
+        const cleanUrl = window.location.pathname + '?file=' + url;
+        history.replaceState(null, '', cleanUrl);
     } catch (error) {
         console.error('Failed to load PAGX from URL:', error);
         const message = error instanceof Error ? error.message : 'Unknown error';
