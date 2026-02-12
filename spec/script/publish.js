@@ -276,19 +276,21 @@ function embedSampleFiles(mdContent, specDir) {
 }
 
 /**
- * Post-process HTML to convert preview comment markers into floating preview
- * buttons overlaid on code blocks. Each `<!-- preview:samples/xxx.pagx -->` after
- * a `</pre>` is replaced by wrapping the `<pre>` in a container with a floating
- * button linking to the viewer.
+ * Post-process HTML to convert preview comment markers into code blocks with a
+ * sticky header bar. The header contains a "PAGX" label and a preview button that
+ * stays visible at the top of the viewport when scrolling through long code blocks.
  */
 function addPreviewButtons(html, viewerUrl, lang) {
   const previewPattern = /(<pre><code class="hljs language-xml">[\s\S]*?<\/code><\/pre>)\s*<!-- preview:(samples\/[^\s]+\.pagx) -->/g;
   return html.replace(previewPattern, (match, preBlock, samplePath) => {
     const previewUrl = viewerUrl + '?file=./' + samplePath;
     const label = lang === 'zh' ? '预览' : 'Preview';
-    const button = '<a class="preview-btn" href="' + previewUrl + '" target="_blank" title="' + label + '">' +
-      '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' + label + '</a>';
-    return '<div class="code-block-wrapper">' + button + preBlock + '</div>';
+    const header = '<div class="code-header">' +
+      '<span class="code-header-label">PAGX</span>' +
+      '<a class="preview-btn" href="' + previewUrl + '" target="_blank">' +
+      '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
+      label + '</a></div>';
+    return '<div class="code-block-wrapper">' + header + preBlock + '</div>';
   });
 }
 

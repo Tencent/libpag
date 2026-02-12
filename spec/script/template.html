@@ -134,38 +134,49 @@
         pre code { background-color: transparent; padding: 0; border-radius: 0; font-size: 100%; }
         .hljs { background: var(--code-bg) !important; }
         
-        /* Code block with preview button */
+        /* Code block with preview header */
         .code-block-wrapper { position: relative; }
         .code-block-wrapper pre {
             margin-top: 0;
             margin-bottom: 16px;
-            border-left: 3px solid var(--primary-color);
+            border-top-left-radius: 0;
+            border-top-right-radius: 0;
+            border-top: none;
+            border-left: 3px solid #16a34a;
+        }
+        .code-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 12px;
+            background: #16a34a;
+            border-radius: 6px 6px 0 0;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .code-header-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.8);
+            letter-spacing: 0.5px;
         }
         .preview-btn {
-            position: absolute;
-            top: 8px;
-            right: 8px;
             display: flex;
             align-items: center;
             gap: 5px;
-            padding: 4px 10px;
-            background: rgba(255, 255, 255, 0.9);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            color: #555;
+            padding: 3px 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            color: white;
             font-family: inherit;
             font-size: 12px;
             line-height: 1;
-            transition: all 0.2s;
-            z-index: 1;
+            transition: background 0.2s;
         }
-        .preview-btn svg { width: 12px; height: 12px; }
-        .preview-btn:hover {
-            background: var(--primary-color);
-            border-color: var(--primary-color);
-            color: white;
-            text-decoration: none;
-        }
+        .preview-btn svg { width: 10px; height: 10px; }
+        .preview-btn:hover { background: rgba(255, 255, 255, 0.35); text-decoration: none; }
         
         /* Table */
         table { border-collapse: collapse; width: 100%; margin: 16px 0; display: block; overflow-x: auto; }
