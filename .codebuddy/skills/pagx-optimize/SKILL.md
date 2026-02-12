@@ -6,9 +6,28 @@ argument-hint: "[file-path]"
 
 # PAGX File Structure Optimization
 
-This skill provides a systematic checklist for optimizing PAGX file structure. Work through
-each direction in order. For every optimization applied, verify that the rendering result
-remains unchanged.
+This skill provides a systematic checklist for optimizing PAGX file structure. The goals are
+to simplify file structure, reduce file size, and improve rendering performance.
+
+## Fundamental Constraint
+
+**All optimizations must preserve the original design appearance.** This is a hard requirement
+that overrides any individual optimization direction below.
+
+- **Allowed**: Structural transformations that produce identical or near-identical rendering
+  (minor pixel-level differences from node reordering or painter merging are acceptable).
+- **Allowed**: Removing provably invisible content — elements entirely outside the canvas
+  bounds, unused resources, zero-width strokes, fully transparent elements, and other content
+  that contributes nothing to the final rendered image.
+- **Forbidden**: Modifying any parameter that affects design intent — blur radius, spacing,
+  density, colors, alpha, gradient stops, font sizes, shadow offsets, stroke widths, or any
+  other visual attribute — unless the user explicitly approves the change.
+- **Forbidden**: Reducing Repeater density (increasing spacing), lowering blur values, changing
+  opacity, or simplifying geometry in ways that alter the visual result, even if the change
+  seems minor. These are design decisions, not optimization decisions.
+- **When in doubt**: If an optimization might change the rendered appearance, do not apply it.
+  Instead, describe the potential optimization and its visual impact to the user, and ask for
+  explicit approval before proceeding.
 
 ---
 
@@ -787,15 +806,10 @@ root element's dimensions, and the mask reference is on a Layer that does not ne
 
 ## 15. Performance Optimization
 
-This section describes performance-related optimizations. They are grouped into two categories:
-equivalent transformations that do not change rendering (safe to auto-apply), and
-approximation-based optimizations that may change visual details (require user confirmation).
-
-**Core principle**: Performance optimization must preserve the original design intent. Only
-remove invisible/off-canvas content or make structurally equivalent substitutions. Never change
-visual parameters (blur radius, spacing, density, colors, alpha) without explicit user approval.
-Acceptable auto-optimizations are limited to eliminating provably invisible work (off-canvas
-elements, fully occluded content, unused resources).
+Performance optimizations follow the same fundamental constraint: preserve the original design
+appearance. They are grouped into two categories: equivalent transformations that do not change
+rendering (safe to auto-apply), and suggestions that may change visual details (present to user
+for approval, never auto-apply).
 
 ### Background: Rendering Cost Model
 
@@ -851,12 +865,13 @@ reference, no alpha, and no name attribute that matters for debugging.
 - Layer with child Layers cannot become Group because Group cannot contain Layers.
 - Only apply when the Layer is a leaf (contains only geometry + painters, no child Layers).
 
-### Approximation Optimizations (May Change Visual — Confirm with User)
-
 #### 15.2 Clip Repeater Content to Canvas Bounds
 
 **Problem**: Repeaters positioned outside the canvas generate invisible elements that still
-consume rendering resources.
+consume rendering resources. These elements are never visible in the final output.
+
+**Category**: This is an equivalent optimization — removing off-canvas content does not affect
+the rendered image within the canvas bounds. Safe to auto-apply.
 
 **When to apply**: A Repeater (or nested Repeaters) generates content that extends significantly
 beyond the canvas bounds.
@@ -894,6 +909,12 @@ the extent of the pattern to the visible area.
 - This optimization preserves the original density and spacing — only the extent changes.
   Within the canvas area, the rendered result should be visually identical.
 
+### Suggestions Only (May Change Visual — Never Auto-apply)
+
+The following optimizations involve modifying design parameters (density, blur, alpha, etc.)
+and **must never be applied automatically**. Instead, describe the potential optimization and
+its visual trade-off to the user, and only apply after receiving explicit approval.
+
 #### 15.3 Reduce Nested Repeater Element Count
 
 **Problem**: Nested Repeaters multiply element counts. A seemingly innocent `copies="70"`
@@ -911,6 +932,9 @@ nested inside `copies="40"` generates 2800 elements, each fully cloned at render
 2. **Limit to visible area**: See 15.2 above.
 3. **Simplify geometry**: Use a simpler shape (e.g., a dot instead of a hexagon) to reduce
    per-element cost.
+
+**Suggest to user**: Describe the performance cost and ask if reducing density, simplifying
+geometry, or other alternatives are acceptable.
 
 #### 15.4 Evaluate Low-Opacity Expensive Elements
 
@@ -938,6 +962,9 @@ rendering cost (Repeaters with many copies, blur filters, complex geometry trees
 </Layer>
 ```
 
+**Suggest to user**: Describe the cost-to-visibility ratio and ask if reducing complexity,
+increasing alpha, or removing the element is acceptable.
+
 #### 15.5 Reduce Large Blur Radius Values
 
 **Problem**: Blur effects have computational cost that grows with blur radius. Large values
@@ -956,6 +983,9 @@ rendering cost (Repeaters with many copies, blur filters, complex geometry trees
    similar visual at fraction of the cost.
 
 **When to apply**: `blurX` or `blurY` exceeds ~30 pixels.
+
+**Suggest to user**: Report the blur values found and their estimated cost. Ask if reducing
+them is acceptable.
 
 #### 15.6 Merge Redundant Overlapping Repeaters
 
@@ -994,6 +1024,9 @@ other.
 </Layer>
 ```
 
+**Suggest to user**: Describe the overlap and ask if the minor visual change (removing
+redundant marks at shared positions) is acceptable.
+
 #### 15.7 Avoid Dashed Stroke under Repeater
 
 **Problem**: Stroke with `dashes` attribute has extra overhead (dash pattern computation) on
@@ -1017,8 +1050,8 @@ replacing with a solid stroke at reduced alpha, or a simpler visual treatment.
 <Stroke width="1" color="#0FF" alpha="0.4"/>
 ```
 
-**Caveats**: Dashes on single elements or small Repeaters (< 20 copies) are fine. This
-optimization only matters when dashes combine with high copy counts.
+**Suggest to user**: Report the dashed stroke + Repeater combination and ask if replacing
+with a solid stroke or other treatment is acceptable.
 
 ---
 
