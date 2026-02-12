@@ -113,3 +113,10 @@ after the Group ends, its geometry propagates upward to the parent scope.
 
 > For DropShadowStyle scope and color source coordinate system, see `references/painter-merging.md`
 > and `references/resource-reuse.md` respectively.
+
+---
+
+## PAGX Specification Quick Reference
+
+For complete attribute defaults, required attributes, and enumeration values extracted from
+the PAGX spec, see `references/pagx-quick-reference.md`.
