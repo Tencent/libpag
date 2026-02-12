@@ -342,15 +342,19 @@ static GlyphRun* CreateGlyphRunForIndices(
     case tgfx::GlyphPositioning::RSXform: {
       // Decompose RSXform into position, scale, and rotation
       auto* xforms = reinterpret_cast<const tgfx::RSXform*>(run.positions);
+      glyphRun->scales.reserve(indices.size());
+      glyphRun->rotations.reserve(indices.size());
       bool hasNonDefaultScale = false;
       bool hasNonDefaultRotation = false;
 
-      // First pass: check if we have non-default values
       for (size_t idx = 0; idx < indices.size(); idx++) {
         size_t i = indices[idx];
         const auto& xform = xforms[i];
         float scale = std::sqrt(xform.scos * xform.scos + xform.ssin * xform.ssin);
         float rotation = RadiansToDegrees(std::atan2(xform.ssin, xform.scos));
+        glyphRun->positions.push_back({xform.tx, xform.ty});
+        glyphRun->scales.push_back({scale, scale});
+        glyphRun->rotations.push_back(rotation);
         if (!FloatNearlyEqual(scale, 1.0f)) {
           hasNonDefaultScale = true;
         }
@@ -358,62 +362,47 @@ static GlyphRun* CreateGlyphRunForIndices(
           hasNonDefaultRotation = true;
         }
       }
-
-      // Second pass: extract values
-      for (size_t idx = 0; idx < indices.size(); idx++) {
-        size_t i = indices[idx];
-        const auto& xform = xforms[i];
-
-        // Decompose: scale = sqrt(scos^2 + ssin^2), rotation = atan2(ssin, scos)
-        float scale = std::sqrt(xform.scos * xform.scos + xform.ssin * xform.ssin);
-        float rotation = RadiansToDegrees(std::atan2(xform.ssin, xform.scos));
-
-        // The RSXform position (tx, ty) is the position after the anchor transform
-        // We need to reverse-calculate the original position
-        // Original transform: translate(-anchor) -> scale -> rotate -> translate(anchor) -> translate(pos)
-        // RSXform encodes: scale*rotate matrix + final position
-        // So tx, ty = anchor + pos - rotatedScaledAnchor
-        // pos = tx - anchor + rotatedScaledAnchor - anchor... this is complex
-        // For simplicity, just store position as tx, ty (the final transformed position)
-        glyphRun->positions.push_back({xform.tx, xform.ty});
-
-        if (hasNonDefaultScale) {
-          glyphRun->scales.push_back({scale, scale});
-        }
-        if (hasNonDefaultRotation) {
-          glyphRun->rotations.push_back(rotation);
-        }
+      if (!hasNonDefaultScale) {
+        glyphRun->scales.clear();
+      }
+      if (!hasNonDefaultRotation) {
+        glyphRun->rotations.clear();
       }
       break;
     }
     case tgfx::GlyphPositioning::Matrix: {
       // Decompose full matrix into position, scale, rotation, skew
       auto* matrices = reinterpret_cast<const float*>(run.positions);
+      glyphRun->scales.reserve(indices.size());
+      glyphRun->rotations.reserve(indices.size());
+      glyphRun->skews.reserve(indices.size());
       bool hasNonDefaultScale = false;
       bool hasNonDefaultRotation = false;
       bool hasNonDefaultSkew = false;
 
-      // First pass: check if we have non-default values
       for (size_t idx = 0; idx < indices.size(); idx++) {
         size_t i = indices[idx];
         float a = matrices[i * 6 + 0];
         float b = matrices[i * 6 + 1];
         float c = matrices[i * 6 + 2];
         float d = matrices[i * 6 + 3];
+        float tx = matrices[i * 6 + 4];
+        float ty = matrices[i * 6 + 5];
 
-        // Decompose matrix: M = T * R * S * Skew
-        // For a uniform scale + rotation matrix: a = s*cos, b = s*sin, c = -s*sin, d = s*cos
         float scaleX = std::sqrt(a * a + b * b);
         float scaleY = std::sqrt(c * c + d * d);
         float rotation = RadiansToDegrees(std::atan2(b, a));
 
-        // Check for skew (non-orthogonal matrix)
         float dotProduct = a * c + b * d;
         float skew = 0.0f;
         if (scaleX > 0.001f && scaleY > 0.001f) {
           skew = RadiansToDegrees(std::atan2(dotProduct, scaleX * scaleY));
         }
 
+        glyphRun->positions.push_back({tx, ty});
+        glyphRun->scales.push_back({scaleX, scaleY});
+        glyphRun->rotations.push_back(rotation);
+        glyphRun->skews.push_back(skew);
         if (!FloatNearlyEqual(scaleX, 1.0f) || !FloatNearlyEqual(scaleY, 1.0f)) {
           hasNonDefaultScale = true;
         }
@@ -424,40 +413,14 @@ static GlyphRun* CreateGlyphRunForIndices(
           hasNonDefaultSkew = true;
         }
       }
-
-      // Second pass: extract values
-      for (size_t idx = 0; idx < indices.size(); idx++) {
-        size_t i = indices[idx];
-        float a = matrices[i * 6 + 0];
-        float b = matrices[i * 6 + 1];
-        float c = matrices[i * 6 + 2];
-        float d = matrices[i * 6 + 3];
-        float tx = matrices[i * 6 + 4];
-        float ty = matrices[i * 6 + 5];
-
-        // Store position
-        glyphRun->positions.push_back({tx, ty});
-
-        // Decompose matrix
-        float scaleX = std::sqrt(a * a + b * b);
-        float scaleY = std::sqrt(c * c + d * d);
-        float rotation = RadiansToDegrees(std::atan2(b, a));
-
-        float dotProduct = a * c + b * d;
-        float skew = 0.0f;
-        if (scaleX > 0.001f && scaleY > 0.001f) {
-          skew = RadiansToDegrees(std::atan2(dotProduct, scaleX * scaleY));
-        }
-
-        if (hasNonDefaultScale) {
-          glyphRun->scales.push_back({scaleX, scaleY});
-        }
-        if (hasNonDefaultRotation) {
-          glyphRun->rotations.push_back(rotation);
-        }
-        if (hasNonDefaultSkew) {
-          glyphRun->skews.push_back(skew);
-        }
+      if (!hasNonDefaultScale) {
+        glyphRun->scales.clear();
+      }
+      if (!hasNonDefaultRotation) {
+        glyphRun->rotations.clear();
+      }
+      if (!hasNonDefaultSkew) {
+        glyphRun->skews.clear();
       }
       break;
     }
@@ -501,9 +464,9 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
     }
   }
 
-  // Second pass: collect all glyphs. Each glyph with a valid glyphID is written with its advance.
-  // Path and image data are optional - vector glyphs carry path, bitmap glyphs carry image, and
-  // spacing glyphs (e.g. space) carry only advance.
+  // Second pass: collect vector and bitmap glyphs. Each glyph with a valid glyphID is written with
+  // its advance. Path and image data are optional - vector glyphs carry path, bitmap glyphs carry
+  // image.
   for (auto* text : textOrder) {
     auto shapedText = FindShapedText(shapedTextMap, text);
     if (shapedText == nullptr || shapedText->textBlob == nullptr) {
@@ -535,8 +498,7 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
       for (size_t i = 0; i < run.glyphCount; ++i) {
         tgfx::GlyphID glyphID = run.glyphs[i];
         GlyphKey key = {typeface, glyphID};
-        auto type = glyphTypes[key];
-        if (type != GlyphType::Spacing) {
+        if (glyphTypes[key] != GlyphType::Spacing) {
           continue;
         }
         float advance = run.font.getAdvance(glyphID);
