@@ -237,9 +237,6 @@
         </Layer>
         <Layer>
             <Rectangle center="-30,0" size="10, 4"/>
-            <Fill color="#002244"/>
-        </Layer>
-        <Layer>
             <Rectangle center="30,0" size="10, 4"/>
             <Fill color="#002244"/>
         </Layer>
@@ -254,17 +251,10 @@
         <Fill color="#001122" alpha="0.9"/>
         <Stroke color="#0066aa" width="2"/>
      </Layer>
-     <!-- Grid Circles -->
+     <!-- Grid Circles & Crosshairs -->
      <Layer>
         <Ellipse center="0,0" size="100,100"/>
-        <Stroke color="#004488" width="1"/>
-     </Layer>
-     <Layer>
         <Ellipse center="0,0" size="50,50"/>
-        <Stroke color="#004488" width="1"/>
-     </Layer>
-     <!-- Crosshairs -->
-     <Layer>
         <Path data="M -70 0 L 70 0 M 0 -70 L 0 70"/>
         <Stroke color="#004488" width="1"/>
      </Layer>
@@ -280,36 +270,29 @@
      </Layer>
      <!-- Enemy Blips -->
      <Layer>
-        <Layer>
-            <Ellipse center="30, -20" size="6,6"/>
-            <Fill color="#ff0000"/>
-            <DropShadowStyle blurX="4" blurY="4" color="#ff0000"/>
-        </Layer>
-        <Layer>
-            <Ellipse center="-40, 10" size="6,6"/>
-            <Fill color="#ff0000"/>
-            <DropShadowStyle blurX="4" blurY="4" color="#ff0000"/>
-        </Layer>
-        <Layer>
-            <Ellipse center="0, 0" size="4,4"/>
-            <Fill color="#ffffff"/> <!-- Player -->
-        </Layer>
+        <Ellipse center="30, -20" size="6,6"/>
+        <Ellipse center="-40, 10" size="6,6"/>
+        <Fill color="#ff0000"/>
+        <DropShadowStyle blurX="4" blurY="4" color="#ff0000"/>
+     </Layer>
+     <!-- Player Blip -->
+     <Layer>
+        <Ellipse center="0, 0" size="4,4"/>
+        <Fill color="#ffffff"/>
      </Layer>
   </Layer>
 
   <!-- Objective Markers (Top Center) -->
   <Layer name="Objectives" x="400" y="50">
-     <Layer>
-        <Text fontFamily="Arial" fontSize="12" fontStyle="Bold">
+     <Text fontFamily="Arial" fontSize="12" fontStyle="Bold">
 <![CDATA[MISSION OBJECTIVES:
 [ ] INFILTRATE BASE
 [ ] HACK TERMINAL
 [x] SECURE PERIMETER]]>
-        </Text>
-        <Fill color="#ffffff"/>
-        <TextLayout position="0,0" textAlign="center" lineHeight="1.6"/>
-        <DropShadowStyle blurX="2" blurY="2" color="#000000"/>
-     </Layer>
+     </Text>
+     <Fill color="#ffffff"/>
+     <TextLayout position="0,0" textAlign="center" lineHeight="1.6"/>
+     <DropShadowStyle blurX="2" blurY="2" color="#000000"/>
   </Layer>
 
   <!-- Yellow Status Indicators (Restored in Top Right) -->
@@ -350,22 +333,8 @@
 
   <!-- Corners -->
   <Layer name="Corners">
-    <Layer>
-        <Path data="M 40 100 L 40 40 L 100 40"/>
-        <Stroke width="4" color="#00ccff"/>
-    </Layer>
-    <Layer>
-        <Path data="M 760 100 L 760 40 L 700 40"/>
-        <Stroke width="4" color="#00ccff"/>
-    </Layer>
-    <Layer>
-        <Path data="M 40 500 L 40 560 L 100 560"/>
-        <Stroke width="4" color="#00ccff"/>
-    </Layer>
-    <Layer>
-        <Path data="M 760 500 L 760 560 L 700 560"/>
-        <Stroke width="4" color="#00ccff"/>
-    </Layer>
+    <Path data="M 40 100 L 40 40 L 100 40 M 760 100 L 760 40 L 700 40 M 40 500 L 40 560 L 100 560 M 760 500 L 760 560 L 700 560"/>
+    <Stroke width="4" color="#00ccff"/>
   </Layer>
 
 </pagx>
