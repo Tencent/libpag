@@ -442,7 +442,7 @@ static GlyphRun* CreateGlyphRunForIndices(
 
 static void CollectSpacingGlyph(PAGXDocument* document, const tgfx::Font& font,
                                 tgfx::GlyphID glyphID,
-                                const std::unordered_map<const tgfx::Typeface*, BitmapFontBuilder>&
+                                std::unordered_map<const tgfx::Typeface*, BitmapFontBuilder>&
                                     bitmapBuilders,
                                 VectorFontBuilder& vectorBuilder) {
   float advance = font.getAdvance(glyphID);
@@ -457,7 +457,7 @@ static void CollectSpacingGlyph(PAGXDocument* document, const tgfx::Font& font,
   }
   auto bitmapIt = bitmapBuilders.find(typeface);
   if (bitmapIt != bitmapBuilders.end() && bitmapIt->second.font != nullptr) {
-    auto& builder = const_cast<BitmapFontBuilder&>(bitmapIt->second);
+    auto& builder = bitmapIt->second;
     if (builder.glyphMapping.count(key)) {
       return;
     }
