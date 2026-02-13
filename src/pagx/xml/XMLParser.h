@@ -82,8 +82,9 @@ class XMLParser {
    */
   virtual bool onText(const std::string& text) = 0;
 
- public:
-  // Public for internal parser library calls, not intended for client use.
+ private:
+  friend struct ParsingContext;
+
   bool startElement(const char* element);
   bool addAttribute(const char* name, const char* value);
   bool endElement(const char* element);

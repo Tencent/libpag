@@ -26,8 +26,6 @@
 
 namespace pagx {
 
-namespace {
-
 template <typename T, T* P>
 struct OverloadedFunctionObject {
   template <typename... Args>
@@ -54,40 +52,63 @@ class AutoTCallVProc : public std::unique_ptr<T, FunctionObject<P>> {
   }
 };
 
-constexpr const void* HASH_SEED = &HASH_SEED;
-
-const XML_Memory_Handling_Suite XML_alloc = {malloc, realloc, free};
+static const XML_Memory_Handling_Suite XML_alloc = {malloc, realloc, free};
 
 struct ParsingContext {
-  explicit ParsingContext(XMLParser* parser)
-      : _parser(parser), _XMLParser(XML_ParserCreate_MM(nullptr, &XML_alloc, nullptr)) {
-  }
+  explicit ParsingContext(XMLParser* parser);
 
-  bool flushText() {
-    if (!_bufferedText.empty()) {
-      bool stop = _parser->text(_bufferedText);
-      _bufferedText.clear();
-      return stop;
-    }
-    return false;
-  }
+  bool flushText();
+  void discardBufferedWhitespace();
+  void appendText(const char* txt, size_t len);
+  bool startElement(const char* element);
+  bool addAttribute(const char* name, const char* value);
+  bool endElement(const char* element);
 
-  void discardBufferedWhitespace() {
-    if (_bufferedText.find_first_not_of(" \n\r\t") == std::string::npos) {
-      _bufferedText.clear();
-    }
-  }
-
-  void appendText(const char* txt, size_t len) {
-    _bufferedText.insert(_bufferedText.end(), txt, &txt[len]);
-  }
-
-  XMLParser* _parser;
-  AutoTCallVProc<std::remove_pointer_t<XML_Parser>, XML_ParserFree> _XMLParser;
+  AutoTCallVProc<std::remove_pointer_t<XML_Parser>, XML_ParserFree> _XMLParser = nullptr;
 
  private:
-  std::string _bufferedText;
+  XMLParser* _parser = nullptr;
+  std::string _bufferedText = {};
 };
+
+ParsingContext::ParsingContext(XMLParser* parser)
+    : _parser(parser), _XMLParser(XML_ParserCreate_MM(nullptr, &XML_alloc, nullptr)) {
+}
+
+bool ParsingContext::flushText() {
+  if (!_bufferedText.empty()) {
+    bool stop = _parser->text(_bufferedText);
+    _bufferedText.clear();
+    return stop;
+  }
+  return false;
+}
+
+void ParsingContext::discardBufferedWhitespace() {
+  if (_bufferedText.find_first_not_of(" \n\r\t") == std::string::npos) {
+    _bufferedText.clear();
+  }
+}
+
+void ParsingContext::appendText(const char* txt, size_t len) {
+  _bufferedText.insert(_bufferedText.end(), txt, &txt[len]);
+}
+
+bool ParsingContext::startElement(const char* element) {
+  return _parser->startElement(element);
+}
+
+bool ParsingContext::addAttribute(const char* name, const char* value) {
+  return _parser->addAttribute(name, value);
+}
+
+bool ParsingContext::endElement(const char* element) {
+  return _parser->endElement(element);
+}
+
+namespace {
+
+constexpr const void* HASH_SEED = &HASH_SEED;
 
 #define HANDLER_CONTEXT(arg, name) ParsingContext* name = static_cast<ParsingContext*>(arg)
 
@@ -98,13 +119,13 @@ void XMLCALL start_element_handler(void* data, const char* tag, const char** att
     return;
   }
 
-  if (context->_parser->startElement(tag)) {
+  if (context->startElement(tag)) {
     XML_StopParser(context->_XMLParser, XML_FALSE);
     return;
   }
 
   for (size_t i = 0; attributes[i]; i += 2) {
-    if (context->_parser->addAttribute(attributes[i], attributes[i + 1])) {
+    if (context->addAttribute(attributes[i], attributes[i + 1])) {
       XML_StopParser(context->_XMLParser, XML_FALSE);
       return;
     }
@@ -118,7 +139,7 @@ void XMLCALL end_element_handler(void* data, const char* tag) {
     return;
   }
 
-  if (context->_parser->endElement(tag)) {
+  if (context->endElement(tag)) {
     XML_StopParser(context->_XMLParser, XML_FALSE);
   }
 }
