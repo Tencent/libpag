@@ -343,6 +343,7 @@ static GlyphRun* CreateGlyphRunForIndices(
   switch (run.positioning) {
     case tgfx::GlyphPositioning::Horizontal: {
       glyphRun->y = run.offsetY;
+      glyphRun->xOffsets.reserve(indices.size());
       for (size_t i : indices) {
         glyphRun->xOffsets.push_back(run.positions[i]);
       }
@@ -350,6 +351,7 @@ static GlyphRun* CreateGlyphRunForIndices(
     }
     case tgfx::GlyphPositioning::Point: {
       auto* points = reinterpret_cast<const tgfx::Point*>(run.positions);
+      glyphRun->positions.reserve(indices.size());
       for (size_t i : indices) {
         glyphRun->positions.push_back({points[i].x, points[i].y});
       }
@@ -358,6 +360,7 @@ static GlyphRun* CreateGlyphRunForIndices(
     case tgfx::GlyphPositioning::RSXform: {
       // Decompose RSXform into position, scale, and rotation
       auto* xforms = reinterpret_cast<const tgfx::RSXform*>(run.positions);
+      glyphRun->positions.reserve(indices.size());
       glyphRun->scales.reserve(indices.size());
       glyphRun->rotations.reserve(indices.size());
       bool hasNonDefaultScale = false;
@@ -389,6 +392,7 @@ static GlyphRun* CreateGlyphRunForIndices(
     case tgfx::GlyphPositioning::Matrix: {
       // Decompose full matrix into position, scale, rotation, skew
       auto* matrices = reinterpret_cast<const float*>(run.positions);
+      glyphRun->positions.reserve(indices.size());
       glyphRun->scales.reserve(indices.size());
       glyphRun->rotations.reserve(indices.size());
       glyphRun->skews.reserve(indices.size());
