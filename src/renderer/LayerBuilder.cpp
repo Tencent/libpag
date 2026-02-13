@@ -57,6 +57,8 @@
 #include "pagx/types/FillRule.h"
 #include "pagx/types/LayerPlacement.h"
 #include "pagx/types/MergePathMode.h"
+#include "pagx/types/RepeaterOrder.h"
+#include "pagx/types/SelectorTypes.h"
 #include "pagx/types/TileMode.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/CustomTypeface.h"
@@ -269,6 +271,62 @@ static tgfx::LayerMaskType ToTGFXMaskType(MaskType type) {
       return tgfx::LayerMaskType::Contour;
   }
   return tgfx::LayerMaskType::Alpha;
+}
+
+static tgfx::RepeaterOrder ToTGFX(RepeaterOrder order) {
+  switch (order) {
+    case RepeaterOrder::BelowOriginal:
+      return tgfx::RepeaterOrder::BelowOriginal;
+    case RepeaterOrder::AboveOriginal:
+      return tgfx::RepeaterOrder::AboveOriginal;
+  }
+  return tgfx::RepeaterOrder::BelowOriginal;
+}
+
+static tgfx::SelectorUnit ToTGFX(SelectorUnit unit) {
+  switch (unit) {
+    case SelectorUnit::Index:
+      return tgfx::SelectorUnit::Index;
+    case SelectorUnit::Percentage:
+      return tgfx::SelectorUnit::Percentage;
+  }
+  return tgfx::SelectorUnit::Index;
+}
+
+static tgfx::SelectorShape ToTGFX(SelectorShape shape) {
+  switch (shape) {
+    case SelectorShape::Square:
+      return tgfx::SelectorShape::Square;
+    case SelectorShape::RampUp:
+      return tgfx::SelectorShape::RampUp;
+    case SelectorShape::RampDown:
+      return tgfx::SelectorShape::RampDown;
+    case SelectorShape::Triangle:
+      return tgfx::SelectorShape::Triangle;
+    case SelectorShape::Round:
+      return tgfx::SelectorShape::Round;
+    case SelectorShape::Smooth:
+      return tgfx::SelectorShape::Smooth;
+  }
+  return tgfx::SelectorShape::Square;
+}
+
+static tgfx::SelectorMode ToTGFX(SelectorMode mode) {
+  switch (mode) {
+    case SelectorMode::Add:
+      return tgfx::SelectorMode::Add;
+    case SelectorMode::Subtract:
+      return tgfx::SelectorMode::Subtract;
+    case SelectorMode::Intersect:
+      return tgfx::SelectorMode::Intersect;
+    case SelectorMode::Min:
+      return tgfx::SelectorMode::Min;
+    case SelectorMode::Max:
+      return tgfx::SelectorMode::Max;
+    case SelectorMode::Difference:
+      return tgfx::SelectorMode::Difference;
+  }
+  return tgfx::SelectorMode::Add;
 }
 
 static tgfx::TileMode ToTGFX(TileMode mode) {
@@ -718,7 +776,7 @@ class LayerBuilderContext {
     auto repeater = tgfx::Repeater::Make();
     repeater->setCopies(node->copies);
     repeater->setOffset(node->offset);
-    repeater->setOrder(static_cast<tgfx::RepeaterOrder>(node->order));
+    repeater->setOrder(ToTGFX(node->order));
     repeater->setAnchor(ToTGFX(node->anchor));
     repeater->setPosition(ToTGFX(node->position));
     repeater->setRotation(node->rotation);
@@ -761,11 +819,11 @@ class LayerBuilderContext {
         tgfxSelector->setStart(rangeSelector->start);
         tgfxSelector->setEnd(rangeSelector->end);
         tgfxSelector->setOffset(rangeSelector->offset);
-        tgfxSelector->setUnit(static_cast<tgfx::SelectorUnit>(rangeSelector->unit));
-        tgfxSelector->setShape(static_cast<tgfx::SelectorShape>(rangeSelector->shape));
+        tgfxSelector->setUnit(ToTGFX(rangeSelector->unit));
+        tgfxSelector->setShape(ToTGFX(rangeSelector->shape));
         tgfxSelector->setEaseIn(rangeSelector->easeIn);
         tgfxSelector->setEaseOut(rangeSelector->easeOut);
-        tgfxSelector->setMode(static_cast<tgfx::SelectorMode>(rangeSelector->mode));
+        tgfxSelector->setMode(ToTGFX(rangeSelector->mode));
         tgfxSelector->setWeight(rangeSelector->weight);
         tgfxSelector->setRandomOrder(rangeSelector->randomOrder);
         tgfxSelector->setRandomSeed(static_cast<uint16_t>(rangeSelector->randomSeed));
