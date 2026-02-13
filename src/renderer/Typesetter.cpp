@@ -50,15 +50,6 @@ void Typesetter::setFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface
   fallbackTypefaces = std::move(typefaces);
 }
 
-// Helper to convert pagx types to tgfx types.
-static tgfx::Path ToTGFXPath(const PathData& pathData) {
-  return PathDataToTGFXPath(pathData);
-}
-
-static tgfx::Point ToTGFXPoint(const Point& p) {
-  return PointToTGFX(p);
-}
-
 
 // Build context that maintains state during text typesetting
 class TypesetterContext {
@@ -531,7 +522,7 @@ class TypesetterContext {
       tgfx::PathTypefaceBuilder builder;
       for (const auto& glyph : fontNode->glyphs) {
         if (glyph->path != nullptr) {
-          auto path = ToTGFXPath(*glyph->path);
+          auto path = PathDataToTGFXPath(*glyph->path);
           if (glyph->offset.x != 0 || glyph->offset.y != 0) {
             path.transform(tgfx::Matrix::MakeTrans(glyph->offset.x, glyph->offset.y));
           }
@@ -560,7 +551,7 @@ class TypesetterContext {
           }
 
           if (codec) {
-            builder.addGlyph(codec, ToTGFXPoint(glyph->offset), glyph->advance);
+            builder.addGlyph(codec, PointToTGFX(glyph->offset), glyph->advance);
           }
         }
       }
