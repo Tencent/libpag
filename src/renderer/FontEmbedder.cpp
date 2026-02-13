@@ -131,7 +131,11 @@ static void CollectVectorGlyph(
     return;
   }
 
-  float scale = static_cast<float>(VectorFontUnitsPerEm) / font.getSize();
+  float fontSize = font.getSize();
+  if (fontSize < 0.001f) {
+    return;
+  }
+  float scale = static_cast<float>(VectorFontUnitsPerEm) / fontSize;
   glyphPath.transform(tgfx::Matrix::MakeScale(scale, scale));
 
   if (builder.font == nullptr) {
@@ -282,6 +286,9 @@ static bool CanUseDefaultMode(const tgfx::GlyphRun& run, const std::vector<size_
     return true;
   }
   if (indices.empty()) {
+    return false;
+  }
+  if (font->unitsPerEm <= 0) {
     return false;
   }
   float scale = fontSize / static_cast<float>(font->unitsPerEm);
@@ -534,15 +541,23 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
             continue;
           }
           auto glyph = document->makeNode<Glyph>();
+          float runFontSize = run.font.getSize();
+          if (runFontSize < 0.001f) {
+            continue;
+          }
           float backingSize = static_cast<float>(builder.backingSize);
-          glyph->advance = advance / run.font.getSize() * backingSize;
+          glyph->advance = advance / runFontSize * backingSize;
           builder.font->glyphs.push_back(glyph);
           builder.glyphMapping[key] = static_cast<tgfx::GlyphID>(builder.font->glyphs.size());
         } else if (vectorBuilder.font != nullptr) {
           if (vectorBuilder.glyphMapping.find(key) != vectorBuilder.glyphMapping.end()) {
             continue;
           }
-          float scale = static_cast<float>(VectorFontUnitsPerEm) / run.font.getSize();
+          float runFontSize = run.font.getSize();
+          if (runFontSize < 0.001f) {
+            continue;
+          }
+          float scale = static_cast<float>(VectorFontUnitsPerEm) / runFontSize;
           auto glyph = document->makeNode<Glyph>();
           glyph->advance = advance * scale;
           vectorBuilder.font->glyphs.push_back(glyph);
