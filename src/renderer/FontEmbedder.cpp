@@ -589,8 +589,6 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
 
       std::vector<size_t> vectorIndices = {};
       std::vector<size_t> bitmapIndices = {};
-      vectorIndices.reserve(run.glyphCount);
-      bitmapIndices.reserve(run.glyphCount);
 
       for (size_t i = 0; i < run.glyphCount; ++i) {
         tgfx::GlyphID glyphID = run.glyphs[i];
