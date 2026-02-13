@@ -1122,18 +1122,7 @@ LinearGradient* SVGParserContext::convertLinearGradient(
   }
 
   // Parse stops.
-  auto child = element->getFirstChild();
-  while (child) {
-    if (child->name == "stop") {
-      ColorStop stop;
-      stop.offset = parseLength(getAttribute(child, "offset", "0"), 1.0f);
-      stop.color = parseColor(getAttribute(child, "stop-color", "#000000"));
-      float opacity = parseLength(getAttribute(child, "stop-opacity", "1"), 1.0f);
-      stop.color.alpha = opacity;
-      gradient->colorStops.push_back(stop);
-    }
-    child = child->getNextSibling();
-  }
+  parseGradientStops(element, gradient->colorStops);
 
   return gradient;
 }
@@ -1178,6 +1167,13 @@ RadialGradient* SVGParserContext::convertRadialGradient(
   }
 
   // Parse stops.
+  parseGradientStops(element, gradient->colorStops);
+
+  return gradient;
+}
+
+void SVGParserContext::parseGradientStops(const std::shared_ptr<DOMNode>& element,
+                                          std::vector<ColorStop>& colorStops) {
   auto child = element->getFirstChild();
   while (child) {
     if (child->name == "stop") {
@@ -1186,12 +1182,10 @@ RadialGradient* SVGParserContext::convertRadialGradient(
       stop.color = parseColor(getAttribute(child, "stop-color", "#000000"));
       float opacity = parseLength(getAttribute(child, "stop-opacity", "1"), 1.0f);
       stop.color.alpha = opacity;
-      gradient->colorStops.push_back(stop);
+      colorStops.push_back(stop);
     }
     child = child->getNextSibling();
   }
-
-  return gradient;
 }
 
 ImagePattern* SVGParserContext::convertPattern(
@@ -1334,7 +1328,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       solidColor->color = {0, 0, 0, 1, ColorSpace::SRGB};
       fillNode->color = solidColor;
       contents.push_back(fillNode);
-    } else if (fill.find("url(") == 0) {
+    } else if (fill.compare(0, 4, "url(") == 0) {
       auto fillNode = _document->makeNode<Fill>();
       std::string refId = resolveUrl(fill);
       // Use getColorSourceForRef which handles reference counting.
@@ -1407,7 +1401,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
 
     auto strokeNode = _document->makeNode<Stroke>();
 
-    if (stroke.find("url(") == 0) {
+    if (stroke.compare(0, 4, "url(") == 0) {
       std::string refId = resolveUrl(stroke);
       // Use getColorSourceForRef which handles reference counting.
       if (!boundsComputed) {
@@ -1689,14 +1683,14 @@ static Color ParseCSSColorFunction(const std::string& value) {
 
   // Detect color space identifier.
   ColorSpace colorSpace = ColorSpace::SRGB;
-  if (inner.find("display-p3") == 0) {
+  if (inner.compare(0, 10, "display-p3") == 0) {
     colorSpace = ColorSpace::DisplayP3;
     inner = inner.substr(10);
-  } else if (inner.find("a98-rgb") == 0) {
+  } else if (inner.compare(0, 7, "a98-rgb") == 0) {
     inner = inner.substr(7);
-  } else if (inner.find("rec2020") == 0) {
+  } else if (inner.compare(0, 7, "rec2020") == 0) {
     inner = inner.substr(7);
-  } else if (inner.find("srgb") == 0) {
+  } else if (inner.compare(0, 4, "srgb") == 0) {
     inner = inner.substr(4);
   }
 
@@ -1778,7 +1772,7 @@ Color SVGParserContext::parseColor(const std::string& value) {
     }
   }
 
-  if (value.find("rgb") == 0) {
+  if (value.compare(0, 3, "rgb") == 0) {
     size_t start = value.find('(');
     size_t end = value.find(')');
     if (start != std::string::npos && end != std::string::npos) {
@@ -1798,7 +1792,7 @@ Color SVGParserContext::parseColor(const std::string& value) {
   }
 
   // CSS Color Level 4: color(display-p3 r g b) or color(display-p3 r g b / a)
-  if (value.find("color(") == 0) {
+  if (value.compare(0, 6, "color(") == 0) {
     auto color = ParseCSSColorFunction(value);
     if (color.alpha >= 0) {
       return color;
@@ -1993,11 +1987,11 @@ std::string SVGParserContext::colorToHex(const std::string& value) {
     return value;
   }
   // url() references should be returned as-is.
-  if (value.find("url(") == 0) {
+  if (value.compare(0, 4, "url(") == 0) {
     return value;
   }
   // CSS Color Level 4: color(display-p3 r g b) -> p3(r, g, b)
-  if (value.find("color(") == 0) {
+  if (value.compare(0, 6, "color(") == 0) {
     auto color = ParseCSSColorFunction(value);
     if (color.alpha >= 0 && color.colorSpace == ColorSpace::DisplayP3) {
       char buf[64] = {};
@@ -2123,7 +2117,7 @@ std::string SVGParserContext::resolveUrl(const std::string& url) {
     return "";
   }
   // Handle url(#id) format.
-  if (url.find("url(") == 0) {
+  if (url.compare(0, 4, "url(") == 0) {
     size_t start = url.find('#');
     size_t end = url.find(')');
     if (start != std::string::npos && end != std::string::npos) {
@@ -2725,7 +2719,7 @@ void SVGParserContext::countColorSourceReferencesInElement(const std::shared_ptr
 
   // Check fill attribute for url() references.
   std::string fill = getAttribute(element, "fill");
-  if (!fill.empty() && fill.find("url(") == 0) {
+  if (!fill.empty() && fill.compare(0, 4, "url(") == 0) {
     std::string refId = resolveUrl(fill);
     auto it = _defs.find(refId);
     if (it != _defs.end()) {
@@ -2739,7 +2733,7 @@ void SVGParserContext::countColorSourceReferencesInElement(const std::shared_ptr
 
   // Check stroke attribute for url() references.
   std::string stroke = getAttribute(element, "stroke");
-  if (!stroke.empty() && stroke.find("url(") == 0) {
+  if (!stroke.empty() && stroke.compare(0, 4, "url(") == 0) {
     std::string refId = resolveUrl(stroke);
     auto it = _defs.find(refId);
     if (it != _defs.end()) {

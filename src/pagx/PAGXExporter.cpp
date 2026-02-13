@@ -257,6 +257,20 @@ static std::string floatListToString(const float* values, size_t count) {
   return result;
 }
 
+static std::string pointListToString(const std::vector<Point>& points) {
+  std::string result = {};
+  result.reserve(points.size() * 12);
+  char buf[64] = {};
+  for (size_t i = 0; i < points.size(); i++) {
+    if (i > 0) {
+      result += ";";
+    }
+    snprintf(buf, sizeof(buf), "%g,%g", points[i].x, points[i].y);
+    result += buf;
+  }
+  return result;
+}
+
 //==============================================================================
 // Forward declarations
 //==============================================================================
@@ -517,47 +531,17 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
 
           // Write positions (semicolon-separated x,y pairs)
           if (!run->positions.empty()) {
-            std::string posStr = {};
-            posStr.reserve(run->positions.size() * 12);
-            char buf[64] = {};
-            for (size_t i = 0; i < run->positions.size(); i++) {
-              if (i > 0) {
-                posStr += ";";
-              }
-              snprintf(buf, sizeof(buf), "%g,%g", run->positions[i].x, run->positions[i].y);
-              posStr += buf;
-            }
-            xml.addRequiredAttribute("positions", posStr);
+            xml.addRequiredAttribute("positions", pointListToString(run->positions));
           }
 
           // Write anchors (semicolon-separated x,y pairs)
           if (!run->anchors.empty()) {
-            std::string anchorsStr = {};
-            anchorsStr.reserve(run->anchors.size() * 12);
-            char buf[64] = {};
-            for (size_t i = 0; i < run->anchors.size(); i++) {
-              if (i > 0) {
-                anchorsStr += ";";
-              }
-              snprintf(buf, sizeof(buf), "%g,%g", run->anchors[i].x, run->anchors[i].y);
-              anchorsStr += buf;
-            }
-            xml.addRequiredAttribute("anchors", anchorsStr);
+            xml.addRequiredAttribute("anchors", pointListToString(run->anchors));
           }
 
           // Write scales (semicolon-separated sx,sy pairs)
           if (!run->scales.empty()) {
-            std::string scalesStr = {};
-            scalesStr.reserve(run->scales.size() * 12);
-            char buf[64] = {};
-            for (size_t i = 0; i < run->scales.size(); i++) {
-              if (i > 0) {
-                scalesStr += ";";
-              }
-              snprintf(buf, sizeof(buf), "%g,%g", run->scales[i].x, run->scales[i].y);
-              scalesStr += buf;
-            }
-            xml.addRequiredAttribute("scales", scalesStr);
+            xml.addRequiredAttribute("scales", pointListToString(run->scales));
           }
 
           // Write rotations (comma-separated angles in degrees)

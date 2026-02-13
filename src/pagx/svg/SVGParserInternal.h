@@ -147,6 +147,8 @@ class SVGParserContext {
   // Named colors are converted to their hex equivalents for PAGX compatibility.
   std::string colorToHex(const std::string& value);
   float parseLength(const std::string& value, float containerSize);
+  void parseGradientStops(const std::shared_ptr<DOMNode>& element,
+                          std::vector<ColorStop>& colorStops);
   // Like parseLength, but uses the given fontSize for em/rem unit conversion instead of the
   // default 16px. Returns 0 if value is empty.
   float parseLengthEm(const std::string& value, float containerSize, float fontSize);

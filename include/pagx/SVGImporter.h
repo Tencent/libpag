@@ -31,6 +31,10 @@ namespace pagx {
 class SVGImporter {
  public:
   struct Options {
+    Options()
+        : preserveUnknownElements(false), expandUseReferences(true), flattenTransforms(false) {
+    }
+
     /**
      * If true, unsupported SVG elements are preserved as Unknown nodes.
      */
@@ -45,10 +49,6 @@ class SVGImporter {
      * If true, nested transforms are flattened into single matrices.
      */
     bool flattenTransforms = false;
-
-    Options()
-        : preserveUnknownElements(false), expandUseReferences(true), flattenTransforms(false) {
-    }
   };
 
   /**

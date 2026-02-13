@@ -560,41 +560,47 @@ static Text* parseText(const DOMNode* node, PAGXDocument* doc) {
 // Painter parsing
 //==============================================================================
 
+static ColorSource* parseColorAttr(const std::string& colorAttr, PAGXDocument* doc) {
+  if (colorAttr.empty()) {
+    return nullptr;
+  }
+  if (colorAttr[0] == '@') {
+    return doc->findNode<ColorSource>(colorAttr.substr(1));
+  }
+  auto solidColor = doc->makeNode<SolidColor>();
+  solidColor->color = parseColor(colorAttr);
+  return solidColor;
+}
+
+static ColorSource* parseChildColorSource(const DOMNode* node, PAGXDocument* doc) {
+  auto child = node->firstChild;
+  while (child) {
+    if (child->type == DOMNodeType::Element) {
+      auto colorSource = parseColorSource(child.get(), doc);
+      if (colorSource) {
+        return colorSource;
+      }
+    }
+    child = child->nextSibling;
+  }
+  return nullptr;
+}
+
 static Fill* parseFill(const DOMNode* node, PAGXDocument* doc) {
   auto id = getAttribute(node, "id");
   auto fill = doc->makeNode<Fill>(id);
   if (!fill) {
     return nullptr;
   }
-  auto colorAttr = getAttribute(node, "color");
-  if (!colorAttr.empty()) {
-    if (colorAttr[0] == '@') {
-      // Reference to ColorSource resource.
-      fill->color = doc->findNode<ColorSource>(colorAttr.substr(1));
-    } else {
-      // Inline color string (e.g. #FF0000, srgb(), p3()).
-      auto solidColor = doc->makeNode<SolidColor>();
-      solidColor->color = parseColor(colorAttr);
-      fill->color = solidColor;
-    }
-  }
+  fill->color = parseColorAttr(getAttribute(node, "color"), doc);
   fill->alpha = getFloatAttribute(node, "alpha", 1);
   fill->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
   fill->fillRule = FillRuleFromString(getAttribute(node, "fillRule", "winding"));
   fill->placement = LayerPlacementFromString(getAttribute(node, "placement", "background"));
-
-  auto child = node->firstChild;
-  while (child) {
-    if (child->type == DOMNodeType::Element) {
-      auto colorSource = parseColorSource(child.get(), doc);
-      if (colorSource) {
-        fill->color = colorSource;
-        break;
-      }
-    }
-    child = child->nextSibling;
+  auto childColor = parseChildColorSource(node, doc);
+  if (childColor) {
+    fill->color = childColor;
   }
-
   return fill;
 }
 
@@ -604,18 +610,7 @@ static Stroke* parseStroke(const DOMNode* node, PAGXDocument* doc) {
   if (!stroke) {
     return nullptr;
   }
-  auto colorAttr = getAttribute(node, "color");
-  if (!colorAttr.empty()) {
-    if (colorAttr[0] == '@') {
-      // Reference to ColorSource resource.
-      stroke->color = doc->findNode<ColorSource>(colorAttr.substr(1));
-    } else {
-      // Inline color string (e.g. #FF0000, srgb(), p3()).
-      auto solidColor = doc->makeNode<SolidColor>();
-      solidColor->color = parseColor(colorAttr);
-      stroke->color = solidColor;
-    }
-  }
+  stroke->color = parseColorAttr(getAttribute(node, "color"), doc);
   stroke->width = getFloatAttribute(node, "width", 1);
   stroke->alpha = getFloatAttribute(node, "alpha", 1);
   stroke->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
@@ -630,19 +625,10 @@ static Stroke* parseStroke(const DOMNode* node, PAGXDocument* doc) {
   stroke->dashAdaptive = getBoolAttribute(node, "dashAdaptive", false);
   stroke->align = StrokeAlignFromString(getAttribute(node, "align", "center"));
   stroke->placement = LayerPlacementFromString(getAttribute(node, "placement", "background"));
-
-  auto child = node->firstChild;
-  while (child) {
-    if (child->type == DOMNodeType::Element) {
-      auto colorSource = parseColorSource(child.get(), doc);
-      if (colorSource) {
-        stroke->color = colorSource;
-        break;
-      }
-    }
-    child = child->nextSibling;
+  auto childColor = parseChildColorSource(node, doc);
+  if (childColor) {
+    stroke->color = childColor;
   }
-
   return stroke;
 }
 
@@ -1329,34 +1315,59 @@ static bool getBoolAttribute(const DOMNode* node, const std::string& name,
   return str == "true" || str == "1";
 }
 
+static const char* skipWhitespaceAndComma(const char* ptr, const char* end) {
+  while (ptr < end && (*ptr == ' ' || *ptr == '\t' || *ptr == ',')) {
+    ++ptr;
+  }
+  return ptr;
+}
+
 static Point parsePoint(const std::string& str) {
   Point point = {};
-  auto values = ParseFloatList(str);
-  if (values.size() >= 2) {
-    point.x = values[0];
-    point.y = values[1];
+  const char* ptr = str.c_str();
+  const char* end = ptr + str.size();
+  char* endPtr = nullptr;
+  ptr = skipWhitespaceAndComma(ptr, end);
+  point.x = strtof(ptr, &endPtr);
+  if (endPtr > ptr) {
+    ptr = skipWhitespaceAndComma(endPtr, end);
+    point.y = strtof(ptr, &endPtr);
   }
   return point;
 }
 
 static Size parseSize(const std::string& str) {
   Size size = {};
-  auto values = ParseFloatList(str);
-  if (values.size() >= 2) {
-    size.width = values[0];
-    size.height = values[1];
+  const char* ptr = str.c_str();
+  const char* end = ptr + str.size();
+  char* endPtr = nullptr;
+  ptr = skipWhitespaceAndComma(ptr, end);
+  size.width = strtof(ptr, &endPtr);
+  if (endPtr > ptr) {
+    ptr = skipWhitespaceAndComma(endPtr, end);
+    size.height = strtof(ptr, &endPtr);
   }
   return size;
 }
 
 static Rect parseRect(const std::string& str) {
   Rect rect = {};
-  auto values = ParseFloatList(str);
-  if (values.size() >= 4) {
-    rect.x = values[0];
-    rect.y = values[1];
-    rect.width = values[2];
-    rect.height = values[3];
+  const char* ptr = str.c_str();
+  const char* end = ptr + str.size();
+  char* endPtr = nullptr;
+  ptr = skipWhitespaceAndComma(ptr, end);
+  rect.x = strtof(ptr, &endPtr);
+  if (endPtr > ptr) {
+    ptr = skipWhitespaceAndComma(endPtr, end);
+    rect.y = strtof(ptr, &endPtr);
+  }
+  if (endPtr > ptr) {
+    ptr = skipWhitespaceAndComma(endPtr, end);
+    rect.width = strtof(ptr, &endPtr);
+  }
+  if (endPtr > ptr) {
+    ptr = skipWhitespaceAndComma(endPtr, end);
+    rect.height = strtof(ptr, &endPtr);
   }
   return rect;
 }
@@ -1431,21 +1442,30 @@ static Color parseColor(const std::string& str) {
     if (str.compare(0, fmt.prefixLen, fmt.prefix) != 0) {
       continue;
     }
-    auto start = str.find('(');
-    auto end = str.find(')');
-    if (start == std::string::npos || end == std::string::npos) {
-      continue;
+    const char* ptr = str.c_str() + fmt.prefixLen;
+    const char* strEnd = str.c_str() + str.size();
+    char* endPtr = nullptr;
+    float components[4] = {};
+    int count = 0;
+    for (; count < 4 && ptr < strEnd && *ptr != ')'; ++count) {
+      ptr = skipWhitespaceAndComma(ptr, strEnd);
+      if (ptr >= strEnd || *ptr == ')') {
+        break;
+      }
+      components[count] = strtof(ptr, &endPtr);
+      if (endPtr == ptr) {
+        break;
+      }
+      ptr = endPtr;
     }
-    auto inner = str.substr(start + 1, end - start - 1);
-    auto components = ParseFloatList(inner);
-    if (components.size() < 3) {
+    if (count < 3) {
       continue;
     }
     Color color = {};
     color.red = components[0];
     color.green = components[1];
     color.blue = components[2];
-    color.alpha = components.size() >= 4 ? components[3] : 1.0f;
+    color.alpha = count >= 4 ? components[3] : 1.0f;
     color.colorSpace = fmt.colorSpace;
     return color;
   }

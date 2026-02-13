@@ -47,10 +47,15 @@ std::shared_ptr<Data> Base64Decode(const std::string& encodedString) {
   auto output = std::make_unique<uint8_t[]>(outputLength);
 
   for (size_t i = 0, j = 0; i < inputLength;) {
-    auto a = encodedString[i] <= 127 ? decodingTable[encodedString[i++]] : 64;
-    auto b = encodedString[i] <= 127 ? decodingTable[encodedString[i++]] : 64;
-    auto c = encodedString[i] <= 127 ? decodingTable[encodedString[i++]] : 64;
-    auto d = encodedString[i] <= 127 ? decodingTable[encodedString[i++]] : 64;
+    auto ch0 = static_cast<unsigned char>(encodedString[i]);
+    auto ch1 = static_cast<unsigned char>(encodedString[i + 1]);
+    auto ch2 = static_cast<unsigned char>(encodedString[i + 2]);
+    auto ch3 = static_cast<unsigned char>(encodedString[i + 3]);
+    auto a = ch0 < 128 ? decodingTable[ch0] : 64;
+    auto b = ch1 < 128 ? decodingTable[ch1] : 64;
+    auto c = ch2 < 128 ? decodingTable[ch2] : 64;
+    auto d = ch3 < 128 ? decodingTable[ch3] : 64;
+    i += 4;
 
     uint32_t triple = (a << 3 * 6) + (b << 2 * 6) + (c << 1 * 6) + (d << 0 * 6);
 

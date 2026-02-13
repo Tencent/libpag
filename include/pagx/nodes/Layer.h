@@ -122,7 +122,7 @@ class Layer : public Node {
   Layer* mask = nullptr;
 
   /**
-   * The type of masking to apply (Alpha, Luminosity, InvertedAlpha, or InvertedLuminosity).
+   * The type of masking to apply (Alpha, Luminance, or Contour).
    * The default value is Alpha.
    */
   MaskType maskType = MaskType::Alpha;
