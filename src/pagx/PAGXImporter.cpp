@@ -695,8 +695,7 @@ static TextModifier* parseTextModifier(const DOMNode* node, PAGXDocument* doc) {
   }
   auto strokeWidthAttr = getAttribute(node, "strokeWidth");
   if (!strokeWidthAttr.empty()) {
-    char* endPtr = nullptr;
-    modifier->strokeWidth = strtof(strokeWidthAttr.c_str(), &endPtr);
+    modifier->strokeWidth = getFloatAttribute(node, "strokeWidth", 0);
   }
 
   auto child = node->firstChild;
