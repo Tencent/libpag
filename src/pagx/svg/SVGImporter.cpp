@@ -2247,7 +2247,8 @@ void SVGParserContext::parseMaskChildren(const std::shared_ptr<DOMNode>& parent,
   auto child = parent->getFirstChild();
   while (child) {
     if (child->name == "rect" || child->name == "circle" || child->name == "ellipse" ||
-        child->name == "path" || child->name == "polygon" || child->name == "polyline") {
+        child->name == "path" || child->name == "polygon" || child->name == "polyline" ||
+        child->name == "use") {
       InheritedStyle inheritedStyle = computeInheritedStyle(child, parentStyle);
       std::string transformStr = getAttribute(child, "transform");
       Matrix combinedMatrix = parentMatrix;
