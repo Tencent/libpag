@@ -654,9 +654,6 @@ class TypesetterContext {
       currentX -= text->letterSpacing;
     }
     info.totalWidth = currentX;
-    if (hasLetterSpacing && !info.runs.empty()) {
-      info.totalWidth -= text->letterSpacing;
-    }
   }
 
   float calculateLayoutOffset(const TextLayout* layout, float textWidth) {
