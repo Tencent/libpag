@@ -94,6 +94,7 @@ class SVGParserContext {
   std::shared_ptr<PAGXDocument> parseDOM(const std::shared_ptr<DOM>& dom);
 
   void parseDefs(const std::shared_ptr<DOMNode>& defsNode);
+  void parseStyleElement(const std::shared_ptr<DOMNode>& styleNode);
 
   Layer* convertToLayer(const std::shared_ptr<DOMNode>& element,
                         const InheritedStyle& parentStyle, int depth = 0);
@@ -226,9 +227,6 @@ class SVGParserContext {
   std::unordered_map<std::string, int> _colorSourceRefCount = {};
   // Store the converted ColorSource by SVG def id (for reuse when refCount > 1).
   std::unordered_map<std::string, ColorSource*> _colorSourceCache = {};
-
-  // Parse CSS style rules from <style> element.
-  void parseStyleElement(const std::shared_ptr<DOMNode>& styleNode);
 
   int _nextGeneratedId = 0;
   float _viewBoxWidth = 0;
