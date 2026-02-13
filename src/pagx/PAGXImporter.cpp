@@ -1102,14 +1102,12 @@ static GlyphRun* parseGlyphRun(const DOMNode* node, PAGXDocument* doc) {
   run->x = getFloatAttribute(node, "x", 0);
   run->y = getFloatAttribute(node, "y", 0);
 
-  // Parse glyphs only if font is valid
-  if (run->font) {
-    auto glyphsStr = getAttribute(node, "glyphs");
-    if (!glyphsStr.empty()) {
-      auto glyphList = ParseFloatList(glyphsStr);
-      for (auto g : glyphList) {
-        run->glyphs.push_back(static_cast<uint16_t>(g));
-      }
+  // Parse glyphs regardless of whether font is valid, to maintain data consistency.
+  auto glyphsStr = getAttribute(node, "glyphs");
+  if (!glyphsStr.empty()) {
+    auto glyphList = ParseFloatList(glyphsStr);
+    for (auto g : glyphList) {
+      run->glyphs.push_back(static_cast<uint16_t>(g));
     }
   }
 

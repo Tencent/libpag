@@ -1114,8 +1114,18 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
     writeLayer(xml, layer, options);
   }
 
-  // Write Resources section at the end (only if there are resources)
-  if (!doc.nodes.empty()) {
+  // Write Resources section at the end (only if there are exportable resources)
+  bool hasResources = false;
+  for (const auto& resource : doc.nodes) {
+    if (!resource->id.empty()) {
+      if (options.skipGlyphData && resource->nodeType() == NodeType::Font) {
+        continue;
+      }
+      hasResources = true;
+      break;
+    }
+  }
+  if (hasResources) {
     xml.openElement("Resources");
     xml.closeElementStart();
 

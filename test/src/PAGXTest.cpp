@@ -652,7 +652,7 @@ PAGX_TEST(PAGXTest, TextShaperEmoji) {
  */
 PAGX_TEST(PAGXTest, SampleFiles) {
   auto samplesDir = ProjectPath::Absolute("spec/samples");
-  std::vector<std::string> sampleFiles;
+  std::vector<std::string> sampleFiles = {};
 
   for (const auto& entry : std::filesystem::directory_iterator(samplesDir)) {
     if (entry.path().extension() == ".pagx") {
@@ -660,6 +660,9 @@ PAGX_TEST(PAGXTest, SampleFiles) {
     }
   }
   std::sort(sampleFiles.begin(), sampleFiles.end());
+
+  pagx::Typesetter typesetter;
+  typesetter.setFallbackTypefaces(GetFallbackTypefaces());
 
   for (const auto& filePath : sampleFiles) {
     auto baseName = std::filesystem::path(filePath).stem().string();
@@ -670,8 +673,6 @@ PAGX_TEST(PAGXTest, SampleFiles) {
       continue;
     }
 
-    pagx::Typesetter typesetter;
-    typesetter.setFallbackTypefaces(GetFallbackTypefaces());
     auto typesetterResult = typesetter.shape(doc.get());
     pagx::FontEmbedder().embed(doc.get(), typesetterResult.shapedTextMap,
                                typesetterResult.textOrder);
