@@ -2236,6 +2236,7 @@ void SVGParserContext::mergeAdjacentLayers(std::vector<Layer*>& layers) {
           if (aHasFill != bHasFill) {
             // Create merged layer.
             auto mergedLayer = _document->makeNode<Layer>();
+            mergedLayer->id = layers[i]->id;
 
             // Move geometry from first layer.
             mergedLayer->contents.push_back(layers[i]->contents[0]);
