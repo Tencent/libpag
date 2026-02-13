@@ -826,6 +826,13 @@ function hideDropZone(): void {
     }
 }
 
+function hidePlaybackUI(): void {
+    const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
+    const toolbar = document.getElementById('toolbar') as HTMLDivElement;
+    canvas.classList.add('hidden');
+    toolbar.classList.add('hidden');
+}
+
 const DEFAULT_TITLE = 'PAGX Playground';
 
 function goHome(pushHistory: boolean = true): void {
@@ -898,6 +905,8 @@ async function loadPAGXData(data: Uint8Array, name: string, baseURL: string) {
     playgroundState.pagxView.buildLayers();
     gestureManager.resetTransform(playgroundState);
     updateSize();
+    // Draw the first frame before showing canvas to avoid flashing old content
+    draw();
     hideDropZone();
     canvas.classList.remove('hidden');
     toolbar.classList.remove('hidden');
@@ -906,6 +915,8 @@ async function loadPAGXData(data: Uint8Array, name: string, baseURL: string) {
 }
 
 async function loadPAGXFile(file: File) {
+    // Clear previous content and hide canvas before loading
+    hidePlaybackUI();
     // Show loading UI with progress reset to 0%
     const loadingStartTime = Date.now();
     showLoadingUI();
@@ -949,6 +960,8 @@ async function loadPAGXFile(file: File) {
 }
 
 async function loadPAGXFromURL(url: string, pushHistory: boolean = true) {
+    // Clear previous content and hide canvas before loading
+    hidePlaybackUI();
     // Show loading UI with progress reset to 0%
     const loadingStartTime = Date.now();
     showLoadingUI();
