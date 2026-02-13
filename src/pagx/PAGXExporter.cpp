@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXExporter.h"
-#include <cstdio>
 #include "Base64.h"
 #include "StringParser.h"
 #include "SVGPathParser.h"
@@ -119,12 +118,10 @@ class XMLBuilder {
 
   void addAttribute(const std::string& name, int value, int defaultValue = 0) {
     if (value != defaultValue) {
-      char buf[32] = {};
-      snprintf(buf, sizeof(buf), "%d", value);
       buffer += " ";
       buffer += name;
       buffer += "=\"";
-      buffer += buf;
+      buffer += std::to_string(value);
       buffer += "\"";
     }
   }
