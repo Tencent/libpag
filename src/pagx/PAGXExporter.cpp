@@ -66,6 +66,7 @@ namespace pagx {
 class XMLBuilder {
  public:
   XMLBuilder() {
+    buffer.reserve(4096);
     tagStack.reserve(32);
   }
 
@@ -157,14 +158,8 @@ class XMLBuilder {
     tagStack.pop_back();
   }
 
-  void addTextContent(const std::string& text) {
-    buffer += "<![CDATA[";
-    buffer += text;
-    buffer += "]]>";
-  }
-
-  const std::string& str() const {
-    return buffer;
+  std::string release() {
+    return std::move(buffer);
   }
 
  private:
@@ -229,20 +224,6 @@ static std::string rectToString(const Rect& r) {
   return std::string(buf);
 }
 
-static std::string floatListToString(const std::vector<float>& values) {
-  std::string result;
-  result.reserve(values.size() * 8);
-  char buf[32] = {};
-  for (size_t i = 0; i < values.size(); i++) {
-    if (i > 0) {
-      result += ",";
-    }
-    snprintf(buf, sizeof(buf), "%g", values[i]);
-    result += buf;
-  }
-  return result;
-}
-
 static std::string floatListToString(const float* values, size_t count) {
   std::string result;
   result.reserve(count * 8);
@@ -255,6 +236,10 @@ static std::string floatListToString(const float* values, size_t count) {
     result += buf;
   }
   return result;
+}
+
+static std::string floatListToString(const std::vector<float>& values) {
+  return floatListToString(values.data(), values.size());
 }
 
 static std::string pointListToString(const std::vector<Point>& points) {
@@ -1140,7 +1125,7 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
 
   xml.closeElement();
 
-  return xml.str();
+  return xml.release();
 }
 
 }  // namespace pagx
