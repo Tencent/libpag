@@ -412,6 +412,7 @@ void SVGParserContext::parseStyleElement(const std::shared_ptr<DOMNode>& styleNo
 
   // Parse CSS rules.
   // Format: .class-name { property1: value1; property2: value2; }
+  // Also supports comma-separated selectors: .cls-1, .cls-2 { ... }
   size_t pos = 0;
   while (pos < cssContent.size()) {
     // Skip whitespace.
@@ -429,37 +430,14 @@ void SVGParserContext::parseStyleElement(const std::shared_ptr<DOMNode>& styleNo
       continue;
     }
 
-    // Look for class selector starting with dot.
-    if (cssContent[pos] != '.') {
-      // Skip non-class selectors (find next rule).
-      size_t bracePos = cssContent.find('{', pos);
-      if (bracePos == std::string::npos) {
-        break;
-      }
-      size_t closeBracePos = cssContent.find('}', bracePos);
-      if (closeBracePos == std::string::npos) {
-        break;
-      }
-      pos = closeBracePos + 1;
-      continue;
-    }
-
-    // Found a class selector.
-    pos++;  // Skip the dot.
-
-    // Extract class name (until whitespace or {).
-    size_t classNameEnd = pos;
-    while (classNameEnd < cssContent.size() && !std::isspace(cssContent[classNameEnd]) &&
-           cssContent[classNameEnd] != '{') {
-      classNameEnd++;
-    }
-    std::string className = cssContent.substr(pos, classNameEnd - pos);
-
-    // Find the opening brace.
-    size_t bracePos = cssContent.find('{', classNameEnd);
+    // Find the opening brace for this rule.
+    size_t bracePos = cssContent.find('{', pos);
     if (bracePos == std::string::npos) {
       break;
     }
+
+    // Extract the selector string before the brace.
+    std::string selectorStr = cssContent.substr(pos, bracePos - pos);
 
     // Find the closing brace.
     size_t closeBracePos = cssContent.find('}', bracePos);
@@ -477,9 +455,40 @@ void SVGParserContext::parseStyleElement(const std::shared_ptr<DOMNode>& styleNo
       styleContent = styleContent.substr(contentStart, contentEnd - contentStart + 1);
     }
 
-    // Store the class rule.
-    if (!className.empty() && !styleContent.empty()) {
-      _cssClassRules[className] = styleContent;
+    // Parse comma-separated selectors and store rules for each class selector.
+    if (!styleContent.empty()) {
+      size_t selPos = 0;
+      while (selPos < selectorStr.size()) {
+        // Skip whitespace.
+        while (selPos < selectorStr.size() && std::isspace(selectorStr[selPos])) {
+          selPos++;
+        }
+        if (selPos >= selectorStr.size()) {
+          break;
+        }
+
+        // Find end of this selector (comma or end of string).
+        size_t commaPos = selectorStr.find(',', selPos);
+        size_t selEnd = (commaPos == std::string::npos) ? selectorStr.size() : commaPos;
+        std::string selector = selectorStr.substr(selPos, selEnd - selPos);
+
+        // Trim whitespace from selector.
+        size_t selStart = selector.find_first_not_of(" \t\n\r");
+        size_t selLast = selector.find_last_not_of(" \t\n\r");
+        if (selStart != std::string::npos && selLast != std::string::npos) {
+          selector = selector.substr(selStart, selLast - selStart + 1);
+        }
+
+        // Only handle class selectors (starting with dot).
+        if (!selector.empty() && selector[0] == '.') {
+          std::string className = selector.substr(1);
+          if (!className.empty()) {
+            _cssClassRules[className] = styleContent;
+          }
+        }
+
+        selPos = (commaPos == std::string::npos) ? selectorStr.size() : commaPos + 1;
+      }
     }
 
     pos = closeBracePos + 1;
