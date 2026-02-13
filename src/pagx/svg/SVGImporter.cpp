@@ -575,11 +575,29 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
         // Convert clipPath element to a mask layer.
         auto clipLayer = convertMaskElement(clipElement, inheritedStyle);
         if (clipLayer) {
-          layer->mask = clipLayer;
-          // SVG clip-path uses alpha (shape outline) for clipping.
-          layer->maskType = MaskType::Alpha;
-          // Add clip layer as invisible layer to the document.
-          _maskLayers.push_back(clipLayer);
+          if (layer->mask != nullptr) {
+            // Both mask and clip-path are present. Wrap the current layer in a parent layer
+            // so that the mask stays on the inner layer and clip-path goes on the outer layer.
+            auto wrapperLayer = _document->makeNode<Layer>();
+            wrapperLayer->mask = clipLayer;
+            wrapperLayer->maskType = MaskType::Alpha;
+            // Move properties from layer to wrapper.
+            wrapperLayer->id = std::move(layer->id);
+            wrapperLayer->matrix = layer->matrix;
+            wrapperLayer->alpha = layer->alpha;
+            layer->id.clear();
+            layer->matrix = Matrix::Identity();
+            layer->alpha = 1.0f;
+            wrapperLayer->children.push_back(layer);
+            _maskLayers.push_back(clipLayer);
+            layer = wrapperLayer;
+          } else {
+            layer->mask = clipLayer;
+            // SVG clip-path uses alpha (shape outline) for clipping.
+            layer->maskType = MaskType::Alpha;
+            // Add clip layer as invisible layer to the document.
+            _maskLayers.push_back(clipLayer);
+          }
         }
       }
     }
