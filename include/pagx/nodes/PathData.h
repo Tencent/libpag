@@ -105,7 +105,8 @@ class PathData : public Node {
   }
 
   /**
-   * Returns the bounding rectangle of the path.
+   * Returns the control-point bounding box of the path, which encloses all on-curve and off-curve
+   * points but may be larger than the tight geometric bounds.
    */
   Rect getBounds();
 
