@@ -557,8 +557,6 @@ Painters (Fill, Stroke, etc.) bound to a layer are divided into background conte
 5. **Foreground Content**: Render Fill and Stroke with `placement="foreground"`
 6. **Layer Filters**: Use the combined output of previous steps as input to the filter chain, applying all filters sequentially
 
-**Note**: Layer styles (above) are rendered before foreground content because layer styles compute effects based on the complete **layer content** (including foreground). Since layer content must be fully determined before styles can be computed, styles are rendered first, and foreground content is composited on top afterward.
-
 #### Layer Content
 
 **Layer content** refers to the complete rendering result of the layer's background content, child layers, and foreground content. Layer styles compute their effects based on layer content. For example, when fill is background and stroke is foreground, the stroke renders above child layers, but drop shadows are still calculated based on the complete layer content including fill, child layers, and stroke.
@@ -1629,8 +1627,10 @@ Transforms are applied in the following order:
 
 **Opacity Interpolation**:
 ```
-t = progress / copies
+maxCount = ceil(copies)
+t = progress / maxCount
 alpha = lerp(startAlpha, endAlpha, t)
+// For the last copy, alpha is further multiplied by the fractional part of copies (see below)
 ```
 
 **RepeaterOrder**:
