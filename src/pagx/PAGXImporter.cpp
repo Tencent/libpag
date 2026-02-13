@@ -33,11 +33,12 @@
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
-#include "pagx/nodes/Font.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -55,10 +56,10 @@
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextLayout.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
-#include "pagx/nodes/Text.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/types/Color.h"
 
@@ -1025,8 +1026,12 @@ static Glyph* parseGlyph(const DOMNode* node, PAGXDocument* doc) {
   }
   auto pathAttr = getAttribute(node, "path");
   if (!pathAttr.empty()) {
-    glyph->path = doc->makeNode<PathData>();
-    *glyph->path = PathDataFromSVGString(pathAttr);
+    if (pathAttr[0] == '@') {
+      glyph->path = doc->findNode<PathData>(pathAttr.substr(1));
+    } else {
+      glyph->path = doc->makeNode<PathData>();
+      *glyph->path = PathDataFromSVGString(pathAttr);
+    }
   }
   auto imageAttr = getAttribute(node, "image");
   if (!imageAttr.empty()) {
@@ -1403,25 +1408,17 @@ static Color parseColor(const std::string& str) {
       color.alpha = 1.0f;
       return color;
     }
-    if (str.size() == 7) {
+    if (str.size() == 7 || str.size() == 9) {
       int r = parseHexDigit(str[1]) * 16 + parseHexDigit(str[2]);
       int g = parseHexDigit(str[3]) * 16 + parseHexDigit(str[4]);
       int b = parseHexDigit(str[5]) * 16 + parseHexDigit(str[6]);
       color.red = static_cast<float>(r) / 255.0f;
       color.green = static_cast<float>(g) / 255.0f;
       color.blue = static_cast<float>(b) / 255.0f;
-      color.alpha = 1.0f;
-      return color;
-    }
-    if (str.size() == 9) {
-      int r = parseHexDigit(str[1]) * 16 + parseHexDigit(str[2]);
-      int g = parseHexDigit(str[3]) * 16 + parseHexDigit(str[4]);
-      int b = parseHexDigit(str[5]) * 16 + parseHexDigit(str[6]);
-      int a = parseHexDigit(str[7]) * 16 + parseHexDigit(str[8]);
-      color.red = static_cast<float>(r) / 255.0f;
-      color.green = static_cast<float>(g) / 255.0f;
-      color.blue = static_cast<float>(b) / 255.0f;
-      color.alpha = static_cast<float>(a) / 255.0f;
+      color.alpha = str.size() == 9
+                        ? static_cast<float>(parseHexDigit(str[7]) * 16 + parseHexDigit(str[8])) /
+                              255.0f
+                        : 1.0f;
       return color;
     }
   }
