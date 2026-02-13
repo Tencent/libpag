@@ -137,20 +137,6 @@ static ColorMatrixFilter* parseColorMatrixFilter(const DOMNode* node, PAGXDocume
 // Internal parser implementation
 //==============================================================================
 
-std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t length) {
-  auto dom = DOM::Make(data, length);
-  if (!dom) {
-    return nullptr;
-  }
-  auto root = dom->getRootNode();
-  if (!root || root->name != "pagx") {
-    return nullptr;
-  }
-  auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
-  parseDocument(root.get(), doc.get());
-  return doc;
-}
-
 static void parseResources(const DOMNode* node, PAGXDocument* doc) {
   auto child = node->firstChild;
   while (child) {
@@ -1507,6 +1493,20 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromFile(const std::string& filePath
 
 std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const std::string& xmlContent) {
   return FromXML(reinterpret_cast<const uint8_t*>(xmlContent.data()), xmlContent.size());
+}
+
+std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t length) {
+  auto dom = DOM::Make(data, length);
+  if (!dom) {
+    return nullptr;
+  }
+  auto root = dom->getRootNode();
+  if (!root || root->name != "pagx") {
+    return nullptr;
+  }
+  auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
+  parseDocument(root.get(), doc.get());
+  return doc;
 }
 
 static void parseDocument(const DOMNode* root, PAGXDocument* doc) {
