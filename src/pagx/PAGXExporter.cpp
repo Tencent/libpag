@@ -207,33 +207,26 @@ class XMLBuilder {
 //==============================================================================
 
 static std::string pointToString(const Point& p) {
-  char buf[64] = {};
-  snprintf(buf, sizeof(buf), "%g,%g", p.x, p.y);
-  return std::string(buf);
+  return FloatToString(p.x) + "," + FloatToString(p.y);
 }
 
 static std::string sizeToString(const Size& s) {
-  char buf[64] = {};
-  snprintf(buf, sizeof(buf), "%g,%g", s.width, s.height);
-  return std::string(buf);
+  return FloatToString(s.width) + "," + FloatToString(s.height);
 }
 
 static std::string rectToString(const Rect& r) {
-  char buf[128] = {};
-  snprintf(buf, sizeof(buf), "%g,%g,%g,%g", r.x, r.y, r.width, r.height);
-  return std::string(buf);
+  return FloatToString(r.x) + "," + FloatToString(r.y) + "," + FloatToString(r.width) + "," +
+         FloatToString(r.height);
 }
 
 static std::string floatListToString(const float* values, size_t count) {
   std::string result;
   result.reserve(count * 8);
-  char buf[32] = {};
   for (size_t i = 0; i < count; i++) {
     if (i > 0) {
       result += ",";
     }
-    snprintf(buf, sizeof(buf), "%g", values[i]);
-    result += buf;
+    result += FloatToString(values[i]);
   }
   return result;
 }
@@ -245,13 +238,11 @@ static std::string floatListToString(const std::vector<float>& values) {
 static std::string pointListToString(const std::vector<Point>& points) {
   std::string result = {};
   result.reserve(points.size() * 12);
-  char buf[64] = {};
   for (size_t i = 0; i < points.size(); i++) {
     if (i > 0) {
       result += ";";
     }
-    snprintf(buf, sizeof(buf), "%g,%g", points[i].x, points[i].y);
-    result += buf;
+    result += FloatToString(points[i].x) + "," + FloatToString(points[i].y);
   }
   return result;
 }
