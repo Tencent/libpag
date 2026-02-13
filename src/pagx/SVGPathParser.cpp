@@ -28,7 +28,7 @@ namespace pagx {
 
 std::string PathDataToSVGString(const PathData& pathData) {
   std::string result;
-  result.reserve(256);
+  result.reserve(verbs.size() * 24);
 
   size_t pointIndex = 0;
   const auto& verbs = pathData.verbs();
