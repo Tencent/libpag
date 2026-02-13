@@ -65,6 +65,10 @@ namespace pagx {
 
 class XMLBuilder {
  public:
+  XMLBuilder() {
+    tagStack.reserve(32);
+  }
+
   void appendDeclaration() {
     buffer += "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
   }
@@ -537,7 +541,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
           if (!run->positions.empty()) {
             std::string posStr = {};
             posStr.reserve(run->positions.size() * 12);
-            char buf[32] = {};
+            char buf[64] = {};
             for (size_t i = 0; i < run->positions.size(); i++) {
               if (i > 0) {
                 posStr += ";";
@@ -552,7 +556,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
           if (!run->anchors.empty()) {
             std::string anchorsStr = {};
             anchorsStr.reserve(run->anchors.size() * 12);
-            char buf[32] = {};
+            char buf[64] = {};
             for (size_t i = 0; i < run->anchors.size(); i++) {
               if (i > 0) {
                 anchorsStr += ";";
@@ -567,7 +571,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
           if (!run->scales.empty()) {
             std::string scalesStr = {};
             scalesStr.reserve(run->scales.size() * 12);
-            char buf[32] = {};
+            char buf[64] = {};
             for (size_t i = 0; i < run->scales.size(); i++) {
               if (i > 0) {
                 scalesStr += ";";

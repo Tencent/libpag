@@ -34,7 +34,7 @@ std::string PathDataToSVGString(const PathData& pathData) {
   const auto& verbs = pathData.verbs();
   const auto& points = pathData.points();
 
-  char buf[64] = {};
+  char buf[128] = {};
   for (auto verb : verbs) {
     const Point* pts = points.data() + pointIndex;
     switch (verb) {
@@ -133,7 +133,7 @@ static bool ParseFlag(const char*& ptr, const char* end, bool& result) {
 
 static float VectorAngle(float ux, float uy, float vx, float vy) {
   float n = std::sqrt(ux * ux + uy * uy) * std::sqrt(vx * vx + vy * vy);
-  if (n == 0) {
+  if (n < 1e-6f) {
     return 0;
   }
   float c = (ux * vx + uy * vy) / n;

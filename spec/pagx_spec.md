@@ -32,7 +32,7 @@ This specification is organized in the following order:
 **Appendices** (for quick reference):
 
 - **Appendix A**: Node hierarchy and containment relationships
-- **Appendix B**: Node and attribute reference
+- **Appendix B**: Enumeration type reference
 - **Appendix C**: Common usage examples
 
 ---
@@ -177,7 +177,32 @@ Floating-point format uses `colorspace(r, g, b)` or `colorspace(r, g, b, a)` to 
 
 Use `@resourceId` to reference color sources (gradients, patterns, etc.) defined in Resources.
 
-### 2.9 Path Data Syntax
+### 2.9 Blend Mode
+
+Blend modes define how source color (S) combines with destination color (D).
+
+| Value | Formula | Description |
+|-------|---------|-------------|
+| `normal` | S | Normal (overwrite) |
+| `multiply` | S × D | Multiply |
+| `screen` | 1 - (1-S)(1-D) | Screen |
+| `overlay` | multiply/screen combination | Overlay |
+| `darken` | min(S, D) | Darken |
+| `lighten` | max(S, D) | Lighten |
+| `colorDodge` | D / (1-S) | Color Dodge |
+| `colorBurn` | 1 - (1-D)/S | Color Burn |
+| `hardLight` | multiply/screen reversed combination | Hard Light |
+| `softLight` | Soft version of overlay | Soft Light |
+| `difference` | \|S - D\| | Difference |
+| `exclusion` | S + D - 2SD | Exclusion |
+| `hue` | D's saturation and luminosity + S's hue | Hue |
+| `saturation` | D's hue and luminosity + S's saturation | Saturation |
+| `color` | D's luminosity + S's hue and saturation | Color |
+| `luminosity` | S's luminosity + D's hue and saturation | Luminosity |
+| `plusLighter` | S + D | Plus Lighter (toward white) |
+| `plusDarker` | S + D - 1 | Plus Darker (toward black) |
+
+### 2.10 Path Data Syntax
 
 Path data uses SVG path syntax, consisting of a series of commands and coordinates.
 
@@ -196,7 +221,7 @@ Path data uses SVG path syntax, consisting of a series of commands and coordinat
 | A/a | rx ry rotation large-arc sweep x y | Elliptical arc |
 | Z/z | - | Close path |
 
-### 2.10 External Resource Reference
+### 2.11 External Resource Reference
 
 External resources are referenced via relative paths or data URIs, applicable to images, videos, audio, fonts, and other files.
 
@@ -532,6 +557,8 @@ Painters (Fill, Stroke, etc.) bound to a layer are divided into background conte
 5. **Foreground Content**: Render Fill and Stroke with `placement="foreground"`
 6. **Layer Filters**: Use the combined output of previous steps as input to the filter chain, applying all filters sequentially
 
+**Note**: Layer styles (above) are rendered before foreground content because layer styles compute effects based on the complete **layer content** (including foreground). Since layer content must be fully determined before styles can be computed, styles are rendered first, and foreground content is composited on top afterward.
+
 #### Layer Content
 
 **Layer content** refers to the complete rendering result of the layer's background content, child layers, and foreground content. Layer styles compute their effects based on layer content. For example, when fill is background and stroke is foreground, the stroke renders above child layers, but drop shadows are still calculated based on the complete layer content including fill, child layers, and stroke.
@@ -608,6 +635,10 @@ Layer child elements are automatically categorized into four collections by type
 | `maskType` | MaskType | alpha | Mask type |
 | `composition` | idref | - | Composition reference "@id" |
 
+**groupOpacity**: When `false` (default), the layer's `alpha` is applied independently to each child element, which may cause overlapping semi-transparent children to appear darker at intersections. When `true`, all layer content is first composited into an offscreen buffer, then `alpha` is applied to the buffer as a whole, producing uniform transparency across the entire layer.
+
+**preserve3D**: When `false` (default), child layers with 3D transforms are flattened into the parent's 2D plane before compositing. When `true`, child layers retain their 3D positions and are rendered in a shared 3D space, enabling depth-based intersections and correct z-ordering among siblings. Similar to CSS `transform-style: preserve-3d`.
+
 **Transform Attribute Priority**: `x`/`y`, `matrix`, and `matrix3D` have an override relationship:
 - Only `x`/`y` set: Uses `x`/`y` for translation
 - `matrix` set: `matrix` overrides `x`/`y` values
@@ -621,30 +652,7 @@ Layer child elements are automatically categorized into four collections by type
 | `luminance` | Luminance mask: Uses mask's luminance values |
 | `contour` | Contour mask: Uses mask's contour for clipping |
 
-**BlendMode**:
-
-Blend modes define how source color (S) combines with destination color (D).
-
-| Value | Formula | Description |
-|-------|---------|-------------|
-| `normal` | S | Normal (overwrite) |
-| `multiply` | S × D | Multiply |
-| `screen` | 1 - (1-S)(1-D) | Screen |
-| `overlay` | multiply/screen combination | Overlay |
-| `darken` | min(S, D) | Darken |
-| `lighten` | max(S, D) | Lighten |
-| `colorDodge` | D / (1-S) | Color Dodge |
-| `colorBurn` | 1 - (1-D)/S | Color Burn |
-| `hardLight` | multiply/screen reversed combination | Hard Light |
-| `softLight` | Soft version of overlay | Soft Light |
-| `difference` | \|S - D\| | Difference |
-| `exclusion` | S + D - 2SD | Exclusion |
-| `hue` | D's saturation and luminosity + S's hue | Hue |
-| `saturation` | D's hue and luminosity + S's saturation | Saturation |
-| `color` | D's luminosity + S's hue and saturation | Color |
-| `luminosity` | S's luminosity + D's hue and saturation | Luminosity |
-| `plusLighter` | S + D | Plus Lighter (toward white) |
-| `plusDarker` | S + D - 1 | Plus Darker (toward black) |
+**BlendMode**: See Section 2.9 for the complete blend mode table.
 
 ### 4.3 Layer Styles
 
@@ -662,7 +670,7 @@ Some layer styles additionally use **layer contour** or **layer background** as 
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `blendMode` | BlendMode | normal | Blend mode (see Section 4.1) |
+| `blendMode` | BlendMode | normal | Blend mode (see Section 2.9) |
 
 #### 4.3.1 DropShadowStyle
 
@@ -781,7 +789,7 @@ Overlays a specified color onto the layer using a specified blend mode.
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `color` | Color | (required) | Blend color |
-| `blendMode` | BlendMode | normal | Blend mode (see Section 4.1) |
+| `blendMode` | BlendMode | normal | Blend mode (see Section 2.9) |
 
 #### 4.4.5 ColorMatrixFilter
 
@@ -968,8 +976,8 @@ Supports both regular polygon and star modes.
 | `outerRadius` | float | 100 | Outer radius |
 | `innerRadius` | float | 50 | Inner radius (star only) |
 | `rotation` | float | 0 | Rotation angle |
-| `outerRoundness` | float | 0 | Outer corner roundness |
-| `innerRoundness` | float | 0 | Inner corner roundness |
+| `outerRoundness` | float | 0 | Outer corner roundness 0~1 |
+| `innerRoundness` | float | 0 | Inner corner roundness 0~1 |
 | `reversed` | bool | false | Reverse path direction |
 
 **PolystarType**:
@@ -1144,7 +1152,7 @@ Fill draws the interior region of geometry using a specified color source.
 |-----------|------|---------|-------------|
 | `color` | Color/idref | #000000 | Color value or color source reference, default black |
 | `alpha` | float | 1 | Opacity 0~1 |
-| `blendMode` | BlendMode | normal | Blend mode (see Section 4.1) |
+| `blendMode` | BlendMode | normal | Blend mode (see Section 2.9) |
 | `fillRule` | FillRule | winding | Fill rule (see below) |
 | `placement` | LayerPlacement | background | Rendering position (see Section 5.3.3) |
 
@@ -1173,7 +1181,7 @@ Stroke draws lines along geometry boundaries.
 | `color` | Color/idref | #000000 | Color value or color source reference, default black |
 | `width` | float | 1 | Stroke width |
 | `alpha` | float | 1 | Opacity 0~1 |
-| `blendMode` | BlendMode | normal | Blend mode (see Section 4.1) |
+| `blendMode` | BlendMode | normal | Blend mode (see Section 2.9) |
 | `cap` | LineCap | butt | Line cap style (see below) |
 | `join` | LineJoin | miter | Line join style (see below) |
 | `miterLimit` | float | 4 | Miter limit |
@@ -1241,7 +1249,7 @@ Trims paths to a specified start/end range.
 |-----------|------|---------|-------------|
 | `start` | float | 0 | Start position 0~1 |
 | `end` | float | 1 | End position 0~1 |
-| `offset` | float | 0 | Offset in degrees; 360° equals one full cycle of the path length |
+| `offset` | float | 0 | Offset in degrees; 360° equals one full cycle of the path length. For example, 180° shifts the trim range by half the path length |
 | `type` | TrimType | separate | Trim type (see below) |
 
 **TrimType**:
@@ -1252,7 +1260,7 @@ Trims paths to a specified start/end range.
 | `continuous` | Continuous mode: All shapes treated as one continuous path, trimmed by total length ratio |
 
 **Edge Cases**:
-- `start > end`: Reverse trim; path direction reversed
+- `start > end`: The start and end values are mirrored (`start = 1 - start`, `end = 1 - end`) and all path directions are reversed, then normal trimming is applied. The resulting visual is the complementary segment of the path with reversed direction
 - Supports wrapping: When trim range exceeds [0,1], automatically wraps to other end of path
 - When total path length is 0, no operation is performed
 
@@ -1302,7 +1310,7 @@ Merges all shapes into a single shape.
 | `difference` | Difference: Subtract subsequent shapes from first shape |
 
 **Important Behavior**:
-- MergePath **clears all previously rendered styles**
+- MergePath **clears all previously accumulated Fill and Stroke effects** in the current scope; only the merged path remains in the geometry list
 - Current transformation matrices of shapes are applied during merge
 - Merged shape's transformation matrix resets to identity matrix
 
@@ -1392,8 +1400,8 @@ Applies transforms and style overrides to glyphs within selected ranges. TextMod
 | `position` | Point | 0,0 | Position offset |
 | `rotation` | float | 0 | Rotation |
 | `scale` | Point | 1,1 | Scale |
-| `skew` | float | 0 | Skew |
-| `skewAxis` | float | 0 | Skew axis |
+| `skew` | float | 0 | Skew amount in degrees along the skewAxis direction |
+| `skewAxis` | float | 0 | Skew axis angle in degrees; defines the direction along which skewing is applied |
 | `alpha` | float | 1 | Opacity |
 | `fillColor` | Color | - | Fill color override |
 | `strokeColor` | Color | - | Stroke color override |
@@ -1410,16 +1418,20 @@ The `factor` calculated by the selector ranges from [-1, 1] and controls the deg
 
 ```
 factor = clamp(selectorFactor × weight, -1, 1)
+```
 
-// Position and rotation: apply factor linearly
-transform = translate(-anchor × factor) 
-          × scale(1 + (scale - 1) × factor)  // Scale interpolates from 1 to target value
-          × skew(skew × factor, skewAxis)
-          × rotate(rotation × factor)
-          × translate(anchor × factor)
-          × translate(position × factor)
+Position and rotation are applied linearly with factor. Transforms are applied in the following order:
 
-// Opacity: use absolute value of factor
+1. Translate to negative anchor (`translate(-anchor × factor)`)
+2. Scale from identity (`scale(1 + (scale - 1) × factor)`)
+3. Skew (`skew(skew × factor, skewAxis)`)
+4. Rotate (`rotate(rotation × factor)`)
+5. Translate back to anchor (`translate(anchor × factor)`)
+6. Translate to position (`translate(position × factor)`)
+
+Opacity uses the absolute value of factor:
+
+```
 alphaFactor = 1 + (alpha - 1) × |factor|
 finalAlpha = originalAlpha × max(0, alphaFactor)
 ```
@@ -1483,8 +1495,8 @@ Range selectors define the glyph range and influence degree for TextModifier.
 |-------|-------------|
 | `add` | Add: Accumulate selector weights |
 | `subtract` | Subtract: Subtract selector weights |
-| `intersect` | Intersect: Take minimum weight |
-| `min` | Min: Take minimum value |
+| `intersect` | Intersect: Use the intersection of selector ranges |
+| `min` | Min: Take the minimum of selector values |
 | `max` | Max: Take maximum value |
 | `difference` | Difference: Take absolute difference |
 
@@ -1605,12 +1617,15 @@ Repeater duplicates accumulated content and rendered styles, applying progressiv
 **Transform Calculation** (i-th copy, i starts from 0):
 ```
 progress = i + offset
-matrix = translate(-anchor) 
-       × scale(scale^progress)      // Exponential scaling
-       × rotate(rotation × progress) // Linear rotation
-       × translate(position × progress) // Linear translation
-       × translate(anchor)
 ```
+
+Transforms are applied in the following order:
+
+1. Translate to negative anchor (`translate(-anchor)`)
+2. Scale exponentially (`scale(scale^progress)`)
+3. Rotate linearly (`rotate(rotation × progress)`)
+4. Translate linearly (`translate(position × progress)`)
+5. Translate back to anchor (`translate(anchor)`)
 
 **Opacity Interpolation**:
 ```
@@ -1675,15 +1690,13 @@ Transforms are applied in the following order:
 4. Rotate (`rotation`)
 5. Translate to position (`translate(position)`)
 
-**Transform Matrix**:
-```
-M = translate(position) × rotate(rotation) × skew(skew, skewAxis) × scale(scale) × translate(-anchor)
-```
-
 **Skew Transform**:
-```
-skewMatrix = rotate(skewAxis) × shearX(tan(skew)) × rotate(-skewAxis)
-```
+
+Skew is applied in the following order:
+
+1. Rotate to skew axis direction (`rotate(skewAxis)`)
+2. Shear along X axis (`shearX(tan(skew))`)
+3. Rotate back (`rotate(-skewAxis)`)
 
 #### Scope Isolation
 
@@ -1802,443 +1815,9 @@ Layer / Group
 
 ---
 
-## Appendix B. Node and Attribute Reference
+## Appendix B. Enumeration Types
 
-This appendix lists all node attribute definitions. The `id` and `data-*` attributes are common attributes available on any element (see Section 2.3) and are not repeated in each table.
-
-### B.1 Document Structure Nodes
-
-#### pagx
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `version` | string | (required) |
-| `width` | float | (required) |
-| `height` | float | (required) |
-
-#### Composition
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `width` | float | (required) |
-| `height` | float | (required) |
-
-### B.2 Resource Nodes
-
-#### Image
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `source` | string | (required) |
-
-#### PathData
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `data` | string | (required) |
-
-#### Font
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `unitsPerEm` | int | 1000 |
-
-Child elements: `Glyph`*
-
-#### Glyph
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `advance` | float | (required) |
-| `path` | string | - |
-| `image` | string | - |
-| `offset` | Point | 0,0 |
-
-#### SolidColor
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `color` | Color | (required) |
-
-#### LinearGradient
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `startPoint` | Point | (required) |
-| `endPoint` | Point | (required) |
-| `matrix` | Matrix | identity matrix |
-
-Child elements: `ColorStop`+
-
-#### RadialGradient
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `center` | Point | 0,0 |
-| `radius` | float | (required) |
-| `matrix` | Matrix | identity matrix |
-
-Child elements: `ColorStop`+
-
-#### ConicGradient
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `center` | Point | 0,0 |
-| `startAngle` | float | 0 |
-| `endAngle` | float | 360 |
-| `matrix` | Matrix | identity matrix |
-
-Child elements: `ColorStop`+
-
-#### DiamondGradient
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `center` | Point | 0,0 |
-| `radius` | float | (required) |
-| `matrix` | Matrix | identity matrix |
-
-Child elements: `ColorStop`+
-
-#### ColorStop
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `offset` | float | (required) |
-| `color` | Color | (required) |
-
-#### ImagePattern
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `image` | idref | (required) |
-| `tileModeX` | TileMode | clamp |
-| `tileModeY` | TileMode | clamp |
-| `filterMode` | FilterMode | linear |
-| `mipmapMode` | MipmapMode | linear |
-| `matrix` | Matrix | identity matrix |
-
-### B.3 Layer Node
-
-#### Layer
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `name` | string | "" |
-| `visible` | bool | true |
-| `alpha` | float | 1 |
-| `blendMode` | BlendMode | normal |
-| `x` | float | 0 |
-| `y` | float | 0 |
-| `matrix` | Matrix | identity matrix |
-| `matrix3D` | Matrix | - |
-| `preserve3D` | bool | false |
-| `antiAlias` | bool | true |
-| `groupOpacity` | bool | false |
-| `passThroughBackground` | bool | true |
-| `excludeChildEffectsInLayerStyle` | bool | false |
-| `scrollRect` | Rect | - |
-| `mask` | idref | - |
-| `maskType` | MaskType | alpha |
-| `composition` | idref | - |
-
-Child elements: `VectorElement`*, `LayerStyle`*, `LayerFilter`*, `Layer`* (automatically categorized by type)
-
-### B.4 Layer Style Nodes
-
-#### DropShadowStyle
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `offsetX` | float | 0 |
-| `offsetY` | float | 0 |
-| `blurX` | float | 0 |
-| `blurY` | float | 0 |
-| `color` | Color | #000000 |
-| `showBehindLayer` | bool | true |
-| `blendMode` | BlendMode | normal |
-
-#### InnerShadowStyle
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `offsetX` | float | 0 |
-| `offsetY` | float | 0 |
-| `blurX` | float | 0 |
-| `blurY` | float | 0 |
-| `color` | Color | #000000 |
-| `blendMode` | BlendMode | normal |
-
-#### BackgroundBlurStyle
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `blurX` | float | 0 |
-| `blurY` | float | 0 |
-| `tileMode` | TileMode | mirror |
-| `blendMode` | BlendMode | normal |
-
-### B.5 Filter Nodes
-
-#### BlurFilter
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `blurX` | float | (required) |
-| `blurY` | float | (required) |
-| `tileMode` | TileMode | decal |
-
-#### DropShadowFilter
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `offsetX` | float | 0 |
-| `offsetY` | float | 0 |
-| `blurX` | float | 0 |
-| `blurY` | float | 0 |
-| `color` | Color | #000000 |
-| `shadowOnly` | bool | false |
-
-#### InnerShadowFilter
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `offsetX` | float | 0 |
-| `offsetY` | float | 0 |
-| `blurX` | float | 0 |
-| `blurY` | float | 0 |
-| `color` | Color | #000000 |
-| `shadowOnly` | bool | false |
-
-#### BlendFilter
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `color` | Color | (required) |
-| `blendMode` | BlendMode | normal |
-
-#### ColorMatrixFilter
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `matrix` | Matrix | (required) |
-
-### B.6 Geometry Element Nodes
-
-#### Rectangle
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `center` | Point | 0,0 |
-| `size` | Size | 100,100 |
-| `roundness` | float | 0 |
-| `reversed` | bool | false |
-
-#### Ellipse
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `center` | Point | 0,0 |
-| `size` | Size | 100,100 |
-| `reversed` | bool | false |
-
-#### Polystar
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `center` | Point | 0,0 |
-| `type` | PolystarType | star |
-| `pointCount` | float | 5 |
-| `outerRadius` | float | 100 |
-| `innerRadius` | float | 50 |
-| `rotation` | float | 0 |
-| `outerRoundness` | float | 0 |
-| `innerRoundness` | float | 0 |
-| `reversed` | bool | false |
-
-#### Path
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `data` | string/idref | (required) |
-| `reversed` | bool | false |
-
-#### Text
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `text` | string | "" |
-| `position` | Point | 0,0 |
-| `fontFamily` | string | system default |
-| `fontStyle` | string | "Regular" |
-| `fontSize` | float | 12 |
-| `letterSpacing` | float | 0 |
-| `baselineShift` | float | 0 |
-
-Child elements: `CDATA` text, `GlyphRun`*
-
-#### GlyphRun
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `font` | idref | (required) |
-| `fontSize` | float | 12 |
-| `glyphs` | string | (required) |
-| `x` | float | 0 |
-| `y` | float | 0 |
-| `xOffsets` | string | - |
-| `positions` | string | - |
-| `anchors` | string | - |
-| `scales` | string | - |
-| `rotations` | string | - |
-| `skews` | string | - |
-
-### B.7 Painter Nodes
-
-#### Fill
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `color` | Color/idref | #000000 |
-| `alpha` | float | 1 |
-| `blendMode` | BlendMode | normal |
-| `fillRule` | FillRule | winding |
-| `placement` | LayerPlacement | background |
-
-#### Stroke
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `color` | Color/idref | #000000 |
-| `width` | float | 1 |
-| `alpha` | float | 1 |
-| `blendMode` | BlendMode | normal |
-| `cap` | LineCap | butt |
-| `join` | LineJoin | miter |
-| `miterLimit` | float | 4 |
-| `dashes` | string | - |
-| `dashOffset` | float | 0 |
-| `dashAdaptive` | bool | false |
-| `align` | StrokeAlign | center |
-| `placement` | LayerPlacement | background |
-
-### B.8 Shape Modifier Nodes
-
-#### TrimPath
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `start` | float | 0 |
-| `end` | float | 1 |
-| `offset` | float | 0 |
-| `type` | TrimType | separate |
-
-#### RoundCorner
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `radius` | float | 10 |
-
-#### MergePath
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `mode` | MergePathOp | append |
-
-### B.9 Text Modifier Nodes
-
-#### TextModifier
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `anchor` | Point | 0,0 |
-| `position` | Point | 0,0 |
-| `rotation` | float | 0 |
-| `scale` | Point | 1,1 |
-| `skew` | float | 0 |
-| `skewAxis` | float | 0 |
-| `alpha` | float | 1 |
-| `fillColor` | Color | - |
-| `strokeColor` | Color | - |
-| `strokeWidth` | float | - |
-
-Child elements: `RangeSelector`*
-
-#### RangeSelector
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `start` | float | 0 |
-| `end` | float | 1 |
-| `offset` | float | 0 |
-| `unit` | SelectorUnit | percentage |
-| `shape` | SelectorShape | square |
-| `easeIn` | float | 0 |
-| `easeOut` | float | 0 |
-| `mode` | SelectorMode | add |
-| `weight` | float | 1 |
-| `randomOrder` | bool | false |
-| `randomSeed` | int | 0 |
-
-#### TextPath
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `path` | string/idref | (required) |
-| `baselineOrigin` | Point | 0,0 |
-| `baselineAngle` | float | 0 |
-| `firstMargin` | float | 0 |
-| `lastMargin` | float | 0 |
-| `perpendicular` | bool | true |
-| `reversed` | bool | false |
-| `forceAlignment` | bool | false |
-
-#### TextLayout
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `position` | Point | 0,0 |
-| `width` | float | auto |
-| `height` | float | auto |
-| `textAlign` | TextAlign | start |
-| `verticalAlign` | VerticalAlign | top |
-| `writingMode` | WritingMode | horizontal |
-| `lineHeight` | float | 1.2 |
-
-### B.10 Other Nodes
-
-#### Repeater
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `copies` | float | 3 |
-| `offset` | float | 0 |
-| `order` | RepeaterOrder | belowOriginal |
-| `anchor` | Point | 0,0 |
-| `position` | Point | 100,100 |
-| `rotation` | float | 0 |
-| `scale` | Point | 1,1 |
-| `startAlpha` | float | 1 |
-| `endAlpha` | float | 1 |
-
-#### Group
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `anchor` | Point | 0,0 |
-| `position` | Point | 0,0 |
-| `rotation` | float | 0 |
-| `scale` | Point | 1,1 |
-| `skew` | float | 0 |
-| `skewAxis` | float | 0 |
-| `alpha` | float | 1 |
-
-Child elements: `VectorElement`* (recursive including Group)
-
-### B.11 Enumeration Types
-
-#### Layer Related
+### Layer Related
 
 | Enum | Values |
 |------|--------|
@@ -2248,7 +1827,7 @@ Child elements: `VectorElement`* (recursive including Group)
 | **FilterMode** | `nearest`, `linear` |
 | **MipmapMode** | `none`, `nearest`, `linear` |
 
-#### Painter Related
+### Painter Related
 
 | Enum | Values |
 |------|--------|
@@ -2258,13 +1837,13 @@ Child elements: `VectorElement`* (recursive including Group)
 | **StrokeAlign** | `center`, `inside`, `outside` |
 | **LayerPlacement** | `background`, `foreground` |
 
-#### Geometry Element Related
+### Geometry Element Related
 
 | Enum | Values |
 |------|--------|
 | **PolystarType** | `polygon`, `star` |
 
-#### Modifier Related
+### Modifier Related
 
 | Enum | Values |
 |------|--------|

@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXImporter.h"
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -1626,40 +1626,37 @@ static Color parseColor(const std::string& str) {
     }
   }
   // sRGB float format: srgb(r, g, b) or srgb(r, g, b, a)
-  if (str.compare(0, 5, "srgb(") == 0) {
-    auto start = str.find('(');
-    auto end = str.find(')');
-    if (start != std::string::npos && end != std::string::npos) {
-      auto inner = str.substr(start + 1, end - start - 1);
-      auto components = ParseFloatList(inner);
-      if (components.size() >= 3) {
-        Color color = {};
-        color.red = components[0];
-        color.green = components[1];
-        color.blue = components[2];
-        color.alpha = components.size() >= 4 ? components[3] : 1.0f;
-        color.colorSpace = ColorSpace::SRGB;
-        return color;
-      }
-    }
-  }
   // Display P3 format: p3(r, g, b) or p3(r, g, b, a)
-  if (str.compare(0, 3, "p3(") == 0) {
+  struct FunctionalColorFormat {
+    const char* prefix;
+    size_t prefixLen;
+    ColorSpace colorSpace;
+  };
+  static const FunctionalColorFormat formats[] = {
+      {"srgb(", 5, ColorSpace::SRGB},
+      {"p3(", 3, ColorSpace::DisplayP3},
+  };
+  for (const auto& fmt : formats) {
+    if (str.compare(0, fmt.prefixLen, fmt.prefix) != 0) {
+      continue;
+    }
     auto start = str.find('(');
     auto end = str.find(')');
-    if (start != std::string::npos && end != std::string::npos) {
-      auto inner = str.substr(start + 1, end - start - 1);
-      auto components = ParseFloatList(inner);
-      if (components.size() >= 3) {
-        Color color = {};
-        color.red = components[0];
-        color.green = components[1];
-        color.blue = components[2];
-        color.alpha = components.size() >= 4 ? components[3] : 1.0f;
-        color.colorSpace = ColorSpace::DisplayP3;
-        return color;
-      }
+    if (start == std::string::npos || end == std::string::npos) {
+      continue;
     }
+    auto inner = str.substr(start + 1, end - start - 1);
+    auto components = ParseFloatList(inner);
+    if (components.size() < 3) {
+      continue;
+    }
+    Color color = {};
+    color.red = components[0];
+    color.green = components[1];
+    color.blue = components[2];
+    color.alpha = components.size() >= 4 ? components[3] : 1.0f;
+    color.colorSpace = fmt.colorSpace;
+    return color;
   }
   return {};
 }
@@ -1670,26 +1667,18 @@ static Color parseColor(const std::string& str) {
 //==============================================================================
 
 std::shared_ptr<PAGXDocument> PAGXImporter::FromFile(const std::string& filePath) {
-  FILE* file = fopen(filePath.c_str(), "rb");
+  std::ifstream file(filePath, std::ios::binary | std::ios::ate);
   if (!file) {
     return nullptr;
   }
-
-  fseek(file, 0, SEEK_END);
-  long fileSize = ftell(file);
-  fseek(file, 0, SEEK_SET);
-
+  auto fileSize = file.tellg();
   if (fileSize <= 0) {
-    fclose(file);
     return nullptr;
   }
-
+  file.seekg(0, std::ios::beg);
   std::string content;
   content.resize(static_cast<size_t>(fileSize));
-  size_t bytesRead = fread(&content[0], 1, static_cast<size_t>(fileSize), file);
-  fclose(file);
-
-  if (bytesRead != static_cast<size_t>(fileSize)) {
+  if (!file.read(&content[0], fileSize)) {
     return nullptr;
   }
 
