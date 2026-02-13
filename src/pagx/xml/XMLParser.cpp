@@ -181,15 +181,15 @@ bool XMLParser::parseFile(const std::string& filePath) {
   return parse(reinterpret_cast<const uint8_t*>(content.data()), content.size());
 }
 
-bool XMLParser::startElement(const std::string& element) {
+bool XMLParser::startElement(const char* element) {
   return this->onStartElement(element);
 }
 
-bool XMLParser::addAttribute(const std::string& name, const std::string& value) {
+bool XMLParser::addAttribute(const char* name, const char* value) {
   return this->onAddAttribute(name, value);
 }
 
-bool XMLParser::endElement(const std::string& element) {
+bool XMLParser::endElement(const char* element) {
   return this->onEndElement(element);
 }
 
