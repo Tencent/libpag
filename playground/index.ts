@@ -182,6 +182,13 @@ class PlaygroundError extends Error {
     }
 }
 
+interface GestureEvent extends UIEvent {
+    scale: number;
+    rotation: number;
+    clientX: number;
+    clientY: number;
+}
+
 enum ScaleGestureState {
     SCALE_START = 0,
     SCALE_CHANGE = 1,
@@ -225,6 +232,9 @@ class GestureManager {
     private lastTouchCenterY = 0;
     private isTouchPanning = false;
     private isTouchZooming = false;
+
+    // Safari gesture state
+    private lastGestureScale = 1.0;
 
     public zoom = 1.0;
     public offsetX = 0;
@@ -472,6 +482,30 @@ class GestureManager {
             this.dragStartOffsetX = this.offsetX;
             this.dragStartOffsetY = this.offsetY;
         }
+    }
+
+    // Safari gesture handlers
+    public onGestureStart(event: GestureEvent) {
+        this.lastGestureScale = event.scale;
+        this.scaleStartZoom = this.zoom;
+    }
+
+    public onGestureChange(event: GestureEvent, canvas: HTMLElement,
+                           playgroundState: PlaygroundState) {
+        const scale = event.scale / this.lastGestureScale;
+        const rect = canvas.getBoundingClientRect();
+        const pixelX = (event.clientX - rect.left) * window.devicePixelRatio;
+        const pixelY = (event.clientY - rect.top) * window.devicePixelRatio;
+        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.zoom * scale));
+        this.offsetX = (this.offsetX - pixelX) * (newZoom / this.zoom) + pixelX;
+        this.offsetY = (this.offsetY - pixelY) * (newZoom / this.zoom) + pixelY;
+        this.zoom = newZoom;
+        this.lastGestureScale = event.scale;
+        playgroundState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
+    }
+
+    public onGestureEnd() {
+        this.lastGestureScale = 1.0;
     }
 }
 
@@ -729,15 +763,18 @@ function bindCanvasEvents(canvas: HTMLElement) {
         gestureManager.onTouchEnd(e, canvas);
     });
 
-    // Prevent browser pinch-to-zoom on Safari
+    // Safari gesture events for pinch-to-zoom
     canvas.addEventListener('gesturestart', (e: Event) => {
         e.preventDefault();
+        gestureManager.onGestureStart(e as GestureEvent);
     });
     canvas.addEventListener('gesturechange', (e: Event) => {
         e.preventDefault();
+        gestureManager.onGestureChange(e as GestureEvent, canvas, playgroundState);
     });
     canvas.addEventListener('gestureend', (e: Event) => {
         e.preventDefault();
+        gestureManager.onGestureEnd();
     });
 }
 
