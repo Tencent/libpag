@@ -373,27 +373,6 @@ std::vector<float> ParseFloatList(const std::string& str) {
   return result;
 }
 
-std::vector<float> ParseSpaceSeparatedFloats(const std::string& str) {
-  std::vector<float> values;
-  const char* ptr = str.c_str();
-  const char* end = ptr + str.size();
-  while (ptr < end) {
-    while (ptr < end && std::isspace(*ptr)) {
-      ++ptr;
-    }
-    if (ptr >= end) {
-      break;
-    }
-    char* endPtr = nullptr;
-    float val = strtof(ptr, &endPtr);
-    if (endPtr == ptr) {
-      break;
-    }
-    values.push_back(val);
-    ptr = endPtr;
-  }
-  return values;
-}
 
 std::string FloatToString(float value) {
   char buf[32] = {};

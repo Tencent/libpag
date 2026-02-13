@@ -74,7 +74,7 @@ struct DOMNode {
    * @param attrName The attribute name to find.
    * @return A tuple of (found, value). If not found, returns (false, "").
    */
-  std::tuple<bool, std::string> findAttribute(const std::string& attrName) const;
+  const std::string* findAttribute(const std::string& attrName) const;
 
   /**
    * Counts the number of children, optionally filtered by name.

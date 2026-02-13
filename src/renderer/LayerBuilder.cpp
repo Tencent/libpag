@@ -637,55 +637,50 @@ class LayerBuilderContext {
     }
   }
 
+  static std::shared_ptr<tgfx::ColorSource> ApplyGradientMatrix(
+      std::shared_ptr<tgfx::Gradient> gradient, const Matrix& matrix) {
+    if (gradient && !matrix.isIdentity()) {
+      gradient->setMatrix(ToTGFX(matrix));
+    }
+    return gradient;
+  }
+
   std::shared_ptr<tgfx::ColorSource> convertLinearGradient(const LinearGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     ExtractGradientStops(node->colorStops, &colors, &positions);
-
-    auto gradient = tgfx::Gradient::MakeLinear(ToTGFX(node->startPoint), ToTGFX(node->endPoint),
-                                               colors, positions);
-    if (gradient && !node->matrix.isIdentity()) {
-      gradient->setMatrix(ToTGFX(node->matrix));
-    }
-    return gradient;
+    return ApplyGradientMatrix(
+        tgfx::Gradient::MakeLinear(ToTGFX(node->startPoint), ToTGFX(node->endPoint), colors,
+                                   positions),
+        node->matrix);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertRadialGradient(const RadialGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     ExtractGradientStops(node->colorStops, &colors, &positions);
-
-    auto gradient = tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions);
-    if (gradient && !node->matrix.isIdentity()) {
-      gradient->setMatrix(ToTGFX(node->matrix));
-    }
-    return gradient;
+    return ApplyGradientMatrix(
+        tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions),
+        node->matrix);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertConicGradient(const ConicGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     ExtractGradientStops(node->colorStops, &colors, &positions);
-
-    auto gradient = tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle, node->endAngle,
-                                              colors, positions);
-    if (gradient && !node->matrix.isIdentity()) {
-      gradient->setMatrix(ToTGFX(node->matrix));
-    }
-    return gradient;
+    return ApplyGradientMatrix(
+        tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle, node->endAngle, colors,
+                                  positions),
+        node->matrix);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertDiamondGradient(const DiamondGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     ExtractGradientStops(node->colorStops, &colors, &positions);
-
-    auto gradient =
-        tgfx::Gradient::MakeDiamond(ToTGFX(node->center), node->radius, colors, positions);
-    if (gradient && !node->matrix.isIdentity()) {
-      gradient->setMatrix(ToTGFX(node->matrix));
-    }
-    return gradient;
+    return ApplyGradientMatrix(
+        tgfx::Gradient::MakeDiamond(ToTGFX(node->center), node->radius, colors, positions),
+        node->matrix);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertImagePattern(const ImagePattern* node) {
@@ -837,7 +832,7 @@ class LayerBuilderContext {
       }
     }
 
-    group->setElements(elements);
+    group->setElements(std::move(elements));
 
     // Apply transform properties
     if (node->anchor.x != 0 || node->anchor.y != 0) {

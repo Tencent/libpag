@@ -1289,8 +1289,8 @@ static ColorMatrixFilter* parseColorMatrixFilter(const DOMNode* node, PAGXDocume
 
 static std::string getAttribute(const DOMNode* node, const std::string& name,
                                         const std::string& defaultValue) {
-  auto [found, value] = node->findAttribute(name);
-  return found ? value : defaultValue;
+  auto* value = node->findAttribute(name);
+  return value ? *value : defaultValue;
 }
 
 static float getFloatAttribute(const DOMNode* node, const std::string& name,

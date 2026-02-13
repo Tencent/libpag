@@ -107,7 +107,7 @@ static void CollectVectorGlyph(PAGXDocument* document, const tgfx::Font& font,
                                VectorFontBuilder& builder) {
   GlyphKey key = {font.getTypeface().get(), glyphID};
 
-  if (builder.glyphMapping.count(key)) {
+  if (builder.glyphMapping.find(key) != builder.glyphMapping.end()) {
     return;
   }
 
@@ -154,7 +154,7 @@ static void CollectBitmapGlyph(
   auto& builder = builders[typeface];
 
   GlyphKey key = {typeface, glyphID};
-  if (builder.glyphMapping.count(key)) {
+  if (builder.glyphMapping.find(key) != builder.glyphMapping.end()) {
     return;
   }
 
@@ -509,7 +509,7 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
         auto bitmapIt = bitmapBuilders.find(typeface);
         if (bitmapIt != bitmapBuilders.end() && bitmapIt->second.font != nullptr) {
           auto& builder = bitmapIt->second;
-          if (builder.glyphMapping.count(key)) {
+          if (builder.glyphMapping.find(key) != builder.glyphMapping.end()) {
             continue;
           }
           auto glyph = document->makeNode<Glyph>();
@@ -518,7 +518,7 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
           builder.font->glyphs.push_back(glyph);
           builder.glyphMapping[key] = static_cast<tgfx::GlyphID>(builder.font->glyphs.size());
         } else if (vectorBuilder.font != nullptr) {
-          if (vectorBuilder.glyphMapping.count(key) > 0) {
+          if (vectorBuilder.glyphMapping.find(key) != vectorBuilder.glyphMapping.end()) {
             continue;
           }
           float scale = static_cast<float>(VectorFontUnitsPerEm) / run.font.getSize();
@@ -571,11 +571,12 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
         tgfx::GlyphID glyphID = run.glyphs[i];
         GlyphKey key = {typeface, glyphID};
 
-        if (vectorBuilder.glyphMapping.count(key) > 0) {
+        if (vectorBuilder.glyphMapping.find(key) != vectorBuilder.glyphMapping.end()) {
           vectorIndices.push_back(i);
         } else {
           auto builderIt = bitmapBuilders.find(typeface);
-          if (builderIt != bitmapBuilders.end() && builderIt->second.glyphMapping.count(key) > 0) {
+          if (builderIt != bitmapBuilders.end() &&
+              builderIt->second.glyphMapping.find(key) != builderIt->second.glyphMapping.end()) {
             bitmapIndices.push_back(i);
           }
         }

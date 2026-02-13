@@ -299,6 +299,20 @@ static void writeColorStops(XMLBuilder& xml, const std::vector<ColorStop>& stops
   }
 }
 
+static void writeGradientMatrixAndStops(XMLBuilder& xml, const Matrix& matrix,
+                                        const std::vector<ColorStop>& colorStops) {
+  if (!matrix.isIdentity()) {
+    xml.addAttribute("matrix", MatrixToString(matrix));
+  }
+  if (colorStops.empty()) {
+    xml.closeElementSelfClosing();
+  } else {
+    xml.closeElementStart();
+    writeColorStops(xml, colorStops);
+    xml.closeElement();
+  }
+}
+
 static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
   switch (node->nodeType()) {
     case NodeType::SolidColor: {
@@ -317,16 +331,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
         xml.addAttribute("startPoint", pointToString(grad->startPoint));
       }
       xml.addRequiredAttribute("endPoint", pointToString(grad->endPoint));
-      if (!grad->matrix.isIdentity()) {
-        xml.addAttribute("matrix", MatrixToString(grad->matrix));
-      }
-      if (grad->colorStops.empty()) {
-        xml.closeElementSelfClosing();
-      } else {
-        xml.closeElementStart();
-        writeColorStops(xml, grad->colorStops);
-        xml.closeElement();
-      }
+      writeGradientMatrixAndStops(xml, grad->matrix, grad->colorStops);
       break;
     }
     case NodeType::RadialGradient: {
@@ -337,16 +342,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
         xml.addAttribute("center", pointToString(grad->center));
       }
       xml.addRequiredAttribute("radius", grad->radius);
-      if (!grad->matrix.isIdentity()) {
-        xml.addAttribute("matrix", MatrixToString(grad->matrix));
-      }
-      if (grad->colorStops.empty()) {
-        xml.closeElementSelfClosing();
-      } else {
-        xml.closeElementStart();
-        writeColorStops(xml, grad->colorStops);
-        xml.closeElement();
-      }
+      writeGradientMatrixAndStops(xml, grad->matrix, grad->colorStops);
       break;
     }
     case NodeType::ConicGradient: {
@@ -358,16 +354,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       }
       xml.addAttribute("startAngle", grad->startAngle);
       xml.addAttribute("endAngle", grad->endAngle, 360.0f);
-      if (!grad->matrix.isIdentity()) {
-        xml.addAttribute("matrix", MatrixToString(grad->matrix));
-      }
-      if (grad->colorStops.empty()) {
-        xml.closeElementSelfClosing();
-      } else {
-        xml.closeElementStart();
-        writeColorStops(xml, grad->colorStops);
-        xml.closeElement();
-      }
+      writeGradientMatrixAndStops(xml, grad->matrix, grad->colorStops);
       break;
     }
     case NodeType::DiamondGradient: {
@@ -378,16 +365,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
         xml.addAttribute("center", pointToString(grad->center));
       }
       xml.addRequiredAttribute("radius", grad->radius);
-      if (!grad->matrix.isIdentity()) {
-        xml.addAttribute("matrix", MatrixToString(grad->matrix));
-      }
-      if (grad->colorStops.empty()) {
-        xml.closeElementSelfClosing();
-      } else {
-        xml.closeElementStart();
-        writeColorStops(xml, grad->colorStops);
-        xml.closeElement();
-      }
+      writeGradientMatrixAndStops(xml, grad->matrix, grad->colorStops);
       break;
     }
     case NodeType::ImagePattern: {
@@ -845,6 +823,15 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
 // LayerStyle writing
 //==============================================================================
 
+static void writeShadowAttributes(XMLBuilder& xml, float offsetX, float offsetY, float blurX,
+                                  float blurY, const Color& color) {
+  xml.addAttribute("offsetX", offsetX);
+  xml.addAttribute("offsetY", offsetY);
+  xml.addAttribute("blurX", blurX);
+  xml.addAttribute("blurY", blurY);
+  xml.addAttribute("color", ColorToHexString(color, color.alpha < 1.0f));
+}
+
 static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
   switch (node->nodeType()) {
     case NodeType::DropShadowStyle: {
@@ -853,11 +840,8 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       if (style->blendMode != BlendMode::Normal) {
         xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
       }
-      xml.addAttribute("offsetX", style->offsetX);
-      xml.addAttribute("offsetY", style->offsetY);
-      xml.addAttribute("blurX", style->blurX);
-      xml.addAttribute("blurY", style->blurY);
-      xml.addAttribute("color", ColorToHexString(style->color, style->color.alpha < 1.0f));
+      writeShadowAttributes(xml, style->offsetX, style->offsetY, style->blurX, style->blurY,
+                            style->color);
       xml.addAttribute("showBehindLayer", style->showBehindLayer, true);
       xml.closeElementSelfClosing();
       break;
@@ -868,11 +852,8 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       if (style->blendMode != BlendMode::Normal) {
         xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
       }
-      xml.addAttribute("offsetX", style->offsetX);
-      xml.addAttribute("offsetY", style->offsetY);
-      xml.addAttribute("blurX", style->blurX);
-      xml.addAttribute("blurY", style->blurY);
-      xml.addAttribute("color", ColorToHexString(style->color, style->color.alpha < 1.0f));
+      writeShadowAttributes(xml, style->offsetX, style->offsetY, style->blurX, style->blurY,
+                            style->color);
       xml.closeElementSelfClosing();
       break;
     }
@@ -915,11 +896,8 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
     case NodeType::DropShadowFilter: {
       auto filter = static_cast<const DropShadowFilter*>(node);
       xml.openElement("DropShadowFilter");
-      xml.addAttribute("offsetX", filter->offsetX);
-      xml.addAttribute("offsetY", filter->offsetY);
-      xml.addAttribute("blurX", filter->blurX);
-      xml.addAttribute("blurY", filter->blurY);
-      xml.addAttribute("color", ColorToHexString(filter->color, filter->color.alpha < 1.0f));
+      writeShadowAttributes(xml, filter->offsetX, filter->offsetY, filter->blurX, filter->blurY,
+                            filter->color);
       xml.addAttribute("shadowOnly", filter->shadowOnly);
       xml.closeElementSelfClosing();
       break;
@@ -927,11 +905,8 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
     case NodeType::InnerShadowFilter: {
       auto filter = static_cast<const InnerShadowFilter*>(node);
       xml.openElement("InnerShadowFilter");
-      xml.addAttribute("offsetX", filter->offsetX);
-      xml.addAttribute("offsetY", filter->offsetY);
-      xml.addAttribute("blurX", filter->blurX);
-      xml.addAttribute("blurY", filter->blurY);
-      xml.addAttribute("color", ColorToHexString(filter->color, filter->color.alpha < 1.0f));
+      writeShadowAttributes(xml, filter->offsetX, filter->offsetY, filter->blurX, filter->blurY,
+                            filter->color);
       xml.addAttribute("shadowOnly", filter->shadowOnly);
       xml.closeElementSelfClosing();
       break;

@@ -30,6 +30,8 @@
 
 namespace pagx {
 
+static constexpr float DEFAULT_FONT_SIZE = 16.0f;
+
 std::shared_ptr<PAGXDocument> SVGImporter::Parse(const std::string& filePath,
                                              const Options& options) {
   SVGParserContext parser(options);
@@ -102,8 +104,9 @@ std::string SVGParserContext::getAttribute(const std::shared_ptr<DOMNode>& node,
   // Check style attribute first for CSS property.
   // Style attribute format: "property1: value1; property2: value2; ..."
   // CSS cascade rule: later properties override earlier ones.
-  auto [hasStyle, styleStr] = node->findAttribute("style");
-  if (hasStyle && !styleStr.empty()) {
+  auto* stylePtr = node->findAttribute("style");
+  if (stylePtr && !stylePtr->empty()) {
+    const std::string& styleStr = *stylePtr;
     std::string lastValue;
     size_t pos = 0;
     while (pos < styleStr.size()) {
@@ -164,15 +167,16 @@ std::string SVGParserContext::getAttribute(const std::shared_ptr<DOMNode>& node,
   }
 
   // Fallback: check for direct attribute (presentation attribute).
-  auto [found, value] = node->findAttribute(name);
-  if (found) {
-    return value;
+  auto* directValue = node->findAttribute(name);
+  if (directValue) {
+    return *directValue;
   }
 
   // Check CSS class rules (lowest priority).
   // class attribute can contain multiple class names separated by whitespace.
-  auto [hasClass, classAttr] = node->findAttribute("class");
-  if (hasClass && !classAttr.empty()) {
+  auto* classPtr = node->findAttribute("class");
+  if (classPtr && !classPtr->empty()) {
+    const std::string& classAttr = *classPtr;
     // Parse class names.
     size_t pos = 0;
     while (pos < classAttr.size()) {
@@ -853,7 +857,8 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
   if (fontSizeStr.empty()) {
     fontSizeStr = inheritedStyle.fontSize;
   }
-  float currentFontSize = fontSizeStr.empty() ? 16.0f : parseLength(fontSizeStr, _viewBoxHeight);
+  float currentFontSize =
+      fontSizeStr.empty() ? DEFAULT_FONT_SIZE : parseLength(fontSizeStr, _viewBoxHeight);
 
   // Parse dx/dy offsets. SVG dx/dy provide relative offsets to the text position.
   x += parseLengthEm(getAttribute(element, "dx"), _viewBoxWidth, currentFontSize);
@@ -2026,7 +2031,7 @@ float SVGParserContext::parseLength(const std::string& value, float containerSiz
     return num * 1.333333f;
   }
   if (unit == "em" || unit == "rem") {
-    return num * 16.0f;  // Assume 16px base font.
+    return num * DEFAULT_FONT_SIZE;
   }
   if (unit == "in") {
     return num * 96.0f;
@@ -2062,7 +2067,7 @@ std::vector<float> SVGParserContext::parseViewBox(const std::string& value) {
   if (value.empty()) {
     return {};
   }
-  return ParseSpaceSeparatedFloats(value);
+  return ParseFloatList(value);
 }
 
 PathData SVGParserContext::parsePoints(const std::string& value, bool closed) {
@@ -2334,6 +2339,35 @@ Layer* SVGParserContext::convertMaskElement(
   return maskLayer;
 }
 
+std::pair<float, float> SVGParserContext::parseFilterOffset(const std::shared_ptr<DOMNode>& node) {
+  std::string dx = getAttribute(node, "dx", "0");
+  std::string dy = getAttribute(node, "dy", "0");
+  return {strtof(dx.c_str(), nullptr), strtof(dy.c_str(), nullptr)};
+}
+
+std::pair<float, float> SVGParserContext::parseFilterBlur(const std::shared_ptr<DOMNode>& node) {
+  std::string stdDeviation = getAttribute(node, "stdDeviation", "0");
+  auto values = ParseFloatList(stdDeviation);
+  float blurX = values.empty() ? 0 : values[0];
+  float blurY = values.size() > 1 ? values[1] : blurX;
+  return {blurX, blurY};
+}
+
+Color SVGParserContext::parseFilterColorMatrix(const std::shared_ptr<DOMNode>& node) {
+  Color color = {0, 0, 0, 1.0f};
+  std::string colorMatrix = getAttribute(node, "values");
+  if (!colorMatrix.empty()) {
+    auto values = ParseFloatList(colorMatrix);
+    if (values.size() >= 19) {
+      color.red = values[4];
+      color.green = values[9];
+      color.blue = values[14];
+      color.alpha = values[18];
+    }
+  }
+  return color;
+}
+
 bool SVGParserContext::convertFilterElement(
     const std::shared_ptr<DOMNode>& filterElement,
     std::vector<LayerFilter*>& filters,
@@ -2382,33 +2416,9 @@ bool SVGParserContext::convertFilterElement(
       if (i + 4 < primitives.size() && primitives[i + 1]->name == "feOffset" &&
           primitives[i + 2]->name == "feGaussianBlur" &&
           primitives[i + 3]->name == "feComposite" && primitives[i + 4]->name == "feColorMatrix") {
-        // Extract offset from feOffset.
-        float offsetX = 0, offsetY = 0;
-        std::string dx = getAttribute(primitives[i + 1], "dx", "0");
-        std::string dy = getAttribute(primitives[i + 1], "dy", "0");
-        offsetX = strtof(dx.c_str(), nullptr);
-        offsetY = strtof(dy.c_str(), nullptr);
-
-        // Extract blur from feGaussianBlur.
-        std::string stdDeviation = getAttribute(primitives[i + 2], "stdDeviation", "0");
-        auto blurValues = ParseSpaceSeparatedFloats(stdDeviation);
-        float blurX = blurValues.empty() ? 0 : blurValues[0];
-        float blurY = blurValues.size() > 1 ? blurValues[1] : blurX;
-
-        // Extract color from the second feColorMatrix.
-        // Format: "0 0 0 0 R 0 0 0 0 G 0 0 0 0 B 0 0 0 A 0" where R,G,B are 0-1 and A is alpha.
-        Color shadowColor = {0, 0, 0, 1.0f};
-        std::string colorMatrix = getAttribute(primitives[i + 4], "values");
-        if (!colorMatrix.empty()) {
-          auto values = ParseSpaceSeparatedFloats(colorMatrix);
-          // R is at index 4, G at index 9, B at index 14, A at index 18.
-          if (values.size() >= 19) {
-            shadowColor.red = values[4];
-            shadowColor.green = values[9];
-            shadowColor.blue = values[14];
-            shadowColor.alpha = values[18];
-          }
-        }
+        auto [offsetX, offsetY] = parseFilterOffset(primitives[i + 1]);
+        auto [blurX, blurY] = parseFilterBlur(primitives[i + 2]);
+        auto shadowColor = parseFilterColorMatrix(primitives[i + 4]);
 
         auto dropShadow = _document->makeNode<DropShadowFilter>();
         dropShadow->offsetX = offsetX;
@@ -2432,31 +2442,9 @@ bool SVGParserContext::convertFilterElement(
       // This is common in Figma exports with multiple shadows.
       if (i + 3 < primitives.size() && primitives[i + 1]->name == "feOffset" &&
           primitives[i + 2]->name == "feGaussianBlur" && primitives[i + 3]->name == "feColorMatrix") {
-        // Extract offset from feOffset.
-        float offsetX = 0, offsetY = 0;
-        std::string dx = getAttribute(primitives[i + 1], "dx", "0");
-        std::string dy = getAttribute(primitives[i + 1], "dy", "0");
-        offsetX = strtof(dx.c_str(), nullptr);
-        offsetY = strtof(dy.c_str(), nullptr);
-
-        // Extract blur from feGaussianBlur.
-        std::string stdDeviation = getAttribute(primitives[i + 2], "stdDeviation", "0");
-        auto blurValues = ParseSpaceSeparatedFloats(stdDeviation);
-        float blurX = blurValues.empty() ? 0 : blurValues[0];
-        float blurY = blurValues.size() > 1 ? blurValues[1] : blurX;
-
-        // Extract color from feColorMatrix.
-        Color shadowColor = {0, 0, 0, 1.0f};
-        std::string colorMatrix = getAttribute(primitives[i + 3], "values");
-        if (!colorMatrix.empty()) {
-          auto values = ParseSpaceSeparatedFloats(colorMatrix);
-          if (values.size() >= 19) {
-            shadowColor.red = values[4];
-            shadowColor.green = values[9];
-            shadowColor.blue = values[14];
-            shadowColor.alpha = values[18];
-          }
-        }
+        auto [offsetX, offsetY] = parseFilterOffset(primitives[i + 1]);
+        auto [blurX, blurY] = parseFilterBlur(primitives[i + 2]);
+        auto shadowColor = parseFilterColorMatrix(primitives[i + 3]);
 
         auto dropShadow = _document->makeNode<DropShadowFilter>();
         dropShadow->offsetX = offsetX;
@@ -2480,27 +2468,8 @@ bool SVGParserContext::convertFilterElement(
       // This creates a solid shadow without blur effect.
       if (i + 2 < primitives.size() && primitives[i + 1]->name == "feOffset" &&
           primitives[i + 2]->name == "feColorMatrix") {
-        // Extract offset from feOffset.
-        float offsetX = 0, offsetY = 0;
-        std::string dx = getAttribute(primitives[i + 1], "dx", "0");
-        std::string dy = getAttribute(primitives[i + 1], "dy", "0");
-        offsetX = strtof(dx.c_str(), nullptr);
-        offsetY = strtof(dy.c_str(), nullptr);
-
-        // Extract color from feColorMatrix.
-        // Format: "0 0 0 0 R 0 0 0 0 G 0 0 0 0 B 0 0 0 A 0" where R,G,B are 0-1 and A is alpha.
-        Color shadowColor = {0, 0, 0, 1.0f};
-        std::string colorMatrix = getAttribute(primitives[i + 2], "values");
-        if (!colorMatrix.empty()) {
-          auto values = ParseSpaceSeparatedFloats(colorMatrix);
-          // R is at index 4, G at index 9, B at index 14, A at index 18.
-          if (values.size() >= 19) {
-            shadowColor.red = values[4];
-            shadowColor.green = values[9];
-            shadowColor.blue = values[14];
-            shadowColor.alpha = values[18];
-          }
-        }
+        auto [offsetX, offsetY] = parseFilterOffset(primitives[i + 1]);
+        auto shadowColor = parseFilterColorMatrix(primitives[i + 2]);
 
         auto dropShadow = _document->makeNode<DropShadowFilter>();
         dropShadow->offsetX = offsetX;
@@ -2538,34 +2507,15 @@ bool SVGParserContext::convertFilterElement(
 
         if (isInnerShadow) {
           // Convert inner shadow pattern to InnerShadowFilter.
-          // Extract blur from feGaussianBlur.
-          std::string stdDeviation = getAttribute(node, "stdDeviation", "0");
-          auto blurValues = ParseSpaceSeparatedFloats(stdDeviation);
-          float blurX = blurValues.empty() ? 0 : blurValues[0];
-          float blurY = blurValues.size() > 1 ? blurValues[1] : blurX;
-
-          // Extract offset from feOffset.
-          float offsetX = 0, offsetY = 0;
-          std::string dx = getAttribute(primitives[i + 1], "dx", "0");
-          std::string dy = getAttribute(primitives[i + 1], "dy", "0");
-          offsetX = strtof(dx.c_str(), nullptr);
-          offsetY = strtof(dy.c_str(), nullptr);
+          auto [blurX, blurY] = parseFilterBlur(node);
+          auto [offsetX, offsetY] = parseFilterOffset(primitives[i + 1]);
 
           // Look for feColorMatrix after feComposite for shadow color.
           Color shadowColor = {0, 0, 0, 1.0f};
           size_t colorMatrixIdx = i + 3;
           if (colorMatrixIdx < primitives.size() &&
               primitives[colorMatrixIdx]->name == "feColorMatrix") {
-            std::string colorMatrix = getAttribute(primitives[colorMatrixIdx], "values");
-            if (!colorMatrix.empty()) {
-              auto values = ParseSpaceSeparatedFloats(colorMatrix);
-              if (values.size() >= 19) {
-                shadowColor.red = values[4];
-                shadowColor.green = values[9];
-                shadowColor.blue = values[14];
-                shadowColor.alpha = values[18];
-              }
-            }
+            shadowColor = parseFilterColorMatrix(primitives[colorMatrixIdx]);
           }
 
           auto innerShadow = _document->makeNode<InnerShadowFilter>();
@@ -2585,33 +2535,14 @@ bool SVGParserContext::convertFilterElement(
           continue;
         }
 
-        // Extract blur from feGaussianBlur.
-        std::string stdDeviation = getAttribute(node, "stdDeviation", "0");
-        auto blurValues = ParseSpaceSeparatedFloats(stdDeviation);
-        float blurX = blurValues.empty() ? 0 : blurValues[0];
-        float blurY = blurValues.size() > 1 ? blurValues[1] : blurX;
-
-        // Extract offset from feOffset.
-        float offsetX = 0, offsetY = 0;
-        std::string dx = getAttribute(primitives[i + 1], "dx", "0");
-        std::string dy = getAttribute(primitives[i + 1], "dy", "0");
-        offsetX = strtof(dx.c_str(), nullptr);
-        offsetY = strtof(dy.c_str(), nullptr);
+        auto [blurX, blurY] = parseFilterBlur(node);
+        auto [offsetX, offsetY] = parseFilterOffset(primitives[i + 1]);
 
         // Look for feColorMatrix after feOffset for shadow color.
         Color shadowColor = {0, 0, 0, 1.0f};
         size_t colorMatrixIdx = i + 2;
         if (colorMatrixIdx < primitives.size() && primitives[colorMatrixIdx]->name == "feColorMatrix") {
-          std::string colorMatrix = getAttribute(primitives[colorMatrixIdx], "values");
-          if (!colorMatrix.empty()) {
-            auto values = ParseSpaceSeparatedFloats(colorMatrix);
-            if (values.size() >= 19) {
-              shadowColor.red = values[4];
-              shadowColor.green = values[9];
-              shadowColor.blue = values[14];
-              shadowColor.alpha = values[18];
-            }
-          }
+          shadowColor = parseFilterColorMatrix(primitives[colorMatrixIdx]);
         }
 
         auto dropShadow = _document->makeNode<DropShadowFilter>();
@@ -2637,33 +2568,14 @@ bool SVGParserContext::convertFilterElement(
     if (node->name == "feOffset" && getAttribute(node, "in") == "SourceAlpha") {
       // Look for feGaussianBlur following.
       if (i + 1 < primitives.size() && primitives[i + 1]->name == "feGaussianBlur") {
-        // Extract offset from feOffset.
-        float offsetX = 0, offsetY = 0;
-        std::string dx = getAttribute(node, "dx", "0");
-        std::string dy = getAttribute(node, "dy", "0");
-        offsetX = strtof(dx.c_str(), nullptr);
-        offsetY = strtof(dy.c_str(), nullptr);
-
-        // Extract blur from feGaussianBlur.
-        std::string stdDeviation = getAttribute(primitives[i + 1], "stdDeviation", "0");
-        auto blurValues = ParseSpaceSeparatedFloats(stdDeviation);
-        float blurX = blurValues.empty() ? 0 : blurValues[0];
-        float blurY = blurValues.size() > 1 ? blurValues[1] : blurX;
+        auto [offsetX, offsetY] = parseFilterOffset(node);
+        auto [blurX, blurY] = parseFilterBlur(primitives[i + 1]);
 
         // Look for feColorMatrix after feGaussianBlur for shadow color.
         Color shadowColor = {0, 0, 0, 1.0f};
         size_t colorMatrixIdx = i + 2;
         if (colorMatrixIdx < primitives.size() && primitives[colorMatrixIdx]->name == "feColorMatrix") {
-          std::string colorMatrix = getAttribute(primitives[colorMatrixIdx], "values");
-          if (!colorMatrix.empty()) {
-            auto values = ParseSpaceSeparatedFloats(colorMatrix);
-            if (values.size() >= 19) {
-              shadowColor.red = values[4];
-              shadowColor.green = values[9];
-              shadowColor.blue = values[14];
-              shadowColor.alpha = values[18];
-            }
-          }
+          shadowColor = parseFilterColorMatrix(primitives[colorMatrixIdx]);
         }
 
         auto dropShadow = _document->makeNode<DropShadowFilter>();
@@ -2703,10 +2615,7 @@ bool SVGParserContext::convertFilterElement(
       }
 
       if (isSourceGraphic) {
-        std::string stdDeviation = getAttribute(node, "stdDeviation", "0");
-        auto devValues = ParseSpaceSeparatedFloats(stdDeviation);
-        float devX = devValues.empty() ? 0 : devValues[0];
-        float devY = devValues.size() > 1 ? devValues[1] : devX;
+        auto [devX, devY] = parseFilterBlur(node);
         auto blurFilter = _document->makeNode<BlurFilter>();
         blurFilter->blurX = devX;
         blurFilter->blurY = devY;
@@ -2745,8 +2654,9 @@ void SVGParserContext::collectAllIds(const std::shared_ptr<DOMNode>& node) {
   }
 
   // Collect id from this node.
-  auto [found, id] = node->findAttribute("id");
-  if (found && !id.empty()) {
+  auto* idPtr = node->findAttribute("id");
+  if (idPtr && !idPtr->empty()) {
+    const std::string& id = *idPtr;
     _existingIds.insert(id);
     // Also collect referenceable elements (mask, clipPath, filter, etc.) to _defs,
     // even if they are defined inline (not inside <defs>).

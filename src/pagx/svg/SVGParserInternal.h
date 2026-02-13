@@ -152,6 +152,11 @@ class SVGParserContext {
   PathData parsePoints(const std::string& value, bool closed);
   std::string resolveUrl(const std::string& url);
 
+  // Helpers for parsing filter primitive attributes.
+  std::pair<float, float> parseFilterOffset(const std::shared_ptr<DOMNode>& node);
+  std::pair<float, float> parseFilterBlur(const std::shared_ptr<DOMNode>& node);
+  Color parseFilterColorMatrix(const std::shared_ptr<DOMNode>& node);
+
   // Helper to get attribute from DOMNode.
   std::string getAttribute(const std::shared_ptr<DOMNode>& node, const std::string& name,
                            const std::string& defaultValue = "") const;

@@ -59,11 +59,16 @@ static tgfx::Point ToTGFXPoint(const Point& p) {
   return PointToTGFX(p);
 }
 
+static void ReleasePagxData(const void*, void* context) {
+  delete static_cast<std::shared_ptr<Data>*>(context);
+}
+
 static std::shared_ptr<tgfx::Data> ToTGFXData(const std::shared_ptr<Data>& data) {
   if (data == nullptr) {
     return nullptr;
   }
-  return tgfx::Data::MakeWithCopy(data->data(), data->size());
+  auto* ctx = new std::shared_ptr<Data>(data);
+  return tgfx::Data::MakeAdopted(data->data(), data->size(), ReleasePagxData, ctx);
 }
 
 // Build context that maintains state during text typesetting

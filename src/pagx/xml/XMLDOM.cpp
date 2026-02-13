@@ -202,13 +202,13 @@ std::shared_ptr<DOMNode> DOMNode::getNextSibling(const std::string& name) const 
   return sibling;
 }
 
-std::tuple<bool, std::string> DOMNode::findAttribute(const std::string& attrName) const {
+const std::string* DOMNode::findAttribute(const std::string& attrName) const {
   for (const auto& attr : attributes) {
     if (attr.name == attrName) {
-      return {true, attr.value};
+      return &attr.value;
     }
   }
-  return {false, ""};
+  return nullptr;
 }
 
 int DOMNode::countChildren(const std::string& name) const {
