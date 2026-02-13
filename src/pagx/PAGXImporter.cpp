@@ -955,14 +955,9 @@ static Image* parseImage(const DOMNode* node, PAGXDocument* doc) {
     return nullptr;
   }
   auto source = getAttribute(node, "source");
-  if (source.find("data:") == 0) {
-    auto commaPos = source.find(',');
-    if (commaPos != std::string::npos) {
-      auto header = source.substr(0, commaPos);
-      if (header.find(";base64") != std::string::npos) {
-        image->data = Base64Decode(source.substr(commaPos + 1));
-      }
-    }
+  auto data = DecodeBase64DataURI(source);
+  if (data) {
+    image->data = data;
   } else {
     image->filePath = source;
   }
@@ -1043,11 +1038,9 @@ static Glyph* parseGlyph(const DOMNode* node, PAGXDocument* doc) {
     } else {
       // Inline image source (data URI or file path)
       glyph->image = doc->makeNode<Image>();
-      if (imageAttr.find("data:") == 0) {
-        auto commaPos = imageAttr.find(',');
-        if (commaPos != std::string::npos) {
-          glyph->image->data = Base64Decode(imageAttr.substr(commaPos + 1));
-        }
+      auto data = DecodeBase64DataURI(imageAttr);
+      if (data) {
+        glyph->image->data = data;
       } else {
         glyph->image->filePath = imageAttr;
       }
