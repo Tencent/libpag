@@ -658,6 +658,10 @@ class TypesetterContext {
       currentX += advance + text->letterSpacing;
     }
 
+    // Remove the extra letterSpacing after the last glyph.
+    if (hasLetterSpacing && currentX > 0) {
+      currentX -= text->letterSpacing;
+    }
     info.totalWidth = currentX;
   }
 
