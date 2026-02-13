@@ -294,10 +294,6 @@ class LayerBuilderContext {
   }
 
   std::shared_ptr<tgfx::Layer> build(const PAGXDocument& document) {
-    // Clear mappings from previous builds.
-    _tgfxLayerByPagxLayer.clear();
-    _pendingMasks.clear();
-
     // Build layer tree.
     auto rootLayer = tgfx::Layer::Make();
     for (const auto& layer : document.layers) {
@@ -320,8 +316,6 @@ class LayerBuilderContext {
       }
     }
 
-    _tgfxLayerByPagxLayer.clear();
-    _pendingMasks.clear();
     return rootLayer;
   }
 
