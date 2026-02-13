@@ -477,11 +477,7 @@ function updateVersionLinks(htmlFile, thisVersion, draftVersion, stableVersion, 
 
   let html = fs.readFileSync(htmlFile, 'utf-8');
 
-  // Extract existing "last updated" date from HTML, preserve it
-  // Matches: "30 January 2026" or "2026 年 1 月 30 日"
-  const lastUpdatedRegex = /(\d{1,2}\s+\w+\s+\d{4}|\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日)/;
-  const lastUpdatedMatch = html.match(lastUpdatedRegex);
-  const lastUpdated = lastUpdatedMatch ? lastUpdatedMatch[1] : formatDate(new Date(), isZh ? 'zh' : 'en');
+  const lastUpdated = formatDate(new Date(), isZh ? 'zh' : 'en');
 
   // Generate version info block
   const versionInfoHtml = generateVersionInfoHtml(thisVersion, draftVersion, stableVersion, isZh, lastUpdated);
