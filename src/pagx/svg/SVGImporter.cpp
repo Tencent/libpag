@@ -1185,11 +1185,6 @@ ImagePattern* SVGParserContext::convertPattern(
   std::string contentUnitsStr = getAttribute(element, "patternContentUnits", "userSpaceOnUse");
   bool contentUnitsIsObjectBoundingBox = (contentUnitsStr == "objectBoundingBox");
 
-  // Calculate the actual tile size in user space.
-  // When patternUnits is objectBoundingBox, pattern dimensions are 0-1 ratios of shape bounds.
-  float tileWidth = patternUnitsIsObjectBoundingBox ? patternWidth * shapeBounds.width : patternWidth;
-  float tileHeight = patternUnitsIsObjectBoundingBox ? patternHeight * shapeBounds.height : patternHeight;
-
   // Look for image reference inside the pattern.
   auto child = element->getFirstChild();
   while (child) {
