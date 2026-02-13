@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates composition (reusable component) -->
+<pagx version="1.0" width="400" height="400">
+  <Layer composition="@buttonComp" x="100" y="60"/>
+  <Layer composition="@buttonComp" x="100" y="170"/>
+  <Layer composition="@buttonComp" x="100" y="280"/>
+  <Resources>
+    <Composition id="buttonComp" width="200" height="60">
+      <Layer name="button">
+        <Rectangle center="100,30" size="200,60" roundness="30"/>
+        <Fill>
+          <LinearGradient startPoint="0,0" endPoint="200,0">
+            <ColorStop offset="0" color="#6366F1"/>
+            <ColorStop offset="1" color="#8B5CF6"/>
+          </LinearGradient>
+        </Fill>
+        <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F180"/>
+      </Layer>
+      <Layer name="label">
+        <Text text="Button" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
+        <TextLayout position="100,36" textAlign="center"/>
+        <Fill color="#FFF"/>
+      </Layer>
+    </Composition>
+  </Resources>
+</pagx>

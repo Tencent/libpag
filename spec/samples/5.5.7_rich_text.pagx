@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates rich text with mixed styles via shared TextLayout -->
+<pagx version="1.0" width="400" height="400">
+  <Layer>
+    <Text text="Rich Text" fontFamily="Arial" fontStyle="Bold" fontSize="42"/>
+    <TextLayout position="200,105" textAlign="center"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="200,0">
+        <ColorStop offset="0" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#EC4899"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+
+  <!-- Rich text paragraph: multiple Groups with shared TextLayout -->
+  <Layer>
+    <Group>
+      <Text text="Supports " fontFamily="Arial" fontSize="20"/>
+      <Fill color="#475569"/>
+    </Group>
+    <Group>
+      <Text text="bold" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+      <Fill color="#F43F5E"/>
+    </Group>
+    <Group>
+      <Text text=", " fontFamily="Arial" fontSize="20"/>
+      <Fill color="#475569"/>
+    </Group>
+    <Group>
+      <Text text="italic" fontFamily="Arial" fontStyle="Italic" fontSize="20"/>
+      <Fill color="#10B981"/>
+    </Group>
+    <Group>
+      <Text text=" and " fontFamily="Arial" fontSize="20"/>
+      <Fill color="#475569"/>
+    </Group>
+    <Group>
+      <Text text="colored" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+      <Fill color="#06B6D4"/>
+    </Group>
+    <Group>
+      <Text text=" text." fontFamily="Arial" fontSize="20"/>
+      <Fill color="#475569"/>
+    </Group>
+    <TextLayout position="30,165" textAlign="start"/>
+  </Layer>
+
+  <Layer>
+    <Group>
+      <Text text="Mix " fontFamily="Arial" fontSize="16"/>
+      <Fill color="#475569"/>
+    </Group>
+    <Group>
+      <Text text="different" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+      <Fill color="#F59E0B"/>
+    </Group>
+    <Group>
+      <Text text=" sizes " fontFamily="Arial" fontSize="16"/>
+      <Fill color="#475569"/>
+    </Group>
+    <Group>
+      <Text text="freely" fontFamily="Arial" fontStyle="Bold Italic" fontSize="24"/>
+      <Fill color="#8B5CF6"/>
+    </Group>
+    <Group>
+      <Text text=" within one line." fontFamily="Arial" fontSize="16"/>
+      <Fill color="#475569"/>
+    </Group>
+    <TextLayout position="30,215" textAlign="start"/>
+  </Layer>
+
+  <Layer>
+    <Group>
+      <Text text="Center " fontFamily="Arial" fontSize="20"/>
+      <Fill color="#475569"/>
+    </Group>
+    <Group>
+      <Text text="aligned" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+      <Fill color="#EC4899"/>
+    </Group>
+    <Group>
+      <Text text=" rich text." fontFamily="Arial" fontSize="20"/>
+      <Fill color="#475569"/>
+    </Group>
+    <TextLayout position="200,265" textAlign="center"/>
+  </Layer>
+
+  <Layer>
+    <Text text="Gradient Fill" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+    <TextLayout position="200,310" textAlign="center"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="240,0">
+        <ColorStop offset="0" color="#F43F5E"/>
+        <ColorStop offset="0.5" color="#F59E0B"/>
+        <ColorStop offset="1" color="#10B981"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+</pagx>

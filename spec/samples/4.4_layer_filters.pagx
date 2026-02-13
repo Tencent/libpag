@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates layer filters: Blur and DropShadow -->
+<pagx version="1.0" width="400" height="400">
+  <Layer x="70" y="70">
+    <Rectangle center="130,130" size="260,260" roundness="40"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="260,260">
+        <ColorStop offset="0" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#6366F1"/>
+      </LinearGradient>
+    </Fill>
+    <BlurFilter blurX="4" blurY="4"/>
+    <DropShadowFilter offsetX="0" offsetY="16" blurX="48" blurY="48" color="#8B5CF680"/>
+  </Layer>
+</pagx>

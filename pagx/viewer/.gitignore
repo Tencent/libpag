@@ -1,7 +1,0 @@
-# Build outputs
-wasm-mt/
-
-# Build cache
-build-pagx-viewer/
-.*.md5
-.build.lock

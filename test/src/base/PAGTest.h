@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gtest/gtest.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
 class PAGTest : public testing::Test {
@@ -60,4 +61,30 @@ class PAGTest : public testing::Test {
   auto pagPlayer = std::make_shared<PAGPlayer>();                                \
   pagPlayer->setSurface(pagSurface);                                             \
   pagPlayer->setComposition(pagFile);
+
+class PAGXTest : public PAGTest {
+ public:
+  std::shared_ptr<tgfx::GLDevice> device = nullptr;
+  tgfx::Context* context = nullptr;
+
+  void SetUp() override {
+    PAGTest::SetUp();
+    device = tgfx::GLDevice::Make();
+    ASSERT_TRUE(device != nullptr);
+    context = device->lockContext();
+    ASSERT_TRUE(context != nullptr);
+  }
+
+  void TearDown() override {
+    if (device) {
+      device->unlock();
+    }
+    PAGTest::TearDown();
+  }
+};
+
+#define PAGX_TEST(test_case_name, test_name)             \
+  GTEST_TEST_(test_case_name, test_name, pag::PAGXTest, \
+              ::testing::internal::GetTypeId<pag::PAGXTest>())
+
 }  // namespace pag
