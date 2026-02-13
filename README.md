@@ -71,8 +71,8 @@ required for features like video templates.
 - HarmonyOS Next 5.0.0(12)+
 - macOS 10.15+
 - Windows 7.0+
-- Chrome 69.0+ (Web)
-- Safari 11.3+ (Web)
+- Chrome 69+ (Web)
+- Safari 15+ (Web)
 
 ## Getting Started
 

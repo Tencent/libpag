@@ -60,8 +60,8 @@ PAG 方案目前已经接入了腾讯系几乎所有主流应用以及外部几�
 - HarmonyOS Next 5.0.0(12) 版本及以上
 - macOS 10.15 版本及以上
 - Windows 7.0 版本及以上
-- Chrome 69.0 版本及以上
-- Safari 11.3 版本及以上
+- Chrome 69 版本及以上
+- Safari 15 版本及以上
 
 ## 快速接入
 
