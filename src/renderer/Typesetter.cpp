@@ -238,6 +238,7 @@ class TypesetterContext {
 
     // Shape each Text element individually, then concatenate them into a continuous paragraph.
     std::vector<ShapedInfo> shapedInfos = {};
+    shapedInfos.reserve(textElements.size());
     float totalWidth = 0;
 
     for (auto* text : textElements) {
@@ -327,6 +328,7 @@ class TypesetterContext {
     // TextLayout exists but some Text elements need re-typesetting.
     // Must re-typeset all Text elements together to apply layout correctly.
     std::vector<ShapedInfo> shapedInfos = {};
+    shapedInfos.reserve(textElements.size());
 
     for (auto* text : textElements) {
       ShapedInfo info = {};
