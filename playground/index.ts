@@ -1111,8 +1111,8 @@ function checkWasmSupport(): boolean {
 
 function getBrowserRequirements(): string {
     return `${t().errorBrowser}
-• Chrome 57+
-• Firefox 52+
+• Chrome 69+
+• Firefox 79+
 • Safari 15+
 • Edge 79+`;
 }
