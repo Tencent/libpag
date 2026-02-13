@@ -1454,17 +1454,6 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
 }
 
 Rect SVGParserContext::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
-  auto cacheIt = _shapeBoundsCache.find(element.get());
-  if (cacheIt != _shapeBoundsCache.end()) {
-    return cacheIt->second;
-  }
-
-  auto bounds = computeShapeBounds(element);
-  _shapeBoundsCache[element.get()] = bounds;
-  return bounds;
-}
-
-Rect SVGParserContext::computeShapeBounds(const std::shared_ptr<DOMNode>& element) {
   const auto& tag = element->name;
 
   if (tag == "rect") {
