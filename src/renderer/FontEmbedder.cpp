@@ -91,42 +91,28 @@ struct BitmapFontBuilder {
   std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash> glyphMapping = {};
 };
 
-static void CollectMaxFontSize(const tgfx::Font& font, tgfx::GlyphID glyphID,
-                               std::unordered_map<GlyphKey, float, GlyphKeyHash>& maxSizes) {
-  GlyphKey key = {font.getTypeface().get(), glyphID};
-  float fontSize = font.getSize();
-  auto [it, inserted] = maxSizes.emplace(key, fontSize);
-  if (!inserted && fontSize > it->second) {
-    it->second = fontSize;
-  }
-}
-
 static void CollectVectorGlyph(PAGXDocument* document, const tgfx::Font& font,
                                tgfx::GlyphID glyphID,
-                               const std::unordered_map<GlyphKey, float, GlyphKeyHash>& maxSizes,
+                               std::unordered_map<GlyphKey, float, GlyphKeyHash>& maxSizes,
                                VectorFontBuilder& builder) {
   GlyphKey key = {font.getTypeface().get(), glyphID};
+  float fontSize = font.getSize();
 
-  if (builder.glyphMapping.count(key)) {
-    return;
-  }
-
-  auto it = maxSizes.find(key);
-  if (it == maxSizes.end()) {
-    return;
-  }
-
-  float maxSize = it->second;
-  if (std::abs(font.getSize() - maxSize) > 0.001f) {
-    return;
+  // Track the maximum font size for each vector glyph, and only collect the path at the largest
+  // size to get the best quality when scaling to unitsPerEm space.
+  auto [sizeIt, inserted] = maxSizes.emplace(key, fontSize);
+  if (!inserted) {
+    if (fontSize <= sizeIt->second) {
+      return;
+    }
+    // Found a larger font size. Update the max and re-collect the glyph below.
+    sizeIt->second = fontSize;
   }
 
   tgfx::Path glyphPath = {};
   if (!font.getPath(glyphID, &glyphPath) || glyphPath.isEmpty()) {
     return;
   }
-
-  float fontSize = font.getSize();
   if (fontSize < 0.001f) {
     return;
   }
@@ -138,13 +124,20 @@ static void CollectVectorGlyph(PAGXDocument* document, const tgfx::Font& font,
     builder.font->unitsPerEm = VectorFontUnitsPerEm;
   }
 
+  auto mappingIt = builder.glyphMapping.find(key);
+  if (mappingIt != builder.glyphMapping.end()) {
+    // Re-collect at a larger font size: replace the existing glyph's path data.
+    auto existingGlyph = builder.font->glyphs[mappingIt->second - 1];
+    existingGlyph->path = document->makeNode<PathData>();
+    PathToPathData(glyphPath, existingGlyph->path);
+    existingGlyph->advance = font.getAdvance(glyphID) * scale;
+    return;
+  }
+
   auto glyph = document->makeNode<Glyph>();
   glyph->path = document->makeNode<PathData>();
   PathToPathData(glyphPath, glyph->path);
-
-  // Get advance in font size space and scale to unitsPerEm space
-  float advance = font.getAdvance(glyphID);
-  glyph->advance = advance * scale;
+  glyph->advance = font.getAdvance(glyphID) * scale;
 
   builder.font->glyphs.push_back(glyph);
   builder.glyphMapping[key] = static_cast<tgfx::GlyphID>(builder.font->glyphs.size());
@@ -447,6 +440,44 @@ static GlyphRun* CreateGlyphRunForIndices(
   return glyphRun;
 }
 
+static void CollectSpacingGlyph(PAGXDocument* document, const tgfx::Font& font,
+                                tgfx::GlyphID glyphID,
+                                const std::unordered_map<const tgfx::Typeface*, BitmapFontBuilder>&
+                                    bitmapBuilders,
+                                VectorFontBuilder& vectorBuilder) {
+  float advance = font.getAdvance(glyphID);
+  if (advance <= 0) {
+    return;
+  }
+  auto* typeface = font.getTypeface().get();
+  GlyphKey key = {typeface, glyphID};
+  float runFontSize = font.getSize();
+  if (runFontSize < 0.001f) {
+    return;
+  }
+  auto bitmapIt = bitmapBuilders.find(typeface);
+  if (bitmapIt != bitmapBuilders.end() && bitmapIt->second.font != nullptr) {
+    auto& builder = const_cast<BitmapFontBuilder&>(bitmapIt->second);
+    if (builder.glyphMapping.count(key)) {
+      return;
+    }
+    auto glyph = document->makeNode<Glyph>();
+    float backingSize = static_cast<float>(builder.backingSize);
+    glyph->advance = advance / runFontSize * backingSize;
+    builder.font->glyphs.push_back(glyph);
+    builder.glyphMapping[key] = static_cast<tgfx::GlyphID>(builder.font->glyphs.size());
+  } else if (vectorBuilder.font != nullptr) {
+    if (vectorBuilder.glyphMapping.count(key) > 0) {
+      return;
+    }
+    float scale = static_cast<float>(VectorFontUnitsPerEm) / runFontSize;
+    auto glyph = document->makeNode<Glyph>();
+    glyph->advance = advance * scale;
+    vectorBuilder.font->glyphs.push_back(glyph);
+    vectorBuilder.glyphMapping[key] = static_cast<tgfx::GlyphID>(vectorBuilder.font->glyphs.size());
+  }
+}
+
 bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedTextMap,
                           const std::vector<Text*>& textOrder) {
   if (document == nullptr) {
@@ -459,7 +490,9 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
   std::unordered_map<const tgfx::Typeface*, BitmapFontBuilder> bitmapBuilders = {};
   std::vector<const tgfx::Typeface*> bitmapTypefaces = {};
 
-  // First pass: collect max font size for each vector glyph
+  // First pass: classify all glyphs and collect vector/bitmap/spacing glyph data in one iteration.
+  // For vector glyphs, CollectVectorGlyph internally tracks the maximum font size and re-collects
+  // the path when a larger size is found, so no separate max-size pass is needed.
   for (auto* text : textOrder) {
     auto shapedText = FindShapedText(shapedTextMap, text);
     if (shapedText == nullptr || shapedText->textBlob == nullptr) {
@@ -473,83 +506,18 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
         if (type == GlyphType::Unknown) {
           type = ClassifyGlyph(run.font, glyphID);
         }
-        if (type == GlyphType::Vector) {
-          CollectMaxFontSize(run.font, glyphID, maxFontSizes);
-        }
-      }
-    }
-  }
-
-  // Second pass: collect vector and bitmap glyphs. Each glyph with a valid glyphID is written with
-  // its advance. Path and image data are optional - vector glyphs carry path, bitmap glyphs carry
-  // image.
-  for (auto* text : textOrder) {
-    auto shapedText = FindShapedText(shapedTextMap, text);
-    if (shapedText == nullptr || shapedText->textBlob == nullptr) {
-      continue;
-    }
-    for (const auto& run : *shapedText->textBlob) {
-      for (size_t i = 0; i < run.glyphCount; ++i) {
-        tgfx::GlyphID glyphID = run.glyphs[i];
-        GlyphKey key = {run.font.getTypeface().get(), glyphID};
-        auto type = glyphTypes[key];
-        if (type == GlyphType::Vector) {
-          CollectVectorGlyph(document, run.font, glyphID, maxFontSizes, vectorBuilder);
-        } else if (type == GlyphType::Bitmap) {
-          CollectBitmapGlyph(document, run.font, glyphID, bitmapBuilders, &bitmapTypefaces);
-        }
-      }
-    }
-  }
-
-  // Third pass: collect spacing glyphs (no path, no image, but has advance). Each spacing glyph
-  // is assigned to the same font as other visible glyphs from its typeface.
-  for (auto* text : textOrder) {
-    auto shapedText = FindShapedText(shapedTextMap, text);
-    if (shapedText == nullptr || shapedText->textBlob == nullptr) {
-      continue;
-    }
-    for (const auto& run : *shapedText->textBlob) {
-      auto* typeface = run.font.getTypeface().get();
-      for (size_t i = 0; i < run.glyphCount; ++i) {
-        tgfx::GlyphID glyphID = run.glyphs[i];
-        GlyphKey key = {typeface, glyphID};
-        if (glyphTypes[key] != GlyphType::Spacing) {
-          continue;
-        }
-        float advance = run.font.getAdvance(glyphID);
-        if (advance <= 0) {
-          continue;
-        }
-        auto bitmapIt = bitmapBuilders.find(typeface);
-        if (bitmapIt != bitmapBuilders.end() && bitmapIt->second.font != nullptr) {
-          auto& builder = bitmapIt->second;
-          if (builder.glyphMapping.count(key)) {
-            continue;
-          }
-          auto glyph = document->makeNode<Glyph>();
-          float runFontSize = run.font.getSize();
-          if (runFontSize < 0.001f) {
-            continue;
-          }
-          float backingSize = static_cast<float>(builder.backingSize);
-          glyph->advance = advance / runFontSize * backingSize;
-          builder.font->glyphs.push_back(glyph);
-          builder.glyphMapping[key] = static_cast<tgfx::GlyphID>(builder.font->glyphs.size());
-        } else if (vectorBuilder.font != nullptr) {
-          if (vectorBuilder.glyphMapping.count(key) > 0) {
-            continue;
-          }
-          float runFontSize = run.font.getSize();
-          if (runFontSize < 0.001f) {
-            continue;
-          }
-          float scale = static_cast<float>(VectorFontUnitsPerEm) / runFontSize;
-          auto glyph = document->makeNode<Glyph>();
-          glyph->advance = advance * scale;
-          vectorBuilder.font->glyphs.push_back(glyph);
-          vectorBuilder.glyphMapping[key] =
-              static_cast<tgfx::GlyphID>(vectorBuilder.font->glyphs.size());
+        switch (type) {
+          case GlyphType::Vector:
+            CollectVectorGlyph(document, run.font, glyphID, maxFontSizes, vectorBuilder);
+            break;
+          case GlyphType::Bitmap:
+            CollectBitmapGlyph(document, run.font, glyphID, bitmapBuilders, &bitmapTypefaces);
+            break;
+          case GlyphType::Spacing:
+            CollectSpacingGlyph(document, run.font, glyphID, bitmapBuilders, vectorBuilder);
+            break;
+          default:
+            break;
         }
       }
     }
@@ -570,7 +538,7 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
     }
   }
 
-  // Fourth pass: create GlyphRuns for each Text
+  // Second pass: create GlyphRuns for each Text
   for (auto* text : textOrder) {
     auto shapedText = FindShapedText(shapedTextMap, text);
     if (shapedText == nullptr || shapedText->textBlob == nullptr) {

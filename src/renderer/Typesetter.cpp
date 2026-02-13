@@ -218,21 +218,53 @@ class TypesetterContext {
     }
   }
 
-  void processRichTextWithLayout(std::vector<Text*>& textElements,
-                                   const TextLayout* textLayout) {
-    // If all Text elements have embedded GlyphRun data, use them directly.
-    bool allHaveEmbeddedData = true;
+  // Builds a TextBlob from shaped glyph runs, applying the given x/y offsets to all positions.
+  void buildTextBlobFromShapedInfo(ShapedInfo& info, float xOffset, float yOffset) {
+    if (info.runs.empty()) {
+      return;
+    }
+    tgfx::TextBlobBuilder builder = {};
+    std::vector<float> adjustedPositions = {};
+    for (auto& run : info.runs) {
+      if (run.glyphIDs.empty()) {
+        continue;
+      }
+      adjustedPositions.clear();
+      adjustedPositions.reserve(run.xPositions.size());
+      for (float x : run.xPositions) {
+        adjustedPositions.push_back(x + xOffset);
+      }
+      auto& buffer = builder.allocRunPosH(run.font, run.glyphIDs.size(), yOffset);
+      memcpy(buffer.glyphs, run.glyphIDs.data(), run.glyphIDs.size() * sizeof(tgfx::GlyphID));
+      memcpy(buffer.positions, adjustedPositions.data(),
+             adjustedPositions.size() * sizeof(float));
+    }
+    auto textBlob = builder.build();
+    if (textBlob != nullptr) {
+      ShapedText shapedText = {};
+      shapedText.textBlob = textBlob;
+      StoreShapedText(info.text, std::move(shapedText));
+    }
+  }
+
+  // Checks whether all Text elements have pre-embedded GlyphRun data. If so, stores them directly
+  // and returns true. Otherwise returns false, indicating that re-typesetting is needed.
+  bool tryUseEmbeddedGlyphRuns(const std::vector<Text*>& textElements) {
     for (auto* text : textElements) {
       if (text->glyphRuns.empty()) {
-        allHaveEmbeddedData = false;
-        break;
+        return false;
       }
     }
-    if (allHaveEmbeddedData) {
-      for (auto* text : textElements) {
-        auto shapedText = buildShapedTextFromEmbeddedGlyphRuns(text);
-        StoreShapedText(text, std::move(shapedText));
-      }
+    for (auto* text : textElements) {
+      auto shapedText = buildShapedTextFromEmbeddedGlyphRuns(text);
+      StoreShapedText(text, std::move(shapedText));
+    }
+    return true;
+  }
+
+  void processRichTextWithLayout(std::vector<Text*>& textElements,
+                                   const TextLayout* textLayout) {
+    if (tryUseEmbeddedGlyphRuns(textElements)) {
       return;
     }
 
@@ -259,61 +291,18 @@ class TypesetterContext {
       shapedInfos.push_back(std::move(info));
     }
 
-    // Calculate alignment offset based on total concatenated width
-    float alignOffset = calculateLayoutOffset(textLayout, totalWidth);
-    float baseX = textLayout->position.x;
-    float baseY = textLayout->position.y;
+    // Calculate a single alignment offset based on total concatenated width
+    float xOffset = calculateLayoutOffset(textLayout, totalWidth) + textLayout->position.x;
+    float yOffset = textLayout->position.y;
 
-    // Build TextBlob for each Text element with correct offsets
     for (auto& info : shapedInfos) {
-      if (info.runs.empty()) {
-        continue;
-      }
-
-      tgfx::TextBlobBuilder builder = {};
-      std::vector<float> adjustedPositions = {};
-
-      for (auto& run : info.runs) {
-        if (run.glyphIDs.empty()) {
-          continue;
-        }
-
-        adjustedPositions.clear();
-        adjustedPositions.reserve(run.xPositions.size());
-        for (float x : run.xPositions) {
-          adjustedPositions.push_back(x + alignOffset + baseX);
-        }
-
-        auto& buffer = builder.allocRunPosH(run.font, run.glyphIDs.size(), baseY);
-        memcpy(buffer.glyphs, run.glyphIDs.data(), run.glyphIDs.size() * sizeof(tgfx::GlyphID));
-        memcpy(buffer.positions, adjustedPositions.data(),
-               adjustedPositions.size() * sizeof(float));
-      }
-
-      auto textBlob = builder.build();
-      if (textBlob != nullptr) {
-        ShapedText shapedText = {};
-        shapedText.textBlob = textBlob;
-        StoreShapedText(info.text, std::move(shapedText));
-      }
+      buildTextBlobFromShapedInfo(info, xOffset, yOffset);
     }
   }
 
   void processTextWithLayout(std::vector<Text*>& textElements, const TextLayout* textLayout) {
-    // If TextLayout exists, check if ALL Text elements have embedded GlyphRun data.
-    // If any Text is missing embedded data, we must re-typeset all of them together.
-    bool allHaveEmbeddedData = true;
-    if (textLayout != nullptr) {
-      for (auto* text : textElements) {
-        if (text->glyphRuns.empty()) {
-          allHaveEmbeddedData = false;
-          break;
-        }
-      }
-    }
-
     // If no TextLayout or all have embedded data, process each Text individually
-    if (textLayout == nullptr || allHaveEmbeddedData) {
+    if (textLayout == nullptr) {
       for (auto* text : textElements) {
         if (!text->glyphRuns.empty()) {
           auto shapedText = buildShapedTextFromEmbeddedGlyphRuns(text);
@@ -325,6 +314,10 @@ class TypesetterContext {
       return;
     }
 
+    if (tryUseEmbeddedGlyphRuns(textElements)) {
+      return;
+    }
+
     // TextLayout exists but some Text elements need re-typesetting.
     // Must re-typeset all Text elements together to apply layout correctly.
     std::vector<ShapedInfo> shapedInfos = {};
@@ -333,56 +326,21 @@ class TypesetterContext {
     for (auto* text : textElements) {
       ShapedInfo info = {};
       info.text = text;
-
       if (!text->text.empty()) {
         shapeText(text, info);
       }
-
       shapedInfos.push_back(std::move(info));
     }
 
     // Apply TextLayout and create TextBlobs
     for (auto& info : shapedInfos) {
-      if (info.runs.empty()) {
-        continue;
-      }
-
       float xOffset = calculateLayoutOffset(textLayout, info.totalWidth);
       float yOffset = 0;
-
       if (textLayout->position.x != 0 || textLayout->position.y != 0) {
         xOffset += textLayout->position.x - info.text->position.x;
         yOffset = textLayout->position.y - info.text->position.y;
       }
-
-      // Build TextBlob with multiple runs
-      tgfx::TextBlobBuilder builder = {};
-      std::vector<float> adjustedPositions = {};
-
-      for (auto& run : info.runs) {
-        if (run.glyphIDs.empty()) {
-          continue;
-        }
-
-        // Apply offsets to positions
-        adjustedPositions.clear();
-        adjustedPositions.reserve(run.xPositions.size());
-        for (float x : run.xPositions) {
-          adjustedPositions.push_back(x + xOffset);
-        }
-
-        auto& buffer = builder.allocRunPosH(run.font, run.glyphIDs.size(), yOffset);
-        memcpy(buffer.glyphs, run.glyphIDs.data(), run.glyphIDs.size() * sizeof(tgfx::GlyphID));
-        memcpy(buffer.positions, adjustedPositions.data(),
-               adjustedPositions.size() * sizeof(float));
-      }
-
-      auto textBlob = builder.build();
-      if (textBlob != nullptr) {
-        ShapedText shapedText = {};
-        shapedText.textBlob = textBlob;
-        StoreShapedText(info.text, std::move(shapedText));
-      }
+      buildTextBlobFromShapedInfo(info, xOffset, yOffset);
     }
   }
 
