@@ -2163,6 +2163,9 @@ static bool isSimpleShapeLayer(const Layer* layer, const Element*& outGeometry,
   if (!layer->children.empty() || !layer->filters.empty() || !layer->styles.empty()) {
     return false;
   }
+  if (layer->mask != nullptr) {
+    return false;
+  }
   if (!layer->matrix.isIdentity() || layer->alpha != 1.0f) {
     return false;
   }
