@@ -157,8 +157,11 @@ static tgfx::Color ToTGFX(const Color& c) {
   // we need to convert it to sRGB for correct rendering.
   if (c.colorSpace == ColorSpace::DisplayP3) {
     // Convert Display P3 to sRGB using tgfx::ColorSpace
-    tgfx::ColorMatrix33 p3ToSRGB = {};
-    tgfx::ColorSpace::DisplayP3()->gamutTransformTo(tgfx::ColorSpace::SRGB().get(), &p3ToSRGB);
+    static const tgfx::ColorMatrix33 p3ToSRGB = [] {
+      tgfx::ColorMatrix33 matrix = {};
+      tgfx::ColorSpace::DisplayP3()->gamutTransformTo(tgfx::ColorSpace::SRGB().get(), &matrix);
+      return matrix;
+    }();
 
     float r = c.red * p3ToSRGB.values[0][0] + c.green * p3ToSRGB.values[0][1] +
               c.blue * p3ToSRGB.values[0][2];
@@ -511,7 +514,7 @@ class LayerBuilderContext {
   }
 
   std::shared_ptr<tgfx::Text> convertText(const Text* node) {
-    auto it = _shapedTextMap.find(const_cast<Text*>(node));
+    auto it = _shapedTextMap.find(node);
     if (it == _shapedTextMap.end() || it->second.textBlob == nullptr) {
       return nullptr;
     }

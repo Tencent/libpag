@@ -203,8 +203,6 @@ class SVGParserContext {
   // ColorSource reference counting for gradients and patterns.
   // Key is the SVG def id (e.g., "gradient1"), value is the number of times it's referenced.
   std::unordered_map<std::string, int> _colorSourceRefCount = {};
-  // Maps SVG def id to the PAGX resource id (only for those with refCount > 1).
-  std::unordered_map<std::string, std::string> _colorSourceIdMap = {};
   // Store the converted ColorSource by SVG def id (for reuse when refCount > 1).
   std::unordered_map<std::string, ColorSource*> _colorSourceCache = {};
   

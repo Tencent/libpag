@@ -46,7 +46,7 @@ struct ShapedText {
 /**
  * Mapping from Text nodes to their shaped text data.
  */
-using ShapedTextMap = std::unordered_map<Text*, ShapedText>;
+using ShapedTextMap = std::unordered_map<const Text*, ShapedText>;
 
 /**
  * Typesetter output containing shaped text and stable Text iteration order.

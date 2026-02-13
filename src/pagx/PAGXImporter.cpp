@@ -969,7 +969,10 @@ static Image* parseImage(const DOMNode* node, PAGXDocument* doc) {
   if (source.find("data:") == 0) {
     auto commaPos = source.find(',');
     if (commaPos != std::string::npos) {
-      image->data = Base64Decode(source.substr(commaPos + 1));
+      auto header = source.substr(0, commaPos);
+      if (header.find(";base64") != std::string::npos) {
+        image->data = Base64Decode(source.substr(commaPos + 1));
+      }
     }
   } else {
     image->filePath = source;

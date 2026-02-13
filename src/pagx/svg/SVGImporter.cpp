@@ -2864,56 +2864,13 @@ ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
   // If refCount > 1, we need to create/reuse a resource with an ID.
   if (refCount > 1) {
     // Check if we already created a resource for this ref.
-    auto idIt = _colorSourceIdMap.find(refId);
-    if (idIt != _colorSourceIdMap.end()) {
-      // Return a new ColorSource instance that references the existing resource.
-      // The caller should check if colorSource->id is non-empty to know it's a reference.
-      // We need to create a "stub" ColorSource with just the id set.
-      // Actually, the PAGXExporter uses colorSource->id to determine if it's a reference.
-      // So we create a new instance with just the id filled in.
-      
-      // For proper behavior, we create a copy of the cached ColorSource with the same id.
-      auto cacheIt = _colorSourceCache.find(refId);
-      if (cacheIt != _colorSourceCache.end()) {
-        // Clone the cached ColorSource
-        ColorSource* cached = cacheIt->second;
-        if (defName == "linearGradient") {
-          auto grad = _document->makeNode<LinearGradient>();
-          auto* src = static_cast<LinearGradient*>(cached);
-          grad->id = src->id;
-          grad->startPoint = src->startPoint;
-          grad->endPoint = src->endPoint;
-          grad->matrix = src->matrix;
-          grad->colorStops = src->colorStops;
-          return grad;
-        } else if (defName == "radialGradient") {
-          auto grad = _document->makeNode<RadialGradient>();
-          auto* src = static_cast<RadialGradient*>(cached);
-          grad->id = src->id;
-          grad->center = src->center;
-          grad->radius = src->radius;
-          grad->matrix = src->matrix;
-          grad->colorStops = src->colorStops;
-          return grad;
-        } else if (defName == "pattern") {
-          auto pattern = _document->makeNode<ImagePattern>();
-          auto* src = static_cast<ImagePattern*>(cached);
-          pattern->id = src->id;
-          pattern->image = src->image;
-          pattern->tileModeX = src->tileModeX;
-          pattern->tileModeY = src->tileModeY;
-          pattern->filterMode = src->filterMode;
-          pattern->mipmapMode = src->mipmapMode;
-          pattern->matrix = src->matrix;
-          return pattern;
-        }
-      }
-      return nullptr;
+    auto cacheIt = _colorSourceCache.find(refId);
+    if (cacheIt != _colorSourceCache.end()) {
+      return cacheIt->second;
     }
 
     // First time seeing this multi-referenced def, create the resource.
     std::string colorSourceId = generateColorSourceId();
-    _colorSourceIdMap[refId] = colorSourceId;
 
     ColorSource* colorSource = nullptr;
     if (defName == "linearGradient") {
@@ -2926,11 +2883,8 @@ ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
 
     if (colorSource) {
       colorSource->id = colorSourceId;
-      // Cache the raw pointer.
       _colorSourceCache[refId] = colorSource;
-      
-      // Now return a clone with the same id (as a reference).
-      return getColorSourceForRef(refId, shapeBounds);
+      return colorSource;
     }
     return nullptr;
   }

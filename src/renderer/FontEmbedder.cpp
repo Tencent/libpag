@@ -240,7 +240,7 @@ static GlyphType ClassifyGlyph(const tgfx::Font& font, tgfx::GlyphID glyphID) {
   return GlyphType::Spacing;
 }
 
-static const ShapedText* FindShapedText(const ShapedTextMap& shapedTextMap, Text* text) {
+static const ShapedText* FindShapedText(const ShapedTextMap& shapedTextMap, const Text* text) {
   if (text == nullptr) {
     return nullptr;
   }
