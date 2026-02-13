@@ -172,8 +172,8 @@ class SVGParserContext {
   std::string getAttribute(const std::shared_ptr<DOMNode>& node, const std::string& name,
                            const std::string& defaultValue = "");
 
-  // Parse and cache style properties (from style attribute and CSS class rules) for a node.
-  const std::unordered_map<std::string, std::string>& getStyleProperties(
+  // Parse style properties (from style attribute and CSS class rules) for a node.
+  std::unordered_map<std::string, std::string> getStyleProperties(
       const std::shared_ptr<DOMNode>& node);
 
   // Get href attribute from DOMNode, checking both "href" and "xlink:href".
@@ -240,11 +240,6 @@ class SVGParserContext {
   // CSS class rules: key is class name (without dot), value is style properties.
   // Example: {"cls-1": "fill: #fcfae9"}
   std::unordered_map<std::string, std::string> _cssClassRules = {};
-
-  // Cache of parsed style properties per DOMNode (from style attribute + CSS class rules).
-  // Key is the raw DOMNode pointer (valid for the lifetime of the DOM tree).
-  std::unordered_map<const DOMNode*, std::unordered_map<std::string, std::string>>
-      _stylePropertyCache = {};
 };
 
 }  // namespace pagx
