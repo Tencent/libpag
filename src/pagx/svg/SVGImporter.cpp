@@ -513,7 +513,10 @@ void SVGParserContext::parseStyleElement(const std::shared_ptr<DOMNode>& styleNo
 }
 
 Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
-                                                     const InheritedStyle& parentStyle) {
+                                                     const InheritedStyle& parentStyle, int depth) {
+  if (depth >= MAX_SVG_RECURSION_DEPTH) {
+    return nullptr;
+  }
   const auto& tag = element->name;
 
   if (tag == "defs" || tag == "linearGradient" || tag == "radialGradient" || tag == "pattern" ||
@@ -636,7 +639,7 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
     // Group: convert children as child layers.
     auto child = element->getFirstChild();
     while (child) {
-      auto childLayer = convertToLayer(child, inheritedStyle);
+      auto childLayer = convertToLayer(child, inheritedStyle, depth + 1);
       if (childLayer) {
         layer->children.push_back(childLayer);
       }
@@ -998,6 +1001,9 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
 Element* SVGParserContext::convertUse(
     const std::shared_ptr<DOMNode>& element) {
   std::string refId = resolveUrl(getHrefAttribute(element));
+  if (refId.empty() || _useStack.count(refId) > 0) {
+    return nullptr;
+  }
   auto it = _defs.find(refId);
   if (it == _defs.end()) {
     return nullptr;
@@ -1051,7 +1057,9 @@ Element* SVGParserContext::convertUse(
   }
 
   if (_options.expandUseReferences) {
+    _useStack.insert(refId);
     auto node = convertElement(it->second);
+    _useStack.erase(refId);
     if (node) {
       if (x != 0 || y != 0) {
         // Wrap in a group with translation.

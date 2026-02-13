@@ -82,6 +82,10 @@ class Font : public Node {
    */
   std::vector<Glyph*> glyphs = {};
 
+  static bool IsTypeOf(NodeType type) {
+    return type == NodeType::Font;
+  }
+
   NodeType nodeType() const override {
     return NodeType::Font;
   }

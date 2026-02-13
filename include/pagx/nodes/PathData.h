@@ -121,6 +121,10 @@ class PathData : public Node {
    */
   static int PointsPerVerb(PathVerb verb);
 
+  static bool IsTypeOf(NodeType type) {
+    return type == NodeType::PathData;
+  }
+
   NodeType nodeType() const override {
     return NodeType::PathData;
   }

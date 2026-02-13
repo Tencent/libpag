@@ -41,6 +41,10 @@ class Image : public Node {
    */
   std::string filePath = {};
 
+  static bool IsTypeOf(NodeType type) {
+    return type == NodeType::Image;
+  }
+
   NodeType nodeType() const override {
     return NodeType::Image;
   }

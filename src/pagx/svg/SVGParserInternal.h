@@ -45,6 +45,8 @@
 
 namespace pagx {
 
+static constexpr int MAX_SVG_RECURSION_DEPTH = 128;
+
 /**
  * Type of shadow-only filter for determining how to handle element content.
  */
@@ -94,7 +96,7 @@ class SVGParserContext {
   void parseDefs(const std::shared_ptr<DOMNode>& defsNode);
 
   Layer* convertToLayer(const std::shared_ptr<DOMNode>& element,
-                                            const InheritedStyle& parentStyle);
+                        const InheritedStyle& parentStyle, int depth = 0);
   void convertChildren(const std::shared_ptr<DOMNode>& element,
                        std::vector<Element*>& contents,
                        const InheritedStyle& inheritedStyle,
@@ -204,6 +206,7 @@ class SVGParserContext {
   std::vector<Layer*> _maskLayers = {};
   std::unordered_map<std::string, Image*> _imageSourceToId = {};  // Maps image source to resource node.
   std::unordered_set<std::string> _existingIds = {};  // All IDs found in SVG to avoid conflicts.
+  std::unordered_set<std::string> _useStack = {};  // Tracks <use> references being resolved to detect cycles.
   
   // ColorSource reference counting for gradients and patterns.
   // Key is the SVG def id (e.g., "gradient1"), value is the number of times it's referenced.
