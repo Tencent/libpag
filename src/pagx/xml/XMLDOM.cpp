@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DOM.h"
+#include "XMLDOM.h"
 #include <stack>
 #include <utility>
 #include "XMLParser.h"
@@ -116,14 +116,14 @@ class DOMParser : public XMLParser {
   int _level = 0;
 };
 
-// ============== DOM ==============
+// ============== XMLDOM ==============
 
-DOM::DOM(std::shared_ptr<DOMNode> root) : _root(std::move(root)) {
+XMLDOM::XMLDOM(std::shared_ptr<DOMNode> root) : _root(std::move(root)) {
 }
 
-DOM::~DOM() = default;
+XMLDOM::~XMLDOM() = default;
 
-std::shared_ptr<DOM> DOM::Make(const uint8_t* data, size_t length) {
+std::shared_ptr<XMLDOM> XMLDOM::Make(const uint8_t* data, size_t length) {
   DOMParser parser;
   if (!parser.parse(data, length)) {
     return nullptr;
@@ -132,10 +132,10 @@ std::shared_ptr<DOM> DOM::Make(const uint8_t* data, size_t length) {
   if (!root) {
     return nullptr;
   }
-  return std::shared_ptr<DOM>(new DOM(root));
+  return std::shared_ptr<XMLDOM>(new XMLDOM(root));
 }
 
-std::shared_ptr<DOM> DOM::MakeFromFile(const std::string& filePath) {
+std::shared_ptr<XMLDOM> XMLDOM::MakeFromFile(const std::string& filePath) {
   DOMParser parser;
   if (!parser.parseFile(filePath)) {
     return nullptr;
@@ -144,10 +144,10 @@ std::shared_ptr<DOM> DOM::MakeFromFile(const std::string& filePath) {
   if (!root) {
     return nullptr;
   }
-  return std::shared_ptr<DOM>(new DOM(root));
+  return std::shared_ptr<XMLDOM>(new XMLDOM(root));
 }
 
-std::shared_ptr<DOMNode> DOM::getRootNode() const {
+std::shared_ptr<DOMNode> XMLDOM::getRootNode() const {
   return _root;
 }
 

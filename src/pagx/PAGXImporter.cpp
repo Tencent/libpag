@@ -25,7 +25,7 @@
 #include "utils/Base64.h"
 #include "utils/StringParser.h"
 #include "svg/SVGPathParser.h"
-#include "xml/DOM.h"
+#include "xml/XMLDOM.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -1509,7 +1509,7 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const std::string& xmlConten
 }
 
 std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t length) {
-  auto dom = DOM::Make(data, length);
+  auto dom = XMLDOM::Make(data, length);
   if (!dom) {
     return nullptr;
   }

@@ -79,9 +79,9 @@ struct DOMNode {
 /**
  * Represents an XML DOM tree.
  */
-class DOM {
+class XMLDOM {
  public:
-  ~DOM();
+  ~XMLDOM();
 
   /**
    * Constructs a DOM tree from XML data in memory.
@@ -89,14 +89,14 @@ class DOM {
    * @param length Length of the data in bytes.
    * @return The DOM tree, or nullptr if parsing fails.
    */
-  static std::shared_ptr<DOM> Make(const uint8_t* data, size_t length);
+  static std::shared_ptr<XMLDOM> Make(const uint8_t* data, size_t length);
 
   /**
    * Constructs a DOM tree from an XML file.
    * @param filePath Path to the XML file.
    * @return The DOM tree, or nullptr if parsing fails.
    */
-  static std::shared_ptr<DOM> MakeFromFile(const std::string& filePath);
+  static std::shared_ptr<XMLDOM> MakeFromFile(const std::string& filePath);
 
   /**
    * Gets the root node of the DOM tree.
@@ -105,7 +105,7 @@ class DOM {
   std::shared_ptr<DOMNode> getRootNode() const;
 
  private:
-  explicit DOM(std::shared_ptr<DOMNode> root);
+  explicit XMLDOM(std::shared_ptr<DOMNode> root);
 
   std::shared_ptr<DOMNode> _root = nullptr;
 };

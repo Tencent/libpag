@@ -27,7 +27,7 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/SolidColor.h"
 #include "SVGParserContext.h"
-#include "xml/DOM.h"
+#include "xml/XMLDOM.h"
 
 namespace pagx {
 
@@ -79,7 +79,7 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parse(const uint8_t* data, size_
     return nullptr;
   }
 
-  auto dom = DOM::Make(data, length);
+  auto dom = XMLDOM::Make(data, length);
   if (!dom) {
     return nullptr;
   }
@@ -88,14 +88,14 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parse(const uint8_t* data, size_
 }
 
 std::shared_ptr<PAGXDocument> SVGParserContext::parseFile(const std::string& filePath) {
-  auto dom = DOM::MakeFromFile(filePath);
+  auto dom = XMLDOM::MakeFromFile(filePath);
   if (!dom) {
     return nullptr;
   }
 
   return parseDOM(dom);
 }
-std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<DOM>& dom) {
+std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<XMLDOM>& dom) {
   auto root = dom->getRootNode();
   if (!root || root->name != "svg") {
     return nullptr;
