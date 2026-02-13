@@ -908,17 +908,12 @@ async function loadPAGXData(data: Uint8Array, name: string, baseURL: string) {
     document.title = 'PAGX Playground - ' + name;
 }
 
-async function loadPAGXFile(file: File) {
-    // Clear previous content and hide canvas before loading
+async function prepareForLoading(): Promise<void> {
     hidePlaybackUI();
-    // Show loading UI with progress reset to 0%
-    const loadingStartTime = Date.now();
     showLoadingUI();
     resetProgressUI();
-    // Wait for 0% to render before starting
     await new Promise(resolve => requestAnimationFrame(resolve));
 
-    // Start loading resources if not already started
     if (!wasmLoadPromise) {
         wasmLoadPromise = loadWasm();
     }
@@ -926,26 +921,25 @@ async function loadPAGXFile(file: File) {
         fontLoadPromise = loadFonts();
     }
 
+    const loadingStartTime = Date.now();
+    await Promise.all([wasmLoadPromise, fontLoadPromise]);
+    updateProgressUI();
+
+    const elapsed = Date.now() - loadingStartTime;
+    const minDisplayTime = 300;
+    if (elapsed < minDisplayTime) {
+        await new Promise(resolve => setTimeout(resolve, minDisplayTime - elapsed));
+    }
+}
+
+async function loadPAGXFile(file: File) {
     try {
-        // Wait for WASM and fonts (progress goes from 0% to 99%)
-        await Promise.all([wasmLoadPromise, fontLoadPromise]);
-        updateProgressUI();
+        await prepareForLoading();
 
-        // Ensure minimum display time for loading UI (300ms)
-        const elapsed = Date.now() - loadingStartTime;
-        const minDisplayTime = 300;
-        if (elapsed < minDisplayTime) {
-            await new Promise(resolve => setTimeout(resolve, minDisplayTime - elapsed));
-        }
-
-        // Load PAGX file (progress stays at 99% during this)
         const fileBuffer = await file.arrayBuffer();
-
-        // Register fonts and load PAGX file
         await loadPAGXData(new Uint8Array(fileBuffer), file.name, '');
         currentPlayingFile = null;
 
-        // Clear file parameter from URL (local files have no URL)
         history.replaceState(null, '', window.location.pathname);
     } catch (error) {
         console.error('Failed to load PAGX file:', error);
@@ -954,52 +948,22 @@ async function loadPAGXFile(file: File) {
 }
 
 async function loadPAGXFromURL(url: string, pushHistory: boolean = true) {
-    // Clear previous content and hide canvas before loading
-    hidePlaybackUI();
-    // Show loading UI with progress reset to 0%
-    const loadingStartTime = Date.now();
-    showLoadingUI();
-    resetProgressUI();
-    // Wait for 0% to render before starting
-    await new Promise(resolve => requestAnimationFrame(resolve));
-
-    // Start loading resources if not already started
-    if (!wasmLoadPromise) {
-        wasmLoadPromise = loadWasm();
-    }
-    if (!fontLoadPromise) {
-        fontLoadPromise = loadFonts();
-    }
-
     try {
-        // Wait for WASM and fonts (progress goes from 0% to 99%)
-        await Promise.all([wasmLoadPromise, fontLoadPromise]);
-        updateProgressUI();
+        await prepareForLoading();
 
-        // Ensure minimum display time for loading UI (300ms)
-        const elapsed = Date.now() - loadingStartTime;
-        const minDisplayTime = 300;
-        if (elapsed < minDisplayTime) {
-            await new Promise(resolve => setTimeout(resolve, minDisplayTime - elapsed));
-        }
-
-        // Fetch PAGX file from URL
         const response = await fetch(url);
         if (!response.ok) {
             throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
         }
         const fileBuffer = await response.arrayBuffer();
 
-        // Extract filename and base URL
         const lastSlash = url.lastIndexOf('/');
         const baseURL = lastSlash >= 0 ? url.substring(0, lastSlash + 1) : '';
         const name = url.substring(lastSlash + 1) || 'remote.pagx';
 
-        // Register fonts and load PAGX file
         await loadPAGXData(new Uint8Array(fileBuffer), name, baseURL);
         currentPlayingFile = url;
 
-        // Update URL with file parameter (without page reload)
         const cleanUrl = window.location.pathname + '?file=' + url;
         if (pushHistory) {
             history.pushState(null, '', cleanUrl);
