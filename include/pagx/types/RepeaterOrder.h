@@ -24,7 +24,13 @@ namespace pagx {
  * Repeater stacking order.
  */
 enum class RepeaterOrder {
+  /**
+   * Place copies below (behind) the original elements.
+   */
   BelowOriginal,
+  /**
+   * Place copies above (in front of) the original elements.
+   */
   AboveOriginal
 };
 
