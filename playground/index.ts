@@ -77,7 +77,7 @@ const i18n: Record<string, I18nStrings> = {
         openFile: '打开 PAGX 文件',
         resetView: '重置视图',
         invalidFile: '请拖放 .pagx 文件',
-        spec: 'Spec',
+        spec: '格式',
         specTitle: 'PAGX 格式规范',
         leave: '离开',
         samples: '示例',
