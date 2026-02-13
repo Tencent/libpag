@@ -19,19 +19,13 @@
 #include "LayerBuilder.h"
 #include <tuple>
 #include <unordered_map>
+#include "Base64.h"
 #include "TGFXConverter.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
-#include "pagx/types/ColorSpace.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
-#include "pagx/types/Data.h"
 #include "pagx/nodes/DiamondGradient.h"
-#include "pagx/types/FillRule.h"
-#include "pagx/types/LayerPlacement.h"
-#include "pagx/types/MergePathMode.h"
-#include "pagx/types/TileMode.h"
-#include "Base64.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
@@ -40,7 +34,6 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
-#include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
@@ -49,23 +42,29 @@
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
+#include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
-#include "pagx/nodes/TextModifier.h"
-#include "pagx/nodes/RangeSelector.h"
+#include "pagx/types/ColorSpace.h"
+#include "pagx/types/Data.h"
+#include "pagx/types/FillRule.h"
+#include "pagx/types/LayerPlacement.h"
+#include "pagx/types/MergePathMode.h"
+#include "pagx/types/TileMode.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
-#include "tgfx/core/Path.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/core/TextBlobBuilder.h"
 #include "tgfx/layers/Layer.h"
@@ -92,10 +91,10 @@
 #include "tgfx/layers/vectors/SolidColor.h"
 #include "tgfx/layers/vectors/StrokeStyle.h"
 #include "tgfx/layers/vectors/Text.h"
-#include "tgfx/layers/vectors/TextPath.h"
-#include "tgfx/layers/vectors/TrimPath.h"
 #include "tgfx/layers/vectors/TextModifier.h"
+#include "tgfx/layers/vectors/TextPath.h"
 #include "tgfx/layers/vectors/TextSelector.h"
+#include "tgfx/layers/vectors/TrimPath.h"
 #include "tgfx/layers/vectors/VectorGroup.h"
 
 #ifdef DEBUG
@@ -109,27 +108,10 @@ namespace pagx {
 
 // Decode a data URI (e.g., "data:image/png;base64,...") to an Image.
 static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI) {
-  if (dataURI.find("data:") != 0) {
-    return nullptr;
-  }
-
-  auto commaPos = dataURI.find(',');
-  if (commaPos == std::string::npos) {
-    return nullptr;
-  }
-
-  auto header = dataURI.substr(0, commaPos);
-  auto base64Data = dataURI.substr(commaPos + 1);
-
-  if (header.find(";base64") == std::string::npos) {
-    return nullptr;
-  }
-
-  auto data = Base64Decode(base64Data);
+  auto data = DecodeBase64DataURI(dataURI);
   if (!data) {
     return nullptr;
   }
-
   return tgfx::Image::MakeFromEncoded(ToTGFXData(data));
 }
 
@@ -851,6 +833,9 @@ class LayerBuilderContext {
   void applyLayerAttributes(const Layer* node, tgfx::Layer* layer) {
     layer->setVisible(node->visible);
     layer->setAlpha(node->alpha);
+    if (node->blendMode != BlendMode::Normal) {
+      layer->setBlendMode(ToTGFX(node->blendMode));
+    }
 
     // Apply transformation: combine x/y translation with matrix
     auto matrix = ToTGFX(node->matrix);
