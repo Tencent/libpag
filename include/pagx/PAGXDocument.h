@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <cstdio>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -71,15 +70,7 @@ class PAGXDocument {
   T* makeNode(const std::string& id = "") {
     auto node = std::unique_ptr<T>(new T());
     auto* result = node.get();
-    if (!id.empty()) {
-      auto it = nodeMap.find(id);
-      if (it != nodeMap.end()) {
-        fprintf(stderr, "PAGXDocument::makeNode(): Duplicate node id '%s', overwriting.\n",
-                id.c_str());
-      }
-      result->id = id;
-      nodeMap[id] = result;
-    }
+    registerNode(result, id);
     nodes.push_back(std::move(node));
     return result;
   }
@@ -121,6 +112,8 @@ class PAGXDocument {
 
  private:
   PAGXDocument() = default;
+
+  void registerNode(Node* node, const std::string& id);
 
   std::unordered_map<std::string, Node*> nodeMap = {};
 

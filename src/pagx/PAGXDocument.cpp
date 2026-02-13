@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXDocument.h"
+#include <cstdio>
 #include "pagx/nodes/Image.h"
 
 namespace pagx {
@@ -31,6 +32,18 @@ std::shared_ptr<PAGXDocument> PAGXDocument::Make(float docWidth, float docHeight
 Node* PAGXDocument::findNode(const std::string& id) const {
   auto it = nodeMap.find(id);
   return it != nodeMap.end() ? it->second : nullptr;
+}
+
+void PAGXDocument::registerNode(Node* node, const std::string& id) {
+  if (id.empty()) {
+    return;
+  }
+  auto it = nodeMap.find(id);
+  if (it != nodeMap.end()) {
+    fprintf(stderr, "PAGXDocument::makeNode(): Duplicate node id '%s', overwriting.\n", id.c_str());
+  }
+  node->id = id;
+  nodeMap[id] = node;
 }
 
 std::vector<std::string> PAGXDocument::getExternalFilePaths() const {
