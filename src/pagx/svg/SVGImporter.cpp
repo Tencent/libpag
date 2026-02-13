@@ -1077,26 +1077,16 @@ LinearGradient* SVGParserContext::convertLinearGradient(
   Matrix transformMatrix = gradientTransform.empty() ? Matrix::Identity()
                                                      : parseTransform(gradientTransform);
 
-  if (useObjectBoundingBox) {
-    // For objectBoundingBox, coordinates are normalized 0-1.
-    // Convert to actual coordinates based on shape bounds.
-    Point start = {shapeBounds.x + x1 * shapeBounds.width, shapeBounds.y + y1 * shapeBounds.height};
-    Point end = {shapeBounds.x + x2 * shapeBounds.width, shapeBounds.y + y2 * shapeBounds.height};
-    // Apply gradient transform after converting to actual coordinates.
-    start = transformMatrix.mapPoint(start);
-    end = transformMatrix.mapPoint(end);
-    gradient->startPoint = start;
-    gradient->endPoint = end;
-  } else {
-    // For userSpaceOnUse, coordinates are in user space.
-    // Apply gradient transform to user space points.
-    Point start = {x1, y1};
-    Point end = {x2, y2};
-    start = transformMatrix.mapPoint(start);
-    end = transformMatrix.mapPoint(end);
-    gradient->startPoint = start;
-    gradient->endPoint = end;
-  }
+  Point start = useObjectBoundingBox
+                    ? Point{shapeBounds.x + x1 * shapeBounds.width,
+                            shapeBounds.y + y1 * shapeBounds.height}
+                    : Point{x1, y1};
+  Point end = useObjectBoundingBox
+                  ? Point{shapeBounds.x + x2 * shapeBounds.width,
+                          shapeBounds.y + y2 * shapeBounds.height}
+                  : Point{x2, y2};
+  gradient->startPoint = transformMatrix.mapPoint(start);
+  gradient->endPoint = transformMatrix.mapPoint(end);
 
   // Parse stops.
   parseGradientStops(element, gradient->colorStops);
@@ -1130,17 +1120,14 @@ RadialGradient* SVGParserContext::convertRadialGradient(
                         shapeBounds.y + cy * shapeBounds.height};
     // Radius is scaled by the average of width and height.
     gradient->radius = r * (shapeBounds.width + shapeBounds.height) / 2.0f;
-
-    if (!transformMatrix.isIdentity()) {
-      gradient->matrix = transformMatrix;
-    }
   } else {
     // For userSpaceOnUse, coordinates are in user space.
     gradient->center = {cx, cy};
     gradient->radius = r;
-    if (!transformMatrix.isIdentity()) {
-      gradient->matrix = transformMatrix;
-    }
+  }
+
+  if (!transformMatrix.isIdentity()) {
+    gradient->matrix = transformMatrix;
   }
 
   // Parse stops.
