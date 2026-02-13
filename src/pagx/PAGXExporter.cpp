@@ -79,7 +79,7 @@ class XMLBuilder {
     tagStack.push_back(tag);
   }
 
-  void addAttribute(const std::string& name, const std::string& value) {
+  void addAttribute(const char* name, const std::string& value) {
     if (!value.empty()) {
       buffer += " ";
       buffer += name;
@@ -89,7 +89,7 @@ class XMLBuilder {
     }
   }
 
-  void addAttribute(const std::string& name, float value, float defaultValue = 0) {
+  void addAttribute(const char* name, float value, float defaultValue = 0) {
     if (value != defaultValue) {
       buffer += " ";
       buffer += name;
@@ -99,7 +99,7 @@ class XMLBuilder {
     }
   }
 
-  void addRequiredAttribute(const std::string& name, float value) {
+  void addRequiredAttribute(const char* name, float value) {
     buffer += " ";
     buffer += name;
     buffer += "=\"";
@@ -107,7 +107,7 @@ class XMLBuilder {
     buffer += "\"";
   }
 
-  void addRequiredAttribute(const std::string& name, const std::string& value) {
+  void addRequiredAttribute(const char* name, const std::string& value) {
     buffer += " ";
     buffer += name;
     buffer += "=\"";
@@ -115,7 +115,7 @@ class XMLBuilder {
     buffer += "\"";
   }
 
-  void addAttribute(const std::string& name, int value, int defaultValue = 0) {
+  void addAttribute(const char* name, int value, int defaultValue = 0) {
     if (value != defaultValue) {
       buffer += " ";
       buffer += name;
@@ -125,7 +125,7 @@ class XMLBuilder {
     }
   }
 
-  void addAttribute(const std::string& name, bool value, bool defaultValue = false) {
+  void addAttribute(const char* name, bool value, bool defaultValue = false) {
     if (value != defaultValue) {
       buffer += " ";
       buffer += name;
@@ -1028,7 +1028,7 @@ static void writeLayer(XMLBuilder& xml, const Layer* node, const Options& option
 
   // Write custom data as data-* attributes.
   for (const auto& [key, value] : node->customData) {
-    xml.addAttribute("data-" + key, value);
+    xml.addAttribute(("data-" + key).c_str(), value);
   }
 
   bool hasChildren = !node->contents.empty() || !node->styles.empty() || !node->filters.empty() ||
