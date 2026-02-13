@@ -146,7 +146,7 @@ static void ParseStyleString(const std::string& styleStr,
 }
 
 const std::unordered_map<std::string, std::string>& SVGParserContext::getStyleProperties(
-    const std::shared_ptr<DOMNode>& node) const {
+    const std::shared_ptr<DOMNode>& node) {
   auto it = _stylePropertyCache.find(node.get());
   if (it != _stylePropertyCache.end()) {
     return it->second;
@@ -190,7 +190,7 @@ const std::unordered_map<std::string, std::string>& SVGParserContext::getStylePr
 
 std::string SVGParserContext::getAttribute(const std::shared_ptr<DOMNode>& node,
                                         const std::string& name,
-                                        const std::string& defaultValue) const {
+                                        const std::string& defaultValue) {
   // CSS priority: style attribute > presentation attribute > CSS class rules
   // The cached style properties map merges both style attribute and class rules,
   // with style attribute values overriding class rule values.
@@ -209,7 +209,7 @@ std::string SVGParserContext::getAttribute(const std::shared_ptr<DOMNode>& node,
   return defaultValue;
 }
 
-std::string SVGParserContext::getHrefAttribute(const std::shared_ptr<DOMNode>& node) const {
+std::string SVGParserContext::getHrefAttribute(const std::shared_ptr<DOMNode>& node) {
   auto href = getAttribute(node, "href");
   if (!href.empty()) {
     return href;
@@ -2334,6 +2334,19 @@ Color SVGParserContext::parseFilterColorMatrix(const std::shared_ptr<DOMNode>& n
   return color;
 }
 
+DropShadowFilter* SVGParserContext::createDropShadow(float offsetX, float offsetY, float blurX,
+                                                     float blurY, const Color& color,
+                                                     bool shadowOnly) {
+  auto dropShadow = _document->makeNode<DropShadowFilter>();
+  dropShadow->offsetX = offsetX;
+  dropShadow->offsetY = offsetY;
+  dropShadow->blurX = blurX;
+  dropShadow->blurY = blurY;
+  dropShadow->color = color;
+  dropShadow->shadowOnly = shadowOnly;
+  return dropShadow;
+}
+
 bool SVGParserContext::convertFilterElement(
     const std::shared_ptr<DOMNode>& filterElement,
     std::vector<LayerFilter*>& filters,
@@ -2384,14 +2397,7 @@ bool SVGParserContext::convertFilterElement(
         auto [blurX, blurY] = parseFilterBlur(primitives[i + 2]);
         auto shadowColor = parseFilterColorMatrix(primitives[i + 4]);
 
-        auto dropShadow = _document->makeNode<DropShadowFilter>();
-        dropShadow->offsetX = offsetX;
-        dropShadow->offsetY = offsetY;
-        dropShadow->blurX = blurX;
-        dropShadow->blurY = blurY;
-        dropShadow->color = shadowColor;
-        dropShadow->shadowOnly = shadowOnly;
-        filters.push_back(dropShadow);
+        filters.push_back(createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
 
         // Skip the consumed primitives (5 elements) plus the feBlend that follows.
         i += 5;
@@ -2410,14 +2416,7 @@ bool SVGParserContext::convertFilterElement(
         auto [blurX, blurY] = parseFilterBlur(primitives[i + 2]);
         auto shadowColor = parseFilterColorMatrix(primitives[i + 3]);
 
-        auto dropShadow = _document->makeNode<DropShadowFilter>();
-        dropShadow->offsetX = offsetX;
-        dropShadow->offsetY = offsetY;
-        dropShadow->blurX = blurX;
-        dropShadow->blurY = blurY;
-        dropShadow->color = shadowColor;
-        dropShadow->shadowOnly = shadowOnly;
-        filters.push_back(dropShadow);
+        filters.push_back(createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
 
         // Skip the consumed primitives (4 elements) plus the feBlend that follows.
         i += 4;
@@ -2435,14 +2434,7 @@ bool SVGParserContext::convertFilterElement(
         auto [offsetX, offsetY] = parseFilterOffset(primitives[i + 1]);
         auto shadowColor = parseFilterColorMatrix(primitives[i + 2]);
 
-        auto dropShadow = _document->makeNode<DropShadowFilter>();
-        dropShadow->offsetX = offsetX;
-        dropShadow->offsetY = offsetY;
-        dropShadow->blurX = 0;
-        dropShadow->blurY = 0;
-        dropShadow->color = shadowColor;
-        dropShadow->shadowOnly = shadowOnly;
-        filters.push_back(dropShadow);
+        filters.push_back(createDropShadow(offsetX, offsetY, 0, 0, shadowColor, shadowOnly));
 
         // Skip the consumed primitives (3 elements) plus any feBlend that follows.
         i += 3;
@@ -2509,14 +2501,7 @@ bool SVGParserContext::convertFilterElement(
           shadowColor = parseFilterColorMatrix(primitives[colorMatrixIdx]);
         }
 
-        auto dropShadow = _document->makeNode<DropShadowFilter>();
-        dropShadow->offsetX = offsetX;
-        dropShadow->offsetY = offsetY;
-        dropShadow->blurX = blurX;
-        dropShadow->blurY = blurY;
-        dropShadow->color = shadowColor;
-        dropShadow->shadowOnly = shadowOnly;
-        filters.push_back(dropShadow);
+        filters.push_back(createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
 
         // Skip consumed primitives.
         i += 2;
@@ -2542,14 +2527,7 @@ bool SVGParserContext::convertFilterElement(
           shadowColor = parseFilterColorMatrix(primitives[colorMatrixIdx]);
         }
 
-        auto dropShadow = _document->makeNode<DropShadowFilter>();
-        dropShadow->offsetX = offsetX;
-        dropShadow->offsetY = offsetY;
-        dropShadow->blurX = blurX;
-        dropShadow->blurY = blurY;
-        dropShadow->color = shadowColor;
-        dropShadow->shadowOnly = shadowOnly;
-        filters.push_back(dropShadow);
+        filters.push_back(createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
 
         // Skip consumed primitives.
         i += 2;
@@ -2674,37 +2652,26 @@ void SVGParserContext::countColorSourceReferences(const std::shared_ptr<DOMNode>
   }
 }
 
+void SVGParserContext::countUrlReference(const std::string& attrValue) {
+  if (!attrValue.empty() && attrValue.compare(0, 4, "url(") == 0) {
+    std::string refId = resolveUrl(attrValue);
+    auto it = _defs.find(refId);
+    if (it != _defs.end()) {
+      const auto& defName = it->second->name;
+      if (defName == "linearGradient" || defName == "radialGradient" || defName == "pattern") {
+        _colorSourceRefCount[refId]++;
+      }
+    }
+  }
+}
+
 void SVGParserContext::countColorSourceReferencesInElement(const std::shared_ptr<DOMNode>& element) {
   if (!element) {
     return;
   }
 
-  // Check fill attribute for url() references.
-  std::string fill = getAttribute(element, "fill");
-  if (!fill.empty() && fill.compare(0, 4, "url(") == 0) {
-    std::string refId = resolveUrl(fill);
-    auto it = _defs.find(refId);
-    if (it != _defs.end()) {
-      // Only count gradients and patterns, not masks/clipPaths/filters.
-      const auto& defName = it->second->name;
-      if (defName == "linearGradient" || defName == "radialGradient" || defName == "pattern") {
-        _colorSourceRefCount[refId]++;
-      }
-    }
-  }
-
-  // Check stroke attribute for url() references.
-  std::string stroke = getAttribute(element, "stroke");
-  if (!stroke.empty() && stroke.compare(0, 4, "url(") == 0) {
-    std::string refId = resolveUrl(stroke);
-    auto it = _defs.find(refId);
-    if (it != _defs.end()) {
-      const auto& defName = it->second->name;
-      if (defName == "linearGradient" || defName == "radialGradient" || defName == "pattern") {
-        _colorSourceRefCount[refId]++;
-      }
-    }
-  }
+  countUrlReference(getAttribute(element, "fill"));
+  countUrlReference(getAttribute(element, "stroke"));
 
   // Recurse into children.
   auto child = element->getFirstChild();
@@ -2735,35 +2702,15 @@ ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
     refCount = countIt->second;
   }
 
-  // If refCount > 1, we need to create/reuse a resource with an ID.
+  // If refCount > 1, check if we already created a resource for this ref.
   if (refCount > 1) {
-    // Check if we already created a resource for this ref.
     auto cacheIt = _colorSourceCache.find(refId);
     if (cacheIt != _colorSourceCache.end()) {
       return cacheIt->second;
     }
-
-    // First time seeing this multi-referenced def, create the resource.
-    std::string colorSourceId = generateColorSourceId();
-
-    ColorSource* colorSource = nullptr;
-    if (defName == "linearGradient") {
-      colorSource = convertLinearGradient(defNode, shapeBounds);
-    } else if (defName == "radialGradient") {
-      colorSource = convertRadialGradient(defNode, shapeBounds);
-    } else if (defName == "pattern") {
-      colorSource = convertPattern(defNode, shapeBounds);
-    }
-
-    if (colorSource) {
-      colorSource->id = colorSourceId;
-      _colorSourceCache[refId] = colorSource;
-      return colorSource;
-    }
-    return nullptr;
   }
 
-  // refCount <= 1: inline the ColorSource (no id).
+  // Convert the SVG def to a ColorSource.
   ColorSource* colorSource = nullptr;
   if (defName == "linearGradient") {
     colorSource = convertLinearGradient(defNode, shapeBounds);
@@ -2772,8 +2719,15 @@ ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
   } else if (defName == "pattern") {
     colorSource = convertPattern(defNode, shapeBounds);
   }
-  if (colorSource) {
-    // Clear the id for inline ColorSource to avoid being treated as a reference.
+
+  if (!colorSource) {
+    return nullptr;
+  }
+
+  if (refCount > 1) {
+    colorSource->id = generateColorSourceId();
+    _colorSourceCache[refId] = colorSource;
+  } else {
     colorSource->id.clear();
   }
   return colorSource;

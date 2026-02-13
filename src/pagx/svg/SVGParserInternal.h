@@ -171,14 +171,14 @@ class SVGParserContext {
 
   // Helper to get attribute from DOMNode.
   std::string getAttribute(const std::shared_ptr<DOMNode>& node, const std::string& name,
-                           const std::string& defaultValue = "") const;
+                           const std::string& defaultValue = "");
 
   // Parse and cache style properties (from style attribute and CSS class rules) for a node.
   const std::unordered_map<std::string, std::string>& getStyleProperties(
-      const std::shared_ptr<DOMNode>& node) const;
+      const std::shared_ptr<DOMNode>& node);
 
   // Get href attribute from DOMNode, checking both "href" and "xlink:href".
-  std::string getHrefAttribute(const std::shared_ptr<DOMNode>& node) const;
+  std::string getHrefAttribute(const std::shared_ptr<DOMNode>& node);
 
   // Register an image resource and return its node pointer.
   // If the image source (data URI or path) has already been registered, returns the existing node.
@@ -244,7 +244,7 @@ class SVGParserContext {
 
   // Cache of parsed style properties per DOMNode (from style attribute + CSS class rules).
   // Key is the raw DOMNode pointer (valid for the lifetime of the DOM tree).
-  mutable std::unordered_map<const DOMNode*, std::unordered_map<std::string, std::string>>
+  std::unordered_map<const DOMNode*, std::unordered_map<std::string, std::string>>
       _stylePropertyCache = {};
 };
 
