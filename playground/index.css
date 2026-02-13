@@ -366,6 +366,28 @@ html, body {
     .file-name {
         max-width: 150px;
     }
+
+    .samples-page {
+        padding: 0 16px 24px;
+    }
+
+    .samples-list {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    .samples-list > a {
+        padding: 6px;
+        gap: 6px;
+    }
+
+    .samples-list .sample-image {
+        border-radius: 4px;
+    }
+
+    .samples-list .sample-name {
+        font-size: 10px;
+    }
 }
 
 /* Samples page */
