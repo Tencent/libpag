@@ -45,6 +45,9 @@ class SVGImporter {
      * If true, nested transforms are flattened into single matrices.
      */
     bool flattenTransforms = false;
+
+    Options() {
+    }
   };
 
   /**
