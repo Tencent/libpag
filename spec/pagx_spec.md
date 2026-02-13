@@ -20,6 +20,8 @@
 
 PAGX is a plain XML file (`.pagx`) that can reference external resource files (images, videos, audio, fonts, etc.) or embed resources via data URIs. PAGX and binary PAG formats are bidirectionally convertible: convert to PAG for optimized loading performance during publishing; use PAGX format for reading and editing during development and review.
 
+PAGX files must use UTF-8 encoding. An XML declaration (`<?xml version="1.0" encoding="UTF-8"?>`) is recommended but not required. PAGX does not use XML namespaces.
+
 ### 1.3 Document Organization
 
 This specification is organized in the following order:
@@ -177,7 +179,32 @@ Floating-point format uses `colorspace(r, g, b)` or `colorspace(r, g, b, a)` to 
 
 Use `@resourceId` to reference color sources (gradients, patterns, etc.) defined in Resources.
 
-### 2.9 Path Data Syntax
+### 2.9 Blend Mode
+
+Blend modes define how source color (S) combines with destination color (D).
+
+| Value | Formula | Description |
+|-------|---------|-------------|
+| `normal` | S | Normal (overwrite) |
+| `multiply` | S × D | Multiply |
+| `screen` | 1 - (1-S)(1-D) | Screen |
+| `overlay` | multiply/screen combination | Overlay |
+| `darken` | min(S, D) | Darken |
+| `lighten` | max(S, D) | Lighten |
+| `colorDodge` | D / (1-S) | Color Dodge |
+| `colorBurn` | 1 - (1-D)/S | Color Burn |
+| `hardLight` | multiply/screen reversed combination | Hard Light |
+| `softLight` | Soft version of overlay | Soft Light |
+| `difference` | \|S - D\| | Difference |
+| `exclusion` | S + D - 2SD | Exclusion |
+| `hue` | D's saturation and luminosity + S's hue | Hue |
+| `saturation` | D's hue and luminosity + S's saturation | Saturation |
+| `color` | D's luminosity + S's hue and saturation | Color |
+| `luminosity` | S's luminosity + D's hue and saturation | Luminosity |
+| `plusLighter` | S + D | Plus Lighter (toward white) |
+| `plusDarker` | S + D - 1 | Plus Darker (toward black) |
+
+### 2.10 Path Data Syntax
 
 Path data uses SVG path syntax, consisting of a series of commands and coordinates.
 
@@ -196,7 +223,7 @@ Path data uses SVG path syntax, consisting of a series of commands and coordinat
 | A/a | rx ry rotation large-arc sweep x y | Elliptical arc |
 | Z/z | - | Close path |
 
-### 2.10 External Resource Reference
+### 2.11 External Resource Reference
 
 External resources are referenced via relative paths or data URIs, applicable to images, videos, audio, fonts, and other files.
 
@@ -608,6 +635,10 @@ Layer child elements are automatically categorized into four collections by type
 | `maskType` | MaskType | alpha | Mask type |
 | `composition` | idref | - | Composition reference "@id" |
 
+**groupOpacity**: When `false` (default), the layer's `alpha` is applied independently to each child element, which may cause overlapping semi-transparent children to appear darker at intersections. When `true`, all layer content is first composited into an offscreen buffer, then `alpha` is applied to the buffer as a whole, producing uniform transparency across the entire layer.
+
+**preserve3D**: When `false` (default), child layers with 3D transforms are flattened into the parent's 2D plane before compositing. When `true`, child layers retain their 3D positions and are rendered in a shared 3D space, enabling depth-based intersections and correct z-ordering among siblings. Similar to CSS `transform-style: preserve-3d`.
+
 **Transform Attribute Priority**: `x`/`y`, `matrix`, and `matrix3D` have an override relationship:
 - Only `x`/`y` set: Uses `x`/`y` for translation
 - `matrix` set: `matrix` overrides `x`/`y` values
@@ -621,30 +652,7 @@ Layer child elements are automatically categorized into four collections by type
 | `luminance` | Luminance mask: Uses mask's luminance values |
 | `contour` | Contour mask: Uses mask's contour for clipping |
 
-**BlendMode**:
-
-Blend modes define how source color (S) combines with destination color (D).
-
-| Value | Formula | Description |
-|-------|---------|-------------|
-| `normal` | S | Normal (overwrite) |
-| `multiply` | S × D | Multiply |
-| `screen` | 1 - (1-S)(1-D) | Screen |
-| `overlay` | multiply/screen combination | Overlay |
-| `darken` | min(S, D) | Darken |
-| `lighten` | max(S, D) | Lighten |
-| `colorDodge` | D / (1-S) | Color Dodge |
-| `colorBurn` | 1 - (1-D)/S | Color Burn |
-| `hardLight` | multiply/screen reversed combination | Hard Light |
-| `softLight` | Soft version of overlay | Soft Light |
-| `difference` | \|S - D\| | Difference |
-| `exclusion` | S + D - 2SD | Exclusion |
-| `hue` | D's saturation and luminosity + S's hue | Hue |
-| `saturation` | D's hue and luminosity + S's saturation | Saturation |
-| `color` | D's luminosity + S's hue and saturation | Color |
-| `luminosity` | S's luminosity + D's hue and saturation | Luminosity |
-| `plusLighter` | S + D | Plus Lighter (toward white) |
-| `plusDarker` | S + D - 1 | Plus Darker (toward black) |
+**BlendMode**: See Section 2.9 for the complete blend mode table.
 
 ### 4.3 Layer Styles
 
@@ -662,7 +670,7 @@ Some layer styles additionally use **layer contour** or **layer background** as 
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `blendMode` | BlendMode | normal | Blend mode (see Section 4.1) |
+| `blendMode` | BlendMode | normal | Blend mode (see Section 2.9) |
 
 #### 4.3.1 DropShadowStyle
 
@@ -781,7 +789,7 @@ Overlays a specified color onto the layer using a specified blend mode.
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `color` | Color | (required) | Blend color |
-| `blendMode` | BlendMode | normal | Blend mode (see Section 4.1) |
+| `blendMode` | BlendMode | normal | Blend mode (see Section 2.9) |
 
 #### 4.4.5 ColorMatrixFilter
 
@@ -1144,7 +1152,7 @@ Fill draws the interior region of geometry using a specified color source.
 |-----------|------|---------|-------------|
 | `color` | Color/idref | #000000 | Color value or color source reference, default black |
 | `alpha` | float | 1 | Opacity 0~1 |
-| `blendMode` | BlendMode | normal | Blend mode (see Section 4.1) |
+| `blendMode` | BlendMode | normal | Blend mode (see Section 2.9) |
 | `fillRule` | FillRule | winding | Fill rule (see below) |
 | `placement` | LayerPlacement | background | Rendering position (see Section 5.3.3) |
 
@@ -1173,7 +1181,7 @@ Stroke draws lines along geometry boundaries.
 | `color` | Color/idref | #000000 | Color value or color source reference, default black |
 | `width` | float | 1 | Stroke width |
 | `alpha` | float | 1 | Opacity 0~1 |
-| `blendMode` | BlendMode | normal | Blend mode (see Section 4.1) |
+| `blendMode` | BlendMode | normal | Blend mode (see Section 2.9) |
 | `cap` | LineCap | butt | Line cap style (see below) |
 | `join` | LineJoin | miter | Line join style (see below) |
 | `miterLimit` | float | 4 | Miter limit |
@@ -1241,7 +1249,7 @@ Trims paths to a specified start/end range.
 |-----------|------|---------|-------------|
 | `start` | float | 0 | Start position 0~1 |
 | `end` | float | 1 | End position 0~1 |
-| `offset` | float | 0 | Offset in degrees; 360° equals one full cycle of the path length |
+| `offset` | float | 0 | Offset in degrees; 360° equals one full cycle of the path length. For example, 180° shifts the trim range by half the path length |
 | `type` | TrimType | separate | Trim type (see below) |
 
 **TrimType**:
@@ -1252,7 +1260,7 @@ Trims paths to a specified start/end range.
 | `continuous` | Continuous mode: All shapes treated as one continuous path, trimmed by total length ratio |
 
 **Edge Cases**:
-- `start > end`: Reverse trim; path direction reversed
+- `start > end`: The start and end values are mirrored (`start = 1 - start`, `end = 1 - end`) and all path directions are reversed, then normal trimming is applied. The resulting visual is the complementary segment of the path with reversed direction
 - Supports wrapping: When trim range exceeds [0,1], automatically wraps to other end of path
 - When total path length is 0, no operation is performed
 
@@ -1302,7 +1310,7 @@ Merges all shapes into a single shape.
 | `difference` | Difference: Subtract subsequent shapes from first shape |
 
 **Important Behavior**:
-- MergePath **clears all previously rendered styles**
+- MergePath **clears all previously accumulated Fill and Stroke renderings** in the current scope; only the merged path remains in the geometry list
 - Current transformation matrices of shapes are applied during merge
 - Merged shape's transformation matrix resets to identity matrix
 
@@ -1392,8 +1400,8 @@ Applies transforms and style overrides to glyphs within selected ranges. TextMod
 | `position` | Point | 0,0 | Position offset |
 | `rotation` | float | 0 | Rotation |
 | `scale` | Point | 1,1 | Scale |
-| `skew` | float | 0 | Skew |
-| `skewAxis` | float | 0 | Skew axis |
+| `skew` | float | 0 | Skew amount in degrees along the skewAxis direction |
+| `skewAxis` | float | 0 | Skew axis angle in degrees; defines the direction along which skewing is applied |
 | `alpha` | float | 1 | Opacity |
 | `fillColor` | Color | - | Fill color override |
 | `strokeColor` | Color | - | Stroke color override |
@@ -1483,8 +1491,8 @@ Range selectors define the glyph range and influence degree for TextModifier.
 |-------|-------------|
 | `add` | Add: Accumulate selector weights |
 | `subtract` | Subtract: Subtract selector weights |
-| `intersect` | Intersect: Take minimum weight |
-| `min` | Min: Take minimum value |
+| `intersect` | Intersect: Use the intersection of selector ranges |
+| `min` | Min: Take the minimum of selector values |
 | `max` | Max: Take maximum value |
 | `difference` | Difference: Take absolute difference |
 
@@ -1605,11 +1613,11 @@ Repeater duplicates accumulated content and rendered styles, applying progressiv
 **Transform Calculation** (i-th copy, i starts from 0):
 ```
 progress = i + offset
-matrix = translate(-anchor) 
-       × scale(scale^progress)      // Exponential scaling
-       × rotate(rotation × progress) // Linear rotation
+matrix = translate(anchor)
        × translate(position × progress) // Linear translation
-       × translate(anchor)
+       × rotate(rotation × progress)    // Linear rotation
+       × scale(scale^progress)           // Exponential scaling
+       × translate(-anchor)
 ```
 
 **Opacity Interpolation**:

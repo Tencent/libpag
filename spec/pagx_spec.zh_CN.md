@@ -20,6 +20,8 @@
 
 PAGX 是纯 XML 文件（`.pagx`），可引用外部资源文件（图片、视频、音频、字体等），也支持通过数据 URI 内嵌资源。PAGX 与二进制 PAG 格式可双向互转：发布时转换为 PAG 以优化加载性能；开发、审查或编辑时可使用 PAGX 格式以便阅读和修改。
 
+PAGX 文件必须使用 UTF-8 编码。推荐但不强制添加 XML 声明（`<?xml version="1.0" encoding="UTF-8"?>`）。PAGX 不使用 XML 命名空间。
+
 ### 1.3 文档组织
 
 本规范按以下顺序组织：
@@ -177,7 +179,32 @@ HEX 格式用于表示 sRGB 色域的颜色，使用 `#` 前缀的十六进制�
 
 使用 `@resourceId` 引用 Resources 中定义的颜色源（渐变、图案等）。
 
-### 2.9 路径数据语法（Path Data Syntax）
+### 2.9 混合模式（Blend Mode）
+
+混合模式定义源颜色（S）如何与目标颜色（D）组合。
+
+| 值 | 公式 | 说明 |
+|------|------|------|
+| `normal` | S | 正常（覆盖） |
+| `multiply` | S × D | 正片叠底 |
+| `screen` | 1 - (1-S)(1-D) | 滤色 |
+| `overlay` | multiply/screen 组合 | 叠加 |
+| `darken` | min(S, D) | 变暗 |
+| `lighten` | max(S, D) | 变亮 |
+| `colorDodge` | D / (1-S) | 颜色减淡 |
+| `colorBurn` | 1 - (1-D)/S | 颜色加深 |
+| `hardLight` | multiply/screen 反向组合 | 强光 |
+| `softLight` | 柔和版叠加 | 柔光 |
+| `difference` | \|S - D\| | 差值 |
+| `exclusion` | S + D - 2SD | 排除 |
+| `hue` | D 的饱和度和亮度 + S 的色相 | 色相 |
+| `saturation` | D 的色相和亮度 + S 的饱和度 | 饱和度 |
+| `color` | D 的亮度 + S 的色相和饱和度 | 颜色 |
+| `luminosity` | S 的亮度 + D 的色相和饱和度 | 亮度 |
+| `plusLighter` | S + D | 相加（趋向白色） |
+| `plusDarker` | S + D - 1 | 相加减一（趋向黑色） |
+
+### 2.10 路径数据语法（Path Data Syntax）
 
 路径数据使用 SVG 路径语法，由一系列命令和坐标组成。
 
@@ -196,7 +223,7 @@ HEX 格式用于表示 sRGB 色域的颜色，使用 `#` 前缀的十六进制�
 | A/a | rx ry rotation large-arc sweep x y | 椭圆弧 |
 | Z/z | - | 闭合路径 |
 
-### 2.10 外部资源引用（External Resource Reference）
+### 2.11 外部资源引用（External Resource Reference）
 
 外部资源通过相对路径或数据 URI 引用，适用于图片、视频、音频、字体等文件。
 
@@ -445,14 +472,14 @@ Font 定义嵌入字体资源，包含子集化的字形数据（矢量轮廓或
 ```xml
 <!-- 嵌入矢量字体 -->
 <Font id="myFont" unitsPerEm="1000">
-  <Glyph path="M 50 0 L 300 700 L 550 0 Z" advance="600"/>
-  <Glyph path="M 100 0 L 100 700 L 400 700 C 550 700 550 400 400 400 Z" advance="550"/>
+  <Glyph advance="600" path="M 50 0 L 300 700 L 550 0 Z"/>
+  <Glyph advance="550" path="M 100 0 L 100 700 L 400 700 C 550 700 550 400 400 400 Z"/>
 </Font>
 
 <!-- 嵌入位图字体（Emoji） -->
 <Font id="emojiFont" unitsPerEm="136">
-  <Glyph image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA..." advance="136"/>
-  <Glyph image="emoji/heart.png" offset="0,-5" advance="136"/>
+  <Glyph advance="136" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA..."/>
+  <Glyph advance="136" image="emoji/heart.png" offset="0,-5"/>
 </Font>
 ```
 
@@ -608,6 +635,10 @@ Layer 的子元素按类型自动归类为四个集合：
 | `maskType` | MaskType | alpha | 遮罩类型 |
 | `composition` | idref | - | 合成引用 "@id" |
 
+**groupOpacity**：当值为 `false`（默认）时，图层的 `alpha` 独立应用到每个子元素，重叠的半透明子元素在交叉处可能显得更深。当值为 `true` 时，所有图层内容先合成到离屏缓冲区，再将 `alpha` 整体应用到缓冲区，使整个图层呈现均匀的透明效果。
+
+**preserve3D**：当值为 `false`（默认）时，具有 3D 变换的子图层在合成前会被压平到父级的 2D 平面。当值为 `true` 时，子图层保留其 3D 位置，在共享的 3D 空间中渲染，实现基于深度的交叉和正确的兄弟层 Z 排序。类似于 CSS 的 `transform-style: preserve-3d`。
+
 **变换属性优先级**：`x`/`y`、`matrix`、`matrix3D` 三者存在覆盖关系：
 - 仅设置 `x`/`y`：使用 `x`/`y` 作为平移
 - 设置 `matrix`：`matrix` 覆盖 `x`/`y` 的值
@@ -621,30 +652,7 @@ Layer 的子元素按类型自动归类为四个集合：
 | `luminance` | 亮度遮罩：使用遮罩的亮度值 |
 | `contour` | 轮廓遮罩：使用遮罩的轮廓进行裁剪 |
 
-**BlendMode（混合模式）**：
-
-混合模式定义源颜色（S）如何与目标颜色（D）组合。
-
-| 值 | 公式 | 说明 |
-|------|------|------|
-| `normal` | S | 正常（覆盖） |
-| `multiply` | S × D | 正片叠底 |
-| `screen` | 1 - (1-S)(1-D) | 滤色 |
-| `overlay` | multiply/screen 组合 | 叠加 |
-| `darken` | min(S, D) | 变暗 |
-| `lighten` | max(S, D) | 变亮 |
-| `colorDodge` | D / (1-S) | 颜色减淡 |
-| `colorBurn` | 1 - (1-D)/S | 颜色加深 |
-| `hardLight` | multiply/screen 反向组合 | 强光 |
-| `softLight` | 柔和版叠加 | 柔光 |
-| `difference` | \|S - D\| | 差值 |
-| `exclusion` | S + D - 2SD | 排除 |
-| `hue` | D 的饱和度和亮度 + S 的色相 | 色相 |
-| `saturation` | D 的色相和亮度 + S 的饱和度 | 饱和度 |
-| `color` | D 的亮度 + S 的色相和饱和度 | 颜色 |
-| `luminosity` | S 的亮度 + D 的色相和饱和度 | 亮度 |
-| `plusLighter` | S + D | 相加（趋向白色） |
-| `plusDarker` | S + D - 1 | 相加减一（趋向黑色） |
+**BlendMode**：见 2.9 节混合模式完整表格。
 
 ### 4.3 图层样式（Layer Styles）
 
@@ -662,7 +670,7 @@ Layer 的子元素按类型自动归类为四个集合：
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `blendMode` | BlendMode | normal | 混合模式（见 4.1 节） |
+| `blendMode` | BlendMode | normal | 混合模式（见 2.9 节） |
 
 #### 4.3.1 投影阴影（DropShadowStyle）
 
@@ -781,7 +789,7 @@ Layer 的子元素按类型自动归类为四个集合：
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `color` | Color | (必填) | 混合颜色 |
-| `blendMode` | BlendMode | normal | 混合模式（见 4.1 节） |
+| `blendMode` | BlendMode | normal | 混合模式（见 2.9 节） |
 
 #### 4.4.5 颜色矩阵滤镜（ColorMatrixFilter）
 
@@ -1144,7 +1152,7 @@ finalY[i] = y + positions[i].y
 |------|------|--------|------|
 | `color` | Color/idref | #000000 | 颜色值或颜色源引用，默认黑色 |
 | `alpha` | float | 1 | 透明度 0~1 |
-| `blendMode` | BlendMode | normal | 混合模式（见 4.1 节） |
+| `blendMode` | BlendMode | normal | 混合模式（见 2.9 节） |
 | `fillRule` | FillRule | winding | 填充规则（见下方） |
 | `placement` | LayerPlacement | background | 绘制位置（见 5.3.3 节） |
 
@@ -1173,7 +1181,7 @@ finalY[i] = y + positions[i].y
 | `color` | Color/idref | #000000 | 颜色值或颜色源引用，默认黑色 |
 | `width` | float | 1 | 描边宽度 |
 | `alpha` | float | 1 | 透明度 0~1 |
-| `blendMode` | BlendMode | normal | 混合模式（见 4.1 节） |
+| `blendMode` | BlendMode | normal | 混合模式（见 2.9 节） |
 | `cap` | LineCap | butt | 线帽样式（见下方） |
 | `join` | LineJoin | miter | 线连接样式（见下方） |
 | `miterLimit` | float | 4 | 斜接限制 |
@@ -1252,7 +1260,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 | `continuous` | 连续模式：所有形状视为一条连续路径，按总长度比例裁剪 |
 
 **边界情况**：
-- `start > end`：反向裁剪，路径方向反转
+- `start > end`：对 start 和 end 值取镜像（`start = 1 - start`，`end = 1 - end`）并反转所有路径方向，然后执行正常裁剪。视觉效果为路径的互补段且方向相反
 - 支持环绕：当裁剪范围超出 [0,1] 时，自动环绕到路径另一端
 - 路径总长度为 0 时，不执行任何操作
 
@@ -1302,7 +1310,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 | `difference` | 差集：从第一个形状中减去后续形状 |
 
 **重要行为**：
-- MergePath 会**清空之前渲染的所有样式**
+- MergePath 会**清空当前作用域中之前累积的所有 Fill 和 Stroke 渲染结果**，几何列表中仅保留合并后的路径
 - 合并时应用各形状的当前变换矩阵
 - 合并后的形状变换矩阵重置为单位矩阵
 
@@ -1390,8 +1398,8 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 | `position` | Point | 0,0 | 位置偏移 |
 | `rotation` | float | 0 | 旋转 |
 | `scale` | Point | 1,1 | 缩放 |
-| `skew` | float | 0 | 倾斜 |
-| `skewAxis` | float | 0 | 倾斜轴 |
+| `skew` | float | 0 | 倾斜角度（度），沿 skewAxis 方向应用 |
+| `skewAxis` | float | 0 | 倾斜轴角度（度），定义倾斜的作用方向 |
 | `alpha` | float | 1 | 透明度 |
 | `fillColor` | Color | - | 填充颜色覆盖 |
 | `strokeColor` | Color | - | 描边颜色覆盖 |
@@ -1481,8 +1489,8 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 |------|------|
 | `add` | 相加：累加选择器权重 |
 | `subtract` | 相减：减去选择器权重 |
-| `intersect` | 交集：取最小权重 |
-| `min` | 最小：取最小值 |
+| `intersect` | 交集：使用选择器范围的交集 |
+| `min` | 最小：取选择器值的最小值 |
 | `max` | 最大：取最大值 |
 | `difference` | 差值：取绝对差值 |
 
@@ -1600,11 +1608,11 @@ TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会
 **变换计算**（第 i 个副本，i 从 0 开始）：
 ```
 progress = i + offset
-matrix = translate(-anchor) 
-       × scale(scale^progress)      // 指数缩放
-       × rotate(rotation × progress) // 线性旋转
+matrix = translate(anchor)
        × translate(position × progress) // 线性位移
-       × translate(anchor)
+       × rotate(rotation × progress)    // 线性旋转
+       × scale(scale^progress)           // 指数缩放
+       × translate(-anchor)
 ```
 
 **透明度插值**：
