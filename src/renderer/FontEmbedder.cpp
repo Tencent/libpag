@@ -101,11 +101,10 @@ static void CollectMaxFontSize(const tgfx::Font& font, tgfx::GlyphID glyphID,
   }
 }
 
-static void CollectVectorGlyph(
-    PAGXDocument* document, const tgfx::Font& font, tgfx::GlyphID glyphID,
-    const std::unordered_map<GlyphKey, float, GlyphKeyHash>& maxSizes,
-    std::unordered_map<GlyphKey, tgfx::Path, GlyphKeyHash>& cachedPaths,
-    VectorFontBuilder& builder) {
+static void CollectVectorGlyph(PAGXDocument* document, const tgfx::Font& font,
+                               tgfx::GlyphID glyphID,
+                               const std::unordered_map<GlyphKey, float, GlyphKeyHash>& maxSizes,
+                               VectorFontBuilder& builder) {
   GlyphKey key = {font.getTypeface().get(), glyphID};
 
   if (builder.glyphMapping.find(key) != builder.glyphMapping.end()) {
@@ -123,11 +122,7 @@ static void CollectVectorGlyph(
   }
 
   tgfx::Path glyphPath = {};
-  auto cacheIt = cachedPaths.find(key);
-  if (cacheIt != cachedPaths.end()) {
-    glyphPath = std::move(cacheIt->second);
-    cachedPaths.erase(cacheIt);
-  } else if (!font.getPath(glyphID, &glyphPath) || glyphPath.isEmpty()) {
+  if (!font.getPath(glyphID, &glyphPath) || glyphPath.isEmpty()) {
     return;
   }
 
@@ -241,15 +236,9 @@ enum class GlyphType {
   Spacing,
 };
 
-static GlyphType ClassifyGlyph(
-    const tgfx::Font& font, tgfx::GlyphID glyphID,
-    std::unordered_map<GlyphKey, tgfx::Path, GlyphKeyHash>* cachedPaths) {
+static GlyphType ClassifyGlyph(const tgfx::Font& font, tgfx::GlyphID glyphID) {
   tgfx::Path glyphPath = {};
   if (font.getPath(glyphID, &glyphPath) && !glyphPath.isEmpty()) {
-    if (cachedPaths != nullptr) {
-      GlyphKey key = {font.getTypeface().get(), glyphID};
-      cachedPaths->emplace(key, std::move(glyphPath));
-    }
     return GlyphType::Vector;
   }
   tgfx::Matrix imageMatrix = {};
@@ -466,7 +455,6 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
 
   std::unordered_map<GlyphKey, GlyphType, GlyphKeyHash> glyphTypes = {};
   std::unordered_map<GlyphKey, float, GlyphKeyHash> maxFontSizes = {};
-  std::unordered_map<GlyphKey, tgfx::Path, GlyphKeyHash> cachedPaths = {};
   VectorFontBuilder vectorBuilder = {};
   std::unordered_map<const tgfx::Typeface*, BitmapFontBuilder> bitmapBuilders = {};
   std::vector<const tgfx::Typeface*> bitmapTypefaces = {};
@@ -483,7 +471,7 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
         GlyphKey key = {run.font.getTypeface().get(), glyphID};
         auto& type = glyphTypes[key];
         if (type == GlyphType::Unknown) {
-          type = ClassifyGlyph(run.font, glyphID, &cachedPaths);
+          type = ClassifyGlyph(run.font, glyphID);
         }
         if (type == GlyphType::Vector) {
           CollectMaxFontSize(run.font, glyphID, maxFontSizes);
@@ -506,8 +494,7 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
         GlyphKey key = {run.font.getTypeface().get(), glyphID};
         auto type = glyphTypes[key];
         if (type == GlyphType::Vector) {
-          CollectVectorGlyph(document, run.font, glyphID, maxFontSizes, cachedPaths,
-                             vectorBuilder);
+          CollectVectorGlyph(document, run.font, glyphID, maxFontSizes, vectorBuilder);
         } else if (type == GlyphType::Bitmap) {
           CollectBitmapGlyph(document, run.font, glyphID, bitmapBuilders, &bitmapTypefaces);
         }
