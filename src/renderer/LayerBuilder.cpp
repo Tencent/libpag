@@ -526,9 +526,7 @@ class LayerBuilderContext {
     if (node->data) {
       shapePath->setPath(ToTGFX(*node->data));
     }
-    if (node->reversed) {
-      shapePath->setReversed(true);
-    }
+    shapePath->setReversed(node->reversed);
     return shapePath;
   }
 
