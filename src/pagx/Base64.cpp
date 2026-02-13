@@ -93,8 +93,8 @@ std::shared_ptr<Data> DecodeBase64DataURI(const std::string& dataURI) {
   if (commaPos == std::string::npos) {
     return nullptr;
   }
-  auto header = dataURI.substr(0, commaPos);
-  if (header.find(";base64") == std::string::npos) {
+  auto base64Pos = dataURI.find(";base64");
+  if (base64Pos == std::string::npos || base64Pos > commaPos) {
     return nullptr;
   }
   return Base64Decode(dataURI.substr(commaPos + 1));
