@@ -140,23 +140,23 @@ static ColorMatrixFilter* parseColorMatrixFilter(const DOMNode* node, PAGXDocume
 static void parseResources(const DOMNode* node, PAGXDocument* doc) {
   auto child = node->firstChild;
   while (child) {
-    if (child->type == DOMNodeType::Element) {
-      // Try to parse as a resource (Image, PathData, Composition, Font)
-      auto resource = parseResource(child.get(), doc);
-      if (resource) {
-        child = child->nextSibling;
-        continue;
-      }
-      // Try to parse as a color source (SolidColor, Gradient, ImagePattern)
-      auto colorSource = parseColorSource(child.get(), doc);
-      if (colorSource) {
-        child = child->nextSibling;
-        continue;
-      }
-      // Unknown resource type - report error.
-      fprintf(stderr, "PAGXImporter: Unknown element '%s' in Resources.\n", child->name.c_str());
-    }
+    auto current = child;
     child = child->nextSibling;
+    if (current->type != DOMNodeType::Element) {
+      continue;
+    }
+    // Try to parse as a resource (Image, PathData, Composition, Font)
+    auto resource = parseResource(current.get(), doc);
+    if (resource) {
+      continue;
+    }
+    // Try to parse as a color source (SolidColor, Gradient, ImagePattern)
+    auto colorSource = parseColorSource(current.get(), doc);
+    if (colorSource) {
+      continue;
+    }
+    // Unknown resource type - report error.
+    fprintf(stderr, "PAGXImporter: Unknown element '%s' in Resources.\n", current->name.c_str());
   }
 }
 
@@ -228,57 +228,52 @@ static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
 
   auto child = node->firstChild;
   while (child) {
-    if (child->type == DOMNodeType::Element) {
-      // Legacy format: support container nodes for backward compatibility.
-      if (child->name == "contents") {
-        parseContents(child.get(), layer, doc);
-        child = child->nextSibling;
-        continue;
-      }
-      if (child->name == "styles") {
-        parseStyles(child.get(), layer, doc);
-        child = child->nextSibling;
-        continue;
-      }
-      if (child->name == "filters") {
-        parseFilters(child.get(), layer, doc);
-        child = child->nextSibling;
-        continue;
-      }
-      // New format: direct child elements without container nodes.
-      if (child->name == "Layer") {
-        auto childLayer = parseLayer(child.get(), doc);
-        if (childLayer) {
-          layer->children.push_back(childLayer);
-        }
-        child = child->nextSibling;
-        continue;
-      }
-      // Try to parse as VectorElement.
-      auto element = parseElement(child.get(), doc);
-      if (element) {
-        layer->contents.push_back(element);
-        child = child->nextSibling;
-        continue;
-      }
-      // Try to parse as LayerStyle.
-      auto style = parseLayerStyle(child.get(), doc);
-      if (style) {
-        layer->styles.push_back(style);
-        child = child->nextSibling;
-        continue;
-      }
-      // Try to parse as LayerFilter.
-      auto filter = parseLayerFilter(child.get(), doc);
-      if (filter) {
-        layer->filters.push_back(filter);
-        child = child->nextSibling;
-        continue;
-      }
-      // Unknown node type - report error.
-      fprintf(stderr, "PAGXImporter: Unknown element '%s' in Layer.\n", child->name.c_str());
-    }
+    auto current = child;
     child = child->nextSibling;
+    if (current->type != DOMNodeType::Element) {
+      continue;
+    }
+    // Legacy format: support container nodes for backward compatibility.
+    if (current->name == "contents") {
+      parseContents(current.get(), layer, doc);
+      continue;
+    }
+    if (current->name == "styles") {
+      parseStyles(current.get(), layer, doc);
+      continue;
+    }
+    if (current->name == "filters") {
+      parseFilters(current.get(), layer, doc);
+      continue;
+    }
+    // New format: direct child elements without container nodes.
+    if (current->name == "Layer") {
+      auto childLayer = parseLayer(current.get(), doc);
+      if (childLayer) {
+        layer->children.push_back(childLayer);
+      }
+      continue;
+    }
+    // Try to parse as VectorElement.
+    auto element = parseElement(current.get(), doc);
+    if (element) {
+      layer->contents.push_back(element);
+      continue;
+    }
+    // Try to parse as LayerStyle.
+    auto style = parseLayerStyle(current.get(), doc);
+    if (style) {
+      layer->styles.push_back(style);
+      continue;
+    }
+    // Try to parse as LayerFilter.
+    auto filter = parseLayerFilter(current.get(), doc);
+    if (filter) {
+      layer->filters.push_back(filter);
+      continue;
+    }
+    // Unknown node type - report error.
+    fprintf(stderr, "PAGXImporter: Unknown element '%s' in Layer.\n", current->name.c_str());
   }
 
   return layer;
@@ -287,45 +282,51 @@ static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
 static void parseContents(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
   auto child = node->firstChild;
   while (child) {
-    if (child->type == DOMNodeType::Element) {
-      auto element = parseElement(child.get(), doc);
-      if (element) {
-        layer->contents.push_back(element);
-      } else {
-        fprintf(stderr, "PAGXImporter: Unknown element '%s' in contents.\n", child->name.c_str());
-      }
-    }
+    auto current = child;
     child = child->nextSibling;
+    if (current->type != DOMNodeType::Element) {
+      continue;
+    }
+    auto element = parseElement(current.get(), doc);
+    if (element) {
+      layer->contents.push_back(element);
+    } else {
+      fprintf(stderr, "PAGXImporter: Unknown element '%s' in contents.\n", current->name.c_str());
+    }
   }
 }
 
 static void parseStyles(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
   auto child = node->firstChild;
   while (child) {
-    if (child->type == DOMNodeType::Element) {
-      auto style = parseLayerStyle(child.get(), doc);
-      if (style) {
-        layer->styles.push_back(style);
-      } else {
-        fprintf(stderr, "PAGXImporter: Unknown element '%s' in styles.\n", child->name.c_str());
-      }
-    }
+    auto current = child;
     child = child->nextSibling;
+    if (current->type != DOMNodeType::Element) {
+      continue;
+    }
+    auto style = parseLayerStyle(current.get(), doc);
+    if (style) {
+      layer->styles.push_back(style);
+    } else {
+      fprintf(stderr, "PAGXImporter: Unknown element '%s' in styles.\n", current->name.c_str());
+    }
   }
 }
 
 static void parseFilters(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
   auto child = node->firstChild;
   while (child) {
-    if (child->type == DOMNodeType::Element) {
-      auto filter = parseLayerFilter(child.get(), doc);
-      if (filter) {
-        layer->filters.push_back(filter);
-      } else {
-        fprintf(stderr, "PAGXImporter: Unknown element '%s' in filters.\n", child->name.c_str());
-      }
-    }
+    auto current = child;
     child = child->nextSibling;
+    if (current->type != DOMNodeType::Element) {
+      continue;
+    }
+    auto filter = parseLayerFilter(current.get(), doc);
+    if (filter) {
+      layer->filters.push_back(filter);
+    } else {
+      fprintf(stderr, "PAGXImporter: Unknown element '%s' in filters.\n", current->name.c_str());
+    }
   }
 }
 
