@@ -37,6 +37,8 @@ static constexpr double ZoomInEndTimeoutMs = 300.0;
 static constexpr double ZoomOutEndTimeoutMs = 800.0;
 // The delay in milliseconds before retrying a tile refinement upgrade after zoom ends.
 static constexpr double UpgradeRetryDelayMs = 300.0;
+// The initial delay in milliseconds before upgrading tile refinement after zoom ends.
+static constexpr double InitialUpgradeDelayMs = 200.0;
 // The minimum number of normal frames required to recover from slow state in static mode.
 static constexpr size_t MinRecoveryFramesStatic = 20;
 // The minimum number of normal frames required to recover from slow state after zoom ends.
@@ -315,7 +317,7 @@ void PAGXView::onZoomEnd() {
   isZooming = false;
   currentMaxTilesRefinedPerFrame = 1;
   displayList.setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
-  tryUpgradeTimestampMs = emscripten_get_now() + 200.0;
+  tryUpgradeTimestampMs = emscripten_get_now() + InitialUpgradeDelayMs;
 }
 
 void PAGXView::updatePerformanceState(double frameDurationMs) {
