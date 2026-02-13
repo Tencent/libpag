@@ -69,8 +69,10 @@ namespace pagx {
 // Forward declarations and utility functions
 //==============================================================================
 
-static std::string getAttribute(const DOMNode* node, const std::string& name,
-                                const std::string& defaultValue = "");
+static const std::string EMPTY_STRING = {};
+
+static const std::string& getAttribute(const DOMNode* node, const std::string& name,
+                                       const std::string& defaultValue = EMPTY_STRING);
 static float getFloatAttribute(const DOMNode* node, const std::string& name,
                                float defaultValue = 0);
 static int getIntAttribute(const DOMNode* node, const std::string& name, int defaultValue = 0);
@@ -1276,8 +1278,8 @@ static ColorMatrixFilter* parseColorMatrixFilter(const DOMNode* node, PAGXDocume
 // Utility functions
 //==============================================================================
 
-static std::string getAttribute(const DOMNode* node, const std::string& name,
-                                        const std::string& defaultValue) {
+static const std::string& getAttribute(const DOMNode* node, const std::string& name,
+                                       const std::string& defaultValue) {
   auto* value = node->findAttribute(name);
   return value ? *value : defaultValue;
 }
