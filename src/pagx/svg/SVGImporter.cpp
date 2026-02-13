@@ -2048,6 +2048,7 @@ PathData SVGParserContext::parsePoints(const std::string& value, bool closed) {
 
   // Parse space/comma-separated float values.
   std::vector<float> points;
+  points.reserve(value.size() / 4);
   const char* ptr = value.c_str();
   const char* end = ptr + value.size();
   while (ptr < end) {
