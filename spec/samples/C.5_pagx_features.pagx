@@ -83,7 +83,7 @@
     <!-- Curved definition caption -->
     <Layer x="0" y="0">
       <Text text="An XML-based markup language for describing animated vector graphics." fontFamily="Arial" fontSize="12"/>
-      <TextPath path="M -142 0 A 142 142 0 0 0 142 0" forceAlignment="true"/>
+      <TextPath path="M -141 0 A 141 141 0 0 0 141 0" forceAlignment="true"/>
       <Fill color="#64748B60"/>
     </Layer>
   </Layer>
