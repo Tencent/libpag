@@ -76,22 +76,23 @@ static pagx::Group* MakeCenteredTextGroup(pagx::PAGXDocument* doc, const std::st
   return group;
 }
 
-static std::vector<std::shared_ptr<Typeface>> GetFallbackTypefaces() {
-  static std::vector<std::shared_ptr<Typeface>> typefaces;
-  static bool initialized = false;
-  if (!initialized) {
-    initialized = true;
-    auto regularTypeface =
-        Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
-    if (regularTypeface) {
-      typefaces.push_back(regularTypeface);
-    }
-    auto emojiTypeface =
-        Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
-    if (emojiTypeface) {
-      typefaces.push_back(emojiTypeface);
-    }
+static std::vector<std::shared_ptr<Typeface>> CreateFallbackTypefaces() {
+  std::vector<std::shared_ptr<Typeface>> result = {};
+  auto regularTypeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  if (regularTypeface) {
+    result.push_back(regularTypeface);
   }
+  auto emojiTypeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
+  if (emojiTypeface) {
+    result.push_back(emojiTypeface);
+  }
+  return result;
+}
+
+static std::vector<std::shared_ptr<Typeface>> GetFallbackTypefaces() {
+  static auto typefaces = CreateFallbackTypefaces();
   return typefaces;
 }
 

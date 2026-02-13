@@ -19,6 +19,7 @@
 #include "LayerBuilder.h"
 #include <tuple>
 #include <unordered_map>
+#include "TGFXConverter.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/types/ColorSpace.h"
@@ -29,6 +30,7 @@
 #include "pagx/types/FillRule.h"
 #include "pagx/types/LayerPlacement.h"
 #include "pagx/types/MergePathMode.h"
+#include "pagx/types/TileMode.h"
 #include "Base64.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
@@ -173,27 +175,7 @@ static tgfx::Rect ToTGFX(const Rect& r) {
 }
 
 static tgfx::Path ToTGFX(const PathData& pathData) {
-  tgfx::Path path = {};
-  pathData.forEach([&](PathVerb verb, const Point* pts) {
-    switch (verb) {
-      case PathVerb::Move:
-        path.moveTo(pts[0].x, pts[0].y);
-        break;
-      case PathVerb::Line:
-        path.lineTo(pts[0].x, pts[0].y);
-        break;
-      case PathVerb::Quad:
-        path.quadTo(pts[0].x, pts[0].y, pts[1].x, pts[1].y);
-        break;
-      case PathVerb::Cubic:
-        path.cubicTo(pts[0].x, pts[0].y, pts[1].x, pts[1].y, pts[2].x, pts[2].y);
-        break;
-      case PathVerb::Close:
-        path.close();
-        break;
-    }
-  });
-  return path;
+  return PathDataToTGFXPath(pathData);
 }
 
 static tgfx::LineCap ToTGFX(LineCap cap) {
@@ -309,6 +291,20 @@ static tgfx::LayerMaskType ToTGFXMaskType(MaskType type) {
       return tgfx::LayerMaskType::Contour;
   }
   return tgfx::LayerMaskType::Alpha;
+}
+
+static tgfx::TileMode ToTGFX(TileMode mode) {
+  switch (mode) {
+    case TileMode::Clamp:
+      return tgfx::TileMode::Clamp;
+    case TileMode::Repeat:
+      return tgfx::TileMode::Repeat;
+    case TileMode::Mirror:
+      return tgfx::TileMode::Mirror;
+    case TileMode::Decal:
+      return tgfx::TileMode::Decal;
+  }
+  return tgfx::TileMode::Clamp;
 }
 
 namespace {
@@ -703,21 +699,8 @@ class LayerBuilderContext {
       return nullptr;
     }
 
-    // Convert tile modes.
-    auto tileModeX = tgfx::TileMode::Clamp;
-    auto tileModeY = tgfx::TileMode::Clamp;
-    if (node->tileModeX == TileMode::Repeat) {
-      tileModeX = tgfx::TileMode::Repeat;
-    } else if (node->tileModeX == TileMode::Mirror) {
-      tileModeX = tgfx::TileMode::Mirror;
-    }
-    if (node->tileModeY == TileMode::Repeat) {
-      tileModeY = tgfx::TileMode::Repeat;
-    } else if (node->tileModeY == TileMode::Mirror) {
-      tileModeY = tgfx::TileMode::Mirror;
-    }
-
-    auto pattern = tgfx::ImagePattern::Make(image, tileModeX, tileModeY);
+    auto pattern = tgfx::ImagePattern::Make(image, ToTGFX(node->tileModeX),
+                                             ToTGFX(node->tileModeY));
     if (pattern && !node->matrix.isIdentity()) {
       pattern->setMatrix(ToTGFX(node->matrix));
     }
