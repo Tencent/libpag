@@ -294,7 +294,6 @@ class LayerBuilderContext {
   }
 
   std::shared_ptr<tgfx::Layer> build(const PAGXDocument& document) {
-    _document = &document;
     // Clear mappings from previous builds.
     _tgfxLayerByPagxLayer.clear();
     _pendingMasks.clear();
@@ -321,7 +320,6 @@ class LayerBuilderContext {
       }
     }
 
-    _document = nullptr;
     _tgfxLayerByPagxLayer.clear();
     _pendingMasks.clear();
     return rootLayer;
@@ -925,7 +923,6 @@ class LayerBuilderContext {
   }
 
   const ShapedTextMap& _shapedTextMap;
-  const PAGXDocument* _document = nullptr;
   std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> _tgfxLayerByPagxLayer = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
