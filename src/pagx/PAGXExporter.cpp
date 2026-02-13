@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2026 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -73,7 +73,7 @@ class XMLBuilder {
     buffer += "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
   }
 
-  void openElement(const std::string& tag) {
+  void openElement(const char* tag) {
     writeIndent();
     buffer += "<";
     buffer += tag;
@@ -169,7 +169,7 @@ class XMLBuilder {
 
  private:
   std::string buffer = {};
-  std::vector<std::string> tagStack = {};
+  std::vector<const char*> tagStack = {};
   int indentLevel = 0;
 
   void writeIndent() {

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2026 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -1278,39 +1278,39 @@ static std::string getAttribute(const DOMNode* node, const std::string& name,
 }
 
 static float getFloatAttribute(const DOMNode* node, const std::string& name,
-                                       float defaultValue) {
-  auto str = getAttribute(node, name);
-  if (str.empty()) {
+                               float defaultValue) {
+  auto* str = node->findAttribute(name);
+  if (!str || str->empty()) {
     return defaultValue;
   }
   char* endPtr = nullptr;
-  float value = strtof(str.c_str(), &endPtr);
-  if (endPtr == str.c_str()) {
+  float value = strtof(str->c_str(), &endPtr);
+  if (endPtr == str->c_str()) {
     return defaultValue;
   }
   return value;
 }
 
 static int getIntAttribute(const DOMNode* node, const std::string& name, int defaultValue) {
-  auto str = getAttribute(node, name);
-  if (str.empty()) {
+  auto* str = node->findAttribute(name);
+  if (!str || str->empty()) {
     return defaultValue;
   }
   char* endPtr = nullptr;
-  long value = strtol(str.c_str(), &endPtr, 10);
-  if (endPtr == str.c_str()) {
+  long value = strtol(str->c_str(), &endPtr, 10);
+  if (endPtr == str->c_str()) {
     return defaultValue;
   }
   return static_cast<int>(value);
 }
 
 static bool getBoolAttribute(const DOMNode* node, const std::string& name,
-                                     bool defaultValue) {
-  auto str = getAttribute(node, name);
-  if (str.empty()) {
+                             bool defaultValue) {
+  auto* str = node->findAttribute(name);
+  if (!str || str->empty()) {
     return defaultValue;
   }
-  return str == "true" || str == "1";
+  return *str == "true" || *str == "1";
 }
 
 static const char* skipWhitespaceAndComma(const char* ptr, const char* end) {
