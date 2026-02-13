@@ -92,7 +92,9 @@ class PAGXDocument {
 
   /**
    * Finds a node of the specified type by ID.
-   * Returns nullptr if not found.
+   * The caller must ensure T matches the actual node type, otherwise behavior is undefined.
+   * @param id The unique identifier of the node.
+   * @return A pointer to the node cast to type T, or nullptr if not found.
    */
   template <typename T>
   T* findNode(const std::string& id) const {
