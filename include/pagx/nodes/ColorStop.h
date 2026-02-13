@@ -25,6 +25,8 @@ namespace pagx {
 
 /**
  * A color stop defines a color at a specific position in a gradient.
+ * Unlike other Node subclasses, ColorStop is stored by value in gradient color stop arrays
+ * and does not need to be created through PAGXDocument::makeNode().
  */
 class ColorStop : public Node {
  public:
