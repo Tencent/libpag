@@ -23,24 +23,24 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include "pagx/PAGXDocument.h"
+#include "pagx/SVGImporter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/DropShadowFilter.h"
-#include "pagx/nodes/InnerShadowFilter.h"
-#include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Stroke.h"
-#include "pagx/nodes/TextLayout.h"
 #include "pagx/nodes/Text.h"
-#include "pagx/SVGImporter.h"
+#include "pagx/nodes/TextLayout.h"
 #include "xml/XMLDOM.h"
 
 namespace pagx {
