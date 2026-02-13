@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="150">
+	<!-- display-p3 green -->
+	<rect fill="color(display-p3 0.0 1.0 0.0)" x="10" y="10" width="80" height="80"/>
+	<!-- a98-rgb red -->
+	<rect fill="color(a98-rgb 1.0 0.0 0.0)" x="110" y="10" width="80" height="80"/>
+	<!-- rec2020 blue -->
+	<rect fill="color(rec2020 0.0 0.0 1.0)" x="210" y="10" width="80" height="80"/>
+	<!-- mixed colors row -->
+	<rect fill="color(display-p3 0.5 0.3 0.8)" x="10" y="100" width="40" height="40"/>
+	<rect fill="color(a98-rgb 0.8 0.5 0.2)" x="60" y="100" width="40" height="40"/>
+	<rect fill="color(rec2020 0.2 0.7 0.5)" x="110" y="100" width="40" height="40"/>
+</svg>

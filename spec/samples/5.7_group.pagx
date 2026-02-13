@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="400" height="400">
+  <Layer>
+    <Group anchor="110,110" position="200,200" rotation="12">
+      <Rectangle center="110,110" size="220,220" roundness="32"/>
+      <Fill>
+        <LinearGradient startPoint="0,0" endPoint="220,220">
+          <ColorStop offset="0" color="#F43F5E"/>
+          <ColorStop offset="0.5" color="#EC4899"/>
+          <ColorStop offset="1" color="#8B5CF6"/>
+        </LinearGradient>
+      </Fill>
+    </Group>
+    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#EC489960"/>
+  </Layer>
+</pagx>

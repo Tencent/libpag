@@ -1,0 +1,7 @@
+# Build outputs
+wasm-mt/
+
+# Build cache
+build-pagx-playground/
+.*.md5
+.build.lock

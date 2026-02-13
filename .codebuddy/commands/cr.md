@@ -67,8 +67,8 @@ done
 # 拉取最新的 main 分支
 git fetch origin main
 
-# 当前分支相对 origin/main 的完整变更（已提交 + 暂存区 + 工作区的最终结果）
-git diff origin/main
+# 当前分支相对 origin/main 分叉点的完整变更（已提交 + 暂存区 + 工作区的最终结果）
+git diff $(git merge-base origin/main HEAD)
 
 # 查看文件状态（用于识别未跟踪文件）
 git status
@@ -105,8 +105,8 @@ cd /tmp/pr-review-{pr_number}
 # 拉取最新的 main 分支
 git fetch origin main
 
-# 当前分支相对 origin/main 的完整变更
-git diff origin/main
+# 当前分支相对 origin/main 分叉点的完整变更
+git diff $(git merge-base origin/main HEAD)
 
 gh pr view {pr_number} --comments
 ```
@@ -233,3 +233,4 @@ echo "已清理临时审查环境"
 9. **潜在风险**：是否引入回归风险或影响其他模块
 10. **模块架构**：模块职责是否清晰，依赖方向是否合理（如核心模块不应反向依赖平台特定实现）
 11. **整体设计**：结合关联代码评估修改后的整体合理性，必要时建议扩大修改范围
+

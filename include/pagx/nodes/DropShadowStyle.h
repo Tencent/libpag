@@ -1,0 +1,71 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+#include "pagx/nodes/LayerStyle.h"
+#include "pagx/types/Color.h"
+
+namespace pagx {
+
+/**
+ * A drop shadow layer style that renders a shadow behind the layer content.
+ */
+class DropShadowStyle : public LayerStyle {
+ public:
+  /**
+   * The horizontal offset of the shadow in pixels. The default value is 0.
+   */
+  float offsetX = 0.0f;
+
+  /**
+   * The vertical offset of the shadow in pixels. The default value is 0.
+   */
+  float offsetY = 0.0f;
+
+  /**
+   * The horizontal blur radius of the shadow in pixels. The default value is 0.
+   */
+  float blurX = 0.0f;
+
+  /**
+   * The vertical blur radius of the shadow in pixels. The default value is 0.
+   */
+  float blurY = 0.0f;
+
+  /**
+   * The color of the shadow.
+   */
+  Color color = {};
+
+  /**
+   * Whether the shadow is shown behind the layer. The default value is true.
+   */
+  bool showBehindLayer = true;
+
+  NodeType nodeType() const override {
+    return NodeType::DropShadowStyle;
+  }
+
+ private:
+  DropShadowStyle() = default;
+
+  friend class PAGXDocument;
+};
+
+}  // namespace pagx
