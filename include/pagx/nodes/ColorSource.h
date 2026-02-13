@@ -28,13 +28,6 @@ namespace pagx {
  * Inherits from Node so it can be stored in resources and referenced by ID.
  */
 class ColorSource : public Node {
- public:
-  static bool IsTypeOf(NodeType type) {
-    return type == NodeType::SolidColor || type == NodeType::LinearGradient ||
-           type == NodeType::RadialGradient || type == NodeType::ConicGradient ||
-           type == NodeType::DiamondGradient || type == NodeType::ImagePattern;
-  }
-
  protected:
   ColorSource() = default;
 

@@ -58,7 +58,7 @@ inline void ReleasePagxData(const void*, void* context) {
   delete static_cast<std::shared_ptr<Data>*>(context);
 }
 
-inline std::shared_ptr<tgfx::Data> DataToTGFX(const std::shared_ptr<Data>& data) {
+inline std::shared_ptr<tgfx::Data> ToTGFXData(const std::shared_ptr<Data>& data) {
   if (data == nullptr) {
     return nullptr;
   }

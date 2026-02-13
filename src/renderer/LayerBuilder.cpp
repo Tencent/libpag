@@ -131,7 +131,7 @@ static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI)
     return nullptr;
   }
 
-  return tgfx::Image::MakeFromEncoded(DataToTGFX(data));
+  return tgfx::Image::MakeFromEncoded(ToTGFXData(data));
 }
 
 // Type converters from pagx to tgfx
@@ -680,7 +680,7 @@ class LayerBuilderContext {
     auto imageNode = node->image;
     std::shared_ptr<tgfx::Image> image = nullptr;
     if (imageNode->data) {
-      image = tgfx::Image::MakeFromEncoded(DataToTGFX(imageNode->data));
+      image = tgfx::Image::MakeFromEncoded(ToTGFXData(imageNode->data));
     } else if (imageNode->filePath.find("data:") == 0) {
       image = ImageFromDataURI(imageNode->filePath);
     } else if (!imageNode->filePath.empty()) {

@@ -549,7 +549,7 @@ class TypesetterContext {
           std::shared_ptr<tgfx::ImageCodec> codec = nullptr;
           auto imageNode = glyph->image;
           if (imageNode->data != nullptr) {
-            codec = tgfx::ImageCodec::MakeFrom(DataToTGFX(imageNode->data));
+            codec = tgfx::ImageCodec::MakeFrom(ToTGFXData(imageNode->data));
           } else if (imageNode->filePath.find("data:") == 0) {
             auto commaPos = imageNode->filePath.find(',');
             if (commaPos != std::string::npos) {
@@ -558,7 +558,7 @@ class TypesetterContext {
                 auto base64Data = imageNode->filePath.substr(commaPos + 1);
                 auto data = Base64Decode(base64Data);
                 if (data) {
-                  codec = tgfx::ImageCodec::MakeFrom(DataToTGFX(data));
+                  codec = tgfx::ImageCodec::MakeFrom(ToTGFXData(data));
                 }
               }
             }

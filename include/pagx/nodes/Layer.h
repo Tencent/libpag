@@ -152,10 +152,6 @@ class Layer : public Node {
    */
   std::vector<Layer*> children = {};
 
-  static bool IsTypeOf(NodeType type) {
-    return type == NodeType::Layer;
-  }
-
   NodeType nodeType() const override {
     return NodeType::Layer;
   }

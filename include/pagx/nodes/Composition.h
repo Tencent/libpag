@@ -48,10 +48,6 @@ class Composition : public Node {
    */
   std::vector<Layer*> layers = {};
 
-  static bool IsTypeOf(NodeType type) {
-    return type == NodeType::Composition;
-  }
-
   NodeType nodeType() const override {
     return NodeType::Composition;
   }
