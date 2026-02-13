@@ -48,7 +48,6 @@
 #include "tgfx/core/Typeface.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
-#include "tgfx/svg/TextShaper.h"
 #include "utils/Baseline.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
