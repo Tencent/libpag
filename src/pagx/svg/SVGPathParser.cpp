@@ -22,7 +22,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
-#include "MathUtil.h"
+#include "utils/MathUtil.h"
 
 namespace pagx {
 

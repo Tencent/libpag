@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Typesetter.h"
-#include "Base64.h"
-#include "MathUtil.h"
-#include "TGFXConverter.h"
-#include "UTF8.h"
+#include "utils/Base64.h"
+#include "utils/MathUtil.h"
+#include "ToTGFX.h"
+#include "utils/UTF8.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
@@ -509,7 +509,7 @@ class TypesetterContext {
           }
 
           if (codec) {
-            builder.addGlyph(codec, PointToTGFX(glyph->offset), glyph->advance);
+            builder.addGlyph(codec, ToTGFX(glyph->offset), glyph->advance);
           }
         }
       }

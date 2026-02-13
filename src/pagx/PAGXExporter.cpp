@@ -18,9 +18,9 @@
 
 #include "pagx/PAGXExporter.h"
 #include <cstdio>
-#include "Base64.h"
-#include "StringParser.h"
-#include "SVGPathParser.h"
+#include "utils/Base64.h"
+#include "utils/StringParser.h"
+#include "svg/SVGPathParser.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"

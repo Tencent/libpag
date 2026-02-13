@@ -41,7 +41,7 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextLayout.h"
-#include "xml/XMLDOM.h"
+#include "xml/DOM.h"
 
 namespace pagx {
 

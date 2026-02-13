@@ -26,10 +26,11 @@ endif ()
 
 # Build pagx static library
 file(GLOB PAGX_CORE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../src/pagx/*.cpp)
+file(GLOB_RECURSE PAGX_UTILS_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../src/pagx/utils/*.cpp)
 file(GLOB_RECURSE PAGX_XML_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../src/pagx/xml/*.cpp)
 file(GLOB_RECURSE PAGX_SVG_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../src/pagx/svg/*.cpp)
 if (NOT TARGET pagx)
-    add_library(pagx STATIC ${PAGX_CORE_SOURCES} ${PAGX_XML_SOURCES} ${PAGX_SVG_SOURCES})
+    add_library(pagx STATIC ${PAGX_CORE_SOURCES} ${PAGX_UTILS_SOURCES} ${PAGX_XML_SOURCES} ${PAGX_SVG_SOURCES})
     target_include_directories(pagx PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)
     target_include_directories(pagx PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/../src/pagx

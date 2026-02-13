@@ -640,9 +640,10 @@ if (PAG_BUILD_TESTS)
 
     # Build pagx static library (format module, no tgfx dependency)
     file(GLOB PAGX_CORE_SOURCES src/pagx/*.cpp)
+    file(GLOB_RECURSE PAGX_UTILS_SOURCES src/pagx/utils/*.cpp)
     file(GLOB_RECURSE PAGX_XML_SOURCES src/pagx/xml/*.cpp)
     file(GLOB_RECURSE PAGX_SVG_SOURCES src/pagx/svg/*.cpp)
-    add_library(pagx STATIC ${PAGX_CORE_SOURCES} ${PAGX_XML_SOURCES} ${PAGX_SVG_SOURCES})
+    add_library(pagx STATIC ${PAGX_CORE_SOURCES} ${PAGX_UTILS_SOURCES} ${PAGX_XML_SOURCES} ${PAGX_SVG_SOURCES})
     target_include_directories(pagx PUBLIC include)
     target_include_directories(pagx PRIVATE src/pagx
             ${CMAKE_CURRENT_SOURCE_DIR}/third_party/expat/expat/lib)

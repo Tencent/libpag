@@ -20,7 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
-#include "MathUtil.h"
+#include "utils/MathUtil.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Image.h"
