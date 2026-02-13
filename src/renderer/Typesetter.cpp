@@ -49,7 +49,6 @@ void Typesetter::setFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface
   fallbackTypefaces = std::move(typefaces);
 }
 
-
 // Build context that maintains state during text typesetting
 class TypesetterContext {
  public:
