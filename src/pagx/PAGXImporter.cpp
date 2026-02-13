@@ -526,12 +526,7 @@ static Text* parseText(const DOMNode* node, PAGXDocument* doc) {
     auto textChild = node->firstChild;
     while (textChild) {
       if (textChild->type == DOMNodeType::Text) {
-        auto& raw = textChild->name;
-        auto start = raw.find_first_not_of(" \n\r\t");
-        auto end = raw.find_last_not_of(" \n\r\t");
-        if (start != std::string::npos) {
-          text->text = raw.substr(start, end - start + 1);
-        }
+        text->text = textChild->name;
         break;
       }
       textChild = textChild->nextSibling;

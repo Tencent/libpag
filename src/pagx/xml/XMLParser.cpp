@@ -70,6 +70,12 @@ struct ParsingContext {
     }
   }
 
+  void discardBufferedWhitespace() {
+    if (_bufferedText.find_first_not_of(" \n\r\t") == std::string::npos) {
+      _bufferedText.clear();
+    }
+  }
+
   void appendText(const char* txt, size_t len) {
     _bufferedText.insert(_bufferedText.end(), txt, &txt[len]);
   }
@@ -107,6 +113,20 @@ void XMLCALL text_handler(void* data, const char* txt, int len) {
   context->appendText(txt, static_cast<size_t>(len));
 }
 
+void XMLCALL start_cdata_handler(void* data) {
+  HANDLER_CONTEXT(data, context);
+  // Discard any pure whitespace text buffered before the CDATA section (e.g. formatting
+  // indentation between the element start tag and the CDATA section).
+  context->discardBufferedWhitespace();
+}
+
+void XMLCALL end_cdata_handler(void* data) {
+  HANDLER_CONTEXT(data, context);
+  // Flush the CDATA content immediately so that any trailing whitespace after the CDATA section
+  // does not get merged with it.
+  context->flushText();
+}
+
 void XMLCALL entity_decl_handler(void* data, const XML_Char* /*entityName*/,
                                  int /*is_parameter_entity*/, const XML_Char* /*value*/,
                                  int /*value_length*/, const XML_Char* /*base*/,
@@ -141,6 +161,7 @@ bool XMLParser::parse(const uint8_t* data, size_t length) {
   XML_SetUserData(parsingContext._XMLParser, &parsingContext);
   XML_SetElementHandler(parsingContext._XMLParser, start_element_handler, end_element_handler);
   XML_SetCharacterDataHandler(parsingContext._XMLParser, text_handler);
+  XML_SetCdataSectionHandler(parsingContext._XMLParser, start_cdata_handler, end_cdata_handler);
   XML_SetEntityDeclHandler(parsingContext._XMLParser, entity_decl_handler);
 
   if (length > static_cast<size_t>(std::numeric_limits<int>::max())) {
