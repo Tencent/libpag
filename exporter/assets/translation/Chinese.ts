@@ -203,8 +203,8 @@
     </message>
     <message>
         <location filename="../qml/ConfigWindow.qml" line="496"/>
-        <source>Bitmap Quality:</source>
-        <translation>位图质量：</translation>
+        <source>Frame Storage Format:</source>
+        <translation>帧存储格式：</translation>
     </message>
     <message>
         <location filename="../qml/ConfigWindow.qml" line="510"/>

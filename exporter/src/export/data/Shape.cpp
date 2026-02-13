@@ -212,11 +212,8 @@ static void GetDashes(const AEGP_StreamRefH& streamHandle, pag::ShapeElement* el
       AEGP_StreamRefH childStreamHandle = nullptr;
       Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(PluginID, dashStreamHandle, index,
                                                                  &childStreamHandle);
-      if (IsStreamHidden(childStreamHandle)) {
-        continue;
-      }
       if (!IsStreamHidden(childStreamHandle)) {
-        auto dash = GetProperty(childStreamHandle, index, AEStreamParser::FloatParser);
+        auto dash = GetProperty(childStreamHandle, AEStreamParser::FloatParser);
         dashes.push_back(dash);
       }
       Suites->StreamSuite4()->AEGP_DisposeStream(childStreamHandle);

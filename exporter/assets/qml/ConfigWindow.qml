@@ -493,7 +493,7 @@ PAGWindow {
                                         rowSpacing: 12
 
                                         Text {
-                                            text: qsTr("Bitmap Quality:")
+                                            text: qsTr("Frame Storage Format:")
                                             color: "#cccccc"
                                             font.pixelSize: 14
                                             Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
