@@ -18,6 +18,7 @@
 
 #include "Base64.h"
 #include <array>
+#include <memory>
 
 namespace pagx {
 
@@ -43,7 +44,7 @@ std::shared_ptr<Data> Base64Decode(const std::string& encodedString) {
     outputLength--;
   }
 
-  auto output = new uint8_t[outputLength];
+  auto output = std::make_unique<uint8_t[]>(outputLength);
 
   for (size_t i = 0, j = 0; i < inputLength;) {
     auto a = encodedString[i] <= 127 ? decodingTable[encodedString[i++]] : 64;
@@ -64,13 +65,13 @@ std::shared_ptr<Data> Base64Decode(const std::string& encodedString) {
     }
   }
 
-  return Data::MakeAdopt(output, outputLength);
+  return Data::MakeAdopt(output.release(), outputLength);
 }
 
 std::string Base64Encode(const uint8_t* data, size_t length) {
   static const char encodingTable[] =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  std::string result = "";
+  std::string result;
   result.reserve((length + 2) / 3 * 4);
 
   for (size_t i = 0; i < length; i += 3) {

@@ -258,6 +258,71 @@ function generateHtml(content, title, tocHtml, lang, langSwitchUrl, viewerUrl, f
 }
 
 /**
+ * Embed sample file contents into Markdown content. Replaces lines matching
+ * `> [Sample](samples/xxx.pagx)` with the file content as an xml code block
+ * followed by an HTML comment marker for preview button post-processing.
+ */
+function embedSampleFiles(mdContent, specDir) {
+  const samplePattern = /^> \[Sample\]\((samples\/[^\s)]+\.pagx)\)$/gm;
+  return mdContent.replace(samplePattern, (match, samplePath) => {
+    const filePath = path.join(specDir, samplePath);
+    if (!fs.existsSync(filePath)) {
+      console.warn(`  Warning: sample file not found: ${filePath}`);
+      return match;
+    }
+    const content = fs.readFileSync(filePath, 'utf-8').trimEnd();
+    return '```xml\n' + content + '\n```\n\n<!-- preview:' + samplePath + ' -->';
+  });
+}
+
+/**
+ * Post-process HTML to add preview headers to code blocks. Locates each
+ * `<!-- preview:samples/xxx.pagx -->` marker, finds the immediately preceding
+ * `<pre>` block, and wraps it with a header containing a preview button.
+ * Processes markers from back to front so insertions don't shift positions.
+ */
+function addPreviewButtons(html, viewerUrl, lang) {
+  const markerPattern = /<!-- preview:(samples\/[^\s]+\.pagx) -->/g;
+  var markers = [];
+  var m;
+  while ((m = markerPattern.exec(html)) !== null) {
+    markers.push({ start: m.index, end: m.index + m[0].length, samplePath: m[1] });
+  }
+  if (markers.length === 0) return html;
+  // Process from back to front to keep positions stable.
+  for (var i = markers.length - 1; i >= 0; i--) {
+    var marker = markers[i];
+    // Find the closest </pre> before this marker.
+    var preCloseTag = '</pre>';
+    var preCloseEnd = html.lastIndexOf(preCloseTag, marker.start);
+    if (preCloseEnd === -1) {
+      console.warn('  Warning: no </pre> found before preview marker for ' + marker.samplePath);
+      continue;
+    }
+    preCloseEnd += preCloseTag.length;
+    // Find the matching <pre> for this </pre>.
+    var preOpenStart = html.lastIndexOf('<pre>', preCloseEnd);
+    if (preOpenStart === -1) {
+      console.warn('  Warning: no <pre> found before preview marker for ' + marker.samplePath);
+      continue;
+    }
+    var previewUrl = viewerUrl + '?file=./' + marker.samplePath;
+    var label = lang === 'zh' ? '预览' : 'Preview';
+    var header = '<div class="code-header">' +
+      '<a class="preview-btn" href="' + previewUrl + '">' +
+      '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
+      label + '</a>' +
+      '<span class="code-header-label">PAGX</span></div>';
+    var wrapperOpen = '<div class="code-block-wrapper">' + header;
+    var wrapperClose = '</div>';
+    // Replace marker with wrapper close, then insert wrapper open before <pre>.
+    html = html.slice(0, preCloseEnd) + wrapperClose + html.slice(marker.end);
+    html = html.slice(0, preOpenStart) + wrapperOpen + html.slice(preOpenStart);
+  }
+  return html;
+}
+
+/**
  * Publish a single spec file.
  */
 function publishSpec(specFile, outputDir, lang, langSwitchUrl, viewerUrl, faviconUrl, englishSlugs = null) {
@@ -267,7 +332,8 @@ function publishSpec(specFile, outputDir, lang, langSwitchUrl, viewerUrl, favico
   }
 
   console.log(`  Reading: ${specFile}`);
-  const mdContent = fs.readFileSync(specFile, 'utf-8');
+  let mdContent = fs.readFileSync(specFile, 'utf-8');
+  mdContent = embedSampleFiles(mdContent, SPEC_DIR);
 
   const titleMatch = mdContent.match(/^#\s+(.+)$/m);
   const title = titleMatch ? titleMatch[1] : 'PAGX Format Specification';
@@ -281,6 +347,8 @@ function publishSpec(specFile, outputDir, lang, langSwitchUrl, viewerUrl, favico
   if (englishSlugs) {
     htmlContent = replaceHeadingIds(htmlContent, englishSlugs);
   }
+
+  htmlContent = addPreviewButtons(htmlContent, viewerUrl, lang);
 
   const html = generateHtml(htmlContent, title, tocHtml, lang, langSwitchUrl, viewerUrl, faviconUrl);
 

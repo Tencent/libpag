@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <memory>
 #include <string>
 #include <vector>
 #include "pagx/nodes/Element.h"
@@ -56,7 +55,8 @@ class Text : public Element {
 
   /**
    * The font style/variant name (e.g., "Regular", "Bold", "Italic", "Bold Italic"). This
-   * corresponds to the specific font file variant. The default value is "Regular".
+   * corresponds to the specific font file variant. The default value is an empty string, which
+   * typically resolves to "Regular" during font matching.
    */
   std::string fontStyle = {};
 

@@ -227,6 +227,7 @@ static std::string rectToString(const Rect& r) {
 
 static std::string floatListToString(const std::vector<float>& values) {
   std::string result;
+  result.reserve(values.size() * 8);
   char buf[32] = {};
   for (size_t i = 0; i < values.size(); i++) {
     if (i > 0) {
@@ -240,6 +241,7 @@ static std::string floatListToString(const std::vector<float>& values) {
 
 static std::string floatListToString(const float* values, size_t count) {
   std::string result;
+  result.reserve(count * 8);
   char buf[32] = {};
   for (size_t i = 0; i < count; i++) {
     if (i > 0) {
@@ -267,6 +269,22 @@ static void writeLayer(XMLBuilder& xml, const Layer* node, const Options& option
 //==============================================================================
 // ColorStop and ColorSource writing
 //==============================================================================
+
+static bool writeColorAttribute(XMLBuilder& xml, const ColorSource* color) {
+  if (!color) {
+    return false;
+  }
+  if (!color->id.empty()) {
+    xml.addAttribute("color", "@" + color->id);
+    return false;
+  }
+  if (color->nodeType() == NodeType::SolidColor) {
+    auto solid = static_cast<const SolidColor*>(color);
+    xml.addAttribute("color", ColorToHexString(solid->color, solid->color.alpha < 1.0f));
+    return false;
+  }
+  return true;
+}
 
 static void writeColorStops(XMLBuilder& xml, const std::vector<ColorStop>& stops) {
   for (const auto& stop : stops) {
@@ -494,6 +512,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
           // Write glyphs as comma-separated integers
           if (!run->glyphs.empty()) {
             std::string glyphsStr = {};
+            glyphsStr.reserve(run->glyphs.size() * 6);
             char buf[16] = {};
             for (size_t i = 0; i < run->glyphs.size(); i++) {
               if (i > 0) {
@@ -517,6 +536,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
           // Write positions (semicolon-separated x,y pairs)
           if (!run->positions.empty()) {
             std::string posStr = {};
+            posStr.reserve(run->positions.size() * 12);
             char buf[32] = {};
             for (size_t i = 0; i < run->positions.size(); i++) {
               if (i > 0) {
@@ -531,6 +551,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
           // Write anchors (semicolon-separated x,y pairs)
           if (!run->anchors.empty()) {
             std::string anchorsStr = {};
+            anchorsStr.reserve(run->anchors.size() * 12);
             char buf[32] = {};
             for (size_t i = 0; i < run->anchors.size(); i++) {
               if (i > 0) {
@@ -545,6 +566,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
           // Write scales (semicolon-separated sx,sy pairs)
           if (!run->scales.empty()) {
             std::string scalesStr = {};
+            scalesStr.reserve(run->scales.size() * 12);
             char buf[32] = {};
             for (size_t i = 0; i < run->scales.size(); i++) {
               if (i > 0) {
@@ -575,22 +597,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Fill: {
       auto fill = static_cast<const Fill*>(node);
       xml.openElement("Fill");
-      // Determine color attribute value
-      bool needsInlineColorSource = false;
-      if (fill->color) {
-        if (!fill->color->id.empty()) {
-          // Reference to resource by id
-          xml.addAttribute("color", "@" + fill->color->id);
-        } else if (fill->color->nodeType() == NodeType::SolidColor) {
-          // SolidColor without id: output color value directly
-          auto solid = static_cast<const SolidColor*>(fill->color);
-          xml.addAttribute("color",
-                           ColorToHexString(solid->color, solid->color.alpha < 1.0f));
-        } else {
-          // Other ColorSource without id: needs inline as child element
-          needsInlineColorSource = true;
-        }
-      }
+      bool needsInlineColorSource = writeColorAttribute(xml, fill->color);
       xml.addAttribute("alpha", fill->alpha, 1.0f);
       if (fill->blendMode != BlendMode::Normal) {
         xml.addAttribute("blendMode", BlendModeToString(fill->blendMode));
@@ -613,22 +620,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Stroke: {
       auto stroke = static_cast<const Stroke*>(node);
       xml.openElement("Stroke");
-      // Determine color attribute value
-      bool needsInlineColorSource = false;
-      if (stroke->color) {
-        if (!stroke->color->id.empty()) {
-          // Reference to resource by id
-          xml.addAttribute("color", "@" + stroke->color->id);
-        } else if (stroke->color->nodeType() == NodeType::SolidColor) {
-          // SolidColor without id: output color value directly
-          auto solid = static_cast<const SolidColor*>(stroke->color);
-          xml.addAttribute("color",
-                           ColorToHexString(solid->color, solid->color.alpha < 1.0f));
-        } else {
-          // Other ColorSource without id: needs inline as child element
-          needsInlineColorSource = true;
-        }
-      }
+      bool needsInlineColorSource = writeColorAttribute(xml, stroke->color);
       xml.addAttribute("width", stroke->width, 1.0f);
       xml.addAttribute("alpha", stroke->alpha, 1.0f);
       if (stroke->blendMode != BlendMode::Normal) {
@@ -974,7 +966,7 @@ static void writeResource(XMLBuilder& xml, const Node* node, const Options& opti
       xml.addAttribute("id", image->id);
       if (image->data) {
         xml.addAttribute("source", "data:image/png;base64," +
-                                       Base64Encode(reinterpret_cast<const uint8_t*>(image->data->data()), image->data->size()));
+                                       Base64Encode(image->data->bytes(), image->data->size()));
       } else {
         xml.addAttribute("source", image->filePath);
       }

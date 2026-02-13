@@ -133,6 +133,47 @@
         }
         pre code { background-color: transparent; padding: 0; border-radius: 0; font-size: 100%; }
         .hljs { background: var(--code-bg) !important; }
+        pre:has(> code.language-xml) { border-left: 3px solid #22863a; }
+        
+        /* Code block with preview header */
+        .code-block-wrapper { position: relative; }
+        .code-block-wrapper pre {
+            margin-top: 0;
+            margin-bottom: 16px;
+            border-top-left-radius: 0;
+            border-top-right-radius: 0;
+            border-top: none;
+        }
+        .code-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 12px;
+            background: #22863a;
+            border-radius: 6px 6px 0 0;
+        }
+        .code-header-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.8);
+            letter-spacing: 0.5px;
+        }
+        .preview-btn {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            color: white;
+            font-family: inherit;
+            font-size: 12px;
+            line-height: 1;
+            transition: background 0.2s;
+        }
+        .preview-btn svg { width: 10px; height: 10px; }
+        .preview-btn:hover { background: rgba(255, 255, 255, 0.35); text-decoration: none; }
         
         /* Table */
         table { border-collapse: collapse; width: 100%; margin: 16px 0; display: block; overflow-x: auto; }
@@ -341,6 +382,33 @@
                 if (window.innerWidth <= 900) toggleSidebar();
             });
         });
+        // Update URL hash to match the current visible heading while scrolling.
+        // Only activates if the URL already contains a hash anchor.
+        (function() {
+            if (!location.hash) return;
+            var headings = document.querySelectorAll('.content h1[id], .content h2[id], .content h3[id], .content h4[id], .content h5[id], .content h6[id]');
+            if (!headings.length) return;
+            var updating = false;
+            window.addEventListener('scroll', function() {
+                if (!updating) {
+                    updating = true;
+                    requestAnimationFrame(function() {
+                        var current = '';
+                        for (var i = 0; i < headings.length; i++) {
+                            if (headings[i].getBoundingClientRect().top <= 20) {
+                                current = headings[i].id;
+                            } else {
+                                break;
+                            }
+                        }
+                        if (current && location.hash !== '#' + current) {
+                            history.replaceState(null, '', '#' + current);
+                        }
+                        updating = false;
+                    });
+                }
+            }, { passive: true });
+        })();
     </script>
 </body>
 </html>

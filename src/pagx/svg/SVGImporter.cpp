@@ -20,7 +20,6 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
-#include <fstream>
 #include "StringParser.h"
 #include "SVGPathParser.h"
 #include "pagx/PAGXDocument.h"
@@ -105,7 +104,6 @@ std::string SVGParserContext::getAttribute(const std::shared_ptr<DOMNode>& node,
   // CSS cascade rule: later properties override earlier ones.
   auto [hasStyle, styleStr] = node->findAttribute("style");
   if (hasStyle && !styleStr.empty()) {
-    std::string propName = name;
     std::string lastValue;
     size_t pos = 0;
     while (pos < styleStr.size()) {
@@ -145,7 +143,7 @@ std::string SVGParserContext::getAttribute(const std::shared_ptr<DOMNode>& node,
         semicolonPos = styleStr.size();
       }
       // Check if this is the property we're looking for.
-      if (currentProp == propName) {
+      if (currentProp == name) {
         // Extract and trim the value.
         std::string propValue = styleStr.substr(colonPos + 1, semicolonPos - colonPos - 1);
         size_t valStart = propValue.find_first_not_of(" \t");
@@ -729,42 +727,6 @@ Element* SVGParserContext::convertElement(
   }
 
   return nullptr;
-}
-
-Group* SVGParserContext::convertG(const std::shared_ptr<DOMNode>& element,
-                                               const InheritedStyle& parentStyle) {
-  // Compute inherited style for this group element.
-  InheritedStyle inheritedStyle = computeInheritedStyle(element, parentStyle);
-
-  auto group = _document->makeNode<Group>();
-
-  // group->name (removed) = getAttribute(element, "id");
-
-  std::string transform = getAttribute(element, "transform");
-  if (!transform.empty()) {
-    // For Group, we need to decompose the matrix into position/rotation/scale.
-    // For simplicity, just store as position offset for translation.
-    Matrix m = parseTransform(transform);
-    group->position = {m.tx, m.ty};
-    // Note: Full matrix decomposition would be more complex.
-  }
-
-  std::string opacity = getAttribute(element, "opacity");
-  if (!opacity.empty()) {
-    group->alpha = std::stof(opacity);
-  }
-
-  auto child = element->getFirstChild();
-  while (child) {
-    auto childElement = convertElement(child);
-    if (childElement) {
-      group->elements.push_back(childElement);
-    }
-    addFillStroke(child, group->elements, inheritedStyle);
-    child = child->getNextSibling();
-  }
-
-  return group;
 }
 
 Element* SVGParserContext::convertRect(
@@ -1596,7 +1558,7 @@ static void SkipWhitespace(const char*& ptr, const char* end) {
 static float ReadNumber(const char*& ptr, const char* end) {
   SkipWhitespace(ptr, end);
   const char* start = ptr;
-  if (*ptr == '-' || *ptr == '+') {
+  if (ptr < end && (*ptr == '-' || *ptr == '+')) {
     ++ptr;
   }
   while (ptr < end && (std::isdigit(*ptr) || *ptr == '.')) {
@@ -1604,12 +1566,15 @@ static float ReadNumber(const char*& ptr, const char* end) {
   }
   if (ptr < end && (*ptr == 'e' || *ptr == 'E')) {
     ++ptr;
-    if (*ptr == '-' || *ptr == '+') {
+    if (ptr < end && (*ptr == '-' || *ptr == '+')) {
       ++ptr;
     }
     while (ptr < end && std::isdigit(*ptr)) {
       ++ptr;
     }
+  }
+  if (start == ptr) {
+    return 0.0f;
   }
   return std::stof(std::string(start, ptr));
 }
@@ -1635,7 +1600,7 @@ Matrix SVGParserContext::parseTransform(const std::string& value) {
     }
 
     SkipWhitespace(ptr, end);
-    if (*ptr != '(') {
+    if (ptr >= end || *ptr != '(') {
       break;
     }
     ++ptr;
@@ -1686,7 +1651,7 @@ Matrix SVGParserContext::parseTransform(const std::string& value) {
     }
 
     SkipWhitespace(ptr, end);
-    if (*ptr == ')') {
+    if (ptr < end && *ptr == ')') {
       ++ptr;
     }
 
@@ -2006,11 +1971,11 @@ std::string SVGParserContext::colorToHex(const std::string& value) {
     return value;
   }
   // Already a PAGX p3() color, return as-is.
-  if (value.substr(0, 3) == "p3(") {
+  if (value.compare(0, 3, "p3(") == 0) {
     return value;
   }
   // Already a PAGX srgb() color, return as-is.
-  if (value.substr(0, 5) == "srgb(") {
+  if (value.compare(0, 5, "srgb(") == 0) {
     return value;
   }
   // url() references should be returned as-is.
@@ -2207,6 +2172,9 @@ static bool isSameGeometry(const Element* a, const Element* b) {
     case NodeType::Path: {
       auto pathA = static_cast<const Path*>(a);
       auto pathB = static_cast<const Path*>(b);
+      if (!pathA->data || !pathB->data) {
+        return pathA->data == pathB->data;
+      }
       return pathA->data->verbs() == pathB->data->verbs() &&
              pathA->data->points() == pathB->data->points();
     }
@@ -2298,7 +2266,7 @@ void SVGParserContext::mergeAdjacentLayers(std::vector<Layer*>& layers) {
     i++;
   }
 
-  layers = merged;
+  layers = std::move(merged);
 }
 
 Layer* SVGParserContext::convertMaskElement(
@@ -2372,7 +2340,7 @@ bool SVGParserContext::convertFilterElement(
   bool hasMerge = false;
   auto child = filterElement->getFirstChild();
   while (child) {
-    if (!child->name.empty() && child->name.substr(0, 2) == "fe") {
+    if (!child->name.empty() && child->name.compare(0, 2, "fe") == 0) {
       primitives.push_back(child);
       // Check if filter merges shadow with SourceGraphic.
       // If feMerge or feBlend references SourceGraphic, shadow is composited with original.
@@ -2806,7 +2774,7 @@ void SVGParserContext::parseCustomData(const std::shared_ptr<DOMNode>& element, 
 
   // Iterate through all attributes and find data-* ones.
   for (const auto& attr : element->attributes) {
-    if (attr.name.length() > 5 && attr.name.substr(0, 5) == "data-") {
+    if (attr.name.length() > 5 && attr.name.compare(0, 5, "data-") == 0) {
       // Remove "data-" prefix and store in customData.
       std::string key = attr.name.substr(5);
       layer->customData[key] = attr.value;

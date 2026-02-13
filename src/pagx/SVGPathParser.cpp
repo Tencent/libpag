@@ -219,13 +219,13 @@ static void ArcToCubics(PathData& path, float x1, float y1, float rx, float ry, 
     float cosEnd = std::cos(nextAngle);
     float sinEnd = std::sin(nextAngle);
 
-    float ex = cx + rx * (cosAngle * cosEnd - sinAngle * sinEnd);
-    float ey = cy + rx * (sinAngle * cosEnd + cosAngle * sinEnd);
+    float ex = cx + rx * cosAngle * cosEnd - ry * sinAngle * sinEnd;
+    float ey = cy + rx * sinAngle * cosEnd + ry * cosAngle * sinEnd;
 
-    float dx1 = -rx * (cosAngle * sinStart + sinAngle * cosStart);
-    float dy1 = -rx * (sinAngle * sinStart - cosAngle * cosStart);
-    float dx2m = -rx * (cosAngle * sinEnd + sinAngle * cosEnd);
-    float dy2m = -rx * (sinAngle * sinEnd - cosAngle * cosEnd);
+    float dx1 = -(rx * cosAngle * sinStart + ry * sinAngle * cosStart);
+    float dy1 = -(rx * sinAngle * sinStart - ry * cosAngle * cosStart);
+    float dx2m = -(rx * cosAngle * sinEnd + ry * sinAngle * cosEnd);
+    float dy2m = -(rx * sinAngle * sinEnd - ry * cosAngle * cosEnd);
 
     float c1x = currentX + alpha * dx1;
     float c1y = currentY + alpha * dy1;
