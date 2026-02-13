@@ -149,9 +149,9 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 5px;
+    gap: 6px;
     width: 80px;
-    padding: 7px 0;
+    padding: 8px 0;
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 8px;
@@ -165,8 +165,8 @@ html, body {
 }
 
 .nav-btn svg {
-    width: 15px;
-    height: 15px;
+    width: 16px;
+    height: 16px;
     color: #aaa;
 }
 
@@ -176,7 +176,7 @@ html, body {
 
 .nav-btn span {
     color: #aaa;
-    font-size: 12px;
+    font-size: 13px;
 }
 
 .nav-btn:hover span {
