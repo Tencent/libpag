@@ -886,7 +886,7 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
   if (!normalized.empty() && normalized.back() == ' ') {
     normalized.pop_back();
   }
-  textContent = normalized;
+  textContent = std::move(normalized);
 
   if (!textContent.empty()) {
     auto text = _document->makeNode<Text>();
