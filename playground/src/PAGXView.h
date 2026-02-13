@@ -32,7 +32,7 @@ namespace pagx {
 
 class PAGXView {
  public:
-  PAGXView(const std::string& canvasID);
+  explicit PAGXView(const std::string& canvasID);
 
   void registerFonts(const emscripten::val& fontVal, const emscripten::val& emojiFontVal);
 
