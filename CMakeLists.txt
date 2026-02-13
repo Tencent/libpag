@@ -551,7 +551,7 @@ if (WEB)
     endif ()
     if (PAG_USE_THREADS)
         list(APPEND PAG_LINK_OPTIONS -pthread -sUSE_PTHREADS=1 -sINITIAL_MEMORY=32MB
-                -sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency -sEXIT_RUNTIME=0 -sINVOKE_RUN=0 -sMALLOC=mimalloc)
+                -sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency -sEXIT_RUNTIME=0 -sINVOKE_RUN=0 -sMALLOC=dlmalloc)
         list(APPEND PAG_COMPILE_OPTIONS -fPIC -pthread -sUSE_PTHREADS=1)
     endif ()
 elseif (PAG_BUILD_SHARED)
