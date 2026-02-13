@@ -208,12 +208,16 @@ static void CollectBitmapGlyph(
     return;
   }
 
+  float fontSize = font.getSize();
+  if (fontSize <= 0) {
+    return;
+  }
+
   auto glyph = document->makeNode<Glyph>();
   auto image = document->makeNode<Image>();
   image->data = pagx::Data::MakeWithCopy(pngData->data(), pngData->size());
   glyph->image = image;
 
-  float fontSize = font.getSize();
   float backingSize = static_cast<float>(builder.backingSize);
   glyph->offset.x = imageMatrix.getTranslateX() / fontSize * backingSize;
   glyph->offset.y = imageMatrix.getTranslateY() / fontSize * backingSize;
