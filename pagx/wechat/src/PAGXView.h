@@ -22,7 +22,7 @@
 #include <emscripten/bind.h>
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/layers/DisplayList.h"
-#include "pagx/LayerBuilder.h"
+#include "LayerBuilder.h"
 
 namespace pagx {
 

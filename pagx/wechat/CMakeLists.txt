@@ -26,13 +26,40 @@ if (NOT TARGET tgfx)
     add_subdirectory(${TGFX_DIR} ${CMAKE_CURRENT_BINARY_DIR}/tgfx)
 endif ()
 
+# Build pagx static library
+file(GLOB PAGX_CORE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/*.cpp)
+file(GLOB_RECURSE PAGX_XML_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/xml/*.cpp)
+file(GLOB_RECURSE PAGX_SVG_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/svg/*.cpp)
 if (NOT TARGET pagx)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/.. ${CMAKE_CURRENT_BINARY_DIR}/pagx)
+    add_library(pagx STATIC ${PAGX_CORE_SOURCES} ${PAGX_XML_SOURCES} ${PAGX_SVG_SOURCES})
+    target_include_directories(pagx PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
+    target_include_directories(pagx PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/expat/expat/lib)
+    if(WIN32)
+        target_compile_definitions(pagx PRIVATE XML_STATIC)
+    endif()
+    add_vendor_target(pagx-vendor STATIC_VENDORS expat CONFIG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+    find_vendor_libraries(pagx-vendor STATIC PAGX_VENDOR_STATIC_LIBRARIES)
+    add_dependencies(pagx pagx-vendor)
+    merge_libraries_into(pagx ${PAGX_VENDOR_STATIC_LIBRARIES})
+endif ()
+
+# Build renderer sources as a static library
+file(GLOB_RECURSE RENDERER_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/renderer/*.cpp)
+if (NOT TARGET pagx-renderer)
+    add_library(pagx-renderer STATIC ${RENDERER_SOURCES})
+    target_include_directories(pagx-renderer PUBLIC
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../src/renderer)
+    target_include_directories(pagx-renderer PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx)
+    target_link_libraries(pagx-renderer PUBLIC pagx tgfx)
 endif ()
 
 # For Emscripten builds, pagx needs the same compile options as tgfx
 if (DEFINED EMSCRIPTEN)
     target_compile_options(pagx PRIVATE -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0)
+    target_compile_options(pagx-renderer PRIVATE -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0)
 endif ()
 
 file(GLOB_RECURSE PAGX_VIEWER_FILES src/*.cpp)
@@ -70,4 +97,4 @@ endif ()
 
 target_compile_options(pagx-viewer PUBLIC ${PAGX_VIEWER_COMPILE_OPTIONS})
 target_link_options(pagx-viewer PUBLIC ${PAGX_VIEWER_LINK_OPTIONS})
-target_link_libraries(pagx-viewer pagx)
+target_link_libraries(pagx-viewer pagx-renderer)
