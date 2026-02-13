@@ -1,13 +1,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 //
-//  Tencent is pleased to support the open source community by making tgfx available.
+//  Tencent is pleased to support the open source community by making libpag available.
 //
 //  Copyright (C) 2026 Tencent. All rights reserved.
 //
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
-//  in compliance with the License. You may obtain a copy of the License at
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
 //
-//      https://opensource.org/licenses/BSD-3-Clause
+//      http://www.apache.org/licenses/LICENSE-2.0
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
 //  license is distributed on an "as is" basis, without warranties or conditions of any kind,
@@ -32,9 +32,9 @@ class GridBackgroundLayer : public tgfx::Layer {
  private:
   GridBackgroundLayer(int width, int height, float density);
 
-  int width = 0;
-  int height = 0;
-  float density = 1.f;
+  int _width = 0;
+  int _height = 0;
+  float _density = 1.f;
 };
 
 void DrawBackground(tgfx::Canvas* canvas, int width, int height, float density);

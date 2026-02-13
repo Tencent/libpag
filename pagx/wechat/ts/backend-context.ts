@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 //
-//  Tencent is pleased to support the open source community by making tgfx available.
+//  Tencent is pleased to support the open source community by making libpag available.
 //
 //  Copyright (C) 2026 Tencent. All rights reserved.
 //

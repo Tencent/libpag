@@ -1,13 +1,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 //
-//  Tencent is pleased to support the open source community by making tgfx available.
+//  Tencent is pleased to support the open source community by making libpag available.
 //
 //  Copyright (C) 2026 Tencent. All rights reserved.
 //
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
-//  in compliance with the License. You may obtain a copy of the License at
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
 //
-//      https://opensource.org/licenses/BSD-3-Clause
+//      http://www.apache.org/licenses/LICENSE-2.0
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
 //  license is distributed on an "as is" basis, without warranties or conditions of any kind,
@@ -27,25 +27,25 @@ std::shared_ptr<GridBackgroundLayer> GridBackgroundLayer::Make(int width, int he
 }
 
 GridBackgroundLayer::GridBackgroundLayer(int width, int height, float density)
-    : width(width), height(height), density(density) {
+    : _width(width), _height(height), _density(density) {
   invalidateContent();
 }
 
 void GridBackgroundLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
   tgfx::LayerPaint backgroundPaint(tgfx::Color::White());
-  recorder->addRect(tgfx::Rect::MakeWH(static_cast<float>(width), static_cast<float>(height)),
+  recorder->addRect(tgfx::Rect::MakeWH(static_cast<float>(_width), static_cast<float>(_height)),
                     backgroundPaint);
 
   tgfx::LayerPaint tilePaint(tgfx::Color{0.8f, 0.8f, 0.8f, 1.f});
   // Use fixed logical size (32px) so the grid looks the same on all screens.
   int logicalTileSize = 32;
-  int tileSize = static_cast<int>(static_cast<float>(logicalTileSize) * density);
+  int tileSize = static_cast<int>(static_cast<float>(logicalTileSize) * _density);
   if (tileSize <= 0) {
     tileSize = logicalTileSize;
   }
-  for (int y = 0; y < height; y += tileSize) {
+  for (int y = 0; y < _height; y += tileSize) {
     bool draw = (y / tileSize) % 2 == 1;
-    for (int x = 0; x < width; x += tileSize) {
+    for (int x = 0; x < _width; x += tileSize) {
       if (draw) {
         recorder->addRect(
             tgfx::Rect::MakeXYWH(static_cast<float>(x), static_cast<float>(y),

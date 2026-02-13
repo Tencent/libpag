@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 //
-//  Tencent is pleased to support the open source community by making tgfx available.
+//  Tencent is pleased to support the open source community by making libpag available.
 //
 //  Copyright (C) 2026 Tencent. All rights reserved.
 //
@@ -278,16 +278,16 @@ bool PAGXView::draw() {
   return true;
 }
 
+bool PAGXView::firstFrameRendered() const {
+  return hasRenderedFirstFrame;
+}
+
 int PAGXView::width() const {
   return _width;
 }
 
 int PAGXView::height() const {
   return _height;
-}
-
-bool PAGXView::firstFrameRendered() const {
-  return hasRenderedFirstFrame;
 }
 
 void PAGXView::updatePerformanceState(double frameDurationMs) {

@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 //
-//  Tencent is pleased to support the open source community by making tgfx available.
+//  Tencent is pleased to support the open source community by making libpag available.
 //
 //  Copyright (C) 2026 Tencent. All rights reserved.
 //
@@ -29,18 +29,17 @@ namespace pagx {
 class PAGXView {
  public:
   /**
- * Creates a PAGXView instance for WeChat Mini Program rendering.
- * @param width The width of the canvas in pixels.
- * @param height The height of the canvas in pixels.
- * @return A shared pointer to the created PAGXView, or nullptr if creation fails.
- *
- * Note: Before calling this method, the JavaScript code must:
- * 1. Get the Canvas object from WeChat API
- * 2. Call canvas.getContext('webgl2') to get WebGL2RenderingContext
- * 3. Register the context via GL.registerContext(gl)
- */
+   * Creates a PAGXView instance for WeChat Mini Program rendering.
+   * @param width The width of the canvas in pixels.
+   * @param height The height of the canvas in pixels.
+   * @return A shared pointer to the created PAGXView, or nullptr if creation fails.
+   *
+   * Note: Before calling this method, the JavaScript code must:
+   * 1. Get the Canvas object from WeChat API
+   * 2. Call canvas.getContext('webgl2') to get WebGL2RenderingContext
+   * 3. Register the context via GL.registerContext(gl)
+   */
   static std::shared_ptr<PAGXView> MakeFrom(int width, int height);
-
 
   /**
    * Constructs a PAGXView with the given device and canvas dimensions.
@@ -106,8 +105,8 @@ class PAGXView {
   }
 
   /**
- * Returns the width of the canvas in pixels.
- */
+   * Returns the width of the canvas in pixels.
+   */
   int width() const;
 
   /**
