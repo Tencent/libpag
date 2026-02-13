@@ -1200,10 +1200,6 @@ ImagePattern* SVGParserContext::convertPattern(
         auto imageNode = registerImageResource(imageHref);
         pattern->image = imageNode;
 
-        // Get image display dimensions from SVG (these are the dimensions in pattern content space).
-        float imageWidth = parseLength(getAttribute(imgIt->second, "width"), 1.0f);
-        float imageHeight = parseLength(getAttribute(imgIt->second, "height"), 1.0f);
-
         // Parse transform on the use element.
         std::string useTransform = getAttribute(child, "transform");
         Matrix useMatrix = useTransform.empty() ? Matrix::Identity() : parseTransform(useTransform);
@@ -1245,9 +1241,6 @@ ImagePattern* SVGParserContext::convertPattern(
       // Register the image resource and use the reference pointer.
       auto imageNode = registerImageResource(imageHref);
       pattern->image = imageNode;
-
-      float imageWidth = parseLength(getAttribute(child, "width"), 1.0f);
-      float imageHeight = parseLength(getAttribute(child, "height"), 1.0f);
 
       if (contentUnitsIsObjectBoundingBox) {
         // Image dimensions are 0-1 ratios, scale by shape bounds.
