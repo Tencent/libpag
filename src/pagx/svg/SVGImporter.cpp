@@ -1497,9 +1497,14 @@ Rect SVGParserContext::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
   // For use element, get bounds of the referenced element and apply x/y offset.
   if (tag == "use") {
     std::string refId = resolveUrl(getHrefAttribute(element));
+    if (refId.empty() || _useStack.count(refId) > 0) {
+      return Rect::MakeXYWH(0, 0, 0, 0);
+    }
     auto it = _defs.find(refId);
     if (it != _defs.end()) {
+      _useStack.insert(refId);
       Rect refBounds = getShapeBounds(it->second);
+      _useStack.erase(refId);
       float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
       float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
       return Rect::MakeXYWH(refBounds.x + x, refBounds.y + y, refBounds.width, refBounds.height);
