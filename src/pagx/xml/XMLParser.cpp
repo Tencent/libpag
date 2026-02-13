@@ -63,11 +63,13 @@ struct ParsingContext {
       : _parser(parser), _XMLParser(XML_ParserCreate_MM(nullptr, &XML_alloc, nullptr)) {
   }
 
-  void flushText() {
+  bool flushText() {
     if (!_bufferedText.empty()) {
-      _parser->text(_bufferedText);
+      bool stop = _parser->text(_bufferedText);
       _bufferedText.clear();
+      return stop;
     }
+    return false;
   }
 
   void discardBufferedWhitespace() {
@@ -91,25 +93,38 @@ struct ParsingContext {
 
 void XMLCALL start_element_handler(void* data, const char* tag, const char** attributes) {
   HANDLER_CONTEXT(data, context);
-  context->flushText();
+  if (context->flushText()) {
+    XML_StopParser(context->_XMLParser, XML_FALSE);
+    return;
+  }
 
-  context->_parser->startElement(tag);
+  if (context->_parser->startElement(tag)) {
+    XML_StopParser(context->_XMLParser, XML_FALSE);
+    return;
+  }
 
   for (size_t i = 0; attributes[i]; i += 2) {
-    context->_parser->addAttribute(attributes[i], attributes[i + 1]);
+    if (context->_parser->addAttribute(attributes[i], attributes[i + 1])) {
+      XML_StopParser(context->_XMLParser, XML_FALSE);
+      return;
+    }
   }
 }
 
 void XMLCALL end_element_handler(void* data, const char* tag) {
   HANDLER_CONTEXT(data, context);
-  context->flushText();
+  if (context->flushText()) {
+    XML_StopParser(context->_XMLParser, XML_FALSE);
+    return;
+  }
 
-  context->_parser->endElement(tag);
+  if (context->_parser->endElement(tag)) {
+    XML_StopParser(context->_XMLParser, XML_FALSE);
+  }
 }
 
 void XMLCALL text_handler(void* data, const char* txt, int len) {
   HANDLER_CONTEXT(data, context);
-
   context->appendText(txt, static_cast<size_t>(len));
 }
 
@@ -124,7 +139,9 @@ void XMLCALL end_cdata_handler(void* data) {
   HANDLER_CONTEXT(data, context);
   // Flush the CDATA content immediately so that any trailing whitespace after the CDATA section
   // does not get merged with it.
-  context->flushText();
+  if (context->flushText()) {
+    XML_StopParser(context->_XMLParser, XML_FALSE);
+  }
 }
 
 void XMLCALL entity_decl_handler(void* data, const XML_Char* /*entityName*/,
