@@ -60,24 +60,24 @@ enum class ShadowOnlyType {
  * Inherited SVG style properties that cascade down the element tree.
  */
 struct InheritedStyle {
-  std::string fill = "";            // Empty means not set, "none" means no fill.
-  std::string stroke = "";          // Empty means not set.
-  std::string fillOpacity = "";     // Empty means not set.
-  std::string strokeOpacity = "";   // Empty means not set.
-  std::string fillRule = "";        // Empty means not set.
-  std::string strokeDasharray = ""; // Empty means not set, "none" means solid line.
-  std::string strokeDashoffset = "";// Empty means not set.
-  std::string strokeWidth = "";     // Empty means not set.
-  std::string strokeLinecap = "";   // Empty means not set.
-  std::string strokeLinejoin = "";  // Empty means not set.
-  std::string strokeMiterlimit = "";// Empty means not set.
+  std::string fill = {};            // Empty means not set, "none" means no fill.
+  std::string stroke = {};          // Empty means not set.
+  std::string fillOpacity = {};     // Empty means not set.
+  std::string strokeOpacity = {};   // Empty means not set.
+  std::string fillRule = {};        // Empty means not set.
+  std::string strokeDasharray = {}; // Empty means not set, "none" means solid line.
+  std::string strokeDashoffset = {};// Empty means not set.
+  std::string strokeWidth = {};     // Empty means not set.
+  std::string strokeLinecap = {};   // Empty means not set.
+  std::string strokeLinejoin = {};  // Empty means not set.
+  std::string strokeMiterlimit = {};// Empty means not set.
   // Text properties.
-  std::string fontFamily = "";      // Empty means not set.
-  std::string fontSize = "";        // Empty means not set.
-  std::string fontWeight = "";      // Empty means not set.
-  std::string fontStyle = "";       // Empty means not set (normal/italic/oblique).
-  std::string letterSpacing = "";   // Empty means not set.
-  std::string textAnchor = "";      // Empty means not set (start/middle/end).
+  std::string fontFamily = {};      // Empty means not set.
+  std::string fontSize = {};        // Empty means not set.
+  std::string fontWeight = {};      // Empty means not set.
+  std::string fontStyle = {};       // Empty means not set (normal/italic/oblique).
+  std::string letterSpacing = {};   // Empty means not set.
+  std::string textAnchor = {};      // Empty means not set (start/middle/end).
 };
 
 /**
@@ -165,6 +165,10 @@ class SVGParserContext {
   std::pair<float, float> parseFilterBlur(const std::shared_ptr<DOMNode>& node);
   Color parseFilterColorMatrix(const std::shared_ptr<DOMNode>& node);
 
+  // Create a DropShadowFilter node with the given parameters.
+  DropShadowFilter* createDropShadow(float offsetX, float offsetY, float blurX, float blurY,
+                                     const Color& color, bool shadowOnly);
+
   // Helper to get attribute from DOMNode.
   std::string getAttribute(const std::shared_ptr<DOMNode>& node, const std::string& name,
                            const std::string& defaultValue = "") const;
@@ -198,6 +202,9 @@ class SVGParserContext {
   // Generate a unique ID that doesn't conflict with existing SVG IDs.
   std::string generateUniqueId(const std::string& prefix);
   
+  // Count url() references in fill/stroke attributes for gradient/pattern deduplication.
+  void countUrlReference(const std::string& attrValue);
+
   // Generate a unique ColorSource ID for resources.
   std::string generateColorSourceId();
 
