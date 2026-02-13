@@ -22,6 +22,7 @@
 #include <cstdlib>
 #include "StringParser.h"
 #include "SVGPathParser.h"
+#include "pagx/MathUtil.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/SolidColor.h"
@@ -1607,12 +1608,10 @@ Matrix SVGParserContext::parseTransform(const std::string& value) {
       }
     } else if (funcLen == 5 && memcmp(funcStart, "skewX", 5) == 0) {
       float angle = ReadNumber(ptr, end);
-      float radians = angle * 3.14159265358979323846f / 180.0f;
-      m.c = std::tan(radians);
+      m.c = std::tan(DegreesToRadians(angle));
     } else if (funcLen == 5 && memcmp(funcStart, "skewY", 5) == 0) {
       float angle = ReadNumber(ptr, end);
-      float radians = angle * 3.14159265358979323846f / 180.0f;
-      m.b = std::tan(radians);
+      m.b = std::tan(DegreesToRadians(angle));
     } else if (funcLen == 6 && memcmp(funcStart, "matrix", 6) == 0) {
       m.a = ReadNumber(ptr, end);
       m.b = ReadNumber(ptr, end);
