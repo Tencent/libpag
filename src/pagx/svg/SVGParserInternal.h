@@ -146,9 +146,6 @@ class SVGParserContext {
 
   Matrix parseTransform(const std::string& value);
   Color parseColor(const std::string& value);
-  // Convert a color string (hex, rgb, rgba, or named color) to hex format.
-  // Named colors are converted to their hex equivalents for PAGX compatibility.
-  std::string colorToHex(const std::string& value);
   float parseLength(const std::string& value, float containerSize);
   void parseGradientStops(const std::shared_ptr<DOMNode>& element,
                           std::vector<ColorStop>& colorStops);

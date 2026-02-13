@@ -1949,47 +1949,6 @@ Color SVGParserContext::parseColor(const std::string& value) {
   return {0, 0, 0, 1, ColorSpace::SRGB};
 }
 
-std::string SVGParserContext::colorToHex(const std::string& value) {
-  if (value.empty() || value == "none") {
-    return value;
-  }
-  // Already a hex color, return as-is.
-  if (value[0] == '#') {
-    return value;
-  }
-  // Already a PAGX p3() color, return as-is.
-  if (value.compare(0, 3, "p3(") == 0) {
-    return value;
-  }
-  // Already a PAGX srgb() color, return as-is.
-  if (value.compare(0, 5, "srgb(") == 0) {
-    return value;
-  }
-  // url() references should be returned as-is.
-  if (value.compare(0, 4, "url(") == 0) {
-    return value;
-  }
-  // CSS Color Level 4: color(display-p3 r g b) -> p3(r, g, b)
-  if (value.compare(0, 6, "color(") == 0) {
-    auto color = ParseCSSColorFunction(value);
-    if (color.alpha >= 0 && color.colorSpace == ColorSpace::DisplayP3) {
-      char buf[64] = {};
-      if (color.alpha < 1.0f) {
-        snprintf(buf, sizeof(buf), "p3(%.4g, %.4g, %.4g, %.4g)", color.red, color.green, color.blue,
-                 color.alpha);
-      } else {
-        snprintf(buf, sizeof(buf), "p3(%.4g, %.4g, %.4g)", color.red, color.green, color.blue);
-      }
-      return std::string(buf);
-    }
-  }
-  // Parse the color (handles named colors, rgb, rgba, etc.) and convert to hex.
-  Color color = parseColor(value);
-  // Convert color to hex string using existing utility.
-  std::string result = ColorToHexString(color, true);
-  return result;
-}
-
 float SVGParserContext::parseLength(const std::string& value, float containerSize) {
   if (value.empty()) {
     return 0;
