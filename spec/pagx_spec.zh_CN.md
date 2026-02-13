@@ -557,6 +557,8 @@ PAGX 文档采用层级结构组织内容：
 5. **上层内容**：渲染 `placement="foreground"` 的 Fill 和 Stroke
 6. **图层滤镜**：将前面步骤的整体输出作为滤镜链的输入，依次应用所有滤镜
 
+**说明**：图层样式（上方）在上层内容之前渲染，是因为图层样式基于完整的**图层内容**（包括上层内容）计算效果。图层内容必须先完全确定才能计算样式，因此样式先渲染，上层内容随后合成在其之上。
+
 #### 图层内容（Layer Content）
 
 **图层内容**是指图层的下层内容、子图层和上层内容的完整渲染结果。图层样式基于图层内容计算效果。例如，当填充为下层、描边为上层时，描边会绘制在子图层之上，但投影阴影仍然基于包含填充、子图层和描边的完整图层内容计算。
@@ -974,8 +976,8 @@ boundingRect.bottom = center.y + size.height / 2
 | `outerRadius` | float | 100 | 外半径 |
 | `innerRadius` | float | 50 | 内半径（仅星形） |
 | `rotation` | float | 0 | 旋转角度 |
-| `outerRoundness` | float | 0 | 外角圆度 |
-| `innerRoundness` | float | 0 | 内角圆度 |
+| `outerRoundness` | float | 0 | 外角圆度 0~1 |
+| `innerRoundness` | float | 0 | 内角圆度 0~1 |
 | `reversed` | bool | false | 反转路径方向 |
 
 **PolystarType（类型）**：
@@ -1308,7 +1310,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 | `difference` | 差集：从第一个形状中减去后续形状 |
 
 **重要行为**：
-- MergePath 会**清空当前作用域中之前累积的所有 Fill 和 Stroke 渲染结果**，几何列表中仅保留合并后的路径
+- MergePath 会**清空当前作用域中之前累积的所有 Fill 和 Stroke 效果**，几何列表中仅保留合并后的路径
 - 合并时应用各形状的当前变换矩阵
 - 合并后的形状变换矩阵重置为单位矩阵
 

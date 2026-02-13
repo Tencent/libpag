@@ -557,6 +557,8 @@ Painters (Fill, Stroke, etc.) bound to a layer are divided into background conte
 5. **Foreground Content**: Render Fill and Stroke with `placement="foreground"`
 6. **Layer Filters**: Use the combined output of previous steps as input to the filter chain, applying all filters sequentially
 
+**Note**: Layer styles (above) are rendered before foreground content because layer styles compute effects based on the complete **layer content** (including foreground). Since layer content must be fully determined before styles can be computed, styles are rendered first, and foreground content is composited on top afterward.
+
 #### Layer Content
 
 **Layer content** refers to the complete rendering result of the layer's background content, child layers, and foreground content. Layer styles compute their effects based on layer content. For example, when fill is background and stroke is foreground, the stroke renders above child layers, but drop shadows are still calculated based on the complete layer content including fill, child layers, and stroke.
@@ -974,8 +976,8 @@ Supports both regular polygon and star modes.
 | `outerRadius` | float | 100 | Outer radius |
 | `innerRadius` | float | 50 | Inner radius (star only) |
 | `rotation` | float | 0 | Rotation angle |
-| `outerRoundness` | float | 0 | Outer corner roundness |
-| `innerRoundness` | float | 0 | Inner corner roundness |
+| `outerRoundness` | float | 0 | Outer corner roundness 0~1 |
+| `innerRoundness` | float | 0 | Inner corner roundness 0~1 |
 | `reversed` | bool | false | Reverse path direction |
 
 **PolystarType**:
@@ -1308,7 +1310,7 @@ Merges all shapes into a single shape.
 | `difference` | Difference: Subtract subsequent shapes from first shape |
 
 **Important Behavior**:
-- MergePath **clears all previously accumulated Fill and Stroke renderings** in the current scope; only the merged path remains in the geometry list
+- MergePath **clears all previously accumulated Fill and Stroke effects** in the current scope; only the merged path remains in the geometry list
 - Current transformation matrices of shapes are applied during merge
 - Merged shape's transformation matrix resets to identity matrix
 
