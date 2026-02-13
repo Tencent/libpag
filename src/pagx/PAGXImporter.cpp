@@ -155,13 +155,13 @@ static void parseResources(const DOMNode* node, PAGXDocument* doc) {
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {
-      // Try to parse as a resource (including color sources)
+      // Try to parse as a resource (Image, PathData, Composition, Font)
       auto resource = parseResource(child.get(), doc);
       if (resource) {
         child = child->nextSibling;
         continue;
       }
-      // Try to parse as a color source (which is also a Node)
+      // Try to parse as a color source (SolidColor, Gradient, ImagePattern)
       auto colorSource = parseColorSource(child.get(), doc);
       if (colorSource) {
         child = child->nextSibling;
