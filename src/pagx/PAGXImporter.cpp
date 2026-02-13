@@ -768,7 +768,6 @@ static Group* parseGroup(const DOMNode* node, PAGXDocument* doc) {
   if (!group) {
     return nullptr;
   }
-  // group->name (removed) = getAttribute(node, "name");
   auto anchorStr = getAttribute(node, "anchor", "0,0");
   group->anchor = parsePoint(anchorStr);
   auto positionStr = getAttribute(node, "position", "0,0");
