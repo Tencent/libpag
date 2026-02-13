@@ -922,8 +922,8 @@ static void writeResource(XMLBuilder& xml, const Node* node, const Options& opti
       auto comp = static_cast<const Composition*>(node);
       xml.openElement("Composition");
       xml.addAttribute("id", comp->id);
-      xml.addRequiredAttribute("width", static_cast<float>(comp->width));
-      xml.addRequiredAttribute("height", static_cast<float>(comp->height));
+      xml.addRequiredAttribute("width", comp->width);
+      xml.addRequiredAttribute("height", comp->height);
       if (comp->layers.empty()) {
         xml.closeElementSelfClosing();
       } else {
