@@ -1271,12 +1271,13 @@ if (typeof window !== 'undefined') {
         // Setup drag and drop early so UI is responsive
         setupDragAndDrop();
 
-        if (!checkWasmSupport()) {
-            alert('WebAssembly is not supported.\n\n' + getBrowserRequirements());
-            return;
-        }
-        if (!checkWebGL2Support()) {
-            alert('WebGL 2.0 is not supported.\n\n' + getBrowserRequirements());
+        if (!checkWasmSupport() || !checkWebGL2Support()) {
+            showErrorUI(getBrowserRequirements());
+            const errorContent = document.getElementById('error-content');
+            if (errorContent) {
+                errorContent.style.cursor = 'default';
+                errorContent.style.pointerEvents = 'none';
+            }
             return;
         }
 

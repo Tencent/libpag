@@ -268,6 +268,7 @@ html, body {
     max-width: 400px;
     text-align: center;
     word-break: break-word;
+    white-space: pre-line;
 }
 
 .toolbar {
