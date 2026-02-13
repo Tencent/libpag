@@ -97,148 +97,113 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseFile(const std::string& fil
   return parseDOM(dom);
 }
 
-std::string SVGParserContext::getAttribute(const std::shared_ptr<DOMNode>& node,
-                                        const std::string& name,
-                                        const std::string& defaultValue) const {
-  // CSS priority: style attribute > presentation attribute > CSS class rules
-  // Check style attribute first for CSS property.
-  // Style attribute format: "property1: value1; property2: value2; ..."
-  // CSS cascade rule: later properties override earlier ones.
-  auto* stylePtr = node->findAttribute("style");
-  if (stylePtr && !stylePtr->empty()) {
-    const std::string& styleStr = *stylePtr;
-    std::string lastValue;
-    size_t pos = 0;
-    while (pos < styleStr.size()) {
-      // Skip whitespace.
-      while (pos < styleStr.size() && std::isspace(styleStr[pos])) {
-        ++pos;
-      }
-      // Find property name end (colon).
-      size_t colonPos = styleStr.find(':', pos);
-      if (colonPos == std::string::npos) {
+// Parse a CSS style string into a property map. Later properties override earlier ones.
+// Handles parenthesized values (e.g., color(display-p3 ...)) by tracking parenthesis depth.
+static void ParseStyleString(const std::string& styleStr,
+                             std::unordered_map<std::string, std::string>& out) {
+  size_t pos = 0;
+  while (pos < styleStr.size()) {
+    while (pos < styleStr.size() && std::isspace(styleStr[pos])) {
+      ++pos;
+    }
+    size_t colonPos = styleStr.find(':', pos);
+    if (colonPos == std::string::npos) {
+      break;
+    }
+    std::string propName = styleStr.substr(pos, colonPos - pos);
+    size_t propStart = propName.find_first_not_of(" \t");
+    size_t propEnd = propName.find_last_not_of(" \t");
+    if (propStart != std::string::npos && propEnd != std::string::npos) {
+      propName = propName.substr(propStart, propEnd - propStart + 1);
+    }
+    size_t searchStart = colonPos + 1;
+    size_t semicolonPos = std::string::npos;
+    int parenDepth = 0;
+    for (size_t i = searchStart; i < styleStr.size(); i++) {
+      if (styleStr[i] == '(') {
+        parenDepth++;
+      } else if (styleStr[i] == ')') {
+        parenDepth--;
+      } else if (styleStr[i] == ';' && parenDepth == 0) {
+        semicolonPos = i;
         break;
       }
-      // Extract property name and trim whitespace.
-      std::string currentProp = styleStr.substr(pos, colonPos - pos);
-      size_t propStart = currentProp.find_first_not_of(" \t");
-      size_t propEnd = currentProp.find_last_not_of(" \t");
-      if (propStart != std::string::npos && propEnd != std::string::npos) {
-        currentProp = currentProp.substr(propStart, propEnd - propStart + 1);
-      }
-      // Find value end (semicolon or end of string).
-      // Special case: CSS color() function may contain parentheses,
-      // so find the next semicolon that's not inside parentheses.
-      size_t searchStart = colonPos + 1;
-      size_t semicolonPos = std::string::npos;
-      int parenDepth = 0;
-      for (size_t i = searchStart; i < styleStr.size(); i++) {
-        if (styleStr[i] == '(') {
-          parenDepth++;
-        } else if (styleStr[i] == ')') {
-          parenDepth--;
-        } else if (styleStr[i] == ';' && parenDepth == 0) {
-          semicolonPos = i;
-          break;
-        }
-      }
-      if (semicolonPos == std::string::npos) {
-        semicolonPos = styleStr.size();
-      }
-      // Check if this is the property we're looking for.
-      if (currentProp == name) {
-        // Extract and trim the value.
-        std::string propValue = styleStr.substr(colonPos + 1, semicolonPos - colonPos - 1);
-        size_t valStart = propValue.find_first_not_of(" \t");
-        size_t valEnd = propValue.find_last_not_of(" \t");
-        if (valStart != std::string::npos && valEnd != std::string::npos) {
-          lastValue = propValue.substr(valStart, valEnd - valStart + 1);
-        } else {
-          lastValue = propValue;
-        }
-        // Continue searching for later occurrences (CSS cascade).
-      }
-      // Move to next property.
-      pos = semicolonPos + 1;
     }
-    if (!lastValue.empty()) {
-      return lastValue;
+    if (semicolonPos == std::string::npos) {
+      semicolonPos = styleStr.size();
     }
+    std::string propValue = styleStr.substr(colonPos + 1, semicolonPos - colonPos - 1);
+    size_t valStart = propValue.find_first_not_of(" \t");
+    size_t valEnd = propValue.find_last_not_of(" \t");
+    if (valStart != std::string::npos && valEnd != std::string::npos) {
+      propValue = propValue.substr(valStart, valEnd - valStart + 1);
+    }
+    if (!propName.empty() && !propValue.empty()) {
+      out[propName] = propValue;
+    }
+    pos = semicolonPos + 1;
+  }
+}
+
+const std::unordered_map<std::string, std::string>& SVGParserContext::getStyleProperties(
+    const std::shared_ptr<DOMNode>& node) const {
+  auto it = _stylePropertyCache.find(node.get());
+  if (it != _stylePropertyCache.end()) {
+    return it->second;
   }
 
-  // Fallback: check for direct attribute (presentation attribute).
-  auto* directValue = node->findAttribute(name);
-  if (directValue) {
-    return *directValue;
-  }
+  auto& cached = _stylePropertyCache[node.get()];
 
-  // Check CSS class rules (lowest priority).
-  // class attribute can contain multiple class names separated by whitespace.
+  // CSS class rules (lowest priority): parse all matching classes.
   auto* classPtr = node->findAttribute("class");
   if (classPtr && !classPtr->empty()) {
     const std::string& classAttr = *classPtr;
-    // Parse class names.
     size_t pos = 0;
     while (pos < classAttr.size()) {
-      // Skip whitespace.
       while (pos < classAttr.size() && std::isspace(classAttr[pos])) {
         pos++;
       }
       if (pos >= classAttr.size()) {
         break;
       }
-      // Find end of class name.
       size_t endPos = pos;
       while (endPos < classAttr.size() && !std::isspace(classAttr[endPos])) {
         endPos++;
       }
       std::string className = classAttr.substr(pos, endPos - pos);
       pos = endPos;
-
-      // Look up the class in CSS rules.
-      auto it = _cssClassRules.find(className);
-      if (it != _cssClassRules.end()) {
-        // Parse the style string to find the property we need.
-        const std::string& classStyle = it->second;
-        size_t stylePos = 0;
-        while (stylePos < classStyle.size()) {
-          // Skip whitespace.
-          while (stylePos < classStyle.size() && std::isspace(classStyle[stylePos])) {
-            stylePos++;
-          }
-          // Find property name end (colon).
-          size_t colonPos = classStyle.find(':', stylePos);
-          if (colonPos == std::string::npos) {
-            break;
-          }
-          // Extract property name and trim whitespace.
-          std::string currentProp = classStyle.substr(stylePos, colonPos - stylePos);
-          size_t propStart = currentProp.find_first_not_of(" \t");
-          size_t propEnd = currentProp.find_last_not_of(" \t");
-          if (propStart != std::string::npos && propEnd != std::string::npos) {
-            currentProp = currentProp.substr(propStart, propEnd - propStart + 1);
-          }
-          // Find value end (semicolon or end of string).
-          size_t semicolonPos = classStyle.find(';', colonPos);
-          if (semicolonPos == std::string::npos) {
-            semicolonPos = classStyle.size();
-          }
-          // Check if this is the property we're looking for.
-          if (currentProp == name) {
-            // Extract and trim the value.
-            std::string propValue = classStyle.substr(colonPos + 1, semicolonPos - colonPos - 1);
-            size_t valStart = propValue.find_first_not_of(" \t");
-            size_t valEnd = propValue.find_last_not_of(" \t");
-            if (valStart != std::string::npos && valEnd != std::string::npos) {
-              return propValue.substr(valStart, valEnd - valStart + 1);
-            }
-            return propValue;
-          }
-          // Move to next property.
-          stylePos = semicolonPos + 1;
-        }
+      auto classIt = _cssClassRules.find(className);
+      if (classIt != _cssClassRules.end()) {
+        ParseStyleString(classIt->second, cached);
       }
     }
+  }
+
+  // Style attribute (highest priority): overwrites class rules.
+  auto* stylePtr = node->findAttribute("style");
+  if (stylePtr && !stylePtr->empty()) {
+    ParseStyleString(*stylePtr, cached);
+  }
+
+  return cached;
+}
+
+std::string SVGParserContext::getAttribute(const std::shared_ptr<DOMNode>& node,
+                                        const std::string& name,
+                                        const std::string& defaultValue) const {
+  // CSS priority: style attribute > presentation attribute > CSS class rules
+  // The cached style properties map merges both style attribute and class rules,
+  // with style attribute values overriding class rule values.
+  const auto& styleProps = getStyleProperties(node);
+  auto styleIt = styleProps.find(name);
+  if (styleIt != styleProps.end()) {
+    return styleIt->second;
+  }
+
+  // Fallback: check for direct attribute (presentation attribute).
+  auto* directValue = node->findAttribute(name);
+  if (directValue) {
+    return *directValue;
   }
 
   return defaultValue;
