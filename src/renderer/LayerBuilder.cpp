@@ -434,7 +434,6 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::Layer> convertVectorLayer(const Layer* node) {
     auto layer = tgfx::VectorLayer::Make();
     std::vector<std::shared_ptr<tgfx::VectorElement>> contents;
-    contents.reserve(node->contents.size());
     for (const auto& element : node->contents) {
       auto tgfxElement = convertVectorElement(element);
       if (tgfxElement) {
@@ -811,7 +810,6 @@ class LayerBuilderContext {
 
     // Convert selectors
     std::vector<std::shared_ptr<tgfx::TextSelector>> tgfxSelectors;
-    tgfxSelectors.reserve(node->selectors.size());
     for (const auto* selector : node->selectors) {
       if (selector->nodeType() == NodeType::RangeSelector) {
         auto rangeSelector = static_cast<const RangeSelector*>(selector);
@@ -903,7 +901,6 @@ class LayerBuilderContext {
 
     // Layer styles
     std::vector<std::shared_ptr<tgfx::LayerStyle>> styles;
-    styles.reserve(node->styles.size());
     for (const auto& style : node->styles) {
       auto tgfxStyle = convertLayerStyle(style);
       if (tgfxStyle) {
@@ -916,7 +913,6 @@ class LayerBuilderContext {
 
     // Layer filters
     std::vector<std::shared_ptr<tgfx::LayerFilter>> filters;
-    filters.reserve(node->filters.size());
     for (const auto& filter : node->filters) {
       auto tgfxFilter = convertLayerFilter(filter);
       if (tgfxFilter) {
