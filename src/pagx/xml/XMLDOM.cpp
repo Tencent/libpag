@@ -211,14 +211,4 @@ const std::string* DOMNode::findAttribute(const std::string& attrName) const {
   return nullptr;
 }
 
-int DOMNode::countChildren(const std::string& name) const {
-  int count = 0;
-  auto child = getFirstChild(name);
-  while (child) {
-    ++count;
-    child = child->getNextSibling(name);
-  }
-  return count;
-}
-
 }  // namespace pagx
