@@ -19,7 +19,6 @@
 #include "Typesetter.h"
 #include "Base64.h"
 #include "MathUtil.h"
-#include "SVGPathParser.h"
 #include "TGFXConverter.h"
 #include "UTF8.h"
 #include "pagx/nodes/Composition.h"
