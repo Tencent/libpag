@@ -65,7 +65,6 @@ namespace pagx {
 class XMLBuilder {
  public:
   XMLBuilder() {
-    buffer.reserve(4096);
     tagStack.reserve(32);
   }
 
