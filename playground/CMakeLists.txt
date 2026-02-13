@@ -20,7 +20,6 @@ get_filename_component(TGFX_DIR "${TGFX_DIR}" REALPATH)
 # Add tgfx as dependency
 if (NOT TARGET tgfx)
     set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-    set(TGFX_BUILD_SVG ON CACHE BOOL "" FORCE)
     set(TGFX_BUILD_LAYERS ON CACHE BOOL "" FORCE)
     add_subdirectory(${TGFX_DIR} ${CMAKE_CURRENT_BINARY_DIR}/tgfx)
 endif ()

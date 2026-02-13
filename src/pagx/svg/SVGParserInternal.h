@@ -45,6 +45,8 @@
 
 namespace pagx {
 
+static constexpr int MAX_SVG_RECURSION_DEPTH = 128;
+
 /**
  * Type of shadow-only filter for determining how to handle element content.
  */
@@ -94,7 +96,7 @@ class SVGParserContext {
   void parseDefs(const std::shared_ptr<DOMNode>& defsNode);
 
   Layer* convertToLayer(const std::shared_ptr<DOMNode>& element,
-                                            const InheritedStyle& parentStyle);
+                        const InheritedStyle& parentStyle, int depth = 0);
   void convertChildren(const std::shared_ptr<DOMNode>& element,
                        std::vector<Element*>& contents,
                        const InheritedStyle& inheritedStyle,
@@ -120,6 +122,10 @@ class SVGParserContext {
 
   Layer* convertMaskElement(const std::shared_ptr<DOMNode>& maskElement,
                                                 const InheritedStyle& parentStyle);
+  void parseMaskChildren(const std::shared_ptr<DOMNode>& parent,
+                         Layer* maskLayer,
+                         const InheritedStyle& parentStyle,
+                         const Matrix& parentMatrix);
   // Converts SVG filter element to PAGX filters/styles.
   // Returns true if the filter was successfully converted, false otherwise.
   // If outShadowOnlyType is provided, it will be set to indicate the type of shadow-only filter
@@ -145,6 +151,8 @@ class SVGParserContext {
   // Named colors are converted to their hex equivalents for PAGX compatibility.
   std::string colorToHex(const std::string& value);
   float parseLength(const std::string& value, float containerSize);
+  void parseGradientStops(const std::shared_ptr<DOMNode>& element,
+                          std::vector<ColorStop>& colorStops);
   // Like parseLength, but uses the given fontSize for em/rem unit conversion instead of the
   // default 16px. Returns 0 if value is empty.
   float parseLengthEm(const std::string& value, float containerSize, float fontSize);
@@ -160,6 +168,10 @@ class SVGParserContext {
   // Helper to get attribute from DOMNode.
   std::string getAttribute(const std::shared_ptr<DOMNode>& node, const std::string& name,
                            const std::string& defaultValue = "") const;
+
+  // Parse and cache style properties (from style attribute and CSS class rules) for a node.
+  const std::unordered_map<std::string, std::string>& getStyleProperties(
+      const std::shared_ptr<DOMNode>& node) const;
 
   // Get href attribute from DOMNode, checking both "href" and "xlink:href".
   std::string getHrefAttribute(const std::shared_ptr<DOMNode>& node) const;
@@ -204,6 +216,7 @@ class SVGParserContext {
   std::vector<Layer*> _maskLayers = {};
   std::unordered_map<std::string, Image*> _imageSourceToId = {};  // Maps image source to resource node.
   std::unordered_set<std::string> _existingIds = {};  // All IDs found in SVG to avoid conflicts.
+  std::unordered_set<std::string> _useStack = {};  // Tracks <use> references being resolved to detect cycles.
   
   // ColorSource reference counting for gradients and patterns.
   // Key is the SVG def id (e.g., "gradient1"), value is the number of times it's referenced.
@@ -221,6 +234,11 @@ class SVGParserContext {
   // CSS class rules: key is class name (without dot), value is style properties.
   // Example: {"cls-1": "fill: #fcfae9"}
   std::unordered_map<std::string, std::string> _cssClassRules = {};
+
+  // Cache of parsed style properties per DOMNode (from style attribute + CSS class rules).
+  // Key is the raw DOMNode pointer (valid for the lifetime of the DOM tree).
+  mutable std::unordered_map<const DOMNode*, std::unordered_map<std::string, std::string>>
+      _stylePropertyCache = {};
 };
 
 }  // namespace pagx

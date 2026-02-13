@@ -34,20 +34,19 @@ class SVGImporter {
     /**
      * If true, unsupported SVG elements are preserved as Unknown nodes.
      */
-    bool preserveUnknownElements = false;
+    bool preserveUnknownElements;
 
     /**
      * If true, <use> references are expanded to actual content.
      */
-    bool expandUseReferences = true;
+    bool expandUseReferences;
 
     /**
      * If true, nested transforms are flattened into single matrices.
      */
-    bool flattenTransforms = false;
+    bool flattenTransforms;
 
-    Options()
-        : preserveUnknownElements(false), expandUseReferences(true), flattenTransforms(false) {
+    Options() : preserveUnknownElements(false), expandUseReferences(true), flattenTransforms(false) {
     }
   };
 

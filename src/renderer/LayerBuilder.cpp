@@ -68,7 +68,6 @@
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/core/TextBlobBuilder.h"
-#include "tgfx/svg/SVGPathParser.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/LayerMaskType.h"
 #include "tgfx/layers/LayerPaint.h"
@@ -108,19 +107,6 @@
 
 namespace pagx {
 
-// Type converter from pagx::Data to tgfx::Data
-static void ReleasePagxData(const void*, void* context) {
-  delete static_cast<std::shared_ptr<pagx::Data>*>(context);
-}
-
-static std::shared_ptr<tgfx::Data> ToTGFX(const std::shared_ptr<pagx::Data>& data) {
-  if (!data) {
-    return nullptr;
-  }
-  auto* ctx = new std::shared_ptr<pagx::Data>(data);
-  return tgfx::Data::MakeAdopted(data->data(), data->size(), ReleasePagxData, ctx);
-}
-
 // Decode a data URI (e.g., "data:image/png;base64,...") to an Image.
 static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI) {
   if (dataURI.find("data:") != 0) {
@@ -144,7 +130,7 @@ static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI)
     return nullptr;
   }
 
-  return tgfx::Image::MakeFromEncoded(ToTGFX(data));
+  return tgfx::Image::MakeFromEncoded(ToTGFXData(data));
 }
 
 // Type converters from pagx to tgfx
@@ -152,16 +138,18 @@ static tgfx::Point ToTGFX(const Point& p) {
   return tgfx::Point::Make(p.x, p.y);
 }
 
+static tgfx::ColorMatrix33 ComputeP3ToSRGBMatrix() {
+  tgfx::ColorMatrix33 matrix = {};
+  tgfx::ColorSpace::DisplayP3()->gamutTransformTo(tgfx::ColorSpace::SRGB().get(), &matrix);
+  return matrix;
+}
+
 static tgfx::Color ToTGFX(const Color& c) {
   // tgfx::Color is always in sRGB color space. If source color is in Display P3,
   // we need to convert it to sRGB for correct rendering.
   if (c.colorSpace == ColorSpace::DisplayP3) {
     // Convert Display P3 to sRGB using tgfx::ColorSpace
-    static const tgfx::ColorMatrix33 p3ToSRGB = [] {
-      tgfx::ColorMatrix33 matrix = {};
-      tgfx::ColorSpace::DisplayP3()->gamutTransformTo(tgfx::ColorSpace::SRGB().get(), &matrix);
-      return matrix;
-    }();
+    static const tgfx::ColorMatrix33 p3ToSRGB = ComputeP3ToSRGBMatrix();
 
     float r = c.red * p3ToSRGB.values[0][0] + c.green * p3ToSRGB.values[0][1] +
               c.blue * p3ToSRGB.values[0][2];
@@ -691,7 +679,7 @@ class LayerBuilderContext {
     auto imageNode = node->image;
     std::shared_ptr<tgfx::Image> image = nullptr;
     if (imageNode->data) {
-      image = tgfx::Image::MakeFromEncoded(ToTGFX(imageNode->data));
+      image = tgfx::Image::MakeFromEncoded(ToTGFXData(imageNode->data));
     } else if (imageNode->filePath.find("data:") == 0) {
       image = ImageFromDataURI(imageNode->filePath);
     } else if (!imageNode->filePath.empty()) {

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -268,12 +268,9 @@ ColorSpace ColorSpaceFromString(const std::string& str) {
   return ColorSpace::SRGB;
 }
 
-static std::string ToHex(float v) {
+static int FloatToHexByte(float v) {
   int i = static_cast<int>(std::round(v * 255.0f));
-  i = std::max(0, std::min(255, i));
-  char buf[3] = {};
-  snprintf(buf, sizeof(buf), "%02X", i);
-  return std::string(buf);
+  return std::max(0, std::min(255, i));
 }
 
 std::string ColorToHexString(const Color& color, bool withAlpha) {
@@ -287,11 +284,17 @@ std::string ColorToHexString(const Color& color, bool withAlpha) {
     }
     return std::string(buf);
   }
-  std::string result = "#" + ToHex(color.red) + ToHex(color.green) + ToHex(color.blue);
+  char buf[10] = {};
+  int r = FloatToHexByte(color.red);
+  int g = FloatToHexByte(color.green);
+  int b = FloatToHexByte(color.blue);
   if (withAlpha && color.alpha < 1.0f) {
-    result += ToHex(color.alpha);
+    int a = FloatToHexByte(color.alpha);
+    snprintf(buf, sizeof(buf), "#%02X%02X%02X%02X", r, g, b, a);
+  } else {
+    snprintf(buf, sizeof(buf), "#%02X%02X%02X", r, g, b);
   }
-  return result;
+  return std::string(buf);
 }
 
 //==============================================================================

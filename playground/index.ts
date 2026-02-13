@@ -1111,8 +1111,8 @@ function checkWasmSupport(): boolean {
 
 function getBrowserRequirements(): string {
     return `${t().errorBrowser}
-• Chrome 57+
-• Firefox 52+
+• Chrome 69+
+• Firefox 79+
 • Safari 15+
 • Edge 79+`;
 }
@@ -1271,12 +1271,13 @@ if (typeof window !== 'undefined') {
         // Setup drag and drop early so UI is responsive
         setupDragAndDrop();
 
-        if (!checkWasmSupport()) {
-            alert('WebAssembly is not supported.\n\n' + getBrowserRequirements());
-            return;
-        }
-        if (!checkWebGL2Support()) {
-            alert('WebGL 2.0 is not supported.\n\n' + getBrowserRequirements());
+        if (!checkWasmSupport() || !checkWebGL2Support()) {
+            showErrorUI(getBrowserRequirements());
+            const errorContent = document.getElementById('error-content');
+            if (errorContent) {
+                errorContent.style.cursor = 'default';
+                errorContent.style.pointerEvents = 'none';
+            }
             return;
         }
 

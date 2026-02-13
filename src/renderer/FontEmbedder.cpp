@@ -351,7 +351,7 @@ static GlyphRun* CreateGlyphRunForIndices(
       for (size_t idx = 0; idx < indices.size(); idx++) {
         size_t i = indices[idx];
         const auto& xform = xforms[i];
-        float scale = std::sqrt(xform.scos * xform.scos + xform.ssin * xform.ssin);
+        float scale = std::hypot(xform.scos, xform.ssin);
         float rotation = RadiansToDegrees(std::atan2(xform.ssin, xform.scos));
         glyphRun->positions.push_back({xform.tx, xform.ty});
         glyphRun->scales.push_back({scale, scale});

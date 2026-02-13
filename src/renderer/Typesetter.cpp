@@ -59,17 +59,6 @@ static tgfx::Point ToTGFXPoint(const Point& p) {
   return PointToTGFX(p);
 }
 
-static void ReleasePagxData(const void*, void* context) {
-  delete static_cast<std::shared_ptr<Data>*>(context);
-}
-
-static std::shared_ptr<tgfx::Data> ToTGFXData(const std::shared_ptr<Data>& data) {
-  if (data == nullptr) {
-    return nullptr;
-  }
-  auto* ctx = new std::shared_ptr<Data>(data);
-  return tgfx::Data::MakeAdopted(data->data(), data->size(), ReleasePagxData, ctx);
-}
 
 // Build context that maintains state during text typesetting
 class TypesetterContext {
@@ -658,8 +647,8 @@ class TypesetterContext {
         runStartX = currentX;
         currentRun->startX = runStartX;
         currentRun->canUseDefaultMode = !hasLetterSpacing;
-        // Reserve using remaining bytes as an upper bound for glyph count.
-        auto remaining = content.size() - i + charLen;
+        // Reserve using remaining character count estimate (assuming average 2 bytes per char).
+        auto remaining = (content.size() - i + charLen) / 2 + 1;
         currentRun->glyphIDs.reserve(remaining);
         currentRun->xPositions.reserve(remaining);
       }
