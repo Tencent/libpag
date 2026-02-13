@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <string>
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/types/BlendMode.h"

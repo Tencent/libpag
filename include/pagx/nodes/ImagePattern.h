@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <string>
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/types/FilterMode.h"
 #include "pagx/types/Matrix.h"

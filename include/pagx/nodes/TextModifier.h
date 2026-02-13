@@ -19,7 +19,6 @@
 #pragma once
 
 #include <optional>
-#include <string>
 #include <vector>
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/TextSelector.h"

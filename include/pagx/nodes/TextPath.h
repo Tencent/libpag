@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <string>
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/types/Point.h"

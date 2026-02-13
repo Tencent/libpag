@@ -19,7 +19,6 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
 #include <vector>
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Point.h"
