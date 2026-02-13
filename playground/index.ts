@@ -772,45 +772,38 @@ function bindCanvasEvents(canvas: HTMLElement) {
     });
 }
 
-function showLoadingUI(): void {
+type DropZoneState = 'dropzone' | 'loading' | 'error';
+
+function setDropZoneState(state: DropZoneState, errorMessage?: string): void {
     const dropZoneContent = document.getElementById('drop-zone-content');
     const loadingContent = document.getElementById('loading-content');
     const errorContent = document.getElementById('error-content');
     const dropZone = document.getElementById('drop-zone');
-    if (dropZoneContent && loadingContent && errorContent && dropZone) {
-        dropZoneContent.classList.add('hidden');
-        loadingContent.classList.remove('hidden');
-        errorContent.classList.add('hidden');
-        dropZone.classList.remove('hidden');
+    if (!dropZoneContent || !loadingContent || !errorContent || !dropZone) {
+        return;
     }
+    dropZoneContent.classList.toggle('hidden', state !== 'dropzone');
+    loadingContent.classList.toggle('hidden', state !== 'loading');
+    errorContent.classList.toggle('hidden', state !== 'error');
+    dropZone.classList.remove('hidden');
+    if (state === 'error' && errorMessage !== undefined) {
+        const errorMessageEl = document.getElementById('error-message');
+        if (errorMessageEl) {
+            errorMessageEl.textContent = errorMessage;
+        }
+    }
+}
+
+function showLoadingUI(): void {
+    setDropZoneState('loading');
 }
 
 function showDropZoneUI(): void {
-    const dropZoneContent = document.getElementById('drop-zone-content');
-    const loadingContent = document.getElementById('loading-content');
-    const errorContent = document.getElementById('error-content');
-    const dropZone = document.getElementById('drop-zone');
-    if (dropZoneContent && loadingContent && errorContent && dropZone) {
-        dropZoneContent.classList.remove('hidden');
-        loadingContent.classList.add('hidden');
-        errorContent.classList.add('hidden');
-        dropZone.classList.remove('hidden');
-    }
+    setDropZoneState('dropzone');
 }
 
 function showErrorUI(message: string): void {
-    const dropZoneContent = document.getElementById('drop-zone-content');
-    const loadingContent = document.getElementById('loading-content');
-    const errorContent = document.getElementById('error-content');
-    const errorMessage = document.getElementById('error-message');
-    const dropZone = document.getElementById('drop-zone');
-    if (dropZoneContent && loadingContent && errorContent && errorMessage && dropZone) {
-        dropZoneContent.classList.add('hidden');
-        loadingContent.classList.add('hidden');
-        errorContent.classList.remove('hidden');
-        errorMessage.textContent = message;
-        dropZone.classList.remove('hidden');
-    }
+    setDropZoneState('error', message);
 }
 
 function hideDropZone(): void {
