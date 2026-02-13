@@ -719,6 +719,9 @@ Element* SVGParserContext::convertRect(
   float rx = parseLength(getAttribute(element, "rx"), _viewBoxWidth);
   float ry = parseLength(getAttribute(element, "ry"), _viewBoxHeight);
 
+  if (rx == 0) {
+    rx = ry;
+  }
   if (ry == 0) {
     ry = rx;
   }
