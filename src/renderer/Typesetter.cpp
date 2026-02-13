@@ -122,11 +122,12 @@ class TypesetterContext {
     if (text == nullptr || shapedText.textBlob == nullptr) {
       return;
     }
-    auto it = result.find(text);
-    if (it == result.end()) {
+    auto [it, inserted] = result.emplace(text, std::move(shapedText));
+    if (inserted) {
       textOrder.push_back(text);
+    } else {
+      it->second = std::move(shapedText);
     }
-    result[text] = std::move(shapedText);
   }
 
   static int StylePriority(const std::string& style) {

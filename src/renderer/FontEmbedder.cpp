@@ -95,9 +95,9 @@ static void CollectMaxFontSize(const tgfx::Font& font, tgfx::GlyphID glyphID,
                                std::unordered_map<GlyphKey, float, GlyphKeyHash>& maxSizes) {
   GlyphKey key = {font.getTypeface().get(), glyphID};
   float fontSize = font.getSize();
-  auto it = maxSizes.find(key);
-  if (it == maxSizes.end() || fontSize > it->second) {
-    maxSizes[key] = fontSize;
+  auto [it, inserted] = maxSizes.emplace(key, fontSize);
+  if (!inserted && fontSize > it->second) {
+    it->second = fontSize;
   }
 }
 
@@ -107,7 +107,7 @@ static void CollectVectorGlyph(PAGXDocument* document, const tgfx::Font& font,
                                VectorFontBuilder& builder) {
   GlyphKey key = {font.getTypeface().get(), glyphID};
 
-  if (builder.glyphMapping.count(key) > 0) {
+  if (builder.glyphMapping.count(key)) {
     return;
   }
 
@@ -154,7 +154,7 @@ static void CollectBitmapGlyph(
   auto& builder = builders[typeface];
 
   GlyphKey key = {typeface, glyphID};
-  if (builder.glyphMapping.count(key) > 0) {
+  if (builder.glyphMapping.count(key)) {
     return;
   }
 
@@ -509,7 +509,7 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
         auto bitmapIt = bitmapBuilders.find(typeface);
         if (bitmapIt != bitmapBuilders.end() && bitmapIt->second.font != nullptr) {
           auto& builder = bitmapIt->second;
-          if (builder.glyphMapping.count(key) > 0) {
+          if (builder.glyphMapping.count(key)) {
             continue;
           }
           auto glyph = document->makeNode<Glyph>();

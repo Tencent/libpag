@@ -546,7 +546,7 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
 
   std::string opacity = getAttribute(element, "opacity");
   if (!opacity.empty()) {
-    layer->alpha = std::stof(opacity);
+    layer->alpha = strtof(opacity.c_str(), nullptr);
   }
 
   // Handle mask attribute.
@@ -1336,7 +1336,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
         fillOpacity = inheritedStyle.fillOpacity;
       }
       if (!fillOpacity.empty()) {
-        fillNode->alpha = std::stof(fillOpacity);
+        fillNode->alpha = strtof(fillOpacity.c_str(), nullptr);
       }
       contents.push_back(fillNode);
     } else {
@@ -1348,7 +1348,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
         fillOpacity = inheritedStyle.fillOpacity;
       }
       if (!fillOpacity.empty()) {
-        fillNode->alpha = std::stof(fillOpacity);
+        fillNode->alpha = strtof(fillOpacity.c_str(), nullptr);
       }
 
       // Convert color to SolidColor for PAGX compatibility.
@@ -1409,7 +1409,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
         strokeOpacity = inheritedStyle.strokeOpacity;
       }
       if (!strokeOpacity.empty()) {
-        strokeNode->alpha = std::stof(strokeOpacity);
+        strokeNode->alpha = strtof(strokeOpacity.c_str(), nullptr);
       }
 
       // Convert color to SolidColor for PAGX compatibility.
@@ -1443,7 +1443,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       strokeMiterlimit = inheritedStyle.strokeMiterlimit;
     }
     if (!strokeMiterlimit.empty()) {
-      strokeNode->miterLimit = std::stof(strokeMiterlimit);
+      strokeNode->miterLimit = strtof(strokeMiterlimit.c_str(), nullptr);
     }
 
     std::string dashArray = getAttribute(element, "stroke-dasharray");
@@ -1576,7 +1576,7 @@ static float ReadNumber(const char*& ptr, const char* end) {
   if (start == ptr) {
     return 0.0f;
   }
-  return std::stof(std::string(start, ptr));
+  return strtof(start, nullptr);
 }
 
 Matrix SVGParserContext::parseTransform(const std::string& value) {
@@ -1594,10 +1594,11 @@ Matrix SVGParserContext::parseTransform(const std::string& value) {
       break;
     }
 
-    std::string func;
+    const char* funcStart = ptr;
     while (ptr < end && std::isalpha(*ptr)) {
-      func += *ptr++;
+      ++ptr;
     }
+    size_t funcLen = static_cast<size_t>(ptr - funcStart);
 
     SkipWhitespace(ptr, end);
     if (ptr >= end || *ptr != '(') {
@@ -1607,7 +1608,7 @@ Matrix SVGParserContext::parseTransform(const std::string& value) {
 
     Matrix m = Matrix::Identity();
 
-    if (func == "translate") {
+    if (funcLen == 9 && memcmp(funcStart, "translate", 9) == 0) {
       float tx = ReadNumber(ptr, end);
       SkipWhitespace(ptr, end);
       float ty = 0;
@@ -1615,7 +1616,7 @@ Matrix SVGParserContext::parseTransform(const std::string& value) {
         ty = ReadNumber(ptr, end);
       }
       m = Matrix::Translate(tx, ty);
-    } else if (func == "scale") {
+    } else if (funcLen == 5 && memcmp(funcStart, "scale", 5) == 0) {
       float sx = ReadNumber(ptr, end);
       SkipWhitespace(ptr, end);
       float sy = sx;
@@ -1623,7 +1624,7 @@ Matrix SVGParserContext::parseTransform(const std::string& value) {
         sy = ReadNumber(ptr, end);
       }
       m = Matrix::Scale(sx, sy);
-    } else if (func == "rotate") {
+    } else if (funcLen == 6 && memcmp(funcStart, "rotate", 6) == 0) {
       float angle = ReadNumber(ptr, end);
       SkipWhitespace(ptr, end);
       if (ptr < end && *ptr != ')') {
@@ -1633,15 +1634,15 @@ Matrix SVGParserContext::parseTransform(const std::string& value) {
       } else {
         m = Matrix::Rotate(angle);
       }
-    } else if (func == "skewX") {
+    } else if (funcLen == 5 && memcmp(funcStart, "skewX", 5) == 0) {
       float angle = ReadNumber(ptr, end);
       float radians = angle * 3.14159265358979323846f / 180.0f;
       m.c = std::tan(radians);
-    } else if (func == "skewY") {
+    } else if (funcLen == 5 && memcmp(funcStart, "skewY", 5) == 0) {
       float angle = ReadNumber(ptr, end);
       float radians = angle * 3.14159265358979323846f / 180.0f;
       m.b = std::tan(radians);
-    } else if (func == "matrix") {
+    } else if (funcLen == 6 && memcmp(funcStart, "matrix", 6) == 0) {
       m.a = ReadNumber(ptr, end);
       m.b = ReadNumber(ptr, end);
       m.c = ReadNumber(ptr, end);
@@ -1740,22 +1741,22 @@ Color SVGParserContext::parseColor(const std::string& value) {
       char r = value[1];
       char g = value[2];
       char b = value[3];
-      std::string expanded = std::string() + r + r + g + g + b + b;
-      hex = std::stoul(expanded, nullptr, 16);
+      char expanded[7] = {r, r, g, g, b, b, '\0'};
+      hex = strtoul(expanded, nullptr, 16);
       color.red = static_cast<float>((hex >> 16) & 0xFF) / 255.0f;
       color.green = static_cast<float>((hex >> 8) & 0xFF) / 255.0f;
       color.blue = static_cast<float>(hex & 0xFF) / 255.0f;
       color.alpha = 1.0f;
       return color;
     } else if (value.length() == 7) {
-      hex = std::stoul(value.substr(1), nullptr, 16);
+      hex = strtoul(value.c_str() + 1, nullptr, 16);
       color.red = static_cast<float>((hex >> 16) & 0xFF) / 255.0f;
       color.green = static_cast<float>((hex >> 8) & 0xFF) / 255.0f;
       color.blue = static_cast<float>(hex & 0xFF) / 255.0f;
       color.alpha = 1.0f;
       return color;
     } else if (value.length() == 9) {
-      hex = std::stoul(value.substr(1), nullptr, 16);
+      hex = strtoul(value.c_str() + 1, nullptr, 16);
       color.red = static_cast<float>((hex >> 24) & 0xFF) / 255.0f;
       color.green = static_cast<float>((hex >> 16) & 0xFF) / 255.0f;
       color.blue = static_cast<float>((hex >> 8) & 0xFF) / 255.0f;
@@ -2008,10 +2009,13 @@ float SVGParserContext::parseLength(const std::string& value, float containerSiz
     return 0;
   }
 
-  size_t idx = 0;
-  float num = std::stof(value, &idx);
+  char* endPtr = nullptr;
+  float num = strtof(value.c_str(), &endPtr);
+  if (endPtr == value.c_str()) {
+    return 0;
+  }
 
-  std::string unit = value.substr(idx);
+  std::string unit(endPtr);
   if (unit == "%") {
     return num / 100.0f * containerSize;
   }
@@ -2042,9 +2046,12 @@ float SVGParserContext::parseLengthEm(const std::string& value, float containerS
   if (value.empty()) {
     return 0;
   }
-  size_t idx = 0;
-  float num = std::stof(value, &idx);
-  std::string unit = value.substr(idx);
+  char* endPtr = nullptr;
+  float num = strtof(value.c_str(), &endPtr);
+  if (endPtr == value.c_str()) {
+    return 0;
+  }
+  std::string unit(endPtr);
   if (unit == "em" || unit == "rem") {
     return num * fontSize;
   }

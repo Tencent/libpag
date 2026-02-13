@@ -197,26 +197,27 @@ class XMLTokenizer {
 
   char parseEntity() {
     pos++;
-    std::string entity = {};
+    const char* start = data + pos;
     while (pos < length && data[pos] != ';') {
-      entity += data[pos++];
+      pos++;
     }
+    size_t len = static_cast<size_t>(data + pos - start);
     if (pos < length) {
       pos++;
     }
-    if (entity == "lt") {
+    if (len == 2 && start[0] == 'l' && start[1] == 't') {
       return '<';
     }
-    if (entity == "gt") {
+    if (len == 2 && start[0] == 'g' && start[1] == 't') {
       return '>';
     }
-    if (entity == "amp") {
+    if (len == 3 && start[0] == 'a' && start[1] == 'm' && start[2] == 'p') {
       return '&';
     }
-    if (entity == "apos") {
+    if (len == 4 && start[0] == 'a' && start[1] == 'p' && start[2] == 'o' && start[3] == 's') {
       return '\'';
     }
-    if (entity == "quot") {
+    if (len == 4 && start[0] == 'q' && start[1] == 'u' && start[2] == 'o' && start[3] == 't') {
       return '"';
     }
     return '?';
@@ -1285,24 +1286,30 @@ static Glyph* parseGlyph(const XMLNode* node, PAGXDocument* doc) {
 
 static std::vector<Point> parseSemicolonSeparatedPoints(const std::string& str) {
   std::vector<Point> result = {};
-  size_t start = 0;
-  size_t end = str.find(';');
-  while (start < str.size()) {
-    std::string pair = {};
-    if (end == std::string::npos) {
-      pair = str.substr(start);
-    } else {
-      pair = str.substr(start, end - start);
+  const char* ptr = str.c_str();
+  const char* end = ptr + str.size();
+  while (ptr < end) {
+    while (ptr < end && (*ptr == ' ' || *ptr == '\t' || *ptr == ';')) {
+      ++ptr;
     }
-    auto coords = ParseFloatList(pair);
-    if (coords.size() >= 2) {
-      result.push_back({coords[0], coords[1]});
-    }
-    if (end == std::string::npos) {
+    if (ptr >= end) {
       break;
     }
-    start = end + 1;
-    end = str.find(';', start);
+    char* endPtr = nullptr;
+    float x = strtof(ptr, &endPtr);
+    if (endPtr == ptr) {
+      break;
+    }
+    ptr = endPtr;
+    while (ptr < end && (*ptr == ' ' || *ptr == '\t' || *ptr == ',')) {
+      ++ptr;
+    }
+    float y = strtof(ptr, &endPtr);
+    if (endPtr == ptr) {
+      break;
+    }
+    ptr = endPtr;
+    result.push_back({x, y});
   }
   return result;
 }

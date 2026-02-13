@@ -107,7 +107,7 @@ class PathData : public Node {
   /**
    * Returns the bounding rectangle of the path.
    */
-  Rect getBounds() const;
+  Rect getBounds();
 
   /**
    * Returns true if the path contains no commands.
@@ -130,8 +130,8 @@ class PathData : public Node {
 
   std::vector<PathVerb> _verbs = {};
   std::vector<Point> _points = {};
-  mutable Rect _cachedBounds = {};
-  mutable bool _boundsDirty = true;
+  Rect _cachedBounds = {};
+  bool _boundsDirty = true;
 
   friend class PAGXDocument;
   friend class SVGParserContext;
