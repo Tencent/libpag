@@ -114,24 +114,6 @@ class PAGXView {
    */
   int height() const;
 
-  /**
-   * Enable or disable performance-based adaptation.
-   * Default: true
-   */
-  void setPerformanceAdaptationEnabled(bool enabled);
-
-  /**
-   * Set slow frame threshold in milliseconds.
-   * Default: 50.0ms (more lenient than desktop 32ms due to WeChat environment)
-   */
-  void setSlowFrameThreshold(double thresholdMs);
-
-  /**
-   * Set recovery time window in milliseconds.
-   * Default: 3000ms (3 seconds, longer than desktop 2s to reduce jitter)
-   */
-  void setRecoveryWindow(double windowMs);
-
  private:
   void applyCenteringTransform();
 
@@ -159,16 +141,6 @@ class PAGXView {
   std::deque<FrameRecord> frameHistory = {};
   double frameHistoryTotalTime = 0.0;
   bool lastFrameSlow = false;
-
-  // Configuration
-  bool enablePerformanceAdaptation = true;
-  double slowFrameThresholdMs = 50.0;
-  double recoveryWindowMs = 3000.0;
-  double zoomInEndTimeoutMs = 300.0;    // Timeout for zoom in (faster refinement)
-  double zoomOutEndTimeoutMs = 800.0;   // Timeout for zoom out (slower refinement)
-  double upgradeRetryDelayMs = 300.0;   // Delay before retrying upgrade when performance is still slow
-  size_t minRecoveryFramesStatic = 20;  // Minimum frames to confirm recovery in static state
-  size_t minRecoveryFramesZoomEnd = 10; // Minimum frames to confirm recovery after zoom ends
 
   // State tracking
   bool hasRenderedFirstFrame = false;

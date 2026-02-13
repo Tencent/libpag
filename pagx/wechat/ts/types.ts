@@ -44,12 +44,6 @@ export interface PAGXViewNative {
     contentWidth: () => number;
     /** Returns the height of the PAGX content in content pixels. */
     contentHeight: () => number;
-    /** Enables or disables performance-based adaptation. */
-    setPerformanceAdaptationEnabled: (enabled: boolean) => void;
-    /** Sets the slow frame threshold in milliseconds. */
-    setSlowFrameThreshold: (thresholdMs: number) => void;
-    /** Sets the recovery time window in milliseconds. */
-    setRecoveryWindow: (windowMs: number) => void;
     /** Releases the native C++ object. */
     delete: () => void;
 }

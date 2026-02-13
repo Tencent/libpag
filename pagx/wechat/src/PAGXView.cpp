@@ -34,6 +34,20 @@ namespace pagx {
 constexpr size_t MAX_CACHE_LIMIT = 1U * 1024 * 1024 * 1024;
 // GPU resource expiration in frames. Resources unused beyond this threshold will be released.
 constexpr size_t EXPIRATION_FRAMES = 10 * 60;
+// Slow frame threshold in milliseconds (more lenient than desktop 32ms due to WeChat environment).
+constexpr double SLOW_FRAME_THRESHOLD_MS = 50.0;
+// Recovery time window in milliseconds (longer than desktop 2s to reduce jitter).
+constexpr double RECOVERY_WINDOW_MS = 3000.0;
+// Timeout for detecting zoom-in gesture end (faster refinement).
+constexpr double ZOOM_IN_END_TIMEOUT_MS = 300.0;
+// Timeout for detecting zoom-out gesture end (slower refinement).
+constexpr double ZOOM_OUT_END_TIMEOUT_MS = 800.0;
+// Delay before retrying tile refinement upgrade when performance is still slow.
+constexpr double UPGRADE_RETRY_DELAY_MS = 300.0;
+// Minimum frames to confirm recovery in static state.
+constexpr size_t MIN_RECOVERY_FRAMES_STATIC = 20;
+// Minimum frames to confirm recovery after zoom ends.
+constexpr size_t MIN_RECOVERY_FRAMES_ZOOM_END = 10;
 
 std::shared_ptr<PAGXView> PAGXView::MakeFrom(int width, int height) {
   if (width <= 0 || height <= 0) {
@@ -190,10 +204,6 @@ void PAGXView::onZoomEnd() {
 
   isZooming = false;
 
-  if (!enablePerformanceAdaptation) {
-    return;
-  }
-
   currentMaxTilesRefinedPerFrame = 1;
   displayList.setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
 
@@ -250,7 +260,7 @@ bool PAGXView::draw() {
   updatePerformanceState(frameDurationMs);
 
   if (isZooming && lastZoomUpdateTimestampMs > 0.0) {
-    double currentTimeoutMs = isZoomingIn ? zoomInEndTimeoutMs : zoomOutEndTimeoutMs;
+    double currentTimeoutMs = isZoomingIn ? ZOOM_IN_END_TIMEOUT_MS : ZOOM_OUT_END_TIMEOUT_MS;
     double timeSinceLastUpdate = frameStartMs - lastZoomUpdateTimestampMs;
     
     if (timeSinceLastUpdate >= currentTimeoutMs) {
@@ -258,7 +268,7 @@ bool PAGXView::draw() {
     }
   }
 
-  if (!isZooming && enablePerformanceAdaptation) {
+  if (!isZooming) {
     if (tryUpgradeTimestampMs > 0.0) {
       if (frameStartMs >= tryUpgradeTimestampMs) {
         if (!lastFrameSlow) {
@@ -267,7 +277,7 @@ bool PAGXView::draw() {
           displayList.setMaxTilesRefinedPerFrame(targetCount);
           tryUpgradeTimestampMs = 0.0;
         } else {
-          tryUpgradeTimestampMs = frameStartMs + upgradeRetryDelayMs;
+          tryUpgradeTimestampMs = frameStartMs + UPGRADE_RETRY_DELAY_MS;
         }
       }
     } else {
@@ -291,13 +301,9 @@ int PAGXView::height() const {
 }
 
 void PAGXView::updatePerformanceState(double frameDurationMs) {
-  if (!enablePerformanceAdaptation) {
-    return;
-  }
-
   double now = emscripten_get_now();
 
-  if (frameDurationMs > slowFrameThresholdMs) {
+  if (frameDurationMs > SLOW_FRAME_THRESHOLD_MS) {
     if (!lastFrameSlow) {
       frameHistory.clear();
       frameHistoryTotalTime = 0.0;
@@ -308,7 +314,7 @@ void PAGXView::updatePerformanceState(double frameDurationMs) {
   frameHistory.push_back({now, frameDurationMs});
   frameHistoryTotalTime += frameDurationMs;
 
-  double windowStart = now - recoveryWindowMs;
+  double windowStart = now - RECOVERY_WINDOW_MS;
   while (!frameHistory.empty() && frameHistory.front().timestampMs < windowStart) {
     frameHistoryTotalTime -= frameHistory.front().durationMs;
     frameHistory.pop_front();
@@ -316,8 +322,8 @@ void PAGXView::updatePerformanceState(double frameDurationMs) {
 
   if (lastFrameSlow && !frameHistory.empty()) {
     double avgTime = frameHistoryTotalTime / static_cast<double>(frameHistory.size());
-    size_t minFrames = isZooming ? minRecoveryFramesZoomEnd : minRecoveryFramesStatic;
-    if (avgTime <= slowFrameThresholdMs && frameHistory.size() >= minFrames) {
+    size_t minFrames = isZooming ? MIN_RECOVERY_FRAMES_ZOOM_END : MIN_RECOVERY_FRAMES_STATIC;
+    if (avgTime <= SLOW_FRAME_THRESHOLD_MS && frameHistory.size() >= minFrames) {
       lastFrameSlow = false;
     }
   }
@@ -342,33 +348,12 @@ int PAGXView::calculateTargetTileRefinement(float zoom) const {
 }
 
 void PAGXView::updateAdaptiveTileRefinement() {
-  if (!enablePerformanceAdaptation) {
-    return;
-  }
-
   int targetCount = calculateTargetTileRefinement(lastZoom);
 
   if (targetCount != currentMaxTilesRefinedPerFrame) {
     currentMaxTilesRefinedPerFrame = targetCount;
     displayList.setMaxTilesRefinedPerFrame(targetCount);
   }
-}
-
-void PAGXView::setPerformanceAdaptationEnabled(bool enabled) {
-  enablePerformanceAdaptation = enabled;
-  if (!enabled) {
-    currentMaxTilesRefinedPerFrame = 3;
-    displayList.setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
-    tryUpgradeTimestampMs = 0.0;
-  }
-}
-
-void PAGXView::setSlowFrameThreshold(double thresholdMs) {
-  slowFrameThresholdMs = thresholdMs;
-}
-
-void PAGXView::setRecoveryWindow(double windowMs) {
-  recoveryWindowMs = windowMs;
 }
 
 }  // namespace pagx
