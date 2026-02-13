@@ -327,6 +327,7 @@ Matrix MatrixFromString(const std::string& str) {
 
 std::vector<float> ParseFloatList(const std::string& str) {
   std::vector<float> result = {};
+  result.reserve(8);
   const char* ptr = str.c_str();
   const char* end = ptr + str.size();
   while (ptr < end) {
