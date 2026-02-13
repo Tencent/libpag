@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <memory>
 #include <vector>
 #include "pagx/nodes/Element.h"
 #include "pagx/types/Point.h"

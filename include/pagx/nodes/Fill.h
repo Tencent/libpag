@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <memory>
 #include <string>
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/Element.h"
