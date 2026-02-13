@@ -29,7 +29,7 @@ namespace pagx {
 // Helper macro for enum string conversions
 //==============================================================================
 
-#define DEFINE_ENUM_CONVERSION(EnumType, ...)                                                      \
+#define DEFINE_ENUM_CONVERSION(EnumType, DefaultValue, ...)                                       \
   static const std::unordered_map<EnumType, std::string> EnumType##ToStringMap = {__VA_ARGS__};    \
   static const std::unordered_map<std::string, EnumType> StringTo##EnumType##Map = [] {            \
     std::unordered_map<std::string, EnumType> map = {};                                            \
@@ -44,8 +44,7 @@ namespace pagx {
   }                                                                                                \
   EnumType EnumType##FromString(const std::string& str) {                                          \
     auto it = StringTo##EnumType##Map.find(str);                                                   \
-    return it != StringTo##EnumType##Map.end() ? it->second                                        \
-                                               : EnumType##ToStringMap.begin()->first;             \
+    return it != StringTo##EnumType##Map.end() ? it->second : (DefaultValue);                      \
   }
 
 //==============================================================================
@@ -133,7 +132,7 @@ const char* NodeTypeName(NodeType type) {
 // Enum string conversions
 //==============================================================================
 
-DEFINE_ENUM_CONVERSION(BlendMode,
+DEFINE_ENUM_CONVERSION(BlendMode, BlendMode::Normal,
     {BlendMode::Normal, "normal"},
     {BlendMode::Multiply, "multiply"},
     {BlendMode::Screen, "screen"},
@@ -153,84 +152,84 @@ DEFINE_ENUM_CONVERSION(BlendMode,
     {BlendMode::PlusLighter, "plusLighter"},
     {BlendMode::PlusDarker, "plusDarker"})
 
-DEFINE_ENUM_CONVERSION(LineCap,
+DEFINE_ENUM_CONVERSION(LineCap, LineCap::Butt,
     {LineCap::Butt, "butt"},
     {LineCap::Round, "round"},
     {LineCap::Square, "square"})
 
-DEFINE_ENUM_CONVERSION(LineJoin,
+DEFINE_ENUM_CONVERSION(LineJoin, LineJoin::Miter,
     {LineJoin::Miter, "miter"},
     {LineJoin::Round, "round"},
     {LineJoin::Bevel, "bevel"})
 
-DEFINE_ENUM_CONVERSION(FillRule,
+DEFINE_ENUM_CONVERSION(FillRule, FillRule::Winding,
     {FillRule::Winding, "winding"},
     {FillRule::EvenOdd, "evenOdd"})
 
-DEFINE_ENUM_CONVERSION(StrokeAlign,
+DEFINE_ENUM_CONVERSION(StrokeAlign, StrokeAlign::Center,
     {StrokeAlign::Center, "center"},
     {StrokeAlign::Inside, "inside"},
     {StrokeAlign::Outside, "outside"})
 
-DEFINE_ENUM_CONVERSION(LayerPlacement,
+DEFINE_ENUM_CONVERSION(LayerPlacement, LayerPlacement::Foreground,
     {LayerPlacement::Background, "background"},
     {LayerPlacement::Foreground, "foreground"})
 
-DEFINE_ENUM_CONVERSION(TileMode,
+DEFINE_ENUM_CONVERSION(TileMode, TileMode::Clamp,
     {TileMode::Clamp, "clamp"},
     {TileMode::Repeat, "repeat"},
     {TileMode::Mirror, "mirror"},
     {TileMode::Decal, "decal"})
 
-DEFINE_ENUM_CONVERSION(FilterMode,
+DEFINE_ENUM_CONVERSION(FilterMode, FilterMode::Nearest,
     {FilterMode::Nearest, "nearest"},
     {FilterMode::Linear, "linear"})
 
-DEFINE_ENUM_CONVERSION(MipmapMode,
+DEFINE_ENUM_CONVERSION(MipmapMode, MipmapMode::None,
     {MipmapMode::None, "none"},
     {MipmapMode::Nearest, "nearest"},
     {MipmapMode::Linear, "linear"})
 
-DEFINE_ENUM_CONVERSION(MaskType,
+DEFINE_ENUM_CONVERSION(MaskType, MaskType::Alpha,
     {MaskType::Alpha, "alpha"},
     {MaskType::Luminance, "luminance"},
     {MaskType::Contour, "contour"})
 
-DEFINE_ENUM_CONVERSION(PolystarType,
+DEFINE_ENUM_CONVERSION(PolystarType, PolystarType::Polygon,
     {PolystarType::Polygon, "polygon"},
     {PolystarType::Star, "star"})
 
-DEFINE_ENUM_CONVERSION(TrimType,
+DEFINE_ENUM_CONVERSION(TrimType, TrimType::Separate,
     {TrimType::Separate, "separate"},
     {TrimType::Continuous, "continuous"})
 
-DEFINE_ENUM_CONVERSION(MergePathMode,
+DEFINE_ENUM_CONVERSION(MergePathMode, MergePathMode::Append,
     {MergePathMode::Append, "append"},
     {MergePathMode::Union, "union"},
     {MergePathMode::Intersect, "intersect"},
     {MergePathMode::Xor, "xor"},
     {MergePathMode::Difference, "difference"})
 
-DEFINE_ENUM_CONVERSION(TextAlign,
+DEFINE_ENUM_CONVERSION(TextAlign, TextAlign::Start,
     {TextAlign::Start, "start"},
     {TextAlign::Center, "center"},
     {TextAlign::End, "end"},
     {TextAlign::Justify, "justify"})
 
-DEFINE_ENUM_CONVERSION(VerticalAlign,
+DEFINE_ENUM_CONVERSION(VerticalAlign, VerticalAlign::Top,
     {VerticalAlign::Top, "top"},
     {VerticalAlign::Center, "center"},
     {VerticalAlign::Bottom, "bottom"})
 
-DEFINE_ENUM_CONVERSION(WritingMode,
+DEFINE_ENUM_CONVERSION(WritingMode, WritingMode::Horizontal,
     {WritingMode::Horizontal, "horizontal"},
     {WritingMode::Vertical, "vertical"})
 
-DEFINE_ENUM_CONVERSION(SelectorUnit,
+DEFINE_ENUM_CONVERSION(SelectorUnit, SelectorUnit::Percentage,
     {SelectorUnit::Index, "index"},
     {SelectorUnit::Percentage, "percentage"})
 
-DEFINE_ENUM_CONVERSION(SelectorShape,
+DEFINE_ENUM_CONVERSION(SelectorShape, SelectorShape::Square,
     {SelectorShape::Square, "square"},
     {SelectorShape::RampUp, "rampUp"},
     {SelectorShape::RampDown, "rampDown"},
@@ -238,7 +237,7 @@ DEFINE_ENUM_CONVERSION(SelectorShape,
     {SelectorShape::Round, "round"},
     {SelectorShape::Smooth, "smooth"})
 
-DEFINE_ENUM_CONVERSION(SelectorMode,
+DEFINE_ENUM_CONVERSION(SelectorMode, SelectorMode::Add,
     {SelectorMode::Add, "add"},
     {SelectorMode::Subtract, "subtract"},
     {SelectorMode::Intersect, "intersect"},
@@ -246,7 +245,7 @@ DEFINE_ENUM_CONVERSION(SelectorMode,
     {SelectorMode::Max, "max"},
     {SelectorMode::Difference, "difference"})
 
-DEFINE_ENUM_CONVERSION(RepeaterOrder,
+DEFINE_ENUM_CONVERSION(RepeaterOrder, RepeaterOrder::BelowOriginal,
     {RepeaterOrder::BelowOriginal, "belowOriginal"},
     {RepeaterOrder::AboveOriginal, "aboveOriginal"})
 
