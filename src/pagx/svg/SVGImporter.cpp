@@ -494,7 +494,8 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
   const auto& tag = element->name;
 
   if (tag == "defs" || tag == "linearGradient" || tag == "radialGradient" || tag == "pattern" ||
-      tag == "mask" || tag == "clipPath" || tag == "filter") {
+      tag == "mask" || tag == "clipPath" || tag == "filter" || tag == "style" || tag == "title" ||
+      tag == "desc" || tag == "metadata") {
     return nullptr;
   }
 
