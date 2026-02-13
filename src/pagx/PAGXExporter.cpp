@@ -485,13 +485,11 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
           if (!run->glyphs.empty()) {
             std::string glyphsStr = {};
             glyphsStr.reserve(run->glyphs.size() * 6);
-            char buf[16] = {};
             for (size_t i = 0; i < run->glyphs.size(); i++) {
               if (i > 0) {
                 glyphsStr += ",";
               }
-              snprintf(buf, sizeof(buf), "%u", run->glyphs[i]);
-              glyphsStr += buf;
+              glyphsStr += std::to_string(run->glyphs[i]);
             }
             xml.addRequiredAttribute("glyphs", glyphsStr);
           }
