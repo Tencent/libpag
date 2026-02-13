@@ -139,8 +139,9 @@ class SVGParserContext {
                      std::vector<Element*>& contents,
                      const InheritedStyle& inheritedStyle);
 
-  // Compute shape bounds from SVG element attributes.
+  // Compute shape bounds from SVG element attributes with caching.
   Rect getShapeBounds(const std::shared_ptr<DOMNode>& element);
+  Rect computeShapeBounds(const std::shared_ptr<DOMNode>& element);
 
   InheritedStyle computeInheritedStyle(const std::shared_ptr<DOMNode>& element,
                                        const InheritedStyle& parentStyle);
@@ -230,6 +231,9 @@ class SVGParserContext {
   std::unordered_map<std::string, int> _colorSourceRefCount = {};
   // Store the converted ColorSource by SVG def id (for reuse when refCount > 1).
   std::unordered_map<std::string, ColorSource*> _colorSourceCache = {};
+
+  // Cache of computed shape bounds per DOMNode to avoid redundant SVG string parsing.
+  std::unordered_map<const DOMNode*, Rect> _shapeBoundsCache = {};
   
   // Parse CSS style rules from <style> element.
   void parseStyleElement(const std::shared_ptr<DOMNode>& styleNode);
