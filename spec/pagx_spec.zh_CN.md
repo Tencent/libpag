@@ -20,8 +20,6 @@
 
 PAGX 是纯 XML 文件（`.pagx`），可引用外部资源文件（图片、视频、音频、字体等），也支持通过数据 URI 内嵌资源。PAGX 与二进制 PAG 格式可双向互转：发布时转换为 PAG 以优化加载性能；开发、审查或编辑时可使用 PAGX 格式以便阅读和修改。
 
-PAGX 文件必须使用 UTF-8 编码。推荐但不强制添加 XML 声明（`<?xml version="1.0" encoding="UTF-8"?>`）。PAGX 不使用 XML 命名空间。
-
 ### 1.3 文档组织
 
 本规范按以下顺序组织：
@@ -1416,16 +1414,20 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 
 ```
 factor = clamp(selectorFactor × weight, -1, 1)
+```
 
-// 位置和旋转：线性应用 factor
-transform = translate(-anchor × factor) 
-          × scale(1 + (scale - 1) × factor)  // 缩放从 1 插值到目标值
-          × skew(skew × factor, skewAxis)
-          × rotate(rotation × factor)
-          × translate(anchor × factor)
-          × translate(position × factor)
+位置和旋转线性应用 factor。变换按以下顺序应用：
 
-// 透明度：使用 factor 的绝对值
+1. 平移到锚点的负方向（`translate(-anchor × factor)`）
+2. 从单位矩阵插值缩放（`scale(1 + (scale - 1) × factor)`）
+3. 倾斜（`skew(skew × factor, skewAxis)`）
+4. 旋转（`rotate(rotation × factor)`）
+5. 平移回锚点（`translate(anchor × factor)`）
+6. 平移到位置（`translate(position × factor)`）
+
+透明度使用 factor 的绝对值：
+
+```
 alphaFactor = 1 + (alpha - 1) × |factor|
 finalAlpha = originalAlpha × max(0, alphaFactor)
 ```
@@ -1608,12 +1610,15 @@ TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会
 **变换计算**（第 i 个副本，i 从 0 开始）：
 ```
 progress = i + offset
-matrix = translate(anchor)
-       × translate(position × progress) // 线性位移
-       × rotate(rotation × progress)    // 线性旋转
-       × scale(scale^progress)           // 指数缩放
-       × translate(-anchor)
 ```
+
+变换按以下顺序应用：
+
+1. 平移到锚点的负方向（`translate(-anchor)`）
+2. 指数缩放（`scale(scale^progress)`）
+3. 线性旋转（`rotate(rotation × progress)`）
+4. 线性位移（`translate(position × progress)`）
+5. 平移回锚点（`translate(anchor)`）
 
 **透明度插值**：
 ```
@@ -1670,7 +1675,7 @@ Group 是带变换属性的矢量元素容器。
 
 #### 变换顺序
 
-变换按以下顺序应用（后应用的变换先计算）：
+变换按以下顺序应用：
 
 1. 平移到锚点的负方向（`translate(-anchor)`）
 2. 缩放（`scale`）
@@ -1678,15 +1683,13 @@ Group 是带变换属性的矢量元素容器。
 4. 旋转（`rotation`）
 5. 平移到位置（`translate(position)`）
 
-**变换矩阵**：
-```
-M = translate(position) × rotate(rotation) × skew(skew, skewAxis) × scale(scale) × translate(-anchor)
-```
-
 **倾斜变换**：
-```
-skewMatrix = rotate(skewAxis) × shearX(tan(skew)) × rotate(-skewAxis)
-```
+
+倾斜变换按以下顺序应用：
+
+1. 旋转到倾斜轴方向（`rotate(skewAxis)`）
+2. 沿 X 轴剪切（`shearX(tan(skew))`）
+3. 旋转回原方向（`rotate(-skewAxis)`）
 
 #### 作用域隔离
 

@@ -20,8 +20,6 @@
 
 PAGX is a plain XML file (`.pagx`) that can reference external resource files (images, videos, audio, fonts, etc.) or embed resources via data URIs. PAGX and binary PAG formats are bidirectionally convertible: convert to PAG for optimized loading performance during publishing; use PAGX format for reading and editing during development and review.
 
-PAGX files must use UTF-8 encoding. An XML declaration (`<?xml version="1.0" encoding="UTF-8"?>`) is recommended but not required. PAGX does not use XML namespaces.
-
 ### 1.3 Document Organization
 
 This specification is organized in the following order:
@@ -1418,16 +1416,20 @@ The `factor` calculated by the selector ranges from [-1, 1] and controls the deg
 
 ```
 factor = clamp(selectorFactor × weight, -1, 1)
+```
 
-// Position and rotation: apply factor linearly
-transform = translate(-anchor × factor) 
-          × scale(1 + (scale - 1) × factor)  // Scale interpolates from 1 to target value
-          × skew(skew × factor, skewAxis)
-          × rotate(rotation × factor)
-          × translate(anchor × factor)
-          × translate(position × factor)
+Position and rotation are applied linearly with factor. Transforms are applied in the following order:
 
-// Opacity: use absolute value of factor
+1. Translate to negative anchor (`translate(-anchor × factor)`)
+2. Scale from identity (`scale(1 + (scale - 1) × factor)`)
+3. Skew (`skew(skew × factor, skewAxis)`)
+4. Rotate (`rotate(rotation × factor)`)
+5. Translate back to anchor (`translate(anchor × factor)`)
+6. Translate to position (`translate(position × factor)`)
+
+Opacity uses the absolute value of factor:
+
+```
 alphaFactor = 1 + (alpha - 1) × |factor|
 finalAlpha = originalAlpha × max(0, alphaFactor)
 ```
@@ -1613,12 +1615,15 @@ Repeater duplicates accumulated content and rendered styles, applying progressiv
 **Transform Calculation** (i-th copy, i starts from 0):
 ```
 progress = i + offset
-matrix = translate(anchor)
-       × translate(position × progress) // Linear translation
-       × rotate(rotation × progress)    // Linear rotation
-       × scale(scale^progress)           // Exponential scaling
-       × translate(-anchor)
 ```
+
+Transforms are applied in the following order:
+
+1. Translate to negative anchor (`translate(-anchor)`)
+2. Scale exponentially (`scale(scale^progress)`)
+3. Rotate linearly (`rotate(rotation × progress)`)
+4. Translate linearly (`translate(position × progress)`)
+5. Translate back to anchor (`translate(anchor)`)
 
 **Opacity Interpolation**:
 ```
@@ -1683,15 +1688,13 @@ Transforms are applied in the following order:
 4. Rotate (`rotation`)
 5. Translate to position (`translate(position)`)
 
-**Transform Matrix**:
-```
-M = translate(position) × rotate(rotation) × skew(skew, skewAxis) × scale(scale) × translate(-anchor)
-```
-
 **Skew Transform**:
-```
-skewMatrix = rotate(skewAxis) × shearX(tan(skew)) × rotate(-skewAxis)
-```
+
+Skew is applied in the following order:
+
+1. Rotate to skew axis direction (`rotate(skewAxis)`)
+2. Shear along X axis (`shearX(tan(skew))`)
+3. Rotate back (`rotate(-skewAxis)`)
 
 #### Scope Isolation
 
