@@ -227,15 +227,11 @@ class GestureManager {
     private dragStartOffsetY = 0;
 
     // Touch state
-    private lastTouchDistance = 0;
+    private startTouchDistance = 0;
     private lastTouchCenterX = 0;
     private lastTouchCenterY = 0;
     private isTouchPanning = false;
     private isTouchZooming = false;
-
-    // Safari gesture state
-    private lastGestureScale = 1.0;
-
     public zoom = 1.0;
     public offsetX = 0;
     public offsetY = 0;
@@ -418,7 +414,7 @@ class GestureManager {
             // Two finger zoom/pan
             this.isTouchPanning = false;
             this.isTouchZooming = true;
-            this.lastTouchDistance = this.getTouchDistance(event.touches);
+            this.startTouchDistance = this.getTouchDistance(event.touches);
             const center = this.getTouchCenter(event.touches);
             this.lastTouchCenterX = center.x;
             this.lastTouchCenterY = center.y;
@@ -444,10 +440,10 @@ class GestureManager {
             const pixelX = (center.x - rect.left) * window.devicePixelRatio;
             const pixelY = (center.y - rect.top) * window.devicePixelRatio;
 
-            // Calculate zoom
-            if (this.lastTouchDistance > 0) {
-                const scale = currentDistance / this.lastTouchDistance;
-                const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.zoom * scale));
+            // Calculate zoom using absolute ratio relative to the start distance.
+            if (this.startTouchDistance > 0) {
+                const scale = currentDistance / this.startTouchDistance;
+                const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.scaleStartZoom * scale));
 
                 // Zoom around pinch center
                 this.offsetX = (this.offsetX - pixelX) * (newZoom / this.zoom) + pixelX;
@@ -461,7 +457,6 @@ class GestureManager {
             this.offsetX += centerDeltaX;
             this.offsetY += centerDeltaY;
 
-            this.lastTouchDistance = currentDistance;
             this.lastTouchCenterX = center.x;
             this.lastTouchCenterY = center.y;
 
@@ -486,26 +481,25 @@ class GestureManager {
 
     // Safari gesture handlers
     public onGestureStart(event: GestureEvent) {
-        this.lastGestureScale = event.scale;
         this.scaleStartZoom = this.zoom;
+        this.dragStartOffsetX = this.offsetX;
+        this.dragStartOffsetY = this.offsetY;
     }
 
     public onGestureChange(event: GestureEvent, canvas: HTMLElement,
                            playgroundState: PlaygroundState) {
-        const scale = event.scale / this.lastGestureScale;
+        // event.scale is already an absolute ratio relative to gesturestart.
         const rect = canvas.getBoundingClientRect();
         const pixelX = (event.clientX - rect.left) * window.devicePixelRatio;
         const pixelY = (event.clientY - rect.top) * window.devicePixelRatio;
-        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.zoom * scale));
+        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.scaleStartZoom * event.scale));
         this.offsetX = (this.offsetX - pixelX) * (newZoom / this.zoom) + pixelX;
         this.offsetY = (this.offsetY - pixelY) * (newZoom / this.zoom) + pixelY;
         this.zoom = newZoom;
-        this.lastGestureScale = event.scale;
         playgroundState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
     }
 
     public onGestureEnd() {
-        this.lastGestureScale = 1.0;
     }
 }
 
