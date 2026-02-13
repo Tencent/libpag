@@ -57,9 +57,4 @@ void GridBackgroundLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
   }
 }
 
-void DrawBackground(tgfx::Canvas* canvas, int width, int height, float density) {
-  auto layer = GridBackgroundLayer::Make(width, height, density);
-  layer->draw(canvas);
-}
-
 }  // namespace pagx

@@ -18,7 +18,6 @@
 
 #include "PAGXView.h"
 #include <emscripten/html5.h>
-#include "GridBackground.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/types/Data.h"
 #include "tgfx/core/Data.h"
@@ -253,8 +252,17 @@ void PAGXView::draw() {
   int width = 0;
   int height = 0;
   emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
-  auto density = static_cast<float>(surface->width()) / static_cast<float>(width);
-  pagx::DrawBackground(canvas, surface->width(), surface->height(), density);
+  auto density = width > 0 ? static_cast<float>(surface->width()) / static_cast<float>(width) : 1.0f;
+  int bgWidth = surface->width();
+  int bgHeight = surface->height();
+  if (!backgroundLayer || bgWidth != lastBackgroundWidth || bgHeight != lastBackgroundHeight ||
+      std::abs(density - lastBackgroundDensity) > 0.001f) {
+    backgroundLayer = GridBackgroundLayer::Make(bgWidth, bgHeight, density);
+    lastBackgroundWidth = bgWidth;
+    lastBackgroundHeight = bgHeight;
+    lastBackgroundDensity = density;
+  }
+  backgroundLayer->draw(canvas);
   displayList.render(surface.get(), false);
   auto recording = context->flush();
   if (presentImmediately) {

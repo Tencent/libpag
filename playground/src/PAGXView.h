@@ -25,6 +25,7 @@
 #include "pagx/PAGXDocument.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
+#include "GridBackground.h"
 #include "tgfx/layers/DisplayList.h"
 
 namespace pagx {
@@ -78,6 +79,12 @@ class PAGXView {
   float pagxHeight = 0.0f;
   Typesetter typesetter = {};
   std::shared_ptr<PAGXDocument> document = nullptr;
+
+  // Background layer cache
+  std::shared_ptr<GridBackgroundLayer> backgroundLayer = nullptr;
+  int lastBackgroundWidth = 0;
+  int lastBackgroundHeight = 0;
+  float lastBackgroundDensity = 0.0f;
 
   // Performance monitoring
   struct FrameRecord {

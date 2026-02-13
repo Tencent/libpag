@@ -37,6 +37,4 @@ class GridBackgroundLayer : public tgfx::Layer {
   float density = 1.f;
 };
 
-void DrawBackground(tgfx::Canvas* canvas, int width, int height, float density);
-
 }  // namespace pagx
