@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXExporter.h"
+#include <cstdio>
 #include "Base64.h"
 #include "StringParser.h"
 #include "SVGPathParser.h"
@@ -201,16 +202,21 @@ class XMLBuilder {
 //==============================================================================
 
 static std::string pointToString(const Point& p) {
-  return FloatToString(p.x) + "," + FloatToString(p.y);
+  char buf[64] = {};
+  snprintf(buf, sizeof(buf), "%g,%g", p.x, p.y);
+  return buf;
 }
 
 static std::string sizeToString(const Size& s) {
-  return FloatToString(s.width) + "," + FloatToString(s.height);
+  char buf[64] = {};
+  snprintf(buf, sizeof(buf), "%g,%g", s.width, s.height);
+  return buf;
 }
 
 static std::string rectToString(const Rect& r) {
-  return FloatToString(r.x) + "," + FloatToString(r.y) + "," + FloatToString(r.width) + "," +
-         FloatToString(r.height);
+  char buf[128] = {};
+  snprintf(buf, sizeof(buf), "%g,%g,%g,%g", r.x, r.y, r.width, r.height);
+  return buf;
 }
 
 static std::string floatListToString(const float* values, size_t count) {
