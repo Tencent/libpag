@@ -1696,7 +1696,12 @@ static Color ParseCSSColorFunction(const std::string& value) {
 
   // Trim whitespace after color space name.
   inner.erase(0, inner.find_first_not_of(" \t"));
-  inner.erase(inner.find_last_not_of(" \t") + 1);
+  auto lastNonSpace = inner.find_last_not_of(" \t");
+  if (lastNonSpace != std::string::npos) {
+    inner.erase(lastNonSpace + 1);
+  } else {
+    inner.clear();
+  }
 
   // Parse space-separated values and optional "/ alpha".
   std::vector<float> components;

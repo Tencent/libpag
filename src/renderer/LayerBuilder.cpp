@@ -118,7 +118,11 @@ static std::shared_ptr<tgfx::Data> ToTGFX(const std::shared_ptr<pagx::Data>& dat
     return nullptr;
   }
   auto* ctx = new std::shared_ptr<pagx::Data>(data);
-  return tgfx::Data::MakeAdopted(data->data(), data->size(), ReleasePagxData, ctx);
+  auto result = tgfx::Data::MakeAdopted(data->data(), data->size(), ReleasePagxData, ctx);
+  if (!result) {
+    delete ctx;
+  }
+  return result;
 }
 
 // Decode a data URI (e.g., "data:image/png;base64,...") to an Image.
@@ -152,16 +156,18 @@ static tgfx::Point ToTGFX(const Point& p) {
   return tgfx::Point::Make(p.x, p.y);
 }
 
+static tgfx::ColorMatrix33 ComputeP3ToSRGBMatrix() {
+  tgfx::ColorMatrix33 matrix = {};
+  tgfx::ColorSpace::DisplayP3()->gamutTransformTo(tgfx::ColorSpace::SRGB().get(), &matrix);
+  return matrix;
+}
+
 static tgfx::Color ToTGFX(const Color& c) {
   // tgfx::Color is always in sRGB color space. If source color is in Display P3,
   // we need to convert it to sRGB for correct rendering.
   if (c.colorSpace == ColorSpace::DisplayP3) {
     // Convert Display P3 to sRGB using tgfx::ColorSpace
-    static const tgfx::ColorMatrix33 p3ToSRGB = [] {
-      tgfx::ColorMatrix33 matrix = {};
-      tgfx::ColorSpace::DisplayP3()->gamutTransformTo(tgfx::ColorSpace::SRGB().get(), &matrix);
-      return matrix;
-    }();
+    static const tgfx::ColorMatrix33 p3ToSRGB = ComputeP3ToSRGBMatrix();
 
     float r = c.red * p3ToSRGB.values[0][0] + c.green * p3ToSRGB.values[0][1] +
               c.blue * p3ToSRGB.values[0][2];

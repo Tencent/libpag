@@ -18,6 +18,7 @@
 
 #include "pagx/types/Data.h"
 #include <cstring>
+#include <new>
 
 namespace pagx {
 
@@ -37,9 +38,13 @@ std::shared_ptr<Data> Data::MakeAdopt(uint8_t* data, size_t length) {
 
 Data::Data(const void* data, size_t length) : _size(length) {
   if (data != nullptr && length > 0) {
-    auto* buffer = new uint8_t[length];
-    std::memcpy(buffer, data, length);
-    _data = buffer;
+    auto* buffer = new (std::nothrow) uint8_t[length];
+    if (buffer != nullptr) {
+      std::memcpy(buffer, data, length);
+      _data = buffer;
+    } else {
+      _size = 0;
+    }
   }
 }
 
