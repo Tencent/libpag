@@ -326,33 +326,6 @@ Matrix MatrixFromString(const std::string& str) {
 // String parsing utilities
 //==============================================================================
 
-static std::string TrimString(const std::string& str) {
-  auto start = str.find_first_not_of(" \t\n\r");
-  if (start == std::string::npos) {
-    return "";
-  }
-  auto end = str.find_last_not_of(" \t\n\r");
-  return str.substr(start, end - start + 1);
-}
-
-std::vector<std::string> SplitString(const std::string& str, char delimiter) {
-  std::vector<std::string> tokens;
-  size_t start = 0;
-  size_t end = 0;
-  while ((end = str.find(delimiter, start)) != std::string::npos) {
-    auto token = TrimString(str.substr(start, end - start));
-    if (!token.empty()) {
-      tokens.push_back(token);
-    }
-    start = end + 1;
-  }
-  auto lastToken = TrimString(str.substr(start));
-  if (!lastToken.empty()) {
-    tokens.push_back(lastToken);
-  }
-  return tokens;
-}
-
 std::vector<float> ParseFloatList(const std::string& str) {
   std::vector<float> result = {};
   const char* ptr = str.c_str();

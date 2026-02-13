@@ -164,7 +164,6 @@ Matrix MatrixFromString(const std::string& str);
 //==============================================================================
 // String parsing utilities
 //==============================================================================
-std::vector<std::string> SplitString(const std::string& str, char delimiter);
 std::vector<float> ParseFloatList(const std::string& str);
 std::string FloatToString(float value);
 
