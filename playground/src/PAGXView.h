@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <deque>
 #include <emscripten/bind.h>
 #include "LayerBuilder.h"
 #include "Typesetter.h"
@@ -60,6 +61,10 @@ class PAGXView {
 
  private:
   void applyCenteringTransform();
+  void onZoomEnd();
+  void updatePerformanceState(double frameDurationMs);
+  void updateAdaptiveTileRefinement();
+  int calculateTargetTileRefinement(float zoom) const;
 
   std::string canvasID = {};
   std::shared_ptr<tgfx::Window> window = nullptr;
@@ -73,6 +78,24 @@ class PAGXView {
   float pagxHeight = 0.0f;
   Typesetter typesetter = {};
   std::shared_ptr<PAGXDocument> document = nullptr;
+
+  // Performance monitoring
+  struct FrameRecord {
+    double timestampMs = 0.0;
+    double durationMs = 0.0;
+  };
+  std::deque<FrameRecord> frameHistory = {};
+  double frameHistoryTotalTime = 0.0;
+  bool lastFrameSlow = false;
+
+  // Zoom state tracking
+  float lastZoom = 1.0f;
+  float accumulatedZoomChange = 0.0f;
+  bool isZooming = false;
+  bool isZoomingIn = false;
+  int currentMaxTilesRefinedPerFrame = 1;
+  double tryUpgradeTimestampMs = 0.0;
+  double lastZoomUpdateTimestampMs = 0.0;
 };
 
 }  // namespace pagx
