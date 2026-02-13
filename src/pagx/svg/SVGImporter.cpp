@@ -2253,6 +2253,42 @@ void SVGParserContext::mergeAdjacentLayers(std::vector<Layer*>& layers) {
   layers = std::move(merged);
 }
 
+void SVGParserContext::parseMaskChildren(const std::shared_ptr<DOMNode>& parent,
+                                         Layer* maskLayer,
+                                         const InheritedStyle& parentStyle,
+                                         const Matrix& parentMatrix) {
+  auto child = parent->getFirstChild();
+  while (child) {
+    if (child->name == "rect" || child->name == "circle" || child->name == "ellipse" ||
+        child->name == "path" || child->name == "polygon" || child->name == "polyline") {
+      InheritedStyle inheritedStyle = computeInheritedStyle(child, parentStyle);
+      std::string transformStr = getAttribute(child, "transform");
+      Matrix combinedMatrix = parentMatrix;
+      if (!transformStr.empty()) {
+        combinedMatrix = combinedMatrix * parseTransform(transformStr);
+      }
+      bool hasTransform = !combinedMatrix.isIdentity();
+      if (hasTransform) {
+        auto subLayer = _document->makeNode<Layer>();
+        subLayer->matrix = combinedMatrix;
+        convertChildren(child, subLayer->contents, inheritedStyle);
+        maskLayer->children.push_back(subLayer);
+      } else {
+        convertChildren(child, maskLayer->contents, inheritedStyle);
+      }
+    } else if (child->name == "g") {
+      InheritedStyle inheritedStyle = computeInheritedStyle(child, parentStyle);
+      std::string groupTransform = getAttribute(child, "transform");
+      Matrix combinedMatrix = parentMatrix;
+      if (!groupTransform.empty()) {
+        combinedMatrix = combinedMatrix * parseTransform(groupTransform);
+      }
+      parseMaskChildren(child, maskLayer, inheritedStyle, combinedMatrix);
+    }
+    child = child->getNextSibling();
+  }
+}
+
 Layer* SVGParserContext::convertMaskElement(
     const std::shared_ptr<DOMNode>& maskElement, const InheritedStyle& parentStyle) {
   auto maskLayer = _document->makeNode<Layer>();
@@ -2263,50 +2299,8 @@ Layer* SVGParserContext::convertMaskElement(
   // Compute inherited style from the mask element itself (it may have fill="white" etc.).
   InheritedStyle maskStyle = computeInheritedStyle(maskElement, parentStyle);
 
-  // Parse mask contents.
-  auto child = maskElement->getFirstChild();
-  while (child) {
-    if (child->name == "rect" || child->name == "circle" || child->name == "ellipse" ||
-        child->name == "path" || child->name == "polygon" || child->name == "polyline") {
-      InheritedStyle inheritedStyle = computeInheritedStyle(child, maskStyle);
-      std::string transformStr = getAttribute(child, "transform");
-      if (!transformStr.empty()) {
-        // If child has transform, wrap it in a sub-layer with the matrix.
-        auto subLayer = _document->makeNode<Layer>();
-        subLayer->matrix = parseTransform(transformStr);
-        convertChildren(child, subLayer->contents, inheritedStyle);
-        maskLayer->children.push_back(subLayer);
-      } else {
-        convertChildren(child, maskLayer->contents, inheritedStyle);
-      }
-    } else if (child->name == "g") {
-      // Handle group inside mask.
-      InheritedStyle inheritedStyle = computeInheritedStyle(child, maskStyle);
-      std::string groupTransform = getAttribute(child, "transform");
-      auto groupChild = child->getFirstChild();
-      while (groupChild) {
-        std::string childTransform = getAttribute(groupChild, "transform");
-        // Combine group transform and child transform if needed.
-        if (!groupTransform.empty() || !childTransform.empty()) {
-          auto subLayer = _document->makeNode<Layer>();
-          Matrix combinedMatrix = Matrix::Identity();
-          if (!groupTransform.empty()) {
-            combinedMatrix = parseTransform(groupTransform);
-          }
-          if (!childTransform.empty()) {
-            combinedMatrix = combinedMatrix * parseTransform(childTransform);
-          }
-          subLayer->matrix = combinedMatrix;
-          convertChildren(groupChild, subLayer->contents, inheritedStyle);
-          maskLayer->children.push_back(subLayer);
-        } else {
-          convertChildren(groupChild, maskLayer->contents, inheritedStyle);
-        }
-        groupChild = groupChild->getNextSibling();
-      }
-    }
-    child = child->getNextSibling();
-  }
+  // Parse mask contents recursively.
+  parseMaskChildren(maskElement, maskLayer, maskStyle, Matrix::Identity());
 
   return maskLayer;
 }
@@ -2366,8 +2360,6 @@ bool SVGParserContext::convertFilterElement(
   // If filter only produces shadow without merging with original content,
   // we should set shadowOnly=true.
   bool shadowOnly = !hasMerge;
-  // Track what type of shadow-only filter was converted for output.
-  ShadowOnlyType detectedShadowType = ShadowOnlyType::None;
 
   // Detect Figma-style drop shadow pattern and extract shadow parameters.
   // Pattern: feColorMatrix(in=SourceAlpha) → feOffset → feGaussianBlur → feComposite → feColorMatrix

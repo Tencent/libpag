@@ -28,7 +28,7 @@ using namespace emscripten;
 
 namespace pagx {
 
-static std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenData) {
+static uint8_t* CopyFromEmscripten(const val& emscriptenData, unsigned int* outLength) {
   if (emscriptenData.isUndefined()) {
     return nullptr;
   }
@@ -37,14 +37,33 @@ static std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenDa
     return nullptr;
   }
   auto buffer = new (std::nothrow) uint8_t[length];
-  if (buffer) {
-    auto memory = val::module_property("HEAPU8")["buffer"];
-    auto memoryView = emscriptenData["constructor"].new_(
-        memory, static_cast<unsigned int>(reinterpret_cast<uintptr_t>(buffer)), length);
-    memoryView.call<void>("set", emscriptenData);
-    return tgfx::Data::MakeAdopted(buffer, length, tgfx::Data::DeleteProc);
+  if (!buffer) {
+    return nullptr;
   }
-  return nullptr;
+  auto memory = val::module_property("HEAPU8")["buffer"];
+  auto memoryView = emscriptenData["constructor"].new_(
+      memory, static_cast<unsigned int>(reinterpret_cast<uintptr_t>(buffer)), length);
+  memoryView.call<void>("set", emscriptenData);
+  *outLength = length;
+  return buffer;
+}
+
+static std::shared_ptr<tgfx::Data> GetTGFXDataFromEmscripten(const val& emscriptenData) {
+  unsigned int length = 0;
+  auto buffer = CopyFromEmscripten(emscriptenData, &length);
+  if (!buffer) {
+    return nullptr;
+  }
+  return tgfx::Data::MakeAdopted(buffer, length, tgfx::Data::DeleteProc);
+}
+
+static std::shared_ptr<Data> GetPagxDataFromEmscripten(const val& emscriptenData) {
+  unsigned int length = 0;
+  auto buffer = CopyFromEmscripten(emscriptenData, &length);
+  if (!buffer) {
+    return nullptr;
+  }
+  return Data::MakeAdopt(buffer, length);
 }
 
 PAGXView::PAGXView(const std::string& canvasID) : canvasID(canvasID) {
@@ -55,14 +74,14 @@ PAGXView::PAGXView(const std::string& canvasID) : canvasID(canvasID) {
 
 void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
   std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces;
-  auto fontData = GetDataFromEmscripten(fontVal);
+  auto fontData = GetTGFXDataFromEmscripten(fontVal);
   if (fontData) {
     auto typeface = tgfx::Typeface::MakeFromData(fontData, 0);
     if (typeface) {
       fallbackTypefaces.push_back(std::move(typeface));
     }
   }
-  auto emojiFontData = GetDataFromEmscripten(emojiFontVal);
+  auto emojiFontData = GetTGFXDataFromEmscripten(emojiFontVal);
   if (emojiFontData) {
     auto typeface = tgfx::Typeface::MakeFromData(emojiFontData, 0);
     if (typeface) {
@@ -79,7 +98,7 @@ void PAGXView::loadPAGX(const val& pagxData) {
 
 void PAGXView::parsePAGX(const val& pagxData) {
   document = nullptr;
-  auto data = GetDataFromEmscripten(pagxData);
+  auto data = GetPagxDataFromEmscripten(pagxData);
   if (!data) {
     return;
   }
@@ -97,12 +116,11 @@ bool PAGXView::loadFileData(const std::string& filePath, const val& fileData) {
   if (!document) {
     return false;
   }
-  auto data = GetDataFromEmscripten(fileData);
+  auto data = GetPagxDataFromEmscripten(fileData);
   if (!data) {
     return false;
   }
-  auto pagxData = pagx::Data::MakeWithCopy(data->bytes(), data->size());
-  return document->loadFileData(filePath, std::move(pagxData));
+  return document->loadFileData(filePath, std::move(data));
 }
 
 void PAGXView::buildLayers() {

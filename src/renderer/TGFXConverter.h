@@ -19,7 +19,9 @@
 #pragma once
 
 #include "pagx/nodes/PathData.h"
+#include "pagx/types/Data.h"
 #include "pagx/types/Point.h"
+#include "tgfx/core/Data.h"
 #include "tgfx/core/Path.h"
 
 namespace pagx {
@@ -50,6 +52,22 @@ inline tgfx::Path PathDataToTGFXPath(const PathData& pathData) {
 
 inline tgfx::Point PointToTGFX(const Point& p) {
   return tgfx::Point::Make(p.x, p.y);
+}
+
+inline void ReleasePagxData(const void*, void* context) {
+  delete static_cast<std::shared_ptr<Data>*>(context);
+}
+
+inline std::shared_ptr<tgfx::Data> DataToTGFX(const std::shared_ptr<Data>& data) {
+  if (data == nullptr) {
+    return nullptr;
+  }
+  auto* ctx = new std::shared_ptr<Data>(data);
+  auto result = tgfx::Data::MakeAdopted(data->data(), data->size(), ReleasePagxData, ctx);
+  if (!result) {
+    delete ctx;
+  }
+  return result;
 }
 
 }  // namespace pagx

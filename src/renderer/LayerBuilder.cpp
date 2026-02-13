@@ -108,23 +108,6 @@
 
 namespace pagx {
 
-// Type converter from pagx::Data to tgfx::Data
-static void ReleasePagxData(const void*, void* context) {
-  delete static_cast<std::shared_ptr<pagx::Data>*>(context);
-}
-
-static std::shared_ptr<tgfx::Data> ToTGFX(const std::shared_ptr<pagx::Data>& data) {
-  if (!data) {
-    return nullptr;
-  }
-  auto* ctx = new std::shared_ptr<pagx::Data>(data);
-  auto result = tgfx::Data::MakeAdopted(data->data(), data->size(), ReleasePagxData, ctx);
-  if (!result) {
-    delete ctx;
-  }
-  return result;
-}
-
 // Decode a data URI (e.g., "data:image/png;base64,...") to an Image.
 static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI) {
   if (dataURI.find("data:") != 0) {
@@ -148,7 +131,7 @@ static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI)
     return nullptr;
   }
 
-  return tgfx::Image::MakeFromEncoded(ToTGFX(data));
+  return tgfx::Image::MakeFromEncoded(DataToTGFX(data));
 }
 
 // Type converters from pagx to tgfx
@@ -697,7 +680,7 @@ class LayerBuilderContext {
     auto imageNode = node->image;
     std::shared_ptr<tgfx::Image> image = nullptr;
     if (imageNode->data) {
-      image = tgfx::Image::MakeFromEncoded(ToTGFX(imageNode->data));
+      image = tgfx::Image::MakeFromEncoded(DataToTGFX(imageNode->data));
     } else if (imageNode->filePath.find("data:") == 0) {
       image = ImageFromDataURI(imageNode->filePath);
     } else if (!imageNode->filePath.empty()) {

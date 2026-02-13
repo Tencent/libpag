@@ -122,6 +122,10 @@ class SVGParserContext {
 
   Layer* convertMaskElement(const std::shared_ptr<DOMNode>& maskElement,
                                                 const InheritedStyle& parentStyle);
+  void parseMaskChildren(const std::shared_ptr<DOMNode>& parent,
+                         Layer* maskLayer,
+                         const InheritedStyle& parentStyle,
+                         const Matrix& parentMatrix);
   // Converts SVG filter element to PAGX filters/styles.
   // Returns true if the filter was successfully converted, false otherwise.
   // If outShadowOnlyType is provided, it will be set to indicate the type of shadow-only filter
