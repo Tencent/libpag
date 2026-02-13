@@ -26,6 +26,8 @@ namespace pagx {
 
 std::shared_ptr<Data> Base64Decode(const std::string& encodedString);
 
+std::shared_ptr<Data> DecodeBase64DataURI(const std::string& dataURI);
+
 std::string Base64Encode(const uint8_t* data, size_t length);
 
 }  // namespace pagx

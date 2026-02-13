@@ -85,6 +85,21 @@ std::shared_ptr<Data> Base64Decode(const std::string& encodedString) {
   return Data::MakeAdopt(output.release(), outputLength);
 }
 
+std::shared_ptr<Data> DecodeBase64DataURI(const std::string& dataURI) {
+  if (dataURI.find("data:") != 0) {
+    return nullptr;
+  }
+  auto commaPos = dataURI.find(',');
+  if (commaPos == std::string::npos) {
+    return nullptr;
+  }
+  auto header = dataURI.substr(0, commaPos);
+  if (header.find(";base64") == std::string::npos) {
+    return nullptr;
+  }
+  return Base64Decode(dataURI.substr(commaPos + 1));
+}
+
 std::string Base64Encode(const uint8_t* data, size_t length) {
   static const char encodingTable[] =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
