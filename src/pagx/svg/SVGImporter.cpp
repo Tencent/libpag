@@ -22,7 +22,7 @@
 #include <cstdlib>
 #include "StringParser.h"
 #include "SVGPathParser.h"
-#include "pagx/MathUtil.h"
+#include "MathUtil.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/SolidColor.h"
