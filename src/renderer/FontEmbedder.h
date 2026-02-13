@@ -28,9 +28,8 @@ namespace pagx {
  * It creates Font nodes with glyph paths/images and updates Text nodes with GlyphRun data.
  *
  * Font merging strategy:
- * - All vector glyphs (with path) are merged into one Font node
- * - All bitmap glyphs (with image) are merged into another Font node
- * - Maximum 2 Font nodes per document
+ * - All vector glyphs (with path) are merged into a single Font node
+ * - Bitmap glyphs (with image) are grouped by typeface into separate Font nodes
  */
 class FontEmbedder {
  public:
