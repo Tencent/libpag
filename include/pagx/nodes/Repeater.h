@@ -34,12 +34,12 @@ class Repeater : public Element {
   /**
    * The number of copies to create. The default value is 3.
    */
-  float copies = 3;
+  float copies = 3.0f;
 
   /**
    * The offset applied to the copy index, allowing fractional copies. The default value is 0.
    */
-  float offset = 0;
+  float offset = 0.0f;
 
   /**
    * The stacking order of copies (BelowOriginal or AboveOriginal). The default value is
@@ -55,27 +55,27 @@ class Repeater : public Element {
   /**
    * The position offset applied between each copy. The default value is {100, 100}.
    */
-  Point position = {100, 100};
+  Point position = {100.0f, 100.0f};
 
   /**
    * The rotation angle in degrees applied between each copy. The default value is 0.
    */
-  float rotation = 0;
+  float rotation = 0.0f;
 
   /**
    * The scale factor applied between each copy. The default value is {1, 1}.
    */
-  Point scale = {1, 1};
+  Point scale = {1.0f, 1.0f};
 
   /**
    * The starting opacity for the first copy, ranging from 0 to 1. The default value is 1.
    */
-  float startAlpha = 1;
+  float startAlpha = 1.0f;
 
   /**
    * The ending opacity for the last copy, ranging from 0 to 1. The default value is 1.
    */
-  float endAlpha = 1;
+  float endAlpha = 1.0f;
 
   NodeType nodeType() const override {
     return NodeType::Repeater;

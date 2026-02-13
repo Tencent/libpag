@@ -31,7 +31,7 @@ class RoundCorner : public Element {
   /**
    * The radius of the rounded corners in pixels. The default value is 10.
    */
-  float radius = 10;
+  float radius = 10.0f;
 
   NodeType nodeType() const override {
     return NodeType::RoundCorner;

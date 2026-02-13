@@ -39,7 +39,7 @@ class RadialGradient : public ColorSource {
   /**
    * The radius of the gradient circle.
    */
-  float radius = 0;
+  float radius = 0.0f;
 
   /**
    * The transformation matrix applied to the gradient.

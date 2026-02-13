@@ -33,7 +33,7 @@ class ColorStop : public Node {
   /**
    * The position of this color stop along the gradient, ranging from 0 to 1.
    */
-  float offset = 0;
+  float offset = 0.0f;
 
   /**
    * The color value at this stop position.

@@ -38,7 +38,8 @@ class ColorMatrixFilter : public LayerFilter {
    * The last element of each row is an additive offset (bias).
    * The default value is the identity matrix.
    */
-  std::array<float, 20> matrix = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0};
+  std::array<float, 20> matrix = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+                                  0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
 
   NodeType nodeType() const override {
     return NodeType::ColorMatrixFilter;

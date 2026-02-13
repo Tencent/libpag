@@ -52,7 +52,7 @@ class Layer : public Node {
   /**
    * The opacity of the layer, ranging from 0 to 1. The default value is 1.
    */
-  float alpha = 1;
+  float alpha = 1.0f;
 
   /**
    * The blend mode used when compositing the layer. The default value is Normal.
@@ -62,12 +62,12 @@ class Layer : public Node {
   /**
    * The x-coordinate of the layer position. The default value is 0.
    */
-  float x = 0;
+  float x = 0.0f;
 
   /**
    * The y-coordinate of the layer position. The default value is 0.
    */
-  float y = 0;
+  float y = 0.0f;
 
   /**
    * The 2D transformation matrix of the layer.

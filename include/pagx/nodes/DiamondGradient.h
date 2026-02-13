@@ -39,7 +39,7 @@ class DiamondGradient : public ColorSource {
   /**
    * Half the diagonal length of the diamond shape.
    */
-  float radius = 0;
+  float radius = 0.0f;
 
   /**
    * The transformation matrix applied to the gradient.

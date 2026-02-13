@@ -42,7 +42,7 @@ class Fill : public Element {
   /**
    * The opacity of the fill, ranging from 0 (transparent) to 1 (opaque). The default value is 1.
    */
-  float alpha = 1;
+  float alpha = 1.0f;
 
   /**
    * The blend mode used when compositing the fill. The default value is Normal.

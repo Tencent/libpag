@@ -39,12 +39,12 @@ class ConicGradient : public ColorSource {
   /**
    * The starting angle of the gradient sweep in degrees. The default value is 0.
    */
-  float startAngle = 0;
+  float startAngle = 0.0f;
 
   /**
    * The ending angle of the gradient sweep in degrees. The default value is 360.
    */
-  float endAngle = 360;
+  float endAngle = 360.0f;
 
   /**
    * The transformation matrix applied to the gradient.

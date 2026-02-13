@@ -48,17 +48,17 @@ class TextPath : public Element {
    * along the X axis), 90 means a vertical baseline (text flows top to bottom along the Y axis).
    * The default value is 0.
    */
-  float baselineAngle = 0;
+  float baselineAngle = 0.0f;
 
   /**
    * The margin from the start of the path in pixels. The default value is 0.
    */
-  float firstMargin = 0;
+  float firstMargin = 0.0f;
 
   /**
    * The margin from the end of the path in pixels. The default value is 0.
    */
-  float lastMargin = 0;
+  float lastMargin = 0.0f;
 
   /**
    * Whether characters are rotated to be perpendicular to the path. The default value is true.

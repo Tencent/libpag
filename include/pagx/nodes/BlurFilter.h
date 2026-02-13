@@ -31,12 +31,12 @@ class BlurFilter : public LayerFilter {
   /**
    * The horizontal blur radius in pixels. The default value is 0.
    */
-  float blurX = 0;
+  float blurX = 0.0f;
 
   /**
    * The vertical blur radius in pixels. The default value is 0.
    */
-  float blurY = 0;
+  float blurY = 0.0f;
 
   /**
    * The tile mode for handling blur edges. The default value is Decal.

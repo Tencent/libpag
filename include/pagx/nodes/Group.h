@@ -44,27 +44,27 @@ class Group : public Element {
   /**
    * The rotation angle in degrees. The default value is 0.
    */
-  float rotation = 0;
+  float rotation = 0.0f;
 
   /**
    * The scale factor as (scaleX, scaleY). The default value is {1, 1}.
    */
-  Point scale = {1, 1};
+  Point scale = {1.0f, 1.0f};
 
   /**
    * The skew angle in degrees. The default value is 0.
    */
-  float skew = 0;
+  float skew = 0.0f;
 
   /**
    * The axis angle in degrees for the skew transformation. The default value is 0.
    */
-  float skewAxis = 0;
+  float skewAxis = 0.0f;
 
   /**
    * The opacity of the group, ranging from 0 to 1. The default value is 1.
    */
-  float alpha = 1;
+  float alpha = 1.0f;
 
   /**
    * The child elements contained in this group.

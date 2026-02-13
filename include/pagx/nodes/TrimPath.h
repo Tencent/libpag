@@ -33,20 +33,20 @@ class TrimPath : public Element {
    * The starting point of the trim as a percentage of the path length, ranging from 0 to 1. The
    * default value is 0.
    */
-  float start = 0;
+  float start = 0.0f;
 
   /**
    * The ending point of the trim as a percentage of the path length, ranging from 0 to 1. The
    * default value is 1.
    */
-  float end = 1;
+  float end = 1.0f;
 
   /**
    * The offset to shift the trim range along the path. The value is in degrees, where 360 degrees
    * equals a full cycle of the path length. For example, 180 degrees shifts the trim range by half
    * the path. The default value is 0.
    */
-  float offset = 0;
+  float offset = 0.0f;
 
   /**
    * The trim type that determines how multiple paths are trimmed. Separate trims each path

@@ -37,7 +37,7 @@ class Ellipse : public Element {
   /**
    * The size of the ellipse. The default value is {100, 100}.
    */
-  Size size = {100, 100};
+  Size size = {100.0f, 100.0f};
 
   /**
    * Whether the path direction is reversed. The default value is false.

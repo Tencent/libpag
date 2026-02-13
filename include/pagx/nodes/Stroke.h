@@ -44,12 +44,12 @@ class Stroke : public Element {
   /**
    * The stroke width in pixels. The default value is 1.
    */
-  float width = 1;
+  float width = 1.0f;
 
   /**
    * The opacity of the stroke, ranging from 0 (transparent) to 1 (opaque). The default value is 1.
    */
-  float alpha = 1;
+  float alpha = 1.0f;
 
   /**
    * The blend mode used when compositing the stroke. The default value is Normal.
@@ -69,7 +69,7 @@ class Stroke : public Element {
   /**
    * The limit for miter joins before they are beveled. The default value is 4.
    */
-  float miterLimit = 4;
+  float miterLimit = 4.0f;
 
   /**
    * The dash pattern as an array of dash and gap lengths. An empty array means a solid line.
@@ -79,7 +79,7 @@ class Stroke : public Element {
   /**
    * The offset into the dash pattern. The default value is 0.
    */
-  float dashOffset = 0;
+  float dashOffset = 0.0f;
 
   /**
    * Whether to scale the dash intervals so that the dash segments have the same length. The default

@@ -34,18 +34,18 @@ class RangeSelector : public TextSelector {
    * The starting position of the selection range, in units defined by the unit property.
    * The default value is 0.
    */
-  float start = 0;
+  float start = 0.0f;
 
   /**
    * The ending position of the selection range, in units defined by the unit property. The default
    * value is 1.
    */
-  float end = 1;
+  float end = 1.0f;
 
   /**
    * The offset to shift the selection range. The default value is 0.
    */
-  float offset = 0;
+  float offset = 0.0f;
 
   /**
    * The unit used for start, end, and offset values. The default value is Percentage.
@@ -60,12 +60,12 @@ class RangeSelector : public TextSelector {
   /**
    * The ease-in amount for the selection shape, ranging from 0 to 1. The default value is 0.
    */
-  float easeIn = 0;
+  float easeIn = 0.0f;
 
   /**
    * The ease-out amount for the selection shape, ranging from 0 to 1. The default value is 0.
    */
-  float easeOut = 0;
+  float easeOut = 0.0f;
 
   /**
    * The mode for combining multiple selectors. The default value is Add.
@@ -75,7 +75,7 @@ class RangeSelector : public TextSelector {
   /**
    * The weight of this selector's influence, ranging from 0 to 1. The default value is 1.
    */
-  float weight = 1;
+  float weight = 1.0f;
 
   /**
    * Whether to randomize the order of character selection. The default value is false.

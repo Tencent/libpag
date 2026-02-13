@@ -31,22 +31,22 @@ class InnerShadowStyle : public LayerStyle {
   /**
    * The horizontal offset of the shadow in pixels. The default value is 0.
    */
-  float offsetX = 0;
+  float offsetX = 0.0f;
 
   /**
    * The vertical offset of the shadow in pixels. The default value is 0.
    */
-  float offsetY = 0;
+  float offsetY = 0.0f;
 
   /**
    * The horizontal blur radius of the shadow in pixels. The default value is 0.
    */
-  float blurX = 0;
+  float blurX = 0.0f;
 
   /**
    * The vertical blur radius of the shadow in pixels. The default value is 0.
    */
-  float blurY = 0;
+  float blurY = 0.0f;
 
   /**
    * The color of the shadow.

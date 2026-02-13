@@ -37,12 +37,12 @@ class Rectangle : public Element {
   /**
    * The size of the rectangle. The default value is {100, 100}.
    */
-  Size size = {100, 100};
+  Size size = {100.0f, 100.0f};
 
   /**
    * The corner roundness of the rectangle, ranging from 0 to 100. The default value is 0.
    */
-  float roundness = 0;
+  float roundness = 0.0f;
 
   /**
    * Whether the path direction is reversed. The default value is false.

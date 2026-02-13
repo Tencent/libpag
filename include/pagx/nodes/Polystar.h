@@ -42,33 +42,33 @@ class Polystar : public Element {
   /**
    * The number of points in the polystar. The default value is 5.
    */
-  float pointCount = 5;
+  float pointCount = 5.0f;
 
   /**
    * The outer radius of the polystar. The default value is 100.
    */
-  float outerRadius = 100;
+  float outerRadius = 100.0f;
 
   /**
    * The inner radius of the polystar. Only applies when type is Star. The default value is 50.
    */
-  float innerRadius = 50;
+  float innerRadius = 50.0f;
 
   /**
    * The rotation angle in degrees. The default value is 0.
    */
-  float rotation = 0;
+  float rotation = 0.0f;
 
   /**
    * The roundness of the outer points, ranging from 0 to 100. The default value is 0.
    */
-  float outerRoundness = 0;
+  float outerRoundness = 0.0f;
 
   /**
    * The roundness of the inner points, ranging from 0 to 100. Only applies when type is Star. The
    * default value is 0.
    */
-  float innerRoundness = 0;
+  float innerRoundness = 0.0f;
 
   /**
    * Whether the path direction is reversed. The default value is false.

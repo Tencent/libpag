@@ -45,13 +45,13 @@ class TextLayout : public Element {
    * (paragraph text mode). A value of 0 or negative means point text mode (no wrapping).
    * The default value is 0.
    */
-  float width = 0;
+  float width = 0.0f;
 
   /**
    * The height of the layout area in pixels. When specified (> 0), enables vertical alignment.
    * A value of 0 or negative means auto-height. The default value is 0.
    */
-  float height = 0;
+  float height = 0.0f;
 
   /**
    * The horizontal text alignment. The default value is Start.

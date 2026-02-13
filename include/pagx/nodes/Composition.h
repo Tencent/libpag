@@ -34,12 +34,12 @@ class Composition : public Node {
   /**
    * The width of the composition in pixels.
    */
-  float width = 0;
+  float width = 0.0f;
 
   /**
    * The height of the composition in pixels.
    */
-  float height = 0;
+  float height = 0.0f;
 
   /**
    * The layers contained in this composition.
