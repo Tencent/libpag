@@ -1091,9 +1091,22 @@ static GlyphRun* parseGlyphRun(const DOMNode* node, PAGXDocument* doc) {
   // Parse glyphs regardless of whether font is valid, to maintain data consistency.
   auto glyphsStr = getAttribute(node, "glyphs");
   if (!glyphsStr.empty()) {
-    auto glyphList = ParseFloatList(glyphsStr);
-    for (auto g : glyphList) {
-      run->glyphs.push_back(static_cast<uint16_t>(g));
+    const char* ptr = glyphsStr.c_str();
+    const char* end = ptr + glyphsStr.size();
+    while (ptr < end) {
+      while (ptr < end && (*ptr == ' ' || *ptr == '\t' || *ptr == ',')) {
+        ++ptr;
+      }
+      if (ptr >= end) {
+        break;
+      }
+      char* endPtr = nullptr;
+      long value = strtol(ptr, &endPtr, 10);
+      if (endPtr == ptr) {
+        break;
+      }
+      run->glyphs.push_back(static_cast<uint16_t>(value));
+      ptr = endPtr;
     }
   }
 
