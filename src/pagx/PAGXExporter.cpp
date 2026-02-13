@@ -173,7 +173,6 @@ class XMLBuilder {
       switch (c) {
         case '&':  extraSize += 4; break;
         case '<':  extraSize += 3; break;
-        case '>':  extraSize += 3; break;
         case '"': extraSize += 5; break;
         case '\'': extraSize += 5; break;
         default: break;
@@ -188,7 +187,6 @@ class XMLBuilder {
       switch (c) {
         case '&':  result += "&amp;";  break;
         case '<':  result += "&lt;";   break;
-        case '>':  result += "&gt;";   break;
         case '"': result += "&quot;"; break;
         case '\'': result += "&apos;"; break;
         default:   result += c;         break;
