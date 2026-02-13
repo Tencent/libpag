@@ -107,6 +107,12 @@ static void ParseStyleString(const std::string& styleStr,
     while (pos < styleStr.size() && std::isspace(styleStr[pos])) {
       ++pos;
     }
+    // Skip CSS comments.
+    if (pos + 1 < styleStr.size() && styleStr[pos] == '/' && styleStr[pos + 1] == '*') {
+      auto commentEnd = styleStr.find("*/", pos + 2);
+      pos = (commentEnd == std::string::npos) ? styleStr.size() : commentEnd + 2;
+      continue;
+    }
     size_t colonPos = styleStr.find(':', pos);
     if (colonPos == std::string::npos) {
       break;
@@ -419,6 +425,13 @@ void SVGParserContext::parseStyleElement(const std::shared_ptr<DOMNode>& styleNo
     }
     if (pos >= cssContent.size()) {
       break;
+    }
+
+    // Skip CSS comments.
+    if (pos + 1 < cssContent.size() && cssContent[pos] == '/' && cssContent[pos + 1] == '*') {
+      auto commentEnd = cssContent.find("*/", pos + 2);
+      pos = (commentEnd == std::string::npos) ? cssContent.size() : commentEnd + 2;
+      continue;
     }
 
     // Look for class selector starting with dot.
