@@ -59,12 +59,6 @@ static tgfx::Point ToTGFXPoint(const Point& p) {
   return PointToTGFX(p);
 }
 
-static std::shared_ptr<tgfx::Data> ToTGFXData(const std::shared_ptr<Data>& data) {
-  if (data == nullptr) {
-    return nullptr;
-  }
-  return tgfx::Data::MakeWithCopy(data->data(), data->size());
-}
 
 // Build context that maintains state during text typesetting
 class TypesetterContext {
@@ -122,11 +116,12 @@ class TypesetterContext {
     if (text == nullptr || shapedText.textBlob == nullptr) {
       return;
     }
-    auto it = result.find(text);
-    if (it == result.end()) {
+    auto [it, inserted] = result.emplace(text, std::move(shapedText));
+    if (inserted) {
       textOrder.push_back(text);
+    } else {
+      it->second = std::move(shapedText);
     }
-    result[text] = std::move(shapedText);
   }
 
   static int StylePriority(const std::string& style) {
@@ -556,16 +551,9 @@ class TypesetterContext {
           if (imageNode->data != nullptr) {
             codec = tgfx::ImageCodec::MakeFrom(ToTGFXData(imageNode->data));
           } else if (imageNode->filePath.find("data:") == 0) {
-            auto commaPos = imageNode->filePath.find(',');
-            if (commaPos != std::string::npos) {
-              auto header = imageNode->filePath.substr(0, commaPos);
-              if (header.find(";base64") != std::string::npos) {
-                auto base64Data = imageNode->filePath.substr(commaPos + 1);
-                auto data = Base64Decode(base64Data);
-                if (data) {
-                  codec = tgfx::ImageCodec::MakeFrom(ToTGFXData(data));
-                }
-              }
+            auto data = DecodeBase64DataURI(imageNode->filePath);
+            if (data) {
+              codec = tgfx::ImageCodec::MakeFrom(ToTGFXData(data));
             }
           } else if (!imageNode->filePath.empty()) {
             codec = tgfx::ImageCodec::MakeFrom(imageNode->filePath);
@@ -596,10 +584,17 @@ class TypesetterContext {
     const std::string& content = text->text;
     bool hasLetterSpacing = !FloatNearlyEqual(text->letterSpacing, 0.0f);
 
+    // Pre-build fallback font cache to avoid repeated construction in the inner loop.
+    std::unordered_map<tgfx::Typeface*, tgfx::Font> fallbackFontCache = {};
+    for (const auto& fallback : typesetter->fallbackTypefaces) {
+      if (fallback != nullptr && fallback != primaryTypeface) {
+        fallbackFontCache.emplace(fallback.get(), tgfx::Font(fallback, text->fontSize));
+      }
+    }
+
     // Current run being built
     ShapedGlyphRun* currentRun = nullptr;
     std::shared_ptr<tgfx::Typeface> currentTypeface = nullptr;
-    float runStartX = 0;
 
     size_t i = 0;
     while (i < content.size()) {
@@ -624,13 +619,13 @@ class TypesetterContext {
 
       if (glyphID == 0) {
         for (const auto& fallback : typesetter->fallbackTypefaces) {
-          if (fallback == nullptr || fallback == primaryTypeface) {
+          auto it = fallbackFontCache.find(fallback.get());
+          if (it == fallbackFontCache.end()) {
             continue;
           }
-          tgfx::Font fallbackFont(fallback, text->fontSize);
-          glyphID = fallbackFont.getGlyphID(unichar);
+          glyphID = it->second.getGlyphID(unichar);
           if (glyphID != 0) {
-            glyphFont = fallbackFont;
+            glyphFont = it->second;
             glyphTypeface = fallback;
             break;
           }
@@ -649,11 +644,10 @@ class TypesetterContext {
         currentRun = &info.runs.back();
         currentRun->font = glyphFont;
         currentTypeface = glyphTypeface;
-        runStartX = currentX;
-        currentRun->startX = runStartX;
+        currentRun->startX = currentX;
         currentRun->canUseDefaultMode = !hasLetterSpacing;
-        // Reserve using remaining bytes as an upper bound for glyph count.
-        auto remaining = content.size() - i + charLen;
+        // Reserve using remaining character count estimate (assuming average 2 bytes per char).
+        auto remaining = (content.size() - i + charLen) / 2 + 1;
         currentRun->glyphIDs.reserve(remaining);
         currentRun->xPositions.reserve(remaining);
       }

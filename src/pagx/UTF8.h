@@ -56,7 +56,11 @@ inline size_t DecodeUTF8Char(const char* data, size_t remaining, int32_t* unicha
   }
 
   for (size_t j = 1; j < charLen; j++) {
-    codepoint = (codepoint << 6) | (static_cast<uint8_t>(data[j]) & 0x3F);
+    auto continuation = static_cast<uint8_t>(data[j]);
+    if ((continuation & 0xC0) != 0x80) {
+      return 0;
+    }
+    codepoint = (codepoint << 6) | (continuation & 0x3F);
   }
 
   *unichar = codepoint;

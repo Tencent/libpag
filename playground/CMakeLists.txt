@@ -20,7 +20,6 @@ get_filename_component(TGFX_DIR "${TGFX_DIR}" REALPATH)
 # Add tgfx as dependency
 if (NOT TARGET tgfx)
     set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-    set(TGFX_BUILD_SVG ON CACHE BOOL "" FORCE)
     set(TGFX_BUILD_LAYERS ON CACHE BOOL "" FORCE)
     add_subdirectory(${TGFX_DIR} ${CMAKE_CURRENT_BINARY_DIR}/tgfx)
 endif ()
@@ -78,7 +77,7 @@ if (DEFINED EMSCRIPTEN)
     if (EMSCRIPTEN_PTHREADS)
         list(APPEND PLAYGROUND_LINK_OPTIONS -sUSE_PTHREADS=1 -sINITIAL_MEMORY=32MB -sALLOW_MEMORY_GROWTH=1
                 -sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency
-                -sEXIT_RUNTIME=0 -sINVOKE_RUN=0 -sMALLOC=mimalloc)
+                -sEXIT_RUNTIME=0 -sINVOKE_RUN=0 -sMALLOC=dlmalloc)
         list(APPEND PLAYGROUND_COMPILE_OPTIONS -fPIC -pthread)
     else ()
         list(APPEND PLAYGROUND_LINK_OPTIONS -sALLOW_MEMORY_GROWTH=1)

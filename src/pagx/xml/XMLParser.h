@@ -55,7 +55,7 @@ class XMLParser {
    * @param element The element name.
    * @return true to stop parsing, false to continue.
    */
-  virtual bool onStartElement(const std::string& element) = 0;
+  virtual bool onStartElement(const char* element) = 0;
 
   /**
    * Called for each attribute of the current element.
@@ -64,7 +64,7 @@ class XMLParser {
    * @param value The attribute value.
    * @return true to stop parsing, false to continue.
    */
-  virtual bool onAddAttribute(const std::string& name, const std::string& value) = 0;
+  virtual bool onAddAttribute(const char* name, const char* value) = 0;
 
   /**
    * Called when an element end tag is encountered.
@@ -72,7 +72,7 @@ class XMLParser {
    * @param element The element name.
    * @return true to stop parsing, false to continue.
    */
-  virtual bool onEndElement(const std::string& element) = 0;
+  virtual bool onEndElement(const char* element) = 0;
 
   /**
    * Called when text content is encountered.
@@ -84,9 +84,9 @@ class XMLParser {
 
  public:
   // Public for internal parser library calls, not intended for client use.
-  bool startElement(const std::string& element);
-  bool addAttribute(const std::string& name, const std::string& value);
-  bool endElement(const std::string& element);
+  bool startElement(const char* element);
+  bool addAttribute(const char* name, const char* value);
+  bool endElement(const char* element);
   bool text(const std::string& text);
 };
 

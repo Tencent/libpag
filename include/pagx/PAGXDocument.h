@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -92,7 +92,9 @@ class PAGXDocument {
 
   /**
    * Finds a node of the specified type by ID.
-   * Returns nullptr if not found.
+   * The caller must ensure T matches the actual node type, otherwise behavior is undefined.
+   * @param id The unique identifier of the node.
+   * @return A pointer to the node cast to type T, or nullptr if not found.
    */
   template <typename T>
   T* findNode(const std::string& id) const {

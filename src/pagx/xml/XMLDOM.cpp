@@ -35,17 +35,17 @@ class DOMParser : public XMLParser {
   }
 
  protected:
-  bool onStartElement(const std::string& element) override {
+  bool onStartElement(const char* element) override {
     startCommon(element, DOMNodeType::Element);
     return false;
   }
 
-  bool onAddAttribute(const std::string& name, const std::string& value) override {
+  bool onAddAttribute(const char* name, const char* value) override {
     _attributes.push_back({name, value});
     return false;
   }
 
-  bool onEndElement(const std::string& /*element*/) override {
+  bool onEndElement(const char* /*element*/) override {
     if (_needToFlush) {
       flushAttributes();
     }
@@ -60,7 +60,7 @@ class DOMParser : public XMLParser {
     // Ignore text if it is empty or contains only whitespace.
     if (text.find_first_not_of(" \n\r\t") != std::string::npos) {
       startCommon(text, DOMNodeType::Text);
-      onEndElement(_elementName);
+      onEndElement(_elementName.c_str());
     }
     return false;
   }
@@ -91,12 +91,12 @@ class DOMParser : public XMLParser {
     _attributes.clear();
   }
 
-  void startCommon(const std::string& element, DOMNodeType type) {
+  void startCommon(std::string element, DOMNodeType type) {
     if (_level > 0 && _needToFlush) {
       flushAttributes();
     }
     _needToFlush = true;
-    _elementName = element;
+    _elementName = std::move(element);
     _elementType = type;
     ++_level;
   }
@@ -202,23 +202,13 @@ std::shared_ptr<DOMNode> DOMNode::getNextSibling(const std::string& name) const 
   return sibling;
 }
 
-std::tuple<bool, std::string> DOMNode::findAttribute(const std::string& attrName) const {
+const std::string* DOMNode::findAttribute(const std::string& attrName) const {
   for (const auto& attr : attributes) {
     if (attr.name == attrName) {
-      return {true, attr.value};
+      return &attr.value;
     }
   }
-  return {false, ""};
-}
-
-int DOMNode::countChildren(const std::string& name) const {
-  int count = 0;
-  auto child = getFirstChild(name);
-  while (child) {
-    ++count;
-    child = child->getNextSibling(name);
-  }
-  return count;
+  return nullptr;
 }
 
 }  // namespace pagx

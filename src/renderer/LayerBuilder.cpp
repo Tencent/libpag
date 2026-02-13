@@ -19,19 +19,13 @@
 #include "LayerBuilder.h"
 #include <tuple>
 #include <unordered_map>
+#include "Base64.h"
 #include "TGFXConverter.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
-#include "pagx/types/ColorSpace.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
-#include "pagx/types/Data.h"
 #include "pagx/nodes/DiamondGradient.h"
-#include "pagx/types/FillRule.h"
-#include "pagx/types/LayerPlacement.h"
-#include "pagx/types/MergePathMode.h"
-#include "pagx/types/TileMode.h"
-#include "Base64.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
@@ -40,7 +34,6 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
-#include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
@@ -49,26 +42,31 @@
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
+#include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
-#include "pagx/nodes/TextModifier.h"
-#include "pagx/nodes/RangeSelector.h"
+#include "pagx/types/ColorSpace.h"
+#include "pagx/types/Data.h"
+#include "pagx/types/FillRule.h"
+#include "pagx/types/LayerPlacement.h"
+#include "pagx/types/MergePathMode.h"
+#include "pagx/types/TileMode.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
-#include "tgfx/core/Path.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/core/TextBlobBuilder.h"
-#include "tgfx/svg/SVGPathParser.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/LayerMaskType.h"
 #include "tgfx/layers/LayerPaint.h"
@@ -93,10 +91,10 @@
 #include "tgfx/layers/vectors/SolidColor.h"
 #include "tgfx/layers/vectors/StrokeStyle.h"
 #include "tgfx/layers/vectors/Text.h"
-#include "tgfx/layers/vectors/TextPath.h"
-#include "tgfx/layers/vectors/TrimPath.h"
 #include "tgfx/layers/vectors/TextModifier.h"
+#include "tgfx/layers/vectors/TextPath.h"
 #include "tgfx/layers/vectors/TextSelector.h"
+#include "tgfx/layers/vectors/TrimPath.h"
 #include "tgfx/layers/vectors/VectorGroup.h"
 
 #ifdef DEBUG
@@ -108,38 +106,13 @@
 
 namespace pagx {
 
-// Type converter from pagx::Data to tgfx::Data
-static std::shared_ptr<tgfx::Data> ToTGFX(const std::shared_ptr<pagx::Data>& data) {
-  if (!data) {
-    return nullptr;
-  }
-  return tgfx::Data::MakeWithCopy(data->data(), data->size());
-}
-
 // Decode a data URI (e.g., "data:image/png;base64,...") to an Image.
 static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI) {
-  if (dataURI.find("data:") != 0) {
-    return nullptr;
-  }
-
-  auto commaPos = dataURI.find(',');
-  if (commaPos == std::string::npos) {
-    return nullptr;
-  }
-
-  auto header = dataURI.substr(0, commaPos);
-  auto base64Data = dataURI.substr(commaPos + 1);
-
-  if (header.find(";base64") == std::string::npos) {
-    return nullptr;
-  }
-
-  auto data = Base64Decode(base64Data);
+  auto data = DecodeBase64DataURI(dataURI);
   if (!data) {
     return nullptr;
   }
-
-  return tgfx::Image::MakeFromEncoded(ToTGFX(data));
+  return tgfx::Image::MakeFromEncoded(ToTGFXData(data));
 }
 
 // Type converters from pagx to tgfx
@@ -147,13 +120,18 @@ static tgfx::Point ToTGFX(const Point& p) {
   return tgfx::Point::Make(p.x, p.y);
 }
 
+static tgfx::ColorMatrix33 ComputeP3ToSRGBMatrix() {
+  tgfx::ColorMatrix33 matrix = {};
+  tgfx::ColorSpace::DisplayP3()->gamutTransformTo(tgfx::ColorSpace::SRGB().get(), &matrix);
+  return matrix;
+}
+
 static tgfx::Color ToTGFX(const Color& c) {
   // tgfx::Color is always in sRGB color space. If source color is in Display P3,
   // we need to convert it to sRGB for correct rendering.
   if (c.colorSpace == ColorSpace::DisplayP3) {
     // Convert Display P3 to sRGB using tgfx::ColorSpace
-    tgfx::ColorMatrix33 p3ToSRGB = {};
-    tgfx::ColorSpace::DisplayP3()->gamutTransformTo(tgfx::ColorSpace::SRGB().get(), &p3ToSRGB);
+    static const tgfx::ColorMatrix33 p3ToSRGB = ComputeP3ToSRGBMatrix();
 
     float r = c.red * p3ToSRGB.values[0][0] + c.green * p3ToSRGB.values[0][1] +
               c.blue * p3ToSRGB.values[0][2];
@@ -406,6 +384,7 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::Layer> convertVectorLayer(const Layer* node) {
     auto layer = tgfx::VectorLayer::Make();
     std::vector<std::shared_ptr<tgfx::VectorElement>> contents;
+    contents.reserve(node->contents.size());
     for (const auto& element : node->contents) {
       auto tgfxElement = convertVectorElement(element);
       if (tgfxElement) {
@@ -505,7 +484,7 @@ class LayerBuilderContext {
   }
 
   std::shared_ptr<tgfx::Text> convertText(const Text* node) {
-    auto it = _shapedTextMap.find(const_cast<Text*>(node));
+    auto it = _shapedTextMap.find(node);
     if (it == _shapedTextMap.end() || it->second.textBlob == nullptr) {
       return nullptr;
     }
@@ -628,55 +607,50 @@ class LayerBuilderContext {
     }
   }
 
+  static std::shared_ptr<tgfx::ColorSource> ApplyGradientMatrix(
+      std::shared_ptr<tgfx::Gradient> gradient, const Matrix& matrix) {
+    if (gradient && !matrix.isIdentity()) {
+      gradient->setMatrix(ToTGFX(matrix));
+    }
+    return gradient;
+  }
+
   std::shared_ptr<tgfx::ColorSource> convertLinearGradient(const LinearGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     ExtractGradientStops(node->colorStops, &colors, &positions);
-
-    auto gradient = tgfx::Gradient::MakeLinear(ToTGFX(node->startPoint), ToTGFX(node->endPoint),
-                                               colors, positions);
-    if (gradient && !node->matrix.isIdentity()) {
-      gradient->setMatrix(ToTGFX(node->matrix));
-    }
-    return gradient;
+    return ApplyGradientMatrix(
+        tgfx::Gradient::MakeLinear(ToTGFX(node->startPoint), ToTGFX(node->endPoint), colors,
+                                   positions),
+        node->matrix);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertRadialGradient(const RadialGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     ExtractGradientStops(node->colorStops, &colors, &positions);
-
-    auto gradient = tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions);
-    if (gradient && !node->matrix.isIdentity()) {
-      gradient->setMatrix(ToTGFX(node->matrix));
-    }
-    return gradient;
+    return ApplyGradientMatrix(
+        tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions),
+        node->matrix);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertConicGradient(const ConicGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     ExtractGradientStops(node->colorStops, &colors, &positions);
-
-    auto gradient = tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle, node->endAngle,
-                                              colors, positions);
-    if (gradient && !node->matrix.isIdentity()) {
-      gradient->setMatrix(ToTGFX(node->matrix));
-    }
-    return gradient;
+    return ApplyGradientMatrix(
+        tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle, node->endAngle, colors,
+                                  positions),
+        node->matrix);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertDiamondGradient(const DiamondGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     ExtractGradientStops(node->colorStops, &colors, &positions);
-
-    auto gradient =
-        tgfx::Gradient::MakeDiamond(ToTGFX(node->center), node->radius, colors, positions);
-    if (gradient && !node->matrix.isIdentity()) {
-      gradient->setMatrix(ToTGFX(node->matrix));
-    }
-    return gradient;
+    return ApplyGradientMatrix(
+        tgfx::Gradient::MakeDiamond(ToTGFX(node->center), node->radius, colors, positions),
+        node->matrix);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertImagePattern(const ImagePattern* node) {
@@ -687,7 +661,7 @@ class LayerBuilderContext {
     auto imageNode = node->image;
     std::shared_ptr<tgfx::Image> image = nullptr;
     if (imageNode->data) {
-      image = tgfx::Image::MakeFromEncoded(ToTGFX(imageNode->data));
+      image = tgfx::Image::MakeFromEncoded(ToTGFXData(imageNode->data));
     } else if (imageNode->filePath.find("data:") == 0) {
       image = ImageFromDataURI(imageNode->filePath);
     } else if (!imageNode->filePath.empty()) {
@@ -787,6 +761,7 @@ class LayerBuilderContext {
 
     // Convert selectors
     std::vector<std::shared_ptr<tgfx::TextSelector>> tgfxSelectors;
+    tgfxSelectors.reserve(node->selectors.size());
     for (const auto* selector : node->selectors) {
       if (selector->nodeType() == NodeType::RangeSelector) {
         auto rangeSelector = static_cast<const RangeSelector*>(selector);
@@ -827,7 +802,7 @@ class LayerBuilderContext {
       }
     }
 
-    group->setElements(elements);
+    group->setElements(std::move(elements));
 
     // Apply transform properties
     if (node->anchor.x != 0 || node->anchor.y != 0) {
@@ -858,6 +833,9 @@ class LayerBuilderContext {
   void applyLayerAttributes(const Layer* node, tgfx::Layer* layer) {
     layer->setVisible(node->visible);
     layer->setAlpha(node->alpha);
+    if (node->blendMode != BlendMode::Normal) {
+      layer->setBlendMode(ToTGFX(node->blendMode));
+    }
 
     // Apply transformation: combine x/y translation with matrix
     auto matrix = ToTGFX(node->matrix);
@@ -875,6 +853,7 @@ class LayerBuilderContext {
 
     // Layer styles
     std::vector<std::shared_ptr<tgfx::LayerStyle>> styles;
+    styles.reserve(node->styles.size());
     for (const auto& style : node->styles) {
       auto tgfxStyle = convertLayerStyle(style);
       if (tgfxStyle) {
@@ -887,6 +866,7 @@ class LayerBuilderContext {
 
     // Layer filters
     std::vector<std::shared_ptr<tgfx::LayerFilter>> filters;
+    filters.reserve(node->filters.size());
     for (const auto& filter : node->filters) {
       auto tgfxFilter = convertLayerFilter(filter);
       if (tgfxFilter) {

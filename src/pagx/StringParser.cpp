@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -268,12 +268,9 @@ ColorSpace ColorSpaceFromString(const std::string& str) {
   return ColorSpace::SRGB;
 }
 
-static std::string ToHex(float v) {
+static int FloatToHexByte(float v) {
   int i = static_cast<int>(std::round(v * 255.0f));
-  i = std::max(0, std::min(255, i));
-  char buf[3] = {};
-  snprintf(buf, sizeof(buf), "%02X", i);
-  return std::string(buf);
+  return std::max(0, std::min(255, i));
 }
 
 std::string ColorToHexString(const Color& color, bool withAlpha) {
@@ -287,11 +284,17 @@ std::string ColorToHexString(const Color& color, bool withAlpha) {
     }
     return std::string(buf);
   }
-  std::string result = "#" + ToHex(color.red) + ToHex(color.green) + ToHex(color.blue);
+  char buf[10] = {};
+  int r = FloatToHexByte(color.red);
+  int g = FloatToHexByte(color.green);
+  int b = FloatToHexByte(color.blue);
   if (withAlpha && color.alpha < 1.0f) {
-    result += ToHex(color.alpha);
+    int a = FloatToHexByte(color.alpha);
+    snprintf(buf, sizeof(buf), "#%02X%02X%02X%02X", r, g, b, a);
+  } else {
+    snprintf(buf, sizeof(buf), "#%02X%02X%02X", r, g, b);
   }
-  return result;
+  return std::string(buf);
 }
 
 //==============================================================================
@@ -323,33 +326,6 @@ Matrix MatrixFromString(const std::string& str) {
 // String parsing utilities
 //==============================================================================
 
-static std::string TrimString(const std::string& str) {
-  auto start = str.find_first_not_of(" \t\n\r");
-  if (start == std::string::npos) {
-    return "";
-  }
-  auto end = str.find_last_not_of(" \t\n\r");
-  return str.substr(start, end - start + 1);
-}
-
-std::vector<std::string> SplitString(const std::string& str, char delimiter) {
-  std::vector<std::string> tokens;
-  size_t start = 0;
-  size_t end = 0;
-  while ((end = str.find(delimiter, start)) != std::string::npos) {
-    auto token = TrimString(str.substr(start, end - start));
-    if (!token.empty()) {
-      tokens.push_back(token);
-    }
-    start = end + 1;
-  }
-  auto lastToken = TrimString(str.substr(start));
-  if (!lastToken.empty()) {
-    tokens.push_back(lastToken);
-  }
-  return tokens;
-}
-
 std::vector<float> ParseFloatList(const std::string& str) {
   std::vector<float> result = {};
   const char* ptr = str.c_str();
@@ -373,27 +349,6 @@ std::vector<float> ParseFloatList(const std::string& str) {
   return result;
 }
 
-std::vector<float> ParseSpaceSeparatedFloats(const std::string& str) {
-  std::vector<float> values;
-  const char* ptr = str.c_str();
-  const char* end = ptr + str.size();
-  while (ptr < end) {
-    while (ptr < end && std::isspace(*ptr)) {
-      ++ptr;
-    }
-    if (ptr >= end) {
-      break;
-    }
-    char* endPtr = nullptr;
-    float val = strtof(ptr, &endPtr);
-    if (endPtr == ptr) {
-      break;
-    }
-    values.push_back(val);
-    ptr = endPtr;
-  }
-  return values;
-}
 
 std::string FloatToString(float value) {
   char buf[32] = {};

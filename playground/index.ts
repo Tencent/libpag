@@ -182,6 +182,13 @@ class PlaygroundError extends Error {
     }
 }
 
+interface GestureEvent extends UIEvent {
+    scale: number;
+    rotation: number;
+    clientX: number;
+    clientY: number;
+}
+
 enum ScaleGestureState {
     SCALE_START = 0,
     SCALE_CHANGE = 1,
@@ -220,12 +227,11 @@ class GestureManager {
     private dragStartOffsetY = 0;
 
     // Touch state
-    private lastTouchDistance = 0;
+    private startTouchDistance = 0;
     private lastTouchCenterX = 0;
     private lastTouchCenterY = 0;
     private isTouchPanning = false;
     private isTouchZooming = false;
-
     public zoom = 1.0;
     public offsetX = 0;
     public offsetY = 0;
@@ -408,7 +414,7 @@ class GestureManager {
             // Two finger zoom/pan
             this.isTouchPanning = false;
             this.isTouchZooming = true;
-            this.lastTouchDistance = this.getTouchDistance(event.touches);
+            this.startTouchDistance = this.getTouchDistance(event.touches);
             const center = this.getTouchCenter(event.touches);
             this.lastTouchCenterX = center.x;
             this.lastTouchCenterY = center.y;
@@ -434,10 +440,10 @@ class GestureManager {
             const pixelX = (center.x - rect.left) * window.devicePixelRatio;
             const pixelY = (center.y - rect.top) * window.devicePixelRatio;
 
-            // Calculate zoom
-            if (this.lastTouchDistance > 0) {
-                const scale = currentDistance / this.lastTouchDistance;
-                const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.zoom * scale));
+            // Calculate zoom using absolute ratio relative to the start distance.
+            if (this.startTouchDistance > 0) {
+                const scale = currentDistance / this.startTouchDistance;
+                const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.scaleStartZoom * scale));
 
                 // Zoom around pinch center
                 this.offsetX = (this.offsetX - pixelX) * (newZoom / this.zoom) + pixelX;
@@ -451,7 +457,6 @@ class GestureManager {
             this.offsetX += centerDeltaX;
             this.offsetY += centerDeltaY;
 
-            this.lastTouchDistance = currentDistance;
             this.lastTouchCenterX = center.x;
             this.lastTouchCenterY = center.y;
 
@@ -472,6 +477,29 @@ class GestureManager {
             this.dragStartOffsetX = this.offsetX;
             this.dragStartOffsetY = this.offsetY;
         }
+    }
+
+    // Safari gesture handlers
+    public onGestureStart(event: GestureEvent) {
+        this.scaleStartZoom = this.zoom;
+        this.dragStartOffsetX = this.offsetX;
+        this.dragStartOffsetY = this.offsetY;
+    }
+
+    public onGestureChange(event: GestureEvent, canvas: HTMLElement,
+                           playgroundState: PlaygroundState) {
+        // event.scale is already an absolute ratio relative to gesturestart.
+        const rect = canvas.getBoundingClientRect();
+        const pixelX = (event.clientX - rect.left) * window.devicePixelRatio;
+        const pixelY = (event.clientY - rect.top) * window.devicePixelRatio;
+        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.scaleStartZoom * event.scale));
+        this.offsetX = (this.offsetX - pixelX) * (newZoom / this.zoom) + pixelX;
+        this.offsetY = (this.offsetY - pixelY) * (newZoom / this.zoom) + pixelY;
+        this.zoom = newZoom;
+        playgroundState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
+    }
+
+    public onGestureEnd() {
     }
 }
 
@@ -729,15 +757,18 @@ function bindCanvasEvents(canvas: HTMLElement) {
         gestureManager.onTouchEnd(e, canvas);
     });
 
-    // Prevent browser pinch-to-zoom on Safari
+    // Safari gesture events for pinch-to-zoom
     canvas.addEventListener('gesturestart', (e: Event) => {
         e.preventDefault();
+        gestureManager.onGestureStart(e as GestureEvent);
     });
     canvas.addEventListener('gesturechange', (e: Event) => {
         e.preventDefault();
+        gestureManager.onGestureChange(e as GestureEvent, canvas, playgroundState);
     });
     canvas.addEventListener('gestureend', (e: Event) => {
         e.preventDefault();
+        gestureManager.onGestureEnd();
     });
 }
 
@@ -787,6 +818,13 @@ function hideDropZone(): void {
     if (dropZone) {
         dropZone.classList.add('hidden');
     }
+}
+
+function hidePlaybackUI(): void {
+    const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
+    const toolbar = document.getElementById('toolbar') as HTMLDivElement;
+    canvas.classList.add('hidden');
+    toolbar.classList.add('hidden');
 }
 
 const DEFAULT_TITLE = 'PAGX Playground';
@@ -861,6 +899,8 @@ async function loadPAGXData(data: Uint8Array, name: string, baseURL: string) {
     playgroundState.pagxView.buildLayers();
     gestureManager.resetTransform(playgroundState);
     updateSize();
+    // Draw the first frame before showing canvas to avoid flashing old content
+    draw();
     hideDropZone();
     canvas.classList.remove('hidden');
     toolbar.classList.remove('hidden');
@@ -869,6 +909,8 @@ async function loadPAGXData(data: Uint8Array, name: string, baseURL: string) {
 }
 
 async function loadPAGXFile(file: File) {
+    // Clear previous content and hide canvas before loading
+    hidePlaybackUI();
     // Show loading UI with progress reset to 0%
     const loadingStartTime = Date.now();
     showLoadingUI();
@@ -912,6 +954,8 @@ async function loadPAGXFile(file: File) {
 }
 
 async function loadPAGXFromURL(url: string, pushHistory: boolean = true) {
+    // Clear previous content and hide canvas before loading
+    hidePlaybackUI();
     // Show loading UI with progress reset to 0%
     const loadingStartTime = Date.now();
     showLoadingUI();
@@ -1067,8 +1111,8 @@ function checkWasmSupport(): boolean {
 
 function getBrowserRequirements(): string {
     return `${t().errorBrowser}
-• Chrome 57+
-• Firefox 52+
+• Chrome 69+
+• Firefox 79+
 • Safari 15+
 • Edge 79+`;
 }
@@ -1227,12 +1271,13 @@ if (typeof window !== 'undefined') {
         // Setup drag and drop early so UI is responsive
         setupDragAndDrop();
 
-        if (!checkWasmSupport()) {
-            alert('WebAssembly is not supported.\n\n' + getBrowserRequirements());
-            return;
-        }
-        if (!checkWebGL2Support()) {
-            alert('WebGL 2.0 is not supported.\n\n' + getBrowserRequirements());
+        if (!checkWasmSupport() || !checkWebGL2Support()) {
+            showErrorUI(getBrowserRequirements());
+            const errorContent = document.getElementById('error-content');
+            if (errorContent) {
+                errorContent.style.cursor = 'default';
+                errorContent.style.pointerEvents = 'none';
+            }
             return;
         }
 

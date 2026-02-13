@@ -30,6 +30,8 @@
 
 namespace pagx {
 
+static constexpr float DEFAULT_FONT_SIZE = 16.0f;
+
 std::shared_ptr<PAGXDocument> SVGImporter::Parse(const std::string& filePath,
                                              const Options& options) {
   SVGParserContext parser(options);
@@ -95,152 +97,119 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseFile(const std::string& fil
   return parseDOM(dom);
 }
 
-std::string SVGParserContext::getAttribute(const std::shared_ptr<DOMNode>& node,
-                                        const std::string& name,
-                                        const std::string& defaultValue) const {
-  // CSS priority: style attribute > presentation attribute > CSS class rules
-  // Check style attribute first for CSS property.
-  // Style attribute format: "property1: value1; property2: value2; ..."
-  // CSS cascade rule: later properties override earlier ones.
-  auto [hasStyle, styleStr] = node->findAttribute("style");
-  if (hasStyle && !styleStr.empty()) {
-    std::string lastValue;
-    size_t pos = 0;
-    while (pos < styleStr.size()) {
-      // Skip whitespace.
-      while (pos < styleStr.size() && std::isspace(styleStr[pos])) {
-        ++pos;
-      }
-      // Find property name end (colon).
-      size_t colonPos = styleStr.find(':', pos);
-      if (colonPos == std::string::npos) {
+// Parse a CSS style string into a property map. Later properties override earlier ones.
+// Handles parenthesized values (e.g., color(display-p3 ...)) by tracking parenthesis depth.
+static void ParseStyleString(const std::string& styleStr,
+                             std::unordered_map<std::string, std::string>& out) {
+  size_t pos = 0;
+  while (pos < styleStr.size()) {
+    while (pos < styleStr.size() && std::isspace(styleStr[pos])) {
+      ++pos;
+    }
+    size_t colonPos = styleStr.find(':', pos);
+    if (colonPos == std::string::npos) {
+      break;
+    }
+    std::string propName = styleStr.substr(pos, colonPos - pos);
+    size_t propStart = propName.find_first_not_of(" \t");
+    size_t propEnd = propName.find_last_not_of(" \t");
+    if (propStart != std::string::npos && propEnd != std::string::npos) {
+      propName = propName.substr(propStart, propEnd - propStart + 1);
+    }
+    size_t searchStart = colonPos + 1;
+    size_t semicolonPos = std::string::npos;
+    int parenDepth = 0;
+    for (size_t i = searchStart; i < styleStr.size(); i++) {
+      if (styleStr[i] == '(') {
+        parenDepth++;
+      } else if (styleStr[i] == ')') {
+        parenDepth--;
+      } else if (styleStr[i] == ';' && parenDepth == 0) {
+        semicolonPos = i;
         break;
       }
-      // Extract property name and trim whitespace.
-      std::string currentProp = styleStr.substr(pos, colonPos - pos);
-      size_t propStart = currentProp.find_first_not_of(" \t");
-      size_t propEnd = currentProp.find_last_not_of(" \t");
-      if (propStart != std::string::npos && propEnd != std::string::npos) {
-        currentProp = currentProp.substr(propStart, propEnd - propStart + 1);
-      }
-      // Find value end (semicolon or end of string).
-      // Special case: CSS color() function may contain parentheses,
-      // so find the next semicolon that's not inside parentheses.
-      size_t searchStart = colonPos + 1;
-      size_t semicolonPos = std::string::npos;
-      int parenDepth = 0;
-      for (size_t i = searchStart; i < styleStr.size(); i++) {
-        if (styleStr[i] == '(') {
-          parenDepth++;
-        } else if (styleStr[i] == ')') {
-          parenDepth--;
-        } else if (styleStr[i] == ';' && parenDepth == 0) {
-          semicolonPos = i;
-          break;
-        }
-      }
-      if (semicolonPos == std::string::npos) {
-        semicolonPos = styleStr.size();
-      }
-      // Check if this is the property we're looking for.
-      if (currentProp == name) {
-        // Extract and trim the value.
-        std::string propValue = styleStr.substr(colonPos + 1, semicolonPos - colonPos - 1);
-        size_t valStart = propValue.find_first_not_of(" \t");
-        size_t valEnd = propValue.find_last_not_of(" \t");
-        if (valStart != std::string::npos && valEnd != std::string::npos) {
-          lastValue = propValue.substr(valStart, valEnd - valStart + 1);
-        } else {
-          lastValue = propValue;
-        }
-        // Continue searching for later occurrences (CSS cascade).
-      }
-      // Move to next property.
-      pos = semicolonPos + 1;
     }
-    if (!lastValue.empty()) {
-      return lastValue;
+    if (semicolonPos == std::string::npos) {
+      semicolonPos = styleStr.size();
     }
+    std::string propValue = styleStr.substr(colonPos + 1, semicolonPos - colonPos - 1);
+    size_t valStart = propValue.find_first_not_of(" \t");
+    size_t valEnd = propValue.find_last_not_of(" \t");
+    if (valStart != std::string::npos && valEnd != std::string::npos) {
+      propValue = propValue.substr(valStart, valEnd - valStart + 1);
+    }
+    if (!propName.empty() && !propValue.empty()) {
+      out[propName] = propValue;
+    }
+    pos = semicolonPos + 1;
+  }
+}
+
+const std::unordered_map<std::string, std::string>& SVGParserContext::getStyleProperties(
+    const std::shared_ptr<DOMNode>& node) {
+  auto it = _stylePropertyCache.find(node.get());
+  if (it != _stylePropertyCache.end()) {
+    return it->second;
   }
 
-  // Fallback: check for direct attribute (presentation attribute).
-  auto [found, value] = node->findAttribute(name);
-  if (found) {
-    return value;
-  }
+  auto& cached = _stylePropertyCache[node.get()];
 
-  // Check CSS class rules (lowest priority).
-  // class attribute can contain multiple class names separated by whitespace.
-  auto [hasClass, classAttr] = node->findAttribute("class");
-  if (hasClass && !classAttr.empty()) {
-    // Parse class names.
+  // CSS class rules (lowest priority): parse all matching classes.
+  auto* classPtr = node->findAttribute("class");
+  if (classPtr && !classPtr->empty()) {
+    const std::string& classAttr = *classPtr;
     size_t pos = 0;
     while (pos < classAttr.size()) {
-      // Skip whitespace.
       while (pos < classAttr.size() && std::isspace(classAttr[pos])) {
         pos++;
       }
       if (pos >= classAttr.size()) {
         break;
       }
-      // Find end of class name.
       size_t endPos = pos;
       while (endPos < classAttr.size() && !std::isspace(classAttr[endPos])) {
         endPos++;
       }
       std::string className = classAttr.substr(pos, endPos - pos);
       pos = endPos;
-
-      // Look up the class in CSS rules.
-      auto it = _cssClassRules.find(className);
-      if (it != _cssClassRules.end()) {
-        // Parse the style string to find the property we need.
-        const std::string& classStyle = it->second;
-        size_t stylePos = 0;
-        while (stylePos < classStyle.size()) {
-          // Skip whitespace.
-          while (stylePos < classStyle.size() && std::isspace(classStyle[stylePos])) {
-            stylePos++;
-          }
-          // Find property name end (colon).
-          size_t colonPos = classStyle.find(':', stylePos);
-          if (colonPos == std::string::npos) {
-            break;
-          }
-          // Extract property name and trim whitespace.
-          std::string currentProp = classStyle.substr(stylePos, colonPos - stylePos);
-          size_t propStart = currentProp.find_first_not_of(" \t");
-          size_t propEnd = currentProp.find_last_not_of(" \t");
-          if (propStart != std::string::npos && propEnd != std::string::npos) {
-            currentProp = currentProp.substr(propStart, propEnd - propStart + 1);
-          }
-          // Find value end (semicolon or end of string).
-          size_t semicolonPos = classStyle.find(';', colonPos);
-          if (semicolonPos == std::string::npos) {
-            semicolonPos = classStyle.size();
-          }
-          // Check if this is the property we're looking for.
-          if (currentProp == name) {
-            // Extract and trim the value.
-            std::string propValue = classStyle.substr(colonPos + 1, semicolonPos - colonPos - 1);
-            size_t valStart = propValue.find_first_not_of(" \t");
-            size_t valEnd = propValue.find_last_not_of(" \t");
-            if (valStart != std::string::npos && valEnd != std::string::npos) {
-              return propValue.substr(valStart, valEnd - valStart + 1);
-            }
-            return propValue;
-          }
-          // Move to next property.
-          stylePos = semicolonPos + 1;
-        }
+      auto classIt = _cssClassRules.find(className);
+      if (classIt != _cssClassRules.end()) {
+        ParseStyleString(classIt->second, cached);
       }
     }
+  }
+
+  // Style attribute (highest priority): overwrites class rules.
+  auto* stylePtr = node->findAttribute("style");
+  if (stylePtr && !stylePtr->empty()) {
+    ParseStyleString(*stylePtr, cached);
+  }
+
+  return cached;
+}
+
+std::string SVGParserContext::getAttribute(const std::shared_ptr<DOMNode>& node,
+                                        const std::string& name,
+                                        const std::string& defaultValue) {
+  // CSS priority: style attribute > presentation attribute > CSS class rules
+  // The cached style properties map merges both style attribute and class rules,
+  // with style attribute values overriding class rule values.
+  const auto& styleProps = getStyleProperties(node);
+  auto styleIt = styleProps.find(name);
+  if (styleIt != styleProps.end()) {
+    return styleIt->second;
+  }
+
+  // Fallback: check for direct attribute (presentation attribute).
+  auto* directValue = node->findAttribute(name);
+  if (directValue) {
+    return *directValue;
   }
 
   return defaultValue;
 }
 
-std::string SVGParserContext::getHrefAttribute(const std::shared_ptr<DOMNode>& node) const {
+std::string SVGParserContext::getHrefAttribute(const std::shared_ptr<DOMNode>& node) {
   auto href = getAttribute(node, "href");
   if (!href.empty()) {
     return href;
@@ -509,7 +478,10 @@ void SVGParserContext::parseStyleElement(const std::shared_ptr<DOMNode>& styleNo
 }
 
 Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
-                                                     const InheritedStyle& parentStyle) {
+                                                     const InheritedStyle& parentStyle, int depth) {
+  if (depth >= MAX_SVG_RECURSION_DEPTH) {
+    return nullptr;
+  }
   const auto& tag = element->name;
 
   if (tag == "defs" || tag == "linearGradient" || tag == "radialGradient" || tag == "pattern" ||
@@ -546,7 +518,7 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
 
   std::string opacity = getAttribute(element, "opacity");
   if (!opacity.empty()) {
-    layer->alpha = std::stof(opacity);
+    layer->alpha = strtof(opacity.c_str(), nullptr);
   }
 
   // Handle mask attribute.
@@ -632,7 +604,7 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
     // Group: convert children as child layers.
     auto child = element->getFirstChild();
     while (child) {
-      auto childLayer = convertToLayer(child, inheritedStyle);
+      auto childLayer = convertToLayer(child, inheritedStyle, depth + 1);
       if (childLayer) {
         layer->children.push_back(childLayer);
       }
@@ -853,7 +825,8 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
   if (fontSizeStr.empty()) {
     fontSizeStr = inheritedStyle.fontSize;
   }
-  float currentFontSize = fontSizeStr.empty() ? 16.0f : parseLength(fontSizeStr, _viewBoxHeight);
+  float currentFontSize =
+      fontSizeStr.empty() ? DEFAULT_FONT_SIZE : parseLength(fontSizeStr, _viewBoxHeight);
 
   // Parse dx/dy offsets. SVG dx/dy provide relative offsets to the text position.
   x += parseLengthEm(getAttribute(element, "dx"), _viewBoxWidth, currentFontSize);
@@ -993,6 +966,9 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
 Element* SVGParserContext::convertUse(
     const std::shared_ptr<DOMNode>& element) {
   std::string refId = resolveUrl(getHrefAttribute(element));
+  if (refId.empty() || _useStack.count(refId) > 0) {
+    return nullptr;
+  }
   auto it = _defs.find(refId);
   if (it == _defs.end()) {
     return nullptr;
@@ -1046,7 +1022,9 @@ Element* SVGParserContext::convertUse(
   }
 
   if (_options.expandUseReferences) {
+    _useStack.insert(refId);
     auto node = convertElement(it->second);
+    _useStack.erase(refId);
     if (node) {
       if (x != 0 || y != 0) {
         // Wrap in a group with translation.
@@ -1109,18 +1087,7 @@ LinearGradient* SVGParserContext::convertLinearGradient(
   }
 
   // Parse stops.
-  auto child = element->getFirstChild();
-  while (child) {
-    if (child->name == "stop") {
-      ColorStop stop;
-      stop.offset = parseLength(getAttribute(child, "offset", "0"), 1.0f);
-      stop.color = parseColor(getAttribute(child, "stop-color", "#000000"));
-      float opacity = parseLength(getAttribute(child, "stop-opacity", "1"), 1.0f);
-      stop.color.alpha = opacity;
-      gradient->colorStops.push_back(stop);
-    }
-    child = child->getNextSibling();
-  }
+  parseGradientStops(element, gradient->colorStops);
 
   return gradient;
 }
@@ -1165,6 +1132,13 @@ RadialGradient* SVGParserContext::convertRadialGradient(
   }
 
   // Parse stops.
+  parseGradientStops(element, gradient->colorStops);
+
+  return gradient;
+}
+
+void SVGParserContext::parseGradientStops(const std::shared_ptr<DOMNode>& element,
+                                          std::vector<ColorStop>& colorStops) {
   auto child = element->getFirstChild();
   while (child) {
     if (child->name == "stop") {
@@ -1173,12 +1147,10 @@ RadialGradient* SVGParserContext::convertRadialGradient(
       stop.color = parseColor(getAttribute(child, "stop-color", "#000000"));
       float opacity = parseLength(getAttribute(child, "stop-opacity", "1"), 1.0f);
       stop.color.alpha = opacity;
-      gradient->colorStops.push_back(stop);
+      colorStops.push_back(stop);
     }
     child = child->getNextSibling();
   }
-
-  return gradient;
 }
 
 ImagePattern* SVGParserContext::convertPattern(
@@ -1321,7 +1293,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       solidColor->color = {0, 0, 0, 1, ColorSpace::SRGB};
       fillNode->color = solidColor;
       contents.push_back(fillNode);
-    } else if (fill.find("url(") == 0) {
+    } else if (fill.compare(0, 4, "url(") == 0) {
       auto fillNode = _document->makeNode<Fill>();
       std::string refId = resolveUrl(fill);
       // Use getColorSourceForRef which handles reference counting.
@@ -1336,7 +1308,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
         fillOpacity = inheritedStyle.fillOpacity;
       }
       if (!fillOpacity.empty()) {
-        fillNode->alpha = std::stof(fillOpacity);
+        fillNode->alpha = strtof(fillOpacity.c_str(), nullptr);
       }
       contents.push_back(fillNode);
     } else {
@@ -1348,7 +1320,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
         fillOpacity = inheritedStyle.fillOpacity;
       }
       if (!fillOpacity.empty()) {
-        fillNode->alpha = std::stof(fillOpacity);
+        fillNode->alpha = strtof(fillOpacity.c_str(), nullptr);
       }
 
       // Convert color to SolidColor for PAGX compatibility.
@@ -1394,7 +1366,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
 
     auto strokeNode = _document->makeNode<Stroke>();
 
-    if (stroke.find("url(") == 0) {
+    if (stroke.compare(0, 4, "url(") == 0) {
       std::string refId = resolveUrl(stroke);
       // Use getColorSourceForRef which handles reference counting.
       if (!boundsComputed) {
@@ -1409,7 +1381,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
         strokeOpacity = inheritedStyle.strokeOpacity;
       }
       if (!strokeOpacity.empty()) {
-        strokeNode->alpha = std::stof(strokeOpacity);
+        strokeNode->alpha = strtof(strokeOpacity.c_str(), nullptr);
       }
 
       // Convert color to SolidColor for PAGX compatibility.
@@ -1443,7 +1415,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       strokeMiterlimit = inheritedStyle.strokeMiterlimit;
     }
     if (!strokeMiterlimit.empty()) {
-      strokeNode->miterLimit = std::stof(strokeMiterlimit);
+      strokeNode->miterLimit = strtof(strokeMiterlimit.c_str(), nullptr);
     }
 
     std::string dashArray = getAttribute(element, "stroke-dasharray");
@@ -1480,6 +1452,17 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
 }
 
 Rect SVGParserContext::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
+  auto cacheIt = _shapeBoundsCache.find(element.get());
+  if (cacheIt != _shapeBoundsCache.end()) {
+    return cacheIt->second;
+  }
+
+  auto bounds = computeShapeBounds(element);
+  _shapeBoundsCache[element.get()] = bounds;
+  return bounds;
+}
+
+Rect SVGParserContext::computeShapeBounds(const std::shared_ptr<DOMNode>& element) {
   const auto& tag = element->name;
 
   if (tag == "rect") {
@@ -1576,7 +1559,7 @@ static float ReadNumber(const char*& ptr, const char* end) {
   if (start == ptr) {
     return 0.0f;
   }
-  return std::stof(std::string(start, ptr));
+  return strtof(start, nullptr);
 }
 
 Matrix SVGParserContext::parseTransform(const std::string& value) {
@@ -1594,10 +1577,11 @@ Matrix SVGParserContext::parseTransform(const std::string& value) {
       break;
     }
 
-    std::string func;
+    const char* funcStart = ptr;
     while (ptr < end && std::isalpha(*ptr)) {
-      func += *ptr++;
+      ++ptr;
     }
+    size_t funcLen = static_cast<size_t>(ptr - funcStart);
 
     SkipWhitespace(ptr, end);
     if (ptr >= end || *ptr != '(') {
@@ -1607,7 +1591,7 @@ Matrix SVGParserContext::parseTransform(const std::string& value) {
 
     Matrix m = Matrix::Identity();
 
-    if (func == "translate") {
+    if (funcLen == 9 && memcmp(funcStart, "translate", 9) == 0) {
       float tx = ReadNumber(ptr, end);
       SkipWhitespace(ptr, end);
       float ty = 0;
@@ -1615,7 +1599,7 @@ Matrix SVGParserContext::parseTransform(const std::string& value) {
         ty = ReadNumber(ptr, end);
       }
       m = Matrix::Translate(tx, ty);
-    } else if (func == "scale") {
+    } else if (funcLen == 5 && memcmp(funcStart, "scale", 5) == 0) {
       float sx = ReadNumber(ptr, end);
       SkipWhitespace(ptr, end);
       float sy = sx;
@@ -1623,7 +1607,7 @@ Matrix SVGParserContext::parseTransform(const std::string& value) {
         sy = ReadNumber(ptr, end);
       }
       m = Matrix::Scale(sx, sy);
-    } else if (func == "rotate") {
+    } else if (funcLen == 6 && memcmp(funcStart, "rotate", 6) == 0) {
       float angle = ReadNumber(ptr, end);
       SkipWhitespace(ptr, end);
       if (ptr < end && *ptr != ')') {
@@ -1633,15 +1617,15 @@ Matrix SVGParserContext::parseTransform(const std::string& value) {
       } else {
         m = Matrix::Rotate(angle);
       }
-    } else if (func == "skewX") {
+    } else if (funcLen == 5 && memcmp(funcStart, "skewX", 5) == 0) {
       float angle = ReadNumber(ptr, end);
       float radians = angle * 3.14159265358979323846f / 180.0f;
       m.c = std::tan(radians);
-    } else if (func == "skewY") {
+    } else if (funcLen == 5 && memcmp(funcStart, "skewY", 5) == 0) {
       float angle = ReadNumber(ptr, end);
       float radians = angle * 3.14159265358979323846f / 180.0f;
       m.b = std::tan(radians);
-    } else if (func == "matrix") {
+    } else if (funcLen == 6 && memcmp(funcStart, "matrix", 6) == 0) {
       m.a = ReadNumber(ptr, end);
       m.b = ReadNumber(ptr, end);
       m.c = ReadNumber(ptr, end);
@@ -1675,20 +1659,25 @@ static Color ParseCSSColorFunction(const std::string& value) {
 
   // Detect color space identifier.
   ColorSpace colorSpace = ColorSpace::SRGB;
-  if (inner.find("display-p3") == 0) {
+  if (inner.compare(0, 10, "display-p3") == 0) {
     colorSpace = ColorSpace::DisplayP3;
     inner = inner.substr(10);
-  } else if (inner.find("a98-rgb") == 0) {
+  } else if (inner.compare(0, 7, "a98-rgb") == 0) {
     inner = inner.substr(7);
-  } else if (inner.find("rec2020") == 0) {
+  } else if (inner.compare(0, 7, "rec2020") == 0) {
     inner = inner.substr(7);
-  } else if (inner.find("srgb") == 0) {
+  } else if (inner.compare(0, 4, "srgb") == 0) {
     inner = inner.substr(4);
   }
 
   // Trim whitespace after color space name.
   inner.erase(0, inner.find_first_not_of(" \t"));
-  inner.erase(inner.find_last_not_of(" \t") + 1);
+  auto lastNonSpace = inner.find_last_not_of(" \t");
+  if (lastNonSpace != std::string::npos) {
+    inner.erase(lastNonSpace + 1);
+  } else {
+    inner.clear();
+  }
 
   // Parse space-separated values and optional "/ alpha".
   std::vector<float> components;
@@ -1740,22 +1729,22 @@ Color SVGParserContext::parseColor(const std::string& value) {
       char r = value[1];
       char g = value[2];
       char b = value[3];
-      std::string expanded = std::string() + r + r + g + g + b + b;
-      hex = std::stoul(expanded, nullptr, 16);
+      char expanded[7] = {r, r, g, g, b, b, '\0'};
+      hex = strtoul(expanded, nullptr, 16);
       color.red = static_cast<float>((hex >> 16) & 0xFF) / 255.0f;
       color.green = static_cast<float>((hex >> 8) & 0xFF) / 255.0f;
       color.blue = static_cast<float>(hex & 0xFF) / 255.0f;
       color.alpha = 1.0f;
       return color;
     } else if (value.length() == 7) {
-      hex = std::stoul(value.substr(1), nullptr, 16);
+      hex = strtoul(value.c_str() + 1, nullptr, 16);
       color.red = static_cast<float>((hex >> 16) & 0xFF) / 255.0f;
       color.green = static_cast<float>((hex >> 8) & 0xFF) / 255.0f;
       color.blue = static_cast<float>(hex & 0xFF) / 255.0f;
       color.alpha = 1.0f;
       return color;
     } else if (value.length() == 9) {
-      hex = std::stoul(value.substr(1), nullptr, 16);
+      hex = strtoul(value.c_str() + 1, nullptr, 16);
       color.red = static_cast<float>((hex >> 24) & 0xFF) / 255.0f;
       color.green = static_cast<float>((hex >> 16) & 0xFF) / 255.0f;
       color.blue = static_cast<float>((hex >> 8) & 0xFF) / 255.0f;
@@ -1764,7 +1753,7 @@ Color SVGParserContext::parseColor(const std::string& value) {
     }
   }
 
-  if (value.find("rgb") == 0) {
+  if (value.compare(0, 3, "rgb") == 0) {
     size_t start = value.find('(');
     size_t end = value.find(')');
     if (start != std::string::npos && end != std::string::npos) {
@@ -1784,7 +1773,7 @@ Color SVGParserContext::parseColor(const std::string& value) {
   }
 
   // CSS Color Level 4: color(display-p3 r g b) or color(display-p3 r g b / a)
-  if (value.find("color(") == 0) {
+  if (value.compare(0, 6, "color(") == 0) {
     auto color = ParseCSSColorFunction(value);
     if (color.alpha >= 0) {
       return color;
@@ -1979,11 +1968,11 @@ std::string SVGParserContext::colorToHex(const std::string& value) {
     return value;
   }
   // url() references should be returned as-is.
-  if (value.find("url(") == 0) {
+  if (value.compare(0, 4, "url(") == 0) {
     return value;
   }
   // CSS Color Level 4: color(display-p3 r g b) -> p3(r, g, b)
-  if (value.find("color(") == 0) {
+  if (value.compare(0, 6, "color(") == 0) {
     auto color = ParseCSSColorFunction(value);
     if (color.alpha >= 0 && color.colorSpace == ColorSpace::DisplayP3) {
       char buf[64] = {};
@@ -2008,10 +1997,13 @@ float SVGParserContext::parseLength(const std::string& value, float containerSiz
     return 0;
   }
 
-  size_t idx = 0;
-  float num = std::stof(value, &idx);
+  char* endPtr = nullptr;
+  float num = strtof(value.c_str(), &endPtr);
+  if (endPtr == value.c_str()) {
+    return 0;
+  }
 
-  std::string unit = value.substr(idx);
+  std::string unit(endPtr);
   if (unit == "%") {
     return num / 100.0f * containerSize;
   }
@@ -2022,7 +2014,7 @@ float SVGParserContext::parseLength(const std::string& value, float containerSiz
     return num * 1.333333f;
   }
   if (unit == "em" || unit == "rem") {
-    return num * 16.0f;  // Assume 16px base font.
+    return num * DEFAULT_FONT_SIZE;
   }
   if (unit == "in") {
     return num * 96.0f;
@@ -2042,9 +2034,12 @@ float SVGParserContext::parseLengthEm(const std::string& value, float containerS
   if (value.empty()) {
     return 0;
   }
-  size_t idx = 0;
-  float num = std::stof(value, &idx);
-  std::string unit = value.substr(idx);
+  char* endPtr = nullptr;
+  float num = strtof(value.c_str(), &endPtr);
+  if (endPtr == value.c_str()) {
+    return 0;
+  }
+  std::string unit(endPtr);
   if (unit == "em" || unit == "rem") {
     return num * fontSize;
   }
@@ -2055,7 +2050,7 @@ std::vector<float> SVGParserContext::parseViewBox(const std::string& value) {
   if (value.empty()) {
     return {};
   }
-  return ParseSpaceSeparatedFloats(value);
+  return ParseFloatList(value);
 }
 
 PathData SVGParserContext::parsePoints(const std::string& value, bool closed) {
@@ -2103,7 +2098,7 @@ std::string SVGParserContext::resolveUrl(const std::string& url) {
     return "";
   }
   // Handle url(#id) format.
-  if (url.find("url(") == 0) {
+  if (url.compare(0, 4, "url(") == 0) {
     size_t start = url.find('#');
     size_t end = url.find(')');
     if (start != std::string::npos && end != std::string::npos) {
@@ -2269,6 +2264,42 @@ void SVGParserContext::mergeAdjacentLayers(std::vector<Layer*>& layers) {
   layers = std::move(merged);
 }
 
+void SVGParserContext::parseMaskChildren(const std::shared_ptr<DOMNode>& parent,
+                                         Layer* maskLayer,
+                                         const InheritedStyle& parentStyle,
+                                         const Matrix& parentMatrix) {
+  auto child = parent->getFirstChild();
+  while (child) {
+    if (child->name == "rect" || child->name == "circle" || child->name == "ellipse" ||
+        child->name == "path" || child->name == "polygon" || child->name == "polyline") {
+      InheritedStyle inheritedStyle = computeInheritedStyle(child, parentStyle);
+      std::string transformStr = getAttribute(child, "transform");
+      Matrix combinedMatrix = parentMatrix;
+      if (!transformStr.empty()) {
+        combinedMatrix = combinedMatrix * parseTransform(transformStr);
+      }
+      bool hasTransform = !combinedMatrix.isIdentity();
+      if (hasTransform) {
+        auto subLayer = _document->makeNode<Layer>();
+        subLayer->matrix = combinedMatrix;
+        convertChildren(child, subLayer->contents, inheritedStyle);
+        maskLayer->children.push_back(subLayer);
+      } else {
+        convertChildren(child, maskLayer->contents, inheritedStyle);
+      }
+    } else if (child->name == "g") {
+      InheritedStyle inheritedStyle = computeInheritedStyle(child, parentStyle);
+      std::string groupTransform = getAttribute(child, "transform");
+      Matrix combinedMatrix = parentMatrix;
+      if (!groupTransform.empty()) {
+        combinedMatrix = combinedMatrix * parseTransform(groupTransform);
+      }
+      parseMaskChildren(child, maskLayer, inheritedStyle, combinedMatrix);
+    }
+    child = child->getNextSibling();
+  }
+}
+
 Layer* SVGParserContext::convertMaskElement(
     const std::shared_ptr<DOMNode>& maskElement, const InheritedStyle& parentStyle) {
   auto maskLayer = _document->makeNode<Layer>();
@@ -2279,52 +2310,52 @@ Layer* SVGParserContext::convertMaskElement(
   // Compute inherited style from the mask element itself (it may have fill="white" etc.).
   InheritedStyle maskStyle = computeInheritedStyle(maskElement, parentStyle);
 
-  // Parse mask contents.
-  auto child = maskElement->getFirstChild();
-  while (child) {
-    if (child->name == "rect" || child->name == "circle" || child->name == "ellipse" ||
-        child->name == "path" || child->name == "polygon" || child->name == "polyline") {
-      InheritedStyle inheritedStyle = computeInheritedStyle(child, maskStyle);
-      std::string transformStr = getAttribute(child, "transform");
-      if (!transformStr.empty()) {
-        // If child has transform, wrap it in a sub-layer with the matrix.
-        auto subLayer = _document->makeNode<Layer>();
-        subLayer->matrix = parseTransform(transformStr);
-        convertChildren(child, subLayer->contents, inheritedStyle);
-        maskLayer->children.push_back(subLayer);
-      } else {
-        convertChildren(child, maskLayer->contents, inheritedStyle);
-      }
-    } else if (child->name == "g") {
-      // Handle group inside mask.
-      InheritedStyle inheritedStyle = computeInheritedStyle(child, maskStyle);
-      std::string groupTransform = getAttribute(child, "transform");
-      auto groupChild = child->getFirstChild();
-      while (groupChild) {
-        std::string childTransform = getAttribute(groupChild, "transform");
-        // Combine group transform and child transform if needed.
-        if (!groupTransform.empty() || !childTransform.empty()) {
-          auto subLayer = _document->makeNode<Layer>();
-          Matrix combinedMatrix = Matrix::Identity();
-          if (!groupTransform.empty()) {
-            combinedMatrix = parseTransform(groupTransform);
-          }
-          if (!childTransform.empty()) {
-            combinedMatrix = combinedMatrix * parseTransform(childTransform);
-          }
-          subLayer->matrix = combinedMatrix;
-          convertChildren(groupChild, subLayer->contents, inheritedStyle);
-          maskLayer->children.push_back(subLayer);
-        } else {
-          convertChildren(groupChild, maskLayer->contents, inheritedStyle);
-        }
-        groupChild = groupChild->getNextSibling();
-      }
-    }
-    child = child->getNextSibling();
-  }
+  // Parse mask contents recursively.
+  parseMaskChildren(maskElement, maskLayer, maskStyle, Matrix::Identity());
 
   return maskLayer;
+}
+
+std::pair<float, float> SVGParserContext::parseFilterOffset(const std::shared_ptr<DOMNode>& node) {
+  std::string dx = getAttribute(node, "dx", "0");
+  std::string dy = getAttribute(node, "dy", "0");
+  return {strtof(dx.c_str(), nullptr), strtof(dy.c_str(), nullptr)};
+}
+
+std::pair<float, float> SVGParserContext::parseFilterBlur(const std::shared_ptr<DOMNode>& node) {
+  std::string stdDeviation = getAttribute(node, "stdDeviation", "0");
+  auto values = ParseFloatList(stdDeviation);
+  float blurX = values.empty() ? 0 : values[0];
+  float blurY = values.size() > 1 ? values[1] : blurX;
+  return {blurX, blurY};
+}
+
+Color SVGParserContext::parseFilterColorMatrix(const std::shared_ptr<DOMNode>& node) {
+  Color color = {0, 0, 0, 1.0f};
+  std::string colorMatrix = getAttribute(node, "values");
+  if (!colorMatrix.empty()) {
+    auto values = ParseFloatList(colorMatrix);
+    if (values.size() >= 19) {
+      color.red = values[4];
+      color.green = values[9];
+      color.blue = values[14];
+      color.alpha = values[18];
+    }
+  }
+  return color;
+}
+
+DropShadowFilter* SVGParserContext::createDropShadow(float offsetX, float offsetY, float blurX,
+                                                     float blurY, const Color& color,
+                                                     bool shadowOnly) {
+  auto dropShadow = _document->makeNode<DropShadowFilter>();
+  dropShadow->offsetX = offsetX;
+  dropShadow->offsetY = offsetY;
+  dropShadow->blurX = blurX;
+  dropShadow->blurY = blurY;
+  dropShadow->color = color;
+  dropShadow->shadowOnly = shadowOnly;
+  return dropShadow;
 }
 
 bool SVGParserContext::convertFilterElement(
@@ -2353,8 +2384,6 @@ bool SVGParserContext::convertFilterElement(
   // If filter only produces shadow without merging with original content,
   // we should set shadowOnly=true.
   bool shadowOnly = !hasMerge;
-  // Track what type of shadow-only filter was converted for output.
-  ShadowOnlyType detectedShadowType = ShadowOnlyType::None;
 
   // Detect Figma-style drop shadow pattern and extract shadow parameters.
   // Pattern: feColorMatrix(in=SourceAlpha) → feOffset → feGaussianBlur → feComposite → feColorMatrix
@@ -2375,42 +2404,11 @@ bool SVGParserContext::convertFilterElement(
       if (i + 4 < primitives.size() && primitives[i + 1]->name == "feOffset" &&
           primitives[i + 2]->name == "feGaussianBlur" &&
           primitives[i + 3]->name == "feComposite" && primitives[i + 4]->name == "feColorMatrix") {
-        // Extract offset from feOffset.
-        float offsetX = 0, offsetY = 0;
-        std::string dx = getAttribute(primitives[i + 1], "dx", "0");
-        std::string dy = getAttribute(primitives[i + 1], "dy", "0");
-        offsetX = strtof(dx.c_str(), nullptr);
-        offsetY = strtof(dy.c_str(), nullptr);
+        auto [offsetX, offsetY] = parseFilterOffset(primitives[i + 1]);
+        auto [blurX, blurY] = parseFilterBlur(primitives[i + 2]);
+        auto shadowColor = parseFilterColorMatrix(primitives[i + 4]);
 
-        // Extract blur from feGaussianBlur.
-        std::string stdDeviation = getAttribute(primitives[i + 2], "stdDeviation", "0");
-        auto blurValues = ParseSpaceSeparatedFloats(stdDeviation);
-        float blurX = blurValues.empty() ? 0 : blurValues[0];
-        float blurY = blurValues.size() > 1 ? blurValues[1] : blurX;
-
-        // Extract color from the second feColorMatrix.
-        // Format: "0 0 0 0 R 0 0 0 0 G 0 0 0 0 B 0 0 0 A 0" where R,G,B are 0-1 and A is alpha.
-        Color shadowColor = {0, 0, 0, 1.0f};
-        std::string colorMatrix = getAttribute(primitives[i + 4], "values");
-        if (!colorMatrix.empty()) {
-          auto values = ParseSpaceSeparatedFloats(colorMatrix);
-          // R is at index 4, G at index 9, B at index 14, A at index 18.
-          if (values.size() >= 19) {
-            shadowColor.red = values[4];
-            shadowColor.green = values[9];
-            shadowColor.blue = values[14];
-            shadowColor.alpha = values[18];
-          }
-        }
-
-        auto dropShadow = _document->makeNode<DropShadowFilter>();
-        dropShadow->offsetX = offsetX;
-        dropShadow->offsetY = offsetY;
-        dropShadow->blurX = blurX;
-        dropShadow->blurY = blurY;
-        dropShadow->color = shadowColor;
-        dropShadow->shadowOnly = shadowOnly;
-        filters.push_back(dropShadow);
+        filters.push_back(createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
 
         // Skip the consumed primitives (5 elements) plus the feBlend that follows.
         i += 5;
@@ -2425,40 +2423,11 @@ bool SVGParserContext::convertFilterElement(
       // This is common in Figma exports with multiple shadows.
       if (i + 3 < primitives.size() && primitives[i + 1]->name == "feOffset" &&
           primitives[i + 2]->name == "feGaussianBlur" && primitives[i + 3]->name == "feColorMatrix") {
-        // Extract offset from feOffset.
-        float offsetX = 0, offsetY = 0;
-        std::string dx = getAttribute(primitives[i + 1], "dx", "0");
-        std::string dy = getAttribute(primitives[i + 1], "dy", "0");
-        offsetX = strtof(dx.c_str(), nullptr);
-        offsetY = strtof(dy.c_str(), nullptr);
+        auto [offsetX, offsetY] = parseFilterOffset(primitives[i + 1]);
+        auto [blurX, blurY] = parseFilterBlur(primitives[i + 2]);
+        auto shadowColor = parseFilterColorMatrix(primitives[i + 3]);
 
-        // Extract blur from feGaussianBlur.
-        std::string stdDeviation = getAttribute(primitives[i + 2], "stdDeviation", "0");
-        auto blurValues = ParseSpaceSeparatedFloats(stdDeviation);
-        float blurX = blurValues.empty() ? 0 : blurValues[0];
-        float blurY = blurValues.size() > 1 ? blurValues[1] : blurX;
-
-        // Extract color from feColorMatrix.
-        Color shadowColor = {0, 0, 0, 1.0f};
-        std::string colorMatrix = getAttribute(primitives[i + 3], "values");
-        if (!colorMatrix.empty()) {
-          auto values = ParseSpaceSeparatedFloats(colorMatrix);
-          if (values.size() >= 19) {
-            shadowColor.red = values[4];
-            shadowColor.green = values[9];
-            shadowColor.blue = values[14];
-            shadowColor.alpha = values[18];
-          }
-        }
-
-        auto dropShadow = _document->makeNode<DropShadowFilter>();
-        dropShadow->offsetX = offsetX;
-        dropShadow->offsetY = offsetY;
-        dropShadow->blurX = blurX;
-        dropShadow->blurY = blurY;
-        dropShadow->color = shadowColor;
-        dropShadow->shadowOnly = shadowOnly;
-        filters.push_back(dropShadow);
+        filters.push_back(createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
 
         // Skip the consumed primitives (4 elements) plus the feBlend that follows.
         i += 4;
@@ -2473,36 +2442,10 @@ bool SVGParserContext::convertFilterElement(
       // This creates a solid shadow without blur effect.
       if (i + 2 < primitives.size() && primitives[i + 1]->name == "feOffset" &&
           primitives[i + 2]->name == "feColorMatrix") {
-        // Extract offset from feOffset.
-        float offsetX = 0, offsetY = 0;
-        std::string dx = getAttribute(primitives[i + 1], "dx", "0");
-        std::string dy = getAttribute(primitives[i + 1], "dy", "0");
-        offsetX = strtof(dx.c_str(), nullptr);
-        offsetY = strtof(dy.c_str(), nullptr);
+        auto [offsetX, offsetY] = parseFilterOffset(primitives[i + 1]);
+        auto shadowColor = parseFilterColorMatrix(primitives[i + 2]);
 
-        // Extract color from feColorMatrix.
-        // Format: "0 0 0 0 R 0 0 0 0 G 0 0 0 0 B 0 0 0 A 0" where R,G,B are 0-1 and A is alpha.
-        Color shadowColor = {0, 0, 0, 1.0f};
-        std::string colorMatrix = getAttribute(primitives[i + 2], "values");
-        if (!colorMatrix.empty()) {
-          auto values = ParseSpaceSeparatedFloats(colorMatrix);
-          // R is at index 4, G at index 9, B at index 14, A at index 18.
-          if (values.size() >= 19) {
-            shadowColor.red = values[4];
-            shadowColor.green = values[9];
-            shadowColor.blue = values[14];
-            shadowColor.alpha = values[18];
-          }
-        }
-
-        auto dropShadow = _document->makeNode<DropShadowFilter>();
-        dropShadow->offsetX = offsetX;
-        dropShadow->offsetY = offsetY;
-        dropShadow->blurX = 0;
-        dropShadow->blurY = 0;
-        dropShadow->color = shadowColor;
-        dropShadow->shadowOnly = shadowOnly;
-        filters.push_back(dropShadow);
+        filters.push_back(createDropShadow(offsetX, offsetY, 0, 0, shadowColor, shadowOnly));
 
         // Skip the consumed primitives (3 elements) plus any feBlend that follows.
         i += 3;
@@ -2531,34 +2474,15 @@ bool SVGParserContext::convertFilterElement(
 
         if (isInnerShadow) {
           // Convert inner shadow pattern to InnerShadowFilter.
-          // Extract blur from feGaussianBlur.
-          std::string stdDeviation = getAttribute(node, "stdDeviation", "0");
-          auto blurValues = ParseSpaceSeparatedFloats(stdDeviation);
-          float blurX = blurValues.empty() ? 0 : blurValues[0];
-          float blurY = blurValues.size() > 1 ? blurValues[1] : blurX;
-
-          // Extract offset from feOffset.
-          float offsetX = 0, offsetY = 0;
-          std::string dx = getAttribute(primitives[i + 1], "dx", "0");
-          std::string dy = getAttribute(primitives[i + 1], "dy", "0");
-          offsetX = strtof(dx.c_str(), nullptr);
-          offsetY = strtof(dy.c_str(), nullptr);
+          auto [blurX, blurY] = parseFilterBlur(node);
+          auto [offsetX, offsetY] = parseFilterOffset(primitives[i + 1]);
 
           // Look for feColorMatrix after feComposite for shadow color.
           Color shadowColor = {0, 0, 0, 1.0f};
           size_t colorMatrixIdx = i + 3;
           if (colorMatrixIdx < primitives.size() &&
               primitives[colorMatrixIdx]->name == "feColorMatrix") {
-            std::string colorMatrix = getAttribute(primitives[colorMatrixIdx], "values");
-            if (!colorMatrix.empty()) {
-              auto values = ParseSpaceSeparatedFloats(colorMatrix);
-              if (values.size() >= 19) {
-                shadowColor.red = values[4];
-                shadowColor.green = values[9];
-                shadowColor.blue = values[14];
-                shadowColor.alpha = values[18];
-              }
-            }
+            shadowColor = parseFilterColorMatrix(primitives[colorMatrixIdx]);
           }
 
           auto innerShadow = _document->makeNode<InnerShadowFilter>();
@@ -2578,43 +2502,17 @@ bool SVGParserContext::convertFilterElement(
           continue;
         }
 
-        // Extract blur from feGaussianBlur.
-        std::string stdDeviation = getAttribute(node, "stdDeviation", "0");
-        auto blurValues = ParseSpaceSeparatedFloats(stdDeviation);
-        float blurX = blurValues.empty() ? 0 : blurValues[0];
-        float blurY = blurValues.size() > 1 ? blurValues[1] : blurX;
-
-        // Extract offset from feOffset.
-        float offsetX = 0, offsetY = 0;
-        std::string dx = getAttribute(primitives[i + 1], "dx", "0");
-        std::string dy = getAttribute(primitives[i + 1], "dy", "0");
-        offsetX = strtof(dx.c_str(), nullptr);
-        offsetY = strtof(dy.c_str(), nullptr);
+        auto [blurX, blurY] = parseFilterBlur(node);
+        auto [offsetX, offsetY] = parseFilterOffset(primitives[i + 1]);
 
         // Look for feColorMatrix after feOffset for shadow color.
         Color shadowColor = {0, 0, 0, 1.0f};
         size_t colorMatrixIdx = i + 2;
         if (colorMatrixIdx < primitives.size() && primitives[colorMatrixIdx]->name == "feColorMatrix") {
-          std::string colorMatrix = getAttribute(primitives[colorMatrixIdx], "values");
-          if (!colorMatrix.empty()) {
-            auto values = ParseSpaceSeparatedFloats(colorMatrix);
-            if (values.size() >= 19) {
-              shadowColor.red = values[4];
-              shadowColor.green = values[9];
-              shadowColor.blue = values[14];
-              shadowColor.alpha = values[18];
-            }
-          }
+          shadowColor = parseFilterColorMatrix(primitives[colorMatrixIdx]);
         }
 
-        auto dropShadow = _document->makeNode<DropShadowFilter>();
-        dropShadow->offsetX = offsetX;
-        dropShadow->offsetY = offsetY;
-        dropShadow->blurX = blurX;
-        dropShadow->blurY = blurY;
-        dropShadow->color = shadowColor;
-        dropShadow->shadowOnly = shadowOnly;
-        filters.push_back(dropShadow);
+        filters.push_back(createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
 
         // Skip consumed primitives.
         i += 2;
@@ -2630,43 +2528,17 @@ bool SVGParserContext::convertFilterElement(
     if (node->name == "feOffset" && getAttribute(node, "in") == "SourceAlpha") {
       // Look for feGaussianBlur following.
       if (i + 1 < primitives.size() && primitives[i + 1]->name == "feGaussianBlur") {
-        // Extract offset from feOffset.
-        float offsetX = 0, offsetY = 0;
-        std::string dx = getAttribute(node, "dx", "0");
-        std::string dy = getAttribute(node, "dy", "0");
-        offsetX = strtof(dx.c_str(), nullptr);
-        offsetY = strtof(dy.c_str(), nullptr);
-
-        // Extract blur from feGaussianBlur.
-        std::string stdDeviation = getAttribute(primitives[i + 1], "stdDeviation", "0");
-        auto blurValues = ParseSpaceSeparatedFloats(stdDeviation);
-        float blurX = blurValues.empty() ? 0 : blurValues[0];
-        float blurY = blurValues.size() > 1 ? blurValues[1] : blurX;
+        auto [offsetX, offsetY] = parseFilterOffset(node);
+        auto [blurX, blurY] = parseFilterBlur(primitives[i + 1]);
 
         // Look for feColorMatrix after feGaussianBlur for shadow color.
         Color shadowColor = {0, 0, 0, 1.0f};
         size_t colorMatrixIdx = i + 2;
         if (colorMatrixIdx < primitives.size() && primitives[colorMatrixIdx]->name == "feColorMatrix") {
-          std::string colorMatrix = getAttribute(primitives[colorMatrixIdx], "values");
-          if (!colorMatrix.empty()) {
-            auto values = ParseSpaceSeparatedFloats(colorMatrix);
-            if (values.size() >= 19) {
-              shadowColor.red = values[4];
-              shadowColor.green = values[9];
-              shadowColor.blue = values[14];
-              shadowColor.alpha = values[18];
-            }
-          }
+          shadowColor = parseFilterColorMatrix(primitives[colorMatrixIdx]);
         }
 
-        auto dropShadow = _document->makeNode<DropShadowFilter>();
-        dropShadow->offsetX = offsetX;
-        dropShadow->offsetY = offsetY;
-        dropShadow->blurX = blurX;
-        dropShadow->blurY = blurY;
-        dropShadow->color = shadowColor;
-        dropShadow->shadowOnly = shadowOnly;
-        filters.push_back(dropShadow);
+        filters.push_back(createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
 
         // Skip consumed primitives.
         i += 2;
@@ -2696,10 +2568,7 @@ bool SVGParserContext::convertFilterElement(
       }
 
       if (isSourceGraphic) {
-        std::string stdDeviation = getAttribute(node, "stdDeviation", "0");
-        auto devValues = ParseSpaceSeparatedFloats(stdDeviation);
-        float devX = devValues.empty() ? 0 : devValues[0];
-        float devY = devValues.size() > 1 ? devValues[1] : devX;
+        auto [devX, devY] = parseFilterBlur(node);
         auto blurFilter = _document->makeNode<BlurFilter>();
         blurFilter->blurX = devX;
         blurFilter->blurY = devY;
@@ -2738,8 +2607,9 @@ void SVGParserContext::collectAllIds(const std::shared_ptr<DOMNode>& node) {
   }
 
   // Collect id from this node.
-  auto [found, id] = node->findAttribute("id");
-  if (found && !id.empty()) {
+  auto* idPtr = node->findAttribute("id");
+  if (idPtr && !idPtr->empty()) {
+    const std::string& id = *idPtr;
     _existingIds.insert(id);
     // Also collect referenceable elements (mask, clipPath, filter, etc.) to _defs,
     // even if they are defined inline (not inside <defs>).
@@ -2793,37 +2663,26 @@ void SVGParserContext::countColorSourceReferences(const std::shared_ptr<DOMNode>
   }
 }
 
+void SVGParserContext::countUrlReference(const std::string& attrValue) {
+  if (!attrValue.empty() && attrValue.compare(0, 4, "url(") == 0) {
+    std::string refId = resolveUrl(attrValue);
+    auto it = _defs.find(refId);
+    if (it != _defs.end()) {
+      const auto& defName = it->second->name;
+      if (defName == "linearGradient" || defName == "radialGradient" || defName == "pattern") {
+        _colorSourceRefCount[refId]++;
+      }
+    }
+  }
+}
+
 void SVGParserContext::countColorSourceReferencesInElement(const std::shared_ptr<DOMNode>& element) {
   if (!element) {
     return;
   }
 
-  // Check fill attribute for url() references.
-  std::string fill = getAttribute(element, "fill");
-  if (!fill.empty() && fill.find("url(") == 0) {
-    std::string refId = resolveUrl(fill);
-    auto it = _defs.find(refId);
-    if (it != _defs.end()) {
-      // Only count gradients and patterns, not masks/clipPaths/filters.
-      const auto& defName = it->second->name;
-      if (defName == "linearGradient" || defName == "radialGradient" || defName == "pattern") {
-        _colorSourceRefCount[refId]++;
-      }
-    }
-  }
-
-  // Check stroke attribute for url() references.
-  std::string stroke = getAttribute(element, "stroke");
-  if (!stroke.empty() && stroke.find("url(") == 0) {
-    std::string refId = resolveUrl(stroke);
-    auto it = _defs.find(refId);
-    if (it != _defs.end()) {
-      const auto& defName = it->second->name;
-      if (defName == "linearGradient" || defName == "radialGradient" || defName == "pattern") {
-        _colorSourceRefCount[refId]++;
-      }
-    }
-  }
+  countUrlReference(getAttribute(element, "fill"));
+  countUrlReference(getAttribute(element, "stroke"));
 
   // Recurse into children.
   auto child = element->getFirstChild();
@@ -2854,81 +2713,15 @@ ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
     refCount = countIt->second;
   }
 
-  // If refCount > 1, we need to create/reuse a resource with an ID.
+  // If refCount > 1, check if we already created a resource for this ref.
   if (refCount > 1) {
-    // Check if we already created a resource for this ref.
-    auto idIt = _colorSourceIdMap.find(refId);
-    if (idIt != _colorSourceIdMap.end()) {
-      // Return a new ColorSource instance that references the existing resource.
-      // The caller should check if colorSource->id is non-empty to know it's a reference.
-      // We need to create a "stub" ColorSource with just the id set.
-      // Actually, the PAGXExporter uses colorSource->id to determine if it's a reference.
-      // So we create a new instance with just the id filled in.
-      
-      // For proper behavior, we create a copy of the cached ColorSource with the same id.
-      auto cacheIt = _colorSourceCache.find(refId);
-      if (cacheIt != _colorSourceCache.end()) {
-        // Clone the cached ColorSource
-        ColorSource* cached = cacheIt->second;
-        if (defName == "linearGradient") {
-          auto grad = _document->makeNode<LinearGradient>();
-          auto* src = static_cast<LinearGradient*>(cached);
-          grad->id = src->id;
-          grad->startPoint = src->startPoint;
-          grad->endPoint = src->endPoint;
-          grad->matrix = src->matrix;
-          grad->colorStops = src->colorStops;
-          return grad;
-        } else if (defName == "radialGradient") {
-          auto grad = _document->makeNode<RadialGradient>();
-          auto* src = static_cast<RadialGradient*>(cached);
-          grad->id = src->id;
-          grad->center = src->center;
-          grad->radius = src->radius;
-          grad->matrix = src->matrix;
-          grad->colorStops = src->colorStops;
-          return grad;
-        } else if (defName == "pattern") {
-          auto pattern = _document->makeNode<ImagePattern>();
-          auto* src = static_cast<ImagePattern*>(cached);
-          pattern->id = src->id;
-          pattern->image = src->image;
-          pattern->tileModeX = src->tileModeX;
-          pattern->tileModeY = src->tileModeY;
-          pattern->filterMode = src->filterMode;
-          pattern->mipmapMode = src->mipmapMode;
-          pattern->matrix = src->matrix;
-          return pattern;
-        }
-      }
-      return nullptr;
+    auto cacheIt = _colorSourceCache.find(refId);
+    if (cacheIt != _colorSourceCache.end()) {
+      return cacheIt->second;
     }
-
-    // First time seeing this multi-referenced def, create the resource.
-    std::string colorSourceId = generateColorSourceId();
-    _colorSourceIdMap[refId] = colorSourceId;
-
-    ColorSource* colorSource = nullptr;
-    if (defName == "linearGradient") {
-      colorSource = convertLinearGradient(defNode, shapeBounds);
-    } else if (defName == "radialGradient") {
-      colorSource = convertRadialGradient(defNode, shapeBounds);
-    } else if (defName == "pattern") {
-      colorSource = convertPattern(defNode, shapeBounds);
-    }
-
-    if (colorSource) {
-      colorSource->id = colorSourceId;
-      // Cache the raw pointer.
-      _colorSourceCache[refId] = colorSource;
-      
-      // Now return a clone with the same id (as a reference).
-      return getColorSourceForRef(refId, shapeBounds);
-    }
-    return nullptr;
   }
 
-  // refCount <= 1: inline the ColorSource (no id).
+  // Convert the SVG def to a ColorSource.
   ColorSource* colorSource = nullptr;
   if (defName == "linearGradient") {
     colorSource = convertLinearGradient(defNode, shapeBounds);
@@ -2937,8 +2730,15 @@ ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
   } else if (defName == "pattern") {
     colorSource = convertPattern(defNode, shapeBounds);
   }
-  if (colorSource) {
-    // Clear the id for inline ColorSource to avoid being treated as a reference.
+
+  if (!colorSource) {
+    return nullptr;
+  }
+
+  if (refCount > 1) {
+    colorSource->id = generateColorSourceId();
+    _colorSourceCache[refId] = colorSource;
+  } else {
     colorSource->id.clear();
   }
   return colorSource;

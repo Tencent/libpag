@@ -72,7 +72,7 @@ required for features like video templates.
 - macOS 10.15+
 - Windows 7.0+
 - Chrome 69.0+ (Web)
-- Safari 11.3+ (Web)
+- Safari 15.0+ (Web)
 
 ## Getting Started
 

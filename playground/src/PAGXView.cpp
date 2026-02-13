@@ -28,7 +28,22 @@ using namespace emscripten;
 
 namespace pagx {
 
-static std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenData) {
+// The frame duration threshold in milliseconds above which a frame is considered slow.
+static constexpr double SlowFrameThresholdMs = 32.0;
+// The time window in milliseconds for averaging frame durations to detect performance recovery.
+static constexpr double RecoveryWindowMs = 2000.0;
+// The timeout in milliseconds to detect the end of a zoom-in gesture.
+static constexpr double ZoomInEndTimeoutMs = 300.0;
+// The timeout in milliseconds to detect the end of a zoom-out gesture.
+static constexpr double ZoomOutEndTimeoutMs = 800.0;
+// The delay in milliseconds before retrying a tile refinement upgrade after zoom ends.
+static constexpr double UpgradeRetryDelayMs = 300.0;
+// The minimum number of normal frames required to recover from slow state in static mode.
+static constexpr size_t MinRecoveryFramesStatic = 20;
+// The minimum number of normal frames required to recover from slow state after zoom ends.
+static constexpr size_t MinRecoveryFramesZoomEnd = 10;
+
+static uint8_t* CopyFromEmscripten(const val& emscriptenData, unsigned int* outLength) {
   if (emscriptenData.isUndefined()) {
     return nullptr;
   }
@@ -37,32 +52,52 @@ static std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenDa
     return nullptr;
   }
   auto buffer = new (std::nothrow) uint8_t[length];
-  if (buffer) {
-    auto memory = val::module_property("HEAPU8")["buffer"];
-    auto memoryView = emscriptenData["constructor"].new_(
-        memory, static_cast<unsigned int>(reinterpret_cast<uintptr_t>(buffer)), length);
-    memoryView.call<void>("set", emscriptenData);
-    return tgfx::Data::MakeAdopted(buffer, length, tgfx::Data::DeleteProc);
+  if (!buffer) {
+    return nullptr;
   }
-  return nullptr;
+  auto memory = val::module_property("HEAPU8")["buffer"];
+  auto memoryView = emscriptenData["constructor"].new_(
+      memory, static_cast<unsigned int>(reinterpret_cast<uintptr_t>(buffer)), length);
+  memoryView.call<void>("set", emscriptenData);
+  *outLength = length;
+  return buffer;
+}
+
+static std::shared_ptr<tgfx::Data> GetTGFXDataFromEmscripten(const val& emscriptenData) {
+  unsigned int length = 0;
+  auto buffer = CopyFromEmscripten(emscriptenData, &length);
+  if (!buffer) {
+    return nullptr;
+  }
+  return tgfx::Data::MakeAdopted(buffer, length, tgfx::Data::DeleteProc);
+}
+
+static std::shared_ptr<Data> GetPagxDataFromEmscripten(const val& emscriptenData) {
+  unsigned int length = 0;
+  auto buffer = CopyFromEmscripten(emscriptenData, &length);
+  if (!buffer) {
+    return nullptr;
+  }
+  return Data::MakeAdopt(buffer, length);
 }
 
 PAGXView::PAGXView(const std::string& canvasID) : canvasID(canvasID) {
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
   displayList.setAllowZoomBlur(true);
   displayList.setMaxTileCount(512);
+  displayList.setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
 }
 
 void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
   std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces;
-  auto fontData = GetDataFromEmscripten(fontVal);
+  auto fontData = GetTGFXDataFromEmscripten(fontVal);
   if (fontData) {
     auto typeface = tgfx::Typeface::MakeFromData(fontData, 0);
     if (typeface) {
       fallbackTypefaces.push_back(std::move(typeface));
     }
   }
-  auto emojiFontData = GetDataFromEmscripten(emojiFontVal);
+  auto emojiFontData = GetTGFXDataFromEmscripten(emojiFontVal);
   if (emojiFontData) {
     auto typeface = tgfx::Typeface::MakeFromData(emojiFontData, 0);
     if (typeface) {
@@ -79,7 +114,7 @@ void PAGXView::loadPAGX(const val& pagxData) {
 
 void PAGXView::parsePAGX(const val& pagxData) {
   document = nullptr;
-  auto data = GetDataFromEmscripten(pagxData);
+  auto data = GetPagxDataFromEmscripten(pagxData);
   if (!data) {
     return;
   }
@@ -97,12 +132,11 @@ bool PAGXView::loadFileData(const std::string& filePath, const val& fileData) {
   if (!document) {
     return false;
   }
-  auto data = GetDataFromEmscripten(fileData);
+  auto data = GetPagxDataFromEmscripten(fileData);
   if (!data) {
     return false;
   }
-  auto pagxData = pagx::Data::MakeWithCopy(data->bytes(), data->size());
-  return document->loadFileData(filePath, std::move(pagxData));
+  return document->loadFileData(filePath, std::move(data));
 }
 
 void PAGXView::buildLayers() {
@@ -165,8 +199,30 @@ void PAGXView::applyCenteringTransform() {
 }
 
 void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY) {
+  if (zoom <= 1.0f) {
+    displayList.setSubtreeCacheMaxSize(1024);
+  } else {
+    displayList.setSubtreeCacheMaxSize(0);
+  }
+
+  bool zoomChanged = (std::abs(zoom - lastZoom) > 0.001f);
+  if (zoomChanged) {
+    if (!isZooming) {
+      isZooming = true;
+      accumulatedZoomChange = 0.0f;
+      updateAdaptiveTileRefinement();
+    }
+    float currentChange = zoom - lastZoom;
+    accumulatedZoomChange += currentChange;
+    if (std::abs(accumulatedZoomChange) > 0.01f) {
+      isZoomingIn = (accumulatedZoomChange > 0.0f);
+    }
+    lastZoomUpdateTimestampMs = emscripten_get_now();
+  }
+
   displayList.setZoomScale(zoom);
   displayList.setContentOffset(offsetX, offsetY);
+  lastZoom = zoom;
 }
 
 void PAGXView::draw() {
@@ -176,6 +232,7 @@ void PAGXView::draw() {
   if (window == nullptr) {
     return;
   }
+  double frameStartMs = emscripten_get_now();
   bool hasContentChanged = displayList.hasContentChanged();
   bool hasLastRecording = (lastRecording != nullptr);
   if (!hasContentChanged && !hasLastRecording) {
@@ -214,6 +271,90 @@ void PAGXView::draw() {
     }
   }
   device->unlock();
+
+  double frameEndMs = emscripten_get_now();
+  double frameDurationMs = frameEndMs - frameStartMs;
+  updatePerformanceState(frameDurationMs);
+
+  if (isZooming && lastZoomUpdateTimestampMs > 0.0) {
+    double currentTimeoutMs = isZoomingIn ? ZoomInEndTimeoutMs : ZoomOutEndTimeoutMs;
+    double timeSinceLastUpdate = frameStartMs - lastZoomUpdateTimestampMs;
+    if (timeSinceLastUpdate >= currentTimeoutMs) {
+      onZoomEnd();
+    }
+  }
+
+  if (!isZooming && tryUpgradeTimestampMs > 0.0) {
+    if (frameStartMs >= tryUpgradeTimestampMs) {
+      if (!lastFrameSlow) {
+        int targetCount = calculateTargetTileRefinement(lastZoom);
+        currentMaxTilesRefinedPerFrame = targetCount;
+        displayList.setMaxTilesRefinedPerFrame(targetCount);
+        tryUpgradeTimestampMs = 0.0;
+      } else {
+        tryUpgradeTimestampMs = frameStartMs + UpgradeRetryDelayMs;
+      }
+    }
+  } else if (!isZooming) {
+    updateAdaptiveTileRefinement();
+  }
+}
+
+void PAGXView::onZoomEnd() {
+  if (!isZooming) {
+    return;
+  }
+  isZooming = false;
+  currentMaxTilesRefinedPerFrame = 1;
+  displayList.setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
+  tryUpgradeTimestampMs = emscripten_get_now() + 200.0;
+}
+
+void PAGXView::updatePerformanceState(double frameDurationMs) {
+  double now = emscripten_get_now();
+  if (frameDurationMs > SlowFrameThresholdMs) {
+    if (!lastFrameSlow) {
+      frameHistory.clear();
+      frameHistoryTotalTime = 0.0;
+    }
+    lastFrameSlow = true;
+  }
+  frameHistory.push_back({now, frameDurationMs});
+  frameHistoryTotalTime += frameDurationMs;
+  double windowStart = now - RecoveryWindowMs;
+  while (!frameHistory.empty() && frameHistory.front().timestampMs < windowStart) {
+    frameHistoryTotalTime -= frameHistory.front().durationMs;
+    frameHistory.pop_front();
+  }
+  if (lastFrameSlow && !frameHistory.empty()) {
+    double avgTime = frameHistoryTotalTime / static_cast<double>(frameHistory.size());
+    size_t minFrames = isZooming ? MinRecoveryFramesZoomEnd : MinRecoveryFramesStatic;
+    if (avgTime <= SlowFrameThresholdMs && frameHistory.size() >= minFrames) {
+      lastFrameSlow = false;
+    }
+  }
+}
+
+int PAGXView::calculateTargetTileRefinement(float zoom) const {
+  if (isZooming) {
+    return 0;
+  }
+  if (lastFrameSlow) {
+    return 1;
+  }
+  if (zoom < 1.0f) {
+    int count = static_cast<int>(zoom / 0.33f) + 1;
+    return std::clamp(count, 1, 3);
+  }
+  return 3;
+}
+
+void PAGXView::updateAdaptiveTileRefinement() {
+  int targetCount = calculateTargetTileRefinement(lastZoom);
+  if (targetCount != currentMaxTilesRefinedPerFrame) {
+    currentMaxTilesRefinedPerFrame = targetCount;
+    displayList.setMaxTilesRefinedPerFrame(targetCount);
+  }
 }
 
 }  // namespace pagx

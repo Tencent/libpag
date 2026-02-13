@@ -23,27 +23,29 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include "pagx/PAGXDocument.h"
+#include "pagx/SVGImporter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/DropShadowFilter.h"
-#include "pagx/nodes/InnerShadowFilter.h"
-#include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Stroke.h"
-#include "pagx/nodes/TextLayout.h"
 #include "pagx/nodes/Text.h"
-#include "pagx/SVGImporter.h"
+#include "pagx/nodes/TextLayout.h"
 #include "xml/XMLDOM.h"
 
 namespace pagx {
+
+static constexpr int MAX_SVG_RECURSION_DEPTH = 128;
 
 /**
  * Type of shadow-only filter for determining how to handle element content.
@@ -58,24 +60,24 @@ enum class ShadowOnlyType {
  * Inherited SVG style properties that cascade down the element tree.
  */
 struct InheritedStyle {
-  std::string fill = "";            // Empty means not set, "none" means no fill.
-  std::string stroke = "";          // Empty means not set.
-  std::string fillOpacity = "";     // Empty means not set.
-  std::string strokeOpacity = "";   // Empty means not set.
-  std::string fillRule = "";        // Empty means not set.
-  std::string strokeDasharray = ""; // Empty means not set, "none" means solid line.
-  std::string strokeDashoffset = "";// Empty means not set.
-  std::string strokeWidth = "";     // Empty means not set.
-  std::string strokeLinecap = "";   // Empty means not set.
-  std::string strokeLinejoin = "";  // Empty means not set.
-  std::string strokeMiterlimit = "";// Empty means not set.
+  std::string fill = {};            // Empty means not set, "none" means no fill.
+  std::string stroke = {};          // Empty means not set.
+  std::string fillOpacity = {};     // Empty means not set.
+  std::string strokeOpacity = {};   // Empty means not set.
+  std::string fillRule = {};        // Empty means not set.
+  std::string strokeDasharray = {}; // Empty means not set, "none" means solid line.
+  std::string strokeDashoffset = {};// Empty means not set.
+  std::string strokeWidth = {};     // Empty means not set.
+  std::string strokeLinecap = {};   // Empty means not set.
+  std::string strokeLinejoin = {};  // Empty means not set.
+  std::string strokeMiterlimit = {};// Empty means not set.
   // Text properties.
-  std::string fontFamily = "";      // Empty means not set.
-  std::string fontSize = "";        // Empty means not set.
-  std::string fontWeight = "";      // Empty means not set.
-  std::string fontStyle = "";       // Empty means not set (normal/italic/oblique).
-  std::string letterSpacing = "";   // Empty means not set.
-  std::string textAnchor = "";      // Empty means not set (start/middle/end).
+  std::string fontFamily = {};      // Empty means not set.
+  std::string fontSize = {};        // Empty means not set.
+  std::string fontWeight = {};      // Empty means not set.
+  std::string fontStyle = {};       // Empty means not set (normal/italic/oblique).
+  std::string letterSpacing = {};   // Empty means not set.
+  std::string textAnchor = {};      // Empty means not set (start/middle/end).
 };
 
 /**
@@ -94,7 +96,7 @@ class SVGParserContext {
   void parseDefs(const std::shared_ptr<DOMNode>& defsNode);
 
   Layer* convertToLayer(const std::shared_ptr<DOMNode>& element,
-                                            const InheritedStyle& parentStyle);
+                        const InheritedStyle& parentStyle, int depth = 0);
   void convertChildren(const std::shared_ptr<DOMNode>& element,
                        std::vector<Element*>& contents,
                        const InheritedStyle& inheritedStyle,
@@ -120,6 +122,10 @@ class SVGParserContext {
 
   Layer* convertMaskElement(const std::shared_ptr<DOMNode>& maskElement,
                                                 const InheritedStyle& parentStyle);
+  void parseMaskChildren(const std::shared_ptr<DOMNode>& parent,
+                         Layer* maskLayer,
+                         const InheritedStyle& parentStyle,
+                         const Matrix& parentMatrix);
   // Converts SVG filter element to PAGX filters/styles.
   // Returns true if the filter was successfully converted, false otherwise.
   // If outShadowOnlyType is provided, it will be set to indicate the type of shadow-only filter
@@ -133,8 +139,9 @@ class SVGParserContext {
                      std::vector<Element*>& contents,
                      const InheritedStyle& inheritedStyle);
 
-  // Compute shape bounds from SVG element attributes.
+  // Compute shape bounds from SVG element attributes with caching.
   Rect getShapeBounds(const std::shared_ptr<DOMNode>& element);
+  Rect computeShapeBounds(const std::shared_ptr<DOMNode>& element);
 
   InheritedStyle computeInheritedStyle(const std::shared_ptr<DOMNode>& element,
                                        const InheritedStyle& parentStyle);
@@ -145,6 +152,8 @@ class SVGParserContext {
   // Named colors are converted to their hex equivalents for PAGX compatibility.
   std::string colorToHex(const std::string& value);
   float parseLength(const std::string& value, float containerSize);
+  void parseGradientStops(const std::shared_ptr<DOMNode>& element,
+                          std::vector<ColorStop>& colorStops);
   // Like parseLength, but uses the given fontSize for em/rem unit conversion instead of the
   // default 16px. Returns 0 if value is empty.
   float parseLengthEm(const std::string& value, float containerSize, float fontSize);
@@ -152,12 +161,25 @@ class SVGParserContext {
   PathData parsePoints(const std::string& value, bool closed);
   std::string resolveUrl(const std::string& url);
 
+  // Helpers for parsing filter primitive attributes.
+  std::pair<float, float> parseFilterOffset(const std::shared_ptr<DOMNode>& node);
+  std::pair<float, float> parseFilterBlur(const std::shared_ptr<DOMNode>& node);
+  Color parseFilterColorMatrix(const std::shared_ptr<DOMNode>& node);
+
+  // Create a DropShadowFilter node with the given parameters.
+  DropShadowFilter* createDropShadow(float offsetX, float offsetY, float blurX, float blurY,
+                                     const Color& color, bool shadowOnly);
+
   // Helper to get attribute from DOMNode.
   std::string getAttribute(const std::shared_ptr<DOMNode>& node, const std::string& name,
-                           const std::string& defaultValue = "") const;
+                           const std::string& defaultValue = "");
+
+  // Parse and cache style properties (from style attribute and CSS class rules) for a node.
+  const std::unordered_map<std::string, std::string>& getStyleProperties(
+      const std::shared_ptr<DOMNode>& node);
 
   // Get href attribute from DOMNode, checking both "href" and "xlink:href".
-  std::string getHrefAttribute(const std::shared_ptr<DOMNode>& node) const;
+  std::string getHrefAttribute(const std::shared_ptr<DOMNode>& node);
 
   // Register an image resource and return its node pointer.
   // If the image source (data URI or path) has already been registered, returns the existing node.
@@ -181,6 +203,9 @@ class SVGParserContext {
   // Generate a unique ID that doesn't conflict with existing SVG IDs.
   std::string generateUniqueId(const std::string& prefix);
   
+  // Count url() references in fill/stroke attributes for gradient/pattern deduplication.
+  void countUrlReference(const std::string& attrValue);
+
   // Generate a unique ColorSource ID for resources.
   std::string generateColorSourceId();
 
@@ -199,14 +224,16 @@ class SVGParserContext {
   std::vector<Layer*> _maskLayers = {};
   std::unordered_map<std::string, Image*> _imageSourceToId = {};  // Maps image source to resource node.
   std::unordered_set<std::string> _existingIds = {};  // All IDs found in SVG to avoid conflicts.
+  std::unordered_set<std::string> _useStack = {};  // Tracks <use> references being resolved to detect cycles.
   
   // ColorSource reference counting for gradients and patterns.
   // Key is the SVG def id (e.g., "gradient1"), value is the number of times it's referenced.
   std::unordered_map<std::string, int> _colorSourceRefCount = {};
-  // Maps SVG def id to the PAGX resource id (only for those with refCount > 1).
-  std::unordered_map<std::string, std::string> _colorSourceIdMap = {};
   // Store the converted ColorSource by SVG def id (for reuse when refCount > 1).
   std::unordered_map<std::string, ColorSource*> _colorSourceCache = {};
+
+  // Cache of computed shape bounds per DOMNode to avoid redundant SVG string parsing.
+  std::unordered_map<const DOMNode*, Rect> _shapeBoundsCache = {};
   
   // Parse CSS style rules from <style> element.
   void parseStyleElement(const std::shared_ptr<DOMNode>& styleNode);
@@ -218,6 +245,11 @@ class SVGParserContext {
   // CSS class rules: key is class name (without dot), value is style properties.
   // Example: {"cls-1": "fill: #fcfae9"}
   std::unordered_map<std::string, std::string> _cssClassRules = {};
+
+  // Cache of parsed style properties per DOMNode (from style attribute + CSS class rules).
+  // Key is the raw DOMNode pointer (valid for the lifetime of the DOM tree).
+  std::unordered_map<const DOMNode*, std::unordered_map<std::string, std::string>>
+      _stylePropertyCache = {};
 };
 
 }  // namespace pagx

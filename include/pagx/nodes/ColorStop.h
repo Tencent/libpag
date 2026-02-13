@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -25,6 +25,8 @@ namespace pagx {
 
 /**
  * A color stop defines a color at a specific position in a gradient.
+ * Unlike other Node subclasses, ColorStop is stored by value in gradient color stop arrays
+ * and does not need to be created through PAGXDocument::makeNode().
  */
 class ColorStop : public Node {
  public:

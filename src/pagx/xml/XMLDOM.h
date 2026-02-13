@@ -22,7 +22,6 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <tuple>
 #include <vector>
 
 namespace pagx {
@@ -72,16 +71,9 @@ struct DOMNode {
   /**
    * Finds an attribute value by name.
    * @param attrName The attribute name to find.
-   * @return A tuple of (found, value). If not found, returns (false, "").
+   * @return Pointer to the attribute value string, or nullptr if not found.
    */
-  std::tuple<bool, std::string> findAttribute(const std::string& attrName) const;
-
-  /**
-   * Counts the number of children, optionally filtered by name.
-   * @param name Optional filter by element name. Empty string matches all.
-   * @return The count of matching children.
-   */
-  int countChildren(const std::string& name = "") const;
+  const std::string* findAttribute(const std::string& attrName) const;
 };
 
 /**

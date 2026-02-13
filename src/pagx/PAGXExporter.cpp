@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -21,6 +21,7 @@
 #include "Base64.h"
 #include "StringParser.h"
 #include "SVGPathParser.h"
+#include "pagx/PAGXDocument.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -28,11 +29,12 @@
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
-#include "pagx/PAGXDocument.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -49,13 +51,11 @@
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextLayout.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
-#include "pagx/nodes/Text.h"
 #include "pagx/nodes/TrimPath.h"
-#include "pagx/nodes/Font.h"
-#include "pagx/nodes/GlyphRun.h"
 
 namespace pagx {
 
@@ -66,6 +66,7 @@ namespace pagx {
 class XMLBuilder {
  public:
   XMLBuilder() {
+    buffer.reserve(4096);
     tagStack.reserve(32);
   }
 
@@ -73,7 +74,7 @@ class XMLBuilder {
     buffer += "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
   }
 
-  void openElement(const std::string& tag) {
+  void openElement(const char* tag) {
     writeIndent();
     buffer += "<";
     buffer += tag;
@@ -157,19 +158,13 @@ class XMLBuilder {
     tagStack.pop_back();
   }
 
-  void addTextContent(const std::string& text) {
-    buffer += "<![CDATA[";
-    buffer += text;
-    buffer += "]]>";
-  }
-
-  const std::string& str() const {
-    return buffer;
+  std::string release() {
+    return std::move(buffer);
   }
 
  private:
   std::string buffer = {};
-  std::vector<std::string> tagStack = {};
+  std::vector<const char*> tagStack = {};
   int indentLevel = 0;
 
   void writeIndent() {
@@ -229,20 +224,6 @@ static std::string rectToString(const Rect& r) {
   return std::string(buf);
 }
 
-static std::string floatListToString(const std::vector<float>& values) {
-  std::string result;
-  result.reserve(values.size() * 8);
-  char buf[32] = {};
-  for (size_t i = 0; i < values.size(); i++) {
-    if (i > 0) {
-      result += ",";
-    }
-    snprintf(buf, sizeof(buf), "%g", values[i]);
-    result += buf;
-  }
-  return result;
-}
-
 static std::string floatListToString(const float* values, size_t count) {
   std::string result;
   result.reserve(count * 8);
@@ -252,6 +233,24 @@ static std::string floatListToString(const float* values, size_t count) {
       result += ",";
     }
     snprintf(buf, sizeof(buf), "%g", values[i]);
+    result += buf;
+  }
+  return result;
+}
+
+static std::string floatListToString(const std::vector<float>& values) {
+  return floatListToString(values.data(), values.size());
+}
+
+static std::string pointListToString(const std::vector<Point>& points) {
+  std::string result = {};
+  result.reserve(points.size() * 12);
+  char buf[64] = {};
+  for (size_t i = 0; i < points.size(); i++) {
+    if (i > 0) {
+      result += ";";
+    }
+    snprintf(buf, sizeof(buf), "%g,%g", points[i].x, points[i].y);
     result += buf;
   }
   return result;
@@ -299,6 +298,20 @@ static void writeColorStops(XMLBuilder& xml, const std::vector<ColorStop>& stops
   }
 }
 
+static void writeGradientMatrixAndStops(XMLBuilder& xml, const Matrix& matrix,
+                                        const std::vector<ColorStop>& colorStops) {
+  if (!matrix.isIdentity()) {
+    xml.addAttribute("matrix", MatrixToString(matrix));
+  }
+  if (colorStops.empty()) {
+    xml.closeElementSelfClosing();
+  } else {
+    xml.closeElementStart();
+    writeColorStops(xml, colorStops);
+    xml.closeElement();
+  }
+}
+
 static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
   switch (node->nodeType()) {
     case NodeType::SolidColor: {
@@ -317,16 +330,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
         xml.addAttribute("startPoint", pointToString(grad->startPoint));
       }
       xml.addRequiredAttribute("endPoint", pointToString(grad->endPoint));
-      if (!grad->matrix.isIdentity()) {
-        xml.addAttribute("matrix", MatrixToString(grad->matrix));
-      }
-      if (grad->colorStops.empty()) {
-        xml.closeElementSelfClosing();
-      } else {
-        xml.closeElementStart();
-        writeColorStops(xml, grad->colorStops);
-        xml.closeElement();
-      }
+      writeGradientMatrixAndStops(xml, grad->matrix, grad->colorStops);
       break;
     }
     case NodeType::RadialGradient: {
@@ -337,16 +341,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
         xml.addAttribute("center", pointToString(grad->center));
       }
       xml.addRequiredAttribute("radius", grad->radius);
-      if (!grad->matrix.isIdentity()) {
-        xml.addAttribute("matrix", MatrixToString(grad->matrix));
-      }
-      if (grad->colorStops.empty()) {
-        xml.closeElementSelfClosing();
-      } else {
-        xml.closeElementStart();
-        writeColorStops(xml, grad->colorStops);
-        xml.closeElement();
-      }
+      writeGradientMatrixAndStops(xml, grad->matrix, grad->colorStops);
       break;
     }
     case NodeType::ConicGradient: {
@@ -358,16 +353,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       }
       xml.addAttribute("startAngle", grad->startAngle);
       xml.addAttribute("endAngle", grad->endAngle, 360.0f);
-      if (!grad->matrix.isIdentity()) {
-        xml.addAttribute("matrix", MatrixToString(grad->matrix));
-      }
-      if (grad->colorStops.empty()) {
-        xml.closeElementSelfClosing();
-      } else {
-        xml.closeElementStart();
-        writeColorStops(xml, grad->colorStops);
-        xml.closeElement();
-      }
+      writeGradientMatrixAndStops(xml, grad->matrix, grad->colorStops);
       break;
     }
     case NodeType::DiamondGradient: {
@@ -378,16 +364,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
         xml.addAttribute("center", pointToString(grad->center));
       }
       xml.addRequiredAttribute("radius", grad->radius);
-      if (!grad->matrix.isIdentity()) {
-        xml.addAttribute("matrix", MatrixToString(grad->matrix));
-      }
-      if (grad->colorStops.empty()) {
-        xml.closeElementSelfClosing();
-      } else {
-        xml.closeElementStart();
-        writeColorStops(xml, grad->colorStops);
-        xml.closeElement();
-      }
+      writeGradientMatrixAndStops(xml, grad->matrix, grad->colorStops);
       break;
     }
     case NodeType::ImagePattern: {
@@ -539,47 +516,17 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
 
           // Write positions (semicolon-separated x,y pairs)
           if (!run->positions.empty()) {
-            std::string posStr = {};
-            posStr.reserve(run->positions.size() * 12);
-            char buf[64] = {};
-            for (size_t i = 0; i < run->positions.size(); i++) {
-              if (i > 0) {
-                posStr += ";";
-              }
-              snprintf(buf, sizeof(buf), "%g,%g", run->positions[i].x, run->positions[i].y);
-              posStr += buf;
-            }
-            xml.addRequiredAttribute("positions", posStr);
+            xml.addRequiredAttribute("positions", pointListToString(run->positions));
           }
 
           // Write anchors (semicolon-separated x,y pairs)
           if (!run->anchors.empty()) {
-            std::string anchorsStr = {};
-            anchorsStr.reserve(run->anchors.size() * 12);
-            char buf[64] = {};
-            for (size_t i = 0; i < run->anchors.size(); i++) {
-              if (i > 0) {
-                anchorsStr += ";";
-              }
-              snprintf(buf, sizeof(buf), "%g,%g", run->anchors[i].x, run->anchors[i].y);
-              anchorsStr += buf;
-            }
-            xml.addRequiredAttribute("anchors", anchorsStr);
+            xml.addRequiredAttribute("anchors", pointListToString(run->anchors));
           }
 
           // Write scales (semicolon-separated sx,sy pairs)
           if (!run->scales.empty()) {
-            std::string scalesStr = {};
-            scalesStr.reserve(run->scales.size() * 12);
-            char buf[64] = {};
-            for (size_t i = 0; i < run->scales.size(); i++) {
-              if (i > 0) {
-                scalesStr += ";";
-              }
-              snprintf(buf, sizeof(buf), "%g,%g", run->scales[i].x, run->scales[i].y);
-              scalesStr += buf;
-            }
-            xml.addRequiredAttribute("scales", scalesStr);
+            xml.addRequiredAttribute("scales", pointListToString(run->scales));
           }
 
           // Write rotations (comma-separated angles in degrees)
@@ -845,6 +792,15 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
 // LayerStyle writing
 //==============================================================================
 
+static void writeShadowAttributes(XMLBuilder& xml, float offsetX, float offsetY, float blurX,
+                                  float blurY, const Color& color) {
+  xml.addAttribute("offsetX", offsetX);
+  xml.addAttribute("offsetY", offsetY);
+  xml.addAttribute("blurX", blurX);
+  xml.addAttribute("blurY", blurY);
+  xml.addAttribute("color", ColorToHexString(color, color.alpha < 1.0f));
+}
+
 static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
   switch (node->nodeType()) {
     case NodeType::DropShadowStyle: {
@@ -853,11 +809,8 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       if (style->blendMode != BlendMode::Normal) {
         xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
       }
-      xml.addAttribute("offsetX", style->offsetX);
-      xml.addAttribute("offsetY", style->offsetY);
-      xml.addAttribute("blurX", style->blurX);
-      xml.addAttribute("blurY", style->blurY);
-      xml.addAttribute("color", ColorToHexString(style->color, style->color.alpha < 1.0f));
+      writeShadowAttributes(xml, style->offsetX, style->offsetY, style->blurX, style->blurY,
+                            style->color);
       xml.addAttribute("showBehindLayer", style->showBehindLayer, true);
       xml.closeElementSelfClosing();
       break;
@@ -868,11 +821,8 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       if (style->blendMode != BlendMode::Normal) {
         xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
       }
-      xml.addAttribute("offsetX", style->offsetX);
-      xml.addAttribute("offsetY", style->offsetY);
-      xml.addAttribute("blurX", style->blurX);
-      xml.addAttribute("blurY", style->blurY);
-      xml.addAttribute("color", ColorToHexString(style->color, style->color.alpha < 1.0f));
+      writeShadowAttributes(xml, style->offsetX, style->offsetY, style->blurX, style->blurY,
+                            style->color);
       xml.closeElementSelfClosing();
       break;
     }
@@ -915,11 +865,8 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
     case NodeType::DropShadowFilter: {
       auto filter = static_cast<const DropShadowFilter*>(node);
       xml.openElement("DropShadowFilter");
-      xml.addAttribute("offsetX", filter->offsetX);
-      xml.addAttribute("offsetY", filter->offsetY);
-      xml.addAttribute("blurX", filter->blurX);
-      xml.addAttribute("blurY", filter->blurY);
-      xml.addAttribute("color", ColorToHexString(filter->color, filter->color.alpha < 1.0f));
+      writeShadowAttributes(xml, filter->offsetX, filter->offsetY, filter->blurX, filter->blurY,
+                            filter->color);
       xml.addAttribute("shadowOnly", filter->shadowOnly);
       xml.closeElementSelfClosing();
       break;
@@ -927,11 +874,8 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
     case NodeType::InnerShadowFilter: {
       auto filter = static_cast<const InnerShadowFilter*>(node);
       xml.openElement("InnerShadowFilter");
-      xml.addAttribute("offsetX", filter->offsetX);
-      xml.addAttribute("offsetY", filter->offsetY);
-      xml.addAttribute("blurX", filter->blurX);
-      xml.addAttribute("blurY", filter->blurY);
-      xml.addAttribute("color", ColorToHexString(filter->color, filter->color.alpha < 1.0f));
+      writeShadowAttributes(xml, filter->offsetX, filter->offsetY, filter->blurX, filter->blurY,
+                            filter->color);
       xml.addAttribute("shadowOnly", filter->shadowOnly);
       xml.closeElementSelfClosing();
       break;
@@ -1155,8 +1099,18 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
     writeLayer(xml, layer, options);
   }
 
-  // Write Resources section at the end (only if there are resources)
-  if (!doc.nodes.empty()) {
+  // Write Resources section at the end (only if there are exportable resources)
+  bool hasResources = false;
+  for (const auto& resource : doc.nodes) {
+    if (!resource->id.empty()) {
+      if (options.skipGlyphData && resource->nodeType() == NodeType::Font) {
+        continue;
+      }
+      hasResources = true;
+      break;
+    }
+  }
+  if (hasResources) {
     xml.openElement("Resources");
     xml.closeElementStart();
 
@@ -1171,7 +1125,7 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
 
   xml.closeElement();
 
-  return xml.str();
+  return xml.release();
 }
 
 }  // namespace pagx

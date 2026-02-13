@@ -46,8 +46,7 @@ class SVGImporter {
      */
     bool flattenTransforms = false;
 
-    Options()
-        : preserveUnknownElements(false), expandUseReferences(true), flattenTransforms(false) {
+    Options() {
     }
   };
 
