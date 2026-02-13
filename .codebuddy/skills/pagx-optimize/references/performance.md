@@ -36,7 +36,7 @@ eliminates this overhead.
 
 **When to apply**: A Layer has no styles (DropShadowStyle, InnerShadowStyle,
 BackgroundBlurStyle), no filters (BlurFilter, etc.), no mask, no blendMode, no composition
-reference, no alpha, and no name attribute that matters for debugging.
+reference, no scrollRect, and no name attribute that matters for debugging.
 
 **How**: Replace `<Layer>` with `<Group>`. Convert `x`/`y` to `position`.
 
@@ -58,7 +58,7 @@ reference, no alpha, and no name attribute that matters for debugging.
 - Group geometry **propagates upward** to the parent scope. If the parent scope has painters
   that should not affect this geometry, the Layer isolation is needed. Verify that converting to
   Group does not cause unintended painter leakage.
-- Layer with `alpha` cannot simply become Group because Group does not support alpha.
+- Layer with `scrollRect` cannot become Group because Group does not support scrollRect.
 - Layer with child Layers cannot become Group because Group cannot contain Layers.
 - Only apply when the Layer is a leaf (contains only geometry + painters, no child Layers).
 

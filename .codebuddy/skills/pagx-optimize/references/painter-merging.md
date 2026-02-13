@@ -165,8 +165,28 @@ need different painters, they must be isolated with Groups:
 </Layer>
 ```
 
-**Rule**: Before merging, check each geometry element's original painter set (Fill only,
-Stroke only, or Fill + Stroke). Only geometry with identical painter sets can share a scope.
+**Rule**: Before merging, verify two conditions for each geometry element:
+
+1. **Identical painter sets**: Only geometry with the same painter configuration (Fill only,
+   Stroke only, or Fill + Stroke) can share a scope.
+2. **No modifiers between geometry**: If the original Group contains modifiers (TrimPath,
+   RoundCorner, MergePath, TextModifier, etc.) between geometry and painter, do not merge
+   that Group with others. Merging would expand the modifier's scope to include the other
+   geometry, changing the rendered result.
+
+```xml
+<!-- CANNOT merge: TrimPath scopes would change -->
+<Group>
+  <Path data="M 0 0 L 100 100"/>
+  <TrimPath end="0.5"/>
+  <Fill color="#F00"/>
+</Group>
+<Group>
+  <Path data="M 200 0 L 300 100"/>
+  <Fill color="#F00"/>
+</Group>
+<!-- If merged, TrimPath would apply to BOTH Paths — wrong. -->
+```
 
 ---
 
