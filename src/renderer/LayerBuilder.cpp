@@ -49,7 +49,6 @@
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
-#include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
@@ -209,24 +208,13 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::Layer> convertVectorLayer(const Layer* node) {
     auto layer = tgfx::VectorLayer::Make();
     std::vector<std::shared_ptr<tgfx::VectorElement>> contents;
-    const TextBox* textBox = nullptr;
     for (const auto& element : node->contents) {
-      if (element->nodeType() == NodeType::TextBox) {
-        textBox = static_cast<const TextBox*>(element);
-      }
       auto tgfxElement = convertVectorElement(element);
       if (tgfxElement) {
         contents.push_back(tgfxElement);
       }
     }
     layer->setContents(contents);
-    // Apply TextBox overflow clipping.
-    if (textBox != nullptr && textBox->overflow == Overflow::Hidden &&
-        textBox->size.width > 0 && textBox->size.height > 0) {
-      auto clipRect = tgfx::Rect::MakeXYWH(textBox->position.x, textBox->position.y,
-                                             textBox->size.width, textBox->size.height);
-      layer->setScrollRect(clipRect);
-    }
     return layer;
   }
 

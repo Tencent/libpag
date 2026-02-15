@@ -860,6 +860,8 @@ class TypesetterContext {
     };
     std::unordered_map<Text*, std::vector<PositionedGlyph>> textGlyphs = {};
 
+    bool overflowHidden = textBox->overflow == Overflow::Hidden;
+    float boxBottom = textBox->position.y + boxHeight;
     float baselineY = textBox->position.y + yOffset;
 
     for (size_t lineIdx = 0; lineIdx < lines.size(); lineIdx++) {
@@ -869,6 +871,14 @@ class TypesetterContext {
         baselineY += line.glyphs.empty() ? line.maxLineHeight : line.maxAscent;
       } else {
         baselineY += line.maxLineHeight;
+      }
+
+      // Skip lines that overflow below the box bottom.
+      if (overflowHidden && boxHeight > 0) {
+        float lineBottom = baselineY + line.maxDescent;
+        if (lineBottom > boxBottom) {
+          break;
+        }
       }
 
       // Horizontal alignment.
@@ -1144,11 +1154,19 @@ class TypesetterContext {
     };
     std::unordered_map<Text*, std::vector<VerticalPositionedGlyph>> textGlyphs = {};
 
+    bool overflowHidden = textBox->overflow == Overflow::Hidden;
+    float boxLeft = textBox->position.x;
     float columnX = xStart;
 
     for (auto& column : columns) {
       // Move left by this column's width to get the left edge.
       columnX -= column.maxWidth;
+
+      // Skip columns that overflow beyond the left edge of the box.
+      if (overflowHidden && boxWidth > 0 && columnX < boxLeft) {
+        break;
+      }
+
       // Center of this column for centering upright glyphs.
       float columnCenterX = columnX + column.maxWidth / 2;
 

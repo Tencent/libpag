@@ -1549,7 +1549,7 @@ Unlike other modifiers that operate on accumulated results in a chain (e.g., Tri
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `position` | Point | 0,0 | Top-left corner of the text area. When width or height is 0, serves as the alignment reference point in that dimension |
-| `size` | Size | 0,0 | Layout size. When width or height is 0, text has no boundary in that dimension (wordWrap wraps each character individually, alignment uses position as the reference point, overflow clipping has no effect) |
+| `size` | Size | 0,0 | Layout size. When width or height is 0, text has no boundary in that dimension (wordWrap wraps each character individually, alignment uses position as the reference point) |
 | `textAlign` | TextAlign | start | Horizontal alignment |
 | `verticalAlign` | VerticalAlign | top | Vertical alignment |
 | `writingMode` | WritingMode | horizontal | Layout direction |
@@ -1586,7 +1586,7 @@ Unlike other modifiers that operate on accumulated results in a chain (e.g., Tri
 | Value | Description |
 |-------|-------------|
 | `visible` | Text exceeding box boundaries is still rendered (default) |
-| `hidden` | Text exceeding box boundaries is clipped |
+| `hidden` | Lines (horizontal mode) or columns (vertical mode) that exceed the box boundaries are discarded entirely. Partial lines/columns are never shown |
 
 #### 5.5.7 Rich Text
 

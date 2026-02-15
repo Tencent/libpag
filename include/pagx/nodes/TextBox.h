@@ -47,8 +47,8 @@ class TextBox : public Element {
 
   /**
    * The size of the text box. When width or height is 0, text has no boundary in that dimension
-   * (wordWrap wraps each character individually, alignment uses position as the reference point,
-   * overflow clipping has no effect). The default value is (0, 0).
+   * (wordWrap wraps each character individually, alignment uses position as the reference point).
+   * The default value is (0, 0).
    */
   Size size = {};
 
@@ -84,7 +84,9 @@ class TextBox : public Element {
   bool wordWrap = false;
 
   /**
-   * The overflow behavior when text exceeds the box boundaries. The default value is Visible.
+   * The overflow behavior when text exceeds the box boundaries. When set to Hidden, entire lines
+   * (horizontal mode) or columns (vertical mode) that exceed the boundary are discarded during
+   * typesetting. The default value is Visible.
    */
   Overflow overflow = Overflow::Visible;
 
