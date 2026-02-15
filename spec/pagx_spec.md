@@ -563,11 +563,13 @@ Painters (Fill, Stroke, etc.) bound to a layer are divided into background conte
 
 #### Layer Contour
 
-**Layer contour** extracts opaque coverage from all painted geometry in the layer, producing a binary (opaque or fully transparent) mask. Geometry elements without painters do not participate. The conversion rules by color source type:
+**Layer contour** is a binary (opaque or fully transparent) mask derived from the layer content. Compared to normal layer content, layer contour has these differences:
 
-- **Solid color / gradient fills**: Original colors are replaced with opaque white
-- **Image fills**: Fully transparent pixels remain transparent; all other pixels become fully opaque
-- **Alpha=0 fills**: Geometry painted with completely transparent color is still included (treated as opaque coverage)
+1. **Alpha=0 fills are included**: Geometry painted with completely transparent color is still included in the contour (treated as opaque coverage)
+2. **Solid color / gradient fills**: Original colors are replaced with opaque white
+3. **Image fills**: Fully transparent pixels remain transparent; all other pixels become fully opaque
+
+Note: Geometry elements without painters (standalone Rectangle, Ellipse, etc.) do not participate in contour.
 
 #### Layer Background
 
@@ -630,7 +632,7 @@ Layer child elements are automatically categorized into four collections by type
 
 **preserve3D**: When `false` (default), child layers with 3D transforms are flattened into the parent's 2D plane before compositing. When `true`, child layers retain their 3D positions and are rendered in a shared 3D space, enabling depth-based intersections and correct z-ordering among siblings. Similar to CSS `transform-style: preserve-3d`.
 
-**excludeChildEffectsInLayerStyle**: When `false` (default), layer styles (e.g., DropShadowStyle) compute based on the full layer content including child layers' rendering results. When `true`, layer styles compute based only on the current layer's own painted content (Fill/Stroke), excluding all child layer rendering results.
+**excludeChildEffectsInLayerStyle**: When `false` (default), layer styles (e.g., DropShadowStyle) compute based on the full layer content including child layers' rendering results. When `true`, child layers' styles and filters are excluded from the layer content used to compute the parent's layer styles, but child layers' base rendering results are still included.
 
 **Transform Attribute Priority**: `x`/`y`, `matrix`, and `matrix3D` have an override relationship:
 - Only `x`/`y` set: Uses `x`/`y` for translation
@@ -1402,16 +1404,14 @@ Applies transforms and style overrides to glyphs within selected ranges. TextMod
 
 **Selector Calculation**:
 1. Calculate selection range based on RangeSelector's `start`, `end`, `offset` (supports any decimal value; automatically wraps when exceeding [0,1] range)
-2. Calculate raw influence value (0~1) for each glyph based on `shape`
-3. Combine multiple selectors according to `mode`
+2. Calculate raw influence value (0~1) for each glyph based on `shape`, then multiply by `weight`
+3. Combine multiple selectors according to `mode`, then clamp the combined result to [-1, 1]
+
+```
+factor = clamp(combine(rawInfluence₁ × weight₁, rawInfluence₂ × weight₂, ...), -1, 1)
+```
 
 **Transform Application**:
-
-The final `factor` is derived from the raw influence value multiplied by `weight`, then clamped to [-1, 1]:
-
-```
-factor = clamp(rawInfluence × weight, -1, 1)
-```
 
 Position and rotation are applied linearly with factor. Transforms are applied in the following order:
 
