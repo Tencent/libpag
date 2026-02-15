@@ -565,7 +565,7 @@ Painters (Fill, Stroke, etc.) bound to a layer are divided into background conte
 
 **Layer contour** is a binary (opaque or fully transparent) mask derived from the layer content. Compared to normal layer content, layer contour has these differences:
 
-1. **Alpha=0 fills are included**: Geometry painted with completely transparent color is still included in the contour (treated as opaque coverage)
+1. **Alpha=0 fills are included**: Geometry painted with completely transparent color is still included in the contour
 2. **Solid color / gradient fills**: Original colors are replaced with opaque white
 3. **Image fills**: Fully transparent pixels remain transparent; all other pixels become fully opaque
 
