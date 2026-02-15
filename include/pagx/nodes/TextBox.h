@@ -29,39 +29,38 @@ namespace pagx {
 /**
  * TextBox is a text modifier that controls text layout and alignment for accumulated Text elements.
  * It overrides the position of Text elements and provides layout capabilities including:
- * - Anchor mode (no size): position serves as an anchor point for alignment
- * - Box mode (with size): defines a rectangular area for text layout
  * - Automatic word wrapping when wordWrap is enabled
  * - Horizontal/vertical writing mode
  * - Overflow control (visible or hidden)
  *
- * The position always represents the top-left corner of the text area (or anchor point when size
- * is zero). The first line of text is positioned with its ascent touching the top of the box.
+ * The position represents the top-left corner of the text area. When size is (0, 0), position
+ * serves as the alignment reference point. The first line of text is positioned with its ascent
+ * touching the top of the text area.
  */
 class TextBox : public Element {
  public:
   /**
-   * The position of the text box. When size is (0, 0), this serves as the anchor point for text
-   * alignment. Otherwise, it is the top-left corner of the text box. The default value is (0, 0).
+   * The position of the text box, representing the top-left corner of the text area. When size is
+   * (0, 0), this serves as the alignment reference point. The default value is (0, 0).
    */
   Point position = {};
 
   /**
-   * The size of the text box. A value of 0 for width or height means auto-sizing in that
-   * dimension. When both are 0, the text box operates in anchor mode. The default value is (0, 0).
+   * The size of the text box. When width or height is 0, text has no boundary in that dimension
+   * (wordWrap wraps each character individually, alignment uses position as the reference point,
+   * overflow clipping has no effect). The default value is (0, 0).
    */
   Size size = {};
 
   /**
-   * The horizontal text alignment. In anchor mode (size = 0,0), alignment is relative to the
-   * anchor point. In box mode, alignment is within the box width. The default value is Start.
+   * The horizontal text alignment. When width is 0, alignment is relative to position.x.
+   * When width > 0, alignment is within the box width. The default value is Start.
    */
   TextAlign textAlign = TextAlign::Start;
 
   /**
-   * The vertical text alignment. In anchor mode with height = 0, alignment is relative to the
-   * anchor point (e.g., center = vertically centered on anchor). In box mode with height > 0,
-   * alignment is within the box height. The default value is Top.
+   * The vertical text alignment. When height is 0, alignment is relative to position.y.
+   * When height > 0, alignment is within the box height. The default value is Top.
    */
   VerticalAlign verticalAlign = VerticalAlign::Top;
 
@@ -78,9 +77,9 @@ class TextBox : public Element {
   float lineHeight = 1.2f;
 
   /**
-   * Whether automatic word wrapping is enabled. When true and width > 0, text wraps at the box
-   * width boundary. When false, text only breaks at explicit newline characters. The default value
-   * is false.
+   * Whether automatic word wrapping is enabled. When true, text wraps at the box width boundary
+   * (horizontal mode) or height boundary (vertical mode). When width/height is 0, each character
+   * wraps individually. The default value is false.
    */
   bool wordWrap = false;
 

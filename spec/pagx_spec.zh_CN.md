@@ -1044,7 +1044,7 @@ y = center.y + outerRadius * sin(angle)
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `text` | string | "" | 文本内容 |
-| `position` | Point | 0,0 | 文本起点位置，y 为基线（可被 TextBox 覆盖） |
+| `position` | Point | 0,0 | 文本起点位置，y 为基线（存在 TextBox 时被忽略） |
 | `fontFamily` | string | 系统默认 | 字体族 |
 | `fontStyle` | string | "Regular" | 字体变体（Regular, Bold, Italic, Bold Italic 等） |
 | `fontSize` | float | 12 | 字号 |
@@ -1531,10 +1531,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 #### 5.5.6 文本排版（TextBox）
 
-TextBox 是文本排版修改器，对累积的 Text 元素应用排版，会覆盖 Text 元素的原始位置（类似 TextPath 覆盖位置的行为）。支持两种模式：
-
-- **锚点模式**（size = 0,0）：position 作为对齐锚点，文本不自动换行
-- **盒子模式**（size > 0）：position 为文本框左上角，开启 wordWrap 时文本自动换行
+TextBox 是文本排版修改器，对累积的 Text 元素应用排版。存在 TextBox 时，Text 元素的 position 被忽略，字形位置完全由 TextBox 排版决定。
 
 第一行文本以 ascent 贴顶定位。渲染时会由附加的文字排版模块预先排版，重新计算每个字形的位置。TextBox 会被预排版展开，字形位置直接写入 Text。
 
@@ -1542,13 +1539,13 @@ TextBox 是文本排版修改器，对累积的 Text 元素应用排版，会覆
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `position` | Point | 0,0 | 排版原点（锚点模式为对齐锚点，盒子模式为左上角） |
-| `size` | Size | 0,0 | 排版尺寸；0,0 表示锚点模式（无盒子） |
+| `position` | Point | 0,0 | 文本区域左上角。当宽度或高度为 0 时，该维度上作为对齐参考点 |
+| `size` | Size | 0,0 | 排版尺寸。当宽度或高度为 0 时，该维度上文本无边界（wordWrap 时逐字符换行，对齐以 position 为参考点，overflow 裁剪无效） |
 | `textAlign` | TextAlign | start | 水平对齐（见下方） |
 | `verticalAlign` | VerticalAlign | top | 垂直对齐（见下方） |
 | `writingMode` | WritingMode | horizontal | 排版方向（见下方） |
 | `lineHeight` | float | 1.2 | 行高倍数 |
-| `wordWrap` | boolean | false | 是否启用自动换行（需 width > 0） |
+| `wordWrap` | boolean | false | 是否启用自动换行（在盒子宽度/高度边界处换行；该维度为 0 时逐字符换行） |
 | `overflow` | Overflow | visible | 文本超出盒子边界时的行为 |
 
 **TextAlign（水平对齐）**：

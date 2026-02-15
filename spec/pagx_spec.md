@@ -1044,7 +1044,7 @@ Text elements provide geometric shapes for text content. Unlike shape elements t
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `text` | string | "" | Text content |
-| `position` | Point | 0,0 | Text start position, y is baseline (may be overridden by TextBox) |
+| `position` | Point | 0,0 | Text start position, y is baseline (ignored when TextBox is present) |
 | `fontFamily` | string | system default | Font family |
 | `fontStyle` | string | "Regular" | Font variant (Regular, Bold, Italic, Bold Italic, etc.) |
 | `fontSize` | float | 12 | Font size |
@@ -1536,10 +1536,7 @@ redistributed evenly to fill the available path length.
 
 #### 5.5.6 TextBox
 
-TextBox is a text layout modifier that applies typography to accumulated Text elements. It overrides the original positions of Text elements (similar to how TextPath overrides positions). Two modes are supported:
-
-- **Anchor Mode** (size = 0,0): position serves as an anchor point for alignment; text does not auto-wrap
-- **Box Mode** (size > 0): position is the top-left corner of the text box; text auto-wraps when wordWrap is enabled
+TextBox is a text layout modifier that applies typography to accumulated Text elements. When present, the position of each Text element is ignored, and glyph positions are determined entirely by the TextBox layout.
 
 The first line of text is positioned with its ascent touching the top of the box (ascent-top alignment). During rendering, an attached text typesetting module performs pre-layout, recalculating each glyph's position. TextBox is expanded during pre-layout, with glyph positions written directly into Text.
 
@@ -1547,13 +1544,13 @@ The first line of text is positioned with its ascent touching the top of the box
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `position` | Point | 0,0 | Layout origin (anchor point in anchor mode, top-left corner in box mode) |
-| `size` | Size | 0,0 | Layout size; 0,0 means anchor mode (no box) |
+| `position` | Point | 0,0 | Top-left corner of the text area. When width or height is 0, serves as the alignment reference point in that dimension |
+| `size` | Size | 0,0 | Layout size. When width or height is 0, text has no boundary in that dimension (wordWrap wraps each character individually, alignment uses position as the reference point, overflow clipping has no effect) |
 | `textAlign` | TextAlign | start | Horizontal alignment |
 | `verticalAlign` | VerticalAlign | top | Vertical alignment |
 | `writingMode` | WritingMode | horizontal | Layout direction |
 | `lineHeight` | float | 1.2 | Line height multiplier |
-| `wordWrap` | boolean | false | Enable automatic word wrapping (requires width > 0) |
+| `wordWrap` | boolean | false | Enable automatic word wrapping (wraps at box width/height boundary; when the dimension is 0, each character wraps individually) |
 | `overflow` | Overflow | visible | Overflow behavior when text exceeds box boundaries |
 
 **TextAlign (Horizontal Alignment)**:
