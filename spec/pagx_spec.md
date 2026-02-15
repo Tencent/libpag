@@ -559,22 +559,15 @@ Painters (Fill, Stroke, etc.) bound to a layer are divided into background conte
 
 #### Layer Content
 
-**Layer content** refers to the complete rendering result of the layer's background content, child layers, and foreground content. Layer styles compute their effects based on layer content. For example, when fill is background and stroke is foreground, the stroke renders above child layers, but drop shadows are still calculated based on the complete layer content including fill, child layers, and stroke.
+**Layer content** refers to the complete rendering result of the layer's background content, child layers, and foreground content (steps 2–5 in the rendering pipeline). It does not include layer styles or layer filters. Layer styles compute their effects based on layer content. For example, when fill is background and stroke is foreground, the stroke renders above child layers, but drop shadows are still calculated based on the complete layer content including fill, child layers, and stroke.
 
 #### Layer Contour
 
-**Layer contour** is used for masking and certain layer styles. Compared to normal layer content, layer contour has these differences:
+**Layer contour** extracts opaque coverage from all painted geometry in the layer, producing a binary (opaque or fully transparent) mask. Geometry elements without painters do not participate. The conversion rules by color source type:
 
-1. **Includes geometry drawn with alpha=0**: Geometric shapes filled with completely transparent fills are included in the contour
-2. **Solid fills and gradient fills**: Original fills are ignored and replaced with opaque white drawing
-3. **Image fills**: Original pixels are preserved, but semi-transparent pixels are converted to fully opaque (fully transparent pixels are preserved)
-
-Note: Geometry elements must have painters to participate in the contour; standalone geometry elements (Rectangle, Ellipse, etc.) without corresponding Fill or Stroke do not participate in contour calculation.
-
-Layer contour is primarily used for:
-
-- **Layer Styles**: Some layer styles require contour as one of their input sources
-- **Masking**: `maskType="contour"` uses the mask layer's contour for clipping
+- **Solid color / gradient fills**: Original colors are replaced with opaque white
+- **Image fills**: Fully transparent pixels remain transparent; all other pixels become fully opaque
+- **Alpha=0 fills**: Geometry painted with completely transparent color is still included (treated as opaque coverage)
 
 #### Layer Background
 
@@ -637,6 +630,8 @@ Layer child elements are automatically categorized into four collections by type
 
 **preserve3D**: When `false` (default), child layers with 3D transforms are flattened into the parent's 2D plane before compositing. When `true`, child layers retain their 3D positions and are rendered in a shared 3D space, enabling depth-based intersections and correct z-ordering among siblings. Similar to CSS `transform-style: preserve-3d`.
 
+**excludeChildEffectsInLayerStyle**: When `false` (default), layer styles (e.g., DropShadowStyle) compute based on the full layer content including child layers' rendering results. When `true`, layer styles compute based only on the current layer's own painted content (Fill/Stroke), excluding all child layer rendering results.
+
 **Transform Attribute Priority**: `x`/`y`, `matrix`, and `matrix3D` have an override relationship:
 - Only `x`/`y` set: Uses `x`/`y` for translation
 - `matrix` set: `matrix` overrides `x`/`y` values
@@ -658,7 +653,7 @@ Layer styles add visual effects above or below layer content without modifying t
 
 **Input Sources for Layer Styles**:
 
-All layer styles compute effects based on **layer content**. In layer styles, layer content is automatically converted to **Opaque mode**: geometric shapes are rendered with normal fills, then all semi-transparent pixels are converted to fully opaque (fully transparent pixels are preserved). This means shadows produced by semi-transparent fills appear the same as those from fully opaque fills.
+All layer styles compute effects based on **layer content**. During computation, layer content is converted to its opaque counterpart: geometric shapes are rendered with their normal fills, then all semi-transparent pixels are converted to fully opaque (fully transparent pixels are preserved). This means shadows produced by semi-transparent fills appear the same as those from fully opaque fills.
 
 Some layer styles additionally use **layer contour** or **layer background** as input (see individual style descriptions). Definitions of layer contour and layer background are in Section 4.1.
 
@@ -1407,15 +1402,15 @@ Applies transforms and style overrides to glyphs within selected ranges. TextMod
 
 **Selector Calculation**:
 1. Calculate selection range based on RangeSelector's `start`, `end`, `offset` (supports any decimal value; automatically wraps when exceeding [0,1] range)
-2. Calculate influence factor (0~1) for each glyph based on `shape`
+2. Calculate raw influence value (0~1) for each glyph based on `shape`
 3. Combine multiple selectors according to `mode`
 
 **Transform Application**:
 
-The `factor` calculated by the selector ranges from [-1, 1] and controls the degree to which transform properties are applied:
+The final `factor` is derived from the raw influence value multiplied by `weight`, then clamped to [-1, 1]:
 
 ```
-factor = clamp(selectorFactor × weight, -1, 1)
+factor = clamp(rawInfluence × weight, -1, 1)
 ```
 
 Position and rotation are applied linearly with factor. Transforms are applied in the following order:
