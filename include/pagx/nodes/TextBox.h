@@ -75,15 +75,16 @@ enum class Overflow {
 };
 
 /**
- * TextBox is a text modifier that controls text layout and alignment for accumulated Text elements.
- * It overrides the position of Text elements and provides layout capabilities including:
+ * TextBox is a text layout node that controls typography for accumulated Text elements.
+ * It re-layouts glyph positions and provides layout capabilities including:
  * - Automatic word wrapping when wordWrap is enabled
  * - Horizontal/vertical writing mode
  * - Overflow control (visible or hidden)
  *
  * The position represents the top-left corner of the text area. When size is (0, 0), position
- * serves as the alignment reference point. The first line of text is positioned with its ascent
- * touching the top of the text area.
+ * serves as the alignment reference point. For horizontal mode, the first line is positioned with
+ * its ascent touching the top of the text area. For vertical mode, the first column is positioned
+ * with its right edge touching the right side, and columns flow from right to left.
  */
 class TextBox : public Element {
  public:
