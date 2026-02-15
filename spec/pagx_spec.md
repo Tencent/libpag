@@ -1540,7 +1540,7 @@ redistributed evenly to fill the available path length.
 
 TextBox is a text layout modifier that applies typography to accumulated Text elements. It re-layouts all glyph positions according to its own position, size, and alignment settings. The layout results are written into each Text element's GlyphRun data with inverse-transform compensation, so that Text's own position and parent Group transforms remain effective in the rendering pipeline. The first line of text is positioned with its ascent touching the top of the text area.
 
-TextBox is a **pre-layout-only** node: it is processed during the typesetting stage before rendering and is not instantiated in the render tree. If all accumulated Text elements already contain embedded GlyphRun data, the TextBox is skipped entirely.
+TextBox is a **pre-layout-only** node: it is processed during the typesetting stage before rendering and is not instantiated in the render tree. If all accumulated Text elements already contain embedded GlyphRun data, the TextBox is skipped during typesetting. However, the TextBox node should still be retained even when embedded GlyphRun data and fonts are present, as design tools may read its layout attributes (size, alignment, wordWrap, etc.) for editing purposes.
 
 > [Sample](samples/5.5.6_text_layout.pagx)
 

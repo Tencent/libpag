@@ -1535,7 +1535,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 TextBox 是文本排版修改器，对累积的 Text 元素应用排版。它根据自身的 position、size 和对齐设置重新排版所有字形位置，排版结果通过反向变换补偿写入每个 Text 元素的 GlyphRun 数据，因此 Text 自身的 position 和父级 Group 变换在渲染管线中仍然有效。第一行文本以 ascent 贴顶定位。
 
-TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被处理，不会在渲染树中实例化。如果累积的所有 Text 元素都已包含嵌入的 GlyphRun 数据，则 TextBox 会被完全跳过。
+TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被处理，不会在渲染树中实例化。如果累积的所有 Text 元素都已包含嵌入的 GlyphRun 数据，则排版阶段会跳过 TextBox。但即使已填写嵌入的 GlyphRun 数据和字体，仍建议保留 TextBox 节点，因为设计工具导入时需要读取其排版属性（size、对齐方式、wordWrap 等）用于编辑展示。
 
 > [Sample](samples/5.5.6_text_layout.pagx)
 
