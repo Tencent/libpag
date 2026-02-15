@@ -1542,6 +1542,8 @@ TextBox is a text layout modifier that applies typography to accumulated Text el
 
 TextBox is a **pre-layout-only** node: it is processed during the typesetting stage before rendering and is not instantiated in the render tree. If all accumulated Text elements already contain embedded GlyphRun data, the TextBox is skipped during typesetting. However, the TextBox node should still be retained even when embedded GlyphRun data and fonts are present, as design tools may read its layout attributes (size, alignment, wordWrap, etc.) for editing purposes.
 
+Unlike other modifiers that operate on accumulated results in a chain (e.g., TrimPath modifies the path output of previous elements), TextBox only affects the **initial layout** of Text elements. It determines glyph positions before the modifier chain begins. Subsequent modifiers such as TextPath and TextModifier operate on the TextBox layout results. The position of TextBox in the node order does not change this behavior.
+
 > [Sample](samples/5.5.6_text_layout.pagx)
 
 | Attribute | Type | Default | Description |

@@ -1537,6 +1537,8 @@ TextBox 是文本排版修改器，对累积的 Text 元素应用排版。它根
 
 TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被处理，不会在渲染树中实例化。如果累积的所有 Text 元素都已包含嵌入的 GlyphRun 数据，则排版阶段会跳过 TextBox。但即使已填写嵌入的 GlyphRun 数据和字体，仍建议保留 TextBox 节点，因为设计工具导入时需要读取其排版属性（size、对齐方式、wordWrap 等）用于编辑展示。
 
+与其他修改器不同（如 TrimPath 对累积结果进行链式操作），TextBox 只影响 Text 元素的**初始排版**。它在修改器链开始之前确定字形位置，后续的 TextPath、TextModifier 等修改器在 TextBox 的排版结果基础上工作。TextBox 在节点顺序中的位置不影响这一行为。
+
 > [Sample](samples/5.5.6_text_layout.pagx)
 
 | 属性 | 类型 | 默认值 | 说明 |
