@@ -1403,7 +1403,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 **选择器计算**：
 1. 根据 RangeSelector 的 `start`、`end`、`offset` 计算选择范围（支持任意小数值，超出 [0,1] 范围时自动环绕）
 2. 根据 `shape` 计算每个字形的原始影响值（0~1），然后乘以 `weight`
-3. 多个选择器按 `mode` 组合，组合结果钳制到 [-1, 1]
+3. 多个选择器按 `mode` 组合，组合结果限制到 [-1, 1]
 
 ```
 factor = clamp(combine(rawInfluence₁ × weight₁, rawInfluence₂ × weight₂, ...), -1, 1)
