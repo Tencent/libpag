@@ -1046,7 +1046,7 @@ Text elements provide geometric shapes for text content. Unlike shape elements t
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `text` | string | "" | Text content |
-| `position` | Point | 0,0 | Text start position, y is baseline (ignored when TextBox is present) |
+| `position` | Point | 0,0 | Text start position, y is baseline |
 | `fontFamily` | string | system default | Font family |
 | `fontStyle` | string | "Regular" | Font variant (Regular, Bold, Italic, Bold Italic, etc.) |
 | `fontSize` | float | 12 | Font size |
@@ -1538,7 +1538,7 @@ redistributed evenly to fill the available path length.
 
 #### 5.5.6 TextBox
 
-TextBox is a text layout modifier that applies typography to accumulated Text elements. When present, the position of each Text element is ignored, and glyph positions are determined entirely by the TextBox layout.
+TextBox is a text layout modifier that applies typography to accumulated Text elements. It re-layouts all glyph positions according to its own position, size, and alignment settings. The layout results are written into each Text element's GlyphRun data with inverse-transform compensation, so that Text's own position and parent Group transforms remain effective in the rendering pipeline.
 
 The first line of text is positioned with its ascent touching the top of the box (ascent-top alignment). During rendering, an attached text typesetting module performs pre-layout, recalculating each glyph's position. TextBox is expanded during pre-layout, with glyph positions written directly into Text.
 

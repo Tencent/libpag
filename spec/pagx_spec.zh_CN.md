@@ -1046,7 +1046,7 @@ y = center.y + outerRadius * sin(angle)
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `text` | string | "" | 文本内容 |
-| `position` | Point | 0,0 | 文本起点位置，y 为基线（存在 TextBox 时被忽略） |
+| `position` | Point | 0,0 | 文本起点位置，y 为基线 |
 | `fontFamily` | string | 系统默认 | 字体族 |
 | `fontStyle` | string | "Regular" | 字体变体（Regular, Bold, Italic, Bold Italic 等） |
 | `fontSize` | float | 12 | 字号 |
@@ -1533,7 +1533,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 #### 5.5.6 文本排版（TextBox）
 
-TextBox 是文本排版修改器，对累积的 Text 元素应用排版。存在 TextBox 时，Text 元素的 position 被忽略，字形位置完全由 TextBox 排版决定。
+TextBox 是文本排版修改器，对累积的 Text 元素应用排版。它根据自身的 position、size 和对齐设置重新排版所有字形位置，排版结果通过反向变换补偿写入每个 Text 元素的 GlyphRun 数据，因此 Text 自身的 position 和父级 Group 变换在渲染管线中仍然有效。
 
 第一行文本以 ascent 贴顶定位。渲染时会由附加的文字排版模块预先排版，重新计算每个字形的位置。TextBox 会被预排版展开，字形位置直接写入 Text。
 
