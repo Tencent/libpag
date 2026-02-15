@@ -61,12 +61,12 @@
     <!-- Player name & level -->
     <Layer x="80" y="28">
       <Text text="Aethon" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
-      <TextLayout position="0,0" textAlign="start"/>
+      <TextBox position="0,0" textAlign="start"/>
       <Fill color="#F8FAFC"/>
     </Layer>
     <Layer x="80" y="48">
       <Text text="Lv. 72  Paladin" fontFamily="Arial" fontSize="12"/>
-      <TextLayout position="0,0" textAlign="start"/>
+      <TextBox position="0,0" textAlign="start"/>
       <Fill color="#A89878"/>
     </Layer>
 
@@ -74,7 +74,7 @@
     <Layer name="HPBar" x="190" y="16">
       <Layer>
         <Text text="HP" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-        <TextLayout position="-10,9" textAlign="start"/>
+        <TextBox position="-10,9" textAlign="start"/>
         <Fill color="#FF2D2D"/>
       </Layer>
       <Layer>
@@ -89,7 +89,7 @@
       </Layer>
       <Layer>
         <Text text="2,847 / 3,800" fontFamily="Arial" fontSize="9"/>
-        <TextLayout position="105,8" textAlign="center"/>
+        <TextBox position="105,8" textAlign="center"/>
         <Fill color="#FFFFFFD0"/>
       </Layer>
     </Layer>
@@ -98,7 +98,7 @@
     <Layer name="MPBar" x="190" y="38">
       <Layer>
         <Text text="MP" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-        <TextLayout position="-10,9" textAlign="start"/>
+        <TextBox position="-10,9" textAlign="start"/>
         <Fill color="#4488FF"/>
       </Layer>
       <Layer>
@@ -113,7 +113,7 @@
       </Layer>
       <Layer>
         <Text text="1,250 / 2,000" fontFamily="Arial" fontSize="9"/>
-        <TextLayout position="105,8" textAlign="center"/>
+        <TextBox position="105,8" textAlign="center"/>
         <Fill color="#FFFFFFD0"/>
       </Layer>
     </Layer>
@@ -133,12 +133,12 @@
       </Layer>
       <Layer x="10" y="16">
         <Text text="G" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
-        <TextLayout position="0,4" textAlign="center"/>
+        <TextBox position="0,4" textAlign="center"/>
         <Fill color="#78350F"/>
       </Layer>
       <Layer>
         <Text text="128,450" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
-        <TextLayout position="70,22" textAlign="center"/>
+        <TextBox position="70,22" textAlign="center"/>
         <Fill color="#FFE880"/>
       </Layer>
     </Layer>
@@ -161,7 +161,7 @@
     </Layer>
     <Layer>
       <Text text="CHARACTER" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-      <TextLayout position="130,30" textAlign="center"/>
+      <TextBox position="130,30" textAlign="center"/>
       <Fill color="@titleGrad"/>
     </Layer>
 
@@ -347,12 +347,12 @@
       </Layer>
       <Layer>
         <Text text="ATK" fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="28,4" textAlign="start"/>
+        <TextBox position="28,4" textAlign="start"/>
         <Fill color="#A89878"/>
       </Layer>
       <Layer>
         <Text text="4,256" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <TextLayout position="198,5" textAlign="end"/>
+        <TextBox position="198,5" textAlign="end"/>
         <Fill color="#FF4444"/>
       </Layer>
 
@@ -363,12 +363,12 @@
       </Layer>
       <Layer y="28">
         <Text text="DEF" fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="28,4" textAlign="start"/>
+        <TextBox position="28,4" textAlign="start"/>
         <Fill color="#A89878"/>
       </Layer>
       <Layer y="28">
         <Text text="3,180" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <TextLayout position="198,5" textAlign="end"/>
+        <TextBox position="198,5" textAlign="end"/>
         <Fill color="#4488FF"/>
       </Layer>
 
@@ -379,12 +379,12 @@
       </Layer>
       <Layer y="56">
         <Text text="SPD" fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="28,4" textAlign="start"/>
+        <TextBox position="28,4" textAlign="start"/>
         <Fill color="#A89878"/>
       </Layer>
       <Layer y="56">
         <Text text="186" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <TextLayout position="198,5" textAlign="end"/>
+        <TextBox position="198,5" textAlign="end"/>
         <Fill color="#44DD88"/>
       </Layer>
 
@@ -395,12 +395,12 @@
       </Layer>
       <Layer y="84">
         <Text text="CRT" fontFamily="Arial" fontSize="12"/>
-        <TextLayout position="28,4" textAlign="start"/>
+        <TextBox position="28,4" textAlign="start"/>
         <Fill color="#A89878"/>
       </Layer>
       <Layer y="84">
         <Text text="42.5%" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <TextLayout position="198,5" textAlign="end"/>
+        <TextBox position="198,5" textAlign="end"/>
         <Fill color="#FFD700"/>
       </Layer>
     </Layer>
@@ -414,7 +414,7 @@
     <!-- Power number -->
     <Layer>
       <Text text="52,847" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
-      <TextLayout position="130,450" textAlign="center"/>
+      <TextBox position="130,450" textAlign="center"/>
       <Fill color="@titleGrad"/>
       <DropShadowStyle offsetY="2" blurX="8" blurY="8" color="#FFD70040"/>
     </Layer>
@@ -426,7 +426,7 @@
     <!-- Section title -->
     <Layer>
       <Text text="EQUIPMENT" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-      <TextLayout position="0,15" textAlign="start"/>
+      <TextBox position="0,15" textAlign="start"/>
       <Fill color="@titleGrad"/>
     </Layer>
     <Layer>
@@ -461,7 +461,7 @@
       <!-- Item name -->
       <Layer>
         <Text text="Excalibur" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-        <TextLayout position="65,108" textAlign="center"/>
+        <TextBox position="65,108" textAlign="center"/>
         <Fill color="#F8FAFC"/>
       </Layer>
       <!-- Rarity indicator -->
@@ -494,7 +494,7 @@
       </Layer>
       <Layer>
         <Text text="Aegis" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-        <TextLayout position="65,108" textAlign="center"/>
+        <TextBox position="65,108" textAlign="center"/>
         <Fill color="#F8FAFC"/>
       </Layer>
       <Layer>
@@ -526,7 +526,7 @@
       </Layer>
       <Layer>
         <Text text="Crown Helm" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-        <TextLayout position="65,108" textAlign="center"/>
+        <TextBox position="65,108" textAlign="center"/>
         <Fill color="#F8FAFC"/>
       </Layer>
       <Layer>
@@ -559,7 +559,7 @@
       </Layer>
       <Layer>
         <Text text="Elixir" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
-        <TextLayout position="65,108" textAlign="center"/>
+        <TextBox position="65,108" textAlign="center"/>
         <Fill color="#F8FAFC"/>
       </Layer>
       <Layer>
@@ -585,7 +585,7 @@
       </Layer>
       <Layer>
         <Text text="UPGRADE" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
-        <TextLayout position="110,28" textAlign="center"/>
+        <TextBox position="110,28" textAlign="center"/>
         <Fill color="#3D2200"/>
       </Layer>
 
@@ -598,7 +598,7 @@
       </Layer>
       <Layer x="240">
         <Text text="BATTLE" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
-        <TextLayout position="110,28" textAlign="center"/>
+        <TextBox position="110,28" textAlign="center"/>
         <Fill color="#FFF"/>
       </Layer>
     </Layer>
@@ -621,7 +621,7 @@
     <!-- Label -->
     <Layer>
       <Text text="EXP  12,500 / 18,000" fontFamily="Arial" fontSize="9"/>
-      <TextLayout position="400,13" textAlign="center"/>
+      <TextBox position="400,13" textAlign="center"/>
       <Fill color="#FFFFFFC0"/>
     </Layer>
   </Layer>
@@ -639,7 +639,7 @@
     </Layer>
     <Layer>
       <Text text="New legendary item discovered in the Ancient Ruins!" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
-      <TextLayout position="230,23" textAlign="center"/>
+      <TextBox position="230,23" textAlign="center"/>
       <Fill color="#FFF"/>
     </Layer>
   </Layer>
@@ -748,12 +748,12 @@
       </Layer>
       <Layer x="65" y="50">
         <Text text="+" fontFamily="Arial" fontSize="36"/>
-        <TextLayout position="0,0" textAlign="center"/>
+        <TextBox position="0,0" textAlign="center"/>
         <Fill color="#8B691440"/>
       </Layer>
       <Layer>
         <Text text="Empty" fontFamily="Arial" fontSize="11"/>
-        <TextLayout position="65,108" textAlign="center"/>
+        <TextBox position="65,108" textAlign="center"/>
         <Fill color="#5C451060"/>
       </Layer>
     </Composition>

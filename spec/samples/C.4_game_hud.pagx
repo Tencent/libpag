@@ -151,12 +151,12 @@
     <Layer>
       <Text text="100%" fontFamily="Arial" fontSize="24" fontStyle="Bold" position="-230,0"/>
       <Fill color="#FFF"/>
-      <TextLayout position="-240,10" textAlign="end"/>
+      <TextBox position="-240,10" textAlign="end"/>
     </Layer>
     <Layer>
       <Text text="STRUCTURAL INTEGRITY" fontFamily="Arial" fontSize="10" position="-230,20"/>
       <Fill color="#0088FF"/>
-      <TextLayout position="-240,25" textAlign="end"/>
+      <TextBox position="-240,25" textAlign="end"/>
     </Layer>
   </Layer>
 
@@ -166,17 +166,17 @@
     <Layer>
       <Text text="PWR: 88%" fontFamily="Arial" fontSize="12"/>
       <Fill color="#00CCFF" alpha="0.7"/>
-      <TextLayout textAlign="start"/>
+      <TextBox textAlign="start"/>
     </Layer>
     <Layer>
       <Text text="RADAR: ACT" fontFamily="Arial" fontSize="12"/>
       <Fill color="#00CCFF" alpha="0.7"/>
-      <TextLayout position="0,18" textAlign="start"/>
+      <TextBox position="0,18" textAlign="start"/>
     </Layer>
     <Layer>
       <Text text="SHIELD: OK" fontFamily="Arial" fontSize="12"/>
       <Fill color="#00CCFF" alpha="0.7"/>
-      <TextLayout position="0,36" textAlign="start"/>
+      <TextBox position="0,36" textAlign="start"/>
     </Layer>
   </Layer>
 
@@ -205,12 +205,12 @@
     <Layer>
       <Text text="60%" fontFamily="Arial" fontSize="24" fontStyle="Bold" position="230,0"/>
       <Fill color="#FFF"/>
-      <TextLayout position="240,10" textAlign="start"/>
+      <TextBox position="240,10" textAlign="start"/>
     </Layer>
     <Layer>
       <Text text="PLASMA RESERVES" fontFamily="Arial" fontSize="10" position="230,20"/>
       <Fill color="#0088FF"/>
-      <TextLayout position="240,25" textAlign="start"/>
+      <TextBox position="240,25" textAlign="start"/>
     </Layer>
   </Layer>
 
@@ -228,14 +228,14 @@
     <Layer>
       <Text text="MK-IV RAILGUN" fontFamily="Arial" fontSize="20" fontStyle="Bold"/>
       <Fill color="#FFF"/>
-      <TextLayout position="0,-15" textAlign="center"/>
+      <TextBox position="0,-15" textAlign="center"/>
     </Layer>
 
     <!-- Fire Mode -->
     <Layer>
       <Text text="[ BURST MODE ]" fontFamily="Arial" fontSize="12"/>
       <Fill color="#FFAA00"/>
-      <TextLayout position="0,5" textAlign="center"/>
+      <TextBox position="0,5" textAlign="center"/>
     </Layer>
 
     <!-- Decorative Tech Bits under frame -->
@@ -300,7 +300,7 @@
 [x] SECURE PERIMETER]]>
     </Text>
     <Fill color="#FFF"/>
-    <TextLayout textAlign="center" lineHeight="1.6"/>
+    <TextBox textAlign="center" lineHeight="1.6"/>
     <DropShadowStyle blurX="2" blurY="2" color="#000"/>
   </Layer>
 

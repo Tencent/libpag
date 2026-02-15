@@ -27,7 +27,7 @@
   <!-- ===== Title Area y=60 ===== -->
   <Layer name="Title">
     <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="56"/>
-    <TextLayout position="400,55" textAlign="center"/>
+    <TextBox position="400,55" textAlign="center"/>
     <Fill color="@titleGradient"/>
   </Layer>
   <Layer name="Subtitle">
@@ -86,7 +86,7 @@
   </Layer>
   <Layer y="325" x="148">
     <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
-    <TextLayout position="0,4" textAlign="center"/>
+    <TextBox position="0,4" textAlign="center"/>
     <Fill color="#FFF"/>
   </Layer>
   <Layer name="Modifiers" y="325">

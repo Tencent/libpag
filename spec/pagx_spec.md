@@ -834,7 +834,7 @@ The VectorElement system employs an **accumulate-render** processing model: geom
 | Term | Elements | Description |
 |------|----------|-------------|
 | **Geometry Elements** | Rectangle, Ellipse, Polystar, Path, Text | Elements providing geometric shapes; accumulate as a geometry list in the context |
-| **Modifiers** | TrimPath, RoundCorner, MergePath, TextModifier, TextPath, TextLayout, Repeater | Transform accumulated geometry |
+| **Modifiers** | TrimPath, RoundCorner, MergePath, TextModifier, TextPath, TextBox, Repeater | Transform accumulated geometry |
 | **Painters** | Fill, Stroke | Perform fill or stroke rendering on accumulated geometry |
 | **Containers** | Group | Create isolated scopes and apply matrix transforms; merge upon completion |
 
@@ -863,7 +863,7 @@ Geometry Elements        Modifiers              Painters
 │ Polystar │          │MergePath │          └────┬─────┘
 │   Path   │          │TextModif │               │
 │   Text   │          │ TextPath │               │
-└────┬─────┘          │TextLayout│               │
+└────┬─────┘          │TextBox   │               │
      │                │ Repeater │               │
      │                └────┬─────┘               │
      │                     │                     │
@@ -885,7 +885,7 @@ Different modifiers have different scopes over elements in the geometry list:
 | Modifier Type | Target | Description |
 |---------------|--------|-------------|
 | Shape modifiers (TrimPath, RoundCorner, MergePath) | Paths only | Trigger forced conversion for text |
-| Text modifiers (TextModifier, TextPath, TextLayout) | Glyph lists only | No effect on Paths |
+| Text modifiers (TextModifier, TextPath, TextBox) | Glyph lists only | No effect on Paths |
 | Repeater | Paths + glyph lists | Affects all geometry simultaneously |
 
 ### 5.2 Geometry Elements
@@ -1042,7 +1042,7 @@ Text elements provide geometric shapes for text content. Unlike shape elements t
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `text` | string | "" | Text content |
-| `position` | Point | 0,0 | Text start position, y is baseline (may be overridden by TextLayout) |
+| `position` | Point | 0,0 | Text start position, y is baseline (may be overridden by TextBox) |
 | `fontFamily` | string | system default | Font family |
 | `fontStyle` | string | "Regular" | Font variant (Regular, Bold, Italic, Bold Italic, etc.) |
 | `fontSize` | float | 12 | Font size |
@@ -1072,7 +1072,7 @@ Line 3]]>
 
 **Runtime Layout Rendering Flow**:
 1. Find system font based on `fontFamily` and `fontStyle`; if unavailable, select fallback font according to runtime-configured fallback list
-2. Shape using `text` attribute (or CDATA child node); newlines trigger line breaks (default 1.2× font size line height, customizable via TextLayout)
+2. Shape using `text` attribute (or CDATA child node); newlines trigger line breaks (default 1.2× font size line height, customizable via TextBox)
 3. Apply typography parameters: `fontSize`, `letterSpacing`, `baselineShift`
 4. Construct glyph list and accumulate to rendering context
 
@@ -1324,7 +1324,7 @@ When a text modifier is encountered, **all glyph lists** accumulated in the cont
   <Text text="Hello " fontFamily="Arial" fontSize="24"/>
   <Text text="World" fontFamily="Arial" fontSize="24"/>
   <TextModifier position="0,-5"/>
-  <TextLayout position="100,50" textAlign="center"/>
+  <TextBox position="100,50" textAlign="center"/>
   <Fill color="#333333"/>
 </Group>
 ```
@@ -1534,26 +1534,27 @@ redistributed evenly to fill the available path length.
 
 **Closed Paths**: For closed paths, glyphs exceeding the range wrap to the other end of the path.
 
-#### 5.5.6 TextLayout
+#### 5.5.6 TextBox
 
-TextLayout is a text layout modifier that applies typography to accumulated Text elements. It overrides the original positions of Text elements (similar to how TextPath overrides positions). Two modes are supported:
+TextBox is a text layout modifier that applies typography to accumulated Text elements. It overrides the original positions of Text elements (similar to how TextPath overrides positions). Two modes are supported:
 
-- **Point Text Mode** (no width): Text does not auto-wrap; textAlign controls text alignment relative to the (x, y) anchor point
-- **Paragraph Text Mode** (with width): Text auto-wraps within the specified width
+- **Anchor Mode** (size = 0,0): position serves as an anchor point for alignment; text does not auto-wrap
+- **Box Mode** (size > 0): position is the top-left corner of the text box; text auto-wraps when wordWrap is enabled
 
-During rendering, an attached text typesetting module performs pre-layout, recalculating each glyph's position. TextLayout is expanded during pre-layout, with glyph positions written directly into Text.
+The first line of text is positioned with its ascent touching the top of the box (ascent-top alignment). During rendering, an attached text typesetting module performs pre-layout, recalculating each glyph's position. TextBox is expanded during pre-layout, with glyph positions written directly into Text.
 
 > [Sample](samples/5.5.6_text_layout.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `position` | Point | 0,0 | Layout origin |
-| `width` | float | auto | Layout width (auto-wraps when specified) |
-| `height` | float | auto | Layout height (enables vertical alignment when specified) |
+| `position` | Point | 0,0 | Layout origin (anchor point in anchor mode, top-left corner in box mode) |
+| `size` | Size | 0,0 | Layout size; 0,0 means anchor mode (no box) |
 | `textAlign` | TextAlign | start | Horizontal alignment |
 | `verticalAlign` | VerticalAlign | top | Vertical alignment |
 | `writingMode` | WritingMode | horizontal | Layout direction |
 | `lineHeight` | float | 1.2 | Line height multiplier |
+| `wordWrap` | boolean | false | Enable automatic word wrapping (requires width > 0) |
+| `overflow` | Overflow | visible | Overflow behavior when text exceeds box boundaries |
 
 **TextAlign (Horizontal Alignment)**:
 
@@ -1579,13 +1580,20 @@ During rendering, an attached text typesetting module performs pre-layout, recal
 | `horizontal` | Horizontal text |
 | `vertical` | Vertical text (columns arranged right-to-left, traditional CJK vertical layout) |
 
+**Overflow (Overflow Behavior)**:
+
+| Value | Description |
+|-------|-------------|
+| `visible` | Text exceeding box boundaries is still rendered (default) |
+| `hidden` | Text exceeding box boundaries is clipped |
+
 #### 5.5.7 Rich Text
 
-Rich text is achieved through multiple Text elements within a Group, each Text having independent Fill/Stroke styles. TextLayout provides unified typography.
+Rich text is achieved through multiple Text elements within a Group, each Text having independent Fill/Stroke styles. TextBox provides unified typography.
 
 > [Sample](samples/5.5.7_rich_text.pagx)
 
-**Note**: Each Group's Text + Fill/Stroke defines a text segment with independent styling. TextLayout treats all segments as a single unit for typography, enabling auto-wrapping and alignment.
+**Note**: Each Group's Text + Fill/Stroke defines a text segment with independent styling. TextBox treats all segments as a single unit for typography, enabling auto-wrapping and alignment.
 
 ### 5.6 Repeater
 
@@ -1751,7 +1759,7 @@ This appendix describes node categorization and nesting rules.
 | **Layer Styles** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle` |
 | **Layer Filters** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter` |
 | **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` |
-| **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `TextLayout`, `Repeater` |
+| **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `TextBox`, `Repeater` |
 | **Painters** | `Fill`, `Stroke` |
 
 ### A.2 Document Containment
@@ -1803,7 +1811,7 @@ Layer / Group
 ├── MergePath
 ├── TextModifier → RangeSelector*
 ├── TextPath
-├── TextLayout
+├── TextBox
 ├── Repeater
 └── Group* (recursive)
 ```

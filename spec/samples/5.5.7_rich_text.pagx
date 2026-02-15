@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates rich text with mixed styles via shared TextLayout -->
+<!-- Demonstrates rich text with mixed styles via shared TextBox -->
 <pagx version="1.0" width="400" height="400">
   <Layer>
     <Text text="Rich Text" fontFamily="Arial" fontStyle="Bold" fontSize="42"/>
-    <TextLayout position="200,105" textAlign="center"/>
+    <TextBox position="200,105" textAlign="center"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="200,0">
         <ColorStop offset="0" color="#8B5CF6"/>
@@ -12,7 +12,7 @@
     </Fill>
   </Layer>
 
-  <!-- Rich text paragraph: multiple Groups with shared TextLayout -->
+  <!-- Rich text paragraph: multiple Groups with shared TextBox -->
   <Layer>
     <Group>
       <Text text="Supports " fontFamily="Arial" fontSize="20"/>
@@ -42,7 +42,7 @@
       <Text text=" text." fontFamily="Arial" fontSize="20"/>
       <Fill color="#475569"/>
     </Group>
-    <TextLayout position="30,165" textAlign="start"/>
+    <TextBox position="30,165" textAlign="start"/>
   </Layer>
 
   <Layer>
@@ -66,7 +66,7 @@
       <Text text=" within one line." fontFamily="Arial" fontSize="16"/>
       <Fill color="#475569"/>
     </Group>
-    <TextLayout position="30,215" textAlign="start"/>
+    <TextBox position="30,215" textAlign="start"/>
   </Layer>
 
   <Layer>
@@ -82,12 +82,12 @@
       <Text text=" rich text." fontFamily="Arial" fontSize="20"/>
       <Fill color="#475569"/>
     </Group>
-    <TextLayout position="200,265" textAlign="center"/>
+    <TextBox position="200,265" textAlign="center"/>
   </Layer>
 
   <Layer>
     <Text text="Gradient Fill" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
-    <TextLayout position="200,310" textAlign="center"/>
+    <TextBox position="200,310" textAlign="center"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="240,0">
         <ColorStop offset="0" color="#F43F5E"/>

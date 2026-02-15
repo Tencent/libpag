@@ -18,7 +18,7 @@
       </Layer>
       <Layer name="label">
         <Text text="Button" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
-        <TextLayout position="100,36" textAlign="center"/>
+        <TextBox position="100,36" textAlign="center"/>
         <Fill color="#FFF"/>
       </Layer>
     </Composition>
