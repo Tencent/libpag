@@ -43,8 +43,7 @@ class Text : public Element {
   std::string text = {};
 
   /**
-   * The position of the text origin (x, y where y is the baseline). This can be overridden by
-   * TextBox or TextPath modifiers. The default value is (0, 0).
+   * The position of the text origin (x, y where y is the baseline). The default value is (0, 0).
    */
   Point position = {};
 
