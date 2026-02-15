@@ -19,60 +19,14 @@
 #pragma once
 
 #include "pagx/nodes/Element.h"
+#include "pagx/types/Overflow.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/Size.h"
 #include "pagx/types/TextAlign.h"
+#include "pagx/types/VerticalAlign.h"
+#include "pagx/types/WritingMode.h"
 
 namespace pagx {
-
-/**
- * Text vertical alignment within the layout area.
- */
-enum class VerticalAlign {
-  /**
-   * Align text to the top of the layout area.
-   */
-  Top,
-  /**
-   * Align text to the vertical center of the layout area.
-   */
-  Center,
-  /**
-   * Align text to the bottom of the layout area.
-   */
-  Bottom
-};
-
-/**
- * Text writing mode (horizontal or vertical).
- */
-enum class WritingMode {
-  /**
-   * Horizontal text layout. Lines flow from top to bottom. This is the default mode for most
-   * languages.
-   */
-  Horizontal,
-  /**
-   * Vertical text layout. Characters are arranged vertically from top to bottom, and columns flow
-   * from right to left. This is the traditional writing mode for Chinese, Japanese, and Korean
-   * (CJK) text.
-   */
-  Vertical
-};
-
-/**
- * Text overflow behavior when text exceeds the box boundaries.
- */
-enum class Overflow {
-  /**
-   * Text that exceeds the box boundaries is still rendered (default).
-   */
-  Visible,
-  /**
-   * Text that exceeds the box boundaries is clipped and not rendered.
-   */
-  Hidden
-};
 
 /**
  * TextBox is a text layout node that controls typography for accumulated Text elements.
