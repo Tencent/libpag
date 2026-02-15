@@ -692,4 +692,199 @@ PAGX_TEST(PAGXTest, SampleFiles) {
   }
 }
 
+/**
+ * Test case: TextBox horizontal multi-line layout with word wrapping and alignment.
+ */
+PAGX_TEST(PAGXTest, TextBoxHorizontal) {
+  auto doc = pagx::PAGXDocument::Make(300, 400);
+  auto layer = doc->makeNode<pagx::Layer>();
+
+  // Group 1: Left-aligned text with word wrap
+  auto group1 = doc->makeNode<pagx::Group>();
+  auto text1 = doc->makeNode<pagx::Text>();
+  text1->text = "Hello World this is a long text that should wrap.";
+  text1->fontSize = 20;
+  text1->fontFamily = "NotoSansSC";
+  auto textBox1 = doc->makeNode<pagx::TextBox>();
+  textBox1->position = {10, 10};
+  textBox1->size = {280, 100};
+  textBox1->textAlign = pagx::TextAlign::Start;
+  textBox1->wordWrap = true;
+  auto fill1 = doc->makeNode<pagx::Fill>();
+  auto solid1 = doc->makeNode<pagx::SolidColor>();
+  solid1->color = {0, 0, 0, 1};
+  fill1->color = solid1;
+  group1->elements.push_back(text1);
+  group1->elements.push_back(textBox1);
+  group1->elements.push_back(fill1);
+  layer->contents.push_back(group1);
+
+  // Group 2: Center-aligned text with explicit newlines
+  auto group2 = doc->makeNode<pagx::Group>();
+  auto text2 = doc->makeNode<pagx::Text>();
+  text2->text = "Line One\nLine Two\nLine Three";
+  text2->fontSize = 18;
+  text2->fontFamily = "NotoSansSC";
+  auto textBox2 = doc->makeNode<pagx::TextBox>();
+  textBox2->position = {10, 130};
+  textBox2->size = {280, 100};
+  textBox2->textAlign = pagx::TextAlign::Center;
+  textBox2->verticalAlign = pagx::VerticalAlign::Center;
+  auto fill2 = doc->makeNode<pagx::Fill>();
+  auto solid2 = doc->makeNode<pagx::SolidColor>();
+  solid2->color = {0, 0, 0.6f, 1};
+  fill2->color = solid2;
+  group2->elements.push_back(text2);
+  group2->elements.push_back(textBox2);
+  group2->elements.push_back(fill2);
+  layer->contents.push_back(group2);
+
+  // Group 3: CJK text with word wrap
+  auto group3 = doc->makeNode<pagx::Group>();
+  auto text3 = doc->makeNode<pagx::Text>();
+  text3->text = "\xe4\xbd\xa0\xe5\xa5\xbd\xe4\xb8\x96\xe7\x95\x8c\xef\xbc\x8c"
+                "\xe8\xbf\x99\xe6\x98\xaf\xe4\xb8\x80\xe6\xae\xb5\xe6\xb5\x8b\xe8\xaf\x95"
+                "\xe6\x96\x87\xe6\x9c\xac\xe3\x80\x82";
+  text3->fontSize = 22;
+  text3->fontFamily = "NotoSansSC";
+  auto textBox3 = doc->makeNode<pagx::TextBox>();
+  textBox3->position = {10, 260};
+  textBox3->size = {280, 120};
+  textBox3->textAlign = pagx::TextAlign::End;
+  textBox3->verticalAlign = pagx::VerticalAlign::Bottom;
+  textBox3->wordWrap = true;
+  auto fill3 = doc->makeNode<pagx::Fill>();
+  auto solid3 = doc->makeNode<pagx::SolidColor>();
+  solid3->color = {0.6f, 0, 0, 1};
+  fill3->color = solid3;
+  group3->elements.push_back(text3);
+  group3->elements.push_back(textBox3);
+  group3->elements.push_back(fill3);
+  layer->contents.push_back(group3);
+
+  doc->layers.push_back(layer);
+
+  pagx::Typesetter typesetter;
+  typesetter.setFallbackTypefaces(GetFallbackTypefaces());
+  auto typesetterResult = typesetter.shape(doc.get());
+  ASSERT_FALSE(typesetterResult.shapedTextMap.empty());
+
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get(), &typesetter);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, 300, 400);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/TextBoxHorizontal"));
+}
+
+/**
+ * Test case: TextBox vertical text layout with CJK and mixed Latin characters.
+ */
+PAGX_TEST(PAGXTest, TextBoxVertical) {
+  auto doc = pagx::PAGXDocument::Make(300, 400);
+  auto layer = doc->makeNode<pagx::Layer>();
+
+  // CJK vertical text
+  auto group1 = doc->makeNode<pagx::Group>();
+  auto text1 = doc->makeNode<pagx::Text>();
+  text1->text = "\xe4\xbd\xa0\xe5\xa5\xbd\xe4\xb8\x96\xe7\x95\x8c";
+  text1->fontSize = 24;
+  text1->fontFamily = "NotoSansSC";
+  auto textBox1 = doc->makeNode<pagx::TextBox>();
+  textBox1->position = {10, 10};
+  textBox1->size = {280, 380};
+  textBox1->writingMode = pagx::WritingMode::Vertical;
+  textBox1->textAlign = pagx::TextAlign::Start;
+  auto fill1 = doc->makeNode<pagx::Fill>();
+  auto solid1 = doc->makeNode<pagx::SolidColor>();
+  solid1->color = {0, 0, 0, 1};
+  fill1->color = solid1;
+  group1->elements.push_back(text1);
+  group1->elements.push_back(textBox1);
+  group1->elements.push_back(fill1);
+  layer->contents.push_back(group1);
+
+  // Mixed CJK and Latin vertical text
+  auto group2 = doc->makeNode<pagx::Group>();
+  auto text2 = doc->makeNode<pagx::Text>();
+  text2->text = "\xe4\xb8\xad\xe6\x96\x87\xe6\xb7\xb7\xe5\x90\x88" "English\xe6\xb5\x8b\xe8\xaf\x95";
+  text2->fontSize = 20;
+  text2->fontFamily = "NotoSansSC";
+  auto textBox2 = doc->makeNode<pagx::TextBox>();
+  textBox2->position = {10, 10};
+  textBox2->size = {200, 380};
+  textBox2->writingMode = pagx::WritingMode::Vertical;
+  textBox2->textAlign = pagx::TextAlign::Center;
+  textBox2->verticalAlign = pagx::VerticalAlign::Center;
+  auto fill2 = doc->makeNode<pagx::Fill>();
+  auto solid2 = doc->makeNode<pagx::SolidColor>();
+  solid2->color = {0, 0, 0.6f, 1};
+  fill2->color = solid2;
+  group2->elements.push_back(text2);
+  group2->elements.push_back(textBox2);
+  group2->elements.push_back(fill2);
+  layer->contents.push_back(group2);
+
+  doc->layers.push_back(layer);
+
+  pagx::Typesetter typesetter;
+  typesetter.setFallbackTypefaces(GetFallbackTypefaces());
+  auto typesetterResult = typesetter.shape(doc.get());
+  ASSERT_FALSE(typesetterResult.shapedTextMap.empty());
+
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get(), &typesetter);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, 300, 400);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/TextBoxVertical"));
+}
+
+/**
+ * Test case: TextBox overflow hidden clips text exceeding box boundaries.
+ */
+PAGX_TEST(PAGXTest, TextBoxOverflowHidden) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+
+  auto group = doc->makeNode<pagx::Group>();
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Overflow text that is very long and should be clipped by the box boundary.";
+  text->fontSize = 20;
+  text->fontFamily = "NotoSansSC";
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->position = {10, 10};
+  textBox->size = {180, 80};
+  textBox->wordWrap = true;
+  textBox->overflow = pagx::Overflow::Hidden;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0, 0, 0, 1};
+  fill->color = solid;
+  group->elements.push_back(text);
+  group->elements.push_back(textBox);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+
+  doc->layers.push_back(layer);
+
+  pagx::Typesetter typesetter;
+  typesetter.setFallbackTypefaces(GetFallbackTypefaces());
+  auto typesetterResult = typesetter.shape(doc.get());
+  ASSERT_FALSE(typesetterResult.shapedTextMap.empty());
+
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get(), &typesetter);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, 200, 200);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/TextBoxOverflowHidden"));
+}
+
 }  // namespace pag
