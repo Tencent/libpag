@@ -26,7 +26,7 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Text.h"
-#include "pagx/nodes/TextLayout.h"
+#include "pagx/nodes/TextBox.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/ImageCodec.h"
@@ -151,21 +151,21 @@ class TypesetterContext {
   }
 
   void processLayerContents(const std::vector<Element*>& contents) {
-    const TextLayout* textLayout = nullptr;
+    const TextBox* textBox = nullptr;
     std::vector<Text*> textElements = {};
 
-    // First pass: find TextLayout and collect direct Text elements
+    // First pass: find TextBox and collect direct Text elements
     for (auto* element : contents) {
-      if (element->nodeType() == NodeType::TextLayout) {
-        textLayout = static_cast<const TextLayout*>(element);
+      if (element->nodeType() == NodeType::TextBox) {
+        textBox = static_cast<const TextBox*>(element);
       } else if (element->nodeType() == NodeType::Text) {
         textElements.push_back(static_cast<Text*>(element));
       }
     }
 
-    // Rich text mode: when TextLayout exists and there are Groups containing Text,
+    // Rich text mode: when TextBox exists and there are Groups containing Text,
     // collect Text elements from Groups for unified typography.
-    if (textLayout != nullptr && textElements.empty()) {
+    if (textBox != nullptr && textElements.empty()) {
       for (auto* element : contents) {
         if (element->nodeType() == NodeType::Group) {
           auto* group = static_cast<Group*>(element);
@@ -177,7 +177,7 @@ class TypesetterContext {
         }
       }
       if (!textElements.empty()) {
-        processRichTextWithLayout(textElements, textLayout);
+        processRichTextWithLayout(textElements, textBox);
         return;
       }
     }
@@ -190,7 +190,7 @@ class TypesetterContext {
     }
 
     if (!textElements.empty()) {
-      processTextWithLayout(textElements, textLayout);
+      processTextWithLayout(textElements, textBox);
     }
   }
 
@@ -199,12 +199,12 @@ class TypesetterContext {
       return;
     }
 
-    const TextLayout* textLayout = nullptr;
+    const TextBox* textBox = nullptr;
     std::vector<Text*> textElements = {};
 
     for (auto* element : group->elements) {
-      if (element->nodeType() == NodeType::TextLayout) {
-        textLayout = static_cast<const TextLayout*>(element);
+      if (element->nodeType() == NodeType::TextBox) {
+        textBox = static_cast<const TextBox*>(element);
       } else if (element->nodeType() == NodeType::Text) {
         textElements.push_back(static_cast<Text*>(element));
       } else if (element->nodeType() == NodeType::Group) {
@@ -213,7 +213,7 @@ class TypesetterContext {
     }
 
     if (!textElements.empty()) {
-      processTextWithLayout(textElements, textLayout);
+      processTextWithLayout(textElements, textBox);
     }
   }
 
@@ -262,7 +262,7 @@ class TypesetterContext {
   }
 
   void processRichTextWithLayout(std::vector<Text*>& textElements,
-                                   const TextLayout* textLayout) {
+                                   const TextBox* textBox) {
     if (tryUseEmbeddedGlyphRuns(textElements)) {
       return;
     }
@@ -291,17 +291,17 @@ class TypesetterContext {
     }
 
     // Calculate a single alignment offset based on total concatenated width
-    float xOffset = calculateLayoutOffset(textLayout, totalWidth) + textLayout->position.x;
-    float yOffset = textLayout->position.y;
+    float xOffset = calculateLayoutOffset(textBox, totalWidth) + textBox->position.x;
+    float yOffset = textBox->position.y;
 
     for (auto& info : shapedInfos) {
       buildTextBlobFromShapedInfo(info, xOffset, yOffset);
     }
   }
 
-  void processTextWithLayout(std::vector<Text*>& textElements, const TextLayout* textLayout) {
-    // If no TextLayout or all have embedded data, process each Text individually
-    if (textLayout == nullptr) {
+  void processTextWithLayout(std::vector<Text*>& textElements, const TextBox* textBox) {
+    // If no TextBox or all have embedded data, process each Text individually
+    if (textBox == nullptr) {
       for (auto* text : textElements) {
         if (!text->glyphRuns.empty()) {
           auto shapedText = buildShapedTextFromEmbeddedGlyphRuns(text);
@@ -317,7 +317,7 @@ class TypesetterContext {
       return;
     }
 
-    // TextLayout exists but some Text elements need re-typesetting.
+    // TextBox exists but some Text elements need re-typesetting.
     // Must re-typeset all Text elements together to apply layout correctly.
     std::vector<ShapedInfo> shapedInfos = {};
     shapedInfos.reserve(textElements.size());
@@ -331,13 +331,13 @@ class TypesetterContext {
       shapedInfos.push_back(std::move(info));
     }
 
-    // Apply TextLayout and create TextBlobs
+    // Apply TextBox and create TextBlobs
     for (auto& info : shapedInfos) {
-      float xOffset = calculateLayoutOffset(textLayout, info.totalWidth);
+      float xOffset = calculateLayoutOffset(textBox, info.totalWidth);
       float yOffset = 0;
-      if (textLayout->position.x != 0 || textLayout->position.y != 0) {
-        xOffset += textLayout->position.x - info.text->position.x;
-        yOffset = textLayout->position.y - info.text->position.y;
+      if (textBox->position.x != 0 || textBox->position.y != 0) {
+        xOffset += textBox->position.x - info.text->position.x;
+        yOffset = textBox->position.y - info.text->position.y;
       }
       buildTextBlobFromShapedInfo(info, xOffset, yOffset);
     }
@@ -614,7 +614,7 @@ class TypesetterContext {
     info.totalWidth = currentX;
   }
 
-  float calculateLayoutOffset(const TextLayout* layout, float textWidth) {
+  float calculateLayoutOffset(const TextBox* layout, float textWidth) {
     switch (layout->textAlign) {
       case TextAlign::Start:
         return 0;

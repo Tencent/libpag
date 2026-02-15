@@ -44,7 +44,7 @@ class Text : public Element {
 
   /**
    * The position of the text origin (x, y where y is the baseline). This can be overridden by
-   * TextLayout or TextPath modifiers. The default value is (0, 0).
+   * TextBox or TextPath modifiers. The default value is (0, 0).
    */
   Point position = {};
 

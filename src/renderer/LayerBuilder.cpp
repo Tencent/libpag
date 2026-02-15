@@ -252,8 +252,8 @@ class LayerBuilderContext {
         return convertTextModifier(static_cast<const TextModifier*>(node));
       case NodeType::Group:
         return convertGroup(static_cast<const Group*>(node));
-      case NodeType::TextLayout:
-        // TextLayout is handled in convertGroup, not converted directly.
+      case NodeType::TextBox:
+        // TextBox is handled in convertGroup, not converted directly.
         return nullptr;
       default:
         return nullptr;
@@ -611,8 +611,8 @@ class LayerBuilderContext {
     elements.reserve(node->elements.size());
 
     for (const auto& element : node->elements) {
-      // Skip TextLayout modifier - layout has been baked into GlyphRun positions by Typesetter
-      if (element->nodeType() == NodeType::TextLayout) {
+      // Skip TextBox modifier - layout has been baked into GlyphRun positions by Typesetter
+      if (element->nodeType() == NodeType::TextBox) {
         continue;
       }
 

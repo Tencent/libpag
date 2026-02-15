@@ -52,7 +52,7 @@
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
-#include "pagx/nodes/TextLayout.h"
+#include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
@@ -701,24 +701,31 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::TextLayout: {
-      auto layout = static_cast<const TextLayout*>(node);
-      xml.openElement("TextLayout");
-      if (layout->position.x != 0 || layout->position.y != 0) {
-        xml.addAttribute("position", pointToString(layout->position));
+    case NodeType::TextBox: {
+      auto textBox = static_cast<const TextBox*>(node);
+      xml.openElement("TextBox");
+      if (textBox->position.x != 0 || textBox->position.y != 0) {
+        xml.addAttribute("position", pointToString(textBox->position));
       }
-      xml.addAttribute("width", layout->width);
-      xml.addAttribute("height", layout->height);
-      if (layout->textAlign != TextAlign::Start) {
-        xml.addAttribute("textAlign", TextAlignToString(layout->textAlign));
+      if (textBox->size.width != 0 || textBox->size.height != 0) {
+        xml.addAttribute("size", sizeToString(textBox->size));
       }
-      if (layout->verticalAlign != VerticalAlign::Top) {
-        xml.addAttribute("verticalAlign", VerticalAlignToString(layout->verticalAlign));
+      if (textBox->textAlign != TextAlign::Start) {
+        xml.addAttribute("textAlign", TextAlignToString(textBox->textAlign));
       }
-      if (layout->writingMode != WritingMode::Horizontal) {
-        xml.addAttribute("writingMode", WritingModeToString(layout->writingMode));
+      if (textBox->verticalAlign != VerticalAlign::Top) {
+        xml.addAttribute("verticalAlign", VerticalAlignToString(textBox->verticalAlign));
       }
-      xml.addAttribute("lineHeight", layout->lineHeight, 1.2f);
+      if (textBox->writingMode != WritingMode::Horizontal) {
+        xml.addAttribute("writingMode", WritingModeToString(textBox->writingMode));
+      }
+      xml.addAttribute("lineHeight", textBox->lineHeight, 1.2f);
+      if (textBox->wordWrap) {
+        xml.addAttribute("wordWrap", textBox->wordWrap);
+      }
+      if (textBox->overflow != Overflow::Visible) {
+        xml.addAttribute("overflow", OverflowToString(textBox->overflow));
+      }
       xml.closeElementSelfClosing();
       break;
     }

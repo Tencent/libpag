@@ -57,7 +57,7 @@
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
-#include "pagx/nodes/TextLayout.h"
+#include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
@@ -107,7 +107,7 @@ static RoundCorner* parseRoundCorner(const DOMNode* node, PAGXDocument* doc);
 static MergePath* parseMergePath(const DOMNode* node, PAGXDocument* doc);
 static TextModifier* parseTextModifier(const DOMNode* node, PAGXDocument* doc);
 static TextPath* parseTextPath(const DOMNode* node, PAGXDocument* doc);
-static TextLayout* parseTextLayout(const DOMNode* node, PAGXDocument* doc);
+static TextBox* parseTextBox(const DOMNode* node, PAGXDocument* doc);
 static Repeater* parseRepeater(const DOMNode* node, PAGXDocument* doc);
 static Group* parseGroup(const DOMNode* node, PAGXDocument* doc);
 static RangeSelector* parseRangeSelector(const DOMNode* node, PAGXDocument* doc);
@@ -367,8 +367,8 @@ static Element* parseElement(const DOMNode* node, PAGXDocument* doc) {
   if (node->name == "TextPath") {
     return parseTextPath(node, doc);
   }
-  if (node->name == "TextLayout") {
-    return parseTextLayout(node, doc);
+  if (node->name == "TextBox") {
+    return parseTextBox(node, doc);
   }
   if (node->name == "Repeater") {
     return parseRepeater(node, doc);
@@ -726,21 +726,24 @@ static TextPath* parseTextPath(const DOMNode* node, PAGXDocument* doc) {
   return textPath;
 }
 
-static TextLayout* parseTextLayout(const DOMNode* node, PAGXDocument* doc) {
-  auto layout = doc->makeNode<TextLayout>(getAttribute(node, "id"));
-  if (!layout) {
+static TextBox* parseTextBox(const DOMNode* node, PAGXDocument* doc) {
+  auto textBox = doc->makeNode<TextBox>(getAttribute(node, "id"));
+  if (!textBox) {
     return nullptr;
   }
   auto positionStr = getAttribute(node, "position", "0,0");
   auto pos = parsePoint(positionStr);
-  layout->position = {pos.x, pos.y};
-  layout->width = getFloatAttribute(node, "width", 0);
-  layout->height = getFloatAttribute(node, "height", 0);
-  layout->textAlign = TextAlignFromString(getAttribute(node, "textAlign", "start"));
-  layout->verticalAlign = VerticalAlignFromString(getAttribute(node, "verticalAlign", "top"));
-  layout->writingMode = WritingModeFromString(getAttribute(node, "writingMode", "horizontal"));
-  layout->lineHeight = getFloatAttribute(node, "lineHeight", 1.2f);
-  return layout;
+  textBox->position = {pos.x, pos.y};
+  auto sizeStr = getAttribute(node, "size", "0,0");
+  auto sz = parseSize(sizeStr);
+  textBox->size = {sz.width, sz.height};
+  textBox->textAlign = TextAlignFromString(getAttribute(node, "textAlign", "start"));
+  textBox->verticalAlign = VerticalAlignFromString(getAttribute(node, "verticalAlign", "top"));
+  textBox->writingMode = WritingModeFromString(getAttribute(node, "writingMode", "horizontal"));
+  textBox->lineHeight = getFloatAttribute(node, "lineHeight", 1.2f);
+  textBox->wordWrap = getBoolAttribute(node, "wordWrap", false);
+  textBox->overflow = OverflowFromString(getAttribute(node, "overflow", "visible"));
+  return textBox;
 }
 
 static Repeater* parseRepeater(const DOMNode* node, PAGXDocument* doc) {

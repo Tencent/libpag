@@ -55,4 +55,18 @@ enum class WritingMode {
   Vertical
 };
 
+/**
+ * Text overflow behavior when text exceeds the box boundaries.
+ */
+enum class Overflow {
+  /**
+   * Text that exceeds the box boundaries is still rendered (default).
+   */
+  Visible,
+  /**
+   * Text that exceeds the box boundaries is clipped and not rendered.
+   */
+  Hidden
+};
+
 }  // namespace pagx

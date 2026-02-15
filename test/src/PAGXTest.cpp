@@ -41,7 +41,7 @@
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Text.h"
-#include "pagx/nodes/TextLayout.h"
+#include "pagx/nodes/TextBox.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Surface.h"
@@ -62,7 +62,7 @@ static pagx::Group* MakeCenteredTextGroup(pagx::PAGXDocument* doc, const std::st
   auto text = doc->makeNode<pagx::Text>();
   text->text = content;
   text->fontSize = fontSize;
-  auto layout = doc->makeNode<pagx::TextLayout>();
+  auto layout = doc->makeNode<pagx::TextBox>();
   layout->position = {centerX, y};
   layout->textAlign = pagx::TextAlign::Center;
   auto fill = doc->makeNode<pagx::Fill>();

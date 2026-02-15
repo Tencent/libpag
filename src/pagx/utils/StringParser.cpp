@@ -115,8 +115,8 @@ const char* NodeTypeName(NodeType type) {
       return "TextModifier";
     case NodeType::TextPath:
       return "TextPath";
-    case NodeType::TextLayout:
-      return "TextLayout";
+    case NodeType::TextBox:
+      return "TextBox";
     case NodeType::Group:
       return "Group";
     case NodeType::Repeater:
@@ -224,6 +224,10 @@ DEFINE_ENUM_CONVERSION(VerticalAlign, VerticalAlign::Top,
 DEFINE_ENUM_CONVERSION(WritingMode, WritingMode::Horizontal,
     {WritingMode::Horizontal, "horizontal"},
     {WritingMode::Vertical, "vertical"})
+
+DEFINE_ENUM_CONVERSION(Overflow, Overflow::Visible,
+    {Overflow::Visible, "visible"},
+    {Overflow::Hidden, "hidden"})
 
 DEFINE_ENUM_CONVERSION(SelectorUnit, SelectorUnit::Percentage,
     {SelectorUnit::Index, "index"},

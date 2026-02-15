@@ -51,7 +51,7 @@ class Typesetter {
   /**
    * Performs text shaping for all Text nodes in the document. If a Text node has embedded GlyphRun
    * data (from a loaded PAGX file), it uses that data directly. Otherwise, it performs text
-   * shaping using registered/fallback typefaces. TextLayout modifiers are processed to apply
+   * shaping using registered/fallback typefaces. TextBox modifiers are processed to apply
    * alignment, line breaking, and other layout properties.
    * @param document The document containing Text nodes to typeset.
    * @return TypesetterResult containing shaped text and stable iteration order.

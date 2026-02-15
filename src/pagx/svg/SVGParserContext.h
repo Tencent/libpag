@@ -40,7 +40,7 @@
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
-#include "pagx/nodes/TextLayout.h"
+#include "pagx/nodes/TextBox.h"
 #include "xml/XMLDOM.h"
 
 namespace pagx {

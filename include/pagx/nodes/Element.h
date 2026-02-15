@@ -25,7 +25,7 @@ namespace pagx {
 /**
  * Element is the base class for all elements in a shape layer. It includes shapes (Rectangle,
  * Ellipse, Polystar, Path, Text), painters (Fill, Stroke), modifiers (TrimPath, RoundCorner,
- * MergePath), text elements (TextModifier, TextPath, TextLayout), and containers (Group, Repeater).
+ * MergePath), text elements (TextModifier, TextPath, TextBox), and containers (Group, Repeater).
  */
 class Element : public Node {
  public:

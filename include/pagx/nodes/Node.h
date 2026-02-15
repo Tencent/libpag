@@ -170,9 +170,9 @@ enum class NodeType {
    */
   TextPath,
   /**
-   * A text modifier that controls text layout and alignment.
+   * A text modifier that controls text layout and alignment within a text box.
    */
-  TextLayout,
+  TextBox,
   /**
    * A container that groups multiple elements with its own transform.
    */
