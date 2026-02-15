@@ -44,6 +44,7 @@ local.properties
 
 # CodeBuddy
 .codebuddy/designs/
+CODEBUDDY.local.md
 
 /third_party
 /out
