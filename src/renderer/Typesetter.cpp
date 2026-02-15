@@ -19,6 +19,7 @@
 #include "Typesetter.h"
 #include <cmath>
 #include "LineBreaker.h"
+#include "VerticalTextUtils.h"
 #include "utils/Base64.h"
 #include "utils/MathUtil.h"
 #include "ToTGFX.h"
@@ -113,6 +114,21 @@ class TypesetterContext {
     float maxAscent = 0;
     float maxDescent = 0;
     float maxLineHeight = 0;
+  };
+
+  // A group of glyphs with the same vertical treatment in vertical text layout.
+  struct VerticalGlyphGroup {
+    std::vector<GlyphInfo> glyphs = {};
+    VerticalOrientation orientation = VerticalOrientation::Upright;
+    float height = 0;
+    float width = 0;
+  };
+
+  // Column of vertical text, containing groups of glyphs arranged top to bottom.
+  struct ColumnInfo {
+    std::vector<VerticalGlyphGroup> groups = {};
+    float height = 0;
+    float maxWidth = 0;
   };
 
   // Shaped text information for a single Text element.
@@ -314,8 +330,13 @@ class TypesetterContext {
       return;
     }
 
-    auto lines = layoutLines(allGlyphs, textBox);
-    buildTextBlobWithLayout(textBox, lines);
+    if (textBox->writingMode == WritingMode::Vertical) {
+      auto columns = layoutColumns(allGlyphs, textBox);
+      buildTextBlobVertical(textBox, columns);
+    } else {
+      auto lines = layoutLines(allGlyphs, textBox);
+      buildTextBlobWithLayout(textBox, lines);
+    }
   }
 
   void processTextWithLayout(std::vector<Text*>& textElements, const TextBox* textBox) {
@@ -347,8 +368,13 @@ class TypesetterContext {
         continue;
       }
 
-      auto lines = layoutLines(info.allGlyphs, textBox);
-      buildTextBlobWithLayout(textBox, lines);
+      if (textBox->writingMode == WritingMode::Vertical) {
+        auto columns = layoutColumns(info.allGlyphs, textBox);
+        buildTextBlobVertical(textBox, columns);
+      } else {
+        auto lines = layoutLines(info.allGlyphs, textBox);
+        buildTextBlobWithLayout(textBox, lines);
+      }
     }
   }
 
@@ -909,6 +935,340 @@ class TypesetterContext {
         for (size_t j = 0; j < count; j++) {
           buffer.glyphs[j] = glyphs[runStart + j].glyphID;
           positions[j] = tgfx::Point::Make(glyphs[runStart + j].x, glyphs[runStart + j].y);
+        }
+        runStart = runEnd;
+      }
+
+      auto textBlob = builder.build();
+      if (textBlob != nullptr) {
+        ShapedText shapedText = {};
+        shapedText.textBlob = textBlob;
+        StoreShapedText(text, std::move(shapedText));
+      }
+    }
+  }
+
+  static void FinishColumn(ColumnInfo* column) {
+    float height = 0;
+    float maxWidth = 0;
+    for (auto& group : column->groups) {
+      height += group.height;
+      if (group.width > maxWidth) {
+        maxWidth = group.width;
+      }
+    }
+    column->height = height;
+    column->maxWidth = maxWidth;
+  }
+
+  std::vector<ColumnInfo> layoutColumns(const std::vector<GlyphInfo>& allGlyphs,
+                                        const TextBox* textBox) {
+    std::vector<ColumnInfo> columns = {};
+    columns.emplace_back();
+    auto* currentColumn = &columns.back();
+    float currentColumnHeight = 0;
+    float boxHeight = textBox->size.height;
+    bool doWrap = textBox->wordWrap && boxHeight > 0;
+
+    size_t i = 0;
+    while (i < allGlyphs.size()) {
+      auto& glyph = allGlyphs[i];
+
+      if (glyph.unichar == '\n') {
+        FinishColumn(currentColumn);
+        columns.emplace_back();
+        currentColumn = &columns.back();
+        currentColumnHeight = 0;
+        i++;
+        continue;
+      }
+
+      auto orientation = VerticalTextUtils::getOrientation(glyph.unichar);
+
+      if (orientation == VerticalOrientation::Rotated &&
+          VerticalTextUtils::isRotatedGroupChar(glyph.unichar)) {
+        // Collect consecutive rotated-group characters into a single group.
+        VerticalGlyphGroup group = {};
+        group.orientation = VerticalOrientation::Rotated;
+        float groupHorizontalWidth = 0;
+        float groupMaxFontSize = 0;
+        while (i < allGlyphs.size() &&
+               allGlyphs[i].unichar != '\n' &&
+               VerticalTextUtils::isRotatedGroupChar(allGlyphs[i].unichar)) {
+          group.glyphs.push_back(allGlyphs[i]);
+          groupHorizontalWidth += allGlyphs[i].advance;
+          if (allGlyphs[i].fontSize > groupMaxFontSize) {
+            groupMaxFontSize = allGlyphs[i].fontSize;
+          }
+          i++;
+        }
+        // Rotated group: height = max font size, width = horizontal width sum.
+        group.height = groupMaxFontSize;
+        group.width = groupHorizontalWidth;
+
+        // Check wrap before adding.
+        if (doWrap && !currentColumn->groups.empty() &&
+            currentColumnHeight + group.height > boxHeight) {
+          FinishColumn(currentColumn);
+          columns.emplace_back();
+          currentColumn = &columns.back();
+          currentColumnHeight = 0;
+        }
+        currentColumnHeight += group.height;
+        currentColumn->groups.push_back(std::move(group));
+      } else {
+        // Single upright glyph (CJK, or non-groupable rotated character).
+        float verticalAdvance = glyph.font.getAdvance(glyph.glyphID, true);
+        if (verticalAdvance <= 0) {
+          verticalAdvance = glyph.fontSize;
+        }
+        float glyphWidth = glyph.advance;
+        if (glyphWidth <= 0) {
+          glyphWidth = glyph.fontSize;
+        }
+
+        // Check wrap before adding.
+        if (doWrap && !currentColumn->groups.empty() &&
+            currentColumnHeight + verticalAdvance > boxHeight) {
+          FinishColumn(currentColumn);
+          columns.emplace_back();
+          currentColumn = &columns.back();
+          currentColumnHeight = 0;
+        }
+
+        VerticalGlyphGroup group = {};
+        group.orientation = orientation;
+        group.glyphs.push_back(glyph);
+        group.height = verticalAdvance;
+        group.width = (orientation == VerticalOrientation::Upright) ? glyph.fontSize : glyphWidth;
+        currentColumnHeight += verticalAdvance;
+        currentColumn->groups.push_back(std::move(group));
+        i++;
+      }
+    }
+
+    FinishColumn(currentColumn);
+    return columns;
+  }
+
+  void buildTextBlobVertical(const TextBox* textBox, const std::vector<ColumnInfo>& columns) {
+    if (columns.empty()) {
+      return;
+    }
+
+    float boxWidth = textBox->size.width;
+    float boxHeight = textBox->size.height;
+
+    // Calculate total width: sum of all column maxWidths.
+    float totalWidth = 0;
+    for (auto& col : columns) {
+      totalWidth += col.maxWidth;
+    }
+
+    // Calculate max column height for vertical alignment.
+    float maxColumnHeight = 0;
+    for (auto& col : columns) {
+      if (col.height > maxColumnHeight) {
+        maxColumnHeight = col.height;
+      }
+    }
+
+    // Horizontal offset: columns go right-to-left, so Start = right-aligned.
+    // xStart is where the right edge of the first column starts.
+    float xStart = textBox->position.x;
+    if (boxWidth > 0) {
+      switch (textBox->textAlign) {
+        case TextAlign::Start:
+          xStart += boxWidth;
+          break;
+        case TextAlign::Center:
+          xStart += (boxWidth + totalWidth) / 2;
+          break;
+        case TextAlign::End:
+          xStart += totalWidth;
+          break;
+        case TextAlign::Justify:
+          xStart += boxWidth;
+          break;
+      }
+    } else {
+      // Anchor mode: position is anchor point.
+      switch (textBox->textAlign) {
+        case TextAlign::Start:
+          xStart += totalWidth;
+          break;
+        case TextAlign::Center:
+          xStart += totalWidth / 2;
+          break;
+        case TextAlign::End:
+          break;
+        case TextAlign::Justify:
+          xStart += totalWidth;
+          break;
+      }
+    }
+
+    // Vertical alignment offset.
+    float yBase = textBox->position.y;
+    if (boxHeight > 0) {
+      switch (textBox->verticalAlign) {
+        case VerticalAlign::Top:
+          break;
+        case VerticalAlign::Center:
+          yBase += (boxHeight - maxColumnHeight) / 2;
+          break;
+        case VerticalAlign::Bottom:
+          yBase += boxHeight - maxColumnHeight;
+          break;
+      }
+    } else {
+      switch (textBox->verticalAlign) {
+        case VerticalAlign::Top:
+          break;
+        case VerticalAlign::Center:
+          yBase -= maxColumnHeight / 2;
+          break;
+        case VerticalAlign::Bottom:
+          yBase -= maxColumnHeight;
+          break;
+      }
+    }
+
+    // Positioned glyph for vertical layout that can use either Point or RSXform.
+    struct VerticalPositionedGlyph {
+      tgfx::GlyphID glyphID = 0;
+      tgfx::Font font = {};
+      bool useRSXform = false;
+      tgfx::Point position = {};
+      tgfx::RSXform xform = {};
+    };
+    std::unordered_map<Text*, std::vector<VerticalPositionedGlyph>> textGlyphs = {};
+
+    float columnX = xStart;
+
+    for (auto& column : columns) {
+      // Move left by this column's width to get the left edge.
+      columnX -= column.maxWidth;
+      // Center of this column for centering upright glyphs.
+      float columnCenterX = columnX + column.maxWidth / 2;
+
+      float currentY = yBase;
+
+      for (auto& group : column.groups) {
+        if (group.glyphs.empty()) {
+          currentY += group.height;
+          continue;
+        }
+
+        if (group.orientation == VerticalOrientation::Upright) {
+          // Single upright glyph.
+          auto& g = group.glyphs[0];
+          auto transform = VerticalTextUtils::getPunctuationTransform(g.unichar);
+
+          VerticalPositionedGlyph vpg = {};
+          vpg.glyphID = g.glyphID;
+          vpg.font = g.font;
+
+          if (transform == PunctuationTransform::Rotate90) {
+            // Rotate 90° CW using RSXform: scos=0, ssin=1.
+            vpg.useRSXform = true;
+            // The glyph is drawn with its horizontal origin, then rotated.
+            // After 90° CW rotation around origin: (x,y) -> (y, -x).
+            // We translate to place it in the column center at currentY.
+            float tx = columnCenterX + g.fontSize / 2;
+            float ty = currentY;
+            vpg.xform = tgfx::RSXform::Make(0, 1, tx, ty);
+          } else if (transform == PunctuationTransform::Offset) {
+            vpg.useRSXform = false;
+            float dx = 0;
+            float dy = 0;
+            VerticalTextUtils::getPunctuationOffset(g.unichar, g.fontSize, &dx, &dy);
+            // Position upright glyph centered in column + offset.
+            float glyphX = columnCenterX - g.advance / 2 + dx;
+            float glyphY = currentY + fabsf(g.ascent) + dy;
+            vpg.position = tgfx::Point::Make(glyphX, glyphY);
+          } else {
+            // Normal upright: center horizontally in column, baseline at ascent offset.
+            vpg.useRSXform = false;
+            auto offset = g.font.getVerticalOffset(g.glyphID);
+            float glyphX = columnCenterX + offset.x;
+            float glyphY = currentY + group.height / 2 + offset.y;
+            vpg.position = tgfx::Point::Make(glyphX, glyphY);
+          }
+
+          textGlyphs[g.sourceText].push_back(vpg);
+        } else {
+          // Rotated group: all glyphs rotated 90° CW as a unit.
+          // Horizontal layout within the group, then the whole thing rotates.
+          // After rotation, the group's horizontal axis becomes vertical.
+          // The group is centered in the column.
+          // Position the group centered horizontally in the column.
+          // After 90° CW rotation, the horizontal text becomes vertical:
+          // - original x-axis → y-axis (downward)
+          // - original y-axis → x-axis (rightward, but negated)
+          float groupCenterX = columnCenterX;
+          float groupTopY = currentY;
+
+          float localX = 0;
+          for (auto& g : group.glyphs) {
+            VerticalPositionedGlyph vpg = {};
+            vpg.glyphID = g.glyphID;
+            vpg.font = g.font;
+            vpg.useRSXform = true;
+            // RSXform for 90° CW: scos=0, ssin=1.
+            // Matrix: | 0  -1  tx |
+            //         | 1   0  ty |
+            // The glyph at local position (localX, baseline=0) maps to:
+            //   finalX = -0 + tx = tx
+            //   finalY = localX + ty
+            // We want the group centered in the column width.
+            float tx = groupCenterX + g.fontSize / 2;
+            float ty = groupTopY + localX;
+            vpg.xform = tgfx::RSXform::Make(0, 1, tx, ty);
+            textGlyphs[g.sourceText].push_back(vpg);
+            localX += g.advance;
+          }
+        }
+        currentY += group.height;
+      }
+    }
+
+    // Build TextBlob for each Text element.
+    for (auto& [text, glyphs] : textGlyphs) {
+      if (glyphs.empty() || text == nullptr) {
+        continue;
+      }
+
+      tgfx::TextBlobBuilder builder = {};
+
+      // Separate into Point-positioned and RSXform-positioned runs.
+      // We need to batch consecutive glyphs of the same font and positioning mode.
+      size_t runStart = 0;
+      while (runStart < glyphs.size()) {
+        auto& runFont = glyphs[runStart].font;
+        bool runUseRSXform = glyphs[runStart].useRSXform;
+        size_t runEnd = runStart + 1;
+        while (runEnd < glyphs.size() &&
+               glyphs[runEnd].font == runFont &&
+               glyphs[runEnd].useRSXform == runUseRSXform) {
+          runEnd++;
+        }
+        size_t count = runEnd - runStart;
+
+        if (runUseRSXform) {
+          auto& buffer = builder.allocRunRSXform(runFont, count);
+          auto* xforms = reinterpret_cast<tgfx::RSXform*>(buffer.positions);
+          for (size_t j = 0; j < count; j++) {
+            buffer.glyphs[j] = glyphs[runStart + j].glyphID;
+            xforms[j] = glyphs[runStart + j].xform;
+          }
+        } else {
+          auto& buffer = builder.allocRunPos(runFont, count);
+          auto* positions = reinterpret_cast<tgfx::Point*>(buffer.positions);
+          for (size_t j = 0; j < count; j++) {
+            buffer.glyphs[j] = glyphs[runStart + j].glyphID;
+            positions[j] = glyphs[runStart + j].position;
+          }
         }
         runStart = runEnd;
       }
