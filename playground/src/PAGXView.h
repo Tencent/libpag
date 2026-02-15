@@ -21,7 +21,7 @@
 #include <deque>
 #include <emscripten/bind.h>
 #include "LayerBuilder.h"
-#include "Typesetter.h"
+#include "TextLayout.h"
 #include "pagx/PAGXDocument.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
@@ -77,7 +77,7 @@ class PAGXView {
   bool presentImmediately = true;
   float pagxWidth = 0.0f;
   float pagxHeight = 0.0f;
-  Typesetter typesetter = {};
+  TextLayout textLayout = {};
   std::shared_ptr<PAGXDocument> document = nullptr;
 
   // Background layer cache

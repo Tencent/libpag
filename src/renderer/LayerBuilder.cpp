@@ -611,7 +611,7 @@ class LayerBuilderContext {
     elements.reserve(node->elements.size());
 
     for (const auto& element : node->elements) {
-      // Skip TextBox modifier - layout has been baked into GlyphRun positions by Typesetter
+      // Skip TextBox modifier - layout has been baked into GlyphRun positions by TextLayout
       if (element->nodeType() == NodeType::TextBox) {
         continue;
       }
@@ -752,21 +752,21 @@ class LayerBuilderContext {
 
 // Public API implementation
 
-std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, Typesetter* typesetter) {
+std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, TextLayout* textLayout) {
   if (document == nullptr) {
     return nullptr;
   }
 
-  // Create ShapedTextMap using provided or default Typesetter
-  TypesetterResult typesetterResult = {};
-  if (typesetter != nullptr) {
-    typesetterResult = typesetter->shape(document);
+  // Create ShapedTextMap using provided or default TextLayout
+  TextLayoutResult layoutResult = {};
+  if (textLayout != nullptr) {
+    layoutResult = textLayout->layout(document);
   } else {
-    Typesetter defaultTypesetter;
-    typesetterResult = defaultTypesetter.shape(document);
+    TextLayout defaultTextLayout;
+    layoutResult = defaultTextLayout.layout(document);
   }
 
-  LayerBuilderContext context(typesetterResult.shapedTextMap);
+  LayerBuilderContext context(layoutResult.shapedTextMap);
   return context.build(*document);
 }
 

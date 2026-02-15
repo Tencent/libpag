@@ -28,17 +28,17 @@
 namespace pagx {
 
 /**
- * Typesetter performs text typesetting on PAGXDocument, converting Text elements into positioned
- * glyph data (TextBlob). It handles font matching, fallback, text shaping, and layout (alignment,
- * line breaking, etc.).
+ * TextLayout performs text layout on PAGXDocument, converting Text elements into positioned glyph
+ * data (TextBlob). It handles font matching, fallback, text shaping, and layout (alignment, line
+ * breaking, etc.).
  */
-class Typesetter {
+class TextLayout {
  public:
-  Typesetter() = default;
+  TextLayout() = default;
 
   /**
-   * Registers a typeface for font matching. When typesetting, registered typefaces are matched
-   * first by fontFamily and fontStyle. If no registered typeface matches, the system font is used.
+   * Registers a typeface for font matching. Registered typefaces are matched first by fontFamily
+   * and fontStyle. If no registered typeface matches, the system font is used.
    */
   void registerTypeface(std::shared_ptr<tgfx::Typeface> typeface);
 
@@ -49,17 +49,17 @@ class Typesetter {
   void setFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces);
 
   /**
-   * Performs text shaping for all Text nodes in the document. If a Text node has embedded GlyphRun
+   * Performs text layout for all Text nodes in the document. If a Text node has embedded GlyphRun
    * data (from a loaded PAGX file), it uses that data directly. Otherwise, it performs text
    * shaping using registered/fallback typefaces. TextBox modifiers are processed to apply
    * alignment, line breaking, and other layout properties.
-   * @param document The document containing Text nodes to typeset.
-   * @return TypesetterResult containing shaped text and stable iteration order.
+   * @param document The document containing Text nodes to layout.
+   * @return TextLayoutResult containing shaped text and stable iteration order.
    */
-  TypesetterResult shape(PAGXDocument* document);
+  TextLayoutResult layout(PAGXDocument* document);
 
  private:
-  friend class TypesetterContext;
+  friend class TextLayoutContext;
 
   struct FontKey {
     std::string family = {};

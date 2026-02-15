@@ -119,7 +119,7 @@ class PAGXDocument {
 
   friend class PAGXImporter;
   friend class PAGXExporter;
-  friend class TypesetterContext;
+  friend class TextLayoutContext;
 };
 
 }  // namespace pagx

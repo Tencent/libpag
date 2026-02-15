@@ -105,7 +105,7 @@ void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
       fallbackTypefaces.push_back(std::move(typeface));
     }
   }
-  typesetter.setFallbackTypefaces(std::move(fallbackTypefaces));
+  textLayout.setFallbackTypefaces(std::move(fallbackTypefaces));
 }
 
 void PAGXView::loadPAGX(const val& pagxData) {
@@ -144,7 +144,7 @@ void PAGXView::buildLayers() {
   if (!document) {
     return;
   }
-  contentLayer = LayerBuilder::Build(document.get(), &typesetter);
+  contentLayer = LayerBuilder::Build(document.get(), &textLayout);
   if (!contentLayer) {
     return;
   }

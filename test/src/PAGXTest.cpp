@@ -25,7 +25,7 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/SVGImporter.h"
-#include "Typesetter.h"
+#include "TextLayout.h"
 #include "FontEmbedder.h"
 #include "ShapedText.h"
 #include "utils/StringParser.h"
@@ -126,9 +126,9 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
 
   std::sort(svgFiles.begin(), svgFiles.end());
 
-  // Create Typesetter for text shaping
-  pagx::Typesetter typesetter;
-  typesetter.setFallbackTypefaces(GetFallbackTypefaces());
+  // Create TextLayout for text layout
+  pagx::TextLayout textLayout;
+  textLayout.setFallbackTypefaces(GetFallbackTypefaces());
 
   for (const auto& svgPath : svgFiles) {
     std::string baseName = std::filesystem::path(svgPath).stem().string();
@@ -146,9 +146,9 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
     }
 
     // Step 2: Typeset text elements and embed fonts
-    auto typesetterResult = typesetter.shape(doc.get());
-    pagx::FontEmbedder().embed(doc.get(), typesetterResult.shapedTextMap,
-                               typesetterResult.textOrder);
+    auto layoutResult = textLayout.layout(doc.get());
+    pagx::FontEmbedder().embed(doc.get(), layoutResult.shapedTextMap,
+                               layoutResult.textOrder);
 
     // Step 3: Export to XML and save as PAGX file
     std::string xml = pagx::PAGXExporter::ToXML(*doc);
@@ -468,12 +468,12 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
       MakeCenteredTextGroup(doc.get(), "Embedded Font", 18, 120, 115, {0.5f, 0.5f, 0.5f, 1.0f}));
   doc->layers.push_back(layer);
 
-  pagx::Typesetter typesetter;
-  typesetter.setFallbackTypefaces(GetFallbackTypefaces());
-  auto typesetterResult = typesetter.shape(doc.get());
-  ASSERT_FALSE(typesetterResult.shapedTextMap.empty());
-  pagx::FontEmbedder().embed(doc.get(), typesetterResult.shapedTextMap,
-                             typesetterResult.textOrder);
+  pagx::TextLayout textLayout;
+  textLayout.setFallbackTypefaces(GetFallbackTypefaces());
+  auto layoutResult = textLayout.layout(doc.get());
+  ASSERT_FALSE(layoutResult.shapedTextMap.empty());
+  pagx::FontEmbedder().embed(doc.get(), layoutResult.shapedTextMap,
+                             layoutResult.textOrder);
 
   auto xml = pagx::PAGXExporter::ToXML(*doc);
   ASSERT_FALSE(xml.empty());
@@ -563,14 +563,14 @@ PAGX_TEST(PAGXTest, TextShaperRoundTrip) {
 
   auto typefaces = GetFallbackTypefaces();
 
-  pagx::Typesetter typesetter;
-  typesetter.setFallbackTypefaces(typefaces);
-  auto typesetterResult = typesetter.shape(doc.get());
-  EXPECT_FALSE(typesetterResult.shapedTextMap.empty());
-  pagx::FontEmbedder().embed(doc.get(), typesetterResult.shapedTextMap,
-                             typesetterResult.textOrder);
+  pagx::TextLayout textLayout;
+  textLayout.setFallbackTypefaces(typefaces);
+  auto layoutResult = textLayout.layout(doc.get());
+  EXPECT_FALSE(layoutResult.shapedTextMap.empty());
+  pagx::FontEmbedder().embed(doc.get(), layoutResult.shapedTextMap,
+                             layoutResult.textOrder);
 
-  auto originalLayer = pagx::LayerBuilder::Build(doc.get(), &typesetter);
+  auto originalLayer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
   ASSERT_TRUE(originalLayer != nullptr);
 
   auto originalSurface = Surface::Make(context, canvasWidth, canvasHeight);
@@ -610,15 +610,15 @@ PAGX_TEST(PAGXTest, TextShaperEmoji) {
   auto typefaces = GetFallbackTypefaces();
 
   // Typeset text and embed fonts
-  pagx::Typesetter typesetter;
-  typesetter.setFallbackTypefaces(typefaces);
-  auto typesetterResult = typesetter.shape(doc.get());
-  EXPECT_FALSE(typesetterResult.shapedTextMap.empty());
-  pagx::FontEmbedder().embed(doc.get(), typesetterResult.shapedTextMap,
-                             typesetterResult.textOrder);
+  pagx::TextLayout textLayout;
+  textLayout.setFallbackTypefaces(typefaces);
+  auto layoutResult = textLayout.layout(doc.get());
+  EXPECT_FALSE(layoutResult.shapedTextMap.empty());
+  pagx::FontEmbedder().embed(doc.get(), layoutResult.shapedTextMap,
+                             layoutResult.textOrder);
 
   // Render typeset document
-  auto originalLayer = pagx::LayerBuilder::Build(doc.get(), &typesetter);
+  auto originalLayer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
   ASSERT_TRUE(originalLayer != nullptr);
 
   auto originalSurface = Surface::Make(context, canvasWidth, canvasHeight);
@@ -660,8 +660,8 @@ PAGX_TEST(PAGXTest, SampleFiles) {
   }
   std::sort(sampleFiles.begin(), sampleFiles.end());
 
-  pagx::Typesetter typesetter;
-  typesetter.setFallbackTypefaces(GetFallbackTypefaces());
+  pagx::TextLayout textLayout;
+  textLayout.setFallbackTypefaces(GetFallbackTypefaces());
 
   for (const auto& filePath : sampleFiles) {
     auto baseName = std::filesystem::path(filePath).stem().string();
@@ -672,9 +672,9 @@ PAGX_TEST(PAGXTest, SampleFiles) {
       continue;
     }
 
-    auto typesetterResult = typesetter.shape(doc.get());
-    pagx::FontEmbedder().embed(doc.get(), typesetterResult.shapedTextMap,
-                               typesetterResult.textOrder);
+    auto layoutResult = textLayout.layout(doc.get());
+    pagx::FontEmbedder().embed(doc.get(), layoutResult.shapedTextMap,
+                               layoutResult.textOrder);
 
     auto layer = pagx::LayerBuilder::Build(doc.get());
     if (!layer) {
@@ -764,12 +764,12 @@ PAGX_TEST(PAGXTest, TextBoxHorizontal) {
 
   doc->layers.push_back(layer);
 
-  pagx::Typesetter typesetter;
-  typesetter.setFallbackTypefaces(GetFallbackTypefaces());
-  auto typesetterResult = typesetter.shape(doc.get());
-  ASSERT_FALSE(typesetterResult.shapedTextMap.empty());
+  pagx::TextLayout textLayout;
+  textLayout.setFallbackTypefaces(GetFallbackTypefaces());
+  auto layoutResult = textLayout.layout(doc.get());
+  ASSERT_FALSE(layoutResult.shapedTextMap.empty());
 
-  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get(), &typesetter);
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
   ASSERT_TRUE(tgfxLayer != nullptr);
 
   auto surface = Surface::Make(context, 300, 400);
@@ -829,12 +829,12 @@ PAGX_TEST(PAGXTest, TextBoxVertical) {
 
   doc->layers.push_back(layer);
 
-  pagx::Typesetter typesetter;
-  typesetter.setFallbackTypefaces(GetFallbackTypefaces());
-  auto typesetterResult = typesetter.shape(doc.get());
-  ASSERT_FALSE(typesetterResult.shapedTextMap.empty());
+  pagx::TextLayout textLayout;
+  textLayout.setFallbackTypefaces(GetFallbackTypefaces());
+  auto layoutResult = textLayout.layout(doc.get());
+  ASSERT_FALSE(layoutResult.shapedTextMap.empty());
 
-  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get(), &typesetter);
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
   ASSERT_TRUE(tgfxLayer != nullptr);
 
   auto surface = Surface::Make(context, 300, 400);
@@ -872,12 +872,12 @@ PAGX_TEST(PAGXTest, TextBoxOverflowHidden) {
 
   doc->layers.push_back(layer);
 
-  pagx::Typesetter typesetter;
-  typesetter.setFallbackTypefaces(GetFallbackTypefaces());
-  auto typesetterResult = typesetter.shape(doc.get());
-  ASSERT_FALSE(typesetterResult.shapedTextMap.empty());
+  pagx::TextLayout textLayout;
+  textLayout.setFallbackTypefaces(GetFallbackTypefaces());
+  auto layoutResult = textLayout.layout(doc.get());
+  ASSERT_FALSE(layoutResult.shapedTextMap.empty());
 
-  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get(), &typesetter);
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
   ASSERT_TRUE(tgfxLayer != nullptr);
 
   auto surface = Surface::Make(context, 200, 200);

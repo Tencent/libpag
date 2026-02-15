@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "Typesetter.h"
+#include "TextLayout.h"
 #include <cmath>
 #include "LineBreaker.h"
 #include "VerticalTextUtils.h"
@@ -38,7 +38,7 @@
 
 namespace pagx {
 
-void Typesetter::registerTypeface(std::shared_ptr<tgfx::Typeface> typeface) {
+void TextLayout::registerTypeface(std::shared_ptr<tgfx::Typeface> typeface) {
   if (typeface == nullptr) {
     return;
   }
@@ -48,18 +48,18 @@ void Typesetter::registerTypeface(std::shared_ptr<tgfx::Typeface> typeface) {
   registeredTypefaces[key] = std::move(typeface);
 }
 
-void Typesetter::setFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces) {
+void TextLayout::setFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces) {
   fallbackTypefaces = std::move(typefaces);
 }
 
-// Build context that maintains state during text typesetting
-class TypesetterContext {
+// Build context that maintains state during text layout
+class TextLayoutContext {
  public:
-  TypesetterContext(const Typesetter* typesetter, PAGXDocument* document)
-      : typesetter(typesetter), document(document) {
+  TextLayoutContext(const TextLayout* textLayout, PAGXDocument* document)
+      : textLayout(textLayout), document(document) {
   }
 
-  TypesetterResult run() {
+  TextLayoutResult run() {
     if (document == nullptr) {
       return {};
     }
@@ -79,7 +79,7 @@ class TypesetterContext {
       }
     }
 
-    TypesetterResult output = {};
+    TextLayoutResult output = {};
     output.shapedTextMap = std::move(result);
     output.textOrder = std::move(textOrder);
     return output;
@@ -139,7 +139,7 @@ class TypesetterContext {
     std::vector<GlyphInfo> allGlyphs = {};
   };
 
-  using FontKey = Typesetter::FontKey;
+  using FontKey = TextLayout::FontKey;
 
   void StoreShapedText(Text* text, ShapedText&& shapedText) {
     if (text == nullptr || shapedText.textBlob == nullptr) {
@@ -454,7 +454,7 @@ class TypesetterContext {
 
       // Note: scales, rotations, skews are NOT processed here.
       // These transform attributes should be handled by tgfx layer (similar to TextModifier).
-      // Typesetter only computes position information for TextBlob.
+      // TextLayout only computes position information for TextBlob.
 
       if (!run->positions.empty() && run->positions.size() >= count) {
         // Point mode: each glyph has (x, y) offset combined with overall x/y
@@ -570,7 +570,7 @@ class TypesetterContext {
 
     // Pre-build fallback font cache to avoid repeated construction in the inner loop.
     std::unordered_map<tgfx::Typeface*, tgfx::Font> fallbackFontCache = {};
-    for (const auto& fallback : typesetter->fallbackTypefaces) {
+    for (const auto& fallback : textLayout->fallbackTypefaces) {
       if (fallback != nullptr && fallback != primaryTypeface) {
         fallbackFontCache.emplace(fallback.get(), tgfx::Font(fallback, text->fontSize));
       }
@@ -608,7 +608,7 @@ class TypesetterContext {
       std::shared_ptr<tgfx::Typeface> glyphTypeface = primaryTypeface;
 
       if (glyphID == 0) {
-        for (const auto& fallback : typesetter->fallbackTypefaces) {
+        for (const auto& fallback : textLayout->fallbackTypefaces) {
           auto it = fallbackFontCache.find(fallback.get());
           if (it == fallbackFontCache.end()) {
             continue;
@@ -1322,8 +1322,8 @@ class TypesetterContext {
       FontKey key = {};
       key.family = fontFamily;
       key.style = fontStyle.empty() ? "Regular" : fontStyle;
-      auto it = typesetter->registeredTypefaces.find(key);
-      if (it != typesetter->registeredTypefaces.end()) {
+      auto it = textLayout->registeredTypefaces.find(key);
+      if (it != textLayout->registeredTypefaces.end()) {
         return it->second;
       }
 
@@ -1331,7 +1331,7 @@ class TypesetterContext {
       std::shared_ptr<tgfx::Typeface> bestTypeface = nullptr;
       FontKey bestKey = {};
       bool hasBest = false;
-      for (const auto& pair : typesetter->registeredTypefaces) {
+      for (const auto& pair : textLayout->registeredTypefaces) {
         if (pair.first.family != fontFamily) {
           continue;
         }
@@ -1353,7 +1353,7 @@ class TypesetterContext {
 
     // Then, try fallback typefaces by family name
     if (!fontFamily.empty()) {
-      for (const auto& tf : typesetter->fallbackTypefaces) {
+      for (const auto& tf : textLayout->fallbackTypefaces) {
         if (tf != nullptr && tf->fontFamily() == fontFamily) {
           return tf;
         }
@@ -1361,8 +1361,8 @@ class TypesetterContext {
     }
 
     // Use first fallback typeface
-    if (!typesetter->fallbackTypefaces.empty()) {
-      return typesetter->fallbackTypefaces[0];
+    if (!textLayout->fallbackTypefaces.empty()) {
+      return textLayout->fallbackTypefaces[0];
     }
 
     // Last resort: try system font
@@ -1373,15 +1373,15 @@ class TypesetterContext {
     return nullptr;
   }
 
-  const Typesetter* typesetter = nullptr;
+  const TextLayout* textLayout = nullptr;
   PAGXDocument* document = nullptr;
   ShapedTextMap result = {};
   std::vector<Text*> textOrder = {};
   std::unordered_map<const Font*, std::shared_ptr<tgfx::Typeface>> fontCache = {};
 };
 
-TypesetterResult Typesetter::shape(PAGXDocument* document) {
-  TypesetterContext context(this, document);
+TextLayoutResult TextLayout::layout(PAGXDocument* document) {
+  TextLayoutContext context(this, document);
   return context.run();
 }
 

@@ -49,9 +49,9 @@ struct ShapedText {
 using ShapedTextMap = std::unordered_map<const Text*, ShapedText>;
 
 /**
- * Typesetter output containing shaped text and stable Text iteration order.
+ * TextLayout output containing shaped text and stable Text iteration order.
  */
-struct TypesetterResult {
+struct TextLayoutResult {
   ShapedTextMap shapedTextMap = {};
   std::vector<Text*> textOrder = {};
 };
