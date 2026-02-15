@@ -1548,7 +1548,7 @@ Unlike other modifiers that operate on accumulated results in a chain (e.g., Tri
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `position` | Point | 0,0 | Top-left corner of the text area. When width or height is 0, serves as the alignment reference point in that dimension |
+| `position` | Point | 0,0 | Top-left corner of the text area. When width or height is 0, serves as the anchor point for alignment in that dimension (see below) |
 | `size` | Size | 0,0 | Layout size. When width or height is 0, text has no boundary in that dimension (wordWrap wraps each character individually, alignment uses position as the reference point) |
 | `textAlign` | TextAlign | start | Horizontal alignment |
 | `verticalAlign` | VerticalAlign | top | Vertical alignment |
@@ -1566,6 +1566,8 @@ Unlike other modifiers that operate on accumulated results in a chain (e.g., Tri
 | `end` | End alignment (right-aligned; left-aligned for RTL text) |
 | `justify` | Justified (last line start-aligned) |
 
+When width is 0, alignment is relative to `position.x` as an anchor: `start` places text starting at the anchor, `center` places the visual center of each line at the anchor, and `end` places the trailing edge at the anchor.
+
 **VerticalAlign (Vertical Alignment)**:
 
 | Value | Description |
@@ -1573,6 +1575,8 @@ Unlike other modifiers that operate on accumulated results in a chain (e.g., Tri
 | `top` | Top alignment |
 | `center` | Vertical center |
 | `bottom` | Bottom alignment |
+
+When height is 0, alignment is relative to `position.y` as an anchor: `top` places text starting downward from the anchor, `center` places the vertical midpoint of all lines at the anchor, and `bottom` places the bottom edge of the last line at the anchor.
 
 **WritingMode (Layout Direction)**:
 
