@@ -559,7 +559,9 @@ Painters (Fill, Stroke, etc.) bound to a layer are divided into background conte
 
 #### Layer Content
 
-**Layer content** refers to the complete rendering result of the layer's background content, child layers, and foreground content (steps 2–5 in the rendering pipeline). It does not include layer styles or layer filters. Layer styles compute their effects based on layer content. For example, when fill is background and stroke is foreground, the stroke renders above child layers, but drop shadows are still calculated based on the complete layer content including fill, child layers, and stroke.
+**Layer content** refers to the complete rendering result of the layer's background content, child layers, and foreground content (steps 2–5 in the rendering pipeline). It does not include layer styles or layer filters.
+
+Layer styles compute their effects based on layer content. For example, when fill is background and stroke is foreground, the stroke renders above child layers, but drop shadows are still calculated based on the complete layer content including fill, child layers, and stroke.
 
 #### Layer Contour
 
@@ -669,7 +671,7 @@ Some layer styles additionally use **layer contour** or **layer background** as 
 
 #### 4.3.1 DropShadowStyle
 
-Draws a drop shadow **below** the layer. Computes shadow shape based on opaque layer content. When `showBehindLayer="false"`, additionally uses **layer contour** as an erase mask to cut out the portion occluded by the layer.
+Draws a drop shadow **below** the layer. Computes shadow shape based on opaque layer content.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -741,7 +743,7 @@ Unlike layer styles (Section 4.3), which **independently render** visual effects
 
 #### 4.4.2 DropShadowFilter
 
-Generates shadow effect based on filter input. Unlike DropShadowStyle, the filter projects from original rendering content and preserves semi-transparency, whereas the style projects from opaque layer content. The two also support different attribute features.
+Generates shadow effect based on filter input. Unlike DropShadowStyle, the filter projects from original rendering content and preserves semi-transparency, whereas the style projects from opaque layer content.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -1486,12 +1488,12 @@ Range selectors define the glyph range and influence degree for TextModifier.
 
 | Value | Description |
 |-------|-------------|
-| `add` | Add: Accumulate selector weights |
-| `subtract` | Subtract: Subtract selector weights |
-| `intersect` | Intersect: Use the intersection of selector ranges |
-| `min` | Min: Take the minimum of selector values |
-| `max` | Max: Take maximum value |
-| `difference` | Difference: Take absolute difference |
+| `add` | Add: `result = a + b` |
+| `subtract` | Subtract: `result = b ≥ 0 ? a × (1 − b) : a × (−1 − b)` |
+| `intersect` | Intersect: `result = a × b` |
+| `min` | Min: `result = min(a, b)` |
+| `max` | Max: `result = max(a, b)` |
+| `difference` | Difference: `result = |a − b|` |
 
 #### 5.5.5 TextPath
 
