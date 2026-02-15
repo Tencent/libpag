@@ -77,6 +77,16 @@ class Text : public Element {
   float baselineShift = 0.0f;
 
   /**
+   * Whether to apply algorithmic bolding. The default value is false.
+   */
+  bool fauxBold = false;
+
+  /**
+   * Whether to apply algorithmic slanting. The default value is false.
+   */
+  bool fauxItalic = false;
+
+  /**
    * Pre-shaped glyph runs. When present, these are used for rendering instead of runtime shaping.
    */
   std::vector<GlyphRun*> glyphRuns = {};

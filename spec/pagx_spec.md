@@ -1040,7 +1040,7 @@ Defines arbitrary shapes using SVG path syntax, supporting inline data or refere
 Text elements provide geometric shapes for text content. Unlike shape elements that produce a single Path, Text produces a **glyph list** (multiple glyphs) after shaping, which accumulates in the rendering context's geometry list for subsequent modifier transformation or painter rendering.
 
 ```xml
-<Text text="Hello World" position="100,200" fontFamily="Arial" fontStyle="Bold" fontSize="24" letterSpacing="0" baselineShift="0"/>
+<Text text="Hello World" position="100,200" fontFamily="Arial" fontStyle="Regular" fauxBold="true" fontSize="24" letterSpacing="0" baselineShift="0"/>
 ```
 
 | Attribute | Type | Default | Description |
@@ -1052,6 +1052,8 @@ Text elements provide geometric shapes for text content. Unlike shape elements t
 | `fontSize` | float | 12 | Font size |
 | `letterSpacing` | float | 0 | Letter spacing |
 | `baselineShift` | float | 0 | Baseline shift (positive shifts up, negative shifts down) |
+| `fauxBold` | bool | false | Faux bold (algorithmically bolded) |
+| `fauxItalic` | bool | false | Faux italic (algorithmically slanted) |
 
 Child elements: `CDATA` text, `GlyphRun`*
 

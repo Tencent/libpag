@@ -468,6 +468,8 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addAttribute("fontSize", text->fontSize, 12.0f);
       xml.addAttribute("letterSpacing", text->letterSpacing);
       xml.addAttribute("baselineShift", text->baselineShift);
+      xml.addAttribute("fauxBold", text->fauxBold);
+      xml.addAttribute("fauxItalic", text->fauxItalic);
 
       // Skip GlyphRuns if requested or if none exist
       if (options.skipGlyphData || text->glyphRuns.empty()) {
