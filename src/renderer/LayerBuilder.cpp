@@ -22,7 +22,9 @@
 #include "utils/Base64.h"
 #include "ToTGFX.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
+#include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
@@ -34,6 +36,7 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
@@ -74,8 +77,11 @@
 #include "tgfx/layers/LayerPaint.h"
 #include "tgfx/layers/StrokeAlign.h"
 #include "tgfx/layers/VectorLayer.h"
+#include "tgfx/layers/filters/BlendFilter.h"
 #include "tgfx/layers/filters/BlurFilter.h"
+#include "tgfx/layers/filters/ColorMatrixFilter.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
+#include "tgfx/layers/filters/InnerShadowFilter.h"
 #include "tgfx/layers/filters/LayerFilter.h"
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
@@ -494,8 +500,9 @@ class LayerBuilderContext {
       return nullptr;
     }
 
+    auto sampling = tgfx::SamplingOptions(ToTGFX(node->filterMode), ToTGFX(node->mipmapMode));
     auto pattern = tgfx::ImagePattern::Make(image, ToTGFX(node->tileModeX),
-                                             ToTGFX(node->tileModeY));
+                                             ToTGFX(node->tileModeY), sampling);
     if (pattern && !node->matrix.isIdentity()) {
       pattern->setMatrix(ToTGFX(node->matrix));
     }
@@ -666,6 +673,28 @@ class LayerBuilderContext {
       layer->setMatrix(matrix);
     }
 
+    // Apply 3D matrix if present (overrides 2D matrix)
+    if (node->matrix3D.size() == 16) {
+      layer->setMatrix3D(ToTGFX3D(node->matrix3D));
+    }
+    if (node->preserve3D) {
+      layer->setPreserve3D(true);
+    }
+
+    // Apply layer rendering attributes
+    if (!node->antiAlias) {
+      layer->setAllowsEdgeAntialiasing(false);
+    }
+    if (node->groupOpacity) {
+      layer->setAllowsGroupOpacity(true);
+    }
+    if (!node->passThroughBackground) {
+      layer->setPassThroughBackground(false);
+    }
+    if (node->excludeChildEffectsInLayerStyle) {
+      layer->setExcludeChildEffectsInLayerStyle(true);
+    }
+
     // Apply scrollRect if present
     if (node->hasScrollRect) {
       layer->setScrollRect(ToTGFX(node->scrollRect));
@@ -704,17 +733,31 @@ class LayerBuilderContext {
     switch (node->nodeType()) {
       case NodeType::DropShadowStyle: {
         auto style = static_cast<const DropShadowStyle*>(node);
-        return tgfx::DropShadowStyle::Make(style->offsetX, style->offsetY, style->blurX,
-                                           style->blurY, ToTGFX(style->color));
+        auto tgfxStyle = tgfx::DropShadowStyle::Make(style->offsetX, style->offsetY, style->blurX,
+                                                      style->blurY, ToTGFX(style->color),
+                                                      style->showBehindLayer);
+        if (node->blendMode != BlendMode::Normal) {
+          tgfxStyle->setBlendMode(ToTGFX(node->blendMode));
+        }
+        return tgfxStyle;
       }
       case NodeType::InnerShadowStyle: {
         auto style = static_cast<const InnerShadowStyle*>(node);
-        return tgfx::InnerShadowStyle::Make(style->offsetX, style->offsetY, style->blurX,
-                                            style->blurY, ToTGFX(style->color));
+        auto tgfxStyle = tgfx::InnerShadowStyle::Make(style->offsetX, style->offsetY, style->blurX,
+                                                       style->blurY, ToTGFX(style->color));
+        if (node->blendMode != BlendMode::Normal) {
+          tgfxStyle->setBlendMode(ToTGFX(node->blendMode));
+        }
+        return tgfxStyle;
       }
       case NodeType::BackgroundBlurStyle: {
         auto style = static_cast<const pagx::BackgroundBlurStyle*>(node);
-        return tgfx::BackgroundBlurStyle::Make(style->blurX, style->blurY);
+        auto tgfxStyle = tgfx::BackgroundBlurStyle::Make(style->blurX, style->blurY,
+                                                          ToTGFX(style->tileMode));
+        if (node->blendMode != BlendMode::Normal) {
+          tgfxStyle->setBlendMode(ToTGFX(node->blendMode));
+        }
+        return tgfxStyle;
       }
       default:
         return nullptr;
@@ -729,13 +772,27 @@ class LayerBuilderContext {
     switch (node->nodeType()) {
       case NodeType::BlurFilter: {
         auto filter = static_cast<const pagx::BlurFilter*>(node);
-        return tgfx::BlurFilter::Make(filter->blurX, filter->blurY);
+        return tgfx::BlurFilter::Make(filter->blurX, filter->blurY, ToTGFX(filter->tileMode));
       }
       case NodeType::DropShadowFilter: {
         auto filter = static_cast<const DropShadowFilter*>(node);
         return tgfx::DropShadowFilter::Make(filter->offsetX, filter->offsetY, filter->blurX,
                                             filter->blurY, ToTGFX(filter->color),
                                             filter->shadowOnly);
+      }
+      case NodeType::InnerShadowFilter: {
+        auto filter = static_cast<const pagx::InnerShadowFilter*>(node);
+        return tgfx::InnerShadowFilter::Make(filter->offsetX, filter->offsetY, filter->blurX,
+                                             filter->blurY, ToTGFX(filter->color),
+                                             filter->shadowOnly);
+      }
+      case NodeType::BlendFilter: {
+        auto filter = static_cast<const pagx::BlendFilter*>(node);
+        return tgfx::BlendFilter::Make(ToTGFX(filter->color), ToTGFX(filter->blendMode));
+      }
+      case NodeType::ColorMatrixFilter: {
+        auto filter = static_cast<const pagx::ColorMatrixFilter*>(node);
+        return tgfx::ColorMatrixFilter::Make(filter->matrix);
       }
       default:
         return nullptr;

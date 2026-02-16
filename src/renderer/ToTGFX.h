@@ -33,7 +33,11 @@
 #include "pagx/types/RepeaterOrder.h"
 #include "pagx/types/SelectorTypes.h"
 #include "pagx/types/StrokeStyle.h"
+#include "pagx/types/FilterMode.h"
+#include "pagx/types/MipmapMode.h"
 #include "pagx/types/TileMode.h"
+#include "tgfx/core/Matrix3D.h"
+#include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Data.h"
@@ -95,6 +99,12 @@ tgfx::SelectorShape ToTGFX(SelectorShape shape);
 tgfx::SelectorMode ToTGFX(SelectorMode mode);
 
 tgfx::TileMode ToTGFX(TileMode mode);
+
+tgfx::FilterMode ToTGFX(FilterMode mode);
+
+tgfx::MipmapMode ToTGFX(MipmapMode mode);
+
+tgfx::Matrix3D ToTGFX3D(const std::vector<float>& matrix3D);
 
 std::shared_ptr<tgfx::Data> ToTGFXData(const std::shared_ptr<Data>& data);
 

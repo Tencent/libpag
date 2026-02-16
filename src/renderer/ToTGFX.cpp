@@ -276,6 +276,38 @@ tgfx::TileMode ToTGFX(TileMode mode) {
   return tgfx::TileMode::Clamp;
 }
 
+tgfx::FilterMode ToTGFX(FilterMode mode) {
+  switch (mode) {
+    case FilterMode::Nearest:
+      return tgfx::FilterMode::Nearest;
+    case FilterMode::Linear:
+      return tgfx::FilterMode::Linear;
+  }
+  return tgfx::FilterMode::Linear;
+}
+
+tgfx::MipmapMode ToTGFX(MipmapMode mode) {
+  switch (mode) {
+    case MipmapMode::None:
+      return tgfx::MipmapMode::None;
+    case MipmapMode::Nearest:
+      return tgfx::MipmapMode::Nearest;
+    case MipmapMode::Linear:
+      return tgfx::MipmapMode::Linear;
+  }
+  return tgfx::MipmapMode::Linear;
+}
+
+tgfx::Matrix3D ToTGFX3D(const std::vector<float>& matrix3D) {
+  tgfx::Matrix3D m = {};
+  for (int r = 0; r < 4; r++) {
+    for (int c = 0; c < 4; c++) {
+      m.setRowColumn(r, c, matrix3D[static_cast<size_t>(r * 4 + c)]);
+    }
+  }
+  return m;
+}
+
 static void ReleasePagxData(const void*, void* context) {
   delete static_cast<std::shared_ptr<Data>*>(context);
 }
