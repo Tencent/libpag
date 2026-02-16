@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.13)
 project(PAG)
 
+if (APPLE)
+    enable_language(OBJC OBJCXX)
+endif ()
+
 # Uncomment the next 4 lines to build libpag for Intel cpus on Apple Silicon devices.
 #if (APPLE AND NOT IOS)
 #    SET(CMAKE_SYSTEM_PROCESSOR x86_64)
