@@ -1534,7 +1534,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 #### 5.5.6 文本框（TextBox）
 
-TextBox 是文本框排版器，对累积的 Text 元素应用排版。它根据自身的 position、size 和对齐设置重新排版所有字形位置，排版结果通过反向变换补偿写入每个 Text 元素的 GlyphRun 数据，因此 Text 自身的 position 和父级 Group 变换在渲染管线中仍然有效。横排模式下，第一行文本以 ascent 贴顶定位；竖排模式下，第一列贴右定位，列从右往左排列。
+TextBox 是文本框排版器，对累积的 Text 元素应用排版。它根据自身的 position、size 和对齐设置重新排版所有字形位置，排版结果通过反向变换补偿写入每个 Text 元素的 GlyphRun 数据，因此 Text 自身的 position 和父级 Group 变换在渲染管线中仍然有效。默认垂直对齐为 `baseline`，`position.y` 直接表示首行基线 Y 坐标。当 `verticalAlign` 为 `top` 时，第一行文本以 ascent 贴顶定位。竖排模式下，第一列贴右定位，列从右往左排列。
 
 TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被处理，不会在渲染树中实例化。如果累积的所有 Text 元素都已包含嵌入的 GlyphRun 数据，则排版阶段会跳过 TextBox。但即使已填写嵌入的 GlyphRun 数据和字体，仍建议保留 TextBox 节点，因为设计工具导入时需要读取其排版属性（size、对齐方式、wordWrap 等）用于编辑展示。
 
@@ -1544,10 +1544,10 @@ TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被�
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `position` | Point | 0,0 | 文本区域左上角。当宽度或高度为 0 时，该维度上作为对齐锚点（见下方说明） |
+| `position` | Point | 0,0 | 文本区域参考点。默认 `baseline` 模式下，`position.y` 为首行基线 Y 坐标。`top` 模式下为文本区域左上角。当宽度或高度为 0 时，该维度上作为对齐锚点（见下方说明） |
 | `size` | Size | 0,0 | 排版尺寸。当宽度或高度为 0 时，该维度上文本无边界（wordWrap 时逐字符换行，对齐以 position 为参考点） |
 | `textAlign` | TextAlign | start | 水平对齐（见下方） |
-| `verticalAlign` | VerticalAlign | top | 垂直对齐（见下方） |
+| `verticalAlign` | VerticalAlign | baseline | 垂直对齐（见下方） |
 | `writingMode` | WritingMode | horizontal | 排版方向（见下方） |
 | `lineHeight` | float | 1.2 | 行高倍数 |
 | `wordWrap` | boolean | false | 是否启用自动换行（在盒子宽度/高度边界处换行；该维度为 0 时逐字符换行） |
@@ -1568,11 +1568,12 @@ TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被�
 
 | 值 | 说明 |
 |------|------|
-| `top` | 顶部对齐 |
-| `center` | 垂直居中 |
-| `bottom` | 底部对齐 |
+| `baseline` | 默认。`position.y` 表示首行基线 Y 坐标，文本从该点向上（ascent）和向下（descent）延伸。 |
+| `top` | 顶部对齐。首行基线偏移该行字形的最大 ascent，使最高字形的 ascent 顶部贴齐文本区域顶部。 |
+| `center` | 垂直居中。整体文本块（从首行 ascent 顶部，经过行高间距，到末行 descent 底部）在盒子高度内居中。 |
+| `bottom` | 底部对齐。末行 descent 底部对齐文本区域底部。 |
 
-当高度为 0 时，对齐以 `position.y` 为锚点：`top` 从锚点向下展开，`center` 将所有行的垂直中心对齐锚点，`bottom` 将最后一行底边对齐锚点。
+当高度为 0 时，对齐以 `position.y` 为锚点：`baseline` 直接将 `position.y` 作为首行基线，`top` 从锚点向下展开（带 ascent 偏移），`center` 将所有行的垂直中心对齐锚点，`bottom` 将最后一行底边对齐锚点。
 
 **WritingMode（排版方向）**：
 
@@ -1857,7 +1858,7 @@ Layer / Group
 | **SelectorShape** | `square`, `rampUp`, `rampDown`, `triangle`, `round`, `smooth` |
 | **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
 | **TextAlign** | `start`, `center`, `end`, `justify` |
-| **VerticalAlign** | `top`, `center`, `bottom` |
+| **VerticalAlign** | `baseline`, `top`, `center`, `bottom` |
 | **WritingMode** | `horizontal`, `vertical` |
 | **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |
 ---
