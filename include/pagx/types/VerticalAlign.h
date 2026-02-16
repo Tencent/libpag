@@ -21,7 +21,10 @@
 namespace pagx {
 
 /**
- * Text vertical alignment within the layout area.
+ * Text vertical alignment within the layout area. In horizontal mode, this controls vertical
+ * positioning of lines. In vertical mode, Baseline and Top both position the first column with its
+ * em box right edge touching the right side of the text area. The lineHeight multiplier only affects
+ * spacing between columns, not the first column's position.
  */
 enum class VerticalAlign {
   /**

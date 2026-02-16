@@ -129,6 +129,8 @@ class TextLayoutContext {
     std::vector<VerticalGlyphGroup> groups = {};
     float height = 0;
     float maxWidth = 0;
+    float maxFontSize = 0;
+    float maxColumnWidth = 0;
   };
 
   // Shaped text information for a single Text element.
@@ -1033,22 +1035,31 @@ class TextLayoutContext {
       if (textBlob != nullptr) {
         ShapedText shapedText = {};
         shapedText.textBlob = textBlob;
+        shapedText.hasAbsolutePositions = true;
         StoreShapedText(text, std::move(shapedText));
       }
     }
   }
 
-  static void FinishColumn(ColumnInfo* column) {
+  static void FinishColumn(ColumnInfo* column, float lineHeightMultiplier) {
     float height = 0;
     float maxWidth = 0;
+    float maxFontSize = 0;
     for (auto& group : column->groups) {
       height += group.height;
       if (group.width > maxWidth) {
         maxWidth = group.width;
       }
+      for (auto& g : group.glyphs) {
+        if (g.fontSize > maxFontSize) {
+          maxFontSize = g.fontSize;
+        }
+      }
     }
     column->height = height;
     column->maxWidth = maxWidth;
+    column->maxFontSize = maxFontSize;
+    column->maxColumnWidth = maxFontSize * lineHeightMultiplier;
   }
 
   std::vector<ColumnInfo> layoutColumns(const std::vector<GlyphInfo>& allGlyphs,
@@ -1065,7 +1076,7 @@ class TextLayoutContext {
       auto& glyph = allGlyphs[i];
 
       if (glyph.unichar == '\n') {
-        FinishColumn(currentColumn);
+        FinishColumn(currentColumn, textBox->lineHeight);
         columns.emplace_back();
         currentColumn = &columns.back();
         currentColumnHeight = 0;
@@ -1099,7 +1110,7 @@ class TextLayoutContext {
         // Check wrap before adding.
         if (doWrap && !currentColumn->groups.empty() &&
             currentColumnHeight + group.height > boxHeight) {
-          FinishColumn(currentColumn);
+          FinishColumn(currentColumn, textBox->lineHeight);
           columns.emplace_back();
           currentColumn = &columns.back();
           currentColumnHeight = 0;
@@ -1120,7 +1131,7 @@ class TextLayoutContext {
         // Check wrap before adding.
         if (doWrap && !currentColumn->groups.empty() &&
             currentColumnHeight + verticalAdvance > boxHeight) {
-          FinishColumn(currentColumn);
+          FinishColumn(currentColumn, textBox->lineHeight);
           columns.emplace_back();
           currentColumn = &columns.back();
           currentColumnHeight = 0;
@@ -1137,7 +1148,7 @@ class TextLayoutContext {
       }
     }
 
-    FinishColumn(currentColumn);
+    FinishColumn(currentColumn, textBox->lineHeight);
     return columns;
   }
 
@@ -1149,10 +1160,15 @@ class TextLayoutContext {
     float boxWidth = textBox->size.width;
     float boxHeight = textBox->size.height;
 
-    // Calculate total width: sum of all column maxWidths.
+    // Calculate total width: first column uses em box width (maxFontSize),
+    // subsequent columns use column width (maxFontSize * lineHeight).
     float totalWidth = 0;
-    for (auto& col : columns) {
-      totalWidth += col.maxWidth;
+    for (size_t i = 0; i < columns.size(); i++) {
+      if (i == 0) {
+        totalWidth += columns[i].maxFontSize;
+      } else {
+        totalWidth += columns[i].maxColumnWidth;
+      }
     }
 
     // Calculate max column height for vertical alignment.
@@ -1240,9 +1256,11 @@ class TextLayoutContext {
     float boxLeft = textBox->position.x;
     float columnX = xStart;
 
-    for (auto& column : columns) {
-      // Move left by this column's width to get the left edge.
-      columnX -= column.maxWidth;
+    for (size_t colIdx = 0; colIdx < columns.size(); colIdx++) {
+      auto& column = columns[colIdx];
+      // Move left by this column's allocated width.
+      float allocatedWidth = (colIdx == 0) ? column.maxFontSize : column.maxColumnWidth;
+      columnX -= allocatedWidth;
 
       // Skip columns that overflow beyond the left edge of the box.
       if (overflowHidden && boxWidth > 0 && columnX < boxLeft) {
@@ -1250,7 +1268,7 @@ class TextLayoutContext {
       }
 
       // Center of this column for centering upright glyphs.
-      float columnCenterX = columnX + column.maxWidth / 2;
+      float columnCenterX = columnX + allocatedWidth / 2;
 
       float currentY = yBase;
 
@@ -1377,6 +1395,7 @@ class TextLayoutContext {
       if (textBlob != nullptr) {
         ShapedText shapedText = {};
         shapedText.textBlob = textBlob;
+        shapedText.hasAbsolutePositions = true;
         StoreShapedText(text, std::move(shapedText));
       }
     }

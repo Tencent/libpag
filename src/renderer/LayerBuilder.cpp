@@ -317,7 +317,7 @@ class LayerBuilderContext {
     }
     auto& shapedText = it->second;
     auto tgfxText = tgfx::Text::Make(shapedText.textBlob, shapedText.anchors);
-    if (tgfxText) {
+    if (tgfxText && !shapedText.hasAbsolutePositions) {
       tgfxText->setPosition(tgfx::Point::Make(node->position.x, node->position.y));
     }
     return tgfxText;

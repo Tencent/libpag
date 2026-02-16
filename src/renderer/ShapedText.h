@@ -41,6 +41,12 @@ struct ShapedText {
    * Per-glyph anchor offsets relative to default anchor (advance * 0.5, 0).
    */
   std::vector<tgfx::Point> anchors = {};
+
+  /**
+   * When true, glyph positions in the TextBlob are absolute coordinates produced by TextBox layout.
+   * The LayerBuilder should not apply the Text node's own position as an additional offset.
+   */
+  bool hasAbsolutePositions = false;
 };
 
 /**
