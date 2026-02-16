@@ -454,10 +454,6 @@ class TextLayoutContext {
         }
       }
 
-      // Note: scales, rotations, skews are NOT processed here.
-      // These transform attributes should be handled by tgfx layer (similar to TextModifier).
-      // TextLayout only computes position information for TextBlob.
-
       bool hasTransforms = !run->scales.empty() || !run->rotations.empty() || !run->skews.empty();
 
       if (hasTransforms) {
