@@ -924,9 +924,6 @@ class TextLayoutContext {
         pg.font = g.font;
         pg.x = g.xPosition + xOffset;
         pg.y = baselineY;
-        if (g.sourceText != nullptr) {
-          pg.y += g.sourceText->baselineShift;
-        }
         textGlyphs[g.sourceText].push_back(pg);
       }
     }

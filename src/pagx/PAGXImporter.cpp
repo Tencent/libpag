@@ -529,7 +529,6 @@ static Text* parseText(const DOMNode* node, PAGXDocument* doc) {
   text->fontStyle = getAttribute(node, "fontStyle");
   text->fontSize = getFloatAttribute(node, "fontSize", 12);
   text->letterSpacing = getFloatAttribute(node, "letterSpacing", 0);
-  text->baselineShift = getFloatAttribute(node, "baselineShift", 0);
   text->fauxBold = getBoolAttribute(node, "fauxBold", false);
   text->fauxItalic = getBoolAttribute(node, "fauxItalic", false);
 

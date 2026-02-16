@@ -1040,7 +1040,7 @@ y = center.y + outerRadius * sin(angle)
 文本元素提供文本内容的几何形状。与形状元素产生单一 Path 不同，Text 经过塑形后会产生**字形列表**（多个字形）并累积到渲染上下文的几何列表中，供后续修改器变换或绘制器渲染。
 
 ```xml
-<Text text="Hello World" position="100,200" fontFamily="Arial" fontStyle="Regular" fauxBold="true" fauxItalic="false" fontSize="24" letterSpacing="0" baselineShift="0"/>
+<Text text="Hello World" position="100,200" fontFamily="Arial" fontStyle="Regular" fauxBold="true" fauxItalic="false" fontSize="24" letterSpacing="0"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1051,7 +1051,6 @@ y = center.y + outerRadius * sin(angle)
 | `fontStyle` | string | "Regular" | 字体变体（Regular, Bold, Italic, Bold Italic 等） |
 | `fontSize` | float | 12 | 字号 |
 | `letterSpacing` | float | 0 | 字间距 |
-| `baselineShift` | float | 0 | 基线偏移（正值上移，负值下移） |
 | `fauxBold` | bool | false | 仿粗体效果 |
 | `fauxItalic` | bool | false | 仿斜体效果 |
 
@@ -1079,7 +1078,7 @@ Line 3]]>
 **运行时排版渲染流程**：
 1. 根据 `fontFamily` 和 `fontStyle` 查找系统字体，不可用时按运行时配置的回退列表选择替代字体
 2. 使用 `text` 属性（或 CDATA 子节点）进行塑形，换行符触发换行（默认 1.2 倍字号行高，可通过 TextBox 自定义）
-3. 应用 `fontSize`、`letterSpacing`、`baselineShift` 等排版参数
+3. 应用 `fontSize`、`letterSpacing` 等排版参数
 4. 构造字形列表累积到渲染上下文
 
 **运行时排版示例**：

@@ -71,12 +71,6 @@ class Text : public Element {
   float letterSpacing = 0.0f;
 
   /**
-   * The baseline shift for superscript/subscript effects. Positive values shift up, negative values
-   * shift down. The default value is 0.
-   */
-  float baselineShift = 0.0f;
-
-  /**
    * Whether to apply algorithmic bolding. The default value is false.
    */
   bool fauxBold = false;

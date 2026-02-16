@@ -1040,7 +1040,7 @@ Defines arbitrary shapes using SVG path syntax, supporting inline data or refere
 Text elements provide geometric shapes for text content. Unlike shape elements that produce a single Path, Text produces a **glyph list** (multiple glyphs) after shaping, which accumulates in the rendering context's geometry list for subsequent modifier transformation or painter rendering.
 
 ```xml
-<Text text="Hello World" position="100,200" fontFamily="Arial" fontStyle="Regular" fauxBold="true" fauxItalic="false" fontSize="24" letterSpacing="0" baselineShift="0"/>
+<Text text="Hello World" position="100,200" fontFamily="Arial" fontStyle="Regular" fauxBold="true" fauxItalic="false" fontSize="24" letterSpacing="0"/>
 ```
 
 | Attribute | Type | Default | Description |
@@ -1051,7 +1051,6 @@ Text elements provide geometric shapes for text content. Unlike shape elements t
 | `fontStyle` | string | "Regular" | Font variant (Regular, Bold, Italic, Bold Italic, etc.) |
 | `fontSize` | float | 12 | Font size |
 | `letterSpacing` | float | 0 | Letter spacing |
-| `baselineShift` | float | 0 | Baseline shift (positive shifts up, negative shifts down) |
 | `fauxBold` | bool | false | Faux bold (algorithmically bolded) |
 | `fauxItalic` | bool | false | Faux italic (algorithmically slanted) |
 
@@ -1079,7 +1078,7 @@ Line 3]]>
 **Runtime Layout Rendering Flow**:
 1. Find system font based on `fontFamily` and `fontStyle`; if unavailable, select fallback font according to runtime-configured fallback list
 2. Shape using `text` attribute (or CDATA child node); newlines trigger line breaks (default 1.2× font size line height, customizable via TextBox)
-3. Apply typography parameters: `fontSize`, `letterSpacing`, `baselineShift`
+3. Apply typography parameters: `fontSize`, `letterSpacing`
 4. Construct glyph list and accumulate to rendering context
 
 **Runtime Layout Example**:
