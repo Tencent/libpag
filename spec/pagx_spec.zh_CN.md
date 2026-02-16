@@ -1040,7 +1040,7 @@ y = center.y + outerRadius * sin(angle)
 文本元素提供文本内容的几何形状。与形状元素产生单一 Path 不同，Text 经过塑形后会产生**字形列表**（多个字形）并累积到渲染上下文的几何列表中，供后续修改器变换或绘制器渲染。
 
 ```xml
-<Text text="Hello World" position="100,200" fontFamily="Arial" fontStyle="Bold" fontSize="24" letterSpacing="0" baselineShift="0"/>
+<Text text="Hello World" position="100,200" fontFamily="Arial" fontStyle="Regular" fauxBold="true" fauxItalic="false" fontSize="24" letterSpacing="0" baselineShift="0"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1052,6 +1052,8 @@ y = center.y + outerRadius * sin(angle)
 | `fontSize` | float | 12 | 字号 |
 | `letterSpacing` | float | 0 | 字间距 |
 | `baselineShift` | float | 0 | 基线偏移（正值上移，负值下移） |
+| `fauxBold` | bool | false | 仿粗体（算法加粗） |
+| `fauxItalic` | bool | false | 仿斜体（算法倾斜） |
 
 子元素：`CDATA` 文本、`GlyphRun`*
 

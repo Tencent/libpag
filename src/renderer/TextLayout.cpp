@@ -439,6 +439,8 @@ class TextLayoutContext {
       }
       float fontSizeForTypeface = run->fontSize / static_cast<float>(unitsPerEm);
       tgfx::Font font(typeface, fontSizeForTypeface);
+      font.setFauxBold(text->fauxBold);
+      font.setFauxItalic(text->fauxItalic);
       size_t count = run->glyphs.size();
 
       // Collect anchors for each glyph in this run
@@ -564,6 +566,8 @@ class TextLayoutContext {
     }
 
     tgfx::Font primaryFont(primaryTypeface, text->fontSize);
+    primaryFont.setFauxBold(text->fauxBold);
+    primaryFont.setFauxItalic(text->fauxItalic);
     float currentX = 0;
     const std::string& content = text->text;
     bool hasLetterSpacing = !FloatNearlyEqual(text->letterSpacing, 0.0f);
@@ -572,7 +576,10 @@ class TextLayoutContext {
     std::unordered_map<tgfx::Typeface*, tgfx::Font> fallbackFontCache = {};
     for (const auto& fallback : textLayout->fallbackTypefaces) {
       if (fallback != nullptr && fallback != primaryTypeface) {
-        fallbackFontCache.emplace(fallback.get(), tgfx::Font(fallback, text->fontSize));
+        tgfx::Font fallbackFont(fallback, text->fontSize);
+        fallbackFont.setFauxBold(text->fauxBold);
+        fallbackFont.setFauxItalic(text->fauxItalic);
+        fallbackFontCache.emplace(fallback.get(), std::move(fallbackFont));
       }
     }
 
