@@ -1052,8 +1052,8 @@ y = center.y + outerRadius * sin(angle)
 | `fontSize` | float | 12 | 字号 |
 | `letterSpacing` | float | 0 | 字间距 |
 | `baselineShift` | float | 0 | 基线偏移（正值上移，负值下移） |
-| `fauxBold` | bool | false | 仿粗体（算法加粗） |
-| `fauxItalic` | bool | false | 仿斜体（算法倾斜） |
+| `fauxBold` | bool | false | 仿粗体效果 |
+| `fauxItalic` | bool | false | 仿斜体效果 |
 
 子元素：`CDATA` 文本、`GlyphRun`*
 
