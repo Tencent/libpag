@@ -293,12 +293,8 @@
 
   <!-- Objective Markers (Top Center) -->
   <Layer name="Objectives" x="400" y="50">
-    <Text fontFamily="Arial" fontSize="12" fontStyle="Bold">
-<![CDATA[MISSION OBJECTIVES:
-[ ] INFILTRATE BASE
-[ ] HACK TERMINAL
-[x] SECURE PERIMETER]]>
-    </Text>
+    <Text text="MISSION OBJECTIVES: [ ] INFILTRATE BASE [ ] HACK TERMINAL [x] SECURE PERIMETER" fontFamily="Arial" fontSize="12" fontStyle="Bold"/>
+
     <Fill color="#FFF"/>
     <TextBox textAlign="center" lineHeight="1.6"/>
     <DropShadowStyle blurX="2" blurY="2" color="#000"/>

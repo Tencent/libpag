@@ -1006,11 +1006,16 @@ class TextLayoutContext {
       }
     }
 
-    // Build TextBlob for each Text element.
+    // Build TextBlob for each Text element with inverse-transform compensation:
+    // subtract text->position so that LayerBuilder's setPosition(text.position) restores the
+    // correct absolute coordinates.
     for (auto& [text, glyphs] : textGlyphs) {
       if (glyphs.empty() || text == nullptr) {
         continue;
       }
+
+      float compensateX = text->position.x;
+      float compensateY = text->position.y;
 
       tgfx::TextBlobBuilder builder = {};
       // Group consecutive glyphs with the same font into runs.
@@ -1026,7 +1031,8 @@ class TextLayoutContext {
         auto* positions = reinterpret_cast<tgfx::Point*>(buffer.positions);
         for (size_t j = 0; j < count; j++) {
           buffer.glyphs[j] = glyphs[runStart + j].glyphID;
-          positions[j] = tgfx::Point::Make(glyphs[runStart + j].x, glyphs[runStart + j].y);
+          positions[j] = tgfx::Point::Make(glyphs[runStart + j].x - compensateX,
+                                            glyphs[runStart + j].y - compensateY);
         }
         runStart = runEnd;
       }
@@ -1035,7 +1041,6 @@ class TextLayoutContext {
       if (textBlob != nullptr) {
         ShapedText shapedText = {};
         shapedText.textBlob = textBlob;
-        shapedText.hasAbsolutePositions = true;
         StoreShapedText(text, std::move(shapedText));
       }
     }
@@ -1351,11 +1356,14 @@ class TextLayoutContext {
       }
     }
 
-    // Build TextBlob for each Text element.
+    // Build TextBlob for each Text element with inverse-transform compensation.
     for (auto& [text, glyphs] : textGlyphs) {
       if (glyphs.empty() || text == nullptr) {
         continue;
       }
+
+      float compensateX = text->position.x;
+      float compensateY = text->position.y;
 
       tgfx::TextBlobBuilder builder = {};
 
@@ -1378,14 +1386,18 @@ class TextLayoutContext {
           auto* xforms = reinterpret_cast<tgfx::RSXform*>(buffer.positions);
           for (size_t j = 0; j < count; j++) {
             buffer.glyphs[j] = glyphs[runStart + j].glyphID;
-            xforms[j] = glyphs[runStart + j].xform;
+            auto xform = glyphs[runStart + j].xform;
+            xform.tx -= compensateX;
+            xform.ty -= compensateY;
+            xforms[j] = xform;
           }
         } else {
           auto& buffer = builder.allocRunPos(runFont, count);
           auto* positions = reinterpret_cast<tgfx::Point*>(buffer.positions);
           for (size_t j = 0; j < count; j++) {
             buffer.glyphs[j] = glyphs[runStart + j].glyphID;
-            positions[j] = glyphs[runStart + j].position;
+            positions[j] = tgfx::Point::Make(glyphs[runStart + j].position.x - compensateX,
+                                              glyphs[runStart + j].position.y - compensateY);
           }
         }
         runStart = runEnd;
@@ -1395,7 +1407,6 @@ class TextLayoutContext {
       if (textBlob != nullptr) {
         ShapedText shapedText = {};
         shapedText.textBlob = textBlob;
-        shapedText.hasAbsolutePositions = true;
         StoreShapedText(text, std::move(shapedText));
       }
     }

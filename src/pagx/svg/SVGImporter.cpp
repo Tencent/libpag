@@ -817,6 +817,7 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     //   end    -> End
     if (!anchor.empty() && anchor != "start") {
       auto textBox = _document->makeNode<TextBox>();
+      textBox->position = text->position;
       textBox->size = {0, 0};  // auto-size (Point Text mode)
       if (anchor == "middle") {
         textBox->textAlign = TextAlign::Center;
