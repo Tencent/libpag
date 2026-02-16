@@ -35,10 +35,10 @@ namespace pagx {
  * - Horizontal/vertical writing mode
  * - Overflow control (visible or hidden)
  *
- * The position represents the top-left corner of the text area. When size is (0, 0), position
- * serves as the alignment reference point. For horizontal mode, the first line is positioned with
- * its ascent touching the top of the text area. For vertical mode, the first column is positioned
- * with its right edge touching the right side, and columns flow from right to left.
+ * The default vertical alignment is Baseline, where position.y represents the first line's baseline
+ * coordinate directly. When verticalAlign is Top, the first line is positioned with its ascent
+ * touching the top of the text area. For vertical mode, the first column is positioned with its
+ * right edge touching the right side, and columns flow from right to left.
  */
 class TextBox : public Element {
  public:
@@ -62,10 +62,11 @@ class TextBox : public Element {
   TextAlign textAlign = TextAlign::Start;
 
   /**
-   * The vertical text alignment. When height is 0, alignment is relative to position.y.
-   * When height > 0, alignment is within the box height. The default value is Top.
+   * The vertical text alignment. Default is Baseline, where position.y represents the first line's
+   * baseline coordinate directly. When height is 0, alignment is relative to position.y.
+   * When height > 0, alignment is within the box height.
    */
-  VerticalAlign verticalAlign = VerticalAlign::Top;
+  VerticalAlign verticalAlign = VerticalAlign::Baseline;
 
   /**
    * The writing mode (horizontal or vertical text). Vertical mode uses right-to-left column

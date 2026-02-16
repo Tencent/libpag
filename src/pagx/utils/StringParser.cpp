@@ -216,7 +216,8 @@ DEFINE_ENUM_CONVERSION(TextAlign, TextAlign::Start,
     {TextAlign::End, "end"},
     {TextAlign::Justify, "justify"})
 
-DEFINE_ENUM_CONVERSION(VerticalAlign, VerticalAlign::Top,
+DEFINE_ENUM_CONVERSION(VerticalAlign, VerticalAlign::Baseline,
+    {VerticalAlign::Baseline, "baseline"},
     {VerticalAlign::Top, "top"},
     {VerticalAlign::Center, "center"},
     {VerticalAlign::Bottom, "bottom"})

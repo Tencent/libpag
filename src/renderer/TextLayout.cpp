@@ -872,16 +872,17 @@ class TextLayoutContext {
     float boxWidth = textBox->size.width;
     float boxHeight = textBox->size.height;
 
-    // Calculate total height: first line uses ascent, subsequent lines use maxLineHeight.
+    // Calculate total height: first line uses ascent (except Baseline mode), subsequent lines use
+    // maxLineHeight.
     float totalHeight = 0;
     for (size_t i = 0; i < lines.size(); i++) {
       if (lines[i].glyphs.empty()) {
         totalHeight += lines[i].maxLineHeight;
         continue;
       }
-      if (i == 0) {
+      if (i == 0 && textBox->verticalAlign != VerticalAlign::Baseline) {
         totalHeight += lines[i].maxAscent;
-      } else {
+      } else if (i > 0) {
         totalHeight += lines[i].maxLineHeight;
       }
     }
@@ -900,6 +901,7 @@ class TextLayoutContext {
     float yOffset = 0;
     if (boxHeight > 0) {
       switch (textBox->verticalAlign) {
+        case VerticalAlign::Baseline:
         case VerticalAlign::Top:
           yOffset = 0;
           break;
@@ -912,6 +914,7 @@ class TextLayoutContext {
       }
     } else {
       switch (textBox->verticalAlign) {
+        case VerticalAlign::Baseline:
         case VerticalAlign::Top:
           yOffset = 0;
           break;
@@ -941,7 +944,14 @@ class TextLayoutContext {
       auto& line = lines[lineIdx];
 
       if (lineIdx == 0) {
-        baselineY += line.glyphs.empty() ? line.maxLineHeight : line.maxAscent;
+        if (textBox->verticalAlign == VerticalAlign::Baseline) {
+          // Baseline mode: position.y is the first line's baseline, no ascent offset.
+          if (line.glyphs.empty()) {
+            baselineY += line.maxLineHeight;
+          }
+        } else {
+          baselineY += line.glyphs.empty() ? line.maxLineHeight : line.maxAscent;
+        }
       } else {
         baselineY += line.maxLineHeight;
       }
@@ -1192,6 +1202,7 @@ class TextLayoutContext {
     float yBase = textBox->position.y;
     if (boxHeight > 0) {
       switch (textBox->verticalAlign) {
+        case VerticalAlign::Baseline:
         case VerticalAlign::Top:
           break;
         case VerticalAlign::Center:
@@ -1203,6 +1214,7 @@ class TextLayoutContext {
       }
     } else {
       switch (textBox->verticalAlign) {
+        case VerticalAlign::Baseline:
         case VerticalAlign::Top:
           break;
         case VerticalAlign::Center:

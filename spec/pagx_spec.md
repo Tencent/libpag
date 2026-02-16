@@ -1539,7 +1539,7 @@ redistributed evenly to fill the available path length.
 
 #### 5.5.6 TextBox
 
-TextBox is a text layout node that applies typography to accumulated Text elements. It re-layouts all glyph positions according to its own position, size, and alignment settings. The layout results are written into each Text element's GlyphRun data with inverse-transform compensation, so that Text's own position and parent Group transforms remain effective in the rendering pipeline. For horizontal mode, the first line is positioned with its ascent touching the top of the text area. For vertical mode, the first column is positioned with its right edge touching the right side of the text area, and columns flow from right to left.
+TextBox is a text layout node that applies typography to accumulated Text elements. It re-layouts all glyph positions according to its own position, size, and alignment settings. The layout results are written into each Text element's GlyphRun data with inverse-transform compensation, so that Text's own position and parent Group transforms remain effective in the rendering pipeline. The default vertical alignment is `baseline`, where `position.y` represents the first line's baseline Y coordinate directly. When `verticalAlign` is `top`, the first line is positioned with its ascent touching the top of the text area. For vertical mode, the first column is positioned with its right edge touching the right side of the text area, and columns flow from right to left.
 
 TextBox is a **pre-layout-only** node: it is processed during the typesetting stage before rendering and is not instantiated in the render tree. If all accumulated Text elements already contain embedded GlyphRun data, the TextBox is skipped during typesetting. However, the TextBox node should still be retained even when embedded GlyphRun data and fonts are present, as design tools may read its layout attributes (size, alignment, wordWrap, etc.) for editing purposes.
 
@@ -1549,10 +1549,10 @@ Unlike other modifiers that operate on accumulated results in a chain (e.g., Tri
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `position` | Point | 0,0 | Top-left corner of the text area. When width or height is 0, serves as the anchor point for alignment in that dimension (see below) |
+| `position` | Point | 0,0 | Reference point for the text area. In the default `baseline` mode, `position.y` is the first line's baseline Y coordinate. In `top` mode, it is the top-left corner of the text area. When width or height is 0, serves as the anchor point for alignment in that dimension (see below) |
 | `size` | Size | 0,0 | Layout size. When width or height is 0, text has no boundary in that dimension (wordWrap wraps each character individually, alignment uses position as the reference point) |
 | `textAlign` | TextAlign | start | Horizontal alignment |
-| `verticalAlign` | VerticalAlign | top | Vertical alignment |
+| `verticalAlign` | VerticalAlign | baseline | Vertical alignment |
 | `writingMode` | WritingMode | horizontal | Layout direction |
 | `lineHeight` | float | 1.2 | Line height multiplier |
 | `wordWrap` | boolean | false | Enable automatic word wrapping (wraps at box width/height boundary; when the dimension is 0, each character wraps individually) |
@@ -1573,11 +1573,12 @@ When width is 0, alignment is relative to `position.x` as an anchor: `start` pla
 
 | Value | Description |
 |-------|-------------|
-| `top` | Top alignment |
-| `center` | Vertical center |
-| `bottom` | Bottom alignment |
+| `baseline` | Default. `position.y` represents the first line's baseline Y coordinate. Text extends above (ascent) and below (descent) from this point. |
+| `top` | Top alignment. The first line's baseline is offset by the maximum ascent of glyphs in that line, so that the tallest glyph's ascent touches the top of the text area. |
+| `center` | Vertical center. The total text block (from first line's ascent top, through line height spacing, to last line's descent bottom) is centered within the box height. |
+| `bottom` | Bottom alignment. The last line's descent bottom is aligned to the bottom edge of the text area. |
 
-When height is 0, alignment is relative to `position.y` as an anchor: `top` places text starting downward from the anchor, `center` places the vertical midpoint of all lines at the anchor, and `bottom` places the bottom edge of the last line at the anchor.
+When height is 0, alignment is relative to `position.y` as an anchor: `baseline` uses `position.y` as the first line's baseline directly, `top` places text starting downward from the anchor (with ascent offset), `center` places the vertical midpoint of all lines at the anchor, and `bottom` places the bottom edge of the last line at the anchor.
 
 **WritingMode (Layout Direction)**:
 
@@ -1862,7 +1863,7 @@ Layer / Group
 | **SelectorShape** | `square`, `rampUp`, `rampDown`, `triangle`, `round`, `smooth` |
 | **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
 | **TextAlign** | `start`, `center`, `end`, `justify` |
-| **VerticalAlign** | `top`, `center`, `bottom` |
+| **VerticalAlign** | `baseline`, `top`, `center`, `bottom` |
 | **WritingMode** | `horizontal`, `vertical` |
 | **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |
 ---

@@ -709,6 +709,7 @@ PAGX_TEST(PAGXTest, TextBoxHorizontal) {
   textBox1->position = {10, 10};
   textBox1->size = {280, 100};
   textBox1->textAlign = pagx::TextAlign::Start;
+  textBox1->verticalAlign = pagx::VerticalAlign::Top;
   textBox1->wordWrap = true;
   auto fill1 = doc->makeNode<pagx::Fill>();
   auto solid1 = doc->makeNode<pagx::SolidColor>();
@@ -797,6 +798,7 @@ PAGX_TEST(PAGXTest, TextBoxVertical) {
   textBox1->size = {280, 380};
   textBox1->writingMode = pagx::WritingMode::Vertical;
   textBox1->textAlign = pagx::TextAlign::Start;
+  textBox1->verticalAlign = pagx::VerticalAlign::Top;
   auto fill1 = doc->makeNode<pagx::Fill>();
   auto solid1 = doc->makeNode<pagx::SolidColor>();
   solid1->color = {0, 0, 0, 1};
@@ -859,6 +861,7 @@ PAGX_TEST(PAGXTest, TextBoxOverflowHidden) {
   auto textBox = doc->makeNode<pagx::TextBox>();
   textBox->position = {10, 10};
   textBox->size = {180, 80};
+  textBox->verticalAlign = pagx::VerticalAlign::Top;
   textBox->wordWrap = true;
   textBox->overflow = pagx::Overflow::Hidden;
   auto fill = doc->makeNode<pagx::Fill>();

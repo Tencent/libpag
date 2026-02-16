@@ -25,15 +25,25 @@ namespace pagx {
  */
 enum class VerticalAlign {
   /**
-   * Align text to the top of the layout area.
+   * The position.y of the text box represents the first line's baseline Y coordinate.
+   * Text extends above (ascent) and below (descent) from this baseline.
+   */
+  Baseline,
+  /**
+   * Align text to the top of the layout area. The first line's baseline is positioned at the top
+   * edge plus the maximum ascent of glyphs in that line, so that the tallest glyph's ascent touches
+   * the top of the text area.
    */
   Top,
   /**
-   * Align text to the vertical center of the layout area.
+   * Vertically center all lines within the layout area. The total text block height is measured from
+   * the first line's ascent top to the last line's descent bottom, including line height spacing
+   * between lines. This block is centered within the box height.
    */
   Center,
   /**
-   * Align text to the bottom of the layout area.
+   * Align the bottom of the last line's descent to the bottom edge of the layout area. The total
+   * text block height is calculated the same way as Center.
    */
   Bottom
 };
