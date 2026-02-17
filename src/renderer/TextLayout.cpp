@@ -771,12 +771,6 @@ class TextLayoutContext {
         currentLine = &lines.back();
         currentLineWidth = 0;
         lastBreakIndex = -1;
-        // Add the \n glyph to the next line so its font metrics participate in line metrics
-        // calculation for the next line.
-        GlyphInfo newlineGlyph = glyph;
-        newlineGlyph.xPosition = 0;
-        newlineGlyph.advance = 0;
-        currentLine->glyphs.push_back(newlineGlyph);
         continue;
       }
 
