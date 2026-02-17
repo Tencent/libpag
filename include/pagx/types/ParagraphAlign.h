@@ -25,9 +25,7 @@ namespace pagx {
  * this controls vertical positioning of lines. In vertical mode, this controls horizontal
  * positioning of columns. The naming follows DirectWrite's DWRITE_PARAGRAPH_ALIGNMENT convention,
  * using direction-neutral names (Near/Far instead of Top/Bottom) that work correctly for both
- * horizontal and vertical writing modes. Baseline and Near both position the first column with its
- * em box right edge touching the right side of the text area. The lineHeight value only affects
- * spacing between columns, not the first column's position.
+ * horizontal and vertical writing modes.
  */
 enum class ParagraphAlign {
   /**
