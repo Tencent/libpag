@@ -700,7 +700,23 @@ PAGX_TEST(PAGXTest, TextBoxHorizontal) {
   auto doc = pagx::PAGXDocument::Make(300, 400);
   auto layer = doc->makeNode<pagx::Layer>();
 
+  auto addBorder = [&](float x, float y, float w, float h) {
+    auto borderGroup = doc->makeNode<pagx::Group>();
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->center = {x + w / 2, y + h / 2};
+    rect->size = {w, h};
+    auto stroke = doc->makeNode<pagx::Stroke>();
+    auto strokeColor = doc->makeNode<pagx::SolidColor>();
+    strokeColor->color = {0.8f, 0.8f, 0.8f, 1};
+    stroke->color = strokeColor;
+    stroke->width = 1;
+    borderGroup->elements.push_back(rect);
+    borderGroup->elements.push_back(stroke);
+    layer->contents.push_back(borderGroup);
+  };
+
   // Group 1: Left-aligned text with word wrap
+  addBorder(10, 10, 280, 100);
   auto group1 = doc->makeNode<pagx::Group>();
   auto text1 = doc->makeNode<pagx::Text>();
   text1->text = "Hello World this is a long text that should wrap.";
@@ -722,6 +738,7 @@ PAGX_TEST(PAGXTest, TextBoxHorizontal) {
   layer->contents.push_back(group1);
 
   // Group 2: Center-aligned text with explicit newlines
+  addBorder(10, 130, 280, 100);
   auto group2 = doc->makeNode<pagx::Group>();
   auto text2 = doc->makeNode<pagx::Text>();
   text2->text = "Line One\nLine Two\nLine Three";
@@ -742,6 +759,7 @@ PAGX_TEST(PAGXTest, TextBoxHorizontal) {
   layer->contents.push_back(group2);
 
   // Group 3: CJK text with word wrap
+  addBorder(10, 260, 280, 120);
   auto group3 = doc->makeNode<pagx::Group>();
   auto text3 = doc->makeNode<pagx::Text>();
   text3->text = "\xe4\xbd\xa0\xe5\xa5\xbd\xe4\xb8\x96\xe7\x95\x8c\xef\xbc\x8c"
@@ -788,7 +806,23 @@ PAGX_TEST(PAGXTest, TextBoxVertical) {
   auto doc = pagx::PAGXDocument::Make(300, 400);
   auto layer = doc->makeNode<pagx::Layer>();
 
+  auto addBorder = [&](float x, float y, float w, float h) {
+    auto borderGroup = doc->makeNode<pagx::Group>();
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->center = {x + w / 2, y + h / 2};
+    rect->size = {w, h};
+    auto stroke = doc->makeNode<pagx::Stroke>();
+    auto strokeColor = doc->makeNode<pagx::SolidColor>();
+    strokeColor->color = {0.8f, 0.8f, 0.8f, 1};
+    stroke->color = strokeColor;
+    stroke->width = 1;
+    borderGroup->elements.push_back(rect);
+    borderGroup->elements.push_back(stroke);
+    layer->contents.push_back(borderGroup);
+  };
+
   // CJK vertical text
+  addBorder(10, 10, 280, 380);
   auto group1 = doc->makeNode<pagx::Group>();
   auto text1 = doc->makeNode<pagx::Text>();
   text1->text = "\xe4\xbd\xa0\xe5\xa5\xbd\xe4\xb8\x96\xe7\x95\x8c";
@@ -810,6 +844,7 @@ PAGX_TEST(PAGXTest, TextBoxVertical) {
   layer->contents.push_back(group1);
 
   // Mixed CJK and Latin vertical text
+  addBorder(10, 10, 200, 380);
   auto group2 = doc->makeNode<pagx::Group>();
   auto text2 = doc->makeNode<pagx::Text>();
   text2->text = "\xe4\xb8\xad\xe6\x96\x87\xe6\xb7\xb7\xe5\x90\x88" "English\xe6\xb5\x8b\xe8\xaf\x95";
@@ -853,6 +888,20 @@ PAGX_TEST(PAGXTest, TextBoxVertical) {
 PAGX_TEST(PAGXTest, TextBoxOverflowHidden) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto layer = doc->makeNode<pagx::Layer>();
+
+  // Border for the text box
+  auto borderGroup = doc->makeNode<pagx::Group>();
+  auto borderRect = doc->makeNode<pagx::Rectangle>();
+  borderRect->center = {10 + 180.0f / 2, 10 + 80.0f / 2};
+  borderRect->size = {180, 80};
+  auto borderStroke = doc->makeNode<pagx::Stroke>();
+  auto borderColor = doc->makeNode<pagx::SolidColor>();
+  borderColor->color = {0.8f, 0.8f, 0.8f, 1};
+  borderStroke->color = borderColor;
+  borderStroke->width = 1;
+  borderGroup->elements.push_back(borderRect);
+  borderGroup->elements.push_back(borderStroke);
+  layer->contents.push_back(borderGroup);
 
   auto group = doc->makeNode<pagx::Group>();
   auto text = doc->makeNode<pagx::Text>();
