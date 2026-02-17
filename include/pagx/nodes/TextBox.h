@@ -75,10 +75,11 @@ class TextBox : public Element {
   WritingMode writingMode = WritingMode::Horizontal;
 
   /**
-   * The line height multiplier. Applied to font size to calculate line spacing. The default value
-   * is 1.2.
+   * The line height in pixels. When set to 0 (default), the line height is automatically calculated
+   * from font metrics (ascent + descent + leading). When set to a positive value, all lines use
+   * that fixed height. In vertical mode, this controls the column width instead.
    */
-  float lineHeight = 1.2f;
+  float lineHeight = 0;
 
   /**
    * Whether automatic word wrapping is enabled. When true, text wraps at the box width boundary

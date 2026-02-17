@@ -1534,7 +1534,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 #### 5.5.6 文本框（TextBox）
 
-TextBox 是文本框排版器，对累积的 Text 元素应用排版。它根据自身的 position、size 和对齐设置重新排版所有字形位置，排版结果通过反向变换补偿写入每个 Text 元素的 GlyphRun 数据，因此 Text 自身的 position 和父级 Group 变换在渲染管线中仍然有效。默认垂直对齐为 `baseline`，`position.y` 直接表示首行基线 Y 坐标。当 `verticalAlign` 为 `top` 时，第一行文本以 ascent 贴顶定位。竖排模式下，第一列的 em 框右边缘贴齐文本区域右边缘，列中心距右边缘为 `fontSize / 2`。后续列间距（中心到中心）为 `fontSize × lineHeight`。`lineHeight` 倍数仅影响列间距，不影响首列位置。列从右往左排列。
+TextBox 是文本框排版器，对累积的 Text 元素应用排版。它根据自身的 position、size 和对齐设置重新排版所有字形位置，排版结果通过反向变换补偿写入每个 Text 元素的 GlyphRun 数据，因此 Text 自身的 position 和父级 Group 变换在渲染管线中仍然有效。默认垂直对齐为 `baseline`，`position.y` 直接表示首行基线 Y 坐标。当 `verticalAlign` 为 `top` 时，首行使用行框模型定位：行框顶部贴齐文本区域顶部，基线位于行框顶部下方 `halfLeading + ascent` 处，其中 `halfLeading = (lineHeight - metricsHeight) / 2`，`metricsHeight = ascent + descent + leading`。竖排模式下，列间距为 `lineHeight`。当 `lineHeight` 为 0（自动）时，列宽等于字号。列从右往左排列。
 
 TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被处理，不会在渲染树中实例化。如果累积的所有 Text 元素都已包含嵌入的 GlyphRun 数据，则排版阶段会跳过 TextBox。但即使已填写嵌入的 GlyphRun 数据和字体，仍建议保留 TextBox 节点，因为设计工具导入时需要读取其排版属性（size、对齐方式、wordWrap 等）用于编辑展示。
 
@@ -1549,7 +1549,7 @@ TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被�
 | `textAlign` | TextAlign | start | 水平对齐（见下方） |
 | `verticalAlign` | VerticalAlign | baseline | 垂直对齐（见下方） |
 | `writingMode` | WritingMode | horizontal | 排版方向（见下方） |
-| `lineHeight` | float | 1.2 | 行高倍数 |
+| `lineHeight` | float | 0 | 行高（像素值）。0 表示自动（根据字体 metrics 计算：ascent + descent + leading）。竖排模式下控制列宽 |
 | `wordWrap` | boolean | false | 是否启用自动换行（在盒子宽度/高度边界处换行；该维度为 0 时逐字符换行） |
 | `overflow` | Overflow | visible | 文本超出盒子边界时的行为 |
 
@@ -1569,11 +1569,11 @@ TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被�
 | 值 | 说明 |
 |------|------|
 | `baseline` | 默认。`position.y` 表示首行基线 Y 坐标，文本从该点向上（ascent）和向下（descent）延伸。 |
-| `top` | 顶部对齐。首行基线偏移该行字形的最大 ascent，使最高字形的 ascent 顶部贴齐文本区域顶部。 |
-| `center` | 垂直居中。整体文本块（从首行 ascent 顶部，经过行高间距，到末行 descent 底部）在盒子高度内居中。 |
-| `bottom` | 底部对齐。末行 descent 底部对齐文本区域底部。 |
+| `top` | 顶部对齐。使用行框模型，首行行框顶部贴齐文本区域顶部。基线位于行框顶部下方 `halfLeading + ascent` 处，其中 `halfLeading = (lineHeight - metricsHeight) / 2`。 |
+| `center` | 垂直居中。整体文本块高度（所有行高之和）在盒子高度内居中。 |
+| `bottom` | 底部对齐。末行行框底部对齐文本区域底部。 |
 
-当高度为 0 时，对齐以 `position.y` 为锚点：`baseline` 直接将 `position.y` 作为首行基线，`top` 从锚点向下展开（带 ascent 偏移），`center` 将所有行的垂直中心对齐锚点，`bottom` 将最后一行底边对齐锚点。
+当高度为 0 时，对齐以 `position.y` 为锚点：`baseline` 直接将 `position.y` 作为首行基线，`top` 从锚点向下展开（使用行框模型偏移），`center` 将所有行框的垂直中心对齐锚点，`bottom` 将最后一个行框底边对齐锚点。
 
 **WritingMode（排版方向）**：
 

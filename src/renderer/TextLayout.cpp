@@ -105,6 +105,7 @@ class TextLayoutContext {
     float fontSize = 0;
     float ascent = 0;
     float descent = 0;
+    float leading = 0;
     Text* sourceText = nullptr;
   };
 
@@ -114,6 +115,7 @@ class TextLayoutContext {
     float maxAscent = 0;
     float maxDescent = 0;
     float maxLineHeight = 0;
+    float metricsHeight = 0;
   };
 
   // A group of glyphs with the same vertical treatment in vertical text layout.
@@ -730,6 +732,7 @@ class TextLayoutContext {
       gi.fontSize = text->fontSize;
       gi.ascent = metrics.ascent;
       gi.descent = metrics.descent;
+      gi.leading = metrics.leading;
       gi.sourceText = text;
       info.allGlyphs.push_back(gi);
 
@@ -836,11 +839,13 @@ class TextLayoutContext {
     return lines;
   }
 
-  static void FinishLine(LineInfo* line, float lineHeightMultiplier, Text* newlineSource) {
+  static void FinishLine(LineInfo* line, float lineHeight, Text* newlineSource) {
+    static constexpr float DefaultLineHeightFactor = 1.2f;
     if (line->glyphs.empty()) {
       // Empty line from consecutive \n: use the newline source's fontSize for height.
       if (newlineSource != nullptr) {
-        line->maxLineHeight = newlineSource->fontSize * lineHeightMultiplier;
+        line->maxLineHeight =
+            (lineHeight > 0) ? lineHeight : newlineSource->fontSize * DefaultLineHeightFactor;
       }
       return;
     }
@@ -848,7 +853,7 @@ class TextLayoutContext {
     line->width = lastGlyph.xPosition + lastGlyph.advance;
     float maxAscent = 0;
     float maxDescent = 0;
-    float maxFontSize = 0;
+    float maxLeading = 0;
     for (auto& g : line->glyphs) {
       float absAscent = fabsf(g.ascent);
       if (absAscent > maxAscent) {
@@ -857,13 +862,14 @@ class TextLayoutContext {
       if (g.descent > maxDescent) {
         maxDescent = g.descent;
       }
-      if (g.fontSize > maxFontSize) {
-        maxFontSize = g.fontSize;
+      if (g.leading > maxLeading) {
+        maxLeading = g.leading;
       }
     }
     line->maxAscent = maxAscent;
     line->maxDescent = maxDescent;
-    line->maxLineHeight = maxFontSize * lineHeightMultiplier;
+    line->metricsHeight = maxAscent + maxDescent + maxLeading;
+    line->maxLineHeight = (lineHeight > 0) ? lineHeight : line->metricsHeight;
   }
 
   void buildTextBlobWithLayout(const TextBox* textBox, const std::vector<LineInfo>& lines) {
@@ -874,29 +880,10 @@ class TextLayoutContext {
     float boxWidth = textBox->size.width;
     float boxHeight = textBox->size.height;
 
-    // Calculate total height: first line uses ascent (except Baseline mode), subsequent lines use
-    // maxLineHeight.
+    // Calculate total height using line-box model: each line contributes its full lineHeight.
     float totalHeight = 0;
     for (size_t i = 0; i < lines.size(); i++) {
-      if (lines[i].glyphs.empty()) {
-        totalHeight += lines[i].maxLineHeight;
-        continue;
-      }
-      if (i == 0 && textBox->verticalAlign != VerticalAlign::Baseline) {
-        totalHeight += lines[i].maxAscent;
-      } else if (i > 0) {
-        totalHeight += lines[i].maxLineHeight;
-      }
-    }
-    // Add last line's descent if lineHeight doesn't cover it.
-    auto& lastLine = lines.back();
-    if (!lastLine.glyphs.empty()) {
-      float lineMetricHeight = lastLine.maxAscent + lastLine.maxDescent;
-      if (lastLine.maxLineHeight < lineMetricHeight) {
-        totalHeight += lastLine.maxDescent;
-      } else {
-        totalHeight += lastLine.maxLineHeight - lastLine.maxAscent;
-      }
+      totalHeight += lines[i].maxLineHeight;
     }
 
     // Vertical alignment offset.
@@ -940,23 +927,29 @@ class TextLayoutContext {
 
     bool overflowHidden = textBox->overflow == Overflow::Hidden;
     float boxBottom = textBox->position.y + boxHeight;
-    float baselineY = textBox->position.y + yOffset;
+    float lineTop = textBox->position.y + yOffset;
+    float baselineY = lineTop;
 
     for (size_t lineIdx = 0; lineIdx < lines.size(); lineIdx++) {
       auto& line = lines[lineIdx];
 
-      if (lineIdx == 0) {
-        if (textBox->verticalAlign == VerticalAlign::Baseline) {
-          // Baseline mode: position.y is the first line's baseline, no ascent offset.
-          if (line.glyphs.empty()) {
-            baselineY += line.maxLineHeight;
-          }
+      if (textBox->verticalAlign == VerticalAlign::Baseline && lineIdx == 0) {
+        // Baseline mode: position.y is the first line's baseline, no ascent offset.
+        if (line.glyphs.empty()) {
+          baselineY = lineTop + line.maxLineHeight;
         } else {
-          baselineY += line.glyphs.empty() ? line.maxLineHeight : line.maxAscent;
+          baselineY = lineTop;
         }
       } else {
-        baselineY += line.maxLineHeight;
+        if (line.glyphs.empty()) {
+          baselineY = lineTop + line.maxLineHeight;
+        } else {
+          // Half-leading model: baseline = lineTop + halfLeading + ascent
+          float halfLeading = (line.maxLineHeight - line.metricsHeight) / 2;
+          baselineY = lineTop + halfLeading + line.maxAscent;
+        }
       }
+      lineTop += line.maxLineHeight;
 
       // Skip lines that overflow below the box bottom.
       if (overflowHidden && boxHeight > 0) {
@@ -1046,7 +1039,7 @@ class TextLayoutContext {
     }
   }
 
-  static void FinishColumn(ColumnInfo* column, float lineHeightMultiplier) {
+  static void FinishColumn(ColumnInfo* column, float lineHeight) {
     float height = 0;
     float maxWidth = 0;
     float maxFontSize = 0;
@@ -1064,7 +1057,7 @@ class TextLayoutContext {
     column->height = height;
     column->maxWidth = maxWidth;
     column->maxFontSize = maxFontSize;
-    column->maxColumnWidth = maxFontSize * lineHeightMultiplier;
+    column->maxColumnWidth = (lineHeight > 0) ? lineHeight : maxFontSize;
   }
 
   std::vector<ColumnInfo> layoutColumns(const std::vector<GlyphInfo>& allGlyphs,
@@ -1165,15 +1158,10 @@ class TextLayoutContext {
     float boxWidth = textBox->size.width;
     float boxHeight = textBox->size.height;
 
-    // Calculate total width: first column uses em box width (maxFontSize),
-    // subsequent columns use column width (maxFontSize * lineHeight).
+    // Calculate total width: all columns use maxColumnWidth (line-box model).
     float totalWidth = 0;
     for (size_t i = 0; i < columns.size(); i++) {
-      if (i == 0) {
-        totalWidth += columns[i].maxFontSize;
-      } else {
-        totalWidth += columns[i].maxColumnWidth;
-      }
+      totalWidth += columns[i].maxColumnWidth;
     }
 
     // Calculate max column height for vertical alignment.
@@ -1264,7 +1252,7 @@ class TextLayoutContext {
     for (size_t colIdx = 0; colIdx < columns.size(); colIdx++) {
       auto& column = columns[colIdx];
       // Move left by this column's allocated width.
-      float allocatedWidth = (colIdx == 0) ? column.maxFontSize : column.maxColumnWidth;
+      float allocatedWidth = column.maxColumnWidth;
       columnX -= allocatedWidth;
 
       // Skip columns that overflow beyond the left edge of the box.

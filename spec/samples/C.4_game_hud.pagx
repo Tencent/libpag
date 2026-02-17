@@ -296,7 +296,7 @@
     <Text text="MISSION OBJECTIVES: [ ] INFILTRATE BASE [ ] HACK TERMINAL [x] SECURE PERIMETER" fontFamily="Arial" fontSize="12" fontStyle="Bold"/>
 
     <Fill color="#FFF"/>
-    <TextBox textAlign="center" lineHeight="1.6"/>
+    <TextBox textAlign="center" lineHeight="19.2"/>
     <DropShadowStyle blurX="2" blurY="2" color="#000"/>
   </Layer>
 

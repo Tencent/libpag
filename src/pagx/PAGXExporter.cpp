@@ -720,7 +720,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       if (textBox->writingMode != WritingMode::Horizontal) {
         xml.addAttribute("writingMode", WritingModeToString(textBox->writingMode));
       }
-      xml.addAttribute("lineHeight", textBox->lineHeight, 1.2f);
+      xml.addAttribute("lineHeight", textBox->lineHeight, 0.0f);
       if (textBox->wordWrap) {
         xml.addAttribute("wordWrap", textBox->wordWrap);
       }

@@ -33,20 +33,20 @@ enum class VerticalAlign {
    */
   Baseline,
   /**
-   * Align text to the top of the layout area. The first line's baseline is positioned at the top
-   * edge plus the maximum ascent of glyphs in that line, so that the tallest glyph's ascent touches
-   * the top of the text area.
+   * Align text to the top of the layout area using the line-box model. The first line's line box
+   * top edge is aligned to the top of the text area. The baseline is positioned at
+   * halfLeading + ascent from the top, where halfLeading = (lineHeight - metricsHeight) / 2.
    */
   Top,
   /**
-   * Vertically center all lines within the layout area. The total text block height is measured from
-   * the first line's ascent top to the last line's descent bottom, including line height spacing
-   * between lines. This block is centered within the box height.
+   * Vertically center all lines within the layout area. The total text block height is the sum of
+   * all line heights (each line uses its effective lineHeight). This block is centered within the
+   * box height.
    */
   Center,
   /**
-   * Align the bottom of the last line's descent to the bottom edge of the layout area. The total
-   * text block height is calculated the same way as Center.
+   * Align the bottom of the last line's line box to the bottom edge of the layout area. The total
+   * text block height is the sum of all line heights.
    */
   Bottom
 };

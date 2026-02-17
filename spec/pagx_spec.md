@@ -1539,7 +1539,7 @@ redistributed evenly to fill the available path length.
 
 #### 5.5.6 TextBox
 
-TextBox is a text layout node that applies typography to accumulated Text elements. It re-layouts all glyph positions according to its own position, size, and alignment settings. The layout results are written into each Text element's GlyphRun data with inverse-transform compensation, so that Text's own position and parent Group transforms remain effective in the rendering pipeline. The default vertical alignment is `baseline`, where `position.y` represents the first line's baseline Y coordinate directly. When `verticalAlign` is `top`, the first line is positioned with its ascent touching the top of the text area. For vertical mode, the first column's em box right edge is aligned to the right side of the text area, with the column center at `fontSize / 2` from the right edge. Subsequent columns are spaced by `fontSize × lineHeight` (center-to-center distance). The `lineHeight` multiplier only affects column spacing, not the first column's position. Columns flow from right to left.
+TextBox is a text layout node that applies typography to accumulated Text elements. It re-layouts all glyph positions according to its own position, size, and alignment settings. The layout results are written into each Text element's GlyphRun data with inverse-transform compensation, so that Text's own position and parent Group transforms remain effective in the rendering pipeline. The default vertical alignment is `baseline`, where `position.y` represents the first line's baseline Y coordinate directly. When `verticalAlign` is `top`, the first line is positioned using the line-box model: the line box top edge is aligned to the top of the text area, and the baseline is placed at `halfLeading + ascent` from the top, where `halfLeading = (lineHeight - metricsHeight) / 2` and `metricsHeight = ascent + descent + leading` from the font metrics. For vertical mode, columns are spaced by `lineHeight` (center-to-center distance). When `lineHeight` is 0 (auto), the column width equals the font size. Columns flow from right to left.
 
 TextBox is a **pre-layout-only** node: it is processed during the typesetting stage before rendering and is not instantiated in the render tree. If all accumulated Text elements already contain embedded GlyphRun data, the TextBox is skipped during typesetting. However, the TextBox node should still be retained even when embedded GlyphRun data and fonts are present, as design tools may read its layout attributes (size, alignment, wordWrap, etc.) for editing purposes.
 
@@ -1554,7 +1554,7 @@ Unlike other modifiers that operate on accumulated results in a chain (e.g., Tri
 | `textAlign` | TextAlign | start | Horizontal alignment |
 | `verticalAlign` | VerticalAlign | baseline | Vertical alignment |
 | `writingMode` | WritingMode | horizontal | Layout direction |
-| `lineHeight` | float | 1.2 | Line height multiplier |
+| `lineHeight` | float | 0 | Line height in pixels. 0 means auto (calculated from font metrics: ascent + descent + leading). In vertical mode, controls column width |
 | `wordWrap` | boolean | false | Enable automatic word wrapping (wraps at box width/height boundary; when the dimension is 0, each character wraps individually) |
 | `overflow` | Overflow | visible | Overflow behavior when text exceeds box boundaries |
 
@@ -1574,11 +1574,11 @@ When width is 0, alignment is relative to `position.x` as an anchor: `start` pla
 | Value | Description |
 |-------|-------------|
 | `baseline` | Default. `position.y` represents the first line's baseline Y coordinate. Text extends above (ascent) and below (descent) from this point. |
-| `top` | Top alignment. The first line's baseline is offset by the maximum ascent of glyphs in that line, so that the tallest glyph's ascent touches the top of the text area. |
-| `center` | Vertical center. The total text block (from first line's ascent top, through line height spacing, to last line's descent bottom) is centered within the box height. |
-| `bottom` | Bottom alignment. The last line's descent bottom is aligned to the bottom edge of the text area. |
+| `top` | Top alignment using the line-box model. The first line box's top edge is aligned to the top of the text area. The baseline is positioned at `halfLeading + ascent` from the top, where `halfLeading = (lineHeight - metricsHeight) / 2`. |
+| `center` | Vertical center. The total text block height (sum of all line heights) is centered within the box height. |
+| `bottom` | Bottom alignment. The last line box's bottom edge is aligned to the bottom of the text area. |
 
-When height is 0, alignment is relative to `position.y` as an anchor: `baseline` uses `position.y` as the first line's baseline directly, `top` places text starting downward from the anchor (with ascent offset), `center` places the vertical midpoint of all lines at the anchor, and `bottom` places the bottom edge of the last line at the anchor.
+When height is 0, alignment is relative to `position.y` as an anchor: `baseline` uses `position.y` as the first line's baseline directly, `top` places text starting downward from the anchor (with line-box model offset), `center` places the vertical midpoint of all line boxes at the anchor, and `bottom` places the bottom edge of the last line box at the anchor.
 
 **WritingMode (Layout Direction)**:
 

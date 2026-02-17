@@ -38,6 +38,7 @@
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Text.h"
@@ -888,6 +889,214 @@ PAGX_TEST(PAGXTest, TextBoxOverflowHidden) {
   displayList.root()->addChild(tgfxLayer);
   displayList.render(surface.get(), false);
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/TextBoxOverflowHidden"));
+}
+
+/**
+ * Test case: Compare TextBox vertical alignment modes (Top/Center/Bottom) with border visualization.
+ * Uses "aaAÂẤ" text to test different glyph heights with Noto Sans font.
+ */
+PAGX_TEST(PAGXTest, TextBoxVerticalAlignCompare) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto layer = doc->makeNode<pagx::Layer>();
+
+  struct BoxConfig {
+    pagx::VerticalAlign align;
+    float x;
+  };
+  BoxConfig configs[] = {
+      {pagx::VerticalAlign::Top, 10},
+      {pagx::VerticalAlign::Center, 140},
+      {pagx::VerticalAlign::Bottom, 270},
+  };
+
+  for (auto& config : configs) {
+    // Border rectangle
+    auto borderGroup = doc->makeNode<pagx::Group>();
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->center = {config.x + 60, 140};
+    rect->size = {120, 80};
+    auto stroke = doc->makeNode<pagx::Stroke>();
+    auto strokeColor = doc->makeNode<pagx::SolidColor>();
+    strokeColor->color = {0.8f, 0.8f, 0.8f, 1};
+    stroke->color = strokeColor;
+    stroke->width = 1;
+    borderGroup->elements.push_back(rect);
+    borderGroup->elements.push_back(stroke);
+    layer->contents.push_back(borderGroup);
+
+    // Text with TextBox
+    auto textGroup = doc->makeNode<pagx::Group>();
+    auto text = doc->makeNode<pagx::Text>();
+    text->text = "aaA\xc3\x82\xe1\xba\xa4";
+    text->fontSize = 40;
+    text->fontFamily = "NotoSansSC";
+    auto textBox = doc->makeNode<pagx::TextBox>();
+    textBox->position = {config.x, 100};
+    textBox->size = {120, 80};
+    textBox->verticalAlign = config.align;
+    auto fill = doc->makeNode<pagx::Fill>();
+    auto solid = doc->makeNode<pagx::SolidColor>();
+    solid->color = {0, 0, 0, 1};
+    fill->color = solid;
+    textGroup->elements.push_back(text);
+    textGroup->elements.push_back(textBox);
+    textGroup->elements.push_back(fill);
+    layer->contents.push_back(textGroup);
+  }
+
+  doc->layers.push_back(layer);
+
+  pagx::TextLayout textLayout;
+  textLayout.setFallbackTypefaces(GetFallbackTypefaces());
+  auto layoutResult = textLayout.layout(doc.get());
+  ASSERT_FALSE(layoutResult.shapedTextMap.empty());
+
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, 400, 300);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/TextBoxVerticalAlignCompare"));
+}
+
+/**
+ * Test case: Comprehensive line height and multi-line layout verification.
+ * Covers: mixed font sizes in a line, fixed lineHeight, empty lines, and multi-line vertical
+ * alignment. All boxes use Top alignment for direct Figma comparison.
+ *
+ * Layout (600x500 canvas):
+ * Row 1 (y=10): Auto lineHeight with mixed font sizes
+ *   Box A (10,10 200x180): "Hg\n" (fontSize=40) + "Xy" (fontSize=20) + "\nAB" (fontSize=60)
+ *
+ * Row 1 right: Fixed lineHeight=40 with mixed font sizes
+ *   Box B (220,10 200x180): same text as A, lineHeight=40
+ *
+ * Row 2 (y=200): Fixed lineHeight=80 with single font size
+ *   Box C (10,200 280x120): "Top\nLine" (fontSize=30), lineHeight=80
+ *
+ * Row 2 right: Center alignment with fixed lineHeight=80
+ *   Box D (310,200 280x120): "Top\nLine" (fontSize=30), lineHeight=80, center align
+ */
+PAGX_TEST(PAGXTest, TextBoxLineHeightCompare) {
+  auto doc = pagx::PAGXDocument::Make(600, 500);
+  auto layer = doc->makeNode<pagx::Layer>();
+
+  auto addBorder = [&](float x, float y, float w, float h) {
+    auto borderGroup = doc->makeNode<pagx::Group>();
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->center = {x + w / 2, y + h / 2};
+    rect->size = {w, h};
+    auto stroke = doc->makeNode<pagx::Stroke>();
+    auto strokeColor = doc->makeNode<pagx::SolidColor>();
+    strokeColor->color = {0.8f, 0.8f, 0.8f, 1};
+    stroke->color = strokeColor;
+    stroke->width = 1;
+    borderGroup->elements.push_back(rect);
+    borderGroup->elements.push_back(stroke);
+    layer->contents.push_back(borderGroup);
+  };
+
+  // Helper: add a text segment as a Group with Text+Fill (for rich text mode).
+  auto addRichText = [&](pagx::Layer* targetLayer, const std::string& str, float fontSize) {
+    auto group = doc->makeNode<pagx::Group>();
+    auto text = doc->makeNode<pagx::Text>();
+    text->text = str;
+    text->fontSize = fontSize;
+    text->fontFamily = "NotoSansSC";
+    group->elements.push_back(text);
+    auto fill = doc->makeNode<pagx::Fill>();
+    auto solid = doc->makeNode<pagx::SolidColor>();
+    solid->color = {0, 0, 0, 1};
+    fill->color = solid;
+    group->elements.push_back(fill);
+    targetLayer->contents.push_back(group);
+  };
+
+  // Helper: add a single-text Group with TextBox inside (for single font size).
+  auto addSimpleTextBox = [&](pagx::Layer* targetLayer, const std::string& str, float fontSize,
+                              float x, float y, float w, float h, float lineH,
+                              pagx::VerticalAlign vAlign) {
+    auto textGroup = doc->makeNode<pagx::Group>();
+    auto text = doc->makeNode<pagx::Text>();
+    text->text = str;
+    text->fontSize = fontSize;
+    text->fontFamily = "NotoSansSC";
+    textGroup->elements.push_back(text);
+    auto fill = doc->makeNode<pagx::Fill>();
+    auto solid = doc->makeNode<pagx::SolidColor>();
+    solid->color = {0, 0, 0, 1};
+    fill->color = solid;
+    textGroup->elements.push_back(fill);
+    auto textBox = doc->makeNode<pagx::TextBox>();
+    textBox->position = {x, y};
+    textBox->size = {w, h};
+    textBox->verticalAlign = vAlign;
+    textBox->lineHeight = lineH;
+    textGroup->elements.push_back(textBox);
+    targetLayer->contents.push_back(textGroup);
+  };
+
+  // Box A: Auto lineHeight, mixed font sizes (40+20+60), Top align
+  // Uses rich text mode: TextBox at Layer level, Text in Groups.
+  {
+    addBorder(10, 10, 200, 180);
+    auto boxLayer = doc->makeNode<pagx::Layer>();
+    addRichText(boxLayer, "Hg\n", 40);
+    addRichText(boxLayer, "Xy", 20);
+    addRichText(boxLayer, "\nAB", 60);
+    auto textBox = doc->makeNode<pagx::TextBox>();
+    textBox->position = {10, 10};
+    textBox->size = {200, 180};
+    textBox->verticalAlign = pagx::VerticalAlign::Top;
+    boxLayer->contents.push_back(textBox);
+    layer->children.push_back(boxLayer);
+  }
+
+  // Box B: Fixed lineHeight=40, same mixed text, Top align
+  {
+    addBorder(220, 10, 200, 180);
+    auto boxLayer = doc->makeNode<pagx::Layer>();
+    addRichText(boxLayer, "Hg\n", 40);
+    addRichText(boxLayer, "Xy", 20);
+    addRichText(boxLayer, "\nAB", 60);
+    auto textBox = doc->makeNode<pagx::TextBox>();
+    textBox->position = {220, 10};
+    textBox->size = {200, 180};
+    textBox->verticalAlign = pagx::VerticalAlign::Top;
+    textBox->lineHeight = 40;
+    boxLayer->contents.push_back(textBox);
+    layer->children.push_back(boxLayer);
+  }
+
+  // Box C: Fixed lineHeight=80, single font size 30, Top align
+  {
+    addBorder(10, 200, 280, 120);
+    addSimpleTextBox(layer, "Top\nLine", 30, 10, 200, 280, 120, 80, pagx::VerticalAlign::Top);
+  }
+
+  // Box D: Fixed lineHeight=80, single font size 30, Center align
+  {
+    addBorder(310, 200, 280, 120);
+    addSimpleTextBox(layer, "Top\nLine", 30, 310, 200, 280, 120, 80, pagx::VerticalAlign::Center);
+  }
+
+  doc->layers.push_back(layer);
+
+  pagx::TextLayout textLayout;
+  textLayout.setFallbackTypefaces(GetFallbackTypefaces());
+  auto layoutResult = textLayout.layout(doc.get());
+  ASSERT_FALSE(layoutResult.shapedTextMap.empty());
+
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, 600, 500);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/TextBoxLineHeightCompare"));
 }
 
 }  // namespace pag
