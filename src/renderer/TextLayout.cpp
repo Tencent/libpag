@@ -116,6 +116,7 @@ class TextLayoutContext {
     float maxDescent = 0;
     float maxLineHeight = 0;
     float metricsHeight = 0;
+    float roundingRatio = 1.0f;
   };
 
   // A group of glyphs with the same vertical treatment in vertical text layout.
@@ -869,8 +870,13 @@ class TextLayoutContext {
     line->maxAscent = maxAscent;
     line->maxDescent = maxDescent;
     line->metricsHeight = maxFontLineHeight;
-    line->maxLineHeight =
-        (lineHeight > 0) ? lineHeight : roundf(line->metricsHeight);
+    if (lineHeight > 0) {
+      line->maxLineHeight = lineHeight;
+      line->roundingRatio = 1.0f;
+    } else if (line->metricsHeight > 0) {
+      line->maxLineHeight = roundf(line->metricsHeight);
+      line->roundingRatio = line->maxLineHeight / line->metricsHeight;
+    }
   }
 
   void buildTextBlobWithLayout(const TextBox* textBox, const std::vector<LineInfo>& lines) {
@@ -928,8 +934,10 @@ class TextLayoutContext {
 
     bool overflowHidden = textBox->overflow == Overflow::Hidden;
     float boxBottom = textBox->position.y + boxHeight;
-    float lineTop = textBox->position.y + yOffset;
-    float baselineY = lineTop;
+    // Use relative coordinates for baseline calculation (matching cocraft's layout algorithm),
+    // then add textBox position at the end.
+    float relativeTop = 0;
+    float baselineY = 0;
 
     for (size_t lineIdx = 0; lineIdx < lines.size(); lineIdx++) {
       auto& line = lines[lineIdx];
@@ -937,20 +945,25 @@ class TextLayoutContext {
       if (textBox->verticalAlign == VerticalAlign::Baseline && lineIdx == 0) {
         // Baseline mode: position.y is the first line's baseline, no ascent offset.
         if (line.glyphs.empty()) {
-          baselineY = lineTop + line.maxLineHeight;
+          baselineY = textBox->position.y + yOffset + line.maxLineHeight;
         } else {
-          baselineY = lineTop;
+          baselineY = textBox->position.y + yOffset;
         }
       } else {
         if (line.glyphs.empty()) {
-          baselineY = lineTop + line.maxLineHeight;
+          baselineY = textBox->position.y + roundf(
+              (relativeTop + line.maxLineHeight) * line.roundingRatio + yOffset);
         } else {
-          // Half-leading model: baseline = lineTop + halfLeading + ascent
+          // Half-leading model aligned with cocraft:
+          // relativeBaseline = (relativeTop + halfLeading + ascent) * roundingRatio
+          // baselineY = position.y + roundf(relativeBaseline + yOffset)
           float halfLeading = (line.maxLineHeight - line.metricsHeight) / 2;
-          baselineY = lineTop + halfLeading + line.maxAscent;
+          float relativeBaseline =
+              (relativeTop + halfLeading + line.maxAscent) * line.roundingRatio;
+          baselineY = textBox->position.y + roundf(relativeBaseline + yOffset);
         }
       }
-      lineTop += line.maxLineHeight;
+      relativeTop += line.maxLineHeight;
 
       // Skip lines that overflow below the box bottom.
       if (overflowHidden && boxHeight > 0) {
