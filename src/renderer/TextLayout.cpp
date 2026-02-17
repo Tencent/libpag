@@ -670,8 +670,7 @@ class TextLayoutContext {
       i += charLen;
 
       // Handle newline: store font metrics so \n participates in line metrics calculation
-      // when it becomes the leading cluster of the next line (matching cocraft's paragraph model
-      // where \n belongs to the start of the next paragraph).
+      // when it becomes the leading cluster of the next line.
       if (unichar == '\n') {
         auto metrics = primaryFont.getMetrics();
         GlyphInfo gi = {};
@@ -768,14 +767,13 @@ class TextLayoutContext {
       auto& glyph = allGlyphs[i];
 
       if (glyph.unichar == '\n') {
-        FinishLine(currentLine, textBox->lineHeight, glyph.sourceText);
+        FinishLine(currentLine, textBox->lineHeight, glyph.fontLineHeight);
         lines.emplace_back();
         currentLine = &lines.back();
         currentLineWidth = 0;
         lastBreakIndex = -1;
         // Add the \n glyph to the next line so its font metrics participate in line metrics
-        // calculation. This matches cocraft's paragraph model where \n belongs to the start of
-        // the next paragraph/line.
+        // calculation for the next line.
         GlyphInfo newlineGlyph = glyph;
         newlineGlyph.xPosition = 0;
         newlineGlyph.advance = 0;
@@ -798,7 +796,7 @@ class TextLayoutContext {
                  LineBreaker::isWhitespace(currentLine->glyphs.back().unichar)) {
             currentLine->glyphs.pop_back();
           }
-          FinishLine(currentLine, textBox->lineHeight, nullptr);
+          FinishLine(currentLine, textBox->lineHeight, 0.0f);
           lines.emplace_back();
           currentLine = &lines.back();
           // Skip leading whitespace in overflow
@@ -824,7 +822,7 @@ class TextLayoutContext {
         } else {
           // No break point found - force break before current glyph
           if (!currentLine->glyphs.empty()) {
-            FinishLine(currentLine, textBox->lineHeight, nullptr);
+            FinishLine(currentLine, textBox->lineHeight, 0.0f);
             lines.emplace_back();
             currentLine = &lines.back();
           }
@@ -850,17 +848,19 @@ class TextLayoutContext {
       }
     }
 
-    FinishLine(currentLine, textBox->lineHeight, nullptr);
+    FinishLine(currentLine, textBox->lineHeight, 0.0f);
     return lines;
   }
 
-  static void FinishLine(LineInfo* line, float lineHeight, Text* newlineSource) {
-    static constexpr float DefaultLineHeightFactor = 1.2f;
+  static void FinishLine(LineInfo* line, float lineHeight, float newlineFontLineHeight) {
     if (line->glyphs.empty()) {
-      // Empty line from consecutive \n: use the newline source's fontSize for height.
-      if (newlineSource != nullptr) {
-        line->maxLineHeight =
-            (lineHeight > 0) ? lineHeight : newlineSource->fontSize * DefaultLineHeightFactor;
+      // Empty line from line breaks: use the newline font metrics for height.
+      if (lineHeight > 0) {
+        line->maxLineHeight = lineHeight;
+        line->roundingRatio = 1.0f;
+      } else if (newlineFontLineHeight > 0) {
+        line->maxLineHeight = roundf(newlineFontLineHeight);
+        line->roundingRatio = line->maxLineHeight / newlineFontLineHeight;
       }
       return;
     }
@@ -956,8 +956,7 @@ class TextLayoutContext {
 
     bool overflowHidden = textBox->overflow == Overflow::Hidden;
     float boxBottom = textBox->position.y + boxHeight;
-    // Use relative coordinates for baseline calculation (matching cocraft's layout algorithm),
-    // then add textBox position at the end.
+    // Use relative coordinates for baseline calculation, then add textBox position at the end.
     float relativeTop = 0;
     float baselineY = 0;
 
@@ -976,10 +975,10 @@ class TextLayoutContext {
           baselineY = textBox->position.y + roundf(
               (relativeTop + line.maxLineHeight) * line.roundingRatio + yOffset);
         } else {
-          // Half-leading model aligned with cocraft:
+          // Half-leading line-box model:
           // relativeBaseline = (relativeTop + halfLeading + ascent) * roundingRatio
           // baselineY = position.y + roundf(relativeBaseline + yOffset)
-          float halfLeading = (line.maxLineHeight - line.visibleMetricsHeight) / 2;
+          float halfLeading = (line.maxLineHeight - line.metricsHeight) / 2;
           float relativeBaseline =
               (relativeTop + halfLeading + line.maxAscent) * line.roundingRatio;
           baselineY = textBox->position.y + roundf(relativeBaseline + yOffset);
