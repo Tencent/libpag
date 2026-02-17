@@ -944,35 +944,72 @@ class TextLayoutContext {
     // Use relative coordinates for baseline calculation, then add textBox position at the end.
     float relativeTop = 0;
     float baselineY = 0;
+    // Track the previous line's relative baseline for the equal-spacing model used by subsequent
+    // lines with fixed line height: baseline(n) = baseline(n-1) + lineHeight(n-1).
+    float prevRelativeBaseline = 0;
+    bool hasPrevBaseline = false;
+
+    // For Bottom alignment, pre-compute baselines from the last line upward so that the last line
+    // is anchored at the box bottom and preceding lines are spaced by lineHeight.
+    std::vector<float> precomputedBaselines = {};
+    if (textBox->verticalAlign == VerticalAlign::Bottom && lines.size() > 1) {
+      precomputedBaselines.resize(lines.size(), 0);
+      // Start from the last content line.
+      auto lastIdx = lines.size() - 1;
+      auto& lastLine = lines[lastIdx];
+      float lastRelBaseline = 0;
+      if (!lastLine.glyphs.empty()) {
+        float halfLeading = (lastLine.maxLineHeight - lastLine.metricsHeight) / 2;
+        lastRelBaseline =
+            (totalHeight - lastLine.maxLineHeight + halfLeading + lastLine.maxAscent) *
+            lastLine.roundingRatio;
+      } else {
+        lastRelBaseline =
+            (totalHeight - lastLine.maxLineHeight + lastLine.maxLineHeight) * lastLine.roundingRatio;
+      }
+      precomputedBaselines[lastIdx] = lastRelBaseline;
+      // Walk upward: each preceding line's baseline = next line's baseline - next line's lineHeight
+      for (int i = static_cast<int>(lastIdx) - 1; i >= 0; i--) {
+        precomputedBaselines[i] = precomputedBaselines[i + 1] - lines[i + 1].maxLineHeight;
+      }
+    }
 
     for (size_t lineIdx = 0; lineIdx < lines.size(); lineIdx++) {
       auto& line = lines[lineIdx];
+      float relativeBaseline = 0;
 
       if (textBox->verticalAlign == VerticalAlign::Baseline && lineIdx == 0) {
         // Baseline mode: position.y is the first line's baseline, no ascent offset.
         if (line.glyphs.empty()) {
           baselineY = textBox->position.y + yOffset + line.maxLineHeight;
+          relativeBaseline = line.maxLineHeight;
         } else {
           baselineY = textBox->position.y + yOffset;
+          relativeBaseline = 0;
         }
       } else {
         if (line.glyphs.empty()) {
-          baselineY = textBox->position.y + roundf(
-              (relativeTop + line.maxLineHeight) * line.roundingRatio + yOffset);
+          relativeBaseline = (relativeTop + line.maxLineHeight) * line.roundingRatio;
+          baselineY = textBox->position.y + roundf(relativeBaseline + yOffset);
+        } else if (!precomputedBaselines.empty()) {
+          // Bottom alignment: use pre-computed baselines anchored from the last line.
+          relativeBaseline = precomputedBaselines[lineIdx];
+          baselineY = textBox->position.y + roundf(relativeBaseline + yOffset);
+        } else if (hasPrevBaseline && textBox->lineHeight > 0) {
+          // Fixed line height, subsequent lines: baseline = prevBaseline + lineHeight.
+          // This produces equal baseline-to-baseline spacing matching Figma's behavior where
+          // subsequent lines have their leading added above rather than split above and below.
+          relativeBaseline = prevRelativeBaseline + lines[lineIdx - 1].maxLineHeight;
+          baselineY = textBox->position.y + roundf(relativeBaseline + yOffset);
         } else {
-          // Half-leading line-box model:
-          // relativeBaseline = (relativeTop + halfLeading + ascent) * roundingRatio
-          // baselineY = position.y + roundf(relativeBaseline + yOffset)
+          // Auto line height or first content line: use half-leading model.
           float halfLeading = (line.maxLineHeight - line.metricsHeight) / 2;
-          float relativeBaseline =
-              (relativeTop + halfLeading + line.maxAscent) * line.roundingRatio;
+          relativeBaseline = (relativeTop + halfLeading + line.maxAscent) * line.roundingRatio;
           baselineY = textBox->position.y + roundf(relativeBaseline + yOffset);
         }
       }
-      printf("Line %zu: maxLineHeight=%.2f metricsHeight=%.2f maxAscent=%.2f maxDescent=%.2f roundingRatio=%.4f halfLeading=%.2f relTop=%.2f baselineY=%.2f\n",
-             lineIdx, line.maxLineHeight, line.metricsHeight, line.maxAscent, line.maxDescent, line.roundingRatio,
-             line.glyphs.empty() ? 0.0f : (line.maxLineHeight - line.metricsHeight) / 2.0f,
-             relativeTop, baselineY);
+      prevRelativeBaseline = relativeBaseline;
+      hasPrevBaseline = !line.glyphs.empty();
       relativeTop += line.maxLineHeight;
 
       // Skip lines that overflow below the box bottom.

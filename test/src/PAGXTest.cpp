@@ -1148,4 +1148,207 @@ PAGX_TEST(PAGXTest, TextBoxLineHeightCompare) {
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/TextBoxLineHeightCompare"));
 }
 
+/**
+ * Tests edge cases for text layout: empty lines, baseline vertical alignment, bottom alignment
+ * with mixed font sizes, and anchor mode (size=0) positioning.
+ */
+PAGX_TEST(PAGXTest, TextBoxEdgeCases) {
+  auto doc = pagx::PAGXDocument::Make(500, 400);
+  auto layer = doc->makeNode<pagx::Layer>();
+
+  // Helper: add a border rectangle for visual reference.
+  auto addBorder = [&](float x, float y, float w, float h) {
+    auto borderGroup = doc->makeNode<pagx::Group>();
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->center = {x + w / 2, y + h / 2};
+    rect->size = {w, h};
+    auto stroke = doc->makeNode<pagx::Stroke>();
+    auto strokeColor = doc->makeNode<pagx::SolidColor>();
+    strokeColor->color = {0.8f, 0.8f, 0.8f, 1};
+    stroke->color = strokeColor;
+    stroke->width = 1;
+    borderGroup->elements.push_back(rect);
+    borderGroup->elements.push_back(stroke);
+    layer->contents.push_back(borderGroup);
+  };
+
+  // Helper: add a text segment as a Group with Text+Fill (for rich text mode).
+  auto addRichText = [&](pagx::Layer* targetLayer, const std::string& str, float fontSize) {
+    auto group = doc->makeNode<pagx::Group>();
+    auto text = doc->makeNode<pagx::Text>();
+    text->text = str;
+    text->fontSize = fontSize;
+    text->fontFamily = "NotoSansSC";
+    group->elements.push_back(text);
+    auto fill = doc->makeNode<pagx::Fill>();
+    auto solid = doc->makeNode<pagx::SolidColor>();
+    solid->color = {0, 0, 0, 1};
+    fill->color = solid;
+    group->elements.push_back(fill);
+    targetLayer->contents.push_back(group);
+  };
+
+  // Helper: add a single-text Group with TextBox inside.
+  auto addSimpleTextBox = [&](pagx::Layer* targetLayer, const std::string& str, float fontSize,
+                              float x, float y, float w, float h, float lineH,
+                              pagx::VerticalAlign vAlign) {
+    auto textGroup = doc->makeNode<pagx::Group>();
+    auto text = doc->makeNode<pagx::Text>();
+    text->text = str;
+    text->fontSize = fontSize;
+    text->fontFamily = "NotoSansSC";
+    textGroup->elements.push_back(text);
+    auto fill = doc->makeNode<pagx::Fill>();
+    auto solid = doc->makeNode<pagx::SolidColor>();
+    solid->color = {0, 0, 0, 1};
+    fill->color = solid;
+    textGroup->elements.push_back(fill);
+    auto textBox = doc->makeNode<pagx::TextBox>();
+    textBox->position = {x, y};
+    textBox->size = {w, h};
+    textBox->verticalAlign = vAlign;
+    textBox->lineHeight = lineH;
+    textGroup->elements.push_back(textBox);
+    targetLayer->contents.push_back(textGroup);
+  };
+
+  // Box A: Empty lines - text starting with \n and consecutive \n\n
+  // Tests: first line empty, consecutive empty lines handling
+  {
+    addBorder(10, 10, 150, 160);
+    addSimpleTextBox(layer, "\nLine2\n\nLine4", 24, 10, 10, 150, 160, 0, pagx::VerticalAlign::Top);
+  }
+
+  // Box B: Baseline vertical alignment mode
+  // Tests: position.y is the first line's baseline, so "Base" ascenders extend above the box top.
+  {
+    addBorder(170, 50, 150, 120);
+    addSimpleTextBox(layer, "Base\nLine", 30, 170, 50, 150, 120, 0, pagx::VerticalAlign::Baseline);
+  }
+
+  // Box C: Mixed font sizes with Bottom alignment
+  // Tests: bottom alignment calculation with varying line heights
+  {
+    addBorder(330, 10, 150, 160);
+    auto boxLayer = doc->makeNode<pagx::Layer>();
+    addRichText(boxLayer, "Big\n", 48);
+    addRichText(boxLayer, "Small", 16);
+    auto textBox = doc->makeNode<pagx::TextBox>();
+    textBox->position = {330, 10};
+    textBox->size = {150, 160};
+    textBox->verticalAlign = pagx::VerticalAlign::Bottom;
+    boxLayer->contents.push_back(textBox);
+    layer->children.push_back(boxLayer);
+  }
+
+  // Box D: Anchor mode (size=0) with different alignments
+  // Tests: positioning when there's no bounding box
+  // Left dot: Top/Start alignment, small text
+  {
+    auto textGroup = doc->makeNode<pagx::Group>();
+    auto text = doc->makeNode<pagx::Text>();
+    text->text = "Anchor";
+    text->fontSize = 16;
+    text->fontFamily = "NotoSansSC";
+    textGroup->elements.push_back(text);
+    auto fill = doc->makeNode<pagx::Fill>();
+    auto solid = doc->makeNode<pagx::SolidColor>();
+    solid->color = {0, 0, 0, 1};
+    fill->color = solid;
+    textGroup->elements.push_back(fill);
+    auto textBox = doc->makeNode<pagx::TextBox>();
+    textBox->position = {60, 220};
+    textBox->size = {0, 0};
+    textBox->verticalAlign = pagx::VerticalAlign::Top;
+    textBox->textAlign = pagx::TextAlign::Start;
+    textGroup->elements.push_back(textBox);
+    layer->contents.push_back(textGroup);
+    // Add a small marker at the anchor point
+    auto marker = doc->makeNode<pagx::Group>();
+    auto circle = doc->makeNode<pagx::Ellipse>();
+    circle->center = {60, 220};
+    circle->size = {6, 6};
+    marker->elements.push_back(circle);
+    auto markerFill = doc->makeNode<pagx::Fill>();
+    auto markerColor = doc->makeNode<pagx::SolidColor>();
+    markerColor->color = {1, 0, 0, 1};
+    markerFill->color = markerColor;
+    marker->elements.push_back(markerFill);
+    layer->contents.push_back(marker);
+  }
+
+  // Right dot: Center/Center alignment, large text
+  {
+    auto textGroup = doc->makeNode<pagx::Group>();
+    auto text = doc->makeNode<pagx::Text>();
+    text->text = "Center";
+    text->fontSize = 36;
+    text->fontFamily = "NotoSansSC";
+    textGroup->elements.push_back(text);
+    auto fill = doc->makeNode<pagx::Fill>();
+    auto solid = doc->makeNode<pagx::SolidColor>();
+    solid->color = {0, 0, 0, 1};
+    fill->color = solid;
+    textGroup->elements.push_back(fill);
+    auto textBox = doc->makeNode<pagx::TextBox>();
+    textBox->position = {200, 220};
+    textBox->size = {0, 0};
+    textBox->verticalAlign = pagx::VerticalAlign::Center;
+    textBox->textAlign = pagx::TextAlign::Center;
+    textGroup->elements.push_back(textBox);
+    layer->contents.push_back(textGroup);
+    // Add a small marker at the anchor point
+    auto marker = doc->makeNode<pagx::Group>();
+    auto circle = doc->makeNode<pagx::Ellipse>();
+    circle->center = {200, 220};
+    circle->size = {6, 6};
+    marker->elements.push_back(circle);
+    auto markerFill = doc->makeNode<pagx::Fill>();
+    auto markerColor = doc->makeNode<pagx::SolidColor>();
+    markerColor->color = {1, 0, 0, 1};
+    markerFill->color = markerColor;
+    marker->elements.push_back(markerFill);
+    layer->contents.push_back(marker);
+  }
+
+  // Box E: Fixed lineHeight with text starting with newline
+  // Tests: empty first line + fixed line height interaction
+  {
+    addBorder(10, 260, 150, 100);
+    addSimpleTextBox(layer, "\nSecond", 30, 10, 260, 150, 100, 50, pagx::VerticalAlign::Top);
+  }
+
+  // Box F: Rich text with End (right) alignment
+  // Tests: multiple Text elements with right alignment
+  {
+    addBorder(170, 260, 300, 100);
+    auto boxLayer = doc->makeNode<pagx::Layer>();
+    addRichText(boxLayer, "Right", 24);
+    addRichText(boxLayer, "Align", 36);
+    auto textBox = doc->makeNode<pagx::TextBox>();
+    textBox->position = {170, 260};
+    textBox->size = {300, 100};
+    textBox->verticalAlign = pagx::VerticalAlign::Top;
+    textBox->textAlign = pagx::TextAlign::End;
+    boxLayer->contents.push_back(textBox);
+    layer->children.push_back(boxLayer);
+  }
+
+  doc->layers.push_back(layer);
+
+  pagx::TextLayout textLayout;
+  textLayout.setFallbackTypefaces(GetFallbackTypefaces());
+  auto layoutResult = textLayout.layout(doc.get());
+  ASSERT_FALSE(layoutResult.shapedTextMap.empty());
+
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, 500, 400);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/TextBoxEdgeCases"));
+}
+
 }  // namespace pag
