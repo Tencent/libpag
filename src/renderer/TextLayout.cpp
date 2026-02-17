@@ -668,11 +668,17 @@ class TextLayoutContext {
       }
       i += charLen;
 
-      // Handle newline
+      // Handle newline: store font metrics so \n participates in line metrics calculation
+      // when it becomes the leading cluster of the next line (matching cocraft's paragraph model
+      // where \n belongs to the start of the next paragraph).
       if (unichar == '\n') {
+        auto metrics = primaryFont.getMetrics();
         GlyphInfo gi = {};
         gi.unichar = '\n';
         gi.fontSize = text->fontSize;
+        gi.ascent = metrics.ascent;
+        gi.descent = metrics.descent;
+        gi.fontLineHeight = fabsf(metrics.ascent) + metrics.descent + metrics.leading;
         gi.sourceText = text;
         info.allGlyphs.push_back(gi);
         currentX = 0;
@@ -766,6 +772,13 @@ class TextLayoutContext {
         currentLine = &lines.back();
         currentLineWidth = 0;
         lastBreakIndex = -1;
+        // Add the \n glyph to the next line so its font metrics participate in line metrics
+        // calculation. This matches cocraft's paragraph model where \n belongs to the start of
+        // the next paragraph/line.
+        GlyphInfo newlineGlyph = glyph;
+        newlineGlyph.xPosition = 0;
+        newlineGlyph.advance = 0;
+        currentLine->glyphs.push_back(newlineGlyph);
         continue;
       }
 
@@ -1004,6 +1017,10 @@ class TextLayoutContext {
       }
 
       for (auto& g : line.glyphs) {
+        // Skip newline glyphs: they only participate in metrics, not rendering.
+        if (g.unichar == '\n') {
+          continue;
+        }
         PositionedGlyph pg = {};
         pg.glyphID = g.glyphID;
         pg.font = g.font;
