@@ -117,12 +117,6 @@ class TextLayoutContext {
     float maxLineHeight = 0;
     float metricsHeight = 0;
     float roundingRatio = 1.0f;
-    // Initial metrics inherited from the preceding newline character's font, so that the \n's
-    // style participates in this line's metrics aggregation (matching cocraft behavior where \n
-    // belongs to the start of the next paragraph).
-    float initialAscent = 0;
-    float initialDescent = 0;
-    float initialFontLineHeight = 0;
   };
 
   // A group of glyphs with the same vertical treatment in vertical text layout.
@@ -777,11 +771,6 @@ class TextLayoutContext {
         currentLine = &lines.back();
         currentLineWidth = 0;
         lastBreakIndex = -1;
-        // Pass the newline's font metrics as initial values for the next line, so they
-        // participate in metrics aggregation (the \n style belongs to the next line).
-        currentLine->initialAscent = fabsf(glyph.ascent);
-        currentLine->initialDescent = glyph.descent;
-        currentLine->initialFontLineHeight = glyph.fontLineHeight;
         continue;
       }
 
@@ -870,9 +859,9 @@ class TextLayoutContext {
     }
     auto& lastGlyph = line->glyphs.back();
     line->width = lastGlyph.xPosition + lastGlyph.advance;
-    float maxAscent = line->initialAscent;
-    float maxDescent = line->initialDescent;
-    float maxFontLineHeight = line->initialFontLineHeight;
+    float maxAscent = 0;
+    float maxDescent = 0;
+    float maxFontLineHeight = 0;
     for (auto& g : line->glyphs) {
       float absAscent = fabsf(g.ascent);
       if (absAscent > maxAscent) {
@@ -980,6 +969,10 @@ class TextLayoutContext {
           baselineY = textBox->position.y + roundf(relativeBaseline + yOffset);
         }
       }
+      printf("Line %zu: maxLineHeight=%.2f metricsHeight=%.2f maxAscent=%.2f maxDescent=%.2f roundingRatio=%.4f halfLeading=%.2f relTop=%.2f baselineY=%.2f\n",
+             lineIdx, line.maxLineHeight, line.metricsHeight, line.maxAscent, line.maxDescent, line.roundingRatio,
+             line.glyphs.empty() ? 0.0f : (line.maxLineHeight - line.metricsHeight) / 2.0f,
+             relativeTop, baselineY);
       relativeTop += line.maxLineHeight;
 
       // Skip lines that overflow below the box bottom.
