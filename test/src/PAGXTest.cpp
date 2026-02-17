@@ -821,49 +821,82 @@ PAGX_TEST(PAGXTest, TextBoxVertical) {
     layer->contents.push_back(borderGroup);
   };
 
-  // CJK vertical text (Start align)
-  addBorder(10, 10, 150, 380);
-  auto group1 = doc->makeNode<pagx::Group>();
-  auto text1 = doc->makeNode<pagx::Text>();
-  text1->text = "\xe4\xbd\xa0\xe5\xa5\xbd\xe4\xb8\x96\xe7\x95\x8c";
-  text1->fontSize = 24;
-  text1->fontFamily = "NotoSansSC";
-  auto textBox1 = doc->makeNode<pagx::TextBox>();
-  textBox1->position = {10, 10};
-  textBox1->size = {150, 380};
-  textBox1->writingMode = pagx::WritingMode::Vertical;
-  textBox1->textAlign = pagx::TextAlign::Start;
-  textBox1->verticalAlign = pagx::VerticalAlign::Top;
-  auto fill1 = doc->makeNode<pagx::Fill>();
-  auto solid1 = doc->makeNode<pagx::SolidColor>();
-  solid1->color = {0, 0, 0, 1};
-  fill1->color = solid1;
-  group1->elements.push_back(text1);
-  group1->elements.push_back(textBox1);
-  group1->elements.push_back(fill1);
-  layer->contents.push_back(group1);
+  // Single column: CJK + Latin mixed in one column
+  // Tests rotated English positioning within a vertical column.
+  addBorder(10, 10, 100, 380);
+  {
+    auto group = doc->makeNode<pagx::Group>();
+    auto text = doc->makeNode<pagx::Text>();
+    // "你好Hello世界"
+    text->text = "\xe4\xbd\xa0\xe5\xa5\xbd" "Hello" "\xe4\xb8\x96\xe7\x95\x8c";
+    text->fontSize = 24;
+    text->fontFamily = "NotoSansSC";
+    group->elements.push_back(text);
+    auto textBox = doc->makeNode<pagx::TextBox>();
+    textBox->position = {10, 10};
+    textBox->size = {100, 380};
+    textBox->writingMode = pagx::WritingMode::Vertical;
+    group->elements.push_back(textBox);
+    auto fill = doc->makeNode<pagx::Fill>();
+    auto solid = doc->makeNode<pagx::SolidColor>();
+    solid->color = {0, 0, 0, 1};
+    fill->color = solid;
+    group->elements.push_back(fill);
+    layer->contents.push_back(group);
+  }
 
-  // Mixed CJK and Latin vertical text (Center align)
-  addBorder(180, 10, 200, 380);
-  auto group2 = doc->makeNode<pagx::Group>();
-  auto text2 = doc->makeNode<pagx::Text>();
-  text2->text = "\xe4\xb8\xad\xe6\x96\x87\xe6\xb7\xb7\xe5\x90\x88" "English\xe6\xb5\x8b\xe8\xaf\x95";
-  text2->fontSize = 20;
-  text2->fontFamily = "NotoSansSC";
-  auto textBox2 = doc->makeNode<pagx::TextBox>();
-  textBox2->position = {180, 10};
-  textBox2->size = {200, 380};
-  textBox2->writingMode = pagx::WritingMode::Vertical;
-  textBox2->textAlign = pagx::TextAlign::Center;
-  textBox2->verticalAlign = pagx::VerticalAlign::Center;
-  auto fill2 = doc->makeNode<pagx::Fill>();
-  auto solid2 = doc->makeNode<pagx::SolidColor>();
-  solid2->color = {0, 0, 0.6f, 1};
-  fill2->color = solid2;
-  group2->elements.push_back(text2);
-  group2->elements.push_back(textBox2);
-  group2->elements.push_back(fill2);
-  layer->contents.push_back(group2);
+  // Two columns: CJK + Latin with explicit line break
+  // Tests column spacing with mixed content across multiple columns.
+  addBorder(130, 10, 120, 380);
+  {
+    auto group = doc->makeNode<pagx::Group>();
+    auto text = doc->makeNode<pagx::Text>();
+    // "你好Hello\n世界Test"
+    text->text = "\xe4\xbd\xa0\xe5\xa5\xbd" "Hello\n" "\xe4\xb8\x96\xe7\x95\x8c" "Test";
+    text->fontSize = 24;
+    text->fontFamily = "NotoSansSC";
+    group->elements.push_back(text);
+    auto textBox = doc->makeNode<pagx::TextBox>();
+    textBox->position = {130, 10};
+    textBox->size = {120, 380};
+    textBox->writingMode = pagx::WritingMode::Vertical;
+    group->elements.push_back(textBox);
+    auto fill = doc->makeNode<pagx::Fill>();
+    auto solid = doc->makeNode<pagx::SolidColor>();
+    solid->color = {0, 0, 0.6f, 1};
+    fill->color = solid;
+    group->elements.push_back(fill);
+    layer->contents.push_back(group);
+  }
+
+  // Three columns: pure CJK with wordWrap
+  // Tests auto column wrapping and spacing with CJK-only content.
+  addBorder(270, 10, 120, 150);
+  {
+    auto group = doc->makeNode<pagx::Group>();
+    auto text = doc->makeNode<pagx::Text>();
+    // "春眠不觉晓处处闻啼鸟夜来风雨声花落知多少"
+    text->text =
+        "\xe6\x98\xa5\xe7\x9c\xa0\xe4\xb8\x8d\xe8\xa7\x89\xe6\x99\x93"
+        "\xe5\xa4\x84\xe5\xa4\x84\xe9\x97\xbb\xe5\x95\xbc\xe9\xb8\x9f"
+        "\xe5\xa4\x9c\xe6\x9d\xa5\xe9\xa3\x8e\xe9\x9b\xa8\xe5\xa3\xb0"
+        "\xe8\x8a\xb1\xe8\x90\xbd\xe7\x9f\xa5\xe5\xa4\x9a\xe5\xb0\x91";
+    text->fontSize = 24;
+    text->fontFamily = "NotoSansSC";
+    group->elements.push_back(text);
+    auto textBox = doc->makeNode<pagx::TextBox>();
+    textBox->position = {270, 10};
+    textBox->size = {120, 150};
+    textBox->writingMode = pagx::WritingMode::Vertical;
+    textBox->wordWrap = true;
+    group->elements.push_back(textBox);
+    auto fill = doc->makeNode<pagx::Fill>();
+    auto solid = doc->makeNode<pagx::SolidColor>();
+    solid->color = {0, 0, 0, 1};
+    fill->color = solid;
+    group->elements.push_back(fill);
+    layer->contents.push_back(group);
+  }
 
   doc->layers.push_back(layer);
 
