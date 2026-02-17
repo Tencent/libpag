@@ -1111,6 +1111,7 @@ class TextLayoutContext {
     float height = 0;
     float maxWidth = 0;
     float maxFontSize = 0;
+    float maxFontLineHeight = 0;
     for (auto& group : column->groups) {
       height += group.height;
       if (group.width > maxWidth) {
@@ -1120,12 +1121,18 @@ class TextLayoutContext {
         if (g.fontSize > maxFontSize) {
           maxFontSize = g.fontSize;
         }
+        if (g.fontLineHeight > maxFontLineHeight) {
+          maxFontLineHeight = g.fontLineHeight;
+        }
       }
     }
     column->height = height;
     column->maxWidth = maxWidth;
     column->maxFontSize = maxFontSize;
-    column->maxColumnWidth = (lineHeight > 0) ? lineHeight : maxFontSize;
+    // Auto column width uses font metrics height (ascent + descent + leading) to match
+    // horizontal layout behavior where auto lineHeight = metricsHeight. This ensures rotated
+    // Latin glyphs fit within the column width.
+    column->maxColumnWidth = (lineHeight > 0) ? lineHeight : roundf(maxFontLineHeight);
   }
 
   std::vector<ColumnInfo> layoutColumns(const std::vector<GlyphInfo>& allGlyphs,
@@ -1169,9 +1176,11 @@ class TextLayoutContext {
           }
           i++;
         }
-        // Rotated group: height = max font size, width = horizontal width sum.
-        group.height = groupMaxFontSize;
-        group.width = groupHorizontalWidth;
+        // Rotated group: after 90° CW rotation, the horizontal run becomes vertical.
+        // Height (vertical extent) = total horizontal advance of all glyphs.
+        // Width (horizontal extent) = max font size (approximate glyph height).
+        group.height = groupHorizontalWidth;
+        group.width = groupMaxFontSize;
 
         // Check wrap before adding.
         if (doWrap && !currentColumn->groups.empty() &&
@@ -1333,7 +1342,8 @@ class TextLayoutContext {
 
       float currentY = yBase;
 
-      for (auto& group : column.groups) {
+      for (size_t groupIdx = 0; groupIdx < column.groups.size(); groupIdx++) {
+        auto& group = column.groups[groupIdx];
         if (group.glyphs.empty()) {
           currentY += group.height;
           continue;
@@ -1351,10 +1361,9 @@ class TextLayoutContext {
           if (transform == PunctuationTransform::Rotate90) {
             // Rotate 90° CW using RSXform: scos=0, ssin=1.
             vpg.useRSXform = true;
-            // The glyph is drawn with its horizontal origin, then rotated.
-            // After 90° CW rotation around origin: (x,y) -> (y, -x).
-            // We translate to place it in the column center at currentY.
-            float tx = columnCenterX + g.fontSize / 2;
+            // Center the rotated glyph horizontally in the column.
+            float absAscent = fabsf(g.ascent);
+            float tx = columnCenterX - (absAscent - g.descent) / 2;
             float ty = currentY;
             vpg.xform = tgfx::RSXform::Make(0, 1, tx, ty);
           } else if (transform == PunctuationTransform::Offset) {
@@ -1401,7 +1410,14 @@ class TextLayoutContext {
             //   finalX = -0 + tx = tx
             //   finalY = localX + ty
             // We want the group centered in the column width.
-            float tx = groupCenterX + g.fontSize / 2;
+            // After 90° CW rotation: x' = -y + tx, y' = x + ty.
+            // Glyph ascent (y=-|ascent|) maps to x' = |ascent| + tx (rightward).
+            // Glyph descent (y=descent) maps to x' = -descent + tx (leftward).
+            // To center the rotated glyph in the column:
+            //   center = (tx + |ascent| + tx - descent) / 2 = tx + (|ascent| - descent) / 2
+            //   tx = columnCenterX - (|ascent| - descent) / 2
+            float absAscent = fabsf(g.ascent);
+            float tx = groupCenterX - (absAscent - g.descent) / 2;
             float ty = groupTopY + localX;
             vpg.xform = tgfx::RSXform::Make(0, 1, tx, ty);
             textGlyphs[g.sourceText].push_back(vpg);
