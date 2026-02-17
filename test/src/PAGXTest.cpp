@@ -944,7 +944,7 @@ PAGX_TEST(PAGXTest, TextBoxOverflowHidden) {
  * Test case: Compare TextBox vertical alignment modes (Top/Center/Bottom) with border visualization.
  * Uses "aaAÂẤ" text to test different glyph heights with Noto Sans font.
  */
-PAGX_TEST(PAGXTest, TextBoxVerticalAlignCompare) {
+PAGX_TEST(PAGXTest, TextBoxVerticalAlign) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto layer = doc->makeNode<pagx::Layer>();
 
@@ -1007,7 +1007,7 @@ PAGX_TEST(PAGXTest, TextBoxVerticalAlignCompare) {
   DisplayList displayList;
   displayList.root()->addChild(tgfxLayer);
   displayList.render(surface.get(), false);
-  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/TextBoxVerticalAlignCompare"));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/TextBoxVerticalAlign"));
 }
 
 /**
@@ -1028,7 +1028,7 @@ PAGX_TEST(PAGXTest, TextBoxVerticalAlignCompare) {
  * Row 2 right: Center alignment with fixed lineHeight=80
  *   Box D (310,200 280x120): "Top\nLine" (fontSize=30), lineHeight=80, center align
  */
-PAGX_TEST(PAGXTest, TextBoxLineHeightCompare) {
+PAGX_TEST(PAGXTest, TextBoxLineHeight) {
   auto doc = pagx::PAGXDocument::Make(600, 500);
   auto layer = doc->makeNode<pagx::Layer>();
 
@@ -1145,7 +1145,7 @@ PAGX_TEST(PAGXTest, TextBoxLineHeightCompare) {
   DisplayList displayList;
   displayList.root()->addChild(tgfxLayer);
   displayList.render(surface.get(), false);
-  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/TextBoxLineHeightCompare"));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/TextBoxLineHeight"));
 }
 
 /**
