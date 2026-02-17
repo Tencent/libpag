@@ -116,6 +116,7 @@ class TextLayoutContext {
     float maxDescent = 0;
     float maxLineHeight = 0;
     float metricsHeight = 0;
+    float visibleMetricsHeight = 0;
     float roundingRatio = 1.0f;
   };
 
@@ -868,6 +869,7 @@ class TextLayoutContext {
     float maxAscent = 0;
     float maxDescent = 0;
     float maxFontLineHeight = 0;
+    float visibleFontLineHeight = 0;
     for (auto& g : line->glyphs) {
       float absAscent = fabsf(g.ascent);
       if (absAscent > maxAscent) {
@@ -879,10 +881,17 @@ class TextLayoutContext {
       if (g.fontLineHeight > maxFontLineHeight) {
         maxFontLineHeight = g.fontLineHeight;
       }
+      // Track visible (non-newline) metricsHeight separately. Newline glyphs participate in
+      // maxAscent (shifting baseline down) and metricsHeight (affecting line height), but the
+      // baseline half-leading calculation uses only visible glyphs' metrics to avoid over-shifting.
+      if (g.unichar != '\n' && g.fontLineHeight > visibleFontLineHeight) {
+        visibleFontLineHeight = g.fontLineHeight;
+      }
     }
     line->maxAscent = maxAscent;
     line->maxDescent = maxDescent;
     line->metricsHeight = maxFontLineHeight;
+    line->visibleMetricsHeight = visibleFontLineHeight;
     if (lineHeight > 0) {
       line->maxLineHeight = lineHeight;
       line->roundingRatio = 1.0f;
@@ -970,7 +979,7 @@ class TextLayoutContext {
           // Half-leading model aligned with cocraft:
           // relativeBaseline = (relativeTop + halfLeading + ascent) * roundingRatio
           // baselineY = position.y + roundf(relativeBaseline + yOffset)
-          float halfLeading = (line.maxLineHeight - line.metricsHeight) / 2;
+          float halfLeading = (line.maxLineHeight - line.visibleMetricsHeight) / 2;
           float relativeBaseline =
               (relativeTop + halfLeading + line.maxAscent) * line.roundingRatio;
           baselineY = textBox->position.y + roundf(relativeBaseline + yOffset);
