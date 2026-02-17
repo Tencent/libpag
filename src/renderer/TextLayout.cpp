@@ -1359,7 +1359,10 @@ class TextLayoutContext {
           vpg.font = g.font;
 
           if (transform == PunctuationTransform::Rotate90) {
-            // Rotate 90° CW using RSXform: scos=0, ssin=1.
+            // Rotate 90° CW using RSXform (scos=0, ssin=1). After rotation, the glyph's
+            // ascent-descent range maps to the x-axis. Center it in the column by aligning
+            // the midpoint of (ascent, descent) to columnCenterX, consistent with CSS
+            // vertical text rendering behavior.
             vpg.useRSXform = true;
             float absAscent = fabsf(g.ascent);
             float tx = columnCenterX - (absAscent - g.descent) / 2;
@@ -1385,10 +1388,10 @@ class TextLayoutContext {
 
           textGlyphs[g.sourceText].push_back(vpg);
         } else {
-          // Rotated group: all glyphs rotated 90° CW as a unit.
-          float groupCenterX = columnCenterX;
+          // Rotated group: all glyphs rotated 90° CW as a unit. Each glyph uses
+          // RSXform (scos=0, ssin=1) to rotate, with tx centering the ascent-descent
+          // midpoint in the column, and ty placing the glyph at its vertical position.
           float groupTopY = currentY;
-
           float localX = 0;
           for (auto& g : group.glyphs) {
             VerticalPositionedGlyph vpg = {};
@@ -1396,7 +1399,7 @@ class TextLayoutContext {
             vpg.font = g.font;
             vpg.useRSXform = true;
             float absAscent = fabsf(g.ascent);
-            float tx = groupCenterX - (absAscent - g.descent) / 2;
+            float tx = columnCenterX - (absAscent - g.descent) / 2;
             float ty = groupTopY + localX;
             vpg.xform = tgfx::RSXform::Make(0, 1, tx, ty);
             textGlyphs[g.sourceText].push_back(vpg);
