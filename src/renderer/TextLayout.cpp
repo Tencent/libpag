@@ -903,28 +903,28 @@ class TextLayoutContext {
     // Vertical alignment offset.
     float yOffset = 0;
     if (boxHeight > 0) {
-      switch (textBox->verticalAlign) {
-        case VerticalAlign::Baseline:
-        case VerticalAlign::Top:
+      switch (textBox->paragraphAlign) {
+        case ParagraphAlign::Baseline:
+        case ParagraphAlign::Near:
           yOffset = 0;
           break;
-        case VerticalAlign::Center:
+        case ParagraphAlign::Center:
           yOffset = (boxHeight - totalHeight) / 2;
           break;
-        case VerticalAlign::Bottom:
+        case ParagraphAlign::Far:
           yOffset = boxHeight - totalHeight;
           break;
       }
     } else {
-      switch (textBox->verticalAlign) {
-        case VerticalAlign::Baseline:
-        case VerticalAlign::Top:
+      switch (textBox->paragraphAlign) {
+        case ParagraphAlign::Baseline:
+        case ParagraphAlign::Near:
           yOffset = 0;
           break;
-        case VerticalAlign::Center:
+        case ParagraphAlign::Center:
           yOffset = -totalHeight / 2;
           break;
-        case VerticalAlign::Bottom:
+        case ParagraphAlign::Far:
           yOffset = -totalHeight;
           break;
       }
@@ -953,8 +953,8 @@ class TextLayoutContext {
     // last line is anchored at the box bottom and preceding lines are spaced by lineHeight. This
     // ensures correct baseline positions when lines have different heights (mixed font sizes).
     std::vector<float> precomputedBaselines = {};
-    if ((textBox->verticalAlign == VerticalAlign::Bottom ||
-         textBox->verticalAlign == VerticalAlign::Center) &&
+    if ((textBox->paragraphAlign == ParagraphAlign::Far ||
+         textBox->paragraphAlign == ParagraphAlign::Center) &&
         lines.size() > 1) {
       precomputedBaselines.resize(lines.size(), 0);
       // Start from the last content line.
@@ -981,7 +981,7 @@ class TextLayoutContext {
       auto& line = lines[lineIdx];
       float relativeBaseline = 0;
 
-      if (textBox->verticalAlign == VerticalAlign::Baseline && lineIdx == 0) {
+      if (textBox->paragraphAlign == ParagraphAlign::Baseline && lineIdx == 0) {
         // Baseline mode: position.y is the first line's baseline, no ascent offset.
         if (line.glyphs.empty()) {
           baselineY = textBox->position.y + yOffset + line.maxLineHeight;
@@ -1287,26 +1287,26 @@ class TextLayoutContext {
     // Vertical alignment offset.
     float yBase = textBox->position.y;
     if (boxHeight > 0) {
-      switch (textBox->verticalAlign) {
-        case VerticalAlign::Baseline:
-        case VerticalAlign::Top:
+      switch (textBox->paragraphAlign) {
+        case ParagraphAlign::Baseline:
+        case ParagraphAlign::Near:
           break;
-        case VerticalAlign::Center:
+        case ParagraphAlign::Center:
           yBase += (boxHeight - maxColumnHeight) / 2;
           break;
-        case VerticalAlign::Bottom:
+        case ParagraphAlign::Far:
           yBase += boxHeight - maxColumnHeight;
           break;
       }
     } else {
-      switch (textBox->verticalAlign) {
-        case VerticalAlign::Baseline:
-        case VerticalAlign::Top:
+      switch (textBox->paragraphAlign) {
+        case ParagraphAlign::Baseline:
+        case ParagraphAlign::Near:
           break;
-        case VerticalAlign::Center:
+        case ParagraphAlign::Center:
           yBase -= maxColumnHeight / 2;
           break;
-        case VerticalAlign::Bottom:
+        case ParagraphAlign::Far:
           yBase -= maxColumnHeight;
           break;
       }
@@ -1361,7 +1361,6 @@ class TextLayoutContext {
           if (transform == PunctuationTransform::Rotate90) {
             // Rotate 90° CW using RSXform: scos=0, ssin=1.
             vpg.useRSXform = true;
-            // Center the rotated glyph horizontally in the column.
             float absAscent = fabsf(g.ascent);
             float tx = columnCenterX - (absAscent - g.descent) / 2;
             float ty = currentY;
@@ -1376,24 +1375,17 @@ class TextLayoutContext {
             float glyphY = currentY + fabsf(g.ascent) + dy;
             vpg.position = tgfx::Point::Make(glyphX, glyphY);
           } else {
-            // Normal upright: center horizontally in column, baseline at ascent offset.
+            // Normal upright: use getVerticalOffset to convert from horizontal origin to vertical.
             vpg.useRSXform = false;
             auto offset = g.font.getVerticalOffset(g.glyphID);
             float glyphX = columnCenterX + offset.x;
-            float glyphY = currentY + group.height / 2 + offset.y;
+            float glyphY = currentY + offset.y;
             vpg.position = tgfx::Point::Make(glyphX, glyphY);
           }
 
           textGlyphs[g.sourceText].push_back(vpg);
         } else {
           // Rotated group: all glyphs rotated 90° CW as a unit.
-          // Horizontal layout within the group, then the whole thing rotates.
-          // After rotation, the group's horizontal axis becomes vertical.
-          // The group is centered in the column.
-          // Position the group centered horizontally in the column.
-          // After 90° CW rotation, the horizontal text becomes vertical:
-          // - original x-axis → y-axis (downward)
-          // - original y-axis → x-axis (rightward, but negated)
           float groupCenterX = columnCenterX;
           float groupTopY = currentY;
 
@@ -1403,19 +1395,6 @@ class TextLayoutContext {
             vpg.glyphID = g.glyphID;
             vpg.font = g.font;
             vpg.useRSXform = true;
-            // RSXform for 90° CW: scos=0, ssin=1.
-            // Matrix: | 0  -1  tx |
-            //         | 1   0  ty |
-            // The glyph at local position (localX, baseline=0) maps to:
-            //   finalX = -0 + tx = tx
-            //   finalY = localX + ty
-            // We want the group centered in the column width.
-            // After 90° CW rotation: x' = -y + tx, y' = x + ty.
-            // Glyph ascent (y=-|ascent|) maps to x' = |ascent| + tx (rightward).
-            // Glyph descent (y=descent) maps to x' = -descent + tx (leftward).
-            // To center the rotated glyph in the column:
-            //   center = (tx + |ascent| + tx - descent) / 2 = tx + (|ascent| - descent) / 2
-            //   tx = columnCenterX - (|ascent| - descent) / 2
             float absAscent = fabsf(g.ascent);
             float tx = groupCenterX - (absAscent - g.descent) / 2;
             float ty = groupTopY + localX;

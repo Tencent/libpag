@@ -119,12 +119,12 @@ std::string MipmapModeToString(MipmapMode mode);
 MipmapMode MipmapModeFromString(const std::string& str);
 
 //==============================================================================
-// TextAlign, VerticalAlign, WritingMode, Overflow
+// TextAlign, ParagraphAlign, WritingMode, Overflow
 //==============================================================================
 std::string TextAlignToString(TextAlign align);
 TextAlign TextAlignFromString(const std::string& str);
-std::string VerticalAlignToString(VerticalAlign align);
-VerticalAlign VerticalAlignFromString(const std::string& str);
+std::string ParagraphAlignToString(ParagraphAlign align);
+ParagraphAlign ParagraphAlignFromString(const std::string& str);
 std::string WritingModeToString(WritingMode mode);
 WritingMode WritingModeFromString(const std::string& str);
 std::string OverflowToString(Overflow value);

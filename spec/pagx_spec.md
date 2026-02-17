@@ -1539,7 +1539,7 @@ redistributed evenly to fill the available path length.
 
 #### 5.5.6 TextBox
 
-TextBox is a text layout node that applies typography to accumulated Text elements. It re-layouts all glyph positions according to its own position, size, and alignment settings. The layout results are written into each Text element's GlyphRun data with inverse-transform compensation, so that Text's own position and parent Group transforms remain effective in the rendering pipeline. The default vertical alignment is `baseline`, where `position.y` represents the first line's baseline Y coordinate directly. When `verticalAlign` is `top`, the first line is positioned using the line-box model: the line box top edge is aligned to the top of the text area, and the baseline is placed at `halfLeading + ascent` from the top, where `halfLeading = (lineHeight - metricsHeight) / 2` and `metricsHeight = ascent + descent + leading` from the font metrics. For vertical mode, columns are spaced by `lineHeight` (center-to-center distance). When `lineHeight` is 0 (auto), the column width equals the font size. Columns flow from right to left.
+TextBox is a text layout node that applies typography to accumulated Text elements. It re-layouts all glyph positions according to its own position, size, and alignment settings. The layout results are written into each Text element's GlyphRun data with inverse-transform compensation, so that Text's own position and parent Group transforms remain effective in the rendering pipeline. The default paragraph alignment is `baseline`, where `position.y` represents the first line's baseline Y coordinate directly. When `paragraphAlign` is `near`, the first line is positioned using the line-box model: the line box near edge is aligned to the near edge of the text area, and the baseline is placed at `halfLeading + ascent` from the near edge, where `halfLeading = (lineHeight - metricsHeight) / 2` and `metricsHeight = ascent + descent + leading` from the font metrics. Following CSS Writing Modes conventions, `lineHeight` is a logical property that always applies to the block-axis dimension of a line box. In vertical mode, it controls the column width rather than the line height. Columns are spaced by `lineHeight` (center-to-center distance). When `lineHeight` is 0 (auto), the column width is calculated from font metrics (ascent + descent + leading), same as horizontal auto line height. Columns flow from right to left.
 
 TextBox is a **pre-layout-only** node: it is processed during the typesetting stage before rendering and is not instantiated in the render tree. If all accumulated Text elements already contain embedded GlyphRun data, the TextBox is skipped during typesetting. However, the TextBox node should still be retained even when embedded GlyphRun data and fonts are present, as design tools may read its layout attributes (size, alignment, wordWrap, etc.) for editing purposes.
 
@@ -1549,16 +1549,16 @@ Unlike other modifiers that operate on accumulated results in a chain (e.g., Tri
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `position` | Point | 0,0 | Reference point for the text area. In the default `baseline` mode, `position.y` is the first line's baseline Y coordinate. In `top` mode, it is the top-left corner of the text area. When width or height is 0, serves as the anchor point for alignment in that dimension (see below) |
+| `position` | Point | 0,0 | Reference point for the text area. In the default `baseline` mode, `position.y` is the first line's baseline Y coordinate. In `near` mode, it is the near-edge corner of the text area. When width or height is 0, serves as the anchor point for alignment in that dimension (see below) |
 | `size` | Size | 0,0 | Layout size. When width or height is 0, text has no boundary in that dimension (wordWrap wraps each character individually, alignment uses position as the reference point) |
-| `textAlign` | TextAlign | start | Horizontal alignment |
-| `verticalAlign` | VerticalAlign | baseline | Vertical alignment |
+| `textAlign` | TextAlign | start | Text alignment along the inline direction |
+| `paragraphAlign` | ParagraphAlign | baseline | Paragraph alignment along the block-flow direction |
 | `writingMode` | WritingMode | horizontal | Layout direction |
-| `lineHeight` | float | 0 | Line height in pixels. 0 means auto (calculated from font metrics: ascent + descent + leading). In vertical mode, controls column width |
+| `lineHeight` | float | 0 | Line height in pixels. 0 means auto (calculated from font metrics: ascent + descent + leading). Following CSS Writing Modes conventions, this is a logical property: in vertical mode it controls column width |
 | `wordWrap` | boolean | false | Enable automatic word wrapping (wraps at box width/height boundary; when the dimension is 0, each character wraps individually) |
 | `overflow` | Overflow | visible | Overflow behavior when text exceeds box boundaries |
 
-**TextAlign (Horizontal Alignment)**:
+**TextAlign (Text Alignment)**:
 
 | Value | Description |
 |-------|-------------|
@@ -1569,16 +1569,18 @@ Unlike other modifiers that operate on accumulated results in a chain (e.g., Tri
 
 When width is 0, alignment is relative to `position.x` as an anchor: `start` places text starting at the anchor, `center` places the visual center of each line at the anchor, and `end` places the trailing edge at the anchor.
 
-**VerticalAlign (Vertical Alignment)**:
+**ParagraphAlign (Paragraph Alignment)**:
+
+Aligns text lines or columns along the block-flow direction. The naming follows DirectWrite's `DWRITE_PARAGRAPH_ALIGNMENT` convention, using direction-neutral names (Near/Far instead of Top/Bottom) that work correctly for both horizontal and vertical writing modes. In horizontal mode this controls vertical positioning; in vertical mode this controls horizontal positioning.
 
 | Value | Description |
 |-------|-------------|
 | `baseline` | Default. `position.y` represents the first line's baseline Y coordinate. Text extends above (ascent) and below (descent) from this point. |
-| `top` | Top alignment using the line-box model. The first line box's top edge is aligned to the top of the text area. The baseline is positioned at `halfLeading + ascent` from the top, where `halfLeading = (lineHeight - metricsHeight) / 2`. |
-| `center` | Vertical center. The total text block height (sum of all line heights) is centered within the box height. |
-| `bottom` | Bottom alignment. The last line box's bottom edge is aligned to the bottom of the text area. |
+| `near` | Near-edge alignment (top in horizontal mode, right in vertical mode) using the line-box model. The first line box's near edge is aligned to the near edge of the text area. The baseline is positioned at `halfLeading + ascent` from the near edge, where `halfLeading = (lineHeight - metricsHeight) / 2`. |
+| `center` | Center alignment. The total text block size (sum of all line heights/column widths) is centered within the corresponding box dimension. |
+| `far` | Far-edge alignment (bottom in horizontal mode, left in vertical mode). The last line box's far edge is aligned to the far edge of the text area. |
 
-When height is 0, alignment is relative to `position.y` as an anchor: `baseline` uses `position.y` as the first line's baseline directly, `top` places text starting downward from the anchor (with line-box model offset), `center` places the vertical midpoint of all line boxes at the anchor, and `bottom` places the bottom edge of the last line box at the anchor.
+When height is 0, alignment is relative to `position.y` as an anchor: `baseline` uses `position.y` as the first line's baseline directly, `near` places text starting from the anchor (with line-box model offset), `center` places the midpoint of all line boxes at the anchor, and `far` places the far edge of the last line box at the anchor.
 
 **WritingMode (Layout Direction)**:
 
@@ -1863,7 +1865,7 @@ Layer / Group
 | **SelectorShape** | `square`, `rampUp`, `rampDown`, `triangle`, `round`, `smooth` |
 | **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
 | **TextAlign** | `start`, `center`, `end`, `justify` |
-| **VerticalAlign** | `baseline`, `top`, `center`, `bottom` |
+| **ParagraphAlign** | `baseline`, `near`, `center`, `far` |
 | **WritingMode** | `horizontal`, `vertical` |
 | **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |
 ---

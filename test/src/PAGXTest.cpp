@@ -726,7 +726,7 @@ PAGX_TEST(PAGXTest, TextBoxHorizontal) {
   textBox1->position = {10, 10};
   textBox1->size = {280, 100};
   textBox1->textAlign = pagx::TextAlign::Start;
-  textBox1->verticalAlign = pagx::VerticalAlign::Top;
+  textBox1->paragraphAlign = pagx::ParagraphAlign::Near;
   textBox1->wordWrap = true;
   auto fill1 = doc->makeNode<pagx::Fill>();
   auto solid1 = doc->makeNode<pagx::SolidColor>();
@@ -748,7 +748,7 @@ PAGX_TEST(PAGXTest, TextBoxHorizontal) {
   textBox2->position = {10, 130};
   textBox2->size = {280, 100};
   textBox2->textAlign = pagx::TextAlign::Center;
-  textBox2->verticalAlign = pagx::VerticalAlign::Center;
+  textBox2->paragraphAlign = pagx::ParagraphAlign::Center;
   auto fill2 = doc->makeNode<pagx::Fill>();
   auto solid2 = doc->makeNode<pagx::SolidColor>();
   solid2->color = {0, 0, 0.6f, 1};
@@ -771,7 +771,7 @@ PAGX_TEST(PAGXTest, TextBoxHorizontal) {
   textBox3->position = {10, 260};
   textBox3->size = {280, 120};
   textBox3->textAlign = pagx::TextAlign::End;
-  textBox3->verticalAlign = pagx::VerticalAlign::Bottom;
+  textBox3->paragraphAlign = pagx::ParagraphAlign::Far;
   textBox3->wordWrap = true;
   auto fill3 = doc->makeNode<pagx::Fill>();
   auto solid3 = doc->makeNode<pagx::SolidColor>();
@@ -944,7 +944,7 @@ PAGX_TEST(PAGXTest, TextBoxOverflowHidden) {
   auto textBox = doc->makeNode<pagx::TextBox>();
   textBox->position = {10, 10};
   textBox->size = {180, 80};
-  textBox->verticalAlign = pagx::VerticalAlign::Top;
+  textBox->paragraphAlign = pagx::ParagraphAlign::Near;
   textBox->wordWrap = true;
   textBox->overflow = pagx::Overflow::Hidden;
   auto fill = doc->makeNode<pagx::Fill>();
@@ -977,18 +977,18 @@ PAGX_TEST(PAGXTest, TextBoxOverflowHidden) {
  * Test case: Compare TextBox vertical alignment modes (Top/Center/Bottom) with border visualization.
  * Uses "aaAÂẤ" text to test different glyph heights with Noto Sans font.
  */
-PAGX_TEST(PAGXTest, TextBoxVerticalAlign) {
+PAGX_TEST(PAGXTest, TextBoxParagraphAlign) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto layer = doc->makeNode<pagx::Layer>();
 
   struct BoxConfig {
-    pagx::VerticalAlign align;
+    pagx::ParagraphAlign align;
     float x;
   };
   BoxConfig configs[] = {
-      {pagx::VerticalAlign::Top, 10},
-      {pagx::VerticalAlign::Center, 140},
-      {pagx::VerticalAlign::Bottom, 270},
+      {pagx::ParagraphAlign::Near, 10},
+      {pagx::ParagraphAlign::Center, 140},
+      {pagx::ParagraphAlign::Far, 270},
   };
 
   for (auto& config : configs) {
@@ -1015,7 +1015,7 @@ PAGX_TEST(PAGXTest, TextBoxVerticalAlign) {
     auto textBox = doc->makeNode<pagx::TextBox>();
     textBox->position = {config.x, 100};
     textBox->size = {120, 80};
-    textBox->verticalAlign = config.align;
+    textBox->paragraphAlign = config.align;
     auto fill = doc->makeNode<pagx::Fill>();
     auto solid = doc->makeNode<pagx::SolidColor>();
     solid->color = {0, 0, 0, 1};
@@ -1040,7 +1040,7 @@ PAGX_TEST(PAGXTest, TextBoxVerticalAlign) {
   DisplayList displayList;
   displayList.root()->addChild(tgfxLayer);
   displayList.render(surface.get(), false);
-  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/TextBoxVerticalAlign"));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/TextBoxParagraphAlign"));
 }
 
 /**
@@ -1099,7 +1099,7 @@ PAGX_TEST(PAGXTest, TextBoxLineHeight) {
   // Helper: add a single-text Group with TextBox inside (for single font size).
   auto addSimpleTextBox = [&](pagx::Layer* targetLayer, const std::string& str, float fontSize,
                               float x, float y, float w, float h, float lineH,
-                              pagx::VerticalAlign vAlign) {
+                              pagx::ParagraphAlign vAlign) {
     auto textGroup = doc->makeNode<pagx::Group>();
     auto text = doc->makeNode<pagx::Text>();
     text->text = str;
@@ -1114,7 +1114,7 @@ PAGX_TEST(PAGXTest, TextBoxLineHeight) {
     auto textBox = doc->makeNode<pagx::TextBox>();
     textBox->position = {x, y};
     textBox->size = {w, h};
-    textBox->verticalAlign = vAlign;
+    textBox->paragraphAlign = vAlign;
     textBox->lineHeight = lineH;
     textGroup->elements.push_back(textBox);
     targetLayer->contents.push_back(textGroup);
@@ -1131,7 +1131,7 @@ PAGX_TEST(PAGXTest, TextBoxLineHeight) {
     auto textBox = doc->makeNode<pagx::TextBox>();
     textBox->position = {10, 10};
     textBox->size = {200, 180};
-    textBox->verticalAlign = pagx::VerticalAlign::Top;
+    textBox->paragraphAlign = pagx::ParagraphAlign::Near;
     boxLayer->contents.push_back(textBox);
     layer->children.push_back(boxLayer);
   }
@@ -1146,7 +1146,7 @@ PAGX_TEST(PAGXTest, TextBoxLineHeight) {
     auto textBox = doc->makeNode<pagx::TextBox>();
     textBox->position = {220, 10};
     textBox->size = {200, 180};
-    textBox->verticalAlign = pagx::VerticalAlign::Top;
+    textBox->paragraphAlign = pagx::ParagraphAlign::Near;
     textBox->lineHeight = 40;
     boxLayer->contents.push_back(textBox);
     layer->children.push_back(boxLayer);
@@ -1155,13 +1155,13 @@ PAGX_TEST(PAGXTest, TextBoxLineHeight) {
   // Box C: Fixed lineHeight=80, single font size 30, Top align
   {
     addBorder(10, 200, 280, 120);
-    addSimpleTextBox(layer, "Top\nLine", 30, 10, 200, 280, 120, 80, pagx::VerticalAlign::Top);
+    addSimpleTextBox(layer, "Top\nLine", 30, 10, 200, 280, 120, 80, pagx::ParagraphAlign::Near);
   }
 
   // Box D: Fixed lineHeight=80, single font size 30, Center align
   {
     addBorder(310, 200, 280, 120);
-    addSimpleTextBox(layer, "Top\nLine", 30, 310, 200, 280, 120, 80, pagx::VerticalAlign::Center);
+    addSimpleTextBox(layer, "Top\nLine", 30, 310, 200, 280, 120, 80, pagx::ParagraphAlign::Center);
   }
 
   doc->layers.push_back(layer);
@@ -1224,7 +1224,7 @@ PAGX_TEST(PAGXTest, TextBoxEdgeCases) {
   // Helper: add a single-text Group with TextBox inside.
   auto addSimpleTextBox = [&](pagx::Layer* targetLayer, const std::string& str, float fontSize,
                               float x, float y, float w, float h, float lineH,
-                              pagx::VerticalAlign vAlign) {
+                              pagx::ParagraphAlign vAlign) {
     auto textGroup = doc->makeNode<pagx::Group>();
     auto text = doc->makeNode<pagx::Text>();
     text->text = str;
@@ -1239,7 +1239,7 @@ PAGX_TEST(PAGXTest, TextBoxEdgeCases) {
     auto textBox = doc->makeNode<pagx::TextBox>();
     textBox->position = {x, y};
     textBox->size = {w, h};
-    textBox->verticalAlign = vAlign;
+    textBox->paragraphAlign = vAlign;
     textBox->lineHeight = lineH;
     textGroup->elements.push_back(textBox);
     targetLayer->contents.push_back(textGroup);
@@ -1249,14 +1249,14 @@ PAGX_TEST(PAGXTest, TextBoxEdgeCases) {
   // Tests: first line empty, consecutive empty lines handling
   {
     addBorder(10, 10, 150, 160);
-    addSimpleTextBox(layer, "\nLine2\n\nLine4", 24, 10, 10, 150, 160, 0, pagx::VerticalAlign::Top);
+    addSimpleTextBox(layer, "\nLine2\n\nLine4", 24, 10, 10, 150, 160, 0, pagx::ParagraphAlign::Near);
   }
 
   // Box B: Baseline vertical alignment mode
   // Tests: position.y is the first line's baseline, so "Base" ascenders extend above the box top.
   {
     addBorder(170, 50, 150, 120);
-    addSimpleTextBox(layer, "Base\nLine", 30, 170, 50, 150, 120, 0, pagx::VerticalAlign::Baseline);
+    addSimpleTextBox(layer, "Base\nLine", 30, 170, 50, 150, 120, 0, pagx::ParagraphAlign::Baseline);
   }
 
   // Box C: Mixed font sizes with Bottom alignment
@@ -1269,7 +1269,7 @@ PAGX_TEST(PAGXTest, TextBoxEdgeCases) {
     auto textBox = doc->makeNode<pagx::TextBox>();
     textBox->position = {330, 10};
     textBox->size = {150, 160};
-    textBox->verticalAlign = pagx::VerticalAlign::Bottom;
+    textBox->paragraphAlign = pagx::ParagraphAlign::Far;
     boxLayer->contents.push_back(textBox);
     layer->children.push_back(boxLayer);
   }
@@ -1292,7 +1292,7 @@ PAGX_TEST(PAGXTest, TextBoxEdgeCases) {
     auto textBox = doc->makeNode<pagx::TextBox>();
     textBox->position = {60, 220};
     textBox->size = {0, 0};
-    textBox->verticalAlign = pagx::VerticalAlign::Top;
+    textBox->paragraphAlign = pagx::ParagraphAlign::Near;
     textBox->textAlign = pagx::TextAlign::Start;
     textGroup->elements.push_back(textBox);
     layer->contents.push_back(textGroup);
@@ -1326,7 +1326,7 @@ PAGX_TEST(PAGXTest, TextBoxEdgeCases) {
     auto textBox = doc->makeNode<pagx::TextBox>();
     textBox->position = {200, 220};
     textBox->size = {0, 0};
-    textBox->verticalAlign = pagx::VerticalAlign::Center;
+    textBox->paragraphAlign = pagx::ParagraphAlign::Center;
     textBox->textAlign = pagx::TextAlign::Center;
     textGroup->elements.push_back(textBox);
     layer->contents.push_back(textGroup);
@@ -1348,7 +1348,7 @@ PAGX_TEST(PAGXTest, TextBoxEdgeCases) {
   // Tests: empty first line + fixed line height interaction
   {
     addBorder(10, 260, 150, 100);
-    addSimpleTextBox(layer, "\nSecond", 30, 10, 260, 150, 100, 50, pagx::VerticalAlign::Top);
+    addSimpleTextBox(layer, "\nSecond", 30, 10, 260, 150, 100, 50, pagx::ParagraphAlign::Near);
   }
 
   // Box F: Rich text with End (right) alignment
@@ -1361,7 +1361,7 @@ PAGX_TEST(PAGXTest, TextBoxEdgeCases) {
     auto textBox = doc->makeNode<pagx::TextBox>();
     textBox->position = {170, 260};
     textBox->size = {300, 100};
-    textBox->verticalAlign = pagx::VerticalAlign::Top;
+    textBox->paragraphAlign = pagx::ParagraphAlign::Near;
     textBox->textAlign = pagx::TextAlign::End;
     boxLayer->contents.push_back(textBox);
     layer->children.push_back(boxLayer);
@@ -1428,7 +1428,7 @@ PAGX_TEST(PAGXTest, TextBoxAlignmentCases) {
   // Helper: add a single-text Group with TextBox inside.
   auto addSimpleTextBox = [&](pagx::Layer* targetLayer, const std::string& str, float fontSize,
                               float x, float y, float w, float h, float lineH,
-                              pagx::VerticalAlign vAlign) {
+                              pagx::ParagraphAlign vAlign) {
     auto textGroup = doc->makeNode<pagx::Group>();
     auto text = doc->makeNode<pagx::Text>();
     text->text = str;
@@ -1443,7 +1443,7 @@ PAGX_TEST(PAGXTest, TextBoxAlignmentCases) {
     auto textBox = doc->makeNode<pagx::TextBox>();
     textBox->position = {x, y};
     textBox->size = {w, h};
-    textBox->verticalAlign = vAlign;
+    textBox->paragraphAlign = vAlign;
     textBox->lineHeight = lineH;
     textGroup->elements.push_back(textBox);
     targetLayer->contents.push_back(textGroup);
@@ -1459,7 +1459,7 @@ PAGX_TEST(PAGXTest, TextBoxAlignmentCases) {
     auto textBox = doc->makeNode<pagx::TextBox>();
     textBox->position = {10, 10};
     textBox->size = {150, 160};
-    textBox->verticalAlign = pagx::VerticalAlign::Center;
+    textBox->paragraphAlign = pagx::ParagraphAlign::Center;
     boxLayer->contents.push_back(textBox);
     layer->children.push_back(boxLayer);
   }
@@ -1469,7 +1469,7 @@ PAGX_TEST(PAGXTest, TextBoxAlignmentCases) {
   {
     addBorder(170, 10, 150, 160);
     addSimpleTextBox(layer, "Line1\nLine2", 24, 170, 10, 150, 160, 50,
-                     pagx::VerticalAlign::Bottom);
+                     pagx::ParagraphAlign::Far);
   }
 
   // Box I: 3-line mixed font sizes + Bottom alignment
@@ -1483,7 +1483,7 @@ PAGX_TEST(PAGXTest, TextBoxAlignmentCases) {
     auto textBox = doc->makeNode<pagx::TextBox>();
     textBox->position = {330, 10};
     textBox->size = {150, 200};
-    textBox->verticalAlign = pagx::VerticalAlign::Bottom;
+    textBox->paragraphAlign = pagx::ParagraphAlign::Far;
     boxLayer->contents.push_back(textBox);
     layer->children.push_back(boxLayer);
   }
@@ -1492,7 +1492,7 @@ PAGX_TEST(PAGXTest, TextBoxAlignmentCases) {
   // Verifies empty line handling when computing bottom-up baselines.
   {
     addBorder(10, 220, 150, 160);
-    addSimpleTextBox(layer, "\nLine2", 30, 10, 220, 150, 160, 0, pagx::VerticalAlign::Bottom);
+    addSimpleTextBox(layer, "\nLine2", 30, 10, 220, 150, 160, 0, pagx::ParagraphAlign::Far);
   }
 
   // Box K: Fixed lineHeight + Center alignment
@@ -1500,7 +1500,7 @@ PAGX_TEST(PAGXTest, TextBoxAlignmentCases) {
   {
     addBorder(170, 220, 150, 160);
     addSimpleTextBox(layer, "Line1\nLine2", 24, 170, 220, 150, 160, 50,
-                     pagx::VerticalAlign::Center);
+                     pagx::ParagraphAlign::Center);
   }
 
   doc->layers.push_back(layer);

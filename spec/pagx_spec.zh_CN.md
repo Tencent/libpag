@@ -1534,7 +1534,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 #### 5.5.6 文本框（TextBox）
 
-TextBox 是文本框排版器，对累积的 Text 元素应用排版。它根据自身的 position、size 和对齐设置重新排版所有字形位置，排版结果通过反向变换补偿写入每个 Text 元素的 GlyphRun 数据，因此 Text 自身的 position 和父级 Group 变换在渲染管线中仍然有效。默认垂直对齐为 `baseline`，`position.y` 直接表示首行基线 Y 坐标。当 `verticalAlign` 为 `top` 时，首行使用行框模型定位：行框顶部贴齐文本区域顶部，基线位于行框顶部下方 `halfLeading + ascent` 处，其中 `halfLeading = (lineHeight - metricsHeight) / 2`，`metricsHeight = ascent + descent + leading`。竖排模式下，列间距为 `lineHeight`。当 `lineHeight` 为 0（自动）时，列宽等于字号。列从右往左排列。
+TextBox 是文本框排版器，对累积的 Text 元素应用排版。它根据自身的 position、size 和对齐设置重新排版所有字形位置，排版结果通过反向变换补偿写入每个 Text 元素的 GlyphRun 数据，因此 Text 自身的 position 和父级 Group 变换在渲染管线中仍然有效。默认段落对齐为 `baseline`，`position.y` 直接表示首行基线 Y 坐标。当 `paragraphAlign` 为 `near` 时，首行使用行框模型定位：行框近端贴齐文本区域近端边缘，基线位于近端下方 `halfLeading + ascent` 处，其中 `halfLeading = (lineHeight - metricsHeight) / 2`，`metricsHeight = ascent + descent + leading`。遵循 CSS Writing Modes 的惯例，`lineHeight` 是逻辑属性，始终作用于行框的块轴方向尺寸。竖排模式下，它控制的是列宽而非行高。列间距为 `lineHeight`（中心到中心的距离）。当 `lineHeight` 为 0（自动）时，列宽根据字体 metrics 计算（ascent + descent + leading），与横排自动行高的算法一致。列从右往左排列。
 
 TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被处理，不会在渲染树中实例化。如果累积的所有 Text 元素都已包含嵌入的 GlyphRun 数据，则排版阶段会跳过 TextBox。但即使已填写嵌入的 GlyphRun 数据和字体，仍建议保留 TextBox 节点，因为设计工具导入时需要读取其排版属性（size、对齐方式、wordWrap 等）用于编辑展示。
 
@@ -1544,16 +1544,16 @@ TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被�
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `position` | Point | 0,0 | 文本区域参考点。默认 `baseline` 模式下，`position.y` 为首行基线 Y 坐标。`top` 模式下为文本区域左上角。当宽度或高度为 0 时，该维度上作为对齐锚点（见下方说明） |
+| `position` | Point | 0,0 | 文本区域参考点。默认 `baseline` 模式下，`position.y` 为首行基线 Y 坐标。`near` 模式下为文本区域近端起点。当宽度或高度为 0 时，该维度上作为对齐锚点（见下方说明） |
 | `size` | Size | 0,0 | 排版尺寸。当宽度或高度为 0 时，该维度上文本无边界（wordWrap 时逐字符换行，对齐以 position 为参考点） |
-| `textAlign` | TextAlign | start | 水平对齐（见下方） |
-| `verticalAlign` | VerticalAlign | baseline | 垂直对齐（见下方） |
+| `textAlign` | TextAlign | start | 文本对齐——沿行内方向对齐文本（见下方） |
+| `paragraphAlign` | ParagraphAlign | baseline | 段落对齐——沿块流方向对齐文本行/列（见下方） |
 | `writingMode` | WritingMode | horizontal | 排版方向（见下方） |
-| `lineHeight` | float | 0 | 行高（像素值）。0 表示自动（根据字体 metrics 计算：ascent + descent + leading）。竖排模式下控制列宽 |
+| `lineHeight` | float | 0 | 行高（像素值）。0 表示自动（根据字体 metrics 计算：ascent + descent + leading）。遵循 CSS Writing Modes 的逻辑属性惯例，竖排模式下控制列宽 |
 | `wordWrap` | boolean | false | 是否启用自动换行（在盒子宽度/高度边界处换行；该维度为 0 时逐字符换行） |
 | `overflow` | Overflow | visible | 文本超出盒子边界时的行为 |
 
-**TextAlign（水平对齐）**：
+**TextAlign（文本对齐）**：
 
 | 值 | 说明 |
 |------|------|
@@ -1564,16 +1564,18 @@ TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被�
 
 当宽度为 0 时，对齐以 `position.x` 为锚点：`start` 从锚点开始向右展开，`center` 将每行的视觉中心对齐锚点，`end` 将每行的尾部边缘对齐锚点。
 
-**VerticalAlign（垂直对齐）**：
+**ParagraphAlign（段落对齐）**：
+
+沿块流方向（block-flow direction）对齐文本行或列。命名参考 DirectWrite 的 `DWRITE_PARAGRAPH_ALIGNMENT`，使用方向中立的 Near/Far 而非 Top/Bottom，在横排和竖排模式下语义一致。横排模式下控制垂直定位，竖排模式下控制水平定位。
 
 | 值 | 说明 |
 |------|------|
 | `baseline` | 默认。`position.y` 表示首行基线 Y 坐标，文本从该点向上（ascent）和向下（descent）延伸。 |
-| `top` | 顶部对齐。使用行框模型，首行行框顶部贴齐文本区域顶部。基线位于行框顶部下方 `halfLeading + ascent` 处，其中 `halfLeading = (lineHeight - metricsHeight) / 2`。 |
-| `center` | 垂直居中。整体文本块高度（所有行高之和）在盒子高度内居中。 |
-| `bottom` | 底部对齐。末行行框底部对齐文本区域底部。 |
+| `near` | 近端对齐（横排时为顶部，竖排时为右侧）。使用行框模型，首行行框近端贴齐文本区域近端边缘。基线位于近端下方 `halfLeading + ascent` 处，其中 `halfLeading = (lineHeight - metricsHeight) / 2`。 |
+| `center` | 居中对齐。整体文本块尺寸（所有行高/列宽之和）在对应维度内居中。 |
+| `far` | 远端对齐（横排时为底部，竖排时为左侧）。末行行框远端对齐文本区域远端边缘。 |
 
-当高度为 0 时，对齐以 `position.y` 为锚点：`baseline` 直接将 `position.y` 作为首行基线，`top` 从锚点向下展开（使用行框模型偏移），`center` 将所有行框的垂直中心对齐锚点，`bottom` 将最后一个行框底边对齐锚点。
+当高度为 0 时，对齐以 `position.y` 为锚点：`baseline` 直接将 `position.y` 作为首行基线，`near` 从锚点向下展开（使用行框模型偏移），`center` 将所有行框的中心对齐锚点，`far` 将最后一个行框远端边缘对齐锚点。
 
 **WritingMode（排版方向）**：
 
@@ -1858,7 +1860,7 @@ Layer / Group
 | **SelectorShape** | `square`, `rampUp`, `rampDown`, `triangle`, `round`, `smooth` |
 | **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
 | **TextAlign** | `start`, `center`, `end`, `justify` |
-| **VerticalAlign** | `baseline`, `top`, `center`, `bottom` |
+| **ParagraphAlign** | `baseline`, `near`, `center`, `far` |
 | **WritingMode** | `horizontal`, `vertical` |
 | **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |
 ---

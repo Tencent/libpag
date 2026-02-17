@@ -714,8 +714,8 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       if (textBox->textAlign != TextAlign::Start) {
         xml.addAttribute("textAlign", TextAlignToString(textBox->textAlign));
       }
-      if (textBox->verticalAlign != VerticalAlign::Baseline) {
-        xml.addAttribute("verticalAlign", VerticalAlignToString(textBox->verticalAlign));
+      if (textBox->paragraphAlign != ParagraphAlign::Baseline) {
+        xml.addAttribute("paragraphAlign", ParagraphAlignToString(textBox->paragraphAlign));
       }
       if (textBox->writingMode != WritingMode::Horizontal) {
         xml.addAttribute("writingMode", WritingModeToString(textBox->writingMode));

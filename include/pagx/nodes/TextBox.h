@@ -23,7 +23,7 @@
 #include "pagx/types/Point.h"
 #include "pagx/types/Size.h"
 #include "pagx/types/TextAlign.h"
-#include "pagx/types/VerticalAlign.h"
+#include "pagx/types/ParagraphAlign.h"
 #include "pagx/types/WritingMode.h"
 
 namespace pagx {
@@ -35,10 +35,10 @@ namespace pagx {
  * - Horizontal/vertical writing mode
  * - Overflow control (visible or hidden)
  *
- * The default vertical alignment is Baseline, where position.y represents the first line's baseline
- * coordinate directly. When verticalAlign is Top, the first line is positioned with its ascent
- * touching the top of the text area. For vertical mode, the first column is positioned with its
- * right edge touching the right side, and columns flow from right to left.
+ * The default paragraph alignment is Baseline, where position.y represents the first line's baseline
+ * coordinate directly. When paragraphAlign is Near, the first line is positioned with its ascent
+ * touching the near edge of the text area. For vertical mode, the first column is positioned with
+ * its right edge touching the right side, and columns flow from right to left.
  */
 class TextBox : public Element {
  public:
@@ -62,11 +62,13 @@ class TextBox : public Element {
   TextAlign textAlign = TextAlign::Start;
 
   /**
-   * The vertical text alignment. Default is Baseline, where position.y represents the first line's
-   * baseline coordinate directly. When height is 0, alignment is relative to position.y.
-   * When height > 0, alignment is within the box height.
+   * The paragraph alignment along the block-flow direction. In horizontal mode, this controls
+   * vertical positioning; in vertical mode, this controls horizontal positioning. The naming follows
+   * DirectWrite's DWRITE_PARAGRAPH_ALIGNMENT convention. Default is Baseline, where position.y
+   * represents the first line's baseline coordinate directly. When height is 0, alignment is
+   * relative to position.y. When height > 0, alignment is within the box height.
    */
-  VerticalAlign verticalAlign = VerticalAlign::Baseline;
+  ParagraphAlign paragraphAlign = ParagraphAlign::Baseline;
 
   /**
    * The writing mode (horizontal or vertical text). Vertical mode uses right-to-left column
@@ -77,7 +79,9 @@ class TextBox : public Element {
   /**
    * The line height in pixels. When set to 0 (default), the line height is automatically calculated
    * from font metrics (ascent + descent + leading). When set to a positive value, all lines use
-   * that fixed height. In vertical mode, this controls the column width instead.
+   * that fixed height. Following CSS Writing Modes conventions, in vertical mode this property
+   * controls the column width instead of the line height, since line-height is a logical property
+   * that always applies to the block-axis dimension of a line box.
    */
   float lineHeight = 0;
 
