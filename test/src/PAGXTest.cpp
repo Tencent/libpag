@@ -1351,4 +1351,140 @@ PAGX_TEST(PAGXTest, TextBoxEdgeCases) {
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/TextBoxEdgeCases"));
 }
 
+/**
+ * Tests vertical alignment edge cases that require Figma comparison:
+ * Center + mixed font sizes, fixed lineHeight + Bottom/Center, multi-line mixed sizes + Bottom,
+ * and empty first line + Bottom.
+ */
+PAGX_TEST(PAGXTest, TextBoxAlignmentCases) {
+  auto doc = pagx::PAGXDocument::Make(500, 400);
+  auto layer = doc->makeNode<pagx::Layer>();
+
+  // Helper: add a border rectangle for visual reference.
+  auto addBorder = [&](float x, float y, float w, float h) {
+    auto borderGroup = doc->makeNode<pagx::Group>();
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->center = {x + w / 2, y + h / 2};
+    rect->size = {w, h};
+    auto stroke = doc->makeNode<pagx::Stroke>();
+    auto strokeColor = doc->makeNode<pagx::SolidColor>();
+    strokeColor->color = {0.8f, 0.8f, 0.8f, 1};
+    stroke->color = strokeColor;
+    stroke->width = 1;
+    borderGroup->elements.push_back(rect);
+    borderGroup->elements.push_back(stroke);
+    layer->contents.push_back(borderGroup);
+  };
+
+  // Helper: add a text segment as a Group with Text+Fill (for rich text mode).
+  auto addRichText = [&](pagx::Layer* targetLayer, const std::string& str, float fontSize) {
+    auto group = doc->makeNode<pagx::Group>();
+    auto text = doc->makeNode<pagx::Text>();
+    text->text = str;
+    text->fontSize = fontSize;
+    text->fontFamily = "NotoSansSC";
+    group->elements.push_back(text);
+    auto fill = doc->makeNode<pagx::Fill>();
+    auto solid = doc->makeNode<pagx::SolidColor>();
+    solid->color = {0, 0, 0, 1};
+    fill->color = solid;
+    group->elements.push_back(fill);
+    targetLayer->contents.push_back(group);
+  };
+
+  // Helper: add a single-text Group with TextBox inside.
+  auto addSimpleTextBox = [&](pagx::Layer* targetLayer, const std::string& str, float fontSize,
+                              float x, float y, float w, float h, float lineH,
+                              pagx::VerticalAlign vAlign) {
+    auto textGroup = doc->makeNode<pagx::Group>();
+    auto text = doc->makeNode<pagx::Text>();
+    text->text = str;
+    text->fontSize = fontSize;
+    text->fontFamily = "NotoSansSC";
+    textGroup->elements.push_back(text);
+    auto fill = doc->makeNode<pagx::Fill>();
+    auto solid = doc->makeNode<pagx::SolidColor>();
+    solid->color = {0, 0, 0, 1};
+    fill->color = solid;
+    textGroup->elements.push_back(fill);
+    auto textBox = doc->makeNode<pagx::TextBox>();
+    textBox->position = {x, y};
+    textBox->size = {w, h};
+    textBox->verticalAlign = vAlign;
+    textBox->lineHeight = lineH;
+    textGroup->elements.push_back(textBox);
+    targetLayer->contents.push_back(textGroup);
+  };
+
+  // Box G: Center + mixed font sizes (mirrors Box C but with Center alignment)
+  // Verifies Center alignment with varying line heights produces correct vertical centering.
+  {
+    addBorder(10, 10, 150, 160);
+    auto boxLayer = doc->makeNode<pagx::Layer>();
+    addRichText(boxLayer, "Big\n", 48);
+    addRichText(boxLayer, "Small", 16);
+    auto textBox = doc->makeNode<pagx::TextBox>();
+    textBox->position = {10, 10};
+    textBox->size = {150, 160};
+    textBox->verticalAlign = pagx::VerticalAlign::Center;
+    boxLayer->contents.push_back(textBox);
+    layer->children.push_back(boxLayer);
+  }
+
+  // Box H: Fixed lineHeight + Bottom alignment
+  // Verifies fixed lineHeight interacts correctly with bottom-up layout.
+  {
+    addBorder(170, 10, 150, 160);
+    addSimpleTextBox(layer, "Line1\nLine2", 24, 170, 10, 150, 160, 50,
+                     pagx::VerticalAlign::Bottom);
+  }
+
+  // Box I: 3-line mixed font sizes + Bottom alignment
+  // Verifies multi-step bottom-up baseline recursion with rounding accumulation.
+  {
+    addBorder(330, 10, 150, 200);
+    auto boxLayer = doc->makeNode<pagx::Layer>();
+    addRichText(boxLayer, "Large\n", 36);
+    addRichText(boxLayer, "Medium\n", 24);
+    addRichText(boxLayer, "Tiny", 16);
+    auto textBox = doc->makeNode<pagx::TextBox>();
+    textBox->position = {330, 10};
+    textBox->size = {150, 200};
+    textBox->verticalAlign = pagx::VerticalAlign::Bottom;
+    boxLayer->contents.push_back(textBox);
+    layer->children.push_back(boxLayer);
+  }
+
+  // Box J: Empty first line + Bottom alignment
+  // Verifies empty line handling when computing bottom-up baselines.
+  {
+    addBorder(10, 220, 150, 160);
+    addSimpleTextBox(layer, "\nLine2", 30, 10, 220, 150, 160, 0, pagx::VerticalAlign::Bottom);
+  }
+
+  // Box K: Fixed lineHeight + Center alignment
+  // Verifies fixed lineHeight with center vertical alignment.
+  {
+    addBorder(170, 220, 150, 160);
+    addSimpleTextBox(layer, "Line1\nLine2", 24, 170, 220, 150, 160, 50,
+                     pagx::VerticalAlign::Center);
+  }
+
+  doc->layers.push_back(layer);
+
+  pagx::TextLayout textLayout;
+  textLayout.setFallbackTypefaces(GetFallbackTypefaces());
+  auto layoutResult = textLayout.layout(doc.get());
+  ASSERT_FALSE(layoutResult.shapedTextMap.empty());
+
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, 500, 400);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/TextBoxAlignmentCases"));
+}
+
 }  // namespace pag

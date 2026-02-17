@@ -949,10 +949,13 @@ class TextLayoutContext {
     float prevRelativeBaseline = 0;
     bool hasPrevBaseline = false;
 
-    // For Bottom alignment, pre-compute baselines from the last line upward so that the last line
-    // is anchored at the box bottom and preceding lines are spaced by lineHeight.
+    // For Bottom and Center alignment, pre-compute baselines from the last line upward so that the
+    // last line is anchored at the box bottom and preceding lines are spaced by lineHeight. This
+    // ensures correct baseline positions when lines have different heights (mixed font sizes).
     std::vector<float> precomputedBaselines = {};
-    if (textBox->verticalAlign == VerticalAlign::Bottom && lines.size() > 1) {
+    if ((textBox->verticalAlign == VerticalAlign::Bottom ||
+         textBox->verticalAlign == VerticalAlign::Center) &&
+        lines.size() > 1) {
       precomputedBaselines.resize(lines.size(), 0);
       // Start from the last content line.
       auto lastIdx = lines.size() - 1;
@@ -992,7 +995,7 @@ class TextLayoutContext {
           relativeBaseline = (relativeTop + line.maxLineHeight) * line.roundingRatio;
           baselineY = textBox->position.y + roundf(relativeBaseline + yOffset);
         } else if (!precomputedBaselines.empty()) {
-          // Bottom alignment: use pre-computed baselines anchored from the last line.
+          // Bottom/Center alignment: use pre-computed baselines anchored from the last line.
           relativeBaseline = precomputedBaselines[lineIdx];
           baselineY = textBox->position.y + roundf(relativeBaseline + yOffset);
         } else if (hasPrevBaseline && textBox->lineHeight > 0) {
