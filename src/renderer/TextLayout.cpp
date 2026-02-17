@@ -105,7 +105,7 @@ class TextLayoutContext {
     float fontSize = 0;
     float ascent = 0;
     float descent = 0;
-    float leading = 0;
+    float fontLineHeight = 0;
     Text* sourceText = nullptr;
   };
 
@@ -732,7 +732,7 @@ class TextLayoutContext {
       gi.fontSize = text->fontSize;
       gi.ascent = metrics.ascent;
       gi.descent = metrics.descent;
-      gi.leading = metrics.leading;
+      gi.fontLineHeight = fabsf(metrics.ascent) + metrics.descent + metrics.leading;
       gi.sourceText = text;
       info.allGlyphs.push_back(gi);
 
@@ -853,7 +853,7 @@ class TextLayoutContext {
     line->width = lastGlyph.xPosition + lastGlyph.advance;
     float maxAscent = 0;
     float maxDescent = 0;
-    float maxLeading = 0;
+    float maxFontLineHeight = 0;
     for (auto& g : line->glyphs) {
       float absAscent = fabsf(g.ascent);
       if (absAscent > maxAscent) {
@@ -862,14 +862,15 @@ class TextLayoutContext {
       if (g.descent > maxDescent) {
         maxDescent = g.descent;
       }
-      if (g.leading > maxLeading) {
-        maxLeading = g.leading;
+      if (g.fontLineHeight > maxFontLineHeight) {
+        maxFontLineHeight = g.fontLineHeight;
       }
     }
     line->maxAscent = maxAscent;
     line->maxDescent = maxDescent;
-    line->metricsHeight = maxAscent + maxDescent + maxLeading;
-    line->maxLineHeight = (lineHeight > 0) ? lineHeight : line->metricsHeight;
+    line->metricsHeight = maxFontLineHeight;
+    line->maxLineHeight =
+        (lineHeight > 0) ? lineHeight : roundf(line->metricsHeight);
   }
 
   void buildTextBlobWithLayout(const TextBox* textBox, const std::vector<LineInfo>& lines) {

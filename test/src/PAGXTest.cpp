@@ -803,7 +803,7 @@ PAGX_TEST(PAGXTest, TextBoxHorizontal) {
  * Test case: TextBox vertical text layout with CJK and mixed Latin characters.
  */
 PAGX_TEST(PAGXTest, TextBoxVertical) {
-  auto doc = pagx::PAGXDocument::Make(300, 400);
+  auto doc = pagx::PAGXDocument::Make(400, 400);
   auto layer = doc->makeNode<pagx::Layer>();
 
   auto addBorder = [&](float x, float y, float w, float h) {
@@ -821,8 +821,8 @@ PAGX_TEST(PAGXTest, TextBoxVertical) {
     layer->contents.push_back(borderGroup);
   };
 
-  // CJK vertical text
-  addBorder(10, 10, 280, 380);
+  // CJK vertical text (Start align)
+  addBorder(10, 10, 150, 380);
   auto group1 = doc->makeNode<pagx::Group>();
   auto text1 = doc->makeNode<pagx::Text>();
   text1->text = "\xe4\xbd\xa0\xe5\xa5\xbd\xe4\xb8\x96\xe7\x95\x8c";
@@ -830,7 +830,7 @@ PAGX_TEST(PAGXTest, TextBoxVertical) {
   text1->fontFamily = "NotoSansSC";
   auto textBox1 = doc->makeNode<pagx::TextBox>();
   textBox1->position = {10, 10};
-  textBox1->size = {280, 380};
+  textBox1->size = {150, 380};
   textBox1->writingMode = pagx::WritingMode::Vertical;
   textBox1->textAlign = pagx::TextAlign::Start;
   textBox1->verticalAlign = pagx::VerticalAlign::Top;
@@ -843,15 +843,15 @@ PAGX_TEST(PAGXTest, TextBoxVertical) {
   group1->elements.push_back(fill1);
   layer->contents.push_back(group1);
 
-  // Mixed CJK and Latin vertical text
-  addBorder(10, 10, 200, 380);
+  // Mixed CJK and Latin vertical text (Center align)
+  addBorder(180, 10, 200, 380);
   auto group2 = doc->makeNode<pagx::Group>();
   auto text2 = doc->makeNode<pagx::Text>();
   text2->text = "\xe4\xb8\xad\xe6\x96\x87\xe6\xb7\xb7\xe5\x90\x88" "English\xe6\xb5\x8b\xe8\xaf\x95";
   text2->fontSize = 20;
   text2->fontFamily = "NotoSansSC";
   auto textBox2 = doc->makeNode<pagx::TextBox>();
-  textBox2->position = {10, 10};
+  textBox2->position = {180, 10};
   textBox2->size = {200, 380};
   textBox2->writingMode = pagx::WritingMode::Vertical;
   textBox2->textAlign = pagx::TextAlign::Center;
@@ -875,7 +875,7 @@ PAGX_TEST(PAGXTest, TextBoxVertical) {
   auto tgfxLayer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
   ASSERT_TRUE(tgfxLayer != nullptr);
 
-  auto surface = Surface::Make(context, 300, 400);
+  auto surface = Surface::Make(context, 400, 400);
   DisplayList displayList;
   displayList.root()->addChild(tgfxLayer);
   displayList.render(surface.get(), false);
