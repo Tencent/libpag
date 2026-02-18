@@ -368,7 +368,7 @@
 
   <Layer name="BottomButtonSettings">
     <Layer composition="@navButton" x="217" y="522"/>
-    <Group position="228,533">
+    <Layer x="228" y="533">
       <Group>
         <Polystar center="12,12" type="star" pointCount="8" outerRadius="10" innerRadius="6"/>
         <Stroke color="#93C5FD" width="2"/>
@@ -377,23 +377,23 @@
         <Ellipse center="12,12" size="6,6"/>
         <Fill color="#93C5FD"/>
       </Group>
-    </Group>
+    </Layer>
   </Layer>
 
   <Layer name="BottomButtonHelp">
     <Layer composition="@navButton" x="377" y="522"/>
-    <Group position="388,533">
+    <Layer x="388" y="533">
       <Path data="@IconQuestion"/>
       <Fill color="#93C5FD"/>
-    </Group>
+    </Layer>
   </Layer>
 
   <Layer name="BottomButtonShare">
     <Layer composition="@navButton" x="537" y="522"/>
-    <Group position="548,533">
+    <Layer x="548" y="533">
       <Path data="@IconShare"/>
       <Fill color="#93C5FD"/>
-    </Group>
+    </Layer>
   </Layer>
 
   <!-- ==================== Decorations ==================== -->
