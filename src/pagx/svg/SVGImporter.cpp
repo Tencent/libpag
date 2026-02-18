@@ -810,21 +810,12 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
 
     group->elements.push_back(text);
 
-    // Add TextBox modifier if text-anchor requires alignment.
-    // SVG text-anchor maps to PAGX TextBox.textAlign:
-    //   start  -> Left (default, no TextBox needed)
-    //   middle -> Center
-    //   end    -> End
-    if (!anchor.empty() && anchor != "start") {
-      auto textBox = _document->makeNode<TextBox>();
-      textBox->position = text->position;
-      textBox->size = {0, 0};  // auto-size (Point Text mode)
-      if (anchor == "middle") {
-        textBox->textAlign = TextAlign::Center;
-      } else if (anchor == "end") {
-        textBox->textAlign = TextAlign::End;
-      }
-      group->elements.push_back(textBox);
+    // Map SVG text-anchor to PAGX TextAnchor on the Text node directly.
+    // SVG text-anchor: start (default), middle, end.
+    if (anchor == "middle") {
+      text->textAnchor = TextAnchor::Middle;
+    } else if (anchor == "end") {
+      text->textAnchor = TextAnchor::End;
     }
   }
 

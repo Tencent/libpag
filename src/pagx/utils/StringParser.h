@@ -36,6 +36,7 @@
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/types/TextAnchor.h"
 #include "pagx/types/TileMode.h"
 #include "pagx/nodes/TrimPath.h"
 
@@ -119,12 +120,14 @@ std::string MipmapModeToString(MipmapMode mode);
 MipmapMode MipmapModeFromString(const std::string& str);
 
 //==============================================================================
-// TextAlign, ParagraphAlign, WritingMode, Overflow
+// TextAlign, ParagraphAlign, TextAnchor, WritingMode, Overflow
 //==============================================================================
 std::string TextAlignToString(TextAlign align);
 TextAlign TextAlignFromString(const std::string& str);
 std::string ParagraphAlignToString(ParagraphAlign align);
 ParagraphAlign ParagraphAlignFromString(const std::string& str);
+std::string TextAnchorToString(TextAnchor anchor);
+TextAnchor TextAnchorFromString(const std::string& str);
 std::string WritingModeToString(WritingMode mode);
 WritingMode WritingModeFromString(const std::string& str);
 std::string OverflowToString(Overflow value);

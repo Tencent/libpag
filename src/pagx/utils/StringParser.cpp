@@ -216,11 +216,15 @@ DEFINE_ENUM_CONVERSION(TextAlign, TextAlign::Start,
     {TextAlign::End, "end"},
     {TextAlign::Justify, "justify"})
 
-DEFINE_ENUM_CONVERSION(ParagraphAlign, ParagraphAlign::Baseline,
-    {ParagraphAlign::Baseline, "baseline"},
+DEFINE_ENUM_CONVERSION(ParagraphAlign, ParagraphAlign::Near,
     {ParagraphAlign::Near, "near"},
     {ParagraphAlign::Center, "center"},
     {ParagraphAlign::Far, "far"})
+
+DEFINE_ENUM_CONVERSION(TextAnchor, TextAnchor::Start,
+    {TextAnchor::Start, "start"},
+    {TextAnchor::Middle, "middle"},
+    {TextAnchor::End, "end"})
 
 DEFINE_ENUM_CONVERSION(WritingMode, WritingMode::Horizontal,
     {WritingMode::Horizontal, "horizontal"},

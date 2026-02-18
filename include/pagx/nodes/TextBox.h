@@ -35,9 +35,8 @@ namespace pagx {
  * - Horizontal/vertical writing mode
  * - Overflow control (visible or hidden)
  *
- * The default paragraph alignment is Baseline, where position.y represents the first line's baseline
- * coordinate directly. When paragraphAlign is Near, the first line is positioned with its ascent
- * touching the near edge of the text area. For vertical mode, the first column is positioned with
+ * Position and size define the text area. When size is (0, 0), position serves as an anchor point
+ * and alignment is relative to that point. In vertical mode, the first column is positioned with
  * its right edge touching the right side, and columns flow from right to left.
  */
 class TextBox : public Element {
@@ -56,19 +55,20 @@ class TextBox : public Element {
   Size size = {};
 
   /**
-   * The horizontal text alignment. When width is 0, alignment is relative to position.x.
-   * When width > 0, alignment is within the box width. The default value is Start.
+   * The text alignment along the inline direction. In horizontal mode, this controls horizontal
+   * alignment within each line. In vertical mode, this controls vertical alignment within each
+   * column. When size is (0, 0), alignment is relative to the position as anchor point. The default
+   * value is Start.
    */
   TextAlign textAlign = TextAlign::Start;
 
   /**
    * The paragraph alignment along the block-flow direction. In horizontal mode, this controls
-   * vertical positioning; in vertical mode, this controls horizontal positioning. The naming follows
-   * DirectWrite's DWRITE_PARAGRAPH_ALIGNMENT convention. Default is Baseline, where position.y
-   * represents the first line's baseline coordinate directly. When height is 0, alignment is
-   * relative to position.y. When height > 0, alignment is within the box height.
+   * vertical positioning of lines. In vertical mode, this controls horizontal positioning of
+   * columns. The naming follows DirectWrite's DWRITE_PARAGRAPH_ALIGNMENT convention. When size is
+   * (0, 0), alignment is relative to the position as anchor point. The default value is Near.
    */
-  ParagraphAlign paragraphAlign = ParagraphAlign::Baseline;
+  ParagraphAlign paragraphAlign = ParagraphAlign::Near;
 
   /**
    * The writing mode (horizontal or vertical text). Vertical mode uses right-to-left column

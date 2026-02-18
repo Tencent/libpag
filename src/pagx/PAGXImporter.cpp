@@ -531,6 +531,7 @@ static Text* parseText(const DOMNode* node, PAGXDocument* doc) {
   text->letterSpacing = getFloatAttribute(node, "letterSpacing", 0);
   text->fauxBold = getBoolAttribute(node, "fauxBold", false);
   text->fauxItalic = getBoolAttribute(node, "fauxItalic", false);
+  text->textAnchor = TextAnchorFromString(getAttribute(node, "textAnchor", "start"));
 
   // Parse GlyphRun children for precomposition mode
   auto child = node->firstChild;
@@ -739,7 +740,7 @@ static TextBox* parseTextBox(const DOMNode* node, PAGXDocument* doc) {
   auto sz = parseSize(sizeStr);
   textBox->size = {sz.width, sz.height};
   textBox->textAlign = TextAlignFromString(getAttribute(node, "textAlign", "start"));
-  textBox->paragraphAlign = ParagraphAlignFromString(getAttribute(node, "paragraphAlign", "baseline"));
+  textBox->paragraphAlign = ParagraphAlignFromString(getAttribute(node, "paragraphAlign", "near"));
   textBox->writingMode = WritingModeFromString(getAttribute(node, "writingMode", "horizontal"));
   textBox->lineHeight = getFloatAttribute(node, "lineHeight", 0);
   textBox->wordWrap = getBoolAttribute(node, "wordWrap", false);

@@ -29,11 +29,6 @@ namespace pagx {
  */
 enum class ParagraphAlign {
   /**
-   * The position.y of the text box represents the first line's baseline Y coordinate.
-   * Text extends above (ascent) and below (descent) from this baseline.
-   */
-  Baseline,
-  /**
    * Align text to the near edge of the layout area (top in horizontal mode, right in vertical
    * mode) using the line-box model. The first line's line box near edge is aligned to the near
    * edge of the text area. The baseline is positioned at halfLeading + ascent from the near edge,

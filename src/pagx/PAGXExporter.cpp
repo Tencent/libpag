@@ -469,6 +469,9 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addAttribute("letterSpacing", text->letterSpacing);
       xml.addAttribute("fauxBold", text->fauxBold);
       xml.addAttribute("fauxItalic", text->fauxItalic);
+      if (text->textAnchor != TextAnchor::Start) {
+        xml.addAttribute("textAnchor", TextAnchorToString(text->textAnchor));
+      }
 
       // Skip GlyphRuns if requested or if none exist
       if (options.skipGlyphData || text->glyphRuns.empty()) {
@@ -714,7 +717,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       if (textBox->textAlign != TextAlign::Start) {
         xml.addAttribute("textAlign", TextAlignToString(textBox->textAlign));
       }
-      if (textBox->paragraphAlign != ParagraphAlign::Baseline) {
+      if (textBox->paragraphAlign != ParagraphAlign::Near) {
         xml.addAttribute("paragraphAlign", ParagraphAlignToString(textBox->paragraphAlign));
       }
       if (textBox->writingMode != WritingMode::Horizontal) {

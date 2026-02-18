@@ -134,6 +134,7 @@ class TextLayoutContext {
     float maxWidth = 0;
     float maxFontSize = 0;
     float maxColumnWidth = 0;
+    size_t glyphCount = 0;
   };
 
   // Shaped text information for a single Text element.
@@ -395,7 +396,20 @@ class TextLayoutContext {
       return;
     }
 
-    // Build TextBlob without layout offset
+    // Calculate text anchor offset based on total text width.
+    float anchorOffset = 0;
+    switch (text->textAnchor) {
+      case TextAnchor::Start:
+        break;
+      case TextAnchor::Middle:
+        anchorOffset = -info.totalWidth / 2;
+        break;
+      case TextAnchor::End:
+        anchorOffset = -info.totalWidth;
+        break;
+    }
+
+    // Build TextBlob with anchor offset applied to all x positions.
     tgfx::TextBlobBuilder builder = {};
 
     for (auto& run : info.runs) {
@@ -404,13 +418,16 @@ class TextLayoutContext {
       }
 
       if (run.canUseDefaultMode) {
-        // Default mode: use font's advance values to position glyphs, starting at run.startX
-        auto& buffer = builder.allocRun(run.font, run.glyphIDs.size(), run.startX, 0);
+        auto& buffer =
+            builder.allocRun(run.font, run.glyphIDs.size(), run.startX + anchorOffset, 0);
         memcpy(buffer.glyphs, run.glyphIDs.data(), run.glyphIDs.size() * sizeof(tgfx::GlyphID));
       } else {
         auto& buffer = builder.allocRunPosH(run.font, run.glyphIDs.size(), 0);
         memcpy(buffer.glyphs, run.glyphIDs.data(), run.glyphIDs.size() * sizeof(tgfx::GlyphID));
-        memcpy(buffer.positions, run.xPositions.data(), run.xPositions.size() * sizeof(float));
+        auto* positions = reinterpret_cast<float*>(buffer.positions);
+        for (size_t j = 0; j < run.xPositions.size(); j++) {
+          positions[j] = run.xPositions[j] + anchorOffset;
+        }
       }
     }
 
@@ -904,7 +921,6 @@ class TextLayoutContext {
     float yOffset = 0;
     if (boxHeight > 0) {
       switch (textBox->paragraphAlign) {
-        case ParagraphAlign::Baseline:
         case ParagraphAlign::Near:
           yOffset = 0;
           break;
@@ -917,7 +933,6 @@ class TextLayoutContext {
       }
     } else {
       switch (textBox->paragraphAlign) {
-        case ParagraphAlign::Baseline:
         case ParagraphAlign::Near:
           yOffset = 0;
           break;
@@ -981,35 +996,24 @@ class TextLayoutContext {
       auto& line = lines[lineIdx];
       float relativeBaseline = 0;
 
-      if (textBox->paragraphAlign == ParagraphAlign::Baseline && lineIdx == 0) {
-        // Baseline mode: position.y is the first line's baseline, no ascent offset.
-        if (line.glyphs.empty()) {
-          baselineY = textBox->position.y + yOffset + line.maxLineHeight;
-          relativeBaseline = line.maxLineHeight;
-        } else {
-          baselineY = textBox->position.y + yOffset;
-          relativeBaseline = 0;
-        }
+      if (line.glyphs.empty()) {
+        relativeBaseline = (relativeTop + line.maxLineHeight) * line.roundingRatio;
+        baselineY = textBox->position.y + roundf(relativeBaseline + yOffset);
+      } else if (!precomputedBaselines.empty()) {
+        // Bottom/Center alignment: use pre-computed baselines anchored from the last line.
+        relativeBaseline = precomputedBaselines[lineIdx];
+        baselineY = textBox->position.y + roundf(relativeBaseline + yOffset);
+      } else if (hasPrevBaseline && textBox->lineHeight > 0) {
+        // Fixed line height, subsequent lines: baseline = prevBaseline + lineHeight.
+        // This produces equal baseline-to-baseline spacing matching Figma's behavior where
+        // subsequent lines have their leading added above rather than split above and below.
+        relativeBaseline = prevRelativeBaseline + lines[lineIdx - 1].maxLineHeight;
+        baselineY = textBox->position.y + roundf(relativeBaseline + yOffset);
       } else {
-        if (line.glyphs.empty()) {
-          relativeBaseline = (relativeTop + line.maxLineHeight) * line.roundingRatio;
-          baselineY = textBox->position.y + roundf(relativeBaseline + yOffset);
-        } else if (!precomputedBaselines.empty()) {
-          // Bottom/Center alignment: use pre-computed baselines anchored from the last line.
-          relativeBaseline = precomputedBaselines[lineIdx];
-          baselineY = textBox->position.y + roundf(relativeBaseline + yOffset);
-        } else if (hasPrevBaseline && textBox->lineHeight > 0) {
-          // Fixed line height, subsequent lines: baseline = prevBaseline + lineHeight.
-          // This produces equal baseline-to-baseline spacing matching Figma's behavior where
-          // subsequent lines have their leading added above rather than split above and below.
-          relativeBaseline = prevRelativeBaseline + lines[lineIdx - 1].maxLineHeight;
-          baselineY = textBox->position.y + roundf(relativeBaseline + yOffset);
-        } else {
-          // Auto line height or first content line: use half-leading model.
-          float halfLeading = (line.maxLineHeight - line.metricsHeight) / 2;
-          relativeBaseline = (relativeTop + halfLeading + line.maxAscent) * line.roundingRatio;
-          baselineY = textBox->position.y + roundf(relativeBaseline + yOffset);
-        }
+        // Auto line height or first content line: use half-leading model.
+        float halfLeading = (line.maxLineHeight - line.metricsHeight) / 2;
+        relativeBaseline = (relativeTop + halfLeading + line.maxAscent) * line.roundingRatio;
+        baselineY = textBox->position.y + roundf(relativeBaseline + yOffset);
       }
       prevRelativeBaseline = relativeBaseline;
       hasPrevBaseline = !line.glyphs.empty();
@@ -1025,6 +1029,7 @@ class TextLayoutContext {
 
       // Horizontal alignment.
       float xOffset = textBox->position.x;
+      float justifyExtraPerGap = 0;
       if (boxWidth > 0) {
         switch (textBox->textAlign) {
           case TextAlign::Start:
@@ -1035,8 +1040,14 @@ class TextLayoutContext {
           case TextAlign::End:
             xOffset += boxWidth - line.width;
             break;
-          case TextAlign::Justify:
+          case TextAlign::Justify: {
+            // Justify: distribute extra space evenly between characters. Last line uses Start.
+            if (lineIdx < lines.size() - 1 && line.glyphs.size() > 1) {
+              justifyExtraPerGap =
+                  (boxWidth - line.width) / static_cast<float>(line.glyphs.size() - 1);
+            }
             break;
+          }
         }
       } else {
         switch (textBox->textAlign) {
@@ -1053,7 +1064,8 @@ class TextLayoutContext {
         }
       }
 
-      for (auto& g : line.glyphs) {
+      for (size_t gi = 0; gi < line.glyphs.size(); gi++) {
+        auto& g = line.glyphs[gi];
         // Skip newline glyphs: they only participate in metrics, not rendering.
         if (g.unichar == '\n') {
           continue;
@@ -1061,7 +1073,7 @@ class TextLayoutContext {
         PositionedGlyph pg = {};
         pg.glyphID = g.glyphID;
         pg.font = g.font;
-        pg.x = g.xPosition + xOffset;
+        pg.x = g.xPosition + xOffset + justifyExtraPerGap * static_cast<float>(gi);
         pg.y = baselineY;
         textGlyphs[g.sourceText].push_back(pg);
       }
@@ -1112,8 +1124,10 @@ class TextLayoutContext {
     float maxWidth = 0;
     float maxFontSize = 0;
     float maxFontLineHeight = 0;
+    size_t glyphCount = 0;
     for (auto& group : column->groups) {
       height += group.height;
+      glyphCount += group.glyphs.size();
       if (group.width > maxWidth) {
         maxWidth = group.width;
       }
@@ -1129,6 +1143,7 @@ class TextLayoutContext {
     column->height = height;
     column->maxWidth = maxWidth;
     column->maxFontSize = maxFontSize;
+    column->glyphCount = glyphCount;
     // Auto column width uses font metrics height (ascent + descent + leading) to match
     // horizontal layout behavior where auto lineHeight = metricsHeight. This ensures rotated
     // Latin glyphs fit within the column width.
@@ -1241,73 +1256,32 @@ class TextLayoutContext {
       totalWidth += columns[i].maxColumnWidth;
     }
 
-    // Calculate max column height for vertical alignment.
-    float maxColumnHeight = 0;
-    for (auto& col : columns) {
-      if (col.height > maxColumnHeight) {
-        maxColumnHeight = col.height;
-      }
-    }
-
-    // Horizontal offset: columns go right-to-left, so Start = right-aligned.
+    // ParagraphAlign controls the block-flow direction (horizontal in vertical mode).
+    // Columns go right-to-left, so Near = right-aligned, Far = left-aligned.
     // xStart is where the right edge of the first column starts.
     float xStart = textBox->position.x;
     if (boxWidth > 0) {
-      switch (textBox->textAlign) {
-        case TextAlign::Start:
+      switch (textBox->paragraphAlign) {
+        case ParagraphAlign::Near:
           xStart += boxWidth;
           break;
-        case TextAlign::Center:
+        case ParagraphAlign::Center:
           xStart += (boxWidth + totalWidth) / 2;
           break;
-        case TextAlign::End:
+        case ParagraphAlign::Far:
           xStart += totalWidth;
-          break;
-        case TextAlign::Justify:
-          xStart += boxWidth;
           break;
       }
     } else {
       // Anchor mode: position is anchor point.
-      switch (textBox->textAlign) {
-        case TextAlign::Start:
+      switch (textBox->paragraphAlign) {
+        case ParagraphAlign::Near:
           xStart += totalWidth;
           break;
-        case TextAlign::Center:
+        case ParagraphAlign::Center:
           xStart += totalWidth / 2;
           break;
-        case TextAlign::End:
-          break;
-        case TextAlign::Justify:
-          xStart += totalWidth;
-          break;
-      }
-    }
-
-    // Vertical alignment offset.
-    float yBase = textBox->position.y;
-    if (boxHeight > 0) {
-      switch (textBox->paragraphAlign) {
-        case ParagraphAlign::Baseline:
-        case ParagraphAlign::Near:
-          break;
-        case ParagraphAlign::Center:
-          yBase += (boxHeight - maxColumnHeight) / 2;
-          break;
         case ParagraphAlign::Far:
-          yBase += boxHeight - maxColumnHeight;
-          break;
-      }
-    } else {
-      switch (textBox->paragraphAlign) {
-        case ParagraphAlign::Baseline:
-        case ParagraphAlign::Near:
-          break;
-        case ParagraphAlign::Center:
-          yBase -= maxColumnHeight / 2;
-          break;
-        case ParagraphAlign::Far:
-          yBase -= maxColumnHeight;
           break;
       }
     }
@@ -1340,7 +1314,46 @@ class TextLayoutContext {
       // Center of this column for centering upright glyphs.
       float columnCenterX = columnX + allocatedWidth / 2;
 
-      float currentY = yBase;
+      // TextAlign controls the inline direction (vertical in vertical mode).
+      // Compute per-column vertical offset based on TextAlign.
+      float inlineOffset = 0;
+      float justifyGap = 0;
+      if (boxHeight > 0) {
+        switch (textBox->textAlign) {
+          case TextAlign::Start:
+            break;
+          case TextAlign::Center:
+            inlineOffset = (boxHeight - column.height) / 2;
+            break;
+          case TextAlign::End:
+            inlineOffset = boxHeight - column.height;
+            break;
+          case TextAlign::Justify: {
+            // Justify: distribute extra space evenly between characters. Last column uses Start.
+            if (colIdx < columns.size() - 1 && column.glyphCount > 1) {
+              float extraSpace = boxHeight - column.height;
+              justifyGap = extraSpace / static_cast<float>(column.glyphCount - 1);
+            }
+            break;
+          }
+        }
+      } else {
+        switch (textBox->textAlign) {
+          case TextAlign::Start:
+            break;
+          case TextAlign::Center:
+            inlineOffset = -column.height / 2;
+            break;
+          case TextAlign::End:
+            inlineOffset = -column.height;
+            break;
+          case TextAlign::Justify:
+            break;
+        }
+      }
+
+      float currentY = textBox->position.y + inlineOffset;
+      size_t glyphIdx = 0;
 
       for (size_t groupIdx = 0; groupIdx < column.groups.size(); groupIdx++) {
         auto& group = column.groups[groupIdx];
@@ -1387,11 +1400,15 @@ class TextLayoutContext {
           }
 
           textGlyphs[g.sourceText].push_back(vpg);
+          glyphIdx++;
+          currentY += group.height;
+          if (glyphIdx < column.glyphCount) {
+            currentY += justifyGap;
+          }
         } else {
           // Rotated group: all glyphs rotated 90° CW as a unit. Each glyph uses
           // RSXform (scos=0, ssin=1) to rotate, with tx centering the ascent-descent
           // midpoint in the column, and ty placing the glyph at its vertical position.
-          float groupTopY = currentY;
           float localX = 0;
           for (auto& g : group.glyphs) {
             VerticalPositionedGlyph vpg = {};
@@ -1400,13 +1417,17 @@ class TextLayoutContext {
             vpg.useRSXform = true;
             float absAscent = fabsf(g.ascent);
             float tx = columnCenterX - (absAscent - g.descent) / 2;
-            float ty = groupTopY + localX;
+            float ty = currentY + localX;
             vpg.xform = tgfx::RSXform::Make(0, 1, tx, ty);
             textGlyphs[g.sourceText].push_back(vpg);
             localX += g.advance;
+            glyphIdx++;
+            if (glyphIdx < column.glyphCount) {
+              localX += justifyGap;
+            }
           }
+          currentY += localX;
         }
-        currentY += group.height;
       }
     }
 
@@ -1464,21 +1485,6 @@ class TextLayoutContext {
         StoreShapedText(text, std::move(shapedText));
       }
     }
-  }
-
-  float calculateLayoutOffset(const TextBox* layout, float textWidth) {
-    switch (layout->textAlign) {
-      case TextAlign::Start:
-        return 0;
-      case TextAlign::Center:
-        return -0.5f * textWidth;
-      case TextAlign::End:
-        return -textWidth;
-      case TextAlign::Justify:
-        // TODO: Justify requires more complex handling
-        return 0;
-    }
-    return 0;
   }
 
   std::shared_ptr<tgfx::Typeface> findTypeface(const std::string& fontFamily,
