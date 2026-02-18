@@ -1560,7 +1560,7 @@ Unlike other modifiers that operate on accumulated results in a chain (e.g., Tri
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `position` | Point | 0,0 | Near-edge corner of the text area |
+| `position` | Point | 0,0 | Top-left corner of the text area |
 | `size` | Size | 0,0 | Layout size. When width or height is 0, text has no boundary in that dimension (wordWrap wraps each character individually) |
 | `textAlign` | TextAlign | start | Text alignment along the inline direction |
 | `paragraphAlign` | ParagraphAlign | near | Paragraph alignment along the block-flow direction |

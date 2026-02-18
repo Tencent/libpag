@@ -41,7 +41,7 @@ namespace pagx {
 class TextBox : public Element {
  public:
   /**
-   * The near-edge corner of the text area. The default value is (0, 0).
+   * The top-left corner of the text area. The default value is (0, 0).
    */
   Point position = {};
 

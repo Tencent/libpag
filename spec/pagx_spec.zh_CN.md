@@ -1555,7 +1555,7 @@ TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被�
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `position` | Point | 0,0 | 文本区域近端起点 |
+| `position` | Point | 0,0 | 文本区域左上角坐标 |
 | `size` | Size | 0,0 | 排版尺寸。当宽度或高度为 0 时，该维度上文本无边界（wordWrap 时逐字符换行） |
 | `textAlign` | TextAlign | start | 文本对齐——沿行内方向对齐文本（见下方） |
 | `paragraphAlign` | ParagraphAlign | near | 段落对齐——沿块流方向对齐文本行/列（见下方） |
