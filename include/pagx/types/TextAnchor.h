@@ -21,8 +21,7 @@
 namespace pagx {
 
 /**
- * Text anchor alignment. Controls how text is positioned relative to its origin point when
- * rendered without a TextBox.
+ * Text anchor alignment. Controls how text is positioned relative to its origin point.
  */
 enum class TextAnchor {
   /**

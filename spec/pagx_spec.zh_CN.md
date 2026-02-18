@@ -1040,7 +1040,7 @@ y = center.y + outerRadius * sin(angle)
 文本元素提供文本内容的几何形状。与形状元素产生单一 Path 不同，Text 经过塑形后会产生**字形列表**（多个字形）并累积到渲染上下文的几何列表中，供后续修改器变换或绘制器渲染。
 
 ```xml
-<Text text="Hello World" position="100,200" fontFamily="Arial" fontStyle="Regular" fauxBold="true" fauxItalic="false" fontSize="24" letterSpacing="0"/>
+<Text text="Hello World" position="100,200" fontFamily="Arial" fontStyle="Regular" fauxBold="true" fauxItalic="false" fontSize="24" letterSpacing="0" textAnchor="start"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1053,6 +1053,7 @@ y = center.y + outerRadius * sin(angle)
 | `letterSpacing` | float | 0 | 字间距 |
 | `fauxBold` | bool | false | 仿粗体效果 |
 | `fauxItalic` | bool | false | 仿斜体效果 |
+| `textAnchor` | TextAnchor | start | 文本锚点对齐——控制文本相对原点的位置（见下方）。有 TextBox 排版时忽略 |
 
 子元素：`CDATA` 文本、`GlyphRun`*
 
@@ -1074,6 +1075,16 @@ Line 3]]>
 ```
 
 **渲染模式**：Text 支持**预排版**和**运行时排版**两种模式。预排版通过 GlyphRun 子节点提供预计算的字形和位置，使用嵌入字体渲染，确保跨平台完全一致。运行时排版在运行时进行塑形和排版，因各平台字体和排版特性差异，可能存在细微不一致。如需精确还原设计工具的排版效果，建议使用预排版。
+
+**TextAnchor（文本锚点对齐）**：
+
+控制文本相对其原点的定位方式。
+
+| 值 | 说明 |
+|------|------|
+| `start` | 原点位于文本起始位置，不做偏移 |
+| `middle` | 原点位于文本中心位置，文本偏移半个宽度使其居中于原点 |
+| `end` | 原点位于文本结束位置，文本偏移整个宽度使其终点对齐原点 |
 
 **运行时排版渲染流程**：
 1. 根据 `fontFamily` 和 `fontStyle` 查找系统字体，不可用时按运行时配置的回退列表选择替代字体
@@ -1534,7 +1545,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 #### 5.5.6 文本框（TextBox）
 
-TextBox 是文本框排版器，对累积的 Text 元素应用排版。它根据自身的 position、size 和对齐设置重新排版所有字形位置，排版结果通过反向变换补偿写入每个 Text 元素的 GlyphRun 数据，因此 Text 自身的 position 和父级 Group 变换在渲染管线中仍然有效。默认段落对齐为 `baseline`，`position.y` 直接表示首行基线 Y 坐标。当 `paragraphAlign` 为 `near` 时，首行使用行框模型定位：行框近端贴齐文本区域近端边缘，基线位于近端下方 `halfLeading + ascent` 处，其中 `halfLeading = (lineHeight - metricsHeight) / 2`，`metricsHeight = ascent + descent + leading`。遵循 CSS Writing Modes 的惯例，`lineHeight` 是逻辑属性，始终作用于行框的块轴方向尺寸。竖排模式下，它控制的是列宽而非行高。列间距为 `lineHeight`（中心到中心的距离）。当 `lineHeight` 为 0（自动）时，列宽根据字体 metrics 计算（ascent + descent + leading），与横排自动行高的算法一致。列从右往左排列。
+TextBox 是文本框排版器，对累积的 Text 元素应用排版。它根据自身的 position、size 和对齐设置重新排版所有字形位置，排版结果通过反向变换补偿写入每个 Text 元素的 GlyphRun 数据，因此 Text 自身的 position 和父级 Group 变换在渲染管线中仍然有效。首行使用行框模型定位：行框近端贴齐文本区域近端边缘，基线位于近端下方 `halfLeading + ascent` 处，其中 `halfLeading = (lineHeight - metricsHeight) / 2`，`metricsHeight = ascent + descent + leading`。遵循 CSS Writing Modes 的惯例，`lineHeight` 是逻辑属性，始终作用于行框的块轴方向尺寸。竖排模式下，它控制的是列宽而非行高。列间距为 `lineHeight`（中心到中心的距离）。当 `lineHeight` 为 0（自动）时，列宽根据字体 metrics 计算（ascent + descent + leading），与横排自动行高的算法一致。列从右往左排列。
 
 TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被处理，不会在渲染树中实例化。如果累积的所有 Text 元素都已包含嵌入的 GlyphRun 数据，则排版阶段会跳过 TextBox。但即使已填写嵌入的 GlyphRun 数据和字体，仍建议保留 TextBox 节点，因为设计工具导入时需要读取其排版属性（size、对齐方式、wordWrap 等）用于编辑展示。
 
@@ -1544,10 +1555,10 @@ TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被�
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `position` | Point | 0,0 | 文本区域参考点。默认 `baseline` 模式下，`position.y` 为首行基线 Y 坐标。`near` 模式下为文本区域近端起点。当宽度或高度为 0 时，该维度上作为对齐锚点（见下方说明） |
+| `position` | Point | 0,0 | 文本区域近端起点。当宽度或高度为 0 时，该维度上作为对齐锚点（见下方说明） |
 | `size` | Size | 0,0 | 排版尺寸。当宽度或高度为 0 时，该维度上文本无边界（wordWrap 时逐字符换行，对齐以 position 为参考点） |
 | `textAlign` | TextAlign | start | 文本对齐——沿行内方向对齐文本（见下方） |
-| `paragraphAlign` | ParagraphAlign | baseline | 段落对齐——沿块流方向对齐文本行/列（见下方） |
+| `paragraphAlign` | ParagraphAlign | near | 段落对齐——沿块流方向对齐文本行/列（见下方） |
 | `writingMode` | WritingMode | horizontal | 排版方向（见下方） |
 | `lineHeight` | float | 0 | 行高（像素值）。0 表示自动（根据字体 metrics 计算：ascent + descent + leading）。遵循 CSS Writing Modes 的逻辑属性惯例，竖排模式下控制列宽 |
 | `wordWrap` | boolean | false | 是否启用自动换行（在盒子宽度/高度边界处换行；该维度为 0 时逐字符换行） |
@@ -1570,12 +1581,11 @@ TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被�
 
 | 值 | 说明 |
 |------|------|
-| `baseline` | 默认。`position.y` 表示首行基线 Y 坐标，文本从该点向上（ascent）和向下（descent）延伸。 |
 | `near` | 近端对齐（横排时为顶部，竖排时为右侧）。使用行框模型，首行行框近端贴齐文本区域近端边缘。基线位于近端下方 `halfLeading + ascent` 处，其中 `halfLeading = (lineHeight - metricsHeight) / 2`。 |
 | `center` | 居中对齐。整体文本块尺寸（所有行高/列宽之和）在对应维度内居中。 |
 | `far` | 远端对齐（横排时为底部，竖排时为左侧）。末行行框远端对齐文本区域远端边缘。 |
 
-当高度为 0 时，对齐以 `position.y` 为锚点：`baseline` 直接将 `position.y` 作为首行基线，`near` 从锚点向下展开（使用行框模型偏移），`center` 将所有行框的中心对齐锚点，`far` 将最后一个行框远端边缘对齐锚点。
+当高度为 0 时，对齐以 `position.y` 为锚点：`near` 从锚点向下展开（使用行框模型偏移），`center` 将所有行框的中心对齐锚点，`far` 将最后一个行框远端边缘对齐锚点。
 
 **WritingMode（排版方向）**：
 

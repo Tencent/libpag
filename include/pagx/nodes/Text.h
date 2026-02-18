@@ -23,6 +23,7 @@
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/types/Point.h"
+#include "pagx/types/TextAnchor.h"
 
 namespace pagx {
 
@@ -79,6 +80,13 @@ class Text : public Element {
    * Whether to apply algorithmic slanting. The default value is false.
    */
   bool fauxItalic = false;
+
+  /**
+   * The text anchor alignment. Controls how text is positioned relative to its origin. Start means
+   * the origin is at the text start, Middle centers the text on the origin, and End places the text
+   * ending at the origin. Ignored when a TextBox controls the layout. The default value is Start.
+   */
+  TextAnchor textAnchor = TextAnchor::Start;
 
   /**
    * Pre-shaped glyph runs. When present, these are used for rendering instead of runtime shaping.
