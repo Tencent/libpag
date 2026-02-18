@@ -1573,9 +1573,9 @@ Unlike other modifiers that operate on accumulated results in a chain (e.g., Tri
 
 | Value | Description |
 |-------|-------------|
-| `start` | Start alignment (left-aligned; right-aligned for RTL text) |
+| `start` | Start alignment |
 | `center` | Center alignment |
-| `end` | End alignment (right-aligned; left-aligned for RTL text) |
+| `end` | End alignment |
 | `justify` | Justified (last line start-aligned) |
 
 When width is 0, alignment is relative to `position.x` as an anchor: `start` places text starting at the anchor, `center` places the visual center of each line at the anchor, and `end` places the trailing edge at the anchor.
