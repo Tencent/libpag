@@ -743,7 +743,9 @@ PAGX_TEST(PAGXTest, TextBoxHorizontal) {
 
   // Row 1: wordWrap + textAlign Start/Center/End + paragraphAlign Near/Center/Far
   addBorder(10, 10, 150, 120);
-  addTextBox("Hello World this is a long text.", 18, 10, 10, 150, 120,
+  addTextBox("\xe4\xbd\xa0\xe5\xa5\xbd\xe4\xb8\x96\xe7\x95\x8c\xef\xbc\x8c"
+             "\xe8\xbf\x99\xe6\x98\xaf\xe6\xb5\x8b\xe8\xaf\x95\xe6\x96\x87\xe6\x9c\xac\xe3\x80\x82",
+             20, 10, 10, 150, 120,
              pagx::TextAlign::Start, pagx::ParagraphAlign::Near, true);
 
   addBorder(170, 10, 150, 120);
@@ -752,9 +754,7 @@ PAGX_TEST(PAGXTest, TextBoxHorizontal) {
 
   // CJK text with End/Far
   addBorder(330, 10, 150, 120);
-  addTextBox("\xe4\xbd\xa0\xe5\xa5\xbd\xe4\xb8\x96\xe7\x95\x8c\xef\xbc\x8c"
-             "\xe8\xbf\x99\xe6\x98\xaf\xe6\xb5\x8b\xe8\xaf\x95\xe6\x96\x87\xe6\x9c\xac\xe3\x80\x82",
-             20, 330, 10, 150, 120,
+  addTextBox("Hello World this is a long text.", 18, 330, 10, 150, 120,
              pagx::TextAlign::End, pagx::ParagraphAlign::Far, true);
 
   // Row 2: overflow hidden, Justify, ParagraphAlign single-line Near/Center/Far
