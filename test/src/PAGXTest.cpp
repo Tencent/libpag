@@ -698,7 +698,7 @@ PAGX_TEST(PAGXTest, SampleFiles) {
  * paragraphAlign (Near/Center/Far), and overflow hidden.
  */
 PAGX_TEST(PAGXTest, TextBoxHorizontal) {
-  auto doc = pagx::PAGXDocument::Make(500, 500);
+  auto doc = pagx::PAGXDocument::Make(570, 400);
   auto layer = doc->makeNode<pagx::Layer>();
 
   auto addBorder = [&](float x, float y, float w, float h) {
@@ -742,40 +742,40 @@ PAGX_TEST(PAGXTest, TextBoxHorizontal) {
   };
 
   // Row 1: wordWrap + textAlign Start/Center/End + paragraphAlign Near/Center/Far
-  addBorder(10, 10, 150, 120);
+  addBorder(50, 50, 150, 120);
   addTextBox("\xe4\xbd\xa0\xe5\xa5\xbd\xe4\xb8\x96\xe7\x95\x8c\xef\xbc\x8c"
              "\xe8\xbf\x99\xe6\x98\xaf\xe6\xb5\x8b\xe8\xaf\x95\xe6\x96\x87\xe6\x9c\xac\xe3\x80\x82",
-             20, 10, 10, 150, 120,
+             20, 50, 50, 150, 120,
              pagx::TextAlign::Start, pagx::ParagraphAlign::Near, true);
 
-  addBorder(170, 10, 150, 120);
-  addTextBox("Line One\nLine Two\nLine Three", 18, 170, 10, 150, 120,
+  addBorder(210, 50, 150, 120);
+  addTextBox("Line One\nLine Two\nLine Three", 18, 210, 50, 150, 120,
              pagx::TextAlign::Center, pagx::ParagraphAlign::Middle, false);
 
   // CJK text with End/Far
-  addBorder(330, 10, 150, 120);
-  addTextBox("Hello World this is a long text.", 18, 330, 10, 150, 120,
+  addBorder(370, 50, 150, 120);
+  addTextBox("Hello World this is a long text.", 18, 370, 50, 150, 120,
              pagx::TextAlign::End, pagx::ParagraphAlign::Far, true);
 
   // Row 2: overflow hidden, Justify, ParagraphAlign single-line Near/Center/Far
-  addBorder(10, 150, 150, 80);
+  addBorder(50, 180, 150, 80);
   addTextBox("Overflow text that is very long and should be clipped by the box boundary.", 18,
-             10, 150, 150, 80,
+             50, 180, 150, 80,
              pagx::TextAlign::Start, pagx::ParagraphAlign::Near, true, pagx::Overflow::Hidden);
 
-  addBorder(170, 150, 150, 80);
-  addTextBox("Justify this line\nLast line start", 18, 170, 150, 150, 80,
+  addBorder(210, 180, 150, 80);
+  addTextBox("Justify this line\nLast line start", 18, 210, 180, 150, 80,
              pagx::TextAlign::Justify, pagx::ParagraphAlign::Near, false);
 
   // ParagraphAlign single-line comparison: Near/Center/Far
-  addBorder(10, 260, 150, 80);
-  addTextBox("aaA\xc3\x82\xe1\xba\xa4", 32, 10, 260, 150, 80,
+  addBorder(50, 270, 150, 80);
+  addTextBox("aaA\xc3\x82\xe1\xba\xa4", 32, 50, 270, 150, 80,
              pagx::TextAlign::Start, pagx::ParagraphAlign::Near, false);
-  addBorder(170, 260, 150, 80);
-  addTextBox("aaA\xc3\x82\xe1\xba\xa4", 32, 170, 260, 150, 80,
+  addBorder(210, 270, 150, 80);
+  addTextBox("aaA\xc3\x82\xe1\xba\xa4", 32, 210, 270, 150, 80,
              pagx::TextAlign::Start, pagx::ParagraphAlign::Middle, false);
-  addBorder(330, 260, 150, 80);
-  addTextBox("aaA\xc3\x82\xe1\xba\xa4", 32, 330, 260, 150, 80,
+  addBorder(370, 270, 150, 80);
+  addTextBox("aaA\xc3\x82\xe1\xba\xa4", 32, 370, 270, 150, 80,
              pagx::TextAlign::Start, pagx::ParagraphAlign::Far, false);
 
   doc->layers.push_back(layer);
@@ -788,7 +788,7 @@ PAGX_TEST(PAGXTest, TextBoxHorizontal) {
   auto tgfxLayer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
   ASSERT_TRUE(tgfxLayer != nullptr);
 
-  auto surface = Surface::Make(context, 500, 500);
+  auto surface = Surface::Make(context, 570, 400);
   DisplayList displayList;
   displayList.root()->addChild(tgfxLayer);
   displayList.render(surface.get(), false);
@@ -800,7 +800,7 @@ PAGX_TEST(PAGXTest, TextBoxHorizontal) {
  * paragraphAlign (Near/Center/Far), and overflow hidden.
  */
 PAGX_TEST(PAGXTest, TextBoxVertical) {
-  auto doc = pagx::PAGXDocument::Make(600, 500);
+  auto doc = pagx::PAGXDocument::Make(670, 570);
   auto layer = doc->makeNode<pagx::Layer>();
 
   auto addBorder = [&](float x, float y, float w, float h) {
@@ -847,66 +847,66 @@ PAGX_TEST(PAGXTest, TextBoxVertical) {
 
   // Row 1: CJK+Latin single column, two columns with \n, wordWrap auto-wrap
   // CJK+Latin mixed single column
-  addBorder(10, 10, 80, 230);
+  addBorder(50, 50, 80, 230);
   addVerticalTextBox("\xe4\xbd\xa0\xe5\xa5\xbd" "Hello" "\xe4\xb8\x96\xe7\x95\x8c",
-                     24, 10, 10, 80, 230,
+                     24, 50, 50, 80, 230,
                      pagx::TextAlign::Start, pagx::ParagraphAlign::Near, false);
 
   // Two columns: explicit \n
-  addBorder(100, 10, 100, 230);
+  addBorder(140, 50, 100, 230);
   addVerticalTextBox("\xe4\xbd\xa0\xe5\xa5\xbd" "Hello\n" "\xe4\xb8\x96\xe7\x95\x8c" "Test",
-                     24, 100, 10, 100, 230,
+                     24, 140, 50, 100, 230,
                      pagx::TextAlign::Start, pagx::ParagraphAlign::Near, false);
 
   // CJK wordWrap auto-wrap
-  addBorder(210, 10, 100, 168);
+  addBorder(250, 50, 100, 168);
   addVerticalTextBox("\xe6\x98\xa5\xe7\x9c\xa0\xe4\xb8\x8d\xe8\xa7\x89\xe6\x99\x93"
                      "\xe5\xa4\x84\xe5\xa4\x84\xe9\x97\xbb\xe5\x95\xbc\xe9\xb8\x9f"
                      "\xe5\xa4\x9c\xe6\x9d\xa5\xe9\xa3\x8e\xe9\x9b\xa8\xe5\xa3\xb0"
                      "\xe8\x8a\xb1\xe8\x90\xbd\xe7\x9f\xa5\xe5\xa4\x9a\xe5\xb0\x91",
-                     24, 210, 10, 100, 168,
+                     24, 250, 50, 100, 168,
                      pagx::TextAlign::Start, pagx::ParagraphAlign::Near, true);
 
   // Row 2: ParagraphAlign Near/Center/Far + TextAlign Start/Center/End/Justify + overflow hidden
   // ParagraphAlign Near/Center/Far (single column positioning)
-  addBorder(320, 10, 80, 150);
-  addVerticalTextBox("\xe4\xbd\xa0\xe5\xa5\xbd", 24, 320, 10, 80, 150,
+  addBorder(360, 50, 80, 150);
+  addVerticalTextBox("\xe4\xbd\xa0\xe5\xa5\xbd", 24, 360, 50, 80, 150,
                      pagx::TextAlign::Start, pagx::ParagraphAlign::Near, false);
-  addBorder(410, 10, 80, 150);
-  addVerticalTextBox("\xe4\xbd\xa0\xe5\xa5\xbd", 24, 410, 10, 80, 150,
+  addBorder(450, 50, 80, 150);
+  addVerticalTextBox("\xe4\xbd\xa0\xe5\xa5\xbd", 24, 450, 50, 80, 150,
                      pagx::TextAlign::Start, pagx::ParagraphAlign::Middle, false);
-  addBorder(500, 10, 80, 150);
-  addVerticalTextBox("\xe4\xbd\xa0\xe5\xa5\xbd", 24, 500, 10, 80, 150,
+  addBorder(540, 50, 80, 150);
+  addVerticalTextBox("\xe4\xbd\xa0\xe5\xa5\xbd", 24, 540, 50, 80, 150,
                      pagx::TextAlign::Start, pagx::ParagraphAlign::Far, false);
 
   // TextAlign Start/Center/End (two columns with different lengths)
-  addBorder(10, 260, 100, 230);
+  addBorder(50, 290, 100, 230);
   addVerticalTextBox("\xe4\xbd\xa0\xe5\xa5\xbd\n\xe4\xb8\x96\xe7\x95\x8c\xe5\xa4\xa7\xe5\x9c\xb0",
-                     24, 10, 260, 100, 230,
+                     24, 50, 290, 100, 230,
                      pagx::TextAlign::Start, pagx::ParagraphAlign::Near, false);
-  addBorder(120, 260, 100, 230);
+  addBorder(160, 290, 100, 230);
   addVerticalTextBox("\xe4\xbd\xa0\xe5\xa5\xbd\n\xe4\xb8\x96\xe7\x95\x8c\xe5\xa4\xa7\xe5\x9c\xb0",
-                     24, 120, 260, 100, 230,
+                     24, 160, 290, 100, 230,
                      pagx::TextAlign::Center, pagx::ParagraphAlign::Near, false);
-  addBorder(230, 260, 100, 230);
+  addBorder(270, 290, 100, 230);
   addVerticalTextBox("\xe4\xbd\xa0\xe5\xa5\xbd\n\xe4\xb8\x96\xe7\x95\x8c\xe5\xa4\xa7\xe5\x9c\xb0",
-                     24, 230, 260, 100, 230,
+                     24, 270, 290, 100, 230,
                      pagx::TextAlign::End, pagx::ParagraphAlign::Near, false);
 
   // Justify (two columns, last column Start-aligned)
-  addBorder(340, 260, 80, 230);
+  addBorder(380, 290, 80, 230);
   addVerticalTextBox("\xe6\x98\xa5\xe7\x9c\xa0\xe4\xb8\x8d\xe8\xa7\x89\xe6\x99\x93\n"
                      "\xe5\xa4\x84\xe5\xa4\x84\xe9\x97\xbb\xe5\x95\xbc\xe9\xb8\x9f",
-                     24, 340, 260, 80, 230,
+                     24, 380, 290, 80, 230,
                      pagx::TextAlign::Justify, pagx::ParagraphAlign::Near, false);
 
   // Overflow hidden
-  addBorder(430, 260, 80, 200);
+  addBorder(470, 290, 80, 200);
   addVerticalTextBox("\xe6\x98\xa5\xe7\x9c\xa0\xe4\xb8\x8d\xe8\xa7\x89\xe6\x99\x93"
                      "\xe5\xa4\x84\xe5\xa4\x84\xe9\x97\xbb\xe5\x95\xbc\xe9\xb8\x9f"
                      "\xe5\xa4\x9c\xe6\x9d\xa5\xe9\xa3\x8e\xe9\x9b\xa8\xe5\xa3\xb0"
                      "\xe8\x8a\xb1\xe8\x90\xbd\xe7\x9f\xa5\xe5\xa4\x9a\xe5\xb0\x91",
-                     24, 430, 260, 80, 200,
+                     24, 470, 290, 80, 200,
                      pagx::TextAlign::Start, pagx::ParagraphAlign::Near, true,
                      pagx::Overflow::Hidden);
 
@@ -920,7 +920,7 @@ PAGX_TEST(PAGXTest, TextBoxVertical) {
   auto tgfxLayer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
   ASSERT_TRUE(tgfxLayer != nullptr);
 
-  auto surface = Surface::Make(context, 600, 500);
+  auto surface = Surface::Make(context, 670, 570);
   DisplayList displayList;
   displayList.root()->addChild(tgfxLayer);
   displayList.render(surface.get(), false);
@@ -932,7 +932,7 @@ PAGX_TEST(PAGXTest, TextBoxVertical) {
  * fixed lineHeight + Near/Center/Far, and multi-line mixed sizes + Far.
  */
 PAGX_TEST(PAGXTest, TextBoxLineHeight) {
-  auto doc = pagx::PAGXDocument::Make(500, 400);
+  auto doc = pagx::PAGXDocument::Make(570, 470);
   auto layer = doc->makeNode<pagx::Layer>();
 
   auto addBorder = [&](float x, float y, float w, float h) {
@@ -990,13 +990,13 @@ PAGX_TEST(PAGXTest, TextBoxLineHeight) {
 
   // Box A: Auto lineHeight, mixed font sizes (40+20+60), Near
   {
-    addBorder(10, 10, 200, 180);
+    addBorder(50, 50, 200, 180);
     auto boxLayer = doc->makeNode<pagx::Layer>();
     addRichText(boxLayer, "Hg\n", 40);
     addRichText(boxLayer, "Xy", 20);
     addRichText(boxLayer, "\nAB", 60);
     auto textBox = doc->makeNode<pagx::TextBox>();
-    textBox->position = {10, 10};
+    textBox->position = {50, 50};
     textBox->size = {200, 180};
     textBox->paragraphAlign = pagx::ParagraphAlign::Near;
     boxLayer->contents.push_back(textBox);
@@ -1005,13 +1005,13 @@ PAGX_TEST(PAGXTest, TextBoxLineHeight) {
 
   // Box B: Fixed lineHeight=40, same mixed text, Near
   {
-    addBorder(220, 10, 200, 180);
+    addBorder(260, 50, 200, 180);
     auto boxLayer = doc->makeNode<pagx::Layer>();
     addRichText(boxLayer, "Hg\n", 40);
     addRichText(boxLayer, "Xy", 20);
     addRichText(boxLayer, "\nAB", 60);
     auto textBox = doc->makeNode<pagx::TextBox>();
-    textBox->position = {220, 10};
+    textBox->position = {260, 50};
     textBox->size = {200, 180};
     textBox->paragraphAlign = pagx::ParagraphAlign::Near;
     textBox->lineHeight = 40;
@@ -1021,27 +1021,27 @@ PAGX_TEST(PAGXTest, TextBoxLineHeight) {
 
   // Box C: Fixed lineHeight=50 + Far (bottom alignment)
   {
-    addBorder(10, 210, 150, 160);
-    addSimpleTextBox(layer, "Line1\nLine2", 24, 10, 210, 150, 160, 50,
+    addBorder(50, 240, 150, 160);
+    addSimpleTextBox(layer, "Line1\nLine2", 24, 50, 240, 150, 160, 50,
                      pagx::ParagraphAlign::Far);
   }
 
   // Box D: Fixed lineHeight=50 + Center
   {
-    addBorder(170, 210, 150, 160);
-    addSimpleTextBox(layer, "Line1\nLine2", 24, 170, 210, 150, 160, 50,
+    addBorder(210, 240, 150, 160);
+    addSimpleTextBox(layer, "Line1\nLine2", 24, 210, 240, 150, 160, 50,
                      pagx::ParagraphAlign::Middle);
   }
 
   // Box E: 3-line mixed sizes + Far (multi-step bottom-up recursion)
   {
-    addBorder(330, 210, 150, 180);
+    addBorder(370, 240, 150, 180);
     auto boxLayer = doc->makeNode<pagx::Layer>();
     addRichText(boxLayer, "Large\n", 36);
     addRichText(boxLayer, "Medium\n", 24);
     addRichText(boxLayer, "Tiny", 16);
     auto textBox = doc->makeNode<pagx::TextBox>();
-    textBox->position = {330, 210};
+    textBox->position = {370, 240};
     textBox->size = {150, 180};
     textBox->paragraphAlign = pagx::ParagraphAlign::Far;
     boxLayer->contents.push_back(textBox);
@@ -1058,7 +1058,7 @@ PAGX_TEST(PAGXTest, TextBoxLineHeight) {
   auto tgfxLayer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
   ASSERT_TRUE(tgfxLayer != nullptr);
 
-  auto surface = Surface::Make(context, 500, 400);
+  auto surface = Surface::Make(context, 570, 470);
   DisplayList displayList;
   displayList.root()->addChild(tgfxLayer);
   displayList.render(surface.get(), false);
@@ -1066,11 +1066,11 @@ PAGX_TEST(PAGXTest, TextBoxLineHeight) {
 }
 
 /**
- * TextBox edge cases: empty lines, anchor mode (size=0), fixed lineHeight + empty first line,
- * and End alignment with rich text.
+ * TextBox edge cases: empty lines, anchor mode (size=0) with TextAlign and ParagraphAlign
+ * combinations, fixed lineHeight + empty first line, and End alignment with rich text.
  */
 PAGX_TEST(PAGXTest, TextBoxEdgeCases) {
-  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto doc = pagx::PAGXDocument::Make(570, 440);
   auto layer = doc->makeNode<pagx::Layer>();
 
   auto addBorder = [&](float x, float y, float w, float h) {
@@ -1103,9 +1103,44 @@ PAGX_TEST(PAGXTest, TextBoxEdgeCases) {
     targetLayer->contents.push_back(group);
   };
 
+  auto addAnchorTextBox = [&](const std::string& str, float fontSize, float anchorX,
+                              float anchorY, pagx::TextAlign tAlign,
+                              pagx::ParagraphAlign pAlign) {
+    auto group = doc->makeNode<pagx::Group>();
+    auto text = doc->makeNode<pagx::Text>();
+    text->text = str;
+    text->fontSize = fontSize;
+    text->fontFamily = "NotoSansSC";
+    group->elements.push_back(text);
+    auto fill = doc->makeNode<pagx::Fill>();
+    auto solid = doc->makeNode<pagx::SolidColor>();
+    solid->color = {0, 0, 0, 1};
+    fill->color = solid;
+    group->elements.push_back(fill);
+    auto textBox = doc->makeNode<pagx::TextBox>();
+    textBox->position = {anchorX, anchorY};
+    textBox->size = {0, 0};
+    textBox->textAlign = tAlign;
+    textBox->paragraphAlign = pAlign;
+    group->elements.push_back(textBox);
+    layer->contents.push_back(group);
+
+    auto marker = doc->makeNode<pagx::Group>();
+    auto circle = doc->makeNode<pagx::Ellipse>();
+    circle->center = {anchorX, anchorY};
+    circle->size = {6, 6};
+    marker->elements.push_back(circle);
+    auto markerFill = doc->makeNode<pagx::Fill>();
+    auto markerColor = doc->makeNode<pagx::SolidColor>();
+    markerColor->color = {1, 0, 0, 1};
+    markerFill->color = markerColor;
+    marker->elements.push_back(markerFill);
+    layer->contents.push_back(marker);
+  };
+
   // Box A: Empty lines (\n at start + consecutive \n\n)
   {
-    addBorder(10, 10, 120, 130);
+    addBorder(50, 50, 120, 130);
     auto group = doc->makeNode<pagx::Group>();
     auto text = doc->makeNode<pagx::Text>();
     text->text = "\nLine2\n\nLine4";
@@ -1118,84 +1153,26 @@ PAGX_TEST(PAGXTest, TextBoxEdgeCases) {
     fill->color = solid;
     group->elements.push_back(fill);
     auto textBox = doc->makeNode<pagx::TextBox>();
-    textBox->position = {10, 10};
+    textBox->position = {50, 50};
     textBox->size = {120, 130};
     textBox->paragraphAlign = pagx::ParagraphAlign::Near;
     group->elements.push_back(textBox);
     layer->contents.push_back(group);
   }
 
-  // Box B: Anchor mode (size=0) Start + marker
-  {
-    auto group = doc->makeNode<pagx::Group>();
-    auto text = doc->makeNode<pagx::Text>();
-    text->text = "Anchor";
-    text->fontSize = 16;
-    text->fontFamily = "NotoSansSC";
-    group->elements.push_back(text);
-    auto fill = doc->makeNode<pagx::Fill>();
-    auto solid = doc->makeNode<pagx::SolidColor>();
-    solid->color = {0, 0, 0, 1};
-    fill->color = solid;
-    group->elements.push_back(fill);
-    auto textBox = doc->makeNode<pagx::TextBox>();
-    textBox->position = {180, 30};
-    textBox->size = {0, 0};
-    textBox->paragraphAlign = pagx::ParagraphAlign::Near;
-    textBox->textAlign = pagx::TextAlign::Start;
-    group->elements.push_back(textBox);
-    layer->contents.push_back(group);
+  // Anchor mode: TextAlign Start/Center/End (horizontal alignment to anchor point)
+  addAnchorTextBox("Start", 20, 250, 80, pagx::TextAlign::Start, pagx::ParagraphAlign::Near);
+  addAnchorTextBox("Center", 20, 370, 80, pagx::TextAlign::Center, pagx::ParagraphAlign::Near);
+  addAnchorTextBox("End", 20, 490, 80, pagx::TextAlign::End, pagx::ParagraphAlign::Near);
 
-    auto marker = doc->makeNode<pagx::Group>();
-    auto circle = doc->makeNode<pagx::Ellipse>();
-    circle->center = {180, 30};
-    circle->size = {6, 6};
-    marker->elements.push_back(circle);
-    auto markerFill = doc->makeNode<pagx::Fill>();
-    auto markerColor = doc->makeNode<pagx::SolidColor>();
-    markerColor->color = {1, 0, 0, 1};
-    markerFill->color = markerColor;
-    marker->elements.push_back(markerFill);
-    layer->contents.push_back(marker);
-  }
-
-  // Box C: Anchor mode (size=0) Center/Center + marker
-  {
-    auto group = doc->makeNode<pagx::Group>();
-    auto text = doc->makeNode<pagx::Text>();
-    text->text = "Center";
-    text->fontSize = 30;
-    text->fontFamily = "NotoSansSC";
-    group->elements.push_back(text);
-    auto fill = doc->makeNode<pagx::Fill>();
-    auto solid = doc->makeNode<pagx::SolidColor>();
-    solid->color = {0, 0, 0, 1};
-    fill->color = solid;
-    group->elements.push_back(fill);
-    auto textBox = doc->makeNode<pagx::TextBox>();
-    textBox->position = {300, 30};
-    textBox->size = {0, 0};
-    textBox->paragraphAlign = pagx::ParagraphAlign::Middle;
-    textBox->textAlign = pagx::TextAlign::Center;
-    group->elements.push_back(textBox);
-    layer->contents.push_back(group);
-
-    auto marker = doc->makeNode<pagx::Group>();
-    auto circle = doc->makeNode<pagx::Ellipse>();
-    circle->center = {300, 30};
-    circle->size = {6, 6};
-    marker->elements.push_back(circle);
-    auto markerFill = doc->makeNode<pagx::Fill>();
-    auto markerColor = doc->makeNode<pagx::SolidColor>();
-    markerColor->color = {1, 0, 0, 1};
-    markerFill->color = markerColor;
-    marker->elements.push_back(markerFill);
-    layer->contents.push_back(marker);
-  }
+  // Anchor mode: ParagraphAlign Near/Middle/Far (vertical alignment to anchor point)
+  addAnchorTextBox("Near", 20, 250, 180, pagx::TextAlign::Start, pagx::ParagraphAlign::Near);
+  addAnchorTextBox("Middle", 20, 370, 180, pagx::TextAlign::Start, pagx::ParagraphAlign::Middle);
+  addAnchorTextBox("Far", 20, 490, 180, pagx::TextAlign::Start, pagx::ParagraphAlign::Far);
 
   // Box D: Fixed lineHeight + \n at start
   {
-    addBorder(10, 160, 120, 120);
+    addBorder(50, 270, 120, 120);
     auto group = doc->makeNode<pagx::Group>();
     auto text = doc->makeNode<pagx::Text>();
     text->text = "\nSecond";
@@ -1208,7 +1185,7 @@ PAGX_TEST(PAGXTest, TextBoxEdgeCases) {
     fill->color = solid;
     group->elements.push_back(fill);
     auto textBox = doc->makeNode<pagx::TextBox>();
-    textBox->position = {10, 160};
+    textBox->position = {50, 270};
     textBox->size = {120, 120};
     textBox->paragraphAlign = pagx::ParagraphAlign::Near;
     textBox->lineHeight = 50;
@@ -1218,12 +1195,12 @@ PAGX_TEST(PAGXTest, TextBoxEdgeCases) {
 
   // Box E: End alignment + rich text
   {
-    addBorder(150, 160, 230, 120);
+    addBorder(180, 270, 230, 120);
     auto boxLayer = doc->makeNode<pagx::Layer>();
     addRichText(boxLayer, "Right", 24);
     addRichText(boxLayer, "Align", 36);
     auto textBox = doc->makeNode<pagx::TextBox>();
-    textBox->position = {150, 160};
+    textBox->position = {180, 270};
     textBox->size = {230, 120};
     textBox->paragraphAlign = pagx::ParagraphAlign::Near;
     textBox->textAlign = pagx::TextAlign::End;
@@ -1241,7 +1218,7 @@ PAGX_TEST(PAGXTest, TextBoxEdgeCases) {
   auto tgfxLayer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
   ASSERT_TRUE(tgfxLayer != nullptr);
 
-  auto surface = Surface::Make(context, 400, 300);
+  auto surface = Surface::Make(context, 570, 440);
   DisplayList displayList;
   displayList.root()->addChild(tgfxLayer);
   displayList.render(surface.get(), false);
