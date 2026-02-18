@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="570" height="440" version="1.0">
+  <Layer>
+    <!-- Box A: Empty lines (\n at start + consecutive \n\n) -->
+    <Group>
+      <Rectangle center="110,115" size="120,130"/>
+      <Stroke color="#000" width="1"/>
+    </Group>
+    <Group>
+      <Text text="&#10;Line2&#10;&#10;Line4" fontFamily="NotoSansSC" fontSize="20"/>
+      <Fill color="#000"/>
+      <TextBox position="50,50" size="120,130"/>
+    </Group>
+
+    <!-- Anchor mode: TextAlign Start/Center/End (horizontal alignment to anchor point) -->
+    <Group>
+      <Text text="Start" fontFamily="NotoSansSC" fontSize="20"/>
+      <Fill color="#000"/>
+      <TextBox position="250,80"/>
+    </Group>
+    <Group>
+      <Ellipse center="250,80" size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+
+    <Group>
+      <Text text="Center" fontFamily="NotoSansSC" fontSize="20"/>
+      <Fill color="#000"/>
+      <TextBox position="370,80" textAlign="center"/>
+    </Group>
+    <Group>
+      <Ellipse center="370,80" size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+
+    <Group>
+      <Text text="End" fontFamily="NotoSansSC" fontSize="20"/>
+      <Fill color="#000"/>
+      <TextBox position="490,80" textAlign="end"/>
+    </Group>
+    <Group>
+      <Ellipse center="490,80" size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+
+    <!-- Anchor mode: ParagraphAlign Near/Middle/Far (vertical alignment to anchor point) -->
+    <Group>
+      <Text text="Near" fontFamily="NotoSansSC" fontSize="20"/>
+      <Fill color="#000"/>
+      <TextBox position="250,180"/>
+    </Group>
+    <Group>
+      <Ellipse center="250,180" size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+
+    <Group>
+      <Text text="Middle" fontFamily="NotoSansSC" fontSize="20"/>
+      <Fill color="#000"/>
+      <TextBox position="370,180" paragraphAlign="middle"/>
+    </Group>
+    <Group>
+      <Ellipse center="370,180" size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+
+    <Group>
+      <Text text="Far" fontFamily="NotoSansSC" fontSize="20"/>
+      <Fill color="#000"/>
+      <TextBox position="490,180" paragraphAlign="far"/>
+    </Group>
+    <Group>
+      <Ellipse center="490,180" size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+
+    <!-- Box D: Fixed lineHeight + \n at start -->
+    <Group>
+      <Rectangle center="110,330" size="120,120"/>
+      <Stroke color="#000" width="1"/>
+    </Group>
+    <Group>
+      <Text text="&#10;Second" fontFamily="NotoSansSC" fontSize="24"/>
+      <Fill color="#000"/>
+      <TextBox position="50,270" size="120,120" lineHeight="50"/>
+    </Group>
+
+    <!-- Box E: End alignment + rich text -->
+    <Group>
+      <Rectangle center="295,330" size="230,120"/>
+      <Stroke color="#000" width="1"/>
+    </Group>
+    <Layer>
+      <Group>
+        <Text text="Right" fontFamily="NotoSansSC" fontSize="24"/>
+        <Fill color="#000"/>
+      </Group>
+      <Group>
+        <Text text="Align" fontFamily="NotoSansSC" fontSize="36"/>
+        <Fill color="#000"/>
+      </Group>
+      <TextBox position="180,270" size="230,120" textAlign="end"/>
+    </Layer>
+  </Layer>
+</pagx>
