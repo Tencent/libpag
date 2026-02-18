@@ -1,39 +1,55 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates TextBox: word wrap, text alignment, vertical writing, paragraph alignment -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Box 1: wordWrap + textAlign center -->
+  <!-- Box 1 (top-left): wordWrap + lineHeight -->
   <Layer>
-    <Rectangle center="100,100" size="160,160" roundness="4"/>
+    <Rectangle center="104,104" size="180,180" roundness="6"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
   </Layer>
   <Layer>
     <Group>
-      <Text text="Word wrap with center alignment fills the box nicely." fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+      <Text text="The quick brown fox jumps over the lazy dog near the river bank." fontFamily="Arial" fontSize="16"/>
+      <Fill color="#6366F1"/>
+    </Group>
+    <TextBox position="14,14" size="180,180" wordWrap="true" lineHeight="28"/>
+  </Layer>
+
+  <!-- Box 2 (top-right): textAlign center -->
+  <Layer>
+    <Rectangle center="296,104" size="180,180" roundness="6"/>
+    <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+  </Layer>
+  <Layer>
+    <Group>
+      <Text text="Center&#10;Aligned&#10;Text" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
       <Fill color="#F43F5E"/>
     </Group>
-    <TextBox position="20,20" size="160,160" wordWrap="true" textAlign="center"/>
+    <TextBox position="206,14" size="180,180" textAlign="center"/>
   </Layer>
-  <!-- Box 2: wordWrap + paragraphAlign middle -->
+
+  <!-- Box 3 (bottom-left): writingMode vertical -->
   <Layer>
-    <Rectangle center="300,100" size="160,160" roundness="4"/>
+    <Rectangle center="104,296" size="180,180" roundness="6"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
   </Layer>
   <Layer>
     <Group>
-      <Text text="Vertical middle aligned text in box." fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
-      <Fill color="#3B82F6"/>
-    </Group>
-    <TextBox position="220,20" size="160,160" wordWrap="true" textAlign="center" paragraphAlign="middle"/>
-  </Layer>
-  <!-- Box 3: vertical writing -->
-  <Layer>
-    <Rectangle center="100,300" size="160,160" roundness="4"/>
-    <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-  </Layer>
-  <Layer>
-    <Group>
-      <Text text="春眠Spring不觉晓Dawn" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+      <Text text="春眠Spring不觉晓" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
       <Fill color="#F59E0B"/>
     </Group>
-    <TextBox position="20,220" size="160,160" writingMode="vertical" wordWrap="true"/>
+    <TextBox position="14,206" size="180,180" writingMode="vertical" wordWrap="true"/>
+  </Layer>
+
+  <!-- Box 4 (bottom-right): paragraphAlign middle + textAlign center -->
+  <Layer>
+    <Rectangle center="296,296" size="180,180" roundness="6"/>
+    <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+  </Layer>
+  <Layer>
+    <Group>
+      <Text text="Centered&#10;In Box" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+      <Fill color="#10B981"/>
+    </Group>
+    <TextBox position="206,206" size="180,180" textAlign="center" paragraphAlign="middle" wordWrap="true"/>
   </Layer>
 </pagx>
