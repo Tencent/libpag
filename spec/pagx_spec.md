@@ -1560,8 +1560,8 @@ Unlike other modifiers that operate on accumulated results in a chain (e.g., Tri
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `position` | Point | 0,0 | Near-edge corner of the text area. When width or height is 0, serves as the anchor point for alignment in that dimension (see below) |
-| `size` | Size | 0,0 | Layout size. When width or height is 0, text has no boundary in that dimension (wordWrap wraps each character individually, alignment uses position as the reference point) |
+| `position` | Point | 0,0 | Near-edge corner of the text area |
+| `size` | Size | 0,0 | Layout size. When width or height is 0, text has no boundary in that dimension (wordWrap wraps each character individually) |
 | `textAlign` | TextAlign | start | Text alignment along the inline direction |
 | `paragraphAlign` | ParagraphAlign | near | Paragraph alignment along the block-flow direction |
 | `writingMode` | WritingMode | horizontal | Layout direction |
@@ -1578,8 +1578,6 @@ Unlike other modifiers that operate on accumulated results in a chain (e.g., Tri
 | `end` | End alignment |
 | `justify` | Justified (last line start-aligned) |
 
-When width is 0, alignment is relative to `position.x` as an anchor: `start` places text starting at the anchor, `center` places the visual center of each line at the anchor, and `end` places the trailing edge at the anchor.
-
 **ParagraphAlign (Paragraph Alignment)**:
 
 Aligns text lines or columns along the block-flow direction. The naming follows DirectWrite's `DWRITE_PARAGRAPH_ALIGNMENT` convention, using direction-neutral names (Near/Far instead of Top/Bottom) that work correctly for both horizontal and vertical writing modes. In horizontal mode this controls vertical positioning; in vertical mode this controls horizontal positioning.
@@ -1589,8 +1587,6 @@ Aligns text lines or columns along the block-flow direction. The naming follows 
 | `near` | Near-edge alignment (top in horizontal mode, right in vertical mode) using the line-box model. The first line box's near edge is aligned to the near edge of the text area. The baseline is positioned at `halfLeading + ascent` from the near edge, where `halfLeading = (lineHeight - metricsHeight) / 2`. |
 | `middle` | Middle alignment. The total text block size (sum of all line heights/column widths) is centered within the corresponding box dimension. |
 | `far` | Far-edge alignment (bottom in horizontal mode, left in vertical mode). The last line box's far edge is aligned to the far edge of the text area. |
-
-When height is 0, alignment is relative to `position.y` as an anchor: `near` places text starting from the anchor (with line-box model offset), `middle` places the midpoint of all line boxes at the anchor, and `far` places the far edge of the last line box at the anchor.
 
 **WritingMode (Layout Direction)**:
 

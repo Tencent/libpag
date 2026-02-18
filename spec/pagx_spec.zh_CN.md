@@ -1555,8 +1555,8 @@ TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被�
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `position` | Point | 0,0 | 文本区域近端起点。当宽度或高度为 0 时，该维度上作为对齐锚点（见下方说明） |
-| `size` | Size | 0,0 | 排版尺寸。当宽度或高度为 0 时，该维度上文本无边界（wordWrap 时逐字符换行，对齐以 position 为参考点） |
+| `position` | Point | 0,0 | 文本区域近端起点 |
+| `size` | Size | 0,0 | 排版尺寸。当宽度或高度为 0 时，该维度上文本无边界（wordWrap 时逐字符换行） |
 | `textAlign` | TextAlign | start | 文本对齐——沿行内方向对齐文本（见下方） |
 | `paragraphAlign` | ParagraphAlign | near | 段落对齐——沿块流方向对齐文本行/列（见下方） |
 | `writingMode` | WritingMode | horizontal | 排版方向（见下方） |
@@ -1573,8 +1573,6 @@ TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被�
 | `end` | 结束对齐 |
 | `justify` | 两端对齐（最后一行起始对齐） |
 
-当宽度为 0 时，对齐以 `position.x` 为锚点：`start` 从锚点开始向右展开，`center` 将每行的视觉中心对齐锚点，`end` 将每行的尾部边缘对齐锚点。
-
 **ParagraphAlign（段落对齐）**：
 
 沿块流方向（block-flow direction）对齐文本行或列。命名参考 DirectWrite 的 `DWRITE_PARAGRAPH_ALIGNMENT`，使用方向中立的 Near/Far 而非 Top/Bottom，在横排和竖排模式下语义一致。横排模式下控制垂直定位，竖排模式下控制水平定位。
@@ -1584,8 +1582,6 @@ TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被�
 | `near` | 近端对齐（横排时为顶部，竖排时为右侧）。使用行框模型，首行行框近端贴齐文本区域近端边缘。基线位于近端下方 `halfLeading + ascent` 处，其中 `halfLeading = (lineHeight - metricsHeight) / 2`。 |
 | `middle` | 居中对齐。整体文本块尺寸（所有行高/列宽之和）在对应维度内居中。 |
 | `far` | 远端对齐（横排时为底部，竖排时为左侧）。末行行框远端对齐文本区域远端边缘。 |
-
-当高度为 0 时，对齐以 `position.y` 为锚点：`near` 从锚点向下展开（使用行框模型偏移），`middle` 将所有行框的中心对齐锚点，`far` 将最后一个行框远端边缘对齐锚点。
 
 **WritingMode（排版方向）**：
 
