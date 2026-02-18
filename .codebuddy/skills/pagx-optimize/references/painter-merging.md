@@ -2,12 +2,12 @@
 
 Back to main: [SKILL.md](../SKILL.md)
 
-This file contains detailed examples for Sections 8-9, the most common and highest-impact
-optimizations.
+This file contains detailed examples for Painter Merging optimizations, the most common and
+highest-impact optimizations.
 
 ---
 
-## 8. Merge Geometry Sharing Identical Painters
+## Merge Geometry Sharing Identical Painters
 
 This is the most common and highest-impact optimization.
 
@@ -17,7 +17,7 @@ In PAGX, painters (Fill / Stroke) render **all geometry accumulated in the curre
 Therefore, multiple geometry elements using identical painters can share a single painter
 declaration within the same scope.
 
-### 8.1 Path Merging — Multi-M Subpaths
+### Path Merging — Multi-M Subpaths
 
 **When to apply**: Multiple Paths have identical Fill and/or Stroke.
 
@@ -44,7 +44,7 @@ single Path.
 
 **Typical scenarios**: Symmetrical character parts, corner decorations, repeated small icons.
 
-### 8.2 Shape Merging — Multiple Ellipses / Rectangles Sharing Painters
+### Shape Merging — Multiple Ellipses / Rectangles Sharing Painters
 
 **When to apply**: Multiple independent Ellipses or Rectangles have identical painters.
 
@@ -70,7 +70,7 @@ Fill / Stroke declaration.
 </Group>
 ```
 
-### 8.3 Cross-Layer Merging
+### Cross-Layer Merging
 
 **When to apply**: Multiple adjacent Layers have identical painters and identical styles (or no
 styles), with no individual filters / mask / blendMode / alpha / name.
@@ -92,7 +92,7 @@ styles), with no individual filters / mask / blendMode / alpha / name.
 </Layer>
 ```
 
-### 8.4 Cross-Layer Style Merging
+### Cross-Layer Style Merging
 
 **When to apply**: Multiple adjacent Layers have identical painters AND identical
 DropShadowStyle / InnerShadowStyle parameters, and the elements do not overlap or are spaced
@@ -190,7 +190,7 @@ need different painters, they must be isolated with Groups:
 
 ---
 
-## 9. Merge Multiple Painters on Identical Geometry
+## Merge Multiple Painters on Identical Geometry
 
 ### Principle
 

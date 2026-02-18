@@ -2,11 +2,11 @@
 
 Back to main: [SKILL.md](../SKILL.md)
 
-This file contains detailed examples for Sections 1-7.
+This file contains detailed examples for Structure Cleanup optimizations.
 
 ---
 
-## 1. Move Resources to End of File
+## Move Resources to End of File
 
 ### Principle
 
@@ -49,7 +49,7 @@ None. Resource position does not affect rendering. This is purely a readability 
 
 ---
 
-## 2. Remove Empty and Dead Elements
+## Remove Empty and Dead Elements
 
 ### Principle
 
@@ -92,7 +92,7 @@ Empty elements and invisible painters are dead code and should be removed.
 
 ---
 
-## 3. Omit Default Attribute Values
+## Omit Default Attribute Values
 
 ### Principle
 
@@ -185,14 +185,14 @@ Even when their value is `"0,0"` or `"0"`, they must **never** be omitted.
 
 ---
 
-## 4. Simplify Transform Attributes
+## Simplify Transform Attributes
 
 ### Principle
 
 Use the simplest representation for transforms. Prefer `x`/`y` over `matrix` when the matrix
 only represents translation.
 
-### 4.1 Translation-Only Matrix to x/y
+### Translation-Only Matrix to x/y
 
 When a Layer's matrix is `1,0,0,1,tx,ty` (identity + translation), replace with `x`/`y`.
 
@@ -204,7 +204,7 @@ When a Layer's matrix is `1,0,0,1,tx,ty` (identity + translation), replace with 
 <Layer x="200" y="150">
 ```
 
-### 4.2 Identity Matrix Removal
+### Identity Matrix Removal
 
 A matrix of `1,0,0,1,0,0` is identity and should be removed entirely.
 
@@ -216,7 +216,7 @@ A matrix of `1,0,0,1,0,0` is identity and should be removed entirely.
 <Layer>
 ```
 
-### 4.3 Cascaded Translation Merging
+### Cascaded Translation Merging
 
 When nested Layers each only apply translation (no rotation/scale), their matrices can be
 merged and intermediate Layers removed.
@@ -242,13 +242,13 @@ merged and intermediate Layers removed.
 
 ---
 
-## 5. Normalize Numeric Values
+## Normalize Numeric Values
 
 ### Principle
 
 Use the simplest numeric representation for readability and smaller file size.
 
-### 5.1 Near-Zero Scientific Notation
+### Near-Zero Scientific Notation
 
 Values like `-2.18557e-06` are effectively zero and should be written as `0`.
 
@@ -260,7 +260,7 @@ Values like `-2.18557e-06` are effectively zero and should be written as `0`.
 <LinearGradient startPoint="375,0" endPoint="0,280">
 ```
 
-### 5.2 Integer Values
+### Integer Values
 
 Whole numbers should not have trailing `.0` or unnecessary decimal places.
 
@@ -272,7 +272,7 @@ Whole numbers should not have trailing `.0` or unnecessary decimal places.
 <Rectangle center="100,200" size="50,50"/>
 ```
 
-### 5.3 Short Hex Colors
+### Short Hex Colors
 
 The spec supports `#RGB` shorthand that expands to `#RRGGBB`. Use it when possible.
 
@@ -297,7 +297,7 @@ The spec supports `#RGB` shorthand that expands to `#RRGGBB`. Use it when possib
 
 ---
 
-## 6. Remove Unused Resources
+## Remove Unused Resources
 
 ### Principle
 
@@ -335,7 +335,7 @@ Delete the entire resource definition.
 
 ---
 
-## 7. Remove Redundant Group / Layer Wrappers
+## Remove Redundant Group / Layer Wrappers
 
 ### Principle
 
@@ -379,5 +379,5 @@ Promote the inner content to the parent scope and delete the wrapper element.
   blendMode. If a Layer carries any of these, it must stay.
 - **Groups with transforms cannot be removed**: A Group's transform applies to all its
   contents. Removing it changes the rendering.
-- **Groups for scope isolation**: If a Group exists to isolate painter scope (see Section 8),
+- **Groups for scope isolation**: If a Group exists to isolate painter scope (see Painter Merging reference),
   it must not be removed.

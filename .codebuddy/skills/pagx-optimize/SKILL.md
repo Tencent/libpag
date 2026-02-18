@@ -31,6 +31,19 @@ that overrides any individual optimization direction below.
 
 ---
 
+## Core Concepts (Quick Reference)
+
+**Painter Scope**: Fill/Stroke paints all geometry accumulated in the current scope. Group creates
+an isolated scope — geometry inside only affects painters inside that Group.
+
+**Layer vs Group**: Layer creates an independent rendering surface (heavier, supports styles/filters/mask).
+Group is a lightweight scope boundary (no extra surface, propagates geometry to parent).
+
+**Critical Constraint**: `<pagx>` and `<Composition>` direct children **MUST** be Layer.
+Groups at root level are silently ignored.
+
+---
+
 ## Optimization Checklist
 
 ### Structure Cleanup
@@ -44,10 +57,17 @@ that overrides any individual optimization direction below.
 | 5 | Normalize Numerics | Scientific notation near zero, trailing decimals, short hex |
 | 6 | Remove Unused Resources | Resource `id` has no `@id` reference |
 | 7 | Remove Redundant Wrappers | Group/Layer with no attributes wrapping single element |
-| 8 | Downgrade Layer to Group | Layer uses none of: styles, filters, mask, blendMode, composition, scrollRect, child Layers |
+| 8 | Downgrade Layer to Group | Layer uses none of: styles, filters, mask, blendMode, composition, scrollRect; AND is not a `<pagx>`/`<Composition>` direct child; AND has no child Layers. **High value**: removes extra rendering surface |
 
 > For detailed examples and default value tables, read `references/structure-cleanup.md`.
 > For Layer vs Group comparison and downgrade rules, read `references/layer-vs-group.md`.
+
+> **Caveat**: Some attributes look optional but are required. `ColorStop.offset` has no default —
+> omitting it causes parsing errors. See `references/structure-cleanup.md` for the full list.
+
+> **Layer→Group is high-impact but has strict prerequisites.** Always verify the 10-point
+> checklist in `references/layer-vs-group.md` before applying. Incorrect downgrade can cause
+> content to disappear (at root level) or painter scope to bleed unexpectedly.
 
 ### Painter Merging
 
@@ -76,6 +96,35 @@ a separate Layer.
 
 > **TextBox ignores** Text's `position` and `textAnchor` attributes. When using TextBox, do not
 > set these on child Text elements.
+
+**Before** (absolute positioning):
+```xml
+<Layer>
+  <Group position="200,60">
+    <Text text="Title" fontFamily="Arial" fontSize="36" textAnchor="center"/>
+    <Fill color="#000"/>
+  </Group>
+  <Group position="200,100">
+    <Text text="Subtitle" fontFamily="Arial" fontSize="24" textAnchor="center"/>
+    <Fill color="#666"/>
+  </Group>
+</Layer>
+```
+
+**After** (TextBox auto-layout):
+```xml
+<Layer>
+  <Group>
+    <Text text="Title&#10;" fontFamily="Arial" fontSize="36"/>
+    <Fill color="#000"/>
+  </Group>
+  <Group>
+    <Text text="Subtitle" fontFamily="Arial" fontSize="24"/>
+    <Fill color="#666"/>
+  </Group>
+  <TextBox position="200,60" textAlign="center"/>
+</Layer>
+```
 
 ### Resource Reuse
 

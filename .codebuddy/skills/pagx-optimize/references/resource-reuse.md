@@ -2,11 +2,11 @@
 
 Back to main: [SKILL.md](../SKILL.md)
 
-This file contains detailed examples for Sections 10-14.
+This file contains detailed examples for Resource Reuse optimizations.
 
 ---
 
-## 10. Composition Resource Reuse
+## Composition Resource Reuse
 
 ### Principle
 
@@ -119,7 +119,7 @@ element's local coordinate system origin**.
 
 ---
 
-## 11. PathData Resource Reuse
+## PathData Resource Reuse
 
 ### Principle
 
@@ -159,7 +159,7 @@ Search all `<Path data="..."/>` elements and find identical data strings.
 
 ---
 
-## 12. Color Source Resource Sharing
+## Color Source Resource Sharing
 
 ### Principle
 
@@ -204,7 +204,7 @@ DiamondGradient definitions with identical parameters.
 
 ---
 
-## 13. Replace Path with Primitive Geometry
+## Replace Path with Primitive Geometry
 
 ### Principle
 
@@ -233,11 +233,11 @@ A Path's data is a simple axis-aligned rectangle (4 lines forming a box) or a ci
   described via Bezier curves unless you can accurately extract the roundness parameter.
 - Paths with transforms applied may not map cleanly to primitive attributes.
 - This optimization improves readability. It also benefits rendering performance — see
-  Section 15.8 in the performance reference for details on when shape choice affects render cost.
+  "Prefer Primitive Geometry over Path under Repeater" in the performance reference for details on when shape choice affects render cost.
 
 ---
 
-## 14. Remove Full-Canvas Clip Masks
+## Remove Full-Canvas Clip Masks
 
 ### Principle
 
