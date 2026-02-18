@@ -8,7 +8,7 @@
   </Layer>
   <Layer>
     <Group>
-      <Text text="Justify align distributes words evenly across each line with custom line height." fontFamily="Arial" fontSize="14"/>
+      <Text text="Justify aligns words evenly across each full line." fontFamily="Arial" fontSize="20"/>
       <Fill>
         <LinearGradient startPoint="0,0" endPoint="180,0">
           <ColorStop offset="0" color="#6366F1"/>
@@ -16,7 +16,7 @@
         </LinearGradient>
       </Fill>
     </Group>
-    <TextBox position="14,14" size="180,180" wordWrap="true" lineHeight="26" textAlign="justify"/>
+    <TextBox position="14,14" size="180,180" wordWrap="true" lineHeight="32" textAlign="justify"/>
     <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F130"/>
   </Layer>
 
@@ -27,7 +27,7 @@
   </Layer>
   <Layer>
     <Group>
-      <Text text="Centered&#10;Horizontally&#10;&amp;&#10;Vertically" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+      <Text text="Centered&#10;Horizontally&#10;&amp;&#10;Vertically" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
       <Fill>
         <LinearGradient startPoint="0,0" endPoint="180,100">
           <ColorStop offset="0" color="#F43F5E"/>
@@ -65,7 +65,7 @@
   </Layer>
   <Layer>
     <Group>
-      <Text text="竖排&#10;居中" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+      <Text text="竖排&#10;文本&#10;居中" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
       <Fill>
         <LinearGradient startPoint="0,0" endPoint="180,180">
           <ColorStop offset="0" color="#06B6D4"/>
