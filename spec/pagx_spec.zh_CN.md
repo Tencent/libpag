@@ -1083,7 +1083,7 @@ Line 3]]>
 | 值 | 说明 |
 |------|------|
 | `start` | 原点位于文本起始位置，不做偏移 |
-| `middle` | 原点位于文本中心位置，文本偏移半个宽度使其居中于原点 |
+| `center` | 原点位于文本中心位置，文本偏移半个宽度使其居中于原点 |
 | `end` | 原点位于文本结束位置，文本偏移整个宽度使其终点对齐原点 |
 
 **运行时排版渲染流程**：
@@ -1582,10 +1582,10 @@ TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被�
 | 值 | 说明 |
 |------|------|
 | `near` | 近端对齐（横排时为顶部，竖排时为右侧）。使用行框模型，首行行框近端贴齐文本区域近端边缘。基线位于近端下方 `halfLeading + ascent` 处，其中 `halfLeading = (lineHeight - metricsHeight) / 2`。 |
-| `center` | 居中对齐。整体文本块尺寸（所有行高/列宽之和）在对应维度内居中。 |
+| `middle` | 居中对齐。整体文本块尺寸（所有行高/列宽之和）在对应维度内居中。 |
 | `far` | 远端对齐（横排时为底部，竖排时为左侧）。末行行框远端对齐文本区域远端边缘。 |
 
-当高度为 0 时，对齐以 `position.y` 为锚点：`near` 从锚点向下展开（使用行框模型偏移），`center` 将所有行框的中心对齐锚点，`far` 将最后一个行框远端边缘对齐锚点。
+当高度为 0 时，对齐以 `position.y` 为锚点：`near` 从锚点向下展开（使用行框模型偏移），`middle` 将所有行框的中心对齐锚点，`far` 将最后一个行框远端边缘对齐锚点。
 
 **WritingMode（排版方向）**：
 
@@ -1870,7 +1870,8 @@ Layer / Group
 | **SelectorShape** | `square`, `rampUp`, `rampDown`, `triangle`, `round`, `smooth` |
 | **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
 | **TextAlign** | `start`, `center`, `end`, `justify` |
-| **ParagraphAlign** | `baseline`, `near`, `center`, `far` |
+| **TextAnchor** | `start`, `center`, `end` |
+| **ParagraphAlign** | `near`, `middle`, `far` |
 | **WritingMode** | `horizontal`, `vertical` |
 | **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |
 ---

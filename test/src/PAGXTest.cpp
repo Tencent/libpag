@@ -748,7 +748,7 @@ PAGX_TEST(PAGXTest, TextBoxHorizontal) {
 
   addBorder(170, 10, 150, 120);
   addTextBox("Line One\nLine Two\nLine Three", 18, 170, 10, 150, 120,
-             pagx::TextAlign::Center, pagx::ParagraphAlign::Center, false);
+             pagx::TextAlign::Center, pagx::ParagraphAlign::Middle, false);
 
   // CJK text with End/Far
   addBorder(330, 10, 150, 120);
@@ -773,7 +773,7 @@ PAGX_TEST(PAGXTest, TextBoxHorizontal) {
              pagx::TextAlign::Start, pagx::ParagraphAlign::Near, false);
   addBorder(170, 260, 150, 80);
   addTextBox("aaA\xc3\x82\xe1\xba\xa4", 32, 170, 260, 150, 80,
-             pagx::TextAlign::Start, pagx::ParagraphAlign::Center, false);
+             pagx::TextAlign::Start, pagx::ParagraphAlign::Middle, false);
   addBorder(330, 260, 150, 80);
   addTextBox("aaA\xc3\x82\xe1\xba\xa4", 32, 330, 260, 150, 80,
              pagx::TextAlign::Start, pagx::ParagraphAlign::Far, false);
@@ -874,7 +874,7 @@ PAGX_TEST(PAGXTest, TextBoxVertical) {
                      pagx::TextAlign::Start, pagx::ParagraphAlign::Near, false);
   addBorder(410, 10, 80, 150);
   addVerticalTextBox("\xe4\xbd\xa0\xe5\xa5\xbd", 24, 410, 10, 80, 150,
-                     pagx::TextAlign::Start, pagx::ParagraphAlign::Center, false);
+                     pagx::TextAlign::Start, pagx::ParagraphAlign::Middle, false);
   addBorder(500, 10, 80, 150);
   addVerticalTextBox("\xe4\xbd\xa0\xe5\xa5\xbd", 24, 500, 10, 80, 150,
                      pagx::TextAlign::Start, pagx::ParagraphAlign::Far, false);
@@ -1030,7 +1030,7 @@ PAGX_TEST(PAGXTest, TextBoxLineHeight) {
   {
     addBorder(170, 210, 150, 160);
     addSimpleTextBox(layer, "Line1\nLine2", 24, 170, 210, 150, 160, 50,
-                     pagx::ParagraphAlign::Center);
+                     pagx::ParagraphAlign::Middle);
   }
 
   // Box E: 3-line mixed sizes + Far (multi-step bottom-up recursion)
@@ -1175,7 +1175,7 @@ PAGX_TEST(PAGXTest, TextBoxEdgeCases) {
     auto textBox = doc->makeNode<pagx::TextBox>();
     textBox->position = {300, 30};
     textBox->size = {0, 0};
-    textBox->paragraphAlign = pagx::ParagraphAlign::Center;
+    textBox->paragraphAlign = pagx::ParagraphAlign::Middle;
     textBox->textAlign = pagx::TextAlign::Center;
     group->elements.push_back(textBox);
     layer->contents.push_back(group);

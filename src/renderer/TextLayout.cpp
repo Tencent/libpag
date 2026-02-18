@@ -401,7 +401,7 @@ class TextLayoutContext {
     switch (text->textAnchor) {
       case TextAnchor::Start:
         break;
-      case TextAnchor::Middle:
+      case TextAnchor::Center:
         anchorOffset = -info.totalWidth / 2;
         break;
       case TextAnchor::End:
@@ -924,7 +924,7 @@ class TextLayoutContext {
         case ParagraphAlign::Near:
           yOffset = 0;
           break;
-        case ParagraphAlign::Center:
+        case ParagraphAlign::Middle:
           yOffset = (boxHeight - totalHeight) / 2;
           break;
         case ParagraphAlign::Far:
@@ -936,7 +936,7 @@ class TextLayoutContext {
         case ParagraphAlign::Near:
           yOffset = 0;
           break;
-        case ParagraphAlign::Center:
+        case ParagraphAlign::Middle:
           yOffset = -totalHeight / 2;
           break;
         case ParagraphAlign::Far:
@@ -969,7 +969,7 @@ class TextLayoutContext {
     // ensures correct baseline positions when lines have different heights (mixed font sizes).
     std::vector<float> precomputedBaselines = {};
     if ((textBox->paragraphAlign == ParagraphAlign::Far ||
-         textBox->paragraphAlign == ParagraphAlign::Center) &&
+         textBox->paragraphAlign == ParagraphAlign::Middle) &&
         lines.size() > 1) {
       precomputedBaselines.resize(lines.size(), 0);
       // Start from the last content line.
@@ -1265,7 +1265,7 @@ class TextLayoutContext {
         case ParagraphAlign::Near:
           xStart += boxWidth;
           break;
-        case ParagraphAlign::Center:
+        case ParagraphAlign::Middle:
           xStart += (boxWidth + totalWidth) / 2;
           break;
         case ParagraphAlign::Far:
@@ -1278,7 +1278,7 @@ class TextLayoutContext {
         case ParagraphAlign::Near:
           xStart += totalWidth;
           break;
-        case ParagraphAlign::Center:
+        case ParagraphAlign::Middle:
           xStart += totalWidth / 2;
           break;
         case ParagraphAlign::Far:

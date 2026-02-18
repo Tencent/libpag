@@ -813,7 +813,7 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     // Map SVG text-anchor to PAGX TextAnchor on the Text node directly.
     // SVG text-anchor: start (default), middle, end.
     if (anchor == "middle") {
-      text->textAnchor = TextAnchor::Middle;
+      text->textAnchor = TextAnchor::Center;
     } else if (anchor == "end") {
       text->textAnchor = TextAnchor::End;
     }

@@ -40,7 +40,7 @@ enum class ParagraphAlign {
    * size (sum of all line heights/column widths) is centered within the corresponding box
    * dimension.
    */
-  Center,
+  Middle,
   /**
    * Align the last line's line box far edge to the far edge of the layout area (bottom in
    * horizontal mode, left in vertical mode). The total text block size is the sum of all line

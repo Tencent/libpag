@@ -1083,7 +1083,7 @@ Controls how text is positioned relative to its origin point.
 | Value | Description |
 |-------|-------------|
 | `start` | The origin is at the start of the text. No offset is applied |
-| `middle` | The origin is at the middle of the text. Text is offset by half its width to center on the origin |
+| `center` | The origin is at the center of the text. Text is offset by half its width to center on the origin |
 | `end` | The origin is at the end of the text. Text is offset by its full width so it ends at the origin |
 
 **Runtime Layout Rendering Flow**:
@@ -1587,10 +1587,10 @@ Aligns text lines or columns along the block-flow direction. The naming follows 
 | Value | Description |
 |-------|-------------|
 | `near` | Near-edge alignment (top in horizontal mode, right in vertical mode) using the line-box model. The first line box's near edge is aligned to the near edge of the text area. The baseline is positioned at `halfLeading + ascent` from the near edge, where `halfLeading = (lineHeight - metricsHeight) / 2`. |
-| `center` | Center alignment. The total text block size (sum of all line heights/column widths) is centered within the corresponding box dimension. |
+| `middle` | Middle alignment. The total text block size (sum of all line heights/column widths) is centered within the corresponding box dimension. |
 | `far` | Far-edge alignment (bottom in horizontal mode, left in vertical mode). The last line box's far edge is aligned to the far edge of the text area. |
 
-When height is 0, alignment is relative to `position.y` as an anchor: `near` places text starting from the anchor (with line-box model offset), `center` places the midpoint of all line boxes at the anchor, and `far` places the far edge of the last line box at the anchor.
+When height is 0, alignment is relative to `position.y` as an anchor: `near` places text starting from the anchor (with line-box model offset), `middle` places the midpoint of all line boxes at the anchor, and `far` places the far edge of the last line box at the anchor.
 
 **WritingMode (Layout Direction)**:
 
@@ -1875,7 +1875,8 @@ Layer / Group
 | **SelectorShape** | `square`, `rampUp`, `rampDown`, `triangle`, `round`, `smooth` |
 | **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
 | **TextAlign** | `start`, `center`, `end`, `justify` |
-| **ParagraphAlign** | `baseline`, `near`, `center`, `far` |
+| **TextAnchor** | `start`, `center`, `end` |
+| **ParagraphAlign** | `near`, `middle`, `far` |
 | **WritingMode** | `horizontal`, `vertical` |
 | **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |
 ---

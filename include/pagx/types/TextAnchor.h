@@ -29,10 +29,10 @@ enum class TextAnchor {
    */
   Start,
   /**
-   * The text position represents the middle of the text. The text is offset by half its width to
+   * The text position represents the center of the text. The text is offset by half its width to
    * center it on the position.
    */
-  Middle,
+  Center,
   /**
    * The text position represents the end of the text. The text is offset by its full width so that
    * the text ends at the position.
