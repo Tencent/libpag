@@ -8,10 +8,16 @@
   </Layer>
   <Layer>
     <Group>
-      <Text text="The quick brown fox jumps over the lazy dog near the river bank." fontFamily="Arial" fontSize="16"/>
-      <Fill color="#6366F1"/>
+      <Text text="Word Wrap — The quick brown fox jumps over the lazy dog." fontFamily="Arial" fontSize="14"/>
+      <Fill>
+        <LinearGradient startPoint="0,0" endPoint="180,0">
+          <ColorStop offset="0" color="#6366F1"/>
+          <ColorStop offset="1" color="#8B5CF6"/>
+        </LinearGradient>
+      </Fill>
     </Group>
-    <TextBox position="14,14" size="180,180" wordWrap="true" lineHeight="28"/>
+    <TextBox position="14,14" size="180,180" wordWrap="true" lineHeight="26"/>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F130"/>
   </Layer>
 
   <!-- Box 2 (top-right): horizontal textAlign center + paragraphAlign middle -->
@@ -21,10 +27,16 @@
   </Layer>
   <Layer>
     <Group>
-      <Text text="Centered&#10;In Box" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
-      <Fill color="#F43F5E"/>
+      <Text text="Center&#10;Aligned&#10;Middle" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+      <Fill>
+        <LinearGradient startPoint="0,0" endPoint="180,100">
+          <ColorStop offset="0" color="#F43F5E"/>
+          <ColorStop offset="1" color="#EC4899"/>
+        </LinearGradient>
+      </Fill>
     </Group>
     <TextBox position="206,14" size="180,180" textAlign="center" paragraphAlign="middle"/>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F43F5E30"/>
   </Layer>
 
   <!-- Box 3 (bottom-left): vertical wordWrap -->
@@ -35,9 +47,15 @@
   <Layer>
     <Group>
       <Text text="春眠不觉晓Spring处处闻啼鸟Dawn夜来风雨声花落知多少" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
-      <Fill color="#F59E0B"/>
+      <Fill>
+        <LinearGradient startPoint="180,0" endPoint="0,180">
+          <ColorStop offset="0" color="#F59E0B"/>
+          <ColorStop offset="1" color="#F43F5E"/>
+        </LinearGradient>
+      </Fill>
     </Group>
     <TextBox position="14,206" size="180,180" writingMode="vertical" wordWrap="true"/>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F59E0B30"/>
   </Layer>
 
   <!-- Box 4 (bottom-right): vertical textAlign center + paragraphAlign middle -->
@@ -48,8 +66,14 @@
   <Layer>
     <Group>
       <Text text="花鳥Wind風月Snow山水" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
-      <Fill color="#10B981"/>
+      <Fill>
+        <LinearGradient startPoint="0,0" endPoint="180,180">
+          <ColorStop offset="0" color="#06B6D4"/>
+          <ColorStop offset="1" color="#10B981"/>
+        </LinearGradient>
+      </Fill>
     </Group>
     <TextBox position="206,206" size="180,180" writingMode="vertical" wordWrap="true" textAlign="center" paragraphAlign="middle"/>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D430"/>
   </Layer>
 </pagx>
