@@ -859,12 +859,12 @@ PAGX_TEST(PAGXTest, TextBoxVertical) {
                      pagx::TextAlign::Start, pagx::ParagraphAlign::Near, false);
 
   // CJK wordWrap auto-wrap
-  addBorder(210, 10, 100, 150);
+  addBorder(210, 10, 100, 168);
   addVerticalTextBox("\xe6\x98\xa5\xe7\x9c\xa0\xe4\xb8\x8d\xe8\xa7\x89\xe6\x99\x93"
                      "\xe5\xa4\x84\xe5\xa4\x84\xe9\x97\xbb\xe5\x95\xbc\xe9\xb8\x9f"
                      "\xe5\xa4\x9c\xe6\x9d\xa5\xe9\xa3\x8e\xe9\x9b\xa8\xe5\xa3\xb0"
                      "\xe8\x8a\xb1\xe8\x90\xbd\xe7\x9f\xa5\xe5\xa4\x9a\xe5\xb0\x91",
-                     24, 210, 10, 100, 150,
+                     24, 210, 10, 100, 168,
                      pagx::TextAlign::Start, pagx::ParagraphAlign::Near, true);
 
   // Row 2: ParagraphAlign Near/Center/Far + TextAlign Start/Center/End/Justify + overflow hidden
