@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates TextBox: word wrap, text alignment, vertical writing, paragraph alignment -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Box 1 (top-left): wordWrap + lineHeight -->
+  <!-- Box 1 (top-left): horizontal wordWrap + lineHeight -->
   <Layer>
     <Rectangle center="104,104" size="180,180" roundness="6"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -14,42 +14,42 @@
     <TextBox position="14,14" size="180,180" wordWrap="true" lineHeight="28"/>
   </Layer>
 
-  <!-- Box 2 (top-right): textAlign center -->
+  <!-- Box 2 (top-right): horizontal textAlign center + paragraphAlign middle -->
   <Layer>
     <Rectangle center="296,104" size="180,180" roundness="6"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
   </Layer>
   <Layer>
     <Group>
-      <Text text="Center&#10;Aligned&#10;Text" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+      <Text text="Centered&#10;In Box" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
       <Fill color="#F43F5E"/>
     </Group>
-    <TextBox position="206,14" size="180,180" textAlign="center"/>
+    <TextBox position="206,14" size="180,180" textAlign="center" paragraphAlign="middle"/>
   </Layer>
 
-  <!-- Box 3 (bottom-left): writingMode vertical -->
+  <!-- Box 3 (bottom-left): vertical wordWrap -->
   <Layer>
     <Rectangle center="104,296" size="180,180" roundness="6"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
   </Layer>
   <Layer>
     <Group>
-      <Text text="春眠Spring不觉晓" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
+      <Text text="春眠不觉晓Spring处处闻啼鸟Dawn夜来风雨声花落知多少" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
       <Fill color="#F59E0B"/>
     </Group>
     <TextBox position="14,206" size="180,180" writingMode="vertical" wordWrap="true"/>
   </Layer>
 
-  <!-- Box 4 (bottom-right): paragraphAlign middle + textAlign center -->
+  <!-- Box 4 (bottom-right): vertical textAlign center + paragraphAlign middle -->
   <Layer>
     <Rectangle center="296,296" size="180,180" roundness="6"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
   </Layer>
   <Layer>
     <Group>
-      <Text text="Centered&#10;In Box" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+      <Text text="花鳥Wind風月Snow山水" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
       <Fill color="#10B981"/>
     </Group>
-    <TextBox position="206,206" size="180,180" textAlign="center" paragraphAlign="middle" wordWrap="true"/>
+    <TextBox position="206,206" size="180,180" writingMode="vertical" wordWrap="true" textAlign="center" paragraphAlign="middle"/>
   </Layer>
 </pagx>
