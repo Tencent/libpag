@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates TextBox: word wrap, text alignment, vertical writing, paragraph alignment -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Box 1 (top-left): horizontal wordWrap + lineHeight -->
+  <!-- Box 1 (top-left): horizontal justify + wordWrap + lineHeight -->
   <Layer>
     <Rectangle center="104,104" size="180,180" roundness="6"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
   </Layer>
   <Layer>
     <Group>
-      <Text text="Word Wrap — The quick brown fox jumps over the lazy dog." fontFamily="Arial" fontSize="14"/>
+      <Text text="Justify — The quick brown fox jumps over the lazy dog by the river." fontFamily="Arial" fontSize="14"/>
       <Fill>
         <LinearGradient startPoint="0,0" endPoint="180,0">
           <ColorStop offset="0" color="#6366F1"/>
@@ -16,7 +16,7 @@
         </LinearGradient>
       </Fill>
     </Group>
-    <TextBox position="14,14" size="180,180" wordWrap="true" lineHeight="26"/>
+    <TextBox position="14,14" size="180,180" wordWrap="true" lineHeight="26" textAlign="justify"/>
     <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F130"/>
   </Layer>
 
