@@ -8,7 +8,7 @@
   </Layer>
   <Layer>
     <Group>
-      <Text text="Justify — The quick brown fox jumps over the lazy dog by the river." fontFamily="Arial" fontSize="14"/>
+      <Text text="Justify align distributes words evenly across each line with custom line height." fontFamily="Arial" fontSize="14"/>
       <Fill>
         <LinearGradient startPoint="0,0" endPoint="180,0">
           <ColorStop offset="0" color="#6366F1"/>
@@ -27,7 +27,7 @@
   </Layer>
   <Layer>
     <Group>
-      <Text text="Center&#10;Aligned&#10;Middle" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+      <Text text="Centered&#10;Horizontally&#10;&amp;&#10;Vertically" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <Fill>
         <LinearGradient startPoint="0,0" endPoint="180,100">
           <ColorStop offset="0" color="#F43F5E"/>
@@ -46,7 +46,7 @@
   </Layer>
   <Layer>
     <Group>
-      <Text text="春眠不觉晓Spring处处闻啼鸟Dawn夜来风雨声花落知多少" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+      <Text text="春眠Spring不觉晓处处闻啼鸟夜来风雨声花落知多少" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
       <Fill>
         <LinearGradient startPoint="180,0" endPoint="0,180">
           <ColorStop offset="0" color="#F59E0B"/>
@@ -65,7 +65,7 @@
   </Layer>
   <Layer>
     <Group>
-      <Text text="花鳥Wind風月Snow山水" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+      <Text text="竖排&#10;居中" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
       <Fill>
         <LinearGradient startPoint="0,0" endPoint="180,180">
           <ColorStop offset="0" color="#06B6D4"/>
