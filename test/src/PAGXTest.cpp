@@ -708,7 +708,7 @@ PAGX_TEST(PAGXTest, TextBoxHorizontal) {
     rect->size = {w, h};
     auto stroke = doc->makeNode<pagx::Stroke>();
     auto strokeColor = doc->makeNode<pagx::SolidColor>();
-    strokeColor->color = {0.8f, 0.8f, 0.8f, 1};
+    strokeColor->color = {0, 0, 0, 1};
     stroke->color = strokeColor;
     stroke->width = 1;
     borderGroup->elements.push_back(rect);
@@ -810,7 +810,7 @@ PAGX_TEST(PAGXTest, TextBoxVertical) {
     rect->size = {w, h};
     auto stroke = doc->makeNode<pagx::Stroke>();
     auto strokeColor = doc->makeNode<pagx::SolidColor>();
-    strokeColor->color = {0.8f, 0.8f, 0.8f, 1};
+    strokeColor->color = {0, 0, 0, 1};
     stroke->color = strokeColor;
     stroke->width = 1;
     borderGroup->elements.push_back(rect);
@@ -942,7 +942,7 @@ PAGX_TEST(PAGXTest, TextBoxLineHeight) {
     rect->size = {w, h};
     auto stroke = doc->makeNode<pagx::Stroke>();
     auto strokeColor = doc->makeNode<pagx::SolidColor>();
-    strokeColor->color = {0.8f, 0.8f, 0.8f, 1};
+    strokeColor->color = {0, 0, 0, 1};
     stroke->color = strokeColor;
     stroke->width = 1;
     borderGroup->elements.push_back(rect);
@@ -1080,7 +1080,7 @@ PAGX_TEST(PAGXTest, TextBoxEdgeCases) {
     rect->size = {w, h};
     auto stroke = doc->makeNode<pagx::Stroke>();
     auto strokeColor = doc->makeNode<pagx::SolidColor>();
-    strokeColor->color = {0.8f, 0.8f, 0.8f, 1};
+    strokeColor->color = {0, 0, 0, 1};
     stroke->color = strokeColor;
     stroke->width = 1;
     borderGroup->elements.push_back(rect);
