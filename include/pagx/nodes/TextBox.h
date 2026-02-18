@@ -35,38 +35,33 @@ namespace pagx {
  * - Horizontal/vertical writing mode
  * - Overflow control (visible or hidden)
  *
- * Position and size define the text area. When size is (0, 0), position serves as an anchor point
- * and alignment is relative to that point. In vertical mode, the first column is positioned with
+ * Position and size define the text area. In vertical mode, the first column is positioned with
  * its right edge touching the right side, and columns flow from right to left.
  */
 class TextBox : public Element {
  public:
   /**
-   * The position of the text box, representing the top-left corner of the text area. When size is
-   * (0, 0), this serves as the alignment reference point. The default value is (0, 0).
+   * The near-edge corner of the text area. The default value is (0, 0).
    */
   Point position = {};
 
   /**
    * The size of the text box. When width or height is 0, text has no boundary in that dimension
-   * (wordWrap wraps each character individually, alignment uses position as the reference point).
-   * The default value is (0, 0).
+   * (wordWrap wraps each character individually). The default value is (0, 0).
    */
   Size size = {};
 
   /**
    * The text alignment along the inline direction. In horizontal mode, this controls horizontal
    * alignment within each line. In vertical mode, this controls vertical alignment within each
-   * column. When size is (0, 0), alignment is relative to the position as anchor point. The default
-   * value is Start.
+   * column. The default value is Start.
    */
   TextAlign textAlign = TextAlign::Start;
 
   /**
    * The paragraph alignment along the block-flow direction. In horizontal mode, this controls
    * vertical positioning of lines. In vertical mode, this controls horizontal positioning of
-   * columns. The naming follows DirectWrite's DWRITE_PARAGRAPH_ALIGNMENT convention. When size is
-   * (0, 0), alignment is relative to the position as anchor point. The default value is Near.
+   * columns. The default value is Near.
    */
   ParagraphAlign paragraphAlign = ParagraphAlign::Near;
 
