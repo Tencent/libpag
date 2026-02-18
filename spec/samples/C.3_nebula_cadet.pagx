@@ -178,15 +178,13 @@
   </Layer>
 
   <Layer name="PlayerName">
-    <Text text="NEBULA CADET" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
-    <TextBox position="120,45" textAlign="start"/>
+    <Text text="NEBULA CADET" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="120,45"/>
     <Fill color="#E2E8F0"/>
   </Layer>
 
   <Layer name="PlayerIdRow">
     <Layer name="PlayerId">
-      <Text text="#A17X9" fontFamily="Arial" fontSize="11"/>
-      <TextBox position="120,63" textAlign="start"/>
+      <Text text="#A17X9" fontFamily="Arial" fontSize="11" position="120,63"/>
       <Fill color="#7DD3FC"/>
     </Layer>
     <Layer name="LevelBadge">
@@ -199,8 +197,7 @@
       </Fill>
       <Stroke color="#7DD3FC" width="1"/>
       <Layer>
-        <Text text="LV 27" fontFamily="Arial" fontStyle="Bold" fontSize="9"/>
-        <TextBox position="195,64" textAlign="center"/>
+        <Text text="LV 27" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="195,64" textAnchor="center"/>
         <Fill color="#E0F2FE"/>
       </Layer>
     </Layer>
@@ -261,8 +258,7 @@
       <Stroke color="#F8D477" width="1"/>
     </Group>
     <Layer>
-      <Text text="12,450" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
-      <TextBox position="656,52" textAlign="start"/>
+      <Text text="12,450" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="656,52"/>
       <Fill color="#F8FAFC"/>
     </Layer>
   </Layer>
@@ -286,8 +282,7 @@
       </Fill>
     </Layer>
     <Layer>
-      <Text text="860" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
-      <TextBox position="656,86" textAlign="start"/>
+      <Text text="860" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="656,86"/>
       <Fill color="#F8FAFC"/>
     </Layer>
   </Layer>
@@ -312,8 +307,7 @@
       <Fill color="#ECFEFF"/>
     </Layer>
     <Layer>
-      <Text text="START" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-      <TextBox position="400,227" textAlign="center"/>
+      <Text text="START" fontFamily="Arial" fontStyle="Bold" fontSize="24" position="400,227" textAnchor="center"/>
       <Fill color="#F0FFFD"/>
       <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#0F172A80"/>
     </Layer>
@@ -334,8 +328,7 @@
       <Fill color="#FFF7ED"/>
     </Layer>
     <Layer>
-      <Text text="SHOP" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
-      <TextBox position="400,319" textAlign="center"/>
+      <Text text="SHOP" fontFamily="Arial" fontStyle="Bold" fontSize="22" position="400,319" textAnchor="center"/>
       <Fill color="#FFF7ED"/>
     </Layer>
     <DropShadowStyle offsetY="10" blurX="16" blurY="16" color="#F59E0B66"/>
@@ -355,8 +348,7 @@
       <Fill color="#FDF2F8"/>
     </Layer>
     <Layer>
-      <Text text="RANK" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
-      <TextBox position="400,411" textAlign="center"/>
+      <Text text="RANK" fontFamily="Arial" fontStyle="Bold" fontSize="22" position="400,411" textAnchor="center"/>
       <Fill color="#FDF2F8"/>
     </Layer>
     <DropShadowStyle offsetY="10" blurX="16" blurY="16" color="#C084FC66"/>

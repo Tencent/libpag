@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="400" height="400">
   <Layer>
-    <Text text="Text Layout" fontFamily="Arial" fontStyle="Bold" fontSize="40"/>
-    <TextBox position="200,74" textAlign="center"/>
+    <Text text="Text Layout" fontFamily="Arial" fontStyle="Bold" fontSize="40" position="200,74" textAnchor="center"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="280,0">
         <ColorStop offset="0" color="#6366F1"/>
@@ -17,35 +16,29 @@
   </Layer>
   <!-- Start aligned -->
   <Layer>
-    <Text text="Start" fontFamily="Arial" fontStyle="Bold" fontSize="36"/>
-    <TextBox position="200,139" textAlign="start"/>
+    <Text text="Start" fontFamily="Arial" fontStyle="Bold" fontSize="36" position="200,139"/>
     <Fill color="#F43F5E"/>
   </Layer>
   <Layer>
-    <Text text="text starts at position" fontFamily="Arial" fontSize="18"/>
-    <TextBox position="200,164" textAlign="start"/>
+    <Text text="text starts at position" fontFamily="Arial" fontSize="18" position="200,164"/>
     <Fill color="#475569"/>
   </Layer>
   <!-- Center aligned -->
   <Layer>
-    <Text text="Center" fontFamily="Arial" fontStyle="Bold" fontSize="36"/>
-    <TextBox position="200,234" textAlign="center"/>
+    <Text text="Center" fontFamily="Arial" fontStyle="Bold" fontSize="36" position="200,234" textAnchor="center"/>
     <Fill color="#10B981"/>
   </Layer>
   <Layer>
-    <Text text="text centered on position" fontFamily="Arial" fontSize="18"/>
-    <TextBox position="200,259" textAlign="center"/>
+    <Text text="text centered on position" fontFamily="Arial" fontSize="18" position="200,259" textAnchor="center"/>
     <Fill color="#475569"/>
   </Layer>
   <!-- End aligned -->
   <Layer>
-    <Text text="End" fontFamily="Arial" fontStyle="Bold" fontSize="36"/>
-    <TextBox position="200,329" textAlign="end"/>
+    <Text text="End" fontFamily="Arial" fontStyle="Bold" fontSize="36" position="200,329" textAnchor="end"/>
     <Fill color="#06B6D4"/>
   </Layer>
   <Layer>
-    <Text text="text ends at position" fontFamily="Arial" fontSize="18"/>
-    <TextBox position="200,354" textAlign="end"/>
+    <Text text="text ends at position" fontFamily="Arial" fontSize="18" position="200,354" textAnchor="end"/>
     <Fill color="#475569"/>
   </Layer>
 </pagx>

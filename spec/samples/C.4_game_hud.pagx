@@ -149,14 +149,12 @@
 
     <!-- Health Text -->
     <Layer>
-      <Text text="100%" fontFamily="Arial" fontSize="24" fontStyle="Bold" position="-230,0"/>
+      <Text text="100%" fontFamily="Arial" fontSize="24" fontStyle="Bold" position="-240,10" textAnchor="end"/>
       <Fill color="#FFF"/>
-      <TextBox position="-240,10" textAlign="end"/>
     </Layer>
     <Layer>
-      <Text text="STRUCTURAL INTEGRITY" fontFamily="Arial" fontSize="10" position="-230,20"/>
+      <Text text="STRUCTURAL INTEGRITY" fontFamily="Arial" fontSize="10" position="-240,25" textAnchor="end"/>
       <Fill color="#0088FF"/>
-      <TextBox position="-240,25" textAlign="end"/>
     </Layer>
   </Layer>
 
@@ -166,17 +164,14 @@
     <Layer>
       <Text text="PWR: 88%" fontFamily="Arial" fontSize="12"/>
       <Fill color="#00CCFF" alpha="0.7"/>
-      <TextBox textAlign="start"/>
     </Layer>
     <Layer>
-      <Text text="RADAR: ACT" fontFamily="Arial" fontSize="12"/>
+      <Text text="RADAR: ACT" fontFamily="Arial" fontSize="12" position="0,18"/>
       <Fill color="#00CCFF" alpha="0.7"/>
-      <TextBox position="0,18" textAlign="start"/>
     </Layer>
     <Layer>
-      <Text text="SHIELD: OK" fontFamily="Arial" fontSize="12"/>
+      <Text text="SHIELD: OK" fontFamily="Arial" fontSize="12" position="0,36"/>
       <Fill color="#00CCFF" alpha="0.7"/>
-      <TextBox position="0,36" textAlign="start"/>
     </Layer>
   </Layer>
 
@@ -203,14 +198,12 @@
 
     <!-- Energy Text -->
     <Layer>
-      <Text text="60%" fontFamily="Arial" fontSize="24" fontStyle="Bold" position="230,0"/>
+      <Text text="60%" fontFamily="Arial" fontSize="24" fontStyle="Bold" position="240,10"/>
       <Fill color="#FFF"/>
-      <TextBox position="240,10" textAlign="start"/>
     </Layer>
     <Layer>
-      <Text text="PLASMA RESERVES" fontFamily="Arial" fontSize="10" position="230,20"/>
+      <Text text="PLASMA RESERVES" fontFamily="Arial" fontSize="10" position="240,25"/>
       <Fill color="#0088FF"/>
-      <TextBox position="240,25" textAlign="start"/>
     </Layer>
   </Layer>
 
@@ -226,16 +219,14 @@
 
     <!-- Weapon Name -->
     <Layer>
-      <Text text="MK-IV RAILGUN" fontFamily="Arial" fontSize="20" fontStyle="Bold"/>
+      <Text text="MK-IV RAILGUN" fontFamily="Arial" fontSize="20" fontStyle="Bold" position="0,-15" textAnchor="center"/>
       <Fill color="#FFF"/>
-      <TextBox position="0,-15" textAlign="center"/>
     </Layer>
 
     <!-- Fire Mode -->
     <Layer>
-      <Text text="[ BURST MODE ]" fontFamily="Arial" fontSize="12"/>
+      <Text text="[ BURST MODE ]" fontFamily="Arial" fontSize="12" position="0,5" textAnchor="center"/>
       <Fill color="#FFAA00"/>
-      <TextBox position="0,5" textAlign="center"/>
     </Layer>
 
     <!-- Decorative Tech Bits under frame -->

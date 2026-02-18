@@ -26,8 +26,7 @@
   
   <!-- ===== Title Area y=60 ===== -->
   <Layer name="Title">
-    <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="56"/>
-    <TextBox position="400,55" textAlign="center"/>
+    <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="56" position="400,55" textAnchor="center"/>
     <Fill color="@titleGradient"/>
   </Layer>
   <Layer name="Subtitle">
@@ -85,8 +84,7 @@
     <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#6366F180"/>
   </Layer>
   <Layer y="325" x="148">
-    <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
-    <TextBox position="0,4" textAlign="center"/>
+    <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="0,4" textAnchor="center"/>
     <Fill color="#FFF"/>
   </Layer>
   <Layer name="Modifiers" y="325">

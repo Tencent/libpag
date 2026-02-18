@@ -20,8 +20,7 @@
     </Stroke>
   </Layer>
   <Layer>
-    <Text text="Separate (0.2–0.9)" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
-    <TextBox position="200,187" textAlign="center"/>
+    <Text text="Separate (0.2–0.9)" fontFamily="Arial" fontStyle="Bold" fontSize="18" position="200,187" textAnchor="center"/>
     <Fill color="#475569"/>
   </Layer>
 
@@ -44,8 +43,7 @@
     </Stroke>
   </Layer>
   <Layer>
-    <Text text="Continuous (0.2–0.9)" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
-    <TextBox position="200,357" textAlign="center"/>
+    <Text text="Continuous (0.2–0.9)" fontFamily="Arial" fontStyle="Bold" fontSize="18" position="200,357" textAnchor="center"/>
     <Fill color="#475569"/>
   </Layer>
 </pagx>

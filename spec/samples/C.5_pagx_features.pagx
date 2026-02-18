@@ -69,15 +69,13 @@
     </Layer>
     <!-- PAGX title -->
     <Layer x="0" y="-10">
-      <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="52"/>
-      <TextBox position="0,10" textAlign="center"/>
+      <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="52" position="0,10" textAnchor="center"/>
       <Fill color="#FFF"/>
       <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#06B6D440"/>
     </Layer>
     <!-- Subtitle -->
     <Layer x="0" y="42">
-      <Text text="Portable Animated Graphics XML" fontFamily="Arial" fontSize="14"/>
-      <TextBox position="0,0" textAlign="center"/>
+      <Text text="Portable Animated Graphics XML" fontFamily="Arial" fontSize="14" textAnchor="center"/>
       <Fill color="#94A3B8"/>
     </Layer>
     <!-- Curved definition caption -->
@@ -143,17 +141,14 @@
     </Layer>
     <Layer x="-50" y="-20">
       <Text text="Readable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-      <TextBox position="0,0" textAlign="start"/>
       <Fill color="#F43F5E"/>
     </Layer>
     <Layer x="-50" y="10">
       <Text text="Plain-text XML, easy to" fontFamily="Arial" fontSize="16"/>
-      <TextBox position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
     <Layer x="-50" y="32">
       <Text text="diff, debug, and AI-generate." fontFamily="Arial" fontSize="16"/>
-      <TextBox position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
   </Layer>
@@ -193,17 +188,14 @@
     </Layer>
     <Layer x="-50" y="-20">
       <Text text="Comprehensive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-      <TextBox position="0,0" textAlign="start"/>
       <Fill color="#38BDF8"/>
     </Layer>
     <Layer x="-50" y="10">
       <Text text="Covers vectors, images," fontFamily="Arial" fontSize="16"/>
-      <TextBox position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
     <Layer x="-50" y="32">
       <Text text="text, effects, and masks." fontFamily="Arial" fontSize="16"/>
-      <TextBox position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
   </Layer>
@@ -257,17 +249,14 @@
     </Layer>
     <Layer x="-50" y="-20">
       <Text text="Expressive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-      <TextBox position="0,0" textAlign="start"/>
       <Fill color="#A855F7"/>
     </Layer>
     <Layer x="-50" y="10">
       <Text text="Compact structure for both" fontFamily="Arial" fontSize="16"/>
-      <TextBox position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
     <Layer x="-50" y="32">
       <Text text="static and animated content." fontFamily="Arial" fontSize="16"/>
-      <TextBox position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
   </Layer>
@@ -305,17 +294,14 @@
     </Layer>
     <Layer x="-50" y="-20">
       <Text text="Interoperable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-      <TextBox position="0,0" textAlign="start"/>
       <Fill color="#10B981"/>
     </Layer>
     <Layer x="-50" y="10">
       <Text text="Bridges AE, Figma, SVG," fontFamily="Arial" fontSize="16"/>
-      <TextBox position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
     <Layer x="-50" y="32">
       <Text text="PDF, and more seamlessly." fontFamily="Arial" fontSize="16"/>
-      <TextBox position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
   </Layer>
@@ -362,17 +348,14 @@
     </Layer>
     <Layer x="-50" y="-20">
       <Text text="Deployable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-      <TextBox position="0,0" textAlign="start"/>
       <Fill color="#FBBF24"/>
     </Layer>
     <Layer x="-50" y="10">
       <Text text="One-click export to binary" fontFamily="Arial" fontSize="16"/>
-      <TextBox position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
     <Layer x="-50" y="32">
       <Text text="PAG with high performance." fontFamily="Arial" fontSize="16"/>
-      <TextBox position="0,0" textAlign="start"/>
       <Fill color="#CBD5E1"/>
     </Layer>
   </Layer>
@@ -398,8 +381,7 @@
       <Fill color="#6366F120"/>
       <Stroke color="#6366F160" width="1"/>
       <Layer y="5">
-        <Text text=".pagx" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
-        <TextBox position="0,0" textAlign="center"/>
+        <Text text=".pagx" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
         <Fill color="#A78BFA"/>
       </Layer>
     </Layer>
@@ -414,8 +396,7 @@
       <Fill color="#EC489920"/>
       <Stroke color="#EC489960" width="1"/>
       <Layer y="5">
-        <Text text=".pag" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
-        <TextBox position="0,0" textAlign="center"/>
+        <Text text=".pag" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
         <Fill color="#F472B6"/>
       </Layer>
     </Layer>
@@ -430,8 +411,7 @@
       <Fill color="#34D39920"/>
       <Stroke color="#34D39960" width="1"/>
       <Layer y="5">
-        <Text text="Production" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
-        <TextBox position="0,0" textAlign="center"/>
+        <Text text="Production" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
         <Fill color="#34D399"/>
       </Layer>
     </Layer>
@@ -439,8 +419,7 @@
 
   <!-- Bottom tagline -->
   <Layer name="BottomTagline" x="800" y="1130">
-    <Text text="Design  -  Develop  -  Deploy" fontFamily="Arial" fontSize="16"/>
-    <TextBox position="0,0" textAlign="center"/>
+    <Text text="Design  -  Develop  -  Deploy" fontFamily="Arial" fontSize="16" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
 

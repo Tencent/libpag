@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates rich text with mixed styles via shared TextBox -->
+<!-- Demonstrates rich text with mixed styles -->
 <pagx version="1.0" width="400" height="400">
   <Layer>
-    <Text text="Rich Text" fontFamily="Arial" fontStyle="Bold" fontSize="42"/>
-    <TextBox position="200,105" textAlign="center"/>
+    <Text text="Rich Text" fontFamily="Arial" fontStyle="Bold" fontSize="42" position="200,105" textAnchor="center"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="200,0">
         <ColorStop offset="0" color="#8B5CF6"/>
@@ -12,10 +11,10 @@
     </Fill>
   </Layer>
 
-  <!-- Rich text paragraph: multiple Groups with shared TextBox -->
+  <!-- Rich text paragraph: multiple Groups with shared text anchor -->
   <Layer>
     <Group>
-      <Text text="Supports " fontFamily="Arial" fontSize="20"/>
+      <Text text="Supports " fontFamily="Arial" fontSize="20" position="30,165"/>
       <Fill color="#475569"/>
     </Group>
     <Group>
@@ -42,12 +41,11 @@
       <Text text=" text." fontFamily="Arial" fontSize="20"/>
       <Fill color="#475569"/>
     </Group>
-    <TextBox position="30,165" textAlign="start"/>
   </Layer>
 
   <Layer>
     <Group>
-      <Text text="Mix " fontFamily="Arial" fontSize="16"/>
+      <Text text="Mix " fontFamily="Arial" fontSize="16" position="30,215"/>
       <Fill color="#475569"/>
     </Group>
     <Group>
@@ -66,12 +64,11 @@
       <Text text=" within one line." fontFamily="Arial" fontSize="16"/>
       <Fill color="#475569"/>
     </Group>
-    <TextBox position="30,215" textAlign="start"/>
   </Layer>
 
   <Layer>
     <Group>
-      <Text text="Center " fontFamily="Arial" fontSize="20"/>
+      <Text text="Center " fontFamily="Arial" fontSize="20" position="200,265" textAnchor="center"/>
       <Fill color="#475569"/>
     </Group>
     <Group>
@@ -82,12 +79,10 @@
       <Text text=" rich text." fontFamily="Arial" fontSize="20"/>
       <Fill color="#475569"/>
     </Group>
-    <TextBox position="200,265" textAlign="center"/>
   </Layer>
 
   <Layer>
-    <Text text="Gradient Fill" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
-    <TextBox position="200,310" textAlign="center"/>
+    <Text text="Gradient Fill" fontFamily="Arial" fontStyle="Bold" fontSize="28" position="200,310" textAnchor="center"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="240,0">
         <ColorStop offset="0" color="#F43F5E"/>
