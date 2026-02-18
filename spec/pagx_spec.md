@@ -1556,7 +1556,7 @@ TextBox is a **pre-layout-only** node: it is processed during the typesetting st
 
 Unlike other modifiers that operate on accumulated results in a chain (e.g., TrimPath modifies the path output of previous elements), TextBox only affects the **initial layout** of Text elements. It determines glyph positions before the modifier chain begins. Subsequent modifiers such as TextPath and TextModifier operate on the TextBox layout results. The position of TextBox in the node order does not change this behavior.
 
-> [Sample](samples/5.5.6_text_layout.pagx)
+> [Sample](samples/5.5.6_text_box.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|

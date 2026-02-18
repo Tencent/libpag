@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="400" height="400">
+  <!-- Title -->
+  <Layer>
+    <Text text="TextBox" fontFamily="Arial" fontStyle="Bold" fontSize="42" position="200,50" textAnchor="center"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="280,0">
+        <ColorStop offset="0" color="#6366F1"/>
+        <ColorStop offset="1" color="#8B5CF6"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+
+  <!-- Section 1: Text alignment (start / center / end) -->
+  <!-- Vertical reference line at x=200 -->
+  <Layer>
+    <Path data="M 200,75 L 200,190"/>
+    <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+  </Layer>
+  <!-- Start aligned -->
+  <Layer>
+    <Group>
+      <Text text="Start&#10;" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+      <Fill color="#F43F5E"/>
+    </Group>
+    <Group>
+      <Text text="left of anchor" fontFamily="Arial" fontSize="14"/>
+      <Fill color="#475569"/>
+    </Group>
+    <TextBox position="200,78"/>
+  </Layer>
+  <!-- Center aligned -->
+  <Layer>
+    <Group>
+      <Text text="Center&#10;" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+      <Fill color="#10B981"/>
+    </Group>
+    <Group>
+      <Text text="centered on anchor" fontFamily="Arial" fontSize="14"/>
+      <Fill color="#475569"/>
+    </Group>
+    <TextBox position="200,118" textAlign="center"/>
+  </Layer>
+  <!-- End aligned -->
+  <Layer>
+    <Group>
+      <Text text="End&#10;" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+      <Fill color="#06B6D4"/>
+    </Group>
+    <Group>
+      <Text text="right of anchor" fontFamily="Arial" fontSize="14"/>
+      <Fill color="#475569"/>
+    </Group>
+    <TextBox position="200,158" textAlign="end"/>
+  </Layer>
+
+  <!-- Section divider -->
+  <Layer>
+    <Path data="M 40,198 L 360,198"/>
+    <Stroke color="#E2E8F0" width="1"/>
+  </Layer>
+
+  <!-- Section 2: Word wrap with fixed-size box -->
+  <!-- Box outline showing the text area boundary -->
+  <Layer>
+    <Rectangle center="200,248" size="340,80" roundness="6"/>
+    <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+  </Layer>
+  <Layer>
+    <Group>
+      <Text text="Word Wrap " fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+      <Fill color="#F59E0B"/>
+    </Group>
+    <Group>
+      <Text text="— Long text automatically wraps within a fixed-size box boundary." fontFamily="Arial" fontSize="16"/>
+      <Fill color="#475569"/>
+    </Group>
+    <TextBox position="38,216" size="324,64" wordWrap="true"/>
+  </Layer>
+
+  <!-- Section divider -->
+  <Layer>
+    <Path data="M 40,298 L 360,298"/>
+    <Stroke color="#E2E8F0" width="1"/>
+  </Layer>
+
+  <!-- Section 3: Paragraph alignment within a fixed-size box -->
+  <!-- Box outline -->
+  <Layer>
+    <Rectangle center="200,349" size="340,82" roundness="6"/>
+    <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+  </Layer>
+  <Layer>
+    <Group>
+      <Text text="Centered" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+      <Fill color="#EC4899"/>
+    </Group>
+    <TextBox position="30,308" size="340,82" textAlign="center" paragraphAlign="middle"/>
+  </Layer>
+</pagx>
