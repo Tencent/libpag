@@ -1273,7 +1273,7 @@ class TextLayoutContext {
           break;
       }
     } else {
-      // Anchor mode: position is anchor point.
+      // boxWidth is 0: no boundary, align relative to position.
       switch (textBox->paragraphAlign) {
         case ParagraphAlign::Near:
           xStart += totalWidth;
