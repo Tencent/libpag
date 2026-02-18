@@ -59,14 +59,14 @@
     </Layer>
 
     <!-- Player name & level -->
-    <Layer x="80" y="28">
+    <Group position="80,28">
       <Text text="Aethon" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
       <Fill color="#F8FAFC"/>
-    </Layer>
-    <Layer x="80" y="48">
+    </Group>
+    <Group position="80,48">
       <Text text="Lv. 72  Paladin" fontFamily="Arial" fontSize="12"/>
       <Fill color="#A89878"/>
-    </Layer>
+    </Group>
 
     <!-- HP bar -->
     <Layer name="HPBar" x="190" y="16">
@@ -321,13 +321,13 @@
     </Layer>
 
     <!-- Rarity stars (below portrait) -->
-    <Layer x="148" y="276">
+    <Group position="148,276">
       <Group>
         <Polystar center="0,0" type="star" pointCount="5" outerRadius="7" innerRadius="3"/>
         <Fill color="@starGrad"/>
         <Repeater copies="5" position="18,0"/>
       </Group>
-    </Layer>
+    </Group>
 
     <!-- Stats section -->
     <Layer x="30" y="305">

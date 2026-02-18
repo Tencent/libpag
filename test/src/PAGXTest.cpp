@@ -63,15 +63,13 @@ static pagx::Group* MakeCenteredTextGroup(pagx::PAGXDocument* doc, const std::st
   auto text = doc->makeNode<pagx::Text>();
   text->text = content;
   text->fontSize = fontSize;
-  auto layout = doc->makeNode<pagx::TextBox>();
-  layout->position = {centerX, y};
-  layout->textAlign = pagx::TextAlign::Center;
+  text->position = {centerX, y};
+  text->textAnchor = pagx::TextAnchor::Center;
   auto fill = doc->makeNode<pagx::Fill>();
   auto solid = doc->makeNode<pagx::SolidColor>();
   solid->color = color;
   fill->color = solid;
   group->elements.push_back(text);
-  group->elements.push_back(layout);
   group->elements.push_back(fill);
   return group;
 }

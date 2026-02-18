@@ -74,16 +74,16 @@
       <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#06B6D440"/>
     </Layer>
     <!-- Subtitle -->
-    <Layer x="0" y="42">
+    <Group position="0,42">
       <Text text="Portable Animated Graphics XML" fontFamily="Arial" fontSize="14" textAnchor="center"/>
       <Fill color="#94A3B8"/>
-    </Layer>
+    </Group>
     <!-- Curved definition caption -->
-    <Layer x="0" y="0">
+    <Group>
       <Text text="An XML-based markup language for describing animated vector graphics." fontFamily="Arial" fontSize="12"/>
       <TextPath path="M -141 0 A 141 141 0 0 0 141 0" forceAlignment="true"/>
       <Fill color="#64748B60"/>
-    </Layer>
+    </Group>
   </Layer>
 
   <!-- Connector endpoint dots -->
@@ -140,16 +140,15 @@
       </Group>
     </Layer>
     <Layer x="-50" y="-20">
-      <Text text="Readable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-      <Fill color="#F43F5E"/>
-    </Layer>
-    <Layer x="-50" y="10">
-      <Text text="Plain-text XML, easy to" fontFamily="Arial" fontSize="16"/>
-      <Fill color="#CBD5E1"/>
-    </Layer>
-    <Layer x="-50" y="32">
-      <Text text="diff, debug, and AI-generate." fontFamily="Arial" fontSize="16"/>
-      <Fill color="#CBD5E1"/>
+      <Group>
+        <Text text="Readable&#10;" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+        <Fill color="#F43F5E"/>
+      </Group>
+      <Group>
+        <Text text="Plain-text XML, easy to&#10;diff, debug, and AI-generate." fontFamily="Arial" fontSize="16"/>
+        <Fill color="#CBD5E1"/>
+      </Group>
+      <TextBox/>
     </Layer>
   </Layer>
 
@@ -187,16 +186,15 @@
       </Group>
     </Layer>
     <Layer x="-50" y="-20">
-      <Text text="Comprehensive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-      <Fill color="#38BDF8"/>
-    </Layer>
-    <Layer x="-50" y="10">
-      <Text text="Covers vectors, images," fontFamily="Arial" fontSize="16"/>
-      <Fill color="#CBD5E1"/>
-    </Layer>
-    <Layer x="-50" y="32">
-      <Text text="text, effects, and masks." fontFamily="Arial" fontSize="16"/>
-      <Fill color="#CBD5E1"/>
+      <Group>
+        <Text text="Comprehensive&#10;" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+        <Fill color="#38BDF8"/>
+      </Group>
+      <Group>
+        <Text text="Covers vectors, images,&#10;text, effects, and masks." fontFamily="Arial" fontSize="16"/>
+        <Fill color="#CBD5E1"/>
+      </Group>
+      <TextBox/>
     </Layer>
   </Layer>
 
@@ -248,16 +246,15 @@
       </Group>
     </Layer>
     <Layer x="-50" y="-20">
-      <Text text="Expressive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-      <Fill color="#A855F7"/>
-    </Layer>
-    <Layer x="-50" y="10">
-      <Text text="Compact structure for both" fontFamily="Arial" fontSize="16"/>
-      <Fill color="#CBD5E1"/>
-    </Layer>
-    <Layer x="-50" y="32">
-      <Text text="static and animated content." fontFamily="Arial" fontSize="16"/>
-      <Fill color="#CBD5E1"/>
+      <Group>
+        <Text text="Expressive&#10;" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+        <Fill color="#A855F7"/>
+      </Group>
+      <Group>
+        <Text text="Compact structure for both&#10;static and animated content." fontFamily="Arial" fontSize="16"/>
+        <Fill color="#CBD5E1"/>
+      </Group>
+      <TextBox/>
     </Layer>
   </Layer>
 
@@ -293,16 +290,15 @@
       </Group>
     </Layer>
     <Layer x="-50" y="-20">
-      <Text text="Interoperable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-      <Fill color="#10B981"/>
-    </Layer>
-    <Layer x="-50" y="10">
-      <Text text="Bridges AE, Figma, SVG," fontFamily="Arial" fontSize="16"/>
-      <Fill color="#CBD5E1"/>
-    </Layer>
-    <Layer x="-50" y="32">
-      <Text text="PDF, and more seamlessly." fontFamily="Arial" fontSize="16"/>
-      <Fill color="#CBD5E1"/>
+      <Group>
+        <Text text="Interoperable&#10;" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+        <Fill color="#10B981"/>
+      </Group>
+      <Group>
+        <Text text="Bridges AE, Figma, SVG,&#10;PDF, and more seamlessly." fontFamily="Arial" fontSize="16"/>
+        <Fill color="#CBD5E1"/>
+      </Group>
+      <TextBox/>
     </Layer>
   </Layer>
 
@@ -347,16 +343,15 @@
       </Group>
     </Layer>
     <Layer x="-50" y="-20">
-      <Text text="Deployable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-      <Fill color="#FBBF24"/>
-    </Layer>
-    <Layer x="-50" y="10">
-      <Text text="One-click export to binary" fontFamily="Arial" fontSize="16"/>
-      <Fill color="#CBD5E1"/>
-    </Layer>
-    <Layer x="-50" y="32">
-      <Text text="PAG with high performance." fontFamily="Arial" fontSize="16"/>
-      <Fill color="#CBD5E1"/>
+      <Group>
+        <Text text="Deployable&#10;" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+        <Fill color="#FBBF24"/>
+      </Group>
+      <Group>
+        <Text text="One-click export to binary&#10;PAG with high performance." fontFamily="Arial" fontSize="16"/>
+        <Fill color="#CBD5E1"/>
+      </Group>
+      <TextBox/>
     </Layer>
   </Layer>
 
@@ -380,40 +375,40 @@
       <Rectangle center="0,0" size="120,40" roundness="20"/>
       <Fill color="#6366F120"/>
       <Stroke color="#6366F160" width="1"/>
-      <Layer y="5">
+      <Group position="0,5">
         <Text text=".pagx" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
         <Fill color="#A78BFA"/>
-      </Layer>
+      </Group>
     </Layer>
     <!-- Arrow 1 -->
-    <Layer x="-80" y="0">
+    <Group position="-80,0">
       <Path data="@arrowRight"/>
       <Stroke color="#64748B" width="2" cap="round" join="round"/>
-    </Layer>
+    </Group>
     <!-- .pag badge -->
     <Layer x="0" y="0">
       <Rectangle center="0,0" size="100,40" roundness="20"/>
       <Fill color="#EC489920"/>
       <Stroke color="#EC489960" width="1"/>
-      <Layer y="5">
+      <Group position="0,5">
         <Text text=".pag" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
         <Fill color="#F472B6"/>
-      </Layer>
+      </Group>
     </Layer>
     <!-- Arrow 2 -->
-    <Layer x="90" y="0">
+    <Group position="90,0">
       <Path data="@arrowRight"/>
       <Stroke color="#64748B" width="2" cap="round" join="round"/>
-    </Layer>
+    </Group>
     <!-- Production badge -->
     <Layer x="190" y="0">
       <Rectangle center="0,0" size="140,40" roundness="20"/>
       <Fill color="#34D39920"/>
       <Stroke color="#34D39960" width="1"/>
-      <Layer y="5">
+      <Group position="0,5">
         <Text text="Production" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
         <Fill color="#34D399"/>
-      </Layer>
+      </Group>
     </Layer>
   </Layer>
 

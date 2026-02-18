@@ -33,7 +33,7 @@ that overrides any individual optimization direction below.
 
 ## Optimization Checklist
 
-### Structure Cleanup (Sections 1-7)
+### Structure Cleanup
 
 | # | Optimization | When to Apply |
 |---|--------------|---------------|
@@ -44,34 +44,52 @@ that overrides any individual optimization direction below.
 | 5 | Normalize Numerics | Scientific notation near zero, trailing decimals, short hex |
 | 6 | Remove Unused Resources | Resource `id` has no `@id` reference |
 | 7 | Remove Redundant Wrappers | Group/Layer with no attributes wrapping single element |
+| 8 | Downgrade Layer to Group | Layer uses none of: styles, filters, mask, blendMode, composition, scrollRect, child Layers |
 
 > For detailed examples and default value tables, read `references/structure-cleanup.md`.
+> For Layer vs Group comparison and downgrade rules, read `references/layer-vs-group.md`.
 
-### Painter Merging (Sections 8-9)
-
-| # | Optimization | When to Apply |
-|---|--------------|---------------|
-| 8 | Merge Geometry Sharing Identical Painters | Multiple geometry elements use same Fill/Stroke |
-| 9 | Merge Painters on Identical Geometry | Same geometry appears twice with different painters |
-
-**Critical caveat (Section 8)**: Different geometry needing different painters must be isolated
-with Groups. This is the most common source of errors.
-
-> For detailed examples and scope isolation patterns, read `references/painter-merging.md`.
-
-### Resource Reuse (Sections 10-14)
+### Painter Merging
 
 | # | Optimization | When to Apply |
 |---|--------------|---------------|
-| 10 | Composition Reuse | 2+ identical layer subtrees differing only in position |
-| 11 | PathData Reuse | Same path data string appears 2+ times |
-| 12 | Color Source Sharing | Identical gradient definitions inline in multiple places |
-| 13 | Replace Path with Primitive | Path describes a Rectangle or Ellipse |
-| 14 | Remove Full-Canvas Clips | Clip mask covers entire canvas |
+| 9 | Merge Geometry Sharing Identical Painters | Multiple geometry elements use same Fill/Stroke |
+| 10 | Merge Painters on Identical Geometry | Same geometry appears twice with different painters |
+
+**Critical caveat**: Different geometry needing different painters must be isolated with Groups.
+This is the most common source of errors.
+
+> For detailed examples, scope isolation patterns, and painter scope concepts, read
+> `references/painter-merging.md`.
+
+### Text Layout
+
+| # | Optimization | When to Apply |
+|---|--------------|---------------|
+| 11 | Use TextBox for Multi-Text Layout | Multiple Text elements positioned manually for sequential display |
+| 12 | Merge Text Layers into Groups | Each text segment in its own Layer when Group suffices |
+
+Multiple Text elements that form a sequential block (e.g., title + subtitle, paragraph lines)
+should share a single TextBox for automatic layout instead of using absolute position
+coordinates on each Text. Each text segment should be in a Group (for style isolation), not
+a separate Layer.
+
+> **TextBox ignores** Text's `position` and `textAnchor` attributes. When using TextBox, do not
+> set these on child Text elements.
+
+### Resource Reuse
+
+| # | Optimization | When to Apply |
+|---|--------------|---------------|
+| 13 | Composition Reuse | 2+ identical layer subtrees differing only in position |
+| 14 | PathData Reuse | Same path data string appears 2+ times |
+| 15 | Color Source Sharing | Identical gradient definitions inline in multiple places |
+| 16 | Replace Path with Primitive | Path describes a Rectangle or Ellipse |
+| 17 | Remove Full-Canvas Clips | Clip mask covers entire canvas |
 
 > For detailed examples and coordinate conversion formulas, read `references/resource-reuse.md`.
 
-### Performance Optimization (Section 15)
+### Performance Optimization
 
 **Rendering Cost Model**:
 - **Repeater**: N copies = N× full rendering cost (no GPU instancing)
@@ -85,34 +103,6 @@ with Groups. This is the most common source of errors.
 2. **Suggestions (never auto-apply)**: Reduce density, lower blur, simplify geometry
 
 > For detailed optimization techniques, read `references/performance.md`.
-
----
-
-## Appendix: Core Concepts
-
-### Painter Scope
-
-Painters (Fill / Stroke) render **all geometry accumulated in the current scope up to that
-painter's position**. Subsequent painters continue to render the same geometry.
-
-### Group Scope Isolation
-
-Group creates an isolated scope. Internal geometry accumulates only within the Group, and
-after the Group ends, its geometry propagates upward to the parent scope.
-
-### Layer vs Group
-
-| Feature | Layer | Group |
-|---------|-------|-------|
-| Geometry propagation | No (boundary) | Yes (to parent) |
-| Styles / Filters / Mask | Supported | Not supported |
-| Composition / BlendMode | Supported | Not supported |
-| Transform | matrix | position/rotation/scale |
-
-**Selection rule**: Use Layer for styles/filters/mask/composition/blendMode. Otherwise prefer Group.
-
-> For DropShadowStyle scope and color source coordinate system, see `references/painter-merging.md`
-> and `references/resource-reuse.md` respectively.
 
 ---
 

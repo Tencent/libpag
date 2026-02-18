@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="400" height="400">
   <Layer>
-    <Text text="GlyphRun" fontFamily="Arial" fontStyle="Bold" fontSize="72" position="200,145" textAnchor="center">
+    <Text text="GlyphRun" fontFamily="Arial" fontStyle="Bold" fontSize="72">
       <GlyphRun font="@font1" fontSize="72" glyphs="14,15,16,17,18,19,20,21" x="34" y="145"/>
     </Text>
     <Fill>
@@ -13,13 +13,13 @@
     </Fill>
   </Layer>
   <Layer>
-    <Text text="Embedded Font" fontFamily="Arial" fontSize="36" position="200,230" textAnchor="center">
+    <Text text="Embedded Font" fontFamily="Arial" fontSize="36">
       <GlyphRun font="@font1" fontSize="36" glyphs="6,7,8,9,10,10,9,10,22,11,12,21,13" y="230" xOffsets="66,87,120,142,162,184,206,226,248,256,276,298,320"/>
     </Text>
     <Fill color="#334155"/>
   </Layer>
   <Layer>
-    <Text text="Pre-shaped Glyphs" fontFamily="Arial" fontSize="24" position="200,310" textAnchor="center">
+    <Text text="Pre-shaped Glyphs" fontFamily="Arial" fontSize="24">
       <GlyphRun font="@font1" fontSize="24" glyphs="1,2,9,3,4,18,5,17,9,10,22,14,15,16,17,18,4" y="310" xOffsets="94.5,109.5,118.5,131.5,139.5,150.5,165.5,179.5,194.5,207.5,222.5,227.5,244.5,251.5,264.5,279.5,294.5"/>
     </Text>
     <Fill color="#475569"/>

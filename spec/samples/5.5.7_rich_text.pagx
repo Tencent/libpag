@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates rich text with mixed styles -->
+<!-- Demonstrates rich text with mixed styles via shared TextBox -->
 <pagx version="1.0" width="400" height="400">
   <Layer>
     <Text text="Rich Text" fontFamily="Arial" fontStyle="Bold" fontSize="42" position="200,105" textAnchor="center"/>
@@ -11,10 +11,11 @@
     </Fill>
   </Layer>
 
-  <!-- Rich text paragraph: multiple Groups with shared text anchor -->
+  <!-- Rich text: all paragraphs in one TextBox -->
   <Layer>
+    <!-- Paragraph 1: Supports bold, italic and colored text. -->
     <Group>
-      <Text text="Supports " fontFamily="Arial" fontSize="20" position="30,165"/>
+      <Text text="Supports " fontFamily="Arial" fontSize="20"/>
       <Fill color="#475569"/>
     </Group>
     <Group>
@@ -38,14 +39,12 @@
       <Fill color="#06B6D4"/>
     </Group>
     <Group>
-      <Text text=" text." fontFamily="Arial" fontSize="20"/>
+      <Text text=" text.&#10;" fontFamily="Arial" fontSize="20"/>
       <Fill color="#475569"/>
     </Group>
-  </Layer>
-
-  <Layer>
+    <!-- Paragraph 2: Mix different sizes freely within one line. -->
     <Group>
-      <Text text="Mix " fontFamily="Arial" fontSize="16" position="30,215"/>
+      <Text text="Mix " fontFamily="Arial" fontSize="16"/>
       <Fill color="#475569"/>
     </Group>
     <Group>
@@ -61,14 +60,12 @@
       <Fill color="#8B5CF6"/>
     </Group>
     <Group>
-      <Text text=" within one line." fontFamily="Arial" fontSize="16"/>
+      <Text text=" within one line.&#10;" fontFamily="Arial" fontSize="16"/>
       <Fill color="#475569"/>
     </Group>
-  </Layer>
-
-  <Layer>
+    <!-- Paragraph 3: Center aligned rich text. -->
     <Group>
-      <Text text="Center " fontFamily="Arial" fontSize="20" position="200,265" textAnchor="center"/>
+      <Text text="Center " fontFamily="Arial" fontSize="20"/>
       <Fill color="#475569"/>
     </Group>
     <Group>
@@ -76,19 +73,20 @@
       <Fill color="#EC4899"/>
     </Group>
     <Group>
-      <Text text=" rich text." fontFamily="Arial" fontSize="20"/>
+      <Text text=" rich text.&#10;" fontFamily="Arial" fontSize="20"/>
       <Fill color="#475569"/>
     </Group>
-  </Layer>
-
-  <Layer>
-    <Text text="Gradient Fill" fontFamily="Arial" fontStyle="Bold" fontSize="28" position="200,310" textAnchor="center"/>
-    <Fill>
-      <LinearGradient startPoint="0,0" endPoint="240,0">
-        <ColorStop offset="0" color="#F43F5E"/>
-        <ColorStop offset="0.5" color="#F59E0B"/>
-        <ColorStop offset="1" color="#10B981"/>
-      </LinearGradient>
-    </Fill>
+    <!-- Paragraph 4: Gradient Fill -->
+    <Group>
+      <Text text="Gradient Fill" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+      <Fill>
+        <LinearGradient startPoint="0,0" endPoint="240,0">
+          <ColorStop offset="0" color="#F43F5E"/>
+          <ColorStop offset="0.5" color="#F59E0B"/>
+          <ColorStop offset="1" color="#10B981"/>
+        </LinearGradient>
+      </Fill>
+    </Group>
+    <TextBox position="200,150" textAlign="center"/>
   </Layer>
 </pagx>
