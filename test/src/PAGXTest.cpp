@@ -622,6 +622,9 @@ PAGX_TEST(PAGXTest, SampleFiles) {
   }
   std::sort(sampleFiles.begin(), sampleFiles.end());
 
+  pagx::TextLayout textLayout;
+  textLayout.setFallbackTypefaces(GetFallbackTypefaces());
+
   for (const auto& filePath : sampleFiles) {
     auto baseName = std::filesystem::path(filePath).stem().string();
 
@@ -631,7 +634,9 @@ PAGX_TEST(PAGXTest, SampleFiles) {
       continue;
     }
 
-    auto layer = pagx::LayerBuilder::Build(doc.get());
+    textLayout.layout(doc.get());
+
+    auto layer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
     if (!layer) {
       ADD_FAILURE() << "Failed to build layer: " << filePath;
       continue;
