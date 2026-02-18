@@ -896,7 +896,7 @@ PAGX_TEST(PAGXTest, TextBoxVertical) {
   // Justify (two columns, last column Start-aligned)
   addBorder(340, 260, 80, 230);
   addVerticalTextBox("\xe6\x98\xa5\xe7\x9c\xa0\xe4\xb8\x8d\xe8\xa7\x89\xe6\x99\x93\n"
-                     "\xe8\x8a\xb1\xe8\x90\xbd\xe7\x9f\xa5\xe5\xa4\x9a\xe5\xb0\x91",
+                     "\xe5\xa4\x84\xe5\xa4\x84\xe9\x97\xbb\xe5\x95\xbc\xe9\xb8\x9f",
                      24, 340, 260, 80, 230,
                      pagx::TextAlign::Justify, pagx::ParagraphAlign::Near, false);
 
