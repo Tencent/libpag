@@ -49,7 +49,7 @@ class DiamondGradient : public ColorSource {
   /**
    * The color stops defining the gradient colors and positions.
    */
-  std::vector<ColorStop> colorStops = {};
+  std::vector<ColorStop*> colorStops = {};
 
   NodeType nodeType() const override {
     return NodeType::DiamondGradient;

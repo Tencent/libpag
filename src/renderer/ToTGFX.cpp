@@ -30,7 +30,11 @@ namespace pagx {
 
 tgfx::Path PathDataToTGFXPath(const PathData& pathData) {
   tgfx::Path path = {};
-  pathData.forEach([&path](PathVerb verb, const Point* pts) {
+  const auto& verbs = pathData.verbs();
+  const auto& points = pathData.points();
+  size_t pointIndex = 0;
+  for (auto verb : verbs) {
+    const Point* pts = points.data() + pointIndex;
     switch (verb) {
       case PathVerb::Move:
         path.moveTo(pts[0].x, pts[0].y);
@@ -48,7 +52,8 @@ tgfx::Path PathDataToTGFXPath(const PathData& pathData) {
         path.close();
         break;
     }
-  });
+    pointIndex += PathData::PointsPerVerb(verb);
+  }
   return path;
 }
 

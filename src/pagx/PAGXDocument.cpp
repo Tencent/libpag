@@ -68,6 +68,7 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
   if (filePath.empty() || data == nullptr) {
     return false;
   }
+  bool found = false;
   for (auto& node : nodes) {
     if (node->nodeType() != NodeType::Image) {
       continue;
@@ -76,11 +77,11 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
     if (image->filePath != filePath) {
       continue;
     }
-    image->data = std::move(data);
+    image->data = data;
     image->filePath = {};
-    return true;
+    found = true;
   }
-  return false;
+  return found;
 }
 
 }  // namespace pagx

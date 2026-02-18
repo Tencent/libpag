@@ -262,6 +262,8 @@ PathData PathDataFromSVGString(const std::string& d) {
       break;
     }
 
+    const char* prevPtr = ptr;
+
     char command = *ptr;
     if (std::isalpha(command)) {
       ++ptr;
@@ -452,6 +454,9 @@ PathData PathDataFromSVGString(const std::string& d) {
       default:
         ++ptr;
         break;
+    }
+    if (ptr == prevPtr) {
+      ++ptr;
     }
   }
 

@@ -117,7 +117,7 @@ static RadialGradient* parseRadialGradient(const DOMNode* node, PAGXDocument* do
 static ConicGradient* parseConicGradient(const DOMNode* node, PAGXDocument* doc);
 static DiamondGradient* parseDiamondGradient(const DOMNode* node, PAGXDocument* doc);
 static ImagePattern* parseImagePattern(const DOMNode* node, PAGXDocument* doc);
-static ColorStop parseColorStop(const DOMNode* node);
+static ColorStop* parseColorStop(const DOMNode* node, PAGXDocument* doc);
 static Image* parseImage(const DOMNode* node, PAGXDocument* doc);
 static PathData* parsePathData(const DOMNode* node, PAGXDocument* doc);
 static Composition* parseComposition(const DOMNode* node, PAGXDocument* doc);
@@ -499,7 +499,7 @@ static Path* parsePath(const DOMNode* node, PAGXDocument* doc) {
     } else {
       // Inline path data
       path->data = doc->makeNode<PathData>();
-      *path->data = PathDataFromSVGString(dataAttr);
+      path->data->setPathData(PathDataFromSVGString(dataAttr));
     }
   }
   path->reversed = getBoolAttribute(node, "reversed", false);
@@ -718,7 +718,7 @@ static TextPath* parseTextPath(const DOMNode* node, PAGXDocument* doc) {
     } else {
       // Inline path data
       textPath->path = doc->makeNode<PathData>();
-      *textPath->path = PathDataFromSVGString(pathAttr);
+      textPath->path->setPathData(PathDataFromSVGString(pathAttr));
     }
   }
   textPath->baselineOrigin = parsePoint(getAttribute(node, "baselineOrigin", "0,0"));
@@ -846,8 +846,8 @@ static SolidColor* parseSolidColor(const DOMNode* node, PAGXDocument* doc) {
   return solid;
 }
 
-static void parseGradientCommon(const DOMNode* node, Matrix& matrix,
-                                std::vector<ColorStop>& colorStops) {
+static void parseGradientCommon(const DOMNode* node, PAGXDocument* doc, Matrix& matrix,
+                                std::vector<ColorStop*>& colorStops) {
   auto matrixStr = getAttribute(node, "matrix");
   if (!matrixStr.empty()) {
     matrix = MatrixFromString(matrixStr);
@@ -855,7 +855,10 @@ static void parseGradientCommon(const DOMNode* node, Matrix& matrix,
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element && child->name == "ColorStop") {
-      colorStops.push_back(parseColorStop(child.get()));
+      auto stop = parseColorStop(child.get(), doc);
+      if (stop) {
+        colorStops.push_back(stop);
+      }
     }
     child = child->nextSibling;
   }
@@ -868,7 +871,7 @@ static LinearGradient* parseLinearGradient(const DOMNode* node, PAGXDocument* do
   }
   gradient->startPoint = parsePoint(getAttribute(node, "startPoint", "0,0"));
   gradient->endPoint = parsePoint(getAttribute(node, "endPoint", "0,0"));
-  parseGradientCommon(node, gradient->matrix, gradient->colorStops);
+  parseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
   return gradient;
 }
 
@@ -879,7 +882,7 @@ static RadialGradient* parseRadialGradient(const DOMNode* node, PAGXDocument* do
   }
   gradient->center = parsePoint(getAttribute(node, "center", "0,0"));
   gradient->radius = getFloatAttribute(node, "radius", 0);
-  parseGradientCommon(node, gradient->matrix, gradient->colorStops);
+  parseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
   return gradient;
 }
 
@@ -891,7 +894,7 @@ static ConicGradient* parseConicGradient(const DOMNode* node, PAGXDocument* doc)
   gradient->center = parsePoint(getAttribute(node, "center", "0,0"));
   gradient->startAngle = getFloatAttribute(node, "startAngle", 0);
   gradient->endAngle = getFloatAttribute(node, "endAngle", 360);
-  parseGradientCommon(node, gradient->matrix, gradient->colorStops);
+  parseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
   return gradient;
 }
 
@@ -902,7 +905,7 @@ static DiamondGradient* parseDiamondGradient(const DOMNode* node, PAGXDocument* 
   }
   gradient->center = parsePoint(getAttribute(node, "center", "0,0"));
   gradient->radius = getFloatAttribute(node, "radius", 0);
-  parseGradientCommon(node, gradient->matrix, gradient->colorStops);
+  parseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
   return gradient;
 }
 
@@ -927,12 +930,12 @@ static ImagePattern* parseImagePattern(const DOMNode* node, PAGXDocument* doc) {
   return pattern;
 }
 
-static ColorStop parseColorStop(const DOMNode* node) {
-  ColorStop stop = {};
-  stop.offset = getFloatAttribute(node, "offset", 0);
+static ColorStop* parseColorStop(const DOMNode* node, PAGXDocument* doc) {
+  auto stop = doc->makeNode<ColorStop>();
+  stop->offset = getFloatAttribute(node, "offset", 0);
   auto colorStr = getAttribute(node, "color");
   if (!colorStr.empty()) {
-    stop.color = parseColor(colorStr);
+    stop->color = parseColor(colorStr);
   }
   return stop;
 }
@@ -965,7 +968,7 @@ static PathData* parsePathData(const DOMNode* node, PAGXDocument* doc) {
   }
   auto data = getAttribute(node, "data");
   if (!data.empty()) {
-    *pathData = PathDataFromSVGString(data);
+    pathData->setPathData(PathDataFromSVGString(data));
   }
   return pathData;
 }
@@ -1020,7 +1023,7 @@ static Glyph* parseGlyph(const DOMNode* node, PAGXDocument* doc) {
       glyph->path = doc->findNode<PathData>(pathAttr.substr(1));
     } else {
       glyph->path = doc->makeNode<PathData>();
-      *glyph->path = PathDataFromSVGString(pathAttr);
+      glyph->path->setPathData(PathDataFromSVGString(pathAttr));
     }
   }
   auto imageAttr = getAttribute(node, "image");

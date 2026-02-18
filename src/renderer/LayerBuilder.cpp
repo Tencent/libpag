@@ -419,14 +419,14 @@ class LayerBuilderContext {
     }
   }
 
-  static void ExtractGradientStops(const std::vector<ColorStop>& colorStops,
+  static void ExtractGradientStops(const std::vector<ColorStop*>& colorStops,
                                    std::vector<tgfx::Color>* colors,
                                    std::vector<float>* positions) {
     colors->reserve(colorStops.size());
     positions->reserve(colorStops.size());
-    for (const auto& stop : colorStops) {
-      colors->push_back(ToTGFX(stop.color));
-      positions->push_back(stop.offset);
+    for (const auto* stop : colorStops) {
+      colors->push_back(ToTGFX(stop->color));
+      positions->push_back(stop->offset);
     }
     if (colors->empty()) {
       *colors = {tgfx::Color::Black(), tgfx::Color::White()};

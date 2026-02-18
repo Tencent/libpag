@@ -122,6 +122,12 @@ class PathData : public Node {
    */
   static int PointsPerVerb(PathVerb verb);
 
+  /**
+   * Copies only the path data (verbs and points) from another PathData, without affecting the Node
+   * base class fields (id, customData).
+   */
+  void setPathData(const PathData& other);
+
   NodeType nodeType() const override {
     return NodeType::PathData;
   }

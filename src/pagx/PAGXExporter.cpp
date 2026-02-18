@@ -280,17 +280,17 @@ static bool writeColorAttribute(XMLBuilder& xml, const ColorSource* color) {
   return true;
 }
 
-static void writeColorStops(XMLBuilder& xml, const std::vector<ColorStop>& stops) {
-  for (const auto& stop : stops) {
+static void writeColorStops(XMLBuilder& xml, const std::vector<ColorStop*>& stops) {
+  for (const auto* stop : stops) {
     xml.openElement("ColorStop");
-    xml.addRequiredAttribute("offset", stop.offset);
-    xml.addRequiredAttribute("color", ColorToHexString(stop.color, stop.color.alpha < 1.0f));
+    xml.addRequiredAttribute("offset", stop->offset);
+    xml.addRequiredAttribute("color", ColorToHexString(stop->color, stop->color.alpha < 1.0f));
     xml.closeElementSelfClosing();
   }
 }
 
 static void writeGradientMatrixAndStops(XMLBuilder& xml, const Matrix& matrix,
-                                        const std::vector<ColorStop>& colorStops) {
+                                        const std::vector<ColorStop*>& colorStops) {
   if (!matrix.isIdentity()) {
     xml.addAttribute("matrix", MatrixToString(matrix));
   }

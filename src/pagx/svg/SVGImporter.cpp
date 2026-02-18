@@ -2114,15 +2114,15 @@ float SVGParserContext::parseLength(const std::string& value, float containerSiz
   return num;
 }
 void SVGParserContext::parseGradientStops(const std::shared_ptr<DOMNode>& element,
-                                          std::vector<ColorStop>& colorStops) {
+                                          std::vector<ColorStop*>& colorStops) {
   auto child = element->getFirstChild();
   while (child) {
     if (child->name == "stop") {
-      ColorStop stop;
-      stop.offset = parseLength(getAttribute(child, "offset", "0"), 1.0f);
-      stop.color = parseColor(getAttribute(child, "stop-color", "#000000"));
+      auto stop = _document->makeNode<ColorStop>();
+      stop->offset = parseLength(getAttribute(child, "offset", "0"), 1.0f);
+      stop->color = parseColor(getAttribute(child, "stop-color", "#000000"));
       float opacity = parseLength(getAttribute(child, "stop-opacity", "1"), 1.0f);
-      stop.color.alpha = opacity;
+      stop->color.alpha = opacity;
       colorStops.push_back(stop);
     }
     child = child->getNextSibling();
@@ -2619,6 +2619,20 @@ ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
   auto countIt = _colorSourceRefCount.find(refId);
   if (countIt != _colorSourceRefCount.end()) {
     refCount = countIt->second;
+  }
+
+  // Don't cache gradients/patterns that use objectBoundingBox units, because their coordinates
+  // depend on the referencing shape's bounds and differ for each usage.
+  if (refCount > 1) {
+    std::string unitsAttr;
+    if (defName == "linearGradient" || defName == "radialGradient") {
+      unitsAttr = getAttribute(defNode, "gradientUnits", "objectBoundingBox");
+    } else if (defName == "pattern") {
+      unitsAttr = getAttribute(defNode, "patternUnits", "objectBoundingBox");
+    }
+    if (unitsAttr == "objectBoundingBox") {
+      refCount = 1;
+    }
   }
 
   // If refCount > 1, check if we already created a resource for this ref.

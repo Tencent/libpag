@@ -133,12 +133,14 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
     // Step 1: Parse SVG to PAGXDocument
     auto doc = pagx::SVGImporter::Parse(svgPath);
     if (!doc) {
+      ADD_FAILURE() << "Failed to parse SVG: " << svgPath;
       continue;
     }
 
     float pagxWidth = doc->width;
     float pagxHeight = doc->height;
     if (pagxWidth <= 0 || pagxHeight <= 0) {
+      ADD_FAILURE() << "Invalid dimensions in SVG: " << svgPath;
       continue;
     }
 
@@ -620,25 +622,18 @@ PAGX_TEST(PAGXTest, SampleFiles) {
   }
   std::sort(sampleFiles.begin(), sampleFiles.end());
 
-  pagx::TextLayout textLayout;
-  textLayout.setFallbackTypefaces(GetFallbackTypefaces());
-
   for (const auto& filePath : sampleFiles) {
     auto baseName = std::filesystem::path(filePath).stem().string();
 
     auto doc = pagx::PAGXImporter::FromFile(filePath);
     if (!doc) {
-      FAIL() << "Failed to load: " << filePath;
+      ADD_FAILURE() << "Failed to load: " << filePath;
       continue;
     }
 
-    auto layoutResult = textLayout.layout(doc.get());
-    pagx::FontEmbedder().embed(doc.get(), layoutResult.shapedTextMap,
-                               layoutResult.textOrder);
-
     auto layer = pagx::LayerBuilder::Build(doc.get());
     if (!layer) {
-      FAIL() << "Failed to build layer: " << filePath;
+      ADD_FAILURE() << "Failed to build layer: " << filePath;
       continue;
     }
 
@@ -681,7 +676,7 @@ PAGX_TEST(PAGXTest, ResourceFiles) {
 
     auto doc = pagx::PAGXImporter::FromFile(filePath);
     if (!doc) {
-      FAIL() << "Failed to load: " << filePath;
+      ADD_FAILURE() << "Failed to load: " << filePath;
       continue;
     }
 
@@ -689,7 +684,7 @@ PAGX_TEST(PAGXTest, ResourceFiles) {
 
     auto layer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
     if (!layer) {
-      FAIL() << "Failed to build layer: " << filePath;
+      ADD_FAILURE() << "Failed to build layer: " << filePath;
       continue;
     }
 
