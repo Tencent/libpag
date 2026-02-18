@@ -153,7 +153,13 @@
     </Layer>
     <Layer>
       <Text text="CHARACTER" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="130,30" textAnchor="center"/>
-      <Fill color="@titleGrad"/>
+      <Fill>
+        <LinearGradient startPoint="-130,0" endPoint="120,0">
+          <ColorStop offset="0" color="#FFE880"/>
+          <ColorStop offset="0.5" color="#FFD700"/>
+          <ColorStop offset="1" color="#CC8800"/>
+        </LinearGradient>
+      </Fill>
     </Layer>
 
     <!-- Character portrait area -->
@@ -397,7 +403,13 @@
     <!-- Power number -->
     <Layer>
       <Text text="52,847" fontFamily="Arial" fontStyle="Bold" fontSize="28" position="130,450" textAnchor="center"/>
-      <Fill color="@titleGrad"/>
+      <Fill>
+        <LinearGradient startPoint="-130,0" endPoint="120,0">
+          <ColorStop offset="0" color="#FFE880"/>
+          <ColorStop offset="0.5" color="#FFD700"/>
+          <ColorStop offset="1" color="#CC8800"/>
+        </LinearGradient>
+      </Fill>
       <DropShadowStyle offsetY="2" blurX="8" blurY="8" color="#FFD70040"/>
     </Layer>
   </Layer>

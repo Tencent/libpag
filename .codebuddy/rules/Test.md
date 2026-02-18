@@ -36,14 +36,11 @@ cmake --build cmake-build-debug --target PAGFullTest
 
 当怀疑 bug 出在渲染引擎 tgfx 而非 libpag 本身时，可以链接本地 tgfx 源码进行源码级调试。
 
-通过 `-DTGFX_DIR` 参数指定本地 tgfx 仓库路径，CMake 会以 `add_subdirectory` 方式将 tgfx 源码直接加入构建（而非使用预编译缓存），从而支持修改 tgfx 代码后增量编译和断点调试。
+通过 `-DTGFX_DIR` 参数指定本地 tgfx 仓库路径，CMake 会以 `add_subdirectory` 方式将 tgfx 源码直接加入构建（而非使用预编译缓存），从而支持修改 tgfx 代码后编译和断点调试。
 
-本地 tgfx 仓库通常位于 libpag 同级目录 `../tgfx`，但可以指向任意路径。使用独立的构建目录以避免与常规构建冲突：
+本地 tgfx 仓库通常位于 libpag 同级目录 `../tgfx`，如果本地 `../tgfx` 目录存在，且怀疑问题出在渲染层，优先使用此方式调试。使用独立的构建目录以避免与常规构建冲突：
 
 ```bash
 cmake -G Ninja -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -DTGFX_DIR=../tgfx -B cmake-build-debuglocal
 cmake --build cmake-build-debuglocal --target PAGFullTest
 ```
-
-- 修改 tgfx 代码后重新执行 build 命令即可增量编译，无需重新 configure
-- 如果本地 `../tgfx` 目录存在，且怀疑问题出在渲染层，优先使用此方式调试

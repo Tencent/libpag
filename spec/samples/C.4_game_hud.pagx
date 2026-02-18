@@ -148,30 +148,30 @@
     </Layer>
 
     <!-- Health Text -->
-    <Layer>
+    <Group>
       <Text text="100%" fontFamily="Arial" fontSize="24" fontStyle="Bold" position="-240,10" textAnchor="end"/>
       <Fill color="#FFF"/>
-    </Layer>
-    <Layer>
+    </Group>
+    <Group>
       <Text text="STRUCTURAL INTEGRITY" fontFamily="Arial" fontSize="10" position="-240,25" textAnchor="end"/>
       <Fill color="#0088FF"/>
-    </Layer>
+    </Group>
   </Layer>
 
   <!-- System Stats (Moved to Top Left Corner) -->
   <Layer name="SystemStats" x="50" y="60">
-    <Layer>
+    <Group>
       <Text text="PWR: 88%" fontFamily="Arial" fontSize="12"/>
       <Fill color="#00CCFF" alpha="0.7"/>
-    </Layer>
-    <Layer y="18">
+    </Group>
+    <Group position="0,18">
       <Text text="RADAR: ACT" fontFamily="Arial" fontSize="12"/>
       <Fill color="#00CCFF" alpha="0.7"/>
-    </Layer>
-    <Layer y="36">
+    </Group>
+    <Group position="0,36">
       <Text text="SHIELD: OK" fontFamily="Arial" fontSize="12"/>
       <Fill color="#00CCFF" alpha="0.7"/>
-    </Layer>
+    </Group>
   </Layer>
 
   <!-- Right Side: Energy & Ammo -->
@@ -196,14 +196,14 @@
     </Layer>
 
     <!-- Energy Text -->
-    <Layer>
+    <Group>
       <Text text="60%" fontFamily="Arial" fontSize="24" fontStyle="Bold" position="240,10"/>
       <Fill color="#FFF"/>
-    </Layer>
-    <Layer>
+    </Group>
+    <Group>
       <Text text="PLASMA RESERVES" fontFamily="Arial" fontSize="10" position="240,25"/>
       <Fill color="#0088FF"/>
-    </Layer>
+    </Group>
   </Layer>
 
   <!-- Bottom: Weapon & Radar -->

@@ -1041,10 +1041,22 @@ class TextLayoutContext {
             xOffset += boxWidth - line.width;
             break;
           case TextAlign::Justify: {
-            // Justify: distribute extra space evenly between characters. Last line uses Start.
+            // Justify: CSS-style distribution. CJK characters get inter-character spacing,
+            // Latin words get inter-word spacing (at whitespace boundaries). Last line uses Start.
             if (lineIdx < lines.size() - 1 && line.glyphs.size() > 1) {
-              justifyExtraPerGap =
-                  (boxWidth - line.width) / static_cast<float>(line.glyphs.size() - 1);
+              int gapCount = 0;
+              for (size_t i = 0; i + 1 < line.glyphs.size(); i++) {
+                auto curr = line.glyphs[i].unichar;
+                auto next = line.glyphs[i + 1].unichar;
+                if (LineBreaker::isWhitespace(curr) || LineBreaker::isCJK(curr) ||
+                    LineBreaker::isCJK(next)) {
+                  gapCount++;
+                }
+              }
+              if (gapCount > 0) {
+                justifyExtraPerGap =
+                    (boxWidth - line.width) / static_cast<float>(gapCount);
+              }
             }
             break;
           }
@@ -1064,16 +1076,25 @@ class TextLayoutContext {
         }
       }
 
+      float justifyOffset = 0;
       for (size_t gi = 0; gi < line.glyphs.size(); gi++) {
         auto& g = line.glyphs[gi];
         // Skip newline glyphs: they only participate in metrics, not rendering.
         if (g.unichar == '\n') {
           continue;
         }
+        if (gi > 0) {
+          auto prev = line.glyphs[gi - 1].unichar;
+          auto curr = g.unichar;
+          if (LineBreaker::isWhitespace(prev) || LineBreaker::isCJK(prev) ||
+              LineBreaker::isCJK(curr)) {
+            justifyOffset += justifyExtraPerGap;
+          }
+        }
         PositionedGlyph pg = {};
         pg.glyphID = g.glyphID;
         pg.font = g.font;
-        pg.x = g.xPosition + xOffset + justifyExtraPerGap * static_cast<float>(gi);
+        pg.x = g.xPosition + xOffset + justifyOffset;
         pg.y = baselineY;
         textGlyphs[g.sourceText].push_back(pg);
       }

@@ -88,6 +88,33 @@ A child Layer can be downgraded to Group when **all** of the following are true:
 8. Does not use `visible="false"` (mask definitions)
 9. Does not have `id` attribute referenced elsewhere
 10. Does not contain child Layers (only Group/geometry/painter children)
+11. Downgrade does not change visual stacking order among siblings
+
+**Stacking order caveat**: Within a parent Layer, Groups are part of the parent's **contents**
+(rendered first), while child Layers are **children** (rendered on top of contents). If a Layer
+is downgraded to Group but has sibling Layers, the downgraded Group will render **below** all
+sibling Layers — even if it appeared after them in the XML source order. This can cause
+elements to become hidden behind overlapping siblings.
+
+Example — before downgrade (correct stacking):
+```xml
+<Layer name="parent">
+  <Layer name="background">...</Layer>   <!-- renders first (child 1) -->
+  <Layer name="foreground">...</Layer>   <!-- renders on top (child 2) -->
+</Layer>
+```
+
+After incorrectly downgrading foreground to Group (broken stacking):
+```xml
+<Layer name="parent">
+  <Layer name="background">...</Layer>   <!-- child: renders ON TOP -->
+  <Group>...</Group>                      <!-- contents: renders BELOW background! -->
+</Layer>
+```
+
+**Rule**: Only downgrade a Layer to Group when there are no sibling Layers whose stacking
+order relative to it matters, or when all siblings are also being downgraded to Groups
+(preserving their relative source order).
 
 **Transform conversion**: Layer `x="X" y="Y"` → Group `position="X,Y"`.
 Layer `name` attribute should be removed (Group does not support it).
