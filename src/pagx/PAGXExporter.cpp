@@ -1022,8 +1022,8 @@ static void writeLayer(XMLBuilder& xml, const Layer* node, const Options& option
   if (!node->matrix.isIdentity()) {
     xml.addAttribute("matrix", MatrixToString(node->matrix));
   }
-  if (!node->matrix3D.empty()) {
-    xml.addAttribute("matrix3D", floatListToString(node->matrix3D));
+  if (!node->matrix3D.isIdentity()) {
+    xml.addAttribute("matrix3D", floatListToString(node->matrix3D.values, 16));
   }
   xml.addAttribute("preserve3D", node->preserve3D);
   xml.addAttribute("antiAlias", node->antiAlias, true);

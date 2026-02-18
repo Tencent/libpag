@@ -27,6 +27,7 @@
 #include "pagx/types/BlendMode.h"
 #include "pagx/types/MaskType.h"
 #include "pagx/types/Matrix.h"
+#include "pagx/types/Matrix3D.h"
 #include "pagx/types/Rect.h"
 
 namespace pagx {
@@ -75,9 +76,9 @@ class Layer : public Node {
   Matrix matrix = {};
 
   /**
-   * The 3D transformation matrix as a 16-element array in column-major order.
+   * The 3D transformation matrix.
    */
-  std::vector<float> matrix3D = {};
+  Matrix3D matrix3D = {};
 
   /**
    * Whether to preserve 3D transformations for child layers. The default value is false.

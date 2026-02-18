@@ -674,7 +674,7 @@ class LayerBuilderContext {
     }
 
     // Apply 3D matrix if present (overrides 2D matrix)
-    if (node->matrix3D.size() == 16) {
+    if (!node->matrix3D.isIdentity()) {
       layer->setMatrix3D(ToTGFX3D(node->matrix3D));
     }
     if (node->preserve3D) {

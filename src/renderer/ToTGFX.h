@@ -27,6 +27,7 @@
 #include "pagx/types/LayerPlacement.h"
 #include "pagx/types/MaskType.h"
 #include "pagx/types/Matrix.h"
+#include "pagx/types/Matrix3D.h"
 #include "pagx/types/MergePathMode.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/Rect.h"
@@ -104,7 +105,7 @@ tgfx::FilterMode ToTGFX(FilterMode mode);
 
 tgfx::MipmapMode ToTGFX(MipmapMode mode);
 
-tgfx::Matrix3D ToTGFX3D(const std::vector<float>& matrix3D);
+tgfx::Matrix3D ToTGFX3D(const Matrix3D& matrix3D);
 
 std::shared_ptr<tgfx::Data> ToTGFXData(const std::shared_ptr<Data>& data);
 

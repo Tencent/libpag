@@ -298,11 +298,11 @@ tgfx::MipmapMode ToTGFX(MipmapMode mode) {
   return tgfx::MipmapMode::Linear;
 }
 
-tgfx::Matrix3D ToTGFX3D(const std::vector<float>& matrix3D) {
+tgfx::Matrix3D ToTGFX3D(const Matrix3D& matrix3D) {
   tgfx::Matrix3D m = {};
   for (int r = 0; r < 4; r++) {
     for (int c = 0; c < 4; c++) {
-      m.setRowColumn(r, c, matrix3D[static_cast<size_t>(r * 4 + c)]);
+      m.setRowColumn(r, c, matrix3D.getRowColumn(r, c));
     }
   }
   return m;

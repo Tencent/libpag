@@ -194,7 +194,10 @@ static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
   }
   auto matrix3DStr = getAttribute(node, "matrix3D");
   if (!matrix3DStr.empty()) {
-    layer->matrix3D = ParseFloatList(matrix3DStr);
+    auto floats = ParseFloatList(matrix3DStr);
+    if (floats.size() == 16) {
+      memcpy(layer->matrix3D.values, floats.data(), 16 * sizeof(float));
+    }
   }
   layer->preserve3D = getBoolAttribute(node, "preserve3D", false);
   layer->antiAlias = getBoolAttribute(node, "antiAlias", true);
