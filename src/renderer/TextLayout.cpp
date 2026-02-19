@@ -1216,7 +1216,8 @@ class TextLayoutContext {
           currentColumn->glyphs = std::move(overflow);
           if (!currentColumn->glyphs.empty()) {
             currentColumn->glyphs[0].canBreakBefore = false;
-          }          currentColumnHeight = 0;
+          }
+          currentColumnHeight = 0;
           for (auto& g : currentColumn->glyphs) {
             currentColumnHeight += g.height;
           }
