@@ -143,13 +143,12 @@
       <Text text="Readable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <Fill color="#F43F5E"/>
     </Layer>
-    <Layer x="-50" y="10">
-      <Text text="Plain-text XML, easy to" fontFamily="Arial" fontSize="16"/>
-      <Fill color="#CBD5E1"/>
-    </Layer>
-    <Layer x="-50" y="32">
-      <Text text="diff, debug, and AI-generate." fontFamily="Arial" fontSize="16"/>
-      <Fill color="#CBD5E1"/>
+    <Layer x="-50" y="-7">
+      <Group>
+        <Text text="Plain-text XML, easy to&#10;diff, debug, and AI-generate." fontFamily="Arial" fontSize="16"/>
+        <Fill color="#CBD5E1"/>
+      </Group>
+      <TextBox lineHeight="22"/>
     </Layer>
   </Layer>
 
@@ -190,13 +189,12 @@
       <Text text="Comprehensive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <Fill color="#38BDF8"/>
     </Layer>
-    <Layer x="-50" y="10">
-      <Text text="Covers vectors, images," fontFamily="Arial" fontSize="16"/>
-      <Fill color="#CBD5E1"/>
-    </Layer>
-    <Layer x="-50" y="32">
-      <Text text="text, effects, and masks." fontFamily="Arial" fontSize="16"/>
-      <Fill color="#CBD5E1"/>
+    <Layer x="-50" y="-7">
+      <Group>
+        <Text text="Covers vectors, images,&#10;text, effects, and masks." fontFamily="Arial" fontSize="16"/>
+        <Fill color="#CBD5E1"/>
+      </Group>
+      <TextBox lineHeight="22"/>
     </Layer>
   </Layer>
 
@@ -251,13 +249,12 @@
       <Text text="Expressive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <Fill color="#A855F7"/>
     </Layer>
-    <Layer x="-50" y="10">
-      <Text text="Compact structure for both" fontFamily="Arial" fontSize="16"/>
-      <Fill color="#CBD5E1"/>
-    </Layer>
-    <Layer x="-50" y="32">
-      <Text text="static and animated content." fontFamily="Arial" fontSize="16"/>
-      <Fill color="#CBD5E1"/>
+    <Layer x="-50" y="-7">
+      <Group>
+        <Text text="Compact structure for both&#10;static and animated content." fontFamily="Arial" fontSize="16"/>
+        <Fill color="#CBD5E1"/>
+      </Group>
+      <TextBox lineHeight="22"/>
     </Layer>
   </Layer>
 
@@ -296,13 +293,12 @@
       <Text text="Interoperable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <Fill color="#10B981"/>
     </Layer>
-    <Layer x="-50" y="10">
-      <Text text="Bridges AE, Figma, SVG," fontFamily="Arial" fontSize="16"/>
-      <Fill color="#CBD5E1"/>
-    </Layer>
-    <Layer x="-50" y="32">
-      <Text text="PDF, and more seamlessly." fontFamily="Arial" fontSize="16"/>
-      <Fill color="#CBD5E1"/>
+    <Layer x="-50" y="-7">
+      <Group>
+        <Text text="Bridges AE, Figma, SVG,&#10;PDF, and more seamlessly." fontFamily="Arial" fontSize="16"/>
+        <Fill color="#CBD5E1"/>
+      </Group>
+      <TextBox lineHeight="22"/>
     </Layer>
   </Layer>
 
@@ -350,13 +346,12 @@
       <Text text="Deployable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <Fill color="#FBBF24"/>
     </Layer>
-    <Layer x="-50" y="10">
-      <Text text="One-click export to binary" fontFamily="Arial" fontSize="16"/>
-      <Fill color="#CBD5E1"/>
-    </Layer>
-    <Layer x="-50" y="32">
-      <Text text="PAG with high performance." fontFamily="Arial" fontSize="16"/>
-      <Fill color="#CBD5E1"/>
+    <Layer x="-50" y="-7">
+      <Group>
+        <Text text="One-click export to binary&#10;PAG with high performance." fontFamily="Arial" fontSize="16"/>
+        <Fill color="#CBD5E1"/>
+      </Group>
+      <TextBox lineHeight="22"/>
     </Layer>
   </Layer>
 
