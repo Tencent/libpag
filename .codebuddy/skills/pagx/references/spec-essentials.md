@@ -360,9 +360,11 @@ Multiple Text elements in one Group, each with independent Fill/Stroke, unified 
 
 - Copies all accumulated geometry and already-rendered styles.
 - Transform per copy (i from 0): `progress = i + offset`
-  - Scale: `scale^progress` (exponential)
-  - Rotate: `rotation × progress` (linear)
-  - Translate: `position × progress` (linear)
+  1. translate(-anchor)
+  2. scale(scale^progress) — exponential
+  3. rotate(rotation × progress) — linear
+  4. translate(position × progress) — linear
+  5. translate(anchor)
 - Opacity: `lerp(startAlpha, endAlpha, progress / ceil(copies))`
 - Fractional copies: last copy gets `alpha × fractional_part`
 - `copies < 0`: no operation. `copies = 0`: clears all accumulated content.

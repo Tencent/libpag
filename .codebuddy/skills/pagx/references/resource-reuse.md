@@ -43,6 +43,11 @@ Reference Layer x  = layerX - width/2 + cx   (simplifies to layerX - width/2 whe
 Reference Layer y  = layerY - height/2 + cy   (simplifies to layerY - height/2 when cy=0)
 ```
 
+**Why Internal center = (width/2, height/2)**: Composition has its own coordinate system with
+origin at the **top-left corner** (0,0). A geometry element that was centered at (0,0) in the
+original Layer must shift to (width/2, height/2) inside the Composition to remain centered
+within the Composition bounds.
+
 ### Example
 
 ```xml

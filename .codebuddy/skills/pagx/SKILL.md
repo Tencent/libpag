@@ -13,6 +13,15 @@ This skill provides the knowledge needed to **generate** well-structured PAGX fi
 natural-language descriptions and **optimize** existing ones. Both tasks share the same
 foundational understanding of the PAGX format.
 
+## Reference Map
+
+| Task | Read These References |
+|------|----------------------|
+| Generate PAGX from description | `spec-essentials.md`, `generation-guide.md` |
+| Optimize existing PAGX | `structure-optimization.md`, `painter-merging.md`, `resource-reuse.md` |
+| Improve rendering performance | `performance.md` |
+| Look up attribute defaults or enums | `pagx-quick-reference.md` |
+
 ---
 
 ## Core Concepts
@@ -110,6 +119,8 @@ for Text+TextBox, geometry center for shapes — not Text position when TextBox 
 - Use integer coordinates when possible for clarity
 - Place `<Resources>` after all Layers for readability
 - Prefer Rectangle/Ellipse over Path for standard shapes (more readable, better performance)
+- **Performance awareness**: Keep single Repeater copies ≤ 200; nested Repeater product ≤ 500.
+  Prefer Rectangle/Ellipse over Path under Repeaters (dedicated fast path in renderer).
 
 ### Common Pitfalls
 
@@ -118,6 +129,17 @@ for Text+TextBox, geometry center for shapes — not Text position when TextBox 
 - Setting Text `position`/`textAnchor` when a TextBox controls layout (they are ignored)
 - Omitting required attributes: `ColorStop.offset`/`color`, `LinearGradient.startPoint`/`endPoint`,
   `BlurFilter.blurX`/`blurY` — these have no defaults
+
+### Post-Generation Checklist
+
+After generating, verify:
+
+1. All direct children of `<pagx>` and `<Composition>` are `<Layer>` (no root-level Groups)
+2. All required attributes are present (see `references/pagx-quick-reference.md`)
+3. Different painters on different geometry are isolated with Groups
+4. Text `position`/`textAnchor` are not set when a TextBox is present
+5. Internal coordinates are relative to the Layer origin, not canvas-absolute
+6. `<Resources>` is placed after all Layers
 
 > For detailed generation patterns, component templates, and examples, read
 > `references/generation-guide.md`.
@@ -133,6 +155,18 @@ for Text+TextBox, geometry center for shapes — not Text position when TextBox 
 - **Forbidden**: Modifying visual attributes (colors, blur, spacing, opacity, font sizes, etc.)
   without explicit user approval. These are design decisions, not optimization decisions.
 - **When in doubt**: Describe the potential change and ask the user before applying.
+
+### Recommended Order
+
+Optimizations have dependencies — apply them in this order:
+
+1. **Semantic restructuring** (#7 Layer/Group) — split, merge, or downgrade first
+2. **Coordinate localization** (#8) — normalize coordinates after any structural change
+3. **Structural cleanup** (#1, #3–#5) — move Resources, omit defaults, simplify transforms
+4. **Painter merging** (#9–#10) — merge only after structure is stable
+5. **Text layout** (#11) — consolidate multi-text into TextBox
+6. **Resource reuse** (#12–#16) — extract shared resources, replace Paths with primitives
+7. **Dead code removal** (#2, #6) — remove empty elements and unused resources last
 
 ### Optimization Checklist
 
@@ -207,6 +241,17 @@ layout. Each text segment should be in a Group (for style isolation), not a sepa
 2. **Suggestions (never auto-apply)**: Reduce density, lower blur, simplify geometry
 
 > For detailed optimization techniques, read `references/performance.md`.
+
+### Post-Optimization Checklist
+
+After optimizing, verify:
+
+1. All `@id` references still resolve (no dangling references after resource changes)
+2. Painter scope isolation is correct (no unintended geometry sharing after merging)
+3. Internal coordinates are Layer-relative after coordinate localization
+4. All required attributes are still present (not accidentally removed)
+5. All direct children of `<pagx>` and `<Composition>` are `<Layer>`
+6. Visual stacking order is preserved (especially after Layer↔Group conversions)
 
 ---
 
