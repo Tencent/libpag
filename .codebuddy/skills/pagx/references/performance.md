@@ -32,7 +32,7 @@ Understanding the PAGX renderer's cost model helps identify performance bottlene
 
 Layer creates an independent rendering surface; Group does not. Replacing unnecessary Layers
 with Groups eliminates compositing overhead. For the full downgrade checklist, stacking order
-rules, and detailed examples, see **Scenario C** in `layer-vs-group.md`.
+rules, and detailed examples, see **Scenario C** in `structure-optimization.md`.
 
 ### Clip Repeater Content to Canvas Bounds
 

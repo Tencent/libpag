@@ -1,6 +1,15 @@
-# Layer vs Group Reference
+# Structure Optimization Reference
 
-## Layer vs Group: When to Use Which
+Back to main: [SKILL.md](../SKILL.md)
+
+This file covers all structure-level optimizations: Layer/Group semantic optimization,
+coordinate localization, and structural cleanup rules.
+
+---
+
+## Layer/Group Semantic Optimization (#7)
+
+### Layer vs Group: When to Use Which
 
 **Layer** creates an independent rendering surface with its own coordinate system. It is the
 primary rendering unit for visual content, supporting advanced compositing (styles, filters,
@@ -39,13 +48,13 @@ This principle drives all Layer/Group optimization decisions:
 
 ---
 
-## Optimization Scenarios
+### Optimization Scenarios
 
 The core principle leads to three optimization scenarios. In every case, the Layer carries
 the block's offset via `x`/`y`, and internal elements use coordinates **relative to the
 Layer's origin (0,0)** — so repositioning the block means changing one `x`/`y` value.
 
-### Scenario A: Split an Over-Packed Layer
+#### Scenario A: Split an Over-Packed Layer
 
 **Problem**: One Layer contains multiple distinct logical blocks (e.g., "Box A" and "Box B"
 test cases, or an entire page of unrelated UI sections). Each block cannot be independently
@@ -104,7 +113,7 @@ block's position, and convert internal coordinates to be relative to the Layer's
 </Layer>
 ```
 
-### Scenario B: Merge Overlapping Layers into One Block
+#### Scenario B: Merge Overlapping Layers into One Block
 
 **Problem**: A single logical block (a button, a badge, a bar) is scattered across multiple
 sibling Layers at the same position — e.g., one Layer for the background, another for the
@@ -147,7 +156,7 @@ internal coordinates are origin-relative.
 </Layer>
 ```
 
-### Scenario C: Downgrade Stacked Child Layers to Groups
+#### Scenario C: Downgrade Stacked Child Layers to Groups
 
 **Problem**: Inside one logical block (a parent Layer), multiple child Layers are used for
 sub-elements that do not need Layer-exclusive features — e.g., each stat row in a stats
@@ -197,7 +206,61 @@ a redundant wrapper that can always be flattened (promote the child to the paren
 
 ---
 
-## Coordinate Localization
+### Downgrade Checklist
+
+A child Layer can be downgraded to Group when **all** of the following are true:
+
+1. NOT a direct child of `<pagx>` or `<Composition>`
+2. Does not use any **Layer-exclusive feature**:
+   - **Child nodes**: styles (DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle),
+     filters (BlurFilter, DropShadowFilter, InnerShadowFilter, BlendFilter, ColorMatrixFilter),
+     child Layers
+   - **Attributes**: mask, maskType, blendMode (non-default), composition, scrollRect,
+     visible="false" (mask definitions), id (if referenced elsewhere), name, matrix, matrix3D,
+     preserve3D, groupOpacity, passThroughBackground, excludeChildEffectsInLayerStyle
+3. Downgrade does not change visual stacking order among siblings
+4. The Layer is a **sub-element within the same logical block** — not a distinct independent
+   block on its own
+
+**Transform conversion**: Layer `x="X" y="Y"` → Group `position="X,Y"`.
+Layer `name` attribute should be removed (Group does not support it).
+
+---
+
+### Stacking Order and the All-or-Nothing Rule
+
+Within a parent Layer, **contents** (Groups, geometry, painters) always render first (below),
+and **children** (child Layers) render on top — regardless of XML source order.
+
+This means partial downgrade (converting only some sibling Layers to Groups) can break
+stacking order: newly created Groups move from the children list to contents, rendering
+below their remaining Layer siblings.
+
+**Rule**: When a parent has multiple child Layers, either downgrade **all** that qualify
+(preserving their relative order within contents), or downgrade **none**.
+
+```xml
+<!-- All three qualify → downgrade all, order preserved in contents -->
+<Layer name="parent">
+  <Group position="10,0">...</Group>
+  <Group position="20,0">...</Group>
+  <Group position="30,0">...</Group>
+</Layer>
+```
+
+```xml
+<!-- Layer B has DropShadowStyle → cannot downgrade ANY sibling -->
+<Layer name="parent">
+  <Layer name="A">...</Layer>
+  <Layer name="B"><DropShadowStyle .../></Layer>
+  <Layer name="C">...</Layer>
+</Layer>
+<!-- Keep all as Layers — do NOT downgrade A or C -->
+```
+
+---
+
+## Coordinate Localization (#8)
 
 All three scenarios above share a common sub-step: **converting internal coordinates from
 canvas-absolute to Layer-relative.**
@@ -239,54 +302,115 @@ position, focus on the **layout-controlling nodes**:
 
 ---
 
-## Downgrade Checklist
+## Structure Cleanup
 
-A child Layer can be downgraded to Group when **all** of the following are true:
+### Move Resources to End of File (#1)
 
-1. NOT a direct child of `<pagx>` or `<Composition>`
-2. Does not use any **Layer-exclusive feature**:
-   - **Child nodes**: styles (DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle),
-     filters (BlurFilter, DropShadowFilter, InnerShadowFilter, BlendFilter, ColorMatrixFilter),
-     child Layers
-   - **Attributes**: mask, maskType, blendMode (non-default), composition, scrollRect,
-     visible="false" (mask definitions), id (if referenced elsewhere), name, matrix, matrix3D,
-     preserve3D, groupOpacity, passThroughBackground, excludeChildEffectsInLayerStyle
-3. Downgrade does not change visual stacking order among siblings
-4. The Layer is a **sub-element within the same logical block** — not a distinct independent
-   block on its own
-
-**Transform conversion**: Layer `x="X" y="Y"` → Group `position="X,Y"`.
-Layer `name` attribute should be removed (Group does not support it).
-
----
-
-## Stacking Order and the All-or-Nothing Rule
-
-Within a parent Layer, **contents** (Groups, geometry, painters) always render first (below),
-and **children** (child Layers) render on top — regardless of XML source order.
-
-This means partial downgrade (converting only some sibling Layers to Groups) can break
-stacking order: newly created Groups move from the children list to contents, rendering
-below their remaining Layer siblings.
-
-**Rule**: When a parent has multiple child Layers, either downgrade **all** that qualify
-(preserving their relative order within contents), or downgrade **none**.
+Place the `<Resources>` node as the last child of the root element so the layer tree appears
+first. This makes the content structure immediately visible without scrolling past resource
+definitions. Resource position does not affect rendering.
 
 ```xml
-<!-- All three qualify → downgrade all, order preserved in contents -->
-<Layer name="parent">
-  <Group position="10,0">...</Group>
-  <Group position="20,0">...</Group>
-  <Group position="30,0">...</Group>
-</Layer>
+<!-- Before -->
+<pagx width="800" height="600">
+  <Resources>
+    <PathData id="arrow" data="M 0 0 L 10 0"/>
+  </Resources>
+  <Layer name="Main">...</Layer>
+</pagx>
+
+<!-- After -->
+<pagx width="800" height="600">
+  <Layer name="Main">...</Layer>
+  <Resources>
+    <PathData id="arrow" data="M 0 0 L 10 0"/>
+  </Resources>
+</pagx>
 ```
 
+### Remove Empty and Dead Elements (#2)
+
+- Empty `<Layer/>` tags with no children and no meaningful attributes
+- Empty `<Resources></Resources>` blocks
+- `<Stroke ... width="0"/>` — zero-width strokes are invisible
+
+**Caveats**:
+- An empty Layer may serve as a mask target (`id` referenced elsewhere). Verify before removing.
+- A Layer with `visible="false"` is not "empty" — it is likely a mask/clip definition.
+- **Mask layers must not be moved** to a different position in the layer tree.
+
+### Omit Default Attribute Values (#3)
+
+The PAGX spec defines default values for most optional attributes. Attributes set to their
+default value are redundant and should be omitted.
+
+**Common Defaults to Omit**:
+
+**Layer**: `alpha="1"`, `visible="true"`, `blendMode="normal"`, `x="0"`, `y="0"`,
+`antiAlias="true"`, `groupOpacity="false"`, `maskType="alpha"`
+
+**Rectangle / Ellipse**: `center="0,0"`, `size="100,100"`, `reversed="false"`.
+Also `roundness="0"` for Rectangle.
+
+**Fill**: `color="#000000"`, `alpha="1"`, `blendMode="normal"`, `fillRule="winding"`,
+`placement="background"`
+
+**Stroke**: `color="#000000"`, `width="1"`, `alpha="1"`, `blendMode="normal"`, `cap="butt"`,
+`join="miter"`, `miterLimit="4"`, `dashOffset="0"`, `align="center"`,
+`placement="background"`
+
+**Group**: `alpha="1"`, `position="0,0"`, `rotation="0"`, `scale="1,1"`, `skew="0"`,
+`skewAxis="0"`
+
+**Non-Obvious Defaults (Easy to Forget)**:
+
+| Element | Attribute | Default | Common Misconception |
+|---------|-----------|---------|---------------------|
+| **Repeater** | `position` | `100,100` | Often assumed to be `0,0` |
+| **Repeater** | `copies` | `3` | Often assumed to be `1` |
+| **Rectangle/Ellipse** | `size` | `100,100` | May forget there is a default |
+| **Polystar** | `type` | `star` | May assume `polygon` |
+| **TextLayout** | `lineHeight` | `1.2` | Often assumed to be `1.0` |
+| **RoundCorner** | `radius` | `10` | Often assumed to be `0` |
+| **Stroke** | `miterLimit` | `4` | Often assumed to be `10` (SVG default) |
+
+**Required Attributes That Look Like They Have Defaults**:
+
+| Element | Attribute | Why It Looks Optional |
+|---------|-----------|----------------------|
+| **LinearGradient** | `startPoint` | Looks like `0,0` default, but (required) |
+| **LinearGradient** | `endPoint` | Also (required) |
+| **ColorStop** | `offset` | Looks like zero default, but (required) |
+| **ColorStop** | `color` | Also (required) |
+
+### Simplify Transform Attributes (#4)
+
+**Translation-Only Matrix to x/y**:
+
 ```xml
-<!-- Layer B has DropShadowStyle → cannot downgrade ANY sibling -->
-<Layer name="parent">
-  <Layer name="A">...</Layer>
-  <Layer name="B"><DropShadowStyle .../></Layer>
-  <Layer name="C">...</Layer>
-</Layer>
-<!-- Keep all as Layers — do NOT downgrade A or C -->
+<!-- Before --> <Layer matrix="1,0,0,1,200,150">
+<!-- After  --> <Layer x="200" y="150">
 ```
+
+**Identity Matrix Removal**:
+
+```xml
+<!-- Before --> <Layer matrix="1,0,0,1,0,0">
+<!-- After  --> <Layer>
+```
+
+**Cascaded Translation Merging**: When nested Layers each only apply translation (no
+rotation/scale) and intermediate Layers have no other attributes, merge into a single
+translation.
+
+### Normalize Numeric Values (#5)
+
+- Near-zero scientific notation (`-2.18e-06`) → `0`
+- Trailing decimals (`100.0`) → `100`
+- Short hex when possible (`#FF0000` → `#F00`)
+- Remove spaces after commas: `"30, -20"` → `"30,-20"`
+
+### Remove Unused Resources (#6)
+
+Resources with `id="xxx"` that have no corresponding `@xxx` reference anywhere in the file
+should be deleted. Search the entire file including keyframe values for animated files.

@@ -73,7 +73,7 @@ Fill / Stroke declaration.
 ### Cross-Layer Merging
 
 > **Related**: When the motivation is semantic (grouping one logical block that was scattered
-> across multiple Layers), see **Scenario B** in `layer-vs-group.md`. Cross-Layer Merging here
+> across multiple Layers), see **Scenario B** in `structure-optimization.md`. Cross-Layer Merging here
 > focuses on **painter deduplication** — merging Layers that happen to share identical painters,
 > regardless of whether they form one logical block.
 
