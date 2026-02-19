@@ -1,0 +1,908 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PAGX XML Schema Definition
+  Generated from the PAGX Specification (pagx_spec.md)
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           elementFormDefault="qualified">
+
+  <!-- ========================= Basic Data Types ========================= -->
+
+  <!-- float: standard xs:decimal covers float values -->
+
+  <!-- bool: true/false -->
+  <xs:simpleType name="BoolType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="true"/>
+      <xs:enumeration value="false"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Point: "x,y" - two comma-separated floats -->
+  <xs:simpleType name="PointType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="-?[0-9]*\.?[0-9]+,-?[0-9]*\.?[0-9]+"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Size: "width,height" - same format as Point -->
+  <xs:simpleType name="SizeType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="-?[0-9]*\.?[0-9]+,-?[0-9]*\.?[0-9]+"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Rect: "x,y,width,height" - four comma-separated floats -->
+  <xs:simpleType name="RectType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="-?[0-9]*\.?[0-9]+,-?[0-9]*\.?[0-9]+,-?[0-9]*\.?[0-9]+,-?[0-9]*\.?[0-9]+"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Matrix2D: "a,b,c,d,tx,ty" - six comma-separated floats -->
+  <xs:simpleType name="Matrix2DType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="-?[0-9]*\.?[0-9]+(,-?[0-9]*\.?[0-9]+){5}"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Matrix3D: 16 comma-separated floats -->
+  <xs:simpleType name="Matrix3DType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="-?[0-9]*\.?[0-9]+(,-?[0-9]*\.?[0-9]+){15}"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Matrix: either 2D (6 values) or 3D (16 values) -->
+  <xs:simpleType name="MatrixType">
+    <xs:union memberTypes="Matrix2DType Matrix3DType"/>
+  </xs:simpleType>
+
+  <!--
+    Color: supports three formats:
+    1. HEX: #RGB, #RRGGBB, #RRGGBBAA
+    2. Float: srgb(r,g,b), srgb(r,g,b,a), p3(r,g,b), p3(r,g,b,a)
+    3. idref: @resourceId
+  -->
+  <xs:simpleType name="HexColorType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="#[0-9a-fA-F]{3}"/>
+      <xs:pattern value="#[0-9a-fA-F]{6}"/>
+      <xs:pattern value="#[0-9a-fA-F]{8}"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="FloatColorType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="(srgb|p3)\(\s*-?[0-9]*\.?[0-9]+\s*,\s*-?[0-9]*\.?[0-9]+\s*,\s*-?[0-9]*\.?[0-9]+\s*(,\s*-?[0-9]*\.?[0-9]+\s*)?\)"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="IdRefType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="@\S+"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ColorType">
+    <xs:union memberTypes="HexColorType FloatColorType IdRefType"/>
+  </xs:simpleType>
+
+  <!-- ColorOrIdRef: Color value or idref for color/colorSource attributes -->
+  <xs:simpleType name="ColorOrIdRefType">
+    <xs:union memberTypes="ColorType IdRefType"/>
+  </xs:simpleType>
+
+  <!-- StringOrIdRef: string value or idref for data/path attributes -->
+  <xs:simpleType name="StringOrIdRefType">
+    <xs:restriction base="xs:string"/>
+  </xs:simpleType>
+
+  <!-- ColorMatrix: 20 comma-separated floats -->
+  <xs:simpleType name="ColorMatrixType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="-?[0-9]*\.?[0-9]+(,-?[0-9]*\.?[0-9]+){19}"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Dash pattern: comma-separated floats -->
+  <xs:simpleType name="DashPatternType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="-?[0-9]*\.?[0-9]+(,-?[0-9]*\.?[0-9]+)*"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Comma-separated list of floats (for glyphs, xOffsets, rotations, etc.) -->
+  <xs:simpleType name="FloatListType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="-?[0-9]*\.?[0-9]+(,-?[0-9]*\.?[0-9]+)*"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Semicolon-separated list of points (for positions, anchors, scales) -->
+  <xs:simpleType name="PointListType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="-?[0-9]*\.?[0-9]+,-?[0-9]*\.?[0-9]+(;-?[0-9]*\.?[0-9]+,-?[0-9]*\.?[0-9]+)*"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ========================= Enumeration Types ========================= -->
+
+  <xs:simpleType name="BlendModeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="normal"/>
+      <xs:enumeration value="multiply"/>
+      <xs:enumeration value="screen"/>
+      <xs:enumeration value="overlay"/>
+      <xs:enumeration value="darken"/>
+      <xs:enumeration value="lighten"/>
+      <xs:enumeration value="colorDodge"/>
+      <xs:enumeration value="colorBurn"/>
+      <xs:enumeration value="hardLight"/>
+      <xs:enumeration value="softLight"/>
+      <xs:enumeration value="difference"/>
+      <xs:enumeration value="exclusion"/>
+      <xs:enumeration value="hue"/>
+      <xs:enumeration value="saturation"/>
+      <xs:enumeration value="color"/>
+      <xs:enumeration value="luminosity"/>
+      <xs:enumeration value="plusLighter"/>
+      <xs:enumeration value="plusDarker"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="MaskTypeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="alpha"/>
+      <xs:enumeration value="luminance"/>
+      <xs:enumeration value="contour"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="TileModeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="clamp"/>
+      <xs:enumeration value="repeat"/>
+      <xs:enumeration value="mirror"/>
+      <xs:enumeration value="decal"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="FilterModeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="nearest"/>
+      <xs:enumeration value="linear"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="MipmapModeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="none"/>
+      <xs:enumeration value="nearest"/>
+      <xs:enumeration value="linear"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="FillRuleType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="winding"/>
+      <xs:enumeration value="evenOdd"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="LineCapType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="butt"/>
+      <xs:enumeration value="round"/>
+      <xs:enumeration value="square"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="LineJoinType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="miter"/>
+      <xs:enumeration value="round"/>
+      <xs:enumeration value="bevel"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="StrokeAlignType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="center"/>
+      <xs:enumeration value="inside"/>
+      <xs:enumeration value="outside"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="LayerPlacementType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="background"/>
+      <xs:enumeration value="foreground"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="PolystarTypeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="polygon"/>
+      <xs:enumeration value="star"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="TrimTypeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="separate"/>
+      <xs:enumeration value="continuous"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="MergePathOpType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="append"/>
+      <xs:enumeration value="union"/>
+      <xs:enumeration value="intersect"/>
+      <xs:enumeration value="xor"/>
+      <xs:enumeration value="difference"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="SelectorUnitType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="index"/>
+      <xs:enumeration value="percentage"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="SelectorShapeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="square"/>
+      <xs:enumeration value="rampUp"/>
+      <xs:enumeration value="rampDown"/>
+      <xs:enumeration value="triangle"/>
+      <xs:enumeration value="round"/>
+      <xs:enumeration value="smooth"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="SelectorModeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="add"/>
+      <xs:enumeration value="subtract"/>
+      <xs:enumeration value="intersect"/>
+      <xs:enumeration value="min"/>
+      <xs:enumeration value="max"/>
+      <xs:enumeration value="difference"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="TextAlignType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="start"/>
+      <xs:enumeration value="center"/>
+      <xs:enumeration value="end"/>
+      <xs:enumeration value="justify"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="TextAnchorType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="start"/>
+      <xs:enumeration value="center"/>
+      <xs:enumeration value="end"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ParagraphAlignType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="near"/>
+      <xs:enumeration value="middle"/>
+      <xs:enumeration value="far"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="WritingModeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="horizontal"/>
+      <xs:enumeration value="vertical"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="RepeaterOrderType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="belowOriginal"/>
+      <xs:enumeration value="aboveOriginal"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="OverflowType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="visible"/>
+      <xs:enumeration value="hidden"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ========================= Attribute Groups ========================= -->
+
+  <!-- Common attributes available on any element: id and data-* -->
+  <xs:attributeGroup name="CommonAttributes">
+    <xs:attribute name="id" type="xs:string"/>
+  </xs:attributeGroup>
+
+  <!-- ========================= Color Source Elements ========================= -->
+
+  <!-- ColorStop -->
+  <xs:complexType name="ColorStopType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="offset" type="xs:decimal" use="required"/>
+    <xs:attribute name="color" type="ColorType" use="required"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- SolidColor -->
+  <xs:complexType name="SolidColorType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="color" type="ColorType" use="required"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- LinearGradient -->
+  <xs:complexType name="LinearGradientType">
+    <xs:sequence>
+      <xs:element name="ColorStop" type="ColorStopType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="startPoint" type="PointType" use="required"/>
+    <xs:attribute name="endPoint" type="PointType" use="required"/>
+    <xs:attribute name="matrix" type="MatrixType"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- RadialGradient -->
+  <xs:complexType name="RadialGradientType">
+    <xs:sequence>
+      <xs:element name="ColorStop" type="ColorStopType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="center" type="PointType" default="0,0"/>
+    <xs:attribute name="radius" type="xs:decimal" use="required"/>
+    <xs:attribute name="matrix" type="MatrixType"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- ConicGradient -->
+  <xs:complexType name="ConicGradientType">
+    <xs:sequence>
+      <xs:element name="ColorStop" type="ColorStopType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="center" type="PointType" default="0,0"/>
+    <xs:attribute name="startAngle" type="xs:decimal" default="0"/>
+    <xs:attribute name="endAngle" type="xs:decimal" default="360"/>
+    <xs:attribute name="matrix" type="MatrixType"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- DiamondGradient -->
+  <xs:complexType name="DiamondGradientType">
+    <xs:sequence>
+      <xs:element name="ColorStop" type="ColorStopType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="center" type="PointType" default="0,0"/>
+    <xs:attribute name="radius" type="xs:decimal" use="required"/>
+    <xs:attribute name="matrix" type="MatrixType"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- ImagePattern -->
+  <xs:complexType name="ImagePatternType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="image" type="IdRefType" use="required"/>
+    <xs:attribute name="tileModeX" type="TileModeType" default="clamp"/>
+    <xs:attribute name="tileModeY" type="TileModeType" default="clamp"/>
+    <xs:attribute name="filterMode" type="FilterModeType" default="linear"/>
+    <xs:attribute name="mipmapMode" type="MipmapModeType" default="linear"/>
+    <xs:attribute name="matrix" type="MatrixType"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- Color source group for inline use in Fill/Stroke -->
+  <xs:group name="ColorSourceGroup">
+    <xs:choice>
+      <xs:element name="SolidColor" type="SolidColorType"/>
+      <xs:element name="LinearGradient" type="LinearGradientType"/>
+      <xs:element name="RadialGradient" type="RadialGradientType"/>
+      <xs:element name="ConicGradient" type="ConicGradientType"/>
+      <xs:element name="DiamondGradient" type="DiamondGradientType"/>
+      <xs:element name="ImagePattern" type="ImagePatternType"/>
+    </xs:choice>
+  </xs:group>
+
+  <!-- ========================= Resource Elements ========================= -->
+
+  <!-- Image -->
+  <xs:complexType name="ImageType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="source" type="xs:string" use="required"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- PathData -->
+  <xs:complexType name="PathDataType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="data" type="xs:string" use="required"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- Glyph -->
+  <xs:complexType name="GlyphType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="advance" type="xs:decimal" use="required"/>
+    <xs:attribute name="path" type="xs:string"/>
+    <xs:attribute name="image" type="xs:string"/>
+    <xs:attribute name="offset" type="PointType" default="0,0"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- Font -->
+  <xs:complexType name="FontType">
+    <xs:sequence>
+      <xs:element name="Glyph" type="GlyphType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="unitsPerEm" type="xs:integer" default="1000"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- ========================= GlyphRun ========================= -->
+
+  <xs:complexType name="GlyphRunType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="font" type="IdRefType" use="required"/>
+    <xs:attribute name="fontSize" type="xs:decimal" default="12"/>
+    <xs:attribute name="glyphs" type="xs:string" use="required"/>
+    <xs:attribute name="x" type="xs:decimal" default="0"/>
+    <xs:attribute name="y" type="xs:decimal" default="0"/>
+    <xs:attribute name="xOffsets" type="FloatListType"/>
+    <xs:attribute name="positions" type="PointListType"/>
+    <xs:attribute name="anchors" type="PointListType"/>
+    <xs:attribute name="scales" type="PointListType"/>
+    <xs:attribute name="rotations" type="FloatListType"/>
+    <xs:attribute name="skews" type="FloatListType"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- ========================= Geometry Elements ========================= -->
+
+  <!-- Rectangle -->
+  <xs:complexType name="RectangleType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="center" type="PointType" default="0,0"/>
+    <xs:attribute name="size" type="SizeType" default="100,100"/>
+    <xs:attribute name="roundness" type="xs:decimal" default="0"/>
+    <xs:attribute name="reversed" type="BoolType" default="false"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- Ellipse -->
+  <xs:complexType name="EllipseType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="center" type="PointType" default="0,0"/>
+    <xs:attribute name="size" type="SizeType" default="100,100"/>
+    <xs:attribute name="reversed" type="BoolType" default="false"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- Polystar -->
+  <xs:complexType name="PolystarType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="center" type="PointType" default="0,0"/>
+    <xs:attribute name="type" type="PolystarTypeType" default="star"/>
+    <xs:attribute name="pointCount" type="xs:decimal" default="5"/>
+    <xs:attribute name="outerRadius" type="xs:decimal" default="100"/>
+    <xs:attribute name="innerRadius" type="xs:decimal" default="50"/>
+    <xs:attribute name="rotation" type="xs:decimal" default="0"/>
+    <xs:attribute name="outerRoundness" type="xs:decimal" default="0"/>
+    <xs:attribute name="innerRoundness" type="xs:decimal" default="0"/>
+    <xs:attribute name="reversed" type="BoolType" default="false"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- Path -->
+  <xs:complexType name="PathType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="data" type="xs:string" use="required"/>
+    <xs:attribute name="reversed" type="BoolType" default="false"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- Text -->
+  <xs:complexType name="TextType" mixed="true">
+    <xs:sequence>
+      <xs:element name="GlyphRun" type="GlyphRunType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="text" type="xs:string"/>
+    <xs:attribute name="position" type="PointType" default="0,0"/>
+    <xs:attribute name="fontFamily" type="xs:string"/>
+    <xs:attribute name="fontStyle" type="xs:string"/>
+    <xs:attribute name="fontSize" type="xs:decimal" default="12"/>
+    <xs:attribute name="letterSpacing" type="xs:decimal" default="0"/>
+    <xs:attribute name="fauxBold" type="BoolType" default="false"/>
+    <xs:attribute name="fauxItalic" type="BoolType" default="false"/>
+    <xs:attribute name="textAnchor" type="TextAnchorType" default="start"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- ========================= Painters ========================= -->
+
+  <!-- Fill -->
+  <xs:complexType name="FillType">
+    <xs:sequence>
+      <xs:group ref="ColorSourceGroup" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="color" type="ColorOrIdRefType" default="#000000"/>
+    <xs:attribute name="alpha" type="xs:decimal" default="1"/>
+    <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
+    <xs:attribute name="fillRule" type="FillRuleType" default="winding"/>
+    <xs:attribute name="placement" type="LayerPlacementType" default="background"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- Stroke -->
+  <xs:complexType name="StrokeType">
+    <xs:sequence>
+      <xs:group ref="ColorSourceGroup" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="color" type="ColorOrIdRefType" default="#000000"/>
+    <xs:attribute name="width" type="xs:decimal" default="1"/>
+    <xs:attribute name="alpha" type="xs:decimal" default="1"/>
+    <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
+    <xs:attribute name="cap" type="LineCapType" default="butt"/>
+    <xs:attribute name="join" type="LineJoinType" default="miter"/>
+    <xs:attribute name="miterLimit" type="xs:decimal" default="4"/>
+    <xs:attribute name="dashes" type="DashPatternType"/>
+    <xs:attribute name="dashOffset" type="xs:decimal" default="0"/>
+    <xs:attribute name="dashAdaptive" type="BoolType" default="false"/>
+    <xs:attribute name="align" type="StrokeAlignType" default="center"/>
+    <xs:attribute name="placement" type="LayerPlacementType" default="background"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- ========================= Shape Modifiers ========================= -->
+
+  <!-- TrimPath -->
+  <xs:complexType name="TrimPathType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="start" type="xs:decimal" default="0"/>
+    <xs:attribute name="end" type="xs:decimal" default="1"/>
+    <xs:attribute name="offset" type="xs:decimal" default="0"/>
+    <xs:attribute name="type" type="TrimTypeType" default="separate"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- RoundCorner -->
+  <xs:complexType name="RoundCornerType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="radius" type="xs:decimal" default="10"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- MergePath -->
+  <xs:complexType name="MergePathType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="mode" type="MergePathOpType" default="append"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- ========================= Text Modifiers ========================= -->
+
+  <!-- RangeSelector -->
+  <xs:complexType name="RangeSelectorType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="start" type="xs:decimal" default="0"/>
+    <xs:attribute name="end" type="xs:decimal" default="1"/>
+    <xs:attribute name="offset" type="xs:decimal" default="0"/>
+    <xs:attribute name="unit" type="SelectorUnitType" default="percentage"/>
+    <xs:attribute name="shape" type="SelectorShapeType" default="square"/>
+    <xs:attribute name="easeIn" type="xs:decimal" default="0"/>
+    <xs:attribute name="easeOut" type="xs:decimal" default="0"/>
+    <xs:attribute name="mode" type="SelectorModeType" default="add"/>
+    <xs:attribute name="weight" type="xs:decimal" default="1"/>
+    <xs:attribute name="randomOrder" type="BoolType" default="false"/>
+    <xs:attribute name="randomSeed" type="xs:integer" default="0"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- TextModifier -->
+  <xs:complexType name="TextModifierType">
+    <xs:sequence>
+      <xs:element name="RangeSelector" type="RangeSelectorType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="anchor" type="PointType" default="0,0"/>
+    <xs:attribute name="position" type="PointType" default="0,0"/>
+    <xs:attribute name="rotation" type="xs:decimal" default="0"/>
+    <xs:attribute name="scale" type="PointType" default="1,1"/>
+    <xs:attribute name="skew" type="xs:decimal" default="0"/>
+    <xs:attribute name="skewAxis" type="xs:decimal" default="0"/>
+    <xs:attribute name="alpha" type="xs:decimal" default="1"/>
+    <xs:attribute name="fillColor" type="ColorType"/>
+    <xs:attribute name="strokeColor" type="ColorType"/>
+    <xs:attribute name="strokeWidth" type="xs:decimal"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- TextPath -->
+  <xs:complexType name="TextPathType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="path" type="xs:string" use="required"/>
+    <xs:attribute name="baselineOrigin" type="PointType" default="0,0"/>
+    <xs:attribute name="baselineAngle" type="xs:decimal" default="0"/>
+    <xs:attribute name="firstMargin" type="xs:decimal" default="0"/>
+    <xs:attribute name="lastMargin" type="xs:decimal" default="0"/>
+    <xs:attribute name="perpendicular" type="BoolType" default="true"/>
+    <xs:attribute name="reversed" type="BoolType" default="false"/>
+    <xs:attribute name="forceAlignment" type="BoolType" default="false"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- TextBox -->
+  <xs:complexType name="TextBoxType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="position" type="PointType" default="0,0"/>
+    <xs:attribute name="size" type="SizeType" default="0,0"/>
+    <xs:attribute name="textAlign" type="TextAlignType" default="start"/>
+    <xs:attribute name="paragraphAlign" type="ParagraphAlignType" default="near"/>
+    <xs:attribute name="writingMode" type="WritingModeType" default="horizontal"/>
+    <xs:attribute name="lineHeight" type="xs:decimal" default="0"/>
+    <xs:attribute name="wordWrap" type="BoolType" default="true"/>
+    <xs:attribute name="overflow" type="OverflowType" default="visible"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- Repeater -->
+  <xs:complexType name="RepeaterType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="copies" type="xs:decimal" default="3"/>
+    <xs:attribute name="offset" type="xs:decimal" default="0"/>
+    <xs:attribute name="order" type="RepeaterOrderType" default="belowOriginal"/>
+    <xs:attribute name="anchor" type="PointType" default="0,0"/>
+    <xs:attribute name="position" type="PointType" default="100,100"/>
+    <xs:attribute name="rotation" type="xs:decimal" default="0"/>
+    <xs:attribute name="scale" type="PointType" default="1,1"/>
+    <xs:attribute name="startAlpha" type="xs:decimal" default="1"/>
+    <xs:attribute name="endAlpha" type="xs:decimal" default="1"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- ========================= Layer Styles ========================= -->
+
+  <!-- DropShadowStyle -->
+  <xs:complexType name="DropShadowStyleType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
+    <xs:attribute name="offsetX" type="xs:decimal" default="0"/>
+    <xs:attribute name="offsetY" type="xs:decimal" default="0"/>
+    <xs:attribute name="blurX" type="xs:decimal" default="0"/>
+    <xs:attribute name="blurY" type="xs:decimal" default="0"/>
+    <xs:attribute name="color" type="ColorType" default="#000000"/>
+    <xs:attribute name="showBehindLayer" type="BoolType" default="true"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- BackgroundBlurStyle -->
+  <xs:complexType name="BackgroundBlurStyleType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
+    <xs:attribute name="blurX" type="xs:decimal" default="0"/>
+    <xs:attribute name="blurY" type="xs:decimal" default="0"/>
+    <xs:attribute name="tileMode" type="TileModeType" default="mirror"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- InnerShadowStyle -->
+  <xs:complexType name="InnerShadowStyleType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
+    <xs:attribute name="offsetX" type="xs:decimal" default="0"/>
+    <xs:attribute name="offsetY" type="xs:decimal" default="0"/>
+    <xs:attribute name="blurX" type="xs:decimal" default="0"/>
+    <xs:attribute name="blurY" type="xs:decimal" default="0"/>
+    <xs:attribute name="color" type="ColorType" default="#000000"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- ========================= Layer Filters ========================= -->
+
+  <!-- BlurFilter -->
+  <xs:complexType name="BlurFilterType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="blurX" type="xs:decimal" use="required"/>
+    <xs:attribute name="blurY" type="xs:decimal" use="required"/>
+    <xs:attribute name="tileMode" type="TileModeType" default="decal"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- DropShadowFilter -->
+  <xs:complexType name="DropShadowFilterType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="offsetX" type="xs:decimal" default="0"/>
+    <xs:attribute name="offsetY" type="xs:decimal" default="0"/>
+    <xs:attribute name="blurX" type="xs:decimal" default="0"/>
+    <xs:attribute name="blurY" type="xs:decimal" default="0"/>
+    <xs:attribute name="color" type="ColorType" default="#000000"/>
+    <xs:attribute name="shadowOnly" type="BoolType" default="false"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- InnerShadowFilter -->
+  <xs:complexType name="InnerShadowFilterType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="offsetX" type="xs:decimal" default="0"/>
+    <xs:attribute name="offsetY" type="xs:decimal" default="0"/>
+    <xs:attribute name="blurX" type="xs:decimal" default="0"/>
+    <xs:attribute name="blurY" type="xs:decimal" default="0"/>
+    <xs:attribute name="color" type="ColorType" default="#000000"/>
+    <xs:attribute name="shadowOnly" type="BoolType" default="false"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- BlendFilter -->
+  <xs:complexType name="BlendFilterType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="color" type="ColorType" use="required"/>
+    <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- ColorMatrixFilter -->
+  <xs:complexType name="ColorMatrixFilterType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="matrix" type="ColorMatrixType" use="required"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- ========================= VectorElement Group ========================= -->
+
+  <!-- Group of all VectorElements that can appear in Layer or Group -->
+  <xs:group name="VectorElementGroup">
+    <xs:choice>
+      <!-- Geometry Elements -->
+      <xs:element name="Rectangle" type="RectangleType"/>
+      <xs:element name="Ellipse" type="EllipseType"/>
+      <xs:element name="Polystar" type="PolystarType"/>
+      <xs:element name="Path" type="PathType"/>
+      <xs:element name="Text" type="TextType"/>
+      <!-- Painters -->
+      <xs:element name="Fill" type="FillType"/>
+      <xs:element name="Stroke" type="StrokeType"/>
+      <!-- Shape Modifiers -->
+      <xs:element name="TrimPath" type="TrimPathType"/>
+      <xs:element name="RoundCorner" type="RoundCornerType"/>
+      <xs:element name="MergePath" type="MergePathType"/>
+      <!-- Text Modifiers -->
+      <xs:element name="TextModifier" type="TextModifierType"/>
+      <xs:element name="TextPath" type="TextPathType"/>
+      <xs:element name="TextBox" type="TextBoxType"/>
+      <!-- Repeater -->
+      <xs:element name="Repeater" type="RepeaterType"/>
+      <!-- Group (recursive) -->
+      <xs:element name="Group" type="GroupType"/>
+    </xs:choice>
+  </xs:group>
+
+  <!-- ========================= Group ========================= -->
+
+  <xs:complexType name="GroupType">
+    <xs:sequence>
+      <xs:group ref="VectorElementGroup" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="anchor" type="PointType" default="0,0"/>
+    <xs:attribute name="position" type="PointType" default="0,0"/>
+    <xs:attribute name="rotation" type="xs:decimal" default="0"/>
+    <xs:attribute name="scale" type="PointType" default="1,1"/>
+    <xs:attribute name="skew" type="xs:decimal" default="0"/>
+    <xs:attribute name="skewAxis" type="xs:decimal" default="0"/>
+    <xs:attribute name="alpha" type="xs:decimal" default="1"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- ========================= Layer ========================= -->
+
+  <!-- Layer child element group: VectorElements, LayerStyles, LayerFilters, child Layers -->
+  <xs:group name="LayerChildGroup">
+    <xs:choice>
+      <!-- VectorElements -->
+      <xs:group ref="VectorElementGroup"/>
+      <!-- Layer Styles -->
+      <xs:element name="DropShadowStyle" type="DropShadowStyleType"/>
+      <xs:element name="InnerShadowStyle" type="InnerShadowStyleType"/>
+      <xs:element name="BackgroundBlurStyle" type="BackgroundBlurStyleType"/>
+      <!-- Layer Filters -->
+      <xs:element name="BlurFilter" type="BlurFilterType"/>
+      <xs:element name="DropShadowFilter" type="DropShadowFilterType"/>
+      <xs:element name="InnerShadowFilter" type="InnerShadowFilterType"/>
+      <xs:element name="BlendFilter" type="BlendFilterType"/>
+      <xs:element name="ColorMatrixFilter" type="ColorMatrixFilterType"/>
+      <!-- Child Layers -->
+      <xs:element name="Layer" type="LayerType"/>
+    </xs:choice>
+  </xs:group>
+
+  <xs:complexType name="LayerType">
+    <xs:sequence>
+      <xs:group ref="LayerChildGroup" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="name" type="xs:string" default=""/>
+    <xs:attribute name="visible" type="BoolType" default="true"/>
+    <xs:attribute name="alpha" type="xs:decimal" default="1"/>
+    <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
+    <xs:attribute name="x" type="xs:decimal" default="0"/>
+    <xs:attribute name="y" type="xs:decimal" default="0"/>
+    <xs:attribute name="matrix" type="MatrixType"/>
+    <xs:attribute name="matrix3D" type="Matrix3DType"/>
+    <xs:attribute name="preserve3D" type="BoolType" default="false"/>
+    <xs:attribute name="antiAlias" type="BoolType" default="true"/>
+    <xs:attribute name="groupOpacity" type="BoolType" default="false"/>
+    <xs:attribute name="passThroughBackground" type="BoolType" default="true"/>
+    <xs:attribute name="excludeChildEffectsInLayerStyle" type="BoolType" default="false"/>
+    <xs:attribute name="scrollRect" type="RectType"/>
+    <xs:attribute name="mask" type="IdRefType"/>
+    <xs:attribute name="maskType" type="MaskTypeType" default="alpha"/>
+    <xs:attribute name="composition" type="IdRefType"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- ========================= Composition ========================= -->
+
+  <xs:complexType name="CompositionType">
+    <xs:sequence>
+      <xs:element name="Layer" type="LayerType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="width" type="xs:decimal" use="required"/>
+    <xs:attribute name="height" type="xs:decimal" use="required"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- ========================= Resources ========================= -->
+
+  <xs:complexType name="ResourcesType">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="Image" type="ImageType"/>
+      <xs:element name="PathData" type="PathDataType"/>
+      <xs:element name="SolidColor" type="SolidColorType"/>
+      <xs:element name="LinearGradient" type="LinearGradientType"/>
+      <xs:element name="RadialGradient" type="RadialGradientType"/>
+      <xs:element name="ConicGradient" type="ConicGradientType"/>
+      <xs:element name="DiamondGradient" type="DiamondGradientType"/>
+      <xs:element name="ImagePattern" type="ImagePatternType"/>
+      <xs:element name="Font" type="FontType"/>
+      <xs:element name="Composition" type="CompositionType"/>
+    </xs:choice>
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <!-- ========================= Root Element ========================= -->
+
+  <xs:complexType name="PagxType">
+    <xs:sequence>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element name="Resources" type="ResourcesType"/>
+        <xs:element name="Layer" type="LayerType"/>
+      </xs:choice>
+    </xs:sequence>
+    <xs:attribute name="version" type="xs:string" use="required"/>
+    <xs:attribute name="width" type="xs:decimal" use="required"/>
+    <xs:attribute name="height" type="xs:decimal" use="required"/>
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:complexType>
+
+  <xs:element name="pagx" type="PagxType"/>
+
+</xs:schema>

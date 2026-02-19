@@ -175,12 +175,12 @@ Optimizations have dependencies — apply them in this order:
 
 | # | Optimization | When to Apply |
 |---|--------------|---------------|
-| 1 | Move Resources to End | `<Resources>` appears before layer tree |
-| 2 | Remove Empty Elements | Empty `<Layer/>`, empty `<Resources>`, `width="0"` strokes |
-| 3 | Omit Default Values | Attributes explicitly set to spec default |
-| 4 | Simplify Transforms | Translation-only matrix, identity matrix, cascaded translations |
-| 5 | Normalize Numerics | Scientific notation near zero, trailing decimals, short hex |
-| 6 | Remove Unused Resources | Resource `id` has no `@id` reference |
+| 1 | Move Resources to End | `<Resources>` appears before layer tree → auto: `pagx format` |
+| 2 | Remove Empty Elements | Empty `<Layer/>`, empty `<Resources>`, `width="0"` strokes → auto: `pagx format` |
+| 3 | Omit Default Values | Attributes explicitly set to spec default → auto: `pagx format` |
+| 4 | Simplify Transforms | Translation-only matrix, identity matrix, cascaded translations → auto: `pagx format` |
+| 5 | Normalize Numerics | Scientific notation near zero, trailing decimals, short hex → auto: `pagx format` |
+| 6 | Remove Unused Resources | Resource `id` has no `@id` reference → auto: `pagx format` |
 | 7 | Layer/Group Semantic Optimization | Ensure each Layer maps to one logical block, each Group is a sub-element within a block. Includes removing redundant wrappers (no-attribute Group/Layer wrapping a single element). Three scenarios: (A) split a Layer that packs multiple independent blocks, (B) merge adjacent Layers that scatter one block, (C) downgrade child Layers to Groups within a block when no Layer-exclusive features are used. **High value** |
 | 8 | Coordinate Localization | Layer `x`/`y` carries the block's offset; internal elements use coordinates relative to the Layer's origin (0,0). Eliminates redundant position data and lets a block be repositioned by changing one `x`/`y` value. Apply after any Layer split/merge or whenever internal coordinates use canvas-absolute values |
 
@@ -221,8 +221,8 @@ layout. Each text segment should be in a Group (for style isolation), not a sepa
 | # | Optimization | When to Apply |
 |---|--------------|---------------|
 | 12 | Composition Reuse | 2+ identical layer subtrees differing only in position |
-| 13 | PathData Reuse | Same path data string appears 2+ times |
-| 14 | Color Source Sharing | Identical gradient definitions inline in multiple places |
+| 13 | PathData Reuse | Same path data string appears 2+ times → auto: `pagx format` |
+| 14 | Color Source Sharing | Identical gradient definitions inline in multiple places → auto: `pagx format` |
 | 15 | Replace Path with Primitive | Path describes a Rectangle or Ellipse |
 | 16 | Remove Full-Canvas Clips | Clip mask covers entire canvas |
 

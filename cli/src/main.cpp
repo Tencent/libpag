@@ -22,9 +22,9 @@
 #include "CommandBounds.h"
 #include "CommandFont.h"
 #include "CommandFormat.h"
+#include "CommandMeasure.h"
 #include "CommandRender.h"
 #include "CommandValidator.h"
-#include "CommandZoom.h"
 
 static const char* VERSION = "0.1.0";
 
@@ -35,14 +35,14 @@ static void PrintUsage() {
             << "\n"
             << "Commands:\n"
             << "  validate   Validate PAGX structure against the specification\n"
-            << "  render     Render PAGX to an image file (PNG/WebP)\n"
+            << "  render     Render PAGX to an image file (supports crop and scale)\n"
             << "  bounds     Query the precise bounds of a node or layer\n"
-            << "  zoom       Render a zoomed-in region of the PAGX\n"
+            << "  measure    Measure visual properties of a PAGX node or layer\n"
             << "  font       Embed fonts into a PAGX file\n"
-            << "  format     Format (pretty-print) a PAGX file\n"
+            << "  format     Format and optimize a PAGX file\n"
             << "\n"
             << "Global Options:\n"
-            << "  --format json    Output in JSON format (validate, bounds)\n"
+            << "  --format json    Output in JSON format (validate, bounds, measure)\n"
             << "  --help, -h       Show help\n"
             << "  --version, -v    Show version\n";
 }
@@ -74,8 +74,8 @@ int main(int argc, char* argv[]) {
   if (command == "bounds") {
     return pagx::cli::RunBounds(argc - 1, argv + 1);
   }
-  if (command == "zoom") {
-    return pagx::cli::RunZoom(argc - 1, argv + 1);
+  if (command == "measure") {
+    return pagx::cli::RunMeasure(argc - 1, argv + 1);
   }
   if (command == "font") {
     return pagx::cli::RunFont(argc - 1, argv + 1);

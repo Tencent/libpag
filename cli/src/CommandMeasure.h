@@ -16,14 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "CommandZoom.h"
-#include <iostream>
+#pragma once
 
 namespace pagx::cli {
 
-int RunZoom(int, char*[]) {
-  std::cerr << "pagx zoom: not implemented yet\n";
-  return 1;
-}
+/**
+ * Measures font metrics and text dimensions for a given font and text string.
+ */
+int RunMeasure(int argc, char* argv[]);
 
 }  // namespace pagx::cli

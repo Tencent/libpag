@@ -306,6 +306,8 @@ position, focus on the **layout-controlling nodes**:
 
 ### Move Resources to End of File (#1)
 
+> Automated by `pagx format`.
+
 Place the `<Resources>` node as the last child of the root element so the layer tree appears
 first. This makes the content structure immediately visible without scrolling past resource
 definitions. Resource position does not affect rendering.
@@ -330,6 +332,8 @@ definitions. Resource position does not affect rendering.
 
 ### Remove Empty and Dead Elements (#2)
 
+> Automated by `pagx format`.
+
 - Empty `<Layer/>` tags with no children and no meaningful attributes
 - Empty `<Resources></Resources>` blocks
 - `<Stroke ... width="0"/>` — zero-width strokes are invisible
@@ -340,6 +344,8 @@ definitions. Resource position does not affect rendering.
 - **Mask layers must not be moved** to a different position in the layer tree.
 
 ### Omit Default Attribute Values (#3)
+
+> Automated by `pagx format`.
 
 The PAGX spec defines default values for most optional attributes. Attributes set to their
 default value are redundant and should be omitted.
@@ -385,6 +391,8 @@ Also `roundness="0"` for Rectangle.
 
 ### Simplify Transform Attributes (#4)
 
+> Automated by `pagx format`.
+
 **Translation-Only Matrix to x/y**:
 
 ```xml
@@ -405,12 +413,16 @@ translation.
 
 ### Normalize Numeric Values (#5)
 
+> Automated by `pagx format`.
+
 - Near-zero scientific notation (`-2.18e-06`) → `0`
 - Trailing decimals (`100.0`) → `100`
 - Short hex when possible (`#FF0000` → `#F00`)
 - Remove spaces after commas: `"30, -20"` → `"30,-20"`
 
 ### Remove Unused Resources (#6)
+
+> Automated by `pagx format`.
 
 Resources with `id="xxx"` that have no corresponding `@xxx` reference anywhere in the file
 should be deleted. Search the entire file including keyframe values for animated files.

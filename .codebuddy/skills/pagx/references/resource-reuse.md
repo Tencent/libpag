@@ -126,6 +126,8 @@ element's local coordinate system origin**.
 
 ## PathData Resource Reuse
 
+> Automated by `pagx format`.
+
 ### Principle
 
 When the same Path data string appears 2 or more times in a file, extract it into a
@@ -165,6 +167,8 @@ Search all `<Path data="..."/>` elements and find identical data strings.
 ---
 
 ## Color Source Resource Sharing
+
+> Automated by `pagx format`.
 
 ### Principle
 
