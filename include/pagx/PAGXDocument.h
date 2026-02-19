@@ -98,8 +98,9 @@ class PAGXDocument {
   std::vector<std::unique_ptr<Node>> nodes = {};
 
   /**
-   * Errors collected during parsing. If non-empty, the document contains structural errors and
-   * should be treated as invalid.
+   * Errors collected during parsing. Non-empty errors indicate structural issues in the source
+   * document but do not prevent the document from being returned. The parsed content may be
+   * incomplete where errors occurred.
    */
   std::vector<std::string> errors = {};
 

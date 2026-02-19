@@ -72,6 +72,7 @@ class DOMParser : public XMLParser {
     node->firstChild = nullptr;
     node->attributes.swap(_attributes);
     node->type = _elementType;
+    node->line = currentLine();
 
     if (_root == nullptr) {
       node->nextSibling = nullptr;

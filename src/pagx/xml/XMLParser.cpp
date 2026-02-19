@@ -189,6 +189,7 @@ bool XMLParser::parse(const uint8_t* data, size_t length) {
   if (!parsingContext._XMLParser) {
     return false;
   }
+  _expatParser = parsingContext._XMLParser.get();
 
   // Avoid calls to rand_s if this is not set. This seed helps prevent DOS
   // with a known hash sequence so an address is sufficient. The provided
@@ -254,6 +255,13 @@ bool XMLParser::endElement(const char* element) {
 
 bool XMLParser::text(const std::string& text) {
   return this->onText(text);
+}
+
+int XMLParser::currentLine() const {
+  if (!_expatParser) {
+    return 0;
+  }
+  return static_cast<int>(XML_GetCurrentLineNumber(static_cast<XML_Parser>(_expatParser)));
 }
 
 }  // namespace pagx

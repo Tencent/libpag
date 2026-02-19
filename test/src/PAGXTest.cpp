@@ -156,10 +156,19 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
     // Step 4: Load PAGX file and build layer tree (this is the viewer's actual path)
     auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
     if (reloadedDoc == nullptr) {
+      ADD_FAILURE() << "Failed to reload: " << pagxPath;
       continue;
+    }
+    if (!reloadedDoc->errors.empty()) {
+      std::string errorLog;
+      for (const auto& error : reloadedDoc->errors) {
+        errorLog += "\n  " + error;
+      }
+      ADD_FAILURE() << "Parse errors in " << baseName << ":" << errorLog;
     }
     auto layer = pagx::LayerBuilder::Build(reloadedDoc.get());
     if (layer == nullptr) {
+      ADD_FAILURE() << "Failed to build layer: " << pagxPath;
       continue;
     }
 
@@ -633,6 +642,13 @@ PAGX_TEST(PAGXTest, SampleFiles) {
       ADD_FAILURE() << "Failed to load: " << filePath;
       continue;
     }
+    if (!doc->errors.empty()) {
+      std::string errorLog;
+      for (const auto& error : doc->errors) {
+        errorLog += "\n  " + error;
+      }
+      ADD_FAILURE() << "Parse errors in " << baseName << ":" << errorLog;
+    }
 
     textLayout.layout(doc.get());
 
@@ -683,6 +699,13 @@ PAGX_TEST(PAGXTest, ResourceFiles) {
     if (!doc) {
       ADD_FAILURE() << "Failed to load: " << filePath;
       continue;
+    }
+    if (!doc->errors.empty()) {
+      std::string errorLog;
+      for (const auto& error : doc->errors) {
+        errorLog += "\n  " + error;
+      }
+      ADD_FAILURE() << "Parse errors in " << baseName << ":" << errorLog;
     }
 
     textLayout.layout(doc.get());
