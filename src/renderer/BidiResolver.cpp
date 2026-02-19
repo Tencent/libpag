@@ -63,36 +63,39 @@ std::vector<BidiRun> BidiResolver::Resolve(const std::string& text,
       break;
   }
 
-  SBParagraphRef paragraph = SBAlgorithmCreateParagraph(
-      algorithm, 0, static_cast<SBUInteger>(text.size()), baseLevel);
-  if (paragraph == nullptr) {
-    SBAlgorithmRelease(algorithm);
-    return {};
-  }
-
-  auto paragraphLength = SBParagraphGetLength(paragraph);
-  SBLineRef line = SBParagraphCreateLine(paragraph, 0, paragraphLength);
-  if (line == nullptr) {
-    SBParagraphRelease(paragraph);
-    SBAlgorithmRelease(algorithm);
-    return {};
-  }
-
-  auto runCount = SBLineGetRunCount(line);
-  const SBRun* runs = SBLineGetRunsPtr(line);
-
+  // SheenBidi treats paragraph separators (\n, \r, etc.) as paragraph boundaries.
+  // SBAlgorithmCreateParagraph only processes up to the first separator, so we must loop
+  // over all paragraphs to cover the entire input text.
   std::vector<BidiRun> result;
-  result.reserve(static_cast<size_t>(runCount));
-  for (SBUInteger i = 0; i < runCount; ++i) {
-    BidiRun run;
-    run.start = static_cast<size_t>(runs[i].offset);
-    run.length = static_cast<size_t>(runs[i].length);
-    run.isRTL = (runs[i].level % 2) != 0;
-    result.push_back(run);
+  auto textLength = static_cast<SBUInteger>(text.size());
+  SBUInteger paragraphOffset = 0;
+
+  while (paragraphOffset < textLength) {
+    SBParagraphRef paragraph = SBAlgorithmCreateParagraph(
+        algorithm, paragraphOffset, textLength - paragraphOffset, baseLevel);
+    if (paragraph == nullptr) {
+      break;
+    }
+
+    auto paragraphLength = SBParagraphGetLength(paragraph);
+    SBLineRef line = SBParagraphCreateLine(paragraph, paragraphOffset, paragraphLength);
+    if (line != nullptr) {
+      auto runCount = SBLineGetRunCount(line);
+      const SBRun* runs = SBLineGetRunsPtr(line);
+      for (SBUInteger i = 0; i < runCount; ++i) {
+        BidiRun run;
+        run.start = static_cast<size_t>(runs[i].offset);
+        run.length = static_cast<size_t>(runs[i].length);
+        run.isRTL = (runs[i].level % 2) != 0;
+        result.push_back(run);
+      }
+      SBLineRelease(line);
+    }
+
+    paragraphOffset += paragraphLength;
+    SBParagraphRelease(paragraph);
   }
 
-  SBLineRelease(line);
-  SBParagraphRelease(paragraph);
   SBAlgorithmRelease(algorithm);
 
   return result;

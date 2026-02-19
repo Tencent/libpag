@@ -129,11 +129,14 @@ class TextLayoutContext {
     float roundingRatio = 1.0f;
   };
 
-  // Single glyph with vertical layout metrics.
+  // Vertical glyph group with layout metrics. Usually contains a single glyph, but consecutive
+  // rotated-group characters (Latin letters, digits, etc.) are collected into one group and rendered
+  // as a horizontal run rotated 90 degrees (tate-chu-yoko).
   struct VerticalGlyphInfo {
-    GlyphInfo glyph = {};
+    std::vector<GlyphInfo> glyphs = {};
     VerticalOrientation orientation = VerticalOrientation::Upright;
     float height = 0;
+    float width = 0;
     bool canBreakBefore = false;
   };
 
@@ -1530,8 +1533,8 @@ class TextLayoutContext {
     float maxFontLineHeight = 0;
     for (auto& vg : column->glyphs) {
       height += vg.height;
-      if (vg.glyph.fontLineHeight > maxFontLineHeight) {
-        maxFontLineHeight = vg.glyph.fontLineHeight;
+      if (vg.glyphs.front().fontLineHeight > maxFontLineHeight) {
+        maxFontLineHeight = vg.glyphs.front().fontLineHeight;
       }
     }
     column->height = height;
@@ -1544,43 +1547,91 @@ class TextLayoutContext {
   std::vector<ColumnInfo> layoutColumns(const std::vector<GlyphInfo>& allGlyphs,
                                         const TextBox* textBox) {
     // Phase 1: Build VerticalGlyphInfo list with orientation, metrics, and break marks.
+    // Consecutive rotated-group characters are collected into a single VerticalGlyphInfo.
     std::vector<VerticalGlyphInfo> vgList = {};
     vgList.reserve(allGlyphs.size());
     for (size_t i = 0; i < allGlyphs.size(); i++) {
       auto& glyph = allGlyphs[i];
       if (glyph.unichar == '\n') {
         VerticalGlyphInfo vg = {};
-        vg.glyph = glyph;
+        vg.glyphs.push_back(glyph);
         vgList.push_back(std::move(vg));
         continue;
       }
 
       float letterSpacing = (glyph.sourceText != nullptr) ? glyph.sourceText->letterSpacing : 0;
       auto orientation = VerticalTextUtils::getOrientation(glyph.unichar);
-      VerticalGlyphInfo vg = {};
-      vg.glyph = glyph;
-      vg.orientation = orientation;
-      if (orientation == VerticalOrientation::Rotated) {
-        vg.height = glyph.advance + letterSpacing;
-      } else {
-        float vertAdvance = glyph.font.getAdvance(glyph.glyphID, true);
-        if (vertAdvance <= 0) {
-          vertAdvance = glyph.fontSize;
-        }
-        vg.height = vertAdvance + letterSpacing;
-      }
 
-      if (i > 0 && allGlyphs[i - 1].unichar != '\n') {
+      if (orientation == VerticalOrientation::Rotated &&
+          VerticalTextUtils::isRotatedGroupChar(glyph.unichar)) {
+        // Collect consecutive rotated-group characters into a single group.
+        VerticalGlyphInfo vg = {};
+        vg.orientation = VerticalOrientation::Rotated;
+        float groupHorizontalWidth = 0;
+        float maxFontSize = 0;
+        size_t groupStart = i;
+        while (i < allGlyphs.size() && allGlyphs[i].unichar != '\n' &&
+               VerticalTextUtils::isRotatedGroupChar(allGlyphs[i].unichar)) {
+          vg.glyphs.push_back(allGlyphs[i]);
+          // Use horizontal advance from font metrics, not HarfBuzz's xAdvance which may be 0
+          // in TTB shaping mode.
+          float hAdvance = allGlyphs[i].font.getAdvance(allGlyphs[i].glyphID);
+          groupHorizontalWidth += hAdvance;
+          if (allGlyphs[i].fontSize > maxFontSize) {
+            maxFontSize = allGlyphs[i].fontSize;
+          }
+          i++;
+        }
+        i--;  // Compensate for the outer loop's i++.
+        vg.height = groupHorizontalWidth + letterSpacing;
+        vg.width = maxFontSize;
+        if (groupStart > 0 && allGlyphs[groupStart - 1].unichar != '\n') {
 #ifdef PAG_USE_HARFBUZZ
-        bool sameCluster = (glyph.cluster != 0 || allGlyphs[i - 1].cluster != 0) &&
-                           glyph.cluster == allGlyphs[i - 1].cluster;
-        vg.canBreakBefore =
-            !sameCluster && LineBreaker::canBreakBetween(allGlyphs[i - 1].unichar, glyph.unichar);
+          auto& prevGlyph = allGlyphs[groupStart - 1];
+          auto& firstGlyph = allGlyphs[groupStart];
+          bool sameCluster = (firstGlyph.cluster != 0 || prevGlyph.cluster != 0) &&
+                             firstGlyph.cluster == prevGlyph.cluster;
+          vg.canBreakBefore =
+              !sameCluster &&
+              LineBreaker::canBreakBetween(prevGlyph.unichar, firstGlyph.unichar);
 #else
-        vg.canBreakBefore = LineBreaker::canBreakBetween(allGlyphs[i - 1].unichar, glyph.unichar);
+          vg.canBreakBefore = LineBreaker::canBreakBetween(allGlyphs[groupStart - 1].unichar,
+                                                           allGlyphs[groupStart].unichar);
 #endif
+        }
+        vgList.push_back(std::move(vg));
+      } else {
+        // Single glyph (upright CJK, or non-groupable rotated character).
+        VerticalGlyphInfo vg = {};
+        vg.glyphs.push_back(glyph);
+        vg.orientation = orientation;
+        if (orientation == VerticalOrientation::Rotated) {
+          // Use horizontal advance from font metrics; HarfBuzz TTB xAdvance may be 0.
+          float hAdvance = glyph.font.getAdvance(glyph.glyphID);
+          vg.height = hAdvance + letterSpacing;
+          vg.width = glyph.fontSize;
+        } else {
+          float vertAdvance = glyph.font.getAdvance(glyph.glyphID, true);
+          if (vertAdvance <= 0) {
+            vertAdvance = glyph.fontSize;
+          }
+          vg.height = vertAdvance + letterSpacing;
+          vg.width = glyph.fontSize;
+        }
+
+        if (i > 0 && allGlyphs[i - 1].unichar != '\n') {
+#ifdef PAG_USE_HARFBUZZ
+          bool sameCluster = (glyph.cluster != 0 || allGlyphs[i - 1].cluster != 0) &&
+                             glyph.cluster == allGlyphs[i - 1].cluster;
+          vg.canBreakBefore = !sameCluster &&
+                              LineBreaker::canBreakBetween(allGlyphs[i - 1].unichar, glyph.unichar);
+#else
+          vg.canBreakBefore =
+              LineBreaker::canBreakBetween(allGlyphs[i - 1].unichar, glyph.unichar);
+#endif
+        }
+        vgList.push_back(std::move(vg));
       }
-      vgList.push_back(std::move(vg));
     }
 
     // Phase 2: Split into columns using break marks.
@@ -1595,12 +1646,12 @@ class TextLayoutContext {
     for (size_t i = 0; i < vgList.size(); i++) {
       auto& vg = vgList[i];
 
-      if (vg.glyph.unichar == '\n') {
+      if (vg.glyphs.front().unichar == '\n') {
         // Remove trailing letterSpacing from the last glyph in the column.
         if (!currentColumn->glyphs.empty()) {
           auto& lastVG = currentColumn->glyphs.back();
-          float ls = (lastVG.glyph.sourceText != nullptr)
-                         ? lastVG.glyph.sourceText->letterSpacing
+          float ls = (lastVG.glyphs.front().sourceText != nullptr)
+                         ? lastVG.glyphs.front().sourceText->letterSpacing
                          : 0;
           if (ls != 0) {
             lastVG.height -= ls;
@@ -1608,7 +1659,7 @@ class TextLayoutContext {
         }
         // Trim trailing whitespace from current column.
         while (!currentColumn->glyphs.empty() &&
-               LineBreaker::isWhitespace(currentColumn->glyphs.back().glyph.unichar)) {
+               LineBreaker::isWhitespace(currentColumn->glyphs.back().glyphs.front().unichar)) {
           currentColumn->glyphs.pop_back();
         }
         FinishColumn(currentColumn, textBox->lineHeight);
@@ -1633,8 +1684,8 @@ class TextLayoutContext {
           // Remove trailing letterSpacing from the last glyph before the break.
           if (!currentColumn->glyphs.empty()) {
             auto& lastVG = currentColumn->glyphs.back();
-            float ls = (lastVG.glyph.sourceText != nullptr)
-                           ? lastVG.glyph.sourceText->letterSpacing
+            float ls = (lastVG.glyphs.front().sourceText != nullptr)
+                           ? lastVG.glyphs.front().sourceText->letterSpacing
                            : 0;
             if (ls != 0) {
               lastVG.height -= ls;
@@ -1642,7 +1693,7 @@ class TextLayoutContext {
           }
           // Trim trailing whitespace from current column.
           while (!currentColumn->glyphs.empty() &&
-                 LineBreaker::isWhitespace(currentColumn->glyphs.back().glyph.unichar)) {
+                 LineBreaker::isWhitespace(currentColumn->glyphs.back().glyphs.front().unichar)) {
             currentColumn->glyphs.pop_back();
           }
           FinishColumn(currentColumn, textBox->lineHeight);
@@ -1651,7 +1702,7 @@ class TextLayoutContext {
           // Skip leading whitespace in overflow.
           size_t skipCount = 0;
           while (skipCount < overflow.size() &&
-                 LineBreaker::isWhitespace(overflow[skipCount].glyph.unichar)) {
+                 LineBreaker::isWhitespace(overflow[skipCount].glyphs.front().unichar)) {
             skipCount++;
           }
           for (size_t j = skipCount; j < overflow.size(); j++) {
@@ -1668,8 +1719,8 @@ class TextLayoutContext {
           // Remove trailing letterSpacing from the last glyph.
           if (!currentColumn->glyphs.empty()) {
             auto& lastVG = currentColumn->glyphs.back();
-            float ls = (lastVG.glyph.sourceText != nullptr)
-                           ? lastVG.glyph.sourceText->letterSpacing
+            float ls = (lastVG.glyphs.front().sourceText != nullptr)
+                           ? lastVG.glyphs.front().sourceText->letterSpacing
                            : 0;
             if (ls != 0) {
               lastVG.height -= ls;
@@ -1691,7 +1742,7 @@ class TextLayoutContext {
     if (!currentColumn->glyphs.empty()) {
       auto& lastVG = currentColumn->glyphs.back();
       float ls =
-          (lastVG.glyph.sourceText != nullptr) ? lastVG.glyph.sourceText->letterSpacing : 0;
+          (lastVG.glyphs.front().sourceText != nullptr) ? lastVG.glyphs.front().sourceText->letterSpacing : 0;
       if (ls != 0) {
         lastVG.height -= ls;
       }
@@ -1719,20 +1770,20 @@ class TextLayoutContext {
 
       // Column-start squash: remove leading whitespace of the first non-whitespace glyph.
       for (size_t i = 0; i < glyphCount; i++) {
-        if (LineBreaker::isWhitespace(column.glyphs[i].glyph.unichar)) {
+        if (LineBreaker::isWhitespace(column.glyphs[i].glyphs.front().unichar)) {
           continue;
         }
-        float fraction = PunctuationSquash::GetLineStartSquash(column.glyphs[i].glyph.unichar);
+        float fraction = PunctuationSquash::GetLineStartSquash(column.glyphs[i].glyphs.front().unichar);
         squashAmounts[i] = column.glyphs[i].height * fraction;
         break;
       }
 
       // Column-end squash: remove trailing whitespace of the last non-whitespace glyph.
       for (int i = static_cast<int>(glyphCount) - 1; i >= 0; i--) {
-        if (LineBreaker::isWhitespace(column.glyphs[i].glyph.unichar)) {
+        if (LineBreaker::isWhitespace(column.glyphs[i].glyphs.front().unichar)) {
           continue;
         }
-        float fraction = PunctuationSquash::GetLineEndSquash(column.glyphs[i].glyph.unichar);
+        float fraction = PunctuationSquash::GetLineEndSquash(column.glyphs[i].glyphs.front().unichar);
         if (column.glyphs[i].height * fraction > squashAmounts[i]) {
           squashAmounts[i] = column.glyphs[i].height * fraction;
         }
@@ -1741,8 +1792,8 @@ class TextLayoutContext {
 
       // Adjacent punctuation squash: both sides can be squashed simultaneously.
       for (size_t i = 0; i + 1 < glyphCount; i++) {
-        auto result = PunctuationSquash::GetAdjacentSquash(column.glyphs[i].glyph.unichar,
-                                                           column.glyphs[i + 1].glyph.unichar);
+        auto result = PunctuationSquash::GetAdjacentSquash(column.glyphs[i].glyphs.front().unichar,
+                                                           column.glyphs[i + 1].glyphs.front().unichar);
         float prevAmount = column.glyphs[i].height * result.prevSquash;
         float nextAmount = column.glyphs[i + 1].height * result.nextSquash;
         if (prevAmount > squashAmounts[i]) {
@@ -1886,30 +1937,53 @@ class TextLayoutContext {
 
       for (size_t glyphIdx = 0; glyphIdx < column.glyphs.size(); glyphIdx++) {
         auto& vg = column.glyphs[glyphIdx];
-        auto& g = vg.glyph;
 
         // Skip tab glyphs: they only occupy space, not rendered.
-        if (g.unichar == '\t') {
+        if (vg.glyphs.front().unichar == '\t') {
           currentY += vg.height;
           continue;
         }
 
-        VerticalPositionedGlyph vpg = {};
-        vpg.glyphID = g.glyphID;
-        vpg.font = g.font;
-
-        if (vg.orientation == VerticalOrientation::Rotated) {
-          // Rotated glyph: rotate 90 degrees CW using RSXform (scos=0, ssin=1).
+        if (vg.orientation == VerticalOrientation::Rotated && vg.glyphs.size() > 1) {
+          // Rotated group (tate-chu-yoko): render all glyphs as a horizontal run, rotated 90° CW.
+          float localX = 0;
+          for (auto& g : vg.glyphs) {
+            VerticalPositionedGlyph vpg = {};
+            vpg.glyphID = g.glyphID;
+            vpg.font = g.font;
+            vpg.useRSXform = true;
+            // RSXform::Make(0, 1, tx, ty) rotates 90° CW.
+            // After rotation, the glyph's vertical extent (ascent+descent) becomes horizontal width.
+            // Center each glyph horizontally in the column using its own ascent/descent.
+            float absAscent = fabsf(g.ascent);
+            float tx = columnCenterX - (absAscent - g.descent) / 2;
+            float ty = currentY + localX;
+            vpg.xform = tgfx::RSXform::Make(0, 1, tx, ty);
+            // Use horizontal advance from font metrics for positioning within the group.
+            localX += g.font.getAdvance(g.glyphID);
+            textGlyphs[g.sourceText].push_back(vpg);
+          }
+        } else if (vg.orientation == VerticalOrientation::Rotated) {
+          // Single rotated glyph: rotate 90 degrees CW using RSXform (scos=0, ssin=1).
+          auto& g = vg.glyphs.front();
+          VerticalPositionedGlyph vpg = {};
+          vpg.glyphID = g.glyphID;
+          vpg.font = g.font;
           vpg.useRSXform = true;
           float absAscent = fabsf(g.ascent);
           float tx = columnCenterX - (absAscent - g.descent) / 2;
           float ty = currentY;
           vpg.xform = tgfx::RSXform::Make(0, 1, tx, ty);
+          textGlyphs[g.sourceText].push_back(vpg);
 #ifdef PAG_USE_HARFBUZZ
         } else {
           // With HarfBuzz vert shaping, use getVerticalOffset() for all upright glyphs.
           // If the font has vert/vrt2 features, HarfBuzz already substituted the glyph.
           // Fall back to manual punctuation offset only if getVerticalOffset returns zero.
+          auto& g = vg.glyphs.front();
+          VerticalPositionedGlyph vpg = {};
+          vpg.glyphID = g.glyphID;
+          vpg.font = g.font;
           vpg.useRSXform = false;
           auto offset = g.font.getVerticalOffset(g.glyphID);
           if (FloatNearlyEqual(offset.x, 0) && FloatNearlyEqual(offset.y, 0) &&
@@ -1925,9 +1999,14 @@ class TextLayoutContext {
             float glyphY = currentY + offset.y;
             vpg.position = tgfx::Point::Make(glyphX, glyphY);
           }
+          textGlyphs[g.sourceText].push_back(vpg);
         }
 #else
-        } else if (VerticalTextUtils::needsPunctuationOffset(g.unichar)) {
+        } else if (VerticalTextUtils::needsPunctuationOffset(vg.glyphs.front().unichar)) {
+          auto& g = vg.glyphs.front();
+          VerticalPositionedGlyph vpg = {};
+          vpg.glyphID = g.glyphID;
+          vpg.font = g.font;
           vpg.useRSXform = false;
           float dx = 0;
           float dy = 0;
@@ -1935,16 +2014,21 @@ class TextLayoutContext {
           float glyphX = columnCenterX - g.advance / 2 + dx;
           float glyphY = currentY + fabsf(g.ascent) + dy;
           vpg.position = tgfx::Point::Make(glyphX, glyphY);
+          textGlyphs[g.sourceText].push_back(vpg);
         } else {
+          auto& g = vg.glyphs.front();
+          VerticalPositionedGlyph vpg = {};
+          vpg.glyphID = g.glyphID;
+          vpg.font = g.font;
           vpg.useRSXform = false;
           auto offset = g.font.getVerticalOffset(g.glyphID);
           float glyphX = columnCenterX + offset.x;
           float glyphY = currentY + offset.y;
           vpg.position = tgfx::Point::Make(glyphX, glyphY);
+          textGlyphs[g.sourceText].push_back(vpg);
         }
 #endif
 
-        textGlyphs[g.sourceText].push_back(vpg);
         currentY += vg.height;
         if (justifyGap != 0 && glyphIdx + 1 < column.glyphs.size() &&
             column.glyphs[glyphIdx + 1].canBreakBefore) {

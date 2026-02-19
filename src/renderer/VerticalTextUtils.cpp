@@ -169,4 +169,43 @@ void VerticalTextUtils::getPunctuationOffset(float fontSize, float* outDx, float
   }
 }
 
+static bool isLatinLetter(int32_t c) {
+  return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+         (c >= 0x00C0 && c <= 0x024F);  // Latin Extended-A/B
+}
+
+static bool isDigit(int32_t c) {
+  return c >= '0' && c <= '9';
+}
+
+bool VerticalTextUtils::isRotatedGroupChar(int32_t c) {
+  if (isLatinLetter(c)) {
+    return true;
+  }
+  if (isDigit(c)) {
+    return true;
+  }
+  switch (c) {
+    case '.':
+    case ',':
+    case '-':
+    case '\'':
+    case '/':
+    case ':':
+    case '%':
+    case '#':
+    case '@':
+    case '&':
+    case '+':
+    case '=':
+    case '$':
+    case 0x20AC:  // €
+    case 0x00A3:  // £
+    case 0x00A5:  // ¥
+      return true;
+    default:
+      return false;
+  }
+}
+
 }  // namespace pagx
