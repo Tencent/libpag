@@ -1339,10 +1339,20 @@ class TextLayoutContext {
             inlineOffset = boxHeight - column.height;
             break;
           case TextAlign::Justify: {
-            // Justify: distribute extra space evenly between characters. Last column uses Start.
-            if (colIdx < columns.size() - 1 && column.glyphs.size() > 1) {
-              float extraSpace = boxHeight - column.height;
-              justifyGap = extraSpace / static_cast<float>(column.glyphs.size() - 1);
+            // Justify: distribute extra space evenly between word boundaries (determined by
+            // LineBreaker). Last column uses Start alignment.
+            if (colIdx < columns.size() - 1) {
+              size_t breakCount = 0;
+              for (size_t gi = 1; gi < column.glyphs.size(); gi++) {
+                if (LineBreaker::canBreakBetween(column.glyphs[gi - 1].glyph.unichar,
+                                                 column.glyphs[gi].glyph.unichar)) {
+                  breakCount++;
+                }
+              }
+              if (breakCount > 0) {
+                float extraSpace = boxHeight - column.height;
+                justifyGap = extraSpace / static_cast<float>(breakCount);
+              }
             }
             break;
           }
@@ -1397,7 +1407,8 @@ class TextLayoutContext {
 
         textGlyphs[g.sourceText].push_back(vpg);
         currentY += vg.height;
-        if (glyphIdx < column.glyphs.size() - 1) {
+        if (justifyGap != 0 && glyphIdx + 1 < column.glyphs.size() &&
+            LineBreaker::canBreakBetween(g.unichar, column.glyphs[glyphIdx + 1].glyph.unichar)) {
           currentY += justifyGap;
         }
       }
