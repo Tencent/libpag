@@ -128,41 +128,9 @@ element's local coordinate system origin**.
 
 > Automated by `pagx optimize`.
 
-### Principle
-
-When the same Path data string appears 2 or more times in a file, extract it into a
-`<PathData>` resource to eliminate duplication and improve maintainability.
-
-### When to Apply
-
-Search all `<Path data="..."/>` elements and find identical data strings.
-
-### How
-
-1. Add `<PathData id="..." data="..."/>` to Resources
-2. Replace all identical inline data with `<Path data="@id"/>`
-
-### Example
-
-```xml
-<!-- Before: bullet icon path appears 3 times -->
-<Path data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
-<!-- ... 2 more identical occurrences ... -->
-
-<!-- After -->
-<PathData id="bullet" data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
-
-<Path data="@bullet"/>
-```
-
-### Caveats
-
-- **reversed attribute**: `<Path>` has a `reversed` attribute for reversing path direction.
-  If one reference needs reversal and another does not, you can still extract a shared
-  PathData and set `reversed` individually at each reference site.
-- **Short paths with only 2 occurrences**: If the path is very short (e.g., `M 0 0 L 10 0`),
-  extraction may increase total line count due to the resource definition. The benefit is
-  maintainability (single point of change) rather than line reduction.
+When generating PAGX with shared paths, note that `<Path>` has a `reversed` attribute for
+reversing path direction. Multiple Path elements can reference the same PathData resource and
+set `reversed` independently at each reference site.
 
 ---
 
@@ -170,46 +138,9 @@ Search all `<Path data="..."/>` elements and find identical data strings.
 
 > Automated by `pagx optimize`.
 
-### Principle
-
-When identical gradient definitions appear inline in multiple places, define them once in
-Resources and reference via `@id`.
-
-### When to Apply
-
-Multiple Fill / Stroke elements contain LinearGradient / RadialGradient / ConicGradient /
-DiamondGradient definitions with identical parameters.
-
-### Example
-
-```xml
-<!-- Before: same gradient defined inline 3 times -->
-<Fill>
-  <LinearGradient startPoint="0,0" endPoint="100,0">
-    <ColorStop offset="0" color="#FF0000"/>
-    <ColorStop offset="1" color="#0000FF"/>
-  </LinearGradient>
-</Fill>
-
-<!-- After: defined once in Resources -->
-<LinearGradient id="mainGrad" startPoint="0,0" endPoint="100,0">
-  <ColorStop offset="0" color="#FF0000"/>
-  <ColorStop offset="1" color="#0000FF"/>
-</LinearGradient>
-
-<Fill color="@mainGrad"/>
-```
-
-### Caveats
-
-- **Coordinates are relative to geometry**: Gradient startPoint / endPoint / center
-  coordinates are relative to the geometry element's local coordinate system origin. Two
-  geometry elements at different positions or with different sizes referencing the same
-  gradient will render differently. Sharing a gradient only guarantees visual consistency when
-  the geometry shapes and sizes are identical.
-- **Do not extract single-use gradients**: The PAGX spec supports both modes — shared
-  definitions for multiple references and inline definitions for single use. Not every
-  gradient needs to be in Resources.
+When generating PAGX, single-use gradients can stay inline — not every gradient needs to be in
+Resources. The PAGX spec supports both shared definitions for multiple references and inline
+definitions for single use.
 
 ---
 
@@ -244,47 +175,6 @@ A Path's data is a simple axis-aligned rectangle (4 lines forming a box) or a ci
 - This optimization improves readability. Under Repeater it also significantly benefits
   rendering performance — see **Prefer Primitive Geometry over Path under Repeater** in
   `performance.md` for details on when shape choice affects render cost.
-
----
-
-## Remove Full-Canvas Clip Masks
-
-> Automated by `pagx optimize`.
-
-### Principle
-
-A clip mask that covers the entire canvas (or exceeds the masked content's bounds) has no
-clipping effect and can be removed along with the mask reference.
-
-### When to Apply
-
-A `visible="false"` Layer used as a mask contains a Rectangle whose bounds equal or exceed the
-root element's dimensions, and the mask reference is on a Layer that does not need clipping.
-
-### Example
-
-```xml
-<!-- Before: clip mask covers entire 800x600 canvas -->
-<Layer id="clip0" visible="false">
-  <Rectangle center="400,300" size="800,600"/>
-  <Fill color="#FFF"/>
-</Layer>
-<Layer mask="@clip0">
-  <!-- content that fits within 800x600 anyway -->
-</Layer>
-
-<!-- After: remove mask definition and reference -->
-<Layer>
-  <!-- content unchanged -->
-</Layer>
-```
-
-### Caveats
-
-- Verify that the masked content truly fits within the mask bounds. If content extends beyond
-  the canvas, the clip mask may still be needed.
-- Some full-canvas clips exist because the SVG source had `overflow: hidden` on the root.
-  Removing them is safe when the PAGX root already clips to its own dimensions.
 
 ---
 

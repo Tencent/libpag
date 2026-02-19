@@ -170,21 +170,10 @@ Optimizations have dependencies — apply them in this order:
 
 ### Step 1: Run pagx optimize
 
-Most structural cleanup is handled automatically by `pagx optimize` (100% deterministic
-equivalent transforms):
-
-| # | Optimization | Notes |
-|---|--------------|-------|
-| 1 | Remove empty elements | Empty Layer/Group, zero-width Stroke |
-| 2 | Deduplicate PathData | Identical path data strings → shared resource |
-| 3 | Deduplicate gradient resources | Identical gradient definitions → shared resource |
-| 4 | Remove unreferenced Resources | Resource `id` with no `@id` reference |
-| 5 | Replace Path with Rectangle/Ellipse | With corner rounding detection |
-| 6 | Remove full-canvas clip masks | Clip mask covering entire canvas has no effect |
-| 7 | Remove off-canvas invisible layers | Layers entirely outside canvas bounds |
-
-The exporter also handles: omit default values, normalize numbers, simplify transforms, move
-Resources to end.
+Deterministic structural cleanup (empty elements, resource dedup, path→primitive replacement,
+unused resource removal, full-canvas clip mask removal, off-canvas layer removal). The exporter
+also handles default value omission, number normalization, transform simplification, and
+Resources ordering.
 
 After generating PAGX, run:
 ```bash
