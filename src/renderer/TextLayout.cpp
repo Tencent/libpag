@@ -1195,55 +1195,48 @@ class TextLayoutContext {
         continue;
       }
 
-      // Pass 1: Determine squash adjustments per glyph.
-      std::vector<float> squashAmounts(line.glyphs.size(), 0);
+      auto glyphCount = line.glyphs.size();
+      std::vector<float> squashAmounts(glyphCount, 0);
 
-      // Line-leading punctuation squash (first non-whitespace glyph).
-      for (size_t i = 0; i < line.glyphs.size(); i++) {
+      // Line-start squash: remove leading whitespace of the first non-whitespace glyph.
+      for (size_t i = 0; i < glyphCount; i++) {
         if (LineBreaker::isWhitespace(line.glyphs[i].unichar)) {
           continue;
         }
-        auto pos = PunctuationSquash::GetPosition(line.glyphs[i].unichar);
-        if (pos == PunctuationPosition::Leading) {
-          squashAmounts[i] = PunctuationSquash::GetSquashAmount(line.glyphs[i].advance);
+        float fraction = PunctuationSquash::GetLineStartSquash(line.glyphs[i].unichar);
+        squashAmounts[i] = line.glyphs[i].advance * fraction;
+        break;
+      }
+
+      // Line-end squash: remove trailing whitespace of the last non-whitespace glyph.
+      for (int i = static_cast<int>(glyphCount) - 1; i >= 0; i--) {
+        if (LineBreaker::isWhitespace(line.glyphs[i].unichar)) {
+          continue;
+        }
+        float fraction = PunctuationSquash::GetLineEndSquash(line.glyphs[i].unichar);
+        if (line.glyphs[i].advance * fraction > squashAmounts[i]) {
+          squashAmounts[i] = line.glyphs[i].advance * fraction;
         }
         break;
       }
 
-      // Line-trailing punctuation squash (last non-whitespace glyph).
-      for (int i = static_cast<int>(line.glyphs.size()) - 1; i >= 0; i--) {
-        if (LineBreaker::isWhitespace(line.glyphs[i].unichar)) {
-          continue;
+      // Adjacent punctuation squash: both sides can be squashed simultaneously.
+      for (size_t i = 0; i + 1 < glyphCount; i++) {
+        auto result = PunctuationSquash::GetAdjacentSquash(line.glyphs[i].unichar,
+                                                           line.glyphs[i + 1].unichar);
+        float prevAmount = line.glyphs[i].advance * result.prevSquash;
+        float nextAmount = line.glyphs[i + 1].advance * result.nextSquash;
+        if (prevAmount > squashAmounts[i]) {
+          squashAmounts[i] = prevAmount;
         }
-        auto pos = PunctuationSquash::GetPosition(line.glyphs[i].unichar);
-        if (pos == PunctuationPosition::Trailing) {
-          squashAmounts[i] = PunctuationSquash::GetSquashAmount(line.glyphs[i].advance);
-        }
-        break;
-      }
-
-      // Adjacent punctuation squash.
-      for (size_t i = 0; i + 1 < line.glyphs.size(); i++) {
-        if (PunctuationSquash::ShouldSquashBetween(line.glyphs[i].unichar,
-                                                    line.glyphs[i + 1].unichar)) {
-          auto pos = PunctuationSquash::GetPosition(line.glyphs[i].unichar);
-          if (pos == PunctuationPosition::Trailing || pos == PunctuationPosition::Middle) {
-            float amount = PunctuationSquash::GetSquashAmount(line.glyphs[i].advance);
-            if (amount > squashAmounts[i]) {
-              squashAmounts[i] = amount;
-            }
-          } else {
-            float amount = PunctuationSquash::GetSquashAmount(line.glyphs[i + 1].advance);
-            if (amount > squashAmounts[i + 1]) {
-              squashAmounts[i + 1] = amount;
-            }
-          }
+        if (nextAmount > squashAmounts[i + 1]) {
+          squashAmounts[i + 1] = nextAmount;
         }
       }
 
-      // Pass 2: Recalculate positions with squash applied.
+      // Recalculate positions with squash applied.
       float xPos = 0;
-      for (size_t i = 0; i < line.glyphs.size(); i++) {
+      for (size_t i = 0; i < glyphCount; i++) {
         line.glyphs[i].xPosition = xPos;
         float effectiveAdvance = line.glyphs[i].advance - squashAmounts[i];
         float ls = (line.glyphs[i].sourceText != nullptr)
@@ -1255,8 +1248,7 @@ class TextLayoutContext {
       // Recalculate line width.
       if (!line.glyphs.empty()) {
         auto& lastGlyph = line.glyphs.back();
-        float lastEffectiveAdvance = lastGlyph.advance -
-                                     squashAmounts[line.glyphs.size() - 1];
+        float lastEffectiveAdvance = lastGlyph.advance - squashAmounts[glyphCount - 1];
         line.width = lastGlyph.xPosition + lastEffectiveAdvance;
       }
     }
@@ -1722,54 +1714,48 @@ class TextLayoutContext {
         continue;
       }
 
-      std::vector<float> squashAmounts(column.glyphs.size(), 0);
+      auto glyphCount = column.glyphs.size();
+      std::vector<float> squashAmounts(glyphCount, 0);
 
-      // Column-leading punctuation squash.
-      for (size_t i = 0; i < column.glyphs.size(); i++) {
+      // Column-start squash: remove leading whitespace of the first non-whitespace glyph.
+      for (size_t i = 0; i < glyphCount; i++) {
         if (LineBreaker::isWhitespace(column.glyphs[i].glyph.unichar)) {
           continue;
         }
-        auto pos = PunctuationSquash::GetPosition(column.glyphs[i].glyph.unichar);
-        if (pos == PunctuationPosition::Leading) {
-          squashAmounts[i] = PunctuationSquash::GetSquashAmount(column.glyphs[i].height);
+        float fraction = PunctuationSquash::GetLineStartSquash(column.glyphs[i].glyph.unichar);
+        squashAmounts[i] = column.glyphs[i].height * fraction;
+        break;
+      }
+
+      // Column-end squash: remove trailing whitespace of the last non-whitespace glyph.
+      for (int i = static_cast<int>(glyphCount) - 1; i >= 0; i--) {
+        if (LineBreaker::isWhitespace(column.glyphs[i].glyph.unichar)) {
+          continue;
+        }
+        float fraction = PunctuationSquash::GetLineEndSquash(column.glyphs[i].glyph.unichar);
+        if (column.glyphs[i].height * fraction > squashAmounts[i]) {
+          squashAmounts[i] = column.glyphs[i].height * fraction;
         }
         break;
       }
 
-      // Column-trailing punctuation squash.
-      for (int i = static_cast<int>(column.glyphs.size()) - 1; i >= 0; i--) {
-        if (LineBreaker::isWhitespace(column.glyphs[i].glyph.unichar)) {
-          continue;
+      // Adjacent punctuation squash: both sides can be squashed simultaneously.
+      for (size_t i = 0; i + 1 < glyphCount; i++) {
+        auto result = PunctuationSquash::GetAdjacentSquash(column.glyphs[i].glyph.unichar,
+                                                           column.glyphs[i + 1].glyph.unichar);
+        float prevAmount = column.glyphs[i].height * result.prevSquash;
+        float nextAmount = column.glyphs[i + 1].height * result.nextSquash;
+        if (prevAmount > squashAmounts[i]) {
+          squashAmounts[i] = prevAmount;
         }
-        auto pos = PunctuationSquash::GetPosition(column.glyphs[i].glyph.unichar);
-        if (pos == PunctuationPosition::Trailing) {
-          squashAmounts[i] = PunctuationSquash::GetSquashAmount(column.glyphs[i].height);
-        }
-        break;
-      }
-
-      // Adjacent punctuation squash.
-      for (size_t i = 0; i + 1 < column.glyphs.size(); i++) {
-        if (PunctuationSquash::ShouldSquashBetween(column.glyphs[i].glyph.unichar,
-                                                    column.glyphs[i + 1].glyph.unichar)) {
-          auto pos = PunctuationSquash::GetPosition(column.glyphs[i].glyph.unichar);
-          if (pos == PunctuationPosition::Trailing || pos == PunctuationPosition::Middle) {
-            float amount = PunctuationSquash::GetSquashAmount(column.glyphs[i].height);
-            if (amount > squashAmounts[i]) {
-              squashAmounts[i] = amount;
-            }
-          } else {
-            float amount = PunctuationSquash::GetSquashAmount(column.glyphs[i + 1].height);
-            if (amount > squashAmounts[i + 1]) {
-              squashAmounts[i + 1] = amount;
-            }
-          }
+        if (nextAmount > squashAmounts[i + 1]) {
+          squashAmounts[i + 1] = nextAmount;
         }
       }
 
       // Recalculate column height with squash applied.
       float totalHeight = 0;
-      for (size_t i = 0; i < column.glyphs.size(); i++) {
+      for (size_t i = 0; i < glyphCount; i++) {
         column.glyphs[i].height -= squashAmounts[i];
         totalHeight += column.glyphs[i].height;
       }
