@@ -274,6 +274,9 @@ static bool writeColorAttribute(XMLBuilder& xml, const ColorSource* color) {
   }
   if (color->nodeType() == NodeType::SolidColor) {
     auto solid = static_cast<const SolidColor*>(color);
+    if (solid->color == Color{}) {
+      return false;
+    }
     xml.addAttribute("color", ColorToHexString(solid->color, solid->color.alpha < 1.0f));
     return false;
   }

@@ -329,7 +329,7 @@ class LayerBuilderContext {
       colorSource = convertColorSource(node->color);
     }
     if (colorSource == nullptr) {
-      return nullptr;
+      colorSource = tgfx::SolidColor::Make();
     }
 
     auto fill = tgfx::FillStyle::Make(colorSource);
@@ -354,7 +354,7 @@ class LayerBuilderContext {
       colorSource = convertColorSource(node->color);
     }
     if (colorSource == nullptr) {
-      return nullptr;
+      colorSource = tgfx::SolidColor::Make();
     }
 
     auto stroke = tgfx::StrokeStyle::Make(colorSource);
