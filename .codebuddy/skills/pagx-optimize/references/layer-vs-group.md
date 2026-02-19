@@ -118,3 +118,80 @@ order relative to it matters, or when all siblings are also being downgraded to 
 
 **Transform conversion**: Layer `x="X" y="Y"` → Group `position="X,Y"`.
 Layer `name` attribute should be removed (Group does not support it).
+
+---
+
+## Batch Downgrade Safety
+
+When a parent Layer contains multiple child Layers, some may qualify for downgrade while others
+do not. This creates a **partial downgrade** scenario that requires careful analysis.
+
+### Full Sibling Downgrade (Safe)
+
+When **all** sibling Layers within a parent can be downgraded to Groups, do so. Their relative
+rendering order is preserved because Groups render in source order within the parent's contents.
+
+```xml
+<!-- Before: all three children qualify for downgrade -->
+<Layer name="parent">
+  <Layer x="10" y="0">...</Layer>
+  <Layer x="20" y="0">...</Layer>
+  <Layer x="30" y="0">...</Layer>
+</Layer>
+
+<!-- After: all downgraded, order preserved -->
+<Layer name="parent">
+  <Group position="10,0">...</Group>
+  <Group position="20,0">...</Group>
+  <Group position="30,0">...</Group>
+</Layer>
+```
+
+### Partial Downgrade — "Before-Only" Rule
+
+When **some** siblings cannot be downgraded (e.g., they have filters, styles, or child Layers),
+only downgrade the Layers that appear **before the first non-downgradable Layer**.
+
+**Why**: Groups are part of the parent's **contents** (rendered first), while child Layers are
+**children** (rendered on top). If you downgrade a Layer that appears after a non-downgradable
+sibling, the newly created Group will render **below** that sibling Layer — breaking the
+intended stacking order.
+
+```xml
+<!-- Before: Layer B has BlurFilter, cannot be downgraded -->
+<Layer name="parent">
+  <Layer name="A">...</Layer>           <!-- CAN downgrade -->
+  <Layer name="B"><BlurFilter/></Layer> <!-- CANNOT downgrade -->
+  <Layer name="C">...</Layer>           <!-- CAN downgrade (but appears after B) -->
+</Layer>
+
+<!-- Correct: only downgrade A (before B) -->
+<Layer name="parent">
+  <Group>...</Group>                    <!-- was A, now contents -->
+  <Layer name="B"><BlurFilter/></Layer> <!-- still child Layer -->
+  <Layer name="C">...</Layer>           <!-- keep as Layer to preserve order -->
+</Layer>
+
+<!-- WRONG: if C is also downgraded -->
+<Layer name="parent">
+  <Group>...</Group>                    <!-- was A -->
+  <Group>...</Group>                    <!-- was C — now renders BELOW B! -->
+  <Layer name="B"><BlurFilter/></Layer> <!-- renders ON TOP of both Groups -->
+</Layer>
+```
+
+### Decision Flowchart
+
+1. List all child Layers of the parent
+2. For each, check the 11-point downgrade checklist
+3. Find the **first** Layer that fails the checklist (cannot be downgraded)
+4. Downgrade only Layers **before** that position; keep the rest as Layers
+5. If **all** pass → downgrade all (full sibling downgrade)
+6. If **none** pass → no downgrade
+
+### Special Case: Interleaved Groups and Layers
+
+If the parent already contains a mix of Groups and Layers, Groups are already part of contents.
+The "before-only" rule still applies: only downgrade child Layers that appear before the first
+non-downgradable Layer in the **Layer-only** sequence. Pre-existing Groups do not affect this
+calculation since they are already contents.

@@ -308,7 +308,7 @@
     <Fill color="#1E293B80"/>
     <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetY="4" blurX="24" blurY="24" color="#00000060"/>
-    <Layer alpha="0.08">
+    <Group alpha="0.08">
       <Path data="M -180 -80 L 180 -80"/>
       <Stroke width="1">
         <LinearGradient startPoint="-180,-80" endPoint="180,-80">
@@ -317,8 +317,8 @@
           <ColorStop offset="1" color="#FBBF2400"/>
         </LinearGradient>
       </Stroke>
-    </Layer>
-    <Layer x="-120" y="-2">
+    </Group>
+    <Group position="-120,-2">
       <!-- Rocket body -->
       <Group>
         <Path data="M 0 -40 C 10 -35 18 -20 18 0 L 18 22 L -18 22 L -18 0 C -18 -20 -10 -35 0 -40 Z"/>
@@ -341,24 +341,24 @@
         <Path data="M -10 22 L -5 38 L 0 30 L 5 38 L 10 22"/>
         <Stroke color="#FB923C" width="2" cap="round" join="round"/>
       </Group>
-    </Layer>
-    <Layer x="-50" y="-20">
+    </Group>
+    <Group position="-50,-20">
       <Text text="Deployable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <Fill color="#FBBF24"/>
-    </Layer>
-    <Layer x="-50" y="-7">
+    </Group>
+    <Group position="-50,-7">
       <Group>
         <Text text="One-click export to binary PAG with high performance." fontFamily="Arial" fontSize="16"/>
         <Fill color="#CBD5E1"/>
       </Group>
       <TextBox size="220,0" lineHeight="22"/>
-    </Layer>
+    </Group>
   </Layer>
 
   <!-- Pipeline Section -->
   <Layer name="Pipeline" x="800" y="1070">
     <!-- Separator line -->
-    <Layer alpha="0.18">
+    <Group alpha="0.18">
       <Path data="M -400 -40 L 400 -40"/>
       <Stroke width="1">
         <LinearGradient startPoint="-400,0" endPoint="400,0">
@@ -369,9 +369,9 @@
           <ColorStop offset="1" color="#EC489900"/>
         </LinearGradient>
       </Stroke>
-    </Layer>
+    </Group>
     <!-- .pagx badge -->
-    <Layer x="-180" y="0">
+    <Group position="-180,0">
       <Rectangle center="0,0" size="120,40" roundness="20"/>
       <Fill color="#6366F120"/>
       <Stroke color="#6366F160" width="1"/>
@@ -379,14 +379,14 @@
         <Text text=".pagx" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
         <Fill color="#A78BFA"/>
       </Group>
-    </Layer>
+    </Group>
     <!-- Arrow 1 -->
     <Group position="-80,0">
       <Path data="@arrowRight"/>
       <Stroke color="#64748B" width="2" cap="round" join="round"/>
     </Group>
     <!-- .pag badge -->
-    <Layer x="0" y="0">
+    <Group>
       <Rectangle center="0,0" size="100,40" roundness="20"/>
       <Fill color="#EC489920"/>
       <Stroke color="#EC489960" width="1"/>
@@ -394,14 +394,14 @@
         <Text text=".pag" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
         <Fill color="#F472B6"/>
       </Group>
-    </Layer>
+    </Group>
     <!-- Arrow 2 -->
     <Group position="90,0">
       <Path data="@arrowRight"/>
       <Stroke color="#64748B" width="2" cap="round" join="round"/>
     </Group>
     <!-- Production badge -->
-    <Layer x="190" y="0">
+    <Group position="190,0">
       <Rectangle center="0,0" size="140,40" roundness="20"/>
       <Fill color="#34D39920"/>
       <Stroke color="#34D39960" width="1"/>
@@ -409,7 +409,7 @@
         <Text text="Production" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
         <Fill color="#34D399"/>
       </Group>
-    </Layer>
+    </Group>
   </Layer>
 
   <!-- Bottom tagline -->

@@ -1,10 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="800" height="600">
-  <Resources>
-    <PathData id="bullet" data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
-    <PathData id="healthArc" data="M -180 100 A 200 200 0 0 0 -180 -100"/>
-    <PathData id="energyArc" data="M 180 -100 A 200 200 0 0 0 180 100"/>
-  </Resources>
 
   <!-- Mask Definitions -->
   <Layer id="triangleMask" visible="false">
@@ -229,38 +224,38 @@
 
     <!-- Decorative Tech Bits under frame -->
     <Layer y="30">
-      <Layer>
+      <Group>
         <Rectangle center="0,0" size="40,4"/>
         <Fill color="#004488"/>
-      </Layer>
-      <Layer>
+      </Group>
+      <Group>
         <Rectangle center="-30,0" size="10,4"/>
         <Rectangle center="30,0" size="10,4"/>
         <Fill color="#002244"/>
-      </Layer>
+      </Group>
     </Layer>
   </Layer>
 
   <!-- Minimap / Radar (Bottom Left) -->
   <Layer name="Radar" x="100" y="500">
     <!-- Background -->
-    <Layer>
+    <Group>
       <Ellipse size="140,140"/>
       <Fill color="#001122" alpha="0.9"/>
       <Stroke color="#0066AA" width="2"/>
-    </Layer>
+    </Group>
     <!-- Grid Circles & Crosshairs -->
-    <Layer>
+    <Group>
       <Ellipse size="100,100"/>
       <Ellipse size="50,50"/>
       <Path data="M -70 0 L 70 0 M 0 -70 L 0 70"/>
       <Stroke color="#004488" width="1"/>
-    </Layer>
+    </Group>
     <!-- Sweep (Conic Gradient) -->
     <Layer rotation="-45">
       <Ellipse size="130,130"/>
       <Fill>
-        <ConicGradient startAngle="0" endAngle="90">
+        <ConicGradient endAngle="90">
           <ColorStop offset="0" color="#00FF0000"/>
           <ColorStop offset="1" color="#00FF0080"/>
         </ConicGradient>
@@ -282,7 +277,7 @@
 
   <!-- Objective Markers (Top Center) -->
   <Layer name="Objectives" x="400" y="50">
-    <Text text="MISSION OBJECTIVES:[ ] INFILTRATE BASE[ ] HACK TERMINAL[x] SECURE PERIMETER" fontFamily="Arial" fontSize="12" fontStyle="Bold" textAnchor="center"/>
+    <Text text="MISSION OBJECTIVES:  [ ] INFILTRATE BASE  [ ] HACK TERMINAL  [x] SECURE PERIMETER" fontFamily="Arial" fontSize="12" fontStyle="Bold" textAnchor="center"/>
     <Fill color="#FFF"/>
     <DropShadowStyle blurX="2" blurY="2" color="#000"/>
   </Layer>
@@ -329,4 +324,9 @@
     <Stroke width="4" color="#00CCFF"/>
   </Layer>
 
+  <Resources>
+    <PathData id="bullet" data="M 0 0 L 4 0 L 6 4 L 4 12 L 0 12 L -2 4 Z"/>
+    <PathData id="healthArc" data="M -180 100 A 200 200 0 0 0 -180 -100"/>
+    <PathData id="energyArc" data="M 180 -100 A 200 200 0 0 0 180 100"/>
+  </Resources>
 </pagx>

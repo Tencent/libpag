@@ -29,33 +29,33 @@
   <!-- ==================== TOP BAR ==================== -->
   <Layer name="TopBar">
     <!-- Bar background (Simplified) -->
-    <Layer>
+    <Group>
       <Rectangle center="400,32" size="800,64"/>
       <Fill color="#0E0B1880"/>
-    </Layer>
+    </Group>
     <!-- Bottom border line -->
-    <Layer>
+    <Group>
       <Path data="M 0 64 L 800 64"/>
       <Stroke color="#5C451080" width="1"/>
-    </Layer>
+    </Group>
 
     <!-- Avatar area -->
     <Layer name="Avatar" x="40" y="32">
       <!-- Ring glow -->
-      <Layer>
+      <Group>
         <Ellipse size="52,52"/>
         <Fill color="@avatarRing"/>
-      </Layer>
+      </Group>
       <!-- Avatar inner -->
-      <Layer>
+      <Group>
         <Ellipse size="46,46"/>
         <Fill color="#1A1428"/>
-      </Layer>
+      </Group>
       <!-- Avatar silhouette -->
-      <Layer>
+      <Group>
         <Path data="@helmetIcon"/>
         <Fill color="#A89878"/>
-      </Layer>
+      </Group>
     </Layer>
 
     <!-- Player name & level -->
@@ -70,88 +70,88 @@
 
     <!-- HP bar -->
     <Layer name="HPBar" x="190" y="16">
-      <Layer>
+      <Group>
         <Text text="HP" fontFamily="Arial" fontStyle="Bold" fontSize="11" position="-10,9"/>
         <Fill color="#FF2D2D"/>
-      </Layer>
-      <Layer>
+      </Group>
+      <Group>
         <Rectangle center="105,5" size="190,14" roundness="7"/>
         <Fill color="#0E0B18"/>
         <Stroke color="#5C451080" width="1"/>
-      </Layer>
-      <Layer>
+      </Group>
+      <Group>
         <Rectangle center="83,5" size="142,10" roundness="5"/>
         <Fill color="@hpFill"/>
         <InnerShadowStyle offsetY="-1" blurX="2" blurY="2" color="#FFFFFF40"/>
-      </Layer>
-      <Layer>
+      </Group>
+      <Group>
         <Text text="2,847 / 3,800" fontFamily="Arial" fontSize="9" position="105,8" textAnchor="center"/>
         <Fill color="#FFFFFFD0"/>
-      </Layer>
+      </Group>
     </Layer>
 
     <!-- MP bar -->
     <Layer name="MPBar" x="190" y="38">
-      <Layer>
+      <Group>
         <Text text="MP" fontFamily="Arial" fontStyle="Bold" fontSize="11" position="-10,9"/>
         <Fill color="#4488FF"/>
-      </Layer>
-      <Layer>
+      </Group>
+      <Group>
         <Rectangle center="105,5" size="190,14" roundness="7"/>
         <Fill color="#0E0B18"/>
         <Stroke color="#5C451080" width="1"/>
-      </Layer>
-      <Layer>
+      </Group>
+      <Group>
         <Rectangle center="74,5" size="124,10" roundness="5"/>
         <Fill color="@mpFill"/>
         <InnerShadowStyle offsetY="-1" blurX="2" blurY="2" color="#FFFFFF40"/>
-      </Layer>
-      <Layer>
+      </Group>
+      <Group>
         <Text text="1,250 / 2,000" fontFamily="Arial" fontSize="9" position="105,8" textAnchor="center"/>
         <Fill color="#FFFFFFD0"/>
-      </Layer>
+      </Group>
     </Layer>
 
     <!-- Gold currency -->
     <Layer name="Gold" x="640" y="16">
-      <Layer>
+      <Group>
         <Rectangle center="70,16" size="160,32" roundness="16"/>
         <Fill color="#00000040"/>
         <Stroke color="#FFD70060" width="1"/>
-      </Layer>
+      </Group>
       <!-- Coin icon -->
-      <Layer x="10" y="16">
+      <Group position="10,16">
         <Ellipse size="22,22"/>
         <Fill color="#FFD700"/>
         <InnerShadowStyle offsetX="-2" offsetY="-2" blurX="3" blurY="3" color="#FFFFFF60"/>
-      </Layer>
-      <Layer x="10" y="16">
+      </Group>
+      <Group position="10,16">
         <Text text="G" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="0,4" textAnchor="center"/>
         <Fill color="#78350F"/>
-      </Layer>
-      <Layer>
+      </Group>
+      <Group>
         <Text text="128,450" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="70,22" textAnchor="center"/>
         <Fill color="#FFE880"/>
-      </Layer>
+      </Group>
     </Layer>
   </Layer>
 
   <!-- ==================== LEFT PANEL: CHARACTER ==================== -->
   <Layer name="CharPanel" x="30" y="80">
     <!-- Panel background -->
-    <Layer>
+    <Group>
       <Rectangle center="130,237" size="260,470" roundness="16"/>
       <Fill color="@panelBg"/>
       <Stroke color="@panelBorder" width="1"/>
       <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#00000080"/>
-    </Layer>
+    </Group>
 
     <!-- Panel title -->
-    <Layer>
+    <Group>
       <Path data="M 20 40 L 240 40"/>
       <Stroke color="#5C451080" width="1"/>
-    </Layer>
-    <Layer>
+    </Group>
+    <Group>
       <Text text="CHARACTER" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="130,30" textAnchor="center"/>
       <Fill>
         <LinearGradient startPoint="-130,0" endPoint="120,0">
@@ -160,18 +160,18 @@
           <ColorStop offset="1" color="#CC8800"/>
         </LinearGradient>
       </Fill>
-    </Layer>
+    </Group>
 
     <!-- Character portrait area -->
     <Layer x="130" y="155">
       <!-- Portrait frame -->
-      <Layer>
+      <Group>
         <Rectangle center="0,0" size="200,200" roundness="12"/>
         <Fill color="#0E0B1880"/>
         <Stroke color="#5C451080" width="1"/>
-      </Layer>
+      </Group>
       <!-- Character glow behind -->
-      <Layer>
+      <Group>
         <Ellipse size="140,140"/>
         <Fill>
           <RadialGradient radius="70">
@@ -179,9 +179,9 @@
             <ColorStop offset="1" color="#FFD70000"/>
           </RadialGradient>
         </Fill>
-      </Layer>
+      </Group>
       <!-- Character silhouette -->
-      <Layer y="20">
+      <Group position="0,20">
         <!-- Cape (behind body) -->
         <Group>
           <Path data="M -22 -35 Q -28 15 -18 65 L 18 65 Q 28 15 22 -35"/>
@@ -322,7 +322,7 @@
           <Ellipse center="46,-15" size="6,6"/>
           <Fill color="#FFD700"/>
         </Group>
-      </Layer>
+      </Group>
 
     </Layer>
 
@@ -338,70 +338,70 @@
     <!-- Stats section -->
     <Layer x="30" y="305">
       <!-- ATK -->
-      <Layer>
+      <Group>
         <Polystar center="10,0" type="star" pointCount="4" outerRadius="7" innerRadius="2" rotation="45"/>
         <Fill color="#FF4444"/>
-      </Layer>
-      <Layer>
+      </Group>
+      <Group>
         <Text text="ATK" fontFamily="Arial" fontSize="12" position="28,4"/>
         <Fill color="#A89878"/>
-      </Layer>
-      <Layer>
+      </Group>
+      <Group>
         <Text text="4,256" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="198,5" textAnchor="end"/>
         <Fill color="#FF4444"/>
-      </Layer>
+      </Group>
 
       <!-- DEF -->
-      <Layer y="28">
+      <Group position="0,28">
         <Ellipse center="10,0" size="14,14"/>
         <Fill color="#4488FF"/>
-      </Layer>
-      <Layer y="28">
+      </Group>
+      <Group position="0,28">
         <Text text="DEF" fontFamily="Arial" fontSize="12" position="28,4"/>
         <Fill color="#A89878"/>
-      </Layer>
-      <Layer y="28">
+      </Group>
+      <Group position="0,28">
         <Text text="3,180" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="198,5" textAnchor="end"/>
         <Fill color="#4488FF"/>
-      </Layer>
+      </Group>
 
       <!-- SPD -->
-      <Layer y="56">
+      <Group position="0,56">
         <Polystar center="10,0" type="star" pointCount="4" outerRadius="8" innerRadius="3"/>
         <Fill color="#44DD88"/>
-      </Layer>
-      <Layer y="56">
+      </Group>
+      <Group position="0,56">
         <Text text="SPD" fontFamily="Arial" fontSize="12" position="28,4"/>
         <Fill color="#A89878"/>
-      </Layer>
-      <Layer y="56">
+      </Group>
+      <Group position="0,56">
         <Text text="186" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="198,5" textAnchor="end"/>
         <Fill color="#44DD88"/>
-      </Layer>
+      </Group>
 
       <!-- CRT -->
-      <Layer y="84">
+      <Group position="0,84">
         <Path data="M 10 -7 L 16 0 L 10 7 L 4 0 Z"/>
         <Fill color="#FFD700"/>
-      </Layer>
-      <Layer y="84">
+      </Group>
+      <Group position="0,84">
         <Text text="CRT" fontFamily="Arial" fontSize="12" position="28,4"/>
         <Fill color="#A89878"/>
-      </Layer>
-      <Layer y="84">
+      </Group>
+      <Group position="0,84">
         <Text text="42.5%" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="198,5" textAnchor="end"/>
         <Fill color="#FFD700"/>
-      </Layer>
+      </Group>
     </Layer>
 
     <!-- Separator -->
-    <Layer>
+    <Group>
       <Path data="M 30 413 L 230 413"/>
       <Stroke color="#5C451080" width="1"/>
-    </Layer>
+    </Group>
 
     <!-- Power number -->
-    <Layer>
+    <Group>
       <Text text="52,847" fontFamily="Arial" fontStyle="Bold" fontSize="28" position="130,450" textAnchor="center"/>
       <Fill>
         <LinearGradient startPoint="-130,0" endPoint="120,0">
@@ -411,33 +411,33 @@
         </LinearGradient>
       </Fill>
       <DropShadowStyle offsetY="2" blurX="8" blurY="8" color="#FFD70040"/>
-    </Layer>
+    </Group>
   </Layer>
 
   <!-- ==================== RIGHT AREA: EQUIPMENT GRID ==================== -->
   <Layer name="EquipArea" x="310" y="95">
 
     <!-- Section title -->
-    <Layer>
+    <Group>
       <Text text="EQUIPMENT" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="0,15"/>
       <Fill color="@titleGrad"/>
-    </Layer>
-    <Layer>
+    </Group>
+    <Group>
       <Path data="M 0 25 L 460 25"/>
       <Stroke color="#5C451080" width="1"/>
-    </Layer>
+    </Group>
 
     <!-- Equipment slot row 1 -->
     <!-- Slot 1: Weapon -->
     <Layer name="Slot1" x="10" y="45">
-      <Layer>
+      <Group>
         <Rectangle center="65,65" size="130,130" roundness="12"/>
         <Fill color="@panelBg"/>
         <Stroke color="#FF8C0080" width="1.5"/>
         <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#00000060"/>
-      </Layer>
+      </Group>
       <!-- Item glow -->
-      <Layer x="65" y="50">
+      <Group position="65,50">
         <Ellipse size="60,60"/>
         <Fill>
           <RadialGradient radius="30">
@@ -445,33 +445,33 @@
             <ColorStop offset="1" color="#FF8C0000"/>
           </RadialGradient>
         </Fill>
-      </Layer>
+      </Group>
       <!-- Item icon -->
-      <Layer x="65" y="50">
+      <Group position="65,50">
         <Path data="@swordBig"/>
         <Fill color="#FF8C00"/>
-      </Layer>
+      </Group>
       <!-- Item name -->
-      <Layer>
+      <Group>
         <Text text="Excalibur" fontFamily="Arial" fontStyle="Bold" fontSize="11" position="65,108" textAnchor="center"/>
         <Fill color="#F8FAFC"/>
-      </Layer>
+      </Group>
       <!-- Rarity indicator -->
-      <Layer>
+      <Group>
         <Rectangle center="65,120" size="50,3" roundness="2"/>
         <Fill color="#FF8C00"/>
-      </Layer>
+      </Group>
     </Layer>
 
     <!-- Slot 2: Shield -->
     <Layer name="Slot2" x="165" y="45">
-      <Layer>
+      <Group>
         <Rectangle center="65,65" size="130,130" roundness="12"/>
         <Fill color="@panelBg"/>
         <Stroke color="#A855F780" width="1.5"/>
         <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#00000060"/>
-      </Layer>
-      <Layer x="65" y="50">
+      </Group>
+      <Group position="65,50">
         <Ellipse size="60,60"/>
         <Fill>
           <RadialGradient radius="30">
@@ -479,30 +479,30 @@
             <ColorStop offset="1" color="#A855F700"/>
           </RadialGradient>
         </Fill>
-      </Layer>
-      <Layer x="65" y="50">
+      </Group>
+      <Group position="65,50">
         <Path data="@shieldBig"/>
         <Fill color="#A855F7"/>
-      </Layer>
-      <Layer>
+      </Group>
+      <Group>
         <Text text="Aegis" fontFamily="Arial" fontStyle="Bold" fontSize="11" position="65,108" textAnchor="center"/>
         <Fill color="#F8FAFC"/>
-      </Layer>
-      <Layer>
+      </Group>
+      <Group>
         <Rectangle center="65,120" size="50,3" roundness="2"/>
         <Fill color="#A855F7"/>
-      </Layer>
+      </Group>
     </Layer>
 
     <!-- Slot 3: Helmet -->
     <Layer name="Slot3" x="320" y="45">
-      <Layer>
+      <Group>
         <Rectangle center="65,65" size="130,130" roundness="12"/>
         <Fill color="@panelBg"/>
         <Stroke color="#3B82F680" width="1.5"/>
         <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#00000060"/>
-      </Layer>
-      <Layer x="65" y="50">
+      </Group>
+      <Group position="65,50">
         <Ellipse size="60,60"/>
         <Fill>
           <RadialGradient radius="30">
@@ -510,31 +510,31 @@
             <ColorStop offset="1" color="#3B82F600"/>
           </RadialGradient>
         </Fill>
-      </Layer>
-      <Layer x="65" y="50">
+      </Group>
+      <Group position="65,50">
         <Path data="@helmetBig"/>
         <Fill color="#3B82F6"/>
-      </Layer>
-      <Layer>
+      </Group>
+      <Group>
         <Text text="Crown Helm" fontFamily="Arial" fontStyle="Bold" fontSize="11" position="65,108" textAnchor="center"/>
         <Fill color="#F8FAFC"/>
-      </Layer>
-      <Layer>
+      </Group>
+      <Group>
         <Rectangle center="65,120" size="50,3" roundness="2"/>
         <Fill color="#3B82F6"/>
-      </Layer>
+      </Group>
     </Layer>
 
     <!-- Equipment slot row 2 -->
     <!-- Slot 4: Potion -->
     <Layer name="Slot4" x="10" y="195">
-      <Layer>
+      <Group>
         <Rectangle center="65,65" size="130,130" roundness="12"/>
         <Fill color="@panelBg"/>
         <Stroke color="#22C55E80" width="1.5"/>
         <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#00000060"/>
-      </Layer>
-      <Layer x="65" y="50">
+      </Group>
+      <Group position="65,50">
         <Ellipse size="60,60"/>
         <Fill>
           <RadialGradient radius="30">
@@ -542,19 +542,19 @@
             <ColorStop offset="1" color="#22C55E00"/>
           </RadialGradient>
         </Fill>
-      </Layer>
-      <Layer x="65" y="50">
+      </Group>
+      <Group position="65,50">
         <Path data="@potionBig"/>
         <Fill color="#22C55E"/>
-      </Layer>
-      <Layer>
+      </Group>
+      <Group>
         <Text text="Elixir" fontFamily="Arial" fontStyle="Bold" fontSize="11" position="65,108" textAnchor="center"/>
         <Fill color="#F8FAFC"/>
-      </Layer>
-      <Layer>
+      </Group>
+      <Group>
         <Rectangle center="65,120" size="50,3" roundness="2"/>
         <Fill color="#22C55E"/>
-      </Layer>
+      </Group>
     </Layer>
 
     <!-- Slot 5: Empty -->
@@ -566,67 +566,67 @@
     <!-- Action buttons -->
     <Layer name="Actions" x="0" y="355">
       <!-- Upgrade button -->
-      <Layer>
+      <Group>
         <Rectangle center="110,22" size="200,44" roundness="22"/>
         <Fill color="@btnGold"/>
         <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#DAA52060"/>
         <InnerShadowStyle offsetY="-1" blurX="2" blurY="2" color="#FFFFFF30"/>
-      </Layer>
-      <Layer>
+      </Group>
+      <Group>
         <Text text="UPGRADE" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="110,28" textAnchor="center"/>
         <Fill color="#3D2200"/>
-      </Layer>
+      </Group>
 
       <!-- Battle button -->
-      <Layer x="240">
+      <Group position="240,0">
         <Rectangle center="110,22" size="200,44" roundness="22"/>
         <Fill color="@btnRed"/>
         <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#CC000060"/>
         <InnerShadowStyle offsetY="-1" blurX="2" blurY="2" color="#FFFFFF40"/>
-      </Layer>
-      <Layer x="240">
+      </Group>
+      <Group position="240,0">
         <Text text="BATTLE" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="110,28" textAnchor="center"/>
         <Fill color="#FFF"/>
-      </Layer>
+      </Group>
     </Layer>
   </Layer>
 
   <!-- ==================== BOTTOM EXP BAR ==================== -->
   <Layer name="ExpBar" y="568">
     <!-- Bar background -->
-    <Layer>
+    <Group>
       <Rectangle center="400,10" size="740,16" roundness="8"/>
       <Fill color="#0E0B18"/>
       <Stroke color="#5C451080" width="1"/>
-    </Layer>
+    </Group>
     <!-- Fill (65%) -->
-    <Layer>
+    <Group>
       <Rectangle center="282,10" size="500,12" roundness="6"/>
       <Fill color="@expFill"/>
       <InnerShadowStyle offsetY="-1" blurX="3" blurY="3" color="#FFFFFF30"/>
-    </Layer>
+    </Group>
     <!-- Label -->
-    <Layer>
+    <Group>
       <Text text="EXP  12,500 / 18,000" fontFamily="Arial" fontSize="9" position="400,13" textAnchor="center"/>
       <Fill color="#FFFFFFC0"/>
-    </Layer>
+    </Group>
   </Layer>
 
   <!-- ==================== NOTIFICATION TOAST ==================== -->
   <Layer name="Toast" x="310" y="516">
-    <Layer>
+    <Group>
       <Rectangle center="230,18" size="460,36" roundness="8"/>
       <Fill color="#8B6914E0"/>
       <DropShadowStyle offsetY="4" blurX="10" blurY="10" color="#00000040"/>
-    </Layer>
-    <Layer>
+    </Group>
+    <Group>
       <Polystar center="24,18" type="star" pointCount="4" outerRadius="8" innerRadius="3"/>
       <Fill color="#FFF"/>
-    </Layer>
-    <Layer>
+    </Group>
+    <Group>
       <Text text="New legendary item discovered in the Ancient Ruins!" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="230,23" textAnchor="center"/>
       <Fill color="#FFF"/>
-    </Layer>
+    </Group>
   </Layer>
 
   <!-- ==================== RESOURCES ==================== -->

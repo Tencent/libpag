@@ -186,78 +186,51 @@ class TextLayoutContext {
       return;
     }
 
-    processLayerContents(layer->contents);
+    auto remaining = processScope(layer->contents);
+    // Layer is the accumulation boundary. Process any remaining Text elements that were not
+    // handled by a TextBox with single-line layout.
+    for (auto* text : remaining) {
+      if (result.find(text) != result.end()) {
+        continue;
+      }
+      if (!text->glyphRuns.empty()) {
+        auto shapedText = buildShapedTextFromEmbeddedGlyphRuns(text);
+        StoreShapedText(text, std::move(shapedText));
+      } else {
+        processTextWithoutLayout(text);
+      }
+    }
 
     for (auto* child : layer->children) {
       processLayer(child);
     }
   }
 
-  void processLayerContents(const std::vector<Element*>& contents) {
-    const TextBox* textBox = nullptr;
-    std::vector<Text*> textElements = {};
-
-    // First pass: find TextBox and collect direct Text elements
-    for (auto* element : contents) {
-      if (element->nodeType() == NodeType::TextBox) {
-        textBox = static_cast<const TextBox*>(element);
-      } else if (element->nodeType() == NodeType::Text) {
-        textElements.push_back(static_cast<Text*>(element));
-      }
-    }
-
-    // Rich text mode: when TextBox exists and there are Groups containing Text,
-    // collect Text elements from Groups for unified typography.
-    if (textBox != nullptr && textElements.empty()) {
-      for (auto* element : contents) {
-        if (element->nodeType() == NodeType::Group) {
-          auto* group = static_cast<Group*>(element);
-          for (auto* child : group->elements) {
-            if (child->nodeType() == NodeType::Text) {
-              textElements.push_back(static_cast<Text*>(child));
-            }
-          }
+  // Processes a scope of elements following the VectorElement accumulate-render model.
+  // Text elements accumulate in the scope. Child Group geometry propagates upward after the
+  // Group completes. When a TextBox is encountered, all previously accumulated Text elements
+  // are typeset and the accumulation list is cleared. Returns accumulated Text elements for
+  // upward propagation to the parent scope (up to the Layer boundary).
+  std::vector<Text*> processScope(const std::vector<Element*>& elements) {
+    std::vector<Text*> allText = {};
+    std::vector<Text*> accumulated = {};
+    for (auto* element : elements) {
+      if (element->nodeType() == NodeType::Text) {
+        auto* text = static_cast<Text*>(element);
+        accumulated.push_back(text);
+        allText.push_back(text);
+      } else if (element->nodeType() == NodeType::Group) {
+        auto propagated = processScope(static_cast<Group*>(element)->elements);
+        accumulated.insert(accumulated.end(), propagated.begin(), propagated.end());
+        allText.insert(allText.end(), propagated.begin(), propagated.end());
+      } else if (element->nodeType() == NodeType::TextBox) {
+        if (!accumulated.empty()) {
+          processTextWithLayout(accumulated, static_cast<const TextBox*>(element));
+          accumulated.clear();
         }
       }
-      if (!textElements.empty()) {
-        processRichTextWithLayout(textElements, textBox);
-        return;
-      }
     }
-
-    // Normal mode: process Groups independently
-    for (auto* element : contents) {
-      if (element->nodeType() == NodeType::Group) {
-        processGroup(static_cast<Group*>(element));
-      }
-    }
-
-    if (!textElements.empty()) {
-      processTextWithLayout(textElements, textBox);
-    }
-  }
-
-  void processGroup(Group* group) {
-    if (group == nullptr) {
-      return;
-    }
-
-    const TextBox* textBox = nullptr;
-    std::vector<Text*> textElements = {};
-
-    for (auto* element : group->elements) {
-      if (element->nodeType() == NodeType::TextBox) {
-        textBox = static_cast<const TextBox*>(element);
-      } else if (element->nodeType() == NodeType::Text) {
-        textElements.push_back(static_cast<Text*>(element));
-      } else if (element->nodeType() == NodeType::Group) {
-        processGroup(static_cast<Group*>(element));
-      }
-    }
-
-    if (!textElements.empty()) {
-      processTextWithLayout(textElements, textBox);
-    }
+    return allText;
   }
 
   // Builds a TextBlob from shaped glyph runs, applying the given x/y offsets to all positions.
@@ -304,16 +277,14 @@ class TextLayoutContext {
     return true;
   }
 
-  void processRichTextWithLayout(std::vector<Text*>& textElements,
-                                   const TextBox* textBox) {
+  void processTextWithLayout(std::vector<Text*>& textElements, const TextBox* textBox) {
     if (tryUseEmbeddedGlyphRuns(textElements)) {
       return;
     }
 
-    // Shape each Text element and concatenate allGlyphs for unified layout.
+    // Shape each Text and concatenate all glyphs for unified layout within the TextBox.
     std::vector<GlyphInfo> allGlyphs = {};
     float totalWidth = 0;
-
     for (auto* text : textElements) {
       ShapedInfo info = {};
       info.text = text;
@@ -328,56 +299,15 @@ class TextLayoutContext {
       allGlyphs.insert(allGlyphs.end(), info.allGlyphs.begin(), info.allGlyphs.end());
       totalWidth += info.totalWidth;
     }
-
     if (allGlyphs.empty()) {
       return;
     }
-
     if (textBox->writingMode == WritingMode::Vertical) {
       auto columns = layoutColumns(allGlyphs, textBox);
       buildTextBlobVertical(textBox, columns);
     } else {
       auto lines = layoutLines(allGlyphs, textBox);
       buildTextBlobWithLayout(textBox, lines);
-    }
-  }
-
-  void processTextWithLayout(std::vector<Text*>& textElements, const TextBox* textBox) {
-    // If no TextBox or all have embedded data, process each Text individually
-    if (textBox == nullptr) {
-      for (auto* text : textElements) {
-        if (!text->glyphRuns.empty()) {
-          auto shapedText = buildShapedTextFromEmbeddedGlyphRuns(text);
-          StoreShapedText(text, std::move(shapedText));
-        } else {
-          processTextWithoutLayout(text);
-        }
-      }
-      return;
-    }
-
-    if (tryUseEmbeddedGlyphRuns(textElements)) {
-      return;
-    }
-
-    // With TextBox: shape each Text, then layout with box.
-    for (auto* text : textElements) {
-      ShapedInfo info = {};
-      info.text = text;
-      if (!text->text.empty()) {
-        shapeText(text, info);
-      }
-      if (info.allGlyphs.empty()) {
-        continue;
-      }
-
-      if (textBox->writingMode == WritingMode::Vertical) {
-        auto columns = layoutColumns(info.allGlyphs, textBox);
-        buildTextBlobVertical(textBox, columns);
-      } else {
-        auto lines = layoutLines(info.allGlyphs, textBox);
-        buildTextBlobWithLayout(textBox, lines);
-      }
     }
   }
 

@@ -122,6 +122,19 @@ Also `roundness="0"` for Rectangle.
 **DropShadowStyle**: `showBehindLayer="true"`, `blendMode="normal"`.
 All offsets and blur values default to `0`, color defaults to `#000000`.
 
+**InnerShadowStyle**: `blendMode="normal"`.
+All offsets and blur values default to `0`, color defaults to `#000000`.
+
+**DropShadowFilter**: `shadowOnly="false"`.
+All offsets and blur values default to `0`, color defaults to `#000000`.
+
+**InnerShadowFilter**: `shadowOnly="false"`.
+All offsets and blur values default to `0`, color defaults to `#000000`.
+
+**BlurFilter**: `blurX="0"`, `blurY="0"`.
+
+**BackgroundBlurStyle**: `blurX="0"`, `blurY="0"`.
+
 **Gradient**: `matrix` defaults to identity. RadialGradient/ConicGradient/DiamondGradient
 `center` defaults to `0,0`. ConicGradient `startAngle` defaults to `0`, `endAngle` to `360`.
 

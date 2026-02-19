@@ -90,11 +90,11 @@
 
   <!-- ==================== HUD Rings ==================== -->
   <Layer name="HudRings" x="400" y="310" alpha="0.7">
-    <Layer>
+    <Group>
       <Ellipse size="480,480"/>
       <Stroke color="#1E3A8A" width="2" dashes="10,12"/>
-    </Layer>
-    <Layer>
+    </Group>
+    <Group>
       <Ellipse size="420,420"/>
       <TrimPath start="0.1" end="0.4" offset="40"/>
       <Stroke width="4" cap="round">
@@ -104,12 +104,12 @@
           <ColorStop offset="1" color="#7C3AED"/>
         </ConicGradient>
       </Stroke>
-    </Layer>
-    <Layer>
+    </Group>
+    <Group>
       <Ellipse size="360,360"/>
       <TrimPath start="0.55" end="0.85" offset="-30"/>
       <Stroke width="3" cap="round" color="#38BDF8" alpha="0.8"/>
-    </Layer>
+    </Group>
   </Layer>
 
   <!-- ==================== Main Panel ==================== -->
@@ -183,10 +183,10 @@
   </Layer>
 
   <Layer name="PlayerIdRow">
-    <Layer name="PlayerId">
+    <Group>
       <Text text="#A17X9" fontFamily="Arial" fontSize="11" position="120,63"/>
       <Fill color="#7DD3FC"/>
-    </Layer>
+    </Group>
     <Layer name="LevelBadge">
       <Rectangle center="195,60" size="48,14" roundness="7"/>
       <Fill>
@@ -196,10 +196,10 @@
         </LinearGradient>
       </Fill>
       <Stroke color="#7DD3FC" width="1"/>
-      <Layer>
+      <Group>
         <Text text="LV 27" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="195,64" textAnchor="center"/>
         <Fill color="#E0F2FE"/>
-      </Layer>
+      </Group>
     </Layer>
   </Layer>
 
@@ -257,10 +257,10 @@
       <Ellipse center="636,48" size="8,8"/>
       <Stroke color="#F8D477" width="1"/>
     </Group>
-    <Layer>
+    <Group>
       <Text text="12,450" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="656,52"/>
       <Fill color="#F8FAFC"/>
-    </Layer>
+    </Group>
   </Layer>
 
   <Layer name="DiamondChip">
@@ -281,10 +281,10 @@
         </LinearGradient>
       </Fill>
     </Group>
-    <Layer>
+    <Group>
       <Text text="860" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="656,86"/>
       <Fill color="#F8FAFC"/>
-    </Layer>
+    </Group>
   </Layer>
 
   <!-- ==================== Buttons ==================== -->
@@ -298,14 +298,14 @@
       </LinearGradient>
     </Fill>
     <Stroke color="#5AFADF" width="2"/>
-    <Layer>
+    <Group>
       <Rectangle center="400,208" size="310,34" roundness="18"/>
       <Fill color="#FFFFFF22"/>
-    </Layer>
-    <Layer x="280" y="206">
+    </Group>
+    <Group position="280,206">
       <Path data="@IconPlay"/>
       <Fill color="#ECFEFF"/>
-    </Layer>
+    </Group>
     <Layer>
       <Text text="START" fontFamily="Arial" fontStyle="Bold" fontSize="24" position="400,227" textAnchor="center"/>
       <Fill color="#F0FFFD"/>
@@ -327,10 +327,10 @@
       <Path data="@IconCart"/>
       <Fill color="#FFF7ED"/>
     </Group>
-    <Layer>
+    <Group>
       <Text text="SHOP" fontFamily="Arial" fontStyle="Bold" fontSize="22" position="400,319" textAnchor="center"/>
       <Fill color="#FFF7ED"/>
-    </Layer>
+    </Group>
     <DropShadowStyle offsetY="10" blurX="16" blurY="16" color="#F59E0B66"/>
   </Layer>
 
@@ -347,10 +347,10 @@
       <Path data="@IconCrown"/>
       <Fill color="#FDF2F8"/>
     </Group>
-    <Layer>
+    <Group>
       <Text text="RANK" fontFamily="Arial" fontStyle="Bold" fontSize="22" position="400,411" textAnchor="center"/>
       <Fill color="#FDF2F8"/>
-    </Layer>
+    </Group>
     <DropShadowStyle offsetY="10" blurX="16" blurY="16" color="#C084FC66"/>
   </Layer>
 

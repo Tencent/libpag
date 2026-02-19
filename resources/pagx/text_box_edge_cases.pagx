@@ -90,7 +90,7 @@
       <Rectangle center="295,330" size="230,120"/>
       <Stroke color="#000" width="1"/>
     </Group>
-    <Layer>
+    <Group>
       <Group>
         <Text text="Right" fontFamily="NotoSansSC" fontSize="24"/>
         <Fill color="#000"/>
@@ -100,6 +100,6 @@
         <Fill color="#000"/>
       </Group>
       <TextBox position="180,270" size="230,120" textAlign="end"/>
-    </Layer>
+    </Group>
   </Layer>
 </pagx>

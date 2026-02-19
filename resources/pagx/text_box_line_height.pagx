@@ -6,7 +6,7 @@
       <Rectangle center="150,140" size="200,180"/>
       <Stroke color="#000" width="1"/>
     </Group>
-    <Layer>
+    <Group>
       <Group>
         <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
         <Fill color="#000"/>
@@ -20,14 +20,14 @@
         <Fill color="#000"/>
       </Group>
       <TextBox position="50,50" size="200,180"/>
-    </Layer>
+    </Group>
 
     <!-- Box B: Fixed lineHeight=40, same mixed text, Near -->
     <Group>
       <Rectangle center="360,140" size="200,180"/>
       <Stroke color="#000" width="1"/>
     </Group>
-    <Layer>
+    <Group>
       <Group>
         <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
         <Fill color="#000"/>
@@ -41,7 +41,7 @@
         <Fill color="#000"/>
       </Group>
       <TextBox position="260,50" size="200,180" lineHeight="40"/>
-    </Layer>
+    </Group>
 
     <!-- Box C: Fixed lineHeight=50 + Far (bottom alignment) -->
     <Group>
@@ -70,7 +70,7 @@
       <Rectangle center="445,330" size="150,180"/>
       <Stroke color="#000" width="1"/>
     </Group>
-    <Layer>
+    <Group>
       <Group>
         <Text text="Large&#10;" fontFamily="NotoSansSC" fontSize="36"/>
         <Fill color="#000"/>
@@ -84,6 +84,6 @@
         <Fill color="#000"/>
       </Group>
       <TextBox position="370,240" size="150,180" paragraphAlign="far"/>
-    </Layer>
+    </Group>
   </Layer>
 </pagx>
