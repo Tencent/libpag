@@ -1047,8 +1047,8 @@ Text elements provide geometric shapes for text content. Unlike shape elements t
 |-----------|------|---------|-------------|
 | `text` | string | "" | Text content |
 | `position` | Point | 0,0 | Text start position, y is baseline |
-| `fontFamily` | string | system default | Font family |
-| `fontStyle` | string | "Regular" | Font variant (Regular, Bold, Italic, Bold Italic, etc.) |
+| `fontFamily` | string | "" | Font family (empty string means system default) |
+| `fontStyle` | string | "" | Font variant (Regular, Bold, Italic, Bold Italic, etc.). Empty string means the font's default variant |
 | `fontSize` | float | 12 | Font size |
 | `letterSpacing` | float | 0 | Letter spacing |
 | `fauxBold` | bool | false | Faux bold (algorithmically bolded) |
@@ -1566,7 +1566,7 @@ Unlike other modifiers that operate on accumulated results in a chain (e.g., Tri
 | `paragraphAlign` | ParagraphAlign | near | Paragraph alignment along the block-flow direction |
 | `writingMode` | WritingMode | horizontal | Layout direction |
 | `lineHeight` | float | 0 | Line height in pixels. 0 means auto (calculated from font metrics: ascent + descent + leading). Following CSS Writing Modes conventions, this is a logical property: in vertical mode it controls column width |
-| `wordWrap` | boolean | true | Enable automatic word wrapping at the box width boundary (horizontal mode) or height boundary (vertical mode). Has no effect when that dimension of size is 0 |
+| `wordWrap` | bool | true | Enable automatic word wrapping at the box width boundary (horizontal mode) or height boundary (vertical mode). Has no effect when that dimension of size is 0 |
 | `overflow` | Overflow | visible | Overflow behavior when text exceeds the box height (horizontal mode) or width (vertical mode). Has no effect when that dimension of size is 0 |
 
 **TextAlign (Text Alignment)**:
@@ -1875,6 +1875,7 @@ Layer / Group
 | **ParagraphAlign** | `near`, `middle`, `far` |
 | **WritingMode** | `horizontal`, `vertical` |
 | **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |
+| **Overflow** | `visible`, `hidden` |
 ---
 
 ## Appendix C. Common Usage Examples

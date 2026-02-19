@@ -87,16 +87,6 @@
     <xs:union memberTypes="HexColorType FloatColorType IdRefType"/>
   </xs:simpleType>
 
-  <!-- ColorOrIdRef: Color value or idref for color/colorSource attributes -->
-  <xs:simpleType name="ColorOrIdRefType">
-    <xs:union memberTypes="ColorType IdRefType"/>
-  </xs:simpleType>
-
-  <!-- StringOrIdRef: string value or idref for data/path attributes -->
-  <xs:simpleType name="StringOrIdRefType">
-    <xs:restriction base="xs:string"/>
-  </xs:simpleType>
-
   <!-- ColorMatrix: 20 comma-separated floats -->
   <xs:simpleType name="ColorMatrixType">
     <xs:restriction base="xs:string">
@@ -522,8 +512,8 @@
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="text" type="xs:string"/>
     <xs:attribute name="position" type="PointType" default="0,0"/>
-    <xs:attribute name="fontFamily" type="xs:string"/>
-    <xs:attribute name="fontStyle" type="xs:string"/>
+    <xs:attribute name="fontFamily" type="xs:string" default=""/>
+    <xs:attribute name="fontStyle" type="xs:string" default=""/>
     <xs:attribute name="fontSize" type="xs:decimal" default="12"/>
     <xs:attribute name="letterSpacing" type="xs:decimal" default="0"/>
     <xs:attribute name="fauxBold" type="BoolType" default="false"/>
@@ -540,7 +530,7 @@
       <xs:group ref="ColorSourceGroup" minOccurs="0"/>
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="color" type="ColorOrIdRefType" default="#000000"/>
+    <xs:attribute name="color" type="ColorType" default="#000000"/>
     <xs:attribute name="alpha" type="xs:decimal" default="1"/>
     <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
     <xs:attribute name="fillRule" type="FillRuleType" default="winding"/>
@@ -554,7 +544,7 @@
       <xs:group ref="ColorSourceGroup" minOccurs="0"/>
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="color" type="ColorOrIdRefType" default="#000000"/>
+    <xs:attribute name="color" type="ColorType" default="#000000"/>
     <xs:attribute name="width" type="xs:decimal" default="1"/>
     <xs:attribute name="alpha" type="xs:decimal" default="1"/>
     <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>

@@ -1047,8 +1047,8 @@ y = center.y + outerRadius * sin(angle)
 |------|------|--------|------|
 | `text` | string | "" | 文本内容 |
 | `position` | Point | 0,0 | 文本起点位置，y 为基线 |
-| `fontFamily` | string | 系统默认 | 字体族 |
-| `fontStyle` | string | "Regular" | 字体变体（Regular, Bold, Italic, Bold Italic 等） |
+| `fontFamily` | string | "" | 字体族（空字符串表示系统默认字体） |
+| `fontStyle` | string | "" | 字体变体（Regular, Bold, Italic, Bold Italic 等）。空字符串表示该字体的默认变体 |
 | `fontSize` | float | 12 | 字号 |
 | `letterSpacing` | float | 0 | 字间距 |
 | `fauxBold` | bool | false | 仿粗体效果 |
@@ -1561,7 +1561,7 @@ TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被�
 | `paragraphAlign` | ParagraphAlign | near | 段落对齐——沿块流方向对齐文本行/列（见下方） |
 | `writingMode` | WritingMode | horizontal | 排版方向（见下方） |
 | `lineHeight` | float | 0 | 行高（像素值）。0 表示自动（根据字体 metrics 计算：ascent + descent + leading）。遵循 CSS Writing Modes 的逻辑属性惯例，竖排模式下控制列宽 |
-| `wordWrap` | boolean | true | 是否启用自动换行，在盒子宽度边界（横排）或高度边界（竖排）处换行。当该维度的 size 为 0 时无效果 |
+| `wordWrap` | bool | true | 是否启用自动换行，在盒子宽度边界（横排）或高度边界（竖排）处换行。当该维度的 size 为 0 时无效果 |
 | `overflow` | Overflow | visible | 文本超出盒子高度（横排）或宽度（竖排）时的溢出行为。当该维度的 size 为 0 时无效果 |
 
 **TextAlign（文本对齐）**：
@@ -1870,6 +1870,7 @@ Layer / Group
 | **ParagraphAlign** | `near`, `middle`, `far` |
 | **WritingMode** | `horizontal`, `vertical` |
 | **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |
+| **Overflow** | `visible`, `hidden` |
 ---
 
 ## 附录 C. 常见用法示例（Examples）
