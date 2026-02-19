@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="570" height="440" version="1.0">
+  <!-- Box A: Empty lines (\n at start + consecutive \n\n) -->
   <Layer>
-    <!-- Box A: Empty lines (\n at start + consecutive \n\n) -->
     <Group>
       <Rectangle center="110,115" size="120,130"/>
       <Stroke color="#000" width="1"/>
@@ -11,8 +11,11 @@
       <Fill color="#000"/>
       <TextBox position="50,50" size="120,130"/>
     </Group>
+  </Layer>
 
-    <!-- Anchor mode: TextAlign Start/Center/End (horizontal alignment to anchor point) -->
+  <!-- Anchor mode: TextAlign Start/Center/End + ParagraphAlign Near/Middle/Far -->
+  <Layer>
+    <!-- TextAlign Start -->
     <Group>
       <Text text="Start" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill color="#000"/>
@@ -23,6 +26,7 @@
       <Fill color="#F00"/>
     </Group>
 
+    <!-- TextAlign Center -->
     <Group>
       <Text text="Center" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill color="#000"/>
@@ -33,6 +37,7 @@
       <Fill color="#F00"/>
     </Group>
 
+    <!-- TextAlign End -->
     <Group>
       <Text text="End" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill color="#000"/>
@@ -43,7 +48,7 @@
       <Fill color="#F00"/>
     </Group>
 
-    <!-- Anchor mode: ParagraphAlign Near/Middle/Far (vertical alignment to anchor point) -->
+    <!-- ParagraphAlign Near -->
     <Group>
       <Text text="Near" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill color="#000"/>
@@ -54,6 +59,7 @@
       <Fill color="#F00"/>
     </Group>
 
+    <!-- ParagraphAlign Middle -->
     <Group>
       <Text text="Middle" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill color="#000"/>
@@ -64,6 +70,7 @@
       <Fill color="#F00"/>
     </Group>
 
+    <!-- ParagraphAlign Far -->
     <Group>
       <Text text="Far" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill color="#000"/>
@@ -73,8 +80,10 @@
       <Ellipse center="490,180" size="6,6"/>
       <Fill color="#F00"/>
     </Group>
+  </Layer>
 
-    <!-- Box D: Fixed lineHeight + \n at start -->
+  <!-- Box D: Fixed lineHeight + \n at start -->
+  <Layer>
     <Group>
       <Rectangle center="110,330" size="120,120"/>
       <Stroke color="#000" width="1"/>
@@ -84,8 +93,10 @@
       <Fill color="#000"/>
       <TextBox position="50,270" size="120,120" lineHeight="50"/>
     </Group>
+  </Layer>
 
-    <!-- Box E: End alignment + rich text -->
+  <!-- Box E: End alignment + rich text -->
+  <Layer>
     <Group>
       <Rectangle center="295,330" size="230,120"/>
       <Stroke color="#000" width="1"/>

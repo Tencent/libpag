@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="570" height="470" version="1.0">
+  <!-- Box A: Auto lineHeight, mixed font sizes (40+20+60), Near -->
   <Layer>
-    <!-- Box A: Auto lineHeight, mixed font sizes (40+20+60), Near -->
     <Group>
       <Rectangle center="150,140" size="200,180"/>
       <Stroke color="#000" width="1"/>
@@ -21,8 +21,10 @@
       </Group>
       <TextBox position="50,50" size="200,180"/>
     </Group>
+  </Layer>
 
-    <!-- Box B: Fixed lineHeight=40, same mixed text, Near -->
+  <!-- Box B: Fixed lineHeight=40, same mixed text, Near -->
+  <Layer>
     <Group>
       <Rectangle center="360,140" size="200,180"/>
       <Stroke color="#000" width="1"/>
@@ -42,8 +44,10 @@
       </Group>
       <TextBox position="260,50" size="200,180" lineHeight="40"/>
     </Group>
+  </Layer>
 
-    <!-- Box C: Fixed lineHeight=50 + Far (bottom alignment) -->
+  <!-- Box C: Fixed lineHeight=50 + Far (bottom alignment) -->
+  <Layer>
     <Group>
       <Rectangle center="125,320" size="150,160"/>
       <Stroke color="#000" width="1"/>
@@ -53,8 +57,10 @@
       <Fill color="#000"/>
       <TextBox position="50,240" size="150,160" paragraphAlign="far" lineHeight="50"/>
     </Group>
+  </Layer>
 
-    <!-- Box D: Fixed lineHeight=50 + Center -->
+  <!-- Box D: Fixed lineHeight=50 + Center -->
+  <Layer>
     <Group>
       <Rectangle center="285,320" size="150,160"/>
       <Stroke color="#000" width="1"/>
@@ -64,8 +70,10 @@
       <Fill color="#000"/>
       <TextBox position="210,240" size="150,160" paragraphAlign="middle" lineHeight="50"/>
     </Group>
+  </Layer>
 
-    <!-- Box E: 3-line mixed sizes + Far (multi-step bottom-up recursion) -->
+  <!-- Box E: 3-line mixed sizes + Far (multi-step bottom-up recursion) -->
+  <Layer>
     <Group>
       <Rectangle center="445,330" size="150,180"/>
       <Stroke color="#000" width="1"/>

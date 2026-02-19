@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="670" height="570" version="1.0">
+  <!-- Row 1: CJK+Latin single column, two columns with \n, auto-wrap -->
   <Layer>
-    <!-- Row 1: CJK+Latin single column, two columns with \n, auto-wrap -->
-
     <!-- Box 1: CJK+Latin mixed single column -->
     <Group>
       <Rectangle center="90,165" size="80,230"/>
@@ -35,9 +34,10 @@
       <TextBox position="250,50" size="100,168" writingMode="vertical"/>
       <Fill color="#000"/>
     </Group>
+  </Layer>
 
-    <!-- Row 2: ParagraphAlign Near/Middle/Far (single column positioning) -->
-
+  <!-- Row 2: ParagraphAlign Near/Middle/Far (single column positioning) -->
+  <Layer>
     <!-- Box 4: ParagraphAlign Near -->
     <Group>
       <Rectangle center="400,125" size="80,150"/>
@@ -70,9 +70,10 @@
       <TextBox position="540,50" size="80,150" writingMode="vertical" paragraphAlign="far"/>
       <Fill color="#000"/>
     </Group>
+  </Layer>
 
-    <!-- TextAlign Start/Center/End (two columns with different lengths) -->
-
+  <!-- Row 3: TextAlign Start/Center/End, Justify, Overflow -->
+  <Layer>
     <!-- Box 7: TextAlign Start -->
     <Group>
       <Rectangle center="100,405" size="100,230"/>

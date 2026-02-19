@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="570" height="400" version="1.0">
+  <!-- Row 1: textAlign Start/Center/End + paragraphAlign Near/Middle/Far -->
   <Layer>
-    <!-- Row 1: textAlign Start/Center/End + paragraphAlign Near/Middle/Far -->
-
     <!-- Box 1: CJK wordWrap, Start/Near -->
     <Group>
       <Rectangle center="125,110" size="150,120"/>
@@ -35,9 +34,10 @@
       <TextBox position="370,50" size="150,120" textAlign="end" paragraphAlign="far"/>
       <Fill color="#000"/>
     </Group>
+  </Layer>
 
-    <!-- Row 2: overflow hidden, Justify, ParagraphAlign single-line Near/Middle/Far -->
-
+  <!-- Row 2: overflow hidden, Justify -->
+  <Layer>
     <!-- Box 4: Overflow hidden, Start/Near -->
     <Group>
       <Rectangle center="125,220" size="150,80"/>
@@ -59,7 +59,10 @@
       <TextBox position="210,180" size="150,80" textAlign="justify"/>
       <Fill color="#000"/>
     </Group>
+  </Layer>
 
+  <!-- Row 3: ParagraphAlign Near/Middle/Far -->
+  <Layer>
     <!-- Box 6: ParagraphAlign Near -->
     <Group>
       <Rectangle center="125,310" size="150,80"/>
