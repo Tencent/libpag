@@ -1,38 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx width="400" height="300" version="1.0">
-  <!-- Row 1: textAnchor start/center/end with newlines -->
+<pagx width="350" height="290" version="1.0">
   <Layer>
-    <!-- Text with newlines, no TextBox, textAnchor=start (default) -->
+    <!-- Top-left: textAnchor=start -->
     <Group>
       <Text text="Line One&#10;Line Two&#10;Line Three" fontFamily="NotoSansSC" fontSize="24" position="20,40"/>
       <Fill color="#000"/>
     </Group>
 
-    <!-- Text with newlines, no TextBox, textAnchor=center -->
+    <!-- Top-right: textAnchor=center -->
     <Group>
-      <Text text="Center A&#10;Center BB&#10;Center CCC" fontFamily="NotoSansSC" fontSize="24" position="200,40" textAnchor="center"/>
+      <Text text="Center A&#10;Center BB&#10;Center CCC" fontFamily="NotoSansSC" fontSize="24" position="260,40" textAnchor="center"/>
       <Fill color="#333"/>
     </Group>
 
-    <!-- Text with newlines, no TextBox, textAnchor=end -->
+    <!-- Bottom-left: textAnchor=end -->
     <Group>
-      <Text text="End X&#10;End YY&#10;End ZZZ" fontFamily="NotoSansSC" fontSize="24" position="380,40" textAnchor="end"/>
+      <Text text="End X&#10;End YY&#10;End ZZZ" fontFamily="NotoSansSC" fontSize="24" position="130,180" textAnchor="end"/>
       <Fill color="#666"/>
     </Group>
-  </Layer>
 
-  <!-- Row 2: consecutive newlines + single line -->
-  <Layer>
-    <!-- Text with consecutive newlines (empty lines) -->
+    <!-- Bottom-right: consecutive newlines (empty line), textAnchor=center -->
     <Group>
-      <Text text="Before&#10;&#10;After Gap" fontFamily="NotoSansSC" fontSize="24" position="20,160"/>
+      <Text text="Before&#10;&#10;After Gap" fontFamily="NotoSansSC" fontSize="24" position="260,180" textAnchor="center"/>
       <Fill color="#000"/>
     </Group>
 
-    <!-- Single line text (no newline, should behave unchanged) -->
+    <!-- Anchor markers -->
     <Group>
-      <Text text="No Newline" fontFamily="NotoSansSC" fontSize="24" position="200,160" textAnchor="center"/>
-      <Fill color="#333"/>
+      <Ellipse center="20,40" size="6,6"/>
+      <Ellipse center="260,40" size="6,6"/>
+      <Ellipse center="130,180" size="6,6"/>
+      <Ellipse center="260,180" size="6,6"/>
+      <Fill color="#F00"/>
     </Group>
   </Layer>
 </pagx>
