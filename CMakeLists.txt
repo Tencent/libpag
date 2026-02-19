@@ -731,4 +731,8 @@ if (PAG_BUILD_TESTS)
     target_compile_options(PAGFullTest PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
     target_link_options(PAGFullTest PRIVATE ${PAG_TEST_LINK_OPTIONS})
     target_link_libraries(PAGFullTest ${PAG_TEST_LIBS})
+
+    if (PAG_BUILD_CLI)
+        add_subdirectory(cli)
+    endif ()
 endif ()
