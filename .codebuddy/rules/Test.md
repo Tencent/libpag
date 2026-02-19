@@ -3,6 +3,11 @@ description: 项目编译与测试相关配置
 alwaysApply: true
 ---
 
+## !! IMPORTANT - 操作限制
+
+- **NEVER** 自动接受截图基准变更，包括禁止自动运行 `accept_baseline.sh`、`UpdateBaseline` target、禁止修改或覆盖 `version.json` 文件
+- 截图基准变更**必须先向用户展示截图并获得明确确认**，确认后才可运行 `bash accept_baseline.sh`
+
 ## 编译验证
 
 修改代码后，使用以下命令验证编译。必须传递 `-DPAG_BUILD_TESTS=ON` 以启用所有模块触发编译。
@@ -28,9 +33,7 @@ cmake --build cmake-build-debug --target PAGFullTest
     - 两边 key 都存在且版本号不同：跳过比较并返回成功（用于接受截图变更）
     - 其他情况：正常比较基准图，基准图不存在或不匹配则测试失败
 
-**!! IMPORTANT - 截图基准变更限制**：
-- **NEVER** 自动接受截图基准变更，包括禁止自动运行 `UpdateBaseline` target、禁止修改或覆盖 `version.json` 文件
-- **必须**经过用户确认后直接运行 `bash accept_baseline.sh` 脚本来接受变更，**禁止**将脚本内容展开手动逐步执行
+**!! IMPORTANT**：**禁止**将脚本内容展开手动逐步执行，必须直接运行 `bash accept_baseline.sh`
 
 ## 使用本地 tgfx 源码调试
 
