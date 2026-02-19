@@ -119,12 +119,11 @@ class TextLayoutContext {
     float roundingRatio = 1.0f;
   };
 
-  // A group of glyphs with the same vertical treatment in vertical text layout.
+  // Single glyph with vertical layout metrics.
   struct VerticalGlyphInfo {
     GlyphInfo glyph = {};
     VerticalOrientation orientation = VerticalOrientation::Upright;
     float height = 0;
-    float width = 0;
     bool canBreakBefore = false;
   };
 
@@ -132,8 +131,6 @@ class TextLayoutContext {
   struct ColumnInfo {
     std::vector<VerticalGlyphInfo> glyphs = {};
     float height = 0;
-    float maxWidth = 0;
-    float maxFontSize = 0;
     float maxColumnWidth = 0;
   };
 
@@ -1142,24 +1139,14 @@ class TextLayoutContext {
 
   static void FinishColumn(ColumnInfo* column, float lineHeight) {
     float height = 0;
-    float maxWidth = 0;
-    float maxFontSize = 0;
     float maxFontLineHeight = 0;
     for (auto& vg : column->glyphs) {
       height += vg.height;
-      if (vg.width > maxWidth) {
-        maxWidth = vg.width;
-      }
-      if (vg.glyph.fontSize > maxFontSize) {
-        maxFontSize = vg.glyph.fontSize;
-      }
       if (vg.glyph.fontLineHeight > maxFontLineHeight) {
         maxFontLineHeight = vg.glyph.fontLineHeight;
       }
     }
     column->height = height;
-    column->maxWidth = maxWidth;
-    column->maxFontSize = maxFontSize;
     // Auto column width uses font metrics height (ascent + descent + leading) to match
     // horizontal layout behavior where auto lineHeight = metricsHeight. This ensures rotated
     // Latin glyphs fit within the column width.
@@ -1186,13 +1173,11 @@ class TextLayoutContext {
       vg.orientation = orientation;
       if (orientation == VerticalOrientation::Rotated) {
         vg.height = glyph.advance;
-        vg.width = glyph.fontSize;
       } else {
         vg.height = glyph.font.getAdvance(glyph.glyphID, true);
         if (vg.height <= 0) {
           vg.height = glyph.fontSize;
         }
-        vg.width = glyph.fontSize;
       }
 
       if (i > 0 && allGlyphs[i - 1].unichar != '\n') {
@@ -1237,7 +1222,9 @@ class TextLayoutContext {
           columns.emplace_back();
           currentColumn = &columns.back();
           currentColumn->glyphs = std::move(overflow);
-          currentColumnHeight = 0;
+          if (!currentColumn->glyphs.empty()) {
+            currentColumn->glyphs[0].canBreakBefore = false;
+          }          currentColumnHeight = 0;
           for (auto& g : currentColumn->glyphs) {
             currentColumnHeight += g.height;
           }

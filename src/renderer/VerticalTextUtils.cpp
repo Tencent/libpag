@@ -36,7 +36,7 @@ VerticalOrientation VerticalTextUtils::getOrientation(int32_t c) {
   if (c == 0x30A0) return VerticalOrientation::Rotated;
   if (c == 0x30FC) return VerticalOrientation::Rotated;
   if (c >= 0xFF08 && c <= 0xFF09) return VerticalOrientation::Rotated;
-  if (c >= 0xFF1A && c <= 0xFF1B) return VerticalOrientation::Rotated;
+  if (c == 0xFF0D) return VerticalOrientation::Rotated;
   if (c == 0xFF3B) return VerticalOrientation::Rotated;
   if (c == 0xFF3D) return VerticalOrientation::Rotated;
   if (c == 0xFF3F) return VerticalOrientation::Rotated;
