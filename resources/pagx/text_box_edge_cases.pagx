@@ -4,11 +4,11 @@
   <Layer x="50" y="50">
     <Group>
       <Rectangle center="60,65" size="120,130"/>
-      <Stroke color="#000" width="1"/>
+      <Stroke/>
     </Group>
     <Group>
       <Text text="&#10;Line2&#10;&#10;Line4" fontFamily="NotoSansSC" fontSize="20"/>
-      <Fill color="#000"/>
+      <Fill/>
       <TextBox size="120,130"/>
     </Group>
   </Layer>
@@ -18,7 +18,7 @@
     <!-- TextAlign Start -->
     <Group>
       <Text text="Start" fontFamily="NotoSansSC" fontSize="20"/>
-      <Fill color="#000"/>
+      <Fill/>
       <TextBox/>
     </Group>
     <Group>
@@ -29,7 +29,7 @@
     <!-- TextAlign Center -->
     <Group>
       <Text text="Center" fontFamily="NotoSansSC" fontSize="20"/>
-      <Fill color="#000"/>
+      <Fill/>
       <TextBox position="120,0" textAlign="center"/>
     </Group>
     <Group>
@@ -40,7 +40,7 @@
     <!-- TextAlign End -->
     <Group>
       <Text text="End" fontFamily="NotoSansSC" fontSize="20"/>
-      <Fill color="#000"/>
+      <Fill/>
       <TextBox position="240,0" textAlign="end"/>
     </Group>
     <Group>
@@ -51,7 +51,7 @@
     <!-- ParagraphAlign Near -->
     <Group>
       <Text text="Near" fontFamily="NotoSansSC" fontSize="20"/>
-      <Fill color="#000"/>
+      <Fill/>
       <TextBox position="0,100"/>
     </Group>
     <Group>
@@ -62,7 +62,7 @@
     <!-- ParagraphAlign Middle -->
     <Group>
       <Text text="Middle" fontFamily="NotoSansSC" fontSize="20"/>
-      <Fill color="#000"/>
+      <Fill/>
       <TextBox position="120,100" paragraphAlign="middle"/>
     </Group>
     <Group>
@@ -73,7 +73,7 @@
     <!-- ParagraphAlign Far -->
     <Group>
       <Text text="Far" fontFamily="NotoSansSC" fontSize="20"/>
-      <Fill color="#000"/>
+      <Fill/>
       <TextBox position="240,100" paragraphAlign="far"/>
     </Group>
     <Group>
@@ -86,11 +86,11 @@
   <Layer x="50" y="270">
     <Group>
       <Rectangle center="60,60" size="120,120"/>
-      <Stroke color="#000" width="1"/>
+      <Stroke/>
     </Group>
     <Group>
       <Text text="&#10;Second" fontFamily="NotoSansSC" fontSize="24"/>
-      <Fill color="#000"/>
+      <Fill/>
       <TextBox size="120,120" lineHeight="50"/>
     </Group>
   </Layer>
@@ -99,16 +99,16 @@
   <Layer x="180" y="270">
     <Group>
       <Rectangle center="115,60" size="230,120"/>
-      <Stroke color="#000" width="1"/>
+      <Stroke/>
     </Group>
     <Group>
       <Group>
         <Text text="Right" fontFamily="NotoSansSC" fontSize="24"/>
-        <Fill color="#000"/>
+        <Fill/>
       </Group>
       <Group>
         <Text text="Align" fontFamily="NotoSansSC" fontSize="36"/>
-        <Fill color="#000"/>
+        <Fill/>
       </Group>
       <TextBox size="230,120" textAlign="end"/>
     </Group>
