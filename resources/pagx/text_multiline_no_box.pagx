@@ -4,7 +4,7 @@
     <!-- Top-left: textAnchor=start -->
     <Group>
       <Text text="Line One&#10;Line Two&#10;Line Three" fontFamily="NotoSansSC" fontSize="24" position="20,40"/>
-      <Fill color="#000"/>
+      <Fill/>
     </Group>
 
     <!-- Top-right: textAnchor=center -->
@@ -22,7 +22,7 @@
     <!-- Bottom-right: consecutive newlines (empty line), textAnchor=center -->
     <Group>
       <Text text="Before&#10;&#10;After Gap" fontFamily="NotoSansSC" fontSize="24" position="260,180" textAnchor="center"/>
-      <Fill color="#000"/>
+      <Fill/>
     </Group>
 
     <!-- Anchor markers -->

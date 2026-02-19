@@ -656,6 +656,9 @@ static Fill* parseFill(const DOMNode* node, PAGXDocument* doc) {
   if (childColor) {
     fill->color = childColor;
   }
+  if (fill->color == nullptr) {
+    fill->color = doc->makeNode<SolidColor>();
+  }
   return fill;
 }
 
@@ -683,6 +686,9 @@ static Stroke* parseStroke(const DOMNode* node, PAGXDocument* doc) {
   auto childColor = parseChildColorSource(node, doc);
   if (childColor) {
     stroke->color = childColor;
+  }
+  if (stroke->color == nullptr) {
+    stroke->color = doc->makeNode<SolidColor>();
   }
   return stroke;
 }
