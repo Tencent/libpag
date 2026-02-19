@@ -1556,13 +1556,13 @@ TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被�
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `position` | Point | 0,0 | 文本区域左上角坐标 |
-| `size` | Size | 0,0 | 排版尺寸。当宽度或高度为 0 时，该维度上文本无边界，wordWrap 和 overflow 均无效果 |
+| `size` | Size | 0,0 | 排版尺寸。当宽度或高度为 0 时，该维度上文本无边界，可能导致 wordWrap 或 overflow 无效果 |
 | `textAlign` | TextAlign | start | 文本对齐——沿行内方向对齐文本（见下方） |
 | `paragraphAlign` | ParagraphAlign | near | 段落对齐——沿块流方向对齐文本行/列（见下方） |
 | `writingMode` | WritingMode | horizontal | 排版方向（见下方） |
 | `lineHeight` | float | 0 | 行高（像素值）。0 表示自动（根据字体 metrics 计算：ascent + descent + leading）。遵循 CSS Writing Modes 的逻辑属性惯例，竖排模式下控制列宽 |
-| `wordWrap` | boolean | true | 是否启用自动换行（在盒子宽度/高度边界处换行）。当 size 对应维度为 0 时无效果 |
-| `overflow` | Overflow | visible | 文本超出盒子边界时的行为。当 size 对应维度为 0 时无效果 |
+| `wordWrap` | boolean | true | 是否启用自动换行，在盒子宽度边界（横排）或高度边界（竖排）处换行。当该维度的 size 为 0 时无效果 |
+| `overflow` | Overflow | visible | 文本超出盒子高度（横排）或宽度（竖排）时的溢出行为。当该维度的 size 为 0 时无效果 |
 
 **TextAlign（文本对齐）**：
 
@@ -1595,7 +1595,7 @@ TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被�
 | 值 | 说明 |
 |------|------|
 | `visible` | 超出盒子边界的文本仍然渲染（默认） |
-| `hidden` | 超出盒子边界的整行（横排）或整列（竖排）被丢弃，不会显示被截断的半行/半列。当 size 对应维度为 0 时无效果 |
+| `hidden` | 超出盒子高度（横排）或宽度（竖排）的整行/整列被丢弃，不会显示被截断的半行/半列。当该维度的 size 为 0 时无效果 |
 
 #### 5.5.7 富文本
 

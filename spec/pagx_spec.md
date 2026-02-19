@@ -1561,13 +1561,13 @@ Unlike other modifiers that operate on accumulated results in a chain (e.g., Tri
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `position` | Point | 0,0 | Top-left corner of the text area |
-| `size` | Size | 0,0 | Layout size. When width or height is 0, text has no boundary in that dimension and both wordWrap and overflow have no effect |
+| `size` | Size | 0,0 | Layout size. When width or height is 0, text has no boundary in that dimension, which may cause wordWrap or overflow to have no effect |
 | `textAlign` | TextAlign | start | Text alignment along the inline direction |
 | `paragraphAlign` | ParagraphAlign | near | Paragraph alignment along the block-flow direction |
 | `writingMode` | WritingMode | horizontal | Layout direction |
 | `lineHeight` | float | 0 | Line height in pixels. 0 means auto (calculated from font metrics: ascent + descent + leading). Following CSS Writing Modes conventions, this is a logical property: in vertical mode it controls column width |
-| `wordWrap` | boolean | true | Enable automatic word wrapping (wraps at box width/height boundary). Has no effect when the corresponding dimension of size is 0 |
-| `overflow` | Overflow | visible | Overflow behavior when text exceeds box boundaries. Has no effect when the corresponding dimension of size is 0 |
+| `wordWrap` | boolean | true | Enable automatic word wrapping at the box width boundary (horizontal mode) or height boundary (vertical mode). Has no effect when that dimension of size is 0 |
+| `overflow` | Overflow | visible | Overflow behavior when text exceeds the box height (horizontal mode) or width (vertical mode). Has no effect when that dimension of size is 0 |
 
 **TextAlign (Text Alignment)**:
 
@@ -1600,7 +1600,7 @@ Aligns text lines or columns along the block-flow direction. The naming follows 
 | Value | Description |
 |-------|-------------|
 | `visible` | Text exceeding box boundaries is still rendered (default) |
-| `hidden` | Lines (horizontal mode) or columns (vertical mode) that exceed the box boundaries are discarded entirely. Partial lines/columns are never shown. Has no effect when the corresponding dimension of size is 0 |
+| `hidden` | Lines that exceed the box height (horizontal mode) or columns that exceed the box width (vertical mode) are discarded entirely. Partial lines/columns are never shown. Has no effect when that dimension of size is 0 |
 
 #### 5.5.7 Rich Text
 
