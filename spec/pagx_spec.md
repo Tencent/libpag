@@ -1057,11 +1057,14 @@ Text elements provide geometric shapes for text content. Unlike shape elements t
 
 Child elements: `CDATA` text, `GlyphRun`*
 
-**Text Content**: Typically use the `text` attribute to specify text content. When text contains XML special characters (`<`, `>`, `&`, etc.) or needs to preserve multi-line formatting, use a CDATA child node instead of the `text` attribute. Text does not allow direct plain text child nodes; CDATA wrapping is required.
+**Text Content**: Typically use the `text` attribute to specify text content. The `text` attribute supports the escape sequence `\n` for line breaks. When text contains XML special characters (`<`, `>`, `&`, etc.) or needs to preserve multi-line formatting, use a CDATA child node instead of the `text` attribute. Text does not allow direct plain text child nodes; CDATA wrapping is required.
 
 ```xml
 <!-- Simple text: use text attribute -->
 <Text text="Hello World" fontFamily="Arial" fontSize="24"/>
+
+<!-- Line break in text attribute: use \n -->
+<Text text="Line 1\nLine 2" fontFamily="Arial" fontSize="24"/>
 
 <!-- Contains special characters: use CDATA -->
 <Text fontFamily="Arial" fontSize="24"><![CDATA[A < B & C > D]]></Text>

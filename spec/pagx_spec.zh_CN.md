@@ -1057,11 +1057,14 @@ y = center.y + outerRadius * sin(angle)
 
 子元素：`CDATA` 文本、`GlyphRun`*
 
-**文本内容**：通常使用 `text` 属性指定文本内容。当文本包含 XML 特殊字符（`<`、`>`、`&` 等）或需要保留多行格式时，可使用 CDATA 子节点替代 `text` 属性。Text 不允许直接包含纯文本子节点，必须用 CDATA 包裹。
+**文本内容**：通常使用 `text` 属性指定文本内容。`text` 属性支持 `\n` 转义序列表示换行。当文本包含 XML 特殊字符（`<`、`>`、`&` 等）或需要保留多行格式时，可使用 CDATA 子节点替代 `text` 属性。Text 不允许直接包含纯文本子节点，必须用 CDATA 包裹。
 
 ```xml
 <!-- 简单文本：使用 text 属性 -->
 <Text text="Hello World" fontFamily="Arial" fontSize="24"/>
+
+<!-- text 属性中换行：使用 \n -->
+<Text text="Line 1\nLine 2" fontFamily="Arial" fontSize="24"/>
 
 <!-- 包含特殊字符：使用 CDATA -->
 <Text fontFamily="Arial" fontSize="24"><![CDATA[A < B & C > D]]></Text>
