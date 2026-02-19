@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="670" height="570" version="1.0">
   <Layer>
-    <!-- Row 1: CJK+Latin single column, two columns with \n, wordWrap auto-wrap -->
+    <!-- Row 1: CJK+Latin single column, two columns with \n, auto-wrap -->
 
     <!-- Box 1: CJK+Latin mixed single column -->
     <Group>
@@ -25,14 +25,14 @@
       <Fill color="#000"/>
     </Group>
 
-    <!-- Box 3: CJK wordWrap auto-wrap -->
+    <!-- Box 3: CJK auto-wrap -->
     <Group>
       <Rectangle center="300,134" size="100,168"/>
       <Stroke color="#000" width="1"/>
     </Group>
     <Group>
       <Text text="春眠不觉晓处处闻啼鸟夜来风雨声花落知多少" fontFamily="NotoSansSC" fontSize="24"/>
-      <TextBox position="250,50" size="100,168" writingMode="vertical" wordWrap="true"/>
+      <TextBox position="250,50" size="100,168" writingMode="vertical"/>
       <Fill color="#000"/>
     </Group>
 
@@ -112,7 +112,7 @@
       <Stroke color="#000" width="1"/>
     </Group>
     <Group>
-      <Text text="春眠不觉晓&#10;处处闻啼鸟" fontFamily="NotoSansSC" fontSize="24"/>
+      <Text text="春眠 Not 觉晓&#10;处处 Hear 啼鸟" fontFamily="NotoSansSC" fontSize="24"/>
       <TextBox position="380,290" size="80,230" writingMode="vertical" textAlign="justify"/>
       <Fill color="#000"/>
     </Group>
@@ -124,7 +124,7 @@
     </Group>
     <Group>
       <Text text="春眠不觉晓处处闻啼鸟夜来风雨声花落知多少" fontFamily="NotoSansSC" fontSize="24"/>
-      <TextBox position="470,290" size="80,200" writingMode="vertical" wordWrap="true" overflow="hidden"/>
+      <TextBox position="470,290" size="80,200" writingMode="vertical" overflow="hidden"/>
       <Fill color="#000"/>
     </Group>
   </Layer>

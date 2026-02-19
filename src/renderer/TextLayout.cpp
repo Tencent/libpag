@@ -774,7 +774,7 @@ class TextLayoutContext {
     float currentLineWidth = 0;
     int lastBreakIndex = -1;
     float boxWidth = textBox->size.width;
-    bool doWrap = textBox->wordWrap;
+    bool doWrap = textBox->wordWrap && boxWidth > 0;
 
     for (size_t i = 0; i < allGlyphs.size(); i++) {
       auto& glyph = allGlyphs[i];
@@ -1184,7 +1184,7 @@ class TextLayoutContext {
     auto* currentColumn = &columns.back();
     float currentColumnHeight = 0;
     float boxHeight = textBox->size.height;
-    bool doWrap = textBox->wordWrap;
+    bool doWrap = textBox->wordWrap && boxHeight > 0;
     size_t lastBreakIndex = 0;
 
     for (size_t i = 0; i < vgList.size(); i++) {

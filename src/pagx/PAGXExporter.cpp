@@ -724,7 +724,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
         xml.addAttribute("writingMode", WritingModeToString(textBox->writingMode));
       }
       xml.addAttribute("lineHeight", textBox->lineHeight, 0.0f);
-      if (textBox->wordWrap) {
+      if (!textBox->wordWrap) {
         xml.addAttribute("wordWrap", textBox->wordWrap);
       }
       if (textBox->overflow != Overflow::Visible) {

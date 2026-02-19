@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="570" height="400" version="1.0">
   <Layer>
-    <!-- Row 1: wordWrap + textAlign Start/Center/End + paragraphAlign Near/Middle/Far -->
+    <!-- Row 1: textAlign Start/Center/End + paragraphAlign Near/Middle/Far -->
 
     <!-- Box 1: CJK wordWrap, Start/Near -->
     <Group>
@@ -10,7 +10,7 @@
     </Group>
     <Group>
       <Text text="你好世界，这是测试文本。" fontFamily="NotoSansSC" fontSize="20"/>
-      <TextBox position="50,50" size="150,120" wordWrap="true"/>
+      <TextBox position="50,50" size="150,120"/>
       <Fill color="#000"/>
     </Group>
 
@@ -32,7 +32,7 @@
     </Group>
     <Group>
       <Text text="Hello World this is a long text." fontFamily="NotoSansSC" fontSize="18"/>
-      <TextBox position="370,50" size="150,120" textAlign="end" paragraphAlign="far" wordWrap="true"/>
+      <TextBox position="370,50" size="150,120" textAlign="end" paragraphAlign="far"/>
       <Fill color="#000"/>
     </Group>
 
@@ -45,7 +45,7 @@
     </Group>
     <Group>
       <Text text="Overflow text that is very long and should be clipped by the box boundary." fontFamily="NotoSansSC" fontSize="18"/>
-      <TextBox position="50,180" size="150,80" wordWrap="true" overflow="hidden"/>
+      <TextBox position="50,180" size="150,80" overflow="hidden"/>
       <Fill color="#000"/>
     </Group>
 

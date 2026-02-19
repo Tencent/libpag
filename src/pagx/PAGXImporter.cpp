@@ -746,7 +746,7 @@ static TextBox* parseTextBox(const DOMNode* node, PAGXDocument* doc) {
   textBox->paragraphAlign = ParagraphAlignFromString(getAttribute(node, "paragraphAlign", "near"));
   textBox->writingMode = WritingModeFromString(getAttribute(node, "writingMode", "horizontal"));
   textBox->lineHeight = getFloatAttribute(node, "lineHeight", 0);
-  textBox->wordWrap = getBoolAttribute(node, "wordWrap", false);
+  textBox->wordWrap = getBoolAttribute(node, "wordWrap", true);
   textBox->overflow = OverflowFromString(getAttribute(node, "overflow", "visible"));
   return textBox;
 }

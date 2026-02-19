@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates TextBox: word wrap, text alignment, vertical writing, paragraph alignment -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Box 1 (top-left): horizontal justify + wordWrap + lineHeight -->
+  <!-- Box 1 (top-left): horizontal justify + lineHeight -->
   <Layer>
     <Rectangle center="104,104" size="180,180" roundness="6"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
   </Layer>
   <Layer>
     <Group>
-      <Text text="Justify aligns words evenly across each full line." fontFamily="Arial" fontSize="20"/>
+      <Text text="Justify aligns words evenly 分布在 each full line." fontFamily="Arial" fontSize="18"/>
       <Fill>
         <LinearGradient startPoint="0,0" endPoint="180,0">
           <ColorStop offset="0" color="#6366F1"/>
@@ -16,7 +16,7 @@
         </LinearGradient>
       </Fill>
     </Group>
-    <TextBox position="14,14" size="180,180" wordWrap="true" lineHeight="32" textAlign="justify"/>
+    <TextBox position="14,14" size="180,180" lineHeight="28" textAlign="justify"/>
     <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F130"/>
   </Layer>
 
@@ -27,7 +27,7 @@
   </Layer>
   <Layer>
     <Group>
-      <Text text="Centered&#10;Horizontally&#10;&amp;&#10;Vertically" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+      <Text text="Centered&#10;Horizontally&#10;&amp;&#10;Vertically" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
       <Fill>
         <LinearGradient startPoint="0,0" endPoint="180,100">
           <ColorStop offset="0" color="#F43F5E"/>
@@ -39,14 +39,14 @@
     <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F43F5E30"/>
   </Layer>
 
-  <!-- Box 3 (bottom-left): vertical wordWrap -->
+  <!-- Box 3 (bottom-left): vertical writing -->
   <Layer>
     <Rectangle center="104,296" size="180,180" roundness="6"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
   </Layer>
   <Layer>
     <Group>
-      <Text text="春眠Spring不觉晓处处闻啼鸟夜来风雨声花落知多少" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+      <Text text="春眠不觉 Dawn 处处闻啼鸟 Night 来风雨声花落知多少" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
       <Fill>
         <LinearGradient startPoint="180,0" endPoint="0,180">
           <ColorStop offset="0" color="#F59E0B"/>
@@ -54,7 +54,7 @@
         </LinearGradient>
       </Fill>
     </Group>
-    <TextBox position="14,206" size="180,180" writingMode="vertical" wordWrap="true"/>
+    <TextBox position="14,206" size="180,180" writingMode="vertical" textAlign="justify"/>
     <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F59E0B30"/>
   </Layer>
 
@@ -65,7 +65,7 @@
   </Layer>
   <Layer>
     <Group>
-      <Text text="竖排&#10;文本&#10;居中" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+      <Text text="竖排文本&#10;居中对齐" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
       <Fill>
         <LinearGradient startPoint="0,0" endPoint="180,180">
           <ColorStop offset="0" color="#06B6D4"/>
@@ -73,7 +73,7 @@
         </LinearGradient>
       </Fill>
     </Group>
-    <TextBox position="206,206" size="180,180" writingMode="vertical" wordWrap="true" textAlign="center" paragraphAlign="middle"/>
+    <TextBox position="206,206" size="180,180" writingMode="vertical" textAlign="center" paragraphAlign="middle"/>
     <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D430"/>
   </Layer>
 </pagx>

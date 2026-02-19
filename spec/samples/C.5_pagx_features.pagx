@@ -148,7 +148,7 @@
         <Text text="Plain-text XML, easy to diff, debug, and AI-generate." fontFamily="Arial" fontSize="16"/>
         <Fill color="#CBD5E1"/>
       </Group>
-      <TextBox size="220,0" wordWrap="true" lineHeight="22"/>
+      <TextBox size="220,0" lineHeight="22"/>
     </Layer>
   </Layer>
 
@@ -194,7 +194,7 @@
         <Text text="Covers vectors, images, text, effects, and masks." fontFamily="Arial" fontSize="16"/>
         <Fill color="#CBD5E1"/>
       </Group>
-      <TextBox size="220,0" wordWrap="true" lineHeight="22"/>
+      <TextBox size="220,0" lineHeight="22"/>
     </Layer>
   </Layer>
 
@@ -254,7 +254,7 @@
         <Text text="Compact structure for both static and animated content." fontFamily="Arial" fontSize="16"/>
         <Fill color="#CBD5E1"/>
       </Group>
-      <TextBox size="220,0" wordWrap="true" lineHeight="22"/>
+      <TextBox size="220,0" lineHeight="22"/>
     </Layer>
   </Layer>
 
@@ -298,7 +298,7 @@
         <Text text="Bridges AE, Figma, SVG, PDF, and more seamlessly." fontFamily="Arial" fontSize="16"/>
         <Fill color="#CBD5E1"/>
       </Group>
-      <TextBox size="220,0" wordWrap="true" lineHeight="22"/>
+      <TextBox size="220,0" lineHeight="22"/>
     </Layer>
   </Layer>
 
@@ -351,7 +351,7 @@
         <Text text="One-click export to binary PAG with high performance." fontFamily="Arial" fontSize="16"/>
         <Fill color="#CBD5E1"/>
       </Group>
-      <TextBox size="220,0" wordWrap="true" lineHeight="22"/>
+      <TextBox size="220,0" lineHeight="22"/>
     </Layer>
   </Layer>
 
