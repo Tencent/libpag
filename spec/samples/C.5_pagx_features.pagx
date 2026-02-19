@@ -145,7 +145,7 @@
     </Layer>
     <Layer x="-50" y="-7">
       <Group>
-        <Text text="Plain-text XML, easy to\ndiff, debug, and AI-generate." fontFamily="Arial" fontSize="16"/>
+        <Text text="Plain-text XML, easy to&#10;diff, debug, and AI-generate." fontFamily="Arial" fontSize="16"/>
         <Fill color="#CBD5E1"/>
       </Group>
       <TextBox lineHeight="22"/>
@@ -191,7 +191,7 @@
     </Layer>
     <Layer x="-50" y="-7">
       <Group>
-        <Text text="Covers vectors, images,\ntext, effects, and masks." fontFamily="Arial" fontSize="16"/>
+        <Text text="Covers vectors, images,&#10;text, effects, and masks." fontFamily="Arial" fontSize="16"/>
         <Fill color="#CBD5E1"/>
       </Group>
       <TextBox lineHeight="22"/>
@@ -251,7 +251,7 @@
     </Layer>
     <Layer x="-50" y="-7">
       <Group>
-        <Text text="Compact structure for both\nstatic and animated content." fontFamily="Arial" fontSize="16"/>
+        <Text text="Compact structure for both&#10;static and animated content." fontFamily="Arial" fontSize="16"/>
         <Fill color="#CBD5E1"/>
       </Group>
       <TextBox lineHeight="22"/>
@@ -295,7 +295,7 @@
     </Layer>
     <Layer x="-50" y="-7">
       <Group>
-        <Text text="Bridges AE, Figma, SVG,\nPDF, and more seamlessly." fontFamily="Arial" fontSize="16"/>
+        <Text text="Bridges AE, Figma, SVG,&#10;PDF, and more seamlessly." fontFamily="Arial" fontSize="16"/>
         <Fill color="#CBD5E1"/>
       </Group>
       <TextBox lineHeight="22"/>
@@ -348,7 +348,7 @@
     </Layer>
     <Layer x="-50" y="-7">
       <Group>
-        <Text text="One-click export to binary\nPAG with high performance." fontFamily="Arial" fontSize="16"/>
+        <Text text="One-click export to binary&#10;PAG with high performance." fontFamily="Arial" fontSize="16"/>
         <Fill color="#CBD5E1"/>
       </Group>
       <TextBox lineHeight="22"/>
