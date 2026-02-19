@@ -377,11 +377,7 @@ function generateRedirectPage(siteDir, version) {
     </script>
 </head>
 <body>
-    <p>The latest PAGX specification is version ${version}:</p>
-    <ul>
-        <li><a href="${BASE_URL}/${version}/">${BASE_URL}/${version}/</a> (English)</li>
-        <li><a href="${BASE_URL}/${version}/zh/">${BASE_URL}/${version}/zh/</a> (中文)</li>
-    </ul>
+    <p>Redirecting to PAGX specification ${version}...</p>
 </body>
 </html>`;
 
@@ -648,6 +644,24 @@ function main() {
 
   // Update version links in all published versions
   updateAllVersionLinks(siteDir, version, stableVersion);
+
+  // Update version in SKILL.md
+  const latestVersion = stableVersion || version;
+  const skillFile = path.join(LIBPAG_DIR, '.codebuddy', 'skills', 'pagx', 'SKILL.md');
+  if (fs.existsSync(skillFile)) {
+    console.log('\nUpdating SKILL.md...');
+    const skillContent = fs.readFileSync(skillFile, 'utf-8');
+    const updatedContent = skillContent.replace(
+      /https:\/\/pag\.io\/pagx\/[\w.]+\//g,
+      `${BASE_URL}/${latestVersion}/`
+    );
+    if (updatedContent !== skillContent) {
+      fs.writeFileSync(skillFile, updatedContent, 'utf-8');
+      console.log(`  Updated: ${skillFile}`);
+    } else {
+      console.log(`  No changes needed: ${skillFile}`);
+    }
+  }
 
   console.log('\nCopying favicon...');
   fs.copyFileSync(path.join(SPEC_DIR, 'favicon.png'), path.join(siteDir, 'favicon.png'));
