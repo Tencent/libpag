@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXImporter.h"
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -156,7 +157,11 @@ static void parseResources(const DOMNode* node, PAGXDocument* doc) {
       continue;
     }
     // Unknown resource type - report error.
-    fprintf(stderr, "PAGXImporter: Unknown element '%s' in Resources.\n", current->name.c_str());
+    doc->errors.push_back("Element '" + current->name +
+                          "' is not allowed in 'Resources'." +
+                          " Expected: Image, PathData, Composition, Font," +
+                          " SolidColor, LinearGradient, RadialGradient," +
+                          " ConicGradient, DiamondGradient, ImagePattern.");
   }
 }
 
@@ -276,7 +281,14 @@ static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
       continue;
     }
     // Unknown node type - report error.
-    fprintf(stderr, "PAGXImporter: Unknown element '%s' in Layer.\n", current->name.c_str());
+    doc->errors.push_back("Element '" + current->name +
+                          "' is not allowed in 'Layer'." +
+                          " Expected: Layer, Group, Rectangle, Ellipse, Polystar," +
+                          " Path, Text, Fill, Stroke, TrimPath, RoundCorner," +
+                          " MergePath, TextModifier, TextPath, TextBox, Repeater," +
+                          " DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle," +
+                          " BlurFilter, DropShadowFilter, InnerShadowFilter," +
+                          " BlendFilter, ColorMatrixFilter.");
   }
 
   return layer;
@@ -294,7 +306,11 @@ static void parseContents(const DOMNode* node, Layer* layer, PAGXDocument* doc) 
     if (element) {
       layer->contents.push_back(element);
     } else {
-      fprintf(stderr, "PAGXImporter: Unknown element '%s' in contents.\n", current->name.c_str());
+      doc->errors.push_back("Element '" + current->name +
+                            "' is not allowed in 'contents'." +
+                            " Expected: Group, Rectangle, Ellipse, Polystar," +
+                            " Path, Text, Fill, Stroke, TrimPath, RoundCorner," +
+                            " MergePath, TextModifier, TextPath, TextBox, Repeater.");
     }
   }
 }
@@ -311,7 +327,10 @@ static void parseStyles(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
     if (style) {
       layer->styles.push_back(style);
     } else {
-      fprintf(stderr, "PAGXImporter: Unknown element '%s' in styles.\n", current->name.c_str());
+      doc->errors.push_back("Element '" + current->name +
+                            "' is not allowed in 'styles'." +
+                            " Expected: DropShadowStyle, InnerShadowStyle," +
+                            " BackgroundBlurStyle.");
     }
   }
 }
@@ -328,7 +347,10 @@ static void parseFilters(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
     if (filter) {
       layer->filters.push_back(filter);
     } else {
-      fprintf(stderr, "PAGXImporter: Unknown element '%s' in filters.\n", current->name.c_str());
+      doc->errors.push_back("Element '" + current->name +
+                            "' is not allowed in 'filters'." +
+                            " Expected: BlurFilter, DropShadowFilter," +
+                            " InnerShadowFilter, BlendFilter, ColorMatrixFilter.");
     }
   }
 }
@@ -539,10 +561,15 @@ static Text* parseText(const DOMNode* node, PAGXDocument* doc) {
   // Parse GlyphRun children for precomposition mode
   auto child = node->firstChild;
   while (child) {
-    if (child->type == DOMNodeType::Element && child->name == "GlyphRun") {
-      auto glyphRun = parseGlyphRun(child.get(), doc);
-      if (glyphRun) {
-        text->glyphRuns.push_back(glyphRun);
+    if (child->type == DOMNodeType::Element) {
+      if (child->name == "GlyphRun") {
+        auto glyphRun = parseGlyphRun(child.get(), doc);
+        if (glyphRun) {
+          text->glyphRuns.push_back(glyphRun);
+        }
+      } else {
+        doc->errors.push_back("Element '" + child->name +
+                              "' is not allowed in 'Text'. Expected: GlyphRun.");
       }
     }
     child = child->nextSibling;
@@ -568,17 +595,24 @@ static ColorSource* parseColorAttr(const std::string& colorAttr, PAGXDocument* d
 }
 
 static ColorSource* parseChildColorSource(const DOMNode* node, PAGXDocument* doc) {
+  ColorSource* result = nullptr;
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {
       auto colorSource = parseColorSource(child.get(), doc);
       if (colorSource) {
-        return colorSource;
+        result = colorSource;
+      } else {
+        doc->errors.push_back("Element '" + child->name +
+                              "' is not allowed in '" + node->name +
+                              "'. Expected: SolidColor, LinearGradient,"
+                              " RadialGradient, ConicGradient,"
+                              " DiamondGradient, ImagePattern.");
       }
     }
     child = child->nextSibling;
   }
-  return nullptr;
+  return result;
 }
 
 static Fill* parseFill(const DOMNode* node, PAGXDocument* doc) {
@@ -692,10 +726,16 @@ static TextModifier* parseTextModifier(const DOMNode* node, PAGXDocument* doc) {
 
   auto child = node->firstChild;
   while (child) {
-    if (child->type == DOMNodeType::Element && child->name == "RangeSelector") {
-      auto selector = parseRangeSelector(child.get(), doc);
-      if (selector) {
-        modifier->selectors.push_back(selector);
+    if (child->type == DOMNodeType::Element) {
+      if (child->name == "RangeSelector") {
+        auto selector = parseRangeSelector(child.get(), doc);
+        if (selector) {
+          modifier->selectors.push_back(selector);
+        }
+      } else {
+        doc->errors.push_back("Element '" + child->name +
+                              "' is not allowed in 'TextModifier'." +
+                              " Expected: RangeSelector.");
       }
     }
     child = child->nextSibling;
@@ -794,7 +834,12 @@ static Group* parseGroup(const DOMNode* node, PAGXDocument* doc) {
       if (element) {
         group->elements.push_back(element);
       } else {
-        fprintf(stderr, "PAGXImporter: Unknown element '%s' in Group.\n", child->name.c_str());
+        doc->errors.push_back("Element '" + child->name +
+                              "' is not allowed in 'Group'." +
+                              " Expected: Rectangle, Ellipse, Polystar, Path," +
+                              " Text, Fill, Stroke, TrimPath, RoundCorner," +
+                              " MergePath, TextModifier, TextPath, TextBox," +
+                              " Repeater, Group.");
       }
     }
     child = child->nextSibling;
@@ -859,6 +904,10 @@ static void parseGradientCommon(const DOMNode* node, PAGXDocument* doc, Matrix& 
       if (stop) {
         colorStops.push_back(stop);
       }
+    } else if (child->type == DOMNodeType::Element) {
+      doc->errors.push_back("Element '" + child->name +
+                            "' is not allowed in '" + node->name +
+                            "'. Expected: ColorStop.");
     }
     child = child->nextSibling;
   }
@@ -982,10 +1031,15 @@ static Composition* parseComposition(const DOMNode* node, PAGXDocument* doc) {
   comp->height = getFloatAttribute(node, "height", 0);
   auto child = node->firstChild;
   while (child) {
-    if (child->type == DOMNodeType::Element && child->name == "Layer") {
-      auto layer = parseLayer(child.get(), doc);
-      if (layer) {
-        comp->layers.push_back(layer);
+    if (child->type == DOMNodeType::Element) {
+      if (child->name == "Layer") {
+        auto layer = parseLayer(child.get(), doc);
+        if (layer) {
+          comp->layers.push_back(layer);
+        }
+      } else {
+        doc->errors.push_back("Element '" + child->name +
+                              "' is not allowed in 'Composition'. Expected: Layer.");
       }
     }
     child = child->nextSibling;
@@ -1001,10 +1055,15 @@ static Font* parseFont(const DOMNode* node, PAGXDocument* doc) {
   font->unitsPerEm = getIntAttribute(node, "unitsPerEm", 1000);
   auto child = node->firstChild;
   while (child) {
-    if (child->type == DOMNodeType::Element && child->name == "Glyph") {
-      auto glyph = parseGlyph(child.get(), doc);
-      if (glyph) {
-        font->glyphs.push_back(glyph);
+    if (child->type == DOMNodeType::Element) {
+      if (child->name == "Glyph") {
+        auto glyph = parseGlyph(child.get(), doc);
+        if (glyph) {
+          font->glyphs.push_back(glyph);
+        }
+      } else {
+        doc->errors.push_back("Element '" + child->name +
+                              "' is not allowed in 'Font'. Expected: Glyph.");
       }
     }
     child = child->nextSibling;
@@ -1090,8 +1149,7 @@ static GlyphRun* parseGlyphRun(const DOMNode* node, PAGXDocument* doc) {
     auto fontId = fontAttr.substr(1);
     run->font = doc->findNode<Font>(fontId);
     if (!run->font) {
-      fprintf(stderr, "PAGXImporter: Font resource '%s' not found, GlyphRun will be empty.\n",
-                       fontId.c_str());
+      doc->errors.push_back("Font resource '" + fontId + "' not found for GlyphRun.");
     }
   }
   run->fontSize = getFloatAttribute(node, "fontSize", 12);
@@ -1530,6 +1588,12 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t 
   }
   auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
   parseDocument(root.get(), doc.get());
+  if (!doc->errors.empty()) {
+    for (const auto& error : doc->errors) {
+      fprintf(stderr, "PAGXImporter: %s\n", error.c_str());
+    }
+    return nullptr;
+  }
   return doc;
 }
 
@@ -1547,10 +1611,15 @@ static void parseDocument(const DOMNode* root, PAGXDocument* doc) {
   // Second pass: Parse Layers.
   child = root->firstChild;
   while (child) {
-    if (child->type == DOMNodeType::Element && child->name == "Layer") {
-      auto layer = parseLayer(child.get(), doc);
-      if (layer) {
-        doc->layers.push_back(layer);
+    if (child->type == DOMNodeType::Element) {
+      if (child->name == "Layer") {
+        auto layer = parseLayer(child.get(), doc);
+        if (layer) {
+          doc->layers.push_back(layer);
+        }
+      } else if (child->name != "Resources") {
+        doc->errors.push_back("Element '" + child->name +
+                              "' is not allowed in 'pagx'. Expected: Resources, Layer.");
       }
     }
     child = child->nextSibling;

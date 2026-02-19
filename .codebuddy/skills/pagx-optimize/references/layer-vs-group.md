@@ -79,8 +79,8 @@ Layers to Group — they will be silently ignored and not rendered.
 A child Layer can be downgraded to Group when **all** of the following are true:
 
 1. NOT a direct child of `<pagx>` or `<Composition>`
-2. Does not use styles (DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle, etc.)
-3. Does not use filters (BlurFilter, DropShadowFilter, ColorMatrixFilter, etc.)
+2. **Does not use styles (DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle, etc.)**
+3. **Does not use filters (BlurFilter, DropShadowFilter, ColorMatrixFilter, etc.)**
 4. Does not use `mask` attribute
 5. Does not use `blendMode` (or uses default Normal)
 6. Does not use `composition` attribute
@@ -89,6 +89,11 @@ A child Layer can be downgraded to Group when **all** of the following are true:
 9. Does not have `id` attribute referenced elsewhere
 10. Does not contain child Layers (only Group/geometry/painter children)
 11. Downgrade does not change visual stacking order among siblings
+
+**CRITICAL — items 2 and 3 are the most commonly violated rules.** Styles and filters are
+**only valid inside Layer**, never inside Group. If a Layer contains any style or filter child
+element, it **must remain a Layer**. Placing styles/filters inside a Group is a structural error
+that will cause the PAGX file to fail parsing.
 
 **Stacking order caveat**: Within a parent Layer, Groups are part of the parent's **contents**
 (rendered first), while child Layers are **children** (rendered on top of contents). If a Layer

@@ -70,6 +70,11 @@ Groups at root level are silently ignored.
 > content to disappear (at root level) or change visual stacking order when Groups and Layers
 > are siblings (Groups render as parent contents below sibling Layers).
 
+> **CRITICAL — Group does NOT support styles or filters.** Placing DropShadowStyle,
+> InnerShadowStyle, BackgroundBlurStyle, or any filter inside a Group is a **structural error**
+> that causes parsing failure. Before downgrading a Layer to Group, verify it has **zero** style
+> and filter children. This is the most common downgrade mistake.
+
 ### Painter Merging
 
 | # | Optimization | When to Apply |

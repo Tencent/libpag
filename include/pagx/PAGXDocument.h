@@ -98,6 +98,12 @@ class PAGXDocument {
   std::vector<std::unique_ptr<Node>> nodes = {};
 
   /**
+   * Errors collected during parsing. If non-empty, the document contains structural errors and
+   * should be treated as invalid.
+   */
+  std::vector<std::string> errors = {};
+
+  /**
    * Returns a list of external file paths referenced by Image nodes that have no embedded data.
    * Data URIs (paths starting with "data:") are excluded.
    */
