@@ -314,8 +314,26 @@ position, focus on the **layout-controlling nodes**:
 
 ### Default Attribute Values
 
-The exporter automatically omits default values. When generating PAGX, be aware of these
-non-obvious defaults to avoid writing redundant attributes:
+The exporter automatically omits default values. When generating PAGX, be aware of which
+attributes can be omitted:
+
+**Layer**: `alpha="1"`, `visible="true"`, `blendMode="normal"`, `x="0"`, `y="0"`,
+`antiAlias="true"`, `groupOpacity="false"`, `maskType="alpha"`
+
+**Rectangle / Ellipse**: `center="0,0"`, `size="100,100"`, `reversed="false"`.
+Also `roundness="0"` for Rectangle.
+
+**Fill**: `color="#000000"`, `alpha="1"`, `blendMode="normal"`, `fillRule="winding"`,
+`placement="background"`
+
+**Stroke**: `color="#000000"`, `width="1"`, `alpha="1"`, `blendMode="normal"`, `cap="butt"`,
+`join="miter"`, `miterLimit="4"`, `dashOffset="0"`, `align="center"`,
+`placement="background"`
+
+**Group**: `alpha="1"`, `position="0,0"`, `rotation="0"`, `scale="1,1"`, `skew="0"`,
+`skewAxis="0"`
+
+**Non-Obvious Defaults (Easy to Forget)**:
 
 | Element | Attribute | Default | Common Misconception |
 |---------|-----------|---------|---------------------|
@@ -335,3 +353,11 @@ non-obvious defaults to avoid writing redundant attributes:
 | **LinearGradient** | `endPoint` | Also (required) |
 | **ColorStop** | `offset` | Looks like zero default, but (required) |
 | **ColorStop** | `color` | Also (required) |
+
+### Writing Clean Attributes
+
+When generating PAGX, prefer clean attribute forms:
+- Use `x`/`y` for translation instead of `matrix="1,0,0,1,tx,ty"`
+- Use clean integer values when possible: `100` not `100.0`, `0` not `-2.18e-06`
+- Use short hex colors when possible: `#F00` instead of `#FF0000`
+- No spaces after commas in point values: `"30,-20"` not `"30, -20"`

@@ -138,9 +138,11 @@ set `reversed` independently at each reference site.
 
 > Automated by `pagx optimize`.
 
-When generating PAGX, single-use gradients can stay inline — not every gradient needs to be in
-Resources. The PAGX spec supports both shared definitions for multiple references and inline
-definitions for single use.
+When generating PAGX:
+- Single-use gradients can stay inline — not every gradient needs to be in Resources.
+- Gradient coordinates are relative to the geometry element's local origin. Two geometry
+  elements at different positions or sizes referencing the same gradient will render
+  differently. Only share a gradient when the geometry shapes and sizes are identical.
 
 ---
 
