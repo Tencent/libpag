@@ -837,10 +837,15 @@ function goHome(pushHistory: boolean = true): void {
     showDropZoneUI();
     currentPlayingFile = null;
 
-    // Clear file parameter from URL
+    // Clear sample parameter from URL
     if (pushHistory) {
         history.pushState(null, '', window.location.pathname);
     }
+}
+
+function isSafeRelativePath(path: string): boolean {
+    // Reject protocol schemes, absolute paths, and path traversal.
+    return !path.includes('://') && !path.startsWith('/') && !path.includes('..');
 }
 
 async function loadExternalFiles(baseURL: string): Promise<void> {
@@ -856,6 +861,10 @@ async function loadExternalFiles(baseURL: string): Promise<void> {
     const fetches: Promise<void>[] = [];
     for (let i = 0; i < count; i++) {
         const filePath = paths.get(i);
+        if (!isSafeRelativePath(filePath)) {
+            console.warn(`Skipping unsafe external file path: ${filePath}`);
+            continue;
+        }
         const fileURL = baseURL + filePath;
         fetches.push(
             fetch(fileURL)
@@ -940,37 +949,46 @@ async function loadPAGXFile(file: File) {
     }
 }
 
-async function loadPAGXFromURL(url: string, pushHistory: boolean = true) {
+const SAMPLES_DIR = './samples/';
+
+function isValidSampleName(name: string): boolean {
+    // Only allow filenames like "foo.pagx" or "foo-bar_baz.pagx".
+    // Reject path separators, protocol schemes, and other suspicious patterns.
+    return /^[\w][\w.\-]*\.pagx$/.test(name);
+}
+
+async function loadPAGXSample(name: string, pushHistory: boolean = true) {
+    if (!isValidSampleName(name)) {
+        showErrorUI(t().errorFormat);
+        return;
+    }
     try {
         await prepareForLoading();
 
+        const url = SAMPLES_DIR + name;
         const response = await fetch(url);
         if (!response.ok) {
             throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
         }
         const fileBuffer = await response.arrayBuffer();
 
-        const lastSlash = url.lastIndexOf('/');
-        const baseURL = lastSlash >= 0 ? url.substring(0, lastSlash + 1) : '';
-        const name = url.substring(lastSlash + 1) || 'remote.pagx';
+        await loadPAGXData(new Uint8Array(fileBuffer), name, SAMPLES_DIR);
+        currentPlayingFile = name;
 
-        await loadPAGXData(new Uint8Array(fileBuffer), name, baseURL);
-        currentPlayingFile = url;
-
-        const cleanUrl = window.location.pathname + '?file=' + url;
+        const cleanUrl = window.location.pathname + '?sample=' + encodeURIComponent(name);
         if (pushHistory) {
             history.pushState(null, '', cleanUrl);
         }
     } catch (error) {
-        console.error('Failed to load PAGX from URL:', error);
+        console.error('Failed to load PAGX sample:', error);
         const message = error instanceof Error ? error.message : 'Unknown error';
         showErrorUI(message);
     }
 }
 
-function getPAGXUrlFromParams(): string | null {
+function getSampleNameFromParams(): string | null {
     const params = new URLSearchParams(window.location.search);
-    return params.get('file');
+    return params.get('sample');
 }
 
 function setupDragAndDrop() {
@@ -1159,7 +1177,7 @@ function renderSampleList(): void {
             // Clear hash before loading so replaceState won't carry #samples
             history.replaceState(null, '', window.location.pathname + window.location.search);
             hideSamplesPage();
-            loadPAGXFromURL('./samples/' + file);
+            loadPAGXSample(file);
         });
         list.appendChild(a);
     }
@@ -1185,10 +1203,10 @@ function hideSamplesPage(): void {
 }
 
 function handlePopState(): void {
-    const pagxUrl = getPAGXUrlFromParams();
-    if (pagxUrl) {
-        if (pagxUrl !== currentPlayingFile) {
-            loadPAGXFromURL(pagxUrl, false);
+    const sampleName = getSampleNameFromParams();
+    if (sampleName) {
+        if (sampleName !== currentPlayingFile) {
+            loadPAGXSample(sampleName, false);
         }
     } else {
         goHome(false);
@@ -1249,9 +1267,9 @@ if (typeof window !== 'undefined') {
         });
 
         // Check for URL parameter and auto-load if present
-        const pagxUrl = getPAGXUrlFromParams();
-        if (pagxUrl) {
-            loadPAGXFromURL(pagxUrl, false);
+        const sampleName = getSampleNameFromParams();
+        if (sampleName) {
+            loadPAGXSample(sampleName, false);
         }
     };
 
