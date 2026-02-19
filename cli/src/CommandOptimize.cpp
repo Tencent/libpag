@@ -18,8 +18,11 @@
 
 #include "CommandOptimize.h"
 #include <algorithm>
+#include <cfloat>
+#include <cmath>
 #include <cstring>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <string>
 #include <unordered_map>
@@ -36,6 +39,7 @@
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
@@ -45,6 +49,7 @@
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
+#include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
@@ -67,10 +72,13 @@ struct OptimizeReport {
   int pathToEllipse = 0;
   int fullCanvasClips = 0;
   int offCanvasLayers = 0;
+  int coordinatesLocalized = 0;
+  int compositionsExtracted = 0;
 
   int total() const {
     return emptyElements + deduplicatedPathData + deduplicatedGradients + unreferencedResources +
-           pathToRectangle + pathToEllipse + fullCanvasClips + offCanvasLayers;
+           pathToRectangle + pathToEllipse + fullCanvasClips + offCanvasLayers +
+           coordinatesLocalized + compositionsExtracted;
   }
 
   void print() const {
@@ -104,6 +112,12 @@ struct OptimizeReport {
     if (offCanvasLayers > 0) {
       std::cout << "  - removed " << offCanvasLayers << " off-canvas layers\n";
     }
+    if (coordinatesLocalized > 0) {
+      std::cout << "  - localized " << coordinatesLocalized << " layer coordinates\n";
+    }
+    if (compositionsExtracted > 0) {
+      std::cout << "  - extracted " << compositionsExtracted << " layers to compositions\n";
+    }
   }
 };
 
@@ -120,6 +134,8 @@ static void PrintOptimizeUsage() {
             << "  5. Replace Path with Rectangle/Ellipse\n"
             << "  6. Remove full-canvas clip masks\n"
             << "  7. Remove off-canvas invisible layers\n"
+            << "  8. Localize layer coordinates\n"
+            << "  9. Extract duplicate layers to compositions\n"
             << "\n"
             << "Options:\n"
             << "  -o, --output <path>   Output file path (default: overwrite input)\n"
@@ -665,6 +681,521 @@ static int RemoveOffCanvasLayers(PAGXDocument* document) {
   return static_cast<int>(indicesToRemove.size());
 }
 
+// --- Optimization #8: Localize coordinates ---
+
+static bool ShouldSkipLocalization(const Layer* layer) {
+  if (!layer->matrix.isIdentity()) {
+    return true;
+  }
+  if (layer->composition != nullptr) {
+    return true;
+  }
+  if (layer->contents.empty()) {
+    return true;
+  }
+  return false;
+}
+
+static void ComputeLocalizationOffset(const std::vector<Element*>& contents, float& offsetX,
+                                      float& offsetY) {
+  // Check if there is a TextBox that controls layout.
+  for (auto* element : contents) {
+    if (element->nodeType() == NodeType::TextBox) {
+      auto textBox = static_cast<const TextBox*>(element);
+      offsetX = textBox->position.x;
+      offsetY = textBox->position.y;
+      return;
+    }
+  }
+
+  // No TextBox - compute bounding box center of geometry elements.
+  float minX = FLT_MAX;
+  float minY = FLT_MAX;
+  float maxX = -FLT_MAX;
+  float maxY = -FLT_MAX;
+  bool hasGeometry = false;
+
+  for (auto* element : contents) {
+    auto type = element->nodeType();
+    if (type == NodeType::Rectangle) {
+      auto rect = static_cast<const Rectangle*>(element);
+      float halfW = rect->size.width * 0.5f;
+      float halfH = rect->size.height * 0.5f;
+      minX = std::min(minX, rect->center.x - halfW);
+      minY = std::min(minY, rect->center.y - halfH);
+      maxX = std::max(maxX, rect->center.x + halfW);
+      maxY = std::max(maxY, rect->center.y + halfH);
+      hasGeometry = true;
+    } else if (type == NodeType::Ellipse) {
+      auto ellipse = static_cast<const Ellipse*>(element);
+      float halfW = ellipse->size.width * 0.5f;
+      float halfH = ellipse->size.height * 0.5f;
+      minX = std::min(minX, ellipse->center.x - halfW);
+      minY = std::min(minY, ellipse->center.y - halfH);
+      maxX = std::max(maxX, ellipse->center.x + halfW);
+      maxY = std::max(maxY, ellipse->center.y + halfH);
+      hasGeometry = true;
+    } else if (type == NodeType::Polystar) {
+      auto polystar = static_cast<const Polystar*>(element);
+      float r = polystar->outerRadius;
+      minX = std::min(minX, polystar->center.x - r);
+      minY = std::min(minY, polystar->center.y - r);
+      maxX = std::max(maxX, polystar->center.x + r);
+      maxY = std::max(maxY, polystar->center.y + r);
+      hasGeometry = true;
+    } else if (type == NodeType::Text) {
+      auto text = static_cast<const Text*>(element);
+      minX = std::min(minX, text->position.x);
+      minY = std::min(minY, text->position.y);
+      maxX = std::max(maxX, text->position.x);
+      maxY = std::max(maxY, text->position.y);
+      hasGeometry = true;
+    } else if (type == NodeType::Group) {
+      auto group = static_cast<const Group*>(element);
+      minX = std::min(minX, group->position.x);
+      minY = std::min(minY, group->position.y);
+      maxX = std::max(maxX, group->position.x);
+      maxY = std::max(maxY, group->position.y);
+      hasGeometry = true;
+    }
+  }
+
+  if (hasGeometry) {
+    offsetX = (minX + maxX) * 0.5f;
+    offsetY = (minY + maxY) * 0.5f;
+  }
+}
+
+static void ApplyLocalizationToElements(const std::vector<Element*>& contents, float offsetX,
+                                        float offsetY) {
+  for (auto* element : contents) {
+    auto type = element->nodeType();
+    if (type == NodeType::Rectangle) {
+      auto rect = static_cast<Rectangle*>(element);
+      rect->center.x -= offsetX;
+      rect->center.y -= offsetY;
+    } else if (type == NodeType::Ellipse) {
+      auto ellipse = static_cast<Ellipse*>(element);
+      ellipse->center.x -= offsetX;
+      ellipse->center.y -= offsetY;
+    } else if (type == NodeType::Polystar) {
+      auto polystar = static_cast<Polystar*>(element);
+      polystar->center.x -= offsetX;
+      polystar->center.y -= offsetY;
+    } else if (type == NodeType::Text) {
+      auto text = static_cast<Text*>(element);
+      text->position.x -= offsetX;
+      text->position.y -= offsetY;
+      for (auto* run : text->glyphRuns) {
+        run->x -= offsetX;
+        run->y -= offsetY;
+      }
+    } else if (type == NodeType::TextBox) {
+      auto textBox = static_cast<TextBox*>(element);
+      textBox->position.x -= offsetX;
+      textBox->position.y -= offsetY;
+    } else if (type == NodeType::Group) {
+      auto group = static_cast<Group*>(element);
+      group->position.x -= offsetX;
+      group->position.y -= offsetY;
+    }
+  }
+}
+
+static int LocalizeCoordinates(PAGXDocument* document) {
+  int count = 0;
+
+  std::function<void(Layer*)> processLayer;
+  processLayer = [&](Layer* layer) {
+    if (!ShouldSkipLocalization(layer)) {
+      float offsetX = 0.0f;
+      float offsetY = 0.0f;
+      ComputeLocalizationOffset(layer->contents, offsetX, offsetY);
+
+      if (std::abs(offsetX) >= 0.001f || std::abs(offsetY) >= 0.001f) {
+        layer->x += offsetX;
+        layer->y += offsetY;
+        ApplyLocalizationToElements(layer->contents, offsetX, offsetY);
+        count++;
+      }
+    }
+    for (auto* child : layer->children) {
+      processLayer(child);
+    }
+  };
+
+  for (auto* layer : document->layers) {
+    processLayer(layer);
+  }
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      auto comp = static_cast<Composition*>(node.get());
+      for (auto* layer : comp->layers) {
+        processLayer(layer);
+      }
+    }
+  }
+  return count;
+}
+
+// --- Optimization #9: Extract compositions ---
+
+static size_t HashElement(const Element* element) {
+  size_t h = std::hash<int>{}(static_cast<int>(element->nodeType()));
+  auto type = element->nodeType();
+  if (type == NodeType::Rectangle) {
+    auto rect = static_cast<const Rectangle*>(element);
+    h ^= std::hash<float>{}(rect->size.width) * 31;
+    h ^= std::hash<float>{}(rect->size.height) * 37;
+    h ^= std::hash<float>{}(rect->roundness) * 41;
+    h ^= std::hash<bool>{}(rect->reversed) * 43;
+  } else if (type == NodeType::Ellipse) {
+    auto ellipse = static_cast<const Ellipse*>(element);
+    h ^= std::hash<float>{}(ellipse->size.width) * 31;
+    h ^= std::hash<float>{}(ellipse->size.height) * 37;
+    h ^= std::hash<bool>{}(ellipse->reversed) * 43;
+  } else if (type == NodeType::Polystar) {
+    auto polystar = static_cast<const Polystar*>(element);
+    h ^= std::hash<int>{}(static_cast<int>(polystar->type)) * 31;
+    h ^= std::hash<float>{}(polystar->pointCount) * 37;
+    h ^= std::hash<float>{}(polystar->outerRadius) * 41;
+    h ^= std::hash<float>{}(polystar->innerRadius) * 43;
+    h ^= std::hash<float>{}(polystar->rotation) * 47;
+    h ^= std::hash<float>{}(polystar->outerRoundness) * 53;
+    h ^= std::hash<float>{}(polystar->innerRoundness) * 59;
+    h ^= std::hash<bool>{}(polystar->reversed) * 61;
+  } else if (type == NodeType::Path) {
+    auto path = static_cast<const Path*>(element);
+    if (path->data != nullptr) {
+      h ^= std::hash<size_t>{}(path->data->verbs().size()) * 31;
+      h ^= std::hash<size_t>{}(path->data->points().size()) * 37;
+    }
+    h ^= std::hash<bool>{}(path->reversed) * 43;
+  } else if (type == NodeType::Fill) {
+    auto fill = static_cast<const Fill*>(element);
+    h ^= std::hash<float>{}(fill->alpha) * 31;
+    h ^= std::hash<int>{}(static_cast<int>(fill->blendMode)) * 37;
+    h ^= std::hash<int>{}(static_cast<int>(fill->fillRule)) * 41;
+    if (fill->color != nullptr) {
+      h ^= std::hash<int>{}(static_cast<int>(fill->color->nodeType())) * 43;
+    }
+  } else if (type == NodeType::Stroke) {
+    auto stroke = static_cast<const Stroke*>(element);
+    h ^= std::hash<float>{}(stroke->width) * 31;
+    h ^= std::hash<float>{}(stroke->alpha) * 37;
+    h ^= std::hash<int>{}(static_cast<int>(stroke->cap)) * 41;
+    h ^= std::hash<int>{}(static_cast<int>(stroke->join)) * 43;
+  } else if (type == NodeType::Group) {
+    auto group = static_cast<const Group*>(element);
+    h ^= std::hash<float>{}(group->rotation) * 31;
+    h ^= std::hash<float>{}(group->scale.x) * 37;
+    h ^= std::hash<float>{}(group->scale.y) * 41;
+    h ^= std::hash<float>{}(group->alpha) * 43;
+    h ^= std::hash<size_t>{}(group->elements.size()) * 47;
+  }
+  return h;
+}
+
+static size_t HashLayerStructure(const Layer* layer) {
+  size_t h = std::hash<size_t>{}(layer->contents.size());
+  h ^= std::hash<size_t>{}(layer->children.size()) * 17;
+  for (auto* element : layer->contents) {
+    h = h * 131 + HashElement(element);
+  }
+  for (auto* child : layer->children) {
+    h = h * 131 + HashLayerStructure(child);
+  }
+  return h;
+}
+
+static bool ElementsStructurallyEqual(const Element* a, const Element* b);
+
+static bool PainterColorsEqual(const ColorSource* a, const ColorSource* b) {
+  if (a == b) {
+    return true;
+  }
+  if (a == nullptr || b == nullptr) {
+    return false;
+  }
+  if (a->nodeType() != b->nodeType()) {
+    return false;
+  }
+  // SolidColor values can be compared directly.
+  if (a->nodeType() == NodeType::SolidColor) {
+    return static_cast<const SolidColor*>(a)->color == static_cast<const SolidColor*>(b)->color;
+  }
+  // Gradients should have been deduplicated by DeduplicateColorSources earlier in the pipeline,
+  // so identical gradients will share the same pointer. Different pointers mean different values.
+  return false;
+}
+
+static bool ElementsStructurallyEqual(const Element* a, const Element* b) {
+  if (a->nodeType() != b->nodeType()) {
+    return false;
+  }
+  auto type = a->nodeType();
+  if (type == NodeType::Rectangle) {
+    auto ra = static_cast<const Rectangle*>(a);
+    auto rb = static_cast<const Rectangle*>(b);
+    return ra->size == rb->size && ra->roundness == rb->roundness && ra->reversed == rb->reversed;
+  }
+  if (type == NodeType::Ellipse) {
+    auto ea = static_cast<const Ellipse*>(a);
+    auto eb = static_cast<const Ellipse*>(b);
+    return ea->size == eb->size && ea->reversed == eb->reversed;
+  }
+  if (type == NodeType::Polystar) {
+    auto pa = static_cast<const Polystar*>(a);
+    auto pb = static_cast<const Polystar*>(b);
+    return pa->type == pb->type && pa->pointCount == pb->pointCount &&
+           pa->outerRadius == pb->outerRadius && pa->innerRadius == pb->innerRadius &&
+           pa->rotation == pb->rotation && pa->outerRoundness == pb->outerRoundness &&
+           pa->innerRoundness == pb->innerRoundness && pa->reversed == pb->reversed;
+  }
+  if (type == NodeType::Path) {
+    auto pathA = static_cast<const Path*>(a);
+    auto pathB = static_cast<const Path*>(b);
+    if (pathA->reversed != pathB->reversed) {
+      return false;
+    }
+    return PathDataEqual(pathA->data, pathB->data);
+  }
+  if (type == NodeType::Fill) {
+    auto fa = static_cast<const Fill*>(a);
+    auto fb = static_cast<const Fill*>(b);
+    return fa->alpha == fb->alpha && fa->blendMode == fb->blendMode &&
+           fa->fillRule == fb->fillRule && fa->placement == fb->placement &&
+           PainterColorsEqual(fa->color, fb->color);
+  }
+  if (type == NodeType::Stroke) {
+    auto sa = static_cast<const Stroke*>(a);
+    auto sb = static_cast<const Stroke*>(b);
+    return sa->width == sb->width && sa->alpha == sb->alpha && sa->blendMode == sb->blendMode &&
+           sa->cap == sb->cap && sa->join == sb->join && sa->miterLimit == sb->miterLimit &&
+           sa->dashes == sb->dashes && sa->dashOffset == sb->dashOffset &&
+           sa->dashAdaptive == sb->dashAdaptive && sa->align == sb->align &&
+           sa->placement == sb->placement && PainterColorsEqual(sa->color, sb->color);
+  }
+  if (type == NodeType::Group) {
+    auto ga = static_cast<const Group*>(a);
+    auto gb = static_cast<const Group*>(b);
+    if (ga->anchor != gb->anchor || ga->rotation != gb->rotation || ga->scale != gb->scale ||
+        ga->skew != gb->skew || ga->skewAxis != gb->skewAxis || ga->alpha != gb->alpha) {
+      return false;
+    }
+    if (ga->elements.size() != gb->elements.size()) {
+      return false;
+    }
+    for (size_t i = 0; i < ga->elements.size(); i++) {
+      if (!ElementsStructurallyEqual(ga->elements[i], gb->elements[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+  if (type == NodeType::Text) {
+    auto ta = static_cast<const Text*>(a);
+    auto tb = static_cast<const Text*>(b);
+    return ta->text == tb->text && ta->fontFamily == tb->fontFamily &&
+           ta->fontStyle == tb->fontStyle && ta->fontSize == tb->fontSize &&
+           ta->letterSpacing == tb->letterSpacing && ta->fauxBold == tb->fauxBold &&
+           ta->fauxItalic == tb->fauxItalic && ta->textAnchor == tb->textAnchor &&
+           ta->glyphRuns.size() == tb->glyphRuns.size();
+  }
+  if (type == NodeType::TextBox) {
+    auto tba = static_cast<const TextBox*>(a);
+    auto tbb = static_cast<const TextBox*>(b);
+    return tba->size == tbb->size && tba->textAlign == tbb->textAlign &&
+           tba->paragraphAlign == tbb->paragraphAlign && tba->writingMode == tbb->writingMode &&
+           tba->lineHeight == tbb->lineHeight && tba->wordWrap == tbb->wordWrap &&
+           tba->overflow == tbb->overflow;
+  }
+  // For other element types (TrimPath, RoundCorner, MergePath, Repeater, TextModifier, TextPath),
+  // default to not equal to be conservative.
+  return false;
+}
+
+static bool LayersStructurallyEqual(const Layer* a, const Layer* b) {
+  if (a->contents.size() != b->contents.size()) {
+    return false;
+  }
+  if (a->children.size() != b->children.size()) {
+    return false;
+  }
+  if (a->composition != nullptr || b->composition != nullptr) {
+    return false;
+  }
+  if (a->styles.size() != b->styles.size() || a->filters.size() != b->filters.size()) {
+    return false;
+  }
+  if (a->alpha != b->alpha || a->blendMode != b->blendMode || a->visible != b->visible) {
+    return false;
+  }
+  if (!a->matrix.isIdentity() || !b->matrix.isIdentity()) {
+    return false;
+  }
+  for (size_t i = 0; i < a->contents.size(); i++) {
+    if (!ElementsStructurallyEqual(a->contents[i], b->contents[i])) {
+      return false;
+    }
+  }
+  for (size_t i = 0; i < a->children.size(); i++) {
+    if (!LayersStructurallyEqual(a->children[i], b->children[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+static void ComputeLayerContentsBounds(const Layer* layer, float& boundsWidth,
+                                       float& boundsHeight) {
+  float minX = FLT_MAX;
+  float minY = FLT_MAX;
+  float maxX = -FLT_MAX;
+  float maxY = -FLT_MAX;
+  bool hasGeometry = false;
+
+  for (auto* element : layer->contents) {
+    auto type = element->nodeType();
+    if (type == NodeType::Rectangle) {
+      auto rect = static_cast<const Rectangle*>(element);
+      float halfW = rect->size.width * 0.5f;
+      float halfH = rect->size.height * 0.5f;
+      minX = std::min(minX, rect->center.x - halfW);
+      minY = std::min(minY, rect->center.y - halfH);
+      maxX = std::max(maxX, rect->center.x + halfW);
+      maxY = std::max(maxY, rect->center.y + halfH);
+      hasGeometry = true;
+    } else if (type == NodeType::Ellipse) {
+      auto ellipse = static_cast<const Ellipse*>(element);
+      float halfW = ellipse->size.width * 0.5f;
+      float halfH = ellipse->size.height * 0.5f;
+      minX = std::min(minX, ellipse->center.x - halfW);
+      minY = std::min(minY, ellipse->center.y - halfH);
+      maxX = std::max(maxX, ellipse->center.x + halfW);
+      maxY = std::max(maxY, ellipse->center.y + halfH);
+      hasGeometry = true;
+    } else if (type == NodeType::Polystar) {
+      auto polystar = static_cast<const Polystar*>(element);
+      float r = polystar->outerRadius;
+      minX = std::min(minX, polystar->center.x - r);
+      minY = std::min(minY, polystar->center.y - r);
+      maxX = std::max(maxX, polystar->center.x + r);
+      maxY = std::max(maxY, polystar->center.y + r);
+      hasGeometry = true;
+    }
+  }
+
+  if (hasGeometry) {
+    boundsWidth = maxX - minX;
+    boundsHeight = maxY - minY;
+  } else {
+    boundsWidth = 0.0f;
+    boundsHeight = 0.0f;
+  }
+}
+
+static std::string GenerateUniqueId(PAGXDocument* document, const std::string& prefix) {
+  int counter = 1;
+  std::string id = {};
+  do {
+    id = prefix + std::to_string(counter++);
+  } while (document->findNode(id) != nullptr);
+  return id;
+}
+
+static int ExtractCompositions(PAGXDocument* document) {
+  // Step 1: Collect all candidate layers (with contents, no composition reference, identity matrix).
+  std::unordered_map<size_t, std::vector<Layer*>> hashGroups = {};
+
+  std::function<void(Layer*)> collectLayers;
+  collectLayers = [&](Layer* layer) {
+    if (!layer->contents.empty() && layer->composition == nullptr && layer->matrix.isIdentity() &&
+        layer->children.empty() && layer->styles.empty() && layer->filters.empty()) {
+      auto hash = HashLayerStructure(layer);
+      hashGroups[hash].push_back(layer);
+    }
+    for (auto* child : layer->children) {
+      collectLayers(child);
+    }
+  };
+
+  for (auto* layer : document->layers) {
+    collectLayers(layer);
+  }
+
+  // Step 2: Find groups with 2+ structurally identical layers.
+  struct ExtractionCandidate {
+    std::vector<Layer*> layers = {};
+    float width = 0.0f;
+    float height = 0.0f;
+  };
+  std::vector<ExtractionCandidate> candidates = {};
+
+  for (auto& [hash, layers] : hashGroups) {
+    if (layers.size() < 2) {
+      continue;
+    }
+    // Verify structural equality (handle hash collisions).
+    std::vector<std::vector<Layer*>> equalGroups = {};
+    for (auto* layer : layers) {
+      bool found = false;
+      for (auto& group : equalGroups) {
+        if (LayersStructurallyEqual(layer, group[0])) {
+          group.push_back(layer);
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        equalGroups.push_back({layer});
+      }
+    }
+    for (auto& group : equalGroups) {
+      if (group.size() >= 2) {
+        ExtractionCandidate candidate = {};
+        candidate.layers = group;
+        ComputeLayerContentsBounds(group[0], candidate.width, candidate.height);
+        if (candidate.width > 0.0f && candidate.height > 0.0f) {
+          candidates.push_back(candidate);
+        }
+      }
+    }
+  }
+
+  // Step 3: Create Composition for each candidate group.
+  int count = 0;
+  for (auto& candidate : candidates) {
+    auto* sourceLayer = candidate.layers[0];
+
+    // Create the Composition with a single inner Layer that holds the contents.
+    auto compId = GenerateUniqueId(document, "comp");
+    auto comp = document->makeNode<Composition>(compId);
+    comp->width = candidate.width;
+    comp->height = candidate.height;
+
+    auto innerLayer = document->makeNode<Layer>(GenerateUniqueId(document, "compLayer"));
+    // Move contents from the source layer to the inner layer.
+    innerLayer->contents = sourceLayer->contents;
+    comp->layers.push_back(innerLayer);
+
+    // Replace each layer's contents with a composition reference.
+    for (auto* layer : candidate.layers) {
+      if (layer != sourceLayer) {
+        // Other layers lose their contents (they were structurally identical).
+        layer->contents.clear();
+      } else {
+        // Source layer's contents were moved to innerLayer.
+        layer->contents.clear();
+      }
+      layer->composition = comp;
+    }
+    count += static_cast<int>(candidate.layers.size());
+  }
+
+  return count;
+}
+
 // --- Main optimize pipeline ---
 
 static OptimizeReport OptimizeDocument(PAGXDocument* document) {
@@ -675,6 +1206,8 @@ static OptimizeReport OptimizeDocument(PAGXDocument* document) {
   ReplacePathsWithPrimitives(document, report.pathToRectangle, report.pathToEllipse);
   report.fullCanvasClips = RemoveFullCanvasClipMasks(document, document->layers);
   report.offCanvasLayers = RemoveOffCanvasLayers(document);
+  report.coordinatesLocalized = LocalizeCoordinates(document);
+  report.compositionsExtracted = ExtractCompositions(document);
   report.unreferencedResources = RemoveUnreferencedResources(document);
   return report;
 }
