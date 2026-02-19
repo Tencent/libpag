@@ -1,19 +1,5 @@
 # Layer vs Group Reference
 
-## Core Concepts
-
-### Painter Scope
-
-Painters (Fill / Stroke) render **all geometry accumulated in the current scope up to that
-painter's position**. Subsequent painters continue to render the same geometry.
-
-### Group Scope Isolation
-
-Group creates an isolated scope. Internal geometry accumulates only within the Group, and
-after the Group ends, its geometry propagates upward to the parent scope.
-
----
-
 ## Layer vs Group: When to Use Which
 
 **Layer** creates an independent rendering surface with its own coordinate system. It is the
@@ -129,6 +115,12 @@ Layers.
 Layers; downgrade the rest to Groups. The parent Layer's `x`/`y` carries the block offset;
 internal coordinates are origin-relative.
 
+> **Note**: When multiple Layers share identical painters and no Layer-exclusive features,
+> this scenario overlaps with **Cross-Layer Merging** in `painter-merging.md`. The key
+> difference: Scenario B focuses on semantic grouping (one block = one Layer, even if
+> painters differ), while Cross-Layer Merging focuses on painter deduplication (shared
+> painters, even across independent blocks).
+
 ```xml
 <!-- Before: button scattered across two sibling Layers -->
 <Layer y="325" x="148">
@@ -165,6 +157,9 @@ creates an extra rendering surface.
 **Fix**: Downgrade the child Layers to Groups. This is only safe when the Layers are
 sub-elements of the **same logical block** — never downgrade a Layer that is itself a
 distinct independent block.
+
+The simplest special case: a no-attribute Group or Layer wrapping a single child element is
+a redundant wrapper that can always be flattened (promote the child to the parent scope).
 
 ```xml
 <!-- Before: three stat rows as child Layers (none use Layer-exclusive features) -->

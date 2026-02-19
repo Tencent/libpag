@@ -232,8 +232,9 @@ A Path's data is a simple axis-aligned rectangle (4 lines forming a box) or a ci
 - Only apply when the path is clearly a standard shape. Do not convert rounded rectangles
   described via Bezier curves unless you can accurately extract the roundness parameter.
 - Paths with transforms applied may not map cleanly to primitive attributes.
-- This optimization improves readability. It also benefits rendering performance — see
-  "Prefer Primitive Geometry over Path under Repeater" in the performance reference for details on when shape choice affects render cost.
+- This optimization improves readability. Under Repeater it also significantly benefits
+  rendering performance — see **Prefer Primitive Geometry over Path under Repeater** in
+  `performance.md` for details on when shape choice affects render cost.
 
 ---
 

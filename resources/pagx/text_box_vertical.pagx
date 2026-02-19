@@ -1,131 +1,131 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="670" height="570" version="1.0">
   <!-- Row 1: CJK+Latin single column, two columns with \n, auto-wrap -->
-  <Layer>
+  <Layer x="50" y="50">
     <!-- Box 1: CJK+Latin mixed single column -->
     <Group>
-      <Rectangle center="90,165" size="80,230"/>
+      <Rectangle center="40,115" size="80,230"/>
       <Stroke color="#000" width="1"/>
     </Group>
     <Group>
       <Text text="你好Hello世界" fontFamily="NotoSansSC" fontSize="24"/>
-      <TextBox position="50,50" size="80,230" writingMode="vertical"/>
+      <TextBox size="80,230" writingMode="vertical"/>
       <Fill color="#000"/>
     </Group>
 
     <!-- Box 2: Two columns with explicit \n -->
     <Group>
-      <Rectangle center="190,165" size="100,230"/>
+      <Rectangle center="140,115" size="100,230"/>
       <Stroke color="#000" width="1"/>
     </Group>
     <Group>
       <Text text="你好Hello&#10;世界Test" fontFamily="NotoSansSC" fontSize="24"/>
-      <TextBox position="140,50" size="100,230" writingMode="vertical"/>
+      <TextBox position="90,0" size="100,230" writingMode="vertical"/>
       <Fill color="#000"/>
     </Group>
 
     <!-- Box 3: CJK auto-wrap -->
     <Group>
-      <Rectangle center="300,134" size="100,168"/>
+      <Rectangle center="250,84" size="100,168"/>
       <Stroke color="#000" width="1"/>
     </Group>
     <Group>
       <Text text="春眠不觉晓处处闻啼鸟夜来风雨声花落知多少" fontFamily="NotoSansSC" fontSize="24"/>
-      <TextBox position="250,50" size="100,168" writingMode="vertical"/>
+      <TextBox position="200,0" size="100,168" writingMode="vertical"/>
       <Fill color="#000"/>
     </Group>
   </Layer>
 
   <!-- Row 2: ParagraphAlign Near/Middle/Far (single column positioning) -->
-  <Layer>
+  <Layer x="360" y="50">
     <!-- Box 4: ParagraphAlign Near -->
     <Group>
-      <Rectangle center="400,125" size="80,150"/>
+      <Rectangle center="40,75" size="80,150"/>
       <Stroke color="#000" width="1"/>
     </Group>
     <Group>
       <Text text="你好" fontFamily="NotoSansSC" fontSize="24"/>
-      <TextBox position="360,50" size="80,150" writingMode="vertical"/>
+      <TextBox size="80,150" writingMode="vertical"/>
       <Fill color="#000"/>
     </Group>
 
     <!-- Box 5: ParagraphAlign Middle -->
     <Group>
-      <Rectangle center="490,125" size="80,150"/>
+      <Rectangle center="130,75" size="80,150"/>
       <Stroke color="#000" width="1"/>
     </Group>
     <Group>
       <Text text="你好" fontFamily="NotoSansSC" fontSize="24"/>
-      <TextBox position="450,50" size="80,150" writingMode="vertical" paragraphAlign="middle"/>
+      <TextBox position="90,0" size="80,150" writingMode="vertical" paragraphAlign="middle"/>
       <Fill color="#000"/>
     </Group>
 
     <!-- Box 6: ParagraphAlign Far -->
     <Group>
-      <Rectangle center="580,125" size="80,150"/>
+      <Rectangle center="220,75" size="80,150"/>
       <Stroke color="#000" width="1"/>
     </Group>
     <Group>
       <Text text="你好" fontFamily="NotoSansSC" fontSize="24"/>
-      <TextBox position="540,50" size="80,150" writingMode="vertical" paragraphAlign="far"/>
+      <TextBox position="180,0" size="80,150" writingMode="vertical" paragraphAlign="far"/>
       <Fill color="#000"/>
     </Group>
   </Layer>
 
   <!-- Row 3: TextAlign Start/Center/End, Justify, Overflow -->
-  <Layer>
+  <Layer x="50" y="290">
     <!-- Box 7: TextAlign Start -->
     <Group>
-      <Rectangle center="100,405" size="100,230"/>
+      <Rectangle center="50,115" size="100,230"/>
       <Stroke color="#000" width="1"/>
     </Group>
     <Group>
       <Text text="你好&#10;世界大地" fontFamily="NotoSansSC" fontSize="24"/>
-      <TextBox position="50,290" size="100,230" writingMode="vertical"/>
+      <TextBox size="100,230" writingMode="vertical"/>
       <Fill color="#000"/>
     </Group>
 
     <!-- Box 8: TextAlign Center -->
     <Group>
-      <Rectangle center="210,405" size="100,230"/>
+      <Rectangle center="160,115" size="100,230"/>
       <Stroke color="#000" width="1"/>
     </Group>
     <Group>
       <Text text="你好&#10;世界大地" fontFamily="NotoSansSC" fontSize="24"/>
-      <TextBox position="160,290" size="100,230" writingMode="vertical" textAlign="center"/>
+      <TextBox position="110,0" size="100,230" writingMode="vertical" textAlign="center"/>
       <Fill color="#000"/>
     </Group>
 
     <!-- Box 9: TextAlign End -->
     <Group>
-      <Rectangle center="320,405" size="100,230"/>
+      <Rectangle center="270,115" size="100,230"/>
       <Stroke color="#000" width="1"/>
     </Group>
     <Group>
       <Text text="你好&#10;世界大地" fontFamily="NotoSansSC" fontSize="24"/>
-      <TextBox position="270,290" size="100,230" writingMode="vertical" textAlign="end"/>
+      <TextBox position="220,0" size="100,230" writingMode="vertical" textAlign="end"/>
       <Fill color="#000"/>
     </Group>
 
     <!-- Box 10: Justify (two columns, last column Start-aligned) -->
     <Group>
-      <Rectangle center="420,405" size="80,230"/>
+      <Rectangle center="370,115" size="80,230"/>
       <Stroke color="#000" width="1"/>
     </Group>
     <Group>
       <Text text="春眠 Not 觉晓&#10;处处 Hear 啼鸟" fontFamily="NotoSansSC" fontSize="24"/>
-      <TextBox position="380,290" size="80,230" writingMode="vertical" textAlign="justify"/>
+      <TextBox position="330,0" size="80,230" writingMode="vertical" textAlign="justify"/>
       <Fill color="#000"/>
     </Group>
 
     <!-- Box 11: Overflow hidden -->
     <Group>
-      <Rectangle center="510,390" size="80,200"/>
+      <Rectangle center="460,100" size="80,200"/>
       <Stroke color="#000" width="1"/>
     </Group>
     <Group>
       <Text text="春眠不觉晓处处闻啼鸟夜来风雨声花落知多少" fontFamily="NotoSansSC" fontSize="24"/>
-      <TextBox position="470,290" size="80,200" writingMode="vertical" overflow="hidden"/>
+      <TextBox position="420,0" size="80,200" writingMode="vertical" overflow="hidden"/>
       <Fill color="#000"/>
     </Group>
   </Layer>

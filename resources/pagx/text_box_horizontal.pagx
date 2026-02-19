@@ -1,98 +1,98 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="570" height="400" version="1.0">
   <!-- Row 1: textAlign Start/Center/End + paragraphAlign Near/Middle/Far -->
-  <Layer>
+  <Layer x="50" y="50">
     <!-- Box 1: CJK wordWrap, Start/Near -->
     <Group>
-      <Rectangle center="125,110" size="150,120"/>
+      <Rectangle center="75,60" size="150,120"/>
       <Stroke color="#000" width="1"/>
     </Group>
     <Group>
       <Text text="你好世界，这是测试文本。" fontFamily="NotoSansSC" fontSize="20"/>
-      <TextBox position="50,50" size="150,120"/>
+      <TextBox size="150,120"/>
       <Fill color="#000"/>
     </Group>
 
     <!-- Box 2: Multi-line no wrap, Center/Middle -->
     <Group>
-      <Rectangle center="285,110" size="150,120"/>
+      <Rectangle center="235,60" size="150,120"/>
       <Stroke color="#000" width="1"/>
     </Group>
     <Group>
       <Text text="Line One&#10;Line Two&#10;Line Three" fontFamily="NotoSansSC" fontSize="18"/>
-      <TextBox position="210,50" size="150,120" textAlign="center" paragraphAlign="middle"/>
+      <TextBox position="160,0" size="150,120" textAlign="center" paragraphAlign="middle"/>
       <Fill color="#000"/>
     </Group>
 
     <!-- Box 3: English wordWrap, End/Far -->
     <Group>
-      <Rectangle center="445,110" size="150,120"/>
+      <Rectangle center="395,60" size="150,120"/>
       <Stroke color="#000" width="1"/>
     </Group>
     <Group>
       <Text text="Hello World this is a long text." fontFamily="NotoSansSC" fontSize="18"/>
-      <TextBox position="370,50" size="150,120" textAlign="end" paragraphAlign="far"/>
+      <TextBox position="320,0" size="150,120" textAlign="end" paragraphAlign="far"/>
       <Fill color="#000"/>
     </Group>
   </Layer>
 
   <!-- Row 2: overflow hidden, Justify -->
-  <Layer>
+  <Layer x="50" y="180">
     <!-- Box 4: Overflow hidden, Start/Near -->
     <Group>
-      <Rectangle center="125,220" size="150,80"/>
+      <Rectangle center="75,40" size="150,80"/>
       <Stroke color="#000" width="1"/>
     </Group>
     <Group>
       <Text text="Overflow text that is very long and should be clipped by the box boundary." fontFamily="NotoSansSC" fontSize="18"/>
-      <TextBox position="50,180" size="150,80" overflow="hidden"/>
+      <TextBox size="150,80" overflow="hidden"/>
       <Fill color="#000"/>
     </Group>
 
     <!-- Box 5: Justify, two lines -->
     <Group>
-      <Rectangle center="285,220" size="150,80"/>
+      <Rectangle center="235,40" size="150,80"/>
       <Stroke color="#000" width="1"/>
     </Group>
     <Group>
       <Text text="Justify this line&#10;Last line start" fontFamily="NotoSansSC" fontSize="18"/>
-      <TextBox position="210,180" size="150,80" textAlign="justify"/>
+      <TextBox position="160,0" size="150,80" textAlign="justify"/>
       <Fill color="#000"/>
     </Group>
   </Layer>
 
   <!-- Row 3: ParagraphAlign Near/Middle/Far -->
-  <Layer>
+  <Layer x="50" y="270">
     <!-- Box 6: ParagraphAlign Near -->
     <Group>
-      <Rectangle center="125,310" size="150,80"/>
+      <Rectangle center="75,40" size="150,80"/>
       <Stroke color="#000" width="1"/>
     </Group>
     <Group>
       <Text text="aaAÂẤ" fontFamily="NotoSansSC" fontSize="32"/>
-      <TextBox position="50,270" size="150,80"/>
+      <TextBox size="150,80"/>
       <Fill color="#000"/>
     </Group>
 
     <!-- Box 7: ParagraphAlign Middle -->
     <Group>
-      <Rectangle center="285,310" size="150,80"/>
+      <Rectangle center="235,40" size="150,80"/>
       <Stroke color="#000" width="1"/>
     </Group>
     <Group>
       <Text text="aaAÂẤ" fontFamily="NotoSansSC" fontSize="32"/>
-      <TextBox position="210,270" size="150,80" paragraphAlign="middle"/>
+      <TextBox position="160,0" size="150,80" paragraphAlign="middle"/>
       <Fill color="#000"/>
     </Group>
 
     <!-- Box 8: ParagraphAlign Far -->
     <Group>
-      <Rectangle center="445,310" size="150,80"/>
+      <Rectangle center="395,40" size="150,80"/>
       <Stroke color="#000" width="1"/>
     </Group>
     <Group>
       <Text text="aaAÂẤ" fontFamily="NotoSansSC" fontSize="32"/>
-      <TextBox position="370,270" size="150,80" paragraphAlign="far"/>
+      <TextBox position="320,0" size="150,80" paragraphAlign="far"/>
       <Fill color="#000"/>
     </Group>
   </Layer>

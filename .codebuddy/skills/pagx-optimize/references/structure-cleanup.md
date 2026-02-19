@@ -350,47 +350,6 @@ Delete the entire resource definition.
 
 ## Remove Redundant Group / Layer Wrappers
 
-### Principle
-
-A Group or Layer that carries no attributes and wraps only a single content group is an
-unnecessary intermediate layer that can be flattened.
-
-### When to Apply
-
-All of the following conditions are met:
-
-1. No `transform` / `position` / `rotation` / `scale` / `alpha` / `blendMode` / `name` /
-   `mask` or similar attributes
-2. Contains only one content group (not multiple sibling elements requiring scope isolation)
-
-### How
-
-Promote the inner content to the parent scope and delete the wrapper element.
-
-### Example
-
-```xml
-<!-- Before: Layer contains a single no-attribute Group -->
-<Layer x="100" y="200">
-  <Group>
-    <Rectangle center="50,50" size="100,100"/>
-    <Fill color="#FF0000"/>
-  </Group>
-</Layer>
-
-<!-- After: flattened -->
-<Layer x="100" y="200">
-  <Rectangle center="50,50" size="100,100"/>
-  <Fill color="#FF0000"/>
-</Layer>
-```
-
-### Caveats
-
-- **Layers cannot be removed freely**: Layer is the only container for styles
-  (DropShadowStyle, etc.), filters (BlurFilter, etc.), masks, composition references, and
-  blendMode. If a Layer carries any of these, it must stay.
-- **Groups with transforms cannot be removed**: A Group's transform applies to all its
-  contents. Removing it changes the rendering.
-- **Groups for scope isolation**: If a Group exists to isolate painter scope (see Painter Merging reference),
-  it must not be removed.
+This optimization is now part of **Layer/Group Semantic Optimization (#7)** — specifically the
+simplest case of Scenario C (downgrade). See `layer-vs-group.md` for the full downgrade
+checklist, stacking order rules, and examples.

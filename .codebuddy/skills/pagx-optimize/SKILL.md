@@ -58,12 +58,13 @@ Groups at root level are silently ignored.
 | 4 | Simplify Transforms | Translation-only matrix, identity matrix, cascaded translations |
 | 5 | Normalize Numerics | Scientific notation near zero, trailing decimals, short hex |
 | 6 | Remove Unused Resources | Resource `id` has no `@id` reference |
-| 7 | Remove Redundant Wrappers | Group/Layer with no attributes wrapping single element |
-| 8 | Layer/Group Semantic Optimization | Ensure each Layer maps to one logical block, each Group is a sub-element within a block, and internal coordinates are origin-relative. Three scenarios: (A) split a Layer that packs multiple independent blocks, (B) merge adjacent Layers that scatter one block, (C) downgrade child Layers to Groups within a block when no Layer-exclusive features are used. **High value** |
+| 7 | Layer/Group Semantic Optimization | Ensure each Layer maps to one logical block, each Group is a sub-element within a block. Includes removing redundant wrappers (no-attribute Group/Layer wrapping a single element). Three scenarios: (A) split a Layer that packs multiple independent blocks, (B) merge adjacent Layers that scatter one block, (C) downgrade child Layers to Groups within a block when no Layer-exclusive features are used. **High value** |
+| 8 | Coordinate Localization | Layer `x`/`y` carries the block's offset; internal elements use coordinates relative to the Layer's origin (0,0). Eliminates redundant position data and lets a block be repositioned by changing one `x`/`y` value. Apply after any Layer split/merge or whenever internal coordinates use canvas-absolute values |
 
 > For detailed examples and default value tables, read `references/structure-cleanup.md`.
 > For Layer/Group semantic principle, optimization scenarios (split / merge / downgrade),
-> coordinate localization, and stacking order rules, read `references/layer-vs-group.md`.
+> redundant wrapper removal, coordinate localization, and stacking order rules, read
+> `references/layer-vs-group.md`.
 
 > **Caveat**: Some attributes look optional but are required. `ColorStop.offset` has no default —
 > omitting it causes parsing errors. See `references/structure-cleanup.md` for the full list.
@@ -91,12 +92,14 @@ This is the most common source of errors.
 | # | Optimization | When to Apply |
 |---|--------------|---------------|
 | 11 | Use TextBox for Multi-Text Layout | Multiple Text elements positioned manually for sequential display |
-| 12 | Merge Text Layers into Groups | Each text segment in its own Layer when Group suffices |
 
 Multiple Text elements that form a sequential block (e.g., title + subtitle, paragraph lines)
 should share a single TextBox for automatic layout instead of using absolute position
 coordinates on each Text. Each text segment should be in a Group (for style isolation), not
 a separate Layer.
+
+> If text segments are in separate Layers when Group suffices, apply #7 Layer/Group Semantic
+> Optimization (Scenario C) to downgrade them.
 
 > **TextBox ignores** Text's `position` and `textAnchor` attributes. When using TextBox, do not
 > set these on child Text elements.
@@ -134,11 +137,11 @@ a separate Layer.
 
 | # | Optimization | When to Apply |
 |---|--------------|---------------|
-| 13 | Composition Reuse | 2+ identical layer subtrees differing only in position |
-| 14 | PathData Reuse | Same path data string appears 2+ times |
-| 15 | Color Source Sharing | Identical gradient definitions inline in multiple places |
-| 16 | Replace Path with Primitive | Path describes a Rectangle or Ellipse |
-| 17 | Remove Full-Canvas Clips | Clip mask covers entire canvas |
+| 12 | Composition Reuse | 2+ identical layer subtrees differing only in position |
+| 13 | PathData Reuse | Same path data string appears 2+ times |
+| 14 | Color Source Sharing | Identical gradient definitions inline in multiple places |
+| 15 | Replace Path with Primitive | Path describes a Rectangle or Ellipse |
+| 16 | Remove Full-Canvas Clips | Clip mask covers entire canvas |
 
 > For detailed examples and coordinate conversion formulas, read `references/resource-reuse.md`.
 
@@ -152,7 +155,7 @@ a separate Layer.
 - **Layer vs Group**: Layer creates extra surface; Group is lighter
 
 **Two categories**:
-1. **Equivalent (auto-apply)**: Downgrade Layer to Group, clip Repeater to canvas bounds
+1. **Equivalent (auto-apply)**: Downgrade Layer to Group (see #7), clip Repeater to canvas bounds
 2. **Suggestions (never auto-apply)**: Reduce density, lower blur, simplify geometry
 
 > For detailed optimization techniques, read `references/performance.md`.

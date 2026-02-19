@@ -30,37 +30,9 @@ Understanding the PAGX renderer's cost model helps identify performance bottlene
 
 ### Downgrade Layer to Group
 
-**Problem**: Layer creates an independent rendering surface that must be composited back into
-the parent. When a Layer does not use any Layer-exclusive features, replacing it with Group
-eliminates this overhead.
-
-**When to apply**: A Layer has no styles (DropShadowStyle, InnerShadowStyle,
-BackgroundBlurStyle), no filters (BlurFilter, etc.), no mask, no blendMode, no composition
-reference, no scrollRect, and no name attribute that matters for debugging.
-
-**How**: Replace `<Layer>` with `<Group>`. Convert `x`/`y` to `position`.
-
-```xml
-<!-- Before: Layer used only for grouping -->
-<Layer x="100" y="50">
-  <Rectangle size="40,30"/>
-  <Fill color="#F00"/>
-</Layer>
-
-<!-- After: Group is lighter weight -->
-<Group position="100,50">
-  <Rectangle size="40,30"/>
-  <Fill color="#F00"/>
-</Group>
-```
-
-**Caveats**:
-- Group geometry **propagates upward** to the parent scope. If the parent scope has painters
-  that should not affect this geometry, the Layer isolation is needed. Verify that converting to
-  Group does not cause unintended painter leakage.
-- Layer with `scrollRect` cannot become Group because Group does not support scrollRect.
-- Layer with child Layers cannot become Group because Group cannot contain Layers.
-- Only apply when the Layer is a leaf (contains only geometry + painters, no child Layers).
+Layer creates an independent rendering surface; Group does not. Replacing unnecessary Layers
+with Groups eliminates compositing overhead. For the full downgrade checklist, stacking order
+rules, and detailed examples, see **Scenario C** in `layer-vs-group.md`.
 
 ### Clip Repeater Content to Canvas Bounds
 
@@ -254,34 +226,10 @@ with a solid stroke or other treatment is acceptable.
 
 ### Prefer Primitive Geometry over Path under Repeater
 
-**Problem**: Rectangle and Ellipse are primitive geometry types with dedicated fast paths in
-the renderer. Path requires general-purpose tessellation for every shape instance. When a
-Repeater multiplies a shape hundreds or thousands of times, the per-instance cost difference
-becomes significant.
-
-**When to apply**: A `<Path .../>` appears in the same scope as a Repeater (especially nested
-Repeaters) and the path describes a shape that can be expressed as Rectangle, Ellipse, or
-RoundRect.
-
-**How**: Replace the Path with the equivalent primitive geometry element. This is the same
-transformation as the "Replace Path with Primitive" optimization in Resource Reuse, but here the motivation is rendering performance rather than
-readability.
-
-```xml
-<!-- Expensive: Path tessellated 500 times -->
-<Path data="M 0 0 L 20 0 L 20 10 L 0 10 Z"/>
-<Fill color="#004488"/>
-<Repeater copies="500" position="0,12"/>
-
-<!-- Faster: Rectangle uses optimized render path -->
-<Rectangle center="10,5" size="20,10"/>
-<Fill color="#004488"/>
-<Repeater copies="500" position="0,12"/>
-```
-
-**Note**: This only applies when the Path is geometrically equivalent to a primitive. Do not
-approximate complex shapes (e.g., hexagons, stars) as rectangles — visual fidelity takes
-priority.
+Rectangle and Ellipse have dedicated fast paths in the renderer; Path requires general-purpose
+tessellation per instance. Under Repeater, the per-instance cost difference multiplies
+significantly. See **Replace Path with Primitive** in `resource-reuse.md` for conversion
+examples. When a Path under a Repeater describes a standard shape, always prefer the primitive.
 
 ### Replace PathData with Simple Geometry Combinations
 
