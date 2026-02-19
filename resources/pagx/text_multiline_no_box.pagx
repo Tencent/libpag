@@ -1,36 +1,49 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="350" height="290" version="1.0">
-  <Layer>
-    <!-- Top-left: textAnchor=start -->
+  <!-- textAnchor=start -->
+  <Layer x="20" y="40">
     <Group>
-      <Text text="Line One&#10;Line Two&#10;Line Three" fontFamily="NotoSansSC" fontSize="24" position="20,40"/>
+      <Text text="Line One&#10;Line Two&#10;Line Three" fontFamily="NotoSansSC" fontSize="24"/>
       <Fill/>
     </Group>
-
-    <!-- Top-right: textAnchor=center -->
     <Group>
-      <Text text="Center A&#10;Center BB&#10;Center CCC" fontFamily="NotoSansSC" fontSize="24" position="260,40" textAnchor="center"/>
-      <Fill color="#333"/>
+      <Ellipse size="6,6"/>
+      <Fill color="#F00"/>
     </Group>
+  </Layer>
 
-    <!-- Bottom-left: textAnchor=end -->
+  <!-- textAnchor=center -->
+  <Layer x="260" y="40">
     <Group>
-      <Text text="End X&#10;End YY&#10;End ZZZ" fontFamily="NotoSansSC" fontSize="24" position="130,180" textAnchor="end"/>
-      <Fill color="#666"/>
-    </Group>
-
-    <!-- Bottom-right: consecutive newlines (empty line), textAnchor=center -->
-    <Group>
-      <Text text="Before&#10;&#10;After Gap" fontFamily="NotoSansSC" fontSize="24" position="260,180" textAnchor="center"/>
+      <Text text="Center A&#10;Center BB&#10;Center CCC" fontFamily="NotoSansSC" fontSize="24" textAnchor="center"/>
       <Fill/>
     </Group>
-
-    <!-- Anchor markers -->
     <Group>
-      <Ellipse center="20,40" size="6,6"/>
-      <Ellipse center="260,40" size="6,6"/>
-      <Ellipse center="130,180" size="6,6"/>
-      <Ellipse center="260,180" size="6,6"/>
+      <Ellipse size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+  </Layer>
+
+  <!-- textAnchor=end -->
+  <Layer x="130" y="180">
+    <Group>
+      <Text text="End X&#10;End YY&#10;End ZZZ" fontFamily="NotoSansSC" fontSize="24" textAnchor="end"/>
+      <Fill/>
+    </Group>
+    <Group>
+      <Ellipse size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+  </Layer>
+
+  <!-- Consecutive newlines (empty line), textAnchor=center -->
+  <Layer x="260" y="180">
+    <Group>
+      <Text text="Before&#10;&#10;After Gap" fontFamily="NotoSansSC" fontSize="24" textAnchor="center"/>
+      <Fill/>
+    </Group>
+    <Group>
+      <Ellipse size="6,6"/>
       <Fill color="#F00"/>
     </Group>
   </Layer>
