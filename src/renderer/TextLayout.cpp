@@ -321,6 +321,23 @@ class TextLayoutContext {
       return;
     }
 
+    // Check if the text contains any newlines that require multi-line layout.
+    bool hasNewline = false;
+    for (auto& glyph : info.allGlyphs) {
+      if (glyph.unichar == '\n') {
+        hasNewline = true;
+        break;
+      }
+    }
+
+    if (hasNewline) {
+      buildTextBlobWithoutLayoutMultiLine(text, info);
+    } else {
+      buildTextBlobWithoutLayoutSingleLine(text, info);
+    }
+  }
+
+  void buildTextBlobWithoutLayoutSingleLine(Text* text, const ShapedInfo& info) {
     // Calculate text anchor offset based on total text width.
     float anchorOffset = 0;
     switch (text->textAnchor) {
@@ -354,6 +371,105 @@ class TextLayoutContext {
           positions[j] = run.xPositions[j] + anchorOffset;
         }
       }
+    }
+
+    auto textBlob = builder.build();
+    if (textBlob != nullptr) {
+      ShapedText shapedText = {};
+      shapedText.textBlob = textBlob;
+      StoreShapedText(text, std::move(shapedText));
+    }
+  }
+
+  void buildTextBlobWithoutLayoutMultiLine(Text* text, const ShapedInfo& info) {
+    // Split allGlyphs into lines by '\n'.
+    struct SimpleLine {
+      std::vector<const GlyphInfo*> glyphs = {};
+      float width = 0;
+      float maxAscent = 0;
+      float maxDescent = 0;
+    };
+    std::vector<SimpleLine> lines = {};
+    lines.emplace_back();
+
+    for (auto& glyph : info.allGlyphs) {
+      if (glyph.unichar == '\n') {
+        lines.emplace_back();
+        continue;
+      }
+      auto& line = lines.back();
+      line.glyphs.push_back(&glyph);
+      float absAscent = fabsf(glyph.ascent);
+      if (absAscent > line.maxAscent) {
+        line.maxAscent = absAscent;
+      }
+      if (glyph.descent > line.maxDescent) {
+        line.maxDescent = glyph.descent;
+      }
+      line.width = glyph.xPosition + glyph.advance;
+    }
+
+    // Default line height for text without TextBox: 1.2 × fontSize (per spec line 1091).
+    float defaultLineHeight = text->fontSize * 1.2f;
+
+    // Calculate baselines: first line baseline = ascent portion of first line,
+    // subsequent lines advance by defaultLineHeight.
+    float baselineY = 0;
+    tgfx::TextBlobBuilder builder = {};
+
+    for (size_t lineIdx = 0; lineIdx < lines.size(); lineIdx++) {
+      auto& line = lines[lineIdx];
+      if (line.glyphs.empty()) {
+        baselineY += defaultLineHeight;
+        continue;
+      }
+
+      if (lineIdx == 0) {
+        // First line: baseline at maxAscent (text starts from the top).
+        baselineY = line.maxAscent;
+      }
+
+      // Calculate text anchor offset for this line independently.
+      float anchorOffset = 0;
+      switch (text->textAnchor) {
+        case TextAnchor::Start:
+          break;
+        case TextAnchor::Center:
+          anchorOffset = -line.width / 2;
+          break;
+        case TextAnchor::End:
+          anchorOffset = -line.width;
+          break;
+      }
+
+      // Group consecutive glyphs by font into runs for efficient TextBlob building.
+      size_t glyphIdx = 0;
+      while (glyphIdx < line.glyphs.size()) {
+        auto* startGlyph = line.glyphs[glyphIdx];
+        auto currentFont = startGlyph->font;
+        auto currentTypefaceID = currentFont.getTypeface()->uniqueID();
+        size_t runStart = glyphIdx;
+
+        // Collect consecutive glyphs with the same typeface.
+        while (glyphIdx < line.glyphs.size()) {
+          auto glyphTypefaceID = line.glyphs[glyphIdx]->font.getTypeface()->uniqueID();
+          if (glyphTypefaceID != currentTypefaceID) {
+            break;
+          }
+          glyphIdx++;
+        }
+
+        size_t runLength = glyphIdx - runStart;
+        auto& buffer = builder.allocRunPos(currentFont, runLength);
+        for (size_t j = 0; j < runLength; j++) {
+          auto* g = line.glyphs[runStart + j];
+          buffer.glyphs[j] = g->glyphID;
+          auto* positions = reinterpret_cast<tgfx::Point*>(buffer.positions);
+          positions[j] = {g->xPosition + anchorOffset, baselineY};
+        }
+      }
+
+      baselineY += defaultLineHeight;
     }
 
     auto textBlob = builder.build();
