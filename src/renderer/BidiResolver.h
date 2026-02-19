@@ -25,6 +25,13 @@
 
 namespace pagx {
 
+enum class BaseDirection {
+  AutoLTR,
+  AutoRTL,
+  LTR,
+  RTL
+};
+
 struct BidiRun {
   size_t start = 0;
   size_t length = 0;
@@ -35,8 +42,12 @@ class BidiResolver {
  public:
   /**
    * Resolves bidirectional runs for the given UTF-8 text. Returns runs in visual (display) order.
+   * @param text The UTF-8 encoded text to resolve.
+   * @param baseDirection The base paragraph direction. AutoLTR/AutoRTL detect from text content
+   *   per UAX#9 rules P2-P3. LTR/RTL force a specific direction.
    */
-  static std::vector<BidiRun> Resolve(const std::string& text);
+  static std::vector<BidiRun> Resolve(const std::string& text,
+                                      BaseDirection baseDirection = BaseDirection::AutoLTR);
 };
 
 }  // namespace pagx

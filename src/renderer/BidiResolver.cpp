@@ -28,7 +28,8 @@
 
 namespace pagx {
 
-std::vector<BidiRun> BidiResolver::Resolve(const std::string& text) {
+std::vector<BidiRun> BidiResolver::Resolve(const std::string& text,
+                                           BaseDirection baseDirection) {
   if (text.empty()) {
     return {};
   }
@@ -43,9 +44,27 @@ std::vector<BidiRun> BidiResolver::Resolve(const std::string& text) {
     return {};
   }
 
-  SBParagraphRef paragraph =
-      SBAlgorithmCreateParagraph(algorithm, 0, static_cast<SBUInteger>(text.size()),
-                                 SBLevelDefaultLTR);
+  // Map BaseDirection to SheenBidi base level.
+  // SBLevelDefaultLTR/RTL: detect from text per UAX#9 P2-P3, defaulting to the specified direction.
+  // Explicit 0/1: force LTR/RTL regardless of text content.
+  SBLevel baseLevel = SBLevelDefaultLTR;
+  switch (baseDirection) {
+    case BaseDirection::AutoLTR:
+      baseLevel = SBLevelDefaultLTR;
+      break;
+    case BaseDirection::AutoRTL:
+      baseLevel = SBLevelDefaultRTL;
+      break;
+    case BaseDirection::LTR:
+      baseLevel = 0;
+      break;
+    case BaseDirection::RTL:
+      baseLevel = 1;
+      break;
+  }
+
+  SBParagraphRef paragraph = SBAlgorithmCreateParagraph(
+      algorithm, 0, static_cast<SBUInteger>(text.size()), baseLevel);
   if (paragraph == nullptr) {
     SBAlgorithmRelease(algorithm);
     return {};
