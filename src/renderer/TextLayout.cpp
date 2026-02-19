@@ -1038,15 +1038,12 @@ class TextLayoutContext {
             xOffset += boxWidth - line.width;
             break;
           case TextAlign::Justify: {
-            // Justify: CSS-style distribution. CJK characters get inter-character spacing,
-            // Latin words get inter-word spacing (at whitespace boundaries). Last line uses Start.
+            // Justify: distribute extra space at word boundaries. Last line uses Start.
             if (lineIdx < lines.size() - 1 && line.glyphs.size() > 1) {
               int gapCount = 0;
               for (size_t i = 0; i + 1 < line.glyphs.size(); i++) {
-                auto curr = line.glyphs[i].unichar;
-                auto next = line.glyphs[i + 1].unichar;
-                if (LineBreaker::isWhitespace(curr) || LineBreaker::isCJK(curr) ||
-                    LineBreaker::isCJK(next)) {
+                if (LineBreaker::canBreakBetween(line.glyphs[i].unichar,
+                                                 line.glyphs[i + 1].unichar)) {
                   gapCount++;
                 }
               }
@@ -1080,13 +1077,8 @@ class TextLayoutContext {
         if (g.unichar == '\n') {
           continue;
         }
-        if (gi > 0) {
-          auto prev = line.glyphs[gi - 1].unichar;
-          auto curr = g.unichar;
-          if (LineBreaker::isWhitespace(prev) || LineBreaker::isCJK(prev) ||
-              LineBreaker::isCJK(curr)) {
+        if (gi > 0 && LineBreaker::canBreakBetween(line.glyphs[gi - 1].unichar, g.unichar)) {
             justifyOffset += justifyExtraPerGap;
-          }
         }
         PositionedGlyph pg = {};
         pg.glyphID = g.glyphID;
