@@ -1580,7 +1580,7 @@ Unlike other modifiers that operate on accumulated results in a chain (e.g., Tri
 
 **ParagraphAlign (Paragraph Alignment)**:
 
-Aligns text lines or columns along the block-flow direction. The naming follows DirectWrite's `DWRITE_PARAGRAPH_ALIGNMENT` convention, using direction-neutral names (Near/Far instead of Top/Bottom) that work correctly for both horizontal and vertical writing modes. In horizontal mode this controls vertical positioning; in vertical mode this controls horizontal positioning.
+Aligns text lines or columns along the block-flow direction. Uses direction-neutral names (Near/Far instead of Top/Bottom) that work correctly for both horizontal and vertical writing modes. In horizontal mode this controls vertical positioning; in vertical mode this controls horizontal positioning.
 
 | Value | Description |
 |-------|-------------|

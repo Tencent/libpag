@@ -23,9 +23,8 @@ namespace pagx {
 /**
  * Paragraph alignment within the layout area along the block-flow direction. In horizontal mode,
  * this controls vertical positioning of lines. In vertical mode, this controls horizontal
- * positioning of columns. The naming follows DirectWrite's DWRITE_PARAGRAPH_ALIGNMENT convention,
- * using direction-neutral names (Near/Far instead of Top/Bottom) that work correctly for both
- * horizontal and vertical writing modes.
+ * positioning of columns. Uses direction-neutral names (Near/Far instead of Top/Bottom) that work
+ * correctly for both horizontal and vertical writing modes.
  */
 enum class ParagraphAlign {
   /**

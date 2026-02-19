@@ -1575,7 +1575,7 @@ TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被�
 
 **ParagraphAlign（段落对齐）**：
 
-沿块流方向（block-flow direction）对齐文本行或列。命名参考 DirectWrite 的 `DWRITE_PARAGRAPH_ALIGNMENT`，使用方向中立的 Near/Far 而非 Top/Bottom，在横排和竖排模式下语义一致。横排模式下控制垂直定位，竖排模式下控制水平定位。
+沿块流方向（block-flow direction）对齐文本行或列。使用方向中立的 Near/Far 而非 Top/Bottom，在横排和竖排模式下语义一致。横排模式下控制垂直定位，竖排模式下控制水平定位。
 
 | 值 | 说明 |
 |------|------|
