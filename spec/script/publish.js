@@ -377,7 +377,11 @@ function generateRedirectPage(siteDir, version) {
     </script>
 </head>
 <body>
-    <p>Redirecting to the latest specification...</p>
+    <p>The latest PAGX specification is version ${version}:</p>
+    <ul>
+        <li><a href="../${version}/">English</a></li>
+        <li><a href="../${version}/zh/">中文</a></li>
+    </ul>
 </body>
 </html>`;
 
