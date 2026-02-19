@@ -8,6 +8,17 @@ alwaysApply: true
 - **NEVER** 自动执行 `git stash`、`git reset`、`git checkout` 等改变暂存区或工作区状态的命令，除非**暂存区为空**或**用户明确要求**
 - **NEVER** 在 main 分支直接提交推送代码，必须通过 PR 流程
 
+## Worktree
+
+创建 worktree 新分支时必须加 `--no-track`，避免继承源分支的 tracking 关系。创建完成后，将主仓库的 `test/out/`、`test/baseline/`、`third_party/` 拷贝到新 worktree 目录下：
+
+```bash
+git worktree add <path> -b <branch> --no-track main
+cp -R test/out/ <path>/test/out/
+cp -R test/baseline/ <path>/test/baseline/
+cp -R third_party/ <path>/third_party/
+```
+
 ## 分支命名
 
 格式：`feature/{username}_模块名` 或 `bugfix/{username}_模块名`
