@@ -302,6 +302,9 @@ they **must not** be omitted.
 | `fontSize` | float | 12 |
 | `letterSpacing` | float | 0 |
 | `baselineShift` | float | 0 |
+| `fauxBold` | bool | false |
+| `fauxItalic` | bool | false |
+| `textAnchor` | TextAnchor | start |
 
 ### GlyphRun
 
@@ -312,6 +315,12 @@ they **must not** be omitted.
 | `glyphs` | string | (required) |
 | `x` | float | 0 |
 | `y` | float | 0 |
+| `xOffsets` | string | - |
+| `positions` | string | - |
+| `anchors` | string | - |
+| `scales` | string | - |
+| `rotations` | string | - |
+| `skews` | string | - |
 
 ### TextModifier
 
@@ -324,6 +333,9 @@ they **must not** be omitted.
 | `skew` | float | 0 |
 | `skewAxis` | float | 0 |
 | `alpha` | float | 1 |
+| `fillColor` | Color | - |
+| `strokeColor` | Color | - |
+| `strokeWidth` | float | - |
 
 ### RangeSelector
 
@@ -354,17 +366,18 @@ they **must not** be omitted.
 | `reversed` | bool | false |
 | `forceAlignment` | bool | false |
 
-### TextLayout
+### TextBox
 
 | Attribute | Type | Default |
 |-----------|------|---------|
 | `position` | Point | 0,0 |
-| `width` | float | auto |
-| `height` | float | auto |
+| `size` | Size | 0,0 |
 | `textAlign` | TextAlign | start |
-| `verticalAlign` | VerticalAlign | top |
+| `paragraphAlign` | ParagraphAlign | near |
 | `writingMode` | WritingMode | horizontal |
-| `lineHeight` | float | 1.2 |
+| `lineHeight` | float | 0 |
+| `wordWrap` | bool | true |
+| `overflow` | Overflow | visible |
 
 ---
 
@@ -406,7 +419,9 @@ they **must not** be omitted.
 | **SelectorShape** | `square`, `rampUp`, `rampDown`, `triangle`, `round`, `smooth` |
 | **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
 | **TextAlign** | `start`, `center`, `end`, `justify` |
-| **VerticalAlign** | `top`, `center`, `bottom` |
+| **TextAnchor** | `start`, `center`, `end` |
+| **ParagraphAlign** | `near`, `middle`, `far` |
+| **Overflow** | `visible`, `hidden` |
 | **WritingMode** | `horizontal`, `vertical` |
 | **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |
 
@@ -424,7 +439,7 @@ These defaults are counter-intuitive and commonly forgotten:
 | **Polystar** | `type` | `star` | May assume `polygon` |
 | **Polystar** | `outerRadius` | `100` | May forget there is a default |
 | **Polystar** | `innerRadius` | `50` | May forget there is a default |
-| **TextLayout** | `lineHeight` | `1.2` | Often assumed `1.0` |
+| **TextBox** | `lineHeight` | `0` (auto) | Often assumed non-zero pixel value |
 | **RoundCorner** | `radius` | `10` | Often assumed `0` |
 | **Stroke** | `miterLimit` | `4` | Often assumed `10` (SVG default) |
 | **BackgroundBlurStyle** | `tileMode` | `mirror` | May assume `clamp` |

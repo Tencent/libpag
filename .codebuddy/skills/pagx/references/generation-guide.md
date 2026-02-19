@@ -150,7 +150,10 @@ Key points:
 ```
 
 Key points:
-- Full-canvas background: Layer at default `x="0" y="0"` (omitted).
+- Full-canvas background: Layer at default `x="0" y="0"` (omitted). Using `center="400,300"`
+  (half canvas size) so the Rectangle covers the entire canvas from (0,0) to (800,600). This is
+  an exception to the "center at origin" pattern — for backgrounds, it is simpler than offsetting
+  the Layer.
 - Gradient coordinates are relative to the geometry's local coordinate system origin (which
   coincides with the Layer origin). The gradient spans 600px vertically (full canvas height).
 - Inline gradient (used once); if shared, extract to Resources.

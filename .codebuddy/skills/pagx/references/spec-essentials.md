@@ -35,6 +35,17 @@ For complete attribute defaults and enumeration values, see `pagx-quick-referenc
 - Layers render in document order: earlier = below, later = above.
 - `<Resources>` may appear anywhere; parsers support forward references.
 
+### Common Attributes
+
+- All elements support `id` (unique identifier for references) and `data-*` (custom data
+  attributes, ignored at runtime, for storing tool-specific metadata).
+
+### Color Formats
+
+- **HEX**: `#RGB`, `#RRGGBB`, `#RRGGBBAA` (sRGB)
+- **Floating-point**: `srgb(r, g, b[, a])` or `p3(r, g, b[, a])` for Display P3 wide color gamut
+- **Reference**: `@resourceId` for color sources defined in Resources
+
 ---
 
 ## 2. Node Classification (40 node types)
@@ -162,6 +173,14 @@ Geometry Elements     Modifiers             Painters
 - Sibling Groups cannot see each other's geometry.
 - **Layer is the accumulation boundary** — geometry does not cross Layer boundaries.
 
+### Group Transform Order
+
+1. translate(-anchor)
+2. scale(scale)
+3. skew(skew along skewAxis)
+4. rotate(rotation)
+5. translate(position)
+
 ---
 
 ## 5. Geometry Elements
@@ -209,6 +228,7 @@ Geometry Elements     Modifiers             Painters
 ```
 
 - `position`: y is baseline. `textAnchor`: start / center / end.
+- `fauxBold` / `fauxItalic`: algorithmic bold / italic (default false).
 - **CDATA** for special characters: `<![CDATA[A < B]]>`.
 - `\n` in `text` attribute (as `&#10;`) triggers line breaks.
 - Two rendering modes: **runtime layout** (system fonts) and **pre-layout** (GlyphRun with embedded fonts).

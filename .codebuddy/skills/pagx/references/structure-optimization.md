@@ -370,7 +370,7 @@ Also `roundness="0"` for Rectangle.
 | **Repeater** | `copies` | `3` | Often assumed to be `1` |
 | **Rectangle/Ellipse** | `size` | `100,100` | May forget there is a default |
 | **Polystar** | `type` | `star` | May assume `polygon` |
-| **TextLayout** | `lineHeight` | `1.2` | Often assumed to be `1.0` |
+| **TextBox** | `lineHeight` | `0` (auto) | Often assumed non-zero pixel value |
 | **RoundCorner** | `radius` | `10` | Often assumed to be `0` |
 | **Stroke** | `miterLimit` | `4` | Often assumed to be `10` (SVG default) |
 

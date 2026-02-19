@@ -116,7 +116,7 @@ for Text+TextBox, geometry center for shapes — not Text position when TextBox 
 - Placing `<Group>` as a direct child of `<pagx>` or `<Composition>` — it will be ignored
 - Forgetting to isolate geometry with Groups when using different painters
 - Setting Text `position`/`textAnchor` when a TextBox controls layout (they are ignored)
-- Omitting required attributes: `ColorStop.offset`, `LinearGradient.startPoint`/`endPoint`,
+- Omitting required attributes: `ColorStop.offset`/`color`, `LinearGradient.startPoint`/`endPoint`,
   `BlurFilter.blurX`/`blurY` — these have no defaults
 
 > For detailed generation patterns, component templates, and examples, read
