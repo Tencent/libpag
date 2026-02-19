@@ -79,21 +79,15 @@ Layers to Group — they will be silently ignored and not rendered.
 A child Layer can be downgraded to Group when **all** of the following are true:
 
 1. NOT a direct child of `<pagx>` or `<Composition>`
-2. **Does not use styles (DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle, etc.)**
-3. **Does not use filters (BlurFilter, DropShadowFilter, ColorMatrixFilter, etc.)**
-4. Does not use `mask` attribute
-5. Does not use `blendMode` (or uses default Normal)
-6. Does not use `composition` attribute
-7. Does not use `scrollRect`
-8. Does not use `visible="false"` (mask definitions)
-9. Does not have `id` attribute referenced elsewhere
-10. Does not contain child Layers (only Group/geometry/painter children)
-11. Downgrade does not change visual stacking order among siblings
-
-**CRITICAL — items 2 and 3 are the most commonly violated rules.** Styles and filters are
-**only valid inside Layer**, never inside Group. If a Layer contains any style or filter child
-element, it **must remain a Layer**. Placing styles/filters inside a Group is a structural error
-that will cause the PAGX file to fail parsing.
+2. Does not use any **Layer-exclusive feature** — i.e., any attribute or child node that Group
+   does not support. This includes:
+   - **Child nodes**: styles (DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle),
+     filters (BlurFilter, DropShadowFilter, InnerShadowFilter, BlendFilter, ColorMatrixFilter),
+     child Layers
+   - **Attributes**: mask, maskType, blendMode (non-default), composition, scrollRect,
+     visible="false" (mask definitions), id (if referenced elsewhere), name, matrix, matrix3D,
+     preserve3D, groupOpacity, passThroughBackground, excludeChildEffectsInLayerStyle
+3. Downgrade does not change visual stacking order among siblings
 
 **Stacking order caveat**: Within a parent Layer, Groups are part of the parent's **contents**
 (rendered first), while child Layers are **children** (rendered on top of contents). If a Layer
@@ -188,7 +182,7 @@ intended stacking order.
 ### Decision Flowchart
 
 1. List all child Layers of the parent
-2. For each, check the 11-point downgrade checklist
+2. For each, check the downgrade checklist
 3. Find the **first** Layer that fails the checklist (cannot be downgraded)
 4. Downgrade only Layers **before** that position; keep the rest as Layers
 5. If **all** pass → downgrade all (full sibling downgrade)

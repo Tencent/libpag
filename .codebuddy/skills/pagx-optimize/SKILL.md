@@ -65,10 +65,10 @@ Groups at root level are silently ignored.
 > **Caveat**: Some attributes look optional but are required. `ColorStop.offset` has no default —
 > omitting it causes parsing errors. See `references/structure-cleanup.md` for the full list.
 
-> **Layer→Group is high-impact but has strict prerequisites.** Always verify the 11-point
+> **Layer→Group is high-impact but has strict prerequisites.** Always verify the downgrade
 > checklist in `references/layer-vs-group.md` before applying. Incorrect downgrade can cause
-> content to disappear (at root level) or change visual stacking order when Groups and Layers
-> are siblings (Groups render as parent contents below sibling Layers).
+> content to disappear (at root level), change visual stacking order, or produce parsing
+> errors (styles/filters are invalid inside Group).
 
 ### Painter Merging
 
