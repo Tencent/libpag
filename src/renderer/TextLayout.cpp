@@ -125,6 +125,7 @@ class TextLayoutContext {
     VerticalOrientation orientation = VerticalOrientation::Upright;
     float height = 0;
     float width = 0;
+    bool canBreakBefore = false;
   };
 
   // Column of vertical text, containing glyphs arranged top to bottom.
@@ -1167,21 +1168,52 @@ class TextLayoutContext {
 
   std::vector<ColumnInfo> layoutColumns(const std::vector<GlyphInfo>& allGlyphs,
                                         const TextBox* textBox) {
+    // Phase 1: Build VerticalGlyphInfo list with orientation, metrics, and break marks.
+    std::vector<VerticalGlyphInfo> vgList = {};
+    vgList.reserve(allGlyphs.size());
+    for (size_t i = 0; i < allGlyphs.size(); i++) {
+      auto& glyph = allGlyphs[i];
+      if (glyph.unichar == '\n') {
+        VerticalGlyphInfo vg = {};
+        vg.glyph = glyph;
+        vgList.push_back(std::move(vg));
+        continue;
+      }
+
+      auto orientation = VerticalTextUtils::getOrientation(glyph.unichar);
+      VerticalGlyphInfo vg = {};
+      vg.glyph = glyph;
+      vg.orientation = orientation;
+      if (orientation == VerticalOrientation::Rotated) {
+        vg.height = glyph.advance;
+        vg.width = glyph.fontSize;
+      } else {
+        vg.height = glyph.font.getAdvance(glyph.glyphID, true);
+        if (vg.height <= 0) {
+          vg.height = glyph.fontSize;
+        }
+        vg.width = glyph.fontSize;
+      }
+
+      if (i > 0 && allGlyphs[i - 1].unichar != '\n') {
+        vg.canBreakBefore = LineBreaker::canBreakBetween(allGlyphs[i - 1].unichar, glyph.unichar);
+      }
+      vgList.push_back(std::move(vg));
+    }
+
+    // Phase 2: Split into columns using break marks.
     std::vector<ColumnInfo> columns = {};
     columns.emplace_back();
     auto* currentColumn = &columns.back();
     float currentColumnHeight = 0;
     float boxHeight = textBox->size.height;
     bool doWrap = textBox->wordWrap;
-
-    // Index of the last valid break position within the current column. Used for word-wrap:
-    // when a glyph overflows, we split the column at this position instead of at the overflow.
     size_t lastBreakIndex = 0;
 
-    for (size_t i = 0; i < allGlyphs.size(); i++) {
-      auto& glyph = allGlyphs[i];
+    for (size_t i = 0; i < vgList.size(); i++) {
+      auto& vg = vgList[i];
 
-      if (glyph.unichar == '\n') {
+      if (vg.glyph.unichar == '\n') {
         FinishColumn(currentColumn, textBox->lineHeight);
         columns.emplace_back();
         currentColumn = &columns.back();
@@ -1190,38 +1222,13 @@ class TextLayoutContext {
         continue;
       }
 
-      auto orientation = VerticalTextUtils::getOrientation(glyph.unichar);
-
-      VerticalGlyphInfo vg = {};
-      vg.glyph = glyph;
-      vg.orientation = orientation;
-      if (orientation == VerticalOrientation::Rotated) {
-        // Rotated glyph: horizontal advance becomes vertical height.
-        vg.height = glyph.advance;
-        vg.width = glyph.fontSize;
-      } else {
-        // Upright glyph: use vertical advance from font.
-        vg.height = glyph.font.getAdvance(glyph.glyphID, true);
-        if (vg.height <= 0) {
-          vg.height = glyph.fontSize;
-        }
-        vg.width = glyph.fontSize;
-      }
-
-      // Check if we can break before this glyph.
-      int32_t prevChar = 0;
-      if (!currentColumn->glyphs.empty()) {
-        prevChar = currentColumn->glyphs.back().glyph.unichar;
-      }
-      if (prevChar != 0 && LineBreaker::canBreakBetween(prevChar, glyph.unichar)) {
+      if (vg.canBreakBefore) {
         lastBreakIndex = currentColumn->glyphs.size();
       }
 
-      // Check overflow and wrap.
       if (doWrap && !currentColumn->glyphs.empty() &&
           currentColumnHeight + vg.height > boxHeight) {
         if (lastBreakIndex > 0) {
-          // Split at the last valid break position.
           std::vector<VerticalGlyphInfo> overflow(currentColumn->glyphs.begin() +
                                                       static_cast<ptrdiff_t>(lastBreakIndex),
                                                   currentColumn->glyphs.end());
@@ -1235,7 +1242,6 @@ class TextLayoutContext {
             currentColumnHeight += g.height;
           }
         } else {
-          // No valid break position found, force break here.
           FinishColumn(currentColumn, textBox->lineHeight);
           columns.emplace_back();
           currentColumn = &columns.back();
@@ -1339,13 +1345,11 @@ class TextLayoutContext {
             inlineOffset = boxHeight - column.height;
             break;
           case TextAlign::Justify: {
-            // Justify: distribute extra space evenly between word boundaries (determined by
-            // LineBreaker). Last column uses Start alignment.
+            // Justify: distribute extra space evenly at word boundaries. Last column uses Start.
             if (colIdx < columns.size() - 1) {
               size_t breakCount = 0;
-              for (size_t gi = 1; gi < column.glyphs.size(); gi++) {
-                if (LineBreaker::canBreakBetween(column.glyphs[gi - 1].glyph.unichar,
-                                                 column.glyphs[gi].glyph.unichar)) {
+              for (size_t gi = 0; gi < column.glyphs.size(); gi++) {
+                if (column.glyphs[gi].canBreakBefore) {
                   breakCount++;
                 }
               }
@@ -1408,7 +1412,7 @@ class TextLayoutContext {
         textGlyphs[g.sourceText].push_back(vpg);
         currentY += vg.height;
         if (justifyGap != 0 && glyphIdx + 1 < column.glyphs.size() &&
-            LineBreaker::canBreakBetween(g.unichar, column.glyphs[glyphIdx + 1].glyph.unichar)) {
+            column.glyphs[glyphIdx + 1].canBreakBefore) {
           currentY += justifyGap;
         }
       }
