@@ -208,27 +208,25 @@ class TextLayoutContext {
 
   // Processes a scope of elements following the VectorElement accumulate-render model.
   // Text elements accumulate in the scope. Child Group geometry propagates upward after the
-  // Group completes. When a TextBox is encountered, all previously accumulated Text elements
-  // are typeset and the accumulation list is cleared. Returns accumulated Text elements for
-  // upward propagation to the parent scope (up to the Layer boundary).
+  // Group completes. Per spec, TextBox position in the node order does not affect its behavior:
+  // the last TextBox in the scope applies typography to all accumulated Text elements. Returns
+  // all accumulated Text elements for upward propagation to the parent scope (up to the Layer
+  // boundary).
   std::vector<Text*> processScope(const std::vector<Element*>& elements) {
     std::vector<Text*> allText = {};
-    std::vector<Text*> accumulated = {};
+    const TextBox* textBox = nullptr;
     for (auto* element : elements) {
       if (element->nodeType() == NodeType::Text) {
-        auto* text = static_cast<Text*>(element);
-        accumulated.push_back(text);
-        allText.push_back(text);
+        allText.push_back(static_cast<Text*>(element));
       } else if (element->nodeType() == NodeType::Group) {
         auto propagated = processScope(static_cast<Group*>(element)->elements);
-        accumulated.insert(accumulated.end(), propagated.begin(), propagated.end());
         allText.insert(allText.end(), propagated.begin(), propagated.end());
       } else if (element->nodeType() == NodeType::TextBox) {
-        if (!accumulated.empty()) {
-          processTextWithLayout(accumulated, static_cast<const TextBox*>(element));
-          accumulated.clear();
-        }
+        textBox = static_cast<const TextBox*>(element);
       }
+    }
+    if (textBox != nullptr && !allText.empty()) {
+      processTextWithLayout(allText, textBox);
     }
     return allText;
   }

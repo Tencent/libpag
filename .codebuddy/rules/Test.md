@@ -30,7 +30,7 @@ cmake --build cmake-build-debug --target PAGFullTest
 
 **!! IMPORTANT - 截图基准变更限制**：
 - **NEVER** 自动接受截图基准变更，包括禁止自动运行 `UpdateBaseline` target、禁止修改或覆盖 `version.json` 文件
-- 必须经过用户确认后运行 `accept_baseline.sh` 脚本来接受变更
+- **必须**经过用户确认后直接运行 `bash accept_baseline.sh` 脚本来接受变更，**禁止**将脚本内容展开手动逐步执行
 
 ## 使用本地 tgfx 源码调试
 
