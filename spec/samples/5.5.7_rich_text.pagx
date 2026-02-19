@@ -11,7 +11,7 @@
     </Fill>
   </Layer>
 
-  <!-- Rich text: multiple Groups with different styles in one line -->
+  <!-- Rich text: multiple Groups with different styles in one TextBox -->
   <Layer>
     <Group>
       <Text text="Supports " fontFamily="Arial" fontSize="20"/>
@@ -38,13 +38,9 @@
       <Fill color="#06B6D4"/>
     </Group>
     <Group>
-      <Text text=" text." fontFamily="Arial" fontSize="20"/>
+      <Text text=" text.&#10;" fontFamily="Arial" fontSize="20"/>
       <Fill color="#475569"/>
     </Group>
-    <TextBox position="30,142"/>
-  </Layer>
-
-  <Layer>
     <Group>
       <Text text="Mix " fontFamily="Arial" fontSize="16"/>
       <Fill color="#475569"/>
@@ -62,13 +58,9 @@
       <Fill color="#8B5CF6"/>
     </Group>
     <Group>
-      <Text text=" within one line." fontFamily="Arial" fontSize="16"/>
+      <Text text=" within one line.&#10;" fontFamily="Arial" fontSize="16"/>
       <Fill color="#475569"/>
     </Group>
-    <TextBox position="30,187"/>
-  </Layer>
-
-  <Layer>
     <Group>
       <Text text="Center " fontFamily="Arial" fontSize="20"/>
       <Fill color="#475569"/>
@@ -78,20 +70,19 @@
       <Fill color="#EC4899"/>
     </Group>
     <Group>
-      <Text text=" rich text." fontFamily="Arial" fontSize="20"/>
+      <Text text=" rich text.&#10;" fontFamily="Arial" fontSize="20"/>
       <Fill color="#475569"/>
     </Group>
-    <TextBox position="200,242" textAlign="center"/>
-  </Layer>
-
-  <Layer>
-    <Text text="Gradient Fill" fontFamily="Arial" fontStyle="Bold" fontSize="28" position="200,310" textAnchor="center"/>
-    <Fill>
-      <LinearGradient startPoint="-200,0" endPoint="40,0">
-        <ColorStop offset="0" color="#F43F5E"/>
-        <ColorStop offset="0.5" color="#F59E0B"/>
-        <ColorStop offset="1" color="#10B981"/>
-      </LinearGradient>
-    </Fill>
+    <Group>
+      <Text text="Gradient Fill" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+      <Fill>
+        <LinearGradient startPoint="-200,0" endPoint="40,0">
+          <ColorStop offset="0" color="#F43F5E"/>
+          <ColorStop offset="0.5" color="#F59E0B"/>
+          <ColorStop offset="1" color="#10B981"/>
+        </LinearGradient>
+      </Fill>
+    </Group>
+    <TextBox position="0,142" size="400,0" lineHeight="48" textAlign="center"/>
   </Layer>
 </pagx>
