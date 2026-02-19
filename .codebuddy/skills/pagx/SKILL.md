@@ -182,25 +182,50 @@ pagx optimize -o output.pagx input.pagx
 
 ### Step 2: Manual optimizations (require semantic understanding, cannot be automated)
 
+#### Layer/Group Semantic Optimization
+
 | # | Optimization | When to Apply |
 |---|------|---------|
-| 1 | Layer/Group semantic optimization | Multiple independent modules in one Layer / same module spread across multiple Layers / child Layer can be downgraded to Group. **High value** |
-| 2 | Coordinate localization | Inner elements use canvas absolute coordinates instead of Layer relative coordinates |
-| 3 | Painter merging | Multiple geometries share the same Painter / same geometry has different Painters |
-| 4 | TextBox merging | Multiple manually positioned Text should use a single TextBox with auto-layout |
-| 5 | Composition extraction | 2+ structurally identical Layer subtrees (differing only in position) |
-
-> See references/structure-optimization.md, references/painter-merging.md,
-> references/resource-reuse.md for detailed rules.
-
-> **Caveat**: Some attributes look optional but are required. `ColorStop.offset` has no default —
-> omitting it causes parsing errors. See `references/pagx-quick-reference.md` for the full list.
+| 1 | Layer/Group semantic optimization | Ensure each Layer maps to one logical block, each Group is a sub-element within a block. Three scenarios: (A) split a Layer packing multiple independent blocks, (B) merge adjacent Layers scattering one block, (C) downgrade child Layers to Groups when no Layer-exclusive features are used. **High value** |
+| 2 | Coordinate localization | Inner elements use canvas absolute coordinates instead of Layer relative coordinates. Apply after any Layer split/merge |
 
 > **Layer/Group optimization is high-impact but requires care.** Always verify the downgrade
 > checklist and stacking order rules in `references/structure-optimization.md` before applying.
 
-> **Painter merging critical caveat**: Different geometry needing different painters must be
-> isolated with Groups. See `references/painter-merging.md` for scope isolation patterns.
+#### Painter Merging
+
+| # | Optimization | When to Apply |
+|---|------|---------|
+| 3 | Merge geometry sharing identical Painters | Multiple geometry elements use the same Fill/Stroke — they can share a single Painter in one scope |
+| 4 | Merge Painters on identical geometry | Same geometry appears twice with different painters — combine into one geometry with multiple Painters |
+
+**Critical caveat**: Different geometry needing different painters must be isolated with Groups.
+
+> For detailed examples and scope isolation patterns, read `references/painter-merging.md`.
+
+#### Text Layout
+
+| # | Optimization | When to Apply |
+|---|------|---------|
+| 5 | Use TextBox for multi-text layout | Multiple Text elements positioned manually for sequential display |
+
+Multiple Text elements forming a sequential block should share a single TextBox for automatic
+layout. Each text segment should be in a Group (for style isolation), not a separate Layer.
+
+> If text segments are in separate Layers when Group suffices, apply #1 (Scenario C).
+
+> **TextBox ignores** Text's `position` and `textAnchor`. Do not set these on child Text elements.
+
+#### Resource Reuse
+
+| # | Optimization | When to Apply |
+|---|------|---------|
+| 6 | Composition extraction | 2+ structurally identical Layer subtrees (differing only in position) |
+
+> For detailed examples and coordinate conversion formulas, read `references/resource-reuse.md`.
+
+> **Caveat**: Some attributes look optional but are required. `ColorStop.offset` has no default —
+> omitting it causes parsing errors. See `references/pagx-quick-reference.md` for the full list.
 
 ### Performance Optimization
 
