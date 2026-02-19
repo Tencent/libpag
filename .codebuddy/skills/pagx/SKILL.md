@@ -149,84 +149,36 @@ After generating, verify:
 
 ## Optimizing PAGX
 
-**Fundamental Constraint**: All optimizations must preserve the original design appearance.
+### Step 1: Run pagx optimize
 
-- **Allowed**: Structural transforms producing identical rendering; removing provably invisible
-  content (off-canvas elements, unused resources, zero-width strokes, fully transparent elements).
-- **Forbidden**: Modifying visual attributes (colors, blur, spacing, opacity, font sizes, etc.)
-  without explicit user approval. These are design decisions, not optimization decisions.
-- **When in doubt**: Describe the potential change and ask the user before applying.
+Most structural optimizations are handled automatically by `pagx optimize` (100% deterministic
+equivalent transforms):
+- Remove empty elements (empty Layer/Group, zero-width Stroke)
+- Deduplicate PathData and gradient resources
+- Remove unreferenced Resources
+- Replace Path with Rectangle/Ellipse (with corner rounding detection)
+- Remove full-canvas clip masks
+- Remove off-canvas invisible layers
+- Omit default values, normalize numbers, simplify transforms, move Resources to end (handled
+  by exporter)
 
-### Recommended Order
+After generating PAGX, run:
+```bash
+pagx optimize -o output.pagx input.pagx
+```
 
-Optimizations have dependencies — apply them in this order:
+### Step 2: Manual optimizations (require semantic understanding, cannot be automated)
 
-1. **Semantic restructuring** (#7 Layer/Group) — split, merge, or downgrade first
-2. **Coordinate localization** (#8) — normalize coordinates after any structural change
-3. **Structural cleanup** (#1, #3–#5) — move Resources, omit defaults, simplify transforms
-4. **Painter merging** (#9–#10) — merge only after structure is stable
-5. **Text layout** (#11) — consolidate multi-text into TextBox
-6. **Resource reuse** (#12–#16) — extract shared resources, replace Paths with primitives
-7. **Dead code removal** (#2, #6) — remove empty elements and unused resources last
+| # | Optimization | When to apply |
+|---|------|---------|
+| 1 | Layer/Group semantic optimization | Multiple independent modules in one Layer / same module spread across multiple Layers / child Layer can be downgraded to Group |
+| 2 | Coordinate localization | Inner elements use canvas absolute coordinates instead of Layer relative coordinates |
+| 3 | Painter merging | Multiple geometries share the same Painter / same geometry has different Painters |
+| 4 | TextBox merging | Multiple manually positioned Text should use a single TextBox with auto-layout |
+| 5 | Composition extraction | 2+ structurally identical Layer subtrees (differing only in position) |
 
-### Optimization Checklist
-
-#### Structure Cleanup
-
-| # | Optimization | When to Apply |
-|---|--------------|---------------|
-| 1 | Move Resources to End | `<Resources>` appears before layer tree → auto: `pagx format` |
-| 2 | Remove Empty Elements | Empty `<Layer/>`, empty `<Resources>`, `width="0"` strokes → auto: `pagx format` |
-| 3 | Omit Default Values | Attributes explicitly set to spec default → auto: `pagx format` |
-| 4 | Simplify Transforms | Translation-only matrix, identity matrix, cascaded translations → auto: `pagx format` |
-| 5 | Normalize Numerics | Scientific notation near zero, trailing decimals, short hex → auto: `pagx format` |
-| 6 | Remove Unused Resources | Resource `id` has no `@id` reference → auto: `pagx format` |
-| 7 | Layer/Group Semantic Optimization | Ensure each Layer maps to one logical block, each Group is a sub-element within a block. Includes removing redundant wrappers (no-attribute Group/Layer wrapping a single element). Three scenarios: (A) split a Layer that packs multiple independent blocks, (B) merge adjacent Layers that scatter one block, (C) downgrade child Layers to Groups within a block when no Layer-exclusive features are used. **High value** |
-| 8 | Coordinate Localization | Layer `x`/`y` carries the block's offset; internal elements use coordinates relative to the Layer's origin (0,0). Eliminates redundant position data and lets a block be repositioned by changing one `x`/`y` value. Apply after any Layer split/merge or whenever internal coordinates use canvas-absolute values |
-
-> For detailed examples and rules, read `references/structure-optimization.md`.
-
-> **Caveat**: Some attributes look optional but are required. `ColorStop.offset` has no default —
-> omitting it causes parsing errors. See `references/pagx-quick-reference.md` for the full list.
-
-> **Layer/Group optimization is high-impact but requires care.** Always verify the downgrade
-> checklist and stacking order rules in `references/structure-optimization.md` before applying.
-
-#### Painter Merging
-
-| # | Optimization | When to Apply |
-|---|--------------|---------------|
-| 9 | Merge Geometry Sharing Identical Painters | Multiple geometry elements use same Fill/Stroke |
-| 10 | Merge Painters on Identical Geometry | Same geometry appears twice with different painters |
-
-**Critical caveat**: Different geometry needing different painters must be isolated with Groups.
-
-> For detailed examples and scope isolation patterns, read `references/painter-merging.md`.
-
-#### Text Layout
-
-| # | Optimization | When to Apply |
-|---|--------------|---------------|
-| 11 | Use TextBox for Multi-Text Layout | Multiple Text elements positioned manually for sequential display |
-
-Multiple Text elements forming a sequential block should share a single TextBox for automatic
-layout. Each text segment should be in a Group (for style isolation), not a separate Layer.
-
-> If text segments are in separate Layers when Group suffices, apply #7 (Scenario C).
-
-> **TextBox ignores** Text's `position` and `textAnchor`. Do not set these on child Text elements.
-
-#### Resource Reuse
-
-| # | Optimization | When to Apply |
-|---|--------------|---------------|
-| 12 | Composition Reuse | 2+ identical layer subtrees differing only in position |
-| 13 | PathData Reuse | Same path data string appears 2+ times → auto: `pagx format` |
-| 14 | Color Source Sharing | Identical gradient definitions inline in multiple places → auto: `pagx format` |
-| 15 | Replace Path with Primitive | Path describes a Rectangle or Ellipse |
-| 16 | Remove Full-Canvas Clips | Clip mask covers entire canvas |
-
-> For detailed examples and coordinate conversion formulas, read `references/resource-reuse.md`.
+> See references/structure-optimization.md, references/painter-merging.md,
+> references/resource-reuse.md for detailed rules.
 
 ### Performance Optimization
 
@@ -238,7 +190,8 @@ layout. Each text segment should be in a Group (for style isolation), not a sepa
 - **Layer vs Group**: Layer creates extra surface; Group is lighter
 
 **Two categories**:
-1. **Equivalent (auto-apply)**: Downgrade Layer to Group (see #7), clip Repeater to canvas bounds
+1. **Equivalent (auto-apply)**: Downgrade Layer to Group (see #1 above), clip Repeater to
+   canvas bounds
 2. **Suggestions (never auto-apply)**: Reduce density, lower blur, simplify geometry
 
 > For detailed optimization techniques, read `references/performance.md`.

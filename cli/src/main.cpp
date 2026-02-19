@@ -23,6 +23,7 @@
 #include "CommandFont.h"
 #include "CommandFormat.h"
 #include "CommandMeasure.h"
+#include "CommandOptimize.h"
 #include "CommandRender.h"
 #include "CommandValidator.h"
 
@@ -39,7 +40,8 @@ static void PrintUsage() {
             << "  bounds     Query the precise bounds of a node or layer\n"
             << "  measure    Measure visual properties of a PAGX node or layer\n"
             << "  font       Embed fonts into a PAGX file\n"
-            << "  format     Format and optimize a PAGX file\n"
+            << "  format     Format a PAGX file (indentation and attribute ordering)\n"
+            << "  optimize   Apply deterministic structural optimizations\n"
             << "\n"
             << "Global Options:\n"
             << "  --format json    Output in JSON format (validate, bounds, measure)\n"
@@ -82,6 +84,9 @@ int main(int argc, char* argv[]) {
   }
   if (command == "format") {
     return pagx::cli::RunFormat(argc - 1, argv + 1);
+  }
+  if (command == "optimize") {
+    return pagx::cli::RunOptimize(argc - 1, argv + 1);
   }
 
   std::cerr << "pagx: unknown command '" << command << "'\n";

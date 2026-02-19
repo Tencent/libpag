@@ -160,8 +160,9 @@ pagx font --font ./fonts/CustomFont.ttf --font ./fonts/Noto.ttf -o output.pagx d
 
 ### format
 
-Format and optimize a PAGX file. By default applies structural optimizations in addition
-to pretty-printing.
+Format a PAGX file with consistent indentation and standardized attribute ordering.
+This is a pure text-level formatting operation — it does not modify values, remove elements,
+or apply any structural optimizations.
 
 ```
 pagx format [options] <file.pagx>
@@ -173,27 +174,61 @@ pagx format [options] <file.pagx>
 |--------|-------------|
 | `-o, --output <path>` | Output file path (default: overwrite input) |
 | `--indent <n>` | Indentation spaces (default: 2) |
-| `--no-optimize` | Only format, skip optimizations |
-
-**Automatic optimizations** (unless `--no-optimize` is specified):
-
-- Remove empty elements (empty layers, zero-width strokes, empty groups)
-- Remove unused resources (resources with no references)
-- Deduplicate PathData (identical paths share a single resource)
-- Deduplicate color sources (identical gradients share a single resource)
-- Omit default attribute values (handled by the exporter)
-- Normalize numeric values (handled by the exporter)
-- Simplify transforms (handled by the exporter)
-- Standardize attribute ordering (handled by the exporter)
 
 **Example:**
 
 ```bash
-# Format and optimize in-place
+# Format in-place with default 2-space indentation
 pagx format design.pagx
 
-# Format only (no optimization), output to new file
-pagx format --no-optimize -o formatted.pagx design.pagx
+# Format with 4-space indentation, output to new file
+pagx format --indent 4 -o formatted.pagx design.pagx
+```
+
+---
+
+### optimize
+
+Apply deterministic structural optimizations to a PAGX file. All optimizations are
+equivalent transforms that preserve the original rendering.
+
+```
+pagx optimize [options] <file.pagx>
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `-o, --output <path>` | Output file path (default: overwrite input) |
+| `--dry-run` | Print optimization report without writing the file |
+
+**Optimizations applied:**
+
+| # | Optimization | Description |
+|---|-------------|-------------|
+| 1 | Remove empty elements | Empty Layer/Group, zero-width Stroke, empty Resources |
+| 2 | Deduplicate PathData | Identical path data strings share a single PathData resource |
+| 3 | Deduplicate gradients | Identical gradient definitions share a single resource |
+| 4 | Remove unreferenced resources | Resources with no `@id` references are removed |
+| 5 | Replace Path with primitive | Path describing a Rectangle or Ellipse (with rounding detection) is replaced with the primitive element |
+| 6 | Remove full-canvas clips | Clip mask covering the entire canvas is removed along with its reference |
+| 7 | Remove off-canvas layers | Layers whose bounds do not intersect the canvas are removed |
+
+The exporter also normalizes the output: omits default attribute values, normalizes numbers,
+simplifies transforms, standardizes attribute ordering, and moves Resources to the end.
+
+**Example:**
+
+```bash
+# Optimize in-place
+pagx optimize design.pagx
+
+# Optimize to a new file
+pagx optimize -o optimized.pagx design.pagx
+
+# Preview optimizations without writing
+pagx optimize --dry-run design.pagx
 ```
 
 ## Output Formats

@@ -17,37 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CommandFormat.h"
-#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iostream>
 #include <string>
-#include <unordered_set>
+#include <unordered_map>
 #include <vector>
-#include "pagx/PAGXExporter.h"
-#include "pagx/PAGXImporter.h"
-#include "pagx/nodes/ColorSource.h"
-#include "pagx/nodes/Composition.h"
-#include "pagx/nodes/ConicGradient.h"
-#include "pagx/nodes/DiamondGradient.h"
-#include "pagx/nodes/Fill.h"
-#include "pagx/nodes/Font.h"
-#include "pagx/nodes/GlyphRun.h"
-#include "pagx/nodes/Group.h"
-#include "pagx/nodes/Image.h"
-#include "pagx/nodes/ImagePattern.h"
-#include "pagx/nodes/Layer.h"
-#include "pagx/nodes/LinearGradient.h"
-#include "pagx/nodes/Path.h"
-#include "pagx/nodes/PathData.h"
-#include "pagx/nodes/RadialGradient.h"
-#include "pagx/nodes/Repeater.h"
-#include "pagx/nodes/Stroke.h"
-#include "pagx/nodes/Text.h"
-#include "pagx/nodes/TextBox.h"
-#include "pagx/nodes/TextModifier.h"
-#include "pagx/nodes/TextPath.h"
+#include <libxml/parser.h>
+#include <libxml/tree.h>
 
 namespace pagx::cli {
 
@@ -55,356 +33,206 @@ static void PrintFormatUsage() {
   std::cout << "Usage: pagx format [options] <file.pagx>\n"
             << "\n"
             << "Formats (pretty-prints) a PAGX file with consistent indentation and attribute\n"
-            << "ordering. By default, also applies structural optimizations.\n"
+            << "ordering. Does not modify values or structure.\n"
             << "\n"
             << "Options:\n"
             << "  -o, --output <path>   Output file path (default: overwrite input)\n"
             << "  --indent <n>          Indentation spaces (default: 2)\n"
-            << "  --no-optimize         Only format, skip optimizations\n"
             << "  -h, --help            Show this help message\n";
 }
 
-// Collects all Node pointers that are directly referenced by the document tree.
-static void CollectReferencedNodes(const std::vector<Element*>& elements,
-                                   std::unordered_set<const Node*>& referenced);
+// Attribute ordering tables extracted from PAGXExporter.cpp.
+// Each entry maps an element name to the canonical attribute order.
+// Attributes not in the table retain their original relative order and are appended at the end.
+// "data-*" attributes on Layer are always placed last.
 
-static void CollectReferencedNodesFromColorSource(const ColorSource* source,
-                                                  std::unordered_set<const Node*>& referenced) {
-  if (source == nullptr) {
+// clang-format off
+static const std::unordered_map<std::string, std::vector<const char*>> ATTRIBUTE_ORDER = {
+    {"pagx", {"version", "width", "height"}},
+    {"Layer", {"id", "name", "visible", "alpha", "blendMode", "x", "y", "matrix", "matrix3D",
+               "preserve3D", "antiAlias", "groupOpacity", "passThroughBackground",
+               "excludeChildEffectsInLayerStyle", "scrollRect", "mask", "maskType", "composition"}},
+    {"Rectangle", {"center", "size", "roundness", "reversed"}},
+    {"Ellipse", {"center", "size", "reversed"}},
+    {"Polystar", {"center", "type", "pointCount", "outerRadius", "innerRadius", "rotation",
+                  "outerRoundness", "innerRoundness", "reversed"}},
+    {"Path", {"data", "reversed"}},
+    {"Text", {"text", "position", "fontFamily", "fontStyle", "fontSize", "letterSpacing",
+              "fauxBold", "fauxItalic", "textAnchor"}},
+    {"GlyphRun", {"font", "fontSize", "glyphs", "x", "y", "xOffsets", "positions", "anchors",
+                  "scales", "rotations", "skews"}},
+    {"Fill", {"color", "alpha", "blendMode", "fillRule", "placement"}},
+    {"Stroke", {"color", "width", "alpha", "blendMode", "cap", "join", "miterLimit", "dashes",
+                "dashOffset", "dashAdaptive", "align", "placement"}},
+    {"TrimPath", {"start", "end", "offset", "type"}},
+    {"RoundCorner", {"radius"}},
+    {"MergePath", {"mode"}},
+    {"TextModifier", {"anchor", "position", "rotation", "scale", "skew", "skewAxis", "alpha",
+                      "fillColor", "strokeColor", "strokeWidth"}},
+    {"RangeSelector", {"start", "end", "offset", "unit", "shape", "easeIn", "easeOut", "mode",
+                       "weight", "randomOrder", "randomSeed"}},
+    {"TextPath", {"path", "baselineOrigin", "baselineAngle", "firstMargin", "lastMargin",
+                  "perpendicular", "reversed", "forceAlignment"}},
+    {"TextBox", {"position", "size", "textAlign", "paragraphAlign", "writingMode", "lineHeight",
+                 "wordWrap", "overflow"}},
+    {"Repeater", {"copies", "offset", "order", "anchor", "position", "rotation", "scale",
+                  "startAlpha", "endAlpha"}},
+    {"Group", {"anchor", "position", "rotation", "scale", "skew", "skewAxis", "alpha"}},
+    {"SolidColor", {"id", "color"}},
+    {"LinearGradient", {"id", "startPoint", "endPoint", "matrix"}},
+    {"RadialGradient", {"id", "center", "radius", "matrix"}},
+    {"ConicGradient", {"id", "center", "startAngle", "endAngle", "matrix"}},
+    {"DiamondGradient", {"id", "center", "radius", "matrix"}},
+    {"ImagePattern", {"id", "image", "tileModeX", "tileModeY", "filterMode", "mipmapMode",
+                      "matrix"}},
+    {"ColorStop", {"offset", "color"}},
+    {"Image", {"id", "source"}},
+    {"PathData", {"id", "data"}},
+    {"Composition", {"id", "width", "height"}},
+    {"Font", {"id", "unitsPerEm"}},
+    {"Glyph", {"id", "path", "image", "offset", "advance"}},
+    {"Resources", {}},
+    {"DropShadowStyle", {"blendMode", "offsetX", "offsetY", "blurX", "blurY", "color",
+                         "showBehindLayer"}},
+    {"InnerShadowStyle", {"blendMode", "offsetX", "offsetY", "blurX", "blurY", "color"}},
+    {"BackgroundBlurStyle", {"blendMode", "blurX", "blurY", "tileMode"}},
+    {"BlurFilter", {"blurX", "blurY", "tileMode"}},
+    {"DropShadowFilter", {"offsetX", "offsetY", "blurX", "blurY", "color", "shadowOnly"}},
+    {"InnerShadowFilter", {"offsetX", "offsetY", "blurX", "blurY", "color", "shadowOnly"}},
+    {"BlendFilter", {"color", "blendMode"}},
+    {"ColorMatrixFilter", {"matrix"}},
+};
+// clang-format on
+
+static void ReorderAttributes(xmlNodePtr node) {
+  if (node->type != XML_ELEMENT_NODE || node->properties == nullptr) {
     return;
   }
-  referenced.insert(source);
-  auto type = source->nodeType();
-  if (type == NodeType::LinearGradient) {
-    auto gradient = static_cast<const LinearGradient*>(source);
-    for (auto* stop : gradient->colorStops) {
-      referenced.insert(stop);
+  auto elementName = std::string(reinterpret_cast<const char*>(node->name));
+  auto it = ATTRIBUTE_ORDER.find(elementName);
+  if (it == ATTRIBUTE_ORDER.end()) {
+    return;
+  }
+  const auto& order = it->second;
+
+  // Build a position map: attribute name -> index in canonical order.
+  std::unordered_map<std::string, int> positionMap = {};
+  for (int i = 0; i < static_cast<int>(order.size()); i++) {
+    positionMap[order[i]] = i;
+  }
+
+  // Collect all existing attributes.
+  std::vector<xmlAttrPtr> attrs = {};
+  for (auto attr = node->properties; attr != nullptr; attr = attr->next) {
+    attrs.push_back(attr);
+  }
+
+  // Sort: known attributes by canonical order, unknown attributes after them in original order.
+  int unknownBase = static_cast<int>(order.size());
+  int unknownIndex = 0;
+  std::vector<int> sortKeys = {};
+  sortKeys.reserve(attrs.size());
+  for (auto* attr : attrs) {
+    auto name = std::string(reinterpret_cast<const char*>(attr->name));
+    auto posIt = positionMap.find(name);
+    if (posIt != positionMap.end()) {
+      sortKeys.push_back(posIt->second);
+    } else {
+      sortKeys.push_back(unknownBase + unknownIndex);
+      unknownIndex++;
     }
-  } else if (type == NodeType::RadialGradient) {
-    auto gradient = static_cast<const RadialGradient*>(source);
-    for (auto* stop : gradient->colorStops) {
-      referenced.insert(stop);
+  }
+
+  // Build sorted index array and apply stable sort.
+  std::vector<size_t> indices(attrs.size());
+  for (size_t i = 0; i < indices.size(); i++) {
+    indices[i] = i;
+  }
+  std::stable_sort(indices.begin(), indices.end(),
+                   [&sortKeys](size_t a, size_t b) { return sortKeys[a] < sortKeys[b]; });
+
+  // Rebuild the attribute linked list in sorted order.
+  node->properties = nullptr;
+  xmlAttrPtr prev = nullptr;
+  for (auto idx : indices) {
+    auto* attr = attrs[idx];
+    attr->prev = prev;
+    attr->next = nullptr;
+    if (prev != nullptr) {
+      prev->next = attr;
+    } else {
+      node->properties = attr;
     }
-  } else if (type == NodeType::ConicGradient) {
-    auto gradient = static_cast<const ConicGradient*>(source);
-    for (auto* stop : gradient->colorStops) {
-      referenced.insert(stop);
-    }
-  } else if (type == NodeType::DiamondGradient) {
-    auto gradient = static_cast<const DiamondGradient*>(source);
-    for (auto* stop : gradient->colorStops) {
-      referenced.insert(stop);
-    }
-  } else if (type == NodeType::ImagePattern) {
-    auto pattern = static_cast<const ImagePattern*>(source);
-    if (pattern->image != nullptr) {
-      referenced.insert(pattern->image);
+    prev = attr;
+  }
+}
+
+static void ReorderAttributesRecursive(xmlNodePtr node) {
+  for (auto cur = node; cur != nullptr; cur = cur->next) {
+    if (cur->type == XML_ELEMENT_NODE) {
+      ReorderAttributes(cur);
+      ReorderAttributesRecursive(cur->children);
     }
   }
 }
 
-static void CollectReferencedNodes(const std::vector<Element*>& elements,
-                                   std::unordered_set<const Node*>& referenced) {
-  for (auto* element : elements) {
-    if (element == nullptr) {
-      continue;
-    }
-    referenced.insert(element);
-    auto type = element->nodeType();
-    if (type == NodeType::Fill) {
-      auto fill = static_cast<const Fill*>(element);
-      CollectReferencedNodesFromColorSource(fill->color, referenced);
-    } else if (type == NodeType::Stroke) {
-      auto stroke = static_cast<const Stroke*>(element);
-      CollectReferencedNodesFromColorSource(stroke->color, referenced);
-    } else if (type == NodeType::Path) {
-      auto path = static_cast<const Path*>(element);
-      if (path->data != nullptr) {
-        referenced.insert(path->data);
-      }
-    } else if (type == NodeType::Text) {
-      auto text = static_cast<const Text*>(element);
-      for (auto* run : text->glyphRuns) {
-        referenced.insert(run);
-        if (run->font != nullptr) {
-          referenced.insert(run->font);
-          for (auto* glyph : run->font->glyphs) {
-            referenced.insert(glyph);
-            if (glyph->path != nullptr) {
-              referenced.insert(glyph->path);
-            }
-            if (glyph->image != nullptr) {
-              referenced.insert(glyph->image);
+static void SerializeNode(std::string& output, xmlNodePtr node, int indentLevel, int indentSpaces) {
+  for (auto cur = node; cur != nullptr; cur = cur->next) {
+    if (cur->type == XML_ELEMENT_NODE) {
+      auto indent = std::string(static_cast<size_t>(indentLevel * indentSpaces), ' ');
+      output += indent;
+      output += "<";
+      output += reinterpret_cast<const char*>(cur->name);
+
+      for (auto attr = cur->properties; attr != nullptr; attr = attr->next) {
+        auto* value = xmlGetProp(cur, attr->name);
+        output += " ";
+        output += reinterpret_cast<const char*>(attr->name);
+        output += "=\"";
+        if (value != nullptr) {
+          // The value from xmlGetProp is already entity-escaped for attribute context.
+          // But we need to ensure proper escaping: xmlGetProp returns decoded value,
+          // so we re-escape for attribute output.
+          auto* raw = reinterpret_cast<const char*>(value);
+          for (auto* p = raw; *p != '\0'; p++) {
+            switch (*p) {
+              case '&':
+                output += "&amp;";
+                break;
+              case '<':
+                output += "&lt;";
+                break;
+              case '"':
+                output += "&quot;";
+                break;
+              default:
+                output += *p;
+                break;
             }
           }
+          xmlFree(value);
         }
+        output += "\"";
       }
-    } else if (type == NodeType::Group) {
-      auto group = static_cast<const Group*>(element);
-      CollectReferencedNodes(group->elements, referenced);
-    } else if (type == NodeType::TextPath) {
-      auto textPath = static_cast<const TextPath*>(element);
-      if (textPath->path != nullptr) {
-        referenced.insert(textPath->path);
-      }
-    } else if (type == NodeType::TextModifier) {
-      auto modifier = static_cast<const TextModifier*>(element);
-      for (auto* selector : modifier->selectors) {
-        referenced.insert(selector);
-      }
-    }
-  }
-}
 
-static void CollectReferencedNodesFromLayer(const Layer* layer,
-                                            std::unordered_set<const Node*>& referenced) {
-  if (layer == nullptr) {
-    return;
-  }
-  referenced.insert(layer);
-  CollectReferencedNodes(layer->contents, referenced);
-  for (auto* style : layer->styles) {
-    referenced.insert(style);
-  }
-  for (auto* filter : layer->filters) {
-    referenced.insert(filter);
-  }
-  if (layer->mask != nullptr) {
-    CollectReferencedNodesFromLayer(layer->mask, referenced);
-  }
-  if (layer->composition != nullptr) {
-    referenced.insert(layer->composition);
-    for (auto* child : layer->composition->layers) {
-      CollectReferencedNodesFromLayer(child, referenced);
-    }
-  }
-  for (auto* child : layer->children) {
-    CollectReferencedNodesFromLayer(child, referenced);
-  }
-}
-
-static void RemoveUnreferencedResources(PAGXDocument* document) {
-  std::unordered_set<const Node*> referenced = {};
-  for (auto* layer : document->layers) {
-    CollectReferencedNodesFromLayer(layer, referenced);
-  }
-  auto& nodes = document->nodes;
-  nodes.erase(std::remove_if(nodes.begin(), nodes.end(),
-                              [&referenced](const std::unique_ptr<Node>& node) {
-                                return referenced.find(node.get()) == referenced.end();
-                              }),
-              nodes.end());
-}
-
-static bool IsEmptyLayer(const Layer* layer) {
-  return layer->contents.empty() && layer->children.empty() && layer->composition == nullptr &&
-         layer->styles.empty() && layer->filters.empty();
-}
-
-static void RemoveEmptyLayers(std::vector<Layer*>& layers) {
-  layers.erase(
-      std::remove_if(layers.begin(), layers.end(),
-                     [](const Layer* layer) { return IsEmptyLayer(layer); }),
-      layers.end());
-}
-
-static void RemoveEmptyElements(std::vector<Element*>& elements) {
-  elements.erase(
-      std::remove_if(elements.begin(), elements.end(),
-                     [](const Element* element) {
-                       if (element->nodeType() == NodeType::Stroke) {
-                         auto stroke = static_cast<const Stroke*>(element);
-                         return stroke->width == 0;
-                       }
-                       if (element->nodeType() == NodeType::Group) {
-                         auto group = static_cast<const Group*>(element);
-                         return group->elements.empty();
-                       }
-                       return false;
-                     }),
-      elements.end());
-}
-
-static void RemoveEmptyNodes(PAGXDocument* document) {
-  RemoveEmptyLayers(document->layers);
-  for (auto& node : document->nodes) {
-    if (node->nodeType() == NodeType::Layer) {
-      auto layer = static_cast<Layer*>(node.get());
-      RemoveEmptyLayers(layer->children);
-      RemoveEmptyElements(layer->contents);
-    } else if (node->nodeType() == NodeType::Group) {
-      auto group = static_cast<Group*>(node.get());
-      RemoveEmptyElements(group->elements);
-    } else if (node->nodeType() == NodeType::Composition) {
-      auto composition = static_cast<Composition*>(node.get());
-      RemoveEmptyLayers(composition->layers);
-    }
-  }
-}
-
-static bool PathDataEqual(const PathData* a, const PathData* b) {
-  if (a == b) {
-    return true;
-  }
-  if (a == nullptr || b == nullptr) {
-    return false;
-  }
-  return a->verbs() == b->verbs() && a->points() == b->points();
-}
-
-static void DeduplicatePathData(PAGXDocument* document) {
-  std::vector<PathData*> uniquePaths = {};
-  std::unordered_map<const PathData*, PathData*> mergeMap = {};
-
-  for (auto& node : document->nodes) {
-    if (node->nodeType() != NodeType::PathData) {
-      continue;
-    }
-    auto pathData = static_cast<PathData*>(node.get());
-    bool found = false;
-    for (auto* existing : uniquePaths) {
-      if (PathDataEqual(existing, pathData)) {
-        mergeMap[pathData] = existing;
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      uniquePaths.push_back(pathData);
-    }
-  }
-
-  if (mergeMap.empty()) {
-    return;
-  }
-
-  for (auto& node : document->nodes) {
-    if (node->nodeType() == NodeType::Path) {
-      auto path = static_cast<Path*>(node.get());
-      auto it = mergeMap.find(path->data);
-      if (it != mergeMap.end()) {
-        path->data = it->second;
-      }
-    } else if (node->nodeType() == NodeType::TextPath) {
-      auto textPath = static_cast<TextPath*>(node.get());
-      auto it = mergeMap.find(textPath->path);
-      if (it != mergeMap.end()) {
-        textPath->path = it->second;
-      }
-    } else if (node->nodeType() == NodeType::Glyph) {
-      auto glyph = static_cast<Glyph*>(node.get());
-      auto it = mergeMap.find(glyph->path);
-      if (it != mergeMap.end()) {
-        glyph->path = it->second;
+      if (cur->children != nullptr) {
+        output += ">\n";
+        SerializeNode(output, cur->children, indentLevel + 1, indentSpaces);
+        output += indent;
+        output += "</";
+        output += reinterpret_cast<const char*>(cur->name);
+        output += ">\n";
+      } else {
+        output += "/>\n";
       }
     }
   }
-}
-
-static bool ColorStopsEqual(const std::vector<ColorStop*>& a, const std::vector<ColorStop*>& b) {
-  if (a.size() != b.size()) {
-    return false;
-  }
-  for (size_t i = 0; i < a.size(); i++) {
-    if (a[i]->offset != b[i]->offset || a[i]->color != b[i]->color) {
-      return false;
-    }
-  }
-  return true;
-}
-
-static bool GradientEqual(const ColorSource* a, const ColorSource* b) {
-  if (a->nodeType() != b->nodeType()) {
-    return false;
-  }
-  auto type = a->nodeType();
-  if (type == NodeType::LinearGradient) {
-    auto ga = static_cast<const LinearGradient*>(a);
-    auto gb = static_cast<const LinearGradient*>(b);
-    return ga->startPoint == gb->startPoint && ga->endPoint == gb->endPoint &&
-           ga->matrix == gb->matrix && ColorStopsEqual(ga->colorStops, gb->colorStops);
-  }
-  if (type == NodeType::RadialGradient) {
-    auto ga = static_cast<const RadialGradient*>(a);
-    auto gb = static_cast<const RadialGradient*>(b);
-    return ga->center == gb->center && ga->radius == gb->radius && ga->matrix == gb->matrix &&
-           ColorStopsEqual(ga->colorStops, gb->colorStops);
-  }
-  if (type == NodeType::ConicGradient) {
-    auto ga = static_cast<const ConicGradient*>(a);
-    auto gb = static_cast<const ConicGradient*>(b);
-    return ga->center == gb->center && ga->startAngle == gb->startAngle &&
-           ga->endAngle == gb->endAngle && ga->matrix == gb->matrix &&
-           ColorStopsEqual(ga->colorStops, gb->colorStops);
-  }
-  if (type == NodeType::DiamondGradient) {
-    auto ga = static_cast<const DiamondGradient*>(a);
-    auto gb = static_cast<const DiamondGradient*>(b);
-    return ga->center == gb->center && ga->radius == gb->radius && ga->matrix == gb->matrix &&
-           ColorStopsEqual(ga->colorStops, gb->colorStops);
-  }
-  return false;
-}
-
-static bool IsGradient(NodeType type) {
-  return type == NodeType::LinearGradient || type == NodeType::RadialGradient ||
-         type == NodeType::ConicGradient || type == NodeType::DiamondGradient;
-}
-
-static void DeduplicateColorSources(PAGXDocument* document) {
-  std::vector<ColorSource*> uniqueSources = {};
-  std::unordered_map<const ColorSource*, ColorSource*> mergeMap = {};
-
-  for (auto& node : document->nodes) {
-    if (!IsGradient(node->nodeType())) {
-      continue;
-    }
-    auto source = static_cast<ColorSource*>(node.get());
-    bool found = false;
-    for (auto* existing : uniqueSources) {
-      if (GradientEqual(existing, source)) {
-        mergeMap[source] = existing;
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      uniqueSources.push_back(source);
-    }
-  }
-
-  if (mergeMap.empty()) {
-    return;
-  }
-
-  for (auto& node : document->nodes) {
-    if (node->nodeType() == NodeType::Fill) {
-      auto fill = static_cast<Fill*>(node.get());
-      auto it = mergeMap.find(fill->color);
-      if (it != mergeMap.end()) {
-        fill->color = it->second;
-      }
-    } else if (node->nodeType() == NodeType::Stroke) {
-      auto stroke = static_cast<Stroke*>(node.get());
-      auto it = mergeMap.find(stroke->color);
-      if (it != mergeMap.end()) {
-        stroke->color = it->second;
-      }
-    }
-  }
-}
-
-static void OptimizeDocument(PAGXDocument* document) {
-  RemoveEmptyNodes(document);
-  DeduplicatePathData(document);
-  DeduplicateColorSources(document);
-  RemoveUnreferencedResources(document);
 }
 
 int RunFormat(int argc, char* argv[]) {
   std::string inputPath = {};
   std::string outputPath = {};
-  bool optimize = true;
+  int indentSpaces = 2;
 
   for (int i = 1; i < argc; i++) {
     if (std::strcmp(argv[i], "-h") == 0 || std::strcmp(argv[i], "--help") == 0) {
@@ -417,12 +245,10 @@ int RunFormat(int argc, char* argv[]) {
       continue;
     }
     if (std::strcmp(argv[i], "--indent") == 0 && i + 1 < argc) {
-      // Indent option is accepted but currently handled by the exporter default.
-      ++i;
-      continue;
-    }
-    if (std::strcmp(argv[i], "--no-optimize") == 0) {
-      optimize = false;
+      indentSpaces = std::atoi(argv[++i]);
+      if (indentSpaces < 0) {
+        indentSpaces = 0;
+      }
       continue;
     }
     if (argv[i][0] == '-') {
@@ -447,24 +273,32 @@ int RunFormat(int argc, char* argv[]) {
     outputPath = inputPath;
   }
 
-  auto document = PAGXImporter::FromFile(inputPath);
-  if (document == nullptr) {
-    std::cerr << "pagx format: failed to load '" << inputPath << "'\n";
+  auto doc = xmlReadFile(inputPath.c_str(), nullptr, XML_PARSE_NONET | XML_PARSE_NOBLANKS);
+  if (doc == nullptr) {
+    std::cerr << "pagx format: failed to parse '" << inputPath << "'\n";
     return 1;
   }
 
-  if (optimize) {
-    OptimizeDocument(document.get());
+  auto root = xmlDocGetRootElement(doc);
+  if (root == nullptr) {
+    std::cerr << "pagx format: empty document '" << inputPath << "'\n";
+    xmlFreeDoc(doc);
+    return 1;
   }
 
-  auto xml = PAGXExporter::ToXML(*document);
+  ReorderAttributesRecursive(root);
+
+  std::string output = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+  SerializeNode(output, root, 0, indentSpaces);
+
+  xmlFreeDoc(doc);
 
   std::ofstream out(outputPath);
   if (!out.is_open()) {
     std::cerr << "pagx format: failed to write '" << outputPath << "'\n";
     return 1;
   }
-  out << xml;
+  out << output;
   out.close();
 
   return 0;
