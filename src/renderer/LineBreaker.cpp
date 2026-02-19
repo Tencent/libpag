@@ -31,6 +31,16 @@ bool LineBreaker::isCJK(int32_t c) {
   if (c >= 0x2A700 && c <= 0x2B73F) return true;
   // CJK Unified Ideographs Extension D
   if (c >= 0x2B740 && c <= 0x2B81F) return true;
+  // CJK Unified Ideographs Extension E
+  if (c >= 0x2B820 && c <= 0x2CEAF) return true;
+  // CJK Unified Ideographs Extension F
+  if (c >= 0x2CEB0 && c <= 0x2EBEF) return true;
+  // CJK Unified Ideographs Extension G
+  if (c >= 0x30000 && c <= 0x3134F) return true;
+  // CJK Unified Ideographs Extension H
+  if (c >= 0x31350 && c <= 0x323AF) return true;
+  // CJK Unified Ideographs Extension I
+  if (c >= 0x2EBF0 && c <= 0x2F7FF) return true;
   // CJK Compatibility Ideographs
   if (c >= 0xF900 && c <= 0xFAFF) return true;
   // CJK Compatibility Ideographs Supplement
@@ -51,8 +61,12 @@ bool LineBreaker::isCJK(int32_t c) {
   if (c >= 0x2E80 && c <= 0x2EFF) return true;
   // Kangxi Radicals
   if (c >= 0x2F00 && c <= 0x2FDF) return true;
-  // CJK Symbols and Punctuation (includes some ideographic chars)
+  // CJK Symbols and Punctuation
   if (c >= 0x3000 && c <= 0x303F) return true;
+  // Bopomofo
+  if (c >= 0x3100 && c <= 0x312F) return true;
+  // Bopomofo Extended
+  if (c >= 0x31A0 && c <= 0x31BF) return true;
   // Enclosed CJK Letters and Months
   if (c >= 0x3200 && c <= 0x32FF) return true;
   // CJK Compatibility
@@ -71,9 +85,7 @@ bool LineBreaker::isWhitespace(int32_t c) {
 }
 
 bool LineBreaker::isLineStartProhibited(int32_t c) {
-  // Characters that must not appear at the start of a line (kinsoku)
   switch (c) {
-    // CJK punctuation - closing/trailing
     case 0x3001:  // 、 ideographic comma
     case 0x3002:  // 。 ideographic period
     case 0xFF0C:  // ， fullwidth comma
@@ -94,6 +106,11 @@ bool LineBreaker::isLineStartProhibited(int32_t c) {
     case 0x301B:  // 〛 right white square bracket
     case 0xFF3D:  // ］ fullwidth right square bracket
     case 0xFF5D:  // ｝ fullwidth right curly bracket
+    case 0xFF0D:  // － fullwidth hyphen-minus
+    case 0x2026:  // … horizontal ellipsis
+    case 0x2025:  // ‥ two dot leader
+    case 0x00B7:  // · middle dot
+    case 0x2014:  // — em dash
     case 0x301C:  // 〜 wave dash
     case 0x30FB:  // ・ katakana middle dot
     case 0x30FC:  // ー katakana-hiragana prolonged sound
@@ -133,7 +150,6 @@ bool LineBreaker::isLineStartProhibited(int32_t c) {
 }
 
 bool LineBreaker::isLineEndProhibited(int32_t c) {
-  // Characters that must not appear at the end of a line (kinsoku)
   switch (c) {
     case 0xFF08:  // （ fullwidth left paren
     case 0x3008:  // 〈 left angle bracket
@@ -147,6 +163,9 @@ bool LineBreaker::isLineEndProhibited(int32_t c) {
     case 0x301A:  // 〚 left white square bracket
     case 0xFF3B:  // ［ fullwidth left square bracket
     case 0xFF5B:  // ｛ fullwidth left curly bracket
+    case 0xFF04:  // ＄ fullwidth dollar sign
+    case 0xFFE5:  // ￥ fullwidth yen sign
+    case 0xFFE1:  // ￡ fullwidth pound sign
     case 0x2018:  // ' left single quotation
     case 0x201C:  // " left double quotation
       return true;
@@ -156,9 +175,21 @@ bool LineBreaker::isLineEndProhibited(int32_t c) {
 }
 
 bool LineBreaker::isBreakAfter(int32_t c) {
-  // Characters after which a line break is allowed
   return c == '-' || c == 0x2010 /* hyphen */ || c == 0x2012 /* figure dash */ ||
-         c == 0x2013 /* en dash */;
+         c == 0x2013 /* en dash */ || c == 0x00AD /* soft hyphen */;
+}
+
+bool LineBreaker::isEmojiComponent(int32_t c) {
+  return c == 0x200D ||
+         c == 0xFE0F ||
+         c == 0x20E3 ||
+         (c >= 0x1F3FB && c <= 0x1F3FF) ||
+         (c >= 0x1F1E0 && c <= 0x1F1FF) ||
+         (c >= 0xE0020 && c <= 0xE007F);
+}
+
+bool LineBreaker::isSoftHyphen(int32_t c) {
+  return c == 0x00AD;
 }
 
 bool LineBreaker::canBreakBetween(int32_t prevChar, int32_t nextChar) {
@@ -166,37 +197,38 @@ bool LineBreaker::canBreakBetween(int32_t prevChar, int32_t nextChar) {
     return false;
   }
 
-  // Never break before or after newline (handled separately)
   if (prevChar == '\n' || nextChar == '\n') {
     return false;
   }
 
-  // Check kinsoku: don't break if nextChar is prohibited at line start
+  if (isEmojiComponent(nextChar)) {
+    return false;
+  }
+
   if (isLineStartProhibited(nextChar)) {
     return false;
   }
 
-  // Check kinsoku: don't break if prevChar is prohibited at line end
   if (isLineEndProhibited(prevChar)) {
     return false;
   }
 
-  // Break after whitespace
+  if (isSoftHyphen(prevChar)) {
+    return true;
+  }
+
   if (isWhitespace(prevChar)) {
     return true;
   }
 
-  // Break after hyphen-like characters
   if (isBreakAfter(prevChar)) {
     return true;
   }
 
-  // Break before CJK character (unless prohibited)
   if (isCJK(nextChar)) {
     return true;
   }
 
-  // Break after CJK character (unless prohibited)
   if (isCJK(prevChar)) {
     return true;
   }

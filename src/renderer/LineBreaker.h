@@ -67,6 +67,17 @@ class LineBreaker {
    * This is true for hyphens and similar break-after characters.
    */
   static bool isBreakAfter(int32_t unichar);
+
+  /**
+   * Returns true if the character is an emoji component that should not be separated from its
+   * base character (ZWJ, variation selectors, skin tone modifiers, regional indicators, etc.).
+   */
+  static bool isEmojiComponent(int32_t unichar);
+
+  /**
+   * Returns true if the character is a Unicode soft hyphen (U+00AD).
+   */
+  static bool isSoftHyphen(int32_t unichar);
 };
 
 }  // namespace pagx

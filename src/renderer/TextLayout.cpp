@@ -19,6 +19,7 @@
 #include "TextLayout.h"
 #include <cmath>
 #include "LineBreaker.h"
+#include "PunctuationSquash.h"
 #include "VerticalTextUtils.h"
 #include "utils/Base64.h"
 #include "utils/MathUtil.h"
@@ -35,6 +36,12 @@
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/TextBlobBuilder.h"
+#ifdef PAG_USE_HARFBUZZ
+#include "HarfBuzzShaper.h"
+#endif
+#ifdef PAG_USE_PAGX_LAYOUT
+#include "BidiResolver.h"
+#endif
 
 namespace pagx {
 
@@ -107,6 +114,9 @@ class TextLayoutContext {
     float descent = 0;
     float fontLineHeight = 0;
     Text* sourceText = nullptr;
+    uint32_t cluster = 0;
+    float xOffset = 0;
+    float yOffset = 0;
   };
 
   struct LineInfo {
@@ -287,7 +297,7 @@ class TextLayoutContext {
       ShapedInfo info = {};
       info.text = text;
       if (!text->text.empty()) {
-        shapeText(text, info);
+        shapeText(text, info, textBox->writingMode == WritingMode::Vertical);
       }
       for (auto& g : info.allGlyphs) {
         if (g.unichar != '\n') {
@@ -688,7 +698,7 @@ class TextLayoutContext {
     return typeface;
   }
 
-  void shapeText(Text* text, ShapedInfo& info) {
+  void shapeText(Text* text, ShapedInfo& info, bool vertical = false) {
     auto primaryTypeface = findTypeface(text->fontFamily, text->fontStyle);
     if (primaryTypeface == nullptr) {
       return;
@@ -700,6 +710,237 @@ class TextLayoutContext {
     float currentX = 0;
     const std::string& content = text->text;
     bool hasLetterSpacing = !FloatNearlyEqual(text->letterSpacing, 0.0f);
+
+#ifdef PAG_USE_HARFBUZZ
+    // Build fallback fonts list for HarfBuzz shaping.
+    std::vector<tgfx::Font> fallbackFonts = {};
+    fallbackFonts.reserve(textLayout->fallbackTypefaces.size());
+    for (const auto& fallback : textLayout->fallbackTypefaces) {
+      if (fallback != nullptr && fallback != primaryTypeface) {
+        tgfx::Font fallbackFont(fallback, text->fontSize);
+        fallbackFont.setFauxBold(text->fauxBold);
+        fallbackFont.setFauxItalic(text->fauxItalic);
+        fallbackFonts.push_back(std::move(fallbackFont));
+      }
+    }
+
+    // Collect newline and tab positions, then shape non-special segments.
+    struct TextSegment {
+      size_t start = 0;
+      size_t length = 0;
+      bool isNewline = false;
+      bool isTab = false;
+#ifdef PAG_USE_PAGX_LAYOUT
+      bool isRTL = false;
+#endif
+    };
+    std::vector<TextSegment> segments = {};
+
+#ifdef PAG_USE_PAGX_LAYOUT
+    // Use BiDi resolver to split text into directional runs, then further split by newlines/tabs.
+    auto bidiRuns = BidiResolver::Resolve(content);
+    for (auto& run : bidiRuns) {
+      size_t runEnd = run.start + run.length;
+      size_t pos = run.start;
+      while (pos < runEnd) {
+        int32_t ch = 0;
+        size_t charLen = DecodeUTF8Char(content.data() + pos, runEnd - pos, &ch);
+        if (charLen == 0) {
+          pos++;
+          continue;
+        }
+        if (ch == '\n') {
+          TextSegment seg = {};
+          seg.start = pos;
+          seg.length = charLen;
+          seg.isNewline = true;
+          segments.push_back(seg);
+          pos += charLen;
+        } else if (ch == '\t') {
+          TextSegment seg = {};
+          seg.start = pos;
+          seg.length = charLen;
+          seg.isTab = true;
+          segments.push_back(seg);
+          pos += charLen;
+        } else {
+          // Start a text segment, collecting until newline/tab or end of run.
+          size_t segStart = pos;
+          pos += charLen;
+          while (pos < runEnd) {
+            int32_t nextCh = 0;
+            size_t nextLen = DecodeUTF8Char(content.data() + pos, runEnd - pos, &nextCh);
+            if (nextLen == 0) {
+              pos++;
+              break;
+            }
+            if (nextCh == '\n' || nextCh == '\t') {
+              break;
+            }
+            pos += nextLen;
+          }
+          TextSegment seg = {};
+          seg.start = segStart;
+          seg.length = pos - segStart;
+          seg.isRTL = run.isRTL;
+          segments.push_back(seg);
+        }
+      }
+    }
+#else
+    // Without BiDi: split by newlines and tabs only.
+    {
+      size_t pos = 0;
+      while (pos < content.size()) {
+        int32_t ch = 0;
+        size_t charLen = DecodeUTF8Char(content.data() + pos, content.size() - pos, &ch);
+        if (charLen == 0) {
+          pos++;
+          continue;
+        }
+        if (ch == '\n') {
+          TextSegment seg = {};
+          seg.start = pos;
+          seg.length = charLen;
+          seg.isNewline = true;
+          segments.push_back(seg);
+          pos += charLen;
+        } else if (ch == '\t') {
+          TextSegment seg = {};
+          seg.start = pos;
+          seg.length = charLen;
+          seg.isTab = true;
+          segments.push_back(seg);
+          pos += charLen;
+        } else {
+          size_t segStart = pos;
+          pos += charLen;
+          while (pos < content.size()) {
+            int32_t nextCh = 0;
+            size_t nextLen = DecodeUTF8Char(content.data() + pos, content.size() - pos, &nextCh);
+            if (nextLen == 0) {
+              pos++;
+              break;
+            }
+            if (nextCh == '\n' || nextCh == '\t') {
+              break;
+            }
+            pos += nextLen;
+          }
+          TextSegment seg = {};
+          seg.start = segStart;
+          seg.length = pos - segStart;
+          segments.push_back(seg);
+        }
+      }
+    }
+#endif
+
+    ShapedGlyphRun* currentRun = nullptr;
+    std::shared_ptr<tgfx::Typeface> currentTypeface = nullptr;
+    float tabWidth = text->fontSize * 4;
+
+    for (auto& seg : segments) {
+      if (seg.isNewline) {
+        auto metrics = primaryFont.getMetrics();
+        GlyphInfo gi = {};
+        gi.unichar = '\n';
+        gi.fontSize = text->fontSize;
+        gi.ascent = metrics.ascent;
+        gi.descent = metrics.descent;
+        gi.fontLineHeight = fabsf(metrics.ascent) + metrics.descent + metrics.leading;
+        gi.sourceText = text;
+        info.allGlyphs.push_back(gi);
+        currentX = 0;
+        currentTypeface = nullptr;
+        continue;
+      }
+
+      if (seg.isTab) {
+        float nextTabStop = 0;
+        if (tabWidth > 0) {
+          nextTabStop = ceilf((currentX + 1.0f) / tabWidth) * tabWidth;
+        }
+        float tabAdvance = nextTabStop - currentX;
+        if (tabAdvance < 0) {
+          tabAdvance = 0;
+        }
+        GlyphInfo gi = {};
+        gi.unichar = '\t';
+        gi.advance = tabAdvance;
+        gi.xPosition = currentX;
+        gi.fontSize = text->fontSize;
+        auto metrics = primaryFont.getMetrics();
+        gi.ascent = metrics.ascent;
+        gi.descent = metrics.descent;
+        gi.fontLineHeight = fabsf(metrics.ascent) + metrics.descent + metrics.leading;
+        gi.sourceText = text;
+        info.allGlyphs.push_back(gi);
+        currentX += tabAdvance;
+        currentTypeface = nullptr;
+        continue;
+      }
+
+      // Shape this text segment with HarfBuzz.
+      auto substring = content.substr(seg.start, seg.length);
+      bool rtl = false;
+#ifdef PAG_USE_PAGX_LAYOUT
+      rtl = seg.isRTL;
+#endif
+      auto shapedGlyphs = HarfBuzzShaper::Shape(substring, primaryFont, fallbackFonts,
+                                                 vertical, rtl);
+
+      for (auto& sg : shapedGlyphs) {
+        if (sg.glyphID == 0) {
+          continue;
+        }
+
+        auto glyphTypeface = sg.font.getTypeface();
+        if (currentTypeface == nullptr || glyphTypeface != currentTypeface) {
+          info.runs.emplace_back();
+          currentRun = &info.runs.back();
+          currentRun->font = sg.font;
+          currentTypeface = glyphTypeface;
+          currentRun->startX = currentX;
+          currentRun->canUseDefaultMode = false;
+          currentRun->glyphIDs.reserve(shapedGlyphs.size());
+          currentRun->xPositions.reserve(shapedGlyphs.size());
+        }
+
+        currentRun->xPositions.push_back(currentX + sg.xOffset);
+        currentRun->glyphIDs.push_back(sg.glyphID);
+
+        auto metrics = sg.font.getMetrics();
+        // Decode the unichar at this cluster position for line breaking and other logic.
+        int32_t unichar = 0;
+        size_t clusterByteOffset = seg.start + sg.cluster;
+        if (clusterByteOffset < content.size()) {
+          DecodeUTF8Char(content.data() + clusterByteOffset,
+                         content.size() - clusterByteOffset, &unichar);
+        }
+
+        GlyphInfo gi = {};
+        gi.glyphID = sg.glyphID;
+        gi.font = sg.font;
+        gi.advance = sg.xAdvance;
+        gi.xPosition = currentX;
+        gi.unichar = unichar;
+        gi.fontSize = text->fontSize;
+        gi.ascent = metrics.ascent;
+        gi.descent = metrics.descent;
+        gi.fontLineHeight = fabsf(metrics.ascent) + metrics.descent + metrics.leading;
+        gi.sourceText = text;
+        gi.cluster = static_cast<uint32_t>(seg.start) + sg.cluster;
+        gi.xOffset = sg.xOffset;
+        gi.yOffset = sg.yOffset;
+        info.allGlyphs.push_back(gi);
+
+        currentX += sg.xAdvance + text->letterSpacing;
+      }
+    }
+
+#else
+    // Non-HarfBuzz path: original per-character glyph lookup.
 
     // Pre-build fallback font cache to avoid repeated construction in the inner loop.
     std::unordered_map<tgfx::Typeface*, tgfx::Font> fallbackFontCache = {};
@@ -739,6 +980,33 @@ class TextLayoutContext {
         gi.sourceText = text;
         info.allGlyphs.push_back(gi);
         currentX = 0;
+        currentTypeface = nullptr;
+        continue;
+      }
+
+      // Handle tab character.
+      if (unichar == '\t') {
+        float tabWidth = text->fontSize * 4;
+        float nextTabStop = 0;
+        if (tabWidth > 0) {
+          nextTabStop = ceilf((currentX + 1.0f) / tabWidth) * tabWidth;
+        }
+        float tabAdvance = nextTabStop - currentX;
+        if (tabAdvance < 0) {
+          tabAdvance = 0;
+        }
+        GlyphInfo gi = {};
+        gi.unichar = '\t';
+        gi.advance = tabAdvance;
+        gi.xPosition = currentX;
+        gi.fontSize = text->fontSize;
+        auto metrics = primaryFont.getMetrics();
+        gi.ascent = metrics.ascent;
+        gi.descent = metrics.descent;
+        gi.fontLineHeight = fabsf(metrics.ascent) + metrics.descent + metrics.leading;
+        gi.sourceText = text;
+        info.allGlyphs.push_back(gi);
+        currentX += tabAdvance;
         currentTypeface = nullptr;
         continue;
       }
@@ -802,6 +1070,7 @@ class TextLayoutContext {
 
       currentX += advance + text->letterSpacing;
     }
+#endif
 
     // Remove the extra letterSpacing after the last glyph.
     if (hasLetterSpacing && currentX > 0) {
@@ -893,15 +1162,106 @@ class TextLayoutContext {
 
       // Update break opportunity
       if (i + 1 < allGlyphs.size() && allGlyphs[i + 1].unichar != '\n') {
+#ifdef PAG_USE_HARFBUZZ
+        // Cluster-aware breaking: never break within the same HarfBuzz cluster.
+        bool sameCluster = (glyph.cluster != 0 || allGlyphs[i + 1].cluster != 0) &&
+                           glyph.cluster == allGlyphs[i + 1].cluster;
+        if (!sameCluster &&
+            LineBreaker::canBreakBetween(glyph.unichar, allGlyphs[i + 1].unichar)) {
+          lastBreakIndex = static_cast<int>(currentLine->glyphs.size()) - 1;
+        }
+#else
         if (LineBreaker::canBreakBetween(glyph.unichar, allGlyphs[i + 1].unichar)) {
           lastBreakIndex = static_cast<int>(currentLine->glyphs.size()) - 1;
         }
+#endif
       }
     }
 
     FinishLine(currentLine, textBox->lineHeight, 0.0f);
+
+#ifdef PAG_USE_PAGX_LAYOUT
+    // Apply punctuation squash to all lines.
+    ApplyPunctuationSquashToLines(lines);
+#endif
+
     return lines;
   }
+
+#ifdef PAG_USE_PAGX_LAYOUT
+  static void ApplyPunctuationSquashToLines(std::vector<LineInfo>& lines) {
+    for (auto& line : lines) {
+      if (line.glyphs.empty()) {
+        continue;
+      }
+
+      // Pass 1: Determine squash adjustments per glyph.
+      std::vector<float> squashAmounts(line.glyphs.size(), 0);
+
+      // Line-leading punctuation squash (first non-whitespace glyph).
+      for (size_t i = 0; i < line.glyphs.size(); i++) {
+        if (LineBreaker::isWhitespace(line.glyphs[i].unichar)) {
+          continue;
+        }
+        auto pos = PunctuationSquash::GetPosition(line.glyphs[i].unichar);
+        if (pos == PunctuationPosition::Leading) {
+          squashAmounts[i] = PunctuationSquash::GetSquashAmount(line.glyphs[i].advance);
+        }
+        break;
+      }
+
+      // Line-trailing punctuation squash (last non-whitespace glyph).
+      for (int i = static_cast<int>(line.glyphs.size()) - 1; i >= 0; i--) {
+        if (LineBreaker::isWhitespace(line.glyphs[i].unichar)) {
+          continue;
+        }
+        auto pos = PunctuationSquash::GetPosition(line.glyphs[i].unichar);
+        if (pos == PunctuationPosition::Trailing) {
+          squashAmounts[i] = PunctuationSquash::GetSquashAmount(line.glyphs[i].advance);
+        }
+        break;
+      }
+
+      // Adjacent punctuation squash.
+      for (size_t i = 0; i + 1 < line.glyphs.size(); i++) {
+        if (PunctuationSquash::ShouldSquashBetween(line.glyphs[i].unichar,
+                                                    line.glyphs[i + 1].unichar)) {
+          auto pos = PunctuationSquash::GetPosition(line.glyphs[i].unichar);
+          if (pos == PunctuationPosition::Trailing || pos == PunctuationPosition::Middle) {
+            float amount = PunctuationSquash::GetSquashAmount(line.glyphs[i].advance);
+            if (amount > squashAmounts[i]) {
+              squashAmounts[i] = amount;
+            }
+          } else {
+            float amount = PunctuationSquash::GetSquashAmount(line.glyphs[i + 1].advance);
+            if (amount > squashAmounts[i + 1]) {
+              squashAmounts[i + 1] = amount;
+            }
+          }
+        }
+      }
+
+      // Pass 2: Recalculate positions with squash applied.
+      float xPos = 0;
+      for (size_t i = 0; i < line.glyphs.size(); i++) {
+        line.glyphs[i].xPosition = xPos;
+        float effectiveAdvance = line.glyphs[i].advance - squashAmounts[i];
+        float ls = (line.glyphs[i].sourceText != nullptr)
+                       ? line.glyphs[i].sourceText->letterSpacing
+                       : 0;
+        xPos += effectiveAdvance + ls;
+      }
+
+      // Recalculate line width.
+      if (!line.glyphs.empty()) {
+        auto& lastGlyph = line.glyphs.back();
+        float lastEffectiveAdvance = lastGlyph.advance -
+                                     squashAmounts[line.glyphs.size() - 1];
+        line.width = lastGlyph.xPosition + lastEffectiveAdvance;
+      }
+    }
+  }
+#endif
 
   static void FinishLine(LineInfo* line, float lineHeight, float newlineFontLineHeight) {
     if (line->glyphs.empty()) {
@@ -1117,8 +1477,8 @@ class TextLayoutContext {
       float justifyOffset = 0;
       for (size_t gi = 0; gi < line.glyphs.size(); gi++) {
         auto& g = line.glyphs[gi];
-        // Skip newline glyphs: they only participate in metrics, not rendering.
-        if (g.unichar == '\n') {
+        // Skip newline and tab glyphs: they only participate in metrics/spacing, not rendering.
+        if (g.unichar == '\n' || g.unichar == '\t') {
           continue;
         }
         if (gi > 0 && LineBreaker::canBreakBetween(line.glyphs[gi - 1].unichar, g.unichar)) {
@@ -1127,8 +1487,8 @@ class TextLayoutContext {
         PositionedGlyph pg = {};
         pg.glyphID = g.glyphID;
         pg.font = g.font;
-        pg.x = g.xPosition + xOffset + justifyOffset;
-        pg.y = baselineY;
+        pg.x = g.xPosition + xOffset + justifyOffset + g.xOffset;
+        pg.y = baselineY - g.yOffset;
         textGlyphs[g.sourceText].push_back(pg);
       }
     }
@@ -1203,21 +1563,30 @@ class TextLayoutContext {
         continue;
       }
 
+      float letterSpacing = (glyph.sourceText != nullptr) ? glyph.sourceText->letterSpacing : 0;
       auto orientation = VerticalTextUtils::getOrientation(glyph.unichar);
       VerticalGlyphInfo vg = {};
       vg.glyph = glyph;
       vg.orientation = orientation;
       if (orientation == VerticalOrientation::Rotated) {
-        vg.height = glyph.advance;
+        vg.height = glyph.advance + letterSpacing;
       } else {
-        vg.height = glyph.font.getAdvance(glyph.glyphID, true);
-        if (vg.height <= 0) {
-          vg.height = glyph.fontSize;
+        float vertAdvance = glyph.font.getAdvance(glyph.glyphID, true);
+        if (vertAdvance <= 0) {
+          vertAdvance = glyph.fontSize;
         }
+        vg.height = vertAdvance + letterSpacing;
       }
 
       if (i > 0 && allGlyphs[i - 1].unichar != '\n') {
+#ifdef PAG_USE_HARFBUZZ
+        bool sameCluster = (glyph.cluster != 0 || allGlyphs[i - 1].cluster != 0) &&
+                           glyph.cluster == allGlyphs[i - 1].cluster;
+        vg.canBreakBefore =
+            !sameCluster && LineBreaker::canBreakBetween(allGlyphs[i - 1].unichar, glyph.unichar);
+#else
         vg.canBreakBefore = LineBreaker::canBreakBetween(allGlyphs[i - 1].unichar, glyph.unichar);
+#endif
       }
       vgList.push_back(std::move(vg));
     }
@@ -1235,6 +1604,21 @@ class TextLayoutContext {
       auto& vg = vgList[i];
 
       if (vg.glyph.unichar == '\n') {
+        // Remove trailing letterSpacing from the last glyph in the column.
+        if (!currentColumn->glyphs.empty()) {
+          auto& lastVG = currentColumn->glyphs.back();
+          float ls = (lastVG.glyph.sourceText != nullptr)
+                         ? lastVG.glyph.sourceText->letterSpacing
+                         : 0;
+          if (ls != 0) {
+            lastVG.height -= ls;
+          }
+        }
+        // Trim trailing whitespace from current column.
+        while (!currentColumn->glyphs.empty() &&
+               LineBreaker::isWhitespace(currentColumn->glyphs.back().glyph.unichar)) {
+          currentColumn->glyphs.pop_back();
+        }
         FinishColumn(currentColumn, textBox->lineHeight);
         columns.emplace_back();
         currentColumn = &columns.back();
@@ -1254,18 +1638,51 @@ class TextLayoutContext {
                                                       static_cast<ptrdiff_t>(lastBreakIndex),
                                                   currentColumn->glyphs.end());
           currentColumn->glyphs.resize(lastBreakIndex);
+          // Remove trailing letterSpacing from the last glyph before the break.
+          if (!currentColumn->glyphs.empty()) {
+            auto& lastVG = currentColumn->glyphs.back();
+            float ls = (lastVG.glyph.sourceText != nullptr)
+                           ? lastVG.glyph.sourceText->letterSpacing
+                           : 0;
+            if (ls != 0) {
+              lastVG.height -= ls;
+            }
+          }
+          // Trim trailing whitespace from current column.
+          while (!currentColumn->glyphs.empty() &&
+                 LineBreaker::isWhitespace(currentColumn->glyphs.back().glyph.unichar)) {
+            currentColumn->glyphs.pop_back();
+          }
           FinishColumn(currentColumn, textBox->lineHeight);
           columns.emplace_back();
           currentColumn = &columns.back();
-          currentColumn->glyphs = std::move(overflow);
-          if (!currentColumn->glyphs.empty()) {
-            currentColumn->glyphs[0].canBreakBefore = false;
+          // Skip leading whitespace in overflow.
+          size_t skipCount = 0;
+          while (skipCount < overflow.size() &&
+                 LineBreaker::isWhitespace(overflow[skipCount].glyph.unichar)) {
+            skipCount++;
+          }
+          for (size_t j = skipCount; j < overflow.size(); j++) {
+            if (j == skipCount) {
+              overflow[j].canBreakBefore = false;
+            }
+            currentColumn->glyphs.push_back(std::move(overflow[j]));
           }
           currentColumnHeight = 0;
           for (auto& g : currentColumn->glyphs) {
             currentColumnHeight += g.height;
           }
         } else {
+          // Remove trailing letterSpacing from the last glyph.
+          if (!currentColumn->glyphs.empty()) {
+            auto& lastVG = currentColumn->glyphs.back();
+            float ls = (lastVG.glyph.sourceText != nullptr)
+                           ? lastVG.glyph.sourceText->letterSpacing
+                           : 0;
+            if (ls != 0) {
+              lastVG.height -= ls;
+            }
+          }
           FinishColumn(currentColumn, textBox->lineHeight);
           columns.emplace_back();
           currentColumn = &columns.back();
@@ -1278,9 +1695,88 @@ class TextLayoutContext {
       currentColumn->glyphs.push_back(std::move(vg));
     }
 
+    // Remove trailing letterSpacing from the last glyph of the last column.
+    if (!currentColumn->glyphs.empty()) {
+      auto& lastVG = currentColumn->glyphs.back();
+      float ls =
+          (lastVG.glyph.sourceText != nullptr) ? lastVG.glyph.sourceText->letterSpacing : 0;
+      if (ls != 0) {
+        lastVG.height -= ls;
+      }
+    }
+
     FinishColumn(currentColumn, textBox->lineHeight);
+
+#ifdef PAG_USE_PAGX_LAYOUT
+    // Apply punctuation squash to all columns.
+    ApplyPunctuationSquashToColumns(columns);
+#endif
+
     return columns;
   }
+
+#ifdef PAG_USE_PAGX_LAYOUT
+  static void ApplyPunctuationSquashToColumns(std::vector<ColumnInfo>& columns) {
+    for (auto& column : columns) {
+      if (column.glyphs.empty()) {
+        continue;
+      }
+
+      std::vector<float> squashAmounts(column.glyphs.size(), 0);
+
+      // Column-leading punctuation squash.
+      for (size_t i = 0; i < column.glyphs.size(); i++) {
+        if (LineBreaker::isWhitespace(column.glyphs[i].glyph.unichar)) {
+          continue;
+        }
+        auto pos = PunctuationSquash::GetPosition(column.glyphs[i].glyph.unichar);
+        if (pos == PunctuationPosition::Leading) {
+          squashAmounts[i] = PunctuationSquash::GetSquashAmount(column.glyphs[i].height);
+        }
+        break;
+      }
+
+      // Column-trailing punctuation squash.
+      for (int i = static_cast<int>(column.glyphs.size()) - 1; i >= 0; i--) {
+        if (LineBreaker::isWhitespace(column.glyphs[i].glyph.unichar)) {
+          continue;
+        }
+        auto pos = PunctuationSquash::GetPosition(column.glyphs[i].glyph.unichar);
+        if (pos == PunctuationPosition::Trailing) {
+          squashAmounts[i] = PunctuationSquash::GetSquashAmount(column.glyphs[i].height);
+        }
+        break;
+      }
+
+      // Adjacent punctuation squash.
+      for (size_t i = 0; i + 1 < column.glyphs.size(); i++) {
+        if (PunctuationSquash::ShouldSquashBetween(column.glyphs[i].glyph.unichar,
+                                                    column.glyphs[i + 1].glyph.unichar)) {
+          auto pos = PunctuationSquash::GetPosition(column.glyphs[i].glyph.unichar);
+          if (pos == PunctuationPosition::Trailing || pos == PunctuationPosition::Middle) {
+            float amount = PunctuationSquash::GetSquashAmount(column.glyphs[i].height);
+            if (amount > squashAmounts[i]) {
+              squashAmounts[i] = amount;
+            }
+          } else {
+            float amount = PunctuationSquash::GetSquashAmount(column.glyphs[i + 1].height);
+            if (amount > squashAmounts[i + 1]) {
+              squashAmounts[i + 1] = amount;
+            }
+          }
+        }
+      }
+
+      // Recalculate column height with squash applied.
+      float totalHeight = 0;
+      for (size_t i = 0; i < column.glyphs.size(); i++) {
+        column.glyphs[i].height -= squashAmounts[i];
+        totalHeight += column.glyphs[i].height;
+      }
+      column.height = totalHeight;
+    }
+  }
+#endif
 
   void buildTextBlobVertical(const TextBox* textBox, const std::vector<ColumnInfo>& columns) {
     if (columns.empty()) {
@@ -1406,6 +1902,12 @@ class TextLayoutContext {
         auto& vg = column.glyphs[glyphIdx];
         auto& g = vg.glyph;
 
+        // Skip tab glyphs: they only occupy space, not rendered.
+        if (g.unichar == '\t') {
+          currentY += vg.height;
+          continue;
+        }
+
         VerticalPositionedGlyph vpg = {};
         vpg.glyphID = g.glyphID;
         vpg.font = g.font;
@@ -1417,6 +1919,28 @@ class TextLayoutContext {
           float tx = columnCenterX - (absAscent - g.descent) / 2;
           float ty = currentY;
           vpg.xform = tgfx::RSXform::Make(0, 1, tx, ty);
+#ifdef PAG_USE_HARFBUZZ
+        } else {
+          // With HarfBuzz vert shaping, use getVerticalOffset() for all upright glyphs.
+          // If the font has vert/vrt2 features, HarfBuzz already substituted the glyph.
+          // Fall back to manual punctuation offset only if getVerticalOffset returns zero.
+          vpg.useRSXform = false;
+          auto offset = g.font.getVerticalOffset(g.glyphID);
+          if (FloatNearlyEqual(offset.x, 0) && FloatNearlyEqual(offset.y, 0) &&
+              VerticalTextUtils::needsPunctuationOffset(g.unichar)) {
+            float dx = 0;
+            float dy = 0;
+            VerticalTextUtils::getPunctuationOffset(g.fontSize, &dx, &dy);
+            float glyphX = columnCenterX - g.advance / 2 + dx;
+            float glyphY = currentY + fabsf(g.ascent) + dy;
+            vpg.position = tgfx::Point::Make(glyphX, glyphY);
+          } else {
+            float glyphX = columnCenterX + offset.x;
+            float glyphY = currentY + offset.y;
+            vpg.position = tgfx::Point::Make(glyphX, glyphY);
+          }
+        }
+#else
         } else if (VerticalTextUtils::needsPunctuationOffset(g.unichar)) {
           vpg.useRSXform = false;
           float dx = 0;
@@ -1432,6 +1956,7 @@ class TextLayoutContext {
           float glyphY = currentY + offset.y;
           vpg.position = tgfx::Point::Make(glyphX, glyphY);
         }
+#endif
 
         textGlyphs[g.sourceText].push_back(vpg);
         currentY += vg.height;
