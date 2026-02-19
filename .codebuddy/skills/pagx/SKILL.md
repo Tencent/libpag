@@ -21,6 +21,7 @@ foundational understanding of the PAGX format.
 | Optimize existing PAGX | `structure-optimization.md`, `painter-merging.md`, `resource-reuse.md` |
 | Improve rendering performance | `performance.md` |
 | Look up attribute defaults or enums | `pagx-quick-reference.md` |
+| Verify against full specification | [PAGX Spec (online)](https://pag.io/pagx/latest/) |
 
 ---
 

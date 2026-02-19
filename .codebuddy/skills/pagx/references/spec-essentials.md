@@ -46,6 +46,9 @@ For complete attribute defaults and enumeration values, see `pagx-quick-referenc
 - **Floating-point**: `srgb(r, g, b[, a])` or `p3(r, g, b[, a])` for Display P3 wide color gamut
 - **Reference**: `@resourceId` for color sources defined in Resources
 
+Color syntax follows **CSS Color Level 4** conventions: HEX and `srgb()` match CSS exactly;
+`p3()` maps to CSS `color(display-p3 r g b / a)` with a shorter alias.
+
 ---
 
 ## 2. Node Classification (40 node types)
@@ -95,9 +98,14 @@ pagx
 
 ### Key Layer Concepts
 
-- **Layer Content** = steps 2-5 combined (no styles, no filters)
-- **Layer Contour** = binary mask from layer content (alpha=0 fills included, all non-transparent → opaque white)
-- **Layer Background** = everything rendered below the current layer
+- **Layer Content** = steps 2-5 combined (background content + child layers + foreground
+  content). Does **not** include styles or filters.
+- **Layer Contour** = a binary mask derived from layer content. Geometry with alpha=0 fills is
+  still included. Solid/gradient fills → opaque white; image fills retain transparent pixels,
+  convert others to opaque. Used by `maskType="contour"` and DropShadowStyle `showBehindLayer=false`.
+- **Layer Background** = the composited result of everything already rendered **below** the
+  current layer. Used by BackgroundBlurStyle. Controlled by `passThroughBackground`: when
+  `false`, child layers lose access to the background.
 
 ### Layer Attributes (key ones)
 
@@ -106,28 +114,55 @@ pagx
 | `x`, `y` | 0 | Position (overridden by `matrix` if set) |
 | `matrix` | identity | Overrides x/y; overridden by `matrix3D` |
 | `alpha` | 1 | Opacity 0~1 |
-| `blendMode` | normal | Blend mode |
+| `blendMode` | normal | Blend mode (same names as CSS `mix-blend-mode`, but camelCase e.g. `colorBurn`) |
 | `visible` | true | Whether rendered |
 | `groupOpacity` | false | When true, composites to offscreen buffer first |
 | `passThroughBackground` | true | When false, child layers lose access to background |
 | `mask` | - | Reference to mask layer via `@id` |
 | `maskType` | alpha | alpha / luminance / contour |
+
+**maskType usage**:
+- `alpha`: mask layer's alpha channel controls visibility — use for soft-edge gradual masks.
+- `luminance`: mask layer's brightness controls visibility — use for luminance-based masking.
+- `contour`: binary clipping from mask layer's contour — use for hard-edge shape clipping.
 | `composition` | - | Reference to Composition via `@id` |
 | `scrollRect` | - | Clipping region "x,y,w,h" |
 
 **Transform Priority**: `matrix3D` > `matrix` > `x`/`y`. Each overrides the previous.
 
+### Transform Matrix Formats
+
+**2D Matrix**: 6 comma-separated floats `"a,b,c,d,tx,ty"` — identical to CSS/SVG
+`matrix(a,b,c,d,tx,ty)`. Identity: `"1,0,0,1,0,0"`.
+
+**3D Matrix**: 16 comma-separated floats in column-major order. Identity:
+`"1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1"`. Used with `matrix3D` attribute on Layer.
+
+**preserve3D**: When `true`, child layers retain 3D positions and are rendered in a shared 3D
+space with depth-based z-ordering. When `false` (default), 3D children are flattened into 2D.
+Similar to CSS `transform-style: preserve-3d`.
+
 ### Layer Styles
+
+All styles compute from **opaque layer content**: semi-transparent pixels become opaque,
+fully transparent pixels are preserved.
 
 | Style | Position | Input | Key Attributes |
 |-------|----------|-------|----------------|
 | `DropShadowStyle` | Below | Opaque layer content | offsetX/Y, blurX/Y, color, showBehindLayer |
-| `BackgroundBlurStyle` | Below | Layer background | blurX/Y, tileMode |
-| `InnerShadowStyle` | Above | Opaque layer content (inverse) | offsetX/Y, blurX/Y, color |
+| `BackgroundBlurStyle` | Below | Layer background, clipped by opaque layer content | blurX/Y, tileMode |
+| `InnerShadowStyle` | Above | Inverse of opaque layer content | offsetX/Y, blurX/Y, color |
+
+- **showBehindLayer** (DropShadowStyle): `true` (default) shows the full shadow including
+  behind the layer. `false` uses layer contour to erase the occluded portion — only shadow
+  extending beyond the layer edge is visible.
+- **BackgroundBlurStyle**: blurs the **layer background** (content below this layer), then
+  clips the result using opaque layer content as a mask.
 
 ### Layer Filters
 
-Applied as a chain on the combined output of all previous steps.
+Filters are the **final stage** of layer rendering. Styles are applied **before** filters.
+Filters chain in document order: each filter's output becomes the next filter's input.
 
 | Filter | Key Attributes |
 |--------|----------------|
@@ -135,7 +170,11 @@ Applied as a chain on the combined output of all previous steps.
 | `DropShadowFilter` | offsetX/Y, blurX/Y, color, shadowOnly |
 | `InnerShadowFilter` | offsetX/Y, blurX/Y, color, shadowOnly |
 | `BlendFilter` | color(required), blendMode |
-| `ColorMatrixFilter` | matrix(required, 20 values) |
+| `ColorMatrixFilter` | matrix(required, 20 floats row-major) |
+
+**DropShadowFilter vs DropShadowStyle**: The filter preserves semi-transparency from the
+original content. The style converts to opaque first. Use filter when per-pixel alpha matters;
+use style for solid shadow outlines.
 
 ---
 
@@ -165,6 +204,34 @@ Geometry Elements     Modifiers             Painters
 | Text modifiers (TextModifier, TextPath, TextBox) | Glyph lists only | No effect on Paths |
 | Repeater | Both | Does not trigger text-to-shape |
 
+**Key scope implications**:
+- Shape modifiers trigger **text-to-shape conversion** if glyph lists are present — irreversible.
+- Text modifiers silently skip Paths — no error, no effect.
+- Repeater copies both without conversion, preserving glyph data for later text modifiers.
+
+### MergePath Destructive Behavior
+
+MergePath merges all accumulated Paths into one, but also **clears all previously rendered
+Fill and Stroke effects** in the current scope. Only the merged path remains.
+
+- Transforms are baked into paths during merge; the result resets to identity matrix.
+- No CSS/SVG equivalent — this is PAGX-specific destructive behavior.
+- **Isolate with Groups**: place geometry + painters that must survive in a separate Group
+  before the MergePath scope.
+
+```xml
+<Group>
+  <Rectangle size="50,50"/>
+  <Fill color="#F00"/>           <!-- safe: isolated scope -->
+</Group>
+<Group>
+  <Ellipse size="40,40"/>
+  <Rectangle size="20,20"/>
+  <MergePath mode="difference"/>  <!-- clears only THIS scope -->
+  <Fill color="#00F"/>
+</Group>
+```
+
 ### Group Scope Rules
 
 - Group creates an **isolated** accumulation scope.
@@ -172,6 +239,11 @@ Geometry Elements     Modifiers             Painters
 - After the Group completes, its geometry **propagates upward** to the parent scope.
 - Sibling Groups cannot see each other's geometry.
 - **Layer is the accumulation boundary** — geometry does not cross Layer boundaries.
+
+**Propagation detail**: when a child Group completes, its accumulated geometry (Paths and
+glyph lists) is appended to the parent scope. A painter **after** the Group in the parent can
+render the Group's geometry. But sibling Groups appearing **before** cannot see it — processing
+is sequential and forward-only.
 
 ### Group Transform Order
 
@@ -219,7 +291,8 @@ Geometry Elements     Modifiers             Painters
 <Path data="@pathId"/>  <!-- reference PathData resource -->
 ```
 
-- SVG path syntax: M, L, H, V, C, S, Q, T, A, Z commands.
+- Path data follows **SVG `<path d="...">`** syntax exactly — same commands (M, L, H, V, C,
+  S, Q, T, A, Z), same semantics. Both absolute (uppercase) and relative (lowercase) supported.
 
 ### Text
 
@@ -298,8 +371,16 @@ and color source together.
 - `lineHeight`: 0 = auto (font metrics)
 - `wordWrap` (true), `overflow` (visible / hidden)
 
-**Critical**: TextBox is a **pre-layout-only** node — processed before rendering, not
-instantiated in the render tree. It **overrides** Text's `position` and `textAnchor`.
+**Critical behavior**:
+- TextBox is a **pre-layout-only** node — processed during typesetting, not instantiated in
+  the render tree. Do not expect it to act as a visual container.
+- It **overrides** Text's `position` and `textAnchor` — do not set these on child Text.
+- `lineHeight=0` (auto): calculated from font metrics (`ascent + descent + leading`).
+- `overflow="hidden"`: discards **entire lines** (horizontal) or **entire columns** (vertical)
+  that exceed the box. Similar in spirit to CSS `overflow: hidden` but with whole-line
+  granularity, not pixel-level clipping.
+- In `writingMode="vertical"`, `lineHeight` controls **column width**. Follows CSS Writing
+  Modes conventions where `lineHeight` is a logical block-axis property.
 
 ### TextPath
 
@@ -326,9 +407,14 @@ instantiated in the render tree. It **overrides** Text's `position` and `textAnc
 ### Text-to-Shape Conversion
 
 When Text encounters a **shape modifier** (TrimPath, RoundCorner, MergePath):
-- All glyphs merge into a **single Path** (emoji discarded).
-- Subsequent text modifiers have no effect.
-- **Irreversible** — design accordingly.
+
+1. **Trigger**: any shape modifier in the same scope as accumulated Text.
+2. **Merge**: all glyphs of each Text merge into a **single Path** (not one Path per glyph).
+3. **Emoji loss**: emoji glyphs cannot convert to outlines — **silently discarded**.
+4. **Irreversible**: once converted, subsequent text modifiers (TextModifier, TextPath, TextBox)
+   have no effect.
+
+If you need both shape modifiers and text effects on the same text, use separate Groups.
 
 ### Rich Text Pattern
 
@@ -366,9 +452,12 @@ Multiple Text elements in one Group, each with independent Fill/Stroke, unified 
   4. translate(position × progress) — linear
   5. translate(anchor)
 - Opacity: `lerp(startAlpha, endAlpha, progress / ceil(copies))`
-- Fractional copies: last copy gets `alpha × fractional_part`
-- `copies < 0`: no operation. `copies = 0`: clears all accumulated content.
-- **Does not trigger** text-to-shape conversion.
+- **Fractional copies**: `ceil(copies)` geometry copies are created; the last copy's opacity
+  is multiplied by the fractional part (e.g., `copies=2.3` → 3 copies, copy 3 at 30% opacity).
+  Geometry is not scaled or clipped — partial effect is purely via transparency.
+- `copies < 0`: no operation. `copies = 0`: **clears all** accumulated content and rendered styles.
+- Copies include **already-rendered fills and strokes** — not just geometry.
+- **Does not trigger** text-to-shape conversion; glyph lists retain glyph data after copying.
 - **Nested Repeaters multiply**: A × B = total elements.
 
 ---

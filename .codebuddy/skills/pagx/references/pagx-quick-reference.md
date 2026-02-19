@@ -381,6 +381,25 @@ they **must not** be omitted.
 
 ---
 
+## SVG Path Command Reference
+
+Path `data` uses SVG `<path d="...">` syntax exactly. Uppercase = absolute, lowercase = relative.
+
+| Command | Parameters | Description |
+|---------|-----------|-------------|
+| `M`/`m` | x,y | Move to |
+| `L`/`l` | x,y | Line to |
+| `H`/`h` | x | Horizontal line to |
+| `V`/`v` | y | Vertical line to |
+| `C`/`c` | x1,y1 x2,y2 x,y | Cubic Bézier |
+| `S`/`s` | x2,y2 x,y | Smooth cubic (reflected control point) |
+| `Q`/`q` | x1,y1 x,y | Quadratic Bézier |
+| `T`/`t` | x,y | Smooth quadratic (reflected control point) |
+| `A`/`a` | rx,ry rot large-arc sweep x,y | Elliptical arc |
+| `Z`/`z` | — | Close path |
+
+---
+
 ## Enumeration Types
 
 ### Layer Related

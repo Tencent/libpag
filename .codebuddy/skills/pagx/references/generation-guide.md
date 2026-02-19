@@ -499,6 +499,13 @@ its own Group for painter scope isolation.
 <TextBox position="0,0" size="300,100" textAlign="center"/>
 ```
 
+**Additional TextBox behaviors**:
+- TextBox is a **pre-layout-only** node — it disappears from the render tree after typesetting.
+- `overflow="hidden"` discards **entire lines/columns**, not partial content. Unlike CSS
+  pixel-level clipping, it drops any line whose baseline exceeds the box boundary.
+- `lineHeight=0` (auto) calculates from font metrics (`ascent + descent + leading`), not
+  from `fontSize`.
+
 ### 4. Omitting Required Attributes
 
 These attributes have **no default** and cause parsing errors if omitted:
@@ -565,3 +572,20 @@ These attributes have **no default** and cause parsing errors if omitted:
 ```
 
 Understanding this behavior is essential when using MergePath for cutouts or boolean operations.
+
+**Key takeaway**: always isolate geometry + painters that must survive into a **separate Group**
+before the MergePath scope. MergePath wipes all prior rendering within its scope.
+
+```xml
+<!-- PATTERN: isolate pre-MergePath rendering -->
+<Group>
+  <Rectangle size="100,50"/>
+  <Fill color="#F00"/>           <!-- survives: separate scope -->
+</Group>
+<Group>
+  <Ellipse size="60,60"/>
+  <Rectangle size="40,40"/>
+  <MergePath mode="difference"/>  <!-- clears only this scope -->
+  <Fill color="#00F"/>
+</Group>
+```
