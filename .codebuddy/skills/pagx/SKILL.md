@@ -149,18 +149,42 @@ After generating, verify:
 
 ## Optimizing PAGX
 
+**Fundamental Constraint**: All optimizations must preserve the original design appearance.
+
+- **Allowed**: Structural transforms producing identical rendering; removing provably invisible
+  content (off-canvas elements, unused resources, zero-width strokes, fully transparent elements).
+- **Forbidden**: Modifying visual attributes (colors, blur, spacing, opacity, font sizes, etc.)
+  without explicit user approval. These are design decisions, not optimization decisions.
+- **When in doubt**: Describe the potential change and ask the user before applying.
+
+### Recommended Order
+
+Optimizations have dependencies — apply them in this order:
+
+1. **`pagx optimize`** — run automated deterministic optimizations first (see Step 1 below)
+2. **Semantic restructuring** — Layer/Group split, merge, or downgrade
+3. **Coordinate localization** — normalize coordinates after any structural change
+4. **Painter merging** — merge only after structure is stable
+5. **Text layout** — consolidate multi-text into TextBox
+6. **Composition extraction** — extract shared layer subtrees into reusable resources
+
 ### Step 1: Run pagx optimize
 
-Most structural optimizations are handled automatically by `pagx optimize` (100% deterministic
+Most structural cleanup is handled automatically by `pagx optimize` (100% deterministic
 equivalent transforms):
-- Remove empty elements (empty Layer/Group, zero-width Stroke)
-- Deduplicate PathData and gradient resources
-- Remove unreferenced Resources
-- Replace Path with Rectangle/Ellipse (with corner rounding detection)
-- Remove full-canvas clip masks
-- Remove off-canvas invisible layers
-- Omit default values, normalize numbers, simplify transforms, move Resources to end (handled
-  by exporter)
+
+| # | Optimization | Notes |
+|---|--------------|-------|
+| 1 | Remove empty elements | Empty Layer/Group, zero-width Stroke |
+| 2 | Deduplicate PathData | Identical path data strings → shared resource |
+| 3 | Deduplicate gradient resources | Identical gradient definitions → shared resource |
+| 4 | Remove unreferenced Resources | Resource `id` with no `@id` reference |
+| 5 | Replace Path with Rectangle/Ellipse | With corner rounding detection |
+| 6 | Remove full-canvas clip masks | Clip mask covering entire canvas has no effect |
+| 7 | Remove off-canvas invisible layers | Layers entirely outside canvas bounds |
+
+The exporter also handles: omit default values, normalize numbers, simplify transforms, move
+Resources to end.
 
 After generating PAGX, run:
 ```bash
@@ -169,9 +193,9 @@ pagx optimize -o output.pagx input.pagx
 
 ### Step 2: Manual optimizations (require semantic understanding, cannot be automated)
 
-| # | Optimization | When to apply |
+| # | Optimization | When to Apply |
 |---|------|---------|
-| 1 | Layer/Group semantic optimization | Multiple independent modules in one Layer / same module spread across multiple Layers / child Layer can be downgraded to Group |
+| 1 | Layer/Group semantic optimization | Multiple independent modules in one Layer / same module spread across multiple Layers / child Layer can be downgraded to Group. **High value** |
 | 2 | Coordinate localization | Inner elements use canvas absolute coordinates instead of Layer relative coordinates |
 | 3 | Painter merging | Multiple geometries share the same Painter / same geometry has different Painters |
 | 4 | TextBox merging | Multiple manually positioned Text should use a single TextBox with auto-layout |
@@ -179,6 +203,15 @@ pagx optimize -o output.pagx input.pagx
 
 > See references/structure-optimization.md, references/painter-merging.md,
 > references/resource-reuse.md for detailed rules.
+
+> **Caveat**: Some attributes look optional but are required. `ColorStop.offset` has no default —
+> omitting it causes parsing errors. See `references/pagx-quick-reference.md` for the full list.
+
+> **Layer/Group optimization is high-impact but requires care.** Always verify the downgrade
+> checklist and stacking order rules in `references/structure-optimization.md` before applying.
+
+> **Painter merging critical caveat**: Different geometry needing different painters must be
+> isolated with Groups. See `references/painter-merging.md` for scope isolation patterns.
 
 ### Performance Optimization
 
