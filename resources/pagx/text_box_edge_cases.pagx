@@ -14,15 +14,15 @@
   </Layer>
 
   <!-- Anchor mode: TextAlign Start/Center/End + ParagraphAlign Near/Middle/Far -->
-  <Layer x="247" y="77">
+  <Layer x="250" y="80">
     <!-- TextAlign Start -->
     <Group>
       <Text text="Start" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill color="#000"/>
-      <TextBox position="3,3"/>
+      <TextBox/>
     </Group>
     <Group>
-      <Ellipse center="3,3" size="6,6"/>
+      <Ellipse size="6,6"/>
       <Fill color="#F00"/>
     </Group>
 
@@ -30,10 +30,10 @@
     <Group>
       <Text text="Center" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill color="#000"/>
-      <TextBox position="123,3" textAlign="center"/>
+      <TextBox position="120,0" textAlign="center"/>
     </Group>
     <Group>
-      <Ellipse center="123,3" size="6,6"/>
+      <Ellipse center="120,0" size="6,6"/>
       <Fill color="#F00"/>
     </Group>
 
@@ -41,10 +41,10 @@
     <Group>
       <Text text="End" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill color="#000"/>
-      <TextBox position="243,3" textAlign="end"/>
+      <TextBox position="240,0" textAlign="end"/>
     </Group>
     <Group>
-      <Ellipse center="243,3" size="6,6"/>
+      <Ellipse center="240,0" size="6,6"/>
       <Fill color="#F00"/>
     </Group>
 
@@ -52,10 +52,10 @@
     <Group>
       <Text text="Near" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill color="#000"/>
-      <TextBox position="3,103"/>
+      <TextBox position="0,100"/>
     </Group>
     <Group>
-      <Ellipse center="3,103" size="6,6"/>
+      <Ellipse center="0,100" size="6,6"/>
       <Fill color="#F00"/>
     </Group>
 
@@ -63,10 +63,10 @@
     <Group>
       <Text text="Middle" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill color="#000"/>
-      <TextBox position="123,103" paragraphAlign="middle"/>
+      <TextBox position="120,100" paragraphAlign="middle"/>
     </Group>
     <Group>
-      <Ellipse center="123,103" size="6,6"/>
+      <Ellipse center="120,100" size="6,6"/>
       <Fill color="#F00"/>
     </Group>
 
@@ -74,10 +74,10 @@
     <Group>
       <Text text="Far" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill color="#000"/>
-      <TextBox position="243,103" paragraphAlign="far"/>
+      <TextBox position="240,100" paragraphAlign="far"/>
     </Group>
     <Group>
-      <Ellipse center="243,103" size="6,6"/>
+      <Ellipse center="240,100" size="6,6"/>
       <Fill color="#F00"/>
     </Group>
   </Layer>

@@ -210,9 +210,25 @@ the block be repositioned by changing a single `x`/`y` value.
 
 ### How
 
-1. Identify the block's position in canvas space → set as Layer `x`/`y`
+1. Identify the block's anchor position in canvas space → set as Layer `x`/`y`
 2. Subtract the Layer's x/y from all internal coordinate values (center, position, etc.)
 3. For child Groups, convert absolute positions to Layer-relative offsets
+4. The goal: the first content element starts at or near `0,0`; sibling elements use clean
+   integer offsets from `0,0`
+
+### Which Coordinates Matter
+
+Not all child element coordinates contribute equally. When determining the Layer's anchor
+position, focus on the **layout-controlling nodes**:
+
+- **Text + TextBox**: Text's own `position` and `textAnchor` are **ignored** when a TextBox
+  is present — TextBox takes over layout completely. Use the TextBox `position` (not the
+  Text `position`) as the coordinate to localize.
+- **Text + TextPath**: Text layout follows the TextPath's path starting point. Use the
+  TextPath's path origin as the coordinate to localize, not Text `position`.
+- **Bare Text** (no TextBox or TextPath): Text's `position` attribute controls layout
+  directly — use it for localization.
+- **Geometry elements** (Rectangle, Ellipse, Path): `center` controls placement — use it.
 
 ### Caveats
 
