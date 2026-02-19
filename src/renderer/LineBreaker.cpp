@@ -81,19 +81,16 @@ bool LineBreaker::isCJK(int32_t c) {
 }
 
 bool LineBreaker::isWhitespace(int32_t c) {
-  return c == ' ' || c == '\t' || c == 0x00A0 /* NBSP */ || c == 0x3000 /* ideographic space */;
+  return c == ' ' || c == '\t' || c == 0x00A0 || c == 0x3000;
+}
+
+static bool isBreakableWhitespace(int32_t c) {
+  return c == ' ' || c == '\t' || c == 0x3000;
 }
 
 bool LineBreaker::isLineStartProhibited(int32_t c) {
   switch (c) {
-    case 0x3001:  // 、 ideographic comma
-    case 0x3002:  // 。 ideographic period
-    case 0xFF0C:  // ， fullwidth comma
-    case 0xFF0E:  // ． fullwidth period
-    case 0xFF01:  // ！ fullwidth exclamation
-    case 0xFF1F:  // ？ fullwidth question
-    case 0xFF1A:  // ： fullwidth colon
-    case 0xFF1B:  // ； fullwidth semicolon
+    // Closing brackets (JLREQ cl-02)
     case 0xFF09:  // ） fullwidth right paren
     case 0x3009:  // 〉 right angle bracket
     case 0x300B:  // 》 right double angle bracket
@@ -106,21 +103,41 @@ bool LineBreaker::isLineStartProhibited(int32_t c) {
     case 0x301B:  // 〛 right white square bracket
     case 0xFF3D:  // ］ fullwidth right square bracket
     case 0xFF5D:  // ｝ fullwidth right curly bracket
+    case 0x2019:  // ' right single quotation
+    case 0x201D:  // " right double quotation
+    // Hyphens (JLREQ cl-03)
     case 0xFF0D:  // － fullwidth hyphen-minus
+    case 0x2013:  // – en dash
+    // Dividing punctuation (JLREQ cl-04)
+    case 0xFF01:  // ！ fullwidth exclamation
+    case 0xFF1F:  // ？ fullwidth question
+    // Middle dots (JLREQ cl-05)
+    case 0x30FB:  // ・ katakana middle dot
+    case 0xFF65:  // ･ halfwidth katakana middle dot
+    case 0x00B7:  // · middle dot
+    // Full stops (JLREQ cl-06)
+    case 0x3002:  // 。 ideographic period
+    case 0xFF0E:  // ． fullwidth period
+    // Commas (JLREQ cl-07)
+    case 0x3001:  // 、 ideographic comma
+    case 0xFF0C:  // ， fullwidth comma
+    // Colons and semicolons
+    case 0xFF1A:  // ： fullwidth colon
+    case 0xFF1B:  // ； fullwidth semicolon
+    // Inseparable characters (JLREQ cl-08)
     case 0x2026:  // … horizontal ellipsis
     case 0x2025:  // ‥ two dot leader
-    case 0x00B7:  // · middle dot
     case 0x2014:  // — em dash
+    case 0x2E3A:  // ⸺ two-em dash
     case 0x301C:  // 〜 wave dash
-    case 0x30FB:  // ・ katakana middle dot
+    // Prolonged sound mark (JLREQ cl-10)
     case 0x30FC:  // ー katakana-hiragana prolonged sound
+    // Iteration marks (JLREQ cl-09)
     case 0x30FD:  // ヽ katakana iteration mark
     case 0x30FE:  // ヾ katakana voiced iteration mark
     case 0x309D:  // ゝ hiragana iteration mark
     case 0x309E:  // ゞ hiragana voiced iteration mark
-    case 0x2019:  // ' right single quotation
-    case 0x201D:  // " right double quotation
-    // Small kana
+    // Small kana (JLREQ cl-11)
     case 0x3041:  // ぁ
     case 0x3043:  // ぃ
     case 0x3045:  // ぅ
@@ -151,6 +168,7 @@ bool LineBreaker::isLineStartProhibited(int32_t c) {
 
 bool LineBreaker::isLineEndProhibited(int32_t c) {
   switch (c) {
+    // Opening brackets (JLREQ cl-01)
     case 0xFF08:  // （ fullwidth left paren
     case 0x3008:  // 〈 left angle bracket
     case 0x300A:  // 《 left double angle bracket
@@ -163,11 +181,12 @@ bool LineBreaker::isLineEndProhibited(int32_t c) {
     case 0x301A:  // 〚 left white square bracket
     case 0xFF3B:  // ［ fullwidth left square bracket
     case 0xFF5B:  // ｛ fullwidth left curly bracket
+    case 0x2018:  // ' left single quotation
+    case 0x201C:  // " left double quotation
+    // Currency symbols (should not be separated from the following number)
     case 0xFF04:  // ＄ fullwidth dollar sign
     case 0xFFE5:  // ￥ fullwidth yen sign
     case 0xFFE1:  // ￡ fullwidth pound sign
-    case 0x2018:  // ' left single quotation
-    case 0x201C:  // " left double quotation
       return true;
     default:
       return false;
@@ -175,17 +194,25 @@ bool LineBreaker::isLineEndProhibited(int32_t c) {
 }
 
 bool LineBreaker::isBreakAfter(int32_t c) {
-  return c == '-' || c == 0x2010 /* hyphen */ || c == 0x2012 /* figure dash */ ||
-         c == 0x2013 /* en dash */ || c == 0x00AD /* soft hyphen */;
+  return c == '-' || c == 0x2010 || c == 0x2012 || c == 0x2013 || c == 0x00AD;
 }
 
 bool LineBreaker::isEmojiComponent(int32_t c) {
-  return c == 0x200D ||
-         c == 0xFE0F ||
-         c == 0x20E3 ||
-         (c >= 0x1F3FB && c <= 0x1F3FF) ||
-         (c >= 0x1F1E0 && c <= 0x1F1FF) ||
-         (c >= 0xE0020 && c <= 0xE007F);
+  // ZWJ (Zero Width Joiner)
+  if (c == 0x200D) return true;
+  // Variation Selector 16 (emoji presentation)
+  if (c == 0xFE0F) return true;
+  // Combining Enclosing Keycap
+  if (c == 0x20E3) return true;
+  // Emoji Modifiers (skin tones)
+  if (c >= 0x1F3FB && c <= 0x1F3FF) return true;
+  // Regional Indicator Symbols
+  if (c >= 0x1F1E0 && c <= 0x1F1FF) return true;
+  // Tag Characters (used in flag sequences)
+  if (c >= 0xE0020 && c <= 0xE007F) return true;
+  // Variation Selector 15 (text presentation)
+  if (c == 0xFE0E) return true;
+  return false;
 }
 
 bool LineBreaker::isSoftHyphen(int32_t c) {
@@ -217,7 +244,7 @@ bool LineBreaker::canBreakBetween(int32_t prevChar, int32_t nextChar) {
     return true;
   }
 
-  if (isWhitespace(prevChar)) {
+  if (isBreakableWhitespace(prevChar)) {
     return true;
   }
 
