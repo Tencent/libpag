@@ -31,9 +31,9 @@ option(PAG_USE_QT "Allow build with QT frameworks" OFF)
 option(PAG_USE_RTTR "Enable RTTR support" OFF)
 option(PAG_USE_HARFBUZZ "Enable HarfBuzz support" OFF)
 option(PAG_USE_C "Enable c API" OFF)
-option(PAG_BUILD_PAGX "Enable PAGX format support in libpag" OFF)
-option(PAG_BUILD_CLI "Enable pagx command-line tool" OFF)
-option(PAG_BUILD_SVG "Enable SVG import/export support" OFF)
+option(PAG_BUILD_PAGX "Enable building PAGX format support in libpag" OFF)
+option(PAG_BUILD_CLI "Enable building pagx command-line tool" OFF)
+option(PAG_BUILD_SVG "Enable building SVG import/export support" OFF)
 
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
 if (NOT WEB OR EMSCRIPTEN_PTHREADS)
