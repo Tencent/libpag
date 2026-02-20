@@ -89,10 +89,10 @@ pagx
 
 ### Layer Rendering Pipeline (6 steps)
 
-1. **Layer Styles (below)**: DropShadowStyle
+1. **Layer Styles (below)**: DropShadowStyle, BackgroundBlurStyle
 2. **Background Content**: Fill/Stroke with `placement="background"` (default)
 3. **Child Layers**: Recursively rendered in document order
-4. **Layer Styles (above)**: InnerShadowStyle, BackgroundBlurStyle
+4. **Layer Styles (above)**: InnerShadowStyle
 5. **Foreground Content**: Fill/Stroke with `placement="foreground"`
 6. **Layer Filters**: Applied sequentially as a chain
 
@@ -166,11 +166,11 @@ Filters chain in document order: each filter's output becomes the next filter's 
 
 | Filter | Key Attributes |
 |--------|----------------|
-| `BlurFilter` | blurX(required), blurY(required), tileMode |
+| `BlurFilter` | blurX, blurY, tileMode |
 | `DropShadowFilter` | offsetX/Y, blurX/Y, color, shadowOnly |
 | `InnerShadowFilter` | offsetX/Y, blurX/Y, color, shadowOnly |
 | `BlendFilter` | color(required), blendMode |
-| `ColorMatrixFilter` | matrix(required, 20 floats row-major) |
+| `ColorMatrixFilter` | matrix(20 floats row-major) |
 
 **DropShadowFilter vs DropShadowStyle**: The filter preserves semi-transparency from the
 original content. The style converts to opaque first. Use filter when per-pixel alpha matters;
