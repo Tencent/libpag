@@ -73,7 +73,11 @@ static bool ParseHexColor(const std::string& hex, float* red, float* green, floa
   if (color.size() != 6 && color.size() != 8) {
     return false;
   }
-  unsigned long value = strtoul(color.c_str(), nullptr, 16);
+  char* endPtr = nullptr;
+  unsigned long value = strtoul(color.c_str(), &endPtr, 16);
+  if (endPtr != color.c_str() + color.size()) {
+    return false;
+  }
   if (color.size() == 8) {
     *red = static_cast<float>((value >> 24) & 0xFF) / 255.0f;
     *green = static_cast<float>((value >> 16) & 0xFF) / 255.0f;
