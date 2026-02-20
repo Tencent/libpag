@@ -26,9 +26,6 @@ namespace pagx {
  * Base class for text selectors.
  */
 class TextSelector : public Node {
- public:
-  ~TextSelector() override = default;
-
  protected:
   TextSelector() = default;
 
