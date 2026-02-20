@@ -158,26 +158,8 @@ geometry element's local coordinate system — they are NOT affected by Layer `x
   that achieves the visual effect.
 - `strokeAlign="center"` (default) is GPU-accelerated; `"inside"`/`"outside"` require CPU ops.
 - Mask optimization: use opaque solid-color fills for fast clip path; gradients with
-  transparency or images force slower texture mask.
-
-### Rectangular Clipping: scrollRect over Mask
-
-For rectangular clipping, **always prefer `scrollRect` over mask** — it uses GPU clip directly
-without any texture overhead:
-
-```xml
-<!-- Preferred: scrollRect for rectangular clip -->
-<Layer scrollRect="0,0,400,300">
-  <!-- content clipped to 400×300 region -->
-</Layer>
-
-<!-- Avoid: mask for simple rectangular clip -->
-<Layer mask="@rectMask">...</Layer>
-<Layer id="rectMask" visible="false">
-  <Rectangle size="400,300"/>
-  <Fill color="#FFF"/>
-</Layer>
-```
+  transparency or images force slower texture mask. Prefer `scrollRect` over mask for
+  rectangular clipping — it uses GPU clip directly without any texture overhead.
 
 > For detailed performance patterns, mask optimization, and animation-friendly layer structure,
 > see `references/performance.md`.
