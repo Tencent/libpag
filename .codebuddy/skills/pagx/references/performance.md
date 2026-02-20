@@ -30,8 +30,6 @@ Understanding the PAGX renderer's cost model helps identify performance bottlene
 - **Stroke Alignment**: `strokeAlign="center"` (default) is GPU-accelerated. `"inside"` and
   `"outside"` require CPU path boolean operations (intersect/difference), which are expensive
   especially under Repeater.
-- **Gradient ColorStops**: Gradients with ≤16 ColorStops use efficient shader computation.
-  More than 16 ColorStops trigger texture-based sampling, which is slower.
 
 ---
 
@@ -449,49 +447,38 @@ These changes **invalidate** the subtree cache, forcing re-render:
 </Layer>
 ```
 
-### Flat vs Deep Hierarchy
-
-Prefer flatter hierarchies when content changes are likely:
-
-```xml
-<!-- Better for animation: flat siblings -->
-<Layer name="scene">
-  <Layer name="background"><!-- static, cached --></Layer>
-  <Layer name="middleground"><!-- static, cached --></Layer>
-  <Layer name="character"><!-- animates position --></Layer>
-  <Layer name="ui"><!-- may update text --></Layer>
-</Layer>
-
-<!-- Worse: deep nesting propagates invalidation upward -->
-<Layer name="scene">
-  <Layer name="level1">
-    <Layer name="level2">
-      <Layer name="level3">
-        <Layer name="dynamicElement"><!-- change invalidates level1-3 --></Layer>
-      </Layer>
-    </Layer>
-  </Layer>
-</Layer>
-```
-
-### Simple Leaf Optimization
+### Simple Leaf — When Separation Is Unnecessary
 
 Layers containing only a simple Rectangle or Ellipse with Fill (no filters, no styles) are
-**not cached** — they render directly via GPU fast path. This is optimal; do not add
-unnecessary wrapper Layers around simple shapes.
+**not cached** — they render directly via GPU fast path every frame. This means separating
+simple content into static vs dynamic Layers provides no benefit: there is no cached texture
+to preserve.
 
 ```xml
-<!-- Optimal: simple shape renders directly, no cache overhead -->
-<Layer>
-  <Rectangle size="100,50" roundness="8"/>
-  <Fill color="#3B82F6"/>
-</Layer>
-
-<!-- Unnecessary: wrapper Layer adds no benefit -->
-<Layer>
-  <Layer>  <!-- This wrapper is pointless -->
-    <Rectangle size="100,50" roundness="8"/>
+<!-- Unnecessary separation: both Groups contain only simple shapes -->
+<Layer name="badge">
+  <Layer name="static-bg">
+    <Rectangle size="80,30" roundness="15"/>
     <Fill color="#3B82F6"/>
   </Layer>
+  <Layer name="dynamic-icon">
+    <Ellipse center="15,15" size="20,20"/>
+    <Fill color="#FFF"/>
+  </Layer>
+</Layer>
+
+<!-- Better: keep as Groups in one Layer — simple shapes are cheap to redraw -->
+<Layer name="badge">
+  <Group>
+    <Rectangle size="80,30" roundness="15"/>
+    <Fill color="#3B82F6"/>
+  </Group>
+  <Group>
+    <Ellipse center="15,15" size="20,20"/>
+    <Fill color="#FFF"/>
+  </Group>
 </Layer>
 ```
+
+Only separate into child Layers when the static content is **complex enough to benefit from
+caching** (gradients, paths, drop shadows, blur filters, etc.).

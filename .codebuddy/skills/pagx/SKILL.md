@@ -60,8 +60,10 @@ button are independently positionable. Within a unit, use Groups for internal st
 child Layers — unless Layer-exclusive features (styles, filters, mask, blendMode) are needed.
 
 **Decision rule**: Direct child of `<pagx>`/`<Composition>`? → must be Layer. Independently
-positionable unit? → Layer. Needs styles/filters/mask/blendMode? → Layer. Otherwise → Group
-(lighter, no extra surface).
+positionable unit? → Layer. Needs styles/filters/mask/blendMode? → Layer. Complex static
+content worth caching separately from dynamic content? → Layer (but simple shapes like
+Rectangle/Ellipse with solid Fill render via GPU fast path without caching — no need to
+separate). Otherwise → Group (lighter, no extra surface).
 
 ### VectorElement Processing Model (Accumulate-Render)
 
@@ -156,9 +158,26 @@ geometry element's local coordinate system — they are NOT affected by Layer `x
   that achieves the visual effect.
 - `strokeAlign="center"` (default) is GPU-accelerated; `"inside"`/`"outside"` require CPU ops.
 - Mask optimization: use opaque solid-color fills for fast clip path; gradients with
-  transparency or images force slower texture mask. Prefer `scrollRect` for rectangular clips.
-- Animation-friendly structure: isolate dynamic content from static content so position/alpha
-  animations don't invalidate expensive cached subtrees.
+  transparency or images force slower texture mask.
+
+### Rectangular Clipping: scrollRect over Mask
+
+For rectangular clipping, **always prefer `scrollRect` over mask** — it uses GPU clip directly
+without any texture overhead:
+
+```xml
+<!-- Preferred: scrollRect for rectangular clip -->
+<Layer scrollRect="0,0,400,300">
+  <!-- content clipped to 400×300 region -->
+</Layer>
+
+<!-- Avoid: mask for simple rectangular clip -->
+<Layer mask="@rectMask">...</Layer>
+<Layer id="rectMask" visible="false">
+  <Rectangle size="400,300"/>
+  <Fill color="#FFF"/>
+</Layer>
+```
 
 > For detailed performance patterns, mask optimization, and animation-friendly layer structure,
 > see `references/performance.md`.

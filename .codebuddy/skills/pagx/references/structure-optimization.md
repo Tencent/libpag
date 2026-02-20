@@ -41,6 +41,12 @@ This principle drives all Layer/Group optimization decisions:
 - **Use Layer** when the content is an independently positionable unit: a button, a badge, an
   icon+label row, a panel — or when Layer-exclusive features are needed (styles, filters, mask,
   blendMode, composition, scrollRect).
+- **Use Layer** to isolate **complex** static content from dynamic content for animation. The
+  renderer caches Layer subtrees as textures; position/alpha/rotation/scale animations reuse
+  the cache without re-rendering. But only separate when the static content is complex enough
+  to benefit from caching (gradients, paths, drop shadows, blur filters, etc.). Simple shapes
+  (Rectangle/Ellipse with solid Fill, no effects) render directly via GPU fast path without
+  caching, so separating them provides no benefit — keep as Groups.
 - **Use Group** when the content is internal structure within a unit: painter scope isolation,
   shared transforms, or sub-elements that are not independently positionable.
 - **`<pagx>` and `<Composition>` direct children MUST be Layer.** Groups at root level are
