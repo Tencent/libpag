@@ -20,6 +20,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include "utils/StringParser.h"
 #include "SVGPathParser.h"
 #include "base/utils/MathUtil.h"
@@ -2090,26 +2091,28 @@ float SVGParserContext::parseLength(const std::string& value, float containerSiz
     return 0;
   }
 
-  std::string unit(endPtr);
-  if (unit == "%") {
-    return num / 100.0f * containerSize;
-  }
-  if (unit == "px" || unit.empty()) {
+  if (*endPtr == '\0') {
     return num;
   }
-  if (unit == "pt") {
+  if (*endPtr == '%') {
+    return num / 100.0f * containerSize;
+  }
+  if (strcmp(endPtr, "px") == 0) {
+    return num;
+  }
+  if (strcmp(endPtr, "pt") == 0) {
     return num * 1.333333f;
   }
-  if (unit == "em" || unit == "rem") {
+  if (strcmp(endPtr, "em") == 0 || strcmp(endPtr, "rem") == 0) {
     return num * DEFAULT_FONT_SIZE;
   }
-  if (unit == "in") {
+  if (strcmp(endPtr, "in") == 0) {
     return num * 96.0f;
   }
-  if (unit == "cm") {
+  if (strcmp(endPtr, "cm") == 0) {
     return num * 37.795275591f;
   }
-  if (unit == "mm") {
+  if (strcmp(endPtr, "mm") == 0) {
     return num * 3.7795275591f;
   }
 
