@@ -447,38 +447,3 @@ These changes **invalidate** the subtree cache, forcing re-render:
 </Layer>
 ```
 
-### Simple Leaf — When Separation Is Unnecessary
-
-Layers containing only a simple Rectangle or Ellipse with Fill (no filters, no styles) are
-**not cached** — they render directly via GPU fast path every frame. This means separating
-simple content into static vs dynamic Layers provides no benefit: there is no cached texture
-to preserve.
-
-```xml
-<!-- Unnecessary separation: both Groups contain only simple shapes -->
-<Layer name="badge">
-  <Layer name="static-bg">
-    <Rectangle size="80,30" roundness="15"/>
-    <Fill color="#3B82F6"/>
-  </Layer>
-  <Layer name="dynamic-icon">
-    <Ellipse center="15,15" size="20,20"/>
-    <Fill color="#FFF"/>
-  </Layer>
-</Layer>
-
-<!-- Better: keep as Groups in one Layer — simple shapes are cheap to redraw -->
-<Layer name="badge">
-  <Group>
-    <Rectangle size="80,30" roundness="15"/>
-    <Fill color="#3B82F6"/>
-  </Group>
-  <Group>
-    <Ellipse center="15,15" size="20,20"/>
-    <Fill color="#FFF"/>
-  </Group>
-</Layer>
-```
-
-Only separate into child Layers when the static content is **complex enough to benefit from
-caching** (gradients, paths, drop shadows, blur filters, etc.).
