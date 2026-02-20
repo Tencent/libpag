@@ -84,11 +84,20 @@ all painters:
 
 ```xml
 <!-- WRONG: Fill and Stroke both apply to ALL geometry -->
-<Rectangle .../> <Ellipse .../> <Fill .../> <Stroke .../>
+<Rectangle .../>
+<Ellipse .../>
+<Fill .../>
+<Stroke .../>
 
 <!-- CORRECT: Groups isolate different painters -->
-<Group> <Rectangle .../> <Fill .../> </Group>
-<Group> <Ellipse .../> <Stroke .../> </Group>
+<Group>
+  <Rectangle .../>
+  <Fill .../>
+</Group>
+<Group>
+  <Ellipse .../>
+  <Stroke .../>
+</Group>
 ```
 
 **Same painters → share scope**. Multiple geometry elements with identical Fill/Stroke belong
