@@ -21,7 +21,10 @@
 namespace pagx::cli {
 
 /**
- * Runs deterministic structural optimizations on a PAGX file via import-export pipeline.
+ * Validates, optimizes, and formats a PAGX file in one step. Validates input against the XSD
+ * schema first — aborts with errors if invalid. Then applies deterministic structural
+ * optimizations and exports with consistent formatting. There is no need to run
+ * `pagx validate` or `pagx format` separately after optimize.
  */
 int RunOptimize(int argc, char* argv[]);
 

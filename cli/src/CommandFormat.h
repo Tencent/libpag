@@ -22,6 +22,8 @@ namespace pagx::cli {
 
 /**
  * Formats (pretty-prints) a PAGX file with consistent indentation and attribute ordering.
+ * Standalone command — note that `pagx optimize` already formats its output, so there is no
+ * need to run format separately after optimize.
  */
 int RunFormat(int argc, char* argv[]);
 

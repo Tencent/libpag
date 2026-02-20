@@ -27,11 +27,6 @@
 
 namespace pagx::cli {
 
-struct ValidationError {
-  int line = 0;
-  std::string message;
-};
-
 static void CollectValidationError(void* context, const char* format, ...) {
   auto* errors = static_cast<std::vector<ValidationError>*>(context);
   char buffer[4096] = {};
@@ -128,6 +123,59 @@ static void PrintUsage() {
   std::cerr << "Usage: pagx validate [--format json] <file.pagx>\n";
 }
 
+std::vector<ValidationError> ValidateFile(const std::string& filePath) {
+  std::vector<ValidationError> errors = {};
+
+  xmlDocPtr doc = xmlReadFile(filePath.c_str(), nullptr, XML_PARSE_NONET);
+  if (doc == nullptr) {
+    ValidationError error;
+    error.message = "Failed to parse XML document";
+    errors.push_back(std::move(error));
+    return errors;
+  }
+
+  const auto& xsdContent = PagxXsdContent();
+  xmlSchemaParserCtxtPtr parserCtxt =
+      xmlSchemaNewMemParserCtxt(xsdContent.c_str(), static_cast<int>(xsdContent.size()));
+  if (parserCtxt == nullptr) {
+    xmlFreeDoc(doc);
+    ValidationError error;
+    error.message = "Internal error: failed to create schema parser context";
+    errors.push_back(std::move(error));
+    return errors;
+  }
+
+  xmlSchemaPtr schema = xmlSchemaParse(parserCtxt);
+  xmlSchemaFreeParserCtxt(parserCtxt);
+  if (schema == nullptr) {
+    xmlFreeDoc(doc);
+    ValidationError error;
+    error.message = "Internal error: failed to parse XSD schema";
+    errors.push_back(std::move(error));
+    return errors;
+  }
+
+  xmlSchemaValidCtxtPtr validCtxt = xmlSchemaNewValidCtxt(schema);
+  if (validCtxt == nullptr) {
+    xmlSchemaFree(schema);
+    xmlFreeDoc(doc);
+    ValidationError error;
+    error.message = "Internal error: failed to create validation context";
+    errors.push_back(std::move(error));
+    return errors;
+  }
+
+  xmlSchemaSetValidErrors(validCtxt, CollectValidationError, CollectValidationError, &errors);
+  xmlSchemaSetValidStructuredErrors(validCtxt, CollectStructuredError, &errors);
+  xmlSchemaValidateDoc(validCtxt, doc);
+
+  xmlSchemaFreeValidCtxt(validCtxt);
+  xmlSchemaFree(schema);
+  xmlFreeDoc(doc);
+
+  return errors;
+}
+
 int RunValidate(int argc, char* argv[]) {
   bool jsonOutput = false;
   std::string filePath;
@@ -161,58 +209,7 @@ int RunValidate(int argc, char* argv[]) {
     return 1;
   }
 
-  // Parse the XML document
-  xmlDocPtr doc = xmlReadFile(filePath.c_str(), nullptr, XML_PARSE_NONET);
-  if (doc == nullptr) {
-    if (jsonOutput) {
-      std::vector<ValidationError> errors;
-      ValidationError error;
-      error.message = "Failed to parse XML document";
-      errors.push_back(std::move(error));
-      PrintErrorsJson(errors, filePath);
-    } else {
-      std::cerr << filePath << ": Failed to parse XML document\n";
-    }
-    return 1;
-  }
-
-  // Load XSD schema from embedded string
-  const auto& xsdContent = PagxXsdContent();
-  xmlSchemaParserCtxtPtr parserCtxt =
-      xmlSchemaNewMemParserCtxt(xsdContent.c_str(), static_cast<int>(xsdContent.size()));
-  if (parserCtxt == nullptr) {
-    xmlFreeDoc(doc);
-    std::cerr << "pagx validate: internal error: failed to create schema parser context\n";
-    return 1;
-  }
-
-  xmlSchemaPtr schema = xmlSchemaParse(parserCtxt);
-  xmlSchemaFreeParserCtxt(parserCtxt);
-  if (schema == nullptr) {
-    xmlFreeDoc(doc);
-    std::cerr << "pagx validate: internal error: failed to parse XSD schema\n";
-    return 1;
-  }
-
-  // Create validation context and collect errors
-  xmlSchemaValidCtxtPtr validCtxt = xmlSchemaNewValidCtxt(schema);
-  if (validCtxt == nullptr) {
-    xmlSchemaFree(schema);
-    xmlFreeDoc(doc);
-    std::cerr << "pagx validate: internal error: failed to create validation context\n";
-    return 1;
-  }
-
-  std::vector<ValidationError> errors;
-  xmlSchemaSetValidErrors(validCtxt, CollectValidationError, CollectValidationError, &errors);
-  xmlSchemaSetValidStructuredErrors(validCtxt, CollectStructuredError, &errors);
-
-  int result = xmlSchemaValidateDoc(validCtxt, doc);
-
-  // Cleanup libxml2 resources
-  xmlSchemaFreeValidCtxt(validCtxt);
-  xmlSchemaFree(schema);
-  xmlFreeDoc(doc);
+  auto errors = ValidateFile(filePath);
 
   // Output results
   if (jsonOutput) {
@@ -223,7 +220,7 @@ int RunValidate(int argc, char* argv[]) {
     std::cout << filePath << ": valid\n";
   }
 
-  return (result == 0) ? 0 : 1;
+  return errors.empty() ? 0 : 1;
 }
 
 }  // namespace pagx::cli

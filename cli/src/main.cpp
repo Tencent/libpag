@@ -41,7 +41,7 @@ static void PrintUsage() {
             << "  measure    Measure visual properties of a PAGX node or layer\n"
             << "  font       Embed fonts into a PAGX file\n"
             << "  format     Format a PAGX file (indentation and attribute ordering)\n"
-            << "  optimize   Apply deterministic structural optimizations\n"
+            << "  optimize   Validate, optimize, and format a PAGX file in one step\n"
             << "\n"
             << "Global Options:\n"
             << "  --format json    Output in JSON format (validate, bounds, measure)\n"

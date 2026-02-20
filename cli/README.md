@@ -30,7 +30,9 @@ pagx <command> [options] <file>
 
 ### validate
 
-Validate a PAGX file against the specification.
+Validate a PAGX file against the specification. Note: `pagx optimize` already includes
+validation as its first step — use this command only when you need a standalone check without
+running optimizations.
 
 ```
 pagx validate [options] <file.pagx>
@@ -162,7 +164,8 @@ pagx font --font ./fonts/CustomFont.ttf --font ./fonts/Noto.ttf -o output.pagx d
 
 Format a PAGX file with consistent indentation and standardized attribute ordering.
 This is a pure text-level formatting operation — it does not modify values, remove elements,
-or apply any structural optimizations.
+or apply any structural optimizations. Note: `pagx optimize` already formats its output —
+use this command only when you want to reformat without applying optimizations.
 
 ```
 pagx format [options] <file.pagx>
@@ -189,8 +192,11 @@ pagx format --indent 4 -o formatted.pagx design.pagx
 
 ### optimize
 
-Apply deterministic structural optimizations to a PAGX file. All optimizations are
-equivalent transforms that preserve the original rendering.
+Validate, optimize, and format a PAGX file in one step. Validates input against the XSD
+schema first — aborts with errors if invalid. Then applies deterministic structural
+optimizations (all equivalent transforms that preserve the original rendering) and exports
+with consistent formatting. There is no need to run `pagx validate` or `pagx format`
+separately after optimize.
 
 ```
 pagx optimize [options] <file.pagx>

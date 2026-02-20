@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CommandOptimize.h"
+#include "CommandValidator.h"
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
@@ -124,7 +125,9 @@ struct OptimizeReport {
 static void PrintOptimizeUsage() {
   std::cout << "Usage: pagx optimize [options] <file.pagx>\n"
             << "\n"
-            << "Applies deterministic structural optimizations to a PAGX file.\n"
+            << "Validates, optimizes, and formats a PAGX file in one step.\n"
+            << "Validates input against the XSD schema first — aborts with errors if invalid.\n"
+            << "Then applies structural optimizations and exports with consistent formatting.\n"
             << "\n"
             << "Optimizations:\n"
             << "  1. Remove empty elements (empty Layer/Group, zero-width Stroke)\n"
@@ -1251,6 +1254,20 @@ int RunOptimize(int argc, char* argv[]) {
 
   if (outputPath.empty()) {
     outputPath = inputPath;
+  }
+
+  // Validate input against XSD schema before optimizing.
+  auto validationErrors = ValidateFile(inputPath);
+  if (!validationErrors.empty()) {
+    std::cerr << "pagx optimize: validation failed for '" << inputPath << "'\n";
+    for (const auto& error : validationErrors) {
+      if (error.line > 0) {
+        std::cerr << inputPath << ":" << error.line << ": " << error.message << "\n";
+      } else {
+        std::cerr << inputPath << ": " << error.message << "\n";
+      }
+    }
+    return 1;
   }
 
   auto document = PAGXImporter::FromFile(inputPath);

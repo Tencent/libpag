@@ -18,10 +18,25 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 namespace pagx::cli {
 
+struct ValidationError {
+  int line = 0;
+  std::string message;
+};
+
 /**
- * Validates a PAGX file against the specification.
+ * Validates a PAGX file against the XSD specification schema.
+ * Returns an empty vector if the file is valid.
+ */
+std::vector<ValidationError> ValidateFile(const std::string& filePath);
+
+/**
+ * Validates a PAGX file against the specification. Standalone command — note that
+ * `pagx optimize` already includes validation as its first step.
  * Supports --format json for structured output.
  */
 int RunValidate(int argc, char* argv[]);
