@@ -1439,7 +1439,7 @@ static const char* skipWhitespaceAndComma(const char* ptr, const char* end) {
   return ptr;
 }
 
-static Point parsePoint(const std::string& str) {
+static Point parsePoint(const std::string& str, bool* outValid = nullptr) {
   Point point = {};
   const char* ptr = str.c_str();
   const char* end = ptr + str.size();
@@ -1449,11 +1449,18 @@ static Point parsePoint(const std::string& str) {
   if (endPtr > ptr) {
     ptr = skipWhitespaceAndComma(endPtr, end);
     point.y = strtof(ptr, &endPtr);
+    if (outValid) {
+      *outValid = true;
+    }
+  } else {
+    if (outValid) {
+      *outValid = false;
+    }
   }
   return point;
 }
 
-static Size parseSize(const std::string& str) {
+static Size parseSize(const std::string& str, bool* outValid = nullptr) {
   Size size = {};
   const char* ptr = str.c_str();
   const char* end = ptr + str.size();
@@ -1463,11 +1470,18 @@ static Size parseSize(const std::string& str) {
   if (endPtr > ptr) {
     ptr = skipWhitespaceAndComma(endPtr, end);
     size.height = strtof(ptr, &endPtr);
+    if (outValid) {
+      *outValid = true;
+    }
+  } else {
+    if (outValid) {
+      *outValid = false;
+    }
   }
   return size;
 }
 
-static Rect parseRect(const std::string& str) {
+static Rect parseRect(const std::string& str, bool* outValid = nullptr) {
   Rect rect = {};
   const char* ptr = str.c_str();
   const char* end = ptr + str.size();
@@ -1485,6 +1499,9 @@ static Rect parseRect(const std::string& str) {
   if (endPtr > ptr) {
     ptr = skipWhitespaceAndComma(endPtr, end);
     rect.height = strtof(ptr, &endPtr);
+  }
+  if (outValid) {
+    *outValid = (endPtr > str.c_str());
   }
   return rect;
 }
@@ -1581,21 +1598,15 @@ static Color parseColor(const std::string& str) {
   return {};
 }
 
-static bool isValidParsedValue(const std::string& str, const char* endPtr) {
-  return endPtr > str.c_str();
-}
-
 static Point getPointAttribute(const DOMNode* node, const char* name, Point defaultValue,
                                PAGXDocument* doc) {
   auto* str = node->findAttribute(name);
   if (!str || str->empty()) {
     return defaultValue;
   }
-  auto result = parsePoint(*str);
-  const char* ptr = str->c_str();
-  char* endPtr = nullptr;
-  strtof(ptr, &endPtr);
-  if (!isValidParsedValue(*str, endPtr)) {
+  bool valid = false;
+  auto result = parsePoint(*str, &valid);
+  if (!valid) {
     reportError(doc, node,
                 "Invalid value '" + *str + "' for '" + std::string(name) + "' attribute.");
     return defaultValue;
@@ -1609,11 +1620,9 @@ static Size getSizeAttribute(const DOMNode* node, const char* name, Size default
   if (!str || str->empty()) {
     return defaultValue;
   }
-  auto result = parseSize(*str);
-  const char* ptr = str->c_str();
-  char* endPtr = nullptr;
-  strtof(ptr, &endPtr);
-  if (!isValidParsedValue(*str, endPtr)) {
+  bool valid = false;
+  auto result = parseSize(*str, &valid);
+  if (!valid) {
     reportError(doc, node,
                 "Invalid value '" + *str + "' for '" + std::string(name) + "' attribute.");
     return defaultValue;
@@ -1627,11 +1636,9 @@ static Rect getRectAttribute(const DOMNode* node, const char* name, Rect default
   if (!str || str->empty()) {
     return defaultValue;
   }
-  auto result = parseRect(*str);
-  const char* ptr = str->c_str();
-  char* endPtr = nullptr;
-  strtof(ptr, &endPtr);
-  if (!isValidParsedValue(*str, endPtr)) {
+  bool valid = false;
+  auto result = parseRect(*str, &valid);
+  if (!valid) {
     reportError(doc, node,
                 "Invalid value '" + *str + "' for '" + std::string(name) + "' attribute.");
     return defaultValue;
