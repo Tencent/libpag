@@ -35,9 +35,9 @@ if (NOT TARGET pagx)
     target_include_directories(pagx PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/../src/pagx
             ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/expat/expat/lib)
-    if(WIN32)
+    if (WIN32)
         target_compile_definitions(pagx PRIVATE XML_STATIC)
-    endif()
+    endif ()
     add_vendor_target(pagx-vendor STATIC_VENDORS expat CONFIG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
     find_vendor_libraries(pagx-vendor STATIC PAGX_VENDOR_STATIC_LIBRARIES)
     add_dependencies(pagx pagx-vendor)
