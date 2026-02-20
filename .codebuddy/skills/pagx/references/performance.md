@@ -23,6 +23,15 @@ Understanding the PAGX renderer's cost model helps identify performance bottlene
   Repeater, each copy incurs dash computation overhead on top of the basic stroke cost.
 - **Layer vs Group**: Layer is heavier — it creates an independent rendering surface that must
   be composited back. Group only creates a painter scope boundary with no extra surface.
+  However, a Layer that meets all of the following conditions renders **without** creating an
+  extra surface (as efficient as Group): `blendMode="normal"`, `alpha="1"` (or `groupOpacity`
+  unset/false), no filters, no mask (or mask is a simple opaque path), no `matrix3D` with
+  perspective.
+- **Stroke Alignment**: `strokeAlign="center"` (default) is GPU-accelerated. `"inside"` and
+  `"outside"` require CPU path boolean operations (intersect/difference), which are expensive
+  especially under Repeater.
+- **Gradient ColorStops**: Gradients with ≤16 ColorStops use efficient shader computation.
+  More than 16 ColorStops trigger texture-based sampling, which is slower.
 
 ---
 
@@ -284,3 +293,205 @@ parallel lines (0 degrees, 60 degrees, -60 degrees), each expressible as a Recta
 **Suggest to user**: Replacing PathData with simple geometry combinations may change fine
 details (e.g., hexagon outlines become intersecting lines). At low opacity the difference is
 subtle, but it may be noticeable at higher opacity. Always ask for approval before applying.
+
+---
+
+## Mask Optimization
+
+Masks can be rendered via two paths: a fast **clip path** or a slower **texture mask**. The
+renderer automatically chooses based on mask content.
+
+### Fast Path Conditions (clip path)
+
+A mask Layer uses the fast clip path when **all** of the following are true:
+
+1. **Simple geometry only**: Contains only Rectangle, Ellipse, or Path elements
+2. **Opaque solid fill**: Fill has `alpha="1"` (or no alpha specified) with a solid color
+3. **No transparency in content**: No gradients with transparent stops, no images, no filters
+4. **Alpha mask type**: `maskType` is not `luminance`
+
+```xml
+<!-- Fast: simple shape with opaque fill -->
+<Layer id="mask" visible="false">
+  <Rectangle size="200,200" roundness="20"/>
+  <Fill color="#FFFFFF"/>
+</Layer>
+<Layer mask="@mask">...</Layer>
+
+<!-- Fast: Path is also fine if fill is opaque -->
+<Layer id="mask" visible="false">
+  <Path data="M0,0 L100,0 L50,86 Z"/>
+  <Fill color="#FFF"/>
+</Layer>
+```
+
+### Slow Path Triggers (texture mask)
+
+Any of these conditions forces the slower texture-based mask:
+
+```xml
+<!-- Slow: semi-transparent fill -->
+<Layer id="mask" visible="false">
+  <Rectangle size="200,200"/>
+  <Fill color="#FFFFFF" alpha="0.5"/>  <!-- alpha < 1 -->
+</Layer>
+
+<!-- Slow: gradient with transparency -->
+<Layer id="mask" visible="false">
+  <Rectangle size="200,200"/>
+  <Fill>
+    <LinearGradient startPoint="0,0" endPoint="200,0">
+      <ColorStop offset="0" color="#FFFFFF"/>
+      <ColorStop offset="1" color="#FFFFFF00"/>  <!-- transparent -->
+    </LinearGradient>
+  </Fill>
+</Layer>
+
+<!-- Slow: image-based mask -->
+<Layer id="mask" visible="false">
+  <Rectangle size="200,200"/>
+  <Fill><ImagePattern image="@maskImage"/></Fill>
+</Layer>
+
+<!-- Slow: luminance mask type -->
+<Layer mask="@mask" maskType="luminance">...</Layer>
+
+<!-- Slow: mask layer has filters -->
+<Layer id="mask" visible="false">
+  <Rectangle size="200,200"/>
+  <Fill color="#FFFFFF"/>
+  <BlurFilter blurX="5" blurY="5"/>  <!-- filter triggers slow path -->
+</Layer>
+```
+
+### scrollRect vs Mask
+
+For rectangular clipping, prefer `scrollRect` over mask — it uses GPU clip directly without
+any texture overhead:
+
+```xml
+<!-- Preferred: scrollRect for rectangular clip -->
+<Layer scrollRect="0,0,400,300">
+  <!-- content clipped to 400×300 region -->
+</Layer>
+
+<!-- Avoid: mask for simple rectangular clip -->
+<Layer mask="@rectMask">...</Layer>
+<Layer id="rectMask" visible="false">
+  <Rectangle size="400,300"/>
+  <Fill color="#FFF"/>
+</Layer>
+```
+
+---
+
+## Animation-Friendly Layer Structure
+
+When preparing PAGX files for animation, layer organization significantly impacts performance.
+The renderer caches layer subtrees as textures; proper structure keeps caches valid across
+frames.
+
+### Cache-Preserving Transforms
+
+These property changes on a Layer **do not** invalidate its subtree cache:
+
+| Property | Cache Status | Notes |
+|----------|--------------|-------|
+| `x`, `y` | Preserved | Position animation is cache-friendly |
+| `alpha` | Preserved | Fade animation is cache-friendly |
+| `rotation` (via matrix) | Preserved | Rotation animation is cache-friendly |
+| `scale` (via matrix) | Preserved | Scale animation is cache-friendly |
+
+The cached texture is simply redrawn with the new transform/alpha — no re-rendering needed.
+
+### Cache-Invalidating Changes
+
+These changes **invalidate** the subtree cache, forcing re-render:
+
+| Change | Impact |
+|--------|--------|
+| Child content change | Cache cleared |
+| Add/remove child Layer | Cache cleared |
+| Modify `filters` list | Cache cleared |
+| Modify `layerStyles` list | Cache cleared |
+
+### Separation Strategy
+
+**Principle**: Isolate content that changes from content that stays static.
+
+```xml
+<!-- Good: static decoration cached separately from dynamic text -->
+<Layer name="card">
+  <Layer name="background">
+    <!-- Complex static content — cached as texture -->
+    <Path data="@decorativeBorder"/>
+    <Fill>
+      <LinearGradient .../>
+    </Fill>
+    <DropShadowStyle blurX="10" blurY="10" .../>
+  </Layer>
+  <Layer name="title">
+    <!-- Text that may change — separate cache unit -->
+    <Text text="Dynamic Title" .../>
+    <Fill color="#333"/>
+  </Layer>
+</Layer>
+<!-- Animating card's x/y preserves both caches -->
+```
+
+```xml
+<!-- Bad: dynamic content nested deep inside static content -->
+<Layer name="card">
+  <Path data="@decorativeBorder"/>
+  <Fill>...</Fill>
+  <DropShadowStyle .../>
+  <Text text="Dynamic Title" .../>  <!-- Change invalidates entire card cache -->
+</Layer>
+```
+
+### Flat vs Deep Hierarchy
+
+Prefer flatter hierarchies when content changes are likely:
+
+```xml
+<!-- Better for animation: flat siblings -->
+<Layer name="scene">
+  <Layer name="background"><!-- static, cached --></Layer>
+  <Layer name="middleground"><!-- static, cached --></Layer>
+  <Layer name="character"><!-- animates position --></Layer>
+  <Layer name="ui"><!-- may update text --></Layer>
+</Layer>
+
+<!-- Worse: deep nesting propagates invalidation upward -->
+<Layer name="scene">
+  <Layer name="level1">
+    <Layer name="level2">
+      <Layer name="level3">
+        <Layer name="dynamicElement"><!-- change invalidates level1-3 --></Layer>
+      </Layer>
+    </Layer>
+  </Layer>
+</Layer>
+```
+
+### Simple Leaf Optimization
+
+Layers containing only a simple Rectangle or Ellipse with Fill (no filters, no styles) are
+**not cached** — they render directly via GPU fast path. This is optimal; do not add
+unnecessary wrapper Layers around simple shapes.
+
+```xml
+<!-- Optimal: simple shape renders directly, no cache overhead -->
+<Layer>
+  <Rectangle size="100,50" roundness="8"/>
+  <Fill color="#3B82F6"/>
+</Layer>
+
+<!-- Unnecessary: wrapper Layer adds no benefit -->
+<Layer>
+  <Layer>  <!-- This wrapper is pointless -->
+    <Rectangle size="100,50" roundness="8"/>
+    <Fill color="#3B82F6"/>
+  </Layer>
+</Layer>
+```

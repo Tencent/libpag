@@ -154,6 +154,14 @@ geometry element's local coordinate system — they are NOT affected by Layer `x
   product should stay under ~500 for smooth rendering.
 - BlurFilter / DropShadowStyle cost is proportional to blur radius — use the smallest radius
   that achieves the visual effect.
+- `strokeAlign="center"` (default) is GPU-accelerated; `"inside"`/`"outside"` require CPU ops.
+- Mask optimization: use opaque solid-color fills for fast clip path; gradients with
+  transparency or images force slower texture mask. Prefer `scrollRect` for rectangular clips.
+- Animation-friendly structure: isolate dynamic content from static content so position/alpha
+  animations don't invalidate expensive cached subtrees.
+
+> For detailed performance patterns, mask optimization, and animation-friendly layer structure,
+> see `references/performance.md`.
 
 ### Required Attributes
 
