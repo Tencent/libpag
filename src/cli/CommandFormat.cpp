@@ -307,6 +307,10 @@ int RunFormat(int argc, char* argv[]) {
   }
   out << output;
   out.close();
+  if (out.fail()) {
+    std::cerr << "pagx format: error writing to '" << outputPath << "'\n";
+    return 1;
+  }
 
   return 0;
 }

@@ -300,6 +300,10 @@ static int RunFontEmbed(int argc, char* argv[]) {
   }
   out << xml;
   out.close();
+  if (out.fail()) {
+    std::cerr << "pagx font embed: error writing to '" << options.outputFile << "'\n";
+    return 1;
+  }
 
   return 0;
 }
