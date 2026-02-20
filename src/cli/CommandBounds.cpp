@@ -97,8 +97,7 @@ static bool ComputeLayerPath(xmlNodePtr node, std::vector<int>* path) {
   if (node == nullptr || node->type != XML_ELEMENT_NODE) {
     return false;
   }
-  auto nodeName = std::string(reinterpret_cast<const char*>(node->name));
-  if (nodeName != "Layer") {
+  if (!xmlStrEqual(node->name, BAD_CAST "Layer")) {
     return false;
   }
 
@@ -106,9 +105,8 @@ static bool ComputeLayerPath(xmlNodePtr node, std::vector<int>* path) {
   std::vector<int> reversePath = {};
   xmlNodePtr current = node;
   while (current != nullptr && current->parent != nullptr) {
-    auto parentName =
-        current->parent->name ? std::string(reinterpret_cast<const char*>(current->parent->name))
-                              : "";
+    bool isParentPagx = current->parent->name != nullptr &&
+                        xmlStrEqual(current->parent->name, BAD_CAST "pagx");
     // Count the index of current among sibling <Layer> elements.
     int index = 0;
     for (xmlNodePtr sibling = current->parent->children; sibling != nullptr;
@@ -117,13 +115,13 @@ static bool ComputeLayerPath(xmlNodePtr node, std::vector<int>* path) {
         break;
       }
       if (sibling->type == XML_ELEMENT_NODE && sibling->name != nullptr &&
-          std::string(reinterpret_cast<const char*>(sibling->name)) == "Layer") {
+          xmlStrEqual(sibling->name, BAD_CAST "Layer")) {
         index++;
       }
     }
     reversePath.push_back(index);
 
-    if (parentName == "pagx") {
+    if (isParentPagx) {
       break;
     }
     current = current->parent;
