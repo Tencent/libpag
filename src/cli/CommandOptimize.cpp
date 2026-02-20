@@ -700,23 +700,13 @@ static bool ShouldSkipLocalization(const Layer* layer) {
   return false;
 }
 
-static void ComputeLocalizationOffset(const std::vector<Element*>& contents, float& offsetX,
-                                      float& offsetY) {
-  // Check if there is a TextBox that controls layout.
-  for (auto* element : contents) {
-    if (element->nodeType() == NodeType::TextBox) {
-      auto textBox = static_cast<const TextBox*>(element);
-      offsetX = textBox->position.x;
-      offsetY = textBox->position.y;
-      return;
-    }
-  }
-
-  // No TextBox - compute bounding box center of geometry elements.
-  float minX = FLT_MAX;
-  float minY = FLT_MAX;
-  float maxX = -FLT_MAX;
-  float maxY = -FLT_MAX;
+// Compute the bounding box of shape elements (Rectangle, Ellipse, Polystar).
+static bool ComputeShapeBounds(const std::vector<Element*>& contents, float& minX, float& minY,
+                               float& maxX, float& maxY) {
+  minX = FLT_MAX;
+  minY = FLT_MAX;
+  maxX = -FLT_MAX;
+  maxY = -FLT_MAX;
   bool hasGeometry = false;
 
   for (auto* element : contents) {
@@ -747,7 +737,33 @@ static void ComputeLocalizationOffset(const std::vector<Element*>& contents, flo
       maxX = std::max(maxX, polystar->center.x + r);
       maxY = std::max(maxY, polystar->center.y + r);
       hasGeometry = true;
-    } else if (type == NodeType::Text) {
+    }
+  }
+  return hasGeometry;
+}
+
+static void ComputeLocalizationOffset(const std::vector<Element*>& contents, float& offsetX,
+                                      float& offsetY) {
+  // Check if there is a TextBox that controls layout.
+  for (auto* element : contents) {
+    if (element->nodeType() == NodeType::TextBox) {
+      auto textBox = static_cast<const TextBox*>(element);
+      offsetX = textBox->position.x;
+      offsetY = textBox->position.y;
+      return;
+    }
+  }
+
+  // No TextBox - compute bounding box center of geometry and position elements.
+  float minX = FLT_MAX;
+  float minY = FLT_MAX;
+  float maxX = -FLT_MAX;
+  float maxY = -FLT_MAX;
+  bool hasGeometry = ComputeShapeBounds(contents, minX, minY, maxX, maxY);
+
+  for (auto* element : contents) {
+    auto type = element->nodeType();
+    if (type == NodeType::Text) {
       auto text = static_cast<const Text*>(element);
       minX = std::min(minX, text->position.x);
       minY = std::min(minY, text->position.y);
@@ -1052,44 +1068,11 @@ static bool LayersStructurallyEqual(const Layer* a, const Layer* b) {
 
 static void ComputeLayerContentsBounds(const Layer* layer, float& boundsWidth,
                                        float& boundsHeight) {
-  float minX = FLT_MAX;
-  float minY = FLT_MAX;
-  float maxX = -FLT_MAX;
-  float maxY = -FLT_MAX;
-  bool hasGeometry = false;
-
-  for (auto* element : layer->contents) {
-    auto type = element->nodeType();
-    if (type == NodeType::Rectangle) {
-      auto rect = static_cast<const Rectangle*>(element);
-      float halfW = rect->size.width * 0.5f;
-      float halfH = rect->size.height * 0.5f;
-      minX = std::min(minX, rect->center.x - halfW);
-      minY = std::min(minY, rect->center.y - halfH);
-      maxX = std::max(maxX, rect->center.x + halfW);
-      maxY = std::max(maxY, rect->center.y + halfH);
-      hasGeometry = true;
-    } else if (type == NodeType::Ellipse) {
-      auto ellipse = static_cast<const Ellipse*>(element);
-      float halfW = ellipse->size.width * 0.5f;
-      float halfH = ellipse->size.height * 0.5f;
-      minX = std::min(minX, ellipse->center.x - halfW);
-      minY = std::min(minY, ellipse->center.y - halfH);
-      maxX = std::max(maxX, ellipse->center.x + halfW);
-      maxY = std::max(maxY, ellipse->center.y + halfH);
-      hasGeometry = true;
-    } else if (type == NodeType::Polystar) {
-      auto polystar = static_cast<const Polystar*>(element);
-      float r = polystar->outerRadius;
-      minX = std::min(minX, polystar->center.x - r);
-      minY = std::min(minY, polystar->center.y - r);
-      maxX = std::max(maxX, polystar->center.x + r);
-      maxY = std::max(maxY, polystar->center.y + r);
-      hasGeometry = true;
-    }
-  }
-
-  if (hasGeometry) {
+  float minX = 0.0f;
+  float minY = 0.0f;
+  float maxX = 0.0f;
+  float maxY = 0.0f;
+  if (ComputeShapeBounds(layer->contents, minX, minY, maxX, maxY)) {
     boundsWidth = maxX - minX;
     boundsHeight = maxY - minY;
   } else {
