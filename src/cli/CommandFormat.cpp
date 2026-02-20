@@ -104,6 +104,13 @@ static const std::unordered_map<std::string, std::vector<const char*>> ATTRIBUTE
 };
 // clang-format on
 
+struct SortKeyComparator {
+  const std::vector<int>* keys = nullptr;
+  bool operator()(size_t a, size_t b) const {
+    return (*keys)[a] < (*keys)[b];
+  }
+};
+
 static void ReorderAttributes(xmlNodePtr node) {
   if (node->type != XML_ELEMENT_NODE || node->properties == nullptr) {
     return;
@@ -148,8 +155,8 @@ static void ReorderAttributes(xmlNodePtr node) {
   for (size_t i = 0; i < indices.size(); i++) {
     indices[i] = i;
   }
-  std::stable_sort(indices.begin(), indices.end(),
-                   [&sortKeys](size_t a, size_t b) { return sortKeys[a] < sortKeys[b]; });
+  SortKeyComparator comparator = {&sortKeys};
+  std::stable_sort(indices.begin(), indices.end(), comparator);
 
   // Rebuild the attribute linked list in sorted order.
   node->properties = nullptr;
