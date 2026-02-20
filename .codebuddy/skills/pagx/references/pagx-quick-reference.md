@@ -297,11 +297,10 @@ they **must not** be omitted.
 |-----------|------|---------|
 | `text` | string | "" |
 | `position` | Point | 0,0 |
-| `fontFamily` | string | system default |
-| `fontStyle` | string | "Regular" |
+| `fontFamily` | string | "" |
+| `fontStyle` | string | "" |
 | `fontSize` | float | 12 |
 | `letterSpacing` | float | 0 |
-| `baselineShift` | float | 0 |
 | `fauxBold` | bool | false |
 | `fauxItalic` | bool | false |
 | `textAnchor` | TextAnchor | start |

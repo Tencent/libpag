@@ -170,15 +170,22 @@ These have **no default** — omitting them causes parse errors:
 | Element | Required |
 |---------|----------|
 | `pagx` | `version`, `width`, `height` |
+| `Composition` | `width`, `height` |
 | `LinearGradient` | `startPoint`, `endPoint` |
 | `RadialGradient` | `radius` |
-| `ColorStop` | `offset`, `color` |
 | `DiamondGradient` | `radius` |
+| `ColorStop` | `offset`, `color` |
+| `SolidColor` | `color` |
+| `ImagePattern` | `image` |
 | `BlurFilter` | `blurX`, `blurY` |
 | `BlendFilter` | `color` |
 | `ColorMatrixFilter` | `matrix` |
 | `Path` | `data` |
+| `PathData` | `data` |
 | `Image` | `source` |
+| `TextPath` | `path` |
+| `GlyphRun` | `font`, `glyphs` |
+| `Glyph` | `advance` |
 
 > Omit attributes that **do** match spec defaults (see `references/pagx-quick-reference.md`).
 > For the complete specification reference, read `references/spec-essentials.md`.
