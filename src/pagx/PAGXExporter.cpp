@@ -202,21 +202,16 @@ class XMLBuilder {
 //==============================================================================
 
 static std::string pointToString(const Point& p) {
-  char buf[64] = {};
-  snprintf(buf, sizeof(buf), "%g,%g", p.x, p.y);
-  return buf;
+  return FloatToString(p.x) + "," + FloatToString(p.y);
 }
 
 static std::string sizeToString(const Size& s) {
-  char buf[64] = {};
-  snprintf(buf, sizeof(buf), "%g,%g", s.width, s.height);
-  return buf;
+  return FloatToString(s.width) + "," + FloatToString(s.height);
 }
 
 static std::string rectToString(const Rect& r) {
-  char buf[128] = {};
-  snprintf(buf, sizeof(buf), "%g,%g,%g,%g", r.x, r.y, r.width, r.height);
-  return buf;
+  return FloatToString(r.x) + "," + FloatToString(r.y) + "," + FloatToString(r.width) + "," +
+         FloatToString(r.height);
 }
 
 static std::string floatListToString(const float* values, size_t count) {
