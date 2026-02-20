@@ -193,8 +193,6 @@ These have **no default** — omitting them causes parse errors:
 
 ### Optimizing PAGX
 
-For newly generated files, continue from step 5 above. For existing files, start here.
-
 **Fundamental Constraint**: All optimizations must preserve the original design appearance.
 Never modify visual attributes (colors, blur, spacing, opacity, font sizes, etc.) without
 explicit user approval.
