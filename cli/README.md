@@ -91,20 +91,20 @@ pagx bounds [options] <file.pagx>
 
 | Option | Description |
 |--------|-------------|
-| `--path <xpath>` | Select nodes by XPath expression |
+| `--xpath <expr>` | Select nodes by XPath expression |
 | `--relative <xpath>` | Output bounds relative to another Layer |
 | `--json` | Output in JSON format |
 | `--format json` | Same as `--json` |
 
-Without `--path`, outputs bounds for all layers.
+Without `--xpath`, outputs bounds for all layers.
 
 **XPath examples:**
 
 ```bash
-pagx bounds --path "//Layer[@id='btn']" design.pagx         # Layer with id 'btn'
-pagx bounds --path "/pagx/Layer[1]" design.pagx              # First top-level Layer
-pagx bounds --path "/pagx/Layer[2]/Layer" design.pagx        # Child Layers of second Layer
-pagx bounds --path "//Layer[@id='icon']" --relative "//Layer[@id='card']" design.pagx  # relative
+pagx bounds --xpath "//Layer[@id='btn']" design.pagx         # Layer with id 'btn'
+pagx bounds --xpath "/pagx/Layer[1]" design.pagx              # First top-level Layer
+pagx bounds --xpath "/pagx/Layer[2]/Layer" design.pagx        # Child Layers of second Layer
+pagx bounds --xpath "//Layer[@id='icon']" --relative "//Layer[@id='card']" design.pagx  # relative
 pagx bounds --json design.pagx                                # all layers as JSON
 ```
 

@@ -43,11 +43,11 @@ static void PrintBoundsUsage() {
             << "Query precise rendered bounds of Layer nodes.\n"
             << "\n"
             << "Options:\n"
-            << "  --path <xpath>         Select nodes by XPath expression\n"
+            << "  --xpath <expr>         Select nodes by XPath expression\n"
             << "  --relative <xpath>     Output bounds relative to another Layer\n"
             << "  --json                 Output in JSON format\n"
             << "\n"
-            << "Without --path, outputs bounds for all layers.\n"
+            << "Without --xpath, outputs bounds for all layers.\n"
             << "\n"
             << "XPath examples:\n"
             << "  //Layer[@id='btn']     Layer with id 'btn'\n"
@@ -59,7 +59,7 @@ static bool ParseBoundsOptions(int argc, char* argv[], BoundsOptions* options) {
   int i = 1;
   while (i < argc) {
     std::string arg = argv[i];
-    if (arg == "--path" && i + 1 < argc) {
+    if (arg == "--xpath" && i + 1 < argc) {
       options->xpath = argv[++i];
     } else if (arg == "--relative" && i + 1 < argc) {
       options->relativeTo = argv[++i];

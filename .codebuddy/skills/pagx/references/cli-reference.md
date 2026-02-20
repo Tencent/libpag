@@ -88,19 +88,19 @@ pagx format --indent 4 input.pagx       # 4-space indent (default: 2)
 ## pagx bounds
 
 Query precise rendered bounds of Layer nodes. Supports XPath expressions for node selection.
-Without `--path`, outputs bounds for the entire document and all layers.
+Without `--xpath`, outputs bounds for the entire document and all layers.
 
 ```bash
 pagx bounds input.pagx                                          # all layers
-pagx bounds --path "//Layer[@id='btn']" input.pagx              # by id
-pagx bounds --path "/pagx/Layer[2]/Layer[1]" input.pagx         # by position
-pagx bounds --path "//Layer[@id='icon']" --relative "//Layer[@id='card']" input.pagx
+pagx bounds --xpath "//Layer[@id='btn']" input.pagx              # by id
+pagx bounds --xpath "/pagx/Layer[2]/Layer[1]" input.pagx         # by position
+pagx bounds --xpath "//Layer[@id='icon']" --relative "//Layer[@id='card']" input.pagx
 pagx bounds --json input.pagx
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--path <xpath>` | Select Layer nodes by XPath expression |
+| `--xpath <expr>` | Select Layer nodes by XPath expression |
 | `--relative <xpath>` | Output bounds relative to another Layer |
 | `--json` | JSON output |
 

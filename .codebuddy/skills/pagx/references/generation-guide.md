@@ -33,7 +33,7 @@ Read the description and identify independent visual units. Each becomes a `<Lay
   spacing accurately.
 - **Measure element bounds** with `pagx bounds` to get precise rendered boundaries of Layers
   or elements. When building complex blocks incrementally, render a partial PAGX and use
-  `pagx bounds --id blockId` to get the block's exact size, then use that to calculate
+  `pagx bounds --xpath "//Layer[@id='blockId']"` to get the block's exact size, then use that to calculate
   positions of surrounding blocks.
 
 ### Step 3: Build Each Block
@@ -639,8 +639,8 @@ block sizes) and during refinement (to diagnose misalignment):
 
 ```bash
 pagx bounds input.pagx                                  # all layers
-pagx bounds --path "//Layer[@id='myButton']" input.pagx  # by id
-pagx bounds --path "/pagx/Layer[2]" input.pagx           # by position
+pagx bounds --xpath "//Layer[@id='myButton']" input.pagx  # by id
+pagx bounds --xpath "/pagx/Layer[2]" input.pagx           # by position
 ```
 
 **During layout**: Build a block, render it, and use `pagx bounds` to get its exact size.
