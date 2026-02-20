@@ -49,7 +49,8 @@ file(GLOB_RECURSE RENDERER_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../src/renderer/*
 if (NOT TARGET pagx-renderer)
     add_library(pagx-renderer STATIC ${RENDERER_SOURCES})
     target_include_directories(pagx-renderer PUBLIC
-            ${CMAKE_CURRENT_SOURCE_DIR}/../src/renderer)
+            ${CMAKE_CURRENT_SOURCE_DIR}/../src/renderer
+            ${CMAKE_CURRENT_SOURCE_DIR}/../src/renderer/text)
     target_include_directories(pagx-renderer PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/../src/pagx)
     target_link_libraries(pagx-renderer PUBLIC pagx tgfx)
