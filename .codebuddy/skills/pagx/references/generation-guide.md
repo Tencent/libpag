@@ -27,6 +27,10 @@ Read the description and identify independent visual units. Each becomes a `<Lay
 - Set `width`/`height` on the root `<pagx>` to fit all content with appropriate margins.
 - Assign each Layer's `x`/`y` based on the block's position in the overall layout.
 - Use round integer values for clarity.
+- **Pre-measure text** with `pagx measure` to get precise text dimensions before calculating
+  positions. For example, `pagx measure --font "Arial" --size 24 --text "Title"` returns
+  the exact width and font metrics (ascent, descent, leading), which can be used to size
+  TextBox and compute vertical spacing accurately.
 
 ### Step 3: Build Each Block
 
@@ -43,11 +47,20 @@ For each Layer, construct the internal VectorElement tree:
 - For Text + TextBox: use TextBox `position` relative to Layer origin (ignore Text position).
 - For geometry: `center` is relative to Layer origin.
 
-### Step 5: Extract Shared Resources
+### Step 5: Verify and Refine
 
-- Move `<Resources>` to the end of the document.
-- Extract shared gradients, paths, or compositions used in multiple places.
-- Single-use resources can remain inline.
+Render a screenshot and visually verify the result. If issues are found, fix and re-render
+until satisfied:
+
+1. Render: `pagx render -o preview.png input.pagx`
+2. Read the screenshot image and check:
+   - Does the overall design match the intended description?
+   - Are elements aligned properly (horizontal/vertical centers, baselines)?
+   - Are spacings between sibling elements consistent?
+3. If issues found → edit the PAGX, then go back to step 1.
+   Use `pagx bounds input.pagx` to get precise rendered boundaries for fine-tuning coordinates.
+
+> For details and examples, see **Verify and Refine** in `references/generation-guide.md`.
 
 ---
 
@@ -589,3 +602,57 @@ before the MergePath scope. MergePath wipes all prior rendering within its scope
   <Fill color="#00F"/>
 </Group>
 ```
+
+---
+
+## Verify and Refine
+
+After generating PAGX, render a screenshot and verify visually. This is an iterative loop:
+edit → render → check → repeat until the result matches expectations.
+
+### Render and Inspect
+
+```bash
+pagx render -o preview.png input.pagx
+```
+
+Read the rendered image and check:
+
+- **Design accuracy** — does the layout match the intended visual description?
+- **Alignment** — are related elements aligned (e.g., buttons in a row share the same y,
+  text labels vertically centered within their containers)?
+- **Spacing consistency** — are gaps between sibling elements uniform? Uneven spacing is
+  the most common visual defect in generated PAGX.
+- **Text readability** — are text sizes appropriate, not clipped by TextBox boundaries?
+
+### Fine-Tune with Bounds
+
+When the screenshot reveals misalignment, use `pagx bounds` to get precise rendered
+boundaries instead of guessing coordinate adjustments:
+
+```bash
+pagx bounds input.pagx              # all layers
+pagx bounds --id myButton input.pagx # specific element
+```
+
+Compare actual boundaries to intended positions. Adjust `x`/`y`, `center`, or `position`
+attributes accordingly, then re-render to confirm.
+
+### Pre-Measure Text for Accurate Layout
+
+Before writing PAGX, use `pagx measure` to get precise font metrics. This avoids
+trial-and-error positioning of text elements:
+
+```bash
+pagx measure --font "Arial" --size 24 --text "Hello World"
+```
+
+Returns: `ascent`, `descent`, `leading`, `capHeight`, `xHeight`, `width`.
+
+**Common uses**:
+- **TextBox height**: `ascent + descent + leading` gives the exact single-line height.
+  For multi-line text, multiply by line count (or use `lineHeight` × line count).
+- **Horizontal sizing**: `width` gives the exact rendered width of a text string.
+  Use this to size containers or calculate centering offsets.
+- **Vertical alignment**: `ascent` measures from baseline to top. When aligning text
+  baseline with other elements, the baseline y = element top + ascent.

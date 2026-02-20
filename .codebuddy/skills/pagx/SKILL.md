@@ -178,10 +178,13 @@ These have **no default** — omitting them causes parse errors:
 ### Workflow
 
 1. **Decompose** the visual description into logical blocks (each block → one Layer)
-2. **Determine** canvas size (`width`/`height`) and each block's position
+2. **Determine** canvas size (`width`/`height`) and each block's position — use `pagx measure`
+   to get precise text dimensions before layout calculation
 3. **Build** each block's internal structure (Group isolation for different painters)
 4. **Localize** coordinates (Layer `x`/`y` carries offset, internals relative to origin)
-5. **Extract** shared resources into `<Resources>` at the end
+5. **Verify** — render screenshot with `pagx render`, read the image to check design accuracy,
+   alignment, and spacing consistency. If issues found → fix and re-render until satisfied.
+   Use `pagx bounds` for precise element boundaries when fine-tuning coordinates
 
 > For detailed generation patterns, component templates, and examples, read
 > `references/generation-guide.md`.
@@ -238,9 +241,10 @@ Use after generating or optimizing. Verify:
 4. Same painters on same-type geometry share a single scope (no redundant painters)
 5. Text `position`/`textAnchor` are not set when a TextBox is present
 6. Internal coordinates are relative to the Layer origin, not canvas-absolute
-7. `<Resources>` is placed after all Layers; all `@id` references resolve
+7. Shared resources extracted into `<Resources>` after all Layers; all `@id` references resolve
 8. Repeater copy counts are within limits (≤ 200 single, ≤ 500 nested product)
 9. Visual stacking order is preserved (especially after Layer↔Group conversions)
+10. Rendered screenshot matches expected design (layout, alignment, consistent spacing)
 
 ---
 
