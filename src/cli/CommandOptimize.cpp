@@ -482,9 +482,9 @@ static int RemoveUnreferencedResources(PAGXDocument* document) {
     CollectReferencedNodesFromLayer(layer, referenced);
   }
   auto& nodes = document->nodes;
-  auto originalSize = static_cast<int>(nodes.size());
-  int writeIndex = 0;
-  for (int i = 0; i < static_cast<int>(nodes.size()); i++) {
+  auto originalSize = nodes.size();
+  size_t writeIndex = 0;
+  for (size_t i = 0; i < nodes.size(); i++) {
     if (referenced.find(nodes[i].get()) != referenced.end()) {
       if (writeIndex != i) {
         nodes[writeIndex] = std::move(nodes[i]);
@@ -493,7 +493,7 @@ static int RemoveUnreferencedResources(PAGXDocument* document) {
     }
   }
   nodes.resize(writeIndex);
-  return originalSize - writeIndex;
+  return static_cast<int>(originalSize - writeIndex);
 }
 
 // --- Optimization #5: Path → Rectangle / Ellipse ---
@@ -535,32 +535,24 @@ static void ReplacePathsWithPrimitives(PAGXDocument* document, int& rectCount, i
       auto tgfxPath = ToTGFX(*path->data);
       tgfx::RRect rrect = {};
       tgfx::Rect rect = {};
+      PrimitiveReplacement rep = {};
       if (tgfxPath.isRRect(&rrect)) {
-        PrimitiveReplacement rep = {};
-        rep.elements = elements;
-        rep.index = i;
         rep.bounds = rrect.rect;
         rep.radiusX = rrect.radii.x;
-        rep.reversed = path->reversed;
         rep.type = rrect.isOval() ? PrimitiveType::Oval : PrimitiveType::RoundRect;
-        replacements.push_back(rep);
       } else if (tgfxPath.isOval(&rect)) {
-        PrimitiveReplacement rep = {};
-        rep.elements = elements;
-        rep.index = i;
         rep.bounds = rect;
-        rep.reversed = path->reversed;
         rep.type = PrimitiveType::Oval;
-        replacements.push_back(rep);
       } else if (tgfxPath.isRect(&rect)) {
-        PrimitiveReplacement rep = {};
-        rep.elements = elements;
-        rep.index = i;
         rep.bounds = rect;
-        rep.reversed = path->reversed;
         rep.type = PrimitiveType::Rect;
-        replacements.push_back(rep);
+      } else {
+        continue;
       }
+      rep.elements = elements;
+      rep.index = i;
+      rep.reversed = path->reversed;
+      replacements.push_back(rep);
     }
   }
 
@@ -675,9 +667,9 @@ static int RemoveOffCanvasLayers(PAGXDocument* document) {
     return 0;
   }
   auto& layers = document->layers;
-  int writeIndex = 0;
-  for (int i = 0; i < static_cast<int>(layers.size()); i++) {
-    if (indicesToRemove.find(static_cast<size_t>(i)) == indicesToRemove.end()) {
+  size_t writeIndex = 0;
+  for (size_t i = 0; i < layers.size(); i++) {
+    if (indicesToRemove.find(i) == indicesToRemove.end()) {
       layers[writeIndex++] = layers[i];
     }
   }
@@ -1275,6 +1267,10 @@ int RunOptimize(int argc, char* argv[]) {
   }
   out << xml;
   out.close();
+  if (out.fail()) {
+    std::cerr << "pagx optimize: error writing to '" << outputPath << "'\n";
+    return 1;
+  }
 
   return 0;
 }
