@@ -178,7 +178,7 @@ std::vector<ValidationError> ValidateFile(const std::string& filePath) {
 
 int RunValidate(int argc, char* argv[]) {
   bool jsonOutput = false;
-  std::string filePath;
+  std::string filePath = {};
 
   // Parse arguments (argv[0] is "validate")
   for (int i = 1; i < argc; ++i) {
