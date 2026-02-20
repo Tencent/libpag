@@ -37,6 +37,8 @@ class PAGXDocument {
  public:
   /**
    * Creates an empty document with the specified size.
+   * @param width the canvas width in pixels
+   * @param height the canvas height in pixels
    */
   static std::shared_ptr<PAGXDocument> Make(float width, float height);
 
@@ -65,6 +67,8 @@ class PAGXDocument {
    * If an ID is provided, the node will be indexed for lookup.
    * If the ID already exists, an error will be logged and the new node will replace the old one in
    * the index.
+   * @param id an optional unique identifier for the node, used for lookup via findNode(). If empty,
+   * the node is not indexed.
    */
   template <typename T>
   T* makeNode(const std::string& id = "") {
@@ -114,6 +118,9 @@ class PAGXDocument {
    * Loads external file data for an Image node matching the given file path. Once loaded, the
    * Image's data field is populated and its filePath is cleared, so the renderer uses embedded data
    * instead of file I/O.
+   * @param filePath the external file path to match against Image nodes
+   * @param data the file content to embed into the matching Image node
+   * @return true if a matching Image node was found and its data was loaded successfully
    */
   bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
 

@@ -36,11 +36,15 @@ class PathData : public Node {
  public:
   /**
    * Starts a new contour at the specified point.
+   * @param x the x-coordinate of the starting point
+   * @param y the y-coordinate of the starting point
    */
   void moveTo(float x, float y);
 
   /**
    * Adds a line from the current point to the specified point.
+   * @param x the x-coordinate of the end point
+   * @param y the y-coordinate of the end point
    */
   void lineTo(float x, float y);
 
