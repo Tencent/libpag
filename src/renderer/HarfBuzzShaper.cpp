@@ -34,6 +34,14 @@ struct DataPointer {
   std::shared_ptr<T> data;
 };
 
+static void ReleaseDataWrapper(void* ctx) {
+  delete reinterpret_cast<DataPointer<tgfx::Data>*>(ctx);
+}
+
+static void ReleaseTypefaceWrapper(void* ctx) {
+  delete reinterpret_cast<DataPointer<tgfx::Typeface>*>(ctx);
+}
+
 static hb_blob_t* GetTable(hb_face_t*, hb_tag_t tag, void* userData) {
   auto typeface = reinterpret_cast<DataPointer<tgfx::Typeface>*>(userData)->data;
   auto tableData = typeface->copyTableData(tag);
@@ -43,9 +51,7 @@ static hb_blob_t* GetTable(hb_face_t*, hb_tag_t tag, void* userData) {
   auto wrapper = new DataPointer<tgfx::Data>(tableData);
   return hb_blob_create(static_cast<const char*>(tableData->data()),
                         static_cast<unsigned int>(tableData->size()), HB_MEMORY_MODE_READONLY,
-                        static_cast<void*>(wrapper), [](void* ctx) {
-                          delete reinterpret_cast<DataPointer<tgfx::Data>*>(ctx);
-                        });
+                        static_cast<void*>(wrapper), ReleaseDataWrapper);
 }
 
 static std::shared_ptr<hb_face_t> CreateHBFace(const std::shared_ptr<tgfx::Typeface>& typeface) {
@@ -54,10 +60,7 @@ static std::shared_ptr<hb_face_t> CreateHBFace(const std::shared_ptr<tgfx::Typef
   }
   auto wrapper = new DataPointer<tgfx::Typeface>(typeface);
   auto face = std::shared_ptr<hb_face_t>(
-      hb_face_create_for_tables(GetTable, static_cast<void*>(wrapper),
-                                [](void* ctx) {
-                                  delete reinterpret_cast<DataPointer<tgfx::Typeface>*>(ctx);
-                                }),
+      hb_face_create_for_tables(GetTable, static_cast<void*>(wrapper), ReleaseTypefaceWrapper),
       hb_face_destroy);
   if (hb_face_get_empty() == face.get()) {
     return nullptr;
