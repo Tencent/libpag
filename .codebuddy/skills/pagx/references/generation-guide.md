@@ -69,8 +69,6 @@ until satisfied:
 3. If issues found → edit the PAGX, then go back to step 1.
    Use `pagx bounds input.pagx` to get precise rendered boundaries for fine-tuning coordinates.
 
-> For details and examples, see **Verify and Refine** in `references/generation-guide.md`.
-
 ---
 
 ## Component Templates

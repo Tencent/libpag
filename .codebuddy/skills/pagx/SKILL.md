@@ -173,58 +173,56 @@ These have **no default** — omitting them causes parse errors:
 
 ---
 
-## Generating PAGX
+## Workflow
 
-### Workflow
+### Generating PAGX
 
 1. **Decompose** the visual description into logical blocks (each block → one Layer)
 2. **Determine** canvas size (`width`/`height`) and each block's position — use `pagx measure`
-   for precise text dimensions and `pagx bounds` for precise Layer/element boundaries to
-   calculate layout accurately
+   for precise text dimensions and `pagx bounds` for precise Layer/element boundaries
 3. **Build** each block's internal structure (Group isolation for different painters).
    Identify repeated subtrees upfront and define them as `<Composition>` in Resources —
    reference via `composition="@id"` with only `x`/`y` at each usage point
 4. **Localize** coordinates (Layer `x`/`y` carries offset, internals relative to origin)
-5. **Verify** — render screenshot with `pagx render`, read the image to check design accuracy,
+5. **Verify** — render with `pagx render`, read the screenshot to check design accuracy,
    alignment, and spacing consistency. If issues found → fix and re-render until satisfied
+6. Continue to **Optimizing** below
 
 > For detailed generation patterns, component templates, and examples, read
 > `references/generation-guide.md`.
 
----
+### Optimizing PAGX
 
-## Optimizing PAGX
+For newly generated files, continue from step 5 above. For existing files, start here.
 
 **Fundamental Constraint**: All optimizations must preserve the original design appearance.
 Never modify visual attributes (colors, blur, spacing, opacity, font sizes, etc.) without
 explicit user approval.
 
-### Step 1: Run pagx optimize
-
-Automated deterministic optimizations (run after generating or receiving a PAGX file):
-
-```bash
-pagx optimize -o output.pagx input.pagx
-```
-
-Use `--dry-run` to preview changes without writing output. See `references/cli-reference.md`
-for all options.
-
-### Step 2: Review against Best Practices
-
-Check the file against **Core Concepts and Best Practices** above. Common issues in existing
-PAGX files:
-
-1. **Redundant Layer nesting** — child Layers that should be Groups (no Layer-exclusive features
-   used). See downgrade checklist in `references/structure-optimization.md`.
-2. **Duplicate painters** — identical Fill/Stroke repeated across Groups that could share scope.
-   See merging patterns in `references/painter-merging.md`.
-3. **Scattered blocks** — one logical unit split across multiple sibling Layers.
-4. **Over-packed Layers** — multiple independent blocks crammed into one Layer.
-5. **Manual text positioning** — multiple Text elements positioned by hand that should use a
-   single TextBox.
-6. **Canvas-absolute coordinates** — internal elements using canvas coordinates instead of
-   Layer-relative.
+1. **Run `pagx optimize`** — automated deterministic optimizations (empty element removal,
+   resource dedup, Path→primitive replacement, coordinate localization, etc.):
+   ```bash
+   pagx optimize -o output.pagx input.pagx
+   ```
+2. **Review against Best Practices** — check against the rules in **Core Concepts and Best
+   Practices** above. Common issues:
+   - **Redundant Layer nesting** — child Layers that should be Groups. See
+     `references/structure-optimization.md`.
+   - **Duplicate painters** — identical Fill/Stroke that could share scope. See
+     `references/painter-merging.md`.
+   - **Scattered blocks** — one logical unit split across multiple sibling Layers.
+   - **Over-packed Layers** — multiple independent blocks crammed into one Layer.
+   - **Manual text positioning** — hand-positioned Text that should use TextBox.
+3. **Final check** — verify:
+   - All `<pagx>`/`<Composition>` direct children are `<Layer>`
+   - All required attributes present; no redundant default-value attributes
+   - Painter scope isolation correct (different painters in Groups, same painters shared)
+   - Text `position`/`textAnchor` not set when TextBox is present
+   - Internal coordinates relative to Layer origin
+   - `<Resources>` after all Layers; all `@id` references resolve
+   - Repeater copies ≤ 200 single, ≤ 500 nested product
+   - Visual stacking order preserved
+   - Rendered screenshot matches expected design (layout, alignment, consistent spacing)
 
 > **Stacking order caveat**: When downgrading child Layers to Groups, Layer contents (Groups,
 > geometry) always render below child Layers regardless of XML order. Partial downgrade can
@@ -233,43 +231,7 @@ PAGX files:
 
 ---
 
-## Checklist
-
-Use after generating or optimizing. Verify:
-
-1. All direct children of `<pagx>` and `<Composition>` are `<Layer>`
-2. All required attributes are present (see table above)
-3. Different painters on different geometry are isolated with Groups
-4. Same painters on same-type geometry share a single scope (no redundant painters)
-5. Text `position`/`textAnchor` are not set when a TextBox is present
-6. Internal coordinates are relative to the Layer origin, not canvas-absolute
-7. Shared resources extracted into `<Resources>` after all Layers; all `@id` references resolve
-8. Repeater copy counts are within limits (≤ 200 single, ≤ 500 nested product)
-9. Visual stacking order is preserved (especially after Layer↔Group conversions)
-10. Rendered screenshot matches expected design (layout, alignment, consistent spacing)
-
----
-
 ## CLI Tools
 
-The `pagx` command-line tool provides: `optimize`, `render`, `validate`, `format`, `bounds`,
-`measure`, `font`. See `references/cli-reference.md` for full usage and options.
-
-Common commands:
-
-```bash
-pagx optimize -o output.pagx input.pagx   # automated structural optimization
-pagx render -o output.png input.pagx       # render to image
-pagx validate input.pagx                   # schema validation
-pagx format -o output.pagx input.pagx      # pretty-print
-pagx bounds input.pagx                     # query layer bounds
-pagx measure --font "Arial" --size 24 --text "Hello"  # font metrics
-pagx font -o output.pagx input.pagx        # embed fonts
-```
-
----
-
-## Quick Reference
-
-For complete attribute defaults, required attributes, and enumeration values, see
-`references/pagx-quick-reference.md`.
+See `references/cli-reference.md` for full usage and options:
+`optimize`, `render`, `validate`, `format`, `bounds`, `measure`, `font`.
