@@ -31,9 +31,9 @@ option(PAG_USE_QT "Allow build with QT frameworks" OFF)
 option(PAG_USE_RTTR "Enable RTTR support" OFF)
 option(PAG_USE_HARFBUZZ "Enable HarfBuzz support" OFF)
 option(PAG_USE_C "Enable c API" OFF)
-option(PAG_BUILD_PAGX "Enable PAGX format support in libpag" OFF)
-option(PAG_BUILD_CLI "Enable pagx command-line tool" OFF)
-option(PAG_BUILD_SVG "Enable SVG import/export support" OFF)
+option(PAG_BUILD_PAGX "Enable building PAGX format support in libpag" OFF)
+option(PAG_BUILD_CLI "Enable building pagx command-line tool" OFF)
+option(PAG_BUILD_SVG "Enable building SVG import/export support" OFF)
 
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
 if (NOT WEB OR EMSCRIPTEN_PTHREADS)
@@ -503,7 +503,7 @@ if (PAG_USE_C)
     if (ANDROID OR (WIN32 AND PAG_USE_ANGLE))
         file(GLOB PLATFORM_FILES src/c/ext/egl/pag_egl_globals.cpp)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
-    endif()
+    endif ()
 endif ()
 
 list(APPEND PAG_INCLUDES ${TGFX_DIR}/include)
@@ -630,11 +630,11 @@ if (PAG_BUILD_FRAMEWORK)
             MACOSX_FRAMEWORK_BUNDLE_VERSION ${PAG_VERSION}
             MACOSX_FRAMEWORK_SHORT_VERSION_STRING ${PAG_VERSION})
     set(CMAKE_XCODE_ATTRIBUTE_DEFINES_MODULE YES)
-    if(IOS)
+    if (IOS)
         set(CMAKE_XCODE_ATTRIBUTE_MODULEMAP_FILE ${CMAKE_CURRENT_SOURCE_DIR}/ios/libpag.modulemap)
-    elseif(MACOS)
+    elseif (MACOS)
         set(CMAKE_XCODE_ATTRIBUTE_MODULEMAP_FILE ${CMAKE_CURRENT_SOURCE_DIR}/mac/libpag.modulemap)
-    endif()    
+    endif ()
     set(CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER ${PAG_IDENTIFIER})
     if (HasParent)
         set(CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER ${CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER} PARENT_SCOPE)
@@ -655,17 +655,17 @@ if (PAG_BUILD_FRAMEWORK)
     if (NOT CMAKE_GENERATOR MATCHES "Xcode")
         if (MACOS)
             add_custom_command(TARGET pag POST_BUILD
-                WORKING_DIRECTORY "$<TARGET_FILE_DIR:pag>/../../"
-                COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:pag>/Modules"
-                COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_XCODE_ATTRIBUTE_MODULEMAP_FILE}" "$<TARGET_FILE_DIR:pag>/Modules/module.modulemap"
-                COMMAND ${CMAKE_COMMAND} -E create_symlink "Versions/Current/Modules" "Modules"
-                COMMENT "Copying modulemap file to framework/Versions/A/Modules/module.modulemap"
+                    WORKING_DIRECTORY "$<TARGET_FILE_DIR:pag>/../../"
+                    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:pag>/Modules"
+                    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_XCODE_ATTRIBUTE_MODULEMAP_FILE}" "$<TARGET_FILE_DIR:pag>/Modules/module.modulemap"
+                    COMMAND ${CMAKE_COMMAND} -E create_symlink "Versions/Current/Modules" "Modules"
+                    COMMENT "Copying modulemap file to framework/Versions/A/Modules/module.modulemap"
             )
         else ()
             add_custom_command(TARGET pag POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:pag>/Modules"
-                COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_XCODE_ATTRIBUTE_MODULEMAP_FILE}" "$<TARGET_FILE_DIR:pag>/Modules/module.modulemap"
-                COMMENT "Copying modulemap file to framework/Modules/module.modulemap"
+                    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:pag>/Modules"
+                    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_XCODE_ATTRIBUTE_MODULEMAP_FILE}" "$<TARGET_FILE_DIR:pag>/Modules/module.modulemap"
+                    COMMENT "Copying modulemap file to framework/Modules/module.modulemap"
             )
         endif ()
     endif ()
@@ -698,25 +698,18 @@ if (PAG_BUILD_CLI)
     endif ()
     find_package(LibXml2 REQUIRED)
 
-    # CLI library (all command implementations, excluding main.cpp)
-    file(GLOB_RECURSE CLI_LIB_FILES src/cli/*.cpp src/cli/*.h)
-    list(FILTER CLI_LIB_FILES EXCLUDE REGEX "main\\.cpp$")
-
-    add_library(pagx-cli-lib STATIC ${CLI_LIB_FILES})
-    add_dependencies(pagx-cli-lib pagx_xsd_header)
-    target_include_directories(pagx-cli-lib PUBLIC
+    # CLI executable
+    file(GLOB_RECURSE CLI_FILES src/cli/*.cpp src/cli/*.h)
+    add_executable(pagx-cli ${CLI_FILES})
+    add_dependencies(pagx-cli pagx_xsd_header)
+    set_target_properties(pagx-cli PROPERTIES OUTPUT_NAME pagx)
+    target_include_directories(pagx-cli PRIVATE
             src/cli
             ${PAG_INCLUDES}
             ${CMAKE_CURRENT_BINARY_DIR}/generated
             ${LIBXML2_INCLUDE_DIR})
-    target_compile_options(pagx-cli-lib PRIVATE ${PAG_COMPILE_OPTIONS})
-    target_link_libraries(pagx-cli-lib pag ${PAG_SHARED_LIBS} LibXml2::LibXml2)
-
-    # CLI executable
-    add_executable(pagx-cli src/cli/main.cpp)
-    set_target_properties(pagx-cli PROPERTIES OUTPUT_NAME pagx)
     target_compile_options(pagx-cli PRIVATE ${PAG_COMPILE_OPTIONS})
-    target_link_libraries(pagx-cli pagx-cli-lib)
+    target_link_libraries(pagx-cli pag ${PAG_SHARED_LIBS} LibXml2::LibXml2)
 endif ()
 
 if (PAG_BUILD_TESTS)
@@ -736,14 +729,18 @@ if (PAG_BUILD_TESTS)
     endif ()
 
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
-    list(APPEND PAG_TEST_FILES ${SRC_FILES})
-    list(APPEND PAG_TEST_LIBS pag pagx-cli-lib ${PAG_SHARED_LIBS})
+    file(GLOB_RECURSE CLI_TEST_FILES src/cli/*.cpp src/cli/*.h)
+    list(FILTER CLI_TEST_FILES EXCLUDE REGEX "main\\.cpp$")
+    list(APPEND PAG_TEST_FILES ${SRC_FILES} ${CLI_TEST_FILES})
+    list(APPEND PAG_TEST_LIBS pag ${PAG_SHARED_LIBS} LibXml2::LibXml2)
     set(GOOGLE_TEST_DIR ${TGFX_DIR}/third_party/googletest/googletest)
     list(APPEND PAG_TEST_INCLUDES ${PAG_INCLUDES} test/src
             ${GOOGLE_TEST_DIR} ${GOOGLE_TEST_DIR}/include
             ${TGFX_DIR}/third_party/json/include
             src/renderer src/pagx src/pagx/svg
-            src/cli)
+            src/cli
+            ${CMAKE_CURRENT_BINARY_DIR}/generated
+            ${LIBXML2_INCLUDE_DIR})
 
     add_vendor_target(test-vendor STATIC_VENDORS googletest CONFIG_DIR ${TGFX_DIR})
     find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
@@ -774,7 +771,7 @@ if (PAG_BUILD_TESTS)
     # used to update the local md5 data for baseline testing and generate baseline images to the
     # out/ directory. each image has a "_base" suffix.
     add_executable(UpdateBaseline ${PAG_TEST_FILES})
-    add_dependencies(UpdateBaseline test-vendor)
+    add_dependencies(UpdateBaseline test-vendor pagx_xsd_header)
     target_include_directories(UpdateBaseline PUBLIC ${PAG_TEST_INCLUDES})
     target_compile_definitions(UpdateBaseline PUBLIC ${PAG_BASELINE_DEFINES})
     target_compile_options(UpdateBaseline PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
@@ -782,7 +779,7 @@ if (PAG_BUILD_TESTS)
     target_link_libraries(UpdateBaseline ${PAG_TEST_LIBS})
 
     add_executable(PAGUnitTest ${PAG_TEST_FILES})
-    add_dependencies(PAGUnitTest test-vendor)
+    add_dependencies(PAGUnitTest test-vendor pagx_xsd_header)
     target_include_directories(PAGUnitTest PUBLIC ${PAG_TEST_INCLUDES})
     target_compile_definitions(PAGUnitTest PUBLIC ${PAG_TEST_DEFINES} SKIP_FRAME_COMPARE)
     target_compile_options(PAGUnitTest PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
@@ -790,7 +787,7 @@ if (PAG_BUILD_TESTS)
     target_link_libraries(PAGUnitTest ${PAG_TEST_LIBS})
 
     add_executable(PAGFullTest ${PAG_TEST_FILES})
-    add_dependencies(PAGFullTest test-vendor)
+    add_dependencies(PAGFullTest test-vendor pagx_xsd_header)
     target_include_directories(PAGFullTest PUBLIC ${PAG_TEST_INCLUDES})
     target_compile_definitions(PAGFullTest PUBLIC ${PAG_TEST_DEFINES})
     target_compile_options(PAGFullTest PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
