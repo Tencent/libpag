@@ -224,7 +224,7 @@
     </xs:restriction>
   </xs:simpleType>
 
-  <xs:simpleType name="MergePathOpType">
+  <xs:simpleType name="MergePathModeType">
     <xs:restriction base="xs:string">
       <xs:enumeration value="append"/>
       <xs:enumeration value="union"/>
@@ -581,7 +581,7 @@
   <!-- MergePath -->
   <xs:complexType name="MergePathType">
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="mode" type="MergePathOpType" default="append"/>
+    <xs:attribute name="mode" type="MergePathModeType" default="append"/>
     <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 

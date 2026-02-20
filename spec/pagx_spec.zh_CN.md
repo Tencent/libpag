@@ -737,8 +737,8 @@ Layer 的子元素按类型自动归类为四个集合：
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `blurX` | float | (必填) | X 模糊半径 |
-| `blurY` | float | (必填) | Y 模糊半径 |
+| `blurX` | float | 0 | X 模糊半径 |
+| `blurY` | float | 0 | Y 模糊半径 |
 | `tileMode` | TileMode | decal | 平铺模式 |
 
 #### 4.4.2 投影阴影滤镜（DropShadowFilter）
@@ -794,7 +794,7 @@ Layer 的子元素按类型自动归类为四个集合：
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `matrix` | Matrix | (必填) | 4x5 颜色矩阵（20 个逗号分隔的浮点数） |
+| `matrix` | Matrix | 单位矩阵 | 4x5 颜色矩阵（20 个逗号分隔的浮点数） |
 
 **矩阵格式**（20 个值，行优先）：
 ```
@@ -1306,9 +1306,9 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `mode` | MergePathOp | append | 合并操作（见下方） |
+| `mode` | MergePathMode | append | 合并操作（见下方） |
 
-**MergePathOp（路径合并操作）**：
+**MergePathMode（路径合并操作）**：
 
 | 值 | 说明 |
 |------|------|
@@ -1861,7 +1861,7 @@ Layer / Group
 | 枚举 | 值 |
 |------|------|
 | **TrimType** | `separate`, `continuous` |
-| **MergePathOp** | `append`, `union`, `intersect`, `xor`, `difference` |
+| **MergePathMode** | `append`, `union`, `intersect`, `xor`, `difference` |
 | **SelectorUnit** | `index`, `percentage` |
 | **SelectorShape** | `square`, `rampUp`, `rampDown`, `triangle`, `round`, `smooth` |
 | **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |

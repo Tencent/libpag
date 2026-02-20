@@ -3,7 +3,7 @@
 Back to main: [SKILL.md](../SKILL.md)
 
 This file contains complete attribute defaults and enumeration values extracted from the PAGX
-specification (Appendix C). Use this for quick lookup during optimization.
+specification (attribute tables in the main spec and Appendix B). Use this for quick lookup during optimization.
 
 ---
 
@@ -25,9 +25,7 @@ they **must not** be omitted.
 | **DiamondGradient** | `radius` |
 | **ColorStop** | `offset`, `color` |
 | **ImagePattern** | `image` |
-| **BlurFilter** | `blurX`, `blurY` |
 | **BlendFilter** | `color` |
-| **ColorMatrixFilter** | `matrix` |
 | **Path** | `data` |
 | **GlyphRun** | `font`, `glyphs` |
 | **TextPath** | `path` |
@@ -163,7 +161,7 @@ they **must not** be omitted.
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `mode` | MergePathOp | append |
+| `mode` | MergePathMode | append |
 
 ### LinearGradient
 
@@ -245,8 +243,8 @@ they **must not** be omitted.
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `blurX` | float | (required) |
-| `blurY` | float | (required) |
+| `blurX` | float | 0 |
+| `blurY` | float | 0 |
 | `tileMode` | TileMode | decal |
 
 ### DropShadowFilter
@@ -432,7 +430,7 @@ Path `data` uses SVG `<path d="...">` syntax exactly. Uppercase = absolute, lowe
 | Enum | Values |
 |------|--------|
 | **TrimType** | `separate`, `continuous` |
-| **MergePathOp** | `append`, `union`, `intersect`, `xor`, `difference` |
+| **MergePathMode** | `append`, `union`, `intersect`, `xor`, `difference` |
 | **SelectorUnit** | `index`, `percentage` |
 | **SelectorShape** | `square`, `rampUp`, `rampDown`, `triangle`, `round`, `smooth` |
 | **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |

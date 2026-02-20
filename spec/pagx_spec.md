@@ -737,8 +737,8 @@ Unlike layer styles (Section 4.3), which **independently render** visual effects
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `blurX` | float | (required) | X blur radius |
-| `blurY` | float | (required) | Y blur radius |
+| `blurX` | float | 0 | X blur radius |
+| `blurY` | float | 0 | Y blur radius |
 | `tileMode` | TileMode | decal | Tile mode |
 
 #### 4.4.2 DropShadowFilter
@@ -794,7 +794,7 @@ Transforms colors using a 4×5 color matrix.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `matrix` | Matrix | (required) | 4x5 color matrix (20 comma-separated floats) |
+| `matrix` | Matrix | identity matrix | 4x5 color matrix (20 comma-separated floats) |
 
 **Matrix Format** (20 values, row-major):
 ```
@@ -1306,9 +1306,9 @@ Merges all shapes into a single shape.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `mode` | MergePathOp | append | Merge operation (see below) |
+| `mode` | MergePathMode | append | Merge operation (see below) |
 
-**MergePathOp**:
+**MergePathMode**:
 
 | Value | Description |
 |-------|-------------|
@@ -1866,7 +1866,7 @@ Layer / Group
 | Enum | Values |
 |------|--------|
 | **TrimType** | `separate`, `continuous` |
-| **MergePathOp** | `append`, `union`, `intersect`, `xor`, `difference` |
+| **MergePathMode** | `append`, `union`, `intersect`, `xor`, `difference` |
 | **SelectorUnit** | `index`, `percentage` |
 | **SelectorShape** | `square`, `rampUp`, `rampDown`, `triangle`, `round`, `smooth` |
 | **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
