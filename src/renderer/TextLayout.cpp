@@ -1613,46 +1613,8 @@ class TextLayoutContext {
       float letterSpacing = (glyph.sourceText != nullptr) ? glyph.sourceText->letterSpacing : 0;
       auto orientation = VerticalTextUtils::getOrientation(glyph.unichar);
 
-      if (orientation == VerticalOrientation::Rotated &&
-          VerticalTextUtils::isRotatedGroupChar(glyph.unichar)) {
-        // Collect consecutive rotated-group characters into a single group.
-        VerticalGlyphInfo vg = {};
-        vg.orientation = VerticalOrientation::Rotated;
-        float groupHorizontalWidth = 0;
-        float maxFontSize = 0;
-        size_t groupStart = i;
-        while (i < allGlyphs.size() && allGlyphs[i].unichar != '\n' &&
-               VerticalTextUtils::isRotatedGroupChar(allGlyphs[i].unichar)) {
-          vg.glyphs.push_back(allGlyphs[i]);
-          // Use horizontal advance from font metrics, not HarfBuzz's xAdvance which may be 0
-          // in TTB shaping mode.
-          float hAdvance = allGlyphs[i].font.getAdvance(allGlyphs[i].glyphID);
-          groupHorizontalWidth += hAdvance;
-          if (allGlyphs[i].fontSize > maxFontSize) {
-            maxFontSize = allGlyphs[i].fontSize;
-          }
-          i++;
-        }
-        i--;  // Compensate for the outer loop's i++.
-        vg.height = groupHorizontalWidth + letterSpacing;
-        vg.width = maxFontSize;
-        if (groupStart > 0 && allGlyphs[groupStart - 1].unichar != '\n') {
-#ifdef PAG_USE_HARFBUZZ
-          auto& prevGlyph = allGlyphs[groupStart - 1];
-          auto& firstGlyph = allGlyphs[groupStart];
-          bool sameCluster = (firstGlyph.cluster != 0 || prevGlyph.cluster != 0) &&
-                             firstGlyph.cluster == prevGlyph.cluster;
-          vg.canBreakBefore =
-              !sameCluster &&
-              LineBreaker::canBreakBetween(prevGlyph.unichar, firstGlyph.unichar);
-#else
-          vg.canBreakBefore = LineBreaker::canBreakBetween(allGlyphs[groupStart - 1].unichar,
-                                                           allGlyphs[groupStart].unichar);
-#endif
-        }
-        vgList.push_back(std::move(vg));
-      } else {
-        // Single glyph (upright CJK, or non-groupable rotated character).
+      {
+        // Each glyph gets its own VerticalGlyphInfo entry.
         VerticalGlyphInfo vg = {};
         vg.glyphs.push_back(glyph);
         vg.orientation = orientation;
@@ -2017,27 +1979,7 @@ class TextLayoutContext {
           continue;
         }
 
-        if (vg.orientation == VerticalOrientation::Rotated && vg.glyphs.size() > 1) {
-          // Rotated group (tate-chu-yoko): render all glyphs as a horizontal run, rotated 90° CW.
-          float localX = 0;
-          float squashOffset = vg.leadingSquash;
-          for (auto& g : vg.glyphs) {
-            VerticalPositionedGlyph vpg = {};
-            vpg.glyphID = g.glyphID;
-            vpg.font = g.font;
-            vpg.useRSXform = true;
-            // RSXform::Make(0, 1, tx, ty) rotates 90° CW.
-            // After rotation, the glyph's vertical extent (ascent+descent) becomes horizontal width.
-            // Center each glyph horizontally in the column using its own ascent/descent.
-            float absAscent = fabsf(g.ascent);
-            float tx = columnCenterX - (absAscent - g.descent) / 2;
-            float ty = currentY - squashOffset + localX;
-            vpg.xform = tgfx::RSXform::Make(0, 1, tx, ty);
-            // Use horizontal advance from font metrics for positioning within the group.
-            localX += g.font.getAdvance(g.glyphID);
-            textGlyphs[g.sourceText].push_back(vpg);
-          }
-        } else if (vg.orientation == VerticalOrientation::Rotated) {
+        if (vg.orientation == VerticalOrientation::Rotated) {
           // Single rotated glyph: rotate 90 degrees CW using RSXform (scos=0, ssin=1).
           auto& g = vg.glyphs.front();
           VerticalPositionedGlyph vpg = {};

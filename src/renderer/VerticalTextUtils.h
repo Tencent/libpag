@@ -67,14 +67,6 @@ class VerticalTextUtils {
    * @param outDy Output: vertical offset (negative = upward).
    */
   static void getPunctuationOffset(float fontSize, float* outDx, float* outDy);
-
-  /**
-   * Returns true if the character can form a rotated group in vertical text layout.
-   * Consecutive rotated-group characters are rendered together as a horizontal run rotated 90°,
-   * instead of rotating each character individually. Includes Latin letters, digits, and
-   * connecting punctuation that commonly appears within words or numbers.
-   */
-  static bool isRotatedGroupChar(int32_t unichar);
 };
 
 }  // namespace pagx

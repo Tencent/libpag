@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="700" height="600" version="1.0">
-  <!-- Box A: Tate-chu-yoko digits (date format) -->
+  <!-- Box A: Digits rotated 90° in vertical text (date format) -->
   <Layer x="30" y="20">
     <Group>
       <Rectangle center="30,125" size="60,250"/>
@@ -13,7 +13,7 @@
     </Group>
   </Layer>
 
-  <!-- Box B: Multiple tate-chu-yoko groups (prices) + TextAlign Center -->
+  <!-- Box B: Rotated digits and symbols (prices) + TextAlign Center -->
   <Layer x="110" y="20">
     <Group>
       <Rectangle center="50,125" size="100,250"/>
@@ -26,7 +26,7 @@
     </Group>
   </Layer>
 
-  <!-- Box C: Latin/CJK alternating + explicit newline column break -->
+  <!-- Box C: Latin/CJK alternating (each char rotated individually) + explicit newline -->
   <Layer x="230" y="20">
     <Group>
       <Rectangle center="50,125" size="100,250"/>
@@ -130,7 +130,7 @@
     </Group>
   </Layer>
 
-  <!-- Box H: Pure Latin rotated groups with column wrap -->
+  <!-- Box H: Pure Latin (each character rotated 90°) with column wrap -->
   <Layer x="390" y="300">
     <Group>
       <Rectangle center="50,125" size="100,250"/>
