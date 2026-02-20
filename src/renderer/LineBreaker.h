@@ -61,7 +61,7 @@ class LineBreaker {
    * @param prevChar The Unicode code point before the potential break.
    * @param nextChar The Unicode code point after the potential break.
    */
-  static bool CanBreakBetween(int32_t prevChar, int32_t nextChar);
+  static bool canBreakBetween(int32_t prevChar, int32_t nextChar);
 
   /**
    * Returns the simplified UAX#14 line break class for a Unicode code point. Uses a sorted range
@@ -74,12 +74,12 @@ class LineBreaker {
    * Hangul, etc.). This is a broader check than ID class — it includes characters in the CJK
    * Symbols and Punctuation block that may have OP/CL/NS classes.
    */
-  static bool IsCJK(int32_t unichar);
+  static bool isCJK(int32_t unichar);
 
   /**
    * Returns true if the character is a whitespace character (space, tab, etc.).
    */
-  static bool IsWhitespace(int32_t unichar);
+  static bool isWhitespace(int32_t unichar);
 };
 
 }  // namespace pagx
