@@ -156,20 +156,12 @@ static const Layer* ResolveLayerPath(const PAGXDocument* document, const std::ve
 }
 
 // Evaluate an XPath expression and return matching Layer nodes.
-static std::vector<const Layer*> EvaluateXPath(const std::string& filePath,
-                                               const std::string& xpathExpr,
+static std::vector<const Layer*> EvaluateXPath(xmlDocPtr xmlDoc, const std::string& xpathExpr,
                                                const PAGXDocument* document) {
   std::vector<const Layer*> results = {};
 
-  xmlDocPtr xmlDoc = xmlReadFile(filePath.c_str(), nullptr, XML_PARSE_NONET);
-  if (xmlDoc == nullptr) {
-    std::cerr << "pagx bounds: failed to parse XML from '" << filePath << "'\n";
-    return results;
-  }
-
   xmlXPathContextPtr xpathCtx = xmlXPathNewContext(xmlDoc);
   if (xpathCtx == nullptr) {
-    xmlFreeDoc(xmlDoc);
     std::cerr << "pagx bounds: failed to create XPath context\n";
     return results;
   }
@@ -179,7 +171,6 @@ static std::vector<const Layer*> EvaluateXPath(const std::string& filePath,
   if (xpathObj == nullptr) {
     std::cerr << "pagx bounds: invalid XPath expression '" << xpathExpr << "'\n";
     xmlXPathFreeContext(xpathCtx);
-    xmlFreeDoc(xmlDoc);
     return results;
   }
 
@@ -204,14 +195,13 @@ static std::vector<const Layer*> EvaluateXPath(const std::string& filePath,
 
   xmlXPathFreeObject(xpathObj);
   xmlXPathFreeContext(xpathCtx);
-  xmlFreeDoc(xmlDoc);
   return results;
 }
 
 // Evaluate XPath and return a single Layer (for --relative).
-static const Layer* EvaluateSingleXPath(const std::string& filePath, const std::string& xpathExpr,
+static const Layer* EvaluateSingleXPath(xmlDocPtr xmlDoc, const std::string& xpathExpr,
                                         const PAGXDocument* document) {
-  auto layers = EvaluateXPath(filePath, xpathExpr, document);
+  auto layers = EvaluateXPath(xmlDoc, xpathExpr, document);
   if (layers.empty()) {
     return nullptr;
   }
@@ -304,17 +294,30 @@ int RunBounds(int argc, char* argv[]) {
     return 1;
   }
 
+  // Parse the XML document once for XPath queries.
+  bool needsXPath = !options.xpath.empty() || !options.relativeTo.empty();
+  xmlDocPtr xmlDoc = nullptr;
+  if (needsXPath) {
+    xmlDoc = xmlReadFile(options.inputFile.c_str(), nullptr, XML_PARSE_NONET);
+    if (xmlDoc == nullptr) {
+      std::cerr << "pagx bounds: failed to parse XML from '" << options.inputFile << "'\n";
+      return 1;
+    }
+  }
+
   // Resolve --relative Layer.
   tgfx::Layer* relativeLayer = nullptr;
   if (!options.relativeTo.empty()) {
     const Layer* relativePagx =
-        EvaluateSingleXPath(options.inputFile, options.relativeTo, document.get());
+        EvaluateSingleXPath(xmlDoc, options.relativeTo, document.get());
     if (relativePagx == nullptr) {
+      xmlFreeDoc(xmlDoc);
       std::cerr << "pagx bounds: --relative target not found\n";
       return 1;
     }
     auto it = buildResult.layerMap.find(relativePagx);
     if (it == buildResult.layerMap.end()) {
+      xmlFreeDoc(xmlDoc);
       std::cerr << "pagx bounds: --relative target has no rendered layer\n";
       return 1;
     }
@@ -323,8 +326,9 @@ int RunBounds(int argc, char* argv[]) {
 
   if (!options.xpath.empty()) {
     // XPath mode: query specific nodes.
-    auto matchedLayers = EvaluateXPath(options.inputFile, options.xpath, document.get());
+    auto matchedLayers = EvaluateXPath(xmlDoc, options.xpath, document.get());
     if (matchedLayers.empty()) {
+      xmlFreeDoc(xmlDoc);
       std::cerr << "pagx bounds: no matching Layer nodes found\n";
       return 1;
     }
@@ -353,6 +357,10 @@ int RunBounds(int argc, char* argv[]) {
       PrintLayerBoundsRecursive(document->layers[i], tgfxChildren[i].get(), relativeLayer,
                                 options.jsonOutput, 1);
     }
+  }
+
+  if (xmlDoc != nullptr) {
+    xmlFreeDoc(xmlDoc);
   }
 
   return 0;
