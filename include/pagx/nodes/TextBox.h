@@ -78,7 +78,7 @@ class TextBox : public Element {
    * controls the column width instead of the line height, since line-height is a logical property
    * that always applies to the block-axis dimension of a line box.
    */
-  float lineHeight = 0;
+  float lineHeight = 0.0f;
 
   /**
    * Whether automatic word wrapping is enabled. When true, text wraps at the box width boundary
