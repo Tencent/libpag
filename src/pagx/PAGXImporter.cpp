@@ -69,14 +69,17 @@ namespace pagx {
 // Forward declarations and utility functions
 //==============================================================================
 
-static const std::string EMPTY_STRING = {};
+static const std::string& EmptyString() {
+  static const std::string empty = {};
+  return empty;
+}
 
 static void reportError(PAGXDocument* doc, const DOMNode* node, const std::string& message) {
   doc->errors.push_back("line " + std::to_string(node->line) + ": " + message);
 }
 
 static const std::string& getAttribute(const DOMNode* node, const std::string& name,
-                                       const std::string& defaultValue = EMPTY_STRING);
+                                       const std::string& defaultValue = EmptyString());
 static float getFloatAttribute(const DOMNode* node, const std::string& name,
                                float defaultValue = 0,
                                PAGXDocument* doc = nullptr);
