@@ -671,14 +671,18 @@ if (PAG_BUILD_TESTS)
     add_dependencies(pagx pagx-vendor)
     merge_libraries_into(pagx ${PAGX_VENDOR_STATIC_LIBRARIES})
 
+    # Build CLI library (needed by CLI tests integrated into PAGFullTest)
+    add_subdirectory(cli)
+
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
     list(APPEND PAG_TEST_FILES ${SRC_FILES})
-    list(APPEND PAG_TEST_LIBS pagx pag ${PAG_SHARED_LIBS})
+    list(APPEND PAG_TEST_LIBS pagx pag pagx-cli-lib ${PAG_SHARED_LIBS})
     set(GOOGLE_TEST_DIR ${TGFX_DIR}/third_party/googletest/googletest)
     list(APPEND PAG_TEST_INCLUDES ${PAG_INCLUDES} test/src
             ${GOOGLE_TEST_DIR} ${GOOGLE_TEST_DIR}/include
             ${TGFX_DIR}/third_party/json/include
-            src/renderer src/pagx src/pagx/svg)
+            src/renderer src/pagx src/pagx/svg
+            cli/src)
 
     add_vendor_target(test-vendor STATIC_VENDORS googletest CONFIG_DIR ${TGFX_DIR})
     find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
@@ -732,7 +736,4 @@ if (PAG_BUILD_TESTS)
     target_link_options(PAGFullTest PRIVATE ${PAG_TEST_LINK_OPTIONS})
     target_link_libraries(PAGFullTest ${PAG_TEST_LIBS})
 
-    if (PAG_BUILD_CLI)
-        add_subdirectory(cli)
-    endif ()
 endif ()

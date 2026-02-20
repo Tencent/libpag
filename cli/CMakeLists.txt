@@ -59,18 +59,3 @@ add_executable(pagx-cli src/main.cpp)
 set_target_properties(pagx-cli PROPERTIES OUTPUT_NAME pagx)
 target_compile_options(pagx-cli PRIVATE ${PAG_COMPILE_OPTIONS})
 target_link_libraries(pagx-cli pagx-cli-lib)
-
-# CLI tests
-set(GOOGLE_TEST_DIR ${TGFX_DIR}/third_party/googletest/googletest)
-file(GLOB_RECURSE CLI_TEST_FILES test/*.cpp)
-if (CLI_TEST_FILES)
-    add_executable(pagx-cli-test ${CLI_TEST_FILES})
-    add_dependencies(pagx-cli-test test-vendor)
-    target_include_directories(pagx-cli-test PRIVATE
-            ${GOOGLE_TEST_DIR} ${GOOGLE_TEST_DIR}/include
-            ${CMAKE_SOURCE_DIR}/test/src
-    )
-    target_compile_options(pagx-cli-test PRIVATE ${PAG_COMPILE_OPTIONS})
-    find_vendor_libraries(test-vendor STATIC CLI_TEST_VENDOR_LIBS)
-    target_link_libraries(pagx-cli-test pagx-cli-lib ${CLI_TEST_VENDOR_LIBS})
-endif ()
