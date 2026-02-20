@@ -3,41 +3,8 @@
 Back to main: [SKILL.md](../SKILL.md)
 
 The `pagx` command-line tool provides utilities for working with PAGX files. All commands
-operate on local `.pagx` files.
-
----
-
-## Build & Run
-
-The `pagx` CLI is built as the `pagx-cli` CMake target (output binary name: `pagx`). Two ways
-to enable the build:
-
-1. **Standalone** — pass `-DPAG_BUILD_CLI=ON` (automatically enables `PAG_BUILD_PAGX`):
-   ```bash
-   cmake -G Ninja -DPAG_BUILD_CLI=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
-   cmake --build cmake-build-debug --target pagx-cli
-   ```
-
-2. **Via tests** — pass `-DPAG_BUILD_TESTS=ON` (enables CLI, PAGX, SVG, and all test targets):
-   ```bash
-   cmake -G Ninja -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
-   cmake --build cmake-build-debug --target pagx-cli
-   ```
-
-The built binary is at `cmake-build-debug/pagx`. Run it directly:
-
-```bash
-# Show help
-cmake-build-debug/pagx --help
-
-# Examples
-cmake-build-debug/pagx validate input.pagx
-cmake-build-debug/pagx optimize -o output.pagx input.pagx
-cmake-build-debug/pagx render -o output.png input.pagx
-cmake-build-debug/pagx format input.pagx
-cmake-build-debug/pagx bounds input.pagx
-cmake-build-debug/pagx font info --file font.ttf
-```
+operate on local `.pagx` files. The binary is at `cmake-build-debug/pagx` — if it does not
+exist, build it with `cmake --build cmake-build-debug --target pagx-cli`.
 
 ---
 
