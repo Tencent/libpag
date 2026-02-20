@@ -28,8 +28,7 @@
 
 namespace pagx {
 
-std::vector<BidiRun> BidiResolver::Resolve(const std::string& text,
-                                           BaseDirection baseDirection) {
+BidiResult BidiResolver::Resolve(const std::string& text, BaseDirection baseDirection) {
   if (text.empty()) {
     return {};
   }
@@ -66,9 +65,10 @@ std::vector<BidiRun> BidiResolver::Resolve(const std::string& text,
   // SheenBidi treats paragraph separators (\n, \r, etc.) as paragraph boundaries.
   // SBAlgorithmCreateParagraph only processes up to the first separator, so we must loop
   // over all paragraphs to cover the entire input text.
-  std::vector<BidiRun> result;
+  BidiResult result = {};
   auto textLength = static_cast<SBUInteger>(text.size());
   SBUInteger paragraphOffset = 0;
+  bool firstParagraph = true;
 
   while (paragraphOffset < textLength) {
     SBParagraphRef paragraph = SBAlgorithmCreateParagraph(
@@ -78,6 +78,10 @@ std::vector<BidiRun> BidiResolver::Resolve(const std::string& text,
     }
 
     auto paragraphLength = SBParagraphGetLength(paragraph);
+    if (firstParagraph) {
+      result.isRTL = (SBParagraphGetBaseLevel(paragraph) % 2) != 0;
+      firstParagraph = false;
+    }
     SBLineRef line = SBParagraphCreateLine(paragraph, paragraphOffset, paragraphLength);
     if (line != nullptr) {
       auto runCount = SBLineGetRunCount(line);
@@ -87,7 +91,7 @@ std::vector<BidiRun> BidiResolver::Resolve(const std::string& text,
         run.start = static_cast<size_t>(runs[i].offset);
         run.length = static_cast<size_t>(runs[i].length);
         run.isRTL = (runs[i].level % 2) != 0;
-        result.push_back(run);
+        result.runs.push_back(run);
       }
       SBLineRelease(line);
     }

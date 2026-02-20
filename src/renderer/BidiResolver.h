@@ -38,16 +38,24 @@ struct BidiRun {
   bool isRTL = false;
 };
 
+struct BidiResult {
+  /// Bidirectional runs in visual (display) order.
+  std::vector<BidiRun> runs = {};
+  /// True if the resolved paragraph base direction is RTL.
+  bool isRTL = false;
+};
+
 class BidiResolver {
  public:
   /**
-   * Resolves bidirectional runs for the given UTF-8 text. Returns runs in visual (display) order.
+   * Resolves bidirectional runs for the given UTF-8 text. Returns runs in visual (display) order
+   * along with the resolved paragraph direction.
    * @param text The UTF-8 encoded text to resolve.
    * @param baseDirection The base paragraph direction. AutoLTR/AutoRTL detect from text content
    *   per UAX#9 rules P2-P3. LTR/RTL force a specific direction.
    */
-  static std::vector<BidiRun> Resolve(const std::string& text,
-                                      BaseDirection baseDirection = BaseDirection::AutoLTR);
+  static BidiResult Resolve(const std::string& text,
+                            BaseDirection baseDirection = BaseDirection::AutoLTR);
 };
 
 }  // namespace pagx

@@ -154,6 +154,7 @@ class TextLayoutContext {
     std::vector<ShapedGlyphRun> runs = {};
     float totalWidth = 0;
     std::vector<GlyphInfo> allGlyphs = {};
+    bool paragraphRTL = false;
   };
 
   using FontKey = TextLayout::FontKey;
@@ -297,11 +298,17 @@ class TextLayoutContext {
     // Shape each Text and concatenate all glyphs for unified layout within the TextBox.
     std::vector<GlyphInfo> allGlyphs = {};
     float totalWidth = 0;
+    bool paragraphRTL = false;
+    bool directionResolved = false;
     for (auto* text : textElements) {
       ShapedInfo info = {};
       info.text = text;
       if (!text->text.empty()) {
         shapeText(text, info, textBox->writingMode == WritingMode::Vertical);
+        if (!directionResolved) {
+          paragraphRTL = info.paragraphRTL;
+          directionResolved = true;
+        }
       }
       for (auto& g : info.allGlyphs) {
         if (g.unichar != '\n') {
@@ -319,7 +326,7 @@ class TextLayoutContext {
       buildTextBlobVertical(textBox, columns);
     } else {
       auto lines = layoutLines(allGlyphs, textBox);
-      buildTextBlobWithLayout(textBox, lines);
+      buildTextBlobWithLayout(textBox, lines, paragraphRTL);
     }
   }
 
@@ -742,8 +749,9 @@ class TextLayoutContext {
 
 #ifdef PAG_USE_PAGX_LAYOUT
     // Use BiDi resolver to split text into directional runs, then further split by newlines/tabs.
-    auto bidiRuns = BidiResolver::Resolve(content);
-    for (auto& run : bidiRuns) {
+    auto bidiResult = BidiResolver::Resolve(content);
+    info.paragraphRTL = bidiResult.isRTL;
+    for (auto& run : bidiResult.runs) {
       size_t runEnd = run.start + run.length;
       size_t pos = run.start;
       while (pos < runEnd) {
@@ -1344,7 +1352,8 @@ class TextLayoutContext {
     }
   }
 
-  void buildTextBlobWithLayout(const TextBox* textBox, const std::vector<LineInfo>& lines) {
+  void buildTextBlobWithLayout(const TextBox* textBox, const std::vector<LineInfo>& lines,
+                               bool paragraphRTL = false) {
     if (lines.empty()) {
       return;
     }
@@ -1468,49 +1477,46 @@ class TextLayoutContext {
         }
       }
 
-      // Horizontal alignment.
+      // Horizontal alignment. In RTL paragraphs, Start means right-aligned and End means
+      // left-aligned.
       float xOffset = textBox->position.x;
       float justifyExtraPerGap = 0;
+      bool isStartAligned = (textBox->textAlign == TextAlign::Start && !paragraphRTL) ||
+                            (textBox->textAlign == TextAlign::End && paragraphRTL);
+      bool isEndAligned = (textBox->textAlign == TextAlign::End && !paragraphRTL) ||
+                          (textBox->textAlign == TextAlign::Start && paragraphRTL);
       if (boxWidth > 0) {
-        switch (textBox->textAlign) {
-          case TextAlign::Start:
-            break;
-          case TextAlign::Center:
-            xOffset += (boxWidth - line.width) / 2;
-            break;
-          case TextAlign::End:
-            xOffset += boxWidth - line.width;
-            break;
-          case TextAlign::Justify: {
-            // Justify: distribute extra space at word boundaries. Last line uses Start.
-            if (lineIdx < lines.size() - 1 && line.glyphs.size() > 1) {
-              int gapCount = 0;
-              for (size_t i = 0; i + 1 < line.glyphs.size(); i++) {
-                if (LineBreaker::canBreakBetween(line.glyphs[i].unichar,
-                                                 line.glyphs[i + 1].unichar)) {
-                  gapCount++;
-                }
-              }
-              if (gapCount > 0) {
-                justifyExtraPerGap =
-                    (boxWidth - line.width) / static_cast<float>(gapCount);
+        if (isStartAligned) {
+          // Left-aligned (LTR Start or RTL End): no offset.
+        } else if (textBox->textAlign == TextAlign::Center) {
+          xOffset += (boxWidth - line.width) / 2;
+        } else if (isEndAligned) {
+          xOffset += boxWidth - line.width;
+        } else if (textBox->textAlign == TextAlign::Justify) {
+          // Justify: distribute extra space at word boundaries. Last line uses Start alignment.
+          if (lineIdx < lines.size() - 1 && line.glyphs.size() > 1) {
+            int gapCount = 0;
+            for (size_t i = 0; i + 1 < line.glyphs.size(); i++) {
+              if (LineBreaker::canBreakBetween(line.glyphs[i].unichar,
+                                               line.glyphs[i + 1].unichar)) {
+                gapCount++;
               }
             }
-            break;
+            if (gapCount > 0) {
+              justifyExtraPerGap =
+                  (boxWidth - line.width) / static_cast<float>(gapCount);
+            }
+          } else if (paragraphRTL) {
+            xOffset += boxWidth - line.width;
           }
         }
       } else {
-        switch (textBox->textAlign) {
-          case TextAlign::Start:
-            break;
-          case TextAlign::Center:
-            xOffset -= line.width / 2;
-            break;
-          case TextAlign::End:
-            xOffset -= line.width;
-            break;
-          case TextAlign::Justify:
-            break;
+        if (isStartAligned) {
+          // No offset.
+        } else if (textBox->textAlign == TextAlign::Center) {
+          xOffset -= line.width / 2;
+        } else if (isEndAligned) {
+          xOffset -= line.width;
         }
       }
 
