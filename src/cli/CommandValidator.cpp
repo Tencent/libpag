@@ -42,7 +42,7 @@ static void CollectValidationError(void* context, const char* format, ...) {
   if (msg.empty()) {
     return;
   }
-  ValidationError error;
+  ValidationError error = {};
   error.message = std::move(msg);
   errors->push_back(std::move(error));
 }
@@ -52,7 +52,7 @@ static void CollectStructuredError(void* context, xmlErrorPtr xmlError) {
     return;
   }
   auto* errors = static_cast<std::vector<ValidationError>*>(context);
-  ValidationError error;
+  ValidationError error = {};
   error.line = xmlError->line;
   std::string msg(xmlError->message != nullptr ? xmlError->message : "Unknown error");
   while (!msg.empty() && msg.back() == '\n') {
@@ -128,7 +128,7 @@ std::vector<ValidationError> ValidateFile(const std::string& filePath) {
 
   xmlDocPtr doc = xmlReadFile(filePath.c_str(), nullptr, XML_PARSE_NONET);
   if (doc == nullptr) {
-    ValidationError error;
+    ValidationError error = {};
     error.message = "Failed to parse XML document";
     errors.push_back(std::move(error));
     return errors;
@@ -139,7 +139,7 @@ std::vector<ValidationError> ValidateFile(const std::string& filePath) {
       xmlSchemaNewMemParserCtxt(xsdContent.c_str(), static_cast<int>(xsdContent.size()));
   if (parserCtxt == nullptr) {
     xmlFreeDoc(doc);
-    ValidationError error;
+    ValidationError error = {};
     error.message = "Internal error: failed to create schema parser context";
     errors.push_back(std::move(error));
     return errors;
@@ -149,7 +149,7 @@ std::vector<ValidationError> ValidateFile(const std::string& filePath) {
   xmlSchemaFreeParserCtxt(parserCtxt);
   if (schema == nullptr) {
     xmlFreeDoc(doc);
-    ValidationError error;
+    ValidationError error = {};
     error.message = "Internal error: failed to parse XSD schema";
     errors.push_back(std::move(error));
     return errors;
@@ -159,7 +159,7 @@ std::vector<ValidationError> ValidateFile(const std::string& filePath) {
   if (validCtxt == nullptr) {
     xmlSchemaFree(schema);
     xmlFreeDoc(doc);
-    ValidationError error;
+    ValidationError error = {};
     error.message = "Internal error: failed to create validation context";
     errors.push_back(std::move(error));
     return errors;
