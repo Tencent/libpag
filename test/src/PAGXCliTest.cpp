@@ -32,12 +32,17 @@
 #include "tgfx/core/Pixmap.h"
 #include "utils/Baseline.h"
 #include "utils/ProjectPath.h"
+#include "utils/TestDir.h"
 
 namespace pag {
 using namespace tgfx;
 
 static std::string TempDir() {
-  auto dir = ProjectPath::Absolute("test/out/PAGXCliTest");
+#ifdef GENERATE_BASELINE_IMAGES
+  auto dir = TestDir::GetRoot() + "/baseline-out/PAGXCliTest";
+#else
+  auto dir = TestDir::GetRoot() + "/out/PAGXCliTest";
+#endif
   std::filesystem::create_directories(dir);
   return dir;
 }
