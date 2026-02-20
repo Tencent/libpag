@@ -149,8 +149,7 @@ geometry element's local coordinate system — they are NOT affected by Layer `x
 
 ### Shapes and Performance
 
-- Prefer Rectangle/Ellipse over Path for standard shapes (more readable, better performance,
-  dedicated fast path in renderer under Repeaters).
+- Prefer Rectangle/Ellipse over Path for standard shapes (more readable, better performance).
 - Keep single Repeater copies ≤ 200; nested Repeater product ≤ 500.
 - BlurFilter / DropShadowStyle cost is proportional to blur radius — use the smallest radius
   that achieves the visual effect.
