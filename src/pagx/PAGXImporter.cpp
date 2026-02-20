@@ -1521,8 +1521,11 @@ int parseHexDigit(char c) {
 }
 }  // namespace
 
-static Color parseColor(const std::string& str) {
+static Color parseColor(const std::string& str, bool* outValid = nullptr) {
   if (str.empty()) {
+    if (outValid) {
+      *outValid = false;
+    }
     return {};
   }
   // Hex format: #RGB, #RRGGBB, #RRGGBBAA (sRGB)
@@ -1537,6 +1540,9 @@ static Color parseColor(const std::string& str) {
       color.green = static_cast<float>(g * 17) / 255.0f;
       color.blue = static_cast<float>(b * 17) / 255.0f;
       color.alpha = 1.0f;
+      if (outValid) {
+        *outValid = true;
+      }
       return color;
     }
     if (str.size() == 7 || str.size() == 9) {
@@ -1550,6 +1556,9 @@ static Color parseColor(const std::string& str) {
                         ? static_cast<float>(parseHexDigit(str[7]) * 16 + parseHexDigit(str[8])) /
                               255.0f
                         : 1.0f;
+      if (outValid) {
+        *outValid = true;
+      }
       return color;
     }
   }
@@ -1593,7 +1602,13 @@ static Color parseColor(const std::string& str) {
     color.blue = components[2];
     color.alpha = count >= 4 ? components[3] : 1.0f;
     color.colorSpace = fmt.colorSpace;
+    if (outValid) {
+      *outValid = true;
+    }
     return color;
+  }
+  if (outValid) {
+    *outValid = false;
   }
   return {};
 }
@@ -1651,9 +1666,9 @@ static Color getColorAttribute(const DOMNode* node, const char* name, PAGXDocume
   if (!str || str->empty()) {
     return {};
   }
-  auto result = parseColor(*str);
-  if (result.red == 0 && result.green == 0 && result.blue == 0 && result.alpha == 0 &&
-      !str->empty() && (*str)[0] != '#' && str->find("srgb(") != 0 && str->find("p3(") != 0) {
+  bool valid = false;
+  auto result = parseColor(*str, &valid);
+  if (!valid) {
     reportError(doc, node,
                 "Invalid value '" + *str + "' for '" + std::string(name) + "' attribute.");
   }
