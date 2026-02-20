@@ -202,7 +202,7 @@ static std::vector<ShapedGlyph> ShapeRun(const std::string& text, size_t byteOff
   auto fontSize = font.getSize();
   auto scale = fontSize / upem;
 
-  std::vector<ShapedGlyph> result;
+  std::vector<ShapedGlyph> result = {};
   result.reserve(glyphCount);
   for (unsigned int i = 0; i < glyphCount; ++i) {
     ShapedGlyph glyph = {};
@@ -276,7 +276,7 @@ static hb_script_t ResolveScript(int32_t codepoint, hb_script_t lastScript) {
 static std::vector<ShapingRun> ItemizeRuns(const std::string& text,
                                            const tgfx::Font& primaryFont,
                                            const std::vector<tgfx::Font>& fallbackFonts) {
-  std::vector<ShapingRun> runs;
+  std::vector<ShapingRun> runs = {};
   size_t pos = 0;
   const tgfx::Font* lastFont = nullptr;
   hb_script_t lastScript = HB_SCRIPT_COMMON;
@@ -344,7 +344,7 @@ std::vector<ShapedGlyph> HarfBuzzShaper::Shape(const std::string& text,
   }
 
   // Phase 2: Per-run shaping — shape each run independently with full text context.
-  std::vector<ShapedGlyph> result;
+  std::vector<ShapedGlyph> result = {};
   result.reserve(text.size());
 
   for (auto& run : shapingRuns) {
