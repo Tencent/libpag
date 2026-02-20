@@ -25,7 +25,7 @@ namespace pagx::cli {
 
 struct ValidationError {
   int line = 0;
-  std::string message;
+  std::string message = {};
 };
 
 /**
