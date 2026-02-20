@@ -20,7 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
-#include "utils/MathUtil.h"
+#include "base/utils/MathUtil.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Image.h"
@@ -32,6 +32,9 @@
 #include "tgfx/core/Path.h"
 
 namespace pagx {
+
+using pag::FloatNearlyEqual;
+using pag::RadiansToDegrees;
 
 static constexpr int VectorFontUnitsPerEm = 1000;
 

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#ifdef PAG_USE_PAGX_LAYOUT
+#ifdef PAG_BUILD_PAGX
 
 #include <string>
 #include <vector>

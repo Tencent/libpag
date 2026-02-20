@@ -22,7 +22,7 @@
 #include <cstdlib>
 #include "utils/StringParser.h"
 #include "SVGPathParser.h"
-#include "utils/MathUtil.h"
+#include "base/utils/MathUtil.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/SolidColor.h"
@@ -30,6 +30,8 @@
 #include "xml/XMLDOM.h"
 
 namespace pagx {
+
+using pag::DegreesToRadians;
 
 static constexpr float DEFAULT_FONT_SIZE = 16.0f;
 std::shared_ptr<PAGXDocument> SVGImporter::Parse(const std::string& filePath,

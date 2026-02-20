@@ -30,8 +30,10 @@ option(PAG_USE_ANGLE "Allow build with the ANGLE library" OFF)
 option(PAG_USE_QT "Allow build with QT frameworks" OFF)
 option(PAG_USE_RTTR "Enable RTTR support" OFF)
 option(PAG_USE_HARFBUZZ "Enable HarfBuzz support" OFF)
-option(PAG_USE_PAGX_LAYOUT "Enable PAGX advanced typography (requires HarfBuzz)" OFF)
 option(PAG_USE_C "Enable c API" OFF)
+option(PAG_BUILD_PAGX "Build PAGX format support into libpag" OFF)
+option(PAG_BUILD_CLI "Build pagx-cli command-line tool" OFF)
+option(PAG_BUILD_SVG "Build SVG import/export support" OFF)
 
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
 if (NOT WEB OR EMSCRIPTEN_PTHREADS)
@@ -94,7 +96,16 @@ elseif (PAG_USE_SWIFTSHADER)
     set(PAG_USE_ANGLE OFF)
 endif ()
 
-if (PAG_USE_PAGX_LAYOUT)
+# PAG_BUILD_CLI and PAG_BUILD_SVG both require PAG_BUILD_PAGX
+if (PAG_BUILD_CLI)
+    set(PAG_BUILD_PAGX ON)
+endif ()
+if (PAG_BUILD_SVG)
+    set(PAG_BUILD_PAGX ON)
+endif ()
+
+# PAG_BUILD_PAGX enables HarfBuzz
+if (PAG_BUILD_PAGX)
     set(PAG_USE_HARFBUZZ ON)
 endif ()
 
@@ -108,8 +119,10 @@ endif ()
 
 if (PAG_BUILD_TESTS)
     set(PAG_USE_FREETYPE ON)
+    set(PAG_BUILD_PAGX ON)
+    set(PAG_BUILD_CLI ON)
+    set(PAG_BUILD_SVG ON)
     set(PAG_USE_HARFBUZZ ON)
-    set(PAG_USE_PAGX_LAYOUT ON)
     set(PAG_USE_SYSTEM_LZ4 OFF)
     set(PAG_BUILD_SHARED OFF)
     set(TGFX_BUILD_LAYERS ON)
@@ -118,6 +131,9 @@ endif ()
 message("PAG_USE_LIBAVC: ${PAG_USE_LIBAVC}")
 message("PAG_USE_RTTR: ${PAG_USE_RTTR}")
 message("PAG_USE_HARFBUZZ: ${PAG_USE_HARFBUZZ}")
+message("PAG_BUILD_PAGX: ${PAG_BUILD_PAGX}")
+message("PAG_BUILD_CLI: ${PAG_BUILD_CLI}")
+message("PAG_BUILD_SVG: ${PAG_BUILD_SVG}")
 message("PAG_USE_SYSTEM_LZ4: ${PAG_USE_SYSTEM_LZ4}")
 message("PAG_USE_C: ${PAG_USE_C}")
 message("PAG_BUILD_SHARED: ${PAG_BUILD_SHARED}")
@@ -170,10 +186,27 @@ list(APPEND PAG_FILES ${PAG_HEADERS})
 file(GLOB_RECURSE SRC_FILES
         src/base/*.*
         src/codec/*.*
-        src/rendering/*.*
-        src/renderer/*.*)
+        src/rendering/*.*)
 list(APPEND PAG_FILES ${SRC_FILES})
-list(APPEND PAG_INCLUDES src/renderer src/pagx)
+
+if (PAG_BUILD_PAGX)
+    # pagx core + utils + xml (always included with PAGX)
+    file(GLOB PAGX_CORE_SOURCES src/pagx/*.cpp)
+    file(GLOB_RECURSE PAGX_UTILS_SOURCES src/pagx/utils/*.*)
+    file(GLOB_RECURSE PAGX_XML_SOURCES src/pagx/xml/*.*)
+    # SVGPathParser is part of pagx core (used by PAGXImporter/PAGXExporter for path data)
+    list(APPEND PAGX_CORE_SOURCES src/pagx/svg/SVGPathParser.cpp)
+    list(APPEND PAG_FILES ${PAGX_CORE_SOURCES} ${PAGX_UTILS_SOURCES} ${PAGX_XML_SOURCES})
+    # renderer module (text layout, font embedding, etc.)
+    file(GLOB_RECURSE RENDERER_FILES src/renderer/*.*)
+    list(APPEND PAG_FILES ${RENDERER_FILES})
+    list(APPEND PAG_INCLUDES src/renderer src/pagx)
+
+    if (PAG_BUILD_SVG)
+        list(APPEND PAG_FILES src/pagx/svg/SVGImporter.cpp src/pagx/svg/SVGParserContext.h)
+        list(APPEND PAG_INCLUDES src/pagx/svg)
+    endif ()
+endif ()
 file(GLOB COMMON_FILES src/platform/*.*)
 list(APPEND PAG_FILES ${COMMON_FILES})
 
@@ -243,10 +276,18 @@ if (PAG_USE_HARFBUZZ)
     list(APPEND PAG_INCLUDES third_party/harfbuzz/src)
 endif ()
 
-if (PAG_USE_PAGX_LAYOUT)
-    list(APPEND PAG_DEFINES PAG_USE_PAGX_LAYOUT)
-    list(APPEND PAG_STATIC_VENDORS SheenBidi)
-    list(APPEND PAG_INCLUDES third_party/SheenBidi/Headers)
+if (PAG_BUILD_PAGX)
+    list(APPEND PAG_DEFINES PAG_BUILD_PAGX)
+    list(APPEND PAG_STATIC_VENDORS expat SheenBidi)
+    list(APPEND PAG_INCLUDES third_party/SheenBidi/Headers
+            third_party/expat/expat/lib)
+    if (WIN32)
+        list(APPEND PAG_DEFINES XML_STATIC)
+    endif ()
+endif ()
+
+if (PAG_BUILD_SVG)
+    list(APPEND PAG_DEFINES PAG_BUILD_SVG)
 endif ()
 
 function(find_include_dirs out)
@@ -638,6 +679,54 @@ if (PAG_BUILD_FRAMEWORK)
     endif ()
 endif ()
 
+if (PAG_BUILD_CLI)
+    # Generate pagx_xsd.h from spec/pagx.xsd
+    set(PAGX_XSD_INPUT "${CMAKE_CURRENT_SOURCE_DIR}/spec/pagx.xsd")
+    set(PAGX_XSD_HEADER "${CMAKE_CURRENT_BINARY_DIR}/generated/pagx_xsd.h")
+    add_custom_command(
+            OUTPUT "${PAGX_XSD_HEADER}"
+            COMMAND ${CMAKE_COMMAND}
+            -DXSD_INPUT=${PAGX_XSD_INPUT}
+            -DHEADER_OUTPUT=${PAGX_XSD_HEADER}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/generate_xsd_header.cmake
+            DEPENDS "${PAGX_XSD_INPUT}" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/generate_xsd_header.cmake"
+            COMMENT "Generating pagx_xsd.h from spec/pagx.xsd"
+    )
+    add_custom_target(pagx_xsd_header DEPENDS "${PAGX_XSD_HEADER}")
+
+    # Find LibXml2
+    if (APPLE)
+        execute_process(
+                COMMAND xcrun --show-sdk-path
+                OUTPUT_VARIABLE _MACOS_SDK_PATH
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        set(LIBXML2_INCLUDE_DIR "${_MACOS_SDK_PATH}/usr/include/libxml2" CACHE PATH "" FORCE)
+        set(LIBXML2_LIBRARY "${_MACOS_SDK_PATH}/usr/lib/libxml2.tbd" CACHE FILEPATH "" FORCE)
+    endif ()
+    find_package(LibXml2 REQUIRED)
+
+    # CLI library (all command implementations, excluding main.cpp)
+    file(GLOB_RECURSE CLI_LIB_FILES src/cli/*.cpp src/cli/*.h)
+    list(FILTER CLI_LIB_FILES EXCLUDE REGEX "main\\.cpp$")
+
+    add_library(pagx-cli-lib STATIC ${CLI_LIB_FILES})
+    add_dependencies(pagx-cli-lib pagx_xsd_header)
+    target_include_directories(pagx-cli-lib PUBLIC
+            src/cli
+            ${PAG_INCLUDES}
+            ${CMAKE_CURRENT_BINARY_DIR}/generated
+            ${LIBXML2_INCLUDE_DIR})
+    target_compile_options(pagx-cli-lib PRIVATE ${PAG_COMPILE_OPTIONS})
+    target_link_libraries(pagx-cli-lib pag ${PAG_SHARED_LIBS} LibXml2::LibXml2)
+
+    # CLI executable
+    add_executable(pagx-cli src/cli/main.cpp)
+    set_target_properties(pagx-cli PROPERTIES OUTPUT_NAME pagx)
+    target_compile_options(pagx-cli PRIVATE ${PAG_COMPILE_OPTIONS})
+    target_link_libraries(pagx-cli pagx-cli-lib)
+endif ()
+
 if (PAG_BUILD_TESTS)
 
     execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE HEAD_COMMIT)
@@ -654,35 +743,15 @@ if (PAG_BUILD_TESTS)
         endif ()
     endif ()
 
-    # Build pagx static library (format module, no tgfx dependency)
-    file(GLOB PAGX_CORE_SOURCES src/pagx/*.cpp)
-    file(GLOB_RECURSE PAGX_UTILS_SOURCES src/pagx/utils/*.cpp)
-    file(GLOB_RECURSE PAGX_XML_SOURCES src/pagx/xml/*.cpp)
-    file(GLOB_RECURSE PAGX_SVG_SOURCES src/pagx/svg/*.cpp)
-    add_library(pagx STATIC ${PAGX_CORE_SOURCES} ${PAGX_UTILS_SOURCES} ${PAGX_XML_SOURCES} ${PAGX_SVG_SOURCES})
-    target_include_directories(pagx PUBLIC include)
-    target_include_directories(pagx PRIVATE src/pagx
-            ${CMAKE_CURRENT_SOURCE_DIR}/third_party/expat/expat/lib)
-    if(WIN32)
-        target_compile_definitions(pagx PRIVATE XML_STATIC)
-    endif()
-    add_vendor_target(pagx-vendor STATIC_VENDORS expat)
-    find_vendor_libraries(pagx-vendor STATIC PAGX_VENDOR_STATIC_LIBRARIES)
-    add_dependencies(pagx pagx-vendor)
-    merge_libraries_into(pagx ${PAGX_VENDOR_STATIC_LIBRARIES})
-
-    # Build CLI library (needed by CLI tests integrated into PAGFullTest)
-    add_subdirectory(cli)
-
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
     list(APPEND PAG_TEST_FILES ${SRC_FILES})
-    list(APPEND PAG_TEST_LIBS pagx pag pagx-cli-lib ${PAG_SHARED_LIBS})
+    list(APPEND PAG_TEST_LIBS pag pagx-cli-lib ${PAG_SHARED_LIBS})
     set(GOOGLE_TEST_DIR ${TGFX_DIR}/third_party/googletest/googletest)
     list(APPEND PAG_TEST_INCLUDES ${PAG_INCLUDES} test/src
             ${GOOGLE_TEST_DIR} ${GOOGLE_TEST_DIR}/include
             ${TGFX_DIR}/third_party/json/include
             src/renderer src/pagx src/pagx/svg
-            cli/src)
+            src/cli)
 
     add_vendor_target(test-vendor STATIC_VENDORS googletest CONFIG_DIR ${TGFX_DIR})
     find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)

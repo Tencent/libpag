@@ -22,6 +22,7 @@
 
 namespace pag {
 static constexpr float FLOAT_NEARLY_ZERO = 1.0f / (1 << 12);
+static constexpr float Pi = 3.14159265358979323846f;
 
 static inline float DegreesToRadians(float degrees) {
   return degrees * (static_cast<float>(M_PI) / 180.0f);
@@ -33,6 +34,10 @@ static inline float RadiansToDegrees(float radians) {
 
 static inline bool FloatNearlyZero(float x, float tolerance = FLOAT_NEARLY_ZERO) {
   return fabsf(x) <= tolerance;
+}
+
+static inline bool FloatNearlyEqual(float x, float y, float tolerance = FLOAT_NEARLY_ZERO) {
+  return fabsf(x - y) <= tolerance;
 }
 
 static inline bool DoubleNearlyEqual(double x, double y, double tolerance = FLOAT_NEARLY_ZERO) {

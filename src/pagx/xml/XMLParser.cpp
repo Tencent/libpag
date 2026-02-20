@@ -72,7 +72,7 @@ struct ParsingContext {
 };
 
 ParsingContext::ParsingContext(XMLParser* parser)
-    : _parser(parser), _XMLParser(XML_ParserCreate_MM(nullptr, &XML_alloc, nullptr)) {
+    : _XMLParser(XML_ParserCreate_MM(nullptr, &XML_alloc, nullptr)), _parser(parser) {
 }
 
 bool ParsingContext::flushText() {

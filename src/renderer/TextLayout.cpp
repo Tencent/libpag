@@ -22,9 +22,9 @@
 #include "PunctuationSquash.h"
 #include "VerticalTextUtils.h"
 #include "utils/Base64.h"
-#include "utils/MathUtil.h"
+#include "base/utils/MathUtil.h"
 #include "ToTGFX.h"
-#include "utils/UTF8.h"
+#include "tgfx/core/UTF.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
@@ -39,11 +39,24 @@
 #ifdef PAG_USE_HARFBUZZ
 #include "HarfBuzzShaper.h"
 #endif
-#ifdef PAG_USE_PAGX_LAYOUT
+#ifdef PAG_BUILD_PAGX
 #include "BidiResolver.h"
 #endif
 
 namespace pagx {
+
+using pag::FloatNearlyEqual;
+
+static size_t DecodeUTF8Char(const char* data, size_t remaining, int32_t* unichar) {
+  const char* ptr = data;
+  const char* end = data + remaining;
+  int32_t ch = tgfx::UTF::NextUTF8(&ptr, end);
+  if (ch < 0) {
+    return 0;
+  }
+  *unichar = ch;
+  return static_cast<size_t>(ptr - data);
+}
 
 void TextLayout::registerTypeface(std::shared_ptr<tgfx::Typeface> typeface) {
   if (typeface == nullptr) {
@@ -741,13 +754,13 @@ class TextLayoutContext {
       size_t length = 0;
       bool isNewline = false;
       bool isTab = false;
-#ifdef PAG_USE_PAGX_LAYOUT
+#ifdef PAG_BUILD_PAGX
       bool isRTL = false;
 #endif
     };
     std::vector<TextSegment> segments = {};
 
-#ifdef PAG_USE_PAGX_LAYOUT
+#ifdef PAG_BUILD_PAGX
     // Use BiDi resolver to split text into directional runs, then further split by newlines/tabs.
     auto bidiResult = BidiResolver::Resolve(content);
     info.paragraphRTL = bidiResult.isRTL;
@@ -896,7 +909,7 @@ class TextLayoutContext {
       // Shape this text segment with HarfBuzz.
       auto substring = content.substr(seg.start, seg.length);
       bool rtl = false;
-#ifdef PAG_USE_PAGX_LAYOUT
+#ifdef PAG_BUILD_PAGX
       rtl = seg.isRTL;
 #endif
       auto shapedGlyphs = HarfBuzzShaper::Shape(substring, primaryFont, fallbackFonts,
@@ -1192,7 +1205,7 @@ class TextLayoutContext {
 
     FinishLine(currentLine, textBox->lineHeight, 0.0f);
 
-#ifdef PAG_USE_PAGX_LAYOUT
+#ifdef PAG_BUILD_PAGX
     // Apply punctuation squash to all lines.
     ApplyPunctuationSquashToLines(lines);
 #endif
@@ -1200,7 +1213,7 @@ class TextLayoutContext {
     return lines;
   }
 
-#ifdef PAG_USE_PAGX_LAYOUT
+#ifdef PAG_BUILD_PAGX
   static void ApplyPunctuationSquashToLines(std::vector<LineInfo>& lines) {
     for (auto& line : lines) {
       if (line.glyphs.empty()) {
@@ -1761,7 +1774,7 @@ class TextLayoutContext {
 
     FinishColumn(currentColumn, textBox->lineHeight);
 
-#ifdef PAG_USE_PAGX_LAYOUT
+#ifdef PAG_BUILD_PAGX
     // Apply punctuation squash to all columns.
     ApplyPunctuationSquashToColumns(columns);
 #endif
@@ -1769,7 +1782,7 @@ class TextLayoutContext {
     return columns;
   }
 
-#ifdef PAG_USE_PAGX_LAYOUT
+#ifdef PAG_BUILD_PAGX
   static void ApplyPunctuationSquashToColumns(std::vector<ColumnInfo>& columns) {
     for (auto& column : columns) {
       if (column.glyphs.empty()) {

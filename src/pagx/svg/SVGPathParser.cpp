@@ -22,9 +22,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
-#include "utils/MathUtil.h"
+#include "base/utils/MathUtil.h"
 
 namespace pagx {
+
+using pag::Pi;
 
 std::string PathDataToSVGString(const PathData& pathData) {
   std::string result;
