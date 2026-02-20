@@ -27,10 +27,10 @@ Read the description and identify independent visual units. Each becomes a `<Lay
 - Set `width`/`height` on the root `<pagx>` to fit all content with appropriate margins.
 - Assign each Layer's `x`/`y` based on the block's position in the overall layout.
 - Use round integer values for clarity.
-- **Pre-measure text** with `pagx measure` to get precise text dimensions before calculating
-  positions. For example, `pagx measure --font "Arial" --size 24 --text "Title"` returns
-  the exact width and font metrics (ascent, descent, leading), which can be used to size
-  TextBox and compute vertical spacing accurately.
+- **Pre-measure text** with `pagx font info` to get precise font metrics before calculating
+  positions. For example, `pagx font info --name "Arial" --size 24` returns the font metrics
+  (ascent, descent, leading, etc.), which can be used to size TextBox and compute vertical
+  spacing accurately.
 - **Measure element bounds** with `pagx bounds` to get precise rendered boundaries of Layers
   or elements. When building complex blocks incrementally, render a partial PAGX and use
   `pagx bounds --id blockId` to get the block's exact size, then use that to calculate
@@ -638,8 +638,9 @@ Use `pagx bounds` to get precise rendered boundaries — both during layout plan
 block sizes) and during refinement (to diagnose misalignment):
 
 ```bash
-pagx bounds input.pagx              # all layers
-pagx bounds --id myButton input.pagx # specific element
+pagx bounds input.pagx                                  # all layers
+pagx bounds --path "//Layer[@id='myButton']" input.pagx  # by id
+pagx bounds --path "/pagx/Layer[2]" input.pagx           # by position
 ```
 
 **During layout**: Build a block, render it, and use `pagx bounds` to get its exact size.
@@ -650,19 +651,22 @@ Then calculate positions of adjacent blocks based on actual dimensions rather th
 
 ### Pre-Measure Text for Accurate Layout
 
-Before writing PAGX, use `pagx measure` to get precise font metrics. This avoids
+Before writing PAGX, use `pagx font info` to get precise font metrics. This avoids
 trial-and-error positioning of text elements:
 
 ```bash
-pagx measure --font "Arial" --size 24 --text "Hello World"
+pagx font info --name "Arial" --size 24
+pagx font info --file ./CustomFont.ttf --size 16
 ```
 
-Returns: `ascent`, `descent`, `leading`, `capHeight`, `xHeight`, `width`.
+Returns typeface info (fontFamily, fontStyle, glyphsCount, etc.) and all FontMetrics fields:
+`top`, `ascent`, `descent`, `bottom`, `leading`, `xMin`, `xMax`, `xHeight`, `capHeight`,
+`underlineThickness`, `underlinePosition`.
 
 **Common uses**:
 - **TextBox height**: `ascent + descent + leading` gives the exact single-line height.
   For multi-line text, multiply by line count (or use `lineHeight` × line count).
-- **Horizontal sizing**: `width` gives the exact rendered width of a text string.
-  Use this to size containers or calculate centering offsets.
 - **Vertical alignment**: `ascent` measures from baseline to top. When aligning text
   baseline with other elements, the baseline y = element top + ascent.
+- **Text width**: For precise text width, write the text into a PAGX file and use
+  `pagx bounds` to measure the actual rendered dimensions.

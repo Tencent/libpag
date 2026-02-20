@@ -1,7 +1,7 @@
 # pagx CLI
 
 Command-line tool for working with PAGX files. Provides validation, rendering, querying,
-font embedding, and formatting capabilities.
+font operations, and formatting capabilities.
 
 ## Build
 
@@ -22,7 +22,6 @@ pagx <command> [options] <file>
 
 | Option | Description |
 |--------|-------------|
-| `--format json` | Output in JSON format (validate, bounds, measure) |
 | `--help, -h` | Show help |
 | `--version, -v` | Show version |
 
@@ -81,7 +80,8 @@ pagx render --crop 0,0,400,300 -o cropped.png design.pagx
 
 ### bounds
 
-Query the precise bounds of a node or layer.
+Query precise rendered bounds of Layer nodes. Supports XPath expressions for node selection
+and optional relative coordinate output.
 
 ```
 pagx bounds [options] <file.pagx>
@@ -91,50 +91,66 @@ pagx bounds [options] <file.pagx>
 
 | Option | Description |
 |--------|-------------|
-| `--id <node-id>` | Query bounds of a specific node by ID |
-| `--layer <name>` | Query bounds of a layer by name |
-| `--format json` | Output bounds as JSON |
+| `--path <xpath>` | Select nodes by XPath expression |
+| `--relative <xpath>` | Output bounds relative to another Layer |
+| `--json` | Output in JSON format |
+| `--format json` | Same as `--json` |
 
-**Example:**
+Without `--path`, outputs bounds for all layers.
 
-```bash
-pagx bounds --id myRect design.pagx
-pagx bounds --layer "Background" --format json design.pagx
-```
-
----
-
-### measure
-
-Measure visual properties of a PAGX node or layer.
-
-```
-pagx measure [options] <file.pagx>
-```
-
-**Options:**
-
-| Option | Description |
-|--------|-------------|
-| `--id <node-id>` | Measure a specific node by ID |
-| `--layer <name>` | Measure a layer by name |
-| `--format json` | Output measurements as JSON |
-
-**Example:**
+**XPath examples:**
 
 ```bash
-pagx measure --id textBlock design.pagx
-pagx measure --format json design.pagx
+pagx bounds --path "//Layer[@id='btn']" design.pagx         # Layer with id 'btn'
+pagx bounds --path "/pagx/Layer[1]" design.pagx              # First top-level Layer
+pagx bounds --path "/pagx/Layer[2]/Layer" design.pagx        # Child Layers of second Layer
+pagx bounds --path "//Layer[@id='icon']" --relative "//Layer[@id='card']" design.pagx  # relative
+pagx bounds --json design.pagx                                # all layers as JSON
 ```
 
 ---
 
 ### font
 
+Font operations: querying font metrics and embedding fonts into PAGX files.
+
+```
+pagx font <subcommand> [options]
+```
+
+#### font info
+
+Query font identity and metrics from a font file or system font.
+
+```
+pagx font info [options]
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `--file <path>` | Font file path |
+| `--name <family[,style]>` | System font name (e.g., `"Arial"` or `"Arial,Bold"`) |
+| `--size <pt>` | Font size in points (default: 12) |
+| `--json` | Output in JSON format |
+
+Either `--file` or `--name` is required (mutually exclusive).
+
+**Example:**
+
+```bash
+pagx font info --file ./fonts/CustomFont.ttf
+pagx font info --name "PingFang SC,Bold" --size 24
+pagx font info --name "Arial" --json
+```
+
+#### font embed
+
 Embed fonts into a PAGX file by performing text layout and glyph extraction.
 
 ```
-pagx font [options] <file.pagx>
+pagx font embed [options] <file.pagx>
 ```
 
 **Options:**
@@ -142,20 +158,21 @@ pagx font [options] <file.pagx>
 | Option | Description |
 |--------|-------------|
 | `-o, --output <path>` | Output file path (default: overwrite input) |
-| `--font <path>` | Extra font file path (can be specified multiple times) |
+| `--file <path>` | Add a font file (can be specified multiple times) |
+| `--fallback <family[,style]>` | Add a fallback font (can be specified multiple times) |
 
-The command loads the PAGX file, performs text shaping using system fonts and any
-additionally specified fonts, embeds the glyph data into the document, and writes the
-result back. This ensures cross-platform text rendering consistency.
+Added font files are matched by fontFamily/fontStyle against PAGX text references. Fallback
+fonts are tried in order when a character is not found in the primary font — they can
+reference loaded `--file` fonts or system fonts by name.
 
 **Example:**
 
 ```bash
 # Embed fonts using system fonts only
-pagx font design.pagx
+pagx font embed design.pagx
 
-# Embed fonts with additional custom fonts
-pagx font --font ./fonts/CustomFont.ttf --font ./fonts/Noto.ttf -o output.pagx design.pagx
+# Embed with custom fonts and fallback chain
+pagx font embed --file ./fonts/Brand.ttf --fallback "PingFang SC" --fallback "Noto Emoji" -o output.pagx design.pagx
 ```
 
 ---
@@ -239,8 +256,8 @@ pagx optimize --dry-run design.pagx
 
 ## Output Formats
 
-Commands that support `--format json` output structured JSON suitable for programmatic
-consumption. Without this flag, output is human-readable text on stdout.
+Commands that support `--json` or `--format json` output structured JSON suitable for
+programmatic consumption. Without this flag, output is human-readable text on stdout.
 
 Exit codes:
 - `0` — Success

@@ -178,8 +178,8 @@ These have **no default** — omitting them causes parse errors:
 ### Generating PAGX
 
 1. **Decompose** the visual description into logical blocks (each block → one Layer)
-2. **Determine** canvas size (`width`/`height`) and each block's position — use `pagx measure`
-   for precise text dimensions and `pagx bounds` for precise Layer/element boundaries
+2. **Determine** canvas size (`width`/`height`) and each block's position — use `pagx font info`
+   for precise font metrics and `pagx bounds` for precise Layer/element boundaries
 3. **Build** each block's internal structure (Group isolation for different painters).
    Identify repeated subtrees upfront and define them as `<Composition>` in Resources —
    reference via `composition="@id"` with only `x`/`y` at each usage point
@@ -235,4 +235,4 @@ explicit user approval.
 ## CLI Tools
 
 See `references/cli-reference.md` for full usage and options:
-`optimize`, `render`, `validate`, `format`, `bounds`, `measure`, `font`.
+`optimize`, `render`, `validate`, `format`, `bounds`, `font` (`info`, `embed`).

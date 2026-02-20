@@ -87,54 +87,79 @@ pagx format --indent 4 input.pagx       # 4-space indent (default: 2)
 
 ## pagx bounds
 
-Query precise rendered bounds of the document or specific nodes. Without `--id`, outputs
-bounds for the entire document and all layers.
+Query precise rendered bounds of Layer nodes. Supports XPath expressions for node selection.
+Without `--path`, outputs bounds for the entire document and all layers.
 
 ```bash
-pagx bounds input.pagx                   # all layers
-pagx bounds --id myLayer input.pagx      # specific node
-pagx bounds --format json input.pagx
+pagx bounds input.pagx                                          # all layers
+pagx bounds --path "//Layer[@id='btn']" input.pagx              # by id
+pagx bounds --path "/pagx/Layer[2]/Layer[1]" input.pagx         # by position
+pagx bounds --path "//Layer[@id='icon']" --relative "//Layer[@id='card']" input.pagx
+pagx bounds --json input.pagx
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--id <nodeId>` | Query a specific node by id |
-| `--format json` | JSON output |
+| `--path <xpath>` | Select Layer nodes by XPath expression |
+| `--relative <xpath>` | Output bounds relative to another Layer |
+| `--json` | JSON output |
 
----
+XPath quick reference for PAGX:
+- `//Layer[@id='x']` — Layer with `id="x"` anywhere in the document
+- `/pagx/Layer[1]` — first top-level Layer (1-indexed)
+- `/pagx/Layer[2]/Layer` — all child Layers of the second top-level Layer
+- `//Layer[@name='Title']` — Layer with `name="Title"`
 
-## pagx measure
-
-Measure font metrics and text dimensions.
-
-```bash
-pagx measure --font "Arial" --size 24 --text "Hello World"
-pagx measure --font "PingFang SC" --size 16 --style Bold --text "测试" --format json
-```
-
-| Option | Description |
-|--------|-------------|
-| `--font <family>` | Font family name (required) |
-| `--size <pt>` | Font size in points (required) |
-| `--text <string>` | Text to measure (required) |
-| `--style <style>` | Font style (e.g., Bold, Italic) |
-| `--letter-spacing <float>` | Extra spacing between characters |
-| `--format json` | JSON output |
-
-Returns: fontFamily, fontSize, ascent, descent, leading, capHeight, xHeight, width, charCount.
+Only `<Layer>` nodes are supported for bounds queries. If the XPath matches a non-Layer
+element, an error is reported.
 
 ---
 
 ## pagx font
 
+Font operations with two subcommands: `info` (query metrics) and `embed` (embed into PAGX).
+
+### pagx font info
+
+Query font identity and metrics from a font file or system font.
+
+```bash
+pagx font info --file ./CustomFont.ttf
+pagx font info --file ./CustomFont.ttf --size 24
+pagx font info --name "PingFang SC,Bold"
+pagx font info --name "Arial" --size 24 --json
+```
+
+| Option | Description |
+|--------|-------------|
+| `--file <path>` | Font file path |
+| `--name <family[,style]>` | System font by name (e.g., `"Arial"` or `"Arial,Bold"`) |
+| `--size <pt>` | Font size in points (default: 12, the PAGX spec default) |
+| `--json` | JSON output |
+
+Either `--file` or `--name` is required (mutually exclusive).
+
+Returns typeface info (fontFamily, fontStyle, glyphsCount, unitsPerEm, hasColor, hasOutlines)
+and all FontMetrics fields at the specified size (top, ascent, descent, bottom, leading, xMin,
+xMax, xHeight, capHeight, underlineThickness, underlinePosition).
+
+### pagx font embed
+
 Embed fonts into a PAGX file by performing text layout and glyph extraction.
 
 ```bash
-pagx font -o output.pagx input.pagx
-pagx font --font extra.ttf -o output.pagx input.pagx   # with additional font file
+pagx font embed input.pagx
+pagx font embed -o out.pagx input.pagx
+pagx font embed --file a.ttf --file b.ttf input.pagx
+pagx font embed --file a.ttf --fallback "PingFang SC" --fallback "Noto Emoji" input.pagx
 ```
 
 | Option | Description |
 |--------|-------------|
 | `-o, --output <path>` | Output file path (default: overwrite input) |
-| `--font <path>` | Additional font file (can be specified multiple times) |
+| `--file <path>` | Add a font file (can be specified multiple times) |
+| `--fallback <family[,style]>` | Fallback font in order (can be specified multiple times) |
+
+Added `--file` fonts are matched by fontFamily/fontStyle against PAGX text references.
+`--fallback` fonts are tried in order when a character is not found in the primary font —
+they can reference loaded `--file` fonts or system fonts by name.

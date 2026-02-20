@@ -21,8 +21,8 @@
 namespace pagx::cli {
 
 /**
- * Queries the precise bounds of a node or layer in a PAGX file.
- * Supports --format json for structured output.
+ * Queries the precise rendered bounds of Layer nodes in a PAGX file. Supports XPath expressions
+ * for node selection and optional relative coordinate output.
  */
 int RunBounds(int argc, char* argv[]);
 

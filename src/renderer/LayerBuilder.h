@@ -19,11 +19,21 @@
 #pragma once
 
 #include <memory>
+#include <unordered_map>
 #include "pagx/PAGXDocument.h"
 #include "TextLayout.h"
 #include "tgfx/layers/Layer.h"
 
 namespace pagx {
+
+/**
+ * Result of building a layer tree, containing the root layer and an optional mapping from PAGX
+ * Layer nodes to their corresponding tgfx::Layer objects.
+ */
+struct LayerBuildResult {
+  std::shared_ptr<tgfx::Layer> root = nullptr;
+  std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> layerMap = {};
+};
 
 /**
  * LayerBuilder converts PAGXDocument to tgfx::Layer tree for rendering.
@@ -41,6 +51,13 @@ class LayerBuilder {
    */
   static std::shared_ptr<tgfx::Layer> Build(PAGXDocument* document,
                                             TextLayout* textLayout = nullptr);
+
+  /**
+   * Builds a layer tree and returns a mapping from PAGX Layer nodes to tgfx::Layer objects. This
+   * mapping allows callers to look up the rendered layer for any PAGX Layer node.
+   */
+  static LayerBuildResult BuildWithMap(PAGXDocument* document,
+                                      TextLayout* textLayout = nullptr);
 };
 
 }  // namespace pagx

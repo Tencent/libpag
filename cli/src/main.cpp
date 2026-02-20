@@ -22,7 +22,6 @@
 #include "CommandBounds.h"
 #include "CommandFont.h"
 #include "CommandFormat.h"
-#include "CommandMeasure.h"
 #include "CommandOptimize.h"
 #include "CommandRender.h"
 #include "CommandValidator.h"
@@ -38,13 +37,12 @@ static void PrintUsage() {
             << "  validate   Validate PAGX structure against the specification\n"
             << "  render     Render PAGX to an image file (supports crop and scale)\n"
             << "  bounds     Query the precise bounds of a node or layer\n"
-            << "  measure    Measure visual properties of a PAGX node or layer\n"
-            << "  font       Embed fonts into a PAGX file\n"
+            << "  font       Query font metrics or embed fonts into a PAGX file\n"
             << "  format     Format a PAGX file (indentation and attribute ordering)\n"
             << "  optimize   Validate, optimize, and format a PAGX file in one step\n"
             << "\n"
             << "Global Options:\n"
-            << "  --format json    Output in JSON format (validate, bounds, measure)\n"
+            << "  --format json    Output in JSON format (validate, bounds)\n"
             << "  --help, -h       Show help\n"
             << "  --version, -v    Show version\n";
 }
@@ -75,9 +73,6 @@ int main(int argc, char* argv[]) {
   }
   if (command == "bounds") {
     return pagx::cli::RunBounds(argc - 1, argv + 1);
-  }
-  if (command == "measure") {
-    return pagx::cli::RunMeasure(argc - 1, argv + 1);
   }
   if (command == "font") {
     return pagx::cli::RunFont(argc - 1, argv + 1);

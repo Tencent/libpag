@@ -131,6 +131,14 @@ class LayerBuilderContext {
   explicit LayerBuilderContext(const ShapedTextMap& shapedTextMap) : _shapedTextMap(shapedTextMap) {
   }
 
+  LayerBuildResult buildWithMap(const PAGXDocument& document) {
+    auto root = build(document);
+    LayerBuildResult result = {};
+    result.root = root;
+    result.layerMap = std::move(_tgfxLayerByPagxLayer);
+    return result;
+  }
+
   std::shared_ptr<tgfx::Layer> build(const PAGXDocument& document) {
     // Build layer tree.
     auto rootLayer = tgfx::Layer::Make();
@@ -809,22 +817,30 @@ class LayerBuilderContext {
 
 // Public API implementation
 
+static TextLayoutResult PerformTextLayout(PAGXDocument* document, TextLayout* textLayout) {
+  if (textLayout != nullptr) {
+    return textLayout->layout(document);
+  }
+  TextLayout defaultTextLayout;
+  return defaultTextLayout.layout(document);
+}
+
 std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, TextLayout* textLayout) {
   if (document == nullptr) {
     return nullptr;
   }
-
-  // Create ShapedTextMap using provided or default TextLayout
-  TextLayoutResult layoutResult = {};
-  if (textLayout != nullptr) {
-    layoutResult = textLayout->layout(document);
-  } else {
-    TextLayout defaultTextLayout;
-    layoutResult = defaultTextLayout.layout(document);
-  }
-
+  auto layoutResult = PerformTextLayout(document, textLayout);
   LayerBuilderContext context(layoutResult.shapedTextMap);
   return context.build(*document);
+}
+
+LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document, TextLayout* textLayout) {
+  if (document == nullptr) {
+    return {};
+  }
+  auto layoutResult = PerformTextLayout(document, textLayout);
+  LayerBuilderContext context(layoutResult.shapedTextMap);
+  return context.buildWithMap(*document);
 }
 
 }  // namespace pagx
