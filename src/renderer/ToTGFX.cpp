@@ -28,7 +28,7 @@
 
 namespace pagx {
 
-tgfx::Path PathDataToTGFXPath(const PathData& pathData) {
+tgfx::Path ToTGFX(const PathData& pathData) {
   tgfx::Path path = {};
   const auto& verbs = pathData.verbs();
   const auto& points = pathData.points();
@@ -90,10 +90,6 @@ tgfx::Matrix ToTGFX(const Matrix& m) {
 
 tgfx::Rect ToTGFX(const Rect& r) {
   return tgfx::Rect::MakeXYWH(r.x, r.y, r.width, r.height);
-}
-
-tgfx::Path ToTGFX(const PathData& pathData) {
-  return PathDataToTGFXPath(pathData);
 }
 
 tgfx::LineCap ToTGFX(LineCap cap) {

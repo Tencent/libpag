@@ -63,8 +63,6 @@ enum class SelectorMode;
 
 namespace pagx {
 
-tgfx::Path PathDataToTGFXPath(const PathData& pathData);
-
 tgfx::Point ToTGFX(const Point& point);
 
 tgfx::Color ToTGFX(const Color& color);
