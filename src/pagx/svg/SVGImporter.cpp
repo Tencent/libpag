@@ -326,7 +326,12 @@ void SVGParserContext::parseStyleElement(const std::shared_ptr<DOMNode>& styleNo
         if (!selector.empty() && selector[0] == '.') {
           std::string className = selector.substr(1);
           if (!className.empty()) {
-            _cssClassRules[className] = styleContent;
+            auto it = _cssClassRules.find(className);
+            if (it != _cssClassRules.end()) {
+              it->second += ";" + styleContent;
+            } else {
+              _cssClassRules[className] = styleContent;
+            }
           }
         }
 
