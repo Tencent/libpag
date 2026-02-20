@@ -117,7 +117,7 @@ static std::string SavePAGXFile(const std::string& xml, const std::string& key) 
 PAGX_TEST(PAGXTest, SVGToPAGXAll) {
   constexpr int MinCanvasEdge = 400;
 
-  std::string svgDir = ProjectPath::Absolute("resources/apitest/SVG");
+  std::string svgDir = ProjectPath::Absolute("resources/svg");
   std::vector<std::string> svgFiles = {};
 
   for (const auto& entry : std::filesystem::directory_iterator(svgDir)) {
@@ -529,7 +529,7 @@ PAGX_TEST(PAGXTest, FontGlyphRoundTrip) {
  * Test case: Text shaping round-trip - verifies that original and pre-shaped renders are identical.
  */
 PAGX_TEST(PAGXTest, TextShaperRoundTrip) {
-  std::string svgPath = ProjectPath::Absolute("resources/apitest/SVG/text.svg");
+  std::string svgPath = ProjectPath::Absolute("resources/svg/text.svg");
 
   auto doc = pagx::SVGImporter::Parse(svgPath);
   ASSERT_TRUE(doc != nullptr);
@@ -575,7 +575,7 @@ PAGX_TEST(PAGXTest, TextShaperRoundTrip) {
  * Test case: Text shaping with emoji (mixed vector and bitmap fonts)
  */
 PAGX_TEST(PAGXTest, TextShaperEmoji) {
-  std::string svgPath = ProjectPath::Absolute("resources/apitest/SVG/emoji.svg");
+  std::string svgPath = ProjectPath::Absolute("resources/svg/emoji.svg");
 
   auto doc = pagx::SVGImporter::Parse(svgPath);
   ASSERT_TRUE(doc != nullptr);

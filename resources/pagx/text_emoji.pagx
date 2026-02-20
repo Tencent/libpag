@@ -65,20 +65,7 @@
     </Group>
   </Layer>
 
-  <!-- Box F: Pure emoji sequence with word-wrap -->
-  <Layer x="300" y="280">
-    <Group>
-      <Rectangle center="100,60" size="200,120"/>
-      <Stroke/>
-    </Group>
-    <Group>
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[😀😃😄😁😆🤣😂🙂🙃😉😊😇]]></Text>
-      <TextBox size="200,120"/>
-      <Fill/>
-    </Group>
-  </Layer>
-
-  <!-- Box G: Emoji in vertical text layout -->
+  <!-- Box F: Emoji in vertical text layout -->
   <Layer x="50" y="380">
     <Group>
       <Rectangle center="40,100" size="80,200"/>

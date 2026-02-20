@@ -78,17 +78,4 @@
     </Group>
   </Layer>
 
-  <!-- Box G: URL with CJK context -->
-  <Layer x="280" y="400">
-    <Group>
-      <Rectangle center="150,50" size="300,100"/>
-      <Stroke/>
-    </Group>
-    <Group>
-      <Text fontFamily="NotoSansSC" fontSize="18"><![CDATA[详见 https://example.com/path?id=123
-联系 email@test.com 获取信息]]></Text>
-      <TextBox size="300,100"/>
-      <Fill/>
-    </Group>
-  </Layer>
 </pagx>

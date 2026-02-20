@@ -1,0 +1,311 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="700" height="1050" version="1.0">
+  <!-- === Row 1: Basic box text layout === -->
+
+  <!-- Box A: CJK auto word wrap -->
+  <Layer x="30" y="30">
+    <Group>
+      <Rectangle center="75,60" size="150,120"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text text="你好世界，这是测试文本。" fontFamily="NotoSansSC" fontSize="20"/>
+      <TextBox size="150,120"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box B: Overflow hidden -->
+  <Layer x="200" y="30">
+    <Group>
+      <Rectangle center="75,40" size="150,80"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text text="Overflow text that is very long and should be clipped by the box boundary." fontFamily="NotoSansSC" fontSize="18"/>
+      <TextBox size="150,80" overflow="hidden"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box C: Justify alignment -->
+  <Layer x="370" y="30">
+    <Group>
+      <Rectangle center="75,40" size="150,80"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text text="Justify this line&#10;Last line start" fontFamily="NotoSansSC" fontSize="18"/>
+      <TextBox size="150,80" textAlign="justify"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- === Row 2: Empty lines and rich text === -->
+
+  <!-- Box D: Empty lines (\n at start + consecutive \n\n) -->
+  <Layer x="30" y="170">
+    <Group>
+      <Rectangle center="60,65" size="120,130"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text text="&#10;Line2&#10;&#10;Line4" fontFamily="NotoSansSC" fontSize="20"/>
+      <Fill/>
+      <TextBox size="120,130"/>
+    </Group>
+  </Layer>
+
+  <!-- Box E: Rich text + end alignment -->
+  <Layer x="170" y="170">
+    <Group>
+      <Rectangle center="115,60" size="230,120"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Group>
+        <Text text="Right" fontFamily="NotoSansSC" fontSize="24"/>
+        <Fill/>
+      </Group>
+      <Group>
+        <Text text="Align" fontFamily="NotoSansSC" fontSize="36"/>
+        <Fill/>
+      </Group>
+      <TextBox size="230,120" textAlign="end"/>
+    </Group>
+  </Layer>
+
+  <!-- === Row 3: Paragraph alignment near/middle/far === -->
+
+  <!-- Box F: ParagraphAlign near -->
+  <Layer x="30" y="320">
+    <Group>
+      <Rectangle center="75,40" size="150,80"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text text="aaAÂẤ" fontFamily="NotoSansSC" fontSize="32"/>
+      <TextBox size="150,80"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box G: ParagraphAlign middle -->
+  <Layer x="200" y="320">
+    <Group>
+      <Rectangle center="75,40" size="150,80"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text text="aaAÂẤ" fontFamily="NotoSansSC" fontSize="32"/>
+      <TextBox size="150,80" paragraphAlign="middle"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box H: ParagraphAlign far -->
+  <Layer x="370" y="320">
+    <Group>
+      <Rectangle center="75,40" size="150,80"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text text="aaAÂẤ" fontFamily="NotoSansSC" fontSize="32"/>
+      <TextBox size="150,80" paragraphAlign="far"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- === Row 4: Line height === -->
+
+  <!-- Box I: Auto lineHeight, mixed font sizes -->
+  <Layer x="30" y="430">
+    <Group>
+      <Rectangle center="100,90" size="200,180"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Group>
+        <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
+        <Fill/>
+      </Group>
+      <Group>
+        <Text text="Xy" fontFamily="NotoSansSC" fontSize="20"/>
+        <Fill/>
+      </Group>
+      <Group>
+        <Text text="&#10;AB" fontFamily="NotoSansSC" fontSize="60"/>
+        <Fill/>
+      </Group>
+      <TextBox size="200,180"/>
+    </Group>
+  </Layer>
+
+  <!-- Box J: Fixed lineHeight=40, mixed font sizes -->
+  <Layer x="250" y="430">
+    <Group>
+      <Rectangle center="100,90" size="200,180"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Group>
+        <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
+        <Fill/>
+      </Group>
+      <Group>
+        <Text text="Xy" fontFamily="NotoSansSC" fontSize="20"/>
+        <Fill/>
+      </Group>
+      <Group>
+        <Text text="&#10;AB" fontFamily="NotoSansSC" fontSize="60"/>
+        <Fill/>
+      </Group>
+      <TextBox size="200,180" lineHeight="40"/>
+    </Group>
+  </Layer>
+
+  <!-- Box K: Fixed lineHeight=50, paragraphAlign far -->
+  <Layer x="470" y="430">
+    <Group>
+      <Rectangle center="75,80" size="150,160"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text text="Line1&#10;Line2" fontFamily="NotoSansSC" fontSize="24"/>
+      <Fill/>
+      <TextBox size="150,160" paragraphAlign="far" lineHeight="50"/>
+    </Group>
+  </Layer>
+
+  <!-- Box L: 3-line mixed sizes, paragraphAlign far -->
+  <Layer x="30" y="640">
+    <Group>
+      <Rectangle center="75,90" size="150,180"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Group>
+        <Text text="Large&#10;" fontFamily="NotoSansSC" fontSize="36"/>
+        <Fill/>
+      </Group>
+      <Group>
+        <Text text="Medium&#10;" fontFamily="NotoSansSC" fontSize="24"/>
+        <Fill/>
+      </Group>
+      <Group>
+        <Text text="Tiny" fontFamily="NotoSansSC" fontSize="16"/>
+        <Fill/>
+      </Group>
+      <TextBox size="150,180" paragraphAlign="far"/>
+    </Group>
+  </Layer>
+
+  <!-- === Row 5: Point text (no TextBox, multiline with anchor) === -->
+
+  <!-- Box M: Point text, textAnchor=start (default) -->
+  <Layer x="220" y="640">
+    <Group>
+      <Text text="Line One&#10;Line Two&#10;Line Three" fontFamily="NotoSansSC" fontSize="24"/>
+      <Fill/>
+    </Group>
+    <Group>
+      <Ellipse size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+  </Layer>
+
+  <!-- Box N: Point text, textAnchor=center -->
+  <Layer x="500" y="640">
+    <Group>
+      <Text text="Center A&#10;Center BB&#10;Center CCC" fontFamily="NotoSansSC" fontSize="24" textAnchor="center"/>
+      <Fill/>
+    </Group>
+    <Group>
+      <Ellipse size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+  </Layer>
+
+  <!-- Box O: Point text, textAnchor=end -->
+  <Layer x="500" y="770">
+    <Group>
+      <Text text="End X&#10;End YY&#10;End ZZZ" fontFamily="NotoSansSC" fontSize="24" textAnchor="end"/>
+      <Fill/>
+    </Group>
+    <Group>
+      <Ellipse size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+  </Layer>
+
+  <!-- === Row 6: TextBox anchor mode (TextBox without size) === -->
+
+  <!-- Box P: 6 anchor alignment combinations -->
+  <Layer x="30" y="900">
+    <!-- TextAlign Start -->
+    <Group>
+      <Text text="Start" fontFamily="NotoSansSC" fontSize="20"/>
+      <Fill/>
+      <TextBox/>
+    </Group>
+    <Group>
+      <Ellipse size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+
+    <!-- TextAlign Center -->
+    <Group>
+      <Text text="Center" fontFamily="NotoSansSC" fontSize="20"/>
+      <Fill/>
+      <TextBox position="110,0" textAlign="center"/>
+    </Group>
+    <Group>
+      <Ellipse center="110,0" size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+
+    <!-- TextAlign End -->
+    <Group>
+      <Text text="End" fontFamily="NotoSansSC" fontSize="20"/>
+      <Fill/>
+      <TextBox position="220,0" textAlign="end"/>
+    </Group>
+    <Group>
+      <Ellipse center="220,0" size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+
+    <!-- ParagraphAlign Near -->
+    <Group>
+      <Text text="Near" fontFamily="NotoSansSC" fontSize="20"/>
+      <Fill/>
+      <TextBox position="330,0"/>
+    </Group>
+    <Group>
+      <Ellipse center="330,0" size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+
+    <!-- ParagraphAlign Middle -->
+    <Group>
+      <Text text="Middle" fontFamily="NotoSansSC" fontSize="20"/>
+      <Fill/>
+      <TextBox position="440,0" paragraphAlign="middle"/>
+    </Group>
+    <Group>
+      <Ellipse center="440,0" size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+
+    <!-- ParagraphAlign Far -->
+    <Group>
+      <Text text="Far" fontFamily="NotoSansSC" fontSize="20"/>
+      <Fill/>
+      <TextBox position="550,0" paragraphAlign="far"/>
+    </Group>
+    <Group>
+      <Ellipse center="550,0" size="6,6"/>
+      <Fill color="#F00"/>
+    </Group>
+  </Layer>
+</pagx>
