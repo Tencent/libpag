@@ -37,7 +37,7 @@ namespace pag {
 using namespace tgfx;
 
 static std::string TempDir() {
-  auto dir = ProjectPath::Absolute("test/out/cli");
+  auto dir = ProjectPath::Absolute("test/out/PAGXCliTest");
   std::filesystem::create_directories(dir);
   return dir;
 }
