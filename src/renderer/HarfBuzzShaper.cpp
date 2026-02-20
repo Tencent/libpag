@@ -205,7 +205,7 @@ static std::vector<ShapedGlyph> ShapeRun(const std::string& text, size_t byteOff
   std::vector<ShapedGlyph> result;
   result.reserve(glyphCount);
   for (unsigned int i = 0; i < glyphCount; ++i) {
-    ShapedGlyph glyph = {};
+    ShapedGlyph glyph;
     glyph.glyphID = static_cast<tgfx::GlyphID>(infos[i].codepoint);
     glyph.cluster = infos[i].cluster;
     glyph.xAdvance = static_cast<float>(positions[i].x_advance) * scale;
