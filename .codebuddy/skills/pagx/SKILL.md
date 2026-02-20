@@ -61,9 +61,8 @@ child Layers — unless Layer-exclusive features (styles, filters, mask, blendMo
 
 **Decision rule**: Direct child of `<pagx>`/`<Composition>`? → must be Layer. Independently
 positionable unit? → Layer. Needs styles/filters/mask/blendMode? → Layer. Complex static
-content worth caching separately from dynamic content? → Layer (but simple shapes like
-Rectangle/Ellipse with solid Fill render via GPU fast path without caching — no need to
-separate). Otherwise → Group (lighter, no extra surface).
+content worth caching separately from dynamic content? → Layer. Otherwise → Group (lighter,
+no extra surface).
 
 ### VectorElement Processing Model (Accumulate-Render)
 
