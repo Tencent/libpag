@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- File with off-canvas layer that should be removed -->
+<pagx version="1.0" width="200" height="200">
+  <Layer id="visible">
+    <Rectangle center="100,100" size="100,100"/>
+    <Fill color="#3F51B5"/>
+  </Layer>
+  <!-- This layer is completely outside the canvas -->
+  <Layer id="offCanvas" x="-300" y="-300">
+    <Rectangle center="50,50" size="100,100"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+  <!-- Another off-canvas layer on the right -->
+  <Layer id="offCanvas2" x="500" y="0">
+    <Ellipse center="50,50" size="80,80"/>
+    <Fill color="#00FF00"/>
+  </Layer>
+</pagx>

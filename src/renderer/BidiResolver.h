@@ -35,11 +35,11 @@ enum class BaseDirection {
 struct BidiRun {
   size_t start = 0;
   size_t length = 0;
-  bool isRTL = false;
+  uint8_t level = 0;
 };
 
 struct BidiResult {
-  /// Bidirectional runs in visual (display) order.
+  /// Bidirectional runs in logical (text) order.
   std::vector<BidiRun> runs = {};
   /// True if the resolved paragraph base direction is RTL.
   bool isRTL = false;
@@ -48,7 +48,7 @@ struct BidiResult {
 class BidiResolver {
  public:
   /**
-   * Resolves bidirectional runs for the given UTF-8 text. Returns runs in visual (display) order
+   * Resolves bidirectional runs for the given UTF-8 text. Returns runs in logical (text) order
    * along with the resolved paragraph direction.
    * @param text The UTF-8 encoded text to resolve.
    * @param baseDirection The base paragraph direction. AutoLTR/AutoRTL detect from text content

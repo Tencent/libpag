@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="400" height="400">
+  <Layer name="solo" x="100" y="100">
+    <Rectangle size="50,50"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+</pagx>

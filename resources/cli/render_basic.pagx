@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Basic rendering test with simple shapes and colors -->
+<pagx version="1.0" width="200" height="200">
+  <!-- Red circle in top-left quadrant -->
+  <Layer>
+    <Ellipse center="50,50" size="80,80"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+  <!-- Blue rectangle in bottom-right quadrant -->
+  <Layer>
+    <Rectangle center="150,150" size="80,80"/>
+    <Fill color="#0000FF"/>
+  </Layer>
+</pagx>

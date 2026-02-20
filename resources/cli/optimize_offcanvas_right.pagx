@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer name="visible">
+    <Rectangle center="100,100" size="100,100"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+  <Layer name="offscreen">
+    <Rectangle center="500,500" size="50,50"/>
+    <Fill color="#0000FF"/>
+  </Layer>
+</pagx>

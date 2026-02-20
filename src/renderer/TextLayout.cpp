@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextLayout.h"
+#include <algorithm>
 #include <cmath>
 #include "LineBreaker.h"
 #include "PunctuationSquash.h"
@@ -46,6 +47,10 @@
 namespace pagx {
 
 using pag::FloatNearlyEqual;
+
+static bool CompareByCluster(const ShapedGlyph& a, const ShapedGlyph& b) {
+  return a.cluster < b.cluster;
+}
 
 static size_t DecodeUTF8Char(const char* data, size_t remaining, int32_t* unichar) {
   const char* ptr = data;
@@ -130,6 +135,7 @@ class TextLayoutContext {
     uint32_t cluster = 0;
     float xOffset = 0;
     float yOffset = 0;
+    uint8_t bidiLevel = 0;
   };
 
   struct LineInfo {
@@ -755,7 +761,7 @@ class TextLayoutContext {
       bool isNewline = false;
       bool isTab = false;
 #ifdef PAG_BUILD_PAGX
-      bool isRTL = false;
+      uint8_t bidiLevel = 0;
 #endif
     };
     std::vector<TextSegment> segments = {};
@@ -807,7 +813,7 @@ class TextLayoutContext {
           TextSegment seg = {};
           seg.start = segStart;
           seg.length = pos - segStart;
-          seg.isRTL = run.isRTL;
+          seg.bidiLevel = run.level;
           segments.push_back(seg);
         }
       }
@@ -910,10 +916,21 @@ class TextLayoutContext {
       auto substring = content.substr(seg.start, seg.length);
       bool rtl = false;
 #ifdef PAG_BUILD_PAGX
-      rtl = seg.isRTL;
+      rtl = seg.bidiLevel & 1;
 #endif
       auto shapedGlyphs = HarfBuzzShaper::Shape(substring, primaryFont, fallbackFonts,
                                                  vertical, rtl);
+
+#ifdef PAG_BUILD_PAGX
+      // HarfBuzz returns RTL glyphs in visual order (left-to-right). Sort them by cluster
+      // to restore logical order so that allGlyphs is always in logical order. Simple reverse
+      // is insufficient because HarfBuzz places neutral characters (spaces, punctuation) at
+      // visual positions that don't correspond to a simple reversal of the logical sequence.
+      // Visual reordering is done later via the UAX#9 L2 algorithm when building the TextBlob.
+      if (rtl) {
+        std::sort(shapedGlyphs.begin(), shapedGlyphs.end(), CompareByCluster);
+      }
+#endif
 
       for (auto& sg : shapedGlyphs) {
         if (sg.glyphID == 0) {
@@ -958,6 +975,9 @@ class TextLayoutContext {
         gi.cluster = static_cast<uint32_t>(seg.start) + sg.cluster;
         gi.xOffset = sg.xOffset;
         gi.yOffset = sg.yOffset;
+#ifdef PAG_BUILD_PAGX
+        gi.bidiLevel = seg.bidiLevel;
+#endif
         info.allGlyphs.push_back(gi);
 
         currentX += sg.xAdvance + text->letterSpacing;
@@ -1534,13 +1554,63 @@ class TextLayoutContext {
       }
 
       float justifyOffset = 0;
+#ifdef PAG_BUILD_PAGX
+      // UAX#9 L2: reorder glyphs from logical order to visual order for rendering.
+      // Reverse contiguous runs of glyphs whose bidi level >= current level, starting from the
+      // maximum level down to 1. After reordering, recalculate xPosition for each glyph.
+      auto visualGlyphs = line.glyphs;
+      {
+        uint8_t maxLevel = 0;
+        for (auto& g : visualGlyphs) {
+          if (g.bidiLevel > maxLevel) {
+            maxLevel = g.bidiLevel;
+          }
+        }
+        for (uint8_t level = maxLevel; level > 0; level--) {
+          size_t idx = 0;
+          while (idx < visualGlyphs.size()) {
+            if (visualGlyphs[idx].bidiLevel >= level) {
+              size_t start = idx;
+              while (idx < visualGlyphs.size() && visualGlyphs[idx].bidiLevel >= level) {
+                idx++;
+              }
+              std::reverse(visualGlyphs.begin() + static_cast<ptrdiff_t>(start),
+                           visualGlyphs.begin() + static_cast<ptrdiff_t>(idx));
+            } else {
+              idx++;
+            }
+          }
+        }
+        // Recalculate xPosition after visual reordering.
+        float xPos = 0;
+        for (auto& g : visualGlyphs) {
+          g.xPosition = xPos;
+          float letterSpacing =
+              (g.sourceText != nullptr) ? g.sourceText->letterSpacing : 0;
+          xPos += g.advance + letterSpacing;
+        }
+        // Remove trailing letterSpacing.
+        bool hasLetterSpacing = !visualGlyphs.empty() && visualGlyphs[0].sourceText != nullptr &&
+                                visualGlyphs[0].sourceText->letterSpacing != 0;
+        if (hasLetterSpacing && xPos > 0) {
+          xPos -= visualGlyphs[0].sourceText->letterSpacing;
+        }
+      }
+      for (size_t gi = 0; gi < visualGlyphs.size(); gi++) {
+        auto& g = visualGlyphs[gi];
+#else
       for (size_t gi = 0; gi < line.glyphs.size(); gi++) {
         auto& g = line.glyphs[gi];
+#endif
         // Skip newline and tab glyphs: they only participate in metrics/spacing, not rendering.
         if (g.unichar == '\n' || g.unichar == '\t') {
           continue;
         }
+#ifdef PAG_BUILD_PAGX
+        if (gi > 0 && LineBreaker::canBreakBetween(visualGlyphs[gi - 1].unichar, g.unichar)) {
+#else
         if (gi > 0 && LineBreaker::canBreakBetween(line.glyphs[gi - 1].unichar, g.unichar)) {
+#endif
             justifyOffset += justifyExtraPerGap;
         }
         PositionedGlyph pg = {};

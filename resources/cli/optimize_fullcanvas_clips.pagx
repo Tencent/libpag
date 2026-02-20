@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer id="exactClip">
+    <Rectangle center="100,100" size="200,200"/>
+  </Layer>
+  <Layer id="bigClip">
+    <Rectangle center="100,100" size="400,400"/>
+  </Layer>
+  <Layer name="exact" mask="@exactClip">
+    <Rectangle center="100,100" size="100,100"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+  <Layer name="oversized" mask="@bigClip">
+    <Ellipse center="100,100" size="80,80"/>
+    <Fill color="#0000FF"/>
+  </Layer>
+</pagx>

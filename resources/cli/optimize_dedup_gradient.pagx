@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- File with duplicate gradients that should be deduplicated -->
+<pagx version="1.0" width="300" height="100">
+  <Resources>
+    <LinearGradient id="grad1" startPoint="-50,0" endPoint="50,0">
+      <ColorStop offset="0" color="#FF0000"/>
+      <ColorStop offset="1" color="#0000FF"/>
+    </LinearGradient>
+    <LinearGradient id="grad2" startPoint="-50,0" endPoint="50,0">
+      <ColorStop offset="0" color="#FF0000"/>
+      <ColorStop offset="1" color="#0000FF"/>
+    </LinearGradient>
+  </Resources>
+  <Layer x="75" y="50">
+    <Rectangle center="0,0" size="100,50"/>
+    <Fill color="@grad1"/>
+  </Layer>
+  <Layer x="225" y="50">
+    <Rectangle center="0,0" size="100,50"/>
+    <Fill color="@grad2"/>
+  </Layer>
+</pagx>

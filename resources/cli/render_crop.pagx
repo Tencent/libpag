@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test for crop rendering - a checkerboard pattern -->
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Rectangle center="50,50" size="100,100"/>
+    <Fill color="#000000"/>
+  </Layer>
+  <Layer>
+    <Rectangle center="150,50" size="100,100"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  <Layer>
+    <Rectangle center="50,150" size="100,100"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  <Layer>
+    <Rectangle center="150,150" size="100,100"/>
+    <Fill color="#000000"/>
+  </Layer>
+</pagx>

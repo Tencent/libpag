@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer name="ref" composition="@comp1"/>
+  <Resources>
+    <Composition id="comp1" width="50" height="50">
+      <Layer name="inner">
+        <Rectangle size="50,50"/>
+        <Fill color="#FF0000"/>
+      </Layer>
+    </Composition>
+  </Resources>
+</pagx>

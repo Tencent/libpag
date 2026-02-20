@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Comprehensive optimization test - combines multiple optimization scenarios -->
+<pagx version="1.0" width="400" height="300">
+  <Resources>
+    <!-- Duplicate paths (centered at origin) -->
+    <PathData id="dup1" data="M -20 -20 L 20 -20 L 20 20 L -20 20 Z"/>
+    <PathData id="dup2" data="M -20 -20 L 20 -20 L 20 20 L -20 20 Z"/>
+    <!-- Unreferenced resource -->
+    <PathData id="unused" data="M 0 0 L 100 100 L 200 0 Z"/>
+  </Resources>
+  <!-- Empty layer -->
+  <Layer id="emptyTop"/>
+  <!-- Visible content with duplicate path reference -->
+  <Layer x="50" y="130">
+    <Path data="@dup1"/>
+    <Fill color="#FF6B6B"/>
+  </Layer>
+  <Layer x="150" y="130">
+    <Path data="@dup2"/>
+    <Fill color="#4ECDC4"/>
+  </Layer>
+  <!-- Off-canvas layer -->
+  <Layer id="hidden" x="-500" y="0">
+    <Rectangle center="0,0" size="100,100"/>
+    <Fill color="#000000"/>
+  </Layer>
+  <!-- Duplicate layers for composition extraction -->
+  <Layer x="280" y="100">
+    <Rectangle center="0,0" size="60,60" roundness="8"/>
+    <Fill color="#9B59B6"/>
+  </Layer>
+  <Layer x="350" y="100">
+    <Rectangle center="0,0" size="60,60" roundness="8"/>
+    <Fill color="#9B59B6"/>
+  </Layer>
+  <Layer x="280" y="180">
+    <Rectangle center="0,0" size="60,60" roundness="8"/>
+    <Fill color="#9B59B6"/>
+  </Layer>
+  <Layer x="350" y="180">
+    <Rectangle center="0,0" size="60,60" roundness="8"/>
+    <Fill color="#9B59B6"/>
+  </Layer>
+  <!-- Empty layer at end -->
+  <Layer id="emptyEnd"/>
+</pagx>

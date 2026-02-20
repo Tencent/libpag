@@ -7,7 +7,7 @@
       <Stroke/>
     </Group>
     <Group>
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[2024年12月31日]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[2024 年 12 月 31 日]]></Text>
       <TextBox size="60,250" writingMode="vertical"/>
       <Fill/>
     </Group>
@@ -20,7 +20,7 @@
       <Stroke/>
     </Group>
     <Group>
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[価格$99.50元 税込$110.00]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[価格 $99.50 元 税込 $110.00]]></Text>
       <TextBox size="100,250" writingMode="vertical" textAlign="center"/>
       <Fill/>
     </Group>
@@ -33,7 +33,7 @@
       <Stroke/>
     </Group>
     <Group>
-      <Text text="Testing123你好&#10;World456世界End" fontFamily="NotoSansSC" fontSize="22"/>
+      <Text text="Testing 123 你好&#10;World 456 世界 End" fontFamily="NotoSansSC" fontSize="22"/>
       <TextBox size="100,250" writingMode="vertical"/>
       <Fill/>
     </Group>
@@ -52,41 +52,41 @@
     </Group>
   </Layer>
 
-  <!-- Box E1: ParagraphAlign Near (with digit) -->
+  <!-- Box E1: ParagraphAlign Near -->
   <Layer x="460" y="20">
     <Group>
-      <Rectangle center="30,75" size="60,150"/>
+      <Rectangle center="30,125" size="60,250"/>
       <Stroke/>
     </Group>
     <Group>
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[第1版]]></Text>
-      <TextBox size="60,150" writingMode="vertical"/>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[竖排 Near 对齐]]></Text>
+      <TextBox size="60,250" writingMode="vertical"/>
       <Fill/>
     </Group>
   </Layer>
 
-  <!-- Box E2: ParagraphAlign Middle (with digit) -->
+  <!-- Box E2: ParagraphAlign Middle -->
   <Layer x="540" y="20">
     <Group>
-      <Rectangle center="30,75" size="60,150"/>
+      <Rectangle center="30,125" size="60,250"/>
       <Stroke/>
     </Group>
     <Group>
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[第1版]]></Text>
-      <TextBox size="60,150" writingMode="vertical" paragraphAlign="middle"/>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[竖排 Middle 对齐]]></Text>
+      <TextBox size="60,250" writingMode="vertical" paragraphAlign="middle"/>
       <Fill/>
     </Group>
   </Layer>
 
-  <!-- Box E3: ParagraphAlign Far (with digit) -->
+  <!-- Box E3: ParagraphAlign Far -->
   <Layer x="620" y="20">
     <Group>
-      <Rectangle center="30,75" size="60,150"/>
+      <Rectangle center="30,125" size="60,250"/>
       <Stroke/>
     </Group>
     <Group>
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[第1版]]></Text>
-      <TextBox size="60,150" writingMode="vertical" paragraphAlign="far"/>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[竖排 Far 对齐]]></Text>
+      <TextBox size="60,250" writingMode="vertical" paragraphAlign="far"/>
       <Fill/>
     </Group>
   </Layer>
@@ -98,7 +98,7 @@
       <Stroke/>
     </Group>
     <Group>
-      <Text text="你好Hello&#10;世界大地" fontFamily="NotoSansSC" fontSize="24"/>
+      <Text text="你好 Hello&#10;世界大地" fontFamily="NotoSansSC" fontSize="24"/>
       <TextBox size="100,250" writingMode="vertical"/>
       <Fill/>
     </Group>
@@ -111,7 +111,7 @@
       <Stroke/>
     </Group>
     <Group>
-      <Text text="你好Hello&#10;世界大地" fontFamily="NotoSansSC" fontSize="24"/>
+      <Text text="你好 Hello&#10;世界大地" fontFamily="NotoSansSC" fontSize="24"/>
       <TextBox size="100,250" writingMode="vertical" textAlign="end"/>
       <Fill/>
     </Group>

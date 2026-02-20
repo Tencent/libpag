@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="400" height="400">
+  <Layer name="rotated" matrix="0,-1,1,0,0,0">
+    <Rectangle center="200,200" size="100,100"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+</pagx>

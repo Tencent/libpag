@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer name="hidden" visible="false" x="500" y="500">
+    <Rectangle size="50,50"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+</pagx>

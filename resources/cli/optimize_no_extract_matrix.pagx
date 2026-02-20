@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="400" height="400">
+  <Layer name="a" matrix="0.7,0.7,-0.7,0.7,100,100">
+    <Rectangle size="50,50"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+  <Layer name="b" matrix="0.7,0.7,-0.7,0.7,200,200">
+    <Rectangle size="50,50"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+</pagx>

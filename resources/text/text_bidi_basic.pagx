@@ -46,7 +46,7 @@
       <Stroke/>
     </Group>
     <Group>
-      <Text fontFamily="NotoSansSC" fontSize="20"><![CDATA[版本 v2.0.1 发布 共123项更新]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="20"><![CDATA[版本 v2.0.1 发布 共 123 项更新]]></Text>
       <TextBox size="400,50"/>
       <Fill/>
     </Group>

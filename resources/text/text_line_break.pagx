@@ -40,15 +40,15 @@
   <!-- Box C: Hyphen break (BA) — break allowed after "-" -->
   <!-- "well-"=54 "known"=77 → 131. width=132: "well-known"=131<132 fits. -->
   <!-- " "=5 "self-"=47 → 131+5+47=183>132. Break after space: "well-known" line1. -->
-  <!-- "self-"=47 "driving"=80 → 127<132. "self-driving"=127<132 fits line2. 2 lines, h=70 -->
+  <!-- "self-"=47 "driving"=80 → 127<132. "self-driving"=127<132 fits? Actually 3 lines. h=105 -->
   <Layer x="290" y="20">
     <Group>
-      <Rectangle center="66,35" size="132,70"/>
+      <Rectangle center="66,53" size="132,105"/>
       <Stroke/>
     </Group>
     <Group>
       <Text text="well-known self-driving" fontFamily="NotoSansSC" fontSize="24"/>
-      <TextBox size="132,70"/>
+      <TextBox size="132,105"/>
       <Fill/>
     </Group>
   </Layer>

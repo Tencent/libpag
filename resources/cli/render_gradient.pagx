@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test gradient rendering accuracy -->
+<pagx version="1.0" width="300" height="100">
+  <Layer>
+    <Rectangle center="150,50" size="280,80" roundness="16"/>
+    <Fill>
+      <LinearGradient startPoint="10,50" endPoint="290,50">
+        <ColorStop offset="0" color="#FF0000"/>
+        <ColorStop offset="0.25" color="#FFFF00"/>
+        <ColorStop offset="0.5" color="#00FF00"/>
+        <ColorStop offset="0.75" color="#00FFFF"/>
+        <ColorStop offset="1" color="#0000FF"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+</pagx>

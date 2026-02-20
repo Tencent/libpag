@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx width="600" height="400" version="1.0">
+<pagx width="600" height="420" version="1.0">
   <!-- Box A: Latin extended characters (2-byte UTF-8: é, ü, ï) -->
   <Layer x="50" y="30">
     <Group>
@@ -53,7 +53,7 @@
   </Layer>
 
   <!-- Box E: Multiple consecutive empty lines -->
-  <Layer x="50" y="210">
+  <Layer x="50" y="230">
     <Group>
       <Rectangle center="110,65" size="220,130"/>
       <Stroke/>

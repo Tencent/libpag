@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- File with empty layers that should be removed by optimize -->
+<pagx version="1.0" width="200" height="200">
+  <!-- Empty layer - should be removed -->
+  <Layer id="empty1"/>
+  <!-- Valid layer -->
+  <Layer id="valid">
+    <Rectangle center="100,100" size="100,100"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+  <!-- Another empty layer -->
+  <Layer id="empty2"/>
+  <!-- Empty group inside layer -->
+  <Layer id="withEmptyGroup">
+    <Group/>
+    <Rectangle center="50,50" size="50,50"/>
+    <Fill color="#0000FF"/>
+  </Layer>
+</pagx>

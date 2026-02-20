@@ -149,11 +149,10 @@ static std::shared_ptr<hb_font_t> CreateHBFont(
   return cache.insert(typeface->uniqueID(), hbFont);
 }
 
-// Shapes a single font run. The text must be homogeneous in font — all characters should have
-// glyphs in the given font. Missing glyphs will have glyphID=0 in the output.
+// Shapes a single run. The run must be homogeneous in font and script.
 static std::vector<ShapedGlyph> ShapeRun(const std::string& text, size_t byteOffset,
                                          size_t byteLength, const tgfx::Font& font,
-                                         bool vertical, bool rtl) {
+                                         hb_script_t script, bool vertical, bool rtl) {
   auto typeface = font.getTypeface();
   auto hbFont = CreateHBFont(typeface);
   if (hbFont == nullptr) {
@@ -176,21 +175,18 @@ static std::vector<ShapedGlyph> ShapeRun(const std::string& text, size_t byteOff
 
   if (vertical) {
     hb_buffer_set_direction(buffer.get(), HB_DIRECTION_TTB);
-    // Let HarfBuzz detect script from the actual characters rather than hardcoding COMMON.
-    hb_buffer_guess_segment_properties(buffer.get());
-    // Override direction back to TTB after guess (guess may set LTR/RTL for horizontal scripts).
-    hb_buffer_set_direction(buffer.get(), HB_DIRECTION_TTB);
+    hb_buffer_set_script(buffer.get(), script);
+    hb_buffer_set_language(buffer.get(), hb_language_get_default());
     features[featureCount++] = {HB_TAG('v', 'e', 'r', 't'), 1, 0, static_cast<unsigned>(-1)};
     features[featureCount++] = {HB_TAG('v', 'r', 't', '2'), 1, 0, static_cast<unsigned>(-1)};
   } else if (rtl) {
-    // Set direction to RTL, then let HarfBuzz guess script and language from the text content.
-    // This correctly handles Hebrew, Arabic, Thaana, and other RTL scripts.
     hb_buffer_set_direction(buffer.get(), HB_DIRECTION_RTL);
-    hb_buffer_guess_segment_properties(buffer.get());
-    // Restore RTL direction in case guess overrode it.
-    hb_buffer_set_direction(buffer.get(), HB_DIRECTION_RTL);
+    hb_buffer_set_script(buffer.get(), script);
+    hb_buffer_set_language(buffer.get(), hb_language_get_default());
   } else {
-    hb_buffer_guess_segment_properties(buffer.get());
+    hb_buffer_set_direction(buffer.get(), HB_DIRECTION_LTR);
+    hb_buffer_set_script(buffer.get(), script);
+    hb_buffer_set_language(buffer.get(), hb_language_get_default());
   }
 
   hb_shape(hbFont.get(), buffer.get(), features, featureCount);
@@ -249,22 +245,38 @@ static size_t DecodeUTF8(const char* data, size_t length, int32_t* codepoint) {
   return 1;
 }
 
-// A font run produced by itemization: a contiguous byte range that should be shaped with one font.
-struct FontRun {
+// A shaped run: a contiguous byte range with uniform font and script.
+struct ShapingRun {
   size_t byteStart = 0;
   size_t byteEnd = 0;
   tgfx::Font font = {};
+  hb_script_t script = HB_SCRIPT_COMMON;
 };
 
-// Performs font itemization: assigns each character to the best available font (primary first,
-// then fallbacks in order). Adjacent characters with the same font are merged into runs.
-// This is the standard approach used by Pango, Chrome, and other mature text engines.
-static std::vector<FontRun> ItemizeFonts(const std::string& text,
-                                         const tgfx::Font& primaryFont,
-                                         const std::vector<tgfx::Font>& fallbackFonts) {
-  std::vector<FontRun> runs;
+// Resolves the effective script for a Unicode code point. COMMON and INHERITED scripts inherit the
+// previous "real" script so they stay in the same shaping run as their neighbors. This matches the
+// approach used by rive-runtime, Pango, and Chrome.
+static hb_script_t ResolveScript(int32_t codepoint, hb_script_t lastScript) {
+  auto ufuncs = hb_unicode_funcs_get_default();
+  auto script = hb_unicode_general_category(ufuncs, codepoint) ==
+                        HB_UNICODE_GENERAL_CATEGORY_NON_SPACING_MARK
+                    ? HB_SCRIPT_INHERITED
+                    : hb_unicode_script(ufuncs, codepoint);
+  if (script == HB_SCRIPT_COMMON || script == HB_SCRIPT_INHERITED) {
+    return lastScript;
+  }
+  return script;
+}
+
+// Performs combined font + script itemization. Each character is assigned the best available font
+// and an effective script. Adjacent characters sharing both font and script are merged into runs.
+static std::vector<ShapingRun> ItemizeRuns(const std::string& text,
+                                           const tgfx::Font& primaryFont,
+                                           const std::vector<tgfx::Font>& fallbackFonts) {
+  std::vector<ShapingRun> runs;
   size_t pos = 0;
   const tgfx::Font* lastFont = nullptr;
+  hb_script_t lastScript = HB_SCRIPT_COMMON;
 
   while (pos < text.size()) {
     int32_t codepoint = 0;
@@ -287,23 +299,27 @@ static std::vector<FontRun> ItemizeFonts(const std::string& text,
       }
     }
 
-    // If no font has this glyph, use primary font (HarfBuzz will output glyphID=0).
     if (bestFont == nullptr) {
       bestFont = &primaryFont;
     }
 
-    // Extend the current run if same font, otherwise start a new run.
-    if (lastFont != nullptr && bestFont->getTypeface() == lastFont->getTypeface()) {
+    auto script = ResolveScript(codepoint, lastScript);
+
+    bool sameFont = lastFont != nullptr && bestFont->getTypeface() == lastFont->getTypeface();
+    bool sameScript = (script == lastScript);
+    if (sameFont && sameScript) {
       runs.back().byteEnd = pos + charLen;
     } else {
-      FontRun run = {};
+      ShapingRun run = {};
       run.byteStart = pos;
       run.byteEnd = pos + charLen;
       run.font = *bestFont;
+      run.script = script;
       runs.push_back(run);
       lastFont = bestFont;
     }
 
+    lastScript = script;
     pos += charLen;
   }
 
@@ -318,19 +334,19 @@ std::vector<ShapedGlyph> HarfBuzzShaper::Shape(const std::string& text,
     return {};
   }
 
-  // Phase 1: Font itemization — assign each character to the best available font.
-  auto fontRuns = ItemizeFonts(text, primaryFont, fallbackFonts);
-  if (fontRuns.empty()) {
+  // Phase 1: Combined font + script itemization.
+  auto shapingRuns = ItemizeRuns(text, primaryFont, fallbackFonts);
+  if (shapingRuns.empty()) {
     return {};
   }
 
-  // Phase 2: Per-run shaping — shape each font run independently with full text context.
+  // Phase 2: Per-run shaping — shape each run independently with full text context.
   std::vector<ShapedGlyph> result;
   result.reserve(text.size());
 
-  for (auto& run : fontRuns) {
+  for (auto& run : shapingRuns) {
     auto shaped = ShapeRun(text, run.byteStart, run.byteEnd - run.byteStart, run.font,
-                           vertical, rtl);
+                           run.script, vertical, rtl);
     result.insert(result.end(), shaped.begin(), shaped.end());
   }
 

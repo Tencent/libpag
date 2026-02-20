@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer name="main">
+    <Rectangle center="100,100" size="200,200"/>
+    <Fill color="@grad"/>
+  </Layer>
+  <Resources>
+    <PathData id="orphanPath" data="M 0 0 L 50 50 Z"/>
+    <LinearGradient id="unusedGrad" startPoint="0,0" endPoint="100,0">
+      <ColorStop offset="0" color="#FF0000"/>
+      <ColorStop offset="1" color="#00FF00"/>
+    </LinearGradient>
+    <LinearGradient id="grad" startPoint="0,0" endPoint="200,0">
+      <ColorStop offset="0" color="#FF0000"/>
+      <ColorStop offset="1" color="#0000FF"/>
+    </LinearGradient>
+  </Resources>
+</pagx>

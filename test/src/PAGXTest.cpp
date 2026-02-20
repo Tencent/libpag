@@ -199,7 +199,7 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
  * Test case: Verify PAGXImporter::FromFile and FromXML produce identical results when rendered.
  */
 PAGX_TEST(PAGXTest, LayerBuilderAPIConsistency) {
-  auto pagxPath = ProjectPath::Absolute("resources/pagx/api_consistency.pagx");
+  auto pagxPath = ProjectPath::Absolute("resources/apitest/api_consistency.pagx");
 
   // Load via FromFile
   auto docFromFile = pagx::PAGXImporter::FromFile(pagxPath);
@@ -577,31 +577,20 @@ PAGX_TEST(PAGXTest, SampleFiles) {
   }
 }
 
-/**
- * Test all PAGX resource files in resources/pagx directory.
- * Renders each resource and compares with baseline screenshots.
- */
-PAGX_TEST(PAGXTest, ResourceFiles) {
-  auto resourceDir = ProjectPath::Absolute("resources/pagx");
-  std::vector<std::string> resourceFiles = {};
-
+static void TestPAGXDirectory(tgfx::Context* context, const std::string& resourceSubDir) {
+  auto resourceDir = ProjectPath::Absolute("resources/" + resourceSubDir);
+  std::vector<std::string> files = {};
   for (const auto& entry : std::filesystem::directory_iterator(resourceDir)) {
-    if (entry.path().extension() != ".pagx") {
-      continue;
+    if (entry.path().extension() == ".pagx") {
+      files.push_back(entry.path().string());
     }
-    auto stem = entry.path().stem().string();
-    // Skip files that have dedicated test cases with special logic.
-    if (stem == "api_consistency") {
-      continue;
-    }
-    resourceFiles.push_back(entry.path().string());
   }
-  std::sort(resourceFiles.begin(), resourceFiles.end());
+  std::sort(files.begin(), files.end());
 
   pagx::TextLayout textLayout;
   textLayout.setFallbackTypefaces(GetFallbackTypefaces());
 
-  for (const auto& filePath : resourceFiles) {
+  for (const auto& filePath : files) {
     auto baseName = std::filesystem::path(filePath).stem().string();
 
     auto doc = pagx::PAGXImporter::FromFile(filePath);
@@ -633,6 +622,13 @@ PAGX_TEST(PAGXTest, ResourceFiles) {
 
     EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/" + baseName)) << baseName;
   }
+}
+
+/**
+ * Test all text-related PAGX files in resources/text directory.
+ */
+PAGX_TEST(PAGXTest, TextFiles) {
+  TestPAGXDirectory(context, "text");
 }
 
 }  // namespace pag

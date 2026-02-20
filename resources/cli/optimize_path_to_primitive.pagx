@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- File with Path elements that can be converted to Rectangle/Ellipse -->
+<pagx version="1.0" width="300" height="200">
+  <Resources>
+    <!-- This path describes a rectangle centered at origin -->
+    <PathData id="rectPath" data="M -50 -40 L 50 -40 L 50 40 L -50 40 Z"/>
+    <!-- This path describes an ellipse centered at origin -->
+    <PathData id="circlePath" data="M 0 -40 C 22 -40 40 -22 40 0 C 40 22 22 40 0 40 C -22 40 -40 22 -40 0 C -40 -22 -22 -40 0 -40 Z"/>
+  </Resources>
+  <Layer x="100" y="100">
+    <Path data="@rectPath"/>
+    <Fill color="#FF6B6B"/>
+  </Layer>
+  <Layer x="220" y="100">
+    <Path data="@circlePath"/>
+    <Fill color="#4ECDC4"/>
+  </Layer>
+</pagx>

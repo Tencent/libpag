@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- File with duplicate PathData that should be deduplicated -->
+<pagx version="1.0" width="300" height="200">
+  <Resources>
+    <PathData id="path1" data="M -25 -25 L 25 -25 L 25 25 L -25 25 Z"/>
+    <PathData id="path2" data="M -25 -25 L 25 -25 L 25 25 L -25 25 Z"/>
+    <PathData id="path3" data="M -25 -25 L 25 -25 L 25 25 L -25 25 Z"/>
+    <PathData id="pathUnique" data="M -50 -50 L 50 -50 L 0 50 Z"/>
+  </Resources>
+  <Layer x="75" y="100">
+    <Path data="@path1"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+  <Layer x="150" y="100">
+    <Path data="@path2"/>
+    <Fill color="#00FF00"/>
+  </Layer>
+  <Layer x="225" y="100">
+    <Path data="@path3"/>
+    <Fill color="#0000FF"/>
+  </Layer>
+</pagx>
