@@ -316,6 +316,11 @@ class TextLayoutContext {
 
     // Shape each Text and concatenate all glyphs for unified layout within the TextBox.
     std::vector<GlyphInfo> allGlyphs = {};
+    size_t estimatedGlyphCount = 0;
+    for (auto* text : textElements) {
+      estimatedGlyphCount += text->text.size();
+    }
+    allGlyphs.reserve(estimatedGlyphCount);
     float totalWidth = 0;
     bool paragraphRTL = false;
     bool directionResolved = false;
@@ -522,7 +527,7 @@ class TextLayoutContext {
 
   ShapedText buildShapedTextFromEmbeddedGlyphRuns(const Text* text) {
     ShapedText shapedText = {};
-    tgfx::TextBlobBuilder builder;
+    tgfx::TextBlobBuilder builder = {};
 
     for (const auto& run : text->glyphRuns) {
       if (run->glyphs.empty()) {
@@ -686,7 +691,7 @@ class TextLayoutContext {
       tgfx::PathTypefaceBuilder builder;
       for (const auto& glyph : fontNode->glyphs) {
         if (glyph->path != nullptr) {
-          auto path = PathDataToTGFXPath(*glyph->path);
+          auto path = ToTGFX(*glyph->path);
           if (glyph->offset.x != 0 || glyph->offset.y != 0) {
             path.transform(tgfx::Matrix::MakeTrans(glyph->offset.x, glyph->offset.y));
           }
