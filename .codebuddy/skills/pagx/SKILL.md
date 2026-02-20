@@ -179,12 +179,12 @@ These have **no default** — omitting them causes parse errors:
 
 1. **Decompose** the visual description into logical blocks (each block → one Layer)
 2. **Determine** canvas size (`width`/`height`) and each block's position — use `pagx measure`
-   to get precise text dimensions before layout calculation
+   for precise text dimensions and `pagx bounds` for precise Layer/element boundaries to
+   calculate layout accurately
 3. **Build** each block's internal structure (Group isolation for different painters)
 4. **Localize** coordinates (Layer `x`/`y` carries offset, internals relative to origin)
 5. **Verify** — render screenshot with `pagx render`, read the image to check design accuracy,
-   alignment, and spacing consistency. If issues found → fix and re-render until satisfied.
-   Use `pagx bounds` for precise element boundaries when fine-tuning coordinates
+   alignment, and spacing consistency. If issues found → fix and re-render until satisfied
 
 > For detailed generation patterns, component templates, and examples, read
 > `references/generation-guide.md`.

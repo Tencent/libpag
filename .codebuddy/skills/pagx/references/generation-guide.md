@@ -31,6 +31,10 @@ Read the description and identify independent visual units. Each becomes a `<Lay
   positions. For example, `pagx measure --font "Arial" --size 24 --text "Title"` returns
   the exact width and font metrics (ascent, descent, leading), which can be used to size
   TextBox and compute vertical spacing accurately.
+- **Measure element bounds** with `pagx bounds` to get precise rendered boundaries of Layers
+  or elements. When building complex blocks incrementally, render a partial PAGX and use
+  `pagx bounds --id blockId` to get the block's exact size, then use that to calculate
+  positions of surrounding blocks.
 
 ### Step 3: Build Each Block
 
@@ -627,16 +631,19 @@ Read the rendered image and check:
 
 ### Fine-Tune with Bounds
 
-When the screenshot reveals misalignment, use `pagx bounds` to get precise rendered
-boundaries instead of guessing coordinate adjustments:
+Use `pagx bounds` to get precise rendered boundaries — both during layout planning (to measure
+block sizes) and during refinement (to diagnose misalignment):
 
 ```bash
 pagx bounds input.pagx              # all layers
 pagx bounds --id myButton input.pagx # specific element
 ```
 
-Compare actual boundaries to intended positions. Adjust `x`/`y`, `center`, or `position`
-attributes accordingly, then re-render to confirm.
+**During layout**: Build a block, render it, and use `pagx bounds` to get its exact size.
+Then calculate positions of adjacent blocks based on actual dimensions rather than estimates.
+
+**During refinement**: Compare actual boundaries to intended positions. Adjust `x`/`y`,
+`center`, or `position` attributes accordingly, then re-render to confirm.
 
 ### Pre-Measure Text for Accurate Layout
 
