@@ -23,7 +23,6 @@
 #include <cmath>
 #include <cstring>
 #include <fstream>
-#include <functional>
 #include <iostream>
 #include <string>
 #include <unordered_map>
@@ -806,36 +805,35 @@ static void ApplyLocalizationToElements(const std::vector<Element*>& contents, f
   }
 }
 
+static void LocalizeLayerCoordinates(Layer* layer, int& count) {
+  if (!ShouldSkipLocalization(layer)) {
+    float offsetX = 0.0f;
+    float offsetY = 0.0f;
+    ComputeLocalizationOffset(layer->contents, offsetX, offsetY);
+
+    if (std::abs(offsetX) >= 0.001f || std::abs(offsetY) >= 0.001f) {
+      layer->x += offsetX;
+      layer->y += offsetY;
+      ApplyLocalizationToElements(layer->contents, offsetX, offsetY);
+      count++;
+    }
+  }
+  for (auto* child : layer->children) {
+    LocalizeLayerCoordinates(child, count);
+  }
+}
+
 static int LocalizeCoordinates(PAGXDocument* document) {
   int count = 0;
 
-  std::function<void(Layer*)> processLayer;
-  processLayer = [&](Layer* layer) {
-    if (!ShouldSkipLocalization(layer)) {
-      float offsetX = 0.0f;
-      float offsetY = 0.0f;
-      ComputeLocalizationOffset(layer->contents, offsetX, offsetY);
-
-      if (std::abs(offsetX) >= 0.001f || std::abs(offsetY) >= 0.001f) {
-        layer->x += offsetX;
-        layer->y += offsetY;
-        ApplyLocalizationToElements(layer->contents, offsetX, offsetY);
-        count++;
-      }
-    }
-    for (auto* child : layer->children) {
-      processLayer(child);
-    }
-  };
-
   for (auto* layer : document->layers) {
-    processLayer(layer);
+    LocalizeLayerCoordinates(layer, count);
   }
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Composition) {
       auto comp = static_cast<Composition*>(node.get());
       for (auto* layer : comp->layers) {
-        processLayer(layer);
+        LocalizeLayerCoordinates(layer, count);
       }
     }
   }
@@ -1108,24 +1106,24 @@ static std::string GenerateUniqueId(PAGXDocument* document, const std::string& p
   return id;
 }
 
+static void CollectCandidateLayers(Layer* layer,
+                                   std::unordered_map<size_t, std::vector<Layer*>>& hashGroups) {
+  if (!layer->contents.empty() && layer->composition == nullptr && layer->matrix.isIdentity() &&
+      layer->children.empty() && layer->styles.empty() && layer->filters.empty()) {
+    auto hash = HashLayerStructure(layer);
+    hashGroups[hash].push_back(layer);
+  }
+  for (auto* child : layer->children) {
+    CollectCandidateLayers(child, hashGroups);
+  }
+}
+
 static int ExtractCompositions(PAGXDocument* document) {
   // Step 1: Collect all candidate layers (with contents, no composition reference, identity matrix).
   std::unordered_map<size_t, std::vector<Layer*>> hashGroups = {};
 
-  std::function<void(Layer*)> collectLayers;
-  collectLayers = [&](Layer* layer) {
-    if (!layer->contents.empty() && layer->composition == nullptr && layer->matrix.isIdentity() &&
-        layer->children.empty() && layer->styles.empty() && layer->filters.empty()) {
-      auto hash = HashLayerStructure(layer);
-      hashGroups[hash].push_back(layer);
-    }
-    for (auto* child : layer->children) {
-      collectLayers(child);
-    }
-  };
-
   for (auto* layer : document->layers) {
-    collectLayers(layer);
+    CollectCandidateLayers(layer, hashGroups);
   }
 
   // Step 2: Find groups with 2+ structurally identical layers.
