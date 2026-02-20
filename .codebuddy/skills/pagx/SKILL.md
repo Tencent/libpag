@@ -38,7 +38,7 @@ foundational understanding of the PAGX format.
 ```
 
 - `<pagx>` and `<Composition>` direct children **MUST** be `<Layer>`. Groups at root level
-  are silently ignored and will not render.
+  cause a parse error.
 - Layers render in document order: earlier = below, later = above.
 - Place `<Resources>` after all Layers for readability.
 
@@ -150,7 +150,8 @@ geometry element's local coordinate system — they are NOT affected by Layer `x
 ### Shapes and Performance
 
 - Prefer Rectangle/Ellipse over Path for standard shapes (more readable, better performance).
-- Keep single Repeater copies ≤ 200; nested Repeater product ≤ 500.
+- Repeater guideline: single Repeater up to ~200 copies is typically fine; nested Repeater
+  product should stay under ~500 for smooth rendering.
 - BlurFilter / DropShadowStyle cost is proportional to blur radius — use the smallest radius
   that achieves the visual effect.
 
@@ -164,7 +165,10 @@ These have **no default** — omitting them causes parse errors:
 | `LinearGradient` | `startPoint`, `endPoint` |
 | `RadialGradient` | `radius` |
 | `ColorStop` | `offset`, `color` |
+| `DiamondGradient` | `radius` |
 | `BlurFilter` | `blurX`, `blurY` |
+| `BlendFilter` | `color` |
+| `ColorMatrixFilter` | `matrix` |
 | `Path` | `data` |
 | `Image` | `source` |
 
@@ -219,7 +223,7 @@ explicit user approval.
    - Text `position`/`textAnchor` not set when TextBox is present
    - Internal coordinates relative to Layer origin
    - `<Resources>` after all Layers; all `@id` references resolve
-   - Repeater copies ≤ 200 single, ≤ 500 nested product
+   - Repeater copies reasonable (~200 single, ~500 nested product)
    - Visual stacking order preserved
    - Rendered screenshot matches expected design (layout, alignment, consistent spacing)
 

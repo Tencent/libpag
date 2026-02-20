@@ -370,7 +370,7 @@ Key points:
 
 ```
 Is this a direct child of <pagx> or <Composition>?
-  → YES: Must be Layer (Groups are silently ignored)
+  → YES: Must be Layer (Groups cause a parse error)
 
 Does this need styles, filters, mask, blendMode, composition, or scrollRect?
   → YES: Must be Layer
@@ -464,7 +464,7 @@ its own Group for painter scope isolation.
 ### 1. Group as Direct Child of pagx
 
 ```xml
-<!-- WRONG: Group at root level is silently ignored -->
+<!-- WRONG: Group at root level causes a parse error -->
 <pagx width="800" height="600">
   <Group>
     <Rectangle size="800,600"/>
