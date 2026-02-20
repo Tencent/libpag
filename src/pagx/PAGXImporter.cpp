@@ -87,10 +87,10 @@ static int getIntAttribute(const DOMNode* node, const std::string& name, int def
                            PAGXDocument* doc = nullptr);
 static bool getBoolAttribute(const DOMNode* node, const std::string& name,
                              bool defaultValue = false, PAGXDocument* doc = nullptr);
-static Point parsePoint(const std::string& str);
-static Size parseSize(const std::string& str);
-static Rect parseRect(const std::string& str);
-static Color parseColor(const std::string& str);
+static Point parsePoint(const std::string& str, bool* outValid = nullptr);
+static Size parseSize(const std::string& str, bool* outValid = nullptr);
+static Rect parseRect(const std::string& str, bool* outValid = nullptr);
+static Color parseColor(const std::string& str, bool* outValid = nullptr);
 static Point getPointAttribute(const DOMNode* node, const char* name, Point defaultValue,
                                PAGXDocument* doc);
 static Size getSizeAttribute(const DOMNode* node, const char* name, Size defaultValue,
@@ -1439,7 +1439,7 @@ static const char* skipWhitespaceAndComma(const char* ptr, const char* end) {
   return ptr;
 }
 
-static Point parsePoint(const std::string& str, bool* outValid = nullptr) {
+static Point parsePoint(const std::string& str, bool* outValid) {
   Point point = {};
   const char* ptr = str.c_str();
   const char* end = ptr + str.size();
@@ -1460,7 +1460,7 @@ static Point parsePoint(const std::string& str, bool* outValid = nullptr) {
   return point;
 }
 
-static Size parseSize(const std::string& str, bool* outValid = nullptr) {
+static Size parseSize(const std::string& str, bool* outValid) {
   Size size = {};
   const char* ptr = str.c_str();
   const char* end = ptr + str.size();
@@ -1481,7 +1481,7 @@ static Size parseSize(const std::string& str, bool* outValid = nullptr) {
   return size;
 }
 
-static Rect parseRect(const std::string& str, bool* outValid = nullptr) {
+static Rect parseRect(const std::string& str, bool* outValid) {
   Rect rect = {};
   const char* ptr = str.c_str();
   const char* end = ptr + str.size();
@@ -1521,7 +1521,7 @@ int parseHexDigit(char c) {
 }
 }  // namespace
 
-static Color parseColor(const std::string& str, bool* outValid = nullptr) {
+static Color parseColor(const std::string& str, bool* outValid) {
   if (str.empty()) {
     if (outValid) {
       *outValid = false;
