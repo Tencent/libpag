@@ -84,6 +84,11 @@ static std::vector<std::shared_ptr<Typeface>> CreateFallbackTypefaces() {
   if (emojiTypeface) {
     result.push_back(emojiTypeface);
   }
+  auto hebrewTypeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansHebrew-Regular.ttf"));
+  if (hebrewTypeface) {
+    result.push_back(hebrewTypeface);
+  }
   return result;
 }
 

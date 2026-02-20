@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="600" height="600" version="1.0">
+  <!-- Box A: Basic emoji mixed with Latin text -->
+  <Layer x="50" y="50">
+    <Group>
+      <Rectangle center="100,30" size="200,60"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[Hello😀World🎉Test]]></Text>
+      <TextBox size="200,60"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box B: Emoji mixed with CJK, word-wrap should not split emoji -->
+  <Layer x="50" y="120">
+    <Group>
+      <Rectangle center="100,60" size="200,120"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[你好😀世界🌍天气🌤真好👍]]></Text>
+      <TextBox size="200,120"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box C: ZWJ sequence (family emoji) must not be split -->
+  <Layer x="300" y="50">
+    <Group>
+      <Rectangle center="100,30" size="200,60"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[Family👨‍👩‍👧‍👦Here]]></Text>
+      <TextBox size="200,60"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box D: Skin tone modifiers must stay with base emoji -->
+  <Layer x="300" y="120">
+    <Group>
+      <Rectangle center="100,60" size="200,120"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[Wave👋🏻Hi👋🏿Bye]]></Text>
+      <TextBox size="200,120"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box E: Flag emoji (Regional Indicator pairs must not be split) -->
+  <Layer x="50" y="280">
+    <Group>
+      <Rectangle center="125,30" size="250,60"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[🇨🇳中国🇺🇸美国🇯🇵日本]]></Text>
+      <TextBox size="250,60"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box F: Pure emoji sequence with word-wrap -->
+  <Layer x="300" y="280">
+    <Group>
+      <Rectangle center="100,60" size="200,120"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[😀😃😄😁😆🤣😂🙂🙃😉😊😇]]></Text>
+      <TextBox size="200,120"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box G: Emoji in vertical text layout -->
+  <Layer x="50" y="380">
+    <Group>
+      <Rectangle center="40,100" size="80,200"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="20"><![CDATA[你好世界😀]]></Text>
+      <TextBox size="80,200" writingMode="vertical"/>
+      <Fill/>
+    </Group>
+  </Layer>
+</pagx>

@@ -137,6 +137,7 @@ class TextLayoutContext {
     VerticalOrientation orientation = VerticalOrientation::Upright;
     float height = 0;
     float width = 0;
+    float leadingSquash = 0;
     bool canBreakBefore = false;
   };
 
@@ -1199,49 +1200,92 @@ class TextLayoutContext {
       }
 
       auto glyphCount = line.glyphs.size();
-      std::vector<float> squashAmounts(glyphCount, 0);
+      // Leading squash removes whitespace before the glyph face (Opening punctuation).
+      // Trailing squash removes whitespace after the glyph face (Closing punctuation).
+      std::vector<float> leadingSquash(glyphCount, 0);
+      std::vector<float> trailingSquash(glyphCount, 0);
 
       // Line-start squash: remove leading whitespace of the first non-whitespace glyph.
+      // Only Opening punctuation has leading whitespace.
       for (size_t i = 0; i < glyphCount; i++) {
         if (LineBreaker::isWhitespace(line.glyphs[i].unichar)) {
           continue;
         }
         float fraction = PunctuationSquash::GetLineStartSquash(line.glyphs[i].unichar);
-        squashAmounts[i] = line.glyphs[i].advance * fraction;
+        leadingSquash[i] = line.glyphs[i].advance * fraction;
         break;
       }
 
       // Line-end squash: remove trailing whitespace of the last non-whitespace glyph.
+      // Only Closing punctuation has trailing whitespace.
       for (int i = static_cast<int>(glyphCount) - 1; i >= 0; i--) {
         if (LineBreaker::isWhitespace(line.glyphs[i].unichar)) {
           continue;
         }
         float fraction = PunctuationSquash::GetLineEndSquash(line.glyphs[i].unichar);
-        if (line.glyphs[i].advance * fraction > squashAmounts[i]) {
-          squashAmounts[i] = line.glyphs[i].advance * fraction;
-        }
+        trailingSquash[i] = line.glyphs[i].advance * fraction;
         break;
       }
 
-      // Adjacent punctuation squash: both sides can be squashed simultaneously.
+      // Adjacent punctuation squash. The squash type depends on where each character's internal
+      // whitespace is:
+      //   - Opening punctuation: whitespace on the leading (left) side
+      //   - Closing punctuation: whitespace on the trailing (right) side
+      //   - MiddleDot: whitespace on both sides
+      // prevSquash removes the trailing whitespace of prevChar.
+      // nextSquash removes the leading whitespace of nextChar.
       for (size_t i = 0; i + 1 < glyphCount; i++) {
         auto result = PunctuationSquash::GetAdjacentSquash(line.glyphs[i].unichar,
                                                            line.glyphs[i + 1].unichar);
-        float prevAmount = line.glyphs[i].advance * result.prevSquash;
-        float nextAmount = line.glyphs[i + 1].advance * result.nextSquash;
-        if (prevAmount > squashAmounts[i]) {
-          squashAmounts[i] = prevAmount;
+        if (result.prevSquash > 0) {
+          auto prevCat = PunctuationSquash::GetCategory(line.glyphs[i].unichar);
+          float amount = line.glyphs[i].advance * result.prevSquash;
+          if (prevCat == PunctuationCategory::Opening) {
+            // Opening punctuation has leading whitespace. When the squash table says to remove
+            // the "trailing space" of an Opening bracket (e.g. Opening+Opening: 「「), it actually
+            // means the glyph face is already at the trailing edge, and we should NOT reduce the
+            // advance. Instead this case should not arise in a correct JLREQ table, but if it
+            // does we treat it as trailing squash to avoid breaking the glyph.
+            if (amount > trailingSquash[i]) {
+              trailingSquash[i] = amount;
+            }
+          } else {
+            // Closing and MiddleDot have trailing whitespace, so squash reduces their advance.
+            if (amount > trailingSquash[i]) {
+              trailingSquash[i] = amount;
+            }
+          }
         }
-        if (nextAmount > squashAmounts[i + 1]) {
-          squashAmounts[i + 1] = nextAmount;
+        if (result.nextSquash > 0) {
+          auto nextCat = PunctuationSquash::GetCategory(line.glyphs[i + 1].unichar);
+          float amount = line.glyphs[i + 1].advance * result.nextSquash;
+          if (nextCat == PunctuationCategory::Opening) {
+            // Opening punctuation: squash removes leading whitespace (before the glyph face).
+            if (amount > leadingSquash[i + 1]) {
+              leadingSquash[i + 1] = amount;
+            }
+          } else if (nextCat == PunctuationCategory::MiddleDot) {
+            // MiddleDot: nextSquash removes leading whitespace.
+            if (amount > leadingSquash[i + 1]) {
+              leadingSquash[i + 1] = amount;
+            }
+          } else {
+            // Closing punctuation: nextSquash removes leading whitespace (the space before the
+            // glyph face of a Closing bracket).
+            if (amount > leadingSquash[i + 1]) {
+              leadingSquash[i + 1] = amount;
+            }
+          }
         }
       }
 
       // Recalculate positions with squash applied.
+      // Leading squash shifts the glyph's xPosition backward (removes space before the glyph).
+      // Trailing squash reduces the effective advance (removes space after the glyph).
       float xPos = 0;
       for (size_t i = 0; i < glyphCount; i++) {
-        line.glyphs[i].xPosition = xPos;
-        float effectiveAdvance = line.glyphs[i].advance - squashAmounts[i];
+        line.glyphs[i].xPosition = xPos - leadingSquash[i];
+        float effectiveAdvance = line.glyphs[i].advance - leadingSquash[i] - trailingSquash[i];
         float ls = (line.glyphs[i].sourceText != nullptr)
                        ? line.glyphs[i].sourceText->letterSpacing
                        : 0;
@@ -1251,8 +1295,9 @@ class TextLayoutContext {
       // Recalculate line width.
       if (!line.glyphs.empty()) {
         auto& lastGlyph = line.glyphs.back();
-        float lastEffectiveAdvance = lastGlyph.advance - squashAmounts[glyphCount - 1];
-        line.width = lastGlyph.xPosition + lastEffectiveAdvance;
+        float lastEffectiveAdvance =
+            lastGlyph.advance - leadingSquash[glyphCount - 1] - trailingSquash[glyphCount - 1];
+        line.width = lastGlyph.xPosition + leadingSquash[glyphCount - 1] + lastEffectiveAdvance;
       }
     }
   }
@@ -1611,10 +1656,8 @@ class TextLayoutContext {
           vg.height = hAdvance + letterSpacing;
           vg.width = glyph.fontSize;
         } else {
+          // For upright characters, use the vertical advance from font metrics.
           float vertAdvance = glyph.font.getAdvance(glyph.glyphID, true);
-          if (vertAdvance <= 0) {
-            vertAdvance = glyph.fontSize;
-          }
           vg.height = vertAdvance + letterSpacing;
           vg.width = glyph.fontSize;
         }
@@ -1766,15 +1809,28 @@ class TextLayoutContext {
       }
 
       auto glyphCount = column.glyphs.size();
-      std::vector<float> squashAmounts(glyphCount, 0);
+      // In vertical layout, "leading" = top (before glyph face), "trailing" = bottom (after glyph
+      // face). Opening punctuation has leading (top) whitespace, Closing has trailing (bottom).
+      // Only apply squash to upright glyphs. Rotated glyphs have their whitespace axis changed after
+      // rotation, so horizontal punctuation squash rules do not apply.
+      std::vector<float> leadingSquash(glyphCount, 0);
+      std::vector<float> trailingSquash(glyphCount, 0);
+
+      auto isSquashable = [](const VerticalGlyphInfo& vg) -> bool {
+        return vg.orientation == VerticalOrientation::Upright;
+      };
 
       // Column-start squash: remove leading whitespace of the first non-whitespace glyph.
       for (size_t i = 0; i < glyphCount; i++) {
         if (LineBreaker::isWhitespace(column.glyphs[i].glyphs.front().unichar)) {
           continue;
         }
-        float fraction = PunctuationSquash::GetLineStartSquash(column.glyphs[i].glyphs.front().unichar);
-        squashAmounts[i] = column.glyphs[i].height * fraction;
+        if (!isSquashable(column.glyphs[i])) {
+          break;
+        }
+        float fraction =
+            PunctuationSquash::GetLineStartSquash(column.glyphs[i].glyphs.front().unichar);
+        leadingSquash[i] = column.glyphs[i].height * fraction;
         break;
       }
 
@@ -1783,31 +1839,42 @@ class TextLayoutContext {
         if (LineBreaker::isWhitespace(column.glyphs[i].glyphs.front().unichar)) {
           continue;
         }
-        float fraction = PunctuationSquash::GetLineEndSquash(column.glyphs[i].glyphs.front().unichar);
-        if (column.glyphs[i].height * fraction > squashAmounts[i]) {
-          squashAmounts[i] = column.glyphs[i].height * fraction;
+        if (!isSquashable(column.glyphs[i])) {
+          break;
         }
+        float fraction =
+            PunctuationSquash::GetLineEndSquash(column.glyphs[i].glyphs.front().unichar);
+        trailingSquash[i] = column.glyphs[i].height * fraction;
         break;
       }
 
-      // Adjacent punctuation squash: both sides can be squashed simultaneously.
+      // Adjacent punctuation squash (only between upright glyphs).
       for (size_t i = 0; i + 1 < glyphCount; i++) {
-        auto result = PunctuationSquash::GetAdjacentSquash(column.glyphs[i].glyphs.front().unichar,
-                                                           column.glyphs[i + 1].glyphs.front().unichar);
-        float prevAmount = column.glyphs[i].height * result.prevSquash;
-        float nextAmount = column.glyphs[i + 1].height * result.nextSquash;
-        if (prevAmount > squashAmounts[i]) {
-          squashAmounts[i] = prevAmount;
+        if (!isSquashable(column.glyphs[i]) || !isSquashable(column.glyphs[i + 1])) {
+          continue;
         }
-        if (nextAmount > squashAmounts[i + 1]) {
-          squashAmounts[i + 1] = nextAmount;
+        auto result = PunctuationSquash::GetAdjacentSquash(
+            column.glyphs[i].glyphs.front().unichar,
+            column.glyphs[i + 1].glyphs.front().unichar);
+        if (result.prevSquash > 0) {
+          float amount = column.glyphs[i].height * result.prevSquash;
+          if (amount > trailingSquash[i]) {
+            trailingSquash[i] = amount;
+          }
+        }
+        if (result.nextSquash > 0) {
+          float amount = column.glyphs[i + 1].height * result.nextSquash;
+          if (amount > leadingSquash[i + 1]) {
+            leadingSquash[i + 1] = amount;
+          }
         }
       }
 
-      // Recalculate column height with squash applied.
+      // Apply squash to glyph heights and record leadingSquash for position adjustment.
       float totalHeight = 0;
       for (size_t i = 0; i < glyphCount; i++) {
-        column.glyphs[i].height -= squashAmounts[i];
+        column.glyphs[i].leadingSquash = leadingSquash[i];
+        column.glyphs[i].height -= leadingSquash[i] + trailingSquash[i];
         totalHeight += column.glyphs[i].height;
       }
       column.height = totalHeight;
@@ -1947,6 +2014,7 @@ class TextLayoutContext {
         if (vg.orientation == VerticalOrientation::Rotated && vg.glyphs.size() > 1) {
           // Rotated group (tate-chu-yoko): render all glyphs as a horizontal run, rotated 90° CW.
           float localX = 0;
+          float squashOffset = vg.leadingSquash;
           for (auto& g : vg.glyphs) {
             VerticalPositionedGlyph vpg = {};
             vpg.glyphID = g.glyphID;
@@ -1957,7 +2025,7 @@ class TextLayoutContext {
             // Center each glyph horizontally in the column using its own ascent/descent.
             float absAscent = fabsf(g.ascent);
             float tx = columnCenterX - (absAscent - g.descent) / 2;
-            float ty = currentY + localX;
+            float ty = currentY - squashOffset + localX;
             vpg.xform = tgfx::RSXform::Make(0, 1, tx, ty);
             // Use horizontal advance from font metrics for positioning within the group.
             localX += g.font.getAdvance(g.glyphID);
@@ -1972,33 +2040,22 @@ class TextLayoutContext {
           vpg.useRSXform = true;
           float absAscent = fabsf(g.ascent);
           float tx = columnCenterX - (absAscent - g.descent) / 2;
-          float ty = currentY;
+          float ty = currentY - vg.leadingSquash;
           vpg.xform = tgfx::RSXform::Make(0, 1, tx, ty);
           textGlyphs[g.sourceText].push_back(vpg);
 #ifdef PAG_USE_HARFBUZZ
         } else {
           // With HarfBuzz vert shaping, use getVerticalOffset() for all upright glyphs.
           // If the font has vert/vrt2 features, HarfBuzz already substituted the glyph.
-          // Fall back to manual punctuation offset only if getVerticalOffset returns zero.
           auto& g = vg.glyphs.front();
           VerticalPositionedGlyph vpg = {};
           vpg.glyphID = g.glyphID;
           vpg.font = g.font;
           vpg.useRSXform = false;
           auto offset = g.font.getVerticalOffset(g.glyphID);
-          if (FloatNearlyEqual(offset.x, 0) && FloatNearlyEqual(offset.y, 0) &&
-              VerticalTextUtils::needsPunctuationOffset(g.unichar)) {
-            float dx = 0;
-            float dy = 0;
-            VerticalTextUtils::getPunctuationOffset(g.fontSize, &dx, &dy);
-            float glyphX = columnCenterX - g.advance / 2 + dx;
-            float glyphY = currentY + fabsf(g.ascent) + dy;
-            vpg.position = tgfx::Point::Make(glyphX, glyphY);
-          } else {
-            float glyphX = columnCenterX + offset.x;
-            float glyphY = currentY + offset.y;
-            vpg.position = tgfx::Point::Make(glyphX, glyphY);
-          }
+          float glyphX = columnCenterX + offset.x;
+          float glyphY = currentY - vg.leadingSquash + offset.y;
+          vpg.position = tgfx::Point::Make(glyphX, glyphY);
           textGlyphs[g.sourceText].push_back(vpg);
         }
 #else

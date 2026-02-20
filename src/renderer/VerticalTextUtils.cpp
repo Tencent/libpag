@@ -84,12 +84,7 @@ static const int32_t UprightRanges[][2] = {
     {0x02BD3, 0x02BEB},  // ⯓..⯫ Astronomical Symbols
     {0x02BF0, 0x02BFF},  // ⯰..⯿ Astronomical Symbols
     {0x02E50, 0x02E51},  // ⹐ ⹑ Cross Patty Symbols
-    {0x02E80, 0x03007},  // CJK Radicals..Ideographic Number Zero
-    {0x03012, 0x03013},  // 〒 〓 Postal Mark, Geta Mark
-    {0x03020, 0x0302F},  // 〠..〯 Postal Mark Face..Hangul Tone Marks
-    {0x03031, 0x0309F},  // 〱..ゟ Kana Repeat Marks..Hiragana
-    {0x030A1, 0x030FB},  // ァ..・ Katakana (excl. 30A0 Tr double hyphen)
-    {0x030FD, 0x0A4CF},  // ヽ..꓏ Katakana Iteration..Yi Radicals
+    {0x02E80, 0x0A4CF},  // CJK Radicals..Ideographic..Brackets..Kana..Katakana..Yi Radicals
     {0x0A960, 0x0A97F},  // Hangul Jamo Extended-A
     {0x0AC00, 0x0D7FF},  // Hangul Syllables..Jamo Extended-B
     {0x0E000, 0x0FAFF},  // PUA..CJK Compatibility Ideographs

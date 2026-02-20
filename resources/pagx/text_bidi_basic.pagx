@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="600" height="600" version="1.0">
+  <!-- Box A: Pure Hebrew RTL text -->
+  <Layer x="50" y="30">
+    <Group>
+      <Rectangle center="125,25" size="250,50"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="22"><![CDATA[שלום עולם]]></Text>
+      <TextBox size="250,50"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box B: Hebrew + LTR digits (digits stay LTR in RTL context) -->
+  <Layer x="340" y="30">
+    <Group>
+      <Rectangle center="110,25" size="220,50"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="20"><![CDATA[מחיר: $99.50]]></Text>
+      <TextBox size="220,50"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box C: Hebrew + Latin mixed (BiDi boundary) -->
+  <Layer x="50" y="110">
+    <Group>
+      <Rectangle center="200,25" size="400,50"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="20"><![CDATA[שלום Hello עולם World]]></Text>
+      <TextBox size="400,50"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box D: CJK + digits mixed (LTR paragraph with embedded numbers) -->
+  <Layer x="50" y="190">
+    <Group>
+      <Rectangle center="200,25" size="400,50"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="20"><![CDATA[版本 v2.0.1 发布 共123项更新]]></Text>
+      <TextBox size="400,50"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box E: Multi-line with mixed scripts and line wrapping -->
+  <Layer x="50" y="270">
+    <Group>
+      <Rectangle center="150,50" size="300,100"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="18"><![CDATA[שלום Hello 你好 World עולם 世界]]></Text>
+      <TextBox size="300,100"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box F: Hebrew multi-line with word wrap -->
+  <Layer x="50" y="400">
+    <Group>
+      <Rectangle center="100,50" size="200,100"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="18"><![CDATA[זהו טקסט ארוך בעברית שצריך לעבור שורה]]></Text>
+      <TextBox size="200,100"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box G: URL with CJK context -->
+  <Layer x="280" y="400">
+    <Group>
+      <Rectangle center="150,50" size="300,100"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="18"><![CDATA[详见 https://example.com/path?id=123
+联系 email@test.com 获取信息]]></Text>
+      <TextBox size="300,100"/>
+      <Fill/>
+    </Group>
+  </Layer>
+</pagx>
