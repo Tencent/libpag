@@ -1450,7 +1450,7 @@ static Point parsePoint(const std::string& str, bool* outValid) {
     ptr = skipWhitespaceAndComma(endPtr, end);
     point.y = strtof(ptr, &endPtr);
     if (outValid) {
-      *outValid = true;
+      *outValid = (endPtr > ptr);
     }
   } else {
     if (outValid) {
@@ -1471,7 +1471,7 @@ static Size parseSize(const std::string& str, bool* outValid) {
     ptr = skipWhitespaceAndComma(endPtr, end);
     size.height = strtof(ptr, &endPtr);
     if (outValid) {
-      *outValid = true;
+      *outValid = (endPtr > ptr);
     }
   } else {
     if (outValid) {
@@ -1486,6 +1486,7 @@ static Rect parseRect(const std::string& str, bool* outValid) {
   const char* ptr = str.c_str();
   const char* end = ptr + str.size();
   char* endPtr = nullptr;
+  bool valid = true;
   ptr = skipWhitespaceAndComma(ptr, end);
   rect.x = strtof(ptr, &endPtr);
   if (endPtr > ptr) {
@@ -1499,9 +1500,14 @@ static Rect parseRect(const std::string& str, bool* outValid) {
   if (endPtr > ptr) {
     ptr = skipWhitespaceAndComma(endPtr, end);
     rect.height = strtof(ptr, &endPtr);
+    if (endPtr <= ptr) {
+      valid = false;
+    }
+  } else {
+    valid = false;
   }
   if (outValid) {
-    *outValid = (endPtr > str.c_str());
+    *outValid = valid;
   }
   return rect;
 }
@@ -1517,7 +1523,7 @@ int parseHexDigit(char c) {
   if (c >= 'A' && c <= 'F') {
     return c - 'A' + 10;
   }
-  return 0;
+  return -1;
 }
 }  // namespace
 
@@ -1536,6 +1542,12 @@ static Color parseColor(const std::string& str, bool* outValid) {
       int r = parseHexDigit(str[1]);
       int g = parseHexDigit(str[2]);
       int b = parseHexDigit(str[3]);
+      if (r < 0 || g < 0 || b < 0) {
+        if (outValid) {
+          *outValid = false;
+        }
+        return {};
+      }
       color.red = static_cast<float>(r * 17) / 255.0f;
       color.green = static_cast<float>(g * 17) / 255.0f;
       color.blue = static_cast<float>(b * 17) / 255.0f;
@@ -1546,16 +1558,37 @@ static Color parseColor(const std::string& str, bool* outValid) {
       return color;
     }
     if (str.size() == 7 || str.size() == 9) {
-      int r = parseHexDigit(str[1]) * 16 + parseHexDigit(str[2]);
-      int g = parseHexDigit(str[3]) * 16 + parseHexDigit(str[4]);
-      int b = parseHexDigit(str[5]) * 16 + parseHexDigit(str[6]);
+      int r1 = parseHexDigit(str[1]);
+      int r2 = parseHexDigit(str[2]);
+      int g1 = parseHexDigit(str[3]);
+      int g2 = parseHexDigit(str[4]);
+      int b1 = parseHexDigit(str[5]);
+      int b2 = parseHexDigit(str[6]);
+      if (r1 < 0 || r2 < 0 || g1 < 0 || g2 < 0 || b1 < 0 || b2 < 0) {
+        if (outValid) {
+          *outValid = false;
+        }
+        return {};
+      }
+      int r = r1 * 16 + r2;
+      int g = g1 * 16 + g2;
+      int b = b1 * 16 + b2;
       color.red = static_cast<float>(r) / 255.0f;
       color.green = static_cast<float>(g) / 255.0f;
       color.blue = static_cast<float>(b) / 255.0f;
-      color.alpha = str.size() == 9
-                        ? static_cast<float>(parseHexDigit(str[7]) * 16 + parseHexDigit(str[8])) /
-                              255.0f
-                        : 1.0f;
+      if (str.size() == 9) {
+        int a1 = parseHexDigit(str[7]);
+        int a2 = parseHexDigit(str[8]);
+        if (a1 < 0 || a2 < 0) {
+          if (outValid) {
+            *outValid = false;
+          }
+          return {};
+        }
+        color.alpha = static_cast<float>(a1 * 16 + a2) / 255.0f;
+      } else {
+        color.alpha = 1.0f;
+      }
       if (outValid) {
         *outValid = true;
       }
