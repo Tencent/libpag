@@ -169,7 +169,7 @@ static int RemoveEmptyElements(std::vector<Element*>& elements) {
                      [](const Element* element) {
                        if (element->nodeType() == NodeType::Stroke) {
                          auto stroke = static_cast<const Stroke*>(element);
-                         return stroke->width == 0;
+                         return stroke->width <= 0.0f;
                        }
                        if (element->nodeType() == NodeType::Group) {
                          auto group = static_cast<const Group*>(element);
