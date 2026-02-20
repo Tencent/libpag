@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PunctuationSquash.h"
+#include "LineBreaker.h"
 
 namespace pagx {
 
@@ -29,56 +30,34 @@ static constexpr float HALF = 0.5f;
 static constexpr float QUARTER = 0.25f;
 
 PunctuationCategory PunctuationSquash::GetCategory(int32_t c) {
-  switch (c) {
-    // Opening brackets (JLREQ cl-01): whitespace on the leading (left in LTR, top in vertical)
-    // side.
-    case 0xFF08:  // （ FULLWIDTH LEFT PARENTHESIS
-    case 0x3008:  // 〈 LEFT ANGLE BRACKET
-    case 0x300A:  // 《 LEFT DOUBLE ANGLE BRACKET
-    case 0x300C:  // 「 LEFT CORNER BRACKET
-    case 0x300E:  // 『 LEFT WHITE CORNER BRACKET
-    case 0x3010:  // 【 LEFT BLACK LENTICULAR BRACKET
-    case 0x3014:  // 〔 LEFT TORTOISE SHELL BRACKET
-    case 0x3016:  // 〖 LEFT WHITE LENTICULAR BRACKET
-    case 0x3018:  // 〘 LEFT WHITE TORTOISE SHELL BRACKET
-    case 0x301A:  // 〚 LEFT WHITE SQUARE BRACKET
-    case 0xFF3B:  // ［ FULLWIDTH LEFT SQUARE BRACKET
-    case 0xFF5B:  // ｛ FULLWIDTH LEFT CURLY BRACKET
-    case 0x2018:  // ' LEFT SINGLE QUOTATION MARK
-    case 0x201C:  // " LEFT DOUBLE QUOTATION MARK
+  auto lbc = LineBreaker::GetLineBreakClass(c);
+  switch (lbc) {
+    case LineBreakClass::OP:
       return PunctuationCategory::Opening;
-
-    // Closing brackets, commas, periods, and dividing punctuation (JLREQ cl-02, cl-04, cl-06,
-    // cl-07): whitespace on the trailing (right in LTR, bottom in vertical) side.
-    case 0xFF09:  // ） FULLWIDTH RIGHT PARENTHESIS
-    case 0x3009:  // 〉 RIGHT ANGLE BRACKET
-    case 0x300B:  // 》 RIGHT DOUBLE ANGLE BRACKET
-    case 0x300D:  // 」 RIGHT CORNER BRACKET
-    case 0x300F:  // 』 RIGHT WHITE CORNER BRACKET
-    case 0x3011:  // 】 RIGHT BLACK LENTICULAR BRACKET
-    case 0x3015:  // 〕 RIGHT TORTOISE SHELL BRACKET
-    case 0x3017:  // 〗 RIGHT WHITE LENTICULAR BRACKET
-    case 0x3019:  // 〙 RIGHT WHITE TORTOISE SHELL BRACKET
-    case 0x301B:  // 〛 RIGHT WHITE SQUARE BRACKET
-    case 0xFF3D:  // ］ FULLWIDTH RIGHT SQUARE BRACKET
-    case 0xFF5D:  // ｝ FULLWIDTH RIGHT CURLY BRACKET
-    case 0x2019:  // ' RIGHT SINGLE QUOTATION MARK
-    case 0x201D:  // " RIGHT DOUBLE QUOTATION MARK
-    case 0x3001:  // 、 IDEOGRAPHIC COMMA
-    case 0x3002:  // 。 IDEOGRAPHIC FULL STOP
-    case 0xFF0C:  // ， FULLWIDTH COMMA
-    case 0xFF0E:  // ． FULLWIDTH FULL STOP
-    case 0xFF01:  // ！ FULLWIDTH EXCLAMATION MARK (JLREQ cl-04)
-    case 0xFF1F:  // ？ FULLWIDTH QUESTION MARK (JLREQ cl-04)
-    case 0xFF1A:  // ： FULLWIDTH COLON
-    case 0xFF1B:  // ； FULLWIDTH SEMICOLON
+    case LineBreakClass::CL:
       return PunctuationCategory::Closing;
-
-    // Middle dot punctuation (JLREQ cl-05): whitespace on both sides (quarter-em each side).
-    case 0x30FB:  // ・ KATAKANA MIDDLE DOT
-    case 0xFF65:  // ･ HALFWIDTH KATAKANA MIDDLE DOT
-      return PunctuationCategory::MiddleDot;
-
+    case LineBreakClass::EX:
+      // ！？ have trailing whitespace like closing punctuation.
+      return PunctuationCategory::Closing;
+    case LineBreakClass::QU:
+      // Quotation marks: left quotes act as opening, right quotes as closing.
+      if (c == 0x2018 || c == 0x201C) {
+        return PunctuationCategory::Opening;
+      }
+      if (c == 0x2019 || c == 0x201D) {
+        return PunctuationCategory::Closing;
+      }
+      return PunctuationCategory::None;
+    case LineBreakClass::NS:
+      // ： ； have trailing whitespace like closing punctuation.
+      if (c == 0xFF1A || c == 0xFF1B) {
+        return PunctuationCategory::Closing;
+      }
+      // ・ ･ are middle dot punctuation with quarter-em whitespace on each side.
+      if (c == 0x30FB || c == 0xFF65) {
+        return PunctuationCategory::MiddleDot;
+      }
+      return PunctuationCategory::None;
     default:
       return PunctuationCategory::None;
   }
