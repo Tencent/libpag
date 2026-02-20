@@ -360,34 +360,35 @@ static int DeduplicateColorSources(PAGXDocument* document) {
 static void CollectReferencedNodes(const std::vector<Element*>& elements,
                                    std::unordered_set<const Node*>& referenced);
 
+static void CollectColorStops(const ColorSource* source,
+                              std::unordered_set<const Node*>& referenced) {
+  const std::vector<ColorStop*>* stops = nullptr;
+  auto type = source->nodeType();
+  if (type == NodeType::LinearGradient) {
+    stops = &static_cast<const LinearGradient*>(source)->colorStops;
+  } else if (type == NodeType::RadialGradient) {
+    stops = &static_cast<const RadialGradient*>(source)->colorStops;
+  } else if (type == NodeType::ConicGradient) {
+    stops = &static_cast<const ConicGradient*>(source)->colorStops;
+  } else if (type == NodeType::DiamondGradient) {
+    stops = &static_cast<const DiamondGradient*>(source)->colorStops;
+  }
+  if (stops != nullptr) {
+    for (auto* stop : *stops) {
+      referenced.insert(stop);
+    }
+  }
+}
+
 static void CollectReferencedNodesFromColorSource(const ColorSource* source,
                                                   std::unordered_set<const Node*>& referenced) {
   if (source == nullptr) {
     return;
   }
   referenced.insert(source);
-  auto type = source->nodeType();
-  if (type == NodeType::LinearGradient) {
-    auto gradient = static_cast<const LinearGradient*>(source);
-    for (auto* stop : gradient->colorStops) {
-      referenced.insert(stop);
-    }
-  } else if (type == NodeType::RadialGradient) {
-    auto gradient = static_cast<const RadialGradient*>(source);
-    for (auto* stop : gradient->colorStops) {
-      referenced.insert(stop);
-    }
-  } else if (type == NodeType::ConicGradient) {
-    auto gradient = static_cast<const ConicGradient*>(source);
-    for (auto* stop : gradient->colorStops) {
-      referenced.insert(stop);
-    }
-  } else if (type == NodeType::DiamondGradient) {
-    auto gradient = static_cast<const DiamondGradient*>(source);
-    for (auto* stop : gradient->colorStops) {
-      referenced.insert(stop);
-    }
-  } else if (type == NodeType::ImagePattern) {
+  if (IsGradient(source->nodeType())) {
+    CollectColorStops(source, referenced);
+  } else if (source->nodeType() == NodeType::ImagePattern) {
     auto pattern = static_cast<const ImagePattern*>(source);
     if (pattern->image != nullptr) {
       referenced.insert(pattern->image);
