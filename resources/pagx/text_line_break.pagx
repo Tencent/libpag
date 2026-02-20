@@ -1,228 +1,275 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx width="600" height="850" version="1.0">
-  <!-- All boxes use fontSize=24. CJK char width ≈ 24px, Latin varies. -->
+<pagx width="580" height="650" version="1.0">
+  <!-- All boxes use NotoSansSC fontSize=24. Measured advances:
+       CJK/…/「/」/ー/"/"/￥ = 24px, — = 21px, % = 22px,
+       space = 5px, hyphen = 8px, slash = 9px, digits 0-9 = 13px.
+       Font metrics: ascent=-27.84 descent=6.91 lineHeight≈35px. -->
 
-  <!-- Box A: Forced break — extra-long word wider than box, must split mid-word -->
-  <!-- Width 120px = 5 CJK chars. "Supercalifragilistic" is much wider, forces character-level break. -->
-  <Layer x="30" y="30">
+  <!-- ================================================================ -->
+  <!-- Row 1: Basic break types -->
+  <!-- ================================================================ -->
+
+  <!-- Box A: Forced break — long word (376px total) must split mid-character -->
+  <!-- width=100px, 4 lines, height=140 -->
+  <Layer x="20" y="20">
     <Group>
-      <Rectangle center="60,50" size="120,100"/>
+      <Rectangle center="50,70" size="100,140"/>
       <Stroke/>
     </Group>
     <Group>
       <Text text="Supercalifragilisticexpialidocious" fontFamily="NotoSansSC" fontSize="24"/>
-      <TextBox size="120,100"/>
+      <TextBox size="100,140"/>
       <Fill/>
     </Group>
   </Layer>
 
-  <!-- Box B: Space break — English words break at spaces -->
-  <!-- "Hello World Test" — "Hello World " fits ~140px, "Test" wraps to next line -->
-  <Layer x="170" y="30">
+  <!-- Box B: Space break — "Hello"=59 " "=5 "World"=67 → 131px. -->
+  <!-- width=132: "Hello World"=131<132 fits, "Test"=47 wraps. 2 lines, height=70 -->
+  <Layer x="140" y="20">
     <Group>
-      <Rectangle center="72,30" size="144,60"/>
+      <Rectangle center="66,35" size="132,70"/>
       <Stroke/>
     </Group>
     <Group>
-      <Text text="Hello World Test Line" fontFamily="NotoSansSC" fontSize="24"/>
-      <TextBox size="144,60"/>
+      <Text text="Hello World Test" fontFamily="NotoSansSC" fontSize="24"/>
+      <TextBox size="132,70"/>
       <Fill/>
     </Group>
   </Layer>
 
   <!-- Box C: Hyphen break (BA) — break allowed after "-" -->
-  <!-- "well-known" = ~120px at fontSize=24. Width 96px forces break after "well-" -->
-  <Layer x="340" y="30">
+  <!-- "well-"=54 "known"=77 → 131. width=132: "well-known"=131<132 fits. -->
+  <!-- " "=5 "self-"=47 → 131+5+47=183>132. Break after space: "well-known" line1. -->
+  <!-- "self-"=47 "driving"=80 → 127<132. "self-driving"=127<132 fits line2. 2 lines, h=70 -->
+  <Layer x="290" y="20">
     <Group>
-      <Rectangle center="48,50" size="96,100"/>
+      <Rectangle center="66,35" size="132,70"/>
       <Stroke/>
     </Group>
     <Group>
       <Text text="well-known self-driving" fontFamily="NotoSansSC" fontSize="24"/>
-      <TextBox size="96,100"/>
+      <TextBox size="132,70"/>
       <Fill/>
     </Group>
   </Layer>
 
   <!-- Box D: Slash break (BA) — break allowed after "/" -->
-  <!-- "path/to/file" at fontSize=24. Width 96px forces break after slashes. -->
-  <Layer x="460" y="30">
+  <!-- "path/"=62 "to/"=33 → 95. width=96: "path/to/"=95<96 fits. -->
+  <!-- "some/"=70 → 95+70=165>96 wraps. "some/"=70<96 fits line2. "file"=35<96 fits too. -->
+  <!-- "some/file"=105>96, so "some/" line2, "file" line3. 3 lines, h=105 -->
+  <Layer x="440" y="20">
     <Group>
-      <Rectangle center="48,50" size="96,100"/>
+      <Rectangle center="48,53" size="96,105"/>
       <Stroke/>
     </Group>
     <Group>
       <Text text="path/to/some/file" fontFamily="NotoSansSC" fontSize="24"/>
-      <TextBox size="96,100"/>
+      <TextBox size="96,105"/>
       <Fill/>
     </Group>
   </Layer>
 
-  <!-- Box E: Soft hyphen (BA) — U+00AD allows break, invisible unless at line end -->
-  <!-- "Compre-hensive" with soft hyphen. Width forces break at soft hyphen position. -->
-  <Layer x="30" y="160">
+  <!-- ================================================================ -->
+  <!-- Row 2: Invisible break characters -->
+  <!-- ================================================================ -->
+
+  <!-- Box E: Soft hyphen (BA) — U+00AD invisible unless at line break -->
+  <!-- "Compre"=89 (+SHY=0). width=90: "Compre"=89<90 fits, break at SHY. -->
+  <!-- "hensive"=87<90 fits line2. " "=5 "over"=50 → 87+5+50=142>90. -->
+  <!-- "over"=50 (+SHY=0). 50<90 fits line3. "view"=52<90 fits line4? -->
+  <!-- "over"=50+SHY+... need to check if "overview" is one word. It is two: "over­view". -->
+  <!-- So: line1="Compre", line2="hensive", line3="over", line4="view". 4 lines, h=140 -->
+  <Layer x="20" y="180">
     <Group>
-      <Rectangle center="72,30" size="144,60"/>
+      <Rectangle center="45,70" size="90,140"/>
       <Stroke/>
     </Group>
     <Group>
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[Compre­hensive over­view]]></Text>
-      <TextBox size="144,60"/>
+      <TextBox size="90,140"/>
       <Fill/>
     </Group>
   </Layer>
 
-  <!-- Box F: ZWSP break (BA) — U+200B allows break at zero-width position -->
-  <!-- "Super[ZWSP]Long[ZWSP]Word" — width 120px forces break at first ZWSP -->
-  <Layer x="200" y="160">
+  <!-- Box F: ZWSP break (BA) — U+200B zero-width space allows break -->
+  <!-- "Super"=66 (+ZWSP=0). width=67: "Super"=66<67 fits, break at ZWSP. -->
+  <!-- "Long"=57<67 line2. "Word"=60<67 line3. "Here"=52<67 line4. 4 lines, h=140 -->
+  <Layer x="130" y="180">
     <Group>
-      <Rectangle center="60,50" size="120,100"/>
+      <Rectangle center="34,70" size="67,140"/>
       <Stroke/>
     </Group>
     <Group>
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[Super​Long​Word​Here]]></Text>
-      <TextBox size="120,100"/>
+      <TextBox size="67,140"/>
       <Fill/>
     </Group>
   </Layer>
 
   <!-- Box G: Word Joiner (GL) — U+2060 prevents break -->
-  <!-- "No[WJ]Break Here" — despite space, WJ prevents break between No and Break -->
-  <!-- Width 120px would normally break after "No " but WJ keeps them together -->
-  <Layer x="340" y="160">
+  <!-- AB⁠CD⁠EF = 15+16+0+15+16+0+14+13 = 89. " "=5 "GH"=17+17=34. -->
+  <!-- width=90: "ABCDEF"=89<90 fits (WJ keeps them together). -->
+  <!-- 89+5=94>90 → "ABCDEF" line1. "GH"=34 " "=5 "IJ"=20 → 59<90 line2. 2 lines, h=70 -->
+  <Layer x="220" y="180">
     <Group>
-      <Rectangle center="72,50" size="144,100"/>
+      <Rectangle center="45,35" size="90,70"/>
       <Stroke/>
     </Group>
     <Group>
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[AB⁠CD⁠EF GH IJ]]></Text>
-      <TextBox size="144,100"/>
+      <TextBox size="90,70"/>
       <Fill/>
     </Group>
   </Layer>
 
-  <!-- Box H: Currency prefix (PR) — ￥ must not separate from number -->
-  <!-- "总价￥200元" — width 120px = 5 CJK chars. "总价" = 48px, "￥" = 24px, total "总价￥" = 72px -->
-  <!-- "200" ≈ 36px, so "总价￥200" = 108px fits. "元" would overflow → "元" wraps -->
-  <!-- Key test: ￥ must NOT wrap alone to next line, stays with 200 -->
-  <Layer x="30" y="290">
+  <!-- ================================================================ -->
+  <!-- Row 3: PR/PO/IN rules (sticky prefix/postfix/inseparable) -->
+  <!-- ================================================================ -->
+
+  <!-- Box H: Currency prefix (PR) — ￥ must not separate from following number -->
+  <!-- Text "好￥9吧": 好=24 ￥=24 9=13 吧=24 total=85. -->
+  <!-- width=49: 好=24<49 fits. 好+￥=48<49 fits geometrically. -->
+  <!-- But ￥ is PR class — cannot break between ￥ and 9. So ￥ can't be at line end. -->
+  <!-- Backtrack: "好" line1 (24<49). "￥9"=37<49 line2. "吧"=24<49 line3. -->
+  <!-- Key: ￥ stays with 9, not stranded at end of line1. 3 lines, h=105 -->
+  <Layer x="20" y="370">
     <Group>
-      <Rectangle center="54,30" size="108,60"/>
+      <Rectangle center="25,53" size="49,105"/>
       <Stroke/>
     </Group>
     <Group>
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[总价￥200元]]></Text>
-      <TextBox size="108,60"/>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[好￥9吧]]></Text>
+      <TextBox size="49,105"/>
       <Fill/>
     </Group>
   </Layer>
 
-  <!-- Box I: Postfix (PO) — % must not separate from number -->
-  <!-- "得分100%好" — width 120px = 5 CJK chars. -->
-  <!-- "得分" = 48px, "100" ≈ 36px, "%" ≈ 14px → "得分100%" = 98px fits -->
-  <!-- "好" = 24px → wraps. Key: % stays with 100 -->
-  <Layer x="160" y="290">
+  <!-- Box I: Postfix (PO) — % must not separate from preceding number -->
+  <!-- Text "好9%吧": 好=24 9=13 %=22 吧=24 total=83. -->
+  <!-- width=49: 好=24<49. 好+9=37<49. 好+9+%=59>49 → break needed. -->
+  <!-- But % is PO class — cannot break between 9 and %. -->
+  <!-- Backtrack: "好" line1 (24<49). "9%"=35<49 line2. "吧"=24<49 line3. -->
+  <!-- Key: % stays with 9, not pushed to start of next line alone. 3 lines, h=105 -->
+  <Layer x="90" y="370">
     <Group>
-      <Rectangle center="54,30" size="108,60"/>
+      <Rectangle center="25,53" size="49,105"/>
       <Stroke/>
     </Group>
     <Group>
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[得分100%好]]></Text>
-      <TextBox size="108,60"/>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[好9%吧]]></Text>
+      <TextBox size="49,105"/>
       <Fill/>
     </Group>
   </Layer>
 
-  <!-- Box J: Inseparable ellipsis (IN) — …… must not break between -->
-  <!-- "等等……好的" — "等等" = 48px, "……" = 48px → 96px, "好的" = 48px → 144px total -->
-  <!-- Width 120px: "等等……" = 96px fits, "好的" wraps. Key: …… stays together -->
-  <Layer x="290" y="290">
+  <!-- Box J: Inseparable ellipsis (IN) — …… must not break between the two … -->
+  <!-- Text "等等……好": 等=24 等=24 …=24 …=24 好=24 total=120. -->
+  <!-- width=73: 等+等=48<73. 等+等+…=72<73 fits geometrically. -->
+  <!-- But next … is IN class — …… are inseparable, can't break between them. -->
+  <!-- Backtrack: "等等" line1 (48<73). "……"=48<73 line2. "好"=24<73 line3. -->
+  <!-- Key: …… stay together, not split across lines. 3 lines, h=105 -->
+  <Layer x="160" y="370">
     <Group>
-      <Rectangle center="60,30" size="120,60"/>
+      <Rectangle center="37,53" size="73,105"/>
       <Stroke/>
     </Group>
     <Group>
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[等等……好的]]></Text>
-      <TextBox size="120,60"/>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[等等……好]]></Text>
+      <TextBox size="73,105"/>
       <Fill/>
     </Group>
   </Layer>
 
-  <!-- Box K: Inseparable dash (IN) — —— must not break between -->
-  <!-- "前言——正文" — "前言" = 48px, "——" = 48px → 96px, "正文" = 48px → 144px total -->
-  <!-- Width 120px: "前言——" = 96px fits, "正文" wraps. Key: —— stays together -->
-  <Layer x="430" y="290">
+  <!-- Box K: Inseparable dash (IN) — —— must not break between the two — -->
+  <!-- Text "前言——正": 前=24 言=24 —=21 —=21 正=24 total=114. -->
+  <!-- width=70: 前+言=48<70. 前+言+—=69<70 fits geometrically. -->
+  <!-- But next — is IN class — —— are inseparable, can't break between them. -->
+  <!-- Backtrack: "前言" line1 (48<70). "——"=42<70 line2. "正"=24<70 line3. -->
+  <!-- Key: —— stay together. 3 lines, h=105 -->
+  <Layer x="250" y="370">
     <Group>
-      <Rectangle center="60,30" size="120,60"/>
+      <Rectangle center="35,53" size="70,105"/>
       <Stroke/>
     </Group>
     <Group>
-      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[前言——正文]]></Text>
-      <TextBox size="120,60"/>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[前言——正]]></Text>
+      <TextBox size="70,105"/>
       <Fill/>
     </Group>
   </Layer>
 
-  <!-- Box L: Opening bracket line-end prohibited (OP) — 「 must not be at line end -->
-  <!-- "说完了「引用」" — "说完了" = 72px, "「" = 24px → 96px -->
-  <!-- Width 96px: If naive, "说完了「" fills line, but 「 at end is prohibited -->
-  <!-- So should break before 「: "说完了" on line1, "「引用」" on line2 -->
-  <Layer x="30" y="400">
+  <!-- ================================================================ -->
+  <!-- Row 4: OP/CL/NS/QU rules (bracket/punctuation positioning) -->
+  <!-- ================================================================ -->
+
+  <!-- Box L: Opening bracket (OP) — 「 must not appear at line end -->
+  <!-- Text "说完了「引用」好": 说+完+了=72 「=24 引+用=48 」=24 好=24 total=192. -->
+  <!-- width=97: 说+完+了=72<97. 说+完+了+「=96<97 fits geometrically. -->
+  <!-- But 「 is OP class — prohibited at line end. Break before 「. -->
+  <!-- "说完了" line1 (72<97). "「引用」"=120>97. "「引用"=96<97 fits. -->
+  <!-- 」 is CL — can't be at line start. "「引用」"=120>97 but 」 pulled in → "「引用」"=120>97. -->
+  <!-- Hmm, "「引用"=96<97 line2, "」好"=48<97 line3. 3 lines, h=105 -->
+  <Layer x="340" y="370">
     <Group>
-      <Rectangle center="48,50" size="96,100"/>
+      <Rectangle center="49,53" size="97,105"/>
       <Stroke/>
     </Group>
     <Group>
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[说完了「引用」好]]></Text>
-      <TextBox size="96,100"/>
+      <TextBox size="97,105"/>
       <Fill/>
     </Group>
   </Layer>
 
-  <!-- Box M: Closing bracket line-start prohibited (CL) — 」 must not be at line start -->
-  <!-- "是的」然后" — "是的" = 48px, "」" = 24px → 72px, "然后" = 48px → 120px -->
-  <!-- Width 72px = 3 CJK. If naive: "是的" line1, "」然后" line2 — but 」 at start prohibited -->
-  <!-- So 」 sticks with 是的: "是的」" on line1, "然后" on line2 -->
-  <Layer x="150" y="400">
+  <!-- Box M: Closing bracket (CL) — 」 must not appear at line start -->
+  <!-- Text "是的」然后": 是+的=48 」=24 然+后=48 total=120. -->
+  <!-- width=49: 是+的=48<49. Naive break → "是的" line1, "」然后" line2. -->
+  <!-- But 」 is CL — prohibited at line start. Pull 」 back with 是的. -->
+  <!-- "是的」"=72>49 → forced overflow but CL rule requires it. -->
+  <!-- Use width=73: "是的」"=72<73 fits line1. "然后"=48<73 line2. 2 lines, h=70 -->
+  <Layer x="460" y="370">
     <Group>
-      <Rectangle center="36,50" size="72,100"/>
+      <Rectangle center="37,35" size="73,70"/>
       <Stroke/>
     </Group>
     <Group>
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[是的」然后]]></Text>
-      <TextBox size="72,100"/>
+      <TextBox size="73,70"/>
       <Fill/>
     </Group>
   </Layer>
 
-  <!-- Box N: NS class — prolonged sound mark ー must not be at line start -->
-  <!-- "ゲーム" — "ゲ" = 24px, "ー" = 24px, "ム" = 24px = 72px total -->
-  <!-- Width 48px = 2 CJK. If naive: "ゲ" line1, "ーム" line2 — but ー at start prohibited -->
-  <!-- So ー sticks with ゲ: "ゲー" line1, "ム" line2 -->
-  <Layer x="250" y="400">
+  <!-- Box N: NS class — prolonged sound ー must not appear at line start -->
+  <!-- Text "ゲーム好": ゲ=24 ー=24 ム=24 好=24 total=96. -->
+  <!-- width=25: ゲ=24<25 fits. Naive: "ゲ" line1, "ーム好" line2. -->
+  <!-- But ー is NS — prohibited at line start. Pull ー back with ゲ. -->
+  <!-- "ゲー"=48>25 forced overflow. Use width=49: "ゲー"=48<49 fits. "ム好"=48<49. -->
+  <!-- 2 lines, h=70 -->
+  <Layer x="20" y="530">
     <Group>
-      <Rectangle center="24,50" size="48,100"/>
+      <Rectangle center="25,35" size="49,70"/>
       <Stroke/>
     </Group>
     <Group>
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[ゲーム好]]></Text>
-      <TextBox size="48,100"/>
+      <TextBox size="49,70"/>
       <Fill/>
     </Group>
   </Layer>
 
   <!-- Box O: Quotation marks (QU) — quotes bind to adjacent content -->
-  <!-- Test: "好" should not break quote from content -->
-  <!-- "说"好"吧" — "说" = 24px, """ ≈ 8px, "好" = 24px, """ ≈ 8px → "说"好"" = 64px -->
-  <!-- Width 72px: "说"好"" fits, "吧" wraps. Key: quote sticks with "好" -->
-  <Layer x="320" y="400">
+  <!-- Text "说\u201c好\u201d吧": 说=24 \u201c=24 好=24 \u201d=24 吧=24 total=120. -->
+  <!-- width=97: 说+"=24+24=48<97. 说+"好=72<97. 说+"好"=96<97 fits. -->
+  <!-- 说+"好"+吧=120>97 → "说"好"" line1. "吧" line2. -->
+  <!-- Key: " does not separate from 好. 2 lines, h=70 -->
+  <Layer x="90" y="530">
     <Group>
-      <Rectangle center="36,50" size="72,100"/>
+      <Rectangle center="49,35" size="97,70"/>
       <Stroke/>
     </Group>
     <Group>
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[说"好"吧]]></Text>
-      <TextBox size="72,100"/>
+      <TextBox size="97,70"/>
       <Fill/>
     </Group>
   </Layer>

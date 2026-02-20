@@ -525,7 +525,6 @@ PAGX_TEST(PAGXTest, FontGlyphRoundTrip) {
   SavePAGXFile(xml, "PAGXTest/font_glyph_roundtrip.pagx");
 }
 
-
 /**
  * Test all PAGX sample files in spec/samples directory.
  * Renders each sample and compares with baseline screenshots.
