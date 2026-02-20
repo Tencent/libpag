@@ -213,7 +213,13 @@ explicit user approval.
    - **Scattered blocks** — one logical unit split across multiple sibling Layers.
    - **Over-packed Layers** — multiple independent blocks crammed into one Layer.
    - **Manual text positioning** — hand-positioned Text that should use TextBox.
-3. **Final check** — verify:
+3. **Validate and format** — run `pagx validate` to catch schema errors, then `pagx format`
+   for consistent output:
+   ```bash
+   pagx validate output.pagx
+   pagx format output.pagx
+   ```
+4. **Final check** — verify:
    - All `<pagx>`/`<Composition>` direct children are `<Layer>`
    - All required attributes present; no redundant default-value attributes
    - Painter scope isolation correct (different painters in Groups, same painters shared)
