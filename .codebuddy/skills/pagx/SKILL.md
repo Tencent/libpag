@@ -251,5 +251,9 @@ explicit user approval.
 
 ## CLI Tools
 
+Build: `cmake -G Ninja -DPAG_BUILD_CLI=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug &&
+cmake --build cmake-build-debug --target pagx-cli` → binary at `cmake-build-debug/pagx`.
+Also built automatically when `-DPAG_BUILD_TESTS=ON` is set.
+
 See `references/cli-reference.md` for full usage and options:
 `optimize`, `render`, `validate`, `format`, `bounds`, `font` (`info`, `embed`).
