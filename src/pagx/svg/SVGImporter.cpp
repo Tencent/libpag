@@ -2322,9 +2322,14 @@ std::string SVGParserContext::getAttribute(const std::shared_ptr<DOMNode>& node,
 
   return defaultValue;
 }
-std::unordered_map<std::string, std::string> SVGParserContext::getStyleProperties(
+const std::unordered_map<std::string, std::string>& SVGParserContext::getStyleProperties(
     const std::shared_ptr<DOMNode>& node) {
-  std::unordered_map<std::string, std::string> result = {};
+  auto cacheIt = _stylePropertiesCache.find(node.get());
+  if (cacheIt != _stylePropertiesCache.end()) {
+    return cacheIt->second;
+  }
+
+  auto& result = _stylePropertiesCache[node.get()];
 
   // CSS class rules (lowest priority): parse all matching classes.
   auto* classPtr = node->findAttribute("class");
