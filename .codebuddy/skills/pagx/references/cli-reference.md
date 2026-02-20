@@ -9,11 +9,13 @@ operate on local `.pagx` files.
 
 ## pagx optimize
 
-Automated deterministic structural optimizations. Applies: empty element removal,
-PathData/gradient dedup, unreferenced resource removal, Path→Rectangle/Ellipse replacement,
-full-canvas clip mask removal, off-canvas layer removal, coordinate localization, and
-Composition extraction. The exporter also handles default value omission, number normalization,
-transform simplification, and Resources ordering.
+Validates, optimizes, and formats a PAGX file in one step. First validates the input against
+the specification schema — aborts with errors if invalid. Then applies structural optimizations:
+empty element removal, PathData/gradient dedup, unreferenced resource removal,
+Path→Rectangle/Ellipse replacement, full-canvas clip mask removal, off-canvas layer removal,
+coordinate localization, and Composition extraction. The exporter also handles default value
+omission, number normalization, transform simplification, Resources ordering, and consistent
+formatting.
 
 ```bash
 pagx optimize -o output.pagx input.pagx

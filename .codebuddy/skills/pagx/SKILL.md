@@ -199,8 +199,9 @@ For newly generated files, continue from step 5 above. For existing files, start
 Never modify visual attributes (colors, blur, spacing, opacity, font sizes, etc.) without
 explicit user approval.
 
-1. **Run `pagx optimize`** — automated deterministic optimizations (empty element removal,
-   resource dedup, Path→primitive replacement, coordinate localization, etc.):
+1. **Run `pagx optimize`** — validates, optimizes, and formats in one step (empty element
+   removal, resource dedup, Path→primitive replacement, coordinate localization, consistent
+   formatting, etc.). Aborts with errors if the input file is invalid:
    ```bash
    pagx optimize -o output.pagx input.pagx
    ```
@@ -213,13 +214,7 @@ explicit user approval.
    - **Scattered blocks** — one logical unit split across multiple sibling Layers.
    - **Over-packed Layers** — multiple independent blocks crammed into one Layer.
    - **Manual text positioning** — hand-positioned Text that should use TextBox.
-3. **Validate and format** — run `pagx validate` to catch schema errors, then `pagx format`
-   for consistent output:
-   ```bash
-   pagx validate output.pagx
-   pagx format output.pagx
-   ```
-4. **Final check** — verify:
+3. **Final check** — verify:
    - All `<pagx>`/`<Composition>` direct children are `<Layer>`
    - All required attributes present; no redundant default-value attributes
    - Painter scope isolation correct (different painters in Groups, same painters shared)
