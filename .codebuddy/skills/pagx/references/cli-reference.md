@@ -53,7 +53,9 @@ pagx render -o output.jpg --format jpg --quality 90 --background "#FFFFFF" input
 
 ## pagx validate
 
-Validate a PAGX file against the specification schema.
+Validate a PAGX file against the specification schema. Note: `pagx optimize` already includes
+validation as its first step — use this command only when you need a standalone check without
+running optimizations.
 
 ```bash
 pagx validate input.pagx
@@ -68,7 +70,8 @@ array with `line` and `message` fields.
 ## pagx format
 
 Pretty-print a PAGX file with consistent indentation and attribute ordering. Does not modify
-values or structure.
+values or structure. Note: `pagx optimize` already formats its output — use this command only
+when you want to reformat without applying optimizations.
 
 ```bash
 pagx format -o output.pagx input.pagx
