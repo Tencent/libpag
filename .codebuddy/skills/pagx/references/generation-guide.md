@@ -44,6 +44,11 @@ For each Layer, construct the internal VectorElement tree:
 2. Add modifiers if needed (TextBox, TrimPath, Repeater, etc.)
 3. Add painters (Fill, Stroke) — remember painter scope rules
 4. Wrap sub-elements in Groups when they need different painters
+5. **Extract repeated subtrees** — when 2+ Layers share identical internal structure (differing
+   only in position), define the shared structure as `<Composition>` in Resources and reference
+   via `composition="@id"`. Each instance only needs its own `x`/`y`. This reduces generated
+   code and makes subsequent layout adjustments easier — change the Composition once, all
+   instances update. See `references/resource-reuse.md` for coordinate conversion formulas.
 
 ### Step 4: Localize Coordinates
 

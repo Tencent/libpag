@@ -181,7 +181,9 @@ These have **no default** — omitting them causes parse errors:
 2. **Determine** canvas size (`width`/`height`) and each block's position — use `pagx measure`
    for precise text dimensions and `pagx bounds` for precise Layer/element boundaries to
    calculate layout accurately
-3. **Build** each block's internal structure (Group isolation for different painters)
+3. **Build** each block's internal structure (Group isolation for different painters).
+   Identify repeated subtrees upfront and define them as `<Composition>` in Resources —
+   reference via `composition="@id"` with only `x`/`y` at each usage point
 4. **Localize** coordinates (Layer `x`/`y` carries offset, internals relative to origin)
 5. **Verify** — render screenshot with `pagx render`, read the image to check design accuracy,
    alignment, and spacing consistency. If issues found → fix and re-render until satisfied
