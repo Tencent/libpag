@@ -1858,10 +1858,6 @@ class TextLayoutContext {
   }
 
 #ifdef PAG_BUILD_PAGX
-  static bool IsSquashable(const VerticalGlyphInfo& vg) {
-    return vg.orientation == VerticalOrientation::Upright;
-  }
-
   static void ApplyPunctuationSquashToColumns(std::vector<ColumnInfo>& columns) {
     for (auto& column : columns) {
       if (column.glyphs.empty()) {
@@ -1876,12 +1872,16 @@ class TextLayoutContext {
       std::vector<float> leadingSquash(glyphCount, 0);
       std::vector<float> trailingSquash(glyphCount, 0);
 
+      auto isSquashable = [](const VerticalGlyphInfo& vg) -> bool {
+        return vg.orientation == VerticalOrientation::Upright;
+      };
+
       // Column-start squash: remove leading whitespace of the first non-whitespace glyph.
       for (size_t i = 0; i < glyphCount; i++) {
         if (LineBreaker::IsWhitespace(column.glyphs[i].glyphs.front().unichar)) {
           continue;
         }
-        if (!IsSquashable(column.glyphs[i])) {
+        if (!isSquashable(column.glyphs[i])) {
           break;
         }
         float fraction =
@@ -1895,7 +1895,7 @@ class TextLayoutContext {
         if (LineBreaker::IsWhitespace(column.glyphs[i].glyphs.front().unichar)) {
           continue;
         }
-        if (!IsSquashable(column.glyphs[i])) {
+        if (!isSquashable(column.glyphs[i])) {
           break;
         }
         float fraction =
@@ -1906,7 +1906,7 @@ class TextLayoutContext {
 
       // Adjacent punctuation squash (only between upright glyphs).
       for (size_t i = 0; i + 1 < glyphCount; i++) {
-        if (!IsSquashable(column.glyphs[i]) || !IsSquashable(column.glyphs[i + 1])) {
+        if (!isSquashable(column.glyphs[i]) || !isSquashable(column.glyphs[i + 1])) {
           continue;
         }
         auto result = PunctuationSquash::GetAdjacentSquash(
