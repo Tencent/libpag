@@ -53,12 +53,15 @@ foundational understanding of the PAGX format.
 | As `<pagx>`/`<Composition>` child | **Required** | **NOT allowed** |
 | Rendering cost | Creates extra surface | No extra surface |
 
-**One Layer = one logical block** — a card, button, panel, or status bar. Sub-elements within
-a block use Groups, not child Layers. Only use child Layers when Layer-exclusive features are
-needed (styles, filters, mask, blendMode, composition, scrollRect).
+**One Layer = one independently positionable unit** — elements that are visually clustered
+and would be repositioned as a whole. A button, a badge, an icon+label row, a panel. Layers
+nest naturally: a panel Layer contains button child Layers, because both the panel and each
+button are independently positionable. Within a unit, use Groups for internal structure, not
+child Layers — unless Layer-exclusive features (styles, filters, mask, blendMode) are needed.
 
-**Decision rule**: Direct child of `<pagx>`/`<Composition>`? → must be Layer. Needs
-styles/filters/mask/blendMode? → Layer. Otherwise → Group (lighter, no extra surface).
+**Decision rule**: Direct child of `<pagx>`/`<Composition>`? → must be Layer. Independently
+positionable unit? → Layer. Needs styles/filters/mask/blendMode? → Layer. Otherwise → Group
+(lighter, no extra surface).
 
 ### VectorElement Processing Model (Accumulate-Render)
 

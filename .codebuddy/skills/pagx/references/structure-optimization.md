@@ -32,17 +32,17 @@ needed.
 
 ### The Core Principle
 
-> **One Layer = one logical block.** A Layer should represent a visually and logically
-> independent unit — something that could be repositioned, toggled, or transformed as a
-> whole. Within a block, use Groups to organize sub-elements.
+> **One Layer = one independently positionable unit** — elements that are visually clustered
+> and would be repositioned as a whole. Layers nest naturally: a panel Layer contains button
+> child Layers, because both the panel and each button are independently positionable.
 
 This principle drives all Layer/Group optimization decisions:
 
-- **Use Layer** when the content is an independent block: a card, a button, a status bar, a
-  panel — or when Layer-exclusive features are needed (styles, filters, mask, blendMode,
-  composition, scrollRect, child Layers).
-- **Use Group** when the content is a sub-element within a block: an icon inside a button, a
-  label inside a card, a shape that just needs painter scope isolation or a shared transform.
+- **Use Layer** when the content is an independently positionable unit: a button, a badge, an
+  icon+label row, a panel — or when Layer-exclusive features are needed (styles, filters, mask,
+  blendMode, composition, scrollRect).
+- **Use Group** when the content is internal structure within a unit: painter scope isolation,
+  shared transforms, or sub-elements that are not independently positionable.
 - **`<pagx>` and `<Composition>` direct children MUST be Layer.** Groups at root level are
   silently ignored and not rendered.
 
