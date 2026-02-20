@@ -1694,7 +1694,7 @@ class TextLayoutContext {
       }
 
       float letterSpacing = (glyph.sourceText != nullptr) ? glyph.sourceText->letterSpacing : 0;
-      auto orientation = VerticalTextUtils::getOrientation(glyph.unichar);
+      auto orientation = VerticalTextUtils::GetOrientation(glyph.unichar);
 
       {
         // Each glyph gets its own VerticalGlyphInfo entry.
@@ -2090,7 +2090,7 @@ class TextLayoutContext {
           textGlyphs[g.sourceText].push_back(vpg);
         }
 #else
-        } else if (VerticalTextUtils::needsPunctuationOffset(vg.glyphs.front().unichar)) {
+        } else if (VerticalTextUtils::NeedsPunctuationOffset(vg.glyphs.front().unichar)) {
           auto& g = vg.glyphs.front();
           VerticalPositionedGlyph vpg = {};
           vpg.glyphID = g.glyphID;
@@ -2098,7 +2098,7 @@ class TextLayoutContext {
           vpg.useRSXform = false;
           float dx = 0;
           float dy = 0;
-          VerticalTextUtils::getPunctuationOffset(g.fontSize, &dx, &dy);
+          VerticalTextUtils::GetPunctuationOffset(g.fontSize, &dx, &dy);
           float glyphX = columnCenterX - g.advance / 2 + dx;
           float glyphY = currentY + fabsf(g.ascent) + dy;
           vpg.position = tgfx::Point::Make(glyphX, glyphY);

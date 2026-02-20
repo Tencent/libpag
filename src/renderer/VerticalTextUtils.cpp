@@ -125,7 +125,7 @@ static const int32_t UprightRanges[][2] = {
 
 static constexpr size_t UprightRangeCount = sizeof(UprightRanges) / sizeof(UprightRanges[0]);
 
-VerticalOrientation VerticalTextUtils::getOrientation(int32_t c) {
+VerticalOrientation VerticalTextUtils::GetOrientation(int32_t c) {
   // Binary search over sorted upright ranges from UAX #50 VerticalOrientation-16.0.0.txt.
   // Characters with orientation U (Upright) or Tu (fallback Upright) return Upright.
   // Characters with orientation R (Rotated) or Tr (fallback Rotated) return Rotated.
@@ -144,7 +144,7 @@ VerticalOrientation VerticalTextUtils::getOrientation(int32_t c) {
   return VerticalOrientation::Rotated;
 }
 
-bool VerticalTextUtils::needsPunctuationOffset(int32_t c) {
+bool VerticalTextUtils::NeedsPunctuationOffset(int32_t c) {
   // Tu (Transformed-Upright) punctuation per UTR#50 that occupies the lower-left area in
   // horizontal layout but should appear in the upper-right area in vertical layout.
   // Only includes characters with vo=Tu that need positional adjustment.
@@ -155,7 +155,7 @@ bool VerticalTextUtils::needsPunctuationOffset(int32_t c) {
          c == 0xFF0E;    // ． fullwidth full stop
 }
 
-void VerticalTextUtils::getPunctuationOffset(float fontSize, float* outDx, float* outDy) {
+void VerticalTextUtils::GetPunctuationOffset(float fontSize, float* outDx, float* outDy) {
   if (outDx) {
     *outDx = fontSize * 0.5f;
   }
