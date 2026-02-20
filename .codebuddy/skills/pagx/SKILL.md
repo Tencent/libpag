@@ -154,6 +154,11 @@ geometry element's local coordinate system — they are NOT affected by Layer `x
   product should stay under ~500 for smooth rendering.
 - BlurFilter / DropShadowStyle cost is proportional to blur radius — use the smallest radius
   that achieves the visual effect.
+- `strokeAlign="center"` (default) is GPU-accelerated; `inside`/`outside` require CPU path ops.
+- Avoid unnecessary offscreen buffers: non-normal blendMode, `alpha < 1 + groupOpacity="true"`,
+  filters, complex masks, and perspective transforms all trigger offscreen rendering.
+
+> For detailed performance patterns and optimization techniques, see `references/performance.md`.
 
 ### Required Attributes
 

@@ -23,6 +23,21 @@ Understanding the PAGX renderer's cost model helps identify performance bottlene
   Repeater, each copy incurs dash computation overhead on top of the basic stroke cost.
 - **Layer vs Group**: Layer is heavier — it creates an independent rendering surface that must
   be composited back. Group only creates a painter scope boundary with no extra surface.
+- **Offscreen Buffer Triggers**: A Layer creates an offscreen buffer (extra surface + compositing)
+  when any of these conditions apply:
+  - `blendMode` is not `normal` (SrcOver)
+  - `alpha < 1.0` combined with `groupOpacity="true"`
+  - Any filter is present (BlurFilter, etc.)
+  - Layer has a mask
+  - Layer has perspective transform (via matrix3D)
+- **StrokeAlign**: `center` (default) is handled directly by GPU. `inside` or `outside` require
+  CPU path operations (stroke expansion + boolean clip), significantly slower.
+- **Draw Call Batching**: Consecutive drawing operations with identical attributes (same shader,
+  blendMode, clip, antiAlias) are merged into a single GPU draw call. Interleaving different
+  attributes breaks batching and increases draw call count.
+- **Mask Complexity**: Simple path masks (no Shape/TextBlob) can be optimized to `clipPath()`.
+  Complex masks (containing Shape, Text, or multiple paths) require rendering to texture +
+  MaskFilter, which is slower.
 
 ---
 
@@ -284,3 +299,128 @@ parallel lines (0 degrees, 60 degrees, -60 degrees), each expressible as a Recta
 **Suggest to user**: Replacing PathData with simple geometry combinations may change fine
 details (e.g., hexagon outlines become intersecting lines). At low opacity the difference is
 subtle, but it may be noticeable at higher opacity. Always ask for approval before applying.
+
+---
+
+## Engine-Level Optimization Patterns
+
+These patterns leverage how the rendering engine processes PAGX internally. They may not
+reduce file size, but can significantly improve rendering performance.
+
+### Avoid Unnecessary Offscreen Buffers
+
+Every offscreen buffer means: allocate texture → render to texture → composite back. This
+overhead is significant, especially on mobile devices. Avoid triggering offscreen buffers
+unless the visual effect requires it.
+
+**Triggers to avoid when possible**:
+
+| Trigger | How to Avoid |
+|---------|--------------|
+| `blendMode` other than `normal` | Use `normal` unless effect is essential |
+| `alpha < 1.0` + `groupOpacity="true"` | Set `groupOpacity="false"` (default) unless you need uniform group transparency |
+| Filters (BlurFilter, etc.) | Minimize filter usage; prefer DropShadowStyle on container Layer |
+| Complex mask | Use simple path masks; avoid Text/Shape in mask layers |
+| Perspective transform | Avoid matrix3D unless 3D effect is required |
+
+**groupOpacity example**:
+
+```xml
+<!-- Triggers offscreen: groupOpacity makes the whole layer render to texture first -->
+<Layer alpha="0.5" groupOpacity="true">
+  <Rectangle .../><Fill color="#FF0000"/>
+  <Rectangle .../><Fill color="#00FF00"/>
+</Layer>
+
+<!-- No offscreen: each rectangle is drawn with alpha independently -->
+<Layer alpha="0.5">
+  <Rectangle .../><Fill color="#FF0000"/>
+  <Rectangle .../><Fill color="#00FF00"/>
+</Layer>
+```
+
+The visual difference: with `groupOpacity="true"`, overlapping areas show as if the whole
+group is a single semi-transparent unit. Without it, overlapping areas appear darker due to
+alpha blending twice. Only use `groupOpacity="true"` when this uniform transparency is needed.
+
+### Maximize Draw Call Batching
+
+The renderer batches consecutive drawing operations that share identical attributes into a
+single GPU draw call. Breaking batching increases CPU overhead and draw call count.
+
+**Attributes that must match for batching**:
+- BlendMode
+- Shader (gradient or solid color type, but not the color value itself)
+- Clip path
+- AntiAlias setting
+- MaskFilter / ColorFilter
+- For images: same Image source and sampling mode
+
+**Pattern — group by attribute, not by visual position**:
+
+```xml
+<!-- Bad: alternating blendModes break batching (4 draw calls) -->
+<Layer>
+  <Rectangle center="50,50" .../><Fill color="#F00" blendMode="normal"/>
+  <Rectangle center="150,50" .../><Fill color="#0F0" blendMode="multiply"/>
+  <Rectangle center="250,50" .../><Fill color="#00F" blendMode="normal"/>
+  <Rectangle center="350,50" .../><Fill color="#FF0" blendMode="multiply"/>
+</Layer>
+
+<!-- Better: group by blendMode (2 draw calls) -->
+<Layer>
+  <Group>
+    <Rectangle center="50,50" .../><Rectangle center="250,50" .../>
+    <Fill color="#F00" blendMode="normal"/>
+  </Group>
+  <Group>
+    <Rectangle center="150,50" .../><Rectangle center="350,50" .../>
+    <Fill color="#0F0" blendMode="multiply"/>
+  </Group>
+</Layer>
+```
+
+Note: This may require reordering elements, which changes z-order. Only apply when z-order
+is not critical (e.g., non-overlapping elements).
+
+### Prefer strokeAlign="center"
+
+The default `strokeAlign="center"` is handled directly by GPU. Other values require CPU path
+operations:
+
+- `inside`: stroke expansion → intersect with original path
+- `outside`: stroke expansion → subtract original path
+
+```xml
+<!-- Fast: center stroke, direct GPU rendering -->
+<Path data="..."/>
+<Stroke width="4" strokeAlign="center"/>
+
+<!-- Slow: inside stroke requires CPU path boolean operation -->
+<Path data="..."/>
+<Stroke width="4" strokeAlign="inside"/>
+```
+
+When `strokeAlign="inside"` or `"outside"` is combined with Repeater, the CPU path operation
+cost multiplies per copy.
+
+### Use Simple Masks
+
+Masks that contain only simple paths (no Shape, no TextBlob) can be optimized to efficient
+`clipPath()` operations. Complex masks require rendering to texture + MaskFilter.
+
+```xml
+<!-- Fast: simple path mask → clipPath -->
+<Layer id="mask" visible="false">
+  <Ellipse size="100,100"/>
+  <Fill color="#FFF"/>
+</Layer>
+
+<!-- Slow: Shape in mask requires texture + MaskFilter -->
+<Layer id="mask" visible="false">
+  <Shape .../>  <!-- Shape cannot be extracted as simple path -->
+  <Fill color="#FFF"/>
+</Layer>
+```
+
+Prefer Rectangle, Ellipse, or simple Path in mask layers when possible.
