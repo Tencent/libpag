@@ -297,40 +297,6 @@ static constexpr size_t RangeCount = sizeof(Ranges) / sizeof(Ranges[0]);
 // We keep the source table sorted manually and verify in debug builds.
 // ---------------------------------------------------------------------------
 
-bool LineBreaker::CanBreakBetween(int32_t prevChar, int32_t nextChar) {
-  if (prevChar == 0 || nextChar == 0) {
-    return false;
-  }
-  if (prevChar == '\n' || nextChar == '\n') {
-    return false;
-  }
-
-  auto prevClass = GetLineBreakClass(prevChar);
-  auto nextClass = GetLineBreakClass(nextChar);
-
-  // CM inherits the class of its base character. If prevChar is CM, it was already attached to its
-  // base, so treat it as AL for the purpose of the pair table lookup.
-  if (prevClass == LBC::CM) {
-    prevClass = LBC::AL;
-  }
-  // If nextChar is CM, no break before combining marks (pair table CM column is all P except SP).
-  if (nextClass == LBC::CM) {
-    return false;
-  }
-
-  auto action =
-      PairTable[static_cast<int>(prevClass)][static_cast<int>(nextClass)];
-
-  if (action == BreakAction::Direct) {
-    return true;
-  }
-  if (action == BreakAction::Indirect) {
-    // Indirect break: allowed only when the previous character is a space.
-    return prevClass == LBC::SP;
-  }
-  return false;
-}
-
 LineBreakClass LineBreaker::GetLineBreakClass(int32_t c) {
   size_t lo = 0;
   size_t hi = RangeCount;
@@ -409,6 +375,40 @@ bool LineBreaker::IsCJK(int32_t c) {
 
 bool LineBreaker::IsWhitespace(int32_t c) {
   return c == ' ' || c == '\t' || c == 0x00A0 || c == 0x3000;
+}
+
+bool LineBreaker::CanBreakBetween(int32_t prevChar, int32_t nextChar) {
+  if (prevChar == 0 || nextChar == 0) {
+    return false;
+  }
+  if (prevChar == '\n' || nextChar == '\n') {
+    return false;
+  }
+
+  auto prevClass = GetLineBreakClass(prevChar);
+  auto nextClass = GetLineBreakClass(nextChar);
+
+  // CM inherits the class of its base character. If prevChar is CM, it was already attached to its
+  // base, so treat it as AL for the purpose of the pair table lookup.
+  if (prevClass == LBC::CM) {
+    prevClass = LBC::AL;
+  }
+  // If nextChar is CM, no break before combining marks (pair table CM column is all P except SP).
+  if (nextClass == LBC::CM) {
+    return false;
+  }
+
+  auto action =
+      PairTable[static_cast<int>(prevClass)][static_cast<int>(nextClass)];
+
+  if (action == BreakAction::Direct) {
+    return true;
+  }
+  if (action == BreakAction::Indirect) {
+    // Indirect break: allowed only when the previous character is a space.
+    return prevClass == LBC::SP;
+  }
+  return false;
 }
 
 }  // namespace pagx
