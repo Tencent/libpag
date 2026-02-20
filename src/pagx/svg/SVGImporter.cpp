@@ -2143,8 +2143,7 @@ float SVGParserContext::parseLengthEm(const std::string& value, float containerS
   if (endPtr == value.c_str()) {
     return 0;
   }
-  std::string unit(endPtr);
-  if (unit == "em" || unit == "rem") {
+  if (strcmp(endPtr, "em") == 0 || strcmp(endPtr, "rem") == 0) {
     return num * fontSize;
   }
   return parseLength(value, containerSize);
