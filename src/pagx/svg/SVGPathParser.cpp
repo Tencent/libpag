@@ -203,6 +203,9 @@ static void ArcToCubics(PathData& path, float x1, float y1, float rx, float ry, 
   }
 
   int segments = static_cast<int>(std::ceil(std::abs(dtheta) / (Pi / 2.0f)));
+  if (segments == 0) {
+    return;
+  }
   float segmentAngle = dtheta / segments;
 
   float t = std::tan(segmentAngle / 2.0f);
@@ -458,7 +461,11 @@ PathData PathDataFromSVGString(const std::string& d) {
         break;
     }
     if (ptr == prevPtr) {
-      ++ptr;
+      // ParseNumber or ParseFlag failed — skip to the next command letter or end of string.
+      while (ptr < end && !std::isalpha(*ptr)) {
+        ++ptr;
+      }
+      lastCommand = 0;
     }
   }
 
