@@ -101,8 +101,8 @@ all painters:
 ```
 
 **Same painters → share scope**. Multiple geometry elements with identical Fill/Stroke belong
-in the same scope without redundant painter declarations. For Paths, concatenate into a single
-multi-M path:
+in the same scope without redundant painter declarations. Prefer Rectangle/Ellipse for standard
+shapes — only concatenate non-standard Paths into a single multi-M path:
 
 ```xml
 <!-- Preferred: shared painters in one scope -->

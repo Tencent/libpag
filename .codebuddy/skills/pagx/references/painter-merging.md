@@ -19,10 +19,13 @@ declaration within the same scope.
 
 ### Path Merging — Multi-M Subpaths
 
-**When to apply**: Multiple Paths have identical Fill and/or Stroke.
+**When to apply**: Multiple Paths that are **not expressible as Rectangle/Ellipse** have
+identical Fill and/or Stroke. If a Path describes a standard shape, keep it as the primitive
+geometry element — primitives are more readable and enable renderer fast paths (especially
+under Repeaters).
 
-**How**: Concatenate multiple Path data strings using multiple `M` (moveto) commands into a
-single Path.
+**How**: Concatenate multiple non-standard Path data strings using multiple `M` (moveto)
+commands into a single Path.
 
 ```xml
 <!-- Before: two Groups, each with Path + same Fill -->
