@@ -155,29 +155,25 @@ static bool IsEmptyLayer(const Layer* layer) {
 
 static int RemoveEmptyLayers(std::vector<Layer*>& layers) {
   auto originalSize = static_cast<int>(layers.size());
-  layers.erase(
-      std::remove_if(layers.begin(), layers.end(),
-                     [](const Layer* layer) { return IsEmptyLayer(layer); }),
-      layers.end());
+  layers.erase(std::remove_if(layers.begin(), layers.end(), IsEmptyLayer), layers.end());
   return originalSize - static_cast<int>(layers.size());
+}
+
+static bool IsEmptyElement(const Element* element) {
+  if (element->nodeType() == NodeType::Stroke) {
+    auto stroke = static_cast<const Stroke*>(element);
+    return stroke->width <= 0.0f;
+  }
+  if (element->nodeType() == NodeType::Group) {
+    auto group = static_cast<const Group*>(element);
+    return group->elements.empty();
+  }
+  return false;
 }
 
 static int RemoveEmptyElements(std::vector<Element*>& elements) {
   auto originalSize = static_cast<int>(elements.size());
-  elements.erase(
-      std::remove_if(elements.begin(), elements.end(),
-                     [](const Element* element) {
-                       if (element->nodeType() == NodeType::Stroke) {
-                         auto stroke = static_cast<const Stroke*>(element);
-                         return stroke->width <= 0.0f;
-                       }
-                       if (element->nodeType() == NodeType::Group) {
-                         auto group = static_cast<const Group*>(element);
-                         return group->elements.empty();
-                       }
-                       return false;
-                     }),
-      elements.end());
+  elements.erase(std::remove_if(elements.begin(), elements.end(), IsEmptyElement), elements.end());
   return originalSize - static_cast<int>(elements.size());
 }
 
@@ -487,12 +483,17 @@ static int RemoveUnreferencedResources(PAGXDocument* document) {
   }
   auto& nodes = document->nodes;
   auto originalSize = static_cast<int>(nodes.size());
-  nodes.erase(std::remove_if(nodes.begin(), nodes.end(),
-                              [&referenced](const std::unique_ptr<Node>& node) {
-                                return referenced.find(node.get()) == referenced.end();
-                              }),
-              nodes.end());
-  return originalSize - static_cast<int>(nodes.size());
+  int writeIndex = 0;
+  for (int i = 0; i < static_cast<int>(nodes.size()); i++) {
+    if (referenced.find(nodes[i].get()) != referenced.end()) {
+      if (writeIndex != i) {
+        nodes[writeIndex] = std::move(nodes[i]);
+      }
+      writeIndex++;
+    }
+  }
+  nodes.resize(writeIndex);
+  return originalSize - writeIndex;
 }
 
 // --- Optimization #5: Path → Rectangle / Ellipse ---
