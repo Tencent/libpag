@@ -1,12 +1,16 @@
 ---
-name: fix
-description: Multi-round automated code review and fix using Agent Teams. Use when the user invokes /fix to review and fix code or document issues across a branch.
+name: auto-fix
+description: Multi-round automated code review and fix using Agent Teams. Use when the user invokes /auto-fix to review and fix code or document issues across a branch.
 ---
 
-# Fix — Automated Code Review & Fix
+# Auto-Fix — Automated Code Review & Fix
 
 Automatically review, verify, and fix issues in code and documents across your branch.
 Runs multi-round team-based iterations until no valid issues remain.
+
+Issues that require user judgment — such as test baseline changes or public API
+modifications — are never auto-fixed. They are collected and presented for explicit
+confirmation in Phase 7.
 
 ## Instructions
 
@@ -84,7 +88,8 @@ If the scope contains doc or mixed modules, gather reference material for review
 3. Include all gathered references in the reviewer prompts for doc/mixed modules.
 
 After confirmation, no further user interaction until Phase 7 (but see Mid-Review
-Supplements below).
+Supplements below). Issues requiring user judgment (test baseline changes, API
+modifications) will be collected and confirmed in Phase 7, not auto-fixed.
 
 ### 0.4 Environment Verification
 
@@ -300,12 +305,16 @@ Solution: Run `/config` -> `[Experimental] Agent Teams` -> `true`.
 
 ### Build or test fails in Phase 0
 Cause: Pre-existing issues in the codebase.
-Solution: Fix build/test failures before running `/fix`.
+Solution: Fix build/test failures before running `/auto-fix`.
 
 ### Reviewer reports no issues but code has problems
 Cause: Fix level too restrictive or reviewer prompt insufficient.
 Solution: Re-run with a higher fix level. Team-lead will also auto-adjust prompts in
 subsequent rounds.
+
+### Pending items not presented at the end
+Cause: No test baseline or API changes were detected.
+Solution: This is expected — Phase 7 only presents pending items when they exist.
 
 ### Fixer commits break tests repeatedly
 Cause: Complex semantic changes or insufficient context.
