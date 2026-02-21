@@ -102,13 +102,18 @@ Run sequentially. Abort if any fails.
 3. Build verification — use the project's build command. Fail = abort.
 4. Run tests — use the project's test command. Fail = abort.
 
-### 0.2 Fix Level Selection
+### 0.2 Scope & Fix Level Selection
 
-Ask the user to choose the fix level using an interactive dialog. Briefly report the
-resolved review scope before the question.
+If `$ARGUMENTS` is empty, ask both questions. If scope was resolved from the argument,
+report it and only ask the fix level question.
 
-**Fix level** (option labels should be concise, use descriptions to explain the
-incremental scope of each level):
+**Question 1 — Review scope** (skip if resolved from argument):
+- Current branch vs main diff
+- Diff from a specified base commit
+- Specified folder or file path
+
+**Question 2 — Fix level** (option labels should be concise, use descriptions to explain
+the incremental scope of each level):
 - Option 1 — "Correctness & Safety only": logic bugs, security vulnerabilities,
   resource leaks, memory safety, thread safety
 - Option 2 — "Correctness & Safety + Refactoring": adds performance optimization,
