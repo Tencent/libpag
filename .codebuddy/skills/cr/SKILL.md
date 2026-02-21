@@ -113,9 +113,12 @@ document files. If so, skip this question (doc modules use their full checklist
 automatically). When skipped, all priority levels (A+B+C) are checked.
 
 **Question 1 — Review priority** (code/mixed modules):
-- Option 1 — "Priority A only": correctness and safety issues
-- Option 2 — "Priority A + B": also include refactoring and optimization
-- Option 3 — "All (A + B + C)": also include conventions and documentation
+- Option 1 — "Full review (A + B + C)": correctness, refactoring, and conventions.
+  e.g., null checks, duplicate code extraction, naming style, comment quality.
+- Option 2 — "Correctness + optimization (A + B)": skip conventions and documentation.
+  e.g., null checks, resource leaks, duplicate code, unnecessary copies.
+- Option 3 — "Correctness only (A)": only safety and correctness issues.
+  e.g., null dereference, out-of-bounds, resource leaks, race conditions.
 
 ### 0.3 Auto-Fix Threshold Selection
 
