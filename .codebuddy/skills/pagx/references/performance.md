@@ -235,7 +235,7 @@ with a solid stroke or other treatment is acceptable.
 
 Rectangle and Ellipse have dedicated fast paths in the renderer; Path requires general-purpose
 tessellation per instance. Under Repeater, the per-instance cost difference multiplies
-significantly. See **Replace Path with Primitive** in `resource-reuse.md` for conversion
+significantly. See **Replace Path with Primitive Geometry** in `resource-reuse.md` for conversion
 examples. When a Path under a Repeater describes a standard shape, always prefer the primitive.
 
 ### Replace PathData with Simple Geometry Combinations
