@@ -163,7 +163,8 @@ full matrix and special rules.
 Key points:
 - **Public API protection**: obvious bugs = fix; non-bug signature changes = record to
   `pending-api-changes.md` (see `references/pending-templates.md`)
-- Output semantics changes -> skip by default
+- Output semantics changes: allow the fix; if tests fail due to behavior change, revert
+  and record to `pending-test-updates.md`
 - Previously rolled-back issues -> do not attempt again
 
 ---

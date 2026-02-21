@@ -167,10 +167,8 @@ Coding standards and documentation consistency. Lower impact on functionality.
    standard
 5. Non-critical issues in test code (variable naming, comment style, etc., unless
    project rules have specific requirements)
-6. Optimizations that change output semantics (may invalidate test baselines — should
-   go through the pending flow)
-7. Suggestions for "better alternative implementations" for existing stable code (if
+6. Suggestions for "better alternative implementations" for existing stable code (if
    the current implementation has no bugs)
-8. Public API signature change suggestions (obvious bugs are fixed normally; non-bug
+7. Public API signature change suggestions (obvious bugs are fixed normally; non-bug
    changes are not excluded but go through the `pending-api-changes.md` deferred
    confirmation flow)
