@@ -41,6 +41,11 @@ low risk.
 
 ## Code Modules
 
+The "Criteria" column below determines whether an issue is worth fixing. The risk level
+is **not** determined by issue type — it is assessed per-issue based on the risk level
+definitions above. For example, a "Logic bug" with an obvious one-line fix is low risk,
+while a logic bug requiring cross-module restructuring is high risk.
+
 | Type | Criteria |
 |------|----------|
 | Logic bug | Affects runtime correctness -> must fix |

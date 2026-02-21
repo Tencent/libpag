@@ -150,8 +150,7 @@ If the scope contains doc or mixed modules, gather reference material for review
 3. Include all gathered references in the reviewer prompts for doc/mixed modules.
 
 After confirmation, no further user interaction until fix mode interaction point (but
-see Mid-Review Supplements below). Issues requiring user judgment (test baseline
-changes, API modifications) will be collected and confirmed in Phase 7, not auto-fixed.
+see Mid-Review Supplements below).
 
 ### 0.6 Environment Verification
 
@@ -315,12 +314,12 @@ If there are no deferred issues, skip this phase entirely.
 
 3. **Action depends on mode**:
    - **Local mode / own PR**: selected issues are added to the fix queue for Phase 4.
-     - **Clean branch check** (if deferred from 0.4): verify the working tree is clean.
-       Same rules as 0.4. If not clean, ask user to resolve first.
+     - **Clean branch check** (if deferred from 0.3): verify the working tree is clean.
+       Same rules as 0.3. If not clean, ask user to resolve first.
      - **Environment verification** (if not already done): run Phase 0.6 now.
-   - **Other's PR**: selected issues are submitted as PR review comments (see below).
-     Auto-fix queue issues are also submitted as comments (not committed).
-     Then skip to Phase 6.
+   - **Other's PR**: all confirmed issues (regardless of risk level) are presented in
+     this list. User selects which to submit as PR review comments (see below), then
+     skip to Phase 7 (no fix loop for other's PR).
 
 4. If both the auto-fix queue and user selection are empty -> skip Phase 4-5, go
    directly to Phase 6 termination check.
@@ -402,6 +401,8 @@ Periodically check `git log` for new commits -> no output = stuck -> remind -> r
 ## Phase 6: Loop
 
 - `TeamDelete` to close the team
+- **Other's PR**: skip this phase entirely — no fix loop. Go directly to Phase 7
+  after PR review comments are submitted in Phase 3.5.
 
 ### Termination check
 
@@ -418,45 +419,49 @@ After fixes are validated, if there are still unresolved deferred issues from Ph
   Phase 4
 - User declines -> Phase 7
 
+### Next round context
+
 Next round prompt includes: rollback blacklist, previous fix summary,
 pending file contents, **deferred issue list** (issues above threshold that the user
 has not yet acted on), and prompt adjustments based on review quality analysis.
 Reviewers must skip all issues already reported in previous rounds — whether fixed,
-rolled back, recorded to pending files, or still awaiting user confirmation.
+rolled back, recorded to pending files, declined by the user, or still awaiting
+confirmation.
 
 ---
 
 ## Phase 7: Final Report & Cleanup
 
-### PR mode: push fixes (own PR only)
-
-If fixes were made in PR mode and `IS_OWN_PR = true`, push all commits to the PR
-branch:
-```
-git push origin HEAD:{PR_BRANCH}
-```
-
-### Pending item confirmation
+### Step 1: Pending item confirmation
 
 1. Check `pending-issues.md`
-2. Empty -> proceed to cleanup
+2. Empty -> proceed to step 2
 3. Has content -> present to user via AskUserQuestion, confirm item by item
 4. Approved fixes -> create agent to re-apply; rejected -> discard
 5. Final build + test
 
-### PR mode: worktree cleanup
+### Step 2: PR mode — push fixes (own PR only)
 
-If `WORKTREE_DIR` was created, clean up after all operations are complete:
+If fixes were made in PR mode and `IS_OWN_PR = true`:
+1. Push all commits to the PR branch:
+   ```
+   git push origin HEAD:{PR_BRANCH}
+   ```
+2. Verify push succeeded before proceeding to cleanup.
+
+### Step 3: PR mode — worktree cleanup
+
+If `WORKTREE_DIR` was created, clean up after push is verified:
 ```
 cd {original_directory}
 git worktree remove {WORKTREE_DIR}
 git branch -D pr-{number}
 ```
 
-### Summary Report
+### Step 4: Summary Report
 
 - Total rounds and per-round fix count/type statistics
-- Issues found vs issues fixed (selective mode: also show issues the user declined)
+- Issues found vs issues fixed (also show issues the user declined)
 - Rolled-back issues and reasons
 - Pending items and their resolution
 - Final test result
@@ -481,7 +486,7 @@ Cause: Reviewer prompt insufficient or issues fall outside the checklist.
 Solution: Re-run `/review`. Team-lead will auto-adjust prompts in subsequent rounds.
 
 ### Pending items not presented at the end
-Cause: No test baseline or API changes were detected.
+Cause: No high-risk issues were deferred.
 Solution: This is expected — Phase 7 only presents pending items when they exist.
 
 ### Fixer commits break tests repeatedly
