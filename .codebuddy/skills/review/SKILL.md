@@ -154,7 +154,7 @@ process begins. Complete all checks before proceeding to module partitioning.
   uncommitted changes, abort and ask the user to commit or stash first (fixes may be
   committed even in all-confirm mode after user approval in Phase 3.5).
 
-**Environment verification** (skip for other's PR — no fixes will be committed):
+**Environment verification** (skip for other's PR or doc-only scope):
 - Detect build and test commands from project rules or by exploring the codebase.
 - If no automated tests are found, warn the user: without tests, fix validation cannot
   run. Abort unless the user confirms to continue.
