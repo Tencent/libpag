@@ -205,9 +205,9 @@ Partition files in scope into **review modules** for parallel review.
   group; group related small files together. Balance workload across reviewers.
 - Classify each module as `code`, `doc`, or `mixed` to determine which checklist to use.
 
-**Fix modules** are determined in Phase 4: group confirmed issues **by file** (one
-fixer per file to prevent concurrent edit conflicts). Cross-file issues go to a
-dedicated `fixer-cross` agent.
+**Fix assignment** is determined in Phase 5: reviewers are reused as fixers and
+tasks are dynamically assigned based on which reviewer has context on the relevant
+files. See Phase 5 for details.
 
 ---
 
@@ -250,7 +250,8 @@ dedicated `fixer-cross` agent.
     each issue.
 - **Alignment**: team-lead collects both the reviewer's self-check results and the
   verifier's results. If they disagree on any issue, team-lead reads code to judge.
-- After alignment is complete, close all reviewers and verifiers.
+- After alignment is complete, close all verifiers. **Keep reviewers alive** — they
+  will be reused as fixers in Phase 5 (they already have full context on the code).
 
 ---
 
@@ -301,8 +302,17 @@ matrix. The user's chosen auto-fix threshold determines handling:
 If the auto-fix queue is empty (all issues were recorded to `PENDING_FILE`),
 skip Phase 5-6 and go directly to Phase 7.
 
-- Group confirmed issues into **fix modules by file** (see 1.3).
-- Cross-file issues -> `fixer-cross` agent; multi-file renames -> single atomic task
+### Agent assignment
+
+Reuse surviving reviewers as fixers — each reviewer already has context on the files
+it reviewed. Team-lead dynamically assigns fix tasks to the most suitable agent:
+- Issue in a file that a reviewer already read -> assign to that reviewer
+- Cross-file issues or issues with no matching reviewer -> assign to a `fixer-cross`
+  agent (create one if needed)
+- Multi-file renames -> single atomic task assigned to one agent
+
+One agent may receive multiple fix tasks if it covers several files. Avoid assigning
+the same file to multiple agents to prevent concurrent edit conflicts.
 
 ### Fixer Instructions (include in every fixer prompt)
 
@@ -317,7 +327,7 @@ Team-lead collects skipped issues and includes them in the next round's context.
   commands are available (warned in 1.1), skip validation entirely.
 - For doc-only modules: skip build/test; validation is done through review phases
 
-**All pass** (or no code modules to validate) -> close all fixers -> Phase 7.
+**All pass** (or no code modules to validate) -> Phase 7.
 
 **Failures**: identify the failing commit (bisect if multiple commits, direct revert
 if only one), revert it, and send failure info back to the original fixer for retry
@@ -325,8 +335,7 @@ if only one), revert it, and send failure info back to the original fixer for re
 issue was already in `PENDING_FILE` (a retry from Phase 8), revert and ask the
 user: show the failure details and offer options — provide additional context or
 direction for another attempt, or skip (default). Skipped issues are added to the
-rejected list so they won't be reported again in subsequent rounds. Close all fixers
-when resolved.
+rejected list so they won't be reported again in subsequent rounds.
 
 ---
 
@@ -337,7 +346,7 @@ when resolved.
 ### Termination check
 
 - If at least one commit was produced this round and round count < 100
-  -> create new team, back to Phase 2
+  -> create new team, back to Phase 2 (previous round's agents are released above)
 - Otherwise (no commits produced, or max 100 rounds reached):
   - `PENDING_FILE` has entries -> Phase 8
   - Empty -> Phase 9
