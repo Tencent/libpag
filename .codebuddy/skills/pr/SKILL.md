@@ -19,11 +19,10 @@ existing one — automatically detected based on branch state.
 
 ## Step 1: Pre-flight
 
-Run these three commands **in parallel** (they are independent):
-
 1. `git branch --show-current` — current branch name
-2. `gh pr list --head {branch} --state open --json number,url` — open PRs
-3. `gh api user -q '.login'` — GitHub username
+2. Run in parallel (both depend on step 1 only):
+   - `gh pr list --head {branch} --state open --json number,url` — open PRs
+   - `gh api user -q '.login'` — GitHub username
 
 Detect the **default branch** of the remote:
 
@@ -105,15 +104,13 @@ When there is only one commit, the PR title may reuse the commit message.
 
 #### Create branch, commit, and push
 
-Create or rename the branch:
+Create or switch to the target branch:
 
 | Current branch | Action |
 |----------------|--------|
 | {default_branch} | `git checkout -b {branch_name}` |
-| other | `git branch -m {branch_name}` |
-
-If the branch name already exists locally, append a numeric suffix (e.g.,
-`feature/user_topic_2`).
+| other (no remote tracking) | `git branch -m {branch_name}` |
+| other (has remote tracking) | keep current branch name as-is |
 
 Commit (if there is staged content), push, and create the PR:
 
