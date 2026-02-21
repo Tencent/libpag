@@ -20,8 +20,8 @@ Runs multi-round iterations until no valid issues remain.
 - **Autonomous operation**: between Phase 0 (user confirmation) and Phase 8
   (remaining issue confirmation), the review-fix loop runs without user interaction
   unless a previously failed issue fails again in Phase 6 (which prompts inline).
-  Deferred issues accumulate across rounds and are only presented to the user in
-  Phase 8.
+  Issues above the auto-fix threshold and failed fixes are recorded to
+  `pending-issues.md` across rounds and presented to the user in Phase 8.
 - All user-facing interactions must use the language the user has been using in the
   conversation. Do not default to English.
 - When presenting choices with predefined options, use interactive dialogs with
@@ -268,13 +268,13 @@ special rules.
 Assign each fixable issue a risk level (low / medium / high) based on the judgment
 matrix. The user's chosen auto-fix threshold determines handling:
 - Issues at or below the threshold -> queued for auto-fix (Phase 5)
-- Issues above the threshold -> added to the **deferred issue list** (accumulated
-  across all rounds, presented to the user only in Phase 8)
+- Issues above the threshold -> recorded to `pending-issues.md` with the reason
+  (e.g., "above auto-fix threshold"), presented to the user in Phase 8
 
 ### Mode-specific routing
 
-- **PR mode**: all issues go to the deferred list. Skip Phase 5-7. If the deferred
-  list is empty -> Phase 9; otherwise -> Phase 8.
+- **PR mode**: all issues are recorded to `pending-issues.md`. Skip Phase 5-7.
+  If `pending-issues.md` is empty -> Phase 9; otherwise -> Phase 8.
 - **Local mode**: if no auto-fix issues remain, skip Phase 5-6 and go to Phase 7
   (which routes to Phase 8 or Phase 9 based on deferred/pending state).
 
@@ -330,8 +330,8 @@ when resolved.
 - If at least one commit was produced this round and round count < 100
   -> create new team, back to Phase 2
 - Otherwise (no commits produced, or max 100 rounds reached):
-  - Deferred list or `pending-issues.md` has entries -> Phase 8
-  - Both empty -> Phase 9
+  - `pending-issues.md` has entries -> Phase 8
+  - Empty -> Phase 9
 
 ### Next round context
 
@@ -345,15 +345,13 @@ by the user.
 
 ## Phase 8: Remaining Issue Confirmation
 
-Collect all issues that were not auto-fixed during the loop:
-- **Deferred issues**: above the user's auto-fix threshold (accumulated in Phase 4)
-- **Pending issues**: failed auto-fix or rolled back (recorded in `pending-issues.md`)
-
-Merge both lists, deduplicate, and present to the user. If the merged list is empty,
+Collect all issues from `pending-issues.md` that were not auto-fixed during the loop.
+Each issue has a reason explaining why it was deferred (e.g., above threshold, fix
+failed, rolled back). Deduplicate and present to the user. If the file is empty,
 skip to Phase 9.
 
 1. Present issues in a compact numbered list. Each entry should fit on one line:
-   `[number] [file:line] [risk] [source: deferred/failed] — [description]`
+   `[number] [file:line] [risk] [reason] — [description]`
 
 2. Interaction depends on issue count:
 
