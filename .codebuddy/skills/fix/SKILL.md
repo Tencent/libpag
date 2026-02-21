@@ -9,12 +9,28 @@ compatibility: Requires CodeBuddy Code with Agent Teams experimental feature ena
 
 When the user invokes `/fix`, immediately start executing from Phase 0 below. Do NOT
 ask the user what they want to fix — this skill is a complete automated workflow that
-reviews the entire branch, not a one-off bug fix tool. The scope and fix level will be
-confirmed with the user in Phase 0.2.
+reviews the entire branch, not a one-off bug fix tool.
+
+## Argument Parsing
+
+Parse the argument after `/fix` to determine the review scope:
+
+| Invocation | Scope |
+|------------|-------|
+| `/fix` (no argument) | Current branch diff vs main (default) |
+| `/fix <commit>` | Current branch diff vs the specified base commit |
+| `/fix <path>` | All files under the specified folder or the single file |
+
+How to distinguish a commit from a path: run `git rev-parse --verify <arg>` — if it
+succeeds, treat the argument as a commit; otherwise treat it as a file/directory path
+(verify it exists with `ls`). If neither resolves, report the error and abort.
+
+When scope is resolved from arguments, skip Question 1 in Phase 0.2 and only ask
+Question 2 (fix level). Report the resolved scope to the user for confirmation in the
+same AskUserQuestion interaction.
 
 Automatically review, verify, and fix issues in code and documents across your branch.
-Runs multi-round team-based iterations until no valid issues remain. You only interact
-twice: choosing the scope at the start, and confirming pending items at the end.
+Runs multi-round team-based iterations until no valid issues remain.
 
 ## Prerequisites
 
@@ -81,9 +97,10 @@ Run sequentially. Abort if any fails.
 
 ### 0.2 Scope Confirmation (AskUserQuestion — single interaction)
 
-Ask all questions at once:
+If the review scope was already resolved from the `/fix` argument, report it to the user
+and only ask Question 2. Otherwise ask both questions.
 
-**Question 1 — Review scope:**
+**Question 1 — Review scope** (skip if resolved from argument):
 - A: Current branch vs main diff (default)
 - B: Diff from a specified base commit
 - C: Specified folder path
