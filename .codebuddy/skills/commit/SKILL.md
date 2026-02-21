@@ -31,7 +31,7 @@ If on {default_branch}, create a new branch before committing:
 
 - Generate a branch name following the project's branch naming convention if
   one exists; otherwise use `feature/{username}_topic` or
-  `bugfix/{username}_topic` (`{username}` = git config user.name, lowercase).
+  `bugfix/{username}_topic` (`{username}` = GitHub username, lowercase; obtain via `gh api user -q .login`).
 - `git checkout -b {branch_name}`
 
 ---
