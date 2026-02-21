@@ -17,15 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CommandRender.h"
+#include <cerrno>
+#include <climits>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <string>
+#include "pagx/PAGXImporter.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/TextLayout.h"
-#include "pagx/PAGXImporter.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -144,11 +146,14 @@ static bool ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
         return false;
       }
     } else if (arg == "--quality" && i + 1 < argc) {
-      options->quality = atoi(argv[++i]);
-      if (options->quality < 0 || options->quality > 100) {
-        std::cerr << "pagx render: quality must be between 0 and 100\n";
+      char* endPtr = nullptr;
+      errno = 0;
+      long val = strtol(argv[++i], &endPtr, 10);
+      if (errno != 0 || endPtr == argv[i] || *endPtr != '\0' || val < 0 || val > 100) {
+        std::cerr << "pagx render: invalid quality '" << argv[i] << "', must be 0-100\n";
         return false;
       }
+      options->quality = static_cast<int>(val);
     } else if (arg == "--background" && i + 1 < argc) {
       options->hasBackground = true;
       if (!ParseHexColor(argv[++i], &options->bgRed, &options->bgGreen, &options->bgBlue,
