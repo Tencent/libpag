@@ -204,6 +204,7 @@ bool XMLParser::parse(const uint8_t* data, size_t length) {
   XML_SetEntityDeclHandler(parsingContext._XMLParser, entity_decl_handler);
 
   if (length > static_cast<size_t>(std::numeric_limits<int>::max())) {
+    _expatParser = nullptr;
     return false;
   }
 
@@ -211,6 +212,7 @@ bool XMLParser::parse(const uint8_t* data, size_t length) {
       XML_Parse(parsingContext._XMLParser, reinterpret_cast<const char*>(data),
                 static_cast<int>(length), true);
 
+  _expatParser = nullptr;
   return XML_STATUS_ERROR != status;
 }
 
