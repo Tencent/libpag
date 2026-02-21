@@ -322,11 +322,14 @@ all fixers when resolved.
 
 ### Termination check
 
-- If new auto-fix issues were found and at least one commit was produced
+- If at least one commit was produced this round **and** round count < 5
   -> create new team, back to Phase 2
-- Otherwise (no issues found, or all skipped by fixers):
+- Otherwise (no commits produced, or max rounds reached):
   - Deferred list or `pending-issues.md` has entries -> Phase 8
   - Both empty -> Phase 9
+
+If max rounds reached with remaining issues, all unfixed issues go to the deferred
+list for user confirmation in Phase 8.
 
 ### Next round context
 
