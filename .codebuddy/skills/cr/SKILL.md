@@ -92,7 +92,7 @@ file list without full diff content (e.g., `git diff --name-only` for branch dif
 
 Ask all user-facing questions **immediately after mode detection**, before any heavy
 operations (worktree, diff, build). Use the lightweight file list from 0.1 to determine
-whether to show Q1.
+which questions to show. Present all applicable questions together.
 
 #### Question 1 — Review priority
 
@@ -123,10 +123,24 @@ Threshold is automatically set to **all confirm** with PR comment output. Inform
 user: "This is someone else's PR. Issues will be presented for you to select which ones
 to submit as PR review comments."
 
+#### Question 3 — Test environment (conditional)
+
+Skip if other's PR, doc-only scope, or build/test commands are already known from
+project rules. Otherwise, detect build and test commands by exploring the codebase.
+If no automated tests are found, ask the user: without tests, fix validation cannot
+run — continue anyway?
+
+#### Question 4 — Reference material (doc/mixed modules only)
+
+Ask the user if they have additional reference material for document review (file
+paths, URLs, or inline instructions). The user may skip. Also auto-discover relevant
+best-practice guides, official documentation, or specification standards.
+
+After all questions are answered, no further user interaction until Phase 7.
+
 ### 0.3 Pre-flight Checks
 
-All checks that might require user action are performed here, before the automated
-process begins. Complete all checks before proceeding to module partitioning.
+Automated checks only — no user interaction. Any failure here aborts immediately.
 
 **Agent Teams availability**:
 - Verify Agent Teams is enabled. If not available, prompt the user to enable it and
@@ -139,21 +153,6 @@ process begins. Complete all checks before proceeding to module partitioning.
 - **Local mode**: verify not on the main/master branch (abort if so). If there are
   uncommitted changes, abort and ask the user to commit or stash first (fixes may be
   committed even in all-confirm mode after user approval in Phase 7).
-
-**Environment verification** (skip for other's PR or doc-only scope):
-- Detect build and test commands from project rules or by exploring the codebase.
-- If no automated tests are found, warn the user: without tests, fix validation cannot
-  run. Abort unless the user confirms to continue.
-- Actual build + test baseline runs after 0.4 (scope preparation), in the correct
-  working directory.
-
-**Reference material** (doc/mixed modules only):
-- Auto-discover relevant best-practice guides, official documentation, or specification
-  standards for the document type being reviewed.
-- Ask the user if they have additional reference material (file paths, URLs, or inline
-  instructions). The user may skip.
-
-After all checks pass, no further user interaction until Phase 7 (final report).
 
 ### 0.4 Scope Preparation
 
