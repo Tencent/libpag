@@ -6,7 +6,7 @@ description: Automated code review and fix for local branches, PRs, commits, and
 # Review — Automated Code Review & Fix
 
 Use `/cr` to start. Accepts a PR number/URL, commit (range), file/directory paths,
-or no argument (current branch vs upstream). See Phase 0.2 for full argument parsing.
+or no argument (current branch vs upstream). See Phase 0.3 for full argument parsing.
 
 Reviews code and documents using Agent Teams. Each issue gets a risk level — low-risk
 issues are auto-fixed, higher-risk issues are presented for user confirmation. In PR
@@ -49,16 +49,11 @@ Runs multi-round iterations until no valid issues remain.
 
 ## Phase 0: Scope Confirmation & Environment Check
 
-### 0.1 User Questions
+### 0.1 Review Priority (Question 1)
 
-Present all applicable questions together in one interaction. No commands should be
-run before these questions are answered.
-
-#### Question 1 — Review priority
-
-Always show this question. When the scope turns out to be doc-only (determined later
-in 0.5 module partitioning), all priority levels (A+B+C) are used regardless of the
-user's choice here.
+Always show this question first. No commands should be run before this question is
+answered. When the scope turns out to be doc-only (determined later in 0.5 module
+partitioning), all priority levels (A+B+C) are used regardless of the user's choice.
 
 (code/mixed modules):
 - Option 1 — "Full review (A + B + C)": correctness, refactoring, and conventions.
@@ -68,10 +63,16 @@ user's choice here.
 - Option 3 — "Correctness only (A)": only safety and correctness issues.
   e.g., null dereference, out-of-bounds, resource leaks, race conditions.
 
-#### Question 2 — Auto-fix threshold (Local mode only)
+### 0.2 Auto-fix Threshold (Question 2, Local mode only)
 
-Skip in PR mode. When showing Q1, add a note: "PR mode — issues will be submitted as
-PR review comments after your review."
+After Q1 is answered, check `$ARGUMENTS` to determine whether this is PR mode:
+- Purely numeric (e.g., `123`) or contains `/` (URL) -> **PR mode**.
+- Everything else (empty, commit hash, commit range, file paths) -> **Local mode**.
+
+**PR mode**: skip Q2. Inform the user: "PR mode — issues will be submitted as PR
+review comments after your review."
+
+**Local mode**: show Q2.
 
 - Option 1 — "All confirm": no auto-fix, confirm every issue before any change.
 - Option 2 — "Low risk only": auto-fix only fixes with a single correct approach
@@ -86,27 +87,21 @@ PR review comments after your review."
 
 After all questions are answered, no further user interaction until Phase 7.
 
-### 0.2 Argument Parsing & Mode Detection
+### 0.3 Argument Parsing & Mode Detection
 
-Parse `$ARGUMENTS` to determine the review mode:
+If PR mode was detected in 0.2, reuse that result and proceed to PR metadata fetch
+directly. Otherwise parse `$ARGUMENTS` to determine the Local mode scope:
 
-| `$ARGUMENTS` | Detection | Mode | Scope |
-|--------------|-----------|------|-------|
-| (empty) | — | **Local** | Current branch vs upstream (diff) |
-| PR number (e.g., `123`) | `gh pr view` succeeds | **PR** | PR diff vs base branch |
-| PR URL | Extract owner/repo/number, verify | **PR** | PR diff vs base branch |
-| Single commit (e.g., `abc123`) | `git rev-parse --verify` succeeds | **Local** | That commit's changes (`git show`) |
-| Commit range (e.g., `abc..def`) | Contains `..`, both endpoints valid | **Local** | Diff between two commits (excluding first) |
-| File/directory paths (space-separated) | All paths exist on disk | **Local** | Full content review (no diff) |
+| `$ARGUMENTS` | Detection | Scope |
+|--------------|-----------|-------|
+| (empty) | — | Current branch vs upstream (diff) |
+| Single commit (e.g., `abc123`) | `git rev-parse --verify` succeeds | That commit's changes (`git show`) |
+| Commit range (e.g., `abc..def`) | Contains `..`, both endpoints valid | Diff between two commits (excluding first) |
+| File/directory paths (space-separated) | All paths exist on disk | Full content review (no diff) |
 
-**Parse order**: contains `..` -> commit range; looks like a URL (contains `/`) ->
-PR URL; single arg + purely numeric -> PR number (`gh pr view`); all args exist on
-disk -> file/directory paths; single arg + `git rev-parse` succeeds -> single commit;
+**Local mode parse order**: contains `..` -> commit range; all args exist on disk ->
+file/directory paths; single arg + `git rev-parse` succeeds -> single commit;
 otherwise -> error.
-
-**PR URL mismatch**: if the URL's owner/repo does not match the current repository
-(`gh repo view --json nameWithOwner -q '.nameWithOwner'`), abort and ask the user to
-run `/cr` from the correct repository.
 
 **Empty arguments (default)**: use the current branch's upstream tracking branch as the
 base. If no upstream is configured, fall back to `main` (or `master`).
@@ -116,7 +111,11 @@ base. If no upstream is configured, fall back to `main` (or `master`).
 1. **Verify `gh` is available**: run `gh --version`. If not installed, inform the user
    (macOS: `brew install gh`, others: https://cli.github.com) and abort.
 
-2. **Fetch PR metadata** (single API call):
+2. **PR URL mismatch**: if the URL's owner/repo does not match the current repository
+   (`gh repo view --json nameWithOwner -q '.nameWithOwner'`), abort and ask the user to
+   run `/cr` from the correct repository.
+
+3. **Fetch PR metadata** (single API call):
    ```
    gh pr view {number} --json headRefName,baseRefName,headRefOid,state
    ```
@@ -161,7 +160,7 @@ Fetch the actual diff/content and set up the working environment.
      All subsequent operations use the worktree directory. Record `WORKTREE_DIR` for
      cleanup in Phase 7.
 
-2. **Set review scope**: diff against the PR's base branch (`BASE_BRANCH` from 0.1).
+2. **Set review scope**: diff against the PR's base branch (`BASE_BRANCH` from 0.3).
    ```
    git fetch origin {BASE_BRANCH}
    git diff $(git merge-base origin/{BASE_BRANCH} HEAD)
