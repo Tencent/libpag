@@ -104,13 +104,8 @@ When there is only one commit, the PR title may reuse the commit message.
 
 #### Create branch, commit, and push
 
-Create or switch to the target branch:
-
-| Current branch | Action |
-|----------------|--------|
-| {default_branch} | `git checkout -b {branch_name}` |
-| other (no remote tracking) | `git branch -m {branch_name}` |
-| other (has remote tracking) | keep current branch name as-is |
+If on {default_branch}, create a new branch: `git checkout -b {branch_name}`.
+Otherwise, use the current branch name as-is.
 
 Commit (if there is staged content), push, and create the PR:
 
