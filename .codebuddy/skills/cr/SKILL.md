@@ -21,7 +21,7 @@ Runs multi-round iterations until no valid issues remain.
   (remaining issue confirmation), the review-fix loop runs without user interaction
   unless a previously failed issue fails again in Phase 6 (which prompts inline).
   Issues above the auto-fix threshold and failed fixes are recorded to
-  `pending-issues.md` across rounds and presented to the user in Phase 8.
+  `PENDING_FILE` across rounds and presented to the user in Phase 8.
 - All user-facing interactions must use the language the user has been using in the
   conversation. Do not default to English.
 - When presenting choices with predefined options, use interactive dialogs with
@@ -31,7 +31,7 @@ Runs multi-round iterations until no valid issues remain.
   stuck or unresponsive, a fix that breaks the build, a git operation that fails, an
   agent producing invalid output. Use your judgment: terminate and replace, revert and
   retry, skip and move on, etc. Anything that cannot be resolved automatically should
-  be recorded to `pending-issues.md` for user review in Phase 8.
+  be recorded to `PENDING_FILE` for user review in Phase 8.
 - The user may send additional material (files, URLs, context) at any time. If
   reviewers are still active (Phase 2-3), forward it directly; otherwise include
   the material in the next round.
@@ -110,6 +110,11 @@ Phase 0.2.
 ### 1.1 Pre-flight Checks
 
 Automated checks — no user interaction.
+
+**Initialize `PENDING_FILE`**: set path to `/tmp/cr-pending-issues.md`. If the file
+already exists (leftover from a concurrent or crashed session), append a numeric
+suffix (`-2`, `-3`, …) until an unused name is found. Record the chosen path as
+`PENDING_FILE` for all subsequent phases.
 - Check if Agent Teams is enabled. If not available, warn the user in the conversation
   that review will run in single-agent serial mode (one module at a time) instead of
   parallel. Continue without aborting.
@@ -259,7 +264,7 @@ special rules.
 ### De-duplication
 
 - Skip any issue that matches one already fixed, rolled back, recorded to
-  `pending-issues.md`, or **rejected by the user** in a previous round.
+  `PENDING_FILE`, or **rejected by the user** in a previous round.
 - **PR comment de-duplication** (PR mode): compare each confirmed issue against
   `EXISTING_PR_COMMENTS`. If an issue matches an existing comment (same file, same
   general location, same topic), exclude it — do not present it to the user.
@@ -273,15 +278,15 @@ special rules.
 Assign each fixable issue a risk level (low / medium / high) based on the judgment
 matrix. The user's chosen auto-fix threshold determines handling:
 - Issues at or below the threshold -> queued for auto-fix (Phase 5)
-- Issues above the threshold -> recorded to `pending-issues.md` with the reason
+- Issues above the threshold -> recorded to `PENDING_FILE` with the reason
   (e.g., "above auto-fix threshold"), presented to the user in Phase 8
 
 ### Mode-specific routing
 
-- **PR mode**: all issues are recorded to `pending-issues.md`. Skip Phase 5-7.
-  If `pending-issues.md` is empty -> Phase 9; otherwise -> Phase 8.
+- **PR mode**: all issues are recorded to `PENDING_FILE`. Skip Phase 5-7.
+  If `PENDING_FILE` is empty -> Phase 9; otherwise -> Phase 8.
 - **Local mode**: if no auto-fix issues remain, skip Phase 5-6 and go to Phase 7
-  (which routes to Phase 8 or Phase 9 based on `pending-issues.md` state).
+  (which routes to Phase 8 or Phase 9 based on `PENDING_FILE` state).
 
 ### Additional checks
 
@@ -294,7 +299,7 @@ matrix. The user's chosen auto-fix threshold determines handling:
 
 ## Phase 5: Fix
 
-If the auto-fix queue is empty (all issues were recorded to `pending-issues.md`),
+If the auto-fix queue is empty (all issues were recorded to `PENDING_FILE`),
 skip Phase 5-6 and go directly to Phase 7.
 
 - Group confirmed issues into **fix modules by file** (see 1.3).
@@ -317,8 +322,8 @@ Team-lead collects skipped issues and includes them in the next round's context.
 
 **Failures**: identify the failing commit (bisect if multiple commits, direct revert
 if only one), revert it, and send failure info back to the original fixer for retry
-(max 2 retries). If still failing, revert and record to `pending-issues.md`. If the
-issue was already in `pending-issues.md` (a retry from Phase 8), revert and ask the
+(max 2 retries). If still failing, revert and record to `PENDING_FILE`. If the
+issue was already in `PENDING_FILE` (a retry from Phase 8), revert and ask the
 user: show the failure details and offer options — provide additional context or
 direction for another attempt, or skip (default). Skipped issues are added to the
 rejected list so they won't be reported again in subsequent rounds. Close all fixers
@@ -335,21 +340,21 @@ when resolved.
 - If at least one commit was produced this round and round count < 100
   -> create new team, back to Phase 2
 - Otherwise (no commits produced, or max 100 rounds reached):
-  - `pending-issues.md` has entries -> Phase 8
+  - `PENDING_FILE` has entries -> Phase 8
   - Empty -> Phase 9
 
 ### Next round context
 
 Next round prompt includes: rollback blacklist, previous fix summary,
-`pending-issues.md` contents, and prompt adjustments based on review quality analysis.
+`PENDING_FILE` contents, and prompt adjustments based on review quality analysis.
 Reviewers must skip all issues already reported in previous rounds — whether fixed,
-rolled back, recorded to `pending-issues.md`, or rejected by the user.
+rolled back, recorded to `PENDING_FILE`, or rejected by the user.
 
 ---
 
 ## Phase 8: Remaining Issue Confirmation
 
-Collect all issues from `pending-issues.md` that were not auto-fixed during the loop.
+Collect all issues from `PENDING_FILE` that were not auto-fixed during the loop.
 Each issue has a reason explaining why it was deferred (e.g., above threshold, fix
 failed, rolled back). Deduplicate and present to the user. If the file is empty,
 skip to Phase 9.
@@ -375,8 +380,8 @@ skip to Phase 9.
      Otherwise, jump back to Phase 5 with the user-approved issues as the fix queue.
      The full cycle runs: Phase 5 (fix) -> Phase 6 (validate) -> Phase 7 (loop)
      -> Phase 2 (review the new changes) -> ... until no new issues are found, then
-     back to Phase 8. Any new issues from this cycle are added to `pending-issues.md`
-     and presented again. The loop terminates when `pending-issues.md` is empty or the
+     back to Phase 8. Any new issues from this cycle are added to `PENDING_FILE`
+     and presented again. The loop terminates when `PENDING_FILE` is empty or the
      user skips all remaining issues -> Phase 9.
 
 ---
@@ -402,7 +407,9 @@ git branch -D pr-{number}
 - **PR mode**: list review comments submitted
 - **Local mode with associated PR**: note which issues originated from PR comments
 
-Delete pending files after report.
+### Pending file cleanup
+
+Delete `PENDING_FILE` from the temporary directory.
 
 ---
 

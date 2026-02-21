@@ -1,6 +1,6 @@
 # Pending Issue Template
 
-Use this format to record all issues awaiting user confirmation in `pending-issues.md`.
+Use this format to record all issues awaiting user confirmation in `PENDING_FILE`.
 Each issue includes a **Reason** describing why it was not auto-fixed.
 
 ```markdown

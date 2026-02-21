@@ -214,5 +214,5 @@ Coding standards and documentation consistency. Lower impact on functionality.
 6. Suggestions for "better alternative implementations" for existing stable code (if
    the current implementation has no bugs)
 7. Public API signature change suggestions (obvious bugs are fixed normally; non-bug
-   changes are not excluded but go through `pending-issues.md` for user confirmation
+   changes are not excluded but go through `PENDING_FILE` for user confirmation
    in Phase 8)

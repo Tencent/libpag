@@ -1,7 +1,7 @@
 # Judgment Matrix
 
 Team-lead uses this matrix in Phase 4 to decide whether each confirmed issue should be
-auto-fixed, recorded to `pending-issues.md` for user confirmation, or skipped entirely.
+auto-fixed, recorded to `PENDING_FILE` for user confirmation, or skipped entirely.
 
 ## Risk Level Assessment
 
