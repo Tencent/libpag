@@ -93,8 +93,8 @@ Improvements to code quality, performance, and maintainability. Medium impact.
 - Repeated computation inside loops: can expressions be moved outside the loop?
 - String operations: can frequent concatenation inside loops be optimized?
 - Unnecessary temporary object construction `[C/C++]`
-- Const references: are parameters / variables that can be const& marked as such?
-  `[C/C++]`
+- Const references: are large objects passed by value that should be const& for
+  performance? (For const correctness conventions, see C7) `[C/C++]`
 - Are components re-rendering unnecessarily due to missing memoization, unstable
   references, or inline object/function creation in props? `[React/Vue/Web]`
 - Are large dependencies imported in full when only a small part is used
