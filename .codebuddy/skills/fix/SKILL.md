@@ -1,8 +1,6 @@
 ---
 name: fix
-description: >-
-  Multi-round automated code review and fix using Agent Teams. Use when the
-  user invokes /fix to review and fix code or document issues across a branch.
+description: Multi-round automated code review and fix using Agent Teams. Use when the user invokes /fix to review and fix code or document issues across a branch.
 ---
 
 # Fix — Automated Code Review & Fix
