@@ -30,7 +30,8 @@ based on the selected fix level and the module type (code or document).
 | Regression risk | B | Flag when modification may affect other callers |
 | Naming convention violation | C | Fix only when inconsistent with project rules loaded in context |
 | Missing variable initialization | C | Fix when declared without initial value (per project rules) |
-| Comment / documentation issue | C | Fix when public API lacks description or docs disagree with code |
+| Public API comment inaccuracy | A | Must fix — comments that mislead API consumers are correctness issues |
+| Comment / documentation issue | C | Fix when internal docs are missing or style is inconsistent |
 | Function implementation order | C | Fix only when clearly inconsistent with header declaration order |
 | Type safety (narrowing / magic numbers) | C | Only change local variables, never change function signatures |
 | Const correctness | C | Fix when clearly applicable and low risk |

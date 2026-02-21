@@ -53,6 +53,13 @@ Issues that directly affect runtime behavior. Highest impact.
 - Is shared data protected against concurrent access?
 - Are there race conditions on mutable shared state?
 
+**A7. Public API Comment Accuracy**
+- Do public API comments accurately describe current behavior, parameters, and return
+  values?
+- Are value ranges, constraints, and error conditions in comments consistent with the
+  actual implementation?
+- Are comments updated when the corresponding API behavior changes?
+
 ---
 
 ## Level B: Refactoring & Optimization
@@ -122,7 +129,6 @@ Coding standards and documentation consistency. Lower impact on functionality.
 
 **C4. Comment Conventions**
 - Do public APIs have sufficient parameter and return value descriptions?
-- Are comments consistent with code behavior (outdated comments are worse than none)?
 - Are design intent explanations present where code alone is insufficient?
 
 **C5. File Organization**
@@ -144,8 +150,6 @@ Coding standards and documentation consistency. Lower impact on functionality.
 **C8. Documentation Consistency**
 - Are type names / enum names in code consistent with project documentation?
 - Are value ranges in comments consistent with specification documents?
-- Does documentation description match actual code behavior?
-- Do public API comments accurately describe current behavior?
 
 ---
 
