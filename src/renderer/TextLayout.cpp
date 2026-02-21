@@ -1284,43 +1284,18 @@ class TextLayoutContext {
         auto result = PunctuationSquash::GetAdjacentSquash(line.glyphs[i].unichar,
                                                            line.glyphs[i + 1].unichar);
         if (result.prevSquash > 0) {
-          auto prevCat = PunctuationSquash::GetCategory(line.glyphs[i].unichar);
           float amount = line.glyphs[i].advance * result.prevSquash;
-          if (prevCat == PunctuationCategory::Opening) {
-            // Opening punctuation has leading whitespace. When the squash table says to remove
-            // the "trailing space" of an Opening bracket (e.g. Opening+Opening: 「「), it actually
-            // means the glyph face is already at the trailing edge, and we should NOT reduce the
-            // advance. Instead this case should not arise in a correct JLREQ table, but if it
-            // does we treat it as trailing squash to avoid breaking the glyph.
-            if (amount > trailingSquash[i]) {
-              trailingSquash[i] = amount;
-            }
-          } else {
-            // Closing and MiddleDot have trailing whitespace, so squash reduces their advance.
-            if (amount > trailingSquash[i]) {
-              trailingSquash[i] = amount;
-            }
+          // Both Opening (leading whitespace mapped to trailing squash) and Closing/MiddleDot
+          // (trailing whitespace) reduce the effective advance via trailingSquash.
+          if (amount > trailingSquash[i]) {
+            trailingSquash[i] = amount;
           }
         }
         if (result.nextSquash > 0) {
-          auto nextCat = PunctuationSquash::GetCategory(line.glyphs[i + 1].unichar);
           float amount = line.glyphs[i + 1].advance * result.nextSquash;
-          if (nextCat == PunctuationCategory::Opening) {
-            // Opening punctuation: squash removes leading whitespace (before the glyph face).
-            if (amount > leadingSquash[i + 1]) {
-              leadingSquash[i + 1] = amount;
-            }
-          } else if (nextCat == PunctuationCategory::MiddleDot) {
-            // MiddleDot: nextSquash removes leading whitespace.
-            if (amount > leadingSquash[i + 1]) {
-              leadingSquash[i + 1] = amount;
-            }
-          } else {
-            // Closing punctuation: nextSquash removes leading whitespace (the space before the
-            // glyph face of a Closing bracket).
-            if (amount > leadingSquash[i + 1]) {
-              leadingSquash[i + 1] = amount;
-            }
+          // All categories (Opening, Closing, MiddleDot) remove leading whitespace of nextChar.
+          if (amount > leadingSquash[i + 1]) {
+            leadingSquash[i + 1] = amount;
           }
         }
       }
