@@ -6,7 +6,7 @@ description: Automated code review and fix for local branches, PRs, commits, and
 # Review — Automated Code Review & Fix
 
 Use `/cr` to start. Accepts a PR number/URL, commit (range), file/directory paths,
-or no argument (current branch vs upstream). See Phase 0.1 for full argument parsing.
+or no argument (current branch vs upstream). See Phase 0.2 for full argument parsing.
 
 Reviews code and documents using Agent Teams. Each issue gets a risk level — low-risk
 issues are auto-fixed, higher-risk issues are presented for user confirmation. In PR
@@ -15,14 +15,11 @@ Runs multi-round iterations until no valid issues remain.
 
 ## Instructions
 
-**CRITICAL**:
 - You (the team-lead) **never modify files directly**. Delegate all changes to
   agents. Read code only for arbitration and diagnosis.
 - **Autonomous operation**: between Phase 0 (setup) and Phase 7 (final report), the
   entire review-fix loop runs without user interaction. Deferred issues accumulate
   across rounds and are only presented to the user in Phase 7.
-
-**General**:
 - All user-facing interactions must use the language the user has been using in the
   conversation. Do not default to English.
 - When presenting choices with predefined options, use interactive dialogs with
@@ -33,8 +30,6 @@ Runs multi-round iterations until no valid issues remain.
   agent producing invalid output. Use your judgment: terminate and replace, revert and
   retry, skip and move on, etc. Anything that cannot be resolved automatically should
   be recorded to `pending-issues.md` for user review in Phase 7.
-
-**Mid-conversation supplements**:
 - The user may send additional material (files, URLs, context) at any time. If
   reviewers are still active (Phase 1-2), forward it directly; otherwise include
   the material in the next round.
@@ -54,35 +49,10 @@ Runs multi-round iterations until no valid issues remain.
 
 ## Phase 0: Scope Confirmation & Environment Check
 
-### 0.1 Argument Parsing & Mode Detection
+### 0.1 User Questions
 
-**CRITICAL**: This step does pure string parsing only. Do NOT run any git or gh
-commands. Do NOT read files or explore the codebase. Go straight to 0.2 after
-determining the mode.
-
-Parse `$ARGUMENTS` to determine the review mode:
-
-| `$ARGUMENTS` | Detection (string-level) | Mode | Scope |
-|--------------|--------------------------|------|-------|
-| (empty) | — | **Local** | Current branch vs upstream |
-| Purely numeric (e.g., `123`) | Matches `^[0-9]+$` | **PR** | PR diff vs base branch |
-| URL containing `/` | Extract owner/repo/number from URL | **PR** | PR diff vs base branch |
-| Contains `..` (e.g., `abc..def`) | Split on `..` | **Local** | Diff between two commits |
-| Other single arg | Assume commit hash | **Local** | That commit's changes |
-| Multiple args, none of the above | Assume file/directory paths | **Local** | Full content of specified files |
-
-**Parse order**: contains `..` -> commit range; contains `/` -> PR URL; purely
-numeric -> PR number; multiple args -> file/directory paths; single arg -> commit
-hash; otherwise -> error.
-
-Record the detected mode (Local / PR) and the raw argument values. All validation
-(git rev-parse, gh pr view, path existence, upstream detection) is deferred to 0.3.
-
-### 0.2 User Questions
-
-**CRITICAL**: Ask these questions **immediately after 0.1**. The only thing that
-happened before this point is string parsing — no commands have been run yet.
-Present all applicable questions together in one interaction.
+Present all applicable questions together in one interaction. No commands should be
+run before these questions are answered.
 
 #### Question 1 — Review priority
 
@@ -116,32 +86,47 @@ PR review comments after your review."
 
 After all questions are answered, no further user interaction until Phase 7.
 
+### 0.2 Argument Parsing & Mode Detection
+
+Parse `$ARGUMENTS` to determine the review mode:
+
+| `$ARGUMENTS` | Detection | Mode | Scope |
+|--------------|-----------|------|-------|
+| (empty) | — | **Local** | Current branch vs upstream (diff) |
+| PR number (e.g., `123`) | `gh pr view` succeeds | **PR** | PR diff vs base branch |
+| PR URL | Extract owner/repo/number, verify | **PR** | PR diff vs base branch |
+| Single commit (e.g., `abc123`) | `git rev-parse --verify` succeeds | **Local** | That commit's changes (`git show`) |
+| Commit range (e.g., `abc..def`) | Contains `..`, both endpoints valid | **Local** | Diff between two commits (excluding first) |
+| File/directory paths (space-separated) | All paths exist on disk | **Local** | Full content review (no diff) |
+
+**Parse order**: contains `..` -> commit range; looks like a URL (contains `/`) ->
+PR URL; single arg + purely numeric -> PR number (`gh pr view`); all args exist on
+disk -> file/directory paths; single arg + `git rev-parse` succeeds -> single commit;
+otherwise -> error.
+
+**PR URL mismatch**: if the URL's owner/repo does not match the current repository
+(`gh repo view --json nameWithOwner -q '.nameWithOwner'`), abort and ask the user to
+run `/cr` from the correct repository.
+
+**Empty arguments (default)**: use the current branch's upstream tracking branch as the
+base. If no upstream is configured, fall back to `main` (or `master`).
+
+**PR mode — metadata**:
+
+1. **Verify `gh` is available**: run `gh --version`. If not installed, inform the user
+   (macOS: `brew install gh`, others: https://cli.github.com) and abort.
+
+2. **Fetch PR metadata** (single API call):
+   ```
+   gh pr view {number} --json headRefName,baseRefName,headRefOid,state
+   ```
+   Extract: `PR_BRANCH`, `BASE_BRANCH`, `HEAD_SHA`, `STATE`.
+   If `STATE` is not `OPEN`, inform the user that the PR is already closed/merged and
+   exit.
+
 ### 0.3 Pre-flight Checks
 
-First set of commands to run after user answers. Automated checks — no user interaction.
-
-**Argument validation** (verify what 0.1 parsed):
-
-- **PR mode**:
-  1. Verify `gh` is available (`gh --version`). If not installed, inform the user
-     (macOS: `brew install gh`, others: https://cli.github.com) and abort.
-  2. If PR URL was given, verify the URL's owner/repo matches the current repository
-     (`gh repo view --json nameWithOwner -q '.nameWithOwner'`). Mismatch -> abort.
-  3. Fetch PR metadata:
-     ```
-     gh pr view {number} --json headRefName,baseRefName,headRefOid,state
-     ```
-     Extract: `PR_BRANCH`, `BASE_BRANCH`, `HEAD_SHA`, `STATE`.
-     If `STATE` is not `OPEN`, inform the user and exit.
-
-- **Local mode (empty arguments)**: determine the base branch — use the current
-  branch's upstream tracking branch. If no upstream, fall back to `main` (or `master`).
-
-- **Local mode (commit / commit range)**: validate with `git rev-parse --verify`.
-
-- **Local mode (file/directory paths)**: verify all paths exist on disk.
-
-**Agent Teams availability**:
+Automated checks — no user interaction.
 - Check if Agent Teams is enabled. If not available, warn the user in the conversation
   that review will run in single-agent serial mode (one module at a time) instead of
   parallel. Continue without aborting.
