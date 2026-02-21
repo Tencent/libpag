@@ -45,24 +45,32 @@ Issues that directly affect runtime behavior. Highest impact.
 - Are promises / async calls properly awaited with error handling?
   `[JS/TS/Python/async languages]`
 
-**A4. Resource Management**
+**A4. Injection & Sensitive Data** `[Web]`
+- Is user input inserted into the DOM without sanitization (innerHTML,
+  dangerouslySetInnerHTML, v-html, [innerHTML], document.write, etc.)?
+- Are URL parameters, localStorage, or postMessage data used without validation?
+- Are API keys, tokens, or credentials hard-coded in client-side code?
+
+**A5. Resource Management**
 - Are manually allocated resources correctly released on all paths (prefer RAII)?
   `[C/C++]`
 - Are file handles / system resources properly closed?
 - Are lock acquire and release properly paired? `[C/C++/Java/Go]`
 - Is there a risk of pointer / iterator invalidation after container resize? `[C/C++]`
 - Are database connections / network sockets properly released in finally/defer blocks?
+- Are event listeners, timers, subscriptions, and observers cleaned up on component
+  unmount or scope exit? `[Web]`
 
-**A5. Memory Safety** `[C/C++]`
+**A6. Memory Safety** `[C/C++]`
 - Use-after-move: is a moved-from object used again?
 - Dangling reference / pointer: returning reference / pointer to a local variable?
 - Is a container element reference still used after the container is modified?
 
-**A6. Thread Safety** (when applicable)
+**A7. Thread Safety** (when applicable)
 - Is shared data protected against concurrent access?
 - Are there race conditions on mutable shared state?
 
-**A7. Public API Comment Accuracy**
+**A8. Public API Comment Accuracy**
 - Do public API comments accurately describe current behavior, parameters, and return
   values?
 - Are value ranges, constraints, and error conditions in comments consistent with the
@@ -84,6 +92,10 @@ Improvements to code quality, performance, and maintainability. Medium impact.
 - Unnecessary temporary object construction `[C/C++]`
 - Const references: are parameters / variables that can be const& marked as such?
   `[C/C++]`
+- Are components re-rendering unnecessarily due to missing memoization, unstable
+  references, or inline object/function creation in props? `[React/Vue/Web]`
+- Are large dependencies imported in full when only a small part is used
+  (tree-shaking inefficiency)? `[Web]`
 
 **B2. Code Simplification**
 - Duplicate code: >= 3 identical patterns should be extracted into a method
@@ -116,6 +128,13 @@ Improvements to code quality, performance, and maintainability. Medium impact.
 **B7. Regression Risk**
 - Could the modification affect other callers?
 - Are behavior changes consistent across all target platforms?
+
+**B8. Rendering Correctness** `[Web]`
+- Are list items rendered with a stable, unique key (not array index)?
+- Are side effects correctly placed in lifecycle hooks / useEffect with proper
+  dependency arrays?
+- Is component state derived correctly (no stale closures, no out-of-sync
+  derived state)?
 
 ---
 
@@ -163,6 +182,11 @@ Coding standards and documentation consistency. Lower impact on functionality.
 **C8. Documentation Consistency**
 - Are type names / enum names in code consistent with project documentation?
 - Are value ranges in comments consistent with specification documents?
+
+**C9. Accessibility** `[Web]`
+- Do images have meaningful alt text (or empty alt for decorative images)?
+- Do form inputs have associated labels?
+- Are interactive elements keyboard-navigable and using semantic HTML?
 
 ---
 

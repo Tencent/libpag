@@ -16,26 +16,33 @@ based on the selected fix level and the module type (code or document).
 |------|-----------|----------|
 | Logic bug | A | Affects runtime correctness -> must fix |
 | Security (div-by-zero / OOB / uninitialized read) | A | Must fix |
+| Injection / XSS (unsanitized user input in DOM) | A | Must fix `[Web]` |
+| Sensitive data exposure (keys / tokens in client code) | A | Must fix `[Web]` |
 | Resource leak (handle / lock not released) | A | Must fix |
 | Memory safety (use-after-move / dangling ref) | A | Must fix |
+| Event listener / timer / subscription leak on unmount | A | Must fix `[Web]` |
 | Thread safety violation | A | Must fix |
 | Public API signature change (obvious bug) | A | Must fix |
+| Public API comment inaccuracy | A | Must fix — comments that mislead API consumers are correctness issues |
 | Performance optimization | B | **Must be 100% certain of semantic equivalence; skip if uncertain** |
+| Unnecessary re-renders / missing memoization | B | Fix when measurably impactful `[Web]` |
+| Full-library import when partial suffices | B | Fix when tree-shaking is clearly ineffective `[Web]` |
 | Code simplification | B | Fix when logic can be clearly simplified (early return, branch merge, etc.) |
 | Duplicate code extraction | B | Fix when >= 3 identical patterns |
 | Container pre-allocation | B | Fix when size is predictable **and** on a hot path |
 | Architecture improvement | B | Fix only when dependency direction or responsibility division is clearly wrong |
 | Interface usage | B | Fix when API is used against its design intent |
+| Rendering correctness (stale key / stale closure / wrong deps) | B | Fix when it causes incorrect UI behavior `[Web]` |
 | Test coverage gap | B | Flag when changed logic lacks test coverage |
 | Regression risk | B | Flag when modification may affect other callers |
 | Naming convention violation | C | Fix only when inconsistent with project rules loaded in context |
 | Missing variable initialization | C | Fix when declared without initial value (per project rules) |
-| Public API comment inaccuracy | A | Must fix — comments that mislead API consumers are correctness issues |
 | Comment / documentation issue | C | Fix when internal docs are missing or style is inconsistent |
 | Function implementation order | C | Fix only when clearly inconsistent with header declaration order |
 | Type safety (narrowing / magic numbers) | C | Only change local variables, never change function signatures |
 | Const correctness | C | Fix when clearly applicable and low risk |
 | File organization | C | Fix only when clearly inconsistent with project conventions |
+| Accessibility (missing alt / label / keyboard nav) | C | Fix when semantic HTML or ARIA is clearly missing `[Web]` |
 | Public API signature change (not a bug) | -- | **Do not fix directly**, record to `pending-api-changes.md` for final confirmation |
 | Style preference | -- | **Always skip** |
 
