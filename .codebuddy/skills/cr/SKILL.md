@@ -34,7 +34,8 @@ Runs multi-round iterations until no valid issues remain.
 - **Agent shutdown**: when closing agents (verifiers in Phase 3, team in Phase 7,
   or mid-phase termination), send the shutdown message and **continue immediately**
   without waiting for acknowledgment. Do not block the workflow on agent responses.
-  Late replies from already-shutdown agents should be ignored.
+  Late replies from already-shutdown agents should be ignored. When closing the team
+  (Phase 7, Phase 9), force-terminate (TaskStop) any agents that are still running.
 - The user may send additional material (files, URLs, context) at any time. If
   reviewers are still active (Phase 2-3), forward it directly; otherwise include
   the material in the next round.
