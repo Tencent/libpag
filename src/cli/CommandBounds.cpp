@@ -213,6 +213,34 @@ static const Layer* EvaluateSingleXPath(xmlDocPtr xmlDoc, const std::string& xpa
   return layers[0];
 }
 
+static std::string EscapeJson(const std::string& input) {
+  std::string result = {};
+  result.reserve(input.size() + 16);
+  for (char ch : input) {
+    switch (ch) {
+      case '"':
+        result += "\\\"";
+        break;
+      case '\\':
+        result += "\\\\";
+        break;
+      case '\n':
+        result += "\\n";
+        break;
+      case '\r':
+        result += "\\r";
+        break;
+      case '\t':
+        result += "\\t";
+        break;
+      default:
+        result += ch;
+        break;
+    }
+  }
+  return result;
+}
+
 static void PrintBoundsText(const std::string& label, float left, float top, float width,
                             float height) {
   std::cout << label << ": x=" << left << " y=" << top << " width=" << width
@@ -221,7 +249,7 @@ static void PrintBoundsText(const std::string& label, float left, float top, flo
 
 static void PrintBoundsJson(const std::string& label, float left, float top, float width,
                             float height) {
-  std::cout << "{\"label\": \"" << label << "\", \"x\": " << left << ", \"y\": " << top
+  std::cout << "{\"label\": \"" << EscapeJson(label) << "\", \"x\": " << left << ", \"y\": " << top
             << ", \"width\": " << width << ", \"height\": " << height << "}\n";
 }
 
