@@ -53,30 +53,9 @@ Runs multi-round iterations until no valid issues remain.
 
 #### Argument parsing
 
-Parse `$ARGUMENTS` to determine the review mode and scope:
-
-**PR mode** — argument is purely numeric or a URL (contains `/`):
-
-Fetch PR metadata:
-```
-gh pr view {number} --json headRefName,baseRefName,headRefOid,state
-```
-Extract: `PR_BRANCH`, `BASE_BRANCH`, `HEAD_SHA`, `STATE`.
-If the command fails (gh not installed, not authenticated, PR not found, or URL
-repo mismatch), inform the user and abort.
-If `STATE` is not `OPEN`, inform the user that the PR is already closed/merged and
-exit.
-
-**Local mode** — everything else:
-
-| `$ARGUMENTS` | Detection (string only) | Scope |
-|--------------|-------------------------|-------|
-| (empty) | — | Current branch vs upstream (diff) |
-| Contains `..` (e.g., `abc..def`) | String contains `..` | Diff between two commits (excluding first) |
-| Other | Assume commit hash or file/directory paths | Validated later in 0.3 |
-
-No git commands needed here — just record the raw arguments. Validation (commit
-existence, path existence, upstream detection) happens in 0.3 Scope Preparation.
+Parse `$ARGUMENTS` to determine the review mode:
+- Purely numeric or URL (contains `/`) -> **PR mode**
+- Everything else (empty, commit-like, paths, `..` range) -> **Local mode**
 
 #### User questions
 
@@ -138,9 +117,18 @@ Automated checks — no user interaction.
 
 Validate arguments and fetch the actual diff/content.
 
-**PR mode — working directory & diff**:
+**PR mode**:
 
-1. **Prepare working directory**:
+1. **Fetch PR metadata**:
+   ```
+   gh pr view {number} --json headRefName,baseRefName,headRefOid,state
+   ```
+   Extract: `PR_BRANCH`, `BASE_BRANCH`, `HEAD_SHA`, `STATE`.
+   If the command fails (gh not installed, not authenticated, PR not found, or URL
+   repo mismatch), inform the user and abort.
+   If `STATE` is not `OPEN`, inform the user and exit.
+
+2. **Prepare working directory**:
    - If current branch equals `PR_BRANCH` -> use current directory directly.
    - Otherwise -> create a worktree:
      ```
@@ -150,13 +138,13 @@ Validate arguments and fetch the actual diff/content.
      All subsequent operations use the worktree directory. Record `WORKTREE_DIR` for
      cleanup in Phase 7.
 
-2. **Set review scope**: diff against the PR's base branch (`BASE_BRANCH` from 0.1).
+3. **Set review scope**: diff against `BASE_BRANCH`.
    ```
    git fetch origin {BASE_BRANCH}
    git diff $(git merge-base origin/{BASE_BRANCH} HEAD)
    ```
 
-3. **Fetch existing PR review comments** for de-duplication in Phase 3:
+4. **Fetch existing PR review comments** for de-duplication in Phase 3:
    ```
    gh api repos/{owner}/{repo}/pulls/{number}/comments
    ```
