@@ -17,8 +17,7 @@ controls which risk levels are fixed automatically vs presented for confirmation
 For PR reviews of other people's code, issues are submitted as PR review comments
 instead of direct commits.
 
-Issues that require user judgment — such as test baseline changes or public API
-modifications — always require confirmation regardless of threshold.
+High-risk issues always require user confirmation regardless of threshold.
 
 ## Instructions
 
