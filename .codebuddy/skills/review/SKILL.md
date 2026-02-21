@@ -216,9 +216,12 @@ if those modules are already reviewed, include the material in the next round in
 ## Phase 2: Verification
 
 - **Do not close reviewers yet** (may reuse as fixers in Phase 4)
-- Create independent verifier (`verifier-N`) per review module with issues
-- Verifier reads actual code to confirm each issue. Send results back to the reviewer
-  for second confirmation. If they disagree, team-lead reads code to judge.
+- **Reviewer self-check**: each reviewer re-reads the relevant code and self-verifies
+  every issue they reported, marking each as confirmed or withdrawn.
+- **Independent verification**: create a verifier (`verifier-N`) per review module.
+  The verifier reads actual code to independently confirm each issue.
+- **Alignment**: send verifier results back to the reviewer for comparison with their
+  self-check. If they disagree on any issue, team-lead reads code to judge.
 
 ---
 
