@@ -708,8 +708,8 @@
   <!-- BlurFilter -->
   <xs:complexType name="BlurFilterType">
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="blurX" type="xs:decimal" use="required"/>
-    <xs:attribute name="blurY" type="xs:decimal" use="required"/>
+    <xs:attribute name="blurX" type="xs:decimal" default="0"/>
+    <xs:attribute name="blurY" type="xs:decimal" default="0"/>
     <xs:attribute name="tileMode" type="TileModeType" default="decal"/>
     <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
