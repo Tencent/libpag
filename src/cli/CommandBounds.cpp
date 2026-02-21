@@ -16,15 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "CommandBounds.h"
+#include "cli/CommandBounds.h"
 #include <cstring>
 #include <iostream>
 #include <string>
 #include <vector>
 #include <libxml/parser.h>
 #include <libxml/xpath.h>
-#include "LayerBuilder.h"
-#include "TextLayout.h"
+#include "renderer/LayerBuilder.h"
+#include "renderer/TextLayout.h"
 #include "pagx/PAGXImporter.h"
 #include "tgfx/layers/Layer.h"
 

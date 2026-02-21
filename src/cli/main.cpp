@@ -19,12 +19,12 @@
 #include <cstring>
 #include <iostream>
 #include <string>
-#include "CommandBounds.h"
-#include "CommandFont.h"
-#include "CommandFormat.h"
-#include "CommandOptimize.h"
-#include "CommandRender.h"
-#include "CommandValidator.h"
+#include "cli/CommandBounds.h"
+#include "cli/CommandFont.h"
+#include "cli/CommandFormat.h"
+#include "cli/CommandOptimize.h"
+#include "cli/CommandRender.h"
+#include "cli/CommandValidator.h"
 
 static const char* VERSION = "0.1.0";
 

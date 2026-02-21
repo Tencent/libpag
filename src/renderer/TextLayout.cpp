@@ -22,7 +22,7 @@
 #include "LineBreaker.h"
 #include "PunctuationSquash.h"
 #include "VerticalTextUtils.h"
-#include "utils/Base64.h"
+#include "pagx/utils/Base64.h"
 #include "base/utils/MathUtil.h"
 #include "ToTGFX.h"
 #include "tgfx/core/UTF.h"

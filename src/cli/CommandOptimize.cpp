@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "CommandOptimize.h"
-#include "CommandValidator.h"
+#include "cli/CommandOptimize.h"
+#include "cli/CommandValidator.h"
 #include <algorithm>
 #include <cfloat>
 #include <cmath>

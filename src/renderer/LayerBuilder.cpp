@@ -19,7 +19,7 @@
 #include "LayerBuilder.h"
 #include <tuple>
 #include <unordered_map>
-#include "utils/Base64.h"
+#include "pagx/utils/Base64.h"
 #include "ToTGFX.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"

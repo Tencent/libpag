@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "CommandValidator.h"
+#include "cli/CommandValidator.h"
 #include <cstring>
 #include <iostream>
 #include <string>

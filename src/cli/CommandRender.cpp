@@ -16,15 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "CommandRender.h"
+#include "cli/CommandRender.h"
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <string>
-#include "LayerBuilder.h"
-#include "TextLayout.h"
+#include "renderer/LayerBuilder.h"
+#include "renderer/TextLayout.h"
 #include "pagx/PAGXImporter.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"

@@ -22,10 +22,10 @@
 #include <fstream>
 #include <memory>
 #include <vector>
-#include "utils/Base64.h"
-#include "utils/StringParser.h"
-#include "svg/SVGPathParser.h"
-#include "xml/XMLDOM.h"
+#include "pagx/utils/Base64.h"
+#include "pagx/utils/StringParser.h"
+#include "pagx/svg/SVGPathParser.h"
+#include "pagx/xml/XMLDOM.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"

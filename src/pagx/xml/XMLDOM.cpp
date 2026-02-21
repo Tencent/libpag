@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "XMLDOM.h"
+#include "pagx/xml/XMLDOM.h"
 #include <stack>
 #include <utility>
-#include "XMLParser.h"
+#include "pagx/xml/XMLParser.h"
 
 namespace pagx {
 

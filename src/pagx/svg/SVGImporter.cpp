@@ -21,14 +21,14 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
-#include "utils/StringParser.h"
-#include "SVGPathParser.h"
+#include "pagx/utils/StringParser.h"
+#include "pagx/svg/SVGPathParser.h"
 #include "base/utils/MathUtil.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/SolidColor.h"
-#include "SVGParserContext.h"
-#include "xml/XMLDOM.h"
+#include "pagx/svg/SVGParserContext.h"
+#include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
 
