@@ -314,7 +314,9 @@ if only one), revert it, and send failure info back to the original fixer for re
 (max 2 retries). If still failing, revert and record to `pending-issues.md`. If the
 issue was already in `pending-issues.md` (a retry from Phase 8), revert and ask the
 user: show the failure details and offer options — provide additional context or
-direction for another attempt, or skip this issue. Close all fixers when resolved.
+direction for another attempt, or skip (default). Skipped issues are added to the
+rejected list so they won't be reported again in subsequent rounds. Close all fixers
+when resolved.
 
 ---
 
