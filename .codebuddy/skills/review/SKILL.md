@@ -307,12 +307,7 @@ If there are no deferred issues, skip this phase entirely.
 
 ### Present deferred issues
 
-1. Before the list, briefly explain why these issues need confirmation — they involve
-   design decisions or may change external contracts (e.g., public API changes, test
-   output changes, architecture restructuring, algorithm replacements with multiple
-   viable approaches, new dependencies, persistence format changes).
-
-2. Present deferred issues to the user in a numbered list. Each entry includes:
+1. Present deferred issues to the user in a numbered list. Each entry includes:
    - Issue number
    - File path and line number
    - Brief description (one line)
