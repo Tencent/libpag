@@ -352,8 +352,9 @@ to step 2.
    - Option 3 — "Select individually": present each issue one by one (same as above)
 
 3. **Action depends on mode**:
-   - **Local mode / own PR**: create fixer agents for selected issues -> fix -> validate
-     (same as Phase 4-5). Record any failures to `pending-issues.md`.
+   - **Local mode / own PR**: create a temporary team with fixer agents for selected
+     issues -> fix -> validate (same as Phase 4-5). Record any failures to
+     `pending-issues.md`.
    - **Other's PR**: user selects which to submit as PR review comments using the
      format in `references/pr-comment-format.md`. Comment body should be concise,
      written in the user's conversation language, with a specific fix suggestion.
@@ -363,8 +364,8 @@ to step 2.
 1. Check `pending-issues.md` (issues that failed auto-fix or deferred-fix)
 2. Empty -> proceed to step 3
 3. Has content -> present to user for item-by-item confirmation
-4. Approved fixes -> create agent to re-apply (same fix-validate cycle as Phase 4-5,
-   including retry on failure); rejected -> discard
+4. Approved fixes -> create a temporary team with fixer agents to re-apply (same
+   fix-validate cycle as Phase 4-5, including retry on failure); rejected -> discard
 5. Final build + test (skip for doc-only modules)
 
 ### Step 3: PR mode — push fixes (own PR only)
