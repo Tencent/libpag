@@ -121,9 +121,8 @@ user's choice here.
 
 #### Question 2 — Auto-fix threshold (Local mode only)
 
-Skip in PR mode (PR mode always uses all-confirm with comment output). Inform the
-user: "PR mode: issues will be presented for you to select which ones to submit as
-PR review comments."
+Skip in PR mode. When showing Q1, add a note: "PR mode — issues will be submitted as
+PR review comments after your review."
 
 - Option 1 — "All confirm": no auto-fix, confirm every issue before any change.
 - Option 2 — "Low risk only": auto-fix only fixes with a single correct approach
@@ -148,15 +147,15 @@ Automated checks only — no user interaction.
   parallel. Continue without aborting.
 
 **Test environment**:
-- Skip if PR mode. If the scope is clearly doc-only (e.g., all file extensions are
-  `.md`/`.txt`/`.rst`) or no build/test commands can be determined from context or the
-  codebase, warn the user in the conversation that fix validation will be skipped
-  (fixes are still applied but not automatically verified). Continue without aborting.
+- Skip if PR mode. If the scope appears doc-only based on file extensions
+  (e.g., all `.md`/`.txt`/`.rst`) or no build/test commands can be determined from
+  context or the codebase, warn the user in the conversation that fix validation will
+  be skipped (fixes are still applied but not automatically verified). Continue without
+  aborting.
 
 **Clean branch check**:
-- **PR mode (will use worktree)**: skip — the worktree created in 0.4 will be clean.
-- **PR mode (current branch is PR branch)**: skip — PR mode is read-only (comment
-  output only), no local modifications will be made.
+- **PR mode**: skip — PR mode is read-only (comment output only), no local
+  modifications will be made.
 - **Local mode**: verify not on the main/master branch (abort if so). If there are
   uncommitted changes, abort and ask the user to commit or stash first (fixes may be
   committed even in all-confirm mode after user approval in Phase 7).
@@ -195,11 +194,15 @@ diff, `git show`, commit range diff, or read file contents for full-content revi
 **Local mode — associated PR comments** (optional, best-effort):
 If `gh` is available, check whether the current branch has an open PR:
 ```
-gh pr view --json number,headRefOid,comments 2>/dev/null
+gh pr view --json number,state --jq 'select(.state == "OPEN") | .number' 2>/dev/null
 ```
-If an open PR exists, store its review comments. These are used in Phase 3 as
-reference information — each comment is verified against the actual code to confirm
-the issue still exists before being treated as a known issue to fix.
+If an open PR exists, fetch its line-level review comments:
+```
+gh api repos/{owner}/{repo}/pulls/{number}/comments
+```
+These are used in Phase 3 as reference information — each comment is verified against
+the actual code to confirm the issue still exists before being treated as a known
+issue to fix.
 
 **Empty scope check**: if the diff is empty or the PR has no file changes, inform the
 user that there is nothing to review and exit.
@@ -257,8 +260,8 @@ dedicated `fixer-cross` agent.
   - Simultaneously, create a verifier (`verifier-N`) per review module. The verifier
     receives the reviewer's issue list and reads actual code to independently confirm
     each issue.
-- **Alignment**: send verifier results back to the reviewer for comparison with their
-  self-check. If they disagree on any issue, team-lead reads code to judge.
+- **Alignment**: team-lead collects both the reviewer's self-check results and the
+  verifier's results. If they disagree on any issue, team-lead reads code to judge.
 - After alignment is complete, close all reviewers and verifiers.
 
 ---
@@ -269,6 +272,18 @@ For each confirmed issue, decide whether to fix and assign a risk level. Consult
 `references/judgment-matrix.md` for the full matrix, risk level definitions, and
 special rules.
 
+### De-duplication
+
+- Skip any issue that matches one already fixed, rolled back, recorded to pending, or
+  deferred in a previous round.
+- **PR comment de-duplication** (PR mode): compare each confirmed issue against
+  `EXISTING_PR_COMMENTS`. If an issue matches an existing comment (same file, same
+  general location, same topic), exclude it — do not present it to the user.
+- **Associated PR comment verification** (Local mode with associated PR): for each
+  PR review comment retrieved in 0.4, verify against the current code whether the
+  issue still exists. Verified issues are added to the fix queue as additional known
+  issues (using the same risk assessment flow).
+
 ### Risk level assignment
 
 Assign each fixable issue a risk level (low / medium / high) based on the judgment
@@ -276,27 +291,20 @@ matrix. The user's chosen auto-fix threshold determines handling:
 - Issues at or below the threshold -> queued for auto-fix (Phase 4)
 - Issues above the threshold -> added to the **deferred issue list** (accumulated
   across all rounds, presented to the user only in Phase 7)
-- **PR mode**: all issues are deferred (all-confirm). Skip Phase 4-6 entirely after
-  Phase 3 and go directly to Phase 7.
 
-### Key points
+### Mode-specific routing
 
-- **De-duplication**: skip any issue that matches one already fixed, rolled back, recorded
-  to pending, or deferred in a previous round.
-- **PR comment de-duplication** (PR mode): compare each confirmed issue against
-  `EXISTING_PR_COMMENTS`. If an issue matches an existing comment (same file, same
-  general location, same topic), exclude it from the deferred list — do not present
-  it to the user.
-- **Associated PR comment verification** (Local mode with associated PR): for each
-  PR review comment retrieved in 0.4, verify against the current code whether the
-  issue still exists. Verified issues are added to the fix queue as additional known
-  issues (using the same risk assessment flow).
+- **PR mode**: all issues go to the deferred list. Skip Phase 4-6 and go directly
+  to Phase 7.
+- **Local mode**: if no auto-fix issues remain, proceed to Phase 4 (which will
+  skip to Phase 6 due to empty queue, then Phase 6 terminates to Phase 7).
+
+### Additional checks
+
 - For each fixable issue, check whether the change also requires updates to comments
   or documentation outside the fixer's module — if so, create a follow-up for
   `fixer-cross`.
 - Previously rolled-back issues -> do not attempt again this round
-- If no confirmed issues remain after filtering (all withdrawn, filtered, or
-  de-duplicated), skip Phase 4-6 and proceed directly to Phase 7.
 
 ---
 
@@ -323,9 +331,10 @@ Team-lead collects skipped issues and includes them in the next round's context.
 
 **All pass** (or no code modules to validate) -> close all fixers -> Phase 6.
 
-**Failures**: bisect to locate the bad commit, revert it, and send failure info back
-to the original fixer for retry (max 2 retries). If still failing, revert and record
-to `pending-issues.md`. Close all fixers when resolved.
+**Failures**: identify the failing commit (bisect if multiple commits, direct revert
+if only one), revert it, and send failure info back to the original fixer for retry
+(max 2 retries). If still failing, revert and record to `pending-issues.md`. Close
+all fixers when resolved.
 
 ---
 

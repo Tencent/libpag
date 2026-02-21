@@ -37,7 +37,7 @@ low risk.
 | All confirm    | Confirm  | Confirm     | Confirm   |
 
 **Always confirm regardless of threshold**:
-- Test baseline changes -> record to `pending-issues.md`
+- Test baseline changes -> add to the deferred issue list (presented in Phase 7)
 
 **Confirm unless full auto**:
 - Public API changes and other issues listed as "always confirm" -> in full auto mode
