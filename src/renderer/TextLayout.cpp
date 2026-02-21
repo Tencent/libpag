@@ -1647,6 +1647,9 @@ class TextLayoutContext {
       return;
     }
     auto& lastVG = glyphs.back();
+    if (lastVG.glyphs.empty()) {
+      return;
+    }
     float ls = (lastVG.glyphs.front().sourceText != nullptr)
                    ? lastVG.glyphs.front().sourceText->letterSpacing
                    : 0;
