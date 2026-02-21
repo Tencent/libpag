@@ -8,8 +8,8 @@ description: Commit and push changes, auto-detecting whether to create a new PR 
 Use `/pr` to start, or triggered automatically when the user asks to submit a PR,
 push changes, or create a pull request.
 
-Commits staged/unstaged changes, runs code formatting, pushes to remote, and either
-creates a new PR or appends to an existing one — automatically detected.
+Commits staged/unstaged changes, pushes to remote, and either creates a new PR or
+appends to an existing one — automatically detected.
 
 ## Instructions
 
@@ -55,11 +55,9 @@ for use in Step 2.
 
 ---
 
-## Step 2: Code Formatting
+## Step 2: Stage Files
 
-If `./codeformat.sh` exists, run it (ignore its stderr output).
-
-After formatting, re-stage files according to Step 1:
+Stage files according to the scope determined in Step 1:
 
 | Scope | Action |
 |-------|--------|
@@ -70,8 +68,9 @@ After formatting, re-stage files according to Step 1:
 
 ## Step 3: Generate Commit Message
 
-Read the staged diff (`git diff --cached`) and generate a commit message: English,
-under 120 characters, ending with a period, focusing on user-visible changes.
+Read the staged diff (`git diff --cached`) and generate a commit message following the
+project's commit conventions. If no project-specific convention is found, use a concise
+English message under 120 characters describing the change.
 
 ---
 
@@ -103,11 +102,10 @@ If both are empty, inform user there are no changes and stop.
 
 Based on the full changeset, generate:
 
-- **Branch name**: `feature/{username}_module` or `bugfix/{username}_module`
-  (`{username}` = GitHub login from Step 0, lowercase; module name in snake_case,
-  max two words)
-- **PR title**: English, under 120 characters, ending with a period, focusing on
-  user-visible changes
+- **Branch name**: follow the project's branch naming convention if one exists;
+  otherwise use `feature/{username}_topic` or `bugfix/{username}_topic`
+  (`{username}` = GitHub login from Step 0, lowercase)
+- **PR title**: concise summary of the change, following project conventions if any
 - **PR description**: plain text in the user's conversation language, briefly
   describing what changed and why
 
