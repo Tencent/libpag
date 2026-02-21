@@ -274,7 +274,8 @@ matrix. The user's chosen auto-fix threshold determines handling:
 - **PR mode**: all issues go to the deferred list. Skip Phase 5-7 and go directly
   to Phase 8.
 - **Local mode**: if no auto-fix issues remain, proceed to Phase 5 (which will
-  skip to Phase 7 due to empty queue, then Phase 7 terminates to Phase 8).
+  skip to Phase 7 due to empty queue, then Phase 7 checks for deferred/pending
+  issues: if any -> Phase 8, otherwise -> Phase 9).
 
 ### Additional checks
 
@@ -321,9 +322,11 @@ all fixers when resolved.
 
 ### Termination check
 
-- If no auto-fix issues were found this round, or all auto-fix issues were skipped
-  by fixers (no actual commits produced) -> Phase 8
-- Otherwise -> create new team, back to Phase 2
+- If new auto-fix issues were found and at least one commit was produced
+  -> create new team, back to Phase 2
+- Otherwise (no issues found, or all skipped by fixers):
+  - Deferred list or `pending-issues.md` has entries -> Phase 8
+  - Both empty -> Phase 9
 
 ### Next round context
 
