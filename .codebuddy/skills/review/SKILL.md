@@ -1,16 +1,20 @@
 ---
-name: auto-fix
-description: Multi-round automated code review and fix using Agent Teams. Use when the user invokes /auto-fix to review and fix code or document issues across a branch.
+name: review
+description: Multi-round automated code review and fix using Agent Teams. Use when the user invokes /review to review and fix code or document issues across a branch.
 ---
 
-# Auto-Fix — Automated Code Review & Fix
+# Review — Automated Code Review & Fix
 
 Automatically review, verify, and fix issues in code and documents across your branch.
 Runs multi-round team-based iterations until no valid issues remain.
 
+Two fix modes are available:
+- **Auto-fix**: all confirmed issues are fixed automatically.
+- **Selective fix**: issues are listed for the user to pick which ones to fix by number.
+
 Issues that require user judgment — such as test baseline changes or public API
-modifications — are never auto-fixed. They are collected and presented for explicit
-confirmation in Phase 7.
+modifications — are never auto-fixed in either mode. They are collected and presented
+for explicit confirmation in Phase 7.
 
 ## Instructions
 
@@ -35,7 +39,7 @@ confirmation in Phase 7.
 
 ## Phase 0: Scope Confirmation & Environment Check
 
-### 0.1 Scope & Fix Level Selection
+### 0.1 Scope & Review Level Selection
 
 Parse `$ARGUMENTS` to pre-resolve the review scope:
 
@@ -49,16 +53,16 @@ How to distinguish a commit from a path: run `git rev-parse --verify $ARGUMENTS`
 it succeeds, treat it as a commit; otherwise treat it as a file/directory path (verify
 it exists). If neither resolves, report the error and abort.
 
-If scope is already resolved, report it and only ask the fix level. Otherwise ask both
-questions together in a single interaction.
+If scope is already resolved, report it and only ask the review level. Otherwise ask
+both questions together in a single interaction.
 
 **Question 1 — Review scope** (skip if already resolved from `$ARGUMENTS`):
 - Option 1 — "Current branch vs main": use the diff between current branch and main
 - The "Other" free-text option allows the user to type a base commit (hash or ref) or
   a folder/file path directly. Validate the input the same way as `$ARGUMENTS` parsing.
 
-**Question 2 — Fix level** (option labels should be concise, use descriptions to explain
-the incremental scope of each level):
+**Question 2 — Review level** (option labels should be concise, use descriptions to
+explain the incremental scope of each level):
 - Option 1 — "Correctness & Safety only": logic bugs, security vulnerabilities,
   resource leaks, memory safety, thread safety
 - Option 2 — "Correctness & Safety + Refactoring": adds performance optimization,
@@ -66,16 +70,29 @@ the incremental scope of each level):
   regression risk
 - Option 3 — "All": adds coding conventions, documentation consistency, accessibility
 
-### 0.2 Clean Branch Check
+### 0.2 Fix Mode Selection
 
-Verify the working tree is clean and not on the main branch:
+Ask the user how they want to handle discovered issues:
+
+**Question 3 — Fix mode**:
+- Option 1 — "Auto-fix": all confirmed issues are fixed automatically, each committed
+  individually for easy rollback
+- Option 2 — "Selective fix": after review, all issues are listed with numbers for the
+  user to choose which ones to fix
+
+### 0.3 Clean Branch Check
+
+**Auto-fix mode**: verify the working tree is clean and not on the main branch:
 - If on the main/master branch, or there are uncommitted changes (staged, unstaged,
-  or untracked), inform the user: "Automated fix requires a clean, non-main branch.
-  Each fix is committed individually for easy rollback and issue tracing."
+  or untracked), inform the user: "Auto-fix requires a clean, non-main branch. Each
+  fix is committed individually for easy rollback and issue tracing."
 - On main -> abort, ask user to create a feature branch first.
 - Uncommitted changes -> ask user whether to commit or stash first. Decline = abort.
 
-### 0.3 Reference Material (doc/mixed modules only)
+**Selective fix mode**: defer this check to Phase 3.5 (only needed if the user chooses
+to fix any issues). Still abort immediately if on the main branch.
+
+### 0.4 Reference Material (doc/mixed modules only)
 
 If the scope contains doc or mixed modules, gather reference material for reviewers:
 
@@ -87,11 +104,11 @@ If the scope contains doc or mixed modules, gather reference material for review
    skip this step if no extra references are needed.
 3. Include all gathered references in the reviewer prompts for doc/mixed modules.
 
-After confirmation, no further user interaction until Phase 7 (but see Mid-Review
-Supplements below). Issues requiring user judgment (test baseline changes, API
-modifications) will be collected and confirmed in Phase 7, not auto-fixed.
+After confirmation, no further user interaction until fix mode interaction point (but
+see Mid-Review Supplements below). Issues requiring user judgment (test baseline
+changes, API modifications) will be collected and confirmed in Phase 7, not auto-fixed.
 
-### 0.4 Environment Verification
+### 0.5 Environment Verification
 
 Run sequentially after scope is confirmed. Abort if any step fails.
 
@@ -107,7 +124,7 @@ Run sequentially after scope is confirmed. Abort if any step fails.
 2. **Build verification** — use the project's build command. Fail = abort.
 3. **Run tests** — use the project's test command. Fail = abort.
 
-### 0.5 Module Partitioning
+### 0.6 Module Partitioning
 
 Partition files in scope into **review modules** for parallel review. The goal is to
 balance workload across reviewers, not to match file boundaries.
@@ -153,12 +170,12 @@ review process. When this happens:
   set environment variable `CODEBUDDY_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
 - One `general-purpose` reviewer agent (`reviewer-N`) per module
 - Reviewer prompt includes:
-  - Module file list + check items for the selected fix level, using the checklist
+  - Module file list + check items for the selected review level, using the checklist
     matching the module type: `references/code-checklist.md` for code modules,
     `references/doc-checklist.md` for doc modules, both for mixed modules
   - **Review scope rule**: reviewers must read entire files for full context, but apply
     different reporting thresholds based on whether code is within the branch diff:
-    - **Code within diff**: report all issues matching the selected fix level (A/B/C)
+    - **Code within diff**: report all issues matching the selected review level (A/B/C)
     - **Code outside diff**: report only Level A (correctness/safety) and Level B
       (refactoring/optimization) issues. Skip Level C (conventions/documentation) for
       unchanged code.
@@ -203,22 +220,54 @@ When all other agents in the batch are done but one has not responded:
 
 ## Phase 3: Filter — Team-Lead Only
 
-Decide which confirmed issues to fix. Consult `references/judgment-matrix.md` for the
-full matrix and special rules.
+Decide which confirmed issues are fixable. Consult `references/judgment-matrix.md` for
+the full matrix and special rules.
 
 Key points:
-- **Public API protection**: obvious bugs = fix; non-bug signature changes = record to
-  `pending-api-changes.md` (see `references/pending-templates.md`)
-- **Cross-module doc impact**: for each fix, identify whether the change affects comments
-  or documentation files outside the fixer's own module. If so, create a follow-up task
-  for `fixer-cross` to update those files after the original fix is committed.
+- **Public API protection**: obvious bugs = fixable; non-bug signature changes = record
+  to `pending-api-changes.md` (see `references/pending-templates.md`)
+- **Cross-module doc impact**: for each fixable issue, identify whether the change
+  affects comments or documentation files outside the fixer's own module. If so, create
+  a follow-up task for `fixer-cross` to update those files after the original fix is
+  committed.
 - Previously rolled-back issues -> do not attempt again
+
+---
+
+## Phase 3.5: Issue Presentation & Fix Confirmation
+
+### Auto-fix mode
+
+Skip this phase — proceed directly to Phase 4 with all fixable issues.
+
+### Selective fix mode
+
+1. Present all confirmed issues to the user in a numbered list. Each entry includes:
+   - Issue number
+   - File path and line number
+   - Brief description (one line)
+   - Severity level (A/B/C)
+
+2. Ask the user which issues to fix. The user can:
+   - Enter issue numbers (e.g., "1,3,5" or "1-5,8")
+   - Enter "all" to fix all issues (equivalent to auto-fix for this round)
+   - Enter "none" or leave empty to skip fixing entirely
+
+3. **Clean branch check** (deferred from 0.3): if the user selected any issues to fix,
+   verify the working tree is clean. Same rules as 0.3 auto-fix mode. If not clean,
+   ask the user to resolve before proceeding.
+
+4. **Environment verification** (if not already done): if Phase 0.5 was deferred for
+   selective mode, run it now before proceeding to Phase 4.
+
+5. If the user chose "none" -> skip Phase 4-5, go directly to Phase 6 termination
+   check (which will end the workflow since there are no fixes to validate).
 
 ---
 
 ## Phase 4: Fix
 
-- Group confirmed issues into **fix modules by file** (see 0.5 fix module rules).
+- Group selected issues into **fix modules by file** (see 0.6 fix module rules).
   If a reviewer already has full context for a file, reuse it as fixer for that file.
 - Cross-file issues -> dedicated `fixer-cross` agent
 - Multi-file renames -> single fixer as atomic task
@@ -270,9 +319,21 @@ Periodically check `git log` for new commits -> no output = stuck -> remind -> r
 ## Phase 6: Loop
 
 - `TeamDelete` to close the team
+
+### Auto-fix mode
+
 - **Termination**: valid issues from Phase 3 = 0 -> Phase 7
 - Otherwise -> create new team, back to Phase 1
 - No round limit — driven by valid issue count
+
+### Selective fix mode
+
+After fixes are validated (or if user chose "none"):
+- Present remaining unfixed issues (if any) and ask: "Would you like to fix any of
+  the remaining issues?"
+- User selects more issues -> back to Phase 3.5 step 3 (clean branch check) then
+  Phase 4
+- User declines -> Phase 7
 
 Next round prompt includes: rollback blacklist, previous fix summary,
 pending file contents (to avoid re-reporting), and prompt adjustments based on
@@ -280,7 +341,7 @@ review quality analysis.
 
 ---
 
-## Phase 7: Final Confirmation
+## Phase 7: Final Report
 
 1. Check `pending-test-updates.md` and `pending-api-changes.md`
 2. Both empty -> output summary report, done
@@ -291,6 +352,7 @@ review quality analysis.
 ### Summary Report
 
 - Total rounds and per-round fix count/type statistics
+- Issues found vs issues fixed (selective mode: also show issues the user declined)
 - Rolled-back issues and reasons
 - Pending items and their resolution
 - Final test result
@@ -305,11 +367,11 @@ Solution: Run `/config` -> `[Experimental] Agent Teams` -> `true`.
 
 ### Build or test fails in Phase 0
 Cause: Pre-existing issues in the codebase.
-Solution: Fix build/test failures before running `/auto-fix`.
+Solution: Fix build/test failures before running `/review`.
 
 ### Reviewer reports no issues but code has problems
-Cause: Fix level too restrictive or reviewer prompt insufficient.
-Solution: Re-run with a higher fix level. Team-lead will also auto-adjust prompts in
+Cause: Review level too restrictive or reviewer prompt insufficient.
+Solution: Re-run with a higher review level. Team-lead will also auto-adjust prompts in
 subsequent rounds.
 
 ### Pending items not presented at the end
