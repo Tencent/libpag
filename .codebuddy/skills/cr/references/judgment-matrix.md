@@ -31,13 +31,17 @@ low risk.
 
 | User threshold | Low risk | Medium risk | High risk |
 |----------------|----------|-------------|-----------|
-| Low only | Auto-fix | Confirm | Confirm |
-| Low + Medium | Auto-fix | Auto-fix | Confirm |
-| All confirm | Confirm | Confirm | Confirm |
+| Full auto      | Auto-fix | Auto-fix    | Auto-fix  |
+| Low + Medium   | Auto-fix | Auto-fix    | Confirm   |
+| Low only       | Auto-fix | Confirm     | Confirm   |
+| All confirm    | Confirm  | Confirm     | Confirm   |
 
 **Always confirm regardless of threshold**:
-- Public API changes, test baseline changes, and any other issues that always require
-  confirmation -> record to `pending-issues.md`
+- Test baseline changes -> record to `pending-issues.md`
+
+**Confirm unless full auto**:
+- Public API changes and other issues listed as "always confirm" -> in full auto mode
+  the team-lead decides autonomously; in all other modes these require confirmation
 
 ## Code Modules
 
