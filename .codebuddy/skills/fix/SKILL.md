@@ -70,29 +70,16 @@ You (the team-lead) orchestrate the entire workflow. Critical constraints:
 
 ---
 
-## Phase 0: Environment Check & Scope Confirmation
+## Phase 0: Scope Confirmation & Environment Check
 
-### 0.1 Environment Pre-check
+### 0.1 Clean Branch Check
 
-Run sequentially. Abort if any fails.
-
-1. **Clean branch check** — verify the working tree is clean and not on the main branch:
-   - If on the main/master branch, or there are uncommitted changes (staged, unstaged,
-     or untracked), inform the user: "Automated fix requires a clean, non-main branch.
-     Each fix is committed individually for easy rollback and issue tracing."
-   - On main -> abort, ask user to create a feature branch first.
-   - Uncommitted changes -> ask user whether to commit or stash first. Decline = abort.
-2. **Automated test detection** — check whether the project has a usable test suite:
-   - If the project's rules loaded in context already describe build/test commands, use
-     those directly and skip exploration.
-   - Otherwise, explore the codebase to identify the test framework and run commands
-     (look for test directories, CMakeLists.txt test targets, package.json test scripts,
-     Makefile test targets, etc.).
-   - If no automated tests are found, warn the user: without tests, Phase 5 validation
-     cannot verify fix correctness, and results may be unreliable. Ask the user whether
-     to continue (review + fix without validation) or abort.
-3. Build verification — use the project's build command. Fail = abort.
-4. Run tests — use the project's test command. Fail = abort.
+Verify the working tree is clean and not on the main branch:
+- If on the main/master branch, or there are uncommitted changes (staged, unstaged,
+  or untracked), inform the user: "Automated fix requires a clean, non-main branch.
+  Each fix is committed individually for easy rollback and issue tracing."
+- On main -> abort, ask user to create a feature branch first.
+- Uncommitted changes -> ask user whether to commit or stash first. Decline = abort.
 
 ### 0.2 Scope & Fix Level Selection
 
@@ -128,7 +115,23 @@ If the scope contains doc or mixed modules, gather reference material for review
 After confirmation, no further user interaction until Phase 7 (but see Mid-Review
 Supplements below).
 
-### 0.4 Module Partitioning
+### 0.4 Environment Verification
+
+Run sequentially after scope is confirmed. Abort if any step fails.
+
+1. **Automated test detection** — check whether the project has a usable test suite:
+   - If the project's rules loaded in context already describe build/test commands, use
+     those directly and skip exploration.
+   - Otherwise, explore the codebase to identify the test framework and run commands
+     (look for test directories, CMakeLists.txt test targets, package.json test scripts,
+     Makefile test targets, etc.).
+   - If no automated tests are found, warn the user: without tests, Phase 5 validation
+     cannot verify fix correctness, and results may be unreliable. Ask the user whether
+     to continue (review + fix without validation) or abort.
+2. **Build verification** — use the project's build command. Fail = abort.
+3. **Run tests** — use the project's test command. Fail = abort.
+
+### 0.5 Module Partitioning
 
 Partition files in scope into modules for parallel review. Each module should
 be a self-contained logical unit (a class and its implementation, a feature directory,
