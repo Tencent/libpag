@@ -79,11 +79,13 @@ partitioning), all priority levels (A+B+C) are used regardless of the user's cho
 In PR mode, add a note alongside Q1: "PR mode — issues will be submitted as PR
 review comments after your review."
 
+Option 3 should be pre-selected as the default.
+
 - Option 1 — "All confirm": no auto-fix, confirm every issue before any change.
 - Option 2 — "Low risk only": auto-fix only fixes with a single correct approach
   (e.g., null checks, comment typos, naming, `reserve`). Confirm anything whose
   impact extends beyond the immediate locality.
-- Option 3 — "Low + Medium risk (recommended, default)": auto-fix unambiguous fixes
+- Option 3 — "Low + Medium risk (recommended)": auto-fix unambiguous fixes
   and clear cross-location refactors (e.g., null checks, naming, extract shared logic,
   remove unused internals). Confirm high-risk issues.
 - Option 4 — "Full auto (risky)": auto-fix all risk levels, autonomously deciding
