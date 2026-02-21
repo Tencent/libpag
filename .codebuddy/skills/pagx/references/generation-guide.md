@@ -536,7 +536,6 @@ These attributes have **no default** and cause parsing errors if omitted:
 | `RadialGradient` | `radius` |
 | `DiamondGradient` | `radius` |
 | `ColorStop` | `offset`, `color` |
-| `BlurFilter` | `blurX`, `blurY` |
 | `BlendFilter` | `color` |
 | `ColorMatrixFilter` | `matrix` |
 | `Path` | `data` |

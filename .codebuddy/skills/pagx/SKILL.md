@@ -174,7 +174,6 @@ These have **no default** — omitting them causes parse errors:
 | `ColorStop` | `offset`, `color` |
 | `SolidColor` | `color` |
 | `ImagePattern` | `image` |
-| `BlurFilter` | `blurX`, `blurY` |
 | `BlendFilter` | `color` |
 | `ColorMatrixFilter` | `matrix` |
 | `Path` | `data` |
