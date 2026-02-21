@@ -127,15 +127,3 @@ EOF
 ```
 
 Output the PR URL to the user.
-
----
-
-## Error Handling
-
-- **Push rejected** (remote has new commits): run `git pull --rebase origin
-  {branch}`, then retry push once. If still failing, inform the user.
-- **`gh` not installed or not authenticated**: inform the user to install
-  (`brew install gh` on macOS, or https://cli.github.com) and run
-  `gh auth login`.
-- **PR creation fails**: output the error. The commit and push are already done,
-  so instruct the user to create the PR manually or retry `/pr`.
