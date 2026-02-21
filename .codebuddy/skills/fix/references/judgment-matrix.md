@@ -40,9 +40,6 @@ based on the selected fix level.
 
 ## Special Rules
 
-- Optimizations that may change output semantics (e.g., floating-point precision,
-  ordering): allow the fix, but if tests fail and the cause is a behavior change rather
-  than a bug, revert and record to `pending-test-updates.md` for user confirmation
 - Type narrowing fixes: only change local variables, never function signatures
 - Cross-module renames: assign as an atomic task to a single fixer
 - Issues rolled back in a previous round: **do not attempt again this round**
