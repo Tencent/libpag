@@ -136,10 +136,10 @@ Automated checks only — no user interaction.
   parallel. Continue without aborting.
 
 **Test environment**:
-- Skip if PR mode or doc-only scope. If no build/test commands can be determined
-  from context or the codebase, warn the user in the conversation that fix validation
-  will be skipped (fixes are still applied but not automatically verified). Continue
-  without aborting.
+- Skip if PR mode. If the scope is clearly doc-only (e.g., all file extensions are
+  `.md`/`.txt`/`.rst`) or no build/test commands can be determined from context or the
+  codebase, warn the user in the conversation that fix validation will be skipped
+  (fixes are still applied but not automatically verified). Continue without aborting.
 
 **Clean branch check**:
 - **PR mode (will use worktree)**: skip — the worktree created in 0.4 will be clean.
@@ -323,7 +323,7 @@ to `pending-issues.md`. Close all fixers when resolved.
 
 ## Phase 6: Loop
 
-- Close the team to release all agents.
+- Close the team to release all agents (skip if running in serial mode without a team).
 
 ### Termination check
 
@@ -374,7 +374,8 @@ to step 2.
 3. Has content -> present to user for item-by-item confirmation
 4. Approved fixes -> create a temporary team with fixer agents to re-apply (same
    fix-validate cycle as Phase 4-5, including retry on failure); rejected -> discard
-5. Final build + test (skip for doc-only modules)
+5. Final build + test (skip for doc-only modules or when no build/test commands are
+   available)
 
 ### Step 3: PR mode — worktree cleanup
 
