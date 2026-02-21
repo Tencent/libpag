@@ -215,7 +215,8 @@ dedicated `fixer-cross` agent.
   - Module file list + checklist matching the module type:
     `references/code-checklist.md` for code modules, `references/doc-checklist.md` for
     doc modules, both for mixed modules. Only include priority levels selected by the
-    user (e.g., if user chose "A + B", do not include Priority C items).
+    user (e.g., if user chose "A + B", do not include Priority C items). For doc-only
+    modules, always include all priority levels (A+B+C) regardless of user selection.
   - **Review scope rule**: reviewers must read entire files for full context, but apply
     different reporting thresholds based on scope type:
     - **Diff-based scope** (branch diff, PR, commit, commit range): report issues at
