@@ -39,29 +39,24 @@ code, issues are submitted as PR review comments instead of direct commits.
 
 Parse `$ARGUMENTS` to determine the review mode and scope:
 
-| `$ARGUMENTS` | Detection | Mode |
-|--------------|-----------|------|
-| (empty) | — | **Local** — ask scope below |
-| PR number (e.g., `123`) | `gh pr view` succeeds | **PR** |
-| PR URL | Extract owner/repo/number, verify matches current repo | **PR** |
-| A valid git commit/ref | `git rev-parse --verify` succeeds | **Local** |
-| A file or directory path | Path exists on disk | **Local** |
+| `$ARGUMENTS` | Detection | Mode | Scope |
+|--------------|-----------|------|-------|
+| (empty) | — | **Local** | Current branch vs upstream (diff) |
+| PR number (e.g., `123`) | `gh pr view` succeeds | **PR** | PR diff vs base branch |
+| PR URL | Extract owner/repo/number, verify | **PR** | PR diff vs base branch |
+| Single commit (e.g., `abc123`) | `git rev-parse --verify` succeeds | **Local** | That commit's changes (`git show`) |
+| Commit range (e.g., `abc..def`) | Both endpoints valid | **Local** | Diff between two commits |
+| File or directory path | Path exists on disk | **Local** | Full content review (no diff) |
+
+**Ambiguity**: if the argument could be both a PR number and a commit ref, try
+`gh pr view` first — if it succeeds, treat as PR.
 
 **PR URL mismatch**: if the URL's owner/repo does not match the current repository
 (`gh repo view --json nameWithOwner -q '.nameWithOwner'`), abort and ask the user to
 run `/review` from the correct repository.
 
-**Ambiguity**: if the argument could be both a PR number and a commit ref, try
-`gh pr view` first — if it succeeds, treat as PR.
-
-#### Local mode scope
-
-If scope is not yet determined (empty `$ARGUMENTS`), ask the user:
-
-**Question 1 — Review scope** (skip if already resolved):
-- Option 1 — "Current branch vs main": use the diff between current branch and main
-- The "Other" free-text option allows the user to type a base commit (hash or ref) or
-  a folder/file path directly. Validate the input the same way as `$ARGUMENTS` parsing.
+**Empty arguments (default)**: use the current branch's upstream tracking branch as the
+base. If no upstream is configured, fall back to `main` (or `master`).
 
 #### PR mode setup
 
@@ -93,13 +88,23 @@ If scope is not yet determined (empty `$ARGUMENTS`), ask the user:
    ```
    Include in reviewer prompts so they avoid re-reporting already-discussed issues.
 
-6. **Set review scope**: diff between `origin/main` and `HEAD` in the PR branch.
+6. **Set review scope**: diff between base branch and `HEAD` in the PR branch.
    ```
    git fetch origin main
    git diff $(git merge-base origin/main HEAD)
    ```
 
-### 0.2 Auto-Fix Threshold Selection
+### 0.2 Review Priority Level
+
+Skip this question if the scope contains **only** document files (doc modules use their
+full checklist automatically).
+
+**Question 1 — Review priority**:
+- Option 1 — "Priority A only": correctness and safety issues
+- Option 2 — "Priority A + B": also include refactoring and optimization
+- Option 3 — "All (A + B + C)": also include conventions and documentation
+
+### 0.3 Auto-Fix Threshold Selection
 
 The available options depend on code ownership:
 
@@ -119,7 +124,7 @@ Threshold is automatically set to **all confirm** with PR comment output. Inform
 user: "This is someone else's PR. Issues will be presented for you to select which ones
 to submit as PR review comments."
 
-### 0.3 Clean Branch Check
+### 0.4 Clean Branch Check
 
 **PR mode (worktree)**: skip — the worktree is always clean.
 
@@ -137,7 +142,7 @@ tree is clean and not on the main branch:
 **Local mode, all confirm**: defer this check to Phase 3.5 (only needed if the user
 chooses to fix any issues). Still abort immediately if on the main branch.
 
-### 0.4 Reference Material (doc/mixed modules only)
+### 0.5 Reference Material (doc/mixed modules only)
 
 If the scope contains doc or mixed modules, gather reference material for reviewers:
 
@@ -164,7 +169,7 @@ the user selects issues to fix).
 2. **Build baseline**: run the project's build command. Fail = abort.
 3. **Test baseline**: run the project's test command. Fail = abort.
 
-### 0.5 Module Partitioning
+### 0.6 Module Partitioning
 
 Partition files in scope into **review modules** for parallel review. The goal is to
 balance workload across reviewers, not to match file boundaries.
@@ -210,15 +215,17 @@ review process. When this happens:
   set environment variable `CODEBUDDY_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
 - One `general-purpose` reviewer agent (`reviewer-N`) per module
 - Reviewer prompt includes:
-  - Module file list + full checklist matching the module type:
+  - Module file list + checklist matching the module type:
     `references/code-checklist.md` for code modules, `references/doc-checklist.md` for
-    doc modules, both for mixed modules. All priority levels (A/B/C) are checked.
+    doc modules, both for mixed modules. Only include priority levels selected by the
+    user (e.g., if user chose "A + B", do not include Priority C items).
   - **Review scope rule**: reviewers must read entire files for full context, but apply
-    different reporting thresholds based on whether code is within the branch diff:
-    - **Code within diff**: report all issues (Priority A, B, and C)
-    - **Code outside diff**: report only Priority A (correctness/safety) and Priority B
-      (refactoring/optimization) issues. Skip Priority C (conventions/documentation)
-      for unchanged code.
+    different reporting thresholds based on scope type:
+    - **Diff-based scope** (branch diff, PR, commit, commit range): report issues at
+      the selected priority levels for code within the diff. For code outside the diff,
+      only report Priority A issues.
+    - **Full content scope** (file/directory path): report issues at the selected
+      priority levels for all code in the files.
   - **Evidence requirement**: every issue must have a code citation (file:line + snippet)
   - **Exclusion list**: see the exclusion section in the corresponding checklist. Project
     rules loaded in context take priority over the exclusion list.
@@ -302,7 +309,7 @@ If there are no deferred issues, skip this phase entirely.
 
 3. **Action depends on mode**:
    - **Local mode / own PR**: selected issues are added to the fix queue for Phase 4.
-     - **Clean branch check** (if deferred from 0.3): same rules as 0.3.
+     - **Clean branch check** (if deferred from 0.4): same rules as 0.4.
      - **Environment verification** (if not already done): run it now.
    - **Other's PR**: all confirmed issues (regardless of risk level) are presented in
      this list. User selects which to submit as PR review comments (see below), then
@@ -336,7 +343,7 @@ a specific fix suggestion when possible.
 
 ## Phase 4: Fix
 
-- Group selected issues into **fix modules by file** (see 0.5 fix module rules).
+- Group selected issues into **fix modules by file** (see 0.6 fix module rules).
   If a reviewer already has full context for a file, reuse it as fixer for that file.
 - Cross-file issues -> dedicated `fixer-cross` agent
 - Multi-file renames -> single fixer as atomic task
