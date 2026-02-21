@@ -49,14 +49,14 @@ class VerticalTextUtils {
    * Returns the vertical orientation of a Unicode character based on UTR#50 classification.
    * CJK characters are Upright; Latin letters, digits, and Western punctuation are Rotated.
    */
-  static VerticalOrientation getOrientation(int32_t unichar);
+  static VerticalOrientation GetOrientation(int32_t unichar);
 
   /**
    * Returns true if the character needs position offset in vertical text layout. Characters like
    * fullwidth comma, period, and colon occupy the lower-left area in horizontal layout but should
    * appear in the upper-right area in vertical layout.
    */
-  static bool needsPunctuationOffset(int32_t unichar);
+  static bool NeedsPunctuationOffset(int32_t unichar);
 
   /**
    * Returns the position offset for punctuation characters in vertical text layout.
@@ -66,7 +66,7 @@ class VerticalTextUtils {
    * @param outDx Output: horizontal offset (positive = rightward).
    * @param outDy Output: vertical offset (negative = upward).
    */
-  static void getPunctuationOffset(float fontSize, float* outDx, float* outDy);
+  static void GetPunctuationOffset(float fontSize, float* outDx, float* outDy);
 };
 
 }  // namespace pagx
