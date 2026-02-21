@@ -1,9 +1,6 @@
 ---
 name: pr
-description: >-
-  Commit and push changes, then create a new PR or append to an existing one.
-  Use when user says "submit PR", "push changes", "create pull request",
-  "open a PR", or asks to publish their work.
+description: Commit and push changes, then create a new PR or append to an existing one. Use when user says "submit PR", "push changes", "create pull request", "open a PR", or asks to publish their work.
 ---
 
 # PR — Commit & Push
