@@ -335,13 +335,17 @@ rolled back, recorded to pending files, or deferred for user confirmation.
 
 ## Phase 8: Final Report & Cleanup
 
-### Step 1: Deferred issue confirmation
+### Step 1: Remaining issue confirmation
 
-Present all accumulated deferred issues across all rounds. If the list is empty, skip
-to step 2.
+Collect all issues that were not auto-fixed during the loop:
+- **Deferred issues**: above the user's auto-fix threshold (accumulated in Phase 4)
+- **Pending issues**: failed auto-fix or rolled back (recorded in `pending-issues.md`)
+
+Merge both lists, deduplicate, and present to the user. If the merged list is empty,
+skip to step 2.
 
 1. Present issues in a compact numbered list. Each entry should fit on one line:
-   `[number] [file:line] [risk] — [description]`
+   `[number] [file:line] [risk] [source: deferred/failed] — [description]`
 
 2. Interaction depends on issue count:
 
@@ -349,28 +353,20 @@ to step 2.
    First option = fix (or submit as PR comment), second option = skip.
 
    **More than 5 issues**: ask the user for a bulk action:
-   - Option 1 — "Fix all": act on every deferred issue
-   - Option 2 — "Skip all": discard all deferred issues
+   - Option 1 — "Fix all": act on every issue
+   - Option 2 — "Skip all": discard all issues
    - Option 3 — "Select individually": present each issue one by one (same as above)
 
 3. **Action depends on mode**:
-   - **Local mode**: create a temporary team with fixer agents for selected issues ->
-     fix -> validate (same as Phase 5-6). Record any failures to `pending-issues.md`.
+   - **Local mode**: jump back to Phase 5 with the user-approved issues as the fix
+     queue. Phase 5 -> Phase 6 (validate) -> Phase 7 terminates to Phase 8 (no new
+     review-discovered issues means the loop ends). Any failures during this cycle
+     are reported in the final summary (step 3) rather than re-queued.
    - **PR mode**: submit selected issues as PR review comments using the format in
      `references/pr-comment-format.md`. Comment body should be concise, written in the
      user's conversation language, with a specific fix suggestion.
 
-### Step 2: Pending item confirmation
-
-1. Check `pending-issues.md` (issues that failed auto-fix or deferred-fix)
-2. Empty -> proceed to step 3
-3. Has content -> present to user for item-by-item confirmation
-4. Approved fixes -> create a temporary team with fixer agents to re-apply (same
-   fix-validate cycle as Phase 5-6, including retry on failure)); rejected -> discard
-5. Final build + test (skip for doc-only modules or when no build/test commands are
-   available)
-
-### Step 3: PR mode — worktree cleanup
+### Step 2: PR mode — worktree cleanup
 
 If `WORKTREE_DIR` was created, clean up:
 ```
@@ -379,7 +375,7 @@ git worktree remove {WORKTREE_DIR}
 git branch -D pr-{number}
 ```
 
-### Step 4: Summary Report
+### Step 3: Summary Report
 
 - Total rounds and per-round fix count/type statistics
 - Issues found vs issues fixed (also show issues the user declined)
