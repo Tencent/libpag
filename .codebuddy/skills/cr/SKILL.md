@@ -113,12 +113,16 @@ Skip in PR mode (PR mode always uses all-confirm with comment output). Inform th
 user: "PR mode: issues will be presented for you to select which ones to submit as
 PR review comments."
 
-- Option 1 — "Low + Medium risk (recommended)": auto-fix single and multi-location
-  fixes. Confirm API changes, architecture decisions, and algorithm trade-offs.
-- Option 2 — "Low risk only": auto-fix single-location obvious fixes only. Confirm
-  all cross-function changes and above.
-- Option 3 — "Full auto (risky)": auto-fix everything including high-risk changes.
-  Only test baseline changes require confirmation.
+- Option 1 — "Low + Medium risk (recommended)": auto-fix clear fixes including
+  multi-location changes (e.g., extract shared logic, remove unused internals, simplify
+  cross-function control flow). Confirm high-risk decisions (e.g., API signature changes,
+  architecture restructuring, algorithm trade-offs).
+- Option 2 — "Low risk only": auto-fix only unambiguous single-location fixes (e.g.,
+  null checks, comment typos, naming conventions, `reserve`). Confirm everything that
+  crosses function boundaries or above.
+- Option 3 — "Full auto (risky)": team-lead autonomously decides all fixes including
+  high-risk ones (e.g., API changes, architecture decisions). Only test baseline changes
+  require confirmation.
 - Option 4 — "All confirm": no auto-fix, confirm every issue before any change.
 
 After all questions are answered, no further user interaction until Phase 7.
