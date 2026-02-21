@@ -110,8 +110,8 @@ Based on the full changeset, generate:
   (`{username}` = GitHub login from Step 0, lowercase).
 - **PR title**: concise summary following project conventions, or a short
   English sentence if none found.
-- **PR description**: plain text in the user's conversation language, briefly
-  describing what changed and why.
+- **PR description**: plain text (no Markdown formatting) in the user's
+  conversation language, briefly describing what changed and why.
 
 When there is only one commit, the PR title may reuse the commit message.
 
