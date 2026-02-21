@@ -31,6 +31,34 @@
 
 namespace pagx::cli {
 
+static std::string EscapeJson(const std::string& input) {
+  std::string result = {};
+  result.reserve(input.size() + 16);
+  for (char ch : input) {
+    switch (ch) {
+      case '"':
+        result += "\\\"";
+        break;
+      case '\\':
+        result += "\\\\";
+        break;
+      case '\n':
+        result += "\\n";
+        break;
+      case '\r':
+        result += "\\r";
+        break;
+      case '\t':
+        result += "\\t";
+        break;
+      default:
+        result += ch;
+        break;
+    }
+  }
+  return result;
+}
+
 // Parse "family,style" or "family" into separate components.
 static void ParseFontName(const std::string& nameStr, std::string* family, std::string* style) {
   auto commaPos = nameStr.find(',');
@@ -144,8 +172,8 @@ static int RunFontInfo(int argc, char* argv[]) {
   auto metrics = font.getMetrics();
 
   if (options.jsonOutput) {
-    std::cout << "{\"fontFamily\": \"" << typeface->fontFamily() << "\""
-              << ", \"fontStyle\": \"" << typeface->fontStyle() << "\""
+    std::cout << "{\"fontFamily\": \"" << EscapeJson(typeface->fontFamily()) << "\""
+              << ", \"fontStyle\": \"" << EscapeJson(typeface->fontStyle()) << "\""
               << ", \"glyphsCount\": " << typeface->glyphsCount()
               << ", \"unitsPerEm\": " << typeface->unitsPerEm()
               << ", \"hasColor\": " << (typeface->hasColor() ? "true" : "false")
