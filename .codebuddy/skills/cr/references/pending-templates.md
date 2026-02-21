@@ -1,6 +1,6 @@
 # Pending Issue Template
 
-Use this format to record issues deferred for user confirmation.
+Use this format to record issues that failed auto-fix or were rolled back.
 
 ```markdown
 # Pending Issues

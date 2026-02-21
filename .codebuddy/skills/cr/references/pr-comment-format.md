@@ -23,7 +23,7 @@ EOF
 ```
 
 **Field notes**:
-- `commit_id`: use the HEAD SHA of the PR branch (`HEAD_SHA` from Phase 0)
+- `commit_id`: use the HEAD SHA of the PR branch (`HEAD_SHA` from Phase 1)
 - `path`: relative to repository root
 - `line`: the line number in the **new** file (right side of the diff)
 - `side`: always `"RIGHT"`

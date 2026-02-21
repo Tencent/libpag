@@ -18,7 +18,8 @@ Runs multi-round iterations until no valid issues remain.
 - You (the team-lead) **never modify files directly**. Delegate all changes to
   agents. Read code only for arbitration and diagnosis.
 - **Autonomous operation**: between Phase 0 (user confirmation) and Phase 8
-  (remaining issue confirmation), the review-fix loop runs without user interaction.
+  (remaining issue confirmation), the review-fix loop runs without user interaction
+  unless a previously failed issue fails again in Phase 6 (which prompts inline).
   Deferred issues accumulate across rounds and are only presented to the user in
   Phase 8.
 - All user-facing interactions must use the language the user has been using in the
@@ -95,7 +96,8 @@ Option 3 should be pre-selected as the default.
   fix approach for high-risk issues (e.g., API changes, architecture restructuring,
   algorithm trade-offs). Only test baseline changes require confirmation.
 
-After all questions are answered, no further user interaction until Phase 8.
+After all questions are answered, no further user interaction until Phase 8 (except
+when a previously failed issue fails again in Phase 6, which prompts the user inline).
 
 ---
 
@@ -273,9 +275,8 @@ matrix. The user's chosen auto-fix threshold determines handling:
 
 - **PR mode**: all issues go to the deferred list. Skip Phase 5-7. If the deferred
   list is empty -> Phase 9; otherwise -> Phase 8.
-- **Local mode**: if no auto-fix issues remain, proceed to Phase 5 (which will
-  skip to Phase 7 due to empty queue, then Phase 7 checks for deferred/pending
-  issues: if any -> Phase 8, otherwise -> Phase 9).
+- **Local mode**: if no auto-fix issues remain, skip Phase 5-6 and go to Phase 7
+  (which routes to Phase 8 or Phase 9 based on deferred/pending state).
 
 ### Additional checks
 
@@ -392,8 +393,9 @@ git branch -D pr-{number}
 ### Summary Report
 
 - Total rounds and per-round fix count/type statistics
-- Issues found vs issues fixed (also show issues the user declined)
+- Issues found vs issues fixed (also show issues the user declined or skipped)
 - Rolled-back issues and reasons
+- Issues that failed fix repeatedly and were skipped
 - Final test result
 - **PR mode**: list review comments submitted
 - **Local mode with associated PR**: note which issues originated from PR comments
