@@ -5,34 +5,26 @@ description: Multi-round automated code review and fix using Agent Teams.
 
 # Fix — Automated Code Review & Fix
 
+Automatically review, verify, and fix issues in code and documents across your branch.
+Runs multi-round team-based iterations until no valid issues remain.
+
 **Activation**: Only execute this workflow when the user explicitly invokes `/fix`.
 Do NOT auto-trigger for general bug fix requests, code questions, or error discussions.
 
-When the user invokes `/fix`, immediately start executing from Phase 0 below. Do NOT
-ask the user what they want to fix — this is a complete automated workflow that reviews
-the entire branch, not a one-off bug fix tool.
-
 ## Argument Parsing
 
-The user's input after `/fix` is available as `$ARGUMENTS`. Parse it to determine the
-review scope:
+The user's input after `/fix` is available as `$ARGUMENTS`. If provided, parse it to
+determine the review scope before entering Phase 0:
 
 | `$ARGUMENTS` | Scope |
 |--------------|-------|
-| (empty) | Current branch diff vs main (default) |
+| (empty) | Not yet determined — ask in Phase 0.2 |
 | A valid git commit/ref | Current branch diff vs the specified base commit |
 | A file or directory path | All files under the specified folder or the single file |
 
 How to distinguish a commit from a path: run `git rev-parse --verify $ARGUMENTS` — if
 it succeeds, treat it as a commit; otherwise treat it as a file/directory path (verify
 it exists). If neither resolves, report the error and abort.
-
-When scope is resolved from `$ARGUMENTS`, skip Question 1 in Phase 0.2 and only ask
-Question 2 (fix level). Report the resolved scope to the user for confirmation in the
-same interaction.
-
-Automatically review, verify, and fix issues in code and documents across your branch.
-Runs multi-round team-based iterations until no valid issues remain.
 
 ## Prerequisites
 
@@ -104,10 +96,10 @@ Run sequentially. Abort if any fails.
 
 ### 0.2 Scope & Fix Level Selection
 
-If `$ARGUMENTS` is empty, ask both questions. If scope was resolved from the argument,
-report it and only ask the fix level question.
+If `$ARGUMENTS` already resolved the scope, report it and only ask the fix level.
+Otherwise ask both questions together in a single interaction.
 
-**Question 1 — Review scope** (skip if resolved from argument):
+**Question 1 — Review scope** (skip if already resolved from `$ARGUMENTS`):
 - Option 1 — "Current branch vs main": use the diff between current branch and main
 - The "Other" free-text option allows the user to type a base commit (hash or ref) or
   a folder/file path directly. Validate the input the same way as `$ARGUMENTS` parsing.
