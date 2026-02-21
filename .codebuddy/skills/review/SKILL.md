@@ -76,9 +76,9 @@ base. If no upstream is configured, fall back to `main` (or `master`).
 
 2. **Fetch PR metadata** (single API call):
    ```
-   gh pr view {number} --json headRefName,author,headRefOid
+   gh pr view {number} --json headRefName,baseRefName,author,headRefOid
    ```
-   Extract: `PR_BRANCH`, `PR_AUTHOR`, `HEAD_SHA`.
+   Extract: `PR_BRANCH`, `BASE_BRANCH`, `PR_AUTHOR`, `HEAD_SHA`.
 
 3. **Determine code ownership**: compare `PR_AUTHOR` with `gh api user -q '.login'`.
    Store result as `IS_OWN_PR` (true/false).
@@ -99,17 +99,17 @@ base. If no upstream is configured, fall back to `main` (or `master`).
    ```
    Include in reviewer prompts so they avoid re-reporting already-discussed issues.
 
-6. **Set review scope**: fetch the PR's base branch and diff against `HEAD`.
+6. **Set review scope**: diff against the PR's base branch (`BASE_BRANCH` from step 2).
    ```
-   gh pr view {number} --json baseRefName -q '.baseRefName'
-   git fetch origin {baseRefName}
-   git diff $(git merge-base origin/{baseRefName} HEAD)
+   git fetch origin {BASE_BRANCH}
+   git diff $(git merge-base origin/{BASE_BRANCH} HEAD)
    ```
 
 ### 0.2 Review Priority Level
 
-Skip this question if the scope contains **only** document files (doc modules use their
-full checklist automatically). When skipped, all priority levels (A+B+C) are checked.
+Before asking, scan file extensions in scope to determine if it contains **only**
+document files. If so, skip this question (doc modules use their full checklist
+automatically). When skipped, all priority levels (A+B+C) are checked.
 
 **Question 1 — Review priority** (code/mixed modules):
 - Option 1 — "Priority A only": correctness and safety issues
@@ -150,8 +150,8 @@ process begins. Complete all checks before proceeding to module partitioning.
 - **PR mode (current branch is PR branch)**: verify no uncommitted changes. If dirty,
   abort and ask the user to resolve first.
 - **Local mode**: verify not on the main/master branch (abort if so). If there are
-  uncommitted changes and the threshold has auto-fix, abort and ask the user to commit
-  or stash first.
+  uncommitted changes, abort and ask the user to commit or stash first (fixes may be
+  committed even in all-confirm mode after user approval in Phase 3.5).
 
 **Environment verification** (skip for other's PR — no fixes will be committed):
 - Detect build and test commands from project rules or by exploring the codebase.
@@ -221,7 +221,8 @@ if those modules are already reviewed, include the material in the next round in
   - Each reviewer re-reads the relevant code and self-verifies every issue they
     reported, marking each as confirmed or withdrawn.
   - Simultaneously, create a verifier (`verifier-N`) per review module. The verifier
-    reads actual code to independently confirm each issue.
+    receives the reviewer's issue list and reads actual code to independently confirm
+    each issue.
 - **Alignment**: send verifier results back to the reviewer for comparison with their
   self-check. If they disagree on any issue, team-lead reads code to judge.
 
@@ -320,7 +321,7 @@ to `pending-issues.md`. Close all agents when resolved.
 
 ### Termination check
 
-- If no new issues were found in this round (Phase 3 valid issues = 0) -> Phase 7
+- If no issues were actually fixed or queued for fix this round -> Phase 7
 - Otherwise -> create new team, back to Phase 1
 
 ### Next round context
