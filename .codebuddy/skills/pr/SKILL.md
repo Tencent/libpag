@@ -14,9 +14,10 @@ existing one — automatically detected based on branch state.
 - **NEVER** push directly to main/master — always go through PR workflow.
 - All user-facing text must use the language the user has been using in the
   conversation. Do not default to English.
+
 ---
 
-## Step 0: Pre-flight
+## Step 1: Pre-flight
 
 Run these three commands **in parallel** (they are independent):
 
@@ -45,11 +46,11 @@ Store this as `{default_branch}` for use throughout.
 
 ---
 
-## Step 1: Determine Commit Scope
+## Step 2: Stage & Generate Commit Message
 
 Run `git status --porcelain` and inspect the output:
 
-- **No output** → no local changes. Skip to Step 4 (push-only path).
+- **No output** → no local changes. Skip to Step 3 (push-only path).
 - **Both staged and unstaged changes** → ask the user: commit only the staged
   files (**partial**), or stage everything (**full**)?
 - **Otherwise** → **full** (stage everything).
@@ -57,18 +58,7 @@ Run `git status --porcelain` and inspect the output:
 Detection: first column non-space = staged content; second column non-space or
 `??` prefix = unstaged/untracked content.
 
----
-
-## Step 2: Stage Files
-
-| Scope | Action |
-|-------|--------|
-| **Full** | `git add -A` |
-| **Partial** | skip — files are already staged |
-
----
-
-## Step 3: Generate Commit Message
+If **full**: run `git add -A`. If **partial**: skip (files are already staged).
 
 Read the staged diff (`git diff --cached`) and generate a commit message
 following the project's commit conventions. If no convention is found, default
@@ -76,7 +66,7 @@ to a concise English message under 120 characters describing the change.
 
 ---
 
-## Step 4: Commit & Push
+## Step 3: Commit & Push
 
 ### Append mode
 
@@ -92,22 +82,20 @@ Push and output the commit message (if committed) and the existing PR URL.
 
 ### Create mode
 
-#### 1. Analyze full changeset
-
 Gather all changes that will be part of the PR:
 
 - Existing commits: `git log origin/{default_branch}..HEAD --oneline`
-- Current staged diff (from Step 3)
+- Current staged diff (from Step 2)
 
 If both are empty, inform user there are no changes and stop.
 
-#### 2. Generate PR metadata
+#### Generate PR metadata
 
 Based on the full changeset, generate:
 
 - **Branch name**: follow the project's branch naming convention if one exists;
   otherwise use `feature/{username}_topic` or `bugfix/{username}_topic`
-  (`{username}` = GitHub login from Step 0, lowercase).
+  (`{username}` = GitHub login from Step 1, lowercase).
 - **PR title**: concise summary following project conventions, or a short
   English sentence if none found.
 - **PR description**: plain text (no Markdown formatting) in the user's
@@ -115,7 +103,7 @@ Based on the full changeset, generate:
 
 When there is only one commit, the PR title may reuse the commit message.
 
-#### 3. Create branch, commit, and push
+#### Create branch, commit, and push
 
 Create or rename the branch:
 
