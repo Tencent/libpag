@@ -313,10 +313,15 @@ to step 2.
 1. Present issues in a compact numbered list. Each entry should fit on one line:
    `[number] [file:line] [risk] — [description]`
 
-2. Ask the user which issues to act on. The user can:
-   - Enter issue numbers (e.g., "1,3,5" or "1-5,8")
-   - Enter "all" to act on all deferred issues
-   - Enter "none" or leave empty to skip all
+2. Interaction depends on issue count:
+
+   **5 or fewer issues**: present each issue individually with selectable options.
+   First option = fix (or submit as PR comment), second option = skip.
+
+   **More than 5 issues**: ask the user for a bulk action:
+   - Option 1 — "Fix all": act on every deferred issue
+   - Option 2 — "Skip all": discard all deferred issues
+   - Option 3 — "Select individually": present each issue one by one (same as above)
 
 3. **Action depends on mode**:
    - **Local mode / own PR**: create fixer agents for selected issues -> fix -> validate
