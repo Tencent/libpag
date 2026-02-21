@@ -15,6 +15,8 @@ If on the default branch, creates a new branch first.
 - **NEVER** push. This skill only creates local commits.
 - All user-facing text must use the language the user has been using in the
   conversation. Do not default to English.
+- When presenting choices, use interactive dialogs with selectable options
+  rather than plain text.
 
 ---
 

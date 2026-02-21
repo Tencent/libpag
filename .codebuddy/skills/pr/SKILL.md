@@ -14,6 +14,8 @@ existing one — automatically detected based on branch state.
 - **NEVER** push directly to main/master — always go through PR workflow.
 - All user-facing text must use the language the user has been using in the
   conversation. Do not default to English.
+- When presenting choices, use interactive dialogs with selectable options
+  rather than plain text.
 
 ---
 
