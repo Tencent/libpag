@@ -51,20 +51,18 @@ Runs multi-round iterations until no valid issues remain.
 
 ## Phase 0: User Confirmation
 
-**CRITICAL**: Complete ALL questions in this phase and receive user answers BEFORE
-executing ANY operations from Phase 1 or later — regardless of how fast those
-operations are. The ONLY permitted operations before user answers are parsing
-`$ARGUMENTS` for mode detection (pure string parsing, no git/shell commands).
-
-### Mode detection
+### 0.1 Mode detection (pure string parsing, no tools)
 
 Parse `$ARGUMENTS` to determine the review mode:
 - Purely numeric or URL (contains `/`) -> **PR mode**
 - Everything else (empty, commit-like, paths, `..` range) -> **Local mode**
 
-### Questions
+### 0.2 Ask questions
 
-Present all applicable questions in **one interaction**.
+**STOP. Do NOT call any tools (Bash, Read, Glob, Grep, Task, etc.) before receiving
+user answers.** The questions below do not depend on any repository state.
+
+Present all applicable questions in **one AskUserQuestion call**.
 
 #### Question 1 — Review priority
 
@@ -96,7 +94,8 @@ Option 1 should be pre-selected as the default.
 - Option 3 — "All confirm": no auto-fix, confirm every issue before any change.
 - Option 4 — "Full auto (risky)": auto-fix all risk levels, autonomously deciding
   fix approach for high-risk issues (e.g., API changes, architecture restructuring,
-  algorithm trade-offs).
+  algorithm trade-offs). Only issues affecting test baselines are deferred for
+  confirmation.
 
 After all questions are answered, no further user interaction until Phase 8 (except
 when a previously failed issue fails again in Phase 6, which prompts the user inline).
@@ -104,6 +103,9 @@ when a previously failed issue fails again in Phase 6, which prompts the user in
 ---
 
 ## Phase 1: Scope Confirmation & Environment Check
+
+**Prerequisite**: Phase 0 questions have been answered. If not, STOP and return to
+Phase 0.2.
 
 ### 1.1 Pre-flight Checks
 
