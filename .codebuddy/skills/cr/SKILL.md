@@ -271,8 +271,8 @@ matrix. The user's chosen auto-fix threshold determines handling:
 
 ### Mode-specific routing
 
-- **PR mode**: all issues go to the deferred list. Skip Phase 5-7 and go directly
-  to Phase 8.
+- **PR mode**: all issues go to the deferred list. Skip Phase 5-7. If the deferred
+  list is empty -> Phase 9; otherwise -> Phase 8.
 - **Local mode**: if no auto-fix issues remain, proceed to Phase 5 (which will
   skip to Phase 7 due to empty queue, then Phase 7 checks for deferred/pending
   issues: if any -> Phase 8, otherwise -> Phase 9).
