@@ -11,21 +11,6 @@ Runs multi-round team-based iterations until no valid issues remain.
 **Activation**: Only execute this workflow when the user explicitly invokes `/fix`.
 Do NOT auto-trigger for general bug fix requests, code questions, or error discussions.
 
-## Argument Parsing
-
-The user's input after `/fix` is available as `$ARGUMENTS`. If provided, parse it to
-determine the review scope before entering Phase 0:
-
-| `$ARGUMENTS` | Scope |
-|--------------|-------|
-| (empty) | Not yet determined — ask in Phase 0.2 |
-| A valid git commit/ref | Current branch diff vs the specified base commit |
-| A file or directory path | All files under the specified folder or the single file |
-
-How to distinguish a commit from a path: run `git rev-parse --verify $ARGUMENTS` — if
-it succeeds, treat it as a commit; otherwise treat it as a file/directory path (verify
-it exists). If neither resolves, report the error and abort.
-
 ## Prerequisites
 
 This skill requires the **Agent Teams** experimental feature. If not enabled, prompt
@@ -33,6 +18,23 @@ the user to enable it before proceeding:
 
 - Option A: Run `/config`, find `[Experimental] Agent Teams`, toggle to `true`.
 - Option B: Set environment variable `CODEBUDDY_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
+
+## General Rules
+
+- All user-facing interactions must use the language the user has been using in the
+  conversation. Do not default to English.
+- When presenting choices with predefined options, use interactive dialogs with
+  selectable options rather than plain text.
+
+## Team-Lead Responsibilities
+
+You (the team-lead) orchestrate the entire workflow. Critical constraints:
+
+1. **Never modify code files directly.** Delegate all code changes to agents. This
+   prevents context bloat that causes information loss after compression.
+2. **Read code only for arbitration and diagnosis** — never edit.
+3. **Prompt iteration optimization.** After each round, analyze review quality and
+   adjust the next round's reviewer prompts accordingly.
 
 ## References
 
@@ -45,37 +47,24 @@ the user to enable it before proceeding:
 
 ---
 
-## Interaction Language
-
-All user-facing interactions (AskUserQuestion, progress reports, summary reports,
-warnings, and confirmations) must use the language the user has been using in the
-conversation. Do not default to English.
-
-## User Interaction
-
-When presenting choices with predefined options (e.g., scope confirmation, fix level
-selection), use interactive dialogs with selectable options rather than plain text.
-
----
-
-## Team-Lead Responsibilities
-
-You (the team-lead) orchestrate the entire workflow. Critical constraints:
-
-1. **Never modify code files directly.** Delegate all code changes to agents. This
-   prevents context bloat that causes information loss after compression.
-2. **Read code only for arbitration and diagnosis** — never edit.
-3. **Prompt iteration optimization.** After each round, analyze review quality and
-   adjust the next round's reviewer prompts accordingly.
-
----
-
 ## Phase 0: Scope Confirmation & Environment Check
 
 ### 0.1 Scope & Fix Level Selection
 
-If `$ARGUMENTS` already resolved the scope, report it and only ask the fix level.
-Otherwise ask both questions together in a single interaction.
+Parse `$ARGUMENTS` to pre-resolve the review scope:
+
+| `$ARGUMENTS` | Scope |
+|--------------|-------|
+| (empty) | Not yet determined — ask below |
+| A valid git commit/ref | Current branch diff vs the specified base commit |
+| A file or directory path | All files under the specified folder or the single file |
+
+How to distinguish a commit from a path: run `git rev-parse --verify $ARGUMENTS` — if
+it succeeds, treat it as a commit; otherwise treat it as a file/directory path (verify
+it exists). If neither resolves, report the error and abort.
+
+If scope is already resolved, report it and only ask the fix level. Otherwise ask both
+questions together in a single interaction.
 
 **Question 1 — Review scope** (skip if already resolved from `$ARGUMENTS`):
 - Option 1 — "Current branch vs main": use the diff between current branch and main
