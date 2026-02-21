@@ -1,16 +1,17 @@
 ---
 name: review
-description: Multi-round automated code review and fix using Agent Teams. Use when the user invokes /review to review and fix code or document issues across a branch or pull request.
+description: Automated code review and fix for local branches, PRs, commits, and files. Reviews other people's PRs with line-level comments. Supports multi-round iteration with risk-based auto-fix.
 ---
 
 # Review — Automated Code Review & Fix
 
-Automatically review, verify, and fix issues in code and documents across your branch
-or pull request. Runs multi-round team-based iterations until no valid issues remain.
+Use `/review` to start. Accepts a PR number/URL, commit (range), file/directory paths,
+or no argument (current branch vs upstream). See Phase 0.1 for full argument parsing.
 
-Each issue is assigned a risk level. Low-risk issues can be auto-fixed, while
-high-risk issues are presented for user confirmation. For PR reviews of other people's
-code, issues are submitted as PR review comments instead of direct commits.
+Reviews code and documents using Agent Teams. Each issue gets a risk level — low-risk
+issues are auto-fixed, higher-risk issues are presented for user confirmation. For
+other people's PRs, issues are submitted as line-level PR review comments instead of
+direct commits. Runs multi-round iterations until no valid issues remain.
 
 ## Instructions
 
