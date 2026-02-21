@@ -528,7 +528,9 @@ its own Group for painter scope isolation.
 
 ### 4. Omitting Required Attributes
 
-These attributes have **no default** and cause parsing errors if omitted:
+These commonly encountered attributes have **no default** — omitting them causes
+parse errors. For the complete list, see the Required Attributes table in the main
+SKILL.md.
 
 | Element | Required Attributes |
 |---------|---------------------|
