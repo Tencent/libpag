@@ -120,9 +120,9 @@ PR review comments."
 - Option 3 — "Low + Medium risk (recommended, default)": auto-fix unambiguous fixes
   and clear cross-location refactors (e.g., null checks, naming, extract shared logic,
   remove unused internals). Confirm high-risk issues.
-- Option 4 — "Full auto (risky)": auto-fix all risk levels, team-lead autonomously
-  decides fix approach for high-risk issues (e.g., API changes, architecture
-  restructuring, algorithm trade-offs). Only test baseline changes require confirmation.
+- Option 4 — "Full auto (risky)": auto-fix all risk levels, autonomously deciding
+  fix approach for high-risk issues (e.g., API changes, architecture restructuring,
+  algorithm trade-offs). Only test baseline changes require confirmation.
 
 After all questions are answered, no further user interaction until Phase 7.
 
