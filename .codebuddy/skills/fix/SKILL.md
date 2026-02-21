@@ -1,10 +1,7 @@
 ---
 name: fix
 description: >-
-  Multi-round automated code review, verification, and fix workflow.
-  Use when asked to "review and fix code", "audit code quality",
-  "run code review and fix", or "/fix". Supports branch diff, commit diff,
-  or folder-based review scope.
+  (project)
 ---
 
 # Fix — Automated Code Review & Fix Workflow
