@@ -251,8 +251,8 @@ special rules.
 
 ### De-duplication
 
-- Skip any issue that matches one already fixed, rolled back, recorded to pending, or
-  deferred in a previous round.
+- Skip any issue that matches one already fixed, rolled back, recorded to pending,
+  deferred, or **rejected by the user** in a previous round.
 - **PR comment de-duplication** (PR mode): compare each confirmed issue against
   `EXISTING_PR_COMMENTS`. If an issue matches an existing comment (same file, same
   general location, same topic), exclude it — do not present it to the user.
@@ -333,7 +333,8 @@ all fixers when resolved.
 Next round prompt includes: rollback blacklist, previous fix summary,
 pending file contents, and prompt adjustments based on review quality analysis.
 Reviewers must skip all issues already reported in previous rounds — whether fixed,
-rolled back, recorded to pending files, or deferred for user confirmation.
+rolled back, recorded to pending files, deferred for user confirmation, or rejected
+by the user.
 
 ---
 
