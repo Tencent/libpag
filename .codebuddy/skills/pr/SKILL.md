@@ -81,7 +81,7 @@ Based on all commits since {default_branch}, generate:
 - **PR description**: plain text (no Markdown formatting) in the user's
   conversation language, briefly describing what changed and why.
 
-#### Create branch, commit, and push
+#### Create branch and push
 
 If on {default_branch}, create a new branch: `git checkout -b {branch_name}`.
 
