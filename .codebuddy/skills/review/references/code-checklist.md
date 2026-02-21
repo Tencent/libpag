@@ -1,6 +1,8 @@
-# Review Checklist
+# Code Review Checklist
 
-Reviewers load the check items for the selected fix level and all levels below it.
+Reviewers check all items in this checklist. Levels A/B/C indicate review priority —
+start with Level A (highest impact), then B, then C. All levels are always checked.
+
 Test code has reduced review requirements — only focus on obvious implementation errors.
 
 **Language applicability**: Items marked with a language tag (e.g., `[C/C++]`) apply only
@@ -17,9 +19,9 @@ a particular issue type, follow the project rules.
 
 ---
 
-## Level A: Correctness & Safety
+## Priority A: Correctness & Safety
 
-Issues that directly affect runtime behavior. Highest impact.
+Issues that directly affect runtime behavior. Highest impact — review these first.
 
 **A1. Code Correctness**
 - Are function return values / out-parameters correctly set in all branches (including
@@ -79,7 +81,7 @@ Issues that directly affect runtime behavior. Highest impact.
 
 ---
 
-## Level B: Refactoring & Optimization
+## Priority B: Refactoring & Optimization
 
 Improvements to code quality, performance, and maintainability. Medium impact.
 
@@ -138,7 +140,7 @@ Improvements to code quality, performance, and maintainability. Medium impact.
 
 ---
 
-## Level C: Conventions & Documentation
+## Priority C: Conventions & Documentation
 
 Coding standards and documentation consistency. Lower impact on functionality.
 

@@ -8,16 +8,17 @@ description: Multi-round automated code review and fix using Agent Teams. Use wh
 Automatically review, verify, and fix issues in code and documents across your branch
 or pull request. Runs multi-round team-based iterations until no valid issues remain.
 
-Two fix modes are available:
-- **Auto-fix**: all confirmed issues are fixed automatically.
-- **Selective fix**: issues are listed for the user to pick which ones to fix by number.
+Each issue is assessed for risk level. The user chooses an auto-fix threshold that
+controls which risk levels are fixed automatically vs presented for confirmation:
+- **Low risk only**: auto-fix obvious, unambiguous fixes; confirm everything else.
+- **Low + Medium risk**: also auto-fix clear fixes with broader scope.
+- **All confirm**: present every issue for user selection.
 
-For PR reviews of other people's code, fixes are submitted as PR review comments instead
-of direct commits.
+For PR reviews of other people's code, issues are submitted as PR review comments
+instead of direct commits.
 
 Issues that require user judgment — such as test baseline changes or public API
-modifications — are never auto-fixed in either mode. They are collected and presented
-for explicit confirmation in Phase 7.
+modifications — always require confirmation regardless of threshold.
 
 ## Instructions
 
@@ -33,9 +34,9 @@ for explicit confirmation in Phase 7.
 
 | Topic | File |
 |-------|------|
-| Code review checklist (Level A-C + exclusions) | `references/code-checklist.md` |
-| Document review checklist (Level A-C + exclusions) | `references/doc-checklist.md` |
-| Issue filtering judgment matrix | `references/judgment-matrix.md` |
+| Code review checklist (Priority A-C + exclusions) | `references/code-checklist.md` |
+| Document review checklist (Priority A-C + exclusions) | `references/doc-checklist.md` |
+| Issue filtering & risk level judgment matrix | `references/judgment-matrix.md` |
 | Pending file templates | `references/pending-templates.md` |
 
 ---
@@ -106,32 +107,24 @@ If scope is not yet determined (empty `$ARGUMENTS`), ask the user:
    git diff $(git merge-base origin/main HEAD)
    ```
 
-### 0.2 Review Level Selection
+### 0.2 Auto-Fix Threshold Selection
 
-**Question 2 — Review level** (option labels should be concise, use descriptions to
-explain the incremental scope of each level):
-- Option 1 — "Correctness & Safety only": logic bugs, security vulnerabilities,
-  resource leaks, memory safety, thread safety
-- Option 2 — "Correctness & Safety + Refactoring": adds performance optimization,
-  code simplification, architecture improvement, interface usage, test coverage,
-  regression risk
-- Option 3 — "All": adds coding conventions, documentation consistency, accessibility
-
-### 0.3 Fix Mode Selection
-
-The available fix modes depend on code ownership:
+The available options depend on code ownership:
 
 **Own code** (local mode, or PR mode with `IS_OWN_PR = true`):
 
-**Question 3 — Fix mode**:
-- Option 1 — "Auto-fix": all confirmed issues are fixed automatically, each committed
-  individually for easy rollback
-- Option 2 — "Selective fix": after review, all issues are listed with numbers for the
-  user to choose which ones to fix
+**Question 2 — Auto-fix threshold** (option descriptions should explain what each
+threshold means in practice):
+- Option 1 — "Low risk only": auto-fix obvious unambiguous fixes (e.g., null checks,
+  comment typos, naming). Everything else is listed for confirmation.
+- Option 2 — "Low + Medium risk": also auto-fix clear fixes with broader scope (e.g.,
+  cross-function refactoring, removing unused internal methods). Only high-risk issues
+  require confirmation.
+- Option 3 — "All confirm": no auto-fix, every issue is listed for user selection.
 
 **Other's PR** (`IS_OWN_PR = false`):
 
-Fix mode is automatically set to **selective fix** with PR comment output. Inform the
+Threshold is automatically set to **all confirm** with PR comment output. Inform the
 user: "This is someone else's PR. Issues will be presented for you to select which ones
 to submit as PR review comments."
 
@@ -142,14 +135,15 @@ to submit as PR review comments."
 **PR mode (current branch is PR branch)**: verify no uncommitted changes. If dirty,
 ask the user to resolve first.
 
-**Local mode, auto-fix**: verify the working tree is clean and not on the main branch:
+**Local mode, threshold has auto-fix** (low only, or low + medium): verify the working
+tree is clean and not on the main branch:
 - If on the main/master branch, or there are uncommitted changes (staged, unstaged,
   or untracked), inform the user: "Auto-fix requires a clean, non-main branch. Each
   fix is committed individually for easy rollback and issue tracing."
 - On main -> abort, ask user to create a feature branch first.
 - Uncommitted changes -> ask user whether to commit or stash first. Decline = abort.
 
-**Local mode, selective fix**: defer this check to Phase 3.5 (only needed if the user
+**Local mode, all confirm**: defer this check to Phase 3.5 (only needed if the user
 chooses to fix any issues). Still abort immediately if on the main branch.
 
 ### 0.5 Reference Material (doc/mixed modules only)
@@ -230,15 +224,15 @@ review process. When this happens:
   set environment variable `CODEBUDDY_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
 - One `general-purpose` reviewer agent (`reviewer-N`) per module
 - Reviewer prompt includes:
-  - Module file list + check items for the selected review level, using the checklist
-    matching the module type: `references/code-checklist.md` for code modules,
-    `references/doc-checklist.md` for doc modules, both for mixed modules
+  - Module file list + full checklist matching the module type:
+    `references/code-checklist.md` for code modules, `references/doc-checklist.md` for
+    doc modules, both for mixed modules. All priority levels (A/B/C) are checked.
   - **Review scope rule**: reviewers must read entire files for full context, but apply
     different reporting thresholds based on whether code is within the branch diff:
-    - **Code within diff**: report all issues matching the selected review level (A/B/C)
-    - **Code outside diff**: report only Level A (correctness/safety) and Level B
-      (refactoring/optimization) issues. Skip Level C (conventions/documentation) for
-      unchanged code.
+    - **Code within diff**: report all issues (Priority A, B, and C)
+    - **Code outside diff**: report only Priority A (correctness/safety) and Priority B
+      (refactoring/optimization) issues. Skip Priority C (conventions/documentation)
+      for unchanged code.
   - **Evidence requirement**: every issue must have a code citation (file:line + snippet)
   - **Exclusion list**: see the exclusion section in the corresponding checklist. Project
     rules loaded in context take priority over the exclusion list.
@@ -280,14 +274,26 @@ When all other agents in the batch are done but one has not responded:
 
 ---
 
-## Phase 3: Filter — Team-Lead Only
+## Phase 3: Filter & Risk Assessment — Team-Lead Only
 
-Decide which confirmed issues are fixable. Consult `references/judgment-matrix.md` for
-the full matrix and special rules.
+For each confirmed issue, decide whether to fix and assign a risk level. Consult
+`references/judgment-matrix.md` for the full matrix, risk level definitions, and
+special rules.
 
-Key points:
-- **Public API protection**: obvious bugs = fixable; non-bug signature changes = record
-  to `pending-api-changes.md` (see `references/pending-templates.md`)
+### Risk level assignment
+
+Assign each fixable issue a risk level (low / medium / high) based on the judgment
+matrix. The user's chosen auto-fix threshold determines handling:
+- Issues at or below the threshold -> queued for auto-fix (Phase 4)
+- Issues above the threshold -> deferred to Phase 3.5 for user confirmation
+- Public API changes and test baseline changes -> always deferred regardless of
+  threshold
+
+### Key points
+
+- **Public API protection**: obvious bugs = fixable (but always confirm); non-bug
+  signature changes = record to `pending-api-changes.md`
+  (see `references/pending-templates.md`)
 - **Cross-module doc impact**: for each fixable issue, identify whether the change
   affects comments or documentation files outside the fixer's own module. If so, create
   a follow-up task for `fixer-cross` to update those files after the original fix is
@@ -296,35 +302,37 @@ Key points:
 
 ---
 
-## Phase 3.5: Issue Presentation & Fix Confirmation
+## Phase 3.5: Deferred Issue Confirmation
 
-### Auto-fix mode
+This phase handles issues above the user's auto-fix threshold. Issues at or below the
+threshold have already been queued for auto-fix and proceed directly to Phase 4.
 
-Skip this phase — proceed directly to Phase 4 with all fixable issues.
+If there are no deferred issues, skip this phase entirely.
 
-### Selective fix mode
+### Present deferred issues
 
-1. Present all confirmed issues to the user in a numbered list. Each entry includes:
+1. Present deferred issues to the user in a numbered list. Each entry includes:
    - Issue number
    - File path and line number
    - Brief description (one line)
-   - Severity level (A/B/C)
+   - Risk level (low / medium / high)
 
 2. Ask the user which issues to act on. The user can:
    - Enter issue numbers (e.g., "1,3,5" or "1-5,8")
-   - Enter "all" to act on all issues
-   - Enter "none" or leave empty to skip
+   - Enter "all" to act on all deferred issues
+   - Enter "none" or leave empty to skip all deferred issues
 
 3. **Action depends on mode**:
-   - **Local mode / own PR**: selected issues proceed to Phase 4 (fix).
-     - **Clean branch check** (deferred from 0.4): verify the working tree is clean.
-       Same rules as 0.4 auto-fix mode. If not clean, ask user to resolve first.
+   - **Local mode / own PR**: selected issues are added to the fix queue for Phase 4.
+     - **Clean branch check** (if deferred from 0.4): verify the working tree is clean.
+       Same rules as 0.4. If not clean, ask user to resolve first.
      - **Environment verification** (if not already done): run Phase 0.6 now.
-   - **Other's PR**: selected issues are submitted as PR review comments (see below),
-     then skip to Phase 6.
+   - **Other's PR**: selected issues are submitted as PR review comments (see below).
+     Auto-fix queue issues are also submitted as comments (not committed).
+     Then skip to Phase 6.
 
-4. If the user chose "none" -> skip Phase 4-5, go directly to Phase 6 termination
-   check (which will end the workflow since there are no fixes to validate).
+4. If both the auto-fix queue and user selection are empty -> skip Phase 4-5, go
+   directly to Phase 6 termination check.
 
 ### PR Review Comments (other's PR)
 
@@ -404,24 +412,26 @@ Periodically check `git log` for new commits -> no output = stuck -> remind -> r
 
 - `TeamDelete` to close the team
 
-### Auto-fix mode
+### Termination check
 
-- **Termination**: valid issues from Phase 3 = 0 -> Phase 7
+- If no new issues were found in this round (Phase 3 valid issues = 0) -> Phase 7
 - Otherwise -> create new team, back to Phase 1
 - No round limit — driven by valid issue count
 
-### Selective fix mode
+### Remaining deferred issues
 
-After fixes are validated (or if user chose "none"):
-- Present remaining unfixed issues (if any) and ask: "Would you like to fix any of
-  the remaining issues?"
+After fixes are validated, if there are still unresolved deferred issues from Phase 3.5
+(user chose "none" or selected only some):
+- Present remaining issues and ask: "Would you like to fix any of the remaining issues?"
 - User selects more issues -> back to Phase 3.5 step 3 (clean branch check) then
   Phase 4
 - User declines -> Phase 7
 
 Next round prompt includes: rollback blacklist, previous fix summary,
-pending file contents (to avoid re-reporting), and prompt adjustments based on
-review quality analysis.
+pending file contents, **deferred issue list** (issues above threshold that the user
+has not yet acted on), and prompt adjustments based on review quality analysis.
+Reviewers must skip all issues already reported in previous rounds — whether fixed,
+rolled back, recorded to pending files, or still awaiting user confirmation.
 
 ---
 
@@ -476,9 +486,8 @@ Cause: Pre-existing issues in the codebase.
 Solution: Fix build/test failures before running `/review`.
 
 ### Reviewer reports no issues but code has problems
-Cause: Review level too restrictive or reviewer prompt insufficient.
-Solution: Re-run with a higher review level. Team-lead will also auto-adjust prompts in
-subsequent rounds.
+Cause: Reviewer prompt insufficient or issues fall outside the checklist.
+Solution: Re-run `/review`. Team-lead will auto-adjust prompts in subsequent rounds.
 
 ### Pending items not presented at the end
 Cause: No test baseline or API changes were detected.

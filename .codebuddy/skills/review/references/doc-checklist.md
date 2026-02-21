@@ -1,16 +1,17 @@
-# Document Checklist
+# Document Review Checklist
 
-Reviewers load the check items for the selected fix level and all levels below it.
+Reviewers check all items in this checklist. Levels A/B/C indicate review priority —
+start with Level A (highest impact), then B, then C. All levels are always checked.
 
 **Project-specific rules**: Project rules already loaded in the agent's context take
 priority over this generic checklist.
 
 ---
 
-## Level A: Accuracy
+## Priority A: Accuracy
 
 Issues where the document contains incorrect, contradictory, or incomplete information.
-Highest impact.
+Highest impact — review these first.
 
 **A1. Code-Document Consistency**
 - Do described behaviors match the actual code implementation?
@@ -49,7 +50,7 @@ Highest impact.
 
 ---
 
-## Level B: Clarity & Structure
+## Priority B: Clarity & Structure
 
 Improvements to readability, unambiguity, and organization. Medium impact.
 
@@ -81,7 +82,7 @@ Improvements to readability, unambiguity, and organization. Medium impact.
 
 ---
 
-## Level C: Formatting & Style
+## Priority C: Formatting & Style
 
 Polish and stylistic consistency. Lower impact on content quality.
 
