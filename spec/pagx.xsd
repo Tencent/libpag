@@ -749,7 +749,7 @@
   <!-- ColorMatrixFilter -->
   <xs:complexType name="ColorMatrixFilterType">
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="matrix" type="ColorMatrixType" use="required"/>
+    <xs:attribute name="matrix" type="ColorMatrixType"/>
     <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
