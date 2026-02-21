@@ -1209,6 +1209,9 @@ static GlyphRun* parseGlyphRun(const DOMNode* node, PAGXDocument* doc) {
       if (endPtr == ptr) {
         break;
       }
+      if (value < 0 || value > 65535) {
+        break;
+      }
       run->glyphs.push_back(static_cast<uint16_t>(value));
       ptr = endPtr;
     }
