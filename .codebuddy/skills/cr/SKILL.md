@@ -51,8 +51,10 @@ Runs multi-round iterations until no valid issues remain.
 
 ## Phase 0: User Confirmation
 
-Prioritize asking questions before any time-consuming operations (git, gh, diff,
-build, codebase exploration) to minimize user wait time.
+**CRITICAL**: Complete ALL questions in this phase and receive user answers BEFORE
+executing ANY operations from Phase 1 or later — regardless of how fast those
+operations are. The ONLY permitted operations before user answers are parsing
+`$ARGUMENTS` for mode detection (pure string parsing, no git/shell commands).
 
 ### Mode detection
 
@@ -85,7 +87,7 @@ review comments after your review."
 
 Option 1 should be pre-selected as the default.
 
-- Option 1 — "Low + Medium risk": auto-fix unambiguous fixes and clear
+- Option 1 — "Low + Medium risk (recommended)": auto-fix unambiguous fixes and clear
   cross-location refactors (e.g., null checks, naming, extract shared logic,
   remove unused internals). Confirm high-risk issues.
 - Option 2 — "Low risk only": auto-fix only fixes with a single correct approach
