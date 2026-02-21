@@ -364,8 +364,12 @@ bool LineBreaker::IsCJK(int32_t c) {
   if (c >= 0x3200 && c <= 0x32FF) return true;
   // CJK Compatibility
   if (c >= 0x3300 && c <= 0x33FF) return true;
-  // Fullwidth Latin letters and Halfwidth Katakana (Fullwidth Forms)
-  if (c >= 0xFF01 && c <= 0xFF60) return true;
+  // Fullwidth Forms — punctuation only (exclude fullwidth digits 0xFF10-0xFF19, fullwidth Latin
+  // uppercase 0xFF21-0xFF3A, and fullwidth Latin lowercase 0xFF41-0xFF5A)
+  if (c >= 0xFF01 && c <= 0xFF0F) return true;  // fullwidth punctuation (！＂＃＄％＆＇（）＊＋，－．／)
+  if (c >= 0xFF1A && c <= 0xFF20) return true;  // fullwidth punctuation (：；＜＝＞？＠)
+  if (c >= 0xFF3B && c <= 0xFF40) return true;  // fullwidth punctuation (［＼］＾＿｀)
+  if (c >= 0xFF5B && c <= 0xFF60) return true;  // fullwidth punctuation (｛｜｝～｟｠)
   // Halfwidth Katakana
   if (c >= 0xFF65 && c <= 0xFF9F) return true;
   // Yi Syllables and Radicals
