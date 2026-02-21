@@ -119,7 +119,7 @@ Threshold is automatically set to **all confirm** with PR comment output. Inform
 user: "This is someone else's PR. Issues will be presented for you to select which ones
 to submit as PR review comments."
 
-### 0.4 Clean Branch Check
+### 0.3 Clean Branch Check
 
 **PR mode (worktree)**: skip — the worktree is always clean.
 
@@ -137,7 +137,7 @@ tree is clean and not on the main branch:
 **Local mode, all confirm**: defer this check to Phase 3.5 (only needed if the user
 chooses to fix any issues). Still abort immediately if on the main branch.
 
-### 0.5 Reference Material (doc/mixed modules only)
+### 0.4 Reference Material (doc/mixed modules only)
 
 If the scope contains doc or mixed modules, gather reference material for reviewers:
 
@@ -152,23 +152,19 @@ If the scope contains doc or mixed modules, gather reference material for review
 After confirmation, no further user interaction until fix mode interaction point (but
 see Mid-Review Supplements below).
 
-### 0.6 Environment Verification
+### Environment Verification
 
-Run sequentially after scope is confirmed. Abort if any step fails.
+This step runs **before the first fix attempt** — either in Phase 0 (when auto-fix
+threshold guarantees fixes) or deferred to Phase 3.5 (when all-confirm is chosen and
+the user selects issues to fix).
 
-1. **Automated test detection** — check whether the project has a usable test suite:
-   - If the project's rules loaded in context already describe build/test commands, use
-     those directly and skip exploration.
-   - Otherwise, explore the codebase to identify the test framework and run commands
-     (look for test directories, CMakeLists.txt test targets, package.json test scripts,
-     Makefile test targets, etc.).
-   - If no automated tests are found, warn the user: without tests, Phase 5 validation
-     cannot verify fix correctness, and results may be unreliable. Ask the user whether
-     to continue (review + fix without validation) or abort.
-2. **Build verification** — use the project's build command. Fail = abort.
-3. **Run tests** — use the project's test command. Fail = abort.
+1. **Detect build and test commands**: use project rules if available; otherwise explore
+   the codebase. If no automated tests are found, warn the user and ask whether to
+   continue without Phase 5 validation.
+2. **Build baseline**: run the project's build command. Fail = abort.
+3. **Test baseline**: run the project's test command. Fail = abort.
 
-### 0.7 Module Partitioning
+### 0.5 Module Partitioning
 
 Partition files in scope into **review modules** for parallel review. The goal is to
 balance workload across reviewers, not to match file boundaries.
@@ -276,14 +272,9 @@ Assign each fixable issue a risk level (low / medium / high) based on the judgme
 matrix. The user's chosen auto-fix threshold determines handling:
 - Issues at or below the threshold -> queued for auto-fix (Phase 4)
 - Issues above the threshold -> deferred to Phase 3.5 for user confirmation
-- Public API changes and test baseline changes -> always deferred regardless of
-  threshold
 
 ### Key points
 
-- **Public API protection**: obvious bugs = fixable (but always confirm); non-bug
-  signature changes = record to `pending-issues.md`
-  (see `references/pending-templates.md`)
 - **Cross-module doc impact**: for each fixable issue, identify whether the change
   affects comments or documentation files outside the fixer's own module. If so, create
   a follow-up task for `fixer-cross` to update those files after the original fix is
@@ -311,9 +302,8 @@ If there are no deferred issues, skip this phase entirely.
 
 3. **Action depends on mode**:
    - **Local mode / own PR**: selected issues are added to the fix queue for Phase 4.
-     - **Clean branch check** (if deferred from 0.3): verify the working tree is clean.
-       Same rules as 0.3. If not clean, ask user to resolve first.
-     - **Environment verification** (if not already done): run Phase 0.6 now.
+     - **Clean branch check** (if deferred from 0.3): same rules as 0.3.
+     - **Environment verification** (if not already done): run it now.
    - **Other's PR**: all confirmed issues (regardless of risk level) are presented in
      this list. User selects which to submit as PR review comments (see below), then
      skip to Phase 7 (no fix loop for other's PR).
@@ -346,7 +336,7 @@ a specific fix suggestion when possible.
 
 ## Phase 4: Fix
 
-- Group selected issues into **fix modules by file** (see 0.7 fix module rules).
+- Group selected issues into **fix modules by file** (see 0.5 fix module rules).
   If a reviewer already has full context for a file, reuse it as fixer for that file.
 - Cross-file issues -> dedicated `fixer-cross` agent
 - Multi-file renames -> single fixer as atomic task
@@ -474,7 +464,7 @@ Delete pending files after report.
 Cause: Experimental feature not enabled.
 Solution: Run `/config` -> `[Experimental] Agent Teams` -> `true`.
 
-### Build or test fails in Phase 0
+### Build or test fails before fixes begin
 Cause: Pre-existing issues in the codebase.
 Solution: Fix build/test failures before running `/review`.
 
