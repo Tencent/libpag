@@ -83,7 +83,7 @@ class Text : public Element {
 
   /**
    * The text anchor alignment. Controls how text is positioned relative to its origin. Start means
-   * the origin is at the text start, Middle centers the text on the origin, and End places the text
+   * the origin is at the text start, Center centers the text on the origin, and End places the text
    * ending at the origin. Ignored when a TextBox controls the layout. The default value is Start.
    */
   TextAnchor textAnchor = TextAnchor::Start;
