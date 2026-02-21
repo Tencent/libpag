@@ -71,10 +71,10 @@ while a logic bug requiring cross-module restructuring is high risk.
 | Comment / documentation issue | Fix when internal docs are missing or style is inconsistent |
 | Function implementation order | Fix only when clearly inconsistent with header declaration order |
 | Type safety (narrowing / magic numbers) | Only change local variables, never change function signatures |
-| Const correctness | Fix when clearly applicable and low risk |
+| Const correctness | Fix when clearly applicable and no semantic change |
 | File organization | Fix only when clearly inconsistent with project conventions |
 | Accessibility (missing alt / label / keyboard nav) | Fix when semantic HTML or ARIA is clearly missing `[Web]` |
-| Public API signature change (not a bug) | Assess as high risk — handled by the user's auto-fix threshold |
+| Public API signature change (not a bug) | Fix when justified by clear benefit to API consumers |
 | Style preference | **Always skip** |
 
 ## Document Modules
