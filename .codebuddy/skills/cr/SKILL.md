@@ -133,10 +133,9 @@ to submit as PR review comments."
 
 #### Question 3 — Test environment (conditional)
 
-Skip if other's PR or doc-only scope. Detect build and test commands from project
-rules first; if not found, briefly explore the codebase. If no automated build/test
-commands can be determined at all, ask the user: without tests, fix validation cannot
-run — continue anyway?
+Skip if other's PR or doc-only scope. If no build/test commands are available from
+context or the codebase, ask the user: without tests, fix validation cannot run —
+continue anyway?
 
 #### Question 4 — Reference material (doc/mixed modules only)
 
@@ -364,8 +363,8 @@ to step 2.
 1. Check `pending-issues.md` (issues that failed auto-fix or deferred-fix)
 2. Empty -> proceed to step 3
 3. Has content -> present to user for item-by-item confirmation
-4. Approved fixes -> create agent to re-apply (one attempt only; if it fails again,
-   discard the fix and inform the user in the summary); rejected -> discard
+4. Approved fixes -> create agent to re-apply (same fix-validate cycle as Phase 4-5,
+   including retry on failure); rejected -> discard
 5. Final build + test (skip for doc-only modules)
 
 ### Step 3: PR mode — push fixes (own PR only)
