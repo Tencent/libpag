@@ -23,7 +23,7 @@ existing one — automatically detected based on branch state.
    If empty (detached HEAD), ask the user to switch to a branch first and stop.
 2. Then run in parallel:
    - `gh pr list --head {branch} --state open --json number,url` — open PRs
-   - `git config user.name` — username for branch naming
+   - `git config user.name` — username for branch naming (lowercase)
 
 Determine the remote's default branch and store as `{default_branch}`.
 
