@@ -8,9 +8,6 @@ description: Multi-round automated code review and fix using Agent Teams. Use wh
 Automatically review, verify, and fix issues in code and documents across your branch.
 Runs multi-round team-based iterations until no valid issues remain.
 
-**Activation**: Only execute this workflow when the user explicitly invokes `/fix`.
-Do NOT auto-trigger for general bug fix requests, code questions, or error discussions.
-
 ## Instructions
 
 - All user-facing interactions must use the language the user has been using in the
