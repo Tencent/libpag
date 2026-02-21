@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CommandFormat.h"
+#include <cerrno>
+#include <climits>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -252,10 +254,14 @@ int RunFormat(int argc, char* argv[]) {
       continue;
     }
     if (std::strcmp(argv[i], "--indent") == 0 && i + 1 < argc) {
-      indentSpaces = std::atoi(argv[++i]);
-      if (indentSpaces < 0) {
-        indentSpaces = 0;
+      char* endPtr = nullptr;
+      errno = 0;
+      long value = strtol(argv[++i], &endPtr, 10);
+      if (errno != 0 || endPtr == argv[i] || *endPtr != '\0' || value < 0 || value > INT_MAX) {
+        std::cerr << "pagx format: invalid indent value '" << argv[i] << "'\n";
+        return 1;
       }
+      indentSpaces = static_cast<int>(value);
       continue;
     }
     if (argv[i][0] == '-') {
