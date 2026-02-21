@@ -120,9 +120,9 @@ PR review comments."
 - Option 2 — "Low risk only": auto-fix only unambiguous single-location fixes (e.g.,
   null checks, comment typos, naming conventions, `reserve`). Confirm everything that
   crosses function boundaries or above.
-- Option 3 — "Full auto (risky)": team-lead autonomously decides all fixes including
-  high-risk ones (e.g., API changes, architecture decisions). Only test baseline changes
-  require confirmation.
+- Option 3 — "Full auto (risky)": auto-fix all risk levels, team-lead autonomously
+  decides fix approach for high-risk issues. Only test baseline changes require
+  confirmation.
 - Option 4 — "All confirm": no auto-fix, confirm every issue before any change.
 
 After all questions are answered, no further user interaction until Phase 7.
