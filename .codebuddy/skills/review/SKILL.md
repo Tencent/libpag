@@ -1,16 +1,19 @@
 ---
 name: review
-description: Multi-round automated code review and fix using Agent Teams. Use when the user invokes /review to review and fix code or document issues across a branch.
+description: Multi-round automated code review and fix using Agent Teams. Use when the user invokes /review to review and fix code or document issues across a branch or pull request.
 ---
 
 # Review — Automated Code Review & Fix
 
-Automatically review, verify, and fix issues in code and documents across your branch.
-Runs multi-round team-based iterations until no valid issues remain.
+Automatically review, verify, and fix issues in code and documents across your branch
+or pull request. Runs multi-round team-based iterations until no valid issues remain.
 
 Two fix modes are available:
 - **Auto-fix**: all confirmed issues are fixed automatically.
 - **Selective fix**: issues are listed for the user to pick which ones to fix by number.
+
+For PR reviews of other people's code, fixes are submitted as PR review comments instead
+of direct commits.
 
 Issues that require user judgment — such as test baseline changes or public API
 modifications — are never auto-fixed in either mode. They are collected and presented
@@ -39,27 +42,71 @@ for explicit confirmation in Phase 7.
 
 ## Phase 0: Scope Confirmation & Environment Check
 
-### 0.1 Scope & Review Level Selection
+### 0.1 Scope Resolution
 
-Parse `$ARGUMENTS` to pre-resolve the review scope:
+Parse `$ARGUMENTS` to determine the review mode and scope:
 
-| `$ARGUMENTS` | Scope |
-|--------------|-------|
-| (empty) | Not yet determined — ask below |
-| A valid git commit/ref | Current branch diff vs the specified base commit |
-| A file or directory path | All files under the specified folder or the single file |
+| `$ARGUMENTS` | Detection | Mode |
+|--------------|-----------|------|
+| (empty) | — | **Local** — ask scope below |
+| PR number (e.g., `123`) | `gh pr view` succeeds | **PR** |
+| PR URL | Extract owner/repo/number, verify matches current repo | **PR** |
+| A valid git commit/ref | `git rev-parse --verify` succeeds | **Local** |
+| A file or directory path | Path exists on disk | **Local** |
 
-How to distinguish a commit from a path: run `git rev-parse --verify $ARGUMENTS` — if
-it succeeds, treat it as a commit; otherwise treat it as a file/directory path (verify
-it exists). If neither resolves, report the error and abort.
+**PR URL mismatch**: if the URL's owner/repo does not match the current repository
+(`gh repo view --json nameWithOwner -q '.nameWithOwner'`), abort and ask the user to
+run `/review` from the correct repository.
 
-If scope is already resolved, report it and only ask the review level. Otherwise ask
-both questions together in a single interaction.
+**Ambiguity**: if the argument could be both a PR number and a commit ref, try
+`gh pr view` first — if it succeeds, treat as PR.
 
-**Question 1 — Review scope** (skip if already resolved from `$ARGUMENTS`):
+#### Local mode scope
+
+If scope is not yet determined (empty `$ARGUMENTS`), ask the user:
+
+**Question 1 — Review scope** (skip if already resolved):
 - Option 1 — "Current branch vs main": use the diff between current branch and main
 - The "Other" free-text option allows the user to type a base commit (hash or ref) or
   a folder/file path directly. Validate the input the same way as `$ARGUMENTS` parsing.
+
+#### PR mode setup
+
+1. **Verify `gh` is available**: run `gh --version`. If not installed, inform the user
+   (macOS: `brew install gh`, others: https://cli.github.com) and abort.
+
+2. **Fetch PR metadata** (single API call):
+   ```
+   gh pr view {number} --json headRefName,author,headRefOid
+   ```
+   Extract: `PR_BRANCH`, `PR_AUTHOR`, `HEAD_SHA`.
+
+3. **Determine code ownership**: compare `PR_AUTHOR` with `gh api user -q '.login'`.
+   Store result as `IS_OWN_PR` (true/false).
+
+4. **Prepare working directory**:
+   - If current branch equals `PR_BRANCH` -> use current directory directly.
+   - Otherwise -> create a worktree:
+     ```
+     git fetch origin pull/{number}/head:pr-{number}
+     git worktree add /tmp/pr-review-{number} pr-{number}
+     ```
+     All subsequent operations use the worktree directory. Record `WORKTREE_DIR` for
+     cleanup in Phase 7.
+
+5. **Fetch existing PR comments** for reviewer context:
+   ```
+   gh pr view {number} --comments
+   ```
+   Include in reviewer prompts so they avoid re-reporting already-discussed issues.
+
+6. **Set review scope**: diff between `origin/main` and `HEAD` in the PR branch.
+   ```
+   git fetch origin main
+   git diff $(git merge-base origin/main HEAD)
+   ```
+
+### 0.2 Review Level Selection
 
 **Question 2 — Review level** (option labels should be concise, use descriptions to
 explain the incremental scope of each level):
@@ -70,9 +117,11 @@ explain the incremental scope of each level):
   regression risk
 - Option 3 — "All": adds coding conventions, documentation consistency, accessibility
 
-### 0.2 Fix Mode Selection
+### 0.3 Fix Mode Selection
 
-Ask the user how they want to handle discovered issues:
+The available fix modes depend on code ownership:
+
+**Own code** (local mode, or PR mode with `IS_OWN_PR = true`):
 
 **Question 3 — Fix mode**:
 - Option 1 — "Auto-fix": all confirmed issues are fixed automatically, each committed
@@ -80,19 +129,30 @@ Ask the user how they want to handle discovered issues:
 - Option 2 — "Selective fix": after review, all issues are listed with numbers for the
   user to choose which ones to fix
 
-### 0.3 Clean Branch Check
+**Other's PR** (`IS_OWN_PR = false`):
 
-**Auto-fix mode**: verify the working tree is clean and not on the main branch:
+Fix mode is automatically set to **selective fix** with PR comment output. Inform the
+user: "This is someone else's PR. Issues will be presented for you to select which ones
+to submit as PR review comments."
+
+### 0.4 Clean Branch Check
+
+**PR mode (worktree)**: skip — the worktree is always clean.
+
+**PR mode (current branch is PR branch)**: verify no uncommitted changes. If dirty,
+ask the user to resolve first.
+
+**Local mode, auto-fix**: verify the working tree is clean and not on the main branch:
 - If on the main/master branch, or there are uncommitted changes (staged, unstaged,
   or untracked), inform the user: "Auto-fix requires a clean, non-main branch. Each
   fix is committed individually for easy rollback and issue tracing."
 - On main -> abort, ask user to create a feature branch first.
 - Uncommitted changes -> ask user whether to commit or stash first. Decline = abort.
 
-**Selective fix mode**: defer this check to Phase 3.5 (only needed if the user chooses
-to fix any issues). Still abort immediately if on the main branch.
+**Local mode, selective fix**: defer this check to Phase 3.5 (only needed if the user
+chooses to fix any issues). Still abort immediately if on the main branch.
 
-### 0.4 Reference Material (doc/mixed modules only)
+### 0.5 Reference Material (doc/mixed modules only)
 
 If the scope contains doc or mixed modules, gather reference material for reviewers:
 
@@ -108,7 +168,7 @@ After confirmation, no further user interaction until fix mode interaction point
 see Mid-Review Supplements below). Issues requiring user judgment (test baseline
 changes, API modifications) will be collected and confirmed in Phase 7, not auto-fixed.
 
-### 0.5 Environment Verification
+### 0.6 Environment Verification
 
 Run sequentially after scope is confirmed. Abort if any step fails.
 
@@ -124,7 +184,7 @@ Run sequentially after scope is confirmed. Abort if any step fails.
 2. **Build verification** — use the project's build command. Fail = abort.
 3. **Run tests** — use the project's test command. Fail = abort.
 
-### 0.6 Module Partitioning
+### 0.7 Module Partitioning
 
 Partition files in scope into **review modules** for parallel review. The goal is to
 balance workload across reviewers, not to match file boundaries.
@@ -184,6 +244,8 @@ review process. When this happens:
     rules loaded in context take priority over the exclusion list.
   - **Public API protection**: no signature/interface changes unless obvious bug or
     comment issue
+  - **PR context** (PR mode only): include existing PR comments so reviewers avoid
+    re-reporting already-discussed issues
   - Structured output format
 
 ### Stuck Detection
@@ -248,26 +310,48 @@ Skip this phase — proceed directly to Phase 4 with all fixable issues.
    - Brief description (one line)
    - Severity level (A/B/C)
 
-2. Ask the user which issues to fix. The user can:
+2. Ask the user which issues to act on. The user can:
    - Enter issue numbers (e.g., "1,3,5" or "1-5,8")
-   - Enter "all" to fix all issues (equivalent to auto-fix for this round)
-   - Enter "none" or leave empty to skip fixing entirely
+   - Enter "all" to act on all issues
+   - Enter "none" or leave empty to skip
 
-3. **Clean branch check** (deferred from 0.3): if the user selected any issues to fix,
-   verify the working tree is clean. Same rules as 0.3 auto-fix mode. If not clean,
-   ask the user to resolve before proceeding.
+3. **Action depends on mode**:
+   - **Local mode / own PR**: selected issues proceed to Phase 4 (fix).
+     - **Clean branch check** (deferred from 0.4): verify the working tree is clean.
+       Same rules as 0.4 auto-fix mode. If not clean, ask user to resolve first.
+     - **Environment verification** (if not already done): run Phase 0.6 now.
+   - **Other's PR**: selected issues are submitted as PR review comments (see below),
+     then skip to Phase 6.
 
-4. **Environment verification** (if not already done): if Phase 0.5 was deferred for
-   selective mode, run it now before proceeding to Phase 4.
-
-5. If the user chose "none" -> skip Phase 4-5, go directly to Phase 6 termination
+4. If the user chose "none" -> skip Phase 4-5, go directly to Phase 6 termination
    check (which will end the workflow since there are no fixes to validate).
+
+### PR Review Comments (other's PR)
+
+Submit selected issues as a single GitHub PR review with line-level comments. Use
+`gh api` with the reviews endpoint — do not use `gh pr comment` or `gh pr review`:
+
+```
+gh api repos/{owner}/{repo}/pulls/{number}/reviews --input - <<'EOF'
+{
+  "commit_id": "{HEAD_SHA}",
+  "event": "COMMENT",
+  "comments": [
+    {"path": "file/path.cpp", "line": 42, "side": "RIGHT", "body": "description"},
+    ...
+  ]
+}
+EOF
+```
+
+Comment body should be concise, written in the user's conversation language, and include
+a specific fix suggestion when possible.
 
 ---
 
 ## Phase 4: Fix
 
-- Group selected issues into **fix modules by file** (see 0.6 fix module rules).
+- Group selected issues into **fix modules by file** (see 0.7 fix module rules).
   If a reviewer already has full context for a file, reuse it as fixer for that file.
 - Cross-file issues -> dedicated `fixer-cross` agent
 - Multi-file renames -> single fixer as atomic task
@@ -341,13 +425,32 @@ review quality analysis.
 
 ---
 
-## Phase 7: Final Report
+## Phase 7: Final Report & Cleanup
+
+### PR mode: push fixes (own PR only)
+
+If fixes were made in PR mode and `IS_OWN_PR = true`, push all commits to the PR
+branch:
+```
+git push origin HEAD:{PR_BRANCH}
+```
+
+### Pending item confirmation
 
 1. Check `pending-test-updates.md` and `pending-api-changes.md`
-2. Both empty -> output summary report, done
+2. Both empty -> proceed to cleanup
 3. Either has content -> present to user via AskUserQuestion, confirm item by item
 4. Approved fixes -> create agent to re-apply; rejected -> discard
-5. Final build + test -> output summary report, delete pending files
+5. Final build + test
+
+### PR mode: worktree cleanup
+
+If `WORKTREE_DIR` was created, clean up after all operations are complete:
+```
+cd {original_directory}
+git worktree remove {WORKTREE_DIR}
+git branch -D pr-{number}
+```
 
 ### Summary Report
 
@@ -356,6 +459,9 @@ review quality analysis.
 - Rolled-back issues and reasons
 - Pending items and their resolution
 - Final test result
+- **PR mode**: list commits pushed (own PR) or review comments submitted (other's PR)
+
+Delete pending files after report.
 
 ---
 
@@ -383,3 +489,12 @@ Cause: Complex semantic changes or insufficient context.
 Solution: After 2 retries, `fixer-rescue-N` takes over with full error context. If the
 fix is correct but changes behavior, it goes to `pending-test-updates.md` for user
 confirmation.
+
+### PR URL does not match current repository
+Cause: The PR belongs to a different repository.
+Solution: Navigate to the correct repository and run `/review` there.
+
+### gh CLI not installed or not authenticated
+Cause: PR mode requires the GitHub CLI.
+Solution: Install with `brew install gh` (macOS) or see https://cli.github.com, then
+run `gh auth login`.
