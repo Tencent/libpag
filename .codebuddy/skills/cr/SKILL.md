@@ -312,9 +312,9 @@ Team-lead collects skipped issues and includes them in the next round's context.
 **Failures**: identify the failing commit (bisect if multiple commits, direct revert
 if only one), revert it, and send failure info back to the original fixer for retry
 (max 2 retries). If still failing, revert and record to `pending-issues.md`. If the
-issue was already in `pending-issues.md` (a retry from Phase 8), discard it — do not
-record again. It will be reported as unfixable in the Phase 9 summary. Close all
-fixers when resolved.
+issue was already in `pending-issues.md` (a retry from Phase 8), revert and ask the
+user: show the failure details and offer options — provide additional context or
+direction for another attempt, or skip this issue. Close all fixers when resolved.
 
 ---
 
