@@ -31,11 +31,10 @@ Runs multi-round iterations until no valid issues remain.
   agent producing invalid output. Use your judgment: terminate and replace, revert and
   retry, skip and move on, etc. Anything that cannot be resolved automatically should
   be recorded to `PENDING_FILE` for user review in Phase 8.
-- **Unresponsive agent handling**: when closing or sending a shutdown request to an
-  agent, if it does not respond within a reasonable time, do not wait — force-terminate
-  it (e.g., TaskStop) and proceed. Never let an unresponsive agent block the workflow.
-  This applies to all agent shutdown points: verifier cleanup in Phase 3, team
-  shutdown in Phase 7, and any mid-phase termination.
+- **Agent shutdown**: when closing agents (verifiers in Phase 3, team in Phase 7,
+  or mid-phase termination), send the shutdown message and **continue immediately**
+  without waiting for acknowledgment. Do not block the workflow on agent responses.
+  Late replies from already-shutdown agents should be ignored.
 - The user may send additional material (files, URLs, context) at any time. If
   reviewers are still active (Phase 2-3), forward it directly; otherwise include
   the material in the next round.
