@@ -1,11 +1,11 @@
 ---
-name: review
+name: cr
 description: Automated code review and fix for local branches, PRs, commits, and files. Supports multi-round iteration with risk-based auto-fix.
 ---
 
 # Review — Automated Code Review & Fix
 
-Use `/review` to start. Accepts a PR number/URL, commit (range), file/directory paths,
+Use `/cr` to start. Accepts a PR number/URL, commit (range), file/directory paths,
 or no argument (current branch vs upstream). See Phase 0.1 for full argument parsing.
 
 Reviews code and documents using Agent Teams. Each issue gets a risk level — low-risk
@@ -65,7 +65,7 @@ succeeds -> single commit; otherwise -> error.
 
 **PR URL mismatch**: if the URL's owner/repo does not match the current repository
 (`gh repo view --json nameWithOwner -q '.nameWithOwner'`), abort and ask the user to
-run `/review` from the correct repository.
+run `/cr` from the correct repository.
 
 **Empty arguments (default)**: use the current branch's upstream tracking branch as the
 base. If no upstream is configured, fall back to `main` (or `master`).
@@ -376,7 +376,7 @@ Delete pending files after report.
 ## Troubleshooting
 
 ### PR URL does not match current repository
-The PR belongs to a different repository. Run `/review` from the correct repo.
+The PR belongs to a different repository. Run `/cr` from the correct repo.
 
 ### gh CLI not installed or not authenticated
 PR mode requires `gh`. Install with `brew install gh` (macOS) or see
