@@ -5,7 +5,7 @@ alwaysApply: true
 
 ## 编译验证
 
-修改代码后，使用以下命令验证编译。编译前先运行代码格式化（忽略其 stderr 输出）。必须传递 `-DPAG_BUILD_TESTS=ON` 以启用所有模块触发编译。
+修改代码后，使用以下命令验证编译。编译前先运行代码格式化，忽略其 stderr 报错信息（只要运行就会完成格式化）。必须传递 `-DPAG_BUILD_TESTS=ON` 以启用所有模块触发编译。
 
 ```bash
 ./codeformat.sh 2>/dev/null
