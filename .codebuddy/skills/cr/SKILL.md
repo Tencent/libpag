@@ -59,9 +59,10 @@ Parse `$ARGUMENTS` to determine the review mode:
 | Commit range (e.g., `abc..def`) | Contains `..`, both endpoints valid | **Local** | Diff between two commits (excluding first) |
 | File/directory paths (space-separated) | All paths exist on disk | **Local** | Full content review (no diff) |
 
-**Parse order**: contains `..` -> commit range; single arg + `gh pr view` succeeds ->
-PR; all args exist on disk -> file/directory paths; single arg + `git rev-parse`
-succeeds -> single commit; otherwise -> error.
+**Parse order**: contains `..` -> commit range; looks like a URL (contains `/`) ->
+PR URL; single arg + purely numeric -> PR number (`gh pr view`); all args exist on
+disk -> file/directory paths; single arg + `git rev-parse` succeeds -> single commit;
+otherwise -> error.
 
 **PR URL mismatch**: if the URL's owner/repo does not match the current repository
 (`gh repo view --json nameWithOwner -q '.nameWithOwner'`), abort and ask the user to
@@ -70,6 +71,10 @@ run `/cr` from the correct repository.
 **Empty arguments (default)**: use the current branch's upstream tracking branch as the
 base. If no upstream is configured, fall back to `main` (or `master`).
 
+**Empty diff / no changes**: if the resolved scope produces an empty diff (e.g., branch
+is identical to upstream, commit range endpoints are the same), inform the user that
+there is nothing to review and exit.
+
 **PR mode — lightweight metadata** (do not create worktree or fetch diff yet):
 
 1. **Verify `gh` is available**: run `gh --version`. If not installed, inform the user
@@ -77,9 +82,12 @@ base. If no upstream is configured, fall back to `main` (or `master`).
 
 2. **Fetch PR metadata** (single API call):
    ```
-   gh pr view {number} --json headRefName,baseRefName,author,headRefOid,files
+   gh pr view {number} --json headRefName,baseRefName,author,headRefOid,files,state
    ```
-   Extract: `PR_BRANCH`, `BASE_BRANCH`, `PR_AUTHOR`, `HEAD_SHA`, file list.
+   Extract: `PR_BRANCH`, `BASE_BRANCH`, `PR_AUTHOR`, `HEAD_SHA`, file list, `STATE`.
+   If `STATE` is not `OPEN`, inform the user that the PR is already closed/merged and
+   exit.
+   If the file list is empty, inform the user that the PR has no file changes and exit.
 
 3. **Determine code ownership**: compare `PR_AUTHOR` with `gh api user -q '.login'`.
    Store result as `IS_OWN_PR` (true/false).
@@ -125,9 +133,9 @@ to submit as PR review comments."
 
 #### Question 3 — Test environment (conditional)
 
-Skip if other's PR, doc-only scope, or build/test commands are already known from
-project rules. Otherwise, detect build and test commands by exploring the codebase.
-If no automated tests are found, ask the user: without tests, fix validation cannot
+Skip if other's PR or doc-only scope. Detect build and test commands from project
+rules first; if not found, briefly explore the codebase. If no automated build/test
+commands can be determined at all, ask the user: without tests, fix validation cannot
 run — continue anyway?
 
 #### Question 4 — Reference material (doc/mixed modules only)
@@ -266,10 +274,14 @@ matrix. The user's chosen auto-fix threshold determines handling:
 
 ### Key points
 
+- **De-duplication**: skip any issue that matches one already fixed, rolled back, recorded
+  to pending, or deferred in a previous round.
 - For each fixable issue, check whether the change also requires updates to comments
   or documentation outside the fixer's module — if so, create a follow-up for
   `fixer-cross`.
 - Previously rolled-back issues -> do not attempt again this round
+- If no confirmed issues remain after filtering (all withdrawn, filtered, or
+  de-duplicated), skip Phase 4-6 and proceed directly to Phase 7.
 
 ---
 
@@ -352,7 +364,8 @@ to step 2.
 1. Check `pending-issues.md` (issues that failed auto-fix or deferred-fix)
 2. Empty -> proceed to step 3
 3. Has content -> present to user for item-by-item confirmation
-4. Approved fixes -> create agent to re-apply; rejected -> discard
+4. Approved fixes -> create agent to re-apply (one attempt only; if it fails again,
+   discard the fix and inform the user in the summary); rejected -> discard
 5. Final build + test (skip for doc-only modules)
 
 ### Step 3: PR mode — push fixes (own PR only)
