@@ -56,7 +56,8 @@ Runs multi-round iterations until no valid issues remain.
 
 ### 0.1 Argument Parsing & Mode Detection
 
-Parse `$ARGUMENTS` to determine the review mode:
+Parse `$ARGUMENTS` to determine the review mode. **This step only identifies the mode
+and scope type — do NOT fetch diffs, read code, or perform any analysis.**
 
 | `$ARGUMENTS` | Detection | Mode | Scope |
 |--------------|-----------|------|-------|
@@ -92,14 +93,15 @@ base. If no upstream is configured, fall back to `main` (or `master`).
    If `STATE` is not `OPEN`, inform the user that the PR is already closed/merged and
    exit.
 
-**Local mode**: no exploration needed at this point. Proceed directly to 0.2.
+**Local mode**: only determine the mode and scope type from arguments. Do NOT fetch
+any diff or read any files. Proceed directly to 0.2.
 
 ### 0.2 User Questions
 
-Ask all user-facing questions **immediately after mode detection**, before any heavy
-operations (worktree, diff, build, codebase exploration). Present all applicable
-questions together in one interaction. Do not read code or explore the codebase
-before asking.
+**CRITICAL**: Ask all user-facing questions **immediately after 0.1**, before ANY
+other operation. Do NOT run `git diff`, `git log`, `git show`, read files, explore
+the codebase, create worktrees, or perform any analysis before these questions are
+answered. Present all applicable questions together in one interaction.
 
 #### Question 1 — Review priority
 
