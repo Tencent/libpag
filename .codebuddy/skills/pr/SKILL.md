@@ -1,6 +1,6 @@
 ---
 name: pr
-description: Commit and push changes, then create a new PR or append to an existing one. Use when user says "submit PR", "push changes", "create pull request", "open a PR", or "send code for review".
+description: Commit and push changes, then create a new PR or append to an existing one. Use when user says "submit PR", "push changes", "create pull request", or "open a PR".
 ---
 
 # PR — Commit & Push
@@ -14,9 +14,6 @@ existing one — automatically detected based on branch state.
 - **NEVER** push directly to main/master — always go through PR workflow.
 - All user-facing text must use the language the user has been using in the
   conversation. Do not default to English.
-- `$ARGUMENTS` is treated as the commit message when provided. Skip commit
-  message generation (Step 3) and use the argument verbatim.
-
 ---
 
 ## Step 0: Pre-flight
@@ -72,8 +69,6 @@ Detection: first column non-space = staged content; second column non-space or
 ---
 
 ## Step 3: Generate Commit Message
-
-Skip this step if `$ARGUMENTS` was provided (use it as the commit message).
 
 Read the staged diff (`git diff --cached`) and generate a commit message
 following the project's commit conventions. If no convention is found, default
