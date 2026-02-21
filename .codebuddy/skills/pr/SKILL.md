@@ -49,7 +49,7 @@ Store this as `{default_branch}` for use throughout.
 
 Run `git status --porcelain` and inspect the output:
 
-- **No output** → no local changes. Skip to Step 3 (push-only path).
+- **No output** → no local changes. Skip to Step 3.
 - **Both staged and unstaged changes** → ask the user: commit only the staged
   files (**partial**), or stage everything (**full**)?
 - **Otherwise** → **full** (stage everything).
@@ -92,9 +92,10 @@ If both are empty, inform user there are no changes and stop.
 
 Based on the full changeset, generate:
 
-- **Branch name**: follow the project's branch naming convention if one exists;
-  otherwise use `feature/{username}_topic` or `bugfix/{username}_topic`
-  (`{username}` = GitHub login from Step 1, lowercase).
+- **Branch name** (only when on {default_branch}): follow the project's branch
+  naming convention if one exists; otherwise use `feature/{username}_topic` or
+  `bugfix/{username}_topic` (`{username}` = GitHub login from Step 1, lowercase).
+  When on a non-default branch, skip — use the current branch name.
 - **PR title**: concise summary following project conventions, or a short
   English sentence if none found.
 - **PR description**: plain text (no Markdown formatting) in the user's
@@ -105,7 +106,6 @@ When there is only one commit, the PR title may reuse the commit message.
 #### Create branch, commit, and push
 
 If on {default_branch}, create a new branch: `git checkout -b {branch_name}`.
-Otherwise, use the current branch name as-is.
 
 Commit (if there is staged content), push, and create the PR:
 
