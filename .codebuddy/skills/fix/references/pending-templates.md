@@ -2,7 +2,7 @@
 
 ## pending-test-updates.md
 
-Use this format when a fix is confirmed correct but changes expected test output.
+Use this format when a fix is confirmed correct but alters expected test output.
 
 ```markdown
 # Pending Test-Impact Fixes
