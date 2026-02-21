@@ -1538,25 +1538,24 @@ class TextLayoutContext {
       // UAX#9 L2: reorder glyphs from logical order to visual order for rendering.
       // Reverse contiguous runs of glyphs whose bidi level >= current level, starting from the
       // maximum level down to 1. After reordering, recalculate xPosition for each glyph.
-      uint8_t maxLevel = 0;
-      for (auto& g : line.glyphs) {
-        if (g.bidiLevel > maxLevel) {
-          maxLevel = g.bidiLevel;
+      auto visualGlyphs = line.glyphs;
+      {
+        uint8_t maxLevel = 0;
+        for (auto& g : visualGlyphs) {
+          if (g.bidiLevel > maxLevel) {
+            maxLevel = g.bidiLevel;
+          }
         }
-      }
-      std::vector<GlyphInfo> reorderedGlyphs = {};
-      if (maxLevel > 0) {
-        reorderedGlyphs = line.glyphs;
         for (uint8_t level = maxLevel; level > 0; level--) {
           size_t idx = 0;
-          while (idx < reorderedGlyphs.size()) {
-            if (reorderedGlyphs[idx].bidiLevel >= level) {
+          while (idx < visualGlyphs.size()) {
+            if (visualGlyphs[idx].bidiLevel >= level) {
               size_t start = idx;
-              while (idx < reorderedGlyphs.size() && reorderedGlyphs[idx].bidiLevel >= level) {
+              while (idx < visualGlyphs.size() && visualGlyphs[idx].bidiLevel >= level) {
                 idx++;
               }
-              std::reverse(reorderedGlyphs.begin() + static_cast<ptrdiff_t>(start),
-                           reorderedGlyphs.begin() + static_cast<ptrdiff_t>(idx));
+              std::reverse(visualGlyphs.begin() + static_cast<ptrdiff_t>(start),
+                           visualGlyphs.begin() + static_cast<ptrdiff_t>(idx));
             } else {
               idx++;
             }
@@ -1564,23 +1563,21 @@ class TextLayoutContext {
         }
         // Recalculate xPosition after visual reordering.
         float xPos = 0;
-        for (auto& g : reorderedGlyphs) {
+        for (auto& g : visualGlyphs) {
           g.xPosition = xPos;
           float letterSpacing =
               (g.sourceText != nullptr) ? g.sourceText->letterSpacing : 0;
           xPos += g.advance + letterSpacing;
         }
         // Remove trailing letterSpacing.
-        bool hasLetterSpacing = !reorderedGlyphs.empty() &&
-                                reorderedGlyphs[0].sourceText != nullptr &&
-                                reorderedGlyphs[0].sourceText->letterSpacing != 0;
+        bool hasLetterSpacing = !visualGlyphs.empty() && visualGlyphs[0].sourceText != nullptr &&
+                                visualGlyphs[0].sourceText->letterSpacing != 0;
         if (hasLetterSpacing && xPos > 0) {
-          xPos -= reorderedGlyphs[0].sourceText->letterSpacing;
+          xPos -= visualGlyphs[0].sourceText->letterSpacing;
         }
       }
-      const auto& visualGlyphs = (maxLevel > 0) ? reorderedGlyphs : line.glyphs;
       for (size_t gi = 0; gi < visualGlyphs.size(); gi++) {
-        const auto& g = visualGlyphs[gi];
+        auto& g = visualGlyphs[gi];
 #else
       for (size_t gi = 0; gi < line.glyphs.size(); gi++) {
         auto& g = line.glyphs[gi];
