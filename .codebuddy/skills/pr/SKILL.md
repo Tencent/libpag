@@ -23,9 +23,7 @@ existing one — automatically detected based on branch state.
 
 1. `git branch --show-current` — current branch name.
    If empty (detached HEAD), ask the user to switch to a branch first and stop.
-2. Then run in parallel:
-   - `gh pr list --head {branch} --state open --json number,url` — open PRs
-   - `git config user.name` — username for branch naming (lowercase)
+2. `gh pr list --head {branch} --state open --json number,url` — open PRs
 
 Determine the remote's default branch and store as `{default_branch}`.
 
@@ -67,11 +65,10 @@ If there is nothing to commit and nothing to push, inform the user and stop.
 
 ### Create mode
 
-If there is staged content, commit first.
-
 #### Generate PR metadata
 
-Based on all commits since {default_branch}, generate:
+Based on all changes since {default_branch} (staged diff and existing commits),
+generate:
 
 - **Branch name** (only when on {default_branch}): follow the project's branch
   naming convention if one exists; otherwise use `feature/{username}_topic` or
@@ -83,9 +80,11 @@ Based on all commits since {default_branch}, generate:
 - **PR description**: plain text (no Markdown formatting) in the user's
   conversation language, briefly describing what changed and why.
 
-#### Create branch and push
+#### Create branch, commit, and push
 
 If on {default_branch}, create a new branch: `git checkout -b {branch_name}`.
+
+If there is staged content, commit.
 
 Push and create the PR:
 
