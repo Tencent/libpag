@@ -19,8 +19,9 @@ existing one — automatically detected based on branch state.
 
 ## Step 1: Pre-flight
 
-1. `git branch --show-current` — current branch name
-2. Run in parallel (both depend on step 1 only):
+1. `git branch --show-current` — current branch name.
+   If empty (detached HEAD), ask the user to switch to a branch first and stop.
+2. Then run in parallel:
    - `gh pr list --head {branch} --state open --json number,url` — open PRs
    - `gh api user -q '.login'` — GitHub username
 
