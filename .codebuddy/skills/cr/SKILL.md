@@ -51,11 +51,9 @@ Runs multi-round iterations until no valid issues remain.
 
 ### 0.1 User Questions
 
-First, check `$ARGUMENTS` to determine whether this is PR mode (no commands needed):
-- Purely numeric (e.g., `123`) or contains `/` (URL) -> **PR mode**.
-- Everything else (empty, commit hash, commit range, file paths) -> **Local mode**.
-
-Then present all applicable questions together in **one interaction**:
+Check if `$ARGUMENTS` is purely numeric or a URL — if so this is **PR mode** and
+only Q1 is needed. Otherwise show both Q1 and Q2. Present all applicable questions
+in **one interaction** before running any commands.
 
 #### Question 1 — Review priority
 
@@ -70,10 +68,10 @@ partitioning), all priority levels (A+B+C) are used regardless of the user's cho
 - Option 3 — "Correctness only (A)": only safety and correctness issues.
   e.g., null dereference, out-of-bounds, resource leaks, race conditions.
 
-#### Question 2 — Auto-fix threshold (Local mode only)
+#### Question 2 — Auto-fix threshold (skip in PR mode)
 
-Show only in Local mode. In PR mode, add a note alongside Q1: "PR mode — issues will
-be submitted as PR review comments after your review."
+In PR mode, add a note alongside Q1: "PR mode — issues will be submitted as PR
+review comments after your review."
 
 - Option 1 — "All confirm": no auto-fix, confirm every issue before any change.
 - Option 2 — "Low risk only": auto-fix only fixes with a single correct approach
