@@ -92,10 +92,26 @@ After confirmation, no further user interaction until Phase 7.
 
 ### 0.3 Module Partitioning
 
-- Partition files into sub-modules with **strictly non-overlapping file sets**
-- Target 5-20 files per sub-module
-- Shared headers belong to the module of their primary implementation file
-- Files referenced by 3+ modules belong to their primary caller's module
+Partition files in scope into sub-modules. The goal is to maximize parallel review
+while minimizing cross-module dependencies.
+
+**Partitioning rules (in priority order):**
+
+1. **Logical cohesion first**: each sub-module should be a self-contained logical unit
+   (a class and its implementation, a feature directory, a subsystem). A reviewer should
+   be able to understand the module with minimal reference to other modules.
+2. **Strictly non-overlapping file sets**: every file belongs to exactly one module.
+3. **No minimum file count**: a 2-file module is fine if it is logically independent.
+4. **Split only when too large**: if a single logical module has too many files for one
+   agent to handle effectively, split it along internal boundaries (e.g., by sub-feature
+   or by class). Keep the split balanced.
+5. **Aim for roughly even sizes**: when multiple partitioning strategies are viable,
+   prefer the one that produces more balanced module sizes.
+6. **Shared headers**: assign to the module of their primary implementation file. If a
+   header is primarily consumed (not implemented) by a module, it stays with the
+   implementor.
+7. **Widely referenced files** (used by 3+ modules): assign to their primary caller's
+   module. Other modules treat them as read-only context.
 
 ---
 
