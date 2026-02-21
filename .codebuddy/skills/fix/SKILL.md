@@ -114,18 +114,30 @@ Run sequentially after scope is confirmed. Abort if any step fails.
 
 ### 0.5 Module Partitioning
 
-Partition files in scope into modules for parallel review. Each module should
-be a self-contained logical unit (a class and its implementation, a feature directory,
-a subsystem, or a documentation set) that a reviewer can understand with minimal
-reference to other modules.
+Partition files in scope into **review modules** for parallel review. The goal is to
+balance workload across reviewers, not to match file boundaries.
 
+**Review module rules:**
+- Each module should be a self-contained logical unit that a reviewer can understand
+  with minimal reference to other modules.
+- **Large files**: if a single file is too large for one reviewer (e.g., a long spec
+  document or a large implementation file), split it by sections/chapters (for docs)
+  or by function groups (for code). Each section becomes its own review module.
+- **Small files**: group related small files into one module to avoid under-utilizing
+  reviewers.
+- Balance module sizes so reviewers have roughly equal workload.
 - **Module type**: classify each module as `code`, `doc`, or `mixed` based on its file
   types. This determines which checklist the reviewer uses.
-- **Non-overlapping**: every file belongs to exactly one module.
-- **Split when too large**: if a logical module has too many files for one agent, split
-  along internal boundaries. Keep splits roughly balanced.
-- **Shared headers**: assign to the module of their primary implementation file.
-- **Widely referenced files** (3+ modules): assign to the primary caller's module.
+
+**Fix module rules** (determined in Phase 3, after issues are confirmed):
+- Fix modules are grouped **by file**: all confirmed issues in the same file go to the
+  same fixer, regardless of which review module found them. This prevents concurrent
+  edit conflicts.
+- When a review module covers a section of a large file, the team-lead merges all
+  issues from different review modules targeting the same file into one fix task.
+- Cross-file issues (e.g., renames) -> dedicated `fixer-cross` agent.
+- **Shared headers**: assign to the fixer of their primary implementation file.
+- **Widely referenced files** (3+ fixers need to touch it): assign to `fixer-cross`.
 
 ### Mid-Review Supplements
 
@@ -210,8 +222,9 @@ Key points:
 
 ## Phase 4: Fix
 
-- Reuse reviewers as fixers (they already have module context)
-- Cross-module files -> dedicated `fixer-cross` agent
+- Group confirmed issues into **fix modules by file** (see 0.5 fix module rules).
+  If a reviewer already has full context for a file, reuse it as fixer for that file.
+- Cross-file issues -> dedicated `fixer-cross` agent
 - Multi-file renames -> single fixer as atomic task
 
 ### Fixer Instructions (include in every fixer prompt)
