@@ -191,6 +191,9 @@ full matrix and special rules.
 Key points:
 - **Public API protection**: obvious bugs = fix; non-bug signature changes = record to
   `pending-api-changes.md` (see `references/pending-templates.md`)
+- **Cross-module doc impact**: for each fix, identify whether the change affects comments
+  or documentation files outside the fixer's own module. If so, create a follow-up task
+  for `fixer-cross` to update those files after the original fix is committed.
 - Previously rolled-back issues -> do not attempt again
 
 ---
@@ -211,7 +214,11 @@ Fix rules:
 4. When in doubt, skip the fix rather than risk a wrong change.
 5. Do not run build or tests.
 6. Do not modify public API function signatures or class definitions (comments are OK).
-7. When done, report the commit hash for each fix.
+7. After each fix, check whether the change affects related comments or documentation
+   (function/class doc-comments, inline comments describing the changed logic, README
+   or spec files that reference the changed behavior). If so, update them in the same
+   commit as the fix.
+8. When done, report the commit hash for each fix.
 ```
 
 ### Stuck Detection
