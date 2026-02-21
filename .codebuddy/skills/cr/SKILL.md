@@ -226,13 +226,8 @@ files. See Phase 5 for details.
     doc modules, both for mixed modules. Only include priority levels selected by the
     user (e.g., if user chose "A + B", do not include Priority C items). For doc-only
     modules, always include all priority levels (A+B+C) regardless of user selection.
-  - **Review scope rule**: reviewers must read entire files for full context, but apply
-    different reporting thresholds based on scope type:
-    - **Diff-based scope** (branch diff, PR, commit, commit range): report issues at
-      the selected priority levels for code within the diff. For code outside the diff,
-      only report Priority A issues.
-    - **Full content scope** (file/directory path): report issues at the selected
-      priority levels for all code in the files.
+  - **Review scope rule**: reviewers must read entire files for full context and
+    report issues at the selected priority levels for all code in the reviewed files.
   - **Evidence requirement**: every issue must have a code citation (file:line + snippet)
   - **Exclusion list**: see the exclusion section in the corresponding checklist. Project
     rules loaded in context take priority over the exclusion list.
@@ -268,8 +263,9 @@ special rules.
 
 ### De-duplication
 
-- Skip any issue that matches one already fixed, rolled back, recorded to
-  `PENDING_FILE`, or **rejected by the user** in a previous round.
+- Skip any issue that matches one recorded in `PENDING_FILE` or **rejected by the
+  user** in a previous round. Previously fixed issues are not excluded — if a
+  reviewer reports a new problem in already-fixed code, it is treated as a new issue.
 - **PR comment de-duplication** (PR mode): compare each confirmed issue against
   `EXISTING_PR_COMMENTS`. If an issue matches an existing comment (same file, same
   general location, same topic), exclude it — do not present it to the user.
@@ -358,10 +354,12 @@ rejected list so they won't be reported again in subsequent rounds.
 
 ### Next round context
 
-Next round prompt includes: rollback blacklist, previous fix summary,
-`PENDING_FILE` contents.
-Reviewers must skip all issues already reported in previous rounds — whether fixed,
-rolled back, recorded to `PENDING_FILE`, or rejected by the user.
+Each new round is a **fresh review** of the same scope — not a targeted review of
+previous fixes. Reviewers should not receive previous fix details or be directed to
+focus on previously changed areas. The only filtering is: skip issues recorded in
+`PENDING_FILE` or rejected by the user. Previously fixed issues are **not excluded**
+— if a reviewer independently finds a new problem in code that was fixed last round,
+that is a valid new issue.
 
 ---
 
