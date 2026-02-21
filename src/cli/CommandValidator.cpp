@@ -63,7 +63,7 @@ static void CollectStructuredError(void* context, xmlErrorPtr xmlError) {
 }
 
 static std::string EscapeJson(const std::string& input) {
-  std::string result;
+  std::string result = {};
   result.reserve(input.size() + 16);
   for (char ch : input) {
     switch (ch) {
