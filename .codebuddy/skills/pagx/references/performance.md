@@ -27,7 +27,7 @@ Understanding the PAGX renderer's cost model helps identify performance bottlene
   extra surface (as efficient as Group): `blendMode="normal"`, `alpha="1"` (or `groupOpacity`
   unset/false), no filters, no mask (or mask is a simple opaque path), no `matrix3D` with
   perspective.
-- **Stroke Alignment**: `strokeAlign="center"` (default) is GPU-accelerated. `"inside"` and
+- **Stroke Alignment**: `align="center"` (default) is GPU-accelerated. `"inside"` and
   `"outside"` require CPU path boolean operations (intersect/difference), which are expensive
   especially under Repeater.
 
