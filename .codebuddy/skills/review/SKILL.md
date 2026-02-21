@@ -8,16 +8,9 @@ description: Multi-round automated code review and fix using Agent Teams. Use wh
 Automatically review, verify, and fix issues in code and documents across your branch
 or pull request. Runs multi-round team-based iterations until no valid issues remain.
 
-Each issue is assessed for risk level. The user chooses an auto-fix threshold that
-controls which risk levels are fixed automatically vs presented for confirmation:
-- **Low risk only**: auto-fix obvious, unambiguous fixes; confirm everything else.
-- **Low + Medium risk**: also auto-fix clear fixes with broader scope.
-- **All confirm**: present every issue for user selection.
-
-For PR reviews of other people's code, issues are submitted as PR review comments
-instead of direct commits.
-
-High-risk issues always require user confirmation regardless of threshold.
+Each issue is assigned a risk level. Low-risk issues can be auto-fixed, while
+high-risk issues are presented for user confirmation. For PR reviews of other people's
+code, issues are submitted as PR review comments instead of direct commits.
 
 ## Instructions
 
