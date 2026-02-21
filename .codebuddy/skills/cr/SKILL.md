@@ -1,6 +1,10 @@
 ---
 name: cr
-description: Automated code review and fix for local branches, PRs, commits, and files. Supports multi-round iteration with risk-based auto-fix.
+description: >-
+  Automated code review and fix for local branches, PRs, commits, and files.
+  Supports multi-round iteration with risk-based auto-fix. Use when the user
+  says "review", "code review", "/cr", "review this PR", "check my code",
+  or "review my changes".
 ---
 
 # Review — Automated Code Review & Fix
@@ -15,21 +19,29 @@ Runs multi-round iterations until no valid issues remain.
 
 ## Instructions
 
+**CRITICAL**:
+- You (the team-lead) **never modify files directly**. Delegate all changes to
+  agents. Read code only for arbitration and diagnosis.
+- **Autonomous operation**: between Phase 0 (setup) and Phase 7 (final report), the
+  entire review-fix loop runs without user interaction. Deferred issues accumulate
+  across rounds and are only presented to the user in Phase 7.
+
+**General**:
 - All user-facing interactions must use the language the user has been using in the
   conversation. Do not default to English.
 - When presenting choices with predefined options, use interactive dialogs with
   selectable options rather than plain text.
-- **You (the team-lead) never modify files directly.** Delegate all changes to agents.
-  Read code only for arbitration and diagnosis.
 - After each round, analyze review quality and adjust the next round's reviewer prompts.
-- **Autonomous operation**: between Phase 0 (setup) and Phase 7 (final report), the
-  entire review-fix loop runs without user interaction. Deferred issues accumulate
-  across rounds and are only presented to the user in Phase 7. The team-lead must
-  handle all unexpected situations autonomously — e.g., an agent stuck or unresponsive,
-  a fix that breaks the build, a git operation that fails, an agent producing invalid
-  output. Use your judgment: terminate and replace, revert and retry, skip and move on,
-  etc. Anything that cannot be resolved automatically should be recorded to
-  `pending-issues.md` for user review in Phase 7.
+- The team-lead must handle all unexpected situations autonomously — e.g., an agent
+  stuck or unresponsive, a fix that breaks the build, a git operation that fails, an
+  agent producing invalid output. Use your judgment: terminate and replace, revert and
+  retry, skip and move on, etc. Anything that cannot be resolved automatically should
+  be recorded to `pending-issues.md` for user review in Phase 7.
+
+**Mid-conversation supplements**:
+- The user may send additional material (files, URLs, context) at any time. If
+  reviewers are still active (Phase 1-2), forward it directly; otherwise include
+  the material in the next round.
 
 ## References
 
@@ -207,11 +219,6 @@ Partition files in scope into **review modules** for parallel review.
 fixer per file to prevent concurrent edit conflicts). Cross-file issues go to a
 dedicated `fixer-cross` agent.
 
-### Mid-Review Supplements
-
-The user may send additional material at any time. If reviewers are still active
-(Phase 1-2), forward it directly; otherwise include the material in the next round.
-
 ---
 
 ## Phase 1: Review
@@ -237,7 +244,8 @@ The user may send additional material at any time. If reviewers are still active
     comment issue
   - **PR context** (PR mode only): include existing PR review comments so reviewers
     have context on already-discussed topics
-  - Structured output format
+  - **Output format**: for each issue, report:
+    `[file:line] [priority A/B/C] — [description] — [code snippet]`
 
 ---
 
@@ -408,3 +416,15 @@ The PR belongs to a different repository. Run `/cr` from the correct repo.
 ### gh CLI not installed or not authenticated
 PR mode requires `gh`. Install with `brew install gh` (macOS) or see
 https://cli.github.com, then run `gh auth login`.
+
+### Build baseline fails
+The project does not compile or tests fail before any changes are made. Fix the
+existing build issues first, then re-run `/cr`.
+
+### No upstream branch configured
+When running `/cr` without arguments, the current branch has no upstream tracking
+branch. Either push the branch first (`git push -u origin branch-name`) or specify
+a scope explicitly (e.g., `/cr main..HEAD`).
+
+### Uncommitted changes detected
+Local mode requires a clean working tree. Commit or stash changes before running `/cr`.
