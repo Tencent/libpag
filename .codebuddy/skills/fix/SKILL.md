@@ -1,8 +1,6 @@
 ---
 name: fix
-description: >-
-  Multi-round automated code review, verification, and fix workflow.
-  Supports branch diff, commit diff, or folder-based review scope.
+description: Multi-round automated code review, verification, and fix workflow.
 disable-model-invocation: true
 ---
 
