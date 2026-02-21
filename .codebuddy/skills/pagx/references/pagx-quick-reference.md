@@ -123,7 +123,7 @@ they **must not** be omitted.
 | `cap` | LineCap | butt |
 | `join` | LineJoin | miter |
 | `miterLimit` | float | 4 |
-| `dashes` | string | - |
+| `dashes` | float[] | - |
 | `dashOffset` | float | 0 |
 | `dashAdaptive` | bool | false |
 | `align` | StrokeAlign | center |

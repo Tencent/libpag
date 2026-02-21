@@ -72,7 +72,7 @@ generate:
 
 - **Branch name** (only when on {default_branch}): follow the project's branch
   naming convention if one exists; otherwise use `feature/{username}_topic` or
-  `bugfix/{username}_topic` (`{username}` = GitHub username, lowercase; obtain via `gh api user -q .login`).
+  `bugfix/{username}_topic` (`{username}` = local git username, lowercase; obtain via `git config user.name`).
   When on a non-default branch, use the current branch name.
 - **PR title**: concise summary following project conventions, or a short
   English sentence if none found. May reuse the commit message when there is
