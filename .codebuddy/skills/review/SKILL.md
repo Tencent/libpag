@@ -125,52 +125,37 @@ Threshold is automatically set to **all confirm** with PR comment output. Inform
 user: "This is someone else's PR. Issues will be presented for you to select which ones
 to submit as PR review comments."
 
-### 0.4 Clean Branch Check
+### 0.4 Pre-flight Checks
 
-**PR mode (worktree)**: skip — the worktree is always clean.
+All checks that might require user action are performed here, before the automated
+process begins. Complete all checks before proceeding to module partitioning.
 
-**PR mode (current branch is PR branch)**: verify no uncommitted changes. If dirty,
-ask the user to resolve first.
+**Clean branch check**:
+- **PR mode (worktree)**: skip — the worktree is always clean.
+- **PR mode (current branch is PR branch)**: verify no uncommitted changes. If dirty,
+  abort and ask the user to resolve first.
+- **Local mode**: verify not on the main/master branch (abort if so). If there are
+  uncommitted changes and the threshold has auto-fix, abort and ask the user to commit
+  or stash first.
 
-**Local mode, threshold has auto-fix** (low only, or low + medium): verify the working
-tree is clean and not on the main branch:
-- If on the main/master branch, or there are uncommitted changes (staged, unstaged,
-  or untracked), inform the user: "Auto-fix requires a clean, non-main branch. Each
-  fix is committed individually for easy rollback and issue tracing."
-- On main -> abort, ask user to create a feature branch first.
-- Uncommitted changes -> ask user whether to commit or stash first. Decline = abort.
+**Environment verification** (skip for file/directory full-content scope with
+all-confirm threshold — no fixes guaranteed):
+- Detect build and test commands from project rules or by exploring the codebase.
+- If no automated tests are found, warn the user: without tests, fix validation cannot
+  run. Abort unless the user confirms to continue.
+- Run build and test to establish baseline. Fail = abort.
 
-**Local mode, all confirm**: defer this check to Phase 3.5 (only needed if the user
-chooses to fix any issues). Still abort immediately if on the main branch.
+**Reference material** (doc/mixed modules only):
+- Auto-discover relevant best-practice guides, official documentation, or specification
+  standards for the document type being reviewed.
+- Ask the user if they have additional reference material (file paths, URLs, or inline
+  instructions). The user may skip.
 
-### 0.5 Reference Material (doc/mixed modules only)
+After all checks pass, no further user interaction until the final report (Phase 7),
+except for Phase 3.5 deferred issue confirmation (see Mid-Review Supplements for the
+only other exception).
 
-If the scope contains doc or mixed modules, gather reference material for reviewers:
-
-1. **Auto-discover**: search the project and web for relevant best-practice guides,
-   official documentation, or specification standards that apply to the document type
-   being reviewed (e.g., skill authoring guides, API design guidelines, RFC standards).
-2. **Ask the user**: present what you found and ask if they have additional reference
-   material (file paths, URLs, or inline instructions). The user may also choose to
-   skip this step if no extra references are needed.
-3. Include all gathered references in the reviewer prompts for doc/mixed modules.
-
-After confirmation, no further user interaction until fix mode interaction point (but
-see Mid-Review Supplements below).
-
-### Environment Verification
-
-This step runs **before the first fix attempt** — either in Phase 0 (when auto-fix
-threshold guarantees fixes) or deferred to Phase 3.5 (when all-confirm is chosen and
-the user selects issues to fix).
-
-1. **Detect build and test commands**: use project rules if available; otherwise explore
-   the codebase. If no automated tests are found, warn the user and ask whether to
-   continue without Phase 5 validation.
-2. **Build baseline**: run the project's build command. Fail = abort.
-3. **Test baseline**: run the project's test command. Fail = abort.
-
-### 0.6 Module Partitioning
+### 0.5 Module Partitioning
 
 Partition files in scope into **review modules** for parallel review. The goal is to
 balance workload across reviewers, not to match file boundaries.
@@ -293,15 +278,17 @@ matrix. The user's chosen auto-fix threshold determines handling:
 
 ## Phase 3.5: Deferred Issue Confirmation
 
-This phase handles issues above the user's auto-fix threshold. Issues at or below the
-threshold have already been queued for auto-fix and proceed directly to Phase 4.
+This phase is the **only mid-process user interaction point**. It handles issues above
+the user's auto-fix threshold. Issues at or below the threshold have already been
+queued for auto-fix and proceed directly to Phase 4.
 
 If there are no deferred issues, skip this phase entirely.
 
 ### Present deferred issues
 
-1. Present deferred issues to the user in a compact numbered list. Each entry should
-   fit on one line: `[number] [file:line] [risk] — [description]`
+1. Present all deferred issues (from current round and any remaining from previous
+   rounds) to the user in a compact numbered list. Each entry should fit on one line:
+   `[number] [file:line] [risk] — [description]`
 
 2. Ask the user which issues to act on. The user can:
    - Enter issue numbers (e.g., "1,3,5" or "1-5,8")
@@ -310,8 +297,6 @@ If there are no deferred issues, skip this phase entirely.
 
 3. **Action depends on mode**:
    - **Local mode / own PR**: selected issues are added to the fix queue for Phase 4.
-     - **Clean branch check** (if deferred from 0.4): same rules as 0.4.
-     - **Environment verification** (if not already done): run it now.
    - **Other's PR**: all confirmed issues (regardless of risk level) are presented in
      this list. User selects which to submit as PR review comments (see below), then
      skip to Phase 7 (no fix loop for other's PR).
@@ -344,7 +329,7 @@ a specific fix suggestion when possible.
 
 ## Phase 4: Fix
 
-- Group selected issues into **fix modules by file** (see 0.6 fix module rules).
+- Group selected issues into **fix modules by file** (see 0.5 fix module rules).
   If a reviewer already has full context for a file, reuse it as fixer for that file.
 - Cross-file issues -> dedicated `fixer-cross` agent
 - Multi-file renames -> single fixer as atomic task
@@ -404,15 +389,6 @@ Periodically check `git log` for new commits -> no output = stuck -> remind -> r
 - If no new issues were found in this round (Phase 3 valid issues = 0) -> Phase 7
 - Otherwise -> create new team, back to Phase 1
 - No round limit — driven by valid issue count
-
-### Remaining deferred issues
-
-After fixes are validated, if there are still unresolved deferred issues from Phase 3.5
-(user chose "none" or selected only some):
-- Present remaining issues and ask: "Would you like to fix any of the remaining issues?"
-- User selects more issues -> back to Phase 3.5 step 3 (clean branch check) then
-  Phase 4
-- User declines -> Phase 7
 
 ### Next round context
 
