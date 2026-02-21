@@ -46,8 +46,8 @@ This principle drives all Layer/Group optimization decisions:
   the cache without re-rendering.
 - **Use Group** when the content is internal structure within a unit: painter scope isolation,
   shared transforms, or sub-elements that are not independently positionable.
-- **`<pagx>` and `<Composition>` direct children MUST be Layer.** Groups at root level are
-  silently ignored and not rendered.
+- **`<pagx>` and `<Composition>` direct children MUST be Layer.** Groups at root level
+  cause a parse error.
 
 ---
 

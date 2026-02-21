@@ -31,7 +31,7 @@ For complete attribute defaults and enumeration values, see `pagx-quick-referenc
 ```
 
 - `version`, `width`, `height` are **required**.
-- Direct children of `<pagx>` and `<Composition>` **MUST** be `<Layer>`. Groups are ignored.
+- Direct children of `<pagx>` and `<Composition>` **MUST** be `<Layer>`. Groups at root level cause a parse error.
 - Layers render in document order: earlier = below, later = above.
 - `<Resources>` may appear anywhere; parsers support forward references.
 
