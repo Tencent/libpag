@@ -37,7 +37,7 @@ modifications — always require confirmation regardless of threshold.
 | Code review checklist (Priority A-C + exclusions) | `references/code-checklist.md` |
 | Document review checklist (Priority A-C + exclusions) | `references/doc-checklist.md` |
 | Issue filtering & risk level judgment matrix | `references/judgment-matrix.md` |
-| Pending file templates | `references/pending-templates.md` |
+| Pending issue template | `references/pending-templates.md` |
 
 ---
 
@@ -292,7 +292,7 @@ matrix. The user's chosen auto-fix threshold determines handling:
 ### Key points
 
 - **Public API protection**: obvious bugs = fixable (but always confirm); non-bug
-  signature changes = record to `pending-api-changes.md`
+  signature changes = record to `pending-issues.md`
   (see `references/pending-templates.md`)
 - **Cross-module doc impact**: for each fixable issue, identify whether the change
   affects comments or documentation files outside the fixer's own module. If so, create
@@ -403,7 +403,7 @@ Periodically check `git log` for new commits -> no output = stuck -> remind -> r
 4. After 2 failed retries -> team-lead reads code to diagnose (read only):
    - Fix approach was wrong -> create `fixer-rescue-N` with full error context
    - Fix was correct but changed behavior -> revert, record to
-     `pending-test-updates.md` (see `references/pending-templates.md`)
+     `pending-issues.md` (see `references/pending-templates.md`)
 5. All resolved -> close all reviewers/fixers
 
 ---
@@ -447,9 +447,9 @@ git push origin HEAD:{PR_BRANCH}
 
 ### Pending item confirmation
 
-1. Check `pending-test-updates.md` and `pending-api-changes.md`
-2. Both empty -> proceed to cleanup
-3. Either has content -> present to user via AskUserQuestion, confirm item by item
+1. Check `pending-issues.md`
+2. Empty -> proceed to cleanup
+3. Has content -> present to user via AskUserQuestion, confirm item by item
 4. Approved fixes -> create agent to re-apply; rejected -> discard
 5. Final build + test
 
@@ -496,7 +496,7 @@ Solution: This is expected — Phase 7 only presents pending items when they exi
 ### Fixer commits break tests repeatedly
 Cause: Complex semantic changes or insufficient context.
 Solution: After 2 retries, `fixer-rescue-N` takes over with full error context. If the
-fix is correct but changes behavior, it goes to `pending-test-updates.md` for user
+fix is correct but changes behavior, it goes to `pending-issues.md` for user
 confirmation.
 
 ### PR URL does not match current repository

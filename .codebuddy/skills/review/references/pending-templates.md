@@ -1,35 +1,20 @@
-# Pending File Templates
+# Pending Issue Template
 
-## pending-test-updates.md
-
-Use this format when a fix is confirmed correct but changes expected test output.
-
-```markdown
-# Pending Test-Impact Fixes
-
-The following fixes are confirmed correct in code logic but change the expected output
-of test cases. User confirmation is needed before applying.
-
-## Issue 1: [description]
-- **Original commit**: [hash] (reverted)
-- **Affected tests**: [test case names]
-- **Behavior change**: [why the test fails, how expected output changes]
-- **Code change**: [brief description of the modification]
-```
-
-## pending-api-changes.md
-
-Use this format when an issue involves public API signature changes (non-bug).
+Use this format to record high-risk issues that require user confirmation before fixing.
+Each entry should clearly describe the issue, the proposed fix, and why it needs user
+judgment.
 
 ```markdown
-# Pending Public API Changes
+# Pending Issues
 
-The following issues involve public API signature changes and require user confirmation.
+Issues deferred for user confirmation. Each was assessed as high-risk during Phase 3
+because the fix involves a design decision or changes an external contract.
 
-## Issue 1: [description]
+## Issue 1: [brief description]
 - **File**: [file path:line number]
-- **Current signature**: [existing function signature]
-- **Suggested change**: [proposed new signature]
-- **Reason**: [why the change is needed]
-- **Impact scope**: [which callers need to be updated]
+- **Risk reason**: [why this needs user confirmation, e.g., public API change,
+  test output change, multiple fix approaches, architecture impact]
+- **Current behavior**: [what the code does now]
+- **Proposed fix**: [what the fix would change]
+- **Impact scope**: [what else would be affected — callers, tests, docs, etc.]
 ```

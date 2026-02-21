@@ -36,8 +36,8 @@ low risk.
 | All confirm | Confirm | Confirm | Confirm |
 
 **Always confirm regardless of threshold**:
-- Public API signature or behavior changes -> record to `pending-api-changes.md`
-- Test baseline changes -> record to `pending-test-updates.md`
+- Public API changes, test baseline changes, and any other issues that always require
+  confirmation -> record to `pending-issues.md`
 
 ## Code Modules
 
@@ -72,7 +72,7 @@ low risk.
 | Const correctness | Fix when clearly applicable and low risk |
 | File organization | Fix only when clearly inconsistent with project conventions |
 | Accessibility (missing alt / label / keyboard nav) | Fix when semantic HTML or ARIA is clearly missing `[Web]` |
-| Public API signature change (not a bug) | **Do not fix directly**, record to `pending-api-changes.md` for final confirmation |
+| Public API signature change (not a bug) | **Do not fix directly**, record to `pending-issues.md` for final confirmation |
 | Style preference | **Always skip** |
 
 ## Document Modules
