@@ -11,7 +11,29 @@ or no argument (current branch vs upstream). See Phase 1 for full argument parsi
 Reviews code and documents using Agent Teams. Each issue gets a risk level — low-risk
 issues are auto-fixed, higher-risk issues are presented for user confirmation. In PR
 mode, issues are submitted as line-level PR review comments instead of direct commits.
-Runs multi-round iterations until no valid issues remain.
+
+## Overall Flow
+
+```
+Phase 0 (user confirmation) -> Phase 1 (scope & env)
+  -> Phase 2 (review) -> Phase 3 (verify) -> Phase 4 (filter)
+  -> Phase 5 (fix) -> Phase 6 (validate) -> Phase 7 (loop decision)
+  -> Phase 8 (remaining issues) -> Phase 9 (cleanup & report)
+```
+
+The skill runs as a **continuous loop** across Phase 2-8. Phase 9 is the only exit.
+The loop terminates (-> Phase 9) when ALL of the following are true:
+- No new commits were produced in the latest round (nothing left to fix automatically)
+- `PENDING_FILE` is empty (no issues awaiting user confirmation)
+- Or the user has skipped all remaining issues in Phase 8
+
+Any other state keeps the loop running:
+- Phase 7: new commits were produced -> back to Phase 2 for a fresh review round
+- Phase 7: no commits but `PENDING_FILE` has entries -> Phase 8 for user confirmation
+- Phase 8: user approves fixes -> Phase 5 to fix, then Phase 6 -> 7 -> 2 -> ...
+  (full loop restart, not a sub-procedure of Phase 8)
+
+Safety valve: max 100 rounds before forcing exit to Phase 8/9.
 
 ## Instructions
 
