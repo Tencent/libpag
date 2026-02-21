@@ -36,6 +36,10 @@ low risk.
 | Low only       | Auto-fix | Confirm     | Confirm   |
 | All confirm    | Confirm  | Confirm     | Confirm   |
 
+**Special rule for "Full auto"**: issues that would change test baselines (screenshot
+comparisons, golden files) are always deferred for user confirmation, regardless of
+risk level.
+
 ## Code Modules
 
 The "Criteria" column below determines whether an issue is worth fixing. The risk level
