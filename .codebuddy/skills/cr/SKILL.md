@@ -92,21 +92,24 @@ there is nothing to review and exit.
 3. **Determine code ownership**: compare `PR_AUTHOR` with `gh api user -q '.login'`.
    Store result as `IS_OWN_PR` (true/false).
 
-**Local mode — lightweight file list**: for the purpose of 0.2, quickly obtain the
-file list without full diff content (e.g., `git diff --name-only` for branch diff,
-`git show --name-only` for single commit, or the paths themselves for file/directory).
+**Local mode — lightweight file list**: run a single command to get the file name list
+(e.g., `git diff --name-only` for branch diff, `git show --name-only` for single
+commit, or the paths themselves for file/directory). Do not read file contents or
+explore the codebase yet.
 
 ### 0.2 User Questions
 
 Ask all user-facing questions **immediately after mode detection**, before any heavy
-operations (worktree, diff, build). Use the lightweight file list from 0.1 to determine
-which questions to show. Present all applicable questions together.
+operations (worktree, diff, build, codebase exploration). Present all applicable
+questions together in one interaction. The only input needed is the file name list
+from 0.1 — do not read code or explore the codebase before asking.
 
 #### Question 1 — Review priority
 
-Scan the file list from 0.1 to determine if the scope contains **only** document files.
-If so, skip this question (doc modules use their full checklist automatically). When
-skipped, all priority levels (A+B+C) are checked.
+Check file extensions from 0.1 to determine if the scope contains **only** document
+files (e.g., `.md`, `.txt`, `.rst`, `.html`). If so, skip this question (doc modules
+use their full checklist automatically). When skipped, all priority levels (A+B+C) are
+checked. If uncertain, do not skip — show the question.
 
 (code/mixed modules):
 - Option 1 — "Full review (A + B + C)": correctness, refactoring, and conventions.
