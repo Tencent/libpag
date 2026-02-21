@@ -28,7 +28,7 @@ code, issues are submitted as PR review comments instead of direct commits.
   a git operation that fails, an agent producing invalid output. Use your judgment:
   terminate and replace, revert and retry, skip and move on, etc. Anything that cannot
   be resolved automatically should be recorded to `pending-issues.md` for user review
-  in Phase 7. Maximum **5 rounds** before forced termination.
+  in Phase 7.
 
 ## References
 
