@@ -7,6 +7,11 @@ compatibility: Requires CodeBuddy Code with Agent Teams experimental feature ena
 
 # Fix — Automated Code Review & Fix
 
+When the user invokes `/fix`, immediately start executing from Phase 0 below. Do NOT
+ask the user what they want to fix — this skill is a complete automated workflow that
+reviews the entire branch, not a one-off bug fix tool. The scope and fix level will be
+confirmed with the user in Phase 0.2.
+
 Automatically review, verify, and fix issues in code and documents across your branch.
 Runs multi-round team-based iterations until no valid issues remain. You only interact
 twice: choosing the scope at the start, and confirming pending items at the end.
