@@ -185,8 +185,8 @@ dedicated `fixer-cross` agent.
 
 ### Mid-Review Supplements
 
-The user may send additional material at any time. Forward it to relevant active agents;
-if those modules are already reviewed, include the material in the next round instead.
+The user may send additional material at any time. If reviewers are still active
+(Phase 1-2), forward it directly; otherwise include the material in the next round.
 
 ---
 
@@ -244,6 +244,8 @@ matrix. The user's chosen auto-fix threshold determines handling:
 - Issues at or below the threshold -> queued for auto-fix (Phase 4)
 - Issues above the threshold -> added to the **deferred issue list** (accumulated
   across all rounds, presented to the user only in Phase 7)
+- **Other's PR**: since all issues are deferred, skip Phase 4-6 entirely after Phase 3
+  and go directly to Phase 7.
 
 ### Key points
 
@@ -285,11 +287,11 @@ to `pending-issues.md`. Close all fixers when resolved.
 ## Phase 6: Loop
 
 - Close the team to release all agents.
-- **Other's PR**: skip the loop entirely — go directly to Phase 7 after Phase 3.
 
 ### Termination check
 
-- If no auto-fix issues were found this round (auto-fix queue was empty) -> Phase 7
+- If no auto-fix issues were found this round, or all auto-fix issues were skipped
+  by fixers (no actual commits produced) -> Phase 7
 - Otherwise -> create new team, back to Phase 1
 
 ### Next round context
