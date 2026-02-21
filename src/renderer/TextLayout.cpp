@@ -21,22 +21,22 @@
 #include <cmath>
 #include "LineBreaker.h"
 #include "PunctuationSquash.h"
-#include "VerticalTextUtils.h"
-#include "pagx/utils/Base64.h"
-#include "base/utils/MathUtil.h"
 #include "ToTGFX.h"
-#include "tgfx/core/UTF.h"
+#include "VerticalTextUtils.h"
+#include "base/utils/MathUtil.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/utils/Base64.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/TextBlobBuilder.h"
+#include "tgfx/core/UTF.h"
 #ifdef PAG_USE_HARFBUZZ
 #include "HarfBuzzShaper.h"
 #endif
@@ -283,8 +283,7 @@ class TextLayoutContext {
       }
       auto& buffer = builder.allocRunPosH(run.font, run.glyphIDs.size(), yOffset);
       memcpy(buffer.glyphs, run.glyphIDs.data(), run.glyphIDs.size() * sizeof(tgfx::GlyphID));
-      memcpy(buffer.positions, adjustedPositions.data(),
-             adjustedPositions.size() * sizeof(float));
+      memcpy(buffer.positions, adjustedPositions.data(), adjustedPositions.size() * sizeof(float));
     }
     auto textBlob = builder.build();
     if (textBlob != nullptr) {
@@ -923,8 +922,8 @@ class TextLayoutContext {
 #ifdef PAG_BUILD_PAGX
       rtl = seg.bidiLevel & 1;
 #endif
-      auto shapedGlyphs = HarfBuzzShaper::Shape(substring, primaryFont, fallbackFonts,
-                                                 vertical, rtl);
+      auto shapedGlyphs =
+          HarfBuzzShaper::Shape(substring, primaryFont, fallbackFonts, vertical, rtl);
 
 #ifdef PAG_BUILD_PAGX
       // HarfBuzz returns RTL glyphs in visual order (left-to-right). Sort them by cluster
@@ -962,8 +961,8 @@ class TextLayoutContext {
         int32_t unichar = 0;
         size_t clusterByteOffset = seg.start + sg.cluster;
         if (clusterByteOffset < content.size()) {
-          DecodeUTF8Char(content.data() + clusterByteOffset,
-                         content.size() - clusterByteOffset, &unichar);
+          DecodeUTF8Char(content.data() + clusterByteOffset, content.size() - clusterByteOffset,
+                         &unichar);
         }
 
         GlyphInfo gi = {};
@@ -1158,8 +1157,8 @@ class TextLayoutContext {
       if (doWrap && !currentLine->glyphs.empty() && glyphEndX > boxWidth) {
         if (lastBreakIndex >= 0) {
           // Split at break point: move glyphs after lastBreakIndex to new line
-          std::vector<GlyphInfo> overflow(
-              currentLine->glyphs.begin() + lastBreakIndex + 1, currentLine->glyphs.end());
+          std::vector<GlyphInfo> overflow(currentLine->glyphs.begin() + lastBreakIndex + 1,
+                                          currentLine->glyphs.end());
           currentLine->glyphs.resize(lastBreakIndex + 1);
           // Trim trailing whitespace from current line
           while (!currentLine->glyphs.empty() &&
@@ -1179,8 +1178,8 @@ class TextLayoutContext {
           currentLineWidth = 0;
           for (size_t j = skipCount; j < overflow.size(); j++) {
             overflow[j].xPosition = currentLineWidth;
-            float ls = (overflow[j].sourceText != nullptr) ? overflow[j].sourceText->letterSpacing
-                                                           : 0;
+            float ls =
+                (overflow[j].sourceText != nullptr) ? overflow[j].sourceText->letterSpacing : 0;
             currentLineWidth += overflow[j].advance + ls;
             currentLine->glyphs.push_back(overflow[j]);
           }
@@ -1216,8 +1215,7 @@ class TextLayoutContext {
         // Cluster-aware breaking: never break within the same HarfBuzz cluster.
         bool sameCluster = (glyph.cluster != 0 || allGlyphs[i + 1].cluster != 0) &&
                            glyph.cluster == allGlyphs[i + 1].cluster;
-        if (!sameCluster &&
-            LineBreaker::CanBreakBetween(glyph.unichar, allGlyphs[i + 1].unichar)) {
+        if (!sameCluster && LineBreaker::CanBreakBetween(glyph.unichar, allGlyphs[i + 1].unichar)) {
           lastBreakIndex = static_cast<int>(currentLine->glyphs.size()) - 1;
         }
 #else
@@ -1307,9 +1305,8 @@ class TextLayoutContext {
       for (size_t i = 0; i < glyphCount; i++) {
         line.glyphs[i].xPosition = xPos - leadingSquash[i];
         float effectiveAdvance = line.glyphs[i].advance - leadingSquash[i] - trailingSquash[i];
-        float ls = (line.glyphs[i].sourceText != nullptr)
-                       ? line.glyphs[i].sourceText->letterSpacing
-                       : 0;
+        float ls =
+            (line.glyphs[i].sourceText != nullptr) ? line.glyphs[i].sourceText->letterSpacing : 0;
         xPos += effectiveAdvance + ls;
       }
 
@@ -1445,8 +1442,8 @@ class TextLayoutContext {
             (totalHeight - lastLine.maxLineHeight + halfLeading + lastLine.maxAscent) *
             lastLine.roundingRatio;
       } else {
-        lastRelBaseline =
-            (totalHeight - lastLine.maxLineHeight + lastLine.maxLineHeight) * lastLine.roundingRatio;
+        lastRelBaseline = (totalHeight - lastLine.maxLineHeight + lastLine.maxLineHeight) *
+                          lastLine.roundingRatio;
       }
       precomputedBaselines[lastIdx] = lastRelBaseline;
       // Walk upward: each preceding line's baseline = next line's baseline - next line's lineHeight
@@ -1516,8 +1513,7 @@ class TextLayoutContext {
               }
             }
             if (gapCount > 0) {
-              justifyExtraPerGap =
-                  (boxWidth - line.width) / static_cast<float>(gapCount);
+              justifyExtraPerGap = (boxWidth - line.width) / static_cast<float>(gapCount);
             }
           } else if (paragraphRTL) {
             xOffset += boxWidth - line.width;
@@ -1565,15 +1561,8 @@ class TextLayoutContext {
         float xPos = 0;
         for (auto& g : visualGlyphs) {
           g.xPosition = xPos;
-          float letterSpacing =
-              (g.sourceText != nullptr) ? g.sourceText->letterSpacing : 0;
+          float letterSpacing = (g.sourceText != nullptr) ? g.sourceText->letterSpacing : 0;
           xPos += g.advance + letterSpacing;
-        }
-        // Remove trailing letterSpacing.
-        bool hasLetterSpacing = !visualGlyphs.empty() && visualGlyphs[0].sourceText != nullptr &&
-                                visualGlyphs[0].sourceText->letterSpacing != 0;
-        if (hasLetterSpacing && xPos > 0) {
-          xPos -= visualGlyphs[0].sourceText->letterSpacing;
         }
       }
       for (size_t gi = 0; gi < visualGlyphs.size(); gi++) {
@@ -1591,7 +1580,7 @@ class TextLayoutContext {
 #else
         if (gi > 0 && LineBreaker::CanBreakBetween(line.glyphs[gi - 1].unichar, g.unichar)) {
 #endif
-            justifyOffset += justifyExtraPerGap;
+          justifyOffset += justifyExtraPerGap;
         }
         PositionedGlyph pg = {};
         pg.glyphID = g.glyphID;
@@ -1628,7 +1617,7 @@ class TextLayoutContext {
         for (size_t j = 0; j < count; j++) {
           buffer.glyphs[j] = glyphs[runStart + j].glyphID;
           positions[j] = tgfx::Point::Make(glyphs[runStart + j].x - compensateX,
-                                            glyphs[runStart + j].y - compensateY);
+                                           glyphs[runStart + j].y - compensateY);
         }
         runStart = runEnd;
       }
@@ -1713,11 +1702,10 @@ class TextLayoutContext {
 #ifdef PAG_USE_HARFBUZZ
           bool sameCluster = (glyph.cluster != 0 || allGlyphs[i - 1].cluster != 0) &&
                              glyph.cluster == allGlyphs[i - 1].cluster;
-          vg.canBreakBefore = !sameCluster &&
-                              LineBreaker::CanBreakBetween(allGlyphs[i - 1].unichar, glyph.unichar);
-#else
           vg.canBreakBefore =
-              LineBreaker::CanBreakBetween(allGlyphs[i - 1].unichar, glyph.unichar);
+              !sameCluster && LineBreaker::CanBreakBetween(allGlyphs[i - 1].unichar, glyph.unichar);
+#else
+          vg.canBreakBefore = LineBreaker::CanBreakBetween(allGlyphs[i - 1].unichar, glyph.unichar);
 #endif
         }
         vgList.push_back(std::move(vg));
@@ -1755,12 +1743,11 @@ class TextLayoutContext {
         lastBreakIndex = currentColumn->glyphs.size();
       }
 
-      if (doWrap && !currentColumn->glyphs.empty() &&
-          currentColumnHeight + vg.height > boxHeight) {
+      if (doWrap && !currentColumn->glyphs.empty() && currentColumnHeight + vg.height > boxHeight) {
         if (lastBreakIndex > 0) {
-          std::vector<VerticalGlyphInfo> overflow(currentColumn->glyphs.begin() +
-                                                      static_cast<ptrdiff_t>(lastBreakIndex),
-                                                  currentColumn->glyphs.end());
+          std::vector<VerticalGlyphInfo> overflow(
+              currentColumn->glyphs.begin() + static_cast<ptrdiff_t>(lastBreakIndex),
+              currentColumn->glyphs.end());
           currentColumn->glyphs.resize(lastBreakIndex);
           RemoveTrailingLetterSpacing(currentColumn->glyphs);
           // Trim trailing whitespace from current column.
@@ -1866,8 +1853,7 @@ class TextLayoutContext {
           continue;
         }
         auto result = PunctuationSquash::GetAdjacentSquash(
-            column.glyphs[i].glyphs.front().unichar,
-            column.glyphs[i + 1].glyphs.front().unichar);
+            column.glyphs[i].glyphs.front().unichar, column.glyphs[i + 1].glyphs.front().unichar);
         if (result.prevSquash > 0) {
           float amount = column.glyphs[i].height * result.prevSquash;
           if (amount > trailingSquash[i]) {
@@ -2104,8 +2090,7 @@ class TextLayoutContext {
         auto& runFont = glyphs[runStart].font;
         bool runUseRSXform = glyphs[runStart].useRSXform;
         size_t runEnd = runStart + 1;
-        while (runEnd < glyphs.size() &&
-               glyphs[runEnd].font == runFont &&
+        while (runEnd < glyphs.size() && glyphs[runEnd].font == runFont &&
                glyphs[runEnd].useRSXform == runUseRSXform) {
           runEnd++;
         }
@@ -2127,7 +2112,7 @@ class TextLayoutContext {
           for (size_t j = 0; j < count; j++) {
             buffer.glyphs[j] = glyphs[runStart + j].glyphID;
             positions[j] = tgfx::Point::Make(glyphs[runStart + j].position.x - compensateX,
-                                              glyphs[runStart + j].position.y - compensateY);
+                                             glyphs[runStart + j].position.y - compensateY);
           }
         }
         runStart = runEnd;
