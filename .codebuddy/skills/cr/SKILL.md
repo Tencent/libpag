@@ -388,12 +388,10 @@ skip to Phase 9.
      `references/pr-comment-format.md`. Comment body should be concise, written in the
      user's conversation language, with a specific fix suggestion. -> Phase 9
    - **Local mode**: if no issues were approved for fix (user skipped all) -> Phase 9.
-     Otherwise, jump back to Phase 5 with the user-approved issues as the fix queue.
-     The full cycle runs: Phase 5 (fix) -> Phase 6 (validate) -> Phase 7 (loop)
-     -> Phase 2 (review the new changes) -> ... until no new issues are found, then
-     back to Phase 8. Any new issues from this cycle are added to `PENDING_FILE`
-     and presented again. The loop terminates when `PENDING_FILE` is empty or the
-     user skips all remaining issues -> Phase 9.
+     Otherwise -> **Phase 5** with the user-approved issues as the fix queue. From
+     there the normal flow resumes: Phase 5 -> 6 -> 7 -> 2 -> 3 -> 4 -> ... This is
+     a full restart of the review-fix loop, not a sub-procedure of Phase 8. Phase 7
+     termination check and Phase 8 re-entry apply as usual.
 
 ---
 
