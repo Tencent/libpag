@@ -7,9 +7,9 @@ compatibility: Requires CodeBuddy Code with Agent Teams experimental feature ena
 
 # Fix — Automated Code Review & Fix
 
-Automatically review, verify, and fix code issues across your branch. Runs multi-round
-team-based iterations until no valid issues remain. You only interact twice: choosing
-the scope at the start, and confirming pending items at the end.
+Automatically review, verify, and fix issues in code and documents across your branch.
+Runs multi-round team-based iterations until no valid issues remain. You only interact
+twice: choosing the scope at the start, and confirming pending items at the end.
 
 ## Prerequisites
 
@@ -23,7 +23,8 @@ the user to enable it before proceeding:
 
 | Topic | File |
 |-------|------|
-| Review checklist (Level A-D + exclusions) | `references/review-checklist.md` |
+| Code review checklist (Level A-C + exclusions) | `references/code-checklist.md` |
+| Document review checklist (Level A-C + exclusions) | `references/doc-checklist.md` |
 | Issue filtering judgment matrix | `references/judgment-matrix.md` |
 | Pending file templates | `references/pending-templates.md` |
 
@@ -94,8 +95,11 @@ After confirmation, no further user interaction until Phase 7.
 
 Partition files in scope into modules for parallel review. Each module should
 be a self-contained logical unit (a class and its implementation, a feature directory,
-a subsystem) that a reviewer can understand with minimal reference to other modules.
+a subsystem, or a documentation set) that a reviewer can understand with minimal
+reference to other modules.
 
+- **Module type**: classify each module as `code`, `doc`, or `mixed` based on its file
+  types. This determines which checklist the reviewer uses.
 - **Non-overlapping**: every file belongs to exactly one module.
 - **Split when too large**: if a logical module has too many files for one agent, split
   along internal boundaries. Keep splits roughly balanced.
@@ -109,8 +113,9 @@ a subsystem) that a reviewer can understand with minimal reference to other modu
 - `TeamCreate` to create the team
 - One `general-purpose` reviewer agent (`reviewer-N`) per module
 - Reviewer prompt includes:
-  - Module file list + check items for the selected fix level (see
-    `references/review-checklist.md`)
+  - Module file list + check items for the selected fix level, using the checklist
+    matching the module type: `references/code-checklist.md` for code modules,
+    `references/doc-checklist.md` for doc modules, both for mixed modules
   - **Review scope rule**: reviewers must read entire files for full context, but apply
     different reporting thresholds based on whether code is within the branch diff:
     - **Code within diff**: report all issues matching the selected fix level (A/B/C)
@@ -195,9 +200,11 @@ Periodically check `git log` for new commits -> no output = stuck -> remind -> r
 ## Phase 5: Validate
 
 - **Do not close reviewers yet** (may need retry)
-- Build + test using the project's commands
+- For code/mixed modules: build + test using the project's commands
+- For doc-only modules: skip build/test (no compilation needed); validation is
+  completed through the review and verification phases
 
-**All pass** -> close all reviewers/fixers -> Phase 6.
+**All pass** (or no code modules to validate) -> close all reviewers/fixers -> Phase 6.
 
 **Failures**:
 1. Record failing test case names
@@ -253,8 +260,8 @@ Solution: Fix build/test failures before running `/fix`.
 
 ### Reviewer reports no issues but code has problems
 Cause: Fix level too restrictive or reviewer prompt insufficient.
-Solution: Re-run with a higher fix level (C or D). Team-lead will also auto-adjust
-prompts in subsequent rounds.
+Solution: Re-run with a higher fix level. Team-lead will also auto-adjust prompts in
+subsequent rounds.
 
 ### Fixer commits break tests repeatedly
 Cause: Complex semantic changes or insufficient context.
