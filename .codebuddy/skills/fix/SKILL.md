@@ -5,9 +5,12 @@ description: Multi-round automated code review and fix using Agent Teams.
 
 # Fix — Automated Code Review & Fix
 
+**Activation**: Only execute this workflow when the user explicitly invokes `/fix`.
+Do NOT auto-trigger for general bug fix requests, code questions, or error discussions.
+
 When the user invokes `/fix`, immediately start executing from Phase 0 below. Do NOT
-ask the user what they want to fix — this skill is a complete automated workflow that
-reviews the entire branch, not a one-off bug fix tool.
+ask the user what they want to fix — this is a complete automated workflow that reviews
+the entire branch, not a one-off bug fix tool.
 
 ## Argument Parsing
 
