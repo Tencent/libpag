@@ -130,6 +130,12 @@ to submit as PR review comments."
 All checks that might require user action are performed here, before the automated
 process begins. Complete all checks before proceeding to module partitioning.
 
+**Agent Teams availability**:
+- Verify Agent Teams is enabled by checking the environment. If not available, prompt
+  the user to enable it: run `/config` -> `[Experimental] Agent Teams` -> `true`, or
+  set environment variable `CODEBUDDY_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. Abort if not
+  enabled.
+
 **Clean branch check**:
 - **PR mode (worktree)**: skip — the worktree is always clean.
 - **PR mode (current branch is PR branch)**: verify no uncommitted changes. If dirty,
@@ -196,9 +202,7 @@ review process. When this happens:
 
 ## Phase 1: Review
 
-- Create the team. If team creation fails because Agent Teams is not enabled, prompt
-  the user to enable it: run `/config` -> `[Experimental] Agent Teams` -> `true`, or
-  set environment variable `CODEBUDDY_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
+- Create the team.
 - One `general-purpose` reviewer agent (`reviewer-N`) per module
 - Reviewer prompt includes:
   - Module file list + checklist matching the module type:
@@ -348,8 +352,12 @@ Fix rules:
    (function/class doc-comments, inline comments describing the changed logic, README
    or spec files that reference the changed behavior). If so, update them in the same
    commit as the fix.
-8. When done, report the commit hash for each fix.
+8. When done, report the commit hash for each fix and list any skipped issues with
+   the reason for skipping.
 ```
+
+Team-lead collects skipped issues and includes them in the next round's context so
+they are not lost.
 
 ### Stuck Detection
 
@@ -372,6 +380,7 @@ Periodically check `git log` for new commits -> no output = stuck -> remind -> r
 3. Send failure info back to the original reviewer to re-fix (max **2 retries**)
 4. After 2 failed retries -> team-lead reads code to diagnose (read only):
    - Fix approach was wrong -> create `fixer-rescue-N` with full error context
+   - Rescue also fails -> revert and record to `pending-issues.md`
    - Fix was correct but changed behavior -> revert, record to
      `pending-issues.md` (see `references/pending-templates.md`)
 5. All resolved -> close all reviewers/fixers
@@ -388,7 +397,8 @@ Periodically check `git log` for new commits -> no output = stuck -> remind -> r
 
 - If no new issues were found in this round (Phase 3 valid issues = 0) -> Phase 7
 - Otherwise -> create new team, back to Phase 1
-- No round limit — driven by valid issue count
+- **Safety limit**: maximum 5 rounds. If reached, proceed to Phase 7 with a warning
+  in the summary report.
 
 ### Next round context
 
@@ -418,7 +428,10 @@ If fixes were made in PR mode and `IS_OWN_PR = true`:
    ```
    git push origin HEAD:{PR_BRANCH}
    ```
-2. Verify push succeeded before proceeding to cleanup.
+2. If push fails (permission denied, branch protection, etc.), inform the user with
+   the error message. Do not retry automatically — the commits remain in the local
+   worktree for the user to push manually.
+3. Verify push succeeded before proceeding to cleanup.
 
 ### Step 3: PR mode — worktree cleanup
 
