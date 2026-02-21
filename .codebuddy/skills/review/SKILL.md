@@ -109,8 +109,8 @@ The available options depend on code ownership:
 - Option 1 — "Low risk only": auto-fix unambiguous local fixes (null checks, comment
   typos, naming, `reserve`). Confirm everything else.
 - Option 2 — "Low + Medium risk": also auto-fix clear multi-location fixes (extract
-  shared logic, remove unused internals). Only confirm design decisions (API changes,
-  architecture, algorithm trade-offs).
+  shared logic, remove unused internals). Only confirm high-risk decisions (API
+  changes, architecture, algorithm trade-offs).
 - Option 3 — "All confirm": no auto-fix, review every issue before fixing.
 
 **Other's PR** (`IS_OWN_PR = false`):
