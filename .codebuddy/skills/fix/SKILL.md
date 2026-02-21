@@ -59,9 +59,8 @@ conversation. Do not default to English.
 
 ## Tool Usage
 
-- **All questions to the user MUST use the `AskUserQuestion` tool** to present
-  interactive option dialogs. Never ask questions via plain text output — the user
-  expects clickable options, not free-form text prompts.
+- **Use the `AskUserQuestion` tool** when presenting choices with predefined options
+  (e.g., scope confirmation, fix level selection).
 - Use `TaskCreate` / `TaskUpdate` / `TaskList` to track progress through each phase.
 - Use `TeamCreate` / `SendMessage` to orchestrate agents.
 
