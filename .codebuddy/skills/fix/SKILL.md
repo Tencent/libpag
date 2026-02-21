@@ -111,11 +111,14 @@ and only ask Question 2. Otherwise ask both questions.
 - B: Diff from a specified base commit
 - C: Specified folder path
 
-**Question 2 — Fix level:**
-- A: Correctness and safety only (logic bugs, security, resource leaks)
-- B: A + refactoring and optimization (performance, simplification, architecture,
-  interface usage, test coverage, regression risk)
-- C: All (A + B + coding conventions, documentation consistency)
+**Question 2 — Fix level** (option labels should be concise, use descriptions to explain
+the incremental scope of each level):
+- Option 1 — "Correctness & Safety only": logic bugs, security vulnerabilities,
+  resource leaks, memory safety, thread safety
+- Option 2 — "Correctness & Safety + Refactoring": adds performance optimization,
+  code simplification, architecture improvement, interface usage, test coverage,
+  regression risk
+- Option 3 — "All": adds coding conventions, documentation consistency, accessibility
 
 ### 0.3 Reference Material (doc/mixed modules only)
 
