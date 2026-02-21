@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CommandOptimize.h"
-#include "cli/CommandValidator.h"
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
@@ -28,6 +27,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include "cli/CommandValidator.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/ColorSource.h"
@@ -39,13 +39,13 @@
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
-#include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
+#include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
@@ -627,8 +627,7 @@ static bool IsFullCanvasClipMask(const Layer* maskLayer, float canvasWidth, floa
          rect->size.height >= canvasHeight;
 }
 
-static int RemoveFullCanvasClipMasks(PAGXDocument* document,
-                                     const std::vector<Layer*>& layers) {
+static int RemoveFullCanvasClipMasks(PAGXDocument* document, const std::vector<Layer*>& layers) {
   int count = 0;
   for (auto* layer : layers) {
     if (layer->mask != nullptr &&
@@ -1170,15 +1169,11 @@ static int ExtractCompositions(PAGXDocument* document) {
     innerLayer->contents = sourceLayer->contents;
     comp->layers.push_back(innerLayer);
 
-    // Replace each layer's contents with a composition reference.
+    // Replace each layer's contents with a composition reference. The source layer's
+    // contents were already moved to innerLayer; other layers' contents are structurally
+    // identical and simply discarded.
     for (auto* layer : candidate.layers) {
-      if (layer != sourceLayer) {
-        // Other layers lose their contents (they were structurally identical).
-        layer->contents.clear();
-      } else {
-        // Source layer's contents were moved to innerLayer.
-        layer->contents.clear();
-      }
+      layer->contents.clear();
       layer->composition = comp;
     }
     count += static_cast<int>(candidate.layers.size());
