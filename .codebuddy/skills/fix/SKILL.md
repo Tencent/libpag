@@ -48,8 +48,17 @@ You (the team-lead) orchestrate the entire workflow. Critical constraints:
 Run sequentially. Abort if any fails.
 
 1. `git status` — uncommitted changes? Ask user whether to commit first. Decline = abort.
-2. Build verification — use the project's build command. Fail = abort.
-3. Run tests — use the project's test command. Fail = abort.
+2. **Automated test detection** — check whether the project has a usable test suite:
+   - If the project's rules loaded in context already describe build/test commands, use
+     those directly and skip exploration.
+   - Otherwise, explore the codebase to identify the test framework and run commands
+     (look for test directories, CMakeLists.txt test targets, package.json test scripts,
+     Makefile test targets, etc.).
+   - If no automated tests are found, warn the user: without tests, Phase 5 validation
+     cannot verify fix correctness, and results may be unreliable. Ask the user whether
+     to continue (review + fix without validation) or abort.
+3. Build verification — use the project's build command. Fail = abort.
+4. Run tests — use the project's test command. Fail = abort.
 
 ### 0.2 Scope Confirmation (AskUserQuestion — single interaction)
 
