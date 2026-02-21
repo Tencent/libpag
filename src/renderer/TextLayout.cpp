@@ -1663,7 +1663,7 @@ class TextLayoutContext {
     float maxFontLineHeight = 0;
     for (auto& vg : column->glyphs) {
       height += vg.height;
-      if (vg.glyphs.front().fontLineHeight > maxFontLineHeight) {
+      if (!vg.glyphs.empty() && vg.glyphs.front().fontLineHeight > maxFontLineHeight) {
         maxFontLineHeight = vg.glyphs.front().fontLineHeight;
       }
     }
