@@ -38,6 +38,8 @@ code, issues are submitted as PR review comments instead of direct commits.
 | Document review checklist (Priority A-C + exclusions) | `references/doc-checklist.md` |
 | Issue filtering & risk level judgment matrix | `references/judgment-matrix.md` |
 | Pending issue template | `references/pending-templates.md` |
+| Fixer agent instructions | `references/fixer-instructions.md` |
+| PR review comment format | `references/pr-comment-format.md` |
 
 ---
 
@@ -139,10 +141,8 @@ All checks that might require user action are performed here, before the automat
 process begins. Complete all checks before proceeding to module partitioning.
 
 **Agent Teams availability**:
-- Verify Agent Teams is enabled by checking the environment. If not available, prompt
-  the user to enable it: run `/config` -> `[Experimental] Agent Teams` -> `true`, or
-  set environment variable `CODEBUDDY_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. Abort if not
-  enabled.
+- Verify Agent Teams is enabled. If not available, prompt the user to enable it and
+  abort.
 
 **Clean branch check**:
 - **PR mode (worktree)**: skip — the worktree is always clean.
@@ -274,24 +274,9 @@ If there are no deferred issues, skip this phase entirely.
 
 ### PR Review Comments (other's PR)
 
-Submit selected issues as a single GitHub PR review with line-level comments. Use
-`gh api` with the reviews endpoint — do not use `gh pr comment` or `gh pr review`:
-
-```
-gh api repos/{owner}/{repo}/pulls/{number}/reviews --input - <<'EOF'
-{
-  "commit_id": "{HEAD_SHA}",
-  "event": "COMMENT",
-  "comments": [
-    {"path": "file/path.cpp", "line": 42, "side": "RIGHT", "body": "description"},
-    ...
-  ]
-}
-EOF
-```
-
-Comment body should be concise, written in the user's conversation language, and include
-a specific fix suggestion when possible.
+Submit selected issues as a single GitHub PR review using the format in
+`references/pr-comment-format.md`. Comment body should be concise, written in the
+user's conversation language, and include a specific fix suggestion when possible.
 
 ---
 
@@ -303,24 +288,8 @@ a specific fix suggestion when possible.
 
 ### Fixer Instructions (include in every fixer prompt)
 
-```
-Fix rules:
-1. After fixing each issue, immediately: git commit --only <files> -m "message"
-2. Only commit files in your own module. Never use git add .
-3. Commit message: English, under 120 characters, ending with a period.
-4. When in doubt, skip the fix rather than risk a wrong change.
-5. Do not run build or tests.
-6. Do not modify public API function signatures or class definitions (comments are OK).
-7. After each fix, check whether the change affects related comments or documentation
-   (function/class doc-comments, inline comments describing the changed logic, README
-   or spec files that reference the changed behavior). If so, update them in the same
-   commit as the fix.
-8. When done, report the commit hash for each fix and list any skipped issues with
-   the reason for skipping.
-```
-
-Team-lead collects skipped issues and includes them in the next round's context so
-they are not lost.
+Include `references/fixer-instructions.md` verbatim in every fixer agent's prompt.
+Team-lead collects skipped issues and includes them in the next round's context.
 
 ---
 
