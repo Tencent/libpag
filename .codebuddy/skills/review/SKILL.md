@@ -237,8 +237,8 @@ review process. When this happens:
 When all other agents in the batch are done but one has not responded:
 1. Send a reminder
 2. No response -> check for output
-3. No output -> `shutdown_request` + create replacement
-4. Partial output -> `shutdown_request` + create agent for remaining work
+3. No output -> terminate the agent and create a replacement
+4. Partial output -> terminate the agent and create a new one for remaining work
 
 ---
 
@@ -301,11 +301,8 @@ If there are no deferred issues, skip this phase entirely.
 
 ### Present deferred issues
 
-1. Present deferred issues to the user in a numbered list. Each entry includes:
-   - Issue number
-   - File path and line number
-   - Brief description (one line)
-   - Risk level (low / medium / high)
+1. Present deferred issues to the user in a compact numbered list. Each entry should
+   fit on one line: `[number] [file:line] [risk] — [description]`
 
 2. Ask the user which issues to act on. The user can:
    - Enter issue numbers (e.g., "1,3,5" or "1-5,8")
@@ -400,7 +397,7 @@ Periodically check `git log` for new commits -> no output = stuck -> remind -> r
 
 ## Phase 6: Loop
 
-- `TeamDelete` to close the team
+- Close the team to release all agents.
 - **Other's PR**: skip this phase entirely — no fix loop. Go directly to Phase 7
   after PR review comments are submitted in Phase 3.5.
 
@@ -436,7 +433,7 @@ confirmation.
 
 1. Check `pending-issues.md`
 2. Empty -> proceed to step 2
-3. Has content -> present to user via AskUserQuestion, confirm item by item
+3. Has content -> present to user for item-by-item confirmation
 4. Approved fixes -> create agent to re-apply; rejected -> discard
 5. Final build + test
 
