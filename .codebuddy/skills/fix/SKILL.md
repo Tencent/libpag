@@ -57,6 +57,14 @@ All user-facing interactions (AskUserQuestion, progress reports, summary reports
 warnings, and confirmations) must use the language the user has been using in the
 conversation. Do not default to English.
 
+## Tool Usage
+
+- **All questions to the user MUST use the `AskUserQuestion` tool** to present
+  interactive option dialogs. Never ask questions via plain text output — the user
+  expects clickable options, not free-form text prompts.
+- Use `TaskCreate` / `TaskUpdate` / `TaskList` to track progress through each phase.
+- Use `TeamCreate` / `SendMessage` to orchestrate agents.
+
 ---
 
 ## Team-Lead Responsibilities
