@@ -26,7 +26,6 @@ Runs multi-round iterations until no valid issues remain.
   conversation. Do not default to English.
 - When presenting choices with predefined options, use interactive dialogs with
   selectable options rather than plain text.
-- After each round, analyze review quality and adjust the next round's reviewer prompts.
 - The team-lead must handle all unexpected situations autonomously — e.g., an agent
   stuck or unresponsive, a fix that breaks the build, a git operation that fails, an
   agent producing invalid output. Use your judgment: terminate and replace, revert and
@@ -346,7 +345,7 @@ when resolved.
 ### Next round context
 
 Next round prompt includes: rollback blacklist, previous fix summary,
-`PENDING_FILE` contents, and prompt adjustments based on review quality analysis.
+`PENDING_FILE` contents.
 Reviewers must skip all issues already reported in previous rounds — whether fixed,
 rolled back, recorded to `PENDING_FILE`, or rejected by the user.
 
