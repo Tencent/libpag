@@ -56,52 +56,33 @@ Runs multi-round iterations until no valid issues remain.
 
 ### 0.1 Argument Parsing & Mode Detection
 
-Parse `$ARGUMENTS` to determine the review mode. **This step only identifies the mode
-and scope type — do NOT fetch diffs, read code, or perform any analysis.**
+**CRITICAL**: This step does pure string parsing only. Do NOT run any git or gh
+commands. Do NOT read files or explore the codebase. Go straight to 0.2 after
+determining the mode.
 
-| `$ARGUMENTS` | Detection | Mode | Scope |
-|--------------|-----------|------|-------|
-| (empty) | — | **Local** | Current branch vs upstream (diff) |
-| PR number (e.g., `123`) | `gh pr view` succeeds | **PR** | PR diff vs base branch |
-| PR URL | Extract owner/repo/number, verify | **PR** | PR diff vs base branch |
-| Single commit (e.g., `abc123`) | `git rev-parse --verify` succeeds | **Local** | That commit's changes (`git show`) |
-| Commit range (e.g., `abc..def`) | Contains `..`, both endpoints valid | **Local** | Diff between two commits (excluding first) |
-| File/directory paths (space-separated) | All paths exist on disk | **Local** | Full content review (no diff) |
+Parse `$ARGUMENTS` to determine the review mode:
 
-**Parse order**: contains `..` -> commit range; looks like a URL (contains `/`) ->
-PR URL; single arg + purely numeric -> PR number (`gh pr view`); all args exist on
-disk -> file/directory paths; single arg + `git rev-parse` succeeds -> single commit;
-otherwise -> error.
+| `$ARGUMENTS` | Detection (string-level) | Mode | Scope |
+|--------------|--------------------------|------|-------|
+| (empty) | — | **Local** | Current branch vs upstream |
+| Purely numeric (e.g., `123`) | Matches `^[0-9]+$` | **PR** | PR diff vs base branch |
+| URL containing `/` | Extract owner/repo/number from URL | **PR** | PR diff vs base branch |
+| Contains `..` (e.g., `abc..def`) | Split on `..` | **Local** | Diff between two commits |
+| Other single arg | Assume commit hash | **Local** | That commit's changes |
+| Multiple args, none of the above | Assume file/directory paths | **Local** | Full content of specified files |
 
-**PR URL mismatch**: if the URL's owner/repo does not match the current repository
-(`gh repo view --json nameWithOwner -q '.nameWithOwner'`), abort and ask the user to
-run `/cr` from the correct repository.
+**Parse order**: contains `..` -> commit range; contains `/` -> PR URL; purely
+numeric -> PR number; multiple args -> file/directory paths; single arg -> commit
+hash; otherwise -> error.
 
-**Empty arguments (default)**: use the current branch's upstream tracking branch as the
-base. If no upstream is configured, fall back to `main` (or `master`).
-
-**PR mode — lightweight metadata** (do not create worktree or fetch diff yet):
-
-1. **Verify `gh` is available**: run `gh --version`. If not installed, inform the user
-   (macOS: `brew install gh`, others: https://cli.github.com) and abort.
-
-2. **Fetch PR metadata** (single API call):
-   ```
-   gh pr view {number} --json headRefName,baseRefName,headRefOid,state
-   ```
-   Extract: `PR_BRANCH`, `BASE_BRANCH`, `HEAD_SHA`, `STATE`.
-   If `STATE` is not `OPEN`, inform the user that the PR is already closed/merged and
-   exit.
-
-**Local mode**: only determine the mode and scope type from arguments. Do NOT fetch
-any diff or read any files. Proceed directly to 0.2.
+Record the detected mode (Local / PR) and the raw argument values. All validation
+(git rev-parse, gh pr view, path existence, upstream detection) is deferred to 0.3.
 
 ### 0.2 User Questions
 
-**CRITICAL**: Ask all user-facing questions **immediately after 0.1**, before ANY
-other operation. Do NOT run `git diff`, `git log`, `git show`, read files, explore
-the codebase, create worktrees, or perform any analysis before these questions are
-answered. Present all applicable questions together in one interaction.
+**CRITICAL**: Ask these questions **immediately after 0.1**. The only thing that
+happened before this point is string parsing — no commands have been run yet.
+Present all applicable questions together in one interaction.
 
 #### Question 1 — Review priority
 
@@ -137,7 +118,28 @@ After all questions are answered, no further user interaction until Phase 7.
 
 ### 0.3 Pre-flight Checks
 
-Automated checks only — no user interaction.
+First set of commands to run after user answers. Automated checks — no user interaction.
+
+**Argument validation** (verify what 0.1 parsed):
+
+- **PR mode**:
+  1. Verify `gh` is available (`gh --version`). If not installed, inform the user
+     (macOS: `brew install gh`, others: https://cli.github.com) and abort.
+  2. If PR URL was given, verify the URL's owner/repo matches the current repository
+     (`gh repo view --json nameWithOwner -q '.nameWithOwner'`). Mismatch -> abort.
+  3. Fetch PR metadata:
+     ```
+     gh pr view {number} --json headRefName,baseRefName,headRefOid,state
+     ```
+     Extract: `PR_BRANCH`, `BASE_BRANCH`, `HEAD_SHA`, `STATE`.
+     If `STATE` is not `OPEN`, inform the user and exit.
+
+- **Local mode (empty arguments)**: determine the base branch — use the current
+  branch's upstream tracking branch. If no upstream, fall back to `main` (or `master`).
+
+- **Local mode (commit / commit range)**: validate with `git rev-parse --verify`.
+
+- **Local mode (file/directory paths)**: verify all paths exist on disk.
 
 **Agent Teams availability**:
 - Check if Agent Teams is enabled. If not available, warn the user in the conversation
@@ -160,7 +162,7 @@ Automated checks only — no user interaction.
 
 ### 0.4 Scope Preparation
 
-Perform the heavy operations that were deferred from 0.1.
+Fetch the actual diff/content and set up the working environment.
 
 **PR mode — working directory & diff**:
 
