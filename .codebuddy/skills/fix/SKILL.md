@@ -92,7 +92,7 @@ After confirmation, no further user interaction until Phase 7.
 
 ### 0.3 Module Partitioning
 
-Partition files in scope into sub-modules for parallel review. Each sub-module should
+Partition files in scope into modules for parallel review. Each module should
 be a self-contained logical unit (a class and its implementation, a feature directory,
 a subsystem) that a reviewer can understand with minimal reference to other modules.
 
@@ -107,7 +107,7 @@ a subsystem) that a reviewer can understand with minimal reference to other modu
 ## Phase 1: Review
 
 - `TeamCreate` to create the team
-- One `general-purpose` reviewer agent (`reviewer-N`) per sub-module
+- One `general-purpose` reviewer agent (`reviewer-N`) per module
 - Reviewer prompt includes:
   - Module file list + check items for the selected fix level (see
     `references/review-checklist.md`)
@@ -137,7 +137,7 @@ When all other agents in the batch are done but one has not responded:
 ## Phase 2: Verification
 
 - **Do not close reviewers** (reuse as fixers in Phase 4)
-- Create independent verifier (`verifier-N`) per sub-module with issues
+- Create independent verifier (`verifier-N`) per module with issues
 - Verifier reads actual code to confirm each issue exists
 
 ### Result Alignment
