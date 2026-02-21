@@ -64,7 +64,7 @@ while a logic bug requiring cross-module restructuring is high risk.
 | Full-library import when partial suffices | Fix when tree-shaking is clearly ineffective `[Web]` |
 | Code simplification | Fix when logic can be clearly simplified (early return, branch merge, etc.) |
 | Duplicate code extraction | Fix when >= 3 identical patterns |
-| Container pre-allocation | Fix when size is predictable **and** on a hot path |
+| Container pre-allocation | Fix when size is predictable (e.g., loop count known, input size available) |
 | Architecture improvement | Fix only when dependency direction or responsibility division is clearly wrong |
 | Interface usage | Fix when API is used against its design intent |
 | Rendering correctness (stale key / stale closure / wrong deps) | Fix when it causes incorrect UI behavior `[Web]` |
