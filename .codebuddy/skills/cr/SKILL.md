@@ -53,8 +53,7 @@ Runs multi-round iterations until no valid issues remain.
 
 **CRITICAL**: Complete ALL questions in this phase and receive user answers BEFORE
 executing ANY operations from Phase 1 or later — regardless of how fast those
-operations are. The ONLY permitted operations before user answers are parsing
-`$ARGUMENTS` for mode detection (pure string parsing, no git/shell commands).
+operations are.
 
 ### Mode detection
 
