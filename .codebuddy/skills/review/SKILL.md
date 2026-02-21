@@ -1,6 +1,6 @@
 ---
 name: review
-description: Automated code review and fix for local branches, PRs, commits, and files. Reviews other people's PRs with line-level comments. Supports multi-round iteration with risk-based auto-fix.
+description: Automated code review and fix for local branches, PRs, commits, and files. Supports multi-round iteration with risk-based auto-fix.
 ---
 
 # Review — Automated Code Review & Fix
