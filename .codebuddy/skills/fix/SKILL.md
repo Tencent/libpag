@@ -75,10 +75,10 @@ Ask all questions at once:
 - C: Specified folder path
 
 **Question 2 — Fix level:**
-- A: Logic bugs and security issues only (correctness)
-- B: Bugs + convention violations (naming, initialization, etc.)
-- C: Bugs + conventions + performance optimization + code simplification
-- D: All (including documentation consistency, architecture suggestions)
+- A: Correctness and safety only (logic bugs, security, resource leaks)
+- B: A + refactoring and optimization (performance, simplification, architecture,
+  interface usage, test coverage, regression risk)
+- C: All (A + B + coding conventions, documentation consistency)
 
 **Question 3 — Documentation review** (only when scope includes doc directories):
 - Whether to include documentation-code consistency checks

@@ -17,19 +17,24 @@ based on the selected fix level.
 | Logic bug | A | Affects runtime correctness -> must fix |
 | Security (div-by-zero / OOB / uninitialized read) | A | Must fix |
 | Resource leak (handle / lock not released) | A | Must fix |
-| Project convention violation | B | Fix only when inconsistent with project rules loaded in context |
-| Missing variable initialization | B | Fix when declared without initial value (per project rules) |
-| API comment missing | B | Fix when public API lacks param/return description (comments only, no signature changes) |
-| Function implementation order | B | Fix only when clearly inconsistent with header declaration order |
-| Code simplification | C | Fix when logic can be clearly simplified (early return, branch merge, etc.) |
-| Duplicate code extraction | C | Fix when >= 3 identical patterns |
-| Container pre-allocation | C | Fix when size is predictable **and** on a hot path |
-| Unnecessary copy / perf optimization | C | **Fix only when 100% certain of semantic equivalence; skip if uncertain** |
-| Type safety | C | Only change local variables, never change function signatures |
-| Interface design improvement | D | **Comments and documentation level only**, no signature changes |
-| Documentation consistency | D | Fix when code and documentation disagree |
-| Architecture suggestion | D | Fix only when dependency direction or responsibility division is clearly wrong |
+| Memory safety (use-after-move / dangling ref) | A | Must fix |
+| Thread safety violation | A | Must fix |
 | Public API signature change (obvious bug) | A | Must fix |
+| Performance optimization | B | **Must be 100% certain of semantic equivalence; skip if uncertain** |
+| Code simplification | B | Fix when logic can be clearly simplified (early return, branch merge, etc.) |
+| Duplicate code extraction | B | Fix when >= 3 identical patterns |
+| Container pre-allocation | B | Fix when size is predictable **and** on a hot path |
+| Architecture improvement | B | Fix only when dependency direction or responsibility division is clearly wrong |
+| Interface usage | B | Fix when API is used against its design intent |
+| Test coverage gap | B | Flag when changed logic lacks test coverage |
+| Regression risk | B | Flag when modification may affect other callers |
+| Naming convention violation | C | Fix only when inconsistent with project rules loaded in context |
+| Missing variable initialization | C | Fix when declared without initial value (per project rules) |
+| Comment / documentation issue | C | Fix when public API lacks description or docs disagree with code |
+| Function implementation order | C | Fix only when clearly inconsistent with header declaration order |
+| Type safety (narrowing / magic numbers) | C | Only change local variables, never change function signatures |
+| Const correctness | C | Fix when clearly applicable and low risk |
+| File organization | C | Fix only when clearly inconsistent with project conventions |
 | Public API signature change (not a bug) | -- | **Do not fix directly**, record to `pending-api-changes.md` for final confirmation |
 | Style preference | -- | **Always skip** |
 

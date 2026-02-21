@@ -15,6 +15,8 @@ a particular issue type, follow the project rules.
 
 ## Level A: Correctness & Safety
 
+Issues that directly affect runtime behavior. Highest impact.
+
 **A1. Code Correctness**
 - Are function return values / out-parameters correctly set in all branches (including
   error branches)?
@@ -53,43 +55,11 @@ a particular issue type, follow the project rules.
 
 ---
 
-## Level B: Convention Compliance
+## Level B: Refactoring & Optimization
 
-**B1. Naming Conventions**
-- Does the code follow the project's existing naming style (as defined in the loaded
-  project rules)?
-- Are variable names semantically clear, avoiding unnecessary abbreviations?
-- Are names in new code consistent with the style in the same file?
+Improvements to code quality, performance, and maintainability. Medium impact.
 
-**B2. Initialization Conventions**
-- Are variables assigned an initial value at declaration (as required by project rules)?
-- Are class member variables initialized at declaration or in the constructor?
-
-**B3. Project Language Conventions**
-- Does the code comply with language usage restrictions defined in the project rules
-  (varies by project)?
-- Is new code consistent with existing patterns in the project?
-
-**B4. Comment Conventions**
-- Do public APIs have sufficient parameter and return value descriptions?
-- Are comments consistent with code behavior (outdated comments are worse than none)?
-- Are design intent explanations present where code alone is insufficient?
-
-**B5. File Organization**
-- Is the function order in implementation files consistent with the declaration order?
-- Do header files have appropriate include guards?
-- Are include dependencies necessary and reasonable?
-
-**B6. Interface Usage**
-- Are called APIs used according to their design intent and documentation?
-- Are any deprecated interfaces being used?
-- Parameter passing: are large objects passed by const reference instead of by value?
-
----
-
-## Level C: Performance & Simplification
-
-**C1. Performance Optimization**
+**B1. Performance Optimization**
 - Containers: is space pre-allocated when the size is predictable?
 - Unnecessary deep copies: **must be 100% certain of semantic equivalence; annotate
   the risk of the change**
@@ -98,7 +68,7 @@ a particular issue type, follow the project rules.
 - Unnecessary temporary object construction
 - Const references: are parameters / variables that can be const& marked as such?
 
-**C2. Code Simplification**
+**B2. Code Simplification**
 - Duplicate code: >= 3 identical patterns should be extracted into a method
 - Deep nested if/else: can be simplified with early return
 - Redundant conditional checks: logic branches that can be merged or eliminated
@@ -106,43 +76,76 @@ a particular issue type, follow the project rules.
   sub-methods
 - Similar branch logic that can be merged
 
-**C3. Type Safety**
+**B3. Module Architecture**
+- Are module responsibilities clear? Is there any responsibility boundary violation?
+- Is the dependency direction reasonable?
+- Are there circular dependencies?
+
+**B4. Interface Usage**
+- Are called APIs used according to their design intent and documentation?
+- Are any deprecated interfaces being used?
+- Parameter passing: are large objects passed by const reference instead of by value?
+
+**B5. Interface Changes**
+- Are public API changes necessary and justified?
+- Are backward compatibility implications considered?
+
+**B6. Test Coverage**
+- Do changed logic paths have corresponding test cases?
+- Do boundary conditions have test coverage?
+- Do error paths have test coverage?
+
+**B7. Regression Risk**
+- Could the modification affect other callers?
+- Are behavior changes consistent across all target platforms?
+
+---
+
+## Level C: Conventions & Documentation
+
+Coding standards and documentation consistency. Lower impact on functionality.
+
+**C1. Naming Conventions**
+- Does the code follow the project's existing naming style (as defined in the loaded
+  project rules)?
+- Are variable names semantically clear, avoiding unnecessary abbreviations?
+- Are names in new code consistent with the style in the same file?
+
+**C2. Initialization Conventions**
+- Are variables assigned an initial value at declaration (as required by project rules)?
+- Are class member variables initialized at declaration or in the constructor?
+
+**C3. Project Language Conventions**
+- Does the code comply with language usage restrictions defined in the project rules
+  (varies by project)?
+- Is new code consistent with existing patterns in the project?
+
+**C4. Comment Conventions**
+- Do public APIs have sufficient parameter and return value descriptions?
+- Are comments consistent with code behavior (outdated comments are worse than none)?
+- Are design intent explanations present where code alone is insufficient?
+
+**C5. File Organization**
+- Is the function order in implementation files consistent with the declaration order?
+- Do header files have appropriate include guards?
+- Are include dependencies necessary and reasonable?
+
+**C6. Type Safety**
 - Implicit narrowing conversions (large type -> small type)
 - Signed / unsigned mixed comparisons
 - Magic numbers: hard-coded values should be extracted as named constants (unless
   the context already makes it clear)
 
-**C4. Const Correctness**
+**C7. Const Correctness**
 - Are methods that don't modify state marked const?
 - Are parameters that aren't modified passed as const references?
 - Are local variables that aren't modified declared const?
 
----
-
-## Level D: Architecture & Documentation
-
-**D1. Documentation Consistency**
+**C8. Documentation Consistency**
 - Are type names / enum names in code consistent with project documentation?
 - Are value ranges in comments consistent with specification documents?
 - Does documentation description match actual code behavior?
-
-**D2. Interface Design** (comments / documentation level only, no signature changes)
 - Do public API comments accurately describe current behavior?
-- Is parameter documentation complete?
-
-**D3. Module Architecture**
-- Are module responsibilities clear? Is there any responsibility boundary violation?
-- Is the dependency direction reasonable?
-- Are there circular dependencies?
-
-**D4. Test Coverage**
-- Do changed logic paths have corresponding test cases?
-- Do boundary conditions have test coverage?
-- Do error paths have test coverage?
-
-**D5. Regression Risk Assessment**
-- Could the modification affect other callers?
-- Are behavior changes consistent across all target platforms?
 
 ---
 
