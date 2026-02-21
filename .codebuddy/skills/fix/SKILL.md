@@ -122,6 +122,12 @@ while minimizing cross-module dependencies.
 - Reviewer prompt includes:
   - Module file list + check items for the selected fix level (see
     `references/review-checklist.md`)
+  - **Review scope rule**: reviewers must read entire files for full context, but apply
+    different reporting thresholds based on whether code is within the branch diff:
+    - **Code within diff**: report all issues matching the selected fix level (A/B/C)
+    - **Code outside diff**: report only Level A (correctness/safety) and Level B
+      (refactoring/optimization) issues. Skip Level C (conventions/documentation) for
+      unchanged code.
   - **Evidence requirement**: every issue must have a code citation (file:line + snippet)
   - **Exclusion list**: see `references/review-checklist.md` exclusion section. Project
     rules loaded in context take priority over the exclusion list.
