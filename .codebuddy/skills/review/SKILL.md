@@ -114,12 +114,16 @@ The available options depend on code ownership:
 **Own code** (local mode, or PR mode with `IS_OWN_PR = true`):
 
 **Question 2 — Auto-fix threshold** (option descriptions should explain what each
-threshold means in practice):
-- Option 1 — "Low risk only": auto-fix obvious unambiguous fixes (e.g., null checks,
-  comment typos, naming). Everything else is listed for confirmation.
-- Option 2 — "Low + Medium risk": also auto-fix clear fixes with broader scope (e.g.,
-  cross-function refactoring, removing unused internal methods). Only high-risk issues
-  require confirmation.
+threshold means and give examples so the user understands the boundary):
+- Option 1 — "Low risk only": auto-fix issues where there is only one correct fix and
+  any developer would agree (e.g., adding a missing null check, fixing an incorrect
+  comment, renaming a non-conforming variable, adding `reserve`). Issues with broader
+  impact are listed for confirmation.
+- Option 2 — "Low + Medium risk": also auto-fix issues where the fix is clear but
+  touches multiple locations (e.g., extracting duplicated logic into a shared method,
+  removing an unused internal function, simplifying cross-function control flow). Only
+  issues involving design decisions or external contracts require confirmation (e.g.,
+  API changes, architecture adjustments, algorithm trade-offs).
 - Option 3 — "All confirm": no auto-fix, every issue is listed for user selection.
 
 **Other's PR** (`IS_OWN_PR = false`):
