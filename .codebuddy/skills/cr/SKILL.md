@@ -9,9 +9,9 @@ Use `/cr` to start. Accepts a PR number/URL, commit (range), file/directory path
 or no argument (current branch vs upstream). See Phase 0.1 for full argument parsing.
 
 Reviews code and documents using Agent Teams. Each issue gets a risk level — low-risk
-issues are auto-fixed, higher-risk issues are presented for user confirmation. For
-other people's PRs, issues are submitted as line-level PR review comments instead of
-direct commits. Runs multi-round iterations until no valid issues remain.
+issues are auto-fixed, higher-risk issues are presented for user confirmation. In PR
+mode, issues are submitted as line-level PR review comments instead of direct commits.
+Runs multi-round iterations until no valid issues remain.
 
 ## Instructions
 
@@ -78,14 +78,11 @@ base. If no upstream is configured, fall back to `main` (or `master`).
 
 2. **Fetch PR metadata** (single API call):
    ```
-   gh pr view {number} --json headRefName,baseRefName,author,headRefOid,state
+   gh pr view {number} --json headRefName,baseRefName,headRefOid,state
    ```
-   Extract: `PR_BRANCH`, `BASE_BRANCH`, `PR_AUTHOR`, `HEAD_SHA`, `STATE`.
+   Extract: `PR_BRANCH`, `BASE_BRANCH`, `HEAD_SHA`, `STATE`.
    If `STATE` is not `OPEN`, inform the user that the PR is already closed/merged and
    exit.
-
-3. **Determine code ownership**: compare `PR_AUTHOR` with `gh api user -q '.login'`.
-   Store result as `IS_OWN_PR` (true/false).
 
 **Local mode**: no exploration needed at this point. Proceed directly to 0.2.
 
@@ -98,9 +95,9 @@ before asking.
 
 #### Question 1 — Review priority
 
-Always show this question unless it can be trivially determined that the scope
-contains **only** document files (e.g., PR metadata file list is all `.md`). When
-skipped, all priority levels (A+B+C) are checked.
+Always show this question. When the scope turns out to be doc-only (determined later
+in 0.5 module partitioning), all priority levels (A+B+C) are used regardless of the
+user's choice here.
 
 (code/mixed modules):
 - Option 1 — "Full review (A + B + C)": correctness, refactoring, and conventions.
@@ -110,20 +107,18 @@ skipped, all priority levels (A+B+C) are checked.
 - Option 3 — "Correctness only (A)": only safety and correctness issues.
   e.g., null dereference, out-of-bounds, resource leaks, race conditions.
 
-#### Question 2 — Auto-fix threshold
+#### Question 2 — Auto-fix threshold (Local mode only)
 
-**Own code** (local mode, or PR mode with `IS_OWN_PR = true`):
+Skip in PR mode (PR mode always uses all-confirm with comment output). Inform the
+user: "PR mode: issues will be presented for you to select which ones to submit as
+PR review comments."
+
 - Option 1 — "Low + Medium risk": auto-fix clear fixes including multi-location changes
   (extract shared logic, remove unused internals). Only confirm high-risk decisions
   (API changes, architecture, algorithm trade-offs).
 - Option 2 — "Low risk only": auto-fix only unambiguous local fixes (null checks,
   comment typos, naming, `reserve`). Confirm everything else.
 - Option 3 — "All confirm": no auto-fix, review every issue before fixing.
-
-**Other's PR** (`IS_OWN_PR = false`):
-Threshold is automatically set to **all confirm** with PR comment output. Inform the
-user: "This is someone else's PR. Issues will be presented for you to select which ones
-to submit as PR review comments."
 
 After all questions are answered, no further user interaction until Phase 7.
 
@@ -137,15 +132,15 @@ Automated checks only — no user interaction.
   parallel. Continue without aborting.
 
 **Test environment**:
-- Skip if other's PR or doc-only scope. If no build/test commands can be determined
+- Skip if PR mode or doc-only scope. If no build/test commands can be determined
   from context or the codebase, warn the user in the conversation that fix validation
   will be skipped (fixes are still applied but not automatically verified). Continue
   without aborting.
 
 **Clean branch check**:
 - **PR mode (will use worktree)**: skip — the worktree created in 0.4 will be clean.
-- **PR mode (current branch is PR branch)**: verify no uncommitted changes. If dirty,
-  abort and ask the user to resolve first.
+- **PR mode (current branch is PR branch)**: skip — PR mode is read-only (comment
+  output only), no local modifications will be made.
 - **Local mode**: verify not on the main/master branch (abort if so). If there are
   uncommitted changes, abort and ask the user to commit or stash first (fixes may be
   committed even in all-confirm mode after user approval in Phase 7).
@@ -166,25 +161,34 @@ Perform the heavy operations that were deferred from 0.1.
      All subsequent operations use the worktree directory. Record `WORKTREE_DIR` for
      cleanup in Phase 7.
 
-2. **Fetch existing PR comments** for reviewer context:
-   ```
-   gh pr view {number} --comments
-   ```
-   Include in reviewer prompts so they avoid re-reporting already-discussed issues.
-
-3. **Set review scope**: diff against the PR's base branch (`BASE_BRANCH` from 0.1).
+2. **Set review scope**: diff against the PR's base branch (`BASE_BRANCH` from 0.1).
    ```
    git fetch origin {BASE_BRANCH}
    git diff $(git merge-base origin/{BASE_BRANCH} HEAD)
    ```
 
+3. **Fetch existing PR review comments** for de-duplication in Phase 3:
+   ```
+   gh api repos/{owner}/{repo}/pulls/{number}/comments
+   ```
+   Store as `EXISTING_PR_COMMENTS` for later comparison.
+
 **Local mode**: fetch the full diff content for the scope determined in 0.1 (branch
 diff, `git show`, commit range diff, or read file contents for full-content review).
+
+**Local mode — associated PR comments** (optional, best-effort):
+If `gh` is available, check whether the current branch has an open PR:
+```
+gh pr view --json number,headRefOid,comments 2>/dev/null
+```
+If an open PR exists, store its review comments. These are used in Phase 3 as
+reference information — each comment is verified against the actual code to confirm
+the issue still exists before being treated as a known issue to fix.
 
 **Empty scope check**: if the diff is empty or the PR has no file changes, inform the
 user that there is nothing to review and exit.
 
-**Build + test baseline** (skip for other's PR, doc-only scope, or no build/test commands):
+**Build + test baseline** (skip for PR mode, doc-only scope, or no build/test commands):
 Run build and test in the working directory to establish a passing baseline. Fail = abort.
 
 ### 0.5 Module Partitioning
@@ -227,8 +231,8 @@ The user may send additional material at any time. If reviewers are still active
     rules loaded in context take priority over the exclusion list.
   - **Public API protection**: no signature/interface changes unless obvious bug or
     comment issue
-  - **PR context** (PR mode only): include existing PR comments so reviewers avoid
-    re-reporting already-discussed issues
+  - **PR context** (PR mode only): include existing PR review comments so reviewers
+    have context on already-discussed topics
   - Structured output format
 
 ---
@@ -260,13 +264,21 @@ matrix. The user's chosen auto-fix threshold determines handling:
 - Issues at or below the threshold -> queued for auto-fix (Phase 4)
 - Issues above the threshold -> added to the **deferred issue list** (accumulated
   across all rounds, presented to the user only in Phase 7)
-- **Other's PR**: since all issues are deferred, skip Phase 4-6 entirely after Phase 3
-  and go directly to Phase 7.
+- **PR mode**: all issues are deferred (all-confirm). Skip Phase 4-6 entirely after
+  Phase 3 and go directly to Phase 7.
 
 ### Key points
 
 - **De-duplication**: skip any issue that matches one already fixed, rolled back, recorded
   to pending, or deferred in a previous round.
+- **PR comment de-duplication** (PR mode): compare each confirmed issue against
+  `EXISTING_PR_COMMENTS`. If an issue matches an existing comment (same file, same
+  general location, same topic), exclude it from the deferred list — do not present
+  it to the user.
+- **Associated PR comment verification** (Local mode with associated PR): for each
+  PR review comment retrieved in 0.4, verify against the current code whether the
+  issue still exists. Verified issues are added to the fix queue as additional known
+  issues (using the same risk assessment flow).
 - For each fixable issue, check whether the change also requires updates to comments
   or documentation outside the fixer's module — if so, create a follow-up for
   `fixer-cross`.
@@ -345,12 +357,11 @@ to step 2.
    - Option 3 — "Select individually": present each issue one by one (same as above)
 
 3. **Action depends on mode**:
-   - **Local mode / own PR**: create a temporary team with fixer agents for selected
-     issues -> fix -> validate (same as Phase 4-5). Record any failures to
-     `pending-issues.md`.
-   - **Other's PR**: user selects which to submit as PR review comments using the
-     format in `references/pr-comment-format.md`. Comment body should be concise,
-     written in the user's conversation language, with a specific fix suggestion.
+   - **Local mode**: create a temporary team with fixer agents for selected issues ->
+     fix -> validate (same as Phase 4-5). Record any failures to `pending-issues.md`.
+   - **PR mode**: submit selected issues as PR review comments using the format in
+     `references/pr-comment-format.md`. Comment body should be concise, written in the
+     user's conversation language, with a specific fix suggestion.
 
 ### Step 2: Pending item confirmation
 
@@ -361,28 +372,24 @@ to step 2.
    fix-validate cycle as Phase 4-5, including retry on failure); rejected -> discard
 5. Final build + test (skip for doc-only modules)
 
-### Step 3: PR mode — push fixes (own PR only)
+### Step 3: PR mode — worktree cleanup
 
-If fixes were made in PR mode and `IS_OWN_PR = true`, push all commits to the PR
-branch. If push fails, inform the user — commits remain local for manual push.
-
-### Step 4: PR mode — worktree cleanup
-
-If `WORKTREE_DIR` was created, clean up after push is verified:
+If `WORKTREE_DIR` was created, clean up:
 ```
 cd {original_directory}
 git worktree remove {WORKTREE_DIR}
 git branch -D pr-{number}
 ```
 
-### Step 5: Summary Report
+### Step 4: Summary Report
 
 - Total rounds and per-round fix count/type statistics
 - Issues found vs issues fixed (also show issues the user declined)
 - Rolled-back issues and reasons
 - Pending items and their resolution
 - Final test result
-- **PR mode**: list commits pushed (own PR) or review comments submitted (other's PR)
+- **PR mode**: list review comments submitted
+- **Local mode with associated PR**: note which issues originated from PR comments
 
 Delete pending files after report.
 
