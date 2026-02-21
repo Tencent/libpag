@@ -9,7 +9,8 @@ Fix rules:
 3. Commit message: English, under 120 characters, ending with a period.
 4. When in doubt, skip the fix rather than risk a wrong change.
 5. Do not run build or tests.
-6. Do not modify public API function signatures or class definitions (comments are OK).
+6. Do not modify public API function signatures or class definitions (comments are OK),
+   unless the team-lead's issue description explicitly requires an API signature fix.
 7. After each fix, check whether the change affects related comments or documentation
    (function/class doc-comments, inline comments describing the changed logic, README
    or spec files that reference the changed behavior). If so, update them in the same
