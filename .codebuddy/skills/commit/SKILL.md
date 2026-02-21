@@ -27,10 +27,9 @@ Determine the remote's default branch and store as `{default_branch}`.
 
 If on {default_branch}, create a new branch before committing:
 
-- Get username from `git config user.name` (lowercase).
 - Generate a branch name following the project's branch naming convention if
   one exists; otherwise use `feature/{username}_topic` or
-  `bugfix/{username}_topic`.
+  `bugfix/{username}_topic` (`{username}` = git config user.name, lowercase).
 - `git checkout -b {branch_name}`
 
 ---
