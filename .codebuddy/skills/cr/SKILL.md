@@ -22,14 +22,14 @@ direct commits. Runs multi-round iterations until no valid issues remain.
 - **You (the team-lead) never modify files directly.** Delegate all changes to agents.
   Read code only for arbitration and diagnosis.
 - After each round, analyze review quality and adjust the next round's reviewer prompts.
-- **Autonomous operation**: between Phase 0 (setup) and Phase 3.5 (deferred issue
-  confirmation), and between Phase 3.5 and Phase 7 (final report), the process runs
-  without user interaction. The team-lead must handle all unexpected situations
-  autonomously — e.g., an agent stuck or unresponsive, a fix that breaks the build,
-  a git operation that fails, an agent producing invalid output. Use your judgment:
-  terminate and replace, revert and retry, skip and move on, etc. Anything that cannot
-  be resolved automatically should be recorded to `pending-issues.md` for user review
-  in Phase 7.
+- **Autonomous operation**: between Phase 0 (setup) and Phase 7 (final report), the
+  entire review-fix loop runs without user interaction. Deferred issues accumulate
+  across rounds and are only presented to the user in Phase 7. The team-lead must
+  handle all unexpected situations autonomously — e.g., an agent stuck or unresponsive,
+  a fix that breaks the build, a git operation that fails, an agent producing invalid
+  output. Use your judgment: terminate and replace, revert and retry, skip and move on,
+  etc. Anything that cannot be resolved automatically should be recorded to
+  `pending-issues.md` for user review in Phase 7.
 
 ## References
 
@@ -155,7 +155,7 @@ process begins. Complete all checks before proceeding to module partitioning.
   abort and ask the user to resolve first.
 - **Local mode**: verify not on the main/master branch (abort if so). If there are
   uncommitted changes, abort and ask the user to commit or stash first (fixes may be
-  committed even in all-confirm mode after user approval in Phase 3.5).
+  committed even in all-confirm mode after user approval in Phase 7).
 
 **Environment verification** (skip for other's PR or doc-only scope):
 - Detect build and test commands from project rules or by exploring the codebase.
@@ -169,8 +169,7 @@ process begins. Complete all checks before proceeding to module partitioning.
 - Ask the user if they have additional reference material (file paths, URLs, or inline
   instructions). The user may skip.
 
-After all checks pass, no further user interaction until Phase 3.5 (deferred issue
-confirmation) and Phase 7 (final report).
+After all checks pass, no further user interaction until Phase 7 (final report).
 
 ### 0.5 Module Partitioning
 
@@ -220,7 +219,6 @@ if those modules are already reviewed, include the material in the next round in
 
 ## Phase 2: Verification
 
-- **Do not close reviewers yet** (may reuse as fixers in Phase 4)
 - **Reviewer self-check + independent verification** (run in parallel):
   - Each reviewer re-reads the relevant code and self-verifies every issue they
     reported, marking each as confirmed or withdrawn.
@@ -229,6 +227,7 @@ if those modules are already reviewed, include the material in the next round in
     each issue.
 - **Alignment**: send verifier results back to the reviewer for comparison with their
   self-check. If they disagree on any issue, team-lead reads code to judge.
+- After alignment is complete, close all reviewers and verifiers.
 
 ---
 
@@ -243,7 +242,8 @@ special rules.
 Assign each fixable issue a risk level (low / medium / high) based on the judgment
 matrix. The user's chosen auto-fix threshold determines handling:
 - Issues at or below the threshold -> queued for auto-fix (Phase 4)
-- Issues above the threshold -> deferred to Phase 3.5 for user confirmation
+- Issues above the threshold -> added to the **deferred issue list** (accumulated
+  across all rounds, presented to the user only in Phase 7)
 
 ### Key points
 
@@ -254,46 +254,12 @@ matrix. The user's chosen auto-fix threshold determines handling:
 
 ---
 
-## Phase 3.5: Deferred Issue Confirmation
-
-This phase is the **only mid-process user interaction point**. It handles issues above
-the user's auto-fix threshold. Issues at or below the threshold have already been
-queued for auto-fix and proceed directly to Phase 4.
-
-If there are no deferred issues, skip this phase entirely.
-
-### Present deferred issues
-
-1. Present all deferred issues (from current round and any remaining from previous
-   rounds) to the user in a compact numbered list. Each entry should fit on one line:
-   `[number] [file:line] [risk] — [description]`
-
-2. Ask the user which issues to act on. The user can:
-   - Enter issue numbers (e.g., "1,3,5" or "1-5,8")
-   - Enter "all" to act on all deferred issues
-   - Enter "none" or leave empty to skip all deferred issues
-
-3. **Action depends on mode**:
-   - **Local mode / own PR**: selected issues are added to the fix queue for Phase 4.
-   - **Other's PR**: all confirmed issues (regardless of risk level) are presented in
-     this list. User selects which to submit as PR review comments (see below), then
-     skip to Phase 7 (no fix loop for other's PR).
-
-4. If both the auto-fix queue and user selection are empty -> skip Phase 4-5, go
-   directly to Phase 6 termination check.
-
-### PR Review Comments (other's PR)
-
-Submit selected issues as a single GitHub PR review using the format in
-`references/pr-comment-format.md`. Comment body should be concise, written in the
-user's conversation language, and include a specific fix suggestion when possible.
-
----
-
 ## Phase 4: Fix
 
-- Group confirmed issues into **fix modules by file** (see 0.5). Reuse reviewers as
-  fixers when they already have context for a file.
+If the auto-fix queue is empty (all issues were deferred), skip Phase 4-5 and go
+directly to Phase 6.
+
+- Group confirmed issues into **fix modules by file** (see 0.5).
 - Cross-file issues -> `fixer-cross` agent; multi-file renames -> single atomic task
 
 ### Fixer Instructions (include in every fixer prompt)
@@ -305,56 +271,72 @@ Team-lead collects skipped issues and includes them in the next round's context.
 
 ## Phase 5: Validate
 
-- **Do not close reviewers yet** (may need retry)
 - For code/mixed modules: build + test using the project's commands
 - For doc-only modules: skip build/test; validation is done through review phases
 
-**All pass** (or no code modules to validate) -> close all reviewers/fixers -> Phase 6.
+**All pass** (or no code modules to validate) -> close all fixers -> Phase 6.
 
 **Failures**: bisect to locate the bad commit, revert it, and send failure info back
 to the original fixer for retry (max 2 retries). If still failing, revert and record
-to `pending-issues.md`. Close all agents when resolved.
+to `pending-issues.md`. Close all fixers when resolved.
 
 ---
 
 ## Phase 6: Loop
 
 - Close the team to release all agents.
-- **Other's PR**: skip this phase entirely — no fix loop. Go directly to Phase 7
-  after PR review comments are submitted in Phase 3.5.
+- **Other's PR**: skip the loop entirely — go directly to Phase 7 after Phase 3.
 
 ### Termination check
 
-- If no issues were actually fixed or queued for fix this round -> Phase 7
+- If no auto-fix issues were found this round (auto-fix queue was empty) -> Phase 7
 - Otherwise -> create new team, back to Phase 1
 
 ### Next round context
 
 Next round prompt includes: rollback blacklist, previous fix summary,
-pending file contents, **deferred issue list** (issues above threshold that the user
-has not yet acted on), and prompt adjustments based on review quality analysis.
+pending file contents, and prompt adjustments based on review quality analysis.
 Reviewers must skip all issues already reported in previous rounds — whether fixed,
-rolled back, recorded to pending files, declined by the user, or still awaiting
-confirmation.
+rolled back, recorded to pending files, or deferred for user confirmation.
 
 ---
 
 ## Phase 7: Final Report & Cleanup
 
-### Step 1: Pending item confirmation
+### Step 1: Deferred issue confirmation
 
-1. Check `pending-issues.md`
-2. Empty -> proceed to step 2
+Present all accumulated deferred issues across all rounds. If the list is empty, skip
+to step 2.
+
+1. Present issues in a compact numbered list. Each entry should fit on one line:
+   `[number] [file:line] [risk] — [description]`
+
+2. Ask the user which issues to act on. The user can:
+   - Enter issue numbers (e.g., "1,3,5" or "1-5,8")
+   - Enter "all" to act on all deferred issues
+   - Enter "none" or leave empty to skip all
+
+3. **Action depends on mode**:
+   - **Local mode / own PR**: create fixer agents for selected issues -> fix -> validate
+     (same as Phase 4-5). Record any failures to `pending-issues.md`.
+   - **Other's PR**: user selects which to submit as PR review comments using the
+     format in `references/pr-comment-format.md`. Comment body should be concise,
+     written in the user's conversation language, with a specific fix suggestion.
+
+### Step 2: Pending item confirmation
+
+1. Check `pending-issues.md` (issues that failed auto-fix or deferred-fix)
+2. Empty -> proceed to step 3
 3. Has content -> present to user for item-by-item confirmation
 4. Approved fixes -> create agent to re-apply; rejected -> discard
 5. Final build + test (skip for doc-only modules)
 
-### Step 2: PR mode — push fixes (own PR only)
+### Step 3: PR mode — push fixes (own PR only)
 
 If fixes were made in PR mode and `IS_OWN_PR = true`, push all commits to the PR
 branch. If push fails, inform the user — commits remain local for manual push.
 
-### Step 3: PR mode — worktree cleanup
+### Step 4: PR mode — worktree cleanup
 
 If `WORKTREE_DIR` was created, clean up after push is verified:
 ```
@@ -363,7 +345,7 @@ git worktree remove {WORKTREE_DIR}
 git branch -D pr-{number}
 ```
 
-### Step 4: Summary Report
+### Step 5: Summary Report
 
 - Total rounds and per-round fix count/type statistics
 - Issues found vs issues fixed (also show issues the user declined)
