@@ -1,10 +1,6 @@
 ---
 name: cr
-description: >-
-  Automated code review and fix for local branches, PRs, commits, and files.
-  Supports multi-round iteration with risk-based auto-fix. Use when the user
-  says "review", "code review", "/cr", "review this PR", "check my code",
-  or "review my changes".
+description: Automated code review and fix for local branches, PRs, commits, and files. Supports multi-round iteration with risk-based auto-fix. Use when the user says "review", "code review", "/cr", "review this PR", "check my code", or "review my changes".
 ---
 
 # Review — Automated Code Review & Fix
