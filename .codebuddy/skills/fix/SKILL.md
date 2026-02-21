@@ -108,9 +108,9 @@ If `$ARGUMENTS` is empty, ask both questions. If scope was resolved from the arg
 report it and only ask the fix level question.
 
 **Question 1 — Review scope** (skip if resolved from argument):
-- Current branch vs main diff
-- Diff from a specified base commit
-- Specified folder or file path
+- Option 1 — "Current branch vs main": use the diff between current branch and main
+- The "Other" free-text option allows the user to type a base commit (hash or ref) or
+  a folder/file path directly. Validate the input the same way as `$ARGUMENTS` parsing.
 
 **Question 2 — Fix level** (option labels should be concise, use descriptions to explain
 the incremental scope of each level):
