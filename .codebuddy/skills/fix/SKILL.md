@@ -11,14 +11,6 @@ Runs multi-round team-based iterations until no valid issues remain.
 **Activation**: Only execute this workflow when the user explicitly invokes `/fix`.
 Do NOT auto-trigger for general bug fix requests, code questions, or error discussions.
 
-## Prerequisites
-
-This skill requires the **Agent Teams** experimental feature. If not enabled, prompt
-the user to enable it before proceeding:
-
-- Option A: Run `/config`, find `[Experimental] Agent Teams`, toggle to `true`.
-- Option B: Set environment variable `CODEBUDDY_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
-
 ## General Rules
 
 - All user-facing interactions must use the language the user has been using in the
@@ -149,7 +141,9 @@ review process. When this happens:
 
 ## Phase 1: Review
 
-- `TeamCreate` to create the team
+- Create the team. If team creation fails because Agent Teams is not enabled, prompt
+  the user to enable it: run `/config` -> `[Experimental] Agent Teams` -> `true`, or
+  set environment variable `CODEBUDDY_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
 - One `general-purpose` reviewer agent (`reviewer-N`) per module
 - Reviewer prompt includes:
   - Module file list + check items for the selected fix level, using the checklist
