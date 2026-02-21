@@ -276,6 +276,12 @@ they **must not** be omitted.
 | `color` | Color | (required) |
 | `blendMode` | BlendMode | normal |
 
+### ColorMatrixFilter
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `matrix` | string | (required) |
+
 ### Font
 
 | Attribute | Type | Default |
