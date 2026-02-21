@@ -32,8 +32,9 @@ identical portions can be extracted.
 Composition has its own coordinate system with origin at the top-left corner. The referencing
 Layer's `x` / `y` positions the Composition's top-left corner in the parent coordinate system.
 
-**Conversion steps**: Given an original Layer at `(layerX, layerY)` with geometry using
-`center="cx,cy"`:
+**Conversion steps**: Given an original Layer at `(layerX, layerY)` with geometry
+using `center="cx,cy"` (where cx and cy are the geometry center coordinates relative
+to the original Layer origin):
 
 ```
 Composition width  = geometry width
