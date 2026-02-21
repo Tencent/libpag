@@ -6,7 +6,7 @@ description: Automated code review and fix for local branches, PRs, commits, and
 # Review — Automated Code Review & Fix
 
 Use `/cr` to start. Accepts a PR number/URL, commit (range), file/directory paths,
-or no argument (current branch vs upstream). See Phase 0.2 for full argument parsing.
+or no argument (current branch vs upstream). See Phase 0.1 for full argument parsing.
 
 Reviews code and documents using Agent Teams. Each issue gets a risk level — low-risk
 issues are auto-fixed, higher-risk issues are presented for user confirmation. In PR
@@ -49,18 +49,42 @@ Runs multi-round iterations until no valid issues remain.
 
 ## Phase 0: Scope Confirmation & Environment Check
 
-### 0.1 Mode Detection & User Questions
+### 0.1 Argument Parsing, Mode Detection & User Questions
 
-Determine the mode from `$ARGUMENTS`:
-- Purely numeric or URL (contains `/`) -> **PR mode**
-- Empty or anything else -> **Local mode**
+#### Argument parsing
 
-This requires no commands — just inspect the argument string. Then immediately present
-questions in **one interaction**.
+Parse `$ARGUMENTS` to determine the review mode and scope:
+
+**PR mode** — argument is purely numeric or a URL (contains `/`):
+
+Fetch PR metadata:
+```
+gh pr view {number} --json headRefName,baseRefName,headRefOid,state
+```
+Extract: `PR_BRANCH`, `BASE_BRANCH`, `HEAD_SHA`, `STATE`.
+If the command fails (gh not installed, not authenticated, PR not found, or URL
+repo mismatch), inform the user and abort.
+If `STATE` is not `OPEN`, inform the user that the PR is already closed/merged and
+exit.
+
+**Local mode** — everything else:
+
+| `$ARGUMENTS` | Detection (string only) | Scope |
+|--------------|-------------------------|-------|
+| (empty) | — | Current branch vs upstream (diff) |
+| Contains `..` (e.g., `abc..def`) | String contains `..` | Diff between two commits (excluding first) |
+| Other | Assume commit hash or file/directory paths | Validated later in 0.3 |
+
+No git commands needed here — just record the raw arguments. Validation (commit
+existence, path existence, upstream detection) happens in 0.3 Scope Preparation.
+
+#### User questions
+
+Present all applicable questions in **one interaction**.
 
 #### Question 1 — Review priority
 
-Always show. When the scope turns out to be doc-only (determined later in 0.5 module
+Always show. When the scope turns out to be doc-only (determined later in 0.4 module
 partitioning), all priority levels (A+B+C) are used regardless of the user's choice.
 
 (code/mixed modules):
@@ -89,41 +113,7 @@ review comments after your review."
 
 After all questions are answered, no further user interaction until Phase 7.
 
-### 0.2 Argument Parsing & Validation
-
-Now run commands to fully parse and validate the arguments.
-
-**PR mode** — fetch metadata:
-
-1. Verify `gh` is available (`gh --version`). If not installed, inform the user
-   (macOS: `brew install gh`, others: https://cli.github.com) and abort.
-
-2. If a URL was given, verify the URL's owner/repo matches the current repository
-   (`gh repo view --json nameWithOwner -q '.nameWithOwner'`). Mismatch -> abort.
-
-3. Fetch PR metadata (single API call):
-   ```
-   gh pr view {number} --json headRefName,baseRefName,headRefOid,state
-   ```
-   Extract: `PR_BRANCH`, `BASE_BRANCH`, `HEAD_SHA`, `STATE`.
-   If `STATE` is not `OPEN`, inform the user and exit.
-
-**Local mode** — determine scope from `$ARGUMENTS`:
-
-| `$ARGUMENTS` | Detection | Scope |
-|--------------|-----------|-------|
-| (empty) | — | Current branch vs upstream (diff) |
-| Single commit (e.g., `abc123`) | `git rev-parse --verify` succeeds | That commit's changes (`git show`) |
-| Commit range (e.g., `abc..def`) | Contains `..`, both endpoints valid | Diff between two commits (excluding first) |
-| File/directory paths (space-separated) | All paths exist on disk | Full content review (no diff) |
-
-Parse order: contains `..` -> commit range; all args exist on disk -> file/directory
-paths; single arg + `git rev-parse` succeeds -> single commit; otherwise -> error.
-
-Empty arguments (default): use the current branch's upstream tracking branch as the
-base. If no upstream is configured, fall back to `main` (or `master`).
-
-### 0.3 Pre-flight Checks
+### 0.2 Pre-flight Checks
 
 Automated checks — no user interaction.
 - Check if Agent Teams is enabled. If not available, warn the user in the conversation
@@ -144,9 +134,9 @@ Automated checks — no user interaction.
   uncommitted changes, abort and ask the user to commit or stash first (fixes may be
   committed even in all-confirm mode after user approval in Phase 7).
 
-### 0.4 Scope Preparation
+### 0.3 Scope Preparation
 
-Fetch the actual diff/content and set up the working environment.
+Validate arguments and fetch the actual diff/content.
 
 **PR mode — working directory & diff**:
 
@@ -160,7 +150,7 @@ Fetch the actual diff/content and set up the working environment.
      All subsequent operations use the worktree directory. Record `WORKTREE_DIR` for
      cleanup in Phase 7.
 
-2. **Set review scope**: diff against the PR's base branch (`BASE_BRANCH` from 0.2).
+2. **Set review scope**: diff against the PR's base branch (`BASE_BRANCH` from 0.1).
    ```
    git fetch origin {BASE_BRANCH}
    git diff $(git merge-base origin/{BASE_BRANCH} HEAD)
@@ -172,8 +162,14 @@ Fetch the actual diff/content and set up the working environment.
    ```
    Store as `EXISTING_PR_COMMENTS` for later comparison.
 
-**Local mode**: fetch the full diff content for the scope determined in 0.2 (branch
-diff, `git show`, commit range diff, or read file contents for full-content review).
+**Local mode** — validate arguments and fetch diff:
+
+- Empty arguments: determine the base branch from the current branch's upstream
+  tracking branch. If no upstream, fall back to `main` (or `master`). Fetch the
+  branch diff.
+- Commit hash: validate with `git rev-parse --verify`, then `git show`.
+- Commit range: validate both endpoints, then fetch the range diff.
+- File/directory paths: verify all paths exist on disk, then read file contents.
 
 **Local mode — associated PR comments** (optional, best-effort):
 If `gh` is available, check whether the current branch has an open PR:
@@ -194,7 +190,7 @@ user that there is nothing to review and exit.
 **Build + test baseline** (skip for PR mode, doc-only scope, or no build/test commands):
 Run build and test in the working directory to establish a passing baseline. Fail = abort.
 
-### 0.5 Module Partitioning
+### 0.4 Module Partitioning
 
 Partition files in scope into **review modules** for parallel review.
 
@@ -264,7 +260,7 @@ special rules.
   `EXISTING_PR_COMMENTS`. If an issue matches an existing comment (same file, same
   general location, same topic), exclude it — do not present it to the user.
 - **Associated PR comment verification** (Local mode with associated PR): for each
-  PR review comment retrieved in 0.4, verify against the current code whether the
+  PR review comment retrieved in 0.3, verify against the current code whether the
   issue still exists. Verified issues are added to the fix queue as additional known
   issues (using the same risk assessment flow).
 
@@ -297,7 +293,7 @@ matrix. The user's chosen auto-fix threshold determines handling:
 If the auto-fix queue is empty (all issues were deferred), skip Phase 4-5 and go
 directly to Phase 6.
 
-- Group confirmed issues into **fix modules by file** (see 0.5).
+- Group confirmed issues into **fix modules by file** (see 0.4).
 - Cross-file issues -> `fixer-cross` agent; multi-file renames -> single atomic task
 
 ### Fixer Instructions (include in every fixer prompt)
@@ -310,7 +306,7 @@ Team-lead collects skipped issues and includes them in the next round's context.
 ## Phase 5: Validate
 
 - For code/mixed modules: build + test using the project's commands. If no build/test
-  commands are available (warned in 0.3), skip validation entirely.
+  commands are available (warned in 0.2), skip validation entirely.
 - For doc-only modules: skip build/test; validation is done through review phases
 
 **All pass** (or no code modules to validate) -> close all fixers -> Phase 6.
