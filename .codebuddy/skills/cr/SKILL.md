@@ -226,7 +226,9 @@ Run build and test in the working directory to establish a passing baseline. Fai
 
 ### 1.3 Module Partitioning
 
-Partition files in scope into **review modules** for parallel review.
+Partition files in scope into **review modules** for parallel review. The scope
+and module partitioning are determined once here and **reused in all subsequent
+rounds** — Phase 7 loops back to Phase 2 without re-running Phase 1.
 
 - Each module is a self-contained logical unit. Split large files by section/function
   group; group related small files together. Balance workload across reviewers.
@@ -241,6 +243,8 @@ files. See Phase 5 for details.
 ## Phase 2: Review
 
 - Create the team (or run serially without a team if Agent Teams is unavailable).
+  Reuse the scope and module partitioning from Phase 1 — do not re-diff or
+  re-partition.
 - One `general-purpose` reviewer agent (`reviewer-N`) per module
 - Reviewer prompt includes:
   - Module file list + checklist matching the module type:
