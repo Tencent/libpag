@@ -158,6 +158,18 @@ static int RemoveEmptyLayers(std::vector<Layer*>& layers) {
   return originalSize - static_cast<int>(layers.size());
 }
 
+static void ClearEmptyMaskReferences(PAGXDocument* document) {
+  for (auto& node : document->nodes) {
+    if (node->nodeType() != NodeType::Layer) {
+      continue;
+    }
+    auto layer = static_cast<Layer*>(node.get());
+    if (layer->mask != nullptr && IsEmptyLayer(layer->mask)) {
+      layer->mask = nullptr;
+    }
+  }
+}
+
 static bool IsEmptyElement(const Element* element) {
   if (element->nodeType() == NodeType::Stroke) {
     auto stroke = static_cast<const Stroke*>(element);
@@ -178,6 +190,7 @@ static int RemoveEmptyElements(std::vector<Element*>& elements) {
 
 static int RemoveEmptyNodes(PAGXDocument* document) {
   int count = 0;
+  ClearEmptyMaskReferences(document);
   count += RemoveEmptyLayers(document->layers);
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Layer) {
