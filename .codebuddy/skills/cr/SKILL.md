@@ -51,9 +51,12 @@ Runs multi-round iterations until no valid issues remain.
 
 ### 0.1 User Questions
 
+Your very first action must be presenting the question dialog — no git, gh, or any
+other commands before that.
+
 Check if `$ARGUMENTS` is purely numeric or a URL — if so this is **PR mode** and
 only Q1 is needed. Otherwise show both Q1 and Q2. Present all applicable questions
-in **one interaction** before running any commands.
+in **one interaction**.
 
 #### Question 1 — Review priority
 
