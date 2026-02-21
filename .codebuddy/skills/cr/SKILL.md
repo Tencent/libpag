@@ -6,7 +6,7 @@ description: Automated code review and fix for local branches, PRs, commits, and
 # Review — Automated Code Review & Fix
 
 Use `/cr` to start. Accepts a PR number/URL, commit (range), file/directory paths,
-or no argument (current branch vs upstream). See Phase 0.1 for full argument parsing.
+or no argument (current branch vs upstream). See Phase 1 for full argument parsing.
 
 Reviews code and documents using Agent Teams. Each issue gets a risk level — low-risk
 issues are auto-fixed, higher-risk issues are presented for user confirmation. In PR
@@ -17,9 +17,9 @@ Runs multi-round iterations until no valid issues remain.
 
 - You (the team-lead) **never modify files directly**. Delegate all changes to
   agents. Read code only for arbitration and diagnosis.
-- **Autonomous operation**: between Phase 0 (setup) and Phase 7 (final report), the
-  entire review-fix loop runs without user interaction. Deferred issues accumulate
-  across rounds and are only presented to the user in Phase 7.
+- **Autonomous operation**: between Phase 0 (user confirmation) and Phase 8 (final
+  report), the entire review-fix loop runs without user interaction. Deferred issues
+  accumulate across rounds and are only presented to the user in Phase 8.
 - All user-facing interactions must use the language the user has been using in the
   conversation. Do not default to English.
 - When presenting choices with predefined options, use interactive dialogs with
@@ -29,9 +29,9 @@ Runs multi-round iterations until no valid issues remain.
   stuck or unresponsive, a fix that breaks the build, a git operation that fails, an
   agent producing invalid output. Use your judgment: terminate and replace, revert and
   retry, skip and move on, etc. Anything that cannot be resolved automatically should
-  be recorded to `pending-issues.md` for user review in Phase 7.
+  be recorded to `pending-issues.md` for user review in Phase 8.
 - The user may send additional material (files, URLs, context) at any time. If
-  reviewers are still active (Phase 1-2), forward it directly; otherwise include
+  reviewers are still active (Phase 2-3), forward it directly; otherwise include
   the material in the next round.
 
 ## References
@@ -47,24 +47,26 @@ Runs multi-round iterations until no valid issues remain.
 
 ---
 
-## Phase 0: Scope Confirmation & Environment Check
+## Phase 0: User Confirmation
 
-### 0.1 Argument Parsing, Mode Detection & User Questions
+Prioritize asking questions before any time-consuming operations (git, gh, diff,
+build, codebase exploration) to minimize user wait time.
 
-#### Argument parsing
+### Mode detection
 
 Parse `$ARGUMENTS` to determine the review mode:
 - Purely numeric or URL (contains `/`) -> **PR mode**
 - Everything else (empty, commit-like, paths, `..` range) -> **Local mode**
 
-#### User questions
+### Questions
 
 Present all applicable questions in **one interaction**.
 
 #### Question 1 — Review priority
 
-Always show. When the scope turns out to be doc-only (determined later in 0.4 module
-partitioning), all priority levels (A+B+C) are used regardless of the user's choice.
+Always show. When the scope turns out to be doc-only (determined later in Phase 1
+module partitioning), all priority levels (A+B+C) are used regardless of the user's
+choice.
 
 (code/mixed modules):
 - Option 1 — "Full review (A + B + C)": correctness, refactoring, and conventions.
@@ -92,9 +94,13 @@ Option 3 should be pre-selected as the default.
   fix approach for high-risk issues (e.g., API changes, architecture restructuring,
   algorithm trade-offs). Only test baseline changes require confirmation.
 
-After all questions are answered, no further user interaction until Phase 7.
+After all questions are answered, no further user interaction until Phase 8.
 
-### 0.2 Pre-flight Checks
+---
+
+## Phase 1: Scope Confirmation & Environment Check
+
+### 1.1 Pre-flight Checks
 
 Automated checks — no user interaction.
 - Check if Agent Teams is enabled. If not available, warn the user in the conversation
@@ -113,9 +119,9 @@ Automated checks — no user interaction.
   modifications will be made.
 - **Local mode**: verify not on the main/master branch (abort if so). If there are
   uncommitted changes, abort and ask the user to commit or stash first (fixes may be
-  committed even in all-confirm mode after user approval in Phase 7).
+  committed even in all-confirm mode after user approval in Phase 8).
 
-### 0.3 Scope Preparation
+### 1.2 Scope Preparation
 
 Validate arguments and fetch the actual diff/content.
 
@@ -138,7 +144,7 @@ Validate arguments and fetch the actual diff/content.
      git worktree add /tmp/pr-review-{number} pr-{number}
      ```
      All subsequent operations use the worktree directory. Record `WORKTREE_DIR` for
-     cleanup in Phase 7.
+     cleanup in Phase 8.
 
 3. **Set review scope**: diff against `BASE_BRANCH`.
    ```
@@ -146,7 +152,7 @@ Validate arguments and fetch the actual diff/content.
    git diff $(git merge-base origin/{BASE_BRANCH} HEAD)
    ```
 
-4. **Fetch existing PR review comments** for de-duplication in Phase 3:
+4. **Fetch existing PR review comments** for de-duplication in Phase 4:
    ```
    gh api repos/{owner}/{repo}/pulls/{number}/comments
    ```
@@ -170,7 +176,7 @@ If an open PR exists, fetch its line-level review comments:
 ```
 gh api repos/{owner}/{repo}/pulls/{number}/comments
 ```
-These are used in Phase 3 as reference information — each comment is verified against
+These are used in Phase 4 as reference information — each comment is verified against
 the actual code to confirm the issue still exists before being treated as a known
 issue to fix.
 
@@ -180,7 +186,7 @@ user that there is nothing to review and exit.
 **Build + test baseline** (skip for PR mode, doc-only scope, or no build/test commands):
 Run build and test in the working directory to establish a passing baseline. Fail = abort.
 
-### 0.4 Module Partitioning
+### 1.3 Module Partitioning
 
 Partition files in scope into **review modules** for parallel review.
 
@@ -188,13 +194,13 @@ Partition files in scope into **review modules** for parallel review.
   group; group related small files together. Balance workload across reviewers.
 - Classify each module as `code`, `doc`, or `mixed` to determine which checklist to use.
 
-**Fix modules** are determined in Phase 3: group confirmed issues **by file** (one
+**Fix modules** are determined in Phase 4: group confirmed issues **by file** (one
 fixer per file to prevent concurrent edit conflicts). Cross-file issues go to a
 dedicated `fixer-cross` agent.
 
 ---
 
-## Phase 1: Review
+## Phase 2: Review
 
 - Create the team (or run serially without a team if Agent Teams is unavailable).
 - One `general-purpose` reviewer agent (`reviewer-N`) per module
@@ -222,7 +228,7 @@ dedicated `fixer-cross` agent.
 
 ---
 
-## Phase 2: Verification
+## Phase 3: Verification
 
 - **Reviewer self-check + independent verification** (run in parallel):
   - Each reviewer re-reads the relevant code and self-verifies every issue they
@@ -236,7 +242,7 @@ dedicated `fixer-cross` agent.
 
 ---
 
-## Phase 3: Filter & Risk Assessment — Team-Lead Only
+## Phase 4: Filter & Risk Assessment — Team-Lead Only
 
 For each confirmed issue, decide whether to fix and assign a risk level. Consult
 `references/judgment-matrix.md` for the full matrix, risk level definitions, and
@@ -250,7 +256,7 @@ special rules.
   `EXISTING_PR_COMMENTS`. If an issue matches an existing comment (same file, same
   general location, same topic), exclude it — do not present it to the user.
 - **Associated PR comment verification** (Local mode with associated PR): for each
-  PR review comment retrieved in 0.3, verify against the current code whether the
+  PR review comment retrieved in 1.2, verify against the current code whether the
   issue still exists. Verified issues are added to the fix queue as additional known
   issues (using the same risk assessment flow).
 
@@ -258,16 +264,16 @@ special rules.
 
 Assign each fixable issue a risk level (low / medium / high) based on the judgment
 matrix. The user's chosen auto-fix threshold determines handling:
-- Issues at or below the threshold -> queued for auto-fix (Phase 4)
+- Issues at or below the threshold -> queued for auto-fix (Phase 5)
 - Issues above the threshold -> added to the **deferred issue list** (accumulated
-  across all rounds, presented to the user only in Phase 7)
+  across all rounds, presented to the user only in Phase 8)
 
 ### Mode-specific routing
 
-- **PR mode**: all issues go to the deferred list. Skip Phase 4-6 and go directly
-  to Phase 7.
-- **Local mode**: if no auto-fix issues remain, proceed to Phase 4 (which will
-  skip to Phase 6 due to empty queue, then Phase 6 terminates to Phase 7).
+- **PR mode**: all issues go to the deferred list. Skip Phase 5-7 and go directly
+  to Phase 8.
+- **Local mode**: if no auto-fix issues remain, proceed to Phase 5 (which will
+  skip to Phase 7 due to empty queue, then Phase 7 terminates to Phase 8).
 
 ### Additional checks
 
@@ -278,12 +284,12 @@ matrix. The user's chosen auto-fix threshold determines handling:
 
 ---
 
-## Phase 4: Fix
+## Phase 5: Fix
 
-If the auto-fix queue is empty (all issues were deferred), skip Phase 4-5 and go
-directly to Phase 6.
+If the auto-fix queue is empty (all issues were deferred), skip Phase 5-6 and go
+directly to Phase 7.
 
-- Group confirmed issues into **fix modules by file** (see 0.4).
+- Group confirmed issues into **fix modules by file** (see 1.3).
 - Cross-file issues -> `fixer-cross` agent; multi-file renames -> single atomic task
 
 ### Fixer Instructions (include in every fixer prompt)
@@ -293,13 +299,13 @@ Team-lead collects skipped issues and includes them in the next round's context.
 
 ---
 
-## Phase 5: Validate
+## Phase 6: Validate
 
 - For code/mixed modules: build + test using the project's commands. If no build/test
-  commands are available (warned in 0.2), skip validation entirely.
+  commands are available (warned in 1.1), skip validation entirely.
 - For doc-only modules: skip build/test; validation is done through review phases
 
-**All pass** (or no code modules to validate) -> close all fixers -> Phase 6.
+**All pass** (or no code modules to validate) -> close all fixers -> Phase 7.
 
 **Failures**: identify the failing commit (bisect if multiple commits, direct revert
 if only one), revert it, and send failure info back to the original fixer for retry
@@ -308,15 +314,15 @@ all fixers when resolved.
 
 ---
 
-## Phase 6: Loop
+## Phase 7: Loop
 
 - Close the team to release all agents (skip if running in serial mode without a team).
 
 ### Termination check
 
 - If no auto-fix issues were found this round, or all auto-fix issues were skipped
-  by fixers (no actual commits produced) -> Phase 7
-- Otherwise -> create new team, back to Phase 1
+  by fixers (no actual commits produced) -> Phase 8
+- Otherwise -> create new team, back to Phase 2
 
 ### Next round context
 
@@ -327,7 +333,7 @@ rolled back, recorded to pending files, or deferred for user confirmation.
 
 ---
 
-## Phase 7: Final Report & Cleanup
+## Phase 8: Final Report & Cleanup
 
 ### Step 1: Deferred issue confirmation
 
@@ -349,7 +355,7 @@ to step 2.
 
 3. **Action depends on mode**:
    - **Local mode**: create a temporary team with fixer agents for selected issues ->
-     fix -> validate (same as Phase 4-5). Record any failures to `pending-issues.md`.
+     fix -> validate (same as Phase 5-6). Record any failures to `pending-issues.md`.
    - **PR mode**: submit selected issues as PR review comments using the format in
      `references/pr-comment-format.md`. Comment body should be concise, written in the
      user's conversation language, with a specific fix suggestion.
@@ -360,7 +366,7 @@ to step 2.
 2. Empty -> proceed to step 3
 3. Has content -> present to user for item-by-item confirmation
 4. Approved fixes -> create a temporary team with fixer agents to re-apply (same
-   fix-validate cycle as Phase 4-5, including retry on failure); rejected -> discard
+   fix-validate cycle as Phase 5-6, including retry on failure)); rejected -> discard
 5. Final build + test (skip for doc-only modules or when no build/test commands are
    available)
 
