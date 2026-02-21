@@ -127,11 +127,11 @@ The available options depend on code ownership:
 **Own code** (local mode, or PR mode with `IS_OWN_PR = true`):
 
 **Question 2 — Auto-fix threshold**:
-- Option 1 — "Low risk only": auto-fix unambiguous local fixes (null checks, comment
-  typos, naming, `reserve`). Confirm everything else.
-- Option 2 — "Low + Medium risk": also auto-fix clear multi-location fixes (extract
-  shared logic, remove unused internals). Only confirm high-risk decisions (API
-  changes, architecture, algorithm trade-offs).
+- Option 1 — "Low + Medium risk": auto-fix clear fixes including multi-location changes
+  (extract shared logic, remove unused internals). Only confirm high-risk decisions
+  (API changes, architecture, algorithm trade-offs).
+- Option 2 — "Low risk only": auto-fix only unambiguous local fixes (null checks,
+  comment typos, naming, `reserve`). Confirm everything else.
 - Option 3 — "All confirm": no auto-fix, review every issue before fixing.
 
 **Other's PR** (`IS_OWN_PR = false`):
