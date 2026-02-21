@@ -57,10 +57,10 @@ All user-facing interactions (AskUserQuestion, progress reports, summary reports
 warnings, and confirmations) must use the language the user has been using in the
 conversation. Do not default to English.
 
-## Tool Usage
+## User Interaction
 
-Use the `AskUserQuestion` tool when presenting choices with predefined options
-(e.g., scope confirmation, fix level selection).
+When presenting choices with predefined options (e.g., scope confirmation, fix level
+selection), use interactive dialogs with selectable options rather than plain text.
 
 ---
 
