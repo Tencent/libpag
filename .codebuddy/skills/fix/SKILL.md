@@ -2,7 +2,6 @@
 name: fix
 description: Multi-round automated code review and fix using Agent Teams.
 disable-model-invocation: true
-compatibility: Requires CodeBuddy Code with Agent Teams experimental feature enabled.
 ---
 
 # Fix — Automated Code Review & Fix
