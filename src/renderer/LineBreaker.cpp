@@ -313,7 +313,7 @@ LineBreakClass LineBreaker::GetLineBreakClass(int32_t c) {
   return LBC::AL;
 }
 
-bool LineBreaker::isCJK(int32_t c) {
+bool LineBreaker::IsCJK(int32_t c) {
   // CJK Unified Ideographs
   if (c >= 0x4E00 && c <= 0x9FFF) return true;
   // CJK Unified Ideographs Extension A
@@ -373,11 +373,11 @@ bool LineBreaker::isCJK(int32_t c) {
   return false;
 }
 
-bool LineBreaker::isWhitespace(int32_t c) {
+bool LineBreaker::IsWhitespace(int32_t c) {
   return c == ' ' || c == '\t' || c == 0x00A0 || c == 0x3000;
 }
 
-bool LineBreaker::canBreakBetween(int32_t prevChar, int32_t nextChar) {
+bool LineBreaker::CanBreakBetween(int32_t prevChar, int32_t nextChar) {
   if (prevChar == 0 || nextChar == 0) {
     return false;
   }

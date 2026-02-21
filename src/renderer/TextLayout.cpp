@@ -1163,7 +1163,7 @@ class TextLayoutContext {
           currentLine->glyphs.resize(lastBreakIndex + 1);
           // Trim trailing whitespace from current line
           while (!currentLine->glyphs.empty() &&
-                 LineBreaker::isWhitespace(currentLine->glyphs.back().unichar)) {
+                 LineBreaker::IsWhitespace(currentLine->glyphs.back().unichar)) {
             currentLine->glyphs.pop_back();
           }
           FinishLine(currentLine, textBox->lineHeight, 0.0f);
@@ -1172,7 +1172,7 @@ class TextLayoutContext {
           // Skip leading whitespace in overflow
           size_t skipCount = 0;
           while (skipCount < overflow.size() &&
-                 LineBreaker::isWhitespace(overflow[skipCount].unichar)) {
+                 LineBreaker::IsWhitespace(overflow[skipCount].unichar)) {
             skipCount++;
           }
           // Recalculate positions for overflow glyphs
@@ -1217,11 +1217,11 @@ class TextLayoutContext {
         bool sameCluster = (glyph.cluster != 0 || allGlyphs[i + 1].cluster != 0) &&
                            glyph.cluster == allGlyphs[i + 1].cluster;
         if (!sameCluster &&
-            LineBreaker::canBreakBetween(glyph.unichar, allGlyphs[i + 1].unichar)) {
+            LineBreaker::CanBreakBetween(glyph.unichar, allGlyphs[i + 1].unichar)) {
           lastBreakIndex = static_cast<int>(currentLine->glyphs.size()) - 1;
         }
 #else
-        if (LineBreaker::canBreakBetween(glyph.unichar, allGlyphs[i + 1].unichar)) {
+        if (LineBreaker::CanBreakBetween(glyph.unichar, allGlyphs[i + 1].unichar)) {
           lastBreakIndex = static_cast<int>(currentLine->glyphs.size()) - 1;
         }
 #endif
@@ -1254,7 +1254,7 @@ class TextLayoutContext {
       // Line-start squash: remove leading whitespace of the first non-whitespace glyph.
       // Only Opening punctuation has leading whitespace.
       for (size_t i = 0; i < glyphCount; i++) {
-        if (LineBreaker::isWhitespace(line.glyphs[i].unichar)) {
+        if (LineBreaker::IsWhitespace(line.glyphs[i].unichar)) {
           continue;
         }
         float fraction = PunctuationSquash::GetLineStartSquash(line.glyphs[i].unichar);
@@ -1265,7 +1265,7 @@ class TextLayoutContext {
       // Line-end squash: remove trailing whitespace of the last non-whitespace glyph.
       // Only Closing punctuation has trailing whitespace.
       for (int i = static_cast<int>(glyphCount) - 1; i >= 0; i--) {
-        if (LineBreaker::isWhitespace(line.glyphs[i].unichar)) {
+        if (LineBreaker::IsWhitespace(line.glyphs[i].unichar)) {
           continue;
         }
         float fraction = PunctuationSquash::GetLineEndSquash(line.glyphs[i].unichar);
@@ -1510,7 +1510,7 @@ class TextLayoutContext {
           if (lineIdx < lines.size() - 1 && line.glyphs.size() > 1) {
             int gapCount = 0;
             for (size_t i = 0; i + 1 < line.glyphs.size(); i++) {
-              if (LineBreaker::canBreakBetween(line.glyphs[i].unichar,
+              if (LineBreaker::CanBreakBetween(line.glyphs[i].unichar,
                                                line.glyphs[i + 1].unichar)) {
                 gapCount++;
               }
@@ -1590,9 +1590,9 @@ class TextLayoutContext {
           continue;
         }
 #ifdef PAG_BUILD_PAGX
-        if (gi > 0 && LineBreaker::canBreakBetween(visualGlyphs[gi - 1].unichar, g.unichar)) {
+        if (gi > 0 && LineBreaker::CanBreakBetween(visualGlyphs[gi - 1].unichar, g.unichar)) {
 #else
-        if (gi > 0 && LineBreaker::canBreakBetween(line.glyphs[gi - 1].unichar, g.unichar)) {
+        if (gi > 0 && LineBreaker::CanBreakBetween(line.glyphs[gi - 1].unichar, g.unichar)) {
 #endif
             justifyOffset += justifyExtraPerGap;
         }
@@ -1714,10 +1714,10 @@ class TextLayoutContext {
           bool sameCluster = (glyph.cluster != 0 || allGlyphs[i - 1].cluster != 0) &&
                              glyph.cluster == allGlyphs[i - 1].cluster;
           vg.canBreakBefore = !sameCluster &&
-                              LineBreaker::canBreakBetween(allGlyphs[i - 1].unichar, glyph.unichar);
+                              LineBreaker::CanBreakBetween(allGlyphs[i - 1].unichar, glyph.unichar);
 #else
           vg.canBreakBefore =
-              LineBreaker::canBreakBetween(allGlyphs[i - 1].unichar, glyph.unichar);
+              LineBreaker::CanBreakBetween(allGlyphs[i - 1].unichar, glyph.unichar);
 #endif
         }
         vgList.push_back(std::move(vg));
@@ -1740,7 +1740,7 @@ class TextLayoutContext {
         RemoveTrailingLetterSpacing(currentColumn->glyphs);
         // Trim trailing whitespace from current column.
         while (!currentColumn->glyphs.empty() &&
-               LineBreaker::isWhitespace(currentColumn->glyphs.back().glyphs.front().unichar)) {
+               LineBreaker::IsWhitespace(currentColumn->glyphs.back().glyphs.front().unichar)) {
           currentColumn->glyphs.pop_back();
         }
         FinishColumn(currentColumn, textBox->lineHeight);
@@ -1765,7 +1765,7 @@ class TextLayoutContext {
           RemoveTrailingLetterSpacing(currentColumn->glyphs);
           // Trim trailing whitespace from current column.
           while (!currentColumn->glyphs.empty() &&
-                 LineBreaker::isWhitespace(currentColumn->glyphs.back().glyphs.front().unichar)) {
+                 LineBreaker::IsWhitespace(currentColumn->glyphs.back().glyphs.front().unichar)) {
             currentColumn->glyphs.pop_back();
           }
           FinishColumn(currentColumn, textBox->lineHeight);
@@ -1774,7 +1774,7 @@ class TextLayoutContext {
           // Skip leading whitespace in overflow.
           size_t skipCount = 0;
           while (skipCount < overflow.size() &&
-                 LineBreaker::isWhitespace(overflow[skipCount].glyphs.front().unichar)) {
+                 LineBreaker::IsWhitespace(overflow[skipCount].glyphs.front().unichar)) {
             skipCount++;
           }
           for (size_t j = skipCount; j < overflow.size(); j++) {
@@ -1834,7 +1834,7 @@ class TextLayoutContext {
 
       // Column-start squash: remove leading whitespace of the first non-whitespace glyph.
       for (size_t i = 0; i < glyphCount; i++) {
-        if (LineBreaker::isWhitespace(column.glyphs[i].glyphs.front().unichar)) {
+        if (LineBreaker::IsWhitespace(column.glyphs[i].glyphs.front().unichar)) {
           continue;
         }
         if (!IsSquashable(column.glyphs[i])) {
@@ -1848,7 +1848,7 @@ class TextLayoutContext {
 
       // Column-end squash: remove trailing whitespace of the last non-whitespace glyph.
       for (int i = static_cast<int>(glyphCount) - 1; i >= 0; i--) {
-        if (LineBreaker::isWhitespace(column.glyphs[i].glyphs.front().unichar)) {
+        if (LineBreaker::IsWhitespace(column.glyphs[i].glyphs.front().unichar)) {
           continue;
         }
         if (!IsSquashable(column.glyphs[i])) {
