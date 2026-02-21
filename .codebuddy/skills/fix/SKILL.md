@@ -1,6 +1,6 @@
 ---
 name: fix
-description: Multi-round automated code review, verification, and fix workflow.
+description: Multi-round automated code review and fix using Agent Teams.
 disable-model-invocation: true
 ---
 
