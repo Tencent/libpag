@@ -313,67 +313,63 @@ LineBreakClass LineBreaker::GetLineBreakClass(int32_t c) {
   return LBC::AL;
 }
 
+// Sorted CJK range table for binary search. No overlapping ranges.
+struct CJKRange {
+  int32_t start;
+  int32_t end;
+};
+
+// clang-format off
+static const CJKRange CJKRanges[] = {
+    {0x1100,  0x11FF},   // Hangul Jamo
+    {0x2E80,  0x2EFF},   // CJK Radicals Supplement
+    {0x2F00,  0x2FDF},   // Kangxi Radicals
+    {0x3000,  0x303F},   // CJK Symbols and Punctuation
+    {0x3040,  0x309F},   // Hiragana
+    {0x30A0,  0x30FF},   // Katakana
+    {0x3100,  0x312F},   // Bopomofo
+    {0x3130,  0x318F},   // Hangul Compatibility Jamo
+    {0x31A0,  0x31BF},   // Bopomofo Extended
+    {0x31F0,  0x31FF},   // Katakana Phonetic Extensions
+    {0x3200,  0x32FF},   // Enclosed CJK Letters and Months
+    {0x3300,  0x33FF},   // CJK Compatibility
+    {0x3400,  0x4DBF},   // CJK Extension A
+    {0x4E00,  0x9FFF},   // CJK Unified Ideographs
+    {0xA000,  0xA4CF},   // Yi Syllables and Radicals
+    {0xAC00,  0xD7AF},   // Hangul Syllables
+    {0xF900,  0xFAFF},   // CJK Compatibility Ideographs
+    {0xFF01,  0xFF0F},   // Fullwidth punctuation (！＂＃＄％＆＇（）＊＋，－．／)
+    {0xFF1A,  0xFF20},   // Fullwidth punctuation (：；＜＝＞？＠)
+    {0xFF3B,  0xFF40},   // Fullwidth punctuation (［＼］＾＿｀)
+    {0xFF5B,  0xFF60},   // Fullwidth punctuation (｛｜｝～｟｠)
+    {0xFF65,  0xFF9F},   // Halfwidth Katakana
+    {0x20000, 0x2A6DF},  // CJK Extension B
+    {0x2A700, 0x2B73F},  // CJK Extension C
+    {0x2B740, 0x2B81F},  // CJK Extension D
+    {0x2B820, 0x2CEAF},  // CJK Extension E
+    {0x2CEB0, 0x2EBEF},  // CJK Extension F
+    {0x2EBF0, 0x2F7FF},  // CJK Extension I
+    {0x2F800, 0x2FA1F},  // CJK Compatibility Ideographs Supplement
+    {0x30000, 0x3134F},  // CJK Extension G
+    {0x31350, 0x323AF},  // CJK Extension H
+};
+// clang-format on
+
+static constexpr size_t CJKRangeCount = sizeof(CJKRanges) / sizeof(CJKRanges[0]);
+
 bool LineBreaker::IsCJK(int32_t c) {
-  // CJK Unified Ideographs
-  if (c >= 0x4E00 && c <= 0x9FFF) return true;
-  // CJK Unified Ideographs Extension A
-  if (c >= 0x3400 && c <= 0x4DBF) return true;
-  // CJK Unified Ideographs Extension B
-  if (c >= 0x20000 && c <= 0x2A6DF) return true;
-  // CJK Unified Ideographs Extension C
-  if (c >= 0x2A700 && c <= 0x2B73F) return true;
-  // CJK Unified Ideographs Extension D
-  if (c >= 0x2B740 && c <= 0x2B81F) return true;
-  // CJK Unified Ideographs Extension E
-  if (c >= 0x2B820 && c <= 0x2CEAF) return true;
-  // CJK Unified Ideographs Extension F
-  if (c >= 0x2CEB0 && c <= 0x2EBEF) return true;
-  // CJK Unified Ideographs Extension G
-  if (c >= 0x30000 && c <= 0x3134F) return true;
-  // CJK Unified Ideographs Extension H
-  if (c >= 0x31350 && c <= 0x323AF) return true;
-  // CJK Unified Ideographs Extension I
-  if (c >= 0x2EBF0 && c <= 0x2F7FF) return true;
-  // CJK Compatibility Ideographs
-  if (c >= 0xF900 && c <= 0xFAFF) return true;
-  // CJK Compatibility Ideographs Supplement
-  if (c >= 0x2F800 && c <= 0x2FA1F) return true;
-  // Hiragana
-  if (c >= 0x3040 && c <= 0x309F) return true;
-  // Katakana
-  if (c >= 0x30A0 && c <= 0x30FF) return true;
-  // Katakana Phonetic Extensions
-  if (c >= 0x31F0 && c <= 0x31FF) return true;
-  // Hangul Syllables
-  if (c >= 0xAC00 && c <= 0xD7AF) return true;
-  // Hangul Jamo
-  if (c >= 0x1100 && c <= 0x11FF) return true;
-  // Hangul Compatibility Jamo
-  if (c >= 0x3130 && c <= 0x318F) return true;
-  // CJK Radicals Supplement
-  if (c >= 0x2E80 && c <= 0x2EFF) return true;
-  // Kangxi Radicals
-  if (c >= 0x2F00 && c <= 0x2FDF) return true;
-  // CJK Symbols and Punctuation
-  if (c >= 0x3000 && c <= 0x303F) return true;
-  // Bopomofo
-  if (c >= 0x3100 && c <= 0x312F) return true;
-  // Bopomofo Extended
-  if (c >= 0x31A0 && c <= 0x31BF) return true;
-  // Enclosed CJK Letters and Months
-  if (c >= 0x3200 && c <= 0x32FF) return true;
-  // CJK Compatibility
-  if (c >= 0x3300 && c <= 0x33FF) return true;
-  // Fullwidth Forms — punctuation only (exclude fullwidth digits 0xFF10-0xFF19, fullwidth Latin
-  // uppercase 0xFF21-0xFF3A, and fullwidth Latin lowercase 0xFF41-0xFF5A)
-  if (c >= 0xFF01 && c <= 0xFF0F) return true;  // fullwidth punctuation (！＂＃＄％＆＇（）＊＋，－．／)
-  if (c >= 0xFF1A && c <= 0xFF20) return true;  // fullwidth punctuation (：；＜＝＞？＠)
-  if (c >= 0xFF3B && c <= 0xFF40) return true;  // fullwidth punctuation (［＼］＾＿｀)
-  if (c >= 0xFF5B && c <= 0xFF60) return true;  // fullwidth punctuation (｛｜｝～｟｠)
-  // Halfwidth Katakana
-  if (c >= 0xFF65 && c <= 0xFF9F) return true;
-  // Yi Syllables and Radicals
-  if (c >= 0xA000 && c <= 0xA4CF) return true;
+  size_t lo = 0;
+  size_t hi = CJKRangeCount;
+  while (lo < hi) {
+    auto mid = lo + (hi - lo) / 2;
+    if (c > CJKRanges[mid].end) {
+      lo = mid + 1;
+    } else if (c < CJKRanges[mid].start) {
+      hi = mid;
+    } else {
+      return true;
+    }
+  }
   return false;
 }
 
