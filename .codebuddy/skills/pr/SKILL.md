@@ -41,7 +41,7 @@ Determine the remote's default branch and store as `{default_branch}`.
 
 Run `git status --porcelain` and inspect the output:
 
-- **No output** → no local changes. Skip to Step 3.
+- **No output** → no local changes. Skip to Step 3 (there may be unpushed commits to push).
 - **Both staged and unstaged changes** → ask the user: commit only the staged
   files (**partial**), or stage everything (**full**)?
 - **Otherwise** → **full** (stage everything).
