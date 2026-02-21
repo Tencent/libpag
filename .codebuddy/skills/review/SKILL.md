@@ -99,10 +99,11 @@ base. If no upstream is configured, fall back to `main` (or `master`).
    ```
    Include in reviewer prompts so they avoid re-reporting already-discussed issues.
 
-6. **Set review scope**: diff between base branch and `HEAD` in the PR branch.
+6. **Set review scope**: fetch the PR's base branch and diff against `HEAD`.
    ```
-   git fetch origin main
-   git diff $(git merge-base origin/main HEAD)
+   gh pr view {number} --json baseRefName -q '.baseRefName'
+   git fetch origin {baseRefName}
+   git diff $(git merge-base origin/{baseRefName} HEAD)
    ```
 
 ### 0.2 Review Priority Level
@@ -216,10 +217,11 @@ if those modules are already reviewed, include the material in the next round in
 ## Phase 2: Verification
 
 - **Do not close reviewers yet** (may reuse as fixers in Phase 4)
-- **Reviewer self-check**: each reviewer re-reads the relevant code and self-verifies
-  every issue they reported, marking each as confirmed or withdrawn.
-- **Independent verification**: create a verifier (`verifier-N`) per review module.
-  The verifier reads actual code to independently confirm each issue.
+- **Reviewer self-check + independent verification** (run in parallel):
+  - Each reviewer re-reads the relevant code and self-verifies every issue they
+    reported, marking each as confirmed or withdrawn.
+  - Simultaneously, create a verifier (`verifier-N`) per review module. The verifier
+    reads actual code to independently confirm each issue.
 - **Alignment**: send verifier results back to the reviewer for comparison with their
   self-check. If they disagree on any issue, team-lead reads code to judge.
 
@@ -243,7 +245,7 @@ matrix. The user's chosen auto-fix threshold determines handling:
 - For each fixable issue, check whether the change also requires updates to comments
   or documentation outside the fixer's module — if so, create a follow-up for
   `fixer-cross`.
-- Previously rolled-back issues -> do not attempt again
+- Previously rolled-back issues -> do not attempt again this round
 
 ---
 
@@ -340,7 +342,7 @@ confirmation.
 2. Empty -> proceed to step 2
 3. Has content -> present to user for item-by-item confirmation
 4. Approved fixes -> create agent to re-apply; rejected -> discard
-5. Final build + test
+5. Final build + test (skip for doc-only modules)
 
 ### Step 2: PR mode — push fixes (own PR only)
 
