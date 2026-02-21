@@ -6,7 +6,7 @@ description: Automated code review and fix for local branches, PRs, commits, and
 # Review — Automated Code Review & Fix
 
 Use `/cr` to start. Accepts a PR number/URL, commit (range), file/directory paths,
-or no argument (current branch vs upstream). See Phase 0.3 for full argument parsing.
+or no argument (current branch vs upstream). See Phase 0.2 for full argument parsing.
 
 Reviews code and documents using Agent Teams. Each issue gets a risk level — low-risk
 issues are auto-fixed, higher-risk issues are presented for user confirmation. In PR
@@ -49,10 +49,17 @@ Runs multi-round iterations until no valid issues remain.
 
 ## Phase 0: Scope Confirmation & Environment Check
 
-### 0.1 Review Priority (Question 1)
+### 0.1 User Questions
 
-Always show this question first. No commands should be run before this question is
-answered. When the scope turns out to be doc-only (determined later in 0.5 module
+First, check `$ARGUMENTS` to determine whether this is PR mode (no commands needed):
+- Purely numeric (e.g., `123`) or contains `/` (URL) -> **PR mode**.
+- Everything else (empty, commit hash, commit range, file paths) -> **Local mode**.
+
+Then present all applicable questions together in **one interaction**:
+
+#### Question 1 — Review priority
+
+Always show. When the scope turns out to be doc-only (determined later in 0.5 module
 partitioning), all priority levels (A+B+C) are used regardless of the user's choice.
 
 (code/mixed modules):
@@ -63,16 +70,10 @@ partitioning), all priority levels (A+B+C) are used regardless of the user's cho
 - Option 3 — "Correctness only (A)": only safety and correctness issues.
   e.g., null dereference, out-of-bounds, resource leaks, race conditions.
 
-### 0.2 Auto-fix Threshold (Question 2, Local mode only)
+#### Question 2 — Auto-fix threshold (Local mode only)
 
-After Q1 is answered, check `$ARGUMENTS` to determine whether this is PR mode:
-- Purely numeric (e.g., `123`) or contains `/` (URL) -> **PR mode**.
-- Everything else (empty, commit hash, commit range, file paths) -> **Local mode**.
-
-**PR mode**: skip Q2. Inform the user: "PR mode — issues will be submitted as PR
-review comments after your review."
-
-**Local mode**: show Q2.
+Show only in Local mode. In PR mode, add a note alongside Q1: "PR mode — issues will
+be submitted as PR review comments after your review."
 
 - Option 1 — "All confirm": no auto-fix, confirm every issue before any change.
 - Option 2 — "Low risk only": auto-fix only fixes with a single correct approach
@@ -87,10 +88,10 @@ review comments after your review."
 
 After all questions are answered, no further user interaction until Phase 7.
 
-### 0.3 Argument Parsing & Mode Detection
+### 0.2 Argument Parsing & Mode Detection
 
-If PR mode was detected in 0.2, reuse that result and proceed to PR metadata fetch
-directly. Otherwise parse `$ARGUMENTS` to determine the Local mode scope:
+Reuse the PR mode detection from 0.1. For PR mode, proceed to metadata fetch directly.
+For Local mode, parse `$ARGUMENTS` to determine the scope:
 
 | `$ARGUMENTS` | Detection | Scope |
 |--------------|-----------|-------|
@@ -160,7 +161,7 @@ Fetch the actual diff/content and set up the working environment.
      All subsequent operations use the worktree directory. Record `WORKTREE_DIR` for
      cleanup in Phase 7.
 
-2. **Set review scope**: diff against the PR's base branch (`BASE_BRANCH` from 0.3).
+2. **Set review scope**: diff against the PR's base branch (`BASE_BRANCH` from 0.2).
    ```
    git fetch origin {BASE_BRANCH}
    git diff $(git merge-base origin/{BASE_BRANCH} HEAD)
@@ -172,7 +173,7 @@ Fetch the actual diff/content and set up the working environment.
    ```
    Store as `EXISTING_PR_COMMENTS` for later comparison.
 
-**Local mode**: fetch the full diff content for the scope determined in 0.1 (branch
+**Local mode**: fetch the full diff content for the scope determined in 0.2 (branch
 diff, `git show`, commit range diff, or read file contents for full-content review).
 
 **Local mode — associated PR comments** (optional, best-effort):
