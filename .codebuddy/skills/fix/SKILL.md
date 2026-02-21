@@ -47,7 +47,12 @@ You (the team-lead) orchestrate the entire workflow. Critical constraints:
 
 Run sequentially. Abort if any fails.
 
-1. `git status` — uncommitted changes? Ask user whether to commit first. Decline = abort.
+1. **Clean branch check** — verify the working tree is clean and not on the main branch:
+   - If on the main/master branch, or there are uncommitted changes (staged, unstaged,
+     or untracked), inform the user: "Automated fix requires a clean, non-main branch.
+     Each fix is committed individually for easy rollback and issue tracing."
+   - On main -> abort, ask user to create a feature branch first.
+   - Uncommitted changes -> ask user whether to commit or stash first. Decline = abort.
 2. **Automated test detection** — check whether the project has a usable test suite:
    - If the project's rules loaded in context already describe build/test commands, use
      those directly and skip exploration.
