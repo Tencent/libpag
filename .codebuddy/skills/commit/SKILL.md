@@ -49,6 +49,6 @@ If **full**: run `git add -A`. If **partial**: skip (files are already staged).
 
 Read the staged diff (`git diff --cached`) and generate a commit message
 following the project's commit conventions. If no convention is found, default
-to a concise English message under 120 characters describing the change.
+to a concise English message under 120 characters ending with a period, with no other punctuation, focusing on user-perceivable changes.
 
 Commit and output the commit message to the user.
