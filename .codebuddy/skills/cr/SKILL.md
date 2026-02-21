@@ -253,8 +253,8 @@ special rules.
 
 ### De-duplication
 
-- Skip any issue that matches one already fixed, rolled back, recorded to pending,
-  deferred, or **rejected by the user** in a previous round.
+- Skip any issue that matches one already fixed, rolled back, recorded to
+  `pending-issues.md`, or **rejected by the user** in a previous round.
 - **PR comment de-duplication** (PR mode): compare each confirmed issue against
   `EXISTING_PR_COMMENTS`. If an issue matches an existing comment (same file, same
   general location, same topic), exclude it — do not present it to the user.
@@ -276,7 +276,7 @@ matrix. The user's chosen auto-fix threshold determines handling:
 - **PR mode**: all issues are recorded to `pending-issues.md`. Skip Phase 5-7.
   If `pending-issues.md` is empty -> Phase 9; otherwise -> Phase 8.
 - **Local mode**: if no auto-fix issues remain, skip Phase 5-6 and go to Phase 7
-  (which routes to Phase 8 or Phase 9 based on deferred/pending state).
+  (which routes to Phase 8 or Phase 9 based on `pending-issues.md` state).
 
 ### Additional checks
 
@@ -289,8 +289,8 @@ matrix. The user's chosen auto-fix threshold determines handling:
 
 ## Phase 5: Fix
 
-If the auto-fix queue is empty (all issues were deferred), skip Phase 5-6 and go
-directly to Phase 7.
+If the auto-fix queue is empty (all issues were recorded to `pending-issues.md`),
+skip Phase 5-6 and go directly to Phase 7.
 
 - Group confirmed issues into **fix modules by file** (see 1.3).
 - Cross-file issues -> `fixer-cross` agent; multi-file renames -> single atomic task
@@ -336,10 +336,9 @@ when resolved.
 ### Next round context
 
 Next round prompt includes: rollback blacklist, previous fix summary,
-pending file contents, and prompt adjustments based on review quality analysis.
+`pending-issues.md` contents, and prompt adjustments based on review quality analysis.
 Reviewers must skip all issues already reported in previous rounds — whether fixed,
-rolled back, recorded to pending files, deferred for user confirmation, or rejected
-by the user.
+rolled back, recorded to `pending-issues.md`, or rejected by the user.
 
 ---
 
@@ -371,9 +370,9 @@ skip to Phase 9.
      Otherwise, jump back to Phase 5 with the user-approved issues as the fix queue.
      The full cycle runs: Phase 5 (fix) -> Phase 6 (validate) -> Phase 7 (loop)
      -> Phase 2 (review the new changes) -> ... until no new issues are found, then
-     back to Phase 8. Any remaining deferred/pending issues from this cycle are
-     presented again. The loop terminates when the merged list is empty or the user
-     skips all remaining issues -> Phase 9.
+     back to Phase 8. Any new issues from this cycle are added to `pending-issues.md`
+     and presented again. The loop terminates when `pending-issues.md` is empty or the
+     user skips all remaining issues -> Phase 9.
 
 ---
 
