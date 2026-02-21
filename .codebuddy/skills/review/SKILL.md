@@ -21,6 +21,14 @@ code, issues are submitted as PR review comments instead of direct commits.
 - **You (the team-lead) never modify files directly.** Delegate all changes to agents.
   Read code only for arbitration and diagnosis.
 - After each round, analyze review quality and adjust the next round's reviewer prompts.
+- **Autonomous operation**: between Phase 0 (setup) and Phase 3.5 (deferred issue
+  confirmation), and between Phase 3.5 and Phase 7 (final report), the process runs
+  without user interaction. The team-lead must handle all unexpected situations
+  autonomously — e.g., an agent stuck or unresponsive, a fix that breaks the build,
+  a git operation that fails, an agent producing invalid output. Use your judgment:
+  terminate and replace, revert and retry, skip and move on, etc. Anything that cannot
+  be resolved automatically should be recorded to `pending-issues.md` for user review
+  in Phase 7. Maximum **5 rounds** before forced termination.
 
 ## References
 
@@ -225,14 +233,6 @@ review process. When this happens:
     re-reporting already-discussed issues
   - Structured output format
 
-### Stuck Detection
-
-When all other agents in the batch are done but one has not responded:
-1. Send a reminder
-2. No response -> check for output
-3. No output -> terminate the agent and create a replacement
-4. Partial output -> terminate the agent and create a new one for remaining work
-
 ---
 
 ## Phase 2: Verification
@@ -359,31 +359,19 @@ Fix rules:
 Team-lead collects skipped issues and includes them in the next round's context so
 they are not lost.
 
-### Stuck Detection
-
-Periodically check `git log` for new commits -> no output = stuck -> remind -> replace.
-
 ---
 
 ## Phase 5: Validate
 
 - **Do not close reviewers yet** (may need retry)
 - For code/mixed modules: build + test using the project's commands
-- For doc-only modules: skip build/test (no compilation needed); validation is
-  completed through the review and verification phases
+- For doc-only modules: skip build/test; validation is done through review phases
 
 **All pass** (or no code modules to validate) -> close all reviewers/fixers -> Phase 6.
 
-**Failures**:
-1. Record failing test case names
-2. Bisect to locate the bad commit -> `git revert <bad-commit> --no-edit`
-3. Send failure info back to the original reviewer to re-fix (max **2 retries**)
-4. After 2 failed retries -> team-lead reads code to diagnose (read only):
-   - Fix approach was wrong -> create `fixer-rescue-N` with full error context
-   - Rescue also fails -> revert and record to `pending-issues.md`
-   - Fix was correct but changed behavior -> revert, record to
-     `pending-issues.md` (see `references/pending-templates.md`)
-5. All resolved -> close all reviewers/fixers
+**Failures**: bisect to locate the bad commit, revert it, and send failure info back
+to the original fixer for retry (max 2 retries). If still failing, revert and record
+to `pending-issues.md`. Close all agents when resolved.
 
 ---
 
@@ -397,8 +385,6 @@ Periodically check `git log` for new commits -> no output = stuck -> remind -> r
 
 - If no new issues were found in this round (Phase 3 valid issues = 0) -> Phase 7
 - Otherwise -> create new team, back to Phase 1
-- **Safety limit**: maximum 5 rounds. If reached, proceed to Phase 7 with a warning
-  in the summary report.
 
 ### Next round context
 
@@ -423,15 +409,8 @@ confirmation.
 
 ### Step 2: PR mode — push fixes (own PR only)
 
-If fixes were made in PR mode and `IS_OWN_PR = true`:
-1. Push all commits to the PR branch:
-   ```
-   git push origin HEAD:{PR_BRANCH}
-   ```
-2. If push fails (permission denied, branch protection, etc.), inform the user with
-   the error message. Do not retry automatically — the commits remain in the local
-   worktree for the user to push manually.
-3. Verify push succeeded before proceeding to cleanup.
+If fixes were made in PR mode and `IS_OWN_PR = true`, push all commits to the PR
+branch. If push fails, inform the user — commits remain local for manual push.
 
 ### Step 3: PR mode — worktree cleanup
 
@@ -475,9 +454,8 @@ Solution: This is expected — Phase 7 only presents pending items when they exi
 
 ### Fixer commits break tests repeatedly
 Cause: Complex semantic changes or insufficient context.
-Solution: After 2 retries, `fixer-rescue-N` takes over with full error context. If the
-fix is correct but changes behavior, it goes to `pending-issues.md` for user
-confirmation.
+Solution: Team-lead handles this automatically — reverts bad commits and records
+unresolvable issues to `pending-issues.md` for user review in Phase 7.
 
 ### PR URL does not match current repository
 Cause: The PR belongs to a different repository.
