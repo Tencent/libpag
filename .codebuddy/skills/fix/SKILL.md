@@ -59,9 +59,8 @@ conversation. Do not default to English.
 
 ## Tool Usage
 
-- **Use the `AskUserQuestion` tool** when presenting choices with predefined options
-  (e.g., scope confirmation, fix level selection).
-- Use `TaskCreate` / `TaskUpdate` / `TaskList` to track progress through each phase.
+Use the `AskUserQuestion` tool when presenting choices with predefined options
+(e.g., scope confirmation, fix level selection).
 
 ---
 
