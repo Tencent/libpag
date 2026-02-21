@@ -140,12 +140,6 @@ Skip if other's PR or doc-only scope. If no build/test commands are available fr
 context or the codebase, ask the user: without tests, fix validation cannot run —
 continue anyway?
 
-#### Question 4 — Reference material (doc/mixed modules only)
-
-Ask the user if they have additional reference material for document review (file
-paths, URLs, or inline instructions). The user may skip. Also auto-discover relevant
-best-practice guides, official documentation, or specification standards.
-
 After all questions are answered, no further user interaction until Phase 7.
 
 ### 0.3 Pre-flight Checks
