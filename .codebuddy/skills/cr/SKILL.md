@@ -364,8 +364,9 @@ skip to Phase 9.
    - **PR mode**: submit selected issues as PR review comments using the format in
      `references/pr-comment-format.md`. Comment body should be concise, written in the
      user's conversation language, with a specific fix suggestion. -> Phase 9
-   - **Local mode**: jump back to Phase 5 with the user-approved issues as the fix
-     queue. The full cycle runs: Phase 5 (fix) -> Phase 6 (validate) -> Phase 7 (loop)
+   - **Local mode**: if no issues were approved for fix (user skipped all) -> Phase 9.
+     Otherwise, jump back to Phase 5 with the user-approved issues as the fix queue.
+     The full cycle runs: Phase 5 (fix) -> Phase 6 (validate) -> Phase 7 (loop)
      -> Phase 2 (review the new changes) -> ... until no new issues are found, then
      back to Phase 8. Any remaining deferred/pending issues from this cycle are
      presented again. The loop terminates when the merged list is empty or the user
