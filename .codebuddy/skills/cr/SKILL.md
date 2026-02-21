@@ -94,7 +94,7 @@ Option 3 should be pre-selected as the default.
   remove unused internals). Confirm high-risk issues.
 - Option 4 — "Full auto (risky)": auto-fix all risk levels, autonomously deciding
   fix approach for high-risk issues (e.g., API changes, architecture restructuring,
-  algorithm trade-offs). Only test baseline changes require confirmation.
+  algorithm trade-offs).
 
 After all questions are answered, no further user interaction until Phase 8 (except
 when a previously failed issue fails again in Phase 6, which prompts the user inline).

@@ -36,13 +36,6 @@ low risk.
 | Low only       | Auto-fix | Confirm     | Confirm   |
 | All confirm    | Confirm  | Confirm     | Confirm   |
 
-**Always confirm regardless of threshold**:
-- Test baseline changes -> record to `pending-issues.md` (presented in Phase 8)
-
-**Confirm unless full auto**:
-- Public API changes and other issues listed as "always confirm" -> in full auto mode
-  the team-lead decides autonomously; in all other modes these require confirmation
-
 ## Code Modules
 
 The "Criteria" column below determines whether an issue is worth fixing. The risk level
@@ -81,7 +74,7 @@ while a logic bug requiring cross-module restructuring is high risk.
 | Const correctness | Fix when clearly applicable and low risk |
 | File organization | Fix only when clearly inconsistent with project conventions |
 | Accessibility (missing alt / label / keyboard nav) | Fix when semantic HTML or ARIA is clearly missing `[Web]` |
-| Public API signature change (not a bug) | **Do not fix directly**, record to `pending-issues.md` for user confirmation in Phase 8 |
+| Public API signature change (not a bug) | Assess as high risk — handled by the user's auto-fix threshold |
 | Style preference | **Always skip** |
 
 ## Document Modules

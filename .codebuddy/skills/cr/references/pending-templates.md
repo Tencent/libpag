@@ -8,8 +8,7 @@ Each issue includes a **Reason** describing why it was not auto-fixed.
 
 ## 1. [brief description]
 - **Reason**: [why not auto-fixed, e.g., "above auto-fix threshold (high risk)",
-  "fix failed: build error after 2 retries", "rolled back: introduced regression",
-  "public API change requires confirmation"]
+  "fix failed: build error after 2 retries", "rolled back: introduced regression"]
 - **Risk**: low | medium | high
 - **File**: [file path:line number]
 - **Current**: [what the code does now]
