@@ -45,11 +45,12 @@ Parse `$ARGUMENTS` to determine the review mode and scope:
 | PR number (e.g., `123`) | `gh pr view` succeeds | **PR** | PR diff vs base branch |
 | PR URL | Extract owner/repo/number, verify | **PR** | PR diff vs base branch |
 | Single commit (e.g., `abc123`) | `git rev-parse --verify` succeeds | **Local** | That commit's changes (`git show`) |
-| Commit range (e.g., `abc..def`) | Both endpoints valid | **Local** | Diff between two commits |
-| File or directory path | Path exists on disk | **Local** | Full content review (no diff) |
+| Commit range (e.g., `abc..def`) | Contains `..`, both endpoints valid | **Local** | Diff between two commits (excluding first) |
+| File/directory paths (space-separated) | All paths exist on disk | **Local** | Full content review (no diff) |
 
-**Ambiguity**: if the argument could be both a PR number and a commit ref, try
-`gh pr view` first — if it succeeds, treat as PR.
+**Parse order**: contains `..` -> commit range; single arg + `gh pr view` succeeds ->
+PR; all args exist on disk -> file/directory paths; single arg + `git rev-parse`
+succeeds -> single commit; otherwise -> error.
 
 **PR URL mismatch**: if the URL's owner/repo does not match the current repository
 (`gh repo view --json nameWithOwner -q '.nameWithOwner'`), abort and ask the user to
