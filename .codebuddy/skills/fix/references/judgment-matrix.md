@@ -44,7 +44,11 @@ based on the selected fix level and the module type (code or document).
 |------|-----------|----------|
 | Contradicts code implementation | A | Must fix — verify against actual code |
 | Incorrect values / constants / ranges | A | Must fix |
+| Internal contradiction between sections | A | Must fix |
 | Missing documentation for existing features | A | Fix when public API or feature is undocumented |
+| Incomplete conditional branches or steps | A | Fix when undefined behavior or missing steps found |
+| Broken internal/external references | A | Must fix |
+| Ambiguous description with multiple interpretations | B | Fix when it could lead to incorrect understanding |
 | Verbose or redundant description | B | Fix when clearly simplifiable without losing meaning |
 | Poor logical flow or organization | B | Fix when information order is confusing |
 | Missing examples for complex concepts | B | Fix when concept is hard to understand without example |

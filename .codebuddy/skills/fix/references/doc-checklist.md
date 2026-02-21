@@ -9,7 +9,8 @@ priority over this generic checklist.
 
 ## Level A: Accuracy
 
-Issues where the document contradicts the actual implementation. Highest impact.
+Issues where the document contains incorrect, contradictory, or incomplete information.
+Highest impact.
 
 **A1. Code-Document Consistency**
 - Do described behaviors match the actual code implementation?
@@ -23,34 +24,57 @@ Issues where the document contradicts the actual implementation. Highest impact.
 - Are enum values and their meanings consistent with code definitions?
 - Are file format structures (byte offsets, field sizes, etc.) correct?
 
-**A3. Completeness**
+**A3. Internal Consistency**
+- Do different sections describing the same concept agree with each other?
+- Are constraints and rules consistent across the document (e.g., one section says
+  "must be >= 0" while another implies a negative default)?
+- When the same rule appears in multiple places, are all instances identical in meaning?
+
+**A4. Completeness**
 - Are all public APIs / features documented?
 - Are newly added features or parameters reflected in the document?
 - Are removed or deprecated features marked accordingly?
 - Are edge cases and limitations documented?
 
+**A5. Logical Completeness**
+- Are all conditional branches exhaustively covered (e.g., "if A... if B..." — what
+  about other cases)?
+- Are sequential steps complete with no missing intermediate steps?
+- Are undefined behaviors identified (input combinations with no documented result)?
+
+**A6. Reference Validity**
+- Do internal cross-references point to existing sections or files?
+- Are external links / URLs valid and pointing to the correct content?
+- Do referenced file paths, tool names, and command examples actually exist?
+
 ---
 
 ## Level B: Clarity & Structure
 
-Improvements to readability and organization. Medium impact.
+Improvements to readability, unambiguity, and organization. Medium impact.
 
-**B1. Simplification**
+**B1. Ambiguity Detection**
+- Are there descriptions that can be interpreted in multiple ways?
+- Are conditional statements precise ("should" vs "must", "may" vs "will")?
+- Are boundary conditions clearly stated (inclusive vs exclusive ranges, "at least"
+  vs "exactly")?
+
+**B2. Simplification**
 - Can verbose descriptions be made more concise without losing meaning?
 - Are there redundant paragraphs or sections that repeat the same information?
 - Can complex explanations be replaced with tables, lists, or examples?
 
-**B2. Logical Flow**
+**B3. Logical Flow**
 - Is information presented in a logical order?
 - Are related topics grouped together?
 - Are forward references minimized (referring to something explained later)?
 
-**B3. Examples & Illustrations**
+**B4. Examples & Illustrations**
 - Do complex concepts have illustrative examples?
 - Are examples correct and consistent with the described behavior?
 - Are edge case examples provided where helpful?
 
-**B4. Terminology Consistency**
+**B5. Terminology Consistency**
 - Are terms used consistently throughout the document?
 - Do terms match those used in the codebase (class names, function names, enum values)?
 - Are abbreviations defined on first use?
@@ -64,7 +88,6 @@ Polish and stylistic consistency. Lower impact on content quality.
 **C1. Formatting Consistency**
 - Are headings, lists, and tables formatted consistently?
 - Are code snippets properly formatted and syntax-highlighted?
-- Are cross-references and links valid?
 
 **C2. Grammar & Wording**
 - Are there grammatical errors or awkward phrasing?
