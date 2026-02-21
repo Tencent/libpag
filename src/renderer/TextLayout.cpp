@@ -1642,6 +1642,19 @@ class TextLayoutContext {
     }
   }
 
+  static void RemoveTrailingLetterSpacing(std::vector<VerticalGlyphInfo>& glyphs) {
+    if (glyphs.empty()) {
+      return;
+    }
+    auto& lastVG = glyphs.back();
+    float ls = (lastVG.glyphs.front().sourceText != nullptr)
+                   ? lastVG.glyphs.front().sourceText->letterSpacing
+                   : 0;
+    if (ls != 0) {
+      lastVG.height -= ls;
+    }
+  }
+
   static void FinishColumn(ColumnInfo* column, float lineHeight) {
     float height = 0;
     float maxFontLineHeight = 0;
@@ -1721,16 +1734,7 @@ class TextLayoutContext {
       auto& vg = vgList[i];
 
       if (vg.glyphs.front().unichar == '\n') {
-        // Remove trailing letterSpacing from the last glyph in the column.
-        if (!currentColumn->glyphs.empty()) {
-          auto& lastVG = currentColumn->glyphs.back();
-          float ls = (lastVG.glyphs.front().sourceText != nullptr)
-                         ? lastVG.glyphs.front().sourceText->letterSpacing
-                         : 0;
-          if (ls != 0) {
-            lastVG.height -= ls;
-          }
-        }
+        RemoveTrailingLetterSpacing(currentColumn->glyphs);
         // Trim trailing whitespace from current column.
         while (!currentColumn->glyphs.empty() &&
                LineBreaker::isWhitespace(currentColumn->glyphs.back().glyphs.front().unichar)) {
@@ -1755,16 +1759,7 @@ class TextLayoutContext {
                                                       static_cast<ptrdiff_t>(lastBreakIndex),
                                                   currentColumn->glyphs.end());
           currentColumn->glyphs.resize(lastBreakIndex);
-          // Remove trailing letterSpacing from the last glyph before the break.
-          if (!currentColumn->glyphs.empty()) {
-            auto& lastVG = currentColumn->glyphs.back();
-            float ls = (lastVG.glyphs.front().sourceText != nullptr)
-                           ? lastVG.glyphs.front().sourceText->letterSpacing
-                           : 0;
-            if (ls != 0) {
-              lastVG.height -= ls;
-            }
-          }
+          RemoveTrailingLetterSpacing(currentColumn->glyphs);
           // Trim trailing whitespace from current column.
           while (!currentColumn->glyphs.empty() &&
                  LineBreaker::isWhitespace(currentColumn->glyphs.back().glyphs.front().unichar)) {
@@ -1790,16 +1785,7 @@ class TextLayoutContext {
             currentColumnHeight += g.height;
           }
         } else {
-          // Remove trailing letterSpacing from the last glyph.
-          if (!currentColumn->glyphs.empty()) {
-            auto& lastVG = currentColumn->glyphs.back();
-            float ls = (lastVG.glyphs.front().sourceText != nullptr)
-                           ? lastVG.glyphs.front().sourceText->letterSpacing
-                           : 0;
-            if (ls != 0) {
-              lastVG.height -= ls;
-            }
-          }
+          RemoveTrailingLetterSpacing(currentColumn->glyphs);
           FinishColumn(currentColumn, textBox->lineHeight);
           columns.emplace_back();
           currentColumn = &columns.back();
@@ -1812,15 +1798,7 @@ class TextLayoutContext {
       currentColumn->glyphs.push_back(std::move(vg));
     }
 
-    // Remove trailing letterSpacing from the last glyph of the last column.
-    if (!currentColumn->glyphs.empty()) {
-      auto& lastVG = currentColumn->glyphs.back();
-      float ls =
-          (lastVG.glyphs.front().sourceText != nullptr) ? lastVG.glyphs.front().sourceText->letterSpacing : 0;
-      if (ls != 0) {
-        lastVG.height -= ls;
-      }
-    }
+    RemoveTrailingLetterSpacing(currentColumn->glyphs);
 
     FinishColumn(currentColumn, textBox->lineHeight);
 
