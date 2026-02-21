@@ -106,9 +106,9 @@ base. If no upstream is configured, fall back to `main` (or `master`).
 ### 0.2 Review Priority Level
 
 Skip this question if the scope contains **only** document files (doc modules use their
-full checklist automatically).
+full checklist automatically). When skipped, all priority levels (A+B+C) are checked.
 
-**Question 1 — Review priority**:
+**Question 1 — Review priority** (code/mixed modules):
 - Option 1 — "Priority A only": correctness and safety issues
 - Option 2 — "Priority A + B": also include refactoring and optimization
 - Option 3 — "All (A + B + C)": also include conventions and documentation
@@ -152,8 +152,7 @@ process begins. Complete all checks before proceeding to module partitioning.
   uncommitted changes and the threshold has auto-fix, abort and ask the user to commit
   or stash first.
 
-**Environment verification** (skip for file/directory full-content scope with
-all-confirm threshold — no fixes guaranteed):
+**Environment verification** (skip for other's PR — no fixes will be committed):
 - Detect build and test commands from project rules or by exploring the codebase.
 - If no automated tests are found, warn the user: without tests, fix validation cannot
   run. Abort unless the user confirms to continue.
@@ -165,46 +164,25 @@ all-confirm threshold — no fixes guaranteed):
 - Ask the user if they have additional reference material (file paths, URLs, or inline
   instructions). The user may skip.
 
-After all checks pass, no further user interaction until the final report (Phase 7),
-except for Phase 3.5 deferred issue confirmation (see Mid-Review Supplements for the
-only other exception).
+After all checks pass, no further user interaction until Phase 3.5 (deferred issue
+confirmation) and Phase 7 (final report).
 
 ### 0.5 Module Partitioning
 
-Partition files in scope into **review modules** for parallel review. The goal is to
-balance workload across reviewers, not to match file boundaries.
+Partition files in scope into **review modules** for parallel review.
 
-**Review module rules:**
-- Each module should be a self-contained logical unit that a reviewer can understand
-  with minimal reference to other modules.
-- **Large files**: if a single file is too large for one reviewer (e.g., a long spec
-  document or a large implementation file), split it by sections/chapters (for docs)
-  or by function groups (for code). Each section becomes its own review module.
-- **Small files**: group related small files into one module to avoid under-utilizing
-  reviewers.
-- Balance module sizes so reviewers have roughly equal workload.
-- **Module type**: classify each module as `code`, `doc`, or `mixed` based on its file
-  types. This determines which checklist the reviewer uses.
+- Each module is a self-contained logical unit. Split large files by section/function
+  group; group related small files together. Balance workload across reviewers.
+- Classify each module as `code`, `doc`, or `mixed` to determine which checklist to use.
 
-**Fix module rules** (determined in Phase 3, after issues are confirmed):
-- Fix modules are grouped **by file**: all confirmed issues in the same file go to the
-  same fixer, regardless of which review module found them. This prevents concurrent
-  edit conflicts.
-- When a review module covers a section of a large file, the team-lead merges all
-  issues from different review modules targeting the same file into one fix task.
-- Cross-file issues (e.g., renames) -> dedicated `fixer-cross` agent.
-- **Shared headers**: assign to the fixer of their primary implementation file.
-- **Widely referenced files** (3+ fixers need to touch it): assign to `fixer-cross`.
+**Fix modules** are determined in Phase 3: group confirmed issues **by file** (one
+fixer per file to prevent concurrent edit conflicts). Cross-file issues go to a
+dedicated `fixer-cross` agent.
 
 ### Mid-Review Supplements
 
-The user may send additional reference material or instructions at any time during the
-review process. When this happens:
-
-1. Acknowledge receipt and assess which modules are affected.
-2. Forward the material to the relevant active reviewer/verifier agents.
-3. If reviews for affected modules are already complete, note the supplements for the
-   next round (Phase 6 loop) rather than restarting the current round.
+The user may send additional material at any time. Forward it to relevant active agents;
+if those modules are already reviewed, include the material in the next round instead.
 
 ---
 
@@ -237,23 +215,10 @@ review process. When this happens:
 
 ## Phase 2: Verification
 
-- **Do not close reviewers yet** (may reuse as fixers in Phase 4 if their review module
-  aligns with a fix module)
+- **Do not close reviewers yet** (may reuse as fixers in Phase 4)
 - Create independent verifier (`verifier-N`) per review module with issues
-- Verifier reads actual code to confirm each issue exists
-
-### Result Alignment
-
-1. Send verification results back to the corresponding reviewer
-2. Reviewer second confirmation:
-   - Agrees -> no dispute, accept conclusion
-   - Disagrees -> provides rebuttal evidence, marks as disputed
-3. Close verifier after reviewer confirms
-
-### Dispute Resolution
-
-- No disputes -> accept agreed conclusions
-- Disputes -> team-lead reads code to judge (read only, no edits)
+- Verifier reads actual code to confirm each issue. Send results back to the reviewer
+  for second confirmation. If they disagree, team-lead reads code to judge.
 
 ---
 
@@ -272,10 +237,9 @@ matrix. The user's chosen auto-fix threshold determines handling:
 
 ### Key points
 
-- **Cross-module doc impact**: for each fixable issue, identify whether the change
-  affects comments or documentation files outside the fixer's own module. If so, create
-  a follow-up task for `fixer-cross` to update those files after the original fix is
-  committed.
+- For each fixable issue, check whether the change also requires updates to comments
+  or documentation outside the fixer's module — if so, create a follow-up for
+  `fixer-cross`.
 - Previously rolled-back issues -> do not attempt again
 
 ---
@@ -333,10 +297,9 @@ a specific fix suggestion when possible.
 
 ## Phase 4: Fix
 
-- Group selected issues into **fix modules by file** (see 0.5 fix module rules).
-  If a reviewer already has full context for a file, reuse it as fixer for that file.
-- Cross-file issues -> dedicated `fixer-cross` agent
-- Multi-file renames -> single fixer as atomic task
+- Group confirmed issues into **fix modules by file** (see 0.5). Reuse reviewers as
+  fixers when they already have context for a file.
+- Cross-file issues -> `fixer-cross` agent; multi-file renames -> single atomic task
 
 ### Fixer Instructions (include in every fixer prompt)
 
@@ -436,32 +399,9 @@ Delete pending files after report.
 
 ## Troubleshooting
 
-### Agent Teams not available
-Cause: Experimental feature not enabled.
-Solution: Run `/config` -> `[Experimental] Agent Teams` -> `true`.
-
-### Build or test fails before fixes begin
-Cause: Pre-existing issues in the codebase.
-Solution: Fix build/test failures before running `/review`.
-
-### Reviewer reports no issues but code has problems
-Cause: Reviewer prompt insufficient or issues fall outside the checklist.
-Solution: Re-run `/review`. Team-lead will auto-adjust prompts in subsequent rounds.
-
-### Pending items not presented at the end
-Cause: No high-risk issues were deferred.
-Solution: This is expected — Phase 7 only presents pending items when they exist.
-
-### Fixer commits break tests repeatedly
-Cause: Complex semantic changes or insufficient context.
-Solution: Team-lead handles this automatically — reverts bad commits and records
-unresolvable issues to `pending-issues.md` for user review in Phase 7.
-
 ### PR URL does not match current repository
-Cause: The PR belongs to a different repository.
-Solution: Navigate to the correct repository and run `/review` there.
+The PR belongs to a different repository. Run `/review` from the correct repo.
 
 ### gh CLI not installed or not authenticated
-Cause: PR mode requires the GitHub CLI.
-Solution: Install with `brew install gh` (macOS) or see https://cli.github.com, then
-run `gh auth login`.
+PR mode requires `gh`. Install with `brew install gh` (macOS) or see
+https://cli.github.com, then run `gh auth login`.
