@@ -71,10 +71,6 @@ run `/cr` from the correct repository.
 **Empty arguments (default)**: use the current branch's upstream tracking branch as the
 base. If no upstream is configured, fall back to `main` (or `master`).
 
-**Empty diff / no changes**: if the resolved scope produces an empty diff (e.g., branch
-is identical to upstream, commit range endpoints are the same), inform the user that
-there is nothing to review and exit.
-
 **PR mode — lightweight metadata** (do not create worktree or fetch diff yet):
 
 1. **Verify `gh` is available**: run `gh --version`. If not installed, inform the user
@@ -82,34 +78,29 @@ there is nothing to review and exit.
 
 2. **Fetch PR metadata** (single API call):
    ```
-   gh pr view {number} --json headRefName,baseRefName,author,headRefOid,files,state
+   gh pr view {number} --json headRefName,baseRefName,author,headRefOid,state
    ```
-   Extract: `PR_BRANCH`, `BASE_BRANCH`, `PR_AUTHOR`, `HEAD_SHA`, file list, `STATE`.
+   Extract: `PR_BRANCH`, `BASE_BRANCH`, `PR_AUTHOR`, `HEAD_SHA`, `STATE`.
    If `STATE` is not `OPEN`, inform the user that the PR is already closed/merged and
    exit.
-   If the file list is empty, inform the user that the PR has no file changes and exit.
 
 3. **Determine code ownership**: compare `PR_AUTHOR` with `gh api user -q '.login'`.
    Store result as `IS_OWN_PR` (true/false).
 
-**Local mode — lightweight file list**: run a single command to get the file name list
-(e.g., `git diff --name-only` for branch diff, `git show --name-only` for single
-commit, or the paths themselves for file/directory). Do not read file contents or
-explore the codebase yet.
+**Local mode**: no exploration needed at this point. Proceed directly to 0.2.
 
 ### 0.2 User Questions
 
 Ask all user-facing questions **immediately after mode detection**, before any heavy
 operations (worktree, diff, build, codebase exploration). Present all applicable
-questions together in one interaction. The only input needed is the file name list
-from 0.1 — do not read code or explore the codebase before asking.
+questions together in one interaction. Do not read code or explore the codebase
+before asking.
 
 #### Question 1 — Review priority
 
-Check file extensions from 0.1 to determine if the scope contains **only** document
-files (e.g., `.md`, `.txt`, `.rst`, `.html`). If so, skip this question (doc modules
-use their full checklist automatically). When skipped, all priority levels (A+B+C) are
-checked. If uncertain, do not skip — show the question.
+Always show this question unless it can be trivially determined that the scope
+contains **only** document files (e.g., PR metadata file list is all `.md`). When
+skipped, all priority levels (A+B+C) are checked.
 
 (code/mixed modules):
 - Option 1 — "Full review (A + B + C)": correctness, refactoring, and conventions.
@@ -188,6 +179,9 @@ Perform the heavy operations that were deferred from 0.1.
 
 **Local mode**: fetch the full diff content for the scope determined in 0.1 (branch
 diff, `git show`, commit range diff, or read file contents for full-content review).
+
+**Empty scope check**: if the diff is empty or the PR has no file changes, inform the
+user that there is nothing to review and exit.
 
 **Build + test baseline** (skip for other's PR or doc-only scope):
 Run build and test in the working directory to establish a passing baseline. Fail = abort.
