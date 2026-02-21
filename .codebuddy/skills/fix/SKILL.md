@@ -10,6 +10,14 @@ Multi-round team-based workflow: review -> verify -> filter -> fix -> validate -
 User interaction is limited to Phase 0 (scope confirmation) and Phase 7 (pending items
 confirmation, if any). Everything in between runs fully automatically.
 
+## Prerequisites
+
+This skill requires the **Agent Teams** experimental feature. If not enabled, prompt
+the user to enable it before proceeding:
+
+- Option A: Run `/config`, find `[Experimental] Agent Teams`, toggle to `true`.
+- Option B: Set environment variable `CODEBUDDY_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
+
 ## Reference Map
 
 | Need | Read |
