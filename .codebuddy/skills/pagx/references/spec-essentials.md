@@ -120,13 +120,13 @@ pagx
 | `passThroughBackground` | true | When false, child layers lose access to background |
 | `mask` | - | Reference to mask layer via `@id` |
 | `maskType` | alpha | alpha / luminance / contour |
+| `composition` | - | Reference to Composition via `@id` |
+| `scrollRect` | - | Clipping region "x,y,w,h" |
 
 **maskType usage**:
 - `alpha`: mask layer's alpha channel controls visibility — use for soft-edge gradual masks.
 - `luminance`: mask layer's brightness controls visibility — use for luminance-based masking.
 - `contour`: binary clipping from mask layer's contour — use for hard-edge shape clipping.
-| `composition` | - | Reference to Composition via `@id` |
-| `scrollRect` | - | Clipping region "x,y,w,h" |
 
 **Transform Priority**: `matrix3D` > `matrix` > `x`/`y`. Each overrides the previous.
 
