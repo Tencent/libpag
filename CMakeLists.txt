@@ -194,11 +194,9 @@ if (PAG_BUILD_PAGX)
     # renderer module (text layout, font embedding, etc.)
     file(GLOB_RECURSE RENDERER_FILES src/renderer/*.*)
     list(APPEND PAG_FILES ${RENDERER_FILES})
-    list(APPEND PAG_INCLUDES src/renderer src/pagx)
 
     if (PAG_BUILD_SVG)
         list(APPEND PAG_FILES src/pagx/svg/SVGImporter.cpp src/pagx/svg/SVGParserContext.h)
-        list(APPEND PAG_INCLUDES src/pagx/svg)
     endif ()
 endif ()
 file(GLOB COMMON_FILES src/platform/*.*)
@@ -775,8 +773,6 @@ if (PAG_BUILD_TESTS)
     list(APPEND PAG_TEST_INCLUDES ${PAG_INCLUDES} test/src
             ${GOOGLE_TEST_DIR} ${GOOGLE_TEST_DIR}/include
             ${TGFX_DIR}/third_party/json/include
-            src/renderer src/pagx src/pagx/svg
-            src/cli
             ${CMAKE_CURRENT_BINARY_DIR}/generated
             ${LIBXML2_INCLUDE_DIR})
 
