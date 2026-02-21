@@ -125,21 +125,22 @@ Threshold is automatically set to **all confirm** with PR comment output. Inform
 user: "This is someone else's PR. Issues will be presented for you to select which ones
 to submit as PR review comments."
 
-#### Question 3 — Test environment (conditional)
-
-Skip if other's PR or doc-only scope. If no build/test commands are available from
-context or the codebase, ask the user: without tests, fix validation cannot run —
-continue anyway?
-
 After all questions are answered, no further user interaction until Phase 7.
 
 ### 0.3 Pre-flight Checks
 
-Automated checks only — no user interaction. Any failure here aborts immediately.
+Automated checks only — no user interaction.
 
 **Agent Teams availability**:
-- Verify Agent Teams is enabled. If not available, prompt the user to enable it and
-  abort.
+- Check if Agent Teams is enabled. If not available, warn the user in the conversation
+  that review will run in single-agent serial mode (one module at a time) instead of
+  parallel. Continue without aborting.
+
+**Test environment**:
+- Skip if other's PR or doc-only scope. If no build/test commands can be determined
+  from context or the codebase, warn the user in the conversation that fix validation
+  will be skipped (fixes are still applied but not automatically verified). Continue
+  without aborting.
 
 **Clean branch check**:
 - **PR mode (will use worktree)**: skip — the worktree created in 0.4 will be clean.
@@ -183,7 +184,7 @@ diff, `git show`, commit range diff, or read file contents for full-content revi
 **Empty scope check**: if the diff is empty or the PR has no file changes, inform the
 user that there is nothing to review and exit.
 
-**Build + test baseline** (skip for other's PR or doc-only scope):
+**Build + test baseline** (skip for other's PR, doc-only scope, or no build/test commands):
 Run build and test in the working directory to establish a passing baseline. Fail = abort.
 
 ### 0.5 Module Partitioning
@@ -207,7 +208,7 @@ The user may send additional material at any time. If reviewers are still active
 
 ## Phase 1: Review
 
-- Create the team.
+- Create the team (or run serially without a team if Agent Teams is unavailable).
 - One `general-purpose` reviewer agent (`reviewer-N`) per module
 - Reviewer prompt includes:
   - Module file list + checklist matching the module type:
@@ -292,7 +293,8 @@ Team-lead collects skipped issues and includes them in the next round's context.
 
 ## Phase 5: Validate
 
-- For code/mixed modules: build + test using the project's commands
+- For code/mixed modules: build + test using the project's commands. If no build/test
+  commands are available (warned in 0.3), skip validation entirely.
 - For doc-only modules: skip build/test; validation is done through review phases
 
 **All pass** (or no code modules to validate) -> close all fixers -> Phase 6.
