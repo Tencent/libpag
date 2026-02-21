@@ -322,9 +322,9 @@ all fixers when resolved.
 
 ### Termination check
 
-- If at least one commit was produced this round -> create new team, back to Phase 2
-- Otherwise (no commits produced — either no issues found, all skipped, or queue was
-  empty from the start):
+- If at least one commit was produced this round and round count < 100
+  -> create new team, back to Phase 2
+- Otherwise (no commits produced, or max 100 rounds reached):
   - Deferred list or `pending-issues.md` has entries -> Phase 8
   - Both empty -> Phase 9
 
