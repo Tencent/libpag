@@ -72,16 +72,7 @@ You (the team-lead) orchestrate the entire workflow. Critical constraints:
 
 ## Phase 0: Scope Confirmation & Environment Check
 
-### 0.1 Clean Branch Check
-
-Verify the working tree is clean and not on the main branch:
-- If on the main/master branch, or there are uncommitted changes (staged, unstaged,
-  or untracked), inform the user: "Automated fix requires a clean, non-main branch.
-  Each fix is committed individually for easy rollback and issue tracing."
-- On main -> abort, ask user to create a feature branch first.
-- Uncommitted changes -> ask user whether to commit or stash first. Decline = abort.
-
-### 0.2 Scope & Fix Level Selection
+### 0.1 Scope & Fix Level Selection
 
 If `$ARGUMENTS` already resolved the scope, report it and only ask the fix level.
 Otherwise ask both questions together in a single interaction.
@@ -99,6 +90,15 @@ the incremental scope of each level):
   code simplification, architecture improvement, interface usage, test coverage,
   regression risk
 - Option 3 — "All": adds coding conventions, documentation consistency, accessibility
+
+### 0.2 Clean Branch Check
+
+Verify the working tree is clean and not on the main branch:
+- If on the main/master branch, or there are uncommitted changes (staged, unstaged,
+  or untracked), inform the user: "Automated fix requires a clean, non-main branch.
+  Each fix is committed individually for easy rollback and issue tracing."
+- On main -> abort, ask user to create a feature branch first.
+- Uncommitted changes -> ask user whether to commit or stash first. Decline = abort.
 
 ### 0.3 Reference Material (doc/mixed modules only)
 
