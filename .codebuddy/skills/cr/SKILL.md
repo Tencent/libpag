@@ -17,9 +17,10 @@ Runs multi-round iterations until no valid issues remain.
 
 - You (the team-lead) **never modify files directly**. Delegate all changes to
   agents. Read code only for arbitration and diagnosis.
-- **Autonomous operation**: between Phase 0 (user confirmation) and Phase 8 (final
-  report), the entire review-fix loop runs without user interaction. Deferred issues
-  accumulate across rounds and are only presented to the user in Phase 8.
+- **Autonomous operation**: between Phase 0 (user confirmation) and Phase 8
+  (remaining issue confirmation), the review-fix loop runs without user interaction.
+  Deferred issues accumulate across rounds and are only presented to the user in
+  Phase 8.
 - All user-facing interactions must use the language the user has been using in the
   conversation. Do not default to English.
 - When presenting choices with predefined options, use interactive dialogs with
@@ -144,7 +145,7 @@ Validate arguments and fetch the actual diff/content.
      git worktree add /tmp/pr-review-{number} pr-{number}
      ```
      All subsequent operations use the worktree directory. Record `WORKTREE_DIR` for
-     cleanup in Phase 8.
+     cleanup in Phase 9.
 
 3. **Set review scope**: diff against `BASE_BRANCH`.
    ```
@@ -333,16 +334,14 @@ rolled back, recorded to pending files, or deferred for user confirmation.
 
 ---
 
-## Phase 8: Final Report & Cleanup
-
-### Step 1: Remaining issue confirmation
+## Phase 8: Remaining Issue Confirmation
 
 Collect all issues that were not auto-fixed during the loop:
 - **Deferred issues**: above the user's auto-fix threshold (accumulated in Phase 4)
 - **Pending issues**: failed auto-fix or rolled back (recorded in `pending-issues.md`)
 
 Merge both lists, deduplicate, and present to the user. If the merged list is empty,
-skip to step 2.
+skip to Phase 9.
 
 1. Present issues in a compact numbered list. Each entry should fit on one line:
    `[number] [file:line] [risk] [source: deferred/failed] — [description]`
@@ -358,15 +357,21 @@ skip to step 2.
    - Option 3 — "Select individually": present each issue one by one (same as above)
 
 3. **Action depends on mode**:
-   - **Local mode**: jump back to Phase 5 with the user-approved issues as the fix
-     queue. Phase 5 -> Phase 6 (validate) -> Phase 7 terminates to Phase 8 (no new
-     review-discovered issues means the loop ends). Any failures during this cycle
-     are reported in the final summary (step 3) rather than re-queued.
    - **PR mode**: submit selected issues as PR review comments using the format in
      `references/pr-comment-format.md`. Comment body should be concise, written in the
-     user's conversation language, with a specific fix suggestion.
+     user's conversation language, with a specific fix suggestion. -> Phase 9
+   - **Local mode**: jump back to Phase 5 with the user-approved issues as the fix
+     queue. The full cycle runs: Phase 5 (fix) -> Phase 6 (validate) -> Phase 7 (loop)
+     -> Phase 2 (review the new changes) -> ... until no new issues are found, then
+     back to Phase 8. Any remaining deferred/pending issues from this cycle are
+     presented again. The loop terminates when the merged list is empty or the user
+     skips all remaining issues -> Phase 9.
 
-### Step 2: PR mode — worktree cleanup
+---
+
+## Phase 9: Cleanup & Report
+
+### Worktree cleanup (PR mode only)
 
 If `WORKTREE_DIR` was created, clean up:
 ```
@@ -375,12 +380,11 @@ git worktree remove {WORKTREE_DIR}
 git branch -D pr-{number}
 ```
 
-### Step 3: Summary Report
+### Summary Report
 
 - Total rounds and per-round fix count/type statistics
 - Issues found vs issues fixed (also show issues the user declined)
 - Rolled-back issues and reasons
-- Pending items and their resolution
 - Final test result
 - **PR mode**: list review comments submitted
 - **Local mode with associated PR**: note which issues originated from PR comments
