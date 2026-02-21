@@ -88,9 +88,6 @@ Ask all questions at once:
   interface usage, test coverage, regression risk)
 - C: All (A + B + coding conventions, documentation consistency)
 
-**Question 3 — Documentation review** (only when scope includes doc directories):
-- Whether to include documentation-code consistency checks
-
 After confirmation, no further user interaction until Phase 7.
 
 ### 0.3 Module Partitioning
