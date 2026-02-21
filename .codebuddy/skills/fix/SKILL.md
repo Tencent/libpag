@@ -1,6 +1,8 @@
 ---
 name: fix
-description: Multi-round automated code review and fix using Agent Teams.
+description: >-
+  Multi-round automated code review and fix using Agent Teams. Use when the
+  user invokes /fix to review and fix code or document issues across a branch.
 ---
 
 # Fix — Automated Code Review & Fix
@@ -11,22 +13,15 @@ Runs multi-round team-based iterations until no valid issues remain.
 **Activation**: Only execute this workflow when the user explicitly invokes `/fix`.
 Do NOT auto-trigger for general bug fix requests, code questions, or error discussions.
 
-## General Rules
+## Instructions
 
 - All user-facing interactions must use the language the user has been using in the
   conversation. Do not default to English.
 - When presenting choices with predefined options, use interactive dialogs with
   selectable options rather than plain text.
-
-## Team-Lead Responsibilities
-
-You (the team-lead) orchestrate the entire workflow. Critical constraints:
-
-1. **Never modify code files directly.** Delegate all code changes to agents. This
-   prevents context bloat that causes information loss after compression.
-2. **Read code only for arbitration and diagnosis** — never edit.
-3. **Prompt iteration optimization.** After each round, analyze review quality and
-   adjust the next round's reviewer prompts accordingly.
+- **You (the team-lead) never modify files directly.** Delegate all changes to agents.
+  Read code only for arbitration and diagnosis.
+- After each round, analyze review quality and adjust the next round's reviewer prompts.
 
 ## References
 
@@ -168,7 +163,7 @@ review process. When this happens:
       (refactoring/optimization) issues. Skip Level C (conventions/documentation) for
       unchanged code.
   - **Evidence requirement**: every issue must have a code citation (file:line + snippet)
-  - **Exclusion list**: see `references/review-checklist.md` exclusion section. Project
+  - **Exclusion list**: see the exclusion section in the corresponding checklist. Project
     rules loaded in context take priority over the exclusion list.
   - **Public API protection**: no signature/interface changes unless obvious bug or
     comment issue
@@ -186,8 +181,9 @@ When all other agents in the batch are done but one has not responded:
 
 ## Phase 2: Verification
 
-- **Do not close reviewers** (reuse as fixers in Phase 4)
-- Create independent verifier (`verifier-N`) per module with issues
+- **Do not close reviewers yet** (may reuse as fixers in Phase 4 if their review module
+  aligns with a fix module)
+- Create independent verifier (`verifier-N`) per review module with issues
 - Verifier reads actual code to confirm each issue exists
 
 ### Result Alignment
