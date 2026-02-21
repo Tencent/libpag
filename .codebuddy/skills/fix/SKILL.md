@@ -92,26 +92,15 @@ After confirmation, no further user interaction until Phase 7.
 
 ### 0.3 Module Partitioning
 
-Partition files in scope into sub-modules. The goal is to maximize parallel review
-while minimizing cross-module dependencies.
+Partition files in scope into sub-modules for parallel review. Each sub-module should
+be a self-contained logical unit (a class and its implementation, a feature directory,
+a subsystem) that a reviewer can understand with minimal reference to other modules.
 
-**Partitioning rules (in priority order):**
-
-1. **Logical cohesion first**: each sub-module should be a self-contained logical unit
-   (a class and its implementation, a feature directory, a subsystem). A reviewer should
-   be able to understand the module with minimal reference to other modules.
-2. **Strictly non-overlapping file sets**: every file belongs to exactly one module.
-3. **No minimum file count**: a 2-file module is fine if it is logically independent.
-4. **Split only when too large**: if a single logical module has too many files for one
-   agent to handle effectively, split it along internal boundaries (e.g., by sub-feature
-   or by class). Keep the split balanced.
-5. **Aim for roughly even sizes**: when multiple partitioning strategies are viable,
-   prefer the one that produces more balanced module sizes.
-6. **Shared headers**: assign to the module of their primary implementation file. If a
-   header is primarily consumed (not implemented) by a module, it stays with the
-   implementor.
-7. **Widely referenced files** (used by 3+ modules): assign to their primary caller's
-   module. Other modules treat them as read-only context.
+- **Non-overlapping**: every file belongs to exactly one module.
+- **Split when too large**: if a logical module has too many files for one agent, split
+  along internal boundaries. Keep splits roughly balanced.
+- **Shared headers**: assign to the module of their primary implementation file.
+- **Widely referenced files** (3+ modules): assign to the primary caller's module.
 
 ---
 
