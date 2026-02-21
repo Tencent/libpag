@@ -46,9 +46,9 @@ direct commits. Runs multi-round iterations until no valid issues remain.
 
 ## Phase 0: Scope Confirmation & Environment Check
 
-### 0.1 Scope Resolution
+### 0.1 Argument Parsing & Mode Detection
 
-Parse `$ARGUMENTS` to determine the review mode and scope:
+Parse `$ARGUMENTS` to determine the review mode:
 
 | `$ARGUMENTS` | Detection | Mode | Scope |
 |--------------|-----------|------|-------|
@@ -70,49 +70,37 @@ run `/cr` from the correct repository.
 **Empty arguments (default)**: use the current branch's upstream tracking branch as the
 base. If no upstream is configured, fall back to `main` (or `master`).
 
-#### PR mode setup
+**PR mode — lightweight metadata** (do not create worktree or fetch diff yet):
 
 1. **Verify `gh` is available**: run `gh --version`. If not installed, inform the user
    (macOS: `brew install gh`, others: https://cli.github.com) and abort.
 
 2. **Fetch PR metadata** (single API call):
    ```
-   gh pr view {number} --json headRefName,baseRefName,author,headRefOid
+   gh pr view {number} --json headRefName,baseRefName,author,headRefOid,files
    ```
-   Extract: `PR_BRANCH`, `BASE_BRANCH`, `PR_AUTHOR`, `HEAD_SHA`.
+   Extract: `PR_BRANCH`, `BASE_BRANCH`, `PR_AUTHOR`, `HEAD_SHA`, file list.
 
 3. **Determine code ownership**: compare `PR_AUTHOR` with `gh api user -q '.login'`.
    Store result as `IS_OWN_PR` (true/false).
 
-4. **Prepare working directory**:
-   - If current branch equals `PR_BRANCH` -> use current directory directly.
-   - Otherwise -> create a worktree:
-     ```
-     git fetch origin pull/{number}/head:pr-{number}
-     git worktree add /tmp/pr-review-{number} pr-{number}
-     ```
-     All subsequent operations use the worktree directory. Record `WORKTREE_DIR` for
-     cleanup in Phase 7.
+**Local mode — lightweight file list**: for the purpose of 0.2, quickly obtain the
+file list without full diff content (e.g., `git diff --name-only` for branch diff,
+`git show --name-only` for single commit, or the paths themselves for file/directory).
 
-5. **Fetch existing PR comments** for reviewer context:
-   ```
-   gh pr view {number} --comments
-   ```
-   Include in reviewer prompts so they avoid re-reporting already-discussed issues.
+### 0.2 User Questions
 
-6. **Set review scope**: diff against the PR's base branch (`BASE_BRANCH` from step 2).
-   ```
-   git fetch origin {BASE_BRANCH}
-   git diff $(git merge-base origin/{BASE_BRANCH} HEAD)
-   ```
+Ask all user-facing questions **immediately after mode detection**, before any heavy
+operations (worktree, diff, build). Use the lightweight file list from 0.1 to determine
+whether to show Q1.
 
-### 0.2 Review Priority Level
+#### Question 1 — Review priority
 
-Before asking, scan file extensions in scope to determine if it contains **only**
-document files. If so, skip this question (doc modules use their full checklist
-automatically). When skipped, all priority levels (A+B+C) are checked.
+Scan the file list from 0.1 to determine if the scope contains **only** document files.
+If so, skip this question (doc modules use their full checklist automatically). When
+skipped, all priority levels (A+B+C) are checked.
 
-**Question 1 — Review priority** (code/mixed modules):
+(code/mixed modules):
 - Option 1 — "Full review (A + B + C)": correctness, refactoring, and conventions.
   e.g., null checks, duplicate code extraction, naming style, comment quality.
 - Option 2 — "Correctness + optimization (A + B)": skip conventions and documentation.
@@ -120,13 +108,9 @@ automatically). When skipped, all priority levels (A+B+C) are checked.
 - Option 3 — "Correctness only (A)": only safety and correctness issues.
   e.g., null dereference, out-of-bounds, resource leaks, race conditions.
 
-### 0.3 Auto-Fix Threshold Selection
-
-The available options depend on code ownership:
+#### Question 2 — Auto-fix threshold
 
 **Own code** (local mode, or PR mode with `IS_OWN_PR = true`):
-
-**Question 2 — Auto-fix threshold**:
 - Option 1 — "Low + Medium risk": auto-fix clear fixes including multi-location changes
   (extract shared logic, remove unused internals). Only confirm high-risk decisions
   (API changes, architecture, algorithm trade-offs).
@@ -135,12 +119,11 @@ The available options depend on code ownership:
 - Option 3 — "All confirm": no auto-fix, review every issue before fixing.
 
 **Other's PR** (`IS_OWN_PR = false`):
-
 Threshold is automatically set to **all confirm** with PR comment output. Inform the
 user: "This is someone else's PR. Issues will be presented for you to select which ones
 to submit as PR review comments."
 
-### 0.4 Pre-flight Checks
+### 0.3 Pre-flight Checks
 
 All checks that might require user action are performed here, before the automated
 process begins. Complete all checks before proceeding to module partitioning.
@@ -150,7 +133,7 @@ process begins. Complete all checks before proceeding to module partitioning.
   abort.
 
 **Clean branch check**:
-- **PR mode (worktree)**: skip — the worktree is always clean.
+- **PR mode (will use worktree)**: skip — the worktree created in 0.4 will be clean.
 - **PR mode (current branch is PR branch)**: verify no uncommitted changes. If dirty,
   abort and ask the user to resolve first.
 - **Local mode**: verify not on the main/master branch (abort if so). If there are
@@ -161,7 +144,8 @@ process begins. Complete all checks before proceeding to module partitioning.
 - Detect build and test commands from project rules or by exploring the codebase.
 - If no automated tests are found, warn the user: without tests, fix validation cannot
   run. Abort unless the user confirms to continue.
-- Run build and test to establish baseline. Fail = abort.
+- Actual build + test baseline runs after 0.4 (scope preparation), in the correct
+  working directory.
 
 **Reference material** (doc/mixed modules only):
 - Auto-discover relevant best-practice guides, official documentation, or specification
@@ -170,6 +154,40 @@ process begins. Complete all checks before proceeding to module partitioning.
   instructions). The user may skip.
 
 After all checks pass, no further user interaction until Phase 7 (final report).
+
+### 0.4 Scope Preparation
+
+Perform the heavy operations that were deferred from 0.1.
+
+**PR mode — working directory & diff**:
+
+1. **Prepare working directory**:
+   - If current branch equals `PR_BRANCH` -> use current directory directly.
+   - Otherwise -> create a worktree:
+     ```
+     git fetch origin pull/{number}/head:pr-{number}
+     git worktree add /tmp/pr-review-{number} pr-{number}
+     ```
+     All subsequent operations use the worktree directory. Record `WORKTREE_DIR` for
+     cleanup in Phase 7.
+
+2. **Fetch existing PR comments** for reviewer context:
+   ```
+   gh pr view {number} --comments
+   ```
+   Include in reviewer prompts so they avoid re-reporting already-discussed issues.
+
+3. **Set review scope**: diff against the PR's base branch (`BASE_BRANCH` from 0.1).
+   ```
+   git fetch origin {BASE_BRANCH}
+   git diff $(git merge-base origin/{BASE_BRANCH} HEAD)
+   ```
+
+**Local mode**: fetch the full diff content for the scope determined in 0.1 (branch
+diff, `git show`, commit range diff, or read file contents for full-content review).
+
+**Build + test baseline** (skip for other's PR or doc-only scope):
+Run build and test in the working directory to establish a passing baseline. Fail = abort.
 
 ### 0.5 Module Partitioning
 
