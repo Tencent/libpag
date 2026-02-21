@@ -51,8 +51,10 @@ Runs multi-round iterations until no valid issues remain.
 
 ## Phase 0: User Confirmation
 
-**CRITICAL**: Ask all questions and receive answers before any Phase 1+ operations.
-Only `$ARGUMENTS` string parsing for mode detection is allowed before that.
+**CRITICAL**: Complete ALL questions in this phase and receive user answers BEFORE
+executing ANY operations from Phase 1 or later — regardless of how fast those
+operations are. The ONLY permitted operations before user answers are parsing
+`$ARGUMENTS` for mode detection (pure string parsing, no git/shell commands).
 
 ### Mode detection
 
