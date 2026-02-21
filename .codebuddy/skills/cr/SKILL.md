@@ -51,11 +51,12 @@ Runs multi-round iterations until no valid issues remain.
 
 ### 0.1 Mode Detection & User Questions
 
-Determine the mode by inspecting `$ARGUMENTS` as a string (no commands needed):
-- Purely numeric (e.g., `123`) or contains `/` (URL) -> **PR mode**.
-- Everything else -> **not PR mode**.
+Determine the mode from `$ARGUMENTS`:
+- Purely numeric or URL (contains `/`) -> **PR mode**
+- Empty or anything else -> **Local mode**
 
-Then present questions in **one interaction**:
+This requires no commands — just inspect the argument string. Then immediately present
+questions in **one interaction**.
 
 #### Question 1 — Review priority
 
