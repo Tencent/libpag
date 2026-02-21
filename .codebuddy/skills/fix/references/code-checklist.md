@@ -3,6 +3,10 @@
 Reviewers load the check items for the selected fix level and all levels below it.
 Test code has reduced review requirements — only focus on obvious implementation errors.
 
+**Language applicability**: Items marked with a language tag (e.g., `[C/C++]`) apply only
+to that language. Unmarked items apply to all languages. Skip items that do not match the
+project's language.
+
 **Public API protection**: Do not suggest changes to public API function signatures or
 class interface definitions, unless it is an obvious bug or a comment issue. Focus on
 internal implementation refactoring and optimization.
@@ -28,8 +32,9 @@ Issues that directly affect runtime behavior. Highest impact.
 **A2. Boundary Conditions**
 - Division-by-zero protection (both floating-point and integer)
 - Empty container operations (check empty() before front() / back() / operator[])
-- Null pointer dereference
-- Integer overflow / underflow (especially unsigned subtraction)
+  `[C/C++]`
+- Null/nil/undefined dereference
+- Integer overflow / underflow (especially unsigned subtraction `[C/C++]`)
 - Array / string out-of-bounds access
 
 **A3. Error Handling**
@@ -37,14 +42,18 @@ Issues that directly affect runtime behavior. Highest impact.
 - Is result validity verified after string / data parsing?
 - Is external input validated for legality?
 - Is there a reasonable fallback / return when function calls fail?
+- Are promises / async calls properly awaited with error handling?
+  `[JS/TS/Python/async languages]`
 
 **A4. Resource Management**
 - Are manually allocated resources correctly released on all paths (prefer RAII)?
+  `[C/C++]`
 - Are file handles / system resources properly closed?
-- Are lock acquire and release properly paired?
-- Is there a risk of pointer / iterator invalidation after container resize?
+- Are lock acquire and release properly paired? `[C/C++/Java/Go]`
+- Is there a risk of pointer / iterator invalidation after container resize? `[C/C++]`
+- Are database connections / network sockets properly released in finally/defer blocks?
 
-**A5. Memory Safety**
+**A5. Memory Safety** `[C/C++]`
 - Use-after-move: is a moved-from object used again?
 - Dangling reference / pointer: returning reference / pointer to a local variable?
 - Is a container element reference still used after the container is modified?
@@ -72,8 +81,9 @@ Improvements to code quality, performance, and maintainability. Medium impact.
   the risk of the change**
 - Repeated computation inside loops: can expressions be moved outside the loop?
 - String operations: can frequent concatenation inside loops be optimized?
-- Unnecessary temporary object construction
+- Unnecessary temporary object construction `[C/C++]`
 - Const references: are parameters / variables that can be const& marked as such?
+  `[C/C++]`
 
 **B2. Code Simplification**
 - Duplicate code: >= 3 identical patterns should be extracted into a method
@@ -92,6 +102,7 @@ Improvements to code quality, performance, and maintainability. Medium impact.
 - Are called APIs used according to their design intent and documentation?
 - Are any deprecated interfaces being used?
 - Parameter passing: are large objects passed by const reference instead of by value?
+  `[C/C++]`
 
 **B5. Interface Changes**
 - Are public API changes necessary and justified?
@@ -121,6 +132,7 @@ Coding standards and documentation consistency. Lower impact on functionality.
 **C2. Initialization Conventions**
 - Are variables assigned an initial value at declaration (as required by project rules)?
 - Are class member variables initialized at declaration or in the constructor?
+  `[C/C++/Java]`
 
 **C3. Project Language Conventions**
 - Does the code comply with language usage restrictions defined in the project rules
@@ -133,16 +145,17 @@ Coding standards and documentation consistency. Lower impact on functionality.
 
 **C5. File Organization**
 - Is the function order in implementation files consistent with the declaration order?
-- Do header files have appropriate include guards?
-- Are include dependencies necessary and reasonable?
+  `[C/C++]`
+- Do header files have appropriate include guards? `[C/C++]`
+- Are include / import dependencies necessary and reasonable?
 
 **C6. Type Safety**
-- Implicit narrowing conversions (large type -> small type)
-- Signed / unsigned mixed comparisons
+- Implicit narrowing conversions (large type -> small type) `[C/C++/Java]`
+- Signed / unsigned mixed comparisons `[C/C++]`
 - Magic numbers: hard-coded values should be extracted as named constants (unless
   the context already makes it clear)
 
-**C7. Const Correctness**
+**C7. Const Correctness** `[C/C++]`
 - Are methods that don't modify state marked const?
 - Are parameters that aren't modified passed as const references?
 - Are local variables that aren't modified declared const?
