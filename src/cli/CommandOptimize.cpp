@@ -1028,10 +1028,10 @@ static bool ElementsStructurallyEqual(const Element* a, const Element* b) {
   if (type == NodeType::TextBox) {
     auto tba = static_cast<const TextBox*>(a);
     auto tbb = static_cast<const TextBox*>(b);
-    return tba->size == tbb->size && tba->textAlign == tbb->textAlign &&
-           tba->paragraphAlign == tbb->paragraphAlign && tba->writingMode == tbb->writingMode &&
-           tba->lineHeight == tbb->lineHeight && tba->wordWrap == tbb->wordWrap &&
-           tba->overflow == tbb->overflow;
+    return tba->position == tbb->position && tba->size == tbb->size &&
+           tba->textAlign == tbb->textAlign && tba->paragraphAlign == tbb->paragraphAlign &&
+           tba->writingMode == tbb->writingMode && tba->lineHeight == tbb->lineHeight &&
+           tba->wordWrap == tbb->wordWrap && tba->overflow == tbb->overflow;
   }
   // For other element types (TrimPath, RoundCorner, MergePath, Repeater, TextModifier, TextPath),
   // default to not equal to be conservative.
