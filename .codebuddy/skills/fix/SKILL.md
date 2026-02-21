@@ -89,9 +89,22 @@ Ask all questions at once:
   interface usage, test coverage, regression risk)
 - C: All (A + B + coding conventions, documentation consistency)
 
-After confirmation, no further user interaction until Phase 7.
+### 0.3 Reference Material (doc/mixed modules only)
 
-### 0.3 Module Partitioning
+If the scope contains doc or mixed modules, gather reference material for reviewers:
+
+1. **Auto-discover**: search the project and web for relevant best-practice guides,
+   official documentation, or specification standards that apply to the document type
+   being reviewed (e.g., skill authoring guides, API design guidelines, RFC standards).
+2. **Ask the user**: present what you found and ask if they have additional reference
+   material (file paths, URLs, or inline instructions). The user may also choose to
+   skip this step if no extra references are needed.
+3. Include all gathered references in the reviewer prompts for doc/mixed modules.
+
+After confirmation, no further user interaction until Phase 7 (but see Mid-Review
+Supplements below).
+
+### 0.4 Module Partitioning
 
 Partition files in scope into modules for parallel review. Each module should
 be a self-contained logical unit (a class and its implementation, a feature directory,
@@ -105,6 +118,16 @@ reference to other modules.
   along internal boundaries. Keep splits roughly balanced.
 - **Shared headers**: assign to the module of their primary implementation file.
 - **Widely referenced files** (3+ modules): assign to the primary caller's module.
+
+### Mid-Review Supplements
+
+The user may send additional reference material or instructions at any time during the
+review process. When this happens:
+
+1. Acknowledge receipt and assess which modules are affected.
+2. Forward the material to the relevant active reviewer/verifier agents.
+3. If reviews for affected modules are already complete, note the supplements for the
+   next round (Phase 6 loop) rather than restarting the current round.
 
 ---
 
