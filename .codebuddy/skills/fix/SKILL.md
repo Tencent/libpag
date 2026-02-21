@@ -62,7 +62,6 @@ conversation. Do not default to English.
 - **Use the `AskUserQuestion` tool** when presenting choices with predefined options
   (e.g., scope confirmation, fix level selection).
 - Use `TaskCreate` / `TaskUpdate` / `TaskList` to track progress through each phase.
-- Use `TeamCreate` / `SendMessage` to orchestrate agents.
 
 ---
 
