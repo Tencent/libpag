@@ -13,21 +13,22 @@ reviews the entire branch, not a one-off bug fix tool.
 
 ## Argument Parsing
 
-Parse the argument after `/fix` to determine the review scope:
+The user's input after `/fix` is available as `$ARGUMENTS`. Parse it to determine the
+review scope:
 
-| Invocation | Scope |
-|------------|-------|
-| `/fix` (no argument) | Current branch diff vs main (default) |
-| `/fix <commit>` | Current branch diff vs the specified base commit |
-| `/fix <path>` | All files under the specified folder or the single file |
+| `$ARGUMENTS` | Scope |
+|--------------|-------|
+| (empty) | Current branch diff vs main (default) |
+| A valid git commit/ref | Current branch diff vs the specified base commit |
+| A file or directory path | All files under the specified folder or the single file |
 
-How to distinguish a commit from a path: run `git rev-parse --verify <arg>` — if it
-succeeds, treat the argument as a commit; otherwise treat it as a file/directory path
-(verify it exists with `ls`). If neither resolves, report the error and abort.
+How to distinguish a commit from a path: run `git rev-parse --verify $ARGUMENTS` — if
+it succeeds, treat it as a commit; otherwise treat it as a file/directory path (verify
+it exists). If neither resolves, report the error and abort.
 
-When scope is resolved from arguments, skip Question 1 in Phase 0.2 and only ask
+When scope is resolved from `$ARGUMENTS`, skip Question 1 in Phase 0.2 and only ask
 Question 2 (fix level). Report the resolved scope to the user for confirmation in the
-same AskUserQuestion interaction.
+same interaction.
 
 Automatically review, verify, and fix issues in code and documents across your branch.
 Runs multi-round team-based iterations until no valid issues remain.
