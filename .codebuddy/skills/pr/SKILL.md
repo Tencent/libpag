@@ -25,16 +25,7 @@ existing one — automatically detected based on branch state.
    - `gh pr list --head {branch} --state open --json number,url` — open PRs
    - `gh api user -q '.login'` — GitHub username
 
-Detect the **default branch** of the remote:
-
-```
-git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'
-```
-
-If this fails (e.g., `origin/HEAD` not set), fall back to `main`; if `main`
-does not exist, try `master`.
-
-Store this as `{default_branch}` for use throughout.
+Determine the remote's default branch and store as `{default_branch}`.
 
 **Mode selection**:
 
@@ -55,9 +46,6 @@ Run `git status --porcelain` and inspect the output:
   files (**partial**), or stage everything (**full**)?
 - **Otherwise** → **full** (stage everything).
 
-Detection: first column non-space = staged content; second column non-space or
-`??` prefix = unstaged/untracked content.
-
 If **full**: run `git add -A`. If **partial**: skip (files are already staged).
 
 Read the staged diff (`git diff --cached`) and generate a commit message
@@ -70,48 +58,36 @@ to a concise English message under 120 characters describing the change.
 
 ### Append mode
 
-Check for unpushed commits: `git log origin/{branch}..HEAD --oneline`
+If there is staged content, commit first. Then push and output the existing
+PR URL.
 
-| Staged content | Unpushed commits | Action |
-|----------------|------------------|--------|
-| yes | — | commit → push |
-| no | yes | push only |
-| no | no | inform user "nothing to push" and stop |
-
-Push and output the commit message (if committed) and the existing PR URL.
+If there is nothing to commit and nothing to push, inform the user and stop.
 
 ### Create mode
 
-Gather all changes that will be part of the PR:
-
-- Existing commits: `git log origin/{default_branch}..HEAD --oneline`
-- Current staged diff (from Step 2)
-
-If both are empty, inform user there are no changes and stop.
+If there is staged content, commit first.
 
 #### Generate PR metadata
 
-Based on the full changeset, generate:
+Based on all commits since {default_branch}, generate:
 
 - **Branch name** (only when on {default_branch}): follow the project's branch
   naming convention if one exists; otherwise use `feature/{username}_topic` or
   `bugfix/{username}_topic` (`{username}` = GitHub login from Step 1, lowercase).
-  When on a non-default branch, skip — use the current branch name.
+  When on a non-default branch, use the current branch name.
 - **PR title**: concise summary following project conventions, or a short
-  English sentence if none found.
+  English sentence if none found. May reuse the commit message when there is
+  only one commit.
 - **PR description**: plain text (no Markdown formatting) in the user's
   conversation language, briefly describing what changed and why.
-
-When there is only one commit, the PR title may reuse the commit message.
 
 #### Create branch, commit, and push
 
 If on {default_branch}, create a new branch: `git checkout -b {branch_name}`.
 
-Commit (if there is staged content), push, and create the PR:
+Push and create the PR:
 
 ```
-git commit -m "{commit_message}"
 git push -u origin {branch_name}
 gh pr create --title "{title}" --body "$(cat <<'EOF'
 {description}
