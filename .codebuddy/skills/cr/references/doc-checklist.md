@@ -1,7 +1,8 @@
 # Document Review Checklist
 
 Reviewers check all items in this checklist. Levels A/B/C indicate review priority —
-start with Level A (highest impact), then B, then C. All levels are always checked.
+start with Level A (highest impact), then B, then C. The reviewer prompt specifies
+which levels to check.
 
 **Project-specific rules**: Project rules already loaded in the agent's context take
 priority over this generic checklist.

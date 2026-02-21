@@ -1,7 +1,8 @@
 # Code Review Checklist
 
 Reviewers check all items in this checklist. Levels A/B/C indicate review priority —
-start with Level A (highest impact), then B, then C. All levels are always checked.
+start with Level A (highest impact), then B, then C. The reviewer prompt specifies
+which levels to check.
 
 Test code has reduced review requirements — only focus on obvious implementation errors.
 
