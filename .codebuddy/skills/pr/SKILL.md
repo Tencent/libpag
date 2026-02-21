@@ -31,7 +31,7 @@ Determine the remote's default branch and store as `{default_branch}`.
 
 | Current branch | Open PR on this branch | Mode |
 |----------------|------------------------|------|
-| {default_branch} | — | **Create** |
+| {default_branch} | N/A (new branch) | **Create** |
 | other | yes | **Append** |
 | other | no | **Create** |
 
