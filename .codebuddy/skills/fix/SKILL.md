@@ -29,6 +29,14 @@ the user to enable it before proceeding:
 
 ---
 
+## Interaction Language
+
+All user-facing interactions (AskUserQuestion, progress reports, summary reports,
+warnings, and confirmations) must use the language the user has been using in the
+conversation. Do not default to English.
+
+---
+
 ## Team-Lead Responsibilities
 
 You (the team-lead) orchestrate the entire workflow. Critical constraints:
