@@ -20,17 +20,13 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
-#include "renderer/LayerBuilder.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/SVGImporter.h"
-#include "renderer/TextLayout.h"
-#include "renderer/FontEmbedder.h"
-#include "renderer/ShapedText.h"
-#include "pagx/utils/StringParser.h"
-#include "pagx/svg/SVGPathParser.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
@@ -38,9 +34,13 @@
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
-#include "pagx/nodes/Font.h"
-#include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/svg/SVGPathParser.h"
+#include "pagx/utils/StringParser.h"
+#include "renderer/FontEmbedder.h"
+#include "renderer/LayerBuilder.h"
+#include "renderer/ShapedText.h"
+#include "renderer/TextLayout.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Surface.h"
@@ -55,8 +55,8 @@ namespace pag {
 using namespace tgfx;
 
 static pagx::Group* MakeCenteredTextGroup(pagx::PAGXDocument* doc, const std::string& content,
-                                           float fontSize, float centerX, float y,
-                                           pagx::Color color) {
+                                          float fontSize, float centerX, float y,
+                                          pagx::Color color) {
   auto group = doc->makeNode<pagx::Group>();
   auto text = doc->makeNode<pagx::Text>();
   text->text = content;
@@ -151,8 +151,7 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
 
     // Step 2: Typeset text elements and embed fonts
     auto layoutResult = textLayout.layout(doc.get());
-    pagx::FontEmbedder().embed(doc.get(), layoutResult.shapedTextMap,
-                               layoutResult.textOrder);
+    pagx::FontEmbedder().embed(doc.get(), layoutResult.shapedTextMap, layoutResult.textOrder);
 
     // Step 3: Export to XML and save as PAGX file
     std::string xml = pagx::PAGXExporter::ToXML(*doc);
@@ -439,7 +438,7 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
   layer->contents.push_back(
       MakeCenteredTextGroup(doc.get(), "Hello PAGX", 36, 120, 35, {0.2f, 0.2f, 0.8f, 1.0f}));
   layer->contents.push_back(MakeCenteredTextGroup(doc.get(), "\xe4\xbd\xa0\xe5\xa5\xbd World", 28,
-                                                   120, 80, {0.1f, 0.6f, 0.2f, 1.0f}));
+                                                  120, 80, {0.1f, 0.6f, 0.2f, 1.0f}));
   layer->contents.push_back(
       MakeCenteredTextGroup(doc.get(), "Embedded Font", 18, 120, 115, {0.5f, 0.5f, 0.5f, 1.0f}));
   doc->layers.push_back(layer);
@@ -448,8 +447,7 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
   textLayout.setFallbackTypefaces(GetFallbackTypefaces());
   auto layoutResult = textLayout.layout(doc.get());
   ASSERT_FALSE(layoutResult.shapedTextMap.empty());
-  pagx::FontEmbedder().embed(doc.get(), layoutResult.shapedTextMap,
-                             layoutResult.textOrder);
+  pagx::FontEmbedder().embed(doc.get(), layoutResult.shapedTextMap, layoutResult.textOrder);
 
   auto xml = pagx::PAGXExporter::ToXML(*doc);
   ASSERT_FALSE(xml.empty());

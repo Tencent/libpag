@@ -208,9 +208,8 @@ bool XMLParser::parse(const uint8_t* data, size_t length) {
     return false;
   }
 
-  auto status =
-      XML_Parse(parsingContext._XMLParser, reinterpret_cast<const char*>(data),
-                static_cast<int>(length), true);
+  auto status = XML_Parse(parsingContext._XMLParser, reinterpret_cast<const char*>(data),
+                          static_cast<int>(length), true);
 
   _expatParser = nullptr;
   return XML_STATUS_ERROR != status;

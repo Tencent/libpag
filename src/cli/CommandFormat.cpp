@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CommandFormat.h"
+#include <libxml/parser.h>
+#include <libxml/tree.h>
 #include <cerrno>
 #include <climits>
 #include <cstdlib>
@@ -26,8 +28,6 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <libxml/parser.h>
-#include <libxml/tree.h>
 
 namespace pagx::cli {
 

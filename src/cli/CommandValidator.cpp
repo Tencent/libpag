@@ -17,12 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CommandValidator.h"
+#include <libxml/parser.h>
+#include <libxml/xmlschemas.h>
 #include <cstring>
 #include <iostream>
 #include <string>
 #include <vector>
-#include <libxml/parser.h>
-#include <libxml/xmlschemas.h>
 #include "pagx_xsd.h"
 
 namespace pagx::cli {

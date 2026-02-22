@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "pagx/PAGXDocument.h"
 #include "ShapedText.h"
+#include "pagx/PAGXDocument.h"
 
 namespace pagx {
 

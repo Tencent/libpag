@@ -20,8 +20,8 @@
 
 #include <memory>
 #include <unordered_map>
-#include "pagx/PAGXDocument.h"
 #include "TextLayout.h"
+#include "pagx/PAGXDocument.h"
 #include "tgfx/layers/Layer.h"
 
 namespace pagx {
@@ -56,8 +56,7 @@ class LayerBuilder {
    * Builds a layer tree and returns a mapping from PAGX Layer nodes to tgfx::Layer objects. This
    * mapping allows callers to look up the rendered layer for any PAGX Layer node.
    */
-  static LayerBuildResult BuildWithMap(PAGXDocument* document,
-                                      TextLayout* textLayout = nullptr);
+  static LayerBuildResult BuildWithMap(PAGXDocument* document, TextLayout* textLayout = nullptr);
 };
 
 }  // namespace pagx

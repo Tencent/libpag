@@ -25,12 +25,7 @@
 
 namespace pagx {
 
-enum class BaseDirection {
-  AutoLTR,
-  AutoRTL,
-  LTR,
-  RTL
-};
+enum class BaseDirection { AutoLTR, AutoRTL, LTR, RTL };
 
 struct BidiRun {
   size_t start = 0;

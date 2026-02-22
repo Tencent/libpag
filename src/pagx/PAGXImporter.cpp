@@ -22,10 +22,6 @@
 #include <fstream>
 #include <memory>
 #include <vector>
-#include "pagx/utils/Base64.h"
-#include "pagx/utils/StringParser.h"
-#include "pagx/svg/SVGPathParser.h"
-#include "pagx/xml/XMLDOM.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -61,7 +57,11 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Color.h"
+#include "pagx/utils/Base64.h"
+#include "pagx/utils/StringParser.h"
+#include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
 
@@ -80,8 +80,7 @@ static void reportError(PAGXDocument* doc, const DOMNode* node, const std::strin
 
 static const std::string& getAttribute(const DOMNode* node, const std::string& name,
                                        const std::string& defaultValue = EmptyString());
-static float getFloatAttribute(const DOMNode* node, const std::string& name,
-                               float defaultValue = 0,
+static float getFloatAttribute(const DOMNode* node, const std::string& name, float defaultValue = 0,
                                PAGXDocument* doc = nullptr);
 static int getIntAttribute(const DOMNode* node, const std::string& name, int defaultValue = 0,
                            PAGXDocument* doc = nullptr);
@@ -632,8 +631,7 @@ static ColorSource* parseChildColorSource(const DOMNode* node, PAGXDocument* doc
         result = colorSource;
       } else {
         reportError(doc, child.get(),
-                    "Element '" + child->name +
-                        "' is not allowed in '" + node->name +
+                    "Element '" + child->name + "' is not allowed in '" + node->name +
                         "'. Expected: SolidColor, LinearGradient,"
                         " RadialGradient, ConicGradient,"
                         " DiamondGradient, ImagePattern.");
@@ -783,8 +781,7 @@ static TextPath* parseTextPath(const DOMNode* node, PAGXDocument* doc) {
       // Reference to PathData resource
       textPath->path = doc->findNode<PathData>(pathAttr.substr(1));
       if (!textPath->path) {
-        reportError(doc, node,
-                    "Resource '" + pathAttr + "' not found for 'path' attribute.");
+        reportError(doc, node, "Resource '" + pathAttr + "' not found for 'path' attribute.");
       }
     } else {
       // Inline path data
@@ -989,8 +986,7 @@ static ImagePattern* parseImagePattern(const DOMNode* node, PAGXDocument* doc) {
   if (!imageAttr.empty() && imageAttr[0] == '@') {
     pattern->image = doc->findNode<Image>(imageAttr.substr(1));
     if (!pattern->image) {
-      reportError(doc, node,
-                  "Resource '" + imageAttr + "' not found for 'image' attribute.");
+      reportError(doc, node, "Resource '" + imageAttr + "' not found for 'image' attribute.");
     }
   }
   pattern->tileModeX = TileModeFromString(getAttribute(node, "tileModeX", "clamp"));
@@ -1063,9 +1059,9 @@ static Composition* parseComposition(const DOMNode* node, PAGXDocument* doc) {
           comp->layers.push_back(layer);
         }
       } else {
-        reportError(doc, child.get(),
-                    "Element '" + child->name +
-                        "' is not allowed in 'Composition'. Expected: Layer.");
+        reportError(
+            doc, child.get(),
+            "Element '" + child->name + "' is not allowed in 'Composition'. Expected: Layer.");
       }
     }
     child = child->nextSibling;
@@ -1089,8 +1085,7 @@ static Font* parseFont(const DOMNode* node, PAGXDocument* doc) {
         }
       } else {
         reportError(doc, child.get(),
-                    "Element '" + child->name +
-                        "' is not allowed in 'Font'. Expected: Glyph.");
+                    "Element '" + child->name + "' is not allowed in 'Font'. Expected: Glyph.");
       }
     }
     child = child->nextSibling;
@@ -1184,8 +1179,7 @@ static GlyphRun* parseGlyphRun(const DOMNode* node, PAGXDocument* doc) {
     auto fontId = fontAttr.substr(1);
     run->font = doc->findNode<Font>(fontId);
     if (!run->font) {
-      reportError(doc, node,
-                  "Resource '" + fontAttr + "' not found for 'font' attribute.");
+      reportError(doc, node, "Resource '" + fontAttr + "' not found for 'font' attribute.");
     }
   }
   run->fontSize = getFloatAttribute(node, "fontSize", 12, doc);
@@ -1279,7 +1273,7 @@ static DropShadowStyle* parseDropShadowStyle(const DOMNode* node, PAGXDocument* 
   }
   style->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
   parseShadowAttributes(node, doc, style->offsetX, style->offsetY, style->blurX, style->blurY,
-                         style->color);
+                        style->color);
   style->showBehindLayer = getBoolAttribute(node, "showBehindLayer", true, doc);
   return style;
 }
@@ -1291,12 +1285,11 @@ static InnerShadowStyle* parseInnerShadowStyle(const DOMNode* node, PAGXDocument
   }
   style->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
   parseShadowAttributes(node, doc, style->offsetX, style->offsetY, style->blurX, style->blurY,
-                         style->color);
+                        style->color);
   return style;
 }
 
-static BackgroundBlurStyle* parseBackgroundBlurStyle(
-    const DOMNode* node, PAGXDocument* doc) {
+static BackgroundBlurStyle* parseBackgroundBlurStyle(const DOMNode* node, PAGXDocument* doc) {
   auto style = doc->makeNode<BackgroundBlurStyle>(getAttribute(node, "id"));
   if (!style) {
     return nullptr;
@@ -1329,7 +1322,7 @@ static DropShadowFilter* parseDropShadowFilter(const DOMNode* node, PAGXDocument
     return nullptr;
   }
   parseShadowAttributes(node, doc, filter->offsetX, filter->offsetY, filter->blurX, filter->blurY,
-                         filter->color);
+                        filter->color);
   filter->shadowOnly = getBoolAttribute(node, "shadowOnly", false, doc);
   return filter;
 }
@@ -1340,7 +1333,7 @@ static InnerShadowFilter* parseInnerShadowFilter(const DOMNode* node, PAGXDocume
     return nullptr;
   }
   parseShadowAttributes(node, doc, filter->offsetX, filter->offsetY, filter->blurX, filter->blurY,
-                         filter->color);
+                        filter->color);
   filter->shadowOnly = getBoolAttribute(node, "shadowOnly", false, doc);
   return filter;
 }
@@ -1383,8 +1376,8 @@ static const std::string& getAttribute(const DOMNode* node, const std::string& n
   return value ? *value : defaultValue;
 }
 
-static float getFloatAttribute(const DOMNode* node, const std::string& name,
-                               float defaultValue, PAGXDocument* doc) {
+static float getFloatAttribute(const DOMNode* node, const std::string& name, float defaultValue,
+                               PAGXDocument* doc) {
   auto* str = node->findAttribute(name);
   if (!str || str->empty()) {
     return defaultValue;
@@ -1417,8 +1410,8 @@ static int getIntAttribute(const DOMNode* node, const std::string& name, int def
   return static_cast<int>(value);
 }
 
-static bool getBoolAttribute(const DOMNode* node, const std::string& name,
-                             bool defaultValue, PAGXDocument* doc) {
+static bool getBoolAttribute(const DOMNode* node, const std::string& name, bool defaultValue,
+                             PAGXDocument* doc) {
   auto* str = node->findAttribute(name);
   if (!str || str->empty()) {
     return defaultValue;
@@ -1711,7 +1704,6 @@ static Color getColorAttribute(const DOMNode* node, const char* name, PAGXDocume
   return result;
 }
 
-
 //==============================================================================
 // Public API implementation
 //==============================================================================
@@ -1794,9 +1786,9 @@ static void parseDocument(const DOMNode* root, PAGXDocument* doc) {
           doc->layers.push_back(layer);
         }
       } else if (child->name != "Resources") {
-        reportError(doc, child.get(),
-                    "Element '" + child->name +
-                        "' is not allowed in 'pagx'. Expected: Resources, Layer.");
+        reportError(
+            doc, child.get(),
+            "Element '" + child->name + "' is not allowed in 'pagx'. Expected: Resources, Layer.");
       }
     }
     child = child->nextSibling;

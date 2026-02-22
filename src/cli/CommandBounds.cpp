@@ -17,15 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CommandBounds.h"
+#include <libxml/parser.h>
+#include <libxml/xpath.h>
 #include <cstring>
 #include <iostream>
 #include <string>
 #include <vector>
-#include <libxml/parser.h>
-#include <libxml/xpath.h>
+#include "pagx/PAGXImporter.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/TextLayout.h"
-#include "pagx/PAGXImporter.h"
 #include "tgfx/layers/Layer.h"
 
 namespace pagx::cli {
@@ -105,8 +105,8 @@ static bool ComputeLayerPath(xmlNodePtr node, std::vector<int>* path) {
   std::vector<int> reversePath = {};
   xmlNodePtr current = node;
   while (current != nullptr && current->parent != nullptr) {
-    bool isParentPagx = current->parent->name != nullptr &&
-                        xmlStrEqual(current->parent->name, BAD_CAST "pagx");
+    bool isParentPagx =
+        current->parent->name != nullptr && xmlStrEqual(current->parent->name, BAD_CAST "pagx");
     // Count the index of current among sibling <Layer> elements.
     int index = 0;
     for (xmlNodePtr sibling = current->parent->children; sibling != nullptr;
@@ -243,8 +243,8 @@ static std::string EscapeJson(const std::string& input) {
 
 static void PrintBoundsText(const std::string& label, float left, float top, float width,
                             float height) {
-  std::cout << label << ": x=" << left << " y=" << top << " width=" << width
-            << " height=" << height << "\n";
+  std::cout << label << ": x=" << left << " y=" << top << " width=" << width << " height=" << height
+            << "\n";
 }
 
 static void PrintBoundsJson(const std::string& label, float left, float top, float width,
@@ -336,8 +336,7 @@ int RunBounds(int argc, char* argv[]) {
   // Resolve --relative Layer.
   tgfx::Layer* relativeLayer = nullptr;
   if (!options.relativeTo.empty()) {
-    const Layer* relativePagx =
-        EvaluateSingleXPath(xmlDoc, options.relativeTo, document.get());
+    const Layer* relativePagx = EvaluateSingleXPath(xmlDoc, options.relativeTo, document.get());
     if (relativePagx == nullptr) {
       xmlFreeDoc(xmlDoc);
       std::cerr << "pagx bounds: --relative target not found\n";

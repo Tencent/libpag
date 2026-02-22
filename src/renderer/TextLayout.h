@@ -21,8 +21,8 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
-#include "pagx/PAGXDocument.h"
 #include "ShapedText.h"
+#include "pagx/PAGXDocument.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
@@ -76,7 +76,8 @@ class TextLayout {
     }
   };
 
-  std::unordered_map<FontKey, std::shared_ptr<tgfx::Typeface>, FontKeyHash> registeredTypefaces = {};
+  std::unordered_map<FontKey, std::shared_ptr<tgfx::Typeface>, FontKeyHash> registeredTypefaces =
+      {};
   std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces = {};
 };
 

@@ -19,7 +19,6 @@
 #include "LayerBuilder.h"
 #include <tuple>
 #include <unordered_map>
-#include "pagx/utils/Base64.h"
 #include "ToTGFX.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
@@ -63,6 +62,7 @@
 #include "pagx/types/RepeaterOrder.h"
 #include "pagx/types/SelectorTypes.h"
 #include "pagx/types/TileMode.h"
+#include "pagx/utils/Base64.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Data.h"
@@ -474,10 +474,9 @@ class LayerBuilderContext {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     ExtractGradientStops(node->colorStops, &colors, &positions);
-    return ApplyGradientMatrix(
-        tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle, node->endAngle, colors,
-                                  positions),
-        node->matrix);
+    return ApplyGradientMatrix(tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle,
+                                                         node->endAngle, colors, positions),
+                               node->matrix);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertDiamondGradient(const DiamondGradient* node) {
@@ -510,8 +509,8 @@ class LayerBuilderContext {
     }
 
     auto sampling = tgfx::SamplingOptions(ToTGFX(node->filterMode), ToTGFX(node->mipmapMode));
-    auto pattern = tgfx::ImagePattern::Make(image, ToTGFX(node->tileModeX),
-                                             ToTGFX(node->tileModeY), sampling);
+    auto pattern =
+        tgfx::ImagePattern::Make(image, ToTGFX(node->tileModeX), ToTGFX(node->tileModeY), sampling);
     if (pattern && !node->matrix.isIdentity()) {
       pattern->setMatrix(ToTGFX(node->matrix));
     }
@@ -745,9 +744,9 @@ class LayerBuilderContext {
     switch (node->nodeType()) {
       case NodeType::DropShadowStyle: {
         auto style = static_cast<const DropShadowStyle*>(node);
-        auto tgfxStyle = tgfx::DropShadowStyle::Make(style->offsetX, style->offsetY, style->blurX,
-                                                      style->blurY, ToTGFX(style->color),
-                                                      style->showBehindLayer);
+        auto tgfxStyle =
+            tgfx::DropShadowStyle::Make(style->offsetX, style->offsetY, style->blurX, style->blurY,
+                                        ToTGFX(style->color), style->showBehindLayer);
         if (node->blendMode != BlendMode::Normal) {
           tgfxStyle->setBlendMode(ToTGFX(node->blendMode));
         }
@@ -756,7 +755,7 @@ class LayerBuilderContext {
       case NodeType::InnerShadowStyle: {
         auto style = static_cast<const InnerShadowStyle*>(node);
         auto tgfxStyle = tgfx::InnerShadowStyle::Make(style->offsetX, style->offsetY, style->blurX,
-                                                       style->blurY, ToTGFX(style->color));
+                                                      style->blurY, ToTGFX(style->color));
         if (node->blendMode != BlendMode::Normal) {
           tgfxStyle->setBlendMode(ToTGFX(node->blendMode));
         }
@@ -764,8 +763,8 @@ class LayerBuilderContext {
       }
       case NodeType::BackgroundBlurStyle: {
         auto style = static_cast<const pagx::BackgroundBlurStyle*>(node);
-        auto tgfxStyle = tgfx::BackgroundBlurStyle::Make(style->blurX, style->blurY,
-                                                          ToTGFX(style->tileMode));
+        auto tgfxStyle =
+            tgfx::BackgroundBlurStyle::Make(style->blurX, style->blurY, ToTGFX(style->tileMode));
         if (node->blendMode != BlendMode::Normal) {
           tgfxStyle->setBlendMode(ToTGFX(node->blendMode));
         }

@@ -110,10 +110,10 @@ std::shared_ptr<PAGDecoder> PAGDecoder::MakeFrom(std::shared_ptr<PAGComposition>
   // Limit scale based on single composition size ratio
   auto singleComposition = GetSingleComposition(composition);
   if (singleComposition != nullptr && composition->width() > 0 && composition->height() > 0) {
-    float widthRatio = static_cast<float>(singleComposition->width) / 
-                       static_cast<float>(composition->width());
-    float heightRatio = static_cast<float>(singleComposition->height) / 
-                        static_cast<float>(composition->height());
+    float widthRatio =
+        static_cast<float>(singleComposition->width) / static_cast<float>(composition->width());
+    float heightRatio =
+        static_cast<float>(singleComposition->height) / static_cast<float>(composition->height());
     float maxScale = std::min(widthRatio, heightRatio);
     scale = std::min(scale, maxScale);
   }

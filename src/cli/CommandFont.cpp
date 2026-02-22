@@ -221,17 +221,18 @@ struct FontEmbedOptions {
 };
 
 static void PrintFontEmbedUsage() {
-  std::cerr << "Usage: pagx font embed [options] <file.pagx>\n"
-            << "\n"
-            << "Embed fonts into a PAGX file by performing text layout and glyph extraction.\n"
-            << "\n"
-            << "Options:\n"
-            << "  -o, --output <path>              Output file path (default: overwrite input)\n"
-            << "  --file <path>                    Add a font file (can be specified multiple times)\n"
-            << "  --fallback <family[,style]>      Add a fallback font (can be specified multiple\n"
-            << "                                   times, tried in order). Matches loaded --file\n"
-            << "                                   fonts first, then system fonts.\n"
-            << "  -h, --help                       Show this help message\n";
+  std::cerr
+      << "Usage: pagx font embed [options] <file.pagx>\n"
+      << "\n"
+      << "Embed fonts into a PAGX file by performing text layout and glyph extraction.\n"
+      << "\n"
+      << "Options:\n"
+      << "  -o, --output <path>              Output file path (default: overwrite input)\n"
+      << "  --file <path>                    Add a font file (can be specified multiple times)\n"
+      << "  --fallback <family[,style]>      Add a fallback font (can be specified multiple\n"
+      << "                                   times, tried in order). Matches loaded --file\n"
+      << "                                   fonts first, then system fonts.\n"
+      << "  -h, --help                       Show this help message\n";
 }
 
 static bool ParseFontEmbedOptions(int argc, char* argv[], FontEmbedOptions* options) {

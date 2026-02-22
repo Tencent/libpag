@@ -193,8 +193,8 @@ static void ArcToCubics(PathData& path, float x1, float y1, float rx, float ry, 
   float cy = sinAngle * cxp + cosAngle * cyp + (y1 + y2) / 2.0f;
 
   float theta1 = VectorAngle(1.0f, 0.0f, (x1p - cxp) / rx, (y1p - cyp) / ry);
-  float dtheta = VectorAngle((x1p - cxp) / rx, (y1p - cyp) / ry, (-x1p - cxp) / rx,
-                             (-y1p - cyp) / ry);
+  float dtheta =
+      VectorAngle((x1p - cxp) / rx, (y1p - cyp) / ry, (-x1p - cxp) / rx, (-y1p - cyp) / ry);
 
   if (!sweep && dtheta > 0) {
     dtheta -= 2.0f * Pi;
@@ -339,8 +339,8 @@ PathData PathDataFromSVGString(const std::string& d) {
       case 'C': {
         float x1, y1, x2, y2, x, y;
         if (!ParseNumber(ptr, end, x1) || !ParseNumber(ptr, end, y1) ||
-            !ParseNumber(ptr, end, x2) || !ParseNumber(ptr, end, y2) ||
-            !ParseNumber(ptr, end, x) || !ParseNumber(ptr, end, y)) {
+            !ParseNumber(ptr, end, x2) || !ParseNumber(ptr, end, y2) || !ParseNumber(ptr, end, x) ||
+            !ParseNumber(ptr, end, y)) {
           break;
         }
         if (isRelative) {
@@ -361,8 +361,8 @@ PathData PathDataFromSVGString(const std::string& d) {
       }
       case 'S': {
         float x2, y2, x, y;
-        if (!ParseNumber(ptr, end, x2) || !ParseNumber(ptr, end, y2) ||
-            !ParseNumber(ptr, end, x) || !ParseNumber(ptr, end, y)) {
+        if (!ParseNumber(ptr, end, x2) || !ParseNumber(ptr, end, y2) || !ParseNumber(ptr, end, x) ||
+            !ParseNumber(ptr, end, y)) {
           break;
         }
         if (isRelative) {
@@ -388,8 +388,8 @@ PathData PathDataFromSVGString(const std::string& d) {
       }
       case 'Q': {
         float x1, y1, x, y;
-        if (!ParseNumber(ptr, end, x1) || !ParseNumber(ptr, end, y1) ||
-            !ParseNumber(ptr, end, x) || !ParseNumber(ptr, end, y)) {
+        if (!ParseNumber(ptr, end, x1) || !ParseNumber(ptr, end, y1) || !ParseNumber(ptr, end, x) ||
+            !ParseNumber(ptr, end, y)) {
           break;
         }
         if (isRelative) {
@@ -435,8 +435,7 @@ PathData PathDataFromSVGString(const std::string& d) {
         bool largeArc, sweep;
         if (!ParseNumber(ptr, end, rx) || !ParseNumber(ptr, end, ry) ||
             !ParseNumber(ptr, end, arcAngle) || !ParseFlag(ptr, end, largeArc) ||
-            !ParseFlag(ptr, end, sweep) || !ParseNumber(ptr, end, x) ||
-            !ParseNumber(ptr, end, y)) {
+            !ParseFlag(ptr, end, sweep) || !ParseNumber(ptr, end, x) || !ParseNumber(ptr, end, y)) {
           break;
         }
         if (isRelative) {

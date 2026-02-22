@@ -18,9 +18,6 @@
 
 #include "pagx/PAGXExporter.h"
 #include <cstdio>
-#include "pagx/utils/Base64.h"
-#include "pagx/utils/StringParser.h"
-#include "pagx/svg/SVGPathParser.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
@@ -56,6 +53,9 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/svg/SVGPathParser.h"
+#include "pagx/utils/Base64.h"
+#include "pagx/utils/StringParser.h"
 
 namespace pagx {
 
@@ -172,11 +172,20 @@ class XMLBuilder {
     size_t extraSize = 0;
     for (char c : input) {
       switch (c) {
-        case '&':  extraSize += 4; break;
-        case '<':  extraSize += 3; break;
-        case '"': extraSize += 5; break;
-        case '\'': extraSize += 5; break;
-        default: break;
+        case '&':
+          extraSize += 4;
+          break;
+        case '<':
+          extraSize += 3;
+          break;
+        case '"':
+          extraSize += 5;
+          break;
+        case '\'':
+          extraSize += 5;
+          break;
+        default:
+          break;
       }
     }
     if (extraSize == 0) {
@@ -186,11 +195,21 @@ class XMLBuilder {
     result.reserve(input.size() + extraSize);
     for (char c : input) {
       switch (c) {
-        case '&':  result += "&amp;";  break;
-        case '<':  result += "&lt;";   break;
-        case '"': result += "&quot;"; break;
-        case '\'': result += "&apos;"; break;
-        default:   result += c;         break;
+        case '&':
+          result += "&amp;";
+          break;
+        case '<':
+          result += "&lt;";
+          break;
+        case '"':
+          result += "&quot;";
+          break;
+        case '\'':
+          result += "&apos;";
+          break;
+        default:
+          result += c;
+          break;
       }
     }
     return result;
@@ -969,9 +988,9 @@ static void writeResource(XMLBuilder& xml, const Node* node, const Options& opti
             if (!glyph->image->id.empty()) {
               xml.addAttribute("image", "@" + glyph->image->id);
             } else if (glyph->image->data) {
-              xml.addAttribute("image", "data:image/png;base64," +
-                                            Base64Encode(glyph->image->data->bytes(),
-                                                         glyph->image->data->size()));
+              xml.addAttribute("image",
+                               "data:image/png;base64," + Base64Encode(glyph->image->data->bytes(),
+                                                                       glyph->image->data->size()));
             } else if (!glyph->image->filePath.empty()) {
               xml.addAttribute("image", glyph->image->filePath);
             }

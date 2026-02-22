@@ -60,8 +60,7 @@ static std::shared_ptr<hb_face_t> CreateHBFace(const std::shared_ptr<tgfx::Typef
   }
   auto wrapper = new DataPointer<tgfx::Typeface>(typeface);
   auto face = std::shared_ptr<hb_face_t>(
-      hb_face_create_for_tables(GetTable, static_cast<void*>(wrapper),
-                                DestroyDataPointerTypeface),
+      hb_face_create_for_tables(GetTable, static_cast<void*>(wrapper), DestroyDataPointerTypeface),
       hb_face_destroy);
   if (hb_face_get_empty() == face.get()) {
     return nullptr;
@@ -129,8 +128,7 @@ static FontCache GetFontCache() {
   return {cacheLRU, cacheMap, cacheMutex};
 }
 
-static std::shared_ptr<hb_font_t> CreateHBFont(
-    const std::shared_ptr<tgfx::Typeface>& typeface) {
+static std::shared_ptr<hb_font_t> CreateHBFont(const std::shared_ptr<tgfx::Typeface>& typeface) {
   if (typeface == nullptr) {
     return nullptr;
   }
@@ -143,8 +141,7 @@ static std::shared_ptr<hb_font_t> CreateHBFont(
   if (face == nullptr) {
     return nullptr;
   }
-  auto hbFont =
-      std::shared_ptr<hb_font_t>(hb_font_create(face.get()), hb_font_destroy);
+  auto hbFont = std::shared_ptr<hb_font_t>(hb_font_create(face.get()), hb_font_destroy);
   // Set scale to UPEM so output positions are in font units. The caller converts to pixels by
   // multiplying with (fontSize / UPEM). This allows caching hb_font per typeface regardless of
   // font size — a standard optimization used by Chrome and other engines.
@@ -163,16 +160,14 @@ static std::vector<ShapedGlyph> ShapeRun(const std::string& text, size_t byteOff
     return {};
   }
 
-  auto buffer =
-      std::shared_ptr<hb_buffer_t>(hb_buffer_create(), hb_buffer_destroy);
+  auto buffer = std::shared_ptr<hb_buffer_t>(hb_buffer_create(), hb_buffer_destroy);
   if (!hb_buffer_allocation_successful(buffer.get())) {
     return {};
   }
 
   // Add the run substring, but provide full text as context for correct shaping at boundaries.
   hb_buffer_add_utf8(buffer.get(), text.data(), static_cast<int>(text.size()),
-                     static_cast<unsigned int>(byteOffset),
-                     static_cast<int>(byteLength));
+                     static_cast<unsigned int>(byteOffset), static_cast<int>(byteLength));
 
   hb_feature_t features[2] = {};
   unsigned int featureCount = 0;
@@ -262,10 +257,10 @@ struct ShapingRun {
 // approach used by rive-runtime, Pango, and Chrome.
 static hb_script_t ResolveScript(int32_t codepoint, hb_script_t lastScript) {
   auto ufuncs = hb_unicode_funcs_get_default();
-  auto script = hb_unicode_general_category(ufuncs, codepoint) ==
-                        HB_UNICODE_GENERAL_CATEGORY_NON_SPACING_MARK
-                    ? HB_SCRIPT_INHERITED
-                    : hb_unicode_script(ufuncs, codepoint);
+  auto script =
+      hb_unicode_general_category(ufuncs, codepoint) == HB_UNICODE_GENERAL_CATEGORY_NON_SPACING_MARK
+          ? HB_SCRIPT_INHERITED
+          : hb_unicode_script(ufuncs, codepoint);
   if (script == HB_SCRIPT_COMMON || script == HB_SCRIPT_INHERITED) {
     return lastScript;
   }
@@ -274,8 +269,7 @@ static hb_script_t ResolveScript(int32_t codepoint, hb_script_t lastScript) {
 
 // Performs combined font + script itemization. Each character is assigned the best available font
 // and an effective script. Adjacent characters sharing both font and script are merged into runs.
-static std::vector<ShapingRun> ItemizeRuns(const std::string& text,
-                                           const tgfx::Font& primaryFont,
+static std::vector<ShapingRun> ItemizeRuns(const std::string& text, const tgfx::Font& primaryFont,
                                            const std::vector<tgfx::Font>& fallbackFonts) {
   std::vector<ShapingRun> runs;
   size_t pos = 0;
@@ -349,8 +343,8 @@ std::vector<ShapedGlyph> HarfBuzzShaper::Shape(const std::string& text,
   result.reserve(text.size());
 
   for (auto& run : shapingRuns) {
-    auto shaped = ShapeRun(text, run.byteStart, run.byteEnd - run.byteStart, run.font,
-                           run.script, vertical, rtl);
+    auto shaped = ShapeRun(text, run.byteStart, run.byteEnd - run.byteStart, run.font, run.script,
+                           vertical, rtl);
     result.insert(result.end(), shaped.begin(), shaped.end());
   }
 

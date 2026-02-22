@@ -90,8 +90,8 @@ BidiResult BidiResolver::Resolve(const std::string& text, BaseDirection baseDire
   bool firstParagraph = true;
 
   while (paragraphOffset < textLength) {
-    SBParagraphRef paragraph = SBAlgorithmCreateParagraph(
-        algorithm, paragraphOffset, textLength - paragraphOffset, baseLevel);
+    SBParagraphRef paragraph = SBAlgorithmCreateParagraph(algorithm, paragraphOffset,
+                                                          textLength - paragraphOffset, baseLevel);
     if (paragraph == nullptr) {
       break;
     }
@@ -112,8 +112,7 @@ BidiResult BidiResolver::Resolve(const std::string& text, BaseDirection baseDire
       SBLevel currentLevel = levels[pos];
       size_t runStart = pos;
       while (pos < paragraphLength && levels[pos] == currentLevel) {
-        size_t charLen =
-            UTF8CharLength(text.data() + paragraphOffset + pos, paragraphLength - pos);
+        size_t charLen = UTF8CharLength(text.data() + paragraphOffset + pos, paragraphLength - pos);
         if (charLen == 0) {
           break;
         }

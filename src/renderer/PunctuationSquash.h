@@ -32,12 +32,7 @@ namespace pagx {
  *   cl-07.
  * - MiddleDot: whitespace on both sides (centered in the em). JLREQ cl-05.
  */
-enum class PunctuationCategory {
-  None,
-  Opening,
-  Closing,
-  MiddleDot
-};
+enum class PunctuationCategory { None, Opening, Closing, MiddleDot };
 
 /**
  * Result of computing the squash adjustment between two adjacent punctuation characters.

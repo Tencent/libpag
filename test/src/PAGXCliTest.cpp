@@ -20,13 +20,13 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include "base/PAGTest.h"
 #include "cli/CommandBounds.h"
 #include "cli/CommandFont.h"
 #include "cli/CommandFormat.h"
 #include "cli/CommandOptimize.h"
 #include "cli/CommandRender.h"
 #include "cli/CommandValidator.h"
-#include "base/PAGTest.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -622,9 +622,8 @@ CLI_TEST(PAGXCliTest, Bounds_JsonOutput) {
 
 CLI_TEST(PAGXCliTest, Bounds_RelativeCoords) {
   auto inputPath = TestResourcePath("bounds_layout.pagx");
-  auto ret = CallRun(pagx::cli::RunBounds,
-                     {"bounds", "--relative", "//Layer[@id='content']", "--xpath",
-                      "//Layer[@id='card1']", inputPath});
+  auto ret = CallRun(pagx::cli::RunBounds, {"bounds", "--relative", "//Layer[@id='content']",
+                                            "--xpath", "//Layer[@id='card1']", inputPath});
   EXPECT_EQ(ret, 0);
 }
 
@@ -683,8 +682,8 @@ CLI_TEST(PAGXCliTest, Render_Background) {
 CLI_TEST(PAGXCliTest, Render_WebpFormat) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   auto outputPath = TempDir() + "/RenderWebpFormat.webp";
-  auto ret = CallRun(pagx::cli::RunRender,
-                     {"render", "-o", outputPath, "--format", "webp", inputPath});
+  auto ret =
+      CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, "--format", "webp", inputPath});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(CompareRenderedImage(outputPath, "PAGXCliTest/RenderWebpFormat"));
 }
@@ -692,8 +691,8 @@ CLI_TEST(PAGXCliTest, Render_WebpFormat) {
 CLI_TEST(PAGXCliTest, Render_JpgFormat) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   auto outputPath = TempDir() + "/RenderJpgFormat.jpg";
-  auto ret = CallRun(pagx::cli::RunRender,
-                     {"render", "-o", outputPath, "--format", "jpg", inputPath});
+  auto ret =
+      CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, "--format", "jpg", inputPath});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(CompareRenderedImage(outputPath, "PAGXCliTest/RenderJpgFormat"));
 }
@@ -701,8 +700,8 @@ CLI_TEST(PAGXCliTest, Render_JpgFormat) {
 CLI_TEST(PAGXCliTest, Render_Quality) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   auto outputPath = TempDir() + "/RenderQuality.webp";
-  auto ret = CallRun(pagx::cli::RunRender,
-                     {"render", "-o", outputPath, "--format", "webp", "--quality", "80", inputPath});
+  auto ret = CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, "--format", "webp",
+                                            "--quality", "80", inputPath});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
   EXPECT_GT(std::filesystem::file_size(outputPath), 0u);
@@ -712,7 +711,7 @@ CLI_TEST(PAGXCliTest, Render_CombinedOptions) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   auto outputPath = TempDir() + "/RenderCombinedOptions.png";
   auto ret = CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, "--scale", "2.0", "--crop",
-                                             "0,0,200,200", "--background", "#FFFF00", inputPath});
+                                            "0,0,200,200", "--background", "#FFFF00", inputPath});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(CompareRenderedImage(outputPath, "PAGXCliTest/RenderCombinedOptions"));
 }
@@ -732,8 +731,7 @@ CLI_TEST(PAGXCliTest, Render_MissingOutput) {
 CLI_TEST(PAGXCliTest, Render_InvalidScale) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   auto outputPath = TempDir() + "/RenderInvalidScale.png";
-  auto ret =
-      CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, "--scale", "0", inputPath});
+  auto ret = CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, "--scale", "0", inputPath});
   EXPECT_NE(ret, 0);
 }
 
@@ -756,8 +754,8 @@ CLI_TEST(PAGXCliTest, Render_InvalidBackground) {
 CLI_TEST(PAGXCliTest, Render_UnsupportedFormat) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   auto outputPath = TempDir() + "/RenderUnsupported.bmp";
-  auto ret = CallRun(pagx::cli::RunRender,
-                     {"render", "-o", outputPath, "--format", "bmp", inputPath});
+  auto ret =
+      CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, "--format", "bmp", inputPath});
   EXPECT_NE(ret, 0);
 }
 
@@ -780,8 +778,7 @@ static void TestOptimizeAndRender(const std::string& testName, const std::string
     ASSERT_EQ(ret, 0) << "Failed to optimize file";
   }
   {
-    auto ret =
-        CallRun(pagx::cli::RunRender, {"render", "-o", optimizedRenderPath, optimizedPath});
+    auto ret = CallRun(pagx::cli::RunRender, {"render", "-o", optimizedRenderPath, optimizedPath});
     ASSERT_EQ(ret, 0) << "Failed to render optimized file";
   }
 

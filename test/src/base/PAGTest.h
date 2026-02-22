@@ -83,14 +83,14 @@ class PAGXTest : public PAGTest {
   }
 };
 
-#define PAGX_TEST(test_case_name, test_name)             \
+#define PAGX_TEST(test_case_name, test_name)            \
   GTEST_TEST_(test_case_name, test_name, pag::PAGXTest, \
               ::testing::internal::GetTypeId<pag::PAGXTest>())
 
 class CLITest : public testing::Test {};
 
-#define CLI_TEST(test_case_name, test_name)              \
-  GTEST_TEST_(test_case_name, test_name, pag::CLITest,   \
+#define CLI_TEST(test_case_name, test_name)            \
+  GTEST_TEST_(test_case_name, test_name, pag::CLITest, \
               ::testing::internal::GetTypeId<pag::CLITest>())
 
 }  // namespace pag

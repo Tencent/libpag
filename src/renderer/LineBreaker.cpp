@@ -398,8 +398,7 @@ bool LineBreaker::CanBreakBetween(int32_t prevChar, int32_t nextChar) {
     return false;
   }
 
-  auto action =
-      PairTable[static_cast<int>(prevClass)][static_cast<int>(nextClass)];
+  auto action = PairTable[static_cast<int>(prevClass)][static_cast<int>(nextClass)];
 
   if (action == BreakAction::Direct) {
     return true;

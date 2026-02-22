@@ -21,13 +21,13 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
-#include "pagx/utils/StringParser.h"
-#include "pagx/svg/SVGPathParser.h"
 #include "base/utils/MathUtil.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/svg/SVGParserContext.h"
+#include "pagx/svg/SVGPathParser.h"
+#include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
@@ -36,7 +36,7 @@ using pag::DegreesToRadians;
 
 static constexpr float DEFAULT_FONT_SIZE = 16.0f;
 std::shared_ptr<PAGXDocument> SVGImporter::Parse(const std::string& filePath,
-                                             const Options& options) {
+                                                 const Options& options) {
   SVGParserContext parser(options);
   auto doc = parser.parseFile(filePath);
   if (doc) {
@@ -63,13 +63,13 @@ std::shared_ptr<PAGXDocument> SVGImporter::Parse(const std::string& filePath,
 }
 
 std::shared_ptr<PAGXDocument> SVGImporter::Parse(const uint8_t* data, size_t length,
-                                             const Options& options) {
+                                                 const Options& options) {
   SVGParserContext parser(options);
   return parser.parse(data, length);
 }
 
 std::shared_ptr<PAGXDocument> SVGImporter::ParseString(const std::string& svgContent,
-                                                   const Options& options) {
+                                                       const Options& options) {
   return Parse(reinterpret_cast<const uint8_t*>(svgContent.data()), svgContent.size(), options);
 }
 // ============== SVGParserContext ==============
@@ -343,7 +343,7 @@ void SVGParserContext::parseStyleElement(const std::shared_ptr<DOMNode>& styleNo
   }
 }
 Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
-                                                     const InheritedStyle& parentStyle, int depth) {
+                                        const InheritedStyle& parentStyle, int depth) {
   if (depth >= MAX_SVG_RECURSION_DEPTH) {
     return nullptr;
   }
@@ -466,8 +466,8 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
     std::string filterId = resolveUrl(filterAttr);
     auto filterIt = _defs.find(filterId);
     if (filterIt != _defs.end()) {
-      bool filterConverted = convertFilterElement(filterIt->second, layer->filters, layer->styles,
-                                                  &shadowOnlyType);
+      bool filterConverted =
+          convertFilterElement(filterIt->second, layer->filters, layer->styles, &shadowOnlyType);
       if (!filterConverted) {
         // Filter could not be fully converted to PAGX format.
         if (shadowOnlyType != ShadowOnlyType::None) {
@@ -508,9 +508,9 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
   return layer;
 }
 void SVGParserContext::convertChildren(const std::shared_ptr<DOMNode>& element,
-                                    std::vector<Element*>& contents,
-                                    const InheritedStyle& inheritedStyle,
-                                    ShadowOnlyType shadowOnlyType) {
+                                       std::vector<Element*>& contents,
+                                       const InheritedStyle& inheritedStyle,
+                                       ShadowOnlyType shadowOnlyType) {
   const auto& tag = element->name;
 
   // Handle text element specially - it returns a Group with Text.
@@ -558,8 +558,7 @@ void SVGParserContext::convertChildren(const std::shared_ptr<DOMNode>& element,
     }
   }
 }
-Element* SVGParserContext::convertElement(
-    const std::shared_ptr<DOMNode>& element) {
+Element* SVGParserContext::convertElement(const std::shared_ptr<DOMNode>& element) {
   const auto& tag = element->name;
 
   if (tag == "rect") {
@@ -582,8 +581,7 @@ Element* SVGParserContext::convertElement(
 
   return nullptr;
 }
-Element* SVGParserContext::convertRect(
-    const std::shared_ptr<DOMNode>& element) {
+Element* SVGParserContext::convertRect(const std::shared_ptr<DOMNode>& element) {
   float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
   float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
   float width = parseLength(getAttribute(element, "width"), _viewBoxWidth);
@@ -607,8 +605,7 @@ Element* SVGParserContext::convertRect(
 
   return rect;
 }
-Element* SVGParserContext::convertCircle(
-    const std::shared_ptr<DOMNode>& element) {
+Element* SVGParserContext::convertCircle(const std::shared_ptr<DOMNode>& element) {
   float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth);
   float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight);
   float r = parseLength(getAttribute(element, "r"), _viewBoxWidth);
@@ -621,8 +618,7 @@ Element* SVGParserContext::convertCircle(
 
   return ellipse;
 }
-Element* SVGParserContext::convertEllipse(
-    const std::shared_ptr<DOMNode>& element) {
+Element* SVGParserContext::convertEllipse(const std::shared_ptr<DOMNode>& element) {
   float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth);
   float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight);
   float rx = parseLength(getAttribute(element, "rx"), _viewBoxWidth);
@@ -636,8 +632,7 @@ Element* SVGParserContext::convertEllipse(
 
   return ellipse;
 }
-Element* SVGParserContext::convertLine(
-    const std::shared_ptr<DOMNode>& element) {
+Element* SVGParserContext::convertLine(const std::shared_ptr<DOMNode>& element) {
   float x1 = parseLength(getAttribute(element, "x1"), _viewBoxWidth);
   float y1 = parseLength(getAttribute(element, "y1"), _viewBoxHeight);
   float x2 = parseLength(getAttribute(element, "x2"), _viewBoxWidth);
@@ -654,8 +649,7 @@ Element* SVGParserContext::convertLine(
 
   return path;
 }
-Element* SVGParserContext::convertPolyline(
-    const std::shared_ptr<DOMNode>& element) {
+Element* SVGParserContext::convertPolyline(const std::shared_ptr<DOMNode>& element) {
   auto path = _document->makeNode<Path>();
   auto pathDataNode = _document->makeNode<PathData>();
   *pathDataNode = parsePoints(getAttribute(element, "points"), false);
@@ -665,8 +659,7 @@ Element* SVGParserContext::convertPolyline(
   }
   return path;
 }
-Element* SVGParserContext::convertPolygon(
-    const std::shared_ptr<DOMNode>& element) {
+Element* SVGParserContext::convertPolygon(const std::shared_ptr<DOMNode>& element) {
   auto path = _document->makeNode<Path>();
   auto pathDataNode = _document->makeNode<PathData>();
   *pathDataNode = parsePoints(getAttribute(element, "points"), true);
@@ -676,8 +669,7 @@ Element* SVGParserContext::convertPolygon(
   }
   return path;
 }
-Element* SVGParserContext::convertPath(
-    const std::shared_ptr<DOMNode>& element) {
+Element* SVGParserContext::convertPath(const std::shared_ptr<DOMNode>& element) {
   auto path = _document->makeNode<Path>();
   std::string d = getAttribute(element, "d");
   if (!d.empty()) {
@@ -691,7 +683,7 @@ Element* SVGParserContext::convertPath(
   return path;
 }
 Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
-                                                  const InheritedStyle& inheritedStyle) {
+                                     const InheritedStyle& inheritedStyle) {
   auto group = _document->makeNode<Group>();
 
   float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
@@ -830,8 +822,7 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
   addFillStroke(element, group->elements, inheritedStyle);
   return group;
 }
-Element* SVGParserContext::convertUse(
-    const std::shared_ptr<DOMNode>& element) {
+Element* SVGParserContext::convertUse(const std::shared_ptr<DOMNode>& element) {
   std::string refId = resolveUrl(getHrefAttribute(element));
   if (refId.empty() || _useStack.count(refId) > 0) {
     return nullptr;
@@ -909,8 +900,8 @@ Element* SVGParserContext::convertUse(
   // group->name (removed) = "_useRef:" + refId;
   return group;
 }
-LinearGradient* SVGParserContext::convertLinearGradient(
-    const std::shared_ptr<DOMNode>& element, const Rect& shapeBounds) {
+LinearGradient* SVGParserContext::convertLinearGradient(const std::shared_ptr<DOMNode>& element,
+                                                        const Rect& shapeBounds) {
   auto gradient = _document->makeNode<LinearGradient>();
 
   gradient->id = getAttribute(element, "id");
@@ -928,17 +919,15 @@ LinearGradient* SVGParserContext::convertLinearGradient(
 
   // Parse gradientTransform.
   std::string gradientTransform = getAttribute(element, "gradientTransform");
-  Matrix transformMatrix = gradientTransform.empty() ? Matrix::Identity()
-                                                     : parseTransform(gradientTransform);
+  Matrix transformMatrix =
+      gradientTransform.empty() ? Matrix::Identity() : parseTransform(gradientTransform);
 
-  Point start = useObjectBoundingBox
-                    ? Point{shapeBounds.x + x1 * shapeBounds.width,
-                            shapeBounds.y + y1 * shapeBounds.height}
-                    : Point{x1, y1};
-  Point end = useObjectBoundingBox
-                  ? Point{shapeBounds.x + x2 * shapeBounds.width,
-                          shapeBounds.y + y2 * shapeBounds.height}
-                  : Point{x2, y2};
+  Point start = useObjectBoundingBox ? Point{shapeBounds.x + x1 * shapeBounds.width,
+                                             shapeBounds.y + y1 * shapeBounds.height}
+                                     : Point{x1, y1};
+  Point end = useObjectBoundingBox ? Point{shapeBounds.x + x2 * shapeBounds.width,
+                                           shapeBounds.y + y2 * shapeBounds.height}
+                                   : Point{x2, y2};
   gradient->startPoint = transformMatrix.mapPoint(start);
   gradient->endPoint = transformMatrix.mapPoint(end);
 
@@ -947,8 +936,8 @@ LinearGradient* SVGParserContext::convertLinearGradient(
 
   return gradient;
 }
-RadialGradient* SVGParserContext::convertRadialGradient(
-    const std::shared_ptr<DOMNode>& element, const Rect& shapeBounds) {
+RadialGradient* SVGParserContext::convertRadialGradient(const std::shared_ptr<DOMNode>& element,
+                                                        const Rect& shapeBounds) {
   auto gradient = _document->makeNode<RadialGradient>();
 
   gradient->id = getAttribute(element, "id");
@@ -964,8 +953,8 @@ RadialGradient* SVGParserContext::convertRadialGradient(
 
   // Parse gradientTransform.
   std::string gradientTransform = getAttribute(element, "gradientTransform");
-  Matrix transformMatrix = gradientTransform.empty() ? Matrix::Identity()
-                                                     : parseTransform(gradientTransform);
+  Matrix transformMatrix =
+      gradientTransform.empty() ? Matrix::Identity() : parseTransform(gradientTransform);
 
   if (useObjectBoundingBox) {
     // For objectBoundingBox, convert normalized coordinates to actual coordinates.
@@ -988,8 +977,8 @@ RadialGradient* SVGParserContext::convertRadialGradient(
 
   return gradient;
 }
-ImagePattern* SVGParserContext::convertPattern(
-    const std::shared_ptr<DOMNode>& element, const Rect& shapeBounds) {
+ImagePattern* SVGParserContext::convertPattern(const std::shared_ptr<DOMNode>& element,
+                                               const Rect& shapeBounds) {
   auto pattern = _document->makeNode<ImagePattern>();
 
   pattern->id = getAttribute(element, "id");
@@ -1059,8 +1048,7 @@ ImagePattern* SVGParserContext::convertPattern(
           // Pattern content is in objectBoundingBox coordinates (0-1).
           // Build the complete forward transform: image pixels → screen pixels
           forwardMatrix = Matrix::Translate(shapeBounds.x, shapeBounds.y) *
-                          Matrix::Scale(shapeBounds.width, shapeBounds.height) *
-                          useMatrix;
+                          Matrix::Scale(shapeBounds.width, shapeBounds.height) * useMatrix;
         } else {
           // Pattern content is in userSpaceOnUse coordinates.
           // useMatrix transforms image directly to user space, then translate to shape bounds.
@@ -1091,8 +1079,8 @@ ImagePattern* SVGParserContext::convertPattern(
 
   return pattern;
 }
-Layer* SVGParserContext::convertMaskElement(
-    const std::shared_ptr<DOMNode>& maskElement, const InheritedStyle& parentStyle) {
+Layer* SVGParserContext::convertMaskElement(const std::shared_ptr<DOMNode>& maskElement,
+                                            const InheritedStyle& parentStyle) {
   auto maskLayer = _document->makeNode<Layer>();
   maskLayer->id = getAttribute(maskElement, "id");
   maskLayer->name = maskLayer->id;
@@ -1106,8 +1094,7 @@ Layer* SVGParserContext::convertMaskElement(
 
   return maskLayer;
 }
-void SVGParserContext::parseMaskChildren(const std::shared_ptr<DOMNode>& parent,
-                                         Layer* maskLayer,
+void SVGParserContext::parseMaskChildren(const std::shared_ptr<DOMNode>& parent, Layer* maskLayer,
                                          const InheritedStyle& parentStyle,
                                          const Matrix& parentMatrix) {
   auto child = parent->getFirstChild();
@@ -1142,11 +1129,10 @@ void SVGParserContext::parseMaskChildren(const std::shared_ptr<DOMNode>& parent,
     child = child->getNextSibling();
   }
 }
-bool SVGParserContext::convertFilterElement(
-    const std::shared_ptr<DOMNode>& filterElement,
-    std::vector<LayerFilter*>& filters,
-    std::vector<LayerStyle*>& styles,
-    ShadowOnlyType* outShadowOnlyType) {
+bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filterElement,
+                                            std::vector<LayerFilter*>& filters,
+                                            std::vector<LayerStyle*>& styles,
+                                            ShadowOnlyType* outShadowOnlyType) {
   size_t initialFilterCount = filters.size();
   size_t initialStyleCount = styles.size();
 
@@ -1186,13 +1172,14 @@ bool SVGParserContext::convertFilterElement(
     if (node->name == "feColorMatrix" && getAttribute(node, "in") == "SourceAlpha") {
       // Look for the sequence: feColorMatrix → feOffset → feGaussianBlur → feComposite → feColorMatrix
       if (i + 4 < primitives.size() && primitives[i + 1]->name == "feOffset" &&
-          primitives[i + 2]->name == "feGaussianBlur" &&
-          primitives[i + 3]->name == "feComposite" && primitives[i + 4]->name == "feColorMatrix") {
+          primitives[i + 2]->name == "feGaussianBlur" && primitives[i + 3]->name == "feComposite" &&
+          primitives[i + 4]->name == "feColorMatrix") {
         auto [offsetX, offsetY] = parseFilterOffset(primitives[i + 1]);
         auto [blurX, blurY] = parseFilterBlur(primitives[i + 2]);
         auto shadowColor = parseFilterColorMatrix(primitives[i + 4]);
 
-        filters.push_back(createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
+        filters.push_back(
+            createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
 
         // Skip the consumed primitives (5 elements) plus the feBlend that follows.
         i += 5;
@@ -1206,12 +1193,14 @@ bool SVGParserContext::convertFilterElement(
       // feColorMatrix(in=SourceAlpha) → feOffset → feGaussianBlur → feColorMatrix → feBlend
       // This is common in Figma exports with multiple shadows.
       if (i + 3 < primitives.size() && primitives[i + 1]->name == "feOffset" &&
-          primitives[i + 2]->name == "feGaussianBlur" && primitives[i + 3]->name == "feColorMatrix") {
+          primitives[i + 2]->name == "feGaussianBlur" &&
+          primitives[i + 3]->name == "feColorMatrix") {
         auto [offsetX, offsetY] = parseFilterOffset(primitives[i + 1]);
         auto [blurX, blurY] = parseFilterBlur(primitives[i + 2]);
         auto shadowColor = parseFilterColorMatrix(primitives[i + 3]);
 
-        filters.push_back(createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
+        filters.push_back(
+            createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
 
         // Skip the consumed primitives (4 elements) plus the feBlend that follows.
         i += 4;
@@ -1292,11 +1281,13 @@ bool SVGParserContext::convertFilterElement(
         // Look for feColorMatrix after feOffset for shadow color.
         Color shadowColor = {0, 0, 0, 1.0f};
         size_t colorMatrixIdx = i + 2;
-        if (colorMatrixIdx < primitives.size() && primitives[colorMatrixIdx]->name == "feColorMatrix") {
+        if (colorMatrixIdx < primitives.size() &&
+            primitives[colorMatrixIdx]->name == "feColorMatrix") {
           shadowColor = parseFilterColorMatrix(primitives[colorMatrixIdx]);
         }
 
-        filters.push_back(createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
+        filters.push_back(
+            createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
 
         // Skip consumed primitives.
         i += 2;
@@ -1318,11 +1309,13 @@ bool SVGParserContext::convertFilterElement(
         // Look for feColorMatrix after feGaussianBlur for shadow color.
         Color shadowColor = {0, 0, 0, 1.0f};
         size_t colorMatrixIdx = i + 2;
-        if (colorMatrixIdx < primitives.size() && primitives[colorMatrixIdx]->name == "feColorMatrix") {
+        if (colorMatrixIdx < primitives.size() &&
+            primitives[colorMatrixIdx]->name == "feColorMatrix") {
           shadowColor = parseFilterColorMatrix(primitives[colorMatrixIdx]);
         }
 
-        filters.push_back(createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
+        filters.push_back(
+            createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
 
         // Skip consumed primitives.
         i += 2;
@@ -1385,8 +1378,8 @@ bool SVGParserContext::convertFilterElement(
   return filters.size() > initialFilterCount || styles.size() > initialStyleCount;
 }
 void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
-                                  std::vector<Element*>& contents,
-                                  const InheritedStyle& inheritedStyle) {
+                                     std::vector<Element*>& contents,
+                                     const InheritedStyle& inheritedStyle) {
   // Lazily compute shape bounds only when needed (for gradient/pattern references).
   bool boundsComputed = false;
   Rect shapeBounds = {};
@@ -1640,7 +1633,7 @@ Rect SVGParserContext::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
   return Rect::MakeXYWH(0, 0, 0, 0);
 }
 InheritedStyle SVGParserContext::computeInheritedStyle(const std::shared_ptr<DOMNode>& element,
-                                                    const InheritedStyle& parentStyle) {
+                                                       const InheritedStyle& parentStyle) {
   InheritedStyle style = parentStyle;
 
   static const std::pair<const char*, std::string InheritedStyle::*> StyleProperties[] = {
@@ -2310,8 +2303,8 @@ static void ParseStyleString(const std::string& styleStr,
   }
 }
 std::string SVGParserContext::getAttribute(const std::shared_ptr<DOMNode>& node,
-                                        const std::string& name,
-                                        const std::string& defaultValue) {
+                                           const std::string& name,
+                                           const std::string& defaultValue) {
   // CSS priority: style attribute > presentation attribute > CSS class rules
   // The cached style properties map merges both style attribute and class rules,
   // with style attribute values overriding class rule values.
@@ -2462,8 +2455,9 @@ static bool isSimpleShapeLayer(const Layer* layer, const Element*& outGeometry,
   const auto* second = layer->contents[1];
 
   // Check if first is geometry and second is painter.
-  bool firstIsGeometry = (first->nodeType() == NodeType::Rectangle ||
-                          first->nodeType() == NodeType::Ellipse || first->nodeType() == NodeType::Path);
+  bool firstIsGeometry =
+      (first->nodeType() == NodeType::Rectangle || first->nodeType() == NodeType::Ellipse ||
+       first->nodeType() == NodeType::Path);
   bool secondIsPainter =
       (second->nodeType() == NodeType::Fill || second->nodeType() == NodeType::Stroke);
 
@@ -2492,8 +2486,7 @@ void SVGParserContext::mergeAdjacentLayers(std::vector<Layer*>& layers) {
         const Element* geomB = nullptr;
         const Element* painterB = nullptr;
 
-        if (isSimpleShapeLayer(layers[i + 1], geomB, painterB) &&
-            isSameGeometry(geomA, geomB)) {
+        if (isSimpleShapeLayer(layers[i + 1], geomB, painterB) && isSameGeometry(geomA, geomB)) {
           // Merge: one has Fill, the other has Stroke.
           bool aHasFill = (painterA->nodeType() == NodeType::Fill);
           bool bHasFill = (painterB->nodeType() == NodeType::Fill);
@@ -2566,7 +2559,8 @@ void SVGParserContext::countColorSourceReferences(const std::shared_ptr<DOMNode>
     child = child->getNextSibling();
   }
 }
-void SVGParserContext::countColorSourceReferencesInElement(const std::shared_ptr<DOMNode>& element) {
+void SVGParserContext::countColorSourceReferencesInElement(
+    const std::shared_ptr<DOMNode>& element) {
   if (!element) {
     return;
   }
@@ -2619,7 +2613,7 @@ void SVGParserContext::parseCustomData(const std::shared_ptr<DOMNode>& element, 
   }
 }
 ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
-                                                                  const Rect& shapeBounds) {
+                                                    const Rect& shapeBounds) {
   auto defIt = _defs.find(refId);
   if (defIt == _defs.end()) {
     return nullptr;
@@ -2681,4 +2675,3 @@ ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
 }
 
 }  // namespace pagx
-
