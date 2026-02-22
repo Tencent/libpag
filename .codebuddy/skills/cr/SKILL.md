@@ -12,55 +12,70 @@ Reviews code and documents using Agent Teams. Each issue gets a risk level — l
 issues are auto-fixed, higher-risk issues are presented for user confirmation. In PR
 mode, issues are submitted as line-level PR review comments instead of direct commits.
 
-## Overall Flow
+## Flow
 
 ```
-Phase 0 (user confirmation) -> Phase 1 (scope & env)
-  -> Phase 2 (review) -> Phase 3 (verify) -> Phase 4 (filter)
-  -> Phase 5 (fix) -> Phase 6 (validate) -> Phase 7 (loop decision)
-  -> Phase 8 (remaining issues) -> Phase 9 (cleanup & report)
+  ┌─────────────────────────────── Round N ──────────────────────────────┐
+  │                                                                      │
+  │  Phase 2       Phase 3       Phase 4       Phase 5       Phase 6     │
+  │  Review ──────> Filter ──────> Fix ────────> Validate ───> Decide    │
+  │                                ^                             │       │
+  └────────────────────────────────│─────────────────────────────│───────┘
+                                   │                             │
+Phase 0 ──> Phase 1 ──> ┌─────────│──── Phase 6 exit routes ───┘
+  Setup       Scope      │         │
+                         │         │  1. commits produced, round < 100
+                         │         │     -> close team, back to Phase 2 (new round)
+                         │         │
+                         │         │  2. no commits, PENDING_FILE not empty
+                         │         │     -> Phase 7 (Confirm)
+                         │         │
+                         │         │  3. no commits, PENDING_FILE empty
+                         │         │     -> Phase 8 (Report & Exit)
+                         │         │
+                         │         │
+                         │    Phase 7: Confirm
+                         │      user approves fix(es) -> Phase 4 (Fix)
+                         │      user skips all ──────────> Phase 8
+                         │                                   │
+                         └───────── Phase 4 -> 5 -> 6 ───────┘
+                                    (normal Decide routing)
+
+  Phase 8: Report & Exit
 ```
 
-The skill runs as a **continuous loop** across Phase 2-8. Phase 9 is the only exit.
-The loop terminates (-> Phase 9) when ALL of the following are true:
-- No new commits were produced in the latest round (nothing left to fix automatically)
-- `PENDING_FILE` is empty (no issues awaiting user confirmation)
-- Or the user has skipped all remaining issues in Phase 8
-
-Any other state keeps the loop running:
-- Phase 7: new commits were produced -> back to Phase 2 for a fresh review round
-- Phase 7: no commits but `PENDING_FILE` has entries -> Phase 8 for user confirmation
-- Phase 8: user approves fixes -> Phase 5 to fix, then Phase 6 -> 7 -> 2 -> ...
-  (full loop restart, not a sub-procedure of Phase 8)
-
-Safety valve: max 100 rounds before forcing exit to Phase 8/9.
+**Phase 6 (Decide) is the single routing authority.** All loop/exit decisions are
+made there. Phase 7 (Confirm) feeds back into the loop via Phase 4 → 5 → 6.
+Safety valve: max 100 rounds before forcing exit to Phase 7/8.
 
 ## Instructions
 
-- You (the team-lead) **never modify files directly**. Delegate all changes to
-  agents. Read code only for arbitration and diagnosis.
-- **Autonomous operation**: between Phase 0 (user confirmation) and Phase 8
-  (remaining issue confirmation), the review-fix loop runs without user interaction
-  unless a previously failed issue fails again in Phase 6 (which prompts inline).
-  Issues above the auto-fix threshold and failed fixes are recorded to
-  `PENDING_FILE` across rounds and presented to the user in Phase 8.
-- All user-facing interactions must use the language the user has been using in the
-  conversation. Do not default to English.
-- When presenting choices with predefined options, use interactive dialogs with
-  selectable options rather than plain text.
-- The team-lead must handle all unexpected situations autonomously — e.g., an agent
-  stuck or unresponsive, a fix that breaks the build, a git operation that fails, an
-  agent producing invalid output. Use your judgment: terminate and replace, revert and
-  retry, skip and move on, etc. Anything that cannot be resolved automatically should
-  be recorded to `PENDING_FILE` for user review in Phase 8.
-- **Agent shutdown**: when closing agents (verifiers in Phase 3, team in Phase 7,
-  or mid-phase termination), send the shutdown message and **continue immediately**
-  without waiting for acknowledgment. Do not block the workflow on agent responses.
-  Late replies from already-shutdown agents should be ignored. When closing the team
-  (Phase 7, Phase 9), force-terminate (TaskStop) any agents that are still running.
-- The user may send additional material (files, URLs, context) at any time. If
-  reviewers are still active (Phase 2-3), forward it directly; otherwise include
-  the material in the next round.
+**Delegation**: You (the team-lead) never modify files directly. Delegate all changes
+to agents. Read code only for arbitration and diagnosis.
+
+**Autonomy**: Between Phase 0 (user confirmation) and Phase 7 (remaining issue
+confirmation), the review-fix loop runs without user interaction unless a previously
+failed issue fails again in Phase 5 (which prompts inline). Issues above the auto-fix
+threshold and failed fixes are recorded to `PENDING_FILE` across rounds and presented
+to the user in Phase 7.
+
+**Error handling**: Handle all unexpected situations autonomously — agent stuck or
+unresponsive, fix breaks the build, git operation fails, agent produces invalid output.
+Use your judgment: terminate and replace, revert and retry, skip and move on, etc.
+Anything that cannot be resolved automatically should be recorded to `PENDING_FILE`
+for user review in Phase 7.
+
+**Agent lifecycle**: When closing agents, send the shutdown message and continue
+immediately without waiting for acknowledgment. Do not block the workflow on agent
+responses. Late replies from already-shutdown agents should be ignored. When closing
+the team (Phase 6 end-of-round, Phase 8), force-terminate (TaskStop) any agents that
+are still running.
+
+**User interaction**: All user-facing text must use the language the user has been
+using. When presenting choices with predefined options, use interactive dialogs with
+selectable options rather than plain text. The user may send additional material
+(files, URLs, context) at any time. If reviewers are still active (Phase 2), forward
+it directly; otherwise include the material in the next round.
 
 ## References
 
@@ -123,12 +138,12 @@ Option 1 should be pre-selected as the default.
   algorithm trade-offs). Only issues affecting test baselines are deferred for
   confirmation.
 
-After all questions are answered, no further user interaction until Phase 8 (except
-when a previously failed issue fails again in Phase 6, which prompts the user inline).
+After all questions are answered, no further user interaction until Phase 7 (except
+when a previously failed issue fails again in Phase 5, which prompts the user inline).
 
 ---
 
-## Phase 1: Scope Confirmation & Environment Check
+## Phase 1: Scope & Environment
 
 **Prerequisite**: Phase 0 questions have been answered. If not, STOP and return to
 Phase 0.2.
@@ -157,7 +172,7 @@ suffix (`-2`, `-3`, …) until an unused name is found. Record the chosen path a
   modifications will be made.
 - **Local mode**: verify not on the main/master branch (abort if so). If there are
   uncommitted changes, abort and ask the user to commit or stash first (fixes may be
-  committed even in all-confirm mode after user approval in Phase 8).
+  committed even in all-confirm mode after user approval in Phase 7).
 
 ### 1.2 Scope Preparation
 
@@ -182,7 +197,7 @@ Validate arguments and fetch the actual diff/content.
      git worktree add /tmp/pr-review-{number} pr-{number}
      ```
      All subsequent operations use the worktree directory. Record `WORKTREE_DIR` for
-     cleanup in Phase 9.
+     cleanup in Phase 8.
 
 3. **Set review scope**: diff against `BASE_BRANCH`.
    ```
@@ -190,7 +205,7 @@ Validate arguments and fetch the actual diff/content.
    git diff $(git merge-base origin/{BASE_BRANCH} HEAD)
    ```
 
-4. **Fetch existing PR review comments** for de-duplication in Phase 4:
+4. **Fetch existing PR review comments** for de-duplication in Phase 3:
    ```
    gh api repos/{owner}/{repo}/pulls/{number}/comments
    ```
@@ -214,7 +229,7 @@ If an open PR exists, fetch its line-level review comments:
 ```
 gh api repos/{owner}/{repo}/pulls/{number}/comments
 ```
-These are used in Phase 4 as reference information — each comment is verified against
+These are used in Phase 3 as reference information — each comment is verified against
 the actual code to confirm the issue still exists before being treated as a known
 issue to fix.
 
@@ -232,62 +247,106 @@ Partition files in scope into **review modules** for parallel review.
   group; group related small files together. Balance workload across reviewers.
 - Classify each module as `code`, `doc`, or `mixed` to determine which checklist to use.
 
-**Fix assignment** is determined in Phase 5: reviewers are reused as fixers and
-tasks are dynamically assigned based on which reviewer has context on the relevant
-files. See Phase 5 for details.
+The scope (diff content, file list, module partitioning) determined here is **fixed for
+all rounds**. Subsequent rounds reuse the same scope without re-running diff or
+re-partitioning.
 
 ---
 
 ## Phase 2: Review
 
-- Create the team (or run serially without a team if Agent Teams is unavailable).
-  The review scope is fixed from Phase 1 — do not re-diff.
-- One `general-purpose` reviewer agent (`reviewer-N`) per module
-- Reviewer prompt includes:
-  - Module file list + checklist matching the module type:
-    `references/code-checklist.md` for code modules, `references/doc-checklist.md` for
-    doc modules, both for mixed modules. Only include priority levels selected by the
-    user (e.g., if user chose "A + B", do not include Priority C items). For doc-only
-    modules, always include all priority levels (A+B+C) regardless of user selection.
-  - **Review scope rule**: reviewers must read entire files for full context and
-    report issues at the selected priority levels for all code in the reviewed files.
-  - **Evidence requirement**: every issue must have a code citation (file:line + snippet)
-  - **Exclusion list**: see the exclusion section in the corresponding checklist. Project
-    rules loaded in context take priority over the exclusion list.
-  - **Public API protection**: no signature/interface changes unless obvious bug or
-    comment issue
-  - **PR context** (PR mode only): include existing PR review comments so reviewers
-    have context on already-discussed topics
-  - **Output format**: for each issue, report:
-    `[file:line] [priority A/B/C] — [description] — [code snippet]`
+### Round invariants
+
+These apply to every round including the first:
+
+- **Fixed scope**: the diff content, file list, and module partitioning are determined
+  once in Phase 1. Do not re-run `git diff` or re-partition modules in any round.
+- **Independent review**: reviewers receive no information about previous rounds' fixes,
+  issues, or outcomes. Each round is a fresh, unbiased review of the full scope.
+- **Cross-round exclusion**: the only information carried across rounds is: skip issues
+  already recorded in `PENDING_FILE` or rejected by the user in a previous Phase 7.
+  Previously fixed issues are **not excluded** — if a reviewer independently finds a
+  new problem in code that was fixed last round, that is a valid new issue.
+
+### Team setup
+
+- Create a new team for this round (or run serially without a team if Agent Teams is
+  unavailable). Each round gets a fresh team — do not reuse agents from prior rounds.
+- One `general-purpose` reviewer agent (`reviewer-N`) per module.
+- One `general-purpose` **verifier** agent (`verifier`) shared across all modules.
+  Created at team setup time and kept alive for the entire review phase.
+
+### Reviewer prompt
+
+Include in each reviewer's prompt:
+- Module file list + checklist matching the module type:
+  `references/code-checklist.md` for code modules, `references/doc-checklist.md` for
+  doc modules, both for mixed modules. Only include priority levels selected by the
+  user (e.g., if user chose "A + B", do not include Priority C items). For doc-only
+  modules, always include all priority levels (A+B+C) regardless of user selection.
+- **Review scope rule**: reviewers must read entire files for full context and
+  report issues at the selected priority levels for all code in the reviewed files.
+- **Evidence requirement**: every issue must have a code citation (file:line + snippet)
+- **Exclusion list**: see the exclusion section in the corresponding checklist. Project
+  rules loaded in context take priority over the exclusion list.
+- **Public API protection**: no signature/interface changes unless obvious bug or
+  comment issue
+- **PR context** (PR mode only): include existing PR review comments so reviewers
+  have context on already-discussed topics
+- **Self-check**: before submitting results, re-read the relevant code and verify each
+  reported issue. Mark each as confirmed or withdrawn. Only submit confirmed issues.
+- **Output format**: for each confirmed issue, report:
+  `[file:line] [priority A/B/C] — [description] — [code snippet]`
+
+### Verification (pipeline)
+
+The verifier runs as a **pipeline** — it does not wait for all reviewers to finish.
+As soon as any reviewer reports an issue, the team-lead forwards it to the verifier
+for challenge. Multiple issues can be in-flight simultaneously.
+
+The verifier acts as a **devil's advocate**: for each issue, it reads the cited code
+and actively looks for reasons the issue is **not** a real problem. Its prompt:
+
+```
+You are a code review verifier. Your job is to challenge each issue — actively look
+for reasons it is NOT a real problem. For each issue you receive:
+
+1. Read the cited code (file:line) and surrounding context.
+2. Try to disprove the issue: Is the reviewer's reasoning wrong? Is there context
+   that makes this a non-issue (e.g., invariants guaranteed by callers, platform
+   constraints, intentional design)? Does the code actually behave as described?
+3. Verdict: REJECT (with reasoning) or CONFIRM (only if you cannot find a valid
+   counter-argument).
+4. Confidence: HIGH / MEDIUM / LOW.
+
+Default stance: skeptical. Only confirm when you are unable to construct a reasonable
+counter-argument after reading the code.
+```
+
+### After review
+
+- Close the verifier.
+- Keep all reviewers alive — they will be reused as fixers in Phase 4.
 
 ---
 
-## Phase 3: Verification
+## Phase 3: Filter & Risk Assessment — Team-Lead Only
 
-- **Reviewer self-check + independent verification** (run in parallel):
-  - Each reviewer re-reads the relevant code and self-verifies every issue they
-    reported, marking each as confirmed or withdrawn.
-  - Simultaneously, create a verifier (`verifier-N`) per review module. The verifier
-    receives the reviewer's issue list and reads actual code to independently confirm
-    each issue.
-- **Alignment**: team-lead collects both the reviewer's self-check results and the
-  verifier's results. If they disagree on any issue, team-lead reads code to judge.
-- After alignment is complete, close all verifiers. **Keep reviewers alive** — they
-  will be reused as fixers in Phase 5 (they already have full context on the code).
+For each issue, combine the reviewer's report and the verifier's verdict to decide
+whether to fix and assign a risk level. Consult `references/judgment-matrix.md` for
+the full matrix, risk level definitions, and special rules.
 
----
+### Triage by verifier verdict
 
-## Phase 4: Filter & Risk Assessment — Team-Lead Only
-
-For each confirmed issue, decide whether to fix and assign a risk level. Consult
-`references/judgment-matrix.md` for the full matrix, risk level definitions, and
-special rules.
+- **Verifier REJECT (HIGH confidence)**: drop the issue — do not fix or record.
+- **Verifier CONFIRM**: accept the issue, proceed to risk assessment.
+- **Verifier REJECT (MEDIUM/LOW confidence)** or **reviewer–verifier disagree**:
+  team-lead reads the cited code and makes the final call.
 
 ### De-duplication
 
 - Skip any issue that matches one recorded in `PENDING_FILE` or **rejected by the
-  user** in a previous round. Previously fixed issues are not excluded — if a
+  user** in a previous Phase 7. Previously fixed issues are not excluded — if a
   reviewer reports a new problem in already-fixed code, it is treated as a new issue.
 - **PR comment de-duplication** (PR mode): compare each confirmed issue against
   `EXISTING_PR_COMMENTS`. If an issue matches an existing comment (same file, same
@@ -301,16 +360,16 @@ special rules.
 
 Assign each fixable issue a risk level (low / medium / high) based on the judgment
 matrix. The user's chosen auto-fix threshold determines handling:
-- Issues at or below the threshold -> queued for auto-fix (Phase 5)
+- Issues at or below the threshold -> queued for auto-fix (Phase 4)
 - Issues above the threshold -> recorded to `PENDING_FILE` with the reason
-  (e.g., "above auto-fix threshold"), presented to the user in Phase 8
+  (e.g., "above auto-fix threshold"), presented to the user in Phase 7
 
 ### Mode-specific routing
 
-- **PR mode**: all issues are recorded to `PENDING_FILE`. Skip Phase 5-7.
-  If `PENDING_FILE` is empty -> Phase 9; otherwise -> Phase 8.
-- **Local mode**: if no auto-fix issues remain, skip Phase 5-6 and go to Phase 7
-  (which routes to Phase 8 or Phase 9 based on `PENDING_FILE` state).
+- **PR mode**: all issues are recorded to `PENDING_FILE`. Skip Phase 4-6.
+  If `PENDING_FILE` is empty -> Phase 8; otherwise -> Phase 7.
+- **Local mode**: if no auto-fix issues remain, skip Phase 4-5 and go to Phase 6
+  (which routes to Phase 7 or Phase 8 based on `PENDING_FILE` state).
 
 ### Additional checks
 
@@ -321,10 +380,10 @@ matrix. The user's chosen auto-fix threshold determines handling:
 
 ---
 
-## Phase 5: Fix
+## Phase 4: Fix
 
 If the auto-fix queue is empty (all issues were recorded to `PENDING_FILE`),
-skip Phase 5-6 and go directly to Phase 7.
+skip Phase 4-5 and go directly to Phase 6.
 
 ### Agent assignment
 
@@ -345,53 +404,52 @@ Team-lead collects skipped issues and includes them in the next round's context.
 
 ---
 
-## Phase 6: Validate
+## Phase 5: Validate
 
 - For code/mixed modules: build + test using the project's commands. If no build/test
   commands are available (warned in 1.1), skip validation entirely.
 - For doc-only modules: skip build/test; validation is done through review phases
 
-**All pass** (or no code modules to validate) -> Phase 7.
+**All pass** (or no code modules to validate) -> Phase 6.
 
 **Failures**: identify the failing commit (bisect if multiple commits, direct revert
 if only one), revert it, and send failure info back to the original fixer for retry
 (max 2 retries). If still failing, revert and record to `PENDING_FILE`. If the
-issue was already in `PENDING_FILE` (a retry from Phase 8), revert and ask the
+issue was already in `PENDING_FILE` (a retry from Phase 7), revert and ask the
 user: show the failure details and offer options — provide additional context or
 direction for another attempt, or skip (default). Skipped issues are added to the
 rejected list so they won't be reported again in subsequent rounds.
 
 ---
 
-## Phase 7: Loop
+## Phase 6: Decide
 
-- Close the team to release all agents (skip if running in serial mode without a team).
+This phase is the **single routing authority** for the review-fix loop.
 
-### Termination check
+### Step 1: Close the current team
 
-- If at least one commit was produced this round and round count < 100
-  -> create new team, back to Phase 2 (previous round's agents are released above)
-- Otherwise (no commits produced, or max 100 rounds reached):
-  - `PENDING_FILE` has entries -> Phase 8
-  - Empty -> Phase 9
+Close the team to release all agents (skip if running in serial mode without a team).
+Force-terminate any unresponsive agents.
 
-### Next round context
+### Step 2: Route
 
-Each new round is a **fresh review** of the same scope — not a targeted review of
-previous fixes. Reviewers should not receive previous fix details or be directed to
-focus on previously changed areas. The only filtering is: skip issues recorded in
-`PENDING_FILE` or rejected by the user. Previously fixed issues are **not excluded**
-— if a reviewer independently finds a new problem in code that was fixed last round,
-that is a valid new issue.
+Count the commits produced during this round (Phase 4 → 5).
+
+- **Commits produced AND round count < 100**:
+  -> Back to **Phase 2** for a new round (new team, fresh review).
+- **No commits produced AND `PENDING_FILE` has entries**:
+  -> **Phase 7** (Confirm).
+- **No commits produced AND `PENDING_FILE` is empty** (or max 100 rounds reached):
+  -> **Phase 8** (Report & Exit).
 
 ---
 
-## Phase 8: Remaining Issue Confirmation
+## Phase 7: Remaining Issue Confirmation
 
 Collect all issues from `PENDING_FILE` that were not auto-fixed during the loop.
 Each issue has a reason explaining why it was deferred (e.g., above threshold, fix
 failed, rolled back). Deduplicate and present to the user. If the file is empty,
-skip to Phase 9.
+skip to Phase 8.
 
 1. Present issues in a compact numbered list. Each entry should fit on one line:
    `[number] [file:line] [risk] [reason] — [description]`
@@ -409,16 +467,16 @@ skip to Phase 9.
 3. **Action depends on mode**:
    - **PR mode**: submit selected issues as PR review comments using the format in
      `references/pr-comment-format.md`. Comment body should be concise, written in the
-     user's conversation language, with a specific fix suggestion. -> Phase 9
-   - **Local mode**: if no issues were approved for fix (user skipped all) -> Phase 9.
-     Otherwise -> **Phase 5** with the user-approved issues as the fix queue. From
-     there the normal flow resumes: Phase 5 -> 6 -> 7 -> 2 -> 3 -> 4 -> ... This is
-     a full restart of the review-fix loop, not a sub-procedure of Phase 8. Phase 7
-     termination check and Phase 8 re-entry apply as usual.
+     user's conversation language, with a specific fix suggestion. -> Phase 8
+   - **Local mode**: if no issues were approved for fix (user skipped all) -> Phase 8.
+     Otherwise -> **Phase 4** (Fix) with the user-approved issues as the fix queue.
+     From there the normal flow resumes: Phase 4 -> 5 -> 6, and Phase 6 routes as
+     usual (new round if commits were produced, Phase 7 again if new pending issues
+     accumulated, or Phase 8 if done).
 
 ---
 
-## Phase 9: Cleanup & Report
+## Phase 8: Report & Exit
 
 ### Worktree cleanup (PR mode only)
 
