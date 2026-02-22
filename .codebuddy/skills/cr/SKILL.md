@@ -274,7 +274,9 @@ These apply to every round including the first:
   unavailable). Each round gets a fresh team — do not reuse agents from prior rounds.
 - One `general-purpose` reviewer agent (`reviewer-N`) per module.
 - One `general-purpose` **verifier** agent (`verifier`) shared across all modules.
-  Created at team setup time and kept alive for the entire review phase.
+  The verifier persists across rounds (not recreated each round) to accumulate
+  project context and improve judgment over time. Create it in the first round's
+  team; in subsequent rounds, send new issues to the existing verifier.
 
 ### Reviewer prompt
 
@@ -325,23 +327,34 @@ counter-argument after reading the code.
 
 ### After review
 
-- Close the verifier.
+- Keep the verifier alive — it persists across rounds.
 - Keep all reviewers alive — they will be reused as fixers in Phase 4.
 
 ---
 
 ## Phase 3: Filter & Risk Assessment — Team-Lead Only
 
-For each issue, combine the reviewer's report and the verifier's verdict to decide
-whether to fix and assign a risk level. Consult `references/judgment-matrix.md` for
-the full matrix, risk level definitions, and special rules.
+Two responsibilities, applied to every issue in order:
 
-### Triage by verifier verdict
+### 3.1 Existence check — is the issue real?
 
+Use the verifier's verdict as the primary signal:
+
+- **Verifier CONFIRM**: accept — proceed to 3.2.
 - **Verifier REJECT (HIGH confidence)**: drop the issue — do not fix or record.
-- **Verifier CONFIRM**: accept the issue, proceed to risk assessment.
 - **Verifier REJECT (MEDIUM/LOW confidence)** or **reviewer–verifier disagree**:
   team-lead reads the cited code and makes the final call.
+
+The verifier only judges whether the issue exists. It does not assess value or risk.
+
+### 3.2 Value & risk assessment — should we fix it, and how risky is it?
+
+This is exclusively the team-lead's responsibility. For each issue that passes 3.1,
+consult `references/judgment-matrix.md` for the full matrix, risk level definitions,
+and special rules. Determine:
+- Whether the issue is worth fixing (judgment matrix criteria)
+- Risk level (low / medium / high)
+- Handling based on the user's auto-fix threshold
 
 ### De-duplication
 
@@ -356,10 +369,9 @@ the full matrix, risk level definitions, and special rules.
   issue still exists. Verified issues are added to the fix queue as additional known
   issues (using the same risk assessment flow).
 
-### Risk level assignment
+### Routing by risk level
 
-Assign each fixable issue a risk level (low / medium / high) based on the judgment
-matrix. The user's chosen auto-fix threshold determines handling:
+The user's chosen auto-fix threshold determines handling for each fixable issue:
 - Issues at or below the threshold -> queued for auto-fix (Phase 4)
 - Issues above the threshold -> recorded to `PENDING_FILE` with the reason
   (e.g., "above auto-fix threshold"), presented to the user in Phase 7
@@ -426,10 +438,11 @@ rejected list so they won't be reported again in subsequent rounds.
 
 This phase is the **single routing authority** for the review-fix loop.
 
-### Step 1: Close the current team
+### Step 1: Close the current round's team
 
-Close the team to release all agents (skip if running in serial mode without a team).
-Force-terminate any unresponsive agents.
+Close the team to release reviewers and fixers (skip if running in serial mode
+without a team). Force-terminate any unresponsive agents.
+**Do not close the verifier** — it persists across rounds.
 
 ### Step 2: Route
 
@@ -478,7 +491,12 @@ skip to Phase 8.
 
 ## Phase 8: Report & Exit
 
-### Worktree cleanup (PR mode only)
+### Cleanup
+
+- Close the verifier agent (it persisted across rounds; close it now).
+- Force-terminate any other agents still running.
+
+**Worktree cleanup (PR mode only)**:
 
 If `WORKTREE_DIR` was created, clean up:
 ```
