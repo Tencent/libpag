@@ -359,10 +359,16 @@ Two responsibilities, applied to every issue in order:
 
 Use the verifier's verdict as the primary signal:
 
-- **Verifier CONFIRM**: accept — proceed to 3.2.
+- **Verifier CONFIRM**: team-lead does a quick plausibility check — verify that the
+  reviewer's description is consistent with the cited code snippet and that the
+  conclusion logically follows. If anything looks off, read the full code to confirm.
+  Otherwise accept and proceed to 3.2.
 - **Verifier REJECT (HIGH confidence)**: drop the issue — do not fix or record.
 - **Verifier REJECT (MEDIUM/LOW confidence)** or **reviewer–verifier disagree**:
-  team-lead reads the cited code and makes the final call.
+  team-lead must read the cited code **independently** and form its own judgment.
+  Do not default to either side — the reviewer's report and the verifier's rebuttal
+  are equally weighted inputs. Read the code, understand the actual behavior, then
+  decide based on what the code does, not on which argument sounds more persuasive.
 
 The verifier only judges whether the issue exists. It does not assess value or risk.
 
