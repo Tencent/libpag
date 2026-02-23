@@ -203,7 +203,7 @@ Write `CR_STATE_FILE` (determined in 1.1) with two sections:
 - **Mode**: PR or Local
 - **User choices**: review priority, auto-fix threshold
 - **PR metadata** (PR mode): PR number, `HEAD_SHA`, `BASE_BRANCH`, `PR_BRANCH`,
-  `WORKTREE_DIR` (if created)
+  `WORKTREE_DIR` (if created), `EXISTING_PR_COMMENTS` (for de-duplication in Phase 3)
 - **Scope**: file list with module assignments and types (code/doc/mixed)
 - **Diff summary**: for each file, the range of changed lines (not the full diff —
   reviewers will read files themselves)
@@ -428,10 +428,10 @@ For normal rounds, determine whether this round made meaningful progress:
   check and were not de-duplicated away — regardless of whether they were auto-fixed
   or recorded to `CR_STATE_FILE`):
   -> Back to **Review** for a new round (fresh review to find further missed issues).
-- **No new issues AND `CR_STATE_FILE` has actionable entries** (not `fixed`, `failed`,
-  or `skipped`):
+- **No new issues AND `CR_STATE_FILE` has entries needing user decision** (`pending`
+  or `failed` — not `fixed` or `skipped`):
   -> **Confirm**.
-- **No new issues AND no actionable entries**:
+- **No new issues AND no entries needing user decision**:
   -> **Report**.
 
 
@@ -439,10 +439,8 @@ For normal rounds, determine whether this round made meaningful progress:
 
 ## Phase 7: Confirm
 
-Collect all issues from `CR_STATE_FILE` that have not been resolved during the loop
-(in PR mode: all confirmed issues across rounds; in local mode: issues above threshold,
-failed fixes, rolled-back fixes). Deduplicate and present to the user. If the file is
-empty, skip to Report.
+Collect all issues from `CR_STATE_FILE` with status `pending` or `failed` (in PR mode:
+all confirmed issues across rounds). Present to the user. If none, skip to Report.
 
 1. Present issues grouped by risk level (high → medium → low), sorted by file path
    within each group. Each entry should fit on one line:
@@ -461,12 +459,14 @@ empty, skip to Report.
    - Option 4 — "Select individually": present each issue one by one (same as above)
 
 3. **Action depends on mode**:
-   - **PR mode**: submit selected issues as **line-level** PR review comments via
+   - **PR mode**: mark selected issues as `fixed` and declined issues as `skipped` in
+     `CR_STATE_FILE`. Submit selected issues as **line-level** PR review comments via
      `gh api` (see `references/pr-comment-format.md` for the exact command). **Do not**
      use `gh pr comment` or `gh pr review` — these create general comments, not
      line-level annotations. Then go to Report.
    - **Local mode**: if no issues were approved for fix (user skipped all), go to
-     Report. Otherwise, send the user-approved issues to **Fix** as the fix queue.
+     Report. Otherwise, mark selected issues as `approved` in `CR_STATE_FILE`, mark
+     declined issues as `skipped`, and send approved issues to **Fix** as the fix queue.
      These issues were already verified in a previous Filter — skip directly to fix.
      After Fix → Validate completes (including any retries), go back to **Continue?**
      which will route to a new Review round. This ensures Confirm-initiated fixes are
