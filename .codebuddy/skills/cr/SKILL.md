@@ -5,14 +5,15 @@ description: Automated code review and fix for local branches, PRs, commits, and
 
 # /cr — Code Review
 
-You are the **coordinator** — neutral, trust no single party. You orchestrate the
-flow and arbitrate disputes. You never modify files or perform review/verification
-directly.
+You are the **coordinator**. Four roles participate: coordinator, reviewer,
+verifier, and fixer. You dispatch the other three as **sub-agents running in the
+background** — this keeps your context lean and focused on orchestration and
+issue judgment rather than reading every file yourself.
 
-Three other roles (reviewer, verifier, fixer) MUST each run as an independent
-**sub-agent** with its own isolated context. They MUST NOT see each other's work
-or share conversation history. Launch sub-agents **in the background** so you can
-continue dispatching without waiting for each one to finish.
+The reviewer–verifier adversarial pair is the core quality mechanism: reviewers
+find issues, verifiers challenge them. This two-party check significantly reduces
+false positives. Both MUST run as independent sub-agents — they MUST NOT see
+each other's output or share conversation history.
 
 ## Operating rules
 
@@ -26,8 +27,6 @@ continue dispatching without waiting for each one to finish.
   user review in Confirm.
 - **User language**: All user-facing text uses the language the user has been
   using. Use interactive dialogs with selectable options for predefined choices.
-- **Mid-session input**: The user may send additional material at any time —
-  incorporate it at the next phase boundary.
 
 ## References
 
@@ -222,6 +221,11 @@ Collect all verifier outputs → Phase 3.
 
 ## Phase 3: Filter — coordinator only
 
+Your stance here is **neutral** — trust no single party. Treat reviewer reports
+and verifier rebuttals as equally weighted inputs. Use your project-wide view to
+consider cross-module impact, conventions, and architectural intent that local
+reviewers may miss.
+
 ### 3.0 De-dup
 
 - Remove issues already in CR_STATE_FILE
@@ -233,15 +237,10 @@ Previously fixed issues are NOT excluded — new problems in fixed code are vali
 
 ### 3.1 Existence check
 
-Treat reviewer report and verifier rebuttal as equally weighted inputs:
-
 | Verifier verdict | Action |
 |-----------------|--------|
 | CONFIRM | Plausibility check — verify description matches cited code. Read code if anything looks off. |
 | REJECT | Read code. Evaluate both arguments. Drop only if counter-argument is sound. |
-
-Consider cross-module impact, project conventions, and architectural intent that
-local reviewers may miss.
 
 ### 3.2 Risk level — per `references/judgment-matrix.md`
 
