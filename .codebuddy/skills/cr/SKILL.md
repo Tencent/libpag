@@ -50,16 +50,19 @@ each other's output or share conversation history.
 ## Flow
 
 ```
-Ask → Scope → [ Review → Filter → Fix → Validate → Continue? ⇄ Confirm ] → Report
+Ask → Scope → [ Review → Filter → Continue? ] → (mode split) → Report
 ```
 
-Each round is a fresh review from a new perspective. PR mode and local mode share
-the same loop — PR mode skips Fix and Validate (no code modifications) and outputs
-line-level PR comments instead of commits at the end.
+The review loop (Review → Filter → Continue?) is shared by all modes. Each round
+is a fresh review from a new perspective. The loop repeats as long as new issues
+are found. After the loop ends, the flow diverges:
 
-**Review-only mode** (Q2 = "Review only"): only runs
-Review → Filter → Report. No fixing, no commits. The user can request fixes
-for specific issues in follow-up conversation.
+- **Review-only mode**: → Report. No fixing, no commits. The user can request
+  fixes for specific issues in follow-up conversation.
+- **PR mode**: → Confirm (select which issues to submit as PR comments) → Report.
+- **Auto-fix local mode**: → Fix → Validate → Continue? (new issues from fix? →
+  new Review round). When no new issues remain: if `pending` or `failed` entries
+  exist → Confirm → Fix → Validate → ... repeat until done → Report.
 
 ---
 
@@ -106,7 +109,6 @@ protected branch. Enter review-only mode automatically (skip Q2, inform user).
   high-risk ones (e.g., API changes, architecture decisions).
 - "Low risk only": auto-fix only the most straightforward issues (e.g.,
   null checks, typos, naming). Confirm everything else.
-- "All confirm": no auto-fix, confirm every issue before any change.
 - "Full auto (risky)": auto-fix everything. Only issues affecting test
   baselines are deferred for confirmation.
 
@@ -278,13 +280,11 @@ Record in the issue's `Proposed` field. Low risk: single obvious fix, no guidanc
 
 Consult `references/judgment-matrix.md` for worth-fixing criteria and special rules.
 
-### 3.3 Route
+### 3.3 Route — record to CR_STATE_FILE
 
-**Review-only mode**: record all to CR_STATE_FILE → Phase 8 (skip fix loop).
+All confirmed issues are recorded to CR_STATE_FILE with risk level.
 
-**PR mode**: record all to CR_STATE_FILE → Phase 6.
-
-**Normal local mode**:
+Auto-fix local mode additionally splits issues:
 
 | Risk vs user threshold | → |
 |------------------------|---|
@@ -295,11 +295,11 @@ Consult `references/judgment-matrix.md` for worth-fixing criteria and special ru
   outside the fixer's module, create a follow-up fix task.
 - Previously rolled-back issues: do not attempt again this round.
 
-Fix queue non-empty → Phase 4. Fix queue empty → Phase 6.
+→ Phase 6
 
 ---
 
-## Phase 4: Fix — sub-agents
+## Phase 4: Fix — auto-fix local mode only, sub-agents
 
 Stance: **precise** — apply each fix completely and correctly, never expand
 scope. The coordinator MUST NOT apply fixes directly.
@@ -338,9 +338,11 @@ Wait for all fixers. Run build + test.
 
 | Condition | → |
 |-----------|---|
-| Arriving from Confirm → Fix → Validate | Phase 2 (new round) |
-| New confirmed issues this round | Phase 2 |
-| CR_STATE_FILE has `pending` or `failed` entries | Phase 7 |
+| New confirmed issues this round | Phase 2 (new review round) |
+| No new issues, review-only mode | Phase 8 |
+| No new issues, PR mode | Phase 7 |
+| No new issues, auto-fix with fix queue non-empty | Phase 4 |
+| No new issues, auto-fix with `pending` or `failed` | Phase 7 |
 | Otherwise | Phase 8 |
 
 ---
@@ -354,13 +356,13 @@ file path within each group:
 - **≤5 issues**: individual fix/skip choices per issue.
 - **>5 issues**: Fix all / Skip all / By risk group / Individual
 
-**PR mode**: mark selected `fixed`, declined `skipped`. Submit via `gh api`
-(see `references/pr-comment-format.md`). Do NOT use `gh pr comment` or
-`gh pr review`. → Phase 8.
+**PR mode**: mark selected issues for submission, declined `skipped`. Submit
+via `gh api` (see `references/pr-comment-format.md`). Do NOT use
+`gh pr comment` or `gh pr review`. → Phase 8.
 
-**Local mode**: mark selected `approved`, declined `skipped`. Send approved to
-Fix → Validate → Continue? (which routes to a new Review round for regression
-check). All skipped → Phase 8.
+**Auto-fix local mode**: mark selected `approved`, declined `skipped`. Send
+approved to Fix → Validate → Continue? (which may route to a new Review round
+for regression check). All skipped → Phase 8.
 
 ---
 
