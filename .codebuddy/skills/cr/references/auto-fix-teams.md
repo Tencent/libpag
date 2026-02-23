@@ -30,9 +30,6 @@ share conversation history.
 | File | Used by |
 |------|---------|
 | `references/verifier-prompt.md` | Verifier — include verbatim |
-| `references/fixer-instructions.md` | Fixer — include verbatim |
-| `references/judgment-matrix.md` | Coordinator (risk, worth-fixing, special rules) |
-| `references/pending-templates.md` | Coordinator (CR_STATE_FILE format) |
 
 ## Flow
 
@@ -66,7 +63,7 @@ module is a self-contained logical unit. Split large files by section/function
 group; group related small files together. Classify each module as `code`,
 `doc`, or `mixed`.
 
-**Persist state**: write CR_STATE_FILE (see `references/pending-templates.md`)
+**Persist state**: write CR_STATE_FILE (see CR_STATE_FILE format appendix)
 with session info (mode, priority, threshold, file list, module assignments,
 changed line ranges, build/test commands) and an issues section updated
 incrementally. CR_STATE_FILE is owned by the coordinator — team agents never
@@ -160,7 +157,7 @@ Previously fixed issues are NOT excluded — new problems in fixed code are vali
 | CONFIRM | Plausibility check — verify description matches cited code. Read code if anything looks off. |
 | REJECT | Read code. Evaluate both arguments. Drop only if counter-argument is sound. |
 
-### 3.2 Risk level — per `references/judgment-matrix.md`
+### 3.2 Risk level
 
 | Only one reasonable fix? | Design decision / external contract? | Risk |
 |--------------------------|--------------------------------------|------|
@@ -171,7 +168,7 @@ Previously fixed issues are NOT excluded — new problems in fixed code are vali
 **Fix approach** (Medium/High only): specify the chosen approach and reasoning.
 Record in the issue's `Proposed` field. Low risk: single obvious fix, no guidance.
 
-Consult `references/judgment-matrix.md` for worth-fixing criteria and special rules.
+Consult the Judgment Matrix appendix for worth-fixing criteria and special rules.
 
 ### 3.3 Route — record to CR_STATE_FILE
 
@@ -211,7 +208,25 @@ assigning the same file to multiple agents to prevent concurrent edit conflicts.
 Each fixer receives:
 - Issue description + file path(s) + line range(s) (fixers read files themselves)
 - Fix approach from `Proposed` field (Medium/High risk)
-- `references/fixer-instructions.md` verbatim
+- Fixer rules (include verbatim in every fixer prompt):
+
+```
+Fix rules:
+1. After fixing each issue, immediately: git commit --only <files> -m "message"
+2. Only commit files in your own module. Never use git add .
+3. Commit message: English, under 120 characters, ending with a period.
+4. When in doubt, skip the fix rather than risk a wrong change.
+5. Do not run build or tests.
+6. Do not modify public API function signatures or class definitions (comments are OK),
+   unless the coordinator's issue description explicitly requires an API signature fix.
+7. After each fix, check whether the change affects related comments or documentation
+   within your assigned files (function/class doc-comments, inline comments describing
+   the changed logic). If so, update them in the same commit as the fix.
+   Cross-module documentation updates (README, spec files, other modules) are handled
+   separately by the coordinator.
+8. When done, report the commit hash for each fix and list any skipped issues with
+   the reason for skipping.
+```
 
 Each fixer commits per issue (one commit per fix).
 
@@ -274,3 +289,121 @@ Summary:
 - Rolled-back issues and reasons
 - Final test result
 - Local mode with associated PR: note issues from PR comments
+
+---
+
+## Appendix: Judgment Matrix
+
+### Risk Level Examples
+
+- **Low**: null check, fix incorrect comment, rename to match convention, remove
+  redundant duplicate code, add `reserve`, fix obvious off-by-one error
+- **Medium**: extracting shared logic across functions, removing unused internal
+  methods, simplifying cross-function control flow, adjusting internal module boundaries
+- **High**: public API change (signature, behavior, deprecation), test baseline change,
+  architecture restructuring, algorithm replacement with multiple viable approaches,
+  introducing a new dependency, changing data persistence/serialization format,
+  changing threading model, performance optimization involving space-time trade-offs
+
+### Handling by Risk Level
+
+| User threshold | Low risk | Medium risk | High risk |
+|----------------|----------|-------------|----------|
+| Full auto      | Auto-fix | Auto-fix    | Auto-fix |
+| Low + Medium   | Auto-fix | Auto-fix    | Confirm  |
+| Low only       | Auto-fix | Confirm     | Confirm  |
+
+**Special rule for "Full auto"**: issues that would change test baselines (screenshot
+comparisons, golden files) are always deferred for user confirmation, regardless of
+risk level.
+
+### Code Modules — Worth Fixing?
+
+Risk level is per-issue, not per-type (a "Logic bug" can be low or high risk).
+
+| Type | Criteria |
+|------|----------|
+| Logic bug | Affects runtime correctness -> must fix |
+| Security (div-by-zero / OOB / uninitialized read) | Must fix |
+| Injection / XSS (unsanitized user input in DOM) | Must fix `[Web]` |
+| Sensitive data exposure (keys / tokens in client code) | Must fix `[Web]` |
+| Resource leak (handle / lock not released) | Must fix |
+| Memory safety (use-after-move / dangling ref) | Must fix |
+| Event listener / timer / subscription leak on unmount | Must fix `[Web]` |
+| Thread safety violation | Must fix |
+| Public API signature change (obvious bug) | Must fix |
+| Public API comment inaccuracy | Must fix — comments that mislead API consumers are correctness issues |
+| Performance optimization | **Must be 100% certain of semantic equivalence; skip if uncertain** |
+| Unnecessary re-renders / missing memoization | Fix when measurably impactful `[Web]` |
+| Full-library import when partial suffices | Fix when tree-shaking is clearly ineffective `[Web]` |
+| Code simplification | Fix when logic can be clearly simplified (early return, branch merge, etc.) |
+| Duplicate code extraction | Fix when >= 3 identical patterns |
+| Container pre-allocation | Fix when size is predictable (e.g., loop count known, input size available) |
+| Architecture improvement | Fix only when dependency direction or responsibility division is clearly wrong |
+| Interface usage | Fix when API is used against its design intent |
+| Rendering correctness (stale key / stale closure / wrong deps) | Fix when it causes incorrect UI behavior `[Web]` |
+| Test coverage gap | Flag when changed logic lacks test coverage |
+| Regression risk | Flag when modification may affect other callers |
+| Naming convention violation | Fix only when inconsistent with project rules loaded in context |
+| Missing variable initialization | Fix when declared without initial value (per project rules) |
+| Comment / documentation issue | Fix when internal docs are missing or style is inconsistent |
+| Function implementation order | Fix only when clearly inconsistent with header declaration order |
+| Type safety (narrowing / magic numbers) | Only change local variables, never change function signatures |
+| Const correctness | Fix when clearly applicable and no semantic change |
+| File organization | Fix only when clearly inconsistent with project conventions |
+| Accessibility (missing alt / label / keyboard nav) | Fix when semantic HTML or ARIA is clearly missing `[Web]` |
+| Public API signature change (not a bug) | Fix when justified by clear benefit to API consumers |
+| Style preference | **Always skip** |
+
+### Document Modules
+
+| Type | Criteria |
+|------|----------|
+| Contradicts code implementation | Must fix — verify against actual code |
+| Incorrect values / constants / ranges | Must fix |
+| Internal contradiction between sections | Must fix |
+| Missing documentation for existing features | Fix when public API or feature is undocumented |
+| Incomplete conditional branches or steps | Fix when undefined behavior or missing steps found |
+| Broken internal/external references | Must fix |
+| Ambiguous description with multiple interpretations | Fix when it could lead to incorrect understanding |
+| Verbose or redundant description | Fix when clearly simplifiable without losing meaning |
+| Poor logical flow or organization | Fix when information order is confusing |
+| Missing examples for complex concepts | Fix when concept is hard to understand without example |
+| Inconsistent terminology with codebase | Fix when terms differ from code identifiers |
+| Formatting inconsistency | Fix only when it affects readability |
+| Grammar or wording issues | Fix only when meaning is unclear |
+| Stylistic preference | **Always skip** |
+
+### Special Rules
+
+- Type narrowing fixes: only change local variables, never function signatures
+- Cross-module renames: assign as an atomic task to a single fixer
+- Issues rolled back in a previous round: **do not attempt again this round**
+
+---
+
+## Appendix: CR_STATE_FILE Format
+
+Use this format to record issues in the `# Issues` section of `CR_STATE_FILE`.
+
+**Status values**:
+- `pending` — recorded, awaiting user decision in Phase 7
+- `approved` — user approved fix in Phase 7, sent to Phase 4
+- `fixed` — fix applied and passed validation
+- `failed` — fix attempted but failed validation after retries
+- `skipped` — user declined or issue rejected (do not re-report)
+
+```markdown
+# Issues
+
+## 1. [brief description]
+- **Status**: pending | approved | fixed | failed | skipped
+- **Reason**: [why not auto-fixed, e.g., "above auto-fix threshold (high risk)",
+  "fix failed: build error after 2 retries", "rolled back: introduced regression"]
+- **Risk**: low | medium | high
+- **File**: [file path:line number]
+- **Current**: [what the code does now]
+- **Proposed**: [what the fix would change — for medium/high risk, include the
+  specific approach chosen by the coordinator and the reasoning]
+- **Impact**: [what else would be affected]
+```
