@@ -1435,16 +1435,17 @@ static const char* skipWhitespaceAndComma(const char* ptr, const char* end) {
   return ptr;
 }
 
-static Point parsePoint(const std::string& str, bool* outValid) {
-  Point point = {};
+static std::pair<float, float> parseTwoFloats(const std::string& str, bool* outValid) {
+  float first = 0;
+  float second = 0;
   const char* ptr = str.c_str();
   const char* end = ptr + str.size();
   char* endPtr = nullptr;
   ptr = skipWhitespaceAndComma(ptr, end);
-  point.x = strtof(ptr, &endPtr);
+  first = strtof(ptr, &endPtr);
   if (endPtr > ptr) {
     ptr = skipWhitespaceAndComma(endPtr, end);
-    point.y = strtof(ptr, &endPtr);
+    second = strtof(ptr, &endPtr);
     if (outValid) {
       *outValid = (endPtr > ptr);
     }
@@ -1453,28 +1454,17 @@ static Point parsePoint(const std::string& str, bool* outValid) {
       *outValid = false;
     }
   }
-  return point;
+  return {first, second};
+}
+
+static Point parsePoint(const std::string& str, bool* outValid) {
+  auto [x, y] = parseTwoFloats(str, outValid);
+  return {x, y};
 }
 
 static Size parseSize(const std::string& str, bool* outValid) {
-  Size size = {};
-  const char* ptr = str.c_str();
-  const char* end = ptr + str.size();
-  char* endPtr = nullptr;
-  ptr = skipWhitespaceAndComma(ptr, end);
-  size.width = strtof(ptr, &endPtr);
-  if (endPtr > ptr) {
-    ptr = skipWhitespaceAndComma(endPtr, end);
-    size.height = strtof(ptr, &endPtr);
-    if (outValid) {
-      *outValid = (endPtr > ptr);
-    }
-  } else {
-    if (outValid) {
-      *outValid = false;
-    }
-  }
-  return size;
+  auto [width, height] = parseTwoFloats(str, outValid);
+  return {width, height};
 }
 
 static Rect parseRect(const std::string& str, bool* outValid) {
