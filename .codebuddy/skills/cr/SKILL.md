@@ -56,6 +56,11 @@ Each round is a fresh review from a new perspective. PR mode and local mode shar
 the same loop — PR mode skips Fix and Validate (no code modifications) and outputs
 line-level PR comments instead of commits at the end.
 
+**No-commit mode** (Q2 = "Continue without committing"): auto-fix is disabled,
+fixers run serially (one issue at a time, no parallel), and fixes are not
+committed. Phase 7 Confirm drives the loop — each approved issue is fixed
+immediately before presenting the next.
+
 ---
 
 ## Phase 0: Ask
@@ -289,23 +294,24 @@ Otherwise:
 
 ---
 
-## Phase 4: Fix — sub-agents, run in background on different files
+## Phase 4: Fix — sub-agents
 
 Stance: **precise** — apply each fix completely and correctly, never expand
 scope. The coordinator MUST NOT apply fixes directly.
 
-Launch one fixer sub-agent per issue or file group, all in the background.
-Each receives:
+Each fixer sub-agent receives:
 - Issue description + file path(s) + line range(s) (fixers read files themselves)
 - Fix approach from `Proposed` field (Medium/High risk)
 - `references/fixer-instructions.md` verbatim
 
-Each fixer commits per issue (one commit per fix).
-
-Assignment strategy:
+**Normal mode**: launch one fixer per issue or file group, all in the background.
+Each fixer commits per issue (one commit per fix). Assignment strategy:
 - Group issues by file to minimize concurrent edit conflicts
 - Cross-file issues or multi-file renames → single atomic task to one fixer
 - Multiple fixers can run in parallel on different files
+
+**No-commit mode**: launch one fixer at a time, serially. Fixer does NOT commit.
+Wait for it to finish before launching the next.
 
 → Phase 5
 
@@ -317,10 +323,12 @@ Wait for all fixers. Run build + test.
 
 - Skip if no build/test commands available (warned in 1.3) or doc-only modules.
 - **Pass** → mark issues `fixed` in CR_STATE_FILE → Phase 6.
-- **Fail** → bisect to find the failing commit, revert it, re-validate remaining
-  before blaming others (one bad commit may cause cascading failures).
-  Per failing issue: retry via new fixer sub-agent with failure details (max 2
-  retries), or revert and mark `failed`.
+- **Fail (normal mode)** → bisect to find the failing commit, revert it,
+  re-validate remaining before blaming others (one bad commit may cause
+  cascading failures). Per failing issue: retry via new fixer sub-agent with
+  failure details (max 2 retries), or revert and mark `failed`.
+- **Fail (no-commit mode)** → the single fix just applied is the cause. Undo
+  the file changes, mark `failed`, and return to Phase 7 for the next issue.
 
 → Phase 6
 
@@ -350,9 +358,13 @@ file path within each group:
 (see `references/pr-comment-format.md`). Do NOT use `gh pr comment` or
 `gh pr review`. → Phase 8.
 
-**Local mode**: mark selected `approved`, declined `skipped`. Send approved to
-Fix → Validate → Continue? (which routes to a new Review round for regression
-check). All skipped → Phase 8.
+**Local mode (normal)**: mark selected `approved`, declined `skipped`. Send
+approved to Fix → Validate → Continue? (which routes to a new Review round for
+regression check). All skipped → Phase 8.
+
+**Local mode (no-commit)**: present issues one at a time. For each: user
+approves → Fix (Phase 4, serial) → Validate (Phase 5) → next issue. User
+skips → mark `skipped` → next issue. After all issues processed → Phase 8.
 
 ---
 
