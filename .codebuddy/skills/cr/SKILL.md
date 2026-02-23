@@ -94,8 +94,7 @@ isolated. If you choose not to commit, all issues will require manual
 confirmation before each fix.
 
 - "Commit and continue": auto-commit all uncommitted changes with a WIP
-  message before starting. The review scope will not include the WIP commit —
-  it only ensures a clean working tree for fix commits.
+  message before starting. The WIP commit is included in the review scope.
 - "Continue without committing": skip commit, disable auto-fix for this
   session — every issue will be presented for confirmation before fixing.
 - "Abort": stop and let the user handle changes manually.
