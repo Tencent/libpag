@@ -20,17 +20,18 @@ Main path: Phase 0 → 1 → [Round: 2 → 3 → 4 → 5 → 6] → 7 → 8 (exi
 ```
 
 **Phase 3 routing (PR mode)**:
-- All issues → `PENDING_FILE`, skip Phase 4-6 → Phase 7 (if PENDING) or Phase 8
+- All issues → `PENDING_FILE`, skip Phase 4-6
+- If `PENDING_FILE` has entries → Phase 7; otherwise → Phase 8
 
 **Phase 3 routing (local mode)**:
 - Auto-fix queue not empty → Phase 4
 - Auto-fix queue empty → Phase 6 (which routes to Phase 7 or 8)
 
 **Phase 6 routing (single authority for loop/exit)**:
-- Commits produced, round < 100 → Phase 2 (new round)
+- Commits produced → Phase 2 (new round)
 - No commits, `PENDING_FILE` not empty → Phase 7
 - No commits, `PENDING_FILE` empty → Phase 8
-- Max 100 rounds reached → Phase 7 (if `PENDING_FILE` not empty) or Phase 8
+- Cycle detected (see Phase 6 for criteria) → Phase 7 or Phase 8
 
 **Phase 7 routing**:
 - User approves fix(es) → Phase 4 (then normal 4 → 5 → 6 routing)
@@ -369,14 +370,20 @@ This phase is the **single routing authority** for the review-fix loop.
 
 Count the commits produced during this round (Phase 4 → 5).
 
-- **Commits produced AND round count < 100**:
+- **Commits produced**:
   -> Back to **Phase 2** for a new round (fresh review).
 - **No commits produced AND `PENDING_FILE` has entries**:
   -> **Phase 7** (Confirm).
 - **No commits produced AND `PENDING_FILE` is empty**:
   -> **Phase 8** (Report & Exit).
-- **Max 100 rounds reached**:
-  -> **Phase 7** if `PENDING_FILE` has entries, otherwise **Phase 8**.
+
+**Cycle detection**: before starting a new round, check whether the loop is making
+meaningful progress. Force exit to Phase 7/8 if any of these apply:
+- The same files and issue types keep appearing across consecutive rounds with no net
+  reduction in issues (fix A introduces B, fix B reintroduces A).
+- Multiple consecutive rounds produce only reverted commits (all fixes fail validation).
+
+When forcing exit, go to Phase 7 if `PENDING_FILE` has entries, otherwise Phase 8.
 
 ---
 
