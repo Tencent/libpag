@@ -123,8 +123,8 @@ If Q3 = Abort → stop. **No further user interaction until Phase 7 Confirm.**
 1. Create `.cr-cache/` if needed. CR_STATE_FILE path:
    - PR mode: `.cr-cache/pr-{number}.md`
    - Local mode: `.cr-cache/{branch}.md` (sanitize `/` to `-`)
-   If exists, rename the old file with a timestamp suffix (e.g., `-20260223`),
-   then create a new one.
+   If exists, append a suffix to the new filename to avoid conflict
+   (e.g., `pr-123-2.md`).
 
 2. If Q3 = Commit: `git add -A && git commit -m "WIP: save changes before /cr session."`
 
