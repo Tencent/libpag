@@ -88,7 +88,7 @@ alter already-running reviewers, verifiers, or fixers.
 ## Flow
 
 ```
-Ask → Scope → [Round: Review → Filter → [Fix ↔ Validate] → Continue?] → Confirm → Report
+Ask → Scope → [Round: Review → Filter → [Fix ↔ Validate] → Continue? ⇄ Confirm] → Report
 ```
 
 The multi-round loop exists primarily to **discover missed issues** — each round is a
@@ -424,7 +424,13 @@ For each genuinely failing commit:
 
 This phase is the **single routing authority** for the review-fix loop.
 
-Determine whether this round made meaningful progress:
+Two entry points reach this phase:
+- **From Validate** (normal round): evaluate the round that just finished.
+- **From Confirm → Fix → Validate**: Confirm-initiated fixes produced new commits that
+  need regression checking — always route to a **new Review round** (skip the decision
+  tree below and go directly to Review).
+
+For normal rounds, determine whether this round made meaningful progress:
 - **New confirmed issues were found this round** (issues that passed Filter existence
   check and were not de-duplicated away — regardless of whether they were auto-fixed
   or recorded to `CR_STATE_FILE`):
@@ -443,7 +449,9 @@ apply:
 - **Fix failures**: 2 consecutive rounds where all fixes fail validation and no new
   issues are found beyond those already in `CR_STATE_FILE`.
 
-When forcing exit, go to Confirm if `CR_STATE_FILE` has pending entries, otherwise Report.
+When forcing exit, go to Confirm if `CR_STATE_FILE` has pending entries **and the
+previous phase was not Confirm** (to prevent Confirm ↔ Continue? loops), otherwise
+Report.
 
 ---
 
@@ -478,8 +486,9 @@ empty, skip to Report.
    - **Local mode**: if no issues were approved for fix (user skipped all), go to
      Report. Otherwise, send the user-approved issues to **Fix** as the fix queue.
      These issues were already verified in a previous Filter — skip directly to fix.
-     After Fix → Validate completes (including any retries), go directly to **Report**.
-     Do not re-enter the Review loop — Confirm-initiated fixes are a terminal path.
+     After Fix → Validate completes (including any retries), go back to **Continue?**
+     which will route to a new Review round. This ensures Confirm-initiated fixes are
+     verified for regressions and any previously missed issues are caught.
 
 ---
 
