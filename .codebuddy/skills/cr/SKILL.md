@@ -307,9 +307,9 @@ impact, project conventions, and architectural intent that local reviewers may m
 Stay neutral — treat the reviewer's report and the verifier's rebuttal as equally
 weighted inputs:
 
-- **Verifier CONFIRM**: review the reviewer's description against the cited code to
-  confirm the conclusion is consistent. If anything looks off, read the relevant code
-  to verify. Otherwise accept and proceed to 3.2.
+- **Verifier CONFIRM**: quick plausibility check — verify the reviewer's description
+  is consistent with the cited code and the conclusion logically follows. If anything
+  looks off, read the relevant code to verify. Otherwise accept and proceed to 3.2.
 - **Verifier REJECT**: review both the verifier's counter-argument and the reviewer's
   original report against the cited code. Form your own judgment — drop the issue only
   when you are convinced the counter-argument is sound.
