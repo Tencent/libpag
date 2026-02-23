@@ -37,14 +37,13 @@ Validate arguments and fetch the actual diff/content.
 
 ## Local mode
 
-**No-commit mode** (Q2 = "Continue without committing"): scope is uncommitted
-changes only:
+**Review-only mode with uncommitted changes**: scope is uncommitted changes only:
 ```
 git diff HEAD
 ```
 Skip argument-based scope below — uncommitted changes are the entire scope.
 
-**Normal mode** — validate arguments and fetch diff:
+**Otherwise** — validate arguments and fetch diff:
 
 - Empty arguments: determine the base branch from the current branch's upstream
   tracking branch. If no upstream, fall back to `main` (or `master`). Fetch the

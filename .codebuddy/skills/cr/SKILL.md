@@ -98,12 +98,11 @@ Priority levels apply to both code and document review checklists.
 **Q2 — Fix mode** (skip if PR mode; add note: "PR mode — issues submitted as
 line-level PR comments after confirmation"):
 
-Options depend on 0.2 results (main/master branch, uncommitted changes).
+If on main/master or uncommitted changes exist: enter review-only mode
+automatically (skip Q2, inform user why — fixes would commit to a protected
+branch, or uncommitted changes prevent isolating fix commits).
 
-**On main/master**: fixing is disabled — any commit would land directly on the
-protected branch. Enter review-only mode automatically (skip Q2, inform user).
-
-**Not on main/master, no uncommitted changes** — pre-select option 1:
+Otherwise, pre-select option 1:
 
 - "Low + Medium risk (recommended)": auto-fix most issues, only confirm
   high-risk ones (e.g., API changes, architecture decisions).
@@ -111,19 +110,8 @@ protected branch. Enter review-only mode automatically (skip Q2, inform user).
   null checks, typos, naming). Confirm everything else.
 - "Full auto (risky)": auto-fix everything. Only issues affecting test
   baselines are deferred for confirmation.
-
-**Not on main/master, uncommitted changes detected** — explain that auto-fix
-requires committing first (to isolate fix commits). Pre-select option 1:
-
-- "Commit and auto-fix (Low + Medium, recommended)": commit changes, then
-  auto-fix most issues. Review scope = full branch diff.
-- "Commit and auto-fix (Low only)": commit changes, then auto-fix only
-  straightforward issues.
-- "Commit and auto-fix (Full auto, risky)": commit changes, then auto-fix
-  everything.
-- "Review only (no commit, no fix)": skip commit, review only uncommitted
-  changes. Issues are reported but not fixed — you can request fixes for
-  specific issues afterwards.
+- "Review only": report issues without fixing. You can request fixes for
+  specific issues in follow-up conversation.
 
 **No further user interaction until Phase 7 Confirm.**
 
@@ -139,17 +127,18 @@ requires committing first (to isolate fix commits). Pre-select option 1:
    If exists, append a suffix to the new filename to avoid conflict
    (e.g., `pr-123-2.md`).
 
-2. If Q2 is a "Commit and auto-fix" option: `git add -A && git commit -m "<message based on changes>"`
-
 ### 1.2 Prepare scope
 
 Follow `references/scope-preparation.md` for all git/gh commands, argument
 handling, and PR comment retrieval.
 
-**Review-only mode**: scope is uncommitted changes only (`git diff HEAD`),
-ignoring branch commits.
+**Review-only mode with uncommitted changes**: scope is uncommitted changes
+only (`git diff HEAD`), ignoring branch commits and `$ARGUMENTS`.
 
-**Normal local mode**: also read git log since upstream for recent-fix context
+**Review-only mode on main/master (no uncommitted changes)**: scope follows
+normal argument handling below.
+
+**Auto-fix local mode**: also read git log since upstream for recent-fix context
 (coordinator only — avoid re-flagging issues a previous `/cr` session already
 fixed).
 
