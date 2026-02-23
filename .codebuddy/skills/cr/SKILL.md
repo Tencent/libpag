@@ -173,11 +173,11 @@ Key steps:
   fetch associated PR comments if `gh` is available.
 
 **Recent fix context (local mode only)**: read the recent git log on the current branch
-(commits since diverging from upstream) to understand what changes have already been
-made and why. This gives the coordinator context about prior work on this branch, so
-that Phase 3 judgment can distinguish "a genuine problem in existing code" from "an
-unnecessary stylistic revert of an intentional prior change". This context is for the
-coordinator only — do not pass it to reviewers.
+(commits since diverging from upstream) to see what has already been changed. The primary
+purpose is to detect cross-session cycles — if a reviewer flags something that a previous
+`/cr` session already fixed (or vice versa), the coordinator should recognize the pattern
+and break the loop. Prior commits that are genuinely problematic should still be flagged
+and fixed normally. This context is for the coordinator only — do not pass it to reviewers.
 
 **Empty scope check**: if the diff is empty or the PR has no file changes, inform the
 user that there is nothing to review and exit.
