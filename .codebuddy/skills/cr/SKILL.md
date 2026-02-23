@@ -317,10 +317,17 @@ weighted inputs:
 ### 3.2 Value & risk assessment — should we fix it, and how risky is it?
 
 This is exclusively the coordinator's responsibility. For each issue that passes 3.1,
-consult `references/judgment-matrix.md` for the full matrix, risk level definitions,
-and special rules. Determine:
+determine risk level using these two questions:
+
+1. **Is there only one reasonable way to fix this?** → Yes = **Low risk**
+   (e.g., null check, comment typo, rename to match convention, add `reserve`)
+2. **Does the fix involve a design decision or change an external contract?**
+   → Yes = **High risk** (e.g., API signature change, algorithm trade-off, new dependency)
+   → No = **Medium risk** (e.g., extract shared logic, remove unused internal method)
+
+Then consult `references/judgment-matrix.md` for the full criteria on whether the
+issue is worth fixing, and for special rules. Determine:
 - Whether the issue is worth fixing (judgment matrix criteria)
-- Risk level (low / medium / high)
 - Handling based on the user's auto-fix threshold
 
 ### Routing by risk level
