@@ -87,8 +87,24 @@ Priority levels apply to both code and document review checklists.
   Code: null dereference, out-of-bounds, race conditions. Docs: factual errors,
   contradictions.
 
-**Q2 — Auto-fix threshold** (skip if PR mode; add note: "PR mode — issues
-submitted as line-level PR comments after confirmation"):
+**Q2 — Uncommitted changes** (local mode, only if 0.2 found changes):
+
+Explain to user: auto-fix requires a clean working tree so fix commits can be
+isolated. If you choose not to commit, all issues will require manual
+confirmation before each fix.
+
+- "Commit and continue": auto-commit all uncommitted changes with a WIP
+  message before starting. The review scope will not include the WIP commit —
+  it only ensures a clean working tree for fix commits.
+- "Continue without committing": skip commit, disable auto-fix for this
+  session — every issue will be presented for confirmation before fixing.
+- "Abort": stop and let the user handle changes manually.
+
+If Q2 = Abort → stop.
+
+**Q3 — Auto-fix threshold** (skip if PR mode or Q2 = "Continue without
+committing"; add note for PR mode: "PR mode — issues submitted as line-level
+PR comments after confirmation"):
 
 Pre-select option 1 as default.
 
@@ -100,14 +116,7 @@ Pre-select option 1 as default.
 - "Full auto (risky)": auto-fix everything. Only issues affecting test
   baselines are deferred for confirmation.
 
-**Q3 — Uncommitted changes** (local mode, only if 0.2 found changes):
-
-- "Commit and continue": auto-commit all uncommitted changes with a WIP
-  message before starting. The review scope will not include the WIP commit —
-  it only ensures a clean working tree for fix commits.
-- "Abort": stop and let the user handle changes manually.
-
-If Q3 = Abort → stop. **No further user interaction until Phase 7 Confirm.**
+**No further user interaction until Phase 7 Confirm.**
 
 ---
 
@@ -121,7 +130,7 @@ If Q3 = Abort → stop. **No further user interaction until Phase 7 Confirm.**
    If exists, append a suffix to the new filename to avoid conflict
    (e.g., `pr-123-2.md`).
 
-2. If Q3 = Commit: `git add -A && git commit -m "WIP: save changes before /cr session."`
+2. If Q2 = Commit: `git add -A && git commit -m "WIP: save changes before /cr session."`
 
 ### 1.2 Prepare scope
 
@@ -260,6 +269,11 @@ Record in the issue's `Proposed` field. Low risk: single obvious fix, no guidanc
 Consult `references/judgment-matrix.md` for worth-fixing criteria and special rules.
 
 ### 3.3 Route
+
+If Q2 = "Continue without committing": skip the threshold table — all issues go
+to CR_STATE_FILE as `pending` → Phase 6.
+
+Otherwise:
 
 | Risk vs user threshold | → |
 |------------------------|---|
