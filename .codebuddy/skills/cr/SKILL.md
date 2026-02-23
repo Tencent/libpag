@@ -93,8 +93,8 @@ Explain to user: auto-fix requires a clean working tree so fix commits can be
 isolated. If you choose not to commit, all issues will require manual
 confirmation before each fix.
 
-- "Commit and continue": auto-commit all uncommitted changes with a WIP
-  message before starting. The WIP commit is included in the review scope.
+- "Commit and continue": commit all uncommitted changes with a message
+  describing the actual changes. The commit is included in the review scope.
 - "Continue without committing": skip commit, disable auto-fix for this
   session — every issue will be presented for confirmation before fixing.
 - "Abort": stop and let the user handle changes manually.
@@ -129,7 +129,7 @@ Pre-select option 1 as default.
    If exists, append a suffix to the new filename to avoid conflict
    (e.g., `pr-123-2.md`).
 
-2. If Q2 = Commit: `git add -A && git commit -m "WIP: save changes before /cr session."`
+2. If Q2 = Commit: `git add -A && git commit -m "<message based on changes>"`
 
 ### 1.2 Prepare scope
 
