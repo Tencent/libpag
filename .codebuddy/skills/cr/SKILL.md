@@ -248,8 +248,7 @@ Run one reviewer per module (in parallel when possible). Each reviewer receives:
 - Checklist matching the module type:
   `references/code-checklist.md` for code modules, `references/doc-checklist.md` for
   doc modules, both for mixed modules. Only include priority levels selected by the
-  user (e.g., if user chose "A + B", do not include Priority C items). For doc-only
-  modules, always include all priority levels (A+B+C) regardless of user selection.
+  user (e.g., if user chose "A + B", do not include Priority C items).
 - **Evidence requirement**: every issue must have a code citation (file:line + snippet)
 - **Known-issue exclusion** (from round 2 onward): skip issues matching the exclusion
   list provided by the coordinator. Focus on finding new issues not already covered.
