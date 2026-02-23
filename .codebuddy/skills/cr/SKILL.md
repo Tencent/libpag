@@ -104,7 +104,7 @@ If on main/master or uncommitted changes exist: inform user that auto-fix is
 unavailable (uncommitted changes or protected branch), enter review-only mode
 automatically, skip Q2.
 
-Otherwise, pre-select option 1:
+Otherwise:
 
 - "Low + Medium risk (recommended)": auto-fix most issues, only confirm
   high-risk ones (e.g., API changes, architecture decisions).
