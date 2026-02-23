@@ -416,9 +416,10 @@ skip to Phase 8.
    - Option 3 — "Select individually": present each issue one by one (same as above)
 
 3. **Action depends on mode**:
-   - **PR mode**: submit selected issues as PR review comments using the format in
-     `references/pr-comment-format.md`. Comment body should be concise, written in the
-     user's conversation language, with a specific fix suggestion. Then go to Phase 8.
+   - **PR mode**: submit selected issues as **line-level** PR review comments via
+     `gh api` (see `references/pr-comment-format.md` for the exact command). **Do not**
+     use `gh pr comment` or `gh pr review` — these create general comments, not
+     line-level annotations. Then go to Phase 8.
    - **Local mode**: if no issues were approved for fix (user skipped all), go to
      Phase 8. Otherwise, send the user-approved issues to **Phase 4** (Fix) as the fix
      queue. These issues were already verified in a previous Phase 3 — skip directly to
