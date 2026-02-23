@@ -31,6 +31,8 @@ share conversation history.
 |------|---------|
 | `references/verifier-prompt.md` | Verifier — include verbatim |
 | `references/fixer-instructions.md` | Fixer — include verbatim |
+| `references/judgment-matrix.md` | Coordinator (risk, worth-fixing, special rules) |
+| `references/pending-templates.md` | Coordinator (CR_STATE_FILE format) |
 
 ## Flow
 
@@ -53,6 +55,7 @@ Same as SKILL.md Phase 1, plus:
 - Read git log since upstream for recent-fix context (avoid re-flagging issues
   a previous `/cr` session already fixed).
 - Persist additional state: threshold, build/test commands.
+- Use `references/pending-templates.md` for CR_STATE_FILE format.
 
 ---
 
@@ -144,7 +147,16 @@ Previously fixed issues are NOT excluded — new problems in fixed code are vali
 
 ### 3.2 Risk level — per `references/judgment-matrix.md`
 
-Same as SKILL.md Phase 3.1.
+| Only one reasonable fix? | Design decision / external contract? | Risk |
+|--------------------------|--------------------------------------|------|
+| Yes | — | Low |
+| No | Yes | High |
+| No | No | Medium |
+
+**Fix approach** (Medium/High only): specify the chosen approach and reasoning.
+Record in the issue's `Proposed` field. Low risk: single obvious fix, no guidance.
+
+Consult `references/judgment-matrix.md` for worth-fixing criteria and special rules.
 
 ### 3.3 Route — record to CR_STATE_FILE
 

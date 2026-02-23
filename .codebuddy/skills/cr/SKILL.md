@@ -26,8 +26,6 @@ to dispatch reviewer, verifier, and fixer agents — see
 |------|---------|
 | `references/code-checklist.md` | Reviewer (code modules) |
 | `references/doc-checklist.md` | Reviewer (doc modules) |
-| `references/judgment-matrix.md` | Coordinator (risk & worth-fixing) |
-| `references/pending-templates.md` | Coordinator (CR_STATE_FILE format) |
 | `references/scope-preparation.md` | Coordinator (git/gh commands) |
 | `references/pr-comment-format.md` | Coordinator (PR comment format) |
 | `references/auto-fix-teams.md` | Coordinator (auto-fix with Agent Teams) |
@@ -137,14 +135,10 @@ Partition files in scope into **review modules**.
 
 ### 1.4 Persist state
 
-Write CR_STATE_FILE. See `references/pending-templates.md` for format.
-
-**`# Session`**: mode, user choices (priority), file list with module
-assignments and types, changed line ranges per file. PR mode: include PR
-metadata (number, `HEAD_SHA`, `BASE_BRANCH`, `PR_BRANCH`, `WORKTREE_DIR`,
-`EXISTING_PR_COMMENTS`).
-
-**`# Issues`**: updated incrementally during review.
+Write CR_STATE_FILE with session info (mode, priority, file list, module
+assignments, changed line ranges) and an issues section updated during review.
+PR mode: also include PR metadata (number, `HEAD_SHA`, `BASE_BRANCH`,
+`PR_BRANCH`, `WORKTREE_DIR`, `EXISTING_PR_COMMENTS`).
 
 → Phase 2
 
@@ -175,7 +169,7 @@ review comment against current code. Add verified issues to the results.
 - Remove cross-module duplicates (same location, same topic).
 - PR mode: remove matches to `EXISTING_PR_COMMENTS`.
 
-### 3.1 Risk level — per `references/judgment-matrix.md`
+### 3.1 Risk level
 
 | Only one reasonable fix? | Design decision / external contract? | Risk |
 |--------------------------|--------------------------------------|------|
@@ -185,8 +179,6 @@ review comment against current code. Add verified issues to the results.
 
 **Fix approach** (Medium/High only): specify the chosen approach and reasoning.
 Record in the issue's `Proposed` field. Low risk: single obvious fix, no guidance.
-
-Consult `references/judgment-matrix.md` for worth-fixing criteria and special rules.
 
 ### 3.2 Record to CR_STATE_FILE
 
