@@ -223,8 +223,6 @@ Run one reviewer per module (in parallel when possible). Each reviewer receives:
 - **Evidence requirement**: every issue must have a code citation (file:line + snippet)
 - **Exclusion list**: see the exclusion section in the corresponding checklist. Project
   rules loaded in context take priority over the exclusion list.
-- **Public API protection**: no signature/interface changes unless obvious bug or
-  comment issue
 - **PR context** (PR mode only): include existing PR review comments so reviewers
   have context on already-discussed topics
 - **Self-check**: before submitting results, re-read the relevant code and verify each

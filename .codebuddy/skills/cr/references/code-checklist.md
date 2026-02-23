@@ -10,10 +10,6 @@ Test code has reduced review requirements — only focus on obvious implementati
 to that language. Unmarked items apply to all languages. Skip items that do not match the
 project's language.
 
-**Public API protection**: Do not suggest changes to public API function signatures or
-class interface definitions, unless it is an obvious bug or a comment issue. Focus on
-internal implementation refactoring and optimization.
-
 **Project-specific rules**: Project rules already loaded in the agent's context take
 priority over this generic checklist. When project rules have explicit requirements for
 a particular issue type, follow the project rules.
@@ -213,6 +209,3 @@ Coding standards and documentation consistency. Lower impact on functionality.
    project rules have specific requirements)
 6. Suggestions for "better alternative implementations" for existing stable code (if
    the current implementation has no bugs)
-7. Public API signature change suggestions (obvious bugs are fixed normally; non-bug
-   changes are not excluded but go through `PENDING_FILE` for user confirmation
-   in Phase 7)
