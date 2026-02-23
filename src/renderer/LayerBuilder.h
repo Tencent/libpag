@@ -55,6 +55,12 @@ class LayerBuilder {
   /**
    * Builds a layer tree and returns a mapping from PAGX Layer nodes to tgfx::Layer objects. This
    * mapping allows callers to look up the rendered layer for any PAGX Layer node.
+   * @param document The document to build from.
+   * @param textLayout Optional text layout for text rendering. If nullptr, a default TextLayout is
+   *                   created internally. Pass a custom TextLayout to use registered typefaces
+   *                   and fallback fonts.
+   * @return A LayerBuildResult containing the root layer and a mapping from PAGX Layer nodes to
+   *         their corresponding tgfx::Layer objects.
    */
   static LayerBuildResult BuildWithMap(PAGXDocument* document, TextLayout* textLayout = nullptr);
 };
