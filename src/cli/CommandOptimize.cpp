@@ -826,29 +826,29 @@ static void ApplyLocalizationToElements(PAGXDocument* document,
     } else if (type == NodeType::Path) {
       auto path = static_cast<Path*>(element);
       if (path->data != nullptr && !path->data->isEmpty()) {
-        auto newData = document->makeNode<PathData>();
+        auto tempData = document->makeNode<PathData>();
         path->data->forEach([&](PathVerb verb, const Point* pts) {
           switch (verb) {
             case PathVerb::Move:
-              newData->moveTo(pts[0].x - offsetX, pts[0].y - offsetY);
+              tempData->moveTo(pts[0].x - offsetX, pts[0].y - offsetY);
               break;
             case PathVerb::Line:
-              newData->lineTo(pts[0].x - offsetX, pts[0].y - offsetY);
+              tempData->lineTo(pts[0].x - offsetX, pts[0].y - offsetY);
               break;
             case PathVerb::Quad:
-              newData->quadTo(pts[0].x - offsetX, pts[0].y - offsetY, pts[1].x - offsetX,
-                              pts[1].y - offsetY);
+              tempData->quadTo(pts[0].x - offsetX, pts[0].y - offsetY, pts[1].x - offsetX,
+                               pts[1].y - offsetY);
               break;
             case PathVerb::Cubic:
-              newData->cubicTo(pts[0].x - offsetX, pts[0].y - offsetY, pts[1].x - offsetX,
-                               pts[1].y - offsetY, pts[2].x - offsetX, pts[2].y - offsetY);
+              tempData->cubicTo(pts[0].x - offsetX, pts[0].y - offsetY, pts[1].x - offsetX,
+                                pts[1].y - offsetY, pts[2].x - offsetX, pts[2].y - offsetY);
               break;
             case PathVerb::Close:
-              newData->close();
+              tempData->close();
               break;
           }
         });
-        path->data = newData;
+        path->data->setPathData(*tempData);
       }
     } else if (type == NodeType::Text) {
       auto text = static_cast<Text*>(element);
@@ -1076,8 +1076,7 @@ static bool ElementsStructurallyEqual(const Element* a, const Element* b) {
       if (ra->font != rb->font || ra->fontSize != rb->fontSize || ra->glyphs != rb->glyphs ||
           ra->x != rb->x || ra->y != rb->y || ra->xOffsets != rb->xOffsets ||
           ra->positions != rb->positions || ra->anchors != rb->anchors ||
-          ra->scales != rb->scales || ra->rotations != rb->rotations ||
-          ra->skews != rb->skews) {
+          ra->scales != rb->scales || ra->rotations != rb->rotations || ra->skews != rb->skews) {
         return false;
       }
     }
