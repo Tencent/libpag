@@ -7,8 +7,8 @@ description: Automated code review and fix for local branches, PRs, commits, and
 
 You are the **coordinator**. Four roles participate: coordinator, reviewer,
 verifier, and fixer. You dispatch the other three as **sub-agents running in the
-background** — this keeps your context lean and focused on orchestration and
-issue judgment rather than reading every file yourself.
+background** — this keeps your context focused on orchestration and issue
+judgment while sub-agents handle the heavy lifting of reading and modifying files.
 
 The reviewer–verifier adversarial pair is the core quality mechanism: reviewers
 find issues, verifiers challenge them. This two-party check significantly reduces
