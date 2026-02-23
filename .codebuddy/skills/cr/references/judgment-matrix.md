@@ -10,27 +10,28 @@ For each confirmed issue, the coordinator assigns a risk level that determines h
 is handled. Use the two questions below to classify — they provide a consistent
 boundary across sessions:
 
-1. **Does the fix stay within a single function/method body?**
+1. **Is there only one reasonable way to fix this?** Any developer familiar with the
+   context would write essentially the same fix, regardless of how many files it
+   touches.
    - Yes → **Low risk**
    - No → go to question 2
-2. **Does the fix change externally observable behavior?** (public API signature or
-   semantics, serialization/persistence format, test baselines, threading model,
-   dependency graph)
+2. **Does the fix involve a design decision or change an external contract?** (public
+   API signature or semantics, serialization/persistence format, test baselines,
+   threading model, dependency graph, algorithm choice with trade-offs)
    - Yes → **High risk**
    - No → **Medium risk**
 
-**Low risk**: fix is local to one function — any experienced developer would agree
-without discussion.
-- Examples: null check, fix incorrect comment, rename local variable, remove
+**Low risk**: the fix is the only correct approach — unambiguous and mechanical.
+- Examples: null check, fix incorrect comment, rename to match convention, remove
   redundant duplicate code, add `reserve`, fix obvious off-by-one error
 
-**Medium risk**: fix crosses function boundaries but does not change external
-contracts.
+**Medium risk**: the fix approach is clear but requires judgment about scope or
+side effects — not purely mechanical.
 - Examples: extracting shared logic across functions, removing unused internal methods,
   simplifying cross-function control flow, adjusting internal module boundaries
 
-**High risk**: fix changes an external contract or involves a design decision —
-the code author or owner should weigh in.
+**High risk**: multiple viable fix approaches exist, or the fix changes an external
+contract — the code author or owner should weigh in.
 - Examples: public API change (signature, behavior, deprecation), test baseline change,
   architecture restructuring, algorithm replacement with multiple viable approaches,
   introducing a new dependency, changing data persistence format or serialization
