@@ -314,8 +314,6 @@ weighted inputs:
   original report against the cited code. Form your own judgment — drop the issue only
   when you are convinced the counter-argument is sound.
 
-The verifier only judges whether the issue exists. It does not assess value or risk.
-
 ### 3.2 Value & risk assessment — should we fix it, and how risky is it?
 
 This is exclusively the coordinator's responsibility. For each issue that passes 3.1,
