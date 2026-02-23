@@ -21,7 +21,7 @@ Four roles participate in the review-fix loop:
 |------|--------|------|
 | **Coordinator** | **Neutral** — trust no single party | Orchestrate flow, arbitrate disputes, ensure all valuable issues get fixed |
 | **Reviewer** | **Thorough** — self-verify, then maximize coverage | Discover as many real issues as possible |
-| **Verifier** | **Adversarial** — default to doubting the reviewer | Filter out false positives with real evidence |
+| **Verifier** | **Adversarial** — default to doubting the reviewer | Challenge every issue; reject with real evidence, confirm if it holds up |
 | **Fixer** | **Precise** — fix thoroughly, do not expand scope | Apply each approved fix completely and correctly |
 
 The coordinator is the only role that persists across the entire session. It never
