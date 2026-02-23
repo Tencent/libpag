@@ -44,6 +44,12 @@ reasoning process, or a new round's reviewer anchored by previous findings).
 
 ## Instructions
 
+**Immediate user interaction**: Phase 0 questions MUST be the very first action
+after mode detection. Mode detection (Phase 0.1) is pure string parsing of
+`$ARGUMENTS` — it requires zero tool calls. Do NOT read any files (including
+reference files), run any git/shell commands, or call any tools before presenting
+Phase 0 questions and receiving user answers.
+
 **Delegation**: You (the coordinator) never modify files directly. Delegate all
 file changes to the fixer role. Read code only for arbitration and diagnosis.
 
@@ -80,7 +86,6 @@ the next phase onward.
 | Fixer agent instructions | `references/fixer-instructions.md` |
 | Verifier prompt | `references/verifier-prompt.md` |
 | PR review comment format | `references/pr-comment-format.md` |
-| User questions (Phase 0 options) | `references/user-questions.md` |
 | Scope preparation commands (Phase 1.2) | `references/scope-preparation.md` |
 
 ---
@@ -112,15 +117,34 @@ Parse `$ARGUMENTS` to determine the review mode:
 
 ### 0.2 Ask questions
 
-**STOP. Do NOT call any tools before receiving user answers.** The questions below
-do not depend on any repository state.
+Present all applicable questions in **a single interactive prompt**.
 
-Present all applicable questions in **a single interactive prompt**. See
-`references/user-questions.md` for the full question definitions and option details.
+**Question 1 — Review priority** (always show):
 
-- **Question 1 — Review priority** (always show): A+B+C / A+B / A only
-- **Question 2 — Auto-fix threshold** (skip in PR mode): Low+Medium / Low only /
-  All confirm / Full auto
+Priority levels apply to both code and document review checklists.
+
+- Option 1 — "Full review (A + B + C)": correctness, optimization, and conventions.
+  Code: null checks, duplicate code, naming. Docs: factual errors, clarity, formatting.
+- Option 2 — "Correctness + optimization (A + B)": skip conventions and style.
+  Code: null checks, resource leaks, simplification. Docs: factual errors, clarity.
+- Option 3 — "Correctness only (A)": only safety and correctness issues.
+  Code: null dereference, out-of-bounds, race conditions. Docs: factual errors,
+  contradictions.
+
+**Question 2 — Auto-fix threshold** (skip in PR mode):
+
+In PR mode, add a note alongside Q1: "PR mode — issues will be submitted as
+line-level PR review comments after your confirmation."
+
+Option 1 should be pre-selected as the default.
+
+- Option 1 — "Low + Medium risk (recommended)": auto-fix most issues, only confirm
+  high-risk ones (e.g., API changes, architecture decisions).
+- Option 2 — "Low risk only": auto-fix only the most straightforward issues (e.g.,
+  null checks, typos, naming). Confirm everything else.
+- Option 3 — "All confirm": no auto-fix, confirm every issue before any change.
+- Option 4 — "Full auto (risky)": auto-fix everything. Only issues affecting test
+  baselines are deferred for confirmation.
 
 **Next**: after all questions are answered, go to Scope. No further user interaction
 until Confirm (except when a previously failed issue fails again in Validate, which
@@ -129,9 +153,6 @@ prompts the user inline).
 ---
 
 ## Phase 1: Scope
-
-**Prerequisite**: Phase 0 questions have been answered. If not, STOP and return to
-Phase 0.2.
 
 ### 1.1 Pre-flight Checks
 
