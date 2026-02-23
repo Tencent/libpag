@@ -19,6 +19,11 @@ share conversation history.
   that are still running.
 - **Autonomy**: zero user interaction until Confirm (Phase 7) or Report
   (Phase 8). Record anything unresolvable to `CR_STATE_FILE` for user review.
+- **Error handling**: Handle unexpected situations autonomously (agent stuck or
+  unresponsive, fix breaks the build, git operation fails, agent produces invalid
+  output). Use your judgment: terminate and replace, revert and retry, skip and
+  move on. Record anything unresolvable to `CR_STATE_FILE` for user review in
+  Confirm.
 
 ## Additional references
 

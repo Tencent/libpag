@@ -17,8 +17,6 @@ to dispatch reviewer, verifier, and fixer agents — see
   references, or run any commands before the user answers.
 - **Autonomy**: After Ask (Phase 0), zero user interaction until Report
   (Phase 4). Pre-flight failures abort with a clear message.
-- **Error handling**: Handle unexpected situations autonomously. Record anything
-  unresolvable to `CR_STATE_FILE` for inclusion in the report.
 - **User language**: All user-facing text uses the language the user has been
   using. Use interactive dialogs with selectable options for predefined choices.
 
