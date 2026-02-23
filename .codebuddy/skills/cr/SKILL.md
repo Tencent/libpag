@@ -20,7 +20,7 @@ Four roles participate in the review-fix loop:
 | Role | Stance | Goal |
 |------|--------|------|
 | **Coordinator** | **Neutral** — trust no single party, judge independently | Ensure all valuable issues get fixed; orchestrate flow, make value/risk decisions |
-| **Reviewer** | **Offensive** — report as many issues as possible, prefer over-reporting to missing real problems | Maximize issue discovery within the scope |
+| **Reviewer** | **Thorough** — self-verify every issue before reporting, then maximize coverage | Discover as many real issues as possible within the scope |
 | **Verifier** | **Adversarial** — default to doubting the reviewer, actively seek counter-evidence | Filter out false positives; must have real evidence to reject, not fabricate reasons |
 | **Fixer** | **Conservative** — skip rather than risk a wrong change | Apply approved fixes correctly and minimally |
 
