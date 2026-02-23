@@ -4,9 +4,7 @@ Present all applicable questions in **a single interactive prompt**.
 
 ## Question 1 — Review priority
 
-Always show. When the scope turns out to be doc-only (determined later in Phase 1
-module partitioning), all priority levels (A+B+C) are used regardless of the user's
-choice.
+Always show.
 
 (code/mixed modules):
 - Option 1 — "Full review (A + B + C)": correctness, refactoring, and conventions.
@@ -23,14 +21,14 @@ line-level PR review comments after your confirmation."
 
 Option 1 should be pre-selected as the default.
 
-- Option 1 — "Low + Medium risk (recommended)": auto-fix unambiguous fixes and clear
-  cross-location refactors (e.g., null checks, naming, extract shared logic,
-  remove unused internals). Confirm high-risk issues.
-- Option 2 — "Low risk only": auto-fix only fixes with a single correct approach
-  (e.g., null checks, comment typos, naming, `reserve`). Confirm anything whose
-  impact extends beyond the immediate locality.
+- Option 1 — "Low + Medium risk (recommended)": auto-fix issues where the fix
+  approach is unambiguous or clear (e.g., null checks, naming, extract shared logic,
+  remove unused internals). Confirm issues involving design decisions or external
+  contract changes.
+- Option 2 — "Low risk only": auto-fix only issues where there is exactly one
+  reasonable fix — no room for debate (e.g., null checks, comment typos, naming,
+  `reserve`). Confirm everything else.
 - Option 3 — "All confirm": no auto-fix, confirm every issue before any change.
 - Option 4 — "Full auto (risky)": auto-fix all risk levels, autonomously deciding
-  fix approach for high-risk issues (e.g., API changes, architecture restructuring,
-  algorithm trade-offs). Only issues affecting test baselines are deferred for
-  confirmation.
+  fix approach even for design decisions and external contract changes. Only issues
+  affecting test baselines are deferred for confirmation.
