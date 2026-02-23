@@ -18,7 +18,8 @@ description: Automated code review and fix for local branches, PRs, commits, and
 
 Reviewer, verifier, and fixer MUST each run as an independent **sub-agent** with
 its own isolated context. They MUST NOT see each other's work or share
-conversation history. Multiple sub-agents can run in parallel.
+conversation history. Launch sub-agents **in the background** so the coordinator
+can continue dispatching without waiting for each one to finish.
 
 ## Operating rules
 
@@ -186,9 +187,9 @@ the coordinator extracts relevant information and passes it via prompts.
   issues from prior Confirm are also excluded. Previously fixed issues are
   **not excluded** — new problems in fixed code are valid new issues.
 
-### Reviewers — sub-agents, parallel
+### Reviewers — sub-agents, run in background
 
-Launch one reviewer sub-agent per module. Each receives:
+Launch one reviewer sub-agent per module, all in the background. Each receives:
 - **Scope**: file list + changed line ranges for its module. Reviewers read
   full files and fetch diffs themselves — coordinator does NOT pass raw diff.
 - **Checklist**: `references/code-checklist.md` for code, `references/doc-checklist.md`
@@ -209,9 +210,9 @@ Same output format, same verification pipeline. Skip in subsequent rounds.
 
 ### Verifiers — sub-agents, pipeline
 
-As each reviewer returns, immediately launch one verifier sub-agent for that
-batch. Do not wait for all reviewers. Include `references/verifier-prompt.md`
-verbatim. Each verifier runs independently.
+As each reviewer returns, immediately launch one verifier sub-agent in the
+background for that batch. Do not wait for all reviewers. Include
+`references/verifier-prompt.md` verbatim.
 
 Collect all verifier outputs → Phase 3.
 
@@ -271,9 +272,10 @@ Consult `references/judgment-matrix.md` for worth-fixing criteria and special ru
 
 ---
 
-## Phase 4: Fix — sub-agents, parallel on different files
+## Phase 4: Fix — sub-agents, run in background on different files
 
-Launch one fixer sub-agent per issue or file group. Each receives:
+Launch one fixer sub-agent per issue or file group, all in the background.
+Each receives:
 - Issue description + file path(s) + line range(s) (fixers read files themselves)
 - Fix approach from `Proposed` field (Medium/High risk)
 - `references/fixer-instructions.md` verbatim
