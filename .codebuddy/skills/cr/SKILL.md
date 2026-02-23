@@ -311,8 +311,9 @@ Each fixer commits per issue (one commit per fix). Assignment strategy:
 - Multiple fixers can run in parallel on different files
 
 **No-commit mode**: launch one fixer sub-agent at a time, serially. Fixer does
-NOT commit. Wait for it to finish before launching the next. Still MUST use a
-sub-agent — the coordinator MUST NOT apply fixes directly, even for simple ones.
+NOT commit. After each fixer finishes → run Validate (Phase 5) immediately
+before proceeding to the next issue. Still MUST use a sub-agent — the
+coordinator MUST NOT apply fixes directly, even for simple ones.
 
 → Phase 5
 
