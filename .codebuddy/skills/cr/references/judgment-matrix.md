@@ -15,6 +15,12 @@ agree without discussion.
 - Examples: null check, fix incorrect comment, rename non-conforming variable, remove
   redundant duplicate code, add `reserve`, fix obvious off-by-one error
 
+**Medium risk**: the fix approach is clear but the impact extends beyond the immediate
+locality — the coordinator has enough context to judge, but it is not as self-evident as
+low risk.
+- Examples: extracting shared logic across functions, removing unused internal methods,
+  simplifying cross-function control flow, adjusting internal module boundaries
+
 **High risk**: the fix involves a design decision or changes an external contract —
 the code author or owner should weigh in.
 - Examples: public API change (signature, behavior, deprecation), test baseline change,
@@ -22,12 +28,6 @@ the code author or owner should weigh in.
   introducing a new dependency, changing data persistence format or serialization
   protocol, changing threading model or concurrency architecture, performance
   optimization involving space-time trade-offs
-
-**Medium risk**: the fix approach is clear but the impact extends beyond the immediate
-locality — the coordinator has enough context to judge, but it is not as self-evident as
-low risk.
-- Examples: extracting shared logic across functions, removing unused internal methods,
-  simplifying cross-function control flow, adjusting internal module boundaries
 
 ## Handling by Risk Level
 

@@ -215,4 +215,4 @@ Coding standards and documentation consistency. Lower impact on functionality.
    the current implementation has no bugs)
 7. Public API signature change suggestions (obvious bugs are fixed normally; non-bug
    changes are not excluded but go through `PENDING_FILE` for user confirmation
-   in Phase 8)
+   in Phase 7)

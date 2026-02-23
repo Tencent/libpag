@@ -99,6 +99,7 @@ selectable options rather than plain text. The user may send additional material
 | Issue filtering & risk level judgment matrix | `references/judgment-matrix.md` |
 | Pending issue template | `references/pending-templates.md` |
 | Fixer agent instructions | `references/fixer-instructions.md` |
+| Verifier prompt | `references/verifier-prompt.md` |
 | PR review comment format | `references/pr-comment-format.md` |
 | User questions (Phase 0 options) | `references/user-questions.md` |
 | Scope preparation commands (Phase 1.2) | `references/scope-preparation.md` |
@@ -200,22 +201,24 @@ These apply to every round including the first:
   once in Phase 1. Do not re-run `git diff` or re-partition modules in any round.
 - **Independent review**: reviewers receive no information about previous rounds' fixes,
   issues, or outcomes. Each round is a fresh, unbiased review of the full scope.
-- **Cross-round exclusion**: the only information carried across rounds is: skip issues
-  already recorded in `PENDING_FILE` or rejected by the user in a previous Phase 7.
-  Previously fixed issues are **not excluded** — if a reviewer independently finds a
-  new problem in code that was fixed last round, that is a valid new issue.
+- **Cross-round exclusion (coordinator only)**: after collecting reviewer results, the
+  coordinator skips issues already recorded in `PENDING_FILE` or rejected by the user
+  in a previous Phase 7. Do **not** pass this exclusion list to reviewers — they review
+  with a clean slate. Previously fixed issues are **not excluded** — if a reviewer
+  independently finds a new problem in code that was fixed last round, that is a valid
+  new issue.
 
 ### Reviewers
 
-Run one reviewer per module (in parallel when possible). Each reviewer's context
-includes:
-- Module file list + checklist matching the module type:
+Run one reviewer per module (in parallel when possible). Each reviewer receives:
+- The **diff** for its module (to identify what changed) and the **file list** (to
+  locate full files). Reviewers must **read entire files** themselves for full context —
+  they are not limited to reviewing only the diff lines.
+- Checklist matching the module type:
   `references/code-checklist.md` for code modules, `references/doc-checklist.md` for
   doc modules, both for mixed modules. Only include priority levels selected by the
   user (e.g., if user chose "A + B", do not include Priority C items). For doc-only
   modules, always include all priority levels (A+B+C) regardless of user selection.
-- **Review scope rule**: reviewers must read entire files for full context and
-  report issues at the selected priority levels for all code in the reviewed files.
 - **Evidence requirement**: every issue must have a code citation (file:line + snippet)
 - **Exclusion list**: see the exclusion section in the corresponding checklist. Project
   rules loaded in context take priority over the exclusion list.
@@ -230,41 +233,23 @@ includes:
 
 ### Verification (pipeline)
 
-Verification runs as a **pipeline** — do not wait for all reviewers to finish. As
-soon as any reviewer reports issues, launch verifiers to challenge them. Each issue
-gets its own independent verifier (can run in parallel).
+Verification runs as a **pipeline** — as soon as any reviewer finishes and submits
+its issues, immediately launch verifiers for those issues. Do not wait for all
+reviewers to finish. Each issue gets its own independent verifier (can run in parallel
+with both other verifiers and still-running reviewers).
 
 **Verifier failure/timeout**: if a verifier fails to return a result (timeout, error,
 invalid output), the coordinator reads the cited code and makes the existence judgment
 directly — treat it as if the verifier were absent for that issue.
 
-Verifier context:
-
-```
-You are a code review verifier. Your goal is to produce accurate verdicts — not to
-maximize rejections. For each issue you receive:
-
-1. Read the cited code (file:line) and sufficient surrounding context.
-2. Challenge the issue: Is the reviewer's reasoning wrong? Is there context that
-   makes this a non-issue (e.g., invariants guaranteed by callers, platform
-   constraints, intentional design)? Does the code actually behave as described?
-3. Verdict:
-   - REJECT: you found a concrete reason the issue is not a real problem.
-   - CONFIRM: after investigation, the issue holds up — no valid counter-argument.
-   Both verdicts are equally valid outcomes. A high CONFIRM rate does not indicate
-   failure — it means the reviewers are doing good work.
-4. Confidence: HIGH / MEDIUM / LOW.
-
-Important: do not stretch to find counter-arguments that are technically possible but
-practically unrealistic. Base your judgment on how the code is actually used, not on
-theoretical edge cases in your favor.
-```
+Each verifier receives the issue description and cited code. See
+`references/verifier-prompt.md` for the full verifier prompt.
 
 ---
 
 ## Phase 3: Filter & Risk Assessment — Coordinator Only
 
-Two responsibilities, applied to every issue in order:
+Three steps, applied to every issue in order:
 
 ### 3.0 De-duplication (before verification results)
 
@@ -277,10 +262,11 @@ known issues:
 - **PR comment de-duplication** (PR mode): compare each confirmed issue against
   `EXISTING_PR_COMMENTS`. If an issue matches an existing comment (same file, same
   general location, same topic), exclude it — do not present it to the user.
-- **Associated PR comment verification** (Local mode with associated PR): for each
-  PR review comment retrieved in 1.2, verify against the current code whether the
-  issue still exists. Verified issues are added to the fix queue as additional known
-  issues (using the same risk assessment flow).
+- **Associated PR comment verification** (Local mode with associated PR, **first
+  round only**): for each PR review comment retrieved in 1.2, verify against the
+  current code whether the issue still exists. Verified issues are added to the fix
+  queue as additional known issues (using the same risk assessment flow). Skip this
+  step in subsequent rounds — these comments are only processed once.
 
 ### 3.1 Existence check — is the issue real?
 
@@ -343,6 +329,9 @@ Run one fixer per fix or file group (in parallel when possible). Each fixer rece
 - The full content of the file(s) to modify
 - `references/fixer-instructions.md` verbatim
 
+Each fixer commits **per issue** (one commit per fix, immediately after applying it).
+This enables fine-grained bisection and revert in Phase 5.
+
 Assignment strategy:
 - Group issues by file to minimize concurrent edit conflicts
 - Cross-file issues or multi-file renames -> single atomic task to one fixer
@@ -363,9 +352,10 @@ Coordinator collects skipped issues and records them to `PENDING_FILE`.
 **Commit counting**: only commits that survive validation count as "commits produced"
 for Phase 6 routing. Reverted commits do not count.
 
-**Failures**: identify the failing commit (bisect if multiple commits, direct revert
-if only one), revert it, and send failure info to a new fixer for retry (max 2
-retries). If still failing, revert and record to `PENDING_FILE`. If the issue was
+**Failures**: record the HEAD before Phase 4 starts as the "last known good" commit.
+Identify the failing commit (bisect against the last-known-good if multiple commits,
+direct revert if only one), revert it, and send failure info to a new fixer for retry
+(max 2 retries). If still failing, revert and record to `PENDING_FILE`. If the issue was
 already in `PENDING_FILE` (a retry from Phase 7), revert and ask the user: show the
 failure details and offer options — provide additional context or direction for another
 attempt, or skip (default). Skipped issues are added to the rejected list so they
