@@ -1051,7 +1051,9 @@ static bool LayersStructurallyEqual(const Layer* a, const Layer* b) {
   if (a->styles.size() != b->styles.size() || a->filters.size() != b->filters.size()) {
     return false;
   }
-  if (a->alpha != b->alpha || a->blendMode != b->blendMode || a->visible != b->visible) {
+  if (a->alpha != b->alpha || a->blendMode != b->blendMode || a->visible != b->visible ||
+      a->maskType != b->maskType || a->antiAlias != b->antiAlias ||
+      a->groupOpacity != b->groupOpacity) {
     return false;
   }
   if (!a->matrix.isIdentity() || !b->matrix.isIdentity()) {
