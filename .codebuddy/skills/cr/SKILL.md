@@ -264,15 +264,15 @@ Run one reviewer per module (in parallel when possible). Each reviewer receives:
 ### Verification (pipeline)
 
 Verification runs as a **pipeline** — as soon as any reviewer finishes and submits
-its issues, immediately launch verifiers for those issues. Do not wait for all
-reviewers to finish. Each issue gets its own independent verifier (can run in parallel
-with both other verifiers and still-running reviewers).
+its issues, immediately launch one verifier for that reviewer's batch. Do not wait
+for all reviewers to finish. Each verifier runs independently and can work in parallel
+with other verifiers and still-running reviewers.
 
 **Verifier failure/timeout**: if a verifier fails to return a result (timeout, error,
 invalid output), the coordinator reads the cited code and makes the existence judgment
-directly — treat it as if the verifier were absent for that issue.
+directly for each affected issue.
 
-Each verifier receives the issue description and cited code. See
+Each verifier receives the full batch of issues from one reviewer. See
 `references/verifier-prompt.md` for the full verifier prompt.
 
 **Next**: go to Filter.
