@@ -141,7 +141,10 @@ Pre-select option 1 as default.
 Follow `references/scope-preparation.md` for all git/gh commands, argument
 handling, and PR comment retrieval.
 
-Local mode only: also read git log since upstream for recent-fix context
+**No-commit mode**: scope is uncommitted changes only (`git diff HEAD`), ignoring
+branch commits. Skip recent-fix context since there are no prior `/cr` commits.
+
+**Normal local mode**: also read git log since upstream for recent-fix context
 (coordinator only — avoid re-flagging issues a previous `/cr` session already
 fixed).
 
