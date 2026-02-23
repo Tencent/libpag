@@ -19,7 +19,7 @@ commits.
 Main path: Phase 0 → 1 → [Round: 2 → 3 → 4 → 5 → 6] → 7 → 8 (exit)
 ```
 
-**Phase 3 routing (PR mode)**:
+**Phase 3 routing (PR mode)** — PR mode always runs exactly one round (no iteration):
 - All issues → `PENDING_FILE`, skip Phase 4-6
 - If `PENDING_FILE` has entries → Phase 7; otherwise → Phase 8
 
@@ -356,12 +356,16 @@ Coordinator collects skipped issues and records them to `PENDING_FILE`.
   commands are available (warned in 1.1), skip validation entirely.
 - For doc-only modules: skip build/test; validation is done through review phases
 
-**All pass** (or no code modules to validate) -> Phase 6.
+**All pass** (or no code modules to validate) -> remove successfully fixed issues from
+`PENDING_FILE` (they may have been recorded there from a previous Phase 7 approval),
+then proceed to Phase 6.
 
 **Commit counting**: only commits that survive validation count as "commits produced"
 for Phase 6 routing. Reverted commits do not count.
 
-**Failures**: record the HEAD before Phase 4 starts as the "last known good" commit.
+**Failures**: record the HEAD **once, before any fixer starts** in Phase 4, as the
+"last known good" commit (this is the baseline for bisection regardless of how many
+fixers run in parallel).
 Identify the failing commit (bisect against the last-known-good if multiple commits,
 direct revert if only one), revert it, and send failure info to a new fixer for retry
 (max 2 retries). If still failing, revert and record to `PENDING_FILE`. If the issue was

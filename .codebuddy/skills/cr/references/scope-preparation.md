@@ -18,7 +18,7 @@ Validate arguments and fetch the actual diff/content.
    - Otherwise -> create a worktree:
      ```
      git fetch origin pull/{number}/head:pr-{number}
-     git worktree add /tmp/pr-review-{number} pr-{number}
+     git worktree add --no-track /tmp/pr-review-{number} pr-{number}
      ```
      All subsequent operations use the worktree directory. Record `WORKTREE_DIR` for
      cleanup in Phase 8.
