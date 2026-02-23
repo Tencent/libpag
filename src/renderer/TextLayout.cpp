@@ -531,6 +531,7 @@ class TextLayoutContext {
     // Calculate baselines: first line baseline = ascent portion of first line,
     // subsequent lines advance by defaultLineHeight.
     float baselineY = 0;
+    bool firstContentLine = true;
     tgfx::TextBlobBuilder builder = {};
 
     for (size_t lineIdx = 0; lineIdx < lines.size(); lineIdx++) {
@@ -540,9 +541,10 @@ class TextLayoutContext {
         continue;
       }
 
-      if (lineIdx == 0) {
-        // First line: baseline at maxAscent (text starts from the top).
-        baselineY = line.maxAscent;
+      if (firstContentLine) {
+        // First non-empty line: baseline at maxAscent (text starts from the top).
+        baselineY += line.maxAscent;
+        firstContentLine = false;
       }
 
       // Calculate text anchor offset for this line independently.
