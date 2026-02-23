@@ -1,8 +1,8 @@
 # Auto-Fix Mode (Teams)
 
-When the user selects an auto-fix threshold in Q2, the flow switches to this
-document. Step 1 (Ask) from SKILL.md still applies — this document takes over
-from Step 2 (Scope) onward.
+Entered from SKILL.md Step 1 when the user selects an auto-fix threshold.
+Q1 (review priority) and Q2 (auto-fix threshold) are already answered — this
+document starts from Scope onward.
 
 The reviewer–verifier adversarial pair is the core quality mechanism: reviewers
 find issues, verifiers challenge them. This two-party check significantly reduces
@@ -24,12 +24,6 @@ share conversation history.
   output). Use your judgment: terminate and replace, revert and retry, skip and
   move on. Record anything unresolvable to `CR_STATE_FILE` for user review in
   Confirm.
-
-## Additional references
-
-| File | Used by |
-|------|---------|
-| `references/verifier-prompt.md` | Verifier — include verbatim |
 
 ## Flow
 
@@ -126,8 +120,32 @@ verification itself.
 
 The verifier runs as a **pipeline** — it does not wait for all reviewers to
 finish. As each reviewer reports issues, the coordinator forwards them to the
-verifier immediately. Include `references/verifier-prompt.md` verbatim in the
-verifier's prompt.
+verifier immediately. Include the following verbatim in every verifier's prompt:
+
+```
+You are a code review verifier. Your stance is adversarial — default to doubting the
+reviewer's conclusion and actively look for reasons why the issue might be wrong. Your
+job is to stress-test each issue so that only real problems survive.
+
+For each issue you receive:
+
+1. Read the cited code (file:line) and sufficient surrounding context.
+2. Actively try to disprove the issue: Is the reviewer's reasoning flawed? Is there
+   context that makes this a non-issue (e.g., invariants guaranteed by callers, platform
+   constraints, intentional design)? Does the code actually behave as the reviewer
+   claims? Look for the strongest counter-argument you can find.
+3. Output for each issue:
+   - Verdict: REJECT or CONFIRM
+   - Reasoning: for REJECT, state the concrete counter-argument. For CONFIRM, briefly
+     note what you checked and why no valid counter-argument exists.
+
+Important constraints:
+- Your counter-arguments must be grounded in real evidence from the code. Do not
+  fabricate hypothetical defenses or invent caller guarantees that are not visible in
+  the codebase.
+- A CONFIRM verdict is not a failure — it means the reviewer found a real issue and
+  your challenge validated it.
+```
 
 ### After review
 

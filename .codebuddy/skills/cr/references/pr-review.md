@@ -1,0 +1,89 @@
+# PR Review
+
+Entered from SKILL.md Step 1 when mode is PR. This document covers the complete
+PR review flow from questions through reporting.
+
+## Step 1: Ask
+
+Only ask **Q1 — Review priority** (same options as main flow). Auto-fix is not
+available in PR mode — inform the user that issues will be submitted as
+line-level PR comments after confirmation.
+
+## Step 2: Scope
+
+1. **Fetch PR metadata**:
+   ```
+   gh pr view {number} --json headRefName,baseRefName,headRefOid,state
+   ```
+   Extract: `PR_BRANCH`, `BASE_BRANCH`, `HEAD_SHA`, `STATE`.
+   If the command fails (gh not installed, not authenticated, PR not found, or URL
+   repo mismatch), inform the user and abort.
+   If `STATE` is not `OPEN`, inform the user and exit.
+
+2. **Prepare working directory**:
+   - If current branch equals `PR_BRANCH` → use current directory directly.
+   - Otherwise → create a worktree:
+     ```
+     git fetch origin pull/{number}/head:pr-{number}
+     git worktree add --no-track /tmp/pr-review-{number} pr-{number}
+     ```
+     All subsequent operations use the worktree directory. Record `WORKTREE_DIR`.
+
+3. **Set review scope**: diff against `BASE_BRANCH`.
+   ```
+   git fetch origin {BASE_BRANCH}
+   git diff $(git merge-base origin/{BASE_BRANCH} HEAD)
+   ```
+
+4. **Fetch existing PR review comments** for de-duplication in Step 3:
+   ```
+   gh api repos/{owner}/{repo}/pulls/{number}/comments
+   ```
+   Store as `EXISTING_PR_COMMENTS`.
+
+If diff is empty → exit.
+
+## Step 3: Review
+
+Read all files in scope. Apply `references/code-checklist.md` to code files,
+`references/doc-checklist.md` to documentation files. Only include priority
+levels the user selected.
+
+For each issue found:
+- Provide a code citation (file:line + snippet).
+- Self-verify by re-reading the code — confirm or withdraw.
+- De-duplicate against `EXISTING_PR_COMMENTS` — skip issues already covered.
+
+## Step 4: Report
+
+Present confirmed issues to user. User selects which to submit as PR comments,
+declines are marked `skipped`.
+
+Submit as a **single** GitHub PR review with line-level comments via `gh api`.
+Do NOT use `gh pr comment` or `gh pr review`.
+
+```bash
+gh api repos/{owner}/{repo}/pulls/{number}/reviews --input - <<'EOF'
+{
+  "commit_id": "{HEAD_SHA}",
+  "event": "COMMENT",
+  "comments": [
+    {
+      "path": "relative/file/path",
+      "line": 42,
+      "side": "RIGHT",
+      "body": "Description of the issue and suggested fix"
+    }
+  ]
+}
+EOF
+```
+
+- `commit_id`: HEAD SHA of the PR branch
+- `path`: relative to repository root
+- `line`: line number in the **new** file (right side of diff)
+- `side`: always `"RIGHT"`
+- `body`: concise, in the user's conversation language, with a specific fix
+  suggestion when possible
+
+Summary of issues found / submitted / skipped. Remove worktree and temp branch.

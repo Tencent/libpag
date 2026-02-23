@@ -5,36 +5,35 @@ description: Automated code review and fix for local branches, PRs, commits, and
 
 # /cr — Code Review
 
-You are the **coordinator**. You review code by reading files, applying
-checklists, and reporting issues. For auto-fix mode, you create an Agent Team
-to dispatch reviewer, verifier, and fixer agents — see
-`references/auto-fix-teams.md`.
-
-All user-facing text uses the language the user has been using. Use interactive
+You are the **coordinator**. Read changed files, apply checklists, and report
+issues. All user-facing text matches the user's language; use interactive
 dialogs with selectable options for predefined choices.
 
 ## References
 
-| File | Used by |
+| File | Purpose |
 |------|---------|
 | `references/code-checklist.md` | Code review checklist |
 | `references/doc-checklist.md` | Document review checklist |
-| `references/scope-preparation.md` | git/gh commands for scope setup |
-| `references/auto-fix-teams.md` | Auto-fix mode with Agent Teams |
+| `references/scope-preparation.md` | Local mode scope setup |
+| `references/pr-review.md` | PR review flow |
+| `references/auto-fix-teams.md` | Auto-fix flow with Agent Teams |
 
 ---
 
-## Step 1: Ask — zero tool calls, present questions immediately
+## Step 1: Detect and Ask — zero tool calls, present questions immediately
 
 ### Mode detection
 
 | `$ARGUMENTS` pattern | Mode |
 |----------------------|------|
-| Purely numeric (`123`) | PR |
-| URL containing `/pull/` | PR |
+| Purely numeric (`123`) | PR → `references/pr-review.md` |
+| URL containing `/pull/` | PR → `references/pr-review.md` |
 | Everything else (empty, commit, range, path) | Local |
 
-### Pre-check (local mode only)
+**PR mode**: hand off entirely to `references/pr-review.md` and stop here.
+
+### Pre-check (local mode)
 
 1. `git branch --show-current` → record whether on main/master.
 2. `git status --porcelain` → record whether uncommitted changes exist.
@@ -43,7 +42,7 @@ dialogs with selectable options for predefined choices.
 
 ### Questions — single interactive prompt
 
-**Q1 — Review priority** (always):
+**Q1 — Review priority**:
 
 Priority levels apply to both code and document review checklists.
 
@@ -55,18 +54,14 @@ Priority levels apply to both code and document review checklists.
   Code: null dereference, out-of-bounds, race conditions. Docs: factual errors,
   contradictions.
 
-**Q2 — Auto-fix threshold** (local mode only):
-
-PR mode skips Q2 — inform user that issues will be submitted as line-level PR
-comments after confirmation.
+**Q2 — Auto-fix threshold**:
 
 If on main/master or uncommitted changes exist: inform user that auto-fix is
-unavailable (uncommitted changes or protected branch), skip Q2 and enter
-review-only mode.
+unavailable (uncommitted changes or protected branch), skip Q2.
 
 Otherwise:
 
-- "Review only": report issues without fixing. Continue below.
+- "Review only": report issues without fixing.
 - "Low risk only": auto-fix only the most straightforward issues (e.g.,
   null checks, typos, naming). Confirm everything else.
   → `references/auto-fix-teams.md`.
@@ -76,20 +71,14 @@ Otherwise:
 - "Full auto": auto-fix everything. Only issues affecting test baselines are
   deferred. → `references/auto-fix-teams.md`.
 
+**Auto-fix mode**: hand off to `references/auto-fix-teams.md` and stop here.
+
 ---
 
 ## Step 2: Scope
 
-Follow `references/scope-preparation.md` for all git/gh commands, argument
-handling, and PR comment retrieval.
-
-**Uncommitted changes (review-only)**: scope is `git diff HEAD` only, ignoring
-branch commits and `$ARGUMENTS`.
-
-**Main/master (no uncommitted changes)**: scope follows normal argument handling.
-
-**PR mode**: fetch PR ref into a worktree, determine `BASE_BRANCH`, fetch diff,
-fetch existing PR review comments for de-duplication. Record `WORKTREE_DIR`.
+Follow `references/scope-preparation.md` for all git/gh commands and argument
+handling.
 
 If diff is empty → exit.
 
@@ -105,47 +94,12 @@ For each issue found:
 - Provide a code citation (file:line + snippet).
 - Self-verify by re-reading the code — confirm or withdraw.
 
-**PR comment verification** (local mode with associated PR): verify each PR
-review comment against current code. Add verified issues to the results.
+**PR comment verification** (when current branch has an associated open PR):
+verify each PR review comment against current code. Add verified issues to the
+results.
 
 ---
 
 ## Step 4: Report
 
-### Review-only mode
-
 List all confirmed issues.
-
-### PR mode
-
-Present confirmed issues to user. User selects which to submit as PR comments,
-declines are marked `skipped`.
-
-Submit as a **single** GitHub PR review with line-level comments via `gh api`.
-Do NOT use `gh pr comment` or `gh pr review`.
-
-```bash
-gh api repos/{owner}/{repo}/pulls/{number}/reviews --input - <<'EOF'
-{
-  "commit_id": "{HEAD_SHA}",
-  "event": "COMMENT",
-  "comments": [
-    {
-      "path": "relative/file/path",
-      "line": 42,
-      "side": "RIGHT",
-      "body": "Description of the issue and suggested fix"
-    }
-  ]
-}
-EOF
-```
-
-- `commit_id`: HEAD SHA of the PR branch
-- `path`: relative to repository root
-- `line`: line number in the **new** file (right side of diff)
-- `side`: always `"RIGHT"`
-- `body`: concise, in the user's conversation language, with a specific fix
-  suggestion when possible
-
-Summary of issues found / submitted / skipped. Remove worktree and temp branch.
