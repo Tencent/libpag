@@ -19,7 +19,7 @@ Four roles participate in the review-fix loop:
 
 | Role | Stance | Goal |
 |------|--------|------|
-| **Coordinator** | **Neutral** — trust no single party | Ensure all valuable issues get fixed |
+| **Coordinator** | **Neutral** — trust no single party | Orchestrate flow, arbitrate disputes, ensure all valuable issues get fixed |
 | **Reviewer** | **Thorough** — self-verify, then maximize coverage | Discover as many real issues as possible |
 | **Verifier** | **Adversarial** — default to doubting the reviewer | Filter out false positives with real evidence |
 | **Fixer** | **Precise** — fix thoroughly, do not expand scope | Apply each approved fix completely and correctly |
