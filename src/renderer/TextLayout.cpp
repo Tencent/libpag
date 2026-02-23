@@ -243,6 +243,41 @@ class TextLayoutContext {
     }
   }
 
+  static GlyphInfo CreateNewlineGlyph(Text* text, const tgfx::Font& font) {
+    auto metrics = font.getMetrics();
+    GlyphInfo gi = {};
+    gi.unichar = '\n';
+    gi.fontSize = text->fontSize;
+    gi.ascent = metrics.ascent;
+    gi.descent = metrics.descent;
+    gi.fontLineHeight = fabsf(metrics.ascent) + metrics.descent + metrics.leading;
+    gi.sourceText = text;
+    return gi;
+  }
+
+  static GlyphInfo CreateTabGlyph(Text* text, const tgfx::Font& font, float tabWidth,
+                                  float xPosition) {
+    float nextTabStop = 0;
+    if (tabWidth > 0) {
+      nextTabStop = ceilf((xPosition + 1.0f) / tabWidth) * tabWidth;
+    }
+    float tabAdvance = nextTabStop - xPosition;
+    if (tabAdvance < 0) {
+      tabAdvance = 0;
+    }
+    auto metrics = font.getMetrics();
+    GlyphInfo gi = {};
+    gi.unichar = '\t';
+    gi.advance = tabAdvance;
+    gi.xPosition = xPosition;
+    gi.fontSize = text->fontSize;
+    gi.ascent = metrics.ascent;
+    gi.descent = metrics.descent;
+    gi.fontLineHeight = fabsf(metrics.ascent) + metrics.descent + metrics.leading;
+    gi.sourceText = text;
+    return gi;
+  }
+
   void storeShapedText(Text* text, ShapedText&& shapedText) {
     if (text == nullptr || shapedText.textBlob == nullptr) {
       return;
@@ -815,41 +850,16 @@ class TextLayoutContext {
 
     for (auto& seg : segments) {
       if (seg.isNewline) {
-        auto metrics = primaryFont.getMetrics();
-        GlyphInfo gi = {};
-        gi.unichar = '\n';
-        gi.fontSize = text->fontSize;
-        gi.ascent = metrics.ascent;
-        gi.descent = metrics.descent;
-        gi.fontLineHeight = fabsf(metrics.ascent) + metrics.descent + metrics.leading;
-        gi.sourceText = text;
-        info.allGlyphs.push_back(gi);
+        info.allGlyphs.push_back(CreateNewlineGlyph(text, primaryFont));
         currentX = 0;
         currentTypeface = nullptr;
         continue;
       }
 
       if (seg.isTab) {
-        float nextTabStop = 0;
-        if (tabWidth > 0) {
-          nextTabStop = ceilf((currentX + 1.0f) / tabWidth) * tabWidth;
-        }
-        float tabAdvance = nextTabStop - currentX;
-        if (tabAdvance < 0) {
-          tabAdvance = 0;
-        }
-        GlyphInfo gi = {};
-        gi.unichar = '\t';
-        gi.advance = tabAdvance;
-        gi.xPosition = currentX;
-        gi.fontSize = text->fontSize;
-        auto metrics = primaryFont.getMetrics();
-        gi.ascent = metrics.ascent;
-        gi.descent = metrics.descent;
-        gi.fontLineHeight = fabsf(metrics.ascent) + metrics.descent + metrics.leading;
-        gi.sourceText = text;
-        info.allGlyphs.push_back(gi);
-        currentX += tabAdvance;
+        auto tabGlyph = CreateTabGlyph(text, primaryFont, tabWidth, currentX);
+        currentX += tabGlyph.advance;
+        info.allGlyphs.push_back(std::move(tabGlyph));
         currentTypeface = nullptr;
         continue;
       }
@@ -957,15 +967,7 @@ class TextLayoutContext {
       // Handle newline: store font metrics so \n participates in line metrics calculation
       // when it becomes the leading cluster of the next line.
       if (unichar == '\n') {
-        auto metrics = primaryFont.getMetrics();
-        GlyphInfo gi = {};
-        gi.unichar = '\n';
-        gi.fontSize = text->fontSize;
-        gi.ascent = metrics.ascent;
-        gi.descent = metrics.descent;
-        gi.fontLineHeight = fabsf(metrics.ascent) + metrics.descent + metrics.leading;
-        gi.sourceText = text;
-        info.allGlyphs.push_back(gi);
+        info.allGlyphs.push_back(CreateNewlineGlyph(text, primaryFont));
         currentX = 0;
         currentTypeface = nullptr;
         continue;
@@ -974,26 +976,9 @@ class TextLayoutContext {
       // Handle tab character.
       if (unichar == '\t') {
         float tabWidth = text->fontSize * 4;
-        float nextTabStop = 0;
-        if (tabWidth > 0) {
-          nextTabStop = ceilf((currentX + 1.0f) / tabWidth) * tabWidth;
-        }
-        float tabAdvance = nextTabStop - currentX;
-        if (tabAdvance < 0) {
-          tabAdvance = 0;
-        }
-        GlyphInfo gi = {};
-        gi.unichar = '\t';
-        gi.advance = tabAdvance;
-        gi.xPosition = currentX;
-        gi.fontSize = text->fontSize;
-        auto metrics = primaryFont.getMetrics();
-        gi.ascent = metrics.ascent;
-        gi.descent = metrics.descent;
-        gi.fontLineHeight = fabsf(metrics.ascent) + metrics.descent + metrics.leading;
-        gi.sourceText = text;
-        info.allGlyphs.push_back(gi);
-        currentX += tabAdvance;
+        auto tabGlyph = CreateTabGlyph(text, primaryFont, tabWidth, currentX);
+        currentX += tabGlyph.advance;
+        info.allGlyphs.push_back(std::move(tabGlyph));
         currentTypeface = nullptr;
         continue;
       }
