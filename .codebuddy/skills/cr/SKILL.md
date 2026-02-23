@@ -19,23 +19,27 @@ PR review comments instead of direct commits.
 Main path: Phase 0 → 1 → [Round: 2 → 3 → 4 → 5 → 6] → 7 → 8 (exit)
 ```
 
-**Phase 3 routing (PR mode)** — PR mode always runs exactly one round (no iteration):
-- All issues → `PENDING_FILE`, skip Phase 4-6
-- If `PENDING_FILE` has entries → Phase 7; otherwise → Phase 8
+The multi-round loop exists primarily to **discover missed issues** — each round is a
+fresh review from a new perspective. In local mode, fixes between rounds also allow
+detecting newly introduced problems, but that is a secondary benefit.
+
+**Phase 3 routing (PR mode)**:
+- All confirmed issues → `PENDING_FILE`, skip Phase 4-5 → Phase 6
 
 **Phase 3 routing (local mode)**:
 - Auto-fix queue not empty → Phase 4
 - Auto-fix queue empty → Phase 6 (which routes to Phase 7 or 8)
 
 **Phase 6 routing (single authority for loop/exit)**:
-- Commits produced → Phase 2 (new round)
-- No commits, `PENDING_FILE` not empty → Phase 7
-- No commits, `PENDING_FILE` empty → Phase 8
+- New confirmed issues were found this round → Phase 2 (new round)
+- No new issues, `PENDING_FILE` not empty → Phase 7
+- No new issues, `PENDING_FILE` empty → Phase 8
 - Cycle detected (see Phase 6 for criteria) → Phase 7 or Phase 8
 
 **Phase 7 routing**:
-- User approves fix(es) → Phase 4 (then normal 4 → 5 → 6 routing)
-- User skips all → Phase 8
+- **Local mode**: user approves fix(es) → Phase 4 (then normal 4 → 5 → 6 routing);
+  user skips all → Phase 8
+- **PR mode**: submit selected issues as line-level PR comments → Phase 8
 
 ## Roles
 
@@ -207,8 +211,10 @@ These apply to every round including the first:
 
 - **Fixed scope**: the diff content, file list, and module partitioning are determined
   once in Phase 1. Do not re-run `git diff` or re-partition modules in any round.
-- **Independent review**: reviewers receive no information about previous rounds' fixes,
-  issues, or outcomes. Each round is a fresh, unbiased review of the full scope.
+- **Independent review**: reviewers receive no information about previous rounds'
+  findings, fixes, or outcomes. Each round is a fresh, unbiased review of the full
+  scope — this is by design, so that different perspectives can catch issues missed in
+  earlier rounds.
 - **Cross-round exclusion (coordinator only)**: after collecting reviewer results, the
   coordinator skips issues already recorded in `PENDING_FILE` or rejected by the user
   in a previous Phase 7. Do **not** pass this exclusion list to reviewers — they review
@@ -312,8 +318,8 @@ The user's chosen auto-fix threshold determines handling for each fixable issue:
 
 ### Mode-specific routing
 
-- **PR mode**: all issues are recorded to `PENDING_FILE`. Skip Phase 4-6.
-  If `PENDING_FILE` is empty -> Phase 8; otherwise -> Phase 7.
+- **PR mode**: all confirmed issues are recorded to `PENDING_FILE`. Skip Phase 4-5
+  and go directly to Phase 6 (which decides whether to start a new round or exit).
 - **Local mode**: if no auto-fix issues remain, skip Phase 4-5 and go to Phase 6
   (which routes to Phase 7 or Phase 8 based on `PENDING_FILE` state).
 
@@ -380,20 +386,22 @@ won't be reported again in subsequent rounds.
 
 This phase is the **single routing authority** for the review-fix loop.
 
-Count the commits produced during this round (Phase 4 → 5).
-
-- **Commits produced**:
-  -> Back to **Phase 2** for a new round (fresh review).
-- **No commits produced AND `PENDING_FILE` has entries**:
+Determine whether this round made meaningful progress:
+- **New confirmed issues were found this round** (issues that passed Phase 3 existence
+  check and were not de-duplicated away — regardless of whether they were auto-fixed
+  or recorded to `PENDING_FILE`):
+  -> Back to **Phase 2** for a new round (fresh review to find further missed issues).
+- **No new issues AND `PENDING_FILE` has entries**:
   -> **Phase 7** (Confirm).
-- **No commits produced AND `PENDING_FILE` is empty**:
+- **No new issues AND `PENDING_FILE` is empty**:
   -> **Phase 8** (Report & Exit).
 
 **Cycle detection**: before starting a new round, check whether the loop is making
 meaningful progress. Force exit to Phase 7/8 if any of these apply:
 - The same files and issue types keep appearing across consecutive rounds with no net
-  reduction in issues (fix A introduces B, fix B reintroduces A).
-- Multiple consecutive rounds produce only reverted commits (all fixes fail validation).
+  reduction in issues.
+- Multiple consecutive rounds produce only reverted commits (all fixes fail validation)
+  and no new issues are found beyond those already in `PENDING_FILE`.
 
 When forcing exit, go to Phase 7 if `PENDING_FILE` has entries, otherwise Phase 8.
 
@@ -401,10 +409,10 @@ When forcing exit, go to Phase 7 if `PENDING_FILE` has entries, otherwise Phase 
 
 ## Phase 7: Remaining Issue Confirmation
 
-Collect all issues from `PENDING_FILE` that were not auto-fixed during the loop.
-Each issue has a reason explaining why it was deferred (e.g., above threshold, fix
-failed, rolled back). Deduplicate and present to the user. If the file is empty,
-skip to Phase 8.
+Collect all issues from `PENDING_FILE` that have not been resolved during the loop
+(in PR mode: all confirmed issues across rounds; in local mode: issues above threshold,
+failed fixes, rolled-back fixes). Deduplicate and present to the user. If the file is
+empty, skip to Phase 8.
 
 1. Present issues in a compact numbered list. Each entry should fit on one line:
    `[number] [file:line] [risk] [reason] — [description]`
