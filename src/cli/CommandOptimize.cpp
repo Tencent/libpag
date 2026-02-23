@@ -654,48 +654,45 @@ static int RemoveFullCanvasClipMasks(PAGXDocument* document, const std::vector<L
 
 // --- Optimization #7: Remove off-canvas layers ---
 
-static int RemoveOffCanvasLayers(PAGXDocument* document) {
-  auto rootLayer = LayerBuilder::Build(document);
-  if (rootLayer == nullptr) {
-    return 0;
-  }
-  auto canvasRect = tgfx::Rect::MakeWH(document->width, document->height);
-  auto& rootChildren = rootLayer->children();
-  if (rootChildren.size() != document->layers.size()) {
-    return 0;
-  }
-  std::unordered_set<const Layer*> maskedLayers = {};
-  CollectMaskReferences(document->layers, maskedLayers);
-  std::unordered_set<size_t> indicesToRemove = {};
-  for (size_t i = 0; i < document->layers.size(); i++) {
-    auto* pagxLayer = document->layers[i];
-    if (!pagxLayer->visible) {
-      continue;
-    }
-    if (maskedLayers.find(pagxLayer) != maskedLayers.end()) {
-      continue;
-    }
-    if (!pagxLayer->styles.empty() || !pagxLayer->filters.empty()) {
-      continue;
-    }
-    auto tgfxChild = rootChildren[i];
-    auto bounds = tgfxChild->getBounds(nullptr, true);
-    if (!tgfx::Rect::Intersects(bounds, canvasRect)) {
-      indicesToRemove.insert(i);
-    }
-  }
-  if (indicesToRemove.empty()) {
-    return 0;
-  }
-  auto& layers = document->layers;
+static int RemoveOffCanvasChildren(
+    const std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>>& layerMap,
+    const std::unordered_set<const Layer*>& maskedLayers, const tgfx::Rect& canvasRect,
+    std::vector<Layer*>& layers) {
+  int count = 0;
   size_t writeIndex = 0;
   for (size_t i = 0; i < layers.size(); i++) {
-    if (indicesToRemove.find(i) == indicesToRemove.end()) {
+    auto* pagxLayer = layers[i];
+    bool shouldRemove = false;
+    if (pagxLayer->visible && maskedLayers.find(pagxLayer) == maskedLayers.end() &&
+        pagxLayer->styles.empty() && pagxLayer->filters.empty()) {
+      auto it = layerMap.find(pagxLayer);
+      if (it != layerMap.end()) {
+        auto bounds = it->second->getBounds(nullptr, true);
+        if (!tgfx::Rect::Intersects(bounds, canvasRect)) {
+          shouldRemove = true;
+        }
+      }
+    }
+    if (shouldRemove) {
+      count++;
+    } else {
+      count += RemoveOffCanvasChildren(layerMap, maskedLayers, canvasRect, pagxLayer->children);
       layers[writeIndex++] = layers[i];
     }
   }
   layers.resize(writeIndex);
-  return static_cast<int>(indicesToRemove.size());
+  return count;
+}
+
+static int RemoveOffCanvasLayers(PAGXDocument* document) {
+  auto result = LayerBuilder::BuildWithMap(document);
+  if (result.root == nullptr) {
+    return 0;
+  }
+  auto canvasRect = tgfx::Rect::MakeWH(document->width, document->height);
+  std::unordered_set<const Layer*> maskedLayers = {};
+  CollectMaskReferences(document->layers, maskedLayers);
+  return RemoveOffCanvasChildren(result.layerMap, maskedLayers, canvasRect, document->layers);
 }
 
 // --- Optimization #8: Localize coordinates ---
