@@ -186,9 +186,26 @@ Partition files in scope into **review modules** for parallel review.
   group; group related small files together. Balance workload across reviewers.
 - Classify each module as `code`, `doc`, or `mixed` to determine which checklist to use.
 
-The scope (diff content, file list, module partitioning) determined here is **fixed for
-all rounds**. Subsequent rounds reuse the same scope without re-running diff or
-re-partitioning.
+The scope determined here is persisted in the session file (see 1.4) and reused by
+all subsequent rounds.
+
+### 1.4 Persist Session State
+
+Write a session file to `.cr-cache/session.md` containing all information that must
+survive across rounds (context may be truncated in long sessions):
+
+- **Mode**: PR or Local
+- **User choices**: review priority, auto-fix threshold
+- **PR metadata** (PR mode): PR number, `HEAD_SHA`, `BASE_BRANCH`, `PR_BRANCH`,
+  `WORKTREE_DIR` (if created)
+- **Scope**: file list with module assignments and types (code/doc/mixed)
+- **Diff summary**: for each file, the range of changed lines (not the full diff —
+  reviewers will read files themselves)
+- **Build/test commands**: the commands used for baseline validation
+- **PENDING_FILE path**: the chosen path
+
+This file is read at the start of each round to restore context. Update it when
+state changes (e.g., after Confirm when the user rejects issues).
 
 **Next**: enter the review-fix loop starting with Review.
 
@@ -200,8 +217,8 @@ re-partitioning.
 
 These apply to every round including the first:
 
-- **Fixed scope**: the diff content, file list, and module partitioning are determined
-  once in Scope. Do not re-run `git diff` or re-partition modules in any round.
+- **Scope from session file**: at the start of each round, read `.cr-cache/session.md`
+  to restore the file list, module partitioning, and other session state.
 - **Independent review**: reviewers receive no information about previous rounds'
   findings, fixes, or outcomes. Each round is a fresh, unbiased review of the full
   scope — this is by design, so that different perspectives can catch issues missed in
@@ -459,8 +476,8 @@ git worktree remove {WORKTREE_DIR}
 git branch -D pr-{number}
 ```
 
-Delete `PENDING_FILE`. If `.cr-cache/` contains no other files, remove the directory
-as well.
+Delete `PENDING_FILE` and `.cr-cache/session.md`. If `.cr-cache/` contains no other
+files, remove the directory as well.
 
 ---
 
