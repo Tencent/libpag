@@ -56,10 +56,9 @@ Each round is a fresh review from a new perspective. PR mode and local mode shar
 the same loop — PR mode skips Fix and Validate (no code modifications) and outputs
 line-level PR comments instead of commits at the end.
 
-**No-commit mode** (Q2 = "Continue without committing"): auto-fix is disabled,
-fixers run serially (one issue at a time, no parallel), and fixes are not
-committed. Phase 7 Confirm drives the loop — each approved issue is fixed
-immediately before presenting the next.
+**Review-only mode** (Q2 = "Review only (uncommitted changes)"): only runs
+Review → Filter → Report. No fixing, no commits. The user can request fixes
+for specific issues in follow-up conversation.
 
 ---
 
@@ -94,21 +93,22 @@ Priority levels apply to both code and document review checklists.
 
 **Q2 — Uncommitted changes** (local mode, only if 0.2 found changes):
 
-Explain to user: auto-fix requires a clean working tree so fix commits can be
-isolated. If you choose not to commit, all issues will require manual
-confirmation before each fix.
+Explain to user: uncommitted changes detected. Two options — commit first to
+enable auto-fix and review the full branch, or skip commit to review only the
+uncommitted changes (auto-fix unavailable, issues reported without fixing).
 
 - "Commit and continue": commit all uncommitted changes with a message
-  describing the actual changes. The commit is included in the review scope.
-- "Continue without committing": skip commit, disable auto-fix for this
-  session — every issue will be presented for confirmation before fixing.
+  describing the actual changes. Review scope = full branch diff.
+- "Review only (uncommitted changes)": skip commit, review only uncommitted
+  changes. Issues are reported but not fixed — you can request fixes for
+  specific issues afterwards.
 - "Abort": stop and let the user handle changes manually.
 
 If Q2 = Abort → stop.
 
-**Q3 — Auto-fix threshold** (skip if PR mode or Q2 = "Continue without
-committing"; add note for PR mode: "PR mode — issues submitted as line-level
-PR comments after confirmation"):
+**Q3 — Auto-fix threshold** (skip if PR mode or review-only mode; add note
+for PR mode: "PR mode — issues submitted as line-level PR comments after
+confirmation"):
 
 Pre-select option 1 as default.
 
@@ -141,8 +141,8 @@ Pre-select option 1 as default.
 Follow `references/scope-preparation.md` for all git/gh commands, argument
 handling, and PR comment retrieval.
 
-**No-commit mode**: scope is uncommitted changes only (`git diff HEAD`), ignoring
-branch commits. Skip recent-fix context since there are no prior `/cr` commits.
+**Review-only mode**: scope is uncommitted changes only (`git diff HEAD`),
+ignoring branch commits.
 
 **Normal local mode**: also read git log since upstream for recent-fix context
 (coordinator only — avoid re-flagging issues a previous `/cr` session already
@@ -277,10 +277,11 @@ Consult `references/judgment-matrix.md` for worth-fixing criteria and special ru
 
 ### 3.3 Route
 
-If Q2 = "Continue without committing": skip the threshold table — all issues go
-to CR_STATE_FILE as `pending` → Phase 6.
+**Review-only mode**: record all to CR_STATE_FILE → Phase 8 (skip fix loop).
 
-Otherwise:
+**PR mode**: record all to CR_STATE_FILE → Phase 6.
+
+**Normal local mode**:
 
 | Risk vs user threshold | → |
 |------------------------|---|
@@ -291,9 +292,7 @@ Otherwise:
   outside the fixer's module, create a follow-up fix task.
 - Previously rolled-back issues: do not attempt again this round.
 
-**PR mode**: record all to CR_STATE_FILE → Phase 6.
-**Local, fix queue non-empty** → Phase 4.
-**Local, fix queue empty** → Phase 6.
+Fix queue non-empty → Phase 4. Fix queue empty → Phase 6.
 
 ---
 
@@ -307,16 +306,11 @@ Each fixer sub-agent receives:
 - Fix approach from `Proposed` field (Medium/High risk)
 - `references/fixer-instructions.md` verbatim
 
-**Normal mode**: launch one fixer per issue or file group, all in the background.
+Launch one fixer sub-agent per issue or file group, all in the background.
 Each fixer commits per issue (one commit per fix). Assignment strategy:
 - Group issues by file to minimize concurrent edit conflicts
 - Cross-file issues or multi-file renames → single atomic task to one fixer
 - Multiple fixers can run in parallel on different files
-
-**No-commit mode**: launch one fixer sub-agent at a time, serially. Fixer does
-NOT commit. After each fixer finishes → run Validate (Phase 5) immediately
-before proceeding to the next issue. Still MUST use a sub-agent — the
-coordinator MUST NOT apply fixes directly, even for simple ones.
 
 → Phase 5
 
@@ -328,12 +322,10 @@ Wait for all fixers. Run build + test.
 
 - Skip if no build/test commands available (warned in 1.3) or doc-only modules.
 - **Pass** → mark issues `fixed` in CR_STATE_FILE → Phase 6.
-- **Fail (normal mode)** → bisect to find the failing commit, revert it,
-  re-validate remaining before blaming others (one bad commit may cause
-  cascading failures). Per failing issue: retry via new fixer sub-agent with
-  failure details (max 2 retries), or revert and mark `failed`.
-- **Fail (no-commit mode)** → the single fix just applied is the cause. Undo
-  the file changes, mark `failed`, and return to Phase 7 for the next issue.
+- **Fail** → bisect to find the failing commit, revert it, re-validate
+  remaining before blaming others (one bad commit may cause cascading failures).
+  Per failing issue: retry via new fixer sub-agent with failure details (max 2
+  retries), or revert and mark `failed`.
 
 → Phase 6
 
@@ -363,13 +355,9 @@ file path within each group:
 (see `references/pr-comment-format.md`). Do NOT use `gh pr comment` or
 `gh pr review`. → Phase 8.
 
-**Local mode (normal)**: mark selected `approved`, declined `skipped`. Send
-approved to Fix → Validate → Continue? (which routes to a new Review round for
-regression check). All skipped → Phase 8.
-
-**Local mode (no-commit)**: present issues one at a time. For each: user
-approves → Fix (Phase 4, serial) → Validate (Phase 5) → next issue. User
-skips → mark `skipped` → next issue. After all issues processed → Phase 8.
+**Local mode**: mark selected `approved`, declined `skipped`. Send approved to
+Fix → Validate → Continue? (which routes to a new Review round for regression
+check). All skipped → Phase 8.
 
 ---
 
