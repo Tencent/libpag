@@ -27,26 +27,6 @@
 
 namespace pagx::cli {
 
-static void CollectValidationError(void* context, const char* format, ...) {
-  auto* errors = static_cast<std::vector<ValidationError>*>(context);
-  char buffer[4096] = {};
-  va_list args;
-  va_start(args, format);
-  vsnprintf(buffer, sizeof(buffer), format, args);
-  va_end(args);
-  std::string msg(buffer);
-  // Remove trailing newline
-  while (!msg.empty() && msg.back() == '\n') {
-    msg.pop_back();
-  }
-  if (msg.empty()) {
-    return;
-  }
-  ValidationError error = {};
-  error.message = std::move(msg);
-  errors->push_back(std::move(error));
-}
-
 static void CollectStructuredError(void* context, xmlErrorPtr xmlError) {
   if (xmlError == nullptr) {
     return;
@@ -165,7 +145,6 @@ std::vector<ValidationError> ValidateFile(const std::string& filePath) {
     return errors;
   }
 
-  xmlSchemaSetValidErrors(validCtxt, CollectValidationError, CollectValidationError, &errors);
   xmlSchemaSetValidStructuredErrors(validCtxt, CollectStructuredError, &errors);
   xmlSchemaValidateDoc(validCtxt, doc);
 
