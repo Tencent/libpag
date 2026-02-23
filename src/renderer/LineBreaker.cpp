@@ -297,14 +297,14 @@ static constexpr size_t RangeCount = sizeof(Ranges) / sizeof(Ranges[0]);
 // We keep the source table sorted manually and verify in debug builds.
 // ---------------------------------------------------------------------------
 
-LineBreakClass LineBreaker::GetLineBreakClass(int32_t c) {
+LineBreakClass LineBreaker::GetLineBreakClass(int32_t unichar) {
   size_t lo = 0;
   size_t hi = RangeCount;
   while (lo < hi) {
     auto mid = lo + (hi - lo) / 2;
-    if (c > Ranges[mid].end) {
+    if (unichar > Ranges[mid].end) {
       lo = mid + 1;
-    } else if (c < Ranges[mid].start) {
+    } else if (unichar < Ranges[mid].start) {
       hi = mid;
     } else {
       return Ranges[mid].lbClass;
@@ -357,14 +357,14 @@ static const CJKRange CJKRanges[] = {
 
 static constexpr size_t CJKRangeCount = sizeof(CJKRanges) / sizeof(CJKRanges[0]);
 
-bool LineBreaker::IsCJK(int32_t c) {
+bool LineBreaker::IsCJK(int32_t unichar) {
   size_t lo = 0;
   size_t hi = CJKRangeCount;
   while (lo < hi) {
     auto mid = lo + (hi - lo) / 2;
-    if (c > CJKRanges[mid].end) {
+    if (unichar > CJKRanges[mid].end) {
       lo = mid + 1;
-    } else if (c < CJKRanges[mid].start) {
+    } else if (unichar < CJKRanges[mid].start) {
       hi = mid;
     } else {
       return true;
@@ -373,8 +373,8 @@ bool LineBreaker::IsCJK(int32_t c) {
   return false;
 }
 
-bool LineBreaker::IsWhitespace(int32_t c) {
-  return c == ' ' || c == '\t' || c == 0x00A0 || c == 0x3000;
+bool LineBreaker::IsWhitespace(int32_t unichar) {
+  return unichar == ' ' || unichar == '\t' || unichar == 0x00A0 || unichar == 0x3000;
 }
 
 bool LineBreaker::CanBreakBetween(int32_t prevChar, int32_t nextChar) {
