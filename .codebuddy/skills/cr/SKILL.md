@@ -16,37 +16,25 @@ commits.
 ## Flow
 
 ```
-  ┌─────────────────────────────── Round N ──────────────────────────────┐
-  │                                                                      │
-  │  Phase 2       Phase 3       Phase 4       Phase 5       Phase 6     │
-  │  Review ──────> Filter ──────> Fix ────────> Validate ───> Decide    │
-  │                                ^                             │       │
-  └────────────────────────────────│─────────────────────────────│───────┘
-                                   │                             │
-Phase 0 ──> Phase 1 ──> ┌─────────│──── Phase 6 exit routes ───┘
-  Setup       Scope      │         │
-                         │         │  1. commits produced, round < 100
-                         │         │     -> back to Phase 2 (new round)
-                         │         │
-                         │         │  2. no commits, PENDING_FILE not empty
-                         │         │     -> Phase 7 (Confirm)
-                         │         │
-                         │         │  3. no commits, PENDING_FILE empty
-                         │         │     -> Phase 8 (Report & Exit)
-                         │         │
-                         │    Phase 7: Confirm
-                         │      user approves fix(es) -> Phase 4 (Fix)
-                         │      user skips all ──────────> Phase 8
-                         │                                   │
-                         └───────── Phase 4 -> 5 -> 6 ───────┘
-                                    (normal Decide routing)
-
-  Phase 8: Report & Exit
+Main path: Phase 0 → 1 → [Round: 2 → 3 → 4 → 5 → 6] → 7 → 8 (exit)
 ```
 
-**Phase 6 (Decide) is the single routing authority.** All loop/exit decisions are
-made there. Phase 7 (Confirm) feeds back into the loop via Phase 4 → 5 → 6.
-Safety valve: max 100 rounds before forcing exit to Phase 7/8.
+**Phase 3 routing (PR mode)**:
+- All issues → `PENDING_FILE`, skip Phase 4-6 → Phase 7 (if PENDING) or Phase 8
+
+**Phase 3 routing (local mode)**:
+- Auto-fix queue not empty → Phase 4
+- Auto-fix queue empty → Phase 6 (which routes to Phase 7 or 8)
+
+**Phase 6 routing (single authority for loop/exit)**:
+- Commits produced, round < 100 → Phase 2 (new round)
+- No commits, `PENDING_FILE` not empty → Phase 7
+- No commits, `PENDING_FILE` empty → Phase 8
+- Max 100 rounds reached → Phase 7 (if `PENDING_FILE` not empty) or Phase 8
+
+**Phase 7 routing**:
+- User approves fix(es) → Phase 4 (then normal 4 → 5 → 6 routing)
+- User skips all → Phase 8
 
 ## Roles
 
@@ -112,6 +100,8 @@ selectable options rather than plain text. The user may send additional material
 | Pending issue template | `references/pending-templates.md` |
 | Fixer agent instructions | `references/fixer-instructions.md` |
 | PR review comment format | `references/pr-comment-format.md` |
+| User questions (Phase 0 options) | `references/user-questions.md` |
+| Scope preparation commands (Phase 1.2) | `references/scope-preparation.md` |
 
 ---
 
@@ -120,48 +110,21 @@ selectable options rather than plain text. The user may send additional material
 ### 0.1 Mode detection (pure string parsing, no tools)
 
 Parse `$ARGUMENTS` to determine the review mode:
-- Purely numeric or URL (contains `/`) -> **PR mode**
-- Everything else (empty, commit-like, paths, `..` range) -> **Local mode**
+- Purely numeric (e.g., `123`) -> **PR mode** (PR number)
+- URL containing a PR path (e.g., `github.com/.../pull/123`) -> **PR mode**
+- Everything else (empty, commit-like, file/directory paths, `..` range) -> **Local mode**
 
 ### 0.2 Ask questions
 
 **STOP. Do NOT call any tools (Bash, Read, Glob, Grep, Task, etc.) before receiving
 user answers.** The questions below do not depend on any repository state.
 
-Present all applicable questions in **one AskUserQuestion call**.
+Present all applicable questions in **one AskUserQuestion call**. See
+`references/user-questions.md` for the full question definitions and option details.
 
-#### Question 1 — Review priority
-
-Always show. When the scope turns out to be doc-only (determined later in Phase 1
-module partitioning), all priority levels (A+B+C) are used regardless of the user's
-choice.
-
-(code/mixed modules):
-- Option 1 — "Full review (A + B + C)": correctness, refactoring, and conventions.
-  e.g., null checks, duplicate code extraction, naming style, comment quality.
-- Option 2 — "Correctness + optimization (A + B)": skip conventions and documentation.
-  e.g., null checks, resource leaks, duplicate code, unnecessary copies.
-- Option 3 — "Correctness only (A)": only safety and correctness issues.
-  e.g., null dereference, out-of-bounds, resource leaks, race conditions.
-
-#### Question 2 — Auto-fix threshold (skip in PR mode)
-
-In PR mode, add a note alongside Q1: "PR mode — issues will be submitted as PR
-review comments after your review."
-
-Option 1 should be pre-selected as the default.
-
-- Option 1 — "Low + Medium risk (recommended)": auto-fix unambiguous fixes and clear
-  cross-location refactors (e.g., null checks, naming, extract shared logic,
-  remove unused internals). Confirm high-risk issues.
-- Option 2 — "Low risk only": auto-fix only fixes with a single correct approach
-  (e.g., null checks, comment typos, naming, `reserve`). Confirm anything whose
-  impact extends beyond the immediate locality.
-- Option 3 — "All confirm": no auto-fix, confirm every issue before any change.
-- Option 4 — "Full auto (risky)": auto-fix all risk levels, autonomously deciding
-  fix approach for high-risk issues (e.g., API changes, architecture restructuring,
-  algorithm trade-offs). Only issues affecting test baselines are deferred for
-  confirmation.
+- **Question 1 — Review priority** (always show): A+B+C / A+B / A only
+- **Question 2 — Auto-fix threshold** (skip in PR mode): Low+Medium / Low only /
+  All confirm / Full auto
 
 After all questions are answered, no further user interaction until Phase 7 (except
 when a previously failed issue fails again in Phase 5, which prompts the user inline).
@@ -198,62 +161,14 @@ suffix (`-2`, `-3`, …) until an unused name is found. Record the chosen path a
 
 ### 1.2 Scope Preparation
 
-Validate arguments and fetch the actual diff/content.
+See `references/scope-preparation.md` for detailed commands and argument handling
+for both PR mode and local mode.
 
-**PR mode**:
-
-1. **Fetch PR metadata**:
-   ```
-   gh pr view {number} --json headRefName,baseRefName,headRefOid,state
-   ```
-   Extract: `PR_BRANCH`, `BASE_BRANCH`, `HEAD_SHA`, `STATE`.
-   If the command fails (gh not installed, not authenticated, PR not found, or URL
-   repo mismatch), inform the user and abort.
-   If `STATE` is not `OPEN`, inform the user and exit.
-
-2. **Prepare working directory**:
-   - If current branch equals `PR_BRANCH` -> use current directory directly.
-   - Otherwise -> create a worktree:
-     ```
-     git fetch origin pull/{number}/head:pr-{number}
-     git worktree add /tmp/pr-review-{number} pr-{number}
-     ```
-     All subsequent operations use the worktree directory. Record `WORKTREE_DIR` for
-     cleanup in Phase 8.
-
-3. **Set review scope**: diff against `BASE_BRANCH`.
-   ```
-   git fetch origin {BASE_BRANCH}
-   git diff $(git merge-base origin/{BASE_BRANCH} HEAD)
-   ```
-
-4. **Fetch existing PR review comments** for de-duplication in Phase 3:
-   ```
-   gh api repos/{owner}/{repo}/pulls/{number}/comments
-   ```
-   Store as `EXISTING_PR_COMMENTS` for later comparison.
-
-**Local mode** — validate arguments and fetch diff:
-
-- Empty arguments: determine the base branch from the current branch's upstream
-  tracking branch. If no upstream, fall back to `main` (or `master`). Fetch the
-  branch diff.
-- Commit hash: validate with `git rev-parse --verify`, then `git show`.
-- Commit range: validate both endpoints, then fetch the range diff.
-- File/directory paths: verify all paths exist on disk, then read file contents.
-
-**Local mode — associated PR comments** (optional, best-effort):
-If `gh` is available, check whether the current branch has an open PR:
-```
-gh pr view --json number,state --jq 'select(.state == "OPEN") | .number' 2>/dev/null
-```
-If an open PR exists, fetch its line-level review comments:
-```
-gh api repos/{owner}/{repo}/pulls/{number}/comments
-```
-These are used in Phase 3 as reference information — each comment is verified against
-the actual code to confirm the issue still exists before being treated as a known
-issue to fix.
+Key steps:
+- **PR mode**: fetch PR metadata, prepare worktree if needed, diff against base
+  branch, fetch existing PR comments for de-duplication.
+- **Local mode**: validate arguments (empty/commit/range/path), fetch diff. Optionally
+  fetch associated PR comments if `gh` is available.
 
 **Empty scope check**: if the diff is empty or the PR has no file changes, inform the
 user that there is nothing to review and exit.
@@ -318,6 +233,10 @@ includes:
 Verification runs as a **pipeline** — do not wait for all reviewers to finish. As
 soon as any reviewer reports issues, launch verifiers to challenge them. Each issue
 gets its own independent verifier (can run in parallel).
+
+**Verifier failure/timeout**: if a verifier fails to return a result (timeout, error,
+invalid output), the coordinator reads the cited code and makes the existence judgment
+directly — treat it as if the verifier were absent for that issue.
 
 Verifier context:
 
@@ -441,6 +360,9 @@ Coordinator collects skipped issues and records them to `PENDING_FILE`.
 
 **All pass** (or no code modules to validate) -> Phase 6.
 
+**Commit counting**: only commits that survive validation count as "commits produced"
+for Phase 6 routing. Reverted commits do not count.
+
 **Failures**: identify the failing commit (bisect if multiple commits, direct revert
 if only one), revert it, and send failure info to a new fixer for retry (max 2
 retries). If still failing, revert and record to `PENDING_FILE`. If the issue was
@@ -461,8 +383,10 @@ Count the commits produced during this round (Phase 4 → 5).
   -> Back to **Phase 2** for a new round (fresh review).
 - **No commits produced AND `PENDING_FILE` has entries**:
   -> **Phase 7** (Confirm).
-- **No commits produced AND `PENDING_FILE` is empty** (or max 100 rounds reached):
+- **No commits produced AND `PENDING_FILE` is empty**:
   -> **Phase 8** (Report & Exit).
+- **Max 100 rounds reached**:
+  -> **Phase 7** if `PENDING_FILE` has entries, otherwise **Phase 8**.
 
 ---
 

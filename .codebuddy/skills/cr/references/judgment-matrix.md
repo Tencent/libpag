@@ -1,12 +1,14 @@
 # Judgment Matrix
 
-Team-lead uses this matrix in Phase 4 to decide whether each confirmed issue should be
-auto-fixed, recorded to `PENDING_FILE` for user confirmation, or skipped entirely.
+The coordinator uses this matrix in Phase 3 to decide whether each confirmed issue
+should be auto-fixed, recorded to `PENDING_FILE` for user confirmation, or skipped
+entirely.
 
 ## Risk Level Assessment
 
-For each confirmed issue, the team-lead assigns a risk level that determines how it is
-handled. The user's chosen auto-fix threshold controls which risk levels are auto-fixed.
+For each confirmed issue, the coordinator assigns a risk level that determines how it
+is handled. The user's chosen auto-fix threshold controls which risk levels are
+auto-fixed.
 
 **Low risk**: the fix is the only correct approach — any experienced developer would
 agree without discussion.
@@ -22,7 +24,7 @@ the code author or owner should weigh in.
   optimization involving space-time trade-offs
 
 **Medium risk**: the fix approach is clear but the impact extends beyond the immediate
-locality — the team-lead has enough context to judge, but it is not as self-evident as
+locality — the coordinator has enough context to judge, but it is not as self-evident as
 low risk.
 - Examples: extracting shared logic across functions, removing unused internal methods,
   simplifying cross-function control flow, adjusting internal module boundaries
