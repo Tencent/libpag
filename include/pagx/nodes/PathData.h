@@ -128,7 +128,7 @@ class PathData : public Node {
 
   /**
    * Copies only the path data (verbs and points) from another PathData, without affecting the Node
-   * base class fields (id, customData).
+   * base class fields (id).
    */
   void setPathData(const PathData& other);
 
