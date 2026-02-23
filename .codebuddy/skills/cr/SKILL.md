@@ -330,9 +330,9 @@ Wait for all fixers. Run build + test.
 | Condition | → |
 |-----------|---|
 | New confirmed issues this round | Phase 2 (new review round) |
+| Arriving from Validate (Phase 5) | Phase 2 (regression review round) |
 | No new issues, review-only mode | Phase 8 |
 | No new issues, PR mode | Phase 7 |
-| No new issues, auto-fix with fix queue non-empty | Phase 4 |
 | No new issues, auto-fix with `pending` or `failed` | Phase 7 |
 | Otherwise | Phase 8 |
 
