@@ -176,7 +176,72 @@ class TextLayoutContext {
     bool paragraphRTL = false;
   };
 
+  // A segment of text split by newlines and tabs for shaping.
+  struct TextSegment {
+    size_t start = 0;
+    size_t length = 0;
+    bool isNewline = false;
+    bool isTab = false;
+#ifdef PAG_BUILD_PAGX
+    uint8_t bidiLevel = 0;
+#endif
+  };
+
   using FontKey = TextLayout::FontKey;
+
+  // Splits a text range into segments by newlines and tabs, appending to the output vector.
+  static void SplitTextSegments(const std::string& content, size_t rangeStart, size_t rangeLength,
+                                uint8_t bidiLevel, std::vector<TextSegment>& segments) {
+    size_t rangeEnd = rangeStart + rangeLength;
+    size_t pos = rangeStart;
+    while (pos < rangeEnd) {
+      int32_t ch = 0;
+      size_t charLen = DecodeUTF8Char(content.data() + pos, rangeEnd - pos, &ch);
+      if (charLen == 0) {
+        pos++;
+        continue;
+      }
+      if (ch == '\n') {
+        TextSegment seg = {};
+        seg.start = pos;
+        seg.length = charLen;
+        seg.isNewline = true;
+        segments.push_back(seg);
+        pos += charLen;
+      } else if (ch == '\t') {
+        TextSegment seg = {};
+        seg.start = pos;
+        seg.length = charLen;
+        seg.isTab = true;
+        segments.push_back(seg);
+        pos += charLen;
+      } else {
+        size_t segStart = pos;
+        pos += charLen;
+        while (pos < rangeEnd) {
+          int32_t nextCh = 0;
+          size_t nextLen = DecodeUTF8Char(content.data() + pos, rangeEnd - pos, &nextCh);
+          if (nextLen == 0) {
+            pos++;
+            break;
+          }
+          if (nextCh == '\n' || nextCh == '\t') {
+            break;
+          }
+          pos += nextLen;
+        }
+        TextSegment seg = {};
+        seg.start = segStart;
+        seg.length = pos - segStart;
+#ifdef PAG_BUILD_PAGX
+        seg.bidiLevel = bidiLevel;
+#else
+        (void)bidiLevel;
+#endif
+        segments.push_back(seg);
+      }
+    }
+  }
 
   void storeShapedText(Text* text, ShapedText&& shapedText) {
     if (text == nullptr || shapedText.textBlob == nullptr) {
@@ -731,15 +796,6 @@ class TextLayoutContext {
     }
 
     // Collect newline and tab positions, then shape non-special segments.
-    struct TextSegment {
-      size_t start = 0;
-      size_t length = 0;
-      bool isNewline = false;
-      bool isTab = false;
-#ifdef PAG_BUILD_PAGX
-      uint8_t bidiLevel = 0;
-#endif
-    };
     std::vector<TextSegment> segments = {};
 
 #ifdef PAG_BUILD_PAGX
@@ -747,100 +803,10 @@ class TextLayoutContext {
     auto bidiResult = BidiResolver::Resolve(content);
     info.paragraphRTL = bidiResult.isRTL;
     for (auto& run : bidiResult.runs) {
-      size_t runEnd = run.start + run.length;
-      size_t pos = run.start;
-      while (pos < runEnd) {
-        int32_t ch = 0;
-        size_t charLen = DecodeUTF8Char(content.data() + pos, runEnd - pos, &ch);
-        if (charLen == 0) {
-          pos++;
-          continue;
-        }
-        if (ch == '\n') {
-          TextSegment seg = {};
-          seg.start = pos;
-          seg.length = charLen;
-          seg.isNewline = true;
-          segments.push_back(seg);
-          pos += charLen;
-        } else if (ch == '\t') {
-          TextSegment seg = {};
-          seg.start = pos;
-          seg.length = charLen;
-          seg.isTab = true;
-          segments.push_back(seg);
-          pos += charLen;
-        } else {
-          // Start a text segment, collecting until newline/tab or end of run.
-          size_t segStart = pos;
-          pos += charLen;
-          while (pos < runEnd) {
-            int32_t nextCh = 0;
-            size_t nextLen = DecodeUTF8Char(content.data() + pos, runEnd - pos, &nextCh);
-            if (nextLen == 0) {
-              pos++;
-              break;
-            }
-            if (nextCh == '\n' || nextCh == '\t') {
-              break;
-            }
-            pos += nextLen;
-          }
-          TextSegment seg = {};
-          seg.start = segStart;
-          seg.length = pos - segStart;
-          seg.bidiLevel = run.level;
-          segments.push_back(seg);
-        }
-      }
+      SplitTextSegments(content, run.start, run.length, run.level, segments);
     }
 #else
-    // Without BiDi: split by newlines and tabs only.
-    {
-      size_t pos = 0;
-      while (pos < content.size()) {
-        int32_t ch = 0;
-        size_t charLen = DecodeUTF8Char(content.data() + pos, content.size() - pos, &ch);
-        if (charLen == 0) {
-          pos++;
-          continue;
-        }
-        if (ch == '\n') {
-          TextSegment seg = {};
-          seg.start = pos;
-          seg.length = charLen;
-          seg.isNewline = true;
-          segments.push_back(seg);
-          pos += charLen;
-        } else if (ch == '\t') {
-          TextSegment seg = {};
-          seg.start = pos;
-          seg.length = charLen;
-          seg.isTab = true;
-          segments.push_back(seg);
-          pos += charLen;
-        } else {
-          size_t segStart = pos;
-          pos += charLen;
-          while (pos < content.size()) {
-            int32_t nextCh = 0;
-            size_t nextLen = DecodeUTF8Char(content.data() + pos, content.size() - pos, &nextCh);
-            if (nextLen == 0) {
-              pos++;
-              break;
-            }
-            if (nextCh == '\n' || nextCh == '\t') {
-              break;
-            }
-            pos += nextLen;
-          }
-          TextSegment seg = {};
-          seg.start = segStart;
-          seg.length = pos - segStart;
-          segments.push_back(seg);
-        }
-      }
-    }
+    SplitTextSegments(content, 0, content.size(), 0, segments);
 #endif
 
     ShapedGlyphRun* currentRun = nullptr;
