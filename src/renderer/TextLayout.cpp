@@ -265,34 +265,6 @@ class TextLayoutContext {
     return allText;
   }
 
-  // Builds a TextBlob from shaped glyph runs, applying the given x/y offsets to all positions.
-  void buildTextBlobFromShapedInfo(ShapedInfo& info, float xOffset, float yOffset) {
-    if (info.runs.empty()) {
-      return;
-    }
-    tgfx::TextBlobBuilder builder = {};
-    std::vector<float> adjustedPositions = {};
-    for (auto& run : info.runs) {
-      if (run.glyphIDs.empty()) {
-        continue;
-      }
-      adjustedPositions.clear();
-      adjustedPositions.reserve(run.xPositions.size());
-      for (float x : run.xPositions) {
-        adjustedPositions.push_back(x + xOffset);
-      }
-      auto& buffer = builder.allocRunPosH(run.font, run.glyphIDs.size(), yOffset);
-      memcpy(buffer.glyphs, run.glyphIDs.data(), run.glyphIDs.size() * sizeof(tgfx::GlyphID));
-      memcpy(buffer.positions, adjustedPositions.data(), adjustedPositions.size() * sizeof(float));
-    }
-    auto textBlob = builder.build();
-    if (textBlob != nullptr) {
-      ShapedText shapedText = {};
-      shapedText.textBlob = textBlob;
-      StoreShapedText(info.text, std::move(shapedText));
-    }
-  }
-
   // Checks whether all Text elements have pre-embedded GlyphRun data. If so, stores them directly
   // and returns true. Otherwise returns false, indicating that re-typesetting is needed.
   bool tryUseEmbeddedGlyphRuns(const std::vector<Text*>& textElements) {
