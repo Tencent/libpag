@@ -109,10 +109,10 @@ Parse `$ARGUMENTS` to determine the review mode:
 
 ### 0.2 Ask questions
 
-**STOP. Do NOT call any tools (Bash, Read, Glob, Grep, Task, etc.) before receiving
-user answers.** The questions below do not depend on any repository state.
+**STOP. Do NOT call any tools before receiving user answers.** The questions below
+do not depend on any repository state.
 
-Present all applicable questions in **one AskUserQuestion call**. See
+Present all applicable questions in **a single interactive prompt**. See
 `references/user-questions.md` for the full question definitions and option details.
 
 - **Question 1 — Review priority** (always show): A+B+C / A+B / A only
@@ -134,8 +134,8 @@ Phase 0.2.
 
 Automated checks — no user interaction.
 
-**Initialize `PENDING_FILE`**: create `.codebuddy/tmp/` if it does not exist, then set
-path to `.codebuddy/tmp/cr-pending.md`. If the file already exists (leftover from a
+**Initialize `PENDING_FILE`**: create `.cr-cache/` if it does not exist, then set
+path to `.cr-cache/pending.md`. If the file already exists (leftover from a
 concurrent or crashed session), append a numeric suffix (`-2`, `-3`, …) until an
 unused name is found. Record the chosen path as `PENDING_FILE` for all subsequent
 phases.
@@ -459,7 +459,8 @@ git worktree remove {WORKTREE_DIR}
 git branch -D pr-{number}
 ```
 
-Delete `PENDING_FILE`.
+Delete `PENDING_FILE`. If `.cr-cache/` contains no other files, remove the directory
+as well.
 
 ---
 

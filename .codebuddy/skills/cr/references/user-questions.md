@@ -1,6 +1,6 @@
 # User Questions — Phase 0.2
 
-Present all applicable questions in **one AskUserQuestion call**.
+Present all applicable questions in **a single interactive prompt**.
 
 ## Question 1 — Review priority
 
