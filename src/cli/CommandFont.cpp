@@ -22,6 +22,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include "cli/CliUtils.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "renderer/FontEmbedder.h"
@@ -30,34 +31,6 @@
 #include "tgfx/core/Typeface.h"
 
 namespace pagx::cli {
-
-static std::string EscapeJson(const std::string& input) {
-  std::string result = {};
-  result.reserve(input.size() + 16);
-  for (char ch : input) {
-    switch (ch) {
-      case '"':
-        result += "\\\"";
-        break;
-      case '\\':
-        result += "\\\\";
-        break;
-      case '\n':
-        result += "\\n";
-        break;
-      case '\r':
-        result += "\\r";
-        break;
-      case '\t':
-        result += "\\t";
-        break;
-      default:
-        result += ch;
-        break;
-    }
-  }
-  return result;
-}
 
 // Parse "family,style" or "family" into separate components.
 static void ParseFontName(const std::string& nameStr, std::string* family, std::string* style) {

@@ -23,6 +23,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include "cli/CliUtils.h"
 #include "pagx_xsd.h"
 
 namespace pagx::cli {
@@ -40,34 +41,6 @@ static void CollectStructuredError(void* context, xmlErrorPtr xmlError) {
   }
   error.message = std::move(msg);
   errors->push_back(std::move(error));
-}
-
-static std::string EscapeJson(const std::string& input) {
-  std::string result = {};
-  result.reserve(input.size() + 16);
-  for (char ch : input) {
-    switch (ch) {
-      case '"':
-        result += "\\\"";
-        break;
-      case '\\':
-        result += "\\\\";
-        break;
-      case '\n':
-        result += "\\n";
-        break;
-      case '\r':
-        result += "\\r";
-        break;
-      case '\t':
-        result += "\\t";
-        break;
-      default:
-        result += ch;
-        break;
-    }
-  }
-  return result;
 }
 
 static void PrintErrorsText(const std::vector<ValidationError>& errors, const std::string& file) {
