@@ -4,15 +4,15 @@ Present all applicable questions in **a single interactive prompt**.
 
 ## Question 1 — Review priority
 
-Always show.
+Always show. Priority levels apply to both code and document review checklists.
 
-(code/mixed modules):
-- Option 1 — "Full review (A + B + C)": correctness, refactoring, and conventions.
-  e.g., null checks, duplicate code extraction, naming style, comment quality.
-- Option 2 — "Correctness + optimization (A + B)": skip conventions and documentation.
-  e.g., null checks, resource leaks, duplicate code, unnecessary copies.
+- Option 1 — "Full review (A + B + C)": correctness, optimization, and conventions.
+  Code: null checks, duplicate code, naming. Docs: factual errors, clarity, formatting.
+- Option 2 — "Correctness + optimization (A + B)": skip conventions and style.
+  Code: null checks, resource leaks, simplification. Docs: factual errors, clarity.
 - Option 3 — "Correctness only (A)": only safety and correctness issues.
-  e.g., null dereference, out-of-bounds, resource leaks, race conditions.
+  Code: null dereference, out-of-bounds, race conditions. Docs: factual errors,
+  contradictions.
 
 ## Question 2 — Auto-fix threshold (skip in PR mode)
 

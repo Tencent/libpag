@@ -7,7 +7,7 @@ why it was not auto-fixed.
 **Status values**:
 - `pending` — recorded, awaiting user decision in Phase 7
 - `approved` — user approved fix in Phase 7, sent to Phase 4
-- `fixed` — fix applied and passed validation (remove from file)
+- `fixed` — fix applied and passed validation
 - `failed` — fix attempted but failed validation after retries
 - `skipped` — user declined or issue rejected (do not re-report)
 

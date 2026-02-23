@@ -65,7 +65,9 @@ automatically should be recorded to `CR_STATE_FILE` for user review in Confirm.
 **User interaction**: All user-facing text must use the language the user has been
 using. When presenting choices with predefined options, use interactive dialogs with
 selectable options rather than plain text. The user may send additional material
-(files, URLs, context) at any time; include it in the current or next round's context.
+(files, URLs, context) at any time — process it at the next phase boundary (between
+phases, not mid-phase). Extra context takes effect in the next round; it does not
+alter already-running reviewers, verifiers, or fixers.
 
 ## References
 
@@ -270,12 +272,15 @@ subsequent rounds — PR comments are only processed once.
 
 ### Verification (pipeline)
 
-Verification runs as a **pipeline** — as soon as any reviewer finishes and submits
-its issues, immediately launch one verifier for that reviewer's batch. Do not wait
-for all reviewers to finish. Each verifier runs independently and can work in parallel
-with other verifiers and still-running reviewers.
+Verification runs as a **pipeline**:
+1. As soon as any reviewer finishes, the coordinator **de-duplicates** its issues
+   against `CR_STATE_FILE` and issues already submitted by other reviewers this round.
+2. Surviving issues are sent to a verifier for that batch. Do not wait for all
+   reviewers to finish.
+3. Each verifier runs independently and can work in parallel with other verifiers
+   and still-running reviewers.
 
-Each verifier receives the full batch of issues from one reviewer. See
+Each verifier receives the de-duplicated batch of issues from one reviewer. See
 `references/verifier-prompt.md` for the full verifier prompt.
 
 **Next**: go to Filter.
@@ -286,11 +291,16 @@ Each verifier receives the full batch of issues from one reviewer. See
 
 Three steps, applied to every issue in order:
 
-### 3.0 De-duplication (before verification results)
+### 3.0 De-duplication
 
-Run de-duplication **before** consuming verifier results to avoid wasting effort on
-known issues:
+Cross-reviewer and cross-round de-duplication is performed in two places:
+1. **Before verification** (in the pipeline, Phase 2): coordinator filters out
+   duplicates against `CR_STATE_FILE` and other reviewers' issues before sending
+   to verifiers. This avoids wasting verifier effort.
+2. **After verification** (here): final pass on verified issues to catch any
+   remaining duplicates that slipped through.
 
+Rules:
 - Skip any issue that matches one recorded in `CR_STATE_FILE` or **rejected by the
   user** in a previous Confirm. Previously fixed issues are not excluded — if a
   reviewer reports a new problem in already-fixed code, it is treated as a new issue.
@@ -387,10 +397,14 @@ each individual fixer.
   commands are available (warned in 1.1), skip validation entirely.
 - For doc-only modules: skip build/test; validation is done through review phases
 
-**All pass** → remove successfully fixed issues from `CR_STATE_FILE`, go to Continue?.
+**All pass** → mark successfully fixed issues as `fixed` in `CR_STATE_FILE` (do not
+remove them — Report needs the full history), go to Continue?.
 
-**Failure** → identify which commit(s) caused it (bisect if multiple, obvious if one).
-For each failing commit:
+**Failure** → identify which commit caused it. If multiple commits exist, bisect to
+find the first failing commit, revert it, and **re-run validation** on the remaining
+commits before blaming any others — a single bad commit may cause cascading failures.
+
+For each genuinely failing commit:
 - If the issue still has retries left (max 2 per issue): go back to **Fix** with the
   failure details (build/test error output) and previous fixer's context (original
   issue, attempted fix, files changed). After Fix completes, return here to validate
@@ -420,12 +434,14 @@ Determine whether this round made meaningful progress:
 - **No new issues AND `CR_STATE_FILE` has no pending entries**:
   -> **Report**.
 
-**Cycle detection**: before starting a new round, check whether the loop is making
-meaningful progress. Force exit to Confirm/Report if any of these apply:
-- The same files and issue types keep appearing across consecutive rounds with no net
-  reduction in issues.
-- Multiple consecutive rounds produce only reverted commits (all fixes fail validation)
-  and no new issues are found beyond those already in `CR_STATE_FILE`.
+**Cycle detection and round limits**: force exit to Confirm/Report if any of these
+apply:
+- **Max rounds reached**: 3 rounds (configurable per-project). Enough for diminishing
+  returns — most issues are found in round 1, round 2 catches stragglers.
+- **Stagnation**: 2 consecutive rounds where the same files and issue patterns keep
+  appearing with no net reduction in open issues.
+- **Fix failures**: 2 consecutive rounds where all fixes fail validation and no new
+  issues are found beyond those already in `CR_STATE_FILE`.
 
 When forcing exit, go to Confirm if `CR_STATE_FILE` has pending entries, otherwise Report.
 
@@ -438,7 +454,8 @@ Collect all issues from `CR_STATE_FILE` that have not been resolved during the l
 failed fixes, rolled-back fixes). Deduplicate and present to the user. If the file is
 empty, skip to Report.
 
-1. Present issues in a compact numbered list. Each entry should fit on one line:
+1. Present issues grouped by risk level (high → medium → low), sorted by file path
+   within each group. Each entry should fit on one line:
    `[number] [file:line] [risk] [reason] — [description]`
 
 2. Interaction depends on issue count:
@@ -449,7 +466,9 @@ empty, skip to Report.
    **More than 5 issues**: ask the user for a bulk action:
    - Option 1 — "Fix all": act on every issue
    - Option 2 — "Skip all": discard all issues
-   - Option 3 — "Select individually": present each issue one by one (same as above)
+   - Option 3 — "Select by risk level": present each risk group with fix all / skip
+     all / select individually options
+   - Option 4 — "Select individually": present each issue one by one (same as above)
 
 3. **Action depends on mode**:
    - **PR mode**: submit selected issues as **line-level** PR review comments via
@@ -459,9 +478,8 @@ empty, skip to Report.
    - **Local mode**: if no issues were approved for fix (user skipped all), go to
      Report. Otherwise, send the user-approved issues to **Fix** as the fix queue.
      These issues were already verified in a previous Filter — skip directly to fix.
-     From there the normal flow resumes: Fix, Validate, Continue?, and Continue?
-     routes as usual (new round if new issues were found, Confirm again if new pending
-     issues accumulated, or Report if done).
+     After Fix → Validate completes (including any retries), go directly to **Report**.
+     Do not re-enter the Review loop — Confirm-initiated fixes are a terminal path.
 
 ---
 
