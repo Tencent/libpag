@@ -10,15 +10,8 @@ checklists, and reporting issues. For auto-fix mode, you create an Agent Team
 to dispatch reviewer, verifier, and fixer agents — see
 `references/auto-fix-teams.md`.
 
-## Operating rules
-
-- **Immediate interaction**: Mode detection (Phase 0.1) is pure string parsing —
-  zero tool calls. Present Phase 0 questions immediately. Do NOT read any files,
-  references, or run any commands before the user answers.
-- **Autonomy**: After Ask (Phase 0), zero user interaction until Report
-  (Phase 4). Pre-flight failures abort with a clear message.
-- **User language**: All user-facing text uses the language the user has been
-  using. Use interactive dialogs with selectable options for predefined choices.
+All user-facing text uses the language the user has been using. Use interactive
+dialogs with selectable options for predefined choices.
 
 ## References
 
@@ -32,21 +25,9 @@ to dispatch reviewer, verifier, and fixer agents — see
 
 ---
 
-## Flow
+## Step 1: Ask — zero tool calls, present questions immediately
 
-```
-Ask → Scope → Review → Filter → Report
-```
-
-This is the default flow — the coordinator reviews directly without a team.
-Auto-fix mode (`references/auto-fix-teams.md`) extends this with teams, fixing,
-and multi-round iteration.
-
----
-
-## Phase 0: Ask
-
-### 0.1 Mode detection — string parsing only, zero tool calls
+### Mode detection
 
 | `$ARGUMENTS` pattern | Mode |
 |----------------------|------|
@@ -54,14 +35,14 @@ and multi-round iteration.
 | URL containing `/pull/` | PR |
 | Everything else (empty, commit, range, path) | Local |
 
-### 0.2 Pre-check — local mode only, before questions
+### Pre-check (local mode only)
 
 1. `git branch --show-current` → record whether on main/master.
 2. `git status --porcelain` → record whether uncommitted changes exist.
 3. If on main/master, no uncommitted changes, and `$ARGUMENTS` is empty → abort
    (nothing to review).
 
-### 0.3 Questions — single interactive prompt
+### Questions — single interactive prompt
 
 **Q1 — Review priority** (always):
 
@@ -93,24 +74,12 @@ Otherwise:
 - "Low + Medium risk": auto-fix most issues, only confirm high-risk ones
   (e.g., API changes, architecture decisions).
   → `references/auto-fix-teams.md`.
-- "Full auto (risky)": auto-fix everything. Only issues affecting test
-  baselines are deferred. → `references/auto-fix-teams.md`.
-
-**No further user interaction until Phase 4 Report (or Phase 7 Confirm in
-auto-fix / PR mode).**
+- "Full auto": auto-fix everything. Only issues affecting test baselines are
+  deferred. → `references/auto-fix-teams.md`.
 
 ---
 
-## Phase 1: Scope
-
-### 1.1 Init
-
-1. Create `.cr-cache/` if needed. CR_STATE_FILE path:
-   - PR mode: `.cr-cache/pr-{number}.md`
-   - Local mode: `.cr-cache/{branch}.md` (sanitize `/` to `-`)
-   If exists, append a suffix to avoid conflict (e.g., `feature-foo-2.md`).
-
-### 1.2 Prepare scope
+## Step 2: Scope
 
 Follow `references/scope-preparation.md` for all git/gh commands, argument
 handling, and PR comment retrieval.
@@ -125,26 +94,13 @@ fetch existing PR review comments for de-duplication. Record `WORKTREE_DIR`.
 
 If diff is empty → exit.
 
-### 1.3 Module partitioning
-
-Partition files in scope into **review modules**.
-
-- Each module is a self-contained logical unit. Split large files by
-  section/function group; group related small files together. Balance workload.
-- Classify each module as `code`, `doc`, or `mixed` for checklist selection.
-
-### 1.4 Persist state
-
-Write CR_STATE_FILE with session info (mode, priority, file list, module
-assignments, changed line ranges) and an issues section updated during review.
-PR mode: also include PR metadata (number, `HEAD_SHA`, `BASE_BRANCH`,
-`PR_BRANCH`, `WORKTREE_DIR`, `EXISTING_PR_COMMENTS`).
-
-→ Phase 2
+Partition files in scope into **review modules**. Each module is a
+self-contained logical unit. Split large files by section/function group; group
+related small files together. Classify each module as `code`, `doc`, or `mixed`.
 
 ---
 
-## Phase 2: Review — coordinator direct
+## Step 3: Review & Filter
 
 Read each module's files and apply the corresponding checklist:
 `references/code-checklist.md` for code, `references/doc-checklist.md` for doc,
@@ -153,23 +109,14 @@ both for mixed. Only include priority levels the user selected.
 For each issue found:
 - Provide a code citation (file:line + snippet).
 - Self-verify by re-reading the code — confirm or withdraw.
-- Output: `[file:line] [A/B/C] — [description] — [key lines]`
+
+De-dup: remove cross-module duplicates (same location, same topic). PR mode:
+also remove matches to `EXISTING_PR_COMMENTS`.
 
 **PR comment verification** (local mode with associated PR): verify each PR
 review comment against current code. Add verified issues to the results.
 
-→ Phase 3
-
----
-
-## Phase 3: Filter — coordinator
-
-### 3.0 De-dup
-
-- Remove cross-module duplicates (same location, same topic).
-- PR mode: remove matches to `EXISTING_PR_COMMENTS`.
-
-### 3.1 Risk level
+Assign each confirmed issue a risk level:
 
 | Only one reasonable fix? | Design decision / external contract? | Risk |
 |--------------------------|--------------------------------------|------|
@@ -178,22 +125,14 @@ review comment against current code. Add verified issues to the results.
 | No | No | Medium |
 
 **Fix approach** (Medium/High only): specify the chosen approach and reasoning.
-Record in the issue's `Proposed` field. Low risk: single obvious fix, no guidance.
-
-### 3.2 Record to CR_STATE_FILE
-
-All confirmed issues are recorded with risk level and fix approach.
-
-→ Phase 4 (review-only / PR mode).
 
 ---
 
-## Phase 4: Report
+## Step 4: Report
 
 ### Review-only mode
 
-List all confirmed issues with risk levels and fix approaches. Delete
-CR_STATE_FILE.
+List all confirmed issues with risk levels and fix approaches.
 
 ### PR mode
 
@@ -202,4 +141,3 @@ declines are marked `skipped`. Submit via `gh api` using
 `references/pr-comment-format.md`. Do NOT use `gh pr comment` or `gh pr review`.
 
 Summary of issues found / submitted / skipped. Remove worktree and temp branch.
-Delete CR_STATE_FILE.
