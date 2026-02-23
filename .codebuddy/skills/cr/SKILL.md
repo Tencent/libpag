@@ -54,10 +54,10 @@ Phase 0 questions and receiving user answers.
 file changes to the fixer role. Read code only for arbitration and diagnosis.
 
 **Autonomy**: Between Ask (Phase 0) and Confirm (Phase 7), the review-fix loop runs
-without user interaction unless a previously failed issue fails again in Validate
-(Phase 5, which prompts inline). Issues above the auto-fix threshold and failed fixes
+without user interaction. All issues above the auto-fix threshold and failed fixes
 are recorded to the Issues section of `CR_STATE_FILE` across rounds and presented to
-the user in Confirm.
+the user in Confirm. Pre-flight failures (Phase 1) abort with a clear message — the
+user re-runs `/cr` after resolving the issue.
 
 **Parallelism**: Run reviewer, verifier, and fixer tasks in parallel whenever possible.
 Reviewers for different modules, verifiers for different reviewer batches, and fixers for
@@ -147,8 +147,7 @@ Option 1 should be pre-selected as the default.
   baselines are deferred for confirmation.
 
 **Next**: after all questions are answered, go to Scope. No further user interaction
-until Confirm (except when a previously failed issue fails again in Validate, which
-prompts the user inline).
+until Confirm.
 
 ---
 
@@ -178,8 +177,8 @@ chosen path as `CR_STATE_FILE` for all subsequent phases.
 - **PR mode**: skip — PR mode is read-only (comment output only), no local
   modifications will be made.
 - **Local mode**: verify not on the main/master branch (abort if so). If there are
-  uncommitted changes, abort and ask the user to commit or stash first (fixes may be
-  committed even in all-confirm mode after user approval in Confirm).
+  uncommitted changes, abort — inform the user that a clean working tree is required
+  (fixes will be committed during the session).
 
 ### 1.2 Scope Preparation
 
@@ -432,10 +431,6 @@ For each genuinely failing commit:
   again. This Fix → Validate loop repeats until all pass or retries are exhausted.
 - If retries exhausted: revert the failing commit and record the issue to
   `CR_STATE_FILE` as `failed`.
-- If the issue was already in `CR_STATE_FILE` (a retry from Confirm): revert and
-  ask the user — show failure details and offer options: provide additional context
-  for another attempt, or skip (default). Skipped issues are marked `skipped` so
-  they won't be reported again.
 
 **Next**: go to Continue?.
 
