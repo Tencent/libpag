@@ -242,9 +242,9 @@ These apply to every round including the first:
 ### Reviewers
 
 Run one reviewer per module (in parallel when possible). Each reviewer receives:
-- The **diff** for its module (to identify what changed) and the **file list** (to
-  locate full files). Reviewers must **read entire files** themselves for full context —
-  they are not limited to reviewing only the diff lines.
+- The **scope summary** for its module: file list with changed line ranges (from
+  `CR_STATE_FILE` Session section). Reviewers fetch diffs and read full files
+  themselves — the coordinator does **not** pass raw diff content.
 - Checklist matching the module type:
   `references/code-checklist.md` for code modules, `references/doc-checklist.md` for
   doc modules, both for mixed modules. Only include priority levels selected by the
@@ -260,7 +260,7 @@ Run one reviewer per module (in parallel when possible). Each reviewer receives:
 - **Self-check**: before submitting results, re-read the relevant code and verify each
   reported issue. Mark each as confirmed or withdrawn. Only submit confirmed issues.
 - **Output format**: for each confirmed issue, report:
-  `[file:line] [priority A/B/C] — [description] — [code snippet]`
+  `[file:line] [priority A/B/C] — [description] — [key line(s), max 3 lines]`
 
 ### Verification (pipeline)
 
@@ -307,8 +307,8 @@ Use the verifier's verdict as the primary signal:
 
 - **Verifier CONFIRM**: coordinator does a quick plausibility check — verify that the
   reviewer's description is consistent with the cited code snippet and that the
-  conclusion logically follows. If anything looks off, read the full code to confirm.
-  Otherwise accept and proceed to 3.2.
+  conclusion logically follows. If anything looks off, read the cited range (not the
+  entire file) to confirm. Otherwise accept and proceed to 3.2.
 - **Verifier REJECT (HIGH confidence)**: coordinator does a brief independent check —
   review the verifier's reasoning and the cited code. If the counter-argument is sound,
   drop the issue. If anything is questionable, escalate to full independent review
@@ -360,8 +360,8 @@ skip Fix and Validate and go directly to Continue?.
 ### Fixer assignment
 
 Run one fixer per fix or file group (in parallel when possible). Each fixer receives:
-- The issue description and cited code
-- The full content of the file(s) to modify
+- The issue description and the file path(s) + line range(s) to modify (fixers read
+  file content themselves)
 - `references/fixer-instructions.md` verbatim
 
 Each fixer commits **per issue** (one commit per fix, immediately after applying it).
