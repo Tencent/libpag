@@ -12,7 +12,7 @@ why it was not auto-fixed.
 - `skipped` — user declined or issue rejected (do not re-report)
 
 ```markdown
-# Pending Issues
+# Issues
 
 ## 1. [brief description]
 - **Status**: pending | approved | fixed | failed | skipped

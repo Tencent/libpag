@@ -18,7 +18,6 @@ For each issue you receive:
    - REJECT: you found a concrete reason the issue is not a real problem.
    - CONFIRM: despite your best effort to disprove it, the issue holds up — no valid
      counter-argument exists.
-4. Confidence: HIGH / MEDIUM / LOW.
 
 Important constraints:
 - Your counter-arguments must be grounded in real evidence from the code. Do not

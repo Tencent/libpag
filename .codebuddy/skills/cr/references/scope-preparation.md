@@ -56,6 +56,6 @@ If an open PR exists, fetch its line-level review comments:
 ```
 gh api repos/{owner}/{repo}/pulls/{number}/comments
 ```
-These are used in Phase 3 as reference information — each comment is verified against
-the actual code to confirm the issue still exists before being treated as a known
-issue to fix.
+These are passed to the dedicated PR comment reviewer in Phase 2, which verifies
+each comment against the current code and outputs issues in the standard reviewer
+format.

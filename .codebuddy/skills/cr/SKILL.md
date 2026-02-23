@@ -54,7 +54,7 @@ are recorded to the Issues section of `CR_STATE_FILE` across rounds and presente
 the user in Confirm.
 
 **Parallelism**: Run reviewer, verifier, and fixer tasks in parallel whenever possible.
-Reviewers for different modules, verifiers for different issues, and fixers for
+Reviewers for different modules, verifiers for different reviewer batches, and fixers for
 different files are all independent and can run concurrently.
 
 **Error handling**: Handle all unexpected situations autonomously — role execution
@@ -387,9 +387,6 @@ Coordinator collects skipped issues and records them to `CR_STATE_FILE`.
 **All pass** (or no code modules to validate) -> remove successfully fixed issues from
 `CR_STATE_FILE` (they may have been recorded there from a previous Confirm approval),
 then proceed to Continue?.
-
-**Commit counting**: only commits that survive validation count as "commits produced"
-for Continue? routing. Reverted commits do not count.
 
 **Failures**: record the HEAD **once, before any fixer starts** in Fix, as the
 "last known good" commit (this is the baseline for bisection regardless of how many
