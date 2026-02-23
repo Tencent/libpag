@@ -410,11 +410,11 @@ skip to Phase 8.
 3. **Action depends on mode**:
    - **PR mode**: submit selected issues as PR review comments using the format in
      `references/pr-comment-format.md`. Comment body should be concise, written in the
-     user's conversation language, with a specific fix suggestion. -> Phase 8
-   - **Local mode**: if no issues were approved for fix (user skipped all) -> Phase 8.
-     Otherwise -> **Phase 4** (Fix) with the user-approved issues as the fix queue.
-     These issues were already verified in a previous Phase 3 — skip directly to fix.
-     From there the normal flow resumes: Phase 4 -> 5 -> 6, and Phase 6 routes as
+     user's conversation language, with a specific fix suggestion. Then go to Phase 8.
+   - **Local mode**: if no issues were approved for fix (user skipped all), go to
+     Phase 8. Otherwise, send the user-approved issues to **Phase 4** (Fix) as the fix
+     queue. These issues were already verified in a previous Phase 3 — skip directly to
+     fix. From there the normal flow resumes: Phase 4, 5, 6, and Phase 6 routes as
      usual (new round if commits were produced, Phase 7 again if new pending issues
      accumulated, or Phase 8 if done).
 
