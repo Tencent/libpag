@@ -2092,7 +2092,7 @@ float SVGParserContext::parseLength(const std::string& value, float containerSiz
   if (*endPtr == '\0') {
     return num;
   }
-  if (*endPtr == '%') {
+  if (strcmp(endPtr, "%") == 0) {
     return num / 100.0f * containerSize;
   }
   if (strcmp(endPtr, "px") == 0) {
