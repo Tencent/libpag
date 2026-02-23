@@ -17,11 +17,10 @@ dialogs with selectable options for predefined choices.
 
 | File | Used by |
 |------|---------|
-| `references/code-checklist.md` | Reviewer (code modules) |
-| `references/doc-checklist.md` | Reviewer (doc modules) |
-| `references/scope-preparation.md` | Coordinator (git/gh commands) |
-| `references/pr-comment-format.md` | Coordinator (PR comment format) |
-| `references/auto-fix-teams.md` | Coordinator (auto-fix with Agent Teams) |
+| `references/code-checklist.md` | Code review checklist |
+| `references/doc-checklist.md` | Document review checklist |
+| `references/scope-preparation.md` | git/gh commands for scope setup |
+| `references/auto-fix-teams.md` | Auto-fix mode with Agent Teams |
 
 ---
 
@@ -94,37 +93,20 @@ fetch existing PR review comments for de-duplication. Record `WORKTREE_DIR`.
 
 If diff is empty → exit.
 
-Partition files in scope into **review modules**. Each module is a
-self-contained logical unit. Split large files by section/function group; group
-related small files together. Classify each module as `code`, `doc`, or `mixed`.
-
 ---
 
-## Step 3: Review & Filter
+## Step 3: Review
 
-Read each module's files and apply the corresponding checklist:
-`references/code-checklist.md` for code, `references/doc-checklist.md` for doc,
-both for mixed. Only include priority levels the user selected.
+Read all files in scope. Apply `references/code-checklist.md` to code files,
+`references/doc-checklist.md` to documentation files. Only include priority
+levels the user selected.
 
 For each issue found:
 - Provide a code citation (file:line + snippet).
 - Self-verify by re-reading the code — confirm or withdraw.
 
-De-dup: remove cross-module duplicates (same location, same topic). PR mode:
-also remove matches to `EXISTING_PR_COMMENTS`.
-
 **PR comment verification** (local mode with associated PR): verify each PR
 review comment against current code. Add verified issues to the results.
-
-Assign each confirmed issue a risk level:
-
-| Only one reasonable fix? | Design decision / external contract? | Risk |
-|--------------------------|--------------------------------------|------|
-| Yes | — | Low |
-| No | Yes | High |
-| No | No | Medium |
-
-**Fix approach** (Medium/High only): specify the chosen approach and reasoning.
 
 ---
 
@@ -132,12 +114,38 @@ Assign each confirmed issue a risk level:
 
 ### Review-only mode
 
-List all confirmed issues with risk levels and fix approaches.
+List all confirmed issues.
 
 ### PR mode
 
 Present confirmed issues to user. User selects which to submit as PR comments,
-declines are marked `skipped`. Submit via `gh api` using
-`references/pr-comment-format.md`. Do NOT use `gh pr comment` or `gh pr review`.
+declines are marked `skipped`.
+
+Submit as a **single** GitHub PR review with line-level comments via `gh api`.
+Do NOT use `gh pr comment` or `gh pr review`.
+
+```bash
+gh api repos/{owner}/{repo}/pulls/{number}/reviews --input - <<'EOF'
+{
+  "commit_id": "{HEAD_SHA}",
+  "event": "COMMENT",
+  "comments": [
+    {
+      "path": "relative/file/path",
+      "line": 42,
+      "side": "RIGHT",
+      "body": "Description of the issue and suggested fix"
+    }
+  ]
+}
+EOF
+```
+
+- `commit_id`: HEAD SHA of the PR branch
+- `path`: relative to repository root
+- `line`: line number in the **new** file (right side of diff)
+- `side`: always `"RIGHT"`
+- `body`: concise, in the user's conversation language, with a specific fix
+  suggestion when possible
 
 Summary of issues found / submitted / skipped. Remove worktree and temp branch.

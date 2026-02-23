@@ -1,8 +1,8 @@
 # Auto-Fix Mode (Teams)
 
 When the user selects an auto-fix threshold in Q2, the flow switches to this
-document. Phase 0 (Ask) and Phase 1 (Scope) from SKILL.md still apply, with
-additions noted below. This document replaces Phase 2 onward.
+document. Step 1 (Ask) from SKILL.md still applies — this document takes over
+from Step 2 (Scope) onward.
 
 The reviewer–verifier adversarial pair is the core quality mechanism: reviewers
 find issues, verifiers challenge them. This two-party check significantly reduces
@@ -47,15 +47,30 @@ review. After the loop: if `pending` or `failed` entries exist → Confirm → F
 
 ---
 
-## Phase 1: Scope (additions)
+## Phase 1: Scope
 
-Same as SKILL.md Phase 1, plus:
-- Build baseline (skip if doc-only). If no build/test commands, warn that fix
-  validation will be skipped. Fail → abort.
-- Read git log since upstream for recent-fix context (avoid re-flagging issues
-  a previous `/cr` session already fixed).
-- Persist additional state: threshold, build/test commands.
-- Use `references/pending-templates.md` for CR_STATE_FILE format.
+Follow `references/scope-preparation.md` for all git/gh commands and argument
+handling.
+
+If diff is empty → exit.
+
+**Build baseline** (skip if doc-only): if no build/test commands can be
+determined, warn that fix validation will be skipped. Otherwise run build +
+test. Fail → abort.
+
+Read git log since upstream for recent-fix context (avoid re-flagging issues
+a previous `/cr` session already fixed).
+
+Partition files in scope into **review modules** for parallel review. Each
+module is a self-contained logical unit. Split large files by section/function
+group; group related small files together. Classify each module as `code`,
+`doc`, or `mixed`.
+
+**Persist state**: write CR_STATE_FILE (see `references/pending-templates.md`)
+with session info (mode, priority, threshold, file list, module assignments,
+changed line ranges, build/test commands) and an issues section updated
+incrementally. CR_STATE_FILE is owned by the coordinator — team agents never
+read or write it.
 
 ---
 
