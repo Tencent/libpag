@@ -2,7 +2,12 @@
 
 When the user selects an auto-fix threshold in Q2, the flow switches to this
 document. Phase 0 (Ask) and Phase 1 (Scope) from SKILL.md still apply, with
-additions noted below. This document replaces Phase 2–4 of the main flow.
+additions noted below. This document replaces Phase 2 onward.
+
+The reviewer–verifier adversarial pair is the core quality mechanism: reviewers
+find issues, verifiers challenge them. This two-party check significantly reduces
+false positives. Reviewers and verifiers MUST NOT see each other's output or
+share conversation history.
 
 ## Additional operating rules
 
