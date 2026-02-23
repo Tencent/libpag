@@ -5,18 +5,18 @@ description: Automated code review and fix for local branches, PRs, commits, and
 
 # /cr — Code Review
 
-You are the **coordinator**. Four roles participate: coordinator, reviewer,
-verifier, and fixer. You dispatch the other three as **sub-agents running in the
-background** — this keeps your context focused on orchestration and issue
-judgment while sub-agents handle the heavy lifting of reading and modifying files.
-This is critical for multi-round iteration: sub-agents are disposable, so your
-context grows only by structured issue lists, not raw file contents, avoiding
-context compression that would lose track of earlier rounds.
+You are the **coordinator** (team-lead). Four roles participate: coordinator,
+reviewer, verifier, and fixer. In teams mode, you create an Agent Team and
+dispatch the other three as team members — this keeps your context focused on
+orchestration and issue judgment while agents handle the heavy lifting of reading
+and modifying files. This is critical for multi-round iteration: agents are
+disposable, so your context grows only by structured issue lists, not raw file
+contents, avoiding context compression that would lose track of earlier rounds.
 
 The reviewer–verifier adversarial pair is the core quality mechanism: reviewers
 find issues, verifiers challenge them. This two-party check significantly reduces
-false positives. Both MUST run as independent sub-agents — they MUST NOT see
-each other's output or share conversation history.
+false positives. Reviewers and verifiers MUST NOT see each other's output or
+share conversation history.
 
 ## Operating rules
 
@@ -26,9 +26,17 @@ each other's output or share conversation history.
 - **Autonomy**: After Ask (Phase 0), zero user interaction until Confirm
   (Phase 7) or Report (Phase 8, if no Confirm). Pre-flight failures abort
   with a clear message.
-- **Error handling**: Handle unexpected situations autonomously (timeout, build
-  failure, invalid output). Record anything unresolvable to `CR_STATE_FILE` for
-  user review in Confirm.
+- **Delegation**: You (the coordinator) **never modify files directly**. Delegate
+  all changes to fixer agents. Read code only for arbitration and diagnosis.
+- **Error handling**: Handle unexpected situations autonomously (agent stuck or
+  unresponsive, fix breaks the build, git operation fails, agent produces invalid
+  output). Use your judgment: terminate and replace, revert and retry, skip and
+  move on. Record anything unresolvable to `CR_STATE_FILE` for user review in
+  Confirm.
+- **Agent lifecycle**: When closing agents, send the shutdown message and continue
+  immediately without waiting for acknowledgment. Do not block the workflow on
+  agent responses. When closing the team (Phase 6 end-of-round, Phase 8),
+  force-terminate (TaskStop) any agents that are still running.
 - **User language**: All user-facing text uses the language the user has been
   using. Use interactive dialogs with selectable options for predefined choices.
 
@@ -59,10 +67,10 @@ are found. After the loop ends, the flow diverges:
 
 - **Review-only mode**: → Report. No fixing, no commits. The user can request
   fixes for specific issues in follow-up conversation.
-- **PR mode**: → Confirm (select which issues to submit as PR comments) → Report.
-- **Auto-fix local mode**: → Fix → Validate → Continue? (new issues from fix? →
-  new Review round). When no new issues remain: if `pending` or `failed` entries
-  exist → Confirm → Fix → Validate → ... repeat until done → Report.
+- **PR mode (teams)**: → Confirm (select which issues to submit as PR comments) → Report.
+- **Auto-fix local mode (teams)**: → Fix → Validate → Continue? (new issues from
+  fix? → new Review round). When no new issues remain: if `pending` or `failed`
+  entries exist → Confirm → Fix → Validate → ... repeat until done → Report.
 
 ---
 
@@ -97,14 +105,21 @@ Priority levels apply to both code and document review checklists.
   Code: null dereference, out-of-bounds, race conditions. Docs: factual errors,
   contradictions.
 
-**Q2 — Auto-fix threshold** (local mode only):
+**Q2 — Teams mode** (always):
 
-PR mode skips Q2 — inform user that issues will be submitted as line-level PR
+- "Enable teams (recommended)": create an Agent Team for parallel review with
+  independent reviewer, verifier, and fixer agents.
+- "Quick review": coordinator handles everything directly, review-only — issues
+  are reported but not fixed.
+
+**Q3 — Auto-fix threshold** (only if Q2 = teams AND local mode):
+
+PR mode skips Q3 — inform user that issues will be submitted as line-level PR
 comments after confirmation.
 
 If on main/master or uncommitted changes exist: inform user that auto-fix is
 unavailable (uncommitted changes or protected branch), enter review-only mode
-automatically, skip Q2.
+for fixing (review with teams, but no auto-fix), skip Q3.
 
 Otherwise:
 
@@ -166,7 +181,7 @@ Partition files in scope into **review modules** for parallel review.
 Write CR_STATE_FILE with two sections:
 
 **`# Session`** — written once, read every round:
-- Mode, user choices (priority, threshold)
+- Mode, user choices (priority, threshold, teams mode)
 - PR metadata (if PR): number, `HEAD_SHA`, `BASE_BRANCH`, `PR_BRANCH`,
   `WORKTREE_DIR`, `EXISTING_PR_COMMENTS`
 - File list with module assignments and types (code/doc/mixed)
@@ -175,7 +190,7 @@ Write CR_STATE_FILE with two sections:
 
 **`# Issues`** — updated incrementally. See `references/pending-templates.md`.
 
-CR_STATE_FILE is owned by the coordinator. Sub-agents never read or write it —
+CR_STATE_FILE is owned by the coordinator. Team agents never read or write it —
 the coordinator extracts relevant information and passes it via prompts.
 
 → Phase 2
@@ -197,12 +212,21 @@ the coordinator extracts relevant information and passes it via prompts.
   issues from prior Confirm are also excluded. Previously fixed issues are
   **not excluded** — new problems in fixed code are valid new issues.
 
-### Reviewers — sub-agents, run in background
+### Teams mode — team setup
+
+Create a new team for this round. Each round gets a fresh team — do not reuse
+agents from prior rounds (they lose context after team close).
+
+- One `general-purpose` reviewer agent (`reviewer-N`) per module.
+- One `general-purpose` **verifier** agent (`verifier`), shared across all
+  modules.
+
+### Teams mode — reviewer prompt
 
 Stance: **thorough** — discover as many real issues as possible, self-verify
 before submitting.
 
-Launch one reviewer sub-agent per module, all in the background. Each receives:
+Each reviewer receives:
 - **Scope**: file list + changed line ranges for its module. Reviewers read
   full files and fetch diffs themselves — coordinator does NOT pass raw diff.
 - **Checklist**: `references/code-checklist.md` for code, `references/doc-checklist.md`
@@ -218,21 +242,36 @@ Launch one reviewer sub-agent per module, all in the background. Each receives:
 - **Output format**: `[file:line] [A/B/C] — [description] — [key lines]`
 
 **PR comment reviewer** (local mode with associated PR, round 1 only):
-one additional sub-agent to verify PR review comments against current code.
+one additional agent to verify PR review comments against current code.
 Same output format, same verification pipeline. Skip in subsequent rounds.
 
-### Verifiers — sub-agents, pipeline
+### Teams mode — verification (pipeline)
 
 Stance: **adversarial** — default to doubting the reviewer, actively look for
 reasons each issue is wrong. Reject with real evidence, confirm if it holds up.
 This step is mandatory — the coordinator MUST NOT skip it or perform
 verification itself.
 
-As each reviewer returns, immediately launch one verifier sub-agent in the
-background for that batch. Do not wait for all reviewers. Include
-`references/verifier-prompt.md` verbatim in the prompt.
+The verifier runs as a **pipeline** — it does not wait for all reviewers to
+finish. As each reviewer reports issues, the coordinator forwards them to the
+verifier immediately. Include `references/verifier-prompt.md` verbatim in the
+verifier's prompt.
 
-Collect all verifier outputs → Phase 3.
+### Teams mode — after review
+
+- **Keep all reviewers alive** — they will be reused as fixers in Phase 4
+  (they already have full context on the code).
+- Close the verifier after all verification is complete.
+
+### Quick review mode
+
+Coordinator handles everything directly without creating a team:
+- Read each module's files and apply the checklist.
+- For each issue found, self-verify by re-reading the code.
+- Output issues in the same format as reviewer agents.
+- Coordinator also performs verification (no separate verifier).
+
+→ Phase 3
 
 ---
 
@@ -288,25 +327,34 @@ Auto-fix local mode additionally splits issues:
   outside the fixer's module, create a follow-up fix task.
 - Previously rolled-back issues: do not attempt again this round.
 
-→ Phase 6
+→ Phase 6 (Continue?). If auto-fix queue is non-empty → Phase 4 first.
 
 ---
 
-## Phase 4: Fix — auto-fix local mode only, sub-agents
+## Phase 4: Fix — teams mode, auto-fix local mode only
 
 Stance: **precise** — apply each fix completely and correctly, never expand
 scope. The coordinator MUST NOT apply fixes directly.
 
-Each fixer sub-agent receives:
+### Agent assignment
+
+Reuse surviving reviewers as fixers — each reviewer already has context on the
+files it reviewed. Coordinator dynamically assigns fix tasks:
+
+- Issue in a file that a reviewer already read → assign to that reviewer.
+- Cross-file issues or issues with no matching reviewer → assign to a
+  `fixer-cross` agent (create one if needed).
+- Multi-file renames → single atomic task assigned to one agent.
+
+One agent may receive multiple fix tasks if it covers several files. Avoid
+assigning the same file to multiple agents to prevent concurrent edit conflicts.
+
+Each fixer receives:
 - Issue description + file path(s) + line range(s) (fixers read files themselves)
 - Fix approach from `Proposed` field (Medium/High risk)
 - `references/fixer-instructions.md` verbatim
 
-Launch one fixer sub-agent per issue or file group, all in the background.
-Each fixer commits per issue (one commit per fix). Assignment strategy:
-- Group issues by file to minimize concurrent edit conflicts
-- Cross-file issues or multi-file renames → single atomic task to one fixer
-- Multiple fixers can run in parallel on different files
+Each fixer commits per issue (one commit per fix).
 
 → Phase 5
 
@@ -320,14 +368,23 @@ Wait for all fixers. Run build + test.
 - **Pass** → mark issues `fixed` in CR_STATE_FILE → Phase 6.
 - **Fail** → bisect to find the failing commit, revert it, re-validate
   remaining before blaming others (one bad commit may cause cascading failures).
-  Per failing issue: retry via new fixer sub-agent with failure details (max 2
-  retries), or revert and mark `failed`.
+  Per failing issue: retry via the original fixer agent with failure details
+  (max 2 retries), or revert and mark `failed`.
 
 → Phase 6
 
 ---
 
 ## Phase 6: Continue?
+
+### Step 1: Close the current round's team
+
+Close the team to release reviewers and fixers. Force-terminate any unresponsive
+agents. Skip if quick review mode (no team to close).
+
+### Step 2: Route
+
+**Evaluate conditions top-to-bottom; take the first match.**
 
 | Condition | → |
 |-----------|---|
@@ -361,7 +418,14 @@ for regression check). All skipped → Phase 8.
 
 ## Phase 8: Report
 
-Summary:
+### Cleanup
+
+- Teams mode: force-terminate any agents still running. Close the team.
+- PR mode: remove worktree and temp branch.
+- Delete CR_STATE_FILE.
+
+### Summary
+
 - Rounds and per-round statistics
 - Issues found / fixed / skipped / failed
 - Rolled-back issues and reasons
@@ -369,5 +433,3 @@ Summary:
 - PR mode: list comments submitted
 - Local mode with PR: note issues from PR comments
 - Review-only mode: list all confirmed issues (no fix/skip/fail stats)
-
-Cleanup: delete CR_STATE_FILE. PR mode: remove worktree and temp branch.
