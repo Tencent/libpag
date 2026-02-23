@@ -1113,6 +1113,39 @@ class TextLayoutContext {
           adjusted.xPosition = currentLineWidth;
           currentLineWidth += glyph.advance + letterSpacing;
           currentLine->glyphs.push_back(adjusted);
+          // Re-scan break opportunities among glyphs on the new line.
+          lastBreakIndex = -1;
+          for (size_t j = 0; j + 1 < currentLine->glyphs.size(); j++) {
+            auto& prev = currentLine->glyphs[j];
+            auto& next = currentLine->glyphs[j + 1];
+#ifdef PAG_USE_HARFBUZZ
+            bool sameCluster = (prev.cluster != 0 || next.cluster != 0) &&
+                               prev.cluster == next.cluster;
+            if (!sameCluster && LineBreaker::CanBreakBetween(prev.unichar, next.unichar)) {
+              lastBreakIndex = static_cast<int>(j);
+            }
+#else
+            if (LineBreaker::CanBreakBetween(prev.unichar, next.unichar)) {
+              lastBreakIndex = static_cast<int>(j);
+            }
+#endif
+          }
+          // Also check break between the last glyph and the next unprocessed glyph.
+          if (i + 1 < allGlyphs.size() && allGlyphs[i + 1].unichar != '\n') {
+#ifdef PAG_USE_HARFBUZZ
+            bool sameCluster = (glyph.cluster != 0 || allGlyphs[i + 1].cluster != 0) &&
+                               glyph.cluster == allGlyphs[i + 1].cluster;
+            if (!sameCluster &&
+                LineBreaker::CanBreakBetween(glyph.unichar, allGlyphs[i + 1].unichar)) {
+              lastBreakIndex = static_cast<int>(currentLine->glyphs.size()) - 1;
+            }
+#else
+            if (LineBreaker::CanBreakBetween(glyph.unichar, allGlyphs[i + 1].unichar)) {
+              lastBreakIndex = static_cast<int>(currentLine->glyphs.size()) - 1;
+            }
+#endif
+          }
+          continue;
         } else {
           // No break point found - force break before current glyph
           if (!currentLine->glyphs.empty()) {
@@ -1699,16 +1732,26 @@ class TextLayoutContext {
           for (auto& g : currentColumn->glyphs) {
             currentColumnHeight += g.height;
           }
+          // Re-scan break opportunities among glyphs on the new column.
+          lastBreakIndex = 0;
+          for (size_t j = 1; j < currentColumn->glyphs.size(); j++) {
+            if (currentColumn->glyphs[j].canBreakBefore) {
+              lastBreakIndex = j;
+            }
+          }
         } else {
           RemoveTrailingLetterSpacing(currentColumn->glyphs);
           FinishColumn(currentColumn, textBox->lineHeight);
           columns.emplace_back();
           currentColumn = &columns.back();
           currentColumnHeight = 0;
+          lastBreakIndex = 0;
         }
-        lastBreakIndex = 0;
       }
 
+      if (vg.canBreakBefore) {
+        lastBreakIndex = currentColumn->glyphs.size();
+      }
       currentColumnHeight += vg.height;
       currentColumn->glyphs.push_back(std::move(vg));
     }
