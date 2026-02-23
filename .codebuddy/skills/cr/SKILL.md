@@ -9,9 +9,9 @@ Use `/cr` to start. Accepts a PR number/URL, commit (range), file/directory path
 or no argument (current branch vs upstream). See Phase 1 for full argument parsing.
 
 Automated code review with multi-round iteration. Each issue gets a risk level —
-low-risk issues are auto-fixed, higher-risk issues are presented for user confirmation.
-In PR mode, issues are submitted as line-level PR review comments instead of direct
-commits.
+issues within the user's chosen auto-fix threshold are fixed automatically, the rest
+are presented for user confirmation. In PR mode, issues are submitted as line-level
+PR review comments instead of direct commits.
 
 ## Flow
 
