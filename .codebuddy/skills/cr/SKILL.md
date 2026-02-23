@@ -77,6 +77,18 @@ selectable options rather than plain text. The user may send additional material
 (files, URLs, context) at any time. If reviewers are still active (Phase 2), forward
 it directly; otherwise include the material in the next round.
 
+**No-team fallback**: If Agent Teams is not available, the entire flow still applies
+but the team-lead executes everything in serial mode:
+- **Reviewers**: team-lead launches one Task agent per module sequentially (not in
+  parallel). Each agent completes and returns results before the next starts.
+- **Verifier**: team-lead performs verification directly in Phase 3 — read the cited
+  code for each issue and apply the devil's advocate check before risk assessment.
+- **Fixers**: team-lead launches one Task agent per fix sequentially.
+- **Team lifecycle**: no team to create or close. Skip all team setup/teardown steps
+  (Phase 2 team setup, Phase 6 Step 1, Phase 8 cleanup). The verifier role merges
+  into the team-lead's Phase 3 work.
+- All other phases (scope, filter, validate, decide, confirm, report) work identically.
+
 ## References
 
 | Topic | File |
@@ -156,9 +168,8 @@ Automated checks — no user interaction.
 already exists (leftover from a concurrent or crashed session), append a numeric
 suffix (`-2`, `-3`, …) until an unused name is found. Record the chosen path as
 `PENDING_FILE` for all subsequent phases.
-- Check if Agent Teams is enabled. If not available, warn the user in the conversation
-  that review will run in single-agent serial mode (one module at a time) instead of
-  parallel. Continue without aborting.
+- Check if Agent Teams is enabled. If not available, warn the user and switch to
+  no-team fallback mode (see Instructions).
 
 **Test environment**:
 - Skip if PR mode. If the scope appears doc-only based on file extensions
@@ -270,8 +281,8 @@ These apply to every round including the first:
 
 ### Team setup
 
-- Create a new team for this round (or run serially without a team if Agent Teams is
-  unavailable). Each round gets a fresh team — do not reuse agents from prior rounds.
+- Create a new team for this round. Each round gets a fresh team — do not reuse
+  agents from prior rounds. (No-team fallback: skip team creation.)
 - One `general-purpose` reviewer agent (`reviewer-N`) per module.
 - One `general-purpose` **verifier** agent (`verifier`) shared across all modules.
   The verifier persists across rounds (not recreated each round) to accumulate
@@ -440,9 +451,9 @@ This phase is the **single routing authority** for the review-fix loop.
 
 ### Step 1: Close the current round's team
 
-Close the team to release reviewers and fixers (skip if running in serial mode
-without a team). Force-terminate any unresponsive agents.
-**Do not close the verifier** — it persists across rounds.
+Close the team to release reviewers and fixers. Force-terminate any unresponsive
+agents. **Do not close the verifier** — it persists across rounds.
+(No-team fallback: skip this step.)
 
 ### Step 2: Route
 
