@@ -178,7 +178,7 @@ class TextLayoutContext {
 
   using FontKey = TextLayout::FontKey;
 
-  void StoreShapedText(Text* text, ShapedText&& shapedText) {
+  void storeShapedText(Text* text, ShapedText&& shapedText) {
     if (text == nullptr || shapedText.textBlob == nullptr) {
       return;
     }
@@ -229,7 +229,7 @@ class TextLayoutContext {
       }
       if (!text->glyphRuns.empty()) {
         auto shapedText = buildShapedTextFromEmbeddedGlyphRuns(text);
-        StoreShapedText(text, std::move(shapedText));
+        storeShapedText(text, std::move(shapedText));
       } else {
         processTextWithoutLayout(text);
       }
@@ -275,7 +275,7 @@ class TextLayoutContext {
     }
     for (auto* text : textElements) {
       auto shapedText = buildShapedTextFromEmbeddedGlyphRuns(text);
-      StoreShapedText(text, std::move(shapedText));
+      storeShapedText(text, std::move(shapedText));
     }
     return true;
   }
@@ -393,7 +393,7 @@ class TextLayoutContext {
     if (textBlob != nullptr) {
       ShapedText shapedText = {};
       shapedText.textBlob = textBlob;
-      StoreShapedText(text, std::move(shapedText));
+      storeShapedText(text, std::move(shapedText));
     }
   }
 
@@ -492,7 +492,7 @@ class TextLayoutContext {
     if (textBlob != nullptr) {
       ShapedText shapedText = {};
       shapedText.textBlob = textBlob;
-      StoreShapedText(text, std::move(shapedText));
+      storeShapedText(text, std::move(shapedText));
     }
   }
 
@@ -1598,7 +1598,7 @@ class TextLayoutContext {
       if (textBlob != nullptr) {
         ShapedText shapedText = {};
         shapedText.textBlob = textBlob;
-        StoreShapedText(text, std::move(shapedText));
+        storeShapedText(text, std::move(shapedText));
       }
     }
   }
@@ -2094,7 +2094,7 @@ class TextLayoutContext {
       if (textBlob != nullptr) {
         ShapedText shapedText = {};
         shapedText.textBlob = textBlob;
-        StoreShapedText(text, std::move(shapedText));
+        storeShapedText(text, std::move(shapedText));
       }
     }
   }
