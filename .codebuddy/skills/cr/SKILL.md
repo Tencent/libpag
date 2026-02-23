@@ -77,13 +77,17 @@ selectable options rather than plain text. The user may send additional material
 (files, URLs, context) at any time. If reviewers are still active (Phase 2), forward
 it directly; otherwise include the material in the next round.
 
-**No-team fallback**: If Agent Teams is not available, the entire flow still applies
-but the team-lead executes everything in serial mode:
-- **Reviewers**: team-lead launches one Task agent per module sequentially (not in
-  parallel). Each agent completes and returns results before the next starts.
+**No-team fallback**: If Agent Teams is not available, the entire flow still applies.
+Team-lead uses Task tool sub-agents instead of team agents:
+- **Reviewers**: launch one Task sub-agent per module. Multiple sub-agents can run in
+  parallel (send multiple Task calls in a single message). Each sub-agent completes
+  and returns results — it cannot be kept alive for later reuse.
 - **Verifier**: team-lead performs verification directly in Phase 3 — read the cited
   code for each issue and apply the devil's advocate check before risk assessment.
-- **Fixers**: team-lead launches one Task agent per fix sequentially.
+  (Sub-agents are stateless, so a persistent verifier is not possible.)
+- **Fixers**: launch one Task sub-agent per fix (can also run in parallel). Since
+  reviewers cannot be kept alive, provide each fixer with the necessary file context
+  in its prompt.
 - **Team lifecycle**: no team to create or close. Skip all team setup/teardown steps
   (Phase 2 team setup, Phase 6 Step 1, Phase 8 cleanup). The verifier role merges
   into the team-lead's Phase 3 work.
