@@ -50,7 +50,8 @@ file changes to the fixer role. Read code only for arbitration and diagnosis.
 **Autonomy**: Between Ask (Phase 0) and Confirm (Phase 7), the review-fix loop runs
 without user interaction unless a previously failed issue fails again in Validate
 (Phase 5, which prompts inline). Issues above the auto-fix threshold and failed fixes
-are recorded to `PENDING_FILE` across rounds and presented to the user in Confirm.
+are recorded to the Issues section of `CR_STATE_FILE` across rounds and presented to
+the user in Confirm.
 
 **Parallelism**: Run reviewer, verifier, and fixer tasks in parallel whenever possible.
 Reviewers for different modules, verifiers for different issues, and fixers for
@@ -59,7 +60,7 @@ different files are all independent and can run concurrently.
 **Error handling**: Handle all unexpected situations autonomously — role execution
 timeout or failure, fix breaks the build, git operation fails, invalid output. Use
 your judgment: retry, skip and move on, etc. Anything that cannot be resolved
-automatically should be recorded to `PENDING_FILE` for user review in Confirm.
+automatically should be recorded to `CR_STATE_FILE` for user review in Confirm.
 
 **User interaction**: All user-facing text must use the language the user has been
 using. When presenting choices with predefined options, use interactive dialogs with
@@ -134,12 +135,15 @@ Phase 0.2.
 
 Automated checks — no user interaction.
 
-**Initialize session files**: create `.cr-cache/` if it does not exist. Check whether
-`.cr-cache/pending.md` already exists (leftover from a concurrent or crashed session).
-If it does, find the lowest unused numeric suffix (`-2`, `-3`, …) and apply it to
-**both** filenames: `pending-N.md` and `session-N.md`. Otherwise use the base names
-`pending.md` and `session.md`. Record the chosen paths as `PENDING_FILE` and
-`SESSION_FILE` for all subsequent phases.
+**Initialize `CR_STATE_FILE`**: create `.cr-cache/` if it does not exist. Derive the
+filename from the review scope:
+- **PR mode**: `.cr-cache/pr-{number}.md`
+- **Local mode**: `.cr-cache/{branch}.md` (sanitize `/` to `-`, e.g.,
+  `feature/dom_text_box` → `feature-dom_text_box.md`)
+
+If the file already exists (leftover from a crashed session, or another session is
+running on the same scope), ask the user whether to overwrite or abort. Record the
+chosen path as `CR_STATE_FILE` for all subsequent phases.
 
 **Test environment**:
 - Skip if PR mode. If the scope appears doc-only based on file extensions
@@ -185,13 +189,14 @@ Partition files in scope into **review modules** for parallel review.
   group; group related small files together. Balance workload across reviewers.
 - Classify each module as `code`, `doc`, or `mixed` to determine which checklist to use.
 
-The scope determined here is persisted in the session file (see 1.4) and reused by
+The scope determined here is persisted in `CR_STATE_FILE` (see 1.4) and reused by
 all subsequent rounds.
 
-### 1.4 Persist Session State
+### 1.4 Persist State
 
-Write `SESSION_FILE` (determined in 1.1) containing all information that must survive
-across rounds (context may be truncated in long sessions):
+Write `CR_STATE_FILE` (determined in 1.1) with two sections:
+
+**`# Session`** — written once, read every round to restore context:
 
 - **Mode**: PR or Local
 - **User choices**: review priority, auto-fix threshold
@@ -202,8 +207,12 @@ across rounds (context may be truncated in long sessions):
   reviewers will read files themselves)
 - **Build/test commands**: the commands used for baseline validation
 
-This file is read at the start of each round to restore context. Update it when
-state changes (e.g., after Confirm when the user rejects issues).
+**`# Issues`** — updated incrementally as issues are discovered, fixed, or rejected.
+See `references/pending-templates.md` for the entry format.
+
+This file is owned by the coordinator. Sub-agents (reviewer, verifier, fixer) never
+read or write it directly — the coordinator extracts relevant information and passes
+it via task prompts. Update the Issues section whenever issue status changes.
 
 **Next**: enter the review-fix loop starting with Review.
 
@@ -215,14 +224,17 @@ state changes (e.g., after Confirm when the user rejects issues).
 
 These apply to every round including the first:
 
-- **Scope from session file**: at the start of each round, read `SESSION_FILE` to
-  restore the file list, module partitioning, and other session state.
+- **Restore state (coordinator only)**: at the start of each round, the coordinator
+  reads `CR_STATE_FILE` to restore session context (scope, settings, issue list).
+  Reviewers do **not** read this file — the coordinator extracts only the scope
+  information (file list, module partitioning, diff ranges) and passes it to reviewers
+  via their task prompts, keeping the Issues section invisible to them.
 - **Independent review**: reviewers receive no information about previous rounds'
   findings, fixes, or outcomes. Each round is a fresh, unbiased review of the full
   scope — this is by design, so that different perspectives can catch issues missed in
   earlier rounds.
 - **Cross-round exclusion (coordinator only)**: after collecting reviewer results, the
-  coordinator skips issues already recorded in `PENDING_FILE` or rejected by the user
+  coordinator skips issues already recorded in `CR_STATE_FILE` or rejected by the user
   in a previous Confirm. Do **not** pass this exclusion list to reviewers — they review
   with a clean slate. Previously fixed issues are **not excluded** — if a reviewer
   independently finds a new problem in code that was fixed last round, that is a valid
@@ -276,7 +288,7 @@ Three steps, applied to every issue in order:
 Run de-duplication **before** consuming verifier results to avoid wasting effort on
 known issues:
 
-- Skip any issue that matches one recorded in `PENDING_FILE` or **rejected by the
+- Skip any issue that matches one recorded in `CR_STATE_FILE` or **rejected by the
   user** in a previous Confirm. Previously fixed issues are not excluded — if a
   reviewer reports a new problem in already-fixed code, it is treated as a new issue.
 - **PR comment de-duplication** (PR mode): compare each confirmed issue against
@@ -321,7 +333,7 @@ and special rules. Determine:
 
 The user's chosen auto-fix threshold determines handling for each fixable issue:
 - Issues at or below the threshold -> queued for auto-fix (Fix)
-- Issues above the threshold -> recorded to `PENDING_FILE` with the reason
+- Issues above the threshold -> recorded to `CR_STATE_FILE` with the reason
   (e.g., "above auto-fix threshold"), presented to the user in Confirm
 
 ### Additional checks
@@ -332,7 +344,7 @@ The user's chosen auto-fix threshold determines handling for each fixable issue:
 - Previously rolled-back issues -> do not attempt again this round
 
 **Next**:
-- **PR mode**: all confirmed issues are recorded to `PENDING_FILE`. Skip Fix and
+- **PR mode**: all confirmed issues are recorded to `CR_STATE_FILE`. Skip Fix and
   Validate, go directly to Continue?.
 - **Local mode**: if auto-fix queue is not empty, go to Fix. If auto-fix queue is
   empty, skip Fix and Validate, go directly to Continue?.
@@ -341,7 +353,7 @@ The user's chosen auto-fix threshold determines handling for each fixable issue:
 
 ## Phase 4: Fix
 
-If the auto-fix queue is empty (all issues were recorded to `PENDING_FILE`),
+If the auto-fix queue is empty (all issues were recorded to `CR_STATE_FILE`),
 skip Fix and Validate and go directly to Continue?.
 
 ### Fixer assignment
@@ -359,7 +371,7 @@ Assignment strategy:
 - Cross-file issues or multi-file renames -> single atomic task to one fixer
 - Multiple fixers can run in parallel as long as they work on different files
 
-Coordinator collects skipped issues and records them to `PENDING_FILE`.
+Coordinator collects skipped issues and records them to `CR_STATE_FILE`.
 
 **Next**: go to Validate.
 
@@ -372,7 +384,7 @@ Coordinator collects skipped issues and records them to `PENDING_FILE`.
 - For doc-only modules: skip build/test; validation is done through review phases
 
 **All pass** (or no code modules to validate) -> remove successfully fixed issues from
-`PENDING_FILE` (they may have been recorded there from a previous Confirm approval),
+`CR_STATE_FILE` (they may have been recorded there from a previous Confirm approval),
 then proceed to Continue?.
 
 **Commit counting**: only commits that survive validation count as "commits produced"
@@ -383,8 +395,8 @@ for Continue? routing. Reverted commits do not count.
 fixers run in parallel).
 Identify the failing commit (bisect against the last-known-good if multiple commits,
 direct revert if only one), revert it, and send failure info to a new fixer for retry
-(max 2 retries). If still failing, revert and record to `PENDING_FILE`. If the issue was
-already in `PENDING_FILE` (a retry from Confirm), revert and ask the user: show the
+(max 2 retries). If still failing, revert and record to `CR_STATE_FILE`. If the issue was
+already in `CR_STATE_FILE` (a retry from Confirm), revert and ask the user: show the
 failure details and offer options — provide additional context or direction for another
 attempt, or skip (default). Skipped issues are added to the rejected list so they
 won't be reported again in subsequent rounds.
@@ -400,11 +412,11 @@ This phase is the **single routing authority** for the review-fix loop.
 Determine whether this round made meaningful progress:
 - **New confirmed issues were found this round** (issues that passed Filter existence
   check and were not de-duplicated away — regardless of whether they were auto-fixed
-  or recorded to `PENDING_FILE`):
+  or recorded to `CR_STATE_FILE`):
   -> Back to **Review** for a new round (fresh review to find further missed issues).
-- **No new issues AND `PENDING_FILE` has entries**:
+- **No new issues AND `CR_STATE_FILE` has pending entries**:
   -> **Confirm**.
-- **No new issues AND `PENDING_FILE` is empty**:
+- **No new issues AND `CR_STATE_FILE` has no pending entries**:
   -> **Report**.
 
 **Cycle detection**: before starting a new round, check whether the loop is making
@@ -412,15 +424,15 @@ meaningful progress. Force exit to Confirm/Report if any of these apply:
 - The same files and issue types keep appearing across consecutive rounds with no net
   reduction in issues.
 - Multiple consecutive rounds produce only reverted commits (all fixes fail validation)
-  and no new issues are found beyond those already in `PENDING_FILE`.
+  and no new issues are found beyond those already in `CR_STATE_FILE`.
 
-When forcing exit, go to Confirm if `PENDING_FILE` has entries, otherwise Report.
+When forcing exit, go to Confirm if `CR_STATE_FILE` has pending entries, otherwise Report.
 
 ---
 
 ## Phase 7: Confirm
 
-Collect all issues from `PENDING_FILE` that have not been resolved during the loop
+Collect all issues from `CR_STATE_FILE` that have not been resolved during the loop
 (in PR mode: all confirmed issues across rounds; in local mode: issues above threshold,
 failed fixes, rolled-back fixes). Deduplicate and present to the user. If the file is
 empty, skip to Report.
@@ -474,8 +486,8 @@ git worktree remove {WORKTREE_DIR}
 git branch -D pr-{number}
 ```
 
-Delete `PENDING_FILE` and `SESSION_FILE`. If `.cr-cache/` contains no other files,
-remove the directory as well.
+Delete `CR_STATE_FILE`. If `.cr-cache/` contains no other files, remove the directory
+as well.
 
 ---
 

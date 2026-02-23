@@ -1,6 +1,6 @@
 # Pending Issue Template
 
-Use this format to record all issues awaiting user confirmation in `PENDING_FILE`.
+Use this format to record issues in the `# Issues` section of `CR_STATE_FILE`.
 Each issue includes a **Status** tracking its lifecycle and a **Reason** describing
 why it was not auto-fixed.
 

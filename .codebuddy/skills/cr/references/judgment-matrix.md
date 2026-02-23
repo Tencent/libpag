@@ -1,7 +1,7 @@
 # Judgment Matrix
 
 The coordinator uses this matrix in Phase 3 to decide whether each confirmed issue
-should be auto-fixed, recorded to `PENDING_FILE` for user confirmation, or skipped
+should be auto-fixed, recorded to `CR_STATE_FILE` for user confirmation, or skipped
 entirely.
 
 ## Risk Level Assessment
