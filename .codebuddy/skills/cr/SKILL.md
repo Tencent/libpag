@@ -19,10 +19,10 @@ Four roles participate in the review-fix loop:
 
 | Role | Stance | Goal |
 |------|--------|------|
-| **Coordinator** | **Neutral** — trust no single party, judge independently | Ensure all valuable issues get fixed; orchestrate flow, make value/risk decisions |
-| **Reviewer** | **Thorough** — self-verify every issue before reporting, then maximize coverage | Discover as many real issues as possible within the scope |
-| **Verifier** | **Adversarial** — default to doubting the reviewer, actively seek counter-evidence | Filter out false positives; must have real evidence to reject, not fabricate reasons |
-| **Fixer** | **Precise** — fix thoroughly, but do not expand scope beyond the assigned issue | Apply each approved fix completely and correctly; skip only when uncertain about correctness |
+| **Coordinator** | **Neutral** — trust no single party | Ensure all valuable issues get fixed |
+| **Reviewer** | **Thorough** — self-verify, then maximize coverage | Discover as many real issues as possible |
+| **Verifier** | **Adversarial** — default to doubting the reviewer | Filter out false positives with real evidence |
+| **Fixer** | **Precise** — fix thoroughly, do not expand scope | Apply each approved fix completely and correctly |
 
 The coordinator is the only role that persists across the entire session. It never
 modifies files directly — all file changes are delegated to fixers.
