@@ -304,21 +304,9 @@ Reviewers and verifiers only see local code context. The coordinator is the only
 with a project-wide view — use it. When evaluating any issue, consider cross-module
 impact, project conventions, and architectural intent that local reviewers may miss.
 
-Use the verifier's verdict as the primary signal:
-
-- **Verifier CONFIRM**: coordinator does a quick plausibility check — verify that the
-  reviewer's description is consistent with the cited code snippet and that the
-  conclusion logically follows. If anything looks off, read the relevant code to
-  confirm. Otherwise accept and proceed to 3.2.
-- **Verifier REJECT (HIGH confidence)**: coordinator does a brief independent check —
-  review the verifier's reasoning and the cited code. If the counter-argument is sound,
-  drop the issue. If anything is questionable, escalate to full independent review
-  (same as MEDIUM/LOW below).
-- **Verifier REJECT (MEDIUM/LOW confidence)** or **reviewer–verifier disagree**:
-  coordinator must read the cited code **independently** and form its own judgment.
-  Do not default to either side — the reviewer's report and the verifier's rebuttal
-  are equally weighted inputs. Read the code, understand the actual behavior, then
-  decide based on what the code does, not on which argument sounds more persuasive.
+Use the verifier's verdict as input, not as a final decision. For each issue, review
+the reviewer's report, the verifier's reasoning, and the cited code, then form your
+own judgment. Drop the issue only when you are convinced it is not a real problem.
 
 The verifier only judges whether the issue exists. It does not assess value or risk.
 
