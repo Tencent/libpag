@@ -13,34 +13,6 @@ issues within the user's chosen auto-fix threshold are fixed automatically, the 
 are presented for user confirmation. In PR mode, issues are submitted as line-level
 PR review comments instead of direct commits.
 
-## Flow
-
-```
-Main path: Phase 0 → 1 → [Round: 2 → 3 → 4 → 5 → 6] → 7 → 8 (exit)
-```
-
-The multi-round loop exists primarily to **discover missed issues** — each round is a
-fresh review from a new perspective. In local mode, fixes between rounds also allow
-detecting newly introduced problems, but that is a secondary benefit.
-
-**Phase 3 routing (PR mode)**:
-- All confirmed issues → `PENDING_FILE`, skip Phase 4-5 → Phase 6
-
-**Phase 3 routing (local mode)**:
-- Auto-fix queue not empty → Phase 4
-- Auto-fix queue empty → Phase 6 (which routes to Phase 7 or 8)
-
-**Phase 6 routing (single authority for loop/exit)**:
-- New confirmed issues were found this round → Phase 2 (new round)
-- No new issues, `PENDING_FILE` not empty → Phase 7
-- No new issues, `PENDING_FILE` empty → Phase 8
-- Cycle detected (see Phase 6 for criteria) → Phase 7 or Phase 8
-
-**Phase 7 routing**:
-- **Local mode**: user approves fix(es) → Phase 4 (then normal 4 → 5 → 6 routing);
-  user skips all → Phase 8
-- **PR mode**: submit selected issues as line-level PR comments → Phase 8
-
 ## Roles
 
 Four roles participate in the review-fix loop:
@@ -75,11 +47,10 @@ reasoning process, or a new round's reviewer anchored by previous findings).
 **Delegation**: You (the coordinator) never modify files directly. Delegate all
 file changes to the fixer role. Read code only for arbitration and diagnosis.
 
-**Autonomy**: Between Phase 0 (user confirmation) and Phase 7 (remaining issue
-confirmation), the review-fix loop runs without user interaction unless a previously
-failed issue fails again in Phase 5 (which prompts inline). Issues above the auto-fix
-threshold and failed fixes are recorded to `PENDING_FILE` across rounds and presented
-to the user in Phase 7.
+**Autonomy**: Between Ask (Phase 0) and Confirm (Phase 7), the review-fix loop runs
+without user interaction unless a previously failed issue fails again in Validate
+(Phase 5, which prompts inline). Issues above the auto-fix threshold and failed fixes
+are recorded to `PENDING_FILE` across rounds and presented to the user in Confirm.
 
 **Parallelism**: Run reviewer, verifier, and fixer tasks in parallel whenever possible.
 Reviewers for different modules, verifiers for different issues, and fixers for
@@ -88,7 +59,7 @@ different files are all independent and can run concurrently.
 **Error handling**: Handle all unexpected situations autonomously — role execution
 timeout or failure, fix breaks the build, git operation fails, invalid output. Use
 your judgment: retry, skip and move on, etc. Anything that cannot be resolved
-automatically should be recorded to `PENDING_FILE` for user review in Phase 7.
+automatically should be recorded to `PENDING_FILE` for user review in Confirm.
 
 **User interaction**: All user-facing text must use the language the user has been
 using. When presenting choices with predefined options, use interactive dialogs with
@@ -111,7 +82,23 @@ selectable options rather than plain text. The user may send additional material
 
 ---
 
-## Phase 0: User Confirmation
+## Flow
+
+```
+Ask → Scope → [Round: Review → Filter → Fix → Validate → Continue?] → Confirm → Report
+```
+
+The multi-round loop exists primarily to **discover missed issues** — each round is a
+fresh review from a new perspective. In local mode, fixes between rounds also allow
+detecting newly introduced problems, but that is a secondary benefit.
+
+PR mode and local mode share the same multi-round loop. The only difference is that
+PR mode skips Fix and Validate within each round (no code modifications), and outputs
+line-level PR comments instead of commits at the end.
+
+---
+
+## Phase 0: Ask
 
 ### 0.1 Mode detection (pure string parsing, no tools)
 
@@ -132,12 +119,13 @@ Present all applicable questions in **one AskUserQuestion call**. See
 - **Question 2 — Auto-fix threshold** (skip in PR mode): Low+Medium / Low only /
   All confirm / Full auto
 
-After all questions are answered, no further user interaction until Phase 7 (except
-when a previously failed issue fails again in Phase 5, which prompts the user inline).
+**Next**: after all questions are answered, go to Scope. No further user interaction
+until Confirm (except when a previously failed issue fails again in Validate, which
+prompts the user inline).
 
 ---
 
-## Phase 1: Scope & Environment
+## Phase 1: Scope
 
 **Prerequisite**: Phase 0 questions have been answered. If not, STOP and return to
 Phase 0.2.
@@ -163,7 +151,7 @@ suffix (`-2`, `-3`, …) until an unused name is found. Record the chosen path a
   modifications will be made.
 - **Local mode**: verify not on the main/master branch (abort if so). If there are
   uncommitted changes, abort and ask the user to commit or stash first (fixes may be
-  committed even in all-confirm mode after user approval in Phase 7).
+  committed even in all-confirm mode after user approval in Confirm).
 
 ### 1.2 Scope Preparation
 
@@ -201,6 +189,8 @@ The scope (diff content, file list, module partitioning) determined here is **fi
 all rounds**. Subsequent rounds reuse the same scope without re-running diff or
 re-partitioning.
 
+**Next**: enter the review-fix loop starting with Review.
+
 ---
 
 ## Phase 2: Review
@@ -210,14 +200,14 @@ re-partitioning.
 These apply to every round including the first:
 
 - **Fixed scope**: the diff content, file list, and module partitioning are determined
-  once in Phase 1. Do not re-run `git diff` or re-partition modules in any round.
+  once in Scope. Do not re-run `git diff` or re-partition modules in any round.
 - **Independent review**: reviewers receive no information about previous rounds'
   findings, fixes, or outcomes. Each round is a fresh, unbiased review of the full
   scope — this is by design, so that different perspectives can catch issues missed in
   earlier rounds.
 - **Cross-round exclusion (coordinator only)**: after collecting reviewer results, the
   coordinator skips issues already recorded in `PENDING_FILE` or rejected by the user
-  in a previous Phase 7. Do **not** pass this exclusion list to reviewers — they review
+  in a previous Confirm. Do **not** pass this exclusion list to reviewers — they review
   with a clean slate. Previously fixed issues are **not excluded** — if a reviewer
   independently finds a new problem in code that was fixed last round, that is a valid
   new issue.
@@ -257,9 +247,11 @@ directly — treat it as if the verifier were absent for that issue.
 Each verifier receives the issue description and cited code. See
 `references/verifier-prompt.md` for the full verifier prompt.
 
+**Next**: go to Filter.
+
 ---
 
-## Phase 3: Filter & Risk Assessment — Coordinator Only
+## Phase 3: Filter & Assess (coordinator only)
 
 Three steps, applied to every issue in order:
 
@@ -269,7 +261,7 @@ Run de-duplication **before** consuming verifier results to avoid wasting effort
 known issues:
 
 - Skip any issue that matches one recorded in `PENDING_FILE` or **rejected by the
-  user** in a previous Phase 7. Previously fixed issues are not excluded — if a
+  user** in a previous Confirm. Previously fixed issues are not excluded — if a
   reviewer reports a new problem in already-fixed code, it is treated as a new issue.
 - **PR comment de-duplication** (PR mode): compare each confirmed issue against
   `EXISTING_PR_COMMENTS`. If an issue matches an existing comment (same file, same
@@ -312,16 +304,9 @@ and special rules. Determine:
 ### Routing by risk level
 
 The user's chosen auto-fix threshold determines handling for each fixable issue:
-- Issues at or below the threshold -> queued for auto-fix (Phase 4)
+- Issues at or below the threshold -> queued for auto-fix (Fix)
 - Issues above the threshold -> recorded to `PENDING_FILE` with the reason
-  (e.g., "above auto-fix threshold"), presented to the user in Phase 7
-
-### Mode-specific routing
-
-- **PR mode**: all confirmed issues are recorded to `PENDING_FILE`. Skip Phase 4-5
-  and go directly to Phase 6 (which decides whether to start a new round or exit).
-- **Local mode**: if no auto-fix issues remain, skip Phase 4-5 and go to Phase 6
-  (which routes to Phase 7 or Phase 8 based on `PENDING_FILE` state).
+  (e.g., "above auto-fix threshold"), presented to the user in Confirm
 
 ### Additional checks
 
@@ -330,12 +315,18 @@ The user's chosen auto-fix threshold determines handling for each fixable issue:
   fix task.
 - Previously rolled-back issues -> do not attempt again this round
 
+**Next**:
+- **PR mode**: all confirmed issues are recorded to `PENDING_FILE`. Skip Fix and
+  Validate, go directly to Continue?.
+- **Local mode**: if auto-fix queue is not empty, go to Fix. If auto-fix queue is
+  empty, skip Fix and Validate, go directly to Continue?.
+
 ---
 
 ## Phase 4: Fix
 
 If the auto-fix queue is empty (all issues were recorded to `PENDING_FILE`),
-skip Phase 4-5 and go directly to Phase 6.
+skip Fix and Validate and go directly to Continue?.
 
 ### Fixer assignment
 
@@ -345,7 +336,7 @@ Run one fixer per fix or file group (in parallel when possible). Each fixer rece
 - `references/fixer-instructions.md` verbatim
 
 Each fixer commits **per issue** (one commit per fix, immediately after applying it).
-This enables fine-grained bisection and revert in Phase 5.
+This enables fine-grained bisection and revert in Validate.
 
 Assignment strategy:
 - Group issues by file to minimize concurrent edit conflicts
@@ -353,6 +344,8 @@ Assignment strategy:
 - Multiple fixers can run in parallel as long as they work on different files
 
 Coordinator collects skipped issues and records them to `PENDING_FILE`.
+
+**Next**: go to Validate.
 
 ---
 
@@ -363,56 +356,58 @@ Coordinator collects skipped issues and records them to `PENDING_FILE`.
 - For doc-only modules: skip build/test; validation is done through review phases
 
 **All pass** (or no code modules to validate) -> remove successfully fixed issues from
-`PENDING_FILE` (they may have been recorded there from a previous Phase 7 approval),
-then proceed to Phase 6.
+`PENDING_FILE` (they may have been recorded there from a previous Confirm approval),
+then proceed to Continue?.
 
 **Commit counting**: only commits that survive validation count as "commits produced"
-for Phase 6 routing. Reverted commits do not count.
+for Continue? routing. Reverted commits do not count.
 
-**Failures**: record the HEAD **once, before any fixer starts** in Phase 4, as the
+**Failures**: record the HEAD **once, before any fixer starts** in Fix, as the
 "last known good" commit (this is the baseline for bisection regardless of how many
 fixers run in parallel).
 Identify the failing commit (bisect against the last-known-good if multiple commits,
 direct revert if only one), revert it, and send failure info to a new fixer for retry
 (max 2 retries). If still failing, revert and record to `PENDING_FILE`. If the issue was
-already in `PENDING_FILE` (a retry from Phase 7), revert and ask the user: show the
+already in `PENDING_FILE` (a retry from Confirm), revert and ask the user: show the
 failure details and offer options — provide additional context or direction for another
 attempt, or skip (default). Skipped issues are added to the rejected list so they
 won't be reported again in subsequent rounds.
 
+**Next**: go to Continue?.
+
 ---
 
-## Phase 6: Decide
+## Phase 6: Continue?
 
 This phase is the **single routing authority** for the review-fix loop.
 
 Determine whether this round made meaningful progress:
-- **New confirmed issues were found this round** (issues that passed Phase 3 existence
+- **New confirmed issues were found this round** (issues that passed Filter existence
   check and were not de-duplicated away — regardless of whether they were auto-fixed
   or recorded to `PENDING_FILE`):
-  -> Back to **Phase 2** for a new round (fresh review to find further missed issues).
+  -> Back to **Review** for a new round (fresh review to find further missed issues).
 - **No new issues AND `PENDING_FILE` has entries**:
-  -> **Phase 7** (Confirm).
+  -> **Confirm**.
 - **No new issues AND `PENDING_FILE` is empty**:
-  -> **Phase 8** (Report & Exit).
+  -> **Report**.
 
 **Cycle detection**: before starting a new round, check whether the loop is making
-meaningful progress. Force exit to Phase 7/8 if any of these apply:
+meaningful progress. Force exit to Confirm/Report if any of these apply:
 - The same files and issue types keep appearing across consecutive rounds with no net
   reduction in issues.
 - Multiple consecutive rounds produce only reverted commits (all fixes fail validation)
   and no new issues are found beyond those already in `PENDING_FILE`.
 
-When forcing exit, go to Phase 7 if `PENDING_FILE` has entries, otherwise Phase 8.
+When forcing exit, go to Confirm if `PENDING_FILE` has entries, otherwise Report.
 
 ---
 
-## Phase 7: Remaining Issue Confirmation
+## Phase 7: Confirm
 
 Collect all issues from `PENDING_FILE` that have not been resolved during the loop
 (in PR mode: all confirmed issues across rounds; in local mode: issues above threshold,
 failed fixes, rolled-back fixes). Deduplicate and present to the user. If the file is
-empty, skip to Phase 8.
+empty, skip to Report.
 
 1. Present issues in a compact numbered list. Each entry should fit on one line:
    `[number] [file:line] [risk] [reason] — [description]`
@@ -431,17 +426,17 @@ empty, skip to Phase 8.
    - **PR mode**: submit selected issues as **line-level** PR review comments via
      `gh api` (see `references/pr-comment-format.md` for the exact command). **Do not**
      use `gh pr comment` or `gh pr review` — these create general comments, not
-     line-level annotations. Then go to Phase 8.
+     line-level annotations. Then go to Report.
    - **Local mode**: if no issues were approved for fix (user skipped all), go to
-     Phase 8. Otherwise, send the user-approved issues to **Phase 4** (Fix) as the fix
-     queue. These issues were already verified in a previous Phase 3 — skip directly to
-     fix. From there the normal flow resumes: Phase 4, 5, 6, and Phase 6 routes as
-     usual (new round if commits were produced, Phase 7 again if new pending issues
-     accumulated, or Phase 8 if done).
+     Report. Otherwise, send the user-approved issues to **Fix** as the fix queue.
+     These issues were already verified in a previous Filter — skip directly to fix.
+     From there the normal flow resumes: Fix, Validate, Continue?, and Continue?
+     routes as usual (new round if new issues were found, Confirm again if new pending
+     issues accumulated, or Report if done).
 
 ---
 
-## Phase 8: Report & Exit
+## Phase 8: Report
 
 ### Summary Report
 
