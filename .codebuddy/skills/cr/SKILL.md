@@ -97,13 +97,8 @@ line-level PR comments after confirmation"):
 
 Options depend on 0.2 results (main/master branch, uncommitted changes).
 
-**On main/master**: auto-fix is disabled — fixes would commit directly to the
-protected branch. Only show:
-
-- "All confirm": no auto-fix, confirm every issue before any change.
-- "Review only": report issues without fixing.
-
-If uncommitted changes also exist, only show "Review only".
+**On main/master**: fixing is disabled — any commit would land directly on the
+protected branch. Enter review-only mode automatically (skip Q2, inform user).
 
 **Not on main/master, no uncommitted changes** — pre-select option 1:
 
