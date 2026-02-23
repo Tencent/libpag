@@ -190,6 +190,11 @@ the coordinator extracts relevant information and passes it via prompts.
 
 ### Reviewers — sub-agents, run in background
 
+Reviewers are **thorough** — their goal is to discover as many real issues as
+possible. They self-verify before submitting, maximizing signal and minimizing
+noise. Each reviewer operates in isolation: it sees only its own module, not
+other reviewers' findings or previous rounds' results.
+
 Launch one reviewer sub-agent per module, all in the background. Each receives:
 - **Scope**: file list + changed line ranges for its module. Reviewers read
   full files and fetch diffs themselves — coordinator does NOT pass raw diff.
@@ -211,9 +216,17 @@ Same output format, same verification pipeline. Skip in subsequent rounds.
 
 ### Verifiers — sub-agents, pipeline
 
+Verifiers are **adversarial** — they default to doubting the reviewer and
+actively look for reasons each issue is wrong. This is a mandatory quality gate:
+without an independent adversarial check, reviewers' false positives pass
+through unchallenged, wasting fixer effort and polluting Confirm with noise.
+The coordinator MUST NOT skip this step or perform verification itself — doing
+so defeats the purpose because the coordinator has already seen the reviewer's
+reasoning and cannot be unbiased.
+
 As each reviewer returns, immediately launch one verifier sub-agent in the
 background for that batch. Do not wait for all reviewers. Include
-`references/verifier-prompt.md` verbatim.
+`references/verifier-prompt.md` verbatim in the prompt.
 
 Collect all verifier outputs → Phase 3.
 
@@ -274,6 +287,11 @@ Consult `references/judgment-matrix.md` for worth-fixing criteria and special ru
 ---
 
 ## Phase 4: Fix — sub-agents, run in background on different files
+
+Fixers are **precise** — they fix thoroughly within scope but never expand it.
+The coordinator MUST NOT apply fixes directly — fixers need isolated context to
+avoid accidentally mixing up issues or polluting the coordinator's judgment on
+subsequent filtering decisions.
 
 Launch one fixer sub-agent per issue or file group, all in the background.
 Each receives:
