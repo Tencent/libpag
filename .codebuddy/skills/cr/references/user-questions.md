@@ -18,8 +18,8 @@ choice.
 
 ## Question 2 — Auto-fix threshold (skip in PR mode)
 
-In PR mode, add a note alongside Q1: "PR mode — issues will be submitted as PR
-review comments after your review."
+In PR mode, add a note alongside Q1: "PR mode — issues will be submitted as
+line-level PR review comments after your confirmation."
 
 Option 1 should be pre-selected as the default.
 
