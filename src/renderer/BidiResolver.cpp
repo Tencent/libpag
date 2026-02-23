@@ -23,29 +23,9 @@
 #include <SheenBidi/SBBase.h>
 #include <SheenBidi/SBCodepointSequence.h>
 #include <SheenBidi/SBParagraph.h>
+#include "UTF8Utils.h"
 
 namespace pagx {
-
-// Decode one UTF-8 character and return the number of bytes consumed.
-static size_t UTF8CharLength(const char* data, size_t remaining) {
-  if (remaining == 0) {
-    return 0;
-  }
-  auto byte = static_cast<uint8_t>(data[0]);
-  if (byte < 0x80) {
-    return 1;
-  }
-  if ((byte & 0xE0) == 0xC0 && remaining >= 2) {
-    return 2;
-  }
-  if ((byte & 0xF0) == 0xE0 && remaining >= 3) {
-    return 3;
-  }
-  if ((byte & 0xF8) == 0xF0 && remaining >= 4) {
-    return 4;
-  }
-  return 1;
-}
 
 BidiResult BidiResolver::Resolve(const std::string& text, BaseDirection baseDirection) {
   if (text.empty()) {

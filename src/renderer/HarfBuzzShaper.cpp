@@ -23,6 +23,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include "UTF8Utils.h"
 #include "hb.h"
 
 namespace pagx {
@@ -212,36 +213,6 @@ static std::vector<ShapedGlyph> ShapeRun(const std::string& text, size_t byteOff
     result.push_back(glyph);
   }
   return result;
-}
-
-// Decodes a UTF-8 sequence into a Unicode code point. Returns the number of bytes consumed.
-static size_t DecodeUTF8(const char* data, size_t length, int32_t* codepoint) {
-  if (length == 0) {
-    *codepoint = 0;
-    return 0;
-  }
-  auto byte = static_cast<uint8_t>(data[0]);
-  if (byte < 0x80) {
-    *codepoint = byte;
-    return 1;
-  }
-  if ((byte & 0xE0) == 0xC0 && length >= 2) {
-    *codepoint = ((byte & 0x1F) << 6) | (static_cast<uint8_t>(data[1]) & 0x3F);
-    return 2;
-  }
-  if ((byte & 0xF0) == 0xE0 && length >= 3) {
-    *codepoint = ((byte & 0x0F) << 12) | ((static_cast<uint8_t>(data[1]) & 0x3F) << 6) |
-                 (static_cast<uint8_t>(data[2]) & 0x3F);
-    return 3;
-  }
-  if ((byte & 0xF8) == 0xF0 && length >= 4) {
-    *codepoint = ((byte & 0x07) << 18) | ((static_cast<uint8_t>(data[1]) & 0x3F) << 12) |
-                 ((static_cast<uint8_t>(data[2]) & 0x3F) << 6) |
-                 (static_cast<uint8_t>(data[3]) & 0x3F);
-    return 4;
-  }
-  *codepoint = 0xFFFD;
-  return 1;
 }
 
 // A shaped run: a contiguous byte range with uniform font and script.
