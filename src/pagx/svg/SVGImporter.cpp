@@ -2329,11 +2329,20 @@ const std::unordered_map<std::string, std::string>& SVGParserContext::getStylePr
     return cacheIt->second;
   }
 
+  auto* classPtr = node->findAttribute("class");
+  auto* stylePtr = node->findAttribute("style");
+  bool hasClass = classPtr && !classPtr->empty();
+  bool hasStyle = stylePtr && !stylePtr->empty();
+
+  if (!hasClass && !hasStyle) {
+    static const std::unordered_map<std::string, std::string> emptyMap;
+    return emptyMap;
+  }
+
   auto& result = _stylePropertiesCache[node.get()];
 
   // CSS class rules (lowest priority): parse all matching classes.
-  auto* classPtr = node->findAttribute("class");
-  if (classPtr && !classPtr->empty()) {
+  if (hasClass) {
     const std::string& classAttr = *classPtr;
     size_t pos = 0;
     while (pos < classAttr.size()) {
@@ -2357,8 +2366,7 @@ const std::unordered_map<std::string, std::string>& SVGParserContext::getStylePr
   }
 
   // Style attribute (highest priority): overwrites class rules.
-  auto* stylePtr = node->findAttribute("style");
-  if (stylePtr && !stylePtr->empty()) {
+  if (hasStyle) {
     ParseStyleString(*stylePtr, result);
   }
 
