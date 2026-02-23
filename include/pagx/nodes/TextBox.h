@@ -20,10 +20,10 @@
 
 #include "pagx/nodes/Element.h"
 #include "pagx/types/Overflow.h"
+#include "pagx/types/ParagraphAlign.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/Size.h"
 #include "pagx/types/TextAlign.h"
-#include "pagx/types/ParagraphAlign.h"
 #include "pagx/types/WritingMode.h"
 
 namespace pagx {
