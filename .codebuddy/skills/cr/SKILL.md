@@ -57,7 +57,7 @@ Each round is a fresh review from a new perspective. PR mode and local mode shar
 the same loop — PR mode skips Fix and Validate (no code modifications) and outputs
 line-level PR comments instead of commits at the end.
 
-**Review-only mode** (Q2 = "Review only (uncommitted changes)"): only runs
+**Review-only mode** (Q2 = "Review only"): only runs
 Review → Filter → Report. No fixing, no commits. The user can request fixes
 for specific issues in follow-up conversation.
 
@@ -92,26 +92,12 @@ Priority levels apply to both code and document review checklists.
   Code: null dereference, out-of-bounds, race conditions. Docs: factual errors,
   contradictions.
 
-**Q2 — Uncommitted changes** (local mode, only if 0.2 found changes):
+**Q2 — Fix mode** (skip if PR mode; add note: "PR mode — issues submitted as
+line-level PR comments after confirmation"):
 
-Explain to user: uncommitted changes detected. Two options — commit first to
-enable auto-fix and review the full branch, or skip commit to review only the
-uncommitted changes (auto-fix unavailable, issues reported without fixing).
+Options depend on whether 0.2 found uncommitted changes.
 
-- "Commit and continue": commit all uncommitted changes with a message
-  describing the actual changes. Review scope = full branch diff.
-- "Review only (uncommitted changes)": skip commit, review only uncommitted
-  changes. Issues are reported but not fixed — you can request fixes for
-  specific issues afterwards.
-- "Abort": stop and let the user handle changes manually.
-
-If Q2 = Abort → stop.
-
-**Q3 — Auto-fix threshold** (skip if PR mode or review-only mode; add note
-for PR mode: "PR mode — issues submitted as line-level PR comments after
-confirmation"):
-
-Pre-select option 1 as default.
+**No uncommitted changes** — pre-select option 1:
 
 - "Low + Medium risk (recommended)": auto-fix most issues, only confirm
   high-risk ones (e.g., API changes, architecture decisions).
@@ -120,6 +106,19 @@ Pre-select option 1 as default.
 - "All confirm": no auto-fix, confirm every issue before any change.
 - "Full auto (risky)": auto-fix everything. Only issues affecting test
   baselines are deferred for confirmation.
+
+**Uncommitted changes detected** — explain that auto-fix requires committing
+first (to isolate fix commits). Pre-select option 1:
+
+- "Commit and auto-fix (Low + Medium, recommended)": commit changes, then
+  auto-fix most issues. Review scope = full branch diff.
+- "Commit and auto-fix (Low only)": commit changes, then auto-fix only
+  straightforward issues.
+- "Commit and auto-fix (Full auto, risky)": commit changes, then auto-fix
+  everything.
+- "Review only (no commit, no fix)": skip commit, review only uncommitted
+  changes. Issues are reported but not fixed — you can request fixes for
+  specific issues afterwards.
 
 **No further user interaction until Phase 7 Confirm.**
 
@@ -135,7 +134,7 @@ Pre-select option 1 as default.
    If exists, append a suffix to the new filename to avoid conflict
    (e.g., `pr-123-2.md`).
 
-2. If Q2 = Commit: `git add -A && git commit -m "<message based on changes>"`
+2. If Q2 is a "Commit and auto-fix" option: `git add -A && git commit -m "<message based on changes>"`
 
 ### 1.2 Prepare scope
 
