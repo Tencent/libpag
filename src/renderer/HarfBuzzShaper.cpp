@@ -75,51 +75,51 @@ class FontCache {
  public:
   FontCache(std::list<uint32_t>* lru, std::map<uint32_t, std::shared_ptr<hb_font_t>>* cache,
             std::mutex* mutex)
-      : _lru(lru), _cache(cache), _mutex(mutex) {
-    _mutex->lock();
+      : lru(lru), fontCache(cache), fontMutex(mutex) {
+    fontMutex->lock();
   }
   FontCache(const FontCache&) = delete;
   FontCache& operator=(const FontCache&) = delete;
   FontCache& operator=(FontCache&&) = delete;
 
   ~FontCache() {
-    _mutex->unlock();
+    fontMutex->unlock();
   }
 
   std::shared_ptr<hb_font_t> find(uint32_t fontId) {
-    auto iter = std::find(_lru->begin(), _lru->end(), fontId);
-    if (iter == _lru->end()) {
+    auto iter = std::find(lru->begin(), lru->end(), fontId);
+    if (iter == lru->end()) {
       return nullptr;
     }
-    _lru->erase(iter);
-    _lru->push_front(fontId);
-    return (*_cache)[fontId];
+    lru->erase(iter);
+    lru->push_front(fontId);
+    return (*fontCache)[fontId];
   }
 
   std::shared_ptr<hb_font_t> insert(uint32_t fontId, std::shared_ptr<hb_font_t> font) {
     if (hb_font_get_empty() == font.get()) {
       return nullptr;
     }
-    _cache->insert(std::make_pair(fontId, std::move(font)));
-    _lru->push_front(fontId);
-    while (_lru->size() > MAX_CACHE_SIZE) {
-      auto id = _lru->back();
-      _lru->pop_back();
-      _cache->erase(id);
+    fontCache->insert(std::make_pair(fontId, std::move(font)));
+    lru->push_front(fontId);
+    while (lru->size() > MAX_CACHE_SIZE) {
+      auto id = lru->back();
+      lru->pop_back();
+      fontCache->erase(id);
     }
-    return (*_cache)[fontId];
+    return (*fontCache)[fontId];
   }
 
   void reset() {
-    _lru->clear();
-    _cache->clear();
+    lru->clear();
+    fontCache->clear();
   }
 
  private:
   static constexpr size_t MAX_CACHE_SIZE = 100;
-  std::list<uint32_t>* _lru;
-  std::map<uint32_t, std::shared_ptr<hb_font_t>>* _cache;
-  std::mutex* _mutex;
+  std::list<uint32_t>* lru;
+  std::map<uint32_t, std::shared_ptr<hb_font_t>>* fontCache;
+  std::mutex* fontMutex;
 };
 
 static FontCache GetFontCache() {
