@@ -65,9 +65,9 @@ automatically should be recorded to `CR_STATE_FILE` for user review in Confirm.
 **User interaction**: All user-facing text must use the language the user has been
 using. When presenting choices with predefined options, use interactive dialogs with
 selectable options rather than plain text. The user may send additional material
-(files, URLs, context) at any time — process it at the next phase boundary (between
-phases, not mid-phase). Extra context takes effect in the next round; it does not
-alter already-running reviewers, verifiers, or fixers.
+(files, URLs, context) at any time — incorporate it at the next phase boundary. It
+does not alter already-running sub-agents but is available to the coordinator from
+the next phase onward.
 
 ## References
 
@@ -272,15 +272,12 @@ subsequent rounds — PR comments are only processed once.
 
 ### Verification (pipeline)
 
-Verification runs as a **pipeline**:
-1. As soon as any reviewer finishes, the coordinator **de-duplicates** its issues
-   against `CR_STATE_FILE` and issues already submitted by other reviewers this round.
-2. Surviving issues are sent to a verifier for that batch. Do not wait for all
-   reviewers to finish.
-3. Each verifier runs independently and can work in parallel with other verifiers
-   and still-running reviewers.
+Verification runs as a **pipeline** — as soon as any reviewer finishes and submits
+its issues, immediately launch one verifier for that reviewer's batch. Do not wait
+for all reviewers to finish. Each verifier runs independently and can work in parallel
+with other verifiers and still-running reviewers.
 
-Each verifier receives the de-duplicated batch of issues from one reviewer. See
+Each verifier receives the full batch of issues from one reviewer. See
 `references/verifier-prompt.md` for the full verifier prompt.
 
 **Next**: go to Filter.
@@ -293,17 +290,13 @@ Three steps, applied to every issue in order:
 
 ### 3.0 De-duplication
 
-Cross-reviewer and cross-round de-duplication is performed in two places:
-1. **Before verification** (in the pipeline, Phase 2): coordinator filters out
-   duplicates against `CR_STATE_FILE` and other reviewers' issues before sending
-   to verifiers. This avoids wasting verifier effort.
-2. **After verification** (here): final pass on verified issues to catch any
-   remaining duplicates that slipped through.
+Run de-duplication on all verified issues before proceeding:
 
-Rules:
 - Skip any issue that matches one recorded in `CR_STATE_FILE` or **rejected by the
   user** in a previous Confirm. Previously fixed issues are not excluded — if a
   reviewer reports a new problem in already-fixed code, it is treated as a new issue.
+- **Cross-reviewer de-duplication**: if multiple reviewers report the same issue in
+  different words, keep one.
 - **PR comment de-duplication** (PR mode): compare each confirmed issue against
   `EXISTING_PR_COMMENTS`. If an issue matches an existing comment (same file, same
   general location, same topic), exclude it — do not present it to the user.
@@ -435,23 +428,12 @@ For normal rounds, determine whether this round made meaningful progress:
   check and were not de-duplicated away — regardless of whether they were auto-fixed
   or recorded to `CR_STATE_FILE`):
   -> Back to **Review** for a new round (fresh review to find further missed issues).
-- **No new issues AND `CR_STATE_FILE` has pending entries**:
+- **No new issues AND `CR_STATE_FILE` has actionable entries** (not `fixed`, `failed`,
+  or `skipped`):
   -> **Confirm**.
-- **No new issues AND `CR_STATE_FILE` has no pending entries**:
+- **No new issues AND no actionable entries**:
   -> **Report**.
 
-**Cycle detection and round limits**: force exit to Confirm/Report if any of these
-apply:
-- **Max rounds reached**: 3 rounds (configurable per-project). Enough for diminishing
-  returns — most issues are found in round 1, round 2 catches stragglers.
-- **Stagnation**: 2 consecutive rounds where the same files and issue patterns keep
-  appearing with no net reduction in open issues.
-- **Fix failures**: 2 consecutive rounds where all fixes fail validation and no new
-  issues are found beyond those already in `CR_STATE_FILE`.
-
-When forcing exit, go to Confirm if `CR_STATE_FILE` has pending entries **and the
-previous phase was not Confirm** (to prevent Confirm ↔ Continue? loops), otherwise
-Report.
 
 ---
 
