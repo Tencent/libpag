@@ -300,6 +300,10 @@ known issues:
 
 ### 3.1 Existence check — is the issue real?
 
+Reviewers and verifiers only see local code context. The coordinator is the only role
+with a project-wide view — use it. When evaluating any issue, consider cross-module
+impact, project conventions, and architectural intent that local reviewers may miss.
+
 Use the verifier's verdict as the primary signal:
 
 - **Verifier CONFIRM**: coordinator does a quick plausibility check — verify that the
