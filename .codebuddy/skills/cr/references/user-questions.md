@@ -21,14 +21,10 @@ line-level PR review comments after your confirmation."
 
 Option 1 should be pre-selected as the default.
 
-- Option 1 — "Low + Medium risk (recommended)": auto-fix issues where the fix
-  approach is unambiguous or clear (e.g., null checks, naming, extract shared logic,
-  remove unused internals). Confirm issues involving design decisions or external
-  contract changes.
-- Option 2 — "Low risk only": auto-fix only issues where there is exactly one
-  reasonable fix — no room for debate (e.g., null checks, comment typos, naming,
-  `reserve`). Confirm everything else.
+- Option 1 — "Low + Medium risk (recommended)": auto-fix most issues, only confirm
+  high-risk ones (e.g., API changes, architecture decisions).
+- Option 2 — "Low risk only": auto-fix only the most straightforward issues (e.g.,
+  null checks, typos, naming). Confirm everything else.
 - Option 3 — "All confirm": no auto-fix, confirm every issue before any change.
-- Option 4 — "Full auto (risky)": auto-fix all risk levels, autonomously deciding
-  fix approach even for design decisions and external contract changes. Only issues
-  affecting test baselines are deferred for confirmation.
+- Option 4 — "Full auto (risky)": auto-fix everything. Only issues affecting test
+  baselines are deferred for confirmation.
