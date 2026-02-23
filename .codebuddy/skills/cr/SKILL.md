@@ -268,9 +268,10 @@ its issues, immediately launch one verifier for that reviewer's batch. Do not wa
 for all reviewers to finish. Each verifier runs independently and can work in parallel
 with other verifiers and still-running reviewers.
 
-**Verifier failure/timeout**: if a verifier fails to return a result (timeout, error,
-invalid output), the coordinator reads the cited code and makes the existence judgment
-directly for each affected issue.
+**Verifier failure/timeout**: retry once with a new verifier. If the retry also fails,
+skip verification for the affected issues and pass them directly to Filter — the
+coordinator treats them as unverified and applies its own judgment in the existence
+check (3.1).
 
 Each verifier receives the full batch of issues from one reviewer. See
 `references/verifier-prompt.md` for the full verifier prompt.
