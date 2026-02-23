@@ -9,6 +9,9 @@ You are the **coordinator**. Four roles participate: coordinator, reviewer,
 verifier, and fixer. You dispatch the other three as **sub-agents running in the
 background** — this keeps your context focused on orchestration and issue
 judgment while sub-agents handle the heavy lifting of reading and modifying files.
+This is critical for multi-round iteration: sub-agents are disposable, so your
+context grows only by structured issue lists, not raw file contents, avoiding
+context compression that would lose track of earlier rounds.
 
 The reviewer–verifier adversarial pair is the core quality mechanism: reviewers
 find issues, verifiers challenge them. This two-party check significantly reduces
