@@ -164,8 +164,7 @@ filename from the review scope:
 - **Local mode**: `.cr-cache/{branch}.md` (sanitize `/` to `-`, e.g.,
   `feature/dom_text_box` → `feature-dom_text_box.md`)
 
-If the file already exists (leftover from a crashed session, or another session is
-running on the same scope), ask the user whether to overwrite or abort. Record the
+If the file already exists (leftover from a crashed session), overwrite it. Record the
 chosen path as `CR_STATE_FILE` for all subsequent phases.
 
 **Test environment**:
