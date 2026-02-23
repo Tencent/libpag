@@ -83,7 +83,7 @@ PunctuationCategory PunctuationSquash::GetCategory(int32_t c) {
 // - Closing + Opening: both sides squashed (trailing space of prev + leading space of next)
 // - MiddleDot + Opening: both sides squashed (trailing quarter of prev + leading half of next)
 // - Opening + Opening: only prev squashed (trailing space removed)
-// - Closing + Closing: only next squashed (leading space removed)
+// - Closing + Closing: only next squashed (trailing space removed)
 // - Opening + Closing / Opening + MiddleDot: no squash (the glyph faces are already adjacent)
 
 SquashResult PunctuationSquash::GetAdjacentSquash(int32_t prevChar, int32_t nextChar) {
@@ -98,7 +98,7 @@ SquashResult PunctuationSquash::GetAdjacentSquash(int32_t prevChar, int32_t next
     case PunctuationCategory::Opening:
       switch (nextCat) {
         case PunctuationCategory::Opening:
-          // 「「: remove trailing space of prev opening bracket.
+          // 「「: remove leading whitespace of prev opening bracket.
           return {HALF, 0};
         default:
           // Opening + Closing or Opening + MiddleDot: glyph faces already adjacent, no squash.
@@ -111,10 +111,10 @@ SquashResult PunctuationSquash::GetAdjacentSquash(int32_t prevChar, int32_t next
           // 。「: remove trailing space of prev + leading space of next.
           return {HALF, HALF};
         case PunctuationCategory::Closing:
-          // 。」: remove leading space of next closing bracket.
+          // 。」: remove trailing whitespace of next closing punctuation.
           return {0, HALF};
         case PunctuationCategory::MiddleDot:
-          // 。・: remove trailing quarter of next middle dot.
+          // 。・: remove leading quarter of next middle dot.
           return {0, QUARTER};
         default:
           return {0, 0};
