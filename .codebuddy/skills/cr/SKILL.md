@@ -261,6 +261,13 @@ Run one reviewer per module (in parallel when possible). Each reviewer receives:
 - **Output format**: for each confirmed issue, report:
   `[file:line] [priority A/B/C] — [description] — [key lines]`
 
+**PR comment reviewer** (local mode with associated PR, **first round only**):
+In addition to module reviewers, launch a dedicated reviewer to verify PR review
+comments retrieved in 1.2 against the current code. For each comment, check whether
+the issue still exists and output in the same format as module reviewers. This
+reviewer's output goes through the same verification and filter pipeline. Skip in
+subsequent rounds — PR comments are only processed once.
+
 ### Verification (pipeline)
 
 Verification runs as a **pipeline** — as soon as any reviewer finishes and submits
@@ -290,11 +297,6 @@ known issues:
 - **PR comment de-duplication** (PR mode): compare each confirmed issue against
   `EXISTING_PR_COMMENTS`. If an issue matches an existing comment (same file, same
   general location, same topic), exclude it — do not present it to the user.
-- **Associated PR comment verification** (Local mode with associated PR, **first
-  round only**): for each PR review comment retrieved in 1.2, verify against the
-  current code whether the issue still exists. Verified issues are added to the fix
-  queue as additional known issues (using the same risk assessment flow). Skip this
-  step in subsequent rounds — these comments are only processed once.
 
 ### 3.1 Existence check — is the issue real?
 
