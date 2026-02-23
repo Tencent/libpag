@@ -380,6 +380,9 @@ Coordinator collects skipped issues and records them to `CR_STATE_FILE`.
 
 ## Phase 5: Validate
 
+Wait for **all fixers to finish** before running validation. Do not validate after
+each individual fixer.
+
 - For code/mixed modules: build + test using the project's commands. If no build/test
   commands are available (warned in 1.1), skip validation entirely.
 - For doc-only modules: skip build/test; validation is done through review phases
@@ -388,16 +391,17 @@ Coordinator collects skipped issues and records them to `CR_STATE_FILE`.
 `CR_STATE_FILE` (they may have been recorded there from a previous Confirm approval),
 then proceed to Continue?.
 
-**Failures**: record the HEAD **once, before any fixer starts** in Fix, as the
-"last known good" commit (this is the baseline for bisection regardless of how many
-fixers run in parallel).
-Identify the failing commit (bisect against the last-known-good if multiple commits,
-direct revert if only one), revert it, and send failure info to a new fixer for retry
-(max 2 retries). If still failing, revert and record to `CR_STATE_FILE`. If the issue was
-already in `CR_STATE_FILE` (a retry from Confirm), revert and ask the user: show the
-failure details and offer options — provide additional context or direction for another
-attempt, or skip (default). Skipped issues are added to the rejected list so they
-won't be reported again in subsequent rounds.
+**Failures**: identify which commit(s) caused the failure (bisect if multiple commits,
+obvious if only one). For each failing commit, launch a new fixer with the failure
+details (build/test error output) and the previous fixer's context (original issue,
+attempted fix, files changed). The new fixer fixes forward — no revert. Max 2 retry
+rounds per issue.
+
+If still failing after retries, revert the failing commit and record the issue to
+`CR_STATE_FILE` as `failed`. If the issue was already in `CR_STATE_FILE` (a retry
+from Confirm), revert and ask the user: show the failure details and offer options —
+provide additional context for another attempt, or skip (default). Skipped issues are
+marked `skipped` so they won't be reported again.
 
 **Next**: go to Continue?.
 
