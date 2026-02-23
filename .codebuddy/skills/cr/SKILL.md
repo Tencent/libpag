@@ -265,7 +265,7 @@ Previously fixed issues are NOT excluded — new problems in fixed code are vali
 | No | Yes | High |
 | No | No | Medium |
 
-**Fix approach** (Medium/High only, skip in review-only mode): specify the chosen approach and reasoning
+**Fix approach** (Medium/High only): specify the chosen approach and reasoning
 (which function to extract to, which API shape, which module owns the logic).
 Record in the issue's `Proposed` field. Low risk: single obvious fix, no guidance.
 
