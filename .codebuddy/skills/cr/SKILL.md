@@ -226,19 +226,18 @@ These apply to every round including the first:
 
 - **Restore state (coordinator only)**: at the start of each round, the coordinator
   reads `CR_STATE_FILE` to restore session context (scope, settings, issue list).
-  Reviewers do **not** read this file — the coordinator extracts only the scope
-  information (file list, module partitioning, diff ranges) and passes it to reviewers
-  via their task prompts, keeping the Issues section invisible to them.
-- **Independent review**: reviewers receive no information about previous rounds'
-  findings, fixes, or outcomes. Each round is a fresh, unbiased review of the full
-  scope — this is by design, so that different perspectives can catch issues missed in
-  earlier rounds.
-- **Cross-round exclusion (coordinator only)**: after collecting reviewer results, the
-  coordinator skips issues already recorded in `CR_STATE_FILE` or rejected by the user
-  in a previous Confirm. Do **not** pass this exclusion list to reviewers — they review
-  with a clean slate. Previously fixed issues are **not excluded** — if a reviewer
-  independently finds a new problem in code that was fixed last round, that is a valid
-  new issue.
+  Reviewers do **not** read this file directly.
+- **Known-issue exclusion list**: from the second round onward, the coordinator
+  extracts a minimal exclusion list from `CR_STATE_FILE` — each entry contains only
+  the file path, line range, and a one-line description. No risk levels, no verifier
+  verdicts, no fix outcomes, no rejection reasons. Reviewers use this list solely to
+  avoid re-reporting known issues and focus on finding new ones.
+- **Cross-round de-duplication (coordinator, Phase 3)**: after collecting reviewer
+  results, the coordinator still de-duplicates against `CR_STATE_FILE` as a safety
+  net — reviewers may report a known issue in different words. Issues rejected by
+  the user in a previous Confirm are also excluded. Previously fixed issues (local
+  mode) are **not excluded** — if a reviewer finds a new problem in code that was
+  fixed last round, that is a valid new issue.
 
 ### Reviewers
 
@@ -252,8 +251,10 @@ Run one reviewer per module (in parallel when possible). Each reviewer receives:
   user (e.g., if user chose "A + B", do not include Priority C items). For doc-only
   modules, always include all priority levels (A+B+C) regardless of user selection.
 - **Evidence requirement**: every issue must have a code citation (file:line + snippet)
-- **Exclusion list**: see the exclusion section in the corresponding checklist. Project
-  rules loaded in context take priority over the exclusion list.
+- **Known-issue exclusion** (from round 2 onward): skip issues matching the exclusion
+  list provided by the coordinator. Focus on finding new issues not already covered.
+- **Checklist exclusion**: see the exclusion section in the corresponding checklist.
+  Project rules loaded in context take priority over the exclusion list.
 - **PR context** (PR mode only): include existing PR review comments so reviewers
   have context on already-discussed topics
 - **Self-check**: before submitting results, re-read the relevant code and verify each
