@@ -75,7 +75,7 @@ for specific issues in follow-up conversation.
 
 ### 0.2 Pre-check — local mode only, before questions
 
-1. `git branch --show-current` → if main/master, abort.
+1. `git branch --show-current` → record whether on main/master.
 2. `git status --porcelain` → record whether uncommitted changes exist.
 
 ### 0.3 Questions — single interactive prompt
@@ -95,9 +95,17 @@ Priority levels apply to both code and document review checklists.
 **Q2 — Fix mode** (skip if PR mode; add note: "PR mode — issues submitted as
 line-level PR comments after confirmation"):
 
-Options depend on whether 0.2 found uncommitted changes.
+Options depend on 0.2 results (main/master branch, uncommitted changes).
 
-**No uncommitted changes** — pre-select option 1:
+**On main/master**: auto-fix is disabled — fixes would commit directly to the
+protected branch. Only show:
+
+- "All confirm": no auto-fix, confirm every issue before any change.
+- "Review only": report issues without fixing.
+
+If uncommitted changes also exist, only show "Review only".
+
+**Not on main/master, no uncommitted changes** — pre-select option 1:
 
 - "Low + Medium risk (recommended)": auto-fix most issues, only confirm
   high-risk ones (e.g., API changes, architecture decisions).
@@ -107,8 +115,8 @@ Options depend on whether 0.2 found uncommitted changes.
 - "Full auto (risky)": auto-fix everything. Only issues affecting test
   baselines are deferred for confirmation.
 
-**Uncommitted changes detected** — explain that auto-fix requires committing
-first (to isolate fix commits). Pre-select option 1:
+**Not on main/master, uncommitted changes detected** — explain that auto-fix
+requires committing first (to isolate fix commits). Pre-select option 1:
 
 - "Commit and auto-fix (Low + Medium, recommended)": commit changes, then
   auto-fix most issues. Review scope = full branch diff.
