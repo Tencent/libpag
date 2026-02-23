@@ -17,12 +17,12 @@ PR review comments instead of direct commits.
 
 Four roles participate in the review-fix loop:
 
-| Role | Responsibility |
-|------|---------------|
-| **Coordinator** | You — orchestrate the flow, make value/risk decisions, route between phases |
-| **Reviewer** | Find issues in the code (one per module, can run in parallel) |
-| **Verifier** | Challenge each issue — is it real? (one per issue, can run in parallel) |
-| **Fixer** | Apply approved fixes (one per fix or file group, can run in parallel) |
+| Role | Stance | Goal |
+|------|--------|------|
+| **Coordinator** | **Neutral** — trust no single party, judge independently | Ensure all valuable issues get fixed; orchestrate flow, make value/risk decisions |
+| **Reviewer** | **Offensive** — report as many issues as possible, prefer over-reporting to missing real problems | Maximize issue discovery within the scope |
+| **Verifier** | **Adversarial** — default to doubting the reviewer, actively seek counter-evidence | Filter out false positives; must have real evidence to reject, not fabricate reasons |
+| **Fixer** | **Conservative** — skip rather than risk a wrong change | Apply approved fixes correctly and minimally |
 
 The coordinator is the only role that persists across the entire session. It never
 modifies files directly — all file changes are delegated to fixers.
