@@ -95,8 +95,10 @@ Priority levels apply to both code and document review checklists.
   Code: null dereference, out-of-bounds, race conditions. Docs: factual errors,
   contradictions.
 
-**Q2 — Auto-fix threshold** (skip if PR mode; add note: "PR mode — issues
-submitted as line-level PR comments after confirmation"):
+**Q2 — Auto-fix threshold** (local mode only):
+
+PR mode skips Q2 — inform user that issues will be submitted as line-level PR
+comments after confirmation.
 
 If on main/master or uncommitted changes exist: inform user that auto-fix is
 unavailable (uncommitted changes or protected branch), enter review-only mode
