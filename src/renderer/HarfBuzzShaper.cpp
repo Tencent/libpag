@@ -311,7 +311,7 @@ std::vector<ShapedGlyph> HarfBuzzShaper::Shape(const std::string& text,
 
   // Phase 2: Per-run shaping — shape each run independently with full text context.
   std::vector<ShapedGlyph> result;
-  result.reserve(text.size());
+  result.reserve(text.size() / 2 + 1);
 
   for (auto& run : shapingRuns) {
     auto shaped = ShapeRun(text, run.byteStart, run.byteEnd - run.byteStart, run.font, run.script,
