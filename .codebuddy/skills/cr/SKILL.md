@@ -134,10 +134,11 @@ Phase 0.2.
 
 Automated checks — no user interaction.
 
-**Initialize `PENDING_FILE`**: set path to `/tmp/cr-pending-issues.md`. If the file
-already exists (leftover from a concurrent or crashed session), append a numeric
-suffix (`-2`, `-3`, …) until an unused name is found. Record the chosen path as
-`PENDING_FILE` for all subsequent phases.
+**Initialize `PENDING_FILE`**: create `.codebuddy/tmp/` if it does not exist, then set
+path to `.codebuddy/tmp/cr-pending.md`. If the file already exists (leftover from a
+concurrent or crashed session), append a numeric suffix (`-2`, `-3`, …) until an
+unused name is found. Record the chosen path as `PENDING_FILE` for all subsequent
+phases.
 
 **Test environment**:
 - Skip if PR mode. If the scope appears doc-only based on file extensions
@@ -458,7 +459,7 @@ git worktree remove {WORKTREE_DIR}
 git branch -D pr-{number}
 ```
 
-Delete `PENDING_FILE` from the temporary directory.
+Delete `PENDING_FILE`.
 
 ---
 
