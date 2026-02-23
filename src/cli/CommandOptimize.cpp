@@ -750,6 +750,16 @@ static bool ComputeShapeBounds(const std::vector<Element*>& contents, float& min
       maxX = std::max(maxX, polystar->center.x + r);
       maxY = std::max(maxY, polystar->center.y + r);
       hasGeometry = true;
+    } else if (type == NodeType::Path) {
+      auto path = static_cast<const Path*>(element);
+      if (path->data != nullptr && !path->data->isEmpty()) {
+        auto bounds = path->data->getBounds();
+        minX = std::min(minX, bounds.x);
+        minY = std::min(minY, bounds.y);
+        maxX = std::max(maxX, bounds.x + bounds.width);
+        maxY = std::max(maxY, bounds.y + bounds.height);
+        hasGeometry = true;
+      }
     }
   }
   return hasGeometry;
@@ -799,7 +809,8 @@ static void ComputeLocalizationOffset(const std::vector<Element*>& contents, flo
   }
 }
 
-static void ApplyLocalizationToElements(const std::vector<Element*>& contents, float offsetX,
+static void ApplyLocalizationToElements(PAGXDocument* document,
+                                        const std::vector<Element*>& contents, float offsetX,
                                         float offsetY) {
   for (auto* element : contents) {
     auto type = element->nodeType();
@@ -815,6 +826,33 @@ static void ApplyLocalizationToElements(const std::vector<Element*>& contents, f
       auto polystar = static_cast<Polystar*>(element);
       polystar->center.x -= offsetX;
       polystar->center.y -= offsetY;
+    } else if (type == NodeType::Path) {
+      auto path = static_cast<Path*>(element);
+      if (path->data != nullptr && !path->data->isEmpty()) {
+        auto newData = document->makeNode<PathData>();
+        path->data->forEach([&](PathVerb verb, const Point* pts) {
+          switch (verb) {
+            case PathVerb::Move:
+              newData->moveTo(pts[0].x - offsetX, pts[0].y - offsetY);
+              break;
+            case PathVerb::Line:
+              newData->lineTo(pts[0].x - offsetX, pts[0].y - offsetY);
+              break;
+            case PathVerb::Quad:
+              newData->quadTo(pts[0].x - offsetX, pts[0].y - offsetY, pts[1].x - offsetX,
+                              pts[1].y - offsetY);
+              break;
+            case PathVerb::Cubic:
+              newData->cubicTo(pts[0].x - offsetX, pts[0].y - offsetY, pts[1].x - offsetX,
+                               pts[1].y - offsetY, pts[2].x - offsetX, pts[2].y - offsetY);
+              break;
+            case PathVerb::Close:
+              newData->close();
+              break;
+          }
+        });
+        path->data = newData;
+      }
     } else if (type == NodeType::Text) {
       auto text = static_cast<Text*>(element);
       text->position.x -= offsetX;
@@ -835,7 +873,7 @@ static void ApplyLocalizationToElements(const std::vector<Element*>& contents, f
   }
 }
 
-static void LocalizeLayerCoordinates(Layer* layer, int& count) {
+static void LocalizeLayerCoordinates(PAGXDocument* document, Layer* layer, int& count) {
   if (!ShouldSkipLocalization(layer)) {
     float offsetX = 0.0f;
     float offsetY = 0.0f;
@@ -844,12 +882,12 @@ static void LocalizeLayerCoordinates(Layer* layer, int& count) {
     if (std::abs(offsetX) >= 0.001f || std::abs(offsetY) >= 0.001f) {
       layer->x += offsetX;
       layer->y += offsetY;
-      ApplyLocalizationToElements(layer->contents, offsetX, offsetY);
+      ApplyLocalizationToElements(document, layer->contents, offsetX, offsetY);
       count++;
     }
   }
   for (auto* child : layer->children) {
-    LocalizeLayerCoordinates(child, count);
+    LocalizeLayerCoordinates(document, child, count);
   }
 }
 
@@ -857,13 +895,13 @@ static int LocalizeCoordinates(PAGXDocument* document) {
   int count = 0;
 
   for (auto* layer : document->layers) {
-    LocalizeLayerCoordinates(layer, count);
+    LocalizeLayerCoordinates(document, layer, count);
   }
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Composition) {
       auto comp = static_cast<Composition*>(node.get());
       for (auto* layer : comp->layers) {
-        LocalizeLayerCoordinates(layer, count);
+        LocalizeLayerCoordinates(document, layer, count);
       }
     }
   }
