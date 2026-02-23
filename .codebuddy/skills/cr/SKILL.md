@@ -134,11 +134,12 @@ Phase 0.2.
 
 Automated checks — no user interaction.
 
-**Initialize `PENDING_FILE`**: create `.cr-cache/` if it does not exist, then set
-path to `.cr-cache/pending.md`. If the file already exists (leftover from a
-concurrent or crashed session), append a numeric suffix (`-2`, `-3`, …) until an
-unused name is found. Record the chosen path as `PENDING_FILE` for all subsequent
-phases.
+**Initialize session files**: create `.cr-cache/` if it does not exist. Check whether
+`.cr-cache/pending.md` already exists (leftover from a concurrent or crashed session).
+If it does, find the lowest unused numeric suffix (`-2`, `-3`, …) and apply it to
+**both** filenames: `pending-N.md` and `session-N.md`. Otherwise use the base names
+`pending.md` and `session.md`. Record the chosen paths as `PENDING_FILE` and
+`SESSION_FILE` for all subsequent phases.
 
 **Test environment**:
 - Skip if PR mode. If the scope appears doc-only based on file extensions
@@ -189,8 +190,8 @@ all subsequent rounds.
 
 ### 1.4 Persist Session State
 
-Write a session file to `.cr-cache/session.md` containing all information that must
-survive across rounds (context may be truncated in long sessions):
+Write `SESSION_FILE` (determined in 1.1) containing all information that must survive
+across rounds (context may be truncated in long sessions):
 
 - **Mode**: PR or Local
 - **User choices**: review priority, auto-fix threshold
@@ -200,7 +201,6 @@ survive across rounds (context may be truncated in long sessions):
 - **Diff summary**: for each file, the range of changed lines (not the full diff —
   reviewers will read files themselves)
 - **Build/test commands**: the commands used for baseline validation
-- **PENDING_FILE path**: the chosen path
 
 This file is read at the start of each round to restore context. Update it when
 state changes (e.g., after Confirm when the user rejects issues).
@@ -215,8 +215,8 @@ state changes (e.g., after Confirm when the user rejects issues).
 
 These apply to every round including the first:
 
-- **Scope from session file**: at the start of each round, read `.cr-cache/session.md`
-  to restore the file list, module partitioning, and other session state.
+- **Scope from session file**: at the start of each round, read `SESSION_FILE` to
+  restore the file list, module partitioning, and other session state.
 - **Independent review**: reviewers receive no information about previous rounds'
   findings, fixes, or outcomes. Each round is a fresh, unbiased review of the full
   scope — this is by design, so that different perspectives can catch issues missed in
@@ -474,8 +474,8 @@ git worktree remove {WORKTREE_DIR}
 git branch -D pr-{number}
 ```
 
-Delete `PENDING_FILE` and `.cr-cache/session.md`. If `.cr-cache/` contains no other
-files, remove the directory as well.
+Delete `PENDING_FILE` and `SESSION_FILE`. If `.cr-cache/` contains no other files,
+remove the directory as well.
 
 ---
 
