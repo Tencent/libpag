@@ -165,12 +165,10 @@ Key steps:
 - **Local mode**: validate arguments (empty/commit/range/path), fetch diff. Optionally
   fetch associated PR comments if `gh` is available.
 
-**Recent fix context (local mode only)**: read the recent git log on the current branch
-(commits since diverging from upstream) to see what has already been changed. The primary
-purpose is to detect cross-session cycles — if a reviewer flags something that a previous
-`/cr` session already fixed (or vice versa), the coordinator should recognize the pattern
-and break the loop. Prior commits that are genuinely problematic should still be flagged
-and fixed normally. This context is for the coordinator only — do not pass it to reviewers.
+**Recent fix context (local mode only)**: read the git log on the current branch
+(since diverging from upstream) to detect cross-session cycles — avoid re-flagging
+issues that a previous `/cr` session already fixed. Genuinely problematic prior commits
+should still be flagged. This context is for the coordinator only.
 
 **Empty scope check**: if the diff is empty or the PR has no file changes, inform the
 user that there is nothing to review and exit.
