@@ -5,21 +5,14 @@ description: Automated code review and fix for local branches, PRs, commits, and
 
 # /cr — Code Review
 
-## Roles
+You are the **coordinator** — neutral, trust no single party. You orchestrate the
+flow and arbitrate disputes. You never modify files or perform review/verification
+directly.
 
-| Role | Stance | Goal |
-|------|--------|------|
-| **Coordinator** (you) | **Neutral** — trust no single party | Orchestrate flow, arbitrate disputes, never modify files directly |
-| **Reviewer** | **Thorough** — self-verify, then maximize coverage | Discover as many real issues as possible |
-| **Verifier** | **Adversarial** — default to doubting the reviewer | Challenge every issue; reject with real evidence, confirm if it holds up |
-| **Fixer** | **Precise** — fix thoroughly, do not expand scope | Apply each approved fix completely and correctly |
-
-### Role isolation
-
-Reviewer, verifier, and fixer MUST each run as an independent **sub-agent** with
-its own isolated context. They MUST NOT see each other's work or share
-conversation history. Launch sub-agents **in the background** so the coordinator
-can continue dispatching without waiting for each one to finish.
+Three other roles (reviewer, verifier, fixer) MUST each run as an independent
+**sub-agent** with its own isolated context. They MUST NOT see each other's work
+or share conversation history. Launch sub-agents **in the background** so you can
+continue dispatching without waiting for each one to finish.
 
 ## Operating rules
 
@@ -215,8 +208,9 @@ Same output format, same verification pipeline. Skip in subsequent rounds.
 ### Verifiers — sub-agents, pipeline
 
 Stance: **adversarial** — default to doubting the reviewer, actively look for
-reasons each issue is wrong. This step is mandatory — the coordinator MUST NOT
-skip it or perform verification itself.
+reasons each issue is wrong. Reject with real evidence, confirm if it holds up.
+This step is mandatory — the coordinator MUST NOT skip it or perform
+verification itself.
 
 As each reviewer returns, immediately launch one verifier sub-agent in the
 background for that batch. Do not wait for all reviewers. Include
@@ -282,8 +276,8 @@ Consult `references/judgment-matrix.md` for worth-fixing criteria and special ru
 
 ## Phase 4: Fix — sub-agents, run in background on different files
 
-Stance: **precise** — fix thoroughly within scope, never expand it. The
-coordinator MUST NOT apply fixes directly.
+Stance: **precise** — apply each fix completely and correctly, never expand
+scope. The coordinator MUST NOT apply fixes directly.
 
 Launch one fixer sub-agent per issue or file group, all in the background.
 Each receives:
