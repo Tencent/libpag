@@ -439,8 +439,8 @@ For normal rounds, determine whether this round made meaningful progress:
 
 ## Phase 7: Confirm
 
-Collect all issues from `CR_STATE_FILE` with status `pending` or `failed` (in PR mode:
-all confirmed issues across rounds). Present to the user. If none, skip to Report.
+Collect all issues from `CR_STATE_FILE` with status `pending` or `failed`. Present to
+the user. If none, skip to Report.
 
 1. Present issues grouped by risk level (high → medium → low), sorted by file path
    within each group. Each entry should fit on one line:
