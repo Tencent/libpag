@@ -23,8 +23,9 @@ each other's output or share conversation history.
 - **Immediate interaction**: Mode detection (Phase 0.1) is pure string parsing —
   zero tool calls. Present Phase 0 questions immediately. Do NOT read any files,
   references, or run any commands before the user answers.
-- **Autonomy**: Between Ask (Phase 0) and Confirm (Phase 7), zero user
-  interaction. Pre-flight failures abort with a clear message.
+- **Autonomy**: After Ask (Phase 0), zero user interaction until Confirm
+  (Phase 7) or Report (Phase 8, if no Confirm). Pre-flight failures abort
+  with a clear message.
 - **Error handling**: Handle unexpected situations autonomously (timeout, build
   failure, invalid output). Record anything unresolvable to `CR_STATE_FILE` for
   user review in Confirm.
@@ -150,7 +151,7 @@ fixed).
 
 If diff is empty → exit.
 
-### 1.3 Build baseline — skip if PR mode or doc-only
+### 1.3 Build baseline — skip if PR mode, review-only mode, or doc-only
 
 If no build/test commands can be determined, warn that fix validation will be
 skipped and continue. Otherwise run build + test. Fail → abort.
@@ -370,5 +371,6 @@ Summary:
 - Final test result
 - PR mode: list comments submitted
 - Local mode with PR: note issues from PR comments
+- Review-only mode: list all confirmed issues (no fix/skip/fail stats)
 
 Cleanup: delete CR_STATE_FILE. PR mode: remove worktree and temp branch.
