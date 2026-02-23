@@ -7,21 +7,29 @@ entirely.
 ## Risk Level Assessment
 
 For each confirmed issue, the coordinator assigns a risk level that determines how it
-is handled. The user's chosen auto-fix threshold controls which risk levels are
-auto-fixed.
+is handled. Use the two questions below to classify — they provide a consistent
+boundary across sessions:
 
-**Low risk**: the fix is the only correct approach — any experienced developer would
-agree without discussion.
-- Examples: null check, fix incorrect comment, rename non-conforming variable, remove
+1. **Does the fix stay within a single function/method body?**
+   - Yes → **Low risk**
+   - No → go to question 2
+2. **Does the fix change externally observable behavior?** (public API signature or
+   semantics, serialization/persistence format, test baselines, threading model,
+   dependency graph)
+   - Yes → **High risk**
+   - No → **Medium risk**
+
+**Low risk**: fix is local to one function — any experienced developer would agree
+without discussion.
+- Examples: null check, fix incorrect comment, rename local variable, remove
   redundant duplicate code, add `reserve`, fix obvious off-by-one error
 
-**Medium risk**: the fix approach is clear but the impact extends beyond the immediate
-locality — the coordinator has enough context to judge, but it is not as self-evident as
-low risk.
+**Medium risk**: fix crosses function boundaries but does not change external
+contracts.
 - Examples: extracting shared logic across functions, removing unused internal methods,
   simplifying cross-function control flow, adjusting internal module boundaries
 
-**High risk**: the fix involves a design decision or changes an external contract —
+**High risk**: fix changes an external contract or involves a design decision —
 the code author or owner should weigh in.
 - Examples: public API change (signature, behavior, deprecation), test baseline change,
   architecture restructuring, algorithm replacement with multiple viable approaches,
