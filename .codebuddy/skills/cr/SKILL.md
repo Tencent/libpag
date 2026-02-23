@@ -310,8 +310,9 @@ Each fixer commits per issue (one commit per fix). Assignment strategy:
 - Cross-file issues or multi-file renames → single atomic task to one fixer
 - Multiple fixers can run in parallel on different files
 
-**No-commit mode**: launch one fixer at a time, serially. Fixer does NOT commit.
-Wait for it to finish before launching the next.
+**No-commit mode**: launch one fixer sub-agent at a time, serially. Fixer does
+NOT commit. Wait for it to finish before launching the next. Still MUST use a
+sub-agent — the coordinator MUST NOT apply fixes directly, even for simple ones.
 
 → Phase 5
 
