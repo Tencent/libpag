@@ -5,13 +5,13 @@ description: Automated code review and fix for local branches, PRs, commits, and
 
 # /cr — Code Review
 
-You are the **coordinator** (team-lead). Four roles participate: coordinator,
-reviewer, verifier, and fixer. In teams mode, you create an Agent Team and
-dispatch the other three as team members — this keeps your context focused on
-orchestration and issue judgment while agents handle the heavy lifting of reading
-and modifying files. This is critical for multi-round iteration: agents are
-disposable, so your context grows only by structured issue lists, not raw file
-contents, avoiding context compression that would lose track of earlier rounds.
+You are the **coordinator** (team-lead). You create an Agent Team and dispatch
+reviewer, verifier, and fixer agents as team members — this keeps your context
+focused on orchestration and issue judgment while agents handle the heavy lifting
+of reading and modifying files. This is critical for multi-round iteration:
+agents are disposable, so your context grows only by structured issue lists, not
+raw file contents, avoiding context compression that would lose track of earlier
+rounds.
 
 The reviewer–verifier adversarial pair is the core quality mechanism: reviewers
 find issues, verifiers challenge them. This two-party check significantly reduces
@@ -51,26 +51,20 @@ share conversation history.
 | `references/judgment-matrix.md` | Coordinator (risk & worth-fixing) |
 | `references/pending-templates.md` | Coordinator (CR_STATE_FILE format) |
 | `references/scope-preparation.md` | Coordinator (git/gh commands) |
-| `references/pr-comment-format.md` | Coordinator (gh api format) |
+| `references/pr-comment-format.md` | Coordinator (PR comment format) |
 
 ---
 
 ## Flow
 
 ```
-Ask → Scope → [ Review → Filter → Continue? ] → (mode split) → Report
+Ask → Scope → [ Review → Filter → Continue? ] → Confirm → Report
+                  ↑          Fix ← Validate ←┘
 ```
 
-The review loop (Review → Filter → Continue?) is shared by all modes. Each round
-is a fresh review from a new perspective. The loop repeats as long as new issues
-are found. After the loop ends, the flow diverges:
-
-- **Review-only mode**: → Report. No fixing, no commits. The user can request
-  fixes for specific issues in follow-up conversation.
-- **PR mode (teams)**: → Confirm (select which issues to submit as PR comments) → Report.
-- **Auto-fix local mode (teams)**: → Fix → Validate → Continue? (new issues from
-  fix? → new Review round). When no new issues remain: if `pending` or `failed`
-  entries exist → Confirm → Fix → Validate → ... repeat until done → Report.
+Phase 0 determines the mode. PR mode and review-only mode follow a simplified
+flow described in the appendix. The main flow below covers **auto-fix local
+mode** (teams + automatic fixing).
 
 ---
 
@@ -80,8 +74,8 @@ are found. After the loop ends, the flow diverges:
 
 | `$ARGUMENTS` pattern | Mode |
 |----------------------|------|
-| Purely numeric (`123`) | PR |
-| URL containing `/pull/` | PR |
+| Purely numeric (`123`) | PR → see Appendix A |
+| URL containing `/pull/` | PR → see Appendix A |
 | Everything else (empty, commit, range, path) | Local |
 
 ### 0.2 Pre-check — local mode only, before questions
@@ -105,21 +99,11 @@ Priority levels apply to both code and document review checklists.
   Code: null dereference, out-of-bounds, race conditions. Docs: factual errors,
   contradictions.
 
-**Q2 — Teams mode** (always):
-
-- "Enable teams (recommended)": create an Agent Team for parallel review with
-  independent reviewer, verifier, and fixer agents.
-- "Quick review": coordinator handles everything directly, review-only — issues
-  are reported but not fixed.
-
-**Q3 — Auto-fix threshold** (only if Q2 = teams AND local mode):
-
-PR mode skips Q3 — inform user that issues will be submitted as line-level PR
-comments after confirmation.
+**Q2 — Auto-fix threshold**:
 
 If on main/master or uncommitted changes exist: inform user that auto-fix is
 unavailable (uncommitted changes or protected branch), enter review-only mode
-for fixing (review with teams, but no auto-fix), skip Q3.
+automatically (see Appendix B), skip Q2.
 
 Otherwise:
 
@@ -129,8 +113,7 @@ Otherwise:
   null checks, typos, naming). Confirm everything else.
 - "Full auto (risky)": auto-fix everything. Only issues affecting test
   baselines are deferred for confirmation.
-- "Review only": report issues without fixing. You can request fixes for
-  specific issues in follow-up conversation.
+- "Review only": report issues without fixing. See Appendix B.
 
 **No further user interaction until Phase 7 Confirm.**
 
@@ -141,29 +124,20 @@ Otherwise:
 ### 1.1 Init
 
 1. Create `.cr-cache/` if needed. CR_STATE_FILE path:
-   - PR mode: `.cr-cache/pr-{number}.md`
-   - Local mode: `.cr-cache/{branch}.md` (sanitize `/` to `-`)
-   If exists, append a suffix to the new filename to avoid conflict
-   (e.g., `pr-123-2.md`).
+   `.cr-cache/{branch}.md` (sanitize `/` to `-`).
+   If exists, append a suffix to avoid conflict (e.g., `feature-foo-2.md`).
 
 ### 1.2 Prepare scope
 
-Follow `references/scope-preparation.md` for all git/gh commands, argument
-handling, and PR comment retrieval.
+Follow `references/scope-preparation.md` for all git/gh commands and argument
+handling.
 
-**Review-only mode with uncommitted changes**: scope is uncommitted changes
-only (`git diff HEAD`), ignoring branch commits and `$ARGUMENTS`.
-
-**Review-only mode on main/master (no uncommitted changes)**: scope follows
-normal argument handling below.
-
-**Auto-fix local mode**: also read git log since upstream for recent-fix context
-(coordinator only — avoid re-flagging issues a previous `/cr` session already
-fixed).
+Also read git log since upstream for recent-fix context (coordinator only —
+avoid re-flagging issues a previous `/cr` session already fixed).
 
 If diff is empty → exit.
 
-### 1.3 Build baseline — skip if PR mode, review-only mode, or doc-only
+### 1.3 Build baseline — skip if doc-only
 
 If no build/test commands can be determined, warn that fix validation will be
 skipped and continue. Otherwise run build + test. Fail → abort.
@@ -181,9 +155,7 @@ Partition files in scope into **review modules** for parallel review.
 Write CR_STATE_FILE with two sections:
 
 **`# Session`** — written once, read every round:
-- Mode, user choices (priority, threshold, teams mode)
-- PR metadata (if PR): number, `HEAD_SHA`, `BASE_BRANCH`, `PR_BRANCH`,
-  `WORKTREE_DIR`, `EXISTING_PR_COMMENTS`
+- Mode, user choices (priority, threshold)
 - File list with module assignments and types (code/doc/mixed)
 - Changed line ranges per file (not full diff — reviewers read files themselves)
 - Build/test commands
@@ -212,7 +184,7 @@ the coordinator extracts relevant information and passes it via prompts.
   issues from prior Confirm are also excluded. Previously fixed issues are
   **not excluded** — new problems in fixed code are valid new issues.
 
-### Teams mode — team setup
+### Team setup
 
 Create a new team for this round. Each round gets a fresh team — do not reuse
 agents from prior rounds (they lose context after team close).
@@ -221,7 +193,7 @@ agents from prior rounds (they lose context after team close).
 - One `general-purpose` **verifier** agent (`verifier`), shared across all
   modules.
 
-### Teams mode — reviewer prompt
+### Reviewer prompt
 
 Stance: **thorough** — discover as many real issues as possible, self-verify
 before submitting.
@@ -236,7 +208,6 @@ Each reviewer receives:
   exclusion list. Focus on finding new issues.
 - **Checklist exclusion**: see the exclusion section in the corresponding
   checklist. Project rules loaded in context take priority.
-- **PR context** (PR mode only): include existing PR review comments for context.
 - **Self-check**: before submitting, re-read the relevant code and verify each
   issue. Mark as confirmed or withdrawn. Only submit confirmed issues.
 - **Output format**: `[file:line] [A/B/C] — [description] — [key lines]`
@@ -245,7 +216,7 @@ Each reviewer receives:
 one additional agent to verify PR review comments against current code.
 Same output format, same verification pipeline. Skip in subsequent rounds.
 
-### Teams mode — verification (pipeline)
+### Verification (pipeline)
 
 Stance: **adversarial** — default to doubting the reviewer, actively look for
 reasons each issue is wrong. Reject with real evidence, confirm if it holds up.
@@ -257,19 +228,11 @@ finish. As each reviewer reports issues, the coordinator forwards them to the
 verifier immediately. Include `references/verifier-prompt.md` verbatim in the
 verifier's prompt.
 
-### Teams mode — after review
+### After review
 
 - **Keep all reviewers alive** — they will be reused as fixers in Phase 4
   (they already have full context on the code).
 - Close the verifier after all verification is complete.
-
-### Quick review mode
-
-Coordinator handles everything directly without creating a team:
-- Read each module's files and apply the checklist.
-- For each issue found, self-verify by re-reading the code.
-- Output issues in the same format as reviewer agents.
-- Coordinator also performs verification (no separate verifier).
 
 → Phase 3
 
@@ -287,7 +250,6 @@ reviewers may miss.
 - Remove issues already in CR_STATE_FILE
 - Remove cross-reviewer duplicates (same location, same topic)
 - Remove user-rejected issues from prior Confirm
-- PR mode: remove matches to `EXISTING_PR_COMMENTS`
 
 Previously fixed issues are NOT excluded — new problems in fixed code are valid.
 
@@ -316,8 +278,6 @@ Consult `references/judgment-matrix.md` for worth-fixing criteria and special ru
 
 All confirmed issues are recorded to CR_STATE_FILE with risk level.
 
-Auto-fix local mode additionally splits issues:
-
 | Risk vs user threshold | → |
 |------------------------|---|
 | At or below threshold | auto-fix queue |
@@ -327,11 +287,11 @@ Auto-fix local mode additionally splits issues:
   outside the fixer's module, create a follow-up fix task.
 - Previously rolled-back issues: do not attempt again this round.
 
-→ Phase 6 (Continue?). If auto-fix queue is non-empty → Phase 4 first.
+→ Phase 4 if auto-fix queue is non-empty; otherwise → Phase 6.
 
 ---
 
-## Phase 4: Fix — teams mode, auto-fix local mode only
+## Phase 4: Fix
 
 Stance: **precise** — apply each fix completely and correctly, never expand
 scope. The coordinator MUST NOT apply fixes directly.
@@ -380,7 +340,7 @@ Wait for all fixers. Run build + test.
 ### Step 1: Close the current round's team
 
 Close the team to release reviewers and fixers. Force-terminate any unresponsive
-agents. Skip if quick review mode (no team to close).
+agents.
 
 ### Step 2: Route
 
@@ -390,9 +350,7 @@ agents. Skip if quick review mode (no team to close).
 |-----------|---|
 | New confirmed issues this round | Phase 2 (new review round) |
 | Arriving from Validate (Phase 5) | Phase 2 (regression review round) |
-| No new issues, review-only mode | Phase 8 |
-| No new issues, PR mode | Phase 7 |
-| No new issues, auto-fix with `pending` or `failed` | Phase 7 |
+| `pending` or `failed` in CR_STATE_FILE | Phase 7 |
 | Otherwise | Phase 8 |
 
 ---
@@ -406,13 +364,9 @@ file path within each group:
 - **≤5 issues**: individual fix/skip choices per issue.
 - **>5 issues**: Fix all / Skip all / By risk group / Individual
 
-**PR mode**: mark selected issues for submission, declined `skipped`. Submit
-via `gh api` (see `references/pr-comment-format.md`). Do NOT use
-`gh pr comment` or `gh pr review`. → Phase 8.
-
-**Auto-fix local mode**: mark selected `approved`, declined `skipped`. Send
-approved to Fix → Validate → Continue? (which may route to a new Review round
-for regression check). All skipped → Phase 8.
+Mark selected `approved`, declined `skipped`. Send approved to Phase 4
+(Fix → Validate → Continue?, which may route to a new Review round for
+regression check). All skipped → Phase 8.
 
 ---
 
@@ -420,9 +374,7 @@ for regression check). All skipped → Phase 8.
 
 ### Cleanup
 
-- Teams mode: force-terminate any agents still running. Close the team.
-- PR mode: remove worktree and temp branch.
-- Delete CR_STATE_FILE.
+Force-terminate any agents still running. Close the team. Delete CR_STATE_FILE.
 
 ### Summary
 
@@ -430,6 +382,77 @@ for regression check). All skipped → Phase 8.
 - Issues found / fixed / skipped / failed
 - Rolled-back issues and reasons
 - Final test result
-- PR mode: list comments submitted
-- Local mode with PR: note issues from PR comments
-- Review-only mode: list all confirmed issues (no fix/skip/fail stats)
+- Local mode with associated PR: note issues from PR comments
+
+---
+
+## Appendix A: PR Mode
+
+PR mode reviews a pull request and submits issues as line-level PR comments.
+The coordinator handles everything directly — no Agent Team, no auto-fix.
+
+### Phase 0
+
+Mode detection identifies PR from numeric or `/pull/` URL argument. Ask Q1
+(Review priority) only. Skip Q2 — inform user that issues will be submitted as
+line-level PR comments.
+
+### Phase 1: Scope
+
+1. Init CR_STATE_FILE at `.cr-cache/pr-{number}.md`.
+2. Follow `references/scope-preparation.md` for PR-specific setup: fetch PR
+   ref into a worktree, determine `BASE_BRANCH`, fetch diff, fetch existing
+   PR review comments for de-duplication. Record `WORKTREE_DIR` for cleanup.
+3. Module partitioning (same as main flow).
+4. Persist state (include PR metadata: number, `HEAD_SHA`, `BASE_BRANCH`,
+   `PR_BRANCH`, `WORKTREE_DIR`, `EXISTING_PR_COMMENTS`).
+
+### Phase 2–3: Review & Filter
+
+Coordinator reviews and filters directly (same as Appendix B review-only).
+Additional de-dup: remove matches to `EXISTING_PR_COMMENTS`.
+
+### Phase 7: Confirm
+
+Present confirmed issues to user. User selects which to submit as PR comments,
+declines are marked `skipped`. Submit via `gh api` using
+`references/pr-comment-format.md`. Do NOT use `gh pr comment` or `gh pr review`.
+
+### Phase 8: Report
+
+Summary of issues found / submitted / skipped. Remove worktree and temp branch.
+Delete CR_STATE_FILE.
+
+---
+
+## Appendix B: Review-Only Mode
+
+Review-only mode reports issues without fixing. The coordinator handles
+everything directly — no Agent Team, no auto-fix, no commits.
+
+Entered when:
+- User selects "Review only" in Q2.
+- On main/master or uncommitted changes exist (automatic, Q2 skipped).
+
+### Phase 1: Scope
+
+Same as main flow Phase 1, with differences:
+- Skip build baseline.
+- **Uncommitted changes**: scope is `git diff HEAD` only, ignoring branch
+  commits and `$ARGUMENTS`.
+- **Main/master (no uncommitted changes)**: scope follows normal argument
+  handling.
+
+### Phase 2–3: Review & Filter
+
+Coordinator reviews and filters directly without creating a team:
+- Read each module's files and apply the checklist.
+- For each issue found, self-verify by re-reading the code.
+- Output issues in the same format as reviewer agents.
+- Apply the same Filter logic (risk level, fix approach, de-dup). Record all
+  confirmed issues to CR_STATE_FILE.
+
+### Phase 8: Report
+
+List all confirmed issues with risk levels and fix approaches. No fix/skip/fail
+stats. Delete CR_STATE_FILE.
