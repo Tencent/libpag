@@ -1066,11 +1066,25 @@ static bool ElementsStructurallyEqual(const Element* a, const Element* b) {
   if (type == NodeType::Text) {
     auto ta = static_cast<const Text*>(a);
     auto tb = static_cast<const Text*>(b);
-    return ta->text == tb->text && ta->fontFamily == tb->fontFamily &&
-           ta->fontStyle == tb->fontStyle && ta->fontSize == tb->fontSize &&
-           ta->letterSpacing == tb->letterSpacing && ta->fauxBold == tb->fauxBold &&
-           ta->fauxItalic == tb->fauxItalic && ta->textAnchor == tb->textAnchor &&
-           ta->glyphRuns.size() == tb->glyphRuns.size();
+    if (ta->text != tb->text || ta->fontFamily != tb->fontFamily ||
+        ta->fontStyle != tb->fontStyle || ta->fontSize != tb->fontSize ||
+        ta->letterSpacing != tb->letterSpacing || ta->fauxBold != tb->fauxBold ||
+        ta->fauxItalic != tb->fauxItalic || ta->textAnchor != tb->textAnchor ||
+        ta->glyphRuns.size() != tb->glyphRuns.size()) {
+      return false;
+    }
+    for (size_t i = 0; i < ta->glyphRuns.size(); i++) {
+      auto ra = ta->glyphRuns[i];
+      auto rb = tb->glyphRuns[i];
+      if (ra->font != rb->font || ra->fontSize != rb->fontSize || ra->glyphs != rb->glyphs ||
+          ra->x != rb->x || ra->y != rb->y || ra->xOffsets != rb->xOffsets ||
+          ra->positions != rb->positions || ra->anchors != rb->anchors ||
+          ra->scales != rb->scales || ra->rotations != rb->rotations ||
+          ra->skews != rb->skews) {
+        return false;
+      }
+    }
+    return true;
   }
   if (type == NodeType::TextBox) {
     auto tba = static_cast<const TextBox*>(a);
