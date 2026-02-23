@@ -86,7 +86,7 @@ selectable options rather than plain text. The user may send additional material
 ## Flow
 
 ```
-Ask → Scope → [Round: Review → Filter → Fix → Validate → Continue?] → Confirm → Report
+Ask → Scope → [Round: Review → Filter → [Fix ↔ Validate] → Continue?] → Confirm → Report
 ```
 
 The multi-round loop exists primarily to **discover missed issues** — each round is a
@@ -387,21 +387,20 @@ each individual fixer.
   commands are available (warned in 1.1), skip validation entirely.
 - For doc-only modules: skip build/test; validation is done through review phases
 
-**All pass** (or no code modules to validate) -> remove successfully fixed issues from
-`CR_STATE_FILE` (they may have been recorded there from a previous Confirm approval),
-then proceed to Continue?.
+**All pass** → remove successfully fixed issues from `CR_STATE_FILE`, go to Continue?.
 
-**Failures**: identify which commit(s) caused the failure (bisect if multiple commits,
-obvious if only one). For each failing commit, launch a new fixer with the failure
-details (build/test error output) and the previous fixer's context (original issue,
-attempted fix, files changed). The new fixer fixes forward — no revert. Max 2 retry
-rounds per issue.
-
-If still failing after retries, revert the failing commit and record the issue to
-`CR_STATE_FILE` as `failed`. If the issue was already in `CR_STATE_FILE` (a retry
-from Confirm), revert and ask the user: show the failure details and offer options —
-provide additional context for another attempt, or skip (default). Skipped issues are
-marked `skipped` so they won't be reported again.
+**Failure** → identify which commit(s) caused it (bisect if multiple, obvious if one).
+For each failing commit:
+- If the issue still has retries left (max 2 per issue): go back to **Fix** with the
+  failure details (build/test error output) and previous fixer's context (original
+  issue, attempted fix, files changed). After Fix completes, return here to validate
+  again. This Fix → Validate loop repeats until all pass or retries are exhausted.
+- If retries exhausted: revert the failing commit and record the issue to
+  `CR_STATE_FILE` as `failed`.
+- If the issue was already in `CR_STATE_FILE` (a retry from Confirm): revert and
+  ask the user — show failure details and offer options: provide additional context
+  for another attempt, or skip (default). Skipped issues are marked `skipped` so
+  they won't be reported again.
 
 **Next**: go to Continue?.
 
