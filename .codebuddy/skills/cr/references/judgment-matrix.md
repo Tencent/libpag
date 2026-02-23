@@ -1,42 +1,18 @@
 # Judgment Matrix
 
-The coordinator uses this matrix in Phase 3 to decide whether each confirmed issue
-should be auto-fixed, recorded to `CR_STATE_FILE` for user confirmation, or skipped
-entirely.
+Risk level is determined by SKILL.md Phase 3.2. This file provides handling rules,
+worth-fixing criteria, and risk level examples.
 
-## Risk Level Assessment
+## Risk Level Examples
 
-For each confirmed issue, the coordinator assigns a risk level that determines how it
-is handled. Use the two questions below to classify — they provide a consistent
-boundary across sessions:
-
-1. **Is there only one reasonable way to fix this?** Any developer familiar with the
-   context would write essentially the same fix, regardless of how many files it
-   touches.
-   - Yes → **Low risk**
-   - No → go to question 2
-2. **Does the fix involve a design decision or change an external contract?** (public
-   API signature or semantics, serialization/persistence format, test baselines,
-   threading model, dependency graph, algorithm choice with trade-offs)
-   - Yes → **High risk**
-   - No → **Medium risk**
-
-**Low risk**: the fix is the only correct approach — unambiguous and mechanical.
-- Examples: null check, fix incorrect comment, rename to match convention, remove
+- **Low**: null check, fix incorrect comment, rename to match convention, remove
   redundant duplicate code, add `reserve`, fix obvious off-by-one error
-
-**Medium risk**: the fix approach is clear but requires judgment about scope or
-side effects — not purely mechanical.
-- Examples: extracting shared logic across functions, removing unused internal methods,
-  simplifying cross-function control flow, adjusting internal module boundaries
-
-**High risk**: multiple viable fix approaches exist, or the fix changes an external
-contract — the code author or owner should weigh in.
-- Examples: public API change (signature, behavior, deprecation), test baseline change,
+- **Medium**: extracting shared logic across functions, removing unused internal
+  methods, simplifying cross-function control flow, adjusting internal module boundaries
+- **High**: public API change (signature, behavior, deprecation), test baseline change,
   architecture restructuring, algorithm replacement with multiple viable approaches,
-  introducing a new dependency, changing data persistence format or serialization
-  protocol, changing threading model or concurrency architecture, performance
-  optimization involving space-time trade-offs
+  introducing a new dependency, changing data persistence/serialization format,
+  changing threading model, performance optimization involving space-time trade-offs
 
 ## Handling by Risk Level
 
@@ -51,12 +27,9 @@ contract — the code author or owner should weigh in.
 comparisons, golden files) are always deferred for user confirmation, regardless of
 risk level.
 
-## Code Modules
+## Code Modules — Worth Fixing?
 
-The "Criteria" column below determines whether an issue is worth fixing. The risk level
-is **not** determined by issue type — it is assessed per-issue based on the risk level
-definitions above. For example, a "Logic bug" with an obvious one-line fix is low risk,
-while a logic bug requiring cross-module restructuring is high risk.
+Risk level is per-issue, not per-type (a "Logic bug" can be low or high risk).
 
 | Type | Criteria |
 |------|----------|
