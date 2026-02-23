@@ -304,8 +304,8 @@ Reviewers and verifiers only see local code context. The coordinator is the only
 with a project-wide view — use it. When evaluating any issue, consider cross-module
 impact, project conventions, and architectural intent that local reviewers may miss.
 
-Both the reviewer's report and the verifier's rebuttal are equally weighted inputs,
-not final decisions:
+Stay neutral — treat the reviewer's report and the verifier's rebuttal as equally
+weighted inputs:
 
 - **Verifier CONFIRM**: review the reviewer's description against the cited code to
   confirm the conclusion is consistent. If anything looks off, read the relevant code
