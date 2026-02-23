@@ -260,7 +260,7 @@ Run one reviewer per module (in parallel when possible). Each reviewer receives:
 - **Self-check**: before submitting results, re-read the relevant code and verify each
   reported issue. Mark each as confirmed or withdrawn. Only submit confirmed issues.
 - **Output format**: for each confirmed issue, report:
-  `[file:line] [priority A/B/C] — [description] — [key line(s), max 3 lines]`
+  `[file:line] [priority A/B/C] — [description] — [key lines]`
 
 ### Verification (pipeline)
 
@@ -307,8 +307,8 @@ Use the verifier's verdict as the primary signal:
 
 - **Verifier CONFIRM**: coordinator does a quick plausibility check — verify that the
   reviewer's description is consistent with the cited code snippet and that the
-  conclusion logically follows. If anything looks off, read the cited range (not the
-  entire file) to confirm. Otherwise accept and proceed to 3.2.
+  conclusion logically follows. If anything looks off, read the relevant code to
+  confirm. Otherwise accept and proceed to 3.2.
 - **Verifier REJECT (HIGH confidence)**: coordinator does a brief independent check —
   review the verifier's reasoning and the cited code. If the counter-argument is sound,
   drop the issue. If anything is questionable, escalate to full independent review
