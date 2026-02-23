@@ -12,9 +12,10 @@ Fix rules:
 6. Do not modify public API function signatures or class definitions (comments are OK),
    unless the coordinator's issue description explicitly requires an API signature fix.
 7. After each fix, check whether the change affects related comments or documentation
-   (function/class doc-comments, inline comments describing the changed logic, README
-   or spec files that reference the changed behavior). If so, update them in the same
-   commit as the fix.
+   within your assigned files (function/class doc-comments, inline comments describing
+   the changed logic). If so, update them in the same commit as the fix.
+   Cross-module documentation updates (README, spec files, other modules) are handled
+   separately by the coordinator.
 8. When done, report the commit hash for each fix and list any skipped issues with
    the reason for skipping.
 ```

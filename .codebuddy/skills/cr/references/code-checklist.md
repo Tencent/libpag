@@ -84,8 +84,8 @@ Improvements to code quality, performance, and maintainability. Medium impact.
 
 **B1. Performance Optimization**
 - Containers: is space pre-allocated when the size is predictable?
-- Unnecessary deep copies: **must be 100% certain of semantic equivalence; annotate
-  the risk of the change**
+- Unnecessary deep copies: **must be 100% certain of semantic equivalence before
+  reporting**
 - Repeated computation inside loops: can expressions be moved outside the loop?
 - String operations: can frequent concatenation inside loops be optimized?
 - Unnecessary temporary object construction `[C/C++]`
@@ -116,8 +116,9 @@ Improvements to code quality, performance, and maintainability. Medium impact.
   `[C/C++]`
 
 **B5. Interface Changes**
-- Are public API changes necessary and justified?
-- Are backward compatibility implications considered?
+- Are there changes to public API signatures or class interfaces?
+- If so, describe the change and its scope (the coordinator will assess whether it is
+  justified)
 
 **B6. Test Coverage**
 - Do changed logic paths have corresponding test cases?
