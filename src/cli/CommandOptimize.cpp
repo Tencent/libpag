@@ -1124,13 +1124,13 @@ static int ExtractCompositions(PAGXDocument* document) {
   };
   std::vector<ExtractionCandidate> candidates = {};
 
-  for (auto& [hash, layers] : hashGroups) {
-    if (layers.size() < 2) {
+  for (auto& entry : hashGroups) {
+    if (entry.second.size() < 2) {
       continue;
     }
     // Verify structural equality (handle hash collisions).
     std::vector<std::vector<Layer*>> equalGroups = {};
-    for (auto* layer : layers) {
+    for (auto* layer : entry.second) {
       bool found = false;
       for (auto& group : equalGroups) {
         if (LayersStructurallyEqual(layer, group[0])) {
