@@ -349,6 +349,12 @@ determine risk level using these two questions:
    → Yes = **High risk** (e.g., API signature change, algorithm trade-off, new dependency)
    → No = **Medium risk** (e.g., extract shared logic, remove unused internal method)
 
+**Fix approach** (Medium and High risk only): the coordinator has a project-wide view
+that fixers lack. For issues where multiple fix approaches exist, specify the chosen
+approach and the reasoning — e.g., which function to extract to, which API shape to
+use, which module should own the logic. Record this in the issue's `Proposed` field
+in `CR_STATE_FILE`. Low risk issues have a single obvious fix and need no guidance.
+
 Then consult `references/judgment-matrix.md` for the full criteria on whether the
 issue is worth fixing, and for special rules. Determine:
 - Whether the issue is worth fixing (judgment matrix criteria)
@@ -386,6 +392,8 @@ skip Fix and Validate and go directly to Continue?.
 Run one fixer per fix or file group (in parallel when possible). Each fixer receives:
 - The issue description and the file path(s) + line range(s) to modify (fixers read
   file content themselves)
+- For Medium/High risk issues: the coordinator's chosen fix approach from the
+  `Proposed` field — the fixer must follow this approach, not invent an alternative
 - `references/fixer-instructions.md` verbatim
 
 Each fixer commits **per issue** (one commit per fix, immediately after applying it).

@@ -21,6 +21,7 @@ why it was not auto-fixed.
 - **Risk**: low | medium | high
 - **File**: [file path:line number]
 - **Current**: [what the code does now]
-- **Proposed**: [what the fix would change]
+- **Proposed**: [what the fix would change — for medium/high risk, include the
+  specific approach chosen by the coordinator and the reasoning]
 - **Impact**: [what else would be affected]
 ```
