@@ -1632,52 +1632,36 @@ static Color parseColor(const std::string& str, bool* outValid) {
   return {};
 }
 
-static Point getPointAttribute(const DOMNode* node, const char* name, Point defaultValue,
-                               PAGXDocument* doc) {
+template <typename T, typename Parser>
+static T getParsedAttribute(const DOMNode* node, const char* name, T defaultValue,
+                            PAGXDocument* doc, Parser parser) {
   auto* str = node->findAttribute(name);
   if (!str || str->empty()) {
     return defaultValue;
   }
   bool valid = false;
-  auto result = parsePoint(*str, &valid);
+  auto result = parser(*str, &valid);
   if (!valid) {
     reportError(doc, node,
                 "Invalid value '" + *str + "' for '" + std::string(name) + "' attribute.");
     return defaultValue;
   }
   return result;
+}
+
+static Point getPointAttribute(const DOMNode* node, const char* name, Point defaultValue,
+                               PAGXDocument* doc) {
+  return getParsedAttribute(node, name, defaultValue, doc, parsePoint);
 }
 
 static Size getSizeAttribute(const DOMNode* node, const char* name, Size defaultValue,
                              PAGXDocument* doc) {
-  auto* str = node->findAttribute(name);
-  if (!str || str->empty()) {
-    return defaultValue;
-  }
-  bool valid = false;
-  auto result = parseSize(*str, &valid);
-  if (!valid) {
-    reportError(doc, node,
-                "Invalid value '" + *str + "' for '" + std::string(name) + "' attribute.");
-    return defaultValue;
-  }
-  return result;
+  return getParsedAttribute(node, name, defaultValue, doc, parseSize);
 }
 
 static Rect getRectAttribute(const DOMNode* node, const char* name, Rect defaultValue,
                              PAGXDocument* doc) {
-  auto* str = node->findAttribute(name);
-  if (!str || str->empty()) {
-    return defaultValue;
-  }
-  bool valid = false;
-  auto result = parseRect(*str, &valid);
-  if (!valid) {
-    reportError(doc, node,
-                "Invalid value '" + *str + "' for '" + std::string(name) + "' attribute.");
-    return defaultValue;
-  }
-  return result;
+  return getParsedAttribute(node, name, defaultValue, doc, parseRect);
 }
 
 static Color getColorAttribute(const DOMNode* node, const char* name, PAGXDocument* doc) {
