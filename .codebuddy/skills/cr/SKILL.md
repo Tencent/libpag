@@ -27,7 +27,7 @@ selectable options for predefined choices.
 
 ---
 
-## Detect and Ask — zero tool calls, present questions immediately
+## Detect and Ask
 
 ### Mode detection
 
