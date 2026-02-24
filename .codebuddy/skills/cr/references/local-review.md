@@ -26,6 +26,10 @@ uncommitted changes only:
 ```
 git diff HEAD
 ```
+This covers both staged and unstaged changes to tracked files. Additionally,
+check for untracked files with `git status --porcelain` (lines starting with
+`??`) and read their contents for review.
+
 Skip argument-based scope below.
 
 ### Normal scope — validate arguments and fetch diff
@@ -36,6 +40,9 @@ Skip argument-based scope below.
 - Commit hash: validate with `git rev-parse --verify`, then `git show`.
 - Commit range: validate both endpoints, then fetch the range diff.
 - File/directory paths: verify all paths exist on disk, then read file contents.
+
+For empty arguments and commit range: also check for untracked files with
+`git status --porcelain` (`??` lines) and read their contents for review.
 
 ### Associated PR comments (optional, best-effort)
 
@@ -95,28 +102,26 @@ handling by risk level, and special rules.
 For each issue in the auto-fix queue:
 
 - Read the relevant code and apply the fix directly.
-- Commit each fix individually:
-  ```
-  git commit --only <files> -m "message"
-  ```
-- Commit message: English, under 120 characters, ending with a period.
+- Do **not** run `git add` or `git commit` — leave all changes unstaged so the
+  user can review and decide what to commit.
 - When in doubt, skip the fix rather than risk a wrong change.
 - Do not modify public API function signatures or class definitions (comments
   are OK), unless the issue description explicitly requires it.
 - After each fix, check whether the change affects related comments or
-  documentation within the same files. If so, update them in the same commit.
+  documentation within the same files. If so, update them together.
 
 ### 4.4 Validate
 
 Run build + test (skip if no build/test commands available or doc-only scope).
 
 - **Pass** → mark issues as fixed.
-- **Fail** → bisect to find the failing commit, revert it. Retry the fix once
-  with failure details. If still failing, mark as failed and keep reverted.
+- **Fail** → identify which fix broke the build (review recent changes), revert
+  that fix. Retry the fix once with failure details. If still failing, revert
+  and mark as failed.
 
 ### 4.5 Final report
 
-- Fixed issues (with commit hashes)
+- Fixed issues
 - Above-threshold issues (need manual attention)
 - Failed/rolled-back issues with reasons
 - Final test result

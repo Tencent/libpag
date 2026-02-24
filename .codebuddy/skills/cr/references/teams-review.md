@@ -58,6 +58,10 @@ uncommitted changes only:
 ```
 git diff HEAD
 ```
+This covers both staged and unstaged changes to tracked files. Additionally,
+check for untracked files with `git status --porcelain` (lines starting with
+`??`) and read their contents for review.
+
 Skip argument-based scope below.
 
 ### Normal scope — validate arguments and fetch diff
@@ -68,6 +72,9 @@ Skip argument-based scope below.
 - Commit hash: validate with `git rev-parse --verify`, then `git show`.
 - Commit range: validate both endpoints, then fetch the range diff.
 - File/directory paths: verify all paths exist on disk, then read file contents.
+
+For empty arguments and commit range: also check for untracked files with
+`git status --porcelain` (`??` lines) and read their contents for review.
 
 ### Associated PR comments (optional, best-effort)
 

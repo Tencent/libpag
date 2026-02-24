@@ -19,6 +19,20 @@ Auto-fix is not available in PR mode.
 
 ## Step 1: Scope
 
+### Clean up leftover worktrees
+
+Check for and remove leftover worktree directories from previous sessions:
+```
+ls -d /tmp/pr-review-* 2>/dev/null
+```
+If any exist, clean up each one:
+```
+git worktree remove /tmp/pr-review-{N} 2>/dev/null
+git branch -D pr-{N} 2>/dev/null
+```
+
+### Fetch PR metadata
+
 1. **Fetch PR metadata**:
    ```
    gh pr view {number} --json headRefName,baseRefName,headRefOid,state
@@ -98,4 +112,13 @@ EOF
 - `body`: concise, in the user's conversation language, with a specific fix
   suggestion when possible
 
-Summary of issues found / submitted / skipped. Remove worktree and temp branch.
+Summary of issues found / submitted / skipped.
+
+### Worktree cleanup
+
+If `WORKTREE_DIR` was created, clean up:
+```
+cd {original_directory}
+git worktree remove {WORKTREE_DIR}
+git branch -D pr-{number}
+```
