@@ -30,7 +30,7 @@ share conversation history.
 
 - **Agent lifecycle**: When closing agents, send the shutdown message and continue
   immediately without waiting for acknowledgment. Do not block the workflow on
-  agent responses. When closing the team, force-terminate (TaskStop) any agents
+  agent responses. When closing the team, force-terminate any agents
   that are still running.
 - **Autonomy**: zero user interaction until Confirm (Phase 6) or Report
   (Phase 7). Record anything unresolvable to `CR_STATE_FILE` for user review.
