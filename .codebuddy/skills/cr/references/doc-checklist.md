@@ -46,7 +46,8 @@ Highest impact — review these first.
 
 **A6. Reference Validity**
 - Do internal cross-references point to existing sections or files?
-- Are external links / URLs valid and pointing to the correct content?
+- Are external links / URLs well-formed and not obviously outdated (e.g., pointing
+  to known-dead domains)? Do not attempt to verify reachability.
 - Do referenced file paths, tool names, and command examples actually exist?
 
 ---
