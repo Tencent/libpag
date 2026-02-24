@@ -53,7 +53,7 @@ Scope
 │                                   │
 │  Review → Filter → Fix/Validate   │
 │    ↑                     │        │
-│    └── new issues ───────┘        │
+│    └── new issues ───────
 │                                   │
 └───────────────────────────────────┘
   │ no new issues
@@ -68,9 +68,12 @@ Fix/Validate ──→ Review Loop ↑
 ```
 
 The Review Loop repeats as long as new issues are found. Each round is a fresh
-full review — not a targeted re-check of previous fixes. After Confirm,
-approved fixes always re-enter the Review Loop to catch any issues introduced
-by the fixes.
+full review — not a targeted re-check of previous fixes.
+
+**After Confirm**: approved fixes go through Fix/Validate, then **always
+re-enter the Review Loop** (Phase 2) to catch any issues introduced by the
+fixes. The loop only exits to Confirm (if pending/failed remain) or Report
+(if nothing remains) when a round produces no new issues.
 
 ---
 
