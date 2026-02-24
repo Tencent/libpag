@@ -49,7 +49,8 @@ working in parallel and communicating with each other).
   unavailable (protected branch), and route to `references/local-review.md`.
 - Otherwise, ask a **single question**. The question title should inform the
   user that the current environment supports Agent Teams, and ask whether to
-  enable deep adversarial review with multi-round auto-fix. Provide 4 options:
+  enable multi-agent review with reviewer–verifier adversarial mechanism and
+  auto-fix. Provide 4 options:
 
 | Option | Description |
 |--------|-------------|
