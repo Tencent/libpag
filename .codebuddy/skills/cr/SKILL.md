@@ -42,9 +42,9 @@ fixes, and submit results.
 
 ## Questions (rule 4 only)
 
-**Teams detection**: check whether the current environment supports multi-agent
-team collaboration (e.g., the ability to create agent teams and dispatch
-sub-agents). If supported → teams-review; otherwise → local-review.
+**Teams detection**: check whether the current environment supports agent teams
+(multiple agents working in parallel and communicating with each other). If
+supported → teams-review; otherwise → local-review.
 
 **Auto-fix**:
 
