@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "lib": ["ES5", "ES6", "DOM", "DOM.Iterable"],
+    "target": "ES2020",
+    "declaration": true,
+    "declarationDir": "./types",
+    "emitDeclarationOnly": true,
+    "removeComments": false,
+    "skipLibCheck": true,
+    "experimentalDecorators": true,
+    "moduleResolution": "Node",
+    "baseUrl": ".",
+    "resolveJsonModule": true,
+    "paths": {
+      "@tgfx/*": [
+        "../../third_party/tgfx/web/src/*"
+      ]
+    }
+  },
+  "include": ["ts/pagx.ts"]
+}

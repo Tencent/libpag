@@ -1,0 +1,72 @@
+<view class="container">
+  <!-- File Selector at Top -->
+  <view class="file-selector">
+    <picker 
+      mode="selector" 
+      range="{{sampleNames}}" 
+      value="{{currentIndex}}"
+      bindchange="onPickerChange"
+      class="picker"
+    >
+      <view class="picker-display">
+        <text class="picker-text">{{samples[currentIndex].name}}</text>
+        <text class="picker-arrow">▼</text>
+      </view>
+    </picker>
+    <button 
+      class="reset-btn" 
+      bindtap="onReset"
+    >Reset</button>
+    <button 
+      class="perf-btn {{showPerf ? 'active' : ''}}" 
+      bindtap="togglePerfMonitor"
+    >FPS</button>
+  </view>
+
+  <!-- Canvas Area -->
+  <view class="canvas-container">
+    <canvas 
+      type="webgl" 
+      id="pagx-canvas" 
+      class="canvas"
+      catchtouchstart="onTouchStart"
+      catchtouchmove="onTouchMove"
+      catchtouchend="onTouchEnd"
+    ></canvas>
+
+    <!-- Loading -->
+    <view wx:if="{{loading}}" class="loading">
+      <text>Loading...</text>
+    </view>
+
+    <!-- File Loading Indicator -->
+    <view wx:if="{{loadingFile}}" class="loading-file">
+      <text>Switching...</text>
+    </view>
+    
+    <!-- Performance Stats -->
+    <view wx:if="{{showPerf}}" class="perf-panel">
+      <view class="perf-title">Performance Monitor</view>
+      <view class="perf-row">
+        <text class="perf-label">Quality:</text>
+        <text class="perf-value quality-{{perfStats.quality}}">{{perfStats.quality}}</text>
+      </view>
+      <view class="perf-row">
+        <text class="perf-label">Smoothness:</text>
+        <text class="perf-value">{{perfStats.smoothness}}/100</text>
+      </view>
+      <view class="perf-row">
+        <text class="perf-label">FPS:</text>
+        <text class="perf-value">{{perfStats.fps}} (avg: {{perfStats.avgFPS}})</text>
+      </view>
+      <view class="perf-row">
+        <text class="perf-label">Frame Time:</text>
+        <text class="perf-value">{{perfStats.frameTime}}ms</text>
+      </view>
+      <view class="perf-row">
+        <text class="perf-label">Frame Drops:</text>
+        <text class="perf-value">{{perfStats.dropRate}}%</text>
+      </view>
+    </view>
+  </view>
+</view>
