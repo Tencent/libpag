@@ -15,13 +15,13 @@ issues, and lets the user interactively choose which ones to fix.
 
 ## Step 1: Scope
 
-Determine the diff to review based on how this file was entered:
+Determine the diff to review based on `$ARGUMENTS` and working tree state:
 
-- **From fast path** (no `$ARGUMENTS`, uncommitted changes exist): scope is
+- **Empty `$ARGUMENTS`**, **uncommitted changes exist**: scope is
   uncommitted changes only. Fetch with `git diff HEAD` (staged + unstaged
   tracked files). Also check for untracked files with `git status --porcelain`
   (`??` lines) and read their contents for review.
-- **Empty `$ARGUMENTS`** (no uncommitted changes): determine the base branch
+- **Empty `$ARGUMENTS`**, **no uncommitted changes**: determine the base branch
   from the current branch's upstream tracking branch. If no upstream, fall back
   to `main` (or `master`). Fetch the branch diff:
   ```
