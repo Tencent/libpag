@@ -113,16 +113,24 @@ Present results to user:
 - Overall assessment: code quality evaluation and key improvement directions.
 - Issue list (or "no issues found" if clean).
 
-If no issues → ask whether to submit an approval review on the PR:
-```bash
-gh api repos/{OWNER_REPO}/pulls/{number}/reviews --input - <<'EOF'
-{
-  "commit_id": "{HEAD_SHA}",
-  "event": "APPROVE"
-}
-EOF
-```
-Skip the comment submission below.
+If no issues → ask whether to submit an approval review AND merge the PR:
+
+1. Submit Approval:
+   ```bash
+   gh api repos/{OWNER_REPO}/pulls/{number}/reviews --input - <<'EOF'
+   {
+     "commit_id": "{HEAD_SHA}",
+     "event": "APPROVE"
+   }
+   EOF
+   ```
+
+2. Merge (squash):
+   ```bash
+   gh pr merge {number} --squash --delete-branch
+   ```
+
+If the user declines, do nothing. Skip the comment submission below.
 
 If issues found → present confirmed issues to user in the following format:
 
