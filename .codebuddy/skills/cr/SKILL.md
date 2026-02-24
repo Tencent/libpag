@@ -25,7 +25,7 @@ Run pre-checks, then match the **first** applicable rule top-to-bottom:
 | 1 | `$ARGUMENTS` is a PR number or URL containing `/pull/` | → `references/pr-review.md` |
 | 2 | `$ARGUMENTS` is empty and uncommitted changes exist | → `references/local-review.md` |
 | 3 | `$ARGUMENTS` is empty, no uncommitted changes, on main/master | Abort with usage examples (see below) |
-| 4 | Everything else | → Questions below |
+| 4 | Everything else | → Question below |
 
 Each `→` means: `Read` the target file and follow it as the sole remaining
 instruction. Ignore all sections below. Do NOT review from memory or habit —
@@ -46,7 +46,8 @@ working in parallel and communicating with each other).
 
 - If **not supported**, skip the question and route to `references/local-review.md`.
 - If **on main/master**, skip the question, inform user that auto-fix is
-  unavailable (protected branch), and route to `references/local-review.md`.
+  unavailable on protected branches and quick review mode will be used, then
+  route to `references/local-review.md`.
 - Otherwise, ask a **single question**. The question title should inform the
   user that the current environment supports Agent Teams, and ask whether to
   enable multi-agent review with reviewer–verifier adversarial mechanism and
@@ -68,4 +69,5 @@ working in parallel and communicating with each other).
 | Auto-fix: low + medium risk | `references/teams-review.md` | low_medium |
 | Auto-fix: full | `references/teams-review.md` | full |
 
-Pass `$ARGUMENTS` and `FIX_MODE` (low / low_medium / full) to the target file.
+Pass `$ARGUMENTS` to the target file. For teams-review, also pass `FIX_MODE`
+(low / low_medium / full).

@@ -74,13 +74,14 @@ but ruled out.
 Consult `judgment-matrix.md` for risk level assessment, worth-fixing criteria,
 and special rules. Discard issues that are not worth reporting.
 
-If no issues remain after filtering → Step 6 (Report).
+If no issues remain after filtering → Step 6 (Report). Otherwise → Step 4.
 
 ---
 
 ## Step 4: Interactive fix
 
-Present all confirmed issues to the user, then ask which ones to fix using
+Present all confirmed issues (and any `failed` issues from a previous fix
+attempt, with failure reasons) to the user, then ask which ones to fix using
 **a single multi-select question** where each option's label is the issue
 summary (e.g., `[risk] file:line — description`). User checks multiple options
 in one prompt. Unchecked → skipped.
