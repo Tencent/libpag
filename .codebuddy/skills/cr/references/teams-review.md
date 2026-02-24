@@ -21,7 +21,6 @@ share conversation history.
 | `doc-checklist.md` | Document review checklist |
 | `judgment-matrix.md` | Risk levels, worth-fixing criteria, special rules |
 | `scope-detection.md` | Shared scope detection logic |
-| `judgment-matrix.md` | Risk levels, worth-fixing criteria, special rules |
 
 ## Additional operating rules
 
@@ -76,8 +75,6 @@ Write CR_STATE_FILE (see CR_STATE_FILE format appendix) with session info
 (mode, priority, threshold, file list, module assignments, changed line ranges,
 build/test commands) and an issues section updated incrementally. CR_STATE_FILE
 is owned by the coordinator — team agents never read or write it.
-
-If diff is empty → exit.
 
 ---
 
