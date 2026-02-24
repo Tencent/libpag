@@ -1,23 +1,12 @@
 # Judgment Matrix
 
-## Risk Level Examples
-
-- **Low**: null check, fix incorrect comment, rename to match convention, remove
-  redundant duplicate code, add `reserve`, fix obvious off-by-one error
-- **Medium**: extracting shared logic across functions, removing unused internal
-  methods, simplifying cross-function control flow, adjusting internal module boundaries
-- **High**: public API change (signature, behavior, deprecation), test baseline change,
-  architecture restructuring, algorithm replacement with multiple viable approaches,
-  introducing a new dependency, changing data persistence/serialization format,
-  changing threading model, performance optimization involving space-time trade-offs
-
 ## Risk Level Assessment
 
-| Only one reasonable fix? | Design decision / external contract? | Risk |
-|--------------------------|--------------------------------------|------|
-| Yes | — | Low |
-| No | Yes | High |
-| No | No | Medium |
+| Risk | Rule | Examples |
+|------|------|----------|
+| Low | Only one reasonable fix exists | null check, fix incorrect comment, rename to match convention, remove redundant duplicate code, add `reserve`, fix obvious off-by-one error |
+| Medium | Multiple fixes possible, but no design decision or external contract involved | extracting shared logic across functions, removing unused internal methods, simplifying cross-function control flow, adjusting internal module boundaries |
+| High | Involves design decisions or external contracts | public API change (signature, behavior, deprecation), test baseline change, architecture restructuring, algorithm replacement with multiple viable approaches, introducing a new dependency, changing data persistence/serialization format, changing threading model, performance optimization involving space-time trade-offs |
 
 ## Handling by Risk Level
 
