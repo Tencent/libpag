@@ -45,12 +45,19 @@ For each issue found:
 **PR comment verification** (when `PR_COMMENTS` exist): verify each PR review
 comment against current code. Add verified issues to the results.
 
+**Output rule**: only present the final confirmed issues to the user. Do not
+output analysis process, exclusion reasoning, or issues that were considered
+but ruled out.
+
 ---
 
 ## Step 3: Filter
 
 Consult `judgment-matrix.md` for risk level assessment, worth-fixing criteria,
 and special rules. Discard issues that are not worth reporting.
+
+**Fix approach** (Medium/High only): decide the specific fix approach and
+reasoning before applying. Low risk: single obvious fix, no planning needed.
 
 If `FIX_MODE` = none → Step 6 (Report).
 
@@ -100,14 +107,19 @@ issues:
 
 Present `pending` + `failed` issues and offer a multi-select prompt where each
 option's label is the issue summary (e.g., `[risk] file:line — description`).
-User checks the ones to fix. Checked → apply fix (same rules as Step 4) and
-re-validate. Unchecked → skipped.
+User checks the ones to fix. Unchecked → skipped.
+
+- **All skipped** → Step 6 (Report).
+- **Any checked** → apply fix (same rules as Step 4) → re-validate (Step 5).
+  After validation, re-review for new issues. If new issues found → back to
+  Step 3 (Filter). If no new issues but more `pending`/`failed` remain →
+  return here. If nothing remains → Step 6 (Report).
 
 ---
 
 ## Step 6: Report
 
-- Fixed issues
-- Skipped issues
+- Summary: one paragraph describing what was reviewed and key findings.
+- Issues found / fixed / skipped / failed
 - Failed/rolled-back issues with reasons
 - Final test result
