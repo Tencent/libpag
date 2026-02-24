@@ -219,9 +219,9 @@ verification itself.
 
 The verifier runs as a **pipeline** — it does not wait for all reviewers to
 finish. As each reviewer sends a report via SendMessage, the coordinator MUST
-forward the original report content to the verifier immediately without
-rewriting or supplementing it. Include the following verbatim in every
-verifier's prompt:
+forward it to the verifier immediately as a direct quote of the original
+SendMessage content — no rewriting, summarizing, or supplementing. Include the
+following verbatim in every verifier's prompt:
 
 ```
 You are a code review verifier. Your stance is adversarial — default to doubting the
