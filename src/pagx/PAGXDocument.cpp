@@ -76,11 +76,11 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
     if (image->filePath != filePath) {
       continue;
     }
-    image->data = data;
+    image->data = std::move(data);
     image->filePath = {};
-    found = true;
+    return true;
   }
-  return found;
+  return false;
 }
 
 }  // namespace pagx
