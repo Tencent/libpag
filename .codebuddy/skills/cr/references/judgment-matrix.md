@@ -38,8 +38,10 @@ per-type (a "Logic bug" can be low or high risk).
    comments, or file organization. Fix only when it violates project rules
    loaded in context or contradicts the surrounding code's established patterns.
    Corresponds to checklist Priority C items.
-4. **Always skip** — Pure style preferences and speculative issues without code
-   evidence.
+4. **Always skip** — Pure style preferences (not violating any consistency
+   rule), suggestions based on assumed future requirements rather than current
+   code, and alternative implementation rewrites for stable code that has no
+   correctness issue.
 
 ### Exceptions
 
