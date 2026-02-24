@@ -73,12 +73,12 @@ unavailable (uncommitted changes or protected branch), skip Q3.
 
 Otherwise:
 
-- "Review only": report issues without fixing.
-- "Low risk only": auto-fix only the most straightforward issues (e.g.,
+- "Review only" → `FIX_MODE=none`: report issues without fixing.
+- "Low risk only" → `FIX_MODE=low`: auto-fix only the most straightforward issues (e.g.,
   null checks, typos, naming). Confirm everything else.
-- "Low + Medium risk (recommended)": auto-fix most issues, only confirm high-risk ones
+- "Low + Medium risk (recommended)" → `FIX_MODE=low_medium`: auto-fix most issues, only confirm high-risk ones
   (e.g., API changes, architecture decisions).
-- "Full auto": auto-fix everything. Only issues affecting test baselines are
+- "Full auto" → `FIX_MODE=full`: auto-fix everything. Only issues affecting test baselines are
   deferred.
 
 ### Route
