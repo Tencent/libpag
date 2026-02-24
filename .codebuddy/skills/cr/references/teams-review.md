@@ -47,25 +47,29 @@ Scope → Review → Report
 `FIX_MODE≠none` follows a loop:
 
 ```
-Scope → Review → Filter → Fix → Validate → Continue?
-          ↑                                     │
-          └──── new issues or fixes applied ─────┘
-                                                │
-                                                ↓ no new issues, no fixes
-                                           Confirm → Report
-                                              ↑         ↑
-                                              │    all skipped
-                                         Fix → Validate → Continue?
-                                                          │
-                                                          └→ new issues? → Review ↑
+Scope ──→ Review → Filter → Fix → Validate → Continue? ──→ Report
+            ↑                                     │
+            └─────────── new issues ──────────────┘
+                                                  │ no new issues
+                                                  ↓
+                                               Confirm
+                                                  │ approved
+                                                  ↓
+                                            Fix → Validate
+                                                  │
+                                                  ↓
+                                              Continue? ─── new issues ──→ Review ↑
+                                                  │ no new issues
+                                                  ↓
+                                               Confirm (if more pending) or Report
 ```
 
 - **Main loop**: Review → Filter → Fix → Validate → Continue? repeats as long
-  as new issues are found or fixes were just applied.
-- **Loop exit**: when no new issues and no fixes in this round, check for
-  `pending`/`failed` issues. If none → Report. If any → Confirm.
-- **Confirm loop**: user-approved issues go to Fix → Validate → Continue?.
-  Continue? re-enters the full Review loop if fixes introduced new issues.
+  as new issues are found.
+- **Loop exit**: when no new issues in this round, check for `pending`/`failed`
+  issues. If none → Report. If any → Confirm.
+- **After Confirm**: user-approved fixes go through Fix → Validate → Continue?,
+  which re-enters the full Review loop if the fixes introduced new issues.
   Only when no new issues remain does it return to Confirm (if more
   pending/failed exist) or proceed to Report.
 - Each review round is a fresh review, not a targeted re-check of previous
