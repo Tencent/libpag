@@ -34,6 +34,7 @@ namespace pagx {
 
 using pag::DegreesToRadians;
 
+static constexpr float DEFAULT_FONT_SIZE = 16.0f;
 std::shared_ptr<PAGXDocument> SVGImporter::Parse(const std::string& filePath,
                                                  const Options& options) {
   SVGParserContext parser(options);
@@ -367,10 +368,6 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
 
   // Compute inherited style for this element.
   InheritedStyle inheritedStyle = computeInheritedStyle(element, parentStyle);
-  float currentFontSize = parseLength(inheritedStyle.fontSize, _viewBoxHeight);
-  if (currentFontSize <= 0) {
-    currentFontSize = DEFAULT_FONT_SIZE;
-  }
 
   auto layer = _document->makeNode<Layer>();
 
@@ -421,11 +418,10 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
       if (firstChild && !firstChild->getNextSibling() && firstChild->name == "rect") {
         std::string rectTransform = getAttribute(firstChild, "transform");
         if (rectTransform.empty()) {
-          float cx = parseLength(getAttribute(firstChild, "x"), _viewBoxWidth, currentFontSize);
-          float cy = parseLength(getAttribute(firstChild, "y"), _viewBoxHeight, currentFontSize);
-          float cw = parseLength(getAttribute(firstChild, "width"), _viewBoxWidth, currentFontSize);
-          float ch =
-              parseLength(getAttribute(firstChild, "height"), _viewBoxHeight, currentFontSize);
+          float cx = parseLength(getAttribute(firstChild, "x"), _viewBoxWidth);
+          float cy = parseLength(getAttribute(firstChild, "y"), _viewBoxHeight);
+          float cw = parseLength(getAttribute(firstChild, "width"), _viewBoxWidth);
+          float ch = parseLength(getAttribute(firstChild, "height"), _viewBoxHeight);
           if (cx <= 0 && cy <= 0 && cw >= _viewBoxWidth && ch >= _viewBoxHeight) {
             isFullCanvasClip = true;
           }
@@ -537,7 +533,7 @@ void SVGParserContext::convertChildren(const std::shared_ptr<DOMNode>& element,
     }
   }
 
-  auto shapeElement = convertElement(element, inheritedStyle);
+  auto shapeElement = convertElement(element);
   if (shapeElement) {
     contents.push_back(shapeElement);
   }
@@ -562,41 +558,36 @@ void SVGParserContext::convertChildren(const std::shared_ptr<DOMNode>& element,
     }
   }
 }
-Element* SVGParserContext::convertElement(const std::shared_ptr<DOMNode>& element,
-                                          const InheritedStyle& style) {
+Element* SVGParserContext::convertElement(const std::shared_ptr<DOMNode>& element) {
   const auto& tag = element->name;
 
   if (tag == "rect") {
-    return convertRect(element, style);
+    return convertRect(element);
   } else if (tag == "circle") {
-    return convertCircle(element, style);
+    return convertCircle(element);
   } else if (tag == "ellipse") {
-    return convertEllipse(element, style);
+    return convertEllipse(element);
   } else if (tag == "line") {
-    return convertLine(element, style);
+    return convertLine(element);
   } else if (tag == "polyline") {
-    return convertPolyline(element, style);
+    return convertPolyline(element);
   } else if (tag == "polygon") {
-    return convertPolygon(element, style);
+    return convertPolygon(element);
   } else if (tag == "path") {
-    return convertPath(element, style);
+    return convertPath(element);
   } else if (tag == "use") {
-    return convertUse(element, style);
+    return convertUse(element);
   }
 
   return nullptr;
 }
-Element* SVGParserContext::convertRect(const std::shared_ptr<DOMNode>& element,
-                                       const InheritedStyle& style) {
-  float currentFontSize = parseLength(style.fontSize, _viewBoxHeight);
-  if (currentFontSize <= 0) currentFontSize = DEFAULT_FONT_SIZE;
-
-  float x = parseLength(getAttribute(element, "x"), _viewBoxWidth, currentFontSize);
-  float y = parseLength(getAttribute(element, "y"), _viewBoxHeight, currentFontSize);
-  float width = parseLength(getAttribute(element, "width"), _viewBoxWidth, currentFontSize);
-  float height = parseLength(getAttribute(element, "height"), _viewBoxHeight, currentFontSize);
-  float rx = parseLength(getAttribute(element, "rx"), _viewBoxWidth, currentFontSize);
-  float ry = parseLength(getAttribute(element, "ry"), _viewBoxHeight, currentFontSize);
+Element* SVGParserContext::convertRect(const std::shared_ptr<DOMNode>& element) {
+  float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
+  float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
+  float width = parseLength(getAttribute(element, "width"), _viewBoxWidth);
+  float height = parseLength(getAttribute(element, "height"), _viewBoxHeight);
+  float rx = parseLength(getAttribute(element, "rx"), _viewBoxWidth);
+  float ry = parseLength(getAttribute(element, "ry"), _viewBoxHeight);
 
   if (rx == 0) {
     rx = ry;
@@ -614,14 +605,10 @@ Element* SVGParserContext::convertRect(const std::shared_ptr<DOMNode>& element,
 
   return rect;
 }
-Element* SVGParserContext::convertCircle(const std::shared_ptr<DOMNode>& element,
-                                         const InheritedStyle& style) {
-  float currentFontSize = parseLength(style.fontSize, _viewBoxHeight);
-  if (currentFontSize <= 0) currentFontSize = DEFAULT_FONT_SIZE;
-
-  float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth, currentFontSize);
-  float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight, currentFontSize);
-  float r = parseLength(getAttribute(element, "r"), _viewBoxWidth, currentFontSize);
+Element* SVGParserContext::convertCircle(const std::shared_ptr<DOMNode>& element) {
+  float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth);
+  float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight);
+  float r = parseLength(getAttribute(element, "r"), _viewBoxWidth);
 
   auto ellipse = _document->makeNode<Ellipse>();
   ellipse->center.x = cx;
@@ -631,15 +618,11 @@ Element* SVGParserContext::convertCircle(const std::shared_ptr<DOMNode>& element
 
   return ellipse;
 }
-Element* SVGParserContext::convertEllipse(const std::shared_ptr<DOMNode>& element,
-                                          const InheritedStyle& style) {
-  float currentFontSize = parseLength(style.fontSize, _viewBoxHeight);
-  if (currentFontSize <= 0) currentFontSize = DEFAULT_FONT_SIZE;
-
-  float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth, currentFontSize);
-  float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight, currentFontSize);
-  float rx = parseLength(getAttribute(element, "rx"), _viewBoxWidth, currentFontSize);
-  float ry = parseLength(getAttribute(element, "ry"), _viewBoxHeight, currentFontSize);
+Element* SVGParserContext::convertEllipse(const std::shared_ptr<DOMNode>& element) {
+  float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth);
+  float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight);
+  float rx = parseLength(getAttribute(element, "rx"), _viewBoxWidth);
+  float ry = parseLength(getAttribute(element, "ry"), _viewBoxHeight);
 
   auto ellipse = _document->makeNode<Ellipse>();
   ellipse->center.x = cx;
@@ -649,15 +632,11 @@ Element* SVGParserContext::convertEllipse(const std::shared_ptr<DOMNode>& elemen
 
   return ellipse;
 }
-Element* SVGParserContext::convertLine(const std::shared_ptr<DOMNode>& element,
-                                       const InheritedStyle& style) {
-  float currentFontSize = parseLength(style.fontSize, _viewBoxHeight);
-  if (currentFontSize <= 0) currentFontSize = DEFAULT_FONT_SIZE;
-
-  float x1 = parseLength(getAttribute(element, "x1"), _viewBoxWidth, currentFontSize);
-  float y1 = parseLength(getAttribute(element, "y1"), _viewBoxHeight, currentFontSize);
-  float x2 = parseLength(getAttribute(element, "x2"), _viewBoxWidth, currentFontSize);
-  float y2 = parseLength(getAttribute(element, "y2"), _viewBoxHeight, currentFontSize);
+Element* SVGParserContext::convertLine(const std::shared_ptr<DOMNode>& element) {
+  float x1 = parseLength(getAttribute(element, "x1"), _viewBoxWidth);
+  float y1 = parseLength(getAttribute(element, "y1"), _viewBoxHeight);
+  float x2 = parseLength(getAttribute(element, "x2"), _viewBoxWidth);
+  float y2 = parseLength(getAttribute(element, "y2"), _viewBoxHeight);
 
   auto path = _document->makeNode<Path>();
   auto pathData = _document->makeNode<PathData>();
@@ -670,8 +649,7 @@ Element* SVGParserContext::convertLine(const std::shared_ptr<DOMNode>& element,
 
   return path;
 }
-Element* SVGParserContext::convertPolyline(const std::shared_ptr<DOMNode>& element,
-                                           const InheritedStyle&) {
+Element* SVGParserContext::convertPolyline(const std::shared_ptr<DOMNode>& element) {
   auto path = _document->makeNode<Path>();
   auto pathDataNode = _document->makeNode<PathData>();
   *pathDataNode = parsePoints(getAttribute(element, "points"), false);
@@ -681,8 +659,7 @@ Element* SVGParserContext::convertPolyline(const std::shared_ptr<DOMNode>& eleme
   }
   return path;
 }
-Element* SVGParserContext::convertPolygon(const std::shared_ptr<DOMNode>& element,
-                                          const InheritedStyle&) {
+Element* SVGParserContext::convertPolygon(const std::shared_ptr<DOMNode>& element) {
   auto path = _document->makeNode<Path>();
   auto pathDataNode = _document->makeNode<PathData>();
   *pathDataNode = parsePoints(getAttribute(element, "points"), true);
@@ -692,8 +669,7 @@ Element* SVGParserContext::convertPolygon(const std::shared_ptr<DOMNode>& elemen
   }
   return path;
 }
-Element* SVGParserContext::convertPath(const std::shared_ptr<DOMNode>& element,
-                                       const InheritedStyle&) {
+Element* SVGParserContext::convertPath(const std::shared_ptr<DOMNode>& element) {
   auto path = _document->makeNode<Path>();
   std::string d = getAttribute(element, "d");
   if (!d.empty()) {
@@ -707,19 +683,19 @@ Element* SVGParserContext::convertPath(const std::shared_ptr<DOMNode>& element,
   return path;
 }
 Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
-                                     const InheritedStyle& style) {
+                                     const InheritedStyle& inheritedStyle) {
   auto group = _document->makeNode<Group>();
+
+  float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
+  float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
 
   // Resolve font size early so that em-based dx/dy can be computed correctly.
   std::string fontSizeStr = getAttribute(element, "font-size");
   if (fontSizeStr.empty()) {
-    fontSizeStr = style.fontSize;
+    fontSizeStr = inheritedStyle.fontSize;
   }
   float currentFontSize =
       fontSizeStr.empty() ? DEFAULT_FONT_SIZE : parseLength(fontSizeStr, _viewBoxHeight);
-
-  float x = parseLength(getAttribute(element, "x"), _viewBoxWidth, currentFontSize);
-  float y = parseLength(getAttribute(element, "y"), _viewBoxHeight, currentFontSize);
 
   // Parse dx/dy offsets. SVG dx/dy provide relative offsets to the text position.
   x += parseLengthEm(getAttribute(element, "dx"), _viewBoxWidth, currentFontSize);
@@ -729,7 +705,7 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
   // SVG values: start (default), middle, end.
   std::string anchor = getAttribute(element, "text-anchor");
   if (anchor.empty()) {
-    anchor = style.textAnchor;
+    anchor = inheritedStyle.textAnchor;
   }
 
   // Get text content from child text nodes and tspan elements.
@@ -788,7 +764,7 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     // Font family: element attribute > inherited style.
     std::string fontFamily = getAttribute(element, "font-family");
     if (fontFamily.empty()) {
-      fontFamily = style.fontFamily;
+      fontFamily = inheritedStyle.fontFamily;
     }
     if (!fontFamily.empty()) {
       text->fontFamily = fontFamily;
@@ -801,12 +777,12 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     // SVG font-weight maps to fontStyle in PAGX (e.g., "Bold", "Light").
     std::string fontWeight = getAttribute(element, "font-weight");
     if (fontWeight.empty()) {
-      fontWeight = style.fontWeight;
+      fontWeight = inheritedStyle.fontWeight;
     }
     // Font style: element attribute > inherited style.
     std::string fontStyleAttr = getAttribute(element, "font-style");
     if (fontStyleAttr.empty()) {
-      fontStyleAttr = style.fontStyle;
+      fontStyleAttr = inheritedStyle.fontStyle;
     }
     // Combine font-weight and font-style into fontStyle field.
     // This is a simplification; in practice, font selection is more complex.
@@ -826,10 +802,10 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     // Letter spacing: element attribute > inherited style.
     std::string letterSpacing = getAttribute(element, "letter-spacing");
     if (letterSpacing.empty()) {
-      letterSpacing = style.letterSpacing;
+      letterSpacing = inheritedStyle.letterSpacing;
     }
     if (!letterSpacing.empty()) {
-      text->letterSpacing = parseLength(letterSpacing, _viewBoxWidth, currentFontSize);
+      text->letterSpacing = parseLength(letterSpacing, _viewBoxWidth);
     }
 
     group->elements.push_back(text);
@@ -843,11 +819,10 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     }
   }
 
-  addFillStroke(element, group->elements, style);
+  addFillStroke(element, group->elements, inheritedStyle);
   return group;
 }
-Element* SVGParserContext::convertUse(const std::shared_ptr<DOMNode>& element,
-                                      const InheritedStyle& style) {
+Element* SVGParserContext::convertUse(const std::shared_ptr<DOMNode>& element) {
   std::string refId = resolveUrl(getHrefAttribute(element));
   if (refId.empty() || _useStack.count(refId) > 0) {
     return nullptr;
@@ -857,12 +832,9 @@ Element* SVGParserContext::convertUse(const std::shared_ptr<DOMNode>& element,
     return nullptr;
   }
 
-  float currentFontSize = parseLength(style.fontSize, _viewBoxHeight);
-  if (currentFontSize <= 0) currentFontSize = DEFAULT_FONT_SIZE;
-
   // Parse position offset from use element.
-  float x = parseLength(getAttribute(element, "x"), _viewBoxWidth, currentFontSize);
-  float y = parseLength(getAttribute(element, "y"), _viewBoxHeight, currentFontSize);
+  float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
+  float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
 
   // Check if referenced element is an image.
   if (it->second->name == "image") {
@@ -875,10 +847,8 @@ Element* SVGParserContext::convertUse(const std::shared_ptr<DOMNode>& element,
     // Note: The transform on the use element is handled by convertToLayer,
     // which sets it on the Layer's matrix. So here we just use the original
     // image dimensions without applying the transform again.
-    float imageWidth =
-        parseLength(getAttribute(it->second, "width"), _viewBoxWidth, currentFontSize);
-    float imageHeight =
-        parseLength(getAttribute(it->second, "height"), _viewBoxHeight, currentFontSize);
+    float imageWidth = parseLength(getAttribute(it->second, "width"), _viewBoxWidth);
+    float imageHeight = parseLength(getAttribute(it->second, "height"), _viewBoxHeight);
 
     // Register the image resource.
     auto imageNode = registerImageResource(imageHref);
@@ -911,7 +881,7 @@ Element* SVGParserContext::convertUse(const std::shared_ptr<DOMNode>& element,
 
   if (_options.expandUseReferences) {
     _useStack.insert(refId);
-    auto node = convertElement(it->second, style);
+    auto node = convertElement(it->second);
     _useStack.erase(refId);
     if (node) {
       if (x != 0 || y != 0) {
@@ -931,12 +901,8 @@ Element* SVGParserContext::convertUse(const std::shared_ptr<DOMNode>& element,
   return group;
 }
 LinearGradient* SVGParserContext::convertLinearGradient(const std::shared_ptr<DOMNode>& element,
-                                                        const Rect& shapeBounds,
-                                                        const InheritedStyle& style) {
+                                                        const Rect& shapeBounds) {
   auto gradient = _document->makeNode<LinearGradient>();
-
-  float currentFontSize = parseLength(style.fontSize, _viewBoxHeight);
-  if (currentFontSize <= 0) currentFontSize = DEFAULT_FONT_SIZE;
 
   gradient->id = getAttribute(element, "id");
 
@@ -946,10 +912,10 @@ LinearGradient* SVGParserContext::convertLinearGradient(const std::shared_ptr<DO
   bool useObjectBoundingBox = (gradientUnits == "objectBoundingBox");
 
   // Parse gradient coordinates.
-  float x1 = parseLength(getAttribute(element, "x1", "0%"), 1.0f, currentFontSize);
-  float y1 = parseLength(getAttribute(element, "y1", "0%"), 1.0f, currentFontSize);
-  float x2 = parseLength(getAttribute(element, "x2", "100%"), 1.0f, currentFontSize);
-  float y2 = parseLength(getAttribute(element, "y2", "0%"), 1.0f, currentFontSize);
+  float x1 = parseLength(getAttribute(element, "x1", "0%"), 1.0f);
+  float y1 = parseLength(getAttribute(element, "y1", "0%"), 1.0f);
+  float x2 = parseLength(getAttribute(element, "x2", "100%"), 1.0f);
+  float y2 = parseLength(getAttribute(element, "y2", "0%"), 1.0f);
 
   // Parse gradientTransform.
   std::string gradientTransform = getAttribute(element, "gradientTransform");
@@ -971,12 +937,8 @@ LinearGradient* SVGParserContext::convertLinearGradient(const std::shared_ptr<DO
   return gradient;
 }
 RadialGradient* SVGParserContext::convertRadialGradient(const std::shared_ptr<DOMNode>& element,
-                                                        const Rect& shapeBounds,
-                                                        const InheritedStyle& style) {
+                                                        const Rect& shapeBounds) {
   auto gradient = _document->makeNode<RadialGradient>();
-
-  float currentFontSize = parseLength(style.fontSize, _viewBoxHeight);
-  if (currentFontSize <= 0) currentFontSize = DEFAULT_FONT_SIZE;
 
   gradient->id = getAttribute(element, "id");
 
@@ -985,9 +947,9 @@ RadialGradient* SVGParserContext::convertRadialGradient(const std::shared_ptr<DO
   bool useObjectBoundingBox = (gradientUnits == "objectBoundingBox");
 
   // Parse gradient coordinates.
-  float cx = parseLength(getAttribute(element, "cx", "50%"), 1.0f, currentFontSize);
-  float cy = parseLength(getAttribute(element, "cy", "50%"), 1.0f, currentFontSize);
-  float r = parseLength(getAttribute(element, "r", "50%"), 1.0f, currentFontSize);
+  float cx = parseLength(getAttribute(element, "cx", "50%"), 1.0f);
+  float cy = parseLength(getAttribute(element, "cy", "50%"), 1.0f);
+  float r = parseLength(getAttribute(element, "r", "50%"), 1.0f);
 
   // Parse gradientTransform.
   std::string gradientTransform = getAttribute(element, "gradientTransform");
@@ -1016,18 +978,14 @@ RadialGradient* SVGParserContext::convertRadialGradient(const std::shared_ptr<DO
   return gradient;
 }
 ImagePattern* SVGParserContext::convertPattern(const std::shared_ptr<DOMNode>& element,
-                                               const Rect& shapeBounds,
-                                               const InheritedStyle& style) {
+                                               const Rect& shapeBounds) {
   auto pattern = _document->makeNode<ImagePattern>();
-
-  float currentFontSize = parseLength(style.fontSize, _viewBoxHeight);
-  if (currentFontSize <= 0) currentFontSize = DEFAULT_FONT_SIZE;
 
   pattern->id = getAttribute(element, "id");
 
   // Parse pattern dimensions from SVG attributes.
-  float patternWidth = parseLength(getAttribute(element, "width"), 1.0f, currentFontSize);
-  float patternHeight = parseLength(getAttribute(element, "height"), 1.0f, currentFontSize);
+  float patternWidth = parseLength(getAttribute(element, "width"), 1.0f);
+  float patternHeight = parseLength(getAttribute(element, "height"), 1.0f);
 
   // Check patternUnits - determines how pattern x/y/width/height are interpreted.
   // Default is objectBoundingBox, meaning values are relative to the shape bounds.
@@ -1420,18 +1378,16 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
   return filters.size() > initialFilterCount || styles.size() > initialStyleCount;
 }
 void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
-                                     std::vector<Element*>& contents, const InheritedStyle& style) {
+                                     std::vector<Element*>& contents,
+                                     const InheritedStyle& inheritedStyle) {
   // Lazily compute shape bounds only when needed (for gradient/pattern references).
   bool boundsComputed = false;
   Rect shapeBounds = {};
 
-  float currentFontSize = parseLength(style.fontSize, _viewBoxHeight);
-  if (currentFontSize <= 0) currentFontSize = DEFAULT_FONT_SIZE;
-
   // Determine effective fill value (element attribute overrides inherited).
   std::string fill = getAttribute(element, "fill");
   if (fill.empty()) {
-    fill = style.fill;
+    fill = inheritedStyle.fill;
   }
 
   // Only add fill if we have an effective fill value that is not "none".
@@ -1450,14 +1406,14 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       std::string refId = resolveUrl(fill);
       // Use getColorSourceForRef which handles reference counting.
       if (!boundsComputed) {
-        shapeBounds = getShapeBounds(element, style);
+        shapeBounds = getShapeBounds(element);
         boundsComputed = true;
       }
-      fillNode->color = getColorSourceForRef(refId, shapeBounds, style);
+      fillNode->color = getColorSourceForRef(refId, shapeBounds);
       // Apply fill-opacity even for url() fills.
       std::string fillOpacity = getAttribute(element, "fill-opacity");
       if (fillOpacity.empty()) {
-        fillOpacity = style.fillOpacity;
+        fillOpacity = inheritedStyle.fillOpacity;
       }
       if (!fillOpacity.empty()) {
         fillNode->alpha = strtof(fillOpacity.c_str(), nullptr);
@@ -1469,7 +1425,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       // Determine effective fill-opacity.
       std::string fillOpacity = getAttribute(element, "fill-opacity");
       if (fillOpacity.empty()) {
-        fillOpacity = style.fillOpacity;
+        fillOpacity = inheritedStyle.fillOpacity;
       }
       if (!fillOpacity.empty()) {
         fillNode->alpha = strtof(fillOpacity.c_str(), nullptr);
@@ -1485,7 +1441,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       // Determine effective fill-rule.
       std::string fillRule = getAttribute(element, "fill-rule");
       if (fillRule.empty()) {
-        fillRule = style.fillRule;
+        fillRule = inheritedStyle.fillRule;
       }
       if (fillRule == "evenodd") {
         fillNode->fillRule = FillRule::EvenOdd;
@@ -1498,18 +1454,18 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
   // Determine effective stroke value (element attribute overrides inherited).
   std::string stroke = getAttribute(element, "stroke");
   if (stroke.empty()) {
-    stroke = style.stroke;
+    stroke = inheritedStyle.stroke;
   }
 
   if (!stroke.empty() && stroke != "none") {
     // Check stroke width first. A zero-width stroke is invisible and should be skipped.
     std::string strokeWidth = getAttribute(element, "stroke-width");
     if (strokeWidth.empty()) {
-      strokeWidth = style.strokeWidth;
+      strokeWidth = inheritedStyle.strokeWidth;
     }
     float parsedStrokeWidth = 1;
     if (!strokeWidth.empty()) {
-      parsedStrokeWidth = parseLength(strokeWidth, _viewBoxWidth, currentFontSize);
+      parsedStrokeWidth = parseLength(strokeWidth, _viewBoxWidth);
     }
     if (parsedStrokeWidth <= 0) {
       // Skip creating an invisible zero-width stroke.
@@ -1522,15 +1478,15 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       std::string refId = resolveUrl(stroke);
       // Use getColorSourceForRef which handles reference counting.
       if (!boundsComputed) {
-        shapeBounds = getShapeBounds(element, style);
+        shapeBounds = getShapeBounds(element);
         boundsComputed = true;
       }
-      strokeNode->color = getColorSourceForRef(refId, shapeBounds, style);
+      strokeNode->color = getColorSourceForRef(refId, shapeBounds);
     } else {
       // Determine effective stroke-opacity.
       std::string strokeOpacity = getAttribute(element, "stroke-opacity");
       if (strokeOpacity.empty()) {
-        strokeOpacity = style.strokeOpacity;
+        strokeOpacity = inheritedStyle.strokeOpacity;
       }
       if (!strokeOpacity.empty()) {
         strokeNode->alpha = strtof(strokeOpacity.c_str(), nullptr);
@@ -1548,7 +1504,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
 
     std::string strokeLinecap = getAttribute(element, "stroke-linecap");
     if (strokeLinecap.empty()) {
-      strokeLinecap = style.strokeLinecap;
+      strokeLinecap = inheritedStyle.strokeLinecap;
     }
     if (!strokeLinecap.empty()) {
       strokeNode->cap = LineCapFromString(strokeLinecap);
@@ -1556,7 +1512,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
 
     std::string strokeLinejoin = getAttribute(element, "stroke-linejoin");
     if (strokeLinejoin.empty()) {
-      strokeLinejoin = style.strokeLinejoin;
+      strokeLinejoin = inheritedStyle.strokeLinejoin;
     }
     if (!strokeLinejoin.empty()) {
       strokeNode->join = LineJoinFromString(strokeLinejoin);
@@ -1564,7 +1520,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
 
     std::string strokeMiterlimit = getAttribute(element, "stroke-miterlimit");
     if (strokeMiterlimit.empty()) {
-      strokeMiterlimit = style.strokeMiterlimit;
+      strokeMiterlimit = inheritedStyle.strokeMiterlimit;
     }
     if (!strokeMiterlimit.empty()) {
       strokeNode->miterLimit = strtof(strokeMiterlimit.c_str(), nullptr);
@@ -1572,7 +1528,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
 
     std::string dashArray = getAttribute(element, "stroke-dasharray");
     if (dashArray.empty()) {
-      dashArray = style.strokeDasharray;
+      dashArray = inheritedStyle.strokeDasharray;
     }
     if (!dashArray.empty() && dashArray != "none") {
       // Parse dash array values, which may contain units (e.g., "2px,2px" or "2,2").
@@ -1582,7 +1538,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
         char c = (i < dashArray.size()) ? dashArray[i] : ',';
         if (c == ',' || c == ' ' || c == '\t' || c == '\n' || c == '\r') {
           if (!token.empty()) {
-            strokeNode->dashes.push_back(parseLength(token, _viewBoxWidth, currentFontSize));
+            strokeNode->dashes.push_back(parseLength(token, _viewBoxWidth));
             token.clear();
           }
         } else {
@@ -1593,50 +1549,46 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
 
     std::string dashOffset = getAttribute(element, "stroke-dashoffset");
     if (dashOffset.empty()) {
-      dashOffset = style.strokeDashoffset;
+      dashOffset = inheritedStyle.strokeDashoffset;
     }
     if (!dashOffset.empty()) {
-      strokeNode->dashOffset = parseLength(dashOffset, _viewBoxWidth, currentFontSize);
+      strokeNode->dashOffset = parseLength(dashOffset, _viewBoxWidth);
     }
 
     contents.push_back(strokeNode);
   }
 }
-Rect SVGParserContext::getShapeBounds(const std::shared_ptr<DOMNode>& element,
-                                      const InheritedStyle& style) {
+Rect SVGParserContext::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
   const auto& tag = element->name;
 
-  float currentFontSize = parseLength(style.fontSize, _viewBoxHeight);
-  if (currentFontSize <= 0) currentFontSize = DEFAULT_FONT_SIZE;
-
   if (tag == "rect") {
-    float x = parseLength(getAttribute(element, "x"), _viewBoxWidth, currentFontSize);
-    float y = parseLength(getAttribute(element, "y"), _viewBoxHeight, currentFontSize);
-    float width = parseLength(getAttribute(element, "width"), _viewBoxWidth, currentFontSize);
-    float height = parseLength(getAttribute(element, "height"), _viewBoxHeight, currentFontSize);
+    float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
+    float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
+    float width = parseLength(getAttribute(element, "width"), _viewBoxWidth);
+    float height = parseLength(getAttribute(element, "height"), _viewBoxHeight);
     return Rect::MakeXYWH(x, y, width, height);
   }
 
   if (tag == "circle") {
-    float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth, currentFontSize);
-    float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight, currentFontSize);
-    float r = parseLength(getAttribute(element, "r"), _viewBoxWidth, currentFontSize);
+    float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth);
+    float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight);
+    float r = parseLength(getAttribute(element, "r"), _viewBoxWidth);
     return Rect::MakeXYWH(cx - r, cy - r, r * 2, r * 2);
   }
 
   if (tag == "ellipse") {
-    float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth, currentFontSize);
-    float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight, currentFontSize);
-    float rx = parseLength(getAttribute(element, "rx"), _viewBoxWidth, currentFontSize);
-    float ry = parseLength(getAttribute(element, "ry"), _viewBoxHeight, currentFontSize);
+    float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth);
+    float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight);
+    float rx = parseLength(getAttribute(element, "rx"), _viewBoxWidth);
+    float ry = parseLength(getAttribute(element, "ry"), _viewBoxHeight);
     return Rect::MakeXYWH(cx - rx, cy - ry, rx * 2, ry * 2);
   }
 
   if (tag == "line") {
-    float x1 = parseLength(getAttribute(element, "x1"), _viewBoxWidth, currentFontSize);
-    float y1 = parseLength(getAttribute(element, "y1"), _viewBoxHeight, currentFontSize);
-    float x2 = parseLength(getAttribute(element, "x2"), _viewBoxWidth, currentFontSize);
-    float y2 = parseLength(getAttribute(element, "y2"), _viewBoxHeight, currentFontSize);
+    float x1 = parseLength(getAttribute(element, "x1"), _viewBoxWidth);
+    float y1 = parseLength(getAttribute(element, "y1"), _viewBoxHeight);
+    float x2 = parseLength(getAttribute(element, "x2"), _viewBoxWidth);
+    float y2 = parseLength(getAttribute(element, "y2"), _viewBoxHeight);
     float minX = std::min(x1, x2);
     float minY = std::min(y1, y2);
     float maxX = std::max(x1, x2);
@@ -1670,10 +1622,10 @@ Rect SVGParserContext::getShapeBounds(const std::shared_ptr<DOMNode>& element,
     auto it = _defs.find(refId);
     if (it != _defs.end()) {
       _useStack.insert(refId);
-      Rect refBounds = getShapeBounds(it->second, style);
+      Rect refBounds = getShapeBounds(it->second);
       _useStack.erase(refId);
-      float x = parseLength(getAttribute(element, "x"), _viewBoxWidth, currentFontSize);
-      float y = parseLength(getAttribute(element, "y"), _viewBoxHeight, currentFontSize);
+      float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
+      float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
       return Rect::MakeXYWH(refBounds.x + x, refBounds.y + y, refBounds.width, refBounds.height);
     }
   }
@@ -1934,28 +1886,7 @@ Color SVGParserContext::parseColor(const std::string& value) {
     size_t end = value.find(')');
     if (start != std::string::npos && end != std::string::npos) {
       std::string inner = value.substr(start + 1, end - start - 1);
-      std::vector<float> components;
-      const char* ptr = inner.c_str();
-      const char* endPtr = ptr + inner.size();
-      while (ptr < endPtr) {
-        while (ptr < endPtr && (std::isspace(*ptr) || *ptr == ',')) {
-          ++ptr;
-        }
-        if (ptr >= endPtr) {
-          break;
-        }
-        char* nextPtr = nullptr;
-        float val = strtof(ptr, &nextPtr);
-        if (nextPtr == ptr) {
-          break;
-        }
-        if (nextPtr < endPtr && *nextPtr == '%') {
-          val = val / 100.0f * 255.0f;
-          ++nextPtr;
-        }
-        components.push_back(val);
-        ptr = nextPtr;
-      }
+      auto components = ParseFloatList(inner);
       float r = 0, g = 0, b = 0, a = 1.0f;
       if (components.size() >= 3) {
         r = components[0];
@@ -2147,7 +2078,7 @@ Color SVGParserContext::parseColor(const std::string& value) {
 
   return {0, 0, 0, 1, ColorSpace::SRGB};
 }
-float SVGParserContext::parseLength(const std::string& value, float containerSize, float fontSize) {
+float SVGParserContext::parseLength(const std::string& value, float containerSize) {
   if (value.empty()) {
     return 0;
   }
@@ -2156,10 +2087,6 @@ float SVGParserContext::parseLength(const std::string& value, float containerSiz
   float num = strtof(value.c_str(), &endPtr);
   if (endPtr == value.c_str()) {
     return 0;
-  }
-
-  while (*endPtr != '\0' && std::isspace(*endPtr)) {
-    ++endPtr;
   }
 
   if (*endPtr == '\0') {
@@ -2174,10 +2101,7 @@ float SVGParserContext::parseLength(const std::string& value, float containerSiz
   if (strcmp(endPtr, "pt") == 0) {
     return num * 1.333333f;
   }
-  if (strcmp(endPtr, "em") == 0) {
-    return num * fontSize;
-  }
-  if (strcmp(endPtr, "rem") == 0) {
+  if (strcmp(endPtr, "em") == 0 || strcmp(endPtr, "rem") == 0) {
     return num * DEFAULT_FONT_SIZE;
   }
   if (strcmp(endPtr, "in") == 0) {
@@ -2697,8 +2621,7 @@ void SVGParserContext::parseCustomData(const std::shared_ptr<DOMNode>& element, 
   }
 }
 ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
-                                                    const Rect& shapeBounds,
-                                                    const InheritedStyle& style) {
+                                                    const Rect& shapeBounds) {
   auto defIt = _defs.find(refId);
   if (defIt == _defs.end()) {
     return nullptr;
@@ -2739,11 +2662,11 @@ ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
   // Convert the SVG def to a ColorSource.
   ColorSource* colorSource = nullptr;
   if (defName == "linearGradient") {
-    colorSource = convertLinearGradient(defNode, shapeBounds, style);
+    colorSource = convertLinearGradient(defNode, shapeBounds);
   } else if (defName == "radialGradient") {
-    colorSource = convertRadialGradient(defNode, shapeBounds, style);
+    colorSource = convertRadialGradient(defNode, shapeBounds);
   } else if (defName == "pattern") {
-    colorSource = convertPattern(defNode, shapeBounds, style);
+    colorSource = convertPattern(defNode, shapeBounds);
   }
 
   if (!colorSource) {

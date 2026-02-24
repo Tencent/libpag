@@ -26,7 +26,6 @@
 #include <fstream>
 #include <iostream>
 #include <string>
-#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -126,7 +125,7 @@ static void ReorderAttributes(xmlNodePtr node) {
   const auto& order = it->second;
 
   // Build a position map: attribute name -> index in canonical order.
-  std::unordered_map<std::string_view, int> positionMap = {};
+  std::unordered_map<std::string, int> positionMap = {};
   for (int i = 0; i < static_cast<int>(order.size()); i++) {
     positionMap[order[i]] = i;
   }
@@ -143,7 +142,7 @@ static void ReorderAttributes(xmlNodePtr node) {
   std::vector<int> sortKeys = {};
   sortKeys.reserve(attrs.size());
   for (auto* attr : attrs) {
-    std::string_view name(reinterpret_cast<const char*>(attr->name));
+    auto name = std::string(reinterpret_cast<const char*>(attr->name));
     auto posIt = positionMap.find(name);
     if (posIt != positionMap.end()) {
       sortKeys.push_back(posIt->second);
