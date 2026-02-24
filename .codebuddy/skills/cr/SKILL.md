@@ -42,15 +42,14 @@ fixes, and submit results.
 
 ## Questions (rule 4 only)
 
-**Q1 — Teams**:
+**Teams detection**: check whether `TeamCreate` is available in the current
+tool list (including deferred tools). If available → teams-review; otherwise →
+local-review.
 
-- "No": quick single-agent review.
-- "Yes": multi-agent deep review with reviewer–verifier adversarial mechanism.
-
-**Q2 — Auto-fix**:
+**Auto-fix**:
 
 If on main/master: inform user that auto-fix is unavailable (protected branch),
-set `FIX_MODE=none`, skip Q2.
+set `FIX_MODE=none`, skip this question.
 
 Otherwise:
 
@@ -65,8 +64,8 @@ Otherwise:
 
 ### Hand off
 
-| Q1 Teams | → |
-|----------|---|
+| Teams available | → |
+|-----------------|---|
 | No | `references/local-review.md` |
 | Yes | `references/teams-review.md` |
 
