@@ -41,8 +41,8 @@ diff and submit results.
 1. `git branch --show-current` → record whether on main/master.
 2. `git status --porcelain` → record whether uncommitted changes exist.
 3. If `$ARGUMENTS` is empty and uncommitted changes exist → set
-   `FIX_MODE=none` and `UNCOMMITTED=true`, hand off to
-   `references/local-review.md`, and stop processing this file.
+   `FIX_MODE=none`, hand off to `references/local-review.md`, and stop
+   processing this file.
 4. If `$ARGUMENTS` is empty, no uncommitted changes, and on main/master → abort
    with usage examples: `/cr` (uncommitted changes or current branch),
    `/cr a1b2c3d`, `/cr a1b2c3d..e4f5g6h`,
@@ -78,6 +78,5 @@ Otherwise:
 | No | `references/local-review.md` |
 | Yes | `references/teams-review.md` |
 
-Pass `$ARGUMENTS`, `FIX_MODE` (none / low / low_medium / full), and
-`UNCOMMITTED` (true only from fast path, otherwise unset) to the target file.
-Hand off entirely and stop processing this file.
+Pass `$ARGUMENTS` and `FIX_MODE` (none / low / low_medium / full) to the
+target file. Hand off entirely and stop processing this file.

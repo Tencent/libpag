@@ -5,8 +5,6 @@ Single-agent review for local changes with optional auto-fix.
 ## Input from SKILL.md
 
 - `FIX_MODE`: none | low | low_medium | full
-- `UNCOMMITTED`: true when reviewing uncommitted changes (fast path from
-  SKILL.md), unset otherwise
 
 ## References
 
@@ -15,19 +13,37 @@ Single-agent review for local changes with optional auto-fix.
 | `code-checklist.md` | Code review checklist |
 | `doc-checklist.md` | Document review checklist |
 | `judgment-matrix.md` | Risk levels, worth-fixing criteria, special rules |
-| `scope-detection.md` | Shared scope detection logic |
 
 ---
 
 ## Step 1: Scope
 
-If `UNCOMMITTED` is true: scope is uncommitted changes only. Fetch the diff
-with `git diff HEAD` (covers staged + unstaged tracked files). Also check for
-untracked files with `git status --porcelain` (`??` lines) and read their
-contents for review. Skip `scope-detection.md`.
+Determine the diff to review based on how this file was entered:
 
-Otherwise: follow `scope-detection.md` to determine the review scope and fetch
-the diff.
+- **From fast path** (no `$ARGUMENTS`, uncommitted changes exist): scope is
+  uncommitted changes only. Fetch with `git diff HEAD` (staged + unstaged
+  tracked files). Also check for untracked files with `git status --porcelain`
+  (`??` lines) and read their contents for review.
+- **Empty `$ARGUMENTS`** (no uncommitted changes): determine the base branch
+  from the current branch's upstream tracking branch. If no upstream, fall back
+  to `main` (or `master`). Fetch the branch diff:
+  ```
+  git merge-base origin/{base_branch} HEAD
+  git diff <merge-base-sha>
+  ```
+  Also check for untracked files with `git status --porcelain` (`??` lines).
+- **Commit hash** (e.g., `abc123`): validate with `git rev-parse --verify`,
+  then `git show`.
+- **Commit range** (e.g., `abc123..def456` or `abc123...def456`): validate both
+  endpoints. Fetch the diff including both endpoints:
+  ```
+  git diff A~1..B
+  ```
+  Also check for untracked files with `git status --porcelain` (`??` lines).
+- **File/directory paths**: verify all paths exist on disk, then read file
+  contents.
+
+If diff is empty → exit.
 
 ### Build baseline
 
@@ -50,9 +66,6 @@ For each issue found:
 - Provide a code citation (file:line + snippet) from the current tree.
 - Self-verify by re-reading the code — confirm or withdraw.
 - If a cited path/line no longer exists, locate the correct file/path via `git diff --name-only` or file search before reporting.
-
-**PR comment verification** (when `PR_COMMENTS` exist): verify each PR review
-comment against current code. Add verified issues to the results.
 
 **Output rule**: only present the final confirmed issues to the user. Do not
 output analysis process, exclusion reasoning, or issues that were considered
