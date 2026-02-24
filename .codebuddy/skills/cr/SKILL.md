@@ -63,7 +63,7 @@ Priority levels apply to both code and document review checklists.
 
 **Q2 — Teams**:
 
-- "No": single-agent review.
+- "No": quick single-agent review.
 - "Yes": multi-agent deep review with reviewer–verifier adversarial mechanism.
 
 **Q3 — Auto-fix**:
