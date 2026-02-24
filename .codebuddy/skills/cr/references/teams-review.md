@@ -1,9 +1,11 @@
 # Teams Review
 
 You are the **coordinator**. Create an Agent Team and dispatch reviewer,
-verifier, and fixer agents — agents handle file reading and modification while
-your context stays focused on orchestration and issue judgment. Never modify
-files directly. Read code only for arbitration and diagnosis.
+verifier, and fixer agents. This is critical for multi-round iteration: agents
+are disposable, so your context grows only by structured issue lists, not raw
+file contents — avoiding context compression that would lose track of earlier
+rounds. Never modify files directly. Read code only for arbitration and
+diagnosis.
 
 The review loop is designed for **uninterrupted multi-round iteration**.
 Do NOT pause to ask the user anything until Confirm (Phase 6) or Report
