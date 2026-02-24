@@ -5,6 +5,12 @@ description: Automated code review and fix for local branches, PRs, commits, and
 
 # /cr — Code Review
 
+Automated code review for local branches, PRs, commits, and files. Detects
+review mode from arguments, asks the user about auto-fix preferences, then
+routes to the appropriate review flow. Supports multi-round iteration — each
+round discovers issues, applies risk-based auto-fixes, and loops until no new
+issues are found.
+
 All user-facing text matches the user's language; use interactive dialogs with
 selectable options for predefined choices.
 
