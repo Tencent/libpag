@@ -19,6 +19,8 @@ Run pre-checks, then match the **first** applicable rule top-to-bottom:
 
 1. `git branch --show-current` → record whether on main/master.
 2. `git status --porcelain` → record whether uncommitted changes exist.
+3. Check whether the current environment supports agent teams (multiple agents
+   working in parallel and communicating with each other).
 
 | # | Condition | Action |
 |---|-----------|--------|
@@ -27,9 +29,6 @@ Run pre-checks, then match the **first** applicable rule top-to-bottom:
 | 3 | `$ARGUMENTS` is empty, no uncommitted changes, on main/master | Abort with usage examples (see below) |
 | 4 | Not on main/master, and agent teams supported | → Question below |
 | 5 | Everything else | → `references/local-review.md` |
-
-Check whether the current environment supports agent teams (multiple agents
-working in parallel and communicating with each other) for rule 4.
 
 Each `→` means: `Read` the target file and follow it as the sole remaining
 instruction. Ignore all sections below. Do NOT review from memory or habit —
