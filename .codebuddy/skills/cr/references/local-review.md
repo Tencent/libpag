@@ -21,6 +21,14 @@ Single-agent review for local changes with optional auto-fix.
 
 Follow `scope-detection.md` to determine the review scope and fetch the diff.
 
+### Build baseline
+
+Skip if doc-only. If no build/test commands can be determined, warn that fix
+validation will be skipped. Otherwise run build + test. Fail → abort.
+
+Read git log since upstream for recent-fix context (avoid re-flagging issues
+a previous `/cr` session already fixed).
+
 ---
 
 ## Step 2: Review
@@ -37,31 +45,25 @@ For each issue found:
 **PR comment verification** (when `PR_COMMENTS` exist): verify each PR review
 comment against current code. Add verified issues to the results.
 
-If `FIX_MODE` = none → Step 3. Otherwise → Step 4.
-
 ---
 
-## Step 3: Report
-
-List all confirmed issues. End.
-
----
-
-## Step 4: Auto-fix
-
-### 4.1 Risk assessment
+## Step 3: Filter
 
 Consult `judgment-matrix.md` for risk level assessment, worth-fixing criteria,
-handling by risk level, and special rules.
+and special rules. Discard issues that are not worth reporting.
 
-### 4.2 Route issues
+If `FIX_MODE` = none → Step 6 (Report).
+
+Route remaining issues:
 
 | Risk vs `FIX_MODE` | → |
 |---------------------|---|
 | At or below threshold | auto-fix |
 | Above threshold | `pending` — confirm with user |
 
-### 4.3 Apply fixes
+---
+
+## Step 4: Fix
 
 For each issue in the auto-fix queue:
 
@@ -74,7 +76,9 @@ For each issue in the auto-fix queue:
 - After each fix, check whether the change affects related comments or
   documentation within the same files. If so, update them together.
 
-### 4.4 Validate
+---
+
+## Step 5: Validate
 
 Run build + test (skip if no build/test commands available or doc-only scope).
 
@@ -83,16 +87,25 @@ Run build + test (skip if no build/test commands available or doc-only scope).
   failure, revert that fix. Retry the fix once with failure details. If still
   failing, revert and mark as failed.
 
-### 4.5 Confirm
+### Continue?
 
-If `pending` or `failed` issues exist, present them and offer a multi-select
-prompt where each option's label is the issue summary (e.g.,
-`[risk] file:line — description`). User checks the ones to fix. Checked →
-apply fix (same rules as 4.3) and re-validate. Unchecked → skipped.
+After validation, re-review the changed code for new issues introduced by
+fixes. If new issues are found → go back to Step 3 (Filter). If no new
+issues:
 
-If no `pending`/`failed` issues → Step 4.6.
+- `pending` or `failed` issues exist → Step 5.5 (Confirm).
+- Otherwise → Step 6 (Report).
 
-### 4.6 Final report
+### Step 5.5: Confirm
+
+Present `pending` + `failed` issues and offer a multi-select prompt where each
+option's label is the issue summary (e.g., `[risk] file:line — description`).
+User checks the ones to fix. Checked → apply fix (same rules as Step 4) and
+re-validate. Unchecked → skipped.
+
+---
+
+## Step 6: Report
 
 - Fixed issues
 - Skipped issues
