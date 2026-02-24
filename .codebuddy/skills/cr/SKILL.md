@@ -42,11 +42,16 @@ fixes, and submit results.
 
 ## Questions (rule 4 only)
 
-**Teams detection**: check whether the current environment supports agent teams
-(multiple agents working in parallel and communicating with each other). If
-supported → teams-review; otherwise → local-review.
+**Q1 — Teams** (only when agent teams are available):
 
-**Auto-fix**:
+Check whether the current environment supports agent teams (multiple agents
+working in parallel and communicating with each other). If not supported, skip
+this question and use local-review.
+
+- "No": quick single-agent review.
+- "Yes": multi-agent deep review with reviewer–verifier adversarial mechanism.
+
+**Q2 — Auto-fix**:
 
 If on main/master: inform user that auto-fix is unavailable (protected branch),
 set `FIX_MODE=none`, skip this question.
@@ -64,9 +69,9 @@ Otherwise:
 
 ### Hand off
 
-| Teams available | → |
-|-----------------|---|
-| No | `references/local-review.md` |
+| Q1 Teams | → |
+|----------|---|
+| No / skipped | `references/local-review.md` |
 | Yes | `references/teams-review.md` |
 
 Pass `$ARGUMENTS` and `FIX_MODE` (none / low / low_medium / full) to the
