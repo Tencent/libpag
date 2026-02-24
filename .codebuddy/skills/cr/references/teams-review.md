@@ -31,8 +31,13 @@ share conversation history.
   immediately without waiting for acknowledgment. Do not block the workflow on
   agent responses. When closing the team, force-terminate any agents
   that are still running.
-- **Autonomy**: zero user interaction until Confirm (Phase 6) or Report
-  (Phase 7). Record anything unresolvable to `CR_STATE_FILE` for user review.
+- **Autonomy**: the review loop is designed for uninterrupted multi-round
+  iteration. Do NOT pause to ask the user anything until Confirm (Phase 6) or
+  Report (Phase 7). In particular, when both auto-fixable and `pending` (above
+  threshold) issues exist, always auto-fix first and defer `pending` issues to
+  Phase 6. Never present `pending` issues to the user before all auto-fixable
+  issues have been processed and validated. Record anything unresolvable to
+  `CR_STATE_FILE` for user review.
 
 ## Flow
 
@@ -306,10 +311,6 @@ All confirmed issues are recorded with risk level.
 
 If `FIX_MODE` = none → Phase 7 (Report).
 Otherwise → Phase 4 if auto-fix queue is non-empty; Phase 5 if empty.
-
-**IMPORTANT**: do NOT ask the user about `pending` issues here. Auto-fix
-eligible issues first; user confirmation happens only in Phase 6, after all
-auto-fixable issues have been processed and validated.
 
 ---
 
