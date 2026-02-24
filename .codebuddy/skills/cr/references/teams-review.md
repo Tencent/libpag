@@ -8,6 +8,13 @@ grows only by structured issue lists, not raw file contents, avoiding context
 compression that would lose track of earlier rounds. Never modify files
 directly. Read code only for arbitration and diagnosis.
 
+The review loop is designed for **uninterrupted multi-round iteration**.
+Always process all auto-fixable issues before involving the user. Do NOT pause
+to ask the user anything until Confirm (Phase 6) or Report (Phase 7). When
+both auto-fixable and `pending` (above threshold) issues exist, auto-fix first
+and defer `pending` issues to Phase 6. This is critical to keeping the
+review–fix–validate loop efficient and continuous.
+
 The reviewer–verifier adversarial pair is the core quality mechanism: reviewers
 find issues, verifiers challenge them. This two-party check significantly reduces
 false positives. Reviewers and verifiers MUST NOT see each other's output or
@@ -31,13 +38,7 @@ share conversation history.
   immediately without waiting for acknowledgment. Do not block the workflow on
   agent responses. When closing the team, force-terminate any agents
   that are still running.
-- **Autonomy**: the review loop is designed for uninterrupted multi-round
-  iteration. Do NOT pause to ask the user anything until Confirm (Phase 6) or
-  Report (Phase 7). In particular, when both auto-fixable and `pending` (above
-  threshold) issues exist, always auto-fix first and defer `pending` issues to
-  Phase 6. Never present `pending` issues to the user before all auto-fixable
-  issues have been processed and validated. Record anything unresolvable to
-  `CR_STATE_FILE` for user review.
+- **Autonomy**: record anything unresolvable to `CR_STATE_FILE` for user review.
 
 ## Flow
 
