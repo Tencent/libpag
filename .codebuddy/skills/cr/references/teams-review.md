@@ -123,10 +123,8 @@ group; group related small files together. Classify each module as `code`,
 ### Persist state
 
 Initialize `CR_STATE_FILE`: create `.cr-cache/` if it does not exist. Derive the
-filename from the review scope:
-- **PR mode**: `.cr-cache/pr-{number}.md`
-- **Local mode**: `.cr-cache/{branch}.md` (sanitize `/` to `-`, e.g.,
-  `feature/dom_text_box` → `feature-dom_text_box.md`)
+filename from the review scope: `.cr-cache/{branch}.md` (sanitize `/` to `-`,
+e.g., `feature/dom_text_box` → `feature-dom_text_box.md`).
 
 If the file already exists (leftover from a concurrent or crashed session),
 find the lowest unused numeric suffix (`-2`, `-3`, …) and use that.
