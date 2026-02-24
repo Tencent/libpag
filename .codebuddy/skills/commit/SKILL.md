@@ -1,6 +1,6 @@
 ---
 name: commit
-description: 仅提交本地代码（不推送）
+description: Commit local changes without pushing.
 disable-model-invocation: true
 ---
 

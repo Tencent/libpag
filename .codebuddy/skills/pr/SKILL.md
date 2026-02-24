@@ -1,6 +1,6 @@
 ---
 name: pr
-description: 提交并推送代码，创建或更新 Pull Request
+description: Commit and push changes, then create a new PR or append to an existing one.
 disable-model-invocation: true
 ---
 
