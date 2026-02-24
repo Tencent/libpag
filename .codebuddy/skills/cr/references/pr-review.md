@@ -85,17 +85,14 @@ If diff is empty → exit.
 
 ## Step 2: Review
 
-1. **Read changed files**: Read the full content of every file that appears in
-   the diff (not just the changed lines — full file context is needed for
-   accurate review).
-2. **Read referenced context**: For each changed file, identify symbols (types,
-   base classes, called functions) that are defined elsewhere and are relevant
-   to understanding the change's correctness. Read those definitions. Stop
-   expanding when the change's behavior can be fully evaluated.
-3. **Understand author intent**: Read `PR_BODY` (fetched in Step 1) to
+1. **Review the diff**: examine each change. When changed lines depend on
+   surrounding context (e.g., control flow, variable definitions, class
+   hierarchy), read the relevant sections of the file or related definitions
+   elsewhere. Expand only as needed to evaluate correctness.
+2. **Understand author intent**: Read `PR_BODY` (fetched in Step 1) to
    understand the stated motivation and approach. Verify the implementation
    actually achieves what the author describes.
-4. **Apply checklists**: Apply `code-checklist.md` to code files,
+3. **Apply checklists**: Apply `code-checklist.md` to code files,
    `doc-checklist.md` to documentation files.
 
 For each issue found:

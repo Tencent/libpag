@@ -154,8 +154,9 @@ Stance: **thorough** — discover as many real issues as possible, self-verify
 before submitting.
 
 Each reviewer receives:
-- **Scope**: file list + changed line ranges for its module. Reviewers read
-  full files and fetch diffs themselves — coordinator does NOT pass raw diff.
+- **Scope**: file list + changed line ranges for its module. Reviewers fetch
+  diffs and read additional context themselves as needed — coordinator does NOT
+  pass raw diff or file contents.
 - **Checklist**: `code-checklist.md` for code, `doc-checklist.md` for doc, both
   for mixed.
 - **Evidence requirement**: every issue must have a code citation (file:line + snippet).

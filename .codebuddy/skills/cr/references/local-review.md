@@ -25,8 +25,10 @@ Follow `scope-detection.md` to determine the review scope and fetch the diff.
 
 ## Step 2: Review
 
-Read all files in scope. Apply `code-checklist.md` to code files,
-`doc-checklist.md` to documentation files. Untracked files have no diff — review their full contents as new code.
+Review the diff. Apply `code-checklist.md` to code files,
+`doc-checklist.md` to documentation files. When changed lines depend on
+surrounding context, read the relevant sections or related definitions as
+needed. Untracked files have no diff — review their full contents as new code.
 
 For each issue found:
 - Provide a code citation (file:line + snippet).
