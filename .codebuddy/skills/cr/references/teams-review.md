@@ -33,8 +33,8 @@ share conversation history.
   immediately without waiting for acknowledgment. Do not block the workflow on
   agent responses. When closing the team, force-terminate (TaskStop) any agents
   that are still running.
-- **Autonomy**: zero user interaction until Confirm (Phase 7) or Report
-  (Phase 8). Record anything unresolvable to `CR_STATE_FILE` for user review.
+- **Autonomy**: zero user interaction until Confirm (Phase 6) or Report
+  (Phase 7). Record anything unresolvable to `CR_STATE_FILE` for user review.
 
 ## Flow
 
@@ -44,36 +44,57 @@ share conversation history.
 Scope → Review → Report
 ```
 
-`FIX_MODE≠none` follows a loop:
+`FIX_MODE≠none` has two nested loops:
 
 ```
-Scope ──→ Review → Filter → Fix → Validate → Continue? ──→ Report
-            ↑                                     │
-            └─────────── new issues ──────────────┘
-                                                  │ no new issues
-                                                  ↓
-                                               Confirm
-                                                  │ approved
-                                                  ↓
-                                            Fix → Validate
-                                                  │
-                                                  ↓
-                                              Continue? ─── new issues ──→ Review ↑
-                                                  │ no new issues
-                                                  ↓
-                                               Confirm (if more pending) or Report
+Scope
+  │
+  ↓
+┌─────────── Review Loop ───────────┐
+│                                   │
+│  Review → Filter → Fix/Validate   │
+│    ↑                     │        │
+│    └── new issues ───────┘        │
+│                                   │
+└───────────────────────────────────┘
+  │ no new issues
+  ↓
+pending/failed? ──no──→ Report
+  │ yes
+  ↓
+Confirm
+  │
+  ├── all skipped ──→ Report
+  │
+  └── approved:
+        │
+        ┌── Fix/Validate Loop ──┐
+        │                       │
+        │  Fix/Validate         │
+        │    │                  │
+        │    └→ Continue?       │
+        │         │             │
+        │    new issues ──→ Review Loop ↑
+        │         │             │
+        │    more approved ─────┘
+        │         │
+        └─────────┘
+              │ no new issues, no more approved
+              ↓
+           more pending? ──yes──→ Confirm ↑
+              │
+              no
+              ↓
+            Report
 ```
 
-- **Main loop**: Review → Filter → Fix → Validate → Continue? repeats as long
-  as new issues are found.
-- **Loop exit**: when no new issues in this round, check for `pending`/`failed`
-  issues. If none → Report. If any → Confirm.
-- **After Confirm**: user-approved fixes go through Fix → Validate → Continue?,
-  which re-enters the full Review loop if the fixes introduced new issues.
-  Only when no new issues remain does it return to Confirm (if more
-  pending/failed exist) or proceed to Report.
-- Each review round is a fresh review, not a targeted re-check of previous
-  fixes.
+- **Review Loop** (outer): Review → Filter → Fix/Validate repeats as long as
+  new issues are found. Each round is a fresh review, not a targeted re-check.
+- **Fix/Validate Loop** (inner): applies fixes and validates. Reused by both
+  the Review Loop and post-Confirm.
+- **After Confirm**: approved fixes enter the Fix/Validate Loop. If fixes
+  introduce new issues, re-enter the full Review Loop. Otherwise return to
+  Confirm if more pending/failed remain, or proceed to Report.
 
 ---
 
@@ -105,7 +126,7 @@ is owned by the coordinator — team agents never read or write it.
 
 ---
 
-## Phase 2: Review (teams)
+## Phase 2: Review
 
 ### Round invariants
 
@@ -189,9 +210,9 @@ Important constraints:
 
 ### After review
 
-- `FIX_MODE` = none → close all agents, close the team → Phase 8 (Report).
-- `FIX_MODE` ≠ none → **keep all reviewers alive** (reused as fixers in Phase 4),
-  close the verifier → Phase 3.
+- `FIX_MODE` = none → close all agents, close the team → Phase 7 (Report).
+- `FIX_MODE` ≠ none → **keep all reviewers alive** (reused as fixers in
+  Phase 4), close the verifier → Phase 3.
 
 ---
 
@@ -204,7 +225,7 @@ and verifier rebuttals as equally weighted inputs. Use your project-wide view to
 consider cross-module impact, conventions, and architectural intent that local
 reviewers may miss.
 
-### 3.0 De-dup
+### 3.1 De-dup
 
 - Remove issues already in CR_STATE_FILE
 - Remove cross-reviewer duplicates (same location, same topic)
@@ -212,14 +233,14 @@ reviewers may miss.
 
 Previously fixed issues are NOT excluded — new problems in fixed code are valid.
 
-### 3.1 Existence check
+### 3.2 Existence check
 
 | Verifier verdict | Action |
 |-----------------|--------|
 | CONFIRM | Plausibility check — verify description matches cited code. Read code if anything looks off. |
 | REJECT | Read code. Evaluate both arguments. Drop only if counter-argument is sound. |
 
-### 3.2 Risk level
+### 3.3 Risk level
 
 Consult `judgment-matrix.md` for risk level assessment, worth-fixing criteria,
 handling by risk level, and special rules.
@@ -227,7 +248,7 @@ handling by risk level, and special rules.
 **Fix approach** (Medium/High only): specify the chosen approach and reasoning.
 Record in the issue's `Proposed` field. Low risk: single obvious fix, no guidance.
 
-### 3.3 Route — record to CR_STATE_FILE
+### 3.4 Route — record to CR_STATE_FILE
 
 All confirmed issues are recorded with risk level.
 
@@ -240,21 +261,24 @@ All confirmed issues are recorded with risk level.
   create a follow-up fix task.
 - Previously rolled-back issues: do not attempt again this round.
 
-→ Phase 4 if auto-fix queue is non-empty; otherwise → Phase 6.
+→ Phase 4 if auto-fix queue is non-empty; otherwise → Phase 5.
 
 ---
 
-## Phase 4: Fix
+## Phase 4: Fix/Validate
 
 *Skipped when `FIX_MODE` = none.*
+
+This phase is an atomic unit reused by the Review Loop and post-Confirm flow.
+
+### Fix
 
 Stance: **precise** — apply each fix completely and correctly, never expand
 scope. The coordinator MUST NOT apply fixes directly.
 
-### Agent assignment
-
-Reuse surviving reviewers as fixers — each reviewer already has context on the
-files it reviewed. Coordinator dynamically assigns fix tasks:
+**Agent assignment**: reuse surviving reviewers as fixers — each reviewer
+already has context on the files it reviewed. Coordinator dynamically assigns
+fix tasks:
 
 - Issue in a file that a reviewer already read → assign to that reviewer.
 - Cross-file issues or issues with no matching reviewer → assign to a
@@ -289,16 +313,12 @@ Fix rules:
 
 Each fixer commits per issue (one commit per fix).
 
----
-
-## Phase 5: Validate
-
-*Skipped when `FIX_MODE` = none.*
+### Validate
 
 Wait for all fixers. Run build + test.
 
 - Skip if no build/test commands available or doc-only modules.
-- **Pass** → mark issues `fixed` in CR_STATE_FILE → Phase 6.
+- **Pass** → mark issues `fixed` in CR_STATE_FILE → Phase 5.
 - **Fail** → bisect to find the failing commit, revert it, re-validate
   remaining before blaming others (one bad commit may cause cascading failures).
   Per failing issue: retry via the original fixer agent with failure
@@ -306,7 +326,7 @@ Wait for all fixers. Run build + test.
 
 ---
 
-## Phase 6: Continue?
+## Phase 5: Continue?
 
 *Skipped when `FIX_MODE` = none.*
 
@@ -322,15 +342,14 @@ agents.
 | Condition | → |
 |-----------|---|
 | New confirmed issues this round | Phase 2 (new review round) |
-| Arriving from Validate (Phase 5) | Phase 2 (regression review round) |
-| `pending` or `failed` in CR_STATE_FILE | Phase 7 |
-| Otherwise | Phase 8 |
+| `pending` or `failed` in CR_STATE_FILE | Phase 6 |
+| Otherwise | Phase 7 |
 
 ---
 
-## Phase 7: Confirm
+## Phase 6: Confirm
 
-*When `FIX_MODE` = none, this phase is skipped — go directly to Phase 8.*
+*When `FIX_MODE` = none, this phase is skipped — go directly to Phase 7.*
 
 Present `pending` + `failed` issues grouped by risk (high → low), sorted by
 file path within each group:
@@ -341,15 +360,15 @@ file path within each group:
 
 Mark selected `approved`, declined `skipped`.
 
-- **All skipped** → Phase 8.
-- **Any approved** → Phase 4 (Fix → Validate → Continue?). Continue? re-enters
-  the full Review loop (Phase 2) if the fixes introduced new issues. Only when
-  no new issues remain does it return here for remaining `pending`/`failed`
-  issues, or proceed to Phase 8 if none are left.
+- **All skipped** → Phase 7.
+- **Any approved** → Phase 4 (Fix/Validate). After Validate, go to Phase 5
+  (Continue?). If new issues are found, re-enter the full Review Loop (Phase 2).
+  If no new issues but more `pending`/`failed` remain, return here (Phase 6).
+  If nothing remains, proceed to Phase 7.
 
 ---
 
-## Phase 8: Report
+## Phase 7: Report
 
 Force-terminate any agents still running. Close the team. Delete CR_STATE_FILE.
 
@@ -367,8 +386,8 @@ Summary:
 Use this format to record issues in the `# Issues` section of `CR_STATE_FILE`.
 
 **Status values**:
-- `pending` — recorded, awaiting user decision in Phase 7
-- `approved` — user approved fix in Phase 7, sent to Phase 4
+- `pending` — recorded, awaiting user decision in Phase 6
+- `approved` — user approved fix in Phase 6, sent to Phase 4
 - `fixed` — fix applied and passed validation
 - `failed` — fix attempted but failed validation after retries
 - `skipped` — user declined or issue rejected (do not re-report)
