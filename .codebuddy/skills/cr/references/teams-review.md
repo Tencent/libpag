@@ -258,6 +258,10 @@ Important constraints:
 
 ## Phase 3: Filter — coordinator only
 
+Before entering this phase, confirm: (1) all reviewers have submitted their
+final reports; (2) the verifier has given a CONFIRM/REJECT verdict for every
+forwarded finding. Do NOT proceed until both conditions are met.
+
 Your stance here is **neutral** — trust no single party. Treat reviewer reports
 and verifier rebuttals as equally weighted inputs. Use your project-wide view to
 consider cross-module impact, conventions, and architectural intent that local
