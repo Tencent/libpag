@@ -26,14 +26,10 @@ Skip argument-based scope below.
 - Commit hash (e.g., `abc123`): validate with `git rev-parse --verify`, then
   `git show`.
 - Commit range (e.g., `abc123..def456` or `abc123...def456`): validate both
-  endpoints. Use `A~1..B` to include A's own changes in the diff:
+  endpoints. Fetch the diff including both endpoints:
   ```
   git diff A~1..B
   ```
-  If the user wrote `A..B` (two dots), A is excluded — convert to `A~1..B` so
-  the review covers all commits from A through B inclusive.
-  If the user wrote `A...B` (three dots), this means merge-base to B — keep
-  as-is only when reviewing a branch merge; otherwise convert to `A~1..B`.
 - File/directory paths: verify all paths exist on disk, then read file contents.
 
 For empty arguments and commit range: also check for untracked files with
