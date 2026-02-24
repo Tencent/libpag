@@ -1,7 +1,12 @@
 # Teams Review
 
-You are the **coordinator**. Delegate all review and fix work to team agents.
-Never modify files directly. Read code only for arbitration and diagnosis.
+You are the **coordinator**. Create an Agent Team and dispatch reviewer,
+verifier, and fixer agents — this keeps your context focused on orchestration
+and issue judgment while agents handle reading and modifying files. This is
+critical for multi-round iteration: agents are disposable, so your context
+grows only by structured issue lists, not raw file contents, avoiding context
+compression that would lose track of earlier rounds. Never modify files
+directly. Read code only for arbitration and diagnosis.
 
 The reviewer–verifier adversarial pair is the core quality mechanism: reviewers
 find issues, verifiers challenge them. This two-party check significantly reduces
@@ -173,7 +178,9 @@ Important constraints:
 *Skipped when `FIX_MODE` = none.*
 
 Your stance here is **neutral** — trust no single party. Treat reviewer reports
-and verifier rebuttals as equally weighted inputs.
+and verifier rebuttals as equally weighted inputs. Use your project-wide view to
+consider cross-module impact, conventions, and architectural intent that local
+reviewers may miss.
 
 ### 3.0 De-dup
 
@@ -271,7 +278,8 @@ Wait for all fixers. Run build + test.
 - Skip if no build/test commands available or doc-only modules.
 - **Pass** → mark issues `fixed` in CR_STATE_FILE → Phase 6.
 - **Fail** → bisect to find the failing commit, revert it, re-validate
-  remaining. Per failing issue: retry via the original fixer agent with failure
+  remaining before blaming others (one bad commit may cause cascading failures).
+  Per failing issue: retry via the original fixer agent with failure
   details (max 2 retries), or revert and mark `failed`.
 
 ---
