@@ -25,12 +25,11 @@ Run pre-checks, then match the **first** applicable rule top-to-bottom:
 | 1 | `$ARGUMENTS` is a PR number or URL containing `/pull/` | → `references/pr-review.md` |
 | 2 | `$ARGUMENTS` is empty and uncommitted changes exist | → `references/local-review.md` |
 | 3 | `$ARGUMENTS` is empty, no uncommitted changes, on main/master | Abort with usage examples (see below) |
-| 4 | On main/master (with `$ARGUMENTS`) | → `references/local-review.md` |
-| 5 | Agent teams not supported | → `references/local-review.md` |
-| 6 | Agent teams supported | → Question below |
+| 4 | Not on main/master, and agent teams supported | → Question below |
+| 5 | Everything else | → `references/local-review.md` |
 
 Check whether the current environment supports agent teams (multiple agents
-working in parallel and communicating with each other) for rules 5–6.
+working in parallel and communicating with each other) for rule 4.
 
 Each `→` means: `Read` the target file and follow it as the sole remaining
 instruction. Ignore all sections below. Do NOT review from memory or habit —
@@ -44,7 +43,7 @@ fixes, and submit results.
 
 ---
 
-## Question (rule 6 only)
+## Question (rule 4 only)
 
 Ask a **single question**. The question title should inform the user that the
 current environment supports Agent Teams, and ask whether to enable multi-agent
