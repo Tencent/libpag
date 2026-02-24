@@ -25,7 +25,7 @@ Run pre-checks, then match the **first** applicable rule top-to-bottom:
 | # | Condition | Action |
 |---|-----------|--------|
 | 1 | `$ARGUMENTS` is a PR number or URL containing `/pull/` | → `references/pr-review.md` |
-| 2 | Not on main/master, and agent teams supported | → Question below |
+| 2 | No uncommitted changes, not on main/master, and agent teams supported | → Question below |
 | 3 | Everything else | → `references/local-review.md` |
 
 Each `→` means: `Read` the target file and follow it as the sole remaining
