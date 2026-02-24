@@ -59,7 +59,7 @@ handling by risk level, and special rules.
 | Risk vs `FIX_MODE` | → |
 |---------------------|---|
 | At or below threshold | auto-fix |
-| Above threshold | report only |
+| Above threshold | `pending` — confirm with user |
 
 ### 4.3 Apply fixes
 
@@ -83,9 +83,18 @@ Run build + test (skip if no build/test commands available or doc-only scope).
   failure, revert that fix. Retry the fix once with failure details. If still
   failing, revert and mark as failed.
 
-### 4.5 Final report
+### 4.5 Confirm
+
+If `pending` or `failed` issues exist, present them and offer a multi-select
+prompt where each option's label is the issue summary (e.g.,
+`[risk] file:line — description`). User checks the ones to fix. Checked →
+apply fix (same rules as 4.3) and re-validate. Unchecked → skipped.
+
+If no `pending`/`failed` issues → Step 4.6.
+
+### 4.6 Final report
 
 - Fixed issues
-- Above-threshold issues (need manual attention)
+- Skipped issues
 - Failed/rolled-back issues with reasons
 - Final test result
