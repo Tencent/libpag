@@ -1,15 +1,23 @@
 # PR Review
 
-Entered from SKILL.md Step 1 when mode is PR. This document covers the complete
-PR review flow from questions through reporting.
+Review for pull requests. Issues are submitted as line-level PR comments.
 
-## Step 1: Ask
+## Input from SKILL.md
 
-Only ask **Q1 — Review priority** (same options as main flow). Auto-fix is not
-available in PR mode — inform the user that issues will be submitted as
-line-level PR comments after confirmation.
+- `REVIEW_PRIORITY`: A | A+B | A+B+C
 
-## Step 2: Scope
+Auto-fix is not available in PR mode.
+
+## References
+
+| File | Purpose |
+|------|---------|
+| `code-checklist.md` | Code review checklist |
+| `doc-checklist.md` | Document review checklist |
+
+---
+
+## Step 1: Scope
 
 1. **Fetch PR metadata**:
    ```
@@ -35,7 +43,7 @@ line-level PR comments after confirmation.
    git diff $(git merge-base origin/{BASE_BRANCH} HEAD)
    ```
 
-4. **Fetch existing PR review comments** for de-duplication in Step 3:
+4. **Fetch existing PR review comments** for de-duplication in Step 2:
    ```
    gh api repos/{owner}/{repo}/pulls/{number}/comments
    ```
@@ -43,18 +51,22 @@ line-level PR comments after confirmation.
 
 If diff is empty → exit.
 
-## Step 3: Review
+---
 
-Read all files in scope. Apply `references/code-checklist.md` to code files,
-`references/doc-checklist.md` to documentation files. Only include priority
-levels the user selected.
+## Step 2: Review
+
+Read all files in scope. Apply `code-checklist.md` to code files,
+`doc-checklist.md` to documentation files. Only include priority levels the user
+selected.
 
 For each issue found:
 - Provide a code citation (file:line + snippet).
 - Self-verify by re-reading the code — confirm or withdraw.
 - De-duplicate against `EXISTING_PR_COMMENTS` — skip issues already covered.
 
-## Step 4: Report
+---
+
+## Step 3: Report
 
 Present confirmed issues to user. User selects which to submit as PR comments,
 declines are marked `skipped`.

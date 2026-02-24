@@ -1,18 +1,27 @@
-# Auto-Fix Mode (Teams)
+# Teams Review
 
-Entered from SKILL.md Step 1 when the user selects an auto-fix threshold.
-Q1 (review priority) and Q2 (auto-fix threshold) are already answered — this
-document starts from Scope onward.
+You are the **coordinator**. Delegate all review and fix work to team agents.
+Never modify files directly. Read code only for arbitration and diagnosis.
 
 The reviewer–verifier adversarial pair is the core quality mechanism: reviewers
 find issues, verifiers challenge them. This two-party check significantly reduces
 false positives. Reviewers and verifiers MUST NOT see each other's output or
 share conversation history.
 
+## Input from SKILL.md
+
+- `REVIEW_PRIORITY`: A | A+B | A+B+C
+- `FIX_MODE`: none | low | low_medium | full
+
+## References
+
+| File | Purpose |
+|------|---------|
+| `code-checklist.md` | Code review checklist |
+| `doc-checklist.md` | Document review checklist |
+
 ## Additional operating rules
 
-- **Delegation**: You (the coordinator) **never modify files directly**. Delegate
-  all changes to fixer agents. Read code only for arbitration and diagnosis.
 - **Agent lifecycle**: When closing agents, send the shutdown message and continue
   immediately without waiting for acknowledgment. Do not block the workflow on
   agent responses. When closing the team, force-terminate (TaskStop) any agents
@@ -28,8 +37,9 @@ share conversation history.
 ## Flow
 
 ```
-Scope → [ Review → Filter → Continue? ] → Confirm → Report
-            ↑          Fix ← Validate ←┘
+FIX_MODE=none:   Scope → Review → Report
+FIX_MODE≠none:   Scope → [ Review → Filter → Continue? ] → Confirm → Report
+                            ↑          Fix ← Validate ←┘
 ```
 
 The review loop repeats as long as new issues are found. Each round is a fresh
@@ -40,28 +50,59 @@ review. After the loop: if `pending` or `failed` entries exist → Confirm → F
 
 ## Phase 1: Scope
 
-Follow `references/scope-preparation.md` for all git/gh commands and argument
-handling.
+### Uncommitted changes
 
-If diff is empty → exit.
+If uncommitted changes exist (detected in SKILL.md pre-check), scope is
+uncommitted changes only:
+```
+git diff HEAD
+```
+Skip argument-based scope below.
 
-**Build baseline** (skip if doc-only): if no build/test commands can be
-determined, warn that fix validation will be skipped. Otherwise run build +
-test. Fail → abort.
+### Normal scope — validate arguments and fetch diff
+
+- Empty arguments: determine the base branch from the current branch's upstream
+  tracking branch. If no upstream, fall back to `main` (or `master`). Fetch the
+  branch diff.
+- Commit hash: validate with `git rev-parse --verify`, then `git show`.
+- Commit range: validate both endpoints, then fetch the range diff.
+- File/directory paths: verify all paths exist on disk, then read file contents.
+
+### Associated PR comments (optional, best-effort)
+
+If `gh` is available, check whether the current branch has an open PR:
+```
+gh pr view --json number,state --jq 'select(.state == "OPEN") | .number' 2>/dev/null
+```
+If an open PR exists, fetch its line-level review comments:
+```
+gh api repos/{owner}/{repo}/pulls/{number}/comments
+```
+Store as `PR_COMMENTS` for verification in Phase 2.
+
+### Build baseline
+
+Skip if doc-only. If no build/test commands can be determined, warn that fix
+validation will be skipped. Otherwise run build + test. Fail → abort.
 
 Read git log since upstream for recent-fix context (avoid re-flagging issues
 a previous `/cr` session already fixed).
+
+### Module partition
 
 Partition files in scope into **review modules** for parallel review. Each
 module is a self-contained logical unit. Split large files by section/function
 group; group related small files together. Classify each module as `code`,
 `doc`, or `mixed`.
 
-**Persist state**: write CR_STATE_FILE (see CR_STATE_FILE format appendix)
-with session info (mode, priority, threshold, file list, module assignments,
-changed line ranges, build/test commands) and an issues section updated
-incrementally. CR_STATE_FILE is owned by the coordinator — team agents never
-read or write it.
+### Persist state
+
+Write CR_STATE_FILE (see CR_STATE_FILE format appendix) with session info
+(mode, priority, threshold, file list, module assignments, changed line ranges,
+build/test commands) and an issues section updated incrementally. CR_STATE_FILE
+is owned by the coordinator — team agents never read or write it.
+
+If diff is empty → exit.
 
 ---
 
@@ -96,8 +137,8 @@ before submitting.
 Each reviewer receives:
 - **Scope**: file list + changed line ranges for its module. Reviewers read
   full files and fetch diffs themselves — coordinator does NOT pass raw diff.
-- **Checklist**: `references/code-checklist.md` for code, `references/doc-checklist.md`
-  for doc, both for mixed. Only include priority levels the user selected.
+- **Checklist**: `code-checklist.md` for code, `doc-checklist.md` for doc, both
+  for mixed. Only include priority levels the user selected.
 - **Evidence requirement**: every issue must have a code citation (file:line + snippet).
 - **Known-issue exclusion** (round 2+): skip issues matching the coordinator's
   exclusion list. Focus on finding new issues.
@@ -107,9 +148,9 @@ Each reviewer receives:
   issue. Mark as confirmed or withdrawn. Only submit confirmed issues.
 - **Output format**: `[file:line] [A/B/C] — [description] — [key lines]`
 
-**PR comment reviewer** (local mode with associated PR, round 1 only):
-one additional agent to verify PR review comments against current code.
-Same output format, same verification pipeline. Skip in subsequent rounds.
+**PR comment reviewer** (when `PR_COMMENTS` exist, round 1 only): one additional
+agent to verify PR review comments against current code. Same output format,
+same verification pipeline. Skip in subsequent rounds.
 
 ### Verification (pipeline)
 
@@ -149,13 +190,15 @@ Important constraints:
 
 ### After review
 
-- **Keep all reviewers alive** — they will be reused as fixers in Phase 4
-  (they already have full context on the code).
-- Close the verifier after all verification is complete.
+- `FIX_MODE` = none → close all agents, close the team → Phase 8 (Report).
+- `FIX_MODE` ≠ none → **keep all reviewers alive** (reused as fixers in Phase 4),
+  close the verifier → Phase 3.
 
 ---
 
 ## Phase 3: Filter — coordinator only
+
+*Skipped when `FIX_MODE` = none.*
 
 Your stance here is **neutral** — trust no single party. Treat reviewer reports
 and verifier rebuttals as equally weighted inputs.
@@ -192,8 +235,8 @@ Consult the Judgment Matrix appendix for worth-fixing criteria and special rules
 
 All confirmed issues are recorded with risk level.
 
-| Risk vs user threshold | → |
-|------------------------|---|
+| Risk vs `FIX_MODE` | → |
+|---------------------|---|
 | At or below threshold | auto-fix queue |
 | Above threshold | CR_STATE_FILE as `pending` |
 
@@ -206,6 +249,8 @@ All confirmed issues are recorded with risk level.
 ---
 
 ## Phase 4: Fix
+
+*Skipped when `FIX_MODE` = none.*
 
 Stance: **precise** — apply each fix completely and correctly, never expand
 scope. The coordinator MUST NOT apply fixes directly.
@@ -252,6 +297,8 @@ Each fixer commits per issue (one commit per fix).
 
 ## Phase 5: Validate
 
+*Skipped when `FIX_MODE` = none.*
+
 Wait for all fixers. Run build + test.
 
 - Skip if no build/test commands available or doc-only modules.
@@ -263,6 +310,8 @@ Wait for all fixers. Run build + test.
 ---
 
 ## Phase 6: Continue?
+
+*Skipped when `FIX_MODE` = none.*
 
 ### Step 1: Close the current round's team
 
@@ -283,6 +332,8 @@ agents.
 ---
 
 ## Phase 7: Confirm
+
+*When `FIX_MODE` = none, this phase is skipped — go directly to Phase 8.*
 
 Present `pending` + `failed` issues grouped by risk (high → low), sorted by
 file path within each group:
@@ -306,7 +357,7 @@ Summary:
 - Issues found / fixed / skipped / failed
 - Rolled-back issues and reasons
 - Final test result
-- Local mode with associated PR: note issues from PR comments
+- Issues from PR comments (when `PR_COMMENTS` existed)
 
 ---
 
@@ -325,15 +376,15 @@ Summary:
 
 ### Handling by Risk Level
 
-| User threshold | Low risk | Medium risk | High risk |
-|----------------|----------|-------------|----------|
-| Full auto      | Auto-fix | Auto-fix    | Auto-fix |
-| Low + Medium   | Auto-fix | Auto-fix    | Confirm  |
-| Low only       | Auto-fix | Confirm     | Confirm  |
+| `FIX_MODE` | Low risk | Medium risk | High risk |
+|------------|----------|-------------|----------|
+| full       | Auto-fix | Auto-fix    | Auto-fix |
+| low_medium | Auto-fix | Auto-fix    | Confirm  |
+| low        | Auto-fix | Confirm     | Confirm  |
 
-**Special rule for "Full auto"**: issues that would change test baselines (screenshot
-comparisons, golden files) are always deferred for user confirmation, regardless of
-risk level.
+**Special rule for "full" mode**: issues that would change test baselines
+(screenshot comparisons, golden files) are always deferred for user confirmation,
+regardless of risk level.
 
 ### Code Modules — Worth Fixing?
 
