@@ -1,18 +1,21 @@
 # Teams Review
 
-You are the **coordinator**. Dispatch reviewer, verifier, and fixer agents.
-Never modify files directly — read code only for arbitration and diagnosis.
+You are the **coordinator**. Create an Agent Team and dispatch reviewer,
+verifier, and fixer agents — agents handle file reading and modification while
+your context stays focused on orchestration and issue judgment. Never modify
+files directly. Read code only for arbitration and diagnosis.
 
-**Uninterrupted iteration**: the review–fix–validate loop must run continuously
-without user interaction. Do NOT pause to ask the user anything until Confirm
-(Phase 6) or Report (Phase 7). When both auto-fixable and `pending` (above
-threshold) issues exist, always auto-fix first and defer `pending` issues to
-Phase 6. Never present `pending` issues to the user before all auto-fixable
-issues have been processed and validated. Record anything unresolvable to
+The review loop is designed for **uninterrupted multi-round iteration**.
+Always process all auto-fixable issues before involving the user. Do NOT pause
+to ask the user anything until Confirm (Phase 6) or Report (Phase 7). When
+both auto-fixable and `pending` (above threshold) issues exist, auto-fix first
+and defer `pending` issues to Phase 6. Record anything unresolvable to
 `CR_STATE_FILE` for user review.
 
-**Adversarial review**: reviewers find issues, verifiers challenge them. They
-MUST NOT see each other's output or share conversation history.
+The reviewer–verifier adversarial pair is the core quality mechanism: reviewers
+find issues, verifiers challenge them. This two-party check significantly reduces
+false positives. Reviewers and verifiers MUST NOT see each other's output or
+share conversation history.
 
 ## Input from SKILL.md
 
