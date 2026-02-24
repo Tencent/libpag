@@ -40,22 +40,21 @@ diff and submit results.
 
 1. `git branch --show-current` → record whether on main/master.
 2. `git status --porcelain` → record whether uncommitted changes exist.
-3. If `$ARGUMENTS` is empty:
-   - If uncommitted changes exist → review scope is **only** uncommitted changes
-     (staged + unstaged).
-   - Otherwise → review scope is the current branch.
-4. If `$ARGUMENTS` is provided → review scope follows `$ARGUMENTS` as-is.
-5. If on main/master, no uncommitted changes, and `$ARGUMENTS` is empty → abort
-   with usage examples: `/cr` (uncommitted changes or current branch),
-   `/cr a1b2c3d`, `/cr a1b2c3d..e4f5g6h`,
-   `/cr src/foo.cpp`, `/cr 123`, `/cr https://github.com/.../pull/123`.
 
-### Questions
+### Scope & fast path
 
-Skip conditions:
-- If uncommitted changes exist: skip Q1 and use single-agent mode.
-- If on main/master or uncommitted changes exist: inform user that auto-fix is
-  unavailable (uncommitted changes or protected branch), skip Q2.
+- If `$ARGUMENTS` is empty:
+  - If uncommitted changes exist → review scope is **only** uncommitted changes
+    (staged + unstaged), set `FIX_MODE=none`, hand off to
+    `references/local-review.md`, and stop processing this file.
+  - Otherwise → review scope is the current branch.
+- If `$ARGUMENTS` is provided → review scope follows `$ARGUMENTS` as-is.
+- If on main/master, no uncommitted changes, and `$ARGUMENTS` is empty → abort
+  with usage examples: `/cr` (uncommitted changes or current branch),
+  `/cr a1b2c3d`, `/cr a1b2c3d..e4f5g6h`,
+  `/cr src/foo.cpp`, `/cr 123`, `/cr https://github.com/.../pull/123`.
+
+### Questions (only after the fast path)
 
 **Q1 — Teams**:
 
@@ -63,6 +62,12 @@ Skip conditions:
 - "Yes": multi-agent deep review with reviewer–verifier adversarial mechanism.
 
 **Q2 — Auto-fix**:
+
+If on main/master or uncommitted changes exist: inform user that auto-fix is
+unavailable (uncommitted changes or protected branch), set `FIX_MODE=none`,
+skip Q2.
+
+Otherwise:
 
 - "Review only" → `FIX_MODE=none`: report issues without fixing.
 - "Low risk only" → `FIX_MODE=low`: auto-fix only the most straightforward
