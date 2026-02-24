@@ -87,7 +87,6 @@ Determine the diff to review based on `$ARGUMENTS`:
   git merge-base origin/{base_branch} HEAD
   git diff <merge-base-sha>
   ```
-  Also check for untracked files with `git status --porcelain` (`??` lines).
 - **Commit hash** (e.g., `abc123`): validate with `git rev-parse --verify`,
   then `git show`.
 - **Commit range** (e.g., `abc123..def456` or `abc123...def456`): validate both
