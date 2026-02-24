@@ -44,14 +44,6 @@ If diff is empty → show usage examples and exit:
 `/cr a1b2c3d`, `/cr a1b2c3d..e4f5g6h`,
 `/cr src/foo.cpp`, `/cr 123`, `/cr https://github.com/.../pull/123`.
 
-### Build baseline
-
-Skip if doc-only. If no build/test commands can be determined, warn that fix
-validation will be skipped. Otherwise run build + test. Fail → abort.
-
-Read git log since upstream for recent-fix context (avoid re-flagging issues
-a previous `/cr` session already fixed).
-
 ---
 
 ## Step 2: Review
@@ -77,19 +69,18 @@ but ruled out.
 Consult `judgment-matrix.md` for risk level assessment, worth-fixing criteria,
 and special rules. Discard issues that are not worth reporting.
 
-If no issues remain after filtering → Step 6 (Report). Otherwise → Step 4.
+If no issues remain after filtering → Step 5 (Report).
 
 ---
 
 ## Step 4: Interactive fix
 
-Present all confirmed issues (and any `failed` issues from a previous fix
-attempt, with failure reasons) to the user, then ask which ones to fix using
+Present all confirmed issues to the user, then ask which ones to fix using
 **a single multi-select question** where each option's label is the issue
 summary (e.g., `[risk] file:line — description`). User checks multiple options
 in one prompt. Unchecked → skipped.
 
-- **All skipped** → Step 6 (Report).
+- **All skipped** → Step 5 (Report).
 - **Any checked** → apply fixes:
   - **Fix approach** (Medium/High only): decide the specific fix approach and
     reasoning before applying. Low risk: single obvious fix, no planning needed.
@@ -103,27 +94,7 @@ in one prompt. Unchecked → skipped.
 
 ---
 
-## Step 5: Validate
-
-Skip if no build/test commands available or doc-only scope.
-
-Run build + test.
-
-- **Pass** → mark issues as fixed.
-- **Fail** → use the build error message to identify which fix caused the
-  failure, revert that fix. Retry the fix once with failure details. If still
-  failing, revert and mark as failed.
-
-After validation, re-review the changed code for new issues introduced by
-fixes. If new issues are found → go back to Step 3 (Filter). If no new issues
-and failed issues exist → return to Step 4 (let user decide on failed items).
-Otherwise → Step 6 (Report).
-
----
-
-## Step 6: Report
+## Step 5: Report
 
 - Summary: one paragraph describing what was reviewed and key findings.
-- Issues found / fixed / skipped / failed
-- Failed/rolled-back issues with reasons
-- Final test result
+- Issues found / fixed / skipped
