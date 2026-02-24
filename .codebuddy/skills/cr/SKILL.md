@@ -25,7 +25,12 @@ Run pre-checks, then match the **first** applicable rule top-to-bottom:
 | 1 | `$ARGUMENTS` is a PR number or URL containing `/pull/` | → `references/pr-review.md` |
 | 2 | `$ARGUMENTS` is empty and uncommitted changes exist | → `references/local-review.md` |
 | 3 | `$ARGUMENTS` is empty, no uncommitted changes, on main/master | Abort with usage examples (see below) |
-| 4 | Everything else | → Question below |
+| 4 | On main/master (with `$ARGUMENTS`) | → `references/local-review.md` |
+| 5 | Agent teams not supported | → `references/local-review.md` |
+| 6 | Agent teams supported | → Question below |
+
+Check whether the current environment supports agent teams (multiple agents
+working in parallel and communicating with each other) for rules 5–6.
 
 Each `→` means: `Read` the target file and follow it as the sole remaining
 instruction. Ignore all sections below. Do NOT review from memory or habit —
@@ -39,17 +44,12 @@ fixes, and submit results.
 
 ---
 
-## Question (rule 4 only)
+## Question (rule 6 only)
 
-Check whether the current environment supports agent teams (multiple agents
-working in parallel and communicating with each other).
-
-- If **not supported**, skip the question and route to `references/local-review.md`.
-- If **on main/master**, skip the question and route to `references/local-review.md`.
-- Otherwise, ask a **single question**. The question title should inform the
-  user that the current environment supports Agent Teams, and ask whether to
-  enable multi-agent review with reviewer–verifier adversarial mechanism and
-  auto-fix. Provide 4 options:
+Ask a **single question**. The question title should inform the user that the
+current environment supports Agent Teams, and ask whether to enable multi-agent
+review with reviewer–verifier adversarial mechanism and auto-fix. Provide 4
+options:
 
 | Option | Description |
 |--------|-------------|
@@ -62,7 +62,7 @@ working in parallel and communicating with each other).
 
 | Option | → | FIX_MODE |
 |--------|---|----------|
-| Quick review / skipped | `references/local-review.md` | — |
+| Quick review | `references/local-review.md` | — |
 | Auto-fix: low risk | `references/teams-review.md` | low |
 | Auto-fix: low + medium risk | `references/teams-review.md` | low_medium |
 | Auto-fix: full | `references/teams-review.md` | full |
