@@ -218,8 +218,10 @@ This step is mandatory — the coordinator MUST NOT skip it or perform
 verification itself.
 
 The verifier runs as a **pipeline** — it does not wait for all reviewers to
-finish. As each reviewer reports issues, the coordinator forwards them to the
-verifier immediately. Include the following verbatim in every verifier's prompt:
+finish. As each reviewer sends a report via SendMessage, the coordinator MUST
+forward the original report content to the verifier immediately without
+rewriting or supplementing it. Include the following verbatim in every
+verifier's prompt:
 
 ```
 You are a code review verifier. Your stance is adversarial — default to doubting the
