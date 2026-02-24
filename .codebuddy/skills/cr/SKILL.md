@@ -17,6 +17,7 @@ selectable options for predefined choices.
 | `references/teams-review.md` | Teams review flow (multi-agent) |
 | `references/code-checklist.md` | Code review checklist |
 | `references/doc-checklist.md` | Document review checklist |
+| `references/judgment-matrix.md` | Risk levels, worth-fixing criteria, special rules |
 
 ---
 
