@@ -282,11 +282,14 @@ scope. The coordinator MUST NOT apply fixes directly.
 
 **Agent assignment**: reuse surviving reviewers as fixers — each reviewer
 already has context on the files it reviewed. Coordinator dynamically assigns
-fix tasks:
+fix tasks. The coordinator MUST assign by explicit file list and ensure a file
+is owned by only one fixer at a time:
 
 - Issue in a file that a reviewer already read → assign to that reviewer.
 - Cross-file issues or issues with no matching reviewer → assign to a
   `fixer-cross` agent (create one if needed).
+- Cross-module fixes: assign to the reviewer that owns the target files or to
+  `fixer-cross`, and include the full file list in the task.
 - Multi-file renames → single atomic task assigned to one agent.
 
 One agent may receive multiple fix tasks if it covers several files. Avoid
@@ -300,18 +303,20 @@ Each fixer receives:
 ```
 Fix rules:
 1. After fixing each issue, immediately: git commit --only <files> -m "message"
-2. Only commit files in your own module. Never use git add .
-3. Commit message: English, under 120 characters, ending with a period.
-4. When in doubt, skip the fix rather than risk a wrong change.
-5. Do not run build or tests.
-6. Do not modify public API function signatures or class definitions (comments are OK),
+2. Only modify files explicitly assigned by the coordinator. Never use git add .
+3. If a fix requires changes to unassigned files, stop and report to the coordinator
+   for re-assignment.
+4. Commit message: English, under 120 characters, ending with a period.
+5. When in doubt, skip the fix rather than risk a wrong change.
+6. Do not run build or tests.
+7. Do not modify public API function signatures or class definitions (comments are OK),
    unless the coordinator's issue description explicitly requires an API signature fix.
-7. After each fix, check whether the change affects related comments or documentation
+8. After each fix, check whether the change affects related comments or documentation
    within your assigned files (function/class doc-comments, inline comments describing
    the changed logic). If so, update them in the same commit as the fix.
    Cross-module documentation updates (README, spec files, other modules) are handled
    separately by the coordinator.
-8. When done, report the commit hash for each fix and list any skipped issues with
+9. When done, report the commit hash for each fix and list any skipped issues with
    the reason for skipping.
 ```
 
