@@ -45,7 +45,10 @@
 
 namespace pagx {
 
+static constexpr float DEFAULT_FONT_SIZE = 16.0f;
 static constexpr int MAX_SVG_RECURSION_DEPTH = 128;
+
+static constexpr float DEFAULT_FONT_SIZE = 16.0f;
 
 /**
  * Type of shadow-only filter for determining how to handle element content.
@@ -101,22 +104,23 @@ class SVGParserContext {
   void convertChildren(const std::shared_ptr<DOMNode>& element, std::vector<Element*>& contents,
                        const InheritedStyle& inheritedStyle,
                        ShadowOnlyType shadowOnlyType = ShadowOnlyType::None);
-  Element* convertElement(const std::shared_ptr<DOMNode>& element);
-  Element* convertRect(const std::shared_ptr<DOMNode>& element);
-  Element* convertCircle(const std::shared_ptr<DOMNode>& element);
-  Element* convertEllipse(const std::shared_ptr<DOMNode>& element);
-  Element* convertLine(const std::shared_ptr<DOMNode>& element);
-  Element* convertPolyline(const std::shared_ptr<DOMNode>& element);
-  Element* convertPolygon(const std::shared_ptr<DOMNode>& element);
-  Element* convertPath(const std::shared_ptr<DOMNode>& element);
-  Group* convertText(const std::shared_ptr<DOMNode>& element, const InheritedStyle& inheritedStyle);
-  Element* convertUse(const std::shared_ptr<DOMNode>& element);
+  Element* convertElement(const std::shared_ptr<DOMNode>& element, const InheritedStyle& style);
+  Element* convertRect(const std::shared_ptr<DOMNode>& element, const InheritedStyle& style);
+  Element* convertCircle(const std::shared_ptr<DOMNode>& element, const InheritedStyle& style);
+  Element* convertEllipse(const std::shared_ptr<DOMNode>& element, const InheritedStyle& style);
+  Element* convertLine(const std::shared_ptr<DOMNode>& element, const InheritedStyle& style);
+  Element* convertPolyline(const std::shared_ptr<DOMNode>& element, const InheritedStyle& style);
+  Element* convertPolygon(const std::shared_ptr<DOMNode>& element, const InheritedStyle& style);
+  Element* convertPath(const std::shared_ptr<DOMNode>& element, const InheritedStyle& style);
+  Group* convertText(const std::shared_ptr<DOMNode>& element, const InheritedStyle& style);
+  Element* convertUse(const std::shared_ptr<DOMNode>& element, const InheritedStyle& style);
 
   LinearGradient* convertLinearGradient(const std::shared_ptr<DOMNode>& element,
-                                        const Rect& shapeBounds);
+                                        const Rect& shapeBounds, const InheritedStyle& style);
   RadialGradient* convertRadialGradient(const std::shared_ptr<DOMNode>& element,
-                                        const Rect& shapeBounds);
-  ImagePattern* convertPattern(const std::shared_ptr<DOMNode>& element, const Rect& shapeBounds);
+                                        const Rect& shapeBounds, const InheritedStyle& style);
+  ImagePattern* convertPattern(const std::shared_ptr<DOMNode>& element, const Rect& shapeBounds,
+                               const InheritedStyle& style);
 
   Layer* convertMaskElement(const std::shared_ptr<DOMNode>& maskElement,
                             const InheritedStyle& parentStyle);
@@ -131,16 +135,17 @@ class SVGParserContext {
                             ShadowOnlyType* outShadowOnlyType = nullptr);
 
   void addFillStroke(const std::shared_ptr<DOMNode>& element, std::vector<Element*>& contents,
-                     const InheritedStyle& inheritedStyle);
+                     const InheritedStyle& style);
 
-  Rect getShapeBounds(const std::shared_ptr<DOMNode>& element);
+  Rect getShapeBounds(const std::shared_ptr<DOMNode>& element, const InheritedStyle& style);
 
   InheritedStyle computeInheritedStyle(const std::shared_ptr<DOMNode>& element,
                                        const InheritedStyle& parentStyle);
 
   Matrix parseTransform(const std::string& value);
   Color parseColor(const std::string& value);
-  float parseLength(const std::string& value, float containerSize);
+  float parseLength(const std::string& value, float containerSize,
+                    float fontSize = DEFAULT_FONT_SIZE);
   void parseGradientStops(const std::shared_ptr<DOMNode>& element,
                           std::vector<ColorStop*>& colorStops);
   // Like parseLength, but uses the given fontSize for em/rem unit conversion instead of the
@@ -205,7 +210,8 @@ class SVGParserContext {
   // Get or create ColorSource for a gradient/pattern reference.
   // If the reference is used multiple times, the ColorSource is added to resources.
   // Returns the ColorSource (either new inline instance or reference to resource).
-  ColorSource* getColorSourceForRef(const std::string& refId, const Rect& shapeBounds);
+  ColorSource* getColorSourceForRef(const std::string& refId, const Rect& shapeBounds,
+                                    const InheritedStyle& style);
 
   SVGImporter::Options _options = {};
   std::shared_ptr<PAGXDocument> _document = nullptr;
