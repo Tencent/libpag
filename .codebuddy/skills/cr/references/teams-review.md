@@ -49,17 +49,25 @@ Scope → Review → Report
 ```
 Scope → Review → Filter → Fix → Validate → Continue?
           ↑                                     │
-          └──── new issues found ───────────────┘
+          └──── new issues or fixes applied ─────┘
                                                 │
-                                                ↓ no new issues
+                                                ↓ no new issues, no fixes
                                            Confirm → Report
+                                              ↑         ↑
+                                              │    all skipped
+                                         Fix → Validate → Continue?
+                                                          │
+                                                          └→ new issues? → Review ↑
 ```
 
-- **Loop exit**: Continue? routes back to Review when new issues were found or
-  fixes were just applied. When neither is true and no `pending`/`failed`
-  issues remain, go directly to Report.
-- **Confirm**: only entered when `pending` or `failed` issues exist after the
-  loop ends. User-approved issues re-enter at Fix → Validate → Continue?.
+- **Main loop**: Review → Filter → Fix → Validate → Continue? repeats as long
+  as new issues are found or fixes were just applied.
+- **Loop exit**: when no new issues and no fixes in this round, check for
+  `pending`/`failed` issues. If none → Report. If any → Confirm.
+- **Confirm loop**: user-approved issues go to Fix → Validate → Continue?.
+  Continue? re-enters the full Review loop if fixes introduced new issues.
+  Only when no new issues remain does it return to Confirm (if more
+  pending/failed exist) or proceed to Report.
 - Each review round is a fresh review, not a targeted re-check of previous
   fixes.
 
@@ -327,9 +335,13 @@ file path within each group:
 - **≤5 issues**: individual fix/skip choices per issue.
 - **>5 issues**: Fix all / Skip all / By risk group / Individual
 
-Mark selected `approved`, declined `skipped`. Send approved to Phase 4
-(Fix → Validate → Continue?, which may route to a new Review round for
-regression check). All skipped → Phase 8.
+Mark selected `approved`, declined `skipped`.
+
+- **All skipped** → Phase 8.
+- **Any approved** → Phase 4 (Fix → Validate → Continue?). Continue? re-enters
+  the full Review loop (Phase 2) if the fixes introduced new issues. Only when
+  no new issues remain does it return here for remaining `pending`/`failed`
+  issues, or proceed to Phase 8 if none are left.
 
 ---
 
