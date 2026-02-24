@@ -15,7 +15,6 @@ share conversation history.
 
 ## Input from SKILL.md
 
-- `REVIEW_PRIORITY`: A | A+B | A+B+C
 - `FIX_MODE`: none | low | low_medium | full
 
 ## References
@@ -120,7 +119,7 @@ group; group related small files together. Classify each module as `code`,
 ### Persist state
 
 Write CR_STATE_FILE (see CR_STATE_FILE format appendix) with session info
-(mode, priority, threshold, file list, module assignments, changed line ranges,
+(mode, threshold, file list, module assignments, changed line ranges,
 build/test commands) and an issues section updated incrementally. CR_STATE_FILE
 is owned by the coordinator — team agents never read or write it.
 
@@ -158,7 +157,7 @@ Each reviewer receives:
 - **Scope**: file list + changed line ranges for its module. Reviewers read
   full files and fetch diffs themselves — coordinator does NOT pass raw diff.
 - **Checklist**: `code-checklist.md` for code, `doc-checklist.md` for doc, both
-  for mixed. Only include priority levels the user selected.
+  for mixed.
 - **Evidence requirement**: every issue must have a code citation (file:line + snippet).
 - **Known-issue exclusion** (round 2+): skip issues matching the coordinator's
   exclusion list. Focus on finding new issues.

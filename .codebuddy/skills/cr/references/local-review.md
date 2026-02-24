@@ -4,7 +4,6 @@ Single-agent review for local changes with optional auto-fix.
 
 ## Input from SKILL.md
 
-- `REVIEW_PRIORITY`: A | A+B | A+B+C
 - `FIX_MODE`: none | low | low_medium | full
 
 ## References
@@ -27,8 +26,7 @@ Follow `scope-detection.md` to determine the review scope and fetch the diff.
 ## Step 2: Review
 
 Read all files in scope. Apply `code-checklist.md` to code files,
-`doc-checklist.md` to documentation files. Only include priority levels the user
-selected. Untracked files have no diff — review their full contents as new code.
+`doc-checklist.md` to documentation files. Untracked files have no diff — review their full contents as new code.
 
 For each issue found:
 - Provide a code citation (file:line + snippet).
