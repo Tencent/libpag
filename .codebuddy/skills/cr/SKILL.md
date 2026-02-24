@@ -29,7 +29,9 @@ Run pre-checks, then match the **first** applicable rule top-to-bottom:
 | 4 | Everything else | → Questions below |
 
 Each `→` means: `Read` the target file and follow it as the sole remaining
-instruction. Ignore all sections below.
+instruction. Ignore all sections below. Do NOT review from memory or habit —
+each target file defines specific constraints on how to obtain diffs, apply
+fixes, and submit results.
 
 **Abort message** (rule 3): show usage examples —
 `/cr` (uncommitted changes or current branch),
