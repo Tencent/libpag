@@ -14,6 +14,7 @@ Auto-fix is not available in PR mode.
 |------|---------|
 | `code-checklist.md` | Code review checklist |
 | `doc-checklist.md` | Document review checklist |
+| `judgment-matrix.md` | Worth-fixing criteria and special rules |
 
 ---
 
@@ -49,6 +50,8 @@ git branch -D pr-{N} 2>/dev/null
      git fetch origin pull/{number}/head:pr-{number}
      git worktree add --no-track /tmp/pr-review-{number} pr-{number}
      ```
+     If worktree creation fails (e.g., directory still exists), inform the user
+     and abort.
      All subsequent operations use the worktree directory. Record `WORKTREE_DIR`.
 
 3. **Set review scope**: diff against `BASE_BRANCH`.

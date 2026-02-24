@@ -36,7 +36,10 @@ Skip argument-based scope below.
 
 - Empty arguments: determine the base branch from the current branch's upstream
   tracking branch. If no upstream, fall back to `main` (or `master`). Fetch the
-  branch diff.
+  branch diff:
+  ```
+  git diff $(git merge-base origin/{base_branch} HEAD)
+  ```
 - Commit hash: validate with `git rev-parse --verify`, then `git show`.
 - Commit range: validate both endpoints, then fetch the range diff.
 - File/directory paths: verify all paths exist on disk, then read file contents.
@@ -64,7 +67,7 @@ If diff is empty → exit.
 
 Read all files in scope. Apply `code-checklist.md` to code files,
 `doc-checklist.md` to documentation files. Only include priority levels the user
-selected.
+selected. Untracked files have no diff — review their full contents as new code.
 
 For each issue found:
 - Provide a code citation (file:line + snippet).
@@ -115,9 +118,9 @@ For each issue in the auto-fix queue:
 Run build + test (skip if no build/test commands available or doc-only scope).
 
 - **Pass** → mark issues as fixed.
-- **Fail** → identify which fix broke the build (review recent changes), revert
-  that fix. Retry the fix once with failure details. If still failing, revert
-  and mark as failed.
+- **Fail** → use the build error message to identify which fix caused the
+  failure, revert that fix. Retry the fix once with failure details. If still
+  failing, revert and mark as failed.
 
 ### 4.5 Final report
 
