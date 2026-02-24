@@ -6,11 +6,8 @@ your context stays focused on orchestration and issue judgment. Never modify
 files directly. Read code only for arbitration and diagnosis.
 
 The review loop is designed for **uninterrupted multi-round iteration**.
-Always process all auto-fixable issues before involving the user. Do NOT pause
-to ask the user anything until Confirm (Phase 6) or Report (Phase 7). When
-both auto-fixable and `pending` (above threshold) issues exist, auto-fix first
-and defer `pending` issues to Phase 6. Record anything unresolvable to
-`CR_STATE_FILE` for user review.
+Do NOT pause to ask the user anything until Confirm (Phase 6) or Report
+(Phase 7).
 
 The reviewer–verifier adversarial pair is the core quality mechanism: reviewers
 find issues, verifiers challenge them. This two-party check significantly reduces
@@ -136,7 +133,8 @@ Record the chosen path as `CR_STATE_FILE`.
 Write CR_STATE_FILE with session info (mode, threshold, file list, module
 assignments, changed line ranges, build/test commands) and an issues section
 updated incrementally. CR_STATE_FILE is owned by the coordinator — team agents
-never read or write it.
+never read or write it. Record anything unresolvable to CR_STATE_FILE for user
+review.
 
 **Issue format** in CR_STATE_FILE:
 
@@ -301,6 +299,8 @@ All confirmed issues are recorded with risk level.
 
 If `FIX_MODE` = none → Phase 7 (Report).
 Otherwise → Phase 4 if auto-fix queue is non-empty; Phase 5 if empty.
+Always auto-fix eligible issues first — do NOT present `pending` issues to the
+user before all auto-fixable issues have been processed and validated.
 
 ---
 
