@@ -44,6 +44,10 @@ static constexpr size_t MinRecoveryFramesStatic = 20;
 // The minimum number of normal frames required to recover from slow state after zoom ends.
 static constexpr size_t MinRecoveryFramesZoomEnd = 10;
 
+/**
+ * Copies data from an Emscripten val object to a newly allocated uint8_t buffer.
+ * The caller is responsible for deleting the returned buffer with delete[].
+ */
 static uint8_t* CopyFromEmscripten(const val& emscriptenData, unsigned int* outLength) {
   if (emscriptenData.isUndefined()) {
     return nullptr;
@@ -64,6 +68,9 @@ static uint8_t* CopyFromEmscripten(const val& emscriptenData, unsigned int* outL
   return buffer;
 }
 
+/**
+ * Creates a tgfx::Data object from an Emscripten val object.
+ */
 static std::shared_ptr<tgfx::Data> GetTGFXDataFromEmscripten(const val& emscriptenData) {
   unsigned int length = 0;
   auto buffer = CopyFromEmscripten(emscriptenData, &length);
@@ -73,6 +80,9 @@ static std::shared_ptr<tgfx::Data> GetTGFXDataFromEmscripten(const val& emscript
   return tgfx::Data::MakeAdopted(buffer, length, tgfx::Data::DeleteProc);
 }
 
+/**
+ * Creates a pagx::Data object from an Emscripten val object.
+ */
 static std::shared_ptr<Data> GetPagxDataFromEmscripten(const val& emscriptenData) {
   unsigned int length = 0;
   auto buffer = CopyFromEmscripten(emscriptenData, &length);
