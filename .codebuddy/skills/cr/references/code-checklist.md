@@ -55,7 +55,6 @@ Issues that directly affect runtime behavior. Highest impact — review these fi
   `[C/C++]`
 - Are file handles / system resources properly closed?
 - Are lock acquire and release properly paired? `[C/C++/Java/Go]`
-- Is there a risk of pointer / iterator invalidation after container resize? `[C/C++]`
 - Are database connections / network sockets properly released in finally/defer blocks?
 - Are event listeners, timers, subscriptions, and observers cleaned up on component
   unmount or scope exit? `[Web]`
@@ -84,8 +83,8 @@ Improvements to code quality, performance, and maintainability. Medium impact.
 
 **B1. Performance Optimization**
 - Containers: is space pre-allocated when the size is predictable?
-- Unnecessary deep copies: **must be 100% certain of semantic equivalence before
-  reporting**
+- Unnecessary deep copies: **must have high confidence in semantic equivalence
+  before reporting**
 - Repeated computation inside loops: can expressions be moved outside the loop?
 - String operations: can frequent concatenation inside loops be optimized?
 - Unnecessary temporary object construction `[C/C++]`
@@ -97,7 +96,8 @@ Improvements to code quality, performance, and maintainability. Medium impact.
   (tree-shaking inefficiency)? `[Web]`
 
 **B2. Code Simplification**
-- Duplicate code: >= 3 identical patterns should be extracted into a method
+- Duplicate code: identical logic that is clearly duplicated should be extracted
+  (judge by complexity and maintenance cost, not by count threshold)
 - Deep nested if/else: can be simplified with early return
 - Redundant conditional checks: logic branches that can be merged or eliminated
 - Overly long functions: single-responsibility logic blocks can be extracted as
@@ -112,20 +112,18 @@ Improvements to code quality, performance, and maintainability. Medium impact.
 **B4. Interface Usage**
 - Are called APIs used according to their design intent and documentation?
 - Are any deprecated interfaces being used?
-- Parameter passing: are large objects passed by const reference instead of by value?
-  `[C/C++]`
 
 **B5. Interface Changes**
 - Are there changes to public API signatures or class interfaces?
 - If so, describe the change and its scope (the coordinator will assess whether it is
   justified)
 
-**B6. Test Coverage**
+**B6. Test Coverage** *(flag only — report for awareness, do not auto-fix)*
 - Do changed logic paths have corresponding test cases?
 - Do boundary conditions have test coverage?
 - Do error paths have test coverage?
 
-**B7. Regression Risk**
+**B7. Regression Risk** *(flag only — report for awareness, do not auto-fix)*
 - Could the modification affect other callers?
 - Are behavior changes consistent across all target platforms?
 
