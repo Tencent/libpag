@@ -45,9 +45,7 @@ Check whether the current environment supports agent teams (multiple agents
 working in parallel and communicating with each other).
 
 - If **not supported**, skip the question and route to `references/local-review.md`.
-- If **on main/master**, skip the question, inform user that auto-fix is
-  unavailable on protected branches and quick review mode will be used, then
-  route to `references/local-review.md`.
+- If **on main/master**, skip the question and route to `references/local-review.md`.
 - Otherwise, ask a **single question**. The question title should inform the
   user that the current environment supports Agent Teams, and ask whether to
   enable multi-agent review with reviewer–verifier adversarial mechanism and
