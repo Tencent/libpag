@@ -89,5 +89,5 @@ Otherwise:
 | No | `references/local-review.md` |
 | Yes | `references/teams-review.md` |
 
-Pass to the target file: `REVIEW_PRIORITY`, `FIX_MODE` (none / low / low_medium
-/ full). Hand off entirely and stop here.
+Pass to the target file: `$ARGUMENTS`, `REVIEW_PRIORITY`, `FIX_MODE` (none /
+low / low_medium / full). Hand off entirely and stop here.
