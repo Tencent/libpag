@@ -40,7 +40,7 @@ share conversation history.
 `FIX_MODE=none` follows a short path:
 
 ```
-Scope → Review → Report
+Scope → Review → Filter → Report
 ```
 
 `FIX_MODE≠none` has two nested loops:
@@ -210,15 +210,13 @@ Important constraints:
 
 ### After review
 
-- `FIX_MODE` = none → close all agents, close the team → Phase 7 (Report).
+- `FIX_MODE` = none → close all agents, close the team → Phase 3.
 - `FIX_MODE` ≠ none → **keep all reviewers alive** (reused as fixers in
   Phase 4), close the verifier → Phase 3.
 
 ---
 
 ## Phase 3: Filter — coordinator only
-
-*Skipped when `FIX_MODE` = none.*
 
 Your stance here is **neutral** — trust no single party. Treat reviewer reports
 and verifier rebuttals as equally weighted inputs. Use your project-wide view to
@@ -261,7 +259,8 @@ All confirmed issues are recorded with risk level.
   create a follow-up fix task.
 - Previously rolled-back issues: do not attempt again this round.
 
-→ Phase 4 if auto-fix queue is non-empty; otherwise → Phase 5.
+If `FIX_MODE` = none → Phase 7 (Report).
+Otherwise → Phase 4 if auto-fix queue is non-empty; Phase 5 if empty.
 
 ---
 
