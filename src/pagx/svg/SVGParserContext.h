@@ -48,8 +48,6 @@ namespace pagx {
 static constexpr float DEFAULT_FONT_SIZE = 16.0f;
 static constexpr int MAX_SVG_RECURSION_DEPTH = 128;
 
-static constexpr float DEFAULT_FONT_SIZE = 16.0f;
-
 /**
  * Type of shadow-only filter for determining how to handle element content.
  */
