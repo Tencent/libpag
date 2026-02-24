@@ -27,14 +27,9 @@ Determine mode from `$ARGUMENTS`, then follow the matching section below:
 
 ## PR Mode
 
-No questions — `Read` `references/pr-review.md` and follow every step. Two
-constraints that differ from a typical PR review:
-
-1. **Worktree mode**: fetch the PR branch locally via `git worktree add` and
-   review code in the worktree. NEVER use `gh pr diff` or any GitHub API to
-   obtain the diff.
-2. **Line-level comments only**: submit results via `gh api` as line-level PR
-   comments. NEVER use `gh pr comment` or `gh pr review`.
+No questions — `Read` `references/pr-review.md` and follow it exactly. The flow
+uses worktree-based local checkout and line-level PR comments, not the typical
+`gh pr diff` / `gh pr review` approach.
 
 ---
 
