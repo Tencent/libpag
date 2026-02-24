@@ -39,7 +39,6 @@ Determine the diff to review based on how this file was entered:
   ```
   git diff A~1..B
   ```
-  Also check for untracked files with `git status --porcelain` (`??` lines).
 - **File/directory paths**: verify all paths exist on disk, then read file
   contents.
 

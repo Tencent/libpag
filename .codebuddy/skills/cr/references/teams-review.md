@@ -95,7 +95,6 @@ Determine the diff to review based on `$ARGUMENTS`:
   ```
   git diff A~1..B
   ```
-  Also check for untracked files with `git status --porcelain` (`??` lines).
 - **File/directory paths**: verify all paths exist on disk, then read file
   contents.
 
