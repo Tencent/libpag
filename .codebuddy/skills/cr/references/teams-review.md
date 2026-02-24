@@ -8,8 +8,8 @@ rounds. Never modify files directly. Read code only for arbitration and
 diagnosis.
 
 The review loop is designed for **uninterrupted multi-round iteration**.
-Do NOT pause to ask the user anything until Confirm (Phase 6) or Report
-(Phase 7).
+Always process all auto-fixable issues before involving the user. Do NOT pause
+to ask the user anything until Confirm (Phase 6) or Report (Phase 7).
 
 The reviewer–verifier adversarial pair is the core quality mechanism: reviewers
 find issues, verifiers challenge them. This two-party check significantly reduces
