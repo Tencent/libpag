@@ -307,6 +307,10 @@ All confirmed issues are recorded with risk level.
 If `FIX_MODE` = none → Phase 7 (Report).
 Otherwise → Phase 4 if auto-fix queue is non-empty; Phase 5 if empty.
 
+**IMPORTANT**: do NOT ask the user about `pending` issues here. Auto-fix
+eligible issues first; user confirmation happens only in Phase 6, after all
+auto-fixable issues have been processed and validated.
+
 ---
 
 ## Phase 4: Fix/Validate

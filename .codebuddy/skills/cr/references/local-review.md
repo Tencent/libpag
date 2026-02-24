@@ -89,6 +89,10 @@ Route remaining issues:
 | At or below threshold | auto-fix |
 | Above threshold | `pending` — confirm with user |
 
+**IMPORTANT**: do NOT ask the user about `pending` issues here. Auto-fix
+eligible issues first; user confirmation happens only in Step 5.5, after all
+auto-fixable issues have been processed and validated.
+
 ---
 
 ## Step 4: Fix
