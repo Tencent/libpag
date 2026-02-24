@@ -41,7 +41,8 @@ diff and submit results.
 1. `git branch --show-current` → record whether on main/master.
 2. `git status --porcelain` → record whether uncommitted changes exist.
 3. If on main/master, no uncommitted changes, and `$ARGUMENTS` is empty → abort
-   (nothing to review).
+   with usage examples: `/cr`, `/cr abc123`, `/cr abc123..def456`,
+   `/cr src/foo.cpp`, `/cr 123`, `/cr https://github.com/.../pull/123`.
 
 ### Questions
 
