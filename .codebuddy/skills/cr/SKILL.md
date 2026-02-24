@@ -47,10 +47,12 @@ diff and submit results.
 
 ### Questions
 
-**Q1 — Teams**:
+**Q1 — Teams** (only when no uncommitted changes exist):
 
 - "No": quick single-agent review.
 - "Yes": multi-agent deep review with reviewer–verifier adversarial mechanism.
+
+Skip this question if uncommitted changes exist — use single-agent mode.
 
 **Q2 — Auto-fix**:
 
