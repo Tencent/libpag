@@ -24,6 +24,7 @@ selectable options for predefined choices.
 | `references/code-checklist.md` | Code review checklist |
 | `references/doc-checklist.md` | Document review checklist |
 | `references/judgment-matrix.md` | Risk levels, worth-fixing criteria, special rules |
+| `references/scope-detection.md` | Shared scope detection logic (local & teams) |
 
 ---
 
