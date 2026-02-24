@@ -203,10 +203,9 @@ Coding standards and documentation consistency. Lower impact on functionality.
    required by project rules)
 2. Formatting issues already handled by the project's formatting tools (indentation,
    whitespace, line breaks, etc.)
-3. "Possible" issues without code evidence to support them (speculative issues)
+3. Suggestions based on assumed future requirements rather than current code
 4. Code that follows the project's existing style but does not match some external
    standard
-5. Non-critical issues in test code (variable naming, comment style, etc., unless
-   project rules have specific requirements)
+5. Priority C issues in test code (unless project rules have specific requirements)
 6. Suggestions for "better alternative implementations" for existing stable code (if
    the current implementation has no bugs)

@@ -111,5 +111,5 @@ Polish and stylistic consistency. Lower impact on content quality.
 
 1. Pure formatting preferences not affecting readability
 2. Stylistic rewrites that don't improve clarity or accuracy
-3. Speculative issues without evidence from the codebase
+3. Suggestions based on assumed future requirements rather than current code
 4. Suggestions to add content beyond the document's stated scope
