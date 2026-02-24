@@ -5,6 +5,8 @@ Single-agent review for local changes with optional auto-fix.
 ## Input from SKILL.md
 
 - `FIX_MODE`: none | low | low_medium | full
+- `UNCOMMITTED`: true when reviewing uncommitted changes (fast path from
+  SKILL.md), unset otherwise
 
 ## References
 
@@ -19,7 +21,13 @@ Single-agent review for local changes with optional auto-fix.
 
 ## Step 1: Scope
 
-Follow `scope-detection.md` to determine the review scope and fetch the diff.
+If `UNCOMMITTED` is true: scope is uncommitted changes only. Fetch the diff
+with `git diff HEAD` (covers staged + unstaged tracked files). Also check for
+untracked files with `git status --porcelain` (`??` lines) and read their
+contents for review. Skip `scope-detection.md`.
+
+Otherwise: follow `scope-detection.md` to determine the review scope and fetch
+the diff.
 
 ### Build baseline
 

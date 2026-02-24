@@ -2,20 +2,7 @@
 
 Shared scope-detection logic for local and teams review flows.
 
-## Uncommitted changes
-
-If uncommitted changes exist (detected in SKILL.md pre-check), scope is
-uncommitted changes only:
-```
-git diff HEAD
-```
-This covers both staged and unstaged changes to tracked files. Additionally,
-check for untracked files with `git status --porcelain` (lines starting with
-`??`) and read their contents for review.
-
-Skip argument-based scope below.
-
-## Normal scope — validate arguments and fetch diff
+## Validate arguments and fetch diff
 
 - Empty arguments: determine the base branch from the current branch's upstream
   tracking branch. If no upstream, fall back to `main` (or `master`). Fetch the
