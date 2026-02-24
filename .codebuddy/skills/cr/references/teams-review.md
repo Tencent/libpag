@@ -355,8 +355,9 @@ Present `pending` + `failed` issues grouped by risk (high → low), sorted by
 file path within each group:
 `[number] [file:line] [risk] [reason] — [description]`
 
-Then present a multi-select prompt listing all issues by number. User checks
-the ones to fix. Checked → `approved`, unchecked → `skipped`.
+Then present a multi-select prompt where each option's label is the issue
+summary (e.g., `[risk] file:line — description`). User checks the ones to fix.
+Checked → `approved`, unchecked → `skipped`.
 
 - **All skipped** → Phase 7.
 - **Any approved** → Phase 4 (Fix/Validate). After Validate, go to Phase 5

@@ -130,8 +130,9 @@ If issues found → present confirmed issues to user in the following format:
 ```
 
 Where `{priority}` is the checklist item ID (e.g., A2, B1, C7). Then present a
-multi-select prompt listing all issues by number. User checks the ones to
-submit as PR comments. Unchecked issues are skipped.
+multi-select prompt where each option's label is the issue summary (e.g.,
+`[A2] file:line — description`). User checks the ones to submit as PR comments.
+Unchecked issues are skipped.
 
 **Must** use `gh api` + heredoc. Do not use `gh pr comment`, `gh pr review`,
 or any command that creates non-line-level comments:
