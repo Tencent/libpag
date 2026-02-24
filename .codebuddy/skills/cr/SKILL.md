@@ -47,7 +47,9 @@ working in parallel and communicating with each other).
 - If **not supported**, skip the question and route to `references/local-review.md`.
 - If **on main/master**, skip the question, inform user that auto-fix is
   unavailable (protected branch), and route to `references/local-review.md`.
-- Otherwise, ask a **single question** with 4 options:
+- Otherwise, ask a **single question**. The question title should inform the
+  user that the current environment supports Agent Teams, and ask whether to
+  enable deep adversarial review with multi-round auto-fix. Provide 4 options:
 
 | Option | Description |
 |--------|-------------|
