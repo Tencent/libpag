@@ -52,17 +52,17 @@ diff and submit results.
 
 ### Questions
 
-**Q1 — Teams** (only when no uncommitted changes exist):
+Skip conditions:
+- If uncommitted changes exist: skip Q1 and use single-agent mode.
+- If on main/master or uncommitted changes exist: inform user that auto-fix is
+  unavailable (uncommitted changes or protected branch), skip Q2.
+
+**Q1 — Teams**:
 
 - "No": quick single-agent review.
 - "Yes": multi-agent deep review with reviewer–verifier adversarial mechanism.
 
-Skip this question if uncommitted changes exist — use single-agent mode.
-
 **Q2 — Auto-fix**:
-
-If on main/master or uncommitted changes exist: inform user that auto-fix is
-unavailable (uncommitted changes or protected branch), skip Q2.
 
 Otherwise:
 
