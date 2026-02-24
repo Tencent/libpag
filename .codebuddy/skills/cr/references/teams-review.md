@@ -18,7 +18,7 @@ share conversation history.
 
 ## Input from SKILL.md
 
-- `FIX_MODE`: none | low | low_medium | full
+- `FIX_MODE`: low | low_medium | full
 
 ## References
 
@@ -29,14 +29,6 @@ share conversation history.
 | `judgment-matrix.md` | Risk levels, worth-fixing criteria, special rules |
 
 ## Flow
-
-`FIX_MODE=none` follows a short path:
-
-```
-Scope → Review → Filter → Report
-```
-
-`FIX_MODE≠none` has two nested loops:
 
 ```
 Scope
@@ -250,9 +242,8 @@ Important constraints:
 
 ### After review
 
-- `FIX_MODE` = none → close all agents, close the team → Phase 3.
-- `FIX_MODE` ≠ none → **keep all reviewers alive** (reused as fixers in
-  Phase 4), close the verifier → Phase 3.
+Keep all reviewers alive (reused as fixers in Phase 4), close the verifier
+→ Phase 3.
 
 ---
 
@@ -303,16 +294,13 @@ All confirmed issues are recorded with risk level.
   create a follow-up fix task.
 - Previously rolled-back issues: do not attempt again this round.
 
-If `FIX_MODE` = none → Phase 7 (Report).
-Otherwise → Phase 4 if auto-fix queue is non-empty; Phase 5 if empty.
+Phase 4 if auto-fix queue is non-empty; Phase 5 if empty.
 Always auto-fix eligible issues first — do NOT present `pending` issues to the
 user before all auto-fixable issues have been processed and validated.
 
 ---
 
 ## Phase 4: Fix/Validate
-
-*Skipped when `FIX_MODE` = none.*
 
 This phase is an atomic unit reused by the Review Loop and post-Confirm flow.
 
@@ -378,8 +366,6 @@ Wait for all fixers. Run build + test.
 
 ## Phase 5: Continue?
 
-*Skipped when `FIX_MODE` = none.*
-
 ### Step 1: Close the current round's team
 
 Close the team to release reviewers and fixers. Force-terminate any unresponsive
@@ -398,8 +384,6 @@ agents.
 ---
 
 ## Phase 6: Confirm
-
-*When `FIX_MODE` = none, this phase is skipped — go directly to Phase 7.*
 
 Present `pending` + `failed` issues grouped by risk (high → low), sorted by
 file path within each group:

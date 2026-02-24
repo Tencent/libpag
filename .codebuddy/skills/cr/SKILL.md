@@ -6,10 +6,9 @@ description: Automated code review and fix for local branches, PRs, commits, and
 # /cr — Code Review
 
 Automated code review for local branches, PRs, commits, and files. Detects
-review mode from arguments, asks the user about auto-fix preferences, then
-routes to the appropriate review flow. Supports multi-round iteration — each
-round discovers issues, applies risk-based auto-fixes, and loops until no new
-issues are found.
+review mode from arguments and routes to the appropriate review flow — either
+quick single-agent review with interactive fix selection, or multi-agent
+deep review with risk-based auto-fix.
 
 All user-facing text matches the user's language; use interactive dialogs with
 selectable options for predefined choices.
@@ -24,7 +23,7 @@ Run pre-checks, then match the **first** applicable rule top-to-bottom:
 | # | Condition | Action |
 |---|-----------|--------|
 | 1 | `$ARGUMENTS` is a PR number or URL containing `/pull/` | → `references/pr-review.md` |
-| 2 | `$ARGUMENTS` is empty and uncommitted changes exist | → `references/local-review.md` with `FIX_MODE=none` |
+| 2 | `$ARGUMENTS` is empty and uncommitted changes exist | → `references/local-review.md` |
 | 3 | `$ARGUMENTS` is empty, no uncommitted changes, on main/master | Abort with usage examples (see below) |
 | 4 | Everything else | → Questions below |
 
@@ -40,39 +39,30 @@ fixes, and submit results.
 
 ---
 
-## Questions (rule 4 only)
-
-**Q1 — Teams** (only when agent teams are available):
+## Question (rule 4 only)
 
 Check whether the current environment supports agent teams (multiple agents
-working in parallel and communicating with each other). If not supported, skip
-this question and use local-review.
+working in parallel and communicating with each other).
 
-- "No": quick single-agent review.
-- "Yes": multi-agent deep review with reviewer–verifier adversarial mechanism.
+- If **not supported**, skip the question and route to `references/local-review.md`.
+- If **on main/master**, skip the question, inform user that auto-fix is
+  unavailable (protected branch), and route to `references/local-review.md`.
+- Otherwise, ask a **single question** with 4 options:
 
-**Q2 — Auto-fix**:
-
-If on main/master: inform user that auto-fix is unavailable (protected branch),
-set `FIX_MODE=none`, skip this question.
-
-Otherwise:
-
-- "Review only" → `FIX_MODE=none`: report issues without fixing.
-- "Low risk only" → `FIX_MODE=low`: auto-fix only the most straightforward
-  issues (e.g., null checks, typos, naming). Confirm everything else.
-- "Low + Medium risk (recommended)" → `FIX_MODE=low_medium`: auto-fix most
-  issues, only confirm high-risk ones (e.g., API changes, architecture
-  decisions).
-- "Full auto" → `FIX_MODE=full`: auto-fix everything. Only issues affecting
-  test baselines are deferred.
+| Option | Description |
+|--------|-------------|
+| Quick review | Single-agent review; interactively choose which issues to fix afterward. |
+| Auto-fix: low risk | Multi-agent review; auto-fix only the safest issues (e.g., null checks, typos, naming). Confirm everything else. |
+| Auto-fix: low + medium risk (recommended) | Multi-agent review; auto-fix most issues, only confirm high-risk ones (e.g., API changes, architecture). |
+| Auto-fix: full | Multi-agent review; auto-fix everything. Only issues affecting test baselines are deferred. |
 
 ### Hand off
 
-| Q1 Teams | → |
-|----------|---|
-| No / skipped | `references/local-review.md` |
-| Yes | `references/teams-review.md` |
+| Option | → | FIX_MODE |
+|--------|---|----------|
+| Quick review / skipped | `references/local-review.md` | — |
+| Auto-fix: low risk | `references/teams-review.md` | low |
+| Auto-fix: low + medium risk | `references/teams-review.md` | low_medium |
+| Auto-fix: full | `references/teams-review.md` | full |
 
-Pass `$ARGUMENTS` and `FIX_MODE` (none / low / low_medium / full) to the
-target file.
+Pass `$ARGUMENTS` and `FIX_MODE` (low / low_medium / full) to the target file.

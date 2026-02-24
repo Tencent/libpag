@@ -1,10 +1,7 @@
 # Local Review
 
-Single-agent review for local changes with optional auto-fix.
-
-## Input from SKILL.md
-
-- `FIX_MODE`: none | low | low_medium | full
+Single-agent review for local changes. Reviews the diff, presents confirmed
+issues, and lets the user interactively choose which ones to fix.
 
 ## References
 
@@ -77,69 +74,46 @@ but ruled out.
 Consult `judgment-matrix.md` for risk level assessment, worth-fixing criteria,
 and special rules. Discard issues that are not worth reporting.
 
-**Fix approach** (Medium/High only): decide the specific fix approach and
-reasoning before applying. Low risk: single obvious fix, no planning needed.
-
-If `FIX_MODE` = none → Step 6 (Report).
-
-Route remaining issues:
-
-| Risk vs `FIX_MODE` | → |
-|---------------------|---|
-| At or below threshold | auto-fix |
-| Above threshold | `pending` — confirm with user |
-
-**IMPORTANT**: do NOT ask the user about `pending` issues here. Auto-fix
-eligible issues first; user confirmation happens only in Step 5.5, after all
-auto-fixable issues have been processed and validated.
+If no issues remain after filtering → Step 6 (Report).
 
 ---
 
-## Step 4: Fix
+## Step 4: Interactive fix
 
-For each issue in the auto-fix queue:
+Present all confirmed issues to the user, then ask which ones to fix using
+**a single multi-select question** where each option's label is the issue
+summary (e.g., `[risk] file:line — description`). User checks multiple options
+in one prompt. Unchecked → skipped.
 
-- Read the relevant code and apply the fix directly.
-- Do **not** run `git add` or `git commit` — leave all changes unstaged so the
-  user can review and decide what to commit.
-- When in doubt, skip the fix rather than risk a wrong change.
-- Do not modify public API function signatures or class definitions (comments
-  are OK), unless the issue description explicitly requires it.
-- After each fix, check whether the change affects related comments or
-  documentation within the same files. If so, update them together.
+- **All skipped** → Step 6 (Report).
+- **Any checked** → apply fixes:
+  - **Fix approach** (Medium/High only): decide the specific fix approach and
+    reasoning before applying. Low risk: single obvious fix, no planning needed.
+  - Do **not** run `git add` or `git commit` — leave all changes unstaged so
+    the user can review and decide what to commit.
+  - When in doubt, skip the fix rather than risk a wrong change.
+  - Do not modify public API function signatures or class definitions (comments
+    are OK), unless the issue description explicitly requires it.
+  - After each fix, check whether the change affects related comments or
+    documentation within the same files. If so, update them together.
 
 ---
 
 ## Step 5: Validate
 
-Run build + test (skip if no build/test commands available or doc-only scope).
+Skip if no build/test commands available or doc-only scope.
+
+Run build + test.
 
 - **Pass** → mark issues as fixed.
 - **Fail** → use the build error message to identify which fix caused the
   failure, revert that fix. Retry the fix once with failure details. If still
   failing, revert and mark as failed.
 
-### Continue?
-
 After validation, re-review the changed code for new issues introduced by
-fixes. If new issues are found → go back to Step 3 (Filter). If no new
-issues:
-
-- `pending` or `failed` issues exist → Step 5.5 (Confirm).
-- Otherwise → Step 6 (Report).
-
-### Step 5.5: Confirm
-
-Present `pending` + `failed` issues, then ask the user to select which issues
-to fix using **a single multi-select question** where each option's label is
-the issue summary (e.g., `[risk] file:line — description`). User checks
-multiple options in one prompt. Unchecked → skipped.
-
-- **All skipped** → Step 6 (Report).
-- **Any checked** → apply fix (same rules as Step 4) → re-validate (Step 5).
-  After validation, re-review for new issues. If new issues found → back to
-  Step 3 (Filter). If no new issues but more `pending`/`failed` remain →
-  return here. If nothing remains → Step 6 (Report).
+fixes. If new issues are found → go back to Step 3 (Filter). If no new issues
+and failed issues exist → return to Step 4 (let user decide on failed items).
+Otherwise → Step 6 (Report).
 
 ---
 
