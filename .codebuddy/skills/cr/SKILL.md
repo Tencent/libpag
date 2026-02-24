@@ -42,9 +42,9 @@ fixes, and submit results.
 
 ## Questions (rule 4 only)
 
-**Teams detection**: check whether `TeamCreate` is available in the current
-tool list (including deferred tools). If available → teams-review; otherwise →
-local-review.
+**Teams detection**: check whether the current environment supports multi-agent
+team collaboration (e.g., the ability to create agent teams and dispatch
+sub-agents). If supported → teams-review; otherwise → local-review.
 
 **Auto-fix**:
 
