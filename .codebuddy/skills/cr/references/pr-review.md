@@ -143,8 +143,9 @@ If issues found → present confirmed issues to user in the following format:
 {N}. [{priority}] {file}:{line} — {description of the problem and suggested fix}
 ```
 
-Where `{priority}` is the checklist item ID (e.g., A2, B1, C7). User selects
-which to submit as PR comments, declines are marked `skipped`.
+Where `{priority}` is the checklist item ID (e.g., A2, B1, C7). Then present a
+multi-select prompt listing all issues by number. User checks the ones to
+submit as PR comments. Unchecked issues are skipped.
 
 Submit as a **single** GitHub PR review with line-level comments via `gh api`.
 Do NOT use `gh pr comment` or `gh pr review`.

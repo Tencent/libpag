@@ -355,10 +355,8 @@ Present `pending` + `failed` issues grouped by risk (high → low), sorted by
 file path within each group:
 `[number] [file:line] [risk] [reason] — [description]`
 
-- **≤5 issues**: individual fix/skip choices per issue.
-- **>5 issues**: Fix all / Skip all / By risk group / Individual
-
-Mark selected `approved`, declined `skipped`.
+Then present a multi-select prompt listing all issues by number. User checks
+the ones to fix. Checked → `approved`, unchecked → `skipped`.
 
 - **All skipped** → Phase 7.
 - **Any approved** → Phase 4 (Fix/Validate). After Validate, go to Phase 5
