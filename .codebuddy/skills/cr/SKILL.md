@@ -16,39 +16,29 @@ selectable options for predefined choices.
 
 ## Route
 
-Determine mode from `$ARGUMENTS`, then follow the matching section below:
-
-| `$ARGUMENTS` pattern | Mode |
-|----------------------|------|
-| Purely numeric (`123`) or URL containing `/pull/` | **PR mode** |
-| Everything else (empty, commit, range, path) | **Local mode** |
-
----
-
-## PR Mode
-
-No questions — `Read` `references/pr-review.md` and follow it exactly. Do NOT
-review the PR from memory or habit — the flow requires worktree-based local
-checkout and line-level comments, with specific constraints on how to obtain the
-diff and submit results.
-
----
-
-## Local Mode
-
-### Pre-check
+Run pre-checks, then match the **first** applicable rule top-to-bottom:
 
 1. `git branch --show-current` → record whether on main/master.
 2. `git status --porcelain` → record whether uncommitted changes exist.
-3. If `$ARGUMENTS` is empty and uncommitted changes exist → set
-   `FIX_MODE=none`, hand off to `references/local-review.md`, and stop
-   processing this file.
-4. If `$ARGUMENTS` is empty, no uncommitted changes, and on main/master → abort
-   with usage examples: `/cr` (uncommitted changes or current branch),
-   `/cr a1b2c3d`, `/cr a1b2c3d..e4f5g6h`,
-   `/cr src/foo.cpp`, `/cr 123`, `/cr https://github.com/.../pull/123`.
 
-### Questions
+| # | Condition | Action |
+|---|-----------|--------|
+| 1 | `$ARGUMENTS` is a PR number or URL containing `/pull/` | → `references/pr-review.md` |
+| 2 | `$ARGUMENTS` is empty and uncommitted changes exist | → `references/local-review.md` with `FIX_MODE=none` |
+| 3 | `$ARGUMENTS` is empty, no uncommitted changes, on main/master | Abort with usage examples (see below) |
+| 4 | Everything else | → Questions below |
+
+Each `→` means: `Read` the target file and follow it as the sole remaining
+instruction. Ignore all sections below.
+
+**Abort message** (rule 3): show usage examples —
+`/cr` (uncommitted changes or current branch),
+`/cr a1b2c3d`, `/cr a1b2c3d..e4f5g6h`,
+`/cr src/foo.cpp`, `/cr 123`, `/cr https://github.com/.../pull/123`.
+
+---
+
+## Questions (rule 4 only)
 
 **Q1 — Teams**:
 
@@ -79,4 +69,4 @@ Otherwise:
 | Yes | `references/teams-review.md` |
 
 Pass `$ARGUMENTS` and `FIX_MODE` (none / low / low_medium / full) to the
-target file. Hand off entirely and stop processing this file.
+target file.
