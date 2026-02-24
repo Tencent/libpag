@@ -61,39 +61,23 @@ Scope
 pending/failed? ──no──→ Report
   │ yes
   ↓
-Confirm
-  │
-  ├── all skipped ──→ Report
-  │
-  └── approved:
-        │
-        ┌── Fix/Validate Loop ──┐
-        │                       │
-        │  Fix/Validate         │
-        │    │                  │
-        │    └→ Continue?       │
-        │         │             │
-        │    new issues ──→ Review Loop ↑
-        │         │             │
-        │    more approved ─────┘
-        │         │
-        └─────────┘
-              │ no new issues, no more approved
-              ↓
-           more pending? ──yes──→ Confirm ↑
-              │
-              no
-              ↓
-            Report
+Confirm ──all skipped──→ Report
+  │ approved
+  ↓
+Fix/Validate → Continue? ──new issues──→ Review Loop ↑
+                  │ no new issues
+                  ↓
+              more pending? ──yes──→ Confirm ↑
+                  │ no
+                  ↓
+                Report
 ```
 
 - **Review Loop** (outer): Review → Filter → Fix/Validate repeats as long as
   new issues are found. Each round is a fresh review, not a targeted re-check.
-- **Fix/Validate Loop** (inner): applies fixes and validates. Reused by both
-  the Review Loop and post-Confirm.
-- **After Confirm**: approved fixes enter the Fix/Validate Loop. If fixes
-  introduce new issues, re-enter the full Review Loop. Otherwise return to
-  Confirm if more pending/failed remain, or proceed to Report.
+- **After Confirm**: approved fixes go through Fix/Validate. If fixes introduce
+  new issues, re-enter the full Review Loop. Otherwise return to Confirm if
+  more pending/failed remain, or proceed to Report.
 
 ---
 
