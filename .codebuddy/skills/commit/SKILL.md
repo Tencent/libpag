@@ -1,6 +1,7 @@
 ---
 name: commit
 description: Commit local changes without pushing. Use when user says "commit", "save changes", "commit my work", or "commit code".
+disable-model-invocation: true
 ---
 
 # Commit — Local Commit Only
