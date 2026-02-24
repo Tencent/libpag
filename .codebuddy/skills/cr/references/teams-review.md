@@ -38,15 +38,30 @@ share conversation history.
 
 ## Flow
 
+`FIX_MODE=none` follows a short path:
+
 ```
-FIX_MODE=none:   Scope → Review → Report
-FIX_MODE≠none:   Scope → [ Review → Filter → Continue? ] → Confirm → Report
-                            ↑          Fix ← Validate ←┘
+Scope → Review → Report
 ```
 
-The review loop repeats as long as new issues are found. Each round is a fresh
-review. After the loop: if `pending` or `failed` entries exist → Confirm → Fix
-→ Validate → ... repeat until done → Report.
+`FIX_MODE≠none` follows a loop:
+
+```
+Scope → Review → Filter → Fix → Validate → Continue?
+          ↑                                     │
+          └──── new issues found ───────────────┘
+                                                │
+                                                ↓ no new issues
+                                           Confirm → Report
+```
+
+- **Loop exit**: Continue? routes back to Review when new issues were found or
+  fixes were just applied. When neither is true and no `pending`/`failed`
+  issues remain, go directly to Report.
+- **Confirm**: only entered when `pending` or `failed` issues exist after the
+  loop ends. User-approved issues re-enter at Fix → Validate → Continue?.
+- Each review round is a fresh review, not a targeted re-check of previous
+  fixes.
 
 ---
 
