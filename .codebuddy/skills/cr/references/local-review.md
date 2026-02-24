@@ -84,9 +84,6 @@ in one prompt. Unchecked → skipped.
 - **Any checked** → apply fixes:
   - **Fix approach** (Medium/High only): decide the specific fix approach and
     reasoning before applying. Low risk: single obvious fix, no planning needed.
-  - When in doubt, skip the fix rather than risk a wrong change.
-  - Do not modify public API function signatures or class definitions (comments
-    are OK), unless the issue description explicitly requires it.
   - After each fix, check whether the change affects related comments or
     documentation within the same files. If so, update them together.
 
