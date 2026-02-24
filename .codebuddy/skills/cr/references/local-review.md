@@ -105,9 +105,10 @@ issues:
 
 ### Step 5.5: Confirm
 
-Present `pending` + `failed` issues and offer a multi-select prompt where each
-option's label is the issue summary (e.g., `[risk] file:line — description`).
-User checks the ones to fix. Unchecked → skipped.
+Present `pending` + `failed` issues, then ask the user to select which issues
+to fix using **a single multi-select question** where each option's label is
+the issue summary (e.g., `[risk] file:line — description`). User checks
+multiple options in one prompt. Unchecked → skipped.
 
 - **All skipped** → Step 6 (Report).
 - **Any checked** → apply fix (same rules as Step 4) → re-validate (Step 5).

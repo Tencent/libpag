@@ -149,8 +149,7 @@ Create a new team for this round. Each round gets a fresh team — do not reuse
 agents from prior rounds (they lose context after team close).
 
 - One reviewer agent (`reviewer-N`) per module.
-- One **verifier** agent (`verifier`), shared across all
-  modules.
+- One **verifier** agent (`verifier`), shared across all modules.
 
 ### Reviewer prompt
 
@@ -358,8 +357,9 @@ Present `pending` + `failed` issues grouped by risk (high → low), sorted by
 file path within each group:
 `[number] [file:line] [risk] [reason] — [description]`
 
-Then present a multi-select prompt where each option's label is the issue
-summary (e.g., `[risk] file:line — description`). User checks the ones to fix.
+Then ask the user to select which issues to fix using **a single multi-select
+question** where each option's label is the issue summary (e.g.,
+`[risk] file:line — description`). User checks multiple options in one prompt.
 Checked → `approved`, unchecked → `skipped`.
 
 - **All skipped** → Phase 7.
