@@ -27,9 +27,10 @@ Determine mode from `$ARGUMENTS`, then follow the matching section below:
 
 ## PR Mode
 
-No questions — `Read` `references/pr-review.md` and follow it exactly. The flow
-uses worktree-based local checkout and line-level PR comments, not the typical
-`gh pr diff` / `gh pr review` approach.
+No questions — `Read` `references/pr-review.md` and follow it exactly. Do NOT
+review the PR from memory or habit — the flow requires worktree-based local
+checkout and line-level comments, with specific constraints on how to obtain the
+diff and submit results.
 
 ---
 
