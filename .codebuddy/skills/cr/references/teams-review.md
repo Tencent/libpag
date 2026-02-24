@@ -98,10 +98,34 @@ group; group related small files together. Classify each module as `code`,
 
 ### Persist state
 
-Write CR_STATE_FILE (see CR_STATE_FILE format appendix) with session info
-(mode, threshold, file list, module assignments, changed line ranges,
-build/test commands) and an issues section updated incrementally. CR_STATE_FILE
-is owned by the coordinator — team agents never read or write it.
+Write CR_STATE_FILE with session info (mode, threshold, file list, module
+assignments, changed line ranges, build/test commands) and an issues section
+updated incrementally. CR_STATE_FILE is owned by the coordinator — team agents
+never read or write it.
+
+**Issue format** in CR_STATE_FILE:
+
+```markdown
+# Issues
+
+## 1. [brief description]
+- **Status**: pending | approved | fixed | failed | skipped
+- **Reason**: [why not auto-fixed, e.g., "above auto-fix threshold (high risk)",
+  "fix failed: build error after 2 retries", "rolled back: introduced regression"]
+- **Risk**: low | medium | high
+- **File**: [file path:line number]
+- **Current**: [what the code does now]
+- **Proposed**: [what the fix would change — for medium/high risk, include the
+  specific approach chosen by the coordinator and the reasoning]
+- **Impact**: [what else would be affected]
+```
+
+Status values:
+- `pending` — recorded, awaiting user decision in Phase 6
+- `approved` — user approved fix in Phase 6, sent to Phase 4
+- `fixed` — fix applied and passed validation
+- `failed` — fix attempted but failed validation after retries
+- `skipped` — user declined or issue rejected (do not re-report)
 
 ---
 
@@ -356,31 +380,3 @@ Summary:
 - Rolled-back issues and reasons
 - Final test result
 - Issues from PR comments (when `PR_COMMENTS` existed)
-
----
-
-## Appendix: CR_STATE_FILE Format
-
-Use this format to record issues in the `# Issues` section of `CR_STATE_FILE`.
-
-**Status values**:
-- `pending` — recorded, awaiting user decision in Phase 6
-- `approved` — user approved fix in Phase 6, sent to Phase 4
-- `fixed` — fix applied and passed validation
-- `failed` — fix attempted but failed validation after retries
-- `skipped` — user declined or issue rejected (do not re-report)
-
-```markdown
-# Issues
-
-## 1. [brief description]
-- **Status**: pending | approved | fixed | failed | skipped
-- **Reason**: [why not auto-fixed, e.g., "above auto-fix threshold (high risk)",
-  "fix failed: build error after 2 retries", "rolled back: introduced regression"]
-- **Risk**: low | medium | high
-- **File**: [file path:line number]
-- **Current**: [what the code does now]
-- **Proposed**: [what the fix would change — for medium/high risk, include the
-  specific approach chosen by the coordinator and the reasoning]
-- **Impact**: [what else would be affected]
-```
