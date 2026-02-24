@@ -64,8 +64,6 @@ Skip conditions:
 
 **Q2 — Auto-fix**:
 
-Otherwise:
-
 - "Review only" → `FIX_MODE=none`: report issues without fixing.
 - "Low risk only" → `FIX_MODE=low`: auto-fix only the most straightforward
   issues (e.g., null checks, typos, naming). Confirm everything else.
