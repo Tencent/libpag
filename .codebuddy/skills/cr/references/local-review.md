@@ -39,8 +39,9 @@ surrounding context, read the relevant sections or related definitions as
 needed. Untracked files have no diff — review their full contents as new code.
 
 For each issue found:
-- Provide a code citation (file:line + snippet).
+- Provide a code citation (file:line + snippet) from the current tree.
 - Self-verify by re-reading the code — confirm or withdraw.
+- If a cited path/line no longer exists, locate the correct file/path via `git diff --name-only` or file search before reporting.
 
 **PR comment verification** (when `PR_COMMENTS` exist): verify each PR review
 comment against current code. Add verified issues to the results.

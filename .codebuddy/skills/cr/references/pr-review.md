@@ -58,7 +58,8 @@ If worktree creation fails, inform the user and abort.
 
 ```bash
 git fetch origin {BASE_BRANCH}
-git diff $(git merge-base origin/{BASE_BRANCH} HEAD)
+git merge-base origin/{BASE_BRANCH} HEAD
+git diff <merge-base-sha>
 ```
 If the diff exceeds 200 lines, first run `git diff --stat` to get an overview,
 then read the diff per file using `git diff -- {file}` to avoid output

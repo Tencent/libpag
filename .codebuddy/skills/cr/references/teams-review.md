@@ -162,13 +162,15 @@ Each reviewer receives:
   pass raw diff or file contents.
 - **Checklist**: `code-checklist.md` for code, `doc-checklist.md` for doc, both
   for mixed.
-- **Evidence requirement**: every issue must have a code citation (file:line + snippet).
+- **Evidence requirement**: every issue must have a code citation (file:line + snippet) from the current tree.
 - **Known-issue exclusion** (round 2+): skip issues matching the coordinator's
   exclusion list. Focus on finding new issues.
 - **Checklist exclusion**: see the exclusion section in the corresponding
   checklist. Project rules loaded in context take priority.
 - **Self-check**: before submitting, re-read the relevant code and verify each
-  issue. Mark as confirmed or withdrawn. Only submit confirmed issues.
+  issue. Mark as confirmed or withdrawn. Only submit confirmed issues. If a cited
+  path/line no longer exists, locate the correct file/path via `git diff --name-only`
+  or file search before reporting.
 - **Output format**: `[file:line] [A/B/C] — [description] — [key lines]`
 
 **PR comment reviewer** (when `PR_COMMENTS` exist, round 1 only): one additional

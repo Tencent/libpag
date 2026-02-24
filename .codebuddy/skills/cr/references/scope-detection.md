@@ -21,7 +21,8 @@ Skip argument-based scope below.
   tracking branch. If no upstream, fall back to `main` (or `master`). Fetch the
   branch diff:
   ```
-  git diff $(git merge-base origin/{base_branch} HEAD)
+  git merge-base origin/{base_branch} HEAD
+  git diff <merge-base-sha>
   ```
 - Commit hash (e.g., `abc123`): validate with `git rev-parse --verify`, then
   `git show`.
