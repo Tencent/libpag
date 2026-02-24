@@ -1,6 +1,6 @@
 ---
 name: cr
-description: Automated code review and fix for local branches, PRs, commits, and files. Supports multi-round iteration with risk-based auto-fix. Use when the user says "review", "code review", "/cr", "review this PR", "check my code", or "review my changes".
+description: 代码审查与自动修复（支持本地分支、PR、提交、文件）
 disable-model-invocation: true
 ---
 
