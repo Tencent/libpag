@@ -148,8 +148,8 @@ Status values:
 Create a new team for this round. Each round gets a fresh team — do not reuse
 agents from prior rounds (they lose context after team close).
 
-- One `general-purpose` reviewer agent (`reviewer-N`) per module.
-- One `general-purpose` **verifier** agent (`verifier`), shared across all
+- One reviewer agent (`reviewer-N`) per module.
+- One **verifier** agent (`verifier`), shared across all
   modules.
 
 ### Reviewer prompt
