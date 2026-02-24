@@ -64,20 +64,13 @@ pending/failed? ──no──→ Report
 Confirm ──all skipped──→ Report
   │ approved
   ↓
-Fix/Validate → Continue? ──new issues──→ Review Loop ↑
-                  │ no new issues
-                  ↓
-              more pending? ──yes──→ Confirm ↑
-                  │ no
-                  ↓
-                Report
+Fix/Validate ──→ Review Loop ↑
 ```
 
-- **Review Loop** (outer): Review → Filter → Fix/Validate repeats as long as
-  new issues are found. Each round is a fresh review, not a targeted re-check.
-- **After Confirm**: approved fixes go through Fix/Validate. If fixes introduce
-  new issues, re-enter the full Review Loop. Otherwise return to Confirm if
-  more pending/failed remain, or proceed to Report.
+The Review Loop repeats as long as new issues are found. Each round is a fresh
+full review — not a targeted re-check of previous fixes. After Confirm,
+approved fixes always re-enter the Review Loop to catch any issues introduced
+by the fixes.
 
 ---
 
