@@ -1,7 +1,6 @@
 ---
 name: commit
 description: Commit local changes without pushing.
-disable-model-invocation: true
 ---
 
 # Commit — Local Commit Only

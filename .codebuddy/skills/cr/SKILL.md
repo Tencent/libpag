@@ -1,7 +1,6 @@
 ---
 name: cr
 description: Automated code review and fix for local branches, PRs, commits, and files. Supports multi-round iteration with risk-based auto-fix.
-disable-model-invocation: true
 ---
 
 # /cr — Code Review
