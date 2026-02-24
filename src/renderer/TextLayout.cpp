@@ -1119,8 +1119,8 @@ class TextLayoutContext {
             auto& prev = currentLine->glyphs[j];
             auto& next = currentLine->glyphs[j + 1];
 #ifdef PAG_USE_HARFBUZZ
-            bool sameCluster = (prev.cluster != 0 || next.cluster != 0) &&
-                               prev.cluster == next.cluster;
+            bool sameCluster =
+                (prev.cluster != 0 || next.cluster != 0) && prev.cluster == next.cluster;
             if (!sameCluster && LineBreaker::CanBreakBetween(prev.unichar, next.unichar)) {
               lastBreakIndex = static_cast<int>(j);
             }

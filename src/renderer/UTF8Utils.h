@@ -69,8 +69,7 @@ inline size_t DecodeUTF8(const char* data, size_t length, int32_t* codepoint) {
     *codepoint = byte;
     return 1;
   }
-  if ((byte & 0xE0) == 0xC0 && length >= 2 &&
-      (static_cast<uint8_t>(data[1]) & 0xC0) == 0x80) {
+  if ((byte & 0xE0) == 0xC0 && length >= 2 && (static_cast<uint8_t>(data[1]) & 0xC0) == 0x80) {
     auto cp = ((byte & 0x1F) << 6) | (static_cast<uint8_t>(data[1]) & 0x3F);
     if (cp >= 0x80) {
       *codepoint = cp;
@@ -79,8 +78,7 @@ inline size_t DecodeUTF8(const char* data, size_t length, int32_t* codepoint) {
     *codepoint = 0xFFFD;
     return 1;
   }
-  if ((byte & 0xF0) == 0xE0 && length >= 3 &&
-      (static_cast<uint8_t>(data[1]) & 0xC0) == 0x80 &&
+  if ((byte & 0xF0) == 0xE0 && length >= 3 && (static_cast<uint8_t>(data[1]) & 0xC0) == 0x80 &&
       (static_cast<uint8_t>(data[2]) & 0xC0) == 0x80) {
     auto cp = ((byte & 0x0F) << 12) | ((static_cast<uint8_t>(data[1]) & 0x3F) << 6) |
               (static_cast<uint8_t>(data[2]) & 0x3F);
@@ -91,8 +89,7 @@ inline size_t DecodeUTF8(const char* data, size_t length, int32_t* codepoint) {
     *codepoint = 0xFFFD;
     return 1;
   }
-  if ((byte & 0xF8) == 0xF0 && length >= 4 &&
-      (static_cast<uint8_t>(data[1]) & 0xC0) == 0x80 &&
+  if ((byte & 0xF8) == 0xF0 && length >= 4 && (static_cast<uint8_t>(data[1]) & 0xC0) == 0x80 &&
       (static_cast<uint8_t>(data[2]) & 0xC0) == 0x80 &&
       (static_cast<uint8_t>(data[3]) & 0xC0) == 0x80) {
     auto cp = ((byte & 0x07) << 18) | ((static_cast<uint8_t>(data[1]) & 0x3F) << 12) |
