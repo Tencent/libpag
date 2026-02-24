@@ -1,0 +1,15 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Test SVG with custom data-* attributes -->
+  <g id="main-group" data-layer-name="主图层" data-component-id="comp_001" data-export="true">
+    <rect id="background" x="10" y="10" width="180" height="180" fill="#f0f0f0" 
+          data-figma-node="123:456" data-locked="false"/>
+    <circle id="center-circle" cx="100" cy="100" r="50" fill="#ff6b6b"
+            data-layer-name="中心圆" data-animation="fade-in" data-duration="500"/>
+    <path id="decoration" d="M50 150 L100 50 L150 150 Z" fill="#4ecdc4"
+          data-custom-type="triangle" data-order="1"/>
+    <text id="label" x="100" y="180" text-anchor="middle" font-size="14" fill="#333"
+          data-editable="true" data-font-family="Arial">
+      Custom Data Test
+    </text>
+  </g>
+</svg>

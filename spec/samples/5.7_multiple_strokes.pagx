@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates multiple Stroke styles creating glow/outline effect -->
+<pagx version="1.0" width="400" height="400">
+  <Layer>
+    <Path data="M 60,200 Q 200,60 340,200 Q 200,340 60,200"/>
+    <!-- Outer glow -->
+    <Stroke color="#8B5CF615" width="48" cap="round" join="round"/>
+    <!-- Middle glow -->
+    <Stroke color="#8B5CF640" width="28" cap="round" join="round"/>
+    <!-- Core stroke -->
+    <Stroke width="8" cap="round" join="round">
+      <LinearGradient startPoint="0,0" endPoint="280,0">
+        <ColorStop offset="0" color="#6366F1"/>
+        <ColorStop offset="0.5" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#EC4899"/>
+      </LinearGradient>
+    </Stroke>
+  </Layer>
+</pagx>

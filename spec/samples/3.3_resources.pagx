@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates resource definitions and references -->
+<pagx version="1.0" width="400" height="400">
+  <Layer>
+    <Rectangle center="200,200" size="320,320" roundness="32"/>
+    <Fill color="@oceanGradient"/>
+    <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#06B6D450"/>
+  </Layer>
+  <!-- Shape using solid color resource reference -->
+  <Layer>
+    <Ellipse center="200,200" size="120,120"/>
+    <Fill color="@coral"/>
+  </Layer>
+  <Resources>
+    <SolidColor id="coral" color="#F43F5E"/>
+    <LinearGradient id="oceanGradient" startPoint="0,0" endPoint="320,320">
+      <ColorStop offset="0" color="#06B6D4"/>
+      <ColorStop offset="1" color="#3B82F6"/>
+    </LinearGradient>
+  </Resources>
+</pagx>

@@ -730,13 +730,9 @@ bool JPAGImageView::flush() {
 }
 
 void JPAGImageView::refreshMatrixFromScaleMode() {
-  if (_scaleMode == PAGScaleMode::None) {
-    return;
-  }
   if (_decoder == nullptr) {
     return;
   }
-
   _matrix = ToTGFX(ApplyScaleMode(_scaleMode, _decoder->width() / _renderScale,
                                   _decoder->height() / _renderScale, _width, _height));
 }

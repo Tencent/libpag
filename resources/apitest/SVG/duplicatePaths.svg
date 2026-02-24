@@ -1,0 +1,15 @@
+<svg width="300" height="200" viewBox="0 0 300 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Test SVG with duplicate paths to verify deduplication -->
+  
+  <!-- Same star shape used 3 times with different colors -->
+  <path id="star1" d="M50 10 L61 40 L95 40 L68 60 L79 90 L50 70 L21 90 L32 60 L5 40 L39 40 Z" fill="#FF6B6B"/>
+  <path id="star2" d="M50 10 L61 40 L95 40 L68 60 L79 90 L50 70 L21 90 L32 60 L5 40 L39 40 Z" fill="#4ECDC4" transform="translate(100, 0)"/>
+  <path id="star3" d="M50 10 L61 40 L95 40 L68 60 L79 90 L50 70 L21 90 L32 60 L5 40 L39 40 Z" fill="#45B7D1" transform="translate(200, 0)"/>
+  
+  <!-- Same triangle shape used 2 times -->
+  <path id="triangle1" d="M50 110 L100 190 L0 190 Z" fill="#96CEB4"/>
+  <path id="triangle2" d="M50 110 L100 190 L0 190 Z" fill="#FFEAA7" transform="translate(100, 0)"/>
+  
+  <!-- Unique path (should not be deduplicated) -->
+  <path id="unique" d="M250 110 L280 150 L220 150 L250 190 L200 160 Z" fill="#DDA0DD"/>
+</svg>

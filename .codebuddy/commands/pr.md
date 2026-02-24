@@ -11,7 +11,6 @@ description: 提交 PR - 自动识别新建或追加提交
 ## 前置检查
 
 ```bash
-git fetch origin main && \
 CURRENT_BRANCH=$(git branch --show-current) && \
 echo "CURRENT_BRANCH:$CURRENT_BRANCH" && \
 gh pr list --head "$CURRENT_BRANCH" --state open --json number,url && \

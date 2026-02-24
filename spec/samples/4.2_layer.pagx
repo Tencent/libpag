@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates layer properties and nesting -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Parent layer with nested child -->
+  <Layer name="Parent" x="50" y="50">
+    <Rectangle center="150,150" size="260,260" roundness="32"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="260,260">
+        <ColorStop offset="0" color="#F43F5E"/>
+        <ColorStop offset="1" color="#EC4899"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetY="16" blurX="40" blurY="40" color="#F43F5E60"/>
+    <!-- Nested child layer -->
+    <Layer name="Child">
+      <Ellipse center="150,150" size="120,120"/>
+      <Fill color="#FFF"/>
+      <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#00000030"/>
+    </Layer>
+  </Layer>
+</pagx>
