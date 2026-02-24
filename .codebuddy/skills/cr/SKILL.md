@@ -26,23 +26,17 @@ Run pre-checks, then match the **first** applicable rule top-to-bottom:
 |---|-----------|--------|
 | 1 | `$ARGUMENTS` is a PR number or URL containing `/pull/` | → `references/pr-review.md` |
 | 2 | `$ARGUMENTS` is empty and uncommitted changes exist | → `references/local-review.md` |
-| 3 | `$ARGUMENTS` is empty, no uncommitted changes, on main/master | Abort with usage examples (see below) |
-| 4 | Not on main/master, and agent teams supported | → Question below |
-| 5 | Everything else | → `references/local-review.md` |
+| 3 | Not on main/master, and agent teams supported | → Question below |
+| 4 | Everything else | → `references/local-review.md` |
 
 Each `→` means: `Read` the target file and follow it as the sole remaining
 instruction. Ignore all sections below. Do NOT review from memory or habit —
 each target file defines specific constraints on how to obtain diffs, apply
 fixes, and submit results.
 
-**Abort message** (rule 3): show usage examples —
-`/cr` (uncommitted changes or current branch),
-`/cr a1b2c3d`, `/cr a1b2c3d..e4f5g6h`,
-`/cr src/foo.cpp`, `/cr 123`, `/cr https://github.com/.../pull/123`.
-
 ---
 
-## Question (rule 4 only)
+## Question (rule 3 only)
 
 Ask a **single question**. The question title should inform the user that the
 current environment supports Agent Teams, and ask whether to enable multi-agent

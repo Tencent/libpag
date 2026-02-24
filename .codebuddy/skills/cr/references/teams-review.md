@@ -83,7 +83,10 @@ Determine the diff to review based on `$ARGUMENTS`:
 - **File/directory paths**: verify all paths exist on disk, then read file
   contents.
 
-If diff is empty → exit.
+If diff is empty → show usage examples and exit:
+`/cr` (uncommitted changes or current branch),
+`/cr a1b2c3d`, `/cr a1b2c3d..e4f5g6h`,
+`/cr src/foo.cpp`, `/cr 123`, `/cr https://github.com/.../pull/123`.
 
 ### Associated PR comments (optional, best-effort)
 
