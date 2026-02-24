@@ -13,7 +13,10 @@ Always process all auto-fixable issues before involving the user. Do NOT pause
 to ask the user anything until Confirm (Phase 6) or Report (Phase 7). When
 both auto-fixable and `pending` (above threshold) issues exist, auto-fix first
 and defer `pending` issues to Phase 6. This is critical to keeping the
-review–fix–validate loop efficient and continuous.
+review–fix–validate loop efficient and continuous. Record anything unresolvable
+to `CR_STATE_FILE` for user review. When closing agents, send the shutdown
+message and continue immediately — do not wait for acknowledgment. When closing
+a team, force-terminate any agents that are still running.
 
 The reviewer–verifier adversarial pair is the core quality mechanism: reviewers
 find issues, verifiers challenge them. This two-party check significantly reduces
@@ -31,14 +34,6 @@ share conversation history.
 | `code-checklist.md` | Code review checklist |
 | `doc-checklist.md` | Document review checklist |
 | `judgment-matrix.md` | Risk levels, worth-fixing criteria, special rules |
-
-## Additional operating rules
-
-- **Agent lifecycle**: When closing agents, send the shutdown message and continue
-  immediately without waiting for acknowledgment. Do not block the workflow on
-  agent responses. When closing the team, force-terminate any agents
-  that are still running.
-- **Autonomy**: record anything unresolvable to `CR_STATE_FILE` for user review.
 
 ## Flow
 
