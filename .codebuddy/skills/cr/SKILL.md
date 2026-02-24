@@ -76,7 +76,7 @@ Otherwise:
 - "Review only": report issues without fixing.
 - "Low risk only": auto-fix only the most straightforward issues (e.g.,
   null checks, typos, naming). Confirm everything else.
-- "Low + Medium risk": auto-fix most issues, only confirm high-risk ones
+- "Low + Medium risk (recommended)": auto-fix most issues, only confirm high-risk ones
   (e.g., API changes, architecture decisions).
 - "Full auto": auto-fix everything. Only issues affecting test baselines are
   deferred.
