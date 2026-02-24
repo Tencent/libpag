@@ -80,8 +80,4 @@ which ones to fix using **a single multi-select question** where each option's
 label is the issue summary (e.g., `[risk] file:line — description`). User
 checks multiple options in one prompt.
 
-If the user selects any issues, apply fixes:
-- **Fix approach** (Medium/High only): decide the specific fix approach and
-  reasoning before applying. Low risk: single obvious fix, no planning needed.
-- After each fix, check whether the change affects related comments or
-  documentation within the same files. If so, update them together.
+If the user selects any issues, apply the fixes.
