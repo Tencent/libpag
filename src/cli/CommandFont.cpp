@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CommandFont.h"
+#include <cmath>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -78,7 +79,9 @@ static void PrintFontInfoUsage() {
             << "  --size <pt>            Font size in points (default: 12)\n"
             << "  --json                 Output in JSON format\n"
             << "\n"
-            << "Either --file or --name is required (mutually exclusive).\n";
+            << "A font file can also be specified as a positional argument instead of --file.\n"
+            << "\n"
+            << "Either --file (or positional) or --name is required (mutually exclusive).\n";
 }
 
 static bool ParseFontInfoOptions(int argc, char* argv[], FontInfoOptions* options) {
@@ -92,7 +95,8 @@ static bool ParseFontInfoOptions(int argc, char* argv[], FontInfoOptions* option
     } else if (arg == "--size" && i + 1 < argc) {
       char* endPtr = nullptr;
       options->fontSize = strtof(argv[++i], &endPtr);
-      if (endPtr == argv[i] || *endPtr != '\0' || options->fontSize <= 0.0f) {
+      if (endPtr == argv[i] || *endPtr != '\0' || !std::isfinite(options->fontSize) ||
+          options->fontSize <= 0.0f) {
         std::cerr << "pagx font info: invalid font size '" << argv[i] << "'\n";
         return false;
       }

@@ -135,7 +135,8 @@ static bool ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
     } else if (arg == "--scale" && i + 1 < argc) {
       char* endPtr = nullptr;
       options->scale = strtof(argv[++i], &endPtr);
-      if (endPtr == argv[i] || *endPtr != '\0' || options->scale <= 0.0f) {
+      if (endPtr == argv[i] || *endPtr != '\0' || !std::isfinite(options->scale) ||
+          options->scale <= 0.0f) {
         std::cerr << "pagx render: invalid scale '" << argv[i] << "'\n";
         return false;
       }
@@ -168,8 +169,11 @@ static bool ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
     } else if (arg[0] == '-') {
       std::cerr << "pagx render: unknown option '" << arg << "'\n";
       return false;
-    } else {
+    } else if (options->inputFile.empty()) {
       options->inputFile = arg;
+    } else {
+      std::cerr << "pagx render: unexpected argument '" << arg << "'\n";
+      return false;
     }
     i++;
   }
