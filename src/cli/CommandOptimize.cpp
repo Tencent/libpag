@@ -827,7 +827,11 @@ static void ApplyLocalizationToElements(PAGXDocument* document,
       auto path = static_cast<Path*>(element);
       if (path->data != nullptr && !path->data->isEmpty()) {
         auto tempData = document->makeNode<PathData>();
-        path->data->forEach([&](PathVerb verb, const Point* pts) {
+        auto& verbs = path->data->verbs();
+        auto& points = path->data->points();
+        size_t pointIndex = 0;
+        for (auto verb : verbs) {
+          const Point* pts = points.data() + pointIndex;
           switch (verb) {
             case PathVerb::Move:
               tempData->moveTo(pts[0].x - offsetX, pts[0].y - offsetY);
@@ -847,7 +851,8 @@ static void ApplyLocalizationToElements(PAGXDocument* document,
               tempData->close();
               break;
           }
-        });
+          pointIndex += PathData::PointsPerVerb(verb);
+        }
         path->data->setPathData(*tempData);
       }
     } else if (type == NodeType::Text) {
