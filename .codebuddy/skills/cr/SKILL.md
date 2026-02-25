@@ -30,8 +30,10 @@ Run pre-checks, then match the **first** applicable rule top-to-bottom:
 | # | Condition | Action |
 |---|-----------|--------|
 | 1 | `$ARGUMENTS` is a PR number or URL containing `/pull/` | → `references/pr-review.md` |
-| 2 | Agent teams supported, no uncommitted changes, not on main/master | → Question below |
-| 3 | Everything else | → `references/local-review.md` |
+| 2 | Agent teams NOT supported | → `references/local-review.md` |
+| 3 | Uncommitted changes exist | → `references/local-review.md` |
+| 4 | On main/master branch | → `references/local-review.md` |
+| 5 | Everything else | → Question below |
 
 Each `→` means: `Read` the target file and follow it as the sole remaining
 instruction. Ignore all sections below. Do NOT review from memory or habit —
