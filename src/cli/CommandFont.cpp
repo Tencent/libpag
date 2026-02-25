@@ -90,9 +90,10 @@ static bool ParseFontInfoOptions(int argc, char* argv[], FontInfoOptions* option
     } else if (arg == "--name" && i + 1 < argc) {
       options->fontName = argv[++i];
     } else if (arg == "--size" && i + 1 < argc) {
-      options->fontSize = strtof(argv[++i], nullptr);
-      if (options->fontSize <= 0.0f) {
-        std::cerr << "pagx font info: font size must be positive\n";
+      char* endPtr = nullptr;
+      options->fontSize = strtof(argv[++i], &endPtr);
+      if (endPtr == argv[i] || *endPtr != '\0' || options->fontSize <= 0.0f) {
+        std::cerr << "pagx font info: invalid font size '" << argv[i] << "'\n";
         return false;
       }
     } else if (arg == "--json") {
