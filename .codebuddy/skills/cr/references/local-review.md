@@ -21,9 +21,9 @@ Determine the diff to review based on `$ARGUMENTS` and working tree state:
   uncommitted changes only. Fetch with `git diff HEAD` (staged + unstaged
   tracked files). Also check for untracked files with `git status --porcelain`
   (`??` lines) and read their contents for review.
-- **Empty `$ARGUMENTS`**, **no uncommitted changes**: determine the base branch
-  from the current branch's upstream tracking branch. If no upstream, fall back
-  to `main` (or `master`). Fetch the branch diff:
+- **Empty `$ARGUMENTS`**, **no uncommitted changes**: find the base branch by
+  checking common base branches in order: `main`, `master`. Use the first one
+  that exists. Fetch the branch diff:
   ```
   git merge-base origin/{base_branch} HEAD
   git diff <merge-base-sha>
