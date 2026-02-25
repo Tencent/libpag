@@ -42,8 +42,9 @@ fixes, and submit results.
 ## Question (rule 2 only)
 
 Ask a **single question**. The question title should inform the user that the
-current environment supports Agent Teams, and ask them to select a review mode.
-Provide 4 options:
+current environment supports Agent Teams, and ask whether to enable multi-agent
+review with reviewer–verifier adversarial mechanism and auto-fix. Provide 4
+options:
 
 | Option | Description |
 |--------|-------------|
