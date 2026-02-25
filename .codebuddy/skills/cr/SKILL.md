@@ -44,7 +44,7 @@ fixes, and submit results.
 
 ## Question (rule 2 only)
 
-Ask a **single question** with this exact title:
+Ask a **single question**:
 "Agent Teams is available (multiple agents working in parallel). Enable multi-agent review with reviewer–verifier adversarial mechanism and auto-fix?"
 Provide 4 options:
 
