@@ -32,7 +32,7 @@
 namespace pagx::cli {
 
 static void PrintFormatUsage() {
-  std::cout << "Usage: pagx format [options] <file.pagx>\n"
+  std::cerr << "Usage: pagx format [options] <file.pagx>\n"
             << "\n"
             << "Formats (pretty-prints) a PAGX file with consistent indentation and attribute\n"
             << "ordering. Does not modify values or structure.\n"

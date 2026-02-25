@@ -122,7 +122,7 @@ struct OptimizeReport {
 };
 
 static void PrintOptimizeUsage() {
-  std::cout << "Usage: pagx optimize [options] <file.pagx>\n"
+  std::cerr << "Usage: pagx optimize [options] <file.pagx>\n"
             << "\n"
             << "Validates, optimizes, and formats a PAGX file in one step.\n"
             << "Validates input against the XSD schema first — aborts with errors if invalid.\n"
