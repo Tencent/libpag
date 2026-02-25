@@ -121,8 +121,10 @@ Initialize `CR_STATE_FILE`: create `.cr-cache/` if it does not exist. Derive the
 filename from the review scope: `.cr-cache/{branch}.md` (sanitize `/` to `-`,
 e.g., `feature/dom_text_box` → `feature-dom_text_box.md`).
 
-If the file already exists (leftover from a concurrent or crashed session),
-find the lowest unused numeric suffix (`-2`, `-3`, …) and use that.
+Each `/cr` invocation is a **fresh session**. Never read or resume from an
+existing file — each session starts from scratch with a new full review.
+If the derived filename already exists (leftover from a previous or concurrent
+session), find the lowest unused numeric suffix (`-2`, `-3`, …) and use that.
 Record the chosen path as `CR_STATE_FILE`.
 
 Write CR_STATE_FILE with session info (mode, threshold, file list, module
