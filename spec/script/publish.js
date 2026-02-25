@@ -250,6 +250,7 @@ function generateHtml(content, title, tocHtml, lang, langSwitchUrl, viewerUrl, f
     zhUrl: isEnglish ? langSwitchUrl : '#',
     enActive: isEnglish ? ' class="active"' : '',
     zhActive: isEnglish ? '' : ' class="active"',
+    zhRedirectUrl: isEnglish ? langSwitchUrl : '',
     tocHtml,
     content,
   };
