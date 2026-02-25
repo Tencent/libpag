@@ -16,8 +16,6 @@ If on the default branch, creates a new branch first.
 - **NEVER** push. This skill only creates local commits.
 - All user-facing text must use the language the user has been using in the
   conversation. Do not default to English.
-- When presenting choices, use interactive dialogs with selectable options
-  rather than plain text.
 
 ---
 
@@ -42,11 +40,7 @@ If on {default_branch}, create a new branch before committing:
 Run `git status --porcelain` and inspect the output:
 
 - **No output** → no local changes. Inform the user and stop.
-- **Both staged and unstaged changes** → ask the user: commit only the staged
-  files (**partial**), or stage everything (**full**)?
-- **Otherwise** → **full** (stage everything).
-
-If **full**: run `git add -A`. If **partial**: skip (files are already staged).
+- **Otherwise** → run `git add -A` to stage everything.
 
 Read the staged diff (`git diff --cached`) and generate a commit message
 following the project's commit conventions. If no convention is found, default
