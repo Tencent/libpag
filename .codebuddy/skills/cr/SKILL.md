@@ -42,25 +42,24 @@ fixes, and submit results.
 ## Question (rule 2 only)
 
 Ask a **single question**. The question title should inform the user that the
-current environment supports Agent Teams, and ask whether to enable multi-agent
-review with reviewer–verifier adversarial mechanism and auto-fix. Provide 4
-options:
+current environment supports Agent Teams, and ask them to select a review mode.
+Provide 4 options:
 
 | Option | Description |
 |--------|-------------|
-| Quick review | Single-agent review; interactively choose which issues to fix afterward. |
-| Auto-fix: low risk | Multi-agent review; auto-fix only the safest issues (e.g., null checks, typos, naming). Confirm everything else. |
-| Auto-fix: low + medium risk (recommended) | Multi-agent review; auto-fix most issues, only confirm high-risk ones (e.g., API changes, architecture). |
-| Auto-fix: full | Multi-agent review; auto-fix everything. Only issues affecting test baselines are deferred. |
+| Single-agent + manual fix | Single-agent review; interactively choose which issues to fix afterward. |
+| Teams + auto-fix low risk | Multi-agent review; auto-fix only the safest issues (e.g., null checks, typos, naming). Confirm everything else. |
+| Teams + auto-fix low & medium risk (recommended) | Multi-agent review; auto-fix most issues, only confirm high-risk ones (e.g., API changes, architecture). |
+| Teams + auto-fix all | Multi-agent review; auto-fix everything. Only issues affecting test baselines are deferred. |
 
 ### Hand off
 
 | Option | → | FIX_MODE |
 |--------|---|----------|
-| Quick review | `references/local-review.md` | — |
-| Auto-fix: low risk | `references/teams-review.md` | low |
-| Auto-fix: low + medium risk | `references/teams-review.md` | low_medium |
-| Auto-fix: full | `references/teams-review.md` | full |
+| Single-agent + manual fix | `references/local-review.md` | — |
+| Teams + auto-fix low risk | `references/teams-review.md` | low |
+| Teams + auto-fix low & medium risk (recommended) | `references/teams-review.md` | low_medium |
+| Teams + auto-fix all | `references/teams-review.md` | full |
 
 Pass `$ARGUMENTS` to the target file. For teams-review, also pass `FIX_MODE`
 (low / low_medium / full).
