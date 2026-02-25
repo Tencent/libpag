@@ -40,7 +40,12 @@ If on {default_branch}, create a new branch before committing:
 Run `git status --porcelain` and inspect the output:
 
 - **No output** → no local changes. Inform the user and stop.
-- **Otherwise** → run `git add -A` to stage everything.
+- **Staged changes exist, no unstaged changes** → proceed directly to commit.
+- **Staged changes exist, unstaged changes also exist** → commit only the
+  staged changes. After committing, inform the user that unstaged changes remain
+  and were not included.
+- **No staged changes, unstaged changes exist** → run `git add -A` to stage
+  everything, then commit.
 
 Read the staged diff (`git diff --cached`) and generate a commit message
 following the project's commit conventions. If no convention is found, default
