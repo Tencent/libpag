@@ -361,6 +361,8 @@ function publishSpec(specFile, outputDir, lang, langSwitchUrl, viewerUrl, favico
 
 /**
  * Copy latest version files to latest folder (instead of redirect).
+ * After copying, strips the version-specific banner so the "latest" URL does not display stale
+ * version information.
  */
 function copyLatestVersion(siteDir, version) {
   const latestDir = path.join(siteDir, 'latest');
@@ -372,6 +374,7 @@ function copyLatestVersion(siteDir, version) {
   if (fs.existsSync(enSrc)) {
     fs.mkdirSync(latestDir, { recursive: true });
     fs.copyFileSync(enSrc, enDest);
+    stripVersionInfo(enDest);
     console.log(`  Copied: ${enDest}`);
   }
 
@@ -381,8 +384,18 @@ function copyLatestVersion(siteDir, version) {
   if (fs.existsSync(zhSrc)) {
     fs.mkdirSync(path.join(latestDir, 'zh'), { recursive: true });
     fs.copyFileSync(zhSrc, zhDest);
+    stripVersionInfo(zhDest);
     console.log(`  Copied: ${zhDest}`);
   }
+}
+
+/**
+ * Remove the version-info block from an HTML file so the "latest" page is version-neutral.
+ */
+function stripVersionInfo(htmlFile) {
+  let html = fs.readFileSync(htmlFile, 'utf-8');
+  html = html.replace(/<div class="version-info[\s\S]*?<\/div>\s*/, '');
+  fs.writeFileSync(htmlFile, html, 'utf-8');
 }
 
 /**
