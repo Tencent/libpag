@@ -1,6 +1,10 @@
 ---
 name: pagx
-description: PAGX knowledge base for generating and optimizing PAGX files. Use when asked to create, write, generate, optimize, simplify, or review PAGX files. Covers the PAGX XML format specification, best practices for structure and layout, and optimization techniques for file size and rendering performance.
+description: >-
+  PAGX knowledge base for generating and optimizing PAGX files. Use when asked to
+  create, write, generate, optimize, simplify, or review PAGX files. Covers the
+  PAGX XML format specification, best practices for structure and layout, and
+  optimization techniques for file size and rendering performance.
 user-invocable: false
 ---
 

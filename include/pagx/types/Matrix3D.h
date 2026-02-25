@@ -57,8 +57,10 @@ struct Matrix3D {
    * Returns true if this is the identity matrix.
    */
   bool isIdentity() const {
-    static constexpr float identity[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
-    return memcmp(values, identity, sizeof(values)) == 0;
+    return values[0] == 1 && values[1] == 0 && values[2] == 0 && values[3] == 0 &&
+           values[4] == 0 && values[5] == 1 && values[6] == 0 && values[7] == 0 &&
+           values[8] == 0 && values[9] == 0 && values[10] == 1 && values[11] == 0 &&
+           values[12] == 0 && values[13] == 0 && values[14] == 0 && values[15] == 1;
   }
 
   bool operator==(const Matrix3D& other) const {

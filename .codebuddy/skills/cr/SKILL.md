@@ -1,6 +1,10 @@
 ---
 name: cr
-description: Automated code review and fix for local branches, PRs, commits, and files. Supports single-agent interactive fix and multi-agent adversarial review with auto-fix.
+description: >-
+  Automated code review and fix for local branches, PRs, commits, and files.
+  Supports single-agent interactive fix and multi-agent adversarial review with
+  auto-fix.
+disable-model-invocation: true
 ---
 
 # /cr — Code Review
