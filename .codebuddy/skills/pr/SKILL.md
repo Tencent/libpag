@@ -1,7 +1,6 @@
 ---
 name: pr
-description: >-
-  Commit and push changes, then create a new PR or append to an existing one.
+description: Commit and push changes, then create a new PR or append to an existing one.
 disable-model-invocation: true
 ---
 
