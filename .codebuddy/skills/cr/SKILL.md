@@ -14,12 +14,10 @@ review mode from arguments and routes to the appropriate review flow — either
 quick single-agent review with interactive fix selection, or multi-agent
 deep review with risk-based auto-fix.
 
-All user-facing text matches the user's language.
-
-**GLOBAL RULE — Interactive questions:** Whenever this skill (or any file it
-references) instructs you to ask a question or present options, you MUST use
-your interactive dialog tool (e.g. AskUserQuestion) — never output options as
-plain text. Do not proceed until the user replies.
+All user-facing text matches the user's language. Whenever this skill (or any
+file it references) instructs you to ask a question or present options, you MUST
+use your interactive dialog tool (e.g. AskUserQuestion) — never output options
+as plain text. Do not proceed until the user replies.
 
 ## Route
 
