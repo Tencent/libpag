@@ -359,37 +359,29 @@ function publishSpec(specFile, outputDir, lang, langSwitchUrl, viewerUrl, favico
 }
 
 /**
- * Generate redirect page in latest folder.
+ * Copy latest version files to latest folder (instead of redirect).
  */
-function generateRedirectPage(siteDir, version) {
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PAGX Specification</title>
-    <script>
-        (function() {
-            var lang = navigator.language || navigator.userLanguage || '';
-            var path = '../${version}/' + (lang.toLowerCase().startsWith('zh') ? 'zh/' : '');
-            window.location.replace(path);
-        })();
-    </script>
-</head>
-<body>
-    <p>Redirecting to PAGX specification ${version}...</p>
-    <ul>
-        <li><a href="${BASE_URL}/${version}/">${BASE_URL}/${version}/</a> (English)</li>
-        <li><a href="${BASE_URL}/${version}/zh/">${BASE_URL}/${version}/zh/</a> (中文)</li>
-    </ul>
-</body>
-</html>`;
-
+function copyLatestVersion(siteDir, version) {
   const latestDir = path.join(siteDir, 'latest');
-  fs.mkdirSync(latestDir, { recursive: true });
-  const outputFile = path.join(latestDir, 'index.html');
-  fs.writeFileSync(outputFile, html, 'utf-8');
-  console.log(`  Generated: ${outputFile}`);
+  const versionDir = path.join(siteDir, version);
+
+  // Copy English version
+  const enSrc = path.join(versionDir, 'index.html');
+  const enDest = path.join(latestDir, 'index.html');
+  if (fs.existsSync(enSrc)) {
+    fs.mkdirSync(latestDir, { recursive: true });
+    fs.copyFileSync(enSrc, enDest);
+    console.log(`  Copied: ${enDest}`);
+  }
+
+  // Copy Chinese version
+  const zhSrc = path.join(versionDir, 'zh', 'index.html');
+  const zhDest = path.join(latestDir, 'zh', 'index.html');
+  if (fs.existsSync(zhSrc)) {
+    fs.mkdirSync(path.join(latestDir, 'zh'), { recursive: true });
+    fs.copyFileSync(zhSrc, zhDest);
+    console.log(`  Copied: ${zhDest}`);
+  }
 }
 
 /**
@@ -426,7 +418,7 @@ function findPublishedVersions(siteDir) {
 function generateVersionInfoHtml(thisVersion, draftVersion, stableVersion, isZh, lastUpdated) {
   const langSuffix = isZh ? 'zh/' : '';
   const thisUrl = `${BASE_URL}/${thisVersion}/${langSuffix}`;
-  const latestUrl = `${BASE_URL}/latest/`;
+  const latestUrl = isZh ? `${BASE_URL}/latest/zh/` : `${BASE_URL}/latest/`;
 
   // Check version status
   const isOutdated = stableVersion && thisVersion !== stableVersion &&
@@ -642,30 +634,11 @@ function main() {
   console.log('\nPublishing Chinese version...');
   publishSpec(SPEC_FILE_ZH, path.join(baseOutputDir, 'zh'), 'zh', '../', viewerUrlFromZh, faviconUrlFromZh, englishSlugs);
 
-  console.log('\nGenerating redirect page...');
-  console.log(`  Redirect to: ${stableVersion || version}`);
-  generateRedirectPage(siteDir, stableVersion || version);
+  console.log('\nCopying latest version to latest folder...');
+  copyLatestVersion(siteDir, stableVersion || version);
 
   // Update version links in all published versions
   updateAllVersionLinks(siteDir, version, stableVersion);
-
-  // Update version in SKILL.md
-  const latestVersion = stableVersion || version;
-  const skillFile = path.join(LIBPAG_DIR, '.codebuddy', 'skills', 'pagx', 'SKILL.md');
-  if (fs.existsSync(skillFile)) {
-    console.log('\nUpdating SKILL.md...');
-    const skillContent = fs.readFileSync(skillFile, 'utf-8');
-    const updatedContent = skillContent.replace(
-      /https:\/\/pag\.io\/pagx\/[\w.]+\//g,
-      `${BASE_URL}/${latestVersion}/`
-    );
-    if (updatedContent !== skillContent) {
-      fs.writeFileSync(skillFile, updatedContent, 'utf-8');
-      console.log(`  Updated: ${skillFile}`);
-    } else {
-      console.log(`  No changes needed: ${skillFile}`);
-    }
-  }
 
   console.log('\nCopying favicon...');
   fs.copyFileSync(path.join(SPEC_DIR, 'favicon.png'), path.join(siteDir, 'favicon.png'));

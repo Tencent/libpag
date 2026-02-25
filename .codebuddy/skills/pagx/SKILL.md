@@ -23,7 +23,7 @@ foundational understanding of the PAGX format.
 | Improve rendering performance | `performance.md` |
 | Look up attribute defaults or enums | `pagx-quick-reference.md` |
 | Use the pagx CLI tool | `cli-reference.md` |
-| Verify against full specification | [PAGX Spec (online)](https://pag.io/pagx/1.0/) |
+| Verify against full specification | [PAGX Spec (online)](https://pag.io/pagx/latest/) |
 
 ---
 
