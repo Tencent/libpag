@@ -76,8 +76,8 @@ generate:
   `bugfix/{username}_topic` (`{username}` = local git username, lowercase; obtain via `git config user.name`).
   When on a non-default branch, use the current branch name.
 - **PR title**: concise summary following project conventions, or a short
-  English sentence if none found. May reuse the commit message when there is
-  only one commit.
+  English sentence if none found. Always based on all changes since
+  {default_branch}, not the latest commit message.
 - **PR description**: plain text (no Markdown formatting) in the user's
   conversation language, briefly describing what changed and why.
 
