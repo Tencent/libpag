@@ -214,9 +214,16 @@ verification itself.
 
 The verifier runs as a **pipeline** — it does not wait for all reviewers to
 finish. As each reviewer sends a report via SendMessage, the coordinator MUST
-forward it to the verifier immediately as a direct quote of the original
-SendMessage content — no rewriting, summarizing, or supplementing. Include the
-following verbatim in every verifier's prompt:
+forward it to the verifier immediately. Forwarding rules:
+
+- **Quote verbatim**: wrap the reviewer's original SendMessage content in a
+  quote block and send it as-is.
+- **No rewriting**: do not summarize, reorganize, merge multiple reviewer
+  reports into one message, or add coordinator commentary.
+- **One forward per reviewer**: each reviewer report is a separate message to
+  the verifier.
+
+Include the following verbatim in every verifier's prompt:
 
 ```
 You are a code review verifier. Your stance is adversarial — default to doubting the
@@ -380,9 +387,14 @@ agents.
 
 | Condition | → |
 |-----------|---|
-| New confirmed issues this round | Phase 2 (new review round) |
+| Any issues were confirmed and fixed this round | Phase 2 (new review round) |
 | `pending` or `failed` in CR_STATE_FILE | Phase 6 |
 | Otherwise | Phase 7 |
+
+The first condition means: if this round's review found real issues and fixes
+were applied, always do a fresh full review to catch issues the previous round
+may have missed. This is NOT a targeted re-check of the fixes — it is a
+complete new review of the entire scope with a fresh team.
 
 ---
 
