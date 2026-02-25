@@ -20,9 +20,9 @@
 
 #include "HarfBuzzShaper.h"
 #include <list>
-#include <map>
 #include <memory>
 #include <mutex>
+#include <unordered_map>
 #include "UTF8Utils.h"
 #include "hb.h"
 
@@ -73,7 +73,9 @@ static std::shared_ptr<hb_face_t> CreateHBFace(const std::shared_ptr<tgfx::Typef
 
 class FontCache {
  public:
-  FontCache(std::list<uint32_t>* lru, std::map<uint32_t, std::shared_ptr<hb_font_t>>* cache,
+  FontCache(std::list<uint32_t>* lru,
+            std::unordered_map<uint32_t, std::pair<std::shared_ptr<hb_font_t>,
+                                                   std::list<uint32_t>::iterator>>* cache,
             std::mutex* mutex)
       : lru(lru), fontCache(cache), fontMutex(mutex) {
     fontMutex->lock();
@@ -87,27 +89,32 @@ class FontCache {
   }
 
   std::shared_ptr<hb_font_t> find(uint32_t fontId) {
-    auto iter = std::find(lru->begin(), lru->end(), fontId);
-    if (iter == lru->end()) {
+    auto it = fontCache->find(fontId);
+    if (it == fontCache->end()) {
       return nullptr;
     }
-    lru->erase(iter);
+    lru->erase(it->second.second);
     lru->push_front(fontId);
-    return (*fontCache)[fontId];
+    it->second.second = lru->begin();
+    return it->second.first;
   }
 
   std::shared_ptr<hb_font_t> insert(uint32_t fontId, std::shared_ptr<hb_font_t> font) {
     if (hb_font_get_empty() == font.get()) {
       return nullptr;
     }
-    fontCache->insert_or_assign(fontId, std::move(font));
+    auto existing = fontCache->find(fontId);
+    if (existing != fontCache->end()) {
+      lru->erase(existing->second.second);
+    }
     lru->push_front(fontId);
+    (*fontCache)[fontId] = {std::move(font), lru->begin()};
     while (lru->size() > MAX_CACHE_SIZE) {
       auto id = lru->back();
       lru->pop_back();
       fontCache->erase(id);
     }
-    return (*fontCache)[fontId];
+    return fontCache->at(fontId).first;
   }
 
   void reset() {
@@ -118,14 +125,16 @@ class FontCache {
  private:
   static constexpr size_t MAX_CACHE_SIZE = 100;
   std::list<uint32_t>* lru;
-  std::map<uint32_t, std::shared_ptr<hb_font_t>>* fontCache;
+  std::unordered_map<
+      uint32_t, std::pair<std::shared_ptr<hb_font_t>, std::list<uint32_t>::iterator>>* fontCache;
   std::mutex* fontMutex;
 };
 
 static FontCache GetFontCache() {
   static auto* cacheMutex = new std::mutex();
   static auto* cacheLRU = new std::list<uint32_t>();
-  static auto* cacheMap = new std::map<uint32_t, std::shared_ptr<hb_font_t>>();
+  static auto* cacheMap = new std::unordered_map<
+      uint32_t, std::pair<std::shared_ptr<hb_font_t>, std::list<uint32_t>::iterator>>();
   return {cacheLRU, cacheMap, cacheMutex};
 }
 
@@ -240,14 +249,16 @@ static hb_script_t ResolveScript(int32_t codepoint, hb_script_t lastScript) {
 
 // Performs combined font + script itemization. Each character is assigned the best available font
 // and an effective script. Adjacent characters sharing both font and script are merged into runs.
-static std::vector<ShapingRun> ItemizeRuns(const std::string& text, const tgfx::Font& primaryFont,
+static std::vector<ShapingRun> ItemizeRuns(const std::string& text, size_t offset, size_t length,
+                                           const tgfx::Font& primaryFont,
                                            const std::vector<tgfx::Font>& fallbackFonts) {
   std::vector<ShapingRun> runs;
-  size_t pos = 0;
+  size_t pos = offset;
+  size_t endPos = offset + length;
   const tgfx::Font* lastFont = nullptr;
   hb_script_t lastScript = HB_SCRIPT_COMMON;
 
-  while (pos < text.size()) {
+  while (pos < endPos) {
     int32_t codepoint = 0;
     auto charLen = DecodeUTF8(text.data() + pos, text.size() - pos, &codepoint);
     if (charLen == 0) {
@@ -295,23 +306,23 @@ static std::vector<ShapingRun> ItemizeRuns(const std::string& text, const tgfx::
   return runs;
 }
 
-std::vector<ShapedGlyph> HarfBuzzShaper::Shape(const std::string& text,
-                                               const tgfx::Font& primaryFont,
+std::vector<ShapedGlyph> HarfBuzzShaper::Shape(const std::string& text, size_t offset,
+                                               size_t length, const tgfx::Font& primaryFont,
                                                const std::vector<tgfx::Font>& fallbackFonts,
                                                bool vertical, bool rtl) {
-  if (text.empty()) {
+  if (length == 0) {
     return {};
   }
 
   // Phase 1: Combined font + script itemization.
-  auto shapingRuns = ItemizeRuns(text, primaryFont, fallbackFonts);
+  auto shapingRuns = ItemizeRuns(text, offset, length, primaryFont, fallbackFonts);
   if (shapingRuns.empty()) {
     return {};
   }
 
   // Phase 2: Per-run shaping — shape each run independently with full text context.
   std::vector<ShapedGlyph> result;
-  result.reserve(text.size() / 2 + 1);
+  result.reserve(length / 2 + 1);
 
   for (auto& run : shapingRuns) {
     auto shaped = ShapeRun(text, run.byteStart, run.byteEnd - run.byteStart, run.font, run.script,
