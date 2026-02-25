@@ -510,7 +510,7 @@
       <xs:element name="GlyphRun" type="GlyphRunType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="text" type="xs:string"/>
+    <xs:attribute name="text" type="xs:string" default=""/>
     <xs:attribute name="position" type="PointType" default="0,0"/>
     <xs:attribute name="fontFamily" type="xs:string" default=""/>
     <xs:attribute name="fontStyle" type="xs:string" default=""/>
