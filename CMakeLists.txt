@@ -123,7 +123,9 @@ if (PAG_BUILD_TESTS)
     set(PAG_BUILD_SHARED OFF)
 endif ()
 
-set(TGFX_BUILD_LAYERS ON)
+if (PAG_BUILD_PAGX)
+    set(TGFX_BUILD_LAYERS ON)
+endif ()
 
 message("PAG_USE_LIBAVC: ${PAG_USE_LIBAVC}")
 message("PAG_USE_RTTR: ${PAG_USE_RTTR}")
