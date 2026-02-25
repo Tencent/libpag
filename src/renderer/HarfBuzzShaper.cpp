@@ -100,7 +100,7 @@ class FontCache {
     if (hb_font_get_empty() == font.get()) {
       return nullptr;
     }
-    fontCache->insert(std::make_pair(fontId, std::move(font)));
+    fontCache->insert_or_assign(fontId, std::move(font));
     lru->push_front(fontId);
     while (lru->size() > MAX_CACHE_SIZE) {
       auto id = lru->back();
