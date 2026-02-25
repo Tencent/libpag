@@ -66,9 +66,9 @@ fixes. The loop only exits to Confirm (if pending/failed remain) or Report
 
 Determine the diff to review based on `$ARGUMENTS`:
 
-- **Empty arguments**: determine the base branch from the current branch's
-  upstream tracking branch. If no upstream, fall back to `main` (or `master`).
-  Fetch the branch diff:
+- **Empty arguments**: find the base branch by checking common base branches
+  in order: `main`, `master`. Use the first one that exists. Fetch the branch
+  diff:
   ```
   git merge-base origin/{base_branch} HEAD
   git diff <merge-base-sha>
@@ -105,7 +105,7 @@ Store as `PR_COMMENTS` for verification in the review step.
 Skip if doc-only. If no build/test commands can be determined, warn that fix
 validation will be skipped. Otherwise run build + test. Fail → abort.
 
-Read git log since upstream for recent-fix context (avoid re-flagging issues
+Read git log since the base branch for recent-fix context (avoid re-flagging issues
 a previous `/cr` session already fixed).
 
 ### Module partition
