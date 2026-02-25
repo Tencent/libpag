@@ -25,6 +25,7 @@
 #include <vector>
 #include "cli/CliUtils.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Composition.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/TextLayout.h"
 #include "tgfx/layers/Layer.h"
@@ -92,68 +93,65 @@ static bool ParseBoundsOptions(int argc, char* argv[], BoundsOptions* options) {
   return true;
 }
 
-// Compute the "Layer path" from <pagx> root to a given xmlNode. The path is a list of 0-based
-// child Layer indices at each level. Returns false if the node is not a <Layer> element.
-static bool ComputeLayerPath(xmlNodePtr node, std::vector<int>* path) {
+// Resolve an XML <Layer> node to a pagx::Layer pointer in the document. First tries to match by
+// the "id" attribute, then falls back to positional matching within direct parent context (<pagx>
+// top-level layers or parent <Layer> children). Composition-internal layers are only reachable via
+// the id-based lookup.
+static const Layer* ResolveXmlLayer(xmlNodePtr node, const PAGXDocument* document) {
   if (node == nullptr || node->type != XML_ELEMENT_NODE) {
-    return false;
+    return nullptr;
   }
   if (!xmlStrEqual(node->name, BAD_CAST "Layer")) {
-    return false;
+    return nullptr;
   }
 
-  // Walk up to build the path from root to node.
-  std::vector<int> reversePath = {};
-  xmlNodePtr current = node;
-  while (current != nullptr && current->parent != nullptr) {
-    bool isParentPagx =
-        current->parent->name != nullptr && xmlStrEqual(current->parent->name, BAD_CAST "pagx");
-    // Count the index of current among sibling <Layer> elements.
-    int index = 0;
-    for (xmlNodePtr sibling = current->parent->children; sibling != nullptr;
-         sibling = sibling->next) {
-      if (sibling == current) {
-        break;
-      }
-      if (sibling->type == XML_ELEMENT_NODE && sibling->name != nullptr &&
-          xmlStrEqual(sibling->name, BAD_CAST "Layer")) {
-        index++;
-      }
+  // Try id-based lookup first.
+  xmlChar* idAttr = xmlGetProp(node, BAD_CAST "id");
+  if (idAttr != nullptr) {
+    std::string idStr = reinterpret_cast<const char*>(idAttr);
+    xmlFree(idAttr);
+    auto* found = document->findNode<Layer>(idStr);
+    if (found != nullptr) {
+      return found;
     }
-    reversePath.push_back(index);
+  }
 
-    if (isParentPagx) {
+  // Fallback: positional matching for layers without id.
+  if (node->parent == nullptr) {
+    return nullptr;
+  }
+  int index = 0;
+  for (xmlNodePtr sibling = node->parent->children; sibling != nullptr; sibling = sibling->next) {
+    if (sibling == node) {
       break;
     }
-    current = current->parent;
-  }
-
-  // Reverse to get root-to-node order.
-  path->assign(reversePath.rbegin(), reversePath.rend());
-  return true;
-}
-
-// Resolve a Layer path to a pagx::Layer pointer in the document.
-static const Layer* ResolveLayerPath(const PAGXDocument* document, const std::vector<int>& path) {
-  if (path.empty()) {
-    return nullptr;
-  }
-  // First index selects from document->layers.
-  int topIndex = path[0];
-  if (topIndex < 0 || topIndex >= static_cast<int>(document->layers.size())) {
-    return nullptr;
-  }
-  const Layer* current = document->layers[static_cast<size_t>(topIndex)];
-
-  // Subsequent indices descend through children.
-  for (size_t i = 1; i < path.size(); i++) {
-    int childIndex = path[i];
-    if (childIndex < 0 || childIndex >= static_cast<int>(current->children.size())) {
-      return nullptr;
+    if (sibling->type == XML_ELEMENT_NODE && xmlStrEqual(sibling->name, BAD_CAST "Layer")) {
+      index++;
     }
-    current = current->children[static_cast<size_t>(childIndex)];
   }
-  return current;
+
+  if (xmlStrEqual(node->parent->name, BAD_CAST "pagx")) {
+    if (index >= 0 && index < static_cast<int>(document->layers.size())) {
+      return document->layers[static_cast<size_t>(index)];
+    }
+  } else if (xmlStrEqual(node->parent->name, BAD_CAST "Layer")) {
+    const Layer* parentLayer = ResolveXmlLayer(node->parent, document);
+    if (parentLayer != nullptr && index >= 0 &&
+        index < static_cast<int>(parentLayer->children.size())) {
+      return parentLayer->children[static_cast<size_t>(index)];
+    }
+  } else if (xmlStrEqual(node->parent->name, BAD_CAST "Composition")) {
+    xmlChar* compId = xmlGetProp(node->parent, BAD_CAST "id");
+    if (compId != nullptr) {
+      std::string compIdStr = reinterpret_cast<const char*>(compId);
+      xmlFree(compId);
+      auto* comp = document->findNode<Composition>(compIdStr);
+      if (comp != nullptr && index >= 0 && index < static_cast<int>(comp->layers.size())) {
+        return comp->layers[static_cast<size_t>(index)];
+      }
+    }
+  }
+  return nullptr;
 }
 
 // Evaluate an XPath expression and return matching Layer nodes.
@@ -179,15 +177,18 @@ static std::vector<const Layer*> EvaluateXPath(xmlDocPtr xmlDoc, const std::stri
     int count = xpathObj->nodesetval->nodeNr;
     for (int i = 0; i < count; i++) {
       xmlNodePtr xmlNode = xpathObj->nodesetval->nodeTab[i];
-      std::vector<int> layerPath = {};
-      if (!ComputeLayerPath(xmlNode, &layerPath)) {
+      const Layer* pagxLayer = ResolveXmlLayer(xmlNode, document);
+      if (pagxLayer == nullptr && xmlNode->type == XML_ELEMENT_NODE) {
         auto name =
             xmlNode->name ? std::string(reinterpret_cast<const char*>(xmlNode->name)) : "unknown";
-        std::cerr << "pagx bounds: XPath matched a <" << name
-                  << "> node, but only <Layer> nodes are supported\n";
+        if (!xmlStrEqual(xmlNode->name, BAD_CAST "Layer")) {
+          std::cerr << "pagx bounds: XPath matched a <" << name
+                    << "> node, but only <Layer> nodes are supported\n";
+        } else {
+          std::cerr << "pagx bounds: failed to resolve Layer '" << name << "'\n";
+        }
         continue;
       }
-      const Layer* pagxLayer = ResolveLayerPath(document, layerPath);
       if (pagxLayer != nullptr) {
         results.push_back(pagxLayer);
       }
