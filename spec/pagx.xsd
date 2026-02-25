@@ -101,7 +101,7 @@
     </xs:restriction>
   </xs:simpleType>
 
-  <!-- Comma-separated list of floats (for glyphs, xOffsets, rotations, etc.) -->
+  <!-- Comma-separated list of floats (for xOffsets, rotations, skews, etc.) -->
   <xs:simpleType name="FloatListType">
     <xs:restriction base="xs:string">
       <xs:pattern value="-?[0-9]*\.?[0-9]+(,-?[0-9]*\.?[0-9]+)*"/>
