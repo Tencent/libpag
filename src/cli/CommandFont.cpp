@@ -103,6 +103,11 @@ static bool ParseFontInfoOptions(int argc, char* argv[], FontInfoOptions* option
     } else if (arg[0] == '-') {
       std::cerr << "pagx font info: unknown option '" << arg << "'\n";
       return false;
+    } else if (options->fontFile.empty()) {
+      options->fontFile = arg;
+    } else {
+      std::cerr << "pagx font info: unexpected argument '" << arg << "'\n";
+      return false;
     }
     i++;
   }
