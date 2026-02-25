@@ -29,7 +29,7 @@ enum class Overflow {
    */
   Visible,
   /**
-   * Text that exceeds the box boundaries is clipped and not rendered.
+   * Text that exceeds the box boundaries is discarded and not rendered.
    */
   Hidden
 };
