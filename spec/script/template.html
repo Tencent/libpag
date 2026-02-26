@@ -395,10 +395,7 @@
             var saved = getLangCookie();
             var shouldRedirect = saved === 'zh-CN' ||
                 (!saved && /^zh\b/.test(navigator.language || ''));
-            if (shouldRedirect) {
-                setLangCookie('zh-CN');
-                location.replace(zhUrl);
-            }
+            if (shouldRedirect) location.replace(zhUrl);
         })();
 
         window.addEventListener('scroll', function() {
