@@ -47,11 +47,35 @@ for Step 2 analysis). Include parent hashes to identify merge commits. Record
 `{original_head}` = current HEAD. If the range is empty, inform the user and
 stop.
 
+Check whether the current environment supports agent teams (multiple agents
+working in parallel). Record the result for Step 2.
+
 ---
 
 ## Step 2: Analyze & Propose
 
 Using the `git log` output from Step 1:
+
+### Large ranges
+
+When the range exceeds **50 commits**, split into windows of **50 commits**
+with a stride of **45** (chronological order), giving a **5-commit overlap**
+between adjacent windows. Every window — including the overlap zone — produces
+full decisions independently. The first window starts at the beginning of the
+range; subsequent windows start 45 commits after the previous window's start.
+Never refuse to analyze a branch because of its size.
+
+If agent teams are available (detected in Step 1), spawn one agent per window
+and analyze all windows in parallel. When agent teams are not available,
+process windows sequentially.
+
+**Merge phase**: After all windows complete, the coordinator reviews the
+overlap zones. For each overlap zone, compare the decisions from the two
+adjacent windows:
+
+- **Consistent** — both windows agree on grouping and action → adopt as-is.
+- **Conflicting** — the coordinator examines both windows' decisions plus
+  surrounding context and makes the final call.
 
 **Pass 1 — Coarse scan**: Identify candidate groups from the commit messages
 and file stats (consecutive commits touching the same files or with related
@@ -80,6 +104,10 @@ Do **NOT** group commits when:
 - Each commit is a **self-contained, independently revertible** change.
 - Commits are separated by an unrelated commit or a merge commit — **never
   reorder commits**.
+- **Never eliminate revert commits.** A revert and its original are both
+  meaningful history records. Treat reverts as ordinary commits — only group a
+  revert with its adjacent neighbours when they share the same functional
+  intent, just like any other commit.
 
 ### Commit message quality check
 
