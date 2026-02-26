@@ -33,7 +33,7 @@ option(PAG_USE_HARFBUZZ "Enable HarfBuzz support" OFF)
 option(PAG_USE_C "Enable c API" OFF)
 option(PAG_BUILD_PAGX "Enable PAGX format support" OFF)
 option(PAG_BUILD_CLI "Enable building the command-line tool" OFF)
-option(PAG_BUILD_SVG "Enable SVG import support" OFF)
+option(PAG_BUILD_SVG "Enable SVG import/export support" OFF)
 
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
 if (NOT WEB OR EMSCRIPTEN_PTHREADS)
@@ -269,7 +269,8 @@ if (PAG_USE_HARFBUZZ)
         message("HARFBUZZ_LIB: ${HARFBUZZ_LIB}")
         message("HARFBUZZ_INCLUDE: ${HARFBUZZ_INCLUDE}")
         list(APPEND PAG_INCLUDES ${HARFBUZZ_INCLUDE})
-        list(APPEND PAG_STATIC_LIBS ${HARFBUZZ_LIB})
+        # Use PAG_SHARED_LIBS to avoid embedding into the static libpag archive.
+        list(APPEND PAG_SHARED_LIBS ${HARFBUZZ_LIB})
     else ()
         # Built-in HarfBuzz, compile from third_party.
         list(APPEND PAG_STATIC_VENDORS harfbuzz)
@@ -516,7 +517,8 @@ if (TGFX_LIB AND TGFX_INCLUDE)
     message("TGFX_LIB: ${TGFX_LIB}")
     message("TGFX_INCLUDE: ${TGFX_INCLUDE}")
     list(APPEND PAG_INCLUDES ${TGFX_INCLUDE})
-    list(APPEND PAG_STATIC_LIBS ${TGFX_LIB})
+    # Use PAG_SHARED_LIBS to avoid embedding into the static libpag archive.
+    list(APPEND PAG_SHARED_LIBS ${TGFX_LIB})
 elseif (HAS_CUSTOM_TGFX_DIR)
     # Priority 2: Custom tgfx source directory, build via add_subdirectory.
     message("TGFX_DIR: ${TGFX_DIR}")
