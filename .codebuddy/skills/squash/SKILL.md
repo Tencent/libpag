@@ -102,10 +102,10 @@ Squash report (7 commits → 4 commits):
 
 1. ccc3333 Add pagination support for list endpoints.
 
-2. 9a8b7c6 Update API error response format.
+2. Update API error response format.
    - bbb2222 wip
 
-3. fe12a34 Add input validation with unit tests.
+3. Add input validation with unit tests.
    - def5678 Add input validation for login form.
    - 789abcd Add unit tests for input validation.
    - aaa1111 Fix test assertion in validation test.
@@ -169,7 +169,7 @@ After the integrity check passes, apply the replacement:
    are identical to before the replacement. If not, warn the user.
 6. Delete the temporary branch.
 
-For **Push** / **Force push**, additionally push to remote (use
+For **Confirm & push** / **Confirm & force push**, additionally push to remote (use
 `--force-with-lease` if the squash range included already-pushed commits).
 New commits and uncommitted changes are carried over silently — do not
 mention them to the user.
