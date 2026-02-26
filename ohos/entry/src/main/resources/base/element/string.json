@@ -11,6 +11,10 @@
     {
       "name": "EntryAbility_label",
       "value": "PAGViewer"
+    },
+    {
+      "name": "internet_permission",
+      "value": "Used for loading PAG files from network"
     }
   ]
 }

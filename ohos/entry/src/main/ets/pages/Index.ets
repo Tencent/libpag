@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 import * as pag from 'libpag';
+import { router } from '@kit.ArkUI';
 
 @Entry
 @ComponentV2
@@ -83,7 +84,7 @@ struct Index {
 
 
       Row() {
-        Button("PAGView").width("40%").margin(10)
+        Button("PAGView").width("30%").margin(10)
           .onClick(() => {
             this.pageIndex = 0;
             this.viewController.play();
@@ -92,13 +93,19 @@ struct Index {
             })
           })
 
-        Button("PAGImageView").width("40%")
+        Button("PAGImageView").width("30%")
           .onClick(() => {
             this.pageIndex = 1;
             this.imageViewControllers.forEach((item: pag.PAGImageViewController) => {
               item.play();
             })
             this.viewController.pause();
+          })
+
+        Button("FD Leak Test").width("30%").margin(10)
+          .backgroundColor('#FF6600')
+          .onClick(() => {
+            router.pushUrl({ url: 'pages/NetworkLeakTest' });
           })
       }
     }
