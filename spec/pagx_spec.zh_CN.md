@@ -1040,7 +1040,7 @@ y = center.y + outerRadius * sin(angle)
 文本元素提供文本内容的几何形状。与形状元素产生单一 Path 不同，Text 经过塑形后会产生**字形列表**（多个字形）并累积到渲染上下文的几何列表中，供后续修改器变换或绘制器渲染。
 
 ```xml
-<Text text="Hello World" position="100,200" fontFamily="Arial" fontStyle="Regular" fauxBold="true" fontSize="24"/>
+<Text text="Hello World" position="100,200" fontFamily="Arial" fontStyle="Regular" fauxBold="true" fauxItalic="false" fontSize="24" letterSpacing="0" textAnchor="start"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
