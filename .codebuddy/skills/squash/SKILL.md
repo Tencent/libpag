@@ -119,8 +119,8 @@ The report covers **only** the analyzed range.
 Ask the user to choose using your interactive dialog tool (e.g.
 AskUserQuestion) — never output options as plain text:
 
-- **Push** (or **Force push** if the range includes already-pushed commits)
-- **Keep local** — replace branch, do not push
+- **Confirm & push** (or **Confirm & force push** if the range includes already-pushed commits)
+- **Confirm** — replace branch, do not push
 - **Discard** — no changes made
 
 If the user chooses **Discard**, stop. Otherwise proceed to Step 3.
@@ -165,7 +165,9 @@ After the integrity check passes, apply the replacement:
    `git update-ref` (not `git branch -f` which rejects the current branch).
    This only updates the ref — the working tree, staging area, and any
    uncommitted changes remain untouched.
-5. Delete the temporary branch.
+5. Verify that staged (`git diff --cached`) and unstaged (`git diff`) changes
+   are identical to before the replacement. If not, warn the user.
+6. Delete the temporary branch.
 
 For **Push** / **Force push**, additionally push to remote (use
 `--force-with-lease` if the squash range included already-pushed commits).
