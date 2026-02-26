@@ -9,36 +9,32 @@ which levels to check. Project rules loaded in context override this checklist.
 
 Issues where the document contains incorrect, contradictory, or incomplete information.
 
-### A1. Code-Document Consistency
+### A1. Code-Document Accuracy
 - Described behaviors match actual code implementation
 - Parameter names, types, default values consistent with code
 - Return values and error conditions accurately documented
 - Described algorithms / processing steps consistent with implementation
-
-### A2. Factual Correctness
 - Version numbers, format identifiers, constants correct
 - Value ranges and constraints accurate
 - Enum values and meanings consistent with code definitions
 - File format structures (byte offsets, field sizes, etc.) correct
 
-### A3. Internal Consistency
+### A2. Internal Consistency
 - Different sections describing the same concept agree with each other
 - Constraints and rules consistent across the document (no contradictions like
   "must be >= 0" in one section with a negative default in another)
 - Same rule appearing in multiple places identical in meaning
 
-### A4. Completeness
+### A3. Completeness
 - All public APIs / features documented
 - Newly added features or parameters reflected in the document
 - Removed or deprecated features marked accordingly
 - Edge cases and limitations documented
-
-### A5. Logical Completeness
 - All conditional branches exhaustively covered (no undocumented "else" cases)
 - Sequential steps complete with no missing intermediate steps
 - Undefined behaviors identified (input combinations with no documented result)
 
-### A6. Reference Validity
+### A4. Reference Validity
 > Do not attempt to verify URL reachability.
 - Internal cross-references point to existing sections or files
 - External links / URLs well-formed and not obviously outdated
@@ -56,9 +52,8 @@ Improvements to readability, unambiguity, and organization.
 - Boundary conditions clearly stated (inclusive vs exclusive, "at least" vs "exactly")
 
 ### B2. Simplification
-- Verbose descriptions made concise without losing meaning
-- No redundant paragraphs or sections repeating the same information
-- Complex explanations replaced with tables, lists, or examples where possible
+> Only flag when the same information is stated more than once in different sections.
+- Redundant paragraphs or sections repeating the same information consolidated
 
 ### B3. Logical Flow
 - Information presented in logical order
@@ -66,9 +61,7 @@ Improvements to readability, unambiguity, and organization.
 - Forward references minimized
 
 ### B4. Examples & Illustrations
-- Complex concepts have illustrative examples
-- Examples correct and consistent with described behavior
-- Edge case examples provided where helpful
+- Existing examples correct and consistent with described behavior
 
 ### B5. Terminology Consistency
 - Terms used consistently throughout the document

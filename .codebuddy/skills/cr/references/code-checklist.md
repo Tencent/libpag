@@ -3,8 +3,7 @@
 Review in priority order: A (highest impact) → B → C. The reviewer prompt specifies
 which levels to check. Test code: only check for obvious implementation errors.
 
-Items tagged `[C/C++]`, `[Web]`, etc. apply only to that language — skip non-matching
-items. Project rules loaded in context override this checklist.
+Project rules loaded in context override this checklist.
 
 ---
 
@@ -20,9 +19,9 @@ Issues that directly affect runtime behavior.
 
 ### A2. Boundary Conditions
 - Division-by-zero protected (both float and integer)
-- Empty container checked before front() / back() / operator[] `[C/C++]`
+- Empty container checked before front() / back() / operator[]
 - Null / nil / undefined dereference guarded
-- Integer overflow / underflow handled (especially unsigned subtraction) `[C/C++]`
+- Integer overflow / underflow handled (especially unsigned subtraction)
 - Array / string bounds checked
 
 ### A3. Error Handling
@@ -30,35 +29,40 @@ Issues that directly affect runtime behavior.
 - Parse results validated before use
 - External input validated for legality
 - Failed calls have reasonable fallback / safe return
-- Promises / async calls properly awaited with error handling `[async]`
+- Promises / async calls properly awaited with error handling
 
-### A4. Injection & Sensitive Data `[Web]`
+### A4. Injection & Sensitive Data
 - User input sanitized before DOM insertion (innerHTML, dangerouslySetInnerHTML,
   v-html, [innerHTML], document.write, etc.)
 - URL parameters, localStorage, postMessage data validated before use
 - No hard-coded API keys, tokens, or credentials in client-side code
 
 ### A5. Resource Management
-- Manually allocated resources released on all paths (prefer RAII) `[C/C++]`
+- Manually allocated resources released on all paths (prefer RAII)
 - File handles / system resources properly closed
-- Lock acquire and release properly paired `[C/C++/Java/Go]`
+- Lock acquire and release properly paired
 - Database connections / network sockets released in finally / defer blocks
 - Event listeners, timers, subscriptions, observers cleaned up on unmount / scope
-  exit `[Web]`
+  exit
 
-### A6. Memory Safety `[C/C++]`
+### A6. Memory Safety
 - No use-after-move (moved-from object not reused)
 - No dangling reference / pointer to local variable
 - Container element reference not used after container modification
 
 ### A7. Thread Safety
-- Shared data protected against concurrent access
-- No race conditions on mutable shared state
+> Only flag when the access pattern is clearly unsafe.
+- Shared mutable state accessed without lock or atomic
+- Callback / closure captures a reference or pointer whose lifetime may end before
+  invocation
+- Condition variable wait without predicate (spurious wakeup)
 
-### A8. Public API Comment Accuracy
+### A8. Public API Comments
 - Public API comments accurately describe current behavior, parameters, return values
 - Value ranges, constraints, error conditions in comments match implementation
 - Comments updated when corresponding API behavior changes
+- Public APIs have sufficient parameter and return value descriptions
+- Design intent explanations present where code alone is insufficient
 
 ---
 
@@ -67,27 +71,26 @@ Issues that directly affect runtime behavior.
 Improvements to code quality, performance, and maintainability.
 
 ### B1. Performance
-> Only flag with high confidence in semantic equivalence. Prefer precision over recall.
 - Container space pre-allocated when size is predictable
-- No unnecessary deep copies (must be certain of semantic equivalence)
+- No unnecessary deep copies (only flag when semantic equivalence is certain)
 - Loop-invariant expressions hoisted outside loops
 - Frequent string concatenation inside loops optimized
-- No unnecessary temporary object construction `[C/C++]`
-- Large objects passed by const& instead of by value (for const conventions see C7)
-  `[C/C++]`
+- No unnecessary temporary object construction
+- Large objects passed by const& instead of by value
 - No unnecessary re-renders from missing memoization, unstable references, or inline
-  object/function creation in props `[React/Vue/Web]`
-- No full imports of large dependencies when only a small part is used `[Web]`
+  object/function creation in props
+- No full imports of large dependencies when only a small part is used
 
 ### B2. Code Simplification
-- Clearly duplicated logic extracted (judge by complexity and maintenance cost, not
-  count threshold)
+- Clearly duplicated or similar logic extracted (judge by complexity and maintenance
+  cost, not count threshold)
 - Deep nested if/else simplified with early return
 - Redundant conditional checks merged or eliminated
 - Overly long functions split into single-responsibility sub-methods
-- Similar branch logic merged
 
 ### B3. Module Architecture
+> Only flag when the diff introduces a new dependency or moves code across module
+> boundaries.
 - Module responsibilities clear with no boundary violations
 - Dependency direction reasonable
 - No circular dependencies
@@ -111,7 +114,7 @@ Improvements to code quality, performance, and maintainability.
 - Modification impact on other callers assessed
 - Behavior changes consistent across all target platforms
 
-### B8. Rendering Correctness `[Web]`
+### B8. Rendering Correctness
 - List items rendered with stable, unique key (not array index)
 - Side effects correctly placed in lifecycle hooks / useEffect with proper dependency
   arrays
@@ -123,44 +126,36 @@ Improvements to code quality, performance, and maintainability.
 
 Coding standards and documentation consistency.
 
-### C1. Naming Conventions
-- Code follows project's existing naming style (per loaded project rules)
+### C1. Project Conventions
+- Naming follows project's existing style (per loaded project rules)
 - Variable names semantically clear, no unnecessary abbreviations
 - Names in new code consistent with style in the same file
-
-### C2. Initialization Conventions
 - Variables assigned initial value at declaration (per project rules)
-- Class member variables initialized at declaration or in constructor `[C/C++/Java]`
-
-### C3. Project Language Conventions
+- Class member variables initialized at declaration or in constructor
 - Code complies with language usage restrictions in project rules
 - New code consistent with existing patterns in the project
 
-### C4. Comment Conventions
-- Public APIs have sufficient parameter and return value descriptions
-- Design intent explanations present where code alone is insufficient
-
-### C5. File Organization
-- Function order in implementation files matches declaration order `[C/C++]`
-- Header files have appropriate include guards `[C/C++]`
+### C2. File Organization
+- Function order in implementation files matches declaration order
+- Header files have appropriate include guards
 - Include / import dependencies necessary and reasonable
 
-### C6. Type Safety
-- No implicit narrowing conversions (large type → small type) `[C/C++/Java]`
-- No signed / unsigned mixed comparisons `[C/C++]`
+### C3. Type Safety
+- No implicit narrowing conversions (large type → small type)
+- No signed / unsigned mixed comparisons
 - Magic numbers extracted as named constants (unless context already makes meaning
   clear)
 
-### C7. Const Correctness `[C/C++]`
+### C4. Const Correctness
 - Methods that don't modify state marked const
 - Unmodified parameters passed as const references
 - Unmodified local variables declared const
 
-### C8. Documentation Consistency
+### C5. Documentation Consistency
 - Type names / enum names in code consistent with project documentation
 - Value ranges in comments consistent with specification documents
 
-### C9. Accessibility `[Web]`
+### C6. Accessibility
 - Images have meaningful alt text (empty alt for decorative images)
 - Form inputs have associated labels
 - Interactive elements keyboard-navigable with semantic HTML
