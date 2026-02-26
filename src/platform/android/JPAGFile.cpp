@@ -72,6 +72,14 @@ PAG_API jobject Java_org_libpag_PAGFile_LoadFromBytes(JNIEnv* env, jclass, jbyte
     return NULL;
   }
   auto data = env->GetByteArrayElements(bytes, nullptr);
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    return NULL;
+  }
+  if (data == nullptr) {
+    LOGE("PAGFile.LoadFromBytes() Failed to get byte array elements.");
+    return NULL;
+  }
   auto path = SafeConvertToStdString(env, jpath);
   auto pagFile = PAGFile::Load(data, static_cast<size_t>(length), path);
   env->ReleaseByteArrayElements(bytes, data, 0);
@@ -210,8 +218,11 @@ PAG_API jintArray Java_org_libpag_PAGFile_getEditableIndices(JNIEnv* env, jobjec
     return env->NewIntArray(0);
   }
   auto indices = pagFile->getEditableIndices(static_cast<pag::LayerType>(layerType));
-  auto result = env->NewIntArray(indices.size());
-  env->SetIntArrayRegion(result, 0, indices.size(), indices.data());
+  auto result = env->NewIntArray(static_cast<jsize>(indices.size()));
+  if (result == nullptr) {
+    return nullptr;
+  }
+  env->SetIntArrayRegion(result, 0, static_cast<jsize>(indices.size()), indices.data());
   return result;
 }
 
