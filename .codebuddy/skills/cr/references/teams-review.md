@@ -9,7 +9,8 @@ diagnosis.
 
 The review loop is designed for **uninterrupted multi-round iteration**.
 Always process all auto-fixable issues before involving the user. Do NOT pause
-to ask the user anything until Confirm (Phase 6) or Report (Phase 7).
+to ask the user anything until Confirm (Phase 6) or Report (Phase 7). The only
+post-report interaction is the optional checklist evolution prompt.
 
 The reviewer–verifier adversarial pair is the core quality mechanism: reviewers
 find issues, verifiers challenge them. This two-party check significantly reduces
@@ -27,6 +28,7 @@ share conversation history.
 | `code-checklist.md` | Code review checklist |
 | `doc-checklist.md` | Document review checklist |
 | `judgment-matrix.md` | Risk levels, worth-fixing criteria, special rules |
+| `checklist-evolution.md` | Checklist update flow and rules |
 
 ## Flow
 
@@ -43,10 +45,10 @@ Scope
 └───────────────────────────────────┘
   │ no new issues
   ↓
-pending/failed? ──no──→ Report
+pending/failed? ──no──→ Report + Checklist Evolution
   │ yes
   ↓
-Confirm ──all skipped──→ Report
+Confirm ──all skipped──→ Report + Checklist Evolution
   │ approved
   ↓
 Fix/Validate ──→ Review Loop ↑
@@ -421,7 +423,7 @@ Checked → `approved`, unchecked → `skipped`.
 
 ## Phase 7: Report
 
-Force-terminate any agents still running. Close the team. Delete CR_STATE_FILE.
+Force-terminate any agents still running. Close the team.
 
 Summary:
 - Rounds and per-round statistics
@@ -429,3 +431,13 @@ Summary:
 - Rolled-back issues and reasons
 - Final test result
 - Issues from PR comments (when `PR_COMMENTS` existed)
+
+### Checklist evolution
+
+Review all confirmed issues from this session. If any represent a recurring
+pattern not covered by the current checklist, read `checklist-evolution.md` and
+follow its steps.
+
+### Clean up
+
+Delete CR_STATE_FILE.
