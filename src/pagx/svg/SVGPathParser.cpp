@@ -26,7 +26,7 @@
 
 namespace pagx {
 
-using pag::PI;
+using pag::Pi;
 
 std::string PathDataToSVGString(const PathData& pathData) {
   std::string result;
@@ -156,7 +156,7 @@ static void ArcToCubics(PathData& path, float x1, float y1, float rx, float ry, 
   rx = std::abs(rx);
   ry = std::abs(ry);
 
-  float radians = angle * PI / 180.0f;
+  float radians = angle * Pi / 180.0f;
   float cosAngle = std::cos(radians);
   float sinAngle = std::sin(radians);
 
@@ -197,12 +197,12 @@ static void ArcToCubics(PathData& path, float x1, float y1, float rx, float ry, 
       VectorAngle((x1p - cxp) / rx, (y1p - cyp) / ry, (-x1p - cxp) / rx, (-y1p - cyp) / ry);
 
   if (!sweep && dtheta > 0) {
-    dtheta -= 2.0f * PI;
+    dtheta -= 2.0f * Pi;
   } else if (sweep && dtheta < 0) {
-    dtheta += 2.0f * PI;
+    dtheta += 2.0f * Pi;
   }
 
-  int segments = static_cast<int>(std::ceil(std::abs(dtheta) / (PI / 2.0f)));
+  int segments = static_cast<int>(std::ceil(std::abs(dtheta) / (Pi / 2.0f)));
   if (segments == 0) {
     return;
   }

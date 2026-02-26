@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CommandFont.h"
-#include <cmath>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -79,9 +78,7 @@ static void PrintFontInfoUsage() {
             << "  --size <pt>            Font size in points (default: 12)\n"
             << "  --json                 Output in JSON format\n"
             << "\n"
-            << "A font file can also be specified as a positional argument instead of --file.\n"
-            << "\n"
-            << "Either --file (or positional) or --name is required (mutually exclusive).\n";
+            << "Either --file or --name is required (mutually exclusive).\n";
 }
 
 static bool ParseFontInfoOptions(int argc, char* argv[], FontInfoOptions* options) {
@@ -93,11 +90,9 @@ static bool ParseFontInfoOptions(int argc, char* argv[], FontInfoOptions* option
     } else if (arg == "--name" && i + 1 < argc) {
       options->fontName = argv[++i];
     } else if (arg == "--size" && i + 1 < argc) {
-      char* endPtr = nullptr;
-      options->fontSize = strtof(argv[++i], &endPtr);
-      if (endPtr == argv[i] || *endPtr != '\0' || !std::isfinite(options->fontSize) ||
-          options->fontSize <= 0.0f) {
-        std::cerr << "pagx font info: invalid font size '" << argv[i] << "'\n";
+      options->fontSize = strtof(argv[++i], nullptr);
+      if (options->fontSize <= 0.0f) {
+        std::cerr << "pagx font info: font size must be positive\n";
         return false;
       }
     } else if (arg == "--json") {
@@ -107,11 +102,6 @@ static bool ParseFontInfoOptions(int argc, char* argv[], FontInfoOptions* option
       return false;
     } else if (arg[0] == '-') {
       std::cerr << "pagx font info: unknown option '" << arg << "'\n";
-      return false;
-    } else if (options->fontFile.empty()) {
-      options->fontFile = arg;
-    } else {
-      std::cerr << "pagx font info: unexpected argument '" << arg << "'\n";
       return false;
     }
     i++;

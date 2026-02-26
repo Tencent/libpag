@@ -101,7 +101,7 @@
     </xs:restriction>
   </xs:simpleType>
 
-  <!-- Comma-separated list of floats (for xOffsets, rotations, skews, etc.) -->
+  <!-- Comma-separated list of floats (for glyphs, xOffsets, rotations, etc.) -->
   <xs:simpleType name="FloatListType">
     <xs:restriction base="xs:string">
       <xs:pattern value="-?[0-9]*\.?[0-9]+(,-?[0-9]*\.?[0-9]+)*"/>
@@ -510,7 +510,7 @@
       <xs:element name="GlyphRun" type="GlyphRunType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="text" type="xs:string" default=""/>
+    <xs:attribute name="text" type="xs:string"/>
     <xs:attribute name="position" type="PointType" default="0,0"/>
     <xs:attribute name="fontFamily" type="xs:string" default=""/>
     <xs:attribute name="fontStyle" type="xs:string" default=""/>

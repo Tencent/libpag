@@ -136,7 +136,6 @@ class TextLayoutContext {
     float xOffset = 0;
     float yOffset = 0;
     uint8_t bidiLevel = 0;
-    bool justifyGapBefore = false;
   };
 
   struct LineInfo {
@@ -868,12 +867,13 @@ class TextLayoutContext {
       }
 
       // Shape this text segment with HarfBuzz.
+      auto substring = content.substr(seg.start, seg.length);
       bool rtl = false;
 #ifdef PAG_BUILD_PAGX
       rtl = seg.bidiLevel & 1;
 #endif
-      auto shapedGlyphs = HarfBuzzShaper::Shape(content, seg.start, seg.length, primaryFont,
-                                                fallbackFonts, vertical, rtl);
+      auto shapedGlyphs =
+          HarfBuzzShaper::Shape(substring, primaryFont, fallbackFonts, vertical, rtl);
 
 #ifdef PAG_BUILD_PAGX
       // HarfBuzz returns RTL glyphs in visual order (left-to-right). Sort them by cluster
@@ -908,9 +908,8 @@ class TextLayoutContext {
 
         auto metrics = sg.font.getMetrics();
         // Decode the unichar at this cluster position for line breaking and other logic.
-        // sg.cluster is an absolute byte offset into content (not relative to seg.start).
         int32_t unichar = 0;
-        size_t clusterByteOffset = sg.cluster;
+        size_t clusterByteOffset = seg.start + sg.cluster;
         if (clusterByteOffset < content.size()) {
           DecodeUTF8Char(content.data() + clusterByteOffset, content.size() - clusterByteOffset,
                          &unichar);
@@ -927,7 +926,7 @@ class TextLayoutContext {
         gi.descent = metrics.descent;
         gi.fontLineHeight = fabsf(metrics.ascent) + metrics.descent + metrics.leading;
         gi.sourceText = text;
-        gi.cluster = sg.cluster;
+        gi.cluster = static_cast<uint32_t>(seg.start) + sg.cluster;
         gi.xOffset = sg.xOffset;
         gi.yOffset = sg.yOffset;
 #ifdef PAG_BUILD_PAGX
@@ -1494,16 +1493,6 @@ class TextLayoutContext {
       // Reverse contiguous runs of glyphs whose bidi level >= current level, starting from the
       // maximum level down to 1. After reordering, recalculate xPosition for each glyph.
       auto visualGlyphs = line.glyphs;
-      // Mark justify gap flags in logical order before visual reordering. The flag stays attached
-      // to each glyph through the reorder, so visual-order iteration can use it directly.
-      if (justifyExtraPerGap > 0) {
-        for (size_t i = 0; i + 1 < visualGlyphs.size(); i++) {
-          if (LineBreaker::CanBreakBetween(visualGlyphs[i].unichar,
-                                           visualGlyphs[i + 1].unichar)) {
-            visualGlyphs[i + 1].justifyGapBefore = true;
-          }
-        }
-      }
       {
         uint8_t maxLevel = 0;
         for (auto& g : visualGlyphs) {
@@ -1545,7 +1534,7 @@ class TextLayoutContext {
           continue;
         }
 #ifdef PAG_BUILD_PAGX
-        if (g.justifyGapBefore) {
+        if (gi > 0 && LineBreaker::CanBreakBetween(visualGlyphs[gi - 1].unichar, g.unichar)) {
 #else
         if (gi > 0 && LineBreaker::CanBreakBetween(line.glyphs[gi - 1].unichar, g.unichar)) {
 #endif

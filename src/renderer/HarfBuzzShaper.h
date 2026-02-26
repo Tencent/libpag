@@ -42,8 +42,7 @@ class HarfBuzzShaper {
    * Shapes the given UTF-8 text using the primary font and optional fallback fonts. Returns shaped
    * glyphs with positioning info. Glyphs with glyphID=0 could not be shaped by any font.
    */
-  static std::vector<ShapedGlyph> Shape(const std::string& text, size_t offset, size_t length,
-                                        const tgfx::Font& primaryFont,
+  static std::vector<ShapedGlyph> Shape(const std::string& text, const tgfx::Font& primaryFont,
                                         const std::vector<tgfx::Font>& fallbackFonts = {},
                                         bool vertical = false, bool rtl = false);
 

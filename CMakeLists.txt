@@ -711,9 +711,6 @@ endif ()
 
 if (PAG_BUILD_CLI)
     # Generate pagx_xsd.h from spec/pagx.xsd
-    # Re-run configure when the XSD file changes so the header stays in sync.
-    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-            "${CMAKE_CURRENT_SOURCE_DIR}/spec/pagx.xsd")
     file(READ "${CMAKE_CURRENT_SOURCE_DIR}/spec/pagx.xsd" PAGX_XSD_CONTENT)
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/generated/pagx_xsd.h"
             "// Auto-generated from spec/pagx.xsd. Do not edit manually.\n"

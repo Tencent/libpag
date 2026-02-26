@@ -10,7 +10,6 @@ issues, and lets the user interactively choose which ones to fix.
 | `code-checklist.md` | Code review checklist |
 | `doc-checklist.md` | Document review checklist |
 | `judgment-matrix.md` | Risk levels, worth-fixing criteria, special rules |
-| `checklist-evolution.md` | Checklist update flow and rules |
 
 ---
 
@@ -82,11 +81,3 @@ label is the issue summary (e.g., `[risk] file:line — description`). User
 checks multiple options in one prompt.
 
 If the user selects any issues, apply the fixes.
-
----
-
-## Step 5: Checklist evolution
-
-Review all confirmed issues from this session. If any represent a recurring
-pattern not covered by the current checklist, read `checklist-evolution.md` and
-follow its steps.

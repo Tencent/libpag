@@ -11,7 +11,6 @@ is critical for review accuracy.
 | `code-checklist.md` | Code review checklist |
 | `doc-checklist.md` | Document review checklist |
 | `judgment-matrix.md` | Worth-fixing criteria and special rules |
-| `checklist-evolution.md` | Checklist update flow and rules |
 
 ---
 
@@ -175,11 +174,3 @@ EOF
   suggestion when possible
 
 Summary of issues found / submitted / skipped.
-
----
-
-## Step 5: Checklist evolution
-
-Review all confirmed issues from this session. If any represent a recurring
-pattern not covered by the current checklist, read `checklist-evolution.md` and
-follow its steps.

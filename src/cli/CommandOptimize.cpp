@@ -122,7 +122,7 @@ struct OptimizeReport {
 };
 
 static void PrintOptimizeUsage() {
-  std::cerr << "Usage: pagx optimize [options] <file.pagx>\n"
+  std::cout << "Usage: pagx optimize [options] <file.pagx>\n"
             << "\n"
             << "Validates, optimizes, and formats a PAGX file in one step.\n"
             << "Validates input against the XSD schema first — aborts with errors if invalid.\n"
@@ -827,11 +827,7 @@ static void ApplyLocalizationToElements(PAGXDocument* document,
       auto path = static_cast<Path*>(element);
       if (path->data != nullptr && !path->data->isEmpty()) {
         auto tempData = document->makeNode<PathData>();
-        auto& verbs = path->data->verbs();
-        auto& points = path->data->points();
-        size_t pointIndex = 0;
-        for (auto verb : verbs) {
-          const Point* pts = points.data() + pointIndex;
+        path->data->forEach([&](PathVerb verb, const Point* pts) {
           switch (verb) {
             case PathVerb::Move:
               tempData->moveTo(pts[0].x - offsetX, pts[0].y - offsetY);
@@ -851,8 +847,7 @@ static void ApplyLocalizationToElements(PAGXDocument* document,
               tempData->close();
               break;
           }
-          pointIndex += PathData::PointsPerVerb(verb);
-        }
+        });
         path->data->setPathData(*tempData);
       }
     } else if (type == NodeType::Text) {
