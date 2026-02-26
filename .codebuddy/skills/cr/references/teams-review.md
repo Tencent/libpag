@@ -407,9 +407,8 @@ Present `pending` + `failed` issues grouped by risk (high → low), sorted by
 file path within each group:
 `[number] [file:line] [risk] [reason] — [description]`
 
-Then ask the user to select which issues to fix using **a single multi-select
-question** where each option's label is the issue summary (e.g.,
-`[risk] file:line — description`). User checks multiple options in one prompt.
+Then present issues via multi-select. Each option label is the issue summary
+(e.g., `[risk] file:line — description`).
 Checked → `approved`, unchecked → `skipped`.
 
 If the user replies with a bulk instruction (e.g., "fix all", "skip the rest"),

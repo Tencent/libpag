@@ -25,9 +25,8 @@ When uncertain whether a new item overlaps with an existing one, do NOT add it.
 
 ## Step 2: User confirmation
 
-Present candidates and ask the user via **a single multi-select question** which
-ones to add to the checklist. Each option label is the candidate item text.
-Unchecked candidates are discarded. If all are discarded, stop.
+Present candidates via multi-select. Each option label is the candidate item
+text. Unchecked candidates are discarded. If all are discarded, stop.
 
 ## Step 3: Insert
 
