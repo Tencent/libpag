@@ -192,9 +192,12 @@ Process the commits from **Step 1's list** (not a raw git range) in
   `git reset --hard HEAD` to sync the working tree.
 
 If any step fails, remove the temporary worktree and branch, inform the user,
-and stop. **Cherry-pick conflicts must NOT be manually resolved** — a conflict
-indicates a bug in the execution logic (wrong starting point or wrong commit
-order). Abort and report the problem instead.
+and stop. If a cherry-pick produces a conflict, inspect it carefully:
+- If the two sides' changes are independent (e.g. one adds `.cr-cache/` to
+  `.gitignore`, the other adds an unrelated line nearby), resolve by keeping
+  both sides and continue with `git cherry-pick --continue`.
+- If the conflict reflects genuinely contradictory changes, abort and report
+  the problem — do not guess at the resolution.
 
 **Integrity check**: diff `{squash_end}` against the temporary branch HEAD —
 their trees must be identical. If different, abort (remove worktree and branch).
