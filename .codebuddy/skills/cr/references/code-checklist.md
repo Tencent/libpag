@@ -1,209 +1,175 @@
 # Code Review Checklist
 
-Reviewers check all items in this checklist. Levels A/B/C indicate review priority —
-start with Level A (highest impact), then B, then C. The reviewer prompt specifies
-which levels to check.
+Review in priority order: A (highest impact) → B → C. The reviewer prompt specifies
+which levels to check. Test code: only check for obvious implementation errors.
 
-Test code has reduced review requirements — only focus on obvious implementation errors.
-
-**Language applicability**: Items marked with a language tag (e.g., `[C/C++]`) apply only
-to that language. Unmarked items apply to all languages. Skip items that do not match the
-project's language.
-
-**Project-specific rules**: Project rules already loaded in the agent's context take
-priority over this generic checklist. When project rules have explicit requirements for
-a particular issue type, follow the project rules.
+Project rules loaded in context override this checklist.
 
 ---
 
-## Priority A: Correctness & Safety
+## A. Correctness & Safety
 
-Issues that directly affect runtime behavior. Highest impact — review these first.
+Issues that directly affect runtime behavior.
 
-**A1. Code Correctness**
-- Are function return values / out-parameters correctly set in all branches (including
-  error branches)?
-- Does the implementation match the behavior described by the function name / comments?
-- Are conditional logic expressions correct (&& / || mix-ups, missing negation,
-  operator precedence errors)?
-- Do switch/case statements cover all branches? Any unintended fall-through?
+### A1. Code Correctness
+- Return values / out-parameters set correctly in all branches (including error paths)
+- Implementation matches behavior described by function name / comments
+- Conditional logic free of && / || mix-ups, missing negation, precedence errors
+- switch/case covers all branches with no unintended fall-through
 
-**A2. Boundary Conditions**
-- Division-by-zero protection (both floating-point and integer)
-- Empty container operations (check empty() before front() / back() / operator[])
-  `[C/C++]`
-- Null/nil/undefined dereference
-- Integer overflow / underflow (especially unsigned subtraction `[C/C++]`)
-- Array / string out-of-bounds access
+### A2. Boundary Conditions
+- Division-by-zero protected (both float and integer)
+- Empty container checked before front() / back() / operator[]
+- Null / nil / undefined dereference guarded
+- Integer overflow / underflow handled (especially unsigned subtraction)
+- Array / string bounds checked
 
-**A3. Error Handling**
-- Is error status checked after I/O operations?
-- Is result validity verified after string / data parsing?
-- Is external input validated for legality?
-- Is there a reasonable fallback / return when function calls fail?
-- Are promises / async calls properly awaited with error handling?
-  `[JS/TS/Python/async languages]`
+### A3. Error Handling
+- I/O operation results checked for errors
+- Parse results validated before use
+- External input validated for legality
+- Failed calls have reasonable fallback / safe return
+- Promises / async calls properly awaited with error handling
 
-**A4. Injection & Sensitive Data** `[Web]`
-- Is user input inserted into the DOM without sanitization (innerHTML,
-  dangerouslySetInnerHTML, v-html, [innerHTML], document.write, etc.)?
-- Are URL parameters, localStorage, or postMessage data used without validation?
-- Are API keys, tokens, or credentials hard-coded in client-side code?
+### A4. Injection & Sensitive Data
+- User input sanitized before DOM insertion (innerHTML, dangerouslySetInnerHTML,
+  v-html, [innerHTML], document.write, etc.)
+- URL parameters, localStorage, postMessage data validated before use
+- No hard-coded API keys, tokens, or credentials in client-side code
 
-**A5. Resource Management**
-- Are manually allocated resources correctly released on all paths (prefer RAII)?
-  `[C/C++]`
-- Are file handles / system resources properly closed?
-- Are lock acquire and release properly paired? `[C/C++/Java/Go]`
-- Are database connections / network sockets properly released in finally/defer blocks?
-- Are event listeners, timers, subscriptions, and observers cleaned up on component
-  unmount or scope exit? `[Web]`
+### A5. Resource Management
+- Manually allocated resources released on all paths (prefer RAII)
+- File handles / system resources properly closed
+- Lock acquire and release properly paired
+- Database connections / network sockets released in finally / defer blocks
+- Event listeners, timers, subscriptions, observers cleaned up on unmount / scope
+  exit
 
-**A6. Memory Safety** `[C/C++]`
-- Use-after-move: is a moved-from object used again?
-- Dangling reference / pointer: returning reference / pointer to a local variable?
-- Is a container element reference still used after the container is modified?
+### A6. Memory Safety
+- No use-after-move (moved-from object not reused)
+- No dangling reference / pointer to local variable
+- Container element reference not used after container modification
 
-**A7. Thread Safety** (when applicable)
-- Is shared data protected against concurrent access?
-- Are there race conditions on mutable shared state?
+### A7. Thread Safety
+> Only flag when the access pattern is clearly unsafe.
+- Shared mutable state accessed without lock or atomic
+- Callback / closure captures a reference or pointer whose lifetime may end before
+  invocation
+- Condition variable wait without predicate (spurious wakeup)
 
-**A8. Public API Comment Accuracy**
-- Do public API comments accurately describe current behavior, parameters, and return
-  values?
-- Are value ranges, constraints, and error conditions in comments consistent with the
-  actual implementation?
-- Are comments updated when the corresponding API behavior changes?
+### A8. Public API Comments
+- Public API comments accurately describe current behavior, parameters, return values
+- Value ranges, constraints, error conditions in comments match implementation
+- Comments updated when corresponding API behavior changes
+- Public APIs have sufficient parameter and return value descriptions
+- Design intent explanations present where code alone is insufficient
 
 ---
 
-## Priority B: Refactoring & Optimization
+## B. Refactoring & Optimization
 
-Improvements to code quality, performance, and maintainability. Medium impact.
+Improvements to code quality, performance, and maintainability.
 
-**B1. Performance Optimization**
-- Containers: is space pre-allocated when the size is predictable?
-- Unnecessary deep copies: **must have high confidence in semantic equivalence
-  before reporting**
-- Repeated computation inside loops: can expressions be moved outside the loop?
-- String operations: can frequent concatenation inside loops be optimized?
-- Unnecessary temporary object construction `[C/C++]`
-- Const references: are large objects passed by value that should be const& for
-  performance? (For const correctness conventions, see C7) `[C/C++]`
-- Are components re-rendering unnecessarily due to missing memoization, unstable
-  references, or inline object/function creation in props? `[React/Vue/Web]`
-- Are large dependencies imported in full when only a small part is used
-  (tree-shaking inefficiency)? `[Web]`
+### B1. Performance
+- Container space pre-allocated when size is predictable
+- No unnecessary deep copies (only flag when semantic equivalence is certain)
+- Loop-invariant expressions hoisted outside loops
+- Frequent string concatenation inside loops optimized
+- No unnecessary temporary object construction
+- Large objects passed by const& instead of by value
+- No unnecessary re-renders from missing memoization, unstable references, or inline
+  object/function creation in props
+- No full imports of large dependencies when only a small part is used
 
-**B2. Code Simplification**
-- Duplicate code: identical logic that is clearly duplicated should be extracted
-  (judge by complexity and maintenance cost, not by count threshold)
-- Deep nested if/else: can be simplified with early return
-- Redundant conditional checks: logic branches that can be merged or eliminated
-- Overly long functions: single-responsibility logic blocks can be extracted as
-  sub-methods
-- Similar branch logic that can be merged
+### B2. Code Simplification
+- Clearly duplicated or similar logic extracted (judge by complexity and maintenance
+  cost, not count threshold)
+- Deep nested if/else simplified with early return
+- Redundant conditional checks merged or eliminated
+- Overly long functions split into single-responsibility sub-methods
 
-**B3. Module Architecture**
-- Are module responsibilities clear? Is there any responsibility boundary violation?
-- Is the dependency direction reasonable?
-- Are there circular dependencies?
+### B3. Module Architecture
+> Only flag when the diff introduces a new dependency or moves code across module
+> boundaries.
+- Module responsibilities clear with no boundary violations
+- Dependency direction reasonable
+- No circular dependencies
 
-**B4. Interface Usage**
-- Are called APIs used according to their design intent and documentation?
-- Are any deprecated interfaces being used?
+### B4. Interface Usage
+- Called APIs used according to their design intent and documentation
+- No use of deprecated interfaces
 
-**B5. Interface Changes**
-- Are there changes to public API signatures or class interfaces?
-- If so, describe the change and its scope (the coordinator will assess whether it is
-  justified)
+### B5. Interface Changes
+> Flag only — describe the change and its scope for the coordinator to assess.
+- Public API signature or class interface changes identified and described
 
-**B6. Test Coverage** *(flag only — report for awareness, do not auto-fix)*
-- Do changed logic paths have corresponding test cases?
-- Do boundary conditions have test coverage?
-- Do error paths have test coverage?
+### B6. Test Coverage
+> Flag only — report for awareness, do not auto-fix.
+- Changed logic paths have corresponding test cases
+- Boundary conditions have test coverage
+- Error paths have test coverage
 
-**B7. Regression Risk** *(flag only — report for awareness, do not auto-fix)*
-- Could the modification affect other callers?
-- Are behavior changes consistent across all target platforms?
+### B7. Regression Risk
+> Flag only — report for awareness, do not auto-fix.
+- Modification impact on other callers assessed
+- Behavior changes consistent across all target platforms
 
-**B8. Rendering Correctness** `[Web]`
-- Are list items rendered with a stable, unique key (not array index)?
-- Are side effects correctly placed in lifecycle hooks / useEffect with proper
-  dependency arrays?
-- Is component state derived correctly (no stale closures, no out-of-sync
-  derived state)?
+### B8. Rendering Correctness
+- List items rendered with stable, unique key (not array index)
+- Side effects correctly placed in lifecycle hooks / useEffect with proper dependency
+  arrays
+- Component state derived correctly (no stale closures, no out-of-sync derived state)
 
 ---
 
-## Priority C: Conventions & Documentation
+## C. Conventions & Documentation
 
-Coding standards and documentation consistency. Lower impact on functionality.
+Coding standards and documentation consistency.
 
-**C1. Naming Conventions**
-- Does the code follow the project's existing naming style (as defined in the loaded
-  project rules)?
-- Are variable names semantically clear, avoiding unnecessary abbreviations?
-- Are names in new code consistent with the style in the same file?
+### C1. Project Conventions
+- Naming follows project's existing style (per loaded project rules)
+- Variable names semantically clear, no unnecessary abbreviations
+- Names in new code consistent with style in the same file
+- Variables assigned initial value at declaration (per project rules)
+- Class member variables initialized at declaration or in constructor
+- Code complies with language usage restrictions in project rules
+- New code consistent with existing patterns in the project
 
-**C2. Initialization Conventions**
-- Are variables assigned an initial value at declaration (as required by project rules)?
-- Are class member variables initialized at declaration or in the constructor?
-  `[C/C++/Java]`
+### C2. File Organization
+- Function order in implementation files matches declaration order
+- Header files have appropriate include guards
+- Include / import dependencies necessary and reasonable
 
-**C3. Project Language Conventions**
-- Does the code comply with language usage restrictions defined in the project rules
-  (varies by project)?
-- Is new code consistent with existing patterns in the project?
+### C3. Type Safety
+- No implicit narrowing conversions (large type → small type)
+- No signed / unsigned mixed comparisons
+- Magic numbers extracted as named constants (unless context already makes meaning
+  clear)
 
-**C4. Comment Conventions**
-- Do public APIs have sufficient parameter and return value descriptions?
-- Are design intent explanations present where code alone is insufficient?
+### C4. Const Correctness
+- Methods that don't modify state marked const
+- Unmodified parameters passed as const references
+- Unmodified local variables declared const
 
-**C5. File Organization**
-- Is the function order in implementation files consistent with the declaration order?
-  `[C/C++]`
-- Do header files have appropriate include guards? `[C/C++]`
-- Are include / import dependencies necessary and reasonable?
+### C5. Documentation Consistency
+- Type names / enum names in code consistent with project documentation
+- Value ranges in comments consistent with specification documents
 
-**C6. Type Safety**
-- Implicit narrowing conversions (large type -> small type) `[C/C++/Java]`
-- Signed / unsigned mixed comparisons `[C/C++]`
-- Magic numbers: hard-coded values should be extracted as named constants (unless
-  the context already makes it clear)
-
-**C7. Const Correctness** `[C/C++]`
-- Are methods that don't modify state marked const?
-- Are parameters that aren't modified passed as const references?
-- Are local variables that aren't modified declared const?
-
-**C8. Documentation Consistency**
-- Are type names / enum names in code consistent with project documentation?
-- Are value ranges in comments consistent with specification documents?
-
-**C9. Accessibility** `[Web]`
-- Do images have meaningful alt text (or empty alt for decorative images)?
-- Do form inputs have associated labels?
-- Are interactive elements keyboard-navigable and using semantic HTML?
+### C6. Accessibility
+- Images have meaningful alt text (empty alt for decorative images)
+- Form inputs have associated labels
+- Interactive elements keyboard-navigable with semantic HTML
 
 ---
 
-## Exclusion List (applies to all levels)
+## Exclusion List
 
-> **Important**: The items below are default exclusions. If the project rules loaded in
-> context have explicit requirements for a particular issue type (e.g., "no lambdas",
-> "variables must be initialized"), that issue type is **not excluded** and should be
-> reviewed per the project rules. Project rules take priority over this exclusion list.
+> Project rules override this exclusion list. If project rules have explicit requirements
+> for an excluded issue type, that type is **not excluded** — review per project rules.
 
-**Issue types excluded by default:**
-
-1. Pure style preferences (within the scope of formatting tools, and not explicitly
-   required by project rules)
-2. Formatting issues already handled by the project's formatting tools (indentation,
-   whitespace, line breaks, etc.)
-3. Suggestions based on assumed future requirements rather than current code
-4. Code that follows the project's existing style but does not match some external
-   standard
-5. Priority C issues in test code (unless project rules have specific requirements)
-6. Suggestions for "better alternative implementations" for existing stable code (if
-   the current implementation has no bugs)
+1. Pure style preferences within formatting tool scope (not required by project rules)
+2. Formatting already handled by project formatting tools (indentation, whitespace, etc.)
+3. Suggestions based on assumed future requirements, not current code
+4. Code following project's existing style but not matching some external standard
+5. Priority C issues in test code (unless project rules require otherwise)
+6. "Better alternative" suggestions for existing stable, bug-free code
