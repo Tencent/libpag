@@ -29,11 +29,12 @@ Run pre-checks, then match the **first** applicable rule top-to-bottom:
 
 | # | Condition | Action |
 |---|-----------|--------|
-| 1 | `$ARGUMENTS` is a PR number or URL containing `/pull/` | → `references/pr-review.md` |
-| 2 | Agent teams NOT supported | → `references/local-review.md` |
-| 3 | Uncommitted changes exist | → `references/local-review.md` |
-| 4 | On main/master branch | → `references/local-review.md` |
-| 5 | Everything else | → Question below |
+| 1 | `$ARGUMENTS` is `diagnosis` | → `references/diagnosis.md` |
+| 2 | `$ARGUMENTS` is a PR number or URL containing `/pull/` | → `references/pr-review.md` |
+| 3 | Agent teams NOT supported | → `references/local-review.md` |
+| 4 | Uncommitted changes exist | → `references/local-review.md` |
+| 5 | On main/master branch | → `references/local-review.md` |
+| 6 | Everything else | → Question below |
 
 Each `→` means: `Read` the target file and follow it as the sole remaining
 instruction. Ignore all sections below. Do NOT review from memory or habit —
@@ -42,7 +43,7 @@ fixes, and submit results.
 
 ---
 
-## Question (rule 2 only)
+## Question
 
 Ask a **single question**:
 "Agent Teams is available (multiple agents working in parallel). Enable multi-agent review with reviewer–verifier adversarial mechanism and auto-fix?"
