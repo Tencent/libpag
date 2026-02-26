@@ -9,7 +9,8 @@ diagnosis.
 
 The review loop is designed for **uninterrupted multi-round iteration**.
 Always process all auto-fixable issues before involving the user. Do NOT pause
-to ask the user anything until Confirm (Phase 6) or Report (Phase 7).
+to ask the user anything until Confirm (Phase 6) or Report (Phase 7). The only
+post-report interaction is the optional checklist evolution prompt.
 
 The reviewer–verifier adversarial pair is the core quality mechanism: reviewers
 find issues, verifiers challenge them. This two-party check significantly reduces
@@ -27,6 +28,7 @@ share conversation history.
 | `code-checklist.md` | Code review checklist |
 | `doc-checklist.md` | Document review checklist |
 | `judgment-matrix.md` | Risk levels, worth-fixing criteria, special rules |
+| `checklist-evolution.md` | Checklist update flow and rules |
 
 ## Flow
 
@@ -43,10 +45,10 @@ Scope
 └───────────────────────────────────┘
   │ no new issues
   ↓
-pending/failed? ──no──→ Report
+pending/failed? ──no──→ Report + Checklist Evolution
   │ yes
   ↓
-Confirm ──all skipped──→ Report
+Confirm ──all skipped──→ Report + Checklist Evolution
   │ approved
   ↓
 Fix/Validate ──→ Review Loop ↑
@@ -321,16 +323,15 @@ This phase is an atomic unit reused by the Review Loop and post-Confirm flow.
 Stance: **precise** — apply each fix completely and correctly, never expand
 scope. The coordinator MUST NOT apply fixes directly.
 
-**Agent assignment**: reuse surviving reviewers as fixers — each reviewer
-already has context on the files it reviewed. Coordinator dynamically assigns
-fix tasks. The coordinator MUST assign by explicit file list and ensure a file
-is owned by only one fixer at a time:
+**Agent assignment**: reuse surviving reviewers as fixers when available — each
+reviewer already has context on the files it reviewed. When no reviewers survive
+(e.g., after Phase 5 closes the team), create new fixer agents. The coordinator
+MUST assign by explicit file list and ensure a file is owned by only one fixer
+at a time:
 
-- Issue in a file that a reviewer already read → assign to that reviewer.
-- Cross-file issues or issues with no matching reviewer → assign to a
-  `fixer-cross` agent (create one if needed).
-- Cross-module fixes: assign to the reviewer that owns the target files or to
-  `fixer-cross`, and include the full file list in the task.
+- Issue in a file that a surviving reviewer already read → assign to that
+  reviewer.
+- Otherwise → create a fixer agent (or `fixer-cross` for cross-module issues).
 - Multi-file renames → single atomic task assigned to one agent.
 
 One agent may receive multiple fix tasks if it covers several files. Avoid
@@ -411,6 +412,10 @@ question** where each option's label is the issue summary (e.g.,
 `[risk] file:line — description`). User checks multiple options in one prompt.
 Checked → `approved`, unchecked → `skipped`.
 
+If the user replies with a bulk instruction (e.g., "fix all", "skip the rest"),
+apply it only to issues **at or below** the current `FIX_MODE` threshold.
+Issues above the threshold still require individual confirmation.
+
 - **All skipped** → Phase 7.
 - **Any approved** → Phase 4 (Fix/Validate). After Validate, go to Phase 5
   (Continue?). If new issues are found, re-enter the full Review Loop (Phase 2).
@@ -421,7 +426,7 @@ Checked → `approved`, unchecked → `skipped`.
 
 ## Phase 7: Report
 
-Force-terminate any agents still running. Close the team. Delete CR_STATE_FILE.
+Force-terminate any agents still running. Close the team.
 
 Summary:
 - Rounds and per-round statistics
@@ -429,3 +434,13 @@ Summary:
 - Rolled-back issues and reasons
 - Final test result
 - Issues from PR comments (when `PR_COMMENTS` existed)
+
+### Checklist evolution
+
+Review all confirmed issues from this session. If any represent a recurring
+pattern not covered by the current checklist, read `checklist-evolution.md` and
+follow its steps.
+
+### Clean up
+
+Delete CR_STATE_FILE.
