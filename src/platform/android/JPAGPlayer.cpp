@@ -189,7 +189,17 @@ PAG_API void Java_org_libpag_PAGPlayer_setScaleMode(JNIEnv* env, jobject thiz, j
 
 PAG_API void Java_org_libpag_PAGPlayer_nativeGetMatrix(JNIEnv* env, jobject thiz,
                                                        jfloatArray values) {
+  if (values == nullptr) {
+    return;
+  }
   auto list = env->GetFloatArrayElements(values, nullptr);
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    return;
+  }
+  if (list == nullptr) {
+    return;
+  }
   auto player = getPAGPlayer(env, thiz);
   if (player != nullptr) {
     auto matrix = player->matrix();
@@ -199,7 +209,6 @@ PAG_API void Java_org_libpag_PAGPlayer_nativeGetMatrix(JNIEnv* env, jobject thiz
     matrix.setIdentity();
     matrix.get9(list);
   }
-  env->SetFloatArrayRegion(values, 0, 9, list);
   env->ReleaseFloatArrayElements(values, list, 0);
 }
 

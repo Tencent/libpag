@@ -126,12 +126,19 @@ PAG_API void Java_org_libpag_PAGLayer_resetMatrix(JNIEnv* env, jobject thiz) {
 PAG_API void Java_org_libpag_PAGLayer_getTotalMatrix(JNIEnv* env, jobject thiz,
                                                      jfloatArray matrixObject) {
   auto pagLayer = GetPAGLayer(env, thiz);
-  if (pagLayer == nullptr) {
+  if (pagLayer == nullptr || matrixObject == nullptr) {
     return;
   }
 
-  Matrix matrix = pagLayer->getTotalMatrix();
   auto matrixArray = env->GetFloatArrayElements(matrixObject, nullptr);
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    return;
+  }
+  if (matrixArray == nullptr) {
+    return;
+  }
+  Matrix matrix = pagLayer->getTotalMatrix();
   matrix.get9(matrixArray);
   env->ReleaseFloatArrayElements(matrixObject, matrixArray, 0);
 }
