@@ -711,18 +711,17 @@ endif ()
 
 if (PAG_BUILD_CLI)
     # Generate pagx_xsd.h from spec/pagx.xsd
-    set(PAGX_XSD_INPUT "${CMAKE_CURRENT_SOURCE_DIR}/spec/pagx.xsd")
-    set(PAGX_XSD_HEADER "${CMAKE_CURRENT_BINARY_DIR}/generated/pagx_xsd.h")
-    add_custom_command(
-            OUTPUT "${PAGX_XSD_HEADER}"
-            COMMAND ${CMAKE_COMMAND}
-            -DXSD_INPUT=${PAGX_XSD_INPUT}
-            -DHEADER_OUTPUT=${PAGX_XSD_HEADER}
-            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/generate_xsd_header.cmake
-            DEPENDS "${PAGX_XSD_INPUT}" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/generate_xsd_header.cmake"
-            COMMENT "Generating pagx_xsd.h from spec/pagx.xsd"
-    )
-    add_custom_target(pagx_xsd_header DEPENDS "${PAGX_XSD_HEADER}")
+    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/spec/pagx.xsd" PAGX_XSD_CONTENT)
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/generated/pagx_xsd.h"
+            "// Auto-generated from spec/pagx.xsd. Do not edit manually.\n"
+            "#pragma once\n"
+            "#include <string>\n"
+            "namespace pagx::cli {\n"
+            "inline const std::string& PagxXsdContent() {\n"
+            "  static const std::string content = R\"XSD(${PAGX_XSD_CONTENT})XSD\";\n"
+            "  return content;\n"
+            "}\n"
+            "}  // namespace pagx::cli\n")
 
     # Find LibXml2
     if (APPLE)
@@ -739,7 +738,6 @@ if (PAG_BUILD_CLI)
     # CLI executable
     file(GLOB_RECURSE CLI_FILES src/cli/*.cpp src/cli/*.h)
     add_executable(pagx-cli ${CLI_FILES})
-    add_dependencies(pagx-cli pagx_xsd_header)
     set_target_properties(pagx-cli PROPERTIES OUTPUT_NAME pagx)
     target_include_directories(pagx-cli PRIVATE
             src/cli
@@ -807,7 +805,7 @@ if (PAG_BUILD_TESTS)
     # used to update the local md5 data for baseline testing and generate baseline images to the
     # out/ directory. each image has a "_base" suffix.
     add_executable(UpdateBaseline ${PAG_TEST_FILES})
-    add_dependencies(UpdateBaseline test-vendor pagx_xsd_header)
+    add_dependencies(UpdateBaseline test-vendor)
     target_include_directories(UpdateBaseline PUBLIC ${PAG_TEST_INCLUDES})
     target_compile_definitions(UpdateBaseline PUBLIC ${PAG_BASELINE_DEFINES})
     target_compile_options(UpdateBaseline PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
@@ -815,7 +813,7 @@ if (PAG_BUILD_TESTS)
     target_link_libraries(UpdateBaseline ${PAG_TEST_LIBS})
 
     add_executable(PAGUnitTest ${PAG_TEST_FILES})
-    add_dependencies(PAGUnitTest test-vendor pagx_xsd_header)
+    add_dependencies(PAGUnitTest test-vendor)
     target_include_directories(PAGUnitTest PUBLIC ${PAG_TEST_INCLUDES})
     target_compile_definitions(PAGUnitTest PUBLIC ${PAG_TEST_DEFINES} SKIP_FRAME_COMPARE)
     target_compile_options(PAGUnitTest PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
@@ -823,7 +821,7 @@ if (PAG_BUILD_TESTS)
     target_link_libraries(PAGUnitTest ${PAG_TEST_LIBS})
 
     add_executable(PAGFullTest ${PAG_TEST_FILES})
-    add_dependencies(PAGFullTest test-vendor pagx_xsd_header)
+    add_dependencies(PAGFullTest test-vendor)
     target_include_directories(PAGFullTest PUBLIC ${PAG_TEST_INCLUDES})
     target_compile_definitions(PAGFullTest PUBLIC ${PAG_TEST_DEFINES})
     target_compile_options(PAGFullTest PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
