@@ -323,16 +323,15 @@ This phase is an atomic unit reused by the Review Loop and post-Confirm flow.
 Stance: **precise** — apply each fix completely and correctly, never expand
 scope. The coordinator MUST NOT apply fixes directly.
 
-**Agent assignment**: reuse surviving reviewers as fixers — each reviewer
-already has context on the files it reviewed. Coordinator dynamically assigns
-fix tasks. The coordinator MUST assign by explicit file list and ensure a file
-is owned by only one fixer at a time:
+**Agent assignment**: reuse surviving reviewers as fixers when available — each
+reviewer already has context on the files it reviewed. When no reviewers survive
+(e.g., after Phase 5 closes the team), create new fixer agents. The coordinator
+MUST assign by explicit file list and ensure a file is owned by only one fixer
+at a time:
 
-- Issue in a file that a reviewer already read → assign to that reviewer.
-- Cross-file issues or issues with no matching reviewer → assign to a
-  `fixer-cross` agent (create one if needed).
-- Cross-module fixes: assign to the reviewer that owns the target files or to
-  `fixer-cross`, and include the full file list in the task.
+- Issue in a file that a surviving reviewer already read → assign to that
+  reviewer.
+- Otherwise → create a fixer agent (or `fixer-cross` for cross-module issues).
 - Multi-file renames → single atomic task assigned to one agent.
 
 One agent may receive multiple fix tasks if it covers several files. Avoid
@@ -412,6 +411,10 @@ Then ask the user to select which issues to fix using **a single multi-select
 question** where each option's label is the issue summary (e.g.,
 `[risk] file:line — description`). User checks multiple options in one prompt.
 Checked → `approved`, unchecked → `skipped`.
+
+If the user replies with a bulk instruction (e.g., "fix all", "skip the rest"),
+apply it only to issues **at or below** the current `FIX_MODE` threshold.
+Issues above the threshold still require individual confirmation.
 
 - **All skipped** → Phase 7.
 - **Any approved** → Phase 4 (Fix/Validate). After Validate, go to Phase 5

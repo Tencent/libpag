@@ -98,3 +98,5 @@ Polish and stylistic consistency.
 2. Stylistic rewrites that don't improve clarity or accuracy
 3. Suggestions based on assumed future requirements, not current content
 4. Suggestions to add content beyond the document's stated scope
+5. Removing default or verbose attributes from examples — examples in specs and
+   tutorials are intentionally detailed to demonstrate available options

@@ -9,7 +9,7 @@ low or high risk depending on scope and impact.
 |------|------|----------|
 | Low | Only one reasonable fix exists | null check, fix incorrect comment, rename to match convention, remove redundant duplicate code, add `reserve`, fix obvious off-by-one error |
 | Medium | Multiple fixes possible, but no design decision or external contract involved | extracting shared logic across functions, removing unused internal methods, simplifying cross-function control flow, adjusting internal module boundaries |
-| High | Involves design decisions or external contracts | public API change (signature, behavior, deprecation), test baseline change, architecture restructuring, algorithm replacement with multiple viable approaches, introducing a new dependency, changing data persistence/serialization format, changing threading model, performance optimization involving space-time trade-offs |
+| High | Involves design decisions or external contracts | public API change (signature, behavior, deprecation), test baseline change, architecture restructuring, algorithm replacement with multiple viable approaches, introducing a new dependency, changing data persistence/serialization format, changing threading model, performance optimization involving space-time trade-offs, user-facing behavior change beyond the stated bug scope, build system configuration change |
 
 ## Handling by Risk Level
 
@@ -52,3 +52,18 @@ defines **whether to fix** a discovered issue.
   by clear benefit to API consumers. Always high risk.
 - Test coverage gaps and regression risks are **flagged, not fixed** — report
   them for the user's awareness rather than auto-fixing.
+
+## Anti-patterns (Do NOT Fix)
+
+Patterns that frequently produce false positives. Skip unless there is strong
+evidence of an actual bug:
+
+- **Speculative optimizations** — build system tweaks, caching additions, or
+  conditional guards with no proven failure or measured bottleneck.
+- **Documentation example "simplification"** — removing attributes, parameters,
+  or steps from examples that are intentionally verbose for pedagogical
+  purposes. This is NOT the same as removing redundant code.
+- **Behavior changes disguised as bug fixes** — if a proposed fix changes
+  observable behavior (not just implementation details), verify the original
+  behavior is actually a bug, not an intentional design choice. When intent
+  cannot be confirmed from the diff context alone, flag but do not fix.
