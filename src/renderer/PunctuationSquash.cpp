@@ -29,16 +29,23 @@ static constexpr float HALF = 0.5f;
 // whitespace on each side.
 static constexpr float QUARTER = 0.25f;
 
+// Returns true if the character is a CJK fullwidth punctuation that has internal whitespace
+// eligible for squashing. Only fullwidth forms (U+FF00-FF60) and CJK Symbols (U+3001-301B)
+// contain the half-em internal whitespace that punctuation squash rules target.
+static bool IsFullwidthPunctuation(int32_t c) {
+  return (c >= 0x3001 && c <= 0x301B) || (c >= 0xFF01 && c <= 0xFF60);
+}
+
 PunctuationCategory PunctuationSquash::GetCategory(int32_t c) {
   auto lbc = LineBreaker::GetLineBreakClass(c);
   switch (lbc) {
     case LineBreakClass::OP:
-      return PunctuationCategory::Opening;
+      return IsFullwidthPunctuation(c) ? PunctuationCategory::Opening : PunctuationCategory::None;
     case LineBreakClass::CL:
-      return PunctuationCategory::Closing;
+      return IsFullwidthPunctuation(c) ? PunctuationCategory::Closing : PunctuationCategory::None;
     case LineBreakClass::EX:
       // ！？ have trailing whitespace like closing punctuation.
-      return PunctuationCategory::Closing;
+      return IsFullwidthPunctuation(c) ? PunctuationCategory::Closing : PunctuationCategory::None;
     case LineBreakClass::QU:
       // Quotation marks: left quotes act as opening, right quotes as closing.
       if (c == 0x2018 || c == 0x201C) {
