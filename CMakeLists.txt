@@ -745,7 +745,12 @@ if (PAG_BUILD_CLI)
             ${CMAKE_CURRENT_BINARY_DIR}/generated
             ${LIBXML2_INCLUDE_DIR})
     target_compile_options(pagx-cli PRIVATE ${PAG_COMPILE_OPTIONS})
-    target_link_libraries(pagx-cli pag ${PAG_SHARED_LIBS} LibXml2::LibXml2)
+    set(CLI_EXTRA_LIBS)
+    if (LINUX)
+        find_package(Fontconfig REQUIRED)
+        list(APPEND CLI_EXTRA_LIBS Fontconfig::Fontconfig)
+    endif ()
+    target_link_libraries(pagx-cli pag ${PAG_SHARED_LIBS} LibXml2::LibXml2 ${CLI_EXTRA_LIBS})
 endif ()
 
 if (PAG_BUILD_TESTS)

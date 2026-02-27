@@ -281,7 +281,7 @@ static int RunFontEmbed(int argc, char* argv[]) {
     }
     fallbackTypefaces.push_back(typeface);
   }
-  auto systemFallbacks = GetSystemFallbackTypefaces();
+  auto systemFallbacks = SystemFonts::FallbackTypefaces();
   for (auto& typeface : systemFallbacks) {
     fallbackTypefaces.push_back(std::move(typeface));
   }
