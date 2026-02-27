@@ -374,7 +374,7 @@ bool LineBreaker::IsCJK(int32_t unichar) {
 }
 
 bool LineBreaker::IsWhitespace(int32_t unichar) {
-  return unichar == ' ' || unichar == '\t' || unichar == 0x00A0 || unichar == 0x3000;
+  return unichar == ' ' || unichar == '\t' || unichar == 0x3000;
 }
 
 bool LineBreaker::CanBreakBetween(int32_t prevChar, int32_t nextChar) {
