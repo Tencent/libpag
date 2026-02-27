@@ -1718,7 +1718,7 @@ class TextLayoutContext {
     float currentColumnHeight = 0;
     float boxHeight = textBox->size.height;
     bool doWrap = textBox->wordWrap && boxHeight > 0;
-    size_t lastBreakIndex = 0;
+    int lastBreakIndex = -1;
 
     for (size_t i = 0; i < vgList.size(); i++) {
       auto& vg = vgList[i];
@@ -1734,20 +1734,20 @@ class TextLayoutContext {
         columns.emplace_back();
         currentColumn = &columns.back();
         currentColumnHeight = 0;
-        lastBreakIndex = 0;
+        lastBreakIndex = -1;
         continue;
       }
 
       if (vg.canBreakBefore) {
-        lastBreakIndex = currentColumn->glyphs.size();
+        lastBreakIndex = static_cast<int>(currentColumn->glyphs.size());
       }
 
       if (doWrap && !currentColumn->glyphs.empty() && currentColumnHeight + vg.height > boxHeight) {
-        if (lastBreakIndex > 0) {
+        if (lastBreakIndex >= 0) {
           std::vector<VerticalGlyphInfo> overflow(
-              currentColumn->glyphs.begin() + static_cast<ptrdiff_t>(lastBreakIndex),
+              currentColumn->glyphs.begin() + lastBreakIndex,
               currentColumn->glyphs.end());
-          currentColumn->glyphs.resize(lastBreakIndex);
+          currentColumn->glyphs.resize(static_cast<size_t>(lastBreakIndex));
           RemoveTrailingLetterSpacing(currentColumn->glyphs);
           // Trim trailing whitespace from current column.
           while (!currentColumn->glyphs.empty() &&
@@ -1774,10 +1774,10 @@ class TextLayoutContext {
             currentColumnHeight += g.height;
           }
           // Re-scan break opportunities among glyphs on the new column.
-          lastBreakIndex = 0;
+          lastBreakIndex = -1;
           for (size_t j = 1; j < currentColumn->glyphs.size(); j++) {
             if (currentColumn->glyphs[j].canBreakBefore) {
-              lastBreakIndex = j;
+              lastBreakIndex = static_cast<int>(j);
             }
           }
         } else {
@@ -1786,12 +1786,12 @@ class TextLayoutContext {
           columns.emplace_back();
           currentColumn = &columns.back();
           currentColumnHeight = 0;
-          lastBreakIndex = 0;
+          lastBreakIndex = -1;
         }
       }
 
       if (vg.canBreakBefore) {
-        lastBreakIndex = currentColumn->glyphs.size();
+        lastBreakIndex = static_cast<int>(currentColumn->glyphs.size());
       }
       currentColumnHeight += vg.height;
       currentColumn->glyphs.push_back(std::move(vg));
