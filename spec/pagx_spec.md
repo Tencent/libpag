@@ -559,7 +559,7 @@ Painters (Fill, Stroke, etc.) bound to a layer are divided into background conte
 
 #### Layer Content
 
-**Layer content** refers to the complete rendering result of the layer's background content, child layers, and foreground content (steps 2–5 in the rendering pipeline). It does not include layer styles or layer filters.
+**Layer content** refers to the complete rendering result of the layer's background content, child layers, and foreground content (steps 2, 3, and 5 in the rendering pipeline). It does not include layer styles or layer filters.
 
 Layer styles compute their effects based on layer content. For example, when fill is placed in background content and stroke is placed in foreground content, the stroke renders above child layers, but drop shadows are still calculated based on the complete layer content including fill, child layers, and stroke.
 

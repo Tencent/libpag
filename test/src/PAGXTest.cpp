@@ -523,62 +523,9 @@ PAGX_TEST(PAGXTest, FontGlyphRoundTrip) {
   SavePAGXFile(xml, "PAGXTest/font_glyph_roundtrip.pagx");
 }
 
-/**
- * Test all PAGX sample files in spec/samples directory.
- * Renders each sample and compares with baseline screenshots.
- */
-PAGX_TEST(PAGXTest, SampleFiles) {
-  auto samplesDir = ProjectPath::Absolute("spec/samples");
-  std::vector<std::string> sampleFiles = {};
-
-  for (const auto& entry : std::filesystem::directory_iterator(samplesDir)) {
-    if (entry.path().extension() == ".pagx") {
-      sampleFiles.push_back(entry.path().string());
-    }
-  }
-  std::sort(sampleFiles.begin(), sampleFiles.end());
-
-  pagx::TextLayout textLayout;
-  textLayout.setFallbackTypefaces(GetFallbackTypefaces());
-
-  for (const auto& filePath : sampleFiles) {
-    auto baseName = std::filesystem::path(filePath).stem().string();
-
-    auto doc = pagx::PAGXImporter::FromFile(filePath);
-    if (!doc) {
-      ADD_FAILURE() << "Failed to load: " << filePath;
-      continue;
-    }
-    if (!doc->errors.empty()) {
-      std::string errorLog;
-      for (const auto& error : doc->errors) {
-        errorLog += "\n  " + error;
-      }
-      ADD_FAILURE() << "Parse errors in " << baseName << ":" << errorLog;
-    }
-
-    textLayout.layout(doc.get());
-
-    auto layer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
-    if (!layer) {
-      ADD_FAILURE() << "Failed to build layer: " << filePath;
-      continue;
-    }
-
-    auto surface =
-        Surface::Make(context, static_cast<int>(doc->width), static_cast<int>(doc->height));
-    DisplayList displayList;
-    displayList.root()->addChild(layer);
-    displayList.render(surface.get(), false);
-
-    EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/" + baseName)) << baseName;
-  }
-}
-
-static void TestPAGXDirectory(tgfx::Context* context, const std::string& resourceSubDir) {
-  auto resourceDir = ProjectPath::Absolute("resources/" + resourceSubDir);
+static void TestPAGXDirectory(tgfx::Context* context, const std::string& directory) {
   std::vector<std::string> files = {};
-  for (const auto& entry : std::filesystem::directory_iterator(resourceDir)) {
+  for (const auto& entry : std::filesystem::directory_iterator(directory)) {
     if (entry.path().extension() == ".pagx") {
       files.push_back(entry.path().string());
     }
@@ -623,10 +570,18 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& resourc
 }
 
 /**
+ * Test all PAGX sample files in spec/samples directory.
+ * Renders each sample and compares with baseline screenshots.
+ */
+PAGX_TEST(PAGXTest, SampleFiles) {
+  TestPAGXDirectory(context, ProjectPath::Absolute("spec/samples"));
+}
+
+/**
  * Test all text-related PAGX files in resources/text directory.
  */
 PAGX_TEST(PAGXTest, TextFiles) {
-  TestPAGXDirectory(context, "text");
+  TestPAGXDirectory(context, ProjectPath::Absolute("resources/text"));
 }
 
 }  // namespace pag
