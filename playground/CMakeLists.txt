@@ -12,7 +12,10 @@ if (NOT CMAKE_BUILD_TYPE)
 endif ()
 
 # Enable PAGX module and add the main libpag project as a subdirectory.
+# PAG_USE_FREETYPE must be ON: tgfx defaults to FreeType on WEB+threads, but the main project
+# forces it OFF for WEB. Playground needs FreeType for HarfBuzz text shaping.
 set(PAG_BUILD_PAGX ON)
+set(PAG_USE_FREETYPE ON)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/.. ${CMAKE_CURRENT_BINARY_DIR}/libpag)
 
