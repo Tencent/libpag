@@ -635,11 +635,11 @@ function main() {
   console.log('\nPublishing Chinese version...');
   publishSpec(SPEC_FILE_ZH, path.join(baseOutputDir, 'zh'), 'zh', '../', viewerUrlFromZh, faviconUrlFromZh, englishSlugs);
 
-  console.log('\nCopying latest version to latest folder...');
-  copyLatestVersion(siteDir, stableVersion || version);
-
   // Update version links in all published versions
   updateAllVersionLinks(siteDir, version, stableVersion);
+
+  console.log('\nCopying latest version to latest folder...');
+  copyLatestVersion(siteDir, stableVersion || version);
 
   console.log('\nCopying favicon...');
   fs.copyFileSync(path.join(SPEC_DIR, 'favicon.png'), path.join(siteDir, 'favicon.png'));
