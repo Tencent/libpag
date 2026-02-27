@@ -8,7 +8,6 @@ description: >-
   font info/embed). Also use when user asks how to use the pagx command-line tool,
   what pagx commands are available, or needs help with PAGX XML syntax and
   attributes.
-user-invocable: false
 ---
 
 # PAGX Knowledge Base
