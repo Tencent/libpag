@@ -142,9 +142,11 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
         return 1;
       }
     } else if (arg == "--scale" && i + 1 < argc) {
-      options->scale = strtof(argv[++i], nullptr);
-      if (options->scale <= 0.0f) {
-        std::cerr << "pagx render: scale must be positive\n";
+      char* endPtr = nullptr;
+      options->scale = strtof(argv[++i], &endPtr);
+      if (endPtr == argv[i] || *endPtr != '\0' || !std::isfinite(options->scale) ||
+          options->scale <= 0.0f) {
+        std::cerr << "pagx render: invalid scale '" << argv[i] << "'\n";
         return 1;
       }
     } else if (arg == "--crop" && i + 1 < argc) {

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CommandFont.h"
+#include <cmath>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -65,9 +66,11 @@ static int ParseFontInfoOptions(int argc, char* argv[], FontInfoOptions* options
     } else if (arg == "--name" && i + 1 < argc) {
       options->fontName = argv[++i];
     } else if (arg == "--size" && i + 1 < argc) {
-      options->fontSize = strtof(argv[++i], nullptr);
-      if (options->fontSize <= 0.0f) {
-        std::cerr << "pagx font info: font size must be positive\n";
+      char* endPtr = nullptr;
+      options->fontSize = strtof(argv[++i], &endPtr);
+      if (endPtr == argv[i] || *endPtr != '\0' || !std::isfinite(options->fontSize) ||
+          options->fontSize <= 0.0f) {
+        std::cerr << "pagx font info: invalid font size '" << argv[i] << "'\n";
         return 1;
       }
     } else if (arg == "--json") {
