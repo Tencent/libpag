@@ -106,7 +106,7 @@ void TextLayout::registerTypeface(std::shared_ptr<tgfx::Typeface> typeface) {
   registeredTypefaces[key] = std::move(typeface);
 }
 
-void TextLayout::setFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces) {
+void TextLayout::addFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces) {
   for (auto& tf : typefaces) {
     fallbackTypefaces.emplace_back(std::move(tf));
   }

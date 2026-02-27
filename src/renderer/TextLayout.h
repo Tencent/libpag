@@ -68,10 +68,10 @@ class TextLayout {
   void registerTypeface(std::shared_ptr<tgfx::Typeface> typeface);
 
   /**
-   * Sets the fallback typefaces used when a character is not found in the primary font (either
+   * Adds fallback typefaces used when a character is not found in the primary font (either
    * registered or system). Typefaces are tried in order until one containing the character is found.
    */
-  void setFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces);
+  void addFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces);
 
   /**
    * Adds a deferred fallback font that will be loaded on demand when needed during text shaping.
