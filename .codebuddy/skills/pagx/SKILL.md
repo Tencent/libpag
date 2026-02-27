@@ -1,12 +1,13 @@
 ---
 name: pagx
 description: >-
-  PAGX knowledge base for generating and optimizing PAGX files. Use when asked to
-  create, write, generate, optimize, simplify, or review PAGX files, or when asked
-  about the pagx CLI tool usage, commands, options, rendering, validation,
-  formatting, font operations, or bounds queries. Covers the PAGX XML format
-  specification, best practices for structure and layout, optimization techniques
-  for file size and rendering performance, and full CLI reference.
+  Generates well-structured PAGX files from visual descriptions and optimizes
+  existing ones for size and rendering performance. Use when user asks to create,
+  write, or design PAGX content, optimize or simplify a .pagx file, review PAGX
+  structure, or run pagx CLI commands (render, validate, format, optimize, bounds,
+  font info/embed). Also use when user asks how to use the pagx command-line tool,
+  what pagx commands are available, or needs help with PAGX XML syntax and
+  attributes.
 user-invocable: false
 ---
 
@@ -253,8 +254,16 @@ explicit user approval.
 
 ## CLI Tools
 
-The binary is at `cmake-build-debug/pagx`. If it does not exist, build it with
-`cmake --build cmake-build-debug --target pagx-cli`.
+The binary is at `cmake-build-debug/pagx` (relative to the project root). If it does not
+exist, build it:
+
+```bash
+cmake -G Ninja -DPAG_BUILD_CLI=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
+cmake --build cmake-build-debug --target pagx-cli
+```
+
+Note: `PAG_BUILD_TESTS=ON` already implies `PAG_BUILD_CLI=ON`, so if the test build
+directory exists the binary is likely already there.
 
 See `references/cli-reference.md` for full usage and options:
 `optimize`, `render`, `validate`, `format`, `bounds`, `font` (`info`, `embed`).

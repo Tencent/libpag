@@ -3,8 +3,16 @@
 Back to main: [SKILL.md](../SKILL.md)
 
 The `pagx` command-line tool provides utilities for working with PAGX files. All commands
-operate on local `.pagx` files. The binary is at `cmake-build-debug/pagx` — if it does not
-exist, build it with `cmake --build cmake-build-debug --target pagx-cli`.
+operate on local `.pagx` files. The binary is at `cmake-build-debug/pagx` (relative to the
+project root). If it does not exist, build it:
+
+```bash
+cmake -G Ninja -DPAG_BUILD_CLI=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
+cmake --build cmake-build-debug --target pagx-cli
+```
+
+Note: `PAG_BUILD_TESTS=ON` already implies `PAG_BUILD_CLI=ON`, so if the test build
+directory exists the binary is likely already there.
 
 ---
 
