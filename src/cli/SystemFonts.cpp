@@ -22,6 +22,7 @@
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreText/CoreText.h>
+#include <set>
 
 namespace pagx::cli {
 
@@ -52,24 +53,60 @@ static std::string StringFromCFURL(CFURLRef cfURL) {
   return path;
 }
 
-static std::string GetFontPathFromDescriptor(CTFontDescriptorRef descriptor) {
-  auto cfURL =
-      static_cast<CFURLRef>(CTFontDescriptorCopyAttribute(descriptor, kCTFontURLAttribute));
-  if (cfURL == nullptr) {
-    // Some system-protected fonts don't expose URL on the descriptor directly. Create a CTFont
-    // from the descriptor and query the URL from the font instance instead.
-    CTFontRef ctFont = CTFontCreateWithFontDescriptor(descriptor, 0.0, nullptr);
-    if (ctFont != nullptr) {
-      cfURL = static_cast<CFURLRef>(CTFontCopyAttribute(ctFont, kCTFontURLAttribute));
-      CFRelease(ctFont);
-    }
-  }
-  if (cfURL == nullptr) {
+struct FontLocation {
+  std::string path = {};
+  int ttcIndex = 0;
+};
+
+static FontLocation GetFontLocationFromDescriptor(CTFontDescriptorRef descriptor) {
+  // Get the PostScript name from the cascade descriptor to identify the exact face.
+  CTFontRef ctFont = CTFontCreateWithFontDescriptor(descriptor, 0.0, nullptr);
+  if (ctFont == nullptr) {
     return {};
   }
+  CFStringRef psName = CTFontCopyPostScriptName(ctFont);
+  auto cfURL = static_cast<CFURLRef>(CTFontCopyAttribute(ctFont, kCTFontURLAttribute));
+  CFRelease(ctFont);
+
+  if (cfURL == nullptr) {
+    // Try the descriptor directly for the URL.
+    cfURL = static_cast<CFURLRef>(CTFontDescriptorCopyAttribute(descriptor, kCTFontURLAttribute));
+  }
+  if (cfURL == nullptr) {
+    if (psName != nullptr) {
+      CFRelease(psName);
+    }
+    return {};
+  }
+
   auto path = StringFromCFURL(cfURL);
+  int ttcIndex = 0;
+
+  // Determine the face index within a TTC file by enumerating all descriptors for the same URL
+  // and matching by PostScript name.
+  if (psName != nullptr) {
+    CFArrayRef allDescriptors = CTFontManagerCreateFontDescriptorsFromURL(cfURL);
+    if (allDescriptors != nullptr) {
+      CFIndex total = CFArrayGetCount(allDescriptors);
+      for (CFIndex j = 0; j < total; j++) {
+        auto desc = static_cast<CTFontDescriptorRef>(CFArrayGetValueAtIndex(allDescriptors, j));
+        auto name =
+            static_cast<CFStringRef>(CTFontDescriptorCopyAttribute(desc, kCTFontNameAttribute));
+        if (name != nullptr) {
+          if (CFStringCompare(name, psName, 0) == kCFCompareEqualTo) {
+            ttcIndex = static_cast<int>(j);
+            CFRelease(name);
+            break;
+          }
+          CFRelease(name);
+        }
+      }
+      CFRelease(allDescriptors);
+    }
+    CFRelease(psName);
+  }
   CFRelease(cfURL);
-  return path;
+  return {path, ttcIndex};
 }
 
 std::vector<std::shared_ptr<tgfx::Typeface>> SystemFonts::FallbackTypefaces() {
@@ -91,14 +128,16 @@ std::vector<std::shared_ptr<tgfx::Typeface>> SystemFonts::FallbackTypefaces() {
 
   // Load Helvetica itself since the cascade list only contains fallback fonts, not the base font.
   std::vector<std::shared_ptr<tgfx::Typeface>> fallbacks = {};
+  std::set<std::string> loadedPaths = {};
   auto defaultDescriptor = CTFontCopyFontDescriptor(defaultFont);
   CFRelease(defaultFont);
   if (defaultDescriptor != nullptr) {
-    auto defaultPath = GetFontPathFromDescriptor(defaultDescriptor);
+    auto location = GetFontLocationFromDescriptor(defaultDescriptor);
     CFRelease(defaultDescriptor);
-    if (!defaultPath.empty()) {
-      auto typeface = tgfx::Typeface::MakeFromPath(defaultPath, 0);
+    if (!location.path.empty()) {
+      auto typeface = tgfx::Typeface::MakeFromPath(location.path, location.ttcIndex);
       if (typeface != nullptr) {
+        loadedPaths.insert(location.path);
         fallbacks.push_back(std::move(typeface));
       }
     }
@@ -111,17 +150,22 @@ std::vector<std::shared_ptr<tgfx::Typeface>> SystemFonts::FallbackTypefaces() {
   CFIndex count = CFArrayGetCount(cascadeList);
   fallbacks.reserve(static_cast<size_t>(count) + fallbacks.size());
 
+  // The cascade list is ordered by the user's language preferences. For fonts sharing the same
+  // file (e.g., PingFang SC/TC/HK in PingFang.ttc), only the first one matching the preferred
+  // language is kept.
   for (CFIndex i = 0; i < count; i++) {
     auto descriptor = static_cast<CTFontDescriptorRef>(CFArrayGetValueAtIndex(cascadeList, i));
     if (descriptor == nullptr) {
       continue;
     }
-    auto path = GetFontPathFromDescriptor(descriptor);
-    if (!path.empty()) {
-      auto typeface = tgfx::Typeface::MakeFromPath(path, 0);
-      if (typeface != nullptr) {
-        fallbacks.push_back(std::move(typeface));
-      }
+    auto location = GetFontLocationFromDescriptor(descriptor);
+    if (location.path.empty() || loadedPaths.count(location.path) > 0) {
+      continue;
+    }
+    loadedPaths.insert(location.path);
+    auto typeface = tgfx::Typeface::MakeFromPath(location.path, location.ttcIndex);
+    if (typeface != nullptr) {
+      fallbacks.push_back(std::move(typeface));
     }
   }
   CFRelease(cascadeList);
@@ -237,6 +281,7 @@ std::vector<std::shared_ptr<tgfx::Typeface>> SystemFonts::FallbackTypefaces() {
 
 #include <fontconfig/fontconfig.h>
 #include <unistd.h>
+#include <set>
 #include <string>
 
 namespace pagx::cli {
@@ -259,7 +304,7 @@ std::vector<std::shared_ptr<tgfx::Typeface>> SystemFonts::FallbackTypefaces() {
   }
 
   std::vector<std::shared_ptr<tgfx::Typeface>> fallbacks = {};
-  std::string lastFamily = {};
+  std::set<std::string> loadedFamilies = {};
 
   for (int i = 0; i < fontSet->nfont; i++) {
     FcPattern* font = fontSet->fonts[i];
@@ -284,10 +329,10 @@ std::vector<std::shared_ptr<tgfx::Typeface>> SystemFonts::FallbackTypefaces() {
     }
     auto family = std::string(reinterpret_cast<const char*>(familyName));
 
-    if (family == lastFamily) {
+    if (loadedFamilies.count(family) > 0) {
       continue;
     }
-    lastFamily = family;
+    loadedFamilies.insert(family);
 
     int ttcIndex = 0;
     FcPatternGetInteger(font, FC_INDEX, 0, &ttcIndex);
