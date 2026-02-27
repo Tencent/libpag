@@ -49,6 +49,9 @@ pagx render --format webp --scale 2 input.pagx   # outputs input.webp
 pagx render -o output.png input.pagx
 pagx render -o cropped.png --crop 50,50,200,200 input.pagx
 pagx render -o output.jpg --format jpg --quality 90 --background "#FFFFFF" input.pagx
+pagx render --font CustomFont.ttf input.pagx
+pagx render --font a.ttf --fallback "PingFang SC" input.pagx
+pagx render --font a.ttf --fallback b.otf --fallback "Noto Emoji" input.pagx
 ```
 
 | Option | Description |
@@ -59,6 +62,14 @@ pagx render -o output.jpg --format jpg --quality 90 --background "#FFFFFF" input
 | `--crop <x,y,w,h>` | Crop region in document coordinates |
 | `--quality <0-100>` | Encoding quality (default: 100) |
 | `--background <color>` | Background color (#RRGGBB or #RRGGBBAA) |
+| `--font <path>` | Register a font file (can be specified multiple times) |
+| `--fallback <path\|name>` | Fallback font file or system font name (can be specified multiple times) |
+
+`--font` registers a font file matched by fontFamily/fontStyle against PAGX text references.
+`--fallback` accepts either a file path (e.g., `b.otf`) or a system font name (e.g.,
+`"PingFang SC"` or `"Arial,Bold"`). All fonts added via `--fallback` are also registered
+automatically. Fallback fonts are tried in order when a character is not found in the
+primary font. System fallback fonts are always appended after user-specified fallbacks.
 
 ---
 
@@ -162,15 +173,17 @@ Embed fonts into a PAGX file by performing text layout and glyph extraction.
 pagx font embed input.pagx
 pagx font embed -o out.pagx input.pagx
 pagx font embed --file a.ttf --file b.ttf input.pagx
-pagx font embed --file a.ttf --fallback "PingFang SC" --fallback "Noto Emoji" input.pagx
+pagx font embed --file a.ttf --fallback "PingFang SC" --fallback b.otf input.pagx
 ```
 
 | Option | Description |
 |--------|-------------|
 | `-o, --output <path>` | Output file path (default: overwrite input) |
-| `--file <path>` | Add a font file (can be specified multiple times) |
-| `--fallback <family[,style]>` | Fallback font in order (can be specified multiple times) |
+| `--file <path>` | Register a font file (can be specified multiple times) |
+| `--fallback <path\|name>` | Fallback font file or system font name (can be specified multiple times) |
 
-Added `--file` fonts are matched by fontFamily/fontStyle against PAGX text references.
-`--fallback` fonts are tried in order when a character is not found in the primary font —
-they can reference loaded `--file` fonts or system fonts by name.
+`--file` registers a font file matched by fontFamily/fontStyle against PAGX text references.
+`--fallback` accepts either a file path (e.g., `b.otf`) or a system font name (e.g.,
+`"PingFang SC"` or `"Arial,Bold"`). All fonts added via `--fallback` are also registered
+automatically. Fallback fonts are tried in order when a character is not found in the
+primary font. System fallback fonts are always appended after user-specified fallbacks.

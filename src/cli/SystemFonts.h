@@ -18,11 +18,21 @@
 
 #pragma once
 
-#include <memory>
+#include <string>
 #include <vector>
-#include "tgfx/core/Typeface.h"
 
 namespace pagx::cli {
+
+/**
+ * Describes a font location for deferred loading. Stores enough information to create a Typeface
+ * on demand without loading the font file upfront.
+ */
+struct FontLocation {
+  std::string path = {};
+  std::string fontFamily = {};
+  std::string fontStyle = {};
+  int ttcIndex = 0;
+};
 
 /**
  * Provides access to system fallback fonts by querying native platform APIs. On macOS, this uses
@@ -33,10 +43,10 @@ namespace pagx::cli {
 class SystemFonts {
  public:
   /**
-   * Returns the system default fallback typeface list ordered by the user's language preferences.
-   * The returned list covers CJK, emoji, and other scripts installed on the system.
+   * Returns font location descriptors for the system default fallback fonts, ordered by the user's
+   * language preferences. No Typeface objects are created; callers should load fonts on demand.
    */
-  static std::vector<std::shared_ptr<tgfx::Typeface>> FallbackTypefaces();
+  static std::vector<FontLocation> FallbackTypefaces();
 };
 
 }  // namespace pagx::cli

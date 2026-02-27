@@ -53,19 +53,25 @@ struct RenderOptions {
   float bgGreen = 0.0f;
   float bgBlue = 0.0f;
   float bgAlpha = 0.0f;
+  std::vector<std::string> fontFiles = {};
+  std::vector<std::string> fallbacks = {};
 };
 
 static void PrintRenderUsage() {
-  std::cout << "Usage: pagx render [options] <file.pagx>\n"
-            << "\n"
-            << "Options:\n"
-            << "  -o, --output <path>       Output file path (default: input path with format "
-               "extension)\n"
-            << "  --format png|webp|jpg     Output format (default: png)\n"
-            << "  --scale <float>           Scale factor (default: 1.0)\n"
-            << "  --crop <x,y,w,h>          Crop region in document coordinates\n"
-            << "  --quality <0-100>         Encoding quality (default: 100)\n"
-            << "  --background <color>      Background color (hex: #RRGGBB or #RRGGBBAA)\n";
+  std::cout
+      << "Usage: pagx render [options] <file.pagx>\n"
+      << "\n"
+      << "Options:\n"
+      << "  -o, --output <path>       Output file path (default: input path with format "
+         "extension)\n"
+      << "  --format png|webp|jpg     Output format (default: png)\n"
+      << "  --scale <float>           Scale factor (default: 1.0)\n"
+      << "  --crop <x,y,w,h>          Crop region in document coordinates\n"
+      << "  --quality <0-100>         Encoding quality (default: 100)\n"
+      << "  --background <color>      Background color (hex: #RRGGBB or #RRGGBBAA)\n"
+      << "  --font <path>             Register a font file (can be specified multiple times)\n"
+      << "  --fallback <path|name>    Add a fallback font file or system font name (can be\n"
+         "                            specified multiple times)\n";
 }
 
 static bool ParseHexColor(const std::string& hex, float* red, float* green, float* blue,
@@ -164,6 +170,10 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
         std::cerr << "pagx render: invalid color format, expected #RRGGBB or #RRGGBBAA\n";
         return false;
       }
+    } else if (arg == "--font" && i + 1 < argc) {
+      options->fontFiles.push_back(argv[++i]);
+    } else if (arg == "--fallback" && i + 1 < argc) {
+      options->fallbacks.push_back(argv[++i]);
     } else if (arg == "--help" || arg == "-h") {
       PrintRenderUsage();
       return -1;
@@ -226,9 +236,35 @@ int RunRender(int argc, char* argv[]) {
     }
   }
 
-  // Perform text layout and build the layer tree.
+  // Load fonts and set up text layout.
   TextLayout textLayout = {};
-  SetupSystemFallbackFonts(textLayout);
+  std::vector<std::shared_ptr<tgfx::Typeface>> loadedTypefaces = {};
+  for (const auto& fontFile : options.fontFiles) {
+    auto typeface = tgfx::Typeface::MakeFromPath(fontFile);
+    if (typeface == nullptr) {
+      std::cerr << "pagx render: failed to load font '" << fontFile << "'\n";
+      return 1;
+    }
+    loadedTypefaces.push_back(typeface);
+    textLayout.registerTypeface(typeface);
+  }
+  std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces = {};
+  for (const auto& fallbackStr : options.fallbacks) {
+    auto typeface = ResolveFallbackTypeface(fallbackStr);
+    if (typeface == nullptr) {
+      std::cerr << "pagx render: fallback font '" << fallbackStr << "' not found\n";
+      return 1;
+    }
+    textLayout.registerTypeface(typeface);
+    fallbackTypefaces.push_back(typeface);
+  }
+  if (!fallbackTypefaces.empty()) {
+    textLayout.setFallbackTypefaces(std::move(fallbackTypefaces));
+  }
+  auto systemFallbacks = SystemFonts::FallbackTypefaces();
+  for (const auto& loc : systemFallbacks) {
+    textLayout.addFallbackFont(loc.path, loc.ttcIndex, loc.fontFamily, loc.fontStyle);
+  }
   auto rootLayer = LayerBuilder::Build(document.get(), &textLayout);
   if (rootLayer == nullptr) {
     std::cerr << "pagx render: failed to build layer tree\n";

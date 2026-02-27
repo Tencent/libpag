@@ -32,32 +32,6 @@
 
 namespace pagx::cli {
 
-// Parse "family,style" or "family" into separate components.
-static void ParseFontName(const std::string& nameStr, std::string* family, std::string* style) {
-  auto commaPos = nameStr.find(',');
-  if (commaPos != std::string::npos) {
-    *family = nameStr.substr(0, commaPos);
-    *style = nameStr.substr(commaPos + 1);
-  } else {
-    *family = nameStr;
-    style->clear();
-  }
-}
-
-// Resolve a typeface by name, first searching loaded typefaces then falling back to system fonts.
-static std::shared_ptr<tgfx::Typeface> ResolveTypeface(
-    const std::string& family, const std::string& style,
-    const std::vector<std::shared_ptr<tgfx::Typeface>>& loadedTypefaces) {
-  for (const auto& typeface : loadedTypefaces) {
-    if (typeface->fontFamily() == family) {
-      if (style.empty() || typeface->fontStyle() == style) {
-        return typeface;
-      }
-    }
-  }
-  return tgfx::Typeface::MakeFromName(family, style);
-}
-
 // ---- font info ----
 
 struct FontInfoOptions {
@@ -133,9 +107,11 @@ static int RunFontInfo(int argc, char* argv[]) {
       return 1;
     }
   } else {
-    std::string family = {};
-    std::string style = {};
-    ParseFontName(options.fontName, &family, &style);
+    auto commaPos = options.fontName.find(',');
+    auto family =
+        commaPos != std::string::npos ? options.fontName.substr(0, commaPos) : options.fontName;
+    auto style =
+        commaPos != std::string::npos ? options.fontName.substr(commaPos + 1) : std::string();
     typeface = tgfx::Typeface::MakeFromName(family, style);
     if (typeface == nullptr) {
       std::cerr << "pagx font info: font '" << options.fontName << "' not found\n";
@@ -203,10 +179,10 @@ static void PrintFontEmbedUsage() {
       << "\n"
       << "Options:\n"
       << "  -o, --output <path>              Output file path (default: overwrite input)\n"
-      << "  --file <path>                    Add a font file (can be specified multiple times)\n"
-      << "  --fallback <family[,style]>      Add a fallback font (can be specified multiple\n"
-      << "                                   times, tried in order). Matches loaded --file\n"
-      << "                                   fonts first, then system fonts.\n"
+      << "  --file <path>                    Register a font file (can be specified multiple\n"
+      << "                                   times)\n"
+      << "  --fallback <path|name>           Add a fallback font file or system font name (can\n"
+      << "                                   be specified multiple times)\n"
       << "  -h, --help                       Show this help message\n";
 }
 
@@ -274,22 +250,20 @@ static int RunFontEmbed(int argc, char* argv[]) {
   // Resolve fallback typefaces: user-specified first, then system fallbacks.
   std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces = {};
   for (const auto& fallbackStr : options.fallbacks) {
-    std::string family = {};
-    std::string style = {};
-    ParseFontName(fallbackStr, &family, &style);
-    auto typeface = ResolveTypeface(family, style, loadedTypefaces);
+    auto typeface = ResolveFallbackTypeface(fallbackStr);
     if (typeface == nullptr) {
       std::cerr << "pagx font embed: fallback font '" << fallbackStr << "' not found\n";
       return 1;
     }
+    textLayout.registerTypeface(typeface);
     fallbackTypefaces.push_back(typeface);
-  }
-  auto systemFallbacks = SystemFonts::FallbackTypefaces();
-  for (auto& typeface : systemFallbacks) {
-    fallbackTypefaces.push_back(std::move(typeface));
   }
   if (!fallbackTypefaces.empty()) {
     textLayout.setFallbackTypefaces(std::move(fallbackTypefaces));
+  }
+  auto systemFallbacks = SystemFonts::FallbackTypefaces();
+  for (const auto& loc : systemFallbacks) {
+    textLayout.addFallbackFont(loc.path, loc.ttcIndex, loc.fontFamily, loc.fontStyle);
   }
 
   auto result = textLayout.layout(document.get());

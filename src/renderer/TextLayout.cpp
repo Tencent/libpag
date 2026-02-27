@@ -63,6 +63,39 @@ static size_t DecodeUTF8Char(const char* data, size_t remaining, int32_t* unicha
   return static_cast<size_t>(ptr - data);
 }
 
+TypefaceHolder::TypefaceHolder(std::shared_ptr<tgfx::Typeface> typeface)
+    : typeface(std::move(typeface)) {
+  if (this->typeface != nullptr) {
+    fontFamily = this->typeface->fontFamily();
+    fontStyle = this->typeface->fontStyle();
+  }
+}
+
+TypefaceHolder::TypefaceHolder(std::string path, int ttcIndex, std::string fontFamily,
+                               std::string fontStyle)
+    : path(std::move(path)), fontFamily(std::move(fontFamily)), fontStyle(std::move(fontStyle)),
+      ttcIndex(ttcIndex) {
+}
+
+std::shared_ptr<tgfx::Typeface> TypefaceHolder::getTypeface() {
+  if (typeface == nullptr) {
+    if (!path.empty()) {
+      typeface = tgfx::Typeface::MakeFromPath(path, ttcIndex);
+    } else if (!fontFamily.empty()) {
+      typeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
+    }
+  }
+  return typeface;
+}
+
+const std::string& TypefaceHolder::getFontFamily() const {
+  return fontFamily;
+}
+
+const std::string& TypefaceHolder::getFontStyle() const {
+  return fontStyle;
+}
+
 void TextLayout::registerTypeface(std::shared_ptr<tgfx::Typeface> typeface) {
   if (typeface == nullptr) {
     return;
@@ -74,13 +107,20 @@ void TextLayout::registerTypeface(std::shared_ptr<tgfx::Typeface> typeface) {
 }
 
 void TextLayout::setFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces) {
-  fallbackTypefaces = std::move(typefaces);
+  for (auto& tf : typefaces) {
+    fallbackTypefaces.emplace_back(std::move(tf));
+  }
+}
+
+void TextLayout::addFallbackFont(const std::string& path, int ttcIndex,
+                                 const std::string& fontFamily, const std::string& fontStyle) {
+  fallbackTypefaces.emplace_back(path, ttcIndex, fontFamily, fontStyle);
 }
 
 // Build context that maintains state during text layout
 class TextLayoutContext {
  public:
-  TextLayoutContext(const TextLayout* textLayout, PAGXDocument* document)
+  TextLayoutContext(TextLayout* textLayout, PAGXDocument* document)
       : textLayout(textLayout), document(document) {
   }
 
@@ -824,7 +864,8 @@ class TextLayoutContext {
     // Build fallback fonts list for HarfBuzz shaping.
     std::vector<tgfx::Font> fallbackFonts = {};
     fallbackFonts.reserve(textLayout->fallbackTypefaces.size());
-    for (const auto& fallback : textLayout->fallbackTypefaces) {
+    for (auto& holder : textLayout->fallbackTypefaces) {
+      auto fallback = holder.getTypeface();
       if (fallback != nullptr && fallback != primaryTypeface) {
         tgfx::Font fallbackFont(fallback, text->fontSize);
         fallbackFont.setFauxBold(text->fauxBold);
@@ -942,16 +983,8 @@ class TextLayoutContext {
 #else
     // Non-HarfBuzz path: original per-character glyph lookup.
 
-    // Pre-build fallback font cache to avoid repeated construction in the inner loop.
+    // Fallback font cache: built on demand as fallback typefaces are loaded during glyph lookup.
     std::unordered_map<tgfx::Typeface*, tgfx::Font> fallbackFontCache = {};
-    for (const auto& fallback : textLayout->fallbackTypefaces) {
-      if (fallback != nullptr && fallback != primaryTypeface) {
-        tgfx::Font fallbackFont(fallback, text->fontSize);
-        fallbackFont.setFauxBold(text->fauxBold);
-        fallbackFont.setFauxItalic(text->fauxItalic);
-        fallbackFontCache.emplace(fallback.get(), std::move(fallbackFont));
-      }
-    }
 
     // Current run being built
     ShapedGlyphRun* currentRun = nullptr;
@@ -992,10 +1025,17 @@ class TextLayoutContext {
       std::shared_ptr<tgfx::Typeface> glyphTypeface = primaryTypeface;
 
       if (glyphID == 0) {
-        for (const auto& fallback : textLayout->fallbackTypefaces) {
+        for (auto& holder : textLayout->fallbackTypefaces) {
+          auto fallback = holder.getTypeface();
+          if (fallback == nullptr || fallback == primaryTypeface) {
+            continue;
+          }
           auto it = fallbackFontCache.find(fallback.get());
           if (it == fallbackFontCache.end()) {
-            continue;
+            tgfx::Font f(fallback, text->fontSize);
+            f.setFauxBold(text->fauxBold);
+            f.setFauxItalic(text->fauxItalic);
+            it = fallbackFontCache.emplace(fallback.get(), std::move(f)).first;
           }
           glyphID = it->second.getGlyphID(unichar);
           if (glyphID != 0) {
@@ -2132,18 +2172,18 @@ class TextLayoutContext {
       }
     }
 
-    // Then, try fallback typefaces by family name
+    // Then, try fallback typefaces by family name (no Typeface loading needed for comparison).
     if (!fontFamily.empty()) {
-      for (const auto& tf : textLayout->fallbackTypefaces) {
-        if (tf != nullptr && tf->fontFamily() == fontFamily) {
-          return tf;
+      for (auto& holder : textLayout->fallbackTypefaces) {
+        if (holder.getFontFamily() == fontFamily) {
+          return holder.getTypeface();
         }
       }
     }
 
     // Use first fallback typeface
     if (!textLayout->fallbackTypefaces.empty()) {
-      return textLayout->fallbackTypefaces[0];
+      return textLayout->fallbackTypefaces[0].getTypeface();
     }
 
     // Last resort: try system font
@@ -2154,7 +2194,7 @@ class TextLayoutContext {
     return nullptr;
   }
 
-  const TextLayout* textLayout = nullptr;
+  TextLayout* textLayout = nullptr;
   PAGXDocument* document = nullptr;
   ShapedTextMap result = {};
   std::vector<Text*> textOrder = {};

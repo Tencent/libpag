@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include <unordered_map>
 #include <vector>
 #include "ShapedText.h"
@@ -26,6 +27,30 @@
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
+
+/**
+ * Holds font location info and creates the Typeface on demand. Once created, the Typeface is
+ * cached for subsequent access.
+ */
+class TypefaceHolder {
+ public:
+  explicit TypefaceHolder(std::shared_ptr<tgfx::Typeface> typeface);
+
+  TypefaceHolder(std::string path, int ttcIndex, std::string fontFamily, std::string fontStyle);
+
+  std::shared_ptr<tgfx::Typeface> getTypeface();
+
+  const std::string& getFontFamily() const;
+
+  const std::string& getFontStyle() const;
+
+ private:
+  std::string path = {};
+  std::string fontFamily = {};
+  std::string fontStyle = {};
+  int ttcIndex = 0;
+  std::shared_ptr<tgfx::Typeface> typeface = nullptr;
+};
 
 /**
  * TextLayout performs text layout on PAGXDocument, converting Text elements into positioned glyph
@@ -49,12 +74,17 @@ class TextLayout {
   void setFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces);
 
   /**
-   * Performs text layout for all Text nodes in the document. If a Text node has embedded GlyphRun
-   * data (from a loaded PAGX file), it uses that data directly. Otherwise, it performs text
-   * shaping using registered/fallback typefaces. TextBox modifiers are processed to apply
-   * alignment, line breaking, and other layout properties.
-   * @param document The document containing Text nodes to layout.
-   * @return TextLayoutResult containing shaped text and stable iteration order.
+   * Adds a deferred fallback font that will be loaded on demand when needed during text shaping.
+   * @param path The font file path (empty if using fontFamily for name-based loading).
+   * @param ttcIndex The face index within a TTC font collection.
+   * @param fontFamily The font family name for matching and name-based loading.
+   * @param fontStyle The font style name.
+   */
+  void addFallbackFont(const std::string& path, int ttcIndex, const std::string& fontFamily,
+                       const std::string& fontStyle);
+
+  /**
+   * Performs text layout for all Text nodes in the document.
    */
   TextLayoutResult layout(PAGXDocument* document);
 
@@ -78,7 +108,7 @@ class TextLayout {
 
   std::unordered_map<FontKey, std::shared_ptr<tgfx::Typeface>, FontKeyHash> registeredTypefaces =
       {};
-  std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces = {};
+  std::vector<TypefaceHolder> fallbackTypefaces = {};
 };
 
 }  // namespace pagx
