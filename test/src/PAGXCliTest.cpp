@@ -716,6 +716,14 @@ CLI_TEST(PAGXCliTest, Render_CombinedOptions) {
   EXPECT_TRUE(CompareRenderedImage(outputPath, "PAGXCliTest/RenderCombinedOptions"));
 }
 
+CLI_TEST(PAGXCliTest, Render_Text) {
+  auto inputPath = TestResourcePath("render_text.pagx");
+  auto outputPath = TempDir() + "/RenderText.png";
+  auto ret = CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(CompareRenderedImage(outputPath, "PAGXCliTest/RenderText"));
+}
+
 CLI_TEST(PAGXCliTest, Render_MissingFile) {
   auto outputPath = TempDir() + "/RenderMissingFile.png";
   auto ret = CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, "nonexistent.pagx"});

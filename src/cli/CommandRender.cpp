@@ -25,6 +25,7 @@
 #include <cstring>
 #include <iostream>
 #include <string>
+#include "cli/CliUtils.h"
 #include "pagx/PAGXImporter.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/TextLayout.h"
@@ -223,7 +224,7 @@ int RunRender(int argc, char* argv[]) {
 
   // Perform text layout and build the layer tree.
   TextLayout textLayout = {};
-  textLayout.layout(document.get());
+  SetupSystemFallbackFonts(textLayout);
   auto rootLayer = LayerBuilder::Build(document.get(), &textLayout);
   if (rootLayer == nullptr) {
     std::cerr << "pagx render: failed to build layer tree\n";

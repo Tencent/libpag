@@ -268,7 +268,7 @@ static int RunFontEmbed(int argc, char* argv[]) {
     textLayout.registerTypeface(typeface);
   }
 
-  // Resolve fallback typefaces.
+  // Resolve fallback typefaces: user-specified first, then system fallbacks.
   std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces = {};
   for (const auto& fallbackStr : options.fallbacks) {
     std::string family = {};
@@ -280,6 +280,10 @@ static int RunFontEmbed(int argc, char* argv[]) {
       return 1;
     }
     fallbackTypefaces.push_back(typeface);
+  }
+  auto systemFallbacks = GetSystemFallbackTypefaces();
+  for (auto& typeface : systemFallbacks) {
+    fallbackTypefaces.push_back(std::move(typeface));
   }
   if (!fallbackTypefaces.empty()) {
     textLayout.setFallbackTypefaces(std::move(fallbackTypefaces));
