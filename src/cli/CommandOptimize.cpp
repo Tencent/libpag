@@ -806,6 +806,35 @@ static void ComputeLocalizationOffset(const std::vector<Element*>& contents, flo
   }
 }
 
+static void OffsetPathData(PathData* source, PathData* target, float offsetX, float offsetY) {
+  const auto& verbs = source->verbs();
+  const auto& points = source->points();
+  size_t pointIndex = 0;
+  for (auto verb : verbs) {
+    const Point* pts = points.data() + pointIndex;
+    switch (verb) {
+      case PathVerb::Move:
+        target->moveTo(pts[0].x - offsetX, pts[0].y - offsetY);
+        break;
+      case PathVerb::Line:
+        target->lineTo(pts[0].x - offsetX, pts[0].y - offsetY);
+        break;
+      case PathVerb::Quad:
+        target->quadTo(pts[0].x - offsetX, pts[0].y - offsetY, pts[1].x - offsetX,
+                       pts[1].y - offsetY);
+        break;
+      case PathVerb::Cubic:
+        target->cubicTo(pts[0].x - offsetX, pts[0].y - offsetY, pts[1].x - offsetX,
+                        pts[1].y - offsetY, pts[2].x - offsetX, pts[2].y - offsetY);
+        break;
+      case PathVerb::Close:
+        target->close();
+        break;
+    }
+    pointIndex += PathData::PointsPerVerb(verb);
+  }
+}
+
 static void ApplyLocalizationToElements(PAGXDocument* document,
                                         const std::vector<Element*>& contents, float offsetX,
                                         float offsetY) {
@@ -827,27 +856,7 @@ static void ApplyLocalizationToElements(PAGXDocument* document,
       auto path = static_cast<Path*>(element);
       if (path->data != nullptr && !path->data->isEmpty()) {
         auto tempData = document->makeNode<PathData>();
-        path->data->forEach([&](PathVerb verb, const Point* pts) {
-          switch (verb) {
-            case PathVerb::Move:
-              tempData->moveTo(pts[0].x - offsetX, pts[0].y - offsetY);
-              break;
-            case PathVerb::Line:
-              tempData->lineTo(pts[0].x - offsetX, pts[0].y - offsetY);
-              break;
-            case PathVerb::Quad:
-              tempData->quadTo(pts[0].x - offsetX, pts[0].y - offsetY, pts[1].x - offsetX,
-                               pts[1].y - offsetY);
-              break;
-            case PathVerb::Cubic:
-              tempData->cubicTo(pts[0].x - offsetX, pts[0].y - offsetY, pts[1].x - offsetX,
-                                pts[1].y - offsetY, pts[2].x - offsetX, pts[2].y - offsetY);
-              break;
-            case PathVerb::Close:
-              tempData->close();
-              break;
-          }
-        });
+        OffsetPathData(path->data, tempData, offsetX, offsetY);
         path->data->setPathData(*tempData);
       }
     } else if (type == NodeType::Text) {
