@@ -284,38 +284,38 @@ function embedSampleFiles(mdContent, specDir) {
  */
 function addPreviewButtons(html, viewerUrl, lang) {
   const markerPattern = /<!-- preview:(samples\/[^\s]+\.pagx) -->/g;
-  var markers = [];
-  var m;
+  const markers = [];
+  let m;
   while ((m = markerPattern.exec(html)) !== null) {
     markers.push({ start: m.index, end: m.index + m[0].length, samplePath: m[1] });
   }
   if (markers.length === 0) return html;
   // Process from back to front to keep positions stable.
-  for (var i = markers.length - 1; i >= 0; i--) {
-    var marker = markers[i];
+  for (let i = markers.length - 1; i >= 0; i--) {
+    const marker = markers[i];
     // Find the closest </pre> before this marker.
-    var preCloseTag = '</pre>';
-    var preCloseEnd = html.lastIndexOf(preCloseTag, marker.start);
+    const preCloseTag = '</pre>';
+    let preCloseEnd = html.lastIndexOf(preCloseTag, marker.start);
     if (preCloseEnd === -1) {
       console.warn('  Warning: no </pre> found before preview marker for ' + marker.samplePath);
       continue;
     }
     preCloseEnd += preCloseTag.length;
     // Find the matching <pre> for this </pre>.
-    var preOpenStart = html.lastIndexOf('<pre>', preCloseEnd);
+    const preOpenStart = html.lastIndexOf('<pre>', preCloseEnd);
     if (preOpenStart === -1) {
       console.warn('  Warning: no <pre> found before preview marker for ' + marker.samplePath);
       continue;
     }
-    var previewUrl = viewerUrl + '?file=./' + marker.samplePath;
-    var label = lang === 'zh' ? '预览' : 'Preview';
-    var header = '<div class="code-header">' +
+    const previewUrl = viewerUrl + '?file=./' + marker.samplePath;
+    const label = lang === 'zh' ? '预览' : 'Preview';
+    const header = '<div class="code-header">' +
       '<a class="preview-btn" href="' + previewUrl + '">' +
       '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
       label + '</a>' +
       '<span class="code-header-label">PAGX</span></div>';
-    var wrapperOpen = '<div class="code-block-wrapper">' + header;
-    var wrapperClose = '</div>';
+    const wrapperOpen = '<div class="code-block-wrapper">' + header;
+    const wrapperClose = '</div>';
     // Replace marker with wrapper close, then insert wrapper open before <pre>.
     html = html.slice(0, preCloseEnd) + wrapperClose + html.slice(marker.end);
     html = html.slice(0, preOpenStart) + wrapperOpen + html.slice(preOpenStart);

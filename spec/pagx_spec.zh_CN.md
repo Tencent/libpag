@@ -1871,6 +1871,7 @@ Layer / Group
 | **WritingMode** | `horizontal`, `vertical` |
 | **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |
 | **Overflow** | `visible`, `hidden` |
+
 ---
 
 ## 附录 C. 常见用法示例（Examples）

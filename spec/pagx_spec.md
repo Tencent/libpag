@@ -260,6 +260,8 @@ PAGX uses a standard 2D Cartesian coordinate system:
 
 `<pagx>` is the root element of a PAGX document, defining the canvas dimensions and directly containing the layer list.
 
+> [Sample](samples/3.2_document_structure.pagx)
+
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `version` | string | (required) | Format version |
@@ -267,8 +269,6 @@ PAGX uses a standard 2D Cartesian coordinate system:
 | `height` | float | (required) | Canvas height |
 
 **Layer Rendering Order**: Layers are rendered sequentially in document order; layers earlier in the document render first (below); later layers render last (above).
-
-> [Sample](samples/3.2_document_structure.pagx)
 
 ### 3.3 Resources
 
@@ -1876,6 +1876,7 @@ Layer / Group
 | **WritingMode** | `horizontal`, `vertical` |
 | **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |
 | **Overflow** | `visible`, `hidden` |
+
 ---
 
 ## Appendix C. Common Usage Examples
