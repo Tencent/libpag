@@ -192,10 +192,11 @@ Process the commits from **Step 1's list** (not a raw git range) in
   `git reset --hard HEAD` to sync the working tree.
 
 If any step fails, remove the temporary worktree and branch, inform the user,
-and stop. **Cherry-pick conflicts must NOT be manually resolved** — abort with
-`git cherry-pick --abort`, remove the worktree and branch, and report the
-conflicting commit to the user. Suggest narrowing the range to start after the
-nearest merge commit to avoid history-divergence conflicts.
+and stop. If a cherry-pick produces a conflict, resolve it automatically by
+running `git checkout --theirs <conflicted_file>` for each conflicted file,
+then `git add <conflicted_files>` and `git cherry-pick --continue --no-edit`.
+The integrity check at the end of Phase A will verify the final tree matches
+the original branch exactly.
 
 **Integrity check**: diff `{squash_end}` against the temporary branch HEAD —
 their trees must be identical. If different, abort (remove worktree and branch).
