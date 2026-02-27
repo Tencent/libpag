@@ -30,7 +30,7 @@ namespace pagx {
 
 /**
  * TextBox is a text layout node that controls typography for accumulated Text elements.
- * It re-layouts glyph positions and provides layout capabilities including:
+ * It recalculates glyph positions and provides layout capabilities including:
  * - Automatic word wrapping when wordWrap is enabled
  * - Horizontal/vertical writing mode
  * - Overflow control (visible or hidden)
