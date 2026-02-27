@@ -1744,9 +1744,8 @@ class TextLayoutContext {
 
       if (doWrap && !currentColumn->glyphs.empty() && currentColumnHeight + vg.height > boxHeight) {
         if (lastBreakIndex >= 0) {
-          std::vector<VerticalGlyphInfo> overflow(
-              currentColumn->glyphs.begin() + lastBreakIndex,
-              currentColumn->glyphs.end());
+          std::vector<VerticalGlyphInfo> overflow(currentColumn->glyphs.begin() + lastBreakIndex,
+                                                  currentColumn->glyphs.end());
           currentColumn->glyphs.resize(static_cast<size_t>(lastBreakIndex));
           RemoveTrailingLetterSpacing(currentColumn->glyphs);
           // Trim trailing whitespace from current column.
