@@ -88,6 +88,9 @@ jobject MakeByteBufferObject(JNIEnv* env, const void* bytes, size_t length) {
   static jmethodID ByteBuffer_wrap =
       env->GetStaticMethodID(ByteBufferClass.get(), "wrap", "([B)Ljava/nio/ByteBuffer;");
   auto byteArray = env->NewByteArray(static_cast<jint>(length));
+  if (byteArray == nullptr) {
+    return nullptr;
+  }
   env->SetByteArrayRegion(byteArray, 0, static_cast<jint>(length), (jbyte*)bytes);
   auto result = env->CallStaticObjectMethod(ByteBufferClass.get(), ByteBuffer_wrap, byteArray);
   env->DeleteLocalRef(byteArray);

@@ -98,6 +98,14 @@ PAG_API jlong Java_org_libpag_PAGImage_LoadFromBytes(JNIEnv* env, jclass, jbyteA
     return 0;
   }
   auto data = env->GetByteArrayElements(bytes, nullptr);
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    return 0;
+  }
+  if (data == nullptr) {
+    LOGE("PAGImage.LoadFromBytes() Failed to get byte array elements.");
+    return 0;
+  }
   auto pagImage = PAGImage::FromBytes(data, static_cast<size_t>(length));
   env->ReleaseByteArrayElements(bytes, data, 0);
   if (pagImage == nullptr) {
@@ -174,7 +182,17 @@ PAG_API void Java_org_libpag_PAGImage_setScaleMode(JNIEnv* env, jobject thiz, ji
 
 PAG_API void Java_org_libpag_PAGImage_nativeGetMatrix(JNIEnv* env, jobject thiz,
                                                       jfloatArray values) {
+  if (values == nullptr) {
+    return;
+  }
   auto list = env->GetFloatArrayElements(values, nullptr);
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    return;
+  }
+  if (list == nullptr) {
+    return;
+  }
   auto image = getPAGImage(env, thiz);
   if (image != nullptr) {
     auto matrix = image->matrix();
