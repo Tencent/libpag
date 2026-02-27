@@ -40,7 +40,8 @@ pagx optimize --dry-run input.pagx       # preview only
 
 ## pagx render
 
-Render a PAGX file to an image.
+Render a PAGX file to an image. By default, output to the same directory as the input file
+with the same base name (e.g., `foo.pagx` → `foo.png`).
 
 ```bash
 pagx render -o output.png input.pagx
