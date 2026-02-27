@@ -561,6 +561,10 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
 
     auto surface =
         Surface::Make(context, static_cast<int>(doc->width), static_cast<int>(doc->height));
+    if (!surface) {
+      ADD_FAILURE() << "Failed to create surface for: " << filePath;
+      continue;
+    }
     DisplayList displayList;
     displayList.root()->addChild(layer);
     displayList.render(surface.get(), false);
