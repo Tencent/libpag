@@ -133,7 +133,7 @@ CLI_TEST(PAGXCliTest, Validate_InvalidRootElement) {
 
 CLI_TEST(PAGXCliTest, Validate_JsonFormat) {
   auto path = TestResourcePath("validate_simple.pagx");
-  auto ret = CallRun(pagx::cli::RunValidate, {"validate", "--format", "json", path});
+  auto ret = CallRun(pagx::cli::RunValidate, {"validate", "--json", path});
   EXPECT_EQ(ret, 0);
 }
 
