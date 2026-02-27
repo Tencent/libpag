@@ -196,6 +196,9 @@ static std::vector<ShapedGlyph> ShapeRun(const std::string& text, size_t byteOff
   auto* positions = hb_buffer_get_glyph_positions(buffer.get(), &glyphCount);
 
   auto upem = static_cast<float>(typeface->unitsPerEm());
+  if (upem == 0) {
+    upem = 1;
+  }
   auto fontSize = font.getSize();
   auto scale = fontSize / upem;
 
