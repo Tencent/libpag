@@ -823,7 +823,7 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       if (style->blendMode != BlendMode::Normal) {
         xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
       }
-      xml.addAttribute("excludeChildEffects", style->excludeChildEffects);
+      xml.addAttribute("excludeChildEffects", style->excludeChildEffects, false);
       writeShadowAttributes(xml, style->offsetX, style->offsetY, style->blurX, style->blurY,
                             style->color);
       xml.addAttribute("showBehindLayer", style->showBehindLayer, true);
@@ -836,7 +836,7 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       if (style->blendMode != BlendMode::Normal) {
         xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
       }
-      xml.addAttribute("excludeChildEffects", style->excludeChildEffects);
+      xml.addAttribute("excludeChildEffects", style->excludeChildEffects, false);
       writeShadowAttributes(xml, style->offsetX, style->offsetY, style->blurX, style->blurY,
                             style->color);
       xml.closeElementSelfClosing();
@@ -848,7 +848,7 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       if (style->blendMode != BlendMode::Normal) {
         xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
       }
-      xml.addAttribute("excludeChildEffects", style->excludeChildEffects);
+      xml.addAttribute("excludeChildEffects", style->excludeChildEffects, false);
       xml.addAttribute("blurX", style->blurX);
       xml.addAttribute("blurY", style->blurY);
       if (style->tileMode != TileMode::Mirror) {
