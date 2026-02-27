@@ -18,8 +18,8 @@ original branch is untouched until the user explicitly confirms the result.
   conversation. Do not default to English.
 - **Do NOT pause or ask for confirmation during Steps 1, 2, and Phase A of
   Step 3.** Execute them in a single uninterrupted flow. **However, you MUST
-  stop and ask for user confirmation in Phase B** — this is the one and only
-  mandatory interaction point in the entire skill. See Phase B for details.
+  stop and ask for user confirmation in Phase B** — see Phase B for details.
+  Phase D may present an optional push prompt — see Phase D for details.
 - **NEVER use `$()`, backtick substitution, or shell variable assignment in
   Bash tool calls** — the sandbox rejects all of these. Each Bash call must be
   a plain, self-contained command with no dynamic expansion. When one command's
@@ -245,3 +245,23 @@ is stable and validation passes.
    `git branch --set-upstream-to`.
 
 Output: `Squash complete: {original_count} commits → {new_count} commits`
+
+---
+
+### Phase D — Offer to push
+
+After Phase C, check whether the squashed branch can be pushed **without**
+`--force`. The branch can be pushed normally when **both** conditions are true:
+
+1. The branch has an upstream tracking branch.
+2. The remote tracking point recorded in Step 1 is an ancestor of (or equal
+   to) the new branch HEAD — i.e., `git merge-base --is-ancestor
+   <remote_tracking_point> HEAD` succeeds.
+
+If the branch **cannot** be pushed normally (no upstream, or the remote
+tracking point is not an ancestor — meaning `--force` would be required),
+**do not offer to push**. End silently after the Phase C output.
+
+If the branch **can** be pushed normally, call `AskUserQuestion` with
+**Push** / **Skip** options asking whether to push now. If the user selects
+**Push**, run `git push`. If the user selects **Skip**, do nothing.
