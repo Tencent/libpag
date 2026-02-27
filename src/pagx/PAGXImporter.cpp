@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXImporter.h"
+#include <climits>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -1404,6 +1405,12 @@ static int getIntAttribute(const DOMNode* node, const std::string& name, int def
   if (endPtr == str->c_str()) {
     if (doc) {
       reportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
+    }
+    return defaultValue;
+  }
+  if (value < INT_MIN || value > INT_MAX) {
+    if (doc) {
+      reportError(doc, node, "Value out of range for '" + name + "' attribute.");
     }
     return defaultValue;
   }
