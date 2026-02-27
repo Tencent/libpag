@@ -282,11 +282,12 @@ class TextLayoutContext {
     if (text == nullptr || shapedText.textBlob == nullptr) {
       return;
     }
-    auto [it, inserted] = result.emplace(text, std::move(shapedText));
-    if (inserted) {
-      textOrder.push_back(text);
-    } else {
+    auto it = result.find(text);
+    if (it != result.end()) {
       it->second = std::move(shapedText);
+    } else {
+      result.emplace(text, std::move(shapedText));
+      textOrder.push_back(text);
     }
   }
 
