@@ -79,6 +79,7 @@ class FontCache {
     fontMutex->lock();
   }
   FontCache(const FontCache&) = delete;
+  FontCache(FontCache&&) = delete;
   FontCache& operator=(const FontCache&) = delete;
   FontCache& operator=(FontCache&&) = delete;
 
