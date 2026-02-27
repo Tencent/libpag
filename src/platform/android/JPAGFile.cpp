@@ -50,17 +50,17 @@ PAG_API jint Java_org_libpag_PAGFile_MaxSupportedTagLevel(JNIEnv*, jclass) {
 PAG_API jobject Java_org_libpag_PAGFile_LoadFromPath(JNIEnv* env, jclass, jstring pathObj) {
   if (pathObj == nullptr) {
     LOGE("PAGFile.LoadFromPath() Invalid path specified.");
-    return NULL;
+    return nullptr;
   }
   auto path = SafeConvertToStdString(env, pathObj);
   if (path.empty()) {
-    return NULL;
+    return nullptr;
   }
   LOGI("PAGFile.LoadFromPath() start: %s", path.c_str());
   auto pagFile = PAGFile::Load(path);
   if (pagFile == nullptr) {
     LOGE("PAGFile.LoadFromPath() Invalid pag file : %s", path.c_str());
-    return NULL;
+    return nullptr;
   }
   return ToPAGLayerJavaObject(env, pagFile);
 }
@@ -69,15 +69,23 @@ PAG_API jobject Java_org_libpag_PAGFile_LoadFromBytes(JNIEnv* env, jclass, jbyte
                                                       jint length, jstring jpath) {
   if (bytes == nullptr) {
     LOGE("PAGFile.LoadFromBytes() Invalid pag file bytes specified.");
-    return NULL;
+    return nullptr;
   }
   auto data = env->GetByteArrayElements(bytes, nullptr);
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    return nullptr;
+  }
+  if (data == nullptr) {
+    LOGE("PAGFile.LoadFromBytes() Failed to get byte array elements.");
+    return nullptr;
+  }
   auto path = SafeConvertToStdString(env, jpath);
   auto pagFile = PAGFile::Load(data, static_cast<size_t>(length), path);
   env->ReleaseByteArrayElements(bytes, data, 0);
   if (pagFile == nullptr) {
     LOGE("PAGFile.LoadFromBytes() Invalid pag file bytes specified.");
-    return NULL;
+    return nullptr;
   }
   return ToPAGLayerJavaObject(env, pagFile);
 }
@@ -88,13 +96,13 @@ PAG_API jobject Java_org_libpag_PAGFile_LoadFromAssets(JNIEnv* env, jclass, jobj
   auto byteData = ReadBytesFromAssets(env, managerObj, pathObj);
   if (byteData == nullptr) {
     LOGE("PAGFile.LoadFromAssets() Can't find the file name from asset manager : %s", path.c_str());
-    return NULL;
+    return nullptr;
   }
   LOGI("PAGFile.LoadFromAssets() start: %s", path.c_str());
   auto pagFile = PAGFile::Load(byteData->data(), byteData->length(), "assets://" + path);
   if (pagFile == nullptr) {
     LOGE("PAGFile.LoadFromAssets() Invalid pag file : %s", path.c_str());
-    return NULL;
+    return nullptr;
   }
   return ToPAGLayerJavaObject(env, pagFile);
 }
@@ -210,8 +218,11 @@ PAG_API jintArray Java_org_libpag_PAGFile_getEditableIndices(JNIEnv* env, jobjec
     return env->NewIntArray(0);
   }
   auto indices = pagFile->getEditableIndices(static_cast<pag::LayerType>(layerType));
-  auto result = env->NewIntArray(indices.size());
-  env->SetIntArrayRegion(result, 0, indices.size(), indices.data());
+  auto result = env->NewIntArray(static_cast<jsize>(indices.size()));
+  if (result == nullptr) {
+    return nullptr;
+  }
+  env->SetIntArrayRegion(result, 0, static_cast<jsize>(indices.size()), indices.data());
   return result;
 }
 
@@ -242,7 +253,7 @@ PAG_API void Java_org_libpag_PAGFile_setDuration(JNIEnv* env, jobject thiz, jlon
 PAG_API jobject Java_org_libpag_PAGFile_copyOriginal(JNIEnv* env, jobject thiz) {
   auto pagFile = getPAGFile(env, thiz);
   if (pagFile == nullptr) {
-    return NULL;
+    return nullptr;
   }
   auto newFile = pagFile->copyOriginal();
   return ToPAGLayerJavaObject(env, newFile);

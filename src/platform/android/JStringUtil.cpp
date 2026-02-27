@@ -28,8 +28,12 @@ jstring SafeConvertToJString(JNIEnv* env, const std::string& text) {
   static Global<jclass> StringClass = env->FindClass("java/lang/String");
   static jmethodID StringConstructID =
       env->GetMethodID(StringClass.get(), "<init>", "([BLjava/lang/String;)V");
-  auto array = env->NewByteArray(text.size());
-  env->SetByteArrayRegion(array, 0, text.size(), reinterpret_cast<const jbyte*>(text.data()));
+  auto array = env->NewByteArray(static_cast<jsize>(text.size()));
+  if (array == nullptr) {
+    return nullptr;
+  }
+  env->SetByteArrayRegion(array, 0, static_cast<jsize>(text.size()),
+                          reinterpret_cast<const jbyte*>(text.data()));
   auto stringUTF = env->NewStringUTF("UTF-8");
   auto result = (jstring)env->NewObject(StringClass.get(), StringConstructID, array, stringUTF);
   env->DeleteLocalRef(array);
@@ -48,8 +52,11 @@ std::string SafeConvertToStdString(JNIEnv* env, jstring jText) {
   auto encoding = env->NewStringUTF("utf-8");
   auto jBytes = (jbyteArray)env->CallObjectMethod(jText, GetBytesID, encoding);
   env->DeleteLocalRef(encoding);
-  if (jBytes == nullptr || env->ExceptionCheck()) {
+  if (env->ExceptionCheck()) {
     env->ExceptionClear();
+    return "";
+  }
+  if (jBytes == nullptr) {
     return "";
   }
   auto textLength = env->GetArrayLength(jBytes);
