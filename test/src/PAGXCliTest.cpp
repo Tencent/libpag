@@ -730,10 +730,13 @@ CLI_TEST(PAGXCliTest, Render_MissingFile) {
   EXPECT_NE(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, Render_MissingOutput) {
+CLI_TEST(PAGXCliTest, Render_DefaultOutput) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   auto ret = CallRun(pagx::cli::RunRender, {"render", inputPath});
-  EXPECT_NE(ret, 0);
+  EXPECT_EQ(ret, 0);
+  auto defaultOutput = ProjectPath::Absolute("resources/cli/render_basic.png");
+  EXPECT_TRUE(std::filesystem::exists(defaultOutput));
+  std::filesystem::remove(defaultOutput);
 }
 
 CLI_TEST(PAGXCliTest, Render_InvalidScale) {
