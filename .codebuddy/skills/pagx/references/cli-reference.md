@@ -44,15 +44,16 @@ Render a PAGX file to an image. By default, output to the same directory as the 
 with the same base name (e.g., `foo.pagx` → `foo.png`).
 
 ```bash
+pagx render input.pagx                    # outputs input.png
+pagx render --format webp --scale 2 input.pagx   # outputs input.webp
 pagx render -o output.png input.pagx
-pagx render -o output.webp --format webp --scale 2 input.pagx
 pagx render -o cropped.png --crop 50,50,200,200 input.pagx
 pagx render -o output.jpg --format jpg --quality 90 --background "#FFFFFF" input.pagx
 ```
 
 | Option | Description |
 |--------|-------------|
-| `-o, --output <path>` | Output file path (required) |
+| `-o, --output <path>` | Output file path (default: input path with format extension) |
 | `--format png\|webp\|jpg` | Output format (default: png) |
 | `--scale <float>` | Scale factor (default: 1.0) |
 | `--crop <x,y,w,h>` | Crop region in document coordinates |
@@ -69,7 +70,7 @@ running optimizations.
 
 ```bash
 pagx validate input.pagx
-pagx validate --format json input.pagx
+pagx validate --json input.pagx
 ```
 
 Text output: `filename:line: error message`. JSON output includes `file`, `valid`, and `errors`

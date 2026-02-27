@@ -39,7 +39,7 @@ struct BoundsOptions {
 };
 
 static void PrintBoundsUsage() {
-  std::cerr << "Usage: pagx bounds [options] <file.pagx>\n"
+  std::cout << "Usage: pagx bounds [options] <file.pagx>\n"
             << "\n"
             << "Query precise rendered bounds of Layer nodes.\n"
             << "\n"
@@ -56,7 +56,8 @@ static void PrintBoundsUsage() {
             << "  /pagx/Layer[2]/Layer   Child Layers of second top-level Layer\n";
 }
 
-static bool ParseBoundsOptions(int argc, char* argv[], BoundsOptions* options) {
+// Returns 0 on success, -1 if help was printed, 1 on error.
+static int ParseBoundsOptions(int argc, char* argv[], BoundsOptions* options) {
   int i = 1;
   while (i < argc) {
     std::string arg = argv[i];
@@ -66,30 +67,22 @@ static bool ParseBoundsOptions(int argc, char* argv[], BoundsOptions* options) {
       options->relativeTo = argv[++i];
     } else if (arg == "--json") {
       options->jsonOutput = true;
-    } else if (arg == "--format" && i + 1 < argc) {
-      std::string fmt = argv[++i];
-      if (fmt == "json") {
-        options->jsonOutput = true;
-      } else {
-        std::cerr << "pagx bounds: unsupported format '" << fmt << "'\n";
-        return false;
-      }
     } else if (arg == "--help" || arg == "-h") {
       PrintBoundsUsage();
-      return false;
+      return -1;
     } else if (arg[0] == '-') {
       std::cerr << "pagx bounds: unknown option '" << arg << "'\n";
-      return false;
+      return 1;
     } else {
       options->inputFile = arg;
     }
     i++;
   }
   if (options->inputFile.empty()) {
-    std::cerr << "pagx bounds: no input file specified\n";
-    return false;
+    std::cerr << "pagx bounds: missing input file\n";
+    return 1;
   }
-  return true;
+  return 0;
 }
 
 // Compute the "Layer path" from <pagx> root to a given xmlNode. The path is a list of 0-based
@@ -273,8 +266,9 @@ static void PrintLayerBoundsRecursive(const Layer* pagxLayer, tgfx::Layer* tgfxL
 
 int RunBounds(int argc, char* argv[]) {
   BoundsOptions options = {};
-  if (!ParseBoundsOptions(argc, argv, &options)) {
-    return 1;
+  auto parseResult = ParseBoundsOptions(argc, argv, &options);
+  if (parseResult != 0) {
+    return parseResult == -1 ? 0 : parseResult;
   }
 
   auto document = PAGXImporter::FromFile(options.inputFile);

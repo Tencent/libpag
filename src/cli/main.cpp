@@ -41,8 +41,7 @@ static void PrintUsage() {
             << "  format     Format a PAGX file (indentation and attribute ordering)\n"
             << "  optimize   Validate, optimize, and format a PAGX file in one step\n"
             << "\n"
-            << "Global Options:\n"
-            << "  --format json    Output in JSON format (validate, bounds)\n"
+            << "Options:\n"
             << "  --help, -h       Show help\n"
             << "  --version, -v    Show version\n";
 }

@@ -56,10 +56,11 @@ struct RenderOptions {
 };
 
 static void PrintRenderUsage() {
-  std::cerr << "Usage: pagx render [options] <file.pagx>\n"
+  std::cout << "Usage: pagx render [options] <file.pagx>\n"
             << "\n"
             << "Options:\n"
-            << "  -o, --output <path>       Output file path (required)\n"
+            << "  -o, --output <path>       Output file path (default: input path with format "
+               "extension)\n"
             << "  --format png|webp|jpg     Output format (default: png)\n"
             << "  --scale <float>           Scale factor (default: 1.0)\n"
             << "  --crop <x,y,w,h>          Crop region in document coordinates\n"
@@ -121,7 +122,8 @@ static bool ParseCrop(const std::string& cropStr, float* x, float* y, float* w, 
   return *w > 0 && *h > 0;
 }
 
-static bool ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
+// Returns 0 on success, -1 if help was printed, 1 on error.
+static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
   int i = 1;
   while (i < argc) {
     std::string arg = argv[i];
@@ -164,24 +166,25 @@ static bool ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
       }
     } else if (arg == "--help" || arg == "-h") {
       PrintRenderUsage();
-      return false;
+      return -1;
     } else if (arg[0] == '-') {
       std::cerr << "pagx render: unknown option '" << arg << "'\n";
-      return false;
+      return 1;
     } else {
       options->inputFile = arg;
     }
     i++;
   }
   if (options->inputFile.empty()) {
-    std::cerr << "pagx render: no input file specified\n";
-    return false;
+    std::cerr << "pagx render: missing input file\n";
+    return 1;
   }
   if (options->outputFile.empty()) {
-    std::cerr << "pagx render: no output file specified (use -o)\n";
-    return false;
+    auto dot = options->inputFile.rfind('.');
+    auto base = dot != std::string::npos ? options->inputFile.substr(0, dot) : options->inputFile;
+    options->outputFile = base + "." + options->format;
   }
-  return true;
+  return 0;
 }
 
 static tgfx::EncodedFormat GetEncodedFormat(const std::string& format) {
@@ -206,8 +209,9 @@ static bool WriteDataToFile(const std::string& filePath, const std::shared_ptr<t
 
 int RunRender(int argc, char* argv[]) {
   RenderOptions options = {};
-  if (!ParseRenderOptions(argc, argv, &options)) {
-    return 1;
+  auto parseResult = ParseRenderOptions(argc, argv, &options);
+  if (parseResult != 0) {
+    return parseResult == -1 ? 0 : parseResult;
   }
 
   // Load the PAGX document.

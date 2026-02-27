@@ -68,7 +68,7 @@ struct FontInfoOptions {
 };
 
 static void PrintFontInfoUsage() {
-  std::cerr << "Usage: pagx font info [options]\n"
+  std::cout << "Usage: pagx font info [options]\n"
             << "\n"
             << "Query font identity and metrics.\n"
             << "\n"
@@ -81,7 +81,8 @@ static void PrintFontInfoUsage() {
             << "Either --file or --name is required (mutually exclusive).\n";
 }
 
-static bool ParseFontInfoOptions(int argc, char* argv[], FontInfoOptions* options) {
+// Returns 0 on success, -1 if help was printed, 1 on error.
+static int ParseFontInfoOptions(int argc, char* argv[], FontInfoOptions* options) {
   int i = 1;
   while (i < argc) {
     std::string arg = argv[i];
@@ -93,34 +94,35 @@ static bool ParseFontInfoOptions(int argc, char* argv[], FontInfoOptions* option
       options->fontSize = strtof(argv[++i], nullptr);
       if (options->fontSize <= 0.0f) {
         std::cerr << "pagx font info: font size must be positive\n";
-        return false;
+        return 1;
       }
     } else if (arg == "--json") {
       options->jsonOutput = true;
     } else if (arg == "--help" || arg == "-h") {
       PrintFontInfoUsage();
-      return false;
+      return -1;
     } else if (arg[0] == '-') {
       std::cerr << "pagx font info: unknown option '" << arg << "'\n";
-      return false;
+      return 1;
     }
     i++;
   }
   if (options->fontFile.empty() && options->fontName.empty()) {
     std::cerr << "pagx font info: either --file or --name is required\n";
-    return false;
+    return 1;
   }
   if (!options->fontFile.empty() && !options->fontName.empty()) {
     std::cerr << "pagx font info: --file and --name are mutually exclusive\n";
-    return false;
+    return 1;
   }
-  return true;
+  return 0;
 }
 
 static int RunFontInfo(int argc, char* argv[]) {
   FontInfoOptions options = {};
-  if (!ParseFontInfoOptions(argc, argv, &options)) {
-    return 1;
+  auto parseResult = ParseFontInfoOptions(argc, argv, &options);
+  if (parseResult != 0) {
+    return parseResult == -1 ? 0 : parseResult;
   }
 
   std::shared_ptr<tgfx::Typeface> typeface = nullptr;
@@ -194,7 +196,7 @@ struct FontEmbedOptions {
 };
 
 static void PrintFontEmbedUsage() {
-  std::cerr
+  std::cout
       << "Usage: pagx font embed [options] <file.pagx>\n"
       << "\n"
       << "Embed fonts into a PAGX file by performing text layout and glyph extraction.\n"
@@ -208,7 +210,8 @@ static void PrintFontEmbedUsage() {
       << "  -h, --help                       Show this help message\n";
 }
 
-static bool ParseFontEmbedOptions(int argc, char* argv[], FontEmbedOptions* options) {
+// Returns 0 on success, -1 if help was printed, 1 on error.
+static int ParseFontEmbedOptions(int argc, char* argv[], FontEmbedOptions* options) {
   int i = 1;
   while (i < argc) {
     std::string arg = argv[i];
@@ -220,33 +223,33 @@ static bool ParseFontEmbedOptions(int argc, char* argv[], FontEmbedOptions* opti
       options->fallbacks.push_back(argv[++i]);
     } else if (arg == "--help" || arg == "-h") {
       PrintFontEmbedUsage();
-      return false;
+      return -1;
     } else if (arg[0] == '-') {
       std::cerr << "pagx font embed: unknown option '" << arg << "'\n";
-      return false;
+      return 1;
     } else if (options->inputFile.empty()) {
       options->inputFile = arg;
     } else {
       std::cerr << "pagx font embed: unexpected argument '" << arg << "'\n";
-      return false;
+      return 1;
     }
     i++;
   }
   if (options->inputFile.empty()) {
     std::cerr << "pagx font embed: missing input file\n";
-    PrintFontEmbedUsage();
-    return false;
+    return 1;
   }
   if (options->outputFile.empty()) {
     options->outputFile = options->inputFile;
   }
-  return true;
+  return 0;
 }
 
 static int RunFontEmbed(int argc, char* argv[]) {
   FontEmbedOptions options = {};
-  if (!ParseFontEmbedOptions(argc, argv, &options)) {
-    return 1;
+  auto parseResult = ParseFontEmbedOptions(argc, argv, &options);
+  if (parseResult != 0) {
+    return parseResult == -1 ? 0 : parseResult;
   }
 
   auto document = PAGXImporter::FromFile(options.inputFile);
@@ -311,13 +314,14 @@ static int RunFontEmbed(int argc, char* argv[]) {
     return 1;
   }
 
+  std::cout << "pagx font embed: wrote " << options.outputFile << "\n";
   return 0;
 }
 
 // ---- main entry ----
 
 static void PrintFontUsage() {
-  std::cerr << "Usage: pagx font <subcommand> [options]\n"
+  std::cout << "Usage: pagx font <subcommand> [options]\n"
             << "\n"
             << "Subcommands:\n"
             << "  info    Query font identity and metrics\n"

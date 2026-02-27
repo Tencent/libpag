@@ -73,7 +73,13 @@ static void PrintErrorsJson(const std::vector<ValidationError>& errors, const st
 }
 
 static void PrintUsage() {
-  std::cerr << "Usage: pagx validate [--format json] <file.pagx>\n";
+  std::cout << "Usage: pagx validate [options] <file.pagx>\n"
+            << "\n"
+            << "Validate a PAGX file against the specification schema.\n"
+            << "\n"
+            << "Options:\n"
+            << "  --json                 Output in JSON format\n"
+            << "  -h, --help             Show this help message\n";
 }
 
 std::vector<ValidationError> ValidateFile(const std::string& filePath) {
@@ -134,25 +140,13 @@ int RunValidate(int argc, char* argv[]) {
 
   // Parse arguments (argv[0] is "validate")
   for (int i = 1; i < argc; ++i) {
-    if (strcmp(argv[i], "--format") == 0) {
-      if (i + 1 < argc) {
-        ++i;
-        if (strcmp(argv[i], "json") == 0) {
-          jsonOutput = true;
-        } else {
-          std::cerr << "pagx validate: unknown format '" << argv[i] << "'\n";
-          return 1;
-        }
-      } else {
-        std::cerr << "pagx validate: --format requires an argument\n";
-        return 1;
-      }
+    if (strcmp(argv[i], "--json") == 0) {
+      jsonOutput = true;
     } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
       PrintUsage();
       return 0;
     } else if (argv[i][0] == '-') {
       std::cerr << "pagx validate: unknown option '" << argv[i] << "'\n";
-      PrintUsage();
       return 1;
     } else {
       filePath = argv[i];
@@ -160,7 +154,7 @@ int RunValidate(int argc, char* argv[]) {
   }
 
   if (filePath.empty()) {
-    PrintUsage();
+    std::cerr << "pagx validate: missing input file\n";
     return 1;
   }
 

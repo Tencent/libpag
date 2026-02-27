@@ -318,6 +318,7 @@ int RunFormat(int argc, char* argv[]) {
     return 1;
   }
 
+  std::cout << "pagx format: wrote " << outputPath << "\n";
   return 0;
 }
 
