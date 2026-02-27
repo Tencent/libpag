@@ -139,20 +139,20 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
       options->format = argv[++i];
       if (options->format != "png" && options->format != "webp" && options->format != "jpg") {
         std::cerr << "pagx render: unsupported format '" << options->format << "'\n";
-        return false;
+        return 1;
       }
     } else if (arg == "--scale" && i + 1 < argc) {
       options->scale = strtof(argv[++i], nullptr);
       if (options->scale <= 0.0f) {
         std::cerr << "pagx render: scale must be positive\n";
-        return false;
+        return 1;
       }
     } else if (arg == "--crop" && i + 1 < argc) {
       options->hasCrop = true;
       if (!ParseCrop(argv[++i], &options->cropX, &options->cropY, &options->cropWidth,
                      &options->cropHeight)) {
         std::cerr << "pagx render: invalid crop format, expected x,y,w,h\n";
-        return false;
+        return 1;
       }
     } else if (arg == "--quality" && i + 1 < argc) {
       char* endPtr = nullptr;
@@ -160,7 +160,7 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
       long val = strtol(argv[++i], &endPtr, 10);
       if (errno != 0 || endPtr == argv[i] || *endPtr != '\0' || val < 0 || val > 100) {
         std::cerr << "pagx render: invalid quality '" << argv[i] << "', must be 0-100\n";
-        return false;
+        return 1;
       }
       options->quality = static_cast<int>(val);
     } else if (arg == "--background" && i + 1 < argc) {
@@ -168,7 +168,7 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
       if (!ParseHexColor(argv[++i], &options->bgRed, &options->bgGreen, &options->bgBlue,
                          &options->bgAlpha)) {
         std::cerr << "pagx render: invalid color format, expected #RRGGBB or #RRGGBBAA\n";
-        return false;
+        return 1;
       }
     } else if (arg == "--font" && i + 1 < argc) {
       options->fontFiles.push_back(argv[++i]);
