@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdio>
 #include <string>
 
 namespace pagx::cli {
@@ -42,8 +43,20 @@ inline std::string EscapeJson(const std::string& input) {
       case '\t':
         result += "\\t";
         break;
+      case '\b':
+        result += "\\b";
+        break;
+      case '\f':
+        result += "\\f";
+        break;
       default:
-        result += ch;
+        if (static_cast<unsigned char>(ch) < 0x20) {
+          char buf[8] = {};
+          snprintf(buf, sizeof(buf), "\\u%04x", static_cast<unsigned char>(ch));
+          result += buf;
+        } else {
+          result += ch;
+        }
         break;
     }
   }

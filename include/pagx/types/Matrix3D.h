@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include <cstring>
-
 namespace pagx {
 
 /**
@@ -64,7 +62,12 @@ struct Matrix3D {
   }
 
   bool operator==(const Matrix3D& other) const {
-    return memcmp(values, other.values, sizeof(values)) == 0;
+    for (int i = 0; i < 16; ++i) {
+      if (values[i] != other.values[i]) {
+        return false;
+      }
+    }
+    return true;
   }
 
   bool operator!=(const Matrix3D& other) const {

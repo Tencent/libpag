@@ -147,6 +147,9 @@ int RunValidate(int argc, char* argv[]) {
         std::cerr << "pagx validate: --format requires an argument\n";
         return 1;
       }
+    } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
+      PrintUsage();
+      return 0;
     } else if (argv[i][0] == '-') {
       std::cerr << "pagx validate: unknown option '" << argv[i] << "'\n";
       PrintUsage();
