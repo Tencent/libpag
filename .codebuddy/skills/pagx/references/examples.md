@@ -480,19 +480,18 @@ on an empty background produces no visible effect.
 
 ## Common Pitfalls
 
-Mistakes that apply across all scenes:
+Mistakes that apply across all scenes. For detailed wrong/correct patterns with code examples,
+see `design-patterns.md` §Common Mistakes.
 
 - **Over-detailing icons**: Small dots, thin trend lines, tiny arrows, text labels inside
   icons — all become noise at icon scale. Icons communicate through shape and silhouette.
 - **Path complexity mismatch**: A filled Path with >15 curve segments is fragile. Simplify
   to essential silhouette, switch from Fill to Stroke, or compose from primitives.
 - **MergePath scope surprise**: MergePath clears all previously rendered Fill/Stroke in its
-  scope. Always isolate content that must survive into a separate Group before MergePath.
-- **Gradient coordinate confusion**: All gradient coordinates are relative to the geometry
-  element's local origin, not canvas-absolute. When sharing a gradient via `@id`, two geometry
-  elements at different positions referencing the same gradient will render differently unless
-  they have identical shapes and sizes.
+  scope (`design-patterns.md` §7).
+- **Gradient coordinate confusion**: Gradient coordinates are relative to the geometry
+  element's local origin, not canvas-absolute (`design-patterns.md` §5).
 - **Repeater element explosion**: Nested Repeaters multiply — `copies="50"` × `copies="50"`
   = 2500 elements. Keep single Repeater under ~200 copies, nested products under ~500.
-- **Text position with TextBox**: When TextBox is present, it overrides Text's `position` and
-  `textAnchor`. Do not set these on Text when using TextBox — they will be silently ignored.
+- **Text position with TextBox**: TextBox overrides Text's `position` and `textAnchor` —
+  do not set these on Text when using TextBox (`design-patterns.md` §3).

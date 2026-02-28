@@ -1,8 +1,12 @@
 # CLI Reference
 
 The `pagx` command-line tool provides utilities for working with PAGX files. All commands
-operate on local `.pagx` files. The binary is at `cmake-build-debug/pagx` (relative to the
-project root). If it does not exist, build it:
+operate on local `.pagx` files.
+
+## Building the CLI
+
+The binary is at `cmake-build-debug/pagx` (relative to the project root). If it does not
+exist, build it:
 
 ```bash
 cmake -G Ninja -DPAG_BUILD_CLI=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug

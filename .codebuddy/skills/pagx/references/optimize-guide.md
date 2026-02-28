@@ -72,17 +72,14 @@ Check for issues that automated optimization cannot fix:
 After all optimizations, verify the following:
 
 - [ ] All `<pagx>`/`<Composition>` direct children are `<Layer>` — not Group
-  (`spec-essentials.md` §1)
 - [ ] All required attributes present; no redundant default-value attributes
   (`attribute-reference.md`)
 - [ ] Painter scope isolation correct — different painters in Groups, same painters shared
-  (`spec-essentials.md` §4, see **Painter Merging § Scope Isolation Caveats** below)
+  (see **Painter Merging § Scope Isolation Caveats** below)
 - [ ] Text `position`/`textAnchor` not set when TextBox is present
-  (`spec-essentials.md` §7 TextBox)
 - [ ] Internal coordinates relative to Layer origin, not canvas-absolute
   (see **Coordinate Localization** below)
 - [ ] `<Resources>` placed after all Layers; all `@id` references resolve
-  (`spec-essentials.md` §10)
 - [ ] Repeater copies reasonable (~200 single, ~500 nested product)
 - [ ] Visual stacking order preserved
   (see **Layer/Group Optimization § Stacking Order** below)
@@ -99,41 +96,26 @@ After all optimizations, verify the following:
 
 Understanding the PAGX renderer's cost model helps identify performance bottlenecks:
 
-- **Repeater**: Expands at render time by fully cloning every Geometry and Painter per copy. No
-  GPU instancing or batching. Each copy independently computes Stroke, dash patterns, and
-  transforms. Cost is strictly linear: N copies = N× full rendering cost.
-- **Nested Repeaters**: Multiplicative. `copies="A"` containing `copies="B"` produces A×B
-  elements. This is the most common source of performance problems.
-- **BlurFilter / DropShadowStyle**: Computational cost is proportional to blur radius. Large
-  blur values are expensive.
+- **Repeater**: Fully clones every Geometry and Painter per copy. No GPU instancing. Cost is
+  strictly linear: N copies = N× full rendering cost.
+- **Nested Repeaters**: Multiplicative — `copies="A"` × `copies="B"` = A×B elements. Most
+  common source of performance problems.
+- **BlurFilter / DropShadowStyle**: Cost proportional to blur radius.
 - **DropShadowStyle**: Applied once per Layer on the composited silhouette — not per Repeater
-  copy. This makes container-level shadows efficient.
-- **Dashed Stroke**: Dash pattern is computed per Geometry independently. When combined with
-  Repeater, each copy incurs dash computation overhead on top of the basic stroke cost.
-- **Layer vs Group**: Layer is heavier — it creates an independent rendering surface that must
-  be composited back. Group only creates a painter scope boundary with no extra surface.
-  However, a Layer that meets all of the following conditions renders **without** creating an
-  extra surface (as efficient as Group): `blendMode="normal"`, `alpha="1"` (or `groupOpacity`
-  unset/false), no filters, no mask (or mask is a simple opaque path), no `matrix3D` with
-  perspective.
-- **Stroke Alignment**: `align="center"` (default) is GPU-accelerated. `"inside"` and
-  `"outside"` require CPU path boolean operations (intersect/difference), which are expensive
-  especially under Repeater.
+  copy. Container-level shadows are efficient.
+- **Dashed Stroke**: Dash pattern computed per Geometry independently. Under Repeater, each
+  copy incurs dash computation overhead.
+- **Layer vs Group**: Layer creates an independent rendering surface; Group does not. However,
+  a Layer with `blendMode="normal"`, `alpha="1"`, no filters, no mask (or simple opaque mask),
+  no `matrix3D` with perspective renders without extra surface (as efficient as Group).
+- **Stroke Alignment**: `align="center"` (default) is GPU-accelerated. `"inside"` / `"outside"`
+  require CPU path boolean operations, expensive under Repeater.
 
 ---
 
 ## Layer/Group Optimization
 
 ### Layer vs Group: When to Use Which
-
-**Layer** creates an independent rendering surface with its own coordinate system. It is the
-primary rendering unit for visual content, supporting advanced compositing (styles, filters,
-mask, blendMode, composition, scrollRect).
-
-**Group** is a lightweight scope boundary within a Layer. It supports basic transforms
-(position, rotation, scale, skew, alpha) and isolates painter scope, but creates no extra
-rendering surface. Group is the preferred container when no Layer-exclusive features are
-needed.
 
 | Feature | Layer | Group |
 |---------|-------|-------|
@@ -148,122 +130,87 @@ needed.
 ### The Core Principle
 
 > **One Layer = one independently positionable unit** — elements that are visually clustered
-> and would be repositioned as a whole. Layers nest naturally: a panel Layer contains button
-> child Layers, because both the panel and each button are independently positionable.
+> and would be repositioned as a whole.
 
-This principle drives all Layer/Group optimization decisions:
-
-- **Use Layer** when the content is an independently positionable unit: a button, a badge, an
-  icon+label row, a panel — or when Layer-exclusive features are needed (styles, filters, mask,
-  blendMode, composition, scrollRect).
-- **Use Layer** to isolate complex static content from dynamic content for animation. The
-  renderer caches Layer subtrees as textures; position/alpha/rotation/scale animations reuse
-  the cache without re-rendering.
+- **Use Layer** when the content is an independently positionable unit (button, badge, panel)
+  — or when Layer-exclusive features are needed (styles, filters, mask, blendMode, composition,
+  scrollRect).
+- **Use Layer** to isolate complex static content from dynamic content for animation caching.
 - **Use Group** when the content is internal structure within a unit: painter scope isolation,
-  shared transforms, or sub-elements that are not independently positionable.
-- **`<pagx>` and `<Composition>` direct children MUST be Layer.** Groups at root level
-  cause a parse error.
+  shared transforms, sub-elements that are not independently positionable.
 
 ---
 
 ### Optimization Scenarios
 
-The core principle leads to three optimization scenarios. In every case, the Layer carries
-the block's offset via `x`/`y`, and internal elements use coordinates **relative to the
-Layer's origin (0,0)** — so repositioning the block means changing one `x`/`y` value.
+The core principle leads to three scenarios. In every case, the Layer carries the block's
+offset via `x`/`y`, and internal elements use coordinates **relative to the Layer's origin
+(0,0)**.
 
 #### Scenario A: Split an Over-Packed Layer
 
-**Problem**: One Layer contains multiple distinct logical blocks (e.g., "Box A" and "Box B"
-test cases, or an entire page of unrelated UI sections). Each block cannot be independently
-moved or maintained.
+**Problem**: One Layer contains multiple distinct logical blocks that cannot be independently
+moved.
 
 **Fix**: Split into separate Layers — one per logical block. Set each Layer's `x`/`y` to the
-block's position, and convert internal coordinates to be relative to the Layer's origin.
+block's position, convert internal coordinates to Layer-relative.
 
 ```xml
-<!-- Before: two independent test cases crammed into one Layer -->
+<!-- Before: two independent blocks crammed into one Layer -->
 <Layer>
-  <!-- Box A at position 110,115 -->
   <Group>
     <Rectangle center="110,115" size="120,130"/>
     <Stroke color="#000" width="1"/>
   </Group>
-  <Group>
-    <Text text="Hello" fontFamily="Arial" fontSize="20"/>
-    <Fill color="#000"/>
-    <TextBox position="50,50" size="120,130"/>
-  </Group>
-  <!-- Box B at position 295,115 -->
+  <!-- ...more content for block A... -->
   <Group>
     <Rectangle center="295,115" size="120,130"/>
     <Stroke color="#000" width="1"/>
   </Group>
-  <Group>
-    <Text text="World" fontFamily="Arial" fontSize="20"/>
-    <Fill color="#000"/>
-    <TextBox position="235,50" size="120,130"/>
-  </Group>
+  <!-- ...more content for block B... -->
 </Layer>
 
 <!-- After: each block is an independent Layer with origin-relative internals -->
 <Layer x="110" y="115">
   <Group>
-    <Rectangle size="120,130"/>
+    <Rectangle size="120,130"/>     <!-- center shifted to 0,0 -->
     <Stroke color="#000" width="1"/>
   </Group>
-  <Group>
-    <Text text="Hello" fontFamily="Arial" fontSize="20"/>
-    <Fill color="#000"/>
-    <TextBox position="-60,-65" size="120,130"/>
-  </Group>
+  <!-- ... -->
 </Layer>
 <Layer x="295" y="115">
-  <Group>
-    <Rectangle size="120,130"/>
-    <Stroke color="#000" width="1"/>
-  </Group>
-  <Group>
-    <Text text="World" fontFamily="Arial" fontSize="20"/>
-    <Fill color="#000"/>
-    <TextBox position="-60,-65" size="120,130"/>
-  </Group>
+  <!-- same pattern -->
 </Layer>
 ```
 
 #### Scenario B: Merge Overlapping Layers into One Block
 
-**Problem**: A single logical block (a button, a badge, a bar) is scattered across multiple
-sibling Layers at the same position — e.g., one Layer for the background, another for the
-icon, another for the label. The block cannot be moved as a unit without updating multiple
-Layers.
+**Problem**: A single logical block (button, badge, bar) is scattered across multiple sibling
+Layers at the same position — cannot be moved as a unit.
 
 **Fix**: Wrap in one parent Layer. Keep children that need Layer-exclusive features as child
-Layers; downgrade the rest to Groups. The parent Layer's `x`/`y` carries the block offset;
-internal coordinates are origin-relative.
+Layers; downgrade the rest to Groups.
 
-> **Note**: When multiple Layers share identical painters and no Layer-exclusive features,
-> this scenario overlaps with **Cross-Layer Merging** in the Painter Merging section. The key
-> difference: Scenario B focuses on semantic grouping (one block = one Layer, even if painters
-> differ), while Cross-Layer Merging focuses on painter deduplication (shared painters, even
-> across independent blocks).
+> When multiple Layers share identical painters and no Layer-exclusive features, this overlaps
+> with **Cross-Layer Merging** in Painter Merging. Scenario B focuses on semantic grouping;
+> Cross-Layer Merging focuses on painter deduplication.
 
 ```xml
-<!-- Before: button scattered across two sibling Layers -->
-<Layer y="325" x="148">
-  <Rectangle center="0,0" size="120,36" roundness="18"/>
+<!-- Before: button scattered across two Layers at same position -->
+<Layer x="148" y="325">
+  <Rectangle size="120,36" roundness="18"/>
   <Fill color="@grad"/>
   <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#6366F180"/>
 </Layer>
-<Layer y="325" x="148">
+<Layer x="148" y="325">
   <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="13"
         position="0,4" textAnchor="center"/>
   <Fill color="#FFF"/>
 </Layer>
 
-<!-- After: one Layer for the button, label becomes a Group -->
+<!-- After: one Layer, label becomes a Group -->
 <Layer x="148" y="325">
-  <Rectangle center="0,0" size="120,36" roundness="18"/>
+  <Rectangle size="120,36" roundness="18"/>
   <Fill color="@grad"/>
   <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#6366F180"/>
   <Group>
@@ -276,54 +223,14 @@ internal coordinates are origin-relative.
 
 #### Scenario C: Downgrade Stacked Child Layers to Groups
 
-**Auto-apply** — Layer creates an independent rendering surface; Group does not. Replacing
-unnecessary Layers with Groups eliminates compositing overhead without visual change.
+**Auto-apply** — replacing unnecessary Layers with Groups eliminates compositing overhead.
 
-**Problem**: Inside one logical block (a parent Layer), multiple child Layers are used for
-sub-elements that do not need Layer-exclusive features — e.g., each stat row in a stats
-panel is its own Layer, but none use styles, filters, or mask. Each unnecessary Layer
-creates an extra rendering surface.
+**Problem**: Child Layers inside a block do not use any Layer-exclusive features, wasting
+rendering surfaces.
 
-**Fix**: Downgrade the child Layers to Groups. This is only safe when the Layers are
-sub-elements of the **same logical block** — never downgrade a Layer that is itself a
-distinct independent block.
-
-The simplest special case: a no-attribute Group or Layer wrapping a single child element is
-a redundant wrapper that can always be flattened (promote the child to the parent scope).
-
-```xml
-<!-- Before: three stat rows as child Layers (none use Layer-exclusive features) -->
-<Layer name="Stats" x="30" y="305">
-  <Layer x="0" y="0">
-    <Text text="ATK  4,256" fontFamily="Arial" fontSize="14"/>
-    <Fill color="#FF4444"/>
-  </Layer>
-  <Layer x="0" y="28">
-    <Text text="DEF  3,180" fontFamily="Arial" fontSize="14"/>
-    <Fill color="#4488FF"/>
-  </Layer>
-  <Layer x="0" y="56">
-    <Text text="SPD  186" fontFamily="Arial" fontSize="14"/>
-    <Fill color="#44DD88"/>
-  </Layer>
-</Layer>
-
-<!-- After: child Layers downgraded to Groups -->
-<Layer name="Stats" x="30" y="305">
-  <Group>
-    <Text text="ATK  4,256" fontFamily="Arial" fontSize="14"/>
-    <Fill color="#FF4444"/>
-  </Group>
-  <Group position="0,28">
-    <Text text="DEF  3,180" fontFamily="Arial" fontSize="14"/>
-    <Fill color="#4488FF"/>
-  </Group>
-  <Group position="0,56">
-    <Text text="SPD  186" fontFamily="Arial" fontSize="14"/>
-    <Fill color="#44DD88"/>
-  </Group>
-</Layer>
-```
+**Fix**: Downgrade to Groups. Convert Layer `x="X" y="Y"` → Group `position="X,Y"`. Remove
+`name` attribute (Group does not support it). A no-attribute wrapper (Group or Layer) around a
+single child can be flattened entirely.
 
 ### Downgrade Checklist
 
@@ -331,39 +238,20 @@ A child Layer can be downgraded to Group when **all** of the following are true:
 
 1. NOT a direct child of `<pagx>` or `<Composition>`
 2. Does not use any **Layer-exclusive feature**:
-   - **Child nodes**: styles (DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle),
-     filters (BlurFilter, DropShadowFilter, InnerShadowFilter, BlendFilter, ColorMatrixFilter),
-     child Layers
+   - **Child nodes**: styles, filters, child Layers
    - **Attributes**: mask, maskType, blendMode (non-default), composition, scrollRect,
-     visible="false" (mask definitions), id (if referenced elsewhere), name, matrix, matrix3D,
-     preserve3D, groupOpacity, passThroughBackground
+     visible="false", id (if referenced), name, matrix, matrix3D, preserve3D, groupOpacity,
+     passThroughBackground
 3. Downgrade does not change visual stacking order among siblings
-4. The Layer is a **sub-element within the same logical block** — not a distinct independent
-   block on its own
-
-**Transform conversion**: Layer `x="X" y="Y"` → Group `position="X,Y"`.
-Layer `name` attribute should be removed (Group does not support it).
+4. The Layer is a sub-element within the same logical block — not a distinct independent block
 
 ### Stacking Order and the All-or-Nothing Rule
 
-Within a parent Layer, **contents** (Groups, geometry, painters) always render first (below),
-and **children** (child Layers) render on top — regardless of XML source order.
+Within a parent Layer, **contents** (Groups, geometry, painters) always render below **children**
+(child Layers) — regardless of XML source order. Partial downgrade moves newly created Groups
+from children to contents, breaking stacking.
 
-This means partial downgrade (converting only some sibling Layers to Groups) can break
-stacking order: newly created Groups move from the children list to contents, rendering
-below their remaining Layer siblings.
-
-**Rule**: When a parent has multiple child Layers, either downgrade **all** that qualify
-(preserving their relative order within contents), or downgrade **none**.
-
-```xml
-<!-- All three qualify → downgrade all, order preserved in contents -->
-<Layer name="parent">
-  <Group position="10,0">...</Group>
-  <Group position="20,0">...</Group>
-  <Group position="30,0">...</Group>
-</Layer>
-```
+**Rule**: Either downgrade **all** qualifying sibling Layers or **none**.
 
 ```xml
 <!-- Layer B has DropShadowStyle → cannot downgrade ANY sibling -->
@@ -385,57 +273,41 @@ coordinates from canvas-absolute to Layer-relative.**
 ### Principle
 
 A Layer's `x`/`y` carries the **block-level offset**. Internal elements use coordinates
-**relative to the Layer's origin (0,0)**. This eliminates redundant position data and lets
-the block be repositioned by changing a single `x`/`y` value.
+**relative to the Layer's origin (0,0)**. This lets the block be repositioned by changing
+a single `x`/`y` value.
 
 ### How
 
 1. Identify the block's anchor position in canvas space → set as Layer `x`/`y`
 2. Subtract the Layer's x/y from all internal coordinate values (center, position, etc.)
-3. For child Groups, convert absolute positions to Layer-relative offsets
-4. The goal: the first content element starts at or near `0,0`; sibling elements use clean
-   integer offsets from `0,0`
+3. The goal: the first content element starts at or near `0,0`
 
 ### Which Coordinates Matter
 
-Not all child element coordinates contribute equally. When determining the Layer's anchor
-position, focus on the **layout-controlling nodes**:
+Focus on the **layout-controlling nodes**:
 
-- **Text + TextBox**: Text's own `position` and `textAnchor` are **ignored** when a TextBox
-  is present — TextBox takes over layout completely. Use the TextBox `position` (not the
-  Text `position`) as the coordinate to localize.
-- **Text + TextPath**: Text layout follows the TextPath's path starting point. Use the
-  TextPath's path origin as the coordinate to localize, not Text `position`.
-- **Bare Text** (no TextBox or TextPath): Text's `position` attribute controls layout
-  directly — use it for localization.
-- **Geometry elements** (Rectangle, Ellipse, Path): `center` controls placement — use it.
+- **Text + TextBox**: TextBox `position` controls layout (Text `position` is ignored)
+- **Text + TextPath**: TextPath's path origin controls layout
+- **Bare Text**: Text's `position` attribute controls layout
+- **Geometry elements**: `center` controls placement
 
 ### Caveats
 
-- Gradient coordinates are relative to the geometry element's local coordinate system — they
-  are **not** affected by Layer x/y changes (no conversion needed for gradients).
-- When the Layer is at `x="0" y="0"`, internal coordinates already equal canvas coordinates.
+- Gradient coordinates are relative to the geometry element's local origin — **not** affected
+  by Layer x/y changes (no conversion needed).
 - For nested child Layers, apply the same principle recursively.
 
 ---
 
 ## Painter Merging
 
-The most common and highest-impact optimizations. Painters (Fill / Stroke) render **all
-geometry accumulated in the current scope** — multiple geometry elements using identical
-painters can share a single painter declaration within the same scope.
+Painters (Fill / Stroke) render **all geometry accumulated in the current scope** — multiple
+geometry elements using identical painters can share a single painter declaration.
 
 ### Path Merging — Multi-M Subpaths
 
-**Auto-apply** — concatenating Paths with identical painters is an equivalent transformation.
-
-**When to apply**: Multiple Paths that are **not expressible as Rectangle/Ellipse** have
-identical Fill and/or Stroke. If a Path describes a standard shape, keep it as the primitive
-geometry element — primitives are more readable and enable renderer fast paths (especially
-under Repeaters).
-
-**How**: Concatenate multiple non-standard Path data strings using multiple `M` (moveto)
-commands into a single Path.
+**Auto-apply**. Multiple Paths with identical painters (not expressible as Rectangle/Ellipse)
+→ concatenate into a single multi-M Path.
 
 ```xml
 <!-- Before: two Groups, each with Path + same Fill -->
@@ -455,19 +327,13 @@ commands into a single Path.
 </Group>
 ```
 
-**Typical scenarios**: Symmetrical character parts, corner decorations, repeated small icons.
+### Shape Merging — Multiple Primitives Sharing Painters
 
-### Shape Merging — Multiple Ellipses / Rectangles Sharing Painters
-
-**Auto-apply** — sharing painters across identical-painter geometry is an equivalent transformation.
-
-**When to apply**: Multiple independent Ellipses or Rectangles have identical painters.
-
-**How**: Place them in the same Group (or directly in the same Layer), sharing a single
-Fill / Stroke declaration.
+**Auto-apply**. Multiple Ellipses or Rectangles with identical painters → place in the same
+scope sharing a single Fill / Stroke.
 
 ```xml
-<!-- Before: two Groups, each with Ellipse + same Stroke -->
+<!-- Before -->
 <Group>
   <Ellipse center="23,23" size="46,46"/>
   <Stroke color="#3B82F6" width="1"/>
@@ -477,7 +343,7 @@ Fill / Stroke declaration.
   <Stroke color="#3B82F6" width="1"/>
 </Group>
 
-<!-- After: two Ellipses sharing one Stroke -->
+<!-- After -->
 <Group>
   <Ellipse center="23,23" size="46,46"/>
   <Ellipse center="69,23" size="46,46"/>
@@ -487,21 +353,14 @@ Fill / Stroke declaration.
 
 ### Cross-Layer Merging
 
-**Auto-apply** — merging Layers with identical painters and no Layer-exclusive features
-is an equivalent transformation.
+**Auto-apply**. Multiple adjacent Layers with identical painters and no individual filters /
+mask / blendMode / alpha / name → merge into one Layer.
 
-> **Related**: When the motivation is semantic (grouping one logical block that was scattered
-> across multiple Layers), see **Scenario B** in Layer/Group Optimization. Cross-Layer
-> Merging here focuses on **painter deduplication** — merging Layers that happen to share
-> identical painters, regardless of whether they form one logical block.
-
-**When to apply**: Multiple adjacent Layers have identical painters and identical styles (or no
-styles), with no individual filters / mask / blendMode / alpha / name.
-
-**How**: Merge multiple Layers into one, with geometry sharing painters and styles.
+> When the motivation is semantic grouping (one scattered block), see **Scenario B**.
+> Cross-Layer Merging here focuses on **painter deduplication**.
 
 ```xml
-<!-- Before: 3 Layers, each drawing a circle with the same Stroke -->
+<!-- Before: 3 Layers, each with same Stroke -->
 <Layer><Ellipse center="100,100" size="200,200"/><Stroke color="#00FF0040" width="1"/></Layer>
 <Layer><Ellipse center="100,100" size="140,140"/><Stroke color="#00FF0040" width="1"/></Layer>
 <Layer><Ellipse center="100,100" size="80,80"/><Stroke color="#00FF0040" width="1"/></Layer>
@@ -515,115 +374,16 @@ styles), with no individual filters / mask / blendMode / alpha / name.
 </Layer>
 ```
 
-### Cross-Layer Style Merging
-
-**Auto-apply** — when non-overlapping elements have identical styles, merging is visually
-equivalent.
-
-**When to apply**: Multiple adjacent Layers have identical painters AND identical
-DropShadowStyle / InnerShadowStyle parameters, and the elements do not overlap or are spaced
-far enough apart that their individual shadows do not interact.
-
-DropShadowStyle computes the shadow from the entire Layer's opaque silhouette. When elements do
-not overlap, the shadow of the combined silhouette equals the union of individual shadows —
-merging is visually equivalent.
-
-**How**: Merge the Layers into one, with geometry sharing painters and one shared style.
-
-```xml
-<!-- Before: 3 Layers, each with same Stroke + same DropShadowStyle -->
-<Layer>
-  <Ellipse center="100,200" size="60,60"/>
-  <Stroke color="#00CCFF" width="2"/>
-  <DropShadowStyle blurX="8" blurY="8" color="#00CCFF80"/>
-</Layer>
-<Layer>
-  <Ellipse center="250,200" size="60,60"/>
-  <Stroke color="#00CCFF" width="2"/>
-  <DropShadowStyle blurX="8" blurY="8" color="#00CCFF80"/>
-</Layer>
-<Layer>
-  <Ellipse center="400,200" size="60,60"/>
-  <Stroke color="#00CCFF" width="2"/>
-  <DropShadowStyle blurX="8" blurY="8" color="#00CCFF80"/>
-</Layer>
-
-<!-- After: 1 Layer, shared Stroke + one DropShadowStyle -->
-<Layer>
-  <Ellipse center="100,200" size="60,60"/>
-  <Ellipse center="250,200" size="60,60"/>
-  <Ellipse center="400,200" size="60,60"/>
-  <Stroke color="#00CCFF" width="2"/>
-  <DropShadowStyle blurX="8" blurY="8" color="#00CCFF80"/>
-</Layer>
-```
-
-**Equivalence condition**: The elements must not overlap and the gap between adjacent elements
-must be larger than the blur radius. When this holds, individual shadows are independent and
-the merged shadow is identical. When elements overlap or are very close, the merged shadow
-produces a single connected silhouette instead of multiple separate shadows — this changes the
-rendering and requires user confirmation.
-
-### Scope Isolation Caveats
-
-**This is the most common source of errors.** After merging, if different geometry elements
-need different painters, they must be isolated with Groups:
-
-```xml
-<!-- WRONG: Both Fill and Stroke apply to ALL geometry -->
-<Layer>
-  <Path data="M 0 0 L 50 50"/>          <!-- intended: Stroke only -->
-  <Ellipse center="25,25" size="10,10"/> <!-- intended: Fill only -->
-  <Stroke color="#FFFFFF" width="1"/>
-  <Fill color="#06B6D4"/>
-</Layer>
-
-<!-- CORRECT: Groups isolate different painters -->
-<Layer>
-  <Group>
-    <Path data="M 0 0 L 50 50"/>
-    <Stroke color="#FFFFFF" width="1"/>
-  </Group>
-  <Group>
-    <Ellipse center="25,25" size="10,10"/>
-    <Fill color="#06B6D4"/>
-  </Group>
-</Layer>
-```
-
-**Rule**: Before merging, verify two conditions for each geometry element:
-
-1. **Identical painter sets**: Only geometry with the same painter configuration (Fill only,
-   Stroke only, or Fill + Stroke) can share a scope.
-2. **No modifiers between geometry**: If the original Group contains modifiers (TrimPath,
-   RoundCorner, MergePath, TextModifier, etc.) between geometry and painter, do not merge
-   that Group with others. Merging would expand the modifier's scope to include the other
-   geometry, changing the rendered result.
-
-```xml
-<!-- CANNOT merge: TrimPath scopes would change -->
-<Group>
-  <Path data="M 0 0 L 100 100"/>
-  <TrimPath end="0.5"/>
-  <Fill color="#F00"/>
-</Group>
-<Group>
-  <Path data="M 200 0 L 300 100"/>
-  <Fill color="#F00"/>
-</Group>
-<!-- If merged, TrimPath would apply to BOTH Paths — wrong. -->
-```
+**Cross-Layer Style Merging**: Same technique applies when Layers also share identical
+DropShadowStyle / InnerShadowStyle parameters — merge into one Layer with shared style.
+**Equivalence condition**: elements must not overlap and the gap must exceed the blur radius.
+When elements overlap, the merged shadow produces a single connected silhouette — requires
+user confirmation.
 
 ### Merge Multiple Painters on Identical Geometry
 
-**Auto-apply** — combining painters on identical geometry is an equivalent transformation.
-
-When two Groups use **identical geometry** but apply different painters (e.g., one Fill, one
-Stroke), merge them into a single Group with both painters. Painters do not clear the geometry
-list — subsequent painters continue to render the same geometry.
-
-**When to apply**: Two adjacent Groups contain identical geometry elements (same Path data /
-Rectangle / Ellipse parameters) but different painters.
+**Auto-apply**. Two adjacent Groups with **identical geometry** but different painters →
+merge into one Group with both painters. Painters do not clear the geometry list.
 
 ```xml
 <!-- Before: duplicated geometry -->
@@ -644,21 +404,39 @@ Rectangle / Ellipse parameters) but different painters.
 </Group>
 ```
 
-**Caveats**:
-- Only applicable when geometry is **exactly identical**. Any difference in path data
-  prevents merging.
-- Painter rendering order follows document order — earlier declarations render below later
-  ones. Maintain the original visual stacking when merging.
+Painter rendering order follows document order (earlier = below). Maintain original stacking.
+
+### Scope Isolation Caveats
+
+**Most common source of errors.** After merging, different painters on different geometry
+**must** be isolated with Groups (see `design-patterns.md` §2 for the wrong/correct pattern).
+
+Before merging, verify:
+
+1. **Identical painter sets**: Only geometry with the same painter configuration can share scope.
+2. **No modifiers between geometry**: If a Group contains modifiers (TrimPath, RoundCorner,
+   MergePath, etc.) between geometry and painter, do not merge — merging expands modifier scope.
+
+```xml
+<!-- CANNOT merge: TrimPath scope would change -->
+<Group>
+  <Path data="M 0 0 L 100 100"/>
+  <TrimPath end="0.5"/>
+  <Fill color="#F00"/>
+</Group>
+<Group>
+  <Path data="M 200 0 L 300 100"/>
+  <Fill color="#F00"/>
+</Group>
+<!-- If merged, TrimPath would apply to BOTH Paths — wrong. -->
+```
 
 ### DropShadowStyle Scope
 
-DropShadowStyle is a **layer-level** style that computes shadow shape based on the entire
-Layer's opaque content (including all child layers). This means:
+DropShadowStyle computes shadow from the entire Layer's opaque content (including child layers):
 
-- When merging multiple Layers into one, if they originally had different DropShadowStyle
-  parameters, only one can be retained after merging.
-- Extracting part of a Layer's content into a child Composition does not change shadow scope
-  (the Composition instance remains a child of that Layer).
+- Merging Layers with different DropShadowStyle parameters → only one can be retained.
+- Extracting content into a child Composition does not change shadow scope.
 
 ---
 
@@ -668,59 +446,33 @@ Layer's opaque content (including all child layers). This means:
 
 ### Key Caveats for Empty Element Removal
 
-- A Layer with `visible="false"` is not "empty" — it is likely a mask/clip definition.
-- An empty Layer may serve as a mask target (`id` referenced elsewhere). Verify before removing.
-- **Mask layers must not be moved** to a different position in the layer tree.
+- `visible="false"` Layer is not "empty" — likely a mask definition.
+- Empty Layer may serve as mask target (`id` referenced). Verify before removing.
+- **Mask layers must not be moved** in the layer tree.
 
 ### Default Attribute Values
 
-The exporter automatically omits default values. When generating PAGX, be aware of which
-attributes can be omitted:
-
-**Layer**: `alpha="1"`, `visible="true"`, `blendMode="normal"`, `x="0"`, `y="0"`,
-`antiAlias="true"`, `groupOpacity="false"`, `maskType="alpha"`
-
-**Rectangle / Ellipse**: `center="0,0"`, `size="100,100"`, `reversed="false"`.
-Also `roundness="0"` for Rectangle.
-
-**Fill**: `color="#000000"`, `alpha="1"`, `blendMode="normal"`, `fillRule="winding"`,
-`placement="background"`
-
-**Stroke**: `color="#000000"`, `width="1"`, `alpha="1"`, `blendMode="normal"`, `cap="butt"`,
-`join="miter"`, `miterLimit="4"`, `dashOffset="0"`, `align="center"`,
-`placement="background"`
-
-**Group**: `alpha="1"`, `position="0,0"`, `rotation="0"`, `scale="1,1"`, `skew="0"`,
-`skewAxis="0"`
-
-**Non-Obvious Defaults (Easy to Forget)**:
+The exporter automatically omits defaults. For the complete list of default values by element,
+see `attribute-reference.md`. Key non-obvious defaults to watch for:
 
 | Element | Attribute | Default | Common Misconception |
 |---------|-----------|---------|---------------------|
-| **Repeater** | `position` | `100,100` | Often assumed to be `0,0` |
-| **Repeater** | `copies` | `3` | Often assumed to be `1` |
-| **Rectangle/Ellipse** | `size` | `100,100` | May forget there is a default |
+| **Repeater** | `position` | `100,100` | Often assumed `0,0` |
+| **Repeater** | `copies` | `3` | Often assumed `1` |
 | **Polystar** | `type` | `star` | May assume `polygon` |
-| **TextBox** | `lineHeight` | `0` (auto) | Often assumed non-zero pixel value |
-| **RoundCorner** | `radius` | `10` | Often assumed to be `0` |
-| **Stroke** | `miterLimit` | `4` | Often assumed to be `10` (SVG default) |
+| **RoundCorner** | `radius` | `10` | Often assumed `0` |
+| **Stroke** | `miterLimit` | `4` | Often assumed `10` (SVG) |
 
-**Required Attributes That Look Like They Have Defaults** (omitting these causes parse errors):
-
-| Element | Attribute | Why It Looks Optional |
-|---------|-----------|----------------------|
-| **LinearGradient** | `startPoint` | Looks like `0,0` default, but (required) |
-| **LinearGradient** | `endPoint` | Also (required) |
-| **ColorStop** | `offset` | Looks like zero default, but (required) |
-| **ColorStop** | `color` | Also (required) |
+Required attributes that look optional (omitting causes parse errors): LinearGradient
+`startPoint`/`endPoint`, ColorStop `offset`/`color`. See `attribute-reference.md` for the
+complete list.
 
 ### Writing Clean Attributes
 
-When generating PAGX, prefer clean attribute forms:
 - Use `x`/`y` for translation instead of `matrix="1,0,0,1,tx,ty"`
-- Use clean integer values when possible: `100` not `100.0`, `0` not `-2.18e-06`
-- Use short hex colors when possible: `#F00` instead of `#FF0000`
-- No spaces after commas in point values: `"30,-20"` not `"30, -20"`
+- Clean integers: `100` not `100.0`, `0` not `-2.18e-06`
+- Short hex: `#F00` instead of `#FF0000`
+- No spaces after commas: `"30,-20"` not `"30, -20"`
 
 ---
 
@@ -728,56 +480,28 @@ When generating PAGX, prefer clean attribute forms:
 
 ### Composition Resource Reuse
 
-When multiple layer subtrees have identical internal structure (differing only in position),
-extract them into a `<Composition>` resource and instantiate via
-`<Layer composition="@id"/>`. Compositions do not support parameterization, so only fully
-identical portions can be extracted.
+When 2+ layer subtrees have identical internal structure (differing only in position), extract
+into a `<Composition>` and instantiate via `<Layer composition="@id"/>`.
 
-**When to apply**: 2 or more layer subtrees where:
-1. Internal structure (geometry, painters, child layer hierarchy) is identical
-2. The only difference is the parent Layer's `x` / `y` position
-
-**How**:
-1. Define a Composition in Resources with appropriate `width` and `height`
-2. Convert internal coordinates from canvas-absolute to Composition-local
-3. Replace originals with `<Layer composition="@id" x="..." y="..."/>`
-
-#### Coordinate Conversion
-
-Composition has its own coordinate system with origin at the top-left corner. The referencing
-Layer's `x` / `y` positions the Composition's top-left corner in the parent coordinate system.
-
-**Conversion steps**: Given an original Layer at `(layerX, layerY)` with geometry
-using `center="cx,cy"` (where cx and cy are the geometry center coordinates relative
-to the original Layer origin):
+**Coordinate conversion**: Composition origin is at the top-left corner. Given an original
+Layer at `(layerX, layerY)` with geometry using `center="cx,cy"`:
 
 ```
 Composition width  = geometry width
 Composition height = geometry height
 Internal center    = (width/2, height/2)
-Reference Layer x  = layerX - width/2 + cx   (simplifies to layerX - width/2 when cx=0)
-Reference Layer y  = layerY - height/2 + cy   (simplifies to layerY - height/2 when cy=0)
+Reference Layer x  = layerX - width/2 + cx
+Reference Layer y  = layerY - height/2 + cy
 ```
 
-**Why Internal center = (width/2, height/2)**: Composition has its own coordinate system with
-origin at the **top-left corner** (0,0). A geometry element that was centered at (0,0) in the
-original Layer must shift to (width/2, height/2) inside the Composition to remain centered
-within the Composition bounds.
-
-#### Example
-
 ```xml
-<!-- Before: 5 identical card backgrounds, only x differs -->
+<!-- Before: 5 identical cards, only x differs -->
 <Layer x="160" y="195">
-  <Rectangle center="0,0" size="100,80" roundness="12"/>
+  <Rectangle size="100,80" roundness="12"/>
   <Fill color="#1E293B"/>
   <Stroke color="#334155" width="1"/>
 </Layer>
-<Layer x="280" y="195">
-  <Rectangle center="0,0" size="100,80" roundness="12"/>
-  <Fill color="#1E293B"/>
-  <Stroke color="#334155" width="1"/>
-</Layer>
+<Layer x="280" y="195"><!-- same content --></Layer>
 <!-- ... repeated 5 times -->
 
 <!-- After -->
@@ -791,183 +515,72 @@ within the Composition bounds.
 
 <Layer composition="@cardBg" x="110" y="155"/>
 <Layer composition="@cardBg" x="230" y="155"/>
-<Layer composition="@cardBg" x="350" y="155"/>
-<Layer composition="@cardBg" x="470" y="155"/>
-<Layer composition="@cardBg" x="590" y="155"/>
+<!-- ... -->
 ```
 
-#### Gradient Coordinate Conversion
+**Gradient coordinates**: When geometry inside a Composition uses gradients, convert to
+coordinates relative to the geometry element's local origin (not canvas-absolute).
 
-When geometry inside a Composition uses gradients, convert absolute canvas coordinates to
-coordinates relative to the geometry element's local coordinate system. The PAGX spec states
-that all color source coordinates (except solid colors) are **relative to the geometry
-element's local coordinate system origin**.
+**Caveats**:
+- DropShadowStyle scope is unchanged by Composition extraction (instance remains a child).
+- No parameterization — instances differing beyond position cannot share a Composition.
+- Geometry does not propagate outside the Composition boundary.
 
-```xml
-<!-- Before: button uses canvas-absolute gradient coordinates -->
-<Layer x="217" y="522">
-  <Ellipse center="23,23" size="46,46"/>
-  <Fill>
-    <LinearGradient startPoint="217,545" endPoint="263,545">...</LinearGradient>
-  </Fill>
-</Layer>
-
-<!-- After: Composition uses geometry-relative coordinates -->
-<Composition id="navButton" width="46" height="46">
-  <Layer>
-    <Ellipse center="23,23" size="46,46"/>
-    <Fill>
-      <LinearGradient startPoint="0,23" endPoint="46,23">...</LinearGradient>
-    </Fill>
-  </Layer>
-</Composition>
-
-<Layer composition="@navButton" x="217" y="522"/>
-```
-
-#### Caveats
-
-- **DropShadowStyle scope**: DropShadowStyle computes shadow shape based on the entire
-  Layer's opaque content (including all child layers). If the parent Layer has a
-  DropShadowStyle and you extract some child content into a Composition, the shadow scope does
-  not change (the Composition instance is still a child of that Layer). But if the extracted
-  content's own Layer has a DropShadowStyle, ensure the Composition's internal Layer still
-  carries that style.
-- **No parameterization**: If instances differ in anything beyond position (color, size, etc.),
-  they cannot share the same Composition. Only extract the fully identical subset.
-- **Independent layer tree**: Composition internals are independent rendering units. Geometry
-  does not propagate outside the Composition boundary.
-
-### PathData Resource Reuse
+### PathData & Color Source Reuse
 
 > Automated by `pagx optimize`.
 
-When generating PAGX with shared paths, note that `<Path>` has a `reversed` attribute for
-reversing path direction. Multiple Path elements can reference the same PathData resource and
-set `reversed` independently at each reference site.
-
-### Color Source Resource Sharing
-
-> Automated by `pagx optimize`.
-
-When generating PAGX:
-- Single-use gradients can stay inline — not every gradient needs to be in Resources.
-- Gradient coordinates are relative to the geometry element's local origin. Two geometry
-  elements at different positions or sizes referencing the same gradient will render
-  differently. Only share a gradient when the geometry shapes and sizes are identical.
+- `<Path>` has a `reversed` attribute — multiple Paths can reference the same PathData with
+  independent `reversed` settings.
+- Single-use gradients can stay inline. Only share a gradient when geometry shapes and sizes
+  are identical (gradient coordinates are geometry-relative).
 
 ### Replace Path with Primitive Geometry
 
-When a Path's data describes a shape that can be expressed as a Rectangle or Ellipse, prefer
-the primitive geometry element. Primitives are more readable, more compact, and convey
-semantic intent.
-
-**When to apply**: A Path's data is a simple axis-aligned rectangle (4 lines forming a box) or
-a circle/ellipse (can be detected by arc commands forming a full closed shape).
+**Auto-apply**. When a Path describes a standard shape (axis-aligned rectangle or full
+circle/ellipse), prefer the primitive. Primitives are more readable, compact, and enable
+renderer fast paths (especially under Repeater).
 
 ```xml
-<!-- Before: rectangular path -->
+<!-- Before -->
 <Path data="M 7 51 L 24 51 L 24 210 L 7 210 Z"/>
-
-<!-- After: Rectangle (center and size computed from path bounds) -->
+<!-- After -->
 <Rectangle center="15,130" size="17,159"/>
 ```
 
-**Caveats**:
-- Only apply when the path is clearly a standard shape. Do not convert rounded rectangles
-  described via Bezier curves unless you can accurately extract the roundness parameter.
-- Paths with transforms applied may not map cleanly to primitive attributes.
-- Under Repeater this also significantly benefits rendering performance — see
-  **Repeater Optimization § Prefer Primitive Geometry** below.
+Only convert when clearly a standard shape. Do not convert Bezier-based rounded rectangles
+unless roundness can be accurately extracted.
 
 ### Color Source Coordinate System
 
 All color sources except solid colors use coordinates **relative to the geometry element's
-local coordinate system origin**:
-- External transforms (Group transform, Layer matrix) apply to both geometry and color source
-  together — they scale, rotate, and translate as one unit
-- Modifying geometry properties (e.g., Rectangle size) does not affect color source coordinates
+local origin**. External transforms (Group, Layer) apply to both geometry and color source
+as one unit.
 
 ---
 
 ## Mask Optimization
 
-Masks can be rendered via two paths: a fast **clip path** or a slower **texture mask**. The
-renderer automatically chooses based on mask content.
+Masks use either a fast **clip path** or slower **texture mask**, chosen automatically.
 
-### Fast Path Conditions (clip path)
+### Fast Path (clip path)
 
-A mask Layer uses the fast clip path when **all** of the following are true:
-
-1. **Simple geometry only**: Contains only Rectangle, Ellipse, or Path elements
-2. **Opaque solid fill**: Fill has `alpha="1"` (or no alpha specified) with a solid color
-3. **No transparency in content**: No gradients with transparent stops, no images, no filters
-4. **Alpha mask type**: `maskType` is not `luminance`
-
-```xml
-<!-- Fast: simple shape with opaque fill -->
-<Layer id="mask" visible="false">
-  <Rectangle size="200,200" roundness="20"/>
-  <Fill color="#FFFFFF"/>
-</Layer>
-<Layer mask="@mask">...</Layer>
-
-<!-- Fast: Path is also fine if fill is opaque -->
-<Layer id="mask" visible="false">
-  <Path data="M0,0 L100,0 L50,86 Z"/>
-  <Fill color="#FFF"/>
-</Layer>
-```
+All of the following must be true: simple geometry only (Rectangle, Ellipse, Path), opaque
+solid fill (`alpha="1"`), no gradients with transparent stops / images / filters, `maskType`
+is not `luminance`.
 
 ### Slow Path Triggers (texture mask)
 
-Any of these conditions forces the slower texture-based mask:
-
-```xml
-<!-- Slow: semi-transparent fill -->
-<Layer id="mask" visible="false">
-  <Rectangle size="200,200"/>
-  <Fill color="#FFFFFF" alpha="0.5"/>  <!-- alpha < 1 -->
-</Layer>
-
-<!-- Slow: gradient with transparency -->
-<Layer id="mask" visible="false">
-  <Rectangle size="200,200"/>
-  <Fill>
-    <LinearGradient startPoint="0,0" endPoint="200,0">
-      <ColorStop offset="0" color="#FFFFFF"/>
-      <ColorStop offset="1" color="#FFFFFF00"/>  <!-- transparent -->
-    </LinearGradient>
-  </Fill>
-</Layer>
-
-<!-- Slow: image-based mask -->
-<Layer id="mask" visible="false">
-  <Rectangle size="200,200"/>
-  <Fill><ImagePattern image="@maskImage"/></Fill>
-</Layer>
-
-<!-- Slow: luminance mask type -->
-<Layer mask="@mask" maskType="luminance">...</Layer>
-
-<!-- Slow: mask layer has filters -->
-<Layer id="mask" visible="false">
-  <Rectangle size="200,200"/>
-  <Fill color="#FFFFFF"/>
-  <BlurFilter blurX="5" blurY="5"/>  <!-- filter triggers slow path -->
-</Layer>
-```
+Any of: semi-transparent fill (`alpha < 1`), gradient with transparency, image-based fill,
+`maskType="luminance"`, mask layer has filters.
 
 ### scrollRect vs Mask
 
-For rectangular clipping, prefer `scrollRect` over mask — it uses GPU clip directly without
-any texture overhead:
+For rectangular clipping, prefer `scrollRect` — GPU clip with no texture overhead:
 
 ```xml
-<!-- Preferred: scrollRect for rectangular clip -->
-<Layer scrollRect="0,0,400,300">
-  <!-- content clipped to 400×300 region -->
-</Layer>
+<!-- Preferred -->
+<Layer scrollRect="0,0,400,300">...</Layer>
 
 <!-- Avoid: mask for simple rectangular clip -->
 <Layer mask="@rectMask">...</Layer>
@@ -981,311 +594,90 @@ any texture overhead:
 
 ## Repeater Optimization
 
-All Repeater-related optimizations grouped together. Most items are **Suggest to user** —
-they may change visual details and require user confirmation before applying.
-
 ### Clip Content to Canvas Bounds
 
-**Auto-apply** — removing off-canvas content does not affect the rendered image.
+**Auto-apply**. Adjust starting position and `copies` so content just covers the canvas.
+Keep original spacing/density unchanged — only reduce extent. For animated files, ensure
+clipped area covers all frames. For staggered patterns, include one extra column/row.
 
-**Problem**: Repeaters positioned outside the canvas generate invisible elements that still
-consume rendering resources.
+### Suggest-to-User Optimizations
 
-**When to apply**: A Repeater (or nested Repeaters) generates content that extends significantly
-beyond the canvas bounds.
+The following optimizations may change visual details — present to user before applying:
 
-**How**: Adjust the starting position and `copies` count so generated content just covers the
-canvas, with minimal overflow. **Keep the original spacing/density unchanged** — only reduce
-the extent of the pattern.
+- **Reduce nested element count**: Nested Repeaters multiply (A × B = total). Keep single
+  Repeater under ~200 copies, nested product under ~500. Alternatives: reduce density
+  (increase spacing), limit to visible area, simplify geometry.
 
-```xml
-<!-- Before: generates 70×40 = 2800 hexagons, ~40% outside 800×600 canvas -->
-<Layer alpha="0.15">
-  <Group x="-400">
-    <Path data="@hex"/>
-    <Stroke color="#0066AA" width="1"/>
-    <Repeater copies="70" position="20,0"/>
-  </Group>
-  <Repeater copies="40" position="10,17.32"/>
-</Layer>
-
-<!-- After: generates ~41×36 = 1476 hexagons, same density, clipped to canvas -->
-<Layer alpha="0.15">
-  <Group x="-10">
-    <Path data="@hex"/>
-    <Stroke color="#0066AA" width="1"/>
-    <Repeater copies="41" position="20,0"/>
-  </Group>
-  <Repeater copies="36" position="10,17.32"/>
-</Layer>
-```
-
-**Caveats**:
-- If the file is animated and elements scroll or move, ensure the clipped area still covers all
-  animation frames.
-- For staggered patterns (hex grids), include one extra column/row for the offset.
-
-### Reduce Nested Element Count
-
-**Suggest to user** — changes pattern density or visual appearance.
-
-**Problem**: Nested Repeaters multiply element counts. A seemingly innocent `copies="70"`
-nested inside `copies="40"` generates 2800 elements, each fully cloned at render time.
-
-**Performance guideline**:
-- Single Repeater: up to ~200 copies is typically fine
-- Nested Repeaters: product of copies should ideally stay under ~500 for smooth rendering
-- Above 1000 elements: expect noticeable performance impact
-
-**Alternatives**:
-1. **Reduce density**: Increase spacing to reduce copy count while maintaining visual effect.
-   For decorative grids and patterns, doubling the spacing halves element count while preserving
-   the visual impression.
-2. **Limit to visible area**: See "Clip Content to Canvas Bounds" above.
-3. **Simplify geometry**: Use a simpler shape (e.g., a dot instead of a hexagon) to reduce
-   per-element cost.
-
-### Merge Redundant Overlapping Repeaters
-
-**Suggest to user** — removes redundant marks at shared positions.
-
-**Problem**: UI elements like gauges often have multiple overlapping scale rings (e.g., major
-ticks every 6° and minor ticks every 3°). Half of the minor ticks overlap with major ticks,
-rendering twice at the same position.
-
-**When to apply**: Two Repeaters generate marks at intervals where one is a multiple of the
-other.
-
-**How**: Adjust the finer Repeater to skip positions covered by the coarser one using `offset`.
+- **Merge redundant overlapping Repeaters**: When two Repeaters generate marks at intervals
+  where one is a multiple of the other (e.g., major ticks every 6° + minor ticks every 3°),
+  adjust the finer Repeater to skip shared positions using `offset`.
 
 ```xml
-<!-- Before: 60 major ticks + 120 minor ticks, 60 overlap -->
-<Layer>
-  <Rectangle center="0,-220" size="2,15"/>
-  <Fill color="#00CCFF" alpha="0.6"/>
-  <Repeater copies="60" rotation="6"/>
-</Layer>
-<Layer>
-  <Rectangle center="0,-215" size="1,8"/>
-  <Fill color="#00CCFF" alpha="0.3"/>
-  <Repeater copies="120" rotation="3"/>
-</Layer>
+<!-- Before: 60 major + 120 minor, 60 overlap -->
+<Repeater copies="60" rotation="6"/>   <!-- major -->
+<Repeater copies="120" rotation="3"/>  <!-- minor — half overlap with major -->
 
-<!-- After: 60 major + 60 non-overlapping minor = same visual, fewer elements -->
-<Layer>
-  <Rectangle center="0,-220" size="2,15"/>
-  <Fill color="#00CCFF" alpha="0.6"/>
-  <Repeater copies="60" rotation="6"/>
-</Layer>
-<Layer>
-  <Rectangle center="0,-215" size="1,8"/>
-  <Fill color="#00CCFF" alpha="0.3"/>
-  <Repeater copies="60" rotation="6" offset="0.5"/>
-</Layer>
+<!-- After: 60 major + 60 non-overlapping minor -->
+<Repeater copies="60" rotation="6"/>             <!-- major -->
+<Repeater copies="60" rotation="6" offset="0.5"/>  <!-- minor — interleaved -->
 ```
 
-### Avoid Dashed Stroke under Repeater
+- **Avoid dashed Stroke under Repeater**: Dash pattern computation multiplies per copy.
+  Consider replacing with solid stroke at reduced alpha for decorative patterns.
 
-**Suggest to user** — changes visual appearance of dash pattern.
-
-**Problem**: Stroke with `dashes` attribute has extra overhead (dash pattern computation) on
-each geometry independently. When combined with Repeater, this cost multiplies: each of N
-copies independently computes dash decomposition.
-
-**When to apply**: A `<Stroke ... dashes="..."/>` appears in the same scope as a Repeater
-with many copies.
-
-**How**: For decorative patterns where exact dash alignment per-copy is not critical, consider
-replacing with a solid stroke at reduced alpha, or a simpler visual treatment.
-
-```xml
-<!-- Expensive: 120 copies × dashed stroke computation -->
-<Ellipse size="380,380"/>
-<Stroke width="1" color="#0FF" dashes="60,40"/>
-<Repeater copies="120" rotation="3"/>
-
-<!-- Alternative: solid stroke, fewer copies, similar decorative effect -->
-<Ellipse size="380,380"/>
-<Stroke width="1" color="#0FF" alpha="0.4"/>
-```
+- **Replace PathData with primitive geometry combinations**: Repeated PathData patterns
+  (e.g., hexagonal grids) can often be decomposed into sets of Rectangle + Repeater + Group
+  rotation, which are far cheaper to render.
 
 ### Prefer Primitive Geometry over Path
 
-**Auto-apply** — primitive geometry renders identically to the equivalent Path.
-
-Rectangle and Ellipse have dedicated fast paths in the renderer; Path requires general-purpose
-tessellation per instance. Under Repeater, the per-instance cost difference multiplies
-significantly. When a Path under a Repeater describes a standard shape, always prefer
-the primitive. See **Resource Reuse § Replace Path with Primitive Geometry** for conversion
-examples.
-
-### Replace PathData with Simple Geometry Combinations
-
-**Suggest to user** — may change fine visual details.
-
-**Problem**: PathData is the most expensive geometry type — it requires general-purpose
-tessellation per instance, and Repeaters multiply this cost. Many patterns built from repeated
-PathData can be expressed equivalently using combinations of primitive geometry (Rectangle,
-Ellipse) with Repeater and Group transforms, which are far cheaper to render.
-
-**Key insight**: Rather than looking at individual elements, examine the **overall visual
-result** of the pattern. Ask: "Can this visual effect be constructed from simple rectangles
-or ellipses?" Often the answer is yes, especially for decorative backgrounds.
-
-**When to apply**: PathData appears inside a Repeater (especially nested Repeaters) producing
-a decorative pattern, and the overall visual can be replicated by primitive geometry
-combinations.
-
-**How**: Decompose the visual effect into its simplest geometric components. Use Rectangle /
-Ellipse with single-level Repeaters, and Group `rotation` / `position` for orientation.
-
-**Example — hexagonal grid to 3 sets of parallel lines**:
-
-A hexagonal grid built from repeated Path hexagons is visually equivalent to 3 sets of
-parallel lines (0 degrees, 60 degrees, -60 degrees), each expressible as a Rectangle + Repeater:
-
-```xml
-<!-- Before: ~1500 hexagon Paths via nested Repeater -->
-<Layer alpha="0.15" scrollRect="0,0,800,600">
-  <Group x="-10">
-    <Path data="@hex"/>
-    <Stroke color="#0066AA" width="1"/>
-    <Repeater copies="41" position="20,0"/>
-  </Group>
-  <Repeater copies="36" position="10,17.32"/>
-</Layer>
-
-<!-- After: 3 sets of Rectangle lines (~155 total) -->
-<Layer alpha="0.15" scrollRect="0,0,800,600">
-  <Rectangle center="400,0" size="800,1"/>
-  <Repeater copies="35" position="0,17"/>
-  <Group position="400,300" rotation="60">
-    <Rectangle center="0,-510" size="1200,1"/>
-    <Repeater copies="60" position="0,17"/>
-  </Group>
-  <Group position="400,300" rotation="-60">
-    <Rectangle center="0,-510" size="1200,1"/>
-    <Repeater copies="60" position="0,17"/>
-  </Group>
-  <Fill color="#0066AA"/>
-</Layer>
-```
+**Auto-apply**. Rectangle and Ellipse have dedicated renderer fast paths; Path requires
+general-purpose tessellation. Under Repeater the cost difference multiplies. See **Replace
+Path with Primitive Geometry** above for conversion guidance.
 
 ---
 
 ## Blur & Opacity Optimization
 
-### Reduce Large Blur Radius Values
+Both are **suggest to user** — they change visual appearance.
 
-**Suggest to user** — changes visual intensity of blur effects.
+- **Large blur radius** (`blurX`/`blurY` > ~30): Cost grows with radius. DropShadowStyle on
+  small elements with large blur may be imperceptible — consider reducing or removing.
+  BlurFilter for background glows at low alpha (`alpha="0.2"` + `blurX="220"`) may achieve
+  similar visual at lower radius.
 
-**Problem**: Blur effects have computational cost that grows with blur radius. Large values
-(e.g., `blurX="220"`) are significantly more expensive than moderate values (e.g.,
-`blurX="40"`).
-
-**Two categories**:
-
-1. **DropShadowStyle / InnerShadowStyle**: These operate on the layer's composited silhouette.
-   For small elements with large blur, the shadow may be imperceptible. Reducing blur radius
-   or removing the style entirely can save significant cost.
-
-2. **BlurFilter**: Used for intentional artistic effects (glows, bokeh, frosted glass). These
-   are often more visually significant and harder to reduce. But for background glows
-   (`alpha="0.2"` with `blurX="220"`), consider whether a lower blur radius achieves a
-   similar visual at fraction of the cost.
-
-**When to apply**: `blurX` or `blurY` exceeds ~30 pixels.
-
-### Evaluate Low-Opacity Expensive Elements
-
-**Suggest to user** — may reduce visual subtlety or remove decorative elements.
-
-**Problem**: Elements with very low alpha (e.g., `alpha="0.15"`) are nearly invisible but still
-fully rendered. When combined with Repeaters or blur effects, the cost-to-visibility ratio is
-extremely poor.
-
-**When to apply**: An element or layer has `alpha` below ~0.2 AND generates significant
-rendering cost (Repeaters with many copies, blur filters, complex geometry trees).
-
-**How to optimize**:
-1. Reduce complexity under the low-alpha layer (fewer copies, simpler geometry)
-2. Increase alpha to make the element more visible, justifying the render cost
-3. Ask user if the element can be removed entirely
-
-```xml
-<!-- Example: 378 hexagons at 15% opacity — barely visible, moderately expensive -->
-<Layer alpha="0.15">
-  <Group x="-20">
-    <Path data="@hex"/>
-    <Stroke color="#0066AA" width="1"/>
-    <Repeater copies="21" position="40,0"/>
-  </Group>
-  <Repeater copies="18" position="20,34.64"/>
-</Layer>
-```
+- **Low-opacity expensive elements** (`alpha` < ~0.2 with Repeaters or blur): Nearly invisible
+  but fully rendered. Options: reduce complexity (fewer copies, simpler geometry), increase
+  alpha to justify cost, or ask user if the element can be removed.
 
 ---
 
 ## Animation-Friendly Layer Structure
 
-When preparing PAGX files for animation, layer organization significantly impacts performance.
-The renderer caches layer subtrees as textures; proper structure keeps caches valid across
-frames.
+The renderer caches Layer subtrees as textures. Proper structure keeps caches valid.
 
-### Cache-Preserving Transforms
+**Cache-preserving** (reuse cached texture): `x`/`y`, `alpha`, rotation/scale (via matrix).
 
-These property changes on a Layer **do not** invalidate its subtree cache:
+**Cache-invalidating** (force re-render): child content change, add/remove child Layer,
+modify filters or styles list.
 
-| Property | Cache Status | Notes |
-|----------|--------------|-------|
-| `x`, `y` | Preserved | Position animation is cache-friendly |
-| `alpha` | Preserved | Fade animation is cache-friendly |
-| `rotation` (via matrix) | Preserved | Rotation animation is cache-friendly |
-| `scale` (via matrix) | Preserved | Scale animation is cache-friendly |
-
-The cached texture is simply redrawn with the new transform/alpha — no re-rendering needed.
-
-### Cache-Invalidating Changes
-
-These changes **invalidate** the subtree cache, forcing re-render:
-
-| Change | Impact |
-|--------|--------|
-| Child content change | Cache cleared |
-| Add/remove child Layer | Cache cleared |
-| Modify `filters` list | Cache cleared |
-| Modify `layerStyles` list | Cache cleared |
-
-### Separation Strategy
-
-**Principle**: Isolate content that changes from content that stays static.
+**Strategy**: Isolate dynamic content from static content into separate child Layers. Static
+complex content (gradients, shadows) gets cached; animating the parent Layer's transform
+reuses the cache without re-rendering.
 
 ```xml
-<!-- Good: static decoration cached separately from dynamic text -->
+<!-- Good: static decoration and dynamic text in separate child Layers -->
 <Layer name="card">
   <Layer name="background">
     <!-- Complex static content — cached as texture -->
     <Path data="@decorativeBorder"/>
-    <Fill>
-      <LinearGradient .../>
-    </Fill>
+    <Fill><LinearGradient .../></Fill>
     <DropShadowStyle blurX="10" blurY="10" .../>
   </Layer>
   <Layer name="title">
-    <!-- Text that may change — separate cache unit -->
+    <!-- Dynamic text — separate cache unit -->
     <Text text="Dynamic Title" .../>
     <Fill color="#333"/>
   </Layer>
-</Layer>
-<!-- Animating card's x/y preserves both caches -->
-```
-
-```xml
-<!-- Bad: dynamic content nested deep inside static content -->
-<Layer name="card">
-  <Path data="@decorativeBorder"/>
-  <Fill>...</Fill>
-  <DropShadowStyle .../>
-  <Text text="Dynamic Title" .../>  <!-- Change invalidates entire card cache -->
 </Layer>
 ```

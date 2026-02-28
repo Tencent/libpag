@@ -3,16 +3,20 @@ name: pagx
 description: >-
   Generates well-structured PAGX files from visual descriptions and optimizes existing
   ones for size and rendering performance. Use when user asks to create, write, or
-  design PAGX content, optimize or simplify a .pagx file, review PAGX structure, run
-  pagx CLI commands (render, validate, format, optimize, bounds, font info/embed), or
-  look up PAGX element attributes and syntax.
+  design PAGX content (e.g., "create a pagx icon", "design a button in PAGX"),
+  optimize or simplify a .pagx file, review PAGX structure, run pagx CLI commands
+  (render, validate, format, optimize, bounds, font info/embed), or look up PAGX
+  element attributes and syntax (e.g., "what attributes does Layer support", "how does
+  TextBox work in PAGX"). Do NOT use for general SVG, HTML/CSS, or other vector
+  formats — this skill is specific to the PAGX format.
 user-invocable: false
 ---
 
 # PAGX Skill
 
-Choose the guide that matches the current task. Each guide lists its own references
-at the top — read those as directed by the guide.
+Choose the guide that matches the current task. For combined tasks (e.g., "create and
+optimize a PAGX"), follow Generate first — it directs to Optimize as the final step.
+Each guide lists its own references at the top — read those as directed by the guide.
 
 ## Guides
 

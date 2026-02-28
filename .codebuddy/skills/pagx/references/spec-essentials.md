@@ -22,7 +22,7 @@ For the full specification, see [PAGX Spec (online)](https://pag.io/pagx/latest/
 ### Root Element
 
 ```xml
-<pagx version="0.1" width="800" height="600">
+<pagx version="1.0" width="800" height="600">
   <Layer>...</Layer>
   <Layer>...</Layer>
   <Resources>...</Resources>   <!-- optional, recommended at end -->
