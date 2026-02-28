@@ -25,7 +25,6 @@ guides** based on what you're generating:
 | Task | Read These References |
 |------|----------------------|
 | Generate PAGX (any type) | `spec-essentials.md`, `generation-guide.md` |
-| └ UI components (cards, buttons, pages) | + `ui-components.md` |
 | └ Icons (badges, symbols, small graphics) | + `icon-workflow.md` |
 | Optimize existing PAGX | `structure-optimization.md`, `painter-merging.md`, `resource-reuse.md` |
 | Improve rendering performance | `performance.md` |
@@ -205,7 +204,7 @@ These have **no default** — omitting them causes parse errors:
 ### Generating PAGX
 
 Follow the 5-step process in `references/generation-guide.md`:
-Analyze → Decompose → Build incrementally → Localize coordinates → Verify with `pagx bounds`.
+Analyze → Decompose → Build incrementally → Localize coordinates → Verify and refine.
 
 ### Optimizing PAGX
 
