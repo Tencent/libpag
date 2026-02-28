@@ -2,7 +2,7 @@
 
 Complete methodology for generating PAGX files from visual descriptions — from reference
 analysis through verification. After generation, continue to `optimize-guide.md` for
-structure and performance review.
+optimization review.
 
 ## References
 
@@ -82,8 +82,7 @@ proportions), then use `pagx bounds` to measure and compute corrections. Fix, re
 and re-inspect until correct. See the **Verification and Correction Loop** section at the
 end of this document for the full methodology.
 
-After verification passes, continue to `optimize-guide.md` for structure and performance
-review.
+After verification passes, continue to `optimize-guide.md` for optimization review.
 
 ---
 

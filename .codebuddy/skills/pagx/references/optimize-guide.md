@@ -427,6 +427,8 @@ painters can share a single painter declaration within the same scope.
 
 ### Path Merging — Multi-M Subpaths
 
+**Auto-apply** — concatenating Paths with identical painters is an equivalent transformation.
+
 **When to apply**: Multiple Paths that are **not expressible as Rectangle/Ellipse** have
 identical Fill and/or Stroke. If a Path describes a standard shape, keep it as the primitive
 geometry element — primitives are more readable and enable renderer fast paths (especially
@@ -457,6 +459,8 @@ commands into a single Path.
 
 ### Shape Merging — Multiple Ellipses / Rectangles Sharing Painters
 
+**Auto-apply** — sharing painters across identical-painter geometry is an equivalent transformation.
+
 **When to apply**: Multiple independent Ellipses or Rectangles have identical painters.
 
 **How**: Place them in the same Group (or directly in the same Layer), sharing a single
@@ -482,6 +486,9 @@ Fill / Stroke declaration.
 ```
 
 ### Cross-Layer Merging
+
+**Auto-apply** — merging Layers with identical painters and no Layer-exclusive features
+is an equivalent transformation.
 
 > **Related**: When the motivation is semantic (grouping one logical block that was scattered
 > across multiple Layers), see **Scenario B** in Layer/Group Optimization. Cross-Layer
@@ -509,6 +516,9 @@ styles), with no individual filters / mask / blendMode / alpha / name.
 ```
 
 ### Cross-Layer Style Merging
+
+**Auto-apply** — when non-overlapping elements have identical styles, merging is visually
+equivalent.
 
 **When to apply**: Multiple adjacent Layers have identical painters AND identical
 DropShadowStyle / InnerShadowStyle parameters, and the elements do not overlap or are spaced
@@ -605,6 +615,8 @@ need different painters, they must be isolated with Groups:
 ```
 
 ### Merge Multiple Painters on Identical Geometry
+
+**Auto-apply** — combining painters on identical geometry is an equivalent transformation.
 
 When two Groups use **identical geometry** but apply different painters (e.g., one Fill, one
 Stroke), merge them into a single Group with both painters. Painters do not clear the geometry
@@ -890,7 +902,7 @@ A mask Layer uses the fast clip path when **all** of the following are true:
 1. **Simple geometry only**: Contains only Rectangle, Ellipse, or Path elements
 2. **Opaque solid fill**: Fill has `alpha="1"` (or no alpha specified) with a solid color
 3. **No transparency in content**: No gradients with transparent stops, no images, no filters
-4. **Alpha mask type**: `maskType` is not `luminant`
+4. **Alpha mask type**: `maskType` is not `luminance`
 
 ```xml
 <!-- Fast: simple shape with opaque fill -->
@@ -1098,6 +1110,8 @@ replacing with a solid stroke at reduced alpha, or a simpler visual treatment.
 ```
 
 ### Prefer Primitive Geometry over Path
+
+**Auto-apply** — primitive geometry renders identically to the equivalent Path.
 
 Rectangle and Ellipse have dedicated fast paths in the renderer; Path requires general-purpose
 tessellation per instance. Under Repeater, the per-instance cost difference multiplies
