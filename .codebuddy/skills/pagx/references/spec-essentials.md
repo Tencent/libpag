@@ -4,7 +4,7 @@ This file extracts the specification knowledge that AI must understand when gene
 optimizing PAGX files. It is not a copy of the full spec — it is the **minimum essential
 subset** organized for quick comprehension.
 
-For complete attribute defaults and enumeration values, see `attribute-reference.md`.
+For complete attribute defaults and enumeration values, see `attributes.md`.
 For the full specification, see [PAGX Spec (online)](https://pag.io/pagx/latest/).
 
 ---

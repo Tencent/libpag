@@ -194,7 +194,7 @@ its own Group for painter scope isolation.
 ### 4. Omitting Required Attributes
 
 These **commonly encountered** attributes have **no default** — omitting them causes parse
-errors. This is a subset; for the **complete list** (16 elements), see `attribute-reference.md`.
+errors. This is a subset; for the **complete list** (16 elements), see `attributes.md`.
 
 | Element | Required Attributes |
 |---------|---------------------|

@@ -44,5 +44,5 @@ generation or optimization task.
 |-----------|--------|
 | `spec-essentials.md` | Node types, Layer rendering pipeline, painter scope, text system, masking, resources |
 | `design-patterns.md` | Structure decisions (Layer vs Group), text layout patterns, common mistakes |
-| `attribute-reference.md` | Attribute defaults, enumerations, required attributes |
-| `cli-reference.md` | CLI commands — `render`, `validate`, `optimize`, `format`, `bounds`, `font info`, `font embed` |
+| `attributes.md` | Attribute defaults, enumerations, required attributes |
+| `cli.md` | CLI commands — `render`, `validate`, `optimize`, `format`, `bounds`, `font info`, `font embed` |

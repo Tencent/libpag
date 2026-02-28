@@ -16,8 +16,8 @@ Read as needed:
 
 | Reference | Content |
 |-----------|---------|
-| `attribute-reference.md` | Attribute defaults, enumerations, required attributes |
-| `cli-reference.md` | CLI tool usage — `optimize`, `render`, `validate`, `bounds` commands |
+| `attributes.md` | Attribute defaults, enumerations, required attributes |
+| `cli.md` | CLI tool usage — `optimize`, `render`, `validate`, `bounds` commands |
 
 ---
 
@@ -73,7 +73,7 @@ After all optimizations, verify the following:
 
 - [ ] All `<pagx>`/`<Composition>` direct children are `<Layer>` — not Group
 - [ ] All required attributes present; no redundant default-value attributes
-  (`attribute-reference.md`)
+  (`attributes.md`)
 - [ ] Painter scope isolation correct — different painters in Groups, same painters shared
   (see **Painter Merging § Scope Isolation Caveats** below)
 - [ ] Text `position`/`textAnchor` not set when TextBox is present
@@ -479,7 +479,7 @@ DropShadowStyle computes shadow from the entire Layer's opaque content (includin
 ### Default Attribute Values
 
 The exporter automatically omits defaults. For the complete list of default values by element,
-see `attribute-reference.md`. Key non-obvious defaults to watch for:
+see `attributes.md`. Key non-obvious defaults to watch for:
 
 | Element | Attribute | Default | Common Misconception |
 |---------|-----------|---------|---------------------|
@@ -492,7 +492,7 @@ see `attribute-reference.md`. Key non-obvious defaults to watch for:
 | **Stroke** | `miterLimit` | `4` | Often assumed `10` (SVG) |
 
 Required attributes that look optional (omitting causes parse errors): LinearGradient
-`startPoint`/`endPoint`, ColorStop `offset`/`color`. See `attribute-reference.md` for the
+`startPoint`/`endPoint`, ColorStop `offset`/`color`. See `attributes.md` for the
 complete list.
 
 ### Writing Clean Attributes

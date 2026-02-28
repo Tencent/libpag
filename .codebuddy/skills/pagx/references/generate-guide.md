@@ -18,8 +18,8 @@ Read these as needed:
 | Reference | Content |
 |-----------|---------|
 | `examples.md` | Structural patterns for Icons, UI, Logos, Charts, Decorative backgrounds |
-| `attribute-reference.md` | Attribute defaults, enumerations, required attributes |
-| `cli-reference.md` | CLI tool usage — `render`, `bounds`, `font info` commands |
+| `attributes.md` | Attribute defaults, enumerations, required attributes |
+| `cli.md` | CLI tool usage — `render`, `bounds`, `font info` commands |
 
 ---
 
