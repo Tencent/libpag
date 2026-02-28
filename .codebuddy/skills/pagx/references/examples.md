@@ -334,7 +334,7 @@ use Group `rotation` to reposition the start point.
       <Group>
         <Ellipse size="140,140"/>
         <TrimPath end="0.5"/>
-        <Stroke color="#3B82F6" width="10" cap="round"/>
+        <Stroke color="#3B82F6" width="12" cap="round"/>
       </Group>
     </Group>
     <!-- Tick marks: 10 ticks spanning 270 degrees -->
