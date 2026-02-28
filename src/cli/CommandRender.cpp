@@ -240,14 +240,12 @@ int RunRender(int argc, char* argv[]) {
 
   // Load fonts and set up text layout.
   TextLayout textLayout = {};
-  std::vector<std::shared_ptr<tgfx::Typeface>> loadedTypefaces = {};
   for (const auto& fontFile : options.fontFiles) {
     auto typeface = tgfx::Typeface::MakeFromPath(fontFile);
     if (typeface == nullptr) {
       std::cerr << "pagx render: failed to load font '" << fontFile << "'\n";
       return 1;
     }
-    loadedTypefaces.push_back(typeface);
     textLayout.registerTypeface(typeface);
   }
   std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces = {};
@@ -261,7 +259,7 @@ int RunRender(int argc, char* argv[]) {
     fallbackTypefaces.push_back(typeface);
   }
   if (!fallbackTypefaces.empty()) {
-    textLayout.setFallbackTypefaces(std::move(fallbackTypefaces));
+    textLayout.addFallbackTypefaces(std::move(fallbackTypefaces));
   }
   auto systemFallbacks = SystemFonts::FallbackTypefaces();
   for (const auto& loc : systemFallbacks) {

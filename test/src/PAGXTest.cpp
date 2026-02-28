@@ -130,7 +130,7 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
 
   // Create TextLayout for text layout
   pagx::TextLayout textLayout;
-  textLayout.setFallbackTypefaces(GetFallbackTypefaces());
+  textLayout.addFallbackTypefaces(GetFallbackTypefaces());
 
   for (const auto& svgPath : svgFiles) {
     std::string baseName = std::filesystem::path(svgPath).stem().string();
@@ -444,7 +444,7 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
   doc->layers.push_back(layer);
 
   pagx::TextLayout textLayout;
-  textLayout.setFallbackTypefaces(GetFallbackTypefaces());
+  textLayout.addFallbackTypefaces(GetFallbackTypefaces());
   auto layoutResult = textLayout.layout(doc.get());
   ASSERT_FALSE(layoutResult.shapedTextMap.empty());
   pagx::FontEmbedder().embed(doc.get(), layoutResult.shapedTextMap, layoutResult.textOrder);
@@ -533,7 +533,7 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
   std::sort(files.begin(), files.end());
 
   pagx::TextLayout textLayout;
-  textLayout.setFallbackTypefaces(GetFallbackTypefaces());
+  textLayout.addFallbackTypefaces(GetFallbackTypefaces());
 
   for (const auto& filePath : files) {
     auto baseName = std::filesystem::path(filePath).stem().string();
