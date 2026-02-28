@@ -8,47 +8,53 @@ decisions, and pitfalls to avoid.
 
 ---
 
-## Thinking Framework
+## Generation Steps
 
 When generating PAGX from a visual description, follow these steps:
 
-### Step 1: Identify Logical Blocks
+### Step 1: Analyze the Reference
 
-Read the description and identify independent visual units. Each becomes a `<Layer>`:
+When working from a reference image or style description, systematically decompose it before
+writing any code:
+
+1. **Layer structure** — how many distinct depth layers? What is background vs foreground?
+2. **Rendering technique** — are shapes filled (solid) or stroked (line art)? Both?
+3. **Color scheme** — extract the exact colors. How many unique colors? Any gradients?
+4. **Shape vocabulary** — geometric (circles, polygons) or organic (freeform curves)?
+5. **Level of detail** — is it highly detailed or intentionally abstract/minimal?
+
+Document these observations before proceeding. This prevents mid-generation style drift.
+
+### Step 2: Decompose into Blocks
+
+Identify independent visual units. Each becomes a `<Layer>`:
 
 - **Cards, panels, boxes** → Layer with Rectangle background + content
 - **Buttons** → Layer with shape + label
 - **Text sections** → Layer with Text + TextBox
-- **Icons or badges** → Layer with geometry + Fill
+- **Icons or badges** → Layer with geometry + Fill/Stroke
 - **Decorative backgrounds** → Layer with Repeater patterns
 
-### Step 2: Determine Canvas and Positions
+Determine canvas size (`width`/`height`) and each block's position. Use integer values.
+Use `pagx font info` for precise text metrics, `pagx bounds` for element boundaries.
 
-- Set `width`/`height` on the root `<pagx>` to fit all content with appropriate margins.
-- Assign each Layer's `x`/`y` based on the block's position in the overall layout.
-- Use round integer values for clarity.
-- **Pre-measure text** with `pagx font info` to get precise font metrics before calculating
-  positions. For example, `pagx font info --name "Arial" --size 24` returns the font metrics
-  (ascent, descent, leading, etc.), which can be used to size TextBox and compute vertical
-  spacing accurately.
-- **Measure element bounds** with `pagx bounds` to get precise rendered boundaries of Layers
-  or elements. When building complex blocks incrementally, render a partial PAGX and use
-  `pagx bounds --xpath "//Layer[@id='blockId']"` to get the block's exact size, then use that to calculate
-  positions of surrounding blocks.
+### Step 3: Build Incrementally
 
-### Step 3: Build Each Block
-
-For each Layer, construct the internal VectorElement tree:
+For each block, construct the internal VectorElement tree:
 
 1. Place geometry elements (Rectangle, Ellipse, Text, etc.)
 2. Add modifiers if needed (TextBox, TrimPath, Repeater, etc.)
 3. Add painters (Fill, Stroke) — remember painter scope rules
 4. Wrap sub-elements in Groups when they need different painters
-5. **Extract repeated subtrees** — when 2+ Layers share identical internal structure (differing
-   only in position), define the shared structure as `<Composition>` in Resources and reference
-   via `composition="@id"`. Each instance only needs its own `x`/`y`. This reduces generated
-   code and makes subsequent layout adjustments easier — change the Composition once, all
-   instances update. See `references/resource-reuse.md` for coordinate conversion formulas.
+5. Extract repeated subtrees as `<Composition>` in Resources
+
+**Build in layers of complexity** — do not generate the full design in one shot:
+
+1. **Core structure first** — backgrounds, primary shapes, main text. Render and verify.
+2. **Add secondary elements** — one category at a time. Re-render after each addition.
+3. **Polish** — fine-tune spacing, alignment, and visual balance.
+
+This isolates defects: if something breaks, it was the last thing added.
 
 ### Step 4: Localize Coordinates
 
@@ -56,18 +62,11 @@ For each Layer, construct the internal VectorElement tree:
 - For Text + TextBox: use TextBox `position` relative to Layer origin (ignore Text position).
 - For geometry: `center` is relative to Layer origin.
 
-### Step 5: Verify and Refine
+### Step 5: Verify
 
-Render a screenshot and visually verify the result. If issues are found, fix and re-render
-until satisfied:
-
-1. Render: `pagx render -o preview.png input.pagx`
-2. Read the screenshot image and check:
-   - Does the overall design match the intended description?
-   - Are elements aligned properly (horizontal/vertical centers, baselines)?
-   - Are spacings between sibling elements consistent?
-3. If issues found → edit the PAGX, then go back to step 1.
-   Use `pagx bounds input.pagx` to get precise rendered boundaries for fine-tuning coordinates.
+After each render, use `pagx bounds` to verify alignment quantitatively. Never rely on
+coordinate estimation alone. See the **Verification Checklist** section at the end of this
+document for the full methodology.
 
 ---
 
@@ -613,61 +612,71 @@ before the MergePath scope. MergePath wipes all prior rendering within its scope
 
 ---
 
-## Verify and Refine
+## Verification Checklist
 
-After generating PAGX, render a screenshot and verify visually. This is an iterative loop:
-edit → render → check → repeat until the result matches expectations.
+After each render, use these checks to verify correctness. **Always use `pagx bounds`
+to verify numerically** — this is the single most impactful practice for getting correct
+results quickly.
 
-### Render and Inspect
+### Render
 
 ```bash
-pagx render -o preview.png input.pagx
+pagx render input.pagx            # output alongside the source file
+pagx render --scale 2 input.pagx  # 2x resolution for detail inspection
 ```
 
 Read the rendered image and check:
+- **Design accuracy** — does the layout match the intended description?
+- **Alignment** — are related elements aligned (centers, baselines)?
+- **Spacing consistency** — are gaps between sibling elements uniform?
+- **Text readability** — not clipped by TextBox boundaries?
+- **Structural coherence** — do elements that share a transform look connected?
 
-- **Design accuracy** — does the layout match the intended visual description?
-- **Alignment** — are related elements aligned (e.g., buttons in a row share the same y,
-  text labels vertically centered within their containers)?
-- **Spacing consistency** — are gaps between sibling elements uniform? Uneven spacing is
-  the most common visual defect in generated PAGX.
-- **Text readability** — are text sizes appropriate, not clipped by TextBox boundaries?
-
-### Fine-Tune with Bounds
-
-Use `pagx bounds` to get precise rendered boundaries — both during layout planning (to measure
-block sizes) and during refinement (to diagnose misalignment):
+### Quantitative Checks with `pagx bounds`
 
 ```bash
-pagx bounds input.pagx                                  # all layers
+pagx bounds input.pagx                                   # all layers
 pagx bounds --xpath "//Layer[@id='myButton']" input.pagx  # by id
 pagx bounds --xpath "/pagx/Layer[2]" input.pagx           # by position
 ```
 
-**During layout**: Build a block, render it, and use `pagx bounds` to get its exact size.
-Then calculate positions of adjacent blocks based on actual dimensions rather than estimates.
+Output: `x=<left> y=<top> width=<w> height=<h>` per element.
 
-**During refinement**: Compare actual boundaries to intended positions. Adjust `x`/`y`,
-`center`, or `position` attributes accordingly, then re-render to confirm.
+**Visual center** — for content that should be centered on a `W × H` canvas:
+```
+center_x = bounds_x + bounds_width / 2   → should ≈ W / 2
+center_y = bounds_y + bounds_height / 2  → should ≈ H / 2
+adjust   = target - actual               → apply to Layer x/y, then re-measure
+```
+Note: the visual center often differs from Layer `x`/`y` when content is asymmetric.
 
-### Pre-Measure Text for Accurate Layout
+**Spacing** — for evenly spaced siblings:
+```
+gap = next.bounds_start - (prev.bounds_start + prev.bounds_size)
+```
+All gaps should be equal (±2-3px tolerance).
 
-Before writing PAGX, use `pagx font info` to get precise font metrics. This avoids
-trial-and-error positioning of text elements:
-
-```bash
-pagx font info --name "Arial" --size 24
-pagx font info --file ./CustomFont.ttf --size 16
+**Containment** — when inner content must fit within an outer shape:
+```
+inner bounds ⊂ outer bounds (with padding on all sides)
 ```
 
-Returns typeface info (fontFamily, fontStyle, glyphsCount, etc.) and all FontMetrics fields:
-`top`, `ascent`, `descent`, `bottom`, `leading`, `xMin`, `xMax`, `xHeight`, `capHeight`,
-`underlineThickness`, `underlinePosition`.
+### Structural Checks
 
-**Common uses**:
-- **TextBox height**: `ascent + descent + leading` gives the exact single-line height.
-  For multi-line text, multiply by line count (or use `lineHeight` × line count).
-- **Vertical alignment**: `ascent` measures from baseline to top. When aligning text
-  baseline with other elements, the baseline y = element top + ascent.
-- **Text width**: For precise text width, write the text into a PAGX file and use
-  `pagx bounds` to measure the actual rendered dimensions.
+- **Shared transforms**: Elements that move/rotate/scale together MUST be in the same
+  `<Group>` with the transform. Separate Groups with the same rotation rotate around
+  different origins and will diverge visually.
+- **Painter consistency**: Stroke widths within one visual unit should be intentionally
+  close (e.g., main `width="6"`, detail `width="4"`), not wildly different.
+- **Path complexity**: A single Path with >15-20 curve segments is fragile. Consider
+  decomposing into simpler primitives (Rectangle, Ellipse).
+
+### Text Measurement
+
+Use `pagx font info` for precise font metrics before positioning text:
+```bash
+pagx font info --name "Arial" --size 24
+```
+- **Single-line height**: `ascent + descent + leading`
+- **Baseline position**: element top + `ascent`
+- **Text width**: render into PAGX and measure with `pagx bounds`

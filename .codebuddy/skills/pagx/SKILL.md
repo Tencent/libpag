@@ -8,6 +8,7 @@ description: >-
   font info/embed). Also use when user asks how to use the pagx command-line tool,
   what pagx commands are available, or needs help with PAGX XML syntax and
   attributes.
+user-invocable: false
 ---
 
 # PAGX Knowledge Base
@@ -21,6 +22,7 @@ foundational understanding of the PAGX format.
 | Task | Read These References |
 |------|----------------------|
 | Generate PAGX from description | `spec-essentials.md`, `generation-guide.md` |
+| Generate icons (badges, symbols) | `generation-guide.md`, `icon-workflow.md` |
 | Optimize existing PAGX | `structure-optimization.md`, `painter-merging.md`, `resource-reuse.md` |
 | Improve rendering performance | `performance.md` |
 | Look up attribute defaults or enums | `pagx-quick-reference.md` |
@@ -198,15 +200,15 @@ These have **no default** — omitting them causes parse errors:
 
 ### Generating PAGX
 
-1. **Decompose** the visual description into logical blocks (each block → one Layer)
-2. **Determine** canvas size (`width`/`height`) and each block's position — use `pagx font info`
-   for precise font metrics and `pagx bounds` for precise Layer/element boundaries
-3. **Build** each block's internal structure (Group isolation for different painters).
-   Identify repeated subtrees upfront and define them as `<Composition>` in Resources —
-   reference via `composition="@id"` with only `x`/`y` at each usage point
+1. **Analyze** the reference image or description — identify layer structure, rendering
+   technique (fill vs stroke), color scheme, shape vocabulary, and detail level
+2. **Decompose** into logical blocks (each block → one Layer), determine canvas size
+   and positions — use `pagx font info` for text metrics, `pagx bounds` for element bounds
+3. **Build incrementally** — core structure first, then secondary elements one at a time.
+   Re-render after each addition to isolate defects
 4. **Localize** coordinates (Layer `x`/`y` carries offset, internals relative to origin)
-5. **Verify** — render with `pagx render`, read the screenshot to check design accuracy,
-   alignment, and spacing consistency. If issues found → fix and re-render until satisfied
+5. **Verify** — use `pagx bounds` to check alignment, spacing, and containment numerically.
+   Never rely on coordinate estimation alone
 6. Continue to **Optimizing** below
 
 > For detailed generation patterns, component templates, and examples, read
