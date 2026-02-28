@@ -105,67 +105,79 @@
   <!-- Row 1 backgrounds -->
   <Layer name="CardHome" x="80" y="74">
     <Rectangle size="72,72" roundness="18"/>
-    <Fill color="#151929"/>
-    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+    <Fill color="#1E2A3A"/>
+    <Stroke color="#22D3EE" width="0.5" alpha="0.15"/>
+    <DropShadowStyle offsetY="6" blurX="20" blurY="20" color="#22D3EE30"/>
   </Layer>
   <Layer name="CardSearch" x="240" y="74">
     <Rectangle size="72,72" roundness="18"/>
-    <Fill color="#151929"/>
-    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+    <Fill color="#1E2A3A"/>
+    <Stroke color="#22D3EE" width="0.5" alpha="0.15"/>
+    <DropShadowStyle offsetY="6" blurX="20" blurY="20" color="#22D3EE30"/>
   </Layer>
   <Layer name="CardBell" x="400" y="74">
     <Rectangle size="72,72" roundness="18"/>
-    <Fill color="#151929"/>
-    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+    <Fill color="#1E2A3A"/>
+    <Stroke color="#22D3EE" width="0.5" alpha="0.15"/>
+    <DropShadowStyle offsetY="6" blurX="20" blurY="20" color="#22D3EE30"/>
   </Layer>
   <Layer name="CardHeart" x="560" y="74">
     <Rectangle size="72,72" roundness="18"/>
-    <Fill color="#151929"/>
-    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+    <Fill color="#1E2A3A"/>
+    <Stroke color="#22D3EE" width="0.5" alpha="0.15"/>
+    <DropShadowStyle offsetY="6" blurX="20" blurY="20" color="#22D3EE30"/>
   </Layer>
 
   <!-- Row 2 backgrounds -->
   <Layer name="CardChat" x="80" y="244">
     <Rectangle size="72,72" roundness="18"/>
-    <Fill color="#151929"/>
-    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+    <Fill color="#1E2A3A"/>
+    <Stroke color="#22D3EE" width="0.5" alpha="0.15"/>
+    <DropShadowStyle offsetY="6" blurX="20" blurY="20" color="#22D3EE30"/>
   </Layer>
   <Layer name="CardCamera" x="240" y="244">
     <Rectangle size="72,72" roundness="18"/>
-    <Fill color="#151929"/>
-    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+    <Fill color="#1E2A3A"/>
+    <Stroke color="#22D3EE" width="0.5" alpha="0.15"/>
+    <DropShadowStyle offsetY="6" blurX="20" blurY="20" color="#22D3EE30"/>
   </Layer>
   <Layer name="CardSettings" x="400" y="244">
     <Rectangle size="72,72" roundness="18"/>
-    <Fill color="#151929"/>
-    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+    <Fill color="#1E2A3A"/>
+    <Stroke color="#22D3EE" width="0.5" alpha="0.15"/>
+    <DropShadowStyle offsetY="6" blurX="20" blurY="20" color="#22D3EE30"/>
   </Layer>
   <Layer name="CardUser" x="560" y="244">
     <Rectangle size="72,72" roundness="18"/>
-    <Fill color="#151929"/>
-    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+    <Fill color="#1E2A3A"/>
+    <Stroke color="#22D3EE" width="0.5" alpha="0.15"/>
+    <DropShadowStyle offsetY="6" blurX="20" blurY="20" color="#22D3EE30"/>
   </Layer>
 
   <!-- Row 3 backgrounds -->
   <Layer name="CardCalendar" x="80" y="412">
     <Rectangle size="72,72" roundness="18"/>
-    <Fill color="#151929"/>
-    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+    <Fill color="#1E2A3A"/>
+    <Stroke color="#22D3EE" width="0.5" alpha="0.15"/>
+    <DropShadowStyle offsetY="6" blurX="20" blurY="20" color="#22D3EE30"/>
   </Layer>
   <Layer name="CardLock" x="240" y="412">
     <Rectangle size="72,72" roundness="18"/>
-    <Fill color="#151929"/>
-    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+    <Fill color="#1E2A3A"/>
+    <Stroke color="#22D3EE" width="0.5" alpha="0.15"/>
+    <DropShadowStyle offsetY="6" blurX="20" blurY="20" color="#22D3EE30"/>
   </Layer>
   <Layer name="CardMusic" x="400" y="412">
     <Rectangle size="72,72" roundness="18"/>
-    <Fill color="#151929"/>
-    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+    <Fill color="#1E2A3A"/>
+    <Stroke color="#22D3EE" width="0.5" alpha="0.15"/>
+    <DropShadowStyle offsetY="6" blurX="20" blurY="20" color="#22D3EE30"/>
   </Layer>
   <Layer name="CardDownload" x="560" y="412">
     <Rectangle size="72,72" roundness="18"/>
-    <Fill color="#151929"/>
-    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+    <Fill color="#1E2A3A"/>
+    <Stroke color="#22D3EE" width="0.5" alpha="0.15"/>
+    <DropShadowStyle offsetY="6" blurX="20" blurY="20" color="#22D3EE30"/>
   </Layer>
 
   <!-- ==================== Icons ==================== -->
@@ -224,7 +236,7 @@
       <Ellipse center="-6,-5" size="3,3"/>
       <Ellipse center="0,-5" size="3,3"/>
       <Ellipse center="6,-5" size="3,3"/>
-      <Fill color="#0C0E1A"/>
+      <Fill color="#1E2A3A"/>
     </Group>
   </Layer>
 
@@ -240,7 +252,7 @@
     </Group>
     <Group>
       <Ellipse center="0,2" size="14,14"/>
-      <Fill color="#0C0E1A"/>
+      <Fill color="#1E2A3A"/>
     </Group>
     <Group>
       <Ellipse center="0,2" size="8,8"/>
@@ -256,7 +268,7 @@
     </Group>
     <Group>
       <Ellipse size="12,12"/>
-      <Fill color="#0C0E1A"/>
+      <Fill color="#1E2A3A"/>
     </Group>
     <Group>
       <Ellipse size="5,5"/>
@@ -272,11 +284,11 @@
     </Group>
     <Group>
       <Ellipse center="0,-5" size="12,12"/>
-      <Fill color="#0C0E1A"/>
+      <Fill color="#1E2A3A"/>
     </Group>
     <Group>
       <Path data="M -11 20 C -11 10 -7 6 0 6 C 7 6 11 10 11 20"/>
-      <Fill color="#0C0E1A"/>
+      <Fill color="#1E2A3A"/>
     </Group>
   </Layer>
 
@@ -288,7 +300,7 @@
     </Group>
     <Group>
       <Rectangle center="0,8" size="24,20" roundness="2"/>
-      <Fill color="#0C0E1A"/>
+      <Fill color="#1E2A3A"/>
     </Group>
     <Group>
       <Rectangle center="-7,-14" size="3,7" roundness="2"/>
@@ -316,11 +328,11 @@
     </Group>
     <Group>
       <Ellipse center="0,8" size="5,5"/>
-      <Fill color="#0C0E1A"/>
+      <Fill color="#1E2A3A"/>
     </Group>
     <Group>
       <Rectangle center="0,13" size="2,5" roundness="1"/>
-      <Fill color="#0C0E1A"/>
+      <Fill color="#1E2A3A"/>
     </Group>
   </Layer>
 
