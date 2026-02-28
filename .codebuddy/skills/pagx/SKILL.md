@@ -25,7 +25,8 @@ guides** based on what you're generating:
 | Task | Read These References |
 |------|----------------------|
 | Generate PAGX (any type) | `spec-essentials.md`, `generation-guide.md` |
-| └ Icons (badges, symbols, small graphics) | + `icon-workflow.md` |
+| └ App UI (cards, buttons, lists, pages) | + `app-ui-examples.md` |
+| └ Icons (badges, symbols, small graphics) | + `icon-examples.md` |
 | Optimize existing PAGX | `structure-optimization.md`, `painter-merging.md`, `resource-reuse.md` |
 | Improve rendering performance | `performance.md` |
 | Look up attribute defaults or enums | `pagx-quick-reference.md` |

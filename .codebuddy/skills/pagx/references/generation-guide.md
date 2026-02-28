@@ -3,7 +3,8 @@
 Back to main: [SKILL.md](../SKILL.md)
 
 Universal methodology for generating PAGX files from natural-language descriptions.
-Covers generation steps, structural decisions, component templates, and pitfalls to avoid.
+Covers generation steps, structural decisions, text layout, pitfalls, and the verification
+and correction loop.
 
 ---
 
@@ -26,13 +27,9 @@ Document these observations before proceeding. This prevents mid-generation styl
 
 ### Step 2: Decompose into Blocks
 
-Identify independent visual units. Each becomes a `<Layer>`:
-
-- **Cards, panels, boxes** → Layer with Rectangle background + content
-- **Buttons** → Layer with shape + label
-- **Text sections** → Layer with Text + TextBox
-- **Icons or badges** → Layer with geometry + Fill/Stroke
-- **Decorative backgrounds** → Layer with Repeater patterns
+Identify independent visual units. Each becomes a `<Layer>`. Examples: a card, a button,
+an icon, a text block, a chart axis, a decorative background — any element that could be
+repositioned as a whole.
 
 Determine canvas size (`width`/`height`) and each block's position. Use integer values.
 Use `pagx font info` for precise text metrics, `pagx bounds` for element boundaries.
@@ -63,14 +60,37 @@ This isolates defects: if something breaks, it was the last thing added.
 
 ### Step 5: Verify and Refine
 
-After each render, use `pagx bounds` to verify alignment quantitatively. Never rely on
-coordinate estimation alone. Read the rendered screenshot, identify issues, measure with
-bounds, fix, and re-render until correct. See the **Verification and Correction Loop**
-section at the end of this document for the full methodology.
+After each render, **read the rendered screenshot first** — visual inspection is the primary
+check. Identify any visible issues (misalignment, uneven spacing, clipping, mismatched
+proportions), then use `pagx bounds` to measure and compute corrections. Fix, re-render,
+and re-inspect until correct. See the **Verification and Correction Loop** section at the
+end of this document for the full methodology.
 
 ---
 
 ## Structure Decision Tree
+
+### Rendering Technique
+
+Choose based on the reference analysis (Step 1):
+
+**Stroke (line art)**: Define path skeletons, apply `Stroke` with a width. Few path points
+needed, high tolerance for coordinate imprecision (2-3px off is barely visible at wider
+stroke widths).
+
+**Fill (solid shapes)**: Define closed paths, apply `Fill`. Requires precise control points —
+complex paths (>15 curve segments) are fragile. Prefer Rectangle/Ellipse for standard shapes.
+
+**Mixed**: Fill for backgrounds/large areas + Stroke for details/outlines. A common and
+effective combination.
+
+### Layer Count
+
+Minimize layers — each additional Layer adds alignment complexity:
+
+- Use the fewest Layers that achieve the required visual separation
+- Use Groups (not child Layers) for internal structure within a layer
+- Only add a Layer when Layer-exclusive features are needed (styles, filters, mask, blendMode)
 
 ### Layer vs Group
 
@@ -107,6 +127,8 @@ Single-use gradient or path?
 ---
 
 ## Text Layout Decisions
+
+Code snippets below use placeholder fonts and colors to illustrate structure.
 
 ### Single-Line Text
 
@@ -162,243 +184,6 @@ its own Group for painter scope isolation.
 | `near` | Top (horizontal) / Right (vertical) | Default |
 | `middle` | Vertically centered | Buttons, badges |
 | `far` | Bottom (horizontal) / Left (vertical) | Bottom-aligned labels |
-
----
-
-## Component Templates
-
-Ready-to-use PAGX snippets for common visual elements. Each demonstrates correct painter scope
-isolation, coordinate localization, and text layout patterns.
-
-### Rounded Card with Shadow
-
-```xml
-<Layer x="50" y="50">
-  <Rectangle size="300,200" roundness="12"/>
-  <Fill color="#FFFFFF"/>
-  <DropShadowStyle offsetY="4" blurX="8" blurY="8" color="#00000020"/>
-</Layer>
-```
-
-- Rectangle `center` defaults to `0,0` (omitted), card centered at Layer origin.
-- DropShadowStyle is a Layer-level style (not a VectorElement).
-
-### Button with Label
-
-```xml
-<Layer x="200" y="400">
-  <Rectangle size="160,44" roundness="22"/>
-  <Fill color="#3B82F6"/>
-  <Group>
-    <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-    <Fill color="#FFF"/>
-    <TextBox textAlign="center" paragraphAlign="middle" size="160,44"
-             position="-80,-22"/>
-  </Group>
-  <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#3B82F640"/>
-</Layer>
-```
-
-- Group isolates the text's Fill from the rectangle's Fill.
-- TextBox `position="-80,-22"` aligns with Rectangle bounds (center at origin, size 160×44).
-
-### Multi-Line Text Paragraph
-
-```xml
-<Layer x="50" y="100">
-  <Group>
-    <Text text="Title&#10;" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-    <Fill color="#1A1A1A"/>
-  </Group>
-  <Group>
-    <Text text="Body text goes here. It can wrap automatically within the TextBox bounds."
-          fontFamily="Arial" fontSize="16"/>
-    <Fill color="#666666"/>
-  </Group>
-  <TextBox position="0,0" size="400,300" lineHeight="28"/>
-</Layer>
-```
-
-- Each segment in its own Group for style isolation. `&#10;` creates a line break.
-- TextBox handles all layout — no manual positioning on individual Text elements.
-
-### Icon + Label Row
-
-```xml
-<Layer x="30" y="250">
-  <Group>
-    <Ellipse center="12,12" size="24,24"/>
-    <Fill color="#10B981"/>
-  </Group>
-  <Group>
-    <Text text="Online" fontFamily="Arial" fontSize="14" position="32,16"/>
-    <Fill color="#374151"/>
-  </Group>
-</Layer>
-```
-
-- No TextBox needed for a single bare text label.
-
-### Gradient Background
-
-```xml
-<Layer>
-  <Rectangle size="800,600" center="400,300"/>
-  <Fill>
-    <LinearGradient startPoint="0,0" endPoint="0,600">
-      <ColorStop offset="0" color="#1E3A5F"/>
-      <ColorStop offset="1" color="#0D1B2A"/>
-    </LinearGradient>
-  </Fill>
-</Layer>
-```
-
-- Full-canvas background: `center="400,300"` (half canvas size) covers entire canvas.
-  This is an exception to the "center at origin" pattern.
-- Gradient coordinates are relative to geometry's local coordinate system origin.
-
-### Decorative Dot Grid (Repeater)
-
-```xml
-<Layer alpha="0.1" scrollRect="0,0,800,600">
-  <Group position="-10,-10">
-    <Ellipse size="4,4"/>
-    <Fill color="#FFFFFF"/>
-    <Repeater copies="42" position="20,0"/>
-  </Group>
-  <Repeater copies="32" position="0,20"/>
-</Layer>
-```
-
-- `scrollRect` clips content to canvas bounds. Inner Repeater creates a row; outer stacks rows.
-
-### Shared Color Source
-
-```xml
-<Layer x="100" y="100">
-  <Group>
-    <Ellipse center="0,0" size="60,60"/>
-    <Fill color="@accent"/>
-  </Group>
-  <Group>
-    <Ellipse center="80,0" size="60,60"/>
-    <Fill color="@accent"/>
-  </Group>
-</Layer>
-
-<Resources>
-  <LinearGradient id="accent" startPoint="-30,0" endPoint="30,0">
-    <ColorStop offset="0" color="#6366F1"/>
-    <ColorStop offset="1" color="#8B5CF6"/>
-  </LinearGradient>
-</Resources>
-```
-
-- Gradient defined once in Resources, referenced by `@accent`. Gradient coordinates are
-  relative to each element's local origin.
-
-### Vertical List (Repeating Rows)
-
-```xml
-<Layer x="50" y="100">
-  <Group>
-    <Rectangle size="300,48" roundness="8"/>
-    <Fill color="#F1F5F9"/>
-  </Group>
-  <Group>
-    <Text text="List item" fontFamily="Arial" fontSize="14"/>
-    <Fill color="#1E293B"/>
-    <TextBox position="-150,-24" size="280,48" paragraphAlign="middle"
-             textAlign="start"/>
-  </Group>
-  <Repeater copies="5" position="0,60"/>
-</Layer>
-```
-
-- Each copy offset by `60` (item height 48 + gap 12). Repeater produces the entire list.
-
-### Progress Bar
-
-```xml
-<Layer x="100" y="300">
-  <Group>
-    <Rectangle size="200,8" roundness="4"/>
-    <Fill color="#E2E8F0"/>
-  </Group>
-  <Group>
-    <Rectangle center="-30,0" size="140,8" roundness="4"/>
-    <Fill color="#3B82F6"/>
-  </Group>
-</Layer>
-```
-
-- Track (full width) + fill (partial). Fill center at `-30` spans -100 to +40 = 70% of 200px.
-
-### Avatar with Circular Mask
-
-```xml
-<Layer x="50" y="50" id="avatarClip" visible="false">
-  <Ellipse size="48,48"/>
-  <Fill color="#FFF"/>
-</Layer>
-<Layer x="50" y="50" mask="@avatarClip">
-  <Rectangle size="48,48"/>
-  <Fill>
-    <ImagePattern image="@avatar"/>
-  </Fill>
-</Layer>
-
-<Resources>
-  <Image id="avatar" source="avatar.png"/>
-</Resources>
-```
-
-- Invisible Layer with Ellipse defines clip shape; image Layer references via `mask="@avatarClip"`.
-
-### Tab Bar
-
-```xml
-<Layer x="0" y="550">
-  <Rectangle center="200,25" size="400,50"/>
-  <Fill color="#FFFFFF"/>
-  <Group>
-    <Rectangle center="-100,22" size="80,3" roundness="2"/>
-    <Fill color="#3B82F6"/>
-  </Group>
-  <Group>
-    <Text text="Home" fontFamily="Arial" fontStyle="Bold" fontSize="12"
-          position="-100,4" textAnchor="center"/>
-    <Fill color="#3B82F6"/>
-  </Group>
-  <Group>
-    <Text text="Search" fontFamily="Arial" fontSize="12"
-          position="0,4" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Group>
-  <Group>
-    <Text text="Profile" fontFamily="Arial" fontSize="12"
-          position="100,4" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
-  </Group>
-  <DropShadowStyle offsetY="-1" blurX="4" blurY="4" color="#0000000D"/>
-</Layer>
-```
-
-- Each tab label in its own Group for style isolation. `textAnchor="center"` centers on position.
-
-### Vertical Text (CJK)
-
-```xml
-<Layer x="350" y="50">
-  <Text text="竖排文字示例" fontFamily="PingFang SC" fontSize="24"/>
-  <Fill color="#1A1A1A"/>
-  <TextBox position="0,0" size="0,300" writingMode="vertical"
-           paragraphAlign="near"/>
-</Layer>
-```
-
-- `writingMode="vertical"` enables top-to-bottom, right-to-left column flow.
-- In vertical mode, `lineHeight` controls column width. `paragraphAlign="near"` = right-aligned.
 
 ---
 
