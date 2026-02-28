@@ -1,7 +1,7 @@
 # Icon Examples
 
-Icon-specific examples and pitfalls. For universal methodology (rendering technique, layer
-decisions, verification loop), follow `generation-guide.md` first.
+Icon-specific examples and pitfalls. For universal methodology (generation steps,
+verification loop), follow `generation-guide.md` first.
 
 **Note**: Colors and sizes in these examples are placeholders to illustrate structural patterns.
 Always match the actual design requirements.

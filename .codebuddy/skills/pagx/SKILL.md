@@ -23,10 +23,10 @@ at the top — read those as directed by the workflow.
 **When**: User asks to create, write, or design a new PAGX file from a text description,
 reference image, or design spec.
 
-**What it provides**: A step-by-step process covering design analysis, layer structure
-decisions, incremental construction, text layout, coordinate handling, common pitfalls,
-and a screenshot-based verification loop. Scene-specific examples (App UI, Icons) are
-indexed inside.
+**What it provides**: A step-by-step process covering design analysis, structure decisions,
+incremental construction, text layout, coordinate handling, common pitfalls, and a
+screenshot-based verification loop. Scene-specific examples (App UI, Icons) are indexed
+inside.
 
 ### Optimize — `optimization-guide.md`
 
@@ -36,21 +36,16 @@ the final step after generating a new file.
 **What it provides**: Automated optimization via `pagx optimize`, manual structure and
 performance review patterns, and a final verification checklist.
 
-## References
+## Reference Lookup
 
-### Format Specification — `spec-essentials.md`
+**When**: User asks about PAGX syntax, attributes, node behavior, or CLI usage — not a
+generation or optimization task.
 
-**When**: You need to understand how PAGX works — node types, Layer rendering pipeline,
-VectorElement processing model, painter scope rules, text system, masking, or resources.
+**Where to look**:
 
-### Attribute Quick Reference — `pagx-quick-reference.md`
-
-**When**: You need to check a specific attribute's default value, enum options, or whether
-it is required.
-
-### CLI Reference — `cli-reference.md`
-
-**When**: You need to render, validate, optimize, measure, or inspect fonts in a PAGX file.
-
-**What it provides**: Full command reference for the `pagx` CLI tool (`render`, `validate`,
-`optimize`, `format`, `bounds`, `font info`, `font embed`), including build instructions.
+| Reference | Content |
+|-----------|--------|
+| `spec-essentials.md` | Node types, Layer rendering pipeline, painter scope, text system, masking, resources |
+| `best-practices.md` | Structure decisions (Layer vs Group), text layout patterns, common mistakes |
+| `pagx-quick-reference.md` | Attribute defaults, enumerations, required attributes |
+| `cli-reference.md` | CLI commands — `render`, `validate`, `optimize`, `format`, `bounds`, `font info`, `font embed` |

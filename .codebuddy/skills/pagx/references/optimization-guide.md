@@ -5,11 +5,17 @@ Also used as the final step after generating a new PAGX file.
 
 ## References
 
-Read these as needed during optimization:
+Read before starting optimization:
 
 | Reference | Content |
 |-----------|---------|
 | `spec-essentials.md` | Format specification — node types, processing model, attribute rules |
+| `best-practices.md` | Structure decisions, text layout, common mistakes |
+
+Read these as needed:
+
+| Reference | Content |
+|-----------|---------|
 | `structure-optimization.md` | Layer/Group semantics, coordinate localization, redundant nesting |
 | `painter-merging.md` | Duplicate painter elimination, cross-layer merging |
 | `resource-reuse.md` | Composition extraction, PathData sharing, color source dedup |
@@ -41,8 +47,9 @@ pagx optimize -o output.pagx input.pagx
 
 ### Step 2: Structural Review
 
-Check for issues that automated optimization cannot fix. See `structure-optimization.md` and
-`painter-merging.md` for detailed patterns and examples:
+Check for issues that automated optimization cannot fix. Use the decision trees in
+`best-practices.md` (Layer vs Group, Resource extraction) to evaluate structure, and see
+`structure-optimization.md` and `painter-merging.md` for detailed patterns and examples:
 
 - **Redundant Layer nesting** — child Layers that should be Groups (no styles, filters, or
   mask needed).
@@ -95,6 +102,7 @@ After all optimizations, verify the following. Each item links to where the rule
 - [ ] Visual stacking order preserved
   (`structure-optimization.md` — all-or-nothing rule)
 - [ ] Rendered screenshot matches expected design (layout, alignment, consistent spacing)
+  (use the Verification and Correction Loop in `generation-guide.md` for the full methodology)
 
 > **Stacking order caveat**: When downgrading child Layers to Groups, Layer contents (Groups,
 > geometry) always render below child Layers regardless of XML order. Partial downgrade can
