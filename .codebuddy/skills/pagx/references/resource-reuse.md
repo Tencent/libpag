@@ -1,7 +1,5 @@
 # Resource Reuse Reference
 
-Back to main: [SKILL.md](../SKILL.md)
-
 This file contains detailed examples for Resource Reuse optimizations.
 
 ---

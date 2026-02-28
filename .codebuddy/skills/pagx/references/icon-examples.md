@@ -1,7 +1,5 @@
 # Icon Examples
 
-Back to main: [SKILL.md](../SKILL.md)
-
 Icon-specific examples and pitfalls. For universal methodology (rendering technique, layer
 decisions, verification loop), follow `generation-guide.md` first.
 

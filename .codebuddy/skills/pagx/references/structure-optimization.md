@@ -1,7 +1,5 @@
 # Structure Optimization Reference
 
-Back to main: [SKILL.md](../SKILL.md)
-
 This file covers all structure-level optimizations: Layer/Group semantic optimization,
 coordinate localization, and structural cleanup rules.
 

@@ -1,7 +1,5 @@
 # App UI Examples
 
-Back to main: [SKILL.md](../SKILL.md)
-
 PAGX structural patterns for application interface elements. For universal methodology,
 follow `generation-guide.md` first.
 

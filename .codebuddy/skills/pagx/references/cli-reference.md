@@ -1,7 +1,5 @@
 # CLI Reference
 
-Back to main: [SKILL.md](../SKILL.md)
-
 The `pagx` command-line tool provides utilities for working with PAGX files. All commands
 operate on local `.pagx` files. The binary is at `cmake-build-debug/pagx` (relative to the
 project root). If it does not exist, build it:

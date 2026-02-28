@@ -1,7 +1,5 @@
 # PAGX Quick Reference
 
-Back to main: [SKILL.md](../SKILL.md)
-
 This file contains complete attribute defaults and enumeration values extracted from the PAGX
 specification (attribute tables in the main spec and Appendix B). Use this for quick lookup during optimization.
 

@@ -1,7 +1,5 @@
 # PAGX Optimization Guide
 
-Back to main: [SKILL.md](../SKILL.md)
-
 Complete workflow for optimizing existing PAGX files — structure, performance, and correctness.
 Also used as the final step after generating a new PAGX file.
 
@@ -87,7 +85,7 @@ After all optimizations, verify the following. Each item links to where the rule
 - [ ] Painter scope isolation correct — different painters in Groups, same painters shared
   (`spec-essentials.md` §4, `painter-merging.md`)
 - [ ] Text `position`/`textAnchor` not set when TextBox is present
-  (`spec-essentials.md` §8 TextBox)
+  (`spec-essentials.md` §7 TextBox)
 - [ ] Internal coordinates relative to Layer origin, not canvas-absolute
   (`structure-optimization.md`)
 - [ ] `<Resources>` placed after all Layers; all `@id` references resolve

@@ -1,12 +1,11 @@
 # PAGX Specification Essentials
 
-Back to main: [SKILL.md](../SKILL.md)
-
 This file extracts the specification knowledge that AI must understand when generating or
 optimizing PAGX files. It is not a copy of the full spec — it is the **minimum essential
 subset** organized for quick comprehension.
 
 For complete attribute defaults and enumeration values, see `pagx-quick-reference.md`.
+For the full specification, see [PAGX Spec (online)](https://pag.io/pagx/latest/).
 
 ---
 

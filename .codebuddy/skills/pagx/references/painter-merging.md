@@ -1,7 +1,5 @@
 # Painter Merging Reference
 
-Back to main: [SKILL.md](../SKILL.md)
-
 This file contains detailed examples for Painter Merging optimizations, the most common and
 highest-impact optimizations.
 

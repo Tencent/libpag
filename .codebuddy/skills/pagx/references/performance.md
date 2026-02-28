@@ -1,7 +1,5 @@
 # Performance Optimization Reference
 
-Back to main: [SKILL.md](../SKILL.md)
-
 This file contains detailed examples for Performance optimizations.
 
 ---

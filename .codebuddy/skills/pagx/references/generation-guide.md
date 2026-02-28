@@ -1,7 +1,5 @@
 # PAGX Generation Guide
 
-Back to main: [SKILL.md](../SKILL.md)
-
 Complete methodology for generating PAGX files from visual descriptions — from reference
 analysis through verification. After generation, continue to `optimization-guide.md` for
 structure and performance review.
