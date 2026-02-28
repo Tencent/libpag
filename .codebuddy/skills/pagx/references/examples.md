@@ -103,30 +103,39 @@ Structural patterns for application interface elements.
 ### Card with Shadow
 
 ```xml
-<Layer x="50" y="50">
-  <Rectangle size="300,200" roundness="12"/>
-  <Fill color="#FFFFFF"/>
-  <DropShadowStyle offsetY="4" blurX="8" blurY="8" color="#00000020"/>
-</Layer>
+<pagx version="1.0" width="340" height="240">
+  <!-- Light background to make the white card visible -->
+  <Layer>
+    <Rectangle center="170,120" size="340,240"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+  <Layer x="170" y="120">
+    <Rectangle size="300,200" roundness="12"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetY="4" blurX="8" blurY="8" color="#00000020"/>
+  </Layer>
+</pagx>
 ```
 
 **Pattern**: DropShadowStyle is a **Layer-level** style (not a VectorElement). Rectangle
-`center` defaults to `0,0` (omitted).
+`center` defaults to `0,0` (omitted). White cards need a non-white background to be visible.
 
 ### Button with Centered Label
 
 ```xml
-<Layer x="200" y="400">
-  <Rectangle size="160,44" roundness="22"/>
-  <Fill color="#3B82F6"/>
-  <Group>
-    <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-    <Fill color="#FFF"/>
-    <TextBox textAlign="center" paragraphAlign="middle" size="160,44"
-             position="-80,-22"/>
-  </Group>
-  <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#3B82F640"/>
-</Layer>
+<pagx version="1.0" width="200" height="80">
+  <Layer x="100" y="40">
+    <Rectangle size="160,44" roundness="22"/>
+    <Fill color="#3B82F6"/>
+    <Group>
+      <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+      <Fill color="#FFF"/>
+      <TextBox textAlign="center" paragraphAlign="middle" size="160,44"
+               position="-80,-22"/>
+    </Group>
+    <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#3B82F640"/>
+  </Layer>
+</pagx>
 ```
 
 **Pattern**: Group isolates the text's Fill from the rectangle's Fill. TextBox `position`
@@ -136,16 +145,18 @@ Text's `position` and `textAnchor` — do not set these on child Text.
 ### Icon + Label Row
 
 ```xml
-<Layer x="30" y="250">
-  <Group>
-    <Ellipse center="12,12" size="24,24"/>
-    <Fill color="#10B981"/>
-  </Group>
-  <Group>
-    <Text text="Online" fontFamily="Arial" fontSize="14" position="32,16"/>
-    <Fill color="#374151"/>
-  </Group>
-</Layer>
+<pagx version="1.0" width="120" height="40">
+  <Layer x="25" y="20">
+    <Group>
+      <Ellipse size="24,24"/>
+      <Fill color="#10B981"/>
+    </Group>
+    <Group>
+      <Text text="Online" fontFamily="Arial" fontSize="14" position="20,5"/>
+      <Fill color="#374151"/>
+    </Group>
+  </Layer>
+</pagx>
 ```
 
 **Pattern**: No TextBox needed for a single bare text label. Text `position` places it
@@ -154,64 +165,78 @@ relative to the Layer origin alongside the icon geometry.
 ### Vertical List (Repeater)
 
 ```xml
-<Layer x="50" y="100">
-  <Group>
-    <Rectangle size="300,48" roundness="8"/>
-    <Fill color="#F1F5F9"/>
-  </Group>
-  <Group>
-    <Text text="List item" fontFamily="Arial" fontSize="14"/>
-    <Fill color="#1E293B"/>
-    <TextBox position="-150,-24" size="280,48" paragraphAlign="middle"
-             textAlign="start"/>
-  </Group>
-  <Repeater copies="5" position="0,60"/>
-</Layer>
+<pagx version="1.0" width="400" height="340">
+  <Layer x="200" y="30">
+    <Group>
+      <Rectangle size="300,48" roundness="8"/>
+      <Fill color="#F1F5F9"/>
+    </Group>
+    <Group>
+      <Text text="List item" fontFamily="Arial" fontSize="14"/>
+      <Fill color="#1E293B"/>
+      <TextBox position="-138,-24" size="276,48" paragraphAlign="middle"
+               textAlign="start"/>
+    </Group>
+    <Repeater copies="5" position="0,60"/>
+  </Layer>
+</pagx>
 ```
 
 **Pattern**: Repeater produces the entire list. Each copy offset = item height (48) + gap
-(12). Repeater copies **all** accumulated geometry and already-rendered styles.
+(12). Repeater copies **all** accumulated geometry and already-rendered styles. TextBox
+`position` must keep text within the Rectangle bounds — use slightly inset values (e.g.,
+`position="-138,-24"` for a 300-wide Rectangle with 12px left padding).
 
 ### Progress Bar
 
 ```xml
-<Layer x="100" y="300">
-  <Group>
-    <Rectangle size="200,8" roundness="4"/>
-    <Fill color="#E2E8F0"/>
-  </Group>
-  <Group>
-    <Rectangle center="-30,0" size="140,8" roundness="4"/>
-    <Fill color="#3B82F6"/>
-  </Group>
-</Layer>
+<pagx version="1.0" width="260" height="30">
+  <Layer x="130" y="15">
+    <Group>
+      <Rectangle size="240,8" roundness="4"/>
+      <Fill color="#E2E8F0"/>
+    </Group>
+    <Group>
+      <Rectangle center="-36,0" size="168,8" roundness="4"/>
+      <Fill color="#3B82F6"/>
+    </Group>
+  </Layer>
+</pagx>
 ```
 
 **Pattern**: Track (full width) + fill (partial width). Offset the fill Rectangle's `center`
-to left-align it with the track. Both share center `y=0`.
+to left-align it with the track: `center.x = -(trackWidth - fillWidth) / 2`. Both share
+center `y=0`.
 
 ### Avatar with Circular Mask
 
 ```xml
-<Layer x="50" y="50" id="avatarClip" visible="false">
-  <Ellipse size="48,48"/>
-  <Fill color="#FFF"/>
-</Layer>
-<Layer x="50" y="50" mask="@avatarClip">
-  <Rectangle size="48,48"/>
-  <Fill>
-    <ImagePattern image="@avatar"/>
-  </Fill>
-</Layer>
-
-<Resources>
-  <Image id="avatar" source="avatar.png"/>
-</Resources>
+<pagx version="1.0" width="80" height="80">
+  <!-- Mask shape (invisible, defines the circular clip) -->
+  <Layer x="40" y="40" id="avatarClip" visible="false">
+    <Ellipse size="64,64"/>
+    <Fill color="#FFF"/>
+  </Layer>
+  <!-- Clipped content -->
+  <Layer x="40" y="40" mask="@avatarClip">
+    <!-- Blue background -->
+    <Ellipse size="64,64"/>
+    <Fill color="#3B82F6"/>
+    <!-- White initial letter -->
+    <Group>
+      <Text text="A" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+      <Fill color="#FFFFFF"/>
+      <TextBox textAlign="center" paragraphAlign="middle" size="64,64"
+               position="-32,-32"/>
+    </Group>
+  </Layer>
+</pagx>
 ```
 
-**Pattern**: Invisible Layer with geometry defines clip shape; image Layer references via
+**Pattern**: Invisible Layer with geometry defines clip shape; content Layer references via
 `mask="@id"`. Use opaque fill in mask layer — `maskType="alpha"` (default) means fully
-opaque = fully visible.
+opaque = fully visible. This example uses a solid color + text as placeholder content; in
+practice, replace with `<ImagePattern image="@id"/>` referencing an Image resource.
 
 ---
 
@@ -270,20 +295,26 @@ defaults to `0,0` which aligns with Polystar center, `radius` matches `outerRadi
 
 ```xml
 <pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Rectangle center="100,100" size="200,200"/>
+    <Fill color="#E2E8F0"/>
+  </Layer>
   <Layer x="100" y="100">
     <Ellipse size="140,140"/>
     <Fill color="#CBD5E1"/>
-    <InnerShadowStyle offsetX="-3" offsetY="-3" blurX="6" blurY="6"
-                       color="#00000030"/>
-    <InnerShadowStyle offsetX="3" offsetY="3" blurX="6" blurY="6"
-                       color="#FFFFFF60"/>
+    <InnerShadowStyle offsetX="-5" offsetY="-5" blurX="10" blurY="10"
+                       color="#00000040"/>
+    <InnerShadowStyle offsetX="5" offsetY="5" blurX="10" blurY="10"
+                       color="#FFFFFF80"/>
+    <DropShadowStyle offsetY="4" blurX="8" blurY="8" color="#00000020"/>
   </Layer>
 </pagx>
 ```
 
 **Pattern**: Dual InnerShadowStyle creates an embossed/neumorphic effect — dark shadow from
 top-left simulates depth, light shadow from bottom-right simulates a highlight edge. Multiple
-layer styles stack in document order.
+layer styles stack in document order. A tinted background and DropShadowStyle help the
+effect stand out.
 
 ---
 
@@ -292,40 +323,43 @@ layer styles stack in document order.
 Chart construction relies on Repeater `rotation` for radial patterns and TrimPath for
 arc control.
 
-### Circular Gauge (Repeater rotation + TrimPath)
+### Circular Gauge (TrimPath + Group rotation)
 
 ```xml
 <pagx version="1.0" width="200" height="200">
   <Layer x="100" y="100">
-    <!-- Arc track (270 degrees, gap at bottom) -->
-    <Group rotation="135">
+    <!-- Arcs: 270-degree gauge with gap at bottom -->
+    <Group rotation="-135">
+      <!-- Background track -->
       <Group>
-        <Ellipse size="150,150"/>
+        <Ellipse size="140,140"/>
         <TrimPath end="0.75"/>
-        <Stroke color="#E2E8F0" width="8"/>
+        <Stroke color="#E2E8F0" width="10"/>
       </Group>
-      <!-- Arc fill (about 2/3 of the track) -->
+      <!-- Value fill (67% of 270 degrees = 0.5 of full circle) -->
       <Group>
-        <Ellipse size="150,150"/>
+        <Ellipse size="140,140"/>
         <TrimPath end="0.5"/>
-        <Stroke color="#3B82F6" width="8" cap="round"/>
+        <Stroke color="#3B82F6" width="10" cap="round"/>
       </Group>
     </Group>
-    <!-- Major ticks (from 7:30 to 4:30, 270 degrees) -->
-    <Group rotation="-225">
-      <Rectangle center="0,-68" size="2,10"/>
-      <Fill color="#64748B"/>
-      <Repeater copies="10" rotation="30"/>
+    <!-- Center percentage text -->
+    <Group>
+      <Text text="67%" fontFamily="Arial" fontStyle="Bold" fontSize="32"/>
+      <Fill color="#1E293B"/>
+      <TextBox textAlign="center" paragraphAlign="middle" size="100,40"
+               position="-50,-20"/>
     </Group>
   </Layer>
 </pagx>
 ```
 
-**Pattern**: The outer Group `rotation="135"` rotates the Ellipse's start point (default
-3 o'clock) to 7:30, so `TrimPath end="0.75"` draws a 270° arc from 7:30 clockwise to 4:30
-with the gap at the bottom. Repeater `rotation` generates evenly spaced ticks — the initial
-Group `rotation="-225"` aligns the first tick with the arc start at 7:30. Each tick is a
-thin Rectangle offset from center along the Y axis.
+**Pattern**: Ellipse path starts at 12 o'clock and goes clockwise. `TrimPath end="0.75"`
+draws a 270° arc with a 90° gap. The outer Group `rotation="-135"` rotates the arc so the
+gap sits at the bottom (centered at 6 o'clock). The value arc uses the same rotation but a
+smaller `end` to show progress — `end="0.5"` represents 67% of the 270° track. Center text
+uses TextBox for alignment. To add tick marks, use a Repeater with `position="0,0"` and
+`rotation="30"` on thin Rectangles in a separate Group with the same rotation.
 
 ### Ring Progress (TrimPath + Gradient)
 
@@ -429,46 +463,55 @@ for performance guidance.
 ### Reusable Card Grid (Composition)
 
 ```xml
-<Layer composition="@card" x="20" y="20"/>
-<Layer composition="@card" x="170" y="20"/>
-<Layer composition="@card" x="320" y="20"/>
+<pagx version="1.0" width="500" height="120">
+  <!-- Light background to make white cards visible -->
+  <Layer>
+    <Rectangle center="250,60" size="500,120"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+  <Layer composition="@card" x="20" y="20"/>
+  <Layer composition="@card" x="170" y="20"/>
+  <Layer composition="@card" x="320" y="20"/>
 
-<Resources>
-  <Composition id="card" width="130" height="80">
-    <Layer>
-      <Rectangle center="65,40" size="130,80" roundness="10"/>
-      <Fill color="#FFF"/>
-      <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000020"/>
-    </Layer>
-  </Composition>
-</Resources>
+  <Resources>
+    <Composition id="card" width="130" height="80">
+      <Layer>
+        <Rectangle center="65,40" size="130,80" roundness="10"/>
+        <Fill color="#FFF"/>
+        <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000020"/>
+      </Layer>
+    </Composition>
+  </Resources>
+</pagx>
 ```
 
 **Pattern**: Composition has its own coordinate system with origin at the **top-left corner**.
 Internal geometry must use `center="(width/2, height/2)"` instead of `0,0`. The referencing
-Layer's `x`/`y` positions the Composition's top-left in the parent coordinate system. See
-`optimize-guide.md` §Composition Resource Reuse for coordinate conversion details and gradient
-handling.
+Layer's `x`/`y` positions the Composition's top-left in the parent coordinate system. White
+cards need a non-white background to be visible. See `optimize-guide.md` §Composition
+Resource Reuse for coordinate conversion details and gradient handling.
 
 ### Frosted Panel (BackgroundBlurStyle)
 
 ```xml
-<!-- Content behind the panel -->
-<Layer>
-  <Rectangle center="200,150" size="400,300"/>
-  <Fill>
-    <LinearGradient startPoint="0,0" endPoint="400,300">
-      <ColorStop offset="0" color="#6366F1"/>
-      <ColorStop offset="1" color="#EC4899"/>
-    </LinearGradient>
-  </Fill>
-</Layer>
-<!-- Frosted glass panel -->
-<Layer x="100" y="50">
-  <Rectangle size="200,200" roundness="16"/>
-  <Fill color="#FFFFFF30"/>
-  <BackgroundBlurStyle blurX="20" blurY="20"/>
-</Layer>
+<pagx version="1.0" width="400" height="300">
+  <!-- Content behind the panel -->
+  <Layer>
+    <Rectangle center="200,150" size="400,300"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="400,300">
+        <ColorStop offset="0" color="#6366F1"/>
+        <ColorStop offset="1" color="#EC4899"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+  <!-- Frosted glass panel -->
+  <Layer x="200" y="150">
+    <Rectangle size="200,200" roundness="16"/>
+    <Fill color="#FFFFFF30"/>
+    <BackgroundBlurStyle blurX="20" blurY="20"/>
+  </Layer>
+</pagx>
 ```
 
 **Pattern**: BackgroundBlurStyle blurs the **layer background** (everything already rendered
