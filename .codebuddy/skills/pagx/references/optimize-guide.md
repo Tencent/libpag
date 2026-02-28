@@ -232,6 +232,32 @@ rendering surfaces.
 `name` attribute (Group does not support it). A no-attribute wrapper (Group or Layer) around a
 single child can be flattened entirely.
 
+```xml
+<!-- Before: three stat rows as child Layers -->
+<Layer name="Stats" x="30" y="305">
+  <Layer x="0" y="0">
+    <Text text="ATK  4,256" fontFamily="Arial" fontSize="14"/>
+    <Fill color="#FF4444"/>
+  </Layer>
+  <Layer x="0" y="28">
+    <Text text="DEF  3,180" fontFamily="Arial" fontSize="14"/>
+    <Fill color="#4488FF"/>
+  </Layer>
+</Layer>
+
+<!-- After: downgraded to Groups -->
+<Layer name="Stats" x="30" y="305">
+  <Group>
+    <Text text="ATK  4,256" fontFamily="Arial" fontSize="14"/>
+    <Fill color="#FF4444"/>
+  </Group>
+  <Group position="0,28">
+    <Text text="DEF  3,180" fontFamily="Arial" fontSize="14"/>
+    <Fill color="#4488FF"/>
+  </Group>
+</Layer>
+```
+
 ### Downgrade Checklist
 
 A child Layer can be downgraded to Group when **all** of the following are true:
@@ -459,7 +485,9 @@ see `attribute-reference.md`. Key non-obvious defaults to watch for:
 |---------|-----------|---------|---------------------|
 | **Repeater** | `position` | `100,100` | Often assumed `0,0` |
 | **Repeater** | `copies` | `3` | Often assumed `1` |
+| **Rectangle/Ellipse** | `size` | `100,100` | May forget there is a default |
 | **Polystar** | `type` | `star` | May assume `polygon` |
+| **TextBox** | `lineHeight` | `0` (auto) | Often assumed non-zero pixel value |
 | **RoundCorner** | `radius` | `10` | Often assumed `0` |
 | **Stroke** | `miterLimit` | `4` | Often assumed `10` (SVG) |
 
@@ -520,6 +548,20 @@ Reference Layer y  = layerY - height/2 + cy
 
 **Gradient coordinates**: When geometry inside a Composition uses gradients, convert to
 coordinates relative to the geometry element's local origin (not canvas-absolute).
+
+```xml
+<!-- Before: canvas-absolute gradient -->
+<Ellipse center="23,23" size="46,46"/>
+<Fill>
+  <LinearGradient startPoint="217,545" endPoint="263,545">...</LinearGradient>
+</Fill>
+
+<!-- After: geometry-relative gradient inside Composition -->
+<Ellipse center="23,23" size="46,46"/>
+<Fill>
+  <LinearGradient startPoint="0,23" endPoint="46,23">...</LinearGradient>
+</Fill>
+```
 
 **Caveats**:
 - DropShadowStyle scope is unchanged by Composition extraction (instance remains a child).
@@ -600,6 +642,24 @@ For rectangular clipping, prefer `scrollRect` — GPU clip with no texture overh
 Keep original spacing/density unchanged — only reduce extent. For animated files, ensure
 clipped area covers all frames. For staggered patterns, include one extra column/row.
 
+```xml
+<!-- Before: 70×40 = 2800 hexagons, ~40% outside 800×600 canvas -->
+<Group x="-400">
+  <Path data="@hex"/>
+  <Stroke color="#0066AA" width="1"/>
+  <Repeater copies="70" position="20,0"/>
+</Group>
+<Repeater copies="40" position="10,17.32"/>
+
+<!-- After: 41×36 = 1476, same density, clipped to canvas -->
+<Group x="-10">
+  <Path data="@hex"/>
+  <Stroke color="#0066AA" width="1"/>
+  <Repeater copies="41" position="20,0"/>
+</Group>
+<Repeater copies="36" position="10,17.32"/>
+```
+
 ### Suggest-to-User Optimizations
 
 The following optimizations may change visual details — present to user before applying:
@@ -625,9 +685,11 @@ The following optimizations may change visual details — present to user before
 - **Avoid dashed Stroke under Repeater**: Dash pattern computation multiplies per copy.
   Consider replacing with solid stroke at reduced alpha for decorative patterns.
 
-- **Replace PathData with primitive geometry combinations**: Repeated PathData patterns
-  (e.g., hexagonal grids) can often be decomposed into sets of Rectangle + Repeater + Group
-  rotation, which are far cheaper to render.
+- **Replace PathData with primitive geometry combinations**: Examine the **overall visual
+  result** — many repeated PathData patterns can be decomposed into primitive geometry. E.g.,
+  a hexagonal grid (~1500 Path hexagons via nested Repeater) is visually equivalent to 3 sets
+  of parallel lines (0°/60°/-60°), each a Rectangle + single Repeater + Group rotation (~155
+  total elements).
 
 ### Prefer Primitive Geometry over Path
 
