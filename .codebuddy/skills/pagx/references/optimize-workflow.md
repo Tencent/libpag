@@ -10,15 +10,15 @@ Read before starting optimization:
 | Reference | Content |
 |-----------|---------|
 | `spec-essentials.md` | Format specification — node types, processing model, attribute rules |
-| `best-practices.md` | Structure decisions, text layout, common mistakes |
+| `design-patterns.md` | Structure decisions, text layout, common mistakes |
+| `structure-simplification.md` | Layer/Group simplification, coordinate localization, painter merging |
+| `performance.md` | Rendering cost model, Repeater limits, mask optimization, resource reuse |
 
-Read these as needed:
+Read as needed:
 
 | Reference | Content |
 |-----------|---------|
-| `structure-simplification.md` | Layer/Group simplification, coordinate localization, painter merging |
-| `performance.md` | Rendering cost model, Repeater limits, mask optimization, resource reuse |
-| `pagx-quick-reference.md` | Attribute defaults, enumerations, required attributes |
+| `attribute-reference.md` | Attribute defaults, enumerations, required attributes |
 | `cli-reference.md` | CLI tool usage — `optimize`, `render`, `validate`, `bounds` commands |
 
 ---
@@ -46,7 +46,7 @@ pagx optimize -o output.pagx input.pagx
 ### Step 2: Structural Review
 
 Check for issues that automated optimization cannot fix. Use the decision trees in
-`best-practices.md` (Layer vs Group, Resource extraction) to evaluate structure, and see
+`design-patterns.md` (Layer vs Group, Resource extraction) to evaluate structure, and see
 `structure-simplification.md` for detailed patterns and examples:
 
 - **Redundant Layer nesting** — child Layers that should be Groups (no styles, filters, or
@@ -86,7 +86,7 @@ After all optimizations, verify the following. Each item links to where the rule
 - [ ] All `<pagx>`/`<Composition>` direct children are `<Layer>` — not Group
   (`spec-essentials.md` §1)
 - [ ] All required attributes present; no redundant default-value attributes
-  (`pagx-quick-reference.md`)
+  (`attribute-reference.md`)
 - [ ] Painter scope isolation correct — different painters in Groups, same painters shared
   (`spec-essentials.md` §4, `structure-simplification.md`)
 - [ ] Text `position`/`textAnchor` not set when TextBox is present

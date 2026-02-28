@@ -44,6 +44,6 @@ generation or optimization task.
 | Reference | Content |
 |-----------|--------|
 | `spec-essentials.md` | Node types, Layer rendering pipeline, painter scope, text system, masking, resources |
-| `best-practices.md` | Structure decisions (Layer vs Group), text layout patterns, common mistakes |
-| `pagx-quick-reference.md` | Attribute defaults, enumerations, required attributes |
+| `design-patterns.md` | Structure decisions (Layer vs Group), text layout patterns, common mistakes |
+| `attribute-reference.md` | Attribute defaults, enumerations, required attributes |
 | `cli-reference.md` | CLI commands — `render`, `validate`, `optimize`, `format`, `bounds`, `font info`, `font embed` |

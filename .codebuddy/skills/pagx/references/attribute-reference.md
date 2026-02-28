@@ -1,7 +1,8 @@
-# PAGX Quick Reference
+# PAGX Attribute Reference
 
-This file contains complete attribute defaults and enumeration values extracted from the PAGX
-specification (attribute tables in the main spec and Appendix B). Use this for quick lookup during optimization.
+Complete attribute defaults and enumeration values extracted from the PAGX specification
+(attribute tables in the main spec and Appendix B). Use this for quick lookup during
+generation and optimization.
 
 ---
 

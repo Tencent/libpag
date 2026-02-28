@@ -11,15 +11,15 @@ Read before starting generation:
 | Reference | Content |
 |-----------|---------|
 | `spec-essentials.md` | Format specification — node types, processing model, attribute rules |
-| `best-practices.md` | Structure decisions, text layout, common mistakes |
+| `design-patterns.md` | Structure decisions, text layout, common mistakes |
 
 Read these as needed:
 
 | Reference | Content |
 |-----------|---------|
-| `app-ui-examples.md` | Structural patterns for App UI (cards, buttons, lists, pages) |
-| `icon-examples.md` | Structural patterns for icons (badges, symbols, small graphics) |
-| `pagx-quick-reference.md` | Attribute defaults, enumerations, required attributes |
+| `examples/app-ui.md` | Structural patterns for App UI (cards, buttons, lists, pages) |
+| `examples/icons.md` | Structural patterns for icons (badges, symbols, small graphics) |
+| `attribute-reference.md` | Attribute defaults, enumerations, required attributes |
 | `cli-reference.md` | CLI tool usage — `render`, `bounds`, `font info` commands |
 
 ---
