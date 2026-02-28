@@ -4,87 +4,121 @@
     <Rectangle size="1200,800"/>
     <Fill>
       <LinearGradient startPoint="0,-400" endPoint="0,400">
-        <ColorStop offset="0" color="#050A1A"/>
-        <ColorStop offset="0.3" color="#0C1445"/>
-        <ColorStop offset="0.55" color="#1A1060"/>
-        <ColorStop offset="0.75" color="#2D1B69"/>
-        <ColorStop offset="0.88" color="#4A1942"/>
-        <ColorStop offset="1" color="#6B2040"/>
+        <ColorStop offset="0" color="#020810"/>
+        <ColorStop offset="0.15" color="#06122E"/>
+        <ColorStop offset="0.35" color="#0E1450"/>
+        <ColorStop offset="0.5" color="#1A1060"/>
+        <ColorStop offset="0.65" color="#2D1B69"/>
+        <ColorStop offset="0.8" color="#4A1942"/>
+        <ColorStop offset="0.92" color="#6B2040"/>
+        <ColorStop offset="1" color="#7A2545"/>
       </LinearGradient>
     </Fill>
   </Layer>
-  <Layer alpha="0.4" blendMode="screen" x="200" y="200">
+  <Layer alpha="0.2" blendMode="screen" x="600" y="250">
+    <Ellipse size="1100,180"/>
+    <Fill>
+      <RadialGradient radius="550">
+        <ColorStop offset="0" color="#C4B5FD50"/>
+        <ColorStop offset="0.3" color="#A78BFA30"/>
+        <ColorStop offset="0.6" color="#7C3AED18"/>
+        <ColorStop offset="1" color="#7C3AED00"/>
+      </RadialGradient>
+    </Fill>
+    <BlurFilter blurX="50" blurY="25"/>
+  </Layer>
+  <Layer alpha="0.45" blendMode="screen" x="180" y="180">
     <Ellipse size="500,400"/>
     <Fill>
       <RadialGradient radius="250">
-        <ColorStop offset="0" color="#7C3AED80"/>
-        <ColorStop offset="0.5" color="#7C3AED30"/>
+        <ColorStop offset="0" color="#7C3AED90"/>
+        <ColorStop offset="0.4" color="#7C3AED40"/>
+        <ColorStop offset="0.7" color="#7C3AED18"/>
         <ColorStop offset="1" color="#7C3AED00"/>
       </RadialGradient>
     </Fill>
     <BlurFilter blurX="40" blurY="40"/>
   </Layer>
-  <Layer alpha="0.35" blendMode="screen" x="950" y="150">
-    <Ellipse size="450,350"/>
+  <Layer alpha="0.4" blendMode="screen" x="980" y="130">
+    <Ellipse size="400,300"/>
     <Fill>
-      <RadialGradient radius="225">
-        <ColorStop offset="0" color="#06B6D460"/>
-        <ColorStop offset="0.5" color="#06B6D420"/>
+      <RadialGradient radius="200">
+        <ColorStop offset="0" color="#06B6D470"/>
+        <ColorStop offset="0.4" color="#06B6D430"/>
+        <ColorStop offset="0.7" color="#06B6D415"/>
         <ColorStop offset="1" color="#06B6D400"/>
       </RadialGradient>
     </Fill>
     <BlurFilter blurX="35" blurY="35"/>
   </Layer>
-  <Layer x="80" y="60" composition="@comp1"/>
-  <Layer x="150" y="130" composition="@comp2"/>
-  <Layer x="260" y="45" composition="@comp3"/>
-  <Layer x="340" y="180" composition="@comp1"/>
-  <Layer x="420" y="70" composition="@comp4"/>
-  <Layer x="530" y="25">
+  <Layer alpha="0.25" blendMode="screen" x="550" y="100">
+    <Ellipse size="350,200"/>
+    <Fill>
+      <RadialGradient radius="175">
+        <ColorStop offset="0" color="#EC489950"/>
+        <ColorStop offset="0.5" color="#EC489920"/>
+        <ColorStop offset="1" color="#EC489900"/>
+      </RadialGradient>
+    </Fill>
+    <BlurFilter blurX="30" blurY="30"/>
+  </Layer>
+  <Layer x="80" y="55" composition="@comp5"/>
+  <Layer x="150" y="125" composition="@comp1"/>
+  <Layer x="260" y="42" composition="@comp2"/>
+  <Layer x="340" y="175" composition="@comp5"/>
+  <Layer x="420" y="68" composition="@comp3"/>
+  <Layer x="530" y="22">
     <Ellipse size="4,4"/>
     <Fill color="#FFFFFF"/>
   </Layer>
-  <Layer x="610" y="155" composition="@comp2"/>
-  <Layer x="700" y="50" composition="@comp1"/>
-  <Layer x="780" y="110" composition="@comp3"/>
-  <Layer x="850" y="35" composition="@comp1"/>
-  <Layer x="940" y="90" composition="@comp4"/>
-  <Layer x="1020" y="60" composition="@comp1"/>
-  <Layer x="1100" y="140" composition="@comp2"/>
-  <Layer x="180" y="280" composition="@comp3"/>
-  <Layer x="480" y="240" composition="@comp5"/>
-  <Layer x="750" y="260">
-    <Ellipse size="3,3"/>
-    <Fill color="#FFFFFFBB"/>
-  </Layer>
-  <Layer x="1050" y="220" composition="@comp5"/>
-  <Layer x="320" y="320" composition="@comp2"/>
-  <Layer x="900" y="200" composition="@comp3"/>
-  <Layer x="60" y="350" composition="@comp1"/>
-  <Layer alpha="0.9" x="300" y="100">
+  <Layer x="610" y="150" composition="@comp1"/>
+  <Layer x="700" y="48" composition="@comp5"/>
+  <Layer x="780" y="108" composition="@comp2"/>
+  <Layer x="850" y="32" composition="@comp5"/>
+  <Layer x="940" y="88" composition="@comp3"/>
+  <Layer x="1020" y="58" composition="@comp5"/>
+  <Layer x="1100" y="138" composition="@comp1"/>
+  <Layer x="180" y="275" composition="@comp2"/>
+  <Layer x="480" y="235" composition="@comp4"/>
+  <Layer x="750" y="255" composition="@comp6"/>
+  <Layer x="1050" y="218" composition="@comp4"/>
+  <Layer x="320" y="315" composition="@comp1"/>
+  <Layer x="60" y="345" composition="@comp5"/>
+  <Layer x="45" y="160" composition="@comp2"/>
+  <Layer x="200" y="380" composition="@comp3"/>
+  <Layer x="370" y="260" composition="@comp5"/>
+  <Layer x="560" y="310" composition="@comp1"/>
+  <Layer x="650" y="200" composition="@comp2"/>
+  <Layer x="900" y="195" composition="@comp3"/>
+  <Layer x="1150" y="80" composition="@comp4"/>
+  <Layer x="440" y="150" composition="@comp1"/>
+  <Layer x="1080" y="350" composition="@comp2"/>
+  <Layer x="30" y="450" composition="@comp4"/>
+  <Layer x="680" y="350" composition="@comp6"/>
+  <Layer alpha="0.9" x="300" y="95">
     <Group>
       <Ellipse size="6,6"/>
       <Fill color="#FFFFFF"/>
     </Group>
     <Group>
-      <Ellipse size="20,20"/>
+      <Ellipse size="22,22"/>
       <Fill>
-        <RadialGradient radius="10">
+        <RadialGradient radius="11">
           <ColorStop offset="0" color="#FFFFFF60"/>
           <ColorStop offset="1" color="#FFFFFF00"/>
         </RadialGradient>
       </Fill>
     </Group>
     <Group>
-      <Path data="M-12 0L12 0"/>
+      <Path data="M-14 0L14 0"/>
       <Stroke color="#FFFFFF50"/>
     </Group>
     <Group>
-      <Path data="M0 -12L0 12"/>
+      <Path data="M0 -14L0 14"/>
       <Stroke color="#FFFFFF50"/>
     </Group>
   </Layer>
-  <Layer alpha="0.85" x="820" y="70">
+  <Layer alpha="0.85" x="820" y="65">
     <Group>
       <Ellipse size="5,5"/>
       <Fill color="#FFFFFF"/>
@@ -107,7 +141,7 @@
       <Stroke color="#FFFFFF40"/>
     </Group>
   </Layer>
-  <Layer alpha="0.8" x="1100" y="300">
+  <Layer alpha="0.8" x="1100" y="295">
     <Group>
       <Ellipse size="5,5"/>
       <Fill color="#FFE4B5"/>
@@ -122,7 +156,30 @@
       </Fill>
     </Group>
   </Layer>
-  <Layer x="1000" y="160">
+  <Layer alpha="0.75" x="550" y="180">
+    <Group>
+      <Ellipse size="4,4"/>
+      <Fill color="#E0E7FF"/>
+    </Group>
+    <Group>
+      <Ellipse size="14,14"/>
+      <Fill>
+        <RadialGradient radius="7">
+          <ColorStop offset="0" color="#E0E7FF40"/>
+          <ColorStop offset="1" color="#E0E7FF00"/>
+        </RadialGradient>
+      </Fill>
+    </Group>
+    <Group>
+      <Path data="M-8 0L8 0"/>
+      <Stroke color="#E0E7FF30"/>
+    </Group>
+    <Group>
+      <Path data="M0 -8L0 8"/>
+      <Stroke color="#E0E7FF30"/>
+    </Group>
+  </Layer>
+  <Layer x="1000" y="155">
     <Group>
       <Ellipse size="90,90"/>
       <Fill>
@@ -133,6 +190,14 @@
           <ColorStop offset="1" color="#7C2D12"/>
         </RadialGradient>
       </Fill>
+    </Group>
+    <Group>
+      <Path data="M-40 -5C-20 -8 20 -2 40 -5"/>
+      <Stroke color="#FBBF2420" width="3"/>
+    </Group>
+    <Group>
+      <Path data="M-35 10C-10 7 15 12 35 10"/>
+      <Stroke color="#F9731620" width="4"/>
     </Group>
     <Group rotation="-20">
       <Ellipse size="140,30"/>
@@ -148,6 +213,27 @@
         <RadialGradient radius="50">
           <ColorStop offset="0.7" color="#F9731600"/>
           <ColorStop offset="1" color="#F9731630"/>
+        </RadialGradient>
+      </Fill>
+    </Group>
+  </Layer>
+  <Layer x="420" y="110">
+    <Group>
+      <Ellipse size="20,20"/>
+      <Fill>
+        <RadialGradient center="-3,-3" radius="12">
+          <ColorStop offset="0" color="#A78BFA"/>
+          <ColorStop offset="0.6" color="#7C3AED"/>
+          <ColorStop offset="1" color="#4C1D95"/>
+        </RadialGradient>
+      </Fill>
+    </Group>
+    <Group>
+      <Ellipse size="26,26"/>
+      <Fill>
+        <RadialGradient radius="13">
+          <ColorStop offset="0.7" color="#A78BFA00"/>
+          <ColorStop offset="1" color="#A78BFA20"/>
         </RadialGradient>
       </Fill>
     </Group>
@@ -177,6 +263,10 @@
       <Stroke color="#60A5FA18" width="10"/>
     </Group>
     <Group>
+      <Path data="M-110 -60C-60 -65 10 -55 60 -60"/>
+      <Stroke color="#93C5FD15" width="5"/>
+    </Group>
+    <Group>
       <Ellipse size="340,340"/>
       <Fill>
         <RadialGradient radius="170">
@@ -186,11 +276,27 @@
       </Fill>
     </Group>
   </Layer>
+  <Layer alpha="0.5">
+    <Group>
+      <Path data="M0 560L50 520L100 540L180 480L230 500L300 460L360 490L420 450L480 470L540 430L580 455L650 420L700 445L760 415L820 440L880 410L940 435L1000 400L1050 425L1100 405L1150 430L1200 410L1200 560Z"/>
+      <Fill>
+        <LinearGradient startPoint="600,-80" endPoint="600,80">
+          <ColorStop offset="0" color="#1A0F3A"/>
+          <ColorStop offset="0.5" color="#150C30"/>
+          <ColorStop offset="1" color="#100825"/>
+        </LinearGradient>
+      </Fill>
+    </Group>
+    <Group>
+      <Path data="M0 560L50 520L100 540L180 480L230 500L300 460L360 490L420 450L480 470L540 430L580 455L650 420L700 445L760 415L820 440L880 410L940 435L1000 400L1050 425L1100 405L1150 430L1200 410"/>
+      <Stroke color="#8B5CF620" width="1.5"/>
+    </Group>
+  </Layer>
   <Layer>
     <Group>
-      <Path data="M0 800L0 620C60 610 120 590 200 585C300 578 380 600 440 580C500 560 540 570 600 555C660 540 720 555 780 548C840 540 900 560 960 550C1020 540 1080 555 1140 548L1200 545L1200 800Z"/>
+      <Path data="M0 800L0 610C60 600 120 585 200 580C300 573 380 590 440 575C500 555 540 565 600 550C660 535 720 550 780 543C840 535 900 555 960 545C1020 535 1080 550 1140 543L1200 540L1200 800Z"/>
       <Fill>
-        <LinearGradient startPoint="600,-120" endPoint="600,120">
+        <LinearGradient startPoint="600,-130" endPoint="600,130">
           <ColorStop offset="0" color="#2D1854"/>
           <ColorStop offset="0.3" color="#1F1240"/>
           <ColorStop offset="0.7" color="#150D30"/>
@@ -199,17 +305,70 @@
       </Fill>
     </Group>
     <Group>
-      <Path data="M0 620C60 610 120 590 200 585C300 578 380 600 440 580C500 560 540 570 600 555C660 540 720 555 780 548C840 540 900 560 960 550C1020 540 1080 555 1140 548L1200 545"/>
+      <Path data="M0 610C60 600 120 585 200 580C300 573 380 590 440 575C500 555 540 565 600 550C660 535 720 550 780 543C840 535 900 555 960 545C1020 535 1080 550 1140 543L1200 540"/>
       <Stroke color="#8B5CF640" width="2"/>
     </Group>
     <Group>
-      <Path data="M0 800L0 660C80 655 160 640 240 650C340 662 400 645 480 640C560 635 640 648 720 640C800 632 880 645 960 640C1040 635 1120 648 1200 640L1200 800Z"/>
+      <Path data="M0 800L0 650C80 645 160 632 240 642C340 654 400 638 480 632C560 626 640 640 720 632C800 624 880 638 960 632C1040 626 1120 640 1200 632L1200 800Z"/>
       <Fill color="#18103A"/>
     </Group>
-  </Layer>
-  <Layer x="120" y="560">
     <Group>
-      <Path data="M-8 25L-15 0L-5 -45L5 -55L12 -10L8 25Z"/>
+      <Path data="M200 620L220 635L250 628L270 645"/>
+      <Stroke color="#8B5CF615"/>
+    </Group>
+    <Group>
+      <Path data="M650 580L670 595L700 588"/>
+      <Stroke color="#8B5CF612"/>
+    </Group>
+    <Group>
+      <Path data="M900 572L930 585L950 578L980 592"/>
+      <Stroke color="#8B5CF610"/>
+    </Group>
+  </Layer>
+  <Layer x="400" y="585">
+    <Group>
+      <Ellipse size="70,18"/>
+      <Fill>
+        <RadialGradient radius="35">
+          <ColorStop offset="0" color="#0A0618"/>
+          <ColorStop offset="0.6" color="#120B28"/>
+          <ColorStop offset="1" color="#1F1240"/>
+        </RadialGradient>
+      </Fill>
+    </Group>
+    <Group>
+      <Ellipse size="70,18"/>
+      <Stroke color="#8B5CF625" width="1.5"/>
+    </Group>
+    <Group>
+      <Ellipse center="0,2" size="50,10"/>
+      <Fill>
+        <RadialGradient center="0,2" radius="25">
+          <ColorStop offset="0" color="#050310"/>
+          <ColorStop offset="1" color="#05031000"/>
+        </RadialGradient>
+      </Fill>
+    </Group>
+  </Layer>
+  <Layer x="750" y="555">
+    <Group>
+      <Ellipse size="45,12"/>
+      <Fill>
+        <RadialGradient radius="22">
+          <ColorStop offset="0" color="#0A0618"/>
+          <ColorStop offset="0.6" color="#120B28"/>
+          <ColorStop offset="1" color="#1F1240"/>
+        </RadialGradient>
+      </Fill>
+    </Group>
+    <Group>
+      <Ellipse size="45,12"/>
+      <Stroke color="#8B5CF620"/>
+    </Group>
+  </Layer>
+  <Layer x="120" y="555">
+    <Group>
+      <Path data="M-8 25L-15 0L-5 -50L5 -60L12 -10L8 25Z"/>
       <Fill>
         <LinearGradient startPoint="-10,0" endPoint="10,0">
           <ColorStop offset="0" color="#4C1D95"/>
@@ -219,22 +378,26 @@
       </Fill>
     </Group>
     <Group>
-      <Path data="M-2 -50L0 -58L2 -50"/>
+      <Path data="M-5 -45L0 -30L5 -55"/>
+      <Stroke color="#A78BFA40"/>
+    </Group>
+    <Group>
+      <Path data="M-2 -55L0 -65L2 -55"/>
       <Stroke color="#A78BFA" width="2" cap="round"/>
     </Group>
     <Group>
-      <Ellipse center="0,-55" size="12,12"/>
+      <Ellipse center="0,-62" size="16,16"/>
       <Fill>
-        <RadialGradient center="0,-55" radius="6">
-          <ColorStop offset="0" color="#A78BFA60"/>
+        <RadialGradient center="0,-62" radius="8">
+          <ColorStop offset="0" color="#A78BFA70"/>
           <ColorStop offset="1" color="#A78BFA00"/>
         </RadialGradient>
       </Fill>
     </Group>
   </Layer>
-  <Layer x="1050" y="530">
+  <Layer x="1050" y="525">
     <Group>
-      <Path data="M-12 20L-18 -10L-8 -50L0 -60L8 -45L15 -5L10 20Z"/>
+      <Path data="M-12 22L-18 -10L-8 -55L0 -65L8 -50L15 -5L10 22Z"/>
       <Fill>
         <LinearGradient startPoint="-12,0" endPoint="12,0">
           <ColorStop offset="0" color="#7E22CE"/>
@@ -244,7 +407,7 @@
       </Fill>
     </Group>
     <Group>
-      <Path data="M18 20L22 -5L28 -30L32 -38L36 -20L34 20Z"/>
+      <Path data="M18 22L22 -5L28 -35L32 -42L36 -22L34 22Z"/>
       <Fill>
         <LinearGradient startPoint="22,0" endPoint="36,0">
           <ColorStop offset="0" color="#6D28D9"/>
@@ -254,53 +417,75 @@
       </Fill>
     </Group>
     <Group>
-      <Ellipse center="0,-60" size="14,14"/>
+      <Path data="M-22 22L-28 5L-24 -18L-20 -24L-16 -12L-18 22Z"/>
       <Fill>
-        <RadialGradient center="0,-60" radius="7">
-          <ColorStop offset="0" color="#C4B5FD80"/>
+        <LinearGradient startPoint="-28,0" endPoint="-16,0">
+          <ColorStop offset="0" color="#5B21B6"/>
+          <ColorStop offset="0.5" color="#7C3AED"/>
+          <ColorStop offset="1" color="#5B21B6"/>
+        </LinearGradient>
+      </Fill>
+    </Group>
+    <Group>
+      <Ellipse center="0,-65" size="16,16"/>
+      <Fill>
+        <RadialGradient center="0,-65" radius="8">
+          <ColorStop offset="0" color="#C4B5FD90"/>
           <ColorStop offset="1" color="#C4B5FD00"/>
         </RadialGradient>
       </Fill>
     </Group>
     <Group>
-      <Ellipse center="32,-38" size="10,10"/>
+      <Ellipse center="32,-42" size="12,12"/>
       <Fill>
-        <RadialGradient center="32,-38" radius="5">
-          <ColorStop offset="0" color="#C4B5FD60"/>
+        <RadialGradient center="32,-42" radius="6">
+          <ColorStop offset="0" color="#C4B5FD70"/>
           <ColorStop offset="1" color="#C4B5FD00"/>
         </RadialGradient>
       </Fill>
     </Group>
   </Layer>
-  <Layer x="350" y="590">
-    <Group>
-      <Path data="M-10 8L-12 -2L-5 -10L5 -8L10 0L8 8Z"/>
-      <Fill color="#2D1854"/>
-    </Group>
+  <Layer x="349" y="587">
+    <Path data="M-9 9L-11 -1L-4 -9L6 -7L11 1L9 9Z"/>
+    <Fill color="#2D1854"/>
   </Layer>
-  <Layer x="800" y="555">
-    <Group>
-      <Path data="M-8 6L-10 -4L-3 -12L4 -10L8 -2L6 6Z"/>
-      <Fill color="#3B1F6E"/>
-    </Group>
+  <Layer x="499" y="573.5">
+    <Path data="M-5 6.5L-7 -1.5L-1 -6.5L5 -4.5L7 1.5L5 6.5Z"/>
+    <Fill color="#241548"/>
   </Layer>
-  <Layer x="250" y="575">
+  <Layer x="679" y="552">
+    <Path data="M-7 9L-9 -1L-2 -9L5 -7L9 1L7 9Z"/>
+    <Fill color="#3B1F6E"/>
+  </Layer>
+  <Layer x="829" y="546.5">
+    <Path data="M-4 5.5L-6 -0.5L-1 -5.5L4 -3.5L6 1.5L4 5.5Z"/>
+    <Fill color="#2D1854"/>
+  </Layer>
+  <Layer x="959" y="553">
+    <Path data="M-6 7L-8 -1L-2 -7L5 -5L8 1L6 7Z"/>
+    <Fill color="#251448"/>
+  </Layer>
+  <Layer x="250" y="570">
     <Group>
-      <Path data="M0 10C-2 -5 2 -20 -3 -35C-5 -42 -2 -48 0 -55"/>
+      <Path data="M0 10C-2 -5 2 -20 -3 -38C-5 -45 -2 -52 0 -58"/>
       <Stroke color="#10B981" width="3" cap="round"/>
     </Group>
     <Group>
-      <Path data="M-3 -25C-20 -35 -25 -20 -12 -18"/>
+      <Path data="M-3 -25C-22 -38 -28 -22 -14 -19"/>
       <Fill color="#059669"/>
     </Group>
     <Group>
-      <Path data="M2 -35C18 -45 22 -30 10 -28"/>
+      <Path data="M2 -38C20 -50 25 -34 12 -31"/>
       <Fill color="#059669"/>
     </Group>
     <Group>
-      <Ellipse center="0,-58" size="10,12"/>
+      <Path data="M-2 -48C-14 -53 -16 -42 -8 -41"/>
+      <Fill color="#047857"/>
+    </Group>
+    <Group>
+      <Ellipse center="0,-61" size="10,12"/>
       <Fill>
-        <RadialGradient center="0,-58" radius="6">
+        <RadialGradient center="0,-61" radius="6">
           <ColorStop offset="0" color="#34D399"/>
           <ColorStop offset="0.6" color="#10B981"/>
           <ColorStop offset="1" color="#059669"/>
@@ -308,9 +493,9 @@
       </Fill>
     </Group>
     <Group>
-      <Ellipse center="0,-58" size="28,28"/>
+      <Ellipse center="0,-61" size="30,30"/>
       <Fill>
-        <RadialGradient center="0,-58" radius="14">
+        <RadialGradient center="0,-61" radius="15">
           <ColorStop offset="0" color="#34D39960"/>
           <ColorStop offset="0.5" color="#34D39930"/>
           <ColorStop offset="1" color="#34D39900"/>
@@ -318,27 +503,27 @@
       </Fill>
     </Group>
   </Layer>
-  <Layer x="900" y="550">
+  <Layer x="900" y="545">
     <Group>
-      <Path data="M0 10C3 -8 -1 -25 2 -40C4 -48 1 -55 0 -62"/>
+      <Path data="M0 10C3 -8 -1 -25 2 -42C4 -50 1 -58 0 -65"/>
       <Stroke color="#14B8A6" width="2.5" cap="round"/>
     </Group>
     <Group>
-      <Path data="M-1 -20C-16 -28 -20 -15 -8 -14"/>
+      <Path data="M-1 -20C-18 -30 -22 -16 -10 -14"/>
       <Fill color="#0D9488"/>
     </Group>
     <Group>
-      <Path data="M2 -38C15 -46 18 -33 8 -32"/>
+      <Path data="M2 -40C17 -50 20 -36 10 -34"/>
       <Fill color="#0D9488"/>
     </Group>
     <Group>
-      <Path data="M-2 -50C-12 -55 -14 -45 -6 -44"/>
+      <Path data="M-2 -52C-14 -58 -16 -48 -8 -46"/>
       <Fill color="#0D9488"/>
     </Group>
     <Group>
-      <Ellipse center="0,-65" size="8,10"/>
+      <Ellipse center="0,-68" size="8,10"/>
       <Fill>
-        <RadialGradient center="0,-65" radius="5">
+        <RadialGradient center="0,-68" radius="5">
           <ColorStop offset="0" color="#2DD4BF"/>
           <ColorStop offset="0.6" color="#14B8A6"/>
           <ColorStop offset="1" color="#0D9488"/>
@@ -346,44 +531,90 @@
       </Fill>
     </Group>
     <Group>
-      <Ellipse center="0,-65" size="24,24"/>
+      <Ellipse center="0,-68" size="26,26"/>
       <Fill>
-        <RadialGradient center="0,-65" radius="12">
-          <ColorStop offset="0" color="#2DD4BF50"/>
+        <RadialGradient center="0,-68" radius="13">
+          <ColorStop offset="0" color="#2DD4BF55"/>
           <ColorStop offset="0.5" color="#2DD4BF25"/>
           <ColorStop offset="1" color="#2DD4BF00"/>
         </RadialGradient>
       </Fill>
     </Group>
   </Layer>
-  <Layer x="1120" y="545">
+  <Layer x="1120" y="540">
     <Group>
-      <Path data="M0 8C-1 -5 1 -18 -2 -28"/>
+      <Path data="M0 8C-1 -5 1 -20 -2 -32"/>
       <Stroke color="#10B981" width="2" cap="round"/>
     </Group>
     <Group>
-      <Path data="M12 8C14 -3 11 -15 13 -22"/>
+      <Path data="M14 8C16 -3 13 -18 15 -26"/>
       <Stroke color="#14B8A6" width="2" cap="round"/>
     </Group>
     <Group>
-      <Ellipse center="0,-31" size="7,8"/>
+      <Ellipse center="0,-35" size="7,8"/>
       <Fill color="#34D399"/>
     </Group>
     <Group>
-      <Ellipse center="12,-25" size="6,7"/>
+      <Ellipse center="14,-29" size="6,7"/>
       <Fill color="#2DD4BF"/>
     </Group>
     <Group>
-      <Ellipse center="5,-28" size="20,20"/>
+      <Ellipse center="6,-32" size="24,24"/>
       <Fill>
-        <RadialGradient center="5,-28" radius="10">
+        <RadialGradient center="6,-32" radius="12">
+          <ColorStop offset="0" color="#34D39955"/>
+          <ColorStop offset="1" color="#34D39900"/>
+        </RadialGradient>
+      </Fill>
+    </Group>
+  </Layer>
+  <Layer x="450" y="582">
+    <Group>
+      <Path data="M0 6C1 -4 -1 -14 0 -22"/>
+      <Stroke color="#10B981" width="2" cap="round"/>
+    </Group>
+    <Group>
+      <Path data="M-1 -12C-10 -18 -12 -10 -6 -9"/>
+      <Fill color="#059669"/>
+    </Group>
+    <Group>
+      <Ellipse center="0,-25" size="6,8"/>
+      <Fill color="#34D399"/>
+    </Group>
+    <Group>
+      <Ellipse center="0,-25" size="18,18"/>
+      <Fill>
+        <RadialGradient center="0,-25" radius="9">
           <ColorStop offset="0" color="#34D39950"/>
           <ColorStop offset="1" color="#34D39900"/>
         </RadialGradient>
       </Fill>
     </Group>
   </Layer>
-  <Layer x="880" y="540">
+  <Layer x="720" y="555">
+    <Group>
+      <Path data="M0 5C-1 -6 1 -16 0 -24"/>
+      <Stroke color="#14B8A6" width="2" cap="round"/>
+    </Group>
+    <Group>
+      <Path data="M1 -14C10 -20 12 -12 6 -10"/>
+      <Fill color="#0D9488"/>
+    </Group>
+    <Group>
+      <Ellipse center="0,-27" size="6,7"/>
+      <Fill color="#2DD4BF"/>
+    </Group>
+    <Group>
+      <Ellipse center="0,-27" size="16,16"/>
+      <Fill>
+        <RadialGradient center="0,-27" radius="8">
+          <ColorStop offset="0" color="#2DD4BF45"/>
+          <ColorStop offset="1" color="#2DD4BF00"/>
+        </RadialGradient>
+      </Fill>
+    </Group>
+  </Layer>
+  <Layer x="880" y="535">
     <Group>
       <Ellipse size="18,14"/>
       <Fill>
@@ -411,19 +642,19 @@
       <Fill color="#1E1B4B"/>
     </Group>
     <Group>
-      <Path data="M-3 -7C-6 -15 -8 -18 -10 -20"/>
+      <Path data="M-3 -7C-6 -15 -8 -18 -10 -22"/>
       <Stroke color="#A78BFA" width="1.5" cap="round"/>
     </Group>
     <Group>
-      <Path data="M3 -7C6 -15 8 -18 10 -20"/>
+      <Path data="M3 -7C6 -15 8 -18 10 -22"/>
       <Stroke color="#A78BFA" width="1.5" cap="round"/>
     </Group>
     <Group>
-      <Ellipse center="-10,-20" size="4,4"/>
+      <Ellipse center="-10,-22" size="4,4"/>
       <Fill color="#C4B5FD"/>
     </Group>
     <Group>
-      <Ellipse center="10,-20" size="4,4"/>
+      <Ellipse center="10,-22" size="4,4"/>
       <Fill color="#C4B5FD"/>
     </Group>
     <Group>
@@ -443,22 +674,66 @@
       <Stroke color="#7C3AED" width="2" cap="round"/>
     </Group>
   </Layer>
-  <Layer x="250" y="300">
+  <Layer x="320" y="595">
     <Group>
-      <Path data="M-15 30C-25 55 -10 90 0 110C10 90 25 55 15 30"/>
+      <Ellipse size="14,10"/>
       <Fill>
-        <LinearGradient startPoint="0,30" endPoint="0,110">
-          <ColorStop offset="0" color="#38BDF880"/>
-          <ColorStop offset="0.4" color="#06B6D450"/>
-          <ColorStop offset="0.7" color="#0891B225"/>
+        <RadialGradient radius="7">
+          <ColorStop offset="0" color="#67E8F9"/>
+          <ColorStop offset="0.7" color="#22D3EE"/>
+          <ColorStop offset="1" color="#0891B2"/>
+        </RadialGradient>
+      </Fill>
+    </Group>
+    <Group>
+      <Ellipse center="-3,-2" size="4,5"/>
+      <Fill color="#E0F2FE"/>
+    </Group>
+    <Group>
+      <Ellipse center="3,-2" size="4,5"/>
+      <Fill color="#E0F2FE"/>
+    </Group>
+    <Group>
+      <Ellipse center="-3,-2" size="2,2"/>
+      <Fill color="#164E63"/>
+    </Group>
+    <Group>
+      <Ellipse center="3,-2" size="2,2"/>
+      <Fill color="#164E63"/>
+    </Group>
+    <Group>
+      <Path data="M-2 -5C-4 -12 -3 -15 -5 -18"/>
+      <Stroke color="#22D3EE" width="1.5" cap="round"/>
+    </Group>
+    <Group>
+      <Path data="M2 -5C4 -12 3 -15 5 -18"/>
+      <Stroke color="#22D3EE" width="1.5" cap="round"/>
+    </Group>
+    <Group>
+      <Ellipse center="-5,-18" size="3,3"/>
+      <Fill color="#67E8F9"/>
+    </Group>
+    <Group>
+      <Ellipse center="5,-18" size="3,3"/>
+      <Fill color="#67E8F9"/>
+    </Group>
+  </Layer>
+  <Layer x="250" y="290">
+    <Group>
+      <Path data="M-15 30C-28 58 -12 95 0 120C12 95 28 58 15 30"/>
+      <Fill>
+        <LinearGradient startPoint="0,30" endPoint="0,120">
+          <ColorStop offset="0" color="#38BDF890"/>
+          <ColorStop offset="0.3" color="#06B6D460"/>
+          <ColorStop offset="0.6" color="#0891B230"/>
           <ColorStop offset="1" color="#0891B200"/>
         </LinearGradient>
       </Fill>
     </Group>
     <Group>
-      <Path data="M-35 10C-40 0 -30 -15 -20 -22C-10 -28 10 -28 20 -22C30 -15 40 0 35 10C25 18 -25 18 -35 10Z"/>
+      <Path data="M-38 10C-42 0 -32 -16 -22 -24C-12 -30 12 -30 22 -24C32 -16 42 0 38 10C28 20 -28 20 -38 10Z"/>
       <Fill>
-        <LinearGradient startPoint="0,-25" endPoint="0,18">
+        <LinearGradient startPoint="0,-28" endPoint="0,20">
           <ColorStop offset="0" color="#94A3B8"/>
           <ColorStop offset="0.3" color="#CBD5E1"/>
           <ColorStop offset="0.6" color="#E2E8F0"/>
@@ -467,9 +742,13 @@
       </Fill>
     </Group>
     <Group>
-      <Path data="M-12 -22C-12 -35 12 -35 12 -22"/>
+      <Path data="M-30 5C-15 8 15 8 30 5"/>
+      <Stroke color="#64748B"/>
+    </Group>
+    <Group>
+      <Path data="M-14 -24C-14 -38 14 -38 14 -24"/>
       <Fill>
-        <LinearGradient startPoint="-12,-35" endPoint="12,-22">
+        <LinearGradient startPoint="-14,-38" endPoint="14,-24">
           <ColorStop offset="0" color="#38BDF8"/>
           <ColorStop offset="0.5" color="#7DD3FC"/>
           <ColorStop offset="1" color="#38BDF8"/>
@@ -477,29 +756,29 @@
       </Fill>
     </Group>
     <Group>
-      <Path data="M-6 -30C-6 -33 0 -34 2 -32"/>
+      <Path data="M-7 -33C-7 -36 2 -37 4 -35"/>
       <Stroke color="#FFFFFF80" width="1.5" cap="round"/>
     </Group>
     <Group>
-      <Path data="M-30 10C-20 14 20 14 30 10"/>
+      <Path data="M-32 10C-22 16 22 16 32 10"/>
       <Stroke color="#64748B" width="2"/>
     </Group>
     <Group>
-      <Ellipse center="-18,12" size="4,3"/>
+      <Ellipse center="-20,14" size="4,3"/>
       <Fill color="#FBBF24"/>
     </Group>
     <Group>
-      <Ellipse center="0,14" size="4,3"/>
+      <Ellipse center="0,16" size="4,3"/>
       <Fill color="#FBBF24"/>
     </Group>
     <Group>
-      <Ellipse center="18,12" size="4,3"/>
+      <Ellipse center="20,14" size="4,3"/>
       <Fill color="#FBBF24"/>
     </Group>
     <Group>
-      <Ellipse size="90,50"/>
+      <Ellipse size="95,55"/>
       <Fill>
-        <RadialGradient radius="45">
+        <RadialGradient radius="48">
           <ColorStop offset="0.6" color="#38BDF800"/>
           <ColorStop offset="1" color="#38BDF818"/>
         </RadialGradient>
@@ -507,21 +786,69 @@
     </Group>
     <DropShadowStyle offsetY="5" blurX="15" blurY="15" color="#38BDF840"/>
   </Layer>
-  <Layer x="600" y="575">
-    <Ellipse size="80,16"/>
+  <Layer x="499" y="349">
+    <Path data="M-7 6L-9 -2L-3 -7L5 -5L9 1L6 7Z"/>
+    <Fill color="#3B2060"/>
+    <Stroke color="#8B5CF620"/>
+  </Layer>
+  <Layer x="549.5" y="379.5">
+    <Path data="M-4.5 3.5L-5.5 -1.5L-1.5 -4.5L3.5 -3.5L5.5 0.5L3.5 4.5Z"/>
+    <Fill color="#2D1854"/>
+  </Layer>
+  <Layer x="469.5" y="399.5">
+    <Path data="M-3.5 2.5L-4.5 -0.5L-0.5 -3.5L2.5 -2.5L4.5 0.5L2.5 3.5Z"/>
+    <Fill color="#351C5A"/>
+  </Layer>
+  <Layer x="629.5" y="319.5">
+    <Path data="M-5.5 4.5L-6.5 -1.5L-2.5 -5.5L3.5 -4.5L6.5 0.5L4.5 5.5Z"/>
+    <Fill color="#2D1854"/>
+    <Stroke color="#8B5CF615"/>
+  </Layer>
+  <Layer x="779.5" y="359.5">
+    <Path data="M-3.5 3.5L-4.5 -0.5L-1.5 -3.5L3.5 -2.5L4.5 1.5L2.5 3.5Z"/>
+    <Fill color="#301A58"/>
+  </Layer>
+  <Layer alpha="0.6" x="1120" y="400">
+    <Group>
+      <Rectangle size="12,8" roundness="2"/>
+      <Fill color="#94A3B8"/>
+    </Group>
+    <Group>
+      <Rectangle center="-14,0" size="12,4"/>
+      <Fill color="#38BDF8"/>
+    </Group>
+    <Group>
+      <Rectangle center="14,0" size="12,4"/>
+      <Fill color="#38BDF8"/>
+    </Group>
+    <Group>
+      <Path data="M-8 0L-20 0"/>
+      <Stroke color="#94A3B8"/>
+    </Group>
+    <Group>
+      <Path data="M8 0L20 0"/>
+      <Stroke color="#94A3B8"/>
+    </Group>
+    <Group>
+      <Ellipse center="0,-5" size="2,2"/>
+      <Fill color="#EF4444"/>
+    </Group>
+  </Layer>
+  <Layer x="600" y="570">
+    <Ellipse size="85,18"/>
     <Fill>
-      <RadialGradient radius="40">
-        <ColorStop offset="0" color="#00000050"/>
-        <ColorStop offset="0.7" color="#00000025"/>
+      <RadialGradient radius="42">
+        <ColorStop offset="0" color="#00000055"/>
+        <ColorStop offset="0.7" color="#00000028"/>
         <ColorStop offset="1" color="#00000000"/>
       </RadialGradient>
     </Fill>
   </Layer>
-  <Layer x="600" y="460">
+  <Layer x="600" y="455">
     <Group>
-      <Rectangle center="25,8" size="28,50" roundness="6"/>
+      <Rectangle center="25,8" size="30,54" roundness="6"/>
       <Fill>
-        <LinearGradient startPoint="11,0" endPoint="39,0">
+        <LinearGradient startPoint="10,0" endPoint="40,0">
           <ColorStop offset="0" color="#94A3B8"/>
           <ColorStop offset="0.5" color="#CBD5E1"/>
           <ColorStop offset="1" color="#94A3B8"/>
@@ -529,60 +856,80 @@
       </Fill>
     </Group>
     <Group>
-      <Path data="M15 -10L35 -10"/>
+      <Path data="M14 -12L36 -12"/>
       <Stroke color="#64748B"/>
     </Group>
     <Group>
-      <Path data="M15 5L35 5"/>
+      <Path data="M14 5L36 5"/>
       <Stroke color="#64748B"/>
     </Group>
     <Group>
-      <Path data="M30 -15L32 -35L34 -38"/>
+      <Path data="M14 20L36 20"/>
+      <Stroke color="#64748B"/>
+    </Group>
+    <Group>
+      <Ellipse center="20,30" size="6,4"/>
+      <Fill color="#475569"/>
+    </Group>
+    <Group>
+      <Ellipse center="30,30" size="6,4"/>
+      <Fill color="#475569"/>
+    </Group>
+    <Group>
+      <Path data="M32 -16L34 -38L36 -42"/>
       <Stroke color="#94A3B8" width="2" cap="round"/>
     </Group>
     <Group>
-      <Ellipse center="34,-38" size="4,4"/>
+      <Ellipse center="36,-42" size="5,5"/>
       <Fill color="#EF4444"/>
     </Group>
     <Group>
-      <Ellipse center="34,-38" size="10,10"/>
+      <Ellipse center="36,-42" size="14,14"/>
       <Fill>
-        <RadialGradient center="34,-38" radius="5">
-          <ColorStop offset="0" color="#EF444460"/>
+        <RadialGradient center="36,-42" radius="7">
+          <ColorStop offset="0" color="#EF444470"/>
           <ColorStop offset="1" color="#EF444400"/>
         </RadialGradient>
       </Fill>
     </Group>
     <Group>
-      <Path data="M-20 -20C-25 -10 -25 15 -22 30C-20 40 -15 45 0 48C15 45 20 40 22 30C25 15 25 -10 20 -20C10 -25 -10 -25 -20 -20Z"/>
+      <Path data="M-22 -22C-27 -10 -27 16 -24 32C-22 42 -16 48 0 50C16 48 22 42 24 32C27 16 27 -10 22 -22C12 -27 -12 -27 -22 -22Z"/>
       <Fill>
-        <LinearGradient startPoint="-25,0" endPoint="25,0">
+        <LinearGradient startPoint="-27,0" endPoint="27,0">
           <ColorStop offset="0" color="#94A3B8"/>
-          <ColorStop offset="0.2" color="#CBD5E1"/>
+          <ColorStop offset="0.15" color="#CBD5E1"/>
           <ColorStop offset="0.5" color="#F1F5F9"/>
-          <ColorStop offset="0.8" color="#CBD5E1"/>
+          <ColorStop offset="0.85" color="#CBD5E1"/>
           <ColorStop offset="1" color="#94A3B8"/>
         </LinearGradient>
       </Fill>
     </Group>
     <Group>
-      <Path data="M0 -20L0 45"/>
+      <Path data="M0 -22L0 48"/>
       <Stroke color="#E2E8F0" width="3"/>
     </Group>
     <Group>
-      <Rectangle center="0,5" size="20,16" roundness="3"/>
+      <Ellipse center="-18,-14" size="8,6"/>
+      <Fill color="#EF4444"/>
+    </Group>
+    <Group>
+      <Ellipse center="18,-14" size="8,6"/>
+      <Fill color="#3B82F6"/>
+    </Group>
+    <Group>
+      <Rectangle center="0,5" size="22,18" roundness="3"/>
       <Fill color="#475569"/>
     </Group>
     <Group>
-      <Ellipse center="-5,3" size="4,4"/>
+      <Ellipse center="-6,2" size="4,4"/>
       <Fill color="#22C55E"/>
     </Group>
     <Group>
-      <Ellipse center="2,3" size="4,4"/>
+      <Ellipse center="2,2" size="4,4"/>
       <Fill color="#EAB308"/>
     </Group>
     <Group>
-      <Ellipse center="-5,8" size="4,4"/>
+      <Ellipse center="-6,8" size="4,4"/>
       <Fill color="#3B82F6"/>
     </Group>
     <Group>
@@ -590,25 +937,33 @@
       <Fill color="#EF4444"/>
     </Group>
     <Group>
-      <Path data="M-22 30C-10 34 10 34 22 30"/>
+      <Rectangle center="0,14" size="14,4" roundness="1"/>
+      <Fill color="#0F172A"/>
+    </Group>
+    <Group>
+      <Rectangle center="-2,14" size="6,2" roundness="1"/>
+      <Fill color="#22D3EE60"/>
+    </Group>
+    <Group>
+      <Path data="M-24 32C-12 36 12 36 24 32"/>
       <Stroke color="#64748B" width="4"/>
     </Group>
     <Group>
-      <Rectangle center="0,32" size="10,8" roundness="2"/>
+      <Rectangle center="0,34" size="10,8" roundness="2"/>
       <Fill color="#94A3B8"/>
     </Group>
     <Group>
-      <Path data="M-20 -12C-30 -8 -42 0 -48 -10C-52 -18 -50 -28 -44 -35"/>
-      <Stroke color="#CBD5E1" width="14" cap="round" join="round"/>
+      <Rectangle center="-14,36" size="8,6" roundness="2"/>
+      <Fill color="#64748B"/>
     </Group>
     <Group>
-      <Path data="M-20 -12C-30 -8 -42 0 -48 -10C-52 -18 -50 -28 -44 -35"/>
-      <Stroke color="#94A3B8" width="14" cap="round" join="round"/>
+      <Rectangle center="14,36" size="8,6" roundness="2"/>
+      <Fill color="#64748B"/>
     </Group>
     <Group>
-      <Path data="M-20 -12C-30 -8 -42 0 -48 -10C-52 -18 -50 -28 -44 -35"/>
+      <Path data="M-22 -12C-32 -8 -44 0 -50 -12C-54 -20 -52 -30 -46 -38"/>
       <Stroke>
-        <LinearGradient startPoint="-20,-12" endPoint="-44,-35">
+        <LinearGradient startPoint="-22,-12" endPoint="-46,-38">
           <ColorStop offset="0" color="#94A3B8"/>
           <ColorStop offset="0.3" color="#CBD5E1"/>
           <ColorStop offset="0.7" color="#E2E8F0"/>
@@ -617,9 +972,13 @@
       </Stroke>
     </Group>
     <Group>
-      <Ellipse center="-44,-38" size="16,18"/>
+      <Path data="M-22 -12C-32 -8 -44 0 -50 -12C-54 -20 -52 -30 -46 -38"/>
+      <Stroke color="#CBD5E1" width="14" cap="round" join="round"/>
+    </Group>
+    <Group>
+      <Ellipse center="-46,-41" size="16,18"/>
       <Fill>
-        <LinearGradient startPoint="-52,-38" endPoint="-36,-38">
+        <LinearGradient startPoint="-54,-41" endPoint="-38,-41">
           <ColorStop offset="0" color="#94A3B8"/>
           <ColorStop offset="0.5" color="#E2E8F0"/>
           <ColorStop offset="1" color="#94A3B8"/>
@@ -627,28 +986,21 @@
       </Fill>
     </Group>
     <Group>
-      <Path data="M-48 -45L-48 -50M-44 -46L-44 -52M-40 -45L-40 -50"/>
+      <Path data="M-50 -48L-50 -54M-46 -49L-46 -56M-42 -48L-42 -54"/>
       <Stroke color="#CBD5E1" width="3" cap="round"/>
     </Group>
     <Group>
-      <Path data="M20 -12C30 -5 38 10 42 25"/>
-      <Stroke>
-        <LinearGradient startPoint="20,-12" endPoint="42,25">
-          <ColorStop offset="0" color="#94A3B8"/>
-          <ColorStop offset="0.3" color="#CBD5E1"/>
-          <ColorStop offset="0.7" color="#E2E8F0"/>
-          <ColorStop offset="1" color="#CBD5E1"/>
-        </LinearGradient>
-      </Stroke>
+      <Ellipse center="-46,-32" size="16,6"/>
+      <Fill color="#64748B"/>
     </Group>
     <Group>
-      <Path data="M20 -12C30 -5 38 10 42 25"/>
+      <Path data="M22 -12C32 -5 40 12 44 28"/>
       <Stroke color="#CBD5E1" width="14" cap="round" join="round"/>
     </Group>
     <Group>
-      <Ellipse center="42,28" size="16,18"/>
+      <Ellipse center="44,30" size="16,18"/>
       <Fill>
-        <LinearGradient startPoint="34,28" endPoint="50,28">
+        <LinearGradient startPoint="36,30" endPoint="52,30">
           <ColorStop offset="0" color="#94A3B8"/>
           <ColorStop offset="0.5" color="#E2E8F0"/>
           <ColorStop offset="1" color="#94A3B8"/>
@@ -656,40 +1008,42 @@
       </Fill>
     </Group>
     <Group>
-      <Rectangle center="42,18" size="8,20" roundness="2"/>
+      <Ellipse center="44,20" size="16,6"/>
+      <Fill color="#64748B"/>
+    </Group>
+    <Group>
+      <Rectangle center="44,18" size="8,22" roundness="2"/>
       <Fill color="#475569"/>
     </Group>
     <Group>
-      <Ellipse center="42,10" size="6,6"/>
+      <Rectangle center="44,9" size="6,6" roundness="1"/>
+      <Fill color="#0F172A"/>
+    </Group>
+    <Group>
+      <Ellipse center="44,9" size="4,4"/>
       <Fill color="#22D3EE"/>
     </Group>
     <Group>
-      <Ellipse center="42,10" size="14,14"/>
+      <Ellipse center="44,9" size="16,16"/>
       <Fill>
-        <RadialGradient center="42,10" radius="7">
-          <ColorStop offset="0" color="#22D3EE50"/>
+        <RadialGradient center="44,9" radius="8">
+          <ColorStop offset="0" color="#22D3EE55"/>
           <ColorStop offset="1" color="#22D3EE00"/>
         </RadialGradient>
       </Fill>
     </Group>
     <Group>
-      <Path data="M-10 45C-12 60 -14 75 -16 90"/>
-      <Stroke>
-        <LinearGradient startPoint="-10,45" endPoint="-16,90">
-          <ColorStop offset="0" color="#CBD5E1"/>
-          <ColorStop offset="0.5" color="#E2E8F0"/>
-          <ColorStop offset="1" color="#CBD5E1"/>
-        </LinearGradient>
-      </Stroke>
-    </Group>
-    <Group>
-      <Path data="M-10 45C-12 60 -14 75 -16 90"/>
+      <Path data="M-12 48C-14 64 -16 78 -18 94"/>
       <Stroke color="#CBD5E1" width="14" cap="round"/>
     </Group>
     <Group>
-      <Path data="M-22 88C-24 95 -24 102 -20 105C-16 108 -6 108 -4 105C-2 100 -8 92 -12 88"/>
+      <Ellipse center="-15,70" size="10,8"/>
+      <Fill color="#94A3B8"/>
+    </Group>
+    <Group>
+      <Path data="M-24 92C-26 99 -26 106 -22 109C-18 112 -8 112 -6 109C-4 104 -10 96 -14 92"/>
       <Fill>
-        <LinearGradient startPoint="-24,88" endPoint="-4,105">
+        <LinearGradient startPoint="-26,92" endPoint="-6,109">
           <ColorStop offset="0" color="#64748B"/>
           <ColorStop offset="0.5" color="#94A3B8"/>
           <ColorStop offset="1" color="#64748B"/>
@@ -697,27 +1051,25 @@
       </Fill>
     </Group>
     <Group>
-      <Path data="M-22 104C-16 108 -6 108 -4 104"/>
+      <Path data="M-24 108C-18 112 -8 112 -6 108"/>
       <Stroke color="#475569" width="3"/>
     </Group>
     <Group>
-      <Path data="M10 45C12 60 16 75 18 90"/>
-      <Stroke>
-        <LinearGradient startPoint="10,45" endPoint="18,90">
-          <ColorStop offset="0" color="#CBD5E1"/>
-          <ColorStop offset="0.5" color="#E2E8F0"/>
-          <ColorStop offset="1" color="#CBD5E1"/>
-        </LinearGradient>
-      </Stroke>
+      <Path data="M-21 110L-19 110M-16 110L-14 110M-11 110L-9 110"/>
+      <Stroke color="#475569" width="1.5" cap="round"/>
     </Group>
     <Group>
-      <Path data="M10 45C12 60 16 75 18 90"/>
+      <Path data="M12 48C14 64 18 78 20 94"/>
       <Stroke color="#CBD5E1" width="14" cap="round"/>
     </Group>
     <Group>
-      <Path data="M10 88C8 95 8 102 12 105C16 108 26 108 28 105C30 100 22 92 18 88"/>
+      <Ellipse center="17,70" size="10,8"/>
+      <Fill color="#94A3B8"/>
+    </Group>
+    <Group>
+      <Path data="M12 92C10 99 10 106 14 109C18 112 28 112 30 109C32 104 24 96 20 92"/>
       <Fill>
-        <LinearGradient startPoint="8,88" endPoint="28,105">
+        <LinearGradient startPoint="10,92" endPoint="30,109">
           <ColorStop offset="0" color="#64748B"/>
           <ColorStop offset="0.5" color="#94A3B8"/>
           <ColorStop offset="1" color="#64748B"/>
@@ -725,13 +1077,17 @@
       </Fill>
     </Group>
     <Group>
-      <Path data="M10 104C16 108 26 108 28 104"/>
+      <Path data="M12 108C18 112 28 112 30 108"/>
       <Stroke color="#475569" width="3"/>
     </Group>
     <Group>
-      <Ellipse center="0,-42" size="52,52"/>
+      <Path data="M15 110L17 110M20 110L22 110M25 110L27 110"/>
+      <Stroke color="#475569" width="1.5" cap="round"/>
+    </Group>
+    <Group>
+      <Ellipse center="0,-44" size="54,54"/>
       <Fill>
-        <LinearGradient startPoint="-26,-68" endPoint="26,-16">
+        <LinearGradient startPoint="-27,-71" endPoint="27,-17">
           <ColorStop offset="0" color="#E2E8F0"/>
           <ColorStop offset="0.3" color="#F8FAFC"/>
           <ColorStop offset="0.7" color="#E2E8F0"/>
@@ -740,57 +1096,73 @@
       </Fill>
     </Group>
     <Group>
-      <Ellipse center="0,-42" size="40,36"/>
+      <Ellipse center="0,-44" size="42,38"/>
       <Fill>
-        <LinearGradient startPoint="-20,-60" endPoint="20,-24">
+        <LinearGradient startPoint="-21,-63" endPoint="21,-25">
           <ColorStop offset="0" color="#1E293B"/>
-          <ColorStop offset="0.3" color="#334155"/>
+          <ColorStop offset="0.25" color="#334155"/>
           <ColorStop offset="0.5" color="#1E3A5F"/>
-          <ColorStop offset="0.7" color="#1E293B"/>
+          <ColorStop offset="0.75" color="#1E293B"/>
           <ColorStop offset="1" color="#0F172A"/>
         </LinearGradient>
       </Fill>
     </Group>
     <Group>
-      <Path data="M-14 -55C-8 -58 4 -57 10 -54"/>
+      <Path data="M-15 -58C-8 -61 5 -60 12 -57"/>
       <Stroke color="#FFFFFF50" width="2" cap="round"/>
     </Group>
     <Group>
-      <Path data="M-10 -52C-4 -54 6 -53 10 -51"/>
+      <Path data="M-11 -55C-4 -57 6 -56 11 -54"/>
       <Stroke color="#FFFFFF30" width="1.5" cap="round"/>
     </Group>
     <Group>
-      <Path data="M10 -45C14 -40 15 -35 13 -30"/>
+      <Path data="M11 -48C15 -42 16 -37 14 -32"/>
       <Stroke color="#F9731630" width="3" cap="round"/>
     </Group>
     <Group>
-      <Ellipse center="0,-42" size="52,52"/>
+      <Ellipse center="-8,-40" size="2,2"/>
+      <Fill color="#FFFFFF30"/>
+    </Group>
+    <Group>
+      <Ellipse center="5,-48" size="1,1"/>
+      <Fill color="#FFFFFF25"/>
+    </Group>
+    <Group>
+      <Ellipse center="0,-44" size="54,54"/>
       <Stroke color="#94A3B8" width="2"/>
     </Group>
     <Group>
-      <Ellipse center="0,-20" size="36,12"/>
+      <Rectangle center="0,-70" size="8,5" roundness="2"/>
+      <Fill color="#475569"/>
+    </Group>
+    <Group>
+      <Ellipse center="0,-70" size="4,3"/>
+      <Fill color="#FBBF24"/>
+    </Group>
+    <Group>
+      <Ellipse center="0,-21" size="38,12"/>
       <Fill color="#94A3B8"/>
     </Group>
     <Group>
-      <Ellipse center="0,-20" size="36,12"/>
+      <Ellipse center="0,-21" size="38,12"/>
       <Stroke color="#64748B" width="1.5"/>
     </Group>
     <Group>
-      <Path data="M-18 -20C-22 -15 -24 0 -22 8"/>
+      <Path data="M-19 -21C-24 -16 -26 0 -24 10"/>
       <Stroke color="#94A3B8" width="3" cap="round"/>
     </Group>
     <Group>
-      <Path data="M18 -20C22 -15 24 0 22 8"/>
+      <Path data="M19 -21C24 -16 26 0 24 10"/>
       <Stroke color="#94A3B8" width="3" cap="round"/>
     </Group>
     <Group>
-      <Path data="M36 -15L36 -40"/>
+      <Path data="M38 -16L38 -44"/>
       <Stroke color="#94A3B8" width="2" cap="round"/>
     </Group>
     <Group>
-      <Path data="M36 -40L52 -38L52 -28L36 -30Z"/>
+      <Path data="M38 -44L54 -42L54 -32L38 -34Z"/>
       <Fill>
-        <LinearGradient startPoint="36,-40" endPoint="52,-28">
+        <LinearGradient startPoint="38,-44" endPoint="54,-32">
           <ColorStop offset="0" color="#3B82F6"/>
           <ColorStop offset="0.5" color="#2563EB"/>
           <ColorStop offset="1" color="#3B82F6"/>
@@ -798,75 +1170,191 @@
       </Fill>
     </Group>
     <Group>
-      <Polystar center="44,-34" type="star" outerRadius="4" innerRadius="2" rotation="-90"/>
+      <Polystar center="46,-38" type="star" outerRadius="4" innerRadius="2" rotation="-90"/>
       <Fill color="#FBBF24"/>
     </Group>
   </Layer>
-  <Layer alpha="0.6" x="642" y="478">
+  <Layer alpha="0.7" x="520" y="420">
     <Group>
-      <Path data="M0 0L20 50L-10 55Z"/>
+      <Rectangle size="60,45" roundness="3"/>
+      <Stroke color="#22D3EE50" width="1.5"/>
+    </Group>
+    <Group>
+      <Path data="M-30 -10L30 -10"/>
+      <Stroke color="#22D3EE25"/>
+    </Group>
+    <Group>
+      <Path data="M-30 5L30 5"/>
+      <Stroke color="#22D3EE25"/>
+    </Group>
+    <Group>
+      <Path data="M-10 -22L-10 22"/>
+      <Stroke color="#22D3EE20"/>
+    </Group>
+    <Group>
+      <Path data="M10 -22L10 22"/>
+      <Stroke color="#22D3EE20"/>
+    </Group>
+    <Group>
+      <Rectangle center="-18,-16" size="8,4" roundness="1"/>
+      <Fill color="#22D3EE40"/>
+    </Group>
+    <Group>
+      <Rectangle center="-6,-16" size="12,4" roundness="1"/>
+      <Fill color="#34D39940"/>
+    </Group>
+    <Group>
+      <Rectangle center="8,-16" size="6,4" roundness="1"/>
+      <Fill color="#FBBF2440"/>
+    </Group>
+    <Group>
+      <Ellipse size="14,14"/>
+      <Stroke color="#22D3EE50"/>
+    </Group>
+    <Group>
+      <Ellipse size="14,6"/>
+      <Stroke color="#22D3EE30"/>
+    </Group>
+    <Group>
+      <Rectangle center="-8,14" size="16,2" roundness="1"/>
+      <Fill color="#22D3EE30"/>
+    </Group>
+    <Group>
+      <Rectangle center="8,14" size="10,2" roundness="1"/>
+      <Fill color="#22D3EE25"/>
+    </Group>
+    <Group>
+      <Rectangle center="-4,18" size="20,2" roundness="1"/>
+      <Fill color="#22D3EE20"/>
+    </Group>
+    <Group>
+      <Ellipse size="70,55"/>
       <Fill>
-        <LinearGradient startPoint="0,0" endPoint="5,55">
-          <ColorStop offset="0" color="#22D3EE60"/>
-          <ColorStop offset="0.5" color="#22D3EE30"/>
+        <RadialGradient radius="35">
+          <ColorStop offset="0.5" color="#22D3EE00"/>
+          <ColorStop offset="1" color="#22D3EE10"/>
+        </RadialGradient>
+      </Fill>
+    </Group>
+  </Layer>
+  <Layer alpha="0.5" x="644" y="473">
+    <Group>
+      <Path data="M0 0L25 55L-8 60Z"/>
+      <Fill>
+        <LinearGradient startPoint="0,0" endPoint="8,60">
+          <ColorStop offset="0" color="#22D3EE70"/>
+          <ColorStop offset="0.4" color="#22D3EE35"/>
+          <ColorStop offset="0.7" color="#22D3EE15"/>
           <ColorStop offset="1" color="#22D3EE00"/>
         </LinearGradient>
       </Fill>
     </Group>
+    <Group>
+      <Path data="M4 15L12 15"/>
+      <Stroke color="#22D3EE30"/>
+    </Group>
+    <Group>
+      <Path data="M2 30L16 30"/>
+      <Stroke color="#22D3EE20"/>
+    </Group>
+    <Group>
+      <Path data="M0 45L18 45"/>
+      <Stroke color="#22D3EE15"/>
+    </Group>
   </Layer>
-  <Layer alpha="0.5" x="500" y="480">
+  <Layer x="780" y="530">
+    <Group>
+      <Rectangle center="0,10" size="4,30" roundness="1"/>
+      <Fill color="#64748B"/>
+    </Group>
+    <Group>
+      <Ellipse center="0,25" size="14,5"/>
+      <Fill color="#475569"/>
+    </Group>
+    <Group>
+      <Ellipse center="0,-5" size="8,8"/>
+      <Fill color="#22C55E"/>
+    </Group>
+    <Group>
+      <Ellipse center="0,-5" size="20,20"/>
+      <Fill>
+        <RadialGradient center="0,-5" radius="10">
+          <ColorStop offset="0" color="#22C55E50"/>
+          <ColorStop offset="0.5" color="#22C55E25"/>
+          <ColorStop offset="1" color="#22C55E00"/>
+        </RadialGradient>
+      </Fill>
+    </Group>
+    <Group>
+      <Ellipse center="0,-5" size="28,28"/>
+      <Stroke color="#22C55E15"/>
+    </Group>
+    <Group>
+      <Ellipse center="0,-5" size="38,38"/>
+      <Stroke color="#22C55E10"/>
+    </Group>
+  </Layer>
+  <Layer alpha="0.5" x="500" y="475">
     <Ellipse size="3,3"/>
     <Fill color="#A78BFA"/>
   </Layer>
-  <Layer alpha="0.4" x="520" y="500">
+  <Layer alpha="0.4" x="520" y="495">
     <Ellipse size="2,2"/>
     <Fill color="#C4B5FD"/>
   </Layer>
-  <Layer alpha="0.5" x="680" y="510">
+  <Layer alpha="0.5" x="680" y="505">
     <Ellipse size="3,3"/>
     <Fill color="#22D3EE"/>
   </Layer>
-  <Layer alpha="0.35" x="720" y="490">
+  <Layer alpha="0.35" x="720" y="485">
     <Ellipse size="2,2"/>
     <Fill color="#67E8F9"/>
   </Layer>
-  <Layer alpha="0.45" x="560" y="530">
+  <Layer alpha="0.45" x="560" y="525">
     <Ellipse size="2,2"/>
     <Fill color="#34D399"/>
   </Layer>
-  <Layer alpha="0.4" x="650" y="540">
-    <Ellipse size="3,3"/>
-    <Fill color="#A78BFA"/>
-  </Layer>
-  <Layer alpha="0.3" x="450" y="520">
+  <Layer alpha="0.4" x="650" y="535" composition="@comp7"/>
+  <Layer alpha="0.3" x="450" y="515">
     <Ellipse size="2,2"/>
     <Fill color="#C4B5FD"/>
   </Layer>
-  <Layer alpha="0.5" x="760" y="530">
+  <Layer alpha="0.5" x="760" y="525">
     <Ellipse size="2,2"/>
     <Fill color="#22D3EE"/>
   </Layer>
-  <Layer alpha="0.3" x="480" y="568">
-    <Group>
-      <Ellipse size="10,14"/>
-      <Fill color="#1A1040"/>
-    </Group>
+  <Layer alpha="0.35" x="580" y="440">
+    <Ellipse size="2,2"/>
+    <Fill color="#FBBF24"/>
   </Layer>
-  <Layer alpha="0.25" x="520" y="572">
-    <Group>
-      <Ellipse size="10,14"/>
-      <Fill color="#1A1040"/>
-    </Group>
+  <Layer alpha="0.3" x="620" y="420">
+    <Ellipse size="2,2"/>
+    <Fill color="#F97316"/>
   </Layer>
-  <Layer alpha="0.2" x="555" y="566">
-    <Group>
-      <Ellipse size="10,14"/>
-      <Fill color="#1A1040"/>
-    </Group>
+  <Layer alpha="0.4" x="540" y="460" composition="@comp7"/>
+  <Layer alpha="0.3" x="660" y="450">
+    <Ellipse size="2,2"/>
+    <Fill color="#34D399"/>
+  </Layer>
+  <Layer alpha="0.35" x="480" y="440">
+    <Ellipse size="2,2"/>
+    <Fill color="#C4B5FD"/>
+  </Layer>
+  <Layer alpha="0.3" x="475" y="565">
+    <Ellipse size="10,14"/>
+    <Fill color="#1A1040"/>
+  </Layer>
+  <Layer alpha="0.25" x="515" y="568">
+    <Ellipse size="10,14"/>
+    <Fill color="#1A1040"/>
+  </Layer>
+  <Layer alpha="0.2" x="550" y="562">
+    <Ellipse size="10,14"/>
+    <Fill color="#1A1040"/>
   </Layer>
   <Layer>
     <Group>
-      <Path data="M0 800L0 720C50 710 120 700 200 705C300 712 400 695 500 700C600 705 700 692 800 698C900 704 1000 690 1100 695L1200 692L1200 800Z"/>
+      <Path data="M0 800L0 715C50 705 120 695 200 700C300 707 400 690 500 695C600 700 700 688 800 693C900 699 1000 685 1100 690L1200 687L1200 800Z"/>
       <Fill>
         <LinearGradient startPoint="600,-55" endPoint="600,55">
           <ColorStop offset="0" color="#120B28"/>
@@ -876,48 +1364,71 @@
       </Fill>
     </Group>
     <Group>
-      <Path data="M40 750L30 720L50 700L70 710L75 740L60 755Z"/>
+      <Path data="M35 745L25 715L45 695L65 705L70 735L55 750Z"/>
       <Fill color="#1A1040"/>
     </Group>
     <Group>
-      <Path data="M1130 740L1120 715L1140 700L1160 710L1165 735L1145 745Z"/>
+      <Path data="M80 755L70 738L85 728L98 735L95 752Z"/>
+      <Fill color="#150D30"/>
+    </Group>
+    <Group>
+      <Path data="M1125 735L1115 710L1135 695L1155 705L1160 730L1140 740Z"/>
       <Fill color="#18103A"/>
     </Group>
-  </Layer>
-  <Layer alpha="0.15">
     <Group>
-      <Ellipse center="300,600" size="400,40"/>
+      <Path data="M1170 740L1165 720L1175 710L1180 725L1178 742Z"/>
       <Fill>
-        <RadialGradient center="300,600" radius="200">
+        <LinearGradient startPoint="1165,725" endPoint="1180,725">
+          <ColorStop offset="0" color="#5B21B6"/>
+          <ColorStop offset="0.5" color="#7C3AED"/>
+          <ColorStop offset="1" color="#5B21B6"/>
+        </LinearGradient>
+      </Fill>
+    </Group>
+  </Layer>
+  <Layer alpha="0.18">
+    <Group>
+      <Ellipse center="300,595" size="420,45"/>
+      <Fill>
+        <RadialGradient center="300,595" radius="210">
           <ColorStop offset="0" color="#8B5CF6"/>
           <ColorStop offset="1" color="#8B5CF600"/>
         </RadialGradient>
       </Fill>
     </Group>
     <Group>
-      <Ellipse center="800,580" size="350,35"/>
+      <Ellipse center="600,585" size="350,35"/>
       <Fill>
-        <RadialGradient center="800,580" radius="175">
+        <RadialGradient center="600,585" radius="175">
+          <ColorStop offset="0" color="#A78BFA"/>
+          <ColorStop offset="1" color="#A78BFA00"/>
+        </RadialGradient>
+      </Fill>
+    </Group>
+    <Group>
+      <Ellipse center="850,575" size="380,38"/>
+      <Fill>
+        <RadialGradient center="850,575" radius="190">
           <ColorStop offset="0" color="#06B6D4"/>
           <ColorStop offset="1" color="#06B6D400"/>
         </RadialGradient>
       </Fill>
     </Group>
     <Group>
-      <Ellipse center="600,590" size="300,30"/>
+      <Ellipse center="150,605" size="250,30"/>
       <Fill>
-        <RadialGradient center="600,590" radius="150">
-          <ColorStop offset="0" color="#A78BFA"/>
-          <ColorStop offset="1" color="#A78BFA00"/>
+        <RadialGradient center="150,605" radius="125">
+          <ColorStop offset="0" color="#7C3AED"/>
+          <ColorStop offset="1" color="#7C3AED00"/>
         </RadialGradient>
       </Fill>
     </Group>
   </Layer>
-  <Layer alpha="0.7" x="700" y="120">
+  <Layer alpha="0.7" x="700" y="115">
     <Group>
-      <Path data="M0 0L80 0"/>
+      <Path data="M0 0L85 0"/>
       <Stroke>
-        <LinearGradient startPoint="0,0" endPoint="80,0">
+        <LinearGradient startPoint="0,0" endPoint="85,0">
           <ColorStop offset="0" color="#FFFFFF00"/>
           <ColorStop offset="0.3" color="#FFFFFF40"/>
           <ColorStop offset="0.7" color="#FFFFFFCC"/>
@@ -926,39 +1437,92 @@
       </Stroke>
     </Group>
     <Group>
-      <Ellipse center="80,0" size="4,4"/>
+      <Ellipse center="85,0" size="4,4"/>
       <Fill color="#FFFFFF"/>
     </Group>
   </Layer>
+  <Layer alpha="0.45" x="400" y="210">
+    <Group>
+      <Path data="M0 0L50 0"/>
+      <Stroke>
+        <LinearGradient startPoint="0,0" endPoint="50,0">
+          <ColorStop offset="0" color="#FFFFFF00"/>
+          <ColorStop offset="0.4" color="#FFFFFF30"/>
+          <ColorStop offset="1" color="#FFFFFFAA"/>
+        </LinearGradient>
+      </Stroke>
+    </Group>
+    <Group>
+      <Ellipse center="50,0" size="3,3"/>
+      <Fill color="#FFFFFFAA"/>
+    </Group>
+  </Layer>
+  <Layer alpha="0.5" x="1150" y="50">
+    <Group>
+      <Path data="M0 0L40 0"/>
+      <Stroke>
+        <LinearGradient startPoint="0,0" endPoint="40,0">
+          <ColorStop offset="0" color="#67E8F900"/>
+          <ColorStop offset="0.5" color="#67E8F940"/>
+          <ColorStop offset="1" color="#67E8F9"/>
+        </LinearGradient>
+      </Stroke>
+    </Group>
+    <Group>
+      <Ellipse center="40,0" size="5,5"/>
+      <Fill color="#67E8F9"/>
+    </Group>
+    <Group>
+      <Ellipse center="40,0" size="12,12"/>
+      <Fill>
+        <RadialGradient center="40,0" radius="6">
+          <ColorStop offset="0" color="#67E8F940"/>
+          <ColorStop offset="1" color="#67E8F900"/>
+        </RadialGradient>
+      </Fill>
+    </Group>
+  </Layer>
   <Resources>
-    <Composition id="comp1" width="3" height="3">
+    <Composition id="comp1" width="2" height="2">
       <Layer id="compLayer1">
-        <Ellipse size="3,3"/>
-        <Fill color="#FFFFFF"/>
+        <Ellipse size="2,2"/>
+        <Fill color="#FFFFFFCC"/>
       </Layer>
     </Composition>
     <Composition id="comp2" width="2" height="2">
       <Layer id="compLayer2">
         <Ellipse size="2,2"/>
-        <Fill color="#FFFFFFCC"/>
+        <Fill color="#FFFFFFAA"/>
       </Layer>
     </Composition>
     <Composition id="comp3" width="2" height="2">
       <Layer id="compLayer3">
         <Ellipse size="2,2"/>
-        <Fill color="#FFFFFFAA"/>
+        <Fill color="#FFFFFFBB"/>
       </Layer>
     </Composition>
     <Composition id="comp4" width="2" height="2">
       <Layer id="compLayer4">
         <Ellipse size="2,2"/>
+        <Fill color="#FFFFFF"/>
+      </Layer>
+    </Composition>
+    <Composition id="comp5" width="3" height="3">
+      <Layer id="compLayer5">
+        <Ellipse size="3,3"/>
+        <Fill color="#FFFFFF"/>
+      </Layer>
+    </Composition>
+    <Composition id="comp6" width="3" height="3">
+      <Layer id="compLayer6">
+        <Ellipse size="3,3"/>
         <Fill color="#FFFFFFBB"/>
       </Layer>
     </Composition>
-    <Composition id="comp5" width="2" height="2">
-      <Layer id="compLayer5">
-        <Ellipse size="2,2"/>
-        <Fill color="#FFFFFF"/>
+    <Composition id="comp7" width="3" height="3">
+      <Layer id="compLayer7">
+        <Ellipse size="3,3"/>
+        <Fill color="#A78BFA"/>
       </Layer>
     </Composition>
   </Resources>
