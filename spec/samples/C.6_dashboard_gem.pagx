@@ -1,0 +1,442 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="1200" height="800">
+  <Layer name="Background" x="600" y="400">
+    <Rectangle size="1200,800"/>
+    <Fill>
+      <LinearGradient endPoint="1200,800">
+        <ColorStop offset="0" color="#1A0533"/>
+        <ColorStop offset="0.3" color="#2D1B69"/>
+        <ColorStop offset="0.6" color="#1B1464"/>
+        <ColorStop offset="1" color="#0D0B2E"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+  <Layer name="BlobWarm" alpha="0.7" blendMode="screen" x="950" y="150">
+    <Ellipse size="650,500"/>
+    <Fill>
+      <RadialGradient center="950,150" radius="325">
+        <ColorStop offset="0" color="#FF6B9D"/>
+        <ColorStop offset="0.4" color="#FF6B9D50"/>
+        <ColorStop offset="1" color="#FF6B9D00"/>
+      </RadialGradient>
+    </Fill>
+    <BlurFilter blurX="80" blurY="80"/>
+  </Layer>
+  <Layer name="BlobCool" alpha="0.6" blendMode="screen" x="200" y="650">
+    <Ellipse size="650,450"/>
+    <Fill>
+      <RadialGradient center="200,650" radius="325">
+        <ColorStop offset="0" color="#4ECDC4"/>
+        <ColorStop offset="0.4" color="#4ECDC440"/>
+        <ColorStop offset="1" color="#4ECDC400"/>
+      </RadialGradient>
+    </Fill>
+    <BlurFilter blurX="80" blurY="80"/>
+  </Layer>
+  <Layer name="BlobCenter" alpha="0.5" blendMode="screen" x="600" y="380">
+    <Ellipse size="550,550"/>
+    <Fill>
+      <RadialGradient center="600,380" radius="275">
+        <ColorStop offset="0" color="#A855F7"/>
+        <ColorStop offset="0.4" color="#A855F740"/>
+        <ColorStop offset="1" color="#A855F700"/>
+      </RadialGradient>
+    </Fill>
+    <BlurFilter blurX="60" blurY="60"/>
+  </Layer>
+  <Layer name="BlobTeal" alpha="0.35" blendMode="screen" x="350" y="200">
+    <Ellipse size="400,300"/>
+    <Fill>
+      <RadialGradient center="350,200" radius="200">
+        <ColorStop offset="0" color="#06B6D4"/>
+        <ColorStop offset="0.5" color="#06B6D430"/>
+        <ColorStop offset="1" color="#06B6D400"/>
+      </RadialGradient>
+    </Fill>
+    <BlurFilter blurX="60" blurY="60"/>
+  </Layer>
+  <Layer name="DotGrid" alpha="0.08" x="40" y="40">
+    <Group>
+      <Ellipse size="3,3"/>
+      <Fill color="#FFFFFF"/>
+      <Repeater copies="24" position="48,0"/>
+    </Group>
+    <Repeater copies="16" position="0,48"/>
+  </Layer>
+  <Layer name="OrbitLarge" alpha="0.12" x="600" y="400">
+    <Ellipse size="700,700"/>
+    <Stroke color="#FFFFFF"/>
+  </Layer>
+  <Layer name="OrbitMedium" alpha="0.25" x="600" y="400">
+    <Ellipse size="520,520"/>
+    <Stroke color="#FFFFFF20"/>
+  </Layer>
+  <Layer name="GradientArc" alpha="0.7" x="600" y="400">
+    <Ellipse size="520,520"/>
+    <TrimPath start="0.1" end="0.45"/>
+    <Stroke width="3" cap="round">
+      <ConicGradient>
+        <ColorStop offset="0" color="#FF6B9D00"/>
+        <ColorStop offset="0.2" color="#FF6B9D"/>
+        <ColorStop offset="0.5" color="#C850C0"/>
+        <ColorStop offset="0.8" color="#A855F7"/>
+        <ColorStop offset="1" color="#A855F700"/>
+      </ConicGradient>
+    </Stroke>
+  </Layer>
+  <Layer name="OrbitSmall" alpha="0.15" x="600" y="400">
+    <Ellipse size="340,340"/>
+    <Stroke color="#FFFFFF" dashes="4,8"/>
+  </Layer>
+  <Layer name="OrbitTicks" alpha="0.2" x="600" y="400">
+    <Group>
+      <Rectangle center="0,-350" size="1,12"/>
+      <Fill color="#FFFFFF"/>
+      <Repeater copies="36" position="0,0" rotation="10"/>
+    </Group>
+  </Layer>
+  <Layer name="GemGlow" alpha="0.5" x="600" y="390">
+    <Ellipse size="260,260"/>
+    <Fill>
+      <RadialGradient radius="130">
+        <ColorStop offset="0" color="#C850C080"/>
+        <ColorStop offset="0.5" color="#C850C020"/>
+        <ColorStop offset="1" color="#C850C000"/>
+      </RadialGradient>
+    </Fill>
+    <BlurFilter blurX="20" blurY="20"/>
+  </Layer>
+  <Layer name="GemOuter" x="600" y="390">
+    <Group rotation="45">
+      <Rectangle size="160,160" roundness="28"/>
+    </Group>
+    <Fill>
+      <LinearGradient startPoint="-80,-80" endPoint="80,80">
+        <ColorStop offset="0" color="#FF6B9D"/>
+        <ColorStop offset="0.5" color="#C850C0"/>
+        <ColorStop offset="1" color="#6366F1"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetY="10" blurX="50" blurY="50" color="#C850C070"/>
+  </Layer>
+  <Layer name="GemInner" x="600" y="390">
+    <Group rotation="45">
+      <Rectangle size="115,115" roundness="20"/>
+    </Group>
+    <Fill>
+      <LinearGradient startPoint="-58,-58" endPoint="58,58">
+        <ColorStop offset="0" color="#FF8EC4"/>
+        <ColorStop offset="0.5" color="#D070D8"/>
+        <ColorStop offset="1" color="#8B7CF6"/>
+      </LinearGradient>
+    </Fill>
+    <InnerShadowStyle offsetX="-5" offsetY="-5" blurX="10" blurY="10" color="#FFFFFF50"/>
+    <InnerShadowStyle offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000040"/>
+  </Layer>
+  <Layer name="CardTopLeft" x="195" y="200">
+    <Rectangle size="260,160" roundness="20"/>
+    <Fill color="#FFFFFF10"/>
+    <Stroke color="#FFFFFF20"/>
+    <Group>
+      <Rectangle center="0,-72" size="200,6" roundness="3"/>
+      <Fill>
+        <LinearGradient startPoint="-100,-72" endPoint="100,-72">
+          <ColorStop offset="0" color="#4ECDC4"/>
+          <ColorStop offset="1" color="#44B3F7"/>
+        </LinearGradient>
+      </Fill>
+    </Group>
+    <Group>
+      <Rectangle center="-85,-20" size="40,4" roundness="2"/>
+      <Rectangle center="-95,-8" size="30,4" roundness="2"/>
+      <Rectangle center="-90,4" size="36,4" roundness="2"/>
+      <Fill color="#4ECDC4"/>
+    </Group>
+    <Group>
+      <Rectangle center="-30,-20" size="80,8" roundness="4"/>
+      <Fill color="#FFFFFF50"/>
+    </Group>
+    <Group>
+      <Rectangle center="-10,0" size="120,6" roundness="3"/>
+      <Rectangle center="-25,14" size="90,6" roundness="3"/>
+      <Rectangle center="-15,28" size="110,6" roundness="3"/>
+      <Fill color="#FFFFFF20"/>
+    </Group>
+    <Group>
+      <Ellipse center="-80,55" size="24,24"/>
+      <Fill color="#4ECDC420"/>
+    </Group>
+    <Group>
+      <Ellipse center="-80,55" size="24,24"/>
+      <TrimPath end="0.72"/>
+      <Stroke color="#4ECDC4" width="2.5" cap="round"/>
+    </Group>
+    <Group>
+      <Rectangle center="-40,55" size="30,16" roundness="8"/>
+      <Fill color="#4ECDC420"/>
+    </Group>
+    <Group>
+      <Rectangle center="10,55" size="50,16" roundness="8"/>
+      <Fill color="#44B3F720"/>
+    </Group>
+    <BackgroundBlurStyle blurX="16" blurY="16"/>
+    <DropShadowStyle offsetY="8" blurX="30" blurY="30" color="#00000030"/>
+  </Layer>
+  <Layer name="CardTopRight" x="1005" y="200">
+    <Rectangle size="260,160" roundness="20"/>
+    <Fill color="#FFFFFF10"/>
+    <Stroke color="#FFFFFF20"/>
+    <Group>
+      <Rectangle center="0,-72" size="200,6" roundness="3"/>
+      <Fill>
+        <LinearGradient startPoint="-100,-72" endPoint="100,-72">
+          <ColorStop offset="0" color="#FF6B9D"/>
+          <ColorStop offset="1" color="#FF8B5E"/>
+        </LinearGradient>
+      </Fill>
+    </Group>
+    <Group>
+      <Ellipse center="-85,-5" size="38,38"/>
+      <TrimPath end="0.65"/>
+      <Stroke color="#FF6B9D" width="8"/>
+    </Group>
+    <Group>
+      <Ellipse center="-85,-5" size="38,38"/>
+      <TrimPath start="0.65" end="0.88"/>
+      <Stroke color="#FF8B5E" width="8"/>
+    </Group>
+    <Group>
+      <Ellipse center="-85,-5" size="38,38"/>
+      <TrimPath start="0.88"/>
+      <Stroke color="#FFB84D" width="8"/>
+    </Group>
+    <Group>
+      <Rectangle center="-30,-20" size="80,8" roundness="4"/>
+      <Fill color="#FFFFFF50"/>
+    </Group>
+    <Group>
+      <Rectangle center="-10,0" size="120,6" roundness="3"/>
+      <Rectangle center="-25,14" size="90,6" roundness="3"/>
+      <Fill color="#FFFFFF20"/>
+    </Group>
+    <Group>
+      <Path data="M-100 55L-80 45L-55 52L-30 38L-5 42L20 30L50 35L75 20L100 28"/>
+      <Stroke color="#FF6B9D" width="2" cap="round" join="round"/>
+    </Group>
+    <BackgroundBlurStyle blurX="16" blurY="16"/>
+    <DropShadowStyle offsetY="8" blurX="30" blurY="30" color="#00000030"/>
+  </Layer>
+  <Layer name="CardBottomLeft" x="160" y="560">
+    <Rectangle size="220,140" roundness="18"/>
+    <Fill color="#FFFFFF10"/>
+    <Stroke color="#FFFFFF20"/>
+    <Group>
+      <Rectangle center="0,-62" size="170,5" roundness="3"/>
+      <Fill>
+        <LinearGradient startPoint="-85,-62" endPoint="85,-62">
+          <ColorStop offset="0" color="#A855F7"/>
+          <ColorStop offset="1" color="#6366F1"/>
+        </LinearGradient>
+      </Fill>
+    </Group>
+    <Group>
+      <Rectangle center="-60,-10" size="16,50" roundness="4"/>
+      <Fill color="#A855F740"/>
+    </Group>
+    <Group>
+      <Rectangle center="-60,-3" size="16,36" roundness="4"/>
+      <Fill color="#A855F7"/>
+    </Group>
+    <Group>
+      <Rectangle center="-35,-10" size="16,50" roundness="4"/>
+      <Fill color="#6366F140"/>
+    </Group>
+    <Group>
+      <Rectangle center="-35,4" size="16,22" roundness="4"/>
+      <Fill color="#6366F1"/>
+    </Group>
+    <Group>
+      <Rectangle center="-10,-10" size="16,50" roundness="4"/>
+      <Fill color="#A855F740"/>
+    </Group>
+    <Group>
+      <Rectangle center="-10,-8" size="16,46" roundness="4"/>
+      <Fill color="#A855F7"/>
+    </Group>
+    <Group>
+      <Rectangle center="15,-10" size="16,50" roundness="4"/>
+      <Fill color="#6366F140"/>
+    </Group>
+    <Group>
+      <Rectangle center="15,0" size="16,30" roundness="4"/>
+      <Fill color="#6366F1"/>
+    </Group>
+    <Group>
+      <Rectangle center="65,-20" size="50,6" roundness="3"/>
+      <Rectangle center="62,-6" size="44,6" roundness="3"/>
+      <Fill color="#FFFFFF30"/>
+    </Group>
+    <Group>
+      <Rectangle center="65,12" size="50,20" roundness="10"/>
+      <Fill color="#A855F720"/>
+    </Group>
+    <BackgroundBlurStyle blurX="16" blurY="16"/>
+    <DropShadowStyle offsetY="6" blurX="24" blurY="24" color="#00000030"/>
+  </Layer>
+  <Layer name="CardBottomRight" x="1040" y="580">
+    <Rectangle size="220,140" roundness="18"/>
+    <Fill color="#FFFFFF10"/>
+    <Stroke color="#FFFFFF20"/>
+    <Group>
+      <Rectangle center="0,-62" size="170,5" roundness="3"/>
+      <Fill>
+        <LinearGradient startPoint="-85,-62" endPoint="85,-62">
+          <ColorStop offset="0" color="#FFB84D"/>
+          <ColorStop offset="1" color="#FF6B9D"/>
+        </LinearGradient>
+      </Fill>
+    </Group>
+    <Group>
+      <Ellipse center="-50,5" size="60,60"/>
+      <TrimPath end="0.55"/>
+      <Stroke color="#FFB84D" width="10"/>
+    </Group>
+    <Group>
+      <Ellipse center="-50,5" size="60,60"/>
+      <TrimPath start="0.56" end="0.82"/>
+      <Stroke color="#FF6B9D" width="10"/>
+    </Group>
+    <Group>
+      <Ellipse center="-50,5" size="60,60"/>
+      <TrimPath start="0.83"/>
+      <Stroke color="#A855F7" width="10"/>
+    </Group>
+    <Group>
+      <Ellipse center="20,-18" size="8,8"/>
+      <Fill color="#FFB84D"/>
+    </Group>
+    <Group>
+      <Rectangle center="50,-18" size="40,6" roundness="3"/>
+      <Fill color="#FFFFFF30"/>
+    </Group>
+    <Group>
+      <Ellipse center="20,0" size="8,8"/>
+      <Fill color="#FF6B9D"/>
+    </Group>
+    <Group>
+      <Rectangle center="50,0" size="40,6" roundness="3"/>
+      <Fill color="#FFFFFF30"/>
+    </Group>
+    <Group>
+      <Ellipse center="20,18" size="8,8"/>
+      <Fill color="#A855F7"/>
+    </Group>
+    <Group>
+      <Rectangle center="50,18" size="40,6" roundness="3"/>
+      <Fill color="#FFFFFF30"/>
+    </Group>
+    <BackgroundBlurStyle blurX="16" blurY="16"/>
+    <DropShadowStyle offsetY="6" blurX="24" blurY="24" color="#00000030"/>
+  </Layer>
+  <Layer name="DiamondA" alpha="0.6" x="380" y="140">
+    <Group rotation="45">
+      <Rectangle size="18,18" roundness="4"/>
+    </Group>
+    <Fill color="#4ECDC4"/>
+    <DropShadowStyle blurX="8" blurY="8" color="#4ECDC460"/>
+  </Layer>
+  <Layer name="DiamondB" alpha="0.5" x="850" y="480">
+    <Group rotation="45">
+      <Rectangle size="14,14" roundness="3"/>
+    </Group>
+    <Fill color="#FF6B9D"/>
+    <DropShadowStyle blurX="6" blurY="6" color="#FF6B9D50"/>
+  </Layer>
+  <Layer name="DiamondC" alpha="0.4" x="480" y="650">
+    <Group rotation="45">
+      <Rectangle size="10,10" roundness="2"/>
+    </Group>
+    <Fill color="#FFB84D"/>
+    <DropShadowStyle blurX="5" blurY="5" color="#FFB84D40"/>
+  </Layer>
+  <Layer name="CircleA" alpha="0.5" x="320" y="360">
+    <Ellipse size="12,12"/>
+    <Fill color="#FF6B9D"/>
+    <DropShadowStyle blurX="6" blurY="6" color="#FF6B9D50"/>
+  </Layer>
+  <Layer name="CircleB" alpha="0.4" x="900" y="320">
+    <Ellipse size="10,10"/>
+    <Fill color="#4ECDC4"/>
+    <DropShadowStyle blurX="5" blurY="5" color="#4ECDC440"/>
+  </Layer>
+  <Layer name="CircleC" alpha="0.3" x="740" y="620">
+    <Ellipse size="8,8"/>
+    <Fill color="#A855F7"/>
+  </Layer>
+  <Layer name="CircleD" alpha="0.35" x="150" y="420">
+    <Ellipse size="6,6"/>
+    <Fill color="#FFB84D"/>
+  </Layer>
+  <Layer name="CircleE" alpha="0.3" x="1080" y="440">
+    <Ellipse size="7,7"/>
+    <Fill color="#6366F1"/>
+  </Layer>
+  <Layer name="Connectors" alpha="0.15" x="600" y="390">
+    <Path data="M-275 -190L-70 -30"/>
+    <Path data="M275 -190L70 -30"/>
+    <Path data="M-330 170L-70 30"/>
+    <Path data="M330 190L70 30"/>
+    <Stroke color="#FFFFFF" dashes="6,10"/>
+  </Layer>
+  <Layer name="ConnectorDots" alpha="0.4" x="600" y="390">
+    <Ellipse center="-70,-30" size="6,6"/>
+    <Ellipse center="70,-30" size="6,6"/>
+    <Ellipse center="-70,30" size="6,6"/>
+    <Ellipse center="70,30" size="6,6"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  <Layer name="Sparkles">
+    <Layer alpha="0.7" x="460" y="100">
+      <Polystar type="star" pointCount="4" outerRadius="8" innerRadius="2" rotation="45"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle blurX="4" blurY="4" color="#FFFFFF60"/>
+    </Layer>
+    <Layer alpha="0.5" x="760" y="110">
+      <Polystar type="star" pointCount="4" outerRadius="6" innerRadius="2" rotation="45"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle blurX="3" blurY="3" color="#FFFFFF50"/>
+    </Layer>
+    <Layer alpha="0.4" x="1100" y="280">
+      <Polystar type="star" pointCount="4" outerRadius="5" innerRadius="1" rotation="45"/>
+      <Fill color="#FFFFFF"/>
+    </Layer>
+    <Layer alpha="0.3" x="100" y="300">
+      <Polystar type="star" pointCount="4" outerRadius="5" innerRadius="1" rotation="45"/>
+      <Fill color="#FFFFFF"/>
+    </Layer>
+    <Layer alpha="0.5" x="520" y="720">
+      <Polystar type="star" pointCount="4" outerRadius="6" innerRadius="2" rotation="45"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle blurX="3" blurY="3" color="#FFFFFF40"/>
+    </Layer>
+    <Layer alpha="0.35" x="1150" y="680">
+      <Polystar type="star" pointCount="4" outerRadius="5" innerRadius="1" rotation="45"/>
+      <Fill color="#FFFFFF"/>
+    </Layer>
+  </Layer>
+  <Layer name="Corners" alpha="0.15">
+    <Group>
+      <Path data="M40 90L40 40L90 40M1110 40L1160 40L1160 90M40 710L40 760L90 760M1110 760L1160 760L1160 710"/>
+      <Stroke color="#FFFFFF" cap="round" join="round"/>
+    </Group>
+  </Layer>
+  <Layer name="Vignette" alpha="0.25" x="600" y="400">
+    <Ellipse size="1400,1000"/>
+    <Fill>
+      <RadialGradient center="600,400" radius="700">
+        <ColorStop offset="0.5" color="#00000000"/>
+        <ColorStop offset="1" color="#000000"/>
+      </RadialGradient>
+    </Fill>
+  </Layer>
+</pagx>
