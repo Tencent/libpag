@@ -1,7 +1,7 @@
 # App UI Examples
 
 PAGX structural patterns for application interface elements. For universal methodology,
-follow `generate-workflow.md` first.
+follow `generate-guide.md` first.
 
 **Note**: Colors, fonts, sizes, and spacing in these templates are placeholders to illustrate
 structure. Always match the actual design requirements — do not copy these values as defaults.

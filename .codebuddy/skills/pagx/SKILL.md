@@ -16,7 +16,7 @@ at the top — read those as directed by the workflow.
 
 ## Workflows
 
-### Generate — `generate-workflow.md`
+### Generate — `generate-guide.md`
 
 **When**: User asks to create, write, or design a new PAGX file from a text description,
 reference image, or design spec.
@@ -26,7 +26,7 @@ incremental construction, text layout, coordinate handling, common pitfalls, and
 screenshot-based verification loop. Scene-specific examples (App UI, Icons) are indexed
 inside.
 
-### Optimize — `optimize-workflow.md`
+### Optimize — `optimize-guide.md`
 
 **When**: User asks to optimize, simplify, or review an existing PAGX file. Also used as
 the final step after generating a new file.

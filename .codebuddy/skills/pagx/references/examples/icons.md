@@ -1,7 +1,7 @@
 # Icon Examples
 
 Icon-specific examples and pitfalls. For universal methodology (generation steps,
-verification loop), follow `generate-workflow.md` first.
+verification loop), follow `generate-guide.md` first.
 
 **Note**: Colors and sizes in these examples are placeholders to illustrate structural patterns.
 Always match the actual design requirements.
@@ -115,7 +115,7 @@ with fewer iterations — 2-3px coordinate imprecision is barely visible at wide
 
 ## Icon-Specific Checks
 
-In addition to the standard verification loop in `generate-workflow.md`:
+In addition to the standard verification loop in `generate-guide.md`:
 
 - **Foreground containment**: Verify via bounds that the foreground fits within the
   background with adequate padding on all sides.
