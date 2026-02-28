@@ -113,6 +113,7 @@ std::shared_ptr<tgfx::RenderPipeline> RuntimeFilter::createPipeline(tgfx::GPU* g
   descriptor.fragment.colorAttachments.push_back(colorAttachment);
   descriptor.layout.textureSamplers = textureSamplers();
   descriptor.layout.uniformBlocks = uniformBlocks();
+  descriptor.multisample.count = sampleCount();
   onConfigurePipeline(&descriptor);
   return gpu->createRenderPipeline(descriptor);
 }
