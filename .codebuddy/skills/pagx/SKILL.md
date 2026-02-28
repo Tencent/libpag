@@ -23,8 +23,7 @@ reference image, or design spec.
 
 **What it provides**: A step-by-step process covering design analysis, structure decisions,
 incremental construction, text layout, coordinate handling, common pitfalls, and a
-screenshot-based verification loop. Scene-specific examples (App UI, Icons) are indexed
-inside.
+screenshot-based verification loop. Scene-specific examples are indexed inside.
 
 ### Optimize — `optimize-guide.md`
 

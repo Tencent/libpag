@@ -17,8 +17,7 @@ Read these as needed:
 
 | Reference | Content |
 |-----------|---------|
-| `examples/app-ui.md` | Structural patterns for App UI (cards, buttons, lists, pages) |
-| `examples/icons.md` | Structural patterns for icons (badges, symbols, small graphics) |
+| `examples.md` | Structural patterns for Icons, UI, Logos, Charts, Decorative backgrounds |
 | `attribute-reference.md` | Attribute defaults, enumerations, required attributes |
 | `cli-reference.md` | CLI tool usage — `render`, `bounds`, `font info` commands |
 
