@@ -339,7 +339,7 @@ use Group `rotation` to reposition the start point.
     </Group>
     <!-- Tick marks: 10 ticks spanning 270 degrees -->
     <Group rotation="-135">
-      <Rectangle center="0,-85" size="1,6"/>
+      <Rectangle center="0,-78" size="1,6"/>
       <Fill color="#94A3B8"/>
       <Repeater copies="10" position="0,0" rotation="30"/>
     </Group>
