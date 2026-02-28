@@ -585,9 +585,9 @@ renderer fast paths (especially under Repeater).
 
 ```xml
 <!-- Before -->
-<Path data="M 7 51 L 24 51 L 24 210 L 7 210 Z"/>
+<Path data="M 10 50 L 30 50 L 30 200 L 10 200 Z"/>
 <!-- After -->
-<Rectangle center="15,130" size="17,159"/>
+<Rectangle center="20,125" size="20,150"/>
 ```
 
 Only convert when clearly a standard shape. Do not convert Bezier-based rounded rectangles
@@ -644,7 +644,7 @@ clipped area covers all frames. For staggered patterns, include one extra column
 
 ```xml
 <!-- Before: 70×40 = 2800 hexagons, ~40% outside 800×600 canvas -->
-<Group x="-400">
+<Group position="-400,0">
   <Path data="@hex"/>
   <Stroke color="#0066AA" width="1"/>
   <Repeater copies="70" position="20,0"/>
@@ -652,7 +652,7 @@ clipped area covers all frames. For staggered patterns, include one extra column
 <Repeater copies="40" position="10,17.32"/>
 
 <!-- After: 41×36 = 1476, same density, clipped to canvas -->
-<Group x="-10">
+<Group position="-10,0">
   <Path data="@hex"/>
   <Stroke color="#0066AA" width="1"/>
   <Repeater copies="41" position="20,0"/>

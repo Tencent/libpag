@@ -25,6 +25,7 @@ they **must not** be omitted.
 | **ColorStop** | `offset`, `color` |
 | **ImagePattern** | `image` |
 | **BlendFilter** | `color` |
+| **ColorMatrixFilter** | `matrix` |
 | **Path** | `data` |
 | **GlyphRun** | `font`, `glyphs` |
 | **TextPath** | `path` |
