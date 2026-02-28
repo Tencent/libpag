@@ -11,10 +11,10 @@ user-invocable: false
 
 # PAGX Skill
 
-Choose the workflow that matches the current task. Each workflow lists its own references
-at the top — read those as directed by the workflow.
+Choose the guide that matches the current task. Each guide lists its own references
+at the top — read those as directed by the guide.
 
-## Workflows
+## Guides
 
 ### Generate — `generate-guide.md`
 

@@ -1,7 +1,7 @@
 # PAGX Design Patterns
 
-Shared practical knowledge for both generation and optimization workflows — structure
-decisions, text layout patterns, and common mistakes with corrections.
+Shared practical knowledge for both generation and optimization — structure decisions,
+text layout patterns, and common mistakes with corrections.
 
 ---
 
