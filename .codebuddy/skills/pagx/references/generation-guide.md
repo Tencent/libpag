@@ -2,9 +2,21 @@
 
 Back to main: [SKILL.md](../SKILL.md)
 
-Universal methodology for generating PAGX files from natural-language descriptions.
-Covers generation steps, structural decisions, text layout, pitfalls, and the verification
-and correction loop.
+Complete methodology for generating PAGX files from visual descriptions — from reference
+analysis through verification. After generation, continue to `optimization-guide.md` for
+structure and performance review.
+
+## References
+
+Read these as needed during generation:
+
+| Reference | Content |
+|-----------|---------|
+| `spec-essentials.md` | Format specification — node types, processing model, attribute rules |
+| `app-ui-examples.md` | Structural patterns for App UI (cards, buttons, lists, pages) |
+| `icon-examples.md` | Structural patterns for icons (badges, symbols, small graphics) |
+| `pagx-quick-reference.md` | Attribute defaults, enumerations, required attributes |
+| `cli-reference.md` | CLI tool usage — `render`, `bounds`, `font info` commands |
 
 ---
 
@@ -65,6 +77,9 @@ check. Identify any visible issues (misalignment, uneven spacing, clipping, mism
 proportions), then use `pagx bounds` to measure and compute corrections. Fix, re-render,
 and re-inspect until correct. See the **Verification and Correction Loop** section at the
 end of this document for the full methodology.
+
+After verification passes, continue to `optimization-guide.md` for structure and performance
+review.
 
 ---
 
@@ -256,9 +271,9 @@ its own Group for painter scope isolation.
 
 ### 4. Omitting Required Attributes
 
-These commonly encountered attributes have **no default** — omitting them causes
-parse errors. For the complete list, see the Required Attributes table in the main
-SKILL.md.
+These **commonly encountered** attributes have **no default** — omitting them causes parse
+errors. This is a subset; for the **complete list** (16 elements), see `pagx-quick-reference.md`
+or the Required Attributes table in SKILL.md.
 
 | Element | Required Attributes |
 |---------|---------------------|
