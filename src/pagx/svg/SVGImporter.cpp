@@ -2335,8 +2335,7 @@ const std::unordered_map<std::string, std::string>& SVGParserContext::getStylePr
   bool hasStyle = stylePtr && !stylePtr->empty();
 
   if (!hasClass && !hasStyle) {
-    static const std::unordered_map<std::string, std::string> emptyMap;
-    return emptyMap;
+    return _stylePropertiesCache[node.get()];
   }
 
   auto& result = _stylePropertiesCache[node.get()];

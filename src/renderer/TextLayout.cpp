@@ -290,7 +290,7 @@ class TextLayoutContext {
     gi.fontSize = text->fontSize;
     gi.ascent = metrics.ascent;
     gi.descent = metrics.descent;
-    gi.fontLineHeight = fabsf(metrics.ascent) + metrics.descent + metrics.leading;
+    gi.fontLineHeight = std::max(0.0f, fabsf(metrics.ascent) + metrics.descent + metrics.leading);
     gi.sourceText = text;
     return gi;
   }
@@ -313,7 +313,7 @@ class TextLayoutContext {
     gi.fontSize = text->fontSize;
     gi.ascent = metrics.ascent;
     gi.descent = metrics.descent;
-    gi.fontLineHeight = fabsf(metrics.ascent) + metrics.descent + metrics.leading;
+    gi.fontLineHeight = std::max(0.0f, fabsf(metrics.ascent) + metrics.descent + metrics.leading);
     gi.sourceText = text;
     return gi;
   }
@@ -966,7 +966,8 @@ class TextLayoutContext {
         gi.fontSize = text->fontSize;
         gi.ascent = metrics.ascent;
         gi.descent = metrics.descent;
-        gi.fontLineHeight = fabsf(metrics.ascent) + metrics.descent + metrics.leading;
+        gi.fontLineHeight =
+            std::max(0.0f, fabsf(metrics.ascent) + metrics.descent + metrics.leading);
         gi.sourceText = text;
         gi.cluster = static_cast<uint32_t>(seg.start) + sg.cluster;
         gi.xOffset = sg.xOffset;
@@ -1079,7 +1080,7 @@ class TextLayoutContext {
       gi.fontSize = text->fontSize;
       gi.ascent = metrics.ascent;
       gi.descent = metrics.descent;
-      gi.fontLineHeight = fabsf(metrics.ascent) + metrics.descent + metrics.leading;
+      gi.fontLineHeight = std::max(0.0f, fabsf(metrics.ascent) + metrics.descent + metrics.leading);
       gi.sourceText = text;
       info.allGlyphs.push_back(gi);
 

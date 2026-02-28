@@ -291,6 +291,7 @@ std::vector<FontLocation> SystemFonts::FallbackTypefaces() {
   }
 
   std::vector<FontLocation> fallbacks = {};
+  fallbacks.reserve(static_cast<size_t>(fontSet->nfont));
   std::set<std::string> loadedFamilies = {};
 
   for (int i = 0; i < fontSet->nfont; i++) {

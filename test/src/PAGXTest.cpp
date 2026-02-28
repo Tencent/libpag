@@ -551,8 +551,6 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
       ADD_FAILURE() << "Parse errors in " << baseName << ":" << errorLog;
     }
 
-    textLayout.layout(doc.get());
-
     auto layer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
     if (!layer) {
       ADD_FAILURE() << "Failed to build layer: " << filePath;
