@@ -855,9 +855,9 @@ static void ApplyLocalizationToElements(PAGXDocument* document,
     } else if (type == NodeType::Path) {
       auto path = static_cast<Path*>(element);
       if (path->data != nullptr && !path->data->isEmpty()) {
-        auto tempData = document->makeNode<PathData>();
-        OffsetPathData(path->data, tempData, offsetX, offsetY);
-        path->data->setPathData(*tempData);
+        auto newData = document->makeNode<PathData>();
+        OffsetPathData(path->data, newData, offsetX, offsetY);
+        path->data = newData;
       }
     } else if (type == NodeType::Text) {
       auto text = static_cast<Text*>(element);
@@ -921,25 +921,31 @@ static size_t HashElement(const Element* element) {
   auto type = element->nodeType();
   if (type == NodeType::Rectangle) {
     auto rect = static_cast<const Rectangle*>(element);
-    h ^= std::hash<float>{}(rect->size.width) * 31;
-    h ^= std::hash<float>{}(rect->size.height) * 37;
-    h ^= std::hash<float>{}(rect->roundness) * 41;
-    h ^= std::hash<bool>{}(rect->reversed) * 43;
+    h ^= std::hash<float>{}(rect->center.x) * 29;
+    h ^= std::hash<float>{}(rect->center.y) * 31;
+    h ^= std::hash<float>{}(rect->size.width) * 37;
+    h ^= std::hash<float>{}(rect->size.height) * 41;
+    h ^= std::hash<float>{}(rect->roundness) * 43;
+    h ^= std::hash<bool>{}(rect->reversed) * 47;
   } else if (type == NodeType::Ellipse) {
     auto ellipse = static_cast<const Ellipse*>(element);
-    h ^= std::hash<float>{}(ellipse->size.width) * 31;
-    h ^= std::hash<float>{}(ellipse->size.height) * 37;
+    h ^= std::hash<float>{}(ellipse->center.x) * 29;
+    h ^= std::hash<float>{}(ellipse->center.y) * 31;
+    h ^= std::hash<float>{}(ellipse->size.width) * 37;
+    h ^= std::hash<float>{}(ellipse->size.height) * 41;
     h ^= std::hash<bool>{}(ellipse->reversed) * 43;
   } else if (type == NodeType::Polystar) {
     auto polystar = static_cast<const Polystar*>(element);
-    h ^= std::hash<int>{}(static_cast<int>(polystar->type)) * 31;
-    h ^= std::hash<float>{}(polystar->pointCount) * 37;
-    h ^= std::hash<float>{}(polystar->outerRadius) * 41;
-    h ^= std::hash<float>{}(polystar->innerRadius) * 43;
-    h ^= std::hash<float>{}(polystar->rotation) * 47;
-    h ^= std::hash<float>{}(polystar->outerRoundness) * 53;
-    h ^= std::hash<float>{}(polystar->innerRoundness) * 59;
-    h ^= std::hash<bool>{}(polystar->reversed) * 61;
+    h ^= std::hash<float>{}(polystar->center.x) * 29;
+    h ^= std::hash<float>{}(polystar->center.y) * 31;
+    h ^= std::hash<int>{}(static_cast<int>(polystar->type)) * 37;
+    h ^= std::hash<float>{}(polystar->pointCount) * 41;
+    h ^= std::hash<float>{}(polystar->outerRadius) * 43;
+    h ^= std::hash<float>{}(polystar->innerRadius) * 47;
+    h ^= std::hash<float>{}(polystar->rotation) * 53;
+    h ^= std::hash<float>{}(polystar->outerRoundness) * 59;
+    h ^= std::hash<float>{}(polystar->innerRoundness) * 61;
+    h ^= std::hash<bool>{}(polystar->reversed) * 67;
   } else if (type == NodeType::Path) {
     auto path = static_cast<const Path*>(element);
     if (path->data != nullptr) {
@@ -963,11 +969,13 @@ static size_t HashElement(const Element* element) {
     h ^= std::hash<int>{}(static_cast<int>(stroke->join)) * 43;
   } else if (type == NodeType::Group) {
     auto group = static_cast<const Group*>(element);
-    h ^= std::hash<float>{}(group->rotation) * 31;
-    h ^= std::hash<float>{}(group->scale.x) * 37;
-    h ^= std::hash<float>{}(group->scale.y) * 41;
-    h ^= std::hash<float>{}(group->alpha) * 43;
-    h ^= std::hash<size_t>{}(group->elements.size()) * 47;
+    h ^= std::hash<float>{}(group->position.x) * 29;
+    h ^= std::hash<float>{}(group->position.y) * 31;
+    h ^= std::hash<float>{}(group->rotation) * 37;
+    h ^= std::hash<float>{}(group->scale.x) * 41;
+    h ^= std::hash<float>{}(group->scale.y) * 43;
+    h ^= std::hash<float>{}(group->alpha) * 47;
+    h ^= std::hash<size_t>{}(group->elements.size()) * 53;
   }
   return h;
 }
@@ -1013,17 +1021,18 @@ static bool ElementsStructurallyEqual(const Element* a, const Element* b) {
   if (type == NodeType::Rectangle) {
     auto ra = static_cast<const Rectangle*>(a);
     auto rb = static_cast<const Rectangle*>(b);
-    return ra->size == rb->size && ra->roundness == rb->roundness && ra->reversed == rb->reversed;
+    return ra->center == rb->center && ra->size == rb->size && ra->roundness == rb->roundness &&
+           ra->reversed == rb->reversed;
   }
   if (type == NodeType::Ellipse) {
     auto ea = static_cast<const Ellipse*>(a);
     auto eb = static_cast<const Ellipse*>(b);
-    return ea->size == eb->size && ea->reversed == eb->reversed;
+    return ea->center == eb->center && ea->size == eb->size && ea->reversed == eb->reversed;
   }
   if (type == NodeType::Polystar) {
     auto pa = static_cast<const Polystar*>(a);
     auto pb = static_cast<const Polystar*>(b);
-    return pa->type == pb->type && pa->pointCount == pb->pointCount &&
+    return pa->center == pb->center && pa->type == pb->type && pa->pointCount == pb->pointCount &&
            pa->outerRadius == pb->outerRadius && pa->innerRadius == pb->innerRadius &&
            pa->rotation == pb->rotation && pa->outerRoundness == pb->outerRoundness &&
            pa->innerRoundness == pb->innerRoundness && pa->reversed == pb->reversed;
@@ -1055,8 +1064,9 @@ static bool ElementsStructurallyEqual(const Element* a, const Element* b) {
   if (type == NodeType::Group) {
     auto ga = static_cast<const Group*>(a);
     auto gb = static_cast<const Group*>(b);
-    if (ga->anchor != gb->anchor || ga->rotation != gb->rotation || ga->scale != gb->scale ||
-        ga->skew != gb->skew || ga->skewAxis != gb->skewAxis || ga->alpha != gb->alpha) {
+    if (ga->position != gb->position || ga->anchor != gb->anchor || ga->rotation != gb->rotation ||
+        ga->scale != gb->scale || ga->skew != gb->skew || ga->skewAxis != gb->skewAxis ||
+        ga->alpha != gb->alpha) {
       return false;
     }
     if (ga->elements.size() != gb->elements.size()) {
@@ -1094,10 +1104,10 @@ static bool ElementsStructurallyEqual(const Element* a, const Element* b) {
   if (type == NodeType::TextBox) {
     auto tba = static_cast<const TextBox*>(a);
     auto tbb = static_cast<const TextBox*>(b);
-    return tba->size == tbb->size && tba->textAlign == tbb->textAlign &&
-           tba->paragraphAlign == tbb->paragraphAlign && tba->writingMode == tbb->writingMode &&
-           tba->lineHeight == tbb->lineHeight && tba->wordWrap == tbb->wordWrap &&
-           tba->overflow == tbb->overflow;
+    return tba->position == tbb->position && tba->size == tbb->size &&
+           tba->textAlign == tbb->textAlign && tba->paragraphAlign == tbb->paragraphAlign &&
+           tba->writingMode == tbb->writingMode && tba->lineHeight == tbb->lineHeight &&
+           tba->wordWrap == tbb->wordWrap && tba->overflow == tbb->overflow;
   }
   // For other element types (TrimPath, RoundCorner, MergePath, Repeater, TextModifier, TextPath),
   // default to not equal to be conservative.

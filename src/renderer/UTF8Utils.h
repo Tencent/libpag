@@ -95,7 +95,7 @@ inline size_t DecodeUTF8(const char* data, size_t length, int32_t* codepoint) {
     auto cp = ((byte & 0x07) << 18) | ((static_cast<uint8_t>(data[1]) & 0x3F) << 12) |
               ((static_cast<uint8_t>(data[2]) & 0x3F) << 6) |
               (static_cast<uint8_t>(data[3]) & 0x3F);
-    if (cp >= 0x10000) {
+    if (cp >= 0x10000 && cp <= 0x10FFFF) {
       *codepoint = cp;
       return 4;
     }
