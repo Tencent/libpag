@@ -20,13 +20,6 @@ original branch is untouched until the user explicitly confirms the result.
   Step 3.** Execute them in a single uninterrupted flow. **However, you MUST
   stop and ask for user confirmation in Phase B** — see Phase B for details.
   Phase D may present an optional push prompt — see Phase D for details.
-- **NEVER use `$()`, backtick substitution, or shell variable assignment in
-  Bash tool calls** — the sandbox rejects all of these. Each Bash call must be
-  a plain, self-contained command with no dynamic expansion. When one command's
-  output is needed by another, run the first command in a separate Bash call,
-  read its output, then construct the next command as a literal string yourself
-  (i.e. paste the value directly into the command text).
-
 ---
 
 ## Step 1: Determine Range
