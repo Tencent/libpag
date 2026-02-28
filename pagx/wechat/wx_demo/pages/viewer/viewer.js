@@ -189,8 +189,6 @@ Page({
                   
                   // Create View
                   this.View = await this.module.View.init(this.module, this.canvas, {
-                    useScale: false,
-                    firstFrame: false,
                     autoRender: false
                   });
                   
