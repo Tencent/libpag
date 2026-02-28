@@ -1,123 +1,219 @@
 <pagx version="1.0" width="800" height="600">
   <Resources>
-    <!-- Background Gradient -->
-    <LinearGradient id="bgGradient" startPoint="0,0" endPoint="800,600">
-      <ColorStop position="0" color="#F5F7FA"/>
-      <ColorStop position="1" color="#C3CFE2"/>
+    <!-- Modern Color Palette -->
+    <!-- Primary Blue Gradient -->
+    <LinearGradient id="gradPrimary" startPoint="0,0" endPoint="0,100">
+      <ColorStop position="0" color="#667EEA"/>
+      <ColorStop position="1" color="#764BA2"/>
+    </LinearGradient>
+    <!-- Accent Orange -->
+    <LinearGradient id="gradAccent" startPoint="0,0" endPoint="100,0">
+      <ColorStop position="0" color="#FDC830"/>
+      <ColorStop position="1" color="#F37335"/>
+    </LinearGradient>
+    <!-- Soft Background -->
+    <LinearGradient id="gradBg" startPoint="0,0" endPoint="800,600">
+      <ColorStop position="0" color="#FDFBFB"/>
+      <ColorStop position="1" color="#EBEDEE"/>
     </LinearGradient>
     
-    <!-- Character Shirt Gradient -->
-    <LinearGradient id="shirtGradient" startPoint="0,-40" endPoint="0,40">
-      <ColorStop position="0" color="#4facfe"/>
-      <ColorStop position="1" color="#00f2fe"/>
-    </LinearGradient>
+    <!-- Code Snippet Pattern -->
+    <Composition id="CodeBlock" width="120" height="80">
+      <Layer>
+        <Rectangle size="120,80" roundness="8"/>
+        <Fill color="#2D3436"/>
+      </Layer>
+      <Layer x="10" y="15">
+        <Rectangle size="40,8" roundness="4"/>
+        <Fill color="#FF7675"/>
+      </Layer>
+      <Layer x="60" y="15">
+        <Rectangle size="30,8" roundness="4"/>
+        <Fill color="#74B9FF"/>
+      </Layer>
+      <Layer x="10" y="35">
+        <Rectangle size="20,8" roundness="4"/>
+        <Fill color="#A29BFE"/>
+      </Layer>
+      <Layer x="40" y="35">
+        <Rectangle size="60,8" roundness="4"/>
+        <Fill color="#DFE6E9"/>
+      </Layer>
+      <Layer x="20" y="55">
+        <Rectangle size="80,8" roundness="4"/>
+        <Fill color="#55EFC4"/>
+      </Layer>
+    </Composition>
+
+    <!-- Cloud Element -->
+    <Composition id="Cloud" width="200" height="120">
+      <Layer>
+         <Group>
+            <Ellipse center="60,60" size="80,80"/>
+            <Ellipse center="100,40" size="100,100"/>
+            <Ellipse center="140,60" size="80,80"/>
+            <Rectangle center="100,80" size="140,40" roundness="20"/>
+            <MergePath mode="union"/>
+            <Fill color="#FFFFFF"/>
+         </Group>
+         <DropShadowStyle alpha="0.1" blurX="20" blurY="20" offsetY="10"/>
+      </Layer>
+    </Composition>
   </Resources>
 
-  <!-- Background Layer -->
+  <!-- Background -->
   <Layer name="Background">
     <Rectangle size="800,600"/>
-    <Fill><LinearGradient startPoint="0,0" endPoint="800,600"><ColorStop position="0" color="#F0F4F8"/><ColorStop position="1" color="#D9E2EC"/></LinearGradient></Fill>
+    <Fill><LinearGradient startPoint="0,0" endPoint="800,600"><ColorStop position="0" color="#F5F7FA"/><ColorStop position="1" color="#C3CFE2"/></LinearGradient></Fill>
   </Layer>
 
-  <!-- Decorative Abstract Circles -->
-  <Layer name="Decor" alpha="0.5">
+  <!-- Abstract Background Shapes -->
+  <Layer name="DecorBack" alpha="0.6">
     <Group>
-        <Ellipse center="700,100" size="180,180"/>
-        <Fill color="#FFDEE9"/>
+        <Path data="M 0 400 C 200 350 300 550 500 450 S 800 600 800 600 L 0 600 Z"/>
+        <Fill><LinearGradient startPoint="0,400" endPoint="0,600"><ColorStop position="0" color="#E0C3FC"/><ColorStop position="1" color="#8EC5FC"/></LinearGradient></Fill>
     </Group>
     <Group>
-        <Ellipse center="100,500" size="120,120"/>
-        <Fill color="#B5FFFC"/>
-    </Group>
-    <Group>
-        <Rectangle center="50,50" size="60,60" roundness="10" rotation="45"/>
-        <Fill color="#FF9A9E"/>
+        <Ellipse center="700,100" size="400,400"/>
+        <Fill><RadialGradient center="0,0" radius="200"><ColorStop position="0" color="#FFFFFF" alpha="0.8"/><ColorStop position="1" color="#FFFFFF" alpha="0"/></RadialGradient></Fill>
     </Group>
   </Layer>
 
-  <!-- Floor -->
-  <Layer name="Floor">
-    <Rectangle center="400,550" size="700,20" roundness="10"/>
-    <Fill color="#E0E0E0"/>
+  <!-- Main Scene Container (Center) -->
+  <Layer name="Scene" x="400" y="320">
+    
+    <!-- Character Sitting on a Giant Cloud/Abstract Shape -->
+    <Layer name="SeatShape" x="-50" y="100">
+        <Group>
+            <!-- A futuristic floating platform -->
+            <Path data="M -150 0 C -150 -50 150 -80 200 0 C 250 80 -100 100 -150 0"/>
+            <Fill color="#FFFFFF"/>
+        </Group>
+        <DropShadowStyle alpha="0.1" blurX="30" blurY="20" offsetY="15"/>
+    </Layer>
+
+    <!-- Character Body -->
+    <Layer name="Character" x="0" y="20">
+        <!-- Back Leg (Darker) -->
+        <Group>
+             <Path data="M 20 50 L 20 120 L 70 120 L 70 135 L 10 135 L 0 50 Z"/>
+             <Fill color="#2D3436"/>
+        </Group>
+        <!-- Body/Torso -->
+        <Group>
+             <!-- Hoodie -->
+             <Path data="M -30 -60 Q -40 20 -30 80 L 30 80 Q 40 20 45 -60 Z"/>
+             <Fill color="@gradPrimary"/>
+        </Group>
+        <!-- Front Leg -->
+        <Group>
+             <Path data="M -20 80 L -30 140 L 40 140 L 40 80 Z"/> <!-- Thigh -->
+             <Fill color="#3D3D3D"/>
+        </Group>
+        <Group>
+             <Path data="M 40 100 L 40 180 L 60 180 L 60 100 Z"/> <!-- Calf -->
+             <Fill color="#3D3D3D"/>
+        </Group>
+        <!-- Shoe -->
+        <Group>
+             <Path data="M 30 180 L 70 180 L 75 195 L 30 195 Z"/>
+             <Fill color="#FFFFFF"/>
+        </Group>
+
+        <!-- Head -->
+        <Group>
+            <Ellipse center="5,-80" size="55,65"/>
+            <Fill color="#FFCCAA"/> <!-- Skin Tone -->
+        </Group>
+        <!-- Hair -->
+        <Group>
+            <Path data="M -25 -80 C -35 -120 45 -120 40 -80 L 40 -60 C 40 -50 20 -40 5 -50 C -25 -40 -30 -60 -25 -80 Z"/>
+            <Fill color="#2D3436"/>
+        </Group>
+
+        <!-- Arms (Typing on floating UI) -->
+        <Group>
+            <Path data="M -10 -40 Q 30 -20 50 0 L 70 -10"/>
+            <Stroke color="#FFCCAA" width="14" cap="round" join="round"/>
+        </Group>
+        <!-- Sleeve -->
+        <Group>
+            <Path data="M -25 -50 L -10 -40"/>
+            <Stroke color="@gradPrimary" width="20" cap="round"/>
+        </Group>
+    </Layer>
+
+    <!-- Floating UI Elements (Screens) -->
+    <Layer name="Screens" x="100" y="-50">
+        <!-- Main Screen -->
+        <Layer>
+            <Group>
+                 <Rectangle center="0,0" size="140,100" roundness="10"/>
+                 <Fill color="#FFFFFF"/>
+                 <Stroke color="#DFE6E9" width="2"/>
+            </Group>
+            <DropShadowStyle alpha="0.1" blurX="15" blurY="15" offsetY="5"/>
+        </Layer>
+        <!-- Header -->
+        <Group>
+             <Rectangle center="0,-35" size="120,10" roundness="5"/>
+             <Fill color="#74B9FF"/>
+        </Group>
+        <!-- Lines -->
+        <Group>
+             <Rectangle center="-20,-10" size="80,6" roundness="3"/>
+             <Rectangle center="-20,5" size="80,6" roundness="3"/>
+             <Rectangle center="-20,20" size="60,6" roundness="3"/>
+             <Fill color="#F1F2F6"/>
+        </Group>
+        
+        <!-- Floating Code Block (Small) -->
+        <Layer composition="@CodeBlock" x="80" y="40" scale="0.8,0.8" rotation="10">
+            <DropShadowStyle alpha="0.15" blurX="10" blurY="10"/>
+        </Layer>
+
+        <!-- Another Floating Element -->
+        <Layer x="-100" y="20" rotation="-5">
+            <Group>
+                <Ellipse center="0,0" size="60,60"/>
+                <Fill color="#FFFFFF"/>
+            </Group>
+            <DropShadowStyle alpha="0.1" blurX="10" blurY="10"/>
+            <Group>
+                <Path data="M -15 0 L 0 -15 L 15 0 L 0 15 Z"/> <!-- Diamond/Ruby icon -->
+                <Fill color="#E17055"/>
+            </Group>
+        </Layer>
+    </Layer>
+
+  </Layer> <!-- End Scene -->
+
+  <!-- Foreground Leaves/Blur -->
+  <Layer name="Foreground" alpha="0.8">
+      <Layer>
+          <Group>
+             <Path data="M 0 600 C 100 500 200 650 300 600 L 0 600 Z"/>
+             <Fill color="#81ECEC"/>
+          </Group>
+          <BlurFilter blurX="10" blurY="10"/>
+      </Layer>
+      <Layer>
+          <Group>
+             <Path data="M 800 600 C 700 450 600 650 500 600 L 800 600 Z"/>
+             <Fill color="#74B9FF"/>
+          </Group>
+          <BlurFilter blurX="15" blurY="15"/>
+      </Layer>
   </Layer>
 
-  <!-- Desk Group -->
-  <Layer name="DeskArea">
-    <!-- Desk Legs -->
-    <Group>
-        <Rectangle center="220,450" size="20,200"/> <!-- Left Leg -->
-        <Rectangle center="580,450" size="20,200"/> <!-- Right Leg -->
-        <Fill color="#2C3E50"/>
-    </Group>
-    <!-- Desk Top -->
-    <Group>
-        <Rectangle center="400,350" size="420,30" roundness="5"/>
-        <Fill color="#ECF0F1"/>
-    </Group>
-  </Layer>
-
-  <!-- Character Seated -->
-  <Layer name="Character" x="350" y="320">
-    <!-- Legs (Sitting) -->
-    <Group>
-        <Path data="M 0 50 L 0 130 L 60 130"/>
-        <Stroke color="#34495E" width="28" cap="round" join="round"/>
-    </Group>
-    <!-- Torso -->
-    <Group>
-        <Path data="M -20 50 L 20 50 L 30 -50 L -30 -50 Z"/>
-        <Fill><LinearGradient startPoint="0,-50" endPoint="0,50"><ColorStop position="0" color="#3498DB"/><ColorStop position="1" color="#2980B9"/></LinearGradient></Fill>
-    </Group>
-    <!-- Head -->
-    <Group>
-        <Ellipse center="0,-80" size="50,60"/>
-        <Fill color="#F1C40F"/> <!-- Skin -->
-    </Group>
-    <!-- Hair -->
-    <Group>
-        <Path data="M -25 -80 C -35 -110 35 -110 25 -80 L 25 -70 C 25 -60 -25 -60 -25 -70 Z"/>
-        <Fill color="#2C3E50"/>
-    </Group>
-    <!-- Arms (Typing) -->
-    <Group>
-        <Path data="M -20 -30 L 10 10 L 60 0"/>
-        <Stroke color="#F1C40F" width="12" cap="round" join="round"/>
-    </Group>
-  </Layer>
-
-  <!-- Laptop on Desk -->
-  <Layer name="Laptop" x="450" y="335">
-     <!-- Screen Back -->
-     <Group>
-        <Path data="M -30 0 L -30 -40 L 30 -40 L 30 0"/>
-        <Stroke color="#95A5A6" width="4" cap="round" join="round"/>
-        <Fill color="#34495E"/>
-     </Group>
-     <!-- Screen Display -->
-     <Group>
-        <Rectangle center="0,-20" size="50,30"/>
-        <Fill color="#ECF0F1"/>
-     </Group>
-     <!-- Base -->
-     <Group>
-        <Rectangle center="0,5" size="70,6" roundness="2"/>
-        <Fill color="#7F8C8D"/>
-     </Group>
-  </Layer>
-
-  <!-- Plant Decor -->
-  <Layer name="Plant" x="650" y="480">
-     <Group>
-        <Path data="M -20 70 L 20 70 L 25 20 L -25 20 Z"/> <!-- Pot -->
-        <Fill color="#D35400"/>
-     </Group>
-     <!-- Leaves -->
-     <Group>
-        <Ellipse center="0,0" size="30,80" rotation="0"/>
-        <Ellipse center="-20,10" size="25,70" rotation="-20"/>
-        <Ellipse center="20,10" size="25,70" rotation="20"/>
-        <Fill color="#27AE60"/>
-     </Group>
+  <!-- Decorative Sparkles -->
+  <Layer name="Sparkles">
+     <Repeater copies="5" position="150,50" rotation="72">
+        <Group>
+            <Polystar center="400,300" type="star" pointCount="4" outerRadius="10" innerRadius="4"/>
+            <Fill color="#FDC830"/>
+        </Group>
+     </Repeater>
   </Layer>
 
 </pagx>
