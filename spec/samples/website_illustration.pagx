@@ -1,0 +1,123 @@
+<pagx version="1.0" width="800" height="600">
+  <Resources>
+    <!-- Background Gradient -->
+    <LinearGradient id="bgGradient" startPoint="0,0" endPoint="800,600">
+      <ColorStop position="0" color="#F5F7FA"/>
+      <ColorStop position="1" color="#C3CFE2"/>
+    </LinearGradient>
+    
+    <!-- Character Shirt Gradient -->
+    <LinearGradient id="shirtGradient" startPoint="0,-40" endPoint="0,40">
+      <ColorStop position="0" color="#4facfe"/>
+      <ColorStop position="1" color="#00f2fe"/>
+    </LinearGradient>
+  </Resources>
+
+  <!-- Background Layer -->
+  <Layer name="Background">
+    <Rectangle size="800,600"/>
+    <Fill><LinearGradient startPoint="0,0" endPoint="800,600"><ColorStop position="0" color="#F0F4F8"/><ColorStop position="1" color="#D9E2EC"/></LinearGradient></Fill>
+  </Layer>
+
+  <!-- Decorative Abstract Circles -->
+  <Layer name="Decor" alpha="0.5">
+    <Group>
+        <Ellipse center="700,100" size="180,180"/>
+        <Fill color="#FFDEE9"/>
+    </Group>
+    <Group>
+        <Ellipse center="100,500" size="120,120"/>
+        <Fill color="#B5FFFC"/>
+    </Group>
+    <Group>
+        <Rectangle center="50,50" size="60,60" roundness="10" rotation="45"/>
+        <Fill color="#FF9A9E"/>
+    </Group>
+  </Layer>
+
+  <!-- Floor -->
+  <Layer name="Floor">
+    <Rectangle center="400,550" size="700,20" roundness="10"/>
+    <Fill color="#E0E0E0"/>
+  </Layer>
+
+  <!-- Desk Group -->
+  <Layer name="DeskArea">
+    <!-- Desk Legs -->
+    <Group>
+        <Rectangle center="220,450" size="20,200"/> <!-- Left Leg -->
+        <Rectangle center="580,450" size="20,200"/> <!-- Right Leg -->
+        <Fill color="#2C3E50"/>
+    </Group>
+    <!-- Desk Top -->
+    <Group>
+        <Rectangle center="400,350" size="420,30" roundness="5"/>
+        <Fill color="#ECF0F1"/>
+    </Group>
+  </Layer>
+
+  <!-- Character Seated -->
+  <Layer name="Character" x="350" y="320">
+    <!-- Legs (Sitting) -->
+    <Group>
+        <Path data="M 0 50 L 0 130 L 60 130"/>
+        <Stroke color="#34495E" width="28" cap="round" join="round"/>
+    </Group>
+    <!-- Torso -->
+    <Group>
+        <Path data="M -20 50 L 20 50 L 30 -50 L -30 -50 Z"/>
+        <Fill><LinearGradient startPoint="0,-50" endPoint="0,50"><ColorStop position="0" color="#3498DB"/><ColorStop position="1" color="#2980B9"/></LinearGradient></Fill>
+    </Group>
+    <!-- Head -->
+    <Group>
+        <Ellipse center="0,-80" size="50,60"/>
+        <Fill color="#F1C40F"/> <!-- Skin -->
+    </Group>
+    <!-- Hair -->
+    <Group>
+        <Path data="M -25 -80 C -35 -110 35 -110 25 -80 L 25 -70 C 25 -60 -25 -60 -25 -70 Z"/>
+        <Fill color="#2C3E50"/>
+    </Group>
+    <!-- Arms (Typing) -->
+    <Group>
+        <Path data="M -20 -30 L 10 10 L 60 0"/>
+        <Stroke color="#F1C40F" width="12" cap="round" join="round"/>
+    </Group>
+  </Layer>
+
+  <!-- Laptop on Desk -->
+  <Layer name="Laptop" x="450" y="335">
+     <!-- Screen Back -->
+     <Group>
+        <Path data="M -30 0 L -30 -40 L 30 -40 L 30 0"/>
+        <Stroke color="#95A5A6" width="4" cap="round" join="round"/>
+        <Fill color="#34495E"/>
+     </Group>
+     <!-- Screen Display -->
+     <Group>
+        <Rectangle center="0,-20" size="50,30"/>
+        <Fill color="#ECF0F1"/>
+     </Group>
+     <!-- Base -->
+     <Group>
+        <Rectangle center="0,5" size="70,6" roundness="2"/>
+        <Fill color="#7F8C8D"/>
+     </Group>
+  </Layer>
+
+  <!-- Plant Decor -->
+  <Layer name="Plant" x="650" y="480">
+     <Group>
+        <Path data="M -20 70 L 20 70 L 25 20 L -25 20 Z"/> <!-- Pot -->
+        <Fill color="#D35400"/>
+     </Group>
+     <!-- Leaves -->
+     <Group>
+        <Ellipse center="0,0" size="30,80" rotation="0"/>
+        <Ellipse center="-20,10" size="25,70" rotation="-20"/>
+        <Ellipse center="20,10" size="25,70" rotation="20"/>
+        <Fill color="#27AE60"/>
+     </Group>
+  </Layer>
+
+</pagx>
