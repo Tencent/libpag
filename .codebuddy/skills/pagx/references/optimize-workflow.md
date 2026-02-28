@@ -1,4 +1,4 @@
-# PAGX Optimization Guide
+# PAGX Optimization Workflow
 
 Complete workflow for optimizing existing PAGX files — structure, performance, and correctness.
 Also used as the final step after generating a new PAGX file.
@@ -16,10 +16,8 @@ Read these as needed:
 
 | Reference | Content |
 |-----------|---------|
-| `structure-optimization.md` | Layer/Group semantics, coordinate localization, redundant nesting |
-| `painter-merging.md` | Duplicate painter elimination, cross-layer merging |
-| `resource-reuse.md` | Composition extraction, PathData sharing, color source dedup |
-| `performance.md` | Rendering cost model, Repeater limits, mask optimization, blur cost |
+| `structure-simplification.md` | Layer/Group simplification, coordinate localization, painter merging |
+| `performance.md` | Rendering cost model, Repeater limits, mask optimization, resource reuse |
 | `pagx-quick-reference.md` | Attribute defaults, enumerations, required attributes |
 | `cli-reference.md` | CLI tool usage — `optimize`, `render`, `validate`, `bounds` commands |
 
@@ -49,7 +47,7 @@ pagx optimize -o output.pagx input.pagx
 
 Check for issues that automated optimization cannot fix. Use the decision trees in
 `best-practices.md` (Layer vs Group, Resource extraction) to evaluate structure, and see
-`structure-optimization.md` and `painter-merging.md` for detailed patterns and examples:
+`structure-simplification.md` for detailed patterns and examples:
 
 - **Redundant Layer nesting** — child Layers that should be Groups (no styles, filters, or
   mask needed).
@@ -78,7 +76,7 @@ optimization patterns:
 - **Mask type** — opaque solid-color fills → fast clip path; gradients with transparency or
   images → slower texture mask. Prefer `scrollRect` over mask for rectangular clipping.
 - **Path complexity** — a single Path with >15 curve segments is fragile and slow. Consider
-  decomposing into simpler primitives (Rectangle, Ellipse). See `resource-reuse.md` for
+  decomposing into simpler primitives (Rectangle, Ellipse). See `performance.md` for
   Path→primitive replacement patterns.
 
 ### Step 4: Final Verification Checklist
@@ -90,21 +88,21 @@ After all optimizations, verify the following. Each item links to where the rule
 - [ ] All required attributes present; no redundant default-value attributes
   (`pagx-quick-reference.md`)
 - [ ] Painter scope isolation correct — different painters in Groups, same painters shared
-  (`spec-essentials.md` §4, `painter-merging.md`)
+  (`spec-essentials.md` §4, `structure-simplification.md`)
 - [ ] Text `position`/`textAnchor` not set when TextBox is present
   (`spec-essentials.md` §7 TextBox)
 - [ ] Internal coordinates relative to Layer origin, not canvas-absolute
-  (`structure-optimization.md`)
+  (`structure-simplification.md`)
 - [ ] `<Resources>` placed after all Layers; all `@id` references resolve
   (`spec-essentials.md` §10)
 - [ ] Repeater copies reasonable (~200 single, ~500 nested product)
   (`performance.md`)
 - [ ] Visual stacking order preserved
-  (`structure-optimization.md` — all-or-nothing rule)
+  (`structure-simplification.md` — all-or-nothing rule)
 - [ ] Rendered screenshot matches expected design (layout, alignment, consistent spacing)
-  (use the Verification and Correction Loop in `generation-guide.md` for the full methodology)
+  (use the Verification and Correction Loop in `generate-workflow.md` for the full methodology)
 
 > **Stacking order caveat**: When downgrading child Layers to Groups, Layer contents (Groups,
 > geometry) always render below child Layers regardless of XML order. Partial downgrade can
 > break stacking — either downgrade all qualifying siblings or none. See
-> `structure-optimization.md` for the all-or-nothing rule.
+> `structure-simplification.md` for the all-or-nothing rule.

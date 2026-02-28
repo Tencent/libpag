@@ -1,13 +1,11 @@
 ---
 name: pagx
 description: >-
-  Generates well-structured PAGX files from visual descriptions and optimizes
-  existing ones for size and rendering performance. Use when user asks to create,
-  write, or design PAGX content, optimize or simplify a .pagx file, review PAGX
-  structure, or run pagx CLI commands (render, validate, format, optimize, bounds,
-  font info/embed). Also use when user asks how to use the pagx command-line tool,
-  what pagx commands are available, or needs help with PAGX XML syntax and
-  attributes.
+  Generates well-structured PAGX files from visual descriptions and optimizes existing
+  ones for size and rendering performance. Use when user asks to create, write, or
+  design PAGX content, optimize or simplify a .pagx file, review PAGX structure, run
+  pagx CLI commands (render, validate, format, optimize, bounds, font info/embed), or
+  look up PAGX element attributes and syntax.
 user-invocable: false
 ---
 
@@ -18,7 +16,7 @@ at the top — read those as directed by the workflow.
 
 ## Workflows
 
-### Generate — `generation-guide.md`
+### Generate — `generate-workflow.md`
 
 **When**: User asks to create, write, or design a new PAGX file from a text description,
 reference image, or design spec.
@@ -28,7 +26,7 @@ incremental construction, text layout, coordinate handling, common pitfalls, and
 screenshot-based verification loop. Scene-specific examples (App UI, Icons) are indexed
 inside.
 
-### Optimize — `optimization-guide.md`
+### Optimize — `optimize-workflow.md`
 
 **When**: User asks to optimize, simplify, or review an existing PAGX file. Also used as
 the final step after generating a new file.

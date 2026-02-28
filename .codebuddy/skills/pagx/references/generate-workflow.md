@@ -1,7 +1,7 @@
-# PAGX Generation Guide
+# PAGX Generation Workflow
 
 Complete methodology for generating PAGX files from visual descriptions — from reference
-analysis through verification. After generation, continue to `optimization-guide.md` for
+analysis through verification. After generation, continue to `optimize-workflow.md` for
 structure and performance review.
 
 ## References
@@ -82,7 +82,7 @@ proportions), then use `pagx bounds` to measure and compute corrections. Fix, re
 and re-inspect until correct. See the **Verification and Correction Loop** section at the
 end of this document for the full methodology.
 
-After verification passes, continue to `optimization-guide.md` for structure and performance
+After verification passes, continue to `optimize-workflow.md` for structure and performance
 review.
 
 ---
