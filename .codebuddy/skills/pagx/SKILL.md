@@ -19,10 +19,14 @@ foundational understanding of the PAGX format.
 
 ## Reference Map
 
+All generation tasks read `generation-guide.md` (universal methodology). Add **scene-specific
+guides** based on what you're generating:
+
 | Task | Read These References |
 |------|----------------------|
-| Generate PAGX from description | `spec-essentials.md`, `generation-guide.md` |
-| Generate icons (badges, symbols) | `generation-guide.md`, `icon-workflow.md` |
+| Generate PAGX (any type) | `spec-essentials.md`, `generation-guide.md` |
+| └ UI components (cards, buttons, pages) | + `ui-components.md` |
+| └ Icons (badges, symbols, small graphics) | + `icon-workflow.md` |
 | Optimize existing PAGX | `structure-optimization.md`, `painter-merging.md`, `resource-reuse.md` |
 | Improve rendering performance | `performance.md` |
 | Look up attribute defaults or enums | `pagx-quick-reference.md` |
@@ -200,19 +204,8 @@ These have **no default** — omitting them causes parse errors:
 
 ### Generating PAGX
 
-1. **Analyze** the reference image or description — identify layer structure, rendering
-   technique (fill vs stroke), color scheme, shape vocabulary, and detail level
-2. **Decompose** into logical blocks (each block → one Layer), determine canvas size
-   and positions — use `pagx font info` for text metrics, `pagx bounds` for element bounds
-3. **Build incrementally** — core structure first, then secondary elements one at a time.
-   Re-render after each addition to isolate defects
-4. **Localize** coordinates (Layer `x`/`y` carries offset, internals relative to origin)
-5. **Verify** — use `pagx bounds` to check alignment, spacing, and containment numerically.
-   Never rely on coordinate estimation alone
-6. Continue to **Optimizing** below
-
-> For detailed generation patterns, component templates, and examples, read
-> `references/generation-guide.md`.
+Follow the 5-step process in `references/generation-guide.md`:
+Analyze → Decompose → Build incrementally → Localize coordinates → Verify with `pagx bounds`.
 
 ### Optimizing PAGX
 
