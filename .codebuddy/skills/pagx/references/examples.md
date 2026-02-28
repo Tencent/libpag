@@ -297,19 +297,21 @@ arc control.
 ```xml
 <pagx version="1.0" width="200" height="200">
   <Layer x="100" y="100">
-    <!-- Arc track (270 degrees) -->
-    <Group>
-      <Ellipse size="150,150"/>
-      <TrimPath start="0.125" end="0.875"/>
-      <Stroke color="#E2E8F0" width="8"/>
+    <!-- Arc track (270 degrees, gap at bottom) -->
+    <Group rotation="135">
+      <Group>
+        <Ellipse size="150,150"/>
+        <TrimPath end="0.75"/>
+        <Stroke color="#E2E8F0" width="8"/>
+      </Group>
+      <!-- Arc fill (about 2/3 of the track) -->
+      <Group>
+        <Ellipse size="150,150"/>
+        <TrimPath end="0.5"/>
+        <Stroke color="#3B82F6" width="8" cap="round"/>
+      </Group>
     </Group>
-    <!-- Arc fill (progress portion) -->
-    <Group>
-      <Ellipse size="150,150"/>
-      <TrimPath start="0.125" end="0.5"/>
-      <Stroke color="#3B82F6" width="8" cap="round"/>
-    </Group>
-    <!-- Major ticks -->
+    <!-- Major ticks (from 7:30 to 4:30, 270 degrees) -->
     <Group rotation="-225">
       <Rectangle center="0,-68" size="2,10"/>
       <Fill color="#64748B"/>
@@ -319,11 +321,11 @@ arc control.
 </pagx>
 ```
 
-**Pattern**: TrimPath `start`/`end` values are fractions of the full perimeter (0 = 3
-o'clock, proceeding clockwise). `0.125–0.875` gives a 270° arc starting from 7:30.
-Repeater `rotation` generates evenly spaced ticks — the initial Group `rotation` aligns
-the first tick with the arc start. Each tick is a thin Rectangle offset from center along
-the Y axis.
+**Pattern**: The outer Group `rotation="135"` rotates the Ellipse's start point (default
+3 o'clock) to 7:30, so `TrimPath end="0.75"` draws a 270° arc from 7:30 clockwise to 4:30
+with the gap at the bottom. Repeater `rotation` generates evenly spaced ticks — the initial
+Group `rotation="-225"` aligns the first tick with the arc start at 7:30. Each tick is a
+thin Rectangle offset from center along the Y axis.
 
 ### Ring Progress (TrimPath + Gradient)
 
