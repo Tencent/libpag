@@ -672,6 +672,7 @@
   <xs:complexType name="DropShadowStyleType">
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
+    <xs:attribute name="excludeChildEffects" type="BoolType" default="false"/>
     <xs:attribute name="offsetX" type="xs:decimal" default="0"/>
     <xs:attribute name="offsetY" type="xs:decimal" default="0"/>
     <xs:attribute name="blurX" type="xs:decimal" default="0"/>
@@ -685,6 +686,7 @@
   <xs:complexType name="BackgroundBlurStyleType">
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
+    <xs:attribute name="excludeChildEffects" type="BoolType" default="false"/>
     <xs:attribute name="blurX" type="xs:decimal" default="0"/>
     <xs:attribute name="blurY" type="xs:decimal" default="0"/>
     <xs:attribute name="tileMode" type="TileModeType" default="mirror"/>
@@ -695,6 +697,7 @@
   <xs:complexType name="InnerShadowStyleType">
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
+    <xs:attribute name="excludeChildEffects" type="BoolType" default="false"/>
     <xs:attribute name="offsetX" type="xs:decimal" default="0"/>
     <xs:attribute name="offsetY" type="xs:decimal" default="0"/>
     <xs:attribute name="blurX" type="xs:decimal" default="0"/>
@@ -838,7 +841,6 @@
     <xs:attribute name="antiAlias" type="BoolType" default="true"/>
     <xs:attribute name="groupOpacity" type="BoolType" default="false"/>
     <xs:attribute name="passThroughBackground" type="BoolType" default="true"/>
-    <xs:attribute name="excludeChildEffectsInLayerStyle" type="BoolType" default="false"/>
     <xs:attribute name="scrollRect" type="RectType"/>
     <xs:attribute name="mask" type="IdRefType"/>
     <xs:attribute name="maskType" type="MaskTypeType" default="alpha"/>

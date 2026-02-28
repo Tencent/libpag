@@ -220,7 +220,7 @@ A child Layer can be downgraded to Group when **all** of the following are true:
      child Layers
    - **Attributes**: mask, maskType, blendMode (non-default), composition, scrollRect,
      visible="false" (mask definitions), id (if referenced elsewhere), name, matrix, matrix3D,
-     preserve3D, groupOpacity, passThroughBackground, excludeChildEffectsInLayerStyle
+     preserve3D, groupOpacity, passThroughBackground
 3. Downgrade does not change visual stacking order among siblings
 4. The Layer is a **sub-element within the same logical block** — not a distinct independent
    block on its own

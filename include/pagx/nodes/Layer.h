@@ -102,11 +102,6 @@ class Layer : public Node {
   bool passThroughBackground = true;
 
   /**
-   * Whether to exclude child effects when applying layer styles. The default value is false.
-   */
-  bool excludeChildEffectsInLayerStyle = false;
-
-  /**
    * The scroll rectangle for clipping the layer content.
    */
   Rect scrollRect = {};

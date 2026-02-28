@@ -49,7 +49,6 @@ they **must not** be omitted.
 | `antiAlias` | bool | true |
 | `groupOpacity` | bool | false |
 | `passThroughBackground` | bool | true |
-| `excludeChildEffectsInLayerStyle` | bool | false |
 | `maskType` | MaskType | alpha |
 
 ### Group
@@ -219,6 +218,7 @@ they **must not** be omitted.
 | `color` | Color | #000000 |
 | `showBehindLayer` | bool | true |
 | `blendMode` | BlendMode | normal |
+| `excludeChildEffects` | bool | false |
 
 ### InnerShadowStyle
 
@@ -230,6 +230,7 @@ they **must not** be omitted.
 | `blurY` | float | 0 |
 | `color` | Color | #000000 |
 | `blendMode` | BlendMode | normal |
+| `excludeChildEffects` | bool | false |
 
 ### BackgroundBlurStyle
 
@@ -239,6 +240,7 @@ they **must not** be omitted.
 | `blurY` | float | 0 |
 | `tileMode` | TileMode | mirror |
 | `blendMode` | BlendMode | normal |
+| `excludeChildEffects` | bool | false |
 
 ### BlurFilter
 

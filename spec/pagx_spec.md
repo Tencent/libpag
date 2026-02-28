@@ -624,7 +624,6 @@ Layer child elements are automatically categorized into four collections by type
 | `antiAlias` | bool | true | Edge anti-aliasing |
 | `groupOpacity` | bool | false | Group opacity |
 | `passThroughBackground` | bool | true | Whether to pass background through to child layers |
-| `excludeChildEffectsInLayerStyle` | bool | false | Whether layer styles exclude child layer effects |
 | `scrollRect` | Rect | - | Scroll clipping region "x,y,w,h" |
 | `mask` | idref | - | Mask layer reference "@id" |
 | `maskType` | MaskType | alpha | Mask type |
@@ -633,8 +632,6 @@ Layer child elements are automatically categorized into four collections by type
 **groupOpacity**: When `false` (default), the layer's `alpha` is applied independently to each child element, which may cause overlapping semi-transparent children to appear darker at intersections. When `true`, all layer content is first composited into an offscreen buffer, then `alpha` is applied to the buffer as a whole, producing uniform transparency across the entire layer.
 
 **preserve3D**: When `false` (default), child layers with 3D transforms are flattened into the parent's 2D plane before compositing. When `true`, child layers retain their 3D positions and are rendered in a shared 3D space, enabling depth-based intersections and correct z-ordering among siblings. Similar to CSS `transform-style: preserve-3d`.
-
-**excludeChildEffectsInLayerStyle**: When `false` (default), layer styles (e.g., DropShadowStyle) compute based on the full layer content including child layers' rendering results. When `true`, child layers' styles and filters are excluded from the layer content used to compute the parent's layer styles, but child layers' base rendering results are still included.
 
 **Transform Attribute Priority**: `x`/`y`, `matrix`, and `matrix3D` have an override relationship:
 - Only `x`/`y` set: Uses `x`/`y` for translation
@@ -668,6 +665,9 @@ Some layer styles additionally use **layer contour** or **layer background** as 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `blendMode` | BlendMode | normal | Blend mode (see Section 2.9) |
+| `excludeChildEffects` | bool | false | Whether to exclude child layer effects |
+
+**excludeChildEffects**: When `false` (default), the layer style computes based on the full layer content including child layers' rendering results. When `true`, child layers' styles and filters are excluded from the layer content used to compute this style, but child layers' base rendering results are still included.
 
 #### 4.3.1 DropShadowStyle
 

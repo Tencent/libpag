@@ -700,10 +700,6 @@ class LayerBuilderContext {
     if (!node->passThroughBackground) {
       layer->setPassThroughBackground(false);
     }
-    if (node->excludeChildEffectsInLayerStyle) {
-      layer->setExcludeChildEffectsInLayerStyle(true);
-    }
-
     // Apply scrollRect if present
     if (node->hasScrollRect) {
       layer->setScrollRect(ToTGFX(node->scrollRect));
@@ -715,6 +711,9 @@ class LayerBuilderContext {
     for (const auto& style : node->styles) {
       auto tgfxStyle = convertLayerStyle(style);
       if (tgfxStyle) {
+        if (style->excludeChildEffects) {
+          tgfxStyle->setExcludeChildEffects(true);
+        }
         styles.push_back(tgfxStyle);
       }
     }

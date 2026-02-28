@@ -624,7 +624,6 @@ Layer 的子元素按类型自动归类为四个集合：
 | `antiAlias` | bool | true | 边缘抗锯齿 |
 | `groupOpacity` | bool | false | 组透明度 |
 | `passThroughBackground` | bool | true | 是否允许背景透传给子图层 |
-| `excludeChildEffectsInLayerStyle` | bool | false | 图层样式是否排除子图层效果 |
 | `scrollRect` | Rect | - | 滚动裁剪区域 "x,y,w,h" |
 | `mask` | idref | - | 遮罩图层引用 "@id" |
 | `maskType` | MaskType | alpha | 遮罩类型 |
@@ -633,8 +632,6 @@ Layer 的子元素按类型自动归类为四个集合：
 **groupOpacity**：当值为 `false`（默认）时，图层的 `alpha` 独立应用到每个子元素，重叠的半透明子元素在交叉处可能显得更深。当值为 `true` 时，所有图层内容先合成到离屏缓冲区，再将 `alpha` 整体应用到缓冲区，使整个图层呈现均匀的透明效果。
 
 **preserve3D**：当值为 `false`（默认）时，具有 3D 变换的子图层在合成前会被压平到父级的 2D 平面。当值为 `true` 时，子图层保留其 3D 位置，在共享的 3D 空间中渲染，实现基于深度的交叉和正确的兄弟层 Z 排序。类似于 CSS 的 `transform-style: preserve-3d`。
-
-**excludeChildEffectsInLayerStyle**：当值为 `false`（默认）时，图层样式（如 DropShadowStyle）基于完整的图层内容计算，包含子图层的渲染结果。当值为 `true` 时，子图层的图层样式和图层滤镜不参与父级图层样式的计算，但子图层的基础渲染结果仍然包含在内。
 
 **变换属性优先级**：`x`/`y`、`matrix`、`matrix3D` 三者存在覆盖关系：
 - 仅设置 `x`/`y`：使用 `x`/`y` 作为平移
@@ -668,6 +665,9 @@ Layer 的子元素按类型自动归类为四个集合：
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `blendMode` | BlendMode | normal | 混合模式（见 2.9 节） |
+| `excludeChildEffects` | bool | false | 是否排除子图层效果 |
+
+**excludeChildEffects**：当值为 `false`（默认）时，图层样式基于完整的图层内容计算，包含子图层的渲染结果。当值为 `true` 时，子图层的图层样式和图层滤镜不参与该样式的计算，但子图层的基础渲染结果仍然包含在内。
 
 #### 4.3.1 投影阴影（DropShadowStyle）
 

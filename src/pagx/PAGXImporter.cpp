@@ -224,8 +224,6 @@ static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
   layer->antiAlias = getBoolAttribute(node, "antiAlias", true, doc);
   layer->groupOpacity = getBoolAttribute(node, "groupOpacity", false, doc);
   layer->passThroughBackground = getBoolAttribute(node, "passThroughBackground", true, doc);
-  layer->excludeChildEffectsInLayerStyle =
-      getBoolAttribute(node, "excludeChildEffectsInLayerStyle", false, doc);
   auto scrollRectStr = getAttribute(node, "scrollRect");
   if (!scrollRectStr.empty()) {
     layer->scrollRect = getRectAttribute(node, "scrollRect", {}, doc);
@@ -1273,6 +1271,7 @@ static DropShadowStyle* parseDropShadowStyle(const DOMNode* node, PAGXDocument* 
     return nullptr;
   }
   style->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
+  style->excludeChildEffects = getBoolAttribute(node, "excludeChildEffects", false, doc);
   parseShadowAttributes(node, doc, style->offsetX, style->offsetY, style->blurX, style->blurY,
                         style->color);
   style->showBehindLayer = getBoolAttribute(node, "showBehindLayer", true, doc);
@@ -1285,6 +1284,7 @@ static InnerShadowStyle* parseInnerShadowStyle(const DOMNode* node, PAGXDocument
     return nullptr;
   }
   style->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
+  style->excludeChildEffects = getBoolAttribute(node, "excludeChildEffects", false, doc);
   parseShadowAttributes(node, doc, style->offsetX, style->offsetY, style->blurX, style->blurY,
                         style->color);
   return style;
@@ -1296,6 +1296,7 @@ static BackgroundBlurStyle* parseBackgroundBlurStyle(const DOMNode* node, PAGXDo
     return nullptr;
   }
   style->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
+  style->excludeChildEffects = getBoolAttribute(node, "excludeChildEffects", false, doc);
   style->blurX = getFloatAttribute(node, "blurX", 0, doc);
   style->blurY = getFloatAttribute(node, "blurY", 0, doc);
   style->tileMode = TileModeFromString(getAttribute(node, "tileMode", "mirror"));
