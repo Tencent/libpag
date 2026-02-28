@@ -1,468 +1,413 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="640" height="520">
 
-  <!-- Dark background -->
+  <!-- Deep dark background -->
   <Layer name="Background">
     <Rectangle center="320,260" size="640,520"/>
-    <Fill color="#0F172A"/>
+    <Fill color="#0C0E1A"/>
   </Layer>
 
-  <!-- Subtle ambient glow -->
+  <!-- Ambient glow spots -->
   <Layer name="Ambience">
     <Layer>
-      <Ellipse center="160,130" size="320,320"/>
-      <Fill color="#334155" alpha="0.12"/>
+      <Ellipse center="100,80" size="280,280"/>
+      <Fill color="#22D3EE" alpha="0.03"/>
     </Layer>
     <Layer>
-      <Ellipse center="500,400" size="240,240"/>
-      <Fill color="#1E293B" alpha="0.2"/>
+      <Ellipse center="540,440" size="300,300"/>
+      <Fill color="#22D3EE" alpha="0.025"/>
+    </Layer>
+    <Layer>
+      <Ellipse center="320,260" size="500,500"/>
+      <Fill color="#22D3EE" alpha="0.015"/>
     </Layer>
   </Layer>
 
-  <!-- Grid lines for structure -->
-  <Layer name="Grid">
+  <!-- Decorative grid & geometry -->
+  <Layer name="Decor">
     <Layer>
       <Path data="M 40 172 L 600 172"/>
-      <Stroke color="#1E293B" width="0.5"/>
+      <Stroke color="#22D3EE" width="0.5" alpha="0.08"/>
     </Layer>
     <Layer>
       <Path data="M 40 342 L 600 342"/>
-      <Stroke color="#1E293B" width="0.5"/>
+      <Stroke color="#22D3EE" width="0.5" alpha="0.08"/>
+    </Layer>
+    <Layer>
+      <Path data="M 20 30 L 20 20 L 30 20"/>
+      <Stroke color="#22D3EE" width="1" cap="round" alpha="0.12"/>
+    </Layer>
+    <Layer>
+      <Path data="M 610 20 L 620 20 L 620 30"/>
+      <Stroke color="#22D3EE" width="1" cap="round" alpha="0.12"/>
+    </Layer>
+    <Layer>
+      <Path data="M 20 490 L 20 500 L 30 500"/>
+      <Stroke color="#22D3EE" width="1" cap="round" alpha="0.12"/>
+    </Layer>
+    <Layer>
+      <Path data="M 610 500 L 620 500 L 620 490"/>
+      <Stroke color="#22D3EE" width="1" cap="round" alpha="0.12"/>
+    </Layer>
+    <Layer>
+      <Ellipse center="580,60" size="120,120"/>
+      <Stroke color="#22D3EE" width="0.5" alpha="0.06"/>
+    </Layer>
+    <Layer>
+      <Ellipse center="60,460" size="100,100"/>
+      <Stroke color="#22D3EE" width="0.5" alpha="0.06"/>
+    </Layer>
+    <Layer>
+      <Ellipse center="320,260" size="400,400"/>
+      <TrimPath start="0.1" end="0.25"/>
+      <Stroke color="#22D3EE" width="0.5" cap="round" alpha="0.06"/>
+    </Layer>
+    <Layer>
+      <Ellipse center="320,260" size="400,400"/>
+      <TrimPath start="0.6" end="0.75"/>
+      <Stroke color="#22D3EE" width="0.5" cap="round" alpha="0.06"/>
+    </Layer>
+    <Layer>
+      <Group position="30,260" rotation="45">
+        <Rectangle size="8,8"/>
+        <Stroke color="#22D3EE" width="0.8" alpha="0.1"/>
+      </Group>
+    </Layer>
+    <Layer>
+      <Group position="610,260" rotation="45">
+        <Rectangle size="8,8"/>
+        <Stroke color="#22D3EE" width="0.8" alpha="0.1"/>
+      </Group>
+    </Layer>
+    <Layer>
+      <Path data="M 535,28 L 545,38 M 545,28 L 535,38"/>
+      <Stroke color="#22D3EE" width="0.8" cap="round" alpha="0.08"/>
+    </Layer>
+    <Layer>
+      <Path data="M 95,488 L 105,498 M 105,488 L 95,498"/>
+      <Stroke color="#22D3EE" width="0.8" cap="round" alpha="0.08"/>
+    </Layer>
+    <Layer>
+      <Group>
+        <Ellipse center="180,20" size="2,2"/>
+        <Ellipse center="460,15" size="2,2"/>
+        <Ellipse center="15,180" size="2,2"/>
+        <Ellipse center="625,350" size="2,2"/>
+        <Ellipse center="300,505" size="2,2"/>
+        <Ellipse center="500,505" size="2,2"/>
+        <Fill color="#22D3EE" alpha="0.1"/>
+      </Group>
     </Layer>
   </Layer>
 
-  <!-- ==================== 1. Home ==================== -->
-  <Layer name="Home" x="80" y="78">
-    <!-- Roof -->
+  <!-- ==================== Icon card backgrounds with shadows ==================== -->
+
+  <!-- Row 1 backgrounds -->
+  <Layer name="CardHome" x="80" y="74">
+    <Rectangle size="72,72" roundness="18"/>
+    <Fill color="#151929"/>
+    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+  </Layer>
+  <Layer name="CardSearch" x="240" y="74">
+    <Rectangle size="72,72" roundness="18"/>
+    <Fill color="#151929"/>
+    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+  </Layer>
+  <Layer name="CardBell" x="400" y="74">
+    <Rectangle size="72,72" roundness="18"/>
+    <Fill color="#151929"/>
+    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+  </Layer>
+  <Layer name="CardHeart" x="560" y="74">
+    <Rectangle size="72,72" roundness="18"/>
+    <Fill color="#151929"/>
+    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+  </Layer>
+
+  <!-- Row 2 backgrounds -->
+  <Layer name="CardChat" x="80" y="244">
+    <Rectangle size="72,72" roundness="18"/>
+    <Fill color="#151929"/>
+    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+  </Layer>
+  <Layer name="CardCamera" x="240" y="244">
+    <Rectangle size="72,72" roundness="18"/>
+    <Fill color="#151929"/>
+    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+  </Layer>
+  <Layer name="CardSettings" x="400" y="244">
+    <Rectangle size="72,72" roundness="18"/>
+    <Fill color="#151929"/>
+    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+  </Layer>
+  <Layer name="CardUser" x="560" y="244">
+    <Rectangle size="72,72" roundness="18"/>
+    <Fill color="#151929"/>
+    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+  </Layer>
+
+  <!-- Row 3 backgrounds -->
+  <Layer name="CardCalendar" x="80" y="412">
+    <Rectangle size="72,72" roundness="18"/>
+    <Fill color="#151929"/>
+    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+  </Layer>
+  <Layer name="CardLock" x="240" y="412">
+    <Rectangle size="72,72" roundness="18"/>
+    <Fill color="#151929"/>
+    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+  </Layer>
+  <Layer name="CardMusic" x="400" y="412">
+    <Rectangle size="72,72" roundness="18"/>
+    <Fill color="#151929"/>
+    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+  </Layer>
+  <Layer name="CardDownload" x="560" y="412">
+    <Rectangle size="72,72" roundness="18"/>
+    <Fill color="#151929"/>
+    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#22D3EE18"/>
+  </Layer>
+
+  <!-- ==================== Icons ==================== -->
+
+  <!-- 1. Home -->
+  <Layer name="Home" x="80" y="74">
     <Group>
-      <Path data="M 0 -24 L -22 -6 L -18 -6 L -18 -2 L 18 -2 L 18 -6 L 22 -6 Z"/>
-      <Fill color="#E2E8F0"/>
-    </Group>
-    <!-- Chimney -->
-    <Group>
-      <Rectangle center="11,-16" size="6,10"/>
-      <Fill color="#E2E8F0"/>
-    </Group>
-    <!-- Wall -->
-    <Group>
-      <Rectangle center="0,10" size="28,22"/>
-      <Fill color="#E2E8F0"/>
-    </Group>
-    <!-- Door -->
-    <Group>
-      <Rectangle center="0,13" size="10,16" roundness="5"/>
-      <Fill color="#0F172A"/>
-    </Group>
-    <!-- Door knob -->
-    <Group>
-      <Ellipse center="3,14" size="2,2"/>
-      <Fill color="#E2E8F0"/>
-    </Group>
-    <!-- Left window -->
-    <Group>
-      <Rectangle center="-9,6" size="7,7" roundness="1"/>
-      <Fill color="#0F172A"/>
-    </Group>
-    <!-- Left window cross -->
-    <Group>
-      <Path data="M -9 3 L -9 9 M -12 6 L -6 6"/>
-      <Stroke color="#E2E8F0" width="0.5" alpha="0.5"/>
-    </Group>
-    <!-- Right window -->
-    <Group>
-      <Rectangle center="9,6" size="7,7" roundness="1"/>
-      <Fill color="#0F172A"/>
-    </Group>
-    <!-- Right window cross -->
-    <Group>
-      <Path data="M 9 3 L 9 9 M 6 6 L 12 6"/>
-      <Stroke color="#E2E8F0" width="0.5" alpha="0.5"/>
+      <Path data="M 0 -18 L -16 -2 L -12 -2 L -12 12 L -4 12 L -4 3 L 4 3 L 4 12 L 12 12 L 12 -2 L 16 -2 Z"/>
+      <Fill color="#22D3EE"/>
     </Group>
   </Layer>
 
-  <!-- ==================== 2. Search ==================== -->
-  <Layer name="Search" x="240" y="78">
-    <!-- Glass circle -->
+  <!-- 2. Search -->
+  <Layer name="Search" x="240" y="74">
     <Group>
-      <Ellipse center="-4,-4" size="28,28"/>
-      <Stroke color="#E2E8F0" width="3"/>
+      <Ellipse center="-2,-2" size="22,22"/>
+      <Stroke color="#22D3EE" width="3"/>
     </Group>
-    <!-- Inner detail ring -->
     <Group>
-      <Ellipse center="-4,-4" size="20,20"/>
-      <Stroke color="#E2E8F0" width="0.5" alpha="0.2"/>
-    </Group>
-    <!-- Shine arc -->
-    <Group>
-      <Ellipse center="-4,-4" size="22,22"/>
-      <TrimPath start="0.05" end="0.2"/>
-      <Stroke color="#E2E8F0" width="1.5" cap="round" alpha="0.35"/>
-    </Group>
-    <!-- Handle -->
-    <Group>
-      <Path data="M 7 7 L 18 18"/>
-      <Stroke color="#E2E8F0" width="4" cap="round"/>
-    </Group>
-    <!-- Handle grip line -->
-    <Group>
-      <Path data="M 12 14 L 16 10"/>
-      <Stroke color="#E2E8F0" width="1" cap="round" alpha="0.3"/>
+      <Path data="M 6 6 L 14 14"/>
+      <Stroke color="#22D3EE" width="3.5" cap="round"/>
     </Group>
   </Layer>
 
-  <!-- ==================== 3. Bell ==================== -->
-  <Layer name="Bell" x="400" y="78">
-    <!-- Bell body -->
+  <!-- 3. Bell -->
+  <Layer name="Bell" x="400" y="74">
     <Group>
-      <Path data="M -14 6 C -14 -4 -10 -16 0 -18 C 10 -16 14 -4 14 6 L 16 10 L -16 10 Z"/>
-      <Fill color="#E2E8F0"/>
-    </Group>
-    <!-- Bell top stem -->
-    <Group>
-      <Path data="M 0 -22 L 0 -18"/>
-      <Stroke color="#E2E8F0" width="2.5" cap="round"/>
-    </Group>
-    <!-- Bell top ring -->
-    <Group>
-      <Ellipse center="0,-23" size="5,5"/>
-      <Stroke color="#E2E8F0" width="1.5"/>
-    </Group>
-    <!-- Clapper -->
-    <Group>
-      <Ellipse center="0,13" size="8,5"/>
-      <Fill color="#E2E8F0"/>
-    </Group>
-    <!-- Bell surface line -->
-    <Group>
-      <Path data="M -10 -6 C -6 -8 6 -8 10 -6"/>
-      <Stroke color="#0F172A" width="1" cap="round" alpha="0.25"/>
-    </Group>
-    <!-- Notification dot -->
-    <Group>
-      <Ellipse center="10,-16" size="8,8"/>
-      <Fill color="#E2E8F0"/>
+      <Path data="M -12 5 C -12 -3 -8 -13 0 -15 C 8 -13 12 -3 12 5 L 14 8 L -14 8 Z"/>
+      <Fill color="#22D3EE"/>
     </Group>
     <Group>
-      <Ellipse center="10,-16" size="4,4"/>
-      <Fill color="#0F172A"/>
+      <Path data="M 0 -18 L 0 -15"/>
+      <Stroke color="#22D3EE" width="2" cap="round"/>
+    </Group>
+    <Group>
+      <Ellipse center="0,11" size="7,4"/>
+      <Fill color="#22D3EE"/>
     </Group>
   </Layer>
 
-  <!-- ==================== 4. Heart ==================== -->
-  <Layer name="Heart" x="560" y="78">
-    <!-- Heart shape -->
+  <!-- 4. Heart -->
+  <Layer name="Heart" x="560" y="74">
     <Group>
-      <Path data="M 0 -5 C -3 -14 -18 -16 -18 -4 C -18 6 -7 13 0 20 C 7 13 18 6 18 -4 C 18 -16 3 -14 0 -5 Z"/>
-      <Fill color="#E2E8F0"/>
-    </Group>
-    <!-- Inner heart outline -->
-    <Group>
-      <Path data="M 0 0 C -2 -6 -10 -7 -10 -2 C -10 3 -4 7 0 10 C 4 7 10 3 10 -2 C 10 -7 2 -6 0 0 Z"/>
-      <Stroke color="#0F172A" width="0.8" alpha="0.2"/>
-    </Group>
-    <!-- Highlight -->
-    <Group>
-      <Ellipse center="-8,-6" size="5,7"/>
-      <Fill color="#FFFFFF" alpha="0.12"/>
+      <Path data="M 0 -3 C -2 -12 -16 -14 -16 -3 C -16 6 -6 12 0 18 C 6 12 16 6 16 -3 C 16 -14 2 -12 0 -3 Z"/>
+      <Fill color="#22D3EE"/>
     </Group>
   </Layer>
 
-  <!-- ==================== 5. Chat ==================== -->
-  <Layer name="Chat" x="80" y="248">
-    <!-- Main bubble -->
+  <!-- 5. Chat -->
+  <Layer name="Chat" x="80" y="244">
     <Group>
-      <Path data="M -18 -12 C -18 -17 -14 -20 -9 -20 L 9 -20 C 14 -20 18 -17 18 -12 L 18 2 C 18 7 14 10 9 10 L -1 10 L -8 18 L -5 10 L -9 10 C -14 10 -18 7 -18 2 Z"/>
-      <Fill color="#E2E8F0"/>
-    </Group>
-    <!-- Three dots -->
-    <Group>
-      <Ellipse center="-7,-5" size="4,4"/>
-      <Ellipse center="0,-5" size="4,4"/>
-      <Ellipse center="7,-5" size="4,4"/>
-      <Fill color="#0F172A"/>
-    </Group>
-    <!-- Typing indicator -->
-    <Group>
-      <Ellipse center="14,14" size="8,6"/>
-      <Fill color="#E2E8F0" alpha="0.3"/>
+      <Path data="M -15 -11 C -15 -15 -12 -17 -8 -17 L 8 -17 C 12 -17 15 -15 15 -11 L 15 2 C 15 6 12 8 8 8 L -2 8 L -8 15 L -5 8 L -8 8 C -12 8 -15 6 -15 2 Z"/>
+      <Fill color="#22D3EE"/>
     </Group>
     <Group>
-      <Ellipse center="18,18" size="4,4"/>
-      <Fill color="#E2E8F0" alpha="0.18"/>
+      <Ellipse center="-6,-5" size="3,3"/>
+      <Ellipse center="0,-5" size="3,3"/>
+      <Ellipse center="6,-5" size="3,3"/>
+      <Fill color="#0C0E1A"/>
     </Group>
   </Layer>
 
-  <!-- ==================== 6. Camera ==================== -->
-  <Layer name="Camera" x="240" y="248">
-    <!-- Body -->
+  <!-- 6. Camera -->
+  <Layer name="Camera" x="240" y="244">
     <Group>
-      <Rectangle center="0,2" size="36,24" roundness="5"/>
-      <Fill color="#E2E8F0"/>
+      <Rectangle center="0,2" size="32,22" roundness="4"/>
+      <Fill color="#22D3EE"/>
     </Group>
-    <!-- Top bump -->
     <Group>
-      <Path data="M -8 -10 L -5 -14 L 5 -14 L 8 -10"/>
-      <Fill color="#E2E8F0"/>
+      <Path data="M -6 -9 L -3 -13 L 3 -13 L 6 -9"/>
+      <Fill color="#22D3EE"/>
     </Group>
-    <!-- Lens outer -->
-    <Group>
-      <Ellipse center="0,2" size="18,18"/>
-      <Fill color="#0F172A"/>
-    </Group>
-    <!-- Lens middle ring -->
     <Group>
       <Ellipse center="0,2" size="14,14"/>
-      <Stroke color="#E2E8F0" width="0.8" alpha="0.4"/>
+      <Fill color="#0C0E1A"/>
     </Group>
-    <!-- Lens inner -->
     <Group>
       <Ellipse center="0,2" size="8,8"/>
-      <Fill color="#E2E8F0" alpha="0.25"/>
-    </Group>
-    <!-- Lens dot -->
-    <Group>
-      <Ellipse center="0,2" size="3,3"/>
-      <Fill color="#0F172A"/>
-    </Group>
-    <!-- Flash -->
-    <Group>
-      <Ellipse center="13,-6" size="4,4"/>
-      <Fill color="#0F172A"/>
-    </Group>
-    <!-- Record indicator -->
-    <Group>
-      <Ellipse center="-13,-6" size="3,3"/>
-      <Fill color="#0F172A" alpha="0.4"/>
+      <Stroke color="#22D3EE" width="2"/>
     </Group>
   </Layer>
 
-  <!-- ==================== 7. Settings ==================== -->
-  <Layer name="Settings" x="400" y="248">
-    <!-- Outer gear -->
+  <!-- 7. Settings -->
+  <Layer name="Settings" x="400" y="244">
     <Group>
-      <Polystar type="star" pointCount="8" outerRadius="22" innerRadius="17" rotation="22"/>
-      <Fill color="#E2E8F0"/>
+      <Polystar type="star" pointCount="8" outerRadius="20" innerRadius="15" rotation="22"/>
+      <Fill color="#22D3EE"/>
     </Group>
-    <!-- Body ring -->
     <Group>
-      <Ellipse size="22,22"/>
-      <Fill color="#E2E8F0"/>
+      <Ellipse size="12,12"/>
+      <Fill color="#0C0E1A"/>
     </Group>
-    <!-- Inner ring -->
     <Group>
-      <Ellipse size="14,14"/>
-      <Fill color="#0F172A"/>
-    </Group>
-    <!-- Center dot -->
-    <Group>
-      <Ellipse size="6,6"/>
-      <Fill color="#E2E8F0"/>
-    </Group>
-    <!-- Notch marks -->
-    <Group>
-      <Rectangle center="0,-9" size="1,3"/>
-      <Fill color="#0F172A" alpha="0.25"/>
-      <Repeater copies="8" rotation="45" position="0,0"/>
+      <Ellipse size="5,5"/>
+      <Fill color="#22D3EE"/>
     </Group>
   </Layer>
 
-  <!-- ==================== 8. User ==================== -->
-  <Layer name="User" x="560" y="248">
-    <!-- Outer circle -->
+  <!-- 8. User -->
+  <Layer name="User" x="560" y="244">
     <Group>
-      <Ellipse size="48,48"/>
-      <Fill color="#E2E8F0"/>
+      <Ellipse size="40,40"/>
+      <Fill color="#22D3EE"/>
     </Group>
-    <!-- Head -->
     <Group>
-      <Ellipse center="0,-6" size="16,16"/>
-      <Fill color="#0F172A"/>
+      <Ellipse center="0,-5" size="12,12"/>
+      <Fill color="#0C0E1A"/>
     </Group>
-    <!-- Body arc -->
     <Group>
-      <Path data="M -14 24 C -14 12 -9 6 0 6 C 9 6 14 12 14 24"/>
-      <Fill color="#0F172A"/>
-    </Group>
-    <!-- Inner circle ring -->
-    <Group>
-      <Ellipse size="44,44"/>
-      <Stroke color="#0F172A" width="0.8" alpha="0.2"/>
+      <Path data="M -11 20 C -11 10 -7 6 0 6 C 7 6 11 10 11 20"/>
+      <Fill color="#0C0E1A"/>
     </Group>
   </Layer>
 
-  <!-- ==================== 9. Calendar ==================== -->
-  <Layer name="Calendar" x="80" y="416">
-    <!-- Page body -->
+  <!-- 9. Calendar -->
+  <Layer name="Calendar" x="80" y="412">
     <Group>
-      <Rectangle center="0,2" size="36,38" roundness="5"/>
-      <Fill color="#E2E8F0"/>
+      <Rectangle center="0,2" size="30,32" roundness="4"/>
+      <Fill color="#22D3EE"/>
     </Group>
-    <!-- White area -->
     <Group>
-      <Rectangle center="0,8" size="30,24" roundness="2"/>
-      <Fill color="#0F172A"/>
+      <Rectangle center="0,8" size="24,20" roundness="2"/>
+      <Fill color="#0C0E1A"/>
     </Group>
-    <!-- Ring left -->
     <Group>
-      <Rectangle center="-8,-16" size="3,8" roundness="2"/>
-      <Fill color="#E2E8F0"/>
+      <Rectangle center="-7,-14" size="3,7" roundness="2"/>
+      <Fill color="#22D3EE"/>
     </Group>
-    <!-- Ring right -->
     <Group>
-      <Rectangle center="8,-16" size="3,8" roundness="2"/>
-      <Fill color="#E2E8F0"/>
+      <Rectangle center="7,-14" size="3,7" roundness="2"/>
+      <Fill color="#22D3EE"/>
     </Group>
-    <!-- Date number -->
     <Group>
-      <Text text="17" fontFamily="Arial" fontStyle="Bold" fontSize="18" textAnchor="center" position="0,14"/>
-      <Fill color="#E2E8F0"/>
-    </Group>
-    <!-- Grid dots -->
-    <Group>
-      <Ellipse center="-10,2" size="2,2"/>
-      <Ellipse center="-5,2" size="2,2"/>
-      <Ellipse center="0,2" size="2,2"/>
-      <Ellipse center="5,2" size="2,2"/>
-      <Ellipse center="10,2" size="2,2"/>
-      <Fill color="#E2E8F0" alpha="0.2"/>
+      <Text text="17" fontFamily="Arial" fontStyle="Bold" fontSize="14" textAnchor="center" position="0,12"/>
+      <Fill color="#22D3EE"/>
     </Group>
   </Layer>
 
-  <!-- ==================== 10. Lock ==================== -->
-  <Layer name="Lock" x="240" y="416">
-    <!-- Shackle -->
+  <!-- 10. Lock -->
+  <Layer name="Lock" x="240" y="412">
     <Group>
-      <Path data="M -8 -2 L -8 -10 C -8 -18 8 -18 8 -10 L 8 -2"/>
-      <Stroke color="#E2E8F0" width="4" cap="round"/>
+      <Path data="M -7 -1 L -7 -8 C -7 -15 7 -15 7 -8 L 7 -1"/>
+      <Stroke color="#22D3EE" width="3.5" cap="round"/>
     </Group>
-    <!-- Body -->
     <Group>
-      <Rectangle center="0,10" size="26,22" roundness="5"/>
-      <Fill color="#E2E8F0"/>
+      <Rectangle center="0,10" size="22,20" roundness="4"/>
+      <Fill color="#22D3EE"/>
     </Group>
-    <!-- Keyhole circle -->
     <Group>
-      <Ellipse center="0,7" size="8,8"/>
-      <Fill color="#0F172A"/>
+      <Ellipse center="0,8" size="5,5"/>
+      <Fill color="#0C0E1A"/>
     </Group>
-    <!-- Keyhole slot -->
     <Group>
-      <Rectangle center="0,13" size="3,7" roundness="1"/>
-      <Fill color="#0F172A"/>
-    </Group>
-    <!-- Lock surface detail -->
-    <Group>
-      <Rectangle center="0,3" size="20,1"/>
-      <Fill color="#0F172A" alpha="0.12"/>
+      <Rectangle center="0,13" size="2,5" roundness="1"/>
+      <Fill color="#0C0E1A"/>
     </Group>
   </Layer>
 
-  <!-- ==================== 11. Music ==================== -->
-  <Layer name="Music" x="400" y="416">
-    <!-- Note head 1 -->
+  <!-- 11. Music -->
+  <Layer name="Music" x="400" y="412">
     <Group>
-      <Ellipse center="-6,10" size="14,10"/>
-      <Fill color="#E2E8F0"/>
+      <Ellipse center="-5,8" size="12,9"/>
+      <Fill color="#22D3EE"/>
     </Group>
-    <!-- Note head 2 -->
     <Group>
-      <Ellipse center="12,6" size="14,10"/>
-      <Fill color="#E2E8F0"/>
+      <Ellipse center="10,5" size="12,9"/>
+      <Fill color="#22D3EE"/>
     </Group>
-    <!-- Stem 1 -->
     <Group>
-      <Path data="M 1 10 L 1 -14"/>
-      <Stroke color="#E2E8F0" width="3" cap="round"/>
+      <Path data="M 1 8 L 1 -12 L 16 -15 L 16 5"/>
+      <Stroke color="#22D3EE" width="2.5" cap="round" join="round"/>
     </Group>
-    <!-- Stem 2 -->
     <Group>
-      <Path data="M 19 6 L 19 -18"/>
-      <Stroke color="#E2E8F0" width="3" cap="round"/>
-    </Group>
-    <!-- Beam -->
-    <Group>
-      <Path data="M 1 -14 L 19 -18"/>
-      <Stroke color="#E2E8F0" width="3.5" cap="round"/>
-    </Group>
-    <!-- Second beam -->
-    <Group>
-      <Path data="M 1 -9 L 19 -13"/>
-      <Stroke color="#E2E8F0" width="3" cap="round"/>
+      <Path data="M 1 -8 L 16 -11"/>
+      <Stroke color="#22D3EE" width="2.5" cap="round"/>
     </Group>
   </Layer>
 
-  <!-- ==================== 12. Download ==================== -->
-  <Layer name="Download" x="560" y="416">
-    <!-- Cloud body -->
+  <!-- 12. Download -->
+  <Layer name="Download" x="560" y="412">
     <Group>
-      <Path data="M -16 0 C -20 0 -22 -4 -20 -8 C -18 -12 -14 -14 -10 -14 C -8 -19 -3 -22 4 -22 C 12 -22 17 -17 17 -12 C 21 -12 23 -8 21 -4 C 19 0 15 2 10 2 L -12 2 Z"/>
-      <Fill color="#E2E8F0"/>
+      <Path data="M -14 0 C -17 0 -19 -3 -17 -7 C -15 -10 -12 -12 -8 -12 C -7 -16 -3 -18 3 -18 C 10 -18 14 -14 14 -10 C 18 -10 19 -7 18 -3 C 16 0 13 2 9 2 L -10 2 Z"/>
+      <Fill color="#22D3EE"/>
     </Group>
-    <!-- Arrow shaft -->
     <Group>
-      <Path data="M 0 4 L 0 18"/>
-      <Stroke color="#E2E8F0" width="3.5" cap="round"/>
+      <Path data="M 0 4 L 0 14"/>
+      <Stroke color="#22D3EE" width="2.5" cap="round"/>
     </Group>
-    <!-- Arrow head -->
     <Group>
-      <Path data="M -7 13 L 0 20 L 7 13"/>
-      <Stroke color="#E2E8F0" width="3.5" cap="round" join="round"/>
-    </Group>
-    <!-- Cloud detail line -->
-    <Group>
-      <Path data="M -12 -6 C -6 -8 4 -8 10 -6"/>
-      <Stroke color="#0F172A" width="1" cap="round" alpha="0.2"/>
+      <Path data="M -5 11 L 0 16 L 5 11"/>
+      <Stroke color="#22D3EE" width="2.5" cap="round" join="round"/>
     </Group>
   </Layer>
 
   <!-- ==================== Labels ==================== -->
   <Layer name="LabelHome" x="80" y="130">
     <Text text="Home" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
+    <Fill color="#22D3EE" alpha="0.5"/>
   </Layer>
   <Layer name="LabelSearch" x="240" y="130">
     <Text text="Search" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
+    <Fill color="#22D3EE" alpha="0.5"/>
   </Layer>
   <Layer name="LabelBell" x="400" y="130">
     <Text text="Bell" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
+    <Fill color="#22D3EE" alpha="0.5"/>
   </Layer>
   <Layer name="LabelHeart" x="560" y="130">
     <Text text="Heart" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
+    <Fill color="#22D3EE" alpha="0.5"/>
   </Layer>
   <Layer name="LabelChat" x="80" y="300">
     <Text text="Chat" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
+    <Fill color="#22D3EE" alpha="0.5"/>
   </Layer>
   <Layer name="LabelCamera" x="240" y="300">
     <Text text="Camera" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
+    <Fill color="#22D3EE" alpha="0.5"/>
   </Layer>
   <Layer name="LabelSettings" x="400" y="300">
     <Text text="Settings" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
+    <Fill color="#22D3EE" alpha="0.5"/>
   </Layer>
   <Layer name="LabelUser" x="560" y="300">
     <Text text="User" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
+    <Fill color="#22D3EE" alpha="0.5"/>
   </Layer>
   <Layer name="LabelCalendar" x="80" y="468">
     <Text text="Calendar" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
+    <Fill color="#22D3EE" alpha="0.5"/>
   </Layer>
   <Layer name="LabelLock" x="240" y="468">
     <Text text="Lock" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
+    <Fill color="#22D3EE" alpha="0.5"/>
   </Layer>
   <Layer name="LabelMusic" x="400" y="468">
     <Text text="Music" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
+    <Fill color="#22D3EE" alpha="0.5"/>
   </Layer>
   <Layer name="LabelDownload" x="560" y="468">
     <Text text="Download" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#94A3B8"/>
+    <Fill color="#22D3EE" alpha="0.5"/>
   </Layer>
 
 </pagx>
