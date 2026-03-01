@@ -7,40 +7,69 @@
     <Fill color="#111827"/>
   </Layer>
 
-  <!-- Soft ambient glow -->
-  <Layer name="Ambience">
+  <!-- Background: geometric color block mosaic divided by lines -->
+  <Layer name="BgPattern">
+    <!-- Color block regions: irregular polygons with subtle color differences -->
+    <!-- Top-left: violet tint -->
     <Layer>
-      <Ellipse center="100,80" size="380,380"/>
-      <Fill color="#8B5CF6" alpha="0.06"/>
+      <Path data="M 0 0 L 280 0 L 200 180 L 0 220 Z"/>
+      <Fill color="#1E1148"/>
     </Layer>
+    <!-- Top-center: indigo -->
     <Layer>
-      <Ellipse center="540,440" size="340,340"/>
-      <Fill color="#3B82F6" alpha="0.05"/>
+      <Path data="M 280 0 L 520 0 L 480 120 L 200 180 Z"/>
+      <Fill color="#151838"/>
     </Layer>
+    <!-- Top-right: teal -->
     <Layer>
-      <Ellipse center="500,80" size="300,300"/>
-      <Fill color="#06B6D4" alpha="0.04"/>
+      <Path data="M 520 0 L 640 0 L 640 160 L 480 120 Z"/>
+      <Fill color="#0C2235"/>
     </Layer>
+    <!-- Mid-left: purple -->
     <Layer>
-      <Ellipse center="60,420" size="260,260"/>
-      <Fill color="#EC4899" alpha="0.04"/>
+      <Path data="M 0 220 L 200 180 L 160 360 L 0 380 Z"/>
+      <Fill color="#1A1242"/>
     </Layer>
+    <!-- Center: blue-gray -->
     <Layer>
-      <Ellipse center="320,260" size="500,500"/>
-      <Fill color="#6366F1" alpha="0.03"/>
+      <Path data="M 200 180 L 480 120 L 440 320 L 160 360 Z"/>
+      <Fill color="#121C30"/>
     </Layer>
-  </Layer>
+    <!-- Mid-right: deep blue -->
+    <Layer>
+      <Path data="M 480 120 L 640 160 L 640 350 L 440 320 Z"/>
+      <Fill color="#0E2038"/>
+    </Layer>
+    <!-- Bottom-left: magenta tint -->
+    <Layer>
+      <Path data="M 0 380 L 160 360 L 120 520 L 0 520 Z"/>
+      <Fill color="#20123E"/>
+    </Layer>
+    <!-- Bottom-center: navy -->
+    <Layer>
+      <Path data="M 160 360 L 440 320 L 400 520 L 120 520 Z"/>
+      <Fill color="#101A35"/>
+    </Layer>
+    <!-- Bottom-right: ocean -->
+    <Layer>
+      <Path data="M 440 320 L 640 350 L 640 520 L 400 520 Z"/>
+      <Fill color="#0B1D32"/>
+    </Layer>
 
-  <!-- Decorative geometry -->
-  <Layer name="Decor">
+    <!-- Division lines between color blocks -->
     <Layer>
-      <Path data="M 40 172 L 600 172"/>
-      <Stroke color="#6366F1" width="0.5" alpha="0.06"/>
+      <Group>
+        <!-- Horizontal-ish dividers -->
+        <Path data="M 0 220 L 200 180 L 480 120 L 640 160"/>
+        <Path data="M 0 380 L 160 360 L 440 320 L 640 350"/>
+        <!-- Vertical-ish dividers -->
+        <Path data="M 280 0 L 200 180 L 160 360 L 120 520"/>
+        <Path data="M 520 0 L 480 120 L 440 320 L 400 520"/>
+        <Stroke color="#FFFFFF" width="0.5" alpha="0.1"/>
+      </Group>
     </Layer>
-    <Layer>
-      <Path data="M 40 342 L 600 342"/>
-      <Stroke color="#6366F1" width="0.5" alpha="0.06"/>
-    </Layer>
+
+    <!-- Corner brackets -->
     <Layer>
       <Path data="M 20 30 L 20 20 L 30 20"/>
       <Stroke color="#8B5CF6" width="1" cap="round" alpha="0.12"/>
@@ -57,115 +86,98 @@
       <Path data="M 610 500 L 620 500 L 620 490"/>
       <Stroke color="#8B5CF6" width="1" cap="round" alpha="0.12"/>
     </Layer>
-    <Layer>
-      <Ellipse center="570,55" size="100,100"/>
-      <Stroke color="#3B82F6" width="0.5" alpha="0.06"/>
-    </Layer>
-    <Layer>
-      <Ellipse center="70,465" size="80,80"/>
-      <Stroke color="#EC4899" width="0.5" alpha="0.06"/>
-    </Layer>
-    <Layer>
-      <Ellipse center="320,260" size="380,380"/>
-      <TrimPath start="0.1" end="0.25"/>
-      <Stroke color="#6366F1" width="0.5" cap="round" alpha="0.05"/>
-    </Layer>
-    <Layer>
-      <Ellipse center="320,260" size="380,380"/>
-      <TrimPath start="0.6" end="0.75"/>
-      <Stroke color="#6366F1" width="0.5" cap="round" alpha="0.05"/>
-    </Layer>
-    <Layer>
-      <Group position="30,260" rotation="45">
-        <Rectangle size="7,7"/>
-        <Stroke color="#8B5CF6" width="0.8" alpha="0.08"/>
-      </Group>
-    </Layer>
-    <Layer>
-      <Group position="610,260" rotation="45">
-        <Rectangle size="7,7"/>
-        <Stroke color="#8B5CF6" width="0.8" alpha="0.08"/>
-      </Group>
-    </Layer>
-    <Layer>
-      <Group>
-        <Ellipse center="180,18" size="2,2"/>
-        <Ellipse center="460,14" size="2,2"/>
-        <Ellipse center="14,180" size="2,2"/>
-        <Ellipse center="626,350" size="2,2"/>
-        <Ellipse center="300,506" size="2,2"/>
-        <Ellipse center="500,506" size="2,2"/>
-        <Fill color="#8B5CF6" alpha="0.1"/>
-      </Group>
-    </Layer>
   </Layer>
 
-  <!-- ==================== Cards: White with soft shadow ==================== -->
+  <!-- ==================== Cards: Frosted glass ==================== -->
 
   <!-- Row 1 -->
   <Layer name="CardHome" x="80" y="74">
-    <Rectangle size="72,72" roundness="14"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetY="3" blurX="12" blurY="12" color="#00000018"/>
+    <Rectangle size="72,72" roundness="12"/>
+    <Fill color="#FFFFFF" alpha="0.06"/>
+    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
+    <BackgroundBlurStyle blurX="20" blurY="20"/>
+    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
   </Layer>
   <Layer name="CardSearch" x="240" y="74">
-    <Rectangle size="72,72" roundness="14"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetY="3" blurX="12" blurY="12" color="#00000018"/>
+    <Rectangle size="72,72" roundness="12"/>
+    <Fill color="#FFFFFF" alpha="0.06"/>
+    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
+    <BackgroundBlurStyle blurX="20" blurY="20"/>
+    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
   </Layer>
   <Layer name="CardBell" x="400" y="74">
-    <Rectangle size="72,72" roundness="14"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetY="3" blurX="12" blurY="12" color="#00000018"/>
+    <Rectangle size="72,72" roundness="12"/>
+    <Fill color="#FFFFFF" alpha="0.06"/>
+    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
+    <BackgroundBlurStyle blurX="20" blurY="20"/>
+    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
   </Layer>
   <Layer name="CardHeart" x="560" y="74">
-    <Rectangle size="72,72" roundness="14"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetY="3" blurX="12" blurY="12" color="#00000018"/>
+    <Rectangle size="72,72" roundness="12"/>
+    <Fill color="#FFFFFF" alpha="0.06"/>
+    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
+    <BackgroundBlurStyle blurX="20" blurY="20"/>
+    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
   </Layer>
 
   <!-- Row 2 -->
   <Layer name="CardChat" x="80" y="244">
-    <Rectangle size="72,72" roundness="14"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetY="3" blurX="12" blurY="12" color="#00000018"/>
+    <Rectangle size="72,72" roundness="12"/>
+    <Fill color="#FFFFFF" alpha="0.06"/>
+    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
+    <BackgroundBlurStyle blurX="20" blurY="20"/>
+    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
   </Layer>
   <Layer name="CardCamera" x="240" y="244">
-    <Rectangle size="72,72" roundness="14"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetY="3" blurX="12" blurY="12" color="#00000018"/>
+    <Rectangle size="72,72" roundness="12"/>
+    <Fill color="#FFFFFF" alpha="0.06"/>
+    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
+    <BackgroundBlurStyle blurX="20" blurY="20"/>
+    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
   </Layer>
   <Layer name="CardSettings" x="400" y="244">
-    <Rectangle size="72,72" roundness="14"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetY="3" blurX="12" blurY="12" color="#00000018"/>
+    <Rectangle size="72,72" roundness="12"/>
+    <Fill color="#FFFFFF" alpha="0.06"/>
+    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
+    <BackgroundBlurStyle blurX="20" blurY="20"/>
+    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
   </Layer>
   <Layer name="CardUser" x="560" y="244">
-    <Rectangle size="72,72" roundness="14"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetY="3" blurX="12" blurY="12" color="#00000018"/>
+    <Rectangle size="72,72" roundness="12"/>
+    <Fill color="#FFFFFF" alpha="0.06"/>
+    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
+    <BackgroundBlurStyle blurX="20" blurY="20"/>
+    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
   </Layer>
 
   <!-- Row 3 -->
   <Layer name="CardCalendar" x="80" y="412">
-    <Rectangle size="72,72" roundness="14"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetY="3" blurX="12" blurY="12" color="#00000018"/>
+    <Rectangle size="72,72" roundness="12"/>
+    <Fill color="#FFFFFF" alpha="0.06"/>
+    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
+    <BackgroundBlurStyle blurX="20" blurY="20"/>
+    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
   </Layer>
   <Layer name="CardLock" x="240" y="412">
-    <Rectangle size="72,72" roundness="14"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetY="3" blurX="12" blurY="12" color="#00000018"/>
+    <Rectangle size="72,72" roundness="12"/>
+    <Fill color="#FFFFFF" alpha="0.06"/>
+    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
+    <BackgroundBlurStyle blurX="20" blurY="20"/>
+    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
   </Layer>
   <Layer name="CardMusic" x="400" y="412">
-    <Rectangle size="72,72" roundness="14"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetY="3" blurX="12" blurY="12" color="#00000018"/>
+    <Rectangle size="72,72" roundness="12"/>
+    <Fill color="#FFFFFF" alpha="0.06"/>
+    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
+    <BackgroundBlurStyle blurX="20" blurY="20"/>
+    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
   </Layer>
   <Layer name="CardDownload" x="560" y="412">
-    <Rectangle size="72,72" roundness="14"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetY="3" blurX="12" blurY="12" color="#00000018"/>
+    <Rectangle size="72,72" roundness="12"/>
+    <Fill color="#FFFFFF" alpha="0.06"/>
+    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
+    <BackgroundBlurStyle blurX="20" blurY="20"/>
+    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
   </Layer>
 
   <!-- ==================== Icons: Multi-color, centered by bounds ==================== -->
@@ -217,14 +229,14 @@
   <!-- 5. Chat: Emerald #10B981 -->
   <Layer name="Chat" x="80" y="244">
     <Group>
-      <Path data="M -18 -12 C -18 -17 -15 -19 -10 -19 L 10 -19 C 15 -19 18 -17 18 -12 L 18 3 C 18 8 15 10 10 10 L -2 10 L -10 19 L -6 10 L -10 10 C -15 10 -18 8 -18 3 Z"/>
+      <Path data="M -18 -10 C -18 -15 -15 -17 -10 -17 L 10 -17 C 15 -17 18 -15 18 -10 L 18 5 C 18 10 15 12 10 12 L 2 12 L -10 17 L -4 12 L -10 12 C -15 12 -18 10 -18 5 Z"/>
       <Fill color="#10B981"/>
     </Group>
     <Group>
-      <Ellipse center="-7,-5" size="4,4"/>
-      <Ellipse center="0,-5" size="4,4"/>
-      <Ellipse center="7,-5" size="4,4"/>
-      <Fill color="#FFFFFF"/>
+      <Ellipse center="-7,-3" size="4,4"/>
+      <Ellipse center="0,-3" size="4,4"/>
+      <Ellipse center="7,-3" size="4,4"/>
+      <Fill color="#1E2433"/>
     </Group>
   </Layer>
 
@@ -240,7 +252,7 @@
     </Group>
     <Group>
       <Ellipse center="0,2" size="17,17"/>
-      <Fill color="#FFFFFF"/>
+      <Fill color="#1E2433"/>
     </Group>
     <Group>
       <Ellipse center="0,2" size="10,10"/>
@@ -256,7 +268,7 @@
     </Group>
     <Group>
       <Ellipse size="14,14"/>
-      <Fill color="#FFFFFF"/>
+      <Fill color="#1E2433"/>
     </Group>
     <Group>
       <Ellipse size="6,6"/>
@@ -271,12 +283,12 @@
       <Fill color="#06B6D4"/>
     </Group>
     <Group>
-      <Ellipse center="0,-6" size="14,14"/>
-      <Fill color="#FFFFFF"/>
+      <Ellipse center="0,-10" size="12,12"/>
+      <Fill color="#1E2433"/>
     </Group>
     <Group>
-      <Path data="M -13 23 C -13 12 -8 7 0 7 C 8 7 13 12 13 23"/>
-      <Fill color="#FFFFFF"/>
+      <Path data="M -11 19 C -11 8 -7 3 0 3 C 7 3 11 8 11 19"/>
+      <Fill color="#1E2433"/>
     </Group>
   </Layer>
 
@@ -288,7 +300,7 @@
     </Group>
     <Group>
       <Rectangle center="0,7" size="30,26" roundness="3"/>
-      <Fill color="#FFFFFF"/>
+      <Fill color="#1E2433"/>
     </Group>
     <Group>
       <Rectangle center="-9,-16" size="3,9" roundness="2"/>
@@ -316,11 +328,11 @@
     </Group>
     <Group>
       <Ellipse center="0,6" size="7,7"/>
-      <Fill color="#FFFFFF"/>
+      <Fill color="#1E2433"/>
     </Group>
     <Group>
       <Rectangle center="0,12" size="3,6" roundness="1"/>
-      <Fill color="#FFFFFF"/>
+      <Fill color="#1E2433"/>
     </Group>
   </Layer>
 
@@ -347,18 +359,18 @@
   <!-- 12. Download: Blue #3B82F6, smaller arrow -->
   <Layer name="Download" x="560" y="412">
     <Group>
-      <Ellipse center="-1,-10" size="24,22"/>
-      <Ellipse center="-12,-4" size="16,16"/>
-      <Ellipse center="10,-4" size="18,16"/>
-      <Ellipse center="-1,-2" size="34,10"/>
+      <Ellipse center="-1,-7" size="24,22"/>
+      <Ellipse center="-12,-1" size="16,16"/>
+      <Ellipse center="10,-1" size="18,16"/>
+      <Ellipse center="-1,1" size="34,10"/>
       <Fill color="#3B82F6"/>
     </Group>
     <Group>
-      <Path data="M -1 4 L -1 13"/>
+      <Path data="M -1 7 L -1 14"/>
       <Stroke color="#3B82F6" width="3" cap="round"/>
     </Group>
     <Group>
-      <Path data="M -5 11 L -1 16 L 3 11"/>
+      <Path data="M -4 12 L -1 16 L 2 12"/>
       <Stroke color="#3B82F6" width="3" cap="round" join="round"/>
     </Group>
   </Layer>
