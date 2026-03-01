@@ -166,7 +166,7 @@ relative to the Layer origin alongside the icon geometry.
 
 ```xml
 <pagx version="1.0" width="400" height="340">
-  <Layer x="200" y="30">
+  <Layer x="200" y="50">
     <Group>
       <Rectangle size="300,48" roundness="8"/>
       <Fill color="#F1F5F9"/>
@@ -211,32 +211,25 @@ center `y=0`.
 ### Avatar with Circular Mask
 
 ```xml
-<pagx version="1.0" width="80" height="80">
-  <!-- Mask shape (invisible, defines the circular clip) -->
-  <Layer x="40" y="40" id="avatarClip" visible="false">
-    <Ellipse size="64,64"/>
-    <Fill color="#FFF"/>
-  </Layer>
-  <!-- Clipped content -->
-  <Layer x="40" y="40" mask="@avatarClip">
-    <!-- Blue background -->
-    <Ellipse size="64,64"/>
-    <Fill color="#3B82F6"/>
-    <!-- White initial letter -->
-    <Group>
-      <Text text="A" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
-      <Fill color="#FFFFFF"/>
-      <TextBox textAlign="center" paragraphAlign="middle" size="64,64"
-               position="-32,-32"/>
-    </Group>
-  </Layer>
-</pagx>
+<Layer x="50" y="50" id="avatarClip" visible="false">
+  <Ellipse size="64,64"/>
+  <Fill color="#FFF"/>
+</Layer>
+<Layer x="50" y="50" mask="@avatarClip">
+  <Rectangle size="64,64"/>
+  <Fill>
+    <ImagePattern image="@avatar"/>
+  </Fill>
+</Layer>
+
+<Resources>
+  <Image id="avatar" source="avatar.png"/>
+</Resources>
 ```
 
-**Pattern**: Invisible Layer with geometry defines clip shape; content Layer references via
+**Pattern**: Invisible Layer with geometry defines clip shape; image Layer references via
 `mask="@id"`. Use opaque fill in mask layer — `maskType="alpha"` (default) means fully
-opaque = fully visible. This example uses a solid color + text as placeholder content; in
-practice, replace with `<ImagePattern image="@id"/>` referencing an Image resource.
+opaque = fully visible. Rectangle size matches Ellipse size to ensure full coverage.
 
 ---
 
@@ -320,10 +313,11 @@ effect stand out.
 
 ## Charts & Gauges
 
-Chart construction relies on Repeater `rotation` for radial patterns and TrimPath for
-arc control.
+Chart construction relies on TrimPath for arc control and Repeater `rotation` for radial
+patterns. **Key Ellipse knowledge**: Ellipse path starts at 12 o'clock and goes clockwise —
+use Group `rotation` to reposition the start point.
 
-### Circular Gauge (TrimPath + Group rotation)
+### Circular Gauge (TrimPath + Repeater rotation)
 
 ```xml
 <pagx version="1.0" width="200" height="200">
@@ -343,12 +337,18 @@ arc control.
         <Stroke color="#3B82F6" width="10" cap="round"/>
       </Group>
     </Group>
+    <!-- Tick marks: 10 ticks spanning 270 degrees -->
+    <Group rotation="-135">
+      <Rectangle center="0,-85" size="1,6"/>
+      <Fill color="#94A3B8"/>
+      <Repeater copies="10" position="0,0" rotation="30"/>
+    </Group>
     <!-- Center percentage text -->
     <Group>
-      <Text text="67%" fontFamily="Arial" fontStyle="Bold" fontSize="32"/>
+      <Text text="67%" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
       <Fill color="#1E293B"/>
-      <TextBox textAlign="center" paragraphAlign="middle" size="100,40"
-               position="-50,-20"/>
+      <TextBox textAlign="center" paragraphAlign="middle" size="80,36"
+               position="-40,-18"/>
     </Group>
   </Layer>
 </pagx>
@@ -357,38 +357,62 @@ arc control.
 **Pattern**: Ellipse path starts at 12 o'clock and goes clockwise. `TrimPath end="0.75"`
 draws a 270° arc with a 90° gap. The outer Group `rotation="-135"` rotates the arc so the
 gap sits at the bottom (centered at 6 o'clock). The value arc uses the same rotation but a
-smaller `end` to show progress — `end="0.5"` represents 67% of the 270° track. Center text
-uses TextBox for alignment. To add tick marks, use a Repeater with `position="0,0"` and
-`rotation="30"` on thin Rectangles in a separate Group with the same rotation.
+smaller `end` to show progress — `end="0.5"` represents 67% of the 270° track.
 
-### Ring Progress (TrimPath + Gradient)
+Repeater with `rotation="30"` generates evenly spaced tick marks around the arc. **Critical**:
+`position="0,0"` is required because the default `position="100,100"` would offset copies
+off-canvas. The tick Rectangle is offset from center along the Y axis (`center="0,-78"`) so
+rotation fans copies around the origin.
+
+### Donut Chart (Multi-segment TrimPath)
 
 ```xml
 <pagx version="1.0" width="200" height="200">
   <Layer x="100" y="100">
-    <!-- Track -->
+    <!-- Segment 1: 40% (0 to 0.4) -->
     <Group>
       <Ellipse size="140,140"/>
-      <Stroke color="#E2E8F0" width="10"/>
+      <TrimPath end="0.38"/>
+      <Stroke color="#3B82F6" width="20"/>
     </Group>
-    <!-- Fill (75% progress) -->
+    <!-- Segment 2: 30% (0.4 to 0.7) -->
     <Group>
       <Ellipse size="140,140"/>
-      <TrimPath end="0.75"/>
-      <Stroke width="10" cap="round">
-        <LinearGradient startPoint="-70,-70" endPoint="70,70">
-          <ColorStop offset="0" color="#06B6D4"/>
-          <ColorStop offset="1" color="#8B5CF6"/>
-        </LinearGradient>
-      </Stroke>
+      <TrimPath start="0.4" end="0.68"/>
+      <Stroke color="#10B981" width="20"/>
+    </Group>
+    <!-- Segment 3: 20% (0.7 to 0.9) -->
+    <Group>
+      <Ellipse size="140,140"/>
+      <TrimPath start="0.7" end="0.88"/>
+      <Stroke color="#F59E0B" width="20"/>
+    </Group>
+    <!-- Segment 4: 10% (0.9 to 1.0) -->
+    <Group>
+      <Ellipse size="140,140"/>
+      <TrimPath start="0.9" end="0.98"/>
+      <Stroke color="#EF4444" width="20"/>
     </Group>
   </Layer>
 </pagx>
 ```
 
-**Pattern**: Dual-layer ring — full track underneath, trimmed fill on top. TrimPath `end`
-controls progress (0–1). `cap="round"` gives rounded endpoints. Groups isolate the two
-Strokes so TrimPath only affects the fill ring.
+**Pattern**: Multiple Groups each draw one segment of the donut using `TrimPath start/end`.
+Small gaps between segments (e.g., `end="0.38"` instead of `0.4`) create visual separation.
+All Groups share the same Ellipse size so segments align on the same ring. Thick Stroke
+`width` makes the donut visually distinct from a thin ring progress indicator.
+
+**Gradient stroke variant**: for a ring progress indicator with gradient color, apply a
+LinearGradient directly inside the Stroke element:
+
+```xml
+<Stroke width="10" cap="round">
+  <LinearGradient startPoint="-70,-70" endPoint="70,70">
+    <ColorStop offset="0" color="#06B6D4"/>
+    <ColorStop offset="1" color="#8B5CF6"/>
+  </LinearGradient>
+</Stroke>
+```
 
 ### Bar Chart
 
