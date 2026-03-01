@@ -838,6 +838,8 @@ static void OffsetPathData(PathData* source, PathData* target, float offsetX, fl
 static void ApplyLocalizationToElements(PAGXDocument* document,
                                         const std::vector<Element*>& contents, float offsetX,
                                         float offsetY) {
+  // Track already-offset PathData to avoid duplicating shared instances within the same layer.
+  std::unordered_map<const PathData*, PathData*> offsetPathMap = {};
   for (auto* element : contents) {
     auto type = element->nodeType();
     if (type == NodeType::Rectangle) {
@@ -855,9 +857,16 @@ static void ApplyLocalizationToElements(PAGXDocument* document,
     } else if (type == NodeType::Path) {
       auto path = static_cast<Path*>(element);
       if (path->data != nullptr && !path->data->isEmpty()) {
-        auto newData = document->makeNode<PathData>();
-        OffsetPathData(path->data, newData, offsetX, offsetY);
-        path->data = newData;
+        auto it = offsetPathMap.find(path->data);
+        if (it != offsetPathMap.end()) {
+          path->data = it->second;
+        } else {
+          auto* original = path->data;
+          auto newData = document->makeNode<PathData>(original->id);
+          OffsetPathData(original, newData, offsetX, offsetY);
+          offsetPathMap[original] = newData;
+          path->data = newData;
+        }
       }
     } else if (type == NodeType::Text) {
       auto text = static_cast<Text*>(element);
