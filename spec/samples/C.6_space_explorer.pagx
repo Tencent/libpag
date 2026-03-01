@@ -931,14 +931,6 @@
       </Fill>
     </Group>
     <Group>
-      <Path data="M-24 108C-18 112 -8 112 -6 108M14 108C20 112 28 112 30 108"/>
-      <Stroke color="#475569" width="3"/>
-    </Group>
-    <Group>
-      <Path data="M-21 110L-19 110M-16 110L-14 110M-11 110L-9 110M17 110L19 110M21 110L23 110M25 110L27 110"/>
-      <Stroke color="#475569" width="1.5" cap="round"/>
-    </Group>
-    <Group>
       <Path data="M14 92C12 99 12 106 16 109C20 112 28 112 30 109C32 104 24 96 18 92"/>
       <Fill>
         <LinearGradient startPoint="12,92" endPoint="30,109">
@@ -947,6 +939,14 @@
           <ColorStop offset="1" color="#64748B"/>
         </LinearGradient>
       </Fill>
+    </Group>
+    <Group>
+      <Path data="M-24 108C-18 112 -8 112 -6 108M14 108C20 112 28 112 30 108"/>
+      <Stroke color="#475569" width="3"/>
+    </Group>
+    <Group>
+      <Path data="M-21 110L-19 110M-16 110L-14 110M-11 110L-9 110M17 110L19 110M21 110L23 110M25 110L27 110"/>
+      <Stroke color="#475569" width="1.5" cap="round"/>
     </Group>
     <Group>
       <Ellipse center="0,-44" size="54,54"/>
