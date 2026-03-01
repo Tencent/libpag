@@ -240,17 +240,17 @@
   <!-- 9. Calendar: Red #EF4444 -->
   <Layer name="Calendar" x="80" y="412">
     <Group>
-      <Rectangle center="0,4" size="38,38" roundness="6"/>
-      <Rectangle center="-9,-14" size="3,9" roundness="2"/>
-      <Rectangle center="9,-14" size="3,9" roundness="2"/>
+      <Rectangle center="0,2" size="38,38" roundness="6"/>
+      <Rectangle center="-9,-16" size="3,9" roundness="2"/>
+      <Rectangle center="9,-16" size="3,9" roundness="2"/>
       <Fill color="#EF4444"/>
     </Group>
     <Group>
-      <Rectangle center="0,7" size="30,26" roundness="3"/>
+      <Rectangle center="0,6" size="30,22" roundness="3"/>
       <Fill color="#1E2433"/>
     </Group>
     <Group>
-      <Text text="17" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center" position="0,14"/>
+      <Text text="17" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center" position="0,12"/>
       <Fill color="#EF4444"/>
     </Group>
   </Layer>

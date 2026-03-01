@@ -1919,3 +1919,9 @@ An alien planet exploration scene featuring an astronaut surrounded by exotic fl
 
 > [Sample](samples/C.6_space_explorer.pagx)
 
+### C.7 App Icons
+
+A frosted glass app icon grid with 12 multi-color icons on a dark background with soft color fields and backdrop blur cards. Demonstrates BackgroundBlurStyle, DropShadowStyle, BlurFilter, and multi-layer icon construction.
+
+> [Sample](samples/C.7_app_icons.pagx)
+

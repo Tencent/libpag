@@ -1908,3 +1908,15 @@ PAGX 格式能力的综合展示，包括渐变、效果、文本样式和矢量
 
 > [Sample](samples/C.5_pagx_features.pagx)
 
+### C.6 太空探索者
+
+一个外星球探险场景，展示了宇航员周围的奇异植物和大气元素。演示了复杂的图层合成、分层背景效果、程序化生成的草地和角色动画能力。
+
+> [Sample](samples/C.6_space_explorer.pagx)
+
+### C.7 应用图标
+
+一组毛玻璃风格的应用图标网格，包含 12 个多色图标，背景为柔和色场和深色底色。展示了 BackgroundBlurStyle、DropShadowStyle、BlurFilter 和多图层图标构建。
+
+> [Sample](samples/C.7_app_icons.pagx)
+
