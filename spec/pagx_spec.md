@@ -1913,3 +1913,9 @@ A comprehensive showcase of PAGX format capabilities including gradients, effect
 
 > [Sample](samples/C.5_pagx_features.pagx)
 
+### C.6 Space Explorer
+
+An alien planet exploration scene featuring an astronaut surrounded by exotic flora and atmospheric elements. Demonstrates complex composition with layered background effects, procedurally generated grass fields, and character animation capabilities.
+
+> [Sample](samples/C.6_space_explorer.pagx)
+
