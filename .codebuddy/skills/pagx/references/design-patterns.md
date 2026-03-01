@@ -138,7 +138,7 @@ its own Group for painter scope isolation.
 
 ---
 
-## Essential Rules
+## Practical Pitfall Patterns
 
 Supplements `spec-essentials.md` with practical patterns for common pitfalls.
 For required attributes see `attributes.md`; for coordinate localization see
