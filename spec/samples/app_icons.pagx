@@ -7,84 +7,32 @@
     <Fill color="#111827"/>
   </Layer>
 
-  <!-- Background: geometric color block mosaic divided by lines -->
+  <!-- Background: soft color fields -->
   <Layer name="BgPattern">
-    <!-- Color block regions: irregular polygons with subtle color differences -->
-    <!-- Top-left: violet tint -->
     <Layer>
-      <Path data="M 0 0 L 280 0 L 200 180 L 0 220 Z"/>
-      <Fill color="#1E1148"/>
-    </Layer>
-    <!-- Top-center: indigo -->
-    <Layer>
-      <Path data="M 280 0 L 520 0 L 480 120 L 200 180 Z"/>
-      <Fill color="#151838"/>
-    </Layer>
-    <!-- Top-right: teal -->
-    <Layer>
-      <Path data="M 520 0 L 640 0 L 640 160 L 480 120 Z"/>
-      <Fill color="#0C2235"/>
-    </Layer>
-    <!-- Mid-left: purple -->
-    <Layer>
-      <Path data="M 0 220 L 200 180 L 160 360 L 0 380 Z"/>
-      <Fill color="#1A1242"/>
-    </Layer>
-    <!-- Center: blue-gray -->
-    <Layer>
-      <Path data="M 200 180 L 480 120 L 440 320 L 160 360 Z"/>
-      <Fill color="#121C30"/>
-    </Layer>
-    <!-- Mid-right: deep blue -->
-    <Layer>
-      <Path data="M 480 120 L 640 160 L 640 350 L 440 320 Z"/>
-      <Fill color="#0E2038"/>
-    </Layer>
-    <!-- Bottom-left: magenta tint -->
-    <Layer>
-      <Path data="M 0 380 L 160 360 L 120 520 L 0 520 Z"/>
-      <Fill color="#20123E"/>
-    </Layer>
-    <!-- Bottom-center: navy -->
-    <Layer>
-      <Path data="M 160 360 L 440 320 L 400 520 L 120 520 Z"/>
-      <Fill color="#101A35"/>
-    </Layer>
-    <!-- Bottom-right: ocean -->
-    <Layer>
-      <Path data="M 440 320 L 640 350 L 640 520 L 400 520 Z"/>
-      <Fill color="#0B1D32"/>
-    </Layer>
-
-    <!-- Division lines between color blocks -->
-    <Layer>
-      <Group>
-        <!-- Horizontal-ish dividers -->
-        <Path data="M 0 220 L 200 180 L 480 120 L 640 160"/>
-        <Path data="M 0 380 L 160 360 L 440 320 L 640 350"/>
-        <!-- Vertical-ish dividers -->
-        <Path data="M 280 0 L 200 180 L 160 360 L 120 520"/>
-        <Path data="M 520 0 L 480 120 L 440 320 L 400 520"/>
-        <Stroke color="#FFFFFF" width="0.5" alpha="0.1"/>
-      </Group>
-    </Layer>
-
-    <!-- Corner brackets -->
-    <Layer>
-      <Path data="M 20 30 L 20 20 L 30 20"/>
-      <Stroke color="#8B5CF6" width="1" cap="round" alpha="0.12"/>
+      <Ellipse center="60,60" size="320,320"/>
+      <Fill color="#8B5CF6" alpha="0.2"/>
+      <BlurFilter blurX="50" blurY="50"/>
     </Layer>
     <Layer>
-      <Path data="M 610 20 L 620 20 L 620 30"/>
-      <Stroke color="#8B5CF6" width="1" cap="round" alpha="0.12"/>
+      <Ellipse center="560,80" size="280,280"/>
+      <Fill color="#06B6D4" alpha="0.18"/>
+      <BlurFilter blurX="50" blurY="50"/>
     </Layer>
     <Layer>
-      <Path data="M 20 490 L 20 500 L 30 500"/>
-      <Stroke color="#8B5CF6" width="1" cap="round" alpha="0.12"/>
+      <Ellipse center="600,380" size="260,260"/>
+      <Fill color="#3B82F6" alpha="0.16"/>
+      <BlurFilter blurX="50" blurY="50"/>
     </Layer>
     <Layer>
-      <Path data="M 610 500 L 620 500 L 620 490"/>
-      <Stroke color="#8B5CF6" width="1" cap="round" alpha="0.12"/>
+      <Ellipse center="80,480" size="300,300"/>
+      <Fill color="#EC4899" alpha="0.18"/>
+      <BlurFilter blurX="50" blurY="50"/>
+    </Layer>
+    <Layer>
+      <Ellipse center="320,260" size="200,200"/>
+      <Fill color="#10B981" alpha="0.1"/>
+      <BlurFilter blurX="40" blurY="40"/>
     </Layer>
   </Layer>
 
@@ -209,11 +157,11 @@
       <Fill color="#FBBF24"/>
     </Group>
     <Group>
-      <Path data="M 0 -18 L 0 -14"/>
+      <Path data="M 0 -18 L 0 -12"/>
       <Stroke color="#FBBF24" width="2.5" cap="round"/>
     </Group>
     <Group>
-      <Ellipse center="0,17" size="8,5"/>
+      <Ellipse center="0,16" size="8,5"/>
       <Fill color="#FBBF24"/>
     </Group>
   </Layer>
@@ -244,10 +192,7 @@
   <Layer name="Camera" x="240" y="244">
     <Group>
       <Rectangle center="0,2" size="38,26" roundness="5"/>
-      <Fill color="#6366F1"/>
-    </Group>
-    <Group>
-      <Path data="M -7 -11 L -4 -16 L 4 -16 L 7 -11"/>
+      <Path data="M -7 -9 L -4 -16 L 4 -16 L 7 -9"/>
       <Fill color="#6366F1"/>
     </Group>
     <Group>
@@ -263,7 +208,7 @@
   <!-- 7. Settings: Violet #8B5CF6 -->
   <Layer name="Settings" x="400" y="244">
     <Group>
-      <Polystar type="star" pointCount="8" outerRadius="24" innerRadius="18" rotation="22"/>
+      <Path data="M -2.8 -19.8 L 2.8 -19.8 L 3.5 -13.6 L 7.1 -12.1 L 12 -16 L 16 -12 L 12.1 -7.1 L 13.6 -3.5 L 19.8 -2.8 L 19.8 2.8 L 13.6 3.5 L 12.1 7.1 L 16 12 L 12 16 L 7.1 12.1 L 3.5 13.6 L 2.8 19.8 L -2.8 19.8 L -3.5 13.6 L -7.1 12.1 L -12 16 L -16 12 L -12.1 7.1 L -13.6 3.5 L -19.8 2.8 L -19.8 -2.8 L -13.6 -3.5 L -12.1 -7.1 L -16 -12 L -12 -16 L -7.1 -12.1 L -3.5 -13.6 Z"/>
       <Fill color="#8B5CF6"/>
     </Group>
     <Group>
@@ -271,7 +216,7 @@
       <Fill color="#1E2433"/>
     </Group>
     <Group>
-      <Ellipse size="6,6"/>
+      <Ellipse size="5,5"/>
       <Fill color="#8B5CF6"/>
     </Group>
   </Layer>
@@ -283,32 +228,26 @@
       <Fill color="#06B6D4"/>
     </Group>
     <Group>
-      <Ellipse center="0,-10" size="12,12"/>
+      <Ellipse center="0,-11" size="12,12"/>
       <Fill color="#1E2433"/>
     </Group>
     <Group>
-      <Path data="M -11 19 C -11 8 -7 3 0 3 C 7 3 11 8 11 19"/>
+      <Path data="M -11 16 C -11 4 -7 -2 0 -2 C 7 -2 11 4 11 16"/>
       <Fill color="#1E2433"/>
     </Group>
   </Layer>
 
-  <!-- 9. Calendar: Red #EF4444, front panel top margin enlarged -->
+  <!-- 9. Calendar: Red #EF4444 -->
   <Layer name="Calendar" x="80" y="412">
     <Group>
-      <Rectangle center="0,3" size="38,40" roundness="6"/>
+      <Rectangle center="0,4" size="38,38" roundness="6"/>
+      <Rectangle center="-9,-14" size="3,9" roundness="2"/>
+      <Rectangle center="9,-14" size="3,9" roundness="2"/>
       <Fill color="#EF4444"/>
     </Group>
     <Group>
       <Rectangle center="0,7" size="30,26" roundness="3"/>
       <Fill color="#1E2433"/>
-    </Group>
-    <Group>
-      <Rectangle center="-9,-16" size="3,9" roundness="2"/>
-      <Fill color="#EF4444"/>
-    </Group>
-    <Group>
-      <Rectangle center="9,-16" size="3,9" roundness="2"/>
-      <Fill color="#EF4444"/>
     </Group>
     <Group>
       <Text text="17" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center" position="0,14"/>
@@ -328,9 +267,6 @@
     </Group>
     <Group>
       <Ellipse center="0,6" size="7,7"/>
-      <Fill color="#1E2433"/>
-    </Group>
-    <Group>
       <Rectangle center="0,12" size="3,6" roundness="1"/>
       <Fill color="#1E2433"/>
     </Group>
@@ -340,23 +276,17 @@
   <Layer name="Music" x="400" y="412">
     <Group>
       <Path data="M -11 10 L -11 -13 L 9 -18 L 9 5"/>
+      <Path data="M -11 -8 L 9 -13"/>
       <Stroke color="#EC4899" width="3.5" cap="round" join="round"/>
     </Group>
     <Group>
-      <Path data="M -11 -8 L 9 -13"/>
-      <Stroke color="#EC4899" width="3.5" cap="round"/>
-    </Group>
-    <Group>
       <Ellipse center="-10,14" size="15,11"/>
-      <Fill color="#EC4899"/>
-    </Group>
-    <Group>
       <Ellipse center="10,9" size="15,11"/>
       <Fill color="#EC4899"/>
     </Group>
   </Layer>
 
-  <!-- 12. Download: Blue #3B82F6, smaller arrow -->
+  <!-- 12. Download: Blue #3B82F6 -->
   <Layer name="Download" x="560" y="412">
     <Group>
       <Ellipse center="-1,-7" size="24,22"/>
@@ -367,9 +297,6 @@
     </Group>
     <Group>
       <Path data="M -1 7 L -1 14"/>
-      <Stroke color="#3B82F6" width="3" cap="round"/>
-    </Group>
-    <Group>
       <Path data="M -4 12 L -1 16 L 2 12"/>
       <Stroke color="#3B82F6" width="3" cap="round" join="round"/>
     </Group>
