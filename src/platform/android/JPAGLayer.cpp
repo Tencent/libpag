@@ -71,12 +71,19 @@ PAG_API jstring Java_org_libpag_PAGLayer_layerName(JNIEnv* env, jobject thiz) {
 
 PAG_API void Java_org_libpag_PAGLayer_matrix(JNIEnv* env, jobject thiz, jfloatArray matrixObject) {
   auto pagLayer = GetPAGLayer(env, thiz);
-  if (pagLayer == nullptr) {
+  if (pagLayer == nullptr || matrixObject == nullptr) {
     return;
   }
 
-  auto matrix = pagLayer->matrix();
   auto matrixArray = env->GetFloatArrayElements(matrixObject, nullptr);
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    return;
+  }
+  if (matrixArray == nullptr) {
+    return;
+  }
+  auto matrix = pagLayer->matrix();
   matrix.get9(matrixArray);
   env->ReleaseFloatArrayElements(matrixObject, matrixArray, 0);
 }
@@ -84,7 +91,7 @@ PAG_API void Java_org_libpag_PAGLayer_matrix(JNIEnv* env, jobject thiz, jfloatAr
 PAG_API void Java_org_libpag_PAGLayer_setMatrix(JNIEnv* env, jobject thiz,
                                                 jfloatArray matrixObject) {
   auto pagLayer = GetPAGLayer(env, thiz);
-  if (pagLayer == nullptr) {
+  if (pagLayer == nullptr || matrixObject == nullptr) {
     return;
   }
 
@@ -93,8 +100,15 @@ PAG_API void Java_org_libpag_PAGLayer_setMatrix(JNIEnv* env, jobject thiz,
     return;
   }
 
-  Matrix matrix = {};
   auto matrixArray = env->GetFloatArrayElements(matrixObject, nullptr);
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    return;
+  }
+  if (matrixArray == nullptr) {
+    return;
+  }
+  Matrix matrix = {};
   matrix.set9(matrixArray);
   pagLayer->setMatrix(matrix);
   env->ReleaseFloatArrayElements(matrixObject, matrixArray, 0);
@@ -112,12 +126,19 @@ PAG_API void Java_org_libpag_PAGLayer_resetMatrix(JNIEnv* env, jobject thiz) {
 PAG_API void Java_org_libpag_PAGLayer_getTotalMatrix(JNIEnv* env, jobject thiz,
                                                      jfloatArray matrixObject) {
   auto pagLayer = GetPAGLayer(env, thiz);
-  if (pagLayer == nullptr) {
+  if (pagLayer == nullptr || matrixObject == nullptr) {
     return;
   }
 
-  Matrix matrix = pagLayer->getTotalMatrix();
   auto matrixArray = env->GetFloatArrayElements(matrixObject, nullptr);
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    return;
+  }
+  if (matrixArray == nullptr) {
+    return;
+  }
+  Matrix matrix = pagLayer->getTotalMatrix();
   matrix.get9(matrixArray);
   env->ReleaseFloatArrayElements(matrixObject, matrixArray, 0);
 }
