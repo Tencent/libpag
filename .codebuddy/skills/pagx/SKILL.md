@@ -43,6 +43,6 @@ generation or optimization task.
 | Reference | Content |
 |-----------|--------|
 | `spec-essentials.md` | Node types, Layer rendering pipeline, painter scope, text system, masking, resources |
-| `design-patterns.md` | Structure decisions (Layer vs Group), text layout patterns, essential rules |
+| `design-patterns.md` | Structure decisions (Layer vs Group), text layout patterns, practical pitfall patterns |
 | `attributes.md` | Attribute defaults, enumerations, required attributes |
 | `cli.md` | CLI commands — `render`, `validate`, `optimize`, `format`, `bounds`, `font info`, `font embed` |

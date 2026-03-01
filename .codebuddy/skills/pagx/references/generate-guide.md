@@ -11,7 +11,7 @@ Read before starting generation:
 | Reference | Content |
 |-----------|---------|
 | `spec-essentials.md` | Format specification — node types, processing model, attribute rules |
-| `design-patterns.md` | Structure decisions, text layout, essential rules |
+| `design-patterns.md` | Structure decisions, text layout, practical pitfall patterns |
 
 Read these as needed:
 
@@ -100,9 +100,8 @@ or text baseline differences. Measure first, then adjust — never skip this ste
 
 ### Step 4: Localize Coordinates
 
-- Layer `x`/`y` carries the block offset. Internal coordinates start from `0,0`.
-- For Text + TextBox: use TextBox `position` relative to Layer origin (ignore Text position).
-- For geometry: `center` is relative to Layer origin.
+Layer `x`/`y` carries the block offset; internal coordinates start from `0,0`. See
+`optimize-guide.md` §Coordinate Localization for the full conversion procedure.
 
 ### Step 5: Verify and Refine
 

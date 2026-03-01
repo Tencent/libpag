@@ -252,7 +252,7 @@ often combine Polystar with gradients and layer styles for depth.
 **Pattern**: MergePath merges all accumulated geometry into one path, then **clears all
 previously rendered Fill/Stroke** in the current scope. Place all boolean-participating
 geometry before MergePath, then apply painters after. If other content must survive the
-merge, isolate it in a separate Group — see `design-patterns.md` §7 for details.
+merge, isolate it in a separate Group — see `spec-essentials.md` §4 MergePath for details.
 
 ### Star Badge (Polystar + RadialGradient)
 

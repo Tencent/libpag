@@ -1,7 +1,7 @@
 # PAGX Design Patterns
 
 Shared practical knowledge for both generation and optimization — structure decisions,
-text layout patterns, and essential rules.
+text layout patterns, and practical pitfall patterns.
 
 ---
 
@@ -140,27 +140,15 @@ its own Group for painter scope isolation.
 
 ## Essential Rules
 
-### 1. Root-Level Containment
+Supplements `spec-essentials.md` with practical patterns for common pitfalls.
+For required attributes see `attributes.md`; for coordinate localization see
+`optimize-guide.md` §Coordinate Localization.
 
-Direct children of `<pagx>` and `<Composition>` must be `<Layer>`. Groups at root level cause
-a parse error.
+### 1. Painter Scope Isolation
 
-```xml
-<pagx width="800" height="600">
-  <Layer>
-    <Rectangle size="800,600"/>
-    <Fill color="#FFF"/>
-  </Layer>
-</pagx>
-```
-
-### 2. Missing Painter Scope Isolation
-
-A painter renders **all geometry accumulated in the current scope**. When different geometry
-elements need different painters, isolate them in separate Groups:
+When different geometry needs different painters, isolate in separate Groups:
 
 ```xml
-<!-- Both Fill and Stroke apply to ALL geometry in the same scope — use Groups to isolate -->
 <Layer>
   <Group>
     <Rectangle size="100,100"/>
@@ -173,57 +161,20 @@ elements need different painters, isolate them in separate Groups:
 </Layer>
 ```
 
-### 3. TextBox Layout Rules
+### 2. TextBox Layout Rules
 
-When TextBox controls layout, it overrides Text's `position` and `textAnchor` — do not set
-these on Text. Only set layout attributes on TextBox:
+Do not set `position` or `textAnchor` on Text when TextBox is present — TextBox overrides
+them. Additional behaviors beyond what `spec-essentials.md` §7 covers:
 
-```xml
-<Text text="Hello" fontFamily="Arial" fontSize="24"/>
-<Fill color="#000"/>
-<TextBox position="0,0" size="300,100" textAlign="center"/>
-```
-
-**Additional TextBox behaviors**:
 - TextBox is a **pre-layout-only** node — it disappears from the render tree after typesetting.
 - `overflow="hidden"` discards **entire lines/columns**, not partial content. Unlike CSS
   pixel-level clipping, it drops any line whose baseline exceeds the box boundary.
 - `lineHeight=0` (auto) calculates from font metrics (`ascent + descent + leading`), not
   from `fontSize`.
 
-### 4. Omitting Required Attributes
+### 3. Modifier Scope Isolation
 
-These **commonly encountered** attributes have **no default** — omitting them causes parse
-errors. This is a subset; for the **complete list** (16 elements), see `attributes.md`.
-
-| Element | Required Attributes |
-|---------|---------------------|
-| `LinearGradient` | `startPoint`, `endPoint` |
-| `RadialGradient` | `radius` |
-| `DiamondGradient` | `radius` |
-| `ColorStop` | `offset`, `color` |
-| `BlendFilter` | `color` |
-| `ColorMatrixFilter` | `matrix` |
-| `Path` | `data` |
-| `Image` | `source` |
-| `pagx` | `version`, `width`, `height` |
-
-### 5. Layer-Relative Coordinates
-
-Layer `x`/`y` carries the block offset. Internal coordinates are relative to the Layer's
-origin (0,0):
-
-```xml
-<Layer x="200" y="100">
-  <Rectangle center="50,50" size="100,100"/>
-  <Fill color="#F00"/>
-</Layer>
-```
-
-### 6. Modifier Scope Isolation
-
-Shape modifiers (TrimPath, RoundCorner, MergePath) affect all Paths in the current scope.
-When only one Path needs a modifier, isolate it in its own Group:
+When only one Path needs a shape modifier, isolate it in its own Group:
 
 ```xml
 <Group>
@@ -237,30 +188,9 @@ When only one Path needs a modifier, isolate it in its own Group:
 </Group>
 ```
 
-### 7. MergePath Clears Previously Rendered Styles
+### 4. Fill + Stroke on Same Geometry
 
-MergePath merges all accumulated Paths into one, but also **clears all previously rendered
-Fill and Stroke effects** in the current scope. Always isolate geometry + painters that must
-survive into a separate Group before the MergePath scope:
-
-```xml
-<Group>
-  <Rectangle size="100,50"/>
-  <Fill color="#F00"/>           <!-- survives: separate scope -->
-</Group>
-<Group>
-  <Ellipse size="60,60"/>
-  <Rectangle size="40,40"/>
-  <MergePath mode="difference"/>  <!-- clears only this scope -->
-  <Fill color="#00F"/>
-</Group>
-```
-
-### 8. Fill + Stroke on Same Geometry
-
-Painters render all accumulated geometry without clearing it. A single geometry element can
-have multiple Fill and Stroke painters — they render in document order (earlier = below).
-Declare the geometry once with both painters in one Group:
+Declare geometry once with both painters in one Group — painters do not clear geometry:
 
 ```xml
 <Group>

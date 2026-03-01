@@ -10,7 +10,7 @@ Read before starting optimization:
 | Reference | Content |
 |-----------|---------|
 | `spec-essentials.md` | Format specification — node types, processing model, attribute rules |
-| `design-patterns.md` | Structure decisions, text layout, essential rules |
+| `design-patterns.md` | Structure decisions, text layout, practical pitfall patterns |
 
 Read as needed:
 
@@ -74,21 +74,16 @@ After all optimizations, verify the following:
 - [ ] All `<pagx>`/`<Composition>` direct children are `<Layer>` — not Group
 - [ ] All required attributes present; no redundant default-value attributes
   (`attributes.md`)
-- [ ] Painter scope isolation correct — different painters in Groups, same painters shared
-  (see **Painter Merging § Scope Isolation Caveats** below)
-- [ ] Text `position`/`textAnchor` not set when TextBox is present
-- [ ] Internal coordinates relative to Layer origin, not canvas-absolute
-  (see **Coordinate Localization** below)
+- [ ] Painter scope isolation correct (`design-patterns.md` §1)
+- [ ] Text `position`/`textAnchor` not set when TextBox is present (`design-patterns.md` §2)
+- [ ] Internal coordinates relative to Layer origin (see **Coordinate Localization** below)
 - [ ] `<Resources>` placed after all Layers; all `@id` references resolve
 - [ ] Repeater copies reasonable (~200 single, ~500 nested product)
-- [ ] Visual stacking order preserved
-  (see **Layer/Group Optimization § Stacking Order** below)
+- [ ] Visual stacking order preserved (see **Stacking Order** below)
 - [ ] Rendered screenshot matches expected design (layout, alignment, consistent spacing)
   (use the Verification and Correction Loop in `generate-guide.md` for the full methodology)
 
-> **Stacking order caveat**: When downgrading child Layers to Groups, Layer contents (Groups,
-> geometry) always render below child Layers regardless of XML order. Partial downgrade can
-> break stacking — either downgrade all qualifying siblings or none.
+> **Stacking order caveat**: see §Stacking Order and the All-or-Nothing Rule below.
 
 ---
 
@@ -437,7 +432,7 @@ Painter rendering order follows document order (earlier = below). Maintain origi
 ### Scope Isolation Caveats
 
 **Most common source of errors.** After merging, different painters on different geometry
-**must** be isolated with Groups (see `design-patterns.md` §2 Painter Scope Isolation).
+**must** be isolated with Groups (see `design-patterns.md` §1 Painter Scope Isolation).
 
 Before merging, verify:
 
@@ -486,22 +481,9 @@ DropShadowStyle computes shadow from the entire Layer's opaque content (includin
 
 ### Default Attribute Values
 
-The exporter automatically omits defaults. For the complete list of default values by element,
-see `attributes.md`. Key non-obvious defaults to watch for:
-
-| Element | Attribute | Default | Common Misconception |
-|---------|-----------|---------|---------------------|
-| **Repeater** | `position` | `100,100` | Often assumed `0,0` |
-| **Repeater** | `copies` | `3` | Often assumed `1` |
-| **Rectangle/Ellipse** | `size` | `100,100` | May forget there is a default |
-| **Polystar** | `type` | `star` | May assume `polygon` |
-| **TextBox** | `lineHeight` | `0` (auto) | Often assumed non-zero pixel value |
-| **RoundCorner** | `radius` | `10` | Often assumed `0` |
-| **Stroke** | `miterLimit` | `4` | Often assumed `10` (SVG) |
-
-Required attributes that look optional (omitting causes parse errors): LinearGradient
-`startPoint`/`endPoint`, ColorStop `offset`/`color`. See `attributes.md` for the
-complete list.
+The exporter automatically omits defaults. See `attributes.md` §Non-Obvious Defaults for
+counter-intuitive defaults (Repeater `position="100,100"`, `copies="3"`, etc.) and
+§Required Attributes for attributes that cause parse errors when omitted.
 
 ### Writing Clean Attributes
 
