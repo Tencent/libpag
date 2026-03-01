@@ -22,7 +22,7 @@
     </Layer>
 
     <!-- Hex Grid Pattern (3 sets of parallel lines forming hexagonal grid) -->
-    <Layer alpha="0.15" scrollRect="0,0,800,600">
+    <Layer alpha="0.15">
       <!-- Horizontal lines -->
       <Rectangle center="400,0" size="800,1"/>
       <Repeater copies="35" position="0,17"/>

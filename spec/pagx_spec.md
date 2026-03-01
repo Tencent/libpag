@@ -268,6 +268,8 @@ PAGX uses a standard 2D Cartesian coordinate system:
 | `width` | float | (required) | Canvas width |
 | `height` | float | (required) | Canvas height |
 
+**Canvas Clipping**: The canvas defined by `width` and `height` acts as the rendering boundary. Any content extending beyond the canvas area is clipped and not rendered.
+
 **Layer Rendering Order**: Layers are rendered sequentially in document order; layers earlier in the document render first (below); later layers render last (above).
 
 ### 3.3 Resources

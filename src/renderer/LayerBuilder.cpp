@@ -142,6 +142,8 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::Layer> build(const PAGXDocument& document) {
     // Build layer tree.
     auto rootLayer = tgfx::Layer::Make();
+    // Apply canvas clipping: the root layer clips to the canvas dimensions.
+    rootLayer->setScrollRect(tgfx::Rect::MakeWH(document.width, document.height));
     for (const auto& layer : document.layers) {
       auto childLayer = convertLayer(layer);
       if (childLayer) {
