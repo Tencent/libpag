@@ -11,8 +11,7 @@ as defaults.
 
 ## Icons
 
-Icon-specific structure and pitfalls. Icons communicate through shape and silhouette, not
-fine detail — when in doubt, simplify.
+Icon-specific structural patterns.
 
 ### Background + Foreground (Stroke)
 
@@ -86,13 +85,6 @@ For icons with visible depth:
 
 **Pattern**: Three concentric layers, all sharing `x`/`y`. Middle layer creates depth with
 just a second fill color — no additional rendering technique needed.
-
-### Icon Checks
-
-- **Foreground containment**: Verify via `pagx bounds` that foreground fits within background
-  with adequate padding on all sides.
-- **Batch consistency**: When generating a set, all icons should have similar overall bounds.
-  An outlier breaks visual consistency.
 
 ---
 
@@ -542,23 +534,3 @@ Resource Reuse for coordinate conversion details and gradient handling.
 below this Layer), clipped by the Layer's opaque content. A semi-transparent Fill lets the
 blurred background show through. This Layer must have content below it to blur — placing it
 on an empty background produces no visible effect.
-
----
-
-## Common Pitfalls
-
-Mistakes that apply across all scenes. For detailed wrong/correct patterns with code examples,
-see `design-patterns.md` §Common Mistakes.
-
-- **Over-detailing icons**: Small dots, thin trend lines, tiny arrows, text labels inside
-  icons — all become noise at icon scale. Icons communicate through shape and silhouette.
-- **Path complexity mismatch**: A filled Path with >15 curve segments is fragile. Simplify
-  to essential silhouette, switch from Fill to Stroke, or compose from primitives.
-- **MergePath scope surprise**: MergePath clears all previously rendered Fill/Stroke in its
-  scope (`design-patterns.md` §7).
-- **Gradient coordinate confusion**: Gradient coordinates are relative to the geometry
-  element's local origin, not canvas-absolute (`design-patterns.md` §5).
-- **Repeater element explosion**: Nested Repeaters multiply — `copies="50"` × `copies="50"`
-  = 2500 elements. Keep single Repeater under ~200 copies, nested products under ~500.
-- **Text position with TextBox**: TextBox overrides Text's `position` and `textAnchor` —
-  do not set these on Text when using TextBox (`design-patterns.md` §3).

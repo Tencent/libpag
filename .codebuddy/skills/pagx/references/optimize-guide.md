@@ -10,7 +10,7 @@ Read before starting optimization:
 | Reference | Content |
 |-----------|---------|
 | `spec-essentials.md` | Format specification — node types, processing model, attribute rules |
-| `design-patterns.md` | Structure decisions, text layout, common mistakes |
+| `design-patterns.md` | Structure decisions, text layout, essential rules |
 
 Read as needed:
 
@@ -332,8 +332,9 @@ geometry elements using identical painters can share a single painter declaratio
 
 ### Path Merging — Multi-M Subpaths
 
-**Auto-apply**. Multiple Paths with identical painters (not expressible as Rectangle/Ellipse)
-→ concatenate into a single multi-M Path.
+**Auto-apply** — when Groups are **adjacent siblings** (no elements between them). Multiple
+Paths with identical painters (not expressible as Rectangle/Ellipse) → concatenate into a
+single multi-M Path.
 
 ```xml
 <!-- Before: two Groups, each with Path + same Fill -->
@@ -355,8 +356,9 @@ geometry elements using identical painters can share a single painter declaratio
 
 ### Shape Merging — Multiple Primitives Sharing Painters
 
-**Auto-apply**. Multiple Ellipses or Rectangles with identical painters → place in the same
-scope sharing a single Fill / Stroke.
+**Auto-apply** — when Groups are **adjacent siblings** (no elements between them). Multiple
+Ellipses or Rectangles with identical painters → place in the same scope sharing a single
+Fill / Stroke.
 
 ```xml
 <!-- Before -->
@@ -435,26 +437,32 @@ Painter rendering order follows document order (earlier = below). Maintain origi
 ### Scope Isolation Caveats
 
 **Most common source of errors.** After merging, different painters on different geometry
-**must** be isolated with Groups (see `design-patterns.md` §2 for the wrong/correct pattern).
+**must** be isolated with Groups (see `design-patterns.md` §2 Painter Scope Isolation).
 
 Before merging, verify:
 
 1. **Identical painter sets**: Only geometry with the same painter configuration can share scope.
 2. **No modifiers between geometry**: If a Group contains modifiers (TrimPath, RoundCorner,
    MergePath, etc.) between geometry and painter, do not merge — merging expands modifier scope.
+3. **Adjacency**: Only merge Groups that are **direct siblings with no other elements between
+   them**. Groups separated by other Groups, geometry, or painters must not be merged — the
+   intervening elements would be lost or reordered. When non-adjacent Groups share identical
+   painters, leave them as-is.
 
 ```xml
-<!-- CANNOT merge: TrimPath scope would change -->
+<!-- These two arms share identical Stroke, but CANNOT merge — shoulder joint in between -->
 <Group>
-  <Path data="M 0 0 L 100 100"/>
-  <TrimPath end="0.5"/>
-  <Fill color="#F00"/>
+  <Path data="M-22 -12C-30 -15 -38 -20 -44 -26"/>
+  <Stroke color="#CBD5E1" width="14" cap="round"/>
 </Group>
 <Group>
-  <Path data="M 200 0 L 300 100"/>
-  <Fill color="#F00"/>
+  <Ellipse center="-46,-45" size="16,18"/>
+  <Fill color="#94A3B8"/>
 </Group>
-<!-- If merged, TrimPath would apply to BOTH Paths — wrong. -->
+<Group>
+  <Path data="M22 -12C32 -5 40 12 44 28"/>
+  <Stroke color="#CBD5E1" width="14" cap="round"/>
+</Group>
 ```
 
 ### DropShadowStyle Scope

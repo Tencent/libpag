@@ -1,7 +1,7 @@
 # PAGX Design Patterns
 
 Shared practical knowledge for both generation and optimization — structure decisions,
-text layout patterns, and common mistakes with corrections.
+text layout patterns, and essential rules.
 
 ---
 
@@ -20,6 +20,20 @@ complex paths (>15 curve segments) are fragile. Prefer Rectangle/Ellipse for sta
 
 **Mixed**: Fill for backgrounds/large areas + Stroke for details/outlines. A common and
 effective combination.
+
+### Icon Design Guidelines
+
+- **Foreground proportions**: Icon foreground should approximate a square bounding box (aspect
+  ratio within ~1.2:1). Elongated shapes (tall-thin pencils, wide-flat progress bars) feel
+  unbalanced at icon scale. When the natural shape is non-square, add supporting elements
+  (e.g., a paper sheet beneath a pencil) to fill the bounding square.
+- **Foreground containment**: Verify via `pagx bounds` that foreground fits within background
+  with adequate padding on all sides.
+- **Batch consistency**: When generating a set, all icons should have similar overall bounds.
+  An outlier breaks visual consistency.
+- **Over-detailing**: Small dots, thin trend lines, tiny arrows, text labels inside icons —
+  all become noise at icon scale. Icons communicate through shape and silhouette, not fine
+  detail. When in doubt, remove it.
 
 ### Layer Count
 
@@ -124,20 +138,14 @@ its own Group for painter scope isolation.
 
 ---
 
-## Common Mistakes to Avoid
+## Essential Rules
 
-### 1. Group as Direct Child of pagx
+### 1. Root-Level Containment
+
+Direct children of `<pagx>` and `<Composition>` must be `<Layer>`. Groups at root level cause
+a parse error.
 
 ```xml
-<!-- WRONG: Group at root level causes a parse error -->
-<pagx width="800" height="600">
-  <Group>
-    <Rectangle size="800,600"/>
-    <Fill color="#FFF"/>
-  </Group>
-</pagx>
-
-<!-- CORRECT: Use Layer -->
 <pagx width="800" height="600">
   <Layer>
     <Rectangle size="800,600"/>
@@ -148,16 +156,11 @@ its own Group for painter scope isolation.
 
 ### 2. Missing Painter Scope Isolation
 
-```xml
-<!-- WRONG: Both Fill and Stroke apply to ALL geometry -->
-<Layer>
-  <Rectangle size="100,100"/>
-  <Ellipse center="50,50" size="30,30"/>
-  <Fill color="#F00"/>        <!-- fills both Rectangle and Ellipse -->
-  <Stroke color="#000" width="1"/>  <!-- strokes both -->
-</Layer>
+A painter renders **all geometry accumulated in the current scope**. When different geometry
+elements need different painters, isolate them in separate Groups:
 
-<!-- CORRECT: Groups isolate painters -->
+```xml
+<!-- Both Fill and Stroke apply to ALL geometry in the same scope — use Groups to isolate -->
 <Layer>
   <Group>
     <Rectangle size="100,100"/>
@@ -170,15 +173,12 @@ its own Group for painter scope isolation.
 </Layer>
 ```
 
-### 3. Setting Text Position When TextBox Is Present
+### 3. TextBox Layout Rules
+
+When TextBox controls layout, it overrides Text's `position` and `textAnchor` — do not set
+these on Text. Only set layout attributes on TextBox:
 
 ```xml
-<!-- WRONG: position and textAnchor are ignored when TextBox controls layout -->
-<Text text="Hello" fontFamily="Arial" fontSize="24" position="100,50" textAnchor="center"/>
-<Fill color="#000"/>
-<TextBox position="0,0" size="300,100" textAlign="center"/>
-
-<!-- CORRECT: omit position and textAnchor on Text -->
 <Text text="Hello" fontFamily="Arial" fontSize="24"/>
 <Fill color="#000"/>
 <TextBox position="0,0" size="300,100" textAlign="center"/>
@@ -208,32 +208,24 @@ errors. This is a subset; for the **complete list** (16 elements), see `attribut
 | `Image` | `source` |
 | `pagx` | `version`, `width`, `height` |
 
-### 5. Canvas-Absolute Coordinates Inside Layers
+### 5. Layer-Relative Coordinates
+
+Layer `x`/`y` carries the block offset. Internal coordinates are relative to the Layer's
+origin (0,0):
 
 ```xml
-<!-- WRONG: coordinates are canvas-absolute, not Layer-relative -->
-<Layer x="200" y="100">
-  <Rectangle center="250,150" size="100,100"/>   <!-- should be 50,50 -->
-  <Fill color="#F00"/>
-</Layer>
-
-<!-- CORRECT: internal coordinates relative to Layer origin -->
 <Layer x="200" y="100">
   <Rectangle center="50,50" size="100,100"/>
   <Fill color="#F00"/>
 </Layer>
 ```
 
-### 6. Modifiers Expanding Scope After Merge
+### 6. Modifier Scope Isolation
+
+Shape modifiers (TrimPath, RoundCorner, MergePath) affect all Paths in the current scope.
+When only one Path needs a modifier, isolate it in its own Group:
 
 ```xml
-<!-- WRONG: TrimPath now affects BOTH Paths after removing Groups -->
-<Path data="M 0 0 L 100 100"/>
-<TrimPath end="0.5"/>
-<Path data="M 200 0 L 300 100"/>
-<Fill color="#F00"/>
-
-<!-- CORRECT: keep Groups to isolate modifier scope -->
 <Group>
   <Path data="M 0 0 L 100 100"/>
   <TrimPath end="0.5"/>
@@ -247,22 +239,11 @@ errors. This is a subset; for the **complete list** (16 elements), see `attribut
 
 ### 7. MergePath Clears Previously Rendered Styles
 
-```xml
-<!-- Surprising: MergePath clears all previously accumulated Fill/Stroke effects -->
-<Rectangle size="50,50"/>
-<Fill color="#F00"/>          <!-- this fill result is CLEARED by MergePath -->
-<Ellipse center="25,25" size="30,30"/>
-<MergePath mode="difference"/>
-<Fill color="#00F"/>          <!-- only this fill applies to the merged path -->
-```
-
-Understanding this behavior is essential when using MergePath for cutouts or boolean operations.
-
-**Key takeaway**: always isolate geometry + painters that must survive into a **separate Group**
-before the MergePath scope. MergePath wipes all prior rendering within its scope.
+MergePath merges all accumulated Paths into one, but also **clears all previously rendered
+Fill and Stroke effects** in the current scope. Always isolate geometry + painters that must
+survive into a separate Group before the MergePath scope:
 
 ```xml
-<!-- PATTERN: isolate pre-MergePath rendering -->
 <Group>
   <Rectangle size="100,50"/>
   <Fill color="#F00"/>           <!-- survives: separate scope -->
@@ -272,5 +253,19 @@ before the MergePath scope. MergePath wipes all prior rendering within its scope
   <Rectangle size="40,40"/>
   <MergePath mode="difference"/>  <!-- clears only this scope -->
   <Fill color="#00F"/>
+</Group>
+```
+
+### 8. Fill + Stroke on Same Geometry
+
+Painters render all accumulated geometry without clearing it. A single geometry element can
+have multiple Fill and Stroke painters — they render in document order (earlier = below).
+Declare the geometry once with both painters in one Group:
+
+```xml
+<Group>
+  <Ellipse center="0,-21" size="38,12"/>
+  <Fill color="#94A3B8"/>
+  <Stroke color="#64748B" width="1.5"/>
 </Group>
 ```

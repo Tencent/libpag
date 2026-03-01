@@ -11,7 +11,7 @@ Read before starting generation:
 | Reference | Content |
 |-----------|---------|
 | `spec-essentials.md` | Format specification — node types, processing model, attribute rules |
-| `design-patterns.md` | Structure decisions, text layout, common mistakes |
+| `design-patterns.md` | Structure decisions, text layout, essential rules |
 
 Read these as needed:
 
@@ -66,6 +66,37 @@ For each block, construct the internal VectorElement tree:
 3. **Polish** — fine-tune spacing, alignment, and visual balance.
 
 This isolates defects: if something breaks, it was the last thing added.
+
+**Painter efficiency** — write compact painter scope from the start to avoid redundancy:
+
+- **Same Fill/Stroke → share scope**: When generating symmetric or paired elements (two eyes,
+  two legs, two buttons) with identical painters, place all geometry in one Group with a shared
+  painter.
+
+  ```xml
+  <Group>
+    <Ellipse center="-4,-3" size="5,6"/>
+    <Ellipse center="4,-3" size="5,6"/>
+    <Fill color="#E0E7FF"/>
+  </Group>
+  ```
+
+- **Fill + Stroke on same geometry → one Group**: A painter does not clear the geometry list.
+  When a shape needs both Fill and Stroke, declare the geometry once with both painters.
+
+  ```xml
+  <Group>
+    <Ellipse size="80,20"/>
+    <Fill color="#1F1240"/>
+    <Stroke color="#8B5CF625" width="1.5"/>
+  </Group>
+  ```
+
+**Mandatory measurement after each block** — do not rely on coordinate estimation. After
+completing each block (or group of related blocks), immediately run `pagx render` and
+`pagx bounds` to verify alignment. Coordinates that "look correct" in source often produce
+visible misalignment in the rendered output due to asymmetric shapes, stroke width offsets,
+or text baseline differences. Measure first, then adjust — never skip this step.
 
 ### Step 4: Localize Coordinates
 
