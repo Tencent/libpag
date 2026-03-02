@@ -1504,7 +1504,10 @@ class TextLayoutContext {
           xOffset += boxWidth - line.width;
         } else if (textBox->textAlign == TextAlign::Justify) {
           // Justify: distribute extra space at word boundaries. Last line uses Start alignment.
+          // Note: under PAG_BUILD_PAGX, gap counting is deferred until after L2 BiDi reorder
+          // so that it operates on the same visual glyph order used during gap application.
           if (lineIdx < lines.size() - 1 && line.glyphs.size() > 1) {
+#ifndef PAG_BUILD_PAGX
             int gapCount = 0;
             for (size_t i = 0; i + 1 < line.glyphs.size(); i++) {
               if (LineBreaker::CanBreakBetween(line.glyphs[i].unichar,
@@ -1515,6 +1518,7 @@ class TextLayoutContext {
             if (gapCount > 0) {
               justifyExtraPerGap = (boxWidth - line.width) / static_cast<float>(gapCount);
             }
+#endif
           } else if (paragraphRTL) {
             xOffset += boxWidth - line.width;
           }
@@ -1563,6 +1567,20 @@ class TextLayoutContext {
           g.xPosition = xPos;
           float letterSpacing = (g.sourceText != nullptr) ? g.sourceText->letterSpacing : 0;
           xPos += g.advance + letterSpacing;
+        }
+      }
+      // Compute justify gap count on visual-order glyphs so that counting and application use
+      // the same adjacency pairs. This avoids mismatch when BiDi L2 reorder changes neighbors.
+      if (textBox->textAlign == TextAlign::Justify && lineIdx < lines.size() - 1 &&
+          line.glyphs.size() > 1) {
+        int gapCount = 0;
+        for (size_t i = 0; i + 1 < visualGlyphs.size(); i++) {
+          if (LineBreaker::CanBreakBetween(visualGlyphs[i].unichar, visualGlyphs[i + 1].unichar)) {
+            gapCount++;
+          }
+        }
+        if (gapCount > 0) {
+          justifyExtraPerGap = (boxWidth - line.width) / static_cast<float>(gapCount);
         }
       }
       for (size_t gi = 0; gi < visualGlyphs.size(); gi++) {
