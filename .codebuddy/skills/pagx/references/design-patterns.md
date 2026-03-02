@@ -31,9 +31,9 @@ effective combination.
   with adequate padding on all sides.
 - **Batch consistency**: When generating a set, all icons should have similar overall bounds.
   An outlier breaks visual consistency.
-- **Over-detailing**: Small dots, thin trend lines, tiny arrows, text labels inside icons —
-  all become noise at icon scale. Icons communicate through shape and silhouette, not fine
-  detail. When in doubt, remove it.
+- **Over-detailing**: At small icon sizes, fine details (small dots, thin lines, tiny text
+  labels) may become indistinguishable noise. Evaluate whether each detail remains legible
+  at the target render size before including it.
 
 ### Layer Count
 
