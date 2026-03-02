@@ -31,10 +31,13 @@
 #include "cli/CommandValidator.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/BackgroundBlurStyle.h"
+#include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
+#include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
@@ -42,6 +45,7 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
@@ -68,6 +72,7 @@ struct OptimizeReport {
   int emptyElements = 0;
   int deduplicatedPathData = 0;
   int deduplicatedGradients = 0;
+  int mergedGroups = 0;
   int unreferencedResources = 0;
   int pathToRectangle = 0;
   int pathToEllipse = 0;
@@ -77,9 +82,9 @@ struct OptimizeReport {
   int compositionsExtracted = 0;
 
   int total() const {
-    return emptyElements + deduplicatedPathData + deduplicatedGradients + unreferencedResources +
-           pathToRectangle + pathToEllipse + fullCanvasClips + offCanvasLayers +
-           coordinatesLocalized + compositionsExtracted;
+    return emptyElements + deduplicatedPathData + deduplicatedGradients + mergedGroups +
+           unreferencedResources + pathToRectangle + pathToEllipse + fullCanvasClips +
+           offCanvasLayers + coordinatesLocalized + compositionsExtracted;
   }
 
   void print() const {
@@ -97,6 +102,9 @@ struct OptimizeReport {
     }
     if (deduplicatedGradients > 0) {
       std::cout << "  - deduplicated " << deduplicatedGradients << " gradient resources\n";
+    }
+    if (mergedGroups > 0) {
+      std::cout << "  - merged " << mergedGroups << " adjacent groups\n";
     }
     if (unreferencedResources > 0) {
       std::cout << "  - removed " << unreferencedResources << " unreferenced resources\n";
@@ -130,15 +138,19 @@ static void PrintOptimizeUsage() {
             << "Then applies structural optimizations and exports with consistent formatting.\n"
             << "\n"
             << "Optimizations:\n"
-            << "  1. Remove empty elements (empty Layer/Group, zero-width Stroke)\n"
-            << "  2. Deduplicate PathData resources\n"
-            << "  3. Deduplicate gradient resources\n"
-            << "  4. Remove unreferenced resources\n"
-            << "  5. Replace Path with Rectangle/Ellipse\n"
-            << "  6. Remove full-canvas clip masks\n"
-            << "  7. Remove off-canvas invisible layers\n"
-            << "  8. Localize layer coordinates\n"
-            << "  9. Extract duplicate layers to compositions\n"
+            << "  1.  Remove empty elements (empty Layer/Group, zero-width Stroke)\n"
+            << "  2.  Deduplicate PathData resources\n"
+            << "  3.  Deduplicate gradient resources\n"
+            << "  4.  Merge adjacent Groups with identical painters\n"
+            << "  5.  Replace Path with Rectangle/Ellipse\n"
+            << "  6.  Remove full-canvas clip masks\n"
+            << "  7.  Remove off-canvas invisible layers\n"
+            << "  8.  Localize layer coordinates\n"
+            << "  9.  Extract duplicate layers to compositions\n"
+            << "  10. Remove unreferenced resources\n"
+            << "\n"
+            << "Lint hints (printed but not auto-applied):\n"
+            << "  - Child Layers that could be downgraded to Groups\n"
             << "\n"
             << "Options:\n"
             << "  -o, --output <path>   Output file path (default: overwrite input)\n"
@@ -207,6 +219,350 @@ static int RemoveEmptyNodes(PAGXDocument* document) {
     }
   }
   return count;
+}
+
+// --- Lint hints: Detect potential optimizations that require human judgment ---
+
+// Forward declaration for ElementsStructurallyEqual
+static bool ElementsStructurallyEqual(const Element* a, const Element* b);
+
+struct LintHint {
+  std::string layerName = {};
+  std::string message = {};
+};
+
+// Check if a child Layer uses no Layer-exclusive features and could be a Group.
+static bool CanDowngradeToGroup(const Layer* layer) {
+  if (!layer->styles.empty() || !layer->filters.empty() || !layer->children.empty()) {
+    return false;
+  }
+  if (layer->mask != nullptr || layer->composition != nullptr) {
+    return false;
+  }
+  if (layer->blendMode != BlendMode::Normal) {
+    return false;
+  }
+  if (layer->hasScrollRect || !layer->visible) {
+    return false;
+  }
+  if (!layer->matrix.isIdentity() || !layer->matrix3D.isIdentity()) {
+    return false;
+  }
+  if (layer->preserve3D || layer->groupOpacity || !layer->passThroughBackground) {
+    return false;
+  }
+  if (!layer->antiAlias) {
+    return false;
+  }
+  if (!layer->id.empty() || !layer->name.empty()) {
+    return false;
+  }
+  if (!layer->customData.empty()) {
+    return false;
+  }
+  return true;
+}
+
+// Recursively check layer contents for lint issues
+static void CollectLintHintsFromContents(const Layer* layer, std::vector<LintHint>& hints,
+                                         float repeaterProductSoFar = 1.0f) {
+  std::function<void(const std::vector<Element*>&, float)> checkElements =
+      [&](const std::vector<Element*>& elements, float outerProduct) {
+        // First pass: scan all Repeaters at this level to compute the full product.
+        // Repeater affects all sibling elements regardless of order.
+        float localProduct = outerProduct;
+        for (auto* element : elements) {
+          if (element->nodeType() == NodeType::Repeater) {
+            auto repeater = static_cast<const Repeater*>(element);
+            localProduct *= repeater->copies;
+          }
+        }
+
+        bool hasRepeater = localProduct > outerProduct;
+        bool hasStrokeWithDashes = false;
+
+        // Second pass: check each element with the full product known.
+        for (auto* element : elements) {
+          NodeType type = element->nodeType();
+
+          // C6: Check Repeater copies
+          if (type == NodeType::Repeater) {
+            auto repeater = static_cast<const Repeater*>(element);
+
+            // Single Repeater: warn if > 200 copies
+            if (repeater->copies > 200.0f) {
+              auto name = layer->name.empty() ? layer->id : layer->name;
+              hints.push_back({name, "Repeater with high copies count (" +
+                                         std::to_string(static_cast<int>(repeater->copies)) +
+                                         ") may cause performance issues"});
+            }
+
+            // Nested Repeater: warn if total product > 500 and there is an outer Repeater
+            if (localProduct > 500.0f && outerProduct > 1.0f) {
+              auto name = layer->name.empty() ? layer->id : layer->name;
+              hints.push_back({name, "Nested Repeater with product " +
+                                         std::to_string(static_cast<int>(localProduct)) +
+                                         " (> 500) may cause performance issues"});
+            }
+          }
+
+          // C8: Check Stroke alignment (only costly under Repeater)
+          if (type == NodeType::Stroke) {
+            auto stroke = static_cast<const Stroke*>(element);
+            if (hasRepeater && stroke->align != StrokeAlign::Center) {
+              auto name = layer->name.empty() ? layer->id : layer->name;
+              std::string alignStr = (stroke->align == StrokeAlign::Inside) ? "Inside" : "Outside";
+              hints.push_back(
+                  {name, "Stroke with non-center alignment (" + alignStr +
+                             ") in Repeater scope requires expensive CPU path operations"});
+            }
+
+            // C9: Check for dashed stroke
+            if (!stroke->dashes.empty()) {
+              hasStrokeWithDashes = true;
+            }
+          }
+
+          // C10: Check Path complexity
+          if (type == NodeType::Path) {
+            auto path = static_cast<const Path*>(element);
+            if (path->data != nullptr) {
+              auto verbCount = path->data->verbs().size();
+              if (verbCount > 15) {
+                auto name = layer->name.empty() ? layer->id : layer->name;
+                hints.push_back({name, "Path with high complexity (" + std::to_string(verbCount) +
+                                           " verbs) may cause rendering performance issues"});
+              }
+            }
+          }
+
+          // Recurse into Group with the full product from this level
+          if (type == NodeType::Group) {
+            auto group = static_cast<const Group*>(element);
+            checkElements(group->elements, localProduct);
+          }
+        }
+
+        // C9: Check for dashed stroke in Repeater scope
+        if (hasRepeater && hasStrokeWithDashes) {
+          auto name = layer->name.empty() ? layer->id : layer->name;
+          hints.push_back({name,
+                           "Dashed Stroke within Repeater scope may cause performance "
+                           "issues due to complex rendering calculations"});
+        }
+      };
+
+  checkElements(layer->contents, repeaterProductSoFar);
+
+  // C7: Check Blur filters for high blur radius
+  for (auto* filter : layer->filters) {
+    if (filter->nodeType() == NodeType::BlurFilter) {
+      auto blur = static_cast<const BlurFilter*>(filter);
+      if (blur->blurX > 30.0f || blur->blurY > 30.0f) {
+        auto name = layer->name.empty() ? layer->id : layer->name;
+        hints.push_back({name, "BlurFilter with high blur radius (X:" +
+                                   std::to_string(static_cast<int>(blur->blurX)) +
+                                   " Y:" + std::to_string(static_cast<int>(blur->blurY)) +
+                                   ") may cause performance issues"});
+      }
+    }
+  }
+
+  // C7: Check Layer styles for high blur radius
+  for (auto* style : layer->styles) {
+    auto type = style->nodeType();
+    if (type == NodeType::DropShadowStyle) {
+      auto shadow = static_cast<const DropShadowStyle*>(style);
+      if (shadow->blurX > 30.0f || shadow->blurY > 30.0f) {
+        auto name = layer->name.empty() ? layer->id : layer->name;
+        hints.push_back({name, "DropShadowStyle with high blur radius (X:" +
+                                   std::to_string(static_cast<int>(shadow->blurX)) +
+                                   " Y:" + std::to_string(static_cast<int>(shadow->blurY)) +
+                                   ") may cause performance issues"});
+      }
+    } else if (type == NodeType::BackgroundBlurStyle) {
+      auto bgBlur = static_cast<const BackgroundBlurStyle*>(style);
+      if (bgBlur->blurX > 30.0f || bgBlur->blurY > 30.0f) {
+        auto name = layer->name.empty() ? layer->id : layer->name;
+        hints.push_back({name, "BackgroundBlurStyle with high blur radius (X:" +
+                                   std::to_string(static_cast<int>(bgBlur->blurX)) +
+                                   " Y:" + std::to_string(static_cast<int>(bgBlur->blurY)) +
+                                   ") may cause performance issues"});
+      }
+    }
+  }
+}
+
+// Helper to check if layer has high-cost elements (Repeater, Blur, etc.)
+static bool HasHighCostElements(const Layer* layer) {
+  std::function<bool(const std::vector<Element*>&)> checkElements =
+      [&](const std::vector<Element*>& elements) {
+        for (auto* element : elements) {
+          NodeType type = element->nodeType();
+          if (type == NodeType::Repeater) {
+            return true;
+          }
+          if (type == NodeType::Group) {
+            auto group = static_cast<const Group*>(element);
+            if (checkElements(group->elements)) {
+              return true;
+            }
+          }
+        }
+        return false;
+      };
+
+  // Check for high-cost elements
+  if (checkElements(layer->contents)) {
+    return true;
+  }
+
+  // Check filters for Blur
+  for (auto* filter : layer->filters) {
+    if (filter->nodeType() == NodeType::BlurFilter) {
+      return true;
+    }
+  }
+
+  // Check styles for Blur and Shadows
+  for (auto* style : layer->styles) {
+    auto type = style->nodeType();
+    if (type == NodeType::DropShadowStyle || type == NodeType::BackgroundBlurStyle ||
+        type == NodeType::InnerShadowStyle) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// Helper to check if mask is a simple solid-fill rectangle (eligible for scrollRect)
+static bool IsMaskASimpleRectangle(const Layer* mask) {
+  if (mask == nullptr) {
+    return false;
+  }
+
+  // Mask must have exactly the right structure:
+  // - Exactly 2 elements: Rectangle + Fill
+  // - Fill must be solid color (not gradient or pattern)
+  // - Fill alpha must be 1.0 (opaque)
+  // - No other Layer features (matrix, transform, etc.)
+
+  if (mask->contents.size() != 2) {
+    return false;
+  }
+
+  // Check first element is Rectangle
+  if (mask->contents[0]->nodeType() != NodeType::Rectangle) {
+    return false;
+  }
+
+  // Check second element is Fill
+  if (mask->contents[1]->nodeType() != NodeType::Fill) {
+    return false;
+  }
+
+  auto fill = static_cast<const Fill*>(mask->contents[1]);
+
+  // Fill must be solid color (not gradient or pattern)
+  if (fill->color == nullptr || fill->color->nodeType() != NodeType::SolidColor) {
+    return false;
+  }
+
+  // Fill must be opaque
+  if (fill->alpha < 0.999f) {
+    return false;
+  }
+
+  // Mask layer should have no matrix/transform beyond identity
+  if (!mask->matrix.isIdentity() || !mask->matrix3D.isIdentity()) {
+    return false;
+  }
+
+  // Mask layer should have no styles or filters
+  if (!mask->styles.empty() || !mask->filters.empty()) {
+    return false;
+  }
+
+  // Mask layer should have no blending mode beyond normal
+  if (mask->blendMode != BlendMode::Normal) {
+    return false;
+  }
+
+  return true;
+}
+
+static void CollectLintHints(const Layer* layer, std::vector<LintHint>& hints, bool isRoot) {
+  // Hint: child Layers that could be downgraded to Groups.
+  if (!isRoot && !layer->children.empty()) {
+    bool allDowngradable = true;
+    for (auto* child : layer->children) {
+      if (!CanDowngradeToGroup(child)) {
+        allDowngradable = false;
+        break;
+      }
+    }
+    if (allDowngradable) {
+      auto count = static_cast<int>(layer->children.size());
+      auto name = layer->name.empty() ? layer->id : layer->name;
+      hints.push_back({name, std::to_string(count) + " child Layer(s) use no Layer-exclusive "
+                                                     "features and could be downgraded to Groups"});
+    }
+  }
+
+  // C6-C10: Check contents for various lint issues
+  CollectLintHintsFromContents(layer, hints);
+
+  // C11: Check for low opacity with high-cost elements
+  if (layer->alpha < 0.2f && layer->alpha > 0.0f && HasHighCostElements(layer)) {
+    auto name = layer->name.empty() ? layer->id : layer->name;
+    hints.push_back(
+        {name,
+         "Low opacity (" + std::to_string(static_cast<int>(layer->alpha * 100)) +
+             "%) with high-cost elements (Repeater/Blur) may indicate unnecessary rendering"});
+  }
+
+  // C13: Check if mask is a simple rectangle (could use scrollRect instead)
+  if (layer->mask != nullptr && layer->maskType == MaskType::Alpha &&
+      IsMaskASimpleRectangle(layer->mask)) {
+    auto name = layer->name.empty() ? layer->id : layer->name;
+    hints.push_back(
+        {name, "Using rectangular mask could be replaced with scrollRect for better performance"});
+  }
+
+  for (auto* child : layer->children) {
+    CollectLintHints(child, hints, false);
+  }
+}
+
+static std::vector<LintHint> CollectLintHints(const PAGXDocument* document) {
+  std::vector<LintHint> hints = {};
+  for (auto* layer : document->layers) {
+    CollectLintHints(layer, hints, true);
+  }
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      auto comp = static_cast<const Composition*>(node.get());
+      for (auto* layer : comp->layers) {
+        CollectLintHints(layer, hints, true);
+      }
+    }
+  }
+  return hints;
+}
+
+static void PrintLintHints(const std::vector<LintHint>& hints) {
+  if (hints.empty()) {
+    return;
+  }
+  std::cout << "pagx optimize: " << hints.size() << " lint hint(s)\n";
+  for (auto& hint : hints) {
+    std::cout << "  - ";
+    if (!hint.layerName.empty()) {
+      std::cout << "Layer \"" << hint.layerName << "\": ";
+    }
+    std::cout << hint.message << "\n";
+  }
 }
 
 // --- Optimization #2: Deduplicate PathData ---
@@ -508,6 +864,197 @@ static int RemoveUnreferencedResources(PAGXDocument* document) {
   }
   nodes.resize(writeIndex);
   return static_cast<int>(originalSize - writeIndex);
+}
+
+// --- Optimization #4b: Merge adjacent Groups ---
+
+static bool IsGeometry(NodeType type) {
+  return type == NodeType::Rectangle || type == NodeType::Ellipse || type == NodeType::Polystar ||
+         type == NodeType::Path;
+}
+
+static bool IsPainter(NodeType type) {
+  return type == NodeType::Fill || type == NodeType::Stroke;
+}
+
+static bool IsModifier(NodeType type) {
+  return type == NodeType::TrimPath || type == NodeType::RoundCorner || type == NodeType::MergePath;
+}
+
+static bool HasDefaultGroupTransform(const Group* group) {
+  return group->anchor.x == 0 && group->anchor.y == 0 && group->position.x == 0 &&
+         group->position.y == 0 && group->rotation == 0 && group->scale.x == 1 &&
+         group->scale.y == 1 && group->skew == 0 && group->skewAxis == 0 && group->alpha == 1;
+}
+
+// Split a Group's elements into geometry and painters. Returns false if the Group contains
+// modifiers, nested Groups, or other incompatible elements.
+static bool SplitGeometryAndPainters(const Group* group, std::vector<Element*>& geometry,
+                                     std::vector<Element*>& painters) {
+  bool seenPainter = false;
+  for (auto* element : group->elements) {
+    auto type = element->nodeType();
+    if (IsModifier(type)) {
+      return false;
+    }
+    if (type == NodeType::Group || type == NodeType::Repeater || type == NodeType::Text ||
+        type == NodeType::TextBox || type == NodeType::TextPath || type == NodeType::TextModifier) {
+      return false;
+    }
+    if (IsPainter(type)) {
+      seenPainter = true;
+      painters.push_back(element);
+    } else if (IsGeometry(type)) {
+      if (seenPainter) {
+        return false;
+      }
+      geometry.push_back(element);
+    } else {
+      return false;
+    }
+  }
+  return !geometry.empty() && !painters.empty();
+}
+
+static bool PaintersEqual(const std::vector<Element*>& a, const std::vector<Element*>& b) {
+  if (a.size() != b.size()) {
+    return false;
+  }
+  for (size_t i = 0; i < a.size(); i++) {
+    if (!ElementsStructurallyEqual(a[i], b[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+static void AppendPathData(const PathData* source, PathData* target) {
+  source->forEach([target](PathVerb verb, const Point* pts) {
+    switch (verb) {
+      case PathVerb::Move:
+        target->moveTo(pts[0].x, pts[0].y);
+        break;
+      case PathVerb::Line:
+        target->lineTo(pts[0].x, pts[0].y);
+        break;
+      case PathVerb::Quad:
+        target->quadTo(pts[0].x, pts[0].y, pts[1].x, pts[1].y);
+        break;
+      case PathVerb::Cubic:
+        target->cubicTo(pts[0].x, pts[0].y, pts[1].x, pts[1].y, pts[2].x, pts[2].y);
+        break;
+      case PathVerb::Close:
+        target->close();
+        break;
+    }
+  });
+}
+
+static int MergeAdjacentGroupsInElements(PAGXDocument* document, std::vector<Element*>& elements) {
+  int count = 0;
+  // Recursively process nested Groups first.
+  for (auto* element : elements) {
+    if (element->nodeType() == NodeType::Group) {
+      auto group = static_cast<Group*>(element);
+      count += MergeAdjacentGroupsInElements(document, group->elements);
+    }
+  }
+  // Scan for adjacent mergeable Groups.
+  size_t i = 0;
+  while (i + 1 < elements.size()) {
+    if (elements[i]->nodeType() != NodeType::Group ||
+        elements[i + 1]->nodeType() != NodeType::Group) {
+      i++;
+      continue;
+    }
+    auto groupA = static_cast<Group*>(elements[i]);
+    auto groupB = static_cast<Group*>(elements[i + 1]);
+    if (!HasDefaultGroupTransform(groupA) || !HasDefaultGroupTransform(groupB)) {
+      i++;
+      continue;
+    }
+    std::vector<Element*> geoA = {};
+    std::vector<Element*> paintA = {};
+    std::vector<Element*> geoB = {};
+    std::vector<Element*> paintB = {};
+    if (!SplitGeometryAndPainters(groupA, geoA, paintA) ||
+        !SplitGeometryAndPainters(groupB, geoB, paintB)) {
+      i++;
+      continue;
+    }
+    if (!PaintersEqual(paintA, paintB)) {
+      i++;
+      continue;
+    }
+    // Check if all geometry in both groups are Paths (multi-M merge).
+    bool allPaths = true;
+    for (auto* geo : geoA) {
+      if (geo->nodeType() != NodeType::Path) {
+        allPaths = false;
+        break;
+      }
+    }
+    if (allPaths) {
+      for (auto* geo : geoB) {
+        if (geo->nodeType() != NodeType::Path) {
+          allPaths = false;
+          break;
+        }
+      }
+    }
+    if (allPaths) {
+      // Path multi-M merge: concatenate all PathData into the first Path.
+      auto targetPath = static_cast<Path*>(geoA[0]);
+      auto mergedData = document->makeNode<PathData>();
+      if (targetPath->data != nullptr) {
+        AppendPathData(targetPath->data, mergedData);
+      }
+      for (size_t j = 1; j < geoA.size(); j++) {
+        auto srcPath = static_cast<Path*>(geoA[j]);
+        if (srcPath->data != nullptr) {
+          AppendPathData(srcPath->data, mergedData);
+        }
+      }
+      for (auto* geo : geoB) {
+        auto srcPath = static_cast<Path*>(geo);
+        if (srcPath->data != nullptr) {
+          AppendPathData(srcPath->data, mergedData);
+        }
+      }
+      targetPath->data = mergedData;
+      // Remove extra Path elements from groupA, keep only the first.
+      std::vector<Element*> newElements = {};
+      newElements.push_back(geoA[0]);
+      newElements.insert(newElements.end(), paintA.begin(), paintA.end());
+      groupA->elements = newElements;
+    } else {
+      // Shape merge: move geometry from groupB before groupA's painters.
+      std::vector<Element*> newElements = {};
+      newElements.insert(newElements.end(), geoA.begin(), geoA.end());
+      newElements.insert(newElements.end(), geoB.begin(), geoB.end());
+      newElements.insert(newElements.end(), paintA.begin(), paintA.end());
+      groupA->elements = newElements;
+    }
+    // Remove groupB from the elements list.
+    elements.erase(elements.begin() + static_cast<ptrdiff_t>(i) + 1);
+    count++;
+    // Don't advance i — re-check the merged group against the next element.
+  }
+  return count;
+}
+
+static int MergeAdjacentGroups(PAGXDocument* document) {
+  int count = 0;
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Layer) {
+      auto layer = static_cast<Layer*>(node.get());
+      count += MergeAdjacentGroupsInElements(document, layer->contents);
+    } else if (node->nodeType() == NodeType::Group) {
+      auto group = static_cast<Group*>(node.get());
+      count += MergeAdjacentGroupsInElements(document, group->elements);
+    }
+  }
+  return count;
 }
 
 // --- Optimization #5: Path → Rectangle / Ellipse ---
@@ -1162,16 +1709,20 @@ static bool LayersStructurallyEqual(const Layer* a, const Layer* b) {
   return true;
 }
 
-static void ComputeLayerContentsBounds(const Layer* layer, float& boundsWidth,
-                                       float& boundsHeight) {
+static void ComputeLayerContentsBounds(const Layer* layer, float& boundsMinX, float& boundsMinY,
+                                       float& boundsWidth, float& boundsHeight) {
   float minX = 0.0f;
   float minY = 0.0f;
   float maxX = 0.0f;
   float maxY = 0.0f;
   if (ComputeShapeBounds(layer->contents, minX, minY, maxX, maxY)) {
+    boundsMinX = minX;
+    boundsMinY = minY;
     boundsWidth = maxX - minX;
     boundsHeight = maxY - minY;
   } else {
+    boundsMinX = 0.0f;
+    boundsMinY = 0.0f;
     boundsWidth = 0.0f;
     boundsHeight = 0.0f;
   }
@@ -1209,6 +1760,8 @@ static int ExtractCompositions(PAGXDocument* document) {
   // Step 2: Find groups with 2+ structurally identical layers.
   struct ExtractionCandidate {
     std::vector<Layer*> layers = {};
+    float minX = 0.0f;
+    float minY = 0.0f;
     float width = 0.0f;
     float height = 0.0f;
   };
@@ -1237,7 +1790,8 @@ static int ExtractCompositions(PAGXDocument* document) {
       if (group.size() >= 2) {
         ExtractionCandidate candidate = {};
         candidate.layers = group;
-        ComputeLayerContentsBounds(group[0], candidate.width, candidate.height);
+        ComputeLayerContentsBounds(group[0], candidate.minX, candidate.minY, candidate.width,
+                                   candidate.height);
         if (candidate.width > 0.0f && candidate.height > 0.0f) {
           candidates.push_back(candidate);
         }
@@ -1259,14 +1813,19 @@ static int ExtractCompositions(PAGXDocument* document) {
     auto innerLayer = document->makeNode<Layer>(GenerateUniqueId(document, "compLayer"));
     // Move contents from the source layer to the inner layer.
     innerLayer->contents = sourceLayer->contents;
+    // Localize contents coordinates to Composition space (origin at top-left of bounds).
+    if (std::abs(candidate.minX) >= 0.001f || std::abs(candidate.minY) >= 0.001f) {
+      ApplyLocalizationToElements(document, innerLayer->contents, candidate.minX, candidate.minY);
+    }
     comp->layers.push_back(innerLayer);
 
-    // Replace each layer's contents with a composition reference. The source layer's
-    // contents were already moved to innerLayer; other layers' contents are structurally
-    // identical and simply discarded.
+    // Replace each layer's contents with a composition reference. Adjust each layer's x/y
+    // to compensate for the coordinate shift applied inside the Composition.
     for (auto* layer : candidate.layers) {
       layer->contents.clear();
       layer->composition = comp;
+      layer->x += candidate.minX;
+      layer->y += candidate.minY;
     }
     count += static_cast<int>(candidate.layers.size());
   }
@@ -1281,6 +1840,7 @@ static OptimizeReport OptimizeDocument(PAGXDocument* document) {
   report.emptyElements = RemoveEmptyNodes(document);
   report.deduplicatedPathData = DeduplicatePathData(document);
   report.deduplicatedGradients = DeduplicateColorSources(document);
+  report.mergedGroups = MergeAdjacentGroups(document);
   ReplacePathsWithPrimitives(document, report.pathToRectangle, report.pathToEllipse);
   report.fullCanvasClips = RemoveFullCanvasClipMasks(document, document->layers);
   report.offCanvasLayers = RemoveOffCanvasLayers(document);
@@ -1353,6 +1913,8 @@ int RunOptimize(int argc, char* argv[]) {
 
   auto report = OptimizeDocument(document.get());
   report.print();
+  auto hints = CollectLintHints(document.get());
+  PrintLintHints(hints);
 
   if (dryRun) {
     return 0;

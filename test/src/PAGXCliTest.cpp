@@ -18,6 +18,8 @@
 
 #include <filesystem>
 #include <fstream>
+#include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 #include "base/PAGTest.h"
@@ -871,6 +873,132 @@ CLI_TEST(PAGXCliTest, FontInfo_NoSource) {
 CLI_TEST(PAGXCliTest, Font_UnknownSubcommand) {
   auto ret = CallRun(pagx::cli::RunFont, {"font", "xyz"});
   EXPECT_NE(ret, 0);
+}
+
+//==============================================================================
+// Lint hints tests
+//==============================================================================
+
+CLI_TEST(PAGXCliTest, Lint_C6_HighRepeaterCopies) {
+  auto inputPath = TestResourcePath("lint_c6_high_repeater.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
+  EXPECT_TRUE(output.find("HighCopies") != std::string::npos);
+  EXPECT_TRUE(output.find("Repeater with high copies count") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_C6_NestedRepeaterProduct) {
+  auto inputPath = TestResourcePath("lint_c6_nested_repeater.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
+  EXPECT_TRUE(output.find("NestedRepeaters") != std::string::npos);
+  EXPECT_TRUE(output.find("Nested Repeater with product") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_C7_HighBlurRadius) {
+  auto inputPath = TestResourcePath("lint_c7_high_blur.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
+  EXPECT_TRUE(output.find("HighBlur") != std::string::npos);
+  EXPECT_TRUE(output.find("blur radius") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_C8_StrokeAlignmentInRepeater) {
+  auto inputPath = TestResourcePath("lint_c8_stroke_align.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
+  EXPECT_TRUE(output.find("StrokeAlign") != std::string::npos);
+  EXPECT_TRUE(output.find("Stroke with non-center alignment") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_C9_DashedStrokeInRepeater) {
+  auto inputPath = TestResourcePath("lint_c9_dashed_stroke.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
+  EXPECT_TRUE(output.find("DashedStroke") != std::string::npos);
+  EXPECT_TRUE(output.find("Dashed Stroke within Repeater scope") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_C10_ComplexPath) {
+  auto inputPath = TestResourcePath("lint_c10_complex_path.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
+  EXPECT_TRUE(output.find("ComplexPath") != std::string::npos);
+  EXPECT_TRUE(output.find("Path with high complexity") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_C11_LowOpacityHighCost) {
+  auto inputPath = TestResourcePath("lint_c11_low_opacity.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
+  EXPECT_TRUE(output.find("LowOpacity") != std::string::npos);
+  EXPECT_TRUE(output.find("Low opacity") != std::string::npos);
+  EXPECT_TRUE(output.find("high-cost elements") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_C13_SimpleRectangleMask) {
+  auto inputPath = TestResourcePath("lint_c13_simple_rect_mask.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
+  EXPECT_TRUE(output.find("MaskedContent") != std::string::npos);
+  EXPECT_TRUE(output.find("rectangular mask") != std::string::npos);
+  EXPECT_TRUE(output.find("scrollRect") != std::string::npos);
 }
 
 }  // namespace pag
