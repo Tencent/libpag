@@ -135,7 +135,7 @@ PAGWindow {
 
     Connections {
         target: exportCompositionsWindow
-        onCancelExport: {
+        function onCancelExport() {
             window.close();
         }
     }

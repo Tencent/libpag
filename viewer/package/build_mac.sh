@@ -304,8 +304,8 @@ arm64PluginPath="${arm64BuildDirForPlugin}/PAGExporter.plugin"
 x86_64PluginExePath="${x86_64PluginPath}/Contents/MacOS/PAGExporter"
 arm64PluginExePath="${arm64PluginPath}/Contents/MacOS/PAGExporter"
 
-install_name_tool -delete_rpath "${PluginSourceDir}/vendor/ffaudio/mac/x64" ${x86_64PluginExePath}
-install_name_tool -delete_rpath "${PluginSourceDir}/vendor/ffaudio/mac/arm64" ${arm64PluginExePath}
+install_name_tool -delete_rpath "${SourceDir}/vendor/ffmovie/mac/x64" ${x86_64PluginExePath}
+install_name_tool -delete_rpath "${SourceDir}/vendor/ffmovie/mac/arm64" ${arm64PluginExePath}
 
 cp -fr ${x86_64PluginPath} ${PluginPath}
 lipo -create ${x86_64PluginExePath} ${arm64PluginExePath} -output ${PluginExePath}
@@ -364,27 +364,18 @@ rm -rf "${PluginPath}/Contents/Frameworks"
 rm -rf "${PluginPath}/Contents/Plugins"
 rm -rf "${PluginPath}/Contents/Resources/qml"
 
-# 3.5.2 Merge and copy ffaudio
-print "[ Merge and copy ffaudio ]"
-x64FfaudioPath="${PluginSourceDir}/vendor/ffaudio/mac/x64/libffaudio.dylib"
-arm64FfaudioPath="${PluginSourceDir}/vendor/ffaudio/mac/arm64/libffaudio.dylib"
-PluginFrameworksDir="${PluginPath}/Contents/Frameworks"
-FfaudioPath="${PluginFrameworksDir}/libffaudio.dylib"
-mkdir -p ${PluginFrameworksDir}
-lipo -create ${x64FfaudioPath} ${arm64FfaudioPath} -output ${FfaudioPath}
-
-# 3.5.3 Copy related tools
+# 3.5.2 Copy related tools
 print "[ Copy related tools ]"
 EncoderToolsPath="${EncoderToolBuildDir}/Release/H264EncoderTools"
 cp -f ${EncoderToolsPath} ${ResourcesDir}
 
-# 3.5.4 Copy Qt deployment scripts
+# 3.5.3 Copy Qt deployment scripts
 print "[ Copy Qt deployment scripts ]"
 cp -f "${SourceDir}/qttools/copy_qt_resource.sh" "${ResourcesDir}/"
 cp -f "${SourceDir}/qttools/delete_qt_resource.sh" "${ResourcesDir}/"
 cp -f "${SourceDir}/qttools/replace_qt_path.sh" "${ResourcesDir}/"
 
-# 3.5.5 Generate qt.conf for PAGExporter plugin
+# 3.5.4 Generate qt.conf for PAGExporter plugin
 # Use absolute path to load Qt resources from external shared directory
 # This avoids modifying plugin bundle contents which would break code signature
 # Note: qt.conf in Resources/ has higher priority than MacOS/ on macOS
