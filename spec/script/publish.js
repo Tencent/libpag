@@ -307,7 +307,8 @@ function addPreviewButtons(html, viewerUrl, lang) {
       console.warn('  Warning: no <pre> found before preview marker for ' + marker.samplePath);
       continue;
     }
-    const previewUrl = viewerUrl + '?file=./' + marker.samplePath;
+    const sampleName = path.basename(marker.samplePath);
+    const previewUrl = viewerUrl + '?sample=' + sampleName;
     const label = lang === 'zh' ? '预览' : 'Preview';
     const header = '<div class="code-header">' +
       '<a class="preview-btn" href="' + previewUrl + '">' +
