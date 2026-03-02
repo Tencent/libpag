@@ -55,6 +55,11 @@ Does this need styles, filters, mask, blendMode, composition, or scrollRect?
 Is this an independent visual unit (could be repositioned as a whole)?
   → YES: Use Layer
 
+Are there sibling Layers that are parts of the same visual component
+(e.g., a button background and its label, a card background and its content)?
+  → YES: Wrap in a parent Layer — parts must not be independent siblings.
+         See generate-guide.md §Step 2 for the component-tree principle.
+
 Is this a sub-element within a block (e.g., icon inside a button)?
   → YES: Use Group
 ```

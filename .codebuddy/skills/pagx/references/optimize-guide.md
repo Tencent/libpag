@@ -66,6 +66,9 @@ Check for issues that automated optimization cannot fix:
   See **Mask Optimization** below.
 - **Path complexity** — a single Path with >15 curve segments is fragile and slow. Consider
   decomposing into simpler primitives (Rectangle, Ellipse).
+- **Style inconsistency** — structurally similar elements (e.g., cards in a set, buttons in
+  a row) using different structural patterns (Layer vs Group, `x`/`y` vs `position`) that
+  should be unified for maintainability.
 
 ### Step 3: Final Verification
 
@@ -178,20 +181,45 @@ block's position, convert internal coordinates to Layer-relative.
 </Layer>
 ```
 
-#### Scenario B: Merge Overlapping Layers into One Block
+#### Scenario B: Merge Scattered Layers into One Block
 
-**Problem**: A single logical block (button, badge, bar) is scattered across multiple sibling
-Layers at the same position — cannot be moved as a unit.
+**Problem**: A single logical block is scattered across multiple sibling Layers — cannot be
+moved as a unit. The scattered Layers may share the same position or have different positions
+(e.g., a card background at one position and its content at an offset position).
 
-**Fix**: Wrap in one parent Layer. Keep children that need Layer-exclusive features as child
-Layers; downgrade the rest to Groups.
+**Test**: If moving one Layer without the other breaks the visual meaning, they belong
+together. See `generate-guide.md` §Step 2 for the full component-tree principle.
+
+**Fix**: Wrap in one parent Layer. The parent carries the base position; children use
+relative offsets. Keep children that need Layer-exclusive features as child Layers; downgrade
+the rest to Groups.
 
 > When multiple Layers share identical painters and no Layer-exclusive features, this overlaps
 > with **Cross-Layer Merging** in Painter Merging. Scenario B focuses on semantic grouping;
 > Cross-Layer Merging focuses on painter deduplication.
 
 ```xml
-<!-- Before: button scattered across two Layers at same position -->
+<!-- Before: card background and content as independent siblings at different positions -->
+<Layer composition="@cardBg" x="110" y="155"/>
+<Layer x="160" y="195">
+  <Rectangle size="50,35" roundness="8"/>
+  <Fill color="#F43F5E"/>
+</Layer>
+
+<!-- After: one parent Layer, content uses relative offset -->
+<Layer name="Card" x="110" y="155">
+  <Layer composition="@cardBg"/>
+  <Layer x="50" y="40">
+    <Rectangle size="50,35" roundness="8"/>
+    <Fill color="#F43F5E"/>
+  </Layer>
+</Layer>
+```
+
+Same-position variant (button background + label at identical coordinates):
+
+```xml
+<!-- Before -->
 <Layer x="148" y="325">
   <Rectangle size="120,36" roundness="18"/>
   <Fill color="@grad"/>

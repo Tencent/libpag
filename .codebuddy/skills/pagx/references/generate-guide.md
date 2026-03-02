@@ -49,6 +49,40 @@ repositioned as a whole.
 Determine canvas size (`width`/`height`) and each block's position. Use integer values.
 Use `pagx font info` for precise text metrics, `pagx bounds` for element boundaries.
 
+**Layer tree = visual component tree.** The Layer hierarchy must reflect the semantic
+containment structure of the visual content — not a flat list of shapes. Apply this rule
+recursively from the canvas level down to the smallest components:
+
+> A Layer represents a content unit that remains **visually complete** when moved as a whole.
+> If moving a Layer leaves behind a sibling that loses its visual meaning (e.g., a label
+> without its background, a price without its discount tag), those siblings belong under the
+> same parent Layer.
+
+The test: for any two sibling Layers, ask "can I move one without the other and both still
+make visual sense?" If not, they should share a parent.
+
+**Example** — a profile header decomposes into nested Layers:
+
+```
+ProfileHeader (Layer)
+├── AvatarGroup (Layer)
+│   ├── Avatar (Group: circular photo)
+│   └── OnlineBadge (Layer: green dot + white border ring)
+├── UserInfo (Layer)
+│   ├── Username (Group: name text)
+│   └── Bio (Group: signature text)
+└── EditButton (Layer)
+    ├── background (Group: rounded rectangle + fill)
+    └── label (Group: icon + "Edit" text)
+```
+
+- Moving `ProfileHeader` carries everything — the entire header relocates.
+- Moving `AvatarGroup` carries the photo and the online badge together; `UserInfo` stays.
+- Moving `OnlineBadge` alone repositions only the dot on the avatar.
+- `Username` and `Bio` are Groups (not Layers) because they are internal parts of `UserInfo`
+  that need no Layer-exclusive features — but they must not be top-level siblings outside
+  `UserInfo`, or moving the user info block would leave orphaned text behind.
+
 ### Step 3: Build Incrementally
 
 For each block, construct the internal VectorElement tree:

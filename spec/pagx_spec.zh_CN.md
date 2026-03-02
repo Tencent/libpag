@@ -1884,39 +1884,33 @@ Layer / Group
 
 > [Sample](samples/C.1_complete_example.pagx)
 
-### C.2 RPG 角色面板
+### C.2 应用图标
 
-一个奇幻 RPG 风格的角色状态面板，展示了复杂的 UI 组合，包含嵌套图层、渐变和装饰元素。
+毛玻璃风格的图标网格 — 12 个多色图标位于深色背景上，配合柔和色场和背景模糊卡片。展示了基于 Path 的矢量图标构建、Composition 复用、BackgroundBlurStyle 和 DropShadowStyle。
 
-> [Sample](samples/C.2_rpg_character_panel.pagx)
+> [Sample](samples/C.2_app_icons.pagx)
 
 ### C.3 星云学员
 
-一个太空主题的学员资料卡片，展示了星云效果、星空背景和现代 UI 设计模式。
+全屏 UI 面板，包含顶部导航栏、头像、进度条、操作按钮、货币组件和底部 Tab 栏。展示了典型应用界面的布局方式和组件组合。
 
 > [Sample](samples/C.3_nebula_cadet.pagx)
 
 ### C.4 游戏 HUD
 
-一个游戏平视显示器（HUD），展示了血条、分数显示和游戏界面元素。
+科幻风格的游戏平视显示器，包含瞄准十字线、弧形生命值和能量仪表、雷达小地图、弹药计数器和任务目标栏。展示了 Repeater 驱动的刻度线、弧形 Stroke 上的 TrimPath、ConicGradient 扫描效果和多层 Mask 叠加。
 
 > [Sample](samples/C.4_game_hud.pagx)
 
 ### C.5 PAGX 特性概览
 
-PAGX 格式能力的综合展示，包括渐变、效果、文本样式和矢量图形。
+信息图/演示幻灯片风格的 PAGX 能力介绍 — 中心标题搭配轨道环、五张特性卡片通过虚线连接、底部转换流程条。展示了 TextBox 多行排版、卡片式信息架构和装饰性连接线图形。
 
 > [Sample](samples/C.5_pagx_features.pagx)
 
 ### C.6 太空探索者
 
-一个外星球探险场景，展示了宇航员周围的奇异植物和大气元素。演示了复杂的图层合成、分层背景效果、程序化生成的草地和角色动画能力。
+一幅外星球探险插画，包含宇航员、奇异植物、外星生物和大气效果。展示了复杂场景合成、分层背景、手绘风格 Path 图形、通过超长 Path 数据程序化生成的草地纹理以及丰富的渐变光效。
 
 > [Sample](samples/C.6_space_explorer.pagx)
-
-### C.7 应用图标
-
-一组毛玻璃风格的应用图标网格，包含 12 个多色图标，背景为柔和色场和深色底色。展示了 BackgroundBlurStyle、DropShadowStyle、BlurFilter 和多图层图标构建。
-
-> [Sample](samples/C.7_app_icons.pagx)
 

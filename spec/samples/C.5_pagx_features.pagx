@@ -1,13 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="1600" height="1200">
-
-  <!-- Background -->
   <Layer name="Background">
     <Rectangle center="800,600" size="1600,1200"/>
     <Fill color="@bgGradient"/>
   </Layer>
-
-  <!-- Background aurora glow (2 compact blobs, cool contrast) -->
   <Layer name="GlowB" alpha="0.22">
     <Ellipse center="1560,300" size="700,550"/>
     <Fill color="#38BDF8"/>
@@ -18,16 +14,10 @@
     <Fill color="#10B981"/>
     <BlurFilter blurX="180" blurY="130"/>
   </Layer>
-
-
-  <!-- Subtle orbit ring decoration -->
-  <Layer name="OrbitRing" x="800" y="530" alpha="0.18">
+  <Layer name="OrbitRing" alpha="0.18" x="800" y="530">
     <Ellipse size="760,760"/>
     <Stroke color="#334155" width="1"/>
   </Layer>
-
-
-  <!-- Background grid pattern -->
   <Layer name="Grid" alpha="0.05">
     <Group position="60,60">
       <Path data="M -4 0 L 4 0 M 0 -4 L 0 4"/>
@@ -36,21 +26,16 @@
     </Group>
     <Repeater copies="10" position="0,120"/>
   </Layer>
-
-  <!-- Core -->
   <Layer name="Core" x="800" y="530">
-    <!-- Glow halo -->
     <Layer alpha="0.2">
       <Ellipse size="320,320"/>
       <Fill color="#3B82F6"/>
       <BlurFilter blurX="80" blurY="80"/>
     </Layer>
-    <!-- Main ring -->
     <Layer>
       <Ellipse size="260,260"/>
       <Stroke color="#475569" width="2"/>
     </Layer>
-    <!-- Gradient arc decoration -->
     <Layer alpha="0.7">
       <Ellipse size="310,310"/>
       <TrimPath end="0.77"/>
@@ -62,31 +47,25 @@
         </ConicGradient>
       </Stroke>
     </Layer>
-    <!-- Small tick marks at cardinal directions -->
     <Layer alpha="0.4">
       <Path data="M 0 -155 L 0 -163 M 155 0 L 163 0 M 0 155 L 0 163 M -155 0 L -163 0"/>
       <Stroke color="#94A3B8" width="1.5" cap="round"/>
     </Layer>
-    <!-- PAGX title -->
     <Layer x="0" y="-10">
-      <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="52" position="0,10" textAnchor="center"/>
+      <Text text="PAGX" position="0,10" fontFamily="Arial" fontStyle="Bold" fontSize="52" textAnchor="center"/>
       <Fill color="#FFF"/>
       <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#06B6D440"/>
     </Layer>
-    <!-- Subtitle -->
     <Group position="0,42">
       <Text text="Portable Animated Graphics XML" fontFamily="Arial" fontSize="14" textAnchor="center"/>
       <Fill color="#94A3B8"/>
     </Group>
-    <!-- Curved definition caption -->
     <Group>
       <Text text="An XML-based markup language for describing animated vector graphics." fontFamily="Arial" fontSize="12"/>
       <TextPath path="M -141 0 A 141 141 0 0 0 141 0" forceAlignment="true"/>
       <Fill color="#64748B60"/>
     </Group>
   </Layer>
-
-  <!-- Connector endpoint dots -->
   <Layer name="ConnectorDots" alpha="0.7">
     <Ellipse center="800,375" size="6,6"/>
     <Ellipse center="954,511" size="6,6"/>
@@ -95,14 +74,10 @@
     <Ellipse center="646,511" size="6,6"/>
     <Fill color="#06B6D4"/>
   </Layer>
-
-  <!-- Connectors -->
   <Layer name="Connectors" alpha="0.35">
     <Path data="M 800 375 L 800 240 M 954 511 L 1119 466 M 903 646 L 989 790 M 697 646 L 611 790 M 646 511 L 481 466"/>
     <Stroke color="@accentLine" width="2" dashes="8,14"/>
   </Layer>
-
-  <!-- Card 1: Readable (top center) -->
   <Layer name="CardReadable" x="800" y="160">
     <Rectangle center="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B80"/>
@@ -119,7 +94,6 @@
       </Stroke>
     </Layer>
     <Layer x="-120" y="0">
-      <!-- File outline with folded corner -->
       <Group>
         <Path data="M -22 -32 L 6 -32 L 22 -16 L 22 36 L -22 36 Z"/>
         <Stroke color="#F43F5E" width="2" join="round"/>
@@ -129,7 +103,6 @@
         <Path data="M 6 -32 L 6 -16 L 22 -16"/>
         <Stroke color="#F43F5E" width="1.5" join="round"/>
       </Group>
-      <!-- </> symbol -->
       <Group>
         <Path data="M -10 -4 L -16 4 L -10 12 M 10 -4 L 16 4 L 10 12"/>
         <Stroke color="#F43F5E" width="2" cap="round" join="round"/>
@@ -151,8 +124,6 @@
       <TextBox size="220,0" lineHeight="22"/>
     </Layer>
   </Layer>
-
-  <!-- Card 2: Comprehensive (right-upper) -->
   <Layer name="CardComprehensive" x="1319" y="466">
     <Rectangle center="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B80"/>
@@ -197,8 +168,6 @@
       <TextBox size="220,0" lineHeight="22"/>
     </Layer>
   </Layer>
-
-  <!-- Card 3: Expressive (left-upper) -->
   <Layer name="CardExpressive" x="281" y="466">
     <Rectangle center="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B80"/>
@@ -215,7 +184,6 @@
       </Stroke>
     </Layer>
     <Layer x="-110" y="-2">
-      <!-- Small code block on left -->
       <Group>
         <Rectangle center="-22,0" size="32,72" roundness="5"/>
         <Stroke color="#A855F7" width="2"/>
@@ -225,12 +193,10 @@
         <Path data="M -34 -16 L -10 -16 M -34 0 L -16 0 M -34 16 L -10 16"/>
         <Stroke color="#A855F7" width="1.5" cap="round"/>
       </Group>
-      <!-- Expansion arrow -->
       <Group>
         <Path data="M 2 0 L 12 0 M 8 -5 L 12 0 L 8 5"/>
         <Stroke color="#A855F7" width="2" cap="round" join="round"/>
       </Group>
-      <!-- Rich output shapes on right -->
       <Group>
         <Ellipse center="22,-28" size="18,18"/>
         <Stroke color="#A855F7" width="1.5"/>
@@ -257,8 +223,6 @@
       <TextBox size="220,0" lineHeight="22"/>
     </Layer>
   </Layer>
-
-  <!-- Card 4: Interoperable (left-lower) -->
   <Layer name="CardInteroperable" x="499" y="870">
     <Rectangle center="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B80"/>
@@ -301,14 +265,12 @@
       <TextBox size="220,0" lineHeight="22"/>
     </Layer>
   </Layer>
-
-  <!-- Card 5: Deployable (right-lower) -->
   <Layer name="CardDeployable" x="1101" y="870">
     <Rectangle center="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B80"/>
     <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetY="4" blurX="24" blurY="24" color="#00000060"/>
-    <Group alpha="0.08">
+    <Layer alpha="0.08">
       <Path data="M -180 -80 L 180 -80"/>
       <Stroke width="1">
         <LinearGradient startPoint="-180,-80" endPoint="180,-80">
@@ -317,47 +279,40 @@
           <ColorStop offset="1" color="#FBBF2400"/>
         </LinearGradient>
       </Stroke>
-    </Group>
-    <Group position="-120,-2">
-      <!-- Rocket body -->
+    </Layer>
+    <Layer x="-120" y="-2">
       <Group>
         <Path data="M 0 -40 C 10 -35 18 -20 18 0 L 18 22 L -18 22 L -18 0 C -18 -20 -10 -35 0 -40 Z"/>
         <Stroke color="#FBBF24" width="2" join="round"/>
         <Fill color="#FBBF2420"/>
       </Group>
-      <!-- Fins -->
       <Group>
         <Path data="M -18 12 L -30 30 L -18 25 Z M 18 12 L 30 30 L 18 25 Z"/>
         <Stroke color="#FBBF24" width="2" join="round"/>
         <Fill color="#FBBF2415"/>
       </Group>
-      <!-- Window -->
       <Group>
         <Ellipse center="0,-10" size="12,12"/>
         <Stroke color="#FBBF24" width="2"/>
       </Group>
-      <!-- Flame -->
       <Group>
         <Path data="M -10 22 L -5 38 L 0 30 L 5 38 L 10 22"/>
         <Stroke color="#FB923C" width="2" cap="round" join="round"/>
       </Group>
-    </Group>
-    <Group position="-50,-20">
+    </Layer>
+    <Layer x="-50" y="-20">
       <Text text="Deployable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <Fill color="#FBBF24"/>
-    </Group>
-    <Group position="-50,-7">
+    </Layer>
+    <Layer x="-50" y="-7">
       <Group>
         <Text text="One-click export to binary PAG with high performance." fontFamily="Arial" fontSize="16"/>
         <Fill color="#CBD5E1"/>
       </Group>
       <TextBox size="220,0" lineHeight="22"/>
-    </Group>
+    </Layer>
   </Layer>
-
-  <!-- Pipeline Section -->
   <Layer name="Pipeline" x="800" y="1070">
-    <!-- Separator line -->
     <Group alpha="0.18">
       <Path data="M -400 -40 L 400 -40"/>
       <Stroke width="1">
@@ -370,7 +325,6 @@
         </LinearGradient>
       </Stroke>
     </Group>
-    <!-- .pagx badge -->
     <Group position="-180,0">
       <Rectangle center="0,0" size="120,40" roundness="20"/>
       <Fill color="#6366F120"/>
@@ -380,12 +334,10 @@
         <Fill color="#A78BFA"/>
       </Group>
     </Group>
-    <!-- Arrow 1 -->
     <Group position="-80,0">
       <Path data="@arrowRight"/>
       <Stroke color="#64748B" width="2" cap="round" join="round"/>
     </Group>
-    <!-- .pag badge -->
     <Group>
       <Rectangle center="0,0" size="100,40" roundness="20"/>
       <Fill color="#EC489920"/>
@@ -395,12 +347,10 @@
         <Fill color="#F472B6"/>
       </Group>
     </Group>
-    <!-- Arrow 2 -->
     <Group position="90,0">
       <Path data="@arrowRight"/>
       <Stroke color="#64748B" width="2" cap="round" join="round"/>
     </Group>
-    <!-- Production badge -->
     <Group position="190,0">
       <Rectangle center="0,0" size="140,40" roundness="20"/>
       <Fill color="#34D39920"/>
@@ -411,14 +361,10 @@
       </Group>
     </Group>
   </Layer>
-
-  <!-- Bottom tagline -->
   <Layer name="BottomTagline" x="800" y="1130">
     <Text text="Design  -  Develop  -  Deploy" fontFamily="Arial" fontSize="16" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
-
-  <!-- Corner decorative brackets -->
   <Layer name="Corners" alpha="0.2">
     <Group>
       <Path data="M 50 110 L 50 50 L 110 50 M 1490 50 L 1550 50 L 1550 110 M 50 1090 L 50 1150 L 110 1150 M 1490 1150 L 1550 1150 L 1550 1090"/>
@@ -432,7 +378,6 @@
       <Fill color="#64748B"/>
     </Group>
   </Layer>
-
   <Resources>
     <LinearGradient id="bgGradient" startPoint="0,0" endPoint="0,1200">
       <ColorStop offset="0" color="#0F172A"/>

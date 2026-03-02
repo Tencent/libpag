@@ -1889,39 +1889,33 @@ The following example covers all major node types in PAGX, demonstrating complet
 
 > [Sample](samples/C.1_complete_example.pagx)
 
-### C.2 RPG Character Panel
+### C.2 App Icons
 
-A fantasy RPG-style character status panel demonstrating complex UI composition with nested layers, gradients, and decorative elements.
+A frosted-glass icon grid — 12 multi-color icons on a dark background with soft color fields and backdrop blur cards. Demonstrates icon construction with Path-based vector shapes, Composition reuse, BackgroundBlurStyle, and DropShadowStyle.
 
-> [Sample](samples/C.2_rpg_character_panel.pagx)
+> [Sample](samples/C.2_app_icons.pagx)
 
 ### C.3 Nebula Cadet
 
-A space-themed cadet profile card showcasing nebula effects, star fields, and modern UI design patterns.
+A full-screen UI panel with top navigation bar, avatar, progress bars, action buttons, currency chips, and bottom tab bar. Demonstrates typical application interface layout and component composition.
 
 > [Sample](samples/C.3_nebula_cadet.pagx)
 
 ### C.4 Game HUD
 
-A game heads-up display (HUD) demonstrating health bars, score displays, and game interface elements.
+A sci-fi heads-up display with a targeting reticle, arc-shaped health and energy gauges, radar mini-map, ammo counter, and mission objectives bar. Demonstrates Repeater-driven tick marks, TrimPath on arc Strokes, ConicGradient sweeps, and layered mask effects.
 
 > [Sample](samples/C.4_game_hud.pagx)
 
 ### C.5 PAGX Features Overview
 
-A comprehensive showcase of PAGX format capabilities including gradients, effects, text styling, and vector graphics.
+An infographic / presentation slide introducing PAGX capabilities — center title with orbit ring, five feature cards connected by dashed lines, and a conversion pipeline strip. Demonstrates TextBox multi-line layout, card-based information architecture, and decorative connector graphics.
 
 > [Sample](samples/C.5_pagx_features.pagx)
 
 ### C.6 Space Explorer
 
-An alien planet exploration scene featuring an astronaut surrounded by exotic flora and atmospheric elements. Demonstrates complex composition with layered background effects, procedurally generated grass fields, and character animation capabilities.
+An illustrated alien planet scene with an astronaut, exotic flora, alien creatures, and atmospheric effects. Demonstrates complex scene composition with layered backgrounds, hand-drawn Path artwork, procedurally generated grass fields via long Path data, and rich gradient lighting.
 
 > [Sample](samples/C.6_space_explorer.pagx)
-
-### C.7 App Icons
-
-A frosted glass app icon grid with 12 multi-color icons on a dark background with soft color fields and backdrop blur cards. Demonstrates BackgroundBlurStyle, DropShadowStyle, BlurFilter, and multi-layer icon construction.
-
-> [Sample](samples/C.7_app_icons.pagx)
 

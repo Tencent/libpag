@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="800" height="600">
-  <!-- ==================== Background ==================== -->
   <Layer name="Background">
     <Rectangle center="400,300" size="800,600"/>
     <Fill>
@@ -11,7 +10,6 @@
       </LinearGradient>
     </Fill>
   </Layer>
-
   <Layer name="NebulaLeft">
     <Ellipse center="160,220" size="360,300"/>
     <Fill>
@@ -21,7 +19,6 @@
       </RadialGradient>
     </Fill>
   </Layer>
-
   <Layer name="NebulaRight">
     <Ellipse center="640,180" size="360,280"/>
     <Fill>
@@ -31,7 +28,6 @@
       </RadialGradient>
     </Fill>
   </Layer>
-
   <Layer name="NebulaBottom" alpha="0.9">
     <Ellipse center="400,505" size="600,220"/>
     <Fill>
@@ -41,7 +37,6 @@
       </RadialGradient>
     </Fill>
   </Layer>
-
   <Layer name="Stars" alpha="0.9">
     <Group>
       <Ellipse center="120,80" size="2,2"/>
@@ -69,7 +64,6 @@
       <Fill color="#7DD3FC88"/>
     </Group>
   </Layer>
-
   <Layer name="StarBursts">
     <Layer>
       <Polystar center="220,130" type="star" pointCount="4" outerRadius="8" innerRadius="3" rotation="45"/>
@@ -87,9 +81,7 @@
       <DropShadowStyle blurX="5" blurY="5" color="#22D3EE80"/>
     </Layer>
   </Layer>
-
-  <!-- ==================== HUD Rings ==================== -->
-  <Layer name="HudRings" x="400" y="310" alpha="0.7">
+  <Layer name="HudRings" alpha="0.7" x="400" y="310">
     <Group>
       <Ellipse size="480,480"/>
       <Stroke color="#1E3A8A" width="2" dashes="10,12"/>
@@ -108,11 +100,9 @@
     <Group>
       <Ellipse size="360,360"/>
       <TrimPath start="0.55" end="0.85" offset="-30"/>
-      <Stroke width="3" cap="round" color="#38BDF8" alpha="0.8"/>
+      <Stroke color="#38BDF8" width="3" alpha="0.8" cap="round"/>
     </Group>
   </Layer>
-
-  <!-- ==================== Main Panel ==================== -->
   <Layer name="MainPanel">
     <Rectangle center="400,310" size="680,360" roundness="28"/>
     <Fill>
@@ -132,8 +122,6 @@
     <BackgroundBlurStyle blurX="24" blurY="24" tileMode="mirror"/>
     <DropShadowStyle offsetY="12" blurX="20" blurY="20" color="#00000066"/>
   </Layer>
-
-  <!-- ==================== Top Bar ==================== -->
   <Layer name="TopBar">
     <Rectangle center="400,65" size="760,90" roundness="22"/>
     <Fill>
@@ -150,7 +138,6 @@
     </Stroke>
     <DropShadowStyle offsetY="8" blurX="16" blurY="16" color="#00000055"/>
   </Layer>
-
   <Layer name="Avatar">
     <Group>
       <Polystar center="70,65" type="polygon" pointCount="6" outerRadius="36" rotation="30"/>
@@ -176,15 +163,13 @@
     </Group>
     <DropShadowStyle blurX="10" blurY="10" color="#1D4ED880"/>
   </Layer>
-
   <Layer name="PlayerName">
-    <Text text="NEBULA CADET" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="120,45"/>
+    <Text text="NEBULA CADET" position="120,45" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
     <Fill color="#E2E8F0"/>
   </Layer>
-
   <Layer name="PlayerIdRow">
     <Group>
-      <Text text="#A17X9" fontFamily="Arial" fontSize="11" position="120,63"/>
+      <Text text="#A17X9" position="120,63" fontFamily="Arial" fontSize="11"/>
       <Fill color="#7DD3FC"/>
     </Group>
     <Layer name="LevelBadge">
@@ -197,12 +182,11 @@
       </Fill>
       <Stroke color="#7DD3FC" width="1"/>
       <Group>
-        <Text text="LV 27" fontFamily="Arial" fontStyle="Bold" fontSize="9" position="195,64" textAnchor="center"/>
+        <Text text="LV 27" position="195,64" fontFamily="Arial" fontStyle="Bold" fontSize="9" textAnchor="center"/>
         <Fill color="#E0F2FE"/>
       </Group>
     </Layer>
   </Layer>
-
   <Layer name="ExpBar">
     <Group>
       <Rectangle center="260,79" size="280,10" roundness="5"/>
@@ -218,7 +202,6 @@
       </Fill>
     </Group>
   </Layer>
-
   <Layer name="EnergyBar">
     <Group>
       <Rectangle center="260,95" size="280,10" roundness="5"/>
@@ -234,7 +217,6 @@
       </Fill>
     </Group>
   </Layer>
-
   <Layer name="CoinChip">
     <Rectangle center="691,48" size="150,28" roundness="14"/>
     <Fill>
@@ -252,17 +234,14 @@
           <ColorStop offset="1" color="#F59E0B"/>
         </LinearGradient>
       </Fill>
-    </Group>
-    <Group>
       <Ellipse center="636,48" size="8,8"/>
       <Stroke color="#F8D477" width="1"/>
     </Group>
     <Group>
-      <Text text="12,450" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="656,52"/>
+      <Text text="12,450" position="656,52" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
       <Fill color="#F8FAFC"/>
     </Group>
   </Layer>
-
   <Layer name="DiamondChip">
     <Rectangle center="691,82" size="150,28" roundness="14"/>
     <Fill>
@@ -282,12 +261,10 @@
       </Fill>
     </Group>
     <Group>
-      <Text text="860" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="656,86"/>
+      <Text text="860" position="656,86" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
       <Fill color="#F8FAFC"/>
     </Group>
   </Layer>
-
-  <!-- ==================== Buttons ==================== -->
   <Layer name="StartButton">
     <Rectangle center="400,218" size="340,78" roundness="28"/>
     <Fill>
@@ -307,13 +284,12 @@
       <Fill color="#ECFEFF"/>
     </Group>
     <Layer>
-      <Text text="START" fontFamily="Arial" fontStyle="Bold" fontSize="24" position="400,227" textAnchor="center"/>
+      <Text text="START" position="400,227" fontFamily="Arial" fontStyle="Bold" fontSize="24" textAnchor="center"/>
       <Fill color="#F0FFFD"/>
       <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#0F172A80"/>
     </Layer>
     <DropShadowStyle offsetY="12" blurX="18" blurY="18" color="#00FFC066"/>
   </Layer>
-
   <Layer name="ShopButton">
     <Rectangle center="400,310" size="340,78" roundness="28"/>
     <Fill>
@@ -328,12 +304,11 @@
       <Fill color="#FFF7ED"/>
     </Group>
     <Group>
-      <Text text="SHOP" fontFamily="Arial" fontStyle="Bold" fontSize="22" position="400,319" textAnchor="center"/>
+      <Text text="SHOP" position="400,319" fontFamily="Arial" fontStyle="Bold" fontSize="22" textAnchor="center"/>
       <Fill color="#FFF7ED"/>
     </Group>
     <DropShadowStyle offsetY="10" blurX="16" blurY="16" color="#F59E0B66"/>
   </Layer>
-
   <Layer name="RankButton">
     <Rectangle center="400,402" size="340,78" roundness="28"/>
     <Fill>
@@ -348,13 +323,11 @@
       <Fill color="#FDF2F8"/>
     </Group>
     <Group>
-      <Text text="RANK" fontFamily="Arial" fontStyle="Bold" fontSize="22" position="400,411" textAnchor="center"/>
+      <Text text="RANK" position="400,411" fontFamily="Arial" fontStyle="Bold" fontSize="22" textAnchor="center"/>
       <Fill color="#FDF2F8"/>
     </Group>
     <DropShadowStyle offsetY="10" blurX="16" blurY="16" color="#C084FC66"/>
   </Layer>
-
-  <!-- ==================== Bottom Bar ==================== -->
   <Layer name="BottomBar">
     <Rectangle center="400,545" size="760,70" roundness="20"/>
     <Fill>
@@ -365,9 +338,8 @@
     </Fill>
     <Stroke color="#1D4ED8AA" width="1"/>
   </Layer>
-
   <Layer name="BottomButtonSettings">
-    <Layer composition="@navButton" x="217" y="522"/>
+    <Layer x="217" y="522" composition="@navButton"/>
     <Layer x="228" y="533">
       <Group>
         <Polystar center="12,12" type="star" pointCount="8" outerRadius="10" innerRadius="6"/>
@@ -379,24 +351,20 @@
       </Group>
     </Layer>
   </Layer>
-
   <Layer name="BottomButtonHelp">
-    <Layer composition="@navButton" x="377" y="522"/>
+    <Layer x="377" y="522" composition="@navButton"/>
     <Layer x="388" y="533">
       <Path data="@IconQuestion"/>
       <Fill color="#93C5FD"/>
     </Layer>
   </Layer>
-
   <Layer name="BottomButtonShare">
-    <Layer composition="@navButton" x="537" y="522"/>
+    <Layer x="537" y="522" composition="@navButton"/>
     <Layer x="548" y="533">
       <Path data="@IconShare"/>
       <Fill color="#93C5FD"/>
     </Layer>
   </Layer>
-
-  <!-- ==================== Decorations ==================== -->
   <Layer name="TechLines" alpha="0.6">
     <Group>
       <Path data="M 80 130 L 160 130 L 200 170"/>
@@ -415,7 +383,6 @@
       <Stroke color="#C084FC" width="1"/>
     </Group>
   </Layer>
-
   <Layer name="HexDecor" alpha="0.6">
     <Group>
       <Polystar center="120,200" type="polygon" pointCount="6" outerRadius="14" rotation="30"/>
@@ -434,8 +401,6 @@
       <Stroke color="#A78BFA" width="1"/>
     </Group>
   </Layer>
-
-  <!-- ==================== Resources ==================== -->
   <Resources>
     <PathData id="IconPlay" data="M 0 0 L 24 12 L 0 24 Z"/>
     <PathData id="IconCart" data="M 5 6 L 20 6 L 18 14 L 7 14 Z M 9 18 A 2 2 0 1 0 9 22 A 2 2 0 1 0 9 18 Z M 16 18 A 2 2 0 1 0 16 22 A 2 2 0 1 0 16 18 Z"/>
@@ -443,7 +408,6 @@
     <PathData id="IconDiamond" data="M 8 0 L 16 4 L 16 12 L 8 16 L 0 12 L 0 4 Z"/>
     <PathData id="IconQuestion" data="M 12 4 C 8 4 6 6 6 9 L 9 9 C 9 7.5 10 6.5 12 6.5 C 14 6.5 15 7.5 15 9 C 15 10.5 13.5 11 12 12 C 10.5 13 10 14 10 16 L 14 16 C 14 14.5 14.5 13.5 16 12.5 C 18 11.5 19 10 19 8 C 19 5 16 4 12 4 Z M 12 18 A 2 2 0 1 0 12 22 A 2 2 0 1 0 12 18 Z"/>
     <PathData id="IconShare" data="M 14 4 L 22 12 L 14 20 L 14 15 L 4 15 L 4 9 L 14 9 Z"/>
-    <!-- Navigation Button Shell -->
     <Composition id="navButton" width="46" height="46">
       <Layer>
         <Ellipse center="23,23" size="46,46"/>
