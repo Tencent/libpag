@@ -89,8 +89,8 @@ For each block, construct the internal VectorElement tree:
 
 1. Place geometry elements (Rectangle, Ellipse, Text, etc.)
 2. Add modifiers if needed (TextBox, TrimPath, Repeater, etc.)
-3. Add painters (Fill, Stroke) — remember painter scope rules
-4. Wrap sub-elements in Groups when they need different painters
+3. Add painters (Fill, Stroke) — see `design-patterns.md` §1 Painter Scope Isolation
+4. Wrap sub-elements in Groups when they need different painters (`spec-essentials.md` §4)
 5. Extract repeated subtrees as `<Composition>` in Resources
 
 **Build in layers of complexity** — do not generate the full design in one shot:
@@ -165,8 +165,8 @@ pagx render --scale 2 input.pagx  # 2x resolution for detail inspection
 
 - Element visibly off-center or lopsided
 - Uneven spacing between sibling elements (e.g., icons in a row)
-- Related parts misaligned (e.g., a label not centered in its button, a flame offset from
-  a rocket body, a badge not centered on its background circle)
+- Related parts misaligned (e.g., a label not centered in its button, an icon not
+  centered on its background circle)
 - Text clipped or overflowing its container
 - Elements overlapping when they should not, or gaps where they should connect
 
@@ -215,7 +215,7 @@ If padding is uneven, the inner element appears off-center within the outer.
 **Related-element alignment** — parts that logically belong together should share a visual
 axis. For example:
 - A label and its icon should share the same vertical center (`center_y` equal ±1px)
-- Stacked sub-parts (e.g., rocket body + flame, head + body) should share `center_x`
+- Stacked sub-parts (e.g., icon above label, header above body) should share `center_x`
 - An indicator dot should be horizontally centered under its corresponding tab label
 
 For each pair, compute both center coordinates from bounds and compare.

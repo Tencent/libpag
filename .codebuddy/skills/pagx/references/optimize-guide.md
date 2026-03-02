@@ -256,27 +256,27 @@ rendering surfaces.
 single child can be flattened entirely.
 
 ```xml
-<!-- Before: three stat rows as child Layers -->
-<Layer name="Stats" x="30" y="305">
+<!-- Before: child Layers with no Layer-exclusive features -->
+<Layer x="20" y="80">
   <Layer x="0" y="0">
-    <Text text="ATK  4,256" fontFamily="Arial" fontSize="14"/>
-    <Fill color="#FF4444"/>
+    <Rectangle size="200,40" roundness="8"/>
+    <Fill color="#E2E8F0"/>
   </Layer>
-  <Layer x="0" y="28">
-    <Text text="DEF  3,180" fontFamily="Arial" fontSize="14"/>
-    <Fill color="#4488FF"/>
+  <Layer x="0" y="52">
+    <Rectangle size="200,40" roundness="8"/>
+    <Fill color="#E2E8F0"/>
   </Layer>
 </Layer>
 
 <!-- After: downgraded to Groups -->
-<Layer name="Stats" x="30" y="305">
+<Layer x="20" y="80">
   <Group>
-    <Text text="ATK  4,256" fontFamily="Arial" fontSize="14"/>
-    <Fill color="#FF4444"/>
+    <Rectangle size="200,40" roundness="8"/>
+    <Fill color="#E2E8F0"/>
   </Group>
-  <Group position="0,28">
-    <Text text="DEF  3,180" fontFamily="Arial" fontSize="14"/>
-    <Fill color="#4488FF"/>
+  <Group position="0,52">
+    <Rectangle size="200,40" roundness="8"/>
+    <Fill color="#E2E8F0"/>
   </Group>
 </Layer>
 ```
@@ -411,17 +411,17 @@ mask / blendMode / alpha / name → merge into one Layer.
 > Cross-Layer Merging here focuses on **painter deduplication**.
 
 ```xml
-<!-- Before: 3 Layers, each with same Stroke -->
-<Layer><Ellipse center="100,100" size="200,200"/><Stroke color="#00FF0040" width="1"/></Layer>
-<Layer><Ellipse center="100,100" size="140,140"/><Stroke color="#00FF0040" width="1"/></Layer>
-<Layer><Ellipse center="100,100" size="80,80"/><Stroke color="#00FF0040" width="1"/></Layer>
+<!-- Before: 3 adjacent Layers, each with same Stroke, no styles/filters/mask -->
+<Layer x="20" y="10"><Ellipse center="20,20" size="40,40"/><Stroke color="#3B82F6" width="1"/></Layer>
+<Layer x="80" y="10"><Ellipse center="20,20" size="40,40"/><Stroke color="#3B82F6" width="1"/></Layer>
+<Layer x="140" y="10"><Ellipse center="20,20" size="40,40"/><Stroke color="#3B82F6" width="1"/></Layer>
 
 <!-- After: 1 Layer, 3 Ellipses sharing one Stroke -->
 <Layer>
-  <Ellipse center="100,100" size="200,200"/>
-  <Ellipse center="100,100" size="140,140"/>
-  <Ellipse center="100,100" size="80,80"/>
-  <Stroke color="#00FF0040" width="1"/>
+  <Ellipse center="40,30" size="40,40"/>
+  <Ellipse center="100,30" size="40,40"/>
+  <Ellipse center="160,30" size="40,40"/>
+  <Stroke color="#3B82F6" width="1"/>
 </Layer>
 ```
 
@@ -437,21 +437,21 @@ user confirmation.
 merge into one Group with both painters. Painters do not clear the geometry list.
 
 ```xml
-<!-- Before: duplicated geometry -->
+<!-- Before: same geometry duplicated with different painters -->
 <Group>
-  <Path data="M 46 -30 L 48 -78 L 44 -78 Z"/>
+  <Rectangle size="100,40" roundness="8"/>
   <Fill color="#E2E8F0"/>
 </Group>
 <Group>
-  <Path data="M 46 -30 L 48 -78 L 44 -78 Z"/>
-  <Stroke color="#FFFFFF40" width="1"/>
+  <Rectangle size="100,40" roundness="8"/>
+  <Stroke color="#00000040" width="1"/>
 </Group>
 
 <!-- After: single geometry, two painters -->
 <Group>
-  <Path data="M 46 -30 L 48 -78 L 44 -78 Z"/>
+  <Rectangle size="100,40" roundness="8"/>
   <Fill color="#E2E8F0"/>
-  <Stroke color="#FFFFFF40" width="1"/>
+  <Stroke color="#00000040" width="1"/>
 </Group>
 ```
 
@@ -459,34 +459,32 @@ Painter rendering order follows document order (earlier = below). Maintain origi
 
 ### Scope Isolation Caveats
 
-**Most common source of errors.** After merging, different painters on different geometry
-**must** be isolated with Groups (see `design-patterns.md` §1 Painter Scope Isolation).
+**Most common source of errors.** Core principle: **merging expands scope** — every Painter,
+TrimPath, or modifier applies to **all geometry accumulated above it in the same Group**.
+Before merging, verify that the expanded scope does not change rendering.
 
-Before merging, verify:
+Three checks (fail any one → do not merge):
 
-1. **Identical painter sets**: Only geometry with the same painter configuration can share scope.
-2. **No modifiers between geometry**: If a Group contains modifiers (TrimPath, RoundCorner,
-   MergePath, etc.) between geometry and painter, do not merge — merging expands modifier scope.
-3. **Adjacency**: Only merge Groups that are **direct siblings with no other elements between
-   them**. Groups separated by other Groups, geometry, or painters must not be merged — the
-   intervening elements would be lost or reordered. When non-adjacent Groups share identical
-   painters, leave them as-is.
+1. **Same painters**: Every geometry in the merged Group must use the same painter set.
 
 ```xml
-<!-- These two arms share identical Stroke, but CANNOT merge — shoulder joint in between -->
+<!-- WRONG — Stroke leaks onto Rectangle (was Fill-only). -->
 <Group>
-  <Path data="M-22 -12C-30 -15 -38 -20 -44 -26"/>
-  <Stroke color="#CBD5E1" width="14" cap="round"/>
+  <Rectangle size="100,40"/>
+  <Fill color="#F00"/>
+  <Ellipse center="50,20" size="10,10"/>
+  <Stroke color="#000" width="1"/>
 </Group>
-<Group>
-  <Ellipse center="-46,-45" size="16,18"/>
-  <Fill color="#94A3B8"/>
-</Group>
-<Group>
-  <Path data="M22 -12C32 -5 40 12 44 28"/>
-  <Stroke color="#CBD5E1" width="14" cap="round"/>
-</Group>
+
+<!-- CORRECT — different painter sets stay in separate scopes. -->
+<Group><Rectangle size="100,40"/><Fill color="#F00"/></Group>
+<Group><Ellipse center="50,20" size="10,10"/><Stroke color="#000" width="1"/></Group>
 ```
+
+2. **No modifiers**: TrimPath / RoundCorner / MergePath apply to all geometry above them —
+   merging pulls extra geometry into the modifier's reach.
+3. **Adjacent**: Only merge direct siblings with nothing between them — intervening elements
+   would be swallowed or reordered.
 
 ### DropShadowStyle Scope
 

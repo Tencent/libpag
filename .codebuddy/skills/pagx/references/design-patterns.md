@@ -199,8 +199,8 @@ Declare geometry once with both painters in one Group — painters do not clear 
 
 ```xml
 <Group>
-  <Ellipse center="0,-21" size="38,12"/>
-  <Fill color="#94A3B8"/>
-  <Stroke color="#64748B" width="1.5"/>
+  <Rectangle size="100,40" roundness="8"/>
+  <Fill color="#E2E8F0"/>
+  <Stroke color="#94A3B8" width="1"/>
 </Group>
 ```
