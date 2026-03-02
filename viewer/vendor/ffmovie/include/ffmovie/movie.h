@@ -219,7 +219,7 @@ enum class FFMOVIE_API DecoderResult {
 
   Error = -2,
 
-  EndOfStream = - 3
+  EndOfStream = -3
 };
 
 class FFMOVIE_API MediaFormat {

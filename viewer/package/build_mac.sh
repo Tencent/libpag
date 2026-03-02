@@ -364,18 +364,18 @@ rm -rf "${PluginPath}/Contents/Frameworks"
 rm -rf "${PluginPath}/Contents/Plugins"
 rm -rf "${PluginPath}/Contents/Resources/qml"
 
-# 3.5.2 Copy related tools
+# 3.5.3 Copy related tools
 print "[ Copy related tools ]"
 EncoderToolsPath="${EncoderToolBuildDir}/Release/H264EncoderTools"
 cp -f ${EncoderToolsPath} ${ResourcesDir}
 
-# 3.5.3 Copy Qt deployment scripts
+# 3.5.4 Copy Qt deployment scripts
 print "[ Copy Qt deployment scripts ]"
 cp -f "${SourceDir}/qttools/copy_qt_resource.sh" "${ResourcesDir}/"
 cp -f "${SourceDir}/qttools/delete_qt_resource.sh" "${ResourcesDir}/"
 cp -f "${SourceDir}/qttools/replace_qt_path.sh" "${ResourcesDir}/"
 
-# 3.5.4 Generate qt.conf for PAGExporter plugin
+# 3.5.5 Generate qt.conf for PAGExporter plugin
 # Use absolute path to load Qt resources from external shared directory
 # This avoids modifying plugin bundle contents which would break code signature
 # Note: qt.conf in Resources/ has higher priority than MacOS/ on macOS
