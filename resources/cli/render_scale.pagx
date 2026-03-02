@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test for scale rendering with stroke -->
+<pagx version="1.0" width="100" height="100">
+  <Layer>
+    <Ellipse center="50,50" size="80,80"/>
+    <Fill color="#4CAF50"/>
+    <Stroke color="#2E7D32" width="4"/>
+  </Layer>
+</pagx>

@@ -18,9 +18,6 @@
 
 #include "pagx/PAGXExporter.h"
 #include <cstdio>
-#include "utils/Base64.h"
-#include "utils/StringParser.h"
-#include "svg/SVGPathParser.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
@@ -52,10 +49,13 @@
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
-#include "pagx/nodes/TextLayout.h"
+#include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/svg/SVGPathParser.h"
+#include "pagx/utils/Base64.h"
+#include "pagx/utils/StringParser.h"
 
 namespace pagx {
 
@@ -172,11 +172,20 @@ class XMLBuilder {
     size_t extraSize = 0;
     for (char c : input) {
       switch (c) {
-        case '&':  extraSize += 4; break;
-        case '<':  extraSize += 3; break;
-        case '"': extraSize += 5; break;
-        case '\'': extraSize += 5; break;
-        default: break;
+        case '&':
+          extraSize += 4;
+          break;
+        case '<':
+          extraSize += 3;
+          break;
+        case '"':
+          extraSize += 5;
+          break;
+        case '\'':
+          extraSize += 5;
+          break;
+        default:
+          break;
       }
     }
     if (extraSize == 0) {
@@ -186,11 +195,21 @@ class XMLBuilder {
     result.reserve(input.size() + extraSize);
     for (char c : input) {
       switch (c) {
-        case '&':  result += "&amp;";  break;
-        case '<':  result += "&lt;";   break;
-        case '"': result += "&quot;"; break;
-        case '\'': result += "&apos;"; break;
-        default:   result += c;         break;
+        case '&':
+          result += "&amp;";
+          break;
+        case '<':
+          result += "&lt;";
+          break;
+        case '"':
+          result += "&quot;";
+          break;
+        case '\'':
+          result += "&apos;";
+          break;
+        default:
+          result += c;
+          break;
       }
     }
     return result;
@@ -202,21 +221,16 @@ class XMLBuilder {
 //==============================================================================
 
 static std::string pointToString(const Point& p) {
-  char buf[64] = {};
-  snprintf(buf, sizeof(buf), "%g,%g", p.x, p.y);
-  return buf;
+  return FloatToString(p.x) + "," + FloatToString(p.y);
 }
 
 static std::string sizeToString(const Size& s) {
-  char buf[64] = {};
-  snprintf(buf, sizeof(buf), "%g,%g", s.width, s.height);
-  return buf;
+  return FloatToString(s.width) + "," + FloatToString(s.height);
 }
 
 static std::string rectToString(const Rect& r) {
-  char buf[128] = {};
-  snprintf(buf, sizeof(buf), "%g,%g,%g,%g", r.x, r.y, r.width, r.height);
-  return buf;
+  return FloatToString(r.x) + "," + FloatToString(r.y) + "," + FloatToString(r.width) + "," +
+         FloatToString(r.height);
 }
 
 static std::string floatListToString(const float* values, size_t count) {
@@ -280,17 +294,17 @@ static bool writeColorAttribute(XMLBuilder& xml, const ColorSource* color) {
   return true;
 }
 
-static void writeColorStops(XMLBuilder& xml, const std::vector<ColorStop>& stops) {
-  for (const auto& stop : stops) {
+static void writeColorStops(XMLBuilder& xml, const std::vector<ColorStop*>& stops) {
+  for (const auto* stop : stops) {
     xml.openElement("ColorStop");
-    xml.addRequiredAttribute("offset", stop.offset);
-    xml.addRequiredAttribute("color", ColorToHexString(stop.color, stop.color.alpha < 1.0f));
+    xml.addRequiredAttribute("offset", stop->offset);
+    xml.addRequiredAttribute("color", ColorToHexString(stop->color, stop->color.alpha < 1.0f));
     xml.closeElementSelfClosing();
   }
 }
 
 static void writeGradientMatrixAndStops(XMLBuilder& xml, const Matrix& matrix,
-                                        const std::vector<ColorStop>& colorStops) {
+                                        const std::vector<ColorStop*>& colorStops) {
   if (!matrix.isIdentity()) {
     xml.addAttribute("matrix", MatrixToString(matrix));
   }
@@ -467,7 +481,11 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       }
       xml.addAttribute("fontSize", text->fontSize, 12.0f);
       xml.addAttribute("letterSpacing", text->letterSpacing);
-      xml.addAttribute("baselineShift", text->baselineShift);
+      xml.addAttribute("fauxBold", text->fauxBold);
+      xml.addAttribute("fauxItalic", text->fauxItalic);
+      if (text->textAnchor != TextAnchor::Start) {
+        xml.addAttribute("textAnchor", TextAnchorToString(text->textAnchor));
+      }
 
       // Skip GlyphRuns if requested or if none exist
       if (options.skipGlyphData || text->glyphRuns.empty()) {
@@ -701,24 +719,31 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::TextLayout: {
-      auto layout = static_cast<const TextLayout*>(node);
-      xml.openElement("TextLayout");
-      if (layout->position.x != 0 || layout->position.y != 0) {
-        xml.addAttribute("position", pointToString(layout->position));
+    case NodeType::TextBox: {
+      auto textBox = static_cast<const TextBox*>(node);
+      xml.openElement("TextBox");
+      if (textBox->position.x != 0 || textBox->position.y != 0) {
+        xml.addAttribute("position", pointToString(textBox->position));
       }
-      xml.addAttribute("width", layout->width);
-      xml.addAttribute("height", layout->height);
-      if (layout->textAlign != TextAlign::Start) {
-        xml.addAttribute("textAlign", TextAlignToString(layout->textAlign));
+      if (textBox->size.width != 0 || textBox->size.height != 0) {
+        xml.addAttribute("size", sizeToString(textBox->size));
       }
-      if (layout->verticalAlign != VerticalAlign::Top) {
-        xml.addAttribute("verticalAlign", VerticalAlignToString(layout->verticalAlign));
+      if (textBox->textAlign != TextAlign::Start) {
+        xml.addAttribute("textAlign", TextAlignToString(textBox->textAlign));
       }
-      if (layout->writingMode != WritingMode::Horizontal) {
-        xml.addAttribute("writingMode", WritingModeToString(layout->writingMode));
+      if (textBox->paragraphAlign != ParagraphAlign::Near) {
+        xml.addAttribute("paragraphAlign", ParagraphAlignToString(textBox->paragraphAlign));
       }
-      xml.addAttribute("lineHeight", layout->lineHeight, 1.2f);
+      if (textBox->writingMode != WritingMode::Horizontal) {
+        xml.addAttribute("writingMode", WritingModeToString(textBox->writingMode));
+      }
+      xml.addAttribute("lineHeight", textBox->lineHeight, 0.0f);
+      if (!textBox->wordWrap) {
+        xml.addAttribute("wordWrap", textBox->wordWrap);
+      }
+      if (textBox->overflow != Overflow::Visible) {
+        xml.addAttribute("overflow", OverflowToString(textBox->overflow));
+      }
       xml.closeElementSelfClosing();
       break;
     }
@@ -798,6 +823,7 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       if (style->blendMode != BlendMode::Normal) {
         xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
       }
+      xml.addAttribute("excludeChildEffects", style->excludeChildEffects, false);
       writeShadowAttributes(xml, style->offsetX, style->offsetY, style->blurX, style->blurY,
                             style->color);
       xml.addAttribute("showBehindLayer", style->showBehindLayer, true);
@@ -810,6 +836,7 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       if (style->blendMode != BlendMode::Normal) {
         xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
       }
+      xml.addAttribute("excludeChildEffects", style->excludeChildEffects, false);
       writeShadowAttributes(xml, style->offsetX, style->offsetY, style->blurX, style->blurY,
                             style->color);
       xml.closeElementSelfClosing();
@@ -821,6 +848,7 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       if (style->blendMode != BlendMode::Normal) {
         xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
       }
+      xml.addAttribute("excludeChildEffects", style->excludeChildEffects, false);
       xml.addAttribute("blurX", style->blurX);
       xml.addAttribute("blurY", style->blurY);
       if (style->tileMode != TileMode::Mirror) {
@@ -960,9 +988,9 @@ static void writeResource(XMLBuilder& xml, const Node* node, const Options& opti
             if (!glyph->image->id.empty()) {
               xml.addAttribute("image", "@" + glyph->image->id);
             } else if (glyph->image->data) {
-              xml.addAttribute("image", "data:image/png;base64," +
-                                            Base64Encode(glyph->image->data->bytes(),
-                                                         glyph->image->data->size()));
+              xml.addAttribute("image",
+                               "data:image/png;base64," + Base64Encode(glyph->image->data->bytes(),
+                                                                       glyph->image->data->size()));
             } else if (!glyph->image->filePath.empty()) {
               xml.addAttribute("image", glyph->image->filePath);
             }
@@ -1011,14 +1039,13 @@ static void writeLayer(XMLBuilder& xml, const Layer* node, const Options& option
   if (!node->matrix.isIdentity()) {
     xml.addAttribute("matrix", MatrixToString(node->matrix));
   }
-  if (!node->matrix3D.empty()) {
-    xml.addAttribute("matrix3D", floatListToString(node->matrix3D));
+  if (!node->matrix3D.isIdentity()) {
+    xml.addAttribute("matrix3D", floatListToString(node->matrix3D.values, 16));
   }
   xml.addAttribute("preserve3D", node->preserve3D);
   xml.addAttribute("antiAlias", node->antiAlias, true);
   xml.addAttribute("groupOpacity", node->groupOpacity);
   xml.addAttribute("passThroughBackground", node->passThroughBackground, true);
-  xml.addAttribute("excludeChildEffectsInLayerStyle", node->excludeChildEffectsInLayerStyle);
   if (node->hasScrollRect) {
     xml.addAttribute("scrollRect", rectToString(node->scrollRect));
   }

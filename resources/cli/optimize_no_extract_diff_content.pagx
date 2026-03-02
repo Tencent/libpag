@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="400" height="400">
+  <Layer name="big_red" x="100" y="100">
+    <Rectangle size="100,100"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+  <Layer name="small_red" x="300" y="100">
+    <Rectangle size="50,50"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+  <Layer name="big_blue" x="100" y="300">
+    <Rectangle size="100,100"/>
+    <Fill color="#0000FF"/>
+  </Layer>
+  <Layer name="small_blue" x="300" y="300">
+    <Rectangle size="50,50"/>
+    <Fill color="#0000FF"/>
+  </Layer>
+</pagx>

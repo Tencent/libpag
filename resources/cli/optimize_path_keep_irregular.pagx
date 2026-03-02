@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer name="irregular">
+    <Path data="M 10 10 L 100 30 L 80 90 L 20 70 Z"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+</pagx>

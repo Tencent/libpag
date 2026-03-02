@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- File with duplicate layers that can be extracted to composition -->
+<pagx version="1.0" width="300" height="200">
+  <Layer x="50" y="100">
+    <Ellipse center="0,0" size="60,60"/>
+    <Fill color="#E91E63"/>
+    <Stroke color="#880E4F" width="3"/>
+  </Layer>
+  <Layer x="150" y="100">
+    <Ellipse center="0,0" size="60,60"/>
+    <Fill color="#E91E63"/>
+    <Stroke color="#880E4F" width="3"/>
+  </Layer>
+  <Layer x="250" y="100">
+    <Ellipse center="0,0" size="60,60"/>
+    <Fill color="#E91E63"/>
+    <Stroke color="#880E4F" width="3"/>
+  </Layer>
+</pagx>

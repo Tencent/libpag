@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- File with unreferenced resources that should be removed -->
+<pagx version="1.0" width="200" height="200">
+  <Resources>
+    <PathData id="unusedPath" data="M 0 0 L 100 100"/>
+    <LinearGradient id="unusedGradient" startPoint="0,0" endPoint="100,0">
+      <ColorStop offset="0" color="#FF0000"/>
+      <ColorStop offset="1" color="#0000FF"/>
+    </LinearGradient>
+  </Resources>
+  <Layer>
+    <Rectangle center="100,100" size="100,100"/>
+    <Fill color="#4CAF50"/>
+  </Layer>
+</pagx>

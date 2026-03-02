@@ -19,7 +19,6 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 
 namespace pagx {
 
@@ -170,9 +169,9 @@ enum class NodeType {
    */
   TextPath,
   /**
-   * A text modifier that controls text layout and alignment.
+   * A text modifier that controls text layout and alignment within a text box.
    */
-  TextLayout,
+  TextBox,
   /**
    * A container that groups multiple elements with its own transform.
    */
@@ -204,11 +203,6 @@ class Node {
    * The unique identifier of this node. Used for referencing the node by ID (e.g., "@id").
    */
   std::string id = {};
-
-  /**
-   * Custom data attributes. The keys are stored without the "data-" prefix.
-   */
-  std::unordered_map<std::string, std::string> customData = {};
 
   virtual ~Node() = default;
 

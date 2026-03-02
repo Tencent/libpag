@@ -16,7 +16,10 @@ deep review with risk-based auto-fix.
 
 All user-facing text matches the user's language. All questions and option
 selections MUST use your interactive dialog tool (e.g. AskUserQuestion) — never
-output options as plain text. Do not proceed until the user replies.
+output options as plain text. Do not proceed until the user replies. When
+presenting multi-select options: ≤4 items → one question. >4 items → group by
+priority or category (each group ≤4 options), then present all groups as
+separate questions in a single prompt.
 
 ## Route
 

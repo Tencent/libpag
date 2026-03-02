@@ -11,56 +11,17 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif ()
 
-# Set TGFX_DIR for libpag structure (tgfx is in third_party/tgfx)
-if (NOT TGFX_DIR)
-    set(TGFX_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/tgfx)
-endif ()
-get_filename_component(TGFX_DIR "${TGFX_DIR}" REALPATH)
+# Enable PAGX module and add the main libpag project as a subdirectory.
+# PAG_USE_FREETYPE must be ON: tgfx defaults to FreeType on WEB+threads, but the main project
+# forces it OFF for WEB. Playground needs FreeType for HarfBuzz text shaping.
+set(PAG_BUILD_PAGX ON)
+set(PAG_USE_FREETYPE ON)
+set(PAG_USE_JPEG_DECODE ON)
+set(PAG_USE_PNG_DECODE ON)
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/.. ${CMAKE_CURRENT_BINARY_DIR}/libpag)
 
-# Add tgfx as dependency
-if (NOT TARGET tgfx)
-    set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-    set(TGFX_BUILD_LAYERS ON CACHE BOOL "" FORCE)
-    add_subdirectory(${TGFX_DIR} ${CMAKE_CURRENT_BINARY_DIR}/tgfx)
-endif ()
-
-# Build pagx static library
-file(GLOB PAGX_CORE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../src/pagx/*.cpp)
-file(GLOB_RECURSE PAGX_UTILS_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../src/pagx/utils/*.cpp)
-file(GLOB_RECURSE PAGX_XML_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../src/pagx/xml/*.cpp)
-file(GLOB_RECURSE PAGX_SVG_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../src/pagx/svg/*.cpp)
-if (NOT TARGET pagx)
-    add_library(pagx STATIC ${PAGX_CORE_SOURCES} ${PAGX_UTILS_SOURCES} ${PAGX_XML_SOURCES} ${PAGX_SVG_SOURCES})
-    target_include_directories(pagx PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)
-    target_include_directories(pagx PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/../src/pagx
-            ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/expat/expat/lib)
-    if(WIN32)
-        target_compile_definitions(pagx PRIVATE XML_STATIC)
-    endif()
-    add_vendor_target(pagx-vendor STATIC_VENDORS expat CONFIG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
-    find_vendor_libraries(pagx-vendor STATIC PAGX_VENDOR_STATIC_LIBRARIES)
-    add_dependencies(pagx pagx-vendor)
-    merge_libraries_into(pagx ${PAGX_VENDOR_STATIC_LIBRARIES})
-endif ()
-
-# Build renderer sources as a static library for playground use
-file(GLOB_RECURSE RENDERER_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../src/renderer/*.cpp)
-if (NOT TARGET pagx-renderer)
-    add_library(pagx-renderer STATIC ${RENDERER_SOURCES})
-    target_include_directories(pagx-renderer PUBLIC
-            ${CMAKE_CURRENT_SOURCE_DIR}/../src/renderer)
-    target_include_directories(pagx-renderer PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/../src/pagx)
-    target_link_libraries(pagx-renderer PUBLIC pagx tgfx)
-endif ()
-
-# For Emscripten builds, pagx needs the same compile options as tgfx
-if (DEFINED EMSCRIPTEN)
-    target_compile_options(pagx PRIVATE -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0)
-    target_compile_options(pagx-renderer PRIVATE -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0)
-endif ()
-
+# Playground executable
 file(GLOB_RECURSE PLAYGROUND_FILES src/*.cpp)
 
 if (DEFINED EMSCRIPTEN)
@@ -96,4 +57,9 @@ endif ()
 
 target_compile_options(pagx-playground PUBLIC ${PLAYGROUND_COMPILE_OPTIONS})
 target_link_options(pagx-playground PUBLIC ${PLAYGROUND_LINK_OPTIONS})
-target_link_libraries(pagx-playground pagx-renderer)
+# Link the complete pag static library (dead code is eliminated by wasm-ld + Binaryen Meta-DCE).
+# Also link tgfx to get its PUBLIC include directories (pag links tgfx via file path, not target).
+target_link_libraries(pagx-playground pag tgfx)
+target_include_directories(pagx-playground PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../src
+        ${CMAKE_CURRENT_SOURCE_DIR}/../src/renderer)

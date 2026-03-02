@@ -46,8 +46,8 @@ include if the change is specific and actionable.
 
 ## Apply
 
-If any finding has a concrete file edit, present all actionable edits and ask
-the user via **a single multi-select question** which ones to apply. Each
-option label is a one-line summary of the edit. Unchecked edits are discarded.
+If any finding has a concrete file edit, present all actionable edits via
+multi-select. Each option label is a one-line summary of the edit. Unchecked
+edits are discarded.
 
 Apply selected edits.

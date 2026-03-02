@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="600" height="420" version="1.0">
+  <!-- Box A: Latin extended characters (2-byte UTF-8: é, ü, ï) -->
+  <Layer x="50" y="30">
+    <Group>
+      <Rectangle center="125,25" size="250,50"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[café résumé naïve]]></Text>
+      <TextBox size="250,50"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box B: Tab character handling -->
+  <Layer x="330" y="30">
+    <Group>
+      <Rectangle center="110,25" size="220,50"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="20"><![CDATA[你好	World	测试]]></Text>
+      <TextBox size="220,50"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box C: Mixed CJK scripts (Hiragana + Katakana + Kanji) -->
+  <Layer x="50" y="110">
+    <Group>
+      <Rectangle center="125,50" size="250,100"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[平仮名カタカナ漢字混合テスト]]></Text>
+      <TextBox size="250,100"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box D: Fullwidth characters -->
+  <Layer x="330" y="110">
+    <Group>
+      <Rectangle center="110,25" size="220,50"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[Ａ，Ｂ。Ｃ：Ｄ]]></Text>
+      <TextBox size="220,50"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box E: Multiple consecutive empty lines -->
+  <Layer x="50" y="230">
+    <Group>
+      <Rectangle center="110,65" size="220,130"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="18"><![CDATA[Line1
+Line2
+
+Line4
+Line5]]></Text>
+      <TextBox size="220,130"/>
+      <Fill/>
+    </Group>
+  </Layer>
+</pagx>
