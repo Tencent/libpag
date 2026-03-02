@@ -26,7 +26,7 @@
 
 namespace ffavc {
 class FFAVC_EXPORT DecoderFactory {
-public:
+ public:
   /**
    * Returns a handle of the decoder factory which implements the pag::SoftwareDecoderFactory API.
    * The returned handle can be type-casted to a pag::SoftwareDecoderFactory pointer, then passed in

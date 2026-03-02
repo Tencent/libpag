@@ -83,4 +83,14 @@ for resource in "$VIEWER_RESOURCES"/*.qm; do
     fi
 done
 
+# Copy ffmovie library (required by PAGExporter)
+echo "Copying ffmovie library..."
+FFMOVIE_LIB="$VIEWER_FRAMEWORKS/libffmovie.dylib"
+if [ -f "$FFMOVIE_LIB" ]; then
+    echo "  - libffmovie.dylib"
+    sudo cp "$FFMOVIE_LIB" "$SHARED_QT_DIR/Frameworks/"
+else
+    echo "Warning: libffmovie.dylib not found in PAGViewer"
+fi
+
 echo "Qt resources copied to shared directory: $SHARED_QT_DIR"
