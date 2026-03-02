@@ -16,6 +16,8 @@ endif ()
 # forces it OFF for WEB. Playground needs FreeType for HarfBuzz text shaping.
 set(PAG_BUILD_PAGX ON)
 set(PAG_USE_FREETYPE ON)
+set(PAG_USE_JPEG_DECODE ON)
+set(PAG_USE_PNG_DECODE ON)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/.. ${CMAKE_CURRENT_BINARY_DIR}/libpag)
 
