@@ -234,6 +234,8 @@
           <ColorStop offset="1" color="#F59E0B"/>
         </LinearGradient>
       </Fill>
+    </Group>
+    <Group>
       <Ellipse center="636,48" size="8,8"/>
       <Stroke color="#F8D477" width="1"/>
     </Group>
