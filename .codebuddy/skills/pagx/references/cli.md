@@ -73,6 +73,11 @@ pagx render --font a.ttf --fallback b.otf --fallback "Noto Emoji" input.pagx
 automatically. Fallback fonts are tried in order when a character is not found in the
 primary font. System fallback fonts are always appended after user-specified fallbacks.
 
+**Output convention**: Always output to the same directory as the input `.pagx` file — either omit
+`-o` (default behavior) or specify `-o` with a path in the same directory (e.g., for `--crop`
+variants). Rendered images are temporary verification artifacts. If the project context includes
+auto-commit rules, exclude these generated image files (`.png`, `.webp`, `.jpg`) from the commit.
+
 ---
 
 ## pagx validate
