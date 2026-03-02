@@ -1262,7 +1262,26 @@ static bool ShouldSkipLocalization(const Layer* layer) {
   return false;
 }
 
-// Compute the bounding box of shape elements (Rectangle, Ellipse, Polystar).
+// Compute the maximum stroke expansion from contents. For center-aligned strokes, the expansion is
+// half the stroke width. For outer-aligned strokes, it is the full width.
+static float ComputeStrokeExpansion(const std::vector<Element*>& contents) {
+  float expansion = 0.0f;
+  for (auto* element : contents) {
+    if (element->nodeType() == NodeType::Stroke) {
+      auto stroke = static_cast<const Stroke*>(element);
+      float strokeExpansion = 0.0f;
+      if (stroke->align == StrokeAlign::Center) {
+        strokeExpansion = stroke->width * 0.5f;
+      } else if (stroke->align == StrokeAlign::Outside) {
+        strokeExpansion = stroke->width;
+      }
+      expansion = std::max(expansion, strokeExpansion);
+    }
+  }
+  return expansion;
+}
+
+// Compute the bounding box of shape elements including stroke expansion.
 static bool ComputeShapeBounds(const std::vector<Element*>& contents, float& minX, float& minY,
                                float& maxX, float& maxY) {
   minX = FLT_MAX;
@@ -1310,6 +1329,13 @@ static bool ComputeShapeBounds(const std::vector<Element*>& contents, float& min
         hasGeometry = true;
       }
     }
+  }
+  if (hasGeometry) {
+    auto expansion = ComputeStrokeExpansion(contents);
+    minX -= expansion;
+    minY -= expansion;
+    maxX += expansion;
+    maxY += expansion;
   }
   return hasGeometry;
 }
@@ -1387,6 +1413,61 @@ static void OffsetPathData(PathData* source, PathData* target, float offsetX, fl
   }
 }
 
+static ColorSource* OffsetColorSource(
+    PAGXDocument* document, ColorSource* source, float offsetX, float offsetY,
+    std::unordered_map<const ColorSource*, ColorSource*>& offsetMap) {
+  if (source == nullptr) {
+    return nullptr;
+  }
+  auto type = source->nodeType();
+  if (type == NodeType::SolidColor || type == NodeType::ImagePattern) {
+    return source;
+  }
+  auto it = offsetMap.find(source);
+  if (it != offsetMap.end()) {
+    return it->second;
+  }
+  ColorSource* result = nullptr;
+  if (type == NodeType::LinearGradient) {
+    auto* original = static_cast<LinearGradient*>(source);
+    auto* grad = document->makeNode<LinearGradient>();
+    grad->startPoint = {original->startPoint.x - offsetX, original->startPoint.y - offsetY};
+    grad->endPoint = {original->endPoint.x - offsetX, original->endPoint.y - offsetY};
+    grad->matrix = original->matrix;
+    grad->colorStops = original->colorStops;
+    result = grad;
+  } else if (type == NodeType::RadialGradient) {
+    auto* original = static_cast<RadialGradient*>(source);
+    auto* grad = document->makeNode<RadialGradient>();
+    grad->center = {original->center.x - offsetX, original->center.y - offsetY};
+    grad->radius = original->radius;
+    grad->matrix = original->matrix;
+    grad->colorStops = original->colorStops;
+    result = grad;
+  } else if (type == NodeType::ConicGradient) {
+    auto* original = static_cast<ConicGradient*>(source);
+    auto* grad = document->makeNode<ConicGradient>();
+    grad->center = {original->center.x - offsetX, original->center.y - offsetY};
+    grad->startAngle = original->startAngle;
+    grad->endAngle = original->endAngle;
+    grad->matrix = original->matrix;
+    grad->colorStops = original->colorStops;
+    result = grad;
+  } else if (type == NodeType::DiamondGradient) {
+    auto* original = static_cast<DiamondGradient*>(source);
+    auto* grad = document->makeNode<DiamondGradient>();
+    grad->center = {original->center.x - offsetX, original->center.y - offsetY};
+    grad->radius = original->radius;
+    grad->matrix = original->matrix;
+    grad->colorStops = original->colorStops;
+    result = grad;
+  }
+  if (result != nullptr) {
+    offsetMap[source] = result;
+  }
+  return result != nullptr ? result : source;
+}
+
 static void ApplyLocalizationToElements(PAGXDocument* document,
                                         const std::vector<Element*>& contents, float offsetX,
                                         float offsetY) {
@@ -1436,6 +1517,22 @@ static void ApplyLocalizationToElements(PAGXDocument* document,
       auto group = static_cast<Group*>(element);
       group->position.x -= offsetX;
       group->position.y -= offsetY;
+    }
+  }
+}
+
+static void OffsetColorSourcesInContents(PAGXDocument* document,
+                                         const std::vector<Element*>& contents, float offsetX,
+                                         float offsetY) {
+  std::unordered_map<const ColorSource*, ColorSource*> offsetColorMap = {};
+  for (auto* element : contents) {
+    auto type = element->nodeType();
+    if (type == NodeType::Fill) {
+      auto fill = static_cast<Fill*>(element);
+      fill->color = OffsetColorSource(document, fill->color, offsetX, offsetY, offsetColorMap);
+    } else if (type == NodeType::Stroke) {
+      auto stroke = static_cast<Stroke*>(element);
+      stroke->color = OffsetColorSource(document, stroke->color, offsetX, offsetY, offsetColorMap);
     }
   }
 }
@@ -1816,6 +1913,7 @@ static int ExtractCompositions(PAGXDocument* document) {
     // Localize contents coordinates to Composition space (origin at top-left of bounds).
     if (std::abs(candidate.minX) >= 0.001f || std::abs(candidate.minY) >= 0.001f) {
       ApplyLocalizationToElements(document, innerLayer->contents, candidate.minX, candidate.minY);
+      OffsetColorSourcesInContents(document, innerLayer->contents, candidate.minX, candidate.minY);
     }
     comp->layers.push_back(innerLayer);
 

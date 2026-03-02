@@ -795,8 +795,11 @@ static void TestOptimizeAndRender(const std::string& testName, const std::string
     ASSERT_EQ(ret, 0) << "Failed to render optimized file";
   }
 
-  EXPECT_TRUE(CompareRenderedImage(originalRenderPath, "PAGXCliTest/" + testName));
-  EXPECT_TRUE(CompareRenderedImage(optimizedRenderPath, "PAGXCliTest/" + testName));
+  auto baselineKey = "PAGXCliTest/" + testName;
+  EXPECT_TRUE(CompareRenderedImage(originalRenderPath, baselineKey + "_original"))
+      << "Original rendering mismatch for " << testName;
+  EXPECT_TRUE(CompareRenderedImage(optimizedRenderPath, baselineKey + "_optimized"))
+      << "Optimized rendering mismatch for " << testName;
 }
 
 CLI_TEST(PAGXCliTest, OptimizeRender_EmptyElements) {
