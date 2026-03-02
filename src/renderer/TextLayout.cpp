@@ -1104,16 +1104,20 @@ class TextLayoutContext {
     int lastBreakIndex = -1;
     float boxWidth = textBox->size.width;
     bool doWrap = textBox->wordWrap && boxWidth > 0;
+    // Tracks the fontLineHeight of the \n that created the current line.
+    // Used as the fallback height for empty lines (e.g. consecutive \n\n).
+    float pendingNewlineFontLineHeight = 0.0f;
 
     for (size_t i = 0; i < allGlyphs.size(); i++) {
       auto& glyph = allGlyphs[i];
 
       if (glyph.unichar == '\n') {
-        FinishLine(currentLine, textBox->lineHeight, glyph.fontLineHeight);
+        FinishLine(currentLine, textBox->lineHeight, pendingNewlineFontLineHeight);
         lines.emplace_back();
         currentLine = &lines.back();
         currentLineWidth = 0;
         lastBreakIndex = -1;
+        pendingNewlineFontLineHeight = glyph.fontLineHeight;
         continue;
       }
 
@@ -1226,7 +1230,7 @@ class TextLayoutContext {
       }
     }
 
-    FinishLine(currentLine, textBox->lineHeight, 0.0f);
+    FinishLine(currentLine, textBox->lineHeight, pendingNewlineFontLineHeight);
 
 #ifdef PAG_BUILD_PAGX
     // Apply punctuation squash to all lines.
@@ -1665,7 +1669,15 @@ class TextLayoutContext {
     }
   }
 
-  static void FinishColumn(ColumnInfo* column, float lineHeight) {
+  static void FinishColumn(ColumnInfo* column, float lineHeight, float newlineFontLineHeight) {
+    if (column->glyphs.empty()) {
+      if (lineHeight > 0) {
+        column->maxColumnWidth = lineHeight;
+      } else if (newlineFontLineHeight > 0) {
+        column->maxColumnWidth = roundf(newlineFontLineHeight);
+      }
+      return;
+    }
     float height = 0;
     float maxFontLineHeight = 0;
     for (auto& vg : column->glyphs) {
@@ -1738,6 +1750,9 @@ class TextLayoutContext {
     float boxHeight = textBox->size.height;
     bool doWrap = textBox->wordWrap && boxHeight > 0;
     int lastBreakIndex = -1;
+    // Tracks the fontLineHeight of the \n that created the current column.
+    // Used as the fallback width for empty columns (e.g. consecutive \n\n).
+    float pendingNewlineFontLineHeight = 0.0f;
 
     for (size_t i = 0; i < vgList.size(); i++) {
       auto& vg = vgList[i];
@@ -1749,11 +1764,12 @@ class TextLayoutContext {
                LineBreaker::IsWhitespace(currentColumn->glyphs.back().glyphs.front().unichar)) {
           currentColumn->glyphs.pop_back();
         }
-        FinishColumn(currentColumn, textBox->lineHeight);
+        FinishColumn(currentColumn, textBox->lineHeight, pendingNewlineFontLineHeight);
         columns.emplace_back();
         currentColumn = &columns.back();
         currentColumnHeight = 0;
         lastBreakIndex = -1;
+        pendingNewlineFontLineHeight = vg.glyphs.front().fontLineHeight;
         continue;
       }
 
@@ -1772,7 +1788,7 @@ class TextLayoutContext {
                  LineBreaker::IsWhitespace(currentColumn->glyphs.back().glyphs.front().unichar)) {
             currentColumn->glyphs.pop_back();
           }
-          FinishColumn(currentColumn, textBox->lineHeight);
+          FinishColumn(currentColumn, textBox->lineHeight, 0.0f);
           columns.emplace_back();
           currentColumn = &columns.back();
           // Skip leading whitespace in overflow.
@@ -1800,7 +1816,7 @@ class TextLayoutContext {
           }
         } else {
           RemoveTrailingLetterSpacing(currentColumn->glyphs);
-          FinishColumn(currentColumn, textBox->lineHeight);
+          FinishColumn(currentColumn, textBox->lineHeight, 0.0f);
           columns.emplace_back();
           currentColumn = &columns.back();
           currentColumnHeight = 0;
@@ -1817,7 +1833,7 @@ class TextLayoutContext {
 
     RemoveTrailingLetterSpacing(currentColumn->glyphs);
 
-    FinishColumn(currentColumn, textBox->lineHeight);
+    FinishColumn(currentColumn, textBox->lineHeight, pendingNewlineFontLineHeight);
 
 #ifdef PAG_BUILD_PAGX
     // Apply punctuation squash to all columns.

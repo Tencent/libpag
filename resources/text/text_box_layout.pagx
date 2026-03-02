@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx width="700" height="1050" version="1.0">
+<pagx width="700" height="1100" version="1.0">
   <!-- === Row 1: Basic box text layout === -->
 
   <!-- Box A: CJK auto word wrap -->
-  <Layer x="30" y="30">
+  <Layer x="50" y="50">
     <Group>
       <Rectangle center="75,60" size="150,120"/>
       <Stroke/>
@@ -16,7 +16,7 @@
   </Layer>
 
   <!-- Box B: Overflow hidden -->
-  <Layer x="200" y="30">
+  <Layer x="220" y="50">
     <Group>
       <Rectangle center="75,40" size="150,80"/>
       <Stroke/>
@@ -29,7 +29,7 @@
   </Layer>
 
   <!-- Box C: Justify alignment -->
-  <Layer x="370" y="30">
+  <Layer x="390" y="50">
     <Group>
       <Rectangle center="75,40" size="150,80"/>
       <Stroke/>
@@ -44,7 +44,7 @@
   <!-- === Row 2: Empty lines and rich text === -->
 
   <!-- Box D: Empty lines (\n at start + consecutive \n\n) -->
-  <Layer x="30" y="170">
+  <Layer x="50" y="200">
     <Group>
       <Rectangle center="60,65" size="120,130"/>
       <Stroke/>
@@ -57,7 +57,7 @@
   </Layer>
 
   <!-- Box E: Rich text + end alignment -->
-  <Layer x="170" y="170">
+  <Layer x="190" y="200">
     <Group>
       <Rectangle center="115,60" size="230,120"/>
       <Stroke/>
@@ -78,7 +78,7 @@
   <!-- === Row 3: Paragraph alignment near/middle/far === -->
 
   <!-- Box F: ParagraphAlign near -->
-  <Layer x="30" y="320">
+  <Layer x="50" y="360">
     <Group>
       <Rectangle center="75,40" size="150,80"/>
       <Stroke/>
@@ -91,7 +91,7 @@
   </Layer>
 
   <!-- Box G: ParagraphAlign middle -->
-  <Layer x="200" y="320">
+  <Layer x="220" y="360">
     <Group>
       <Rectangle center="75,40" size="150,80"/>
       <Stroke/>
@@ -104,7 +104,7 @@
   </Layer>
 
   <!-- Box H: ParagraphAlign far -->
-  <Layer x="370" y="320">
+  <Layer x="390" y="360">
     <Group>
       <Rectangle center="75,40" size="150,80"/>
       <Stroke/>
@@ -119,7 +119,7 @@
   <!-- === Row 4: Line height === -->
 
   <!-- Box I: Auto lineHeight, mixed font sizes -->
-  <Layer x="30" y="430">
+  <Layer x="50" y="470">
     <Group>
       <Rectangle center="100,90" size="200,180"/>
       <Stroke/>
@@ -142,7 +142,7 @@
   </Layer>
 
   <!-- Box J: Fixed lineHeight=40, mixed font sizes -->
-  <Layer x="250" y="430">
+  <Layer x="270" y="470">
     <Group>
       <Rectangle center="100,90" size="200,180"/>
       <Stroke/>
@@ -165,7 +165,7 @@
   </Layer>
 
   <!-- Box K: Fixed lineHeight=50, paragraphAlign far -->
-  <Layer x="470" y="430">
+  <Layer x="490" y="470">
     <Group>
       <Rectangle center="75,80" size="150,160"/>
       <Stroke/>
@@ -177,8 +177,10 @@
     </Group>
   </Layer>
 
+  <!-- === Row 4 (continued): Line height with mixed sizes === -->
+
   <!-- Box L: 3-line mixed sizes, paragraphAlign far -->
-  <Layer x="30" y="640">
+  <Layer x="50" y="680">
     <Group>
       <Rectangle center="75,90" size="150,180"/>
       <Stroke/>
@@ -200,10 +202,31 @@
     </Group>
   </Layer>
 
+  <!-- Box L2: Mixed font sizes with empty line — empty line height uses the \n that created it.
+       "Hg\n" at 40pt produces the empty line, "\nAB" at 16pt starts the next line.
+       The empty line height should use 40pt metrics, not 16pt. -->
+  <Layer x="240" y="680">
+    <Group>
+      <Rectangle center="100,90" size="200,180"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Group>
+        <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
+        <Fill/>
+      </Group>
+      <Group>
+        <Text text="&#10;AB" fontFamily="NotoSansSC" fontSize="16"/>
+        <Fill/>
+      </Group>
+      <TextBox size="200,180"/>
+    </Group>
+  </Layer>
+
   <!-- === Row 5: Point text (no TextBox, multiline with anchor) === -->
 
   <!-- Box M: Point text, textAnchor=start (default) -->
-  <Layer x="220" y="640">
+  <Layer x="50" y="890">
     <Group>
       <Text text="Line One&#10;Line Two&#10;Line Three" fontFamily="NotoSansSC" fontSize="24"/>
       <Fill/>
@@ -215,7 +238,7 @@
   </Layer>
 
   <!-- Box N: Point text, textAnchor=center -->
-  <Layer x="500" y="640">
+  <Layer x="320" y="890">
     <Group>
       <Text text="Center A&#10;Center BB&#10;Center CCC" fontFamily="NotoSansSC" fontSize="24" textAnchor="center"/>
       <Fill/>
@@ -227,7 +250,7 @@
   </Layer>
 
   <!-- Box O: Point text, textAnchor=end -->
-  <Layer x="500" y="770">
+  <Layer x="590" y="890">
     <Group>
       <Text text="End X&#10;End YY&#10;End ZZZ" fontFamily="NotoSansSC" fontSize="24" textAnchor="end"/>
       <Fill/>
@@ -241,7 +264,7 @@
   <!-- === Row 6: TextBox anchor mode (TextBox without size) === -->
 
   <!-- Box P: 6 anchor alignment combinations -->
-  <Layer x="30" y="900">
+  <Layer x="50" y="1025">
     <!-- TextAlign Start -->
     <Group>
       <Text text="Start" fontFamily="NotoSansSC" fontSize="20"/>

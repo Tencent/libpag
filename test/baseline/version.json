@@ -8602,6 +8602,7 @@
         "C.4_game_hud": "92c2a4b87",
         "C.5_pagx_features": "004b53bf",
         "C.6_space_explorer": "7d6aeb24d",
+        "C.7_cyberpunk_warrior": "233040cf3",
         "ColorPicker": "cfc36f16",
         "Guidelines": "779fdaa1",
         "LayerBuilderAPIConsistency": "f40e23b6",
@@ -8628,12 +8629,12 @@
         "radialGradient": "cfc36f16",
         "refStyle": "cfc36f16",
         "text_bidi_basic": "bf19f4e8",
-        "text_box_layout": "bf19f4e8",
+        "text_box_layout": "233040cf3",
         "text_emoji": "bf19f4e8",
         "text_line_break": "bf19f4e8",
-        "text_punctuation_squash": "bf19f4e8",
+        "text_punctuation_squash": "233040cf3",
         "text_special_chars": "bf19f4e8",
-        "text_vertical": "bf19f4e8",
+        "text_vertical": "233040cf3",
         "widegamut": "cfc36f16"
     }
 }
