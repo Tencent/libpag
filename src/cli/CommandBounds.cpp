@@ -282,6 +282,7 @@ int RunBounds(int argc, char* argv[]) {
 
   // Build layer tree with mapping.
   TextLayout textLayout = {};
+  SetupSystemFallbackFonts(textLayout);
   textLayout.layout(document.get());
   auto buildResult = LayerBuilder::BuildWithMap(document.get(), &textLayout);
   if (buildResult.root == nullptr) {

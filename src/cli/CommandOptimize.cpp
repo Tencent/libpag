@@ -27,6 +27,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include "cli/CliUtils.h"
 #include "cli/CommandValidator.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
@@ -657,7 +658,7 @@ static int RemoveFullCanvasClipMasks(PAGXDocument* document, const std::vector<L
 static int RemoveOffCanvasChildren(
     const std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>>& layerMap,
     const std::unordered_set<const Layer*>& maskedLayers, const tgfx::Rect& canvasRect,
-    std::vector<Layer*>& layers) {
+    tgfx::Layer* rootLayer, std::vector<Layer*>& layers) {
   int count = 0;
   size_t writeIndex = 0;
   for (size_t i = 0; i < layers.size(); i++) {
@@ -667,7 +668,7 @@ static int RemoveOffCanvasChildren(
         pagxLayer->styles.empty() && pagxLayer->filters.empty()) {
       auto it = layerMap.find(pagxLayer);
       if (it != layerMap.end()) {
-        auto bounds = it->second->getBounds(nullptr, true);
+        auto bounds = it->second->getBounds(rootLayer, true);
         if (!tgfx::Rect::Intersects(bounds, canvasRect)) {
           shouldRemove = true;
         }
@@ -676,7 +677,8 @@ static int RemoveOffCanvasChildren(
     if (shouldRemove) {
       count++;
     } else {
-      count += RemoveOffCanvasChildren(layerMap, maskedLayers, canvasRect, pagxLayer->children);
+      count += RemoveOffCanvasChildren(layerMap, maskedLayers, canvasRect, rootLayer,
+                                       pagxLayer->children);
       layers[writeIndex++] = layers[i];
     }
   }
@@ -685,14 +687,17 @@ static int RemoveOffCanvasChildren(
 }
 
 static int RemoveOffCanvasLayers(PAGXDocument* document) {
-  auto result = LayerBuilder::BuildWithMap(document);
+  TextLayout textLayout = {};
+  SetupSystemFallbackFonts(textLayout);
+  auto result = LayerBuilder::BuildWithMap(document, &textLayout);
   if (result.root == nullptr) {
     return 0;
   }
   auto canvasRect = tgfx::Rect::MakeWH(document->width, document->height);
   std::unordered_set<const Layer*> maskedLayers = {};
   CollectMaskReferences(document->layers, maskedLayers);
-  return RemoveOffCanvasChildren(result.layerMap, maskedLayers, canvasRect, document->layers);
+  return RemoveOffCanvasChildren(result.layerMap, maskedLayers, canvasRect, result.root.get(),
+                                 document->layers);
 }
 
 // --- Optimization #8: Localize coordinates ---
