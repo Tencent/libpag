@@ -2,354 +2,294 @@
 <pagx version="1.0" width="640" height="520">
 
   <!-- Background: Gray 900 -->
-  <Layer name="Background">
-    <Rectangle center="320,260" size="640,520"/>
+  <Layer name="Background" x="320" y="260">
+    <Rectangle size="640,520"/>
     <Fill color="#111827"/>
   </Layer>
 
   <!-- Background: soft color fields -->
   <Layer name="BgPattern">
-    <Layer>
-      <Ellipse center="60,60" size="320,320"/>
+    <Layer x="60" y="60">
+      <Ellipse size="320,320"/>
       <Fill color="#8B5CF6" alpha="0.2"/>
       <BlurFilter blurX="50" blurY="50"/>
     </Layer>
-    <Layer>
-      <Ellipse center="560,80" size="280,280"/>
+    <Layer x="560" y="80">
+      <Ellipse size="280,280"/>
       <Fill color="#06B6D4" alpha="0.18"/>
       <BlurFilter blurX="50" blurY="50"/>
     </Layer>
-    <Layer>
-      <Ellipse center="600,380" size="260,260"/>
+    <Layer x="600" y="380">
+      <Ellipse size="260,260"/>
       <Fill color="#3B82F6" alpha="0.16"/>
       <BlurFilter blurX="50" blurY="50"/>
     </Layer>
-    <Layer>
-      <Ellipse center="80,480" size="300,300"/>
+    <Layer x="80" y="480">
+      <Ellipse size="300,300"/>
       <Fill color="#EC4899" alpha="0.18"/>
       <BlurFilter blurX="50" blurY="50"/>
     </Layer>
-    <Layer>
-      <Ellipse center="320,260" size="200,200"/>
+    <Layer x="320" y="260">
+      <Ellipse size="200,200"/>
       <Fill color="#10B981" alpha="0.1"/>
       <BlurFilter blurX="40" blurY="40"/>
     </Layer>
   </Layer>
 
-  <!-- ==================== Cards: Frosted glass ==================== -->
+  <!-- ==================== App Icons ==================== -->
 
   <!-- Row 1 -->
-  <Layer name="CardHome" x="80" y="74">
-    <Rectangle size="72,72" roundness="12"/>
-    <Fill color="#FFFFFF" alpha="0.06"/>
-    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
-    <BackgroundBlurStyle blurX="20" blurY="20"/>
-    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
+  <Layer name="Home" x="44" y="38">
+    <Layer composition="@card"/>
+    <Layer x="36" y="36">
+      <Path data="M0 -18L-19 1L-14 1L-14 18L-5 18L-5 7L5 7L5 18L14 18L14 1L19 1Z"/>
+      <Fill color="#F97316"/>
+    </Layer>
+    <Layer x="36" y="94">
+      <Text text="Home" fontFamily="Arial" fontSize="11" textAnchor="center"/>
+      <Fill color="#6B7280"/>
+    </Layer>
   </Layer>
-  <Layer name="CardSearch" x="240" y="74">
-    <Rectangle size="72,72" roundness="12"/>
-    <Fill color="#FFFFFF" alpha="0.06"/>
-    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
-    <BackgroundBlurStyle blurX="20" blurY="20"/>
-    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
+
+  <Layer name="Search" x="204" y="38">
+    <Layer composition="@card"/>
+    <Layer x="36" y="36">
+      <Group>
+        <Ellipse center="-4,-4" size="26,26"/>
+        <Stroke color="#3B82F6" width="3.5"/>
+      </Group>
+      <Group>
+        <Path data="M6 6L16 16"/>
+        <Stroke color="#3B82F6" width="4" cap="round"/>
+      </Group>
+    </Layer>
+    <Layer x="36" y="94">
+      <Text text="Search" fontFamily="Arial" fontSize="11" textAnchor="center"/>
+      <Fill color="#6B7280"/>
+    </Layer>
   </Layer>
-  <Layer name="CardBell" x="400" y="74">
-    <Rectangle size="72,72" roundness="12"/>
-    <Fill color="#FFFFFF" alpha="0.06"/>
-    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
-    <BackgroundBlurStyle blurX="20" blurY="20"/>
-    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
+
+  <Layer name="Bell" x="364" y="38">
+    <Layer composition="@card"/>
+    <Layer x="36" y="36">
+      <Group>
+        <Path data="M-14 10C-14 0 -10 -12 0 -14C10 -12 14 0 14 10L17 14L-17 14Z"/>
+        <Fill color="#FBBF24"/>
+      </Group>
+      <Group>
+        <Path data="M0 -18L0 -12"/>
+        <Stroke color="#FBBF24" width="2.5" cap="round"/>
+      </Group>
+      <Group>
+        <Ellipse center="0,16" size="8,5"/>
+        <Fill color="#FBBF24"/>
+      </Group>
+    </Layer>
+    <Layer x="36" y="94">
+      <Text text="Bell" fontFamily="Arial" fontSize="11" textAnchor="center"/>
+      <Fill color="#6B7280"/>
+    </Layer>
   </Layer>
-  <Layer name="CardHeart" x="560" y="74">
-    <Rectangle size="72,72" roundness="12"/>
-    <Fill color="#FFFFFF" alpha="0.06"/>
-    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
-    <BackgroundBlurStyle blurX="20" blurY="20"/>
-    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
+
+  <Layer name="Heart" x="524" y="38">
+    <Layer composition="@card"/>
+    <Layer x="36" y="36">
+      <Path data="M0 -7C-3 -17 -19 -20 -19 -7C-19 4 -7 12 0 19C7 12 19 4 19 -7C19 -20 3 -17 0 -7Z"/>
+      <Fill color="#EF4444"/>
+    </Layer>
+    <Layer x="36" y="94">
+      <Text text="Heart" fontFamily="Arial" fontSize="11" textAnchor="center"/>
+      <Fill color="#6B7280"/>
+    </Layer>
   </Layer>
 
   <!-- Row 2 -->
-  <Layer name="CardChat" x="80" y="244">
-    <Rectangle size="72,72" roundness="12"/>
-    <Fill color="#FFFFFF" alpha="0.06"/>
-    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
-    <BackgroundBlurStyle blurX="20" blurY="20"/>
-    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
+  <Layer name="Chat" x="44" y="208">
+    <Layer composition="@card"/>
+    <Layer x="36" y="36">
+      <Group>
+        <Path data="M-18 -10C-18 -15 -15 -17 -10 -17L10 -17C15 -17 18 -15 18 -10L18 5C18 10 15 12 10 12L2 12L-10 17L-4 12L-10 12C-15 12 -18 10 -18 5Z"/>
+        <Fill color="#10B981"/>
+      </Group>
+      <Group>
+        <Ellipse center="-7,-3" size="4,4"/>
+        <Ellipse center="0,-3" size="4,4"/>
+        <Ellipse center="7,-3" size="4,4"/>
+        <Fill color="#1E2433"/>
+      </Group>
+    </Layer>
+    <Layer x="36" y="94">
+      <Text text="Chat" fontFamily="Arial" fontSize="11" textAnchor="center"/>
+      <Fill color="#6B7280"/>
+    </Layer>
   </Layer>
-  <Layer name="CardCamera" x="240" y="244">
-    <Rectangle size="72,72" roundness="12"/>
-    <Fill color="#FFFFFF" alpha="0.06"/>
-    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
-    <BackgroundBlurStyle blurX="20" blurY="20"/>
-    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
+
+  <Layer name="Camera" x="204" y="208">
+    <Layer composition="@card"/>
+    <Layer x="36" y="36">
+      <Group>
+        <Rectangle center="0,2" size="38,26" roundness="5"/>
+        <Path data="M-7 -9L-4 -16L4 -16L7 -9"/>
+        <Fill color="#6366F1"/>
+      </Group>
+      <Group>
+        <Ellipse center="0,2" size="17,17"/>
+        <Fill color="#1E2433"/>
+      </Group>
+      <Group>
+        <Ellipse center="0,2" size="10,10"/>
+        <Stroke color="#6366F1" width="2.5"/>
+      </Group>
+    </Layer>
+    <Layer x="36" y="94">
+      <Text text="Camera" fontFamily="Arial" fontSize="11" textAnchor="center"/>
+      <Fill color="#6B7280"/>
+    </Layer>
   </Layer>
-  <Layer name="CardSettings" x="400" y="244">
-    <Rectangle size="72,72" roundness="12"/>
-    <Fill color="#FFFFFF" alpha="0.06"/>
-    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
-    <BackgroundBlurStyle blurX="20" blurY="20"/>
-    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
+
+  <Layer name="Settings" x="364" y="208">
+    <Layer composition="@card"/>
+    <Layer x="36" y="36">
+      <Group>
+        <Path data="M-2.8 -19.8L2.8 -19.8L3.5 -13.6L7.1 -12.1L12 -16L16 -12L12.1 -7.1L13.6 -3.5L19.8 -2.8L19.8 2.8L13.6 3.5L12.1 7.1L16 12L12 16L7.1 12.1L3.5 13.6L2.8 19.8L-2.8 19.8L-3.5 13.6L-7.1 12.1L-12 16L-16 12L-12.1 7.1L-13.6 3.5L-19.8 2.8L-19.8 -2.8L-13.6 -3.5L-12.1 -7.1L-16 -12L-12 -16L-7.1 -12.1L-3.5 -13.6Z"/>
+        <Fill color="#8B5CF6"/>
+      </Group>
+      <Group>
+        <Ellipse size="14,14"/>
+        <Fill color="#1E2433"/>
+      </Group>
+      <Group>
+        <Ellipse size="5,5"/>
+        <Fill color="#8B5CF6"/>
+      </Group>
+    </Layer>
+    <Layer x="36" y="94">
+      <Text text="Settings" fontFamily="Arial" fontSize="11" textAnchor="center"/>
+      <Fill color="#6B7280"/>
+    </Layer>
   </Layer>
-  <Layer name="CardUser" x="560" y="244">
-    <Rectangle size="72,72" roundness="12"/>
-    <Fill color="#FFFFFF" alpha="0.06"/>
-    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
-    <BackgroundBlurStyle blurX="20" blurY="20"/>
-    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
+
+  <Layer name="User" x="524" y="208">
+    <Layer composition="@card"/>
+    <Layer x="36" y="36">
+      <Group>
+        <Ellipse size="46,46"/>
+        <Fill color="#06B6D4"/>
+      </Group>
+      <Group>
+        <Ellipse center="0,-11" size="12,12"/>
+        <Fill color="#1E2433"/>
+      </Group>
+      <Group>
+        <Path data="M-11 16C-11 4 -7 -2 0 -2C7 -2 11 4 11 16"/>
+        <Fill color="#1E2433"/>
+      </Group>
+    </Layer>
+    <Layer x="36" y="94">
+      <Text text="User" fontFamily="Arial" fontSize="11" textAnchor="center"/>
+      <Fill color="#6B7280"/>
+    </Layer>
   </Layer>
 
   <!-- Row 3 -->
-  <Layer name="CardCalendar" x="80" y="412">
-    <Rectangle size="72,72" roundness="12"/>
-    <Fill color="#FFFFFF" alpha="0.06"/>
-    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
-    <BackgroundBlurStyle blurX="20" blurY="20"/>
-    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
-  </Layer>
-  <Layer name="CardLock" x="240" y="412">
-    <Rectangle size="72,72" roundness="12"/>
-    <Fill color="#FFFFFF" alpha="0.06"/>
-    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
-    <BackgroundBlurStyle blurX="20" blurY="20"/>
-    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
-  </Layer>
-  <Layer name="CardMusic" x="400" y="412">
-    <Rectangle size="72,72" roundness="12"/>
-    <Fill color="#FFFFFF" alpha="0.06"/>
-    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
-    <BackgroundBlurStyle blurX="20" blurY="20"/>
-    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
-  </Layer>
-  <Layer name="CardDownload" x="560" y="412">
-    <Rectangle size="72,72" roundness="12"/>
-    <Fill color="#FFFFFF" alpha="0.06"/>
-    <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
-    <BackgroundBlurStyle blurX="20" blurY="20"/>
-    <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
+  <Layer name="Calendar" x="44" y="376">
+    <Layer composition="@card"/>
+    <Layer x="36" y="36">
+      <Group>
+        <Rectangle center="0,2" size="38,38" roundness="6"/>
+        <Rectangle center="-9,-16" size="3,9" roundness="2"/>
+        <Rectangle center="9,-16" size="3,9" roundness="2"/>
+        <Fill color="#EF4444"/>
+      </Group>
+      <Group>
+        <Rectangle center="0,6" size="30,22" roundness="3"/>
+        <Fill color="#1E2433"/>
+      </Group>
+      <Group>
+        <Text text="17" position="0,12" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
+        <Fill color="#EF4444"/>
+      </Group>
+    </Layer>
+    <Layer x="36" y="94">
+      <Text text="Calendar" fontFamily="Arial" fontSize="11" textAnchor="center"/>
+      <Fill color="#6B7280"/>
+    </Layer>
   </Layer>
 
-  <!-- ==================== Icons: Multi-color, centered by bounds ==================== -->
-
-  <!-- 1. Home: Orange #F97316 -->
-  <Layer name="Home" x="80" y="74">
-    <Group>
-      <Path data="M 0 -18 L -19 1 L -14 1 L -14 18 L -5 18 L -5 7 L 5 7 L 5 18 L 14 18 L 14 1 L 19 1 Z"/>
-      <Fill color="#F97316"/>
-    </Group>
+  <Layer name="Lock" x="204" y="376">
+    <Layer composition="@card"/>
+    <Layer x="36" y="36">
+      <Group>
+        <Path data="M-10 -4L-10 -11C-10 -20 10 -20 10 -11L10 -4"/>
+        <Stroke color="#F97316" width="4" cap="round"/>
+      </Group>
+      <Group>
+        <Rectangle center="0,8" size="30,22" roundness="6"/>
+        <Fill color="#F97316"/>
+      </Group>
+      <Group>
+        <Ellipse center="0,6" size="7,7"/>
+        <Rectangle center="0,12" size="3,6" roundness="1"/>
+        <Fill color="#1E2433"/>
+      </Group>
+    </Layer>
+    <Layer x="36" y="94">
+      <Text text="Lock" fontFamily="Arial" fontSize="11" textAnchor="center"/>
+      <Fill color="#6B7280"/>
+    </Layer>
   </Layer>
 
-  <!-- 2. Search: Blue #3B82F6 -->
-  <Layer name="Search" x="240" y="74">
-    <Group>
-      <Ellipse center="-4,-4" size="26,26"/>
-      <Stroke color="#3B82F6" width="3.5"/>
-    </Group>
-    <Group>
-      <Path data="M 6 6 L 16 16"/>
-      <Stroke color="#3B82F6" width="4" cap="round"/>
-    </Group>
+  <Layer name="Music" x="364" y="376">
+    <Layer composition="@card"/>
+    <Layer x="36" y="36">
+      <Group>
+        <Path data="M-11 10L-11 -13L9 -18L9 5M-11 -8L9 -13"/>
+        <Stroke color="#EC4899" width="3.5" cap="round" join="round"/>
+      </Group>
+      <Group>
+        <Ellipse center="-10,14" size="15,11"/>
+        <Ellipse center="10,9" size="15,11"/>
+        <Fill color="#EC4899"/>
+      </Group>
+    </Layer>
+    <Layer x="36" y="94">
+      <Text text="Music" fontFamily="Arial" fontSize="11" textAnchor="center"/>
+      <Fill color="#6B7280"/>
+    </Layer>
   </Layer>
 
-  <!-- 3. Bell: Amber #FBBF24 -->
-  <Layer name="Bell" x="400" y="74">
-    <Group>
-      <Path data="M -14 10 C -14 0 -10 -12 0 -14 C 10 -12 14 0 14 10 L 17 14 L -17 14 Z"/>
-      <Fill color="#FBBF24"/>
-    </Group>
-    <Group>
-      <Path data="M 0 -18 L 0 -12"/>
-      <Stroke color="#FBBF24" width="2.5" cap="round"/>
-    </Group>
-    <Group>
-      <Ellipse center="0,16" size="8,5"/>
-      <Fill color="#FBBF24"/>
-    </Group>
+  <Layer name="Download" x="524" y="376">
+    <Layer composition="@card"/>
+    <Layer x="36" y="36">
+      <Group>
+        <Ellipse center="-1,-7" size="24,22"/>
+        <Ellipse center="-12,-1" size="16,16"/>
+        <Ellipse center="10,-1" size="18,16"/>
+        <Ellipse center="-1,1" size="34,10"/>
+        <Fill color="#3B82F6"/>
+      </Group>
+      <Group>
+        <Path data="M-1 7L-1 14M-4 12L-1 16L2 12"/>
+        <Stroke color="#3B82F6" width="3" cap="round" join="round"/>
+      </Group>
+    </Layer>
+    <Layer x="36" y="94">
+      <Text text="Download" fontFamily="Arial" fontSize="11" textAnchor="center"/>
+      <Fill color="#6B7280"/>
+    </Layer>
   </Layer>
 
-  <!-- 4. Heart: Red #EF4444 -->
-  <Layer name="Heart" x="560" y="74">
-    <Group>
-      <Path data="M 0 -7 C -3 -17 -19 -20 -19 -7 C -19 4 -7 12 0 19 C 7 12 19 4 19 -7 C 19 -20 3 -17 0 -7 Z"/>
-      <Fill color="#EF4444"/>
-    </Group>
-  </Layer>
-
-  <!-- 5. Chat: Emerald #10B981 -->
-  <Layer name="Chat" x="80" y="244">
-    <Group>
-      <Path data="M -18 -10 C -18 -15 -15 -17 -10 -17 L 10 -17 C 15 -17 18 -15 18 -10 L 18 5 C 18 10 15 12 10 12 L 2 12 L -10 17 L -4 12 L -10 12 C -15 12 -18 10 -18 5 Z"/>
-      <Fill color="#10B981"/>
-    </Group>
-    <Group>
-      <Ellipse center="-7,-3" size="4,4"/>
-      <Ellipse center="0,-3" size="4,4"/>
-      <Ellipse center="7,-3" size="4,4"/>
-      <Fill color="#1E2433"/>
-    </Group>
-  </Layer>
-
-  <!-- 6. Camera: Indigo #6366F1 -->
-  <Layer name="Camera" x="240" y="244">
-    <Group>
-      <Rectangle center="0,2" size="38,26" roundness="5"/>
-      <Path data="M -7 -9 L -4 -16 L 4 -16 L 7 -9"/>
-      <Fill color="#6366F1"/>
-    </Group>
-    <Group>
-      <Ellipse center="0,2" size="17,17"/>
-      <Fill color="#1E2433"/>
-    </Group>
-    <Group>
-      <Ellipse center="0,2" size="10,10"/>
-      <Stroke color="#6366F1" width="2.5"/>
-    </Group>
-  </Layer>
-
-  <!-- 7. Settings: Violet #8B5CF6 -->
-  <Layer name="Settings" x="400" y="244">
-    <Group>
-      <Path data="M -2.8 -19.8 L 2.8 -19.8 L 3.5 -13.6 L 7.1 -12.1 L 12 -16 L 16 -12 L 12.1 -7.1 L 13.6 -3.5 L 19.8 -2.8 L 19.8 2.8 L 13.6 3.5 L 12.1 7.1 L 16 12 L 12 16 L 7.1 12.1 L 3.5 13.6 L 2.8 19.8 L -2.8 19.8 L -3.5 13.6 L -7.1 12.1 L -12 16 L -16 12 L -12.1 7.1 L -13.6 3.5 L -19.8 2.8 L -19.8 -2.8 L -13.6 -3.5 L -12.1 -7.1 L -16 -12 L -12 -16 L -7.1 -12.1 L -3.5 -13.6 Z"/>
-      <Fill color="#8B5CF6"/>
-    </Group>
-    <Group>
-      <Ellipse size="14,14"/>
-      <Fill color="#1E2433"/>
-    </Group>
-    <Group>
-      <Ellipse size="5,5"/>
-      <Fill color="#8B5CF6"/>
-    </Group>
-  </Layer>
-
-  <!-- 8. User: Cyan #06B6D4 -->
-  <Layer name="User" x="560" y="244">
-    <Group>
-      <Ellipse size="46,46"/>
-      <Fill color="#06B6D4"/>
-    </Group>
-    <Group>
-      <Ellipse center="0,-11" size="12,12"/>
-      <Fill color="#1E2433"/>
-    </Group>
-    <Group>
-      <Path data="M -11 16 C -11 4 -7 -2 0 -2 C 7 -2 11 4 11 16"/>
-      <Fill color="#1E2433"/>
-    </Group>
-  </Layer>
-
-  <!-- 9. Calendar: Red #EF4444 -->
-  <Layer name="Calendar" x="80" y="412">
-    <Group>
-      <Rectangle center="0,2" size="38,38" roundness="6"/>
-      <Rectangle center="-9,-16" size="3,9" roundness="2"/>
-      <Rectangle center="9,-16" size="3,9" roundness="2"/>
-      <Fill color="#EF4444"/>
-    </Group>
-    <Group>
-      <Rectangle center="0,6" size="30,22" roundness="3"/>
-      <Fill color="#1E2433"/>
-    </Group>
-    <Group>
-      <Text text="17" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center" position="0,12"/>
-      <Fill color="#EF4444"/>
-    </Group>
-  </Layer>
-
-  <!-- 10. Lock: Orange #F97316 -->
-  <Layer name="Lock" x="240" y="412">
-    <Group>
-      <Path data="M -10 -4 L -10 -11 C -10 -20 10 -20 10 -11 L 10 -4"/>
-      <Stroke color="#F97316" width="4" cap="round"/>
-    </Group>
-    <Group>
-      <Rectangle center="0,8" size="30,22" roundness="6"/>
-      <Fill color="#F97316"/>
-    </Group>
-    <Group>
-      <Ellipse center="0,6" size="7,7"/>
-      <Rectangle center="0,12" size="3,6" roundness="1"/>
-      <Fill color="#1E2433"/>
-    </Group>
-  </Layer>
-
-  <!-- 11. Music: Pink #EC4899 -->
-  <Layer name="Music" x="400" y="412">
-    <Group>
-      <Path data="M -11 10 L -11 -13 L 9 -18 L 9 5"/>
-      <Path data="M -11 -8 L 9 -13"/>
-      <Stroke color="#EC4899" width="3.5" cap="round" join="round"/>
-    </Group>
-    <Group>
-      <Ellipse center="-10,14" size="15,11"/>
-      <Ellipse center="10,9" size="15,11"/>
-      <Fill color="#EC4899"/>
-    </Group>
-  </Layer>
-
-  <!-- 12. Download: Blue #3B82F6 -->
-  <Layer name="Download" x="560" y="412">
-    <Group>
-      <Ellipse center="-1,-7" size="24,22"/>
-      <Ellipse center="-12,-1" size="16,16"/>
-      <Ellipse center="10,-1" size="18,16"/>
-      <Ellipse center="-1,1" size="34,10"/>
-      <Fill color="#3B82F6"/>
-    </Group>
-    <Group>
-      <Path data="M -1 7 L -1 14"/>
-      <Path data="M -4 12 L -1 16 L 2 12"/>
-      <Stroke color="#3B82F6" width="3" cap="round" join="round"/>
-    </Group>
-  </Layer>
-
-  <!-- ==================== Labels: Gray 500 ==================== -->
-  <Layer name="LabelHome" x="80" y="132">
-    <Text text="Home" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#6B7280"/>
-  </Layer>
-  <Layer name="LabelSearch" x="240" y="132">
-    <Text text="Search" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#6B7280"/>
-  </Layer>
-  <Layer name="LabelBell" x="400" y="132">
-    <Text text="Bell" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#6B7280"/>
-  </Layer>
-  <Layer name="LabelHeart" x="560" y="132">
-    <Text text="Heart" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#6B7280"/>
-  </Layer>
-  <Layer name="LabelChat" x="80" y="302">
-    <Text text="Chat" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#6B7280"/>
-  </Layer>
-  <Layer name="LabelCamera" x="240" y="302">
-    <Text text="Camera" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#6B7280"/>
-  </Layer>
-  <Layer name="LabelSettings" x="400" y="302">
-    <Text text="Settings" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#6B7280"/>
-  </Layer>
-  <Layer name="LabelUser" x="560" y="302">
-    <Text text="User" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#6B7280"/>
-  </Layer>
-  <Layer name="LabelCalendar" x="80" y="470">
-    <Text text="Calendar" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#6B7280"/>
-  </Layer>
-  <Layer name="LabelLock" x="240" y="470">
-    <Text text="Lock" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#6B7280"/>
-  </Layer>
-  <Layer name="LabelMusic" x="400" y="470">
-    <Text text="Music" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#6B7280"/>
-  </Layer>
-  <Layer name="LabelDownload" x="560" y="470">
-    <Text text="Download" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-    <Fill color="#6B7280"/>
-  </Layer>
+  <!-- ==================== Resources ==================== -->
+  <Resources>
+    <Composition id="card" width="72" height="72">
+      <Layer x="36" y="36">
+        <Rectangle size="72,72" roundness="12"/>
+        <Fill color="#FFFFFF" alpha="0.06"/>
+        <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
+        <BackgroundBlurStyle blurX="20" blurY="20"/>
+        <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
+      </Layer>
+    </Composition>
+  </Resources>
 
 </pagx>
