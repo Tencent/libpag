@@ -1,0 +1,221 @@
+name: Release CLI
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 0.1.0)"
+        required: true
+        type: string
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: third_party
+          key: third-party-cli-macos-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-cli-macos-
+
+      - uses: tecolicom/actions-use-homebrew-tools@v1
+        with:
+          tools: ninja
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+        shell: bash
+
+      - name: Build pagx (arm64)
+        run: node build_pag pagx -a arm64 -i -DPAG_BUILD_CLI=ON -DPAG_BUILD_SHARED=OFF
+
+      - name: Build pagx (x64)
+        run: node build_pag pagx -a x64 -i -DPAG_BUILD_CLI=ON -DPAG_BUILD_SHARED=OFF
+
+      - name: Create Universal Binary
+        run: |
+          lipo -create out/release/mac/arm64/pagx out/release/mac/x64/pagx \
+            -output out/release/mac/pagx-darwin
+          lipo -info out/release/mac/pagx-darwin
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pagx-darwin
+          path: out/release/mac/pagx-darwin
+
+      - name: Save Third-Party Cache
+        if: steps.third-party-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: third_party
+          key: third-party-cli-macos-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: third_party
+          key: third-party-cli-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-cli-linux-
+
+      - uses: seanmiddleditch/gha-setup-ninja@master
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+        shell: bash
+
+      - name: Install system dependencies
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libxml2-dev libfontconfig1-dev
+          version: 1.0
+
+      - name: Build pagx
+        run: node build_pag pagx -a x64 -i -DPAG_BUILD_CLI=ON -DPAG_BUILD_SHARED=OFF
+
+      - name: Prepare artifact
+        run: cp out/release/linux/x64/pagx out/release/linux/pagx-linux
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pagx-linux
+          path: out/release/linux/pagx-linux
+
+      - name: Save Third-Party Cache
+        if: steps.third-party-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: third_party
+          key: third-party-cli-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: third_party
+          key: third-party-cli-windows-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-cli-windows-
+
+      - uses: seanmiddleditch/gha-setup-ninja@master
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+        shell: bash
+
+      - name: Install LibXml2 via vcpkg
+        run: vcpkg install libxml2:x64-windows
+
+      - name: Build pagx
+        run: >
+          node build_pag pagx -a x64 -i
+          -DPAG_BUILD_CLI=ON
+          -DPAG_BUILD_SHARED=OFF
+          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+        shell: pwsh
+
+      - name: Prepare artifact
+        run: copy out\release\win\x64\pagx.exe out\release\win\pagx-win32.exe
+        shell: cmd
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pagx-win32
+          path: out/release/win/pagx-win32.exe
+
+      - name: Save Third-Party Cache
+        if: steps.third-party-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: third_party
+          key: third-party-cli-windows-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+  publish:
+    needs: [build-macos, build-linux, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+
+      - name: Verify version consistency
+        run: |
+          MAIN_VERSION=$(grep 'static const char\* VERSION' src/cli/main.cpp | sed 's/.*"\(.*\)".*/\1/')
+          if [ "$MAIN_VERSION" != "${{ inputs.version }}" ]; then
+            echo "::error::main.cpp VERSION ($MAIN_VERSION) does not match input version (${{ inputs.version }}). Update src/cli/main.cpp first."
+            exit 1
+          fi
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Prepare npm package
+        run: |
+          mkdir -p npm-package/bin
+          cp pagx-darwin/pagx-darwin npm-package/bin/pagx-darwin
+          cp pagx-linux/pagx-linux npm-package/bin/pagx-linux
+          cp pagx-win32/pagx-win32.exe npm-package/bin/pagx-win32.exe
+          chmod +x npm-package/bin/pagx-darwin npm-package/bin/pagx-linux
+          cp cli/npm/pagx.js npm-package/bin/pagx.js
+          sed "s/\"version\": \"0.0.0\"/\"version\": \"${{ inputs.version }}\"/" cli/npm/package.json > npm-package/package.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Publish to npm
+        run: npm publish ./npm-package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: cli/v${{ inputs.version }}
+          name: pagx CLI v${{ inputs.version }}
+          body: |
+            ## pagx CLI v${{ inputs.version }}
+
+            ### Install
+
+            ```bash
+            npm install -g pagx
+            ```
+
+            Or download the binary for your platform from the assets below.
+          files: |
+            pagx-darwin/pagx-darwin
+            pagx-linux/pagx-linux
+            pagx-win32/pagx-win32.exe
