@@ -2,11 +2,6 @@ name: Release CLI
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Release version (e.g. 0.1.0)"
-        required: true
-        type: string
 
 jobs:
   build-macos:
@@ -161,26 +156,26 @@ jobs:
       - name: Check Out Repo
         uses: actions/checkout@v4
 
-      - name: Verify version consistency
+      - name: Read version from source
+        id: version
         run: |
-          MAIN_VERSION=$(grep 'static const char\* VERSION' src/cli/main.cpp | sed 's/.*"\(.*\)".*/\1/')
-          if [ "$MAIN_VERSION" != "${{ inputs.version }}" ]; then
-            echo "::error::main.cpp VERSION ($MAIN_VERSION) does not match input version (${{ inputs.version }}). Update src/cli/main.cpp first."
-            exit 1
-          fi
+          VERSION=$(grep 'static const char\* VERSION' src/cli/main.cpp | sed 's/.*"\(.*\)".*/\1/')
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Detected version: $VERSION"
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
 
       - name: Prepare npm package
         run: |
+          VERSION="${{ steps.version.outputs.value }}"
           mkdir -p npm-package/bin/darwin npm-package/bin/linux npm-package/bin/win32
           cp pagx-darwin/pagx-universal npm-package/bin/darwin/pagx
           cp pagx-linux/pagx npm-package/bin/linux/pagx
           cp pagx-win32/pagx.exe npm-package/bin/win32/pagx.exe
           chmod +x npm-package/bin/darwin/pagx npm-package/bin/linux/pagx
           cp cli/npm/pagx.js npm-package/bin/pagx.js
-          sed "s/\"version\": \"0.0.0\"/\"version\": \"${{ inputs.version }}\"/" cli/npm/package.json > npm-package/package.json
+          sed "s/\"version\": \"0.0.0\"/\"version\": \"$VERSION\"/" cli/npm/package.json > npm-package/package.json
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -196,10 +191,10 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: cli/v${{ inputs.version }}
-          name: pagx CLI v${{ inputs.version }}
+          tag_name: cli/v${{ steps.version.outputs.value }}
+          name: pagx CLI v${{ steps.version.outputs.value }}
           body: |
-            ## pagx CLI v${{ inputs.version }}
+            ## pagx CLI v${{ steps.version.outputs.value }}
 
             ### Install
 
