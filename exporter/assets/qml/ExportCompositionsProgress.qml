@@ -126,6 +126,19 @@ PAGWindow {
         }
     }
 
+    Timer {
+        id: raiseTimer
+        interval: 200
+        running: window.visible
+        repeat: true
+        onTriggered: {
+            let isAEActive = exportingPanelWindow !== null && exportingPanelWindow.isAEWindowActive();
+            if (!window.active && isAEActive) {
+                window.raise();
+            }
+        }
+    }
+
     onClosing: function (closeEvent) {
         closeEvent.accepted = true;
         if (exportCompositionsWindow !== null) {
