@@ -3,18 +3,20 @@
 The `pagx` command-line tool provides utilities for working with PAGX files. All commands
 operate on local `.pagx` files.
 
-## Building the CLI
+## Setup
 
-The binary is at `cmake-build-debug/pagx` (relative to the project root). If it does not
-exist, build it:
+The `pagx` binary is provided by the `pagx` npm package. Before running any command below,
+ensure it is installed and meets the minimum version (**0.1.0**):
 
 ```bash
-cmake -G Ninja -DPAG_BUILD_CLI=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
-cmake --build cmake-build-debug --target pagx-cli
+if ! command -v pagx &>/dev/null; then
+  npm install -g pagx
+elif [ "$(printf '%s\n' "0.1.0" "$(pagx -v | awk '{print $2}')" | sort -V | head -1)" != "0.1.0" ]; then
+  npm update -g pagx
+fi
 ```
 
-Note: `PAG_BUILD_TESTS=ON` already implies `PAG_BUILD_CLI=ON`, so if the test build
-directory exists the binary is likely already there.
+Run this check before the first `pagx` invocation in each session.
 
 ---
 

@@ -1,19 +1,11 @@
 # pagx
 
-Command-line tool for the [PAGX](https://pag.art/pagx) file format.
+Command-line tool for working with [PAGX](https://pag.io/pagx/latest/) files — an XML-based vector
+animation format that is human-readable, diff-friendly, and designed for AI-assisted generation.
 
-## What is PAGX?
-
-**PAGX** (Portable Animated Graphics XML) is an XML-based markup language for describing vector
-animations. As a plain-text format, PAGX files are human-readable, easy to diff, and naturally
-suited for version control and AI-assisted generation.
-
-Key capabilities include vector shapes, rich text, image fills, gradients, blend modes, masks,
-filters, layer styles, 3D transforms, and keyframe animation — covering the full spectrum of
-modern motion graphics.
-
-PAGX can be converted to the binary **PAG** format for production deployment, achieving roughly
-50% smaller file size and 10x faster decoding. The two formats are interconvertible.
+Use this tool to validate PAGX files against the specification, render them to images, optimize
+file structure and size, format for consistent style, query layer bounds, and manage font
+embedding.
 
 ## Install
 
