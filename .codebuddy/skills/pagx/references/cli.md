@@ -6,12 +6,13 @@ operate on local `.pagx` files.
 ## Setup
 
 The `pagx` binary is provided by the `pagx` npm package. Before running any command below,
-ensure it is installed and meets the minimum version (**0.1.0**):
+ensure it is installed and meets the minimum version:
 
 ```bash
+PAGX_MIN="0.1.0"
 if ! command -v pagx &>/dev/null; then
   npm install -g pagx
-elif [ "$(printf '%s\n' "0.1.0" "$(pagx -v | awk '{print $2}')" | sort -V | head -1)" != "0.1.0" ]; then
+elif [ "$(printf '%s\n' "$PAGX_MIN" "$(pagx -v | awk '{print $2}')" | sort -V | head -1)" != "$PAGX_MIN" ]; then
   npm update -g pagx
 fi
 ```
