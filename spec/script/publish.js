@@ -250,6 +250,7 @@ function generateHtml(content, title, tocHtml, lang, langSwitchUrl, viewerUrl, f
     zhUrl: isEnglish ? langSwitchUrl : '#',
     enActive: isEnglish ? ' class="active"' : '',
     zhActive: isEnglish ? '' : ' class="active"',
+    zhRedirectUrl: isEnglish ? langSwitchUrl : '',
     tocHtml,
     content,
   };
@@ -283,38 +284,39 @@ function embedSampleFiles(mdContent, specDir) {
  */
 function addPreviewButtons(html, viewerUrl, lang) {
   const markerPattern = /<!-- preview:(samples\/[^\s]+\.pagx) -->/g;
-  var markers = [];
-  var m;
+  const markers = [];
+  let m;
   while ((m = markerPattern.exec(html)) !== null) {
     markers.push({ start: m.index, end: m.index + m[0].length, samplePath: m[1] });
   }
   if (markers.length === 0) return html;
   // Process from back to front to keep positions stable.
-  for (var i = markers.length - 1; i >= 0; i--) {
-    var marker = markers[i];
+  for (let i = markers.length - 1; i >= 0; i--) {
+    const marker = markers[i];
     // Find the closest </pre> before this marker.
-    var preCloseTag = '</pre>';
-    var preCloseEnd = html.lastIndexOf(preCloseTag, marker.start);
+    const preCloseTag = '</pre>';
+    let preCloseEnd = html.lastIndexOf(preCloseTag, marker.start);
     if (preCloseEnd === -1) {
       console.warn('  Warning: no </pre> found before preview marker for ' + marker.samplePath);
       continue;
     }
     preCloseEnd += preCloseTag.length;
     // Find the matching <pre> for this </pre>.
-    var preOpenStart = html.lastIndexOf('<pre>', preCloseEnd);
+    const preOpenStart = html.lastIndexOf('<pre>', preCloseEnd);
     if (preOpenStart === -1) {
       console.warn('  Warning: no <pre> found before preview marker for ' + marker.samplePath);
       continue;
     }
-    var previewUrl = viewerUrl + '?file=./' + marker.samplePath;
-    var label = lang === 'zh' ? '预览' : 'Preview';
-    var header = '<div class="code-header">' +
+    const sampleName = path.basename(marker.samplePath);
+    const previewUrl = viewerUrl + '?sample=' + sampleName;
+    const label = lang === 'zh' ? '预览' : 'Preview';
+    const header = '<div class="code-header">' +
       '<a class="preview-btn" href="' + previewUrl + '">' +
       '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
       label + '</a>' +
       '<span class="code-header-label">PAGX</span></div>';
-    var wrapperOpen = '<div class="code-block-wrapper">' + header;
-    var wrapperClose = '</div>';
+    const wrapperOpen = '<div class="code-block-wrapper">' + header;
+    const wrapperClose = '</div>';
     // Replace marker with wrapper close, then insert wrapper open before <pre>.
     html = html.slice(0, preCloseEnd) + wrapperClose + html.slice(marker.end);
     html = html.slice(0, preOpenStart) + wrapperOpen + html.slice(preOpenStart);
@@ -359,33 +361,29 @@ function publishSpec(specFile, outputDir, lang, langSwitchUrl, viewerUrl, favico
 }
 
 /**
- * Generate redirect page in latest folder.
+ * Copy latest version files to latest folder (instead of redirect).
  */
-function generateRedirectPage(siteDir, version) {
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PAGX Specification</title>
-    <script>
-        (function() {
-            var lang = navigator.language || navigator.userLanguage || '';
-            var path = '../${version}/' + (lang.toLowerCase().startsWith('zh') ? 'zh/' : '');
-            window.location.replace(path);
-        })();
-    </script>
-</head>
-<body>
-    <p>Redirecting to the latest specification...</p>
-</body>
-</html>`;
-
+function copyLatestVersion(siteDir, version) {
   const latestDir = path.join(siteDir, 'latest');
-  fs.mkdirSync(latestDir, { recursive: true });
-  const outputFile = path.join(latestDir, 'index.html');
-  fs.writeFileSync(outputFile, html, 'utf-8');
-  console.log(`  Generated: ${outputFile}`);
+  const versionDir = path.join(siteDir, version);
+
+  // Copy English version
+  const enSrc = path.join(versionDir, 'index.html');
+  const enDest = path.join(latestDir, 'index.html');
+  if (fs.existsSync(enSrc)) {
+    fs.mkdirSync(latestDir, { recursive: true });
+    fs.copyFileSync(enSrc, enDest);
+    console.log(`  Copied: ${enDest}`);
+  }
+
+  // Copy Chinese version
+  const zhSrc = path.join(versionDir, 'zh', 'index.html');
+  const zhDest = path.join(latestDir, 'zh', 'index.html');
+  if (fs.existsSync(zhSrc)) {
+    fs.mkdirSync(path.join(latestDir, 'zh'), { recursive: true });
+    fs.copyFileSync(zhSrc, zhDest);
+    console.log(`  Copied: ${zhDest}`);
+  }
 }
 
 /**
@@ -422,7 +420,7 @@ function findPublishedVersions(siteDir) {
 function generateVersionInfoHtml(thisVersion, draftVersion, stableVersion, isZh, lastUpdated) {
   const langSuffix = isZh ? 'zh/' : '';
   const thisUrl = `${BASE_URL}/${thisVersion}/${langSuffix}`;
-  const latestUrl = `${BASE_URL}/latest/`;
+  const latestUrl = isZh ? `${BASE_URL}/latest/zh/` : `${BASE_URL}/latest/`;
 
   // Check version status
   const isOutdated = stableVersion && thisVersion !== stableVersion &&
@@ -638,12 +636,11 @@ function main() {
   console.log('\nPublishing Chinese version...');
   publishSpec(SPEC_FILE_ZH, path.join(baseOutputDir, 'zh'), 'zh', '../', viewerUrlFromZh, faviconUrlFromZh, englishSlugs);
 
-  console.log('\nGenerating redirect page...');
-  console.log(`  Redirect to: ${stableVersion || version}`);
-  generateRedirectPage(siteDir, stableVersion || version);
-
   // Update version links in all published versions
   updateAllVersionLinks(siteDir, version, stableVersion);
+
+  console.log('\nCopying latest version to latest folder...');
+  copyLatestVersion(siteDir, stableVersion || version);
 
   console.log('\nCopying favicon...');
   fs.copyFileSync(path.join(SPEC_DIR, 'favicon.png'), path.join(siteDir, 'favicon.png'));

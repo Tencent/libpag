@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer name="paths">
+    <Path data="@pd1"/>
+    <Path data="@pd2"/>
+    <Path data="@pd3"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+  <Resources>
+    <PathData id="pd1" data="M 0 0 L 80 0 L 40 60 Z"/>
+    <PathData id="pd2" data="M 0 0 L 80 0 L 40 60 Z"/>
+    <PathData id="pd3" data="M 0 0 L 80 0 L 40 60 Z"/>
+  </Resources>
+</pagx>

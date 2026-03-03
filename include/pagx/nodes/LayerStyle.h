@@ -33,6 +33,11 @@ class LayerStyle : public Node {
    */
   BlendMode blendMode = BlendMode::Normal;
 
+  /**
+   * Whether to exclude child layer effects when computing this style. The default value is false.
+   */
+  bool excludeChildEffects = false;
+
   ~LayerStyle() override = default;
 
  protected:

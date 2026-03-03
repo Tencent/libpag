@@ -28,9 +28,13 @@
 
 namespace pagx {
 
-tgfx::Path PathDataToTGFXPath(const PathData& pathData) {
+tgfx::Path ToTGFX(const PathData& pathData) {
   tgfx::Path path = {};
-  pathData.forEach([&path](PathVerb verb, const Point* pts) {
+  const auto& verbs = pathData.verbs();
+  const auto& points = pathData.points();
+  size_t pointIndex = 0;
+  for (auto verb : verbs) {
+    const Point* pts = points.data() + pointIndex;
     switch (verb) {
       case PathVerb::Move:
         path.moveTo(pts[0].x, pts[0].y);
@@ -48,7 +52,8 @@ tgfx::Path PathDataToTGFXPath(const PathData& pathData) {
         path.close();
         break;
     }
-  });
+    pointIndex += PathData::PointsPerVerb(verb);
+  }
   return path;
 }
 
@@ -85,10 +90,6 @@ tgfx::Matrix ToTGFX(const Matrix& m) {
 
 tgfx::Rect ToTGFX(const Rect& r) {
   return tgfx::Rect::MakeXYWH(r.x, r.y, r.width, r.height);
-}
-
-tgfx::Path ToTGFX(const PathData& pathData) {
-  return PathDataToTGFXPath(pathData);
 }
 
 tgfx::LineCap ToTGFX(LineCap cap) {
@@ -274,6 +275,38 @@ tgfx::TileMode ToTGFX(TileMode mode) {
       return tgfx::TileMode::Decal;
   }
   return tgfx::TileMode::Clamp;
+}
+
+tgfx::FilterMode ToTGFX(FilterMode mode) {
+  switch (mode) {
+    case FilterMode::Nearest:
+      return tgfx::FilterMode::Nearest;
+    case FilterMode::Linear:
+      return tgfx::FilterMode::Linear;
+  }
+  return tgfx::FilterMode::Linear;
+}
+
+tgfx::MipmapMode ToTGFX(MipmapMode mode) {
+  switch (mode) {
+    case MipmapMode::None:
+      return tgfx::MipmapMode::None;
+    case MipmapMode::Nearest:
+      return tgfx::MipmapMode::Nearest;
+    case MipmapMode::Linear:
+      return tgfx::MipmapMode::Linear;
+  }
+  return tgfx::MipmapMode::Linear;
+}
+
+tgfx::Matrix3D ToTGFX3D(const Matrix3D& matrix3D) {
+  tgfx::Matrix3D m = {};
+  for (int r = 0; r < 4; r++) {
+    for (int c = 0; c < 4; c++) {
+      m.setRowColumn(r, c, matrix3D.getRowColumn(r, c));
+    }
+  }
+  return m;
 }
 
 static void ReleasePagxData(const void*, void* context) {

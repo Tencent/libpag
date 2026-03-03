@@ -20,28 +20,27 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
-#include "LayerBuilder.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/SVGImporter.h"
-#include "Typesetter.h"
-#include "FontEmbedder.h"
-#include "ShapedText.h"
-#include "utils/StringParser.h"
-#include "svg/SVGPathParser.h"
-#include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
-#include "pagx/nodes/Font.h"
-#include "pagx/nodes/GlyphRun.h"
+#include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
-#include "pagx/nodes/TextLayout.h"
+#include "pagx/svg/SVGPathParser.h"
+#include "pagx/utils/StringParser.h"
+#include "renderer/FontEmbedder.h"
+#include "renderer/LayerBuilder.h"
+#include "renderer/ShapedText.h"
+#include "renderer/TextLayout.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Surface.h"
@@ -56,21 +55,19 @@ namespace pag {
 using namespace tgfx;
 
 static pagx::Group* MakeCenteredTextGroup(pagx::PAGXDocument* doc, const std::string& content,
-                                           float fontSize, float centerX, float y,
-                                           pagx::Color color) {
+                                          float fontSize, float centerX, float y,
+                                          pagx::Color color) {
   auto group = doc->makeNode<pagx::Group>();
   auto text = doc->makeNode<pagx::Text>();
   text->text = content;
   text->fontSize = fontSize;
-  auto layout = doc->makeNode<pagx::TextLayout>();
-  layout->position = {centerX, y};
-  layout->textAlign = pagx::TextAlign::Center;
+  text->position = {centerX, y};
+  text->textAnchor = pagx::TextAnchor::Center;
   auto fill = doc->makeNode<pagx::Fill>();
   auto solid = doc->makeNode<pagx::SolidColor>();
   solid->color = color;
   fill->color = solid;
   group->elements.push_back(text);
-  group->elements.push_back(layout);
   group->elements.push_back(fill);
   return group;
 }
@@ -86,6 +83,11 @@ static std::vector<std::shared_ptr<Typeface>> CreateFallbackTypefaces() {
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
   if (emojiTypeface) {
     result.push_back(emojiTypeface);
+  }
+  auto hebrewTypeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansHebrew-Regular.ttf"));
+  if (hebrewTypeface) {
+    result.push_back(hebrewTypeface);
   }
   return result;
 }
@@ -115,7 +117,7 @@ static std::string SavePAGXFile(const std::string& xml, const std::string& key) 
 PAGX_TEST(PAGXTest, SVGToPAGXAll) {
   constexpr int MinCanvasEdge = 400;
 
-  std::string svgDir = ProjectPath::Absolute("resources/apitest/SVG");
+  std::string svgDir = ProjectPath::Absolute("resources/svg");
   std::vector<std::string> svgFiles = {};
 
   for (const auto& entry : std::filesystem::directory_iterator(svgDir)) {
@@ -126,9 +128,9 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
 
   std::sort(svgFiles.begin(), svgFiles.end());
 
-  // Create Typesetter for text shaping
-  pagx::Typesetter typesetter;
-  typesetter.setFallbackTypefaces(GetFallbackTypefaces());
+  // Create TextLayout for text layout
+  pagx::TextLayout textLayout;
+  textLayout.addFallbackTypefaces(GetFallbackTypefaces());
 
   for (const auto& svgPath : svgFiles) {
     std::string baseName = std::filesystem::path(svgPath).stem().string();
@@ -136,19 +138,20 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
     // Step 1: Parse SVG to PAGXDocument
     auto doc = pagx::SVGImporter::Parse(svgPath);
     if (!doc) {
+      ADD_FAILURE() << "Failed to parse SVG: " << svgPath;
       continue;
     }
 
     float pagxWidth = doc->width;
     float pagxHeight = doc->height;
     if (pagxWidth <= 0 || pagxHeight <= 0) {
+      ADD_FAILURE() << "Invalid dimensions in SVG: " << svgPath;
       continue;
     }
 
     // Step 2: Typeset text elements and embed fonts
-    auto typesetterResult = typesetter.shape(doc.get());
-    pagx::FontEmbedder().embed(doc.get(), typesetterResult.shapedTextMap,
-                               typesetterResult.textOrder);
+    auto layoutResult = textLayout.layout(doc.get());
+    pagx::FontEmbedder().embed(doc.get(), layoutResult.shapedTextMap, layoutResult.textOrder);
 
     // Step 3: Export to XML and save as PAGX file
     std::string xml = pagx::PAGXExporter::ToXML(*doc);
@@ -157,10 +160,19 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
     // Step 4: Load PAGX file and build layer tree (this is the viewer's actual path)
     auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
     if (reloadedDoc == nullptr) {
+      ADD_FAILURE() << "Failed to reload: " << pagxPath;
       continue;
+    }
+    if (!reloadedDoc->errors.empty()) {
+      std::string errorLog;
+      for (const auto& error : reloadedDoc->errors) {
+        errorLog += "\n  " + error;
+      }
+      ADD_FAILURE() << "Parse errors in " << baseName << ":" << errorLog;
     }
     auto layer = pagx::LayerBuilder::Build(reloadedDoc.get());
     if (layer == nullptr) {
+      ADD_FAILURE() << "Failed to build layer: " << pagxPath;
       continue;
     }
 
@@ -183,47 +195,10 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
 }
 
 /**
- * Test case: Verify Layer can directly contain Shape + Fill without Group wrapper.
- */
-PAGX_TEST(PAGXTest, LayerDirectContent) {
-  // Test 1: Group vs no-Group should render identically (left=Group, right=direct)
-  {
-    auto pagxPath = ProjectPath::Absolute("resources/pagx/layer_direct_content.pagx");
-    auto doc = pagx::PAGXImporter::FromFile(pagxPath);
-    ASSERT_TRUE(doc != nullptr);
-
-    auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
-    ASSERT_TRUE(tgfxLayer != nullptr);
-
-    auto surface = Surface::Make(context, 200, 100);
-    DisplayList displayList;
-    displayList.root()->addChild(tgfxLayer);
-    displayList.render(surface.get(), false);
-    EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/PAGXLayerDirect"));
-  }
-
-  // Test 2: PAGX Layer with LinearGradient fill
-  {
-    auto pagxPath = ProjectPath::Absolute("resources/pagx/linear_gradient.pagx");
-    auto doc = pagx::PAGXImporter::FromFile(pagxPath);
-    ASSERT_TRUE(doc != nullptr);
-
-    auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
-    ASSERT_TRUE(tgfxLayer != nullptr);
-
-    auto surface = Surface::Make(context, 200, 100);
-    DisplayList displayList;
-    displayList.root()->addChild(tgfxLayer);
-    displayList.render(surface.get(), false);
-    EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/PAGXLinearGradient"));
-  }
-}
-
-/**
  * Test case: Verify PAGXImporter::FromFile and FromXML produce identical results when rendered.
  */
 PAGX_TEST(PAGXTest, LayerBuilderAPIConsistency) {
-  auto pagxPath = ProjectPath::Absolute("resources/pagx/api_consistency.pagx");
+  auto pagxPath = ProjectPath::Absolute("resources/apitest/api_consistency.pagx");
 
   // Load via FromFile
   auto docFromFile = pagx::PAGXImporter::FromFile(pagxPath);
@@ -463,17 +438,16 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
   layer->contents.push_back(
       MakeCenteredTextGroup(doc.get(), "Hello PAGX", 36, 120, 35, {0.2f, 0.2f, 0.8f, 1.0f}));
   layer->contents.push_back(MakeCenteredTextGroup(doc.get(), "\xe4\xbd\xa0\xe5\xa5\xbd World", 28,
-                                                   120, 80, {0.1f, 0.6f, 0.2f, 1.0f}));
+                                                  120, 80, {0.1f, 0.6f, 0.2f, 1.0f}));
   layer->contents.push_back(
       MakeCenteredTextGroup(doc.get(), "Embedded Font", 18, 120, 115, {0.5f, 0.5f, 0.5f, 1.0f}));
   doc->layers.push_back(layer);
 
-  pagx::Typesetter typesetter;
-  typesetter.setFallbackTypefaces(GetFallbackTypefaces());
-  auto typesetterResult = typesetter.shape(doc.get());
-  ASSERT_FALSE(typesetterResult.shapedTextMap.empty());
-  pagx::FontEmbedder().embed(doc.get(), typesetterResult.shapedTextMap,
-                             typesetterResult.textOrder);
+  pagx::TextLayout textLayout;
+  textLayout.addFallbackTypefaces(GetFallbackTypefaces());
+  auto layoutResult = textLayout.layout(doc.get());
+  ASSERT_FALSE(layoutResult.shapedTextMap.empty());
+  pagx::FontEmbedder().embed(doc.get(), layoutResult.shapedTextMap, layoutResult.textOrder);
 
   auto xml = pagx::PAGXExporter::ToXML(*doc);
   ASSERT_FALSE(xml.empty());
@@ -549,100 +523,52 @@ PAGX_TEST(PAGXTest, FontGlyphRoundTrip) {
   SavePAGXFile(xml, "PAGXTest/font_glyph_roundtrip.pagx");
 }
 
-/**
- * Test case: Text shaping round-trip - verifies that original and pre-shaped renders are identical.
- */
-PAGX_TEST(PAGXTest, TextShaperRoundTrip) {
-  std::string svgPath = ProjectPath::Absolute("resources/apitest/SVG/text.svg");
+static void TestPAGXDirectory(tgfx::Context* context, const std::string& directory) {
+  std::vector<std::string> files = {};
+  for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+    if (entry.path().extension() == ".pagx") {
+      files.push_back(entry.path().string());
+    }
+  }
+  std::sort(files.begin(), files.end());
 
-  auto doc = pagx::SVGImporter::Parse(svgPath);
-  ASSERT_TRUE(doc != nullptr);
+  pagx::TextLayout textLayout;
+  textLayout.addFallbackTypefaces(GetFallbackTypefaces());
 
-  int canvasWidth = static_cast<int>(doc->width);
-  int canvasHeight = static_cast<int>(doc->height);
+  for (const auto& filePath : files) {
+    auto baseName = std::filesystem::path(filePath).stem().string();
 
-  auto typefaces = GetFallbackTypefaces();
+    auto doc = pagx::PAGXImporter::FromFile(filePath);
+    if (!doc) {
+      ADD_FAILURE() << "Failed to load: " << filePath;
+      continue;
+    }
+    if (!doc->errors.empty()) {
+      std::string errorLog;
+      for (const auto& error : doc->errors) {
+        errorLog += "\n  " + error;
+      }
+      ADD_FAILURE() << "Parse errors in " << baseName << ":" << errorLog;
+    }
 
-  pagx::Typesetter typesetter;
-  typesetter.setFallbackTypefaces(typefaces);
-  auto typesetterResult = typesetter.shape(doc.get());
-  EXPECT_FALSE(typesetterResult.shapedTextMap.empty());
-  pagx::FontEmbedder().embed(doc.get(), typesetterResult.shapedTextMap,
-                             typesetterResult.textOrder);
+    auto layer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
+    if (!layer) {
+      ADD_FAILURE() << "Failed to build layer: " << filePath;
+      continue;
+    }
 
-  auto originalLayer = pagx::LayerBuilder::Build(doc.get(), &typesetter);
-  ASSERT_TRUE(originalLayer != nullptr);
+    auto surface =
+        Surface::Make(context, static_cast<int>(doc->width), static_cast<int>(doc->height));
+    if (!surface) {
+      ADD_FAILURE() << "Failed to create surface for: " << filePath;
+      continue;
+    }
+    DisplayList displayList;
+    displayList.root()->addChild(layer);
+    displayList.render(surface.get(), false);
 
-  auto originalSurface = Surface::Make(context, canvasWidth, canvasHeight);
-  DisplayList originalDL;
-  originalDL.root()->addChild(originalLayer);
-  originalDL.render(originalSurface.get(), false);
-
-  std::string xml = pagx::PAGXExporter::ToXML(*doc);
-  std::string pagxPath = SavePAGXFile(xml, "PAGXTest/text_preshaped.pagx");
-
-  auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
-  ASSERT_TRUE(reloadedDoc != nullptr);
-  auto reloadedLayer = pagx::LayerBuilder::Build(reloadedDoc.get());
-  ASSERT_TRUE(reloadedLayer != nullptr);
-
-  auto preshapedSurface = Surface::Make(context, canvasWidth, canvasHeight);
-  DisplayList preshapedDL;
-  preshapedDL.root()->addChild(reloadedLayer);
-  preshapedDL.render(preshapedSurface.get(), false);
-
-  EXPECT_TRUE(Baseline::Compare(originalSurface, "PAGXTest/TextShaper_Original"));
-  EXPECT_TRUE(Baseline::Compare(preshapedSurface, "PAGXTest/TextShaper_PreShaped"));
-}
-
-/**
- * Test case: Text shaping with emoji (mixed vector and bitmap fonts)
- */
-PAGX_TEST(PAGXTest, TextShaperEmoji) {
-  std::string svgPath = ProjectPath::Absolute("resources/apitest/SVG/emoji.svg");
-
-  auto doc = pagx::SVGImporter::Parse(svgPath);
-  ASSERT_TRUE(doc != nullptr);
-
-  int canvasWidth = static_cast<int>(doc->width);
-  int canvasHeight = static_cast<int>(doc->height);
-
-  auto typefaces = GetFallbackTypefaces();
-
-  // Typeset text and embed fonts
-  pagx::Typesetter typesetter;
-  typesetter.setFallbackTypefaces(typefaces);
-  auto typesetterResult = typesetter.shape(doc.get());
-  EXPECT_FALSE(typesetterResult.shapedTextMap.empty());
-  pagx::FontEmbedder().embed(doc.get(), typesetterResult.shapedTextMap,
-                             typesetterResult.textOrder);
-
-  // Render typeset document
-  auto originalLayer = pagx::LayerBuilder::Build(doc.get(), &typesetter);
-  ASSERT_TRUE(originalLayer != nullptr);
-
-  auto originalSurface = Surface::Make(context, canvasWidth, canvasHeight);
-  DisplayList originalDL;
-  originalDL.root()->addChild(originalLayer);
-  originalDL.render(originalSurface.get(), false);
-
-  // Export and reload
-  std::string xml = pagx::PAGXExporter::ToXML(*doc);
-  std::string pagxPath = SavePAGXFile(xml, "PAGXTest/emoji_preshaped.pagx");
-
-  auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
-  ASSERT_TRUE(reloadedDoc != nullptr);
-  auto reloadedLayer = pagx::LayerBuilder::Build(reloadedDoc.get());
-  ASSERT_TRUE(reloadedLayer != nullptr);
-
-  // Render pre-shaped
-  auto preshapedSurface = Surface::Make(context, canvasWidth, canvasHeight);
-  DisplayList preshapedDL;
-  preshapedDL.root()->addChild(reloadedLayer);
-  preshapedDL.render(preshapedSurface.get(), false);
-
-  EXPECT_TRUE(Baseline::Compare(originalSurface, "PAGXTest/TextShaperEmoji_Original"));
-  EXPECT_TRUE(Baseline::Compare(preshapedSurface, "PAGXTest/TextShaperEmoji_PreShaped"));
+    EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/" + baseName)) << baseName;
+  }
 }
 
 /**
@@ -650,46 +576,14 @@ PAGX_TEST(PAGXTest, TextShaperEmoji) {
  * Renders each sample and compares with baseline screenshots.
  */
 PAGX_TEST(PAGXTest, SampleFiles) {
-  auto samplesDir = ProjectPath::Absolute("spec/samples");
-  std::vector<std::string> sampleFiles = {};
+  TestPAGXDirectory(context, ProjectPath::Absolute("spec/samples"));
+}
 
-  for (const auto& entry : std::filesystem::directory_iterator(samplesDir)) {
-    if (entry.path().extension() == ".pagx") {
-      sampleFiles.push_back(entry.path().string());
-    }
-  }
-  std::sort(sampleFiles.begin(), sampleFiles.end());
-
-  pagx::Typesetter typesetter;
-  typesetter.setFallbackTypefaces(GetFallbackTypefaces());
-
-  for (const auto& filePath : sampleFiles) {
-    auto baseName = std::filesystem::path(filePath).stem().string();
-
-    auto doc = pagx::PAGXImporter::FromFile(filePath);
-    if (!doc) {
-      FAIL() << "Failed to load: " << filePath;
-      continue;
-    }
-
-    auto typesetterResult = typesetter.shape(doc.get());
-    pagx::FontEmbedder().embed(doc.get(), typesetterResult.shapedTextMap,
-                               typesetterResult.textOrder);
-
-    auto layer = pagx::LayerBuilder::Build(doc.get());
-    if (!layer) {
-      FAIL() << "Failed to build layer: " << filePath;
-      continue;
-    }
-
-    auto surface =
-        Surface::Make(context, static_cast<int>(doc->width), static_cast<int>(doc->height));
-    DisplayList displayList;
-    displayList.root()->addChild(layer);
-    displayList.render(surface.get(), false);
-
-    EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/" + baseName)) << baseName;
-  }
+/**
+ * Test all text-related PAGX files in resources/text directory.
+ */
+PAGX_TEST(PAGXTest, TextFiles) {
+  TestPAGXDirectory(context, ProjectPath::Absolute("resources/text"));
 }
 
 }  // namespace pag

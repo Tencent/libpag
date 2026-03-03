@@ -226,6 +226,10 @@ forward it to the verifier immediately. Forwarding rules:
   reports into one message, or add coordinator commentary.
 - **One forward per reviewer**: each reviewer report is a separate message to
   the verifier.
+- **Completion signal**: after forwarding the last reviewer's report, send a
+  separate message to the verifier stating: "All reviewer reports have been
+  forwarded. Please finalize your verdicts for all issues above." This prevents
+  the verifier from finishing early before all reports arrive.
 
 Include the following verbatim in every verifier's prompt:
 
@@ -252,6 +256,10 @@ Important constraints:
   the codebase.
 - A CONFIRM verdict is not a failure — it means the reviewer found a real issue and
   your challenge validated it.
+- Reviewer reports arrive incrementally via the coordinator. Do NOT produce a final
+  summary until the coordinator explicitly tells you all reports have been forwarded.
+  Process each report as it arrives, but wait for the completion signal before
+  concluding.
 ```
 
 ### After review
@@ -407,9 +415,8 @@ Present `pending` + `failed` issues grouped by risk (high → low), sorted by
 file path within each group:
 `[number] [file:line] [risk] [reason] — [description]`
 
-Then ask the user to select which issues to fix using **a single multi-select
-question** where each option's label is the issue summary (e.g.,
-`[risk] file:line — description`). User checks multiple options in one prompt.
+Then present issues via multi-select. Each option label is the issue summary
+(e.g., `[risk] file:line — description`).
 Checked → `approved`, unchecked → `skipped`.
 
 If the user replies with a bulk instruction (e.g., "fix all", "skip the rest"),

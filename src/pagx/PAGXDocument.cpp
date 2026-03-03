@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXDocument.h"
-#include <cstdio>
 #include "pagx/nodes/Image.h"
 
 namespace pagx {
@@ -40,7 +39,7 @@ void PAGXDocument::registerNode(Node* node, const std::string& id) {
   }
   auto it = nodeMap.find(id);
   if (it != nodeMap.end()) {
-    fprintf(stderr, "PAGXDocument::makeNode(): Duplicate node id '%s', overwriting.\n", id.c_str());
+    errors.push_back("Duplicate node id '" + id + "'.");
   }
   node->id = id;
   nodeMap[id] = node;
@@ -68,6 +67,7 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
   if (filePath.empty() || data == nullptr) {
     return false;
   }
+  bool found = false;
   for (auto& node : nodes) {
     if (node->nodeType() != NodeType::Image) {
       continue;
@@ -76,11 +76,11 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
     if (image->filePath != filePath) {
       continue;
     }
-    image->data = std::move(data);
+    image->data = data;
     image->filePath = {};
-    return true;
+    found = true;
   }
-  return false;
+  return found;
 }
 
 }  // namespace pagx

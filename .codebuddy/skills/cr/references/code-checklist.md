@@ -18,6 +18,9 @@ Issues that directly affect runtime behavior.
 - switch/case covers all branches with no unintended fall-through
 
 ### A2. Boundary Conditions
+> For internal (non-public-API) functions: if callers provably guarantee a
+> precondition (e.g., non-null, non-empty, within range), the guard is
+> unnecessary — do not flag. Verify the guarantee by reading actual callers.
 - Division-by-zero protected (both float and integer)
 - Empty container checked before front() / back() / operator[]
 - Null / nil / undefined dereference guarded
@@ -56,13 +59,6 @@ Issues that directly affect runtime behavior.
 - Callback / closure captures a reference or pointer whose lifetime may end before
   invocation
 - Condition variable wait without predicate (spurious wakeup)
-
-### A8. Public API Comments
-- Public API comments accurately describe current behavior, parameters, return values
-- Value ranges, constraints, error conditions in comments match implementation
-- Comments updated when corresponding API behavior changes
-- Public APIs have sufficient parameter and return value descriptions
-- Design intent explanations present where code alone is insufficient
 
 ---
 
@@ -155,7 +151,14 @@ Coding standards and documentation consistency.
 - Type names / enum names in code consistent with project documentation
 - Value ranges in comments consistent with specification documents
 
-### C6. Accessibility
+### C6. Public API Comments
+- Public API comments accurately describe current behavior, parameters, return values
+- Value ranges, constraints, error conditions in comments match implementation
+- Comments updated when corresponding API behavior changes
+- Public APIs have sufficient parameter and return value descriptions
+- Design intent explanations present where code alone is insufficient
+
+### C7. Accessibility
 - Images have meaningful alt text (empty alt for decorative images)
 - Form inputs have associated labels
 - Interactive elements keyboard-navigable with semantic HTML
@@ -173,3 +176,5 @@ Coding standards and documentation consistency.
 4. Code following project's existing style but not matching some external standard
 5. Priority C issues in test code (unless project rules require otherwise)
 6. "Better alternative" suggestions for existing stable, bug-free code
+7. Missing guards in internal functions when callers provably guarantee the precondition
+   (only applies to non-public-API code; verify by reading actual call sites)

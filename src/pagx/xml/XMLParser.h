@@ -82,6 +82,11 @@ class XMLParser {
    */
   virtual bool onText(const std::string& text) = 0;
 
+  /**
+   * Returns the current line number in the XML source being parsed.
+   */
+  int currentLine() const;
+
  private:
   friend struct ParsingContext;
 
@@ -89,6 +94,8 @@ class XMLParser {
   bool addAttribute(const char* name, const char* value);
   bool endElement(const char* element);
   bool text(const std::string& text);
+
+  void* _expatParser = nullptr;
 };
 
 }  // namespace pagx

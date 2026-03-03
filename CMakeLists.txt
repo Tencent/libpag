@@ -31,14 +31,13 @@ option(PAG_USE_QT "Allow build with QT frameworks" OFF)
 option(PAG_USE_RTTR "Enable RTTR support" OFF)
 option(PAG_USE_HARFBUZZ "Enable HarfBuzz support" OFF)
 option(PAG_USE_C "Enable c API" OFF)
+option(PAG_BUILD_PAGX "Enable PAGX format support" OFF)
+option(PAG_BUILD_CLI "Enable building the command-line tool" OFF)
+option(PAG_BUILD_SVG "Enable SVG import/export support" OFF)
 
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
 if (NOT WEB OR EMSCRIPTEN_PTHREADS)
     option(PAG_USE_THREADS "Enable support for multithreaded rendering" ON)
-endif ()
-
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    option(PAG_ENABLE_PROFILING "Enable Profiling" ON)
 endif ()
 
 if (NOT MACOS AND NOT IOS AND NOT WEB)
@@ -93,6 +92,19 @@ elseif (PAG_USE_SWIFTSHADER)
     set(PAG_USE_ANGLE OFF)
 endif ()
 
+# PAG_BUILD_CLI and PAG_BUILD_SVG both require PAG_BUILD_PAGX
+if (PAG_BUILD_CLI)
+    set(PAG_BUILD_PAGX ON)
+endif ()
+if (PAG_BUILD_SVG)
+    set(PAG_BUILD_PAGX ON)
+endif ()
+
+# PAG_BUILD_PAGX enables HarfBuzz
+if (PAG_BUILD_PAGX)
+    set(PAG_USE_HARFBUZZ ON)
+endif ()
+
 if (PAG_USE_QT OR PAG_USE_SWIFTSHADER OR PAG_USE_ANGLE)
     set(PAG_USE_OPENGL ON)
 endif ()
@@ -103,23 +115,27 @@ endif ()
 
 if (PAG_BUILD_TESTS)
     set(PAG_USE_FREETYPE ON)
+    set(PAG_BUILD_PAGX ON)
+    set(PAG_BUILD_CLI ON)
+    set(PAG_BUILD_SVG ON)
     set(PAG_USE_HARFBUZZ ON)
     set(PAG_USE_SYSTEM_LZ4 OFF)
     set(PAG_BUILD_SHARED OFF)
-    set(TGFX_BUILD_LAYERS ON)
 endif ()
+
+set(TGFX_BUILD_LAYERS ON)
 
 message("PAG_USE_LIBAVC: ${PAG_USE_LIBAVC}")
 message("PAG_USE_RTTR: ${PAG_USE_RTTR}")
 message("PAG_USE_HARFBUZZ: ${PAG_USE_HARFBUZZ}")
+message("PAG_BUILD_PAGX: ${PAG_BUILD_PAGX}")
+message("PAG_BUILD_CLI: ${PAG_BUILD_CLI}")
+message("PAG_BUILD_SVG: ${PAG_BUILD_SVG}")
 message("PAG_USE_SYSTEM_LZ4: ${PAG_USE_SYSTEM_LZ4}")
 message("PAG_USE_C: ${PAG_USE_C}")
 message("PAG_BUILD_SHARED: ${PAG_BUILD_SHARED}")
 message("PAG_BUILD_FRAMEWORK: ${PAG_BUILD_FRAMEWORK}")
 message("PAG_BUILD_TESTS: ${PAG_BUILD_TESTS}")
-message("PAG_ENABLE_PROFILING: ${PAG_ENABLE_PROFILING}")
-message("PAG_USE_FREETYPE: ${PAG_USE_FREETYPE}")
-message("PAG_USE_THREADS: ${PAG_USE_THREADS}")
 
 if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     if (DEPLOYMENT_TARGET)
@@ -164,10 +180,25 @@ list(APPEND PAG_FILES ${PAG_HEADERS})
 file(GLOB_RECURSE SRC_FILES
         src/base/*.*
         src/codec/*.*
-        src/rendering/*.*
-        src/renderer/*.*)
+        src/rendering/*.*)
 list(APPEND PAG_FILES ${SRC_FILES})
-list(APPEND PAG_INCLUDES src/renderer src/pagx)
+
+if (PAG_BUILD_PAGX)
+    # pagx core + utils + xml (always included with PAGX)
+    file(GLOB PAGX_CORE_SOURCES src/pagx/*.cpp)
+    file(GLOB_RECURSE PAGX_UTILS_SOURCES src/pagx/utils/*.*)
+    file(GLOB_RECURSE PAGX_XML_SOURCES src/pagx/xml/*.*)
+    # SVGPathParser is part of pagx core (used by PAGXImporter/PAGXExporter for path data)
+    list(APPEND PAGX_CORE_SOURCES src/pagx/svg/SVGPathParser.cpp)
+    list(APPEND PAG_FILES ${PAGX_CORE_SOURCES} ${PAGX_UTILS_SOURCES} ${PAGX_XML_SOURCES})
+    # renderer module (text layout, font embedding, etc.)
+    file(GLOB_RECURSE RENDERER_FILES src/renderer/*.*)
+    list(APPEND PAG_FILES ${RENDERER_FILES})
+
+    if (PAG_BUILD_SVG)
+        list(APPEND PAG_FILES src/pagx/svg/SVGImporter.cpp src/pagx/svg/SVGParserContext.h)
+    endif ()
+endif ()
 file(GLOB COMMON_FILES src/platform/*.*)
 list(APPEND PAG_FILES ${COMMON_FILES})
 
@@ -178,7 +209,7 @@ endif ()
 if (MSVC)
     list(APPEND PAG_COMPILE_OPTIONS "/utf-8")
     list(APPEND PAG_COMPILE_OPTIONS /w44251 /w44275)
-endif (MSVC)
+endif ()
 
 # Sets flags
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -233,8 +264,32 @@ endif ()
 
 if (PAG_USE_HARFBUZZ)
     list(APPEND PAG_DEFINES PAG_USE_HARFBUZZ)
-    list(APPEND PAG_STATIC_VENDORS harfbuzz)
-    list(APPEND PAG_INCLUDES third_party/harfbuzz/src)
+    if (HARFBUZZ_LIB AND HARFBUZZ_INCLUDE)
+        # Prebuilt HarfBuzz static library and headers provided externally.
+        message("HARFBUZZ_LIB: ${HARFBUZZ_LIB}")
+        message("HARFBUZZ_INCLUDE: ${HARFBUZZ_INCLUDE}")
+        list(APPEND PAG_INCLUDES ${HARFBUZZ_INCLUDE})
+        # Use PAG_SHARED_LIBS to avoid embedding into the static libpag archive.
+        list(APPEND PAG_SHARED_LIBS ${HARFBUZZ_LIB})
+    else ()
+        # Built-in HarfBuzz, compile from third_party.
+        list(APPEND PAG_STATIC_VENDORS harfbuzz)
+        list(APPEND PAG_INCLUDES third_party/harfbuzz/src)
+    endif ()
+endif ()
+
+if (PAG_BUILD_PAGX)
+    list(APPEND PAG_DEFINES PAG_BUILD_PAGX)
+    list(APPEND PAG_STATIC_VENDORS expat SheenBidi)
+    list(APPEND PAG_INCLUDES third_party/SheenBidi/Headers
+            third_party/expat/expat/lib)
+    if (WIN32)
+        list(APPEND PAG_DEFINES XML_STATIC)
+    endif ()
+endif ()
+
+if (PAG_BUILD_SVG)
+    list(APPEND PAG_DEFINES PAG_BUILD_SVG)
 endif ()
 
 function(find_include_dirs out)
@@ -268,8 +323,6 @@ elseif (IOS)
     list(APPEND PAG_SHARED_LIBS ${CoreText_LIBS})
     find_library(VideoToolbox_LIBS VideoToolbox REQUIRED)
     list(APPEND PAG_SHARED_LIBS ${VideoToolbox_LIBS})
-    find_library(CoreMedia_LIBS CoreMedia REQUIRED)
-    list(APPEND PAG_SHARED_LIBS ${CoreMedia_LIBS})
     find_library(CoreMedia_LIBS CoreMedia REQUIRED)
     list(APPEND PAG_SHARED_LIBS ${CoreMedia_LIBS})
     find_library(ImageIO_LIBS ImageIO REQUIRED)
@@ -456,48 +509,20 @@ if (PAG_USE_C)
     if (ANDROID OR (WIN32 AND PAG_USE_ANGLE))
         file(GLOB PLATFORM_FILES src/c/ext/egl/pag_egl_globals.cpp)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
-    endif()
+    endif ()
 endif ()
 
-list(APPEND PAG_INCLUDES ${TGFX_DIR}/include)
-set(TGFX_CACHE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tgfx/out/cache)
-if (NOT HAS_CUSTOM_TGFX_DIR AND EXISTS ${TGFX_CACHE_DIR})
-    message("TGFX_CACHE_DIR: ${TGFX_CACHE_DIR}")
-    list(APPEND TGFX_OPTIONS "-DTGFX_USE_OPENGL=${PAG_USE_OPENGL}")
-    list(APPEND TGFX_OPTIONS "-DTGFX_USE_QT=${PAG_USE_QT}")
-    list(APPEND TGFX_OPTIONS "-DTGFX_USE_SWIFTSHADER=${PAG_USE_SWIFTSHADER}")
-    list(APPEND TGFX_OPTIONS "-DTGFX_USE_ANGLE=${PAG_USE_ANGLE}")
-    list(APPEND TGFX_OPTIONS "-DTGFX_USE_FREETYPE=${PAG_USE_FREETYPE}")
-    list(APPEND TGFX_OPTIONS "-DTGFX_USE_PNG_DECODE=${PAG_USE_PNG_DECODE}")
-    list(APPEND TGFX_OPTIONS "-DTGFX_USE_PNG_ENCODE=${PAG_USE_PNG_ENCODE}")
-    list(APPEND TGFX_OPTIONS "-DTGFX_USE_JPEG_DECODE=${PAG_USE_JPEG_DECODE}")
-    list(APPEND TGFX_OPTIONS "-DTGFX_USE_JPEG_ENCODE=${PAG_USE_JPEG_ENCODE}")
-    list(APPEND TGFX_OPTIONS "-DTGFX_USE_WEBP_DECODE=${PAG_USE_WEBP_DECODE}")
-    list(APPEND TGFX_OPTIONS "-DTGFX_USE_WEBP_ENCODE=${PAG_USE_WEBP_ENCODE}")
-    list(APPEND TGFX_OPTIONS "-DTGFX_ENABLE_PROFILING=${PAG_ENABLE_PROFILING}")
-    list(APPEND TGFX_OPTIONS "-DTGFX_USE_THREADS=${PAG_USE_THREADS}")
-    list(APPEND TGFX_OPTIONS "-DTGFX_USE_TEXT_GAMMA_CORRECTION=ON")
-    list(APPEND TGFX_OPTIONS "-DTGFX_BUILD_LAYERS=${TGFX_BUILD_LAYERS}")
-    if (PAG_USE_QT)
-        list(APPEND TGFX_OPTIONS "-DCMAKE_PREFIX_PATH=\"${CMAKE_PREFIX_PATH}\"")
-    endif ()
-    if (CMAKE_BUILD_TYPE MATCHES "Debug")
-        list(APPEND TGFX_OPTIONS "-d")
-        string(TOLOWER ${CMAKE_BUILD_TYPE} TGFX_BUILD_TYPE)
-    endif ()
-
-    set(TGFX_OUTPUT_DIR ${TGFX_CACHE_DIR}/${TGFX_BUILD_TYPE}/${PLATFORM})
-    set(TGFX_OUTPUT_LIB ${TGFX_OUTPUT_DIR}/${ARCH}/tgfx${CMAKE_STATIC_LIBRARY_SUFFIX})
-    set(TGFX_OUTPUT_MD5 ${TGFX_OUTPUT_DIR}/.tgfx.${ARCH}.md5)
-    add_custom_target(tgfx
-            COMMAND node build_tgfx ${TGFX_OPTIONS} -p ${PLATFORM} -a ${ARCH} -o ${TGFX_OUTPUT_DIR}
-            WORKING_DIRECTORY ${TGFX_DIR}
-            BYPRODUCTS ${TGFX_OUTPUT_LIB} ${TGFX_OUTPUT_MD5}
-            VERBATIM USES_TERMINAL)
-    list(APPEND PAG_STATIC_LIBS ${TGFX_OUTPUT_LIB})
-    list(APPEND PAG_DEPEND_TARGETS tgfx)
-else ()
+if (TGFX_LIB AND TGFX_INCLUDE)
+    # Priority 1: Prebuilt tgfx static library and headers provided externally.
+    message("TGFX_LIB: ${TGFX_LIB}")
+    message("TGFX_INCLUDE: ${TGFX_INCLUDE}")
+    list(APPEND PAG_INCLUDES ${TGFX_INCLUDE})
+    # Use PAG_SHARED_LIBS to avoid embedding into the static libpag archive.
+    list(APPEND PAG_SHARED_LIBS ${TGFX_LIB})
+elseif (HAS_CUSTOM_TGFX_DIR)
+    # Priority 2: Custom tgfx source directory, build via add_subdirectory.
     message("TGFX_DIR: ${TGFX_DIR}")
+    list(APPEND PAG_INCLUDES ${TGFX_DIR}/include)
     set(TGFX_USE_OPENGL ${PAG_USE_OPENGL})
     set(TGFX_USE_QT ${PAG_USE_QT})
     set(TGFX_USE_SWIFTSHADER ${PAG_USE_SWIFTSHADER})
@@ -509,7 +534,6 @@ else ()
     set(TGFX_USE_JPEG_ENCODE ${PAG_USE_JPEG_ENCODE})
     set(TGFX_USE_WEBP_DECODE ${PAG_USE_WEBP_DECODE})
     set(TGFX_USE_WEBP_ENCODE ${PAG_USE_WEBP_ENCODE})
-    set(TGFX_ENABLE_PROFILING ${PAG_ENABLE_PROFILING})
     set(TGFX_USE_THREADS ${PAG_USE_THREADS})
     set(TGFX_USE_TEXT_GAMMA_CORRECTION ON)
     set(TGFX_BUILD_LAYERS ${TGFX_BUILD_LAYERS})
@@ -517,6 +541,65 @@ else ()
     add_subdirectory(${TGFX_DIR} tgfx EXCLUDE_FROM_ALL)
     list(APPEND PAG_STATIC_LIBS $<TARGET_FILE:tgfx>)
     list(APPEND PAG_DEPEND_TARGETS tgfx)
+else ()
+    # Priority 3: Built-in tgfx, use cache build or add_subdirectory.
+    list(APPEND PAG_INCLUDES ${TGFX_DIR}/include)
+    set(TGFX_CACHE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tgfx/out/cache)
+    if (EXISTS ${TGFX_CACHE_DIR})
+        message("TGFX_CACHE_DIR: ${TGFX_CACHE_DIR}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_OPENGL=${PAG_USE_OPENGL}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_QT=${PAG_USE_QT}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_SWIFTSHADER=${PAG_USE_SWIFTSHADER}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_ANGLE=${PAG_USE_ANGLE}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_FREETYPE=${PAG_USE_FREETYPE}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_PNG_DECODE=${PAG_USE_PNG_DECODE}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_PNG_ENCODE=${PAG_USE_PNG_ENCODE}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_JPEG_DECODE=${PAG_USE_JPEG_DECODE}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_JPEG_ENCODE=${PAG_USE_JPEG_ENCODE}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_WEBP_DECODE=${PAG_USE_WEBP_DECODE}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_WEBP_ENCODE=${PAG_USE_WEBP_ENCODE}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_THREADS=${PAG_USE_THREADS}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_TEXT_GAMMA_CORRECTION=ON")
+        list(APPEND TGFX_OPTIONS "-DTGFX_BUILD_LAYERS=${TGFX_BUILD_LAYERS}")
+        if (PAG_USE_QT)
+            list(APPEND TGFX_OPTIONS "-DCMAKE_PREFIX_PATH=\"${CMAKE_PREFIX_PATH}\"")
+        endif ()
+        if (CMAKE_BUILD_TYPE MATCHES "Debug")
+            list(APPEND TGFX_OPTIONS "-d")
+            string(TOLOWER ${CMAKE_BUILD_TYPE} TGFX_BUILD_TYPE)
+        endif ()
+
+        set(TGFX_OUTPUT_DIR ${TGFX_CACHE_DIR}/${TGFX_BUILD_TYPE}/${PLATFORM})
+        set(TGFX_OUTPUT_LIB ${TGFX_OUTPUT_DIR}/${ARCH}/tgfx${CMAKE_STATIC_LIBRARY_SUFFIX})
+        set(TGFX_OUTPUT_MD5 ${TGFX_OUTPUT_DIR}/.tgfx.${ARCH}.md5)
+        add_custom_target(tgfx
+                COMMAND node build_tgfx ${TGFX_OPTIONS} -p ${PLATFORM} -a ${ARCH} -o ${TGFX_OUTPUT_DIR}
+                WORKING_DIRECTORY ${TGFX_DIR}
+                BYPRODUCTS ${TGFX_OUTPUT_LIB} ${TGFX_OUTPUT_MD5}
+                VERBATIM USES_TERMINAL)
+        list(APPEND PAG_STATIC_LIBS ${TGFX_OUTPUT_LIB})
+        list(APPEND PAG_DEPEND_TARGETS tgfx)
+    else ()
+        message("TGFX_DIR: ${TGFX_DIR}")
+        set(TGFX_USE_OPENGL ${PAG_USE_OPENGL})
+        set(TGFX_USE_QT ${PAG_USE_QT})
+        set(TGFX_USE_SWIFTSHADER ${PAG_USE_SWIFTSHADER})
+        set(TGFX_USE_ANGLE ${PAG_USE_ANGLE})
+        set(TGFX_USE_FREETYPE ${PAG_USE_FREETYPE})
+        set(TGFX_USE_PNG_DECODE ${PAG_USE_PNG_DECODE})
+        set(TGFX_USE_PNG_ENCODE ${PAG_USE_PNG_ENCODE})
+        set(TGFX_USE_JPEG_DECODE ${PAG_USE_JPEG_DECODE})
+        set(TGFX_USE_JPEG_ENCODE ${PAG_USE_JPEG_ENCODE})
+        set(TGFX_USE_WEBP_DECODE ${PAG_USE_WEBP_DECODE})
+        set(TGFX_USE_WEBP_ENCODE ${PAG_USE_WEBP_ENCODE})
+        set(TGFX_USE_THREADS ${PAG_USE_THREADS})
+        set(TGFX_USE_TEXT_GAMMA_CORRECTION ON)
+        set(TGFX_BUILD_LAYERS ${TGFX_BUILD_LAYERS})
+        set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+        add_subdirectory(${TGFX_DIR} tgfx EXCLUDE_FROM_ALL)
+        list(APPEND PAG_STATIC_LIBS $<TARGET_FILE:tgfx>)
+        list(APPEND PAG_DEPEND_TARGETS tgfx)
+    endif ()
 endif ()
 
 add_vendor_target(pag-vendor STATIC_VENDORS ${PAG_STATIC_VENDORS} SHARED_VENDORS ${PAG_SHARED_VENDORS})
@@ -537,10 +620,16 @@ if (PAG_EXCLUDE_FILES)
 endif ()
 
 if (WEB)
-    add_executable(pag ${PAG_FILES})
-    list(APPEND PAG_LINK_OPTIONS --no-entry -lembind -sEXPORT_NAME='PAGInit' -sWASM=1
-            -sMAX_WEBGL_VERSION=2 -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8'] -sALLOW_MEMORY_GROWTH=1
-            -sMODULARIZE=1 -sENVIRONMENT=web,worker -sEXPORT_ES6=1 -sEXPORTED_FUNCTIONS=['_malloc','_free'])
+    if (HasParent)
+        # When used as a subdirectory, build as a static library for the parent to link.
+        add_library(pag STATIC ${PAG_FILES})
+        merge_libraries_into(pag ${PAG_STATIC_LIBS})
+    else ()
+        add_executable(pag ${PAG_FILES})
+        list(APPEND PAG_LINK_OPTIONS --no-entry -lembind -sEXPORT_NAME='PAGInit' -sWASM=1
+                -sMAX_WEBGL_VERSION=2 -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8'] -sALLOW_MEMORY_GROWTH=1
+                -sMODULARIZE=1 -sENVIRONMENT=web,worker -sEXPORT_ES6=1 -sEXPORTED_FUNCTIONS=['_malloc','_free'])
+    endif ()
     set(unsupported_emsdk_versions "4.0.11")
     foreach (unsupported_version IN LISTS unsupported_emsdk_versions)
         if (${EMSCRIPTEN_VERSION} VERSION_EQUAL ${unsupported_version})
@@ -585,11 +674,11 @@ if (PAG_BUILD_FRAMEWORK)
             MACOSX_FRAMEWORK_BUNDLE_VERSION ${PAG_VERSION}
             MACOSX_FRAMEWORK_SHORT_VERSION_STRING ${PAG_VERSION})
     set(CMAKE_XCODE_ATTRIBUTE_DEFINES_MODULE YES)
-    if(IOS)
+    if (IOS)
         set(CMAKE_XCODE_ATTRIBUTE_MODULEMAP_FILE ${CMAKE_CURRENT_SOURCE_DIR}/ios/libpag.modulemap)
-    elseif(MACOS)
+    elseif (MACOS)
         set(CMAKE_XCODE_ATTRIBUTE_MODULEMAP_FILE ${CMAKE_CURRENT_SOURCE_DIR}/mac/libpag.modulemap)
-    endif()    
+    endif ()
     set(CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER ${PAG_IDENTIFIER})
     if (HasParent)
         set(CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER ${CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER} PARENT_SCOPE)
@@ -610,20 +699,64 @@ if (PAG_BUILD_FRAMEWORK)
     if (NOT CMAKE_GENERATOR MATCHES "Xcode")
         if (MACOS)
             add_custom_command(TARGET pag POST_BUILD
-                WORKING_DIRECTORY "$<TARGET_FILE_DIR:pag>/../../"
-                COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:pag>/Modules"
-                COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_XCODE_ATTRIBUTE_MODULEMAP_FILE}" "$<TARGET_FILE_DIR:pag>/Modules/module.modulemap"
-                COMMAND ${CMAKE_COMMAND} -E create_symlink "Versions/Current/Modules" "Modules"
-                COMMENT "Copying modulemap file to framework/Versions/A/Modules/module.modulemap"
+                    WORKING_DIRECTORY "$<TARGET_FILE_DIR:pag>/../../"
+                    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:pag>/Modules"
+                    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_XCODE_ATTRIBUTE_MODULEMAP_FILE}" "$<TARGET_FILE_DIR:pag>/Modules/module.modulemap"
+                    COMMAND ${CMAKE_COMMAND} -E create_symlink "Versions/Current/Modules" "Modules"
+                    COMMENT "Copying modulemap file to framework/Versions/A/Modules/module.modulemap"
             )
         else ()
             add_custom_command(TARGET pag POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:pag>/Modules"
-                COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_XCODE_ATTRIBUTE_MODULEMAP_FILE}" "$<TARGET_FILE_DIR:pag>/Modules/module.modulemap"
-                COMMENT "Copying modulemap file to framework/Modules/module.modulemap"
+                    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:pag>/Modules"
+                    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_XCODE_ATTRIBUTE_MODULEMAP_FILE}" "$<TARGET_FILE_DIR:pag>/Modules/module.modulemap"
+                    COMMENT "Copying modulemap file to framework/Modules/module.modulemap"
             )
         endif ()
     endif ()
+endif ()
+
+if (PAG_BUILD_CLI)
+    # Generate pagx_xsd.h from spec/pagx.xsd
+    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/spec/pagx.xsd" PAGX_XSD_CONTENT)
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/generated/pagx_xsd.h"
+            "// Auto-generated from spec/pagx.xsd. Do not edit manually.\n"
+            "#pragma once\n"
+            "#include <string>\n"
+            "namespace pagx::cli {\n"
+            "inline const std::string& PagxXsdContent() {\n"
+            "  static const std::string content = R\"XSD(${PAGX_XSD_CONTENT})XSD\";\n"
+            "  return content;\n"
+            "}\n"
+            "}  // namespace pagx::cli\n")
+
+    # Find LibXml2
+    if (APPLE)
+        execute_process(
+                COMMAND xcrun --show-sdk-path
+                OUTPUT_VARIABLE _MACOS_SDK_PATH
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        set(LIBXML2_INCLUDE_DIR "${_MACOS_SDK_PATH}/usr/include/libxml2" CACHE PATH "" FORCE)
+        set(LIBXML2_LIBRARY "${_MACOS_SDK_PATH}/usr/lib/libxml2.tbd" CACHE FILEPATH "" FORCE)
+    endif ()
+    find_package(LibXml2 REQUIRED)
+
+    # CLI executable
+    file(GLOB_RECURSE CLI_FILES src/cli/*.cpp src/cli/*.h)
+    add_executable(pagx-cli ${CLI_FILES})
+    set_target_properties(pagx-cli PROPERTIES OUTPUT_NAME pagx)
+    target_include_directories(pagx-cli PRIVATE
+            src/cli
+            ${PAG_INCLUDES}
+            ${CMAKE_CURRENT_BINARY_DIR}/generated
+            ${LIBXML2_INCLUDE_DIR})
+    target_compile_options(pagx-cli PRIVATE ${PAG_COMPILE_OPTIONS})
+    set(CLI_EXTRA_LIBS)
+    if (LINUX)
+        find_package(Fontconfig REQUIRED)
+        list(APPEND CLI_EXTRA_LIBS Fontconfig::Fontconfig)
+    endif ()
+    target_link_libraries(pagx-cli pag ${PAG_SHARED_LIBS} LibXml2::LibXml2 ${CLI_EXTRA_LIBS})
 endif ()
 
 if (PAG_BUILD_TESTS)
@@ -642,31 +775,17 @@ if (PAG_BUILD_TESTS)
         endif ()
     endif ()
 
-    # Build pagx static library (format module, no tgfx dependency)
-    file(GLOB PAGX_CORE_SOURCES src/pagx/*.cpp)
-    file(GLOB_RECURSE PAGX_UTILS_SOURCES src/pagx/utils/*.cpp)
-    file(GLOB_RECURSE PAGX_XML_SOURCES src/pagx/xml/*.cpp)
-    file(GLOB_RECURSE PAGX_SVG_SOURCES src/pagx/svg/*.cpp)
-    add_library(pagx STATIC ${PAGX_CORE_SOURCES} ${PAGX_UTILS_SOURCES} ${PAGX_XML_SOURCES} ${PAGX_SVG_SOURCES})
-    target_include_directories(pagx PUBLIC include)
-    target_include_directories(pagx PRIVATE src/pagx
-            ${CMAKE_CURRENT_SOURCE_DIR}/third_party/expat/expat/lib)
-    if(WIN32)
-        target_compile_definitions(pagx PRIVATE XML_STATIC)
-    endif()
-    add_vendor_target(pagx-vendor STATIC_VENDORS expat)
-    find_vendor_libraries(pagx-vendor STATIC PAGX_VENDOR_STATIC_LIBRARIES)
-    add_dependencies(pagx pagx-vendor)
-    merge_libraries_into(pagx ${PAGX_VENDOR_STATIC_LIBRARIES})
-
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
-    list(APPEND PAG_TEST_FILES ${SRC_FILES})
-    list(APPEND PAG_TEST_LIBS pagx pag ${PAG_SHARED_LIBS})
+    file(GLOB_RECURSE CLI_TEST_FILES src/cli/*.cpp src/cli/*.h)
+    list(FILTER CLI_TEST_FILES EXCLUDE REGEX "main\\.cpp$")
+    list(APPEND PAG_TEST_FILES ${SRC_FILES} ${CLI_TEST_FILES})
+    list(APPEND PAG_TEST_LIBS pag ${PAG_SHARED_LIBS} LibXml2::LibXml2)
     set(GOOGLE_TEST_DIR ${TGFX_DIR}/third_party/googletest/googletest)
     list(APPEND PAG_TEST_INCLUDES ${PAG_INCLUDES} test/src
             ${GOOGLE_TEST_DIR} ${GOOGLE_TEST_DIR}/include
             ${TGFX_DIR}/third_party/json/include
-            src/renderer src/pagx src/pagx/svg)
+            ${CMAKE_CURRENT_BINARY_DIR}/generated
+            ${LIBXML2_INCLUDE_DIR})
 
     add_vendor_target(test-vendor STATIC_VENDORS googletest CONFIG_DIR ${TGFX_DIR})
     find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
@@ -719,4 +838,5 @@ if (PAG_BUILD_TESTS)
     target_compile_options(PAGFullTest PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
     target_link_options(PAGFullTest PRIVATE ${PAG_TEST_LINK_OPTIONS})
     target_link_libraries(PAGFullTest ${PAG_TEST_LIBS})
+
 endif ()

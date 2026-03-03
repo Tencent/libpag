@@ -20,24 +20,25 @@
 
 #include <string>
 #include <vector>
-#include "pagx/types/BlendMode.h"
-#include "pagx/types/Color.h"
-#include "pagx/types/ColorSpace.h"
 #include "pagx/nodes/Fill.h"
-#include "pagx/types/FilterMode.h"
 #include "pagx/nodes/Layer.h"
-#include "pagx/types/LayerPlacement.h"
-#include "pagx/types/Matrix.h"
 #include "pagx/nodes/MergePath.h"
-#include "pagx/types/MipmapMode.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/Stroke.h"
-#include "pagx/nodes/TextLayout.h"
-#include "pagx/types/TileMode.h"
+#include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/types/BlendMode.h"
+#include "pagx/types/Color.h"
+#include "pagx/types/ColorSpace.h"
+#include "pagx/types/FilterMode.h"
+#include "pagx/types/LayerPlacement.h"
+#include "pagx/types/Matrix.h"
+#include "pagx/types/MipmapMode.h"
+#include "pagx/types/TextAnchor.h"
+#include "pagx/types/TileMode.h"
 
 namespace pagx {
 
@@ -119,14 +120,18 @@ std::string MipmapModeToString(MipmapMode mode);
 MipmapMode MipmapModeFromString(const std::string& str);
 
 //==============================================================================
-// TextAlign, VerticalAlign, WritingMode
+// TextAlign, ParagraphAlign, TextAnchor, WritingMode, Overflow
 //==============================================================================
 std::string TextAlignToString(TextAlign align);
 TextAlign TextAlignFromString(const std::string& str);
-std::string VerticalAlignToString(VerticalAlign align);
-VerticalAlign VerticalAlignFromString(const std::string& str);
+std::string ParagraphAlignToString(ParagraphAlign align);
+ParagraphAlign ParagraphAlignFromString(const std::string& str);
+std::string TextAnchorToString(TextAnchor anchor);
+TextAnchor TextAnchorFromString(const std::string& str);
 std::string WritingModeToString(WritingMode mode);
 WritingMode WritingModeFromString(const std::string& str);
+std::string OverflowToString(Overflow value);
+Overflow OverflowFromString(const std::string& str);
 
 //==============================================================================
 // RepeaterOrder

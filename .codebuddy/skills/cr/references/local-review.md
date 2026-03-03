@@ -77,9 +77,11 @@ If no issues remain after filtering → report "no issues found" and exit.
 ## Step 4: Report and fix
 
 Present a summary of what was reviewed, then list all confirmed issues. Ask
-which ones to fix using **a single multi-select question** where each option's
-label is the issue summary (e.g., `[risk] file:line — description`). User
-checks multiple options in one prompt.
+which ones to fix via multi-select. Each option's label is the issue summary
+(e.g., `[risk] file:line — description`). Follow the grouping rule in
+`SKILL.md`: ≤4 items → one question; >4 items → group by priority or category
+(each group ≤4 options), then present all groups as separate questions in a
+single prompt.
 
 If the user selects any issues, apply the fixes.
 

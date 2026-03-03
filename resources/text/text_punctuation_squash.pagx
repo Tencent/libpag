@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="700" height="500" version="1.0">
+  <!-- Box A: Opening + Closing + Opening squash (「」「」) -->
+  <Layer x="50" y="50">
+    <Group>
+      <Rectangle center="150,30" size="300,60"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[「你好」「世界」]]></Text>
+      <TextBox size="300,60"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box B: Closing + Opening squash (。「) -->
+  <Layer x="50" y="120">
+    <Group>
+      <Rectangle center="150,30" size="300,60"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[这是。「测试」]]></Text>
+      <TextBox size="300,60"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box C: Closing + Closing adjacent squash (、。) -->
+  <Layer x="400" y="50">
+    <Group>
+      <Rectangle center="125,30" size="250,60"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[测试、。文本]]></Text>
+      <TextBox size="250,60"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box D: MiddleDot + Opening squash (・「) -->
+  <Layer x="400" y="120">
+    <Group>
+      <Rectangle center="125,30" size="250,60"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[你好・「世界」]]></Text>
+      <TextBox size="250,60"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box E: Line-start Opening squash -->
+  <Layer x="50" y="200">
+    <Group>
+      <Rectangle center="150,30" size="300,60"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[「开头文本]]></Text>
+      <TextBox size="300,60"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box F: Line-end Closing squash -->
+  <Layer x="400" y="200">
+    <Group>
+      <Rectangle center="125,30" size="250,60"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[结尾文本。]]></Text>
+      <TextBox size="250,60"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box G: Compound squash (multiple punctuation types in sequence) -->
+  <Layer x="50" y="300">
+    <Group>
+      <Rectangle center="125,60" size="250,120"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[「你好」，「世界」。这是・「测试」]]></Text>
+      <TextBox size="250,120"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box H: Vertical text punctuation squash -->
+  <Layer x="350" y="300">
+    <Group>
+      <Rectangle center="50,80" size="100,160"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[「你好」。「世界」]]></Text>
+      <TextBox size="100,160" writingMode="vertical"/>
+      <Fill/>
+    </Group>
+  </Layer>
+
+  <!-- Box I: Normal CJK punctuation baseline (no squash expected) -->
+  <Layer x="50" y="430">
+    <Group>
+      <Rectangle center="150,25" size="300,50"/>
+      <Stroke/>
+    </Group>
+    <Group>
+      <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[你好，世界。测试！]]></Text>
+      <TextBox size="300,50"/>
+      <Fill/>
+    </Group>
+  </Layer>
+</pagx>
