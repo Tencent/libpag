@@ -122,7 +122,7 @@ Each reviewer receives:
   snippet) from the PR branch.
 - **Self-check**: before submitting, re-read the relevant code and verify each
   issue. Mark as confirmed or withdrawn. Only submit confirmed issues.
-- **Output format**: `[file:line] [A/B/C] — [description] — [key lines]`
+- **Output format**: `[file:line] [A1/B2/C3] — [description] — [key lines]`
 
 ### Verification (pipeline)
 
@@ -161,6 +161,10 @@ Important constraints:
   the codebase.
 - A CONFIRM verdict is not a failure — it means the reviewer found a real issue and
   your challenge validated it.
+- Reviewer reports arrive incrementally via the coordinator. Do NOT produce a final
+  summary until the coordinator explicitly tells you all reports have been forwarded.
+  Process each report as it arrives, but wait for the completion signal before
+  concluding.
 ```
 
 ### After review
