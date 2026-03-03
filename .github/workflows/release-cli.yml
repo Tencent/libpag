@@ -34,22 +34,22 @@ jobs:
         shell: bash
 
       - name: Build pagx (arm64)
-        run: node build_pag pagx -a arm64 -i -DPAG_BUILD_CLI=ON -DPAG_BUILD_SHARED=OFF
+        run: node build_pag pagx-cli -a arm64 -i -DPAG_BUILD_CLI=ON -DPAG_BUILD_SHARED=OFF
 
       - name: Build pagx (x64)
-        run: node build_pag pagx -a x64 -i -DPAG_BUILD_CLI=ON -DPAG_BUILD_SHARED=OFF
+        run: node build_pag pagx-cli -a x64 -i -DPAG_BUILD_CLI=ON -DPAG_BUILD_SHARED=OFF
 
       - name: Create Universal Binary
         run: |
-          lipo -create out/release/mac/arm64/pagx out/release/mac/x64/pagx \
-            -output out/release/mac/pagx-darwin
-          lipo -info out/release/mac/pagx-darwin
+          lipo -create out/release/mac/arm64/pagx out/release/mac/x64/pagx 
+            -output out/release/mac/pagx-universal
+          lipo -info out/release/mac/pagx-universal
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: pagx-darwin
-          path: out/release/mac/pagx-darwin
+          path: out/release/mac/pagx-universal
 
       - name: Save Third-Party Cache
         if: steps.third-party-cache.outputs.cache-hit != 'true'
@@ -87,16 +87,13 @@ jobs:
           version: 1.0
 
       - name: Build pagx
-        run: node build_pag pagx -a x64 -i -DPAG_BUILD_CLI=ON -DPAG_BUILD_SHARED=OFF
-
-      - name: Prepare artifact
-        run: cp out/release/linux/x64/pagx out/release/linux/pagx-linux
+        run: node build_pag pagx-cli -a x64 -i -DPAG_BUILD_CLI=ON -DPAG_BUILD_SHARED=OFF
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: pagx-linux
-          path: out/release/linux/pagx-linux
+          path: out/release/linux/x64/pagx
 
       - name: Save Third-Party Cache
         if: steps.third-party-cache.outputs.cache-hit != 'true'
@@ -136,21 +133,17 @@ jobs:
 
       - name: Build pagx
         run: >
-          node build_pag pagx -a x64 -i
+          node build_pag pagx-cli -a x64 -i
           -DPAG_BUILD_CLI=ON
           -DPAG_BUILD_SHARED=OFF
           -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
         shell: pwsh
 
-      - name: Prepare artifact
-        run: copy out\release\win\x64\pagx.exe out\release\win\pagx-win32.exe
-        shell: cmd
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: pagx-win32
-          path: out/release/win/pagx-win32.exe
+          path: out/release/win/x64/pagx.exe
 
       - name: Save Third-Party Cache
         if: steps.third-party-cache.outputs.cache-hit != 'true'
@@ -181,11 +174,11 @@ jobs:
 
       - name: Prepare npm package
         run: |
-          mkdir -p npm-package/bin
-          cp pagx-darwin/pagx-darwin npm-package/bin/pagx-darwin
-          cp pagx-linux/pagx-linux npm-package/bin/pagx-linux
-          cp pagx-win32/pagx-win32.exe npm-package/bin/pagx-win32.exe
-          chmod +x npm-package/bin/pagx-darwin npm-package/bin/pagx-linux
+          mkdir -p npm-package/bin/darwin npm-package/bin/linux npm-package/bin/win32
+          cp pagx-darwin/pagx-universal npm-package/bin/darwin/pagx
+          cp pagx-linux/pagx npm-package/bin/linux/pagx
+          cp pagx-win32/pagx.exe npm-package/bin/win32/pagx.exe
+          chmod +x npm-package/bin/darwin/pagx npm-package/bin/linux/pagx
           cp cli/npm/pagx.js npm-package/bin/pagx.js
           sed "s/\"version\": \"0.0.0\"/\"version\": \"${{ inputs.version }}\"/" cli/npm/package.json > npm-package/package.json
 
@@ -216,6 +209,6 @@ jobs:
 
             Or download the binary for your platform from the assets below.
           files: |
-            pagx-darwin/pagx-darwin
-            pagx-linux/pagx-linux
-            pagx-win32/pagx-win32.exe
+            pagx-darwin/pagx-universal
+            pagx-linux/pagx
+            pagx-win32/pagx.exe
