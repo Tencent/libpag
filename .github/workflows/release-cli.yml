@@ -156,10 +156,10 @@ jobs:
       - name: Check Out Repo
         uses: actions/checkout@v4
 
-      - name: Read version from source
+      - name: Read version from package.json
         id: version
         run: |
-          VERSION=$(grep 'static const char\* VERSION' src/cli/main.cpp | sed 's/.*"\(.*\)".*/\1/')
+          VERSION=$(node -p "require('./cli/npm/package.json').version")
           echo "value=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Detected version: $VERSION"
 
@@ -168,14 +168,14 @@ jobs:
 
       - name: Prepare npm package
         run: |
-          VERSION="${{ steps.version.outputs.value }}"
           mkdir -p npm-package/bin/darwin npm-package/bin/linux npm-package/bin/win32
           cp pagx-darwin/pagx-universal npm-package/bin/darwin/pagx
           cp pagx-linux/pagx npm-package/bin/linux/pagx
           cp pagx-win32/pagx.exe npm-package/bin/win32/pagx.exe
           chmod +x npm-package/bin/darwin/pagx npm-package/bin/linux/pagx
           cp cli/npm/pagx.js npm-package/bin/pagx.js
-          sed "s/\"version\": \"0.0.0\"/\"version\": \"$VERSION\"/" cli/npm/package.json > npm-package/package.json
+          cp cli/npm/package.json npm-package/package.json
+          cp cli/npm/README.md npm-package/README.md
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

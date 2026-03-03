@@ -26,7 +26,9 @@
 #include "cli/CommandRender.h"
 #include "cli/CommandValidator.h"
 
-static const char* VERSION = "0.1.0";
+#ifndef PAGX_CLI_VERSION
+#define PAGX_CLI_VERSION "0.0.0-dev"
+#endif
 
 static void PrintUsage() {
   std::cout << "pagx - PAGX command-line tool\n"
@@ -60,7 +62,7 @@ int main(int argc, char* argv[]) {
   }
 
   if (command == "--version" || command == "-v") {
-    std::cout << "pagx " << VERSION << "\n";
+    std::cout << "pagx " << PAGX_CLI_VERSION << "\n";
     return 0;
   }
 

@@ -1,6 +1,6 @@
 {
   "name": "pagx",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "PAGX command-line tool for validation, rendering, optimization and formatting",
   "license": "Apache-2.0",
   "repository": {
@@ -20,6 +20,7 @@
     "arm64"
   ],
   "files": [
-    "bin/"
+    "bin/",
+    "README.md"
   ]
 }

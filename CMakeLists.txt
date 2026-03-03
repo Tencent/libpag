@@ -716,6 +716,12 @@ if (PAG_BUILD_FRAMEWORK)
 endif ()
 
 if (PAG_BUILD_CLI)
+    # Read CLI version from cli/npm/package.json
+    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/cli/npm/package.json" _CLI_PACKAGE_JSON)
+    string(REGEX MATCH "\"version\": *\"([0-9]+\\.[0-9]+\\.[0-9]+)\"" _ "${_CLI_PACKAGE_JSON}")
+    set(PAGX_CLI_VERSION "${CMAKE_MATCH_1}")
+    message("PAGX_CLI_VERSION: ${PAGX_CLI_VERSION}")
+
     # Generate pagx_xsd.h from spec/pagx.xsd
     file(READ "${CMAKE_CURRENT_SOURCE_DIR}/spec/pagx.xsd" PAGX_XSD_CONTENT)
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/generated/pagx_xsd.h"
@@ -751,6 +757,7 @@ if (PAG_BUILD_CLI)
             ${CMAKE_CURRENT_BINARY_DIR}/generated
             ${LIBXML2_INCLUDE_DIR})
     target_compile_options(pagx-cli PRIVATE ${PAG_COMPILE_OPTIONS})
+    target_compile_definitions(pagx-cli PRIVATE PAGX_CLI_VERSION="${PAGX_CLI_VERSION}")
     set(CLI_EXTRA_LIBS)
     if (LINUX)
         find_package(Fontconfig REQUIRED)
