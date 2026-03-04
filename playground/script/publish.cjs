@@ -114,6 +114,9 @@ function publishSkills(outputDir, names) {
 
     // Copy static files
     const skillDestDir = path.join(skillsOutputDir, name);
+    if (fs.existsSync(skillDestDir)) {
+      fs.rmSync(skillDestDir, { recursive: true });
+    }
     copyDir(skillSrcDir, skillDestDir);
 
     // Create zip (contents only, no outer directory)
