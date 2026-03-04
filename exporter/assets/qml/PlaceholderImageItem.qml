@@ -62,7 +62,7 @@ Rectangle {
                     cursorShape: Qt.PointingHandCursor
 
                     onClicked: {
-                        Qt.openUrlExternally("https://pag.art/docs/pag-fillmode.html");
+                        Qt.openUrlExternally("https://pag.io/docs/pag-fillmode.html");
                     }
                 }
             }
@@ -100,7 +100,7 @@ Rectangle {
                     cursorShape: Qt.PointingHandCursor
 
                     onClicked: {
-                        Qt.openUrlExternally("https://pag.art/docs/pag-edit.html");
+                        Qt.openUrlExternally("https://pag.io/docs/pag-edit.html");
                     }
                 }
             }
