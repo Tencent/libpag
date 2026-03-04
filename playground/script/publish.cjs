@@ -8,15 +8,18 @@
  *     index.html
  *     index.css
  *     wasm-mt/
- *     ../../resources/font/  (from libpag root)
- *     ../../spec/samples/    (from libpag root)
+ *     ../../resources/font/       (from libpag root)
+ *     ../../spec/samples/         (from libpag root)
+ *     ../../.codebuddy/skills/    (from libpag root)
  *
  * Output structure:
  *     <output>/index.html
  *     <output>/index.css
  *     <output>/fonts/
  *     <output>/wasm-mt/
- *     <output>/samples/          (.pagx files, images, and generated index.json)
+ *     <output>/samples/           (.pagx files, images, and generated index.json)
+ *     <output>/skills/<name>/     (static skill files for online browsing)
+ *     <output>/skills/<name>.zip  (skill archive for AI tool downloads)
  *
  * Usage:
  *     npm run publish [-- -o <output-dir>]
@@ -32,6 +35,7 @@ const PLAYGROUND_DIR = path.dirname(SCRIPT_DIR);
 const LIBPAG_DIR = path.dirname(PLAYGROUND_DIR);
 const RESOURCES_FONT_DIR = path.join(LIBPAG_DIR, 'resources', 'font');
 const SAMPLES_DIR = path.join(LIBPAG_DIR, 'spec', 'samples');
+const SKILLS_DIR = path.join(LIBPAG_DIR, '.codebuddy', 'skills');
 const DEFAULT_OUTPUT_DIR = path.join(LIBPAG_DIR, 'public');
 
 /**
@@ -75,6 +79,55 @@ function copyFile(src, dest) {
   fs.mkdirSync(destDir, { recursive: true });
   fs.copyFileSync(src, dest);
   console.log(`  Copied: ${dest}`);
+}
+
+/**
+ * Recursively copy a directory.
+ */
+function copyDir(src, dest) {
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyDir(srcPath, destPath);
+    } else {
+      copyFile(srcPath, destPath);
+    }
+  }
+}
+
+/**
+ * Publish skills as static files and zip archives for AI tool downloads.
+ * Each named skill is copied to <outputDir>/skills/<name>/ and packaged as
+ * <outputDir>/skills/<name>.zip (without the outer directory).
+ */
+function publishSkills(outputDir, names) {
+  const skillsOutputDir = path.join(outputDir, 'skills');
+
+  for (const name of names) {
+    const skillSrcDir = path.join(SKILLS_DIR, name);
+    if (!fs.existsSync(skillSrcDir)) {
+      console.warn(`  Warning: skill directory not found: ${skillSrcDir}`);
+      continue;
+    }
+
+    // Copy static files
+    const skillDestDir = path.join(skillsOutputDir, name);
+    if (fs.existsSync(skillDestDir)) {
+      fs.rmSync(skillDestDir, { recursive: true });
+    }
+    copyDir(skillSrcDir, skillDestDir);
+
+    // Create zip (contents only, no outer directory)
+    const zipPath = path.join(skillsOutputDir, `${name}.zip`);
+    fs.mkdirSync(skillsOutputDir, { recursive: true });
+    if (fs.existsSync(zipPath)) {
+      fs.unlinkSync(zipPath);
+    }
+    execSync(`zip -r "${zipPath}" .`, { cwd: skillSrcDir, stdio: 'pipe' });
+    console.log(`  Created: ${zipPath}`);
+  }
 }
 
 /**
@@ -212,6 +265,10 @@ function main() {
   } else {
     console.warn('  Warning: test output directory not found at', testOutputDir);
   }
+
+  // Publish skills
+  console.log('\n  Publishing skills...');
+  publishSkills(outputDir, ['pagx']);
 
   console.log('\nDone!');
 }

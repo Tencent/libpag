@@ -3,18 +3,21 @@
 The `pagx` command-line tool provides utilities for working with PAGX files. All commands
 operate on local `.pagx` files.
 
-## Building the CLI
+## Setup
 
-The binary is at `cmake-build-debug/pagx` (relative to the project root). If it does not
-exist, build it:
+The `pagx` binary is provided by the `pagx` npm package. Before running any command below,
+ensure it is installed and meets the minimum version:
 
 ```bash
-cmake -G Ninja -DPAG_BUILD_CLI=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
-cmake --build cmake-build-debug --target pagx-cli
+PAGX_MIN="0.1.0"
+if ! command -v pagx &>/dev/null; then
+  npm install -g @libpag/pagx
+elif [ "$(printf '%s\n' "$PAGX_MIN" "$(pagx -v | awk '{print $2}')" | sort -V | head -1)" != "$PAGX_MIN" ]; then
+  npm update -g @libpag/pagx
+fi
 ```
 
-Note: `PAG_BUILD_TESTS=ON` already implies `PAG_BUILD_CLI=ON`, so if the test build
-directory exists the binary is likely already there.
+Run this check before the first `pagx` invocation in each session.
 
 ---
 
@@ -75,8 +78,9 @@ primary font. System fallback fonts are always appended after user-specified fal
 
 **Output convention**: Always output to the same directory as the input `.pagx` file — either omit
 `-o` (default behavior) or specify `-o` with a path in the same directory (e.g., for `--crop`
-variants). Rendered images are temporary verification artifacts. If the project context includes
-auto-commit rules, exclude these generated image files (`.png`, `.webp`, `.jpg`) from the commit.
+variants). Rendered images are verification artifacts — do not delete them, but if the project
+context includes auto-commit rules, do not include these image files (`.png`, `.webp`, `.jpg`)
+in the commit.
 
 ---
 

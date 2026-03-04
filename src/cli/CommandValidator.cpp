@@ -28,7 +28,12 @@
 
 namespace pagx::cli {
 
-static void CollectStructuredError(void* context, xmlErrorPtr xmlError) {
+// System libxml2 (macOS/Linux) uses non-const xmlError*, vcpkg libxml2 (Windows) uses const xmlError*
+#ifdef _WIN32
+static void CollectStructuredError(void* context, const xmlError* xmlError) {
+#else
+static void CollectStructuredError(void* context, xmlError* xmlError) {
+#endif
   if (xmlError == nullptr) {
     return;
   }

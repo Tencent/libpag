@@ -23,16 +23,39 @@
             </svg>
             <span id="samples-btn-text">Samples</span>
         </a>
-        <a id="spec-btn" class="nav-btn" href="./latest/" title="PAGX Specification">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/>
-                <line x1="16" y1="17" x2="8" y2="17"/>
-                <polyline points="10 9 9 9 8 9"/>
-            </svg>
-            <span id="spec-btn-text">Spec</span>
-        </a>
+        <div class="nav-dropdown">
+            <button class="nav-btn nav-dropdown-toggle" title="Docs">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
+                    <polyline points="10 9 9 9 8 9"/>
+                </svg>
+                <span>Docs</span>
+                <svg class="nav-dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            </button>
+            <div class="nav-dropdown-menu">
+                <a class="nav-dropdown-item nav-dropdown-spec" href="./latest/">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                    </svg>
+                    <span>Specification</span>
+                </a>
+                <a class="nav-dropdown-item nav-dropdown-skills" href="./skills/pagx.zip" download>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 3v12m0 0l-4-4m4 4l4-4"/>
+                        <path d="M2 17l.621 2.485A2 2 0 0 0 4.561 21h14.878a2 2 0 0 0 1.94-1.515L22 17"/>
+                    </svg>
+                    <span>AI Skills</span>
+                </a>
+            </div>
+        </div>
     </div>
     <div id="toolbar" class="toolbar hidden">
         <a id="toolbar-samples-btn" class="toolbar-btn" href="#samples" title="Samples">
@@ -108,20 +131,59 @@
                 </svg>
                 <span>Back</span>
             </a>
-            <a id="samples-spec-btn" class="nav-btn" href="./latest/" title="PAGX Specification">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                    <polyline points="14 2 14 8 20 8"/>
-                    <line x1="16" y1="13" x2="8" y2="13"/>
-                    <line x1="16" y1="17" x2="8" y2="17"/>
-                    <polyline points="10 9 9 9 8 9"/>
-                </svg>
-                <span>Spec</span>
-            </a>
+            <div class="nav-dropdown">
+                <button class="nav-btn nav-dropdown-toggle" title="Docs">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                        <polyline points="10 9 9 9 8 9"/>
+                    </svg>
+                    <span>Docs</span>
+                    <svg class="nav-dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </button>
+                <div class="nav-dropdown-menu">
+                    <a class="nav-dropdown-item nav-dropdown-spec" href="./latest/">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                        </svg>
+                        <span>Specification</span>
+                    </a>
+                    <a class="nav-dropdown-item nav-dropdown-skills" href="./skills/pagx.zip" download>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 3v12m0 0l-4-4m4 4l4-4"/>
+                            <path d="M2 17l.621 2.485A2 2 0 0 0 4.561 21h14.878a2 2 0 0 0 1.94-1.515L22 17"/>
+                        </svg>
+                        <span>AI Skills</span>
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
     <div id="samples-list" class="samples-list"></div>
 </div>
+<script>
+document.querySelectorAll('.nav-dropdown-toggle').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        var dropdown = btn.closest('.nav-dropdown');
+        var isOpen = dropdown.classList.contains('open');
+        document.querySelectorAll('.nav-dropdown.open').forEach(function(d) { d.classList.remove('open'); });
+        if (!isOpen) dropdown.classList.add('open');
+    });
+});
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.nav-dropdown')) {
+        document.querySelectorAll('.nav-dropdown.open').forEach(function(d) { d.classList.remove('open'); });
+    }
+});
+</script>
 <script type="module" src="./wasm-mt/index.js"></script>
 </body>
 </html>

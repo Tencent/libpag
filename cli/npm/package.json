@@ -1,0 +1,26 @@
+{
+  "name": "@libpag/pagx",
+  "version": "0.1.1",
+  "description": "PAGX command-line tool for validation, rendering, optimization and formatting",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/libpag/libpag"
+  },
+  "bin": {
+    "pagx": "bin/pagx.js"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "files": [
+    "bin/",
+    "README.md"
+  ]
+}
