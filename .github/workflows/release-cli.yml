@@ -187,7 +187,7 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - name: Publish to npm
-        run: npm publish ./npm-package
+        run: npm publish ./npm-package --access=public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -202,7 +202,7 @@ jobs:
             ### Install
 
             ```bash
-            npm install -g pagx
+            npm install -g @libpag/pagx
             ```
 
             Or download the binary for your platform from the assets below.
