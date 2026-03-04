@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - feature/domchen_cli_release
+      - feature/domchen_cli_release_test
 
 jobs:
   build-macos:
@@ -81,8 +81,8 @@ jobs:
       - name: Install system dependencies
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: libxml2-dev libfontconfig1-dev
-          version: 1.0
+          packages: libxml2-dev libfontconfig1-dev libgles2-mesa-dev libegl1-mesa-dev
+          version: 1.1
 
       - name: Build pagx
         run: node build_pag pagx-cli -a x64 -i -DPAG_BUILD_CLI=ON -DPAG_BUILD_SHARED=OFF
