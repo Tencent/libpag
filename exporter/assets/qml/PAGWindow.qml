@@ -116,46 +116,11 @@ Window {
 
                     MouseArea {
                         id: mouseArea
-                        property int mouseLastX: 0
-
-                        property int mouseLastY: 0
-
-                        property int windowX: 0
-
-                        property int windowY: 0
-
-                        property int windowWidth: 0
                         height: 40
                         anchors.fill: parent
                         anchors.topMargin: resizeHandleSize
                         onPressed: {
-                            mouseLastX = mouseX;
-                            mouseLastY = mouseY;
-                            windowX = window.x;
-                            windowY = window.y;
-                            windowWidth = window.width;
-                        }
-                        onPositionChanged: {
-                            let offsetX = mouseX - mouseLastX;
-                            let offsetY = mouseY - mouseLastY;
-                            if (((windowX - window.x) === offsetX) && ((windowY - window.y) === offsetY)) {
-                                return;
-                            }
-                            if (window.isMaximized) {
-                                setMaximized(false);
-                                let sourceX = (mouseLastX - 240) / (windowWidth - 240 - 120);
-                                let targetX = (window.width - 240 - 120) * sourceX + 240;
-                                let xChange = mouseLastX - targetX;
-                                window.x += xChange;
-                                mouseLastX = targetX;
-                            }
-                            if (offsetX !== 0) {
-                                window.x += offsetX;
-                            }
-                            if (offsetY !== 0) {
-                                window.y += offsetY;
-                            }
-                            ensurePositionMovable();
+                            window.startSystemMove();
                         }
                         onDoubleClicked: {
                             setMaximized(!window.isMaximized);

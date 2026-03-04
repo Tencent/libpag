@@ -524,7 +524,7 @@ PAGWindow {
             toggleEditPanel();
             break;
         case "open-help":
-            Qt.openUrlExternally("https://pag.art/#pag-player");
+            Qt.openUrlExternally("https://pag.io/#pag-player");
             break;
         case "open-about":
             aboutWindow.visible = true;

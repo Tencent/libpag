@@ -10,7 +10,7 @@
       <enclosure url="~url~" sparkle:version="~version~" sparkle:shortVersionString="~version~" sparkle:dsaSignature="~zipDSAHash~" sparkle:edSignature="~zipEDDSAHash~" length="~zipLength~" type="application/octet-stream"/>
       <sparkle:minimumSystemVersion>10.7</sparkle:minimumSystemVersion>
       <forceUpdateVersion>2.0.0</forceUpdateVersion>
-      <description>https://pag.art/changelog/pag-viewer.html</description>
+      <description>https://pag.io/changelog/pag-viewer.html</description>
     </item>
   </channel>
 </rss>
