@@ -136,8 +136,8 @@ html, body {
     top: 16px;
     right: 16px;
     z-index: 150;
-    display: flex;
-    align-items: center;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 8px;
 }
 
@@ -189,6 +189,7 @@ html, body {
 }
 
 .nav-dropdown-toggle {
+    width: 100%;
     cursor: pointer;
     font-family: inherit;
 }
@@ -197,6 +198,7 @@ html, body {
     width: 12px;
     height: 12px;
     margin-left: -2px;
+    margin-right: -4px;
     transition: transform 0.2s ease;
 }
 
@@ -481,8 +483,8 @@ html, body {
     position: fixed;
     top: 16px;
     right: 16px;
-    display: flex;
-    align-items: center;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 8px;
     z-index: 10;
 }
