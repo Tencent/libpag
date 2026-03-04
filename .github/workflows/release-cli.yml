@@ -39,7 +39,7 @@ jobs:
 
       - name: Create Universal Binary
         run: |
-          lipo -create out/release/mac/arm64/pagx out/release/mac/x64/pagx 
+          lipo -create out/release/mac/arm64/pagx out/release/mac/x64/pagx \
             -output out/release/mac/pagx-universal
           lipo -info out/release/mac/pagx-universal
 
