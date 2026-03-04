@@ -20,6 +20,7 @@
 
 #ifdef PAG_BUILD_PAGX
 
+#include <cstdint>
 #include <string>
 #include <vector>
 

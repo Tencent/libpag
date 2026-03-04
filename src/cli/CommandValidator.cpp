@@ -28,7 +28,7 @@
 
 namespace pagx::cli {
 
-static void CollectStructuredError(void* context, xmlErrorPtr xmlError) {
+static void CollectStructuredError(void* context, const xmlError* xmlError) {
   if (xmlError == nullptr) {
     return;
   }
