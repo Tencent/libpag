@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - feature/domchen_cli_release_test
+      - feature/domchen_cli_release
 
 jobs:
   build-macos:
