@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AudioSequence.h"
+#include <cstdio>
 #include "ffmovie/movie.h"
 #include "utils/PAGExportSession.h"
 #include "utils/PAGExportSessionManager.h"
@@ -86,6 +87,7 @@ static std::string EncodeAudioToMP4(int16_t* samples, int numSamples, int channe
     offset += samplesToSend;
   }
 
+  bool encodeSuccess = (offset >= numSamples);
   encoder->onEndOfStream();
   while (true) {
     void* packet = nullptr;
@@ -97,6 +99,10 @@ static std::string EncodeAudioToMP4(int16_t* samples, int numSamples, int channe
     }
   }
   muxer->stop();
+  if (!encodeSuccess) {
+    std::remove(mp4Path.c_str());
+    return "";
+  }
   return mp4Path;
 }
 

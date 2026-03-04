@@ -460,7 +460,8 @@ PAGWindow {
         running: window.visible
         repeat: true
         onTriggered: {
-            if (!window.active && exportingPanelWindow.isAEWindowActive()) {
+            let isAEActive = exportingPanelWindow !== null && exportingPanelWindow.isAEWindowActive();
+            if (!window.active && isAEActive) {
                 window.raise();
             }
         }
