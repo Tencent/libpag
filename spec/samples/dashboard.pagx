@@ -175,12 +175,12 @@
       <TextBox position="-22,4" size="80,20" paragraphAlign="middle"/>
     </Group>
     <Group>
-      <Ellipse center="-31,12" size="8,8"/>
-      <Fill color="#34D399"/>
-    </Group>
-    <Group>
       <Ellipse center="-31,12" size="12,12"/>
       <Stroke color="#111827" width="2"/>
+    </Group>
+    <Group>
+      <Ellipse center="-31,12" size="8,8"/>
+      <Fill color="#34D399"/>
     </Group>
   </Layer>
   <Layer x="490" y="30">
@@ -190,35 +190,35 @@
       <TextBox position="-280,-14" size="260,28" paragraphAlign="middle"/>
     </Group>
     <Group>
-      <Rectangle center="160,0" size="160,32" roundness="16"/>
+      <Rectangle center="130,0" size="160,32" roundness="16"/>
       <Fill color="#1F2937"/>
       <Stroke color="#374151"/>
     </Group>
     <Group>
-      <Ellipse center="98,-1" size="12,12"/>
+      <Ellipse center="68,-1" size="12,12"/>
       <Stroke color="#6B7280" width="1.5"/>
     </Group>
     <Group>
-      <Path data="M107 4L111 8"/>
+      <Path data="M77 4L81 8"/>
       <Stroke color="#6B7280" width="1.5" cap="round"/>
     </Group>
     <Group>
       <Text text="Search..." fontFamily="Arial"/>
       <Fill color="#6B7280"/>
-      <TextBox position="115,-16" size="80,32" paragraphAlign="middle"/>
+      <TextBox position="85,-16" size="80,32" paragraphAlign="middle"/>
     </Group>
     <Group>
-      <Path data="M258 -7C258 -12 262 -16 267 -16C272 -16 276 -12 276 -7L276 0L258 0Z"/>
+      <Path data="M230 -7C230 -12 234 -16 239 -16C244 -16 248 -12 248 -7L248 0L230 0Z"/>
       <Stroke color="#9CA3AF" width="1.5" join="round"/>
     </Group>
     <Group>
-      <Ellipse center="267,-17" size="6,6"/>
+      <Ellipse center="239,-17" size="6,6"/>
       <Fill color="#EF4444"/>
     </Group>
     <Group>
-      <Ellipse center="286,0" size="28,28"/>
+      <Ellipse center="272,0" size="28,28"/>
       <Fill>
-        <LinearGradient startPoint="272,-14" endPoint="300,14">
+        <LinearGradient startPoint="258,-14" endPoint="286,14">
           <ColorStop offset="0" color="#F472B6"/>
           <ColorStop offset="1" color="#EC4899"/>
         </LinearGradient>
@@ -227,65 +227,65 @@
     <Group>
       <Text text="A" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
       <Fill color="#FFFFFF"/>
-      <TextBox position="272,-14" size="28,28" textAlign="center" paragraphAlign="middle"/>
+      <TextBox position="258,-14" size="28,28" textAlign="center" paragraphAlign="middle"/>
     </Group>
   </Layer>
-  <Layer x="290" y="108">
-    <Rectangle size="180,90" roundness="12"/>
+  <Layer x="290" y="110">
+    <Rectangle size="180,96" roundness="12"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155"/>
     <DropShadowStyle offsetY="4" blurX="10" blurY="10" color="#00000040"/>
-    <Layer x="-58" y="-16">
+    <Layer x="-60" y="-24">
       <Group>
-        <Ellipse size="30,30"/>
+        <Ellipse size="28,28"/>
         <Fill color="#818CF820"/>
       </Group>
       <Group>
-        <Text text="$" fontFamily="Arial" fontStyle="Bold" fontSize="15"/>
+        <Text text="$" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
         <Fill color="#818CF8"/>
-        <TextBox position="-15,-15" size="30,30" textAlign="center" paragraphAlign="middle"/>
+        <TextBox position="-14,-14" size="28,28" textAlign="center" paragraphAlign="middle"/>
       </Group>
     </Layer>
     <Layer y="8">
       <Group>
         <Text text="$48,560" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
         <Fill color="#F9FAFB"/>
-        <TextBox position="-82,-14" size="164,28" paragraphAlign="middle"/>
+        <TextBox position="-82,-12" size="164,24" paragraphAlign="middle"/>
       </Group>
     </Layer>
-    <Layer y="30">
+    <Layer y="32">
       <Group>
         <Text text="Total Revenue" fontFamily="Arial" fontSize="11"/>
         <Fill color="#9CA3AF"/>
-        <TextBox position="-82,-8" size="100,16" paragraphAlign="middle"/>
+        <TextBox position="-82,-7" size="100,14" paragraphAlign="middle"/>
       </Group>
       <Group>
-        <Path data="M40 -4L44 -8L48 -4"/>
+        <Path data="M42 -3L46 -7L50 -3"/>
         <Stroke color="#34D399" width="1.5" cap="round" join="round"/>
       </Group>
       <Group>
         <Text text="+12%" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
         <Fill color="#34D399"/>
-        <TextBox position="50,-8" size="40,16" paragraphAlign="middle"/>
+        <TextBox position="52,-7" size="40,14" paragraphAlign="middle"/>
       </Group>
     </Layer>
   </Layer>
-  <Layer x="490" y="108">
-    <Rectangle size="180,90" roundness="12"/>
+  <Layer x="490" y="110">
+    <Rectangle size="180,96" roundness="12"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155"/>
     <DropShadowStyle offsetY="4" blurX="10" blurY="10" color="#00000040"/>
-    <Layer x="-58" y="-16">
+    <Layer x="-60" y="-24">
       <Group>
-        <Ellipse size="30,30"/>
+        <Ellipse size="28,28"/>
         <Fill color="#10B98120"/>
       </Group>
       <Group>
-        <Ellipse center="0,-4" size="10,10"/>
+        <Ellipse center="0,-3" size="9,9"/>
         <Fill color="#10B981"/>
       </Group>
       <Group>
-        <Path data="M-8 6C-8 2 -4 -1 0 -1C4 -1 8 2 8 6"/>
+        <Path data="M-7 5C-7 2 -4 -1 0 -1C4 -1 7 2 7 5"/>
         <Stroke color="#10B981" width="1.5"/>
       </Group>
     </Layer>
@@ -293,38 +293,38 @@
       <Group>
         <Text text="12,845" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
         <Fill color="#F9FAFB"/>
-        <TextBox position="-82,-14" size="164,28" paragraphAlign="middle"/>
+        <TextBox position="-82,-12" size="164,24" paragraphAlign="middle"/>
       </Group>
     </Layer>
-    <Layer y="30">
+    <Layer y="32">
       <Group>
         <Text text="Active Users" fontFamily="Arial" fontSize="11"/>
         <Fill color="#9CA3AF"/>
-        <TextBox position="-82,-8" size="100,16" paragraphAlign="middle"/>
+        <TextBox position="-82,-7" size="100,14" paragraphAlign="middle"/>
       </Group>
       <Group>
-        <Path data="M40 -4L44 -8L48 -4"/>
+        <Path data="M42 -3L46 -7L50 -3"/>
         <Stroke color="#34D399" width="1.5" cap="round" join="round"/>
       </Group>
       <Group>
         <Text text="+8.2%" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
         <Fill color="#34D399"/>
-        <TextBox position="50,-8" size="40,16" paragraphAlign="middle"/>
+        <TextBox position="52,-7" size="40,14" paragraphAlign="middle"/>
       </Group>
     </Layer>
   </Layer>
-  <Layer x="690" y="108">
-    <Rectangle size="180,90" roundness="12"/>
+  <Layer x="690" y="110">
+    <Rectangle size="180,96" roundness="12"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155"/>
     <DropShadowStyle offsetY="4" blurX="10" blurY="10" color="#00000040"/>
-    <Layer x="-58" y="-16">
+    <Layer x="-60" y="-24">
       <Group>
-        <Ellipse size="30,30"/>
+        <Ellipse size="28,28"/>
         <Fill color="#F59E0B20"/>
       </Group>
       <Group>
-        <Path data="M0 -6L0 6M-4 -2L0 -6L4 -2"/>
+        <Path data="M0 -5L0 5M-4 -1L0 -5L4 -1"/>
         <Stroke color="#F59E0B" width="2" cap="round" join="round"/>
       </Group>
     </Layer>
@@ -332,27 +332,27 @@
       <Group>
         <Text text="24.8%" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
         <Fill color="#F9FAFB"/>
-        <TextBox position="-82,-14" size="164,28" paragraphAlign="middle"/>
+        <TextBox position="-82,-12" size="164,24" paragraphAlign="middle"/>
       </Group>
     </Layer>
-    <Layer y="30">
+    <Layer y="32">
       <Group>
         <Text text="Conversion" fontFamily="Arial" fontSize="11"/>
         <Fill color="#9CA3AF"/>
-        <TextBox position="-82,-8" size="100,16" paragraphAlign="middle"/>
+        <TextBox position="-82,-7" size="100,14" paragraphAlign="middle"/>
       </Group>
       <Group>
-        <Path data="M40 -4L44 -8L48 -4"/>
+        <Path data="M42 -3L46 -7L50 -3"/>
         <Stroke color="#34D399" width="1.5" cap="round" join="round"/>
       </Group>
       <Group>
         <Text text="+3.1%" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
         <Fill color="#34D399"/>
-        <TextBox position="50,-8" size="40,16" paragraphAlign="middle"/>
+        <TextBox position="52,-7" size="40,14" paragraphAlign="middle"/>
       </Group>
     </Layer>
   </Layer>
-  <Layer x="340" y="300">
+  <Layer x="340" y="302">
     <Rectangle size="280,230" roundness="12"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155"/>
@@ -398,7 +398,7 @@
         <TextBox position="-30,10" size="60,16" textAlign="center" paragraphAlign="middle"/>
       </Group>
     </Layer>
-    <Layer x="68" y="-20">
+    <Layer x="62" y="-20">
       <Group>
         <Rectangle size="8,8" roundness="2"/>
         <Fill color="#818CF8"/>
@@ -406,15 +406,15 @@
       <Group>
         <Text text="Direct" fontFamily="Arial" fontSize="11"/>
         <Fill color="#D1D5DB"/>
-        <TextBox position="10,-8" size="55,16" paragraphAlign="middle"/>
+        <TextBox position="10,-8" size="50,16" paragraphAlign="middle"/>
       </Group>
       <Group>
         <Text text="40%" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
         <Fill color="#F9FAFB"/>
-        <TextBox position="68,-8" size="35,16" textAlign="end" paragraphAlign="middle"/>
+        <TextBox position="62,-8" size="42,16" textAlign="end" paragraphAlign="middle"/>
       </Group>
     </Layer>
-    <Layer x="68" y="4">
+    <Layer x="62" y="4">
       <Group>
         <Rectangle size="8,8" roundness="2"/>
         <Fill color="#34D399"/>
@@ -422,15 +422,15 @@
       <Group>
         <Text text="Organic" fontFamily="Arial" fontSize="11"/>
         <Fill color="#D1D5DB"/>
-        <TextBox position="10,-8" size="55,16" paragraphAlign="middle"/>
+        <TextBox position="10,-8" size="50,16" paragraphAlign="middle"/>
       </Group>
       <Group>
         <Text text="28%" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
         <Fill color="#F9FAFB"/>
-        <TextBox position="68,-8" size="35,16" textAlign="end" paragraphAlign="middle"/>
+        <TextBox position="62,-8" size="42,16" textAlign="end" paragraphAlign="middle"/>
       </Group>
     </Layer>
-    <Layer x="68" y="28">
+    <Layer x="62" y="28">
       <Group>
         <Rectangle size="8,8" roundness="2"/>
         <Fill color="#FBBF24"/>
@@ -438,15 +438,15 @@
       <Group>
         <Text text="Referral" fontFamily="Arial" fontSize="11"/>
         <Fill color="#D1D5DB"/>
-        <TextBox position="10,-8" size="55,16" paragraphAlign="middle"/>
+        <TextBox position="10,-8" size="50,16" paragraphAlign="middle"/>
       </Group>
       <Group>
         <Text text="20%" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
         <Fill color="#F9FAFB"/>
-        <TextBox position="68,-8" size="35,16" textAlign="end" paragraphAlign="middle"/>
+        <TextBox position="62,-8" size="42,16" textAlign="end" paragraphAlign="middle"/>
       </Group>
     </Layer>
-    <Layer x="68" y="52">
+    <Layer x="62" y="52">
       <Group>
         <Rectangle size="8,8" roundness="2"/>
         <Fill color="#F472B6"/>
@@ -454,16 +454,16 @@
       <Group>
         <Text text="Social" fontFamily="Arial" fontSize="11"/>
         <Fill color="#D1D5DB"/>
-        <TextBox position="10,-8" size="55,16" paragraphAlign="middle"/>
+        <TextBox position="10,-8" size="50,16" paragraphAlign="middle"/>
       </Group>
       <Group>
         <Text text="12%" fontFamily="Arial" fontStyle="Bold" fontSize="11"/>
         <Fill color="#F9FAFB"/>
-        <TextBox position="68,-8" size="35,16" textAlign="end" paragraphAlign="middle"/>
+        <TextBox position="62,-8" size="42,16" textAlign="end" paragraphAlign="middle"/>
       </Group>
     </Layer>
   </Layer>
-  <Layer x="640" y="300">
+  <Layer x="640" y="302">
     <Rectangle size="280,230" roundness="12"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155"/>
@@ -570,7 +570,7 @@
       </Group>
     </Layer>
   </Layer>
-  <Layer x="490" y="505">
+  <Layer x="490" y="507">
     <Rectangle size="580,120" roundness="12"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155"/>
