@@ -723,14 +723,25 @@ if (PAG_BUILD_CLI)
     message("PAGX_CLI_VERSION: ${PAGX_CLI_VERSION}")
 
     # Generate pagx_xsd.h from spec/pagx.xsd
-    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/spec/pagx.xsd" PAGX_XSD_CONTENT)
+    # Use HEX encoding to avoid MSVC string literal length limit (C2026)
+    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/spec/pagx.xsd" PAGX_XSD_CONTENT HEX)
+    string(LENGTH "${PAGX_XSD_CONTENT}" PAGX_XSD_HEX_LEN)
+    set(PAGX_XSD_BYTES "")
+    set(_POS 0)
+    while (_POS LESS PAGX_XSD_HEX_LEN)
+        string(SUBSTRING "${PAGX_XSD_CONTENT}" ${_POS} 2 _BYTE)
+        string(APPEND PAGX_XSD_BYTES "0x${_BYTE},")
+        math(EXPR _POS "${_POS} + 2")
+    endwhile ()
+    math(EXPR PAGX_XSD_SIZE "${PAGX_XSD_HEX_LEN} / 2")
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/generated/pagx_xsd.h"
             "// Auto-generated from spec/pagx.xsd. Do not edit manually.\n"
             "#pragma once\n"
             "#include <string>\n"
             "namespace pagx::cli {\n"
             "inline const std::string& PagxXsdContent() {\n"
-            "  static const std::string content = R\"XSD(${PAGX_XSD_CONTENT})XSD\";\n"
+            "  static const unsigned char data[] = {${PAGX_XSD_BYTES}};\n"
+            "  static const std::string content(reinterpret_cast<const char*>(data), ${PAGX_XSD_SIZE});\n"
             "  return content;\n"
             "}\n"
             "}  // namespace pagx::cli\n")
