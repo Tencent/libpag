@@ -99,30 +99,26 @@ function copyDir(src, dest) {
 
 /**
  * Publish skills as static files and zip archives for AI tool downloads.
- * Each skill directory under SKILLS_DIR is copied to <outputDir>/skills/<name>/
- * and packaged as <outputDir>/skills/<name>.zip (without the outer directory).
+ * Each named skill is copied to <outputDir>/skills/<name>/ and packaged as
+ * <outputDir>/skills/<name>.zip (without the outer directory).
  */
-function publishSkills(outputDir) {
-  if (!fs.existsSync(SKILLS_DIR)) {
-    console.warn('  Warning: skills directory not found at', SKILLS_DIR);
-    return;
-  }
-
+function publishSkills(outputDir, names) {
   const skillsOutputDir = path.join(outputDir, 'skills');
-  const entries = fs.readdirSync(SKILLS_DIR, { withFileTypes: true })
-    .filter(e => e.isDirectory() && !e.name.startsWith('.'));
 
-  for (const entry of entries) {
-    const skillSrcDir = path.join(SKILLS_DIR, entry.name);
-    const skillDestDir = path.join(skillsOutputDir, entry.name);
+  for (const name of names) {
+    const skillSrcDir = path.join(SKILLS_DIR, name);
+    if (!fs.existsSync(skillSrcDir)) {
+      console.warn(`  Warning: skill directory not found: ${skillSrcDir}`);
+      continue;
+    }
 
     // Copy static files
+    const skillDestDir = path.join(skillsOutputDir, name);
     copyDir(skillSrcDir, skillDestDir);
 
     // Create zip (contents only, no outer directory)
-    const zipPath = path.join(skillsOutputDir, `${entry.name}.zip`);
+    const zipPath = path.join(skillsOutputDir, `${name}.zip`);
     fs.mkdirSync(skillsOutputDir, { recursive: true });
-    // Remove existing zip to avoid appending
     if (fs.existsSync(zipPath)) {
       fs.unlinkSync(zipPath);
     }
@@ -269,7 +265,7 @@ function main() {
 
   // Publish skills
   console.log('\n  Publishing skills...');
-  publishSkills(outputDir);
+  publishSkills(outputDir, ['pagx']);
 
   console.log('\nDone!');
 }
