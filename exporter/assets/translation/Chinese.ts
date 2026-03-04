@@ -271,47 +271,47 @@
 <context>
     <name>ExportPanel</name>
     <message>
-        <location filename="../qml/ExportPanel.qml" line="12"/>
+        <location filename="../qml/ExportPanel.qml" line="14"/>
         <source>Export PAG</source>
         <translation>导出PAG</translation>
     </message>
     <message>
-        <location filename="../qml/ExportPanel.qml" line="108"/>
+        <location filename="../qml/ExportPanel.qml" line="110"/>
         <source>Search Composition</source>
         <translation>查找合成</translation>
     </message>
     <message>
-        <location filename="../qml/ExportPanel.qml" line="186"/>
+        <location filename="../qml/ExportPanel.qml" line="188"/>
         <source>Storage Path</source>
         <translation>存储路径</translation>
     </message>
     <message>
-        <location filename="../qml/ExportPanel.qml" line="206"/>
+        <location filename="../qml/ExportPanel.qml" line="208"/>
         <source>Setting</source>
         <translation>设置</translation>
     </message>
     <message>
-        <location filename="../qml/ExportPanel.qml" line="226"/>
+        <location filename="../qml/ExportPanel.qml" line="228"/>
         <source>Preview</source>
         <translation>预览</translation>
     </message>
     <message>
-        <location filename="../qml/ExportPanel.qml" line="278"/>
+        <location filename="../qml/ExportPanel.qml" line="280"/>
         <source>No Error Message Found</source>
         <translation>暂未发现错误信息</translation>
     </message>
     <message>
-        <location filename="../qml/ExportPanel.qml" line="342"/>
+        <location filename="../qml/ExportPanel.qml" line="344"/>
         <source>Also Export Audio</source>
         <translation>同时导出音频</translation>
     </message>
     <message>
-        <location filename="../qml/ExportPanel.qml" line="380"/>
+        <location filename="../qml/ExportPanel.qml" line="382"/>
         <source>Cancel</source>
         <translation>取消</translation>
     </message>
     <message>
-        <location filename="../qml/ExportPanel.qml" line="410"/>
+        <location filename="../qml/ExportPanel.qml" line="412"/>
         <source>Export</source>
         <translation>导出</translation>
     </message>
