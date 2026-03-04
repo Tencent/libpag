@@ -10,7 +10,7 @@ embedding.
 ## Install
 
 ```bash
-npm install -g pagx
+npm install -g @libpag/pagx
 ```
 
 ## Commands

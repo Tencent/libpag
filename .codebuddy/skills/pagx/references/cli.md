@@ -11,9 +11,9 @@ ensure it is installed and meets the minimum version:
 ```bash
 PAGX_MIN="0.1.0"
 if ! command -v pagx &>/dev/null; then
-  npm install -g pagx
+  npm install -g @libpag/pagx
 elif [ "$(printf '%s\n' "$PAGX_MIN" "$(pagx -v | awk '{print $2}')" | sort -V | head -1)" != "$PAGX_MIN" ]; then
-  npm update -g pagx
+  npm update -g @libpag/pagx
 fi
 ```
 
