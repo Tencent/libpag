@@ -203,10 +203,11 @@
     <main class="content">
         <!-- About -->
         <h2 id="about">简介</h2>
-        <p>PAGX AI Skills 是面向 AI 编程助手的技能包。安装后，助手可以根据文字描述生成 PAGX 矢量图形，按指令精确修改现有文件，并完成校验、渲染和体积优化。</p>
-        <p>先说为什么要用 PAGX。主流图像生成模型大多直接生成位图；当局部效果不对时，通常只能整体重试。PAGX 走的是另一条路径：AI 输出结构化标记，每个元素都有可编辑的明确参数。</p>
-        <p>因此，迭代方式也不同。你可以先给出目标，再根据预览结果只调整颜色、尺寸、位置或间距等局部属性。因为修改是“定点编辑”而不是“整图重抽”，多轮协作会更稳定、更可控。</p>
-        <p>目前 PAGX 的重点是静态矢量图能力。动效能力会在后续版本持续完善，届时同一套元素结构可直接扩展到动画生产流程。</p>
+        <p>PAGX AI Skills 是面向 AI 编程助手的专业技能扩展。安装后，助手可以根据文字描述生成结构化的 PAGX 矢量图形，优化现有文件的体积与渲染性能，并在需要时查询 PAGX 语法、属性和命令行工具用法。</p>
+        <p>先看传统路径。当前主流的 AI 出图工具（如 Stable Diffusion、DALL-E）主要生成位图，本质上是从概率分布中采样结果。若某个细节不理想，通常只能整张重试，很难只改动单一局部。</p>
+        <p>PAGX 的路径不同：AI 输出的是结构化标记而不是像素采样。文件中的元素都带有明确、可编辑的参数，因此你可以用自然语言指定局部改动，例如颜色、尺寸、位置和间距，并且不影响其他部分。这种“可精确二次编辑”的能力，是矢量工作流的核心优势。</p>
+        <p>在这个流程中，你可以选择全自动迭代，也可以在关键节点加入人工审美和结构判断。通过多轮“小步修改 + 渲染校验”，结果会稳定收敛。随着模型能力提升，实现同等效果所需的提示也会逐步减少。</p>
+        <p>PAGX 最初为动效描述而设计，动效能力建立在矢量静态图基础上。当前阶段重点仍是夯实静态能力；后续动效模块完善后，AI 可在同一套元素结构上继续生成更复杂的动画效果。</p>
 
         <!-- Installation -->
         <h2 id="installation">安装指南</h2>
@@ -241,32 +242,15 @@
         </div>
 
         <h3 id="install-skills">3. 安装 PAGX Skills</h3>
-        <p>下载上方 Skills 安装包后，按以下步骤安装到项目目录：</p>
-        <div class="step">
-            <p><span class="step-number">第 1 步</span> &mdash; 打开终端，进入你的项目文件夹（即你想要创建 PAGX 文件的目录）：</p>
-            <pre><code>cd /path/to/your/project</code></pre>
-        </div>
-        <div class="step">
-            <p><span class="step-number">第 2 步</span> &mdash; 创建 Skills 目录：</p>
-            <pre><code>mkdir -p .codebuddy/skills</code></pre>
-        </div>
-        <div class="step">
-            <p><span class="step-number">第 3 步</span> &mdash; 将下载的 <code>pagx.zip</code> 解压到 Skills 目录中：</p>
-            <pre><code>unzip pagx.zip -d .codebuddy/skills/pagx</code></pre>
-            <p>解压后，目录结构应如下所示：</p>
-            <pre><code>your-project/
+        <p>下载上方的 Skills 安装包后，将 <code>pagx.zip</code> 解压，把得到的 <code>pagx</code> 文件夹放到项目中的以下位置：</p>
+        <pre><code>your-project/
   .codebuddy/
     skills/
       pagx/
         SKILL.md
         references/
           ...</code></pre>
-        </div>
-        <div class="step">
-            <p><span class="step-number">第 4 步</span> &mdash; 在项目文件夹中启动 CodeBuddy Code：</p>
-            <pre><code>codebuddy</code></pre>
-            <p>PAGX Skills 会被自动识别并加载。</p>
-        </div>
+        <p>如果项目中还没有 <code>.codebuddy/skills/</code> 文件夹，手动创建即可。然后在项目目录下启动 CodeBuddy Code，PAGX Skills 会被自动识别并加载。</p>
         <div class="info-box">
             <p><code>pagx-cli</code> 命令行工具会在 AI 助手首次需要时自动安装，这依赖于第 1 步中搭建的 Node.js 环境。</p>
         </div>

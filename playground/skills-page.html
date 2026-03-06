@@ -265,33 +265,21 @@
 
         <h3 id="install-skills">3. Install PAGX Skills</h3>
         <p>
-            After downloading the Skills package above, install it into your project with these steps:
+            After downloading the Skills package above, extract <code>pagx.zip</code> and place the
+            resulting <code>pagx</code> folder into your project at the following path:
         </p>
-        <div class="step">
-            <p><span class="step-number">Step 1</span> &mdash; Open a terminal and navigate to your project folder (the folder where you want to create PAGX files):</p>
-            <pre><code>cd /path/to/your/project</code></pre>
-        </div>
-        <div class="step">
-            <p><span class="step-number">Step 2</span> &mdash; Create the Skills directory:</p>
-            <pre><code>mkdir -p .codebuddy/skills</code></pre>
-        </div>
-        <div class="step">
-            <p><span class="step-number">Step 3</span> &mdash; Extract the downloaded <code>pagx.zip</code> into the Skills directory:</p>
-            <pre><code>unzip pagx.zip -d .codebuddy/skills/pagx</code></pre>
-            <p>After extraction, the directory structure should look like:</p>
-            <pre><code>your-project/
+        <pre><code>your-project/
   .codebuddy/
     skills/
       pagx/
         SKILL.md
         references/
           ...</code></pre>
-        </div>
-        <div class="step">
-            <p><span class="step-number">Step 4</span> &mdash; Launch CodeBuddy Code in your project folder:</p>
-            <pre><code>codebuddy</code></pre>
-            <p>The PAGX Skills will be automatically detected and loaded.</p>
-        </div>
+        <p>
+            If the <code>.codebuddy/skills/</code> folders do not exist yet, create them manually.
+            Then launch CodeBuddy Code in your project folder &mdash; the PAGX Skills will be
+            automatically detected and loaded.
+        </p>
         <div class="info-box">
             <p>The <code>pagx-cli</code> command-line tool will be automatically installed when the AI
             assistant needs it for the first time. This requires the Node.js environment set up in Step 1.</p>
