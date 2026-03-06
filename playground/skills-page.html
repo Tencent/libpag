@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PAGX AI Skills</title>
+    <link rel="icon" href="../favicon.png" type="image/png">
+    <style>
+        :root {
+            --primary-color: #0066cc;
+            --bg-color: #ffffff;
+            --text-color: #333333;
+            --code-bg: #f6f8fa;
+            --border-color: #e1e4e8;
+        }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Content */
+        .content {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 60px 40px 80px;
+        }
+
+        /* Typography */
+        h1 { font-size: 2em; font-weight: 600; margin-top: 0; margin-bottom: 8px; line-height: 1.25; }
+        h2 { font-size: 1.5em; font-weight: 600; margin-top: 48px; margin-bottom: 16px; padding-bottom: 0.3em; border-bottom: 1px solid var(--border-color); }
+        h3 { font-size: 1.25em; font-weight: 600; margin-top: 32px; margin-bottom: 12px; }
+        a { color: var(--primary-color); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        p { margin-top: 0; margin-bottom: 16px; }
+
+        /* Subtitle */
+        .subtitle { font-size: 18px; color: #586069; margin-bottom: 32px; }
+
+        /* Code */
+        code {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 85%;
+            background-color: var(--code-bg);
+            padding: 0.2em 0.4em;
+            border-radius: 6px;
+        }
+        pre {
+            background-color: var(--code-bg);
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            font-size: 85%;
+            line-height: 1.45;
+            border: 1px solid var(--border-color);
+        }
+        pre code { background-color: transparent; padding: 0; border-radius: 0; font-size: 100%; }
+
+        /* Table */
+        table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+        th, td { border: 1px solid var(--border-color); padding: 8px 13px; text-align: left; }
+        th { background-color: #f6f8fa; font-weight: 600; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+
+        /* Lists */
+        ul, ol { padding-left: 2em; margin-top: 0; margin-bottom: 16px; }
+        li { margin: 4px 0; }
+
+        /* Download section */
+        .download-section {
+            margin: 32px 0;
+            padding: 24px;
+            background: #f0f7ff;
+            border-radius: 8px;
+            border: 1px solid #c8ddf5;
+            text-align: center;
+        }
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 28px;
+            background: var(--primary-color);
+            color: white;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        .download-btn:hover { background: #0052a3; text-decoration: none; }
+        .download-btn svg { width: 18px; height: 18px; }
+        .download-note { margin-top: 12px; margin-bottom: 0; font-size: 14px; color: #586069; }
+
+        /* Steps */
+        .step { margin: 20px 0; padding: 16px 20px; background: #f8f9fa; border-radius: 6px; border-left: 3px solid var(--primary-color); }
+        .step-number { font-weight: 600; color: var(--primary-color); }
+
+        /* Info box */
+        .info-box {
+            margin: 16px 0;
+            padding: 12px 16px;
+            border-left: 4px solid #0366d6;
+            background-color: #f1f8ff;
+            border-radius: 0 6px 6px 0;
+        }
+        .info-box p { margin: 0; font-size: 14px; }
+
+        /* Footer */
+        .last-updated { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border-color); font-size: 14px; color: #586069; }
+
+        /* Header actions */
+        .header-actions {
+            position: fixed;
+            top: 12px;
+            right: 20px;
+            z-index: 101;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .header-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            background: #f8f9fa;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: #555;
+            font-family: inherit;
+            font-size: 14px;
+            line-height: 1.2;
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .header-btn:hover { background: #e9ecef; text-decoration: none; }
+        .header-btn svg { width: 14px; height: 14px; }
+
+        /* Language switch */
+        .lang-switch { position: relative; }
+        .lang-switch svg { transition: transform 0.2s; }
+        .lang-switch.open svg { transform: rotate(180deg); }
+        .lang-switch-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            min-width: 100%;
+            margin-top: 4px;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            overflow: hidden;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-8px);
+            transition: all 0.2s;
+        }
+        .lang-switch.open .lang-switch-menu { opacity: 1; visibility: visible; transform: translateY(0); }
+        .lang-switch-menu a { display: block; padding: 8px 16px; color: #555; font-size: 13px; text-decoration: none; white-space: nowrap; }
+        .lang-switch-menu a:hover { background: #f8f9fa; color: var(--primary-color); }
+        .lang-switch-menu a.active { background: #e3f2fd; color: #1565c0; }
+
+        /* Mobile */
+        @media (max-width: 600px) {
+            .content { padding: 40px 16px 60px; }
+            h1 { font-size: 1.5em; }
+            .header-actions { top: 8px; right: 12px; gap: 6px; }
+            .header-btn span { display: none; }
+            .header-btn { padding: 8px 10px; gap: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header-actions">
+        <a href="../" class="header-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            <span>Playground</span>
+        </a>
+        <div class="lang-switch" onclick="this.classList.toggle('open')">
+            <button class="header-btn">
+                <span>English</span>
+                <svg viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+            </button>
+            <div class="lang-switch-menu">
+                <a href="#" onclick="return switchLang('en', this.href);" class="active">English</a>
+                <a href="zh/" onclick="return switchLang('zh-CN', this.href);">简体中文</a>
+            </div>
+        </div>
+    </div>
+
+    <main class="content">
+        <h1>PAGX AI Skills</h1>
+        <p class="subtitle">Give your AI coding assistant the ability to create and optimize PAGX vector graphics.</p>
+
+        <p>
+            PAGX AI Skills is a reference documentation package that enables AI coding assistants to
+            generate well-structured PAGX files from text descriptions, optimize existing files for size
+            and rendering performance, and look up PAGX syntax, attributes, and CLI commands.
+        </p>
+        <p>The package includes:</p>
+        <ul>
+            <li>Format specification essentials and design patterns</li>
+            <li>Step-by-step generation and optimization guides</li>
+            <li>Complete attribute reference with defaults and enumerations</li>
+            <li>CLI tool reference for rendering, validation, and more</li>
+            <li>Practical examples covering icons, UI components, cards, and text</li>
+        </ul>
+
+        <!-- Download -->
+        <div class="download-section">
+            <a href="./pagx.zip" download class="download-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M2 17l.621 2.485A2 2 0 0 0 4.561 21h14.878a2 2 0 0 0 1.94-1.515L22 17"/></svg>
+                Download Skills Package
+            </a>
+            <p class="download-note">pagx.zip &mdash; extract and install into your AI coding tool</p>
+        </div>
+
+        <!-- Installation -->
+        <h2>Installation Guide</h2>
+
+        <h3>1. Install Node.js</h3>
+        <p>
+            The Skills package includes a companion command-line tool (<code>pagx-cli</code>) that
+            requires a Node.js runtime. If you don't have Node.js installed yet, follow these steps:
+        </p>
+        <div class="step">
+            <p><span class="step-number">Step 1</span> &mdash; Visit <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a> and download the <strong>LTS</strong> (Long Term Support) version for your operating system.</p>
+        </div>
+        <div class="step">
+            <p><span class="step-number">Step 2</span> &mdash; Run the installer and follow the on-screen instructions. Accept all default settings.</p>
+        </div>
+        <div class="step">
+            <p><span class="step-number">Step 3</span> &mdash; Verify the installation. Open a terminal (Terminal on macOS, Command Prompt or PowerShell on Windows) and run:</p>
+            <pre><code>node --version</code></pre>
+            <p>You should see a version number like <code>v22.x.x</code>. Version 18 or later is required.</p>
+        </div>
+
+        <h3>2. Install CodeBuddy Code</h3>
+        <p>
+            <a href="https://docs.codebuddy.ai" target="_blank" rel="noopener">CodeBuddy Code</a>
+            is an AI coding assistant that runs in your terminal. If you haven't installed it yet:
+        </p>
+        <div class="step">
+            <p><span class="step-number">Step 1</span> &mdash; Open a terminal and run the installation command:</p>
+            <pre><code>npm install -g @anthropic-ai/codebuddy-code</code></pre>
+        </div>
+        <div class="step">
+            <p><span class="step-number">Step 2</span> &mdash; After installation, launch it by typing:</p>
+            <pre><code>codebuddy</code></pre>
+            <p>Follow the on-screen prompts to complete the initial setup and authentication.</p>
+        </div>
+        <div class="info-box">
+            <p>For detailed installation instructions and system requirements, see the
+            <a href="https://docs.codebuddy.ai" target="_blank" rel="noopener">CodeBuddy Code documentation</a>.</p>
+        </div>
+
+        <h3>3. Install PAGX Skills</h3>
+        <p>
+            After downloading the Skills package above, extract and install it into your project:
+        </p>
+        <div class="step">
+            <p><span class="step-number">Step 1</span> &mdash; Open a terminal and navigate to your project folder (the folder where you want to create PAGX files):</p>
+            <pre><code>cd /path/to/your/project</code></pre>
+        </div>
+        <div class="step">
+            <p><span class="step-number">Step 2</span> &mdash; Create the Skills directory:</p>
+            <pre><code>mkdir -p .codebuddy/skills</code></pre>
+        </div>
+        <div class="step">
+            <p><span class="step-number">Step 3</span> &mdash; Extract the downloaded <code>pagx.zip</code> into the Skills directory:</p>
+            <pre><code>unzip pagx.zip -d .codebuddy/skills/pagx</code></pre>
+            <p>After extraction, the directory structure should look like:</p>
+            <pre><code>your-project/
+  .codebuddy/
+    skills/
+      pagx/
+        SKILL.md
+        references/
+          ...</code></pre>
+        </div>
+        <div class="step">
+            <p><span class="step-number">Step 4</span> &mdash; Launch CodeBuddy Code in your project folder:</p>
+            <pre><code>codebuddy</code></pre>
+            <p>The PAGX Skills will be automatically detected and loaded.</p>
+        </div>
+        <div class="info-box">
+            <p>The <code>pagx-cli</code> command-line tool will be automatically installed when the AI
+            assistant needs it for the first time. This requires the Node.js environment set up in Step 1.</p>
+        </div>
+        <div class="info-box">
+            <p>PAGX Skills has been most thoroughly tested with CodeBuddy Code. For best results,
+            select the <strong>Claude Opus</strong> model in your CodeBuddy Code settings &mdash;
+            it currently produces the highest quality output with this Skills package.</p>
+        </div>
+
+        <h3>Using with Other AI Coding Tools</h3>
+        <p>
+            The guide above uses CodeBuddy Code as an example, but PAGX Skills is a set of structured
+            reference documents following an open convention &mdash; it is not tied to any specific tool.
+            If you use a different AI coding assistant that supports a Skills (or similar) mechanism,
+            you only need to:
+        </p>
+        <ol>
+            <li><strong>Ensure Node.js is installed</strong> on your system (see Step 1 above) &mdash;
+            this is required for the <code>pagx-cli</code> tool that Skills relies on.</li>
+            <li><strong>Copy the Skills files</strong> into the directory designated by your AI tool.
+            Refer to Step 3 above for the extraction process &mdash; just replace the
+            <code>.codebuddy/skills/</code> path with the corresponding directory for your tool.</li>
+        </ol>
+
+        <!-- CLI Tools -->
+        <!-- Getting Started -->
+        <h2>Getting Started</h2>
+        <p>
+            Once the Skills are installed, you can interact with the AI using natural language.
+            Here are some common operations:
+        </p>
+
+        <h3>Creating PAGX Files</h3>
+        <ul>
+            <li><em>"Create a PAGX file for a blue rounded rectangle button with white text 'Submit'"</em></li>
+            <li><em>"Design a card component with an avatar, title, and subtitle"</em></li>
+            <li><em>"Make a settings icon using simple geometric shapes, 24x24"</em></li>
+            <li><em>"Create a gradient banner with the text 'Welcome Back' in bold"</em></li>
+        </ul>
+
+        <h3>Modifying and Iterating</h3>
+        <ul>
+            <li><em>"Change the button color to green and increase the corner radius"</em></li>
+            <li><em>"Make the title text larger and align it to the left"</em></li>
+            <li><em>"Add a subtle drop shadow to the card"</em></li>
+            <li><em>"The spacing between the icon and the label feels too tight, increase it"</em></li>
+        </ul>
+
+        <h3>Rendering and Inspection</h3>
+        <ul>
+            <li><em>"Render this PAGX file as a screenshot so I can preview it"</em></li>
+            <li><em>"Render it at 2x scale for Retina display"</em></li>
+            <li><em>"Validate this PAGX file and fix any errors"</em></li>
+            <li><em>"Optimize this PAGX file to reduce its size"</em></li>
+        </ul>
+
+        <h3>Why Vector Generation Matters</h3>
+        <p>
+            Bitmap-based image generation (such as Stable Diffusion or DALL-E) works by sampling
+            from a probability distribution &mdash; essentially drawing a lottery ticket each time.
+            The result is never fully controllable: you might generate dozens of images, each with
+            minor imperfections that prevent production use. More critically, there is no way to
+            precisely modify just one part of a bitmap output. Need the button 2 pixels wider?
+            The shadow slightly softer? You have to regenerate the entire image and hope for the best.
+            This inherent unpredictability limits bitmap generation largely to early-stage creative
+            exploration.
+        </p>
+        <p>
+            Vector generation solves this fundamental problem. Because PAGX is a structured format
+            with precise, editable values, every element can be modified exactly. If something isn't
+            right, you simply describe the change and the AI adjusts that specific part &mdash;
+            colors, sizes, positions, spacing &mdash; without affecting anything else. With enough
+            iterations, the output can reliably reach production quality.
+        </p>
+
+        <h3>Tips for Best Results</h3>
+        <p>
+            <strong>Iterate to perfection.</strong>
+            Don't expect a perfect result on the first try. Instead, treat the process as a
+            conversation: describe what you want, preview the rendered output, then tell the AI
+            what to adjust. Each round of feedback produces precise modifications &mdash;
+            not probabilistic re-rolls &mdash; so you steadily converge on the ideal result.
+            This multi-round iteration can be fully automated by the AI, or you can step in
+            at any point to provide key aesthetic judgment and structural guidance.
+            This ability to make exact, language-driven modifications across multiple iterations
+            is the core value of this workflow.
+        </p>
+        <p>
+            <strong>Create, don't trace.</strong>
+            If you provide a bitmap image as reference, the AI will use it as inspiration for a
+            fresh vector creation &mdash; not as a template to reproduce pixel by pixel.
+            Precise bitmap reproduction is not a strength of any current AI model: a bitmap is
+            fundamentally a probabilistic "impression," while a vector graphic is a precise
+            structural description with an exact solution. Deriving exact structure from a
+            probability distribution goes against the nature of how large language models work.
+            Use reference images to convey style and concept, then let the AI create a clean
+            vector interpretation.
+        </p>
+
+        <!-- CLI Tools -->
+        <h2>Command-Line Tools</h2>
+        <p>
+            The Skills package works with <code>pagx-cli</code>, a companion command-line tool distributed
+            via npm. When used through an AI assistant, the CLI is invoked automatically. You can also
+            install and use it directly:
+        </p>
+        <pre><code>npm install -g @libpag/pagx</code></pre>
+
+        <table>
+            <tr><th>Command</th><th>Description</th></tr>
+            <tr><td><code>pagx render</code></td><td>Render a PAGX file to PNG, WebP, or JPG</td></tr>
+            <tr><td><code>pagx validate</code></td><td>Validate a PAGX file against the specification</td></tr>
+            <tr><td><code>pagx optimize</code></td><td>Validate, optimize structure, and format in one step</td></tr>
+            <tr><td><code>pagx format</code></td><td>Pretty-print with consistent indentation</td></tr>
+            <tr><td><code>pagx bounds</code></td><td>Query precise rendered bounds of layers</td></tr>
+            <tr><td><code>pagx font info</code></td><td>Query font identity and metrics</td></tr>
+            <tr><td><code>pagx font embed</code></td><td>Embed fonts into a PAGX file</td></tr>
+        </table>
+
+        <p>
+            For complete CLI documentation including all options, see the
+            <a href="https://pag.io/pagx/latest/#cli-reference">Specification &mdash; CLI Reference</a>.
+        </p>
+
+        <p class="last-updated">Last updated: {{lastUpdated}}</p>
+    </main>
+
+    <script>
+        var LANG_COOKIE = 'pagx_lang';
+        var LANG_COOKIE_PATH = '/';
+
+        function getLangCookie() {
+            var match = document.cookie.match(/(?:^|;\s*)pagx_lang=([^;]+)/);
+            return match ? decodeURIComponent(match[1]) : null;
+        }
+
+        function setLangCookie(lang) {
+            var expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
+            document.cookie = LANG_COOKIE + '=' + encodeURIComponent(lang) +
+                '; path=' + LANG_COOKIE_PATH +
+                '; expires=' + expires +
+                '; SameSite=Lax';
+        }
+
+        function switchLang(lang, url) {
+            setLangCookie(lang);
+            if (url && url !== '#' && url !== location.href) {
+                location.href = url;
+            }
+            return false;
+        }
+
+        (function() {
+            var zhUrl = 'zh/';
+            if (!zhUrl) return;
+            var saved = getLangCookie();
+            var shouldRedirect = saved === 'zh-CN' ||
+                (!saved && /^zh\b/.test(navigator.language || ''));
+            if (shouldRedirect) location.replace(zhUrl);
+        })();
+
+        document.addEventListener('click', function(e) {
+            var langSwitch = document.querySelector('.lang-switch');
+            if (!langSwitch.contains(e.target)) langSwitch.classList.remove('open');
+        });
+    </script>
+</body>
+</html>
