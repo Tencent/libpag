@@ -244,10 +244,12 @@
             <p>You should see a version number like <code>v22.x.x</code>. Version 18 or later is required.</p>
         </div>
 
-        <h3 id="install-codebuddy">2. Install CodeBuddy Code</h3>
+        <h3 id="install-codebuddy">2. Install an AI Coding Assistant</h3>
         <p>
+            PAGX Skills works with any AI coding assistant that supports a Skills mechanism.
+            Here we use
             <a href="https://www.codebuddy.ai/docs/cli/overview" target="_blank" rel="noopener">CodeBuddy Code</a>
-            is an AI coding assistant for terminal workflows. If it is not installed yet:
+            as an example. For other tools, refer to their official documentation for installation.
         </p>
         <div class="step">
             <p><span class="step-number">Step 1</span> &mdash; Open a terminal and run the installation command:</p>
@@ -295,20 +297,6 @@
             select the <strong>Claude Opus</strong> model in your CodeBuddy Code settings &mdash;
             it currently produces the highest quality output with this Skills package.</p>
         </div>
-
-        <h3 id="other-tools">Using with Other AI Coding Tools</h3>
-        <p>
-            The guide above uses CodeBuddy Code as an example. PAGX Skills itself follows an open
-            convention and is not tied to one tool. If your AI coding assistant supports Skills (or
-            a similar mechanism), you usually only need to:
-        </p>
-        <ol>
-            <li><strong>Ensure Node.js is installed</strong> on your system (see Step 1 above) &mdash;
-            this is required for the <code>pagx-cli</code> tool that Skills relies on.</li>
-            <li><strong>Copy the Skills files</strong> into the directory designated by your AI tool.
-            Refer to Step 3 above for the extraction process &mdash; just replace the
-            <code>.codebuddy/skills/</code> path with the corresponding directory for your tool.</li>
-        </ol>
 
         <!-- Getting Started -->
         <h2 id="getting-started">Getting Started</h2>

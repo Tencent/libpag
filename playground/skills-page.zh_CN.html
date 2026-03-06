@@ -226,8 +226,8 @@
             <p>正常情况下会显示类似 <code>v22.x.x</code> 的版本号。版本需要 18 或更高。</p>
         </div>
 
-        <h3 id="install-codebuddy">2. 安装 CodeBuddy Code</h3>
-        <p><a href="https://www.codebuddy.ai/docs/cli/overview" target="_blank" rel="noopener">CodeBuddy Code</a> 是运行在终端中的 AI 编程助手。若尚未安装，请按以下步骤操作：</p>
+        <h3 id="install-codebuddy">2. 安装 AI 编程助手</h3>
+        <p>PAGX Skills 可用于任何支持 Skills 机制的 AI 编程助手。这里以 <a href="https://www.codebuddy.ai/docs/cli/overview" target="_blank" rel="noopener">CodeBuddy Code</a> 为例，其他工具请参考其官方文档完成安装。</p>
         <div class="step">
             <p><span class="step-number">第 1 步</span> &mdash; 打开终端，运行以下安装命令：</p>
             <pre><code>npm install -g @tencent-ai/codebuddy-code</code></pre>
@@ -262,15 +262,6 @@
         <div class="info-box">
         <p>目前 PAGX Skills 在 CodeBuddy Code 上经过了最全面的测试。为获得最佳效果，建议在 CodeBuddy Code 设置中选择 <strong>Claude Opus</strong> 模型，该模型在使用此 Skills 时生成质量最高。</p>
         </div>
-
-        <h3 id="other-tools">在其他 AI 编程工具中使用</h3>
-        <p>上面的步骤以 CodeBuddy Code 为例。PAGX Skills 本身遵循开放约定，不绑定特定工具。若你使用其他支持 Skills（或类似机制）的 AI 助手，通常只需完成以下两件事：</p>
-        <ol>
-            <li><strong>确保系统已安装 Node.js</strong>（参见上方第 1 步）&mdash;
-            这是 Skills 依赖的 <code>pagx-cli</code> 工具运行所必需的。</li>
-            <li><strong>将 Skills 文件拷贝到对应目录</strong>。参考上方第 3 步的解压过程，只需将
-            <code>.codebuddy/skills/</code> 替换为你所用工具指定的 Skills 存放路径即可。</li>
-        </ol>
 
         <!-- Getting Started -->
         <h2 id="getting-started">开始使用</h2>
