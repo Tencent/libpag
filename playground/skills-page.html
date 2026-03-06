@@ -192,7 +192,7 @@
     <!-- Hero download -->
     <div class="hero">
         <h1>PAGX AI Skills</h1>
-        <p class="subtitle">Give your AI coding assistant the ability to create and optimize PAGX vector graphics.</p>
+        <p class="subtitle">Enable your AI coding assistant to create, revise, and optimize PAGX vector graphics.</p>
         <a href="./pagx.zip" download class="download-btn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M2 17l.621 2.485A2 2 0 0 0 4.561 21h14.878a2 2 0 0 0 1.94-1.515L22 17"/></svg>
             Download Skills Package
@@ -204,39 +204,24 @@
         <!-- About -->
         <h2 id="about">About</h2>
         <p>
-            PAGX AI Skills is a professional skill extension for AI coding assistants. Once installed,
-            it gives the AI the ability to generate well-structured PAGX vector graphics from text
-            descriptions, optimize existing files for size and rendering performance, and look up PAGX
-            syntax, attributes, and CLI commands.
+            PAGX AI Skills is a skills package for AI coding assistants. After installation, the
+            assistant can generate PAGX vector graphics from prompts, apply precise edits to existing
+            files, and run validation, rendering, and size optimization.
         </p>
         <p>
-            Most AI image generation tools today (such as Stable Diffusion and DALL-E) work with
-            pixels &mdash; sampling bitmaps from a probability distribution. Their output is
-            essentially a one-shot "impression": if a detail is wrong, you cannot precisely fix
-            just that part; you can only regenerate and hope the next attempt turns out better.
+            Why PAGX first: most image generators produce bitmaps. When one detail is off, you often
+            have to regenerate the whole output. PAGX works differently &mdash; the AI outputs structured
+            markup, where each element is represented by explicit editable parameters.
         </p>
         <p>
-            Vector generation takes a fundamentally different approach. The AI writes structured
-            markup rather than sampling pixels, producing PAGX files where every element has exact,
-            editable values. If something isn't right, you simply describe the change in natural
-            language, and the AI adjusts that specific part &mdash; colors, sizes, positions,
-            spacing &mdash; without affecting anything else. This ability to make precise secondary
-            edits and iterate continuously is the core advantage of vector generation over
-            pixel-based approaches.
+            This changes the iteration model. You can define a target, preview the result, then adjust
+            only local properties such as color, size, position, or spacing. Because updates are
+            targeted edits instead of full re-rolls, multi-round collaboration is more stable and
+            predictable.
         </p>
         <p>
-            The entire iteration process can be fully automated by the AI, or you can step in at
-            any point to provide key aesthetic judgment and structural guidance. With enough
-            iterations, the output can reliably reach production quality. And as AI models continue
-            to advance, less detailed prompting will be needed to achieve the same results, with
-            less and less human intervention required.
-        </p>
-        <p>
-            PAGX was originally designed to describe motion graphics &mdash; animations built on top
-            of vector graphics. The format is under active development; the current focus is on
-            refining the static vector graphics foundation. Once animation capabilities are added,
-            AI will be able to go further and directly manipulate these vector elements to produce
-            complex motion effects as well.
+            The current PAGX focus is static vector graphics. Motion capabilities are being expanded,
+            so the same element structure can later extend into animation workflows.
         </p>
 
         <!-- Installation -->
@@ -244,8 +229,8 @@
 
         <h3 id="install-nodejs">1. Install Node.js</h3>
         <p>
-            The Skills package includes a companion command-line tool (<code>pagx-cli</code>) that
-            requires a Node.js runtime. If you don't have Node.js installed yet, follow these steps:
+            The Skills package includes the <code>pagx-cli</code> command-line tool, which depends on
+            Node.js. If Node.js is not installed on your machine, complete these steps first:
         </p>
         <div class="step">
             <p><span class="step-number">Step 1</span> &mdash; Visit <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a> and download the <strong>LTS</strong> (Long Term Support) version for your operating system.</p>
@@ -262,7 +247,7 @@
         <h3 id="install-codebuddy">2. Install CodeBuddy Code</h3>
         <p>
             <a href="https://www.codebuddy.ai/docs/cli/overview" target="_blank" rel="noopener">CodeBuddy Code</a>
-            is an AI coding assistant that runs in your terminal. If you haven't installed it yet:
+            is an AI coding assistant for terminal workflows. If it is not installed yet:
         </p>
         <div class="step">
             <p><span class="step-number">Step 1</span> &mdash; Open a terminal and run the installation command:</p>
@@ -286,7 +271,7 @@ curl -fsSL https://copilot.tencent.com/cli/install.sh | bash</code></pre>
 
         <h3 id="install-skills">3. Install PAGX Skills</h3>
         <p>
-            After downloading the Skills package above, extract and install it into your project:
+            After downloading the Skills package above, install it into your project with these steps:
         </p>
         <div class="step">
             <p><span class="step-number">Step 1</span> &mdash; Open a terminal and navigate to your project folder (the folder where you want to create PAGX files):</p>
@@ -325,10 +310,9 @@ curl -fsSL https://copilot.tencent.com/cli/install.sh | bash</code></pre>
 
         <h3 id="other-tools">Using with Other AI Coding Tools</h3>
         <p>
-            The guide above uses CodeBuddy Code as an example, but PAGX Skills is a set of structured
-            reference documents following an open convention &mdash; it is not tied to any specific tool.
-            If you use a different AI coding assistant that supports a Skills (or similar) mechanism,
-            you only need to:
+            The guide above uses CodeBuddy Code as an example. PAGX Skills itself follows an open
+            convention and is not tied to one tool. If your AI coding assistant supports Skills (or
+            a similar mechanism), you usually only need to:
         </p>
         <ol>
             <li><strong>Ensure Node.js is installed</strong> on your system (see Step 1 above) &mdash;
@@ -341,8 +325,8 @@ curl -fsSL https://copilot.tencent.com/cli/install.sh | bash</code></pre>
         <!-- Getting Started -->
         <h2 id="getting-started">Getting Started</h2>
         <p>
-            Once the Skills are installed, you can interact with the AI using natural language.
-            Here are some common operations:
+            Once installed, you can drive the AI with natural language. The examples below follow a
+            simple sequence: create, iterate, then validate.
         </p>
 
         <h3 id="creating">Creating PAGX Files</h3>
@@ -378,26 +362,16 @@ curl -fsSL https://copilot.tencent.com/cli/install.sh | bash</code></pre>
 
         <h3 id="tips">Tips for Best Results</h3>
         <p>
-            <strong>Iterate to perfection.</strong>
-            Don't expect a perfect result on the first try. Instead, treat the process as a
-            conversation: describe what you want, preview the rendered output, then tell the AI
-            what to adjust. Each round of feedback produces precise modifications &mdash;
-            not probabilistic re-rolls &mdash; so you steadily converge on the ideal result.
-            This multi-round iteration can be fully automated by the AI, or you can step in
-            at any point to provide key aesthetic judgment and structural guidance.
-            This ability to make exact, language-driven modifications across multiple iterations
-            is the core value of this workflow.
+            <strong>Set the target, then iterate in small steps.</strong>
+            Describe the desired outcome, preview the render, and only report local changes.
+            Each round is a traceable, testable edit instead of a probabilistic re-roll, so
+            results converge faster and stay easier to reuse.
         </p>
         <p>
-            <strong>Create, don't trace.</strong>
-            If you provide a bitmap image as reference, the AI will use it as inspiration for a
-            fresh vector creation &mdash; not as a template to reproduce pixel by pixel.
-            Precise bitmap reproduction is not a strength of any current AI model: a bitmap is
-            fundamentally a probabilistic "impression," while a vector graphic is a precise
-            structural description with an exact solution. Deriving exact structure from a
-            probability distribution goes against the nature of how large language models work.
-            Use reference images to convey style and concept, then let the AI create a clean
-            vector interpretation.
+            <strong>Use bitmap references for style, not tracing.</strong>
+            Bitmaps are good for conveying mood and composition, but not for pixel-perfect copying.
+            A better workflow is to let AI rebuild the idea as clean vector structure, then refine
+            it through targeted parameter edits.
         </p>
 
     </main>

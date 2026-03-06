@@ -192,7 +192,7 @@
     <!-- Hero download -->
     <div class="hero">
         <h1>PAGX AI Skills</h1>
-        <p class="subtitle">让你的 AI 编程助手具备创建和优化 PAGX 矢量图形的能力。</p>
+        <p class="subtitle">让 AI 编程助手能够创建、修改并优化 PAGX 矢量图形。</p>
         <a href="../pagx.zip" download class="download-btn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M2 17l.621 2.485A2 2 0 0 0 4.561 21h14.878a2 2 0 0 0 1.94-1.515L22 17"/></svg>
             下载 Skills 安装包
@@ -203,17 +203,16 @@
     <main class="content">
         <!-- About -->
         <h2 id="about">简介</h2>
-        <p>PAGX AI Skills 是一套 AI 编程助手的专业技能扩展。安装后，AI 助手即可根据文字描述生成结构规范的 PAGX 矢量图形，优化已有文件的体积和渲染性能，以及查询 PAGX 语法、属性和命令行工具用法。</p>
-        <p>目前主流的 AI 图片生成工具（如 Stable Diffusion、DALL-E）都围绕像素展开，从概率分布中抽样产出位图。这类输出本质上是一次性的"感觉" &mdash; 如果某个细节不对，你无法精确地只改那一处，只能重新生成并期望下一次运气更好。</p>
-        <p>矢量生成走的是完全不同的路径。AI 编写的是结构化标记语言而非采样像素，产出的 PAGX 文件中每个元素都有精确可编辑的值。哪里不对，只需用自然语言描述改动，AI 就会精确调整那个具体的部分 &mdash; 颜色、尺寸、位置、间距 &mdash; 而不影响其他任何东西。这种支持二次精确修改、持续迭代的能力，正是矢量生成相比像素生成的核心价值。</p>
-        <p>整个迭代过程可以完全交给 AI 自动完成，也可以在任何环节让人介入，提供关键的审美判断和结构指导。只要迭代次数足够，输出就几乎一定可以达到上线标准。而且随着 AI 大模型能力的持续提升，达到同样效果所需的提示会越来越简洁，人工介入也会越来越少。</p>
-        <p>PAGX 格式最初就是为描述动效而设计的 &mdash; 动效是在矢量静态图基础上的扩展。该格式目前仍在持续迭代中，当前阶段的重点是打磨矢量静态图的基础能力。待动效能力补充完善后，AI 还可以进一步直接操作这些矢量元素来生成复杂的动效。</p>
+        <p>PAGX AI Skills 是面向 AI 编程助手的技能包。安装后，助手可以根据文字描述生成 PAGX 矢量图形，按指令精确修改现有文件，并完成校验、渲染和体积优化。</p>
+        <p>先说为什么要用 PAGX。主流图像生成模型大多直接生成位图；当局部效果不对时，通常只能整体重试。PAGX 走的是另一条路径：AI 输出结构化标记，每个元素都有可编辑的明确参数。</p>
+        <p>因此，迭代方式也不同。你可以先给出目标，再根据预览结果只调整颜色、尺寸、位置或间距等局部属性。因为修改是“定点编辑”而不是“整图重抽”，多轮协作会更稳定、更可控。</p>
+        <p>目前 PAGX 的重点是静态矢量图能力。动效能力会在后续版本持续完善，届时同一套元素结构可直接扩展到动画生产流程。</p>
 
         <!-- Installation -->
         <h2 id="installation">安装指南</h2>
 
         <h3 id="install-nodejs">1. 安装 Node.js</h3>
-        <p>Skills 安装包内含配套的命令行工具（<code>pagx-cli</code>），运行时需要 Node.js 环境。如果你的电脑上还没有安装 Node.js，请按以下步骤操作：</p>
+        <p>Skills 安装包包含命令行工具 <code>pagx-cli</code>，运行依赖 Node.js。若本机尚未安装，请先完成以下步骤：</p>
         <div class="step">
             <p><span class="step-number">第 1 步</span> &mdash; 访问 <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a>，下载适用于你操作系统的 <strong>LTS</strong>（长期支持）版本。</p>
         </div>
@@ -227,7 +226,7 @@
         </div>
 
         <h3 id="install-codebuddy">2. 安装 CodeBuddy Code</h3>
-        <p><a href="https://www.codebuddy.ai/docs/cli/overview" target="_blank" rel="noopener">CodeBuddy Code</a> 是一款在终端中运行的 AI 编程助手。如果你还没有安装过，请按以下步骤操作：</p>
+        <p><a href="https://www.codebuddy.ai/docs/cli/overview" target="_blank" rel="noopener">CodeBuddy Code</a> 是运行在终端中的 AI 编程助手。若尚未安装，请按以下步骤操作：</p>
         <div class="step">
             <p><span class="step-number">第 1 步</span> &mdash; 打开终端，运行以下安装命令：</p>
             <pre><code>npm install -g @tencent-ai/codebuddy-code</code></pre>
@@ -248,7 +247,7 @@ curl -fsSL https://copilot.tencent.com/cli/install.sh | bash</code></pre>
         </div>
 
         <h3 id="install-skills">3. 安装 PAGX Skills</h3>
-        <p>下载上方的 Skills 安装包后，将其解压并安装到你的项目中：</p>
+        <p>下载上方 Skills 安装包后，按以下步骤安装到项目目录：</p>
         <div class="step">
             <p><span class="step-number">第 1 步</span> &mdash; 打开终端，进入你的项目文件夹（即你想要创建 PAGX 文件的目录）：</p>
             <pre><code>cd /path/to/your/project</code></pre>
@@ -282,7 +281,7 @@ curl -fsSL https://copilot.tencent.com/cli/install.sh | bash</code></pre>
         </div>
 
         <h3 id="other-tools">在其他 AI 编程工具中使用</h3>
-        <p>以上指南以 CodeBuddy Code 为例，但 PAGX Skills 是一套遵循开放规范的结构化参考文档，不绑定任何特定工具。如果你使用其他支持 Skills（或类似机制）的 AI 编程助手，只需要：</p>
+        <p>上面的步骤以 CodeBuddy Code 为例。PAGX Skills 本身遵循开放约定，不绑定特定工具。若你使用其他支持 Skills（或类似机制）的 AI 助手，通常只需完成以下两件事：</p>
         <ol>
             <li><strong>确保系统已安装 Node.js</strong>（参见上方第 1 步）&mdash;
             这是 Skills 依赖的 <code>pagx-cli</code> 工具运行所必需的。</li>
@@ -292,7 +291,7 @@ curl -fsSL https://copilot.tencent.com/cli/install.sh | bash</code></pre>
 
         <!-- Getting Started -->
         <h2 id="getting-started">开始使用</h2>
-        <p>Skills 安装完成后，你可以用自然语言与 AI 交互。以下是一些常见的操作示例：</p>
+        <p>安装完成后，可直接用自然语言驱动 AI。下面按“创建→迭代→验证”给出常见示例：</p>
 
         <h3 id="creating">创建 PAGX 文件</h3>
         <ul>
@@ -322,8 +321,8 @@ curl -fsSL https://copilot.tencent.com/cli/install.sh | bash</code></pre>
         <p>你也可以通过 <a href="../../">PAGX Playground</a> 在线预览 PAGX 文件 &mdash; 只需将任意 <code>.pagx</code> 文件拖放到页面上，即可在浏览器中查看渲染效果。</p>
 
         <h3 id="tips">使用建议</h3>
-        <p><strong>多轮迭代，逐步趋近完美。</strong>不要期望一次就得到完美结果，而是把这个过程当作一场对话：描述你想要的效果，预览渲染输出，然后告诉 AI 哪里需要调整。每一轮反馈产生的都是精确修改 &mdash; 而不是概率性的重新抽卡 &mdash; 所以你会稳步逼近理想结果。这个多轮迭代过程可以完全交给 AI 自动完成，也可以在任何环节让人介入，提供关键的审美判断和解构思路指导。这种通过自然语言驱动、支持多轮迭代的精确修改能力，正是这套工作流程的核心价值所在。</p>
-        <p><strong>以创作为主，而非临摹。</strong>如果你提供位图作为参考，AI 会将其作为灵感来源进行全新的矢量创作，而不是逐像素描摹。精确复现位图并非当前任何 AI 大模型的强项：位图本质上是一个基于概率的"感觉"，而矢量图则是一个有唯一解的精确结构描述。从概率分布中求解唯一解，从原理上与大语言模型的能力方向并不契合。用参考图来传达风格和概念即可，让 AI 去创作一个干净的矢量演绎。</p>
+        <p><strong>先定目标，再做小步迭代。</strong>先描述目标效果，再看渲染结果，最后只反馈需要改动的局部。由于每轮都是可定位、可验证的精确修改（而不是概率重试），结果会更快收敛，也更容易稳定复用。</p>
+        <p><strong>参考位图，用于“定风格”而非“做临摹”。</strong>位图适合传达氛围与构图，不适合逐像素复刻。更有效的做法是让 AI 依据参考图重建为结构清晰的矢量表达，再通过局部参数持续打磨到可用版本。</p>
 
     </main>
 
