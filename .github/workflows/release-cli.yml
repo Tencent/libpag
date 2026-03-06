@@ -34,26 +34,11 @@ jobs:
           depsync
         shell: bash
 
-      - name: Install LibXml2 via vcpkg (static)
-        run: |
-          vcpkg install libxml2:arm64-osx
-          vcpkg install libxml2:x64-osx
-
       - name: Build pagx (arm64)
-        run: >
-          node build_pag pagx-cli -a arm64 -i
-          -DPAG_BUILD_CLI=ON
-          -DPAG_BUILD_SHARED=OFF
-          -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-          -DVCPKG_TARGET_TRIPLET=arm64-osx
+        run: node build_pag pagx-cli -a arm64 -i -DPAG_BUILD_CLI=ON -DPAG_BUILD_SHARED=OFF
 
       - name: Build pagx (x64)
-        run: >
-          node build_pag pagx-cli -a x64 -i
-          -DPAG_BUILD_CLI=ON
-          -DPAG_BUILD_SHARED=OFF
-          -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-          -DVCPKG_TARGET_TRIPLET=x64-osx
+        run: node build_pag pagx-cli -a x64 -i -DPAG_BUILD_CLI=ON -DPAG_BUILD_SHARED=OFF
 
       - name: Create Universal Binary
         run: |
