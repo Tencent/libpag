@@ -2,6 +2,12 @@ name: Release CLI
 
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish to npm and create GitHub release'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   build-macos:
@@ -28,11 +34,26 @@ jobs:
           depsync
         shell: bash
 
+      - name: Install LibXml2 via vcpkg (static)
+        run: |
+          vcpkg install libxml2:arm64-osx
+          vcpkg install libxml2:x64-osx
+
       - name: Build pagx (arm64)
-        run: node build_pag pagx-cli -a arm64 -i -DPAG_BUILD_CLI=ON -DPAG_BUILD_SHARED=OFF
+        run: >
+          node build_pag pagx-cli -a arm64 -i
+          -DPAG_BUILD_CLI=ON
+          -DPAG_BUILD_SHARED=OFF
+          -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+          -DVCPKG_TARGET_TRIPLET=arm64-osx
 
       - name: Build pagx (x64)
-        run: node build_pag pagx-cli -a x64 -i -DPAG_BUILD_CLI=ON -DPAG_BUILD_SHARED=OFF
+        run: >
+          node build_pag pagx-cli -a x64 -i
+          -DPAG_BUILD_CLI=ON
+          -DPAG_BUILD_SHARED=OFF
+          -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+          -DVCPKG_TARGET_TRIPLET=x64-osx
 
       - name: Create Universal Binary
         run: |
@@ -78,11 +99,19 @@ jobs:
       - name: Install system dependencies
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: libxml2-dev libfontconfig1-dev libgles2-mesa-dev libegl1-mesa-dev
+          packages: libfontconfig1-dev libgles2-mesa-dev libegl1-mesa-dev
           version: 1.1
 
+      - name: Install LibXml2 via vcpkg (static)
+        run: vcpkg install libxml2:x64-linux
+
       - name: Build pagx
-        run: node build_pag pagx-cli -a x64 -i -DPAG_BUILD_CLI=ON -DPAG_BUILD_SHARED=OFF
+        run: >
+          node build_pag pagx-cli -a x64 -i
+          -DPAG_BUILD_CLI=ON
+          -DPAG_BUILD_SHARED=OFF
+          -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+          -DVCPKG_TARGET_TRIPLET=x64-linux
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -123,8 +152,8 @@ jobs:
           depsync
         shell: bash
 
-      - name: Install LibXml2 via vcpkg
-        run: vcpkg install libxml2:x64-windows
+      - name: Install LibXml2 via vcpkg (static)
+        run: vcpkg install libxml2:x64-windows-static
 
       - name: Build pagx
         run: >
@@ -132,6 +161,8 @@ jobs:
           -DPAG_BUILD_CLI=ON
           -DPAG_BUILD_SHARED=OFF
           -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+          -DVCPKG_TARGET_TRIPLET=x64-windows-static
+          -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
         shell: pwsh
 
       - name: Upload artifact
@@ -149,6 +180,7 @@ jobs:
 
   publish:
     needs: [build-macos, build-linux, build-windows]
+    if: ${{ inputs.publish }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
