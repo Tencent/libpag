@@ -203,17 +203,12 @@
     <main class="content">
         <!-- About -->
         <h2 id="about">简介</h2>
-        <p>PAGX AI Skills 是面向 AI 编程助手的专业技能扩展包。安装后，AI Agent 可以根据文字描述生成结构简洁的 PAGX 矢量图形，优化现有文件的大小与渲染性能，并在需要时查询 PAGX 语法、属性和命令行工具用法。</p>
-        <p>当前主流的 AI 出图工具（如 Stable Diffusion、DALL-E）主要都是围绕像素生成位图，本质上是从概率分布中采样结果。若某个细节不理想，通常只能整张重试，很难只改动单一局部。</p>
-        <p>PAGX 是专门为 AI 优化的矢量图格式，AI 输出的是结构化标记而不是像素采样。文件中的元素都带有明确、可编辑的参数，因此你可以用自然语言指定局部改动，例如颜色、尺寸、位置和间距，并且不影响其他部分。这种“可精确二次编辑”的能力，是 AI 矢量工作流的核心优势。</p>
-        <p>这也决定了工作方式：围绕“目标描述 → 渲染验证 → 定点修改”进行多轮迭代。AI 负责高频执行，人工在关键轮次提供审美与结构方向，结果会逐步逼近上线质量。</p>
-        <p>PAGX 最初为动效描述而设计，动效能力建立在矢量静态图基础上。当前阶段重点仍是夯实静态能力；后续动效模块完善后，AI 可在同一套元素结构上继续生成更复杂的动画效果。</p>
+        <p>PAGX AI Skills 是面向 AI 编程助手的专业技能扩展包。安装后，AI Agent 可以根据文字描述生成结构化的 PAGX 矢量图形，优化文件体积与渲染性能，并在需要时查询 PAGX 语法、属性和命令行工具用法。</p>
+        <p>与主流位图生成工具不同，PAGX 输出的是结构化标记而不是像素采样。位图结果更偏概率“感觉”，局部偏差常常需要整图重试；而 PAGX 中每个元素都有明确参数，可对颜色、尺寸、位置、间距等属性进行定点修改，不影响其他部分。</p>
+        <p>PAGX 最初为动效描述而设计，动效能力建立在静态矢量基础之上。当前阶段重点是打磨静态能力；后续会在同一套元素结构上持续完善动效能力，扩展到更完整的动画生产流程。</p>
 
         <!-- Installation -->
         <h2 id="installation">安装指南</h2>
-        <div class="info-box">
-        <p>PAGX Skills 目前主要在 <strong>CodeBuddy Code</strong> + <strong>Claude Opus</strong> 模型上完成测试。使用其他工具或模型时效果可能有所不同。</p>
-        </div>
 
         <h3 id="install-nodejs">1. 安装 Node.js</h3>
         <p>Skills 安装包包含命令行工具 <a href="https://www.npmjs.com/package/@libpag/pagx" target="_blank" rel="noopener"><code>@libpag/pagx</code></a>，运行依赖 Node.js。若本机尚未安装，请先完成以下步骤：</p>
@@ -265,7 +260,11 @@
 
         <!-- Getting Started -->
         <h2 id="getting-started">开始使用</h2>
-        <p>安装完成后，可直接用自然语言驱动 AI。下面按“创建→迭代→验证”给出常见示例：</p>
+        <div class="info-box">
+        <p>PAGX Skills 目前主要在 <strong>CodeBuddy Code</strong> + <strong>Claude Opus 4.6</strong> 模型上完成测试。使用其他工具或模型时效果可能有所不同。</p>
+        </div>
+
+        <p>安装完成后，可直接用自然语言驱动 AI。下面按"创建→迭代→验证"给出常见示例：</p>
 
         <h3 id="creating">创建 PAGX 文件</h3>
         <p>首次创建时，请在提示中包含 <strong>"PAGX"</strong> 关键词，以便 AI 激活 PAGX 技能。激活后，同一对话中的后续消息无需再重复该关键词。</p>

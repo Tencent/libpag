@@ -204,32 +204,26 @@
         <!-- About -->
         <h2 id="about">About</h2>
         <p>
-            PAGX AI Skills is a skills package for AI coding assistants. After installation, the
-            assistant can generate PAGX vector graphics from prompts, apply precise edits to existing
-            files, and run validation, rendering, and size optimization.
+            PAGX AI Skills is a professional skills extension for AI coding assistants. After
+            installation, an AI agent can generate structured PAGX vector graphics from text prompts,
+            optimize file size and rendering performance, and look up PAGX syntax, attributes, and
+            CLI usage when needed.
         </p>
         <p>
-            Why PAGX first: most image generators produce bitmaps. When one detail is off, you often
-            have to regenerate the whole output. PAGX works differently &mdash; the AI outputs structured
-            markup, where each element is represented by explicit editable parameters.
+            Unlike mainstream bitmap generators, PAGX outputs structured markup instead of sampled
+            pixels. Bitmap outputs are probabilistic "impressions," so local mistakes often require
+            regenerating the whole image. In PAGX, each element has explicit editable parameters,
+            allowing targeted updates to color, size, position, and spacing without changing
+            unrelated parts.
         </p>
         <p>
-            This changes the iteration model. You can define a target, preview the result, then adjust
-            only local properties such as color, size, position, or spacing. Because updates are
-            targeted edits instead of full re-rolls, multi-round collaboration is more stable and
-            predictable.
-        </p>
-        <p>
-            The current PAGX focus is static vector graphics. Motion capabilities are being expanded,
-            so the same element structure can later extend into animation workflows.
+            PAGX was originally designed for motion description, built on top of static vector
+            foundations. The current focus is to strengthen static capabilities; motion capabilities
+            will continue to expand on the same element structure for broader animation workflows.
         </p>
 
         <!-- Installation -->
         <h2 id="installation">Installation Guide</h2>
-        <div class="info-box">
-            <p>PAGX Skills has been tested primarily with <strong>CodeBuddy Code</strong> and the
-            <strong>Claude Opus</strong> model. Other tools and models may produce different results.</p>
-        </div>
 
         <h3 id="install-nodejs">1. Install Node.js</h3>
         <p>
@@ -299,6 +293,11 @@
 
         <!-- Getting Started -->
         <h2 id="getting-started">Getting Started</h2>
+        <div class="info-box">
+            <p>PAGX Skills has been tested primarily with <strong>CodeBuddy Code</strong> and the
+            <strong>Claude Opus 4.6</strong> model. Other tools and models may produce different results.</p>
+        </div>
+
         <p>
             Once installed, you can drive the AI with natural language. The examples below follow a
             simple sequence: create, iterate, then validate.
