@@ -204,16 +204,16 @@
         <!-- About -->
         <h2 id="about">简介</h2>
         <p>PAGX AI Skills 是面向 AI 编程助手的专业技能扩展包。安装后，AI Agent 可以根据文字描述生成结构简洁的 PAGX 矢量图形，优化现有文件的大小与渲染性能，并在需要时查询 PAGX 语法、属性和命令行工具用法。</p>
-        <p>先看传统路径。当前主流的 AI 出图工具（如 Stable Diffusion、DALL-E）主要生成位图，本质上是从概率分布中采样结果。若某个细节不理想，通常只能整张重试，很难只改动单一局部。</p>
-        <p>PAGX 的路径不同：AI 输出的是结构化标记而不是像素采样。文件中的元素都带有明确、可编辑的参数，因此你可以用自然语言指定局部改动，例如颜色、尺寸、位置和间距，并且不影响其他部分。这种“可精确二次编辑”的能力，是矢量工作流的核心优势。</p>
-        <p>在这个流程中，你可以选择全自动迭代，也可以在关键节点加入人工审美和结构判断。通过多轮“小步修改 + 渲染校验”，结果会稳定收敛。随着模型能力提升，实现同等效果所需的提示也会逐步减少。</p>
+        <p>当前主流的 AI 出图工具（如 Stable Diffusion、DALL-E）主要都是围绕像素生成位图，本质上是从概率分布中采样结果。若某个细节不理想，通常只能整张重试，很难只改动单一局部。</p>
+        <p>PAGX 是专门为 AI 优化的矢量图格式，AI 输出的是结构化标记而不是像素采样。文件中的元素都带有明确、可编辑的参数，因此你可以用自然语言指定局部改动，例如颜色、尺寸、位置和间距，并且不影响其他部分。这种“可精确二次编辑”的能力，是 AI 矢量工作流的核心优势。</p>
+        <p>这也决定了工作方式：围绕“目标描述 → 渲染验证 → 定点修改”进行多轮迭代。AI 负责高频执行，人工在关键轮次提供审美与结构方向，结果会逐步逼近上线质量。</p>
         <p>PAGX 最初为动效描述而设计，动效能力建立在矢量静态图基础上。当前阶段重点仍是夯实静态能力；后续动效模块完善后，AI 可在同一套元素结构上继续生成更复杂的动画效果。</p>
 
         <!-- Installation -->
         <h2 id="installation">安装指南</h2>
 
         <h3 id="install-nodejs">1. 安装 Node.js</h3>
-        <p>Skills 安装包包含命令行工具 <code>pagx</code>，运行依赖 Node.js。若本机尚未安装，请先完成以下步骤：</p>
+        <p>Skills 安装包包含命令行工具 <a href="https://www.npmjs.com/package/@libpag/pagx" target="_blank" rel="noopener"><code>@libpag/pagx</code></a>，运行依赖 Node.js。若本机尚未安装，请先完成以下步骤：</p>
         <div class="step">
             <p><span class="step-number">第 1 步</span> &mdash; 访问 <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a>，下载适用于你操作系统的 <strong>LTS</strong>（长期支持）版本。</p>
         </div>
@@ -223,7 +223,7 @@
         <div class="step">
             <p><span class="step-number">第 3 步</span> &mdash; 验证安装是否成功。打开终端（macOS 上的"终端"应用，Windows 上的"命令提示符"或"PowerShell"），输入以下命令：</p>
             <pre><code>node --version</code></pre>
-            <p>正常情况下会显示类似 <code>v22.x.x</code> 的版本号。版本需要 18 或更高。</p>
+            <p>正常情况下会显示类似 <code>v22.x.x</code> 的版本号。</p>
         </div>
 
         <h3 id="install-codebuddy">2. 安装 AI 编程助手</h3>
@@ -257,7 +257,7 @@
         ...</code></pre>
         <p>如果 <code>.codebuddy/skills/</code> 文件夹尚不存在，手动创建即可。然后在任意项目目录下启动 CodeBuddy Code，PAGX Skills 会被自动识别并加载。</p>
         <div class="info-box">
-            <p><code>pagx</code> 命令行工具会在 AI 助手首次需要时自动安装，这依赖于第 1 步中搭建的 Node.js 环境。</p>
+            <p><a href="https://www.npmjs.com/package/@libpag/pagx" target="_blank" rel="noopener"><code>@libpag/pagx</code></a> 命令行工具会在 AI 助手首次需要时自动安装，这依赖于第 1 步中搭建的 Node.js 环境。</p>
         </div>
         <div class="info-box">
         <p>PAGX Skills 目前主要在 <strong>CodeBuddy Code</strong> + <strong>Claude Opus</strong> 模型上完成测试。使用其他工具或模型时效果可能有所不同。</p>
@@ -297,7 +297,7 @@
 
         <h3 id="tips">使用建议</h3>
         <p><strong>多轮迭代，稳定收敛到上线质量。</strong>这套流程的核心是：只要迭代次数足够多，结果理论上就能持续逼近上线标准。每一轮都围绕“明确目标 → 渲染验证 → 定点修改”推进；其中一部分可由 AI 自动完成，另一部分由人工在关键轮次提供审美与结构方向。随着大模型、Skills 和配套工具持续进步，人工参与的轮次会逐步减少，指令也会更简洁。</p>
-        <p><strong>以创作为主，不以临摹为目标。</strong>当你提供位图参考时，建议把它用于传达风格、氛围和构图方向，而不是要求逐像素复刻。原因在于位图生成更偏概率采样，而矢量结果要求明确结构解，两者的求解方式并不相同。实践中，更可靠的流程是先让 AI 产出结构正确的矢量版本，再通过局部参数持续打磨细节。</p>
+        <p><strong>以创作为主，不以临摹为目标。</strong>当你提供位图参考时，建议把它用于传达风格、氛围和构图方向，而不是要求逐像素复刻。位图生成本质上是概率采样，输出更接近“感觉”；而矢量结果是参数明确、接近唯一解的结构表达。从概率分布中直接还原唯一结构，并不符合当前大模型的能力优势。实践中，更可靠的流程是先让 AI 产出结构正确的矢量版本，再通过局部参数持续打磨细节。</p>
 
     </main>
 
