@@ -244,7 +244,6 @@ function generateHtml(content, title, tocHtml, lang, langSwitchUrl, viewerUrl, f
     viewerUrl,
     tocTitle: isEnglish ? 'Table of Contents' : '目录',
     tocLabel: isEnglish ? 'TOC' : '目录',
-    viewerLabel: 'Playground',
     currentLang: isEnglish ? 'English' : '简体中文',
     enUrl: isEnglish ? '#' : langSwitchUrl,
     zhUrl: isEnglish ? langSwitchUrl : '#',
