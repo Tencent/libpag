@@ -244,7 +244,7 @@ function generateHtml(content, title, tocHtml, lang, langSwitchUrl, viewerUrl, f
     viewerUrl,
     tocTitle: isEnglish ? 'Table of Contents' : '目录',
     tocLabel: isEnglish ? 'TOC' : '目录',
-    previewLabel: isEnglish ? 'Preview' : '预览',
+    previewLabel: isEnglish ? 'Preview' : '在线预览',
     currentLang: isEnglish ? 'English' : '简体中文',
     enUrl: isEnglish ? '#' : langSwitchUrl,
     zhUrl: isEnglish ? langSwitchUrl : '#',

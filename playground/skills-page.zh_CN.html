@@ -117,7 +117,9 @@
         .header-btn {
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 6px;
+            min-width: 108px;
             padding: 8px 14px;
             background: rgba(255,255,255,0.85);
             backdrop-filter: blur(8px);
@@ -173,9 +175,9 @@
 </head>
 <body>
     <div class="header-actions">
-        <a href="../../" class="header-btn" title="预览">
+        <a href="../../" class="header-btn" title="在线预览">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-            <span>预览</span>
+            <span>在线预览</span>
         </a>
         <div class="lang-switch" onclick="this.classList.toggle('open')">
             <button class="header-btn">
