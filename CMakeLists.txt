@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.13)
 project(PAG)
 
+# Enable CMAKE_MSVC_RUNTIME_LIBRARY support (CMake 3.15+)
+if (POLICY CMP0091)
+    cmake_policy(SET CMP0091 NEW)
+endif ()
+
 if (APPLE)
     enable_language(OBJC OBJCXX)
 endif ()
