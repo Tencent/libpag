@@ -87,16 +87,8 @@ jobs:
           packages: libfontconfig1-dev libgles2-mesa-dev libegl1-mesa-dev
           version: 1.1
 
-      - name: Install LibXml2 via vcpkg (static)
-        run: vcpkg install libxml2:x64-linux
-
       - name: Build pagx
-        run: >
-          node build_pag pagx-cli -a x64 -i
-          -DPAG_BUILD_CLI=ON
-          -DPAG_BUILD_SHARED=OFF
-          -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-          -DVCPKG_TARGET_TRIPLET=x64-linux
+        run: node build_pag pagx-cli -a x64 -i -DPAG_BUILD_CLI=ON -DPAG_BUILD_SHARED=OFF
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -137,17 +129,8 @@ jobs:
           depsync
         shell: bash
 
-      - name: Install LibXml2 via vcpkg (static)
-        run: vcpkg install libxml2:x64-windows-static
-
       - name: Build pagx
-        run: >
-          node build_pag pagx-cli -a x64 -i
-          -DPAG_BUILD_CLI=ON
-          -DPAG_BUILD_SHARED=OFF
-          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-          -DVCPKG_TARGET_TRIPLET=x64-windows-static
-        shell: pwsh
+        run: node build_pag pagx-cli -a x64 -i -DPAG_BUILD_CLI=ON -DPAG_BUILD_SHARED=OFF
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

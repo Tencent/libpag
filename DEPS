@@ -44,6 +44,11 @@
         "url": "https://github.com/Tehreer/SheenBidi.git",
         "commit": "cfe430e7375a7845b679adae9d51dac6deaa8858",
         "dir": "third_party/SheenBidi"
+      },
+      {
+        "url": "https://github.com/GNOME/libxml2.git",
+        "commit": "3d840e17858de03a09fba8b202e3a89267d5795a",
+        "dir": "third_party/libxml2"
       }
     ]
   },

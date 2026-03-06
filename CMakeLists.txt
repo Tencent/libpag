@@ -746,27 +746,20 @@ if (PAG_BUILD_CLI)
             "}\n"
             "}  // namespace pagx::cli\n")
 
-    # Find LibXml2
-    if (APPLE)
-        execute_process(
-                COMMAND xcrun --show-sdk-path
-                OUTPUT_VARIABLE _MACOS_SDK_PATH
-                OUTPUT_STRIP_TRAILING_WHITESPACE
-        )
-        set(LIBXML2_INCLUDE_DIR "${_MACOS_SDK_PATH}/usr/include/libxml2" CACHE PATH "" FORCE)
-        set(LIBXML2_LIBRARY "${_MACOS_SDK_PATH}/usr/lib/libxml2.tbd" CACHE FILEPATH "" FORCE)
-    endif ()
-    find_package(LibXml2 REQUIRED)
+    # Build libxml2 via vendor system
+    add_vendor_target(cli-vendor STATIC_VENDORS libxml2)
+    find_vendor_libraries(cli-vendor STATIC CLI_VENDOR_LIBRARIES)
 
     # CLI executable
     file(GLOB_RECURSE CLI_FILES src/cli/*.cpp src/cli/*.h)
     add_executable(pagx-cli ${CLI_FILES})
+    add_dependencies(pagx-cli cli-vendor)
     set_target_properties(pagx-cli PROPERTIES OUTPUT_NAME pagx)
     target_include_directories(pagx-cli PRIVATE
             src/cli
             ${PAG_INCLUDES}
             ${CMAKE_CURRENT_BINARY_DIR}/generated
-            ${LIBXML2_INCLUDE_DIR})
+            third_party/out/libxml2/${INCLUDE_ENTRY})
     target_compile_options(pagx-cli PRIVATE ${PAG_COMPILE_OPTIONS})
     target_compile_definitions(pagx-cli PRIVATE PAGX_CLI_VERSION="${PAGX_CLI_VERSION}")
     set(CLI_EXTRA_LIBS)
@@ -774,7 +767,7 @@ if (PAG_BUILD_CLI)
         find_package(Fontconfig REQUIRED)
         list(APPEND CLI_EXTRA_LIBS Fontconfig::Fontconfig)
     endif ()
-    target_link_libraries(pagx-cli pag ${PAG_SHARED_LIBS} LibXml2::LibXml2 ${CLI_EXTRA_LIBS})
+    target_link_libraries(pagx-cli pag ${PAG_SHARED_LIBS} ${CLI_VENDOR_LIBRARIES} ${CLI_EXTRA_LIBS})
 endif ()
 
 if (PAG_BUILD_TESTS)
