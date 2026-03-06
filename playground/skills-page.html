@@ -25,7 +25,7 @@
             padding: 0;
         }
 
-        /* Hero download section */
+        /* Hero download section — full width, above sidebar */
         .hero {
             background: linear-gradient(135deg, #f0f7ff 0%, #e8f0fe 100%);
             border-bottom: 1px solid #c8ddf5;
@@ -53,12 +53,12 @@
         .download-meta { margin-top: 14px; font-size: 13px; color: #586069; }
         .download-meta span { margin: 0 6px; }
 
-        /* Sidebar */
+        /* Sidebar — starts below hero */
         .sidebar {
             width: var(--toc-width);
             position: fixed;
             top: 0;
-            left: max(0px, calc((100vw - 1200px) / 2));
+            left: 0;
             height: 100vh;
             overflow-y: auto;
             padding: 20px 16px;
@@ -85,10 +85,8 @@
         .sidebar ul ul a { font-size: 12px; color: #777; }
         .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 99; }
 
-        /* Layout */
-        .page-body {
-            margin-left: var(--toc-width);
-        }
+        /* Layout — content offset by sidebar width */
+        .doc-body { margin-left: var(--toc-width); }
         .content {
             max-width: 800px;
             margin: 0 auto;
@@ -234,7 +232,7 @@
             .sidebar-close { display: block; }
             .sidebar-overlay.open { display: block; z-index: 1000; }
             .sidebar-toggle { display: block; }
-            .page-body { margin-left: 0; }
+            .doc-body { margin-left: 0; }
             .content { padding: 8px 16px 60px; }
             .hero { padding: 48px 16px 36px; }
             .hero h1 { font-size: 1.5em; }
@@ -290,11 +288,6 @@
                         <li><a href="#modifying">Modifying and Iterating</a></li>
                         <li><a href="#rendering">Rendering and Inspection</a></li>
                         <li><a href="#preview">Online Preview</a></li>
-                    </ul>
-                </li>
-                <li>
-                    <a href="#why-vector">Why Vector Generation</a>
-                    <ul>
                         <li><a href="#tips">Tips for Best Results</a></li>
                     </ul>
                 </li>
@@ -304,8 +297,8 @@
     </nav>
     <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
 
-    <!-- Hero download -->
-    <div class="page-body">
+    <!-- Hero download — full width, not affected by sidebar -->
+    <div class="doc-body">
         <div class="hero">
             <h1>PAGX AI Skills</h1>
             <p class="subtitle">Give your AI coding assistant the ability to create and optimize PAGX vector graphics.</p>
@@ -327,8 +320,13 @@
             <p>
                 Under the hood, vector generation is essentially an AI coding process &mdash; the model
                 writes structured markup rather than sampling pixels. This means the quality of output
-                improves naturally as AI coding models advance. Over time, less detailed prompting and
-                fewer manual iteration rounds will be needed to achieve the same results.
+                improves naturally as AI coding models advance, and less detailed prompting will be needed
+                over time to achieve the same results. Unlike bitmap-based generation (such as Stable
+                Diffusion or DALL-E), which samples from a probability distribution with no way to precisely
+                modify the output, PAGX produces structured files where every element has exact, editable
+                values. If something isn't right, you simply describe the change and the AI adjusts that
+                specific part &mdash; colors, sizes, positions, spacing &mdash; without affecting anything
+                else. With enough iterations, the output can reliably reach production quality.
             </p>
             <p>
                 PAGX was originally designed to describe motion graphics &mdash; animations built on top
@@ -481,25 +479,6 @@ curl -fsSL https://copilot.tencent.com/cli/install.sh | bash</code></pre>
                 You can also preview PAGX files visually using the
                 <a href="../">PAGX Playground</a> &mdash; simply drag and drop any
                 <code>.pagx</code> file onto the page to see the rendered result in your browser.
-            </p>
-
-            <h2 id="why-vector">Why Vector Generation Matters</h2>
-            <p>
-                Bitmap-based image generation (such as Stable Diffusion or DALL-E) works by sampling
-                from a probability distribution &mdash; essentially drawing a lottery ticket each time.
-                The result is never fully controllable: you might generate dozens of images, each with
-                minor imperfections that prevent production use. More critically, there is no way to
-                precisely modify just one part of a bitmap output. Need the button 2 pixels wider?
-                The shadow slightly softer? You have to regenerate the entire image and hope for the best.
-                This inherent unpredictability limits bitmap generation largely to early-stage creative
-                exploration.
-            </p>
-            <p>
-                Vector generation solves this fundamental problem. Because PAGX is a structured format
-                with precise, editable values, every element can be modified exactly. If something isn't
-                right, you simply describe the change and the AI adjusts that specific part &mdash;
-                colors, sizes, positions, spacing &mdash; without affecting anything else. With enough
-                iterations, the output can reliably reach production quality.
             </p>
 
             <h3 id="tips">Tips for Best Results</h3>

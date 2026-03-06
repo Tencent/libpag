@@ -25,7 +25,7 @@
             padding: 0;
         }
 
-        /* Hero download section */
+        /* Hero download section — full width, above sidebar */
         .hero {
             background: linear-gradient(135deg, #f0f7ff 0%, #e8f0fe 100%);
             border-bottom: 1px solid #c8ddf5;
@@ -53,12 +53,12 @@
         .download-meta { margin-top: 14px; font-size: 13px; color: #586069; }
         .download-meta span { margin: 0 6px; }
 
-        /* Sidebar */
+        /* Sidebar — starts below hero */
         .sidebar {
             width: var(--toc-width);
             position: fixed;
             top: 0;
-            left: max(0px, calc((100vw - 1200px) / 2));
+            left: 0;
             height: 100vh;
             overflow-y: auto;
             padding: 20px 16px;
@@ -85,10 +85,8 @@
         .sidebar ul ul a { font-size: 12px; color: #777; }
         .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 99; }
 
-        /* Layout */
-        .page-body {
-            margin-left: var(--toc-width);
-        }
+        /* Layout — content offset by sidebar width */
+        .doc-body { margin-left: var(--toc-width); }
         .content {
             max-width: 800px;
             margin: 0 auto;
@@ -234,7 +232,7 @@
             .sidebar-close { display: block; }
             .sidebar-overlay.open { display: block; z-index: 1000; }
             .sidebar-toggle { display: block; }
-            .page-body { margin-left: 0; }
+            .doc-body { margin-left: 0; }
             .content { padding: 8px 16px 60px; }
             .hero { padding: 48px 16px 36px; }
             .hero h1 { font-size: 1.5em; }
@@ -290,11 +288,6 @@
                         <li><a href="#modifying">修改与迭代</a></li>
                         <li><a href="#rendering">渲染与检查</a></li>
                         <li><a href="#preview">在线预览</a></li>
-                    </ul>
-                </li>
-                <li>
-                    <a href="#why-vector">为什么矢量生成很重要</a>
-                    <ul>
                         <li><a href="#tips">使用建议</a></li>
                     </ul>
                 </li>
@@ -304,8 +297,8 @@
     </nav>
     <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
 
-    <!-- Hero download -->
-    <div class="page-body">
+    <!-- Hero download — full width, not affected by sidebar -->
+    <div class="doc-body">
         <div class="hero">
             <h1>PAGX AI Skills</h1>
             <p class="subtitle">让你的 AI 编程助手具备创建和优化 PAGX 矢量图形的能力。</p>
@@ -325,8 +318,12 @@
             </p>
             <p>
                 矢量图生成的本质是一个 AI 编程过程 &mdash; 模型编写的是结构化标记语言，而非采样像素。
-                这意味着输出质量会随着 AI 编程大模型能力的持续提升而自然提高。随着时间推移，
-                达到同样效果所需的提示详细程度和人工多轮迭代次数都会逐渐降低。
+                这意味着输出质量会随着 AI 编程大模型能力的持续提升而自然提高，达到同样效果所需的
+                提示详细程度和人工迭代次数都会逐渐降低。与位图生成（如 Stable Diffusion、DALL-E）
+                从概率分布中抽样、无法精确修改输出不同，PAGX 产出的是结构化文件，每个元素都有精确
+                可编辑的值。哪里不对，只需描述一下改动，AI 就会精确调整那个具体的部分 &mdash;
+                颜色、尺寸、位置、间距 &mdash; 而不影响其他任何东西。只要迭代次数足够，
+                输出就几乎一定可以达到上线标准。
             </p>
             <p>
                 PAGX 格式最初就是为描述动效而设计的 &mdash; 动效是在矢量静态图基础上的扩展。
@@ -470,21 +467,6 @@ curl -fsSL https://copilot.tencent.com/cli/install.sh | bash</code></pre>
             <p>
                 你也可以通过 <a href="../../">PAGX Playground</a> 在线预览 PAGX 文件
                 &mdash; 只需将任意 <code>.pagx</code> 文件拖放到页面上，即可在浏览器中查看渲染效果。
-            </p>
-
-            <h2 id="why-vector">为什么矢量生成很重要</h2>
-            <p>
-                基于位图像素的图片生成（如 Stable Diffusion、DALL-E 等）本质上是从概率分布中抽样
-                &mdash; 相当于每次抽卡。结果永远不是完全可控的：你可能生成几十张图，每张都差一点点
-                无法上线。更关键的是，位图输出无法精确地局部修改。需要按钮宽 2 像素？阴影再柔和一点？
-                只能重新生成整张图，然后祈祷好运。这种内在的不可控性，让位图生成基本只能局限于前期
-                创意探索环节使用。
-            </p>
-            <p>
-                矢量生成从根本上解决了这个问题。因为 PAGX 是一种结构化格式，每个元素都有精确可编辑的值，
-                所以任何部分都可以被精准修改。哪里不对，只需描述一下改动，AI 就会精确调整那个具体的部分
-                &mdash; 颜色、尺寸、位置、间距 &mdash; 而不影响其他任何东西。只要迭代次数足够，
-                输出就几乎一定可以达到上线标准。
             </p>
 
             <h3 id="tips">使用建议</h3>
