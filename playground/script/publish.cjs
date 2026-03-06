@@ -116,6 +116,32 @@ function copyDir(src, dest) {
 }
 
 /**
+ * Strip the last-updated date from a skills HTML string so that two versions
+ * can be compared ignoring the timestamp alone.
+ */
+function stripDate(html) {
+  return html.replace(/Last updated: .+?</, 'Last updated: <')
+             .replace(/最后更新：.+?</, '最后更新：<');
+}
+
+/**
+ * Write a skills HTML file only when content (ignoring timestamp) has changed.
+ * If the existing file has identical content, the old timestamp is preserved.
+ */
+function writeIfChanged(outputPath, newHtml) {
+  if (fs.existsSync(outputPath)) {
+    const oldHtml = fs.readFileSync(outputPath, 'utf-8');
+    if (stripDate(oldHtml) === stripDate(newHtml)) {
+      console.log(`  Unchanged: ${outputPath}`);
+      return;
+    }
+  }
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, newHtml, 'utf-8');
+  console.log(`  Published: ${outputPath}`);
+}
+
+/**
  * Publish skills as static files, zip archives, and documentation pages.
  * Each named skill is copied to <outputDir>/skills/<name>/ and packaged as
  * <outputDir>/skills/<name>.zip (without the outer directory).
@@ -156,9 +182,7 @@ function publishSkills(outputDir, names) {
   );
   const enHtml = enTemplate.replace('{{lastUpdated}}', formatDateEn(now));
   const enOutput = path.join(skillsOutputDir, 'index.html');
-  fs.mkdirSync(skillsOutputDir, { recursive: true });
-  fs.writeFileSync(enOutput, enHtml, 'utf-8');
-  console.log(`  Published: ${enOutput}`);
+  writeIfChanged(enOutput, enHtml);
 
   const zhTemplate = fs.readFileSync(
     path.join(PLAYGROUND_DIR, 'skills-page.zh_CN.html'), 'utf-8'
@@ -166,9 +190,7 @@ function publishSkills(outputDir, names) {
   const zhHtml = zhTemplate.replace('{{lastUpdated}}', formatDateZh(now));
   const zhDir = path.join(skillsOutputDir, 'zh');
   const zhOutput = path.join(zhDir, 'index.html');
-  fs.mkdirSync(zhDir, { recursive: true });
-  fs.writeFileSync(zhOutput, zhHtml, 'utf-8');
-  console.log(`  Published: ${zhOutput}`);
+  writeIfChanged(zhOutput, zhHtml);
 }
 
 /**
