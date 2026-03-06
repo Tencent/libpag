@@ -210,11 +210,17 @@
             CLI usage when needed.
         </p>
         <p>
-            Unlike mainstream bitmap generators, PAGX outputs structured markup instead of sampled
-            pixels. Bitmap outputs are probabilistic "impressions," so local mistakes often require
-            regenerating the whole image. In PAGX, each element has explicit editable parameters,
-            allowing targeted updates to color, size, position, and spacing without changing
-            unrelated parts.
+            Most mainstream image generators (such as Stable Diffusion and DALL-E) produce bitmaps
+            by sampling from probability distributions. When a local detail is off, you often have
+            to regenerate the entire image instead of fixing just that specific part.
+        </p>
+        <p>
+            PAGX takes a different path: the AI outputs structured markup rather than sampled pixels.
+            Each element carries explicit editable parameters, so you can make targeted updates to
+            color, size, position, and spacing through natural-language instructions without affecting
+            unrelated parts. This ability to support precise secondary edits and continuous iteration
+            is the core value over bitmap-first generation; as iterations accumulate, outcomes are
+            more likely to converge toward production-ready quality.
         </p>
         <p>
             PAGX was originally designed for motion description, built on top of static vector
