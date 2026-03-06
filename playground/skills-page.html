@@ -266,18 +266,24 @@
         <h3 id="install-skills">3. Install PAGX Skills</h3>
         <p>
             After downloading the Skills package above, extract <code>pagx.zip</code> and place the
-            resulting <code>pagx</code> folder into your project at the following path:
+            resulting <code>pagx</code> folder into your <strong>user-level</strong> Skills directory.
+            This makes the skill available across all your projects.
         </p>
-        <pre><code>your-project/
-  .codebuddy/
-    skills/
-      pagx/
-        SKILL.md
-        references/
-          ...</code></pre>
+        <table>
+            <tr><th>Platform</th><th>Skills directory</th></tr>
+            <tr><td>macOS / Linux</td><td><code>~/.codebuddy/skills/</code></td></tr>
+            <tr><td>Windows</td><td><code>C:\Users\&lt;username&gt;\.codebuddy\skills\</code></td></tr>
+        </table>
+        <p>The final directory structure should look like:</p>
+        <pre><code>.codebuddy/
+  skills/
+    pagx/
+      SKILL.md
+      references/
+        ...</code></pre>
         <p>
             If the <code>.codebuddy/skills/</code> folders do not exist yet, create them manually.
-            Then launch CodeBuddy Code in your project folder &mdash; the PAGX Skills will be
+            Then launch CodeBuddy Code in any project folder &mdash; the PAGX Skills will be
             automatically detected and loaded.
         </p>
         <div class="info-box">
