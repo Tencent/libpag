@@ -147,7 +147,6 @@ jobs:
           -DPAG_BUILD_SHARED=OFF
           -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
           -DVCPKG_TARGET_TRIPLET=x64-windows-static
-          -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
         shell: pwsh
 
       - name: Upload artifact
