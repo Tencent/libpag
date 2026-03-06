@@ -12,7 +12,6 @@
             --text-color: #333333;
             --code-bg: #f6f8fa;
             --border-color: #e1e4e8;
-            --toc-width: 220px;
         }
         * { box-sizing: border-box; }
         html { scroll-behavior: smooth; }
@@ -25,7 +24,7 @@
             padding: 0;
         }
 
-        /* Hero download section — full width, above sidebar */
+        /* Hero download section */
         .hero {
             background: linear-gradient(135deg, #f0f7ff 0%, #e8f0fe 100%);
             border-bottom: 1px solid #c8ddf5;
@@ -53,40 +52,7 @@
         .download-meta { margin-top: 14px; font-size: 13px; color: #586069; }
         .download-meta span { margin: 0 6px; }
 
-        /* Sidebar — starts below hero */
-        .sidebar {
-            width: var(--toc-width);
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100vh;
-            overflow-y: auto;
-            padding: 20px 16px;
-            background: #f8f9fa;
-            border-right: 1px solid var(--border-color);
-            z-index: 100;
-        }
-        .sidebar-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid var(--border-color);
-        }
-        .sidebar-header h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin: 0; padding: 0; font-weight: 600; }
-        .sidebar-close { display: none; background: none; border: none; font-size: 24px; color: #666; cursor: pointer; padding: 0; line-height: 1; }
-        .sidebar ul { list-style: none; padding: 0; margin: 0; }
-        .sidebar li { margin: 2px 0; }
-        .sidebar a { color: #555; text-decoration: none; font-size: 13px; display: block; padding: 4px 8px; border-radius: 4px; transition: all 0.2s; }
-        .sidebar a:hover { background: #e9ecef; color: var(--primary-color); }
-        .sidebar a.active { background: #e3f2fd; color: #1565c0; font-weight: 500; }
-        .sidebar ul ul { padding-left: 14px; }
-        .sidebar ul ul a { font-size: 12px; color: #777; }
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 99; }
-
-        /* Layout — content offset by sidebar width */
-        .doc-body { margin-left: var(--toc-width); }
+        /* Content */
         .content {
             max-width: 800px;
             margin: 0 auto;
@@ -196,43 +162,8 @@
         .lang-switch-menu a:hover { background: #f8f9fa; color: var(--primary-color); }
         .lang-switch-menu a.active { background: #e3f2fd; color: #1565c0; }
 
-        /* Mobile hamburger */
-        .sidebar-toggle {
-            display: none;
-            position: fixed;
-            top: 12px;
-            left: 12px;
-            z-index: 101;
-            background: rgba(255,255,255,0.85);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 8px 10px;
-            cursor: pointer;
-            color: #555;
-        }
-        .sidebar-toggle svg { width: 18px; height: 18px; display: block; }
-
         /* Mobile */
-        @media (max-width: 900px) {
-            .sidebar {
-                display: none;
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 85%;
-                max-width: 300px;
-                height: 100vh;
-                z-index: 1001;
-                transform: translateX(-100%);
-                transition: transform 0.3s ease;
-            }
-            .sidebar.open { display: block; transform: translateX(0); }
-            .sidebar-close { display: block; }
-            .sidebar-overlay.open { display: block; z-index: 1000; }
-            .sidebar-toggle { display: block; }
-            .doc-body { margin-left: 0; }
+        @media (max-width: 600px) {
             .content { padding: 8px 16px 60px; }
             .hero { padding: 48px 16px 36px; }
             .hero h1 { font-size: 1.5em; }
@@ -244,7 +175,7 @@
 </head>
 <body>
     <div class="header-actions">
-        <a href="../" class="header-btn" title="Playground">
+        <a href="../" class="header-btn" title="Preview">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
         </a>
         <div class="lang-switch" onclick="this.classList.toggle('open')">
@@ -259,279 +190,240 @@
         </div>
     </div>
 
-    <button class="sidebar-toggle" onclick="toggleSidebar()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-    </button>
+    <!-- Hero download -->
+    <div class="hero">
+        <h1>PAGX AI Skills</h1>
+        <p class="subtitle">Give your AI coding assistant the ability to create and optimize PAGX vector graphics.</p>
+        <a href="./pagx.zip" download class="download-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M2 17l.621 2.485A2 2 0 0 0 4.561 21h14.878a2 2 0 0 0 1.94-1.515L22 17"/></svg>
+            Download Skills Package
+        </a>
+        <p class="download-meta">pagx.zip<span>&middot;</span>Last updated: {{lastUpdated}}</p>
+    </div>
 
-    <nav class="sidebar">
-        <div class="sidebar-header">
-            <h2>Contents</h2>
-            <button class="sidebar-close" onclick="toggleSidebar()">&times;</button>
+    <main class="content">
+        <!-- About -->
+        <h2 id="about">About</h2>
+        <p>
+            PAGX AI Skills is a reference documentation package that enables AI coding assistants to
+            generate well-structured PAGX files from text descriptions, optimize existing files for size
+            and rendering performance, and look up PAGX syntax, attributes, and CLI commands.
+        </p>
+        <p>
+            Under the hood, vector generation is essentially an AI coding process &mdash; the model
+            writes structured markup rather than sampling pixels. This means the quality of output
+            improves naturally as AI coding models advance, and less detailed prompting will be needed
+            over time to achieve the same results. Unlike bitmap-based generation (such as Stable
+            Diffusion or DALL-E), which samples from a probability distribution with no way to precisely
+            modify the output, PAGX produces structured files where every element has exact, editable
+            values. If something isn't right, you simply describe the change and the AI adjusts that
+            specific part &mdash; colors, sizes, positions, spacing &mdash; without affecting anything
+            else. With enough iterations, the output can reliably reach production quality.
+        </p>
+        <p>
+            PAGX was originally designed to describe motion graphics &mdash; animations built on top
+            of vector graphics. The format is under active development; the current focus is on
+            refining the static vector graphics foundation. Once animation capabilities are added,
+            AI will be able to go further and directly manipulate these vector elements to produce
+            complex motion effects as well.
+        </p>
+        <p>The package includes:</p>
+        <ul>
+            <li>Format specification essentials and design patterns</li>
+            <li>Step-by-step generation and optimization guides</li>
+            <li>Complete attribute reference with defaults and enumerations</li>
+            <li>CLI tool reference for rendering, validation, and more</li>
+            <li>Practical examples covering icons, UI components, cards, and text</li>
+        </ul>
+
+        <!-- Installation -->
+        <h2 id="installation">Installation Guide</h2>
+
+        <h3 id="install-nodejs">1. Install Node.js</h3>
+        <p>
+            The Skills package includes a companion command-line tool (<code>pagx-cli</code>) that
+            requires a Node.js runtime. If you don't have Node.js installed yet, follow these steps:
+        </p>
+        <div class="step">
+            <p><span class="step-number">Step 1</span> &mdash; Visit <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a> and download the <strong>LTS</strong> (Long Term Support) version for your operating system.</p>
         </div>
-        <div class="toc">
-            <ul>
-                <li><a href="#about">About</a></li>
-                <li>
-                    <a href="#installation">Installation Guide</a>
-                    <ul>
-                        <li><a href="#install-nodejs">Install Node.js</a></li>
-                        <li><a href="#install-codebuddy">Install CodeBuddy Code</a></li>
-                        <li><a href="#install-skills">Install PAGX Skills</a></li>
-                        <li><a href="#other-tools">Other AI Coding Tools</a></li>
-                    </ul>
-                </li>
-                <li>
-                    <a href="#getting-started">Getting Started</a>
-                    <ul>
-                        <li><a href="#creating">Creating PAGX Files</a></li>
-                        <li><a href="#modifying">Modifying and Iterating</a></li>
-                        <li><a href="#rendering">Rendering and Inspection</a></li>
-                        <li><a href="#preview">Online Preview</a></li>
-                        <li><a href="#tips">Tips for Best Results</a></li>
-                    </ul>
-                </li>
-                <li><a href="#cli">Command-Line Tools</a></li>
-            </ul>
+        <div class="step">
+            <p><span class="step-number">Step 2</span> &mdash; Run the installer and follow the on-screen instructions. Accept all default settings.</p>
         </div>
-    </nav>
-    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
-
-    <!-- Hero download — full width, not affected by sidebar -->
-    <div class="doc-body">
-        <div class="hero">
-            <h1>PAGX AI Skills</h1>
-            <p class="subtitle">Give your AI coding assistant the ability to create and optimize PAGX vector graphics.</p>
-            <a href="./pagx.zip" download class="download-btn">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M2 17l.621 2.485A2 2 0 0 0 4.561 21h14.878a2 2 0 0 0 1.94-1.515L22 17"/></svg>
-                Download Skills Package
-            </a>
-            <p class="download-meta">pagx.zip<span>&middot;</span>Last updated: {{lastUpdated}}</p>
+        <div class="step">
+            <p><span class="step-number">Step 3</span> &mdash; Verify the installation. Open a terminal (Terminal on macOS, Command Prompt or PowerShell on Windows) and run:</p>
+            <pre><code>node --version</code></pre>
+            <p>You should see a version number like <code>v22.x.x</code>. Version 18 or later is required.</p>
         </div>
 
-        <main class="content">
-            <!-- About -->
-            <h2 id="about">About</h2>
-            <p>
-                PAGX AI Skills is a reference documentation package that enables AI coding assistants to
-                generate well-structured PAGX files from text descriptions, optimize existing files for size
-                and rendering performance, and look up PAGX syntax, attributes, and CLI commands.
-            </p>
-            <p>
-                Under the hood, vector generation is essentially an AI coding process &mdash; the model
-                writes structured markup rather than sampling pixels. This means the quality of output
-                improves naturally as AI coding models advance, and less detailed prompting will be needed
-                over time to achieve the same results. Unlike bitmap-based generation (such as Stable
-                Diffusion or DALL-E), which samples from a probability distribution with no way to precisely
-                modify the output, PAGX produces structured files where every element has exact, editable
-                values. If something isn't right, you simply describe the change and the AI adjusts that
-                specific part &mdash; colors, sizes, positions, spacing &mdash; without affecting anything
-                else. With enough iterations, the output can reliably reach production quality.
-            </p>
-            <p>
-                PAGX was originally designed to describe motion graphics &mdash; animations built on top
-                of vector graphics. The format is under active development; the current focus is on
-                refining the static vector graphics foundation. Once animation capabilities are added,
-                AI will be able to go further and directly manipulate these vector elements to produce
-                complex motion effects as well.
-            </p>
-            <p>The package includes:</p>
-            <ul>
-                <li>Format specification essentials and design patterns</li>
-                <li>Step-by-step generation and optimization guides</li>
-                <li>Complete attribute reference with defaults and enumerations</li>
-                <li>CLI tool reference for rendering, validation, and more</li>
-                <li>Practical examples covering icons, UI components, cards, and text</li>
-            </ul>
-
-            <!-- Installation -->
-            <h2 id="installation">Installation Guide</h2>
-
-            <h3 id="install-nodejs">1. Install Node.js</h3>
-            <p>
-                The Skills package includes a companion command-line tool (<code>pagx-cli</code>) that
-                requires a Node.js runtime. If you don't have Node.js installed yet, follow these steps:
-            </p>
-            <div class="step">
-                <p><span class="step-number">Step 1</span> &mdash; Visit <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a> and download the <strong>LTS</strong> (Long Term Support) version for your operating system.</p>
-            </div>
-            <div class="step">
-                <p><span class="step-number">Step 2</span> &mdash; Run the installer and follow the on-screen instructions. Accept all default settings.</p>
-            </div>
-            <div class="step">
-                <p><span class="step-number">Step 3</span> &mdash; Verify the installation. Open a terminal (Terminal on macOS, Command Prompt or PowerShell on Windows) and run:</p>
-                <pre><code>node --version</code></pre>
-                <p>You should see a version number like <code>v22.x.x</code>. Version 18 or later is required.</p>
-            </div>
-
-            <h3 id="install-codebuddy">2. Install CodeBuddy Code</h3>
-            <p>
-                <a href="https://www.codebuddy.ai/docs/cli/installation" target="_blank" rel="noopener">CodeBuddy Code</a>
-                is an AI coding assistant that runs in your terminal. If you haven't installed it yet:
-            </p>
-            <div class="step">
-                <p><span class="step-number">Step 1</span> &mdash; Open a terminal and run the installation command:</p>
-                <pre><code>npm install -g @tencent-ai/codebuddy-code</code></pre>
-                <p>You can also use other package managers:</p>
-                <pre><code># Homebrew (macOS / Linux)
+        <h3 id="install-codebuddy">2. Install CodeBuddy Code</h3>
+        <p>
+            <a href="https://www.codebuddy.ai/docs/cli/installation" target="_blank" rel="noopener">CodeBuddy Code</a>
+            is an AI coding assistant that runs in your terminal. If you haven't installed it yet:
+        </p>
+        <div class="step">
+            <p><span class="step-number">Step 1</span> &mdash; Open a terminal and run the installation command:</p>
+            <pre><code>npm install -g @tencent-ai/codebuddy-code</code></pre>
+            <p>You can also use other package managers:</p>
+            <pre><code># Homebrew (macOS / Linux)
 brew install Tencent-CodeBuddy/tap/codebuddy-code
 
 # Or install without Node.js (macOS / Linux)
 curl -fsSL https://copilot.tencent.com/cli/install.sh | bash</code></pre>
-            </div>
-            <div class="step">
-                <p><span class="step-number">Step 2</span> &mdash; After installation, launch it by typing:</p>
-                <pre><code>codebuddy</code></pre>
-                <p>Follow the on-screen prompts to complete the initial setup and authentication.</p>
-            </div>
-            <div class="info-box">
-                <p>For detailed installation instructions and system requirements, see the
-                <a href="https://www.codebuddy.ai/docs/cli/installation" target="_blank" rel="noopener">CodeBuddy Code documentation</a>.</p>
-            </div>
+        </div>
+        <div class="step">
+            <p><span class="step-number">Step 2</span> &mdash; After installation, launch it by typing:</p>
+            <pre><code>codebuddy</code></pre>
+            <p>Follow the on-screen prompts to complete the initial setup and authentication.</p>
+        </div>
+        <div class="info-box">
+            <p>For detailed installation instructions and system requirements, see the
+            <a href="https://www.codebuddy.ai/docs/cli/installation" target="_blank" rel="noopener">CodeBuddy Code documentation</a>.</p>
+        </div>
 
-            <h3 id="install-skills">3. Install PAGX Skills</h3>
-            <p>
-                After downloading the Skills package above, extract and install it into your project:
-            </p>
-            <div class="step">
-                <p><span class="step-number">Step 1</span> &mdash; Open a terminal and navigate to your project folder (the folder where you want to create PAGX files):</p>
-                <pre><code>cd /path/to/your/project</code></pre>
-            </div>
-            <div class="step">
-                <p><span class="step-number">Step 2</span> &mdash; Create the Skills directory:</p>
-                <pre><code>mkdir -p .codebuddy/skills</code></pre>
-            </div>
-            <div class="step">
-                <p><span class="step-number">Step 3</span> &mdash; Extract the downloaded <code>pagx.zip</code> into the Skills directory:</p>
-                <pre><code>unzip pagx.zip -d .codebuddy/skills/pagx</code></pre>
-                <p>After extraction, the directory structure should look like:</p>
-                <pre><code>your-project/
+        <h3 id="install-skills">3. Install PAGX Skills</h3>
+        <p>
+            After downloading the Skills package above, extract and install it into your project:
+        </p>
+        <div class="step">
+            <p><span class="step-number">Step 1</span> &mdash; Open a terminal and navigate to your project folder (the folder where you want to create PAGX files):</p>
+            <pre><code>cd /path/to/your/project</code></pre>
+        </div>
+        <div class="step">
+            <p><span class="step-number">Step 2</span> &mdash; Create the Skills directory:</p>
+            <pre><code>mkdir -p .codebuddy/skills</code></pre>
+        </div>
+        <div class="step">
+            <p><span class="step-number">Step 3</span> &mdash; Extract the downloaded <code>pagx.zip</code> into the Skills directory:</p>
+            <pre><code>unzip pagx.zip -d .codebuddy/skills/pagx</code></pre>
+            <p>After extraction, the directory structure should look like:</p>
+            <pre><code>your-project/
   .codebuddy/
     skills/
       pagx/
         SKILL.md
         references/
           ...</code></pre>
-            </div>
-            <div class="step">
-                <p><span class="step-number">Step 4</span> &mdash; Launch CodeBuddy Code in your project folder:</p>
-                <pre><code>codebuddy</code></pre>
-                <p>The PAGX Skills will be automatically detected and loaded.</p>
-            </div>
-            <div class="info-box">
-                <p>The <code>pagx-cli</code> command-line tool will be automatically installed when the AI
-                assistant needs it for the first time. This requires the Node.js environment set up in Step 1.</p>
-            </div>
-            <div class="info-box">
-                <p>PAGX Skills has been most thoroughly tested with CodeBuddy Code. For best results,
-                select the <strong>Claude Opus</strong> model in your CodeBuddy Code settings &mdash;
-                it currently produces the highest quality output with this Skills package.</p>
-            </div>
+        </div>
+        <div class="step">
+            <p><span class="step-number">Step 4</span> &mdash; Launch CodeBuddy Code in your project folder:</p>
+            <pre><code>codebuddy</code></pre>
+            <p>The PAGX Skills will be automatically detected and loaded.</p>
+        </div>
+        <div class="info-box">
+            <p>The <code>pagx-cli</code> command-line tool will be automatically installed when the AI
+            assistant needs it for the first time. This requires the Node.js environment set up in Step 1.</p>
+        </div>
+        <div class="info-box">
+            <p>PAGX Skills has been most thoroughly tested with CodeBuddy Code. For best results,
+            select the <strong>Claude Opus</strong> model in your CodeBuddy Code settings &mdash;
+            it currently produces the highest quality output with this Skills package.</p>
+        </div>
 
-            <h3 id="other-tools">Using with Other AI Coding Tools</h3>
-            <p>
-                The guide above uses CodeBuddy Code as an example, but PAGX Skills is a set of structured
-                reference documents following an open convention &mdash; it is not tied to any specific tool.
-                If you use a different AI coding assistant that supports a Skills (or similar) mechanism,
-                you only need to:
-            </p>
-            <ol>
-                <li><strong>Ensure Node.js is installed</strong> on your system (see Step 1 above) &mdash;
-                this is required for the <code>pagx-cli</code> tool that Skills relies on.</li>
-                <li><strong>Copy the Skills files</strong> into the directory designated by your AI tool.
-                Refer to Step 3 above for the extraction process &mdash; just replace the
-                <code>.codebuddy/skills/</code> path with the corresponding directory for your tool.</li>
-            </ol>
+        <h3 id="other-tools">Using with Other AI Coding Tools</h3>
+        <p>
+            The guide above uses CodeBuddy Code as an example, but PAGX Skills is a set of structured
+            reference documents following an open convention &mdash; it is not tied to any specific tool.
+            If you use a different AI coding assistant that supports a Skills (or similar) mechanism,
+            you only need to:
+        </p>
+        <ol>
+            <li><strong>Ensure Node.js is installed</strong> on your system (see Step 1 above) &mdash;
+            this is required for the <code>pagx-cli</code> tool that Skills relies on.</li>
+            <li><strong>Copy the Skills files</strong> into the directory designated by your AI tool.
+            Refer to Step 3 above for the extraction process &mdash; just replace the
+            <code>.codebuddy/skills/</code> path with the corresponding directory for your tool.</li>
+        </ol>
 
-            <!-- Getting Started -->
-            <h2 id="getting-started">Getting Started</h2>
-            <p>
-                Once the Skills are installed, you can interact with the AI using natural language.
-                Here are some common operations:
-            </p>
+        <!-- Getting Started -->
+        <h2 id="getting-started">Getting Started</h2>
+        <p>
+            Once the Skills are installed, you can interact with the AI using natural language.
+            Here are some common operations:
+        </p>
 
-            <h3 id="creating">Creating PAGX Files</h3>
-            <ul>
-                <li><em>"Create a PAGX file for a blue rounded rectangle button with white text 'Submit'"</em></li>
-                <li><em>"Design a card component with an avatar, title, and subtitle"</em></li>
-                <li><em>"Make a settings icon using simple geometric shapes, 24x24"</em></li>
-                <li><em>"Create a gradient banner with the text 'Welcome Back' in bold"</em></li>
-            </ul>
+        <h3 id="creating">Creating PAGX Files</h3>
+        <ul>
+            <li><em>"Create a PAGX file for a blue rounded rectangle button with white text 'Submit'"</em></li>
+            <li><em>"Design a card component with an avatar, title, and subtitle"</em></li>
+            <li><em>"Make a settings icon using simple geometric shapes, 24x24"</em></li>
+            <li><em>"Create a gradient banner with the text 'Welcome Back' in bold"</em></li>
+        </ul>
 
-            <h3 id="modifying">Modifying and Iterating</h3>
-            <ul>
-                <li><em>"Change the button color to green and increase the corner radius"</em></li>
-                <li><em>"Make the title text larger and align it to the left"</em></li>
-                <li><em>"Add a subtle drop shadow to the card"</em></li>
-                <li><em>"The spacing between the icon and the label feels too tight, increase it"</em></li>
-            </ul>
+        <h3 id="modifying">Modifying and Iterating</h3>
+        <ul>
+            <li><em>"Change the button color to green and increase the corner radius"</em></li>
+            <li><em>"Make the title text larger and align it to the left"</em></li>
+            <li><em>"Add a subtle drop shadow to the card"</em></li>
+            <li><em>"The spacing between the icon and the label feels too tight, increase it"</em></li>
+        </ul>
 
-            <h3 id="rendering">Rendering and Inspection</h3>
-            <ul>
-                <li><em>"Render this PAGX file as a screenshot so I can preview it"</em></li>
-                <li><em>"Render it at 2x scale for Retina display"</em></li>
-                <li><em>"Validate this PAGX file and fix any errors"</em></li>
-                <li><em>"Optimize this PAGX file to reduce its size"</em></li>
-            </ul>
+        <h3 id="rendering">Rendering and Inspection</h3>
+        <ul>
+            <li><em>"Render this PAGX file as a screenshot so I can preview it"</em></li>
+            <li><em>"Render it at 2x scale for Retina display"</em></li>
+            <li><em>"Validate this PAGX file and fix any errors"</em></li>
+            <li><em>"Optimize this PAGX file to reduce its size"</em></li>
+        </ul>
 
-            <h3 id="preview">Online Preview</h3>
-            <p>
-                You can also preview PAGX files visually using the
-                <a href="../">PAGX Playground</a> &mdash; simply drag and drop any
-                <code>.pagx</code> file onto the page to see the rendered result in your browser.
-            </p>
+        <h3 id="preview">Online Preview</h3>
+        <p>
+            You can also preview PAGX files visually using the
+            <a href="../">PAGX Playground</a> &mdash; simply drag and drop any
+            <code>.pagx</code> file onto the page to see the rendered result in your browser.
+        </p>
 
-            <h3 id="tips">Tips for Best Results</h3>
-            <p>
-                <strong>Iterate to perfection.</strong>
-                Don't expect a perfect result on the first try. Instead, treat the process as a
-                conversation: describe what you want, preview the rendered output, then tell the AI
-                what to adjust. Each round of feedback produces precise modifications &mdash;
-                not probabilistic re-rolls &mdash; so you steadily converge on the ideal result.
-                This multi-round iteration can be fully automated by the AI, or you can step in
-                at any point to provide key aesthetic judgment and structural guidance.
-                This ability to make exact, language-driven modifications across multiple iterations
-                is the core value of this workflow.
-            </p>
-            <p>
-                <strong>Create, don't trace.</strong>
-                If you provide a bitmap image as reference, the AI will use it as inspiration for a
-                fresh vector creation &mdash; not as a template to reproduce pixel by pixel.
-                Precise bitmap reproduction is not a strength of any current AI model: a bitmap is
-                fundamentally a probabilistic "impression," while a vector graphic is a precise
-                structural description with an exact solution. Deriving exact structure from a
-                probability distribution goes against the nature of how large language models work.
-                Use reference images to convey style and concept, then let the AI create a clean
-                vector interpretation.
-            </p>
+        <h3 id="tips">Tips for Best Results</h3>
+        <p>
+            <strong>Iterate to perfection.</strong>
+            Don't expect a perfect result on the first try. Instead, treat the process as a
+            conversation: describe what you want, preview the rendered output, then tell the AI
+            what to adjust. Each round of feedback produces precise modifications &mdash;
+            not probabilistic re-rolls &mdash; so you steadily converge on the ideal result.
+            This multi-round iteration can be fully automated by the AI, or you can step in
+            at any point to provide key aesthetic judgment and structural guidance.
+            This ability to make exact, language-driven modifications across multiple iterations
+            is the core value of this workflow.
+        </p>
+        <p>
+            <strong>Create, don't trace.</strong>
+            If you provide a bitmap image as reference, the AI will use it as inspiration for a
+            fresh vector creation &mdash; not as a template to reproduce pixel by pixel.
+            Precise bitmap reproduction is not a strength of any current AI model: a bitmap is
+            fundamentally a probabilistic "impression," while a vector graphic is a precise
+            structural description with an exact solution. Deriving exact structure from a
+            probability distribution goes against the nature of how large language models work.
+            Use reference images to convey style and concept, then let the AI create a clean
+            vector interpretation.
+        </p>
 
-            <!-- CLI Tools -->
-            <h2 id="cli">Command-Line Tools</h2>
-            <p>
-                The Skills package works with <code>pagx-cli</code>, a companion command-line tool distributed
-                via npm. When used through an AI assistant, the CLI is invoked automatically. You can also
-                install and use it directly:
-            </p>
-            <pre><code>npm install -g @libpag/pagx</code></pre>
+        <!-- CLI Tools -->
+        <h2 id="cli">Command-Line Tools</h2>
+        <p>
+            The Skills package works with <code>pagx-cli</code>, a companion command-line tool distributed
+            via npm. When used through an AI assistant, the CLI is invoked automatically. You can also
+            install and use it directly:
+        </p>
+        <pre><code>npm install -g @libpag/pagx</code></pre>
 
-            <table>
-                <tr><th>Command</th><th>Description</th></tr>
-                <tr><td><code>pagx render</code></td><td>Render a PAGX file to PNG, WebP, or JPG</td></tr>
-                <tr><td><code>pagx validate</code></td><td>Validate a PAGX file against the specification</td></tr>
-                <tr><td><code>pagx optimize</code></td><td>Validate, optimize structure, and format in one step</td></tr>
-                <tr><td><code>pagx format</code></td><td>Pretty-print with consistent indentation</td></tr>
-                <tr><td><code>pagx bounds</code></td><td>Query precise rendered bounds of layers</td></tr>
-                <tr><td><code>pagx font info</code></td><td>Query font identity and metrics</td></tr>
-                <tr><td><code>pagx font embed</code></td><td>Embed fonts into a PAGX file</td></tr>
-            </table>
+        <table>
+            <tr><th>Command</th><th>Description</th></tr>
+            <tr><td><code>pagx render</code></td><td>Render a PAGX file to PNG, WebP, or JPG</td></tr>
+            <tr><td><code>pagx validate</code></td><td>Validate a PAGX file against the specification</td></tr>
+            <tr><td><code>pagx optimize</code></td><td>Validate, optimize structure, and format in one step</td></tr>
+            <tr><td><code>pagx format</code></td><td>Pretty-print with consistent indentation</td></tr>
+            <tr><td><code>pagx bounds</code></td><td>Query precise rendered bounds of layers</td></tr>
+            <tr><td><code>pagx font info</code></td><td>Query font identity and metrics</td></tr>
+            <tr><td><code>pagx font embed</code></td><td>Embed fonts into a PAGX file</td></tr>
+        </table>
 
-            <p>
-                For complete CLI documentation including all options, see the
-                <a href="https://pag.io/pagx/latest/#cli-reference">Specification &mdash; CLI Reference</a>.
-            </p>
+        <p>
+            For complete CLI documentation including all options, see the
+            <a href="https://pag.io/pagx/latest/#cli-reference">Specification &mdash; CLI Reference</a>.
+        </p>
 
-            <p class="last-updated">Last updated: {{lastUpdated}}</p>
-        </main>
-    </div>
+        <p class="last-updated">Last updated: {{lastUpdated}}</p>
+    </main>
 
     <script>
         var LANG_COOKIE = 'pagx_lang';
@@ -558,14 +450,6 @@ curl -fsSL https://copilot.tencent.com/cli/install.sh | bash</code></pre>
             return false;
         }
 
-        function toggleSidebar() {
-            var sidebar = document.querySelector('.sidebar');
-            var overlay = document.querySelector('.sidebar-overlay');
-            sidebar.classList.toggle('open');
-            overlay.classList.toggle('open');
-            document.body.style.overflow = sidebar.classList.contains('open') ? 'hidden' : '';
-        }
-
         (function() {
             var zhUrl = 'zh/';
             if (!zhUrl) return;
@@ -579,41 +463,6 @@ curl -fsSL https://copilot.tencent.com/cli/install.sh | bash</code></pre>
             var langSwitch = document.querySelector('.lang-switch');
             if (!langSwitch.contains(e.target)) langSwitch.classList.remove('open');
         });
-
-        // Close sidebar on link click (mobile)
-        document.querySelectorAll('.sidebar a').forEach(function(link) {
-            link.addEventListener('click', function() {
-                if (window.innerWidth <= 900) toggleSidebar();
-            });
-        });
-
-        // Active TOC highlight on scroll
-        (function() {
-            var links = document.querySelectorAll('.sidebar a[href^="#"]');
-            var ids = [];
-            links.forEach(function(a) { ids.push(a.getAttribute('href').slice(1)); });
-            if (!ids.length) return;
-            var updating = false;
-            window.addEventListener('scroll', function() {
-                if (updating) return;
-                updating = true;
-                requestAnimationFrame(function() {
-                    var current = '';
-                    for (var i = 0; i < ids.length; i++) {
-                        var el = document.getElementById(ids[i]);
-                        if (el && el.getBoundingClientRect().top <= 24) {
-                            current = ids[i];
-                        } else {
-                            break;
-                        }
-                    }
-                    links.forEach(function(a) {
-                        a.classList.toggle('active', a.getAttribute('href') === '#' + current);
-                    });
-                    updating = false;
-                });
-            }, { passive: true });
-        })();
     </script>
 </body>
 </html>

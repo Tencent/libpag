@@ -12,7 +12,6 @@
             --text-color: #333333;
             --code-bg: #f6f8fa;
             --border-color: #e1e4e8;
-            --toc-width: 220px;
         }
         * { box-sizing: border-box; }
         html { scroll-behavior: smooth; }
@@ -25,7 +24,7 @@
             padding: 0;
         }
 
-        /* Hero download section — full width, above sidebar */
+        /* Hero download section */
         .hero {
             background: linear-gradient(135deg, #f0f7ff 0%, #e8f0fe 100%);
             border-bottom: 1px solid #c8ddf5;
@@ -53,40 +52,7 @@
         .download-meta { margin-top: 14px; font-size: 13px; color: #586069; }
         .download-meta span { margin: 0 6px; }
 
-        /* Sidebar — starts below hero */
-        .sidebar {
-            width: var(--toc-width);
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100vh;
-            overflow-y: auto;
-            padding: 20px 16px;
-            background: #f8f9fa;
-            border-right: 1px solid var(--border-color);
-            z-index: 100;
-        }
-        .sidebar-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid var(--border-color);
-        }
-        .sidebar-header h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin: 0; padding: 0; font-weight: 600; }
-        .sidebar-close { display: none; background: none; border: none; font-size: 24px; color: #666; cursor: pointer; padding: 0; line-height: 1; }
-        .sidebar ul { list-style: none; padding: 0; margin: 0; }
-        .sidebar li { margin: 2px 0; }
-        .sidebar a { color: #555; text-decoration: none; font-size: 13px; display: block; padding: 4px 8px; border-radius: 4px; transition: all 0.2s; }
-        .sidebar a:hover { background: #e9ecef; color: var(--primary-color); }
-        .sidebar a.active { background: #e3f2fd; color: #1565c0; font-weight: 500; }
-        .sidebar ul ul { padding-left: 14px; }
-        .sidebar ul ul a { font-size: 12px; color: #777; }
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 99; }
-
-        /* Layout — content offset by sidebar width */
-        .doc-body { margin-left: var(--toc-width); }
+        /* Content */
         .content {
             max-width: 800px;
             margin: 0 auto;
@@ -196,43 +162,8 @@
         .lang-switch-menu a:hover { background: #f8f9fa; color: var(--primary-color); }
         .lang-switch-menu a.active { background: #e3f2fd; color: #1565c0; }
 
-        /* Mobile hamburger */
-        .sidebar-toggle {
-            display: none;
-            position: fixed;
-            top: 12px;
-            left: 12px;
-            z-index: 101;
-            background: rgba(255,255,255,0.85);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 8px 10px;
-            cursor: pointer;
-            color: #555;
-        }
-        .sidebar-toggle svg { width: 18px; height: 18px; display: block; }
-
         /* Mobile */
-        @media (max-width: 900px) {
-            .sidebar {
-                display: none;
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 85%;
-                max-width: 300px;
-                height: 100vh;
-                z-index: 1001;
-                transform: translateX(-100%);
-                transition: transform 0.3s ease;
-            }
-            .sidebar.open { display: block; transform: translateX(0); }
-            .sidebar-close { display: block; }
-            .sidebar-overlay.open { display: block; z-index: 1000; }
-            .sidebar-toggle { display: block; }
-            .doc-body { margin-left: 0; }
+        @media (max-width: 600px) {
             .content { padding: 8px 16px 60px; }
             .hero { padding: 48px 16px 36px; }
             .hero h1 { font-size: 1.5em; }
@@ -244,7 +175,7 @@
 </head>
 <body>
     <div class="header-actions">
-        <a href="../../" class="header-btn" title="Playground">
+        <a href="../../" class="header-btn" title="预览">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
         </a>
         <div class="lang-switch" onclick="this.classList.toggle('open')">
@@ -259,260 +190,221 @@
         </div>
     </div>
 
-    <button class="sidebar-toggle" onclick="toggleSidebar()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-    </button>
+    <!-- Hero download -->
+    <div class="hero">
+        <h1>PAGX AI Skills</h1>
+        <p class="subtitle">让你的 AI 编程助手具备创建和优化 PAGX 矢量图形的能力。</p>
+        <a href="../pagx.zip" download class="download-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M2 17l.621 2.485A2 2 0 0 0 4.561 21h14.878a2 2 0 0 0 1.94-1.515L22 17"/></svg>
+            下载 Skills 安装包
+        </a>
+        <p class="download-meta">pagx.zip<span>&middot;</span>最后更新：{{lastUpdated}}</p>
+    </div>
 
-    <nav class="sidebar">
-        <div class="sidebar-header">
-            <h2>目录</h2>
-            <button class="sidebar-close" onclick="toggleSidebar()">&times;</button>
+    <main class="content">
+        <!-- About -->
+        <h2 id="about">简介</h2>
+        <p>
+            PAGX AI Skills 是一套参考文档包，安装后可以让 AI 编程助手根据文字描述生成结构规范的 PAGX 文件，
+            优化已有文件的体积和渲染性能，以及查询 PAGX 语法、属性和命令行工具用法。
+        </p>
+        <p>
+            矢量图生成的本质是一个 AI 编程过程 &mdash; 模型编写的是结构化标记语言，而非采样像素。
+            这意味着输出质量会随着 AI 编程大模型能力的持续提升而自然提高，达到同样效果所需的
+            提示详细程度和人工迭代次数都会逐渐降低。与位图生成（如 Stable Diffusion、DALL-E）
+            从概率分布中抽样、无法精确修改输出不同，PAGX 产出的是结构化文件，每个元素都有精确
+            可编辑的值。哪里不对，只需描述一下改动，AI 就会精确调整那个具体的部分 &mdash;
+            颜色、尺寸、位置、间距 &mdash; 而不影响其他任何东西。只要迭代次数足够，
+            输出就几乎一定可以达到上线标准。
+        </p>
+        <p>
+            PAGX 格式最初就是为描述动效而设计的 &mdash; 动效是在矢量静态图基础上的扩展。
+            该格式目前仍在持续迭代中，当前阶段的重点是打磨矢量静态图的基础能力。
+            待动效能力补充完善后，AI 还可以进一步直接操作这些矢量元素来生成复杂的动效。
+        </p>
+        <p>文档包包含：</p>
+        <ul>
+            <li>格式规范要点与设计模式</li>
+            <li>分步骤的生成指南和优化指南</li>
+            <li>完整的属性参考（含默认值和枚举值）</li>
+            <li>命令行工具参考（渲染、校验等）</li>
+            <li>实用示例（图标、UI 组件、卡片、文本等）</li>
+        </ul>
+
+        <!-- Installation -->
+        <h2 id="installation">安装指南</h2>
+
+        <h3 id="install-nodejs">1. 安装 Node.js</h3>
+        <p>
+            Skills 安装包内含配套的命令行工具（<code>pagx-cli</code>），运行时需要 Node.js 环境。
+            如果你的电脑上还没有安装 Node.js，请按以下步骤操作：
+        </p>
+        <div class="step">
+            <p><span class="step-number">第 1 步</span> &mdash; 访问 <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a>，下载适用于你操作系统的 <strong>LTS</strong>（长期支持）版本。</p>
         </div>
-        <div class="toc">
-            <ul>
-                <li><a href="#about">简介</a></li>
-                <li>
-                    <a href="#installation">安装指南</a>
-                    <ul>
-                        <li><a href="#install-nodejs">安装 Node.js</a></li>
-                        <li><a href="#install-codebuddy">安装 CodeBuddy Code</a></li>
-                        <li><a href="#install-skills">安装 PAGX Skills</a></li>
-                        <li><a href="#other-tools">其他 AI 编程工具</a></li>
-                    </ul>
-                </li>
-                <li>
-                    <a href="#getting-started">开始使用</a>
-                    <ul>
-                        <li><a href="#creating">创建 PAGX 文件</a></li>
-                        <li><a href="#modifying">修改与迭代</a></li>
-                        <li><a href="#rendering">渲染与检查</a></li>
-                        <li><a href="#preview">在线预览</a></li>
-                        <li><a href="#tips">使用建议</a></li>
-                    </ul>
-                </li>
-                <li><a href="#cli">命令行工具</a></li>
-            </ul>
+        <div class="step">
+            <p><span class="step-number">第 2 步</span> &mdash; 运行安装程序，按照屏幕提示操作，保持所有默认设置即可。</p>
         </div>
-    </nav>
-    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
-
-    <!-- Hero download — full width, not affected by sidebar -->
-    <div class="doc-body">
-        <div class="hero">
-            <h1>PAGX AI Skills</h1>
-            <p class="subtitle">让你的 AI 编程助手具备创建和优化 PAGX 矢量图形的能力。</p>
-            <a href="../pagx.zip" download class="download-btn">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M2 17l.621 2.485A2 2 0 0 0 4.561 21h14.878a2 2 0 0 0 1.94-1.515L22 17"/></svg>
-                下载 Skills 安装包
-            </a>
-            <p class="download-meta">pagx.zip<span>&middot;</span>最后更新：{{lastUpdated}}</p>
+        <div class="step">
+            <p><span class="step-number">第 3 步</span> &mdash; 验证安装是否成功。打开终端（macOS 上的"终端"应用，Windows 上的"命令提示符"或"PowerShell"），输入以下命令：</p>
+            <pre><code>node --version</code></pre>
+            <p>正常情况下会显示类似 <code>v22.x.x</code> 的版本号。版本需要 18 或更高。</p>
         </div>
 
-        <main class="content">
-            <!-- About -->
-            <h2 id="about">简介</h2>
-            <p>
-                PAGX AI Skills 是一套参考文档包，安装后可以让 AI 编程助手根据文字描述生成结构规范的 PAGX 文件，
-                优化已有文件的体积和渲染性能，以及查询 PAGX 语法、属性和命令行工具用法。
-            </p>
-            <p>
-                矢量图生成的本质是一个 AI 编程过程 &mdash; 模型编写的是结构化标记语言，而非采样像素。
-                这意味着输出质量会随着 AI 编程大模型能力的持续提升而自然提高，达到同样效果所需的
-                提示详细程度和人工迭代次数都会逐渐降低。与位图生成（如 Stable Diffusion、DALL-E）
-                从概率分布中抽样、无法精确修改输出不同，PAGX 产出的是结构化文件，每个元素都有精确
-                可编辑的值。哪里不对，只需描述一下改动，AI 就会精确调整那个具体的部分 &mdash;
-                颜色、尺寸、位置、间距 &mdash; 而不影响其他任何东西。只要迭代次数足够，
-                输出就几乎一定可以达到上线标准。
-            </p>
-            <p>
-                PAGX 格式最初就是为描述动效而设计的 &mdash; 动效是在矢量静态图基础上的扩展。
-                该格式目前仍在持续迭代中，当前阶段的重点是打磨矢量静态图的基础能力。
-                待动效能力补充完善后，AI 还可以进一步直接操作这些矢量元素来生成复杂的动效。
-            </p>
-            <p>文档包包含：</p>
-            <ul>
-                <li>格式规范要点与设计模式</li>
-                <li>分步骤的生成指南和优化指南</li>
-                <li>完整的属性参考（含默认值和枚举值）</li>
-                <li>命令行工具参考（渲染、校验等）</li>
-                <li>实用示例（图标、UI 组件、卡片、文本等）</li>
-            </ul>
-
-            <!-- Installation -->
-            <h2 id="installation">安装指南</h2>
-
-            <h3 id="install-nodejs">1. 安装 Node.js</h3>
-            <p>
-                Skills 安装包内含配套的命令行工具（<code>pagx-cli</code>），运行时需要 Node.js 环境。
-                如果你的电脑上还没有安装 Node.js，请按以下步骤操作：
-            </p>
-            <div class="step">
-                <p><span class="step-number">第 1 步</span> &mdash; 访问 <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a>，下载适用于你操作系统的 <strong>LTS</strong>（长期支持）版本。</p>
-            </div>
-            <div class="step">
-                <p><span class="step-number">第 2 步</span> &mdash; 运行安装程序，按照屏幕提示操作，保持所有默认设置即可。</p>
-            </div>
-            <div class="step">
-                <p><span class="step-number">第 3 步</span> &mdash; 验证安装是否成功。打开终端（macOS 上的"终端"应用，Windows 上的"命令提示符"或"PowerShell"），输入以下命令：</p>
-                <pre><code>node --version</code></pre>
-                <p>正常情况下会显示类似 <code>v22.x.x</code> 的版本号。版本需要 18 或更高。</p>
-            </div>
-
-            <h3 id="install-codebuddy">2. 安装 CodeBuddy Code</h3>
-            <p>
-                <a href="https://www.codebuddy.ai/docs/cli/installation" target="_blank" rel="noopener">CodeBuddy Code</a>
-                是一款在终端中运行的 AI 编程助手。如果你还没有安装过，请按以下步骤操作：
-            </p>
-            <div class="step">
-                <p><span class="step-number">第 1 步</span> &mdash; 打开终端，运行以下安装命令：</p>
-                <pre><code>npm install -g @tencent-ai/codebuddy-code</code></pre>
-                <p>也可以使用其他包管理器安装：</p>
-                <pre><code># Homebrew（macOS / Linux）
+        <h3 id="install-codebuddy">2. 安装 CodeBuddy Code</h3>
+        <p>
+            <a href="https://www.codebuddy.ai/docs/cli/installation" target="_blank" rel="noopener">CodeBuddy Code</a>
+            是一款在终端中运行的 AI 编程助手。如果你还没有安装过，请按以下步骤操作：
+        </p>
+        <div class="step">
+            <p><span class="step-number">第 1 步</span> &mdash; 打开终端，运行以下安装命令：</p>
+            <pre><code>npm install -g @tencent-ai/codebuddy-code</code></pre>
+            <p>也可以使用其他包管理器安装：</p>
+            <pre><code># Homebrew（macOS / Linux）
 brew install Tencent-CodeBuddy/tap/codebuddy-code
 
 # 或无需 Node.js 安装（macOS / Linux）
 curl -fsSL https://copilot.tencent.com/cli/install.sh | bash</code></pre>
-            </div>
-            <div class="step">
-                <p><span class="step-number">第 2 步</span> &mdash; 安装完成后，输入以下命令启动：</p>
-                <pre><code>codebuddy</code></pre>
-                <p>按照屏幕提示完成初始设置和账号认证。</p>
-            </div>
-            <div class="info-box">
-                <p>如需了解详细的安装说明和系统要求，请参阅
-                <a href="https://www.codebuddy.ai/docs/cli/installation" target="_blank" rel="noopener">CodeBuddy Code 官方文档</a>。</p>
-            </div>
+        </div>
+        <div class="step">
+            <p><span class="step-number">第 2 步</span> &mdash; 安装完成后，输入以下命令启动：</p>
+            <pre><code>codebuddy</code></pre>
+            <p>按照屏幕提示完成初始设置和账号认证。</p>
+        </div>
+        <div class="info-box">
+            <p>如需了解详细的安装说明和系统要求，请参阅
+            <a href="https://www.codebuddy.ai/docs/cli/installation" target="_blank" rel="noopener">CodeBuddy Code 官方文档</a>。</p>
+        </div>
 
-            <h3 id="install-skills">3. 安装 PAGX Skills</h3>
-            <p>
-                下载上方的 Skills 安装包后，将其解压并安装到你的项目中：
-            </p>
-            <div class="step">
-                <p><span class="step-number">第 1 步</span> &mdash; 打开终端，进入你的项目文件夹（即你想要创建 PAGX 文件的目录）：</p>
-                <pre><code>cd /path/to/your/project</code></pre>
-            </div>
-            <div class="step">
-                <p><span class="step-number">第 2 步</span> &mdash; 创建 Skills 目录：</p>
-                <pre><code>mkdir -p .codebuddy/skills</code></pre>
-            </div>
-            <div class="step">
-                <p><span class="step-number">第 3 步</span> &mdash; 将下载的 <code>pagx.zip</code> 解压到 Skills 目录中：</p>
-                <pre><code>unzip pagx.zip -d .codebuddy/skills/pagx</code></pre>
-                <p>解压后，目录结构应如下所示：</p>
-                <pre><code>your-project/
+        <h3 id="install-skills">3. 安装 PAGX Skills</h3>
+        <p>
+            下载上方的 Skills 安装包后，将其解压并安装到你的项目中：
+        </p>
+        <div class="step">
+            <p><span class="step-number">第 1 步</span> &mdash; 打开终端，进入你的项目文件夹（即你想要创建 PAGX 文件的目录）：</p>
+            <pre><code>cd /path/to/your/project</code></pre>
+        </div>
+        <div class="step">
+            <p><span class="step-number">第 2 步</span> &mdash; 创建 Skills 目录：</p>
+            <pre><code>mkdir -p .codebuddy/skills</code></pre>
+        </div>
+        <div class="step">
+            <p><span class="step-number">第 3 步</span> &mdash; 将下载的 <code>pagx.zip</code> 解压到 Skills 目录中：</p>
+            <pre><code>unzip pagx.zip -d .codebuddy/skills/pagx</code></pre>
+            <p>解压后，目录结构应如下所示：</p>
+            <pre><code>your-project/
   .codebuddy/
     skills/
       pagx/
         SKILL.md
         references/
           ...</code></pre>
-            </div>
-            <div class="step">
-                <p><span class="step-number">第 4 步</span> &mdash; 在项目文件夹中启动 CodeBuddy Code：</p>
-                <pre><code>codebuddy</code></pre>
-                <p>PAGX Skills 会被自动识别并加载。</p>
-            </div>
-            <div class="info-box">
-                <p><code>pagx-cli</code> 命令行工具会在 AI 助手首次需要时自动安装，这依赖于第 1 步中搭建的 Node.js 环境。</p>
-            </div>
-            <div class="info-box">
-                <p>目前 PAGX Skills 在 CodeBuddy Code 上经过了最全面的测试。为获得最佳效果，建议在
-                CodeBuddy Code 设置中选择 <strong>Claude Opus</strong> 模型，该模型在使用此 Skills 时生成质量最高。</p>
-            </div>
+        </div>
+        <div class="step">
+            <p><span class="step-number">第 4 步</span> &mdash; 在项目文件夹中启动 CodeBuddy Code：</p>
+            <pre><code>codebuddy</code></pre>
+            <p>PAGX Skills 会被自动识别并加载。</p>
+        </div>
+        <div class="info-box">
+            <p><code>pagx-cli</code> 命令行工具会在 AI 助手首次需要时自动安装，这依赖于第 1 步中搭建的 Node.js 环境。</p>
+        </div>
+        <div class="info-box">
+            <p>目前 PAGX Skills 在 CodeBuddy Code 上经过了最全面的测试。为获得最佳效果，建议在
+            CodeBuddy Code 设置中选择 <strong>Claude Opus</strong> 模型，该模型在使用此 Skills 时生成质量最高。</p>
+        </div>
 
-            <h3 id="other-tools">在其他 AI 编程工具中使用</h3>
-            <p>
-                以上指南以 CodeBuddy Code 为例，但 PAGX Skills 是一套遵循开放规范的结构化参考文档，不绑定任何特定工具。
-                如果你使用其他支持 Skills（或类似机制）的 AI 编程助手，只需要：
-            </p>
-            <ol>
-                <li><strong>确保系统已安装 Node.js</strong>（参见上方第 1 步）&mdash;
-                这是 Skills 依赖的 <code>pagx-cli</code> 工具运行所必需的。</li>
-                <li><strong>将 Skills 文件拷贝到对应目录</strong>。参考上方第 3 步的解压过程，只需将
-                <code>.codebuddy/skills/</code> 替换为你所用工具指定的 Skills 存放路径即可。</li>
-            </ol>
+        <h3 id="other-tools">在其他 AI 编程工具中使用</h3>
+        <p>
+            以上指南以 CodeBuddy Code 为例，但 PAGX Skills 是一套遵循开放规范的结构化参考文档，不绑定任何特定工具。
+            如果你使用其他支持 Skills（或类似机制）的 AI 编程助手，只需要：
+        </p>
+        <ol>
+            <li><strong>确保系统已安装 Node.js</strong>（参见上方第 1 步）&mdash;
+            这是 Skills 依赖的 <code>pagx-cli</code> 工具运行所必需的。</li>
+            <li><strong>将 Skills 文件拷贝到对应目录</strong>。参考上方第 3 步的解压过程，只需将
+            <code>.codebuddy/skills/</code> 替换为你所用工具指定的 Skills 存放路径即可。</li>
+        </ol>
 
-            <!-- Getting Started -->
-            <h2 id="getting-started">开始使用</h2>
-            <p>
-                Skills 安装完成后，你可以用自然语言与 AI 交互。以下是一些常见的操作示例：
-            </p>
+        <!-- Getting Started -->
+        <h2 id="getting-started">开始使用</h2>
+        <p>
+            Skills 安装完成后，你可以用自然语言与 AI 交互。以下是一些常见的操作示例：
+        </p>
 
-            <h3 id="creating">创建 PAGX 文件</h3>
-            <ul>
-                <li><em>"创建一个蓝色圆角矩形按钮的 PAGX 文件，按钮上有白色文字 'Submit'"</em></li>
-                <li><em>"设计一个卡片组件，包含头像、标题和副标题"</em></li>
-                <li><em>"用简单的几何图形做一个设置图标，24x24 尺寸"</em></li>
-                <li><em>"创建一个渐变色横幅，上面有加粗文字 'Welcome Back'"</em></li>
-            </ul>
+        <h3 id="creating">创建 PAGX 文件</h3>
+        <ul>
+            <li><em>"创建一个蓝色圆角矩形按钮的 PAGX 文件，按钮上有白色文字 'Submit'"</em></li>
+            <li><em>"设计一个卡片组件，包含头像、标题和副标题"</em></li>
+            <li><em>"用简单的几何图形做一个设置图标，24x24 尺寸"</em></li>
+            <li><em>"创建一个渐变色横幅，上面有加粗文字 'Welcome Back'"</em></li>
+        </ul>
 
-            <h3 id="modifying">修改与迭代</h3>
-            <ul>
-                <li><em>"把按钮颜色改成绿色，圆角再大一些"</em></li>
-                <li><em>"标题文字调大一些，改成左对齐"</em></li>
-                <li><em>"给卡片加一个淡淡的阴影效果"</em></li>
-                <li><em>"图标和文字之间的间距感觉太紧了，拉开一些"</em></li>
-            </ul>
+        <h3 id="modifying">修改与迭代</h3>
+        <ul>
+            <li><em>"把按钮颜色改成绿色，圆角再大一些"</em></li>
+            <li><em>"标题文字调大一些，改成左对齐"</em></li>
+            <li><em>"给卡片加一个淡淡的阴影效果"</em></li>
+            <li><em>"图标和文字之间的间距感觉太紧了，拉开一些"</em></li>
+        </ul>
 
-            <h3 id="rendering">渲染与检查</h3>
-            <ul>
-                <li><em>"把这个 PAGX 文件渲染成截图，我看一下效果"</em></li>
-                <li><em>"渲染成 2 倍大小，方便在 Retina 屏幕上预览"</em></li>
-                <li><em>"校验一下这个 PAGX 文件有没有错误，有的话帮我修复"</em></li>
-                <li><em>"优化一下这个 PAGX 文件的体积"</em></li>
-            </ul>
+        <h3 id="rendering">渲染与检查</h3>
+        <ul>
+            <li><em>"把这个 PAGX 文件渲染成截图，我看一下效果"</em></li>
+            <li><em>"渲染成 2 倍大小，方便在 Retina 屏幕上预览"</em></li>
+            <li><em>"校验一下这个 PAGX 文件有没有错误，有的话帮我修复"</em></li>
+            <li><em>"优化一下这个 PAGX 文件的体积"</em></li>
+        </ul>
 
-            <h3 id="preview">在线预览</h3>
-            <p>
-                你也可以通过 <a href="../../">PAGX Playground</a> 在线预览 PAGX 文件
-                &mdash; 只需将任意 <code>.pagx</code> 文件拖放到页面上，即可在浏览器中查看渲染效果。
-            </p>
+        <h3 id="preview">在线预览</h3>
+        <p>
+            你也可以通过 <a href="../../">PAGX Playground</a> 在线预览 PAGX 文件
+            &mdash; 只需将任意 <code>.pagx</code> 文件拖放到页面上，即可在浏览器中查看渲染效果。
+        </p>
 
-            <h3 id="tips">使用建议</h3>
-            <p>
-                <strong>多轮迭代，逐步趋近完美。</strong>
-                不要期望一次就得到完美结果，而是把这个过程当作一场对话：描述你想要的效果，预览渲染输出，
-                然后告诉 AI 哪里需要调整。每一轮反馈产生的都是精确修改 &mdash; 而不是概率性的重新抽卡
-                &mdash; 所以你会稳步逼近理想结果。这个多轮迭代过程可以完全交给 AI 自动完成，
-                也可以在任何环节让人介入，提供关键的审美判断和解构思路指导。
-                这种通过自然语言驱动、支持多轮迭代的精确修改能力，正是这套工作流程的核心价值所在。
-            </p>
-            <p>
-                <strong>以创作为主，而非临摹。</strong>
-                如果你提供位图作为参考，AI 会将其作为灵感来源进行全新的矢量创作，而不是逐像素描摹。
-                精确复现位图并非当前任何 AI 大模型的强项：位图本质上是一个基于概率的"感觉"，
-                而矢量图则是一个有唯一解的精确结构描述。从概率分布中求解唯一解，
-                从原理上与大语言模型的能力方向并不契合。
-                用参考图来传达风格和概念即可，让 AI 去创作一个干净的矢量演绎。
-            </p>
+        <h3 id="tips">使用建议</h3>
+        <p>
+            <strong>多轮迭代，逐步趋近完美。</strong>
+            不要期望一次就得到完美结果，而是把这个过程当作一场对话：描述你想要的效果，预览渲染输出，
+            然后告诉 AI 哪里需要调整。每一轮反馈产生的都是精确修改 &mdash; 而不是概率性的重新抽卡
+            &mdash; 所以你会稳步逼近理想结果。这个多轮迭代过程可以完全交给 AI 自动完成，
+            也可以在任何环节让人介入，提供关键的审美判断和解构思路指导。
+            这种通过自然语言驱动、支持多轮迭代的精确修改能力，正是这套工作流程的核心价值所在。
+        </p>
+        <p>
+            <strong>以创作为主，而非临摹。</strong>
+            如果你提供位图作为参考，AI 会将其作为灵感来源进行全新的矢量创作，而不是逐像素描摹。
+            精确复现位图并非当前任何 AI 大模型的强项：位图本质上是一个基于概率的"感觉"，
+            而矢量图则是一个有唯一解的精确结构描述。从概率分布中求解唯一解，
+            从原理上与大语言模型的能力方向并不契合。
+            用参考图来传达风格和概念即可，让 AI 去创作一个干净的矢量演绎。
+        </p>
 
-            <!-- CLI Tools -->
-            <h2 id="cli">命令行工具</h2>
-            <p>
-                Skills 安装包配合 <code>pagx-cli</code> 命令行工具使用，该工具通过 npm 分发。
-                通过 AI 助手使用时，CLI 会被自动调用。你也可以手动安装并直接使用：
-            </p>
-            <pre><code>npm install -g @libpag/pagx</code></pre>
+        <!-- CLI Tools -->
+        <h2 id="cli">命令行工具</h2>
+        <p>
+            Skills 安装包配合 <code>pagx-cli</code> 命令行工具使用，该工具通过 npm 分发。
+            通过 AI 助手使用时，CLI 会被自动调用。你也可以手动安装并直接使用：
+        </p>
+        <pre><code>npm install -g @libpag/pagx</code></pre>
 
-            <table>
-                <tr><th>命令</th><th>功能</th></tr>
-                <tr><td><code>pagx render</code></td><td>将 PAGX 文件渲染为 PNG、WebP 或 JPG 图片</td></tr>
-                <tr><td><code>pagx validate</code></td><td>校验 PAGX 文件是否符合规范</td></tr>
-                <tr><td><code>pagx optimize</code></td><td>一步完成校验、结构优化和格式化</td></tr>
-                <tr><td><code>pagx format</code></td><td>统一缩进格式美化输出</td></tr>
-                <tr><td><code>pagx bounds</code></td><td>查询图层的精确渲染边界</td></tr>
-                <tr><td><code>pagx font info</code></td><td>查询字体信息和度量数据</td></tr>
-                <tr><td><code>pagx font embed</code></td><td>将字体嵌入 PAGX 文件</td></tr>
-            </table>
+        <table>
+            <tr><th>命令</th><th>功能</th></tr>
+            <tr><td><code>pagx render</code></td><td>将 PAGX 文件渲染为 PNG、WebP 或 JPG 图片</td></tr>
+            <tr><td><code>pagx validate</code></td><td>校验 PAGX 文件是否符合规范</td></tr>
+            <tr><td><code>pagx optimize</code></td><td>一步完成校验、结构优化和格式化</td></tr>
+            <tr><td><code>pagx format</code></td><td>统一缩进格式美化输出</td></tr>
+            <tr><td><code>pagx bounds</code></td><td>查询图层的精确渲染边界</td></tr>
+            <tr><td><code>pagx font info</code></td><td>查询字体信息和度量数据</td></tr>
+            <tr><td><code>pagx font embed</code></td><td>将字体嵌入 PAGX 文件</td></tr>
+        </table>
 
-            <p>
-                如需查看完整的命令行文档及所有参数选项，请参阅
-                <a href="https://pag.io/pagx/latest/zh/#cli-reference">规范文档 &mdash; CLI 参考</a>。
-            </p>
+        <p>
+            如需查看完整的命令行文档及所有参数选项，请参阅
+            <a href="https://pag.io/pagx/latest/zh/#cli-reference">规范文档 &mdash; CLI 参考</a>。
+        </p>
 
-            <p class="last-updated">最后更新：{{lastUpdated}}</p>
-        </main>
-    </div>
+        <p class="last-updated">最后更新：{{lastUpdated}}</p>
+    </main>
 
     <script>
         var LANG_COOKIE = 'pagx_lang';
@@ -539,53 +431,10 @@ curl -fsSL https://copilot.tencent.com/cli/install.sh | bash</code></pre>
             return false;
         }
 
-        function toggleSidebar() {
-            var sidebar = document.querySelector('.sidebar');
-            var overlay = document.querySelector('.sidebar-overlay');
-            sidebar.classList.toggle('open');
-            overlay.classList.toggle('open');
-            document.body.style.overflow = sidebar.classList.contains('open') ? 'hidden' : '';
-        }
-
         document.addEventListener('click', function(e) {
             var langSwitch = document.querySelector('.lang-switch');
             if (!langSwitch.contains(e.target)) langSwitch.classList.remove('open');
         });
-
-        // Close sidebar on link click (mobile)
-        document.querySelectorAll('.sidebar a').forEach(function(link) {
-            link.addEventListener('click', function() {
-                if (window.innerWidth <= 900) toggleSidebar();
-            });
-        });
-
-        // Active TOC highlight on scroll
-        (function() {
-            var links = document.querySelectorAll('.sidebar a[href^="#"]');
-            var ids = [];
-            links.forEach(function(a) { ids.push(a.getAttribute('href').slice(1)); });
-            if (!ids.length) return;
-            var updating = false;
-            window.addEventListener('scroll', function() {
-                if (updating) return;
-                updating = true;
-                requestAnimationFrame(function() {
-                    var current = '';
-                    for (var i = 0; i < ids.length; i++) {
-                        var el = document.getElementById(ids[i]);
-                        if (el && el.getBoundingClientRect().top <= 24) {
-                            current = ids[i];
-                        } else {
-                            break;
-                        }
-                    }
-                    links.forEach(function(a) {
-                        a.classList.toggle('active', a.getAttribute('href') === '#' + current);
-                    });
-                    updating = false;
-                });
-            }, { passive: true });
-        })();
     </script>
 </body>
 </html>
