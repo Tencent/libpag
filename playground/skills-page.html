@@ -210,15 +210,26 @@
             syntax, attributes, and CLI commands.
         </p>
         <p>
-            Under the hood, vector generation is essentially an AI coding process &mdash; the model
-            writes structured markup rather than sampling pixels. This means the quality of output
-            improves naturally as AI coding models advance, and less detailed prompting will be needed
-            over time to achieve the same results. Unlike bitmap-based generation (such as Stable
-            Diffusion or DALL-E), which samples from a probability distribution with no way to precisely
-            modify the output, PAGX produces structured files where every element has exact, editable
-            values. If something isn't right, you simply describe the change and the AI adjusts that
-            specific part &mdash; colors, sizes, positions, spacing &mdash; without affecting anything
-            else. With enough iterations, the output can reliably reach production quality.
+            Most AI image generation tools today (such as Stable Diffusion and DALL-E) work with
+            pixels &mdash; sampling bitmaps from a probability distribution. Their output is
+            essentially a one-shot "impression": if a detail is wrong, you cannot precisely fix
+            just that part; you can only regenerate and hope the next attempt turns out better.
+        </p>
+        <p>
+            Vector generation takes a fundamentally different approach. The AI writes structured
+            markup rather than sampling pixels, producing PAGX files where every element has exact,
+            editable values. If something isn't right, you simply describe the change in natural
+            language, and the AI adjusts that specific part &mdash; colors, sizes, positions,
+            spacing &mdash; without affecting anything else. This ability to make precise secondary
+            edits and iterate continuously is the core advantage of vector generation over
+            pixel-based approaches.
+        </p>
+        <p>
+            The entire iteration process can be fully automated by the AI, or you can step in at
+            any point to provide key aesthetic judgment and structural guidance. With enough
+            iterations, the output can reliably reach production quality. And as AI models continue
+            to advance, less detailed prompting will be needed to achieve the same results, with
+            less and less human intervention required.
         </p>
         <p>
             PAGX was originally designed to describe motion graphics &mdash; animations built on top
@@ -250,7 +261,7 @@
 
         <h3 id="install-codebuddy">2. Install CodeBuddy Code</h3>
         <p>
-            <a href="https://www.codebuddy.ai/docs/cli/installation" target="_blank" rel="noopener">CodeBuddy Code</a>
+            <a href="https://www.codebuddy.ai/docs/cli/overview" target="_blank" rel="noopener">CodeBuddy Code</a>
             is an AI coding assistant that runs in your terminal. If you haven't installed it yet:
         </p>
         <div class="step">
@@ -270,7 +281,7 @@ curl -fsSL https://copilot.tencent.com/cli/install.sh | bash</code></pre>
         </div>
         <div class="info-box">
             <p>For detailed installation instructions and system requirements, see the
-            <a href="https://www.codebuddy.ai/docs/cli/installation" target="_blank" rel="noopener">CodeBuddy Code documentation</a>.</p>
+            <a href="https://www.codebuddy.ai/docs/cli/overview" target="_blank" rel="noopener">CodeBuddy Code documentation</a>.</p>
         </div>
 
         <h3 id="install-skills">3. Install PAGX Skills</h3>

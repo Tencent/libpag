@@ -204,7 +204,9 @@
         <!-- About -->
         <h2 id="about">简介</h2>
         <p>PAGX AI Skills 是一套 AI 编程助手的专业技能扩展。安装后，AI 助手即可根据文字描述生成结构规范的 PAGX 矢量图形，优化已有文件的体积和渲染性能，以及查询 PAGX 语法、属性和命令行工具用法。</p>
-        <p>矢量图生成的本质是一个 AI 编程过程 &mdash; 模型编写的是结构化标记语言，而非采样像素。这意味着输出质量会随着 AI 编程大模型能力的持续提升而自然提高，达到同样效果所需的提示详细程度和人工迭代次数都会逐渐降低。与位图生成（如 Stable Diffusion、DALL-E）从概率分布中抽样、无法精确修改输出不同，PAGX 产出的是结构化文件，每个元素都有精确可编辑的值。哪里不对，只需描述一下改动，AI 就会精确调整那个具体的部分 &mdash; 颜色、尺寸、位置、间距 &mdash; 而不影响其他任何东西。只要迭代次数足够，输出就几乎一定可以达到上线标准。</p>
+        <p>目前主流的 AI 图片生成工具（如 Stable Diffusion、DALL-E）都围绕像素展开，从概率分布中抽样产出位图。这类输出本质上是一次性的"感觉" &mdash; 如果某个细节不对，你无法精确地只改那一处，只能重新生成并期望下一次运气更好。</p>
+        <p>矢量生成走的是完全不同的路径。AI 编写的是结构化标记语言而非采样像素，产出的 PAGX 文件中每个元素都有精确可编辑的值。哪里不对，只需用自然语言描述改动，AI 就会精确调整那个具体的部分 &mdash; 颜色、尺寸、位置、间距 &mdash; 而不影响其他任何东西。这种支持二次精确修改、持续迭代的能力，正是矢量生成相比像素生成的核心价值。</p>
+        <p>整个迭代过程可以完全交给 AI 自动完成，也可以在任何环节让人介入，提供关键的审美判断和结构指导。只要迭代次数足够，输出就几乎一定可以达到上线标准。而且随着 AI 大模型能力的持续提升，达到同样效果所需的提示会越来越简洁，人工介入也会越来越少。</p>
         <p>PAGX 格式最初就是为描述动效而设计的 &mdash; 动效是在矢量静态图基础上的扩展。该格式目前仍在持续迭代中，当前阶段的重点是打磨矢量静态图的基础能力。待动效能力补充完善后，AI 还可以进一步直接操作这些矢量元素来生成复杂的动效。</p>
 
         <!-- Installation -->
@@ -225,7 +227,7 @@
         </div>
 
         <h3 id="install-codebuddy">2. 安装 CodeBuddy Code</h3>
-        <p><a href="https://www.codebuddy.ai/docs/cli/installation" target="_blank" rel="noopener">CodeBuddy Code</a> 是一款在终端中运行的 AI 编程助手。如果你还没有安装过，请按以下步骤操作：</p>
+        <p><a href="https://www.codebuddy.ai/docs/cli/overview" target="_blank" rel="noopener">CodeBuddy Code</a> 是一款在终端中运行的 AI 编程助手。如果你还没有安装过，请按以下步骤操作：</p>
         <div class="step">
             <p><span class="step-number">第 1 步</span> &mdash; 打开终端，运行以下安装命令：</p>
             <pre><code>npm install -g @tencent-ai/codebuddy-code</code></pre>
@@ -242,7 +244,7 @@ curl -fsSL https://copilot.tencent.com/cli/install.sh | bash</code></pre>
             <p>按照屏幕提示完成初始设置和账号认证。</p>
         </div>
         <div class="info-box">
-        <p>如需了解详细的安装说明和系统要求，请参阅 <a href="https://www.codebuddy.ai/docs/cli/installation" target="_blank" rel="noopener">CodeBuddy Code 官方文档</a>。</p>
+        <p>如需了解详细的安装说明和系统要求，请参阅 <a href="https://www.codebuddy.ai/docs/cli/overview" target="_blank" rel="noopener">CodeBuddy Code 官方文档</a>。</p>
         </div>
 
         <h3 id="install-skills">3. 安装 PAGX Skills</h3>
