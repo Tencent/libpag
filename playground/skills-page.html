@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PAGX AI Skills</title>
+    <link rel="icon" href="../favicon.png" type="image/png">
+    <style>
+        :root {
+            --primary-color: #0066cc;
+            --bg-color: #ffffff;
+            --text-color: #333333;
+            --code-bg: #f6f8fa;
+            --border-color: #e1e4e8;
+        }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Hero download section */
+        .hero {
+            background: linear-gradient(135deg, #f0f7ff 0%, #e8f0fe 100%);
+            border-bottom: 1px solid #c8ddf5;
+            padding: 48px 40px 40px;
+            text-align: center;
+        }
+        .hero h1 { font-size: 2em; font-weight: 600; margin: 0 0 8px; line-height: 1.25; }
+        .hero .subtitle { font-size: 18px; color: #586069; margin: 0 0 28px; }
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 32px;
+            background: var(--primary-color);
+            color: white;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: background 0.2s, box-shadow 0.2s;
+            box-shadow: 0 2px 8px rgba(0, 102, 204, 0.25);
+        }
+        .download-btn:hover { background: #0052a3; box-shadow: 0 4px 14px rgba(0, 102, 204, 0.35); text-decoration: none; }
+        .download-btn svg { width: 18px; height: 18px; }
+        .download-meta { margin-top: 14px; font-size: 13px; color: #586069; }
+        .download-meta span { margin: 0 6px; }
+
+        /* Content */
+        .content {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 8px 60px 80px;
+        }
+
+        /* Typography */
+        h2 { font-size: 1.5em; font-weight: 600; margin-top: 48px; margin-bottom: 16px; padding-bottom: 0.3em; border-bottom: 1px solid var(--border-color); }
+        h3 { font-size: 1.25em; font-weight: 600; margin-top: 32px; margin-bottom: 12px; }
+        a { color: var(--primary-color); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        p { margin-top: 0; margin-bottom: 16px; }
+
+        /* Code */
+        code {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 85%;
+            background-color: var(--code-bg);
+            padding: 0.2em 0.4em;
+            border-radius: 6px;
+        }
+        pre {
+            background-color: var(--code-bg);
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            font-size: 85%;
+            line-height: 1.45;
+            border: 1px solid var(--border-color);
+        }
+        pre code { background-color: transparent; padding: 0; border-radius: 0; font-size: 100%; }
+
+        /* Table */
+        table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+        th, td { border: 1px solid var(--border-color); padding: 8px 13px; text-align: left; }
+        th { background-color: #f6f8fa; font-weight: 600; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+
+        /* Lists */
+        ul, ol { padding-left: 2em; margin-top: 0; margin-bottom: 16px; }
+        li { margin: 4px 0; }
+
+        /* Steps */
+        .step { margin: 20px 0; padding: 16px 20px; background: #f8f9fa; border-radius: 6px; border-left: 3px solid var(--primary-color); }
+        .step-number { font-weight: 600; color: var(--primary-color); }
+
+        /* Info box */
+        .info-box { margin: 16px 0; padding: 12px 16px; border-left: 4px solid #0366d6; background-color: #f1f8ff; border-radius: 0 6px 6px 0; }
+        .info-box p { margin: 0; font-size: 14px; }
+
+
+        /* Header actions */
+        .header-actions {
+            position: fixed;
+            top: 12px;
+            right: 20px;
+            z-index: 101;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .header-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            background: rgba(255,255,255,0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: #555;
+            font-family: inherit;
+            font-size: 14px;
+            line-height: 1.2;
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .header-btn:hover { background: #e9ecef; text-decoration: none; }
+        .header-btn svg { width: 14px; height: 14px; }
+
+        /* Language switch */
+        .lang-switch { position: relative; }
+        .lang-switch svg { transition: transform 0.2s; }
+        .lang-switch.open svg { transform: rotate(180deg); }
+        .lang-switch-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            min-width: 100%;
+            margin-top: 4px;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            overflow: hidden;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-8px);
+            transition: all 0.2s;
+        }
+        .lang-switch.open .lang-switch-menu { opacity: 1; visibility: visible; transform: translateY(0); }
+        .lang-switch-menu a { display: block; padding: 8px 16px; color: #555; font-size: 13px; text-decoration: none; white-space: nowrap; }
+        .lang-switch-menu a:hover { background: #f8f9fa; color: var(--primary-color); }
+        .lang-switch-menu a.active { background: #e3f2fd; color: #1565c0; }
+
+        /* Mobile */
+        @media (max-width: 600px) {
+            .content { padding: 8px 16px 60px; }
+            .hero { padding: 48px 16px 36px; }
+            .hero h1 { font-size: 1.5em; }
+            .header-actions { top: 8px; right: 12px; gap: 6px; }
+            .header-btn span { display: none; }
+            .header-btn { padding: 8px 10px; gap: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header-actions">
+        <a href="../" class="header-btn" title="Preview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            <span>Preview</span>
+        </a>
+        <div class="lang-switch" onclick="this.classList.toggle('open')">
+            <button class="header-btn">
+                <span>English</span>
+                <svg viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+            </button>
+            <div class="lang-switch-menu">
+                <a href="#" onclick="return switchLang('en', this.href);" class="active">English</a>
+                <a href="zh/" onclick="return switchLang('zh-CN', this.href);">简体中文</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hero download -->
+    <div class="hero">
+        <h1>PAGX AI Skills</h1>
+        <p class="subtitle">Enable your AI coding assistant to create, revise, and optimize PAGX vector graphics.</p>
+        <a href="./pagx.zip" download class="download-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M2 17l.621 2.485A2 2 0 0 0 4.561 21h14.878a2 2 0 0 0 1.94-1.515L22 17"/></svg>
+            Download Skills Package
+        </a>
+        <p class="download-meta">Last updated: {{lastUpdated}}</p>
+    </div>
+
+    <main class="content">
+        <!-- About -->
+        <h2 id="about">About</h2>
+        <p>
+            PAGX AI Skills is a professional skills extension for AI coding assistants. After
+            installation, an AI agent can generate structured PAGX vector graphics from text prompts,
+            optimize file size and rendering performance, and look up PAGX syntax, attributes, and
+            CLI usage when needed.
+        </p>
+        <p>
+            Most mainstream image generators (such as Stable Diffusion and DALL-E) produce bitmaps
+            by sampling from probability distributions. When a local detail is off, you often have
+            to regenerate the entire image instead of fixing just that specific part.
+        </p>
+        <p>
+            PAGX takes a different path: the AI outputs structured markup rather than sampled pixels.
+            Each element carries explicit editable parameters, so you can make targeted updates to
+            color, size, position, and spacing through natural-language instructions without affecting
+            unrelated parts. This ability to support precise secondary edits and continuous iteration
+            is the core value over bitmap-first generation; as iterations accumulate, outcomes are
+            more likely to converge toward production-ready quality.
+        </p>
+        <p>
+            The PAGX format is still under active development, and the
+            <a href="https://pag.io/pagx/latest/" target="_blank" rel="noopener">specification</a>
+            may be updated at any time. Static vector capabilities are complete; motion capabilities
+            will be added next, at which point AI Skills will also be able to generate animations
+            directly.
+        </p>
+
+        <!-- Installation -->
+        <h2 id="installation">Installation Guide</h2>
+
+        <h3 id="install-nodejs">1. Install Node.js</h3>
+        <p>
+            The Skills package includes the <a href="https://www.npmjs.com/package/@libpag/pagx" target="_blank" rel="noopener"><code>@libpag/pagx</code></a> command-line tool, which depends on
+            Node.js. If Node.js is not installed on your machine, complete these steps first:
+        </p>
+        <div class="step">
+            <p><span class="step-number">Step 1</span> &mdash; Visit <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a> and download the <strong>LTS</strong> (Long Term Support) version for your operating system.</p>
+        </div>
+        <div class="step">
+            <p><span class="step-number">Step 2</span> &mdash; Run the installer and follow the on-screen instructions. Accept all default settings.</p>
+        </div>
+        <div class="step">
+            <p><span class="step-number">Step 3</span> &mdash; Verify the installation. Open a terminal (Terminal on macOS, Command Prompt or PowerShell on Windows) and run:</p>
+            <pre><code>node --version</code></pre>
+            <p>If you see a version number like <code>v22.x.x</code>, Node.js is installed successfully.</p>
+        </div>
+
+        <h3 id="install-codebuddy">2. Install an AI Coding Assistant</h3>
+        <p>
+            PAGX Skills works with any AI coding assistant that supports a Skills mechanism.
+            Here we use
+            <a href="https://www.codebuddy.ai/cli" target="_blank" rel="noopener">CodeBuddy Code</a>
+            as an example. For other tools, refer to their official documentation for installation.
+        </p>
+        <div class="step">
+            <p><span class="step-number">Step 1</span> &mdash; Open a terminal and run the installation command:</p>
+            <pre><code>npm install -g @tencent-ai/codebuddy-code</code></pre>
+        </div>
+        <div class="step">
+            <p><span class="step-number">Step 2</span> &mdash; After installation, launch it by typing:</p>
+            <pre><code>codebuddy</code></pre>
+            <p>Follow the on-screen prompts to complete the initial setup and authentication.</p>
+        </div>
+        <div class="info-box">
+            <p>For detailed installation instructions and system requirements, see the
+            <a href="https://www.codebuddy.ai/cli" target="_blank" rel="noopener">CodeBuddy Code documentation</a>.</p>
+        </div>
+
+        <h3 id="install-skills">3. Install PAGX Skills</h3>
+        <p>
+            After downloading <a href="./pagx.zip" download><code>pagx.zip</code></a>, extract it and place the
+            resulting <code>pagx</code> folder into your <strong>user-level</strong> Skills directory.
+            This makes the skill available across all your projects.
+        </p>
+        <table>
+            <tr><th>Platform</th><th>Skills directory</th></tr>
+            <tr><td>macOS / Linux</td><td><code>~/.codebuddy/skills/</code></td></tr>
+            <tr><td>Windows</td><td><code>C:\Users\&lt;username&gt;\.codebuddy\skills\</code></td></tr>
+        </table>
+        <p>The final directory structure should look like:</p>
+        <pre><code>.codebuddy/
+  skills/
+    pagx/
+      SKILL.md
+      references/
+        ...</code></pre>
+        <p>
+            If the <code>.codebuddy/skills/</code> folders do not exist yet, create them manually.
+            Then launch CodeBuddy Code in any project folder &mdash; the PAGX Skills will be
+            automatically detected and loaded.
+        </p>
+        <div class="info-box">
+            <p>The <a href="https://www.npmjs.com/package/@libpag/pagx" target="_blank" rel="noopener"><code>@libpag/pagx</code></a> command-line tool will be automatically installed when the AI
+            assistant needs it for the first time. This requires the Node.js environment set up in Step 1.</p>
+        </div>
+
+        <!-- Getting Started -->
+        <h2 id="getting-started">Getting Started</h2>
+        <div class="info-box">
+            <p>PAGX Skills has been tested primarily with <strong>CodeBuddy Code</strong> and the
+            <strong>Claude Opus 4.6</strong> model. Other tools and models may produce different results.</p>
+        </div>
+
+        <p>
+            Once installed, you can drive the AI with natural language. The examples below follow a
+            simple sequence: create, iterate, then validate.
+        </p>
+
+        <h3 id="creating">Creating PAGX Files</h3>
+        <p>
+            When creating for the first time, include <strong>"PAGX"</strong> in your prompt so the
+            AI activates the PAGX skill. Once activated, subsequent messages in the same conversation
+            no longer need the keyword.
+        </p>
+        <ul>
+            <li><code>Create a PAGX button: blue rounded rectangle, white text 'Submit'</code></li>
+            <li><code>Design a PAGX card with an avatar, title, and subtitle</code></li>
+            <li><code>Make a PAGX settings icon using simple geometric shapes, 24x24</code></li>
+            <li><code>Create a PAGX gradient banner with bold text 'Welcome Back'</code></li>
+        </ul>
+
+        <h3 id="modifying">Modifying and Iterating</h3>
+        <ul>
+            <li><code>Change the Submit button color to green and increase its corner radius</code></li>
+            <li><code>Make the title text in the card larger and align it to the left</code></li>
+            <li><code>Add a subtle drop shadow to the entire card</code></li>
+            <li><code>The spacing between the settings icon and the label text feels too tight, increase it</code></li>
+        </ul>
+
+        <h3 id="rendering">Rendering and Inspection</h3>
+        <ul>
+            <li><code>Render this PAGX file as a screenshot so I can preview it</code></li>
+            <li><code>Render it at 2x scale for Retina display</code></li>
+            <li><code>Validate this PAGX file and fix any errors</code></li>
+            <li><code>Optimize this PAGX file for size and performance</code></li>
+        </ul>
+
+        <h3 id="preview">Online Preview</h3>
+        <p>
+            You can also preview PAGX files visually using the
+            <a href="../">PAGX Playground</a> &mdash; simply drag and drop any
+            <code>.pagx</code> file onto the page to see the rendered result in your browser.
+        </p>
+
+        <h3 id="tips">Tips for Best Results</h3>
+        <p>
+            <strong>Set the target, then iterate in small steps.</strong>
+            Describe the desired outcome, preview the render, and only report local changes.
+            Each round is a traceable, testable edit instead of a probabilistic re-roll, so
+            results converge faster and stay easier to reuse.
+        </p>
+        <p>
+            <strong>Use bitmap references for style, not tracing.</strong>
+            Bitmaps are good for conveying mood and composition, but not for pixel-perfect copying.
+            A better workflow is to let AI rebuild the idea as clean vector structure, then refine
+            it through targeted parameter edits.
+        </p>
+
+    </main>
+
+    <script>
+        var LANG_COOKIE = 'pagx_lang';
+        var LANG_COOKIE_PATH = '/';
+
+        function getLangCookie() {
+            var match = document.cookie.match(/(?:^|;\s*)pagx_lang=([^;]+)/);
+            return match ? decodeURIComponent(match[1]) : null;
+        }
+
+        function setLangCookie(lang) {
+            var expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
+            document.cookie = LANG_COOKIE + '=' + encodeURIComponent(lang) +
+                '; path=' + LANG_COOKIE_PATH +
+                '; expires=' + expires +
+                '; SameSite=Lax';
+        }
+
+        function switchLang(lang, url) {
+            setLangCookie(lang);
+            if (url && url !== '#' && url !== location.href) {
+                location.href = url;
+            }
+            return false;
+        }
+
+        (function() {
+            var zhUrl = 'zh/';
+            if (!zhUrl) return;
+            var saved = getLangCookie();
+            var shouldRedirect = saved === 'zh-CN' ||
+                (!saved && /^zh\b/.test(navigator.language || ''));
+            if (shouldRedirect) location.replace(zhUrl);
+        })();
+
+        document.addEventListener('click', function(e) {
+            var langSwitch = document.querySelector('.lang-switch');
+            if (!langSwitch.contains(e.target)) langSwitch.classList.remove('open');
+        });
+    </script>
+</body>
+</html>

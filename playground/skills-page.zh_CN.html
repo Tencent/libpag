@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PAGX AI Skills</title>
+    <link rel="icon" href="../../favicon.png" type="image/png">
+    <style>
+        :root {
+            --primary-color: #0066cc;
+            --bg-color: #ffffff;
+            --text-color: #333333;
+            --code-bg: #f6f8fa;
+            --border-color: #e1e4e8;
+        }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Hero download section */
+        .hero {
+            background: linear-gradient(135deg, #f0f7ff 0%, #e8f0fe 100%);
+            border-bottom: 1px solid #c8ddf5;
+            padding: 48px 40px 40px;
+            text-align: center;
+        }
+        .hero h1 { font-size: 2em; font-weight: 600; margin: 0 0 8px; line-height: 1.25; }
+        .hero .subtitle { font-size: 18px; color: #586069; margin: 0 0 28px; }
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 32px;
+            background: var(--primary-color);
+            color: white;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: background 0.2s, box-shadow 0.2s;
+            box-shadow: 0 2px 8px rgba(0, 102, 204, 0.25);
+        }
+        .download-btn:hover { background: #0052a3; box-shadow: 0 4px 14px rgba(0, 102, 204, 0.35); text-decoration: none; }
+        .download-btn svg { width: 18px; height: 18px; }
+        .download-meta { margin-top: 14px; font-size: 13px; color: #586069; }
+        .download-meta span { margin: 0 6px; }
+
+        /* Content */
+        .content {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 8px 60px 80px;
+        }
+
+        /* Typography */
+        h2 { font-size: 1.5em; font-weight: 600; margin-top: 48px; margin-bottom: 16px; padding-bottom: 0.3em; border-bottom: 1px solid var(--border-color); }
+        h3 { font-size: 1.25em; font-weight: 600; margin-top: 32px; margin-bottom: 12px; }
+        a { color: var(--primary-color); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        p { margin-top: 0; margin-bottom: 16px; }
+
+        /* Code */
+        code {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 85%;
+            background-color: var(--code-bg);
+            padding: 0.2em 0.4em;
+            border-radius: 6px;
+        }
+        pre {
+            background-color: var(--code-bg);
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            font-size: 85%;
+            line-height: 1.45;
+            border: 1px solid var(--border-color);
+        }
+        pre code { background-color: transparent; padding: 0; border-radius: 0; font-size: 100%; }
+
+        /* Table */
+        table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+        th, td { border: 1px solid var(--border-color); padding: 8px 13px; text-align: left; }
+        th { background-color: #f6f8fa; font-weight: 600; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+
+        /* Lists */
+        ul, ol { padding-left: 2em; margin-top: 0; margin-bottom: 16px; }
+        li { margin: 4px 0; }
+
+        /* Steps */
+        .step { margin: 20px 0; padding: 16px 20px; background: #f8f9fa; border-radius: 6px; border-left: 3px solid var(--primary-color); }
+        .step-number { font-weight: 600; color: var(--primary-color); }
+
+        /* Info box */
+        .info-box { margin: 16px 0; padding: 12px 16px; border-left: 4px solid #0366d6; background-color: #f1f8ff; border-radius: 0 6px 6px 0; }
+        .info-box p { margin: 0; font-size: 14px; }
+
+
+        /* Header actions */
+        .header-actions {
+            position: fixed;
+            top: 12px;
+            right: 20px;
+            z-index: 101;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .header-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            background: rgba(255,255,255,0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: #555;
+            font-family: inherit;
+            font-size: 14px;
+            line-height: 1.2;
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .header-btn:hover { background: #e9ecef; text-decoration: none; }
+        .header-btn svg { width: 14px; height: 14px; }
+
+        /* Language switch */
+        .lang-switch { position: relative; }
+        .lang-switch svg { transition: transform 0.2s; }
+        .lang-switch.open svg { transform: rotate(180deg); }
+        .lang-switch-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            min-width: 100%;
+            margin-top: 4px;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            overflow: hidden;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-8px);
+            transition: all 0.2s;
+        }
+        .lang-switch.open .lang-switch-menu { opacity: 1; visibility: visible; transform: translateY(0); }
+        .lang-switch-menu a { display: block; padding: 8px 16px; color: #555; font-size: 13px; text-decoration: none; white-space: nowrap; }
+        .lang-switch-menu a:hover { background: #f8f9fa; color: var(--primary-color); }
+        .lang-switch-menu a.active { background: #e3f2fd; color: #1565c0; }
+
+        /* Mobile */
+        @media (max-width: 600px) {
+            .content { padding: 8px 16px 60px; }
+            .hero { padding: 48px 16px 36px; }
+            .hero h1 { font-size: 1.5em; }
+            .header-actions { top: 8px; right: 12px; gap: 6px; }
+            .header-btn span { display: none; }
+            .header-btn { padding: 8px 10px; gap: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header-actions">
+        <a href="../../" class="header-btn" title="在线预览">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            <span>在线预览</span>
+        </a>
+        <div class="lang-switch" onclick="this.classList.toggle('open')">
+            <button class="header-btn">
+                <span>简体中文</span>
+                <svg viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+            </button>
+            <div class="lang-switch-menu">
+                <a href="../" onclick="return switchLang('en', this.href);">English</a>
+                <a href="#" onclick="return switchLang('zh-CN', this.href);" class="active">简体中文</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hero download -->
+    <div class="hero">
+        <h1>PAGX AI Skills</h1>
+        <p class="subtitle">让 AI 编程助手能够创建、修改并优化 PAGX 矢量图形。</p>
+        <a href="../pagx.zip" download class="download-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M2 17l.621 2.485A2 2 0 0 0 4.561 21h14.878a2 2 0 0 0 1.94-1.515L22 17"/></svg>
+            下载 Skills 安装包
+        </a>
+        <p class="download-meta">最后更新：{{lastUpdated}}</p>
+    </div>
+
+    <main class="content">
+        <!-- About -->
+        <h2 id="about">简介</h2>
+        <p>PAGX AI Skills 是面向 AI 编程助手的专业技能扩展包。安装后，AI Agent 可以根据文字描述生成结构化的 PAGX 矢量图形，优化文件体积与渲染性能，并在需要时查询 PAGX 语法、属性和命令行工具用法。</p>
+        <p>当前主流的 AI 出图工具（如 Stable Diffusion、DALL-E）主要围绕像素生成位图，本质上是从概率分布中采样结果。若某个局部细节不理想，往往只能整图重试，很难只改动单一位置。</p>
+        <p>PAGX 走的是不同路径：AI 输出的是结构化标记而不是像素采样。文件中的元素都带有明确、可编辑的参数，因此你可以通过自然语言对颜色、尺寸、位置、间距等局部属性做定点修改，而不影响其他部分。这种“可精确二次编辑、可持续迭代”的能力，就是相对位图生成的核心价值；迭代轮次增加后，结果也更容易稳定收敛到可交付质量。</p>
+        <p>PAGX 格式仍在持续迭代中，<a href="https://pag.io/pagx/latest/" target="_blank" rel="noopener">规范文档</a>可能随时更新。目前已完成静态矢量部分，后续将继续扩充动效能力——届时 AI Skills 也将具备直接生成动效的能力。</p>
+
+        <!-- Installation -->
+        <h2 id="installation">安装指南</h2>
+
+        <h3 id="install-nodejs">1. 安装 Node.js</h3>
+        <p>Skills 安装包包含命令行工具 <a href="https://www.npmjs.com/package/@libpag/pagx" target="_blank" rel="noopener"><code>@libpag/pagx</code></a>，运行依赖 Node.js。若本机尚未安装，请先完成以下步骤：</p>
+        <div class="step">
+            <p><span class="step-number">第 1 步</span> &mdash; 访问 <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a>，下载适用于你操作系统的 <strong>LTS</strong>（长期支持）版本。</p>
+        </div>
+        <div class="step">
+            <p><span class="step-number">第 2 步</span> &mdash; 运行安装程序，按照屏幕提示操作，保持所有默认设置即可。</p>
+        </div>
+        <div class="step">
+            <p><span class="step-number">第 3 步</span> &mdash; 验证安装是否成功。打开终端（macOS 上的"终端"应用，Windows 上的"命令提示符"或"PowerShell"），输入以下命令：</p>
+            <pre><code>node --version</code></pre>
+            <p>如果显示类似 <code>v22.x.x</code> 的版本号，说明 Node.js 已安装成功。</p>
+        </div>
+
+        <h3 id="install-codebuddy">2. 安装 AI 编程助手</h3>
+        <p>PAGX Skills 可用于任何支持 Skills 机制的 AI 编程助手。这里以 <a href="https://www.codebuddy.ai/cli" target="_blank" rel="noopener">CodeBuddy Code</a> 为例，其他工具请参考其官方文档完成安装。</p>
+        <div class="step">
+            <p><span class="step-number">第 1 步</span> &mdash; 打开终端，运行以下安装命令：</p>
+            <pre><code>npm install -g @tencent-ai/codebuddy-code</code></pre>
+        </div>
+        <div class="step">
+            <p><span class="step-number">第 2 步</span> &mdash; 安装完成后，输入以下命令启动：</p>
+            <pre><code>codebuddy</code></pre>
+            <p>按照屏幕提示完成初始设置和账号认证。</p>
+        </div>
+        <div class="info-box">
+        <p>如需了解详细的安装说明和系统要求，请参阅 <a href="https://www.codebuddy.ai/cli" target="_blank" rel="noopener">CodeBuddy Code 官方文档</a>。</p>
+        </div>
+
+        <h3 id="install-skills">3. 安装 PAGX Skills</h3>
+        <p>下载 <a href="../pagx.zip" download><code>pagx.zip</code></a> 后，将其解压，把得到的 <code>pagx</code> 文件夹放到<strong>用户级</strong> Skills 目录中。这样所有项目都可以使用该技能。</p>
+        <table>
+            <tr><th>平台</th><th>Skills 目录</th></tr>
+            <tr><td>macOS / Linux</td><td><code>~/.codebuddy/skills/</code></td></tr>
+            <tr><td>Windows</td><td><code>C:\Users\&lt;用户名&gt;\.codebuddy\skills\</code></td></tr>
+        </table>
+        <p>最终目录结构应如下所示：</p>
+        <pre><code>.codebuddy/
+  skills/
+    pagx/
+      SKILL.md
+      references/
+        ...</code></pre>
+        <p>如果 <code>.codebuddy/skills/</code> 文件夹尚不存在，手动创建即可。然后在任意项目目录下启动 CodeBuddy Code，PAGX Skills 会被自动识别并加载。</p>
+        <div class="info-box">
+            <p><a href="https://www.npmjs.com/package/@libpag/pagx" target="_blank" rel="noopener"><code>@libpag/pagx</code></a> 命令行工具会在 AI 助手首次需要时自动安装，这依赖于第 1 步中搭建的 Node.js 环境。</p>
+        </div>
+
+        <!-- Getting Started -->
+        <h2 id="getting-started">开始使用</h2>
+        <div class="info-box">
+        <p>PAGX Skills 目前主要在 <strong>CodeBuddy Code</strong> + <strong>Claude Opus 4.6</strong> 模型上完成测试。使用其他工具或模型时效果可能有所不同。</p>
+        </div>
+
+        <p>安装完成后，可直接用自然语言驱动 AI。下面按"创建→迭代→验证"给出常见示例：</p>
+
+        <h3 id="creating">创建 PAGX 文件</h3>
+        <p>首次创建时，请在提示中包含 <strong>"PAGX"</strong> 关键词，以便 AI 激活 PAGX 技能。激活后，同一对话中的后续消息无需再重复该关键词。</p>
+        <ul>
+            <li><code>创建一个 PAGX 按钮：蓝色圆角矩形，白色文字 'Submit'</code></li>
+            <li><code>设计一个 PAGX 卡片，包含头像、标题和副标题</code></li>
+            <li><code>用简单几何图形做一个 PAGX 设置图标，24x24 尺寸</code></li>
+            <li><code>创建一个 PAGX 渐变色横幅，加粗文字 'Welcome Back'</code></li>
+        </ul>
+
+        <h3 id="modifying">修改与迭代</h3>
+        <ul>
+            <li><code>把 Submit 按钮的颜色改成绿色，圆角再大一些</code></li>
+            <li><code>卡片里的标题文字调大一些，改成左对齐</code></li>
+            <li><code>给整个卡片加一个淡淡的阴影效果</code></li>
+            <li><code>设置图标和右侧文字之间的间距太紧了，拉开一些</code></li>
+        </ul>
+
+        <h3 id="rendering">渲染与检查</h3>
+        <ul>
+            <li><code>把这个 PAGX 文件渲染成截图，我看一下效果</code></li>
+            <li><code>渲染成 2 倍大小的截图，方便在 Retina 屏幕上预览</code></li>
+            <li><code>校验一下这个 PAGX 文件有没有错误，有的话帮我修复</code></li>
+            <li><code>优化这个 PAGX 文件的大小和性能</code></li>
+        </ul>
+
+        <h3 id="preview">在线预览</h3>
+        <p>你也可以通过 <a href="../../">PAGX Playground</a> 在线预览 PAGX 文件 &mdash; 只需将任意 <code>.pagx</code> 文件拖放到页面上，即可在浏览器中查看渲染效果。</p>
+
+        <h3 id="tips">使用建议</h3>
+        <p><strong>多轮迭代，稳定收敛到上线质量。</strong>这套流程的核心是：只要迭代次数足够多，结果理论上就能持续逼近上线标准。每一轮都围绕“明确目标 → 渲染验证 → 定点修改”推进；其中一部分可由 AI 自动完成，另一部分由人工在关键轮次提供审美与结构方向。随着大模型、Skills 和配套工具持续进步，人工参与的轮次会逐步减少，指令也会更简洁。</p>
+        <p><strong>以创作为主，不以临摹为目标。</strong>当你提供位图参考时，建议把它用于传达风格、氛围和构图方向，而不是要求逐像素复刻。位图生成本质上是概率采样，输出更接近“感觉”；而矢量结果是参数明确、接近唯一解的结构表达。从概率分布中直接还原唯一结构，并不符合当前大模型的能力优势。实践中，更可靠的流程是先让 AI 产出结构正确的矢量版本，再通过局部参数持续打磨细节。</p>
+
+    </main>
+
+    <script>
+        var LANG_COOKIE = 'pagx_lang';
+        var LANG_COOKIE_PATH = '/';
+
+        function getLangCookie() {
+            var match = document.cookie.match(/(?:^|;\s*)pagx_lang=([^;]+)/);
+            return match ? decodeURIComponent(match[1]) : null;
+        }
+
+        function setLangCookie(lang) {
+            var expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
+            document.cookie = LANG_COOKIE + '=' + encodeURIComponent(lang) +
+                '; path=' + LANG_COOKIE_PATH +
+                '; expires=' + expires +
+                '; SameSite=Lax';
+        }
+
+        function switchLang(lang, url) {
+            setLangCookie(lang);
+            if (url && url !== '#' && url !== location.href) {
+                location.href = url;
+            }
+            return false;
+        }
+
+        document.addEventListener('click', function(e) {
+            var langSwitch = document.querySelector('.lang-switch');
+            if (!langSwitch.contains(e.target)) langSwitch.classList.remove('open');
+        });
+    </script>
+</body>
+</html>

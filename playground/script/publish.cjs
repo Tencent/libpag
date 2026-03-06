@@ -20,6 +20,8 @@
  *     <output>/samples/           (.pagx files, images, and generated index.json)
  *     <output>/skills/<name>/     (static skill files for online browsing)
  *     <output>/skills/<name>.zip  (skill archive for AI tool downloads)
+ *     <output>/skills/index.html  (skills documentation page - English)
+ *     <output>/skills/zh/index.html (skills documentation page - Chinese)
  *
  * Usage:
  *     npm run publish [-- -o <output-dir>]
@@ -37,6 +39,22 @@ const RESOURCES_FONT_DIR = path.join(LIBPAG_DIR, 'resources', 'font');
 const SAMPLES_DIR = path.join(LIBPAG_DIR, 'spec', 'samples');
 const SKILLS_DIR = path.join(LIBPAG_DIR, '.codebuddy', 'skills');
 const DEFAULT_OUTPUT_DIR = path.join(LIBPAG_DIR, 'public');
+
+/**
+ * Format date in English (e.g., "6 March 2026").
+ */
+function formatDateEn(date) {
+  const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                  'July', 'August', 'September', 'October', 'November', 'December'];
+  return date.getDate() + ' ' + months[date.getMonth()] + ' ' + date.getFullYear();
+}
+
+/**
+ * Format date in Chinese (e.g., "2026 \u5e74 3 \u6708 6 \u65e5").
+ */
+function formatDateZh(date) {
+  return date.getFullYear() + ' \u5e74 ' + (date.getMonth() + 1) + ' \u6708 ' + date.getDate() + ' \u65e5';
+}
 
 /**
  * Parse command line arguments.
@@ -98,9 +116,36 @@ function copyDir(src, dest) {
 }
 
 /**
- * Publish skills as static files and zip archives for AI tool downloads.
+ * Strip the last-updated date from a skills HTML string so that two versions
+ * can be compared ignoring the timestamp alone.
+ */
+function stripDate(html) {
+  return html.replace(/Last updated: .+?</, 'Last updated: <')
+             .replace(/最后更新：.+?</, '最后更新：<');
+}
+
+/**
+ * Write a skills HTML file only when content (ignoring timestamp) has changed.
+ * If the existing file has identical content, the old timestamp is preserved.
+ */
+function writeIfChanged(outputPath, newHtml) {
+  if (fs.existsSync(outputPath)) {
+    const oldHtml = fs.readFileSync(outputPath, 'utf-8');
+    if (stripDate(oldHtml) === stripDate(newHtml)) {
+      console.log(`  Unchanged: ${outputPath}`);
+      return;
+    }
+  }
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, newHtml, 'utf-8');
+  console.log(`  Published: ${outputPath}`);
+}
+
+/**
+ * Publish skills as static files, zip archives, and documentation pages.
  * Each named skill is copied to <outputDir>/skills/<name>/ and packaged as
  * <outputDir>/skills/<name>.zip (without the outer directory).
+ * Additionally generates skills/index.html (English) and skills/zh/index.html (Chinese).
  */
 function publishSkills(outputDir, names) {
   const skillsOutputDir = path.join(outputDir, 'skills');
@@ -128,6 +173,24 @@ function publishSkills(outputDir, names) {
     execSync(`zip -r "${zipPath}" .`, { cwd: skillSrcDir, stdio: 'pipe' });
     console.log(`  Created: ${zipPath}`);
   }
+
+  // Publish skills documentation pages
+  const now = new Date();
+
+  const enTemplate = fs.readFileSync(
+    path.join(PLAYGROUND_DIR, 'skills-page.html'), 'utf-8'
+  );
+  const enHtml = enTemplate.replace('{{lastUpdated}}', formatDateEn(now));
+  const enOutput = path.join(skillsOutputDir, 'index.html');
+  writeIfChanged(enOutput, enHtml);
+
+  const zhTemplate = fs.readFileSync(
+    path.join(PLAYGROUND_DIR, 'skills-page.zh_CN.html'), 'utf-8'
+  );
+  const zhHtml = zhTemplate.replace('{{lastUpdated}}', formatDateZh(now));
+  const zhDir = path.join(skillsOutputDir, 'zh');
+  const zhOutput = path.join(zhDir, 'index.html');
+  writeIfChanged(zhOutput, zhHtml);
 }
 
 /**
