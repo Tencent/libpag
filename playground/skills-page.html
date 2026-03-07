@@ -204,30 +204,37 @@
         <!-- About -->
         <h2 id="about">About</h2>
         <p>
-            PAGX AI Skills is a professional skills extension for AI coding assistants. After
-            installation, an AI agent can generate structured PAGX vector graphics from text prompts,
-            optimize file size and rendering performance, and look up PAGX syntax, attributes, and
-            CLI usage when needed.
+            PAGX AI Skills is a professional extension for AI coding assistants. After installation,
+            AI can generate structured PAGX vector graphics from natural-language prompts, optimize
+            file size and rendering performance, and look up PAGX syntax, attributes, and CLI usage
+            when needed.
         </p>
         <p>
-            Most mainstream image generators (such as Stable Diffusion and DALL-E) produce bitmaps
-            by sampling from probability distributions. When a local detail is off, you often have
-            to regenerate the entire image instead of fixing just that specific part.
+            First, the current landscape: mainstream AI image tools (such as Stable Diffusion and
+            DALL-E) are primarily bitmap-based and rely on probabilistic sampling. When one local
+            detail is off, you often need to regenerate the whole image instead of editing only that
+            specific part.
         </p>
         <p>
-            PAGX takes a different path: the AI outputs structured markup rather than sampled pixels.
-            Each element carries explicit editable parameters, so you can make targeted updates to
-            color, size, position, and spacing through natural-language instructions without affecting
-            unrelated parts. This ability to support precise secondary edits and continuous iteration
-            is the core value over bitmap-first generation; as iterations accumulate, outcomes are
-            more likely to converge toward production-ready quality.
+            This directly limits delivery control. Bitmap workflows work well for early-stage ideation,
+            but they are less suitable for production scenarios that require precise edits and stable
+            reuse. To close that gap, AI needs to operate on vector structures that are explicitly
+            described and locally editable.
         </p>
         <p>
-            The PAGX format is still under active development, and the
+            PAGX is designed for exactly this. Compared with general vector formats such as SVG,
+            PAGX is optimized for AI at the format level and paired with Skills and CLI tooling.
+            Its core value is precise secondary editing plus continuous iteration: as iteration rounds
+            increase, results can converge more reliably to production-ready quality. In this loop,
+            AI and tools handle high-frequency execution and automated checks, while humans provide
+            aesthetic and structural guidance at key rounds.
+        </p>
+        <p>
+            The PAGX format is still evolving, and the
             <a href="https://pag.io/pagx/latest/" target="_blank" rel="noopener">specification</a>
-            may be updated at any time. Static vector capabilities are complete; motion capabilities
-            will be added next, at which point AI Skills will also be able to generate animations
-            directly.
+            may change at any time. Static vector capability is complete for now; motion capability
+            will continue to expand next, and the same AI Skills will then support direct animation
+            generation as well.
         </p>
 
         <!-- Installation -->
@@ -349,16 +356,20 @@
 
         <h3 id="tips">Tips for Best Results</h3>
         <p>
-            <strong>Set the target, then iterate in small steps.</strong>
-            Describe the desired outcome, preview the render, and only report local changes.
-            Each round is a traceable, testable edit instead of a probabilistic re-roll, so
-            results converge faster and stay easier to reuse.
+            <strong>Treat multi-round iteration as the default workflow, not a fallback.</strong>
+            Do not expect one-shot output to reach production quality. A more reliable process is to
+            repeat: define the target, validate by rendering, then apply targeted edits. With enough
+            rounds, results can theoretically keep converging toward production standards. In practice,
+            AI handles high-frequency execution and automated checks, while humans provide aesthetic
+            and structural direction at key rounds.
         </p>
         <p>
-            <strong>Use bitmap references for style, not tracing.</strong>
-            Bitmaps are good for conveying mood and composition, but not for pixel-perfect copying.
-            A better workflow is to let AI rebuild the idea as clean vector structure, then refine
-            it through targeted parameter edits.
+            <strong>Use bitmap references to set direction, not for pixel-perfect tracing.</strong>
+            Bitmap output is fundamentally probabilistic and closer to an "impression," while vector
+            output is an explicit, near-unique structural description. Recovering a unique structure
+            directly from a probability distribution is not aligned with current model strengths. A
+            more reliable path is to let AI produce a structurally correct vector first, then refine
+            details through targeted parameter edits.
         </p>
 
     </main>
