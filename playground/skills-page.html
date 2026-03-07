@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PAGX AI Skills</title>
+    <title>PAGX Skills</title>
     <link rel="icon" href="../favicon.png" type="image/png">
     <style>
         :root {
@@ -191,11 +191,11 @@
 
     <!-- Hero download -->
     <div class="hero">
-        <h1>PAGX AI Skills</h1>
+        <h1>PAGX Skills</h1>
         <p class="subtitle">Enable your AI coding assistant to create, revise, and optimize PAGX vector graphics.</p>
         <a href="./pagx.zip" download class="download-btn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M2 17l.621 2.485A2 2 0 0 0 4.561 21h14.878a2 2 0 0 0 1.94-1.515L22 17"/></svg>
-            Download Skills Package
+            Download Skills
         </a>
         <p class="download-meta">Last updated: {{lastUpdated}}</p>
     </div>
@@ -204,30 +204,33 @@
         <!-- About -->
         <h2 id="about">About</h2>
         <p>
-            PAGX AI Skills is a professional skills extension for AI coding assistants. After
-            installation, an AI agent can generate structured PAGX vector graphics from text prompts,
-            optimize file size and rendering performance, and look up PAGX syntax, attributes, and
-            CLI usage when needed.
+            PAGX Skills is a professional extension for AI coding assistants. After installation,
+            AI can generate well structured PAGX vector graphics from natural-language prompts, optimize
+            file size and rendering performance, and look up PAGX syntax, attributes, and CLI usage
+            when needed.
         </p>
         <p>
-            Most mainstream image generators (such as Stable Diffusion and DALL-E) produce bitmaps
-            by sampling from probability distributions. When a local detail is off, you often have
-            to regenerate the entire image instead of fixing just that specific part.
+            Mainstream AI image generation tools (such as Stable Diffusion and DALL-E) are primarily
+            bitmap-based, relying on probabilistic sampling. This means when a local detail in the
+            generated result does not meet expectations, it is usually impossible to adjust only that
+            specific detail precisely; instead, the entire image must be regenerated.
+            This limitation makes bitmap-based AI tools more suitable for early-stage creative exploration,
+            but less capable of meeting the precise control and stable reuse requirements of production delivery.
+            To address this, AI needs to work on vector graphics with precise structures. However,
+            AI has not yet seen widespread adoption in vector generation, largely due to the lack of a
+            universal vector format standard optimized for AI. PAGX is designed precisely for this purpose
+            — compared with traditional vector formats like SVG, PAGX is deeply optimized for AI at the
+            file-format level and comes with a complete set of Skills and command-line tools, giving it
+            stronger visual expressiveness and more accurate element positioning, and supporting precise
+            secondary editing and continuous iteration: theoretically, with enough iteration rounds,
+            output can continuously approach production-ready quality.
         </p>
         <p>
-            PAGX takes a different path: the AI outputs structured markup rather than sampled pixels.
-            Each element carries explicit editable parameters, so you can make targeted updates to
-            color, size, position, and spacing through natural-language instructions without affecting
-            unrelated parts. This ability to support precise secondary edits and continuous iteration
-            is the core value over bitmap-first generation; as iterations accumulate, outcomes are
-            more likely to converge toward production-ready quality.
-        </p>
-        <p>
-            The PAGX format is still under active development, and the
-            <a href="https://pag.io/pagx/latest/" target="_blank" rel="noopener">specification</a>
-            may be updated at any time. Static vector capabilities are complete; motion capabilities
-            will be added next, at which point AI Skills will also be able to generate animations
-            directly.
+            The PAGX format is still evolving, and the
+            <a href="https://pag.io/pagx/latest/">specification</a>
+            may change at any time. Static vector capability is complete for now; motion capability
+            will continue to be expanded next, after which AI will also support direct
+            animation generation.
         </p>
 
         <!-- Installation -->
@@ -235,11 +238,11 @@
 
         <h3 id="install-nodejs">1. Install Node.js</h3>
         <p>
-            The Skills package includes the <a href="https://www.npmjs.com/package/@libpag/pagx" target="_blank" rel="noopener"><code>@libpag/pagx</code></a> command-line tool, which depends on
+            The Skills package includes the <a href="https://www.npmjs.com/package/@libpag/pagx"><code>@libpag/pagx</code></a> command-line tool, which depends on
             Node.js. If Node.js is not installed on your machine, complete these steps first:
         </p>
         <div class="step">
-            <p><span class="step-number">Step 1</span> &mdash; Visit <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a> and download the <strong>LTS</strong> (Long Term Support) version for your operating system.</p>
+            <p><span class="step-number">Step 1</span> &mdash; Visit <a href="https://nodejs.org">nodejs.org</a> and download the <strong>LTS</strong> (Long Term Support) version for your operating system.</p>
         </div>
         <div class="step">
             <p><span class="step-number">Step 2</span> &mdash; Run the installer and follow the on-screen instructions. Accept all default settings.</p>
@@ -254,7 +257,7 @@
         <p>
             PAGX Skills works with any AI coding assistant that supports a Skills mechanism.
             Here we use
-            <a href="https://www.codebuddy.ai/cli" target="_blank" rel="noopener">CodeBuddy Code</a>
+            <a href="https://www.codebuddy.ai/cli">CodeBuddy Code</a>
             as an example. For other tools, refer to their official documentation for installation.
         </p>
         <div class="step">
@@ -268,7 +271,7 @@
         </div>
         <div class="info-box">
             <p>For detailed installation instructions and system requirements, see the
-            <a href="https://www.codebuddy.ai/cli" target="_blank" rel="noopener">CodeBuddy Code documentation</a>.</p>
+            <a href="https://www.codebuddy.ai/cli">CodeBuddy Code documentation</a>.</p>
         </div>
 
         <h3 id="install-skills">3. Install PAGX Skills</h3>
@@ -295,7 +298,7 @@
             automatically detected and loaded.
         </p>
         <div class="info-box">
-            <p>The <a href="https://www.npmjs.com/package/@libpag/pagx" target="_blank" rel="noopener"><code>@libpag/pagx</code></a> command-line tool will be automatically installed when the AI
+            <p>The <a href="https://www.npmjs.com/package/@libpag/pagx"><code>@libpag/pagx</code></a> command-line tool will be automatically installed when the AI
             assistant needs it for the first time. This requires the Node.js environment set up in Step 1.</p>
         </div>
 
@@ -349,16 +352,24 @@
 
         <h3 id="tips">Tips for Best Results</h3>
         <p>
-            <strong>Set the target, then iterate in small steps.</strong>
-            Describe the desired outcome, preview the render, and only report local changes.
-            Each round is a traceable, testable edit instead of a probabilistic re-roll, so
-            results converge faster and stay easier to reuse.
+            <strong>Iterate steadily to converge.</strong>
+            Do not expect a single AI generation to meet production standards directly. Instead, iterate
+            continuously. The underlying principle is that with enough iteration rounds, output can
+            keep approaching production‑ready quality. AI and tools can handle
+            high‑frequency execution and automated verification, while humans provide aesthetic and
+            structural guidance at key decision points. As large models, Skills, and supporting tools
+            continue to advance, human involvement will gradually decrease, and the efficiency of
+            natural language descriptions will keep improving.
         </p>
         <p>
-            <strong>Use bitmap references for style, not tracing.</strong>
-            Bitmaps are good for conveying mood and composition, but not for pixel-perfect copying.
-            A better workflow is to let AI rebuild the idea as clean vector structure, then refine
-            it through targeted parameter edits.
+            <strong>Guide creation, not precise tracing.</strong>
+            When providing bitmap references, treat them as guides for style, mood, and composition,
+            not as pixel‑perfect targets to replicate. Bitmap generation is based on probabilistic
+            sampling, yielding outputs that are closer to “visual impressions.” Vector generation,
+            by contrast, produces explicit, structurally clear descriptions. Recovering a unique
+            structure directly from a probability distribution exceeds the capabilities of current
+            large models. A more reliable approach is to let AI produce a structurally correct vector
+            version first, then refine details through targeted parameter adjustments.
         </p>
 
     </main>

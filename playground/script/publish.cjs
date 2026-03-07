@@ -116,29 +116,49 @@ function copyDir(src, dest) {
 }
 
 /**
- * Strip the last-updated date from a skills HTML string so that two versions
- * can be compared ignoring the timestamp alone.
+ * Check whether two directories have identical file content recursively.
+ * Returns true if every file exists in both directories with the same content.
  */
-function stripDate(html) {
-  return html.replace(/Last updated: .+?</, 'Last updated: <')
-             .replace(/最后更新：.+?</, '最后更新：<');
+function dirsEqual(dirA, dirB) {
+  if (!fs.existsSync(dirA) || !fs.existsSync(dirB)) {
+    return false;
+  }
+  const entriesA = fs.readdirSync(dirA, { withFileTypes: true }).filter(e => !e.name.startsWith('.'));
+  const entriesB = fs.readdirSync(dirB, { withFileTypes: true }).filter(e => !e.name.startsWith('.'));
+  if (entriesA.length !== entriesB.length) {
+    return false;
+  }
+  const namesB = new Set(entriesB.map(e => e.name));
+  for (const entry of entriesA) {
+    if (!namesB.has(entry.name)) {
+      return false;
+    }
+    const pathA = path.join(dirA, entry.name);
+    const pathB = path.join(dirB, entry.name);
+    if (entry.isDirectory()) {
+      if (!dirsEqual(pathA, pathB)) {
+        return false;
+      }
+    } else {
+      if (!fs.readFileSync(pathA).equals(fs.readFileSync(pathB))) {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 /**
- * Write a skills HTML file only when content (ignoring timestamp) has changed.
- * If the existing file has identical content, the old timestamp is preserved.
+ * Extract the last-updated date string from an existing skills HTML file.
+ * Returns the matched date string, or null if not found.
  */
-function writeIfChanged(outputPath, newHtml) {
-  if (fs.existsSync(outputPath)) {
-    const oldHtml = fs.readFileSync(outputPath, 'utf-8');
-    if (stripDate(oldHtml) === stripDate(newHtml)) {
-      console.log(`  Unchanged: ${outputPath}`);
-      return;
-    }
+function extractDate(htmlPath) {
+  if (!fs.existsSync(htmlPath)) {
+    return null;
   }
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  fs.writeFileSync(outputPath, newHtml, 'utf-8');
-  console.log(`  Published: ${outputPath}`);
+  const html = fs.readFileSync(htmlPath, 'utf-8');
+  var match = html.match(/Last updated: (.+?)</) || html.match(/最后更新：(.+?)</);
+  return match ? match[1] : null;
 }
 
 /**
@@ -149,6 +169,7 @@ function writeIfChanged(outputPath, newHtml) {
  */
 function publishSkills(outputDir, names) {
   const skillsOutputDir = path.join(outputDir, 'skills');
+  let skillsChanged = false;
 
   for (const name of names) {
     const skillSrcDir = path.join(SKILLS_DIR, name);
@@ -157,15 +178,25 @@ function publishSkills(outputDir, names) {
       continue;
     }
 
-    // Copy static files
     const skillDestDir = path.join(skillsOutputDir, name);
+    const zipPath = path.join(skillsOutputDir, `${name}.zip`);
+
+    // Compare source and cached destination to decide whether to rebuild
+    if (dirsEqual(skillSrcDir, skillDestDir) && fs.existsSync(zipPath)) {
+      console.log(`  Unchanged: ${skillDestDir}`);
+      console.log(`  Unchanged: ${zipPath}`);
+      continue;
+    }
+
+    skillsChanged = true;
+
+    // Copy static files
     if (fs.existsSync(skillDestDir)) {
       fs.rmSync(skillDestDir, { recursive: true });
     }
     copyDir(skillSrcDir, skillDestDir);
 
     // Create zip (contents only, no outer directory)
-    const zipPath = path.join(skillsOutputDir, `${name}.zip`);
     fs.mkdirSync(skillsOutputDir, { recursive: true });
     if (fs.existsSync(zipPath)) {
       fs.unlinkSync(zipPath);
@@ -174,23 +205,35 @@ function publishSkills(outputDir, names) {
     console.log(`  Created: ${zipPath}`);
   }
 
-  // Publish skills documentation pages
-  const now = new Date();
+  // Determine the timestamp for skills pages.
+  // If skills content is unchanged, preserve the existing date; otherwise use today.
+  const enOutput = path.join(skillsOutputDir, 'index.html');
+  const zhOutput = path.join(skillsOutputDir, 'zh', 'index.html');
+  var dateEn;
+  var dateZh;
+  if (skillsChanged) {
+    const now = new Date();
+    dateEn = formatDateEn(now);
+    dateZh = formatDateZh(now);
+  } else {
+    dateEn = extractDate(enOutput) || formatDateEn(new Date());
+    dateZh = extractDate(zhOutput) || formatDateZh(new Date());
+  }
 
+  // Always publish skills documentation pages
   const enTemplate = fs.readFileSync(
     path.join(PLAYGROUND_DIR, 'skills-page.html'), 'utf-8'
   );
-  const enHtml = enTemplate.replace('{{lastUpdated}}', formatDateEn(now));
-  const enOutput = path.join(skillsOutputDir, 'index.html');
-  writeIfChanged(enOutput, enHtml);
+  fs.mkdirSync(path.dirname(enOutput), { recursive: true });
+  fs.writeFileSync(enOutput, enTemplate.replace('{{lastUpdated}}', dateEn), 'utf-8');
+  console.log(`  Published: ${enOutput}`);
 
   const zhTemplate = fs.readFileSync(
     path.join(PLAYGROUND_DIR, 'skills-page.zh_CN.html'), 'utf-8'
   );
-  const zhHtml = zhTemplate.replace('{{lastUpdated}}', formatDateZh(now));
-  const zhDir = path.join(skillsOutputDir, 'zh');
-  const zhOutput = path.join(zhDir, 'index.html');
-  writeIfChanged(zhOutput, zhHtml);
+  fs.mkdirSync(path.dirname(zhOutput), { recursive: true });
+  fs.writeFileSync(zhOutput, zhTemplate.replace('{{lastUpdated}}', dateZh), 'utf-8');
+  console.log(`  Published: ${zhOutput}`);
 }
 
 /**
