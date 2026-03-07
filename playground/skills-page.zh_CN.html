@@ -205,15 +205,15 @@
         <h2 id="about">简介</h2>
         <p>PAGX Skills 是面向 AI 编程助手的专业技能扩展包。安装后，AI 可以根据自然语言描述生成结构简洁的 PAGX 矢量图形，优化文件大小和渲染性能，并在需要时查询 PAGX 语法、属性和命令行工具用法。</p>
         <p>当前主流的 AI 图像生成工具（如 Stable Diffusion、DALL-E）主要基于位图生成，其本质是一个概率采样过程。这意味着当生成结果中某个局部细节不符合预期时，通常无法仅针对该细节进行精确调整，而需要重新生成整张图像。这种局限性使得基于位图的 AI 工具更适合前期的创意探索，难以满足上线交付环节对精确控制和稳定复用的要求。要解决这一问题，需要让 AI 在具备精确结构的矢量图形上进行工作。然而，目前 AI 在矢量生成领域尚未大规模应用，核心原因在于缺少专门为 AI 优化的通用矢量格式标准。PAGX 正是为此设计的——相比 SVG 等传统矢量格式，PAGX 在文件格式层面针对 AI 进行了深度优化，并配套提供了完善的 Skills 和命令行工具，使其具备更强的视觉表达能力和更精准的元素定位能力，支持精确的二次编辑和持续迭代：理论上，只要迭代次数足够多，产出就能持续逼近上线质量标准。</p>
-        <p>PAGX 格式目前仍在持续迭代中，<a href="https://pag.io/pagx/latest/" target="_blank" rel="noopener">规范文档</a>可能随时更新。目前已初步完成静态矢量部分，后续将继续扩充动效能力——届时 AI 也将具备直接生成动效的能力。</p>
+        <p>PAGX 格式目前仍在持续迭代中，<a href="https://pag.io/pagx/latest/">规范文档</a>可能随时更新。目前已初步完成静态矢量部分，后续将继续扩充动效能力——届时 AI 也将具备直接生成动效的能力。</p>
 
         <!-- Installation -->
         <h2 id="installation">安装指南</h2>
 
         <h3 id="install-nodejs">1. 安装 Node.js</h3>
-        <p>Skills 安装包包含命令行工具 <a href="https://www.npmjs.com/package/@libpag/pagx" target="_blank" rel="noopener"><code>@libpag/pagx</code></a>，运行依赖 Node.js。若本机尚未安装，请先完成以下步骤：</p>
+        <p>Skills 安装包包含命令行工具 <a href="https://www.npmjs.com/package/@libpag/pagx"><code>@libpag/pagx</code></a>，运行依赖 Node.js。若本机尚未安装，请先完成以下步骤：</p>
         <div class="step">
-            <p><span class="step-number">第 1 步</span> &mdash; 访问 <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a>，下载适用于你操作系统的 <strong>LTS</strong>（长期支持）版本。</p>
+            <p><span class="step-number">第 1 步</span> &mdash; 访问 <a href="https://nodejs.org">nodejs.org</a>，下载适用于你操作系统的 <strong>LTS</strong>（长期支持）版本。</p>
         </div>
         <div class="step">
             <p><span class="step-number">第 2 步</span> &mdash; 运行安装程序，按照屏幕提示操作，保持所有默认设置即可。</p>
@@ -225,7 +225,7 @@
         </div>
 
         <h3 id="install-codebuddy">2. 安装 AI 编程助手</h3>
-        <p>PAGX Skills 可用于任何支持 Skills 机制的 AI 编程助手。这里以 <a href="https://www.codebuddy.ai/cli" target="_blank" rel="noopener">CodeBuddy Code</a> 为例，其他工具请参考其官方文档完成安装。</p>
+        <p>PAGX Skills 可用于任何支持 Skills 机制的 AI 编程助手。这里以 <a href="https://www.codebuddy.ai/cli">CodeBuddy Code</a> 为例，其他工具请参考其官方文档完成安装。</p>
         <div class="step">
             <p><span class="step-number">第 1 步</span> &mdash; 打开终端，运行以下安装命令：</p>
             <pre><code>npm install -g @tencent-ai/codebuddy-code</code></pre>
@@ -236,7 +236,7 @@
             <p>按照屏幕提示完成初始设置和账号认证。</p>
         </div>
         <div class="info-box">
-        <p>如需了解详细的安装说明和系统要求，请参阅 <a href="https://www.codebuddy.ai/cli" target="_blank" rel="noopener">CodeBuddy Code 官方文档</a>。</p>
+        <p>如需了解详细的安装说明和系统要求，请参阅 <a href="https://www.codebuddy.ai/cli">CodeBuddy Code 官方文档</a>。</p>
         </div>
 
         <h3 id="install-skills">3. 安装 PAGX Skills</h3>
@@ -255,7 +255,7 @@
         ...</code></pre>
         <p>如果 <code>.codebuddy/skills/</code> 文件夹尚不存在，手动创建即可。然后在任意项目目录下启动 CodeBuddy Code，PAGX Skills 会被自动识别并加载。</p>
         <div class="info-box">
-            <p><a href="https://www.npmjs.com/package/@libpag/pagx" target="_blank" rel="noopener"><code>@libpag/pagx</code></a> 命令行工具会在 AI 助手首次需要时自动安装，这依赖于第 1 步中搭建的 Node.js 环境。</p>
+            <p><a href="https://www.npmjs.com/package/@libpag/pagx"><code>@libpag/pagx</code></a> 命令行工具会在 AI 助手首次需要时自动安装，这依赖于第 1 步中搭建的 Node.js 环境。</p>
         </div>
 
         <!-- Getting Started -->
