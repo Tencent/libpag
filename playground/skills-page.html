@@ -210,31 +210,40 @@
             when needed.
         </p>
         <p>
-            Mainstream AI image tools (such as Stable Diffusion and DALL-E) are primarily
-            bitmap-based and rely on probabilistic sampling. When one local detail is off, you often
-            need to regenerate the whole image instead of editing only that specific part.
+            Mainstream AI image generation tools (such as Stable Diffusion and DALL-E) are primarily
+            bitmap-based, relying on probabilistic sampling. This means when a local detail in the
+            generated result does not meet expectations, it is usually impossible to adjust only that
+            specific detail precisely; instead, the entire image must be regenerated.
         </p>
         <p>
-            This directly limits delivery control. Bitmap workflows work well for early-stage ideation,
-            but they are less suitable for production scenarios that require precise edits and stable
-            reuse. To close that gap, AI needs to operate on vector structures that are explicitly
-            described and locally editable.
+            This limitation makes bitmap-based AI tools more suitable for early-stage creative exploration,
+            but less capable of meeting the precise control and stable reuse requirements of production delivery.
         </p>
         <p>
-            PAGX is designed for exactly this. Compared with traditional vector formats such as SVG,
-            PAGX is optimized for AI at the format level, with stronger graphic expressiveness and
-            more precise element positioning, and is paired with Skills and CLI tooling. Its core
-            value is precise secondary editing plus continuous iteration: as iteration rounds increase,
-            results can converge more reliably to production-ready quality. In this loop, AI and tools
-            handle high-frequency execution and automated checks, while humans provide aesthetic and
-            structural guidance at key rounds.
+            To address this, AI needs to work on vector graphics with precise structures. However,
+            AI has not yet seen widespread adoption in vector generation, largely due to the lack of a
+            universal vector format standard optimized for AI.
+        </p>
+        <p>
+            PAGX is designed precisely for this purpose. Compared with traditional vector formats like SVG,
+            PAGX is deeply optimized for AI at the file-format level and comes with a complete set of
+            Skills and command-line tools, giving it stronger visual expressiveness and more accurate
+            element positioning. The core advantage of PAGX is its support for precise secondary editing
+            and continuous iteration: theoretically, with enough iteration rounds, output can continuously
+            approach production-ready quality.
+        </p>
+        <p>
+            In a multi-round iterative workflow, AI and tools handle high-frequency execution and
+            automated verification, while humans provide aesthetic and structural guidance at key stages.
+            As large models, Skills, and supporting tools continue to advance, human involvement will
+            gradually decrease, and the efficiency of natural language descriptions will keep improving.
         </p>
         <p>
             The PAGX format is still evolving, and the
             <a href="https://pag.io/pagx/latest/" target="_blank" rel="noopener">specification</a>
             may change at any time. Static vector capability is complete for now; motion capability
-            will continue to expand next, and the same AI Skills will then support direct animation
-            generation as well.
+            will continue to be expanded next, after which the same AI Skills will also support direct
+            animation generation.
         </p>
 
         <!-- Installation -->
@@ -356,20 +365,23 @@
 
         <h3 id="tips">Tips for Best Results</h3>
         <p>
-            <strong>Treat multi-round iteration as the default workflow, not a fallback.</strong>
-            Do not expect one-shot output to reach production quality. A more reliable process is to
-            repeat: define the target, validate by rendering, then apply targeted edits. With enough
-            rounds, results can theoretically keep converging toward production standards. In practice,
-            AI handles high-frequency execution and automated checks, while humans provide aesthetic
-            and structural direction at key rounds.
+            <strong>Adopt a multi‑round iterative workflow to steadily converge to production quality.</strong>
+            Do not expect a single AI generation to meet production standards directly. Instead, iterate
+            continuously. The underlying principle is that with enough iteration rounds, output can
+            keep approaching production‑ready quality. Each round should follow the loop:
+            “define target → validate by rendering → apply targeted edits.” AI and tools can handle
+            high‑frequency execution and automated verification, while humans provide aesthetic and
+            structural guidance at key decision points.
         </p>
         <p>
-            <strong>Create, don't trace.</strong>
-            Bitmap output is fundamentally probabilistic and closer to an "impression," while vector
-            output is an explicit, near-unique structural description. Recovering a unique structure
-            directly from a probability distribution is not aligned with current model strengths. A
-            more reliable path is to let AI produce a structurally correct vector first, then refine
-            details through targeted parameter edits.
+            <strong>Guide creation, not precise tracing.</strong>
+            When providing bitmap references, treat them as guides for style, mood, and composition,
+            not as pixel‑perfect targets to replicate. Bitmap generation is based on probabilistic
+            sampling, yielding outputs that are closer to “visual impressions.” Vector generation,
+            by contrast, produces explicit, structurally clear descriptions. Recovering a unique
+            structure directly from a probability distribution exceeds the capabilities of current
+            large models. A more reliable approach is to let AI produce a structurally correct vector
+            version first, then refine details through targeted parameter adjustments.
         </p>
 
     </main>
