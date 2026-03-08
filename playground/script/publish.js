@@ -861,14 +861,6 @@ function publishSpecDocs(outputDir) {
 
   console.log('\n  Copying latest version to latest folder...');
   copyLatestVersion(outputDir, stableVersion || version);
-
-  // Copy favicon
-  const faviconSrc = path.join(SPEC_DIR, 'favicon.png');
-  if (fs.existsSync(faviconSrc)) {
-    const faviconDest = path.join(outputDir, 'favicon.png');
-    fs.copyFileSync(faviconSrc, faviconDest);
-    console.log(`  Copied: ${faviconDest}`);
-  }
 }
 
 // ============================================================================
