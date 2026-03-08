@@ -195,7 +195,7 @@ function extractDate(htmlPath) {
     return null;
   }
   const html = fs.readFileSync(htmlPath, 'utf-8');
-  const match = html.match(/Last updated:<\/strong>\s*(.+?)</) || html.match(/最后更新：<\/strong>\s*(.+?)</);
+  const match = html.match(/Last updated:.*?(\d{1,2} \w+ \d{4})/) || html.match(/最后更新：.*?(\d{4} 年 \d{1,2} 月 \d{1,2} 日)/);
   return match ? match[1].trim() : null;
 }
 
@@ -674,7 +674,7 @@ function updateVersionLinks(htmlFile, thisVersion, draftVersion, stableVersion, 
 
   let html = fs.readFileSync(htmlFile, 'utf-8');
 
-  const dateMatch = html.match(/Last updated:<\/strong>\s*(.+?)</) || html.match(/最后更新：<\/strong>\s*(.+?)</);
+  const dateMatch = html.match(/Last updated:.*?(\d{1,2} \w+ \d{4})/) || html.match(/最后更新：.*?(\d{4} 年 \d{1,2} 月 \d{1,2} 日)/);
   const lastUpdated = (dateMatch ? dateMatch[1].trim() : null) || fallbackDate;
   const versionInfoHtml = generateVersionInfoHtml(thisVersion, draftVersion, stableVersion, isZh, lastUpdated);
 
