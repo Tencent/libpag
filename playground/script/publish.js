@@ -37,7 +37,6 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
-import { createRequire } from 'module';
 import { Marked } from 'marked';
 import { markedHighlight } from 'marked-highlight';
 import { gfmHeadingId } from 'marked-gfm-heading-id';
@@ -196,7 +195,7 @@ function extractDate(htmlPath) {
     return null;
   }
   const html = fs.readFileSync(htmlPath, 'utf-8');
-  var match = html.match(/Last updated:\s*(.+?)</) || html.match(/最后更新：(.+?)</);
+  const match = html.match(/Last updated:\s*(.+?)</) || html.match(/最后更新：\s*(.+?)</);
   return match ? match[1].trim() : null;
 }
 
@@ -268,8 +267,8 @@ function publishSkills(outputDir, names) {
 
   const enOutput = path.join(skillsOutputDir, 'index.html');
   const zhOutput = path.join(skillsOutputDir, 'zh', 'index.html');
-  var dateEn;
-  var dateZh;
+  let dateEn;
+  let dateZh;
   if (skillsChanged) {
     const now = new Date();
     dateEn = formatDateEn(now);
@@ -791,12 +790,16 @@ function copyLatestVersion(siteDir, version) {
 
   // Copy markdown sources to latest/ for change detection
   fs.mkdirSync(latestDir, { recursive: true });
-  const mdEnDest = path.join(latestDir, 'pagx_spec.md');
-  fs.copyFileSync(SPEC_FILE_EN, mdEnDest);
-  console.log(`  Copied: ${mdEnDest}`);
-  const mdZhDest = path.join(latestDir, 'pagx_spec.zh_CN.md');
-  fs.copyFileSync(SPEC_FILE_ZH, mdZhDest);
-  console.log(`  Copied: ${mdZhDest}`);
+  if (fs.existsSync(SPEC_FILE_EN)) {
+    const mdEnDest = path.join(latestDir, 'pagx_spec.md');
+    fs.copyFileSync(SPEC_FILE_EN, mdEnDest);
+    console.log(`  Copied: ${mdEnDest}`);
+  }
+  if (fs.existsSync(SPEC_FILE_ZH)) {
+    const mdZhDest = path.join(latestDir, 'pagx_spec.zh_CN.md');
+    fs.copyFileSync(SPEC_FILE_ZH, mdZhDest);
+    console.log(`  Copied: ${mdZhDest}`);
+  }
 }
 
 /**
