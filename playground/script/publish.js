@@ -667,13 +667,14 @@ ${linksHtml}
 
 /**
  * Update version links in an HTML file. Preserves the original "last updated"
- * time when specChanged is false; uses the provided lastUpdated otherwise.
+ * time from the existing HTML; falls back to the provided date if not found.
  */
-function updateVersionLinks(htmlFile, thisVersion, draftVersion, stableVersion, isZh, lastUpdated) {
+function updateVersionLinks(htmlFile, thisVersion, draftVersion, stableVersion, isZh, fallbackDate) {
   if (!fs.existsSync(htmlFile)) return false;
 
   let html = fs.readFileSync(htmlFile, 'utf-8');
 
+  const lastUpdated = extractDate(htmlFile) || fallbackDate;
   const versionInfoHtml = generateVersionInfoHtml(thisVersion, draftVersion, stableVersion, isZh, lastUpdated);
 
   const versionInfoCss = `/* Version info block */
@@ -743,9 +744,10 @@ function updateVersionLinks(htmlFile, thisVersion, draftVersion, stableVersion, 
 }
 
 /**
- * Update version links in all published versions.
+ * Update version links in all published versions. Each version's HTML preserves
+ * its own "last updated" date; fallback dates are used only when not found.
  */
-function updateAllVersionLinks(siteDir, draftVersion, stableVersion, lastUpdatedEn, lastUpdatedZh) {
+function updateAllVersionLinks(siteDir, draftVersion, stableVersion, fallbackDateEn, fallbackDateZh) {
   const versions = findPublishedVersions(siteDir);
   if (versions.length === 0) return;
 
@@ -755,10 +757,10 @@ function updateAllVersionLinks(siteDir, draftVersion, stableVersion, lastUpdated
     const enFile = path.join(siteDir, ver, 'index.html');
     const zhFile = path.join(siteDir, ver, 'zh', 'index.html');
 
-    if (updateVersionLinks(enFile, ver, draftVersion, stableVersion, false, lastUpdatedEn)) {
+    if (updateVersionLinks(enFile, ver, draftVersion, stableVersion, false, fallbackDateEn)) {
       console.log(`  Updated: ${enFile}`);
     }
-    if (updateVersionLinks(zhFile, ver, draftVersion, stableVersion, true, lastUpdatedZh)) {
+    if (updateVersionLinks(zhFile, ver, draftVersion, stableVersion, true, fallbackDateZh)) {
       console.log(`  Updated: ${zhFile}`);
     }
   }
