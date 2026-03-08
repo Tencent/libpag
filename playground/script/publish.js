@@ -60,7 +60,8 @@ const DEFAULT_OUTPUT_DIR = path.join(LIBPAG_DIR, 'public');
 const SPEC_DIR = path.join(LIBPAG_DIR, 'spec');
 const SPEC_FILE_EN = path.join(SPEC_DIR, 'pagx_spec.md');
 const SPEC_FILE_ZH = path.join(SPEC_DIR, 'pagx_spec.zh_CN.md');
-const SPEC_TEMPLATE_FILE = path.join(SCRIPT_DIR, 'spec-template.html');
+const PAGES_DIR = path.join(PLAYGROUND_DIR, 'pages');
+const SPEC_TEMPLATE_FILE = path.join(PAGES_DIR, 'spec', 'template.html');
 const PACKAGE_FILE = path.join(PLAYGROUND_DIR, 'package.json');
 
 // Base URL for the spec site
@@ -279,14 +280,14 @@ function publishSkills(outputDir, names) {
   }
 
   const enTemplate = fs.readFileSync(
-    path.join(PLAYGROUND_DIR, 'skills-page.html'), 'utf-8'
+    path.join(PAGES_DIR, 'skills', 'index.html'), 'utf-8'
   );
   fs.mkdirSync(path.dirname(enOutput), { recursive: true });
   fs.writeFileSync(enOutput, enTemplate.replace('{{lastUpdated}}', dateEn), 'utf-8');
   console.log(`  Published: ${enOutput}`);
 
   const zhTemplate = fs.readFileSync(
-    path.join(PLAYGROUND_DIR, 'skills-page.zh_CN.html'), 'utf-8'
+    path.join(PAGES_DIR, 'skills', 'zh', 'index.html'), 'utf-8'
   );
   fs.mkdirSync(path.dirname(zhOutput), { recursive: true });
   fs.writeFileSync(zhOutput, zhTemplate.replace('{{lastUpdated}}', dateZh), 'utf-8');
