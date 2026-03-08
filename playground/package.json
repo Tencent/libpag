@@ -1,6 +1,8 @@
 {
   "name": "pagx-playground",
   "version": "1.0.0",
+  "specVersion": "1.0",
+  "specStableVersion": "",
   "description": "PAGX Playground",
   "type": "module",
   "scripts": {
@@ -8,7 +10,7 @@
     "build": "node script/cmake.js -a wasm-mt && rollup -c ./script/rollup.js",
     "build:debug": "node script/cmake.js -a wasm-mt --debug && rollup -c ./script/rollup.js",
     "build:release": "node script/cmake.js -a wasm-mt && BUILD_MODE=release rollup -c ./script/rollup.js",
-    "publish": "node script/publish.cjs",
+    "publish": "node script/publish.js",
     "server": "node server.js"
   },
   "devDependencies": {
@@ -26,7 +28,11 @@
     "typescript": "~5.0.3"
   },
   "dependencies": {
-    "express": "^4.21.1"
+    "express": "^4.21.1",
+    "highlight.js": "^11.9.0",
+    "marked": "^15.0.0",
+    "marked-gfm-heading-id": "^4.1.0",
+    "marked-highlight": "^2.2.0"
   },
   "license": "Apache-2.0",
   "author": "Tencent"
