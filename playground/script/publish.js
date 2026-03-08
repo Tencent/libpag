@@ -770,7 +770,7 @@ function updateAllVersionLinks(siteDir, draftVersion, stableVersion, fallbackDat
  * Copy latest version files to latest folder, including markdown source copies
  * for change detection on subsequent runs.
  */
-function copyLatestVersion(siteDir, version) {
+function copyLatestVersion(siteDir, version, contentChanged) {
   const latestDir = path.join(siteDir, 'latest');
   const versionDir = path.join(siteDir, version);
 
@@ -790,17 +790,19 @@ function copyLatestVersion(siteDir, version) {
     console.log(`  Copied: ${zhDest}`);
   }
 
-  // Copy source files to latest/ for change detection
-  fs.mkdirSync(latestDir, { recursive: true });
-  if (fs.existsSync(SPEC_FILE_EN)) {
-    const mdEnDest = path.join(latestDir, 'pagx_spec.md');
-    fs.copyFileSync(SPEC_FILE_EN, mdEnDest);
-    console.log(`  Copied: ${mdEnDest}`);
-  }
-  if (fs.existsSync(SPEC_FILE_ZH)) {
-    const mdZhDest = path.join(latestDir, 'pagx_spec.zh_CN.md');
-    fs.copyFileSync(SPEC_FILE_ZH, mdZhDest);
-    console.log(`  Copied: ${mdZhDest}`);
+  // Copy markdown sources to latest/ for change detection (only when content changed)
+  if (contentChanged) {
+    fs.mkdirSync(latestDir, { recursive: true });
+    if (fs.existsSync(SPEC_FILE_EN)) {
+      const mdEnDest = path.join(latestDir, 'pagx_spec.md');
+      fs.copyFileSync(SPEC_FILE_EN, mdEnDest);
+      console.log(`  Copied: ${mdEnDest}`);
+    }
+    if (fs.existsSync(SPEC_FILE_ZH)) {
+      const mdZhDest = path.join(latestDir, 'pagx_spec.zh_CN.md');
+      fs.copyFileSync(SPEC_FILE_ZH, mdZhDest);
+      console.log(`  Copied: ${mdZhDest}`);
+    }
   }
 }
 
@@ -860,7 +862,7 @@ function publishSpecDocs(outputDir) {
   updateAllVersionLinks(outputDir, version, stableVersion, lastUpdatedEn, lastUpdatedZh);
 
   console.log('\n  Copying latest version to latest folder...');
-  copyLatestVersion(outputDir, stableVersion || version);
+  copyLatestVersion(outputDir, stableVersion || version, contentChanged);
 }
 
 // ============================================================================
