@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CommandRender.h"
+#include <libxml/parser.h>
 #include <cerrno>
 #include <climits>
 #include <cmath>
@@ -26,7 +27,9 @@
 #include <iostream>
 #include <string>
 #include "cli/CliUtils.h"
+#include "cli/XPathQuery.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Node.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/TextLayout.h"
 #include "tgfx/core/Bitmap.h"
@@ -53,6 +56,8 @@ struct RenderOptions {
   float bgGreen = 0.0f;
   float bgBlue = 0.0f;
   float bgAlpha = 0.0f;
+  std::string id = {};
+  std::string xpath = {};
   std::vector<std::string> fontFiles = {};
   std::vector<std::string> fallbacks = {};
 };
@@ -67,6 +72,8 @@ static void PrintRenderUsage() {
       << "  --format png|webp|jpg     Output format (default: png)\n"
       << "  --scale <float>           Scale factor (default: 1.0)\n"
       << "  --crop <x,y,w,h>          Crop region in document coordinates\n"
+      << "  --id <id>                 Render only the Layer with the specified id\n"
+      << "  --xpath <expr>            Render only the Layer matched by XPath expression\n"
       << "  --quality <0-100>         Encoding quality (default: 100)\n"
       << "  --background <color>      Background color (hex: #RRGGBB or #RRGGBBAA)\n"
       << "  --font <path>             Register a font file (can be specified multiple times)\n"
@@ -172,6 +179,10 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
         std::cerr << "pagx render: invalid color format, expected #RRGGBB or #RRGGBBAA\n";
         return 1;
       }
+    } else if (arg == "--id" && i + 1 < argc) {
+      options->id = argv[++i];
+    } else if (arg == "--xpath" && i + 1 < argc) {
+      options->xpath = argv[++i];
     } else if (arg == "--font" && i + 1 < argc) {
       options->fontFiles.push_back(argv[++i]);
     } else if (arg == "--fallback" && i + 1 < argc) {
@@ -186,6 +197,10 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
       options->inputFile = arg;
     }
     i++;
+  }
+  if (!options->id.empty() && !options->xpath.empty()) {
+    std::cerr << "pagx render: --id and --xpath are mutually exclusive\n";
+    return 1;
   }
   if (options->inputFile.empty()) {
     std::cerr << "pagx render: missing input file\n";
@@ -265,15 +280,87 @@ int RunRender(int argc, char* argv[]) {
   for (const auto& loc : systemFallbacks) {
     textLayout.addFallbackFont(loc.path, loc.ttcIndex, loc.fontFamily, loc.fontStyle);
   }
-  auto rootLayer = LayerBuilder::Build(document.get(), &textLayout);
+  bool hasTarget = !options.id.empty() || !options.xpath.empty();
+  std::shared_ptr<tgfx::Layer> rootLayer = nullptr;
+  std::shared_ptr<tgfx::Layer> targetTgfxLayer = nullptr;
+  LayerBuildResult buildResult = {};
+
+  if (hasTarget) {
+    buildResult = LayerBuilder::BuildWithMap(document.get(), &textLayout);
+    rootLayer = buildResult.root;
+  } else {
+    rootLayer = LayerBuilder::Build(document.get(), &textLayout);
+  }
   if (rootLayer == nullptr) {
     std::cerr << "pagx render: failed to build layer tree\n";
     return 1;
   }
 
-  // Calculate output dimensions.
-  float sourceWidth = options.hasCrop ? options.cropWidth : document->width;
-  float sourceHeight = options.hasCrop ? options.cropHeight : document->height;
+  // Resolve the target Layer when --id or --xpath is specified.
+  if (hasTarget) {
+    const Layer* targetPagxLayer = nullptr;
+    if (!options.id.empty()) {
+      auto* node = document->findNode(options.id);
+      if (node == nullptr) {
+        std::cerr << "pagx render: no node found with id '" << options.id << "'\n";
+        return 1;
+      }
+      if (node->nodeType() != NodeType::Layer) {
+        std::cerr << "pagx render: node '" << options.id << "' is not a Layer\n";
+        return 1;
+      }
+      targetPagxLayer = static_cast<const Layer*>(node);
+    } else {
+      xmlDocPtr xmlDoc = xmlReadFile(options.inputFile.c_str(), nullptr, XML_PARSE_NONET);
+      if (xmlDoc == nullptr) {
+        std::cerr << "pagx render: failed to parse XML from '" << options.inputFile << "'\n";
+        return 1;
+      }
+      targetPagxLayer = EvaluateSingleXPath(xmlDoc, options.xpath, document.get(), "render");
+      xmlFreeDoc(xmlDoc);
+      if (targetPagxLayer == nullptr) {
+        std::cerr << "pagx render: no matching Layer found\n";
+        return 1;
+      }
+    }
+    auto it = buildResult.layerMap.find(targetPagxLayer);
+    if (it == buildResult.layerMap.end()) {
+      std::cerr << "pagx render: target Layer has no rendered layer\n";
+      return 1;
+    }
+    targetTgfxLayer = it->second;
+  }
+
+  // Calculate output dimensions and content offset.
+  float sourceWidth = 0;
+  float sourceHeight = 0;
+  float offsetX = 0;
+  float offsetY = 0;
+
+  if (targetTgfxLayer != nullptr) {
+    // Detach the target layer from the full tree so it renders in its own local coordinate space.
+    targetTgfxLayer->removeFromParent();
+    auto localBounds = targetTgfxLayer->getBounds(nullptr, true);
+    if (options.hasCrop) {
+      sourceWidth = options.cropWidth;
+      sourceHeight = options.cropHeight;
+      offsetX = -(localBounds.left + options.cropX);
+      offsetY = -(localBounds.top + options.cropY);
+    } else {
+      sourceWidth = localBounds.right - localBounds.left;
+      sourceHeight = localBounds.bottom - localBounds.top;
+      offsetX = -localBounds.left;
+      offsetY = -localBounds.top;
+    }
+  } else {
+    sourceWidth = options.hasCrop ? options.cropWidth : document->width;
+    sourceHeight = options.hasCrop ? options.cropHeight : document->height;
+    if (options.hasCrop) {
+      offsetX = -options.cropX;
+      offsetY = -options.cropY;
+    }
+  }
+
   int outputWidth = static_cast<int>(ceilf(sourceWidth * options.scale));
   int outputHeight = static_cast<int>(ceilf(sourceHeight * options.scale));
   if (outputWidth <= 0 || outputHeight <= 0) {
@@ -302,17 +389,17 @@ int RunRender(int argc, char* argv[]) {
     return 1;
   }
 
-  // Set up the display list with zoom and offset for crop+scale.
+  // Set up the display list with zoom and offset.
   tgfx::DisplayList displayList = {};
   displayList.setRenderMode(tgfx::RenderMode::Direct);
   if (options.hasBackground) {
     displayList.setBackgroundColor(
         tgfx::Color(options.bgRed, options.bgGreen, options.bgBlue, options.bgAlpha));
   }
-  displayList.root()->addChild(rootLayer);
+  displayList.root()->addChild(targetTgfxLayer != nullptr ? targetTgfxLayer : rootLayer);
   displayList.setZoomScale(options.scale);
-  if (options.hasCrop) {
-    displayList.setContentOffset(-options.cropX * options.scale, -options.cropY * options.scale);
+  if (offsetX != 0.0f || offsetY != 0.0f) {
+    displayList.setContentOffset(offsetX * options.scale, offsetY * options.scale);
   }
 
   // Render the display list to the surface.
