@@ -674,7 +674,8 @@ function updateVersionLinks(htmlFile, thisVersion, draftVersion, stableVersion, 
 
   let html = fs.readFileSync(htmlFile, 'utf-8');
 
-  const lastUpdated = extractDate(htmlFile) || fallbackDate;
+  const dateMatch = html.match(/Last updated:\s*(.+?)</) || html.match(/最后更新：\s*(.+?)</);
+  const lastUpdated = (dateMatch ? dateMatch[1].trim() : null) || fallbackDate;
   const versionInfoHtml = generateVersionInfoHtml(thisVersion, draftVersion, stableVersion, isZh, lastUpdated);
 
   const versionInfoCss = `/* Version info block */
