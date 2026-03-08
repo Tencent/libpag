@@ -790,7 +790,7 @@ function copyLatestVersion(siteDir, version) {
     console.log(`  Copied: ${zhDest}`);
   }
 
-  // Copy markdown sources to latest/ for change detection
+  // Copy source files to latest/ for change detection
   fs.mkdirSync(latestDir, { recursive: true });
   if (fs.existsSync(SPEC_FILE_EN)) {
     const mdEnDest = path.join(latestDir, 'pagx_spec.md');
@@ -805,9 +805,9 @@ function copyLatestVersion(siteDir, version) {
 }
 
 /**
- * Publish spec documents with change detection.
- * Compares source markdown files against cached copies to determine whether
- * the HTML needs to be regenerated. When unchanged, preserves existing timestamps.
+ * Publish spec documents. Always rebuilds HTML from markdown and template.
+ * Compares source markdown against cached copies only to determine whether
+ * the "last updated" timestamp should be refreshed.
  */
 function publishSpecDocs(outputDir) {
   const version = getSpecVersion();
@@ -816,20 +816,20 @@ function publishSpecDocs(outputDir) {
   console.log(`  Spec version: ${version}`);
   console.log(`  Spec stable: ${stableVersion || '(none)'}`);
 
-  // Check whether markdown sources have changed by comparing against copies in latest/
+  // Check whether markdown content has changed (for timestamp decision only)
   const latestDir = path.join(outputDir, 'latest');
   const cachedEn = path.join(latestDir, 'pagx_spec.md');
   const cachedZh = path.join(latestDir, 'pagx_spec.zh_CN.md');
-  const specChanged = !filesEqual(SPEC_FILE_EN, cachedEn) || !filesEqual(SPEC_FILE_ZH, cachedZh);
+  const contentChanged = !filesEqual(SPEC_FILE_EN, cachedEn) || !filesEqual(SPEC_FILE_ZH, cachedZh);
 
-  // Determine timestamps
+  // Determine timestamps: refresh only when document content actually changed
   const baseOutputDir = path.join(outputDir, version);
   const enHtmlPath = path.join(baseOutputDir, 'index.html');
   const zhHtmlPath = path.join(baseOutputDir, 'zh', 'index.html');
   let lastUpdatedEn;
   let lastUpdatedZh;
 
-  if (specChanged) {
+  if (contentChanged) {
     const now = new Date();
     lastUpdatedEn = formatDateEn(now);
     lastUpdatedZh = formatDateZh(now);
@@ -838,31 +838,25 @@ function publishSpecDocs(outputDir) {
     lastUpdatedZh = extractDate(zhHtmlPath) || formatDateZh(new Date());
   }
 
-  if (specChanged) {
-    console.log('  Spec documents changed, rebuilding HTML...');
+  // Always rebuild HTML (template or generation logic may have changed)
+  const viewerUrlFromRoot = '../';
+  const viewerUrlFromZh = '../../';
+  const faviconUrlFromRoot = '../favicon.png';
+  const faviconUrlFromZh = '../../favicon.png';
 
-    const viewerUrlFromRoot = '../';
-    const viewerUrlFromZh = '../../';
-    const faviconUrlFromRoot = '../favicon.png';
-    const faviconUrlFromZh = '../../favicon.png';
-
-    let englishSlugs = null;
-    if (fs.existsSync(SPEC_FILE_EN)) {
-      englishSlugs = extractEnglishSlugs(fs.readFileSync(SPEC_FILE_EN, 'utf-8'));
-      console.log(`  Extracted ${englishSlugs.length} heading slugs from English version`);
-    }
-
-    console.log('\n  Publishing English spec...');
-    publishSpecFile(SPEC_FILE_EN, baseOutputDir, 'en', 'zh/', viewerUrlFromRoot, faviconUrlFromRoot, englishSlugs);
-
-    console.log('\n  Publishing Chinese spec...');
-    publishSpecFile(SPEC_FILE_ZH, path.join(baseOutputDir, 'zh'), 'zh', '../', viewerUrlFromZh, faviconUrlFromZh, englishSlugs);
-
-  } else {
-    console.log('  Spec documents unchanged, skipping HTML rebuild.');
+  let englishSlugs = null;
+  if (fs.existsSync(SPEC_FILE_EN)) {
+    englishSlugs = extractEnglishSlugs(fs.readFileSync(SPEC_FILE_EN, 'utf-8'));
+    console.log(`  Extracted ${englishSlugs.length} heading slugs from English version`);
   }
 
-  // Always update version links (version numbers may have changed)
+  console.log('\n  Publishing English spec...');
+  publishSpecFile(SPEC_FILE_EN, baseOutputDir, 'en', 'zh/', viewerUrlFromRoot, faviconUrlFromRoot, englishSlugs);
+
+  console.log('\n  Publishing Chinese spec...');
+  publishSpecFile(SPEC_FILE_ZH, path.join(baseOutputDir, 'zh'), 'zh', '../', viewerUrlFromZh, faviconUrlFromZh, englishSlugs);
+
+  // Update version links in all published versions
   updateAllVersionLinks(outputDir, version, stableVersion, lastUpdatedEn, lastUpdatedZh);
 
   console.log('\n  Copying latest version to latest folder...');
