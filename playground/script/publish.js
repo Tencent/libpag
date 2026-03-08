@@ -765,7 +765,8 @@ function updateAllVersionLinks(siteDir, draftVersion, stableVersion, lastUpdated
 }
 
 /**
- * Copy latest version files to latest folder.
+ * Copy latest version files to latest folder, including markdown source copies
+ * for change detection on subsequent runs.
  */
 function copyLatestVersion(siteDir, version) {
   const latestDir = path.join(siteDir, 'latest');
@@ -786,6 +787,15 @@ function copyLatestVersion(siteDir, version) {
     fs.copyFileSync(zhSrc, zhDest);
     console.log(`  Copied: ${zhDest}`);
   }
+
+  // Copy markdown sources to latest/ for change detection
+  fs.mkdirSync(latestDir, { recursive: true });
+  const mdEnDest = path.join(latestDir, 'pagx_spec.md');
+  fs.copyFileSync(SPEC_FILE_EN, mdEnDest);
+  console.log(`  Copied: ${mdEnDest}`);
+  const mdZhDest = path.join(latestDir, 'pagx_spec.zh_CN.md');
+  fs.copyFileSync(SPEC_FILE_ZH, mdZhDest);
+  console.log(`  Copied: ${mdZhDest}`);
 }
 
 /**
@@ -800,10 +810,10 @@ function publishSpecDocs(outputDir) {
   console.log(`  Spec version: ${version}`);
   console.log(`  Spec stable: ${stableVersion || '(none)'}`);
 
-  // Check whether markdown sources have changed by comparing against cached copies
-  const sourceDir = path.join(outputDir, '.spec-source');
-  const cachedEn = path.join(sourceDir, 'pagx_spec.md');
-  const cachedZh = path.join(sourceDir, 'pagx_spec.zh_CN.md');
+  // Check whether markdown sources have changed by comparing against copies in latest/
+  const latestDir = path.join(outputDir, 'latest');
+  const cachedEn = path.join(latestDir, 'pagx_spec.md');
+  const cachedZh = path.join(latestDir, 'pagx_spec.zh_CN.md');
   const specChanged = !filesEqual(SPEC_FILE_EN, cachedEn) || !filesEqual(SPEC_FILE_ZH, cachedZh);
 
   // Determine timestamps
@@ -842,12 +852,6 @@ function publishSpecDocs(outputDir) {
     console.log('\n  Publishing Chinese spec...');
     publishSpecFile(SPEC_FILE_ZH, path.join(baseOutputDir, 'zh'), 'zh', '../', viewerUrlFromZh, faviconUrlFromZh, englishSlugs);
 
-    // Update cached markdown copies
-    fs.mkdirSync(sourceDir, { recursive: true });
-    fs.copyFileSync(SPEC_FILE_EN, cachedEn);
-    console.log(`  Cached: ${cachedEn}`);
-    fs.copyFileSync(SPEC_FILE_ZH, cachedZh);
-    console.log(`  Cached: ${cachedZh}`);
   } else {
     console.log('  Spec documents unchanged, skipping HTML rebuild.');
   }
