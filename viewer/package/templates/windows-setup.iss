@@ -1,7 +1,7 @@
 #define MyAppName "PAGViewer"
 #define MyAppVersion "~PAGViewerVersion~"
 #define MyAppPublisher "pag.art"
-#define MyAppURL "https://pag.art/"
+#define MyAppURL "https://pag.io/"
 #define MyAppExeName "PAGViewer.exe"
 
 [Setup]

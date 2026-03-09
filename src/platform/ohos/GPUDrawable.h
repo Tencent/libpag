@@ -27,7 +27,8 @@ namespace pag {
 class GPUDrawable : public Drawable {
  public:
   static std::shared_ptr<GPUDrawable> FromWindow(NativeWindow* nativeWindow,
-                                                 EGLContext sharedContext = EGL_NO_CONTEXT);
+                                                 EGLContext sharedContext = EGL_NO_CONTEXT,
+                                                 bool ownsWindow = false);
 
   ~GPUDrawable() override;
 
@@ -59,7 +60,8 @@ class GPUDrawable : public Drawable {
   EGLContext sharedContext = nullptr;
   int64_t currentTimeStamp = 0;
   std::shared_ptr<tgfx::EGLWindow> window = nullptr;
+  bool ownsWindow = false;
 
-  explicit GPUDrawable(NativeWindow* nativeWindow, EGLContext eglContext = EGL_NO_CONTEXT);
+  explicit GPUDrawable(NativeWindow* nativeWindow, EGLContext eglContext, bool ownsWindow);
 };
 }  // namespace pag

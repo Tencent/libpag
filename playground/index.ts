@@ -35,6 +35,9 @@ interface I18nStrings {
     invalidFile: string;
     spec: string;
     specTitle: string;
+    docs: string;
+    specification: string;
+    aiSkills: string;
     leave: string;
     samples: string;
     samplesTitle: string;
@@ -58,6 +61,9 @@ const i18n: Record<string, I18nStrings> = {
         invalidFile: 'Please drop a .pagx file',
         spec: 'Spec',
         specTitle: 'PAGX Specification',
+        docs: 'Docs',
+        specification: 'Specification',
+        aiSkills: 'AI Skills',
         leave: 'Leave',
         samples: 'Samples',
         samplesTitle: 'PAGX Samples',
@@ -79,6 +85,9 @@ const i18n: Record<string, I18nStrings> = {
         invalidFile: '请拖放 .pagx 文件',
         spec: '格式',
         specTitle: 'PAGX 格式规范',
+        docs: '文档',
+        specification: '格式规范',
+        aiSkills: 'AI Skills',
         leave: '离开',
         samples: '示例',
         samplesTitle: 'PAGX 示例',
@@ -1113,11 +1122,6 @@ function applyI18n(): void {
     if (resetBtn) resetBtn.title = strings.resetView;
     if (leaveBtn) leaveBtn.title = strings.leave;
 
-    const specBtn = document.getElementById('spec-btn');
-    const specBtnText = document.getElementById('spec-btn-text');
-    if (specBtn) specBtn.title = strings.specTitle;
-    if (specBtnText) specBtnText.textContent = strings.spec;
-
     const samplesBtn = document.getElementById('samples-btn');
     const samplesBtnText = document.getElementById('samples-btn-text');
     if (samplesBtn) samplesBtn.title = strings.samplesTitle;
@@ -1136,12 +1140,19 @@ function applyI18n(): void {
         if (span) span.textContent = strings.back;
     }
 
-    const samplesSpecBtn = document.getElementById('samples-spec-btn');
-    if (samplesSpecBtn) {
-        samplesSpecBtn.title = strings.specTitle;
-        const span = samplesSpecBtn.querySelector('span');
-        if (span) span.textContent = strings.spec;
-    }
+    document.querySelectorAll('.nav-dropdown-toggle').forEach((toggle) => {
+        toggle.title = strings.docs;
+        const span = toggle.querySelector('span');
+        if (span) span.textContent = strings.docs;
+    });
+    document.querySelectorAll('.nav-dropdown-spec').forEach((item) => {
+        const span = item.querySelector('span');
+        if (span) span.textContent = strings.specification;
+    });
+    document.querySelectorAll('.nav-dropdown-skills').forEach((item) => {
+        const span = item.querySelector('span');
+        if (span) span.textContent = strings.aiSkills;
+    });
 }
 
 let sampleFiles: string[] = [];
