@@ -18,12 +18,11 @@
 
 #include "cli/CommandBounds.h"
 #include <libxml/parser.h>
-#include <libxml/xpath.h>
 #include <cstring>
 #include <iostream>
 #include <string>
-#include <vector>
 #include "cli/CliUtils.h"
+#include "cli/XPathQuery.h"
 #include "pagx/PAGXImporter.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/TextLayout.h"
@@ -33,6 +32,7 @@ namespace pagx::cli {
 
 struct BoundsOptions {
   std::string inputFile = {};
+  std::string id = {};
   std::string xpath = {};
   std::string relativeTo = {};
   bool jsonOutput = false;
@@ -44,11 +44,12 @@ static void PrintBoundsUsage() {
             << "Query precise rendered bounds of Layer nodes.\n"
             << "\n"
             << "Options:\n"
+            << "  --id <id>              Select a Layer by its id attribute\n"
             << "  --xpath <expr>         Select nodes by XPath expression\n"
             << "  --relative <xpath>     Output bounds relative to another Layer\n"
             << "  --json                 Output in JSON format\n"
             << "\n"
-            << "Without --xpath, outputs bounds for all layers.\n"
+            << "Without --id or --xpath, outputs bounds for all layers.\n"
             << "\n"
             << "XPath examples:\n"
             << "  //Layer[@id='btn']     Layer with id 'btn'\n"
@@ -61,7 +62,9 @@ static int ParseBoundsOptions(int argc, char* argv[], BoundsOptions* options) {
   int i = 1;
   while (i < argc) {
     std::string arg = argv[i];
-    if (arg == "--xpath" && i + 1 < argc) {
+    if (arg == "--id" && i + 1 < argc) {
+      options->id = argv[++i];
+    } else if (arg == "--xpath" && i + 1 < argc) {
       options->xpath = argv[++i];
     } else if (arg == "--relative" && i + 1 < argc) {
       options->relativeTo = argv[++i];
@@ -78,133 +81,15 @@ static int ParseBoundsOptions(int argc, char* argv[], BoundsOptions* options) {
     }
     i++;
   }
+  if (!options->id.empty() && !options->xpath.empty()) {
+    std::cerr << "pagx bounds: --id and --xpath are mutually exclusive\n";
+    return 1;
+  }
   if (options->inputFile.empty()) {
     std::cerr << "pagx bounds: missing input file\n";
     return 1;
   }
   return 0;
-}
-
-// Compute the "Layer path" from <pagx> root to a given xmlNode. The path is a list of 0-based
-// child Layer indices at each level. Returns false if the node is not a <Layer> element.
-static bool ComputeLayerPath(xmlNodePtr node, std::vector<int>* path) {
-  if (node == nullptr || node->type != XML_ELEMENT_NODE) {
-    return false;
-  }
-  if (!xmlStrEqual(node->name, BAD_CAST "Layer")) {
-    return false;
-  }
-
-  // Walk up to build the path from root to node.
-  std::vector<int> reversePath = {};
-  xmlNodePtr current = node;
-  while (current != nullptr && current->parent != nullptr) {
-    bool isParentPagx =
-        current->parent->name != nullptr && xmlStrEqual(current->parent->name, BAD_CAST "pagx");
-    // Count the index of current among sibling <Layer> elements.
-    int index = 0;
-    for (xmlNodePtr sibling = current->parent->children; sibling != nullptr;
-         sibling = sibling->next) {
-      if (sibling == current) {
-        break;
-      }
-      if (sibling->type == XML_ELEMENT_NODE && sibling->name != nullptr &&
-          xmlStrEqual(sibling->name, BAD_CAST "Layer")) {
-        index++;
-      }
-    }
-    reversePath.push_back(index);
-
-    if (isParentPagx) {
-      break;
-    }
-    current = current->parent;
-  }
-
-  // Reverse to get root-to-node order.
-  path->assign(reversePath.rbegin(), reversePath.rend());
-  return true;
-}
-
-// Resolve a Layer path to a pagx::Layer pointer in the document.
-static const Layer* ResolveLayerPath(const PAGXDocument* document, const std::vector<int>& path) {
-  if (path.empty()) {
-    return nullptr;
-  }
-  // First index selects from document->layers.
-  int topIndex = path[0];
-  if (topIndex < 0 || topIndex >= static_cast<int>(document->layers.size())) {
-    return nullptr;
-  }
-  const Layer* current = document->layers[static_cast<size_t>(topIndex)];
-
-  // Subsequent indices descend through children.
-  for (size_t i = 1; i < path.size(); i++) {
-    int childIndex = path[i];
-    if (childIndex < 0 || childIndex >= static_cast<int>(current->children.size())) {
-      return nullptr;
-    }
-    current = current->children[static_cast<size_t>(childIndex)];
-  }
-  return current;
-}
-
-// Evaluate an XPath expression and return matching Layer nodes.
-static std::vector<const Layer*> EvaluateXPath(xmlDocPtr xmlDoc, const std::string& xpathExpr,
-                                               const PAGXDocument* document) {
-  std::vector<const Layer*> results = {};
-
-  xmlXPathContextPtr xpathCtx = xmlXPathNewContext(xmlDoc);
-  if (xpathCtx == nullptr) {
-    std::cerr << "pagx bounds: failed to create XPath context\n";
-    return results;
-  }
-
-  auto* xpathBuf = reinterpret_cast<const xmlChar*>(xpathExpr.c_str());
-  xmlXPathObjectPtr xpathObj = xmlXPathEvalExpression(xpathBuf, xpathCtx);
-  if (xpathObj == nullptr) {
-    std::cerr << "pagx bounds: invalid XPath expression '" << xpathExpr << "'\n";
-    xmlXPathFreeContext(xpathCtx);
-    return results;
-  }
-
-  if (xpathObj->nodesetval != nullptr) {
-    int count = xpathObj->nodesetval->nodeNr;
-    for (int i = 0; i < count; i++) {
-      xmlNodePtr xmlNode = xpathObj->nodesetval->nodeTab[i];
-      std::vector<int> layerPath = {};
-      if (!ComputeLayerPath(xmlNode, &layerPath)) {
-        auto name =
-            xmlNode->name ? std::string(reinterpret_cast<const char*>(xmlNode->name)) : "unknown";
-        std::cerr << "pagx bounds: XPath matched a <" << name
-                  << "> node, but only <Layer> nodes are supported\n";
-        continue;
-      }
-      const Layer* pagxLayer = ResolveLayerPath(document, layerPath);
-      if (pagxLayer != nullptr) {
-        results.push_back(pagxLayer);
-      }
-    }
-  }
-
-  xmlXPathFreeObject(xpathObj);
-  xmlXPathFreeContext(xpathCtx);
-  return results;
-}
-
-// Evaluate XPath and return a single Layer (for --relative).
-static const Layer* EvaluateSingleXPath(xmlDocPtr xmlDoc, const std::string& xpathExpr,
-                                        const PAGXDocument* document) {
-  auto layers = EvaluateXPath(xmlDoc, xpathExpr, document);
-  if (layers.empty()) {
-    return nullptr;
-  }
-  if (layers.size() > 1) {
-    std::cerr << "pagx bounds: --relative XPath matched " << layers.size()
-              << " nodes, expected exactly 1\n";
-    return nullptr;
-  }
-  return layers[0];
 }
 
 static void PrintBoundsText(const std::string& label, float left, float top, float width,
@@ -283,7 +168,6 @@ int RunBounds(int argc, char* argv[]) {
   // Build layer tree with mapping.
   TextLayout textLayout = {};
   SetupSystemFallbackFonts(textLayout);
-  textLayout.layout(document.get());
   auto buildResult = LayerBuilder::BuildWithMap(document.get(), &textLayout);
   if (buildResult.root == nullptr) {
     std::cerr << "pagx bounds: failed to build layer tree\n";
@@ -304,7 +188,8 @@ int RunBounds(int argc, char* argv[]) {
   // Resolve --relative Layer.
   tgfx::Layer* relativeLayer = nullptr;
   if (!options.relativeTo.empty()) {
-    const Layer* relativePagx = EvaluateSingleXPath(xmlDoc, options.relativeTo, document.get());
+    const Layer* relativePagx =
+        EvaluateSingleXPath(xmlDoc, options.relativeTo, document.get(), "bounds");
     if (relativePagx == nullptr) {
       xmlFreeDoc(xmlDoc);
       std::cerr << "pagx bounds: --relative target not found\n";
@@ -319,7 +204,25 @@ int RunBounds(int argc, char* argv[]) {
     relativeLayer = it->second.get();
   }
 
-  if (!options.xpath.empty()) {
+  if (!options.id.empty()) {
+    // ID mode: look up a single Layer by document node ID.
+    auto* node = document->findNode(options.id);
+    if (node == nullptr) {
+      std::cerr << "pagx bounds: no node found with id '" << options.id << "'\n";
+      return 1;
+    }
+    if (node->nodeType() != NodeType::Layer) {
+      std::cerr << "pagx bounds: node '" << options.id << "' is not a Layer\n";
+      return 1;
+    }
+    auto* pagxLayer = static_cast<const Layer*>(node);
+    auto it = buildResult.layerMap.find(pagxLayer);
+    if (it == buildResult.layerMap.end()) {
+      std::cerr << "pagx bounds: Layer '" << options.id << "' has no rendered layer\n";
+      return 1;
+    }
+    PrintLayerBounds(pagxLayer, it->second.get(), relativeLayer, options.jsonOutput);
+  } else if (!options.xpath.empty()) {
     // XPath mode: query specific nodes.
     auto matchedLayers = EvaluateXPath(xmlDoc, options.xpath, document.get());
     if (matchedLayers.empty()) {

@@ -18,18 +18,26 @@
 
 #pragma once
 
-#include "tgfx/core/Bitmap.h"
+#include <libxml/parser.h>
+#include <string>
+#include <vector>
+#include "pagx/PAGXDocument.h"
 
 namespace pagx::cli {
 
 /**
- * Renders a PAGX file and returns the result as a Bitmap. Returns an empty Bitmap on error.
+ * Evaluates an XPath expression on the XML document and returns matching pagx::Layer nodes. The
+ * function maps XML nodes back to the PAGXDocument's layer tree by computing positional paths.
+ * Non-Layer nodes matched by the expression are skipped with a warning on stderr.
  */
-tgfx::Bitmap RenderToBitmap(int argc, char* argv[]);
+std::vector<const Layer*> EvaluateXPath(xmlDocPtr xmlDoc, const std::string& xpathExpr,
+                                        const PAGXDocument* document);
 
 /**
- * Renders a PAGX file to an image (PNG/WebP).
+ * Evaluates an XPath expression and returns exactly one matching Layer. Prints an error and returns
+ * nullptr if zero or more than one Layer is matched.
  */
-int RunRender(int argc, char* argv[]);
+const Layer* EvaluateSingleXPath(xmlDocPtr xmlDoc, const std::string& xpathExpr,
+                                 const PAGXDocument* document, const std::string& commandName);
 
 }  // namespace pagx::cli

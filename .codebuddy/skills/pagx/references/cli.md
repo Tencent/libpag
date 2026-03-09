@@ -57,6 +57,8 @@ pagx render -o output.jpg --format jpg --quality 90 --background "#FFFFFF" input
 pagx render --font CustomFont.ttf input.pagx
 pagx render --font a.ttf --fallback "PingFang SC" input.pagx
 pagx render --font a.ttf --fallback b.otf --fallback "Noto Emoji" input.pagx
+pagx render --id "btnLayer" input.pagx            # render only the Layer with id="btnLayer"
+pagx render --xpath "/pagx/Layer[2]" input.pagx   # render only the matched Layer
 ```
 
 | Option | Description |
@@ -64,11 +66,23 @@ pagx render --font a.ttf --fallback b.otf --fallback "Noto Emoji" input.pagx
 | `-o, --output <path>` | Output file path (default: input path with format extension) |
 | `--format png\|webp\|jpg` | Output format (default: png) |
 | `--scale <float>` | Scale factor (default: 1.0) |
-| `--crop <x,y,w,h>` | Crop region in document coordinates |
+| `--crop <x,y,w,h>` | Crop region in document coordinates (relative to target Layer when `--id`/`--xpath` is set) |
+| `--id <id>` | Render only the Layer with the specified `id` attribute |
+| `--xpath <expr>` | Render only the Layer matched by XPath expression (must match exactly one) |
 | `--quality <0-100>` | Encoding quality (default: 100) |
 | `--background <color>` | Background color (#RRGGBB or #RRGGBBAA) |
 | `--font <path>` | Register a font file (can be specified multiple times) |
 | `--fallback <path\|name>` | Fallback font file or system font name (can be specified multiple times) |
+
+`--id` and `--xpath` are mutually exclusive. When either is specified, only the target Layer
+is rendered — all other content is excluded. The output image is cropped to the target Layer's
+bounds, so the image dimensions reflect the Layer's actual rendered size rather than the full
+canvas. This is useful for inspecting individual components in isolation. For render, `--xpath`
+must match exactly one Layer; an error is reported if zero or more than one Layer matches. In
+contrast, bounds `--xpath` can match multiple Layers.
+
+Errors: `--id` reports an error if no node with that id exists or if the matched node is not a
+Layer. `--xpath` reports an error if no Layer matches or if more than one Layer matches.
 
 `--font` registers a font file matched by fontFamily/fontStyle against PAGX text references.
 `--fallback` accepts either a file path (e.g., `b.otf`) or a system font name (e.g.,
@@ -120,12 +134,13 @@ pagx format --indent 4 input.pagx       # 4-space indent (default: 2)
 
 ## pagx bounds
 
-Query precise rendered bounds of Layer nodes. Supports XPath expressions for node selection.
-Without `--xpath`, outputs bounds for the entire document and all layers.
+Query precise rendered bounds of Layer nodes. Supports `--id` for quick lookup by id attribute
+and `--xpath` for flexible node selection. Without either, outputs bounds for the entire
+document and all layers.
 
 ```bash
 pagx bounds input.pagx                                          # all layers
-pagx bounds --xpath "//Layer[@id='btn']" input.pagx              # by id
+pagx bounds --id "btn" input.pagx                                # by id
 pagx bounds --xpath "/pagx/Layer[2]/Layer[1]" input.pagx         # by position
 pagx bounds --xpath "//Layer[@id='icon']" --relative "//Layer[@id='card']" input.pagx
 pagx bounds --json input.pagx
@@ -133,9 +148,13 @@ pagx bounds --json input.pagx
 
 | Option | Description |
 |--------|-------------|
+| `--id <id>` | Select a Layer by its `id` attribute |
 | `--xpath <expr>` | Select Layer nodes by XPath expression |
 | `--relative <xpath>` | Output bounds relative to another Layer |
 | `--json` | JSON output |
+
+`--id` and `--xpath` are mutually exclusive. `--id "btn"` is a shorthand for selecting a
+Layer by its `id` attribute.
 
 XPath quick reference for PAGX:
 - `//Layer[@id='x']` — Layer with `id="x"` anywhere in the document
