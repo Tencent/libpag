@@ -18,7 +18,14 @@
 
 #pragma once
 
+#include "tgfx/core/Bitmap.h"
+
 namespace pagx::cli {
+
+/**
+ * Renders a PAGX file and returns the result as a Bitmap. Returns an empty Bitmap on error.
+ */
+tgfx::Bitmap RenderToBitmap(int argc, char* argv[]);
 
 /**
  * Renders a PAGX file to an image (PNG/WebP).
