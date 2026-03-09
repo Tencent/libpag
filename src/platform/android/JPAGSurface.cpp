@@ -115,6 +115,7 @@ PAG_API jlong Java_org_libpag_PAGSurface_SetupFromSurfaceWithGLContext(JNIEnv* e
   auto drawable = GPUDrawable::FromWindow(nativeWindow, reinterpret_cast<EGLContext>(shareContext));
   if (drawable == nullptr) {
     LOGE("PAGSurface.SetupFromSurface() Invalid surface specified.");
+    ANativeWindow_release(nativeWindow);
     return 0;
   }
   auto pagSurface = PAGSurface::MakeFrom(drawable);

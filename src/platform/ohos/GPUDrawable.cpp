@@ -23,21 +23,23 @@
 
 namespace pag {
 std::shared_ptr<GPUDrawable> GPUDrawable::FromWindow(NativeWindow* nativeWindow,
-                                                     EGLContext sharedContext) {
+                                                     EGLContext sharedContext, bool ownsWindow) {
   if (!nativeWindow) {
     LOGE("GPUDrawable.FromWindow() The nativeWindow is invalid.");
     return nullptr;
   }
-  return std::shared_ptr<GPUDrawable>(new GPUDrawable(nativeWindow, sharedContext));
+  return std::shared_ptr<GPUDrawable>(new GPUDrawable(nativeWindow, sharedContext, ownsWindow));
 }
 
-GPUDrawable::GPUDrawable(NativeWindow* nativeWindow, EGLContext eglContext)
-    : nativeWindow(nativeWindow), sharedContext(eglContext) {
+GPUDrawable::GPUDrawable(NativeWindow* nativeWindow, EGLContext eglContext, bool ownsWindow)
+    : nativeWindow(nativeWindow), sharedContext(eglContext), ownsWindow(ownsWindow) {
   updateSize();
 }
 
 GPUDrawable::~GPUDrawable() {
-  OH_NativeWindow_DestroyNativeWindow(nativeWindow);
+  if (ownsWindow && nativeWindow) {
+    OH_NativeWindow_DestroyNativeWindow(nativeWindow);
+  }
 }
 
 void GPUDrawable::updateSize() {

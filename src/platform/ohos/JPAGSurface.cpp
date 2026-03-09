@@ -131,7 +131,7 @@ static napi_value FromSurfaceID(napi_env env, napi_callback_info info) {
     LOGE("Could not Create Native Window From Surface Id:%lld", surfaceId);
     return nullptr;
   }
-  auto drawable = pag::GPUDrawable::FromWindow(window);
+  auto drawable = pag::GPUDrawable::FromWindow(window, EGL_NO_CONTEXT, true);
   return JPAGSurface::ToJs(env, pag::PAGSurface::MakeFrom(drawable));
 }
 
