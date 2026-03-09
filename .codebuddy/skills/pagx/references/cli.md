@@ -68,7 +68,7 @@ pagx render --xpath "/pagx/Layer[2]" input.pagx   # render only the matched Laye
 | `--scale <float>` | Scale factor (default: 1.0) |
 | `--crop <x,y,w,h>` | Crop region in document coordinates (relative to target Layer when `--id`/`--xpath` is set) |
 | `--id <id>` | Render only the Layer with the specified `id` attribute |
-| `--xpath <expr>` | Render only the Layer matched by XPath expression |
+| `--xpath <expr>` | Render only the Layer matched by XPath expression (must match exactly one) |
 | `--quality <0-100>` | Encoding quality (default: 100) |
 | `--background <color>` | Background color (#RRGGBB or #RRGGBBAA) |
 | `--font <path>` | Register a font file (can be specified multiple times) |
@@ -77,7 +77,12 @@ pagx render --xpath "/pagx/Layer[2]" input.pagx   # render only the matched Laye
 `--id` and `--xpath` are mutually exclusive. When either is specified, only the target Layer
 is rendered — all other content is excluded. The output image is cropped to the target Layer's
 bounds, so the image dimensions reflect the Layer's actual rendered size rather than the full
-canvas. This is useful for inspecting individual components in isolation.
+canvas. This is useful for inspecting individual components in isolation. For render, `--xpath`
+must match exactly one Layer; an error is reported if zero or more than one Layer matches. In
+contrast, bounds `--xpath` can match multiple Layers.
+
+Errors: `--id` reports an error if no node with that id exists or if the matched node is not a
+Layer. `--xpath` reports an error if no Layer matches or if more than one Layer matches.
 
 `--font` registers a font file matched by fontFamily/fontStyle against PAGX text references.
 `--fallback` accepts either a file path (e.g., `b.otf`) or a system font name (e.g.,
@@ -148,8 +153,9 @@ pagx bounds --json input.pagx
 | `--relative <xpath>` | Output bounds relative to another Layer |
 | `--json` | JSON output |
 
-`--id` and `--xpath` are mutually exclusive. `--id "btn"` is equivalent to
-`--xpath "//*[@id='btn']"` but shorter to type.
+`--id` and `--xpath` are mutually exclusive. `--id "btn"` is a shorthand for selecting a
+Layer by its `id` attribute, semantically equivalent to `--xpath "//Layer[@id='btn']"` but
+shorter to type.
 
 XPath quick reference for PAGX:
 - `//Layer[@id='x']` — Layer with `id="x"` anywhere in the document
