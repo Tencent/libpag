@@ -108,6 +108,7 @@ std::vector<const Layer*> EvaluateXPath(xmlDocPtr xmlDoc, const std::string& xpa
 
   if (xpathObj->nodesetval != nullptr) {
     int count = xpathObj->nodesetval->nodeNr;
+    results.reserve(static_cast<size_t>(count));
     for (int i = 0; i < count; i++) {
       xmlNodePtr xmlNode = xpathObj->nodesetval->nodeTab[i];
       std::vector<int> layerPath = {};
