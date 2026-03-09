@@ -869,7 +869,7 @@ void JPAGView::onAnimationUpdate(PAGAnimator* animator) {
 
 void JPAGView::onSurfaceCreated(NativeWindow* window) {
   std::lock_guard lock_guard(locker);
-  auto drawable = pag::GPUDrawable::FromWindow(window);
+  auto drawable = pag::GPUDrawable::FromWindow(window, EGL_NO_CONTEXT, false);
   if (player == nullptr || animator == nullptr) {
     return;
   }
