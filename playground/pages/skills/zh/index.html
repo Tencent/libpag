@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PAGX AI Skills</title>
-    <link rel="icon" href="../favicon.png" type="image/png">
+    <title>PAGX Skills</title>
+    <link rel="icon" href="../../favicon.png" type="image/png">
     <style>
         :root {
             --primary-color: #0066cc;
@@ -173,193 +173,130 @@
 </head>
 <body>
     <div class="header-actions">
-        <a href="../" class="header-btn" title="Preview">
+        <a href="../../" class="header-btn" title="在线预览">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-            <span>Preview</span>
+            <span>在线预览</span>
         </a>
         <div class="lang-switch" onclick="this.classList.toggle('open')">
             <button class="header-btn">
-                <span>English</span>
+                <span>简体中文</span>
                 <svg viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
             </button>
             <div class="lang-switch-menu">
-                <a href="#" onclick="return switchLang('en', this.href);" class="active">English</a>
-                <a href="zh/" onclick="return switchLang('zh-CN', this.href);">简体中文</a>
+                <a href="../" onclick="return switchLang('en', this.href);">English</a>
+                <a href="#" onclick="return switchLang('zh-CN', this.href);" class="active">简体中文</a>
             </div>
         </div>
     </div>
 
     <!-- Hero download -->
     <div class="hero">
-        <h1>PAGX AI Skills</h1>
-        <p class="subtitle">Enable your AI coding assistant to create, revise, and optimize PAGX vector graphics.</p>
-        <a href="./pagx.zip" download class="download-btn">
+        <h1>PAGX Skills</h1>
+        <p class="subtitle">让 AI 编程助手能够创建、修改并优化 PAGX 矢量图形。</p>
+        <a href="../pagx.zip" download class="download-btn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M2 17l.621 2.485A2 2 0 0 0 4.561 21h14.878a2 2 0 0 0 1.94-1.515L22 17"/></svg>
-            Download Skills Package
+            下载 Skills 安装包
         </a>
-        <p class="download-meta">Last updated: {{lastUpdated}}</p>
+        <p class="download-meta">最后更新：{{lastUpdated}}</p>
     </div>
 
     <main class="content">
         <!-- About -->
-        <h2 id="about">About</h2>
-        <p>
-            PAGX AI Skills is a professional skills extension for AI coding assistants. After
-            installation, an AI agent can generate structured PAGX vector graphics from text prompts,
-            optimize file size and rendering performance, and look up PAGX syntax, attributes, and
-            CLI usage when needed.
-        </p>
-        <p>
-            Most mainstream image generators (such as Stable Diffusion and DALL-E) produce bitmaps
-            by sampling from probability distributions. When a local detail is off, you often have
-            to regenerate the entire image instead of fixing just that specific part.
-        </p>
-        <p>
-            PAGX takes a different path: the AI outputs structured markup rather than sampled pixels.
-            Each element carries explicit editable parameters, so you can make targeted updates to
-            color, size, position, and spacing through natural-language instructions without affecting
-            unrelated parts. This ability to support precise secondary edits and continuous iteration
-            is the core value over bitmap-first generation; as iterations accumulate, outcomes are
-            more likely to converge toward production-ready quality.
-        </p>
-        <p>
-            The PAGX format is still under active development, and the
-            <a href="https://pag.io/pagx/latest/" target="_blank" rel="noopener">specification</a>
-            may be updated at any time. Static vector capabilities are complete; motion capabilities
-            will be added next, at which point AI Skills will also be able to generate animations
-            directly.
-        </p>
+        <h2 id="about">简介</h2>
+        <p>PAGX Skills 是面向 AI 编程助手的专业技能扩展包。安装后，AI 可以根据自然语言描述生成结构简洁的 PAGX 矢量图形，优化文件大小和渲染性能，并在需要时查询 PAGX 语法、属性和命令行工具用法。</p>
+        <p>当前主流的 AI 图像生成工具（如 Stable Diffusion、DALL-E）主要基于位图生成，其本质是一个概率采样过程。这意味着当生成结果中某个局部细节不符合预期时，通常无法仅针对该细节进行精确调整，而需要重新生成整张图像。这种局限性使得基于位图的 AI 工具更适合前期的创意探索，难以满足上线交付环节对精确控制和稳定复用的要求。要解决这一问题，需要让 AI 在具备精确结构的矢量图形上进行工作。然而，目前 AI 在矢量生成领域尚未大规模应用，核心原因在于缺少专门为 AI 优化的通用矢量格式标准。PAGX 正是为此设计的——相比 SVG 等传统矢量格式，PAGX 在文件格式层面针对 AI 进行了深度优化，并配套提供了完善的 Skills 和命令行工具，使其具备更强的视觉表达能力和更精准的元素定位能力，支持精确的二次编辑和持续迭代：理论上，只要迭代次数足够多，产出就能持续逼近上线质量标准。</p>
+        <p>PAGX 格式目前仍在持续迭代中，<a href="https://pag.io/pagx/latest/">规范文档</a>可能随时更新。目前已初步完成静态矢量部分，后续将继续扩充动效能力——届时 AI 也将具备直接生成动效的能力。</p>
 
         <!-- Installation -->
-        <h2 id="installation">Installation Guide</h2>
+        <h2 id="installation">安装指南</h2>
 
-        <h3 id="install-nodejs">1. Install Node.js</h3>
-        <p>
-            The Skills package includes the <a href="https://www.npmjs.com/package/@libpag/pagx" target="_blank" rel="noopener"><code>@libpag/pagx</code></a> command-line tool, which depends on
-            Node.js. If Node.js is not installed on your machine, complete these steps first:
-        </p>
+        <h3 id="install-nodejs">1. 安装 Node.js</h3>
+        <p>Skills 安装包包含命令行工具 <a href="https://www.npmjs.com/package/@libpag/pagx"><code>@libpag/pagx</code></a>，运行依赖 Node.js。若本机尚未安装，请先完成以下步骤：</p>
         <div class="step">
-            <p><span class="step-number">Step 1</span> &mdash; Visit <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a> and download the <strong>LTS</strong> (Long Term Support) version for your operating system.</p>
+            <p><span class="step-number">第 1 步</span> &mdash; 访问 <a href="https://nodejs.org">nodejs.org</a>，下载适用于你操作系统的 <strong>LTS</strong>（长期支持）版本。</p>
         </div>
         <div class="step">
-            <p><span class="step-number">Step 2</span> &mdash; Run the installer and follow the on-screen instructions. Accept all default settings.</p>
+            <p><span class="step-number">第 2 步</span> &mdash; 运行安装程序，按照屏幕提示操作，保持所有默认设置即可。</p>
         </div>
         <div class="step">
-            <p><span class="step-number">Step 3</span> &mdash; Verify the installation. Open a terminal (Terminal on macOS, Command Prompt or PowerShell on Windows) and run:</p>
+            <p><span class="step-number">第 3 步</span> &mdash; 验证安装是否成功。打开终端（macOS 上的"终端"应用，Windows 上的"命令提示符"或"PowerShell"），输入以下命令：</p>
             <pre><code>node --version</code></pre>
-            <p>If you see a version number like <code>v22.x.x</code>, Node.js is installed successfully.</p>
+            <p>如果显示类似 <code>v22.x.x</code> 的版本号，说明 Node.js 已安装成功。</p>
         </div>
 
-        <h3 id="install-codebuddy">2. Install an AI Coding Assistant</h3>
-        <p>
-            PAGX Skills works with any AI coding assistant that supports a Skills mechanism.
-            Here we use
-            <a href="https://www.codebuddy.ai/cli" target="_blank" rel="noopener">CodeBuddy Code</a>
-            as an example. For other tools, refer to their official documentation for installation.
-        </p>
+        <h3 id="install-codebuddy">2. 安装 AI 编程助手</h3>
+        <p>PAGX Skills 可用于任何支持 Skills 机制的 AI 编程助手。这里以 <a href="https://www.codebuddy.ai/cli">CodeBuddy Code</a> 为例，其他工具请参考其官方文档完成安装。</p>
         <div class="step">
-            <p><span class="step-number">Step 1</span> &mdash; Open a terminal and run the installation command:</p>
+            <p><span class="step-number">第 1 步</span> &mdash; 打开终端，运行以下安装命令：</p>
             <pre><code>npm install -g @tencent-ai/codebuddy-code</code></pre>
         </div>
         <div class="step">
-            <p><span class="step-number">Step 2</span> &mdash; After installation, launch it by typing:</p>
+            <p><span class="step-number">第 2 步</span> &mdash; 安装完成后，输入以下命令启动：</p>
             <pre><code>codebuddy</code></pre>
-            <p>Follow the on-screen prompts to complete the initial setup and authentication.</p>
+            <p>按照屏幕提示完成初始设置和账号认证。</p>
         </div>
         <div class="info-box">
-            <p>For detailed installation instructions and system requirements, see the
-            <a href="https://www.codebuddy.ai/cli" target="_blank" rel="noopener">CodeBuddy Code documentation</a>.</p>
+        <p>如需了解详细的安装说明和系统要求，请参阅 <a href="https://www.codebuddy.ai/cli">CodeBuddy Code 官方文档</a>。</p>
         </div>
 
-        <h3 id="install-skills">3. Install PAGX Skills</h3>
-        <p>
-            After downloading <a href="./pagx.zip" download><code>pagx.zip</code></a>, extract it and place the
-            resulting <code>pagx</code> folder into your <strong>user-level</strong> Skills directory.
-            This makes the skill available across all your projects.
-        </p>
+        <h3 id="install-skills">3. 安装 PAGX Skills</h3>
+        <p>下载 <a href="../pagx.zip" download><code>pagx.zip</code></a> 后，将其解压，把得到的 <code>pagx</code> 文件夹放到<strong>用户级</strong> Skills 目录中。这样所有项目都可以使用该技能。</p>
         <table>
-            <tr><th>Platform</th><th>Skills directory</th></tr>
+            <tr><th>平台</th><th>Skills 目录</th></tr>
             <tr><td>macOS / Linux</td><td><code>~/.codebuddy/skills/</code></td></tr>
-            <tr><td>Windows</td><td><code>C:\Users\&lt;username&gt;\.codebuddy\skills\</code></td></tr>
+            <tr><td>Windows</td><td><code>C:\Users\&lt;用户名&gt;\.codebuddy\skills\</code></td></tr>
         </table>
-        <p>The final directory structure should look like:</p>
+        <p>最终目录结构应如下所示：</p>
         <pre><code>.codebuddy/
   skills/
     pagx/
       SKILL.md
       references/
         ...</code></pre>
-        <p>
-            If the <code>.codebuddy/skills/</code> folders do not exist yet, create them manually.
-            Then launch CodeBuddy Code in any project folder &mdash; the PAGX Skills will be
-            automatically detected and loaded.
-        </p>
+        <p>如果 <code>.codebuddy/skills/</code> 文件夹尚不存在，手动创建即可。然后在任意项目目录下启动 CodeBuddy Code，PAGX Skills 会被自动识别并加载。</p>
         <div class="info-box">
-            <p>The <a href="https://www.npmjs.com/package/@libpag/pagx" target="_blank" rel="noopener"><code>@libpag/pagx</code></a> command-line tool will be automatically installed when the AI
-            assistant needs it for the first time. This requires the Node.js environment set up in Step 1.</p>
+            <p><a href="https://www.npmjs.com/package/@libpag/pagx"><code>@libpag/pagx</code></a> 命令行工具会在 AI 助手首次需要时自动安装，这依赖于第 1 步中搭建的 Node.js 环境。</p>
         </div>
 
         <!-- Getting Started -->
-        <h2 id="getting-started">Getting Started</h2>
+        <h2 id="getting-started">开始使用</h2>
         <div class="info-box">
-            <p>PAGX Skills has been tested primarily with <strong>CodeBuddy Code</strong> and the
-            <strong>Claude Opus 4.6</strong> model. Other tools and models may produce different results.</p>
+        <p>PAGX Skills 目前主要在 <strong>CodeBuddy Code</strong> + <strong>Claude Opus 4.6</strong> 模型上完成测试。使用其他工具或模型时效果可能有所不同。</p>
         </div>
 
-        <p>
-            Once installed, you can drive the AI with natural language. The examples below follow a
-            simple sequence: create, iterate, then validate.
-        </p>
+        <p>安装完成后，可直接用自然语言驱动 AI。下面按"创建→迭代→验证"给出常见示例：</p>
 
-        <h3 id="creating">Creating PAGX Files</h3>
-        <p>
-            When creating for the first time, include <strong>"PAGX"</strong> in your prompt so the
-            AI activates the PAGX skill. Once activated, subsequent messages in the same conversation
-            no longer need the keyword.
-        </p>
+        <h3 id="creating">创建 PAGX 文件</h3>
+        <p>首次创建时，请在提示中包含 <strong>"PAGX"</strong> 关键词，以便 AI 激活 PAGX 技能。激活后，同一对话中的后续消息无需再重复该关键词。</p>
         <ul>
-            <li><code>Create a PAGX button: blue rounded rectangle, white text 'Submit'</code></li>
-            <li><code>Design a PAGX card with an avatar, title, and subtitle</code></li>
-            <li><code>Make a PAGX settings icon using simple geometric shapes, 24x24</code></li>
-            <li><code>Create a PAGX gradient banner with bold text 'Welcome Back'</code></li>
+            <li><code>创建一个 PAGX 按钮：蓝色圆角矩形，白色文字 'Submit'</code></li>
+            <li><code>设计一个 PAGX 卡片，包含头像、标题和副标题</code></li>
+            <li><code>用简单几何图形做一个 PAGX 设置图标，24x24 尺寸</code></li>
+            <li><code>创建一个 PAGX 渐变色横幅，加粗文字 'Welcome Back'</code></li>
         </ul>
 
-        <h3 id="modifying">Modifying and Iterating</h3>
+        <h3 id="modifying">修改与迭代</h3>
         <ul>
-            <li><code>Change the Submit button color to green and increase its corner radius</code></li>
-            <li><code>Make the title text in the card larger and align it to the left</code></li>
-            <li><code>Add a subtle drop shadow to the entire card</code></li>
-            <li><code>The spacing between the settings icon and the label text feels too tight, increase it</code></li>
+            <li><code>把 Submit 按钮的颜色改成绿色，圆角再大一些</code></li>
+            <li><code>卡片里的标题文字调大一些，改成左对齐</code></li>
+            <li><code>给整个卡片加一个淡淡的阴影效果</code></li>
+            <li><code>设置图标和右侧文字之间的间距太紧了，拉开一些</code></li>
         </ul>
 
-        <h3 id="rendering">Rendering and Inspection</h3>
+        <h3 id="rendering">渲染与检查</h3>
         <ul>
-            <li><code>Render this PAGX file as a screenshot so I can preview it</code></li>
-            <li><code>Render it at 2x scale for Retina display</code></li>
-            <li><code>Validate this PAGX file and fix any errors</code></li>
-            <li><code>Optimize this PAGX file for size and performance</code></li>
+            <li><code>把这个 PAGX 文件渲染成截图，我看一下效果</code></li>
+            <li><code>渲染成 2 倍大小的截图，方便在 Retina 屏幕上预览</code></li>
+            <li><code>校验一下这个 PAGX 文件有没有错误，有的话帮我修复</code></li>
+            <li><code>优化这个 PAGX 文件的大小和性能</code></li>
         </ul>
 
-        <h3 id="preview">Online Preview</h3>
-        <p>
-            You can also preview PAGX files visually using the
-            <a href="../">PAGX Playground</a> &mdash; simply drag and drop any
-            <code>.pagx</code> file onto the page to see the rendered result in your browser.
-        </p>
+        <h3 id="preview">在线预览</h3>
+        <p>你也可以通过 <a href="../../">PAGX Playground</a> 在线预览 PAGX 文件 &mdash; 只需将任意 <code>.pagx</code> 文件拖放到页面上，即可在浏览器中查看渲染效果。</p>
 
-        <h3 id="tips">Tips for Best Results</h3>
-        <p>
-            <strong>Set the target, then iterate in small steps.</strong>
-            Describe the desired outcome, preview the render, and only report local changes.
-            Each round is a traceable, testable edit instead of a probabilistic re-roll, so
-            results converge faster and stay easier to reuse.
-        </p>
-        <p>
-            <strong>Use bitmap references for style, not tracing.</strong>
-            Bitmaps are good for conveying mood and composition, but not for pixel-perfect copying.
-            A better workflow is to let AI rebuild the idea as clean vector structure, then refine
-            it through targeted parameter edits.
-        </p>
+        <h3 id="tips">使用建议</h3>
+        <p><strong>多轮迭代，稳定收敛。</strong>不要期望 AI 单次生成的结果就能直接达到上线标准，而应通过多轮迭代持续优化。其核心原理是：只要迭代次数足够多，产出就能持续逼近上线质量。AI 和工具承担高频执行与自动验证，人类则在关键节点提供审美与结构指导。随着大模型、Skills 及配套工具的持续进步，人工参与的轮次将逐步减少，自然语言描述的效率也会不断提升。</p>
+        <p><strong>创作导向，非精确临摹。</strong>当提供位图参考时，应将其视为风格、氛围和构图方向的指引，而非要求逐像素复刻。位图生成基于概率采样，输出更接近"视觉印象"；而矢量生成则产生参数明确、结构清晰的描述。从概率分布中直接还原唯一结构超出了当前大模型的能力范围。更可靠的做法是：先让 AI 生成结构正确的矢量版本，再通过调整局部参数精细打磨细节。</p>
 
     </main>
 
@@ -387,15 +324,6 @@
             }
             return false;
         }
-
-        (function() {
-            var zhUrl = 'zh/';
-            if (!zhUrl) return;
-            var saved = getLangCookie();
-            var shouldRedirect = saved === 'zh-CN' ||
-                (!saved && /^zh\b/.test(navigator.language || ''));
-            if (shouldRedirect) location.replace(zhUrl);
-        })();
 
         document.addEventListener('click', function(e) {
             var langSwitch = document.querySelector('.lang-switch');
