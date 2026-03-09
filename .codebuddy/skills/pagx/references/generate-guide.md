@@ -159,6 +159,7 @@ skip steps or assume coordinates are correct — always measure.
 ```bash
 pagx render input.pagx            # output alongside the source file
 pagx render --scale 2 input.pagx  # 2x resolution for detail inspection
+pagx render --id "myLayer" input.pagx  # render only the target Layer in isolation
 ```
 
 **Read the rendered image** and identify all visible issues. Common problems:
@@ -178,7 +179,7 @@ For each issue identified above, measure the relevant elements:
 
 ```bash
 pagx bounds input.pagx                                   # all layers
-pagx bounds --xpath "//Layer[@id='myButton']" input.pagx  # by id
+pagx bounds --id "myButton" input.pagx                    # by id
 pagx bounds --xpath "/pagx/Layer[2]" input.pagx           # by position
 ```
 
