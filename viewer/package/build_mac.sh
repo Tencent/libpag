@@ -304,8 +304,8 @@ arm64PluginPath="${arm64BuildDirForPlugin}/PAGExporter.plugin"
 x86_64PluginExePath="${x86_64PluginPath}/Contents/MacOS/PAGExporter"
 arm64PluginExePath="${arm64PluginPath}/Contents/MacOS/PAGExporter"
 
-install_name_tool -delete_rpath "${PluginSourceDir}/vendor/ffaudio/mac/x64" ${x86_64PluginExePath}
-install_name_tool -delete_rpath "${PluginSourceDir}/vendor/ffaudio/mac/arm64" ${arm64PluginExePath}
+install_name_tool -delete_rpath "${SourceDir}/vendor/ffmovie/mac/x64" ${x86_64PluginExePath}
+install_name_tool -delete_rpath "${SourceDir}/vendor/ffmovie/mac/arm64" ${arm64PluginExePath}
 
 cp -fr ${x86_64PluginPath} ${PluginPath}
 lipo -create ${x86_64PluginExePath} ${arm64PluginExePath} -output ${PluginExePath}
@@ -363,15 +363,6 @@ cp -fRP "${PluginPath}/Contents/Plugins/*" "${AppDir}/Contents/Plugins/"
 rm -rf "${PluginPath}/Contents/Frameworks"
 rm -rf "${PluginPath}/Contents/Plugins"
 rm -rf "${PluginPath}/Contents/Resources/qml"
-
-# 3.5.2 Merge and copy ffaudio
-print "[ Merge and copy ffaudio ]"
-x64FfaudioPath="${PluginSourceDir}/vendor/ffaudio/mac/x64/libffaudio.dylib"
-arm64FfaudioPath="${PluginSourceDir}/vendor/ffaudio/mac/arm64/libffaudio.dylib"
-PluginFrameworksDir="${PluginPath}/Contents/Frameworks"
-FfaudioPath="${PluginFrameworksDir}/libffaudio.dylib"
-mkdir -p ${PluginFrameworksDir}
-lipo -create ${x64FfaudioPath} ${arm64FfaudioPath} -output ${FfaudioPath}
 
 # 3.5.3 Copy related tools
 print "[ Copy related tools ]"
@@ -572,7 +563,7 @@ then
 
         ZipLength=$(stat -f%z ${BuildDir}/${ZipFile})
 
-        URL=$(curl -s https://pag.qq.com/server.html)
+        URL=$(curl -s https://pag.io/server.html)
         if [ "${isBetaVersion}" == true ];
         then
             URL="${URL}beta/"

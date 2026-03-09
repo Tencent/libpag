@@ -51,9 +51,9 @@ class PAGViewerInstaller : public QObject {
   QNetworkReply* downloadReply = nullptr;
   QString tempDir = "";
 #ifdef Q_OS_WIN
-  QString downloadUrl = "https://pag.qq.com/update/libpag/PAGViewer_Installer.exe";
+  QString downloadUrl = "https://pag.io/update/libpag/PAGViewer_Installer.exe";
 #else
-  QString downloadUrl = "https://pag.qq.com/update/libpag/PAGViewer.zip";
+  QString downloadUrl = "https://pag.io/update/libpag/PAGViewer.zip";
 #endif
 };
 }  // namespace exporter

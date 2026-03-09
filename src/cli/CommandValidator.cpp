@@ -28,7 +28,12 @@
 
 namespace pagx::cli {
 
-static void CollectStructuredError(void* context, xmlErrorPtr xmlError) {
+// libxml2 2.12+ changed xmlStructuredErrorFunc signature to use const xmlError*
+#if LIBXML_VERSION >= 21200
+static void CollectStructuredError(void* context, const xmlError* xmlError) {
+#else
+static void CollectStructuredError(void* context, xmlError* xmlError) {
+#endif
   if (xmlError == nullptr) {
     return;
   }
