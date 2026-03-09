@@ -292,6 +292,12 @@ if (PAG_BUILD_SVG)
     list(APPEND PAG_DEFINES PAG_BUILD_SVG)
 endif ()
 
+if (PAG_BUILD_CLI OR PAG_BUILD_TESTS)
+    list(APPEND PAG_STATIC_VENDORS libxml2)
+    list(APPEND PAG_INCLUDES third_party/out/libxml2/${INCLUDE_ENTRY})
+    list(APPEND PAG_DEFINES LIBXML_STATIC)
+endif ()
+
 function(find_include_dirs out)
     file(GLOB_RECURSE headers ${ARGN})
     foreach (path ${headers})
@@ -715,11 +721,6 @@ if (PAG_BUILD_FRAMEWORK)
     endif ()
 endif ()
 
-# Build libxml2 via vendor system (used by CLI and tests)
-add_vendor_target(xml2-vendor STATIC_VENDORS libxml2)
-find_vendor_libraries(xml2-vendor STATIC XML2_VENDOR_LIBRARIES)
-set(XML2_VENDOR_INCLUDES third_party/out/libxml2/${INCLUDE_ENTRY})
-
 if (PAG_BUILD_CLI)
     # Read CLI version from cli/npm/package.json
     file(READ "${CMAKE_CURRENT_SOURCE_DIR}/cli/npm/package.json" _CLI_PACKAGE_JSON)
@@ -754,13 +755,12 @@ if (PAG_BUILD_CLI)
     # CLI executable
     file(GLOB_RECURSE CLI_FILES src/cli/*.cpp src/cli/*.h)
     add_executable(pagx-cli ${CLI_FILES})
-    add_dependencies(pagx-cli xml2-vendor)
+    add_dependencies(pagx-cli pag-vendor)
     set_target_properties(pagx-cli PROPERTIES OUTPUT_NAME pagx)
     target_include_directories(pagx-cli PRIVATE
             src/cli
             ${PAG_INCLUDES}
-            ${CMAKE_CURRENT_BINARY_DIR}/generated
-            ${XML2_VENDOR_INCLUDES})
+            ${CMAKE_CURRENT_BINARY_DIR}/generated)
     target_compile_options(pagx-cli PRIVATE ${PAG_COMPILE_OPTIONS})
     target_compile_definitions(pagx-cli PRIVATE PAGX_CLI_VERSION="${PAGX_CLI_VERSION}" LIBXML_STATIC)
     set(CLI_EXTRA_LIBS)
@@ -768,7 +768,7 @@ if (PAG_BUILD_CLI)
         find_package(Fontconfig REQUIRED)
         list(APPEND CLI_EXTRA_LIBS Fontconfig::Fontconfig)
     endif ()
-    target_link_libraries(pagx-cli pag ${PAG_SHARED_LIBS} ${XML2_VENDOR_LIBRARIES} ${CLI_EXTRA_LIBS})
+    target_link_libraries(pagx-cli pag ${PAG_SHARED_LIBS} ${CLI_EXTRA_LIBS})
 endif ()
 
 if (PAG_BUILD_TESTS)
@@ -793,9 +793,6 @@ if (PAG_BUILD_TESTS)
     file(GLOB_RECURSE CLI_TEST_FILES src/cli/*.cpp src/cli/*.h)
     list(FILTER CLI_TEST_FILES EXCLUDE REGEX "main\\.cpp$")
     list(APPEND PAG_TEST_FILES ${CLI_TEST_FILES})
-    list(APPEND PAG_TEST_LIBS ${XML2_VENDOR_LIBRARIES})
-    list(APPEND PAG_TEST_INCLUDES ${XML2_VENDOR_INCLUDES})
-    list(APPEND PAG_TEST_DEFINES LIBXML_STATIC)
 
     list(APPEND PAG_TEST_LIBS pag ${PAG_SHARED_LIBS})
     set(GOOGLE_TEST_DIR ${TGFX_DIR}/third_party/googletest/googletest)
@@ -806,7 +803,6 @@ if (PAG_BUILD_TESTS)
 
     add_vendor_target(test-vendor STATIC_VENDORS googletest CONFIG_DIR ${TGFX_DIR})
     find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
-    add_dependencies(test-vendor xml2-vendor)
     list(APPEND PAG_TEST_LIBS ${TEST_VENDOR_STATIC_LIBRARIES})
 
     file(GLOB FFAVC_LIB vendor/ffavc/${PLATFORM}/${ARCH}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
