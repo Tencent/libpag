@@ -154,8 +154,7 @@ pagx bounds --json input.pagx
 | `--json` | JSON output |
 
 `--id` and `--xpath` are mutually exclusive. `--id "btn"` is a shorthand for selecting a
-Layer by its `id` attribute, semantically equivalent to `--xpath "//Layer[@id='btn']"` but
-shorter to type.
+Layer by its `id` attribute.
 
 XPath quick reference for PAGX:
 - `//Layer[@id='x']` — Layer with `id="x"` anywhere in the document
