@@ -788,12 +788,9 @@ if (PAG_BUILD_TESTS)
     endif ()
 
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
-    list(APPEND PAG_TEST_FILES ${SRC_FILES})
-
     file(GLOB_RECURSE CLI_TEST_FILES src/cli/*.cpp src/cli/*.h)
     list(FILTER CLI_TEST_FILES EXCLUDE REGEX "main\\.cpp$")
-    list(APPEND PAG_TEST_FILES ${CLI_TEST_FILES})
-
+    list(APPEND PAG_TEST_FILES ${SRC_FILES} ${CLI_TEST_FILES})
     list(APPEND PAG_TEST_LIBS pag ${PAG_SHARED_LIBS})
     set(GOOGLE_TEST_DIR ${TGFX_DIR}/third_party/googletest/googletest)
     list(APPEND PAG_TEST_INCLUDES ${PAG_INCLUDES} test/src
