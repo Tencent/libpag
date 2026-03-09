@@ -49,7 +49,7 @@ static void PrintBoundsUsage() {
             << "  --relative <xpath>     Output bounds relative to another Layer\n"
             << "  --json                 Output in JSON format\n"
             << "\n"
-            << "Without --xpath, outputs bounds for all layers.\n"
+            << "Without --id or --xpath, outputs bounds for all layers.\n"
             << "\n"
             << "XPath examples:\n"
             << "  //Layer[@id='btn']     Layer with id 'btn'\n"
