@@ -295,7 +295,6 @@ endif ()
 if (PAG_BUILD_CLI OR PAG_BUILD_TESTS)
     list(APPEND PAG_STATIC_VENDORS libxml2)
     list(APPEND PAG_INCLUDES third_party/out/libxml2/${INCLUDE_ENTRY})
-    list(APPEND PAG_DEFINES LIBXML_STATIC)
 endif ()
 
 function(find_include_dirs out)
