@@ -175,11 +175,6 @@ int RunBounds(int argc, char* argv[]) {
     return 1;
   }
 
-  // Convert --id to an XPath expression so it shares the same query path.
-  if (!options.id.empty()) {
-    options.xpath = "//*[@id='" + options.id + "']";
-  }
-
   // Parse the XML document once for XPath queries.
   bool needsXPath = !options.xpath.empty() || !options.relativeTo.empty();
   xmlDocPtr xmlDoc = nullptr;
@@ -210,7 +205,25 @@ int RunBounds(int argc, char* argv[]) {
     relativeLayer = it->second.get();
   }
 
-  if (!options.xpath.empty()) {
+  if (!options.id.empty()) {
+    // ID mode: look up a single Layer by document node ID.
+    auto* node = document->findNode(options.id);
+    if (node == nullptr) {
+      std::cerr << "pagx bounds: no node found with id '" << options.id << "'\n";
+      return 1;
+    }
+    if (node->nodeType() != NodeType::Layer) {
+      std::cerr << "pagx bounds: node '" << options.id << "' is not a Layer\n";
+      return 1;
+    }
+    auto* pagxLayer = static_cast<const Layer*>(node);
+    auto it = buildResult.layerMap.find(pagxLayer);
+    if (it == buildResult.layerMap.end()) {
+      std::cerr << "pagx bounds: Layer '" << options.id << "' has no rendered layer\n";
+      return 1;
+    }
+    PrintLayerBounds(pagxLayer, it->second.get(), relativeLayer, options.jsonOutput);
+  } else if (!options.xpath.empty()) {
     // XPath mode: query specific nodes.
     auto matchedLayers = EvaluateXPath(xmlDoc, options.xpath, document.get());
     if (matchedLayers.empty()) {
