@@ -78,6 +78,7 @@ static bool CompareRenderedImage(const std::string& imagePath, const std::string
 
 static bool RenderAndCompare(std::vector<std::string> args, const std::string& key) {
   std::vector<char*> argv = {};
+  argv.reserve(args.size());
   for (auto& arg : args) {
     argv.push_back(arg.data());
   }
@@ -96,6 +97,7 @@ static std::string ReadFile(const std::string& path) {
 
 static int CallRun(int (*fn)(int, char*[]), std::vector<std::string> args) {
   std::vector<char*> argv = {};
+  argv.reserve(args.size());
   for (auto& arg : args) {
     argv.push_back(arg.data());
   }
