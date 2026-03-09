@@ -12,6 +12,7 @@ apply fixes, approve, or merge — only reviews and comments.
 | `code-checklist.md` | Code review checklist |
 | `doc-checklist.md` | Document review checklist |
 | `judgment-matrix.md` | Risk levels and worth-fixing criteria |
+| `checklist-evolution.md` | Checklist update flow and rules |
 
 ---
 
@@ -120,6 +121,8 @@ Each reviewer receives:
   the implementation actually achieves what the author describes.
 - **Evidence requirement**: every issue must have a code citation (file:line +
   snippet) from the PR branch.
+- **Checklist exclusion**: see the exclusion section in the corresponding
+  checklist. Project rules loaded in context take priority.
 - **Self-check**: before submitting, re-read the relevant code and verify each
   issue. Mark as confirmed or withdrawn. Only submit confirmed issues.
 - **Output format**: `[file:line] [A1/B2/C3] — [description] — [key lines]`
@@ -135,6 +138,10 @@ finish. As each reviewer sends a report, forward it to the verifier immediately:
 - **Quote verbatim**: wrap the reviewer's original content in a quote block.
 - **No rewriting**: do not summarize or merge multiple reports.
 - **One forward per reviewer**: each reviewer report is a separate message.
+- **Completion signal**: after forwarding the last reviewer's report, send a
+  separate message to the verifier stating: "All reviewer reports have been
+  forwarded. Please finalize your verdicts for all issues above." This prevents
+  the verifier from finishing early before all reports arrive.
 
 Include the following verbatim in the verifier's prompt:
 
@@ -283,3 +290,10 @@ Summary:
 - C (Conventions & Documentation): Z issues
 ```
 
+---
+
+## Phase 5: Checklist evolution
+
+Review all confirmed issues from this session. If any represent a recurring
+pattern not covered by the current checklist, read `checklist-evolution.md` and
+follow its steps.
