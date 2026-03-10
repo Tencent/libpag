@@ -35,12 +35,13 @@ if (NOT TARGET pagx)
     add_library(pagx STATIC ${PAGX_CORE_SOURCES} ${PAGX_UTILS_SOURCES} ${PAGX_XML_SOURCES} ${PAGX_SVG_SOURCES})
     target_include_directories(pagx PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
     target_include_directories(pagx PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../src
             ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/expat/expat/lib)
+    target_compile_definitions(pagx PUBLIC PAG_USE_HARFBUZZ PAG_BUILD_PAGX)
     if(WIN32)
         target_compile_definitions(pagx PRIVATE XML_STATIC)
     endif()
-    add_vendor_target(pagx-vendor STATIC_VENDORS expat CONFIG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+    add_vendor_target(pagx-vendor STATIC_VENDORS expat SheenBidi harfbuzz CONFIG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../..)
     find_vendor_libraries(pagx-vendor STATIC PAGX_VENDOR_STATIC_LIBRARIES)
     add_dependencies(pagx pagx-vendor)
     merge_libraries_into(pagx ${PAGX_VENDOR_STATIC_LIBRARIES})
@@ -53,7 +54,9 @@ if (NOT TARGET pagx-renderer)
     target_include_directories(pagx-renderer PUBLIC
             ${CMAKE_CURRENT_SOURCE_DIR}/../../src/renderer)
     target_include_directories(pagx-renderer PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx)
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../src
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/harfbuzz/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/SheenBidi/Headers)
     target_link_libraries(pagx-renderer PUBLIC pagx tgfx)
 endif ()
 

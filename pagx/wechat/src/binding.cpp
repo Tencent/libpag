@@ -42,6 +42,4 @@ EMSCRIPTEN_BINDINGS(PAGXView) {
       .function("firstFrameRendered", &PAGXView::firstFrameRendered)
       .function("contentWidth", &PAGXView::contentWidth)
       .function("contentHeight", &PAGXView::contentHeight);
-
-  register_vector<std::string>("VectorString");
 }

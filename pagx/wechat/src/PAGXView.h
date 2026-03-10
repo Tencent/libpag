@@ -163,7 +163,7 @@ class PAGXView {
   float pagxHeight = 0.0f;
   int _width = 0;
   int _height = 0;
-  Typesetter typesetter = {};
+  TextLayout textLayout = {};
 
   // Performance monitoring
   struct FrameRecord {
