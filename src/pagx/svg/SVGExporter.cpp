@@ -358,27 +358,34 @@ static std::string getColorSourceRef(const ColorSource* source, float* outAlpha,
   }
   if (source->nodeType() == NodeType::ImagePattern) {
     auto pattern = static_cast<const ImagePattern*>(source);
-    if (pattern->image && pattern->image->data) {
-      std::string defId = ctx.generateId("pattern");
-      defs.openElement("pattern");
-      defs.addAttribute("id", defId);
-      defs.addAttribute("patternUnits", std::string("userSpaceOnUse"));
-      defs.addAttribute("width", std::string("100%"));
-      defs.addAttribute("height", std::string("100%"));
-      defs.closeElementStart();
-      defs.openElement("image");
-      std::string dataUri = "data:image/png;base64," +
-                            Base64Encode(pattern->image->data->bytes(), pattern->image->data->size());
-      defs.addAttribute("href", dataUri);
-      if (!pattern->matrix.isIdentity()) {
-        defs.addAttribute("transform", matrixToSVGTransform(pattern->matrix));
+    if (pattern->image) {
+      std::string href;
+      if (pattern->image->data) {
+        href = "data:image/png;base64," +
+               Base64Encode(pattern->image->data->bytes(), pattern->image->data->size());
+      } else if (!pattern->image->filePath.empty()) {
+        href = pattern->image->filePath;
       }
-      defs.closeElementSelfClosing();
-      defs.closeElement();
-      if (outAlpha) {
-        *outAlpha = 1.0f;
+      if (!href.empty()) {
+        std::string defId = ctx.generateId("pattern");
+        defs.openElement("pattern");
+        defs.addAttribute("id", defId);
+        defs.addAttribute("patternUnits", std::string("userSpaceOnUse"));
+        defs.addAttribute("width", std::string("100%"));
+        defs.addAttribute("height", std::string("100%"));
+        defs.closeElementStart();
+        defs.openElement("image");
+        defs.addAttribute("href", href);
+        if (!pattern->matrix.isIdentity()) {
+          defs.addAttribute("transform", matrixToSVGTransform(pattern->matrix));
+        }
+        defs.closeElementSelfClosing();
+        defs.closeElement();
+        if (outAlpha) {
+          *outAlpha = 1.0f;
+        }
+        return "url(#" + defId + ")";
       }
-      return "url(#" + defId + ")";
     }
   }
   return "none";
