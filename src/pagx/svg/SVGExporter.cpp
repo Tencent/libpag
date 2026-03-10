@@ -40,6 +40,7 @@
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextBox.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/StringParser.h"
@@ -562,6 +563,7 @@ static std::string writeMaskDef(SVGBuilder& defs, const Layer* maskLayer, SVGExp
 struct FillStrokeInfo {
   const Fill* fill = nullptr;
   const Stroke* stroke = nullptr;
+  const TextBox* textBox = nullptr;
 };
 
 static FillStrokeInfo collectFillStroke(const std::vector<Element*>& contents) {
@@ -571,6 +573,8 @@ static FillStrokeInfo collectFillStroke(const std::vector<Element*>& contents) {
       info.fill = static_cast<const Fill*>(element);
     } else if (element->nodeType() == NodeType::Stroke && !info.stroke) {
       info.stroke = static_cast<const Stroke*>(element);
+    } else if (element->nodeType() == NodeType::TextBox && !info.textBox) {
+      info.textBox = static_cast<const TextBox*>(element);
     }
   }
   return info;
@@ -697,9 +701,43 @@ static void writeText(SVGBuilder& svg, const Text* text, const FillStrokeInfo& f
   if (text->text.empty()) {
     return;
   }
+
+  float x = text->position.x;
+  float y = text->position.y;
+  TextAnchor anchor = text->textAnchor;
+
+  auto* textBox = fs.textBox;
+  if (textBox) {
+    switch (textBox->textAlign) {
+      case TextAlign::Center:
+        x = textBox->position.x + textBox->size.width / 2;
+        anchor = TextAnchor::Center;
+        break;
+      case TextAlign::End:
+        x = textBox->position.x + textBox->size.width;
+        anchor = TextAnchor::End;
+        break;
+      default:
+        x = textBox->position.x;
+        anchor = TextAnchor::Start;
+        break;
+    }
+    switch (textBox->paragraphAlign) {
+      case ParagraphAlign::Middle:
+        y = textBox->position.y + textBox->size.height / 2 + text->fontSize * 0.35f;
+        break;
+      case ParagraphAlign::Far:
+        y = textBox->position.y + textBox->size.height;
+        break;
+      default:
+        y = textBox->position.y + text->fontSize;
+        break;
+    }
+  }
+
   svg.openElement("text");
-  svg.addAttributeIfNonZero("x", text->position.x);
-  svg.addAttributeIfNonZero("y", text->position.y);
+  svg.addAttributeIfNonZero("x", x);
+  svg.addAttributeIfNonZero("y", y);
   if (!text->fontFamily.empty()) {
     svg.addAttribute("font-family", text->fontFamily);
   }
@@ -709,9 +747,9 @@ static void writeText(SVGBuilder& svg, const Text* text, const FillStrokeInfo& f
   if (text->letterSpacing != 0.0f) {
     svg.addAttribute("letter-spacing", FloatToString(text->letterSpacing));
   }
-  if (text->textAnchor == TextAnchor::Center) {
+  if (anchor == TextAnchor::Center) {
     svg.addAttribute("text-anchor", std::string("middle"));
-  } else if (text->textAnchor == TextAnchor::End) {
+  } else if (anchor == TextAnchor::End) {
     svg.addAttribute("text-anchor", std::string("end"));
   }
   if (!text->fontStyle.empty()) {
@@ -741,8 +779,8 @@ static void writeGroupContents(SVGBuilder& svg, const Group* group, SVGExportCon
 
   for (const auto* element : group->elements) {
     auto type = element->nodeType();
-    if (type == NodeType::Fill || type == NodeType::Stroke) {
-      continue;  // handled by applyFillAttributes/applyStrokeAttributes
+    if (type == NodeType::Fill || type == NodeType::Stroke || type == NodeType::TextBox) {
+      continue;
     }
     switch (type) {
       case NodeType::Rectangle:
@@ -805,7 +843,7 @@ static void writeLayerContents(SVGBuilder& svg, const Layer* layer, SVGExportCon
 
   for (const auto* element : layer->contents) {
     auto type = element->nodeType();
-    if (type == NodeType::Fill || type == NodeType::Stroke) {
+    if (type == NodeType::Fill || type == NodeType::Stroke || type == NodeType::TextBox) {
       continue;
     }
     switch (type) {
