@@ -876,7 +876,7 @@ static void writeLayer(SVGBuilder& svg, const Layer* layer, SVGExportContext& ct
 
   bool needsGroup = !layer->matrix.isIdentity() || layer->alpha < 1.0f ||
                     !layer->id.empty() || !layer->filters.empty() || layer->mask != nullptr ||
-                    layer->x != 0.0f || layer->y != 0.0f;
+                    layer->x != 0.0f || layer->y != 0.0f || !layer->customData.empty();
 
   // If it's a simple layer with only one content element and no children, and no group attributes
   // needed, we can flatten it.
@@ -892,6 +892,10 @@ static void writeLayer(SVGBuilder& svg, const Layer* layer, SVGExportContext& ct
 
   if (!layer->id.empty()) {
     svg.addAttribute("id", layer->id);
+  }
+
+  for (const auto& [key, value] : layer->customData) {
+    svg.addAttribute(("data-" + key).c_str(), value);
   }
 
   // Build transform string combining position and matrix.
