@@ -33,12 +33,22 @@ PAG_API void JNICALL Java_org_libpag_PAGFont_UnregisterFont(JNIEnv* env, jclass,
 PAG_API void Java_org_libpag_PAGFont_SetFallbackFontPaths(JNIEnv* env, jclass,
                                                           jobjectArray fontNameList,
                                                           jintArray ttcIndices) {
+  if (fontNameList == nullptr || ttcIndices == nullptr) {
+    return;
+  }
   std::vector<std::string> fallbackList;
   std::vector<int> ttcList;
   auto length = env->GetArrayLength(fontNameList);
   auto ttcLength = env->GetArrayLength(ttcIndices);
   length = std::min(length, ttcLength);
   auto ttcData = env->GetIntArrayElements(ttcIndices, nullptr);
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    return;
+  }
+  if (ttcData == nullptr) {
+    return;
+  }
   for (int index = 0; index < length; index++) {
     auto fontNameObject = (jstring)env->GetObjectArrayElement(fontNameList, index);
     auto fontFamily = SafeConvertToStdString(env, fontNameObject);
@@ -83,7 +93,17 @@ Java_org_libpag_PAGFont_RegisterFont__Landroid_content_res_AssetManager_2Ljava_l
 PAG_API jobject Java_org_libpag_PAGFont_RegisterFontBytes(JNIEnv* env, jclass, jbyteArray bytes,
                                                           jint length, jint ttcIndex,
                                                           jstring font_family, jstring font_style) {
+  if (bytes == nullptr) {
+    return nullptr;
+  }
   auto data = env->GetByteArrayElements(bytes, nullptr);
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    return nullptr;
+  }
+  if (data == nullptr) {
+    return nullptr;
+  }
   auto font = PAGFont::RegisterFont(data, static_cast<size_t>(length), ttcIndex,
                                     SafeConvertToStdString(env, font_family),
                                     SafeConvertToStdString(env, font_style));

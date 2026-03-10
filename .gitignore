@@ -44,6 +44,10 @@ local.properties
 
 # CodeBuddy
 .codebuddy/designs/
+CODEBUDDY.local.md
+
+# Skill runtime cache
+.cr-cache/
 
 /third_party
 /out
@@ -97,4 +101,11 @@ public
 # PAGX Spec
 spec/node_modules
 spec/package-lock.json
+
+# PAGX CLI npm link
+cli/npm/darwin
+cli/npm/linux
+cli/npm/win32
+cli/npm/node_modules
+cli/npm/package-lock.json
 

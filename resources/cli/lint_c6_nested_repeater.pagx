@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test file for C6: Nested Repeater with product > 500 -->
+<pagx version="1.0" width="400" height="100">
+  <Layer x="10" y="10" name="NestedRepeaters">
+    <Group>
+      <Rectangle center="0,0" size="5,10"/>
+      <Fill color="#FF0000"/>
+      <Repeater copies="30" position="7,0"/>
+    </Group>
+    <Repeater copies="18" position="0,15"/>
+  </Layer>
+</pagx>

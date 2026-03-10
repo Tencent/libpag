@@ -21,24 +21,25 @@
 namespace pagx {
 
 /**
- * Text horizontal alignment.
+ * Text alignment along the inline direction. In horizontal mode, this controls horizontal alignment
+ * within each line. In vertical mode, this controls vertical alignment within each column.
  */
 enum class TextAlign {
   /**
-   * Align text to the start (left for LTR, right for RTL).
+   * Align text to the start of the inline direction.
    */
   Start,
   /**
-   * Align text to the center.
+   * Align text to the center of the inline direction.
    */
   Center,
   /**
-   * Align text to the end (right for LTR, left for RTL).
+   * Align text to the end of the inline direction.
    */
   End,
   /**
-   * Justify text (stretch to fill the available width).
-   * The last line uses start alignment by default.
+   * Justify text by distributing extra space evenly between characters to fill the available inline
+   * dimension. The last line/column uses Start alignment by default.
    */
   Justify
 };

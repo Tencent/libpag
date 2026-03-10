@@ -20,10 +20,10 @@
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
-#include "utils/MathUtil.h"
+#include "base/utils/MathUtil.h"
 #include "pagx/nodes/Font.h"
-#include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Image.h"
+#include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/types/Data.h"
 #include "tgfx/core/Bitmap.h"
@@ -32,6 +32,9 @@
 #include "tgfx/core/Path.h"
 
 namespace pagx {
+
+using pag::FloatNearlyEqual;
+using pag::RadiansToDegrees;
 
 static constexpr int VectorFontUnitsPerEm = 1000;
 
@@ -302,8 +305,8 @@ static bool CanUseDefaultMode(const tgfx::GlyphRun& run, const std::vector<size_
 
 static GlyphRun* CreateGlyphRunForIndices(
     PAGXDocument* document, const tgfx::GlyphRun& run, const std::vector<size_t>& indices,
-    Font* font,
-    const std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash>& glyphMapping, float fontSize) {
+    Font* font, const std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash>& glyphMapping,
+    float fontSize) {
   auto glyphRun = document->makeNode<GlyphRun>();
   glyphRun->font = font;
   glyphRun->fontSize = fontSize;
@@ -440,11 +443,10 @@ static GlyphRun* CreateGlyphRunForIndices(
   return glyphRun;
 }
 
-static void CollectSpacingGlyph(PAGXDocument* document, const tgfx::Font& font,
-                                tgfx::GlyphID glyphID,
-                                std::unordered_map<const tgfx::Typeface*, BitmapFontBuilder>&
-                                    bitmapBuilders,
-                                VectorFontBuilder& vectorBuilder) {
+static void CollectSpacingGlyph(
+    PAGXDocument* document, const tgfx::Font& font, tgfx::GlyphID glyphID,
+    std::unordered_map<const tgfx::Typeface*, BitmapFontBuilder>& bitmapBuilders,
+    VectorFontBuilder& vectorBuilder) {
   float advance = font.getAdvance(glyphID);
   if (advance <= 0) {
     return;
@@ -479,7 +481,7 @@ static void CollectSpacingGlyph(PAGXDocument* document, const tgfx::Font& font,
 }
 
 bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedTextMap,
-                          const std::vector<Text*>& textOrder) {
+                         const std::vector<Text*>& textOrder) {
   if (document == nullptr) {
     return false;
   }

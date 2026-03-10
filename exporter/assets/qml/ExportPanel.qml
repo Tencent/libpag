@@ -9,6 +9,8 @@ PAGWindow {
 
     property int windowHeight: 800
 
+    property var progressWindow: null
+
     title: qsTr("Export PAG")
     width: windowWidth
     height: windowHeight
@@ -422,14 +424,15 @@ PAGWindow {
                 onPressed: {
                     let component = Qt.createComponent("qrc:/qml/ExportCompositionsProgress.qml");
                     if (component.status === Component.Ready) {
-                        let progressListWindow = component.createObject(this, {});
-                        if (progressListWindow) {
-                            progressListWindow.closing.connect(function () {
-                                progressListWindow.close();
+                        window.progressWindow = component.createObject(window, {});
+                        if (window.progressWindow) {
+                            window.progressWindow.closing.connect(function () {
+                                window.progressWindow.close();
+                                window.progressWindow = null;
                                 window.show();
                             });
                             window.hide();
-                            progressListWindow.show();
+                            window.progressWindow.show();
                         }
                     }
                     if (compositionsModel !== null) {
@@ -450,31 +453,35 @@ PAGWindow {
         }
     }
 
+
     Timer {
         id: raiseTimer
         interval: 200
-        running: true
+        running: window.visible
         repeat: true
         onTriggered: {
-            if (!window.active && window.visible && exportingPanelWindow.isAEWindowActive()) {
+            let isAEActive = exportingPanelWindow !== null && exportingPanelWindow.isAEWindowActive();
+            if (!window.active && isAEActive) {
                 window.raise();
-                window.flags |= Qt.WindowStaysOnTopHint;
-            } else {
-                window.flags &= ~Qt.WindowStaysOnTopHint;
             }
         }
     }
 
     onClosing: function (closeEvent) {
         closeEvent.accepted = true;
+        if (window.progressWindow !== null) {
+            window.progressWindow.close();
+            window.progressWindow = null;
+        }
         exportingPanelWindow.onWindowClosing();
     }
 
     onVisibleChanged: function (visible) {
         if (visible) {
-            raiseTimer.start();
-        } else {
-            raiseTimer.stop();
+            if (window.progressWindow !== null) {
+                window.progressWindow.close();
+                window.progressWindow = null;
+            }
         }
     }
 }

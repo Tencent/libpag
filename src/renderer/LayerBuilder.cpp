@@ -19,10 +19,11 @@
 #include "LayerBuilder.h"
 #include <tuple>
 #include <unordered_map>
-#include "utils/Base64.h"
 #include "ToTGFX.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
+#include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
@@ -34,6 +35,7 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
@@ -60,6 +62,7 @@
 #include "pagx/types/RepeaterOrder.h"
 #include "pagx/types/SelectorTypes.h"
 #include "pagx/types/TileMode.h"
+#include "pagx/utils/Base64.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Data.h"
@@ -74,8 +77,11 @@
 #include "tgfx/layers/LayerPaint.h"
 #include "tgfx/layers/StrokeAlign.h"
 #include "tgfx/layers/VectorLayer.h"
+#include "tgfx/layers/filters/BlendFilter.h"
 #include "tgfx/layers/filters/BlurFilter.h"
+#include "tgfx/layers/filters/ColorMatrixFilter.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
+#include "tgfx/layers/filters/InnerShadowFilter.h"
 #include "tgfx/layers/filters/LayerFilter.h"
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
@@ -125,9 +131,19 @@ class LayerBuilderContext {
   explicit LayerBuilderContext(const ShapedTextMap& shapedTextMap) : _shapedTextMap(shapedTextMap) {
   }
 
+  LayerBuildResult buildWithMap(const PAGXDocument& document) {
+    auto root = build(document);
+    LayerBuildResult result = {};
+    result.root = root;
+    result.layerMap = std::move(_tgfxLayerByPagxLayer);
+    return result;
+  }
+
   std::shared_ptr<tgfx::Layer> build(const PAGXDocument& document) {
     // Build layer tree.
     auto rootLayer = tgfx::Layer::Make();
+    // Apply canvas clipping: the root layer clips to the canvas dimensions.
+    rootLayer->setScrollRect(tgfx::Rect::MakeWH(document.width, document.height));
     for (const auto& layer : document.layers) {
       auto childLayer = convertLayer(layer);
       if (childLayer) {
@@ -208,6 +224,7 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::Layer> convertVectorLayer(const Layer* node) {
     auto layer = tgfx::VectorLayer::Make();
     std::vector<std::shared_ptr<tgfx::VectorElement>> contents;
+    contents.reserve(node->contents.size());
     for (const auto& element : node->contents) {
       auto tgfxElement = convertVectorElement(element);
       if (tgfxElement) {
@@ -252,8 +269,8 @@ class LayerBuilderContext {
         return convertTextModifier(static_cast<const TextModifier*>(node));
       case NodeType::Group:
         return convertGroup(static_cast<const Group*>(node));
-      case NodeType::TextLayout:
-        // TextLayout is handled in convertGroup, not converted directly.
+      case NodeType::TextBox:
+        // TextBox is handled in convertGroup, not converted directly.
         return nullptr;
       default:
         return nullptr;
@@ -323,7 +340,7 @@ class LayerBuilderContext {
       colorSource = convertColorSource(node->color);
     }
     if (colorSource == nullptr) {
-      return nullptr;
+      colorSource = tgfx::SolidColor::Make();
     }
 
     auto fill = tgfx::FillStyle::Make(colorSource);
@@ -348,7 +365,7 @@ class LayerBuilderContext {
       colorSource = convertColorSource(node->color);
     }
     if (colorSource == nullptr) {
-      return nullptr;
+      colorSource = tgfx::SolidColor::Make();
     }
 
     auto stroke = tgfx::StrokeStyle::Make(colorSource);
@@ -413,14 +430,14 @@ class LayerBuilderContext {
     }
   }
 
-  static void ExtractGradientStops(const std::vector<ColorStop>& colorStops,
+  static void ExtractGradientStops(const std::vector<ColorStop*>& colorStops,
                                    std::vector<tgfx::Color>* colors,
                                    std::vector<float>* positions) {
     colors->reserve(colorStops.size());
     positions->reserve(colorStops.size());
-    for (const auto& stop : colorStops) {
-      colors->push_back(ToTGFX(stop.color));
-      positions->push_back(stop.offset);
+    for (const auto* stop : colorStops) {
+      colors->push_back(ToTGFX(stop->color));
+      positions->push_back(stop->offset);
     }
     if (colors->empty()) {
       *colors = {tgfx::Color::Black(), tgfx::Color::White()};
@@ -459,10 +476,9 @@ class LayerBuilderContext {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     ExtractGradientStops(node->colorStops, &colors, &positions);
-    return ApplyGradientMatrix(
-        tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle, node->endAngle, colors,
-                                  positions),
-        node->matrix);
+    return ApplyGradientMatrix(tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle,
+                                                         node->endAngle, colors, positions),
+                               node->matrix);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertDiamondGradient(const DiamondGradient* node) {
@@ -494,8 +510,9 @@ class LayerBuilderContext {
       return nullptr;
     }
 
-    auto pattern = tgfx::ImagePattern::Make(image, ToTGFX(node->tileModeX),
-                                             ToTGFX(node->tileModeY));
+    auto sampling = tgfx::SamplingOptions(ToTGFX(node->filterMode), ToTGFX(node->mipmapMode));
+    auto pattern =
+        tgfx::ImagePattern::Make(image, ToTGFX(node->tileModeX), ToTGFX(node->tileModeY), sampling);
     if (pattern && !node->matrix.isIdentity()) {
       pattern->setMatrix(ToTGFX(node->matrix));
     }
@@ -582,6 +599,7 @@ class LayerBuilderContext {
 
     // Convert selectors
     std::vector<std::shared_ptr<tgfx::TextSelector>> tgfxSelectors;
+    tgfxSelectors.reserve(node->selectors.size());
     for (const auto* selector : node->selectors) {
       if (selector->nodeType() == NodeType::RangeSelector) {
         auto rangeSelector = static_cast<const RangeSelector*>(selector);
@@ -611,8 +629,8 @@ class LayerBuilderContext {
     elements.reserve(node->elements.size());
 
     for (const auto& element : node->elements) {
-      // Skip TextLayout modifier - layout has been baked into GlyphRun positions by Typesetter
-      if (element->nodeType() == NodeType::TextLayout) {
+      // Skip TextBox modifier - layout has been baked into GlyphRun positions by TextLayout
+      if (element->nodeType() == NodeType::TextBox) {
         continue;
       }
 
@@ -666,6 +684,24 @@ class LayerBuilderContext {
       layer->setMatrix(matrix);
     }
 
+    // Apply 3D matrix if present (overrides 2D matrix)
+    if (!node->matrix3D.isIdentity()) {
+      layer->setMatrix3D(ToTGFX3D(node->matrix3D));
+    }
+    if (node->preserve3D) {
+      layer->setPreserve3D(true);
+    }
+
+    // Apply layer rendering attributes
+    if (!node->antiAlias) {
+      layer->setAllowsEdgeAntialiasing(false);
+    }
+    if (node->groupOpacity) {
+      layer->setAllowsGroupOpacity(true);
+    }
+    if (!node->passThroughBackground) {
+      layer->setPassThroughBackground(false);
+    }
     // Apply scrollRect if present
     if (node->hasScrollRect) {
       layer->setScrollRect(ToTGFX(node->scrollRect));
@@ -673,9 +709,13 @@ class LayerBuilderContext {
 
     // Layer styles
     std::vector<std::shared_ptr<tgfx::LayerStyle>> styles;
+    styles.reserve(node->styles.size());
     for (const auto& style : node->styles) {
       auto tgfxStyle = convertLayerStyle(style);
       if (tgfxStyle) {
+        if (style->excludeChildEffects) {
+          tgfxStyle->setExcludeChildEffects(true);
+        }
         styles.push_back(tgfxStyle);
       }
     }
@@ -685,6 +725,7 @@ class LayerBuilderContext {
 
     // Layer filters
     std::vector<std::shared_ptr<tgfx::LayerFilter>> filters;
+    filters.reserve(node->filters.size());
     for (const auto& filter : node->filters) {
       auto tgfxFilter = convertLayerFilter(filter);
       if (tgfxFilter) {
@@ -704,17 +745,31 @@ class LayerBuilderContext {
     switch (node->nodeType()) {
       case NodeType::DropShadowStyle: {
         auto style = static_cast<const DropShadowStyle*>(node);
-        return tgfx::DropShadowStyle::Make(style->offsetX, style->offsetY, style->blurX,
-                                           style->blurY, ToTGFX(style->color));
+        auto tgfxStyle =
+            tgfx::DropShadowStyle::Make(style->offsetX, style->offsetY, style->blurX, style->blurY,
+                                        ToTGFX(style->color), style->showBehindLayer);
+        if (node->blendMode != BlendMode::Normal) {
+          tgfxStyle->setBlendMode(ToTGFX(node->blendMode));
+        }
+        return tgfxStyle;
       }
       case NodeType::InnerShadowStyle: {
         auto style = static_cast<const InnerShadowStyle*>(node);
-        return tgfx::InnerShadowStyle::Make(style->offsetX, style->offsetY, style->blurX,
-                                            style->blurY, ToTGFX(style->color));
+        auto tgfxStyle = tgfx::InnerShadowStyle::Make(style->offsetX, style->offsetY, style->blurX,
+                                                      style->blurY, ToTGFX(style->color));
+        if (node->blendMode != BlendMode::Normal) {
+          tgfxStyle->setBlendMode(ToTGFX(node->blendMode));
+        }
+        return tgfxStyle;
       }
       case NodeType::BackgroundBlurStyle: {
         auto style = static_cast<const pagx::BackgroundBlurStyle*>(node);
-        return tgfx::BackgroundBlurStyle::Make(style->blurX, style->blurY);
+        auto tgfxStyle =
+            tgfx::BackgroundBlurStyle::Make(style->blurX, style->blurY, ToTGFX(style->tileMode));
+        if (node->blendMode != BlendMode::Normal) {
+          tgfxStyle->setBlendMode(ToTGFX(node->blendMode));
+        }
+        return tgfxStyle;
       }
       default:
         return nullptr;
@@ -729,13 +784,27 @@ class LayerBuilderContext {
     switch (node->nodeType()) {
       case NodeType::BlurFilter: {
         auto filter = static_cast<const pagx::BlurFilter*>(node);
-        return tgfx::BlurFilter::Make(filter->blurX, filter->blurY);
+        return tgfx::BlurFilter::Make(filter->blurX, filter->blurY, ToTGFX(filter->tileMode));
       }
       case NodeType::DropShadowFilter: {
         auto filter = static_cast<const DropShadowFilter*>(node);
         return tgfx::DropShadowFilter::Make(filter->offsetX, filter->offsetY, filter->blurX,
                                             filter->blurY, ToTGFX(filter->color),
                                             filter->shadowOnly);
+      }
+      case NodeType::InnerShadowFilter: {
+        auto filter = static_cast<const pagx::InnerShadowFilter*>(node);
+        return tgfx::InnerShadowFilter::Make(filter->offsetX, filter->offsetY, filter->blurX,
+                                             filter->blurY, ToTGFX(filter->color),
+                                             filter->shadowOnly);
+      }
+      case NodeType::BlendFilter: {
+        auto filter = static_cast<const pagx::BlendFilter*>(node);
+        return tgfx::BlendFilter::Make(ToTGFX(filter->color), ToTGFX(filter->blendMode));
+      }
+      case NodeType::ColorMatrixFilter: {
+        auto filter = static_cast<const pagx::ColorMatrixFilter*>(node);
+        return tgfx::ColorMatrixFilter::Make(filter->matrix);
       }
       default:
         return nullptr;
@@ -752,22 +821,30 @@ class LayerBuilderContext {
 
 // Public API implementation
 
-std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, Typesetter* typesetter) {
+static TextLayoutResult PerformTextLayout(PAGXDocument* document, TextLayout* textLayout) {
+  if (textLayout != nullptr) {
+    return textLayout->layout(document);
+  }
+  TextLayout defaultTextLayout;
+  return defaultTextLayout.layout(document);
+}
+
+std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, TextLayout* textLayout) {
   if (document == nullptr) {
     return nullptr;
   }
-
-  // Create ShapedTextMap using provided or default Typesetter
-  TypesetterResult typesetterResult = {};
-  if (typesetter != nullptr) {
-    typesetterResult = typesetter->shape(document);
-  } else {
-    Typesetter defaultTypesetter;
-    typesetterResult = defaultTypesetter.shape(document);
-  }
-
-  LayerBuilderContext context(typesetterResult.shapedTextMap);
+  auto layoutResult = PerformTextLayout(document, textLayout);
+  LayerBuilderContext context(layoutResult.shapedTextMap);
   return context.build(*document);
+}
+
+LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document, TextLayout* textLayout) {
+  if (document == nullptr) {
+    return {};
+  }
+  auto layoutResult = PerformTextLayout(document, textLayout);
+  LayerBuilderContext context(layoutResult.shapedTextMap);
+  return context.buildWithMap(*document);
 }
 
 }  // namespace pagx

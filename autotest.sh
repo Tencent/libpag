@@ -26,9 +26,9 @@ make_dir build
 cd build
 
 if [[ "$1" == "USE_SWIFTSHADER" ]]; then
-  cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DPAG_USE_SWIFTSHADER=ON -DPAG_BUILD_TESTS=ON -DPAG_ENABLE_PROFILING=OFF -DCMAKE_BUILD_TYPE=Debug ../
+  cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DPAG_USE_SWIFTSHADER=ON -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
 else
-  cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DPAG_BUILD_TESTS=ON -DPAG_ENABLE_PROFILING=OFF -DCMAKE_BUILD_TYPE=Debug ../
+  cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
 fi
 if test $? -eq 0; then
   echo "~~~~~~~~~~~~~~~~~~~CMakeLists OK~~~~~~~~~~~~~~~~~~"

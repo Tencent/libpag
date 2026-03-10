@@ -169,13 +169,6 @@ $GeneratedPluginPath = Join-Path $x64BuildDirForPlugin -ChildPath "Release" |
                        Join-Path -ChildPath "PAGExporter.aex"
 Copy-Item -Path $GeneratedPluginPath -Destination $ExeDir -Force
 
-$LibFfaudioPath = Join-Path $PluginSourceDir -ChildPath "vendor" |
-                  Join-Path -ChildPath "ffaudio" |
-                  Join-Path -ChildPath "win" |
-                  Join-Path -ChildPath "x64" |
-                  Join-Path -ChildPath "ffaudio.dll"
-Copy-Item -Path $LibFfaudioPath -Destination $ExeDir -Force
-
 $GeneratedEncorderToolsPath = Join-Path $EncoderToolsSourceDir -ChildPath "x64" |
                               Join-Path -ChildPath "Release" |
                               Join-Path -ChildPath "H264EncoderTools.exe"
@@ -272,7 +265,7 @@ if ([string]::IsNullOrEmpty($DSAPrivateKey) -eq $false) {
 
     # 5.3 Update Appcast
     Print-Text "[ Update Appcast ]"
-    $URL = (Invoke-WebRequest -Uri "https://pag.qq.com/server.html" -UseBasicParsing).Content
+    $URL = (Invoke-WebRequest -Uri "https://pag.io/server.html" -UseBasicParsing).Content
     if ($IsBetaVersion -eq $true) {
         $URL = $URL + "beta/"
     }

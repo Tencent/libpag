@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- File with full-canvas clip mask that should be removed -->
+<pagx version="1.0" width="200" height="200">
+  <Layer id="maskLayer">
+    <Rectangle center="100,100" size="200,200"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  <Layer mask="@maskLayer">
+    <Ellipse center="100,100" size="150,150"/>
+    <Fill color="#E91E63"/>
+  </Layer>
+</pagx>

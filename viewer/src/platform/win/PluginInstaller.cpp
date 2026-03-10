@@ -502,7 +502,10 @@ QString PluginInstaller::getQtResourceDir() const {
 bool PluginInstaller::shouldExcludeFile(const QString& fileName) const {
   // Files that should NOT be copied to AE directory
   static const QStringList excludedFiles = {
-      "PAGViewer.exe", "PAGExporter.aex", "H264EncoderTools.exe", "ffmovie.dll", "WinSparkle.dll",
+      "PAGViewer.exe",
+      "PAGExporter.aex",
+      "H264EncoderTools.exe",
+      "WinSparkle.dll",
   };
   return excludedFiles.contains(fileName, Qt::CaseInsensitive);
 }

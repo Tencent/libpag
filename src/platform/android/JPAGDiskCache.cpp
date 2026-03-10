@@ -70,8 +70,12 @@ PAG_API jbyteArray JNICALL Java_org_libpag_PAGDiskCache_ReadFile(JNIEnv* env, jc
   if (data == nullptr) {
     return nullptr;
   }
-  auto bytes = env->NewByteArray(data->size());
-  env->SetByteArrayRegion(bytes, 0, data->size(), reinterpret_cast<const jbyte*>(data->data()));
+  auto bytes = env->NewByteArray(static_cast<jsize>(data->size()));
+  if (bytes == nullptr) {
+    return nullptr;
+  }
+  env->SetByteArrayRegion(bytes, 0, static_cast<jsize>(data->size()),
+                          reinterpret_cast<const jbyte*>(data->data()));
   return bytes;
 }
 
@@ -83,8 +87,15 @@ PAG_API jboolean JNICALL Java_org_libpag_PAGDiskCache_WriteFile(JNIEnv* env, jcl
     return JNI_FALSE;
   }
   auto data = env->GetByteArrayElements(bytes, nullptr);
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    return JNI_FALSE;
+  }
+  if (data == nullptr) {
+    return JNI_FALSE;
+  }
   auto length = env->GetArrayLength(bytes);
-  auto byteData = tgfx::Data::MakeWithoutCopy(data, length);
+  auto byteData = tgfx::Data::MakeWithoutCopy(data, static_cast<size_t>(length));
   auto result = pag::DiskCache::WriteFile(key, byteData);
   env->ReleaseByteArrayElements(bytes, data, JNI_ABORT);
   return result;

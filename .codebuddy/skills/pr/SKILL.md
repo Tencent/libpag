@@ -1,0 +1,100 @@
+---
+name: pr
+description: Commit and push changes, then create a new PR or append to an existing one.
+disable-model-invocation: true
+---
+
+# PR — Commit & Push
+
+Commits local changes, pushes to remote, and creates a new PR or appends to an
+existing one — automatically detected based on branch state.
+
+## Instructions
+
+- **NEVER** force push.
+- **NEVER** push directly to main/master — always go through PR workflow.
+- All user-facing text must use the language the user has been using in the
+  conversation. Do not default to English.
+- When presenting choices, use interactive dialogs with selectable options
+  rather than plain text.
+
+---
+
+## Step 1: Pre-flight
+
+1. `git branch --show-current` — current branch name.
+   If empty (detached HEAD), ask the user to switch to a branch first and stop.
+2. `gh pr list --head {branch} --state open --json number,url` — open PRs
+
+Determine the remote's default branch and store as `{default_branch}`.
+
+**Mode selection**:
+
+| Current branch | Open PR on this branch | Mode |
+|----------------|------------------------|------|
+| {default_branch} | N/A (new branch) | **Create** |
+| other | yes | **Append** |
+| other | no | **Create** |
+
+---
+
+## Step 2: Stage & Generate Commit Message
+
+Run `git status --porcelain` and inspect the output:
+
+- **No output** → no local changes. Skip to Step 3 (there may be unpushed commits to push).
+- **Both staged and unstaged changes** → ask the user: commit only the staged
+  files (**partial**), or stage everything (**full**)?
+- **Otherwise** → **full** (stage everything).
+
+If **full**: run `git add -A`. If **partial**: skip (files are already staged).
+
+Read the staged diff (`git diff --cached`) and generate a commit message
+following the project's commit conventions. If no convention is found, default
+to a concise English message under 120 characters ending with a period, with no other punctuation, focusing on user-perceivable changes.
+
+---
+
+## Step 3: Commit & Push
+
+### Append mode
+
+If there is staged content, commit first. Then push and output the existing
+PR URL.
+
+If there is nothing to commit and nothing to push, inform the user and stop.
+
+### Create mode
+
+#### Generate PR metadata
+
+Based on all changes since {default_branch} (staged diff and existing commits),
+generate:
+
+- **Branch name** (only when on {default_branch}): follow the project's branch
+  naming convention if one exists; otherwise use `feature/{username}_topic` or
+  `bugfix/{username}_topic` (`{username}` = local git username, lowercase; obtain via `git config user.name`).
+  When on a non-default branch, use the current branch name.
+- **PR title**: concise summary following project conventions, or a short
+  English sentence if none found. Always based on all changes since
+  {default_branch}, not the latest commit message.
+- **PR description**: plain text (no Markdown formatting) in the user's
+  conversation language, briefly describing what changed and why.
+
+#### Create branch, commit, and push
+
+If on {default_branch}, create a new branch: `git checkout -b {branch_name}`.
+
+If there is staged content, commit.
+
+Push and create the PR:
+
+```
+git push -u origin {branch_name}
+gh pr create --title "{title}" --body "$(cat <<'EOF'
+{description}
+EOF
+)"
+```
+
+Output the PR URL to the user.

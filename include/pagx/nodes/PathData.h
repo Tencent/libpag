@@ -36,11 +36,15 @@ class PathData : public Node {
  public:
   /**
    * Starts a new contour at the specified point.
+   * @param x the x-coordinate of the starting point
+   * @param y the y-coordinate of the starting point
    */
   void moveTo(float x, float y);
 
   /**
    * Adds a line from the current point to the specified point.
+   * @param x the x-coordinate of the end point
+   * @param y the y-coordinate of the end point
    */
   void lineTo(float x, float y);
 
@@ -121,6 +125,12 @@ class PathData : public Node {
    * Returns the number of points used by the given verb.
    */
   static int PointsPerVerb(PathVerb verb);
+
+  /**
+   * Copies only the path data (verbs and points) from another PathData, without affecting the Node
+   * base class fields (id).
+   */
+  void setPathData(const PathData& other);
 
   NodeType nodeType() const override {
     return NodeType::PathData;

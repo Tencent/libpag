@@ -52,6 +52,10 @@ std::unique_ptr<ByteData> CopyDataFromUint8Array(const val& emscriptenData) {
   return buffer;
 }
 
+// Converts a PAGLayer to the corresponding JS object with the correct derived type. Emscripten
+// requires static_pointer_cast to the actual subclass so that JS can access subclass methods.
+// Layers without a dedicated binding class (e.g. ShapeLayer) fall through to the default case and
+// are exposed as a base PAGLayer.
 emscripten::val PAGLayerToJsObject(std::shared_ptr<PAGLayer> pagLayer) {
   emscripten::val layerObject = emscripten::val::null();
   if (!pagLayer) {
@@ -65,10 +69,6 @@ emscripten::val PAGLayerToJsObject(std::shared_ptr<PAGLayer> pagLayer) {
     }
     case LayerType::Text: {
       layerObject = emscripten::val(std::static_pointer_cast<PAGTextLayer>(pagLayer));
-      break;
-    }
-    case LayerType::Shape: {
-      layerObject = emscripten::val(std::static_pointer_cast<PAGShapeLayer>(pagLayer));
       break;
     }
     case LayerType::Image: {
@@ -133,9 +133,6 @@ bool PAGBindInit() {
                   return static_cast<int>(pagLayer.duration());
                 }))
       .function("_frameRate", &PAGLayer::frameRate)
-      .function("_startTime", optional_override([](PAGLayer& pagLayer) {
-                  return static_cast<int>(pagLayer.startTime());
-                }))
       .function("_startTime", optional_override([](PAGLayer& pagLayer) {
                   return static_cast<int>(pagLayer.startTime());
                 }))

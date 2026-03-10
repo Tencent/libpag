@@ -51,6 +51,7 @@ struct DOMNode {
   std::shared_ptr<DOMNode> nextSibling;
   std::vector<DOMAttribute> attributes;
   DOMNodeType type = DOMNodeType::Element;
+  int line = 0;
 
   ~DOMNode();
 

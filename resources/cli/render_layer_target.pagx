@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test file for layer targeting (id and xpath) in render command.
+     Each layer has distinct visual content to verify correct isolation. -->
+<pagx version="1.0" width="400" height="300">
+  <!-- Red circle with a blue inner circle -->
+  <Layer id="badge" x="80" y="80">
+    <Ellipse center="0,0" size="120,120"/>
+    <Fill color="#E53935"/>
+    <Layer>
+      <Ellipse center="0,0" size="60,60"/>
+      <Fill color="#1565C0"/>
+    </Layer>
+  </Layer>
+  <!-- Green rounded rectangle with a yellow circle inside -->
+  <Layer id="card" x="280" y="80">
+    <Rectangle center="0,0" size="160,120" roundness="16"/>
+    <Fill color="#43A047"/>
+    <Layer id="icon">
+      <Ellipse center="0,0" size="50,50"/>
+      <Fill color="#FFD600"/>
+    </Layer>
+  </Layer>
+  <!-- Bottom banner: gradient bar with two colored circles -->
+  <Layer id="banner" x="200" y="240">
+    <Rectangle center="0,0" size="360,80" roundness="12"/>
+    <Fill>
+      <LinearGradient startPoint="-180,0" endPoint="180,0">
+        <ColorStop offset="0" color="#7B1FA2"/>
+        <ColorStop offset="1" color="#FF6F00"/>
+      </LinearGradient>
+    </Fill>
+    <Layer id="dot_left" x="-100" y="0">
+      <Ellipse center="0,0" size="40,40"/>
+      <Fill color="#FFFFFF"/>
+    </Layer>
+    <Layer id="dot_right" x="100" y="0">
+      <Ellipse center="0,0" size="40,40"/>
+      <Fill color="#000000"/>
+    </Layer>
+  </Layer>
+</pagx>
