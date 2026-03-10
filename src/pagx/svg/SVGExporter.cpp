@@ -214,6 +214,12 @@ struct SVGExportContext {
 // Forward declarations
 //==============================================================================
 
+struct FillStrokeInfo {
+  const Fill* fill = nullptr;
+  const Stroke* stroke = nullptr;
+  const TextBox* textBox = nullptr;
+};
+
 static std::string colorToSVGString(const Color& color);
 static std::string colorToSVGStringWithAlpha(const Color& color, float* outAlpha);
 static std::string matrixToSVGTransform(const Matrix& matrix);
@@ -221,10 +227,18 @@ static void writeColorSourceDef(SVGBuilder& defs, const ColorSource* source, con
                                 SVGExportContext& ctx);
 static std::string getColorSourceRef(const ColorSource* source, float* outAlpha,
                                      SVGExportContext& ctx, SVGBuilder& defs);
-static void writeElement(SVGBuilder& svg, const Element* element, SVGExportContext& ctx,
-                         SVGBuilder& defs);
 static void writeLayer(SVGBuilder& svg, const Layer* layer, SVGExportContext& ctx,
                        SVGBuilder& defs);
+static void writeRectangle(SVGBuilder& svg, const Rectangle* rect, const FillStrokeInfo& fs,
+                           SVGExportContext& ctx, SVGBuilder& defs);
+static void writeEllipse(SVGBuilder& svg, const Ellipse* ellipse, const FillStrokeInfo& fs,
+                         SVGExportContext& ctx, SVGBuilder& defs);
+static void writePath(SVGBuilder& svg, const Path* path, const FillStrokeInfo& fs,
+                      SVGExportContext& ctx, SVGBuilder& defs);
+static void writeText(SVGBuilder& svg, const Text* text, const FillStrokeInfo& fs,
+                      SVGExportContext& ctx, SVGBuilder& defs);
+static void writeGroupContents(SVGBuilder& svg, const Group* group, SVGExportContext& ctx,
+                               SVGBuilder& defs);
 
 //==============================================================================
 // Color conversion helpers
@@ -529,6 +543,24 @@ static std::string writeFilterDefs(SVGBuilder& defs, const std::vector<LayerFilt
 }
 
 //==============================================================================
+// Collect fill/stroke info from a layer's contents
+//==============================================================================
+
+static FillStrokeInfo collectFillStroke(const std::vector<Element*>& contents) {
+  FillStrokeInfo info = {};
+  for (const auto* element : contents) {
+    if (element->nodeType() == NodeType::Fill && !info.fill) {
+      info.fill = static_cast<const Fill*>(element);
+    } else if (element->nodeType() == NodeType::Stroke && !info.stroke) {
+      info.stroke = static_cast<const Stroke*>(element);
+    } else if (element->nodeType() == NodeType::TextBox && !info.textBox) {
+      info.textBox = static_cast<const TextBox*>(element);
+    }
+  }
+  return info;
+}
+
+//==============================================================================
 // Write mask defs
 //==============================================================================
 
@@ -537,8 +569,31 @@ static std::string writeMaskDef(SVGBuilder& defs, const Layer* maskLayer, SVGExp
 
 static void writeMaskLayerContent(SVGBuilder& defs, const Layer* layer, SVGExportContext& ctx,
                                   SVGBuilder& nestedDefs) {
+  auto fs = collectFillStroke(layer->contents);
   for (const auto* element : layer->contents) {
-    writeElement(defs, element, ctx, nestedDefs);
+    auto type = element->nodeType();
+    if (type == NodeType::Fill || type == NodeType::Stroke || type == NodeType::TextBox) {
+      continue;
+    }
+    switch (type) {
+      case NodeType::Rectangle:
+        writeRectangle(defs, static_cast<const Rectangle*>(element), fs, ctx, nestedDefs);
+        break;
+      case NodeType::Ellipse:
+        writeEllipse(defs, static_cast<const Ellipse*>(element), fs, ctx, nestedDefs);
+        break;
+      case NodeType::Path:
+        writePath(defs, static_cast<const Path*>(element), fs, ctx, nestedDefs);
+        break;
+      case NodeType::Text:
+        writeText(defs, static_cast<const Text*>(element), fs, ctx, nestedDefs);
+        break;
+      case NodeType::Group:
+        writeGroupContents(defs, static_cast<const Group*>(element), ctx, nestedDefs);
+        break;
+      default:
+        break;
+    }
   }
   for (const auto* child : layer->children) {
     writeLayer(defs, child, ctx, nestedDefs);
@@ -565,30 +620,6 @@ static std::string writeClipPathDef(SVGBuilder& defs, const Layer* maskLayer,
   writeMaskLayerContent(defs, maskLayer, ctx, nestedDefs);
   defs.closeElement();
   return clipId;
-}
-
-//==============================================================================
-// Collect fill/stroke info from a layer's contents
-//==============================================================================
-
-struct FillStrokeInfo {
-  const Fill* fill = nullptr;
-  const Stroke* stroke = nullptr;
-  const TextBox* textBox = nullptr;
-};
-
-static FillStrokeInfo collectFillStroke(const std::vector<Element*>& contents) {
-  FillStrokeInfo info = {};
-  for (const auto* element : contents) {
-    if (element->nodeType() == NodeType::Fill && !info.fill) {
-      info.fill = static_cast<const Fill*>(element);
-    } else if (element->nodeType() == NodeType::Stroke && !info.stroke) {
-      info.stroke = static_cast<const Stroke*>(element);
-    } else if (element->nodeType() == NodeType::TextBox && !info.textBox) {
-      info.textBox = static_cast<const TextBox*>(element);
-    }
-  }
-  return info;
 }
 
 static void applyFillAttributes(SVGBuilder& svg, const Fill* fill, SVGExportContext& ctx,
@@ -812,30 +843,6 @@ static void writeGroupContents(SVGBuilder& svg, const Group* group, SVGExportCon
       default:
         break;
     }
-  }
-}
-
-static void writeElement(SVGBuilder& svg, const Element* element, SVGExportContext& ctx,
-                         SVGBuilder& defs) {
-  FillStrokeInfo emptyFs = {};
-  switch (element->nodeType()) {
-    case NodeType::Rectangle:
-      writeRectangle(svg, static_cast<const Rectangle*>(element), emptyFs, ctx, defs);
-      break;
-    case NodeType::Ellipse:
-      writeEllipse(svg, static_cast<const Ellipse*>(element), emptyFs, ctx, defs);
-      break;
-    case NodeType::Path:
-      writePath(svg, static_cast<const Path*>(element), emptyFs, ctx, defs);
-      break;
-    case NodeType::Text:
-      writeText(svg, static_cast<const Text*>(element), emptyFs, ctx, defs);
-      break;
-    case NodeType::Group:
-      writeGroupContents(svg, static_cast<const Group*>(element), ctx, defs);
-      break;
-    default:
-      break;
   }
 }
 
