@@ -228,7 +228,7 @@ static void writeColorSourceDef(SVGBuilder& defs, const ColorSource* source, con
 static std::string getColorSourceRef(const ColorSource* source, float* outAlpha,
                                      SVGExportContext& ctx, SVGBuilder& defs);
 static void writeLayerContents(SVGBuilder& svg, const Layer* layer, SVGExportContext& ctx,
-                               SVGBuilder& defs);
+                               SVGBuilder& defs, const std::string& transform = "");
 static void writeLayer(SVGBuilder& svg, const Layer* layer, SVGExportContext& ctx,
                        SVGBuilder& defs);
 
@@ -578,13 +578,46 @@ static std::string writeMaskDef(SVGBuilder& defs, const Layer* maskLayer, SVGExp
   return maskId;
 }
 
+static std::string buildLayerTransform(const Layer* layer) {
+  if (layer->x != 0.0f || layer->y != 0.0f) {
+    if (!layer->matrix.isIdentity()) {
+      Matrix combined = Matrix::Translate(layer->x, layer->y) * layer->matrix;
+      return matrixToSVGTransform(combined);
+    }
+    return "translate(" + FloatToString(layer->x) + "," + FloatToString(layer->y) + ")";
+  }
+  if (!layer->matrix.isIdentity()) {
+    return matrixToSVGTransform(layer->matrix);
+  }
+  return "";
+}
+
+static void writeClipPathLayerContent(SVGBuilder& svg, const Layer* layer, SVGExportContext& ctx,
+                                      SVGBuilder& defs,
+                                      const std::string& parentTransform = "") {
+  std::string layerTransform = buildLayerTransform(layer);
+  std::string transform;
+  if (!parentTransform.empty() && !layerTransform.empty()) {
+    transform = parentTransform + " " + layerTransform;
+  } else if (!parentTransform.empty()) {
+    transform = parentTransform;
+  } else {
+    transform = layerTransform;
+  }
+
+  writeLayerContents(svg, layer, ctx, defs, transform);
+  for (const auto* child : layer->children) {
+    writeClipPathLayerContent(svg, child, ctx, defs, transform);
+  }
+}
+
 static std::string writeClipPathDef(SVGBuilder& defs, const Layer* maskLayer,
                                     SVGExportContext& ctx, SVGBuilder& nestedDefs) {
   std::string clipId = maskLayer->id.empty() ? ctx.generateId("clip") : maskLayer->id;
   defs.openElement("clipPath");
   defs.addAttribute("id", clipId);
   defs.closeElementStart();
-  writeMaskLayerContent(defs, maskLayer, ctx, nestedDefs);
+  writeClipPathLayerContent(defs, maskLayer, ctx, nestedDefs);
   defs.closeElement();
   return clipId;
 }
@@ -655,10 +688,14 @@ static void applyStrokeAttributes(SVGBuilder& svg, const Stroke* stroke, SVGExpo
 //==============================================================================
 
 static void writeRectangle(SVGBuilder& svg, const Rectangle* rect, const FillStrokeInfo& fs,
-                           SVGExportContext& ctx, SVGBuilder& defs) {
+                           SVGExportContext& ctx, SVGBuilder& defs,
+                           const std::string& transform = "") {
   float x = rect->center.x - rect->size.width / 2;
   float y = rect->center.y - rect->size.height / 2;
   svg.openElement("rect");
+  if (!transform.empty()) {
+    svg.addAttribute("transform", transform);
+  }
   svg.addAttributeIfNonZero("x", x);
   svg.addAttributeIfNonZero("y", y);
   svg.addAttribute("width", rect->size.width);
@@ -673,16 +710,23 @@ static void writeRectangle(SVGBuilder& svg, const Rectangle* rect, const FillStr
 }
 
 static void writeEllipse(SVGBuilder& svg, const Ellipse* ellipse, const FillStrokeInfo& fs,
-                         SVGExportContext& ctx, SVGBuilder& defs) {
+                         SVGExportContext& ctx, SVGBuilder& defs,
+                         const std::string& transform = "") {
   float rx = ellipse->size.width / 2;
   float ry = ellipse->size.height / 2;
   if (std::abs(rx - ry) < 0.001f) {
     svg.openElement("circle");
+    if (!transform.empty()) {
+      svg.addAttribute("transform", transform);
+    }
     svg.addAttribute("cx", ellipse->center.x);
     svg.addAttribute("cy", ellipse->center.y);
     svg.addAttribute("r", rx);
   } else {
     svg.openElement("ellipse");
+    if (!transform.empty()) {
+      svg.addAttribute("transform", transform);
+    }
     svg.addAttribute("cx", ellipse->center.x);
     svg.addAttribute("cy", ellipse->center.y);
     svg.addAttribute("rx", rx);
@@ -694,11 +738,15 @@ static void writeEllipse(SVGBuilder& svg, const Ellipse* ellipse, const FillStro
 }
 
 static void writePath(SVGBuilder& svg, const Path* path, const FillStrokeInfo& fs,
-                      SVGExportContext& ctx, SVGBuilder& defs) {
+                      SVGExportContext& ctx, SVGBuilder& defs,
+                      const std::string& transform = "") {
   if (!path->data || path->data->isEmpty()) {
     return;
   }
   svg.openElement("path");
+  if (!transform.empty()) {
+    svg.addAttribute("transform", transform);
+  }
   svg.addAttribute("d", PathDataToSVGString(*path->data));
   applyFillAttributes(svg, fs.fill, ctx, defs);
   applyStrokeAttributes(svg, fs.stroke, ctx, defs);
@@ -706,7 +754,8 @@ static void writePath(SVGBuilder& svg, const Path* path, const FillStrokeInfo& f
 }
 
 static void writeText(SVGBuilder& svg, const Text* text, const FillStrokeInfo& fs,
-                      SVGExportContext& ctx, SVGBuilder& defs) {
+                      SVGExportContext& ctx, SVGBuilder& defs,
+                      const std::string& transform = "") {
   if (text->text.empty()) {
     return;
   }
@@ -745,6 +794,9 @@ static void writeText(SVGBuilder& svg, const Text* text, const FillStrokeInfo& f
   }
 
   svg.openElement("text");
+  if (!transform.empty()) {
+    svg.addAttribute("transform", transform);
+  }
   svg.addAttributeIfNonZero("x", x);
   svg.addAttributeIfNonZero("y", y);
   if (!text->fontFamily.empty()) {
@@ -781,9 +833,7 @@ static void writeText(SVGBuilder& svg, const Text* text, const FillStrokeInfo& f
 //==============================================================================
 
 static void writeGroupContents(SVGBuilder& svg, const Group* group, SVGExportContext& ctx,
-                               SVGBuilder& defs) {
-  // A Group in PAGX typically contains: [Shape, Fill, Stroke] or [Text, Fill, Stroke]
-  // Collect fill/stroke info first.
+                               SVGBuilder& defs, const std::string& transform = "") {
   auto fs = collectFillStroke(group->elements);
 
   for (const auto* element : group->elements) {
@@ -793,19 +843,19 @@ static void writeGroupContents(SVGBuilder& svg, const Group* group, SVGExportCon
     }
     switch (type) {
       case NodeType::Rectangle:
-        writeRectangle(svg, static_cast<const Rectangle*>(element), fs, ctx, defs);
+        writeRectangle(svg, static_cast<const Rectangle*>(element), fs, ctx, defs, transform);
         break;
       case NodeType::Ellipse:
-        writeEllipse(svg, static_cast<const Ellipse*>(element), fs, ctx, defs);
+        writeEllipse(svg, static_cast<const Ellipse*>(element), fs, ctx, defs, transform);
         break;
       case NodeType::Path:
-        writePath(svg, static_cast<const Path*>(element), fs, ctx, defs);
+        writePath(svg, static_cast<const Path*>(element), fs, ctx, defs, transform);
         break;
       case NodeType::Text:
-        writeText(svg, static_cast<const Text*>(element), fs, ctx, defs);
+        writeText(svg, static_cast<const Text*>(element), fs, ctx, defs, transform);
         break;
       case NodeType::Group:
-        writeGroupContents(svg, static_cast<const Group*>(element), ctx, defs);
+        writeGroupContents(svg, static_cast<const Group*>(element), ctx, defs, transform);
         break;
       default:
         break;
@@ -818,12 +868,7 @@ static void writeGroupContents(SVGBuilder& svg, const Group* group, SVGExportCon
 //==============================================================================
 
 static void writeLayerContents(SVGBuilder& svg, const Layer* layer, SVGExportContext& ctx,
-                               SVGBuilder& defs) {
-  // A Layer's contents can follow different patterns:
-  // Pattern 1: [Group([Shape, Fill, Stroke])] — typical SVG import result
-  // Pattern 2: [Shape, Fill, Stroke] — direct contents
-  // Pattern 3: [Shape1, Shape2, ..., Fill, Stroke] — multiple shapes sharing fill/stroke
-
+                               SVGBuilder& defs, const std::string& transform) {
   auto fs = collectFillStroke(layer->contents);
 
   for (const auto* element : layer->contents) {
@@ -833,19 +878,19 @@ static void writeLayerContents(SVGBuilder& svg, const Layer* layer, SVGExportCon
     }
     switch (type) {
       case NodeType::Rectangle:
-        writeRectangle(svg, static_cast<const Rectangle*>(element), fs, ctx, defs);
+        writeRectangle(svg, static_cast<const Rectangle*>(element), fs, ctx, defs, transform);
         break;
       case NodeType::Ellipse:
-        writeEllipse(svg, static_cast<const Ellipse*>(element), fs, ctx, defs);
+        writeEllipse(svg, static_cast<const Ellipse*>(element), fs, ctx, defs, transform);
         break;
       case NodeType::Path:
-        writePath(svg, static_cast<const Path*>(element), fs, ctx, defs);
+        writePath(svg, static_cast<const Path*>(element), fs, ctx, defs, transform);
         break;
       case NodeType::Text:
-        writeText(svg, static_cast<const Text*>(element), fs, ctx, defs);
+        writeText(svg, static_cast<const Text*>(element), fs, ctx, defs, transform);
         break;
       case NodeType::Group:
-        writeGroupContents(svg, static_cast<const Group*>(element), ctx, defs);
+        writeGroupContents(svg, static_cast<const Group*>(element), ctx, defs, transform);
         break;
       default:
         break;
@@ -881,18 +926,7 @@ static void writeLayer(SVGBuilder& svg, const Layer* layer, SVGExportContext& ct
     svg.addAttribute(("data-" + key).c_str(), value);
   }
 
-  // Build transform string combining position and matrix.
-  std::string transform;
-  if (layer->x != 0.0f || layer->y != 0.0f) {
-    if (!layer->matrix.isIdentity()) {
-      Matrix combined = Matrix::Translate(layer->x, layer->y) * layer->matrix;
-      transform = matrixToSVGTransform(combined);
-    } else {
-      transform = "translate(" + FloatToString(layer->x) + "," + FloatToString(layer->y) + ")";
-    }
-  } else if (!layer->matrix.isIdentity()) {
-    transform = matrixToSVGTransform(layer->matrix);
-  }
+  std::string transform = buildLayerTransform(layer);
   if (!transform.empty()) {
     svg.addAttribute("transform", transform);
   }
