@@ -863,13 +863,11 @@ static void writeLayer(SVGBuilder& svg, const Layer* layer, SVGExportContext& ct
                     !layer->id.empty() || !layer->filters.empty() || layer->mask != nullptr ||
                     layer->x != 0.0f || layer->y != 0.0f || !layer->customData.empty();
 
-  // If it's a simple layer with only one content element and no children, and no group attributes
-  // needed, we can flatten it.
-  bool hasMultipleItems = layer->contents.size() + layer->children.size() > 1;
-
-  if (!needsGroup && !hasMultipleItems && layer->children.empty() && !layer->contents.empty()) {
-    // Single content element — write it directly.
+  if (!needsGroup) {
     writeLayerContents(svg, layer, ctx, defs);
+    for (const auto* child : layer->children) {
+      writeLayer(svg, child, ctx, defs);
+    }
     return;
   }
 
