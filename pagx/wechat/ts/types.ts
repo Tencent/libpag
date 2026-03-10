@@ -28,8 +28,16 @@ export interface PAGXViewNative {
     height: () => number;
     /** Registers fallback fonts for text rendering. */
     registerFonts: (fontData: Uint8Array, emojiFontData: Uint8Array) => void;
-    /** Loads a PAGX file from the given data. */
+    /** Loads a PAGX file and builds the layer tree in one step. */
     loadPAGX: (data: Uint8Array) => boolean;
+    /** Parses a PAGX file without building layers. Use with getExternalFilePaths(), loadFileData(), and buildLayers(). */
+    parsePAGX: (data: Uint8Array) => void;
+    /** Returns external file paths referenced by Image nodes that need to be fetched. */
+    getExternalFilePaths: () => StringVector;
+    /** Loads external file data for an Image node matching the given path. Returns true on success. */
+    loadFileData: (filePath: string, fileData: Uint8Array) => boolean;
+    /** Builds the layer tree from the previously parsed document. */
+    buildLayers: () => void;
     /** Updates the canvas size and recreates the surface. */
     updateSize: (width: number, height: number) => void;
     /** Updates the zoom scale and content offset for the display list. */
@@ -45,6 +53,18 @@ export interface PAGXViewNative {
     /** Returns the height of the PAGX content in content pixels. */
     contentHeight: () => number;
     /** Releases the native C++ object. */
+    delete: () => void;
+}
+
+/**
+ * Emscripten register_vector<std::string> wrapper, used to access string vectors returned from C++.
+ */
+export interface StringVector {
+    /** Returns the number of elements. */
+    size: () => number;
+    /** Returns the element at the given index. */
+    get: (index: number) => string;
+    /** Releases the underlying C++ object. Must be called after use to avoid memory leaks. */
     delete: () => void;
 }
 

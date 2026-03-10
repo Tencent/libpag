@@ -22,6 +22,7 @@
 #include <emscripten/bind.h>
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/layers/DisplayList.h"
+#include "pagx/PAGXDocument.h"
 #include "LayerBuilder.h"
 
 namespace pagx {
@@ -55,9 +56,39 @@ class PAGXView {
 
   /**
    * Loads a PAGX file from the given data and builds the layer tree for rendering.
+   * This is a convenience method equivalent to calling parsePAGX() followed by buildLayers().
    * @param pagxData PAGX file data as a JavaScript Uint8Array.
    */
   void loadPAGX(const emscripten::val& pagxData);
+
+  /**
+   * Parses a PAGX file from the given data without building the layer tree. After parsing, call
+   * getExternalFilePaths() to retrieve external resources, load them with loadFileData(), then
+   * call buildLayers() to finalize rendering.
+   * @param pagxData PAGX file data as a JavaScript Uint8Array.
+   */
+  void parsePAGX(const emscripten::val& pagxData);
+
+  /**
+   * Returns external file paths referenced by Image nodes that have no embedded data. Data URIs
+   * are excluded. Call this after parsePAGX() to determine which files need to be fetched.
+   */
+  std::vector<std::string> getExternalFilePaths() const;
+
+  /**
+   * Loads external file data for an Image node matching the given file path. The data is embedded
+   * into the matching node so the renderer uses it directly instead of file I/O.
+   * @param filePath The external file path to match against Image nodes.
+   * @param fileData The file content as a JavaScript Uint8Array.
+   * @return True if a matching Image node was found and its data was loaded successfully.
+   */
+  bool loadFileData(const std::string& filePath, const emscripten::val& fileData);
+
+  /**
+   * Builds the layer tree from the previously parsed document. Call this after parsePAGX() and
+   * any loadFileData() calls to finalize the rendering content.
+   */
+  void buildLayers();
 
   /**
    * Updates the canvas size and recreates the surface.
@@ -127,6 +158,7 @@ class PAGXView {
   std::shared_ptr<tgfx::Surface> surface = nullptr;
   tgfx::DisplayList displayList = {};
   std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
+  std::shared_ptr<PAGXDocument> document = nullptr;
   float pagxWidth = 0.0f;
   float pagxHeight = 0.0f;
   int _width = 0;

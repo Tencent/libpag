@@ -25,6 +25,7 @@
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/types/Data.h"
 
 using namespace emscripten;
 
@@ -82,6 +83,26 @@ static std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenDa
   return nullptr;
 }
 
+// Copies data from a JavaScript Uint8Array into a pagx::Data object.
+static std::shared_ptr<Data> GetPagxDataFromEmscripten(const val& emscriptenData) {
+  if (emscriptenData.isUndefined()) {
+    return nullptr;
+  }
+  unsigned int length = emscriptenData["length"].as<unsigned int>();
+  if (length == 0) {
+    return nullptr;
+  }
+  auto buffer = new (std::nothrow) uint8_t[length];
+  if (!buffer) {
+    return nullptr;
+  }
+  auto memory = val::module_property("HEAPU8")["buffer"];
+  auto memoryView = emscriptenData["constructor"].new_(
+      memory, static_cast<unsigned int>(reinterpret_cast<uintptr_t>(buffer)), length);
+  memoryView.call<void>("set", emscriptenData);
+  return Data::MakeAdopt(buffer, length);
+}
+
 PAGXView::PAGXView(std::shared_ptr<tgfx::Device> device, int width, int height)
 : device(device), _width(width), _height(height) {
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
@@ -110,11 +131,38 @@ void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
 }
 
 void PAGXView::loadPAGX(const val& pagxData) {
-  auto data = GetDataFromEmscripten(pagxData);
+  parsePAGX(pagxData);
+  buildLayers();
+}
+
+void PAGXView::parsePAGX(const val& pagxData) {
+  document = nullptr;
+  auto data = GetPagxDataFromEmscripten(pagxData);
   if (!data) {
     return;
   }
-  auto document = PAGXImporter::FromXML(data->bytes(), data->size());
+  document = PAGXImporter::FromXML(data->bytes(), data->size());
+}
+
+std::vector<std::string> PAGXView::getExternalFilePaths() const {
+  if (!document) {
+    return {};
+  }
+  return document->getExternalFilePaths();
+}
+
+bool PAGXView::loadFileData(const std::string& filePath, const val& fileData) {
+  if (!document) {
+    return false;
+  }
+  auto data = GetPagxDataFromEmscripten(fileData);
+  if (!data) {
+    return false;
+  }
+  return document->loadFileData(filePath, std::move(data));
+}
+
+void PAGXView::buildLayers() {
   if (!document) {
     return;
   }

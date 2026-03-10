@@ -131,8 +131,10 @@ export class View {
   }
 
   /**
-   * Load PAGX file data.
-   * @param pagxData PAGX file data
+   * Load PAGX file data and build the layer tree in one step. Equivalent to calling parsePAGX()
+   * followed by buildLayers(). For PAGX files with external image resources, use the three-step
+   * loading flow instead: parsePAGX() -> getExternalFilePaths() + loadFileData() -> buildLayers().
+   * @param pagxData PAGX file data as Uint8Array.
    */
   public loadPAGX(pagxData: Uint8Array): void {
     if (!this.nativeView) {
@@ -140,6 +142,65 @@ export class View {
     }
     this.firstFrameCallbackFired = false;
     this.nativeView.loadPAGX(pagxData);
+  }
+
+  /**
+   * Parse a PAGX file without building the layer tree. After parsing, call getExternalFilePaths()
+   * to determine which external resources need to be fetched, load them with loadFileData(), then
+   * call buildLayers() to finalize the rendering content.
+   * @param pagxData PAGX file data as Uint8Array.
+   */
+  public parsePAGX(pagxData: Uint8Array): void {
+    if (!this.nativeView) {
+      throw new Error('Native view not initialized');
+    }
+    this.firstFrameCallbackFired = false;
+    this.nativeView.parsePAGX(pagxData);
+  }
+
+  /**
+   * Returns external file paths referenced by Image nodes that need to be fetched. Call this after
+   * parsePAGX() to determine which files to download. Data URIs are excluded from the result.
+   * @returns An array of relative file path strings.
+   */
+  public getExternalFilePaths(): string[] {
+    if (!this.nativeView) {
+      throw new Error('Native view not initialized');
+    }
+    const paths = this.nativeView.getExternalFilePaths();
+    const result: string[] = [];
+    const count = paths.size();
+    for (let i = 0; i < count; i++) {
+      result.push(paths.get(i));
+    }
+    paths.delete();
+    return result;
+  }
+
+  /**
+   * Load external file data for an Image node matching the given file path. The binary data is
+   * embedded into the matching node so the renderer can use it directly. Call this after
+   * parsePAGX() and before buildLayers() for each path returned by getExternalFilePaths().
+   * @param filePath The external file path to match against Image nodes.
+   * @param fileData The file content as Uint8Array.
+   * @returns True if a matching Image node was found and its data was loaded successfully.
+   */
+  public loadFileData(filePath: string, fileData: Uint8Array): boolean {
+    if (!this.nativeView) {
+      throw new Error('Native view not initialized');
+    }
+    return this.nativeView.loadFileData(filePath, fileData);
+  }
+
+  /**
+   * Build the layer tree from the previously parsed document. Call this after parsePAGX() and any
+   * loadFileData() calls to finalize the rendering content.
+   */
+  public buildLayers(): void {
+    if (!this.nativeView) {
+      throw new Error('Native view not initialized');
+    }
+    this.nativeView.buildLayers();
   }
 
   /**

@@ -31,6 +31,10 @@ EMSCRIPTEN_BINDINGS(PAGXView) {
       .function("width", &PAGXView::width)
       .function("height", &PAGXView::height)
       .function("loadPAGX", &PAGXView::loadPAGX)
+      .function("parsePAGX", &PAGXView::parsePAGX)
+      .function("getExternalFilePaths", &PAGXView::getExternalFilePaths)
+      .function("loadFileData", &PAGXView::loadFileData)
+      .function("buildLayers", &PAGXView::buildLayers)
       .function("updateSize", &PAGXView::updateSize)
       .function("updateZoomScaleAndOffset", &PAGXView::updateZoomScaleAndOffset)
       .function("onZoomEnd", &PAGXView::onZoomEnd)
@@ -38,4 +42,6 @@ EMSCRIPTEN_BINDINGS(PAGXView) {
       .function("firstFrameRendered", &PAGXView::firstFrameRendered)
       .function("contentWidth", &PAGXView::contentWidth)
       .function("contentHeight", &PAGXView::contentHeight);
+
+  register_vector<std::string>("VectorString");
 }
