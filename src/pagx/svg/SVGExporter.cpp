@@ -556,6 +556,17 @@ static std::string writeMaskDef(SVGBuilder& defs, const Layer* maskLayer, SVGExp
   return maskId;
 }
 
+static std::string writeClipPathDef(SVGBuilder& defs, const Layer* maskLayer,
+                                    SVGExportContext& ctx, SVGBuilder& nestedDefs) {
+  std::string clipId = maskLayer->id.empty() ? ctx.generateId("clip") : maskLayer->id;
+  defs.openElement("clipPath");
+  defs.addAttribute("id", clipId);
+  defs.closeElementStart();
+  writeMaskLayerContent(defs, maskLayer, ctx, nestedDefs);
+  defs.closeElement();
+  return clipId;
+}
+
 //==============================================================================
 // Collect fill/stroke info from a layer's contents
 //==============================================================================
@@ -928,10 +939,11 @@ static void writeLayer(SVGBuilder& svg, const Layer* layer, SVGExportContext& ct
 
   // Handle mask.
   if (layer->mask != nullptr) {
-    auto maskId = writeMaskDef(defs, layer->mask, ctx, defs);
     if (layer->maskType == MaskType::Alpha) {
-      svg.addAttribute("clip-path", "url(#" + maskId + ")");
+      auto clipId = writeClipPathDef(defs, layer->mask, ctx, defs);
+      svg.addAttribute("clip-path", "url(#" + clipId + ")");
     } else {
+      auto maskId = writeMaskDef(defs, layer->mask, ctx, defs);
       svg.addAttribute("mask", "url(#" + maskId + ")");
     }
   }
