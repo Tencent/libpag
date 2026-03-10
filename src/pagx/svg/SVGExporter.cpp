@@ -227,18 +227,10 @@ static void writeColorSourceDef(SVGBuilder& defs, const ColorSource* source, con
                                 SVGExportContext& ctx);
 static std::string getColorSourceRef(const ColorSource* source, float* outAlpha,
                                      SVGExportContext& ctx, SVGBuilder& defs);
+static void writeLayerContents(SVGBuilder& svg, const Layer* layer, SVGExportContext& ctx,
+                               SVGBuilder& defs);
 static void writeLayer(SVGBuilder& svg, const Layer* layer, SVGExportContext& ctx,
                        SVGBuilder& defs);
-static void writeRectangle(SVGBuilder& svg, const Rectangle* rect, const FillStrokeInfo& fs,
-                           SVGExportContext& ctx, SVGBuilder& defs);
-static void writeEllipse(SVGBuilder& svg, const Ellipse* ellipse, const FillStrokeInfo& fs,
-                         SVGExportContext& ctx, SVGBuilder& defs);
-static void writePath(SVGBuilder& svg, const Path* path, const FillStrokeInfo& fs,
-                      SVGExportContext& ctx, SVGBuilder& defs);
-static void writeText(SVGBuilder& svg, const Text* text, const FillStrokeInfo& fs,
-                      SVGExportContext& ctx, SVGBuilder& defs);
-static void writeGroupContents(SVGBuilder& svg, const Group* group, SVGExportContext& ctx,
-                               SVGBuilder& defs);
 
 //==============================================================================
 // Color conversion helpers
@@ -569,32 +561,7 @@ static std::string writeMaskDef(SVGBuilder& defs, const Layer* maskLayer, SVGExp
 
 static void writeMaskLayerContent(SVGBuilder& defs, const Layer* layer, SVGExportContext& ctx,
                                   SVGBuilder& nestedDefs) {
-  auto fs = collectFillStroke(layer->contents);
-  for (const auto* element : layer->contents) {
-    auto type = element->nodeType();
-    if (type == NodeType::Fill || type == NodeType::Stroke || type == NodeType::TextBox) {
-      continue;
-    }
-    switch (type) {
-      case NodeType::Rectangle:
-        writeRectangle(defs, static_cast<const Rectangle*>(element), fs, ctx, nestedDefs);
-        break;
-      case NodeType::Ellipse:
-        writeEllipse(defs, static_cast<const Ellipse*>(element), fs, ctx, nestedDefs);
-        break;
-      case NodeType::Path:
-        writePath(defs, static_cast<const Path*>(element), fs, ctx, nestedDefs);
-        break;
-      case NodeType::Text:
-        writeText(defs, static_cast<const Text*>(element), fs, ctx, nestedDefs);
-        break;
-      case NodeType::Group:
-        writeGroupContents(defs, static_cast<const Group*>(element), ctx, nestedDefs);
-        break;
-      default:
-        break;
-    }
-  }
+  writeLayerContents(defs, layer, ctx, nestedDefs);
   for (const auto* child : layer->children) {
     writeLayer(defs, child, ctx, nestedDefs);
   }
