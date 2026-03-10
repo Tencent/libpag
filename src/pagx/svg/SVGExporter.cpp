@@ -496,9 +496,9 @@ static std::string writeFilterDefs(SVGBuilder& defs, const std::vector<LayerFilt
         defs.addAttribute("type", std::string("matrix"));
         auto& c = shadow->color;
         std::string matrixValues =
-            "0 0 0 " + FloatToString(c.red) + " 0 " +
-            "0 0 0 " + FloatToString(c.green) + " 0 " +
-            "0 0 0 " + FloatToString(c.blue) + " 0 " +
+            "0 0 0 0 " + FloatToString(c.red) + " " +
+            "0 0 0 0 " + FloatToString(c.green) + " " +
+            "0 0 0 0 " + FloatToString(c.blue) + " " +
             "0 0 0 " + FloatToString(c.alpha) + " 0";
         defs.addAttribute("values", matrixValues);
         defs.closeElementSelfClosing();
