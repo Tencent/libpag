@@ -154,8 +154,9 @@ Layer `x`/`y` carries the block offset; internal coordinates start from `0,0`. S
 ### Step 5: Verify and Refine
 
 After each render, follow the **Verification and Correction Loop** at the end of this
-document — run `pagx bounds` first to detect misalignment by numbers, fix with CLI tools,
-then visually confirm. Do not skip bounds measurement even if the screenshot looks correct.
+document — run `pagx bounds` first to detect misalignment by numbers, fix with CLI tools
+or coordinate adjustment, then visually confirm. Do not skip bounds measurement even if
+the screenshot looks correct.
 
 After verification passes, continue to `optimize-guide.md` for optimization review.
 
@@ -181,6 +182,13 @@ for targeted measurement when needed (see `cli.md`).
 Scan the bounds data for any misalignment, uneven spacing, or asymmetric padding. Even if
 `pagx align` / `pagx distribute` were applied during generation, fixes in one area can
 introduce regressions elsewhere — always re-check everything.
+
+**Alignment** — elements that should share an edge or center:
+```
+A.center_y = A.bounds_y + A.bounds_height / 2
+B.center_y = B.bounds_y + B.bounds_height / 2
+→ difference should be 0 (same for center_x, left edges, etc.)
+```
 
 **Container padding** — compute all four sides and compare:
 ```
