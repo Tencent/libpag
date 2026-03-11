@@ -176,11 +176,11 @@ pagx bounds input.pagx
 This outputs `x=<left> y=<top> width=<w> height=<h>` for every layer. Use `--id` or `--xpath`
 for targeted measurement when needed (see `cli.md`).
 
-### 2. Check Spacing and Padding by Numbers
+### 2. Check Alignment, Spacing, and Padding by Numbers
 
-Alignment issues (shared edges, centers) should already be fixed by `pagx align` /
-`pagx distribute` during generation. This step focuses on spacing values that CLI tools
-cannot enforce — verify them from bounds data.
+Scan the bounds data for any misalignment, uneven spacing, or asymmetric padding. Even if
+`pagx align` / `pagx distribute` were applied during generation, fixes in one area can
+introduce regressions elsewhere — always re-check everything.
 
 **Container padding** — compute all four sides and compare:
 ```
