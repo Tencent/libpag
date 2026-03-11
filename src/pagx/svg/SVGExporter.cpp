@@ -398,21 +398,33 @@ static std::string buildLayerTransform(const Layer* layer) {
 }
 
 //==============================================================================
+// SVGWriterContext - shared state across SVGWriter instances
+//==============================================================================
+
+struct SVGWriterContext {
+  int nextDefId = 0;
+
+  std::string generateId(const std::string& prefix) {
+    return prefix + std::to_string(nextDefId++);
+  }
+};
+
+//==============================================================================
 // SVGWriter - encapsulates all SVG writing operations
 //==============================================================================
 
 class SVGWriter {
  public:
-  explicit SVGWriter(SVGBuilder& defs) : _defs(defs) {}
+  SVGWriter(SVGBuilder& defs, SVGWriterContext& context) : _defs(defs), _context(context) {}
 
   void writeLayer(SVGBuilder& out, const Layer* layer);
 
  private:
-  int _nextDefId = 0;
   SVGBuilder& _defs;
+  SVGWriterContext& _context;
 
   std::string generateId(const std::string& prefix) {
-    return prefix + std::to_string(_nextDefId++);
+    return _context.generateId(prefix);
   }
 
   // Layer / element writing
@@ -837,7 +849,7 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, const char* ta
   _defs.openElement(tag);
   _defs.addAttribute("id", defId);
   _defs.closeElementStart();
-  SVGWriter nestedWriter(paintDefs);
+  SVGWriter nestedWriter(paintDefs, _context);
   (nestedWriter.*writer)(_defs, maskLayer);
   _defs.closeElement();
   std::string paintDefsStr = paintDefs.release();
@@ -1238,7 +1250,8 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
 std::string SVGExporter::ToSVG(const PAGXDocument& doc, const Options& options) {
   SVGBuilder svg(options.indent);
   SVGBuilder defs(options.indent, 2);
-  SVGWriter writer(defs);
+  SVGWriterContext context;
+  SVGWriter writer(defs, context);
 
   if (options.xmlDeclaration) {
     svg.appendDeclaration();
