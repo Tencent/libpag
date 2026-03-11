@@ -266,8 +266,9 @@ static std::string colorToDisplayP3String(const Color& color) {
          FloatToString(color.blue) + ")";
 }
 
-static void appendP3FillStyle(std::string& styleStr, const ColorSource* colorSource,
-                              const std::string& srgbHex, float effectiveAlpha) {
+static void appendP3ColorStyle(std::string& styleStr, const char* property,
+                               const ColorSource* colorSource, const std::string& srgbHex,
+                               float effectiveAlpha) {
   if (!colorSource || colorSource->nodeType() != NodeType::SolidColor) {
     return;
   }
@@ -275,23 +276,18 @@ static void appendP3FillStyle(std::string& styleStr, const ColorSource* colorSou
   if (solid->color.colorSpace != ColorSpace::DisplayP3) {
     return;
   }
-  styleStr += "fill:" + srgbHex + ";";
-  styleStr += "fill:" + colorToDisplayP3String(solid->color) + ";";
-  styleStr += "fill-opacity:" + FloatToString(effectiveAlpha) + ";";
-}
-
-static void appendP3StrokeStyle(std::string& styleStr, const ColorSource* colorSource,
-                                const std::string& srgbHex, float effectiveAlpha) {
-  if (!colorSource || colorSource->nodeType() != NodeType::SolidColor) {
-    return;
-  }
-  auto solid = static_cast<const SolidColor*>(colorSource);
-  if (solid->color.colorSpace != ColorSpace::DisplayP3) {
-    return;
-  }
-  styleStr += "stroke:" + srgbHex + ";";
-  styleStr += "stroke:" + colorToDisplayP3String(solid->color) + ";";
-  styleStr += "stroke-opacity:" + FloatToString(effectiveAlpha) + ";";
+  styleStr += property;
+  styleStr += ':';
+  styleStr += srgbHex;
+  styleStr += ';';
+  styleStr += property;
+  styleStr += ':';
+  styleStr += colorToDisplayP3String(solid->color);
+  styleStr += ';';
+  styleStr += property;
+  styleStr += "-opacity:";
+  styleStr += FloatToString(effectiveAlpha);
+  styleStr += ';';
 }
 
 static std::string matrixToSVGTransform(const Matrix& matrix) {
@@ -350,6 +346,26 @@ static bool GetPNGDimensionsFromPath(const std::string& path, int* width, int* h
     return false;
   }
   return GetPNGDimensions(header, 24, width, height);
+}
+
+static bool GetImagePNGDimensions(const Image* image, int* width, int* height) {
+  if (image->data) {
+    return GetPNGDimensions(image->data->bytes(), image->data->size(), width, height);
+  }
+  if (!image->filePath.empty()) {
+    return GetPNGDimensionsFromPath(image->filePath, width, height);
+  }
+  return false;
+}
+
+static std::string GetImageHref(const Image* image) {
+  if (image->data) {
+    return "data:image/png;base64," + Base64Encode(image->data->bytes(), image->data->size());
+  }
+  if (!image->filePath.empty()) {
+    return image->filePath;
+  }
+  return {};
 }
 
 static FillStrokeInfo collectFillStroke(const std::vector<Element*>& contents) {
@@ -421,6 +437,7 @@ class SVGWriter {
   void writeGradientStops(const std::vector<ColorStop*>& stops);
   void finishGradientDef(const Matrix& matrix, const std::vector<ColorStop*>& stops);
   void writeColorSourceDef(const ColorSource* source, const std::string& id);
+  std::string writeImagePatternDef(const ImagePattern* pattern, const Rect& shapeBounds);
   std::string getColorSourceRef(const ColorSource* source, float* outAlpha,
                                 const Rect& shapeBounds = {});
 
@@ -516,6 +533,73 @@ void SVGWriter::writeColorSourceDef(const ColorSource* source, const std::string
   }
 }
 
+std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern,
+                                            const Rect& shapeBounds) {
+  if (!pattern->image) {
+    return {};
+  }
+  std::string href = GetImageHref(pattern->image);
+  if (href.empty()) {
+    return {};
+  }
+
+  std::string defId = generateId("pattern");
+  bool needsTiling =
+      (pattern->tileModeX == TileMode::Repeat || pattern->tileModeY == TileMode::Repeat);
+
+  int imgW = 0;
+  int imgH = 0;
+  bool canUseOBB = false;
+  if (!shapeBounds.isEmpty()) {
+    canUseOBB = needsTiling ? GetImagePNGDimensions(pattern->image, &imgW, &imgH) : true;
+  }
+
+  _defs.openElement("pattern");
+  _defs.addAttribute("id", defId);
+
+  if (canUseOBB) {
+    float W = shapeBounds.width;
+    float H = shapeBounds.height;
+    float X = shapeBounds.x;
+    float Y = shapeBounds.y;
+    const auto& M = pattern->matrix;
+    Matrix obbMatrix = {};
+    obbMatrix.a = M.a / W;
+    obbMatrix.b = M.b / H;
+    obbMatrix.c = M.c / W;
+    obbMatrix.d = M.d / H;
+    obbMatrix.tx = (M.tx - X) / W;
+    obbMatrix.ty = (M.ty - Y) / H;
+
+    _defs.addAttribute("patternContentUnits", "objectBoundingBox");
+    if (needsTiling) {
+      _defs.addAttribute("width", static_cast<float>(imgW) * obbMatrix.a);
+      _defs.addAttribute("height", static_cast<float>(imgH) * obbMatrix.d);
+    } else {
+      _defs.addAttribute("width", 1.0f);
+      _defs.addAttribute("height", 1.0f);
+    }
+    _defs.closeElementStart();
+    _defs.openElement("image");
+    _defs.addAttribute("href", href);
+    _defs.addAttribute("transform", matrixToSVGTransform(obbMatrix));
+  } else {
+    _defs.addAttribute("patternUnits", "userSpaceOnUse");
+    _defs.addAttribute("width", "100%");
+    _defs.addAttribute("height", "100%");
+    _defs.closeElementStart();
+    _defs.openElement("image");
+    _defs.addAttribute("href", href);
+    if (!pattern->matrix.isIdentity()) {
+      _defs.addAttribute("transform", matrixToSVGTransform(pattern->matrix));
+    }
+  }
+
+  _defs.closeElementSelfClosing();
+  _defs.closeElement();
+  return "url(#" + defId + ")";
+}
+
 std::string SVGWriter::getColorSourceRef(const ColorSource* source, float* outAlpha,
                                          const Rect& shapeBounds) {
   if (!source) {
@@ -535,83 +619,12 @@ std::string SVGWriter::getColorSourceRef(const ColorSource* source, float* outAl
     return "url(#" + defId + ")";
   }
   if (source->nodeType() == NodeType::ImagePattern) {
-    auto pattern = static_cast<const ImagePattern*>(source);
-    if (pattern->image) {
-      std::string href;
-      if (pattern->image->data) {
-        href = "data:image/png;base64," +
-               Base64Encode(pattern->image->data->bytes(), pattern->image->data->size());
-      } else if (!pattern->image->filePath.empty()) {
-        href = pattern->image->filePath;
+    auto ref = writeImagePatternDef(static_cast<const ImagePattern*>(source), shapeBounds);
+    if (!ref.empty()) {
+      if (outAlpha) {
+        *outAlpha = 1.0f;
       }
-      if (!href.empty()) {
-        std::string defId = generateId("pattern");
-        bool needsTiling = (pattern->tileModeX == TileMode::Repeat ||
-                            pattern->tileModeY == TileMode::Repeat);
-        int imgW = 0;
-        int imgH = 0;
-        bool canUseOBB = false;
-        if (!shapeBounds.isEmpty()) {
-          if (needsTiling) {
-            if (pattern->image->data) {
-              canUseOBB = GetPNGDimensions(pattern->image->data->bytes(),
-                                           pattern->image->data->size(), &imgW, &imgH);
-            } else if (!pattern->image->filePath.empty()) {
-              canUseOBB = GetPNGDimensionsFromPath(pattern->image->filePath, &imgW, &imgH);
-            }
-          } else {
-            canUseOBB = true;
-          }
-        }
-
-        _defs.openElement("pattern");
-        _defs.addAttribute("id", defId);
-        if (canUseOBB) {
-          float W = shapeBounds.width;
-          float H = shapeBounds.height;
-          float X = shapeBounds.x;
-          float Y = shapeBounds.y;
-          const auto& M = pattern->matrix;
-          Matrix obbMatrix = {};
-          obbMatrix.a = M.a / W;
-          obbMatrix.b = M.b / H;
-          obbMatrix.c = M.c / W;
-          obbMatrix.d = M.d / H;
-          obbMatrix.tx = (M.tx - X) / W;
-          obbMatrix.ty = (M.ty - Y) / H;
-
-          _defs.addAttribute("patternContentUnits", "objectBoundingBox");
-          if (needsTiling) {
-            float tileW = static_cast<float>(imgW) * obbMatrix.a;
-            float tileH = static_cast<float>(imgH) * obbMatrix.d;
-            _defs.addAttribute("width", tileW);
-            _defs.addAttribute("height", tileH);
-          } else {
-            _defs.addAttribute("width", 1.0f);
-            _defs.addAttribute("height", 1.0f);
-          }
-          _defs.closeElementStart();
-          _defs.openElement("image");
-          _defs.addAttribute("href", href);
-          _defs.addAttribute("transform", matrixToSVGTransform(obbMatrix));
-        } else {
-          _defs.addAttribute("patternUnits", "userSpaceOnUse");
-          _defs.addAttribute("width", "100%");
-          _defs.addAttribute("height", "100%");
-          _defs.closeElementStart();
-          _defs.openElement("image");
-          _defs.addAttribute("href", href);
-          if (!pattern->matrix.isIdentity()) {
-            _defs.addAttribute("transform", matrixToSVGTransform(pattern->matrix));
-          }
-        }
-        _defs.closeElementSelfClosing();
-        _defs.closeElement();
-        if (outAlpha) {
-          *outAlpha = 1.0f;
-        }
-        return "url(#" + defId + ")";
-      }
+      return ref;
     }
   }
   return "none";
@@ -888,7 +901,7 @@ void SVGWriter::applyFillAttributes(SVGBuilder& out, const Fill* fill, const Rec
     out.addAttribute("fill-rule", "evenodd");
   }
   if (p3Style) {
-    appendP3FillStyle(*p3Style, fill->color, fillStr, effectiveAlpha);
+    appendP3ColorStyle(*p3Style, "fill", fill->color, fillStr, effectiveAlpha);
   }
 }
 
@@ -934,7 +947,7 @@ void SVGWriter::applyStrokeAttributes(SVGBuilder& out, const Stroke* stroke,
     out.addAttribute("stroke-dashoffset", FloatToString(stroke->dashOffset));
   }
   if (p3Style) {
-    appendP3StrokeStyle(*p3Style, stroke->color, strokeStr, effectiveAlpha);
+    appendP3ColorStyle(*p3Style, "stroke", stroke->color, strokeStr, effectiveAlpha);
   }
 }
 
