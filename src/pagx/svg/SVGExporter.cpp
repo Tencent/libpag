@@ -22,7 +22,9 @@
 #include <string>
 #include <vector>
 #include "pagx/PAGXDocument.h"
+#include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/Ellipse.h"
@@ -732,6 +734,45 @@ std::string SVGWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters)
         if (!shadow->shadowOnly) {
           needSourceGraphic = true;
         }
+        break;
+      }
+      case NodeType::ColorMatrixFilter: {
+        auto cm = static_cast<const ColorMatrixFilter*>(filter);
+        _defs.openElement("feColorMatrix");
+        _defs.addAttribute("in", "SourceGraphic");
+        _defs.addAttribute("type", "matrix");
+        std::string values;
+        values.reserve(200);
+        for (size_t i = 0; i < cm->matrix.size(); i++) {
+          if (i > 0) {
+            values += " ";
+          }
+          values += FloatToString(cm->matrix[i]);
+        }
+        _defs.addAttribute("values", values);
+        _defs.closeElementSelfClosing();
+        break;
+      }
+      case NodeType::BlendFilter: {
+        auto blend = static_cast<const BlendFilter*>(filter);
+        std::string idx = std::to_string(shadowIndex++);
+        std::string floodResult = "blendFlood" + idx;
+        _defs.openElement("feFlood");
+        _defs.addAttribute("flood-color", colorToSVGString(blend->color));
+        if (blend->color.alpha < 1.0f) {
+          _defs.addAttribute("flood-opacity", FloatToString(blend->color.alpha));
+        }
+        _defs.addAttribute("result", floodResult);
+        _defs.closeElementSelfClosing();
+
+        _defs.openElement("feBlend");
+        _defs.addAttribute("in", "SourceGraphic");
+        _defs.addAttribute("in2", floodResult);
+        auto modeStr = BlendModeToSVGString(blend->blendMode);
+        if (!modeStr.empty()) {
+          _defs.addAttribute("mode", modeStr);
+        }
+        _defs.closeElementSelfClosing();
         break;
       }
       default:
