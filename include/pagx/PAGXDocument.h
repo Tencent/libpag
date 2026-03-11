@@ -24,7 +24,6 @@
 #include <vector>
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
-#include "pagx/types/Color.h"
 #include "pagx/types/Data.h"
 
 namespace pagx {
@@ -57,21 +56,6 @@ class PAGXDocument {
    * Canvas height.
    */
   float height = 0;
-
-  /**
-   * Canvas background color.
-   */
-  Color backgroundColor = {0.96f, 0.96f, 0.96f, 1.0f};
-
-  /**
-   * Canvas background alpha in [0, 1] range.
-   */
-  float backgroundAlpha = 1.0f;
-
-  /**
-   * Whether the canvas background is visible.
-   */
-  bool backgroundVisible = false;
 
   /**
    * Top-level layers (raw pointers, owned by nodes).

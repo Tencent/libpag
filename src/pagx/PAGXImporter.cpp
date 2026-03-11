@@ -1751,12 +1751,6 @@ static void parseDocument(const DOMNode* root, PAGXDocument* doc) {
   doc->version = getAttribute(root, "version", "1.0");
   doc->width = getFloatAttribute(root, "width", 0, doc);
   doc->height = getFloatAttribute(root, "height", 0, doc);
-  auto bgColorStr = getAttribute(root, "backgroundColor");
-  if (!bgColorStr.empty()) {
-    doc->backgroundColor = getColorAttribute(root, "backgroundColor", doc);
-  }
-  doc->backgroundAlpha = getFloatAttribute(root, "backgroundAlpha", 1, doc);
-  doc->backgroundVisible = getBoolAttribute(root, "backgroundVisible", false, doc);
 
   // First pass: Parse Resources.
   auto child = root->getFirstChild("Resources");
