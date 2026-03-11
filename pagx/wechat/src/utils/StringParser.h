@@ -36,24 +36,47 @@ static int ParseHexDigit(char ch) {
   return -1;
 }
 
+static tgfx::Color DefaultBackgroundColor() {
+  return tgfx::Color::FromRGBA(245, 245, 245);
+}
+
 static tgfx::Color ParseHexColor(const std::string& hex) {
   if (hex.empty() || hex[0] != '#') {
-    return tgfx::Color::FromRGBA(245, 245, 245);
+    return DefaultBackgroundColor();
   }
-  if (hex.size() == 7) {
-    int r = ParseHexDigit(hex[1]) * 16 + ParseHexDigit(hex[2]);
-    int g = ParseHexDigit(hex[3]) * 16 + ParseHexDigit(hex[4]);
-    int b = ParseHexDigit(hex[5]) * 16 + ParseHexDigit(hex[6]);
+  if (hex.size() == 4) {
+    int r = ParseHexDigit(hex[1]);
+    int g = ParseHexDigit(hex[2]);
+    int b = ParseHexDigit(hex[3]);
+    if (r < 0 || g < 0 || b < 0) {
+      return DefaultBackgroundColor();
+    }
+    return tgfx::Color::FromRGBA(r * 17, g * 17, b * 17);
+  }
+  if (hex.size() == 7 || hex.size() == 9) {
+    int r1 = ParseHexDigit(hex[1]);
+    int r2 = ParseHexDigit(hex[2]);
+    int g1 = ParseHexDigit(hex[3]);
+    int g2 = ParseHexDigit(hex[4]);
+    int b1 = ParseHexDigit(hex[5]);
+    int b2 = ParseHexDigit(hex[6]);
+    if (r1 < 0 || r2 < 0 || g1 < 0 || g2 < 0 || b1 < 0 || b2 < 0) {
+      return DefaultBackgroundColor();
+    }
+    int r = r1 * 16 + r2;
+    int g = g1 * 16 + g2;
+    int b = b1 * 16 + b2;
+    if (hex.size() == 9) {
+      int a1 = ParseHexDigit(hex[7]);
+      int a2 = ParseHexDigit(hex[8]);
+      if (a1 < 0 || a2 < 0) {
+        return DefaultBackgroundColor();
+      }
+      return tgfx::Color::FromRGBA(r, g, b, a1 * 16 + a2);
+    }
     return tgfx::Color::FromRGBA(r, g, b);
   }
-  if (hex.size() == 9) {
-    int r = ParseHexDigit(hex[1]) * 16 + ParseHexDigit(hex[2]);
-    int g = ParseHexDigit(hex[3]) * 16 + ParseHexDigit(hex[4]);
-    int b = ParseHexDigit(hex[5]) * 16 + ParseHexDigit(hex[6]);
-    int a = ParseHexDigit(hex[7]) * 16 + ParseHexDigit(hex[8]);
-    return tgfx::Color::FromRGBA(r, g, b, a);
-  }
-  return tgfx::Color::FromRGBA(245, 245, 245);
+  return DefaultBackgroundColor();
 }
 
 }  // namespace pagx
