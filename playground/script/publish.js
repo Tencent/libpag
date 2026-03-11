@@ -295,7 +295,7 @@ function publishSkills(outputDir, names) {
     if (fs.existsSync(zipPath)) {
       fs.unlinkSync(zipPath);
     }
-    execSync(`zip -r "${zipPath}" .`, { cwd: skillSrcDir, stdio: 'pipe' });
+    execSync(`zip -r "${zipPath}" .`, { cwd: skillDestDir, stdio: 'pipe' });
     console.log(`  Created: ${zipPath}`);
   }
 
