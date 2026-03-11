@@ -410,18 +410,21 @@ static std::string getColorSourceRef(const ColorSource* source, float* outAlpha,
         int imgW = 0;
         int imgH = 0;
         bool canUseOBB = false;
-        if (needsTiling && !shapeBounds.isEmpty()) {
-          if (pattern->image->data) {
-            canUseOBB = GetPNGDimensions(pattern->image->data->bytes(),
-                                         pattern->image->data->size(), &imgW, &imgH);
-          } else if (!pattern->image->filePath.empty()) {
-            canUseOBB = GetPNGDimensionsFromPath(pattern->image->filePath, &imgW, &imgH);
+        if (!shapeBounds.isEmpty()) {
+          if (needsTiling) {
+            if (pattern->image->data) {
+              canUseOBB = GetPNGDimensions(pattern->image->data->bytes(),
+                                           pattern->image->data->size(), &imgW, &imgH);
+            } else if (!pattern->image->filePath.empty()) {
+              canUseOBB = GetPNGDimensionsFromPath(pattern->image->filePath, &imgW, &imgH);
+            }
+          } else {
+            canUseOBB = true;
           }
         }
 
         defs.openElement("pattern");
         defs.addAttribute("id", defId);
-        defs.addAttribute("a", canUseOBB);
         if (canUseOBB) {
           // Convert forward matrix (image pixels → screen) to objectBoundingBox space (0-1).
           // imageToOBB = Scale(1/W, 1/H) * Translate(-X, -Y) * forwardMatrix
@@ -438,12 +441,16 @@ static std::string getColorSourceRef(const ColorSource* source, float* outAlpha,
           obbMatrix.tx = (M.tx - X) / W;
           obbMatrix.ty = (M.ty - Y) / H;
 
-          float tileW = static_cast<float>(imgW) * obbMatrix.a;
-          float tileH = static_cast<float>(imgH) * obbMatrix.d;
-
           defs.addAttribute("patternContentUnits", std::string("objectBoundingBox"));
-          defs.addAttribute("width", tileW);
-          defs.addAttribute("height", tileH);
+          if (needsTiling) {
+            float tileW = static_cast<float>(imgW) * obbMatrix.a;
+            float tileH = static_cast<float>(imgH) * obbMatrix.d;
+            defs.addAttribute("width", tileW);
+            defs.addAttribute("height", tileH);
+          } else {
+            defs.addAttribute("width", 1.0f);
+            defs.addAttribute("height", 1.0f);
+          }
           defs.closeElementStart();
           defs.openElement("image");
           defs.addAttribute("href", href);
