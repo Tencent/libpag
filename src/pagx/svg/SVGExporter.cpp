@@ -18,7 +18,9 @@
 
 #include "pagx/SVGExporter.h"
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -31,6 +33,7 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/types/Rect.h"
 #include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
@@ -226,7 +229,8 @@ static std::string matrixToSVGTransform(const Matrix& matrix);
 static void writeColorSourceDef(SVGBuilder& defs, const ColorSource* source, const std::string& id,
                                 SVGExportContext& ctx);
 static std::string getColorSourceRef(const ColorSource* source, float* outAlpha,
-                                     SVGExportContext& ctx, SVGBuilder& defs);
+                                     SVGExportContext& ctx, SVGBuilder& defs,
+                                     const Rect& shapeBounds = {});
 static void writeLayerContents(SVGBuilder& svg, const Layer* layer, SVGExportContext& ctx,
                                SVGBuilder& defs, const std::string& transform = "");
 static void writeLayer(SVGBuilder& svg, const Layer* layer, SVGExportContext& ctx,
@@ -338,8 +342,41 @@ static void writeColorSourceDef(SVGBuilder& defs, const ColorSource* source, con
   }
 }
 
+static bool GetPNGDimensions(const uint8_t* data, size_t size, int* width, int* height) {
+  if (size < 24) {
+    return false;
+  }
+  static const uint8_t kPNGSignature[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+  if (memcmp(data, kPNGSignature, 8) != 0) {
+    return false;
+  }
+  *width = static_cast<int>((data[16] << 24) | (data[17] << 16) | (data[18] << 8) | data[19]);
+  *height = static_cast<int>((data[20] << 24) | (data[21] << 16) | (data[22] << 8) | data[23]);
+  return *width > 0 && *height > 0;
+}
+
+static bool GetPNGDimensionsFromPath(const std::string& path, int* width, int* height) {
+  if (path.find("data:") == 0) {
+    auto decoded = DecodeBase64DataURI(path);
+    if (!decoded) {
+      return false;
+    }
+    return GetPNGDimensions(decoded->bytes(), decoded->size(), width, height);
+  }
+  std::ifstream file(path, std::ios::binary);
+  if (!file) {
+    return false;
+  }
+  uint8_t header[24];
+  if (!file.read(reinterpret_cast<char*>(header), 24)) {
+    return false;
+  }
+  return GetPNGDimensions(header, 24, width, height);
+}
+
 static std::string getColorSourceRef(const ColorSource* source, float* outAlpha,
-                                     SVGExportContext& ctx, SVGBuilder& defs) {
+                                     SVGExportContext& ctx, SVGBuilder& defs,
+                                     const Rect& shapeBounds) {
   if (!source) {
     return "none";
   }
@@ -368,16 +405,59 @@ static std::string getColorSourceRef(const ColorSource* source, float* outAlpha,
       }
       if (!href.empty()) {
         std::string defId = ctx.generateId("pattern");
+        bool needsTiling = (pattern->tileModeX == TileMode::Repeat ||
+                            pattern->tileModeY == TileMode::Repeat);
+        int imgW = 0;
+        int imgH = 0;
+        bool canUseOBB = false;
+        if (needsTiling && !shapeBounds.isEmpty()) {
+          if (pattern->image->data) {
+            canUseOBB = GetPNGDimensions(pattern->image->data->bytes(),
+                                         pattern->image->data->size(), &imgW, &imgH);
+          } else if (!pattern->image->filePath.empty()) {
+            canUseOBB = GetPNGDimensionsFromPath(pattern->image->filePath, &imgW, &imgH);
+          }
+        }
+
         defs.openElement("pattern");
         defs.addAttribute("id", defId);
-        defs.addAttribute("patternUnits", std::string("userSpaceOnUse"));
-        defs.addAttribute("width", std::string("100%"));
-        defs.addAttribute("height", std::string("100%"));
-        defs.closeElementStart();
-        defs.openElement("image");
-        defs.addAttribute("href", href);
-        if (!pattern->matrix.isIdentity()) {
-          defs.addAttribute("transform", matrixToSVGTransform(pattern->matrix));
+        defs.addAttribute("a", canUseOBB);
+        if (canUseOBB) {
+          // Convert forward matrix (image pixels → screen) to objectBoundingBox space (0-1).
+          // imageToOBB = Scale(1/W, 1/H) * Translate(-X, -Y) * forwardMatrix
+          float W = shapeBounds.width;
+          float H = shapeBounds.height;
+          float X = shapeBounds.x;
+          float Y = shapeBounds.y;
+          const auto& M = pattern->matrix;
+          Matrix obbMatrix = {};
+          obbMatrix.a = M.a / W;
+          obbMatrix.b = M.b / H;
+          obbMatrix.c = M.c / W;
+          obbMatrix.d = M.d / H;
+          obbMatrix.tx = (M.tx - X) / W;
+          obbMatrix.ty = (M.ty - Y) / H;
+
+          float tileW = static_cast<float>(imgW) * obbMatrix.a;
+          float tileH = static_cast<float>(imgH) * obbMatrix.d;
+
+          defs.addAttribute("patternContentUnits", std::string("objectBoundingBox"));
+          defs.addAttribute("width", tileW);
+          defs.addAttribute("height", tileH);
+          defs.closeElementStart();
+          defs.openElement("image");
+          defs.addAttribute("href", href);
+          defs.addAttribute("transform", matrixToSVGTransform(obbMatrix));
+        } else {
+          defs.addAttribute("patternUnits", std::string("userSpaceOnUse"));
+          defs.addAttribute("width", std::string("100%"));
+          defs.addAttribute("height", std::string("100%"));
+          defs.closeElementStart();
+          defs.openElement("image");
+          defs.addAttribute("href", href);
+          if (!pattern->matrix.isIdentity()) {
+            defs.addAttribute("transform", matrixToSVGTransform(pattern->matrix));
+          }
         }
         defs.closeElementSelfClosing();
         defs.closeElement();
@@ -648,13 +728,13 @@ static std::string writeClipPathDef(SVGBuilder& defs, const Layer* maskLayer,
 }
 
 static void applyFillAttributes(SVGBuilder& svg, const Fill* fill, SVGExportContext& ctx,
-                                SVGBuilder& defs) {
+                                SVGBuilder& defs, const Rect& shapeBounds = {}) {
   if (!fill) {
     svg.addAttribute("fill", std::string("none"));
     return;
   }
   float alpha = 1.0f;
-  std::string fillStr = getColorSourceRef(fill->color, &alpha, ctx, defs);
+  std::string fillStr = getColorSourceRef(fill->color, &alpha, ctx, defs, shapeBounds);
   svg.addAttribute("fill", fillStr);
   float effectiveAlpha = alpha * fill->alpha;
   if (effectiveAlpha < 1.0f) {
@@ -666,12 +746,12 @@ static void applyFillAttributes(SVGBuilder& svg, const Fill* fill, SVGExportCont
 }
 
 static void applyStrokeAttributes(SVGBuilder& svg, const Stroke* stroke, SVGExportContext& ctx,
-                                  SVGBuilder& defs) {
+                                  SVGBuilder& defs, const Rect& shapeBounds = {}) {
   if (!stroke) {
     return;
   }
   float alpha = 1.0f;
-  std::string strokeStr = getColorSourceRef(stroke->color, &alpha, ctx, defs);
+  std::string strokeStr = getColorSourceRef(stroke->color, &alpha, ctx, defs, shapeBounds);
   svg.addAttribute("stroke", strokeStr);
   float effectiveAlpha = alpha * stroke->alpha;
   if (effectiveAlpha < 1.0f) {
@@ -729,8 +809,9 @@ static void writeRectangle(SVGBuilder& svg, const Rectangle* rect, const FillStr
     svg.addAttribute("rx", rect->roundness);
     svg.addAttribute("ry", rect->roundness);
   }
-  applyFillAttributes(svg, fs.fill, ctx, defs);
-  applyStrokeAttributes(svg, fs.stroke, ctx, defs);
+  Rect bounds = Rect::MakeXYWH(x, y, rect->size.width, rect->size.height);
+  applyFillAttributes(svg, fs.fill, ctx, defs, bounds);
+  applyStrokeAttributes(svg, fs.stroke, ctx, defs, bounds);
   svg.closeElementSelfClosing();
 }
 
@@ -757,8 +838,9 @@ static void writeEllipse(SVGBuilder& svg, const Ellipse* ellipse, const FillStro
     svg.addAttribute("rx", rx);
     svg.addAttribute("ry", ry);
   }
-  applyFillAttributes(svg, fs.fill, ctx, defs);
-  applyStrokeAttributes(svg, fs.stroke, ctx, defs);
+  Rect bounds = Rect::MakeXYWH(ellipse->center.x - rx, ellipse->center.y - ry, rx * 2, ry * 2);
+  applyFillAttributes(svg, fs.fill, ctx, defs, bounds);
+  applyStrokeAttributes(svg, fs.stroke, ctx, defs, bounds);
   svg.closeElementSelfClosing();
 }
 
@@ -773,8 +855,9 @@ static void writePath(SVGBuilder& svg, const Path* path, const FillStrokeInfo& f
     svg.addAttribute("transform", transform);
   }
   svg.addAttribute("d", PathDataToSVGString(*path->data));
-  applyFillAttributes(svg, fs.fill, ctx, defs);
-  applyStrokeAttributes(svg, fs.stroke, ctx, defs);
+  Rect bounds = path->data->getBounds();
+  applyFillAttributes(svg, fs.fill, ctx, defs, bounds);
+  applyStrokeAttributes(svg, fs.stroke, ctx, defs, bounds);
   svg.closeElementSelfClosing();
 }
 
