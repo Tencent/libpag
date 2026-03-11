@@ -277,6 +277,39 @@ static std::string colorToSVGStringWithAlpha(const Color& color, float* outAlpha
   return colorToSVGString(color);
 }
 
+static std::string colorToDisplayP3String(const Color& color) {
+  return "color(display-p3 " + FloatToString(color.red) + " " + FloatToString(color.green) + " " +
+         FloatToString(color.blue) + ")";
+}
+
+static void appendP3FillStyle(std::string& styleStr, const ColorSource* colorSource,
+                              const std::string& srgbHex, float effectiveAlpha) {
+  if (!colorSource || colorSource->nodeType() != NodeType::SolidColor) {
+    return;
+  }
+  auto solid = static_cast<const SolidColor*>(colorSource);
+  if (solid->color.colorSpace != ColorSpace::DisplayP3) {
+    return;
+  }
+  styleStr += "fill:" + srgbHex + ";";
+  styleStr += "fill:" + colorToDisplayP3String(solid->color) + ";";
+  styleStr += "fill-opacity:" + FloatToString(effectiveAlpha) + ";";
+}
+
+static void appendP3StrokeStyle(std::string& styleStr, const ColorSource* colorSource,
+                                const std::string& srgbHex, float effectiveAlpha) {
+  if (!colorSource || colorSource->nodeType() != NodeType::SolidColor) {
+    return;
+  }
+  auto solid = static_cast<const SolidColor*>(colorSource);
+  if (solid->color.colorSpace != ColorSpace::DisplayP3) {
+    return;
+  }
+  styleStr += "stroke:" + srgbHex + ";";
+  styleStr += "stroke:" + colorToDisplayP3String(solid->color) + ";";
+  styleStr += "stroke-opacity:" + FloatToString(effectiveAlpha) + ";";
+}
+
 //==============================================================================
 // Matrix conversion: PAGX Matrix → SVG transform attribute
 //==============================================================================
@@ -303,9 +336,16 @@ static void writeGradientStops(SVGBuilder& svg, const std::vector<ColorStop*>& s
     svg.openElement("stop");
     svg.addAttribute("offset", FloatToString(stop->offset));
     float alpha = stop->color.alpha;
-    svg.addAttribute("stop-color", colorToSVGString(stop->color));
+    std::string srgbHex = colorToSVGString(stop->color);
+    svg.addAttribute("stop-color", srgbHex);
     if (alpha < 1.0f) {
       svg.addAttribute("stop-opacity", FloatToString(alpha));
+    }
+    if (stop->color.colorSpace == ColorSpace::DisplayP3) {
+      std::string style = "stop-color:" + srgbHex + ";";
+      style += "stop-color:" + colorToDisplayP3String(stop->color) + ";";
+      style += "stop-opacity:" + FloatToString(alpha) + ";";
+      svg.addAttribute("style", style);
     }
     svg.closeElementSelfClosing();
   }
@@ -765,7 +805,8 @@ static std::string writeClipPathDef(SVGBuilder& defs, const Layer* maskLayer,
 }
 
 static void applyFillAttributes(SVGBuilder& svg, const Fill* fill, SVGExportContext& ctx,
-                                SVGBuilder& defs, const Rect& shapeBounds = {}) {
+                                SVGBuilder& defs, const Rect& shapeBounds = {},
+                                std::string* p3Style = nullptr) {
   if (!fill) {
     svg.addAttribute("fill", std::string("none"));
     return;
@@ -780,10 +821,14 @@ static void applyFillAttributes(SVGBuilder& svg, const Fill* fill, SVGExportCont
   if (fill->fillRule == FillRule::EvenOdd) {
     svg.addAttribute("fill-rule", std::string("evenodd"));
   }
+  if (p3Style) {
+    appendP3FillStyle(*p3Style, fill->color, fillStr, effectiveAlpha);
+  }
 }
 
 static void applyStrokeAttributes(SVGBuilder& svg, const Stroke* stroke, SVGExportContext& ctx,
-                                  SVGBuilder& defs, const Rect& shapeBounds = {}) {
+                                  SVGBuilder& defs, const Rect& shapeBounds = {},
+                                  std::string* p3Style = nullptr) {
   if (!stroke) {
     return;
   }
@@ -823,6 +868,15 @@ static void applyStrokeAttributes(SVGBuilder& svg, const Stroke* stroke, SVGExpo
   if (stroke->dashOffset != 0.0f) {
     svg.addAttribute("stroke-dashoffset", FloatToString(stroke->dashOffset));
   }
+  if (p3Style) {
+    appendP3StrokeStyle(*p3Style, stroke->color, strokeStr, effectiveAlpha);
+  }
+}
+
+static void applyP3Style(SVGBuilder& svg, const std::string& p3Style) {
+  if (!p3Style.empty()) {
+    svg.addAttribute("style", p3Style);
+  }
 }
 
 //==============================================================================
@@ -847,8 +901,10 @@ static void writeRectangle(SVGBuilder& svg, const Rectangle* rect, const FillStr
     svg.addAttribute("ry", rect->roundness);
   }
   Rect bounds = Rect::MakeXYWH(x, y, rect->size.width, rect->size.height);
-  applyFillAttributes(svg, fs.fill, ctx, defs, bounds);
-  applyStrokeAttributes(svg, fs.stroke, ctx, defs, bounds);
+  std::string p3Style;
+  applyFillAttributes(svg, fs.fill, ctx, defs, bounds, &p3Style);
+  applyStrokeAttributes(svg, fs.stroke, ctx, defs, bounds, &p3Style);
+  applyP3Style(svg, p3Style);
   svg.closeElementSelfClosing();
 }
 
@@ -876,8 +932,10 @@ static void writeEllipse(SVGBuilder& svg, const Ellipse* ellipse, const FillStro
     svg.addAttribute("ry", ry);
   }
   Rect bounds = Rect::MakeXYWH(ellipse->center.x - rx, ellipse->center.y - ry, rx * 2, ry * 2);
-  applyFillAttributes(svg, fs.fill, ctx, defs, bounds);
-  applyStrokeAttributes(svg, fs.stroke, ctx, defs, bounds);
+  std::string p3Style;
+  applyFillAttributes(svg, fs.fill, ctx, defs, bounds, &p3Style);
+  applyStrokeAttributes(svg, fs.stroke, ctx, defs, bounds, &p3Style);
+  applyP3Style(svg, p3Style);
   svg.closeElementSelfClosing();
 }
 
@@ -893,8 +951,10 @@ static void writePath(SVGBuilder& svg, const Path* path, const FillStrokeInfo& f
   }
   svg.addAttribute("d", PathDataToSVGString(*path->data));
   Rect bounds = path->data->getBounds();
-  applyFillAttributes(svg, fs.fill, ctx, defs, bounds);
-  applyStrokeAttributes(svg, fs.stroke, ctx, defs, bounds);
+  std::string p3Style;
+  applyFillAttributes(svg, fs.fill, ctx, defs, bounds, &p3Style);
+  applyStrokeAttributes(svg, fs.stroke, ctx, defs, bounds, &p3Style);
+  applyP3Style(svg, p3Style);
   svg.closeElementSelfClosing();
 }
 
@@ -968,8 +1028,10 @@ static void writeText(SVGBuilder& svg, const Text* text, const FillStrokeInfo& f
       svg.addAttribute("font-style", std::string("italic"));
     }
   }
-  applyFillAttributes(svg, fs.fill, ctx, defs);
-  applyStrokeAttributes(svg, fs.stroke, ctx, defs);
+  std::string p3Style;
+  applyFillAttributes(svg, fs.fill, ctx, defs, {}, &p3Style);
+  applyStrokeAttributes(svg, fs.stroke, ctx, defs, {}, &p3Style);
+  applyP3Style(svg, p3Style);
   svg.closeElementWithText(text->text);
 }
 
