@@ -463,6 +463,26 @@ CLI_TEST(PAGXCliTest, Optimize_NoExtractSingleLayer) {
 // Optimize tests — DryRun, general, and error handling
 //==============================================================================
 
+CLI_TEST(PAGXCliTest, Optimize_PreserveNewline) {
+  auto inputPath = TestResourcePath("optimize_preserve_newline.pagx");
+  auto outputPath = TempDir() + "/preserve_newline_out.pagx";
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  EXPECT_TRUE(output.find("&#10;") != std::string::npos);
+  EXPECT_TRUE(output.find("Hello&#10;World") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Format_PreserveNewline) {
+  auto inputPath = TestResourcePath("optimize_preserve_newline.pagx");
+  auto outputPath = TempDir() + "/format_newline_out.pagx";
+  auto ret = CallRun(pagx::cli::RunFormat, {"format", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  EXPECT_TRUE(output.find("&#10;") != std::string::npos);
+  EXPECT_TRUE(output.find("Hello&#10;World") != std::string::npos);
+}
+
 CLI_TEST(PAGXCliTest, Optimize_DryRun) {
   auto inputPath = CopyToTemp("validate_simple.pagx", "dryrun.pagx");
   auto originalContent = ReadFile(inputPath);

@@ -215,6 +215,15 @@ static void SerializeNode(std::string& output, xmlNodePtr node, int indentLevel,
               case '"':
                 output += "&quot;";
                 break;
+              case '\n':
+                output += "&#10;";
+                break;
+              case '\r':
+                output += "&#13;";
+                break;
+              case '\t':
+                output += "&#9;";
+                break;
               default:
                 output += *p;
                 break;
