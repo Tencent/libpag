@@ -132,14 +132,19 @@ is harmless; subtle misalignment is not.
 After completing each block (or group of related blocks), actively scan for **every** pair or
 group of Layers that are visually close — shared edges, similar positions, nearly equal gaps.
 Do not limit this to obvious cases; any two values within a few pixels of each other should
-be unified to the exact same value.
+be unified to the exact same value. Common scenarios include but are not limited to:
+
+- Same-row elements should share a vertical center (icon + label, price + badge)
+- Same-column elements should share a left edge or horizontal center (list items, cards)
+- Content should be centered on its canvas or container background
+- Sibling elements in a row/column should have equal gaps between them
+- Container padding should be symmetric (left = right, top = bottom)
+- Similar containers (cards, buttons, badges) should use the same internal padding
 
 Tool selection:
 - **2+ Layers sharing an edge or center** → `pagx align` (see `cli.md`)
 - **3+ Layers in a row or column** → `pagx distribute` (see `cli.md`)
-- **Container padding, two-element gaps, cross-container padding consistency** → measure
-  with `pagx bounds`, then adjust coordinates to make left = right, top = bottom, and
-  matching gaps across similar containers
+- **Padding and gaps** → measure with `pagx bounds`, then adjust coordinates to equalize
 
 ### Step 4: Localize Coordinates
 
