@@ -62,6 +62,7 @@ const SPEC_FILE_ZH = path.join(SPEC_DIR, 'pagx_spec.zh_CN.md');
 const PAGES_DIR = path.join(PLAYGROUND_DIR, 'pages');
 const SPEC_TEMPLATE_FILE = path.join(PAGES_DIR, 'spec', 'template.html');
 const PACKAGE_FILE = path.join(PLAYGROUND_DIR, 'package.json');
+const CLI_PACKAGE_FILE = path.join(LIBPAG_DIR, 'cli', 'npm', 'package.json');
 
 // Base URL for the spec site
 const BASE_URL = 'https://pag.io/pagx';
@@ -228,11 +229,31 @@ function runCommand(command, cwd, timeout = 600000) {
 // ============================================================================
 
 /**
+ * Read CLI version from cli/npm/package.json.
+ */
+function getCliVersion() {
+  if (!fs.existsSync(CLI_PACKAGE_FILE)) {
+    console.warn(`  Warning: CLI package.json not found: ${CLI_PACKAGE_FILE}`);
+    return null;
+  }
+  try {
+    const pkg = JSON.parse(fs.readFileSync(CLI_PACKAGE_FILE, 'utf-8'));
+    return pkg.version;
+  } catch (error) {
+    console.warn(`  Warning: Failed to parse CLI package.json: ${error.message}`);
+    return null;
+  }
+}
+
+/**
  * Publish skills as static files, zip archives, and documentation pages.
  */
 function publishSkills(outputDir, names) {
   const skillsOutputDir = path.join(outputDir, 'skills');
   let skillsChanged = false;
+
+  // Read CLI version once before the loop to avoid redundant file reads
+  const cliVersion = getCliVersion();
 
   for (const name of names) {
     const skillSrcDir = path.join(SKILLS_DIR, name);
@@ -257,11 +278,24 @@ function publishSkills(outputDir, names) {
     }
     copyDir(skillSrcDir, skillDestDir);
 
+    // Update PAGX_MIN version in cli.md to match cli/npm/package.json version
+    const cliMdPath = path.join(skillDestDir, 'references', 'cli.md');
+    if (cliVersion && fs.existsSync(cliMdPath)) {
+      try {
+        let cliMdContent = fs.readFileSync(cliMdPath, 'utf-8');
+        cliMdContent = cliMdContent.replace(/PAGX_MIN="[\d.]+"/, `PAGX_MIN="${cliVersion}"`);
+        fs.writeFileSync(cliMdPath, cliMdContent, 'utf-8');
+        console.log(`  Updated: ${cliMdPath} (PAGX_MIN="${cliVersion}")`);
+      } catch (error) {
+        console.warn(`  Warning: Failed to update ${cliMdPath}: ${error.message}`);
+      }
+    }
+
     fs.mkdirSync(skillsOutputDir, { recursive: true });
     if (fs.existsSync(zipPath)) {
       fs.unlinkSync(zipPath);
     }
-    execSync(`zip -r "${zipPath}" .`, { cwd: skillSrcDir, stdio: 'pipe' });
+    execSync(`zip -r "${zipPath}" .`, { cwd: skillDestDir, stdio: 'pipe' });
     console.log(`  Created: ${zipPath}`);
   }
 
