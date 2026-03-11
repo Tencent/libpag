@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/SVGExporter.h"
+#include <algorithm>
 #include <cstdio>
 #include <fstream>
 #include <string>
@@ -221,7 +222,7 @@ struct FillStrokeInfo {
   const TextBox* textBox = nullptr;
 };
 
-static std::string BlendModeToSVGString(BlendMode mode) {
+static const char* BlendModeToSVGString(BlendMode mode) {
   switch (mode) {
     case BlendMode::Multiply:   return "multiply";
     case BlendMode::Screen:     return "screen";
@@ -238,17 +239,14 @@ static std::string BlendModeToSVGString(BlendMode mode) {
     case BlendMode::Saturation: return "saturation";
     case BlendMode::Color:      return "color";
     case BlendMode::Luminosity: return "luminosity";
-    default:                    return "";
+    default:                    return nullptr;
   }
 }
 
 static std::string colorToSVGString(const Color& color) {
-  int r = static_cast<int>(std::round(color.red * 255.0f));
-  int g = static_cast<int>(std::round(color.green * 255.0f));
-  int b = static_cast<int>(std::round(color.blue * 255.0f));
-  r = std::max(0, std::min(255, r));
-  g = std::max(0, std::min(255, g));
-  b = std::max(0, std::min(255, b));
+  int r = std::clamp(static_cast<int>(std::round(color.red * 255.0f)), 0, 255);
+  int g = std::clamp(static_cast<int>(std::round(color.green * 255.0f)), 0, 255);
+  int b = std::clamp(static_cast<int>(std::round(color.blue * 255.0f)), 0, 255);
   char buf[8];
   snprintf(buf, sizeof(buf), "#%02X%02X%02X", r, g, b);
   return buf;
@@ -330,7 +328,7 @@ static bool GetPNGDimensions(const uint8_t* data, size_t size, int* width, int* 
 }
 
 static bool GetPNGDimensionsFromPath(const std::string& path, int* width, int* height) {
-  if (path.find("data:") == 0) {
+  if (path.rfind("data:", 0) == 0) {
     auto decoded = DecodeBase64DataURI(path);
     if (!decoded) {
       return false;
@@ -482,9 +480,15 @@ void SVGWriter::writeGradientStops(const std::vector<ColorStop*>& stops) {
       _defs.addAttribute("stop-opacity", FloatToString(alpha));
     }
     if (stop->color.colorSpace == ColorSpace::DisplayP3) {
-      std::string style = "stop-color:" + srgbHex + ";";
-      style += "stop-color:" + colorToDisplayP3String(stop->color) + ";";
-      style += "stop-opacity:" + FloatToString(alpha) + ";";
+      std::string style;
+      style.reserve(120);
+      style += "stop-color:";
+      style += srgbHex;
+      style += ";stop-color:";
+      style += colorToDisplayP3String(stop->color);
+      style += ";stop-opacity:";
+      style += FloatToString(alpha);
+      style += ';';
       _defs.addAttribute("style", style);
     }
     _defs.closeElementSelfClosing();
@@ -782,7 +786,7 @@ std::string SVGWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters)
         _defs.addAttribute("in", "SourceGraphic");
         _defs.addAttribute("in2", floodResult);
         auto modeStr = BlendModeToSVGString(blend->blendMode);
-        if (!modeStr.empty()) {
+        if (modeStr) {
           _defs.addAttribute("mode", modeStr);
         }
         _defs.closeElementSelfClosing();
@@ -1188,8 +1192,8 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
 
   if (layer->blendMode != BlendMode::Normal) {
     auto blendStr = BlendModeToSVGString(layer->blendMode);
-    if (!blendStr.empty()) {
-      out.addAttribute("style", "mix-blend-mode:" + blendStr);
+    if (blendStr) {
+      out.addAttribute("style", std::string("mix-blend-mode:") + blendStr);
     }
   }
 
