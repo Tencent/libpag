@@ -143,6 +143,41 @@ its own Group for painter scope isolation.
 
 ---
 
+## Alignment Verification
+
+After rendering, use `pagx bounds` to diagnose alignment issues, then fix with `pagx align` /
+`pagx distribute` (see `cli.md`). **Do not compute coordinate deltas manually.**
+
+**Visual center** — content centered on a `W × H` canvas:
+```
+center_x = bounds_x + bounds_width / 2   → should ≈ W / 2
+center_y = bounds_y + bounds_height / 2   → should ≈ H / 2
+```
+Always compute from bounds, not from Layer `x`/`y` — asymmetric content shifts the visual
+center. Fix with `pagx align --anchor centerX` / `centerY`.
+
+**Spacing consistency** — sibling elements evenly spaced:
+```
+gap_i = next_i.bounds_start - (prev_i.bounds_start + prev_i.bounds_size)
+```
+All gaps should be equal (±2px). Fix with `pagx distribute --axis x` or `y`.
+
+**Containment** — inner content within an outer shape with even padding:
+```
+inner.x ≥ outer.x + padding
+inner.y ≥ outer.y + padding
+inner.x + inner.width  ≤ outer.x + outer.width  - padding
+inner.y + inner.height ≤ outer.y + outer.height - padding
+```
+If padding is uneven, fix with `pagx align --anchor centerX` / `centerY`.
+
+**Related-element alignment** — parts that belong together (label + icon, header + body) should
+share a visual axis. Fix with `pagx align --anchor centerY` or `centerX`.
+
+After each fix, re-render and re-inspect — one fix can shift other elements.
+
+---
+
 ## Practical Pitfall Patterns
 
 Supplements `spec-essentials.md` with practical patterns for common pitfalls.

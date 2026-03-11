@@ -11,7 +11,7 @@ Read before starting generation:
 | Reference | Content |
 |-----------|---------|
 | `spec-essentials.md` | Format specification — node types, processing model, attribute rules |
-| `design-patterns.md` | Structure decisions, text layout, practical pitfall patterns |
+| `design-patterns.md` | Structure decisions, text layout, alignment verification, practical pitfall patterns |
 
 Read these as needed:
 
@@ -19,7 +19,7 @@ Read these as needed:
 |-----------|---------|
 | `examples.md` | Structural patterns for Icons, UI, Logos, Charts, Decorative backgrounds |
 | `attributes.md` | Attribute defaults, enumerations, required attributes |
-| `cli.md` | CLI tool usage — `render`, `bounds`, `font info` commands |
+| `cli.md` | CLI tool usage — `render`, `bounds`, `font info`, `align`, `distribute` commands |
 
 ---
 
@@ -126,11 +126,12 @@ This isolates defects: if something breaks, it was the last thing added.
   </Group>
   ```
 
-**Mandatory measurement after each block** — do not rely on coordinate estimation. After
+**Mandatory measurement and alignment after each block** — do not rely on coordinate estimation. After
 completing each block (or group of related blocks), immediately run `pagx render` and
 `pagx bounds` to verify alignment. Coordinates that "look correct" in source often produce
 visible misalignment in the rendered output due to asymmetric shapes, stroke width offsets,
-or text baseline differences. Measure first, then adjust — never skip this step.
+or text baseline differences. When misalignment is found, use `pagx align` / `pagx distribute`
+to fix automatically — do not compute coordinate deltas manually. See `cli.md` for usage.
 
 ### Step 4: Localize Coordinates
 
@@ -141,9 +142,8 @@ Layer `x`/`y` carries the block offset; internal coordinates start from `0,0`. S
 
 After each render, **read the rendered screenshot first** — visual inspection is the primary
 check. Identify any visible issues (misalignment, uneven spacing, clipping, mismatched
-proportions), then use `pagx bounds` to measure and compute corrections. Fix, re-render,
-and re-inspect until correct. See the **Verification and Correction Loop** section at the
-end of this document for the full methodology.
+proportions), then follow the **Verification and Correction Loop** at the end of this
+document to measure and fix. Re-render and re-inspect until correct.
 
 After verification passes, continue to `optimize-guide.md` for optimization review.
 
@@ -185,58 +185,12 @@ pagx bounds --xpath "/pagx/Layer[2]" input.pagx           # by position
 
 Output: `x=<left> y=<top> width=<w> height=<h>` per element.
 
-### 3. Apply Alignment Checks
+### 3. Diagnose and Fix Alignment
 
-**Visual center** — content that should be centered on a `W × H` canvas:
-```
-center_x = bounds_x + bounds_width / 2   → should ≈ W / 2
-center_y = bounds_y + bounds_height / 2   → should ≈ H / 2
-delta_x  = W / 2 - center_x              → apply to Layer x
-delta_y  = H / 2 - center_y              → apply to Layer y
-```
-The visual center often differs from Layer `x`/`y` when content is asymmetric (e.g., an
-icon with a tail extending to one side). Always compute from bounds, not from coordinates.
+Apply the diagnostic formulas and CLI tools described in `design-patterns.md` §Alignment
+Verification. After each fix, re-render and re-inspect until no visible issues remain.
 
-**Spacing consistency** — sibling elements that should be evenly spaced:
-```
-gap_i = next_i.bounds_start - (prev_i.bounds_start + prev_i.bounds_size)
-```
-All gaps should be equal (tolerance ±2px). If one gap differs, adjust the outlier element's
-position, not all others.
-
-**Containment** — inner content must fit within an outer shape:
-```
-inner.x ≥ outer.x + padding
-inner.y ≥ outer.y + padding
-inner.x + inner.width  ≤ outer.x + outer.width  - padding
-inner.y + inner.height ≤ outer.y + outer.height - padding
-```
-If padding is uneven, the inner element appears off-center within the outer.
-
-**Related-element alignment** — parts that logically belong together should share a visual
-axis. For example:
-- A label and its icon should share the same vertical center (`center_y` equal ±1px)
-- Stacked sub-parts (e.g., icon above label, header above body) should share `center_x`
-- An indicator dot should be horizontally centered under its corresponding tab label
-
-For each pair, compute both center coordinates from bounds and compare.
-
-### 4. Fix and Re-verify
-
-For every misalignment found:
-
-1. **Compute the correction** — calculate the exact delta from the bounds measurements
-2. **Apply to coordinates** — adjust Layer `x`/`y` or element `position`/`center`
-3. **Re-render** — `pagx render` to produce a new screenshot
-4. **Re-inspect the screenshot** — read the image and confirm the fix visually
-5. **Re-measure if needed** — run `pagx bounds` again if the visual check is ambiguous
-
-**Do not batch fixes blindly** — after applying corrections, always re-render and re-read
-the screenshot. One fix can shift other elements (e.g., centering a parent shifts all children).
-
-Repeat this loop until no visible issues remain.
-
-### 5. Structural Checks
+### 4. Structural Checks
 
 After alignment is correct, verify structural integrity:
 
@@ -247,7 +201,7 @@ After alignment is correct, verify structural integrity:
 - **Path complexity**: A single Path with >15 curve segments is fragile. Consider
   decomposing into simpler primitives (Rectangle, Ellipse).
 
-### 6. Text Measurement
+### 5. Text Measurement
 
 Use `pagx font info` for precise font metrics before positioning text:
 ```bash
