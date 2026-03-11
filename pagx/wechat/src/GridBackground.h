@@ -19,6 +19,7 @@
 #pragma once
 
 #include "tgfx/layers/Layer.h"
+#include "tgfx/core/Color.h"
 
 namespace pagx {
 
@@ -38,5 +39,7 @@ class GridBackgroundLayer : public tgfx::Layer {
 };
 
 void DrawBackground(tgfx::Canvas* canvas, int width, int height, float density);
+
+void DrawSolidBackground(tgfx::Canvas* canvas, int width, int height, const tgfx::Color& color);
 
 }  // namespace pagx

@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GridBackground.h"
+#include "tgfx/core/Canvas.h"
+#include "tgfx/core/Paint.h"
 #include "tgfx/layers/LayerRecorder.h"
 
 namespace pagx {
@@ -60,6 +62,13 @@ void GridBackgroundLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
 void DrawBackground(tgfx::Canvas* canvas, int width, int height, float density) {
   auto layer = GridBackgroundLayer::Make(width, height, density);
   layer->draw(canvas);
+}
+
+void DrawSolidBackground(tgfx::Canvas* canvas, int width, int height, const tgfx::Color& color) {
+  tgfx::Paint paint = {};
+  paint.setColor(color);
+  canvas->drawRect(tgfx::Rect::MakeWH(static_cast<float>(width), static_cast<float>(height)),
+                   paint);
 }
 
 }  // namespace pagx

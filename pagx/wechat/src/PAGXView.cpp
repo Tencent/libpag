@@ -173,6 +173,9 @@ void PAGXView::buildLayers() {
   hasRenderedFirstFrame = false;
   pagxWidth = document->width;
   pagxHeight = document->height;
+  backgroundVisible = document->backgroundVisible;
+  auto bg = document->backgroundColor;
+  backgroundTGFXColor = {bg.red, bg.green, bg.blue, bg.alpha * document->backgroundAlpha};
   displayList.root()->removeChildren();
   displayList.root()->addChild(contentLayer);
   applyCenteringTransform();
@@ -288,7 +291,11 @@ bool PAGXView::draw() {
     auto canvas = surface->getCanvas();
     canvas->clear();
 
-    DrawBackground(canvas, _width, _height, 1.0f);
+    if (backgroundVisible) {
+      DrawSolidBackground(canvas, _width, _height, backgroundTGFXColor);
+    } else {
+      DrawBackground(canvas, _width, _height, 1.0f);
+    }
 
     displayList.render(surface.get(), false);
 

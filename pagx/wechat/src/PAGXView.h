@@ -20,6 +20,7 @@
 
 #include <deque>
 #include <emscripten/bind.h>
+#include "tgfx/core/Color.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/layers/DisplayList.h"
 #include "pagx/PAGXDocument.h"
@@ -164,6 +165,10 @@ class PAGXView {
   int _width = 0;
   int _height = 0;
   TextLayout textLayout = {};
+
+  // Background state from the PAGX document
+  bool backgroundVisible = false;
+  tgfx::Color backgroundTGFXColor = tgfx::Color::FromRGBA(245, 245, 245);
 
   // Performance monitoring
   struct FrameRecord {
