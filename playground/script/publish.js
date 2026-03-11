@@ -246,14 +246,38 @@ function getCliVersion() {
 }
 
 /**
+ * Update PAGX_MIN version in the source cli.md to match cli/npm/package.json version.
+ */
+function updateSkillCliVersion(cliVersion) {
+  if (!cliVersion) {
+    return;
+  }
+  const cliMdPath = path.join(SKILLS_DIR, 'pagx', 'references', 'cli.md');
+  if (!fs.existsSync(cliMdPath)) {
+    return;
+  }
+  try {
+    let content = fs.readFileSync(cliMdPath, 'utf-8');
+    const updated = content.replace(/PAGX_MIN="[\d.]+"/, `PAGX_MIN="${cliVersion}"`);
+    if (updated !== content) {
+      fs.writeFileSync(cliMdPath, updated, 'utf-8');
+      console.log(`  Updated: ${cliMdPath} (PAGX_MIN="${cliVersion}")`);
+    }
+  } catch (error) {
+    console.warn(`  Warning: Failed to update ${cliMdPath}: ${error.message}`);
+  }
+}
+
+/**
  * Publish skills as static files, zip archives, and documentation pages.
  */
 function publishSkills(outputDir, names) {
   const skillsOutputDir = path.join(outputDir, 'skills');
   let skillsChanged = false;
 
-  // Read CLI version once before the loop to avoid redundant file reads
-  const cliVersion = getCliVersion();
+  // Update PAGX_MIN in source cli.md before comparing, so the source stays in sync
+  // with cli/npm/package.json and dirsEqual caching works correctly.
+  updateSkillCliVersion(getCliVersion());
 
   for (const name of names) {
     const skillSrcDir = path.join(SKILLS_DIR, name);
@@ -277,19 +301,6 @@ function publishSkills(outputDir, names) {
       fs.rmSync(skillDestDir, { recursive: true });
     }
     copyDir(skillSrcDir, skillDestDir);
-
-    // Update PAGX_MIN version in cli.md to match cli/npm/package.json version
-    const cliMdPath = path.join(skillDestDir, 'references', 'cli.md');
-    if (cliVersion && fs.existsSync(cliMdPath)) {
-      try {
-        let cliMdContent = fs.readFileSync(cliMdPath, 'utf-8');
-        cliMdContent = cliMdContent.replace(/PAGX_MIN="[\d.]+"/, `PAGX_MIN="${cliVersion}"`);
-        fs.writeFileSync(cliMdPath, cliMdContent, 'utf-8');
-        console.log(`  Updated: ${cliMdPath} (PAGX_MIN="${cliVersion}")`);
-      } catch (error) {
-        console.warn(`  Warning: Failed to update ${cliMdPath}: ${error.message}`);
-      }
-    }
 
     fs.mkdirSync(skillsOutputDir, { recursive: true });
     if (fs.existsSync(zipPath)) {
