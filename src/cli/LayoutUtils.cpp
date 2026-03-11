@@ -24,7 +24,7 @@
 
 namespace pagx::cli {
 
-std::vector<Layer*> SelectLayers(const PAGXDocument* document, const std::string& inputFile,
+std::vector<Layer*> SelectLayers(PAGXDocument* document, const std::string& inputFile,
                                  const std::vector<std::string>& ids, const std::string& xpath,
                                  const std::string& commandName) {
   std::vector<Layer*> result = {};
@@ -61,9 +61,8 @@ std::vector<Layer*> SelectLayers(const PAGXDocument* document, const std::string
       return {};
     }
     for (auto* matchedLayer : xpathLayers) {
-      auto* layer = const_cast<Layer*>(matchedLayer);
-      if (seen.insert(layer).second) {
-        result.push_back(layer);
+      if (seen.insert(matchedLayer).second) {
+        result.push_back(matchedLayer);
       }
     }
   }

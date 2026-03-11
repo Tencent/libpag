@@ -41,7 +41,7 @@ struct LayerInfo {
  * Returns a deduplicated list of matching Layers. Prints errors to stderr and returns an empty
  * vector on failure.
  */
-std::vector<Layer*> SelectLayers(const PAGXDocument* document, const std::string& inputFile,
+std::vector<Layer*> SelectLayers(PAGXDocument* document, const std::string& inputFile,
                                  const std::vector<std::string>& ids, const std::string& xpath,
                                  const std::string& commandName);
 
