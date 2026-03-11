@@ -53,8 +53,10 @@ namespace pagx {
 
 class SVGBuilder {
  public:
-  explicit SVGBuilder(int indentSpaces) : _indentSpaces(indentSpaces) {
+  explicit SVGBuilder(int indentSpaces, size_t reserveCapacity = 4096)
+      : _indentSpaces(indentSpaces) {
     _tagStack.reserve(32);
+    _buffer.reserve(reserveCapacity);
   }
 
   void appendDeclaration() {
@@ -66,6 +68,16 @@ class SVGBuilder {
     _buffer += "<";
     _buffer += tag;
     _tagStack.push_back(tag);
+  }
+
+  void addAttribute(const char* name, const char* value) {
+    if (value && value[0] != '\0') {
+      _buffer += " ";
+      _buffer += name;
+      _buffer += "=\"";
+      _buffer += value;
+      _buffer += "\"";
+    }
   }
 
   void addAttribute(const char* name, const std::string& value) {
@@ -322,9 +334,22 @@ static std::string matrixToSVGTransform(const Matrix& matrix) {
   // [a c e]   [scaleX skewX  transX]
   // [b d f] = [skewY  scaleY transY]
   // [0 0 1]   [0      0      1     ]
-  return "matrix(" + FloatToString(matrix.a) + "," + FloatToString(matrix.b) + "," +
-         FloatToString(matrix.c) + "," + FloatToString(matrix.d) + "," +
-         FloatToString(matrix.tx) + "," + FloatToString(matrix.ty) + ")";
+  std::string result;
+  result.reserve(80);
+  result += "matrix(";
+  result += FloatToString(matrix.a);
+  result += ',';
+  result += FloatToString(matrix.b);
+  result += ',';
+  result += FloatToString(matrix.c);
+  result += ',';
+  result += FloatToString(matrix.d);
+  result += ',';
+  result += FloatToString(matrix.tx);
+  result += ',';
+  result += FloatToString(matrix.ty);
+  result += ')';
+  return result;
 }
 
 //==============================================================================
@@ -351,6 +376,21 @@ static void writeGradientStops(SVGBuilder& svg, const std::vector<ColorStop*>& s
   }
 }
 
+static void finishGradientDef(SVGBuilder& defs, const Matrix& matrix,
+                              const std::vector<ColorStop*>& stops) {
+  defs.addAttribute("gradientUnits", "userSpaceOnUse");
+  if (!matrix.isIdentity()) {
+    defs.addAttribute("gradientTransform", matrixToSVGTransform(matrix));
+  }
+  if (stops.empty()) {
+    defs.closeElementSelfClosing();
+  } else {
+    defs.closeElementStart();
+    writeGradientStops(defs, stops);
+    defs.closeElement();
+  }
+}
+
 static void writeColorSourceDef(SVGBuilder& defs, const ColorSource* source, const std::string& id,
                                 SVGExportContext& /*ctx*/) {
   switch (source->nodeType()) {
@@ -362,17 +402,7 @@ static void writeColorSourceDef(SVGBuilder& defs, const ColorSource* source, con
       defs.addAttribute("y1", grad->startPoint.y);
       defs.addAttribute("x2", grad->endPoint.x);
       defs.addAttribute("y2", grad->endPoint.y);
-      defs.addAttribute("gradientUnits", std::string("userSpaceOnUse"));
-      if (!grad->matrix.isIdentity()) {
-        defs.addAttribute("gradientTransform", matrixToSVGTransform(grad->matrix));
-      }
-      if (grad->colorStops.empty()) {
-        defs.closeElementSelfClosing();
-      } else {
-        defs.closeElementStart();
-        writeGradientStops(defs, grad->colorStops);
-        defs.closeElement();
-      }
+      finishGradientDef(defs, grad->matrix, grad->colorStops);
       break;
     }
     case NodeType::RadialGradient: {
@@ -382,17 +412,7 @@ static void writeColorSourceDef(SVGBuilder& defs, const ColorSource* source, con
       defs.addAttribute("cx", grad->center.x);
       defs.addAttribute("cy", grad->center.y);
       defs.addAttribute("r", grad->radius);
-      defs.addAttribute("gradientUnits", std::string("userSpaceOnUse"));
-      if (!grad->matrix.isIdentity()) {
-        defs.addAttribute("gradientTransform", matrixToSVGTransform(grad->matrix));
-      }
-      if (grad->colorStops.empty()) {
-        defs.closeElementSelfClosing();
-      } else {
-        defs.closeElementStart();
-        writeGradientStops(defs, grad->colorStops);
-        defs.closeElement();
-      }
+      finishGradientDef(defs, grad->matrix, grad->colorStops);
       break;
     }
     default:
@@ -499,7 +519,7 @@ static std::string getColorSourceRef(const ColorSource* source, float* outAlpha,
           obbMatrix.tx = (M.tx - X) / W;
           obbMatrix.ty = (M.ty - Y) / H;
 
-          defs.addAttribute("patternContentUnits", std::string("objectBoundingBox"));
+          defs.addAttribute("patternContentUnits", "objectBoundingBox");
           if (needsTiling) {
             float tileW = static_cast<float>(imgW) * obbMatrix.a;
             float tileH = static_cast<float>(imgH) * obbMatrix.d;
@@ -514,9 +534,9 @@ static std::string getColorSourceRef(const ColorSource* source, float* outAlpha,
           defs.addAttribute("href", href);
           defs.addAttribute("transform", matrixToSVGTransform(obbMatrix));
         } else {
-          defs.addAttribute("patternUnits", std::string("userSpaceOnUse"));
-          defs.addAttribute("width", std::string("100%"));
-          defs.addAttribute("height", std::string("100%"));
+          defs.addAttribute("patternUnits", "userSpaceOnUse");
+          defs.addAttribute("width", "100%");
+          defs.addAttribute("height", "100%");
           defs.closeElementStart();
           defs.openElement("image");
           defs.addAttribute("href", href);
@@ -540,6 +560,48 @@ static std::string getColorSourceRef(const ColorSource* source, float* outAlpha,
 // Write SVG filter defs
 //==============================================================================
 
+static void writeShadowBlurAndOffset(SVGBuilder& defs, float blurX, float blurY, float offsetX,
+                                     float offsetY, const std::string& blurResult,
+                                     const std::string& offsetResult) {
+  defs.openElement("feGaussianBlur");
+  defs.addAttribute("in", "SourceAlpha");
+  std::string stdDev = FloatToString(blurX);
+  if (blurX != blurY) {
+    stdDev += " " + FloatToString(blurY);
+  }
+  defs.addAttribute("stdDeviation", stdDev);
+  defs.addAttribute("result", blurResult);
+  defs.closeElementSelfClosing();
+
+  defs.openElement("feOffset");
+  defs.addAttribute("in", blurResult);
+  defs.addAttributeIfNonZero("dx", offsetX);
+  defs.addAttributeIfNonZero("dy", offsetY);
+  defs.addAttribute("result", offsetResult);
+  defs.closeElementSelfClosing();
+}
+
+static void writeShadowColorMatrix(SVGBuilder& defs, const Color& c, const std::string& inResult,
+                                   const std::string& outResult) {
+  defs.openElement("feColorMatrix");
+  defs.addAttribute("in", inResult);
+  defs.addAttribute("type", "matrix");
+  std::string values;
+  values.reserve(80);
+  values += "0 0 0 0 ";
+  values += FloatToString(c.red);
+  values += " 0 0 0 0 ";
+  values += FloatToString(c.green);
+  values += " 0 0 0 0 ";
+  values += FloatToString(c.blue);
+  values += " 0 0 0 ";
+  values += FloatToString(c.alpha);
+  values += " 0";
+  defs.addAttribute("values", values);
+  defs.addAttribute("result", outResult);
+  defs.closeElementSelfClosing();
+}
+
 static std::string writeFilterDefs(SVGBuilder& defs, const std::vector<LayerFilter*>& filters,
                                    SVGExportContext& ctx) {
   if (filters.empty()) {
@@ -549,11 +611,11 @@ static std::string writeFilterDefs(SVGBuilder& defs, const std::vector<LayerFilt
   std::string filterId = ctx.generateId("filter");
   defs.openElement("filter");
   defs.addAttribute("id", filterId);
-  defs.addAttribute("x", std::string("-50%"));
-  defs.addAttribute("y", std::string("-50%"));
-  defs.addAttribute("width", std::string("200%"));
-  defs.addAttribute("height", std::string("200%"));
-  defs.addAttribute("color-interpolation-filters", std::string("sRGB"));
+  defs.addAttribute("x", "-50%");
+  defs.addAttribute("y", "-50%");
+  defs.addAttribute("width", "200%");
+  defs.addAttribute("height", "200%");
+  defs.addAttribute("color-interpolation-filters", "sRGB");
   defs.closeElementStart();
 
   int shadowIndex = 0;
@@ -566,7 +628,7 @@ static std::string writeFilterDefs(SVGBuilder& defs, const std::vector<LayerFilt
       case NodeType::BlurFilter: {
         auto blur = static_cast<const BlurFilter*>(filter);
         defs.openElement("feGaussianBlur");
-        defs.addAttribute("in", std::string("SourceGraphic"));
+        defs.addAttribute("in", "SourceGraphic");
         std::string stdDev = FloatToString(blur->blurX);
         if (blur->blurX != blur->blurY) {
           stdDev += " " + FloatToString(blur->blurY);
@@ -578,39 +640,11 @@ static std::string writeFilterDefs(SVGBuilder& defs, const std::vector<LayerFilt
       case NodeType::DropShadowFilter: {
         auto shadow = static_cast<const DropShadowFilter*>(filter);
         std::string idx = std::to_string(shadowIndex++);
-        std::string blurResult = "shadowBlur" + idx;
         std::string offsetResult = "shadowOffset" + idx;
         std::string shadowResult = "shadow" + idx;
-
-        defs.openElement("feGaussianBlur");
-        defs.addAttribute("in", std::string("SourceAlpha"));
-        std::string stdDev = FloatToString(shadow->blurX);
-        if (shadow->blurX != shadow->blurY) {
-          stdDev += " " + FloatToString(shadow->blurY);
-        }
-        defs.addAttribute("stdDeviation", stdDev);
-        defs.addAttribute("result", blurResult);
-        defs.closeElementSelfClosing();
-
-        defs.openElement("feOffset");
-        defs.addAttribute("in", blurResult);
-        defs.addAttributeIfNonZero("dx", shadow->offsetX);
-        defs.addAttributeIfNonZero("dy", shadow->offsetY);
-        defs.addAttribute("result", offsetResult);
-        defs.closeElementSelfClosing();
-
-        defs.openElement("feColorMatrix");
-        defs.addAttribute("in", offsetResult);
-        defs.addAttribute("type", std::string("matrix"));
-        auto& c = shadow->color;
-        std::string matrixValues = "0 0 0 0 " + FloatToString(c.red) + " " +
-                                   "0 0 0 0 " + FloatToString(c.green) + " " +
-                                   "0 0 0 0 " + FloatToString(c.blue) + " " +
-                                   "0 0 0 " + FloatToString(c.alpha) + " 0";
-        defs.addAttribute("values", matrixValues);
-        defs.addAttribute("result", shadowResult);
-        defs.closeElementSelfClosing();
-
+        writeShadowBlurAndOffset(defs, shadow->blurX, shadow->blurY, shadow->offsetX,
+                                 shadow->offsetY, "shadowBlur" + idx, offsetResult);
+        writeShadowColorMatrix(defs, shadow->color, offsetResult, shadowResult);
         dropShadowResults.push_back(shadowResult);
         if (!shadow->shadowOnly) {
           needSourceGraphic = true;
@@ -620,50 +654,22 @@ static std::string writeFilterDefs(SVGBuilder& defs, const std::vector<LayerFilt
       case NodeType::InnerShadowFilter: {
         auto shadow = static_cast<const InnerShadowFilter*>(filter);
         std::string idx = std::to_string(shadowIndex++);
-        std::string blurResult = "innerBlur" + idx;
         std::string offsetResult = "innerOffset" + idx;
         std::string compositeResult = "innerComposite" + idx;
         std::string shadowResult = "innerShadow" + idx;
-
-        defs.openElement("feGaussianBlur");
-        defs.addAttribute("in", std::string("SourceAlpha"));
-        std::string stdDev = FloatToString(shadow->blurX);
-        if (shadow->blurX != shadow->blurY) {
-          stdDev += " " + FloatToString(shadow->blurY);
-        }
-        defs.addAttribute("stdDeviation", stdDev);
-        defs.addAttribute("result", blurResult);
-        defs.closeElementSelfClosing();
-
-        defs.openElement("feOffset");
-        defs.addAttribute("in", blurResult);
-        defs.addAttributeIfNonZero("dx", shadow->offsetX);
-        defs.addAttributeIfNonZero("dy", shadow->offsetY);
-        defs.addAttribute("result", offsetResult);
-        defs.closeElementSelfClosing();
+        writeShadowBlurAndOffset(defs, shadow->blurX, shadow->blurY, shadow->offsetX,
+                                 shadow->offsetY, "innerBlur" + idx, offsetResult);
 
         defs.openElement("feComposite");
-        defs.addAttribute("in", std::string("SourceAlpha"));
+        defs.addAttribute("in", "SourceAlpha");
         defs.addAttribute("in2", offsetResult);
-        defs.addAttribute("operator", std::string("arithmetic"));
-        defs.addAttribute("k2", std::string("-1"));
-        defs.addAttribute("k3", std::string("1"));
+        defs.addAttribute("operator", "arithmetic");
+        defs.addAttribute("k2", "-1");
+        defs.addAttribute("k3", "1");
         defs.addAttribute("result", compositeResult);
         defs.closeElementSelfClosing();
 
-        defs.openElement("feColorMatrix");
-        defs.addAttribute("in", compositeResult);
-        defs.addAttribute("type", std::string("matrix"));
-        auto& c = shadow->color;
-        std::string matrixValues =
-            "0 0 0 0 " + FloatToString(c.red) + " " +
-            "0 0 0 0 " + FloatToString(c.green) + " " +
-            "0 0 0 0 " + FloatToString(c.blue) + " " +
-            "0 0 0 " + FloatToString(c.alpha) + " 0";
-        defs.addAttribute("values", matrixValues);
-        defs.addAttribute("result", shadowResult);
-        defs.closeElementSelfClosing();
-
+        writeShadowColorMatrix(defs, shadow->color, compositeResult, shadowResult);
         innerShadowResults.push_back(shadowResult);
         if (!shadow->shadowOnly) {
           needSourceGraphic = true;
@@ -688,7 +694,7 @@ static std::string writeFilterDefs(SVGBuilder& defs, const std::vector<LayerFilt
       }
       if (needSourceGraphic) {
         defs.openElement("feMergeNode");
-        defs.addAttribute("in", std::string("SourceGraphic"));
+        defs.addAttribute("in", "SourceGraphic");
         defs.closeElementSelfClosing();
       }
       for (const auto& result : innerShadowResults) {
@@ -718,6 +724,9 @@ static FillStrokeInfo collectFillStroke(const std::vector<Element*>& contents) {
     } else if (element->nodeType() == NodeType::TextBox && !info.textBox) {
       info.textBox = static_cast<const TextBox*>(element);
     }
+    if (info.fill && info.stroke && info.textBox) {
+      break;
+    }
   }
   return info;
 }
@@ -737,22 +746,30 @@ static void writeMaskLayerContent(SVGBuilder& defs, const Layer* layer, SVGExpor
   }
 }
 
-static std::string writeMaskDef(SVGBuilder& defs, const Layer* maskLayer, SVGExportContext& ctx,
-                                SVGBuilder& nestedDefs) {
-  std::string maskId = maskLayer->id.empty() ? ctx.generateId("mask") : maskLayer->id;
-  // Collect paint defs (gradients, patterns) into a separate builder so they don't
-  // get interleaved with the mask element when defs and nestedDefs are the same builder.
+using MaskContentWriter = void (*)(SVGBuilder&, const Layer*, SVGExportContext&, SVGBuilder&);
+
+static std::string writeMaskOrClipDef(SVGBuilder& defs, const Layer* maskLayer,
+                                      SVGExportContext& ctx, SVGBuilder& nestedDefs,
+                                      const char* tag, const char* idPrefix,
+                                      MaskContentWriter contentWriter) {
+  std::string defId = maskLayer->id.empty() ? ctx.generateId(idPrefix) : maskLayer->id;
   SVGBuilder paintDefs(2);
-  defs.openElement("mask");
-  defs.addAttribute("id", maskId);
+  defs.openElement(tag);
+  defs.addAttribute("id", defId);
   defs.closeElementStart();
-  writeMaskLayerContent(defs, maskLayer, ctx, paintDefs);
+  contentWriter(defs, maskLayer, ctx, paintDefs);
   defs.closeElement();
   std::string paintDefsStr = paintDefs.release();
   if (!paintDefsStr.empty()) {
     nestedDefs.addRawContent(paintDefsStr);
   }
-  return maskId;
+  return defId;
+}
+
+static std::string writeMaskDef(SVGBuilder& defs, const Layer* maskLayer, SVGExportContext& ctx,
+                                SVGBuilder& nestedDefs) {
+  return writeMaskOrClipDef(defs, maskLayer, ctx, nestedDefs, "mask", "mask",
+                            writeMaskLayerContent);
 }
 
 static std::string buildLayerTransform(const Layer* layer) {
@@ -788,27 +805,22 @@ static void writeClipPathLayerContent(SVGBuilder& svg, const Layer* layer, SVGEx
   }
 }
 
+static void writeClipPathLayerContentAdapter(SVGBuilder& svg, const Layer* layer,
+                                              SVGExportContext& ctx, SVGBuilder& defs) {
+  writeClipPathLayerContent(svg, layer, ctx, defs);
+}
+
 static std::string writeClipPathDef(SVGBuilder& defs, const Layer* maskLayer,
                                     SVGExportContext& ctx, SVGBuilder& nestedDefs) {
-  std::string clipId = maskLayer->id.empty() ? ctx.generateId("clip") : maskLayer->id;
-  SVGBuilder paintDefs(2);
-  defs.openElement("clipPath");
-  defs.addAttribute("id", clipId);
-  defs.closeElementStart();
-  writeClipPathLayerContent(defs, maskLayer, ctx, paintDefs);
-  defs.closeElement();
-  std::string paintDefsStr = paintDefs.release();
-  if (!paintDefsStr.empty()) {
-    nestedDefs.addRawContent(paintDefsStr);
-  }
-  return clipId;
+  return writeMaskOrClipDef(defs, maskLayer, ctx, nestedDefs, "clipPath", "clip",
+                            writeClipPathLayerContentAdapter);
 }
 
 static void applyFillAttributes(SVGBuilder& svg, const Fill* fill, SVGExportContext& ctx,
                                 SVGBuilder& defs, const Rect& shapeBounds = {},
                                 std::string* p3Style = nullptr) {
   if (!fill) {
-    svg.addAttribute("fill", std::string("none"));
+    svg.addAttribute("fill", "none");
     return;
   }
   float alpha = 1.0f;
@@ -819,7 +831,7 @@ static void applyFillAttributes(SVGBuilder& svg, const Fill* fill, SVGExportCont
     svg.addAttribute("fill-opacity", FloatToString(effectiveAlpha));
   }
   if (fill->fillRule == FillRule::EvenOdd) {
-    svg.addAttribute("fill-rule", std::string("evenodd"));
+    svg.addAttribute("fill-rule", "evenodd");
   }
   if (p3Style) {
     appendP3FillStyle(*p3Style, fill->color, fillStr, effectiveAlpha);
@@ -843,14 +855,14 @@ static void applyStrokeAttributes(SVGBuilder& svg, const Stroke* stroke, SVGExpo
     svg.addAttribute("stroke-width", FloatToString(stroke->width));
   }
   if (stroke->cap == LineCap::Round) {
-    svg.addAttribute("stroke-linecap", std::string("round"));
+    svg.addAttribute("stroke-linecap", "round");
   } else if (stroke->cap == LineCap::Square) {
-    svg.addAttribute("stroke-linecap", std::string("square"));
+    svg.addAttribute("stroke-linecap", "square");
   }
   if (stroke->join == LineJoin::Round) {
-    svg.addAttribute("stroke-linejoin", std::string("round"));
+    svg.addAttribute("stroke-linejoin", "round");
   } else if (stroke->join == LineJoin::Bevel) {
-    svg.addAttribute("stroke-linejoin", std::string("bevel"));
+    svg.addAttribute("stroke-linejoin", "bevel");
   }
   if (stroke->join == LineJoin::Miter && stroke->miterLimit != 4.0f) {
     svg.addAttribute("stroke-miterlimit", FloatToString(stroke->miterLimit));
@@ -1014,18 +1026,18 @@ static void writeText(SVGBuilder& svg, const Text* text, const FillStrokeInfo& f
     svg.addAttribute("letter-spacing", FloatToString(text->letterSpacing));
   }
   if (anchor == TextAnchor::Center) {
-    svg.addAttribute("text-anchor", std::string("middle"));
+    svg.addAttribute("text-anchor", "middle");
   } else if (anchor == TextAnchor::End) {
-    svg.addAttribute("text-anchor", std::string("end"));
+    svg.addAttribute("text-anchor", "end");
   }
   if (!text->fontStyle.empty()) {
     bool hasBold = text->fontStyle.find("Bold") != std::string::npos;
     bool hasItalic = text->fontStyle.find("Italic") != std::string::npos;
     if (hasBold) {
-      svg.addAttribute("font-weight", std::string("bold"));
+      svg.addAttribute("font-weight", "bold");
     }
     if (hasItalic) {
-      svg.addAttribute("font-style", std::string("italic"));
+      svg.addAttribute("font-style", "italic");
     }
   }
   std::string p3Style;
@@ -1175,11 +1187,10 @@ std::string SVGExporter::ToSVG(const PAGXDocument& doc, const Options& options) 
   }
 
   svg.openElement("svg");
-  svg.addAttribute("xmlns", std::string("http://www.w3.org/2000/svg"));
+  svg.addAttribute("xmlns", "http://www.w3.org/2000/svg");
   svg.addAttribute("width", doc.width);
   svg.addAttribute("height", doc.height);
-  std::string viewBox = FloatToString(0) + " " + FloatToString(0) + " " +
-                        FloatToString(doc.width) + " " + FloatToString(doc.height);
+  std::string viewBox = "0 0 " + FloatToString(doc.width) + " " + FloatToString(doc.height);
   svg.addAttribute("viewBox", viewBox);
   svg.closeElementStart();
 
