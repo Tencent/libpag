@@ -21,6 +21,7 @@
 #include <GLES3/gl31.h>
 #include <tgfx/gpu/opengl/GLDevice.h>
 #include "GridBackground.h"
+#include "utils/StringParser.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
@@ -160,39 +161,6 @@ bool PAGXView::loadFileData(const std::string& filePath, const val& fileData) {
     return false;
   }
   return document->loadFileData(filePath, std::move(data));
-}
-
-static int parseHexDigit(char ch) {
-  if (ch >= '0' && ch <= '9') {
-    return ch - '0';
-  }
-  if (ch >= 'a' && ch <= 'f') {
-    return ch - 'a' + 10;
-  }
-  if (ch >= 'A' && ch <= 'F') {
-    return ch - 'A' + 10;
-  }
-  return -1;
-}
-
-static tgfx::Color ParseHexColor(const std::string& hex) {
-  if (hex.empty() || hex[0] != '#') {
-    return tgfx::Color::FromRGBA(245, 245, 245);
-  }
-  if (hex.size() == 7) {
-    int r = parseHexDigit(hex[1]) * 16 + parseHexDigit(hex[2]);
-    int g = parseHexDigit(hex[3]) * 16 + parseHexDigit(hex[4]);
-    int b = parseHexDigit(hex[5]) * 16 + parseHexDigit(hex[6]);
-    return tgfx::Color::FromRGBA(r, g, b);
-  }
-  if (hex.size() == 9) {
-    int r = parseHexDigit(hex[1]) * 16 + parseHexDigit(hex[2]);
-    int g = parseHexDigit(hex[3]) * 16 + parseHexDigit(hex[4]);
-    int b = parseHexDigit(hex[5]) * 16 + parseHexDigit(hex[6]);
-    int a = parseHexDigit(hex[7]) * 16 + parseHexDigit(hex[8]);
-    return tgfx::Color::FromRGBA(r, g, b, a);
-  }
-  return tgfx::Color::FromRGBA(245, 245, 245);
 }
 
 void PAGXView::buildLayers() {
