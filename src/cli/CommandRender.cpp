@@ -388,9 +388,23 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
     auto canvas = surface->getCanvas();
     canvas->scale(options.scale, options.scale);
     canvas->translate(-offsetX, -offsetY);
-    auto gm = targetTgfxLayer->getGlobalMatrix();
-    auto globalMatrix2D = tgfx::Matrix::MakeAll(gm.values[0], gm.values[4], gm.values[12],
-                                                gm.values[1], gm.values[5], gm.values[13]);
+    // Compute the global matrix by walking up the parent chain using public APIs.
+    // PAGX files are 2D-only, so a simple matrix3D concatenation is sufficient.
+    tgfx::Matrix3D globalMatrix3D = {};
+    auto layer = targetTgfxLayer.get();
+    while (layer->parent()) {
+      auto layerMatrix = layer->matrix3D();
+      auto sr = layer->scrollRect();
+      if (!sr.isEmpty()) {
+        layerMatrix.preTranslate(-sr.left, -sr.top, 0);
+      }
+      globalMatrix3D.postConcat(layerMatrix);
+      layer = layer->parent();
+    }
+    auto globalMatrix2D =
+        tgfx::Matrix::MakeAll(globalMatrix3D.getRowColumn(0, 0), globalMatrix3D.getRowColumn(0, 1),
+                              globalMatrix3D.getRowColumn(0, 3), globalMatrix3D.getRowColumn(1, 0),
+                              globalMatrix3D.getRowColumn(1, 1), globalMatrix3D.getRowColumn(1, 3));
     canvas->concat(globalMatrix2D);
     targetTgfxLayer->draw(canvas);
   } else {
