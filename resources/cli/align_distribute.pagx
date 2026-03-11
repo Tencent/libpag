@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test file for align and distribute commands.
+     Canvas: 500x500
+
+     Layer "a": 50x40 rect, x=10 y=0   → global bounds: [10,0,60,40]
+     Layer "b": 50x40 rect, x=100 y=100 → global bounds: [100,100,150,140]
+     Layer "c": 50x40 rect, x=250 y=300 → global bounds: [250,300,300,340]
+     Layer "group": y=200, contains nested child "d"
+       Layer "d": 50x40 rect, x=30 relative → global bounds: [30,200,80,240]
+-->
+<pagx version="1.0" width="500" height="500">
+  <Layer id="a" name="Layer A" x="10">
+    <Rectangle center="25,20" size="50,40"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+  <Layer id="b" name="Layer B" x="100" y="100">
+    <Rectangle center="25,20" size="50,40"/>
+    <Fill color="#00FF00"/>
+  </Layer>
+  <Layer id="c" name="Layer C" x="250" y="300">
+    <Rectangle center="25,20" size="50,40"/>
+    <Fill color="#0000FF"/>
+  </Layer>
+  <Layer id="group" name="Container" y="200">
+    <Layer id="d" name="Nested Layer" x="30">
+      <Rectangle center="25,20" size="50,40"/>
+      <Fill color="#FFFF00"/>
+    </Layer>
+  </Layer>
+</pagx>

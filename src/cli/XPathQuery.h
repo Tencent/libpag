@@ -34,6 +34,13 @@ std::vector<const Layer*> EvaluateXPath(xmlDocPtr xmlDoc, const std::string& xpa
                                         const PAGXDocument* document);
 
 /**
+ * Non-const overload that returns mutable Layer pointers. Delegates to the const overload and
+ * centralizes the const_cast, since PAGXDocument::layers stores non-const Layer pointers.
+ */
+std::vector<Layer*> EvaluateXPath(xmlDocPtr xmlDoc, const std::string& xpathExpr,
+                                  PAGXDocument* document);
+
+/**
  * Evaluates an XPath expression and returns exactly one matching Layer. Prints an error and returns
  * nullptr if zero or more than one Layer is matched.
  */

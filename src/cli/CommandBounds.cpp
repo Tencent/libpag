@@ -22,6 +22,7 @@
 #include <iostream>
 #include <string>
 #include "cli/CliUtils.h"
+#include "cli/LayoutUtils.h"
 #include "cli/XPathQuery.h"
 #include "pagx/PAGXImporter.h"
 #include "renderer/LayerBuilder.h"
@@ -102,16 +103,6 @@ static void PrintBoundsJson(const std::string& label, float left, float top, flo
                             float height) {
   std::cout << "{\"label\": \"" << EscapeJson(label) << "\", \"x\": " << left << ", \"y\": " << top
             << ", \"width\": " << width << ", \"height\": " << height << "}\n";
-}
-
-static std::string GetLayerLabel(const Layer* layer) {
-  if (!layer->id.empty()) {
-    return layer->id;
-  }
-  if (!layer->name.empty()) {
-    return layer->name;
-  }
-  return "(unnamed)";
 }
 
 static void PrintLayerBounds(const Layer* pagxLayer, tgfx::Layer* tgfxLayer,

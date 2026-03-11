@@ -131,6 +131,17 @@ std::vector<const Layer*> EvaluateXPath(xmlDocPtr xmlDoc, const std::string& xpa
   return results;
 }
 
+std::vector<Layer*> EvaluateXPath(xmlDocPtr xmlDoc, const std::string& xpathExpr,
+                                  PAGXDocument* document) {
+  auto constLayers = EvaluateXPath(xmlDoc, xpathExpr, static_cast<const PAGXDocument*>(document));
+  std::vector<Layer*> results = {};
+  results.reserve(constLayers.size());
+  for (auto* layer : constLayers) {
+    results.push_back(const_cast<Layer*>(layer));
+  }
+  return results;
+}
+
 const Layer* EvaluateSingleXPath(xmlDocPtr xmlDoc, const std::string& xpathExpr,
                                  const PAGXDocument* document, const std::string& commandName) {
   auto layers = EvaluateXPath(xmlDoc, xpathExpr, document);
