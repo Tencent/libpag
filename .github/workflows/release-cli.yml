@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: 'Publish to npm and create GitHub release'
+        description: 'Publish CLI to npm registry'
         required: false
         default: false
         type: boolean
@@ -149,8 +149,7 @@ jobs:
     needs: [build-macos, build-linux, build-windows]
     if: ${{ inputs.publish }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    permissions: {}
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
@@ -186,23 +185,3 @@ jobs:
         run: npm publish ./npm-package --access=public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: cli/v${{ steps.version.outputs.value }}
-          name: pagx CLI v${{ steps.version.outputs.value }}
-          body: |
-            ## pagx CLI v${{ steps.version.outputs.value }}
-
-            ### Install
-
-            ```bash
-            npm install -g @libpag/pagx
-            ```
-
-            Or download the binary for your platform from the assets below.
-          files: |
-            pagx-darwin/pagx-universal
-            pagx-linux/pagx
-            pagx-win32/pagx.exe
