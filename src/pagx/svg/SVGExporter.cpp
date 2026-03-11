@@ -209,19 +209,6 @@ class SVGBuilder {
 };
 
 //==============================================================================
-// SVGExportContext - tracks defs and generates unique IDs
-//==============================================================================
-
-struct SVGExportContext {
-  int nextDefId = 0;
-  std::string defsContent = {};
-
-  std::string generateId(const std::string& prefix) {
-    return prefix + std::to_string(nextDefId++);
-  }
-};
-
-//==============================================================================
 // Utility types and static helpers
 //==============================================================================
 
@@ -399,13 +386,17 @@ static std::string buildLayerTransform(const Layer* layer) {
 
 class SVGWriter {
  public:
-  SVGWriter(SVGExportContext& ctx, SVGBuilder& defs) : _ctx(ctx), _defs(defs) {}
+  explicit SVGWriter(SVGBuilder& defs) : _defs(defs) {}
 
   void writeLayer(SVGBuilder& out, const Layer* layer);
 
  private:
-  SVGExportContext& _ctx;
+  int _nextDefId = 0;
   SVGBuilder& _defs;
+
+  std::string generateId(const std::string& prefix) {
+    return prefix + std::to_string(_nextDefId++);
+  }
 
   // Layer / element writing
   void writeLayerContents(SVGBuilder& out, const Layer* layer,
@@ -533,7 +524,7 @@ std::string SVGWriter::getColorSourceRef(const ColorSource* source, float* outAl
   }
   if (source->nodeType() == NodeType::LinearGradient ||
       source->nodeType() == NodeType::RadialGradient) {
-    std::string defId = _ctx.generateId("grad");
+    std::string defId = generateId("grad");
     writeColorSourceDef(source, defId);
     if (outAlpha) {
       *outAlpha = 1.0f;
@@ -551,7 +542,7 @@ std::string SVGWriter::getColorSourceRef(const ColorSource* source, float* outAl
         href = pattern->image->filePath;
       }
       if (!href.empty()) {
-        std::string defId = _ctx.generateId("pattern");
+        std::string defId = generateId("pattern");
         bool needsTiling = (pattern->tileModeX == TileMode::Repeat ||
                             pattern->tileModeY == TileMode::Repeat);
         int imgW = 0;
@@ -674,7 +665,7 @@ std::string SVGWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters)
     return {};
   }
 
-  std::string filterId = _ctx.generateId("filter");
+  std::string filterId = generateId("filter");
   _defs.openElement("filter");
   _defs.addAttribute("id", filterId);
   _defs.addAttribute("x", "-50%");
@@ -782,12 +773,12 @@ std::string SVGWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters)
 
 std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, const char* tag,
                                           const char* idPrefix, ContentWriter writer) {
-  std::string defId = maskLayer->id.empty() ? _ctx.generateId(idPrefix) : maskLayer->id;
+  std::string defId = maskLayer->id.empty() ? generateId(idPrefix) : maskLayer->id;
   SVGBuilder paintDefs(2);
   _defs.openElement(tag);
   _defs.addAttribute("id", defId);
   _defs.closeElementStart();
-  SVGWriter nestedWriter(_ctx, paintDefs);
+  SVGWriter nestedWriter(paintDefs);
   (nestedWriter.*writer)(_defs, maskLayer);
   _defs.closeElement();
   std::string paintDefsStr = paintDefs.release();
@@ -1186,10 +1177,9 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
 //==============================================================================
 
 std::string SVGExporter::ToSVG(const PAGXDocument& doc, const Options& options) {
-  SVGExportContext ctx = {};
   SVGBuilder svg(options.indent);
   SVGBuilder defs(options.indent);
-  SVGWriter writer(ctx, defs);
+  SVGWriter writer(defs);
 
   if (options.xmlDeclaration) {
     svg.appendDeclaration();
