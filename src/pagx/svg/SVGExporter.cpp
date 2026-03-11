@@ -937,14 +937,15 @@ static void writeText(SVGBuilder& svg, const Text* text, const FillStrokeInfo& f
 }
 
 //==============================================================================
-// Write a group of elements (shape + fill + stroke pattern from PAGX)
+// Write a list of elements (shared by Group and Layer)
 //==============================================================================
 
-static void writeGroupContents(SVGBuilder& svg, const Group* group, SVGExportContext& ctx,
-                               SVGBuilder& defs, const std::string& transform = "") {
-  auto fs = collectFillStroke(group->elements);
+static void writeElements(SVGBuilder& svg, const std::vector<Element*>& elements,
+                          SVGExportContext& ctx, SVGBuilder& defs,
+                          const std::string& transform = "") {
+  auto fs = collectFillStroke(elements);
 
-  for (const auto* element : group->elements) {
+  for (const auto* element : elements) {
     auto type = element->nodeType();
     if (type == NodeType::Fill || type == NodeType::Stroke || type == NodeType::TextBox) {
       continue;
@@ -963,7 +964,7 @@ static void writeGroupContents(SVGBuilder& svg, const Group* group, SVGExportCon
         writeText(svg, static_cast<const Text*>(element), fs, ctx, defs, transform);
         break;
       case NodeType::Group:
-        writeGroupContents(svg, static_cast<const Group*>(element), ctx, defs, transform);
+        writeElements(svg, static_cast<const Group*>(element)->elements, ctx, defs, transform);
         break;
       default:
         break;
@@ -977,33 +978,7 @@ static void writeGroupContents(SVGBuilder& svg, const Group* group, SVGExportCon
 
 static void writeLayerContents(SVGBuilder& svg, const Layer* layer, SVGExportContext& ctx,
                                SVGBuilder& defs, const std::string& transform) {
-  auto fs = collectFillStroke(layer->contents);
-
-  for (const auto* element : layer->contents) {
-    auto type = element->nodeType();
-    if (type == NodeType::Fill || type == NodeType::Stroke || type == NodeType::TextBox) {
-      continue;
-    }
-    switch (type) {
-      case NodeType::Rectangle:
-        writeRectangle(svg, static_cast<const Rectangle*>(element), fs, ctx, defs, transform);
-        break;
-      case NodeType::Ellipse:
-        writeEllipse(svg, static_cast<const Ellipse*>(element), fs, ctx, defs, transform);
-        break;
-      case NodeType::Path:
-        writePath(svg, static_cast<const Path*>(element), fs, ctx, defs, transform);
-        break;
-      case NodeType::Text:
-        writeText(svg, static_cast<const Text*>(element), fs, ctx, defs, transform);
-        break;
-      case NodeType::Group:
-        writeGroupContents(svg, static_cast<const Group*>(element), ctx, defs, transform);
-        break;
-      default:
-        break;
-    }
-  }
+  writeElements(svg, layer->contents, ctx, defs, transform);
 }
 
 static void writeLayer(SVGBuilder& svg, const Layer* layer, SVGExportContext& ctx,
