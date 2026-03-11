@@ -186,23 +186,3 @@ jobs:
         run: npm publish ./npm-package --access=public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: cli/v${{ steps.version.outputs.value }}
-          name: pagx CLI v${{ steps.version.outputs.value }}
-          body: |
-            ## pagx CLI v${{ steps.version.outputs.value }}
-
-            ### Install
-
-            ```bash
-            npm install -g @libpag/pagx
-            ```
-
-            Or download the binary for your platform from the assets below.
-          files: |
-            pagx-darwin/pagx-universal
-            pagx-linux/pagx
-            pagx-win32/pagx.exe

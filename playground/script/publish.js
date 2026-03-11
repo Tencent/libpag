@@ -62,6 +62,7 @@ const SPEC_FILE_ZH = path.join(SPEC_DIR, 'pagx_spec.zh_CN.md');
 const PAGES_DIR = path.join(PLAYGROUND_DIR, 'pages');
 const SPEC_TEMPLATE_FILE = path.join(PAGES_DIR, 'spec', 'template.html');
 const PACKAGE_FILE = path.join(PLAYGROUND_DIR, 'package.json');
+const CLI_PACKAGE_FILE = path.join(LIBPAG_DIR, 'cli', 'npm', 'package.json');
 
 // Base URL for the spec site
 const BASE_URL = 'https://pag.io/pagx';
@@ -228,6 +229,14 @@ function runCommand(command, cwd, timeout = 600000) {
 // ============================================================================
 
 /**
+ * Read CLI version from cli/npm/package.json.
+ */
+function getCliVersion() {
+  const pkg = JSON.parse(fs.readFileSync(CLI_PACKAGE_FILE, 'utf-8'));
+  return pkg.version;
+}
+
+/**
  * Publish skills as static files, zip archives, and documentation pages.
  */
 function publishSkills(outputDir, names) {
@@ -256,6 +265,16 @@ function publishSkills(outputDir, names) {
       fs.rmSync(skillDestDir, { recursive: true });
     }
     copyDir(skillSrcDir, skillDestDir);
+
+    // Update PAGX_MIN version in cli.md to match cli/npm/package.json version
+    const cliMdPath = path.join(skillDestDir, 'references', 'cli.md');
+    if (fs.existsSync(cliMdPath)) {
+      const cliVersion = getCliVersion();
+      let cliMdContent = fs.readFileSync(cliMdPath, 'utf-8');
+      cliMdContent = cliMdContent.replace(/PAGX_MIN="[\d.]+"/, `PAGX_MIN="${cliVersion}"`);
+      fs.writeFileSync(cliMdPath, cliMdContent, 'utf-8');
+      console.log(`  Updated: ${cliMdPath} (PAGX_MIN="${cliVersion}")`);
+    }
 
     fs.mkdirSync(skillsOutputDir, { recursive: true });
     if (fs.existsSync(zipPath)) {
