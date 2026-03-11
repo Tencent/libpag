@@ -35,6 +35,22 @@ namespace pagx {
 using pag::DegreesToRadians;
 
 static constexpr float DEFAULT_FONT_SIZE = 16.0f;
+
+static BlendMode SVGBlendModeFromString(const std::string& str) {
+  static const std::unordered_map<std::string, BlendMode> map = {
+      {"normal", BlendMode::Normal},         {"multiply", BlendMode::Multiply},
+      {"screen", BlendMode::Screen},         {"overlay", BlendMode::Overlay},
+      {"darken", BlendMode::Darken},         {"lighten", BlendMode::Lighten},
+      {"color-dodge", BlendMode::ColorDodge}, {"color-burn", BlendMode::ColorBurn},
+      {"hard-light", BlendMode::HardLight},  {"soft-light", BlendMode::SoftLight},
+      {"difference", BlendMode::Difference}, {"exclusion", BlendMode::Exclusion},
+      {"hue", BlendMode::Hue},               {"saturation", BlendMode::Saturation},
+      {"color", BlendMode::Color},           {"luminosity", BlendMode::Luminosity},
+  };
+  auto it = map.find(str);
+  return it != map.end() ? it->second : BlendMode::Normal;
+}
+
 std::shared_ptr<PAGXDocument> SVGImporter::Parse(const std::string& filePath,
                                                  const Options& options) {
   SVGParserContext parser(options);
@@ -385,6 +401,11 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
   std::string opacity = getAttribute(element, "opacity");
   if (!opacity.empty()) {
     layer->alpha = strtof(opacity.c_str(), nullptr);
+  }
+
+  std::string mixBlendMode = getAttribute(element, "mix-blend-mode");
+  if (!mixBlendMode.empty()) {
+    layer->blendMode = SVGBlendModeFromString(mixBlendMode);
   }
 
   // Handle mask attribute.

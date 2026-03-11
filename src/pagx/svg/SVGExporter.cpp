@@ -17,10 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/SVGExporter.h"
-#include <cmath>
-#include <cstdint>
 #include <cstdio>
-#include <cstring>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -222,6 +219,27 @@ struct FillStrokeInfo {
   const Stroke* stroke = nullptr;
   const TextBox* textBox = nullptr;
 };
+
+static std::string BlendModeToSVGString(BlendMode mode) {
+  switch (mode) {
+    case BlendMode::Multiply:   return "multiply";
+    case BlendMode::Screen:     return "screen";
+    case BlendMode::Overlay:    return "overlay";
+    case BlendMode::Darken:     return "darken";
+    case BlendMode::Lighten:    return "lighten";
+    case BlendMode::ColorDodge: return "color-dodge";
+    case BlendMode::ColorBurn:  return "color-burn";
+    case BlendMode::HardLight:  return "hard-light";
+    case BlendMode::SoftLight:  return "soft-light";
+    case BlendMode::Difference: return "difference";
+    case BlendMode::Exclusion:  return "exclusion";
+    case BlendMode::Hue:        return "hue";
+    case BlendMode::Saturation: return "saturation";
+    case BlendMode::Color:      return "color";
+    case BlendMode::Luminosity: return "luminosity";
+    default:                    return "";
+  }
+}
 
 static std::string colorToSVGString(const Color& color);
 static std::string colorToSVGStringWithAlpha(const Color& color, float* outAlpha);
@@ -1008,7 +1026,8 @@ static void writeLayer(SVGBuilder& svg, const Layer* layer, SVGExportContext& ct
 
   bool needsGroup = !layer->matrix.isIdentity() || layer->alpha < 1.0f ||
                     !layer->id.empty() || !layer->filters.empty() || layer->mask != nullptr ||
-                    layer->x != 0.0f || layer->y != 0.0f || !layer->customData.empty();
+                    layer->x != 0.0f || layer->y != 0.0f || !layer->customData.empty() ||
+                    layer->blendMode != BlendMode::Normal;
 
   if (!needsGroup) {
     writeLayerContents(svg, layer, ctx, defs);
@@ -1035,6 +1054,13 @@ static void writeLayer(SVGBuilder& svg, const Layer* layer, SVGExportContext& ct
 
   if (layer->alpha < 1.0f) {
     svg.addAttribute("opacity", FloatToString(layer->alpha));
+  }
+
+  if (layer->blendMode != BlendMode::Normal) {
+    auto blendStr = BlendModeToSVGString(layer->blendMode);
+    if (!blendStr.empty()) {
+      svg.addAttribute("style", "mix-blend-mode:" + blendStr);
+    }
   }
 
   // Handle filters.
