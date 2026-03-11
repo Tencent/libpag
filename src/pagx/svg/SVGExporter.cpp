@@ -53,8 +53,9 @@ namespace pagx {
 
 class SVGBuilder {
  public:
-  explicit SVGBuilder(int indentSpaces, size_t reserveCapacity = 4096)
-      : _indentSpaces(indentSpaces) {
+  explicit SVGBuilder(int indentSpaces, int initialIndentLevel = 0,
+                      size_t reserveCapacity = 4096)
+      : _indentLevel(initialIndentLevel), _indentSpaces(indentSpaces) {
     _tagStack.reserve(32);
     _buffer.reserve(reserveCapacity);
   }
@@ -1178,7 +1179,7 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
 
 std::string SVGExporter::ToSVG(const PAGXDocument& doc, const Options& options) {
   SVGBuilder svg(options.indent);
-  SVGBuilder defs(options.indent);
+  SVGBuilder defs(options.indent, 2);
   SVGWriter writer(defs);
 
   if (options.xmlDeclaration) {
@@ -1193,7 +1194,7 @@ std::string SVGExporter::ToSVG(const PAGXDocument& doc, const Options& options) 
   svg.addAttribute("viewBox", viewBox);
   svg.closeElementStart();
 
-  SVGBuilder bodyContent(options.indent);
+  SVGBuilder bodyContent(options.indent, 1);
   for (const auto* layer : doc.layers) {
     writer.writeLayer(bodyContent, layer);
   }
