@@ -404,14 +404,18 @@ static std::string writeFilterDefs(SVGBuilder& defs, const std::vector<LayerFilt
   std::string filterId = ctx.generateId("filter");
   defs.openElement("filter");
   defs.addAttribute("id", filterId);
-  // Extend filter region for effects like blur and shadows.
   defs.addAttribute("x", std::string("-50%"));
   defs.addAttribute("y", std::string("-50%"));
   defs.addAttribute("width", std::string("200%"));
   defs.addAttribute("height", std::string("200%"));
+  defs.addAttribute("color-interpolation-filters", std::string("sRGB"));
   defs.closeElementStart();
 
-  bool hasDropShadow = false;
+  int shadowIndex = 0;
+  std::vector<std::string> dropShadowResults;
+  std::vector<std::string> innerShadowResults;
+  bool needSourceGraphic = false;
+
   for (const auto* filter : filters) {
     switch (filter->nodeType()) {
       case NodeType::BlurFilter: {
@@ -428,7 +432,11 @@ static std::string writeFilterDefs(SVGBuilder& defs, const std::vector<LayerFilt
       }
       case NodeType::DropShadowFilter: {
         auto shadow = static_cast<const DropShadowFilter*>(filter);
-        // Standard SVG drop shadow: feGaussianBlur(SourceAlpha) → feOffset → feColorMatrix → feMerge
+        std::string idx = std::to_string(shadowIndex++);
+        std::string blurResult = "shadowBlur" + idx;
+        std::string offsetResult = "shadowOffset" + idx;
+        std::string shadowResult = "shadow" + idx;
+
         defs.openElement("feGaussianBlur");
         defs.addAttribute("in", std::string("SourceAlpha"));
         std::string stdDev = FloatToString(shadow->blurX);
@@ -436,48 +444,42 @@ static std::string writeFilterDefs(SVGBuilder& defs, const std::vector<LayerFilt
           stdDev += " " + FloatToString(shadow->blurY);
         }
         defs.addAttribute("stdDeviation", stdDev);
-        defs.addAttribute("result", std::string("shadowBlur"));
+        defs.addAttribute("result", blurResult);
         defs.closeElementSelfClosing();
 
         defs.openElement("feOffset");
-        defs.addAttribute("in", std::string("shadowBlur"));
+        defs.addAttribute("in", blurResult);
         defs.addAttributeIfNonZero("dx", shadow->offsetX);
         defs.addAttributeIfNonZero("dy", shadow->offsetY);
-        defs.addAttribute("result", std::string("shadowOffset"));
+        defs.addAttribute("result", offsetResult);
         defs.closeElementSelfClosing();
 
-        defs.openElement("feFlood");
-        defs.addAttribute("flood-color", colorToSVGString(shadow->color));
-        if (shadow->color.alpha < 1.0f) {
-          defs.addAttribute("flood-opacity", FloatToString(shadow->color.alpha));
-        }
-        defs.addAttribute("result", std::string("shadowColor"));
+        defs.openElement("feColorMatrix");
+        defs.addAttribute("in", offsetResult);
+        defs.addAttribute("type", std::string("matrix"));
+        auto& c = shadow->color;
+        std::string matrixValues = "0 0 0 0 " + FloatToString(c.red) + " " +
+                                   "0 0 0 0 " + FloatToString(c.green) + " " +
+                                   "0 0 0 0 " + FloatToString(c.blue) + " " +
+                                   "0 0 0 " + FloatToString(c.alpha) + " 0";
+        defs.addAttribute("values", matrixValues);
+        defs.addAttribute("result", shadowResult);
         defs.closeElementSelfClosing();
 
-        defs.openElement("feComposite");
-        defs.addAttribute("in", std::string("shadowColor"));
-        defs.addAttribute("in2", std::string("shadowOffset"));
-        defs.addAttribute("operator", std::string("in"));
-        defs.addAttribute("result", std::string("shadow"));
-        defs.closeElementSelfClosing();
-
-        hasDropShadow = true;
+        dropShadowResults.push_back(shadowResult);
         if (!shadow->shadowOnly) {
-          defs.openElement("feMerge");
-          defs.closeElementStart();
-          defs.openElement("feMergeNode");
-          defs.addAttribute("in", std::string("shadow"));
-          defs.closeElementSelfClosing();
-          defs.openElement("feMergeNode");
-          defs.addAttribute("in", std::string("SourceGraphic"));
-          defs.closeElementSelfClosing();
-          defs.closeElement();
+          needSourceGraphic = true;
         }
         break;
       }
       case NodeType::InnerShadowFilter: {
         auto shadow = static_cast<const InnerShadowFilter*>(filter);
-        // Inner shadow pattern: feGaussianBlur(SourceAlpha) → feOffset → feComposite(arithmetic)
+        std::string idx = std::to_string(shadowIndex++);
+        std::string blurResult = "innerBlur" + idx;
+        std::string offsetResult = "innerOffset" + idx;
+        std::string compositeResult = "innerComposite" + idx;
+        std::string shadowResult = "innerShadow" + idx;
+
         defs.openElement("feGaussianBlur");
         defs.addAttribute("in", std::string("SourceAlpha"));
         std::string stdDev = FloatToString(shadow->blurX);
@@ -485,27 +487,27 @@ static std::string writeFilterDefs(SVGBuilder& defs, const std::vector<LayerFilt
           stdDev += " " + FloatToString(shadow->blurY);
         }
         defs.addAttribute("stdDeviation", stdDev);
-        defs.addAttribute("result", std::string("innerBlur"));
+        defs.addAttribute("result", blurResult);
         defs.closeElementSelfClosing();
 
         defs.openElement("feOffset");
-        defs.addAttribute("in", std::string("innerBlur"));
+        defs.addAttribute("in", blurResult);
         defs.addAttributeIfNonZero("dx", shadow->offsetX);
         defs.addAttributeIfNonZero("dy", shadow->offsetY);
-        defs.addAttribute("result", std::string("innerOffset"));
+        defs.addAttribute("result", offsetResult);
         defs.closeElementSelfClosing();
 
         defs.openElement("feComposite");
         defs.addAttribute("in", std::string("SourceAlpha"));
-        defs.addAttribute("in2", std::string("innerOffset"));
+        defs.addAttribute("in2", offsetResult);
         defs.addAttribute("operator", std::string("arithmetic"));
         defs.addAttribute("k2", std::string("-1"));
         defs.addAttribute("k3", std::string("1"));
-        defs.addAttribute("result", std::string("innerShadow"));
+        defs.addAttribute("result", compositeResult);
         defs.closeElementSelfClosing();
 
         defs.openElement("feColorMatrix");
-        defs.addAttribute("in", std::string("innerShadow"));
+        defs.addAttribute("in", compositeResult);
         defs.addAttribute("type", std::string("matrix"));
         auto& c = shadow->color;
         std::string matrixValues =
@@ -514,18 +516,12 @@ static std::string writeFilterDefs(SVGBuilder& defs, const std::vector<LayerFilt
             "0 0 0 0 " + FloatToString(c.blue) + " " +
             "0 0 0 " + FloatToString(c.alpha) + " 0";
         defs.addAttribute("values", matrixValues);
+        defs.addAttribute("result", shadowResult);
         defs.closeElementSelfClosing();
 
+        innerShadowResults.push_back(shadowResult);
         if (!shadow->shadowOnly) {
-          defs.openElement("feMerge");
-          defs.closeElementStart();
-          defs.openElement("feMergeNode");
-          defs.addAttribute("in", std::string("SourceGraphic"));
-          defs.closeElementSelfClosing();
-          defs.openElement("feMergeNode");
-          defs.addAttribute("in", std::string("innerShadow"));
-          defs.closeElementSelfClosing();
-          defs.closeElement();
+          needSourceGraphic = true;
         }
         break;
       }
@@ -534,8 +530,30 @@ static std::string writeFilterDefs(SVGBuilder& defs, const std::vector<LayerFilt
     }
   }
 
-  // If we only had shadow filters without merge, and none wrote a merge, the filter stands as-is.
-  (void)hasDropShadow;
+  bool hasShadows = !dropShadowResults.empty() || !innerShadowResults.empty();
+  if (hasShadows) {
+    bool multipleShadows = (dropShadowResults.size() + innerShadowResults.size()) > 1;
+    if (needSourceGraphic || multipleShadows) {
+      defs.openElement("feMerge");
+      defs.closeElementStart();
+      for (const auto& result : dropShadowResults) {
+        defs.openElement("feMergeNode");
+        defs.addAttribute("in", result);
+        defs.closeElementSelfClosing();
+      }
+      if (needSourceGraphic) {
+        defs.openElement("feMergeNode");
+        defs.addAttribute("in", std::string("SourceGraphic"));
+        defs.closeElementSelfClosing();
+      }
+      for (const auto& result : innerShadowResults) {
+        defs.openElement("feMergeNode");
+        defs.addAttribute("in", result);
+        defs.closeElementSelfClosing();
+      }
+      defs.closeElement();
+    }
+  }
 
   defs.closeElement();  // </filter>
   return filterId;
