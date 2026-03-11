@@ -682,11 +682,18 @@ static void writeMaskLayerContent(SVGBuilder& defs, const Layer* layer, SVGExpor
 static std::string writeMaskDef(SVGBuilder& defs, const Layer* maskLayer, SVGExportContext& ctx,
                                 SVGBuilder& nestedDefs) {
   std::string maskId = maskLayer->id.empty() ? ctx.generateId("mask") : maskLayer->id;
+  // Collect paint defs (gradients, patterns) into a separate builder so they don't
+  // get interleaved with the mask element when defs and nestedDefs are the same builder.
+  SVGBuilder paintDefs(2);
   defs.openElement("mask");
   defs.addAttribute("id", maskId);
   defs.closeElementStart();
-  writeMaskLayerContent(defs, maskLayer, ctx, nestedDefs);
+  writeMaskLayerContent(defs, maskLayer, ctx, paintDefs);
   defs.closeElement();
+  std::string paintDefsStr = paintDefs.release();
+  if (!paintDefsStr.empty()) {
+    nestedDefs.addRawContent(paintDefsStr);
+  }
   return maskId;
 }
 
@@ -726,11 +733,16 @@ static void writeClipPathLayerContent(SVGBuilder& svg, const Layer* layer, SVGEx
 static std::string writeClipPathDef(SVGBuilder& defs, const Layer* maskLayer,
                                     SVGExportContext& ctx, SVGBuilder& nestedDefs) {
   std::string clipId = maskLayer->id.empty() ? ctx.generateId("clip") : maskLayer->id;
+  SVGBuilder paintDefs(2);
   defs.openElement("clipPath");
   defs.addAttribute("id", clipId);
   defs.closeElementStart();
-  writeClipPathLayerContent(defs, maskLayer, ctx, nestedDefs);
+  writeClipPathLayerContent(defs, maskLayer, ctx, paintDefs);
   defs.closeElement();
+  std::string paintDefsStr = paintDefs.release();
+  if (!paintDefsStr.empty()) {
+    nestedDefs.addRawContent(paintDefsStr);
+  }
   return clipId;
 }
 
