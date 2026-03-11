@@ -11,7 +11,7 @@ Read before starting generation:
 | Reference | Content |
 |-----------|---------|
 | `spec-essentials.md` | Format specification — node types, processing model, attribute rules |
-| `design-patterns.md` | Structure decisions, text layout, alignment verification, practical pitfall patterns |
+| `design-patterns.md` | Structure decisions, text layout, practical pitfall patterns |
 
 Read these as needed:
 
@@ -126,12 +126,20 @@ This isolates defects: if something breaks, it was the last thing added.
   </Group>
   ```
 
-**Mandatory measurement and alignment after each block** — do not rely on coordinate estimation. After
-completing each block (or group of related blocks), immediately run `pagx render` and
-`pagx bounds` to verify alignment. Coordinates that "look correct" in source often produce
-visible misalignment in the rendered output due to asymmetric shapes, stroke width offsets,
-or text baseline differences. When misalignment is found, use `pagx align` / `pagx distribute`
-to fix automatically — do not compute coordinate deltas manually. See `cli.md` for usage.
+**Mandatory alignment and spacing after each block** — when in doubt, align. Over-aligning
+is harmless; subtle misalignment is not.
+
+After completing each block (or group of related blocks), actively scan for **every** pair or
+group of Layers that are visually close — shared edges, similar positions, nearly equal gaps.
+Do not limit this to obvious cases; any two values within a few pixels of each other should
+be unified to the exact same value.
+
+Tool selection:
+- **2+ Layers sharing an edge or center** → `pagx align` (see `cli.md`)
+- **3+ Layers in a row or column** → `pagx distribute` (see `cli.md`)
+- **Container padding, two-element gaps, cross-container padding consistency** → measure
+  with `pagx bounds`, then adjust coordinates to make left = right, top = bottom, and
+  matching gaps across similar containers
 
 ### Step 4: Localize Coordinates
 
@@ -140,10 +148,9 @@ Layer `x`/`y` carries the block offset; internal coordinates start from `0,0`. S
 
 ### Step 5: Verify and Refine
 
-After each render, **read the rendered screenshot first** — visual inspection is the primary
-check. Identify any visible issues (misalignment, uneven spacing, clipping, mismatched
-proportions), then follow the **Verification and Correction Loop** at the end of this
-document to measure and fix. Re-render and re-inspect until correct.
+After each render, follow the **Verification and Correction Loop** at the end of this
+document — run `pagx bounds` first to detect misalignment by numbers, fix with CLI tools,
+then visually confirm. Do not skip bounds measurement even if the screenshot looks correct.
 
 After verification passes, continue to `optimize-guide.md` for optimization review.
 
@@ -151,46 +158,65 @@ After verification passes, continue to `optimize-guide.md` for optimization revi
 
 ## Verification and Correction Loop
 
-After **every render**, follow this loop until the output matches the design intent. Do not
-skip steps or assume coordinates are correct — always measure.
+After **every render**, follow this loop until the output matches the design intent.
 
-### 1. Render and Inspect
+### 1. Measure All Layers
 
-```bash
-pagx render input.pagx            # output alongside the source file
-pagx render --scale 2 input.pagx  # 2x resolution for detail inspection
-pagx render --id "myLayer" input.pagx  # render only the target Layer in isolation
-```
-
-**Read the rendered image** and identify all visible issues. Common problems:
-
-- Element visibly off-center or lopsided
-- Uneven spacing between sibling elements (e.g., icons in a row)
-- Related parts misaligned (e.g., a label not centered in its button, an icon not
-  centered on its background circle)
-- Text clipped or overflowing its container
-- Elements overlapping when they should not, or gaps where they should connect
-
-List every issue before proceeding to measurement.
-
-### 2. Measure with `pagx bounds`
-
-For each issue identified above, measure the relevant elements:
+Run `pagx bounds` unconditionally — do not skip this step even if the screenshot looks correct:
 
 ```bash
-pagx bounds input.pagx                                   # all layers
-pagx bounds --id "myButton" input.pagx                    # by id
-pagx bounds --xpath "/pagx/Layer[2]" input.pagx           # by position
+pagx bounds input.pagx
 ```
 
-Output: `x=<left> y=<top> width=<w> height=<h>` per element.
+This outputs `x=<left> y=<top> width=<w> height=<h>` for every layer. Use `--id` or `--xpath`
+for targeted measurement when needed (see `cli.md`).
 
-### 3. Diagnose and Fix Alignment
+### 2. Check Spacing and Padding by Numbers
 
-Apply the diagnostic formulas and CLI tools described in `design-patterns.md` §Alignment
-Verification. After each fix, re-render and re-inspect until no visible issues remain.
+Alignment issues (shared edges, centers) should already be fixed by `pagx align` /
+`pagx distribute` during generation. This step focuses on spacing values that CLI tools
+cannot enforce — verify them from bounds data.
 
-### 4. Structural Checks
+**Container padding** — compute all four sides and compare:
+```
+padding_left   = inner.x - outer.x
+padding_right  = (outer.x + outer.width)  - (inner.x + inner.width)
+padding_top    = inner.y - outer.y
+padding_bottom = (outer.y + outer.height) - (inner.y + inner.height)
+```
+Left should equal right; top should equal bottom. Prefer all four equal when the design
+allows.
+
+**Element gaps** — measure actual gaps between adjacent elements:
+```
+gap = B.bounds_start - (A.bounds_start + A.bounds_size)
+```
+All gaps in the same visual context should use the same value. Any two gaps within a few
+pixels of each other should be unified to one value.
+
+**Visual center** — content that should be centered on a `W × H` canvas:
+```
+center_x = bounds_x + bounds_width / 2   → should ≈ W / 2
+center_y = bounds_y + bounds_height / 2   → should ≈ H / 2
+```
+Compute from bounds, not from Layer `x`/`y` — asymmetric content shifts the visual center.
+
+### 3. Fix Issues
+
+- **Alignment or distribution off** → re-run `pagx align` / `pagx distribute`
+- **Uneven padding or gaps** → adjust Layer `x`/`y` to equalize values
+
+### 4. Re-render and Visually Confirm
+
+After applying fixes, re-render and **read the screenshot** to confirm:
+
+- No new issues introduced (one fix can shift other elements)
+- Overall visual balance looks correct
+- Text is not clipped or overflowing
+
+If any issues remain, return to step 1. Repeat until clean.
+
+### 5. Structural Checks
 
 After alignment is correct, verify structural integrity:
 
@@ -201,7 +227,7 @@ After alignment is correct, verify structural integrity:
 - **Path complexity**: A single Path with >15 curve segments is fragile. Consider
   decomposing into simpler primitives (Rectangle, Ellipse).
 
-### 5. Text Measurement
+### 6. Text Measurement
 
 Use `pagx font info` for precise font metrics before positioning text:
 ```bash

@@ -60,8 +60,8 @@ std::vector<Layer*> SelectLayers(const PAGXDocument* document, const std::string
       std::cerr << "pagx " << commandName << ": --xpath matched no Layer nodes\n";
       return {};
     }
-    for (auto* constLayer : xpathLayers) {
-      auto* layer = const_cast<Layer*>(constLayer);
+    for (auto* matchedLayer : xpathLayers) {
+      auto* layer = const_cast<Layer*>(matchedLayer);
       if (seen.insert(layer).second) {
         result.push_back(layer);
       }

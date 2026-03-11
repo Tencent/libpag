@@ -10,14 +10,14 @@ Read before starting optimization:
 | Reference | Content |
 |-----------|---------|
 | `spec-essentials.md` | Format specification — node types, processing model, attribute rules |
-| `design-patterns.md` | Structure decisions, text layout, alignment verification, practical pitfall patterns |
+| `design-patterns.md` | Structure decisions, text layout, practical pitfall patterns |
 
 Read as needed:
 
 | Reference | Content |
 |-----------|---------|
 | `attributes.md` | Attribute defaults, enumerations, required attributes |
-| `cli.md` | CLI tool usage — `optimize`, `render`, `validate`, `bounds`, `align`, `distribute` commands |
+| `cli.md` | CLI tool usage — `optimize`, `render`, `validate`, `bounds` commands |
 
 ---
 
@@ -70,7 +70,7 @@ Check for issues that automated optimization cannot fix:
   a row) using different structural patterns (Layer vs Group, `x`/`y` vs `position`) that
   should be unified for maintainability.
 
-### Step 3: Final Verification and Alignment Check
+### Step 3: Final Verification
 
 After all optimizations, verify the following:
 
@@ -83,12 +83,8 @@ After all optimizations, verify the following:
 - [ ] `<Resources>` placed after all Layers; all `@id` references resolve
 - [ ] Repeater copies reasonable (~200 single, ~500 nested product)
 - [ ] Visual stacking order preserved (see **Stacking Order** below)
-
-**Alignment and spacing verification** (mandatory before considering optimization complete):
-- [ ] Render and visually inspect: `pagx render output.pagx`
-- [ ] Verify aligned edges/centers and uniform spacing are visually correct
-- [ ] If misalignment detected, diagnose and fix per `design-patterns.md` §Alignment
-  Verification. Re-render and re-inspect after each fix.
+- [ ] Rendered screenshot matches expected design (layout, alignment, consistent spacing)
+  (use the Verification and Correction Loop in `generate-guide.md` for the full methodology)
 
 > **Stacking order caveat**: see §Stacking Order and the All-or-Nothing Rule below.
 
