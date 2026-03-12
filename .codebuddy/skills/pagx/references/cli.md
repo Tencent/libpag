@@ -278,3 +278,28 @@ pagx distribute --id col1 --id col2 --id col3 --id col4 --axis x -o out.pagx inp
 selected (2 Layers have no gap to equalize). Layers are sorted by their current position
 along the chosen axis before distribution. The file is modified in place unless `-o` is
 specified.
+
+---
+
+## pagx export-svg
+
+Export a PAGX file to SVG format. Loads the input via the PAGX importer, converts the
+document to SVG using the SVG exporter, and writes the result. Import warnings are printed
+but do not prevent export.
+
+```bash
+pagx export-svg input.pagx                          # outputs input.svg
+pagx export-svg -o output.svg input.pagx
+pagx export-svg --indent 4 -o output.svg input.pagx
+pagx export-svg --no-xml-declaration -o output.svg input.pagx
+```
+
+| Option | Description |
+|--------|-------------|
+| `-o, --output <path>` | Output SVG file path (default: input path with `.svg` extension) |
+| `--indent <n>` | Indentation spaces (default: 2, valid range: 0–16) |
+| `--no-xml-declaration` | Omit the `<?xml ...?>` declaration |
+
+By default the output file has the same base name as the input with a `.svg` extension
+(e.g., `foo.pagx` → `foo.svg`). Use `-o` to override. On success the command prints
+`pagx export-svg: wrote <path>` and exits 0; on failure it prints an error and exits 1.

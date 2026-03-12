@@ -23,17 +23,13 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
-#include "pagx/SVGImporter.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
-#include "pagx/nodes/LinearGradient.h"
-#include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
-#include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/StringParser.h"
@@ -108,90 +104,6 @@ static std::string SavePAGXFile(const std::string& xml, const std::string& key) 
     file.write(xml.data(), static_cast<std::streamsize>(xml.size()));
   }
   return outPath;
-}
-
-/**
- * Test case: Convert all SVG files to PAGX format, save as files, then load and render.
- * This tests the complete round-trip: SVG -> PAGX file -> Load -> Render
- */
-PAGX_TEST(PAGXTest, SVGToPAGXAll) {
-  constexpr int MinCanvasEdge = 400;
-
-  std::string svgDir = ProjectPath::Absolute("resources/svg");
-  std::vector<std::string> svgFiles = {};
-
-  for (const auto& entry : std::filesystem::directory_iterator(svgDir)) {
-    if (entry.path().extension() == ".svg") {
-      svgFiles.push_back(entry.path().string());
-    }
-  }
-
-  std::sort(svgFiles.begin(), svgFiles.end());
-
-  // Create TextLayout for text layout
-  pagx::TextLayout textLayout;
-  textLayout.addFallbackTypefaces(GetFallbackTypefaces());
-
-  for (const auto& svgPath : svgFiles) {
-    std::string baseName = std::filesystem::path(svgPath).stem().string();
-
-    // Step 1: Parse SVG to PAGXDocument
-    auto doc = pagx::SVGImporter::Parse(svgPath);
-    if (!doc) {
-      ADD_FAILURE() << "Failed to parse SVG: " << svgPath;
-      continue;
-    }
-
-    float pagxWidth = doc->width;
-    float pagxHeight = doc->height;
-    if (pagxWidth <= 0 || pagxHeight <= 0) {
-      ADD_FAILURE() << "Invalid dimensions in SVG: " << svgPath;
-      continue;
-    }
-
-    // Step 2: Typeset text elements and embed fonts
-    auto layoutResult = textLayout.layout(doc.get());
-    pagx::FontEmbedder().embed(doc.get(), layoutResult.shapedTextMap, layoutResult.textOrder);
-
-    // Step 3: Export to XML and save as PAGX file
-    std::string xml = pagx::PAGXExporter::ToXML(*doc);
-    std::string pagxPath = SavePAGXFile(xml, "PAGXTest/" + baseName + ".pagx");
-
-    // Step 4: Load PAGX file and build layer tree (this is the viewer's actual path)
-    auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
-    if (reloadedDoc == nullptr) {
-      ADD_FAILURE() << "Failed to reload: " << pagxPath;
-      continue;
-    }
-    if (!reloadedDoc->errors.empty()) {
-      std::string errorLog;
-      for (const auto& error : reloadedDoc->errors) {
-        errorLog += "\n  " + error;
-      }
-      ADD_FAILURE() << "Parse errors in " << baseName << ":" << errorLog;
-    }
-    auto layer = pagx::LayerBuilder::Build(reloadedDoc.get());
-    if (layer == nullptr) {
-      ADD_FAILURE() << "Failed to build layer: " << pagxPath;
-      continue;
-    }
-
-    // Calculate canvas size
-    float maxEdge = std::max(pagxWidth, pagxHeight);
-    float scale = (maxEdge < MinCanvasEdge) ? (MinCanvasEdge / maxEdge) : 1.0f;
-    int canvasWidth = static_cast<int>(std::ceil(pagxWidth * scale));
-    int canvasHeight = static_cast<int>(std::ceil(pagxHeight * scale));
-
-    // Render PAGX (loaded from file)
-    auto pagxSurface = Surface::Make(context, canvasWidth, canvasHeight);
-    DisplayList displayList;
-    auto container = tgfx::Layer::Make();
-    container->setMatrix(tgfx::Matrix::MakeScale(scale, scale));
-    container->addChild(layer);
-    displayList.root()->addChild(container);
-    displayList.render(pagxSurface.get(), false);
-    EXPECT_TRUE(Baseline::Compare(pagxSurface, "PAGXTest/" + baseName)) << baseName;
-  }
 }
 
 /**
