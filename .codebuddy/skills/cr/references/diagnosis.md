@@ -15,10 +15,13 @@ stop.
 
 ## Analyze
 
-Scan the session for these signals and report findings. Key evidence includes
-user rollbacks of auto-fixes, manual corrections or overrides the user had to
-provide, and steps the AI deviated from. For each finding, state which skill
-file to change and what the change should be.
+Scan the **entire** session from start to finish for these signals and report
+findings. Do not stop after finding the first issue — exhaustively check every
+user message and system notification. Key evidence includes user rollbacks of
+auto-fixes, manual corrections or overrides the user had to provide, steps the
+AI deviated from, and user interventions to unblock a stalled flow (e.g., the
+user asking "why did you stop?" or manually prompting the AI to continue). For
+each finding, state which skill file to change and what the change should be.
 
 ### False positives
 

@@ -264,6 +264,12 @@ Important constraints:
 
 ### After review
 
+**Missing report detection**: if a reviewer's system notification shows
+"completed" but the coordinator has not received a SendMessage report from
+that reviewer, immediately send a follow-up message to the reviewer requesting
+its report. Do not wait or assume the report was lost — the agent may have
+exhausted its turn limit before sending.
+
 Keep all reviewers alive (reused as fixers in Phase 4), close the verifier
 → Phase 3.
 
@@ -370,18 +376,24 @@ Fix rules:
    the reason for skipping.
 ```
 
-Each fixer commits per issue (one commit per fix).
+Each fixer commits per issue (one commit per fix — never combine multiple
+issues into a single commit).
 
 ### Validate
 
 Wait for all fixers. Run build + test.
 
+**Revert scope**: only revert commits produced by fixers in this round. Never
+revert commits unrelated to the current fixes — other users or tools may commit
+concurrently during the fix phase. Identify fixer commits by the commit hashes
+reported by fixers; any other commits on the branch are out of scope.
+
 - Skip if no build/test commands available or doc-only modules.
 - **Pass** → mark issues `fixed` in CR_STATE_FILE → Phase 5.
-- **Fail** → bisect to find the failing commit, revert it, re-validate
-  remaining before blaming others (one bad commit may cause cascading failures).
-  Per failing issue: retry via the original fixer agent with failure
-  details (max 2 retries), or revert and mark `failed`.
+- **Fail** → bisect among fixer commits only to find the failing commit, revert
+  it, re-validate remaining before blaming others (one bad commit may cause
+  cascading failures). Per failing issue: retry via the original fixer agent
+  with failure details (max 2 retries), or revert and mark `failed`.
 
 ---
 

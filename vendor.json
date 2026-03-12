@@ -72,6 +72,34 @@
           "SheenBidi"
         ]
       }
+    },
+    {
+      "name": "libxml2",
+      "cmake": {
+        "targets": [
+          "LibXml2"
+        ],
+        "arguments": [
+          "-DBUILD_SHARED_LIBS=OFF",
+          "-DLIBXML2_WITH_ICONV=OFF",
+          "-DLIBXML2_WITH_ICU=OFF",
+          "-DLIBXML2_WITH_LZMA=OFF",
+          "-DLIBXML2_WITH_ZLIB=OFF",
+          "-DLIBXML2_WITH_PYTHON=OFF",
+          "-DLIBXML2_WITH_PROGRAMS=OFF",
+          "-DLIBXML2_WITH_TESTS=OFF",
+          "-DLIBXML2_WITH_HTTP=OFF"
+        ],
+        "includes": [
+          "${SOURCE_DIR}/include/libxml",
+          "${BUILD_DIR}/libxml"
+        ],
+        "platforms": [
+          "mac",
+          "win",
+          "linux"
+        ]
+      }
     }
   ]
 }

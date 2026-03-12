@@ -23,7 +23,9 @@
 #include <string>
 #include <vector>
 #include "base/PAGTest.h"
+#include "cli/CommandAlign.h"
 #include "cli/CommandBounds.h"
+#include "cli/CommandDistribute.h"
 #include "cli/CommandFont.h"
 #include "cli/CommandFormat.h"
 #include "cli/CommandOptimize.h"
@@ -76,6 +78,20 @@ static bool CompareRenderedImage(const std::string& imagePath, const std::string
   return Baseline::Compare(pixmap, key);
 }
 
+static bool RenderAndCompare(std::vector<std::string> args, const std::string& key) {
+  std::vector<char*> argv = {};
+  argv.reserve(args.size());
+  for (auto& arg : args) {
+    argv.push_back(arg.data());
+  }
+  auto bitmap = pagx::cli::RenderToBitmap(static_cast<int>(argv.size()), argv.data());
+  if (bitmap.isEmpty()) {
+    return false;
+  }
+  Pixmap pixmap(bitmap);
+  return Baseline::Compare(pixmap, key);
+}
+
 static std::string ReadFile(const std::string& path) {
   std::ifstream in(path);
   return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
@@ -83,6 +99,7 @@ static std::string ReadFile(const std::string& path) {
 
 static int CallRun(int (*fn)(int, char*[]), std::vector<std::string> args) {
   std::vector<char*> argv = {};
+  argv.reserve(args.size());
   for (auto& arg : args) {
     argv.push_back(arg.data());
   }
@@ -634,51 +651,73 @@ CLI_TEST(PAGXCliTest, Bounds_MissingFile) {
   EXPECT_NE(ret, 0);
 }
 
+CLI_TEST(PAGXCliTest, Bounds_IdTopLevel) {
+  auto inputPath = TestResourcePath("bounds_layout.pagx");
+  auto ret = CallRun(pagx::cli::RunBounds, {"bounds", "--id", "header", inputPath});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Bounds_IdNested) {
+  auto inputPath = TestResourcePath("bounds_layout.pagx");
+  auto ret = CallRun(pagx::cli::RunBounds, {"bounds", "--id", "card1", inputPath});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Bounds_IdWithJson) {
+  auto inputPath = TestResourcePath("bounds_layout.pagx");
+  auto ret = CallRun(pagx::cli::RunBounds, {"bounds", "--id", "sidebar", "--json", inputPath});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Bounds_IdWithRelative) {
+  auto inputPath = TestResourcePath("bounds_layout.pagx");
+  auto ret = CallRun(pagx::cli::RunBounds, {"bounds", "--id", "card1", "--relative",
+                                            "//Layer[@id='content']", inputPath});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Bounds_IdNotFound) {
+  auto inputPath = TestResourcePath("bounds_layout.pagx");
+  auto ret = CallRun(pagx::cli::RunBounds, {"bounds", "--id", "nonexistent", inputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Bounds_IdAndXPathMutuallyExclusive) {
+  auto inputPath = TestResourcePath("bounds_layout.pagx");
+  auto ret = CallRun(pagx::cli::RunBounds,
+                     {"bounds", "--id", "header", "--xpath", "//Layer[1]", inputPath});
+  EXPECT_NE(ret, 0);
+}
+
 //==============================================================================
 // Render tests — Verify rendered output matches baseline screenshots
 //==============================================================================
 
 CLI_TEST(PAGXCliTest, Render_Basic) {
   auto inputPath = TestResourcePath("render_basic.pagx");
-  auto outputPath = TempDir() + "/RenderBasic.png";
-  auto ret = CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(CompareRenderedImage(outputPath, "PAGXCliTest/RenderBasic"));
+  EXPECT_TRUE(RenderAndCompare({"render", inputPath}, "PAGXCliTest/RenderBasic"));
 }
 
 CLI_TEST(PAGXCliTest, Render_Gradient) {
   auto inputPath = TestResourcePath("render_gradient.pagx");
-  auto outputPath = TempDir() + "/RenderGradient.png";
-  auto ret = CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(CompareRenderedImage(outputPath, "PAGXCliTest/RenderGradient"));
+  EXPECT_TRUE(RenderAndCompare({"render", inputPath}, "PAGXCliTest/RenderGradient"));
 }
 
 CLI_TEST(PAGXCliTest, Render_Scale) {
   auto inputPath = TestResourcePath("render_scale.pagx");
-  auto outputPath = TempDir() + "/RenderScale.png";
-  auto ret =
-      CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, "--scale", "2.0", inputPath});
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(CompareRenderedImage(outputPath, "PAGXCliTest/RenderScale"));
+  EXPECT_TRUE(RenderAndCompare({"render", "--scale", "2.0", inputPath}, "PAGXCliTest/RenderScale"));
 }
 
 CLI_TEST(PAGXCliTest, Render_Crop) {
   auto inputPath = TestResourcePath("render_crop.pagx");
-  auto outputPath = TempDir() + "/RenderCrop.png";
-  auto ret = CallRun(pagx::cli::RunRender,
-                     {"render", "-o", outputPath, "--crop", "50,50,100,100", inputPath});
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(CompareRenderedImage(outputPath, "PAGXCliTest/RenderCrop"));
+  EXPECT_TRUE(
+      RenderAndCompare({"render", "--crop", "50,50,100,100", inputPath}, "PAGXCliTest/RenderCrop"));
 }
 
 CLI_TEST(PAGXCliTest, Render_Background) {
   auto inputPath = TestResourcePath("render_background.pagx");
-  auto outputPath = TempDir() + "/RenderBackground.png";
-  auto ret = CallRun(pagx::cli::RunRender,
-                     {"render", "-o", outputPath, "--background", "#0088FF", inputPath});
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(CompareRenderedImage(outputPath, "PAGXCliTest/RenderBackground"));
+  EXPECT_TRUE(RenderAndCompare({"render", "--background", "#0088FF", inputPath},
+                               "PAGXCliTest/RenderBackground"));
 }
 
 CLI_TEST(PAGXCliTest, Render_WebpFormat) {
@@ -711,19 +750,14 @@ CLI_TEST(PAGXCliTest, Render_Quality) {
 
 CLI_TEST(PAGXCliTest, Render_CombinedOptions) {
   auto inputPath = TestResourcePath("render_basic.pagx");
-  auto outputPath = TempDir() + "/RenderCombinedOptions.png";
-  auto ret = CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, "--scale", "2.0", "--crop",
-                                            "0,0,200,200", "--background", "#FFFF00", inputPath});
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(CompareRenderedImage(outputPath, "PAGXCliTest/RenderCombinedOptions"));
+  EXPECT_TRUE(RenderAndCompare(
+      {"render", "--scale", "2.0", "--crop", "0,0,200,200", "--background", "#FFFF00", inputPath},
+      "PAGXCliTest/RenderCombinedOptions"));
 }
 
 CLI_TEST(PAGXCliTest, Render_Text) {
   auto inputPath = TestResourcePath("render_text.pagx");
-  auto outputPath = TempDir() + "/RenderText.png";
-  auto ret = CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(CompareRenderedImage(outputPath, "PAGXCliTest/RenderText"));
+  EXPECT_TRUE(RenderAndCompare({"render", inputPath}, "PAGXCliTest/RenderText"));
 }
 
 CLI_TEST(PAGXCliTest, Render_MissingFile) {
@@ -772,6 +806,76 @@ CLI_TEST(PAGXCliTest, Render_UnsupportedFormat) {
   EXPECT_NE(ret, 0);
 }
 
+CLI_TEST(PAGXCliTest, Render_IdFull) {
+  auto inputPath = TestResourcePath("render_layer_target.pagx");
+  EXPECT_TRUE(RenderAndCompare({"render", inputPath}, "PAGXCliTest/RenderIdFull"));
+}
+
+CLI_TEST(PAGXCliTest, Render_IdBadge) {
+  auto inputPath = TestResourcePath("render_layer_target.pagx");
+  EXPECT_TRUE(
+      RenderAndCompare({"render", "--id", "badge", inputPath}, "PAGXCliTest/RenderIdBadge"));
+}
+
+CLI_TEST(PAGXCliTest, Render_IdCard) {
+  auto inputPath = TestResourcePath("render_layer_target.pagx");
+  EXPECT_TRUE(RenderAndCompare({"render", "--id", "card", inputPath}, "PAGXCliTest/RenderIdCard"));
+}
+
+CLI_TEST(PAGXCliTest, Render_IdBanner) {
+  auto inputPath = TestResourcePath("render_layer_target.pagx");
+  EXPECT_TRUE(
+      RenderAndCompare({"render", "--id", "banner", inputPath}, "PAGXCliTest/RenderIdBanner"));
+}
+
+CLI_TEST(PAGXCliTest, Render_IdNestedIcon) {
+  auto inputPath = TestResourcePath("render_layer_target.pagx");
+  EXPECT_TRUE(
+      RenderAndCompare({"render", "--id", "icon", inputPath}, "PAGXCliTest/RenderIdNestedIcon"));
+}
+
+CLI_TEST(PAGXCliTest, Render_IdWithScale) {
+  auto inputPath = TestResourcePath("render_layer_target.pagx");
+  EXPECT_TRUE(RenderAndCompare({"render", "--id", "banner", "--scale", "2", inputPath},
+                               "PAGXCliTest/RenderIdWithScale"));
+}
+
+CLI_TEST(PAGXCliTest, Render_IdWithCrop) {
+  auto inputPath = TestResourcePath("render_layer_target.pagx");
+  EXPECT_TRUE(RenderAndCompare({"render", "--id", "banner", "--crop", "60,0,120,80", inputPath},
+                               "PAGXCliTest/RenderIdWithCrop"));
+}
+
+CLI_TEST(PAGXCliTest, Render_XPathLayer) {
+  auto inputPath = TestResourcePath("render_layer_target.pagx");
+  EXPECT_TRUE(RenderAndCompare({"render", "--xpath", "//Layer[@id='badge']", inputPath},
+                               "PAGXCliTest/RenderXPathLayer"));
+}
+
+CLI_TEST(PAGXCliTest, Render_IdNotFound) {
+  auto inputPath = TestResourcePath("render_layer_target.pagx");
+  auto outputPath = TempDir() + "/RenderIdNotFound.png";
+  auto ret =
+      CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, "--id", "nonexistent", inputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Render_IdAndXPathMutuallyExclusive) {
+  auto inputPath = TestResourcePath("render_layer_target.pagx");
+  auto outputPath = TempDir() + "/RenderMutualExclusive.png";
+  auto ret = CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, "--id", "badge", "--xpath",
+                                            "//Layer[1]", inputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Render_XPathNoMatch) {
+  auto inputPath = TestResourcePath("render_layer_target.pagx");
+  auto outputPath = TempDir() + "/RenderXPathNoMatch.png";
+  auto ret = CallRun(pagx::cli::RunRender,
+                     {"render", "-o", outputPath, "--xpath", "//Layer[@id='nope']", inputPath});
+  EXPECT_NE(ret, 0);
+}
+
 //==============================================================================
 // Optimize render consistency — Verify optimization preserves visual output
 //==============================================================================
@@ -779,26 +883,14 @@ CLI_TEST(PAGXCliTest, Render_UnsupportedFormat) {
 static void TestOptimizeAndRender(const std::string& testName, const std::string& inputFile) {
   auto inputPath = TestResourcePath(inputFile);
   auto optimizedPath = TempDir() + "/" + testName + "_optimized.pagx";
-  auto originalRenderPath = TempDir() + "/" + testName + "_original.png";
-  auto optimizedRenderPath = TempDir() + "/" + testName + "_optimized.png";
 
-  {
-    auto ret = CallRun(pagx::cli::RunRender, {"render", "-o", originalRenderPath, inputPath});
-    ASSERT_EQ(ret, 0) << "Failed to render original file";
-  }
-  {
-    auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", optimizedPath, inputPath});
-    ASSERT_EQ(ret, 0) << "Failed to optimize file";
-  }
-  {
-    auto ret = CallRun(pagx::cli::RunRender, {"render", "-o", optimizedRenderPath, optimizedPath});
-    ASSERT_EQ(ret, 0) << "Failed to render optimized file";
-  }
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", optimizedPath, inputPath});
+  ASSERT_EQ(ret, 0) << "Failed to optimize file";
 
   auto baselineKey = "PAGXCliTest/" + testName;
-  EXPECT_TRUE(CompareRenderedImage(originalRenderPath, baselineKey + "_original"))
+  EXPECT_TRUE(RenderAndCompare({"render", inputPath}, baselineKey + "_original"))
       << "Original rendering mismatch for " << testName;
-  EXPECT_TRUE(CompareRenderedImage(optimizedRenderPath, baselineKey + "_optimized"))
+  EXPECT_TRUE(RenderAndCompare({"render", optimizedPath}, baselineKey + "_optimized"))
       << "Optimized rendering mismatch for " << testName;
 }
 
@@ -1002,6 +1094,257 @@ CLI_TEST(PAGXCliTest, Lint_C13_SimpleRectangleMask) {
   EXPECT_TRUE(output.find("MaskedContent") != std::string::npos);
   EXPECT_TRUE(output.find("rectangular mask") != std::string::npos);
   EXPECT_TRUE(output.find("scrollRect") != std::string::npos);
+}
+
+//==============================================================================
+// Align tests
+//==============================================================================
+
+// Helper: extract the attribute value for a given layer id from PAGX XML.
+// Returns the attribute value string, or empty if not found.
+static std::string GetLayerAttribute(const std::string& xml, const std::string& id,
+                                     const std::string& attr) {
+  // Find the Layer element with the given id.
+  auto idPattern = "id=\"" + id + "\"";
+  auto pos = xml.find(idPattern);
+  if (pos == std::string::npos) {
+    return "";
+  }
+  // Walk backward to find the opening '<Layer' tag.
+  auto layerStart = xml.rfind("<Layer", pos);
+  if (layerStart == std::string::npos) {
+    return "";
+  }
+  // Find the end of the opening tag (either '>' or '/>').
+  auto tagEnd = xml.find('>', layerStart);
+  if (tagEnd == std::string::npos) {
+    return "";
+  }
+  auto tag = xml.substr(layerStart, tagEnd - layerStart + 1);
+
+  // Search for the attribute within the tag.
+  auto attrPattern = attr + "=\"";
+  auto attrPos = tag.find(attrPattern);
+  if (attrPos == std::string::npos) {
+    return "";
+  }
+  auto valueStart = attrPos + attrPattern.size();
+  auto valueEnd = tag.find('"', valueStart);
+  if (valueEnd == std::string::npos) {
+    return "";
+  }
+  return tag.substr(valueStart, valueEnd - valueStart);
+}
+
+CLI_TEST(PAGXCliTest, Align_Left) {
+  auto inputPath = CopyToTemp("align_distribute.pagx", "align_left.pagx");
+  auto outputPath = TempDir() + "/align_left_out.pagx";
+  auto ret = CallRun(pagx::cli::RunAlign, {"align", "--id", "a", "--id", "b", "--id", "c",
+                                           "--anchor", "left", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  EXPECT_EQ(GetLayerAttribute(output, "a", "x"), "10");
+  EXPECT_EQ(GetLayerAttribute(output, "b", "x"), "10");
+  EXPECT_EQ(GetLayerAttribute(output, "c", "x"), "10");
+  EXPECT_TRUE(RenderAndCompare({"render", outputPath}, "PAGXCliTest/AlignLeft"));
+}
+
+CLI_TEST(PAGXCliTest, Align_Right) {
+  auto inputPath = CopyToTemp("align_distribute.pagx", "align_right.pagx");
+  auto outputPath = TempDir() + "/align_right_out.pagx";
+  auto ret = CallRun(pagx::cli::RunAlign, {"align", "--id", "a", "--id", "b", "--id", "c",
+                                           "--anchor", "right", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  EXPECT_EQ(GetLayerAttribute(output, "a", "x"), "250");
+  EXPECT_EQ(GetLayerAttribute(output, "b", "x"), "250");
+  EXPECT_EQ(GetLayerAttribute(output, "c", "x"), "250");
+}
+
+CLI_TEST(PAGXCliTest, Align_Top) {
+  auto inputPath = CopyToTemp("align_distribute.pagx", "align_top.pagx");
+  auto outputPath = TempDir() + "/align_top_out.pagx";
+  auto ret = CallRun(pagx::cli::RunAlign, {"align", "--id", "a", "--id", "b", "--id", "c",
+                                           "--anchor", "top", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // a: y=0 (default, attribute omitted), b: y=0 (omitted), c: y=0 (omitted)
+  EXPECT_EQ(GetLayerAttribute(output, "a", "y"), "");
+  EXPECT_EQ(GetLayerAttribute(output, "b", "y"), "");
+  EXPECT_EQ(GetLayerAttribute(output, "c", "y"), "");
+}
+
+CLI_TEST(PAGXCliTest, Align_Bottom) {
+  auto inputPath = CopyToTemp("align_distribute.pagx", "align_bottom.pagx");
+  auto outputPath = TempDir() + "/align_bottom_out.pagx";
+  auto ret = CallRun(pagx::cli::RunAlign, {"align", "--id", "a", "--id", "b", "--id", "c",
+                                           "--anchor", "bottom", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  EXPECT_EQ(GetLayerAttribute(output, "a", "y"), "300");
+  EXPECT_EQ(GetLayerAttribute(output, "b", "y"), "300");
+  EXPECT_EQ(GetLayerAttribute(output, "c", "y"), "300");
+}
+
+CLI_TEST(PAGXCliTest, Align_CenterX) {
+  auto inputPath = CopyToTemp("align_distribute.pagx", "align_center_x.pagx");
+  auto outputPath = TempDir() + "/align_center_x_out.pagx";
+  auto ret = CallRun(pagx::cli::RunAlign, {"align", "--id", "a", "--id", "b", "--id", "c",
+                                           "--anchor", "centerX", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  EXPECT_EQ(GetLayerAttribute(output, "a", "x"), "130");
+  EXPECT_EQ(GetLayerAttribute(output, "b", "x"), "130");
+  EXPECT_EQ(GetLayerAttribute(output, "c", "x"), "130");
+  EXPECT_TRUE(RenderAndCompare({"render", outputPath}, "PAGXCliTest/AlignCenterX"));
+}
+
+CLI_TEST(PAGXCliTest, Align_CenterY) {
+  auto inputPath = CopyToTemp("align_distribute.pagx", "align_center_y.pagx");
+  auto outputPath = TempDir() + "/align_center_y_out.pagx";
+  auto ret = CallRun(pagx::cli::RunAlign, {"align", "--id", "a", "--id", "b", "--id", "c",
+                                           "--anchor", "centerY", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  EXPECT_EQ(GetLayerAttribute(output, "a", "y"), "150");
+  EXPECT_EQ(GetLayerAttribute(output, "b", "y"), "150");
+  EXPECT_EQ(GetLayerAttribute(output, "c", "y"), "150");
+}
+
+CLI_TEST(PAGXCliTest, Align_CrossHierarchy) {
+  auto inputPath = CopyToTemp("align_distribute.pagx", "align_cross.pagx");
+  auto outputPath = TempDir() + "/align_cross_out.pagx";
+  auto ret = CallRun(pagx::cli::RunAlign, {"align", "--id", "a", "--id", "d", "--anchor", "left",
+                                           "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // target=min(10,30)=10. a: stays x=10. d: global delta=-20, parent has no x transform, x=30-20=10
+  EXPECT_EQ(GetLayerAttribute(output, "a", "x"), "10");
+  EXPECT_EQ(GetLayerAttribute(output, "d", "x"), "10");
+  EXPECT_TRUE(RenderAndCompare({"render", outputPath}, "PAGXCliTest/AlignCrossHierarchy"));
+}
+
+CLI_TEST(PAGXCliTest, Align_XPath) {
+  auto inputPath = CopyToTemp("align_distribute.pagx", "align_xpath.pagx");
+  auto outputPath = TempDir() + "/align_xpath_out.pagx";
+  auto ret =
+      CallRun(pagx::cli::RunAlign, {"align", "--xpath", "//Layer[@id='a' or @id='b' or @id='c']",
+                                    "--anchor", "left", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  EXPECT_EQ(GetLayerAttribute(output, "a", "x"), "10");
+  EXPECT_EQ(GetLayerAttribute(output, "b", "x"), "10");
+  EXPECT_EQ(GetLayerAttribute(output, "c", "x"), "10");
+}
+
+CLI_TEST(PAGXCliTest, Align_MissingAnchor) {
+  auto inputPath = TestResourcePath("align_distribute.pagx");
+  auto ret = CallRun(pagx::cli::RunAlign, {"align", "--id", "a", "--id", "b", inputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Align_TooFewLayers) {
+  auto inputPath = TestResourcePath("align_distribute.pagx");
+  auto outputPath = TempDir() + "/align_toofew_out.pagx";
+  auto ret = CallRun(pagx::cli::RunAlign,
+                     {"align", "--id", "a", "--anchor", "left", "-o", outputPath, inputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Align_InvalidAnchor) {
+  auto inputPath = TestResourcePath("align_distribute.pagx");
+  auto ret = CallRun(pagx::cli::RunAlign,
+                     {"align", "--id", "a", "--id", "b", "--anchor", "middle", inputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Align_IdNotFound) {
+  auto inputPath = TestResourcePath("align_distribute.pagx");
+  auto ret = CallRun(pagx::cli::RunAlign,
+                     {"align", "--id", "nonexistent", "--id", "a", "--anchor", "left", inputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Align_NoSelection) {
+  auto inputPath = TestResourcePath("align_distribute.pagx");
+  auto ret = CallRun(pagx::cli::RunAlign, {"align", "--anchor", "left", inputPath});
+  EXPECT_NE(ret, 0);
+}
+
+//==============================================================================
+// Distribute tests
+//==============================================================================
+
+CLI_TEST(PAGXCliTest, Distribute_X) {
+  auto inputPath = CopyToTemp("align_distribute.pagx", "distribute_x.pagx");
+  auto outputPath = TempDir() + "/distribute_x_out.pagx";
+  auto ret = CallRun(pagx::cli::RunDistribute, {"distribute", "--id", "a", "--id", "b", "--id", "c",
+                                                "--axis", "x", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // sorted by left: a(10), b(100), c(250). firstEnd=60, lastStart=250, middleSizes=50
+  // totalGap=140, gap=70. b: newLeft=130, x=130
+  EXPECT_EQ(GetLayerAttribute(output, "a", "x"), "10");
+  EXPECT_EQ(GetLayerAttribute(output, "b", "x"), "130");
+  EXPECT_EQ(GetLayerAttribute(output, "c", "x"), "250");
+  EXPECT_TRUE(RenderAndCompare({"render", outputPath}, "PAGXCliTest/DistributeX"));
+}
+
+CLI_TEST(PAGXCliTest, Distribute_Y) {
+  auto inputPath = CopyToTemp("align_distribute.pagx", "distribute_y.pagx");
+  auto outputPath = TempDir() + "/distribute_y_out.pagx";
+  auto ret = CallRun(pagx::cli::RunDistribute, {"distribute", "--id", "a", "--id", "b", "--id", "c",
+                                                "--axis", "y", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // sorted by top: a(0), b(100), c(300). firstEnd=40, lastStart=300, middleSizes=40
+  // totalGap=220, gap=110. b: newTop=150, y=150
+  EXPECT_EQ(GetLayerAttribute(output, "a", "y"), "");
+  EXPECT_EQ(GetLayerAttribute(output, "b", "y"), "150");
+  EXPECT_EQ(GetLayerAttribute(output, "c", "y"), "300");
+  EXPECT_TRUE(RenderAndCompare({"render", outputPath}, "PAGXCliTest/DistributeY"));
+}
+
+CLI_TEST(PAGXCliTest, Distribute_XPath) {
+  auto inputPath = CopyToTemp("align_distribute.pagx", "distribute_xpath.pagx");
+  auto outputPath = TempDir() + "/distribute_xpath_out.pagx";
+  auto ret = CallRun(pagx::cli::RunDistribute,
+                     {"distribute", "--xpath", "//Layer[@id='a' or @id='b' or @id='c']", "--axis",
+                      "x", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  EXPECT_EQ(GetLayerAttribute(output, "a", "x"), "10");
+  EXPECT_EQ(GetLayerAttribute(output, "b", "x"), "130");
+  EXPECT_EQ(GetLayerAttribute(output, "c", "x"), "250");
+}
+
+CLI_TEST(PAGXCliTest, Distribute_MissingAxis) {
+  auto inputPath = TestResourcePath("align_distribute.pagx");
+  auto ret = CallRun(pagx::cli::RunDistribute,
+                     {"distribute", "--id", "a", "--id", "b", "--id", "c", inputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Distribute_TooFewLayers) {
+  auto inputPath = TestResourcePath("align_distribute.pagx");
+  auto outputPath = TempDir() + "/distribute_toofew_out.pagx";
+  auto ret = CallRun(pagx::cli::RunDistribute, {"distribute", "--id", "a", "--id", "b", "--axis",
+                                                "x", "-o", outputPath, inputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Distribute_InvalidAxis) {
+  auto inputPath = TestResourcePath("align_distribute.pagx");
+  auto ret = CallRun(pagx::cli::RunDistribute, {"distribute", "--id", "a", "--id", "b", "--id", "c",
+                                                "--axis", "z", inputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Distribute_IdNotFound) {
+  auto inputPath = TestResourcePath("align_distribute.pagx");
+  auto ret = CallRun(pagx::cli::RunDistribute, {"distribute", "--id", "nonexistent", "--id", "a",
+                                                "--id", "b", "--axis", "x", inputPath});
+  EXPECT_NE(ret, 0);
 }
 
 }  // namespace pag
