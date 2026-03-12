@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -26,6 +28,39 @@
 #include "tgfx/core/Typeface.h"
 
 namespace pagx::cli {
+
+static inline bool FontFamilyMatch(const std::string& requested, const std::string& actual) {
+  if (requested.size() != actual.size()) {
+    return false;
+  }
+  for (size_t i = 0; i < requested.size(); i++) {
+    if (std::tolower(static_cast<unsigned char>(requested[i])) !=
+        std::tolower(static_cast<unsigned char>(actual[i]))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Resolves a system font by family and style with fallback. First attempts an exact match with the
+ * given style. If the result's fontFamily does not match the requested family (case-insensitive),
+ * or the style is not found, falls back to the family's default style.
+ */
+static inline std::shared_ptr<tgfx::Typeface> ResolveSystemTypeface(const std::string& family,
+                                                                    const std::string& style) {
+  auto typeface = tgfx::Typeface::MakeFromName(family, style);
+  if (typeface != nullptr && FontFamilyMatch(family, typeface->fontFamily())) {
+    return typeface;
+  }
+  if (!style.empty()) {
+    typeface = tgfx::Typeface::MakeFromName(family, "");
+    if (typeface != nullptr && FontFamilyMatch(family, typeface->fontFamily())) {
+      return typeface;
+    }
+  }
+  return nullptr;
+}
 
 /**
  * Adds system fallback fonts to the given TextLayout as deferred entries. Fonts are loaded on
@@ -59,7 +94,7 @@ inline std::shared_ptr<tgfx::Typeface> ResolveFallbackTypeface(const std::string
   auto commaPos = specifier.find(',');
   auto family = commaPos != std::string::npos ? specifier.substr(0, commaPos) : specifier;
   auto style = commaPos != std::string::npos ? specifier.substr(commaPos + 1) : std::string();
-  return tgfx::Typeface::MakeFromName(family, style);
+  return ResolveSystemTypeface(family, style);
 }
 
 inline std::string EscapeJson(const std::string& input) {
