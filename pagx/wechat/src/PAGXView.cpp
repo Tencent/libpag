@@ -176,19 +176,21 @@ void PAGXView::buildLayers() {
   pagxHeight = document->height;
   backgroundVisible = false;
   backgroundTGFXColor = tgfx::Color::FromRGBA(245, 245, 245);
-  auto* bgLayer = document->findNode<Layer>("backGround");
+  auto* bgLayer = document->findNode<Layer>("backGroundColor");
   if (bgLayer) {
     auto visibleIt = bgLayer->customData.find("bg-visible");
     if (visibleIt != bgLayer->customData.end()) {
       backgroundVisible = (visibleIt->second == "true");
     }
-    auto colorIt = bgLayer->customData.find("bg-color");
-    if (colorIt != bgLayer->customData.end()) {
-      backgroundTGFXColor = ParseHexColor(colorIt->second);
-    }
-    auto alphaIt = bgLayer->customData.find("bg-alpha");
-    if (alphaIt != bgLayer->customData.end()) {
-      backgroundTGFXColor.alpha *= std::stof(alphaIt->second);
+    if (backgroundVisible) {
+      auto colorIt = bgLayer->customData.find("bg-color");
+      if (colorIt != bgLayer->customData.end()) {
+        backgroundTGFXColor = ParseHexColor(colorIt->second);
+      }
+      auto alphaIt = bgLayer->customData.find("bg-alpha");
+      if (alphaIt != bgLayer->customData.end()) {
+        backgroundTGFXColor.alpha *= std::stof(alphaIt->second);
+      }
     }
   }
   displayList.root()->removeChildren();
