@@ -189,7 +189,11 @@ void PAGXView::buildLayers() {
       }
       auto alphaIt = bgLayer->customData.find("bg-alpha");
       if (alphaIt != bgLayer->customData.end()) {
-        backgroundTGFXColor.alpha *= std::stof(alphaIt->second);
+        char* end = nullptr;
+        float alpha = std::strtof(alphaIt->second.c_str(), &end);
+        if (end != alphaIt->second.c_str()) {
+          backgroundTGFXColor.alpha *= alpha;
+        }
       }
     }
   }
