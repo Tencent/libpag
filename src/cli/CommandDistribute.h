@@ -18,18 +18,12 @@
 
 #pragma once
 
-#include "tgfx/core/Bitmap.h"
-
 namespace pagx::cli {
 
 /**
- * Renders a PAGX file and returns the result as a Bitmap. Returns an empty Bitmap on error.
+ * Distributes selected Layer nodes with equal spacing along an axis. The first and last Layers
+ * (by position) remain in place while middle Layers are repositioned to create uniform gaps.
  */
-tgfx::Bitmap RenderToBitmap(int argc, char* argv[]);
-
-/**
- * Renders a PAGX file to an image (PNG/WebP).
- */
-int RunRender(int argc, char* argv[]);
+int RunDistribute(int argc, char* argv[]);
 
 }  // namespace pagx::cli

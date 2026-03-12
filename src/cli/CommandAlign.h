@@ -18,18 +18,13 @@
 
 #pragma once
 
-#include "tgfx/core/Bitmap.h"
-
 namespace pagx::cli {
 
 /**
- * Renders a PAGX file and returns the result as a Bitmap. Returns an empty Bitmap on error.
+ * Aligns selected Layer nodes along a specified edge or center line. Supports cross-hierarchy
+ * alignment by computing bounds in global coordinates and converting offsets back to each Layer's
+ * local coordinate space.
  */
-tgfx::Bitmap RenderToBitmap(int argc, char* argv[]);
-
-/**
- * Renders a PAGX file to an image (PNG/WebP).
- */
-int RunRender(int argc, char* argv[]);
+int RunAlign(int argc, char* argv[]);
 
 }  // namespace pagx::cli
