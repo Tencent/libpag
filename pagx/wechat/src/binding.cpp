@@ -41,5 +41,7 @@ EMSCRIPTEN_BINDINGS(PAGXView) {
       .function("draw", &PAGXView::draw)
       .function("firstFrameRendered", &PAGXView::firstFrameRendered)
       .function("contentWidth", &PAGXView::contentWidth)
-      .function("contentHeight", &PAGXView::contentHeight);
+      .function("contentHeight", &PAGXView::contentHeight)
+      .function("setBoundsOrigin", &PAGXView::setBoundsOrigin)
+      .function("getContentTransform", &PAGXView::getContentTransform);
 }

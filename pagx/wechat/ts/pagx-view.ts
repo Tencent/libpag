@@ -248,6 +248,40 @@ export class View {
   }
 
   /**
+   * Sets the bounds origin of the PAGX content relative to the cocraft canvas origin. This
+   * overrides any values read from the PAGX file's backGroundColor customData. The values can be
+   * negative.
+   * @param x The x coordinate of the content bounds origin in cocraft canvas coordinates.
+   * @param y The y coordinate of the content bounds origin in cocraft canvas coordinates.
+   */
+  public setBoundsOrigin(x: number, y: number): void {
+    this.nativeView!.setBoundsOrigin(x, y);
+  }
+
+  /**
+   * Returns a transform that maps cocraft canvas coordinates to canvas pixel coordinates. To get
+   * screen logical coordinates for CSS positioning, divide by devicePixelRatio:
+   *
+   * @example
+   * ```ts
+   * const t = view.getContentTransform();
+   * const dpr = wx.getSystemInfoSync().pixelRatio;
+   * // For each comment overlay:
+   * const screenX = (comment.cocraftX * t.scale + t.tx) / dpr;
+   * const screenY = (comment.cocraftY * t.scale + t.ty) / dpr;
+   * ```
+   *
+   * The transform accounts for boundsOrigin offset, fit-to-canvas scaling, centering, and the
+   * current zoom / pan state. Requery after updateSize(), updateZoomScaleAndOffset(), or
+   * buildLayers() since those calls invalidate the cached transform.
+   *
+   * @returns An object with {scale, tx, ty} in canvas pixel coordinates.
+   */
+  public getContentTransform(): { scale: number; tx: number; ty: number } {
+    return this.nativeView!.getContentTransform();
+  }
+
+  /**
    * Get content width.
    */
   public contentWidth(): number {

@@ -52,6 +52,10 @@ export interface PAGXViewNative {
     contentWidth: () => number;
     /** Returns the height of the PAGX content in content pixels. */
     contentHeight: () => number;
+    /** Overrides bounds origin read from the PAGX file. Values can be negative. */
+    setBoundsOrigin: (x: number, y: number) => void;
+    /** Returns {scale, tx, ty} mapping cocraft canvas coordinates to canvas pixel coordinates. */
+    getContentTransform: () => { scale: number; tx: number; ty: number };
     /** Releases the native C++ object. */
     delete: () => void;
 }
