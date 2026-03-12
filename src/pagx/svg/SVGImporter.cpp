@@ -1086,13 +1086,17 @@ ImagePattern* SVGParserContext::convertPattern(const std::shared_ptr<DOMNode>& e
       auto imageNode = registerImageResource(imageHref);
       pattern->image = imageNode;
 
+      std::string imageTransform = getAttribute(child, "transform");
+      Matrix imageMatrix =
+          imageTransform.empty() ? Matrix::Identity() : parseTransform(imageTransform);
+
       if (contentUnitsIsObjectBoundingBox) {
         // Image dimensions are 0-1 ratios, scale by shape bounds.
         pattern->matrix = Matrix::Translate(shapeBounds.x, shapeBounds.y) *
-                          Matrix::Scale(shapeBounds.width, shapeBounds.height);
+                          Matrix::Scale(shapeBounds.width, shapeBounds.height) * imageMatrix;
       } else {
         // Image dimensions are absolute, translate to shape bounds origin.
-        pattern->matrix = Matrix::Translate(shapeBounds.x, shapeBounds.y);
+        pattern->matrix = Matrix::Translate(shapeBounds.x, shapeBounds.y) * imageMatrix;
       }
     }
     child = child->getNextSibling();
