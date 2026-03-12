@@ -29,11 +29,7 @@
   </view>
 
   <!-- Canvas Area -->
-  <view 
-    class="canvas-container"
-    change:comment-transform="{{commentWxs.onTransformChanged}}"
-    comment-transform="{{commentTransform}}"
-  >
+  <view class="canvas-container">
     <canvas 
       type="webgl" 
       id="pagx-canvas" 
@@ -51,6 +47,8 @@
         class="comment-pin"
         data-basex="{{item.baseX}}"
         data-basey="{{item.baseY}}"
+        change:prop="{{commentWxs.onTransformChanged}}"
+        prop="{{commentTransform}}"
       >
         <view class="comment-dot" style="background:{{item.color}};"></view>
         <view class="comment-bubble">

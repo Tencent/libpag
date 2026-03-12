@@ -5,28 +5,20 @@
  */
 
 /**
- * Called when commentTransform changes. Updates each comment pin's position
- * directly on the render thread using the same zoom/pan values as the canvas.
+ * Called on each comment-pin node when commentTransform changes.
+ * Reads baseX/baseY from the node's dataset and computes screen position.
  */
-function onTransformChanged(newVal, oldVal, ownerInstance) {
+function onTransformChanged(newVal, oldVal, ownerInstance, instance) {
   if (!newVal || !newVal.zoom) {
     return;
   }
-  var zoom = newVal.zoom;
-  var panOffsetX = newVal.panOffsetX;
-  var panOffsetY = newVal.panOffsetY;
-  var dpr = newVal.dpr;
-  var pins = ownerInstance.selectAllComponents('.comment-pin');
-  for (var i = 0; i < pins.length; i++) {
-    var pin = pins[i];
-    var dataset = pin.getDataset();
-    var screenX = (dataset.basex * zoom + panOffsetX) / dpr;
-    var screenY = (dataset.basey * zoom + panOffsetY) / dpr;
-    pin.setStyle({
-      left: screenX + 'px',
-      top: screenY + 'px'
-    });
-  }
+  var dataset = instance.getDataset();
+  var screenX = (dataset.basex * newVal.zoom + newVal.panOffsetX) / newVal.dpr;
+  var screenY = (dataset.basey * newVal.zoom + newVal.panOffsetY) / newVal.dpr;
+  instance.setStyle({
+    left: screenX + 'px',
+    top: screenY + 'px'
+  });
 }
 
 module.exports = {
