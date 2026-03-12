@@ -33,42 +33,6 @@ the final step after generating a new file.
 **What it provides**: Automated optimization via `pagx optimize`, manual structure and
 performance review patterns, and a final verification checklist.
 
-## SVG Import/Export
-
-### SVG Import (`SVGImporter`)
-
-Converts SVG documents to PAGX format. Supports: rect, circle, ellipse, line, polyline,
-polygon, path, text, g, use, linearGradient, radialGradient, pattern, mask, clipPath,
-filter (blur, drop shadow, inner shadow), CSS class styles, and inherited SVG properties.
-
-**API**: `SVGImporter::Parse(filePath)`, `SVGImporter::ParseString(svgContent)`
-
-### SVG Export (`SVGExporter`)
-
-Converts PAGX documents back to SVG format. Maps PAGX node types to SVG elements:
-
-| PAGX Node | SVG Element |
-|-----------|-------------|
-| Rectangle | `<rect>` |
-| Ellipse (equal rx/ry) | `<circle>` |
-| Ellipse (different rx/ry) | `<ellipse>` |
-| Path | `<path>` |
-| Text (in Group) | `<text>` |
-| Layer | `<g>` |
-| Fill (SolidColor) | `fill` attribute |
-| Fill (LinearGradient) | `<linearGradient>` in `<defs>` |
-| Fill (RadialGradient) | `<radialGradient>` in `<defs>` |
-| Stroke | `stroke` + stroke-* attributes |
-| BlurFilter | `<feGaussianBlur>` |
-| DropShadowFilter | shadow filter chain |
-| InnerShadowFilter | inner shadow filter chain |
-| Mask (Alpha) | `clip-path` |
-| Mask (Luminance) | `mask` |
-
-**API**: `SVGExporter::ToSVG(document, options)`, `SVGExporter::ToFile(document, filePath, options)`
-
-**CLI**: `pagx export-svg [options] <file.pagx>`
-
 ## Reference Lookup
 
 **When**: User asks about PAGX syntax, attributes, node behavior, or CLI usage — not a
