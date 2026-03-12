@@ -397,6 +397,47 @@ static std::string buildLayerTransform(const Layer* layer) {
   return "";
 }
 
+static std::string buildGroupTransform(const Group* group) {
+  bool hasAnchor = group->anchor.x != 0 || group->anchor.y != 0;
+  bool hasPosition = group->position.x != 0 || group->position.y != 0;
+  bool hasRotation = group->rotation != 0;
+  bool hasScale = group->scale.x != 1 || group->scale.y != 1;
+  bool hasSkew = group->skew != 0;
+
+  if (!hasAnchor && !hasPosition && !hasRotation && !hasScale && !hasSkew) {
+    return {};
+  }
+
+  // Transform order per PAGX spec:
+  // 1. translate(-anchor) → 2. scale → 3. skew → 4. rotate → 5. translate(position)
+  // Column-vector composition: M = T(pos) * R(rot) * Skew * S(scale) * T(-anchor)
+  Matrix m = {};
+
+  if (hasAnchor) {
+    m = Matrix::Translate(-group->anchor.x, -group->anchor.y);
+  }
+  if (hasScale) {
+    m = Matrix::Scale(group->scale.x, group->scale.y) * m;
+  }
+  if (hasSkew) {
+    // Skew per spec: R(skewAxis) → ShearX(tan(skew)) → R(-skewAxis)
+    // Column-vector: R(-skewAxis) * ShearX * R(skewAxis)
+    m = Matrix::Rotate(group->skewAxis) * m;
+    Matrix shear = {};
+    shear.c = std::tan(group->skew * 3.14159265358979323846f / 180.0f);
+    m = shear * m;
+    m = Matrix::Rotate(-group->skewAxis) * m;
+  }
+  if (hasRotation) {
+    m = Matrix::Rotate(group->rotation) * m;
+  }
+  if (hasPosition) {
+    m = Matrix::Translate(group->position.x, group->position.y) * m;
+  }
+
+  return matrixToSVGTransform(m);
+}
+
 //==============================================================================
 // SVGWriterContext - shared state across SVGWriter instances
 //==============================================================================
@@ -1151,9 +1192,35 @@ void SVGWriter::writeElements(SVGBuilder& out, const std::vector<Element*>& elem
       case NodeType::Text:
         writeText(out, static_cast<const Text*>(element), fs, transform);
         break;
-      case NodeType::Group:
-        writeElements(out, static_cast<const Group*>(element)->elements, transform);
+      case NodeType::Group: {
+        auto* group = static_cast<const Group*>(element);
+        std::string groupTransform = buildGroupTransform(group);
+        bool hasGroupTransform = !groupTransform.empty();
+        bool hasAlpha = group->alpha < 1.0f;
+        if (hasGroupTransform || hasAlpha) {
+          out.openElement("g");
+          std::string combinedTransform;
+          if (!transform.empty() && hasGroupTransform) {
+            combinedTransform = transform + " " + groupTransform;
+          } else if (!transform.empty()) {
+            combinedTransform = transform;
+          } else {
+            combinedTransform = groupTransform;
+          }
+          if (!combinedTransform.empty()) {
+            out.addAttribute("transform", combinedTransform);
+          }
+          if (hasAlpha) {
+            out.addAttribute("opacity", FloatToString(group->alpha));
+          }
+          out.closeElementStart();
+          writeElements(out, group->elements, "");
+          out.closeElement();
+        } else {
+          writeElements(out, group->elements, transform);
+        }
         break;
+      }
       default:
         break;
     }
