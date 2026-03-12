@@ -137,6 +137,27 @@ class PAGXView {
   }
 
   /**
+   * Returns the x coordinate of the PAGX content bounds origin relative to the cocraft canvas
+   * origin. This value is read from the PAGX file's backGroundColor customData (bounds-origin-x)
+   * during buildLayers(), or set via setBoundsOrigin(). Can be negative. To convert a cocraft
+   * canvas coordinate to a PAGX content coordinate:
+   *
+   *   pagxX = cocraftX - view.boundsOriginX();
+   *   pagxY = cocraftY - view.boundsOriginY();
+   */
+  float boundsOriginX() const {
+    return _boundsOriginX;
+  }
+
+  /**
+   * Returns the y coordinate of the PAGX content bounds origin relative to the cocraft canvas
+   * origin. See boundsOriginX() for details.
+   */
+  float boundsOriginY() const {
+    return _boundsOriginY;
+  }
+
+  /**
    * Sets the bounds origin of the PAGX content relative to the cocraft canvas origin. This
    * overrides any bounds-origin-x / bounds-origin-y values read from the PAGX file's
    * backGroundColor customData. The values can be negative.
@@ -144,23 +165,6 @@ class PAGXView {
    * @param y The y coordinate of the content bounds origin in cocraft canvas coordinates.
    */
   void setBoundsOrigin(float x, float y);
-
-  /**
-   * Returns a transform that maps cocraft canvas coordinates to canvas pixel coordinates. The
-   * returned JavaScript object has three properties: scale, tx, ty. To position an overlay (e.g. a
-   * comment bubble) on screen, apply the transform to the cocraft coordinates and divide by
-   * devicePixelRatio:
-   *
-   *   const t = view.getContentTransform();
-   *   const dpr = wx.getSystemInfoSync().pixelRatio;
-   *   const screenX = (comment.cocraftX * t.scale + t.tx) / dpr;
-   *   const screenY = (comment.cocraftY * t.scale + t.ty) / dpr;
-   *
-   * The transform accounts for boundsOrigin offset, fit-to-canvas scaling, centering, and the
-   * current zoom / pan state. Requery after updateSize(), updateZoomScaleAndOffset(), or
-   * buildLayers() since those calls change the transform.
-   */
-  emscripten::val getContentTransform() const;
 
   /**
    * Returns the width of the canvas in pixels.
@@ -206,13 +210,9 @@ class PAGXView {
   bool lastFrameSlow = false;
 
   // Bounds origin: PAGX content bounding box top-left relative to cocraft canvas origin
-  float boundsOriginX = 0.0f;
-  float boundsOriginY = 0.0f;
+  float _boundsOriginX = 0.0f;
+  float _boundsOriginY = 0.0f;
   bool boundsOriginOverridden = false;
-
-  // Cached zoom/pan state for getContentTransform()
-  float currentOffsetX = 0.0f;
-  float currentOffsetY = 0.0f;
 
   // State tracking
   bool hasRenderedFirstFrame = false;

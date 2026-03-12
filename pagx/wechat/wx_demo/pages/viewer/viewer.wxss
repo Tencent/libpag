@@ -209,3 +209,37 @@
 .quality-Very {
   color: #f5222d;
 }
+
+/* Comment Overlays */
+.comment-pin {
+  position: absolute;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.comment-dot {
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 50%;
+  border: 3rpx solid #fff;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.3);
+}
+
+.comment-bubble {
+  position: absolute;
+  left: 24rpx;
+  top: -8rpx;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 8rpx 16rpx;
+  border-radius: 8rpx;
+  white-space: nowrap;
+  max-width: 300rpx;
+}
+
+.comment-text {
+  color: #fff;
+  font-size: 20rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

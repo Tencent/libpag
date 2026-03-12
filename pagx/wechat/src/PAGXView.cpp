@@ -203,7 +203,7 @@ void PAGXView::buildLayers() {
       char* end = nullptr;
       float value = std::strtof(originXIt->second.c_str(), &end);
       if (end != originXIt->second.c_str()) {
-        boundsOriginX = value;
+        _boundsOriginX = value;
       }
     }
     auto originYIt = bgLayer->customData.find("bounds-origin-y");
@@ -211,7 +211,7 @@ void PAGXView::buildLayers() {
       char* end = nullptr;
       float value = std::strtof(originYIt->second.c_str(), &end);
       if (end != originYIt->second.c_str()) {
-        boundsOriginY = value;
+        _boundsOriginY = value;
       }
     }
   }
@@ -255,30 +255,9 @@ void PAGXView::applyCenteringTransform() {
 }
 
 void PAGXView::setBoundsOrigin(float x, float y) {
-  boundsOriginX = x;
-  boundsOriginY = y;
+  _boundsOriginX = x;
+  _boundsOriginY = y;
   boundsOriginOverridden = true;
-}
-
-val PAGXView::getContentTransform() const {
-  auto result = val::object();
-  if (_width <= 0 || _height <= 0 || pagxWidth <= 0 || pagxHeight <= 0) {
-    result.set("scale", 0.0f);
-    result.set("tx", 0.0f);
-    result.set("ty", 0.0f);
-    return result;
-  }
-  float fitScale = std::min(static_cast<float>(_width) / pagxWidth,
-                            static_cast<float>(_height) / pagxHeight);
-  float centerOffsetX = (static_cast<float>(_width) - pagxWidth * fitScale) * 0.5f;
-  float centerOffsetY = (static_cast<float>(_height) - pagxHeight * fitScale) * 0.5f;
-  float scale = fitScale * lastZoom;
-  float tx = (-boundsOriginX * fitScale + centerOffsetX) * lastZoom + currentOffsetX;
-  float ty = (-boundsOriginY * fitScale + centerOffsetY) * lastZoom + currentOffsetY;
-  result.set("scale", scale);
-  result.set("tx", tx);
-  result.set("ty", ty);
-  return result;
 }
 
 void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY) {
@@ -312,8 +291,6 @@ void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY
   displayList.setZoomScale(zoom);
   displayList.setContentOffset(offsetX, offsetY);
   lastZoom = zoom;
-  currentOffsetX = offsetX;
-  currentOffsetY = offsetY;
 }
 
 void PAGXView::onZoomEnd() {

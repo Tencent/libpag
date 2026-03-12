@@ -21,6 +21,10 @@
       class="perf-btn {{showPerf ? 'active' : ''}}" 
       bindtap="togglePerfMonitor"
     >FPS</button>
+    <button 
+      class="perf-btn {{showComments ? 'active' : ''}}" 
+      bindtap="toggleComments"
+    >Comments</button>
   </view>
 
   <!-- Canvas Area -->
@@ -33,6 +37,21 @@
       catchtouchmove="onTouchMove"
       catchtouchend="onTouchEnd"
     ></canvas>
+
+    <!-- Comment Overlays -->
+    <block wx:if="{{showComments}}">
+      <view 
+        wx:for="{{comments}}" 
+        wx:key="id"
+        class="comment-pin"
+        style="left:{{item.screenX}}px;top:{{item.screenY}}px;"
+      >
+        <view class="comment-dot" style="background:{{item.color}};"></view>
+        <view class="comment-bubble">
+          <text class="comment-text">{{item.text}}</text>
+        </view>
+      </view>
+    </block>
 
     <!-- Loading -->
     <view wx:if="{{loading}}" class="loading">

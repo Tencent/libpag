@@ -259,26 +259,40 @@ export class View {
   }
 
   /**
-   * Returns a transform that maps cocraft canvas coordinates to canvas pixel coordinates. To get
-   * screen logical coordinates for CSS positioning, divide by devicePixelRatio:
+   * Returns the x coordinate of the PAGX content bounds origin relative to the cocraft canvas
+   * origin. This value is read from the PAGX file's backGroundColor customData (bounds-origin-x)
+   * during buildLayers(), or set via setBoundsOrigin(). Can be negative.
+   *
+   * To convert a cocraft canvas coordinate to a PAGX content coordinate and position an overlay:
    *
    * @example
    * ```ts
-   * const t = view.getContentTransform();
-   * const dpr = wx.getSystemInfoSync().pixelRatio;
-   * // For each comment overlay:
-   * const screenX = (comment.cocraftX * t.scale + t.tx) / dpr;
-   * const screenY = (comment.cocraftY * t.scale + t.ty) / dpr;
+   * // Once after buildLayers():
+   * const originX = view.boundsOriginX();
+   * const originY = view.boundsOriginY();
+   * const cw = view.contentWidth();
+   * const ch = view.contentHeight();
+   * const fitScale = Math.min(canvasW / cw, canvasH / ch);
+   * const centerOffsetX = (canvasW - cw * fitScale) / 2;
+   * const centerOffsetY = (canvasH - ch * fitScale) / 2;
+   * const baseX = (cocraftX - originX) * fitScale + centerOffsetX;
+   * const baseY = (cocraftY - originY) * fitScale + centerOffsetY;
+   *
+   * // On each zoom/pan gesture callback:
+   * const screenX = (baseX * zoom + panOffsetX) / dpr;
+   * const screenY = (baseY * zoom + panOffsetY) / dpr;
    * ```
-   *
-   * The transform accounts for boundsOrigin offset, fit-to-canvas scaling, centering, and the
-   * current zoom / pan state. Requery after updateSize(), updateZoomScaleAndOffset(), or
-   * buildLayers() since those calls invalidate the cached transform.
-   *
-   * @returns An object with {scale, tx, ty} in canvas pixel coordinates.
    */
-  public getContentTransform(): { scale: number; tx: number; ty: number } {
-    return this.nativeView!.getContentTransform();
+  public boundsOriginX(): number {
+    return this.nativeView!.boundsOriginX();
+  }
+
+  /**
+   * Returns the y coordinate of the PAGX content bounds origin relative to the cocraft canvas
+   * origin. See boundsOriginX() for details.
+   */
+  public boundsOriginY(): number {
+    return this.nativeView!.boundsOriginY();
   }
 
   /**

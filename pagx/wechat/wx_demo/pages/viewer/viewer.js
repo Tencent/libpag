@@ -17,7 +17,7 @@ const EMOJI_FONT_URL = 'https://pag.qq.com/wx_pagx_demo/fonts/NotoColorEmoji.ttf
 const SAMPLE_FILES = [
   { 
     name: 'Guidelines', 
-    url: 'https://pag.qq.com/wx_pagx_demo/Guidelines.pagx'
+    url: 'https://pag.qq.com/wx_pagx_demo/Guidelines_4.pagx'
   },
   { 
     name: 'ColorPicker', 
@@ -54,7 +54,11 @@ Page({
       dropRate: 0,
       smoothness: 0,
       quality: 'N/A'
-    }
+    },
+
+    // Comment overlays demo
+    showComments: false,
+    comments: []
   },
 
   // State
@@ -67,6 +71,12 @@ Page({
   gestureJustStarted: false,
   fontData: null,
   emojiFontData: null,
+
+  // Comment overlay state (cached transform parameters)
+  commentBaseCoords: null,  // Array of {id, text, color, baseX, baseY}
+  commentFitScale: 0,
+  commentCenterOffsetX: 0,
+  commentCenterOffsetY: 0,
 
   async onLoad(options) {
     try {
@@ -236,6 +246,11 @@ Page({
     if (resetState) {
       this.applyGestureState(resetState);
     }
+
+    // Re-initialize comment overlays for new content
+    if (this.data.showComments) {
+      this.initCommentOverlays();
+    }
   },
 
   async switchFile(index) {
@@ -357,6 +372,9 @@ Page({
     } catch (error) {
       // Silently ignore errors
     }
+
+    // Sync comment overlay positions with the same zoom/pan values
+    this.updateCommentPositions(state.zoom, state.offsetX, state.offsetY);
   },
 
   // Touch Events
@@ -442,5 +460,96 @@ Page({
         quality: this.perfMonitor.getSummary().quality
       }
     });
+  },
+
+  // ========== Comment Overlay Demo ==========
+
+  // Simulated comment data in cocraft canvas coordinates.
+  // In production, these would come from the cocraft comment service.
+  getMockComments() {
+    const cw = this.View.contentWidth();
+    const ch = this.View.contentHeight();
+    const originX = this.View.boundsOriginX();
+    const originY = this.View.boundsOriginY();
+    return [
+      { id: 1, cocraftX: originX + cw * 0.25, cocraftY: originY + ch * 0.2,
+        text: 'Nice header!', color: '#ff4d4f' },
+      { id: 2, cocraftX: originX + cw * 0.5,  cocraftY: originY + ch * 0.5,
+        text: 'Center element', color: '#1890ff' },
+      { id: 3, cocraftX: originX + cw * 0.75, cocraftY: originY + ch * 0.8,
+        text: 'Check this area', color: '#52c41a' },
+    ];
+  },
+
+  toggleComments() {
+    const show = !this.data.showComments;
+    if (show) {
+      this.initCommentOverlays();
+    }
+    this.setData({ showComments: show });
+    if (show) {
+      this.updateCommentPositions(1, 0, 0);
+    }
+  },
+
+  // Compute and cache the fixed base coordinates for each comment (called once).
+  initCommentOverlays() {
+    if (!this.View) {
+      return;
+    }
+    const originX = this.View.boundsOriginX();
+    const originY = this.View.boundsOriginY();
+    const cw = this.View.contentWidth();
+    const ch = this.View.contentHeight();
+    const canvasW = this.canvas.width;
+    const canvasH = this.canvas.height;
+
+    const fitScale = Math.min(canvasW / cw, canvasH / ch);
+    const centerOffsetX = (canvasW - cw * fitScale) / 2;
+    const centerOffsetY = (canvasH - ch * fitScale) / 2;
+
+    this.commentFitScale = fitScale;
+    this.commentCenterOffsetX = centerOffsetX;
+    this.commentCenterOffsetY = centerOffsetY;
+
+    const mockComments = this.getMockComments();
+    this.commentBaseCoords = mockComments.map(function(c) {
+      var pagxX = c.cocraftX - originX;
+      var pagxY = c.cocraftY - originY;
+      return {
+        id: c.id,
+        text: c.text,
+        color: c.color,
+        baseX: pagxX * fitScale + centerOffsetX,
+        baseY: pagxY * fitScale + centerOffsetY,
+      };
+    });
+
+    // Apply current gesture state
+    if (this.gestureManager) {
+      this.updateCommentPositions(
+        this.gestureManager.zoom,
+        this.gestureManager.offsetX,
+        this.gestureManager.offsetY
+      );
+    }
+  },
+
+  // Recompute screen positions from cached base coords (called on each zoom/pan).
+  updateCommentPositions(zoom, panOffsetX, panOffsetY) {
+    if (!this.commentBaseCoords || !this.data.showComments) {
+      return;
+    }
+    var dpr = this.dpr;
+    var comments = this.commentBaseCoords.map(function(c) {
+      return {
+        id: c.id,
+        text: c.text,
+        color: c.color,
+        screenX: (c.baseX * zoom + panOffsetX) / dpr,
+        screenY: (c.baseY * zoom + panOffsetY) / dpr,
+      };
+    });
+    this.setData({ comments: comments });
   },
 });
