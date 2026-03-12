@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "XMLDOM.h"
+#include "pagx/xml/XMLDOM.h"
 #include <stack>
 #include <utility>
-#include "XMLParser.h"
+#include "pagx/xml/XMLParser.h"
 
 namespace pagx {
 
@@ -72,6 +72,7 @@ class DOMParser : public XMLParser {
     node->firstChild = nullptr;
     node->attributes.swap(_attributes);
     node->type = _elementType;
+    node->line = _pendingLine;
 
     if (_root == nullptr) {
       node->nextSibling = nullptr;
@@ -98,6 +99,7 @@ class DOMParser : public XMLParser {
     _needToFlush = true;
     _elementName = std::move(element);
     _elementType = type;
+    _pendingLine = currentLine();
     ++_level;
   }
 
@@ -114,6 +116,7 @@ class DOMParser : public XMLParser {
   std::string _elementName;
   DOMNodeType _elementType = DOMNodeType::Element;
   int _level = 0;
+  int _pendingLine = 0;
 };
 
 // ============== XMLDOM ==============

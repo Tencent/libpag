@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test background color with semi-transparent content -->
+<pagx version="1.0" width="200" height="200">
+  <Layer alpha="0.5">
+    <Ellipse center="100,100" size="160,160"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+</pagx>

@@ -69,6 +69,12 @@ void PathData::close() {
   _verbs.push_back(PathVerb::Close);
 }
 
+void PathData::setPathData(const PathData& other) {
+  _verbs = other._verbs;
+  _points = other._points;
+  _boundsDirty = true;
+}
+
 Rect PathData::getBounds() {
   if (!_boundsDirty) {
     return _cachedBounds;

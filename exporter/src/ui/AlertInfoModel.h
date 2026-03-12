@@ -84,7 +84,7 @@ class AlertInfoModel : public QAbstractListModel {
   QString errorMessage = "";
   QQuickWindow* alertWindow = nullptr;
   mutable QVariantMap alertInfoVariantMap;
-  static constexpr char documentationUrl[] = "https://pag.art/docs/pag-export-verify.html";
+  static constexpr char documentationUrl[] = "https://pag.io/docs/pag-export-verify.html";
   std::string lastOutputPath = "";
   std::string lastFilePath = "";
 };

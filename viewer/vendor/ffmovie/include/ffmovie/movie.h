@@ -232,9 +232,6 @@ class FFMOVIE_API MediaFormat {
   float getFloat(const std::string& name);
   std::string getString(const std::string& name);
   void* getCodecPar();
-  void* getCodecContext() {
-    return avCodecContext;
-  }
   // Get video header information, AnnexB format
   std::vector<std::shared_ptr<ByteData>> headers();
   void setInteger(std::string name, int value);
@@ -243,12 +240,8 @@ class FFMOVIE_API MediaFormat {
   void setString(std::string name, std::string value);
   void setCodecPar(void* value);
   void setHeaders(std::vector<std::shared_ptr<ByteData>> headers);
-  void setCodecContext(void* codecContext) {
-    avCodecContext = codecContext;
-  }
 
  private:
-  void* avCodecContext = nullptr;
   std::unordered_map<std::string, std::string> trackFormatMap{};
   void* _codecPar = nullptr;
   std::vector<std::shared_ptr<ByteData>> _headers;

@@ -18,15 +18,8 @@ original branch is untouched until the user explicitly confirms the result.
   conversation. Do not default to English.
 - **Do NOT pause or ask for confirmation during Steps 1, 2, and Phase A of
   Step 3.** Execute them in a single uninterrupted flow. **However, you MUST
-  stop and ask for user confirmation in Phase B** — this is the one and only
-  mandatory interaction point in the entire skill. See Phase B for details.
-- **NEVER use `$()`, backtick substitution, or shell variable assignment in
-  Bash tool calls** — the sandbox rejects all of these. Each Bash call must be
-  a plain, self-contained command with no dynamic expansion. When one command's
-  output is needed by another, run the first command in a separate Bash call,
-  read its output, then construct the next command as a literal string yourself
-  (i.e. paste the value directly into the command text).
-
+  stop and ask for user confirmation in Phase B** — see Phase B for details.
+  Phase D may present an optional push prompt — see Phase D for details.
 ---
 
 ## Step 1: Determine Range
@@ -49,73 +42,71 @@ argument is a branch name, a commit hash, or a range.
 For the default (empty) case: if HEAD equals the tracking point (nothing
 unpushed), inform the user and stop.
 
-Collect the commit list in `{squash_base}..{squash_end}` using a single
-`git log --first-parent --stat --format="%H %P %s"` command (newest first).
-The format includes commit hash, parent hashes (space-separated), and subject
-— parent hashes with two or more entries identify merge commits.
-`--first-parent` ensures that only the current branch's own commits are listed
-— commits brought in by merge points (e.g. merging main into the branch) are
-**not expanded** and do not appear individually. Each merge point itself
-appears as a single merge commit in the list and will be preserved as-is in
-Step 3. If the range is empty, inform the user and stop.
+### Collect commits
+
+Run a **single** command to collect the commit list:
+
+```
+git log --first-parent --stat=200 --format="---commit%nH: %H%nP: %P%nS: %s" {squash_base}..{squash_end}
+```
+
+This produces structured blocks separated by `---commit`, with labeled lines
+for hash (`H:`), parents (`P:`), and subject (`S:`). The `--stat` file list
+follows each block. `--stat=200` ensures file lists are not truncated.
+`--first-parent` ensures only the current branch's own commits are listed —
+merge points appear as single commits (identifiable by multiple hashes on the
+`P:` line). If the range is empty, inform the user and stop.
+
+### Build the commit table
+
+After collecting the log, **immediately** produce a numbered summary table in
+**chronological order** (oldest = #1). This table is the **index** for all
+subsequent steps.
+
+```
+ #  | Hash    | Subject
+  1 | abc1234 | Add foo module.
+  2 | def5678 | Fix bar crash on empty input.
+  3 | 1112222 | Add unit tests for foo.
+...
+```
+
+Each row: sequence number, short hash (7 chars), and the full subject line.
+Mark merge commits with `[merge]` after the hash. File lists are already in
+the raw log output above — refer back to them during grouping as needed.
+Do not duplicate file lists into the table.
 
 ---
 
 ## Step 2: Analyze & Propose
 
-Using the `git log` output from Step 1:
+Work entirely from the commit table built in Step 1.
 
-### Analysis passes
+### Grouping
 
-**`git diff` must NEVER be used to decide grouping, and NEVER for individual
-commits.** The only permitted use is in Pass 2: one `git diff` per **group**
-to read the combined diff for drafting the new commit message. No other Bash
-commands may be run during Step 2. All information needed for grouping is
-already in the Step 1 `git log` output (commit messages and `--stat` file
-lists).
+Walk through the table and identify groups of commits that belong to the same
+logical change. Two commits belong together when **either** condition is met:
 
-**Pre-pass — Mark merge commits**: Identify all merge commits (commits with
-two or more parents). Mark each as **[merge]** immediately — they are
-preserved as-is in Step 3 and take no further part in analysis. They act as
-segment boundaries that split the remaining commits into independent segments.
+1. **File overlap ≥ 30 %** — overlap ratio = (shared paths) / (smaller file
+   list size). Commits touching largely the same files likely belong to the
+   same unit of work.
+2. **Message similarity** — their subjects reference the same module, feature
+   keyword, or concern (e.g., both mention "TextBox", "excludeChildEffects",
+   "playground CMake"), or the later commit is a follow-up ("fix …", "wip",
+   "update …", "add tests for …", "update baseline for …").
 
-**Pass 1 — Scan and group**: Within each segment (non-merge commits between
-two adjacent merge commits, or between the range boundary and a merge commit),
-apply the **Grouping criteria** below to identify which adjacent commits
-should be merged.
+Once a group forms, compare the next commit against the **union** of all files
+in the group and the group's overall topic. Extend greedily.
 
-**Pass 2 — Draft messages**: For each squashed or reworded group, read the
-**single combined diff** spanning the group (`git diff <oldest>~1 <newest>` —
-using `<oldest>~1` so the oldest commit's changes are included) and use it to
-draft an accurate commit message. One diff per group, not per commit.
+Do **NOT** merge commits separated by a **[merge]** commit. Never reorder
+commits — only adjacent commits can be grouped.
 
-### Grouping criteria
+### Draft messages
 
-The task is simple: **walk through commits in order and check whether adjacent
-commits can be merged.** Never reorder commits. For example, if commit A and
-commit C are a revert pair but commit B sits between them, do NOT try to
-eliminate A and C — just evaluate A↔B and B↔C adjacency as usual.
-
-For each pair of adjacent non-merge commits, collect their `--stat` file lists
-and compute the **overlap ratio** = (number of shared paths) / (size of the
-smaller list). Merge the pair when **either** condition is met:
-
-1. **File overlap ≥ 50 %** — the commits modify largely the same files,
-   indicating work on the same functional module.
-2. **Message similarity** — no file overlap (or below 50 %), but their commit
-   messages clearly reference the same module or feature keyword (e.g., both
-   mention "TextBox", "squash skill", "CMake option"), or the later commit
-   carries a continuation signal ("fix …", "wip", "update", "clarify").
-
-Once two commits form a group, compare the next commit against the **union** of
-all files in the group using the same overlap ratio, and also check message
-similarity against the group's overall topic. Extend greedily.
-
-Do **NOT** merge when:
-
-- Neither condition is met — files are disjoint **and** messages point to
-  different topics.
-- Commits are separated by a merge commit.
+For each squashed group, draft a new commit message by synthesizing the
+original subjects in the group. **Never** run `git diff` or read file contents
+during Step 2 — all grouping and message drafting must use only the commit
+table (file lists and subjects).
 
 ### Commit message quality check
 
@@ -123,13 +114,15 @@ Review every non-grouped commit message against the project's commit
 conventions. Mark commits whose messages need rewriting (e.g., vague messages
 like "wip", "fix", "update", or messages violating the project's format).
 
-### Result
+### Output
 
 If nothing to merge or rewrite, inform the user the history is already clean
 and **stop — do not show a report or ask any questions**.
 
-Otherwise, mark each commit as **[keep]**, **[squash]**, **[reword]**, or
-**[merge]** and prepare the squash report (do not present it yet).
+Otherwise, produce the **execution plan**: an ordered list (chronological) of
+actions for Phase A, showing exactly which commits are [keep], [reword],
+[squash] (with group members), and [merge]. Also prepare the squash report
+(do not present it yet — it will be shown in Phase B).
 
 ### Report format
 
@@ -150,13 +143,9 @@ Squash report (7 commits → 4 commits):
 ```
 
 List in **reverse chronological order** (newest first, oldest last) — the same
-order as the `git log` output and the analysis in Pass 1. Unchanged commits
-show their original hash and message. Squashed or reworded entries show the
-proposed new message with the original commits listed below. The report covers
-**only** the analyzed range.
-
-Do **not** present the report here — it will be shown in Phase B for user
-confirmation.
+order as `git log`. Unchanged commits show their original hash and message.
+Squashed or reworded entries show the proposed new message with the original
+commits listed below. The report covers **only** the analyzed range.
 
 ---
 
@@ -174,8 +163,8 @@ pattern `squash-tmp-{branch_name}`. All operations below run **inside this
 worktree** — the user's working tree, staging area, and branch remain
 completely untouched until Phase C.
 
-Process the commits from **Step 1's list** (not a raw git range) in
-**chronological order** (oldest first) — reverse of Step 1's listing order:
+Process commits according to the execution plan from Step 2, in
+**chronological order** (oldest first):
 
 - **[keep]**: `git cherry-pick --allow-empty`. Batch consecutive [keep]
   commits into a single `git cherry-pick A B C ...` call.
@@ -192,7 +181,11 @@ Process the commits from **Step 1's list** (not a raw git range) in
   `git reset --hard HEAD` to sync the working tree.
 
 If any step fails, remove the temporary worktree and branch, inform the user,
-and stop.
+and stop. If a cherry-pick produces a conflict, resolve it automatically by
+running `git checkout --theirs <conflicted_file>` for each conflicted file,
+then `git add <conflicted_files>` and `git cherry-pick --continue --no-edit`.
+The integrity check at the end of Phase A will verify the final tree matches
+the original branch exactly.
 
 **Integrity check**: diff `{squash_end}` against the temporary branch HEAD —
 their trees must be identical. If different, abort (remove worktree and branch).
@@ -241,3 +234,23 @@ is stable and validation passes.
    `git branch --set-upstream-to`.
 
 Output: `Squash complete: {original_count} commits → {new_count} commits`
+
+---
+
+### Phase D — Offer to push
+
+After Phase C, check whether the squashed branch can be pushed **without**
+`--force`. The branch can be pushed normally when **both** conditions are true:
+
+1. The branch has an upstream tracking branch.
+2. The remote tracking point recorded in Step 1 is an ancestor of (or equal
+   to) the new branch HEAD — i.e., `git merge-base --is-ancestor
+   <remote_tracking_point> HEAD` succeeds.
+
+If the branch **cannot** be pushed normally (no upstream, or the remote
+tracking point is not an ancestor — meaning `--force` would be required),
+**do not offer to push**. End silently after the Phase C output.
+
+If the branch **can** be pushed normally, call `AskUserQuestion` with
+**Push** / **Skip** options asking whether to push now. If the user selects
+**Push**, run `git push`. If the user selects **Skip**, do nothing.

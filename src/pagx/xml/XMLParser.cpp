@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "XMLParser.h"
+#include "pagx/xml/XMLParser.h"
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
@@ -72,7 +72,7 @@ struct ParsingContext {
 };
 
 ParsingContext::ParsingContext(XMLParser* parser)
-    : _parser(parser), _XMLParser(XML_ParserCreate_MM(nullptr, &XML_alloc, nullptr)) {
+    : _XMLParser(XML_ParserCreate_MM(nullptr, &XML_alloc, nullptr)), _parser(parser) {
 }
 
 bool ParsingContext::flushText() {
@@ -189,6 +189,7 @@ bool XMLParser::parse(const uint8_t* data, size_t length) {
   if (!parsingContext._XMLParser) {
     return false;
   }
+  _expatParser = parsingContext._XMLParser.get();
 
   // Avoid calls to rand_s if this is not set. This seed helps prevent DOS
   // with a known hash sequence so an address is sufficient. The provided
@@ -203,13 +204,14 @@ bool XMLParser::parse(const uint8_t* data, size_t length) {
   XML_SetEntityDeclHandler(parsingContext._XMLParser, entity_decl_handler);
 
   if (length > static_cast<size_t>(std::numeric_limits<int>::max())) {
+    _expatParser = nullptr;
     return false;
   }
 
-  auto status =
-      XML_Parse(parsingContext._XMLParser, reinterpret_cast<const char*>(data),
-                static_cast<int>(length), true);
+  auto status = XML_Parse(parsingContext._XMLParser, reinterpret_cast<const char*>(data),
+                          static_cast<int>(length), true);
 
+  _expatParser = nullptr;
   return XML_STATUS_ERROR != status;
 }
 
@@ -254,6 +256,13 @@ bool XMLParser::endElement(const char* element) {
 
 bool XMLParser::text(const std::string& text) {
   return this->onText(text);
+}
+
+int XMLParser::currentLine() const {
+  if (!_expatParser) {
+    return 0;
+  }
+  return static_cast<int>(XML_GetCurrentLineNumber(static_cast<XML_Parser>(_expatParser)));
 }
 
 }  // namespace pagx

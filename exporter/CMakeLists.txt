@@ -138,7 +138,7 @@ list(APPEND PAG_EXPORTER_THIRD_PARTY_INCLUDES
         ../third_party/tgfx/third_party/json/include
         ../third_party/tgfx/third_party/libwebp/src
         vendor/TinyXML2
-        vendor/ffaudio/include)
+        ../viewer/vendor/ffmovie/include)
 
 if (APPLE)
     find_library(COCOA Cocoa REQUIRED)
@@ -159,10 +159,10 @@ if (APPLE)
     list(APPEND libs ${CORE_MEDIA})
     find_library(ICONV_LIBRARIES NAMES iconv libiconv libiconv-2 c)
     list(APPEND libs ${ICONV_LIBRARIES})
-    list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/ffaudio/mac/${ARCH}/libffaudio.dylib)
+    list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/../viewer/vendor/ffmovie/mac/${ARCH}/libffmovie.dylib)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum OS X deployment version" FORCE)
 elseif (WIN32)
-    list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/ffaudio/win/x64/ffaudio.lib)
+    list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/../viewer/vendor/ffmovie/win/x64/ffmovie.lib)
 endif ()
 
 set(PAG_USE_QT ON)

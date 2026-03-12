@@ -60,12 +60,12 @@ class Polystar : public Element {
   float rotation = 0.0f;
 
   /**
-   * The roundness of the outer points, ranging from 0 to 100. The default value is 0.
+   * The roundness of the outer points, ranging from 0 to 1. The default value is 0.
    */
   float outerRoundness = 0.0f;
 
   /**
-   * The roundness of the inner points, ranging from 0 to 100. Only applies when type is Star. The
+   * The roundness of the inner points, ranging from 0 to 1. Only applies when type is Star. The
    * default value is 0.
    */
   float innerRoundness = 0.0f;

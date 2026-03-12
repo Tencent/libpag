@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- File with large coordinates that should be localized -->
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Rectangle center="100,100" size="80,80"/>
+    <Ellipse center="100,100" size="40,40"/>
+    <Fill color="#9C27B0"/>
+  </Layer>
+</pagx>

@@ -16,15 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "SVGPathParser.h"
+#include "pagx/svg/SVGPathParser.h"
 #include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
-#include "utils/MathUtil.h"
+#include "base/utils/MathUtil.h"
 
 namespace pagx {
+
+using pag::PI;
 
 std::string PathDataToSVGString(const PathData& pathData) {
   std::string result;
@@ -154,7 +156,7 @@ static void ArcToCubics(PathData& path, float x1, float y1, float rx, float ry, 
   rx = std::abs(rx);
   ry = std::abs(ry);
 
-  float radians = angle * Pi / 180.0f;
+  float radians = angle * PI / 180.0f;
   float cosAngle = std::cos(radians);
   float sinAngle = std::sin(radians);
 
@@ -191,16 +193,19 @@ static void ArcToCubics(PathData& path, float x1, float y1, float rx, float ry, 
   float cy = sinAngle * cxp + cosAngle * cyp + (y1 + y2) / 2.0f;
 
   float theta1 = VectorAngle(1.0f, 0.0f, (x1p - cxp) / rx, (y1p - cyp) / ry);
-  float dtheta = VectorAngle((x1p - cxp) / rx, (y1p - cyp) / ry, (-x1p - cxp) / rx,
-                             (-y1p - cyp) / ry);
+  float dtheta =
+      VectorAngle((x1p - cxp) / rx, (y1p - cyp) / ry, (-x1p - cxp) / rx, (-y1p - cyp) / ry);
 
   if (!sweep && dtheta > 0) {
-    dtheta -= 2.0f * Pi;
+    dtheta -= 2.0f * PI;
   } else if (sweep && dtheta < 0) {
-    dtheta += 2.0f * Pi;
+    dtheta += 2.0f * PI;
   }
 
-  int segments = static_cast<int>(std::ceil(std::abs(dtheta) / (Pi / 2.0f)));
+  int segments = static_cast<int>(std::ceil(std::abs(dtheta) / (PI / 2.0f)));
+  if (segments == 0) {
+    return;
+  }
   float segmentAngle = dtheta / segments;
 
   float t = std::tan(segmentAngle / 2.0f);
@@ -261,6 +266,8 @@ PathData PathDataFromSVGString(const std::string& d) {
     if (ptr >= end) {
       break;
     }
+
+    const char* prevPtr = ptr;
 
     char command = *ptr;
     if (std::isalpha(command)) {
@@ -332,8 +339,8 @@ PathData PathDataFromSVGString(const std::string& d) {
       case 'C': {
         float x1, y1, x2, y2, x, y;
         if (!ParseNumber(ptr, end, x1) || !ParseNumber(ptr, end, y1) ||
-            !ParseNumber(ptr, end, x2) || !ParseNumber(ptr, end, y2) ||
-            !ParseNumber(ptr, end, x) || !ParseNumber(ptr, end, y)) {
+            !ParseNumber(ptr, end, x2) || !ParseNumber(ptr, end, y2) || !ParseNumber(ptr, end, x) ||
+            !ParseNumber(ptr, end, y)) {
           break;
         }
         if (isRelative) {
@@ -354,8 +361,8 @@ PathData PathDataFromSVGString(const std::string& d) {
       }
       case 'S': {
         float x2, y2, x, y;
-        if (!ParseNumber(ptr, end, x2) || !ParseNumber(ptr, end, y2) ||
-            !ParseNumber(ptr, end, x) || !ParseNumber(ptr, end, y)) {
+        if (!ParseNumber(ptr, end, x2) || !ParseNumber(ptr, end, y2) || !ParseNumber(ptr, end, x) ||
+            !ParseNumber(ptr, end, y)) {
           break;
         }
         if (isRelative) {
@@ -381,8 +388,8 @@ PathData PathDataFromSVGString(const std::string& d) {
       }
       case 'Q': {
         float x1, y1, x, y;
-        if (!ParseNumber(ptr, end, x1) || !ParseNumber(ptr, end, y1) ||
-            !ParseNumber(ptr, end, x) || !ParseNumber(ptr, end, y)) {
+        if (!ParseNumber(ptr, end, x1) || !ParseNumber(ptr, end, y1) || !ParseNumber(ptr, end, x) ||
+            !ParseNumber(ptr, end, y)) {
           break;
         }
         if (isRelative) {
@@ -428,8 +435,7 @@ PathData PathDataFromSVGString(const std::string& d) {
         bool largeArc, sweep;
         if (!ParseNumber(ptr, end, rx) || !ParseNumber(ptr, end, ry) ||
             !ParseNumber(ptr, end, arcAngle) || !ParseFlag(ptr, end, largeArc) ||
-            !ParseFlag(ptr, end, sweep) || !ParseNumber(ptr, end, x) ||
-            !ParseNumber(ptr, end, y)) {
+            !ParseFlag(ptr, end, sweep) || !ParseNumber(ptr, end, x) || !ParseNumber(ptr, end, y)) {
           break;
         }
         if (isRelative) {
@@ -452,6 +458,13 @@ PathData PathDataFromSVGString(const std::string& d) {
       default:
         ++ptr;
         break;
+    }
+    if (ptr == prevPtr) {
+      // ParseNumber or ParseFlag failed — skip to the next command letter or end of string.
+      while (ptr < end && !std::isalpha(*ptr)) {
+        ++ptr;
+      }
+      lastCommand = 0;
     }
   }
 

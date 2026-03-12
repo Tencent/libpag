@@ -260,15 +260,17 @@ PAGX uses a standard 2D Cartesian coordinate system:
 
 `<pagx>` is the root element of a PAGX document, defining the canvas dimensions and directly containing the layer list.
 
+> [Sample](samples/3.2_document_structure.pagx)
+
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `version` | string | (required) | Format version |
 | `width` | float | (required) | Canvas width |
 | `height` | float | (required) | Canvas height |
 
-**Layer Rendering Order**: Layers are rendered sequentially in document order; layers earlier in the document render first (below); later layers render last (above).
+**Canvas Clipping**: The canvas defined by `width` and `height` acts as the rendering boundary. Any content extending beyond the canvas area is clipped and not rendered.
 
-> [Sample](samples/3.2_document_structure.pagx)
+**Layer Rendering Order**: Layers are rendered sequentially in document order; layers earlier in the document render first (below); later layers render last (above).
 
 ### 3.3 Resources
 
@@ -554,27 +556,24 @@ Painters (Fill, Stroke, etc.) bound to a layer are divided into background conte
 2. **Background Content**: Render Fill and Stroke with `placement="background"`
 3. **Child Layers**: Recursively render all child layers in document order
 4. **Layer Styles (above)**: Render layer styles positioned above content (e.g., inner shadows)
-5. **Foreground Content**: Render Fill and Stroke with `placement="foreground"`
+5. **Foreground Content**: Render Fill and Stroke with `placement="foreground"` (drawn above child layers)
 6. **Layer Filters**: Use the combined output of previous steps as input to the filter chain, applying all filters sequentially
 
 #### Layer Content
 
-**Layer content** refers to the complete rendering result of the layer's background content, child layers, and foreground content. Layer styles compute their effects based on layer content. For example, when fill is background and stroke is foreground, the stroke renders above child layers, but drop shadows are still calculated based on the complete layer content including fill, child layers, and stroke.
+**Layer content** refers to the complete rendering result of the layer's background content, child layers, and foreground content (steps 2, 3, and 5 in the rendering pipeline). It does not include layer styles or layer filters.
+
+Layer styles compute their effects based on layer content. For example, when fill is placed in background content and stroke is placed in foreground content, the stroke renders above child layers, but drop shadows are still calculated based on the complete layer content including fill, child layers, and stroke.
 
 #### Layer Contour
 
-**Layer contour** is used for masking and certain layer styles. Compared to normal layer content, layer contour has these differences:
+**Layer contour** is a binary (opaque or fully transparent) mask derived from the layer content. Compared to normal layer content, layer contour has these differences:
 
-1. **Includes geometry drawn with alpha=0**: Geometric shapes filled with completely transparent fills are included in the contour
-2. **Solid fills and gradient fills**: Original fills are ignored and replaced with opaque white drawing
-3. **Image fills**: Original pixels are preserved, but semi-transparent pixels are converted to fully opaque (fully transparent pixels are preserved)
+1. **Alpha=0 fills are included**: Geometry painted with completely transparent color is still included in the contour
+2. **Solid color / gradient fills**: Original colors are replaced with opaque white
+3. **Image fills**: Fully transparent pixels remain transparent; all other pixels become fully opaque
 
-Note: Geometry elements must have painters to participate in the contour; standalone geometry elements (Rectangle, Ellipse, etc.) without corresponding Fill or Stroke do not participate in contour calculation.
-
-Layer contour is primarily used for:
-
-- **Layer Styles**: Some layer styles require contour as one of their input sources
-- **Masking**: `maskType="contour"` uses the mask layer's contour for clipping
+Note: Geometry elements without painters (standalone Rectangle, Ellipse, etc.) do not participate in contour.
 
 #### Layer Background
 
@@ -627,7 +626,6 @@ Layer child elements are automatically categorized into four collections by type
 | `antiAlias` | bool | true | Edge anti-aliasing |
 | `groupOpacity` | bool | false | Group opacity |
 | `passThroughBackground` | bool | true | Whether to pass background through to child layers |
-| `excludeChildEffectsInLayerStyle` | bool | false | Whether layer styles exclude child layer effects |
 | `scrollRect` | Rect | - | Scroll clipping region "x,y,w,h" |
 | `mask` | idref | - | Mask layer reference "@id" |
 | `maskType` | MaskType | alpha | Mask type |
@@ -658,7 +656,7 @@ Layer styles add visual effects above or below layer content without modifying t
 
 **Input Sources for Layer Styles**:
 
-All layer styles compute effects based on **layer content**. In layer styles, layer content is automatically converted to **Opaque mode**: geometric shapes are rendered with normal fills, then all semi-transparent pixels are converted to fully opaque (fully transparent pixels are preserved). This means shadows produced by semi-transparent fills appear the same as those from fully opaque fills.
+All layer styles compute effects based on **layer content**. During computation, layer content is converted to its opaque counterpart: geometric shapes are rendered with their normal fills, then all semi-transparent pixels are converted to fully opaque (fully transparent pixels are preserved). This means shadows produced by semi-transparent fills appear the same as those from fully opaque fills.
 
 Some layer styles additionally use **layer contour** or **layer background** as input (see individual style descriptions). Definitions of layer contour and layer background are in Section 4.1.
 
@@ -669,10 +667,13 @@ Some layer styles additionally use **layer contour** or **layer background** as 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `blendMode` | BlendMode | normal | Blend mode (see Section 2.9) |
+| `excludeChildEffects` | bool | false | Whether to exclude child layer effects |
+
+**excludeChildEffects**: When `false` (default), the layer style computes based on the full layer content including child layers' rendering results. When `true`, child layers' styles and filters are excluded from the layer content used to compute this style, but child layers' base rendering results are still included.
 
 #### 4.3.1 DropShadowStyle
 
-Draws a drop shadow **below** the layer. Computes shadow shape based on opaque layer content. When `showBehindLayer="false"`, additionally uses **layer contour** as an erase mask to cut out the portion occluded by the layer.
+Draws a drop shadow **below** the layer. Computes shadow shape based on opaque layer content.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -738,13 +739,13 @@ Unlike layer styles (Section 4.3), which **independently render** visual effects
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `blurX` | float | (required) | X blur radius |
-| `blurY` | float | (required) | Y blur radius |
+| `blurX` | float | 0 | X blur radius |
+| `blurY` | float | 0 | Y blur radius |
 | `tileMode` | TileMode | decal | Tile mode |
 
 #### 4.4.2 DropShadowFilter
 
-Generates shadow effect based on filter input. Unlike DropShadowStyle, the filter projects from original rendering content and preserves semi-transparency, whereas the style projects from opaque layer content. The two also support different attribute features.
+Generates shadow effect based on filter input. Unlike DropShadowStyle, the filter projects from original rendering content and preserves semi-transparency, whereas the style projects from opaque layer content.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -795,7 +796,7 @@ Transforms colors using a 4×5 color matrix.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `matrix` | Matrix | (required) | 4x5 color matrix (20 comma-separated floats) |
+| `matrix` | Matrix | identity matrix | 4x5 color matrix (20 comma-separated floats) |
 
 **Matrix Format** (20 values, row-major):
 ```
@@ -839,7 +840,7 @@ The VectorElement system employs an **accumulate-render** processing model: geom
 | Term | Elements | Description |
 |------|----------|-------------|
 | **Geometry Elements** | Rectangle, Ellipse, Polystar, Path, Text | Elements providing geometric shapes; accumulate as a geometry list in the context |
-| **Modifiers** | TrimPath, RoundCorner, MergePath, TextModifier, TextPath, TextLayout, Repeater | Transform accumulated geometry |
+| **Modifiers** | TrimPath, RoundCorner, MergePath, TextModifier, TextPath, TextBox, Repeater | Transform accumulated geometry |
 | **Painters** | Fill, Stroke | Perform fill or stroke rendering on accumulated geometry |
 | **Containers** | Group | Create isolated scopes and apply matrix transforms; merge upon completion |
 
@@ -868,7 +869,7 @@ Geometry Elements        Modifiers              Painters
 │ Polystar │          │MergePath │          └────┬─────┘
 │   Path   │          │TextModif │               │
 │   Text   │          │ TextPath │               │
-└────┬─────┘          │TextLayout│               │
+└────┬─────┘          │TextBox   │               │
      │                │ Repeater │               │
      │                └────┬─────┘               │
      │                     │                     │
@@ -890,7 +891,7 @@ Different modifiers have different scopes over elements in the geometry list:
 | Modifier Type | Target | Description |
 |---------------|--------|-------------|
 | Shape modifiers (TrimPath, RoundCorner, MergePath) | Paths only | Trigger forced conversion for text |
-| Text modifiers (TextModifier, TextPath, TextLayout) | Glyph lists only | No effect on Paths |
+| Text modifiers (TextModifier, TextPath, TextBox) | Glyph lists only | No effect on Paths |
 | Repeater | Paths + glyph lists | Affects all geometry simultaneously |
 
 ### 5.2 Geometry Elements
@@ -1041,18 +1042,20 @@ Defines arbitrary shapes using SVG path syntax, supporting inline data or refere
 Text elements provide geometric shapes for text content. Unlike shape elements that produce a single Path, Text produces a **glyph list** (multiple glyphs) after shaping, which accumulates in the rendering context's geometry list for subsequent modifier transformation or painter rendering.
 
 ```xml
-<Text text="Hello World" position="100,200" fontFamily="Arial" fontStyle="Bold" fontSize="24" letterSpacing="0" baselineShift="0"/>
+<Text text="Hello World" position="100,200" fontFamily="Arial" fontStyle="Regular" fauxBold="true" fauxItalic="false" fontSize="24" letterSpacing="0" textAnchor="start"/>
 ```
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `text` | string | "" | Text content |
-| `position` | Point | 0,0 | Text start position, y is baseline (may be overridden by TextLayout) |
-| `fontFamily` | string | system default | Font family |
-| `fontStyle` | string | "Regular" | Font variant (Regular, Bold, Italic, Bold Italic, etc.) |
+| `position` | Point | 0,0 | Text start position, y is baseline |
+| `fontFamily` | string | "" | Font family (empty string means system default) |
+| `fontStyle` | string | "" | Font variant (Regular, Bold, Italic, Bold Italic, etc.). Empty string means the font's default variant |
 | `fontSize` | float | 12 | Font size |
 | `letterSpacing` | float | 0 | Letter spacing |
-| `baselineShift` | float | 0 | Baseline shift (positive shifts up, negative shifts down) |
+| `fauxBold` | bool | false | Faux bold (algorithmically bolded) |
+| `fauxItalic` | bool | false | Faux italic (algorithmically slanted) |
+| `textAnchor` | TextAnchor | start | Text anchor alignment relative to the origin (see below). Ignored when a TextBox controls the layout |
 
 Child elements: `CDATA` text, `GlyphRun`*
 
@@ -1075,10 +1078,20 @@ Line 3]]>
 
 **Rendering Modes**: Text supports **pre-layout** and **runtime layout** modes. Pre-layout provides pre-computed glyphs and positions via GlyphRun child nodes, rendering with embedded fonts for cross-platform consistency. Runtime layout performs shaping and layout at runtime; due to platform differences in fonts and layout features, minor inconsistencies may occur. For pixel-perfect reproduction of design tool layouts, pre-layout is recommended.
 
+**TextAnchor (Text Anchor Alignment)**:
+
+Controls how text is positioned relative to its origin point.
+
+| Value | Description |
+|-------|-------------|
+| `start` | The origin is at the start of the text. No offset is applied |
+| `center` | The origin is at the center of the text. Text is offset by half its width to center on the origin |
+| `end` | The origin is at the end of the text. Text is offset by its full width so it ends at the origin |
+
 **Runtime Layout Rendering Flow**:
 1. Find system font based on `fontFamily` and `fontStyle`; if unavailable, select fallback font according to runtime-configured fallback list
-2. Shape using `text` attribute (or CDATA child node); newlines trigger line breaks (default 1.2× font size line height, customizable via TextLayout)
-3. Apply typography parameters: `fontSize`, `letterSpacing`, `baselineShift`
+2. Shape using `text` attribute (or CDATA child node); newlines trigger line breaks (default 1.2× font size line height, customizable via TextBox)
+3. Apply typography parameters: `fontSize`, `letterSpacing`
 4. Construct glyph list and accumulate to rendering context
 
 **Runtime Layout Example**:
@@ -1295,9 +1308,9 @@ Merges all shapes into a single shape.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `mode` | MergePathOp | append | Merge operation (see below) |
+| `mode` | MergePathMode | append | Merge operation (see below) |
 
-**MergePathOp**:
+**MergePathMode**:
 
 | Value | Description |
 |-------|-------------|
@@ -1329,7 +1342,7 @@ When a text modifier is encountered, **all glyph lists** accumulated in the cont
   <Text text="Hello " fontFamily="Arial" fontSize="24"/>
   <Text text="World" fontFamily="Arial" fontSize="24"/>
   <TextModifier position="0,-5"/>
-  <TextLayout position="100,50" textAlign="center"/>
+  <TextBox position="100,50" textAlign="center"/>
   <Fill color="#333333"/>
 </Group>
 ```
@@ -1407,16 +1420,14 @@ Applies transforms and style overrides to glyphs within selected ranges. TextMod
 
 **Selector Calculation**:
 1. Calculate selection range based on RangeSelector's `start`, `end`, `offset` (supports any decimal value; automatically wraps when exceeding [0,1] range)
-2. Calculate influence factor (0~1) for each glyph based on `shape`
-3. Combine multiple selectors according to `mode`
+2. Calculate raw influence value (0~1) for each glyph based on `shape`, then multiply by `weight`
+3. Combine multiple selectors according to `mode`, then clamp the combined result to [-1, 1]
+
+```
+factor = clamp(combine(rawInfluence₁ × weight₁, rawInfluence₂ × weight₂, ...), -1, 1)
+```
 
 **Transform Application**:
-
-The `factor` calculated by the selector ranges from [-1, 1] and controls the degree to which transform properties are applied:
-
-```
-factor = clamp(selectorFactor × weight, -1, 1)
-```
 
 Position and rotation are applied linearly with factor. Transforms are applied in the following order:
 
@@ -1491,12 +1502,12 @@ Range selectors define the glyph range and influence degree for TextModifier.
 
 | Value | Description |
 |-------|-------------|
-| `add` | Add: Accumulate selector weights |
-| `subtract` | Subtract: Subtract selector weights |
-| `intersect` | Intersect: Use the intersection of selector ranges |
-| `min` | Min: Take the minimum of selector values |
-| `max` | Max: Take maximum value |
-| `difference` | Difference: Take absolute difference |
+| `add` | Add: `result = a + b` |
+| `subtract` | Subtract: `result = b ≥ 0 ? a × (1 − b) : a × (−1 − b)` |
+| `intersect` | Intersect: `result = a × b` |
+| `min` | Min: `result = min(a, b)` |
+| `max` | Max: `result = max(a, b)` |
+| `difference` | Difference: `result = |a − b|` |
 
 #### 5.5.5 TextPath
 
@@ -1539,43 +1550,45 @@ redistributed evenly to fill the available path length.
 
 **Closed Paths**: For closed paths, glyphs exceeding the range wrap to the other end of the path.
 
-#### 5.5.6 TextLayout
+#### 5.5.6 TextBox
 
-TextLayout is a text layout modifier that applies typography to accumulated Text elements. It overrides the original positions of Text elements (similar to how TextPath overrides positions). Two modes are supported:
+TextBox is a text layout node that applies typography to accumulated Text elements. It re-layouts all glyph positions according to its own position, size, and alignment settings. The layout results are written into each Text element's GlyphRun data with inverse-transform compensation, so that Text's own position and parent Group transforms remain effective in the rendering pipeline. The first line is positioned using the line-box model: the line box near edge is aligned to the near edge of the text area, and the baseline is placed at `halfLeading + ascent` from the near edge, where `halfLeading = (lineHeight - metricsHeight) / 2` and `metricsHeight = ascent + descent + leading` from the font metrics. Following CSS Writing Modes conventions, `lineHeight` is a logical property that always applies to the block-axis dimension of a line box. In vertical mode, it controls the column width rather than the line height. Columns are spaced by `lineHeight` (center-to-center distance). When `lineHeight` is 0 (auto), the column width is calculated from font metrics (ascent + descent + leading), same as horizontal auto line height. Columns flow from right to left.
 
-- **Point Text Mode** (no width): Text does not auto-wrap; textAlign controls text alignment relative to the (x, y) anchor point
-- **Paragraph Text Mode** (with width): Text auto-wraps within the specified width
+TextBox is a **pre-layout-only** node: it is processed during the typesetting stage before rendering and is not instantiated in the render tree. If all accumulated Text elements already contain embedded GlyphRun data, the TextBox is skipped during typesetting. However, the TextBox node should still be retained even when embedded GlyphRun data and fonts are present, as design tools may read its layout attributes (size, alignment, wordWrap, etc.) for editing purposes.
 
-During rendering, an attached text typesetting module performs pre-layout, recalculating each glyph's position. TextLayout is expanded during pre-layout, with glyph positions written directly into Text.
+Unlike other modifiers that operate on accumulated results in a chain (e.g., TrimPath modifies the path output of previous elements), TextBox only affects the **initial layout** of Text elements. It determines glyph positions before the modifier chain begins. Subsequent modifiers such as TextPath and TextModifier operate on the TextBox layout results. The position of TextBox in the node order does not change this behavior.
 
-> [Sample](samples/5.5.6_text_layout.pagx)
+> [Sample](samples/5.5.6_text_box.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `position` | Point | 0,0 | Layout origin |
-| `width` | float | auto | Layout width (auto-wraps when specified) |
-| `height` | float | auto | Layout height (enables vertical alignment when specified) |
-| `textAlign` | TextAlign | start | Horizontal alignment |
-| `verticalAlign` | VerticalAlign | top | Vertical alignment |
+| `position` | Point | 0,0 | Top-left corner of the text area |
+| `size` | Size | 0,0 | Layout size. When width or height is 0, text has no boundary in that dimension, which may cause wordWrap or overflow to have no effect |
+| `textAlign` | TextAlign | start | Text alignment along the inline direction |
+| `paragraphAlign` | ParagraphAlign | near | Paragraph alignment along the block-flow direction |
 | `writingMode` | WritingMode | horizontal | Layout direction |
-| `lineHeight` | float | 1.2 | Line height multiplier |
+| `lineHeight` | float | 0 | Line height in pixels. 0 means auto (calculated from font metrics: ascent + descent + leading). Following CSS Writing Modes conventions, this is a logical property: in vertical mode it controls column width |
+| `wordWrap` | bool | true | Enable automatic word wrapping at the box width boundary (horizontal mode) or height boundary (vertical mode). Has no effect when that dimension of size is 0 |
+| `overflow` | Overflow | visible | Overflow behavior when text exceeds the box height (horizontal mode) or width (vertical mode). Has no effect when that dimension of size is 0 |
 
-**TextAlign (Horizontal Alignment)**:
+**TextAlign (Text Alignment)**:
 
 | Value | Description |
 |-------|-------------|
-| `start` | Start alignment (left-aligned; right-aligned for RTL text) |
+| `start` | Start alignment |
 | `center` | Center alignment |
-| `end` | End alignment (right-aligned; left-aligned for RTL text) |
+| `end` | End alignment |
 | `justify` | Justified (last line start-aligned) |
 
-**VerticalAlign (Vertical Alignment)**:
+**ParagraphAlign (Paragraph Alignment)**:
+
+Aligns text lines or columns along the block-flow direction. Uses direction-neutral names (Near/Far instead of Top/Bottom) that work correctly for both horizontal and vertical writing modes. In horizontal mode this controls vertical positioning; in vertical mode this controls horizontal positioning.
 
 | Value | Description |
 |-------|-------------|
-| `top` | Top alignment |
-| `center` | Vertical center |
-| `bottom` | Bottom alignment |
+| `near` | Near-edge alignment (top in horizontal mode, right in vertical mode) using the line-box model. The first line box's near edge is aligned to the near edge of the text area. The baseline is positioned at `halfLeading + ascent` from the near edge, where `halfLeading = (lineHeight - metricsHeight) / 2`. |
+| `middle` | Middle alignment. The total text block size (sum of all line heights/column widths) is centered within the corresponding box dimension. |
+| `far` | Far-edge alignment (bottom in horizontal mode, left in vertical mode). The last line box's far edge is aligned to the far edge of the text area. |
 
 **WritingMode (Layout Direction)**:
 
@@ -1584,13 +1597,20 @@ During rendering, an attached text typesetting module performs pre-layout, recal
 | `horizontal` | Horizontal text |
 | `vertical` | Vertical text (columns arranged right-to-left, traditional CJK vertical layout) |
 
+**Overflow (Overflow Behavior)**:
+
+| Value | Description |
+|-------|-------------|
+| `visible` | Text exceeding box boundaries is still rendered (default) |
+| `hidden` | Lines that exceed the box height (horizontal mode) or columns that exceed the box width (vertical mode) are discarded entirely. Partial lines/columns are never shown. Has no effect when that dimension of size is 0 |
+
 #### 5.5.7 Rich Text
 
-Rich text is achieved through multiple Text elements within a Group, each Text having independent Fill/Stroke styles. TextLayout provides unified typography.
+Rich text is achieved through multiple Text elements within a Group, each Text having independent Fill/Stroke styles. TextBox provides unified typography.
 
 > [Sample](samples/5.5.7_rich_text.pagx)
 
-**Note**: Each Group's Text + Fill/Stroke defines a text segment with independent styling. TextLayout treats all segments as a single unit for typography, enabling auto-wrapping and alignment.
+**Note**: Each Group's Text + Fill/Stroke defines a text segment with independent styling. TextBox treats all segments as a single unit for typography, enabling auto-wrapping and alignment.
 
 ### 5.6 Repeater
 
@@ -1756,7 +1776,7 @@ This appendix describes node categorization and nesting rules.
 | **Layer Styles** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle` |
 | **Layer Filters** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter` |
 | **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` |
-| **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `TextLayout`, `Repeater` |
+| **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `TextBox`, `Repeater` |
 | **Painters** | `Fill`, `Stroke` |
 
 ### A.2 Document Containment
@@ -1808,7 +1828,7 @@ Layer / Group
 ├── MergePath
 ├── TextModifier → RangeSelector*
 ├── TextPath
-├── TextLayout
+├── TextBox
 ├── Repeater
 └── Group* (recursive)
 ```
@@ -1848,14 +1868,17 @@ Layer / Group
 | Enum | Values |
 |------|--------|
 | **TrimType** | `separate`, `continuous` |
-| **MergePathOp** | `append`, `union`, `intersect`, `xor`, `difference` |
+| **MergePathMode** | `append`, `union`, `intersect`, `xor`, `difference` |
 | **SelectorUnit** | `index`, `percentage` |
 | **SelectorShape** | `square`, `rampUp`, `rampDown`, `triangle`, `round`, `smooth` |
 | **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
 | **TextAlign** | `start`, `center`, `end`, `justify` |
-| **VerticalAlign** | `top`, `center`, `bottom` |
+| **TextAnchor** | `start`, `center`, `end` |
+| **ParagraphAlign** | `near`, `middle`, `far` |
 | **WritingMode** | `horizontal`, `vertical` |
 | **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |
+| **Overflow** | `visible`, `hidden` |
+
 ---
 
 ## Appendix C. Common Usage Examples
@@ -1866,27 +1889,33 @@ The following example covers all major node types in PAGX, demonstrating complet
 
 > [Sample](samples/C.1_complete_example.pagx)
 
-### C.2 RPG Character Panel
+### C.2 App Icons
 
-A fantasy RPG-style character status panel demonstrating complex UI composition with nested layers, gradients, and decorative elements.
+A frosted-glass icon grid — 12 multi-color icons on a dark background with soft color fields and backdrop blur cards. Demonstrates icon construction with Path-based vector shapes, Composition reuse, BackgroundBlurStyle, and DropShadowStyle.
 
-> [Sample](samples/C.2_rpg_character_panel.pagx)
+> [Sample](samples/C.2_app_icons.pagx)
 
 ### C.3 Nebula Cadet
 
-A space-themed cadet profile card showcasing nebula effects, star fields, and modern UI design patterns.
+A full-screen UI panel with top navigation bar, avatar, progress bars, action buttons, currency chips, and bottom tab bar. Demonstrates typical application interface layout and component composition.
 
 > [Sample](samples/C.3_nebula_cadet.pagx)
 
 ### C.4 Game HUD
 
-A game heads-up display (HUD) demonstrating health bars, score displays, and game interface elements.
+A sci-fi heads-up display with a targeting reticle, arc-shaped health and energy gauges, radar mini-map, ammo counter, and mission objectives bar. Demonstrates Repeater-driven tick marks, TrimPath on arc Strokes, ConicGradient sweeps, and layered mask effects.
 
 > [Sample](samples/C.4_game_hud.pagx)
 
 ### C.5 PAGX Features Overview
 
-A comprehensive showcase of PAGX format capabilities including gradients, effects, text styling, and vector graphics.
+An infographic / presentation slide introducing PAGX capabilities — center title with orbit ring, five feature cards connected by dashed lines, and a conversion pipeline strip. Demonstrates TextBox multi-line layout, card-based information architecture, and decorative connector graphics.
 
 > [Sample](samples/C.5_pagx_features.pagx)
+
+### C.6 Space Explorer
+
+An illustrated alien planet scene with an astronaut, exotic flora, alien creatures, and atmospheric effects. Demonstrates complex scene composition with layered backgrounds, hand-drawn Path artwork, procedurally generated grass fields via long Path data, and rich gradient lighting.
+
+> [Sample](samples/C.6_space_explorer.pagx)
 

@@ -102,3 +102,10 @@ public
 spec/node_modules
 spec/package-lock.json
 
+# PAGX CLI npm link
+cli/npm/darwin
+cli/npm/linux
+cli/npm/win32
+cli/npm/node_modules
+cli/npm/package-lock.json
+

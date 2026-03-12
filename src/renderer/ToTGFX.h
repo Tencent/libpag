@@ -24,10 +24,13 @@
 #include "pagx/types/Color.h"
 #include "pagx/types/Data.h"
 #include "pagx/types/FillRule.h"
+#include "pagx/types/FilterMode.h"
 #include "pagx/types/LayerPlacement.h"
 #include "pagx/types/MaskType.h"
 #include "pagx/types/Matrix.h"
+#include "pagx/types/Matrix3D.h"
 #include "pagx/types/MergePathMode.h"
+#include "pagx/types/MipmapMode.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/Rect.h"
 #include "pagx/types/RepeaterOrder.h"
@@ -38,8 +41,10 @@
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/TileMode.h"
 
@@ -57,8 +62,6 @@ enum class SelectorMode;
 }  // namespace tgfx
 
 namespace pagx {
-
-tgfx::Path PathDataToTGFXPath(const PathData& pathData);
 
 tgfx::Point ToTGFX(const Point& point);
 
@@ -95,6 +98,12 @@ tgfx::SelectorShape ToTGFX(SelectorShape shape);
 tgfx::SelectorMode ToTGFX(SelectorMode mode);
 
 tgfx::TileMode ToTGFX(TileMode mode);
+
+tgfx::FilterMode ToTGFX(FilterMode mode);
+
+tgfx::MipmapMode ToTGFX(MipmapMode mode);
+
+tgfx::Matrix3D ToTGFX3D(const Matrix3D& matrix3D);
 
 std::shared_ptr<tgfx::Data> ToTGFXData(const std::shared_ptr<Data>& data);
 

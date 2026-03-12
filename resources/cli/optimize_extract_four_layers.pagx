@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="400" height="400">
+  <Layer name="a" x="50" y="50">
+    <Ellipse size="30,30"/>
+    <Fill color="#00FF00"/>
+  </Layer>
+  <Layer name="b" x="150" y="50">
+    <Ellipse size="30,30"/>
+    <Fill color="#00FF00"/>
+  </Layer>
+  <Layer name="c" x="250" y="50">
+    <Ellipse size="30,30"/>
+    <Fill color="#00FF00"/>
+  </Layer>
+  <Layer name="d" x="350" y="50">
+    <Ellipse size="30,30"/>
+    <Fill color="#00FF00"/>
+  </Layer>
+</pagx>
