@@ -58,7 +58,8 @@ Page({
 
     // Comment overlays demo
     showComments: false,
-    comments: []
+    commentPins: [],        // Fixed base coords for WXS: [{id, text, color, baseX, baseY}]
+    commentTransform: null  // Dynamic transform for WXS: {zoom, panOffsetX, panOffsetY, dpr}
   },
 
   // State
@@ -71,12 +72,6 @@ Page({
   gestureJustStarted: false,
   fontData: null,
   emojiFontData: null,
-
-  // Comment overlay state (cached transform parameters)
-  commentBaseCoords: null,  // Array of {id, text, color, baseX, baseY}
-  commentFitScale: 0,
-  commentCenterOffsetX: 0,
-  commentCenterOffsetY: 0,
 
   async onLoad(options) {
     try {
@@ -373,8 +368,17 @@ Page({
       // Silently ignore errors
     }
 
-    // Sync comment overlay positions with the same zoom/pan values
-    this.updateCommentPositions(state.zoom, state.offsetX, state.offsetY);
+    // Update comment transform for WXS render-thread positioning
+    if (this.data.showComments) {
+      this.setData({
+        commentTransform: {
+          zoom: state.zoom,
+          panOffsetX: state.offsetX,
+          panOffsetY: state.offsetY,
+          dpr: this.dpr
+        }
+      });
+    }
   },
 
   // Touch Events
@@ -485,14 +489,12 @@ Page({
     const show = !this.data.showComments;
     if (show) {
       this.initCommentOverlays();
-    }
-    this.setData({ showComments: show });
-    if (show) {
-      this.updateCommentPositions(1, 0, 0);
+    } else {
+      this.setData({ showComments: false, commentPins: [], commentTransform: null });
     }
   },
 
-  // Compute and cache the fixed base coordinates for each comment (called once).
+  // Compute fixed base coordinates and set initial transform (called once per file load).
   initCommentOverlays() {
     if (!this.View) {
       return;
@@ -508,12 +510,8 @@ Page({
     const centerOffsetX = (canvasW - cw * fitScale) / 2;
     const centerOffsetY = (canvasH - ch * fitScale) / 2;
 
-    this.commentFitScale = fitScale;
-    this.commentCenterOffsetX = centerOffsetX;
-    this.commentCenterOffsetY = centerOffsetY;
-
     const mockComments = this.getMockComments();
-    this.commentBaseCoords = mockComments.map(function(c) {
+    const pins = mockComments.map(function(c) {
       var pagxX = c.cocraftX - originX;
       var pagxY = c.cocraftY - originY;
       return {
@@ -525,31 +523,24 @@ Page({
       };
     });
 
-    // Apply current gesture state
+    var zoom = 1;
+    var offsetX = 0;
+    var offsetY = 0;
     if (this.gestureManager) {
-      this.updateCommentPositions(
-        this.gestureManager.zoom,
-        this.gestureManager.offsetX,
-        this.gestureManager.offsetY
-      );
+      zoom = this.gestureManager.zoom;
+      offsetX = this.gestureManager.offsetX;
+      offsetY = this.gestureManager.offsetY;
     }
-  },
 
-  // Recompute screen positions from cached base coords (called on each zoom/pan).
-  updateCommentPositions(zoom, panOffsetX, panOffsetY) {
-    if (!this.commentBaseCoords || !this.data.showComments) {
-      return;
-    }
-    var dpr = this.dpr;
-    var comments = this.commentBaseCoords.map(function(c) {
-      return {
-        id: c.id,
-        text: c.text,
-        color: c.color,
-        screenX: (c.baseX * zoom + panOffsetX) / dpr,
-        screenY: (c.baseY * zoom + panOffsetY) / dpr,
-      };
+    this.setData({
+      showComments: true,
+      commentPins: pins,
+      commentTransform: {
+        zoom: zoom,
+        panOffsetX: offsetX,
+        panOffsetY: offsetY,
+        dpr: this.dpr
+      }
     });
-    this.setData({ comments: comments });
   },
 });

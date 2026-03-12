@@ -1,3 +1,4 @@
+<wxs src="./comment.wxs" module="commentWxs" />
 <view class="container">
   <!-- File Selector at Top -->
   <view class="file-selector">
@@ -28,7 +29,11 @@
   </view>
 
   <!-- Canvas Area -->
-  <view class="canvas-container">
+  <view 
+    class="canvas-container"
+    change:comment-transform="{{commentWxs.onTransformChanged}}"
+    comment-transform="{{commentTransform}}"
+  >
     <canvas 
       type="webgl" 
       id="pagx-canvas" 
@@ -38,13 +43,14 @@
       catchtouchend="onTouchEnd"
     ></canvas>
 
-    <!-- Comment Overlays -->
+    <!-- Comment Overlays (positioned by WXS on render thread) -->
     <block wx:if="{{showComments}}">
       <view 
-        wx:for="{{comments}}" 
+        wx:for="{{commentPins}}" 
         wx:key="id"
         class="comment-pin"
-        style="left:{{item.screenX}}px;top:{{item.screenY}}px;"
+        data-basex="{{item.baseX}}"
+        data-basey="{{item.baseY}}"
       >
         <view class="comment-dot" style="background:{{item.color}};"></view>
         <view class="comment-bubble">

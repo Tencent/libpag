@@ -1,0 +1,34 @@
+/**
+ * Copyright (C) 2026 Tencent. All Rights Reserved.
+ * WXS module for comment overlay positioning.
+ * Runs on the render thread to avoid setData latency during zoom/pan gestures.
+ */
+
+/**
+ * Called when commentTransform changes. Updates each comment pin's position
+ * directly on the render thread using the same zoom/pan values as the canvas.
+ */
+function onTransformChanged(newVal, oldVal, ownerInstance) {
+  if (!newVal || !newVal.zoom) {
+    return;
+  }
+  var zoom = newVal.zoom;
+  var panOffsetX = newVal.panOffsetX;
+  var panOffsetY = newVal.panOffsetY;
+  var dpr = newVal.dpr;
+  var pins = ownerInstance.selectAllComponents('.comment-pin');
+  for (var i = 0; i < pins.length; i++) {
+    var pin = pins[i];
+    var dataset = pin.getDataset();
+    var screenX = (dataset.basex * zoom + panOffsetX) / dpr;
+    var screenY = (dataset.basey * zoom + panOffsetY) / dpr;
+    pin.setStyle({
+      left: screenX + 'px',
+      top: screenY + 'px'
+    });
+  }
+}
+
+module.exports = {
+  onTransformChanged: onTransformChanged
+};
