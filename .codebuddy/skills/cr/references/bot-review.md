@@ -5,14 +5,44 @@ adversarial review mechanism (reviewer–verifier) to ensure high-quality issue
 detection, then posts all confirmed issues as line-level PR comments. Does NOT
 apply fixes, approve, or merge — only reviews and comments.
 
+For shared review mechanics (team setup, reviewer/verifier prompts, filter logic),
+see `teams-review.md`. This document covers bot-specific setup and output only.
+
+## Flow
+
+```
+Setup (validate PR, fetch diff)
+  │
+  │ (invalid PR / auth error / empty diff)
+  ├──────────────────────────────────────→ Stop
+  │
+  ↓
+Review (reviewer–verifier pipeline)
+  │
+  ↓
+Filter (de-dup, worth-reporting, line numbers)
+  │
+  │ (no issues)
+  ├──────────────────────────────────────→ Clean up → Success
+  │
+  ↓
+Output (post PR comments, print summary)
+  │
+  ↓
+Checklist Evolution (suggest new patterns)
+  │
+  ↓
+Clean up (delete temp branch) ──────────→ Done
+```
+
+Unlike teams mode, bot mode is a **single-pass pipeline** — no fix loop, no user
+confirmation. Issues are reported as PR comments for human follow-up.
+
 ## References
 
 | File | Purpose |
 |------|---------|
-| `code-checklist.md` | Code review checklist |
-| `doc-checklist.md` | Document review checklist |
-| `judgment-matrix.md` | Risk levels and worth-fixing criteria |
-| `checklist-evolution.md` | Checklist update flow and rules |
+| `teams-review.md` | Shared review mechanics (team setup, reviewer/verifier prompts, filter logic, checklists) |
 
 ---
 
@@ -45,6 +75,16 @@ permissions:
 ---
 
 ## Phase 1: Setup
+
+### Check prerequisites
+
+Verify `gh` CLI is available and authenticated:
+
+```bash
+gh auth status
+```
+
+If this command fails, print error message with setup instructions and stop.
 
 ### Validate PR
 
@@ -88,106 +128,42 @@ Store as `EXISTING_COMMENTS` for de-duplication in Phase 3.
 
 ### Module partition
 
-Partition files in scope into **review modules** for parallel review. Each
-module is a self-contained logical unit. Split large files by section/function
-group; group related small files together. Classify each module as `code`,
-`doc`, or `mixed`.
+See `teams-review.md` → Phase 1: Scope → Module partition.
 
 ---
 
 ## Phase 2: Review
 
-You are the **coordinator**. Create an Agent Team and dispatch reviewer and
-verifier agents. The reviewer–verifier adversarial pair is the core quality
-mechanism: reviewers find issues, verifiers challenge them. This two-party check
-significantly reduces false positives.
+See `teams-review.md` → Phase 2: Review (Team setup, Verification pipeline,
+Verifier prompt), with the following bot-specific adjustments:
 
-### Team setup
+### Reviewer prompt additions
 
-- One reviewer agent (`reviewer-N`) per module.
-- One **verifier** agent (`verifier`), shared across all modules.
-
-### Reviewer prompt
-
-Stance: **thorough** — discover as many real issues as possible, self-verify
-before submitting.
-
-Each reviewer receives:
-- **Scope**: file list + changed line ranges for its module. Reviewers fetch
-  diffs and read additional context themselves as needed.
-- **Checklist**: `code-checklist.md` for code, `doc-checklist.md` for doc, both
-  for mixed.
+In addition to the base reviewer prompt from `teams-review.md`:
 - **PR context**: `PR_BODY` content to understand the stated motivation. Verify
   the implementation actually achieves what the author describes.
-- **Evidence requirement**: every issue must have a code citation (file:line +
-  snippet) from the PR branch.
-- **Checklist exclusion**: see the exclusion section in the corresponding
-  checklist. Project rules loaded in context take priority.
-- **Self-check**: before submitting, re-read the relevant code and verify each
-  issue. Mark as confirmed or withdrawn. Only submit confirmed issues.
 - **Output format**: `[file:line] [A1/B2/C3] — [description] — [key lines]`
+  (include checklist item ID, e.g., A1, B2, C3)
 
-### Verification (pipeline)
+### Verification completion signal
 
-Stance: **adversarial** — default to doubting the reviewer, actively look for
-reasons each issue is wrong. Reject with real evidence, confirm if it holds up.
-
-The verifier runs as a **pipeline** — it does not wait for all reviewers to
-finish. As each reviewer sends a report, forward it to the verifier immediately:
-
-- **Quote verbatim**: wrap the reviewer's original content in a quote block.
-- **No rewriting**: do not summarize or merge multiple reports.
-- **One forward per reviewer**: each reviewer report is a separate message.
-- **Completion signal**: after forwarding the last reviewer's report, send a
-  separate message to the verifier stating: "All reviewer reports have been
-  forwarded. Please finalize your verdicts for all issues above." This prevents
-  the verifier from finishing early before all reports arrive.
-
-Include the following verbatim in the verifier's prompt:
-
-```
-You are a code review verifier. Your stance is adversarial — default to doubting the
-reviewer's conclusion and actively look for reasons why the issue might be wrong. Your
-job is to stress-test each issue so that only real problems survive.
-
-For each issue you receive:
-
-1. Read the cited code (file:line) and sufficient surrounding context.
-2. Actively try to disprove the issue: Is the reviewer's reasoning flawed? Is there
-   context that makes this a non-issue (e.g., invariants guaranteed by callers, platform
-   constraints, intentional design)? Does the code actually behave as the reviewer
-   claims? Look for the strongest counter-argument you can find.
-3. Output for each issue:
-   - Verdict: REJECT or CONFIRM
-   - Reasoning: for REJECT, state the concrete counter-argument. For CONFIRM, briefly
-     note what you checked and why no valid counter-argument exists.
-
-Important constraints:
-- Your counter-arguments must be grounded in real evidence from the code. Do not
-  fabricate hypothetical defenses or invent caller guarantees that are not visible in
-  the codebase.
-- A CONFIRM verdict is not a failure — it means the reviewer found a real issue and
-  your challenge validated it.
-- Reviewer reports arrive incrementally via the coordinator. Do NOT produce a final
-  summary until the coordinator explicitly tells you all reports have been forwarded.
-  Process each report as it arrives, but wait for the completion signal before
-  concluding.
-```
+After forwarding the last reviewer's report to the verifier, send a separate
+message stating: "All reviewer reports have been forwarded. Please finalize
+your verdicts for all issues above."
 
 ### After review
 
-Close all agents → Phase 3.
+Close all agents → Phase 3. Unlike teams mode, bot mode does not retain reviewers
+as fixers since bot mode only comments and never applies fixes.
 
 ---
 
 ## Phase 3: Filter — coordinator only
 
-Before entering this phase, confirm: (1) all reviewers have submitted their
-final reports; (2) the verifier has given a CONFIRM/REJECT verdict for every
-forwarded finding.
-
-Your stance here is **neutral** — trust no single party. Treat reviewer reports
-and verifier rebuttals as equally weighted inputs.
+See `teams-review.md` → Phase 3: Filter (entry conditions, stance), with the
+following bot-specific adjustments. Bot mode skips the Existence check step
+(teams-review.md Phase 3.2) — verifiers already confirmed issue existence during
+the review phase.
 
 ### 3.1 De-dup
 
@@ -195,39 +171,38 @@ and verifier rebuttals as equally weighted inputs.
 - Remove issues already in `EXISTING_COMMENTS` (same file, same line range,
   similar description)
 
-### 3.2 Existence check
-
-| Verifier verdict | Action |
-|-----------------|--------|
-| CONFIRM | Plausibility check — verify description matches cited code. Read code if anything looks off. |
-| REJECT | Read code. Evaluate both arguments. Drop only if counter-argument is sound. |
-
-### 3.3 Worth reporting
+### 3.2 Worth reporting
 
 Consult `judgment-matrix.md` for worth-fixing criteria. Discard issues that are
 not worth reporting (e.g., pure style preferences, speculative optimizations).
 
-### 3.4 Determine line numbers
+### 3.3 Determine line numbers
 
 For each confirmed issue, determine the exact line number in the **new** file
 (right side of diff). Read the actual file in the PR branch to confirm — do not
 derive from diff hunk offsets alone.
 
+### 3.4 Handle deleted lines
+
+GitHub PR review comments can only target lines that exist in the **new** file
+(additions or unchanged lines within the diff hunk). For issues involving deleted
+lines:
+
+- If the issue is about **why the deletion is wrong** (e.g., removed necessary
+  code), target the nearest surviving line in the same hunk and mention the
+  deleted line in the comment body.
+- If no suitable line exists in the hunk, add to `ORPHAN_ISSUES` list for
+  standalone comment (see Phase 4).
+
 ---
 
 ## Phase 4: Output
 
-### Clean up
-
-```bash
-git branch -D pr-{number} 2>/dev/null || true
-```
-
 ### If no issues found
 
-Print success message:
+Print success message and skip to Phase 6 (Clean up):
 ```
-✅ Code review passed. No issues found.
+Code review passed. No issues found.
 ```
 
 ### If issues found
@@ -277,7 +252,7 @@ Where `{priority}` is the checklist item ID (e.g., A2, B1, C7).
 
 After submitting line comments, **print** (not post to PR) a summary to stdout:
 ```
-⚠️ Code review found {N} issue(s). Comments posted to PR #{number}.
+Code review found {N} issue(s). Comments posted to PR #{number}.
 
 Issues:
 1. [A2] src/foo.cpp:42 — null pointer dereference risk
@@ -290,10 +265,72 @@ Summary:
 - C (Conventions & Documentation): Z issues
 ```
 
+**Error handling**: If the `gh api` call fails (network error, auth failure, rate
+limit), print the error to stderr and exit with code 2. Posting failure is a fatal
+error that requires attention.
+
+### Orphan issues
+
+If `ORPHAN_ISSUES` (from Phase 3.4) is not empty, post a **separate PR comment**
+listing these issues:
+
+```bash
+gh pr comment {number} --body '### ⚠️ Issues on Deleted Lines
+
+The following issues were found but could not be attached to specific lines
+(the affected code was deleted in this PR):
+
+1. [A2] `src/foo.cpp` (deleted line 42) — removed necessary null check
+2. [B1] `src/bar.cpp` (deleted line 88) — deleted error handling code
+...'
+```
+
+If this comment fails to post, print the error but continue — orphan issues are
+supplementary information.
+
 ---
 
 ## Phase 5: Checklist evolution
 
+Skip this phase if no issues were found in Phase 3 or no new patterns are identified.
+
 Review all confirmed issues from this session. If any represent a recurring
-pattern not covered by the current checklist, read `checklist-evolution.md` and
-follow its steps.
+pattern not covered by the current checklist, follow `checklist-evolution.md`
+Step 1 (Draft candidates) to identify new patterns.
+
+Since bot mode cannot modify repository files directly, post a **separate PR
+comment** (not a line-level review comment) proposing the checklist update:
+
+```bash
+gh pr comment {number} --body '### 📋 Suggested Checklist Update
+
+The following pattern was detected but is not covered by the current checklist:
+
+- **ID**: `[suggested-id]`
+- **Pattern**: [description]
+- **Why it matters**: [rationale]
+
+Consider adding this to `.codebuddy/skills/cr/references/code-checklist.md`.'
+```
+
+If the comment fails to post, skip silently — do not block the review workflow.
+
+---
+
+## Phase 6: Clean up
+
+```bash
+git branch -D pr-{number} 2>/dev/null || true
+```
+
+---
+
+## Exit Codes
+
+For CI/CD integration, the bot review process uses the following exit codes:
+
+| Code | Meaning |
+|------|---------|
+| 0 | Review passed — no issues found |
+| 1 | Review completed — issues found and posted to PR |
+| 2 | Setup or posting failed — invalid PR, auth error, API failure, or other fatal error |
