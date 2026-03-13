@@ -19,9 +19,7 @@
 #include <cstring>
 #include <iostream>
 #include <string>
-#include "cli/CommandAlign.h"
 #include "cli/CommandBounds.h"
-#include "cli/CommandDistribute.h"
 #include "cli/CommandFont.h"
 #include "cli/CommandFormat.h"
 #include "cli/CommandOptimize.h"
@@ -38,14 +36,12 @@ static void PrintUsage() {
             << "Usage: pagx <command> [options] <file>\n"
             << "\n"
             << "Commands:\n"
-            << "  validate     Validate PAGX structure against the specification\n"
-            << "  render       Render PAGX to an image file (supports crop and scale)\n"
-            << "  bounds       Query the precise bounds of a node or layer\n"
-            << "  font         Query font metrics or embed fonts into a PAGX file\n"
-            << "  format       Format a PAGX file (indentation and attribute ordering)\n"
-            << "  optimize     Validate, optimize, and format a PAGX file in one step\n"
-            << "  align        Align selected Layers along an edge or center line\n"
-            << "  distribute   Distribute selected Layers with equal spacing\n"
+            << "  validate   Validate PAGX structure against the specification\n"
+            << "  render     Render PAGX to an image file (supports crop and scale)\n"
+            << "  bounds     Query the precise bounds of a node or layer\n"
+            << "  font       Query font metrics or embed fonts into a PAGX file\n"
+            << "  format     Format a PAGX file (indentation and attribute ordering)\n"
+            << "  optimize   Validate, optimize, and format a PAGX file in one step\n"
             << "\n"
             << "Options:\n"
             << "  --help, -h       Show help\n"
@@ -88,13 +84,6 @@ int main(int argc, char* argv[]) {
   if (command == "optimize") {
     return pagx::cli::RunOptimize(argc - 1, argv + 1);
   }
-  if (command == "align") {
-    return pagx::cli::RunAlign(argc - 1, argv + 1);
-  }
-  if (command == "distribute") {
-    return pagx::cli::RunDistribute(argc - 1, argv + 1);
-  }
-
   std::cerr << "pagx: unknown command '" << command << "'\n";
   std::cerr << "Run 'pagx --help' for usage.\n";
   return 1;
