@@ -4,7 +4,7 @@
 
 在 Cocraft 中，用户可以在设计稿上添加评论标记。当设计稿导出为 PAGX 文件并在小程序端渲染时，需要将评论标记准确地叠加显示在对应位置上。
 
-本文档说明如何将 Cocraft 画布坐标系中的评论坐标转换为小程序屏幕坐标。
+本文档说明如何将 Cocraft 画布坐标系中的评论坐标转换为小程序屏幕像素位置，并提供完整的小程序端接入步骤。
 
 ---
 
@@ -55,86 +55,36 @@
 |------|------|
 | **Cocraft 画布** | 无限大的设计画布，坐标可以为任意正负数 |
 | **boundsOrigin** | PAGX 设计稿内容左上角在 Cocraft 画布中的坐标 |
-| **PAGX 内容坐标系** | 以设计稿左上角为原点 (0,0)，范围为 (0\~contentWidth, 0\~contentHeight) |
-| **Canvas 物理像素坐标系** | 小程序 Canvas 的像素坐标，PAGX 内容在其中等比缩放并居中显示 |
+| **fitScale** | PAGX 内容等比缩放到 Canvas 的缩放因子（contain 模式） |
+| **centerOffset** | 缩放后居中显示产生的偏移量 |
 
 ---
 
-## 转换步骤
+## 转换公式
 
 整个坐标转换分为两个阶段：
 
 ### 阶段一：初始定位（加载文件时计算一次）
 
-加载 PAGX 文件后，调用 `View.getContentTransform()` 获取所有变换参数：
+加载 PAGX 文件后，调用 `View.getContentTransform()` 一次性获取所有变换参数：
 
 ```js
 const t = View.getContentTransform();
 // t = { boundsOriginX, boundsOriginY, fitScale, centerOffsetX, centerOffsetY }
 ```
 
-然后对每个评论计算 canvas 物理像素坐标：
+然后对每个评论计算 Canvas 物理像素坐标（静态值，缓存后续复用）：
 
 ```
 baseX = (cocraftX - t.boundsOriginX) * t.fitScale + t.centerOffsetX
 baseY = (cocraftY - t.boundsOriginY) * t.fitScale + t.centerOffsetY
 ```
 
-这个公式做了两件事：
-
-**① 减去 boundsOrigin：** 将 Cocraft 绝对坐标转换为相对于 PAGX 内容左上角的偏移
-
-```
-            boundsOrigin
-            (-900, -193)
-                 ┌──────────────┐
-                 │              │  ● 评论A (pagxX=519, pagxY=262)
-                 │              │    pagxX > 450，在内容右侧外面
-                 │         ● 评论B (pagxX=181, pagxY=494)
-                 │           在内容内部
-                 └──────────────┘
-
-评论A: cocraftX = -381, cocraftY = 69
-pagxX = -381 - (-900) = 519    ← 超出 contentWidth(450)，在右侧外面
-pagxY =   69 - (-193) = 262
-
-评论B: cocraftX = -719, cocraftY = 301
-pagxX = -719 - (-900) = 181    ← 在 contentWidth(450) 内
-pagxY =  301 - (-193) = 494
-```
-
-> **说明：** 结果可以为负数（评论在内容左侧/上方）或超出内容尺寸（评论在内容右侧/下方），这都是正常的。
-
-**② 乘以 fitScale + 加 centerOffset：** PAGX 内容在 Canvas 中等比缩放并居中显示，评论坐标需要同样的变换
-
-```
-Canvas (1264 × 2237 物理像素)
-┌────────────────────────────────────┐
-│← centerOffsetX →│                  │
-│  ┌──────────────┐                  │
-│  │              │  ● 评论A (baseX=1346.9, baseY=637.1)
-│  │  PAGX 内容    │    在 Canvas 中也在内容右侧外面
-│  │  (缩放后)     │                  │
-│  │         ● 评论B (baseX=525.0, baseY=1201.4)
-│  │          在内容内部               │
-│  └──────────────┘                  │
-│                                    │
-└────────────────────────────────────┘
-
-评论A: baseX = 519 × 2.43 + 84.9 = 1346.9（在内容右侧外面）
-        baseY = 262 × 2.43 + 0    = 637.1
-
-评论B: baseX = 181 × 2.43 + 84.9 = 525.0（在内容内部）
-        baseY = 494 × 2.43 + 0    = 1201.4
-```
-
-`baseX` / `baseY` 是静态值，**只需在加载文件时计算一次**，后续缓存使用。
-
----
+> **说明：** 结果可以为负数（评论在内容左侧/上方）或超出 Canvas 范围（评论在内容右侧/下方），这都是正常的。
 
 ### 阶段二：动态定位（缩放/平移时每帧更新）
 
-用户手势操作（缩放、平移）会产生 `zoom`、`panOffsetX`、`panOffsetY` 三个动态参数。将 base 坐标转换为最终屏幕 CSS 像素位置：
+用户手势产生的 `zoom`、`panOffsetX`、`panOffsetY` 实时变化，需要将 base 坐标转换为屏幕 CSS 像素位置：
 
 ```
 screenX = (baseX × zoom + panOffsetX) / dpr
@@ -148,15 +98,12 @@ screenY = (baseY × zoom + panOffsetY) / dpr
 | panOffsetY | 0 | 垂直平移量（物理像素） |
 | dpr | 设备像素比 | 物理像素 → CSS 像素的换算因子 |
 
-> **为什么除以 dpr？** Canvas 使用物理像素坐标（确保高清渲染），而 WXML 元素使用 CSS 像素定位。`dpr` 是二者之间的换算比例。
+> **为什么除以 dpr？** Canvas 使用物理像素坐标（确保高清渲染），而 WXML 元素使用 CSS 像素定位。
 
----
-
-## 完整公式总结
+### 完整流程
 
 ```
-  加载 PAGX 后调用一次
-  const t = View.getContentTransform()
+  const t = View.getContentTransform()     ← 加载 PAGX 后调用一次
   ┌───────────────────────────────────────────────────┐
   │  t.boundsOriginX/Y   ← PAGX 内容在 Cocraft 的位置  │
   │  t.fitScale          ← 等比缩放因子                 │
@@ -181,40 +128,65 @@ screenY = (baseY × zoom + panOffsetY) / dpr
 
 ---
 
-## 参数获取方式
+## 小程序端接入步骤
 
-| 参数 | 获取方式 | 更新时机 |
-|------|----------|----------|
-| `boundsOriginX/Y` | `View.getContentTransform()` | 加载 PAGX 文件后 |
-| `fitScale` | `View.getContentTransform()` | 加载 PAGX 文件后 |
-| `centerOffsetX/Y` | `View.getContentTransform()` | 加载 PAGX 文件后 |
-| `dpr` | `wx.getSystemInfoSync().pixelRatio` | 页面加载时 |
-| `zoom, panOffsetX/Y` | 手势管理器输出 | 每次手势事件 |
-| `cocraftX/Y` | Cocraft 评论服务 | 业务数据 |
+### 前置条件
 
----
+- 已集成 PAGX Viewer SDK（`pagx-view.ts`），能正常渲染 PAGX 文件
+- 已获取评论数据（每个评论包含 `cocraftX`、`cocraftY` 坐标）
 
-## 代码示例
+### 第 1 步：准备 Page data
 
-### JS 端：计算 baseX/baseY（加载时调用一次）
+在 Page `data` 中声明评论相关的状态：
 
 ```js
-function calcCommentBasePositions(View, comments) {
-  var t = View.getContentTransform();
+Page({
+  data: {
+    commentPins: [],        // 评论基准坐标列表：[{id, baseX, baseY, text, color}]
+    commentTransform: null  // 动态变换参数：{zoom, panOffsetX, panOffsetY, dpr}
+  },
+  dpr: 2,   // 设备像素比，onLoad 时获取
+})
+```
 
-  return comments.map(function (c) {
+### 第 2 步：加载 PAGX 后计算评论基准坐标
+
+在 `View.loadPAGX()` 之后调用 `View.getContentTransform()` 计算每个评论的 `baseX`/`baseY`：
+
+```js
+// comments 来自评论服务，格式：[{id, cocraftX, cocraftY, text, color}]
+initCommentOverlays(comments) {
+  if (!this.View) return;
+
+  const t = this.View.getContentTransform();
+  const pins = comments.map(function(c) {
     return {
       id: c.id,
+      text: c.text,
+      color: c.color,
       baseX: (c.cocraftX - t.boundsOriginX) * t.fitScale + t.centerOffsetX,
       baseY: (c.cocraftY - t.boundsOriginY) * t.fitScale + t.centerOffsetY,
     };
   });
+
+  this.setData({
+    commentPins: pins,
+    commentTransform: {
+      zoom: 1,
+      panOffsetX: 0,
+      panOffsetY: 0,
+      dpr: this.dpr
+    }
+  });
 }
 ```
 
-### WXS 端：动态更新屏幕位置（每帧调用）
+### 第 3 步：创建 WXS 文件处理动态定位
+
+新建 `comment.wxs` 文件，在渲染线程上直接更新评论位置（避免 `setData` 延迟）：
 
 ```js
+// comment.wxs
 function onTransformChanged(newVal, oldVal, ownerInstance, instance) {
   if (!newVal || !newVal.zoom) return;
   var dataset = instance.getDataset();
@@ -222,24 +194,130 @@ function onTransformChanged(newVal, oldVal, ownerInstance, instance) {
   var screenY = (dataset.basey * newVal.zoom + newVal.panOffsetY) / newVal.dpr;
   instance.setStyle({ left: screenX + 'px', top: screenY + 'px' });
 }
+
+module.exports = { onTransformChanged: onTransformChanged };
 ```
 
-### WXML 模板
+### 第 4 步：WXML 模板
+
+在 Canvas 同级位置添加评论浮层。通过 `wxs` 引用 WXS 模块，`change:prop` 绑定变换回调：
 
 ```xml
+<!-- 引入 WXS 模块 -->
+<wxs src="./comment.wxs" module="commentWxs" />
+
+<!-- Canvas（PAGX 渲染区域） -->
+<canvas id="pagx-canvas" type="webgl2" ... />
+
+<!-- 评论浮层（与 Canvas 同级，共享同一个定位上下文） -->
 <view
   wx:for="{{commentPins}}"
   wx:key="id"
   class="comment-pin"
-  style="position:absolute;"
   data-basex="{{item.baseX}}"
   data-basey="{{item.baseY}}"
   change:prop="{{commentWxs.onTransformChanged}}"
   prop="{{commentTransform}}"
 >
-  <!-- 评论内容 -->
+  <view class="comment-dot" style="background:{{item.color}};"></view>
+  <view class="comment-bubble">
+    <text class="comment-text">{{item.text}}</text>
+  </view>
 </view>
 ```
+
+> **注意：** Canvas 和评论浮层需要在同一个 `position: relative` 的容器内，评论使用 `position: absolute` 定位。
+
+### 第 5 步：WXSS 样式
+
+```css
+/* 包裹 Canvas 和评论的容器 */
+.canvas-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* 评论标记 */
+.comment-pin {
+  position: absolute;
+  z-index: 50;
+  pointer-events: none;  /* 不拦截触摸事件，手势穿透到 Canvas */
+}
+
+.comment-dot {
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 50%;
+  border: 3rpx solid #fff;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.3);
+}
+
+.comment-bubble {
+  position: absolute;
+  left: 24rpx;
+  top: -8rpx;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 8rpx 16rpx;
+  border-radius: 8rpx;
+  white-space: nowrap;
+  max-width: 300rpx;
+}
+
+.comment-text {
+  color: #fff;
+  font-size: 20rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+```
+
+### 第 6 步：手势回调中同步更新评论变换
+
+每次手势（缩放/平移）回调时，将最新的变换参数通过 `setData` 传给 WXS：
+
+```js
+applyGestureState(state) {
+  if (!state || !this.View) return;
+
+  // 更新 PAGX 渲染引擎
+  this.View.updateZoomScaleAndOffset(state.zoom, state.offsetX, state.offsetY);
+
+  // 同步更新评论位置（WXS 渲染线程处理）
+  this.setData({
+    commentTransform: {
+      zoom: state.zoom,
+      panOffsetX: state.offsetX,
+      panOffsetY: state.offsetY,
+      dpr: this.dpr
+    }
+  });
+}
+```
+
+---
+
+## API 参考
+
+### `View.getContentTransform()`
+
+返回坐标转换所需的所有参数。加载 PAGX 文件后调用一次。
+
+**返回值：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `boundsOriginX` | number | PAGX 内容左上角在 Cocraft 画布中的 X 坐标 |
+| `boundsOriginY` | number | PAGX 内容左上角在 Cocraft 画布中的 Y 坐标 |
+| `fitScale` | number | 等比缩放因子（contain 模式） |
+| `centerOffsetX` | number | 水平居中偏移（物理像素） |
+| `centerOffsetY` | number | 垂直居中偏移（物理像素） |
+
+### `View.setBoundsOrigin(x, y)`
+
+手动设置 boundsOrigin，覆盖 PAGX 文件中的值。
 
 ---
 
@@ -247,7 +325,7 @@ function onTransformChanged(newVal, oldVal, ownerInstance, instance) {
 
 ### Q: 评论显示在画布外面怎么办？
 
-这是正常的。评论在 Cocraft 中可能就在设计稿外面（比如标注在旁边），转换后自然也在 PAGX 渲染区域外面。用户缩小画布后就能看到。
+这是正常的。评论在 Cocraft 中可能就在设计稿外面（比如标注在旁边），转换后自然也在 PAGX 渲染区域外面。用户缩小画布后就能看到。如果不希望显示画布外的评论，可以对 `baseX`/`baseY` 做范围判断后过滤。
 
 ### Q: boundsOriginX/Y 返回 0 怎么办？
 
@@ -255,6 +333,14 @@ function onTransformChanged(newVal, oldVal, ownerInstance, instance) {
 - 确认 Cocraft 导出时已将 `bounds-origin-x` / `bounds-origin-y` 写入 PAGX 文件根 SVG 元素的 `data-*` 属性
 - 或者在 JS 端手动调用 `View.setBoundsOrigin(x, y)` 设置
 
-### Q: 为什么用 WXS 而不是 setData 更新位置？
+### Q: 为什么用 WXS 而不是 setData 更新评论位置？
 
-`setData` 是异步的（逻辑层 → 渲染层通信），在快速缩放/平移时会导致评论标记跟不上画面。WXS 直接运行在渲染线程上，可以同步更新 DOM 样式，保证评论标记与画面同步移动。
+`setData` 是异步的（逻辑层 → 渲染层通信），在快速缩放/平移时会导致评论标记跟不上 PAGX 画面。WXS 直接运行在渲染线程上，可以同步更新 DOM 样式，保证评论标记与画面同步移动。
+
+### Q: 切换 PAGX 文件后需要重新计算吗？
+
+需要。每次调用 `View.loadPAGX()` 后，`getContentTransform()` 返回的参数可能不同（不同文件的 boundsOrigin、内容尺寸不同），必须重新调用 `initCommentOverlays()` 计算新的 `baseX`/`baseY`。
+
+### Q: Canvas 尺寸变化（如屏幕旋转）后需要重新计算吗？
+
+需要。Canvas 尺寸变化会影响 `fitScale` 和 `centerOffset`。调用 `View.updateSize()` 后需要重新调用 `getContentTransform()` 并重新计算所有评论的 `baseX`/`baseY`。
