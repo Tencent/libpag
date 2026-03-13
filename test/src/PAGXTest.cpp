@@ -24,17 +24,25 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/SVGImporter.h"
+#include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/ColorStop.h"
+#include "pagx/nodes/Composition.h"
+#include "pagx/nodes/DropShadowStyle.h"
+#include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
+#include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextModifier.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/StringParser.h"
 #include "renderer/FontEmbedder.h"
@@ -677,6 +685,194 @@ PAGX_TEST(PAGXTest, CustomDataRoundTrip) {
   auto* solid3 = doc3->findNode<pagx::SolidColor>("red");
   ASSERT_TRUE(solid3 != nullptr);
   EXPECT_EQ(solid3->customData, solid2->customData);
+}
+
+/**
+ * Test case: Verify customData round-trip for LayerStyle, LayerFilter, sub-nodes (ColorStop,
+ * RangeSelector), resource nodes (Composition, LinearGradient, PathData, Image), nested children,
+ * XML special characters, and empty customData preservation.
+ */
+PAGX_TEST(PAGXTest, CustomDataEdgeCases) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  ASSERT_TRUE(doc != nullptr);
+
+  // LayerStyle with customData.
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->name = "StyledLayer";
+  auto shadow = doc->makeNode<pagx::DropShadowStyle>();
+  shadow->offsetX = 5;
+  shadow->offsetY = 5;
+  shadow->color = {0, 0, 0, 0.5f};
+  shadow->customData["priority"] = "high";
+  layer->styles.push_back(shadow);
+
+  // LayerFilter with customData.
+  auto blur = doc->makeNode<pagx::BlurFilter>();
+  blur->blurX = 10;
+  blur->blurY = 10;
+  blur->customData["source"] = "user-input";
+  layer->filters.push_back(blur);
+
+  // LinearGradient resource with ColorStop sub-nodes.
+  auto gradient = doc->makeNode<pagx::LinearGradient>("grad1");
+  gradient->startPoint = {0, 0};
+  gradient->endPoint = {100, 0};
+  gradient->customData["origin"] = "figma";
+  auto stop1 = doc->makeNode<pagx::ColorStop>();
+  stop1->offset = 0;
+  stop1->color = {1, 0, 0, 1};
+  stop1->customData["role"] = "start";
+  auto stop2 = doc->makeNode<pagx::ColorStop>();
+  stop2->offset = 1;
+  stop2->color = {0, 0, 1, 1};
+  stop2->customData["role"] = "end";
+  gradient->colorStops.push_back(stop1);
+  gradient->colorStops.push_back(stop2);
+  auto fill = doc->makeNode<pagx::Fill>();
+  fill->color = gradient;
+  layer->contents.push_back(fill);
+
+  // Ellipse with empty customData — should produce no data-* attributes.
+  auto ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->size = {50, 50};
+  layer->contents.push_back(ellipse);
+
+  // XML special characters in customData value.
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {80, 60};
+  rect->customData["formula"] = "a<b&c>d\"e";
+  layer->contents.push_back(rect);
+
+  // Nested child layer.
+  auto child = doc->makeNode<pagx::Layer>();
+  child->name = "ChildLayer";
+  child->customData["depth"] = "1";
+  layer->children.push_back(child);
+
+  // Composition resource with customData.
+  auto comp = doc->makeNode<pagx::Composition>("comp1");
+  comp->width = 100;
+  comp->height = 100;
+  comp->customData["scene"] = "intro";
+  auto compLayer = doc->makeNode<pagx::Layer>();
+  compLayer->name = "CompLayer";
+  comp->layers.push_back(compLayer);
+
+  doc->layers.push_back(layer);
+
+  // Export.
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+
+  // Verify special characters are XML-escaped.
+  EXPECT_NE(xml.find("data-formula=\"a&lt;b&amp;c>d&quot;e\""), std::string::npos);
+
+  // Verify empty customData produces no data-* for Ellipse.
+  auto ellipsePos = xml.find("<Ellipse");
+  ASSERT_NE(ellipsePos, std::string::npos);
+  auto ellipseEnd = xml.find("/>", ellipsePos);
+  ASSERT_NE(ellipseEnd, std::string::npos);
+  std::string ellipseTag = xml.substr(ellipsePos, ellipseEnd - ellipsePos);
+  EXPECT_EQ(ellipseTag.find("data-"), std::string::npos);
+
+  // Re-import.
+  auto doc2 = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc2 != nullptr);
+  EXPECT_TRUE(doc2->errors.empty());
+
+  // Verify LayerStyle customData.
+  ASSERT_EQ(doc2->layers.size(), 1u);
+  auto* layer2 = doc2->layers[0];
+  ASSERT_EQ(layer2->styles.size(), 1u);
+  EXPECT_EQ(layer2->styles[0]->customData.at("priority"), "high");
+
+  // Verify LayerFilter customData.
+  ASSERT_EQ(layer2->filters.size(), 1u);
+  EXPECT_EQ(layer2->filters[0]->customData.at("source"), "user-input");
+
+  // Verify LinearGradient resource customData.
+  auto* grad2 = doc2->findNode<pagx::LinearGradient>("grad1");
+  ASSERT_TRUE(grad2 != nullptr);
+  EXPECT_EQ(grad2->customData.at("origin"), "figma");
+
+  // Verify ColorStop customData.
+  ASSERT_EQ(grad2->colorStops.size(), 2u);
+  EXPECT_EQ(grad2->colorStops[0]->customData.at("role"), "start");
+  EXPECT_EQ(grad2->colorStops[1]->customData.at("role"), "end");
+
+  // Verify empty customData.
+  ASSERT_GE(layer2->contents.size(), 3u);
+  EXPECT_TRUE(layer2->contents[1]->customData.empty());
+
+  // Verify XML special characters survived round-trip.
+  EXPECT_EQ(layer2->contents[2]->customData.at("formula"), "a<b&c>d\"e");
+
+  // Verify nested child layer customData.
+  ASSERT_EQ(layer2->children.size(), 1u);
+  EXPECT_EQ(layer2->children[0]->customData.at("depth"), "1");
+
+  // Verify Composition resource customData.
+  auto* comp2 = doc2->findNode<pagx::Composition>("comp1");
+  ASSERT_TRUE(comp2 != nullptr);
+  EXPECT_EQ(comp2->customData.at("scene"), "intro");
+
+  // Re-export and re-import to verify consistency.
+  std::string xml2 = pagx::PAGXExporter::ToXML(*doc2);
+  auto doc3 = pagx::PAGXImporter::FromXML(xml2);
+  ASSERT_TRUE(doc3 != nullptr);
+  ASSERT_EQ(doc3->layers.size(), 1u);
+  auto* layer3 = doc3->layers[0];
+  EXPECT_EQ(layer3->styles[0]->customData, layer2->styles[0]->customData);
+  EXPECT_EQ(layer3->filters[0]->customData, layer2->filters[0]->customData);
+  auto* grad3 = doc3->findNode<pagx::LinearGradient>("grad1");
+  ASSERT_TRUE(grad3 != nullptr);
+  EXPECT_EQ(grad3->colorStops[0]->customData, grad2->colorStops[0]->customData);
+  EXPECT_EQ(grad3->colorStops[1]->customData, grad2->colorStops[1]->customData);
+  EXPECT_EQ(layer3->contents[2]->customData, layer2->contents[2]->customData);
+  EXPECT_EQ(layer3->children[0]->customData, layer2->children[0]->customData);
+}
+
+/**
+ * Test case: Verify customData round-trip for TextModifier with RangeSelector sub-node.
+ */
+PAGX_TEST(PAGXTest, CustomDataTextModifierRangeSelector) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->name = "TextLayer";
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Hello";
+  text->fontSize = 24;
+  layer->contents.push_back(text);
+
+  auto modifier = doc->makeNode<pagx::TextModifier>();
+  modifier->customData["effect"] = "fade-in";
+  auto selector = doc->makeNode<pagx::RangeSelector>();
+  selector->start = 0;
+  selector->end = 1;
+  selector->customData["timing"] = "ease";
+  modifier->selectors.push_back(selector);
+  layer->contents.push_back(modifier);
+
+  doc->layers.push_back(layer);
+
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+  EXPECT_NE(xml.find("data-effect=\"fade-in\""), std::string::npos);
+  EXPECT_NE(xml.find("data-timing=\"ease\""), std::string::npos);
+
+  auto doc2 = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc2 != nullptr);
+  EXPECT_TRUE(doc2->errors.empty());
+  ASSERT_EQ(doc2->layers.size(), 1u);
+  ASSERT_GE(doc2->layers[0]->contents.size(), 2u);
+  auto* mod2 = doc2->layers[0]->contents[1];
+  EXPECT_EQ(mod2->customData.at("effect"), "fade-in");
+  auto* modifier2 = static_cast<pagx::TextModifier*>(mod2);
+  ASSERT_EQ(modifier2->selectors.size(), 1u);
+  EXPECT_EQ(modifier2->selectors[0]->customData.at("timing"), "ease");
 }
 
 }  // namespace pag

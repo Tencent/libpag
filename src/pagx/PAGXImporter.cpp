@@ -1007,7 +1007,7 @@ static ImagePattern* parseImagePattern(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static ColorStop* parseColorStop(const DOMNode* node, PAGXDocument* doc) {
-  auto stop = doc->makeNode<ColorStop>();
+  auto stop = makeNodeFromXML<ColorStop>(node, doc);
   stop->offset = getFloatAttribute(node, "offset", 0, doc);
   auto colorStr = getAttribute(node, "color");
   if (!colorStr.empty()) {

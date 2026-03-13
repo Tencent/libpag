@@ -323,6 +323,7 @@ static void writeColorStops(XMLBuilder& xml, const std::vector<ColorStop*>& stop
     xml.openElement("ColorStop");
     xml.addRequiredAttribute("offset", stop->offset);
     xml.addRequiredAttribute("color", ColorToHexString(stop->color, stop->color.alpha < 1.0f));
+    writeCustomData(xml, stop);
     xml.closeElementSelfClosing();
   }
 }
@@ -581,6 +582,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
             xml.addRequiredAttribute("skews", floatListToString(run->skews));
           }
 
+          writeCustomData(xml, run);
           xml.closeElementSelfClosing();
         }
         xml.closeElement();
@@ -732,6 +734,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
           xml.addAttribute("weight", rangeSelector->weight, 1.0f);
           xml.addAttribute("randomOrder", rangeSelector->randomOrder);
           xml.addAttribute("randomSeed", rangeSelector->randomSeed);
+          writeCustomData(xml, rangeSelector);
           xml.closeElementSelfClosing();
         }
         xml.closeElement();
@@ -1056,6 +1059,7 @@ static void writeResource(XMLBuilder& xml, const Node* node, const Options& opti
             xml.addAttribute("offset", pointToString(glyph->offset));
           }
           xml.addRequiredAttribute("advance", glyph->advance);
+          writeCustomData(xml, glyph);
           xml.closeElementSelfClosing();
         }
         xml.closeElement();
