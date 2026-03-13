@@ -938,7 +938,9 @@ PAGX_TEST(PAGXTest, CustomDataKeyValidation) {
 
   // Invalid keys.
   EXPECT_FALSE(pagx::Node::IsValidCustomDataKey(""));
+  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("-leading"));
   EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("trailing-"));
+  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("-"));
   EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("UPPER"));
   EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("has space"));
   EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("under_score"));

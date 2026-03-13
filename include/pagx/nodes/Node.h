@@ -226,7 +226,7 @@ class Node {
    * with a hyphen. The key should not include the "data-" prefix.
    */
   static bool IsValidCustomDataKey(const std::string& key) {
-    if (key.empty() || key.back() == '-') {
+    if (key.empty() || key.front() == '-' || key.back() == '-') {
       return false;
     }
     for (auto c : key) {
