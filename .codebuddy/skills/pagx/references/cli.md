@@ -281,25 +281,28 @@ specified.
 
 ---
 
-## pagx export-svg
+## pagx export
 
-Export a PAGX file to SVG format. Loads the input via the PAGX importer, converts the
-document to SVG using the SVG exporter, and writes the result. Import warnings are printed
+Export a PAGX file to another format. By default, exports to SVG. Loads the input via the
+PAGX importer, converts the document, and writes the result. Import warnings are printed
 but do not prevent export.
 
 ```bash
-pagx export-svg input.pagx                          # outputs input.svg
-pagx export-svg -o output.svg input.pagx
-pagx export-svg --indent 4 -o output.svg input.pagx
-pagx export-svg --no-xml-declaration -o output.svg input.pagx
+pagx export input.pagx                              # outputs input.svg
+pagx export -o output.svg input.pagx
+pagx export --format svg -o output.svg input.pagx
+pagx export --indent 4 -o output.svg input.pagx
+pagx export --no-xml-declaration -o output.svg input.pagx
 ```
 
 | Option | Description |
 |--------|-------------|
-| `-o, --output <path>` | Output SVG file path (default: input path with `.svg` extension) |
-| `--indent <n>` | Indentation spaces (default: 2, valid range: 0–16) |
-| `--no-xml-declaration` | Omit the `<?xml ...?>` declaration |
+| `-o, --output <path>` | Output file path (default: input path with format extension) |
+| `--format <type>` | Export format (default: inferred from output extension, fallback: `svg`) |
+| `--indent <n>` | SVG indentation spaces (default: 2, valid range: 0–16) |
+| `--no-xml-declaration` | Omit the `<?xml ...?>` declaration (SVG only) |
 
-By default the output file has the same base name as the input with a `.svg` extension
-(e.g., `foo.pagx` → `foo.svg`). Use `-o` to override. On success the command prints
-`pagx export-svg: wrote <path>` and exits 0; on failure it prints an error and exits 1.
+By default the output file has the same base name as the input with the format extension
+(e.g., `foo.pagx` → `foo.svg`). Use `-o` to override. The `--format` flag can be omitted
+when the output extension makes the format unambiguous. On success the command prints
+`pagx export: wrote <path>` and exits 0; on failure it prints an error and exits 1.

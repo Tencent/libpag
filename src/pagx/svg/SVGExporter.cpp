@@ -22,6 +22,7 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include "base/utils/MathUtil.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -44,11 +45,15 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/svg/SVGBlendMode.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/StringParser.h"
 
 namespace pagx {
+
+using pag::DegreesToRadians;
+using pag::FloatNearlyZero;
 
 //==============================================================================
 // SVGBuilder - SVG generation helper
@@ -222,28 +227,9 @@ struct FillStrokeInfo {
   const TextBox* textBox = nullptr;
 };
 
-static const char* BlendModeToSVGString(BlendMode mode) {
-  switch (mode) {
-    case BlendMode::Multiply:   return "multiply";
-    case BlendMode::Screen:     return "screen";
-    case BlendMode::Overlay:    return "overlay";
-    case BlendMode::Darken:     return "darken";
-    case BlendMode::Lighten:    return "lighten";
-    case BlendMode::ColorDodge: return "color-dodge";
-    case BlendMode::ColorBurn:  return "color-burn";
-    case BlendMode::HardLight:  return "hard-light";
-    case BlendMode::SoftLight:  return "soft-light";
-    case BlendMode::Difference: return "difference";
-    case BlendMode::Exclusion:  return "exclusion";
-    case BlendMode::Hue:        return "hue";
-    case BlendMode::Saturation: return "saturation";
-    case BlendMode::Color:      return "color";
-    case BlendMode::Luminosity: return "luminosity";
-    default:                    return nullptr;
-  }
-}
-
-static std::string colorToSVGString(const Color& color) {
+// Returns only the RGB hex string (#RRGGBB). Alpha is handled separately via
+// fill-opacity/stroke-opacity attributes, following standard SVG practice.
+static std::string ColorToSVGString(const Color& color) {
   int r = std::clamp(static_cast<int>(std::round(color.red * 255.0f)), 0, 255);
   int g = std::clamp(static_cast<int>(std::round(color.green * 255.0f)), 0, 255);
   int b = std::clamp(static_cast<int>(std::round(color.blue * 255.0f)), 0, 255);
@@ -252,14 +238,16 @@ static std::string colorToSVGString(const Color& color) {
   return buf;
 }
 
-static std::string colorToSVGStringWithAlpha(const Color& color, float* outAlpha) {
+static std::string ColorToSVGStringWithAlpha(const Color& color, float* outAlpha) {
   if (outAlpha) {
     *outAlpha = color.alpha;
   }
-  return colorToSVGString(color);
+  return ColorToSVGString(color);
 }
 
-static std::string colorToDisplayP3String(const Color& color) {
+// Emits a CSS color(display-p3 ...) value. Only used when the color source has
+// Display P3 color space values; sRGB colors use the standard #RRGGBB format.
+static std::string ColorToDisplayP3String(const Color& color) {
   return "color(display-p3 " + FloatToString(color.red) + " " + FloatToString(color.green) + " " +
          FloatToString(color.blue) + ")";
 }
@@ -280,7 +268,7 @@ static void appendP3ColorStyle(std::string& styleStr, const char* property,
   styleStr += ';';
   styleStr += property;
   styleStr += ':';
-  styleStr += colorToDisplayP3String(solid->color);
+  styleStr += ColorToDisplayP3String(solid->color);
   styleStr += ';';
   styleStr += property;
   styleStr += "-opacity:";
@@ -424,7 +412,7 @@ static std::string buildGroupTransform(const Group* group) {
     // Column-vector: R(-skewAxis) * ShearX * R(skewAxis)
     m = Matrix::Rotate(group->skewAxis) * m;
     Matrix shear = {};
-    shear.c = std::tan(group->skew * 3.14159265358979323846f / 180.0f);
+    shear.c = std::tan(DegreesToRadians(group->skew));
     m = shear * m;
     m = Matrix::Rotate(-group->skewAxis) * m;
   }
@@ -442,12 +430,14 @@ static std::string buildGroupTransform(const Group* group) {
 // SVGWriterContext - shared state across SVGWriter instances
 //==============================================================================
 
-struct SVGWriterContext {
-  int nextDefId = 0;
-
+class SVGWriterContext {
+ public:
   std::string generateId(const std::string& prefix) {
     return prefix + std::to_string(nextDefId++);
   }
+
+ private:
+  int nextDefId = 0;
 };
 
 //==============================================================================
@@ -527,7 +517,7 @@ void SVGWriter::writeGradientStops(const std::vector<ColorStop*>& stops) {
     _defs.openElement("stop");
     _defs.addAttribute("offset", FloatToString(stop->offset));
     float alpha = stop->color.alpha;
-    std::string srgbHex = colorToSVGString(stop->color);
+    std::string srgbHex = ColorToSVGString(stop->color);
     _defs.addAttribute("stop-color", srgbHex);
     if (alpha < 1.0f) {
       _defs.addAttribute("stop-opacity", FloatToString(alpha));
@@ -538,7 +528,7 @@ void SVGWriter::writeGradientStops(const std::vector<ColorStop*>& stops) {
       style += "stop-color:";
       style += srgbHex;
       style += ";stop-color:";
-      style += colorToDisplayP3String(stop->color);
+      style += ColorToDisplayP3String(stop->color);
       style += ";stop-opacity:";
       style += FloatToString(alpha);
       style += ';';
@@ -664,7 +654,7 @@ std::string SVGWriter::getColorSourceRef(const ColorSource* source, float* outAl
   }
   if (source->nodeType() == NodeType::SolidColor) {
     auto solid = static_cast<const SolidColor*>(source);
-    return colorToSVGStringWithAlpha(solid->color, outAlpha);
+    return ColorToSVGStringWithAlpha(solid->color, outAlpha);
   }
   if (source->nodeType() == NodeType::LinearGradient ||
       source->nodeType() == NodeType::RadialGradient) {
@@ -828,7 +818,7 @@ std::string SVGWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters)
         std::string idx = std::to_string(shadowIndex++);
         std::string floodResult = "blendFlood" + idx;
         _defs.openElement("feFlood");
-        _defs.addAttribute("flood-color", colorToSVGString(blend->color));
+        _defs.addAttribute("flood-color", ColorToSVGString(blend->color));
         if (blend->color.alpha < 1.0f) {
           _defs.addAttribute("flood-opacity", FloatToString(blend->color.alpha));
         }
@@ -1046,7 +1036,7 @@ void SVGWriter::writeEllipse(SVGBuilder& out, const Ellipse* ellipse, const Fill
                              const std::string& transform) {
   float rx = ellipse->size.width / 2;
   float ry = ellipse->size.height / 2;
-  if (std::abs(rx - ry) < 0.001f) {
+  if (FloatNearlyZero(rx - ry)) {
     out.openElement("circle");
     if (!transform.empty()) {
       out.addAttribute("transform", transform);
@@ -1118,6 +1108,7 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
     }
     switch (textBox->paragraphAlign) {
       case ParagraphAlign::Middle:
+        // Approximate baseline-to-center offset (~0.35em) for vertical text centering.
         y = textBox->position.y + textBox->size.height / 2 + text->fontSize * 0.35f;
         break;
       case ParagraphAlign::Far:
@@ -1284,7 +1275,7 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   }
 
   if (layer->mask != nullptr) {
-    if (layer->maskType == MaskType::Alpha) {
+    if (layer->maskType == MaskType::Alpha || layer->maskType == MaskType::Contour) {
       auto clipId = writeClipPathDef(layer->mask);
       out.addAttribute("clip-path", "url(#" + clipId + ")");
     } else {

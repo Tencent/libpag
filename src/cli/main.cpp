@@ -21,7 +21,7 @@
 #include <string>
 #include "cli/CommandAlign.h"
 #include "cli/CommandBounds.h"
-#include "cli/CommandExportSVG.h"
+#include "cli/CommandExport.h"
 #include "cli/CommandDistribute.h"
 #include "cli/CommandFont.h"
 #include "cli/CommandFormat.h"
@@ -45,7 +45,7 @@ static void PrintUsage() {
             << "  font         Query font metrics or embed fonts into a PAGX file\n"
             << "  format       Format a PAGX file (indentation and attribute ordering)\n"
             << "  optimize     Validate, optimize, and format a PAGX file in one step\n"
-            << "  export-svg   Export a PAGX file to SVG format\n"
+            << "  export       Export a PAGX file (default: SVG format)\n"
             << "  align        Align selected Layers along an edge or center line\n"
             << "  distribute   Distribute selected Layers with equal spacing\n"
             << "\n"
@@ -90,8 +90,8 @@ int main(int argc, char* argv[]) {
   if (command == "optimize") {
     return pagx::cli::RunOptimize(argc - 1, argv + 1);
   }
-  if (command == "export-svg") {
-    return pagx::cli::RunExportSVG(argc - 1, argv + 1);
+  if (command == "export") {
+    return pagx::cli::RunExport(argc - 1, argv + 1);
   }
   if (command == "align") {
     return pagx::cli::RunAlign(argc - 1, argv + 1);
