@@ -30,7 +30,7 @@ namespace pagx {
 class Rectangle : public Element {
  public:
   /**
-   * The position of the rectangle anchor point in the parent coordinate system.
+   * The position of the rectangle center point.
    */
   Point position = {};
 

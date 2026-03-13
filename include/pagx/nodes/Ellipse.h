@@ -30,7 +30,7 @@ namespace pagx {
 class Ellipse : public Element {
  public:
   /**
-   * The position of the ellipse anchor point in the parent coordinate system.
+   * The position of the ellipse center point.
    */
   Point position = {};
 

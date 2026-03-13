@@ -30,7 +30,7 @@ namespace pagx {
 class Polystar : public Element {
  public:
   /**
-   * The position of the polystar anchor point in the parent coordinate system.
+   * The position of the polystar center point.
    */
   Point position = {};
 
