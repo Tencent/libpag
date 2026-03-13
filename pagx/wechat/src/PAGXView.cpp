@@ -174,40 +174,45 @@ void PAGXView::buildLayers() {
   hasRenderedFirstFrame = false;
   pagxWidth = document->width;
   pagxHeight = document->height;
+  applyDocumentCustomData();
+  displayList.root()->removeChildren();
+  displayList.root()->addChild(contentLayer);
+  applyCenteringTransform();
+}
+
+void PAGXView::applyDocumentCustomData() {
   backgroundVisible = false;
   backgroundTGFXColor = tgfx::Color::FromRGBA(245, 245, 245);
-  auto* bgLayer = document->findNode<Layer>("backGroundColor");
-  if (bgLayer) {
-    auto visibleIt = bgLayer->customData.find("bg-visible");
-    if (visibleIt != bgLayer->customData.end()) {
-      backgroundVisible = (visibleIt->second == "true");
+  auto& customData = document->customData;
+  auto visibleIt = customData.find("bg-visible");
+  if (visibleIt != customData.end()) {
+    backgroundVisible = (visibleIt->second == "true");
+  }
+  if (backgroundVisible) {
+    auto colorIt = customData.find("bg-color");
+    if (colorIt != customData.end()) {
+      backgroundTGFXColor = ParseHexColor(colorIt->second);
     }
-    if (backgroundVisible) {
-      auto colorIt = bgLayer->customData.find("bg-color");
-      if (colorIt != bgLayer->customData.end()) {
-        backgroundTGFXColor = ParseHexColor(colorIt->second);
-      }
-      auto alphaIt = bgLayer->customData.find("bg-alpha");
-      if (alphaIt != bgLayer->customData.end()) {
-        char* end = nullptr;
-        float alpha = std::strtof(alphaIt->second.c_str(), &end);
-        if (end != alphaIt->second.c_str()) {
-          backgroundTGFXColor.alpha *= alpha;
-        }
+    auto alphaIt = customData.find("bg-alpha");
+    if (alphaIt != customData.end()) {
+      char* end = nullptr;
+      float alpha = std::strtof(alphaIt->second.c_str(), &end);
+      if (end != alphaIt->second.c_str()) {
+        backgroundTGFXColor.alpha *= alpha;
       }
     }
   }
-  if (bgLayer && !boundsOriginOverridden) {
-    auto originXIt = bgLayer->customData.find("bounds-origin-x");
-    if (originXIt != bgLayer->customData.end()) {
+  if (!boundsOriginOverridden) {
+    auto originXIt = customData.find("bounds-origin-x");
+    if (originXIt != customData.end()) {
       char* end = nullptr;
       float value = std::strtof(originXIt->second.c_str(), &end);
       if (end != originXIt->second.c_str()) {
         _boundsOriginX = value;
       }
     }
-    auto originYIt = bgLayer->customData.find("bounds-origin-y");
-    if (originYIt != bgLayer->customData.end()) {
+    auto originYIt = customData.find("bounds-origin-y");
+    if (originYIt != customData.end()) {
       char* end = nullptr;
       float value = std::strtof(originYIt->second.c_str(), &end);
       if (end != originYIt->second.c_str()) {
@@ -215,9 +220,6 @@ void PAGXView::buildLayers() {
       }
     }
   }
-  displayList.root()->removeChildren();
-  displayList.root()->addChild(contentLayer);
-  applyCenteringTransform();
 }
 
 void PAGXView::updateSize(int width, int height) {
@@ -258,6 +260,26 @@ void PAGXView::setBoundsOrigin(float x, float y) {
   _boundsOriginX = x;
   _boundsOriginY = y;
   boundsOriginOverridden = true;
+}
+
+val PAGXView::getContentTransform() const {
+  float fitScale = 0.0f;
+  float centerOffsetX = 0.0f;
+  float centerOffsetY = 0.0f;
+  if (_width > 0 && _height > 0 && pagxWidth > 0 && pagxHeight > 0) {
+    float scaleX = static_cast<float>(_width) / pagxWidth;
+    float scaleY = static_cast<float>(_height) / pagxHeight;
+    fitScale = std::min(scaleX, scaleY);
+    centerOffsetX = (static_cast<float>(_width) - pagxWidth * fitScale) * 0.5f;
+    centerOffsetY = (static_cast<float>(_height) - pagxHeight * fitScale) * 0.5f;
+  }
+  val result = val::object();
+  result.set("boundsOriginX", _boundsOriginX);
+  result.set("boundsOriginY", _boundsOriginY);
+  result.set("fitScale", fitScale);
+  result.set("centerOffsetX", centerOffsetX);
+  result.set("centerOffsetY", centerOffsetY);
+  return result;
 }
 
 void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY) {

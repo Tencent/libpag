@@ -16,8 +16,8 @@ const EMOJI_FONT_URL = 'https://pag.qq.com/wx_pagx_demo/fonts/NotoColorEmoji.ttf
 // PAGX sample files configuration
 const SAMPLE_FILES = [
   { 
-    name: 'Guidelines', 
-    url: 'https://pag.qq.com/wx_pagx_demo/Guidelines_4.pagx'
+    name: 'ios2666', 
+    url: 'https://pag.qq.com/wx_pagx_demo/ios2666.pagx'
   },
   { 
     name: 'ColorPicker', 
@@ -225,6 +225,10 @@ Page({
     
     // Load into View
     this.View.loadPAGX(data);
+    
+    // TODO: Remove after PAGX file embeds bounds-origin data.
+    // Manually set boundsOrigin for comment positioning verification.
+    this.View.setBoundsOrigin(-900, -193);
     
     // Re-initialize gesture manager with new content dimensions
     // NOTE: init() automatically resets all transforms and returns the reset state
@@ -468,20 +472,15 @@ Page({
 
   // ========== Comment Overlay Demo ==========
 
-  // Simulated comment data in cocraft canvas coordinates.
-  // In production, these would come from the cocraft comment service.
-  getMockComments() {
-    const cw = this.View.contentWidth();
-    const ch = this.View.contentHeight();
-    const originX = this.View.boundsOriginX();
-    const originY = this.View.boundsOriginY();
+  // Comment data in cocraft canvas coordinates.
+  // boundsOrigin: (-900, -193)
+  getComments() {
     return [
-      { id: 1, cocraftX: originX + cw * 0.25, cocraftY: originY + ch * 0.2,
-        text: 'Nice header!', color: '#ff4d4f' },
-      { id: 2, cocraftX: originX + cw * 0.5,  cocraftY: originY + ch * 0.5,
-        text: 'Center element', color: '#1890ff' },
-      { id: 3, cocraftX: originX + cw * 0.75, cocraftY: originY + ch * 0.8,
-        text: 'Check this area', color: '#52c41a' },
+      { id: 1, cocraftX: -381, cocraftY: 69,  text: 'Comment 1', color: '#ff4d4f' },
+      { id: 2, cocraftX: -398, cocraftY: 269, text: 'Comment 2', color: '#1890ff' },
+      { id: 3, cocraftX: -191,  cocraftY: 409, text: 'Comment 3', color: '#52c41a' },
+      { id: 4, cocraftX: -719,  cocraftY: 301, text: 'Comment 4', color: '#faad14' },
+      { id: 5, cocraftX: -1085,  cocraftY: 257, text: 'Comment 5', color: '#0000FF' },
     ];
   },
 
@@ -499,27 +498,16 @@ Page({
     if (!this.View) {
       return;
     }
-    const originX = this.View.boundsOriginX();
-    const originY = this.View.boundsOriginY();
-    const cw = this.View.contentWidth();
-    const ch = this.View.contentHeight();
-    const canvasW = this.canvas.width;
-    const canvasH = this.canvas.height;
+    const t = this.View.getContentTransform();
 
-    const fitScale = Math.min(canvasW / cw, canvasH / ch);
-    const centerOffsetX = (canvasW - cw * fitScale) / 2;
-    const centerOffsetY = (canvasH - ch * fitScale) / 2;
-
-    const mockComments = this.getMockComments();
-    const pins = mockComments.map(function(c) {
-      var pagxX = c.cocraftX - originX;
-      var pagxY = c.cocraftY - originY;
+    const comments = this.getComments();
+    const pins = comments.map(function(c) {
       return {
         id: c.id,
         text: c.text,
         color: c.color,
-        baseX: pagxX * fitScale + centerOffsetX,
-        baseY: pagxY * fitScale + centerOffsetY,
+        baseX: (c.cocraftX - t.boundsOriginX) * t.fitScale + t.centerOffsetX,
+        baseY: (c.cocraftY - t.boundsOriginY) * t.fitScale + t.centerOffsetY,
       };
     });
 

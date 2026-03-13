@@ -19,7 +19,7 @@
 import { RenderCanvas, WxCanvas } from './render-canvas';
 import { BackendContext } from './backend-context';
 import { destroyVerify } from './decorators';
-import type { PAGX, PAGXViewNative } from './types';
+import type { PAGX, PAGXViewNative, ContentTransform } from './types';
 import type { wx } from './interfaces';
 
 declare const wx: wx;
@@ -260,28 +260,7 @@ export class View {
 
   /**
    * Returns the x coordinate of the PAGX content bounds origin relative to the cocraft canvas
-   * origin. This value is read from the PAGX file's backGroundColor customData (bounds-origin-x)
-   * during buildLayers(), or set via setBoundsOrigin(). Can be negative.
-   *
-   * To convert a cocraft canvas coordinate to a PAGX content coordinate and position an overlay:
-   *
-   * @example
-   * ```ts
-   * // Once after buildLayers():
-   * const originX = view.boundsOriginX();
-   * const originY = view.boundsOriginY();
-   * const cw = view.contentWidth();
-   * const ch = view.contentHeight();
-   * const fitScale = Math.min(canvasW / cw, canvasH / ch);
-   * const centerOffsetX = (canvasW - cw * fitScale) / 2;
-   * const centerOffsetY = (canvasH - ch * fitScale) / 2;
-   * const baseX = (cocraftX - originX) * fitScale + centerOffsetX;
-   * const baseY = (cocraftY - originY) * fitScale + centerOffsetY;
-   *
-   * // On each zoom/pan gesture callback:
-   * const screenX = (baseX * zoom + panOffsetX) / dpr;
-   * const screenY = (baseY * zoom + panOffsetY) / dpr;
-   * ```
+   * origin. See getContentTransform() for the recommended coordinate conversion approach.
    */
   public boundsOriginX(): number {
     return this.nativeView!.boundsOriginX();
@@ -289,10 +268,31 @@ export class View {
 
   /**
    * Returns the y coordinate of the PAGX content bounds origin relative to the cocraft canvas
-   * origin. See boundsOriginX() for details.
+   * origin. See getContentTransform() for the recommended coordinate conversion approach.
    */
   public boundsOriginY(): number {
     return this.nativeView!.boundsOriginY();
+  }
+
+  /**
+   * Returns the content transform parameters for mapping cocraft canvas coordinates to canvas
+   * pixel positions. Call this once after loading a PAGX file to get the static transform needed
+   * for comment overlay positioning.
+   *
+   * @example
+   * ```ts
+   * // Once after loadPAGX():
+   * const t = view.getContentTransform();
+   * const baseX = (cocraftX - t.boundsOriginX) * t.fitScale + t.centerOffsetX;
+   * const baseY = (cocraftY - t.boundsOriginY) * t.fitScale + t.centerOffsetY;
+   *
+   * // On each zoom/pan gesture callback:
+   * const screenX = (baseX * zoom + panOffsetX) / dpr;
+   * const screenY = (baseY * zoom + panOffsetY) / dpr;
+   * ```
+   */
+  public getContentTransform(): ContentTransform {
+    return this.nativeView!.getContentTransform();
   }
 
   /**

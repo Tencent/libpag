@@ -58,6 +58,8 @@ export interface PAGXViewNative {
     boundsOriginX: () => number;
     /** Returns the y coordinate of the PAGX content bounds origin relative to cocraft canvas. */
     boundsOriginY: () => number;
+    /** Returns content transform parameters for mapping cocraft coordinates to canvas positions. */
+    getContentTransform: () => ContentTransform;
     /** Releases the native C++ object. */
     delete: () => void;
 }
@@ -72,6 +74,23 @@ export interface StringVector {
     get: (index: number) => string;
     /** Releases the underlying C++ object. Must be called after use to avoid memory leaks. */
     delete: () => void;
+}
+
+/**
+ * Content transform parameters for mapping cocraft canvas coordinates to canvas pixel positions.
+ * Returned by View.getContentTransform(). These values are static per file load and canvas size.
+ */
+export interface ContentTransform {
+    /** X coordinate of the PAGX content bounds origin in cocraft canvas coordinates. */
+    boundsOriginX: number;
+    /** Y coordinate of the PAGX content bounds origin in cocraft canvas coordinates. */
+    boundsOriginY: number;
+    /** Scale factor applied to fit PAGX content into the canvas (contain mode). */
+    fitScale: number;
+    /** Horizontal pixel offset for centering the scaled content in the canvas. */
+    centerOffsetX: number;
+    /** Vertical pixel offset for centering the scaled content in the canvas. */
+    centerOffsetY: number;
 }
 
 /**

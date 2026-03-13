@@ -138,9 +138,9 @@ class PAGXView {
 
   /**
    * Returns the x coordinate of the PAGX content bounds origin relative to the cocraft canvas
-   * origin. This value is read from the PAGX file's backGroundColor customData (bounds-origin-x)
-   * during buildLayers(), or set via setBoundsOrigin(). Can be negative. To convert a cocraft
-   * canvas coordinate to a PAGX content coordinate:
+   * origin. This value is read from the document's customData (bounds-origin-x) during
+   * buildLayers(), or set via setBoundsOrigin(). Can be negative. To convert a cocraft canvas
+   * coordinate to a PAGX content coordinate:
    *
    *   pagxX = cocraftX - view.boundsOriginX();
    *   pagxY = cocraftY - view.boundsOriginY();
@@ -159,12 +159,22 @@ class PAGXView {
 
   /**
    * Sets the bounds origin of the PAGX content relative to the cocraft canvas origin. This
-   * overrides any bounds-origin-x / bounds-origin-y values read from the PAGX file's
-   * backGroundColor customData. The values can be negative.
+   * overrides any values read from the document's customData. The values can be negative.
    * @param x The x coordinate of the content bounds origin in cocraft canvas coordinates.
    * @param y The y coordinate of the content bounds origin in cocraft canvas coordinates.
    */
   void setBoundsOrigin(float x, float y);
+
+  /**
+   * Returns the content transform parameters needed for mapping cocraft canvas coordinates to
+   * canvas pixel positions. The returned JavaScript object contains:
+   * - boundsOriginX/Y: PAGX content origin in cocraft canvas coordinates.
+   * - fitScale: scale factor applied to fit PAGX content into the canvas (contain mode).
+   * - centerOffsetX/Y: pixel offset for centering the scaled content in the canvas.
+   *
+   * Usage: baseX = (cocraftX - boundsOriginX) * fitScale + centerOffsetX
+   */
+  emscripten::val getContentTransform() const;
 
   /**
    * Returns the width of the canvas in pixels.
@@ -178,6 +188,8 @@ class PAGXView {
 
  private:
   void applyCenteringTransform();
+
+  void applyDocumentCustomData();
 
   void updatePerformanceState(double frameDurationMs);
 
