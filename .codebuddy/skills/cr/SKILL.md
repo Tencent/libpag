@@ -54,19 +54,19 @@ Provide 4 options:
 
 | Option | Description |
 |--------|-------------|
-| Single-agent + manual fix | Single-agent review; interactively choose which issues to fix afterward. |
-| Teams + auto-fix low risk | Multi-agent review; auto-fix only the safest issues (e.g., null checks, typos, naming). Confirm everything else. |
 | Teams + auto-fix low & medium risk (recommended) | Multi-agent review; auto-fix most issues, only confirm high-risk ones (e.g., API changes, architecture). |
+| Teams + auto-fix low risk | Multi-agent review; auto-fix only the safest issues (e.g., null checks, typos, naming). Confirm everything else. |
 | Teams + auto-fix all | Multi-agent review; auto-fix everything. Only issues affecting test baselines are deferred. |
+| Single-agent + manual fix | Single-agent review; interactively choose which issues to fix afterward. |
 
 ### Hand off
 
 | Option | → | FIX_MODE |
 |--------|---|----------|
-| Single-agent + manual fix | `references/local-review.md` | — |
-| Teams + auto-fix low risk | `references/teams-review.md` | low |
 | Teams + auto-fix low & medium risk (recommended) | `references/teams-review.md` | low_medium |
+| Teams + auto-fix low risk | `references/teams-review.md` | low |
 | Teams + auto-fix all | `references/teams-review.md` | full |
+| Single-agent + manual fix | `references/local-review.md` | — |
 
 Pass `$ARGUMENTS` to the target file. For teams-review, also pass `FIX_MODE`
 (low / low_medium / full).

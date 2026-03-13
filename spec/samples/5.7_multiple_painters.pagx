@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="400" height="400">
   <Layer>
-    <Rectangle center="200,200" size="260,260" roundness="32"/>
+    <Rectangle position="200,200" size="260,260" roundness="32"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="260,260">
         <ColorStop offset="0" color="#F43F5E"/>

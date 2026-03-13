@@ -597,8 +597,8 @@ Element* SVGParserContext::convertRect(const std::shared_ptr<DOMNode>& element) 
   }
 
   auto rect = _document->makeNode<Rectangle>();
-  rect->center.x = x + width / 2;
-  rect->center.y = y + height / 2;
+  rect->position.x = x + width / 2;
+  rect->position.y = y + height / 2;
   rect->size.width = width;
   rect->size.height = height;
   rect->roundness = std::max(rx, ry);
@@ -611,8 +611,8 @@ Element* SVGParserContext::convertCircle(const std::shared_ptr<DOMNode>& element
   float r = parseLength(getAttribute(element, "r"), _viewBoxWidth);
 
   auto ellipse = _document->makeNode<Ellipse>();
-  ellipse->center.x = cx;
-  ellipse->center.y = cy;
+  ellipse->position.x = cx;
+  ellipse->position.y = cy;
   ellipse->size.width = r * 2;
   ellipse->size.height = r * 2;
 
@@ -625,8 +625,8 @@ Element* SVGParserContext::convertEllipse(const std::shared_ptr<DOMNode>& elemen
   float ry = parseLength(getAttribute(element, "ry"), _viewBoxHeight);
 
   auto ellipse = _document->makeNode<Ellipse>();
-  ellipse->center.x = cx;
-  ellipse->center.y = cy;
+  ellipse->position.x = cx;
+  ellipse->position.y = cy;
   ellipse->size.width = rx * 2;
   ellipse->size.height = ry * 2;
 
@@ -856,8 +856,8 @@ Element* SVGParserContext::convertUse(const std::shared_ptr<DOMNode>& element) {
     // Create a rectangle to display the image at original size.
     // The transform will be applied by the parent Layer's matrix.
     auto rect = _document->makeNode<Rectangle>();
-    rect->center.x = x + imageWidth / 2;
-    rect->center.y = y + imageHeight / 2;
+    rect->position.x = x + imageWidth / 2;
+    rect->position.y = y + imageHeight / 2;
     rect->size.width = imageWidth;
     rect->size.height = imageHeight;
 
@@ -2417,14 +2417,15 @@ static bool isSameGeometry(const Element* a, const Element* b) {
     case NodeType::Rectangle: {
       auto rectA = static_cast<const Rectangle*>(a);
       auto rectB = static_cast<const Rectangle*>(b);
-      return rectA->center.x == rectB->center.x && rectA->center.y == rectB->center.y &&
+      return rectA->position.x == rectB->position.x && rectA->position.y == rectB->position.y &&
              rectA->size.width == rectB->size.width && rectA->size.height == rectB->size.height &&
              rectA->roundness == rectB->roundness;
     }
     case NodeType::Ellipse: {
       auto ellipseA = static_cast<const Ellipse*>(a);
       auto ellipseB = static_cast<const Ellipse*>(b);
-      return ellipseA->center.x == ellipseB->center.x && ellipseA->center.y == ellipseB->center.y &&
+      return ellipseA->position.x == ellipseB->position.x &&
+             ellipseA->position.y == ellipseB->position.y &&
              ellipseA->size.width == ellipseB->size.width &&
              ellipseA->size.height == ellipseB->size.height;
     }

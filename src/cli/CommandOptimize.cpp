@@ -1126,14 +1126,14 @@ static void ReplacePathsWithPrimitives(PAGXDocument* document, int& rectCount, i
     auto centerY = rep.bounds.top + height * 0.5f;
     if (rep.type == PrimitiveType::Oval) {
       auto ellipse = document->makeNode<Ellipse>();
-      ellipse->center = {centerX, centerY};
+      ellipse->position = {centerX, centerY};
       ellipse->size = {width, height};
       ellipse->reversed = rep.reversed;
       (*rep.elements)[rep.index] = ellipse;
       ellipseCount++;
     } else {
       auto rectangle = document->makeNode<Rectangle>();
-      rectangle->center = {centerX, centerY};
+      rectangle->position = {centerX, centerY};
       rectangle->size = {width, height};
       if (rep.type == PrimitiveType::RoundRect) {
         auto minSide = std::min(width, height);
@@ -1179,8 +1179,8 @@ static bool IsFullCanvasClipMask(const Layer* maskLayer, float canvasWidth, floa
     return false;
   }
   auto rect = static_cast<const Rectangle*>(element);
-  auto left = rect->center.x - rect->size.width * 0.5f;
-  auto top = rect->center.y - rect->size.height * 0.5f;
+  auto left = rect->position.x - rect->size.width * 0.5f;
+  auto top = rect->position.y - rect->size.height * 0.5f;
   return left <= 0 && top <= 0 && rect->size.width >= canvasWidth &&
          rect->size.height >= canvasHeight;
 }
@@ -1297,27 +1297,27 @@ static bool ComputeShapeBounds(const std::vector<Element*>& contents, float& min
       auto rect = static_cast<const Rectangle*>(element);
       float halfW = rect->size.width * 0.5f;
       float halfH = rect->size.height * 0.5f;
-      minX = std::min(minX, rect->center.x - halfW);
-      minY = std::min(minY, rect->center.y - halfH);
-      maxX = std::max(maxX, rect->center.x + halfW);
-      maxY = std::max(maxY, rect->center.y + halfH);
+      minX = std::min(minX, rect->position.x - halfW);
+      minY = std::min(minY, rect->position.y - halfH);
+      maxX = std::max(maxX, rect->position.x + halfW);
+      maxY = std::max(maxY, rect->position.y + halfH);
       hasGeometry = true;
     } else if (type == NodeType::Ellipse) {
       auto ellipse = static_cast<const Ellipse*>(element);
       float halfW = ellipse->size.width * 0.5f;
       float halfH = ellipse->size.height * 0.5f;
-      minX = std::min(minX, ellipse->center.x - halfW);
-      minY = std::min(minY, ellipse->center.y - halfH);
-      maxX = std::max(maxX, ellipse->center.x + halfW);
-      maxY = std::max(maxY, ellipse->center.y + halfH);
+      minX = std::min(minX, ellipse->position.x - halfW);
+      minY = std::min(minY, ellipse->position.y - halfH);
+      maxX = std::max(maxX, ellipse->position.x + halfW);
+      maxY = std::max(maxY, ellipse->position.y + halfH);
       hasGeometry = true;
     } else if (type == NodeType::Polystar) {
       auto polystar = static_cast<const Polystar*>(element);
       float r = polystar->outerRadius;
-      minX = std::min(minX, polystar->center.x - r);
-      minY = std::min(minY, polystar->center.y - r);
-      maxX = std::max(maxX, polystar->center.x + r);
-      maxY = std::max(maxY, polystar->center.y + r);
+      minX = std::min(minX, polystar->position.x - r);
+      minY = std::min(minY, polystar->position.y - r);
+      maxX = std::max(maxX, polystar->position.x + r);
+      maxY = std::max(maxY, polystar->position.y + r);
       hasGeometry = true;
     } else if (type == NodeType::Path) {
       auto path = static_cast<const Path*>(element);
@@ -1478,16 +1478,16 @@ static void ApplyLocalizationToElements(PAGXDocument* document,
     auto type = element->nodeType();
     if (type == NodeType::Rectangle) {
       auto rect = static_cast<Rectangle*>(element);
-      rect->center.x -= offsetX;
-      rect->center.y -= offsetY;
+      rect->position.x -= offsetX;
+      rect->position.y -= offsetY;
     } else if (type == NodeType::Ellipse) {
       auto ellipse = static_cast<Ellipse*>(element);
-      ellipse->center.x -= offsetX;
-      ellipse->center.y -= offsetY;
+      ellipse->position.x -= offsetX;
+      ellipse->position.y -= offsetY;
     } else if (type == NodeType::Polystar) {
       auto polystar = static_cast<Polystar*>(element);
-      polystar->center.x -= offsetX;
-      polystar->center.y -= offsetY;
+      polystar->position.x -= offsetX;
+      polystar->position.y -= offsetY;
     } else if (type == NodeType::Path) {
       auto path = static_cast<Path*>(element);
       if (path->data != nullptr && !path->data->isEmpty()) {
@@ -1580,23 +1580,23 @@ static size_t HashElement(const Element* element) {
   auto type = element->nodeType();
   if (type == NodeType::Rectangle) {
     auto rect = static_cast<const Rectangle*>(element);
-    h ^= std::hash<float>{}(rect->center.x) * 29;
-    h ^= std::hash<float>{}(rect->center.y) * 31;
+    h ^= std::hash<float>{}(rect->position.x) * 29;
+    h ^= std::hash<float>{}(rect->position.y) * 31;
     h ^= std::hash<float>{}(rect->size.width) * 37;
     h ^= std::hash<float>{}(rect->size.height) * 41;
     h ^= std::hash<float>{}(rect->roundness) * 43;
     h ^= std::hash<bool>{}(rect->reversed) * 47;
   } else if (type == NodeType::Ellipse) {
     auto ellipse = static_cast<const Ellipse*>(element);
-    h ^= std::hash<float>{}(ellipse->center.x) * 29;
-    h ^= std::hash<float>{}(ellipse->center.y) * 31;
+    h ^= std::hash<float>{}(ellipse->position.x) * 29;
+    h ^= std::hash<float>{}(ellipse->position.y) * 31;
     h ^= std::hash<float>{}(ellipse->size.width) * 37;
     h ^= std::hash<float>{}(ellipse->size.height) * 41;
     h ^= std::hash<bool>{}(ellipse->reversed) * 43;
   } else if (type == NodeType::Polystar) {
     auto polystar = static_cast<const Polystar*>(element);
-    h ^= std::hash<float>{}(polystar->center.x) * 29;
-    h ^= std::hash<float>{}(polystar->center.y) * 31;
+    h ^= std::hash<float>{}(polystar->position.x) * 29;
+    h ^= std::hash<float>{}(polystar->position.y) * 31;
     h ^= std::hash<int>{}(static_cast<int>(polystar->type)) * 37;
     h ^= std::hash<float>{}(polystar->pointCount) * 41;
     h ^= std::hash<float>{}(polystar->outerRadius) * 43;
@@ -1680,21 +1680,22 @@ static bool ElementsStructurallyEqual(const Element* a, const Element* b) {
   if (type == NodeType::Rectangle) {
     auto ra = static_cast<const Rectangle*>(a);
     auto rb = static_cast<const Rectangle*>(b);
-    return ra->center == rb->center && ra->size == rb->size && ra->roundness == rb->roundness &&
+    return ra->position == rb->position && ra->size == rb->size && ra->roundness == rb->roundness &&
            ra->reversed == rb->reversed;
   }
   if (type == NodeType::Ellipse) {
     auto ea = static_cast<const Ellipse*>(a);
     auto eb = static_cast<const Ellipse*>(b);
-    return ea->center == eb->center && ea->size == eb->size && ea->reversed == eb->reversed;
+    return ea->position == eb->position && ea->size == eb->size && ea->reversed == eb->reversed;
   }
   if (type == NodeType::Polystar) {
     auto pa = static_cast<const Polystar*>(a);
     auto pb = static_cast<const Polystar*>(b);
-    return pa->center == pb->center && pa->type == pb->type && pa->pointCount == pb->pointCount &&
-           pa->outerRadius == pb->outerRadius && pa->innerRadius == pb->innerRadius &&
-           pa->rotation == pb->rotation && pa->outerRoundness == pb->outerRoundness &&
-           pa->innerRoundness == pb->innerRoundness && pa->reversed == pb->reversed;
+    return pa->position == pb->position && pa->type == pb->type &&
+           pa->pointCount == pb->pointCount && pa->outerRadius == pb->outerRadius &&
+           pa->innerRadius == pb->innerRadius && pa->rotation == pb->rotation &&
+           pa->outerRoundness == pb->outerRoundness && pa->innerRoundness == pb->innerRoundness &&
+           pa->reversed == pb->reversed;
   }
   if (type == NodeType::Path) {
     auto pathA = static_cast<const Path*>(a);

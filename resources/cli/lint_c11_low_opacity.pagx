@@ -2,7 +2,7 @@
 <!-- Test file for C11: Low opacity with high-cost elements -->
 <pagx version="1.0" width="200" height="100">
   <Layer x="10" y="10" name="LowOpacity" alpha="0.15">
-    <Rectangle center="50,25" size="80,50"/>
+    <Rectangle position="50,25" size="80,50"/>
     <Fill color="#FF0000"/>
     <Repeater copies="15" position="20,0"/>
   </Layer>

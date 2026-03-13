@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="800" height="600">
   <Layer name="Background">
-    <Rectangle center="400,300" size="800,600"/>
+    <Rectangle position="400,300" size="800,600"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="0,600">
         <ColorStop offset="0" color="#0B1026"/>
@@ -11,7 +11,7 @@
     </Fill>
   </Layer>
   <Layer name="NebulaLeft">
-    <Ellipse center="160,220" size="360,300"/>
+    <Ellipse position="160,220" size="360,300"/>
     <Fill>
       <RadialGradient center="160,220" radius="220">
         <ColorStop offset="0" color="#1D4ED880"/>
@@ -20,7 +20,7 @@
     </Fill>
   </Layer>
   <Layer name="NebulaRight">
-    <Ellipse center="640,180" size="360,280"/>
+    <Ellipse position="640,180" size="360,280"/>
     <Fill>
       <RadialGradient center="640,180" radius="220">
         <ColorStop offset="0" color="#C026D380"/>
@@ -29,7 +29,7 @@
     </Fill>
   </Layer>
   <Layer name="NebulaBottom" alpha="0.9">
-    <Ellipse center="400,505" size="600,220"/>
+    <Ellipse position="400,505" size="600,220"/>
     <Fill>
       <RadialGradient center="400,505" radius="260">
         <ColorStop offset="0" color="#22D3EE60"/>
@@ -39,44 +39,44 @@
   </Layer>
   <Layer name="Stars" alpha="0.9">
     <Group>
-      <Ellipse center="120,80" size="2,2"/>
-      <Ellipse center="180,110" size="3,3"/>
-      <Ellipse center="260,90" size="2,2"/>
-      <Ellipse center="340,70" size="2,2"/>
-      <Ellipse center="420,110" size="3,3"/>
-      <Ellipse center="520,80" size="2,2"/>
-      <Ellipse center="610,120" size="2,2"/>
-      <Ellipse center="700,90" size="2,2"/>
-      <Ellipse center="740,150" size="3,3"/>
-      <Ellipse center="90,160" size="2,2"/>
+      <Ellipse position="120,80" size="2,2"/>
+      <Ellipse position="180,110" size="3,3"/>
+      <Ellipse position="260,90" size="2,2"/>
+      <Ellipse position="340,70" size="2,2"/>
+      <Ellipse position="420,110" size="3,3"/>
+      <Ellipse position="520,80" size="2,2"/>
+      <Ellipse position="610,120" size="2,2"/>
+      <Ellipse position="700,90" size="2,2"/>
+      <Ellipse position="740,150" size="3,3"/>
+      <Ellipse position="90,160" size="2,2"/>
       <Fill color="#FFFFFFCC"/>
     </Group>
     <Group>
-      <Ellipse center="150,200" size="2,2"/>
-      <Ellipse center="240,170" size="2,2"/>
-      <Ellipse center="360,190" size="2,2"/>
-      <Ellipse center="470,160" size="3,3"/>
-      <Ellipse center="560,210" size="2,2"/>
-      <Ellipse center="660,180" size="2,2"/>
-      <Ellipse center="740,230" size="2,2"/>
-      <Ellipse center="210,240" size="2,2"/>
-      <Ellipse center="540,240" size="2,2"/>
+      <Ellipse position="150,200" size="2,2"/>
+      <Ellipse position="240,170" size="2,2"/>
+      <Ellipse position="360,190" size="2,2"/>
+      <Ellipse position="470,160" size="3,3"/>
+      <Ellipse position="560,210" size="2,2"/>
+      <Ellipse position="660,180" size="2,2"/>
+      <Ellipse position="740,230" size="2,2"/>
+      <Ellipse position="210,240" size="2,2"/>
+      <Ellipse position="540,240" size="2,2"/>
       <Fill color="#7DD3FC88"/>
     </Group>
   </Layer>
   <Layer name="StarBursts">
     <Layer>
-      <Polystar center="220,130" type="star" pointCount="4" outerRadius="8" innerRadius="3" rotation="45"/>
+      <Polystar position="220,130" type="star" pointCount="4" outerRadius="8" innerRadius="3" rotation="45"/>
       <Fill color="#FFFFFFEE"/>
       <DropShadowStyle blurX="6" blurY="6" color="#7DD3FC80"/>
     </Layer>
     <Layer>
-      <Polystar center="620,210" type="star" pointCount="4" outerRadius="7" innerRadius="3" rotation="45"/>
+      <Polystar position="620,210" type="star" pointCount="4" outerRadius="7" innerRadius="3" rotation="45"/>
       <Fill color="#FFFFFFDD"/>
       <DropShadowStyle blurX="6" blurY="6" color="#C084FC80"/>
     </Layer>
     <Layer>
-      <Polystar center="700,420" type="star" pointCount="4" outerRadius="6" innerRadius="2" rotation="45"/>
+      <Polystar position="700,420" type="star" pointCount="4" outerRadius="6" innerRadius="2" rotation="45"/>
       <Fill color="#FFFFFFCC"/>
       <DropShadowStyle blurX="5" blurY="5" color="#22D3EE80"/>
     </Layer>
@@ -104,7 +104,7 @@
     </Group>
   </Layer>
   <Layer name="MainPanel">
-    <Rectangle center="400,310" size="680,360" roundness="28"/>
+    <Rectangle position="400,310" size="680,360" roundness="28"/>
     <Fill>
       <LinearGradient startPoint="60,310" endPoint="740,310">
         <ColorStop offset="0" color="#0F1C3DCC"/>
@@ -123,7 +123,7 @@
     <DropShadowStyle offsetY="12" blurX="20" blurY="20" color="#00000066"/>
   </Layer>
   <Layer name="TopBar">
-    <Rectangle center="400,65" size="760,90" roundness="22"/>
+    <Rectangle position="400,65" size="760,90" roundness="22"/>
     <Fill>
       <LinearGradient startPoint="20,65" endPoint="780,65">
         <ColorStop offset="0" color="#0C1B33EE"/>
@@ -140,7 +140,7 @@
   </Layer>
   <Layer name="Avatar">
     <Group>
-      <Polystar center="70,65" type="polygon" pointCount="6" outerRadius="36" rotation="30"/>
+      <Polystar position="70,65" type="polygon" pointCount="6" outerRadius="36" rotation="30"/>
       <Stroke width="2">
         <LinearGradient startPoint="34,29" endPoint="106,101">
           <ColorStop offset="0" color="#38BDF8"/>
@@ -149,11 +149,11 @@
       </Stroke>
     </Group>
     <Group>
-      <Ellipse center="70,65" size="56,56"/>
+      <Ellipse position="70,65" size="56,56"/>
       <Fill color="#0B1225"/>
     </Group>
     <Group>
-      <Ellipse center="70,65" size="48,48"/>
+      <Ellipse position="70,65" size="48,48"/>
       <Fill>
         <RadialGradient center="70,65" radius="30">
           <ColorStop offset="0" color="#38BDF8AA"/>
@@ -173,7 +173,7 @@
       <Fill color="#7DD3FC"/>
     </Group>
     <Layer name="LevelBadge">
-      <Rectangle center="195,60" size="48,14" roundness="7"/>
+      <Rectangle position="195,60" size="48,14" roundness="7"/>
       <Fill>
         <LinearGradient startPoint="171,60" endPoint="219,60">
           <ColorStop offset="0" color="#0EA5E9"/>
@@ -189,11 +189,11 @@
   </Layer>
   <Layer name="ExpBar">
     <Group>
-      <Rectangle center="260,79" size="280,10" roundness="5"/>
+      <Rectangle position="260,79" size="280,10" roundness="5"/>
       <Fill color="#1E293B"/>
     </Group>
     <Group>
-      <Rectangle center="215,79" size="190,6" roundness="3"/>
+      <Rectangle position="215,79" size="190,6" roundness="3"/>
       <Fill>
         <LinearGradient startPoint="120,79" endPoint="310,79">
           <ColorStop offset="0" color="#22D3EE"/>
@@ -204,11 +204,11 @@
   </Layer>
   <Layer name="EnergyBar">
     <Group>
-      <Rectangle center="260,95" size="280,10" roundness="5"/>
+      <Rectangle position="260,95" size="280,10" roundness="5"/>
       <Fill color="#172437"/>
     </Group>
     <Group>
-      <Rectangle center="200,95" size="160,6" roundness="3"/>
+      <Rectangle position="200,95" size="160,6" roundness="3"/>
       <Fill>
         <LinearGradient startPoint="120,95" endPoint="280,95">
           <ColorStop offset="0" color="#34D399"/>
@@ -218,7 +218,7 @@
     </Group>
   </Layer>
   <Layer name="CoinChip">
-    <Rectangle center="691,48" size="150,28" roundness="14"/>
+    <Rectangle position="691,48" size="150,28" roundness="14"/>
     <Fill>
       <LinearGradient startPoint="616,48" endPoint="766,48">
         <ColorStop offset="0" color="#0F1A33CC"/>
@@ -227,7 +227,7 @@
     </Fill>
     <Stroke color="#334155" width="1"/>
     <Group>
-      <Ellipse center="636,48" size="16,16"/>
+      <Ellipse position="636,48" size="16,16"/>
       <Fill>
         <LinearGradient startPoint="628,48" endPoint="644,48">
           <ColorStop offset="0" color="#FFE29A"/>
@@ -236,7 +236,7 @@
       </Fill>
     </Group>
     <Group>
-      <Ellipse center="636,48" size="8,8"/>
+      <Ellipse position="636,48" size="8,8"/>
       <Stroke color="#F8D477" width="1"/>
     </Group>
     <Group>
@@ -245,7 +245,7 @@
     </Group>
   </Layer>
   <Layer name="DiamondChip">
-    <Rectangle center="691,82" size="150,28" roundness="14"/>
+    <Rectangle position="691,82" size="150,28" roundness="14"/>
     <Fill>
       <LinearGradient startPoint="616,82" endPoint="766,82">
         <ColorStop offset="0" color="#0F1A33CC"/>
@@ -268,7 +268,7 @@
     </Group>
   </Layer>
   <Layer name="StartButton">
-    <Rectangle center="400,218" size="340,78" roundness="28"/>
+    <Rectangle position="400,218" size="340,78" roundness="28"/>
     <Fill>
       <LinearGradient startPoint="230,218" endPoint="570,218">
         <ColorStop offset="0" color="#00FFC6"/>
@@ -278,7 +278,7 @@
     </Fill>
     <Stroke color="#5AFADF" width="2"/>
     <Group>
-      <Rectangle center="400,208" size="310,34" roundness="18"/>
+      <Rectangle position="400,208" size="310,34" roundness="18"/>
       <Fill color="#FFFFFF22"/>
     </Group>
     <Group position="280,206">
@@ -293,7 +293,7 @@
     <DropShadowStyle offsetY="12" blurX="18" blurY="18" color="#00FFC066"/>
   </Layer>
   <Layer name="ShopButton">
-    <Rectangle center="400,310" size="340,78" roundness="28"/>
+    <Rectangle position="400,310" size="340,78" roundness="28"/>
     <Fill>
       <LinearGradient startPoint="230,310" endPoint="570,310">
         <ColorStop offset="0" color="#FFD166"/>
@@ -312,7 +312,7 @@
     <DropShadowStyle offsetY="10" blurX="16" blurY="16" color="#F59E0B66"/>
   </Layer>
   <Layer name="RankButton">
-    <Rectangle center="400,402" size="340,78" roundness="28"/>
+    <Rectangle position="400,402" size="340,78" roundness="28"/>
     <Fill>
       <LinearGradient startPoint="230,402" endPoint="570,402">
         <ColorStop offset="0" color="#7C3AED"/>
@@ -331,7 +331,7 @@
     <DropShadowStyle offsetY="10" blurX="16" blurY="16" color="#C084FC66"/>
   </Layer>
   <Layer name="BottomBar">
-    <Rectangle center="400,545" size="760,70" roundness="20"/>
+    <Rectangle position="400,545" size="760,70" roundness="20"/>
     <Fill>
       <LinearGradient startPoint="20,545" endPoint="780,545">
         <ColorStop offset="0" color="#0B1A33CC"/>
@@ -344,11 +344,11 @@
     <Layer x="217" y="522" composition="@navButton"/>
     <Layer x="228" y="533">
       <Group>
-        <Polystar center="12,12" type="star" pointCount="8" outerRadius="10" innerRadius="6"/>
+        <Polystar position="12,12" type="star" pointCount="8" outerRadius="10" innerRadius="6"/>
         <Stroke color="#93C5FD" width="2"/>
       </Group>
       <Group>
-        <Ellipse center="12,12" size="6,6"/>
+        <Ellipse position="12,12" size="6,6"/>
         <Fill color="#93C5FD"/>
       </Group>
     </Layer>
@@ -387,19 +387,19 @@
   </Layer>
   <Layer name="HexDecor" alpha="0.6">
     <Group>
-      <Polystar center="120,200" type="polygon" pointCount="6" outerRadius="14" rotation="30"/>
+      <Polystar position="120,200" type="polygon" pointCount="6" outerRadius="14" rotation="30"/>
       <Stroke color="#1D4ED8" width="1"/>
     </Group>
     <Group>
-      <Polystar center="680,240" type="polygon" pointCount="6" outerRadius="12" rotation="30"/>
+      <Polystar position="680,240" type="polygon" pointCount="6" outerRadius="12" rotation="30"/>
       <Stroke color="#38BDF8" width="1"/>
     </Group>
     <Group>
-      <Polystar center="180,420" type="polygon" pointCount="6" outerRadius="10" rotation="30"/>
+      <Polystar position="180,420" type="polygon" pointCount="6" outerRadius="10" rotation="30"/>
       <Stroke color="#22D3EE" width="1"/>
     </Group>
     <Group>
-      <Polystar center="640,420" type="polygon" pointCount="6" outerRadius="12" rotation="30"/>
+      <Polystar position="640,420" type="polygon" pointCount="6" outerRadius="12" rotation="30"/>
       <Stroke color="#A78BFA" width="1"/>
     </Group>
   </Layer>
@@ -412,7 +412,7 @@
     <PathData id="IconShare" data="M 14 4 L 22 12 L 14 20 L 14 15 L 4 15 L 4 9 L 14 9 Z"/>
     <Composition id="navButton" width="46" height="46">
       <Layer>
-        <Ellipse center="23,23" size="46,46"/>
+        <Ellipse position="23,23" size="46,46"/>
         <Fill>
           <LinearGradient startPoint="0,23" endPoint="46,23">
             <ColorStop offset="0" color="#0D2038CC"/>

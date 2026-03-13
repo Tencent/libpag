@@ -347,7 +347,7 @@ CLI_TEST(PAGXCliTest, Optimize_LocalizeRectangle) {
   auto output = ReadFile(outputPath);
   EXPECT_TRUE(output.find("x=\"200\"") != std::string::npos);
   EXPECT_TRUE(output.find("y=\"300\"") != std::string::npos);
-  EXPECT_TRUE(output.find("center=") == std::string::npos);
+  EXPECT_TRUE(output.find("position=") == std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Optimize_LocalizeEllipse) {
@@ -386,7 +386,7 @@ CLI_TEST(PAGXCliTest, Optimize_LocalizeSkipMatrix) {
   auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("center=\"200,200\"") != std::string::npos);
+  EXPECT_TRUE(output.find("position=\"200,200\"") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Optimize_LocalizeAlreadyAtOrigin) {
@@ -553,11 +553,11 @@ CLI_TEST(PAGXCliTest, Format_AttributeReordering) {
   ASSERT_NE(namePos, std::string::npos);
   ASSERT_NE(alphaPos, std::string::npos);
   EXPECT_LT(namePos, alphaPos);
-  auto centerPos = output.find("center=");
+  auto positionPos = output.find("position=");
   auto sizePos = output.find("size=");
-  ASSERT_NE(centerPos, std::string::npos);
+  ASSERT_NE(positionPos, std::string::npos);
   ASSERT_NE(sizePos, std::string::npos);
-  EXPECT_LT(centerPos, sizePos);
+  EXPECT_LT(positionPos, sizePos);
 }
 
 CLI_TEST(PAGXCliTest, Format_PreservesValues) {
