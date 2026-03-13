@@ -586,4 +586,87 @@ PAGX_TEST(PAGXTest, TextFiles) {
   TestPAGXDirectory(context, ProjectPath::Absolute("resources/text"));
 }
 
+/**
+ * Test case: Verify data-* custom attributes round-trip on Document, Layer, and Element nodes.
+ */
+PAGX_TEST(PAGXTest, CustomDataRoundTrip) {
+  // Step 1: Create document with customData on various nodes.
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  ASSERT_TRUE(doc != nullptr);
+
+  doc->customData["app-name"] = "test-tool";
+  doc->customData["version"] = "2.0";
+
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->name = "TestLayer";
+  layer->customData["layer-role"] = "background";
+  layer->customData["export"] = "true";
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {100, 80};
+  rect->customData["figma-node"] = "123:456";
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>("red");
+  solid->color = {1, 0, 0, 1};
+  solid->customData["source"] = "design-token";
+  fill->color = solid;
+  fill->customData["auto-generated"] = "true";
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  // Step 2: Export to XML.
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+
+  EXPECT_NE(xml.find("data-app-name=\"test-tool\""), std::string::npos);
+  EXPECT_NE(xml.find("data-version=\"2.0\""), std::string::npos);
+  EXPECT_NE(xml.find("data-layer-role=\"background\""), std::string::npos);
+  EXPECT_NE(xml.find("data-export=\"true\""), std::string::npos);
+  EXPECT_NE(xml.find("data-figma-node=\"123:456\""), std::string::npos);
+  EXPECT_NE(xml.find("data-auto-generated=\"true\""), std::string::npos);
+  EXPECT_NE(xml.find("data-source=\"design-token\""), std::string::npos);
+
+  // Step 3: Re-import from XML.
+  auto doc2 = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc2 != nullptr);
+  EXPECT_TRUE(doc2->errors.empty());
+
+  // Step 4: Verify Document customData.
+  EXPECT_EQ(doc2->customData.size(), 2u);
+  EXPECT_EQ(doc2->customData.at("app-name"), "test-tool");
+  EXPECT_EQ(doc2->customData.at("version"), "2.0");
+
+  // Step 5: Verify Layer customData.
+  ASSERT_EQ(doc2->layers.size(), 1u);
+  auto* layer2 = doc2->layers[0];
+  EXPECT_EQ(layer2->customData.size(), 2u);
+  EXPECT_EQ(layer2->customData.at("layer-role"), "background");
+  EXPECT_EQ(layer2->customData.at("export"), "true");
+
+  // Step 6: Verify Element customData.
+  ASSERT_GE(layer2->contents.size(), 2u);
+  auto* rect2 = layer2->contents[0];
+  EXPECT_EQ(rect2->nodeType(), pagx::NodeType::Rectangle);
+  EXPECT_EQ(rect2->customData.size(), 1u);
+  EXPECT_EQ(rect2->customData.at("figma-node"), "123:456");
+
+  auto* fill2 = layer2->contents[1];
+  EXPECT_EQ(fill2->nodeType(), pagx::NodeType::Fill);
+  EXPECT_EQ(fill2->customData.size(), 1u);
+  EXPECT_EQ(fill2->customData.at("auto-generated"), "true");
+
+  // Step 7: Verify SolidColor resource customData.
+  auto* solid2 = doc2->findNode<pagx::SolidColor>("red");
+  ASSERT_TRUE(solid2 != nullptr);
+  EXPECT_EQ(solid2->customData.size(), 1u);
+  EXPECT_EQ(solid2->customData.at("source"), "design-token");
+
+  // Step 8: Re-export and verify XML consistency.
+  std::string xml2 = pagx::PAGXExporter::ToXML(*doc2);
+  EXPECT_EQ(xml, xml2);
+}
+
 }  // namespace pag

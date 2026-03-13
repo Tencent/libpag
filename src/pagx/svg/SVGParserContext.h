@@ -199,8 +199,8 @@ class SVGParserContext {
   // Generate a unique ColorSource ID for resources.
   std::string generateColorSourceId();
 
-  // Parse data-* attributes from element and add to layer's customData.
-  void parseCustomData(const std::shared_ptr<DOMNode>& element, Layer* layer);
+  // Parse data-* attributes from element and add to node's customData.
+  void parseCustomData(const std::shared_ptr<DOMNode>& element, Node* node);
 
   // Get or create ColorSource for a gradient/pattern reference.
   // If the reference is used multiple times, the ColorSource is added to resources.

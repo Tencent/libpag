@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <map>
 #include <string>
 
 namespace pagx {
@@ -27,6 +28,12 @@ namespace pagx {
  * resources (Image, Composition, ColorSources) and elements (shapes, painters, modifiers, etc.).
  */
 enum class NodeType {
+  // Document
+  /**
+   * The root document node.
+   */
+  Document,
+
   // Resources
   /**
    * A reusable path data resource.
@@ -203,6 +210,11 @@ class Node {
    * The unique identifier of this node. Used for referencing the node by ID (e.g., "@id").
    */
   std::string id = {};
+
+  /**
+   * Custom data attributes. The keys are stored without the "data-" prefix.
+   */
+  std::map<std::string, std::string> customData = {};
 
   virtual ~Node() = default;
 
