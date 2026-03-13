@@ -2,13 +2,13 @@
 <!-- Demonstrates resource definitions and references -->
 <pagx version="1.0" width="400" height="400">
   <Layer>
-    <Rectangle center="200,200" size="320,320" roundness="32"/>
+    <Rectangle position="200,200" size="320,320" roundness="32"/>
     <Fill color="@oceanGradient"/>
     <DropShadowStyle offsetY="12" blurX="40" blurY="40" color="#06B6D450"/>
   </Layer>
   <!-- Shape using solid color resource reference -->
   <Layer>
-    <Ellipse center="200,200" size="120,120"/>
+    <Ellipse position="200,200" size="120,120"/>
     <Fill color="@coral"/>
   </Layer>
   <Resources>

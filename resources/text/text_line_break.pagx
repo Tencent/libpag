@@ -13,7 +13,7 @@
   <!-- width=100px, 4 lines, height=140 -->
   <Layer x="20" y="20">
     <Group>
-      <Rectangle center="50,70" size="100,140"/>
+      <Rectangle position="50,70" size="100,140"/>
       <Stroke/>
     </Group>
     <Group>
@@ -27,7 +27,7 @@
   <!-- width=132: "Hello World"=131<132 fits, "Test"=47 wraps. 2 lines, height=70 -->
   <Layer x="140" y="20">
     <Group>
-      <Rectangle center="66,35" size="132,70"/>
+      <Rectangle position="66,35" size="132,70"/>
       <Stroke/>
     </Group>
     <Group>
@@ -43,7 +43,7 @@
   <!-- "self-"=47 "driving"=80 → 127<132. "self-driving"=127<132 fits? Actually 3 lines. h=105 -->
   <Layer x="290" y="20">
     <Group>
-      <Rectangle center="66,53" size="132,105"/>
+      <Rectangle position="66,53" size="132,105"/>
       <Stroke/>
     </Group>
     <Group>
@@ -59,7 +59,7 @@
   <!-- "some/file"=105>96, so "some/" line2, "file" line3. 3 lines, h=105 -->
   <Layer x="440" y="20">
     <Group>
-      <Rectangle center="48,53" size="96,105"/>
+      <Rectangle position="48,53" size="96,105"/>
       <Stroke/>
     </Group>
     <Group>
@@ -81,7 +81,7 @@
   <!-- So: line1="Compre", line2="hensive", line3="over", line4="view". 4 lines, h=140 -->
   <Layer x="20" y="180">
     <Group>
-      <Rectangle center="45,70" size="90,140"/>
+      <Rectangle position="45,70" size="90,140"/>
       <Stroke/>
     </Group>
     <Group>
@@ -96,7 +96,7 @@
   <!-- "Long"=57<67 line2. "Word"=60<67 line3. "Here"=52<67 line4. 4 lines, h=140 -->
   <Layer x="130" y="180">
     <Group>
-      <Rectangle center="34,70" size="67,140"/>
+      <Rectangle position="34,70" size="67,140"/>
       <Stroke/>
     </Group>
     <Group>
@@ -112,7 +112,7 @@
   <!-- 89+5=94>90 → "ABCDEF" line1. "GH"=34 " "=5 "IJ"=20 → 59<90 line2. 2 lines, h=70 -->
   <Layer x="220" y="180">
     <Group>
-      <Rectangle center="45,35" size="90,70"/>
+      <Rectangle position="45,35" size="90,70"/>
       <Stroke/>
     </Group>
     <Group>
@@ -134,7 +134,7 @@
   <!-- Key: ￥ stays with 9, not stranded at end of line1. 3 lines, h=105 -->
   <Layer x="20" y="370">
     <Group>
-      <Rectangle center="25,53" size="49,105"/>
+      <Rectangle position="25,53" size="49,105"/>
       <Stroke/>
     </Group>
     <Group>
@@ -152,7 +152,7 @@
   <!-- Key: % stays with 9, not pushed to start of next line alone. 3 lines, h=105 -->
   <Layer x="90" y="370">
     <Group>
-      <Rectangle center="25,53" size="49,105"/>
+      <Rectangle position="25,53" size="49,105"/>
       <Stroke/>
     </Group>
     <Group>
@@ -170,7 +170,7 @@
   <!-- Key: …… stay together, not split across lines. 3 lines, h=105 -->
   <Layer x="160" y="370">
     <Group>
-      <Rectangle center="37,53" size="73,105"/>
+      <Rectangle position="37,53" size="73,105"/>
       <Stroke/>
     </Group>
     <Group>
@@ -188,7 +188,7 @@
   <!-- Key: —— stay together. 3 lines, h=105 -->
   <Layer x="250" y="370">
     <Group>
-      <Rectangle center="35,53" size="70,105"/>
+      <Rectangle position="35,53" size="70,105"/>
       <Stroke/>
     </Group>
     <Group>
@@ -211,7 +211,7 @@
   <!-- Hmm, "「引用"=96<97 line2, "」好"=48<97 line3. 3 lines, h=105 -->
   <Layer x="340" y="370">
     <Group>
-      <Rectangle center="49,53" size="97,105"/>
+      <Rectangle position="49,53" size="97,105"/>
       <Stroke/>
     </Group>
     <Group>
@@ -229,7 +229,7 @@
   <!-- Use width=73: "是的」"=72<73 fits line1. "然后"=48<73 line2. 2 lines, h=70 -->
   <Layer x="460" y="370">
     <Group>
-      <Rectangle center="37,35" size="73,70"/>
+      <Rectangle position="37,35" size="73,70"/>
       <Stroke/>
     </Group>
     <Group>
@@ -247,7 +247,7 @@
   <!-- 2 lines, h=70 -->
   <Layer x="20" y="530">
     <Group>
-      <Rectangle center="25,35" size="49,70"/>
+      <Rectangle position="25,35" size="49,70"/>
       <Stroke/>
     </Group>
     <Group>
@@ -264,7 +264,7 @@
   <!-- Key: " does not separate from 好. 2 lines, h=70 -->
   <Layer x="90" y="530">
     <Group>
-      <Rectangle center="49,35" size="97,70"/>
+      <Rectangle position="49,35" size="97,70"/>
       <Stroke/>
     </Group>
     <Group>

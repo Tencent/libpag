@@ -388,10 +388,7 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
     auto canvas = surface->getCanvas();
     canvas->scale(options.scale, options.scale);
     canvas->translate(-offsetX, -offsetY);
-    auto gm = targetTgfxLayer->getGlobalMatrix();
-    auto globalMatrix2D = tgfx::Matrix::MakeAll(gm.values[0], gm.values[4], gm.values[12],
-                                                gm.values[1], gm.values[5], gm.values[13]);
-    canvas->concat(globalMatrix2D);
+    canvas->concat(targetTgfxLayer->getRelativeMatrix(rootLayer.get()));
     targetTgfxLayer->draw(canvas);
   } else {
     displayList.setZoomScale(options.scale);

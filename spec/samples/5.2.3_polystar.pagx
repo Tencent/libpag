@@ -3,7 +3,7 @@
 <pagx version="1.0" width="400" height="400">
   <!-- 5-pointed star -->
   <Layer>
-    <Polystar center="110,110" type="star" pointCount="5" outerRadius="60" innerRadius="28" rotation="-90"/>
+    <Polystar position="110,110" type="star" pointCount="5" outerRadius="60" innerRadius="28" rotation="-90"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="120,120">
         <ColorStop offset="0" color="#FBBF24"/>
@@ -14,7 +14,7 @@
   </Layer>
   <!-- 6-pointed star -->
   <Layer>
-    <Polystar center="290,110" type="star" pointCount="6" outerRadius="60" innerRadius="32" rotation="-90"/>
+    <Polystar position="290,110" type="star" pointCount="6" outerRadius="60" innerRadius="32" rotation="-90"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="120,120">
         <ColorStop offset="0" color="#F43F5E"/>
@@ -25,7 +25,7 @@
   </Layer>
   <!-- Hexagon (polygon) -->
   <Layer>
-    <Polystar center="110,290" type="polygon" pointCount="6" outerRadius="64"/>
+    <Polystar position="110,290" type="polygon" pointCount="6" outerRadius="64"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="128,128">
         <ColorStop offset="0" color="#06B6D4"/>
@@ -36,7 +36,7 @@
   </Layer>
   <!-- Pentagon (polygon) -->
   <Layer>
-    <Polystar center="290,290" type="polygon" pointCount="5" outerRadius="64" rotation="-90"/>
+    <Polystar position="290,290" type="polygon" pointCount="5" outerRadius="64" rotation="-90"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="128,128">
         <ColorStop offset="0" color="#8B5CF6"/>

@@ -55,9 +55,9 @@ static const std::unordered_map<std::string, std::vector<const char*>> ATTRIBUTE
     {"Layer", {"id", "name", "visible", "alpha", "blendMode", "x", "y", "matrix", "matrix3D",
                "preserve3D", "antiAlias", "groupOpacity", "passThroughBackground",
                "scrollRect", "mask", "maskType", "composition"}},
-    {"Rectangle", {"center", "size", "roundness", "reversed"}},
-    {"Ellipse", {"center", "size", "reversed"}},
-    {"Polystar", {"center", "type", "pointCount", "outerRadius", "innerRadius", "rotation",
+    {"Rectangle", {"position", "size", "roundness", "reversed"}},
+    {"Ellipse", {"position", "size", "reversed"}},
+    {"Polystar", {"position", "type", "pointCount", "outerRadius", "innerRadius", "rotation",
                   "outerRoundness", "innerRoundness", "reversed"}},
     {"Path", {"data", "reversed"}},
     {"Text", {"text", "position", "fontFamily", "fontStyle", "fontSize", "letterSpacing",
@@ -214,6 +214,15 @@ static void SerializeNode(std::string& output, xmlNodePtr node, int indentLevel,
                 break;
               case '"':
                 output += "&quot;";
+                break;
+              case '\n':
+                output += "&#10;";
+                break;
+              case '\r':
+                output += "&#13;";
+                break;
+              case '\t':
+                output += "&#9;";
                 break;
               default:
                 output += *p;

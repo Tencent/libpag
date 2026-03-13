@@ -2,11 +2,11 @@
 <!-- Test file for C13: Simple rectangular mask (can use scrollRect instead) -->
 <pagx version="1.0" width="200" height="100">
   <Layer id="maskLayer" visible="false" name="RectMask">
-    <Rectangle center="50,25" size="100,50"/>
+    <Rectangle position="50,25" size="100,50"/>
     <Fill color="#FFFFFF"/>
   </Layer>
   <Layer x="10" y="10" name="MaskedContent" mask="@maskLayer" maskType="alpha">
-    <Rectangle center="50,25" size="200,100"/>
+    <Rectangle position="50,25" size="200,100"/>
     <Fill color="#FF0000"/>
   </Layer>
 </pagx>

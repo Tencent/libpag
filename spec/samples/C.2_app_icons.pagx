@@ -55,7 +55,7 @@
     <Layer composition="@card"/>
     <Layer x="36" y="36">
       <Group>
-        <Ellipse center="-4,-4" size="26,26"/>
+        <Ellipse position="-4,-4" size="26,26"/>
         <Stroke color="#3B82F6" width="3.5"/>
       </Group>
       <Group>
@@ -81,7 +81,7 @@
         <Stroke color="#FBBF24" width="2.5" cap="round"/>
       </Group>
       <Group>
-        <Ellipse center="0,16" size="8,5"/>
+        <Ellipse position="0,16" size="8,5"/>
         <Fill color="#FBBF24"/>
       </Group>
     </Layer>
@@ -112,9 +112,9 @@
         <Fill color="#10B981"/>
       </Group>
       <Group>
-        <Ellipse center="-7,-3" size="4,4"/>
-        <Ellipse center="0,-3" size="4,4"/>
-        <Ellipse center="7,-3" size="4,4"/>
+        <Ellipse position="-7,-3" size="4,4"/>
+        <Ellipse position="0,-3" size="4,4"/>
+        <Ellipse position="7,-3" size="4,4"/>
         <Fill color="#1E2433"/>
       </Group>
     </Layer>
@@ -128,16 +128,16 @@
     <Layer composition="@card"/>
     <Layer x="36" y="36">
       <Group>
-        <Rectangle center="0,2" size="38,26" roundness="5"/>
+        <Rectangle position="0,2" size="38,26" roundness="5"/>
         <Path data="M-7 -9L-4 -16L4 -16L7 -9"/>
         <Fill color="#6366F1"/>
       </Group>
       <Group>
-        <Ellipse center="0,2" size="17,17"/>
+        <Ellipse position="0,2" size="17,17"/>
         <Fill color="#1E2433"/>
       </Group>
       <Group>
-        <Ellipse center="0,2" size="10,10"/>
+        <Ellipse position="0,2" size="10,10"/>
         <Stroke color="#6366F1" width="2.5"/>
       </Group>
     </Layer>
@@ -177,7 +177,7 @@
         <Fill color="#06B6D4"/>
       </Group>
       <Group>
-        <Ellipse center="0,-11" size="12,12"/>
+        <Ellipse position="0,-11" size="12,12"/>
         <Fill color="#1E2433"/>
       </Group>
       <Group>
@@ -196,13 +196,13 @@
     <Layer composition="@card"/>
     <Layer x="36" y="36">
       <Group>
-        <Rectangle center="0,2" size="38,38" roundness="6"/>
-        <Rectangle center="-9,-16" size="3,9" roundness="2"/>
-        <Rectangle center="9,-16" size="3,9" roundness="2"/>
+        <Rectangle position="0,2" size="38,38" roundness="6"/>
+        <Rectangle position="-9,-16" size="3,9" roundness="2"/>
+        <Rectangle position="9,-16" size="3,9" roundness="2"/>
         <Fill color="#EF4444"/>
       </Group>
       <Group>
-        <Rectangle center="0,6" size="30,22" roundness="3"/>
+        <Rectangle position="0,6" size="30,22" roundness="3"/>
         <Fill color="#1E2433"/>
       </Group>
       <Group>
@@ -224,12 +224,12 @@
         <Stroke color="#F97316" width="4" cap="round"/>
       </Group>
       <Group>
-        <Rectangle center="0,8" size="30,22" roundness="6"/>
+        <Rectangle position="0,8" size="30,22" roundness="6"/>
         <Fill color="#F97316"/>
       </Group>
       <Group>
-        <Ellipse center="0,6" size="7,7"/>
-        <Rectangle center="0,12" size="3,6" roundness="1"/>
+        <Ellipse position="0,6" size="7,7"/>
+        <Rectangle position="0,12" size="3,6" roundness="1"/>
         <Fill color="#1E2433"/>
       </Group>
     </Layer>
@@ -247,8 +247,8 @@
         <Stroke color="#EC4899" width="3.5" cap="round" join="round"/>
       </Group>
       <Group>
-        <Ellipse center="-10,14" size="15,11"/>
-        <Ellipse center="10,9" size="15,11"/>
+        <Ellipse position="-10,14" size="15,11"/>
+        <Ellipse position="10,9" size="15,11"/>
         <Fill color="#EC4899"/>
       </Group>
     </Layer>
@@ -262,10 +262,10 @@
     <Layer composition="@card"/>
     <Layer x="36" y="36">
       <Group>
-        <Ellipse center="-1,-7" size="24,22"/>
-        <Ellipse center="-12,-1" size="16,16"/>
-        <Ellipse center="10,-1" size="18,16"/>
-        <Ellipse center="-1,1" size="34,10"/>
+        <Ellipse position="-1,-7" size="24,22"/>
+        <Ellipse position="-12,-1" size="16,16"/>
+        <Ellipse position="10,-1" size="18,16"/>
+        <Ellipse position="-1,1" size="34,10"/>
         <Fill color="#3B82F6"/>
       </Group>
       <Group>

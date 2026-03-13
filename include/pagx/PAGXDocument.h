@@ -20,7 +20,6 @@
 
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
@@ -33,7 +32,7 @@ namespace pagx {
  * It contains resources and layers. This is a pure data structure class.
  * Use PAGXImporter to load documents and PAGXExporter to save documents.
  */
-class PAGXDocument {
+class PAGXDocument : public Node {
  public:
   /**
    * Creates an empty document with the specified size.
@@ -123,6 +122,10 @@ class PAGXDocument {
    * @return true if a matching Image node was found and its data was loaded successfully
    */
   bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
+
+  NodeType nodeType() const override {
+    return NodeType::Document;
+  }
 
  private:
   PAGXDocument() = default;

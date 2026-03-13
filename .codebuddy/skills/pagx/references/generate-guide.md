@@ -19,7 +19,7 @@ Read these as needed:
 |-----------|---------|
 | `examples.md` | Structural patterns for Icons, UI, Logos, Charts, Decorative backgrounds |
 | `attributes.md` | Attribute defaults, enumerations, required attributes |
-| `cli.md` | CLI tool usage — `render`, `bounds`, `font info`, `align`, `distribute` commands |
+| `cli.md` | CLI tool usage — `render`, `bounds`, `font info` commands |
 
 ---
 
@@ -109,8 +109,8 @@ This isolates defects: if something breaks, it was the last thing added.
 
   ```xml
   <Group>
-    <Ellipse center="-4,-3" size="5,6"/>
-    <Ellipse center="4,-3" size="5,6"/>
+    <Ellipse position="-4,-3" size="5,6"/>
+    <Ellipse position="4,-3" size="5,6"/>
     <Fill color="#E0E7FF"/>
   </Group>
   ```
@@ -141,10 +141,7 @@ be unified to the exact same value. Common scenarios include but are not limited
 - Container padding should be symmetric (left = right, top = bottom)
 - Similar containers (cards, buttons, badges) should use the same internal padding
 
-Tool selection:
-- **2+ Layers sharing an edge or center** → `pagx align` (see `cli.md`)
-- **3+ Layers in a row or column** → `pagx distribute` (see `cli.md`)
-- **Padding and gaps** → measure with `pagx bounds`, then adjust coordinates to equalize
+Use `pagx bounds` to measure, then adjust coordinates to equalize.
 
 ### Step 4: Localize Coordinates
 
@@ -154,8 +151,8 @@ Layer `x`/`y` carries the block offset; internal coordinates start from `0,0`. S
 ### Step 5: Verify and Refine
 
 After each render, follow the **Verification and Correction Loop** at the end of this
-document — run `pagx bounds` first to detect misalignment by numbers, fix with CLI tools
-or coordinate adjustment, then visually confirm. Do not skip bounds measurement even if
+document — run `pagx bounds` first to detect misalignment by numbers, fix with
+coordinate adjustment, then visually confirm. Do not skip bounds measurement even if
 the screenshot looks correct.
 
 After verification passes, continue to `optimize-guide.md` for optimization review.
@@ -179,9 +176,8 @@ for targeted measurement when needed (see `cli.md`).
 
 ### 2. Check Alignment, Spacing, and Padding by Numbers
 
-Scan the bounds data for any misalignment, uneven spacing, or asymmetric padding. Even if
-`pagx align` / `pagx distribute` were applied during generation, fixes in one area can
-introduce regressions elsewhere — always re-check everything.
+Scan the bounds data for any misalignment, uneven spacing, or asymmetric padding. Fixes
+in one area can introduce regressions elsewhere — always re-check everything.
 
 **Alignment** — elements that should share an edge or center:
 ```
@@ -216,8 +212,7 @@ Compute from bounds, not from Layer `x`/`y` — asymmetric content shifts the vi
 
 ### 3. Fix Issues
 
-- **Alignment or distribution off** → re-run `pagx align` / `pagx distribute`
-- **Uneven padding or gaps** → adjust Layer `x`/`y` to equalize values
+- **Alignment or spacing off** → adjust Layer `x`/`y` or element `position`/`center` to equalize values
 
 ### 4. Re-render and Visually Confirm
 

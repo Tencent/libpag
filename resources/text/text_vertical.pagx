@@ -3,7 +3,7 @@
   <!-- Box A: Digits rotated 90° in vertical text (date format) -->
   <Layer x="30" y="20">
     <Group>
-      <Rectangle center="30,125" size="60,250"/>
+      <Rectangle position="30,125" size="60,250"/>
       <Stroke/>
     </Group>
     <Group>
@@ -16,7 +16,7 @@
   <!-- Box B: Rotated digits and symbols (prices) + TextAlign Center -->
   <Layer x="110" y="20">
     <Group>
-      <Rectangle center="50,125" size="100,250"/>
+      <Rectangle position="50,125" size="100,250"/>
       <Stroke/>
     </Group>
     <Group>
@@ -29,7 +29,7 @@
   <!-- Box C: Latin/CJK alternating (each char rotated individually) + explicit newline -->
   <Layer x="230" y="20">
     <Group>
-      <Rectangle center="50,125" size="100,250"/>
+      <Rectangle position="50,125" size="100,250"/>
       <Stroke/>
     </Group>
     <Group>
@@ -42,7 +42,7 @@
   <!-- Box D: CJK auto-wrap + overflow hidden -->
   <Layer x="350" y="20">
     <Group>
-      <Rectangle center="40,100" size="80,200"/>
+      <Rectangle position="40,100" size="80,200"/>
       <Stroke/>
     </Group>
     <Group>
@@ -55,7 +55,7 @@
   <!-- Box E1: ParagraphAlign Near -->
   <Layer x="460" y="20">
     <Group>
-      <Rectangle center="30,125" size="60,250"/>
+      <Rectangle position="30,125" size="60,250"/>
       <Stroke/>
     </Group>
     <Group>
@@ -68,7 +68,7 @@
   <!-- Box E2: ParagraphAlign Middle -->
   <Layer x="540" y="20">
     <Group>
-      <Rectangle center="30,125" size="60,250"/>
+      <Rectangle position="30,125" size="60,250"/>
       <Stroke/>
     </Group>
     <Group>
@@ -81,7 +81,7 @@
   <!-- Box E3: ParagraphAlign Far -->
   <Layer x="620" y="20">
     <Group>
-      <Rectangle center="30,125" size="60,250"/>
+      <Rectangle position="30,125" size="60,250"/>
       <Stroke/>
     </Group>
     <Group>
@@ -94,7 +94,7 @@
   <!-- Box F1: TextAlign Start with Latin mix -->
   <Layer x="30" y="300">
     <Group>
-      <Rectangle center="50,125" size="100,250"/>
+      <Rectangle position="50,125" size="100,250"/>
       <Stroke/>
     </Group>
     <Group>
@@ -107,7 +107,7 @@
   <!-- Box F2: TextAlign End with Latin mix -->
   <Layer x="150" y="300">
     <Group>
-      <Rectangle center="50,125" size="100,250"/>
+      <Rectangle position="50,125" size="100,250"/>
       <Stroke/>
     </Group>
     <Group>
@@ -120,7 +120,7 @@
   <!-- Box G: TextAlign Justify + lineHeight -->
   <Layer x="270" y="300">
     <Group>
-      <Rectangle center="50,125" size="100,250"/>
+      <Rectangle position="50,125" size="100,250"/>
       <Stroke/>
     </Group>
     <Group>
@@ -133,7 +133,7 @@
   <!-- Box H: Pure Latin (each character rotated 90°) with column wrap -->
   <Layer x="390" y="300">
     <Group>
-      <Rectangle center="50,125" size="100,250"/>
+      <Rectangle position="50,125" size="100,250"/>
       <Stroke/>
     </Group>
     <Group>

@@ -3,7 +3,7 @@
   <!-- Box A: Pure Hebrew RTL text -->
   <Layer x="50" y="30">
     <Group>
-      <Rectangle center="125,25" size="250,50"/>
+      <Rectangle position="125,25" size="250,50"/>
       <Stroke/>
     </Group>
     <Group>
@@ -16,7 +16,7 @@
   <!-- Box B: Hebrew + LTR digits (digits stay LTR in RTL context) -->
   <Layer x="340" y="30">
     <Group>
-      <Rectangle center="110,25" size="220,50"/>
+      <Rectangle position="110,25" size="220,50"/>
       <Stroke/>
     </Group>
     <Group>
@@ -29,7 +29,7 @@
   <!-- Box C: Hebrew + Latin mixed (BiDi boundary) -->
   <Layer x="50" y="110">
     <Group>
-      <Rectangle center="200,25" size="400,50"/>
+      <Rectangle position="200,25" size="400,50"/>
       <Stroke/>
     </Group>
     <Group>
@@ -42,7 +42,7 @@
   <!-- Box D: CJK + digits mixed (LTR paragraph with embedded numbers) -->
   <Layer x="50" y="190">
     <Group>
-      <Rectangle center="200,25" size="400,50"/>
+      <Rectangle position="200,25" size="400,50"/>
       <Stroke/>
     </Group>
     <Group>
@@ -55,7 +55,7 @@
   <!-- Box E: Multi-line with mixed scripts and line wrapping -->
   <Layer x="50" y="270">
     <Group>
-      <Rectangle center="150,50" size="300,100"/>
+      <Rectangle position="150,50" size="300,100"/>
       <Stroke/>
     </Group>
     <Group>
@@ -68,7 +68,7 @@
   <!-- Box F: Hebrew multi-line with word wrap -->
   <Layer x="50" y="400">
     <Group>
-      <Rectangle center="100,50" size="200,100"/>
+      <Rectangle position="100,50" size="200,100"/>
       <Stroke/>
     </Group>
     <Group>
