@@ -1,16 +1,11 @@
 # Teams Review
 
 You are the **coordinator**. Create an Agent Team and dispatch reviewer,
-verifier, and fixer agents. This is critical for multi-round iteration: agents
-are disposable, so your context grows only by structured issue lists, not raw
-file contents — avoiding context compression that would lose track of earlier
-rounds. Never modify files directly. Read code only for arbitration and
-diagnosis.
+verifier, and fixer agents. Never modify files directly. Read code only for
+arbitration, diagnosis, and fix verification.
 
-The review loop is designed for **uninterrupted multi-round iteration**.
 Always process all auto-fixable issues before involving the user. Do NOT pause
-to ask the user anything until Confirm (Phase 6) or Report (Phase 7). The only
-post-report interaction is the optional checklist evolution prompt.
+to ask the user anything until Confirm (Phase 5) or Report (Phase 6).
 
 The reviewer–verifier adversarial pair is the core quality mechanism: reviewers
 find issues, verifiers challenge them. This two-party check significantly reduces
@@ -33,34 +28,12 @@ share conversation history.
 ## Flow
 
 ```
-Scope
-  │
-  ↓
-┌─────────── Review Loop ───────────┐
-│                                   │
-│  Review → Filter → Fix/Validate   │
-│    ↑                     │        │
-│    └── new issues ───────
-│                                   │
-└───────────────────────────────────┘
-  │ no new issues
-  ↓
-pending/failed? ──no──→ Report + Checklist Evolution
-  │ yes
-  ↓
-Confirm ──all skipped──→ Report + Checklist Evolution
-  │ approved
-  ↓
-Fix/Validate ──→ Review Loop ↑
+Scope → Review → Filter → Fix/Validate → Confirm → Report
 ```
 
-The Review Loop repeats as long as new issues are found. Each round is a fresh
-full review — not a targeted re-check of previous fixes.
-
-**After Confirm**: approved fixes go through Fix/Validate, then **always
-re-enter the Review Loop** (Phase 2) to catch any issues introduced by the
-fixes. The loop only exits to Confirm (if pending/failed remain) or Report
-(if nothing remains) when a round produces no new issues.
+- **Filter** routes auto-fixable issues to Fix/Validate; remaining go to Confirm.
+  If nothing to fix or confirm, skip directly to Report.
+- **Confirm** ↔ **Fix/Validate** loop until no pending issues remain.
 
 ---
 
@@ -90,7 +63,7 @@ If diff is empty → show usage examples and exit:
 `/cr a1b2c3d`, `/cr a1b2c3d..e4f5g6h`,
 `/cr src/foo.cpp`, `/cr 123`, `/cr https://github.com/.../pull/123`.
 
-### Associated PR comments (optional, best-effort)
+### Associated PR comments
 
 If `gh` is available, check whether the current branch has an open PR:
 ```
@@ -107,9 +80,6 @@ Store as `PR_COMMENTS` for verification in the review step.
 Skip if doc-only. If no build/test commands can be determined, warn that fix
 validation will be skipped. Otherwise run build + test. Fail → abort.
 
-Read git log since the base branch for recent-fix context (avoid re-flagging issues
-a previous `/cr` session already fixed).
-
 ### Module partition
 
 Partition files in scope into **review modules** for parallel review. Each
@@ -117,71 +87,31 @@ module is a self-contained logical unit. Split large files by section/function
 group; group related small files together. Classify each module as `code`,
 `doc`, or `mixed`.
 
-### Persist state
+### Issue tracking
 
-Initialize `CR_STATE_FILE`: create `.cr-cache/` if it does not exist. Derive the
-filename from the review scope: `.cr-cache/{branch}.md` (sanitize `/` to `-`,
-e.g., `feature/dom_text_box` → `feature-dom_text_box.md`).
-
-Each `/cr` invocation is a **fresh session**. Never read or resume from an
-existing file — each session starts from scratch with a new full review.
-If the derived filename already exists (leftover from a previous or concurrent
-session), find the lowest unused numeric suffix (`-2`, `-3`, …) and use that.
-Record the chosen path as `CR_STATE_FILE`.
-
-Write CR_STATE_FILE with session info (mode, threshold, file list, module
-assignments, changed line ranges, build/test commands) and an issues section
-updated incrementally. CR_STATE_FILE is owned by the coordinator — team agents
-never read or write it. Record anything unresolvable to CR_STATE_FILE for user
-review.
-
-**Issue format** in CR_STATE_FILE:
-
-```markdown
-# Issues
-
-## 1. [brief description]
-- **Status**: pending | approved | fixed | failed | skipped
-- **Reason**: [why not auto-fixed, e.g., "above auto-fix threshold (high risk)",
-  "fix failed: build error after 2 retries", "rolled back: introduced regression"]
-- **Risk**: low | medium | high
-- **File**: [file path:line number]
-- **Current**: [what the code does now]
-- **Proposed**: [what the fix would change — for medium/high risk, include the
-  specific approach chosen by the coordinator and the reasoning]
-- **Impact**: [what else would be affected]
-```
-
-Status values:
-- `pending` — recorded, awaiting user decision in Phase 6
-- `approved` — user approved fix in Phase 6, sent to Phase 4
-- `fixed` — fix applied and passed validation
-- `failed` — fix attempted but failed validation after retries
-- `skipped` — user declined or issue rejected (do not re-report)
+The coordinator tracks all issues in memory throughout the session. Each issue
+has:
+- Brief description
+- Status: `pending` | `approved` | `fixed` | `failed` | `skipped`
+- Risk: low | medium | high
+- File: file path:line
+- Proposed fix (medium/high risk only)
 
 ---
 
 ## Phase 2: Review
 
-### Round invariants
-
-- **Restore state**: coordinator reads CR_STATE_FILE at each round start.
-  Reviewers do NOT read this file.
-- **Known-issue exclusion list** (round 2+): coordinator extracts from
-  CR_STATE_FILE — each entry contains only file path, line range, and a one-line
-  description. No risk levels, no verifier verdicts, no fix outcomes.
-- **Cross-round de-dup** (coordinator, Phase 3): de-duplicate against
-  CR_STATE_FILE as a safety net. User-rejected issues from prior Confirm are
-  also excluded. Previously fixed issues are **not excluded** — new problems in
-  fixed code are valid new issues.
-
 ### Team setup
 
-Create a new team for this round. Each round gets a fresh team — do not reuse
-agents from prior rounds (they lose context after team close).
+Create a team for the session.
 
 - One reviewer agent (`reviewer-N`) per module.
 - One **verifier** agent (`verifier`), shared across all modules.
+
+**Module merging**: if the total diff is ≤1000 changed lines AND ≤20 files,
+merge all modules into a single reviewer. The overhead of multiple agents
+(startup, coordination, forwarding) outweighs the parallelism benefit at
+this scale.
 
 ### Reviewer prompt
 
@@ -195,8 +125,6 @@ Each reviewer receives:
 - **Checklist**: `code-checklist.md` for code, `doc-checklist.md` for doc, both
   for mixed.
 - **Evidence requirement**: every issue must have a code citation (file:line + snippet) from the current tree.
-- **Known-issue exclusion** (round 2+): skip issues matching the coordinator's
-  exclusion list. Focus on finding new issues.
 - **Checklist exclusion**: see the exclusion section in the corresponding
   checklist. Project rules loaded in context take priority.
 - **Self-check**: before submitting, re-read the relevant code and verify each
@@ -205,16 +133,18 @@ Each reviewer receives:
   or file search before reporting.
 - **Output format**: `[file:line] [A/B/C] — [description] — [key lines]`
 
-**PR comment reviewer** (when `PR_COMMENTS` exist, round 1 only): one additional
-agent to verify PR review comments against current code. Same output format,
-same verification pipeline. Skip in subsequent rounds.
+**PR comment reviewer** (when `PR_COMMENTS` exist): one additional agent to
+verify PR review comments against current code. Same output format, same
+verification pipeline.
 
 ### Verification (pipeline)
 
 Stance: **adversarial** — default to doubting the reviewer, actively look for
 reasons each issue is wrong. Reject with real evidence, confirm if it holds up.
 This step is mandatory — the coordinator MUST NOT skip it or perform
-verification itself.
+verification itself. **Exception**: if every reviewer explicitly reports zero
+issues (LGTM / no issues found), skip verification and proceed directly to
+Phase 3.
 
 The verifier runs as a **pipeline** — it does not wait for all reviewers to
 finish. As each reviewer sends a report via SendMessage, the coordinator MUST
@@ -227,9 +157,9 @@ forward it to the verifier immediately. Forwarding rules:
 - **One forward per reviewer**: each reviewer report is a separate message to
   the verifier.
 - **Completion signal**: after forwarding the last reviewer's report, send a
-  separate message to the verifier stating: "All reviewer reports have been
-  forwarded. Please finalize your verdicts for all issues above." This prevents
-  the verifier from finishing early before all reports arrive.
+  separate message to the verifier stating: "All N reviewer reports have been
+  forwarded. Please finalize your verdicts for all issues above." (Replace N
+  with the actual reviewer count.)
 
 Include the following verbatim in every verifier's prompt:
 
@@ -260,6 +190,9 @@ Important constraints:
   summary until the coordinator explicitly tells you all reports have been forwarded.
   Process each report as it arrives, but wait for the completion signal before
   concluding.
+- The coordinator will tell you the total number of reviewers in the completion
+  signal. If you have not received that many reports, do NOT finalize — wait for
+  the remaining forwards.
 ```
 
 ### After review
@@ -270,16 +203,17 @@ that reviewer, immediately send a follow-up message to the reviewer requesting
 its report. Do not wait or assume the report was lost — the agent may have
 exhausted its turn limit before sending.
 
-Keep all reviewers alive (reused as fixers in Phase 4), close the verifier
-→ Phase 3.
+Before entering Phase 3, confirm: (1) all reviewers have submitted their final
+reports; (2) the verifier has given a CONFIRM/REJECT verdict for every
+forwarded finding, OR all reviewers reported zero issues and verification was
+skipped.
+
+Keep all agents alive — do not close any agents mid-session. Reviewers are
+reused as fixers in Phase 4. All agents are cleaned up in Phase 6 (Report).
 
 ---
 
 ## Phase 3: Filter — coordinator only
-
-Before entering this phase, confirm: (1) all reviewers have submitted their
-final reports; (2) the verifier has given a CONFIRM/REJECT verdict for every
-forwarded finding. Do NOT proceed until both conditions are met.
 
 Your stance here is **neutral** — trust no single party. Treat reviewer reports
 and verifier rebuttals as equally weighted inputs. Use your project-wide view to
@@ -288,11 +222,7 @@ reviewers may miss.
 
 ### 3.1 De-dup
 
-- Remove issues already in CR_STATE_FILE
-- Remove cross-reviewer duplicates (same location, same topic)
-- Remove user-rejected issues from prior Confirm
-
-Previously fixed issues are NOT excluded — new problems in fixed code are valid.
+Remove cross-reviewer duplicates (same location, same topic).
 
 ### 3.2 Existence check
 
@@ -309,42 +239,37 @@ handling by risk level, and special rules.
 **Fix approach** (Medium/High only): specify the chosen approach and reasoning.
 Record in the issue's `Proposed` field. Low risk: single obvious fix, no guidance.
 
-### 3.4 Route — record to CR_STATE_FILE
+### 3.4 Route
 
 All confirmed issues are recorded with risk level.
 
 | Risk vs `FIX_MODE` | → |
 |---------------------|---|
 | At or below threshold | auto-fix queue |
-| Above threshold | CR_STATE_FILE as `pending` |
+| Above threshold | `pending` (for Phase 5 Confirm) |
 
 - Cross-module impact: if a fix requires updates outside the fixer's module,
-  create a follow-up fix task.
-- Previously rolled-back issues: do not attempt again this round.
+  add it to the current fix queue and assign to the appropriate fixer.
 
-Phase 4 if auto-fix queue is non-empty; Phase 5 if empty.
 Always auto-fix eligible issues first — do NOT present `pending` issues to the
 user before all auto-fixable issues have been processed and validated.
+Phase 4 if auto-fix queue is non-empty. Otherwise jump to Phase 5 if pending
+issues exist, or Phase 6 if none.
 
 ---
 
 ## Phase 4: Fix/Validate
-
-This phase is an atomic unit reused by the Review Loop and post-Confirm flow.
 
 ### Fix
 
 Stance: **precise** — apply each fix completely and correctly, never expand
 scope. The coordinator MUST NOT apply fixes directly.
 
-**Agent assignment**: reuse surviving reviewers as fixers when available — each
-reviewer already has context on the files it reviewed. When no reviewers survive
-(e.g., after Phase 5 closes the team), create new fixer agents. The coordinator
-MUST assign by explicit file list and ensure a file is owned by only one fixer
-at a time:
+**Agent assignment**: reuse reviewers as fixers when available — each reviewer
+already has context on the files it reviewed. The coordinator MUST assign by
+explicit file list and ensure a file is owned by only one fixer at a time:
 
-- Issue in a file that a surviving reviewer already read → assign to that
-  reviewer.
+- Issue in a file that a reviewer already read → assign to that reviewer.
 - Otherwise → create a fixer agent (or `fixer-cross` for cross-module issues).
 - Multi-file renames → single atomic task assigned to one agent.
 
@@ -379,49 +304,48 @@ Fix rules:
 Each fixer commits per issue (one commit per fix — never combine multiple
 issues into a single commit).
 
-### Validate
+### Verify fixes (coordinator)
 
-Wait for all fixers. Run build + test.
+Wait for all fixers. Before running build + test, the coordinator reads each
+fixer's commit diff and verifies:
+1. The fix correctly addresses the original issue
+2. No new issues introduced (naming inconsistencies, missing updates in
+   surrounding code, logic errors)
+3. Fix scope matches the issue — no unintended changes
 
-**Revert scope**: only revert commits produced by fixers in this round. Never
+If a problem is found, send the fixer a correction request with specific
+details (max 1 retry). If the retry fails or the fixer is unavailable,
+revert and mark `failed`.
+
+### Build/test validate
+
+Run build + test.
+
+**Revert scope**: only revert commits produced by fixers in this phase. Never
 revert commits unrelated to the current fixes — other users or tools may commit
 concurrently during the fix phase. Identify fixer commits by the commit hashes
 reported by fixers; any other commits on the branch are out of scope.
 
 - Skip if no build/test commands available or doc-only modules.
-- **Pass** → mark issues `fixed` in CR_STATE_FILE → Phase 5.
+- **Pass** → mark issues `fixed`.
 - **Fail** → bisect among fixer commits only to find the failing commit, revert
   it, re-validate remaining before blaming others (one bad commit may cause
   cascading failures). Per failing issue: retry via the original fixer agent
   with failure details (max 2 retries), or revert and mark `failed`.
 
----
-
-## Phase 5: Continue?
-
-### Step 1: Close the current round's team
-
-Close the team to release reviewers and fixers. Force-terminate any unresponsive
-agents.
-
-### Step 2: Route
-
-**Evaluate conditions top-to-bottom; take the first match.**
+### After validation
 
 | Condition | → |
 |-----------|---|
-| Any issues were confirmed and fixed this round | Phase 2 (new review round) |
-| `pending` or `failed` in CR_STATE_FILE | Phase 6 |
-| Otherwise | Phase 7 |
+| `pending` or `failed` issues exist | Phase 5 (Confirm) |
+| Otherwise | Phase 6 (Report) |
 
-The first condition means: if this round's review found real issues and fixes
-were applied, always do a fresh full review to catch issues the previous round
-may have missed. This is NOT a targeted re-check of the fixes — it is a
-complete new review of the entire scope with a fresh team.
+If Phase 5 approves further fixes, reuse existing reviewers as fixers (or
+create new fixer agents if needed) and re-enter Phase 4.
 
 ---
 
-## Phase 6: Confirm
+## Phase 5: Confirm
 
 Present `pending` + `failed` issues grouped by risk (high → low), sorted by
 file path within each group:
@@ -435,31 +359,28 @@ If the user replies with a bulk instruction (e.g., "fix all", "skip the rest"),
 apply it only to issues **at or below** the current `FIX_MODE` threshold.
 Issues above the threshold still require individual confirmation.
 
-- **All skipped** → Phase 7.
-- **Any approved** → Phase 4 (Fix/Validate). After Validate, go to Phase 5
-  (Continue?). If new issues are found, re-enter the full Review Loop (Phase 2).
-  If no new issues but more `pending`/`failed` remain, return here (Phase 6).
-  If nothing remains, proceed to Phase 7.
+- **All skipped** → Phase 6.
+- **Any approved** → Phase 4 (Fix/Validate). After validation, if more
+  `pending`/`failed` remain, return here (Phase 5). If nothing remains,
+  proceed to Phase 6.
 
 ---
 
-## Phase 7: Report
+## Phase 6: Report
 
-Force-terminate any agents still running. Close the team.
+Send shutdown_request to all remaining agents in parallel (single message with
+multiple SendMessage calls). Then call TeamDelete immediately without waiting
+for individual shutdown responses.
 
 Summary:
-- Rounds and per-round statistics
 - Issues found / fixed / skipped / failed
 - Rolled-back issues and reasons
 - Final test result
 - Issues from PR comments (when `PR_COMMENTS` existed)
+- Note: "To verify fix quality, run `/cr` again."
 
 ### Checklist evolution
 
 Review all confirmed issues from this session. If any represent a recurring
 pattern not covered by the current checklist, read `checklist-evolution.md` and
 follow its steps.
-
-### Clean up
-
-Delete CR_STATE_FILE.
