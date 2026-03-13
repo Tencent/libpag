@@ -259,6 +259,11 @@ static void SerializeInstance(const rttr::instance& item, PAGTreeNode* node) {
   }
 }
 
+// Forward declarations
+static void SerializeNode(pagx::Node* nodePtr, PAGTreeNode* treeNode);
+static void SerializeSequentialContainer(const rttr::variant_sequential_view& view,
+                                         PAGTreeNode* node);
+
 static void SerializeVariant(const rttr::variant& value, PAGTreeNode* node) {
   auto wrappedType = GetWrappedType(value.get_type());
   bool isWrapped = wrappedType != value.get_type();
@@ -270,12 +275,21 @@ static void SerializeVariant(const rttr::variant& value, PAGTreeNode* node) {
     return;
   }
 
-  // Check if it's a pointer type and the pointer is null
+  // Check if it's a pointer type
   if (wrappedType.is_pointer()) {
     void* ptr = nullptr;
     if (value.convert(ptr) || realValue.convert(ptr)) {
       if (ptr == nullptr) {
         node->setValue("<null>");
+        return;
+      }
+    }
+    // Check if it's a pointer to pagx::Node derived class
+    auto rawType = wrappedType.get_raw_type();
+    if (rawType.is_derived_from<pagx::Node>() || rawType == rttr::type::get<pagx::Node>()) {
+      pagx::Node* nodePtr = nullptr;
+      if (realValue.convert(nodePtr) && nodePtr != nullptr) {
+        SerializeNode(nodePtr, node);
         return;
       }
     }
@@ -337,6 +351,19 @@ static void SerializeSequentialContainer(const rttr::variant_sequential_view& vi
         childNode->setValue(TransformEnumToQString(wrappedValue));
       } else if (type == rttr::type::get<std::string>()) {
         childNode->setValue(wrappedValue.to_string().c_str());
+      } else if (type.is_pointer()) {
+        // Check if it's a pointer to pagx::Node derived class
+        auto rawType = type.get_raw_type();
+        if (rawType.is_derived_from<pagx::Node>() || rawType == rttr::type::get<pagx::Node>()) {
+          pagx::Node* nodePtr = nullptr;
+          if (wrappedValue.convert(nodePtr) && nodePtr != nullptr) {
+            SerializeNode(nodePtr, childNode.get());
+          } else {
+            childNode->setValue("<null>");
+          }
+        } else {
+          SerializeInstance(wrappedValue, childNode.get());
+        }
       } else {
         SerializeInstance(wrappedValue, childNode.get());
       }
