@@ -125,7 +125,7 @@ enum class NodeType {
    */
   Rectangle,
   /**
-   * An ellipse shape defined by center point and size.
+   * An ellipse shape defined by position point and size.
    */
   Ellipse,
   /**

@@ -25,7 +25,7 @@
 namespace pagx {
 
 /**
- * Ellipse represents an ellipse shape defined by a center point and size.
+ * Ellipse represents an ellipse shape defined by a position point and size.
  */
 class Ellipse : public Element {
  public:
