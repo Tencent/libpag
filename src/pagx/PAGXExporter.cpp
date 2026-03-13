@@ -294,7 +294,9 @@ static void writeLayer(XMLBuilder& xml, const Layer* node, const Options& option
 
 static void writeCustomData(XMLBuilder& xml, const Node* node) {
   for (const auto& [key, value] : node->customData) {
-    xml.addAttribute(("data-" + key).c_str(), value);
+    if (Node::IsValidCustomDataKey(key)) {
+      xml.addAttribute(("data-" + key).c_str(), value);
+    }
   }
 }
 
