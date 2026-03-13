@@ -492,7 +492,7 @@ static Rectangle* parseRectangle(const DOMNode* node, PAGXDocument* doc) {
   if (!rect) {
     return nullptr;
   }
-  rect->center = getPointAttribute(node, "center", {0, 0}, doc);
+  rect->position = getPointAttribute(node, "position", {0, 0}, doc);
   rect->size = getSizeAttribute(node, "size", {100, 100}, doc);
   rect->roundness = getFloatAttribute(node, "roundness", 0, doc);
   rect->reversed = getBoolAttribute(node, "reversed", false, doc);
@@ -504,7 +504,7 @@ static Ellipse* parseEllipse(const DOMNode* node, PAGXDocument* doc) {
   if (!ellipse) {
     return nullptr;
   }
-  ellipse->center = getPointAttribute(node, "center", {0, 0}, doc);
+  ellipse->position = getPointAttribute(node, "position", {0, 0}, doc);
   ellipse->size = getSizeAttribute(node, "size", {100, 100}, doc);
   ellipse->reversed = getBoolAttribute(node, "reversed", false, doc);
   return ellipse;
@@ -515,7 +515,7 @@ static Polystar* parsePolystar(const DOMNode* node, PAGXDocument* doc) {
   if (!polystar) {
     return nullptr;
   }
-  polystar->center = getPointAttribute(node, "center", {0, 0}, doc);
+  polystar->position = getPointAttribute(node, "position", {0, 0}, doc);
   polystar->type = PolystarTypeFromString(getAttribute(node, "type", "star"));
   polystar->pointCount = getFloatAttribute(node, "pointCount", 5, doc);
   polystar->outerRadius = getFloatAttribute(node, "outerRadius", 100, doc);
@@ -946,7 +946,7 @@ static RadialGradient* parseRadialGradient(const DOMNode* node, PAGXDocument* do
   if (!gradient) {
     return nullptr;
   }
-  gradient->center = getPointAttribute(node, "center", {0, 0}, doc);
+  gradient->position = getPointAttribute(node, "position", {0, 0}, doc);
   gradient->radius = getFloatAttribute(node, "radius", 0, doc);
   parseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
   return gradient;
@@ -957,7 +957,7 @@ static ConicGradient* parseConicGradient(const DOMNode* node, PAGXDocument* doc)
   if (!gradient) {
     return nullptr;
   }
-  gradient->center = getPointAttribute(node, "center", {0, 0}, doc);
+  gradient->position = getPointAttribute(node, "position", {0, 0}, doc);
   gradient->startAngle = getFloatAttribute(node, "startAngle", 0, doc);
   gradient->endAngle = getFloatAttribute(node, "endAngle", 360, doc);
   parseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
@@ -969,7 +969,7 @@ static DiamondGradient* parseDiamondGradient(const DOMNode* node, PAGXDocument* 
   if (!gradient) {
     return nullptr;
   }
-  gradient->center = getPointAttribute(node, "center", {0, 0}, doc);
+  gradient->position = getPointAttribute(node, "position", {0, 0}, doc);
   gradient->radius = getFloatAttribute(node, "radius", 0, doc);
   parseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
   return gradient;

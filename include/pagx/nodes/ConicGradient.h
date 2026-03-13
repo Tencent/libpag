@@ -34,7 +34,7 @@ class ConicGradient : public ColorSource {
   /**
    * The center point of the gradient.
    */
-  Point center = {};
+  Point position = {};
 
   /**
    * The starting angle of the gradient sweep in degrees. The default value is 0.

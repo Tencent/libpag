@@ -360,8 +360,8 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       auto grad = static_cast<const RadialGradient*>(node);
       xml.openElement("RadialGradient");
       xml.addAttribute("id", grad->id);
-      if (grad->center.x != 0 || grad->center.y != 0) {
-        xml.addAttribute("center", pointToString(grad->center));
+      if (grad->position.x != 0 || grad->position.y != 0) {
+        xml.addAttribute("position", pointToString(grad->position));
       }
       xml.addRequiredAttribute("radius", grad->radius);
       writeGradientMatrixAndStops(xml, grad->matrix, grad->colorStops);
@@ -371,8 +371,8 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       auto grad = static_cast<const ConicGradient*>(node);
       xml.openElement("ConicGradient");
       xml.addAttribute("id", grad->id);
-      if (grad->center.x != 0 || grad->center.y != 0) {
-        xml.addAttribute("center", pointToString(grad->center));
+      if (grad->position.x != 0 || grad->position.y != 0) {
+        xml.addAttribute("position", pointToString(grad->position));
       }
       xml.addAttribute("startAngle", grad->startAngle);
       xml.addAttribute("endAngle", grad->endAngle, 360.0f);
@@ -383,8 +383,8 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       auto grad = static_cast<const DiamondGradient*>(node);
       xml.openElement("DiamondGradient");
       xml.addAttribute("id", grad->id);
-      if (grad->center.x != 0 || grad->center.y != 0) {
-        xml.addAttribute("center", pointToString(grad->center));
+      if (grad->position.x != 0 || grad->position.y != 0) {
+        xml.addAttribute("position", pointToString(grad->position));
       }
       xml.addRequiredAttribute("radius", grad->radius);
       writeGradientMatrixAndStops(xml, grad->matrix, grad->colorStops);
@@ -429,8 +429,8 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Rectangle: {
       auto rect = static_cast<const Rectangle*>(node);
       xml.openElement("Rectangle");
-      if (rect->center.x != 0 || rect->center.y != 0) {
-        xml.addAttribute("center", pointToString(rect->center));
+      if (rect->position.x != 0 || rect->position.y != 0) {
+        xml.addAttribute("position", pointToString(rect->position));
       }
       if (rect->size.width != 100 || rect->size.height != 100) {
         xml.addAttribute("size", sizeToString(rect->size));
@@ -443,8 +443,8 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Ellipse: {
       auto ellipse = static_cast<const Ellipse*>(node);
       xml.openElement("Ellipse");
-      if (ellipse->center.x != 0 || ellipse->center.y != 0) {
-        xml.addAttribute("center", pointToString(ellipse->center));
+      if (ellipse->position.x != 0 || ellipse->position.y != 0) {
+        xml.addAttribute("position", pointToString(ellipse->position));
       }
       if (ellipse->size.width != 100 || ellipse->size.height != 100) {
         xml.addAttribute("size", sizeToString(ellipse->size));
@@ -456,8 +456,8 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Polystar: {
       auto polystar = static_cast<const Polystar*>(node);
       xml.openElement("Polystar");
-      if (polystar->center.x != 0 || polystar->center.y != 0) {
-        xml.addAttribute("center", pointToString(polystar->center));
+      if (polystar->position.x != 0 || polystar->position.y != 0) {
+        xml.addAttribute("position", pointToString(polystar->position));
       }
       xml.addAttribute("type", PolystarTypeToString(polystar->type));
       xml.addAttribute("pointCount", polystar->pointCount, 5.0f);

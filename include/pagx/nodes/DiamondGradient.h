@@ -34,7 +34,7 @@ class DiamondGradient : public ColorSource {
   /**
    * The center point of the gradient.
    */
-  Point center = {};
+  Point position = {};
 
   /**
    * Half the diagonal length of the diamond shape.

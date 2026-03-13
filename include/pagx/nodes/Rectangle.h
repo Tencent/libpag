@@ -30,9 +30,9 @@ namespace pagx {
 class Rectangle : public Element {
  public:
   /**
-   * The center point of the rectangle.
+   * The position of the rectangle anchor point in the parent coordinate system.
    */
-  Point center = {};
+  Point position = {};
 
   /**
    * The size of the rectangle. The default value is {100, 100}.

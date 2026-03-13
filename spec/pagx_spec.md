@@ -80,7 +80,7 @@ The following attributes are available on any element and are not repeated in in
 
 ```xml
 <Layer data-name="Background Layer" data-figma-id="12:34" data-exported-by="PAGExporter">
-  <Rectangle center="50,50" size="100,100"/>
+  <Rectangle position="50,50" size="100,100"/>
   <Fill color="#FF0000"/>
 </Layer>
 ```
@@ -346,11 +346,11 @@ Radial gradients radiate outward from the center.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Center point |
+| `position` | Point | 0,0 | Center point |
 | `radius` | float | (required) | Gradient radius |
 | `matrix` | Matrix | identity matrix | Transform matrix |
 
-**Calculation**: For a point P, its color is determined by `distance(P, center) / radius`.
+**Calculation**: For a point P, its color is determined by `distance(P, position) / radius`.
 
 ##### ConicGradient
 
@@ -360,12 +360,12 @@ Conic gradients (also known as sweep gradients) interpolate along the circumfere
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Center point |
+| `position` | Point | 0,0 | Center point |
 | `startAngle` | float | 0 | Start angle |
 | `endAngle` | float | 360 | End angle |
 | `matrix` | Matrix | identity matrix | Transform matrix |
 
-**Calculation**: For a point P, its color is determined by the ratio of `atan2(P.y - center.y, P.x - center.x)` within the `[startAngle, endAngle]` range.
+**Calculation**: For a point P, its color is determined by the ratio of `atan2(P.y - position.y, P.x - position.x)` within the `[startAngle, endAngle]` range.
 
 **Angle convention**: Follows the global coordinate system convention (see §3.1): 0° points to the **right** (positive X-axis), and angles increase **clockwise**. This differs from CSS `conic-gradient` where 0° points to the top. Common reference angles:
 
@@ -384,11 +384,11 @@ Diamond gradients radiate from the center toward the four corners.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Center point |
+| `position` | Point | 0,0 | Center point |
 | `radius` | float | (required) | Gradient radius |
 | `matrix` | Matrix | identity matrix | Transform matrix |
 
-**Calculation**: For a point P, its color is determined by the Chebyshev distance `max(|P.x - center.x|, |P.y - center.y|) / radius`.
+**Calculation**: For a point P, its color is determined by the Chebyshev distance `max(|P.x - position.x|, |P.y - position.y|) / radius`.
 
 ##### ColorStop
 
@@ -903,22 +903,22 @@ Geometry elements provide renderable shapes.
 Rectangles are defined from center point with uniform corner rounding support.
 
 ```xml
-<Rectangle center="100,100" size="200,150" roundness="10" reversed="false"/>
+<Rectangle position="100,100" size="200,150" roundness="10" reversed="false"/>
 ```
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Center point |
+| `position` | Point | 0,0 | Position of the rectangle anchor point |
 | `size` | Size | 100,100 | Dimensions "width,height" |
 | `roundness` | float | 0 | Corner radius |
 | `reversed` | bool | false | Reverse path direction |
 
 **Calculation Rules**:
 ```
-rect.left   = center.x - size.width / 2
-rect.top    = center.y - size.height / 2
-rect.right  = center.x + size.width / 2
-rect.bottom = center.y + size.height / 2
+rect.left   = position.x - size.width / 2
+rect.top    = position.y - size.height / 2
+rect.right  = position.x + size.width / 2
+rect.bottom = position.y + size.height / 2
 ```
 
 **Corner Rounding**:
@@ -936,21 +936,21 @@ rect.bottom = center.y + size.height / 2
 Ellipses are defined from center point.
 
 ```xml
-<Ellipse center="100,100" size="100,60" reversed="false"/>
+<Ellipse position="100,100" size="100,60" reversed="false"/>
 ```
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Center point |
+| `position` | Point | 0,0 | Position of the ellipse anchor point |
 | `size` | Size | 100,100 | Dimensions "width,height" |
 | `reversed` | bool | false | Reverse path direction |
 
 **Calculation Rules**:
 ```
-boundingRect.left   = center.x - size.width / 2
-boundingRect.top    = center.y - size.height / 2
-boundingRect.right  = center.x + size.width / 2
-boundingRect.bottom = center.y + size.height / 2
+boundingRect.left   = position.x - size.width / 2
+boundingRect.top    = position.y - size.height / 2
+boundingRect.right  = position.x + size.width / 2
+boundingRect.bottom = position.y + size.height / 2
 ```
 
 **Path Start Point**: Ellipse path starts from the **right midpoint** (3 o'clock position).
@@ -964,12 +964,12 @@ boundingRect.bottom = center.y + size.height / 2
 Supports both regular polygon and star modes.
 
 ```xml
-<Polystar center="100,100" type="star" pointCount="5" outerRadius="100" innerRadius="50" rotation="0" outerRoundness="0" innerRoundness="0" reversed="false"/>
+<Polystar position="100,100" type="star" pointCount="5" outerRadius="100" innerRadius="50" rotation="0" outerRoundness="0" innerRoundness="0" reversed="false"/>
 ```
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Center point |
+| `position` | Point | 0,0 | Position of the polystar anchor point |
 | `type` | PolystarType | star | Type (see below) |
 | `pointCount` | float | 5 | Number of points (supports decimals) |
 | `outerRadius` | float | 100 | Outer radius |

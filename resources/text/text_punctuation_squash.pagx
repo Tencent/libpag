@@ -3,7 +3,7 @@
   <!-- Box A: Opening + Closing + Opening squash (「」「」) -->
   <Layer x="50" y="50">
     <Group>
-      <Rectangle center="150,30" size="300,60"/>
+      <Rectangle position="150,30" size="300,60"/>
       <Stroke/>
     </Group>
     <Group>
@@ -16,7 +16,7 @@
   <!-- Box B: Closing + Opening squash (。「) -->
   <Layer x="50" y="120">
     <Group>
-      <Rectangle center="150,30" size="300,60"/>
+      <Rectangle position="150,30" size="300,60"/>
       <Stroke/>
     </Group>
     <Group>
@@ -29,7 +29,7 @@
   <!-- Box C: Closing + Closing adjacent squash (、。) -->
   <Layer x="400" y="50">
     <Group>
-      <Rectangle center="125,30" size="250,60"/>
+      <Rectangle position="125,30" size="250,60"/>
       <Stroke/>
     </Group>
     <Group>
@@ -42,7 +42,7 @@
   <!-- Box D: MiddleDot + Opening squash (・「) -->
   <Layer x="400" y="120">
     <Group>
-      <Rectangle center="125,30" size="250,60"/>
+      <Rectangle position="125,30" size="250,60"/>
       <Stroke/>
     </Group>
     <Group>
@@ -55,7 +55,7 @@
   <!-- Box E: Line-start Opening squash -->
   <Layer x="50" y="200">
     <Group>
-      <Rectangle center="150,30" size="300,60"/>
+      <Rectangle position="150,30" size="300,60"/>
       <Stroke/>
     </Group>
     <Group>
@@ -68,7 +68,7 @@
   <!-- Box F: Line-end Closing squash -->
   <Layer x="400" y="200">
     <Group>
-      <Rectangle center="125,30" size="250,60"/>
+      <Rectangle position="125,30" size="250,60"/>
       <Stroke/>
     </Group>
     <Group>
@@ -81,7 +81,7 @@
   <!-- Box G: Compound squash (multiple punctuation types in sequence) -->
   <Layer x="50" y="300">
     <Group>
-      <Rectangle center="125,60" size="250,120"/>
+      <Rectangle position="125,60" size="250,120"/>
       <Stroke/>
     </Group>
     <Group>
@@ -94,7 +94,7 @@
   <!-- Box H: Vertical text punctuation squash -->
   <Layer x="350" y="300">
     <Group>
-      <Rectangle center="50,80" size="100,160"/>
+      <Rectangle position="50,80" size="100,160"/>
       <Stroke/>
     </Group>
     <Group>
@@ -107,7 +107,7 @@
   <!-- Box I: Normal CJK punctuation baseline (no squash expected) -->
   <Layer x="50" y="430">
     <Group>
-      <Rectangle center="150,25" size="300,50"/>
+      <Rectangle position="150,25" size="300,50"/>
       <Stroke/>
     </Group>
     <Group>

@@ -34,7 +34,7 @@ class RadialGradient : public ColorSource {
   /**
    * The center point of the gradient.
    */
-  Point center = {};
+  Point position = {};
 
   /**
    * The radius of the gradient circle.

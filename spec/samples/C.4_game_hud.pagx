@@ -6,9 +6,9 @@
   </Layer>
   <Layer name="Background">
     <Layer>
-      <Rectangle center="400,300" size="800,600"/>
+      <Rectangle position="400,300" size="800,600"/>
       <Fill>
-        <RadialGradient center="400,300" radius="500">
+        <RadialGradient position="400,300" radius="500">
           <ColorStop offset="0" color="#001122"/>
           <ColorStop offset="0.7" color="#000811"/>
           <ColorStop offset="1" color="#000"/>
@@ -16,22 +16,22 @@
       </Fill>
     </Layer>
     <Layer alpha="0.15">
-      <Rectangle center="400,0" size="800,1"/>
+      <Rectangle position="400,0" size="800,1"/>
       <Repeater copies="35" position="0,17"/>
       <Group position="400,300" rotation="60">
-        <Rectangle center="0,-510" size="1200,1"/>
+        <Rectangle position="0,-510" size="1200,1"/>
         <Repeater copies="60" position="0,17"/>
       </Group>
       <Group position="400,300" rotation="-60">
-        <Rectangle center="0,-510" size="1200,1"/>
+        <Rectangle position="0,-510" size="1200,1"/>
         <Repeater copies="60" position="0,17"/>
       </Group>
       <Fill color="#0066AA"/>
     </Layer>
     <Layer>
-      <Rectangle center="400,300" size="800,600"/>
+      <Rectangle position="400,300" size="800,600"/>
       <Fill>
-        <RadialGradient center="400,300" radius="600">
+        <RadialGradient position="400,300" radius="600">
           <ColorStop offset="0.6" color="#00000000"/>
           <ColorStop offset="1" color="#00000080"/>
         </RadialGradient>
@@ -40,12 +40,12 @@
   </Layer>
   <Layer name="ReticleComplex" x="400" y="300">
     <Layer>
-      <Rectangle center="0,-220" size="2,15"/>
+      <Rectangle position="0,-220" size="2,15"/>
       <Fill color="#00CCFF" alpha="0.6"/>
       <Repeater copies="60" rotation="6"/>
     </Layer>
     <Layer>
-      <Rectangle center="0,-215" size="1,8"/>
+      <Rectangle position="0,-215" size="1,8"/>
       <Fill color="#00CCFF" alpha="0.3"/>
       <Repeater copies="60" offset="0.5" rotation="6"/>
     </Layer>
@@ -74,7 +74,7 @@
       <DropShadowStyle blurX="25" blurY="25" color="#FFAA00"/>
     </Layer>
     <Layer mask="@triangleMask">
-      <Rectangle center="0,0" size="100,100"/>
+      <Rectangle position="0,0" size="100,100"/>
       <Fill>
         <LinearGradient startPoint="-50,0" endPoint="50,0">
           <ColorStop offset="0" color="#FFAA0000"/>
@@ -178,12 +178,12 @@
     </Layer>
     <Layer y="30">
       <Group>
-        <Rectangle center="0,0" size="40,4"/>
+        <Rectangle position="0,0" size="40,4"/>
         <Fill color="#004488"/>
       </Group>
       <Group>
-        <Rectangle center="-30,0" size="10,4"/>
-        <Rectangle center="30,0" size="10,4"/>
+        <Rectangle position="-30,0" size="10,4"/>
+        <Rectangle position="30,0" size="10,4"/>
         <Fill color="#002244"/>
       </Group>
     </Layer>
@@ -210,8 +210,8 @@
       </Fill>
     </Layer>
     <Layer>
-      <Ellipse center="30,-20" size="6,6"/>
-      <Ellipse center="-40,10" size="6,6"/>
+      <Ellipse position="30,-20" size="6,6"/>
+      <Ellipse position="-40,10" size="6,6"/>
       <Fill color="#F00"/>
       <DropShadowStyle blurX="4" blurY="4" color="#F00"/>
     </Layer>

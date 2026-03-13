@@ -285,8 +285,8 @@ PAGX_TEST(PAGXTest, PAGXDocumentXMLExport) {
   auto group = doc->makeNode<pagx::Group>();
 
   auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->center.x = 50;
-  rect->center.y = 50;
+  rect->position.x = 50;
+  rect->position.y = 50;
   rect->size.width = 80;
   rect->size.height = 60;
 
@@ -321,8 +321,8 @@ PAGX_TEST(PAGXTest, PAGXDocumentRoundTrip) {
   layer->name = "TestLayer";
 
   auto rect = doc1->makeNode<pagx::Rectangle>();
-  rect->center.x = 50;
-  rect->center.y = 50;
+  rect->position.x = 50;
+  rect->position.y = 50;
   rect->size.width = 80;
   rect->size.height = 60;
 

@@ -10,20 +10,20 @@
 -->
 <pagx version="1.0" width="500" height="500">
   <Layer id="a" name="Layer A" x="10">
-    <Rectangle center="25,20" size="50,40"/>
+    <Rectangle position="25,20" size="50,40"/>
     <Fill color="#FF0000"/>
   </Layer>
   <Layer id="b" name="Layer B" x="100" y="100">
-    <Rectangle center="25,20" size="50,40"/>
+    <Rectangle position="25,20" size="50,40"/>
     <Fill color="#00FF00"/>
   </Layer>
   <Layer id="c" name="Layer C" x="250" y="300">
-    <Rectangle center="25,20" size="50,40"/>
+    <Rectangle position="25,20" size="50,40"/>
     <Fill color="#0000FF"/>
   </Layer>
   <Layer id="group" name="Container" y="200">
     <Layer id="d" name="Nested Layer" x="30">
-      <Rectangle center="25,20" size="50,40"/>
+      <Rectangle position="25,20" size="50,40"/>
       <Fill color="#FFFF00"/>
     </Layer>
   </Layer>

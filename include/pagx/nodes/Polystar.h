@@ -30,9 +30,9 @@ namespace pagx {
 class Polystar : public Element {
  public:
   /**
-   * The center point of the polystar.
+   * The position of the polystar anchor point in the parent coordinate system.
    */
-  Point center = {};
+  Point position = {};
 
   /**
    * The type of polystar shape, either Star or Polygon. The default value is Star.
