@@ -513,9 +513,9 @@ Resource Reuse for coordinate conversion details and gradient handling.
 <pagx version="1.0" width="400" height="300">
   <!-- Content behind the panel -->
   <Layer>
-  <Rectangle position="200,150" size="400,300"/>
-  <Fill>
-    <LinearGradient startPoint="0,0" endPoint="400,300">
+    <Rectangle position="200,150" size="400,300"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="400,300">
         <ColorStop offset="0" color="#6366F1"/>
         <ColorStop offset="1" color="#EC4899"/>
       </LinearGradient>

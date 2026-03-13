@@ -998,8 +998,8 @@ boundingRect.bottom = position.y + size.height / 2
 **顶点计算**（第 i 个外顶点）：
 ```
 angle = rotation + (i / pointCount) * 360°
-x = center.x + outerRadius * cos(angle)
-y = center.y + outerRadius * sin(angle)
+x = position.x + outerRadius * cos(angle)
+y = position.y + outerRadius * sin(angle)
 ```
 
 **小数点数**：

@@ -998,8 +998,8 @@ Supports both regular polygon and star modes.
 **Vertex Calculation** (i-th outer vertex):
 ```
 angle = rotation + (i / pointCount) * 360°
-x = center.x + outerRadius * cos(angle)
-y = center.y + outerRadius * sin(angle)
+x = position.x + outerRadius * cos(angle)
+y = position.y + outerRadius * sin(angle)
 ```
 
 **Fractional Point Count**:
