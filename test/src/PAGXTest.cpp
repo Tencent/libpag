@@ -894,4 +894,38 @@ PAGX_TEST(PAGXTest, CustomDataTextModifierRangeSelector) {
   EXPECT_EQ(modifier2->selectors[0]->customData.at("timing"), "ease");
 }
 
+PAGX_TEST(PAGXTest, CustomDataSVGRootElement) {
+  // Verify that data-* attributes on the root <svg> element are parsed into PAGXDocument.
+  std::string svg = R"(
+    <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"
+         data-source="figma" data-version="3">
+      <rect x="0" y="0" width="50" height="50" fill="red" data-role="bg"/>
+    </svg>
+  )";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+
+  // Verify document-level customData from root <svg>.
+  ASSERT_EQ(doc->customData.count("source"), 1u);
+  EXPECT_EQ(doc->customData.at("source"), "figma");
+  ASSERT_EQ(doc->customData.count("version"), 1u);
+  EXPECT_EQ(doc->customData.at("version"), "3");
+
+  // Verify child layer customData is also parsed (SVG rect becomes a Layer with data-* on it).
+  ASSERT_EQ(doc->layers.size(), 1u);
+  ASSERT_EQ(doc->layers[0]->customData.count("role"), 1u);
+  EXPECT_EQ(doc->layers[0]->customData.at("role"), "bg");
+
+  // Export to PAGX XML and re-import to verify round-trip.
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+  auto doc2 = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc2 != nullptr);
+  EXPECT_TRUE(doc2->errors.empty());
+  EXPECT_EQ(doc2->customData, doc->customData);
+  ASSERT_EQ(doc2->layers.size(), 1u);
+  EXPECT_EQ(doc2->layers[0]->customData, doc->layers[0]->customData);
+}
+
 }  // namespace pag

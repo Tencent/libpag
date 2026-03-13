@@ -130,6 +130,7 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
   }
 
   _document = PAGXDocument::Make(width, height);
+  parseCustomData(root, _document.get());
 
   // Collect all IDs from the SVG to avoid conflicts when generating new IDs.
   collectAllIds(root);
