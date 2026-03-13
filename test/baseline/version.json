@@ -8527,11 +8527,6 @@
         }
     },
     "PAGXCliTest": {
-        "AlignCenterX": "4d590923e",
-        "AlignCrossHierarchy": "4d590923e",
-        "AlignLeft": "4d590923e",
-        "DistributeX": "4d590923e",
-        "DistributeY": "4d590923e",
         "OptimizeComprehensive_optimized": "4c378e29a",
         "OptimizeComprehensive_original": "4c378e29a",
         "OptimizeDedupGradient_optimized": "4c378e29a",
