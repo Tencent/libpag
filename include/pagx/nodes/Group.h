@@ -18,8 +18,10 @@
 
 #pragma once
 
+#include <optional>
 #include <vector>
 #include "pagx/nodes/Element.h"
+#include "pagx/types/Constraints.h"
 #include "pagx/types/Point.h"
 
 namespace pagx {
@@ -70,6 +72,23 @@ class Group : public Element {
    * The child elements contained in this group.
    */
   std::vector<Element*> elements = {};
+
+  /**
+   * The layout width of the group. When set, the group becomes a constraint layout reference frame
+   * for its child elements. Does not affect rendering behavior.
+   */
+  std::optional<float> width = std::nullopt;
+
+  /**
+   * The layout height of the group. When set, the group becomes a constraint layout reference frame
+   * for its child elements. Does not affect rendering behavior.
+   */
+  std::optional<float> height = std::nullopt;
+
+  /**
+   * Constraint attributes for positioning relative to the containing Layer or Group.
+   */
+  Constraints constraints = {};
 
   NodeType nodeType() const override {
     return NodeType::Group;

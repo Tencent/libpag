@@ -18,16 +18,22 @@
 
 #pragma once
 
+#include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/LayerFilter.h"
 #include "pagx/nodes/LayerStyle.h"
 #include "pagx/nodes/Node.h"
+#include "pagx/types/Alignment.h"
+#include "pagx/types/Arrangement.h"
 #include "pagx/types/BlendMode.h"
+#include "pagx/types/LayoutDirection.h"
 #include "pagx/types/MaskType.h"
 #include "pagx/types/Matrix.h"
 #include "pagx/types/Matrix3D.h"
+#include "pagx/types/Padding.h"
 #include "pagx/types/Rect.h"
 
 namespace pagx {
@@ -145,6 +151,73 @@ class Layer : public Node {
    * The child layers contained in this layer.
    */
   std::vector<Layer*> children = {};
+
+  /**
+   * The layout width of the layer. When set, enables constraint layout for contents.
+   */
+  std::optional<float> width = std::nullopt;
+
+  /**
+   * The layout height of the layer. When set, enables constraint layout for contents.
+   */
+  std::optional<float> height = std::nullopt;
+
+  /**
+   * The minimum width constraint for flexible sizing in a layout container.
+   */
+  std::optional<float> minWidth = std::nullopt;
+
+  /**
+   * The maximum width constraint for flexible sizing in a layout container.
+   */
+  std::optional<float> maxWidth = std::nullopt;
+
+  /**
+   * The minimum height constraint for flexible sizing in a layout container.
+   */
+  std::optional<float> minHeight = std::nullopt;
+
+  /**
+   * The maximum height constraint for flexible sizing in a layout container.
+   */
+  std::optional<float> maxHeight = std::nullopt;
+
+  /**
+   * Enables auto layout and sets the arrangement direction. When set, child layers are
+   * automatically positioned along this axis. When not set, children use absolute positioning.
+   */
+  std::optional<LayoutDirection> layout = std::nullopt;
+
+  /**
+   * The spacing between adjacent child layers in the layout direction. The default value is 0.
+   */
+  float gap = 0.0f;
+
+  /**
+   * The inner padding of the layout container. The default value is zero on all sides.
+   */
+  Padding padding = {};
+
+  /**
+   * Whether child elements can wrap to the next line when they exceed the main axis. The default
+   * value is false.
+   */
+  bool layoutWrap = false;
+
+  /**
+   * The alignment of child elements along the cross axis. The default value is Start.
+   */
+  Alignment alignment = Alignment::Start;
+
+  /**
+   * The arrangement of child elements along the main axis. The default value is Start.
+   */
+  Arrangement arrangement = Arrangement::Start;
+
+  /**
+   * Custom data attributes. The keys are stored without the "data-" prefix.
+   */
+  std::unordered_map<std::string, std::string> customData = {};
 
   NodeType nodeType() const override {
     return NodeType::Layer;

@@ -19,6 +19,7 @@
 #pragma once
 
 #include "pagx/nodes/Element.h"
+#include "pagx/types/Constraints.h"
 #include "pagx/types/Overflow.h"
 #include "pagx/types/ParagraphAlign.h"
 #include "pagx/types/Point.h"
@@ -94,6 +95,11 @@ class TextBox : public Element {
    * default value is Visible.
    */
   Overflow overflow = Overflow::Visible;
+
+  /**
+   * Constraint attributes for positioning relative to the containing Layer or Group.
+   */
+  Constraints constraints = {};
 
   NodeType nodeType() const override {
     return NodeType::TextBox;

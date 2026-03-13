@@ -28,6 +28,7 @@ PAGX 是纯 XML 文件（`.pagx`），可引用外部资源文件（图片、视
 2. **文档结构**：描述 PAGX 文档的整体组织方式
 3. **图层系统**：定义图层及其相关特性（样式、滤镜、遮罩）
 4. **矢量元素系统**：定义图层内容的矢量元素及其处理模型
+5. **自动布局**：定义布局尺寸、容器布局和约束布局机制
 
 **附录**（方便速查）：
 
@@ -630,6 +631,18 @@ Layer 的子元素按类型自动归类为四个集合：
 | `mask` | idref | - | 遮罩图层引用 "@id" |
 | `maskType` | MaskType | alpha | 遮罩类型 |
 | `composition` | idref | - | 合成引用 "@id" |
+| `width` | float | - | 布局宽度（见 §6） |
+| `height` | float | - | 布局高度（见 §6） |
+| `minWidth` | float | - | 最小布局宽度（见 §6） |
+| `maxWidth` | float | - | 最大布局宽度（见 §6） |
+| `minHeight` | float | - | 最小布局高度（见 §6） |
+| `maxHeight` | float | - | 最大布局高度（见 §6） |
+| `layout` | Layout | - | 启用容器布局（见 §6） |
+| `gap` | float | 0 | 子 Layer 间距（见 §6） |
+| `padding` | float 或 "t,r,b,l" | 0 | 内边距（见 §6） |
+| `layoutWrap` | bool | false | 允许子元素换行（见 §6） |
+| `alignment` | Alignment | start | 交叉轴对齐（见 §6） |
+| `arrangement` | Arrangement | start | 主轴排布（见 §6） |
 
 **groupOpacity**：当值为 `false`（默认）时，图层的 `alpha` 独立应用到每个子元素，重叠的半透明子元素在交叉处可能显得更深。当值为 `true` 时，所有图层内容先合成到离屏缓冲区，再将 `alpha` 整体应用到缓冲区，使整个图层呈现均匀的透明效果。
 
@@ -1694,6 +1707,8 @@ Group 是带变换属性的矢量元素容器。
 | `skew` | float | 0 | 倾斜量 |
 | `skewAxis` | float | 0 | 倾斜轴角度 |
 | `alpha` | float | 1 | 透明度 0~1 |
+| `width` | float | - | 布局宽度（见 §6） |
+| `height` | float | - | 布局高度（见 §6） |
 
 #### 变换顺序
 
@@ -1754,6 +1769,297 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 > [Sample](samples/5.7_mixed_overlay.pagx)
 
 **渲染顺序**：多个绘制器按文档顺序渲染，先出现的位于下方。
+
+---
+
+## 6. 自动布局（Auto Layout）
+
+自动布局使 PAGX 元素能够声明布局意图，由引擎自动计算坐标和尺寸，无需手动指定每个元素的绝对位置。
+
+布局在两个层级上运作：
+
+| 层级 | 机制 | 用途 |
+|------|------|------|
+| Layer 之间 | 容器布局 | 父 Layer 排列子 Layer 的位置和尺寸 |
+| Layer 内部 | 约束布局 | 图层内容节点相对于容器定位或拉伸 |
+
+两者独立但互补：容器布局控制 Layer 的排列，约束布局控制 Layer 内部元素的位置。两者可以单独使用，也可以组合使用。
+
+### 6.1 布局尺寸（Layout Size）
+
+`width`/`height` 属性声明容器的布局尺寸。布局尺寸是自动布局的基础——容器布局用它确定可用空间，约束布局用它作为参考系。
+
+Layer 和 Group 都可以拥有布局尺寸，都可作为约束布局的参考系。区别在于只有 Layer 支持容器布局（排列子 Layer）。Layer 设 `width`/`height` 但不设 `layout` 时，不激活容器布局，但其内部元素仍可使用约束属性。
+
+Group 的布局尺寸不影响渲染行为，仅向下传递尺寸信息供约束布局使用。Group 的布局尺寸有两种来源：
+- **显式设置**：`width="360" height="260"`
+- **约束推导**：`left="20" right="20"` 从所属容器推导出 `width = 容器.width - 20 - 20`
+
+弹性尺寸受 `minWidth`/`maxWidth`/`minHeight`/`maxHeight` 约束。显式设了 `width`/`height` 时忽略 min/max。
+
+布局尺寸和约束计算在本地坐标系中完成，`matrix` 变换是渲染时叠加的视觉效果，不影响布局计算。
+
+### 6.2 容器布局（Container Layout）
+
+设置 `layout` 属性后，父 Layer 沿指定轴方向排列所有子 Layer。语义上是 CSS Flexbox 的子集。
+
+#### 属性
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `layout` | Layout | - | 主轴方向；设置后激活容器布局 |
+| `gap` | float | 0 | 相邻子 Layer 之间的间距 |
+| `padding` | float 或 "t,r,b,l" | 0 | 内边距。支持单值（四边均匀）、两值（垂直,水平）、四值（上,右,下,左），与 CSS shorthand 一致 |
+| `layoutWrap` | bool | false | 允许子元素换行排列 |
+| `alignment` | Alignment | start | 交叉轴对齐方式 |
+| `arrangement` | Arrangement | start | 主轴排布方式 |
+
+**Layout**：
+
+| 值 | 说明 |
+|------|------|
+| `horizontal` | 主轴水平方向，交叉轴垂直方向 |
+| `vertical` | 主轴垂直方向，交叉轴水平方向 |
+
+**Alignment（交叉轴对齐）**：
+
+| 值 | 说明 |
+|------|------|
+| `start` | 交叉轴起始端对齐 |
+| `center` | 交叉轴居中对齐 |
+| `end` | 交叉轴末尾端对齐 |
+
+**Arrangement（主轴排布）**：
+
+| 值 | 说明 |
+|------|------|
+| `start` | 主轴起始端排布 |
+| `center` | 主轴居中排布 |
+| `end` | 主轴末尾端排布 |
+| `spaceBetween` | 子元素之间均匀分布，首尾贴边 |
+
+#### 子元素尺寸
+
+子 Layer 的主轴尺寸有两种状态：
+
+- **固定尺寸**：设了 `width`/`height`，不随父容器变化。
+- **弹性尺寸**：未设 `width`/`height`。先按内容 bounds 确定最小尺寸，父容器有剩余空间时在所有弹性子元素之间等分追加。弹性尺寸受 `minWidth`/`maxWidth`/`minHeight`/`maxHeight` 约束。
+
+交叉轴尺寸：有显式 `width`/`height` 则使用，否则由内容 bounds 决定。
+
+内容区域为 `width × height` 减去各边 `padding`。
+
+#### 绝对定位
+
+设了 `layout` 的 Layer，所有子 Layer 的位置一律由布局引擎决定，不存在脱离布局流的方式。需要绝对定位的元素通过嵌套 Layer 解决：
+
+```xml
+<Layer width="400" height="300">
+  <!-- 布局容器 -->
+  <Layer width="400" height="280" layout="vertical" gap="12">
+    <Layer>...</Layer>
+    <Layer>...</Layer>
+  </Layer>
+
+  <!-- 绝对定位元素：与布局容器并列 -->
+  <Layer x="370" y="10">
+    <Ellipse size="24,24"/>
+    <Fill color="#EF4444"/>
+  </Layer>
+</Layer>
+```
+
+#### 示例
+
+三个等宽卡片水平排列，间距 14px，内边距 20px：
+
+```xml
+<Layer width="920" height="200" layout="horizontal" gap="14" padding="20">
+  <Layer><!-- 卡片 A：弹性尺寸 --></Layer>
+  <Layer><!-- 卡片 B：弹性尺寸 --></Layer>
+  <Layer><!-- 卡片 C：弹性尺寸 --></Layer>
+</Layer>
+```
+
+三个子 Layer 均未设 `width`，等分可用宽度：`(920 - 40 - 28) / 3 = 284`。
+
+### 6.3 约束布局（Constraint Layout）
+
+约束布局允许图层内容节点声明与所属容器的位置关系，引擎自动计算坐标。约束属性可用于所有图层内容节点（Rectangle、Ellipse、Polystar、Path、Text、TextBox、Group）。
+
+#### 6.3.1 属性
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `left` | float | - | 元素左边缘到容器左边缘的距离 |
+| `right` | float | - | 元素右边缘到容器右边缘的距离 |
+| `top` | float | - | 元素上边缘到容器上边缘的距离 |
+| `bottom` | float | - | 元素下边缘到容器下边缘的距离 |
+| `centerX` | float | - | 元素中心相对于容器水平中心的偏移（0 = 水平居中） |
+| `centerY` | float | - | 元素中心相对于容器垂直中心的偏移（0 = 垂直居中） |
+
+**生效条件**：约束属性仅在所属容器有对应轴的布局尺寸时有效。约束参考最近的有布局尺寸的祖先容器（Layer 或 Group）；没有布局尺寸的 Group 不形成参考系，约束穿透它继续向上查找。
+
+**互斥关系**：水平方向上 `left`、`right`、`centerX` 三者互斥（`left` + `right` 对边组合除外）。垂直方向同理。约束在受约束的方向上覆盖 `position` 和 `size`。
+
+#### 6.3.2 单边约束
+
+仅设置一边的约束，将元素的对应边缘定位到距容器边缘指定距离处，不改变元素尺寸。
+
+```
+left=L:     tx = L - B.left
+right=R:    tx = (W - R) - B.right
+top=T:      ty = T - B.top
+bottom=B_:  ty = (H - B_) - B.bottom
+```
+
+其中 `B` 为元素的 content bounds，`W`/`H` 为容器布局尺寸。
+
+#### 6.3.3 居中约束
+
+`centerX`/`centerY` 将元素中心定位到容器中心加偏移量处，不改变元素尺寸。
+
+```
+centerX=C:  tx = (W/2 + C) - B.centerX
+centerY=C:  ty = (H/2 + C) - B.centerY
+```
+
+`centerX="0"` 水平居中，`centerX="20"` 居中后偏右 20px。
+
+#### 6.3.4 对边约束
+
+同时设置 `left` + `right`（或 `top` + `bottom`）确定一个目标区域。元素根据类型决定如何适应：
+
+| 元素 | 对边行为 | 说明 |
+|------|---------|------|
+| Rectangle | 拉伸填满 | 改写尺寸，适合背景填充 |
+| Ellipse | 拉伸填满 | 改写尺寸，适合背景填充 |
+| TextBox | 拉伸填满 | 文本区域适应容器 |
+| Path | 退化居中 | 保持原始尺寸，在目标区域内居中 |
+| Polystar | 退化居中 | 保持原始尺寸，在目标区域内居中 |
+| Group | 退化居中 | 保持原始尺寸，在目标区域内居中 |
+| Text | 退化居中 | 保持原始尺寸，在目标区域内居中 |
+
+**拉伸填满**（Rectangle、Ellipse、TextBox）：
+
+```
+left=L, right=R:  新 width = W - L - R, 新 position.x 由元素类型决定
+top=T, bottom=B_: 新 height = H - T - B_, 新 position.y 由元素类型决定
+```
+
+**退化居中**（Path、Polystar、Group、Text）：
+
+```
+left=L, right=R:  areaWidth = W - L - R
+                  tx = L + (areaWidth - B.width)/2 - B.left
+top=T, bottom=B_: areaHeight = H - T - B_
+                  ty = T + (areaHeight - B.height)/2 - B.top
+```
+
+退化居中使得对边同设对所有元素类型都合法。
+
+#### 6.3.5 Content Bounds
+
+约束属性中的「边缘」统一指元素的 content bounds 边缘，而非坐标系原点。content bounds 是元素在未施加约束时、在本地坐标系中的内容包围盒。
+
+例如一条从 `(50, 30)` 开始绘制的 Path，其 content bounds 的左边缘是 50；设置 `left="0"` 会将该 Path 整体左移 50px，使其内容紧贴容器左边缘。这确保了 `left="0"` 对所有元素类型的语义统一：「内容紧贴容器左边缘」。
+
+#### 6.3.6 示例
+
+以下示例均在 `width="400" height="200"` 的容器中。
+
+**拉伸填满**——Rectangle 铺满容器并留出边距：
+
+```xml
+<Layer width="400" height="200">
+  <Rectangle left="10" right="10" top="5" bottom="5"/>
+  <Fill color="#3B82F6"/>
+</Layer>
+```
+
+```
+rect.width      = 400 - 10 - 10 = 380
+rect.height     = 200 - 5 - 5   = 190
+rect.position.x = 10 + 380/2    = 200   (锚点在几何中心)
+rect.position.y = 5 + 190/2     = 100
+```
+
+**居中定位**——Rectangle 在容器中心：
+
+```xml
+<Layer width="400" height="200">
+  <Rectangle centerX="0" centerY="0" size="100,40"/>
+  <Fill color="#3B82F6"/>
+</Layer>
+```
+
+```
+B = { left: -50, right: 50, top: -20, bottom: 20, centerX: 0, centerY: 0 }
+tx = (400/2 + 0) - 0 = 200   → rect.position.x = 200
+ty = (200/2 + 0) - 0 = 100   → rect.position.y = 100
+rect.size 保持 100×40 不变
+```
+
+**TextBox 拉伸**——文本区域铺满容器并留出边距：
+
+```xml
+<Layer width="400" height="200">
+  <Text text="Hello World" fontFamily="Arial" fontSize="24"/>
+  <TextBox left="20" right="20" top="16" bottom="16" textAlign="center"/>
+  <Fill color="#333333"/>
+</Layer>
+```
+
+```
+textbox.width      = 400 - 20 - 20 = 360
+textbox.height     = 200 - 16 - 16 = 168
+textbox.position.x = 20
+textbox.position.y = 16
+```
+
+**Group 传递布局尺寸**——嵌套约束布局：
+
+```xml
+<Layer width="400" height="300">
+  <Group left="20" right="20" top="20" bottom="20">
+    <!-- Group 布局尺寸 = 360×260，由约束推导 -->
+
+    <!-- Rectangle 参考 Group 的 360×260 撑满 -->
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+    <Fill color="#1E293B"/>
+
+    <Group>
+      <Text text="Hello" fontFamily="Inter" fontSize="16"/>
+      <Fill color="white"/>
+      <!-- TextBox 参考外层 Group 的 360×260 居中 -->
+      <TextBox centerX="0" centerY="0"/>
+    </Group>
+  </Group>
+</Layer>
+```
+
+### 6.4 position 属性
+
+所有图层内容节点统一拥有 `position` 属性，表示元素锚点在父坐标系中的绝对坐标。约束布局的计算结果写入 `position`。
+
+| 元素 | 锚点位置 | 说明 |
+|------|---------|------|
+| Rectangle | 几何中心 | `position="0,0"` 表示中心在原点，矩形向四周延伸 |
+| Ellipse | 几何中心 | 同 Rectangle |
+| Polystar | 几何中心 | 同 Rectangle |
+| Path | 坐标系原点 | `position="0,0"` 时路径数据坐标直接作为绘制坐标 |
+| Text | 由 `textAnchor` 决定 | `start`：基线起点；`center`：水平中点；`end`：末尾 |
+| Group | 坐标系原点 | `position="0,0"` 时子元素坐标直接作为绘制坐标 |
+
+### 6.5 与动画的关系
+
+自动布局在**解析阶段**完成。布局引擎为每个元素计算出具体的位置和尺寸值，运行时的动画系统基于这些已解析的值运作。
+
+| 属性 | 可否动画 | 说明 |
+|------|---------|------|
+| `transform`、`alpha` | 可以 | 叠加在布局结果之上，不触发重新布局 |
+| `width`、`height` | 可以 | 触发重新布局 |
+| `layout`、`gap`、`padding`、`alignment`、`arrangement`、`layoutWrap` | 不可 | 布局结构属性 |
 
 ---
 
@@ -1841,6 +2147,9 @@ Layer / Group
 | **TileMode** | `clamp`, `repeat`, `mirror`, `decal` |
 | **FilterMode** | `nearest`, `linear` |
 | **MipmapMode** | `none`, `nearest`, `linear` |
+| **Layout** | `horizontal`, `vertical` |
+| **Alignment** | `start`, `center`, `end` |
+| **Arrangement** | `start`, `center`, `end`, `spaceBetween` |
 
 ### 绘制器相关
 

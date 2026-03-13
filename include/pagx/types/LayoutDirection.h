@@ -18,47 +18,20 @@
 
 #pragma once
 
-#include "pagx/nodes/PathData.h"
-#include "pagx/nodes/Element.h"
-#include "pagx/types/Constraints.h"
-#include "pagx/types/Point.h"
-
 namespace pagx {
 
 /**
- * Path represents a freeform shape defined by a PathData containing vertices, in-tangents, and
- * out-tangents.
+ * The direction of auto layout for arranging child layers.
  */
-class Path : public Element {
- public:
+enum class LayoutDirection {
   /**
-   * The path data containing vertices and control points.
+   * Arrange child layers horizontally from left to right.
    */
-  PathData* data = nullptr;
-
+  Horizontal,
   /**
-   * The position offset of the path coordinate system origin. The default value is (0, 0).
+   * Arrange child layers vertically from top to bottom.
    */
-  Point position = {};
-
-  /**
-   * Whether the path direction is reversed. The default value is false.
-   */
-  bool reversed = false;
-
-  /**
-   * Constraint attributes for positioning relative to the containing Layer or Group.
-   */
-  Constraints constraints = {};
-
-  NodeType nodeType() const override {
-    return NodeType::Path;
-  }
-
- private:
-  Path() = default;
-
-  friend class PAGXDocument;
+  Vertical
 };
 
 }  // namespace pagx

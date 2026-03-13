@@ -30,13 +30,17 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/types/Alignment.h"
+#include "pagx/types/Arrangement.h"
 #include "pagx/types/BlendMode.h"
 #include "pagx/types/Color.h"
 #include "pagx/types/ColorSpace.h"
 #include "pagx/types/FilterMode.h"
 #include "pagx/types/LayerPlacement.h"
+#include "pagx/types/LayoutDirection.h"
 #include "pagx/types/Matrix.h"
 #include "pagx/types/MipmapMode.h"
+#include "pagx/types/Padding.h"
 #include "pagx/types/TextAnchor.h"
 #include "pagx/types/TileMode.h"
 
@@ -138,6 +142,30 @@ Overflow OverflowFromString(const std::string& str);
 //==============================================================================
 std::string RepeaterOrderToString(RepeaterOrder order);
 RepeaterOrder RepeaterOrderFromString(const std::string& str);
+
+//==============================================================================
+// LayoutDirection
+//==============================================================================
+std::string LayoutDirectionToString(LayoutDirection dir);
+LayoutDirection LayoutDirectionFromString(const std::string& str);
+
+//==============================================================================
+// Alignment
+//==============================================================================
+std::string AlignmentToString(Alignment align);
+Alignment AlignmentFromString(const std::string& str);
+
+//==============================================================================
+// Arrangement
+//==============================================================================
+std::string ArrangementToString(Arrangement arr);
+Arrangement ArrangementFromString(const std::string& str);
+
+//==============================================================================
+// Padding
+//==============================================================================
+Padding PaddingFromString(const std::string& str);
+std::string PaddingToString(const Padding& padding);
 
 //==============================================================================
 // Selector types

@@ -18,47 +18,17 @@
 
 #pragma once
 
-#include "pagx/nodes/PathData.h"
-#include "pagx/nodes/Element.h"
-#include "pagx/types/Constraints.h"
-#include "pagx/types/Point.h"
-
 namespace pagx {
 
-/**
- * Path represents a freeform shape defined by a PathData containing vertices, in-tangents, and
- * out-tangents.
- */
-class Path : public Element {
+class PAGXDocument;
+
+/// Performs auto layout on a parsed PAGX document. This includes container layout (arranging child
+/// Layers within a parent Layer that has `layout` set) and constraint layout (positioning elements
+/// within a Layer or Group that has layout dimensions).
+class AutoLayout {
  public:
-  /**
-   * The path data containing vertices and control points.
-   */
-  PathData* data = nullptr;
-
-  /**
-   * The position offset of the path coordinate system origin. The default value is (0, 0).
-   */
-  Point position = {};
-
-  /**
-   * Whether the path direction is reversed. The default value is false.
-   */
-  bool reversed = false;
-
-  /**
-   * Constraint attributes for positioning relative to the containing Layer or Group.
-   */
-  Constraints constraints = {};
-
-  NodeType nodeType() const override {
-    return NodeType::Path;
-  }
-
- private:
-  Path() = default;
-
-  friend class PAGXDocument;
+  /// Applies auto layout to all layers in the document. Called once after parsing, before rendering.
+  static void Apply(PAGXDocument* document);
 };
 
 }  // namespace pagx

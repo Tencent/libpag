@@ -18,47 +18,23 @@
 
 #pragma once
 
-#include "pagx/nodes/PathData.h"
-#include "pagx/nodes/Element.h"
-#include "pagx/types/Constraints.h"
-#include "pagx/types/Point.h"
-
 namespace pagx {
 
 /**
- * Path represents a freeform shape defined by a PathData containing vertices, in-tangents, and
- * out-tangents.
+ * Padding defines the inner spacing of a layout container. Supports three shorthand forms:
+ * - Single value: all four sides equal (e.g., "20")
+ * - Two values: vertical, horizontal (e.g., "10,20")
+ * - Four values: top, right, bottom, left (e.g., "10,20,10,20")
  */
-class Path : public Element {
- public:
-  /**
-   * The path data containing vertices and control points.
-   */
-  PathData* data = nullptr;
+struct Padding {
+  float top = 0;
+  float right = 0;
+  float bottom = 0;
+  float left = 0;
 
-  /**
-   * The position offset of the path coordinate system origin. The default value is (0, 0).
-   */
-  Point position = {};
-
-  /**
-   * Whether the path direction is reversed. The default value is false.
-   */
-  bool reversed = false;
-
-  /**
-   * Constraint attributes for positioning relative to the containing Layer or Group.
-   */
-  Constraints constraints = {};
-
-  NodeType nodeType() const override {
-    return NodeType::Path;
+  bool isZero() const {
+    return top == 0 && right == 0 && bottom == 0 && left == 0;
   }
-
- private:
-  Path() = default;
-
-  friend class PAGXDocument;
 };
 
 }  // namespace pagx

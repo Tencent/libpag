@@ -23,6 +23,7 @@
 #include <fstream>
 #include <memory>
 #include <vector>
+#include "AutoLayout.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -60,6 +61,7 @@
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Color.h"
+#include "pagx/types/Constraints.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
@@ -221,6 +223,11 @@ static Node* parseResource(const DOMNode* node, PAGXDocument* doc) {
   return nullptr;
 }
 
+// Forward declarations for helper functions defined later in the file.
+static std::optional<float> getOptionalFloatAttribute(const DOMNode* node, const std::string& name,
+                                                      PAGXDocument* doc);
+static Constraints parseConstraints(const DOMNode* node, PAGXDocument* doc);
+
 static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
   auto layer = makeNodeFromXML<Layer>(node, doc);
   if (!layer) {
@@ -232,6 +239,30 @@ static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
   layer->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
   layer->x = getFloatAttribute(node, "x", 0, doc);
   layer->y = getFloatAttribute(node, "y", 0, doc);
+  layer->width = getOptionalFloatAttribute(node, "width", doc);
+  layer->height = getOptionalFloatAttribute(node, "height", doc);
+  layer->minWidth = getOptionalFloatAttribute(node, "minWidth", doc);
+  layer->maxWidth = getOptionalFloatAttribute(node, "maxWidth", doc);
+  layer->minHeight = getOptionalFloatAttribute(node, "minHeight", doc);
+  layer->maxHeight = getOptionalFloatAttribute(node, "maxHeight", doc);
+  auto layoutStr = getAttribute(node, "layout");
+  if (!layoutStr.empty()) {
+    layer->layout = LayoutDirectionFromString(layoutStr);
+  }
+  layer->gap = getFloatAttribute(node, "gap", 0, doc);
+  auto paddingStr = getAttribute(node, "padding");
+  if (!paddingStr.empty()) {
+    layer->padding = PaddingFromString(paddingStr);
+  }
+  layer->layoutWrap = getBoolAttribute(node, "layoutWrap", false, doc);
+  auto alignmentStr = getAttribute(node, "alignment");
+  if (!alignmentStr.empty()) {
+    layer->alignment = AlignmentFromString(alignmentStr);
+  }
+  auto arrangementStr = getAttribute(node, "arrangement");
+  if (!arrangementStr.empty()) {
+    layer->arrangement = ArrangementFromString(arrangementStr);
+  }
   auto matrixStr = getAttribute(node, "matrix");
   if (!matrixStr.empty()) {
     layer->matrix = MatrixFromString(matrixStr);
@@ -512,6 +543,7 @@ static Rectangle* parseRectangle(const DOMNode* node, PAGXDocument* doc) {
   rect->size = getSizeAttribute(node, "size", {100, 100}, doc);
   rect->roundness = getFloatAttribute(node, "roundness", 0, doc);
   rect->reversed = getBoolAttribute(node, "reversed", false, doc);
+  rect->constraints = parseConstraints(node, doc);
   return rect;
 }
 
@@ -523,6 +555,7 @@ static Ellipse* parseEllipse(const DOMNode* node, PAGXDocument* doc) {
   ellipse->position = getPointAttribute(node, "position", {0, 0}, doc);
   ellipse->size = getSizeAttribute(node, "size", {100, 100}, doc);
   ellipse->reversed = getBoolAttribute(node, "reversed", false, doc);
+  ellipse->constraints = parseConstraints(node, doc);
   return ellipse;
 }
 
@@ -540,6 +573,7 @@ static Polystar* parsePolystar(const DOMNode* node, PAGXDocument* doc) {
   polystar->outerRoundness = getFloatAttribute(node, "outerRoundness", 0, doc);
   polystar->innerRoundness = getFloatAttribute(node, "innerRoundness", 0, doc);
   polystar->reversed = getBoolAttribute(node, "reversed", false, doc);
+  polystar->constraints = parseConstraints(node, doc);
   return polystar;
 }
 
@@ -563,6 +597,8 @@ static Path* parsePath(const DOMNode* node, PAGXDocument* doc) {
     }
   }
   path->reversed = getBoolAttribute(node, "reversed", false, doc);
+  path->position = getPointAttribute(node, "position", {0, 0}, doc);
+  path->constraints = parseConstraints(node, doc);
   return path;
 }
 
@@ -611,6 +647,7 @@ static Text* parseText(const DOMNode* node, PAGXDocument* doc) {
     child = child->nextSibling;
   }
 
+  text->constraints = parseConstraints(node, doc);
   return text;
 }
 
@@ -822,6 +859,7 @@ static TextBox* parseTextBox(const DOMNode* node, PAGXDocument* doc) {
   textBox->lineHeight = getFloatAttribute(node, "lineHeight", 0, doc);
   textBox->wordWrap = getBoolAttribute(node, "wordWrap", true, doc);
   textBox->overflow = OverflowFromString(getAttribute(node, "overflow", "visible"));
+  textBox->constraints = parseConstraints(node, doc);
   return textBox;
 }
 
@@ -854,6 +892,9 @@ static Group* parseGroup(const DOMNode* node, PAGXDocument* doc) {
   group->skew = getFloatAttribute(node, "skew", 0, doc);
   group->skewAxis = getFloatAttribute(node, "skewAxis", 0, doc);
   group->alpha = getFloatAttribute(node, "alpha", 1, doc);
+  group->width = getOptionalFloatAttribute(node, "width", doc);
+  group->height = getOptionalFloatAttribute(node, "height", doc);
+  group->constraints = parseConstraints(node, doc);
 
   auto child = node->firstChild;
   while (child) {
@@ -1444,6 +1485,34 @@ static bool getBoolAttribute(const DOMNode* node, const std::string& name, bool 
   return defaultValue;
 }
 
+static std::optional<float> getOptionalFloatAttribute(const DOMNode* node, const std::string& name,
+                                                      PAGXDocument* doc) {
+  auto* str = node->findAttribute(name);
+  if (!str || str->empty()) {
+    return std::nullopt;
+  }
+  char* endPtr = nullptr;
+  float value = strtof(str->c_str(), &endPtr);
+  if (endPtr == str->c_str()) {
+    if (doc) {
+      reportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
+    }
+    return std::nullopt;
+  }
+  return value;
+}
+
+static Constraints parseConstraints(const DOMNode* node, PAGXDocument* doc) {
+  Constraints c = {};
+  c.left = getOptionalFloatAttribute(node, "left", doc);
+  c.right = getOptionalFloatAttribute(node, "right", doc);
+  c.top = getOptionalFloatAttribute(node, "top", doc);
+  c.bottom = getOptionalFloatAttribute(node, "bottom", doc);
+  c.centerX = getOptionalFloatAttribute(node, "centerX", doc);
+  c.centerY = getOptionalFloatAttribute(node, "centerY", doc);
+  return c;
+}
+
 static const char* skipWhitespaceAndComma(const char* ptr, const char* end) {
   while (ptr < end && (*ptr == ' ' || *ptr == '\t' || *ptr == ',')) {
     ++ptr;
@@ -1752,6 +1821,7 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t 
   }
   auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
   parseDocument(root.get(), doc.get());
+  AutoLayout::Apply(doc.get());
   return doc;
 }
 

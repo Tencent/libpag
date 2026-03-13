@@ -28,6 +28,7 @@ This specification is organized in the following order:
 2. **Document Structure**: Describes the overall organization of a PAGX document
 3. **Layer System**: Defines layers and their related features (styles, filters, masks)
 4. **VectorElement System**: Defines vector elements within layers and their processing model
+5. **Auto Layout**: Defines layout size, container layout, and constraint layout mechanisms
 
 **Appendices** (for quick reference):
 
@@ -630,6 +631,18 @@ Layer child elements are automatically categorized into four collections by type
 | `mask` | idref | - | Mask layer reference "@id" |
 | `maskType` | MaskType | alpha | Mask type |
 | `composition` | idref | - | Composition reference "@id" |
+| `width` | float | - | Layout width (see §6) |
+| `height` | float | - | Layout height (see §6) |
+| `minWidth` | float | - | Minimum layout width (see §6) |
+| `maxWidth` | float | - | Maximum layout width (see §6) |
+| `minHeight` | float | - | Minimum layout height (see §6) |
+| `maxHeight` | float | - | Maximum layout height (see §6) |
+| `layout` | Layout | - | Enables container layout (see §6) |
+| `gap` | float | 0 | Child Layer spacing (see §6) |
+| `padding` | float or "t,r,b,l" | 0 | Inner padding (see §6) |
+| `layoutWrap` | bool | false | Allow child wrapping (see §6) |
+| `alignment` | Alignment | start | Cross-axis alignment (see §6) |
+| `arrangement` | Arrangement | start | Main-axis arrangement (see §6) |
 
 **groupOpacity**: When `false` (default), the layer's `alpha` is applied independently to each child element, which may cause overlapping semi-transparent children to appear darker at intersections. When `true`, all layer content is first composited into an offscreen buffer, then `alpha` is applied to the buffer as a whole, producing uniform transparency across the entire layer.
 
@@ -1699,6 +1712,8 @@ Group is a VectorElement container with transform properties.
 | `skew` | float | 0 | Skew amount |
 | `skewAxis` | float | 0 | Skew axis angle |
 | `alpha` | float | 1 | Opacity 0~1 |
+| `width` | float | - | Layout width (see §6) |
+| `height` | float | - | Layout height (see §6) |
 
 #### Transform Order
 
@@ -1759,6 +1774,305 @@ Since painters do not clear the geometry list, the same geometry can have multip
 > [Sample](samples/5.7_mixed_overlay.pagx)
 
 **Rendering Order**: Multiple painters render in document order; those appearing earlier are below.
+
+---
+
+## 6. Auto Layout
+
+Auto layout enables PAGX elements to declare layout intent, allowing the engine to automatically calculate coordinates and sizes without manually specifying absolute positions.
+
+Layout operates at two levels:
+
+| Level | Mechanism | Purpose |
+|-------|-----------|---------|
+| Between Layers | Container layout | Parent Layer arranges child Layer positions and sizes |
+| Within a Layer | Constraint layout | Content nodes position or stretch relative to container |
+
+The two mechanisms are independent but complementary: container layout controls Layer arrangement, constraint layout controls element positioning within a Layer. They can be used separately or combined.
+
+### 6.1 Layout Size
+
+The `width`/`height` attributes declare a container's layout size. Layout size is the foundation of auto layout—container layout uses it to determine available space, and constraint layout uses it as the reference frame.
+
+Both Layer and Group can have layout sizes, but with different roles:
+
+| | Layer | Group |
+|---|---|---|
+| Container layout (arranging child Layers) | Supported | Not supported |
+| Constraint layout reference frame | Yes | Yes (only when layout size is set) |
+| Painter scope isolation | No | Yes |
+
+When a Layer has `width`/`height` but no `layout`, container layout is not activated, but its content elements can use constraint attributes.
+
+Group layout size does not affect rendering behavior; it only passes size information downward for constraint layout. Group layout size has two sources:
+- **Explicit**: `width="360" height="260"`
+- **Constraint-derived**: `left="20" right="20"` derives `width = container.width - 20 - 20` from the parent container
+
+Flexible sizes are constrained by `minWidth`/`maxWidth`/`minHeight`/`maxHeight`. When `width`/`height` is explicitly set, min/max constraints are ignored.
+
+Layout size and constraint calculations are performed in the local coordinate system; `matrix` transforms are visual effects applied during rendering and do not affect layout calculations.
+
+### 6.2 Container Layout
+
+Setting the `layout` attribute causes a parent Layer to arrange all child Layers along the specified axis. Semantically, this is a subset of CSS Flexbox.
+
+#### Attributes
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `layout` | Layout | - | Main axis direction; activates container layout when set |
+| `gap` | float | 0 | Spacing between adjacent child Layers |
+| `padding` | float or "t,r,b,l" | 0 | Inner padding. Supports single value (uniform), two values (vertical,horizontal), four values (top,right,bottom,left), consistent with CSS shorthand |
+| `layoutWrap` | bool | false | Allow child elements to wrap |
+| `alignment` | Alignment | start | Cross-axis alignment |
+| `arrangement` | Arrangement | start | Main-axis arrangement |
+
+**Layout**:
+
+| Value | Description |
+|-------|-------------|
+| `horizontal` | Main axis horizontal, cross axis vertical |
+| `vertical` | Main axis vertical, cross axis horizontal |
+
+**Alignment (Cross-Axis)**:
+
+| Value | Description |
+|-------|-------------|
+| `start` | Align to cross-axis start edge |
+| `center` | Center along cross-axis |
+| `end` | Align to cross-axis end edge |
+
+**Arrangement (Main-Axis)**:
+
+| Value | Description |
+|-------|-------------|
+| `start` | Arrange from main-axis start |
+| `center` | Center along main-axis |
+| `end` | Arrange from main-axis end |
+| `spaceBetween` | Distribute evenly between children, flush with edges |
+
+#### Child Element Sizing
+
+Child Layer main-axis sizing has two states:
+
+- **Fixed size**: `width`/`height` set; does not change with parent container.
+- **Flexible size**: `width`/`height` not set. First sized by content bounds minimum, then remaining parent space is distributed equally among all flexible children. Flexible sizes are constrained by `minWidth`/`maxWidth`/`minHeight`/`maxHeight`.
+
+Cross-axis: Uses explicit `width`/`height` if set; otherwise determined by content bounds.
+
+Content area is `width × height` minus `padding` on each side.
+
+#### Absolute Positioning
+
+When a Layer has `layout` set, all child Layer positions are determined by the layout engine. There is no way to opt out of the layout flow. Elements requiring absolute positioning are handled through nesting:
+
+```xml
+<Layer width="400" height="300">
+  <!-- Layout container -->
+  <Layer width="400" height="280" layout="vertical" gap="12">
+    <Layer>...</Layer>
+    <Layer>...</Layer>
+  </Layer>
+
+  <!-- Absolutely positioned element: sibling of layout container -->
+  <Layer x="370" y="10">
+    <Ellipse size="24,24"/>
+    <Fill color="#EF4444"/>
+  </Layer>
+</Layer>
+```
+
+#### Examples
+
+Three equal-width cards arranged horizontally with 14px gap and 20px padding:
+
+```xml
+<Layer width="920" height="200" layout="horizontal" gap="14" padding="20">
+  <Layer><!-- Card A: flexible size --></Layer>
+  <Layer><!-- Card B: flexible size --></Layer>
+  <Layer><!-- Card C: flexible size --></Layer>
+</Layer>
+```
+
+All three child Layers have no `width` set, equally sharing available width: `(920 - 40 - 28) / 3 = 284`.
+
+### 6.3 Constraint Layout
+
+Constraint layout allows content nodes to declare positional relationships with their container, and the engine automatically calculates coordinates. Constraint attributes are available on all content nodes (Rectangle, Ellipse, Polystar, Path, Text, TextBox, Group).
+
+#### 6.3.1 Attributes
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `left` | float | - | Distance from element's left edge to container's left edge |
+| `right` | float | - | Distance from element's right edge to container's right edge |
+| `top` | float | - | Distance from element's top edge to container's top edge |
+| `bottom` | float | - | Distance from element's bottom edge to container's bottom edge |
+| `centerX` | float | - | Horizontal offset of element center from container center (0 = horizontally centered) |
+| `centerY` | float | - | Vertical offset of element center from container center (0 = vertically centered) |
+
+**Activation**: Constraint attributes are only effective when the container has layout size on the corresponding axis. Constraints reference the nearest ancestor container (Layer or Group) with layout size; Groups without layout size do not form a reference frame, and constraints pass through them to look upward.
+
+**Mutual Exclusion**: On the horizontal axis, `left`, `right`, and `centerX` are mutually exclusive (except the `left` + `right` opposite-edge combination). Same for the vertical axis. Constraints override `position` and `size` on the constrained axis.
+
+#### 6.3.2 Single-Edge Constraints
+
+Setting only one edge constraint positions the element's corresponding edge at the specified distance from the container edge, without changing element size.
+
+```
+left=L:     tx = L - B.left
+right=R:    tx = (W - R) - B.right
+top=T:      ty = T - B.top
+bottom=B_:  ty = (H - B_) - B.bottom
+```
+
+Where `B` is the element's content bounds and `W`/`H` is the container's layout size.
+
+#### 6.3.3 Center Constraints
+
+`centerX`/`centerY` positions the element center at the container center plus an offset, without changing element size.
+
+```
+centerX=C:  tx = (W/2 + C) - B.centerX
+centerY=C:  ty = (H/2 + C) - B.centerY
+```
+
+`centerX="0"` centers horizontally; `centerX="20"` centers then offsets 20px right.
+
+#### 6.3.4 Opposite-Edge Constraints
+
+Setting both `left` + `right` (or `top` + `bottom`) defines a target area. The element adapts based on its type:
+
+| Element | Opposite-Edge Behavior | Description |
+|---------|----------------------|-------------|
+| Rectangle | Stretch to fill | Resizes to fill target area |
+| Ellipse | Stretch to fill | Resizes to fill target area |
+| TextBox | Stretch to fill | Text area adapts to container |
+| Path | Fall back to centering | Maintains original size, centers within target area |
+| Polystar | Fall back to centering | Maintains original size, centers within target area |
+| Group | Fall back to centering | Maintains original size, centers within target area |
+| Text | Fall back to centering | Maintains original size, centers within target area |
+
+**Stretch to fill** (Rectangle, Ellipse, TextBox):
+
+```
+left=L, right=R:  new width = W - L - R, new position.x determined by element type
+top=T, bottom=B_: new height = H - T - B_, new position.y determined by element type
+```
+
+**Fall back to centering** (Path, Polystar, Group, Text):
+
+```
+left=L, right=R:  areaWidth = W - L - R
+                  tx = L + (areaWidth - B.width)/2 - B.left
+top=T, bottom=B_: areaHeight = H - T - B_
+                  ty = T + (areaHeight - B.height)/2 - B.top
+```
+
+Fall-back centering makes opposite-edge constraints valid for all element types.
+
+#### 6.3.5 Content Bounds
+
+"Edges" in constraint attributes uniformly refer to the element's content bounds edges, not the coordinate origin. Content bounds is the element's bounding box in its local coordinate system before constraints are applied.
+
+For example, a Path drawn starting at `(50, 30)` has a content bounds left edge of 50; setting `left="0"` shifts the Path 50px left so its content is flush with the container's left edge. This ensures `left="0"` has a unified meaning for all element types: "content flush with container's left edge."
+
+#### 6.3.6 Examples
+
+All examples use a container with `width="400" height="200"`.
+
+**Stretch to fill**—Rectangle fills container with margins:
+
+```xml
+<Layer width="400" height="200">
+  <Rectangle left="10" right="10" top="5" bottom="5"/>
+  <Fill color="#3B82F6"/>
+</Layer>
+```
+
+```
+rect.width      = 400 - 10 - 10 = 380
+rect.height     = 200 - 5 - 5   = 190
+rect.position.x = 10 + 380/2    = 200   (anchor at geometric center)
+rect.position.y = 5 + 190/2     = 100
+```
+
+**Center positioning**—Rectangle centered in container:
+
+```xml
+<Layer width="400" height="200">
+  <Rectangle centerX="0" centerY="0" size="100,40"/>
+  <Fill color="#3B82F6"/>
+</Layer>
+```
+
+```
+B = { left: -50, right: 50, top: -20, bottom: 20, centerX: 0, centerY: 0 }
+tx = (400/2 + 0) - 0 = 200   → rect.position.x = 200
+ty = (200/2 + 0) - 0 = 100   → rect.position.y = 100
+rect.size remains 100×40
+```
+
+**TextBox stretch**—Text area fills container with margins:
+
+```xml
+<Layer width="400" height="200">
+  <Text text="Hello World" fontFamily="Arial" fontSize="24"/>
+  <TextBox left="20" right="20" top="16" bottom="16" textAlign="center"/>
+  <Fill color="#333333"/>
+</Layer>
+```
+
+```
+textbox.width      = 400 - 20 - 20 = 360
+textbox.height     = 200 - 16 - 16 = 168
+textbox.position.x = 20
+textbox.position.y = 16
+```
+
+**Group passing layout size**—Nested constraint layout:
+
+```xml
+<Layer width="400" height="300">
+  <Group left="20" right="20" top="20" bottom="20">
+    <!-- Group layout size = 360×260, derived from constraints -->
+
+    <!-- Rectangle references Group's 360×260 to fill -->
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+    <Fill color="#1E293B"/>
+
+    <Group>
+      <Text text="Hello" fontFamily="Inter" fontSize="16"/>
+      <Fill color="white"/>
+      <!-- TextBox references outer Group's 360×260 to center -->
+      <TextBox centerX="0" centerY="0"/>
+    </Group>
+  </Group>
+</Layer>
+```
+
+### 6.4 The position Attribute
+
+All content nodes share a unified `position` attribute representing the element's anchor point in the parent coordinate system. Constraint layout results are written to `position`.
+
+| Element | Anchor Location | Description |
+|---------|----------------|-------------|
+| Rectangle | Geometric center | `position="0,0"` means center at origin, rectangle extends outward |
+| Ellipse | Geometric center | Same as Rectangle |
+| Polystar | Geometric center | Same as Rectangle |
+| Path | Coordinate origin | `position="0,0"` means path data coordinates are used directly |
+| Text | Determined by `textAnchor` | `start`: baseline start; `center`: horizontal midpoint; `end`: end |
+| Group | Coordinate origin | `position="0,0"` means child coordinates are used directly |
+
+### 6.5 Animation Compatibility
+
+Auto layout completes during the **parsing stage**. The layout engine computes concrete position and size values for each element; the runtime animation system operates on these resolved values.
+
+| Attribute | Animatable | Description |
+|-----------|-----------|-------------|
+| `transform`, `alpha` | Yes | Applied on top of layout results; does not trigger relayout |
+| `width`, `height` | Yes | Triggers relayout |
+| `layout`, `gap`, `padding`, `alignment`, `arrangement`, `layoutWrap` | No | Layout structural attributes |
 
 ---
 
@@ -1846,6 +2160,9 @@ Layer / Group
 | **TileMode** | `clamp`, `repeat`, `mirror`, `decal` |
 | **FilterMode** | `nearest`, `linear` |
 | **MipmapMode** | `none`, `nearest`, `linear` |
+| **Layout** | `horizontal`, `vertical` |
+| **Alignment** | `start`, `center`, `end` |
+| **Arrangement** | `start`, `center`, `end`, `spaceBetween` |
 
 ### Painter Related
 

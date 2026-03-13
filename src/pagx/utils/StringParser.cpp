@@ -216,6 +216,17 @@ DEFINE_ENUM_CONVERSION(RepeaterOrder, RepeaterOrder::BelowOriginal,
                        {RepeaterOrder::BelowOriginal, "belowOriginal"},
                        {RepeaterOrder::AboveOriginal, "aboveOriginal"})
 
+DEFINE_ENUM_CONVERSION(LayoutDirection, LayoutDirection::Horizontal,
+                       {LayoutDirection::Horizontal, "horizontal"},
+                       {LayoutDirection::Vertical, "vertical"})
+
+DEFINE_ENUM_CONVERSION(Alignment, Alignment::Start, {Alignment::Start, "start"},
+                       {Alignment::Center, "center"}, {Alignment::End, "end"})
+
+DEFINE_ENUM_CONVERSION(Arrangement, Arrangement::Start, {Arrangement::Start, "start"},
+                       {Arrangement::Center, "center"}, {Arrangement::End, "end"},
+                       {Arrangement::SpaceBetween, "spaceBetween"})
+
 std::string ColorSpaceToString(ColorSpace space) {
   switch (space) {
     case ColorSpace::SRGB:
@@ -321,6 +332,40 @@ std::string FloatToString(float value) {
   char buf[32] = {};
   snprintf(buf, sizeof(buf), "%g", value);
   return std::string(buf);
+}
+
+Padding PaddingFromString(const std::string& str) {
+  auto values = ParseFloatList(str);
+  Padding p = {};
+  if (values.size() == 1) {
+    p.top = values[0];
+    p.right = values[0];
+    p.bottom = values[0];
+    p.left = values[0];
+  } else if (values.size() == 2) {
+    p.top = values[0];
+    p.bottom = values[0];
+    p.right = values[1];
+    p.left = values[1];
+  } else if (values.size() >= 4) {
+    p.top = values[0];
+    p.right = values[1];
+    p.bottom = values[2];
+    p.left = values[3];
+  }
+  return p;
+}
+
+std::string PaddingToString(const Padding& padding) {
+  if (padding.top == padding.right && padding.right == padding.bottom &&
+      padding.bottom == padding.left) {
+    return FloatToString(padding.top);
+  }
+  if (padding.top == padding.bottom && padding.left == padding.right) {
+    return FloatToString(padding.top) + "," + FloatToString(padding.right);
+  }
+  return FloatToString(padding.top) + "," + FloatToString(padding.right) + "," +
+         FloatToString(padding.bottom) + "," + FloatToString(padding.left);
 }
 
 #undef DEFINE_ENUM_CONVERSION

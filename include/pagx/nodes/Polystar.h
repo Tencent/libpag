@@ -19,6 +19,7 @@
 #pragma once
 
 #include "pagx/nodes/Element.h"
+#include "pagx/types/Constraints.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/PolystarType.h"
 
@@ -74,6 +75,11 @@ class Polystar : public Element {
    * Whether the path direction is reversed. The default value is false.
    */
   bool reversed = false;
+
+  /**
+   * Constraint attributes for positioning relative to the containing Layer or Group.
+   */
+  Constraints constraints = {};
 
   NodeType nodeType() const override {
     return NodeType::Polystar;

@@ -22,6 +22,7 @@
 #include <vector>
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/GlyphRun.h"
+#include "pagx/types/Constraints.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/TextAnchor.h"
 
@@ -92,6 +93,11 @@ class Text : public Element {
    * Pre-shaped glyph runs. When present, these are used for rendering instead of runtime shaping.
    */
   std::vector<GlyphRun*> glyphRuns = {};
+
+  /**
+   * Constraint attributes for positioning relative to the containing Layer or Group.
+   */
+  Constraints constraints = {};
 
   NodeType nodeType() const override {
     return NodeType::Text;
