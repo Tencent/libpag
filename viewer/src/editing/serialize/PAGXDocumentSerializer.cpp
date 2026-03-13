@@ -62,6 +62,7 @@
 
 namespace pag::PAGXDocumentSerializer {
 
+// Helper function to get RTTR type for a PAGX node type
 static rttr::type GetRttrTypeForNodeType(pagx::NodeType nodeType) {
   switch (nodeType) {
     case pagx::NodeType::PathData:
@@ -144,6 +145,28 @@ static rttr::type GetRttrTypeForNodeType(pagx::NodeType nodeType) {
       return rttr::type::get<pagx::Node>();
   }
 }
+
+// Helper macro to simplify casting and getting property value for each node type
+#define SERIALIZE_NODE_CASE(NodeTypeEnum, NodeClass)                       \
+  case pagx::NodeType::NodeTypeEnum: {                                     \
+    auto* derivedPtr = static_cast<pagx::NodeClass*>(nodePtr);             \
+    auto properties = rttr::type::get<pagx::NodeClass>().get_properties(); \
+    for (const auto& property : properties) {                              \
+      if (property.get_metadata("NO_SERIALIZE")) {                         \
+        continue;                                                          \
+      }                                                                    \
+      auto propertyName = property.get_name().to_string();                 \
+      if (propertyName == "id") {                                          \
+        continue;                                                          \
+      }                                                                    \
+      auto variant = property.get_value(*derivedPtr);                      \
+      auto childNode = std::make_unique<PAGTreeNode>(treeNode);            \
+      childNode->setName(propertyName.c_str());                            \
+      SerializeVariant(variant, childNode.get());                          \
+      treeNode->appendChild(std::move(childNode));                         \
+    }                                                                      \
+    break;                                                                 \
+  }
 
 static rttr::instance GetWrappedInstance(const rttr::instance& item) {
   return item.get_type().get_raw_type().is_wrapper() ? item.get_wrapped_instance() : item;
@@ -340,25 +363,71 @@ static void SerializeNode(pagx::Node* nodePtr, PAGTreeNode* treeNode) {
     treeNode->appendChild(std::move(idNode));
   }
 
-  // Get properties of the derived type
-  auto properties = type.get_properties();
-  for (const auto& property : properties) {
-    if (property.get_metadata("NO_SERIALIZE")) {
-      continue;
+  // Get properties using correctly typed instance for each node type
+  switch (nodePtr->nodeType()) {
+    SERIALIZE_NODE_CASE(PathData, PathData)
+    SERIALIZE_NODE_CASE(Image, Image)
+    SERIALIZE_NODE_CASE(Composition, Composition)
+    SERIALIZE_NODE_CASE(SolidColor, SolidColor)
+    SERIALIZE_NODE_CASE(LinearGradient, LinearGradient)
+    SERIALIZE_NODE_CASE(RadialGradient, RadialGradient)
+    SERIALIZE_NODE_CASE(ConicGradient, ConicGradient)
+    SERIALIZE_NODE_CASE(DiamondGradient, DiamondGradient)
+    SERIALIZE_NODE_CASE(ImagePattern, ImagePattern)
+    SERIALIZE_NODE_CASE(ColorStop, ColorStop)
+    SERIALIZE_NODE_CASE(Font, Font)
+    SERIALIZE_NODE_CASE(Layer, Layer)
+    SERIALIZE_NODE_CASE(DropShadowStyle, DropShadowStyle)
+    SERIALIZE_NODE_CASE(InnerShadowStyle, InnerShadowStyle)
+    SERIALIZE_NODE_CASE(BackgroundBlurStyle, BackgroundBlurStyle)
+    SERIALIZE_NODE_CASE(BlurFilter, BlurFilter)
+    SERIALIZE_NODE_CASE(DropShadowFilter, DropShadowFilter)
+    SERIALIZE_NODE_CASE(InnerShadowFilter, InnerShadowFilter)
+    SERIALIZE_NODE_CASE(BlendFilter, BlendFilter)
+    SERIALIZE_NODE_CASE(ColorMatrixFilter, ColorMatrixFilter)
+    SERIALIZE_NODE_CASE(Rectangle, Rectangle)
+    SERIALIZE_NODE_CASE(Ellipse, Ellipse)
+    SERIALIZE_NODE_CASE(Polystar, Polystar)
+    SERIALIZE_NODE_CASE(Path, Path)
+    SERIALIZE_NODE_CASE(Text, Text)
+    SERIALIZE_NODE_CASE(Fill, Fill)
+    SERIALIZE_NODE_CASE(Stroke, Stroke)
+    SERIALIZE_NODE_CASE(TrimPath, TrimPath)
+    SERIALIZE_NODE_CASE(RoundCorner, RoundCorner)
+    SERIALIZE_NODE_CASE(MergePath, MergePath)
+    SERIALIZE_NODE_CASE(TextModifier, TextModifier)
+    SERIALIZE_NODE_CASE(TextPath, TextPath)
+    SERIALIZE_NODE_CASE(TextBox, TextBox)
+    SERIALIZE_NODE_CASE(Group, Group)
+    SERIALIZE_NODE_CASE(Repeater, Repeater)
+    SERIALIZE_NODE_CASE(RangeSelector, RangeSelector)
+    SERIALIZE_NODE_CASE(GlyphRun, GlyphRun)
+    case pagx::NodeType::Glyph: {
+      // Glyph uses GlyphRun class
+      auto* derivedPtr = static_cast<pagx::GlyphRun*>(nodePtr);
+      auto properties = rttr::type::get<pagx::GlyphRun>().get_properties();
+      for (const auto& property : properties) {
+        if (property.get_metadata("NO_SERIALIZE")) {
+          continue;
+        }
+        auto propertyName = property.get_name().to_string();
+        if (propertyName == "id") {
+          continue;
+        }
+        auto variant = property.get_value(*derivedPtr);
+        auto childNode = std::make_unique<PAGTreeNode>(treeNode);
+        childNode->setName(propertyName.c_str());
+        SerializeVariant(variant, childNode.get());
+        treeNode->appendChild(std::move(childNode));
+      }
+      break;
     }
-    auto propertyName = property.get_name().to_string();
-    if (propertyName == "id") {
-      continue;  // Already handled above
-    }
-
-    // Create rttr::instance from the raw pointer
-    auto variant = property.get_value(nodePtr);
-    auto childNode = std::make_unique<PAGTreeNode>(treeNode);
-    childNode->setName(propertyName.c_str());
-    SerializeVariant(variant, childNode.get());
-    treeNode->appendChild(std::move(childNode));
+    default:
+      break;
   }
 }
+
+#undef SERIALIZE_NODE_CASE
 
 static void SerializeNodes(const std::vector<std::unique_ptr<pagx::Node>>& nodes,
                            PAGTreeNode* node) {
