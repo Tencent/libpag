@@ -46,7 +46,8 @@ QString PluginInstaller::GetH264EncoderToolsExePath() {
     return localPath;
   }
 
-  QString roaming = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+  // Return installed path: %APPDATA%\H264EncoderTools\H264EncoderTools.exe
+  QString roaming = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
   return roaming + "/H264EncoderTools/H264EncoderTools.exe";
 }
 
@@ -201,7 +202,8 @@ QString PluginInstaller::getPluginInstallPath(const QString& pluginName) const {
   QString fullName = getPluginFullName(pluginName);
 
   if (pluginName == "H264EncoderTools") {
-    QString roaming = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    // Install to %APPDATA%\H264EncoderTools\ to match exporter's GetRoamingPath()
+    QString roaming = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
     return roaming + "/H264EncoderTools/" + fullName;
   } else {
     return "C:/Program Files/Adobe/Common/Plug-ins/7.0/MediaCore/" + fullName;
@@ -518,7 +520,8 @@ bool PluginInstaller::shouldExcludeDir(const QString& dirName) const {
 }
 
 QString PluginInstaller::getH264EncoderToolsInstallDir() const {
-  QString roaming = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+  // Install to %APPDATA%\H264EncoderTools\ to match exporter's GetRoamingPath()
+  QString roaming = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
   return roaming + "/H264EncoderTools";
 }
 
