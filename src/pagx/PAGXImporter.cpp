@@ -156,7 +156,10 @@ static ColorMatrixFilter* parseColorMatrixFilter(const DOMNode* node, PAGXDocume
 static void parseCustomData(const DOMNode* xmlNode, Node* node) {
   for (const auto& attr : xmlNode->attributes) {
     if (attr.name.length() > 5 && attr.name.compare(0, 5, "data-") == 0) {
-      node->customData[attr.name.substr(5)] = attr.value;
+      auto key = attr.name.substr(5);
+      if (Node::IsValidCustomDataKey(key)) {
+        node->customData[std::move(key)] = attr.value;
+      }
     }
   }
 }

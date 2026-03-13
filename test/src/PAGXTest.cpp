@@ -928,4 +928,45 @@ PAGX_TEST(PAGXTest, CustomDataSVGRootElement) {
   EXPECT_EQ(doc2->layers[0]->customData, doc->layers[0]->customData);
 }
 
+PAGX_TEST(PAGXTest, CustomDataKeyValidation) {
+  // Valid keys.
+  EXPECT_TRUE(pagx::Node::IsValidCustomDataKey("role"));
+  EXPECT_TRUE(pagx::Node::IsValidCustomDataKey("figma-node"));
+  EXPECT_TRUE(pagx::Node::IsValidCustomDataKey("v2"));
+  EXPECT_TRUE(pagx::Node::IsValidCustomDataKey("a"));
+  EXPECT_TRUE(pagx::Node::IsValidCustomDataKey("abc-123-def"));
+
+  // Invalid keys.
+  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey(""));
+  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("trailing-"));
+  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("UPPER"));
+  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("has space"));
+  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("under_score"));
+  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("dot.name"));
+  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("a<b"));
+  EXPECT_FALSE(pagx::Node::IsValidCustomDataKey("a\"b"));
+
+  // Verify invalid keys are rejected during PAGX import.
+  // Note: XML attribute names with uppercase (data-INVALID) and underscores (data-has_underscore)
+  // are valid XML, but should be rejected by our key validation.
+  std::string xml =
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+      "<pagx width=\"100\" height=\"100\" data-valid=\"yes\" data-INVALID=\"no\">\n"
+      "  <Layer name=\"Test\" data-ok=\"1\" data-Bad=\"2\" data-has_underscore=\"3\"/>\n"
+      "</pagx>";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+
+  // Only valid keys should survive import.
+  ASSERT_EQ(doc->customData.count("valid"), 1u);
+  EXPECT_EQ(doc->customData.at("valid"), "yes");
+  EXPECT_EQ(doc->customData.count("INVALID"), 0u);
+
+  ASSERT_EQ(doc->layers.size(), 1u);
+  ASSERT_EQ(doc->layers[0]->customData.count("ok"), 1u);
+  EXPECT_EQ(doc->layers[0]->customData.at("ok"), "1");
+  EXPECT_EQ(doc->layers[0]->customData.count("Bad"), 0u);
+  EXPECT_EQ(doc->layers[0]->customData.count("has_underscore"), 0u);
+}
+
 }  // namespace pag

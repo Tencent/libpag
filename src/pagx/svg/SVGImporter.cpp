@@ -2621,8 +2621,10 @@ void SVGParserContext::parseCustomData(const std::shared_ptr<DOMNode>& element, 
   for (const auto& attr : element->attributes) {
     if (attr.name.length() > 5 && attr.name.compare(0, 5, "data-") == 0) {
       // Remove "data-" prefix and store in customData.
-      std::string key = attr.name.substr(5);
-      node->customData[key] = attr.value;
+      auto key = attr.name.substr(5);
+      if (Node::IsValidCustomDataKey(key)) {
+        node->customData[std::move(key)] = attr.value;
+      }
     }
   }
 }
