@@ -130,6 +130,7 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
   }
 
   _document = PAGXDocument::Make(width, height);
+  parseCustomData(root, _document.get());
 
   // Collect all IDs from the SVG to avoid conflicts when generating new IDs.
   collectAllIds(root);
@@ -517,6 +518,7 @@ void SVGParserContext::convertChildren(const std::shared_ptr<DOMNode>& element,
   if (tag == "text") {
     auto textGroup = convertText(element, inheritedStyle);
     if (textGroup) {
+      parseCustomData(element, textGroup);
       contents.push_back(textGroup);
     }
     return;
@@ -561,25 +563,28 @@ void SVGParserContext::convertChildren(const std::shared_ptr<DOMNode>& element,
 Element* SVGParserContext::convertElement(const std::shared_ptr<DOMNode>& element) {
   const auto& tag = element->name;
 
+  Element* result = nullptr;
   if (tag == "rect") {
-    return convertRect(element);
+    result = convertRect(element);
   } else if (tag == "circle") {
-    return convertCircle(element);
+    result = convertCircle(element);
   } else if (tag == "ellipse") {
-    return convertEllipse(element);
+    result = convertEllipse(element);
   } else if (tag == "line") {
-    return convertLine(element);
+    result = convertLine(element);
   } else if (tag == "polyline") {
-    return convertPolyline(element);
+    result = convertPolyline(element);
   } else if (tag == "polygon") {
-    return convertPolygon(element);
+    result = convertPolygon(element);
   } else if (tag == "path") {
-    return convertPath(element);
+    result = convertPath(element);
   } else if (tag == "use") {
-    return convertUse(element);
+    result = convertUse(element);
   }
-
-  return nullptr;
+  if (result) {
+    parseCustomData(element, result);
+  }
+  return result;
 }
 Element* SVGParserContext::convertRect(const std::shared_ptr<DOMNode>& element) {
   float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
@@ -1091,6 +1096,8 @@ Layer* SVGParserContext::convertMaskElement(const std::shared_ptr<DOMNode>& mask
 
   // Parse mask contents recursively.
   parseMaskChildren(maskElement, maskLayer, maskStyle, Matrix::Identity());
+
+  parseCustomData(maskElement, maskLayer);
 
   return maskLayer;
 }
@@ -2606,8 +2613,8 @@ void SVGParserContext::countUrlReference(const std::string& attrValue) {
 std::string SVGParserContext::generateColorSourceId() {
   return generateUniqueId("color");
 }
-void SVGParserContext::parseCustomData(const std::shared_ptr<DOMNode>& element, Layer* layer) {
-  if (!element || !layer) {
+void SVGParserContext::parseCustomData(const std::shared_ptr<DOMNode>& element, Node* node) {
+  if (!element || !node) {
     return;
   }
 
@@ -2615,8 +2622,10 @@ void SVGParserContext::parseCustomData(const std::shared_ptr<DOMNode>& element, 
   for (const auto& attr : element->attributes) {
     if (attr.name.length() > 5 && attr.name.compare(0, 5, "data-") == 0) {
       // Remove "data-" prefix and store in customData.
-      std::string key = attr.name.substr(5);
-      layer->customData[key] = attr.value;
+      auto key = attr.name.substr(5);
+      if (Node::IsValidCustomDataKey(key)) {
+        node->customData[std::move(key)] = attr.value;
+      }
     }
   }
 }
@@ -2672,6 +2681,8 @@ ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
   if (!colorSource) {
     return nullptr;
   }
+
+  parseCustomData(defNode, colorSource);
 
   if (refCount > 1) {
     colorSource->id = generateColorSourceId();

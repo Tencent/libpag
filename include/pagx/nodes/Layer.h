@@ -19,7 +19,6 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 #include <vector>
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/LayerFilter.h"
@@ -146,11 +145,6 @@ class Layer : public Node {
    * The child layers contained in this layer.
    */
   std::vector<Layer*> children = {};
-
-  /**
-   * Custom data attributes. The keys are stored without the "data-" prefix.
-   */
-  std::unordered_map<std::string, std::string> customData = {};
 
   NodeType nodeType() const override {
     return NodeType::Layer;
