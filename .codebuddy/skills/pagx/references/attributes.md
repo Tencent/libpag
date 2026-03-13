@@ -72,6 +72,9 @@ they **must not** be omitted.
 | `roundness` | float | 0 |
 | `reversed` | bool | false |
 
+> `position` is the **center point** of the rectangle, not the top-left corner.
+> Bounds: `left = position.x − width/2`, `top = position.y − height/2`.
+
 ### Ellipse
 
 | Attribute | Type | Default |
@@ -79,6 +82,8 @@ they **must not** be omitted.
 | `position` | Point | 0,0 |
 | `size` | Size | 100,100 |
 | `reversed` | bool | false |
+
+> `position` is the **center point** of the ellipse, not the top-left corner.
 
 ### Polystar
 
@@ -93,6 +98,9 @@ they **must not** be omitted.
 | `outerRoundness` | float | 0 |
 | `innerRoundness` | float | 0 |
 | `reversed` | bool | false |
+
+> `position` is the **center point** of the polystar, not the top-left corner.
+> Vertices are computed relative to this center (see spec §4.4).
 
 ### Path
 
@@ -458,6 +466,7 @@ These defaults are counter-intuitive and commonly forgotten:
 
 | Element | Attribute | Default | Common Misconception |
 |---------|-----------|---------|---------------------|
+| **Rectangle/Ellipse/Polystar** | `position` | `0,0` | Often assumed to be top-left corner; it is actually the **center point** of the shape |
 | **Repeater** | `position` | `100,100` | Often assumed `0,0` |
 | **Repeater** | `copies` | `3` | Often assumed `1` |
 | **Rectangle/Ellipse** | `size` | `100,100` | May forget there is a default |
