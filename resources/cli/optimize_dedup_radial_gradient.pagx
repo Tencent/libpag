@@ -7,11 +7,11 @@
     <Fill color="@rg2"/>
   </Layer>
   <Resources>
-    <RadialGradient id="rg1" position="50,50" radius="50">
+    <RadialGradient id="rg1" center="50,50" radius="50">
       <ColorStop offset="0" color="#FF0000"/>
       <ColorStop offset="1" color="#0000FF"/>
     </RadialGradient>
-    <RadialGradient id="rg2" position="50,50" radius="50">
+    <RadialGradient id="rg2" center="50,50" radius="50">
       <ColorStop offset="0" color="#FF0000"/>
       <ColorStop offset="1" color="#0000FF"/>
     </RadialGradient>

@@ -958,13 +958,13 @@ RadialGradient* SVGParserContext::convertRadialGradient(const std::shared_ptr<DO
 
   if (useObjectBoundingBox) {
     // For objectBoundingBox, convert normalized coordinates to actual coordinates.
-    gradient->position = {shapeBounds.x + cx * shapeBounds.width,
+    gradient->center = {shapeBounds.x + cx * shapeBounds.width,
                         shapeBounds.y + cy * shapeBounds.height};
     // Radius is scaled by the average of width and height.
     gradient->radius = r * (shapeBounds.width + shapeBounds.height) / 2.0f;
   } else {
     // For userSpaceOnUse, coordinates are in user space.
-    gradient->position = {cx, cy};
+    gradient->center = {cx, cy};
     gradient->radius = r;
   }
 
@@ -2424,7 +2424,8 @@ static bool isSameGeometry(const Element* a, const Element* b) {
     case NodeType::Ellipse: {
       auto ellipseA = static_cast<const Ellipse*>(a);
       auto ellipseB = static_cast<const Ellipse*>(b);
-      return ellipseA->position.x == ellipseB->position.x && ellipseA->position.y == ellipseB->position.y &&
+      return ellipseA->position.x == ellipseB->position.x &&
+             ellipseA->position.y == ellipseB->position.y &&
              ellipseA->size.width == ellipseB->size.width &&
              ellipseA->size.height == ellipseB->size.height;
     }

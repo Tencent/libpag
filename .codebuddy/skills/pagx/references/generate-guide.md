@@ -109,8 +109,8 @@ This isolates defects: if something breaks, it was the last thing added.
 
   ```xml
   <Group>
-    <Ellipse center="-4,-3" size="5,6"/>
-    <Ellipse center="4,-3" size="5,6"/>
+    <Ellipse position="-4,-3" size="5,6"/>
+    <Ellipse position="4,-3" size="5,6"/>
     <Fill color="#E0E7FF"/>
   </Group>
   ```

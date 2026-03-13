@@ -157,12 +157,12 @@ block's position, convert internal coordinates to Layer-relative.
 <!-- Before: two independent blocks crammed into one Layer -->
 <Layer>
   <Group>
-    <Rectangle center="110,115" size="120,130"/>
+    <Rectangle position="110,115" size="120,130"/>
     <Stroke color="#000" width="1"/>
   </Group>
   <!-- ...more content for block A... -->
   <Group>
-    <Rectangle center="295,115" size="120,130"/>
+    <Rectangle position="295,115" size="120,130"/>
     <Stroke color="#000" width="1"/>
   </Group>
   <!-- ...more content for block B... -->
@@ -171,7 +171,7 @@ block's position, convert internal coordinates to Layer-relative.
 <!-- After: each block is an independent Layer with origin-relative internals -->
 <Layer x="110" y="115">
   <Group>
-    <Rectangle size="120,130"/>     <!-- center shifted to 0,0 -->
+    <Rectangle size="120,130"/>     <!-- position shifted to 0,0 -->
     <Stroke color="#000" width="1"/>
   </Group>
   <!-- ... -->
@@ -328,7 +328,7 @@ a single `x`/`y` value.
 ### How
 
 1. Identify the block's anchor position in canvas space → set as Layer `x`/`y`
-2. Subtract the Layer's x/y from all internal coordinate values (center, position, etc.)
+2. Subtract the Layer's x/y from all internal coordinate values (position, etc.)
 3. The goal: the first content element starts at or near `0,0`
 
 ### Which Coordinates Matter
@@ -338,7 +338,7 @@ Focus on the **layout-controlling nodes**:
 - **Text + TextBox**: TextBox `position` controls layout (Text `position` is ignored)
 - **Text + TextPath**: TextPath's path origin controls layout
 - **Bare Text**: Text's `position` attribute controls layout
-- **Geometry elements**: `center` controls placement
+- **Geometry elements**: `position` controls placement
 
 ### Caveats
 
@@ -386,18 +386,18 @@ Fill / Stroke.
 ```xml
 <!-- Before -->
 <Group>
-  <Ellipse center="23,23" size="46,46"/>
+  <Ellipse position="23,23" size="46,46"/>
   <Stroke color="#3B82F6" width="1"/>
 </Group>
 <Group>
-  <Ellipse center="69,23" size="46,46"/>
+  <Ellipse position="69,23" size="46,46"/>
   <Stroke color="#3B82F6" width="1"/>
 </Group>
 
 <!-- After -->
 <Group>
-  <Ellipse center="23,23" size="46,46"/>
-  <Ellipse center="69,23" size="46,46"/>
+  <Ellipse position="23,23" size="46,46"/>
+  <Ellipse position="69,23" size="46,46"/>
   <Stroke color="#3B82F6" width="1"/>
 </Group>
 ```
@@ -412,15 +412,15 @@ mask / blendMode / alpha / name → merge into one Layer.
 
 ```xml
 <!-- Before: 3 adjacent Layers, each with same Stroke, no styles/filters/mask -->
-<Layer x="20" y="10"><Ellipse center="20,20" size="40,40"/><Stroke color="#3B82F6" width="1"/></Layer>
-<Layer x="80" y="10"><Ellipse center="20,20" size="40,40"/><Stroke color="#3B82F6" width="1"/></Layer>
-<Layer x="140" y="10"><Ellipse center="20,20" size="40,40"/><Stroke color="#3B82F6" width="1"/></Layer>
+<Layer x="20" y="10"><Ellipse position="20,20" size="40,40"/><Stroke color="#3B82F6" width="1"/></Layer>
+<Layer x="80" y="10"><Ellipse position="20,20" size="40,40"/><Stroke color="#3B82F6" width="1"/></Layer>
+<Layer x="140" y="10"><Ellipse position="20,20" size="40,40"/><Stroke color="#3B82F6" width="1"/></Layer>
 
 <!-- After: 1 Layer, 3 Ellipses sharing one Stroke -->
 <Layer>
-  <Ellipse center="40,30" size="40,40"/>
-  <Ellipse center="100,30" size="40,40"/>
-  <Ellipse center="160,30" size="40,40"/>
+  <Ellipse position="40,30" size="40,40"/>
+  <Ellipse position="100,30" size="40,40"/>
+  <Ellipse position="160,30" size="40,40"/>
   <Stroke color="#3B82F6" width="1"/>
 </Layer>
 ```
@@ -472,13 +472,13 @@ Three checks (fail any one → do not merge):
 <Group>
   <Rectangle size="100,40"/>
   <Fill color="#F00"/>
-  <Ellipse center="50,20" size="10,10"/>
+  <Ellipse position="50,20" size="10,10"/>
   <Stroke color="#000" width="1"/>
 </Group>
 
 <!-- CORRECT — different painter sets stay in separate scopes. -->
 <Group><Rectangle size="100,40"/><Fill color="#F00"/></Group>
-<Group><Ellipse center="50,20" size="10,10"/><Stroke color="#000" width="1"/></Group>
+<Group><Ellipse position="50,20" size="10,10"/><Stroke color="#000" width="1"/></Group>
 ```
 
 2. **No modifiers**: TrimPath / RoundCorner / MergePath apply to all geometry above them —
@@ -528,12 +528,12 @@ When 2+ layer subtrees have identical internal structure (differing only in posi
 into a `<Composition>` and instantiate via `<Layer composition="@id"/>`.
 
 **Coordinate conversion**: Composition origin is at the top-left corner. Given an original
-Layer at `(layerX, layerY)` with geometry using `center="cx,cy"`:
+Layer at `(layerX, layerY)` with geometry using `position="cx,cy"`:
 
 ```
 Composition width  = geometry width
 Composition height = geometry height
-Internal center    = (width/2, height/2)
+Internal position   = (width/2, height/2)
 Reference Layer x  = layerX - width/2 + cx
 Reference Layer y  = layerY - height/2 + cy
 ```
@@ -551,7 +551,7 @@ Reference Layer y  = layerY - height/2 + cy
 <!-- After -->
 <Composition id="cardBg" width="100" height="80">
   <Layer>
-    <Rectangle center="50,40" size="100,80" roundness="12"/>
+    <Rectangle position="50,40" size="100,80" roundness="12"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
   </Layer>
@@ -567,13 +567,13 @@ coordinates relative to the geometry element's local origin (not canvas-absolute
 
 ```xml
 <!-- Before: canvas-absolute gradient -->
-<Ellipse center="23,23" size="46,46"/>
+<Ellipse position="23,23" size="46,46"/>
 <Fill>
   <LinearGradient startPoint="217,545" endPoint="263,545">...</LinearGradient>
 </Fill>
 
 <!-- After: geometry-relative gradient inside Composition -->
-<Ellipse center="23,23" size="46,46"/>
+<Ellipse position="23,23" size="46,46"/>
 <Fill>
   <LinearGradient startPoint="0,23" endPoint="46,23">...</LinearGradient>
 </Fill>
@@ -603,7 +603,7 @@ renderer fast paths (especially under Repeater).
 <!-- Before -->
 <Path data="M 10 50 L 30 50 L 30 200 L 10 200 Z"/>
 <!-- After -->
-<Rectangle center="20,125" size="20,150"/>
+<Rectangle position="20,125" size="20,150"/>
 ```
 
 Only convert when clearly a standard shape. Do not convert Bezier-based rounded rectangles

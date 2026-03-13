@@ -346,11 +346,11 @@ Radial gradients radiate outward from the center.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `position` | Point | 0,0 | Center point |
+| `center` | Point | 0,0 | Center point |
 | `radius` | float | (required) | Gradient radius |
 | `matrix` | Matrix | identity matrix | Transform matrix |
 
-**Calculation**: For a point P, its color is determined by `distance(P, position) / radius`.
+**Calculation**: For a point P, its color is determined by `distance(P, center) / radius`.
 
 ##### ConicGradient
 
@@ -360,12 +360,12 @@ Conic gradients (also known as sweep gradients) interpolate along the circumfere
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `position` | Point | 0,0 | Center point |
+| `center` | Point | 0,0 | Center point |
 | `startAngle` | float | 0 | Start angle |
 | `endAngle` | float | 360 | End angle |
 | `matrix` | Matrix | identity matrix | Transform matrix |
 
-**Calculation**: For a point P, its color is determined by the ratio of `atan2(P.y - position.y, P.x - position.x)` within the `[startAngle, endAngle]` range.
+**Calculation**: For a point P, its color is determined by the ratio of `atan2(P.y - center.y, P.x - center.x)` within the `[startAngle, endAngle]` range.
 
 **Angle convention**: Follows the global coordinate system convention (see §3.1): 0° points to the **right** (positive X-axis), and angles increase **clockwise**. This differs from CSS `conic-gradient` where 0° points to the top. Common reference angles:
 
@@ -384,11 +384,11 @@ Diamond gradients radiate from the center toward the four corners.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `position` | Point | 0,0 | Center point |
+| `center` | Point | 0,0 | Center point |
 | `radius` | float | (required) | Gradient radius |
 | `matrix` | Matrix | identity matrix | Transform matrix |
 
-**Calculation**: For a point P, its color is determined by the Chebyshev distance `max(|P.x - position.x|, |P.y - position.y|) / radius`.
+**Calculation**: For a point P, its color is determined by the Chebyshev distance `max(|P.x - center.x|, |P.y - center.y|) / radius`.
 
 ##### ColorStop
 
@@ -908,7 +908,7 @@ Rectangles are defined from center point with uniform corner rounding support.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `position` | Point | 0,0 | Position of the rectangle anchor point |
+| `position` | Point | 0,0 | Center point coordinate |
 | `size` | Size | 100,100 | Dimensions "width,height" |
 | `roundness` | float | 0 | Corner radius |
 | `reversed` | bool | false | Reverse path direction |
@@ -941,7 +941,7 @@ Ellipses are defined from center point.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `position` | Point | 0,0 | Position of the ellipse anchor point |
+| `position` | Point | 0,0 | Center point coordinate |
 | `size` | Size | 100,100 | Dimensions "width,height" |
 | `reversed` | bool | false | Reverse path direction |
 
@@ -969,7 +969,7 @@ Supports both regular polygon and star modes.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `position` | Point | 0,0 | Position of the polystar anchor point |
+| `position` | Point | 0,0 | Center point coordinate |
 | `type` | PolystarType | star | Type (see below) |
 | `pointCount` | float | 5 | Number of points (supports decimals) |
 | `outerRadius` | float | 100 | Outer radius |

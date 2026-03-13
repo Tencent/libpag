@@ -360,8 +360,8 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       auto grad = static_cast<const RadialGradient*>(node);
       xml.openElement("RadialGradient");
       xml.addAttribute("id", grad->id);
-      if (grad->position.x != 0 || grad->position.y != 0) {
-        xml.addAttribute("position", pointToString(grad->position));
+      if (grad->center.x != 0 || grad->center.y != 0) {
+        xml.addAttribute("center", pointToString(grad->center));
       }
       xml.addRequiredAttribute("radius", grad->radius);
       writeGradientMatrixAndStops(xml, grad->matrix, grad->colorStops);
@@ -371,8 +371,8 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       auto grad = static_cast<const ConicGradient*>(node);
       xml.openElement("ConicGradient");
       xml.addAttribute("id", grad->id);
-      if (grad->position.x != 0 || grad->position.y != 0) {
-        xml.addAttribute("position", pointToString(grad->position));
+      if (grad->center.x != 0 || grad->center.y != 0) {
+        xml.addAttribute("center", pointToString(grad->center));
       }
       xml.addAttribute("startAngle", grad->startAngle);
       xml.addAttribute("endAngle", grad->endAngle, 360.0f);
@@ -383,8 +383,8 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       auto grad = static_cast<const DiamondGradient*>(node);
       xml.openElement("DiamondGradient");
       xml.addAttribute("id", grad->id);
-      if (grad->position.x != 0 || grad->position.y != 0) {
-        xml.addAttribute("position", pointToString(grad->position));
+      if (grad->center.x != 0 || grad->center.y != 0) {
+        xml.addAttribute("center", pointToString(grad->center));
       }
       xml.addRequiredAttribute("radius", grad->radius);
       writeGradientMatrixAndStops(xml, grad->matrix, grad->colorStops);

@@ -67,7 +67,7 @@ they **must not** be omitted.
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `center` | Point | 0,0 |
+| `position` | Point | 0,0 |
 | `size` | Size | 100,100 |
 | `roundness` | float | 0 |
 | `reversed` | bool | false |
@@ -76,7 +76,7 @@ they **must not** be omitted.
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `center` | Point | 0,0 |
+| `position` | Point | 0,0 |
 | `size` | Size | 100,100 |
 | `reversed` | bool | false |
 
@@ -84,7 +84,7 @@ they **must not** be omitted.
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `center` | Point | 0,0 |
+| `position` | Point | 0,0 |
 | `type` | PolystarType | star |
 | `pointCount` | float | 5 |
 | `outerRadius` | float | 100 |

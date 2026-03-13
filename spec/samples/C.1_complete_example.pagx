@@ -156,11 +156,11 @@
       <Glyph path="M -8 -8 L 8 -8 L 8 8 L -8 8 Z" advance="20"/>
       <Glyph path="M 0 -10 A 10 10 0 1 1 0 10 A 10 10 0 1 1 0 -10" advance="24"/>
     </Font>
-    <RadialGradient id="glowPurple" position="160,160" radius="160">
+    <RadialGradient id="glowPurple" center="160,160" radius="160">
       <ColorStop offset="0" color="#8B5CF660"/>
       <ColorStop offset="1" color="#8B5CF600"/>
     </RadialGradient>
-    <RadialGradient id="glowCyan" position="200,200" radius="200">
+    <RadialGradient id="glowCyan" center="200,200" radius="200">
       <ColorStop offset="0" color="#06B6D450"/>
       <ColorStop offset="1" color="#06B6D400"/>
     </RadialGradient>
@@ -173,7 +173,7 @@
       <ColorStop offset="0" color="#6366F1"/>
       <ColorStop offset="1" color="#8B5CF6"/>
     </LinearGradient>
-    <ConicGradient id="rainbow" position="25,25">
+    <ConicGradient id="rainbow" center="25,25">
       <ColorStop offset="0" color="#F43F5E"/>
       <ColorStop offset="0.25" color="#8B5CF6"/>
       <ColorStop offset="0.5" color="#06B6D4"/>
@@ -186,7 +186,7 @@
     <SolidColor id="orange" color="#F97316"/>
     <SolidColor id="cyan" color="#06B6D4"/>
     <SolidColor id="emerald" color="#10B981"/>
-    <DiamondGradient id="diamond" position="26,26" radius="26">
+    <DiamondGradient id="diamond" center="26,26" radius="26">
       <ColorStop offset="0" color="#14B8A6"/>
       <ColorStop offset="1" color="#0F766E"/>
     </DiamondGradient>

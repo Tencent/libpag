@@ -4,7 +4,7 @@
   <Layer>
     <Ellipse position="200,200" size="320,320"/>
     <Fill>
-      <ConicGradient position="200,200">
+      <ConicGradient center="200,200">
         <ColorStop offset="0" color="#F43F5E"/>
         <ColorStop offset="0.2" color="#F59E0B"/>
         <ColorStop offset="0.4" color="#10B981"/>

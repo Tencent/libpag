@@ -468,7 +468,7 @@ class LayerBuilderContext {
     std::vector<float> positions;
     ExtractGradientStops(node->colorStops, &colors, &positions);
     return ApplyGradientMatrix(
-        tgfx::Gradient::MakeRadial(ToTGFX(node->position), node->radius, colors, positions),
+        tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions),
         node->matrix);
   }
 
@@ -476,7 +476,7 @@ class LayerBuilderContext {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     ExtractGradientStops(node->colorStops, &colors, &positions);
-    return ApplyGradientMatrix(tgfx::Gradient::MakeConic(ToTGFX(node->position), node->startAngle,
+    return ApplyGradientMatrix(tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle,
                                                          node->endAngle, colors, positions),
                                node->matrix);
   }
@@ -486,7 +486,7 @@ class LayerBuilderContext {
     std::vector<float> positions;
     ExtractGradientStops(node->colorStops, &colors, &positions);
     return ApplyGradientMatrix(
-        tgfx::Gradient::MakeDiamond(ToTGFX(node->position), node->radius, colors, positions),
+        tgfx::Gradient::MakeDiamond(ToTGFX(node->center), node->radius, colors, positions),
         node->matrix);
   }
 

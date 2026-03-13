@@ -11,7 +11,7 @@
       <ColorStop offset="0" color="#FF0000"/>
       <ColorStop offset="1" color="#0000FF"/>
     </LinearGradient>
-    <RadialGradient id="g2" position="50,50" radius="50">
+    <RadialGradient id="g2" center="50,50" radius="50">
       <ColorStop offset="0" color="#FF0000"/>
       <ColorStop offset="1" color="#0000FF"/>
     </RadialGradient>

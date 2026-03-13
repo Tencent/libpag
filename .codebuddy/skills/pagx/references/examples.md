@@ -52,7 +52,7 @@ Fill for solid areas, Stroke for line details:
       <Stroke color="#10B981" width="6" cap="round" join="round"/>
     </Group>
     <Group>
-      <Ellipse center="0,15" size="40,25"/>
+      <Ellipse position="0,15" size="40,25"/>
       <Fill color="#10B981"/>
     </Group>
   </Layer>
@@ -98,7 +98,7 @@ Structural patterns for application interface elements.
 <pagx version="1.0" width="340" height="240">
   <!-- Light background to make the white card visible -->
   <Layer>
-    <Rectangle center="170,120" size="340,240"/>
+    <Rectangle position="170,120" size="340,240"/>
     <Fill color="#F1F5F9"/>
   </Layer>
   <Layer x="170" y="120">
@@ -110,7 +110,7 @@ Structural patterns for application interface elements.
 ```
 
 **Pattern**: DropShadowStyle is a **Layer-level** style (not a VectorElement). Rectangle
-`center` defaults to `0,0` (omitted). White cards need a non-white background to be visible.
+`position` defaults to `0,0` (omitted). White cards need a non-white background to be visible.
 
 ### Button with Centered Label
 
@@ -189,16 +189,16 @@ relative to the Layer origin alongside the icon geometry.
       <Fill color="#E2E8F0"/>
     </Group>
     <Group>
-      <Rectangle center="-36,0" size="168,8" roundness="4"/>
+      <Rectangle position="-36,0" size="168,8" roundness="4"/>
       <Fill color="#3B82F6"/>
     </Group>
   </Layer>
 </pagx>
 ```
 
-**Pattern**: Track (full width) + fill (partial width). Offset the fill Rectangle's `center`
-to left-align it with the track: `center.x = -(trackWidth - fillWidth) / 2`. Both share
-center `y=0`.
+**Pattern**: Track (full width) + fill (partial width). Offset the fill Rectangle's `position`
+to left-align it with the track: `position.x = -(trackWidth - fillWidth) / 2`. Both share
+`position.y = 0`.
 
 ### Avatar with Circular Mask
 
@@ -236,7 +236,7 @@ often combine Polystar with gradients and layer styles for depth.
 <pagx version="1.0" width="200" height="200">
   <Layer x="100" y="100">
     <Rectangle size="160,160" roundness="32"/>
-    <Ellipse center="40,-40" size="60,60"/>
+    <Ellipse position="40,-40" size="60,60"/>
     <MergePath mode="difference"/>
     <Fill>
       <LinearGradient startPoint="-80,-80" endPoint="80,80">
@@ -274,14 +274,14 @@ merge, isolate it in a separate Group — see `spec-essentials.md` §4 MergePath
 
 **Pattern**: Polystar `rotation="-90"` points the first vertex upward (default is 3 o'clock).
 RadialGradient coordinates are **relative to the geometry element's local origin** — `center`
-defaults to `0,0` which aligns with Polystar center, `radius` matches `outerRadius`.
+defaults to `0,0` which aligns with Polystar position, `radius` matches `outerRadius`.
 
 ### Embossed Token (InnerShadowStyle)
 
 ```xml
 <pagx version="1.0" width="200" height="200">
   <Layer>
-    <Rectangle center="100,100" size="200,200"/>
+    <Rectangle position="100,100" size="200,200"/>
     <Fill color="#E2E8F0"/>
   </Layer>
   <Layer x="100" y="100">
@@ -331,7 +331,7 @@ use Group `rotation` to reposition the start point.
     </Group>
     <!-- Tick marks: 10 ticks spanning 270 degrees -->
     <Group rotation="-135">
-      <Rectangle center="0,-78" size="1,6"/>
+      <Rectangle position="0,-78" size="1,6"/>
       <Fill color="#94A3B8"/>
       <Repeater copies="10" position="0,0" rotation="30"/>
     </Group>
@@ -353,7 +353,7 @@ smaller `end` to show progress — `end="0.5"` represents 67% of the 270° track
 
 Repeater with `rotation="30"` generates evenly spaced tick marks around the arc. **Critical**:
 `position="0,0"` is required because the default `position="100,100"` would offset copies
-off-canvas. The tick Rectangle is offset from center along the Y axis (`center="0,-78"`) so
+off-canvas. The tick Rectangle is offset from the origin along the Y axis (`position="0,-78"`) so
 rotation fans copies around the origin.
 
 ### Donut Chart (Multi-segment TrimPath)
@@ -413,23 +413,23 @@ LinearGradient directly inside the Stroke element:
   <!-- Bars (bottom-aligned at y=180) -->
   <Layer x="30" y="180">
     <Group>
-      <Rectangle center="25,-40" size="30,80" roundness="4"/>
-      <Rectangle center="75,-65" size="30,130" roundness="4"/>
-      <Rectangle center="125,-30" size="30,60" roundness="4"/>
-      <Rectangle center="175,-55" size="30,110" roundness="4"/>
-      <Rectangle center="225,-45" size="30,90" roundness="4"/>
+      <Rectangle position="25,-40" size="30,80" roundness="4"/>
+      <Rectangle position="75,-65" size="30,130" roundness="4"/>
+      <Rectangle position="125,-30" size="30,60" roundness="4"/>
+      <Rectangle position="175,-55" size="30,110" roundness="4"/>
+      <Rectangle position="225,-45" size="30,90" roundness="4"/>
       <Fill color="#3B82F6"/>
     </Group>
   </Layer>
   <!-- Baseline -->
   <Layer x="30" y="180">
-    <Rectangle center="125,0" size="270,1"/>
+    <Rectangle position="125,0" size="270,1"/>
     <Fill color="#CBD5E1"/>
   </Layer>
 </pagx>
 ```
 
-**Pattern**: Each bar's `center.y` is `-height/2` to bottom-align all bars at the Layer's
+**Pattern**: Each bar's `position.y` is `-height/2` to bottom-align all bars at the Layer's
 y position. Bars with different heights **cannot** use Repeater (no per-copy parameterization)
 — use multiple Rectangles sharing one Fill via painter scope. The shared Fill applies to all
 geometry accumulated in the Group.
@@ -446,7 +446,7 @@ and BackgroundBlurStyle for frosted glass.
 ```xml
 <!-- Decorative glow on a dark background -->
 <Layer>
-  <Rectangle center="200,150" size="400,300"/>
+  <Rectangle position="200,150" size="400,300"/>
   <Fill color="#0F172A"/>
 </Layer>
 <Layer x="80" y="60" blendMode="screen">
@@ -482,7 +482,7 @@ for performance guidance.
 <pagx version="1.0" width="500" height="120">
   <!-- Light background to make white cards visible -->
   <Layer>
-    <Rectangle center="250,60" size="500,120"/>
+    <Rectangle position="250,60" size="500,120"/>
     <Fill color="#F1F5F9"/>
   </Layer>
   <Layer composition="@card" x="20" y="20"/>
@@ -492,7 +492,7 @@ for performance guidance.
   <Resources>
     <Composition id="card" width="130" height="80">
       <Layer>
-        <Rectangle center="65,40" size="130,80" roundness="10"/>
+        <Rectangle position="65,40" size="130,80" roundness="10"/>
         <Fill color="#FFF"/>
         <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000020"/>
       </Layer>
@@ -502,7 +502,7 @@ for performance guidance.
 ```
 
 **Pattern**: Composition has its own coordinate system with origin at the **top-left corner**.
-Internal geometry must use `center="(width/2, height/2)"` instead of `0,0`. The referencing
+Internal geometry must use `position="(width/2, height/2)"` instead of `0,0`. The referencing
 Layer's `x`/`y` positions the Composition's top-left in the parent coordinate system. White
 cards need a non-white background to be visible. See `optimize-guide.md` §Composition
 Resource Reuse for coordinate conversion details and gradient handling.
@@ -513,9 +513,9 @@ Resource Reuse for coordinate conversion details and gradient handling.
 <pagx version="1.0" width="400" height="300">
   <!-- Content behind the panel -->
   <Layer>
-    <Rectangle center="200,150" size="400,300"/>
-    <Fill>
-      <LinearGradient startPoint="0,0" endPoint="400,300">
+  <Rectangle position="200,150" size="400,300"/>
+  <Fill>
+    <LinearGradient startPoint="0,0" endPoint="400,300">
         <ColorStop offset="0" color="#6366F1"/>
         <ColorStop offset="1" color="#EC4899"/>
       </LinearGradient>

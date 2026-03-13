@@ -8,7 +8,7 @@
     <Layer>
       <Rectangle position="400,300" size="800,600"/>
       <Fill>
-        <RadialGradient position="400,300" radius="500">
+        <RadialGradient center="400,300" radius="500">
           <ColorStop offset="0" color="#001122"/>
           <ColorStop offset="0.7" color="#000811"/>
           <ColorStop offset="1" color="#000"/>
@@ -31,7 +31,7 @@
     <Layer>
       <Rectangle position="400,300" size="800,600"/>
       <Fill>
-        <RadialGradient position="400,300" radius="600">
+        <RadialGradient center="400,300" radius="600">
           <ColorStop offset="0.6" color="#00000000"/>
           <ColorStop offset="1" color="#00000080"/>
         </RadialGradient>

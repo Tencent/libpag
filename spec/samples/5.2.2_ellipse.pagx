@@ -5,7 +5,7 @@
   <Layer>
     <Ellipse position="120,120" size="140,140"/>
     <Fill>
-      <RadialGradient position="50,50" radius="100">
+      <RadialGradient center="50,50" radius="100">
         <ColorStop offset="0" color="#FBBF24"/>
         <ColorStop offset="1" color="#F59E0B"/>
       </RadialGradient>
@@ -38,7 +38,7 @@
   <Layer>
     <Ellipse position="290,280" size="150,150"/>
     <Fill>
-      <RadialGradient position="55,55" radius="100">
+      <RadialGradient center="55,55" radius="100">
         <ColorStop offset="0" color="#A78BFA"/>
         <ColorStop offset="1" color="#8B5CF6"/>
       </RadialGradient>

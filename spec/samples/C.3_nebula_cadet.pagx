@@ -13,7 +13,7 @@
   <Layer name="NebulaLeft">
     <Ellipse position="160,220" size="360,300"/>
     <Fill>
-      <RadialGradient position="160,220" radius="220">
+      <RadialGradient center="160,220" radius="220">
         <ColorStop offset="0" color="#1D4ED880"/>
         <ColorStop offset="1" color="#1D4ED800"/>
       </RadialGradient>
@@ -22,7 +22,7 @@
   <Layer name="NebulaRight">
     <Ellipse position="640,180" size="360,280"/>
     <Fill>
-      <RadialGradient position="640,180" radius="220">
+      <RadialGradient center="640,180" radius="220">
         <ColorStop offset="0" color="#C026D380"/>
         <ColorStop offset="1" color="#C026D300"/>
       </RadialGradient>
@@ -31,7 +31,7 @@
   <Layer name="NebulaBottom" alpha="0.9">
     <Ellipse position="400,505" size="600,220"/>
     <Fill>
-      <RadialGradient position="400,505" radius="260">
+      <RadialGradient center="400,505" radius="260">
         <ColorStop offset="0" color="#22D3EE60"/>
         <ColorStop offset="1" color="#22D3EE00"/>
       </RadialGradient>
@@ -155,7 +155,7 @@
     <Group>
       <Ellipse position="70,65" size="48,48"/>
       <Fill>
-        <RadialGradient position="70,65" radius="30">
+        <RadialGradient center="70,65" radius="30">
           <ColorStop offset="0" color="#38BDF8AA"/>
           <ColorStop offset="1" color="#0B122500"/>
         </RadialGradient>

@@ -22,7 +22,7 @@
   <Layer>
     <Ellipse position="200,300" size="320,140"/>
     <Fill>
-      <RadialGradient position="160,70" radius="170">
+      <RadialGradient center="160,70" radius="170">
         <ColorStop offset="0" color="#FFF"/>
         <ColorStop offset="0.5" color="#06B6D4"/>
         <ColorStop offset="1" color="#0891B2"/>

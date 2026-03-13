@@ -4,7 +4,7 @@
   <Layer x="100" y="100" scrollRect="100,100,200,200">
     <Ellipse position="200,200" size="320,320"/>
     <Fill>
-      <RadialGradient position="200,200" radius="160">
+      <RadialGradient center="200,200" radius="160">
         <ColorStop offset="0" color="#F43F5E"/>
         <ColorStop offset="0.6" color="#EC4899"/>
         <ColorStop offset="1" color="#8B5CF6"/>

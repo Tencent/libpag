@@ -657,20 +657,20 @@ static bool GradientEqual(const ColorSource* a, const ColorSource* b) {
   if (type == NodeType::RadialGradient) {
     auto ga = static_cast<const RadialGradient*>(a);
     auto gb = static_cast<const RadialGradient*>(b);
-    return ga->position == gb->position && ga->radius == gb->radius && ga->matrix == gb->matrix &&
+    return ga->center == gb->center && ga->radius == gb->radius && ga->matrix == gb->matrix &&
            ColorStopsEqual(ga->colorStops, gb->colorStops);
   }
   if (type == NodeType::ConicGradient) {
     auto ga = static_cast<const ConicGradient*>(a);
     auto gb = static_cast<const ConicGradient*>(b);
-    return ga->position == gb->position && ga->startAngle == gb->startAngle &&
+    return ga->center == gb->center && ga->startAngle == gb->startAngle &&
            ga->endAngle == gb->endAngle && ga->matrix == gb->matrix &&
            ColorStopsEqual(ga->colorStops, gb->colorStops);
   }
   if (type == NodeType::DiamondGradient) {
     auto ga = static_cast<const DiamondGradient*>(a);
     auto gb = static_cast<const DiamondGradient*>(b);
-    return ga->position == gb->position && ga->radius == gb->radius && ga->matrix == gb->matrix &&
+    return ga->center == gb->center && ga->radius == gb->radius && ga->matrix == gb->matrix &&
            ColorStopsEqual(ga->colorStops, gb->colorStops);
   }
   return false;
@@ -1440,7 +1440,7 @@ static ColorSource* OffsetColorSource(
   } else if (type == NodeType::RadialGradient) {
     auto* original = static_cast<RadialGradient*>(source);
     auto* grad = document->makeNode<RadialGradient>();
-    grad->position = {original->position.x - offsetX, original->position.y - offsetY};
+    grad->center = {original->center.x - offsetX, original->center.y - offsetY};
     grad->radius = original->radius;
     grad->matrix = original->matrix;
     grad->colorStops = original->colorStops;
@@ -1448,7 +1448,7 @@ static ColorSource* OffsetColorSource(
   } else if (type == NodeType::ConicGradient) {
     auto* original = static_cast<ConicGradient*>(source);
     auto* grad = document->makeNode<ConicGradient>();
-    grad->position = {original->position.x - offsetX, original->position.y - offsetY};
+    grad->center = {original->center.x - offsetX, original->center.y - offsetY};
     grad->startAngle = original->startAngle;
     grad->endAngle = original->endAngle;
     grad->matrix = original->matrix;
@@ -1457,7 +1457,7 @@ static ColorSource* OffsetColorSource(
   } else if (type == NodeType::DiamondGradient) {
     auto* original = static_cast<DiamondGradient*>(source);
     auto* grad = document->makeNode<DiamondGradient>();
-    grad->position = {original->position.x - offsetX, original->position.y - offsetY};
+    grad->center = {original->center.x - offsetX, original->center.y - offsetY};
     grad->radius = original->radius;
     grad->matrix = original->matrix;
     grad->colorStops = original->colorStops;
@@ -1691,10 +1691,11 @@ static bool ElementsStructurallyEqual(const Element* a, const Element* b) {
   if (type == NodeType::Polystar) {
     auto pa = static_cast<const Polystar*>(a);
     auto pb = static_cast<const Polystar*>(b);
-    return pa->position == pb->position && pa->type == pb->type && pa->pointCount == pb->pointCount &&
-           pa->outerRadius == pb->outerRadius && pa->innerRadius == pb->innerRadius &&
-           pa->rotation == pb->rotation && pa->outerRoundness == pb->outerRoundness &&
-           pa->innerRoundness == pb->innerRoundness && pa->reversed == pb->reversed;
+    return pa->position == pb->position && pa->type == pb->type &&
+           pa->pointCount == pb->pointCount && pa->outerRadius == pb->outerRadius &&
+           pa->innerRadius == pb->innerRadius && pa->rotation == pb->rotation &&
+           pa->outerRoundness == pb->outerRoundness && pa->innerRoundness == pb->innerRoundness &&
+           pa->reversed == pb->reversed;
   }
   if (type == NodeType::Path) {
     auto pathA = static_cast<const Path*>(a);
