@@ -173,16 +173,25 @@ class XMLBuilder {
     for (char c : input) {
       switch (c) {
         case '&':
-          extraSize += 4;
+          extraSize += 4;  // &amp;
           break;
         case '<':
-          extraSize += 3;
+          extraSize += 3;  // &lt;
           break;
         case '"':
-          extraSize += 5;
+          extraSize += 5;  // &quot;
           break;
         case '\'':
-          extraSize += 5;
+          extraSize += 5;  // &apos;
+          break;
+        case '\n':
+          extraSize += 4;  // &#10;
+          break;
+        case '\r':
+          extraSize += 4;  // &#13;
+          break;
+        case '\t':
+          extraSize += 3;  // &#9;
           break;
         default:
           break;
@@ -206,6 +215,15 @@ class XMLBuilder {
           break;
         case '\'':
           result += "&apos;";
+          break;
+        case '\n':
+          result += "&#10;";
+          break;
+        case '\r':
+          result += "&#13;";
+          break;
+        case '\t':
+          result += "&#9;";
           break;
         default:
           result += c;

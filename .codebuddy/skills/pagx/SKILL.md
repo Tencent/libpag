@@ -6,7 +6,6 @@ description: >-
   design PAGX content, optimize or simplify a .pagx file, review PAGX structure, run
   pagx CLI commands (render, validate, format, optimize, bounds, font info/embed,
   align, distribute, export-svg), or look up PAGX element attributes and syntax.
-user-invocable: false
 ---
 
 # PAGX Skill
