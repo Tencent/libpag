@@ -664,9 +664,19 @@ PAGX_TEST(PAGXTest, CustomDataRoundTrip) {
   EXPECT_EQ(solid2->customData.size(), 1u);
   EXPECT_EQ(solid2->customData.at("source"), "design-token");
 
-  // Step 8: Re-export and verify XML consistency.
+  // Step 8: Re-export and re-import to verify consistency.
   std::string xml2 = pagx::PAGXExporter::ToXML(*doc2);
-  EXPECT_EQ(xml, xml2);
+  ASSERT_FALSE(xml2.empty());
+  auto doc3 = pagx::PAGXImporter::FromXML(xml2);
+  ASSERT_TRUE(doc3 != nullptr);
+  EXPECT_EQ(doc3->customData, doc2->customData);
+  ASSERT_EQ(doc3->layers.size(), 1u);
+  EXPECT_EQ(doc3->layers[0]->customData, layer2->customData);
+  EXPECT_EQ(doc3->layers[0]->contents[0]->customData, rect2->customData);
+  EXPECT_EQ(doc3->layers[0]->contents[1]->customData, fill2->customData);
+  auto* solid3 = doc3->findNode<pagx::SolidColor>("red");
+  ASSERT_TRUE(solid3 != nullptr);
+  EXPECT_EQ(solid3->customData, solid2->customData);
 }
 
 }  // namespace pag

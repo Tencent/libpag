@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include <map>
 #include <string>
+#include <unordered_map>
 
 namespace pagx {
 
@@ -214,7 +214,7 @@ class Node {
   /**
    * Custom data attributes. The keys are stored without the "data-" prefix.
    */
-  std::map<std::string, std::string> customData = {};
+  std::unordered_map<std::string, std::string> customData = {};
 
   virtual ~Node() = default;
 
