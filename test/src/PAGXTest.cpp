@@ -643,33 +643,33 @@ PAGX_TEST(PAGXTest, CustomDataRoundTrip) {
   EXPECT_TRUE(doc2->errors.empty());
 
   // Step 4: Verify Document customData.
-  EXPECT_EQ(doc2->customData.size(), 2u);
+  ASSERT_EQ(doc2->customData.size(), 2u);
   EXPECT_EQ(doc2->customData.at("app-name"), "test-tool");
   EXPECT_EQ(doc2->customData.at("version"), "2.0");
 
   // Step 5: Verify Layer customData.
   ASSERT_EQ(doc2->layers.size(), 1u);
   auto* layer2 = doc2->layers[0];
-  EXPECT_EQ(layer2->customData.size(), 2u);
+  ASSERT_EQ(layer2->customData.size(), 2u);
   EXPECT_EQ(layer2->customData.at("layer-role"), "background");
   EXPECT_EQ(layer2->customData.at("export"), "true");
 
   // Step 6: Verify Element customData.
   ASSERT_GE(layer2->contents.size(), 2u);
   auto* rect2 = layer2->contents[0];
-  EXPECT_EQ(rect2->nodeType(), pagx::NodeType::Rectangle);
-  EXPECT_EQ(rect2->customData.size(), 1u);
+  ASSERT_EQ(rect2->nodeType(), pagx::NodeType::Rectangle);
+  ASSERT_EQ(rect2->customData.size(), 1u);
   EXPECT_EQ(rect2->customData.at("figma-node"), "123:456");
 
   auto* fill2 = layer2->contents[1];
-  EXPECT_EQ(fill2->nodeType(), pagx::NodeType::Fill);
-  EXPECT_EQ(fill2->customData.size(), 1u);
+  ASSERT_EQ(fill2->nodeType(), pagx::NodeType::Fill);
+  ASSERT_EQ(fill2->customData.size(), 1u);
   EXPECT_EQ(fill2->customData.at("auto-generated"), "true");
 
   // Step 7: Verify SolidColor resource customData.
   auto* solid2 = doc2->findNode<pagx::SolidColor>("red");
   ASSERT_TRUE(solid2 != nullptr);
-  EXPECT_EQ(solid2->customData.size(), 1u);
+  ASSERT_EQ(solid2->customData.size(), 1u);
   EXPECT_EQ(solid2->customData.at("source"), "design-token");
 
   // Step 8: Re-export and re-import to verify consistency.
@@ -677,8 +677,10 @@ PAGX_TEST(PAGXTest, CustomDataRoundTrip) {
   ASSERT_FALSE(xml2.empty());
   auto doc3 = pagx::PAGXImporter::FromXML(xml2);
   ASSERT_TRUE(doc3 != nullptr);
+  EXPECT_TRUE(doc3->errors.empty());
   EXPECT_EQ(doc3->customData, doc2->customData);
   ASSERT_EQ(doc3->layers.size(), 1u);
+  ASSERT_GE(doc3->layers[0]->contents.size(), 2u);
   EXPECT_EQ(doc3->layers[0]->customData, layer2->customData);
   EXPECT_EQ(doc3->layers[0]->contents[0]->customData, rect2->customData);
   EXPECT_EQ(doc3->layers[0]->contents[1]->customData, fill2->customData);
@@ -784,20 +786,25 @@ PAGX_TEST(PAGXTest, CustomDataEdgeCases) {
   ASSERT_EQ(doc2->layers.size(), 1u);
   auto* layer2 = doc2->layers[0];
   ASSERT_EQ(layer2->styles.size(), 1u);
+  ASSERT_EQ(layer2->styles[0]->customData.count("priority"), 1u);
   EXPECT_EQ(layer2->styles[0]->customData.at("priority"), "high");
 
   // Verify LayerFilter customData.
   ASSERT_EQ(layer2->filters.size(), 1u);
+  ASSERT_EQ(layer2->filters[0]->customData.count("source"), 1u);
   EXPECT_EQ(layer2->filters[0]->customData.at("source"), "user-input");
 
   // Verify LinearGradient resource customData.
   auto* grad2 = doc2->findNode<pagx::LinearGradient>("grad1");
   ASSERT_TRUE(grad2 != nullptr);
+  ASSERT_EQ(grad2->customData.count("origin"), 1u);
   EXPECT_EQ(grad2->customData.at("origin"), "figma");
 
   // Verify ColorStop customData.
   ASSERT_EQ(grad2->colorStops.size(), 2u);
+  ASSERT_EQ(grad2->colorStops[0]->customData.count("role"), 1u);
   EXPECT_EQ(grad2->colorStops[0]->customData.at("role"), "start");
+  ASSERT_EQ(grad2->colorStops[1]->customData.count("role"), 1u);
   EXPECT_EQ(grad2->colorStops[1]->customData.at("role"), "end");
 
   // Verify empty customData.
@@ -805,30 +812,39 @@ PAGX_TEST(PAGXTest, CustomDataEdgeCases) {
   EXPECT_TRUE(layer2->contents[1]->customData.empty());
 
   // Verify XML special characters survived round-trip.
+  ASSERT_EQ(layer2->contents[2]->customData.count("formula"), 1u);
   EXPECT_EQ(layer2->contents[2]->customData.at("formula"), "a<b&c>d\"e");
 
   // Verify nested child layer customData.
   ASSERT_EQ(layer2->children.size(), 1u);
+  ASSERT_EQ(layer2->children[0]->customData.count("depth"), 1u);
   EXPECT_EQ(layer2->children[0]->customData.at("depth"), "1");
 
   // Verify Composition resource customData.
   auto* comp2 = doc2->findNode<pagx::Composition>("comp1");
   ASSERT_TRUE(comp2 != nullptr);
+  ASSERT_EQ(comp2->customData.count("scene"), 1u);
   EXPECT_EQ(comp2->customData.at("scene"), "intro");
 
   // Re-export and re-import to verify consistency.
   std::string xml2 = pagx::PAGXExporter::ToXML(*doc2);
   auto doc3 = pagx::PAGXImporter::FromXML(xml2);
   ASSERT_TRUE(doc3 != nullptr);
+  EXPECT_TRUE(doc3->errors.empty());
   ASSERT_EQ(doc3->layers.size(), 1u);
   auto* layer3 = doc3->layers[0];
+  ASSERT_EQ(layer3->styles.size(), 1u);
   EXPECT_EQ(layer3->styles[0]->customData, layer2->styles[0]->customData);
+  ASSERT_EQ(layer3->filters.size(), 1u);
   EXPECT_EQ(layer3->filters[0]->customData, layer2->filters[0]->customData);
   auto* grad3 = doc3->findNode<pagx::LinearGradient>("grad1");
   ASSERT_TRUE(grad3 != nullptr);
+  ASSERT_EQ(grad3->colorStops.size(), 2u);
   EXPECT_EQ(grad3->colorStops[0]->customData, grad2->colorStops[0]->customData);
   EXPECT_EQ(grad3->colorStops[1]->customData, grad2->colorStops[1]->customData);
+  ASSERT_GE(layer3->contents.size(), 3u);
   EXPECT_EQ(layer3->contents[2]->customData, layer2->contents[2]->customData);
+  ASSERT_EQ(layer3->children.size(), 1u);
   EXPECT_EQ(layer3->children[0]->customData, layer2->children[0]->customData);
 }
 
@@ -869,9 +885,12 @@ PAGX_TEST(PAGXTest, CustomDataTextModifierRangeSelector) {
   ASSERT_EQ(doc2->layers.size(), 1u);
   ASSERT_GE(doc2->layers[0]->contents.size(), 2u);
   auto* mod2 = doc2->layers[0]->contents[1];
+  ASSERT_EQ(mod2->nodeType(), pagx::NodeType::TextModifier);
+  ASSERT_EQ(mod2->customData.count("effect"), 1u);
   EXPECT_EQ(mod2->customData.at("effect"), "fade-in");
   auto* modifier2 = static_cast<pagx::TextModifier*>(mod2);
   ASSERT_EQ(modifier2->selectors.size(), 1u);
+  ASSERT_EQ(modifier2->selectors[0]->customData.count("timing"), 1u);
   EXPECT_EQ(modifier2->selectors[0]->customData.at("timing"), "ease");
 }
 
