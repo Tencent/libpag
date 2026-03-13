@@ -279,7 +279,7 @@ class LayerBuilderContext {
 
   std::shared_ptr<tgfx::Rectangle> convertRectangle(const Rectangle* node) {
     auto rect = tgfx::Rectangle::Make();
-    rect->setCenter(ToTGFX(node->position));
+    rect->setPosition(ToTGFX(node->position));
     rect->setSize({node->size.width, node->size.height});
     rect->setRoundness(node->roundness);
     rect->setReversed(node->reversed);
@@ -288,7 +288,7 @@ class LayerBuilderContext {
 
   std::shared_ptr<tgfx::Ellipse> convertEllipse(const Ellipse* node) {
     auto ellipse = tgfx::Ellipse::Make();
-    ellipse->setCenter(ToTGFX(node->position));
+    ellipse->setPosition(ToTGFX(node->position));
     ellipse->setSize({node->size.width, node->size.height});
     ellipse->setReversed(node->reversed);
     return ellipse;
@@ -296,7 +296,7 @@ class LayerBuilderContext {
 
   std::shared_ptr<tgfx::Polystar> convertPolystar(const Polystar* node) {
     auto polystar = tgfx::Polystar::Make();
-    polystar->setCenter(ToTGFX(node->position));
+    polystar->setPosition(ToTGFX(node->position));
     polystar->setPointCount(node->pointCount);
     polystar->setOuterRadius(node->outerRadius);
     polystar->setInnerRadius(node->innerRadius);
