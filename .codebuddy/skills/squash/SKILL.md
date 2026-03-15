@@ -57,6 +57,15 @@ follows each block. `--stat=200` ensures file lists are not truncated.
 merge points appear as single commits (identifiable by multiple hashes on the
 `P:` line). If the range is empty, inform the user and stop.
 
+**Output truncation**: The Bash tool truncates output exceeding 20000
+characters. If the output ends with `[truncated ...]`, the commit list is
+incomplete — **you MUST recover the missing commits before proceeding**.
+Re-run the same `git log` command with `--skip=N` where N is the number of
+commits already collected, and append the results. Repeat until the output is
+no longer truncated. Proceeding with a partial list causes cherry-pick
+conflicts in Phase A (because skipped commits break the linear parent chain)
+and will always fail the integrity check.
+
 ### Build the commit table
 
 After collecting the log, **immediately** produce a numbered summary table in
@@ -180,12 +189,16 @@ Process commits according to the execution plan from Step 2, in
   parent (`-p`). Then `git update-ref HEAD <new_hash>` and
   `git reset --hard HEAD` to sync the working tree.
 
-If any step fails, remove the temporary worktree and branch, inform the user,
-and stop. If a cherry-pick produces a conflict, resolve it automatically by
-running `git checkout --theirs <conflicted_file>` for each conflicted file,
-then `git add <conflicted_files>` and `git cherry-pick --continue --no-edit`.
-The integrity check at the end of Phase A will verify the final tree matches
-the original branch exactly.
+**Conflict handling**: Since the commit list is linear (`--first-parent`) and
+only adjacent commits are squashed without reordering, the worktree HEAD's
+tree always equals the next cherry-pick's base tree. Therefore **cherry-pick
+conflicts should never occur** when the commit list is complete. If a conflict
+does occur, it almost certainly means the commit list was truncated and commits
+are missing — abort, re-collect the full commit list (see "Output truncation"
+in Step 1), and restart Phase A from scratch.
+
+If any other step fails, remove the temporary worktree and branch, inform the
+user, and stop.
 
 **Integrity check**: diff `{squash_end}` against the temporary branch HEAD —
 their trees must be identical. If different, abort (remove worktree and branch).
