@@ -2,8 +2,8 @@
 name: cr
 description: >-
   Automated code review and fix for local branches, PRs, commits, and files.
-  Supports single-agent interactive fix and multi-agent adversarial review with
-  auto-fix.
+  Supports single-agent interactive fix, multi-agent adversarial review with
+  auto-fix, and bot mode with multi-agent PR review for CI/CD.
 disable-model-invocation: true
 ---
 
@@ -11,8 +11,9 @@ disable-model-invocation: true
 
 Automated code review for local branches, PRs, commits, and files. Detects
 review mode from arguments and routes to the appropriate review flow — either
-quick single-agent review with interactive fix selection, or multi-agent
-deep review with risk-based auto-fix.
+quick single-agent review with interactive fix selection, multi-agent
+deep review with risk-based auto-fix, or bot mode with multi-agent adversarial
+review for PR comments.
 
 All user-facing text matches the user's language. All questions and option
 selections MUST use your interactive dialog tool (e.g. AskUserQuestion) — never
@@ -34,10 +35,11 @@ Run pre-checks, then match the **first** applicable rule top-to-bottom:
 |---|-----------|--------|
 | 1 | `$ARGUMENTS` is `diag` | → `references/diagnosis.md` |
 | 2 | `$ARGUMENTS` is a PR number or URL containing `/pull/` | → `references/pr-review.md` |
-| 3 | Agent teams NOT supported | → `references/local-review.md` |
-| 4 | Uncommitted changes exist | → `references/local-review.md` |
-| 5 | On main/master branch | → `references/local-review.md` |
-| 6 | Everything else | → Question below |
+| 3 | `$ARGUMENTS` is `bot <PR>` (PR number or URL) | → `references/bot-review.md` |
+| 4 | Agent teams NOT supported | → `references/local-review.md` |
+| 5 | Uncommitted changes exist | → `references/local-review.md` |
+| 6 | On main/master branch | → `references/local-review.md` |
+| 7 | Everything else | → Question below |
 
 Each `→` means: `Read` the target file and follow it as the sole remaining
 instruction. Ignore all sections below. Do NOT review from memory or habit —
