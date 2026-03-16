@@ -1161,6 +1161,7 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
     if (needsMultiLine) {
       float boxHeight = textBox->size.height;
       float totalHeight = static_cast<float>(lines.size()) * lineHeight;
+      // Approximate ascent ratio for common fonts (ascender ≈ 80% of em-square).
       float ascent = fontSize * 0.8f;
       float yOffset = 0;
       if (boxHeight > 0) {
@@ -1179,6 +1180,7 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
     } else {
       switch (textBox->paragraphAlign) {
         case ParagraphAlign::Middle:
+          // 0.35 ≈ (ascent - descent) / 2 / em, shifts baseline so text visually centers.
           y = textBox->position.y + textBox->size.height / 2 + fontSize * 0.35f;
           break;
         case ParagraphAlign::Far:
