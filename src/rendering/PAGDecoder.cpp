@@ -152,6 +152,7 @@ float PAGDecoder::frameRate() {
 }
 
 bool PAGDecoder::checkFrameChanged(int index) {
+  std::lock_guard<std::mutex> auoLock(locker);
   if (index < 0 || index >= _numFrames) {
     LOGE("PAGDecoder::readFrame() The index is out of range!");
     return false;
