@@ -20,6 +20,6 @@
 
 namespace pagx::cli {
 
-int RunExport(int argc, char* argv[]);
+int RunConvert(int argc, char* argv[]);
 
 }  // namespace pagx::cli

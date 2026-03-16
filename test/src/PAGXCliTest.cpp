@@ -25,7 +25,7 @@
 #include "base/PAGTest.h"
 #include "cli/CommandAlign.h"
 #include "cli/CommandBounds.h"
-#include "cli/CommandExport.h"
+#include "cli/CommandConvert.h"
 #include "cli/CommandDistribute.h"
 #include "cli/CommandFont.h"
 #include "cli/CommandFormat.h"
@@ -1118,13 +1118,13 @@ CLI_TEST(PAGXCliTest, Lint_C13_SimpleRectangleMask) {
 }
 
 //==============================================================================
-// Export-SVG tests
+// Convert tests — PAGX to SVG
 //==============================================================================
 
-CLI_TEST(PAGXCliTest, ExportSVG_Basic) {
+CLI_TEST(PAGXCliTest, Convert_PagxToSvg_Basic) {
   auto inputPath = TestResourcePath("render_basic.pagx");
-  auto outputPath = TempDir() + "/ExportSVG_Basic.svg";
-  auto ret = CallRun(pagx::cli::RunExport, {"export", "-o", outputPath, inputPath});
+  auto outputPath = TempDir() + "/ConvertSVG_Basic.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, outputPath});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
   auto output = ReadFile(outputPath);
@@ -1133,91 +1133,105 @@ CLI_TEST(PAGXCliTest, ExportSVG_Basic) {
   EXPECT_NE(output.find("xmlns=\"http://www.w3.org/2000/svg\""), std::string::npos);
 }
 
-CLI_TEST(PAGXCliTest, ExportSVG_Gradient) {
+CLI_TEST(PAGXCliTest, Convert_PagxToSvg_Gradient) {
   auto inputPath = TestResourcePath("render_gradient.pagx");
-  auto outputPath = TempDir() + "/ExportSVG_Gradient.svg";
-  auto ret = CallRun(pagx::cli::RunExport, {"export", "-o", outputPath, inputPath});
+  auto outputPath = TempDir() + "/ConvertSVG_Gradient.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, outputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_TRUE(output.find("<svg") != std::string::npos);
 }
 
-CLI_TEST(PAGXCliTest, ExportSVG_DefaultOutput) {
-  auto inputPath = CopyToTemp("render_basic.pagx", "export_svg_default.pagx");
-  auto ret = CallRun(pagx::cli::RunExport, {"export", inputPath});
-  EXPECT_EQ(ret, 0);
-  auto expectedOutput = TempDir() + "/export_svg_default.svg";
-  EXPECT_TRUE(std::filesystem::exists(expectedOutput));
-  std::filesystem::remove(expectedOutput);
-}
-
-CLI_TEST(PAGXCliTest, ExportSVG_CustomIndent) {
+CLI_TEST(PAGXCliTest, Convert_PagxToSvg_CustomIndent) {
   auto inputPath = TestResourcePath("render_basic.pagx");
-  auto outputPath = TempDir() + "/ExportSVG_Indent4.svg";
+  auto outputPath = TempDir() + "/ConvertSVG_Indent4.svg";
   auto ret =
-      CallRun(pagx::cli::RunExport, {"export", "--indent", "4", "-o", outputPath, inputPath});
+      CallRun(pagx::cli::RunConvert, {"convert", "--indent", "4", inputPath, outputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_TRUE(output.find("    <") != std::string::npos);
 }
 
-CLI_TEST(PAGXCliTest, ExportSVG_NoXmlDeclaration) {
+CLI_TEST(PAGXCliTest, Convert_PagxToSvg_NoXmlDeclaration) {
   auto inputPath = TestResourcePath("render_basic.pagx");
-  auto outputPath = TempDir() + "/ExportSVG_NoXml.svg";
-  auto ret = CallRun(pagx::cli::RunExport,
-                     {"export", "--no-xml-declaration", "-o", outputPath, inputPath});
+  auto outputPath = TempDir() + "/ConvertSVG_NoXml.svg";
+  auto ret = CallRun(pagx::cli::RunConvert,
+                     {"convert", "--no-xml-declaration", inputPath, outputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_TRUE(output.find("<?xml") == std::string::npos);
   EXPECT_EQ(output.find("<svg"), 0u);
 }
 
-CLI_TEST(PAGXCliTest, ExportSVG_MissingFile) {
-  auto outputPath = TempDir() + "/ExportSVG_Missing.svg";
-  auto ret = CallRun(pagx::cli::RunExport, {"export", "-o", outputPath, "nonexistent.pagx"});
-  EXPECT_NE(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, ExportSVG_InvalidFile) {
-  auto inputPath = TestResourcePath("validate_not_xml.pagx");
-  auto outputPath = TempDir() + "/ExportSVG_Invalid.svg";
-  auto ret = CallRun(pagx::cli::RunExport, {"export", "-o", outputPath, inputPath});
-  EXPECT_NE(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, ExportSVG_UnknownOption) {
+CLI_TEST(PAGXCliTest, Convert_PagxToSvg_ForceFormat) {
   auto inputPath = TestResourcePath("render_basic.pagx");
-  auto ret = CallRun(pagx::cli::RunExport, {"export", "--unknown", inputPath});
+  auto outputPath = TempDir() + "/ConvertSVG_ForceFormat.out";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", "-f", "svg", inputPath, outputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  EXPECT_NE(output.find("<svg"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Convert_PagxToSvg_MissingFile) {
+  auto outputPath = TempDir() + "/ConvertSVG_Missing.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", "nonexistent.pagx", outputPath});
   EXPECT_NE(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, ExportSVG_MissingInput) {
-  auto ret = CallRun(pagx::cli::RunExport, {"export"});
+CLI_TEST(PAGXCliTest, Convert_PagxToSvg_InvalidFile) {
+  auto inputPath = TestResourcePath("validate_not_xml.pagx");
+  auto outputPath = TempDir() + "/ConvertSVG_Invalid.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, outputPath});
   EXPECT_NE(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, ExportSVG_Text) {
+CLI_TEST(PAGXCliTest, Convert_UnknownOption) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto outputPath = TempDir() + "/ConvertSVG_Unknown.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", "--unknown", inputPath, outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_MissingArgs) {
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert"});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_MissingOutput) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_UnknownOutputFormat) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto outputPath = TempDir() + "/ConvertSVG_Unknown.xyz";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_PagxToSvg_Text) {
   auto inputPath = TestResourcePath("render_text.pagx");
-  auto outputPath = TempDir() + "/ExportSVG_Text.svg";
-  auto ret = CallRun(pagx::cli::RunExport, {"export", "-o", outputPath, inputPath});
+  auto outputPath = TempDir() + "/ConvertSVG_Text.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, outputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_NE(output.find("<svg"), std::string::npos);
 }
 
-CLI_TEST(PAGXCliTest, ExportSVG_Scale) {
+CLI_TEST(PAGXCliTest, Convert_PagxToSvg_Scale) {
   auto inputPath = TestResourcePath("render_scale.pagx");
-  auto outputPath = TempDir() + "/ExportSVG_Scale.svg";
-  auto ret = CallRun(pagx::cli::RunExport, {"export", "-o", outputPath, inputPath});
+  auto outputPath = TempDir() + "/ConvertSVG_Scale.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, outputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_NE(output.find("<svg"), std::string::npos);
 }
 
-CLI_TEST(PAGXCliTest, ExportSVG_ValidateSimple) {
+CLI_TEST(PAGXCliTest, Convert_PagxToSvg_ValidateSimple) {
   auto inputPath = TestResourcePath("validate_simple.pagx");
-  auto outputPath = TempDir() + "/ExportSVG_ValidateSimple.svg";
-  auto ret = CallRun(pagx::cli::RunExport, {"export", "-o", outputPath, inputPath});
+  auto outputPath = TempDir() + "/ConvertSVG_ValidateSimple.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, outputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_NE(output.find("<svg"), std::string::npos);
