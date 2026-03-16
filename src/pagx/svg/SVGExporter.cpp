@@ -1136,9 +1136,7 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
   if (!text->fontFamily.empty()) {
     out.addAttribute("font-family", text->fontFamily);
   }
-  if (text->fontSize != 12.0f) {
-    out.addAttribute("font-size", FloatToString(text->fontSize));
-  }
+  out.addAttribute("font-size", FloatToString(text->fontSize));
   if (text->letterSpacing != 0.0f) {
     out.addAttribute("letter-spacing", FloatToString(text->letterSpacing));
   }
