@@ -168,7 +168,7 @@ class PAGAnimator {
 
   explicit PAGAnimator(std::weak_ptr<Listener> listener);
   void advance();
-  std::vector<int> doAdvance();
+  std::vector<int> doAdvance(std::shared_ptr<tgfx::Task>& pendingTask);
   void doUpdate(bool setStartTime);
   void onFlush(bool setStartTime);
   void startAnimation();
