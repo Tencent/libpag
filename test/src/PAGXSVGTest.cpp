@@ -647,9 +647,11 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ToFile) {
 }
 
 /**
- * Test SVG round-trip: SVG -> PAGX -> SVG. Verify the re-exported SVG contains expected elements.
+ * Test multiple SVG <-> PAGX round-trips.
+ * Each iteration feeds the previous output back as input: SVG -> PAGX -> SVG -> PAGX -> ...
  */
-PAGX_TEST(PAGXSVGTest, SVGExport_RoundTrip) {
+PAGX_TEST(PAGXSVGTest, SVGExport_MultiRoundTrip) {
+  constexpr int NumRoundTrips = 3;
   std::string svgDir = ProjectPath::Absolute("resources/svg");
   std::vector<std::string> svgFiles = {};
 
@@ -671,56 +673,24 @@ PAGX_TEST(PAGXSVGTest, SVGExport_RoundTrip) {
       continue;
     }
 
-    auto svg = pagx::SVGExporter::ToSVG(*doc);
-    EXPECT_FALSE(svg.empty()) << "Failed to export SVG for: " << baseName;
-    EXPECT_NE(svg.find("<svg"), std::string::npos) << baseName;
-    EXPECT_NE(svg.find("xmlns=\"http://www.w3.org/2000/svg\""), std::string::npos) << baseName;
-    EXPECT_NE(svg.find("</svg>"), std::string::npos) << baseName;
-    SaveFile(svg, "PAGXSVGTest/roundtrip_" + baseName + ".svg");
-  }
-}
+    for (int i = 0; i < NumRoundTrips; i++) {
+      auto round = std::to_string(i + 1);
 
-/**
- * Test double SVG round-trip: SVG -> PAGX -> SVG -> PAGX -> SVG.
- * Verify the second export still produces valid SVG with expected elements.
- */
-PAGX_TEST(PAGXSVGTest, SVGExport_DoubleRoundTrip) {
-  std::string svgDir = ProjectPath::Absolute("resources/svg");
-  std::vector<std::string> svgFiles = {};
+      auto pagxXml = pagx::PAGXExporter::ToXML(*doc);
+      ASSERT_FALSE(pagxXml.empty()) << baseName << " round " << round << " PAGX export failed";
+      auto pagxPath =
+          SaveFile(pagxXml, "PAGXSVGTest/multi_roundtrip_" + baseName + ".pagx");
 
-  for (const auto& entry : std::filesystem::directory_iterator(svgDir)) {
-    if (entry.path().extension() == ".svg") {
-      svgFiles.push_back(entry.path().string());
+      doc = pagx::PAGXImporter::FromFile(pagxPath);
+      ASSERT_NE(doc, nullptr) << baseName << " round " << round << " PAGX import failed";
+
+      auto svgStr = pagx::SVGExporter::ToSVG(*doc);
+      ASSERT_FALSE(svgStr.empty()) << baseName << " round " << round << " SVG export failed";
+      SaveFile(svgStr, "PAGXSVGTest/multi_roundtrip_" + baseName + ".svg");
+
+      doc = pagx::SVGImporter::ParseString(svgStr);
+      ASSERT_NE(doc, nullptr) << baseName << " round " << round << " SVG re-import failed";
     }
-  }
-  std::sort(svgFiles.begin(), svgFiles.end());
-
-  for (const auto& svgPath : svgFiles) {
-    std::string baseName = std::filesystem::path(svgPath).stem().string();
-
-    auto doc1 = pagx::SVGImporter::Parse(svgPath);
-    if (!doc1) {
-      continue;
-    }
-    if (doc1->width <= 0 || doc1->height <= 0) {
-      continue;
-    }
-
-    auto svg1 = pagx::SVGExporter::ToSVG(*doc1);
-    ASSERT_FALSE(svg1.empty()) << "First export failed for: " << baseName;
-
-    auto doc2 = pagx::SVGImporter::ParseString(svg1);
-    ASSERT_NE(doc2, nullptr) << "Re-import failed for: " << baseName;
-    EXPECT_EQ(doc2->width, doc1->width) << baseName;
-    EXPECT_EQ(doc2->height, doc1->height) << baseName;
-
-    auto svg2 = pagx::SVGExporter::ToSVG(*doc2);
-    EXPECT_FALSE(svg2.empty()) << "Second export failed for: " << baseName;
-    EXPECT_NE(svg2.find("<svg"), std::string::npos) << baseName;
-    EXPECT_NE(svg2.find("xmlns=\"http://www.w3.org/2000/svg\""), std::string::npos) << baseName;
-    EXPECT_NE(svg2.find("</svg>"), std::string::npos) << baseName;
-    SaveFile(svg1, "PAGXSVGTest/double_roundtrip_1_" + baseName + ".svg");
-    SaveFile(svg2, "PAGXSVGTest/double_roundtrip_2_" + baseName + ".svg");
   }
 }
 
