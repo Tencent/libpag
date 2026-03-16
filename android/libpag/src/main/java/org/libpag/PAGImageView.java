@@ -587,8 +587,9 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
             needResetBitmapCache = true;
             memoryCacheStatusHasChanged = false;
         }
-        if (_pagFilePath == null && _composition != null) {
-            int nVersion = ContentVersion(_composition);
+        PAGComposition composition = _composition; // Hold strong reference to avoid UAF
+        if (_pagFilePath == null && composition != null) {
+            int nVersion = ContentVersion(composition);
             if (lastContentVersion >= 0 && lastContentVersion != nVersion) {
                 needResetBitmapCache = true;
             }
@@ -597,7 +598,6 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
         if (needResetBitmapCache) {
             bitmapCache.clear();
             if (!decoderInfo.hasPAGDecoder()) {
-                PAGComposition composition = _composition;
                 if (composition == null) {
                     composition = getCompositionFromPath(_pagFilePath);
                 }
@@ -716,7 +716,8 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
         }
         isVisible = visible;
         if (isVisible) {
-            long duration = _composition != null ? _composition.duration() : animationDuration;
+            PAGComposition composition = _composition; // Hold strong reference to avoid UAF
+            long duration = composition != null ? composition.duration() : animationDuration;
             animator.setDuration(duration);
             animator.update();
         } else {
@@ -787,8 +788,9 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
         if (!isAttachedToWindow) {
             return;
         }
-        if (isVisible && (_composition != null)) {
-            animator.setDuration(_composition.duration());
+        PAGComposition composition = _composition; // Hold strong reference to avoid UAF
+        if (isVisible && composition != null) {
+            animator.setDuration(composition.duration());
         }
         flush();
         ArrayList<PAGImageView.PAGImageViewListener> arrayList;
