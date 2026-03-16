@@ -1193,62 +1193,63 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
     }
   }
 
-  // ── Open <text> element with shared attributes ──
-  out.openElement("text");
-  if (!transform.empty()) {
-    out.addAttribute("transform", transform);
-  }
-  if (!needsMultiLine) {
-    out.addAttributeIfNonZero("x", x);
-    out.addAttributeIfNonZero("y", y);
-  }
-  if (!text->fontFamily.empty()) {
-    out.addAttribute("font-family", text->fontFamily);
-  }
-  out.addAttribute("font-size", FloatToString(fontSize));
-  if (text->letterSpacing != 0.0f) {
-    out.addAttribute("letter-spacing", FloatToString(text->letterSpacing));
-  }
-  if (anchor == TextAnchor::Center) {
-    out.addAttribute("text-anchor", "middle");
-  } else if (anchor == TextAnchor::End) {
-    out.addAttribute("text-anchor", "end");
-  }
-  if (!text->fontStyle.empty()) {
-    bool hasBold = text->fontStyle.find("Bold") != std::string::npos;
-    bool hasItalic = text->fontStyle.find("Italic") != std::string::npos;
-    if (hasBold) {
-      out.addAttribute("font-weight", "bold");
+  auto writeSharedTextAttrs = [&]() {
+    if (!transform.empty()) {
+      out.addAttribute("transform", transform);
     }
-    if (hasItalic) {
-      out.addAttribute("font-style", "italic");
+    if (!text->fontFamily.empty()) {
+      out.addAttribute("font-family", text->fontFamily);
     }
-  }
-  std::string p3Style;
-  applyFillAttributes(out, fs.fill, {}, &p3Style);
-  applyStrokeAttributes(out, fs.stroke, {}, &p3Style);
-  applyP3Style(out, p3Style);
+    out.addAttribute("font-size", FloatToString(fontSize));
+    if (text->letterSpacing != 0.0f) {
+      out.addAttribute("letter-spacing", FloatToString(text->letterSpacing));
+    }
+    if (anchor == TextAnchor::Center) {
+      out.addAttribute("text-anchor", "middle");
+    } else if (anchor == TextAnchor::End) {
+      out.addAttribute("text-anchor", "end");
+    }
+    if (!text->fontStyle.empty()) {
+      bool hasBold = text->fontStyle.find("Bold") != std::string::npos;
+      bool hasItalic = text->fontStyle.find("Italic") != std::string::npos;
+      if (hasBold) {
+        out.addAttribute("font-weight", "bold");
+      }
+      if (hasItalic) {
+        out.addAttribute("font-style", "italic");
+      }
+    }
+    std::string p3Style;
+    applyFillAttributes(out, fs.fill, {}, &p3Style);
+    applyStrokeAttributes(out, fs.stroke, {}, &p3Style);
+    applyP3Style(out, p3Style);
+  };
 
   // ── Write content ──
   if (needsMultiLine) {
-    out.closeElementStart();
+    float currentY = firstLineY;
+    bool isFirst = true;
     for (size_t i = 0; i < lines.size(); i++) {
       auto& line = lines[i];
       std::string lineText = ExtractLineText(content, chars, line);
       if (lineText.empty() && i < lines.size() - 1) {
         continue;
       }
-      out.openElement("tspan");
-      out.addAttribute("x", x);
-      if (i == 0) {
-        out.addAttribute("y", firstLineY);
-      } else {
-        out.addAttribute("dy", lineHeight);
+      if (!isFirst) {
+        currentY += lineHeight;
       }
+      out.openElement("text");
+      writeSharedTextAttrs();
+      out.addAttribute("x", x);
+      out.addAttribute("y", currentY);
       out.closeElementWithText(lineText);
+      isFirst = false;
     }
-    out.closeElement();
   } else {
+    out.openElement("text");
+    writeSharedTextAttrs();
+    out.addAttributeIfNonZero("x", x);
+    out.addAttributeIfNonZero("y", y);
     out.closeElementWithText(text->text);
   }
 }
