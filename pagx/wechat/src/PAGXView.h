@@ -137,27 +137,6 @@ class PAGXView {
   }
 
   /**
-   * Returns the x coordinate of the PAGX content bounds origin relative to the cocraft canvas
-   * origin. This value is read from the document's customData (bounds-origin-x) during
-   * buildLayers(), or set via setBoundsOrigin(). Can be negative. To convert a cocraft canvas
-   * coordinate to a PAGX content coordinate:
-   *
-   *   pagxX = cocraftX - view.boundsOriginX();
-   *   pagxY = cocraftY - view.boundsOriginY();
-   */
-  float boundsOriginX() const {
-    return _boundsOriginX;
-  }
-
-  /**
-   * Returns the y coordinate of the PAGX content bounds origin relative to the cocraft canvas
-   * origin. See boundsOriginX() for details.
-   */
-  float boundsOriginY() const {
-    return _boundsOriginY;
-  }
-
-  /**
    * Sets the bounds origin of the PAGX content relative to the cocraft canvas origin. This
    * overrides any values read from the document's customData. The values can be negative.
    * @param x The x coordinate of the content bounds origin in cocraft canvas coordinates.

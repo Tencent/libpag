@@ -330,8 +330,9 @@ applyGestureState(state) {
 ### Q: boundsOriginX/Y 返回 0 怎么办？
 
 说明 PAGX 文件中没有嵌入 `bounds-origin` 数据。需要：
-- 确认 Cocraft 导出时已将 `bounds-origin-x` / `bounds-origin-y` 写入 PAGX 文件根 SVG 元素的 `data-*` 属性
+- 确认 Cocraft 导出时已将 `bounds-origin-x` / `bounds-origin-y` 写入 PAGX 文件根节点的 `data-*` 属性
 - 或者在 JS 端手动调用 `View.setBoundsOrigin(x, y)` 设置
+    现有版本中，小程序端可以获取到 bounds-origin-x 和 bounds-origin-y，后续新版本中 pagx 文件自身会携带 bounds-origin 相关参数
 
 ### Q: 为什么用 WXS 而不是 setData 更新评论位置？
 

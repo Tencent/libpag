@@ -259,22 +259,6 @@ export class View {
   }
 
   /**
-   * Returns the x coordinate of the PAGX content bounds origin relative to the cocraft canvas
-   * origin. See getContentTransform() for the recommended coordinate conversion approach.
-   */
-  public boundsOriginX(): number {
-    return this.nativeView!.boundsOriginX();
-  }
-
-  /**
-   * Returns the y coordinate of the PAGX content bounds origin relative to the cocraft canvas
-   * origin. See getContentTransform() for the recommended coordinate conversion approach.
-   */
-  public boundsOriginY(): number {
-    return this.nativeView!.boundsOriginY();
-  }
-
-  /**
    * Returns the content transform parameters for mapping cocraft canvas coordinates to canvas
    * pixel positions. Call this once after loading a PAGX file to get the static transform needed
    * for comment overlay positioning.
