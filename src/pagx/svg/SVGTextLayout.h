@@ -45,21 +45,10 @@ struct SVGTextLine {
 size_t SVGDecodeUTF8Char(const char* data, size_t remaining, int32_t* unichar);
 
 /**
- * Returns true if the Unicode code point is a CJK fullwidth character.
- */
-bool IsCJKCharacter(int32_t ch);
-
-/**
  * Estimates the advance width of a character based on font size.
  * CJK characters use full em-width, Latin characters use ~0.6em.
  */
 float EstimateCharAdvance(int32_t ch, float fontSize);
-
-/**
- * Simplified UAX#14-style line break opportunity check.
- * Returns true if a line break is allowed between prevChar and nextChar.
- */
-bool SVGCanBreakBetween(int32_t prevChar, int32_t nextChar);
 
 /**
  * Breaks a sequence of characters into lines that fit within boxWidth.

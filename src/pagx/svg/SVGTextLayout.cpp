@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SVGTextLayout.h"
+#include "renderer/LineBreaker.h"
+#include "tgfx/core/UTF.h"
 
 namespace pagx {
 
@@ -24,49 +26,18 @@ size_t SVGDecodeUTF8Char(const char* data, size_t remaining, int32_t* unichar) {
   if (remaining == 0) {
     return 0;
   }
-  auto first = static_cast<uint8_t>(data[0]);
-  if (first < 0x80) {
-    *unichar = first;
-    return 1;
-  }
-  size_t len;
-  int32_t ch;
-  if (first < 0xC0) {
+  const char* ptr = data;
+  const char* end = data + remaining;
+  int32_t ch = tgfx::UTF::NextUTF8(&ptr, end);
+  if (ch < 0) {
     return 0;
-  } else if (first < 0xE0) {
-    len = 2;
-    ch = first & 0x1F;
-  } else if (first < 0xF0) {
-    len = 3;
-    ch = first & 0x0F;
-  } else if (first < 0xF8) {
-    len = 4;
-    ch = first & 0x07;
-  } else {
-    return 0;
-  }
-  if (len > remaining) {
-    return 0;
-  }
-  for (size_t i = 1; i < len; i++) {
-    auto b = static_cast<uint8_t>(data[i]);
-    if ((b & 0xC0) != 0x80) {
-      return 0;
-    }
-    ch = (ch << 6) | (b & 0x3F);
   }
   *unichar = ch;
-  return len;
-}
-
-bool IsCJKCharacter(int32_t ch) {
-  return (ch >= 0x2E80 && ch <= 0x9FFF) || (ch >= 0xF900 && ch <= 0xFAFF) ||
-         (ch >= 0x3000 && ch <= 0x303F) || (ch >= 0xFF00 && ch <= 0xFFEF) ||
-         (ch >= 0x20000 && ch <= 0x2A6DF);
+  return static_cast<size_t>(ptr - data);
 }
 
 float EstimateCharAdvance(int32_t ch, float fontSize) {
-  if (IsCJKCharacter(ch)) {
+  if (LineBreaker::IsCJK(ch)) {
     return fontSize;
   }
   if (ch == ' ') {
@@ -76,19 +47,6 @@ float EstimateCharAdvance(int32_t ch, float fontSize) {
     return fontSize * 4.0f;
   }
   return fontSize * 0.6f;
-}
-
-bool SVGCanBreakBetween(int32_t prevChar, int32_t nextChar) {
-  if (prevChar == ' ' || prevChar == '\t') {
-    return true;
-  }
-  if (IsCJKCharacter(prevChar) || IsCJKCharacter(nextChar)) {
-    return true;
-  }
-  if (prevChar == '-' || prevChar == 0x2014 || prevChar == 0x2013) {
-    return true;
-  }
-  return false;
 }
 
 std::vector<SVGTextLine> BreakTextIntoLines(const std::vector<SVGCharInfo>& chars, float boxWidth) {
@@ -121,7 +79,7 @@ std::vector<SVGTextLine> BreakTextIntoLines(const std::vector<SVGCharInfo>& char
         // Recalculate width up to the break point, trimming trailing whitespace.
         float w = 0;
         size_t endIdx = lineStartIdx + currentLine->charCount;
-        while (endIdx > lineStartIdx && chars[endIdx - 1].unichar == ' ') {
+        while (endIdx > lineStartIdx && LineBreaker::IsWhitespace(chars[endIdx - 1].unichar)) {
           endIdx--;
         }
         for (size_t j = lineStartIdx; j < endIdx; j++) {
@@ -131,7 +89,7 @@ std::vector<SVGTextLine> BreakTextIntoLines(const std::vector<SVGCharInfo>& char
 
         // Skip leading whitespace for next line.
         size_t nextStart = breakAt + 1;
-        while (nextStart <= i && chars[nextStart].unichar == ' ') {
+        while (nextStart <= i && LineBreaker::IsWhitespace(chars[nextStart].unichar)) {
           nextStart++;
         }
 
@@ -146,7 +104,7 @@ std::vector<SVGTextLine> BreakTextIntoLines(const std::vector<SVGCharInfo>& char
         // Re-scan break opportunities on the new line.
         lastBreakIndex = -1;
         for (size_t j = lineStartIdx; j < i; j++) {
-          if (SVGCanBreakBetween(chars[j].unichar, chars[j + 1].unichar)) {
+          if (LineBreaker::CanBreakBetween(chars[j].unichar, chars[j + 1].unichar)) {
             lastBreakIndex = static_cast<int>(j);
           }
         }
@@ -160,7 +118,7 @@ std::vector<SVGTextLine> BreakTextIntoLines(const std::vector<SVGCharInfo>& char
         lastBreakIndex = -1;
       }
       if (i + 1 < chars.size() && chars[i + 1].unichar != '\n') {
-        if (SVGCanBreakBetween(ch.unichar, chars[i + 1].unichar)) {
+        if (LineBreaker::CanBreakBetween(ch.unichar, chars[i + 1].unichar)) {
           lastBreakIndex = static_cast<int>(i);
         }
       }
@@ -171,7 +129,7 @@ std::vector<SVGTextLine> BreakTextIntoLines(const std::vector<SVGCharInfo>& char
     currentLineWidth += ch.advance;
 
     if (i + 1 < chars.size() && chars[i + 1].unichar != '\n') {
-      if (SVGCanBreakBetween(ch.unichar, chars[i + 1].unichar)) {
+      if (LineBreaker::CanBreakBetween(ch.unichar, chars[i + 1].unichar)) {
         lastBreakIndex = static_cast<int>(i);
       }
     }
