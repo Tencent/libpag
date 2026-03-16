@@ -281,28 +281,30 @@ specified.
 
 ---
 
-## pagx export
+## pagx convert
 
-Export a PAGX file to another format. By default, exports to SVG. Loads the input via the
-PAGX importer, converts the document, and writes the result. Import warnings are printed
-but do not prevent export.
+Convert between PAGX and other formats. The conversion direction is inferred from file
+extensions (e.g., `.pagx` → `.svg` or `.svg` → `.pagx`). Loads the input, converts the
+document, and writes the result. Import warnings are printed but do not prevent conversion.
 
 ```bash
-pagx export input.pagx                              # outputs input.svg
-pagx export -o output.svg input.pagx
-pagx export --format svg -o output.svg input.pagx
-pagx export --indent 4 -o output.svg input.pagx
-pagx export --no-xml-declaration -o output.svg input.pagx
+pagx convert input.pagx output.svg                   # PAGX to SVG
+pagx convert input.svg output.pagx                   # SVG to PAGX
+pagx convert --indent 4 input.pagx output.svg        # PAGX to SVG with 4-space indent
+pagx convert --no-xml-declaration input.pagx out.svg
+pagx convert -f svg input.pagx output                # force SVG output format
+pagx convert --no-expand-use input.svg output.pagx   # SVG to PAGX without expanding <use>
 ```
 
 | Option | Description |
 |--------|-------------|
-| `-o, --output <path>` | Output file path (default: input path with format extension) |
-| `--format <type>` | Export format (default: inferred from output extension, fallback: `svg`) |
+| `-f <format>` | Override output format (`svg`, `pagx`; default: inferred from output extension) |
 | `--indent <n>` | SVG indentation spaces (default: 2, valid range: 0–16) |
-| `--no-xml-declaration` | Omit the `<?xml ...?>` declaration (SVG only) |
+| `--no-xml-declaration` | Omit the `<?xml ...?>` declaration (SVG output only) |
+| `--no-expand-use` | Do not expand `<use>` references (SVG input only) |
+| `--flatten-transforms` | Flatten nested transforms into single matrices (SVG input only) |
+| `--preserve-unknown` | Preserve unsupported SVG elements as Unknown nodes (SVG input only) |
 
-By default the output file has the same base name as the input with the format extension
-(e.g., `foo.pagx` → `foo.svg`). Use `-o` to override. The `--format` flag can be omitted
-when the output extension makes the format unambiguous. On success the command prints
-`pagx export: wrote <path>` and exits 0; on failure it prints an error and exits 1.
+The command takes two positional arguments: `<input>` and `<output>`. Use `-f` when the
+output extension does not make the format unambiguous. On success the command prints
+`pagx convert: wrote <path>` and exits 0; on failure it prints an error and exits 1.
