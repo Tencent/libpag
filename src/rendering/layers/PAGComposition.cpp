@@ -69,17 +69,17 @@ PAGComposition::~PAGComposition() {
 }
 
 int PAGComposition::width() const {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   return _width;
 }
 
 int PAGComposition::height() const {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   return _height;
 }
 
 void PAGComposition::setContentSize(int width, int height) {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   setContentSizeInternal(width, height);
 }
 
@@ -101,12 +101,12 @@ void PAGComposition::setContentSizeInternal(int width, int height) {
 }
 
 int PAGComposition::numChildren() const {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   return static_cast<int>(layers.size());
 }
 
 std::shared_ptr<PAGLayer> PAGComposition::getLayerAt(int index) const {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   if (index >= 0 && static_cast<size_t>(index) < layers.size()) {
     return layers[index];
   }
@@ -126,12 +126,12 @@ int PAGComposition::getLayerIndexInternal(std::shared_ptr<PAGLayer> child) const
 }
 
 int PAGComposition::getLayerIndex(std::shared_ptr<PAGLayer> pagLayer) const {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   return getLayerIndexInternal(pagLayer);
 }
 
 void PAGComposition::setLayerIndex(std::shared_ptr<PAGLayer> pagLayer, int index) {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   doSetLayerIndex(pagLayer, index);
 }
 
@@ -156,7 +156,7 @@ bool PAGComposition::addLayer(std::shared_ptr<PAGLayer> pagLayer) {
   if (pagLayer == nullptr) {
     return false;
   }
-  ScopedLock autoLock(rootLocker, pagLayer->rootLocker);
+  ScopedLock autoLock(&rootLocker, &pagLayer->rootLocker);
   auto index = layers.size();
   if (pagLayer->_parent == this) {
     index--;
@@ -168,7 +168,7 @@ bool PAGComposition::addLayerAt(std::shared_ptr<PAGLayer> pagLayer, int index) {
   if (pagLayer == nullptr) {
     return false;
   }
-  ScopedLock autoLock(rootLocker, pagLayer->rootLocker);
+  ScopedLock autoLock(&rootLocker, &pagLayer->rootLocker);
   if (index < 0 || static_cast<size_t>(index) >= layers.size()) {
     index = static_cast<int>(layers.size());
     if (pagLayer->_parent == this) {
@@ -215,7 +215,7 @@ bool PAGComposition::contains(std::shared_ptr<PAGLayer> pagLayer) const {
   if (pagLayer == nullptr) {
     return false;
   }
-  ScopedLock autoLock(rootLocker, pagLayer->rootLocker);
+  ScopedLock autoLock(&rootLocker, &pagLayer->rootLocker);
   return doContains(pagLayer.get());
 }
 
@@ -230,7 +230,7 @@ bool PAGComposition::doContains(pag::PAGLayer* target) const {
 }
 
 std::shared_ptr<PAGLayer> PAGComposition::removeLayer(std::shared_ptr<PAGLayer> pagLayer) {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   auto index = getLayerIndexInternal(pagLayer);
   if (index < 0) {
     LOGE("The supplied layer must be a child of the caller.");
@@ -240,7 +240,7 @@ std::shared_ptr<PAGLayer> PAGComposition::removeLayer(std::shared_ptr<PAGLayer> 
 }
 
 std::shared_ptr<PAGLayer> PAGComposition::removeLayerAt(int index) {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   if (index < 0 || static_cast<size_t>(index) >= layers.size()) {
     LOGE("An index specified for a parameter was out of range.");
     return nullptr;
@@ -264,7 +264,7 @@ std::shared_ptr<PAGLayer> PAGComposition::doRemoveLayer(int index) {
 }
 
 void PAGComposition::removeAllLayers() {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   for (int i = static_cast<int>(layers.size() - 1); i >= 0; i--) {
     doRemoveLayer(i);
   }
@@ -272,7 +272,7 @@ void PAGComposition::removeAllLayers() {
 
 void PAGComposition::swapLayer(std::shared_ptr<PAGLayer> pagLayer1,
                                std::shared_ptr<PAGLayer> pagLayer2) {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   auto index1 = getLayerIndexInternal(pagLayer1);
   auto index2 = getLayerIndexInternal(pagLayer2);
   if (index1 == -1 || index2 == -1) {
@@ -283,7 +283,7 @@ void PAGComposition::swapLayer(std::shared_ptr<PAGLayer> pagLayer1,
 }
 
 void PAGComposition::swapLayerAt(int index1, int index2) {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   auto size = this->layers.size();
   if (index1 >= 0 && static_cast<size_t>(index1) < size && index2 >= 0 &&
       static_cast<size_t>(index2) < size) {
@@ -491,7 +491,7 @@ void PAGComposition::MeasureChildLayer(tgfx::Rect* bounds, PAGLayer* childLayer)
 
 std::vector<std::shared_ptr<PAGLayer>> PAGComposition::getLayersByName(
     const std::string& layerName) {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   if (layerName.empty()) {
     return {};
   }
@@ -502,7 +502,7 @@ std::vector<std::shared_ptr<PAGLayer>> PAGComposition::getLayersByName(
 
 std::vector<std::shared_ptr<PAGLayer>> PAGComposition::getLayersUnderPoint(float localX,
                                                                            float localY) {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   std::vector<std::shared_ptr<PAGLayer>> results;
   getLayersUnderPointInternal(localX, localY, &results);
   return results;

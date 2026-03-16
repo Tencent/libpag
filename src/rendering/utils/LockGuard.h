@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <memory>
 #include <mutex>
 
@@ -25,7 +26,11 @@ namespace pag {
 
 class LockGuard {
  public:
-  explicit LockGuard(std::shared_ptr<std::mutex> locker) : mutex(std::move(locker)) {
+  /**
+   * Atomically loads the mutex from the given shared_ptr and locks it for the scope.
+   */
+  explicit LockGuard(const std::shared_ptr<std::mutex>* lockerPtr)
+      : mutex(lockerPtr ? std::atomic_load(lockerPtr) : nullptr) {
     if (mutex) {
       mutex->lock();
     }

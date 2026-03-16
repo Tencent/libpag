@@ -134,13 +134,13 @@ std::shared_ptr<TextDocument> PAGFile::getTextData(int editableTextIndex) {
 }
 
 void PAGFile::replaceText(int editableTextIndex, std::shared_ptr<TextDocument> textData) {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   auto textLayers = getLayersByEditableIndexInternal(editableTextIndex, LayerType::Text);
   replaceTextInternal(textLayers, textData);
 }
 
 void PAGFile::replaceImage(int editableImageIndex, std::shared_ptr<PAGImage> image) {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   auto imageLayers = getLayersByEditableIndexInternal(editableImageIndex, LayerType::Image);
   replaceImageInternal(imageLayers, image);
 }
@@ -153,13 +153,13 @@ void PAGFile::replaceImageByName(const std::string& layerName, std::shared_ptr<P
   if (imageLayers.size() == 0) {
     return;
   }
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   replaceImageInternal(imageLayers, image);
 }
 
 std::vector<std::shared_ptr<PAGLayer>> PAGFile::getLayersByEditableIndex(int editableIndex,
                                                                          LayerType layerType) {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   return getLayersByEditableIndexInternal(editableIndex, layerType);
 }
 
@@ -173,7 +173,7 @@ std::vector<std::shared_ptr<PAGLayer>> PAGFile::getLayersByEditableIndexInternal
 }
 
 PAGTimeStretchMode PAGFile::timeStretchMode() const {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   return _timeStretchMode;
 }
 
@@ -182,12 +182,12 @@ PAGTimeStretchMode PAGFile::timeStretchModeInternal() const {
 }
 
 void PAGFile::setTimeStretchMode(PAGTimeStretchMode value) {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   _timeStretchMode = value;
 }
 
 void PAGFile::setDuration(int64_t duration) {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   setDurationInternal(duration);
 }
 

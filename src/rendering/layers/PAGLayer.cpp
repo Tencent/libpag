@@ -58,22 +58,22 @@ std::string PAGLayer::layerName() const {
 }
 
 Matrix PAGLayer::matrix() const {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   return layerMatrix;
 }
 
 void PAGLayer::setMatrix(const Matrix& value) {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   setMatrixInternal(value);
 }
 
 void PAGLayer::resetMatrix() {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   setMatrixInternal(Matrix::I());
 }
 
 Matrix PAGLayer::getTotalMatrix() {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   return getTotalMatrixInternal();
 }
 
@@ -84,12 +84,12 @@ Matrix PAGLayer::getTotalMatrixInternal() {
 }
 
 float PAGLayer::alpha() const {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   return layerAlpha;
 }
 
 void PAGLayer::setAlpha(float alpha) {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   if (alpha == layerAlpha) {
     return;
   }
@@ -98,12 +98,12 @@ void PAGLayer::setAlpha(float alpha) {
 }
 
 bool PAGLayer::visible() const {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   return layerVisible;
 }
 
 void PAGLayer::setVisible(bool value) {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   setVisibleInternal(value);
 }
 
@@ -116,7 +116,7 @@ void PAGLayer::setVisibleInternal(bool value) {
 }
 
 Rect PAGLayer::getBounds() {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   Rect bounds = {};
   measureBounds(ToTGFX(&bounds));
   return bounds;
@@ -127,7 +127,7 @@ int PAGLayer::editableIndex() const {
 }
 
 std::shared_ptr<PAGComposition> PAGLayer::parent() const {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   if (_parent) {
     return std::static_pointer_cast<PAGComposition>(_parent->weakThis.lock());
   }
@@ -143,7 +143,7 @@ std::vector<const Marker*> PAGLayer::markers() const {
 }
 
 int64_t PAGLayer::localTimeToGlobal(int64_t localTime) const {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   auto localFrame = TimeToFrame(localTime, frameRateInternal());
   auto globalFrame = localFrameToGlobal(localFrame);
   auto globalLayer = this;
@@ -169,7 +169,7 @@ Frame PAGLayer::localFrameToGlobal(Frame localFrame) const {
 }
 
 int64_t PAGLayer::globalToLocalTime(int64_t globalTime) const {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   auto globalLayer = this;
   while (globalLayer) {
     auto owner = globalLayer->getTimelineOwner();
@@ -218,7 +218,7 @@ PAGLayer* PAGLayer::getTimelineOwner() const {
 }
 
 int64_t PAGLayer::startTime() const {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   return startTimeInternal();
 }
 
@@ -227,7 +227,7 @@ int64_t PAGLayer::startTimeInternal() const {
 }
 
 void PAGLayer::setStartTime(int64_t time) {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   setStartTimeInternal(time);
 }
 
@@ -246,7 +246,7 @@ void PAGLayer::setStartTimeInternal(int64_t time) {
 }
 
 int64_t PAGLayer::duration() const {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   return durationInternal();
 }
 
@@ -255,7 +255,7 @@ int64_t PAGLayer::durationInternal() const {
 }
 
 float PAGLayer::frameRate() const {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   return frameRateInternal();
 }
 
@@ -264,7 +264,7 @@ float PAGLayer::frameRateInternal() const {
 }
 
 int64_t PAGLayer::currentTime() const {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   return currentTimeInternal();
 }
 
@@ -273,7 +273,7 @@ int64_t PAGLayer::currentTimeInternal() const {
 }
 
 void PAGLayer::setCurrentTime(int64_t time) {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   setCurrentTimeInternal(time);
 }
 
@@ -286,7 +286,7 @@ Frame PAGLayer::currentFrameInternal() const {
 }
 
 double PAGLayer::getProgress() {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   return getProgressInternal();
 }
 
@@ -295,7 +295,7 @@ double PAGLayer::getProgressInternal() {
 }
 
 void PAGLayer::setProgress(double percent) {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   setProgressInternal(percent);
 }
 
@@ -304,7 +304,7 @@ void PAGLayer::setProgressInternal(double percent) {
 }
 
 void PAGLayer::preFrame() {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   preFrameInternal();
 }
 
@@ -322,7 +322,7 @@ void PAGLayer::preFrameInternal() {
 }
 
 void PAGLayer::nextFrame() {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   nextFrameInternal();
 }
 
@@ -377,12 +377,12 @@ Point PAGLayer::globalToLocalPoint(float stageX, float stageY) {
 }
 
 bool PAGLayer::excludedFromTimeline() const {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   return _excludedFromTimeline;
 }
 
 void PAGLayer::setExcludedFromTimeline(bool value) {
-  LockGuard autoLock(rootLocker);
+  LockGuard autoLock(&rootLocker);
   _excludedFromTimeline = value;
 }
 
@@ -506,7 +506,7 @@ void PAGLayer::updateRootLocker(std::shared_ptr<std::mutex> newLocker) {
   if (_trackMatteLayer != nullptr) {
     _trackMatteLayer->updateRootLocker(newLocker);
   }
-  rootLocker = newLocker;
+  std::atomic_store(&rootLocker, newLocker);
 }
 
 void PAGLayer::setMatrixInternal(const Matrix& matrix) {

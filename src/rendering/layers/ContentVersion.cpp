@@ -23,7 +23,7 @@ uint32_t ContentVersion::Get(std::shared_ptr<PAGLayer> pagLayer) {
   if (pagLayer == nullptr) {
     return 0;
   }
-  LockGuard autoLock(pagLayer->rootLocker);
+  LockGuard autoLock(&pagLayer->rootLocker);
   return pagLayer->contentVersion;
 }
 }  // namespace pag
