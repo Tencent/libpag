@@ -479,8 +479,6 @@ class SVGWriter {
                  const std::string& transform = "");
   void writeText(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
                  const std::string& transform = "");
-  void writeTextMultiLine(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
-                          const std::string& transform = "");
 
   // Gradient / pattern defs (write to _defs)
   void writeGradientStops(const std::vector<ColorStop*>& stops);
@@ -1097,16 +1095,52 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
   }
 
   auto* textBox = fs.textBox;
+  float fontSize = text->fontSize;
   bool needsMultiLine = textBox != nullptr && textBox->wordWrap && textBox->size.width > 0;
 
+  // ── Multi-line: parse text and break into lines ──
+  float boxWidth = 0;
+  float lineHeight = 0;
+  const std::string& content = text->text;
+  std::vector<SVGCharInfo> chars;
+  std::vector<SVGTextLine> lines;
+
   if (needsMultiLine) {
-    writeTextMultiLine(out, text, fs, transform);
-    return;
+    boxWidth = textBox->size.width;
+    lineHeight = textBox->lineHeight > 0 ? textBox->lineHeight : fontSize * 1.2f;
+
+    chars.reserve(content.size());
+    size_t pos = 0;
+    while (pos < content.size()) {
+      int32_t unichar = 0;
+      size_t len = SVGDecodeUTF8Char(content.data() + pos, content.size() - pos, &unichar);
+      if (len == 0) {
+        pos++;
+        continue;
+      }
+      float advance = 0;
+      if (unichar != '\n') {
+        advance = EstimateCharAdvance(unichar, fontSize) + text->letterSpacing;
+      }
+      chars.push_back({unichar, pos, len, advance});
+      pos += len;
+    }
+
+    lines = BreakTextIntoLines(chars, boxWidth);
+
+    while (lines.size() > 1 && lines.back().charCount == 0) {
+      lines.pop_back();
+    }
+    if (lines.empty()) {
+      return;
+    }
   }
 
+  // ── Compute position and anchor ──
   float x = text->position.x;
   float y = text->position.y;
   TextAnchor anchor = text->textAnchor;
+  float firstLineY = 0;
 
   if (textBox) {
     switch (textBox->textAlign) {
@@ -1123,133 +1157,48 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
         anchor = TextAnchor::Start;
         break;
     }
-    switch (textBox->paragraphAlign) {
-      case ParagraphAlign::Middle:
-        y = textBox->position.y + textBox->size.height / 2 + text->fontSize * 0.35f;
-        break;
-      case ParagraphAlign::Far:
-        y = textBox->position.y + textBox->size.height;
-        break;
-      default:
-        y = textBox->position.y + text->fontSize;
-        break;
+
+    if (needsMultiLine) {
+      float boxHeight = textBox->size.height;
+      float totalHeight = static_cast<float>(lines.size()) * lineHeight;
+      float ascent = fontSize * 0.8f;
+      float yOffset = 0;
+      if (boxHeight > 0) {
+        switch (textBox->paragraphAlign) {
+          case ParagraphAlign::Middle:
+            yOffset = (boxHeight - totalHeight) / 2;
+            break;
+          case ParagraphAlign::Far:
+            yOffset = boxHeight - totalHeight;
+            break;
+          default:
+            break;
+        }
+      }
+      firstLineY = textBox->position.y + yOffset + ascent;
+    } else {
+      switch (textBox->paragraphAlign) {
+        case ParagraphAlign::Middle:
+          y = textBox->position.y + textBox->size.height / 2 + fontSize * 0.35f;
+          break;
+        case ParagraphAlign::Far:
+          y = textBox->position.y + textBox->size.height;
+          break;
+        default:
+          y = textBox->position.y + fontSize;
+          break;
+      }
     }
   }
 
+  // ── Open <text> element with shared attributes ──
   out.openElement("text");
   if (!transform.empty()) {
     out.addAttribute("transform", transform);
   }
-  out.addAttributeIfNonZero("x", x);
-  out.addAttributeIfNonZero("y", y);
-  if (!text->fontFamily.empty()) {
-    out.addAttribute("font-family", text->fontFamily);
-  }
-  out.addAttribute("font-size", FloatToString(text->fontSize));
-  if (text->letterSpacing != 0.0f) {
-    out.addAttribute("letter-spacing", FloatToString(text->letterSpacing));
-  }
-  if (anchor == TextAnchor::Center) {
-    out.addAttribute("text-anchor", "middle");
-  } else if (anchor == TextAnchor::End) {
-    out.addAttribute("text-anchor", "end");
-  }
-  if (!text->fontStyle.empty()) {
-    bool hasBold = text->fontStyle.find("Bold") != std::string::npos;
-    bool hasItalic = text->fontStyle.find("Italic") != std::string::npos;
-    if (hasBold) {
-      out.addAttribute("font-weight", "bold");
-    }
-    if (hasItalic) {
-      out.addAttribute("font-style", "italic");
-    }
-  }
-  std::string p3Style;
-  applyFillAttributes(out, fs.fill, {}, &p3Style);
-  applyStrokeAttributes(out, fs.stroke, {}, &p3Style);
-  applyP3Style(out, p3Style);
-  out.closeElementWithText(text->text);
-}
-
-void SVGWriter::writeTextMultiLine(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
-                                   const std::string& transform) {
-  auto* textBox = fs.textBox;
-  float boxWidth = textBox->size.width;
-  float boxHeight = textBox->size.height;
-  float fontSize = text->fontSize;
-  float lineHeight = textBox->lineHeight > 0 ? textBox->lineHeight : fontSize * 1.2f;
-
-  // Parse text into characters with estimated advances.
-  const std::string& content = text->text;
-  std::vector<SVGCharInfo> chars;
-  chars.reserve(content.size());
-  size_t pos = 0;
-  while (pos < content.size()) {
-    int32_t unichar = 0;
-    size_t len = SVGDecodeUTF8Char(content.data() + pos, content.size() - pos, &unichar);
-    if (len == 0) {
-      pos++;
-      continue;
-    }
-    float advance = 0;
-    if (unichar != '\n') {
-      advance = EstimateCharAdvance(unichar, fontSize) + text->letterSpacing;
-    }
-    chars.push_back({unichar, pos, len, advance});
-    pos += len;
-  }
-
-  auto lines = BreakTextIntoLines(chars, boxWidth);
-
-  // Remove empty trailing line produced by a trailing '\n'.
-  while (lines.size() > 1 && lines.back().charCount == 0) {
-    lines.pop_back();
-  }
-  if (lines.empty()) {
-    return;
-  }
-
-  float totalHeight = static_cast<float>(lines.size()) * lineHeight;
-  // Approximate ascent for baseline positioning (typical Latin font metrics).
-  float ascent = fontSize * 0.8f;
-
-  // Vertical offset based on paragraphAlign.
-  float yOffset = 0;
-  if (boxHeight > 0) {
-    switch (textBox->paragraphAlign) {
-      case ParagraphAlign::Middle:
-        yOffset = (boxHeight - totalHeight) / 2;
-        break;
-      case ParagraphAlign::Far:
-        yOffset = boxHeight - totalHeight;
-        break;
-      default:
-        break;
-    }
-  }
-
-  // Horizontal anchor based on textAlign.
-  float xBase = textBox->position.x;
-  TextAnchor anchor = TextAnchor::Start;
-  switch (textBox->textAlign) {
-    case TextAlign::Center:
-      xBase = textBox->position.x + boxWidth / 2;
-      anchor = TextAnchor::Center;
-      break;
-    case TextAlign::End:
-      xBase = textBox->position.x + boxWidth;
-      anchor = TextAnchor::End;
-      break;
-    default:
-      break;
-  }
-
-  float firstLineY = textBox->position.y + yOffset + ascent;
-
-  // Open <text> element with shared attributes.
-  out.openElement("text");
-  if (!transform.empty()) {
-    out.addAttribute("transform", transform);
+  if (!needsMultiLine) {
+    out.addAttributeIfNonZero("x", x);
+    out.addAttributeIfNonZero("y", y);
   }
   if (!text->fontFamily.empty()) {
     out.addAttribute("font-family", text->fontFamily);
@@ -1277,26 +1226,29 @@ void SVGWriter::writeTextMultiLine(SVGBuilder& out, const Text* text, const Fill
   applyFillAttributes(out, fs.fill, {}, &p3Style);
   applyStrokeAttributes(out, fs.stroke, {}, &p3Style);
   applyP3Style(out, p3Style);
-  out.closeElementStart();
 
-  // Write each line as a <tspan>.
-  for (size_t i = 0; i < lines.size(); i++) {
-    auto& line = lines[i];
-    std::string lineText = ExtractLineText(content, chars, line);
-    if (lineText.empty() && i < lines.size() - 1) {
-      continue;
+  // ── Write content ──
+  if (needsMultiLine) {
+    out.closeElementStart();
+    for (size_t i = 0; i < lines.size(); i++) {
+      auto& line = lines[i];
+      std::string lineText = ExtractLineText(content, chars, line);
+      if (lineText.empty() && i < lines.size() - 1) {
+        continue;
+      }
+      out.openElement("tspan");
+      out.addAttribute("x", x);
+      if (i == 0) {
+        out.addAttribute("y", firstLineY);
+      } else {
+        out.addAttribute("dy", lineHeight);
+      }
+      out.closeElementWithText(lineText);
     }
-    out.openElement("tspan");
-    out.addAttribute("x", xBase);
-    if (i == 0) {
-      out.addAttribute("y", firstLineY);
-    } else {
-      out.addAttribute("dy", lineHeight);
-    }
-    out.closeElementWithText(lineText);
+    out.closeElement();
+  } else {
+    out.closeElementWithText(text->text);
   }
-
-  out.closeElement();
 }
 
 //==============================================================================
