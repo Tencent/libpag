@@ -160,9 +160,9 @@ static bool IsHardcodedOpaqueColor(const Color& color) {
 // --- Per-layer rule checks ---
 
 // VIS-001/002/003: Pixel alignment and coordinate precision.
-static void CheckPixelAlignment(const Layer* layer, std::vector<LintIssue>& issues) {
-  std::string location = LayerLabel(layer);
-
+static void CheckPixelAlignment(const Layer* layer, const std::string& location,
+                                const std::vector<const Stroke*>& strokes,
+                                std::vector<LintIssue>& issues) {
   auto checkCoord = [&](float value, const std::string& name) {
     if (ExceedsPrecision(value)) {
       issues.push_back({"VIS-003", location,
@@ -197,8 +197,6 @@ static void CheckPixelAlignment(const Layer* layer, std::vector<LintIssue>& issu
   }
 
   // VIS-002: For strokes, check that stroke center sits on the correct boundary.
-  std::vector<const Stroke*> strokes;
-  CollectStrokes(layer->contents, strokes);
   for (auto* stroke : strokes) {
     float width = stroke->width;
     bool isIntegerWidth = std::fabs(width - std::round(width)) < 1e-4f;
@@ -217,11 +215,9 @@ static void CheckPixelAlignment(const Layer* layer, std::vector<LintIssue>& issu
 }
 
 // VIS-010/011/012/013: Stroke width constraints.
-static void CheckStrokeWidth(const Layer* layer, float canvasSize, std::vector<LintIssue>& issues) {
-  std::string location = LayerLabel(layer);
-  std::vector<const Stroke*> strokes;
-  CollectStrokes(layer->contents, strokes);
-
+static void CheckStrokeWidth(const Layer* layer, float canvasSize, const std::string& location,
+                             const std::vector<const Stroke*>& strokes,
+                             std::vector<LintIssue>& issues) {
   if (strokes.empty()) {
     return;
   }
@@ -300,12 +296,10 @@ static void CheckStrokeWidth(const Layer* layer, float canvasSize, std::vector<L
 
 // VIS-020/021/022: Safe zone / margins.
 static void CheckSafeZone(const Layer* layer, float canvasWidth, float canvasHeight,
-                          std::vector<LintIssue>& issues) {
+                          const std::string& location, std::vector<LintIssue>& issues) {
   if (canvasWidth <= 0.0f || canvasHeight <= 0.0f) {
     return;
   }
-
-  std::string location = LayerLabel(layer);
   float minPadding = canvasWidth * 0.083f;  // VIS-021 formula
 
   Rect bounds = CollectGeometryBounds(layer->contents);
@@ -341,9 +335,8 @@ static void CheckSafeZone(const Layer* layer, float canvasWidth, float canvasHei
 }
 
 // VIS-100/101: Color rules — hardcoded colors break dark/light theme compatibility.
-static void CheckColorRules(const Layer* layer, std::vector<LintIssue>& issues) {
-  std::string location = LayerLabel(layer);
-
+static void CheckColorRules(const Layer* layer, const std::string& location,
+                            std::vector<LintIssue>& issues) {
   std::vector<const Fill*> fills;
   CollectFills(layer->contents, fills);
   std::vector<const Stroke*> strokes;
@@ -383,10 +376,13 @@ static void CheckColorRules(const Layer* layer, std::vector<LintIssue>& issues) 
 static void CheckLayer(const Layer* layer, float canvasWidth, float canvasHeight,
                        std::vector<LintIssue>& issues) {
   float canvasSize = std::min(canvasWidth, canvasHeight);
-  CheckPixelAlignment(layer, issues);
-  CheckStrokeWidth(layer, canvasSize, issues);
-  CheckSafeZone(layer, canvasWidth, canvasHeight, issues);
-  CheckColorRules(layer, issues);
+  std::string location = LayerLabel(layer);
+  std::vector<const Stroke*> strokes;
+  CollectStrokes(layer->contents, strokes);
+  CheckPixelAlignment(layer, location, strokes, issues);
+  CheckStrokeWidth(layer, canvasSize, location, strokes, issues);
+  CheckSafeZone(layer, canvasWidth, canvasHeight, location, issues);
+  CheckColorRules(layer, location, issues);
 
   for (auto* child : layer->children) {
     CheckLayer(child, canvasWidth, canvasHeight, issues);
