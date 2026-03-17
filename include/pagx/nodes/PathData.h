@@ -112,7 +112,7 @@ class PathData : public Node {
    * Returns the control-point bounding box of the path, which encloses all on-curve and off-curve
    * points but may be larger than the tight geometric bounds.
    */
-  Rect getBounds();
+  Rect getBounds() const;
 
   /**
    * Returns true if the path contains no commands.
@@ -141,8 +141,8 @@ class PathData : public Node {
 
   std::vector<PathVerb> _verbs = {};
   std::vector<Point> _points = {};
-  Rect _cachedBounds = {};
-  bool _boundsDirty = true;
+  mutable Rect _cachedBounds = {};
+  mutable bool _boundsDirty = true;
 
   friend class PAGXDocument;
   friend class SVGParserContext;
