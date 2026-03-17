@@ -146,15 +146,19 @@ static Rect CollectGeometryBounds(const std::vector<Element*>& elements) {
   return found ? bounds : Rect{};
 }
 
+static constexpr float kColorNearOneThreshold = 0.99f;   // near-white / near-opaque
+static constexpr float kColorNearZeroThreshold = 0.01f;  // near-black
+
 // Returns true if the color is pure white (all RGB components >= 0.99, any color space).
 static bool IsPureWhite(const Color& color) {
-  return color.red >= 0.99f && color.green >= 0.99f && color.blue >= 0.99f;
+  return color.red >= kColorNearOneThreshold && color.green >= kColorNearOneThreshold &&
+         color.blue >= kColorNearOneThreshold;
 }
 
 // Returns true if the color is a hardcoded opaque color (not referencing currentColor or a
 // resource). White and black are the most problematic for theme compatibility.
 static bool IsHardcodedOpaqueColor(const Color& color) {
-  return color.alpha >= 0.99f;
+  return color.alpha >= kColorNearOneThreshold;
 }
 
 // --- Per-layer rule checks ---
@@ -360,8 +364,9 @@ static void CheckColorRules(const Layer* layer, const std::string& location,
     }
     // VIS-100/101: Warn on hardcoded white or black as the sole color.
     bool isWhite = IsPureWhite(solid->color);
-    bool isBlack =
-        solid->color.red <= 0.01f && solid->color.green <= 0.01f && solid->color.blue <= 0.01f;
+    bool isBlack = solid->color.red <= kColorNearZeroThreshold &&
+                   solid->color.green <= kColorNearZeroThreshold &&
+                   solid->color.blue <= kColorNearZeroThreshold;
     if (isWhite || isBlack) {
       std::string colorName = isWhite ? "white (#FFFFFF)" : "black (#000000)";
       issues.push_back(
