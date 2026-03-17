@@ -201,7 +201,8 @@ static void CheckPixelAlignment(const Layer* layer, std::vector<LintIssue>& issu
   CollectStrokes(layer->contents, strokes);
   for (auto* stroke : strokes) {
     float width = stroke->width;
-    bool isOddWidth = std::fmod(std::round(width), 2.0f) != 0.0f;
+    bool isIntegerWidth = std::fabs(width - std::round(width)) < 1e-4f;
+    bool isOddWidth = isIntegerWidth && (std::fmod(std::round(width), 2.0f) != 0.0f);
     if (isOddWidth) {
       // Odd stroke width: stroke center must be on strict 0.5px boundary (layer at half-pixel)
       if (!IsStrictHalfPixel(layer->x) || !IsStrictHalfPixel(layer->y)) {
