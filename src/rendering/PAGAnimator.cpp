@@ -280,25 +280,21 @@ std::vector<int> PAGAnimator::doAdvance() {
     }
     _progress = ClampProgress(fraction);
   }
-  std::vector<int> events = {};
   auto count = static_cast<int>(playTime / _duration);
-  if (_repeatCount > 0 && count >= _repeatCount) {
-    // Set the playedCount to 0 to allow the animation to be played again.
-    playedCount = 0;
-    isEnded = true;
-    _isRunning = false;
-    cancelAnimation();
-    extractAndWaitTask(lock);
-    events.push_back(AnimationTypeUpdate);
-    events.push_back(AnimationTypeEnd);
-  } else {
+  if (!(_repeatCount > 0 && count >= _repeatCount)) {
     if (count > playedCount) {
       playedCount = count;
-      events.push_back(AnimationTypeRepeat);
+      return {AnimationTypeRepeat, AnimationTypeUpdate};
     }
-    events.push_back(AnimationTypeUpdate);
+    return {AnimationTypeUpdate};
   }
-  return events;
+  // Set the playedCount to 0 to allow the animation to be played again.
+  playedCount = 0;
+  isEnded = true;
+  _isRunning = false;
+  cancelAnimation();
+  extractAndWaitTask(lock);
+  return {AnimationTypeUpdate, AnimationTypeEnd};
 }
 
 void PAGAnimator::doUpdate(bool setStartTime) {
