@@ -31,6 +31,7 @@
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -452,13 +453,15 @@ class SVGWriterContext {
 
 class SVGWriter {
  public:
-  SVGWriter(SVGBuilder* defs, SVGWriterContext* context) : _defs(defs), _context(context) {}
+  SVGWriter(SVGBuilder* defs, SVGWriterContext* context, bool convertTextToPath = true)
+      : _defs(defs), _context(context), _convertTextToPath(convertTextToPath) {}
 
   void writeLayer(SVGBuilder& out, const Layer* layer);
 
  private:
   SVGBuilder* _defs;
   SVGWriterContext* _context;
+  bool _convertTextToPath;
 
   std::string generateId(const std::string& prefix) {
     return _context->generateId(prefix);
@@ -479,6 +482,8 @@ class SVGWriter {
                  const std::string& transform = "");
   void writeText(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
                  const std::string& transform = "");
+  void writeTextAsPath(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
+                       const std::string& transform = "");
 
   // Gradient / pattern defs (write to _defs)
   void writeGradientStops(const std::vector<ColorStop*>& stops);
@@ -886,7 +891,7 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, const char* ta
   _defs->openElement(tag);
   _defs->addAttribute("id", defId);
   _defs->closeElementStart();
-  SVGWriter nestedWriter(&paintDefs, _context);
+  SVGWriter nestedWriter(&paintDefs, _context, _convertTextToPath);
   (nestedWriter.*writer)(*_defs, maskLayer);
   _defs->closeElement();
   std::string paintDefsStr = paintDefs.release();
@@ -1086,11 +1091,111 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
   out.closeElementSelfClosing();
 }
 
+// ── writeTextAsPath ─────────────────────────────────────────────────────────
+
+void SVGWriter::writeTextAsPath(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
+                                const std::string& transform) {
+  out.openElement("g");
+  if (!transform.empty()) {
+    out.addAttribute("transform", transform);
+  }
+  std::string p3Style;
+  applyFillAttributes(out, fs.fill, {}, &p3Style);
+  applyStrokeAttributes(out, fs.stroke, {}, &p3Style);
+  applyP3Style(out, p3Style);
+  out.closeElementStart();
+
+  float textPosX = text->position.x;
+  float textPosY = text->position.y;
+
+  for (const auto* run : text->glyphRuns) {
+    if (!run->font || run->glyphs.empty()) {
+      continue;
+    }
+    float scale = run->fontSize / static_cast<float>(run->font->unitsPerEm);
+    float currentX = textPosX + run->x;
+    for (size_t i = 0; i < run->glyphs.size(); i++) {
+      uint16_t glyphID = run->glyphs[i];
+      if (glyphID == 0) {
+        continue;
+      }
+      auto glyphIndex = static_cast<size_t>(glyphID) - 1;
+      if (glyphIndex >= run->font->glyphs.size()) {
+        continue;
+      }
+      auto* glyph = run->font->glyphs[glyphIndex];
+      if (!glyph || !glyph->path || glyph->path->isEmpty()) {
+        continue;
+      }
+
+      float posX = 0;
+      float posY = 0;
+      if (i < run->positions.size()) {
+        posX = textPosX + run->x + run->positions[i].x;
+        posY = textPosY + run->y + run->positions[i].y;
+        if (i < run->xOffsets.size()) {
+          posX += run->xOffsets[i];
+        }
+      } else if (i < run->xOffsets.size()) {
+        posX = textPosX + run->x + run->xOffsets[i];
+        posY = textPosY + run->y;
+      } else {
+        posX = currentX;
+        posY = textPosY + run->y;
+      }
+      currentX += glyph->advance * scale;
+
+      Matrix glyphMatrix = Matrix::Translate(posX, posY) * Matrix::Scale(scale, scale);
+
+      bool hasRotation = i < run->rotations.size() && run->rotations[i] != 0;
+      bool hasGlyphScale =
+          i < run->scales.size() && (run->scales[i].x != 1 || run->scales[i].y != 1);
+      bool hasSkew = i < run->skews.size() && run->skews[i] != 0;
+
+      if (hasRotation || hasGlyphScale || hasSkew) {
+        float anchorX = glyph->advance * 0.5f;
+        float anchorY = 0;
+        if (i < run->anchors.size()) {
+          anchorX += run->anchors[i].x;
+          anchorY += run->anchors[i].y;
+        }
+
+        Matrix perGlyph = Matrix::Translate(-anchorX, -anchorY);
+        if (hasGlyphScale) {
+          perGlyph = Matrix::Scale(run->scales[i].x, run->scales[i].y) * perGlyph;
+        }
+        if (hasSkew) {
+          Matrix shear = {};
+          shear.c = std::tan(DegreesToRadians(run->skews[i]));
+          perGlyph = shear * perGlyph;
+        }
+        if (hasRotation) {
+          perGlyph = Matrix::Rotate(run->rotations[i]) * perGlyph;
+        }
+        perGlyph = Matrix::Translate(anchorX, anchorY) * perGlyph;
+        glyphMatrix = glyphMatrix * perGlyph;
+      }
+
+      out.openElement("path");
+      out.addAttribute("transform", MatrixToSVGTransform(glyphMatrix));
+      out.addAttribute("d", PathDataToSVGString(*glyph->path));
+      out.closeElementSelfClosing();
+    }
+  }
+
+  out.closeElement();
+}
+
 // ── writeText ───────────────────────────────────────────────────────────────
 
 void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
                           const std::string& transform) {
   if (text->text.empty()) {
+    return;
+  }
+
+  if (_convertTextToPath && !text->glyphRuns.empty()) {
+    writeTextAsPath(out, text, fs, transform);
     return;
   }
 
@@ -1408,7 +1513,7 @@ std::string SVGExporter::ToSVG(const PAGXDocument& doc, const Options& options) 
   SVGBuilder svg(options.indent);
   SVGBuilder defs(options.indent, 2);
   SVGWriterContext context;
-  SVGWriter writer(&defs, &context);
+  SVGWriter writer(&defs, &context, options.convertTextToPath);
 
   if (options.xmlDeclaration) {
     svg.appendDeclaration();

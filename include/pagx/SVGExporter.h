@@ -36,6 +36,14 @@ struct SVGExportOptions {
    * Whether to include the XML declaration (<?xml ...?>) at the top. The default value is true.
    */
   bool xmlDeclaration = true;
+
+  /**
+   * Whether to convert text elements to path elements using pre-shaped glyph outlines. When
+   * enabled, text with GlyphRun data is rendered as SVG <path> elements instead of <text> elements,
+   * ensuring identical rendering across platforms without font dependency. Falls back to <text>
+   * elements when glyph outline data is unavailable. The default value is true.
+   */
+  bool convertTextToPath = true;
 };
 
 /**
