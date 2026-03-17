@@ -155,6 +155,8 @@ jreleaser {
                     sourceJar = true
                     javadocJar = true
                     retryDelay = 60
+                    connectTimeout = 60
+                    readTimeout = 300
                 }
             }
         }
