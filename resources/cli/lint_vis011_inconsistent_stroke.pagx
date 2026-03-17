@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- VIS-011: Inconsistent stroke widths (1px vs 2px, delta > 0.25px) -->
+<pagx version="1.0" width="24" height="24">
+  <Layer name="InconsistentStrokes">
+    <Group>
+      <Rectangle position="12,12" size="18,18"/>
+      <Stroke color="currentColor" width="1"/>
+    </Group>
+    <Group>
+      <Rectangle position="12,12" size="14,14"/>
+      <Stroke color="currentColor" width="2"/>
+    </Group>
+  </Layer>
+</pagx>

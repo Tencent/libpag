@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- VIS-020: Content within safe zone (3px padding on each side) -->
+<pagx version="1.0" width="24" height="24">
+  <Layer name="InsideSafeZone">
+    <Rectangle position="12,12" size="18,18"/>
+    <Fill color="currentColor"/>
+  </Layer>
+</pagx>

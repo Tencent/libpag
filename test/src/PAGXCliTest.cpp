@@ -26,6 +26,7 @@
 #include "cli/CommandBounds.h"
 #include "cli/CommandFont.h"
 #include "cli/CommandFormat.h"
+#include "cli/CommandLint.h"
 #include "cli/CommandOptimize.h"
 #include "cli/CommandRender.h"
 #include "cli/CommandValidator.h"
@@ -1112,6 +1113,187 @@ CLI_TEST(PAGXCliTest, Lint_C13_SimpleRectangleMask) {
   EXPECT_TRUE(output.find("MaskedContent") != std::string::npos);
   EXPECT_TRUE(output.find("rectangular mask") != std::string::npos);
   EXPECT_TRUE(output.find("scrollRect") != std::string::npos);
+}
+
+//==============================================================================
+// Lint VIS-xxx tests
+//==============================================================================
+
+// VIS-001 / VIS-002: pixel alignment
+CLI_TEST(PAGXCliTest, Lint_VIS001_MisalignedCoord) {
+  auto inputPath = TestResourcePath("lint_vis001_misaligned.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-001") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_VIS001_AlignedCoord) {
+  auto inputPath = TestResourcePath("lint_vis001_aligned.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-001") == std::string::npos);
+}
+
+// VIS-003: decimal precision
+CLI_TEST(PAGXCliTest, Lint_VIS003_ExcessPrecision) {
+  auto inputPath = TestResourcePath("lint_vis003_precision.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-003") != std::string::npos);
+}
+
+// VIS-010: minimum stroke width
+CLI_TEST(PAGXCliTest, Lint_VIS010_ThinStroke) {
+  auto inputPath = TestResourcePath("lint_vis010_thin_stroke.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-010") != std::string::npos);
+}
+
+// VIS-011: stroke width consistency
+CLI_TEST(PAGXCliTest, Lint_VIS011_InconsistentStroke) {
+  auto inputPath = TestResourcePath("lint_vis011_inconsistent_stroke.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-011") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_VIS011_ConsistentStroke) {
+  auto inputPath = TestResourcePath("lint_vis011_consistent_stroke.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-011") == std::string::npos);
+}
+
+// VIS-012: stroke width range for canvas size
+CLI_TEST(PAGXCliTest, Lint_VIS012_StrokeOutOfRange) {
+  auto inputPath = TestResourcePath("lint_vis012_stroke_out_of_range.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-012") != std::string::npos);
+}
+
+// VIS-013: stroke corner ratio
+CLI_TEST(PAGXCliTest, Lint_VIS013_CornerRatio) {
+  auto inputPath = TestResourcePath("lint_vis013_corner_ratio.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-013") != std::string::npos);
+}
+
+// VIS-020 / VIS-022: safe zone
+CLI_TEST(PAGXCliTest, Lint_VIS020_OutsideSafeZone) {
+  auto inputPath = TestResourcePath("lint_vis020_outside_safezone.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-020") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_VIS020_InsideSafeZone) {
+  auto inputPath = TestResourcePath("lint_vis020_inside_safezone.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-020") == std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_VIS022_TouchesBoundary) {
+  auto inputPath = TestResourcePath("lint_vis022_touches_boundary.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-022") != std::string::npos);
+}
+
+// VIS-101: hardcoded black color
+CLI_TEST(PAGXCliTest, Lint_VIS101_HardcodedBlack) {
+  auto inputPath = TestResourcePath("lint_vis101_hardcoded_black.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-101") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_VIS101_ThemeColor) {
+  auto inputPath = TestResourcePath("lint_vis101_theme_color.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-101") == std::string::npos);
 }
 
 }  // namespace pag

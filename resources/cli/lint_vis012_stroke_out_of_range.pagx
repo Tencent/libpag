@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- VIS-012: Stroke width 5px on 24x24 canvas (safe range 1-2.5px) -->
+<pagx version="1.0" width="24" height="24">
+  <Layer name="WideStroke">
+    <Rectangle position="12,12" size="14,14"/>
+    <Stroke color="currentColor" width="5"/>
+  </Layer>
+</pagx>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- VIS-101: Hardcoded black fill breaks dark mode compatibility -->
+<pagx version="1.0" width="24" height="24">
+  <Layer name="HardcodedBlack">
+    <Rectangle position="12,12" size="18,18"/>
+    <Fill color="#000000"/>
+  </Layer>
+</pagx>

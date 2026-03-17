@@ -22,6 +22,7 @@
 #include "cli/CommandBounds.h"
 #include "cli/CommandFont.h"
 #include "cli/CommandFormat.h"
+#include "cli/CommandLint.h"
 #include "cli/CommandOptimize.h"
 #include "cli/CommandRender.h"
 #include "cli/CommandValidator.h"
@@ -41,6 +42,7 @@ static void PrintUsage() {
             << "  bounds     Query the precise bounds of a node or layer\n"
             << "  font       Query font metrics or embed fonts into a PAGX file\n"
             << "  format     Format a PAGX file (indentation and attribute ordering)\n"
+            << "  lint       Check visual quality rules and report advisory issues\n"
             << "  optimize   Validate, optimize, and format a PAGX file in one step\n"
             << "\n"
             << "Options:\n"
@@ -80,6 +82,9 @@ int main(int argc, char* argv[]) {
   }
   if (command == "format") {
     return pagx::cli::RunFormat(argc - 1, argv + 1);
+  }
+  if (command == "lint") {
+    return pagx::cli::RunLint(argc - 1, argv + 1);
   }
   if (command == "optimize") {
     return pagx::cli::RunOptimize(argc - 1, argv + 1);

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- VIS-010: Stroke width below 0.5px -->
+<pagx version="1.0" width="24" height="24">
+  <Layer name="ThinStroke">
+    <Rectangle position="12,12" size="18,18"/>
+    <Stroke color="currentColor" width="0.3"/>
+  </Layer>
+</pagx>

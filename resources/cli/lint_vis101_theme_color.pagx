@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- VIS-101: Using a non-hardcoded color (compliant) -->
+<pagx version="1.0" width="24" height="24">
+  <Layer name="NonBlackColor">
+    <Rectangle position="12,12" size="18,18"/>
+    <Fill color="#666666"/>
+  </Layer>
+</pagx>
