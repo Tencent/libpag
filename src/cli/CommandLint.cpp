@@ -120,7 +120,7 @@ static Rect CollectGeometryBounds(const std::vector<Element*>& elements) {
     } else if (element->nodeType() == NodeType::Path) {
       auto* path = static_cast<const Path*>(element);
       if (path->data != nullptr && !path->data->isEmpty()) {
-        elementBounds = const_cast<PathData*>(path->data)->getBounds();
+        elementBounds = path->data->getBounds();
         hasBounds = true;
       }
     } else if (element->nodeType() == NodeType::Group) {
