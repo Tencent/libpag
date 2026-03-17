@@ -212,8 +212,7 @@ bool PAGAnimator::isTaskRunning() const {
   if (task == nullptr) {
     return false;
   }
-  auto status = task->status();
-  return status != tgfx::TaskStatus::Finished && status != tgfx::TaskStatus::Canceled;
+  return !task->finished() && !task->cancelled();
 }
 
 void PAGAnimator::extractAndWaitTask(std::unique_lock<std::mutex>& lock) {
