@@ -309,7 +309,7 @@ static void CheckSafeZone(const Layer* layer, float canvasWidth, float canvasHei
   float minPadding = canvasWidth * 0.083f;  // VIS-021 formula
 
   Rect bounds = CollectGeometryBounds(layer->contents);
-  if (bounds.width <= 0.0f && bounds.height <= 0.0f) {
+  if (bounds.isEmpty()) {
     return;
   }
 
