@@ -74,9 +74,13 @@ std::shared_ptr<PAGSurface> PAGPlayer::getSurface() {
 }
 
 void PAGPlayer::setSurface(std::shared_ptr<PAGSurface> newSurface) {
-  auto locker = newSurface ? newSurface->rootLocker : nullptr;
-  ScopedLock autoLock(rootLocker, locker);
-  setSurfaceInternal(newSurface);
+  if (newSurface) {
+    ScopedLock autoLock(rootLocker, newSurface->rootLocker);
+    setSurfaceInternal(newSurface);
+  } else {
+    LockGuard autoLock(rootLocker);
+    setSurfaceInternal(nullptr);
+  }
 }
 
 void PAGPlayer::setSurfaceInternal(std::shared_ptr<PAGSurface> newSurface) {
@@ -89,13 +93,13 @@ void PAGPlayer::setSurfaceInternal(std::shared_ptr<PAGSurface> newSurface) {
   }
   if (pagSurface) {
     pagSurface->pagPlayer = nullptr;
-    pagSurface->rootLocker = std::make_shared<std::mutex>();
+    std::atomic_store(&pagSurface->rootLocker, std::make_shared<std::mutex>());
   }
   pagSurface = newSurface;
   if (pagSurface) {
     pagSurface->pagPlayer = this;
     pagSurface->contentVersion = 0;
-    pagSurface->rootLocker = rootLocker;
+    std::atomic_store(&pagSurface->rootLocker, rootLocker);
     updateStageSize();
   } else {
     stage->setContentSizeInternal(0, 0);

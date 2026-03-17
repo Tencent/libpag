@@ -19,8 +19,9 @@
 #include "ScopedLock.h"
 
 namespace pag {
-ScopedLock::ScopedLock(std::shared_ptr<std::mutex> first, std::shared_ptr<std::mutex> second)
-    : firstLocker(std::move(first)), secondLocker(std::move(second)) {
+ScopedLock::ScopedLock(const std::shared_ptr<std::mutex>& first,
+                       const std::shared_ptr<std::mutex>& second)
+    : firstLocker(std::atomic_load(&first)), secondLocker(std::atomic_load(&second)) {
   if (firstLocker == nullptr) {
     return;
   }

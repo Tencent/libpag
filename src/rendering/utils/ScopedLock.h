@@ -18,13 +18,14 @@
 
 #pragma once
 
+#include <atomic>
 #include <memory>
 #include <mutex>
 
 namespace pag {
 class ScopedLock {
  public:
-  ScopedLock(std::shared_ptr<std::mutex> first, std::shared_ptr<std::mutex> second);
+  ScopedLock(const std::shared_ptr<std::mutex>& first, const std::shared_ptr<std::mutex>& second);
 
   ~ScopedLock();
 

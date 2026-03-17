@@ -506,7 +506,7 @@ void PAGLayer::updateRootLocker(std::shared_ptr<std::mutex> newLocker) {
   if (_trackMatteLayer != nullptr) {
     _trackMatteLayer->updateRootLocker(newLocker);
   }
-  rootLocker = newLocker;
+  std::atomic_store(&rootLocker, newLocker);
 }
 
 void PAGLayer::setMatrixInternal(const Matrix& matrix) {
