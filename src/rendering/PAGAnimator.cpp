@@ -81,7 +81,7 @@ class AnimationTicker {
     locker.unlock();
     for (auto& animator : listCopy) {
       if (animator.use_count() == 1) {
-        animator->cancel();
+        animator->cancelAnimation();
         continue;
       }
       animator->advance();
