@@ -44,7 +44,6 @@ namespace pagx::cli {
 static void CheckFmt043Scope(const std::vector<Element*>& elements, const std::string& scopeLabel,
                              std::vector<ValidationError>& errors) {
   bool hasPainterBeforeMergePath = false;
-  bool hasMergePath = false;
   for (auto* element : elements) {
     NodeType type = element->nodeType();
     if (type == NodeType::Fill || type == NodeType::Stroke) {
@@ -59,14 +58,12 @@ static void CheckFmt043Scope(const std::vector<Element*>& elements, const std::s
       }
       // Reset: painters after MergePath belong to a new accumulation phase.
       hasPainterBeforeMergePath = false;
-      hasMergePath = true;
     } else if (type == NodeType::Group) {
       // Recurse into groups for their own scope.
       auto* group = static_cast<const Group*>(element);
       CheckFmt043Scope(group->elements, scopeLabel + "/<Group>", errors);
     }
   }
-  (void)hasMergePath;
 }
 
 // FMT-051: Text with position or non-Start textAnchor when TextBox is present in the same scope.
