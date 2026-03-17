@@ -102,23 +102,21 @@ static void CheckFmt051Scope(const std::vector<Element*>& elements, const std::s
   }
 }
 
+static void CheckSemanticRulesLayer(const Layer* layer, std::vector<ValidationError>& errors) {
+  std::string label = "Layer";
+  if (!layer->name.empty()) {
+    label += "[" + layer->name + "]";
+  }
+  CheckFmt043Scope(layer->contents, label, errors);
+  CheckFmt051Scope(layer->contents, label, errors);
+  for (auto* child : layer->children) {
+    CheckSemanticRulesLayer(child, errors);
+  }
+}
+
 static void CheckSemanticRules(const PAGXDocument* document, std::vector<ValidationError>& errors) {
   for (auto* layer : document->layers) {
-    std::string label = "Layer";
-    if (!layer->name.empty()) {
-      label += "[" + layer->name + "]";
-    }
-    CheckFmt043Scope(layer->contents, label, errors);
-    CheckFmt051Scope(layer->contents, label, errors);
-    // Recurse into child layers.
-    for (auto* child : layer->children) {
-      std::string childLabel = "Layer";
-      if (!child->name.empty()) {
-        childLabel += "[" + child->name + "]";
-      }
-      CheckFmt043Scope(child->contents, childLabel, errors);
-      CheckFmt051Scope(child->contents, childLabel, errors);
-    }
+    CheckSemanticRulesLayer(layer, errors);
   }
 }
 
