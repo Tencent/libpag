@@ -210,6 +210,7 @@ static void CheckPixelAlignment(const Layer* layer, std::vector<LintIssue>& issu
                           "Stroke width " + std::to_string(width) +
                               "px is odd — layer position should be on 0.5px boundary for "
                               "crisp rendering"});
+        break;
       }
     }
   }
