@@ -81,7 +81,7 @@ class AnimationTicker {
     locker.unlock();
     for (auto& animator : listCopy) {
       if (animator.use_count() == 1) {
-        animator->cancelAnimation();
+        animator->cancel();
         continue;
       }
       animator->advance();
@@ -112,7 +112,9 @@ void PAGAnimator::setSync(bool value) {
     return;
   }
   _isSync = value;
-  extractAndWaitTask(lock);
+  if (task) {
+    extractAndWaitTask(lock);
+  }
 }
 
 int64_t PAGAnimator::duration() {
@@ -126,13 +128,14 @@ void PAGAnimator::setDuration(int64_t duration) {
     return;
   }
   _duration = duration;
-  if (_isRunning) {
-    if (_duration > 0) {
-      startAnimation();
-    } else {
-      cancelAnimation();
-      extractAndWaitTask(lock);
-    }
+  if (!_isRunning) {
+    return;
+  }
+  if (_duration > 0) {
+    startAnimation();
+  } else {
+    cancelAnimation();
+    extractAndWaitTask(lock);
   }
 }
 
@@ -188,15 +191,13 @@ void PAGAnimator::start() {
 }
 
 void PAGAnimator::cancel() {
-  {
-    std::unique_lock<std::mutex> lock(locker);
-    if (!_isRunning) {
-      return;
-    }
-    _isRunning = false;
-    cancelAnimation();
-    extractAndWaitTask(lock);
+  std::unique_lock<std::mutex> lock(locker);
+  if (!_isRunning) {
+    return;
   }
+  _isRunning = false;
+  cancelAnimation();
+  extractAndWaitTask(lock);
   auto listener = weakListener.lock();
   if (listener) {
     listener->onAnimationCancel(this);
@@ -225,18 +226,16 @@ void PAGAnimator::extractAndWaitTask(std::unique_lock<std::mutex>& lock) {
 }
 
 void PAGAnimator::flushAsync(bool setStartTime) {
-  auto newTask = tgfx::Task::Run([weakThis = weakThis, setStartTime]() {
+  std::lock_guard<std::mutex> autoLock(locker);
+  if (!_isRunning) {
+    return;
+  }
+  task = tgfx::Task::Run([weakThis = weakThis, setStartTime]() {
     auto animator = weakThis.lock();
     if (animator) {
       animator->onFlush(setStartTime);
     }
   });
-  std::lock_guard<std::mutex> autoLock(locker);
-  if (_isRunning) {
-    task = std::move(newTask);
-  } else {
-    newTask->cancel();
-  }
 }
 
 void PAGAnimator::advance() {
