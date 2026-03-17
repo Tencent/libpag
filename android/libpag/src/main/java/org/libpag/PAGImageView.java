@@ -167,7 +167,7 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
     }
 
 
-    private PAGComposition _composition;
+    private volatile PAGComposition _composition;
 
     /**
      * Returns the current PAGComposition in the PAGImageView. Returns null if the internal
@@ -462,8 +462,8 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
         _pagFilePath = path;
         _composition = composition;
         _currentFrame = 0;
-        animator.setProgress(_composition == null ? 0 : _composition.getProgress());
-        animationDuration = _composition == null ? 0 : _composition.duration();
+        animator.setProgress(composition == null ? 0 : composition.getProgress());
+        animationDuration = composition == null ? 0 : composition.duration();
         if (isVisible) {
             animator.setDuration(animationDuration);
         }
