@@ -56,6 +56,17 @@ static bool IsHalfPixelAligned(float value) {
   return std::fabs(scaled - std::round(scaled)) < 1e-4f;
 }
 
+// Returns true only when the value is on a strict half-pixel boundary (0.5, 1.5, 2.5, ...),
+// i.e. value * 2 is an odd integer. Integer values (0, 1, 2, ...) return false.
+static bool IsStrictHalfPixel(float value) {
+  float scaled = value * 2.0f;
+  float nearest = std::round(scaled);
+  if (std::fabs(scaled - nearest) >= 1e-4f) {
+    return false;
+  }
+  return std::fmod(std::fabs(nearest), 2.0f) > 0.5f;
+}
+
 // Returns true if the value has more than 4 decimal places of precision.
 static bool ExceedsPrecision(float value) {
   float rounded = std::round(value * 1e4f) / 1e4f;
@@ -192,8 +203,8 @@ static void CheckPixelAlignment(const Layer* layer, std::vector<LintIssue>& issu
     float width = stroke->width;
     bool isOddWidth = std::fmod(std::round(width), 2.0f) != 0.0f;
     if (isOddWidth) {
-      // Odd stroke width: stroke center must be on 0.5px boundary (layer at half-pixel)
-      if (!IsHalfPixelAligned(layer->x) || !IsHalfPixelAligned(layer->y)) {
+      // Odd stroke width: stroke center must be on strict 0.5px boundary (layer at half-pixel)
+      if (!IsStrictHalfPixel(layer->x) || !IsStrictHalfPixel(layer->y)) {
         issues.push_back({"VIS-002", location,
                           "Stroke width " + std::to_string(width) +
                               "px is odd — layer position should be on 0.5px boundary for "
