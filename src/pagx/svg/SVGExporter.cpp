@@ -1021,8 +1021,8 @@ void SVGWriter::applyP3Style(SVGBuilder& out, const std::string& p3Style) {
 
 void SVGWriter::writeRectangle(SVGBuilder& out, const Rectangle* rect, const FillStrokeInfo& fs,
                                const std::string& transform) {
-  float x = rect->center.x - rect->size.width / 2;
-  float y = rect->center.y - rect->size.height / 2;
+  float x = rect->position.x - rect->size.width / 2;
+  float y = rect->position.y - rect->size.height / 2;
   out.openElement("rect");
   if (!transform.empty()) {
     out.addAttribute("transform", transform);
@@ -1052,20 +1052,20 @@ void SVGWriter::writeEllipse(SVGBuilder& out, const Ellipse* ellipse, const Fill
     if (!transform.empty()) {
       out.addAttribute("transform", transform);
     }
-    out.addAttribute("cx", ellipse->center.x);
-    out.addAttribute("cy", ellipse->center.y);
+    out.addAttribute("cx", ellipse->position.x);
+    out.addAttribute("cy", ellipse->position.y);
     out.addAttribute("r", rx);
   } else {
     out.openElement("ellipse");
     if (!transform.empty()) {
       out.addAttribute("transform", transform);
     }
-    out.addAttribute("cx", ellipse->center.x);
-    out.addAttribute("cy", ellipse->center.y);
+    out.addAttribute("cx", ellipse->position.x);
+    out.addAttribute("cy", ellipse->position.y);
     out.addAttribute("rx", rx);
     out.addAttribute("ry", ry);
   }
-  Rect bounds = Rect::MakeXYWH(ellipse->center.x - rx, ellipse->center.y - ry, rx * 2, ry * 2);
+  Rect bounds = Rect::MakeXYWH(ellipse->position.x - rx, ellipse->position.y - ry, rx * 2, ry * 2);
   std::string p3Style;
   applyFillAttributes(out, fs.fill, bounds, &p3Style);
   applyStrokeAttributes(out, fs.stroke, bounds, &p3Style);

@@ -179,7 +179,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_Rectangle) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto layer = doc->makeNode<pagx::Layer>();
   auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->center = {100, 100};
+  rect->position = {100, 100};
   rect->size = {160, 120};
   rect->roundness = 10;
   auto fill = doc->makeNode<pagx::Fill>();
@@ -209,7 +209,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_Ellipse) {
 
   auto layer1 = doc->makeNode<pagx::Layer>();
   auto circle = doc->makeNode<pagx::Ellipse>();
-  circle->center = {80, 100};
+  circle->position = {80, 100};
   circle->size = {100, 100};
   auto fill1 = doc->makeNode<pagx::Fill>();
   auto solid1 = doc->makeNode<pagx::SolidColor>();
@@ -221,7 +221,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_Ellipse) {
 
   auto layer2 = doc->makeNode<pagx::Layer>();
   auto ellipse = doc->makeNode<pagx::Ellipse>();
-  ellipse->center = {220, 100};
+  ellipse->position = {220, 100};
   ellipse->size = {120, 80};
   auto fill2 = doc->makeNode<pagx::Fill>();
   auto solid2 = doc->makeNode<pagx::SolidColor>();
@@ -302,7 +302,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_LinearGradient) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto layer = doc->makeNode<pagx::Layer>();
   auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->center = {100, 100};
+  rect->position = {100, 100};
   rect->size = {180, 180};
 
   auto fill = doc->makeNode<pagx::Fill>();
@@ -337,7 +337,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_RadialGradient) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto layer = doc->makeNode<pagx::Layer>();
   auto ellipse = doc->makeNode<pagx::Ellipse>();
-  ellipse->center = {100, 100};
+  ellipse->position = {100, 100};
   ellipse->size = {160, 160};
 
   auto fill = doc->makeNode<pagx::Fill>();
@@ -372,7 +372,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_Transform) {
   auto layer = doc->makeNode<pagx::Layer>();
   layer->matrix = pagx::Matrix::Translate(50, 50);
   auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->center = {50, 50};
+  rect->position = {50, 50};
   rect->size = {80, 80};
   auto fill = doc->makeNode<pagx::Fill>();
   auto solid = doc->makeNode<pagx::SolidColor>();
@@ -395,7 +395,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_Opacity) {
   auto layer = doc->makeNode<pagx::Layer>();
   layer->alpha = 0.5f;
   auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->center = {100, 100};
+  rect->position = {100, 100};
   rect->size = {150, 150};
   auto fill = doc->makeNode<pagx::Fill>();
   auto solid = doc->makeNode<pagx::SolidColor>();
@@ -475,7 +475,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_BlurFilter) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto layer = doc->makeNode<pagx::Layer>();
   auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->center = {100, 100};
+  rect->position = {100, 100};
   rect->size = {120, 120};
   auto fill = doc->makeNode<pagx::Fill>();
   auto solid = doc->makeNode<pagx::SolidColor>();
@@ -503,7 +503,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_DropShadow) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto layer = doc->makeNode<pagx::Layer>();
   auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->center = {100, 100};
+  rect->position = {100, 100};
   rect->size = {100, 100};
   auto fill = doc->makeNode<pagx::Fill>();
   auto solid = doc->makeNode<pagx::SolidColor>();
@@ -539,7 +539,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_NestedLayers) {
   auto childLayer1 = doc->makeNode<pagx::Layer>();
   childLayer1->id = "child1";
   auto rect1 = doc->makeNode<pagx::Rectangle>();
-  rect1->center = {75, 75};
+  rect1->position = {75, 75};
   rect1->size = {100, 100};
   auto fill1 = doc->makeNode<pagx::Fill>();
   auto solid1 = doc->makeNode<pagx::SolidColor>();
@@ -552,7 +552,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_NestedLayers) {
   childLayer2->id = "child2";
   childLayer2->matrix = pagx::Matrix::Translate(100, 100);
   auto rect2 = doc->makeNode<pagx::Rectangle>();
-  rect2->center = {75, 75};
+  rect2->position = {75, 75};
   rect2->size = {100, 100};
   auto fill2 = doc->makeNode<pagx::Fill>();
   auto solid2 = doc->makeNode<pagx::SolidColor>();
@@ -579,7 +579,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_FillOpacity) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto layer = doc->makeNode<pagx::Layer>();
   auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->center = {100, 100};
+  rect->position = {100, 100};
   rect->size = {150, 150};
   auto fill = doc->makeNode<pagx::Fill>();
   fill->alpha = 0.6f;
@@ -602,7 +602,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_NoXmlDeclaration) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto layer = doc->makeNode<pagx::Layer>();
   auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->center = {50, 50};
+  rect->position = {50, 50};
   rect->size = {80, 80};
   auto fill = doc->makeNode<pagx::Fill>();
   auto solid = doc->makeNode<pagx::SolidColor>();
@@ -626,7 +626,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ToFile) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto layer = doc->makeNode<pagx::Layer>();
   auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->center = {50, 50};
+  rect->position = {50, 50};
   rect->size = {80, 80};
   auto fill = doc->makeNode<pagx::Fill>();
   auto solid = doc->makeNode<pagx::SolidColor>();
@@ -713,7 +713,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_InnerShadow) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto layer = doc->makeNode<pagx::Layer>();
   auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->center = {100, 100};
+  rect->position = {100, 100};
   rect->size = {120, 120};
   auto fill = doc->makeNode<pagx::Fill>();
   auto solid = doc->makeNode<pagx::SolidColor>();
@@ -744,7 +744,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_MultiStopGradient) {
   auto doc = pagx::PAGXDocument::Make(300, 100);
   auto layer = doc->makeNode<pagx::Layer>();
   auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->center = {150, 50};
+  rect->position = {150, 50};
   rect->size = {280, 80};
   auto fill = doc->makeNode<pagx::Fill>();
   auto grad = doc->makeNode<pagx::LinearGradient>();
@@ -789,7 +789,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_FillAndStroke) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto layer = doc->makeNode<pagx::Layer>();
   auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->center = {100, 100};
+  rect->position = {100, 100};
   rect->size = {120, 120};
   rect->roundness = 15;
   auto fill = doc->makeNode<pagx::Fill>();
@@ -822,7 +822,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_LayerPosition) {
   layer->x = 50;
   layer->y = 50;
   auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->center = {50, 50};
+  rect->position = {50, 50};
   rect->size = {80, 80};
   auto fill = doc->makeNode<pagx::Fill>();
   auto solid = doc->makeNode<pagx::SolidColor>();
