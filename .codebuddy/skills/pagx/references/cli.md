@@ -231,6 +231,7 @@ pagx convert input.pagx output.svg                   # PAGX to SVG
 pagx convert input.svg output.pagx                   # SVG to PAGX
 pagx convert --indent 4 input.pagx output.svg        # PAGX to SVG with 4-space indent
 pagx convert --no-xml-declaration input.pagx out.svg
+pagx convert --no-convert-text-to-path input.pagx out.svg  # keep <text> elements
 pagx convert -f svg input.pagx output                # force SVG output format
 pagx convert --no-expand-use input.svg output.pagx   # SVG to PAGX without expanding <use>
 ```
@@ -240,6 +241,7 @@ pagx convert --no-expand-use input.svg output.pagx   # SVG to PAGX without expan
 | `-f <format>` | Override output format (`svg`, `pagx`; default: inferred from output extension) |
 | `--indent <n>` | SVG indentation spaces (default: 2, valid range: 0–16) |
 | `--no-xml-declaration` | Omit the `<?xml ...?>` declaration (SVG output only) |
+| `--no-convert-text-to-path` | Keep text as `<text>` elements instead of converting to `<path>` (SVG output only) |
 | `--no-expand-use` | Do not expand `<use>` references (SVG input only) |
 | `--flatten-transforms` | Flatten nested transforms into single matrices (SVG input only) |
 | `--preserve-unknown` | Preserve unsupported SVG elements as Unknown nodes (SVG input only) |

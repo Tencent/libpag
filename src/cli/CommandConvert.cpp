@@ -35,6 +35,7 @@ struct ConvertOptions {
   // SVG export options
   int indent = 2;
   bool noXmlDeclaration = false;
+  bool noConvertTextToPath = false;
   // SVG import options
   bool expandUse = true;
   bool flattenTransforms = false;
@@ -54,6 +55,7 @@ static void PrintUsage() {
       << "SVG output options:\n"
       << "  --indent <n>              Indentation spaces (default: 2, valid range: 0-16)\n"
       << "  --no-xml-declaration      Omit the <?xml ...?> declaration\n"
+      << "  --no-convert-text-to-path Keep text as <text> elements instead of <path>\n"
       << "\n"
       << "SVG input options:\n"
       << "  --no-expand-use           Do not expand <use> references\n"
@@ -99,6 +101,8 @@ static int ParseOptions(int argc, char* argv[], ConvertOptions* options) {
       options->indent = static_cast<int>(value);
     } else if (arg == "--no-xml-declaration") {
       options->noXmlDeclaration = true;
+    } else if (arg == "--no-convert-text-to-path") {
+      options->noConvertTextToPath = true;
     } else if (arg == "--no-expand-use") {
       options->expandUse = false;
     } else if (arg == "--flatten-transforms") {
@@ -159,6 +163,7 @@ static int ConvertToSVG(const ConvertOptions& options) {
   SVGExporter::Options svgOptions = {};
   svgOptions.indent = options.indent;
   svgOptions.xmlDeclaration = !options.noXmlDeclaration;
+  svgOptions.convertTextToPath = !options.noConvertTextToPath;
 
   if (!SVGExporter::ToFile(*document, options.outputFile, svgOptions)) {
     std::cerr << "pagx convert: error: failed to write '" << options.outputFile << "'\n";
