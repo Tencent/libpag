@@ -75,10 +75,13 @@ std::shared_ptr<PAGSurface> PAGPlayer::getSurface() {
 }
 
 void PAGPlayer::setSurface(std::shared_ptr<PAGSurface> newSurface) {
-  auto surfaceLocker =
-      newSurface ? std::atomic_load(&newSurface->rootLocker) : std::shared_ptr<std::mutex>();
-  ScopedLock autoLock(rootLocker, surfaceLocker);
-  setSurfaceInternal(newSurface);
+  if (newSurface) {
+    ScopedLock autoLock(rootLocker, newSurface->rootLocker);
+    setSurfaceInternal(newSurface);
+  } else {
+    LockGuard autoLock(rootLocker);
+    setSurfaceInternal(nullptr);
+  }
 }
 
 void PAGPlayer::setSurfaceInternal(std::shared_ptr<PAGSurface> newSurface) {
