@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- VIS-002: Odd stroke width (3px) but layer position is at integer (1,1) not half-pixel -->
+<pagx version="1.0" width="24" height="24">
+  <Layer name="OddStrokeMisaligned" x="1" y="1">
+    <Rectangle position="12,12" size="18,18"/>
+    <Stroke color="currentColor" width="3"/>
+  </Layer>
+</pagx>

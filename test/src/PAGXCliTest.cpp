@@ -1333,4 +1333,159 @@ CLI_TEST(PAGXCliTest, Lint_VIS101_ThemeColor) {
   EXPECT_TRUE(output.find("VIS-101") == std::string::npos);
 }
 
+// VIS-101: hardcoded white color
+CLI_TEST(PAGXCliTest, Lint_VIS101_HardcodedWhite) {
+  auto inputPath = TestResourcePath("lint_vis101_hardcoded_white.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-101") != std::string::npos);
+}
+
+// VIS-002: odd stroke width — layer position misaligned (integer, not half-pixel)
+CLI_TEST(PAGXCliTest, Lint_VIS002_OddStrokeMisaligned) {
+  auto inputPath = TestResourcePath("lint_vis002_odd_stroke_misaligned.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-002") != std::string::npos);
+}
+
+// VIS-002: odd stroke width — layer position on strict half-pixel (should pass)
+CLI_TEST(PAGXCliTest, Lint_VIS002_OddStrokeAligned) {
+  auto inputPath = TestResourcePath("lint_vis002_odd_stroke_aligned.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-002") == std::string::npos);
+}
+
+// VIS-001: misaligned Ellipse geometry
+CLI_TEST(PAGXCliTest, Lint_VIS001_EllipseMisaligned) {
+  auto inputPath = TestResourcePath("lint_vis001_ellipse_misaligned.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-001") != std::string::npos);
+}
+
+// VIS-012: canvas 16x16 — stroke 2px exceeds safe range [1.0, 1.5]px
+CLI_TEST(PAGXCliTest, Lint_VIS012_SmallCanvas) {
+  auto inputPath = TestResourcePath("lint_vis012_canvas_small.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-012") != std::string::npos);
+}
+
+// VIS-012: canvas 64x64 (>48px) — no safe range defined, should NOT trigger VIS-012
+CLI_TEST(PAGXCliTest, Lint_VIS012_LargeCanvasNoRange) {
+  auto inputPath = TestResourcePath("lint_vis012_canvas_large.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-012") == std::string::npos);
+}
+
+// VIS-013: rounded rectangle with no stroke — should NOT trigger VIS-013
+CLI_TEST(PAGXCliTest, Lint_VIS013_NoStroke) {
+  auto inputPath = TestResourcePath("lint_vis013_no_stroke.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-013") == std::string::npos);
+}
+
+// VIS-020: content with generous padding — should NOT trigger VIS-020
+CLI_TEST(PAGXCliTest, Lint_VIS020_BoundaryPass) {
+  auto inputPath = TestResourcePath("lint_vis020_boundary_pass.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-020") == std::string::npos);
+  EXPECT_TRUE(output.find("VIS-022") == std::string::npos);
+}
+
+// FMT-043: multiple MergePaths — first Fill+MergePath triggers violation
+CLI_TEST(PAGXCliTest, Validate_FMT043_MultipleMerges) {
+  auto path = TestResourcePath("validate_fmt043_multiple_merges.pagx");
+  std::string errOutput;
+  std::streambuf* oldCerr = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
+  std::cerr.rdbuf(oldCerr);
+  errOutput = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(errOutput.find("FMT-043") != std::string::npos);
+}
+
+// FMT-051: Text with non-Start textAnchor and TextBox present — triggers violation
+CLI_TEST(PAGXCliTest, Validate_FMT051_TextAnchorOnly) {
+  auto path = TestResourcePath("validate_fmt051_text_anchor_only.pagx");
+  std::string errOutput;
+  std::streambuf* oldCerr = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
+  std::cerr.rdbuf(oldCerr);
+  errOutput = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(errOutput.find("FMT-051") != std::string::npos);
+}
+
+// FMT-051: Text with position set (y==0) and TextBox present — triggers violation
+CLI_TEST(PAGXCliTest, Validate_FMT051_TextPositionOnly) {
+  auto path = TestResourcePath("validate_fmt051_text_position_only.pagx");
+  std::string errOutput;
+  std::streambuf* oldCerr = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
+  std::cerr.rdbuf(oldCerr);
+  errOutput = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(errOutput.find("FMT-051") != std::string::npos);
+}
+
 }  // namespace pag

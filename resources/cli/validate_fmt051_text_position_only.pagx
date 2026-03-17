@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- FMT-051: Text with position set (textAnchor is default Start) but TextBox present -->
+<pagx version="1.0" width="200" height="100">
+  <Layer name="PositionOnlyTextBox">
+    <Text text="Hello" fontFamily="Arial" fontSize="24" position="50,0"/>
+    <TextBox position="0,0" size="200,100"/>
+    <Fill color="#333333"/>
+  </Layer>
+</pagx>
