@@ -246,22 +246,27 @@ static void CheckStrokeWidth(const Layer* layer, float canvasSize, const std::st
     }
   }
 
-  // VIS-012: Recommended stroke width range for this canvas size.
+  // VIS-012: recommended stroke width ranges by canvas size.
+  struct StrokeRange {
+    float maxCanvasSize;
+    float minSafe;
+    float maxSafe;
+  };
+  static constexpr StrokeRange kVis012StrokeRanges[] = {
+      {16.0f, 1.0f, 1.5f},
+      {24.0f, 1.0f, 2.5f},
+      {32.0f, 1.5f, 3.0f},
+      {48.0f, 2.0f, 4.0f},
+  };
   if (canvasSize > 0) {
     float minSafe = 0.0f;
     float maxSafe = 0.0f;
-    if (canvasSize <= 16.0f) {
-      minSafe = 1.0f;
-      maxSafe = 1.5f;
-    } else if (canvasSize <= 24.0f) {
-      minSafe = 1.0f;
-      maxSafe = 2.5f;
-    } else if (canvasSize <= 32.0f) {
-      minSafe = 1.5f;
-      maxSafe = 3.0f;
-    } else if (canvasSize <= 48.0f) {
-      minSafe = 2.0f;
-      maxSafe = 4.0f;
+    for (const auto& range : kVis012StrokeRanges) {
+      if (canvasSize <= range.maxCanvasSize) {
+        minSafe = range.minSafe;
+        maxSafe = range.maxSafe;
+        break;
+      }
     }
     if (maxSafe > 0.0f) {
       for (auto* stroke : strokes) {
