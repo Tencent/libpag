@@ -50,10 +50,13 @@ static std::string LayerLabel(const Layer* layer) {
   return "(unnamed layer)";
 }
 
+// Tolerance for floating-point alignment checks (10^-4 pixels).
+static constexpr float kAlignmentEpsilon = 1e-4f;
+
 // Returns true if the value is aligned to a 0.5px grid (i.e. value * 2 is an integer).
 static bool IsHalfPixelAligned(float value) {
   float scaled = value * 2.0f;
-  return std::fabs(scaled - std::round(scaled)) < 1e-4f;
+  return std::fabs(scaled - std::round(scaled)) < kAlignmentEpsilon;
 }
 
 // Returns true only when the value is on a strict half-pixel boundary (0.5, 1.5, 2.5, ...),
@@ -61,7 +64,7 @@ static bool IsHalfPixelAligned(float value) {
 static bool IsStrictHalfPixel(float value) {
   float scaled = value * 2.0f;
   float nearest = std::round(scaled);
-  if (std::fabs(scaled - nearest) >= 1e-4f) {
+  if (std::fabs(scaled - nearest) >= kAlignmentEpsilon) {
     return false;
   }
   return std::fmod(std::fabs(nearest), 2.0f) > 0.5f;
@@ -203,7 +206,7 @@ static void CheckPixelAlignment(const Layer* layer, const std::string& location,
   // VIS-002: For strokes, check that stroke center sits on the correct boundary.
   for (auto* stroke : strokes) {
     float width = stroke->width;
-    bool isIntegerWidth = std::fabs(width - std::round(width)) < 1e-4f;
+    bool isIntegerWidth = std::fabs(width - std::round(width)) < kAlignmentEpsilon;
     bool isOddWidth = isIntegerWidth && (std::fmod(std::round(width), 2.0f) != 0.0f);
     if (isOddWidth) {
       // Odd stroke width: stroke center must be on strict 0.5px boundary (layer at half-pixel)
