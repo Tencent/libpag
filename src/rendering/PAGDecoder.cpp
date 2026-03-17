@@ -130,18 +130,19 @@ PAGDecoder::~PAGDecoder() {
 }
 
 int PAGDecoder::numFrames() {
-  std::lock_guard<std::mutex> auoLock(locker);
+  std::lock_guard<std::mutex> autoLock(locker);
   checkCompositionChange(getComposition());
   return _numFrames;
 }
 
 float PAGDecoder::frameRate() {
-  std::lock_guard<std::mutex> auoLock(locker);
+  std::lock_guard<std::mutex> autoLock(locker);
   checkCompositionChange(getComposition());
   return _frameRate;
 }
 
 bool PAGDecoder::checkFrameChanged(int index) {
+  std::lock_guard<std::mutex> autoLock(locker);
   if (index < 0 || index >= _numFrames) {
     LOGE("PAGDecoder::readFrame() The index is out of range!");
     return false;
@@ -156,7 +157,7 @@ bool PAGDecoder::checkFrameChanged(int index) {
 
 bool PAGDecoder::readFrame(int index, void* pixels, size_t rowBytes, ColorType colorType,
                            AlphaType alphaType) {
-  std::lock_guard<std::mutex> auoLock(locker);
+  std::lock_guard<std::mutex> autoLock(locker);
   auto info =
       tgfx::ImageInfo::Make(_width, _height, ToTGFX(colorType), ToTGFX(alphaType), rowBytes);
   auto bitmap = BitmapBuffer::Wrap(info, pixels);
@@ -164,7 +165,7 @@ bool PAGDecoder::readFrame(int index, void* pixels, size_t rowBytes, ColorType c
 }
 
 bool PAGDecoder::readFrame(int index, HardwareBufferRef hardwareBuffer) {
-  std::lock_guard<std::mutex> auoLock(locker);
+  std::lock_guard<std::mutex> autoLock(locker);
   auto bitmap = BitmapBuffer::Wrap(hardwareBuffer);
   return readFrameInternal(index, bitmap);
 }
