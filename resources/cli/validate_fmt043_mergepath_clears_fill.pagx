@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- FMT-043 violation: Fill before MergePath is cleared by MergePath -->
+<pagx version="1.0" width="24" height="24">
+  <Layer name="BadMergePath">
+    <Rectangle size="20,20"/>
+    <Fill color="#FF0000"/>
+    <Ellipse center="12,12" size="16,16"/>
+    <MergePath mode="difference"/>
+    <Fill color="#0000FF"/>
+  </Layer>
+</pagx>

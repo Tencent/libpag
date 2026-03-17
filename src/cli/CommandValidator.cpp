@@ -24,11 +24,105 @@
 #include <string>
 #include <vector>
 #include "cli/CliUtils.h"
+#include "pagx/PAGXDocument.h"
+#include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Group.h"
+#include "pagx/nodes/Layer.h"
+#include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextBox.h"
 #include "pagx_xsd.h"
 
 namespace pagx::cli {
 
-// libxml2 2.12+ changed xmlStructuredErrorFunc signature to use const xmlError*
+// --- Semantic rule checks on the parsed document model ---
+
+// FMT-043: MergePath in a scope preceded by Fill/Stroke will clear those effects.
+// Check a flat elements vector (one layer or group scope).
+static void CheckFmt043Scope(const std::vector<Element*>& elements, const std::string& scopeLabel,
+                             std::vector<ValidationError>& errors) {
+  bool hasPainterBeforeMergePath = false;
+  bool hasMergePath = false;
+  for (auto* element : elements) {
+    NodeType type = element->nodeType();
+    if (type == NodeType::Fill || type == NodeType::Stroke) {
+      hasPainterBeforeMergePath = true;
+    } else if (type == NodeType::MergePath) {
+      if (hasPainterBeforeMergePath) {
+        ValidationError err = {};
+        err.message = "[FMT-043] " + scopeLabel +
+                      ": Fill/Stroke before MergePath will be cleared by MergePath."
+                      " Isolate pre-MergePath rendering in a separate Group.";
+        errors.push_back(std::move(err));
+      }
+      // Reset: painters after MergePath belong to a new accumulation phase.
+      hasPainterBeforeMergePath = false;
+      hasMergePath = true;
+    } else if (type == NodeType::Group) {
+      // Recurse into groups for their own scope.
+      auto* group = static_cast<const Group*>(element);
+      CheckFmt043Scope(group->elements, scopeLabel + "/<Group>", errors);
+    }
+  }
+  (void)hasMergePath;
+}
+
+// FMT-051: Text with position or non-Start textAnchor when TextBox is present in the same scope.
+static void CheckFmt051Scope(const std::vector<Element*>& elements, const std::string& scopeLabel,
+                             std::vector<ValidationError>& errors) {
+  bool hasTextBox = false;
+  std::vector<const Text*> texts;
+  for (auto* element : elements) {
+    NodeType type = element->nodeType();
+    if (type == NodeType::TextBox) {
+      hasTextBox = true;
+    } else if (type == NodeType::Text) {
+      texts.push_back(static_cast<const Text*>(element));
+    } else if (type == NodeType::Group) {
+      auto* group = static_cast<const Group*>(element);
+      CheckFmt051Scope(group->elements, scopeLabel + "/<Group>", errors);
+    }
+  }
+  if (!hasTextBox) {
+    return;
+  }
+  for (auto* text : texts) {
+    bool hasPosition = text->position.x != 0.0f || text->position.y != 0.0f;
+    bool hasNonDefaultAnchor = text->textAnchor != TextAnchor::Start;
+    if (hasPosition || hasNonDefaultAnchor) {
+      ValidationError err = {};
+      err.message = "[FMT-051] " + scopeLabel +
+                    ": Text has 'position' or 'textAnchor' that will be ignored because TextBox"
+                    " overrides text layout. Remove these attributes from the Text element.";
+      errors.push_back(std::move(err));
+      break;  // One error per scope is enough.
+    }
+  }
+}
+
+static void CheckSemanticRules(const PAGXDocument* document, std::vector<ValidationError>& errors) {
+  for (auto* layer : document->layers) {
+    std::string label = "Layer";
+    if (!layer->name.empty()) {
+      label += "[" + layer->name + "]";
+    }
+    CheckFmt043Scope(layer->contents, label, errors);
+    CheckFmt051Scope(layer->contents, label, errors);
+    // Recurse into child layers.
+    for (auto* child : layer->children) {
+      std::string childLabel = "Layer";
+      if (!child->name.empty()) {
+        childLabel += "[" + child->name + "]";
+      }
+      CheckFmt043Scope(child->contents, childLabel, errors);
+      CheckFmt051Scope(child->contents, childLabel, errors);
+    }
+  }
+}
+
+// ---
 #if LIBXML_VERSION >= 21200
 static void CollectStructuredError(void* context, const xmlError* xmlError) {
 #else
@@ -135,6 +229,14 @@ std::vector<ValidationError> ValidateFile(const std::string& filePath) {
   xmlSchemaFreeValidCtxt(validCtxt);
   xmlSchemaFree(schema);
   xmlFreeDoc(doc);
+
+  // Only run semantic checks when XSD validation passes.
+  if (errors.empty()) {
+    auto pagxDoc = pagx::PAGXImporter::FromFile(filePath);
+    if (pagxDoc != nullptr) {
+      CheckSemanticRules(pagxDoc.get(), errors);
+    }
+  }
 
   return errors;
 }

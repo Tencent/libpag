@@ -160,10 +160,47 @@ CLI_TEST(PAGXCliTest, Validate_MissingFile) {
   EXPECT_NE(ret, 0);
 }
 
+// FMT semantic rule tests (validate returns non-zero on violation)
+CLI_TEST(PAGXCliTest, Validate_FMT043_MergePathClearsFill) {
+  auto path = TestResourcePath("validate_fmt043_mergepath_clears_fill.pagx");
+  std::string errOutput;
+  std::streambuf* oldCerr = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
+  std::cerr.rdbuf(oldCerr);
+  errOutput = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(errOutput.find("FMT-043") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Validate_FMT043_MergeIsolated) {
+  auto path = TestResourcePath("validate_fmt043_merge_isolated.pagx");
+  auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Validate_FMT051_TextBoxOverridesPosition) {
+  auto path = TestResourcePath("validate_fmt051_textbox_position.pagx");
+  std::string errOutput;
+  std::streambuf* oldCerr = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
+  std::cerr.rdbuf(oldCerr);
+  errOutput = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(errOutput.find("FMT-051") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Validate_FMT051_TextBoxClean) {
+  auto path = TestResourcePath("validate_fmt051_textbox_clean.pagx");
+  auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
+  EXPECT_EQ(ret, 0);
+}
+
 //==============================================================================
 // Optimize tests — RemoveEmptyNodes
-//==============================================================================
-
 CLI_TEST(PAGXCliTest, Optimize_RemoveEmptyElements) {
   auto inputPath = TestResourcePath("optimize_remove_empty.pagx");
   auto outputPath = TempDir() + "/empty_elements_out.pagx";
