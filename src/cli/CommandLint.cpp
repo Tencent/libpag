@@ -299,13 +299,16 @@ static void CheckStrokeWidth(const Layer* layer, float canvasSize, const std::st
   }
 }
 
+// VIS-021: content must stay within 8.3% (1/12) of canvas edge.
+static constexpr float kSafeZonePaddingRatio = 0.083f;
+
 // VIS-020/021/022: Safe zone / margins.
 static void CheckSafeZone(const Layer* layer, float canvasWidth, float canvasHeight,
                           const std::string& location, std::vector<LintIssue>& issues) {
   if (canvasWidth <= 0.0f || canvasHeight <= 0.0f) {
     return;
   }
-  float minPadding = canvasWidth * 0.083f;  // VIS-021 formula
+  float minPadding = canvasWidth * kSafeZonePaddingRatio;
 
   Rect bounds = CollectGeometryBounds(layer->contents);
   if (bounds.isEmpty()) {
