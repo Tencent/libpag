@@ -167,8 +167,11 @@ class PAGAnimator {
   int playedCount = 0;
 
   explicit PAGAnimator(std::weak_ptr<Listener> listener);
+  bool isTaskRunning() const;
+  void extractAndWaitTask(std::unique_lock<std::mutex>& lock);
+  void flushAsync(bool setStartTime);
   void advance();
-  std::vector<int> doAdvance(std::shared_ptr<tgfx::Task>& pendingTask);
+  std::vector<int> doAdvance();
   void doUpdate(bool setStartTime);
   void onFlush(bool setStartTime);
   void startAnimation();

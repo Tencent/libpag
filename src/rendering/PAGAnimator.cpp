@@ -107,18 +107,12 @@ bool PAGAnimator::isSync() {
 }
 
 void PAGAnimator::setSync(bool value) {
-  locker.lock();
+  std::unique_lock<std::mutex> lock(locker);
   if (_isSync == value) {
-    locker.unlock();
     return;
   }
   _isSync = value;
-  auto tempTask = task;
-  task = nullptr;
-  locker.unlock();
-  if (tempTask) {
-    tempTask->wait();
-  }
+  extractAndWaitTask(lock);
 }
 
 int64_t PAGAnimator::duration() {
@@ -127,25 +121,18 @@ int64_t PAGAnimator::duration() {
 }
 
 void PAGAnimator::setDuration(int64_t duration) {
-  std::shared_ptr<tgfx::Task> tempTask;
-  {
-    std::lock_guard<std::mutex> autoLock(locker);
-    if (_duration == duration) {
-      return;
-    }
-    _duration = duration;
-    if (_isRunning) {
-      if (_duration > 0) {
-        startAnimation();
-      } else {
-        cancelAnimation();
-        tempTask = std::move(task);
-        task = nullptr;
-      }
-    }
+  std::unique_lock<std::mutex> lock(locker);
+  if (_duration == duration) {
+    return;
   }
-  if (tempTask) {
-    tempTask->wait();
+  _duration = duration;
+  if (_isRunning) {
+    if (_duration > 0) {
+      startAnimation();
+    } else {
+      cancelAnimation();
+      extractAndWaitTask(lock);
+    }
   }
 }
 
@@ -201,19 +188,14 @@ void PAGAnimator::start() {
 }
 
 void PAGAnimator::cancel() {
-  std::shared_ptr<tgfx::Task> tempTask;
   {
-    std::lock_guard<std::mutex> autoLock(locker);
+    std::unique_lock<std::mutex> lock(locker);
     if (!_isRunning) {
       return;
     }
     _isRunning = false;
     cancelAnimation();
-    tempTask = std::move(task);
-    task = nullptr;
-  }
-  if (tempTask) {
-    tempTask->wait();
+    extractAndWaitTask(lock);
   }
   auto listener = weakListener.lock();
   if (listener) {
@@ -225,12 +207,40 @@ void PAGAnimator::update() {
   doUpdate(false);
 }
 
-void PAGAnimator::advance() {
-  std::shared_ptr<tgfx::Task> pendingTask;
-  auto events = doAdvance(pendingTask);
+bool PAGAnimator::isTaskRunning() const {
+  if (task == nullptr) {
+    return false;
+  }
+  auto status = task->status();
+  return status != tgfx::TaskStatus::Finished && status != tgfx::TaskStatus::Canceled;
+}
+
+void PAGAnimator::extractAndWaitTask(std::unique_lock<std::mutex>& lock) {
+  auto pendingTask = std::move(task);
+  task = nullptr;
+  lock.unlock();
   if (pendingTask) {
     pendingTask->wait();
   }
+}
+
+void PAGAnimator::flushAsync(bool setStartTime) {
+  auto newTask = tgfx::Task::Run([weakThis = weakThis, setStartTime]() {
+    auto animator = weakThis.lock();
+    if (animator) {
+      animator->onFlush(setStartTime);
+    }
+  });
+  std::lock_guard<std::mutex> autoLock(locker);
+  if (_isRunning) {
+    task = std::move(newTask);
+  } else {
+    newTask->cancel();
+  }
+}
+
+void PAGAnimator::advance() {
+  auto events = doAdvance();
   auto listener = weakListener.lock();
   if (listener == nullptr) {
     return;
@@ -251,8 +261,8 @@ void PAGAnimator::advance() {
   }
 }
 
-std::vector<int> PAGAnimator::doAdvance(std::shared_ptr<tgfx::Task>& pendingTask) {
-  std::lock_guard<std::mutex> autoLock(locker);
+std::vector<int> PAGAnimator::doAdvance() {
+  std::unique_lock<std::mutex> lock(locker);
   if (!_isRunning || _duration <= 0) {
     return {};
   }
@@ -279,8 +289,7 @@ std::vector<int> PAGAnimator::doAdvance(std::shared_ptr<tgfx::Task>& pendingTask
     isEnded = true;
     _isRunning = false;
     cancelAnimation();
-    pendingTask = std::move(task);
-    task = nullptr;
+    extractAndWaitTask(lock);
     events.push_back(AnimationTypeUpdate);
     events.push_back(AnimationTypeEnd);
   } else {
@@ -294,41 +303,25 @@ std::vector<int> PAGAnimator::doAdvance(std::shared_ptr<tgfx::Task>& pendingTask
 }
 
 void PAGAnimator::doUpdate(bool setStartTime) {
-  locker.lock();
-  if (task != nullptr && task->status() != tgfx::TaskStatus::Finished &&
-      task->status() != tgfx::TaskStatus::Canceled) {
-    locker.unlock();
-    return;
+  bool isSync = false;
+  bool isRunning = false;
+  {
+    std::lock_guard<std::mutex> autoLock(locker);
+    if (isTaskRunning()) {
+      return;
+    }
+    isSync = _isSync;
+    isRunning = _isRunning;
   }
-  auto isSync = _isSync;
-  locker.unlock();
   auto listener = weakListener.lock();
   if (listener) {
     listener->onAnimationWillUpdate(this);
   }
-  if (isSync) {
+  if (isSync || !isRunning) {
     onFlush(setStartTime);
-  } else {
-    locker.lock();
-    auto isRunning = _isRunning;
-    locker.unlock();
-    if (!isRunning) {
-      onFlush(setStartTime);
-      return;
-    }
-    auto newTask = tgfx::Task::Run([weakThis = weakThis, setStartTime]() {
-      auto animator = weakThis.lock();
-      if (animator) {
-        animator->onFlush(setStartTime);
-      }
-    });
-    std::lock_guard<std::mutex> autoLock(locker);
-    if (_isRunning) {
-      task = std::move(newTask);
-    } else {
-      newTask->cancel();
-    }
+    return;
   }
+  flushAsync(setStartTime);
 }
 
 void PAGAnimator::onFlush(bool setStartTime) {
