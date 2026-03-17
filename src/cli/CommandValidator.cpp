@@ -26,6 +26,7 @@
 #include "cli/CliUtils.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Layer.h"
@@ -114,6 +115,14 @@ static void CheckSemanticRulesLayer(const Layer* layer, std::vector<ValidationEr
 static void CheckSemanticRules(const PAGXDocument* document, std::vector<ValidationError>& errors) {
   for (auto* layer : document->layers) {
     CheckSemanticRulesLayer(layer, errors);
+  }
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      auto* comp = static_cast<const Composition*>(node.get());
+      for (auto* layer : comp->layers) {
+        CheckSemanticRulesLayer(layer, errors);
+      }
+    }
   }
 }
 
