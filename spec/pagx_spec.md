@@ -80,7 +80,7 @@ The following attributes are available on any element and are not repeated in in
 
 ```xml
 <Layer data-name="Background Layer" data-figma-id="12:34" data-exported-by="PAGExporter">
-  <Rectangle center="50,50" size="100,100"/>
+  <Rectangle position="50,50" size="100,100"/>
   <Fill color="#FF0000"/>
 </Layer>
 ```
@@ -903,22 +903,22 @@ Geometry elements provide renderable shapes.
 Rectangles are defined from center point with uniform corner rounding support.
 
 ```xml
-<Rectangle center="100,100" size="200,150" roundness="10" reversed="false"/>
+<Rectangle position="100,100" size="200,150" roundness="10" reversed="false"/>
 ```
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Center point |
+| `position` | Point | 0,0 | Center point coordinate |
 | `size` | Size | 100,100 | Dimensions "width,height" |
 | `roundness` | float | 0 | Corner radius |
 | `reversed` | bool | false | Reverse path direction |
 
 **Calculation Rules**:
 ```
-rect.left   = center.x - size.width / 2
-rect.top    = center.y - size.height / 2
-rect.right  = center.x + size.width / 2
-rect.bottom = center.y + size.height / 2
+rect.left   = position.x - size.width / 2
+rect.top    = position.y - size.height / 2
+rect.right  = position.x + size.width / 2
+rect.bottom = position.y + size.height / 2
 ```
 
 **Corner Rounding**:
@@ -936,21 +936,21 @@ rect.bottom = center.y + size.height / 2
 Ellipses are defined from center point.
 
 ```xml
-<Ellipse center="100,100" size="100,60" reversed="false"/>
+<Ellipse position="100,100" size="100,60" reversed="false"/>
 ```
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Center point |
+| `position` | Point | 0,0 | Center point coordinate |
 | `size` | Size | 100,100 | Dimensions "width,height" |
 | `reversed` | bool | false | Reverse path direction |
 
 **Calculation Rules**:
 ```
-boundingRect.left   = center.x - size.width / 2
-boundingRect.top    = center.y - size.height / 2
-boundingRect.right  = center.x + size.width / 2
-boundingRect.bottom = center.y + size.height / 2
+boundingRect.left   = position.x - size.width / 2
+boundingRect.top    = position.y - size.height / 2
+boundingRect.right  = position.x + size.width / 2
+boundingRect.bottom = position.y + size.height / 2
 ```
 
 **Path Start Point**: Ellipse path starts from the **right midpoint** (3 o'clock position).
@@ -964,12 +964,12 @@ boundingRect.bottom = center.y + size.height / 2
 Supports both regular polygon and star modes.
 
 ```xml
-<Polystar center="100,100" type="star" pointCount="5" outerRadius="100" innerRadius="50" rotation="0" outerRoundness="0" innerRoundness="0" reversed="false"/>
+<Polystar position="100,100" type="star" pointCount="5" outerRadius="100" innerRadius="50" rotation="0" outerRoundness="0" innerRoundness="0" reversed="false"/>
 ```
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Center point |
+| `position` | Point | 0,0 | Center point coordinate |
 | `type` | PolystarType | star | Type (see below) |
 | `pointCount` | float | 5 | Number of points (supports decimals) |
 | `outerRadius` | float | 100 | Outer radius |
@@ -998,8 +998,8 @@ Supports both regular polygon and star modes.
 **Vertex Calculation** (i-th outer vertex):
 ```
 angle = rotation + (i / pointCount) * 360°
-x = center.x + outerRadius * cos(angle)
-y = center.y + outerRadius * sin(angle)
+x = position.x + outerRadius * cos(angle)
+y = position.y + outerRadius * sin(angle)
 ```
 
 **Fractional Point Count**:

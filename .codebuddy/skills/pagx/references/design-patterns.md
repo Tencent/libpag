@@ -160,7 +160,7 @@ When different geometry needs different painters, isolate in separate Groups:
     <Fill color="#F00"/>
   </Group>
   <Group>
-    <Ellipse center="50,50" size="30,30"/>
+    <Ellipse position="50,50" size="30,30"/>
     <Stroke color="#000" width="1"/>
   </Group>
 </Layer>

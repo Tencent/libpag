@@ -132,6 +132,7 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
   }
 
   _document = PAGXDocument::Make(width, height);
+  parseCustomData(root, _document.get());
 
   // Collect all IDs from the SVG to avoid conflicts when generating new IDs.
   collectAllIds(root);
@@ -524,6 +525,7 @@ void SVGParserContext::convertChildren(const std::shared_ptr<DOMNode>& element,
   if (tag == "text") {
     auto textGroup = convertText(element, inheritedStyle);
     if (textGroup) {
+      parseCustomData(element, textGroup);
       contents.push_back(textGroup);
     }
     return;
@@ -568,25 +570,28 @@ void SVGParserContext::convertChildren(const std::shared_ptr<DOMNode>& element,
 Element* SVGParserContext::convertElement(const std::shared_ptr<DOMNode>& element) {
   const auto& tag = element->name;
 
+  Element* result = nullptr;
   if (tag == "rect") {
-    return convertRect(element);
+    result = convertRect(element);
   } else if (tag == "circle") {
-    return convertCircle(element);
+    result = convertCircle(element);
   } else if (tag == "ellipse") {
-    return convertEllipse(element);
+    result = convertEllipse(element);
   } else if (tag == "line") {
-    return convertLine(element);
+    result = convertLine(element);
   } else if (tag == "polyline") {
-    return convertPolyline(element);
+    result = convertPolyline(element);
   } else if (tag == "polygon") {
-    return convertPolygon(element);
+    result = convertPolygon(element);
   } else if (tag == "path") {
-    return convertPath(element);
+    result = convertPath(element);
   } else if (tag == "use") {
-    return convertUse(element);
+    result = convertUse(element);
   }
-
-  return nullptr;
+  if (result) {
+    parseCustomData(element, result);
+  }
+  return result;
 }
 Element* SVGParserContext::convertRect(const std::shared_ptr<DOMNode>& element) {
   float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
@@ -604,8 +609,8 @@ Element* SVGParserContext::convertRect(const std::shared_ptr<DOMNode>& element) 
   }
 
   auto rect = _document->makeNode<Rectangle>();
-  rect->center.x = x + width / 2;
-  rect->center.y = y + height / 2;
+  rect->position.x = x + width / 2;
+  rect->position.y = y + height / 2;
   rect->size.width = width;
   rect->size.height = height;
   rect->roundness = std::max(rx, ry);
@@ -618,8 +623,8 @@ Element* SVGParserContext::convertCircle(const std::shared_ptr<DOMNode>& element
   float r = parseLength(getAttribute(element, "r"), _viewBoxWidth);
 
   auto ellipse = _document->makeNode<Ellipse>();
-  ellipse->center.x = cx;
-  ellipse->center.y = cy;
+  ellipse->position.x = cx;
+  ellipse->position.y = cy;
   ellipse->size.width = r * 2;
   ellipse->size.height = r * 2;
 
@@ -632,8 +637,8 @@ Element* SVGParserContext::convertEllipse(const std::shared_ptr<DOMNode>& elemen
   float ry = parseLength(getAttribute(element, "ry"), _viewBoxHeight);
 
   auto ellipse = _document->makeNode<Ellipse>();
-  ellipse->center.x = cx;
-  ellipse->center.y = cy;
+  ellipse->position.x = cx;
+  ellipse->position.y = cy;
   ellipse->size.width = rx * 2;
   ellipse->size.height = ry * 2;
 
@@ -863,8 +868,8 @@ Element* SVGParserContext::convertUse(const std::shared_ptr<DOMNode>& element) {
     // Create a rectangle to display the image at original size.
     // The transform will be applied by the parent Layer's matrix.
     auto rect = _document->makeNode<Rectangle>();
-    rect->center.x = x + imageWidth / 2;
-    rect->center.y = y + imageHeight / 2;
+    rect->position.x = x + imageWidth / 2;
+    rect->position.y = y + imageHeight / 2;
     rect->size.width = imageWidth;
     rect->size.height = imageHeight;
 
@@ -1102,6 +1107,8 @@ Layer* SVGParserContext::convertMaskElement(const std::shared_ptr<DOMNode>& mask
 
   // Parse mask contents recursively.
   parseMaskChildren(maskElement, maskLayer, maskStyle, Matrix::Identity());
+
+  parseCustomData(maskElement, maskLayer);
 
   return maskLayer;
 }
@@ -2428,14 +2435,15 @@ static bool isSameGeometry(const Element* a, const Element* b) {
     case NodeType::Rectangle: {
       auto rectA = static_cast<const Rectangle*>(a);
       auto rectB = static_cast<const Rectangle*>(b);
-      return rectA->center.x == rectB->center.x && rectA->center.y == rectB->center.y &&
+      return rectA->position.x == rectB->position.x && rectA->position.y == rectB->position.y &&
              rectA->size.width == rectB->size.width && rectA->size.height == rectB->size.height &&
              rectA->roundness == rectB->roundness;
     }
     case NodeType::Ellipse: {
       auto ellipseA = static_cast<const Ellipse*>(a);
       auto ellipseB = static_cast<const Ellipse*>(b);
-      return ellipseA->center.x == ellipseB->center.x && ellipseA->center.y == ellipseB->center.y &&
+      return ellipseA->position.x == ellipseB->position.x &&
+             ellipseA->position.y == ellipseB->position.y &&
              ellipseA->size.width == ellipseB->size.width &&
              ellipseA->size.height == ellipseB->size.height;
     }
@@ -2616,8 +2624,8 @@ void SVGParserContext::countUrlReference(const std::string& attrValue) {
 std::string SVGParserContext::generateColorSourceId() {
   return generateUniqueId("color");
 }
-void SVGParserContext::parseCustomData(const std::shared_ptr<DOMNode>& element, Layer* layer) {
-  if (!element || !layer) {
+void SVGParserContext::parseCustomData(const std::shared_ptr<DOMNode>& element, Node* node) {
+  if (!element || !node) {
     return;
   }
 
@@ -2625,8 +2633,10 @@ void SVGParserContext::parseCustomData(const std::shared_ptr<DOMNode>& element, 
   for (const auto& attr : element->attributes) {
     if (attr.name.length() > 5 && attr.name.compare(0, 5, "data-") == 0) {
       // Remove "data-" prefix and store in customData.
-      std::string key = attr.name.substr(5);
-      layer->customData[key] = attr.value;
+      auto key = attr.name.substr(5);
+      if (Node::IsValidCustomDataKey(key)) {
+        node->customData[std::move(key)] = attr.value;
+      }
     }
   }
 }
@@ -2682,6 +2692,8 @@ ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
   if (!colorSource) {
     return nullptr;
   }
+
+  parseCustomData(defNode, colorSource);
 
   if (refCount > 1) {
     colorSource->id = generateColorSourceId();

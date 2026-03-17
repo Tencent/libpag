@@ -3,7 +3,7 @@
   <!-- Box A: Latin extended characters (2-byte UTF-8: é, ü, ï) -->
   <Layer x="50" y="30">
     <Group>
-      <Rectangle center="125,25" size="250,50"/>
+      <Rectangle position="125,25" size="250,50"/>
       <Stroke/>
     </Group>
     <Group>
@@ -16,7 +16,7 @@
   <!-- Box B: Tab character handling -->
   <Layer x="330" y="30">
     <Group>
-      <Rectangle center="110,25" size="220,50"/>
+      <Rectangle position="110,25" size="220,50"/>
       <Stroke/>
     </Group>
     <Group>
@@ -29,7 +29,7 @@
   <!-- Box C: Mixed CJK scripts (Hiragana + Katakana + Kanji) -->
   <Layer x="50" y="110">
     <Group>
-      <Rectangle center="125,50" size="250,100"/>
+      <Rectangle position="125,50" size="250,100"/>
       <Stroke/>
     </Group>
     <Group>
@@ -42,7 +42,7 @@
   <!-- Box D: Fullwidth characters -->
   <Layer x="330" y="110">
     <Group>
-      <Rectangle center="110,25" size="220,50"/>
+      <Rectangle position="110,25" size="220,50"/>
       <Stroke/>
     </Group>
     <Group>
@@ -55,7 +55,7 @@
   <!-- Box E: Multiple consecutive empty lines -->
   <Layer x="50" y="230">
     <Group>
-      <Rectangle center="110,65" size="220,130"/>
+      <Rectangle position="110,65" size="220,130"/>
       <Stroke/>
     </Group>
     <Group>

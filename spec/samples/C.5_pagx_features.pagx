@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="1600" height="1200">
   <Layer name="Background">
-    <Rectangle center="800,600" size="1600,1200"/>
+    <Rectangle position="800,600" size="1600,1200"/>
     <Fill color="@bgGradient"/>
   </Layer>
   <Layer name="GlowB" alpha="0.22">
-    <Ellipse center="1560,300" size="700,550"/>
+    <Ellipse position="1560,300" size="700,550"/>
     <Fill color="#38BDF8"/>
     <BlurFilter blurX="220" blurY="200"/>
   </Layer>
   <Layer name="GlowC" alpha="0.18">
-    <Ellipse center="350,1050" size="500,350"/>
+    <Ellipse position="350,1050" size="500,350"/>
     <Fill color="#10B981"/>
     <BlurFilter blurX="180" blurY="130"/>
   </Layer>
@@ -67,11 +67,11 @@
     </Group>
   </Layer>
   <Layer name="ConnectorDots" alpha="0.7">
-    <Ellipse center="800,375" size="6,6"/>
-    <Ellipse center="954,511" size="6,6"/>
-    <Ellipse center="903,646" size="6,6"/>
-    <Ellipse center="697,646" size="6,6"/>
-    <Ellipse center="646,511" size="6,6"/>
+    <Ellipse position="800,375" size="6,6"/>
+    <Ellipse position="954,511" size="6,6"/>
+    <Ellipse position="903,646" size="6,6"/>
+    <Ellipse position="697,646" size="6,6"/>
+    <Ellipse position="646,511" size="6,6"/>
     <Fill color="#06B6D4"/>
   </Layer>
   <Layer name="Connectors" alpha="0.35">
@@ -79,7 +79,7 @@
     <Stroke color="@accentLine" width="2" dashes="8,14"/>
   </Layer>
   <Layer name="CardReadable" x="800" y="160">
-    <Rectangle center="0,0" size="400,160" roundness="20"/>
+    <Rectangle position="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B80"/>
     <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetY="4" blurX="24" blurY="24" color="#00000060"/>
@@ -125,7 +125,7 @@
     </Layer>
   </Layer>
   <Layer name="CardComprehensive" x="1319" y="466">
-    <Rectangle center="0,0" size="400,160" roundness="20"/>
+    <Rectangle position="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B80"/>
     <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetY="4" blurX="24" blurY="24" color="#00000060"/>
@@ -141,17 +141,17 @@
     </Layer>
     <Layer x="-120" y="-2">
       <Group>
-        <Rectangle center="-5,-18" size="52,32" roundness="6"/>
+        <Rectangle position="-5,-18" size="52,32" roundness="6"/>
         <Stroke color="#38BDF8" width="2"/>
         <Fill color="#38BDF820"/>
       </Group>
       <Group>
-        <Rectangle center="5,2" size="52,32" roundness="6"/>
+        <Rectangle position="5,2" size="52,32" roundness="6"/>
         <Stroke color="#38BDF8" width="2"/>
         <Fill color="#38BDF815"/>
       </Group>
       <Group>
-        <Rectangle center="15,22" size="52,32" roundness="6"/>
+        <Rectangle position="15,22" size="52,32" roundness="6"/>
         <Stroke color="#38BDF8" width="2"/>
         <Fill color="#38BDF810"/>
       </Group>
@@ -169,7 +169,7 @@
     </Layer>
   </Layer>
   <Layer name="CardExpressive" x="281" y="466">
-    <Rectangle center="0,0" size="400,160" roundness="20"/>
+    <Rectangle position="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B80"/>
     <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetY="4" blurX="24" blurY="24" color="#00000060"/>
@@ -185,7 +185,7 @@
     </Layer>
     <Layer x="-110" y="-2">
       <Group>
-        <Rectangle center="-22,0" size="32,72" roundness="5"/>
+        <Rectangle position="-22,0" size="32,72" roundness="5"/>
         <Stroke color="#A855F7" width="2"/>
         <Fill color="#A855F720"/>
       </Group>
@@ -198,7 +198,7 @@
         <Stroke color="#A855F7" width="2" cap="round" join="round"/>
       </Group>
       <Group>
-        <Ellipse center="22,-28" size="18,18"/>
+        <Ellipse position="22,-28" size="18,18"/>
         <Stroke color="#A855F7" width="1.5"/>
       </Group>
       <Group>
@@ -224,7 +224,7 @@
     </Layer>
   </Layer>
   <Layer name="CardInteroperable" x="499" y="870">
-    <Rectangle center="0,0" size="400,160" roundness="20"/>
+    <Rectangle position="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B80"/>
     <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetY="4" blurX="24" blurY="24" color="#00000060"/>
@@ -240,8 +240,8 @@
     </Layer>
     <Layer x="-110" y="0">
       <Group>
-        <Ellipse center="-18,0" size="40,40"/>
-        <Ellipse center="18,0" size="40,40"/>
+        <Ellipse position="-18,0" size="40,40"/>
+        <Ellipse position="18,0" size="40,40"/>
         <Stroke color="#10B981" width="2"/>
       </Group>
       <Group>
@@ -266,7 +266,7 @@
     </Layer>
   </Layer>
   <Layer name="CardDeployable" x="1101" y="870">
-    <Rectangle center="0,0" size="400,160" roundness="20"/>
+    <Rectangle position="0,0" size="400,160" roundness="20"/>
     <Fill color="#1E293B80"/>
     <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetY="4" blurX="24" blurY="24" color="#00000060"/>
@@ -292,7 +292,7 @@
         <Fill color="#FBBF2415"/>
       </Group>
       <Group>
-        <Ellipse center="0,-10" size="12,12"/>
+        <Ellipse position="0,-10" size="12,12"/>
         <Stroke color="#FBBF24" width="2"/>
       </Group>
       <Group>
@@ -326,7 +326,7 @@
       </Stroke>
     </Group>
     <Group position="-180,0">
-      <Rectangle center="0,0" size="120,40" roundness="20"/>
+      <Rectangle position="0,0" size="120,40" roundness="20"/>
       <Fill color="#6366F120"/>
       <Stroke color="#6366F160" width="1"/>
       <Group position="0,5">
@@ -339,7 +339,7 @@
       <Stroke color="#64748B" width="2" cap="round" join="round"/>
     </Group>
     <Group>
-      <Rectangle center="0,0" size="100,40" roundness="20"/>
+      <Rectangle position="0,0" size="100,40" roundness="20"/>
       <Fill color="#EC489920"/>
       <Stroke color="#EC489960" width="1"/>
       <Group position="0,5">
@@ -352,7 +352,7 @@
       <Stroke color="#64748B" width="2" cap="round" join="round"/>
     </Group>
     <Group position="190,0">
-      <Rectangle center="0,0" size="140,40" roundness="20"/>
+      <Rectangle position="0,0" size="140,40" roundness="20"/>
       <Fill color="#34D39920"/>
       <Stroke color="#34D39960" width="1"/>
       <Group position="0,5">
@@ -371,10 +371,10 @@
       <Stroke color="#64748B" width="1" cap="round" join="round"/>
     </Group>
     <Group>
-      <Ellipse center="50,50" size="4,4"/>
-      <Ellipse center="1550,50" size="4,4"/>
-      <Ellipse center="50,1150" size="4,4"/>
-      <Ellipse center="1550,1150" size="4,4"/>
+      <Ellipse position="50,50" size="4,4"/>
+      <Ellipse position="1550,50" size="4,4"/>
+      <Ellipse position="50,1150" size="4,4"/>
+      <Ellipse position="1550,1150" size="4,4"/>
       <Fill color="#64748B"/>
     </Group>
   </Layer>
