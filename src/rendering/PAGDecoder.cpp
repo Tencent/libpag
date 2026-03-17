@@ -75,7 +75,7 @@ std::pair<int, float> PAGDecoder::GetFrameCountAndRate(
 
 std::vector<TimeRange> PAGDecoder::GetStaticTimeRange(std::shared_ptr<PAGComposition> composition,
                                                       int numFrames) {
-  LockGuard autoLock(&composition->rootLocker);
+  LockGuard autoLock(composition->rootLocker);
   std::vector<TimeRange> timeRanges = {};
   auto startTime = composition->startTimeInternal();
   auto duration = composition->durationInternal();

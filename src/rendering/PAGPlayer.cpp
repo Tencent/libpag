@@ -43,12 +43,12 @@ PAGPlayer::~PAGPlayer() {
 }
 
 std::shared_ptr<PAGComposition> PAGPlayer::getComposition() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return stage->getRootComposition();
 }
 
 void PAGPlayer::setComposition(std::shared_ptr<PAGComposition> newComposition) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   auto pagComposition = stage->getRootComposition();
   if (pagComposition == newComposition) {
     return;
@@ -70,12 +70,14 @@ void PAGPlayer::setComposition(std::shared_ptr<PAGComposition> newComposition) {
 }
 
 std::shared_ptr<PAGSurface> PAGPlayer::getSurface() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return pagSurface;
 }
 
 void PAGPlayer::setSurface(std::shared_ptr<PAGSurface> newSurface) {
-  ScopedLock autoLock(&rootLocker, newSurface ? &newSurface->rootLocker : nullptr);
+  auto surfaceLocker =
+      newSurface ? std::atomic_load(&newSurface->rootLocker) : std::shared_ptr<std::mutex>();
+  ScopedLock autoLock(rootLocker, surfaceLocker);
   setSurfaceInternal(newSurface);
 }
 
@@ -103,52 +105,52 @@ void PAGPlayer::setSurfaceInternal(std::shared_ptr<PAGSurface> newSurface) {
 }
 
 bool PAGPlayer::videoEnabled() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return renderCache->videoEnabled();
 }
 
 void PAGPlayer::setVideoEnabled(bool value) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   renderCache->setVideoEnabled(value);
 }
 
 bool PAGPlayer::cacheEnabled() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return renderCache->snapshotEnabled();
 }
 
 void PAGPlayer::setCacheEnabled(bool value) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   renderCache->setSnapshotEnabled(value);
 }
 
 bool PAGPlayer::useDiskCache() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return renderCache->useDiskCache();
 }
 
 void PAGPlayer::setUseDiskCache(bool value) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   renderCache->setUseDiskCache(value);
 }
 
 float PAGPlayer::cacheScale() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return stage->cacheScale();
 }
 
 void PAGPlayer::setCacheScale(float value) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   stage->setCacheScale(value);
 }
 
 float PAGPlayer::maxFrameRate() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return _maxFrameRate;
 }
 
 void PAGPlayer::setMaxFrameRate(float value) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   if (_maxFrameRate == value) {
     return;
   }
@@ -156,12 +158,12 @@ void PAGPlayer::setMaxFrameRate(float value) {
 }
 
 PAGScaleMode PAGPlayer::scaleMode() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return _scaleMode;
 }
 
 void PAGPlayer::setScaleMode(PAGScaleMode mode) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   _scaleMode = mode;
   auto pagComposition = stage->getRootComposition();
   if (_scaleMode == PAGScaleMode::None && pagComposition) {
@@ -171,13 +173,13 @@ void PAGPlayer::setScaleMode(PAGScaleMode mode) {
 }
 
 Matrix PAGPlayer::matrix() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   auto pagComposition = stage->getRootComposition();
   return pagComposition ? pagComposition->layerMatrix : Matrix::I();
 }
 
 void PAGPlayer::setMatrix(const Matrix& matrix) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   _scaleMode = PAGScaleMode::None;
   auto pagComposition = stage->getRootComposition();
   if (pagComposition) {
@@ -186,7 +188,7 @@ void PAGPlayer::setMatrix(const Matrix& matrix) {
 }
 
 int64_t PAGPlayer::duration() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return durationInternal();
 }
 
@@ -196,7 +198,7 @@ int64_t PAGPlayer::durationInternal() {
 }
 
 void PAGPlayer::nextFrame() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   auto pagComposition = stage->getRootComposition();
   if (pagComposition) {
     pagComposition->nextFrameInternal();
@@ -204,7 +206,7 @@ void PAGPlayer::nextFrame() {
 }
 
 void PAGPlayer::preFrame() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   auto pagComposition = stage->getRootComposition();
   if (pagComposition) {
     pagComposition->preFrameInternal();
@@ -212,13 +214,13 @@ void PAGPlayer::preFrame() {
 }
 
 double PAGPlayer::getProgress() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   auto pagComposition = stage->getRootComposition();
   return pagComposition ? pagComposition->getProgressInternal() : 0;
 }
 
 void PAGPlayer::setProgress(double percent) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   auto pagComposition = stage->getRootComposition();
   if (pagComposition == nullptr) {
     return;
@@ -237,18 +239,18 @@ void PAGPlayer::setProgress(double percent) {
 }
 
 Frame PAGPlayer::currentFrame() const {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   auto pagComposition = stage->getRootComposition();
   return pagComposition ? pagComposition->currentFrameInternal() : 0;
 }
 
 bool PAGPlayer::autoClear() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return _autoClear;
 }
 
 void PAGPlayer::setAutoClear(bool value) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   if (_autoClear == value) {
     return;
   }
@@ -257,7 +259,7 @@ void PAGPlayer::setAutoClear(bool value) {
 }
 
 void PAGPlayer::prepare() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   prepareInternal();
   if (pagSurface != nullptr && pagSurface->prepare(renderCache, lastGraphic)) {
     return;
@@ -277,7 +279,7 @@ void PAGPlayer::prepareInternal() {
 }
 
 bool PAGPlayer::wait(const BackendSemaphore& waitSemaphore) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   if (pagSurface == nullptr) {
     return false;
   }
@@ -285,12 +287,12 @@ bool PAGPlayer::wait(const BackendSemaphore& waitSemaphore) {
 }
 
 bool PAGPlayer::flushAndSignalSemaphore(BackendSemaphore* signalSemaphore) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return flushInternal(signalSemaphore);
 }
 
 bool PAGPlayer::flush() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return flushInternal(nullptr);
 }
 
@@ -324,7 +326,7 @@ Rect PAGPlayer::getBounds(std::shared_ptr<PAGLayer> pagLayer) {
   if (pagLayer == nullptr) {
     return Rect::MakeEmpty();
   }
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   updateStageSize();
   tgfx::Rect bounds = {};
   pagLayer->measureBounds(&bounds);
@@ -348,7 +350,7 @@ Rect PAGPlayer::getBounds(std::shared_ptr<PAGLayer> pagLayer) {
 
 std::vector<std::shared_ptr<PAGLayer>> PAGPlayer::getLayersUnderPoint(float surfaceX,
                                                                       float surfaceY) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   updateStageSize();
   std::vector<std::shared_ptr<PAGLayer>> results;
   stage->getLayersUnderPointInternal(surfaceX, surfaceY, &results);
@@ -357,7 +359,7 @@ std::vector<std::shared_ptr<PAGLayer>> PAGPlayer::getLayersUnderPoint(float surf
 
 bool PAGPlayer::hitTestPoint(std::shared_ptr<PAGLayer> pagLayer, float surfaceX, float surfaceY,
                              bool pixelHitTest) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   updateStageSize();
   auto local = pagLayer->globalToLocalPoint(surfaceX, surfaceY);
   if (!pixelHitTest) {
@@ -386,25 +388,25 @@ int64_t PAGPlayer::getTimeStampInternal() {
 }
 
 int64_t PAGPlayer::renderingTime() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   // TODO(domrjchen): update the performance monitoring panel of PAGViewer to display the new
   // properties
   return renderCache->totalTime - renderCache->presentingTime;
 }
 
 int64_t PAGPlayer::imageDecodingTime() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return renderCache->imageDecodingTime + renderCache->hardwareDecodingTime +
          renderCache->softwareDecodingTime;
 }
 
 int64_t PAGPlayer::presentingTime() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return renderCache->presentingTime;
 }
 
 int64_t PAGPlayer::graphicsMemory() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return renderCache->memoryUsage();
 }
 

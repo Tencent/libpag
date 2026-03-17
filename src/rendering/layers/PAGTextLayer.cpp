@@ -66,55 +66,55 @@ PAGTextLayer::~PAGTextLayer() {
 }
 
 Color PAGTextLayer::fillColor() const {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return textDocumentForRead()->fillColor;
 }
 
 void PAGTextLayer::setFillColor(const Color& value) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   textDocumentForWrite()->fillColor = value;
 }
 
 PAGFont PAGTextLayer::font() const {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   auto textDocument = textDocumentForRead();
   return {textDocument->fontFamily, textDocument->fontStyle};
 }
 
 void PAGTextLayer::setFont(const PAGFont& font) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   auto textDocument = textDocumentForWrite();
   textDocument->fontFamily = font.fontFamily;
   textDocument->fontStyle = font.fontStyle;
 }
 
 float PAGTextLayer::fontSize() const {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return textDocumentForRead()->fontSize;
 }
 
 void PAGTextLayer::setFontSize(float size) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   textDocumentForWrite()->fontSize = size;
 }
 
 Color PAGTextLayer::strokeColor() const {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return textDocumentForRead()->strokeColor;
 }
 
 void PAGTextLayer::setStrokeColor(const Color& color) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   textDocumentForWrite()->strokeColor = color;
 }
 
 std::string PAGTextLayer::text() const {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return textDocumentForRead()->text;
 }
 
 void PAGTextLayer::setText(const std::string& text) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   textDocumentForWrite()->text = text;
 }
 

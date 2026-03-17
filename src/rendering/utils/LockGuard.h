@@ -29,8 +29,7 @@ class LockGuard {
   /**
    * Atomically loads the mutex from the given shared_ptr and locks it for the scope.
    */
-  explicit LockGuard(const std::shared_ptr<std::mutex>* lockerPtr)
-      : mutex(lockerPtr ? std::atomic_load(lockerPtr) : nullptr) {
+  explicit LockGuard(const std::shared_ptr<std::mutex>& locker) : mutex(std::atomic_load(&locker)) {
     if (mutex) {
       mutex->lock();
     }

@@ -67,12 +67,12 @@ bool PAGSolidLayer::contentModified() const {
 }
 
 Color PAGSolidLayer::solidColor() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return _solidColor;
 }
 
 void PAGSolidLayer::setSolidColor(const pag::Color& value) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   if (_solidColor == value) {
     return;
   }

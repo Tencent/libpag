@@ -79,7 +79,7 @@ Frame CalculateMaxFrame(const std::vector<Keyframe<T>*>& keyframes) {
 }
 
 int64_t PAGImageLayer::contentDuration() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return contentDurationInternal();
 }
 
@@ -134,7 +134,7 @@ class FrameRange {
 };
 
 std::vector<PAGVideoRange> PAGImageLayer::getVideoRanges() const {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   auto frameRate = frameRateInternal();
   auto imageFillRule = static_cast<ImageLayer*>(layer)->imageFillRule;
   auto timeRemap = (imageFillRule == nullptr) ? nullptr : imageFillRule->timeRemap;
@@ -172,7 +172,7 @@ bool PAGImageLayer::gotoTime(int64_t layerTime) {
 }
 
 void PAGImageLayer::replaceImage(std::shared_ptr<pag::PAGImage> image) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   if (rootFile != nullptr) {
     auto imageLayers = rootFile->getLayersByEditableIndexInternal(_editableIndex, LayerType::Image);
     rootFile->replaceImageInternal(imageLayers, image);
@@ -182,7 +182,7 @@ void PAGImageLayer::replaceImage(std::shared_ptr<pag::PAGImage> image) {
 }
 
 void PAGImageLayer::setImage(std::shared_ptr<PAGImage> image) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   setImageInternal(image);
 }
 
@@ -521,7 +521,7 @@ void PAGImageLayer::ExpandPropertyByRepeat(AnimatableProperty<float>* property, 
 }
 
 int64_t PAGImageLayer::contentTimeToLayer(int64_t replacementTime) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   if (rootFile == nullptr) {
     return replacementTime;
   }
@@ -538,7 +538,7 @@ int64_t PAGImageLayer::contentTimeToLayer(int64_t replacementTime) {
 }
 
 int64_t PAGImageLayer::layerTimeToContent(int64_t layerTime) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   if (rootFile == nullptr) {
     return layerTime;
   }

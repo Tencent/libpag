@@ -46,17 +46,17 @@ PAGSurface::~PAGSurface() {
 }
 
 int PAGSurface::width() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return drawable->width();
 }
 
 int PAGSurface::height() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   return drawable->height();
 }
 
 void PAGSurface::updateSize() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   TextShaper::PurgeCaches();
   if (pagPlayer) {
     pagPlayer->renderCache->releaseAll();
@@ -66,7 +66,7 @@ void PAGSurface::updateSize() {
 }
 
 void PAGSurface::freeCache() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   onFreeCache();
 }
 
@@ -84,7 +84,7 @@ void PAGSurface::onFreeCache() {
 }
 
 bool PAGSurface::clearAll() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   auto context = lockContext();
   if (!context) {
     return false;
@@ -105,7 +105,7 @@ bool PAGSurface::clearAll() {
 }
 
 HardwareBufferRef PAGSurface::getHardwareBuffer() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   auto context = lockContext();
   if (context == nullptr) {
     return nullptr;
@@ -121,7 +121,7 @@ HardwareBufferRef PAGSurface::getHardwareBuffer() {
 }
 
 BackendTexture PAGSurface::getFrontTexture() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   auto context = lockContext();
   if (context == nullptr) {
     return {};
@@ -137,7 +137,7 @@ BackendTexture PAGSurface::getFrontTexture() {
 }
 
 BackendTexture PAGSurface::getBackTexture() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   auto context = lockContext();
   if (context == nullptr) {
     return {};
@@ -153,7 +153,7 @@ BackendTexture PAGSurface::getBackTexture() {
 }
 
 HardwareBufferRef PAGSurface::getFrontHardwareBuffer() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   auto context = lockContext();
   if (context == nullptr) {
     return nullptr;
@@ -169,7 +169,7 @@ HardwareBufferRef PAGSurface::getFrontHardwareBuffer() {
 }
 
 HardwareBufferRef PAGSurface::getBackHardwareBuffer() {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   auto context = lockContext();
   if (context == nullptr) {
     return nullptr;
@@ -186,7 +186,7 @@ HardwareBufferRef PAGSurface::getBackHardwareBuffer() {
 
 bool PAGSurface::readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels,
                             size_t dstRowBytes) {
-  LockGuard autoLock(&rootLocker);
+  LockGuard autoLock(rootLocker);
   auto context = lockContext();
   if (context == nullptr) {
     return false;
