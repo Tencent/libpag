@@ -1472,6 +1472,47 @@ CLI_TEST(PAGXCliTest, Lint_VIS020_BoundaryPass) {
   EXPECT_TRUE(output.find("VIS-022") == std::string::npos);
 }
 
+// Lint CLI error handling
+CLI_TEST(PAGXCliTest, Lint_MissingFileArg) {
+  // No file argument provided — should print usage and return 0 (lint is always advisory).
+  std::string errOutput;
+  std::streambuf* oldCerr = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint"});
+  std::cerr.rdbuf(oldCerr);
+  errOutput = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(errOutput.find("missing input file") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_UnknownOption) {
+  // Unknown flag passed — should print error message and return 0.
+  auto inputPath = TestResourcePath("lint_vis001_aligned_coord.pagx");
+  std::string errOutput;
+  std::streambuf* oldCerr = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", "--not-a-flag", inputPath});
+  std::cerr.rdbuf(oldCerr);
+  errOutput = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(errOutput.find("unknown option") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_NonexistentFile) {
+  // File does not exist — LintFile returns a load-error issue with empty ruleId.
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", "nonexistent_file.pagx"});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("Failed to load file") != std::string::npos);
+}
+
 // FMT-043: multiple MergePaths — first Fill+MergePath triggers violation
 CLI_TEST(PAGXCliTest, Validate_FMT043_MultipleMerges) {
   auto path = TestResourcePath("validate_fmt043_multiple_merges.pagx");
