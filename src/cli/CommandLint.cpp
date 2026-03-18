@@ -200,6 +200,21 @@ static void CheckPixelAlignment(const Layer* layer, const std::string& location,
       checkCoord(ellipse->position.y, "Ellipse center.y");
       checkCoord(ellipse->size.width, "Ellipse size.width");
       checkCoord(ellipse->size.height, "Ellipse size.height");
+    } else if (element->nodeType() == NodeType::Path) {
+      auto* path = static_cast<const Path*>(element);
+      if (path->data != nullptr) {
+        // Check on-curve end points only; skip off-curve control points to reduce noise.
+        // For Move/Line: the single point is on-curve. For Quad: last of 2 points. For Cubic: last
+        // of 3 points. Close has no points.
+        path->data->forEach([&](PathVerb verb, const Point* pts) {
+          int count = PathData::PointsPerVerb(verb);
+          if (count > 0) {
+            // The on-curve end point is always the last point for each verb.
+            checkCoord(pts[count - 1].x, "Path point.x");
+            checkCoord(pts[count - 1].y, "Path point.y");
+          }
+        });
+      }
     }
   }
 
