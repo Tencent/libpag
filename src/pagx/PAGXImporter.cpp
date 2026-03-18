@@ -102,7 +102,6 @@ static Color getColorAttribute(const DOMNode* node, const char* name, PAGXDocume
 // Forward declarations for parse functions
 static void parseDocument(const DOMNode* root, PAGXDocument* doc);
 static void parseResources(const DOMNode* node, PAGXDocument* doc);
-static Node* parseResource(const DOMNode* node, PAGXDocument* doc);
 static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc);
 static void parseContents(const DOMNode* node, Layer* layer, PAGXDocument* doc);
 static void parseStyles(const DOMNode* node, Layer* layer, PAGXDocument* doc);
@@ -166,7 +165,14 @@ static void parseCustomData(const DOMNode* xmlNode, Node* node) {
 
 template <typename T>
 static T* makeNodeFromXML(const DOMNode* xmlNode, PAGXDocument* doc) {
-  auto* node = doc->makeNode<T>(getAttribute(xmlNode, "id"));
+  auto id = getAttribute(xmlNode, "id");
+  // If a node with this ID was pre-registered, reuse it instead of creating a duplicate.
+  auto* existing = id.empty() ? nullptr : doc->findNode(id);
+  if (existing) {
+    parseCustomData(xmlNode, existing);
+    return static_cast<T*>(existing);
+  }
+  auto* node = doc->makeNode<T>(id);
   if (node) {
     parseCustomData(xmlNode, node);
   }
@@ -177,48 +183,87 @@ static T* makeNodeFromXML(const DOMNode* xmlNode, PAGXDocument* doc) {
 // Internal parser implementation
 //==============================================================================
 
+// Pre-registers a resource node by tag name. Creates an empty node of the correct type and
+// registers its ID in nodeMap. Returns true if the tag name is a known resource type.
+// NOTE: When adding a new resource type to PAGX, add a corresponding branch here and in
+// parseResource() below.
+static bool preRegisterResource(const DOMNode* node, PAGXDocument* doc) {
+  auto id = getAttribute(node, "id");
+  if (id.empty()) {
+    return true;
+  }
+  if (node->name == "Image") {
+    doc->makeNode<Image>(id);
+  } else if (node->name == "PathData") {
+    doc->makeNode<PathData>(id);
+  } else if (node->name == "Font") {
+    doc->makeNode<Font>(id);
+  } else if (node->name == "Composition") {
+    doc->makeNode<Composition>(id);
+  } else if (node->name == "SolidColor") {
+    doc->makeNode<SolidColor>(id);
+  } else if (node->name == "LinearGradient") {
+    doc->makeNode<LinearGradient>(id);
+  } else if (node->name == "RadialGradient") {
+    doc->makeNode<RadialGradient>(id);
+  } else if (node->name == "ConicGradient") {
+    doc->makeNode<ConicGradient>(id);
+  } else if (node->name == "DiamondGradient") {
+    doc->makeNode<DiamondGradient>(id);
+  } else if (node->name == "ImagePattern") {
+    doc->makeNode<ImagePattern>(id);
+  } else {
+    return false;
+  }
+  return true;
+}
+
+// Fully parses a resource node by tag name. Pre-registered nodes are reused by makeNodeFromXML.
+// Returns true if the tag name is a known resource type.
+// NOTE: When adding a new resource type to PAGX, add a corresponding branch here and in
+// preRegisterResource() above.
+static bool parseResource(const DOMNode* node, PAGXDocument* doc) {
+  if (node->name == "Image") {
+    parseImage(node, doc);
+  } else if (node->name == "PathData") {
+    parsePathData(node, doc);
+  } else if (node->name == "Font") {
+    parseFont(node, doc);
+  } else if (node->name == "Composition") {
+    parseComposition(node, doc);
+  } else {
+    return parseColorSource(node, doc) != nullptr;
+  }
+  return true;
+}
+
 static void parseResources(const DOMNode* node, PAGXDocument* doc) {
+  // First pass: pre-register all resource IDs so that cross-references via '@id' resolve
+  // regardless of XML declaration order.
   auto child = node->firstChild;
+  while (child) {
+    if (child->type == DOMNodeType::Element) {
+      preRegisterResource(child.get(), doc);
+    }
+    child = child->nextSibling;
+  }
+  // Second pass: fully parse each resource. Pre-registered nodes are reused by makeNodeFromXML.
+  child = node->firstChild;
   while (child) {
     auto current = child;
     child = child->nextSibling;
     if (current->type != DOMNodeType::Element) {
       continue;
     }
-    // Try to parse as a resource (Image, PathData, Composition, Font)
-    auto resource = parseResource(current.get(), doc);
-    if (resource) {
-      continue;
+    if (!parseResource(current.get(), doc)) {
+      reportError(doc, current.get(),
+                  "Element '" + current->name +
+                      "' is not allowed in 'Resources'."
+                      " Expected: Image, PathData, Composition, Font,"
+                      " SolidColor, LinearGradient, RadialGradient,"
+                      " ConicGradient, DiamondGradient, ImagePattern.");
     }
-    // Try to parse as a color source (SolidColor, Gradient, ImagePattern)
-    auto colorSource = parseColorSource(current.get(), doc);
-    if (colorSource) {
-      continue;
-    }
-    // Unknown resource type - report error.
-    reportError(doc, current.get(),
-                "Element '" + current->name +
-                    "' is not allowed in 'Resources'."
-                    " Expected: Image, PathData, Composition, Font,"
-                    " SolidColor, LinearGradient, RadialGradient,"
-                    " ConicGradient, DiamondGradient, ImagePattern.");
   }
-}
-
-static Node* parseResource(const DOMNode* node, PAGXDocument* doc) {
-  if (node->name == "Image") {
-    return parseImage(node, doc);
-  }
-  if (node->name == "PathData") {
-    return parsePathData(node, doc);
-  }
-  if (node->name == "Composition") {
-    return parseComposition(node, doc);
-  }
-  if (node->name == "Font") {
-    return parseFont(node, doc);
-  }
-  return nullptr;
 }
 
 static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
