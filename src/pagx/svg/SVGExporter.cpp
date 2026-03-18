@@ -85,7 +85,7 @@ class SVGBuilder {
       _buffer += " ";
       _buffer += name;
       _buffer += "=\"";
-      _buffer += value;
+      _buffer += escapeXML(value);
       _buffer += "\"";
     }
   }
@@ -109,7 +109,7 @@ class SVGBuilder {
   }
 
   void addAttributeIfNonZero(const char* name, float value) {
-    if (value != 0.0f) {
+    if (!FloatNearlyZero(value)) {
       addAttribute(name, value);
     }
   }
@@ -377,26 +377,25 @@ static FillStrokeInfo CollectFillStroke(const std::vector<Element*>& contents) {
   return info;
 }
 
-static std::string BuildLayerTransform(const Layer* layer) {
+static Matrix BuildLayerMatrix(const Layer* layer) {
+  Matrix m = layer->matrix;
   if (layer->x != 0.0f || layer->y != 0.0f) {
-    if (!layer->matrix.isIdentity()) {
-      Matrix combined = Matrix::Translate(layer->x, layer->y) * layer->matrix;
-      return MatrixToSVGTransform(combined);
-    }
-    return "translate(" + FloatToString(layer->x) + "," + FloatToString(layer->y) + ")";
+    m = Matrix::Translate(layer->x, layer->y) * m;
   }
-  if (!layer->matrix.isIdentity()) {
-    return MatrixToSVGTransform(layer->matrix);
-  }
-  return "";
+  return m;
 }
 
-static std::string BuildGroupTransform(const Group* group) {
-  bool hasAnchor = group->anchor.x != 0 || group->anchor.y != 0;
-  bool hasPosition = group->position.x != 0 || group->position.y != 0;
-  bool hasRotation = group->rotation != 0;
-  bool hasScale = group->scale.x != 1 || group->scale.y != 1;
-  bool hasSkew = group->skew != 0;
+static std::string BuildLayerTransform(const Layer* layer) {
+  Matrix m = BuildLayerMatrix(layer);
+  return MatrixToSVGTransform(m);
+}
+
+static Matrix BuildGroupMatrix(const Group* group) {
+  bool hasAnchor = !FloatNearlyZero(group->anchor.x) || !FloatNearlyZero(group->anchor.y);
+  bool hasPosition = !FloatNearlyZero(group->position.x) || !FloatNearlyZero(group->position.y);
+  bool hasRotation = !FloatNearlyZero(group->rotation);
+  bool hasScale = !FloatNearlyZero(group->scale.x - 1.0f) || !FloatNearlyZero(group->scale.y - 1.0f);
+  bool hasSkew = !FloatNearlyZero(group->skew);
 
   if (!hasAnchor && !hasPosition && !hasRotation && !hasScale && !hasSkew) {
     return {};
@@ -429,8 +428,9 @@ static std::string BuildGroupTransform(const Group* group) {
     m = Matrix::Translate(group->position.x, group->position.y) * m;
   }
 
-  return MatrixToSVGTransform(m);
+  return m;
 }
+
 
 //==============================================================================
 // SVGWriterContext - shared state across SVGWriter instances
@@ -452,14 +452,17 @@ class SVGWriterContext {
 
 class SVGWriter {
  public:
-  SVGWriter(SVGBuilder* defs, SVGWriterContext* context, bool convertTextToPath = true)
-      : _defs(defs), _context(context), _convertTextToPath(convertTextToPath) {}
+  SVGWriter(SVGBuilder* defs, SVGWriterContext* context, int indentSpaces = 2,
+            bool convertTextToPath = true)
+      : _defs(defs), _context(context), _indentSpaces(indentSpaces),
+        _convertTextToPath(convertTextToPath) {}
 
   void writeLayer(SVGBuilder& out, const Layer* layer);
 
  private:
   SVGBuilder* _defs = nullptr;
   SVGWriterContext* _context = nullptr;
+  int _indentSpaces = 2;
   bool _convertTextToPath = true;
 
   std::string generateId(const std::string& prefix) {
@@ -468,9 +471,9 @@ class SVGWriter {
 
   // Layer / element writing
   void writeLayerContents(SVGBuilder& out, const Layer* layer,
-                          const std::string& transform = "");
+                          const Matrix& transform = {});
   void writeElements(SVGBuilder& out, const std::vector<Element*>& elements,
-                     const std::string& transform = "");
+                     const Matrix& transform = {});
 
   // Shape writing
   void writeRectangle(SVGBuilder& out, const Rectangle* rect, const FillStrokeInfo& fs,
@@ -506,7 +509,7 @@ class SVGWriter {
   void writeMaskContent(SVGBuilder& out, const Layer* layer);
   void writeClipPathContent(SVGBuilder& out, const Layer* layer);
   void writeClipPathContentRecursive(SVGBuilder& out, const Layer* layer,
-                                     const std::string& parentTransform = "");
+                                     const Matrix& parentMatrix = {});
   std::string writeMaskDef(const Layer* maskLayer);
   std::string writeClipPathDef(const Layer* maskLayer);
 
@@ -886,11 +889,11 @@ std::string SVGWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters)
 std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, const char* tag,
                                           const char* idPrefix, ContentWriter writer) {
   std::string defId = maskLayer->id.empty() ? generateId(idPrefix) : maskLayer->id;
-  SVGBuilder paintDefs(2);
+  SVGBuilder paintDefs(_indentSpaces);
   _defs->openElement(tag);
   _defs->addAttribute("id", defId);
   _defs->closeElementStart();
-  SVGWriter nestedWriter(&paintDefs, _context, _convertTextToPath);
+  SVGWriter nestedWriter(&paintDefs, _context, _indentSpaces, _convertTextToPath);
   (nestedWriter.*writer)(*_defs, maskLayer);
   _defs->closeElement();
   std::string paintDefsStr = paintDefs.release();
@@ -912,20 +915,13 @@ void SVGWriter::writeClipPathContent(SVGBuilder& out, const Layer* layer) {
 }
 
 void SVGWriter::writeClipPathContentRecursive(SVGBuilder& out, const Layer* layer,
-                                              const std::string& parentTransform) {
-  std::string layerTransform = BuildLayerTransform(layer);
-  std::string transform;
-  if (!parentTransform.empty() && !layerTransform.empty()) {
-    transform = parentTransform + " " + layerTransform;
-  } else if (!parentTransform.empty()) {
-    transform = parentTransform;
-  } else {
-    transform = layerTransform;
-  }
+                                              const Matrix& parentMatrix) {
+  Matrix layerMatrix = BuildLayerMatrix(layer);
+  Matrix combined = parentMatrix * layerMatrix;
 
-  writeLayerContents(out, layer, transform);
+  writeLayerContents(out, layer, combined);
   for (const auto* child : layer->children) {
-    writeClipPathContentRecursive(out, child, transform);
+    writeClipPathContentRecursive(out, child, combined);
   }
 }
 
@@ -1213,8 +1209,9 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
 //==============================================================================
 
 void SVGWriter::writeElements(SVGBuilder& out, const std::vector<Element*>& elements,
-                              const std::string& transform) {
+                              const Matrix& transform) {
   auto fs = CollectFillStroke(elements);
+  std::string transformStr = MatrixToSVGTransform(transform);
 
   for (const auto* element : elements) {
     auto type = element->nodeType();
@@ -1223,40 +1220,34 @@ void SVGWriter::writeElements(SVGBuilder& out, const std::vector<Element*>& elem
     }
     switch (type) {
       case NodeType::Rectangle:
-        writeRectangle(out, static_cast<const Rectangle*>(element), fs, transform);
+        writeRectangle(out, static_cast<const Rectangle*>(element), fs, transformStr);
         break;
       case NodeType::Ellipse:
-        writeEllipse(out, static_cast<const Ellipse*>(element), fs, transform);
+        writeEllipse(out, static_cast<const Ellipse*>(element), fs, transformStr);
         break;
       case NodeType::Path:
-        writePath(out, static_cast<const Path*>(element), fs, transform);
+        writePath(out, static_cast<const Path*>(element), fs, transformStr);
         break;
       case NodeType::Text:
-        writeText(out, static_cast<const Text*>(element), fs, transform);
+        writeText(out, static_cast<const Text*>(element), fs, transformStr);
         break;
       case NodeType::Group: {
         auto* group = static_cast<const Group*>(element);
-        std::string groupTransform = BuildGroupTransform(group);
-        bool hasGroupTransform = !groupTransform.empty();
+        Matrix groupMatrix = BuildGroupMatrix(group);
+        bool hasGroupTransform = !groupMatrix.isIdentity();
         bool hasAlpha = group->alpha < 1.0f;
         if (hasGroupTransform || hasAlpha) {
           out.openElement("g");
-          std::string combinedTransform;
-          if (!transform.empty() && hasGroupTransform) {
-            combinedTransform = transform + " " + groupTransform;
-          } else if (!transform.empty()) {
-            combinedTransform = transform;
-          } else {
-            combinedTransform = groupTransform;
-          }
-          if (!combinedTransform.empty()) {
-            out.addAttribute("transform", combinedTransform);
+          Matrix combined = transform * groupMatrix;
+          std::string combinedStr = MatrixToSVGTransform(combined);
+          if (!combinedStr.empty()) {
+            out.addAttribute("transform", combinedStr);
           }
           if (hasAlpha) {
             out.addAttribute("opacity", FloatToString(group->alpha));
           }
           out.closeElementStart();
-          writeElements(out, group->elements, "");
+          writeElements(out, group->elements, {});
           out.closeElement();
         } else {
           writeElements(out, group->elements, transform);
@@ -1270,7 +1261,7 @@ void SVGWriter::writeElements(SVGBuilder& out, const std::vector<Element*>& elem
 }
 
 void SVGWriter::writeLayerContents(SVGBuilder& out, const Layer* layer,
-                                   const std::string& transform) {
+                                   const Matrix& transform) {
   writeElements(out, layer->contents, transform);
 }
 
@@ -1362,7 +1353,7 @@ std::string SVGExporter::ToSVG(const PAGXDocument& doc, const Options& options) 
   SVGBuilder svg(options.indent);
   SVGBuilder defs(options.indent, 2);
   SVGWriterContext context;
-  SVGWriter writer(&defs, &context, options.convertTextToPath);
+  SVGWriter writer(&defs, &context, options.indent, options.convertTextToPath);
 
   if (options.xmlDeclaration) {
     svg.appendDeclaration();
