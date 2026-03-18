@@ -3,7 +3,7 @@
 Constraints enforced by `pagx lint` and `pagx validate`. Apply these when generating or
 editing PAGX files to produce clean, lint-free output.
 
-> **Batch coverage**: Initial 12 rules. Full set (73 rules) added incrementally.
+> **Batch coverage**: Initial 10 rules. Full set (73 rules) added incrementally.
 
 ---
 

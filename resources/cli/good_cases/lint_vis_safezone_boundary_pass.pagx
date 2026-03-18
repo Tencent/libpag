@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Content with exactly minimum safe padding (8.3% of 24 = ~2px), should pass -->
+<!-- Content well within canvas boundary (1px margin on each side), should pass -->
 <pagx version="1.0" width="24" height="24">
   <Layer name="ExactSafePadding">
     <Rectangle position="12,12" size="16,16"/>

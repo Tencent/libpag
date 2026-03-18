@@ -103,7 +103,7 @@ static void CollectFills(const std::vector<Element*>& elements, std::vector<cons
   }
 }
 
-// CollectGeometryBounds: Computes the union bounding box of all geometry in the element list.
+// Computes the union bounding box of all geometry in the element list.
 //
 // Handles three geometry node types:
 //   Rectangle / Ellipse: both use a center-based coordinate model (position = center point,
@@ -112,8 +112,8 @@ static void CollectFills(const std::vector<Element*>& elements, std::vector<cons
 //   Group: recursed into; the group's child bounds are unioned into the running result.
 //
 // Returns an empty Rect{} (width == height == 0) if no geometry is found in the list.
-// Used by CheckSafeZone to determine whether the layer's content falls within the safe-zone
-// inset. The const_cast on PathData is required because getBounds() is non-const
+// Used by CheckSafeZone to determine whether the layer's content stays within the canvas
+// boundary. The const_cast on PathData is required because getBounds() is non-const
 // (it caches the result internally) but we hold a const pointer from the document model.
 static Rect CollectGeometryBounds(const std::vector<Element*>& elements) {
   bool found = false;
