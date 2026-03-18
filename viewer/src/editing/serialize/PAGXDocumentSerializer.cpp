@@ -86,7 +86,15 @@ static QString TransformEnumToQString(const rttr::variant& value) {
 }
 
 static void SerializeInstance(const rttr::instance& item, PAGTreeNode* node) {
+  if (!item.is_valid()) {
+    node->setValue("nullptr");
+    return;
+  }
   rttr::instance object = GetWrappedInstance(item);
+  if (!object.is_valid()) {
+    node->setValue("nullptr");
+    return;
+  }
   auto derivedType = object.get_derived_type();
   node->setValue(derivedType.get_name().data());
 
@@ -171,19 +179,33 @@ static void SerializeSequentialContainer(const rttr::variant_sequential_view& vi
         childNode->setValue(TransformEnumToQString(wrappedValue));
       } else if (type == rttr::type::get<std::string>()) {
         childNode->setValue(wrappedValue.to_string().c_str());
-      } else if (type.is_pointer()) {
-        void* ptr = nullptr;
-        if (wrappedValue.convert(ptr) && ptr != nullptr) {
-          SerializeInstance(wrappedValue, childNode.get());
-        } else {
-          childNode->setValue("nullptr");
-        }
       } else {
         SerializeInstance(wrappedValue, childNode.get());
       }
     }
     node->appendChild(std::move(childNode));
   }
+}
+
+static void SerializeNodesSimplified(const std::vector<std::unique_ptr<pagx::Node>>& nodes,
+                                     PAGTreeNode* parentNode) {
+  auto nodesNode = std::make_unique<PAGTreeNode>(parentNode);
+  nodesNode->setName("nodes");
+  nodesNode->setValue(QString("Node[%1]").arg(nodes.size()));
+
+  int index = 0;
+  for (const auto& node : nodes) {
+    auto childNode = std::make_unique<PAGTreeNode>(nodesNode.get());
+    childNode->setName(QString::number(index++));
+    if (node == nullptr) {
+      childNode->setValue("nullptr");
+    } else {
+      auto nodeType = rttr::type::get(*node).get_name().to_string();
+      childNode->setValue(QString::fromStdString(nodeType));
+    }
+    nodesNode->appendChild(std::move(childNode));
+  }
+  parentNode->appendChild(std::move(nodesNode));
 }
 
 void Serialize(const std::shared_ptr<pagx::PAGXDocument>& document, PAGTreeNode* node) {
@@ -193,6 +215,7 @@ void Serialize(const std::shared_ptr<pagx::PAGXDocument>& document, PAGTreeNode*
   }
   rttr::instance item = document;
   SerializeInstance(item, node);
+  SerializeNodesSimplified(document->nodes, node);
 }
 
 }  // namespace pag::PAGXDocumentSerializer

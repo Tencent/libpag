@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "pagx/defines.h"
+
 namespace pagx {
 
 /**
@@ -26,7 +28,7 @@ namespace pagx {
  * positioning of columns. Uses direction-neutral names (Near/Far instead of Top/Bottom) that work
  * correctly for both horizontal and vertical writing modes.
  */
-enum class ParagraphAlign {
+enum class RTTR_AUTO_REGISTER_CLASS ParagraphAlign {
   /**
    * Align text to the near edge of the layout area (top in horizontal mode, right in vertical
    * mode) using the line-box model. The first line's line box near edge is aligned to the near

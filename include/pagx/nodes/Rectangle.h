@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "pagx/defines.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/Size.h"
@@ -27,7 +28,7 @@ namespace pagx {
 /**
  * Rectangle represents a rectangle shape with optional rounded corners.
  */
-class Rectangle : public Element {
+class RTTR_AUTO_REGISTER_CLASS Rectangle : public Element {
  public:
   /**
    * The center point of the rectangle.
@@ -52,6 +53,8 @@ class Rectangle : public Element {
   NodeType nodeType() const override {
     return NodeType::Rectangle;
   }
+
+  RTTR_ENABLE(Element)
 
  private:
   Rectangle() = default;

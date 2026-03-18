@@ -22,11 +22,16 @@
 
 namespace pag {
 
+class ContentView;
+
 class PAGWindowHelper : public QObject {
   Q_OBJECT
  public:
   explicit PAGWindowHelper(QObject* parent = nullptr);
   Q_INVOKABLE void setWindowStyle(QQuickWindow* quickWindow, double red, double green, double blue);
+  Q_INVOKABLE void notifyContentViewChanged(ContentView* newContentView);
+
+  Q_SIGNAL void contentViewChanged(ContentView* newContentView);
 };
 
 }  // namespace pag

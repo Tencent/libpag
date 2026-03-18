@@ -18,6 +18,7 @@
 
 #include "PAGWindowHelper.h"
 #include <Cocoa/Cocoa.h>
+#include "rendering/ContentView.h"
 
 namespace pag {
 PAGWindowHelper::PAGWindowHelper(QObject* parent) : QObject(parent) {
@@ -37,6 +38,10 @@ void PAGWindowHelper::setWindowStyle(QQuickWindow* quickWindow, double red, doub
     window.colorSpace = [NSColorSpace extendedSRGBColorSpace];
     window.backgroundColor = [NSColor colorWithRed:red green:green blue:blue alpha:1.];
   }
+}
+
+void PAGWindowHelper::notifyContentViewChanged(ContentView* newContentView) {
+  Q_EMIT contentViewChanged(newContentView);
 }
 
 }  // namespace pag

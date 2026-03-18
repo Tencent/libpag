@@ -149,7 +149,8 @@ QString PluginInstaller::getPluginInstallPath(const QString& pluginName) const {
   QString fullName = getPluginFullName(pluginName);
 
   if (pluginName == "H264EncoderTools") {
-    // Install to ~/Library/Application Support/H264EncoderTools/ to match exporter's GetRoamingPath()
+    // Install to ~/Library/Application Support/H264EncoderTools/ to match exporter's
+    // GetRoamingPath()
     QString appSupport = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
     return appSupport + "/H264EncoderTools/" + fullName;
   } else {

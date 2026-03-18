@@ -20,6 +20,7 @@
 
 #include <string>
 #include <vector>
+#include "pagx/defines.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/types/PathVerb.h"
 #include "pagx/types/Point.h"
@@ -32,7 +33,7 @@ namespace pagx {
  * and serialization. Unlike tgfx::Path, it exposes raw data arrays directly.
  * PathData can be stored in document resources and referenced by ID.
  */
-class PathData : public Node {
+class RTTR_AUTO_REGISTER_CLASS PathData : public Node {
  public:
   /**
    * Starts a new contour at the specified point.
@@ -135,6 +136,8 @@ class PathData : public Node {
   NodeType nodeType() const override {
     return NodeType::PathData;
   }
+
+  RTTR_ENABLE(Node)
 
  private:
   PathData() = default;

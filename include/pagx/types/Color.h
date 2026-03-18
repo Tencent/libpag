@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "pagx/defines.h"
 #include "pagx/types/ColorSpace.h"
 
 namespace pagx {
@@ -25,7 +26,7 @@ namespace pagx {
 /**
  * An RGBA color with floating-point components and color space.
  */
-struct Color {
+struct RTTR_AUTO_REGISTER_CLASS Color {
   /**
    * Red component in [0, 1] range.
    */

@@ -16,35 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "PAGXRenderThread.h"
+#include "PAGXView.h"
 
-#include "pagx/defines.h"
-#include "pagx/nodes/Element.h"
-#include "pagx/types/MergePathMode.h"
+namespace pag {
 
-namespace pagx {
+PAGXRenderThread::PAGXRenderThread(PAGXView* view) : pagxView(view) {
+}
 
-/**
- * MergePath is a path modifier that merges multiple paths using boolean operations. It can append,
- * add, subtract, intersect, or exclude paths from each other.
- */
-class RTTR_AUTO_REGISTER_CLASS MergePath : public Element {
- public:
-  /**
-   * The merge mode that determines how paths are combined. The default value is Append.
-   */
-  MergePathMode mode = MergePathMode::Append;
-
-  NodeType nodeType() const override {
-    return NodeType::MergePath;
+void PAGXRenderThread::flush() {
+  if (pagxView == nullptr) {
+    return;
   }
+  if (pagxView->sizeChanged) {
+    pagxView->sizeChanged = false;
+    pagxView->drawable->updateSize();
+  }
+  if (!pagxView->needsRender) {
+    return;
+  }
+  pagxView->needsRender = false;
 
-  RTTR_ENABLE(Element)
+  auto metrics = pagxView->renderPAGX();
 
- private:
-  MergePath() = default;
+  Q_EMIT renderTimeReady(metrics.renderTime, metrics.imageTime, metrics.presentTime);
+}
 
-  friend class PAGXDocument;
-};
-
-}  // namespace pagx
+void PAGXRenderThread::shutDown() {
+  quit();
+}
+}  // namespace pag

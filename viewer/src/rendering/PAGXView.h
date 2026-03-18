@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -21,26 +21,28 @@
 #include <QOpenGLContext>
 #include <QTimer>
 #include "ContentView.h"
-#include "audio/PAGAudioPlayer.h"
+#include "pagx/PAGXDocument.h"
 #include "platform/qt/GPUDrawable.h"
-#include "rendering/PAGRenderThread.h"
+#include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/Layer.h"
 
 namespace pag {
 
-class PAGView : public ContentView {
+class PAGXRenderThread;
+
+/**
+ * PAGXView is a view for rendering PAGX files.
+ */
+class PAGXView : public ContentView {
   Q_OBJECT
  public:
-  explicit PAGView(QQuickItem* parent = nullptr);
-  ~PAGView() override;
+  explicit PAGXView(QQuickItem* parent = nullptr);
+  ~PAGXView() override;
 
   int getWidth() const override;
   int getHeight() const override;
   bool hasAnimation() const override;
-  int getEditableTextLayerCount() const override;
-  int getEditableImageLayerCount() const override;
-
   bool isPlaying() const override;
-  bool getShowVideoFrames() const override;
   double getProgress() const override;
   QString getTotalFrame() const override;
   QString getCurrentFrame() const override;
@@ -49,15 +51,16 @@ class PAGView : public ContentView {
   QString getDisplayedTime() const override;
   QColor getBackgroundColor() const override;
   QSizeF getPreferredSize() const override;
+  int getEditableTextLayerCount() const override;
+  int getEditableImageLayerCount() const override;
+  bool getShowVideoFrames() const override;
 
   void setIsPlaying(bool isPlaying) override;
-  void setShowVideoFrames(bool isShow) override;
   void setProgress(double progress) override;
+  void setShowVideoFrames(bool isShow) override;
   void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
 
-  Q_SLOT void flush() const;
   Q_SLOT void sizeChangedDelayHandle();
-  Q_SLOT void onAudioTimeChanged(int64_t audioTime);
 
   Q_INVOKABLE bool setFile(const QString& filePath) override;
   Q_INVOKABLE void firstFrame() override;
@@ -65,29 +68,43 @@ class PAGView : public ContentView {
   Q_INVOKABLE void nextFrame() override;
   Q_INVOKABLE void previousFrame() override;
 
+  void flush() const;
+
+  PAGXRenderThread* getRenderThread() const;
+
   QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
-  PAGRenderThread* getRenderThread() const;
+
+  struct RenderTimeMetrics {
+    int64_t renderTime = 0;
+    int64_t imageTime = 0;
+    int64_t presentTime = 0;
+  };
 
  private:
-  void setProgressInternal(double progress, bool isAudioSeek);
+  RenderTimeMetrics renderPAGX();
+  void clearContent();
+  void updateAnimationState();
 
-  int editableTextLayerCount = 0;
-  int editableImageLayerCount = 0;
-  int64_t lastPlayTime = 0;
-  bool isPlaying_ = true;
   std::atomic_bool sizeChanged = false;
-  qreal lastWidth = 0;
-  qreal lastHeight = 0;
-  qreal lastPixelRatio = 1;
-  double progress = 0.0;
-  double progressPerFrame = 0.0;
+  std::atomic_bool needsRender = false;
   std::unique_ptr<QTimer> resizeTimer = nullptr;
-  std::unique_ptr<PAGPlayer> pagPlayer = nullptr;
-  std::unique_ptr<PAGRenderThread> renderThread = nullptr;
-  std::shared_ptr<PAGFile> pagFile = nullptr;
   std::shared_ptr<GPUDrawable> drawable = nullptr;
-  std::unique_ptr<PAGAudioPlayer> audioPlayer = nullptr;
+  std::unique_ptr<PAGXRenderThread> renderThread = nullptr;
 
-  friend class PAGRenderThread;
+  std::shared_ptr<pagx::PAGXDocument> pagxDocument = nullptr;
+  std::shared_ptr<tgfx::Layer> pagxContentLayer = nullptr;
+  std::unique_ptr<tgfx::DisplayList> displayList = nullptr;
+  int pagxWidth = 0;
+  int pagxHeight = 0;
+  std::string currentFilePath = {};
+
+  int64_t totalFrames = 1;
+  float frameRate = 0.0f;
+  double progress = 0.0;
+  double progressPerFrame = 1.0;
+  bool isPlaying_ = false;
+  int64_t lastPlayTime = 0;
+
+  friend class PAGXRenderThread;
 };
 }  // namespace pag

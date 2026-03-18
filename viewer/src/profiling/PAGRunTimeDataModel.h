@@ -19,9 +19,11 @@
 #pragma once
 
 #include <QObject>
+#include "pagx/PAGXDocument.h"
 #include "profiling/PAGChartDataModel.h"
 #include "profiling/PAGFileInfoModel.h"
 #include "profiling/PAGFrameDisplayInfoModel.h"
+#include "profiling/PAGNodeStatsModel.h"
 
 namespace pag {
 
@@ -48,6 +50,9 @@ class PAGRunTimeDataModel : public QObject {
   Q_PROPERTY(const PAGChartDataModel* chartDataModel READ getChartDataModel NOTIFY dataChanged)
   Q_PROPERTY(const PAGFrameDisplayInfoModel* frameDisplayInfoModel READ getFrameDisplayInfoModel
                  NOTIFY frameDisplayInfoModelChanged)
+  Q_PROPERTY(
+      const PAGNodeStatsModel* nodeStatsModel READ getNodeStatsModel NOTIFY nodeStatsModelChanged)
+  Q_PROPERTY(bool isPAGX READ isPAGX NOTIFY isPAGXChanged)
 
   QString getTotalFrame() const;
   QString getCurrentFrame() const;
@@ -55,6 +60,8 @@ class PAGRunTimeDataModel : public QObject {
   const PAGFileInfoModel* getFileInfoModel() const;
   const PAGChartDataModel* getChartDataModel() const;
   const PAGFrameDisplayInfoModel* getFrameDisplayInfoModel() const;
+  const PAGNodeStatsModel* getNodeStatsModel() const;
+  bool isPAGX() const;
 
   void setCurrentFrame(const QString& currentFrame);
   void setChartDataSize(int chartDataSize);
@@ -63,12 +70,16 @@ class PAGRunTimeDataModel : public QObject {
   Q_SIGNAL void currentFrameChanged();
   Q_SIGNAL void fileInfoModelChanged();
   Q_SIGNAL void frameDisplayInfoModelChanged();
+  Q_SIGNAL void nodeStatsModelChanged();
+  Q_SIGNAL void isPAGXChanged();
   Q_SIGNAL void dataChanged();
 
   Q_SLOT void updateData(int64_t currentFrame, int64_t renderTime, int64_t presentTime,
                          int64_t imageDecodeTime);
+  Q_SLOT void updatePAGXRenderTime(int64_t renderTime, int64_t imageTime, int64_t presentTime);
 
   void setPAGFile(std::shared_ptr<PAGFile> pagFile);
+  void setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pagxDocument);
 
  private:
   void updateChartData();
@@ -78,10 +89,13 @@ class PAGRunTimeDataModel : public QObject {
  private:
   int64_t totalFrame = -1;
   int64_t currentFrame = -1;
+  int64_t lastUpdatedFrame = -1;
   int chartDataSize = 0;
+  bool pagxMode = false;
   PAGFileInfoModel fileInfoModel = {};
   PAGChartDataModel chartDataModel = {};
   PAGFrameDisplayInfoModel frameDisplayInfoModel = {};
+  PAGNodeStatsModel nodeStatsModel = {};
   QVector<FrameTimeMetrics> frameTimeMetricsVector = {};
 };
 }  // namespace pag

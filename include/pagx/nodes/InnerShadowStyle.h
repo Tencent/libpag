@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "pagx/defines.h"
 #include "pagx/nodes/LayerStyle.h"
 #include "pagx/types/Color.h"
 
@@ -26,7 +27,7 @@ namespace pagx {
 /**
  * An inner shadow layer style that renders a shadow inside the layer content.
  */
-class InnerShadowStyle : public LayerStyle {
+class RTTR_AUTO_REGISTER_CLASS InnerShadowStyle : public LayerStyle {
  public:
   /**
    * The horizontal offset of the shadow in pixels. The default value is 0.
@@ -56,6 +57,8 @@ class InnerShadowStyle : public LayerStyle {
   NodeType nodeType() const override {
     return NodeType::InnerShadowStyle;
   }
+
+  RTTR_ENABLE(LayerStyle)
 
  private:
   InnerShadowStyle() = default;

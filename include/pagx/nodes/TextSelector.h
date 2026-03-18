@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "pagx/defines.h"
 #include "pagx/nodes/Node.h"
 
 namespace pagx {
@@ -25,7 +26,10 @@ namespace pagx {
 /**
  * Base class for text selectors.
  */
-class TextSelector : public Node {
+class RTTR_AUTO_REGISTER_CLASS TextSelector : public Node {
+ public:
+  RTTR_ENABLE(Node)
+
  protected:
   TextSelector() = default;
 

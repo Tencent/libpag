@@ -18,33 +18,27 @@
 
 #pragma once
 
-#include "pagx/defines.h"
-#include "pagx/nodes/Element.h"
-#include "pagx/types/MergePathMode.h"
+#include <QThread>
 
-namespace pagx {
+namespace pag {
+
+class PAGXView;
 
 /**
- * MergePath is a path modifier that merges multiple paths using boolean operations. It can append,
- * add, subtract, intersect, or exclude paths from each other.
+ * PAGXRenderThread handles rendering of static PAGX content on a separate thread
+ * to avoid blocking the main UI thread for large or complex PAGX files.
  */
-class RTTR_AUTO_REGISTER_CLASS MergePath : public Element {
+class PAGXRenderThread : public QThread {
+  Q_OBJECT
  public:
-  /**
-   * The merge mode that determines how paths are combined. The default value is Append.
-   */
-  MergePathMode mode = MergePathMode::Append;
+  explicit PAGXRenderThread(PAGXView* view);
 
-  NodeType nodeType() const override {
-    return NodeType::MergePath;
-  }
+  Q_SIGNAL void renderTimeReady(int64_t renderTime, int64_t imageTime, int64_t presentTime);
 
-  RTTR_ENABLE(Element)
+  Q_SLOT void flush();
+  Q_SLOT void shutDown();
 
  private:
-  MergePath() = default;
-
-  friend class PAGXDocument;
+  PAGXView* pagxView = nullptr;
 };
-
-}  // namespace pagx
+}  // namespace pag

@@ -21,6 +21,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "pagx/defines.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/LayerFilter.h"
 #include "pagx/nodes/LayerStyle.h"
@@ -39,7 +40,7 @@ class Composition;
  * Layer represents a layer node that can contain vector elements, layer styles, filters, and child
  * layers. It is the main building block for composing visual content in a PAGX document.
  */
-class Layer : public Node {
+class RTTR_AUTO_REGISTER_CLASS Layer : public Node {
  public:
   /**
    * The display name of the layer.
@@ -155,6 +156,8 @@ class Layer : public Node {
   NodeType nodeType() const override {
     return NodeType::Layer;
   }
+
+  RTTR_ENABLE(Node)
 
  private:
   Layer() = default;

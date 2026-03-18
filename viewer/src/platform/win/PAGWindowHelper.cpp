@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGWindowHelper.h"
+#include "rendering/ContentView.h"
 
 namespace pag {
 PAGWindowHelper::PAGWindowHelper(QObject* parent) : QObject(parent) {
@@ -25,6 +26,10 @@ PAGWindowHelper::PAGWindowHelper(QObject* parent) : QObject(parent) {
 void PAGWindowHelper::setWindowStyle(QQuickWindow* quickWindow, double red, double green,
                                      double blue) {
   return;
+}
+
+void PAGWindowHelper::notifyContentViewChanged(ContentView* newContentView) {
+  Q_EMIT contentViewChanged(newContentView);
 }
 
 }  // namespace pag

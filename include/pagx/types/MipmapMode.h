@@ -18,12 +18,14 @@
 
 #pragma once
 
+#include "pagx/defines.h"
+
 namespace pagx {
 
 /**
  * MipmapMode defines how mipmap levels are selected during texture sampling.
  */
-enum class MipmapMode {
+enum class RTTR_AUTO_REGISTER_CLASS MipmapMode {
   /**
    * Ignore mipmap levels, sample from the "base".
    */

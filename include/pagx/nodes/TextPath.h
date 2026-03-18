@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "pagx/defines.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/types/Point.h"
@@ -28,7 +29,7 @@ namespace pagx {
  * TextPath is a text modifier that places text along a path. It allows text to follow the contour
  * of a path shape. The path can be specified either inline or by referencing a PathData resource.
  */
-class TextPath : public Element {
+class RTTR_AUTO_REGISTER_CLASS TextPath : public Element {
  public:
   /**
    * The path data that the text follows.
@@ -80,6 +81,8 @@ class TextPath : public Element {
   NodeType nodeType() const override {
     return NodeType::TextPath;
   }
+
+  RTTR_ENABLE(Element)
 
  private:
   TextPath() = default;

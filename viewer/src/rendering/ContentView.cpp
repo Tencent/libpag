@@ -16,35 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "ContentView.h"
 
-#include "pagx/defines.h"
-#include "pagx/nodes/Element.h"
-#include "pagx/types/MergePathMode.h"
+namespace pag {
 
-namespace pagx {
+ContentView::ContentView(QQuickItem* parent) : QQuickItem(parent) {
+}
 
-/**
- * MergePath is a path modifier that merges multiple paths using boolean operations. It can append,
- * add, subtract, intersect, or exclude paths from each other.
- */
-class RTTR_AUTO_REGISTER_CLASS MergePath : public Element {
- public:
-  /**
-   * The merge mode that determines how paths are combined. The default value is Append.
-   */
-  MergePathMode mode = MergePathMode::Append;
-
-  NodeType nodeType() const override {
-    return NodeType::MergePath;
-  }
-
-  RTTR_ENABLE(Element)
-
- private:
-  MergePath() = default;
-
-  friend class PAGXDocument;
-};
-
-}  // namespace pagx
+}  // namespace pag

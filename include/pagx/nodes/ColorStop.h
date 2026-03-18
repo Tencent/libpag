@@ -18,15 +18,16 @@
 
 #pragma once
 
-#include "pagx/types/Color.h"
+#include "pagx/defines.h"
 #include "pagx/nodes/Node.h"
+#include "pagx/types/Color.h"
 
 namespace pagx {
 
 /**
  * A color stop defines a color at a specific position in a gradient.
  */
-class ColorStop : public Node {
+class RTTR_AUTO_REGISTER_CLASS ColorStop : public Node {
  public:
   /**
    * The position of this color stop along the gradient, ranging from 0 to 1.
@@ -41,6 +42,8 @@ class ColorStop : public Node {
   NodeType nodeType() const override {
     return NodeType::ColorStop;
   }
+
+  RTTR_ENABLE(Node)
 
  private:
   ColorStop() = default;
