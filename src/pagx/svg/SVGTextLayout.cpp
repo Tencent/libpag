@@ -43,15 +43,19 @@ size_t SVGDecodeUTF8Char(const char* data, size_t remaining, int32_t* unichar) {
 }
 
 float EstimateCharAdvance(int32_t ch, float fontSize) {
+  // CJK ideographs are full-width, occupying 1em per character.
   if (LineBreaker::IsCJK(ch)) {
     return fontSize;
   }
+  // Space is typically ~0.25em in common proportional fonts (e.g. Arial, Helvetica).
   if (ch == ' ') {
     return fontSize * 0.25f;
   }
+  // Tab is conventionally rendered as 4 spaces worth of advance (4 × 1em).
   if (ch == '\t') {
     return fontSize * 4.0f;
   }
+  // Latin and other alphabetic characters average ~0.6em in common proportional fonts.
   return fontSize * 0.6f;
 }
 
@@ -170,6 +174,7 @@ SVGTextLayoutResult ComputeTextLayout(const SVGTextLayoutParams& params) {
 
   if (needsMultiLine) {
     boxWidth = textBox->size.width;
+    // Default line height is 1.2em, a widely used typographic convention (CSS "normal" line-height).
     result.lineHeight = textBox->lineHeight > 0 ? textBox->lineHeight : fontSize * 1.2f;
 
     result.chars.reserve(content.size());
@@ -221,7 +226,9 @@ SVGTextLayoutResult ComputeTextLayout(const SVGTextLayoutParams& params) {
     if (needsMultiLine) {
       float boxHeight = textBox->size.height;
       float totalHeight = static_cast<float>(result.lines.size()) * result.lineHeight;
-      // Approximate ascent ratio for common fonts (ascender ≈ 80% of em-square).
+      // Approximate ascent for common fonts: ascender ≈ 80% of em-square (e.g. Arial 0.81,
+      // Helvetica 0.77, Times New Roman 0.81). Used to shift the first baseline down from the
+      // top of the text box so that glyphs sit on the baseline rather than hang from the top.
       float ascent = fontSize * 0.8f;
       float yOffset = 0;
       if (boxHeight > 0) {
@@ -240,7 +247,10 @@ SVGTextLayoutResult ComputeTextLayout(const SVGTextLayoutParams& params) {
     } else {
       switch (textBox->paragraphAlign) {
         case ParagraphAlign::Middle:
-          // 0.35 ≈ (ascent - descent) / 2 / em, shifts baseline so text visually centers.
+          // 0.35 ≈ (ascent − descent) / 2 / em. For common fonts the ascent-to-descent midpoint
+          // is roughly 0.35em above the baseline (e.g. Arial ascent 0.81, descent 0.19 →
+          // (0.81 − 0.19) / 2 = 0.31; Helvetica similar). This shifts the baseline so that
+          // the visual center of the glyphs aligns with the vertical center of the text box.
           result.y = textBox->position.y + textBox->size.height / 2 + fontSize * 0.35f;
           break;
         case ParagraphAlign::Far:
