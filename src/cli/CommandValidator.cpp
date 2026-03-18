@@ -57,8 +57,9 @@ namespace pagx::cli {
 //
 // Data flow: called per-layer by CheckSemanticRulesLayer; errors flow into the shared
 // ValidationError list returned to the caller of RunValidate.
-static void CheckMergePathPainterScope(const std::vector<Element*>& elements, const std::string& scopeLabel,
-                             std::vector<ValidationError>& errors) {
+static void CheckMergePathPainterScope(const std::vector<Element*>& elements,
+                                       const std::string& scopeLabel,
+                                       std::vector<ValidationError>& errors) {
   bool hasPainterBeforeMergePath = false;
   for (auto* element : elements) {
     NodeType type = element->nodeType();
@@ -102,8 +103,9 @@ static void CheckMergePathPainterScope(const std::vector<Element*>& elements, co
 //
 // Data flow: called per-layer by CheckSemanticRulesLayer; errors flow into the shared
 // ValidationError list returned to the caller of RunValidate.
-static void CheckTextBoxLayoutOverrideScope(const std::vector<Element*>& elements, const std::string& scopeLabel,
-                             std::vector<ValidationError>& errors) {
+static void CheckTextBoxLayoutOverrideScope(const std::vector<Element*>& elements,
+                                            const std::string& scopeLabel,
+                                            std::vector<ValidationError>& errors) {
   bool hasTextBox = false;
   std::vector<const Text*> texts;
   for (auto* element : elements) {
