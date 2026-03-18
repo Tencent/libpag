@@ -190,8 +190,7 @@ static bool IsHardcodedOpaqueColor(const Color& color) {
 
 // Helper to check geometry coordinates in a flat element list, recursing into Groups.
 static void CheckGeometryCoordinates(const std::vector<Element*>& elements,
-                                     const std::string& location,
-                                     std::vector<LintIssue>& issues) {
+                                     const std::string& location, std::vector<LintIssue>& issues) {
   for (auto* element : elements) {
     if (element->nodeType() == NodeType::Rectangle) {
       auto* rect = static_cast<const Rectangle*>(element);
@@ -210,15 +209,20 @@ static void CheckGeometryCoordinates(const std::vector<Element*>& elements,
       if (path->data != nullptr) {
         // Check on-curve end points only; skip off-curve control points to reduce noise.
         // For Move/Line: the single point is on-curve. For Quad: last of 2 points. For Cubic: last
-        // of 3 points. Close has no points.
-        path->data->forEach([&](PathVerb verb, const Point* pts) {
+        // of 3 points. Close has no points. The on-curve end point is always the last point for
+        // each verb.
+        const auto& verbs = path->data->verbs();
+        const auto& pts = path->data->points();
+        size_t pointIndex = 0;
+        for (auto verb : verbs) {
           int count = PathData::PointsPerVerb(verb);
           if (count > 0) {
-            // The on-curve end point is always the last point for each verb.
-            CheckCoordinate(pts[count - 1].x, "Path point.x", location, issues);
-            CheckCoordinate(pts[count - 1].y, "Path point.y", location, issues);
+            const Point& endPoint = pts[pointIndex + static_cast<size_t>(count) - 1];
+            CheckCoordinate(endPoint.x, "Path point.x", location, issues);
+            CheckCoordinate(endPoint.y, "Path point.y", location, issues);
           }
-        });
+          pointIndex += static_cast<size_t>(count);
+        }
       }
     } else if (element->nodeType() == NodeType::Group) {
       // Recurse into groups to check nested geometry coordinates.
@@ -439,8 +443,7 @@ static void CheckColorSource(const ColorSource* source, const std::string& paint
 }
 
 // Color rules — hardcoded colors break dark/light theme compatibility.
-static void CheckColorRules(const std::string& location,
-                            const std::vector<const Fill*>& fills,
+static void CheckColorRules(const std::string& location, const std::vector<const Fill*>& fills,
                             const std::vector<const Stroke*>& strokes,
                             std::vector<LintIssue>& issues) {
   for (auto* fill : fills) {
