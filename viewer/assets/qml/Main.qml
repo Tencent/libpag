@@ -31,6 +31,9 @@ PAGWindow {
 
     property int minWindowHeightWithEditPanel: 650
 
+    property var contentView: mainForm.contentView
+    property var connectedContentView: null
+
     Settings {
         id: settings
         property bool isEditPanelOpen: false
@@ -59,64 +62,38 @@ PAGWindow {
 
         centerItem {
             onWidthChanged: {
-                resizePAGView();
+                resizeContentView();
             }
             onHeightChanged: {
-                resizePAGView();
+                resizeContentView();
             }
         }
 
-        pagView {
-            showVideoFrames: settings.isShowVideoFrames
-            onProgressChanged: function (progress) {
-                if (controlForm.progressSlider.value === progress) {
-                    return;
-                }
-                controlForm.progressSlider.value = progress;
-                updateProgress();
-            }
-            onFileChanged: {
-                let path = pagView.filePath;
-                path = path.replace(/\\/ig, '/').match(/\/([^\/]+)$/)[1];
-                viewWindow.title = path;
-                viewWindow.filePath = path;
-                centerItem.color = pagView.backgroundColor;
-                updateProgress();
-                let oldX = viewWindow.x;
-                let oldY = viewWindow.y;
-                let oldWidth = viewWindow.width;
-                let oldHeight = viewWindow.height;
-                let preferredSize = pagView.preferredSize;
-                let width = Math.max(viewWindow.minimumWidth, preferredSize.width);
-                let height = Math.max(viewWindow.minimumHeight, preferredSize.height + controlForm.height);
-                if (mainForm.rightItemLoader.status === Loader.Ready) {
-                    width += mainForm.rightItemLoader.width + mainForm.splitHandleWidth;
-                }
-                let x = Math.max(0, oldX - ((width - oldWidth) / 2));
-                let y = Math.max(50, oldY - ((height - oldHeight) / 2));
-                settings.lastX = x;
-                settings.lastY = y;
-                viewWindow.x = x;
-                viewWindow.y = y;
-                viewWindow.width = width + windowPadding;
-                viewWindow.height = height;
+        contentViewLoader.onLoaded: {
+            if (contentView) {
+                connectContentViewSignals();
             }
         }
+
         controlForm {
             progressSlider {
                 onValueChanged: {
-                    if (pagView.progress === controlForm.progressSlider.value) {
+                    if (!contentView)
+                        return;
+                    if (contentView.progress === controlForm.progressSlider.value) {
                         return;
                     }
-                    pagView.progress = controlForm.progressSlider.value;
+                    contentView.progress = controlForm.progressSlider.value;
                     updateProgress();
                 }
                 onPressedChanged: {
+                    if (!contentView)
+                        return;
                     if (controlForm.progressSlider.pressed) {
-                        viewWindow.lastPlayStatusIsPlaying = pagView.isPlaying;
-                        pagView.isPlaying = false;
+                        viewWindow.lastPlayStatusIsPlaying = contentView.isPlaying;
+                        contentView.isPlaying = false;
                     } else {
-                        pagView.isPlaying = viewWindow.lastPlayStatusIsPlaying;
+                        contentView.isPlaying = viewWindow.lastPlayStatusIsPlaying;
                         viewWindow.lastPlayStatusIsPlaying = false;
                     }
                 }
@@ -152,12 +129,73 @@ PAGWindow {
                 } else {
                     path = viewWindow.filePath;
                 }
-                if (path.endsWith("pag")) {
-                    mainForm.pagView.setFile(path);
+                let lowerPath = path.toLowerCase();
+                if (lowerPath.endsWith(".pag") || lowerPath.endsWith(".pagx")) {
+                    mainForm.loadFile(path);
                 }
             }
         }
     }
+
+    function onContentViewProgressChanged(progress) {
+        if (controlForm.progressSlider.value === progress) {
+            return;
+        }
+        controlForm.progressSlider.value = progress;
+        updateProgress();
+    }
+
+    function onContentViewFilePathChanged(filePath) {
+        let path = contentView.filePath;
+        path = path.replace(/\\/ig, '/').match(/\/([^\/]+)$/)[1];
+        viewWindow.title = path;
+        viewWindow.filePath = path;
+        centerItem.color = contentView.backgroundColor;
+        updateProgress();
+        let oldX = viewWindow.x;
+        let oldY = viewWindow.y;
+        let oldWidth = viewWindow.width;
+        let oldHeight = viewWindow.height;
+        let preferredSize = contentView.preferredSize;
+        let width = Math.max(viewWindow.minimumWidth, preferredSize.width);
+        let height = Math.max(viewWindow.minimumHeight, preferredSize.height + controlForm.height);
+        if (mainForm.rightItemLoader.status === Loader.Ready) {
+            width += mainForm.rightItemLoader.width + mainForm.splitHandleWidth;
+        }
+        let x = Math.max(0, oldX - ((width - oldWidth) / 2));
+        let y = Math.max(50, oldY - ((height - oldHeight) / 2));
+        settings.lastX = x;
+        settings.lastY = y;
+        viewWindow.x = x;
+        viewWindow.y = y;
+        viewWindow.width = width + windowPadding;
+        viewWindow.height = height;
+    }
+
+    function disconnectContentViewSignals() {
+        if (!connectedContentView)
+            return;
+        connectedContentView.progressChanged.disconnect(onContentViewProgressChanged);
+        connectedContentView.filePathChanged.disconnect(onContentViewFilePathChanged);
+        connectedContentView = null;
+    }
+
+    function connectContentViewSignals() {
+        if (!contentView)
+            return;
+        disconnectContentViewSignals();
+        connectedContentView = contentView;
+        contentView.progressChanged.connect(onContentViewProgressChanged);
+        contentView.filePathChanged.connect(onContentViewFilePathChanged);
+
+        // Apply showVideoFrames setting
+        if (contentView.showVideoFrames !== undefined) {
+            contentView.showVideoFrames = settings.isShowVideoFrames;
+        }
+    }
+
+    property alias controlForm: mainForm.controlForm
+    property alias centerItem: mainForm.centerItem
 
     SettingsWindow {
         id: settingsWindow
@@ -380,6 +418,9 @@ PAGWindow {
             hasPAGFile: Qt.binding(function () {
                 return mainForm.hasPAGFile;
             }),
+            hasAnimation: Qt.binding(function () {
+                return mainForm.hasAnimation;
+            }),
             windowActive: Qt.binding(function () {
                 return viewWindow.active;
             }),
@@ -394,12 +435,16 @@ PAGWindow {
 
         startupTimer.start();
         updateTimer.start();
+
+        connectContentViewSignals();
     }
 
     function updateProgress() {
-        mainForm.controlForm.timeDisplayedText.text = mainForm.pagView.displayedTime;
-        mainForm.controlForm.currentFrameText.text = mainForm.pagView.currentFrame;
-        mainForm.controlForm.totalFrameText.text = mainForm.pagView.totalFrame;
+        if (!contentView)
+            return;
+        mainForm.controlForm.timeDisplayedText.text = contentView.displayedTime;
+        mainForm.controlForm.currentFrameText.text = contentView.currentFrame;
+        mainForm.controlForm.totalFrameText.text = contentView.totalFrame;
     }
 
     function toggleBackground(checked) {
@@ -443,9 +488,11 @@ PAGWindow {
         }
     }
 
-    function resizePAGView() {
-        let width = mainForm.pagView.pagWidth;
-        let height = mainForm.pagView.pagHeight;
+    function resizeContentView() {
+        if (!contentView)
+            return;
+        let width = contentView.pagWidth;
+        let height = contentView.pagHeight;
         let windowWidth = mainForm.centerItem.width;
         let windowHeight = mainForm.centerItem.height - mainForm.controlForm.height;
         let finalHeight = 1;
@@ -458,10 +505,10 @@ PAGWindow {
             finalWidth = windowWidth;
             finalHeight = finalWidth / width * height;
         }
-        mainForm.pagView.width = finalWidth;
-        mainForm.pagView.height = finalHeight;
-        mainForm.pagView.x = (windowWidth - finalWidth) / 2;
-        mainForm.pagView.y = (windowHeight - finalHeight) / 2;
+        mainForm.contentViewLoader.item.width = finalWidth;
+        mainForm.contentViewLoader.item.height = finalHeight;
+        mainForm.contentViewLoader.item.x = (windowWidth - finalWidth) / 2;
+        mainForm.contentViewLoader.item.y = (windowHeight - finalHeight) / 2;
     }
 
     function updateAvailable(hasNewVersion) {
@@ -473,11 +520,10 @@ PAGWindow {
     }
 
     function onCommand(command) {
-        console.log(`Get command: [${command}]`);
         switch (command) {
         case "open-pag-file":
             if (mainForm.hasPAGFile) {
-                let filePath = mainForm.pagView.filePath;
+                let filePath = contentView.filePath;
                 openFileDialog.currentFolder = Utils.getFileDir(filePath);
             } else {
                 openFileDialog.currentFolder = StandardPaths.writableLocation(StandardPaths.DocumentsLocation);
@@ -487,10 +533,10 @@ PAGWindow {
             }
             openFileDialog.fileMode = FileDialog.OpenFile;
             openFileDialog.title = qsTr("Open PAG File");
-            openFileDialog.nameFilters = ["PAG files(*.pag)"];
+            openFileDialog.nameFilters = ["PAG files(*.pag *.pagx)"];
             openFileDialog.currentAcceptHandler = function () {
                 let filePath = openFileDialog.selectedFile;
-                mainForm.pagView.setFile(filePath);
+                mainForm.loadFile(filePath);
             };
             openFileDialog.accepted.connect(openFileDialog.currentAcceptHandler);
             openFileDialog.open();
@@ -503,19 +549,24 @@ PAGWindow {
             settingsWindow.raise();
             break;
         case "first-frame":
-            mainForm.pagView.firstFrame();
+            if (contentView)
+                contentView.firstFrame();
             break;
         case "last-frame":
-            mainForm.pagView.lastFrame();
+            if (contentView)
+                contentView.lastFrame();
             break;
         case "previous-frame":
-            mainForm.pagView.previousFrame();
+            if (contentView)
+                contentView.previousFrame();
             break;
         case "next-frame":
-            mainForm.pagView.nextFrame();
+            if (contentView)
+                contentView.nextFrame();
             break;
         case "pause-or-play":
-            mainForm.pagView.isPlaying = !mainForm.pagView.isPlaying;
+            if (contentView)
+                contentView.isPlaying = !contentView.isPlaying;
             break;
         case "toggle-background":
             toggleBackground();
@@ -559,11 +610,11 @@ PAGWindow {
             openFileDialog.title = qsTr("Select save path");
             openFileDialog.nameFilters = ["PNG files(*.png)"];
             openFileDialog.defaultSuffix = "png";
-            openFileDialog.currentFolder = Utils.getFileDir(mainForm.pagView.filePath);
+            openFileDialog.currentFolder = Utils.getFileDir(contentView.filePath);
             openFileDialog.currentAcceptHandler = function () {
                 let filePath = openFileDialog.selectedFile;
                 let task = taskFactory.createTask(PAGTaskFactory.PAGTaskType_ExportPNG, filePath, {
-                    "exportFrame": mainForm.pagView.currentFrame
+                    "exportFrame": contentView.currentFrame
                 });
                 if (task) {
                     taskConnections.target = task;
@@ -582,7 +633,7 @@ PAGWindow {
                 openFolderDialog.accepted.disconnect(openFolderDialog.currentAcceptHandler);
             }
             openFolderDialog.title = qsTr("Select save path");
-            openFolderDialog.currentFolder = Utils.getFileDir(mainForm.pagView.filePath);
+            openFolderDialog.currentFolder = Utils.getFileDir(contentView.filePath);
             openFolderDialog.currentAcceptHandler = function () {
                 let filePath = openFolderDialog.folder;
                 let task = taskFactory.createTask(PAGTaskFactory.PAGTaskType_ExportPNG, filePath);
@@ -607,7 +658,7 @@ PAGWindow {
             openFileDialog.title = qsTr("Select save path");
             openFileDialog.nameFilters = ["APNG files(*.png)"];
             openFileDialog.defaultSuffix = "png";
-            openFileDialog.currentFolder = Utils.getFileDir(mainForm.pagView.filePath);
+            openFileDialog.currentFolder = Utils.getFileDir(contentView.filePath);
             openFileDialog.currentAcceptHandler = function () {
                 let filePath = openFileDialog.selectedFile;
                 let task = taskFactory.createTask(PAGTaskFactory.PAGTaskType_ExportAPNG, filePath);
@@ -628,7 +679,7 @@ PAGWindow {
             checkForUpdates(false);
             break;
         case "performance-profile":
-            let task = taskFactory.createTask(PAGTaskFactory.PAGTaskType_Profiling, mainForm.pagView.filePath);
+            let task = taskFactory.createTask(PAGTaskFactory.PAGTaskType_Profiling, contentView.filePath);
             if (task) {
                 taskConnections.target = task;
                 progressWindow.title = qsTr("Profiling");
@@ -640,13 +691,13 @@ PAGWindow {
             }
             break;
         case "performance-benchmark":
-            mainForm.pagView.isPlaying = false;
+            if (contentView)
+                contentView.isPlaying = false;
             benchmarkBusyIndicator.visible = true;
             benchmarkBusyIndicator.running = true;
             benchmarkModel.startBenchmarkOnTemplate(false);
             break;
         default:
-            console.log(`Undefined command: [${command}]`);
             break;
         }
     }

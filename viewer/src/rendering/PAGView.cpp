@@ -38,7 +38,7 @@ static void reportPAGFIleInfo(const std::shared_ptr<PAGFile>& pagFile, size_t le
   qDebug() << map;
 }
 
-PAGView::PAGView(QQuickItem* parent) : QQuickItem(parent) {
+PAGView::PAGView(QQuickItem* parent) : ContentView(parent) {
   setFlag(ItemHasContents, true);
   drawable = GPUDrawable::MakeFrom(this);
   pagPlayer = std::make_unique<PAGPlayer>();
@@ -84,18 +84,22 @@ PAGView::~PAGView() {
   renderThread->wait();
 }
 
-int PAGView::getPAGWidth() const {
+int PAGView::getWidth() const {
   if (pagFile == nullptr) {
     return 0;
   }
   return pagFile->width();
 }
 
-int PAGView::getPAGHeight() const {
+int PAGView::getHeight() const {
   if (pagFile == nullptr) {
     return 0;
   }
   return pagFile->height();
+}
+
+bool PAGView::hasAnimation() const {
+  return pagFile != nullptr && pagFile->duration() > 0;
 }
 
 int PAGView::getEditableTextLayerCount() const {
@@ -151,7 +155,6 @@ QString PAGView::getFilePath() const {
   if (pagFile == nullptr) {
     return "";
   }
-
   return QString::fromLocal8Bit(pagFile->path().data());
 }
 
@@ -169,15 +172,17 @@ QColor PAGView::getBackgroundColor() const {
   if (pagFile == nullptr) {
     return QColorConstants::Black;
   }
-
   auto color = pagFile->getFile()->getRootLayer()->composition->backgroundColor;
   return QColor::fromRgb((int32_t)color.red, (int32_t)color.green, (int32_t)color.blue);
 }
 
 QSizeF PAGView::getPreferredSize() const {
   auto quickWindow = window();
-  int pagWidth = getPAGWidth();
-  int pagHeight = getPAGHeight();
+  int pagWidth = getWidth();
+  int pagHeight = getHeight();
+  if (quickWindow == nullptr || pagWidth == 0 || pagHeight == 0) {
+    return {0, 0};
+  }
   auto screen = quickWindow->screen();
   QSize screenSize = screen->availableVirtualSize();
   qreal maxHeight = screenSize.height() * 0.8;
@@ -245,10 +250,12 @@ bool PAGView::setFile(const QString& filePath) {
   if (byteData == nullptr) {
     return false;
   }
+
   auto newPagFile = pag::PAGFile::Load(byteData->data(), byteData->length());
   if (newPagFile == nullptr) {
     return false;
   }
+
   setIsPlaying(false);
   pagFile = newPagFile;
   pagFile->getFile()->path = strPath;
@@ -258,7 +265,7 @@ bool PAGView::setFile(const QString& filePath) {
   sizeChanged = true;
   progressPerFrame = 1.0 / (pagFile->frameRate() * pagFile->duration() / 1000000);
   Q_EMIT fileChanged(pagFile->getFile());
-  Q_EMIT filePathChanged(strPath);
+  Q_EMIT filePathChanged(QString::fromLocal8Bit(strPath.data()));
   Q_EMIT pagFileChanged(pagFile);
   audioPlayer->setVolume(1.0f);
   setProgressInternal(0, true);
