@@ -1143,8 +1143,7 @@ CLI_TEST(PAGXCliTest, Convert_PagxToSvg_Gradient) {
 CLI_TEST(PAGXCliTest, Convert_PagxToSvg_CustomIndent) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   auto outputPath = TempDir() + "/ConvertSVG_Indent4.svg";
-  auto ret =
-      CallRun(pagx::cli::RunConvert, {"convert", "--indent", "4", inputPath, outputPath});
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", "--indent", "4", inputPath, outputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_TRUE(output.find("    <") != std::string::npos);
@@ -1153,8 +1152,8 @@ CLI_TEST(PAGXCliTest, Convert_PagxToSvg_CustomIndent) {
 CLI_TEST(PAGXCliTest, Convert_PagxToSvg_NoXmlDeclaration) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   auto outputPath = TempDir() + "/ConvertSVG_NoXml.svg";
-  auto ret = CallRun(pagx::cli::RunConvert,
-                     {"convert", "--no-xml-declaration", inputPath, outputPath});
+  auto ret =
+      CallRun(pagx::cli::RunConvert, {"convert", "--no-xml-declaration", inputPath, outputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_TRUE(output.find("<?xml") == std::string::npos);

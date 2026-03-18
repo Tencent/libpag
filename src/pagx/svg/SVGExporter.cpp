@@ -34,7 +34,6 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
-#include "pagx/types/Rect.h"
 #include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
@@ -48,6 +47,7 @@
 #include "pagx/svg/SVGBlendMode.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/svg/SVGTextLayout.h"
+#include "pagx/types/Rect.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/StringParser.h"
 
@@ -62,8 +62,7 @@ using pag::FloatNearlyZero;
 
 class SVGBuilder {
  public:
-  explicit SVGBuilder(int indentSpaces, int initialIndentLevel = 0,
-                      size_t reserveCapacity = 4096)
+  explicit SVGBuilder(int indentSpaces, int initialIndentLevel = 0, size_t reserveCapacity = 4096)
       : _indentLevel(initialIndentLevel), _indentSpaces(indentSpaces) {
     _tagStack.reserve(32);
     _buffer.reserve(reserveCapacity);
@@ -394,7 +393,8 @@ static Matrix BuildGroupMatrix(const Group* group) {
   bool hasAnchor = !FloatNearlyZero(group->anchor.x) || !FloatNearlyZero(group->anchor.y);
   bool hasPosition = !FloatNearlyZero(group->position.x) || !FloatNearlyZero(group->position.y);
   bool hasRotation = !FloatNearlyZero(group->rotation);
-  bool hasScale = !FloatNearlyZero(group->scale.x - 1.0f) || !FloatNearlyZero(group->scale.y - 1.0f);
+  bool hasScale =
+      !FloatNearlyZero(group->scale.x - 1.0f) || !FloatNearlyZero(group->scale.y - 1.0f);
   bool hasSkew = !FloatNearlyZero(group->skew);
 
   if (!hasAnchor && !hasPosition && !hasRotation && !hasScale && !hasSkew) {
@@ -431,7 +431,6 @@ static Matrix BuildGroupMatrix(const Group* group) {
   return m;
 }
 
-
 //==============================================================================
 // SVGWriterContext - shared state across SVGWriter instances
 //==============================================================================
@@ -455,7 +454,8 @@ class SVGWriter {
   SVGWriter(SVGBuilder* defs, SVGWriterContext* context, int indentSpaces = 2,
             bool convertTextToPath = true)
       : _defs(defs), _context(context), _indentSpaces(indentSpaces),
-        _convertTextToPath(convertTextToPath) {}
+        _convertTextToPath(convertTextToPath) {
+  }
 
   void writeLayer(SVGBuilder& out, const Layer* layer);
 
@@ -470,8 +470,7 @@ class SVGWriter {
   }
 
   // Layer / element writing
-  void writeLayerContents(SVGBuilder& out, const Layer* layer,
-                          const Matrix& transform = {});
+  void writeLayerContents(SVGBuilder& out, const Layer* layer, const Matrix& transform = {});
   void writeElements(SVGBuilder& out, const std::vector<Element*>& elements,
                      const Matrix& transform = {});
 
@@ -504,8 +503,8 @@ class SVGWriter {
 
   // Mask / clip-path defs
   using ContentWriter = void (SVGWriter::*)(SVGBuilder&, const Layer*);
-  std::string writeMaskOrClipDef(const Layer* maskLayer, const char* tag,
-                                 const char* idPrefix, ContentWriter writer);
+  std::string writeMaskOrClipDef(const Layer* maskLayer, const char* tag, const char* idPrefix,
+                                 ContentWriter writer);
   void writeMaskContent(SVGBuilder& out, const Layer* layer);
   void writeClipPathContent(SVGBuilder& out, const Layer* layer);
   void writeClipPathContentRecursive(SVGBuilder& out, const Layer* layer,
@@ -515,9 +514,9 @@ class SVGWriter {
 
   // Fill / stroke attribute helpers
   void applyFillAttributes(SVGBuilder& out, const Fill* fill, const Rect& shapeBounds = {},
-                            std::string* p3Style = nullptr);
+                           std::string* p3Style = nullptr);
   void applyStrokeAttributes(SVGBuilder& out, const Stroke* stroke, const Rect& shapeBounds = {},
-                              std::string* p3Style = nullptr);
+                             std::string* p3Style = nullptr);
   static void applyP3Style(SVGBuilder& out, const std::string& p3Style);
 };
 
@@ -593,8 +592,7 @@ void SVGWriter::writeColorSourceDef(const ColorSource* source, const std::string
   }
 }
 
-std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern,
-                                            const Rect& shapeBounds) {
+std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const Rect& shapeBounds) {
   if (!pattern->image) {
     return {};
   }
@@ -1131,9 +1129,8 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
     return;
   }
 
-  auto layout = ComputeTextLayout(
-      {&text->text, text->fontSize, text->letterSpacing, text->position, text->textAnchor,
-       fs.textBox});
+  auto layout = ComputeTextLayout({&text->text, text->fontSize, text->letterSpacing, text->position,
+                                   text->textAnchor, fs.textBox});
 
   if (layout.isMultiLine && layout.lines.empty()) {
     return;
@@ -1260,8 +1257,7 @@ void SVGWriter::writeElements(SVGBuilder& out, const std::vector<Element*>& elem
   }
 }
 
-void SVGWriter::writeLayerContents(SVGBuilder& out, const Layer* layer,
-                                   const Matrix& transform) {
+void SVGWriter::writeLayerContents(SVGBuilder& out, const Layer* layer, const Matrix& transform) {
   writeElements(out, layer->contents, transform);
 }
 
@@ -1270,9 +1266,9 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
     return;
   }
 
-  bool needsGroup = !layer->matrix.isIdentity() || layer->alpha < 1.0f ||
-                    !layer->id.empty() || !layer->filters.empty() || layer->mask != nullptr ||
-                    layer->x != 0.0f || layer->y != 0.0f || !layer->customData.empty() ||
+  bool needsGroup = !layer->matrix.isIdentity() || layer->alpha < 1.0f || !layer->id.empty() ||
+                    !layer->filters.empty() || layer->mask != nullptr || layer->x != 0.0f ||
+                    layer->y != 0.0f || !layer->customData.empty() ||
                     layer->blendMode != BlendMode::Normal;
 
   if (!needsGroup) {

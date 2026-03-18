@@ -49,30 +49,29 @@ struct ConvertOptions {
 };
 
 static void PrintUsage() {
-  std::cout
-      << "Usage: pagx convert [options] <input> <output>\n"
-      << "\n"
-      << "Convert between PAGX and other formats. The conversion direction\n"
-      << "is inferred from file extensions (e.g. .pagx -> .svg or .svg -> .pagx).\n"
-      << "\n"
-      << "Options:\n"
-      << "  --force <format>            Override output format (svg, pagx)\n"
-      << "\n"
-      << "SVG output options:\n"
-      << "  --indent <n>              Indentation spaces (default: 2, valid range: 0-16)\n"
-      << "  --no-xml-declaration      Omit the <?xml ...?> declaration\n"
-      << "  --no-convert-text-to-path Keep text as <text> elements instead of <path>\n"
-      << "\n"
-      << "SVG input options:\n"
-      << "  --no-expand-use           Do not expand <use> references\n"
-      << "  --flatten-transforms      Flatten nested transforms into single matrices\n"
-      << "  --preserve-unknown        Preserve unsupported SVG elements as Unknown nodes\n"
-      << "\n"
-      << "Examples:\n"
-      << "  pagx convert input.pagx output.svg          # PAGX to SVG\n"
-      << "  pagx convert input.svg output.pagx           # SVG to PAGX\n"
-      << "  pagx convert --indent 4 input.pagx out.svg   # PAGX to SVG with 4-space indent\n"
-      << "  pagx convert --force svg input.pagx output        # force SVG output format\n";
+  std::cout << "Usage: pagx convert [options] <input> <output>\n"
+            << "\n"
+            << "Convert between PAGX and other formats. The conversion direction\n"
+            << "is inferred from file extensions (e.g. .pagx -> .svg or .svg -> .pagx).\n"
+            << "\n"
+            << "Options:\n"
+            << "  --force <format>            Override output format (svg, pagx)\n"
+            << "\n"
+            << "SVG output options:\n"
+            << "  --indent <n>              Indentation spaces (default: 2, valid range: 0-16)\n"
+            << "  --no-xml-declaration      Omit the <?xml ...?> declaration\n"
+            << "  --no-convert-text-to-path Keep text as <text> elements instead of <path>\n"
+            << "\n"
+            << "SVG input options:\n"
+            << "  --no-expand-use           Do not expand <use> references\n"
+            << "  --flatten-transforms      Flatten nested transforms into single matrices\n"
+            << "  --preserve-unknown        Preserve unsupported SVG elements as Unknown nodes\n"
+            << "\n"
+            << "Examples:\n"
+            << "  pagx convert input.pagx output.svg          # PAGX to SVG\n"
+            << "  pagx convert input.svg output.pagx           # SVG to PAGX\n"
+            << "  pagx convert --indent 4 input.pagx out.svg   # PAGX to SVG with 4-space indent\n"
+            << "  pagx convert --force svg input.pagx output        # force SVG output format\n";
 }
 
 static std::string InferFormat(const std::string& path) {
@@ -100,8 +99,7 @@ static int ParseOptions(int argc, char* argv[], ConvertOptions* options) {
       char* endPtr = nullptr;
       long value = strtol(argv[++i], &endPtr, 10);
       if (endPtr == argv[i] || *endPtr != '\0' || value < 0 || value > 16) {
-        std::cerr << "pagx convert: error: invalid indent '" << argv[i]
-                  << "' (must be 0-16)\n";
+        std::cerr << "pagx convert: error: invalid indent '" << argv[i] << "' (must be 0-16)\n";
         return 1;
       }
       options->svgExport.indent = static_cast<int>(value);
@@ -147,8 +145,8 @@ static int ParseOptions(int argc, char* argv[], ConvertOptions* options) {
     options->outputFormat = InferFormat(options->outputFile);
   }
   if (options->outputFormat.empty()) {
-    std::cerr << "pagx convert: error: cannot infer output format from '"
-              << options->outputFile << "', use --force to specify\n";
+    std::cerr << "pagx convert: error: cannot infer output format from '" << options->outputFile
+              << "', use --force to specify\n";
     return 1;
   }
   return 0;
@@ -183,8 +181,8 @@ static int ConvertToSVG(const ConvertOptions& options) {
 static int ConvertToPAGX(const ConvertOptions& options) {
   auto inputFormat = InferFormat(options.inputFile);
   if (inputFormat != "svg") {
-    std::cerr << "pagx convert: error: unsupported input format for '"
-              << options.inputFile << "'\n";
+    std::cerr << "pagx convert: error: unsupported input format for '" << options.inputFile
+              << "'\n";
     return 1;
   }
 

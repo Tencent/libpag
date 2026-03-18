@@ -87,12 +87,12 @@ struct SVGTextLayoutParams {
  * Result of text layout computation (position, anchor, line-break info).
  */
 struct SVGTextLayoutResult {
-  float x;                        // text x coordinate
-  float y;                        // text y coordinate (used for single-line)
-  TextAnchor anchor;              // resolved anchor
-  bool isMultiLine;               // whether layout produced multiple lines
-  float lineHeight;               // line height (multi-line)
-  float firstLineY;               // first line y coordinate (multi-line)
+  float x;                         // text x coordinate
+  float y;                         // text y coordinate (used for single-line)
+  TextAnchor anchor;               // resolved anchor
+  bool isMultiLine;                // whether layout produced multiple lines
+  float lineHeight;                // line height (multi-line)
+  float firstLineY;                // first line y coordinate (multi-line)
   std::vector<SVGCharInfo> chars;  // parsed character info
   std::vector<SVGTextLine> lines;  // line-break results
 };

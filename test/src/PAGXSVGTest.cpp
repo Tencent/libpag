@@ -451,8 +451,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_FillRule) {
   auto layer = doc->makeNode<pagx::Layer>();
   auto path = doc->makeNode<pagx::Path>();
   auto pathData = doc->makeNode<pagx::PathData>();
-  *pathData = pagx::PathDataFromSVGString(
-      "M100,10 L40,198 L190,78 L10,78 L160,198 Z");
+  *pathData = pagx::PathDataFromSVGString("M100,10 L40,198 L190,78 L10,78 L160,198 Z");
   path->data = pathData;
   auto fill = doc->makeNode<pagx::Fill>();
   auto solid = doc->makeNode<pagx::SolidColor>();
@@ -678,8 +677,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_MultiRoundTrip) {
 
       auto pagxXml = pagx::PAGXExporter::ToXML(*doc);
       ASSERT_FALSE(pagxXml.empty()) << baseName << " round " << round << " PAGX export failed";
-      auto pagxPath =
-          SaveFile(pagxXml, "PAGXSVGTest/multi_roundtrip_" + baseName + ".pagx");
+      auto pagxPath = SaveFile(pagxXml, "PAGXSVGTest/multi_roundtrip_" + baseName + ".pagx");
 
       doc = pagx::PAGXImporter::FromFile(pagxPath);
       ASSERT_NE(doc, nullptr) << baseName << " round " << round << " PAGX import failed";
