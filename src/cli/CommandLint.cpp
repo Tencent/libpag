@@ -371,6 +371,11 @@ static void CheckSafeZone(const Layer* layer, float canvasWidth, float canvasHei
     return;
   }
 
+  // Geometry coordinates are relative to the layer origin. Translate to canvas space by adding
+  // the layer's x/y offset so that safe-zone checks are against the correct absolute positions.
+  bounds.x += layer->x;
+  bounds.y += layer->y;
+
   float boundsRight = bounds.x + bounds.width;
   float boundsBottom = bounds.y + bounds.height;
 
