@@ -17,6 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SVGTextLayout.h"
+#include "base/utils/MathUtil.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/PathData.h"
+#include "pagx/nodes/GlyphRun.h"
+#include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextBox.h"
 #include "renderer/LineBreaker.h"
 #include "tgfx/core/UTF.h"
 
@@ -148,6 +154,182 @@ std::string ExtractLineText(const std::string& fullText, const std::vector<SVGCh
   auto& lastChar = chars[line.charStart + line.charCount - 1];
   size_t byteEnd = lastChar.byteOffset + lastChar.byteLen;
   return fullText.substr(byteStart, byteEnd - byteStart);
+}
+
+SVGTextLayoutResult ComputeTextLayout(const SVGTextLayoutParams& params) {
+  SVGTextLayoutResult result = {};
+  const auto& content = *params.text;
+  auto* textBox = params.textBox;
+  float fontSize = params.fontSize;
+
+  bool needsMultiLine = textBox != nullptr && textBox->wordWrap && textBox->size.width > 0;
+  result.isMultiLine = needsMultiLine;
+
+  // ── Multi-line: parse text and break into lines ──
+  float boxWidth = 0;
+
+  if (needsMultiLine) {
+    boxWidth = textBox->size.width;
+    result.lineHeight = textBox->lineHeight > 0 ? textBox->lineHeight : fontSize * 1.2f;
+
+    result.chars.reserve(content.size());
+    size_t pos = 0;
+    while (pos < content.size()) {
+      int32_t unichar = 0;
+      size_t len = SVGDecodeUTF8Char(content.data() + pos, content.size() - pos, &unichar);
+      if (len == 0) {
+        pos++;
+        continue;
+      }
+      float advance = 0;
+      if (unichar != '\n') {
+        advance = EstimateCharAdvance(unichar, fontSize) + params.letterSpacing;
+      }
+      result.chars.push_back({unichar, pos, len, advance});
+      pos += len;
+    }
+
+    result.lines = BreakTextIntoLines(result.chars, boxWidth);
+
+    while (result.lines.size() > 1 && result.lines.back().charCount == 0) {
+      result.lines.pop_back();
+    }
+  }
+
+  // ── Compute position and anchor ──
+  result.x = params.position.x;
+  result.y = params.position.y;
+  result.anchor = params.textAnchor;
+  result.firstLineY = 0;
+
+  if (textBox) {
+    switch (textBox->textAlign) {
+      case TextAlign::Center:
+        result.x = textBox->position.x + textBox->size.width / 2;
+        result.anchor = TextAnchor::Center;
+        break;
+      case TextAlign::End:
+        result.x = textBox->position.x + textBox->size.width;
+        result.anchor = TextAnchor::End;
+        break;
+      default:
+        result.x = textBox->position.x;
+        result.anchor = TextAnchor::Start;
+        break;
+    }
+
+    if (needsMultiLine) {
+      float boxHeight = textBox->size.height;
+      float totalHeight = static_cast<float>(result.lines.size()) * result.lineHeight;
+      // Approximate ascent ratio for common fonts (ascender ≈ 80% of em-square).
+      float ascent = fontSize * 0.8f;
+      float yOffset = 0;
+      if (boxHeight > 0) {
+        switch (textBox->paragraphAlign) {
+          case ParagraphAlign::Middle:
+            yOffset = (boxHeight - totalHeight) / 2;
+            break;
+          case ParagraphAlign::Far:
+            yOffset = boxHeight - totalHeight;
+            break;
+          default:
+            break;
+        }
+      }
+      result.firstLineY = textBox->position.y + yOffset + ascent;
+    } else {
+      switch (textBox->paragraphAlign) {
+        case ParagraphAlign::Middle:
+          // 0.35 ≈ (ascent - descent) / 2 / em, shifts baseline so text visually centers.
+          result.y = textBox->position.y + textBox->size.height / 2 + fontSize * 0.35f;
+          break;
+        case ParagraphAlign::Far:
+          result.y = textBox->position.y + textBox->size.height;
+          break;
+        default:
+          result.y = textBox->position.y + fontSize;
+          break;
+      }
+    }
+  }
+
+  return result;
+}
+
+std::vector<SVGGlyphPath> ComputeGlyphPaths(const Text& text, float textPosX, float textPosY) {
+  std::vector<SVGGlyphPath> result;
+  for (const auto* run : text.glyphRuns) {
+    if (!run->font || run->glyphs.empty()) {
+      continue;
+    }
+    float scale = run->fontSize / static_cast<float>(run->font->unitsPerEm);
+    float currentX = textPosX + run->x;
+    for (size_t i = 0; i < run->glyphs.size(); i++) {
+      uint16_t glyphID = run->glyphs[i];
+      if (glyphID == 0) {
+        continue;
+      }
+      auto glyphIndex = static_cast<size_t>(glyphID) - 1;
+      if (glyphIndex >= run->font->glyphs.size()) {
+        continue;
+      }
+      auto* glyph = run->font->glyphs[glyphIndex];
+      if (!glyph || !glyph->path || glyph->path->isEmpty()) {
+        continue;
+      }
+
+      float posX = 0;
+      float posY = 0;
+      if (i < run->positions.size()) {
+        posX = textPosX + run->x + run->positions[i].x;
+        posY = textPosY + run->y + run->positions[i].y;
+        if (i < run->xOffsets.size()) {
+          posX += run->xOffsets[i];
+        }
+      } else if (i < run->xOffsets.size()) {
+        posX = textPosX + run->x + run->xOffsets[i];
+        posY = textPosY + run->y;
+      } else {
+        posX = currentX;
+        posY = textPosY + run->y;
+      }
+      currentX += glyph->advance * scale;
+
+      Matrix glyphMatrix = Matrix::Translate(posX, posY) * Matrix::Scale(scale, scale);
+
+      bool hasRotation = i < run->rotations.size() && run->rotations[i] != 0;
+      bool hasGlyphScale =
+          i < run->scales.size() && (run->scales[i].x != 1 || run->scales[i].y != 1);
+      bool hasSkew = i < run->skews.size() && run->skews[i] != 0;
+
+      if (hasRotation || hasGlyphScale || hasSkew) {
+        float anchorX = glyph->advance * 0.5f;
+        float anchorY = 0;
+        if (i < run->anchors.size()) {
+          anchorX += run->anchors[i].x;
+          anchorY += run->anchors[i].y;
+        }
+
+        Matrix perGlyph = Matrix::Translate(-anchorX, -anchorY);
+        if (hasGlyphScale) {
+          perGlyph = Matrix::Scale(run->scales[i].x, run->scales[i].y) * perGlyph;
+        }
+        if (hasSkew) {
+          Matrix shear = {};
+          shear.c = std::tan(pag::DegreesToRadians(run->skews[i]));
+          perGlyph = shear * perGlyph;
+        }
+        if (hasRotation) {
+          perGlyph = Matrix::Rotate(run->rotations[i]) * perGlyph;
+        }
+        perGlyph = Matrix::Translate(anchorX, anchorY) * perGlyph;
+        glyphMatrix = glyphMatrix * perGlyph;
+      }
+
+      result.push_back({glyphMatrix, glyph->path});
+    }
+  }
+  return result;
 }
 
 }  // namespace pagx

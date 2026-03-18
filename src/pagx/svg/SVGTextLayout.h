@@ -22,8 +22,15 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include "pagx/types/Matrix.h"
+#include "pagx/types/Point.h"
+#include "pagx/types/TextAnchor.h"
 
 namespace pagx {
+
+class PathData;
+class Text;
+class TextBox;
 
 struct SVGCharInfo {
   int32_t unichar = 0;
@@ -63,5 +70,50 @@ std::vector<SVGTextLine> BreakTextIntoLines(const std::vector<SVGCharInfo>& char
  */
 std::string ExtractLineText(const std::string& fullText, const std::vector<SVGCharInfo>& chars,
                             const SVGTextLine& line);
+
+/**
+ * Input parameters for multi-line text layout computation.
+ */
+struct SVGTextLayoutParams {
+  const std::string* text;  // raw text content
+  float fontSize;           // font size in pixels
+  float letterSpacing;      // letter spacing in pixels
+  Point position;           // Text node position
+  TextAnchor textAnchor;    // Text node textAnchor
+  const TextBox* textBox;   // may be nullptr
+};
+
+/**
+ * Result of text layout computation (position, anchor, line-break info).
+ */
+struct SVGTextLayoutResult {
+  float x;                        // text x coordinate
+  float y;                        // text y coordinate (used for single-line)
+  TextAnchor anchor;              // resolved anchor
+  bool isMultiLine;               // whether layout produced multiple lines
+  float lineHeight;               // line height (multi-line)
+  float firstLineY;               // first line y coordinate (multi-line)
+  std::vector<SVGCharInfo> chars;  // parsed character info
+  std::vector<SVGTextLine> lines;  // line-break results
+};
+
+/**
+ * Computes the text layout (UTF-8 parsing, line breaking, position/alignment).
+ */
+SVGTextLayoutResult ComputeTextLayout(const SVGTextLayoutParams& params);
+
+/**
+ * A single glyph's path data with its computed transform matrix.
+ */
+struct SVGGlyphPath {
+  Matrix transform;          // glyph's full transform matrix
+  const PathData* pathData;  // pointer to glyph's path (not owned)
+};
+
+/**
+ * Converts text glyph runs into a list of glyph paths with transform matrices.
+ * textPosX/textPosY are the TextBox-aligned base position (from ComputeTextLayout).
+ */
+std::vector<SVGGlyphPath> ComputeGlyphPaths(const Text& text, float textPosX, float textPosY);
 
 }  // namespace pagx

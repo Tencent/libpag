@@ -31,7 +31,6 @@
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
-#include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -1095,6 +1094,19 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
 
 void SVGWriter::writeTextAsPath(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
                                 const std::string& transform) {
+  // Compute TextBox-aligned position via ComputeTextLayout.
+  auto layout = ComputeTextLayout(
+      {&text->text, text->fontSize, text->letterSpacing, text->position, text->textAnchor,
+       fs.textBox});
+
+  float textPosX = layout.x;
+  float textPosY = layout.isMultiLine ? layout.firstLineY : layout.y;
+
+  auto glyphPaths = ComputeGlyphPaths(*text, textPosX, textPosY);
+  if (glyphPaths.empty()) {
+    return;
+  }
+
   out.openElement("g");
   if (!transform.empty()) {
     out.addAttribute("transform", transform);
@@ -1105,82 +1117,11 @@ void SVGWriter::writeTextAsPath(SVGBuilder& out, const Text* text, const FillStr
   applyP3Style(out, p3Style);
   out.closeElementStart();
 
-  float textPosX = text->position.x;
-  float textPosY = text->position.y;
-
-  for (const auto* run : text->glyphRuns) {
-    if (!run->font || run->glyphs.empty()) {
-      continue;
-    }
-    float scale = run->fontSize / static_cast<float>(run->font->unitsPerEm);
-    float currentX = textPosX + run->x;
-    for (size_t i = 0; i < run->glyphs.size(); i++) {
-      uint16_t glyphID = run->glyphs[i];
-      if (glyphID == 0) {
-        continue;
-      }
-      auto glyphIndex = static_cast<size_t>(glyphID) - 1;
-      if (glyphIndex >= run->font->glyphs.size()) {
-        continue;
-      }
-      auto* glyph = run->font->glyphs[glyphIndex];
-      if (!glyph || !glyph->path || glyph->path->isEmpty()) {
-        continue;
-      }
-
-      float posX = 0;
-      float posY = 0;
-      if (i < run->positions.size()) {
-        posX = textPosX + run->x + run->positions[i].x;
-        posY = textPosY + run->y + run->positions[i].y;
-        if (i < run->xOffsets.size()) {
-          posX += run->xOffsets[i];
-        }
-      } else if (i < run->xOffsets.size()) {
-        posX = textPosX + run->x + run->xOffsets[i];
-        posY = textPosY + run->y;
-      } else {
-        posX = currentX;
-        posY = textPosY + run->y;
-      }
-      currentX += glyph->advance * scale;
-
-      Matrix glyphMatrix = Matrix::Translate(posX, posY) * Matrix::Scale(scale, scale);
-
-      bool hasRotation = i < run->rotations.size() && run->rotations[i] != 0;
-      bool hasGlyphScale =
-          i < run->scales.size() && (run->scales[i].x != 1 || run->scales[i].y != 1);
-      bool hasSkew = i < run->skews.size() && run->skews[i] != 0;
-
-      if (hasRotation || hasGlyphScale || hasSkew) {
-        float anchorX = glyph->advance * 0.5f;
-        float anchorY = 0;
-        if (i < run->anchors.size()) {
-          anchorX += run->anchors[i].x;
-          anchorY += run->anchors[i].y;
-        }
-
-        Matrix perGlyph = Matrix::Translate(-anchorX, -anchorY);
-        if (hasGlyphScale) {
-          perGlyph = Matrix::Scale(run->scales[i].x, run->scales[i].y) * perGlyph;
-        }
-        if (hasSkew) {
-          Matrix shear = {};
-          shear.c = std::tan(DegreesToRadians(run->skews[i]));
-          perGlyph = shear * perGlyph;
-        }
-        if (hasRotation) {
-          perGlyph = Matrix::Rotate(run->rotations[i]) * perGlyph;
-        }
-        perGlyph = Matrix::Translate(anchorX, anchorY) * perGlyph;
-        glyphMatrix = glyphMatrix * perGlyph;
-      }
-
-      out.openElement("path");
-      out.addAttribute("transform", MatrixToSVGTransform(glyphMatrix));
-      out.addAttribute("d", PathDataToSVGString(*glyph->path));
-      out.closeElementSelfClosing();
-    }
+  for (const auto& gp : glyphPaths) {
+    out.openElement("path");
+    out.addAttribute("transform", MatrixToSVGTransform(gp.transform));
+    out.addAttribute("d", PathDataToSVGString(*gp.pathData));
+    out.closeElementSelfClosing();
   }
 
   out.closeElement();
@@ -1199,104 +1140,17 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
     return;
   }
 
-  auto* textBox = fs.textBox;
-  float fontSize = text->fontSize;
-  bool needsMultiLine = textBox != nullptr && textBox->wordWrap && textBox->size.width > 0;
+  auto layout = ComputeTextLayout(
+      {&text->text, text->fontSize, text->letterSpacing, text->position, text->textAnchor,
+       fs.textBox});
 
-  // ── Multi-line: parse text and break into lines ──
-  float boxWidth = 0;
-  float lineHeight = 0;
-  const std::string& content = text->text;
-  std::vector<SVGCharInfo> chars;
-  std::vector<SVGTextLine> lines;
-
-  if (needsMultiLine) {
-    boxWidth = textBox->size.width;
-    lineHeight = textBox->lineHeight > 0 ? textBox->lineHeight : fontSize * 1.2f;
-
-    chars.reserve(content.size());
-    size_t pos = 0;
-    while (pos < content.size()) {
-      int32_t unichar = 0;
-      size_t len = SVGDecodeUTF8Char(content.data() + pos, content.size() - pos, &unichar);
-      if (len == 0) {
-        pos++;
-        continue;
-      }
-      float advance = 0;
-      if (unichar != '\n') {
-        advance = EstimateCharAdvance(unichar, fontSize) + text->letterSpacing;
-      }
-      chars.push_back({unichar, pos, len, advance});
-      pos += len;
-    }
-
-    lines = BreakTextIntoLines(chars, boxWidth);
-
-    while (lines.size() > 1 && lines.back().charCount == 0) {
-      lines.pop_back();
-    }
-    if (lines.empty()) {
-      return;
-    }
+  if (layout.isMultiLine && layout.lines.empty()) {
+    return;
   }
 
-  // ── Compute position and anchor ──
-  float x = text->position.x;
-  float y = text->position.y;
-  TextAnchor anchor = text->textAnchor;
-  float firstLineY = 0;
-
-  if (textBox) {
-    switch (textBox->textAlign) {
-      case TextAlign::Center:
-        x = textBox->position.x + textBox->size.width / 2;
-        anchor = TextAnchor::Center;
-        break;
-      case TextAlign::End:
-        x = textBox->position.x + textBox->size.width;
-        anchor = TextAnchor::End;
-        break;
-      default:
-        x = textBox->position.x;
-        anchor = TextAnchor::Start;
-        break;
-    }
-
-    if (needsMultiLine) {
-      float boxHeight = textBox->size.height;
-      float totalHeight = static_cast<float>(lines.size()) * lineHeight;
-      // Approximate ascent ratio for common fonts (ascender ≈ 80% of em-square).
-      float ascent = fontSize * 0.8f;
-      float yOffset = 0;
-      if (boxHeight > 0) {
-        switch (textBox->paragraphAlign) {
-          case ParagraphAlign::Middle:
-            yOffset = (boxHeight - totalHeight) / 2;
-            break;
-          case ParagraphAlign::Far:
-            yOffset = boxHeight - totalHeight;
-            break;
-          default:
-            break;
-        }
-      }
-      firstLineY = textBox->position.y + yOffset + ascent;
-    } else {
-      switch (textBox->paragraphAlign) {
-        case ParagraphAlign::Middle:
-          // 0.35 ≈ (ascent - descent) / 2 / em, shifts baseline so text visually centers.
-          y = textBox->position.y + textBox->size.height / 2 + fontSize * 0.35f;
-          break;
-        case ParagraphAlign::Far:
-          y = textBox->position.y + textBox->size.height;
-          break;
-        default:
-          y = textBox->position.y + fontSize;
-          break;
-      }
-    }
-  }
+  float x = layout.x;
+  float y = layout.y;
+  TextAnchor anchor = layout.anchor;
 
   auto writeSharedTextAttrs = [&]() {
     if (!transform.empty()) {
@@ -1305,7 +1159,7 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
     if (!text->fontFamily.empty()) {
       out.addAttribute("font-family", text->fontFamily);
     }
-    out.addAttribute("font-size", FloatToString(fontSize));
+    out.addAttribute("font-size", FloatToString(text->fontSize));
     if (text->letterSpacing != 0.0f) {
       out.addAttribute("letter-spacing", FloatToString(text->letterSpacing));
     }
@@ -1331,17 +1185,17 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
   };
 
   // ── Write content ──
-  if (needsMultiLine) {
-    float currentY = firstLineY;
+  if (layout.isMultiLine) {
+    float currentY = layout.firstLineY;
     bool isFirst = true;
-    for (size_t i = 0; i < lines.size(); i++) {
-      auto& line = lines[i];
-      std::string lineText = ExtractLineText(content, chars, line);
-      if (lineText.empty() && i < lines.size() - 1) {
+    for (size_t i = 0; i < layout.lines.size(); i++) {
+      auto& line = layout.lines[i];
+      std::string lineText = ExtractLineText(text->text, layout.chars, line);
+      if (lineText.empty() && i < layout.lines.size() - 1) {
         continue;
       }
       if (!isFirst) {
-        currentY += lineHeight;
+        currentY += layout.lineHeight;
       }
       out.openElement("text");
       writeSharedTextAttrs();
