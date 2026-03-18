@@ -300,6 +300,10 @@ int RunValidate(int argc, char* argv[]) {
       std::cerr << "pagx validate: unknown option '" << argv[i] << "'\n";
       return 1;
     } else {
+      if (!filePath.empty()) {
+        std::cerr << "pagx validate: multiple input files specified; only one is supported\n";
+        return 1;
+      }
       filePath = argv[i];
     }
   }

@@ -38,8 +38,6 @@
 
 namespace pagx::cli {
 
-// --- Helpers ---
-
 static std::string LayerLabel(const Layer* layer) {
   if (!layer->name.empty()) {
     return layer->name;
@@ -51,12 +49,12 @@ static std::string LayerLabel(const Layer* layer) {
 }
 
 // Tolerance for floating-point alignment checks (10^-4 pixels).
-static constexpr float kAlignmentEpsilon = 1e-4f;
+static constexpr float ALIGNMENT_EPSILON = 1e-4f;
 
 // Returns true if the value is aligned to a 0.5px grid (i.e. value * 2 is an integer).
 static bool IsHalfPixelAligned(float value) {
   float scaled = value * 2.0f;
-  return std::fabs(scaled - std::round(scaled)) < kAlignmentEpsilon;
+  return std::fabs(scaled - std::round(scaled)) < ALIGNMENT_EPSILON;
 }
 
 // Returns true only when the value is on a strict half-pixel boundary (0.5, 1.5, 2.5, ...),
@@ -64,7 +62,7 @@ static bool IsHalfPixelAligned(float value) {
 static bool IsStrictHalfPixel(float value) {
   float scaled = value * 2.0f;
   float nearest = std::round(scaled);
-  if (std::fabs(scaled - nearest) >= kAlignmentEpsilon) {
+  if (std::fabs(scaled - nearest) >= ALIGNMENT_EPSILON) {
     return false;
   }
   return std::fmod(std::fabs(nearest), 2.0f) > 0.5f;
@@ -74,6 +72,20 @@ static bool IsStrictHalfPixel(float value) {
 static bool ExceedsPrecision(float value) {
   float rounded = std::round(value * 1e4f) / 1e4f;
   return std::fabs(value - rounded) > 1e-6f;
+}
+
+// Checks coordinate precision and pixel alignment for a single coordinate value.
+static void CheckCoordinate(float value, const std::string& name, const std::string& location,
+                            std::vector<LintIssue>& issues) {
+  if (ExceedsPrecision(value)) {
+    issues.push_back({"coord-precision", location,
+                      name + " (" + std::to_string(value) +
+                          ") has more than 4 decimal places — likely floating-point noise"});
+  } else if (!IsHalfPixelAligned(value)) {
+    issues.push_back({"pixel-alignment", location,
+                      name + " (" + std::to_string(value) +
+                          ") is not aligned to 0.5px grid — may cause blurry rendering"});
+  }
 }
 
 // Collects all Stroke nodes from a flat element list, recursing into Groups.
@@ -159,57 +171,40 @@ static Rect CollectGeometryBounds(const std::vector<Element*>& elements) {
   return found ? bounds : Rect{};
 }
 
-static constexpr float kColorNearOneThreshold = 0.99f;   // near-white / near-opaque
-static constexpr float kColorNearZeroThreshold = 0.01f;  // near-black
+static constexpr float COLOR_NEAR_ONE_THRESHOLD = 0.99f;   // near-white / near-opaque
+static constexpr float COLOR_NEAR_ZERO_THRESHOLD = 0.01f;  // near-black
 
 // Returns true if the color is pure white (all RGB components >= 0.99, any color space).
 static bool IsPureWhite(const Color& color) {
-  return color.red >= kColorNearOneThreshold && color.green >= kColorNearOneThreshold &&
-         color.blue >= kColorNearOneThreshold;
+  return color.red >= COLOR_NEAR_ONE_THRESHOLD && color.green >= COLOR_NEAR_ONE_THRESHOLD &&
+         color.blue >= COLOR_NEAR_ONE_THRESHOLD;
 }
 
 // Returns true if the color is a hardcoded opaque color (not referencing currentColor or a
 // resource). White and black are the most problematic for theme compatibility.
 static bool IsHardcodedOpaqueColor(const Color& color) {
-  return color.alpha >= kColorNearOneThreshold;
+  return color.alpha >= COLOR_NEAR_ONE_THRESHOLD;
 }
 
 // --- Per-layer rule checks ---
 
-// Pixel alignment and coordinate precision checks.
-static void CheckPixelAlignment(const Layer* layer, const std::string& location,
-                                const std::vector<const Stroke*>& strokes,
-                                std::vector<LintIssue>& issues) {
-  auto checkCoord = [&](float value, const std::string& name) {
-    if (ExceedsPrecision(value)) {
-      issues.push_back({"coord-precision", location,
-                        name + " (" + std::to_string(value) +
-                            ") has more than 4 decimal places — likely floating-point noise"});
-    } else if (!IsHalfPixelAligned(value)) {
-      issues.push_back({"pixel-alignment", location,
-                        name + " (" + std::to_string(value) +
-                            ") is not aligned to 0.5px grid — may cause blurry rendering"});
-    }
-  };
-
-  // Check layer position
-  checkCoord(layer->x, "Layer x");
-  checkCoord(layer->y, "Layer y");
-
-  // Check geometry elements
-  for (auto* element : layer->contents) {
+// Helper to check geometry coordinates in a flat element list, recursing into Groups.
+static void CheckGeometryCoordinates(const std::vector<Element*>& elements,
+                                     const std::string& location,
+                                     std::vector<LintIssue>& issues) {
+  for (auto* element : elements) {
     if (element->nodeType() == NodeType::Rectangle) {
       auto* rect = static_cast<const Rectangle*>(element);
-      checkCoord(rect->position.x, "Rectangle center.x");
-      checkCoord(rect->position.y, "Rectangle center.y");
-      checkCoord(rect->size.width, "Rectangle size.width");
-      checkCoord(rect->size.height, "Rectangle size.height");
+      CheckCoordinate(rect->position.x, "Rectangle center.x", location, issues);
+      CheckCoordinate(rect->position.y, "Rectangle center.y", location, issues);
+      CheckCoordinate(rect->size.width, "Rectangle size.width", location, issues);
+      CheckCoordinate(rect->size.height, "Rectangle size.height", location, issues);
     } else if (element->nodeType() == NodeType::Ellipse) {
       auto* ellipse = static_cast<const Ellipse*>(element);
-      checkCoord(ellipse->position.x, "Ellipse center.x");
-      checkCoord(ellipse->position.y, "Ellipse center.y");
-      checkCoord(ellipse->size.width, "Ellipse size.width");
-      checkCoord(ellipse->size.height, "Ellipse size.height");
+      CheckCoordinate(ellipse->position.x, "Ellipse center.x", location, issues);
+      CheckCoordinate(ellipse->position.y, "Ellipse center.y", location, issues);
+      CheckCoordinate(ellipse->size.width, "Ellipse size.width", location, issues);
+      CheckCoordinate(ellipse->size.height, "Ellipse size.height", location, issues);
     } else if (element->nodeType() == NodeType::Path) {
       auto* path = static_cast<const Path*>(element);
       if (path->data != nullptr) {
@@ -220,18 +215,33 @@ static void CheckPixelAlignment(const Layer* layer, const std::string& location,
           int count = PathData::PointsPerVerb(verb);
           if (count > 0) {
             // The on-curve end point is always the last point for each verb.
-            checkCoord(pts[count - 1].x, "Path point.x");
-            checkCoord(pts[count - 1].y, "Path point.y");
+            CheckCoordinate(pts[count - 1].x, "Path point.x", location, issues);
+            CheckCoordinate(pts[count - 1].y, "Path point.y", location, issues);
           }
         });
       }
+    } else if (element->nodeType() == NodeType::Group) {
+      // Recurse into groups to check nested geometry coordinates.
+      CheckGeometryCoordinates(static_cast<const Group*>(element)->elements, location, issues);
     }
   }
+}
+
+// Pixel alignment and coordinate precision checks.
+static void CheckPixelAlignment(const Layer* layer, const std::string& location,
+                                const std::vector<const Stroke*>& strokes,
+                                std::vector<LintIssue>& issues) {
+  // Check layer position
+  CheckCoordinate(layer->x, "Layer x", location, issues);
+  CheckCoordinate(layer->y, "Layer y", location, issues);
+
+  // Check geometry elements (recursing into Groups)
+  CheckGeometryCoordinates(layer->contents, location, issues);
 
   // Odd-stroke alignment: stroke center must sit on the correct pixel boundary.
   for (auto* stroke : strokes) {
     float width = stroke->width;
-    bool isIntegerWidth = std::fabs(width - std::round(width)) < kAlignmentEpsilon;
+    bool isIntegerWidth = std::fabs(width - std::round(width)) < ALIGNMENT_EPSILON;
     bool isOddWidth = isIntegerWidth && (std::fmod(std::round(width), 2.0f) != 0.0f);
     if (isOddWidth) {
       // Odd stroke width: stroke center must be on strict 0.5px boundary (layer at half-pixel)
@@ -242,6 +252,30 @@ static void CheckPixelAlignment(const Layer* layer, const std::string& location,
                               "crisp rendering"});
         break;
       }
+    }
+  }
+}
+
+// Helper to check corner ratio in a flat element list, recursing into Groups.
+static void CheckCornerRadiusRatio(const std::vector<Element*>& elements,
+                                   const std::string& location,
+                                   const std::vector<const Stroke*>& strokes,
+                                   std::vector<LintIssue>& issues) {
+  for (auto* element : elements) {
+    if (element->nodeType() == NodeType::Rectangle) {
+      auto* rect = static_cast<const Rectangle*>(element);
+      if (rect->roundness > 0.0f && !strokes.empty()) {
+        float referenceWidth = strokes[0]->width;
+        if (referenceWidth > 0.0f && (rect->roundness / referenceWidth) > 4.0f) {
+          issues.push_back({"stroke-corner-ratio", location,
+                            "Corner radius (" + std::to_string(rect->roundness) +
+                                "px) to stroke width (" + std::to_string(referenceWidth) +
+                                "px) ratio exceeds 4 — may produce visual overlapping artifacts"});
+        }
+      }
+    } else if (element->nodeType() == NodeType::Group) {
+      CheckCornerRadiusRatio(static_cast<const Group*>(element)->elements, location, strokes,
+                             issues);
     }
   }
 }
@@ -289,7 +323,7 @@ static void CheckStrokeWidth(const Layer* layer, float canvasSize, const std::st
     float minSafe;
     float maxSafe;
   };
-  static constexpr StrokeRange kStrokeRanges[] = {
+  static constexpr StrokeRange STROKE_RANGES[] = {
       {16.0f, 1.0f, 1.5f},
       {24.0f, 1.0f, 2.5f},
       {32.0f, 1.5f, 3.0f},
@@ -298,7 +332,7 @@ static void CheckStrokeWidth(const Layer* layer, float canvasSize, const std::st
   if (canvasSize > 0) {
     float minSafe = 0.0f;
     float maxSafe = 0.0f;
-    for (const auto& range : kStrokeRanges) {
+    for (const auto& range : STROKE_RANGES) {
       if (canvasSize <= range.maxCanvasSize) {
         minSafe = range.minSafe;
         maxSafe = range.maxSafe;
@@ -319,25 +353,12 @@ static void CheckStrokeWidth(const Layer* layer, float canvasSize, const std::st
     }
   }
 
-  // Corner radius to stroke width ratio must not exceed 4.
-  for (auto* element : layer->contents) {
-    if (element->nodeType() == NodeType::Rectangle) {
-      auto* rect = static_cast<const Rectangle*>(element);
-      if (rect->roundness > 0.0f && !strokes.empty()) {
-        float referenceWidth = strokes[0]->width;
-        if (referenceWidth > 0.0f && (rect->roundness / referenceWidth) > 4.0f) {
-          issues.push_back({"stroke-corner-ratio", location,
-                            "Corner radius (" + std::to_string(rect->roundness) +
-                                "px) to stroke width (" + std::to_string(referenceWidth) +
-                                "px) ratio exceeds 4 — may produce visual overlapping artifacts"});
-        }
-      }
-    }
-  }
+  // Corner radius to stroke width ratio must not exceed 4 (recurse into Groups).
+  CheckCornerRadiusRatio(layer->contents, location, strokes, issues);
 }
 
 // Safe-zone minimum padding: 8.3% (1/12) of canvas edge.
-static constexpr float kSafeZonePaddingRatio = 0.083f;
+static constexpr float SAFE_ZONE_PADDING_RATIO = 0.083f;
 
 // Safe zone / canvas margin checks.
 static void CheckSafeZone(const Layer* layer, float canvasWidth, float canvasHeight,
@@ -345,7 +366,8 @@ static void CheckSafeZone(const Layer* layer, float canvasWidth, float canvasHei
   if (canvasWidth <= 0.0f || canvasHeight <= 0.0f) {
     return;
   }
-  float minPadding = canvasWidth * kSafeZonePaddingRatio;
+  float minPaddingX = canvasWidth * SAFE_ZONE_PADDING_RATIO;
+  float minPaddingY = canvasHeight * SAFE_ZONE_PADDING_RATIO;
 
   Rect bounds = CollectGeometryBounds(layer->contents);
   if (bounds.isEmpty()) {
@@ -364,62 +386,68 @@ static void CheckSafeZone(const Layer* layer, float canvasWidth, float canvasHei
     return;
   }
 
-  // Content must respect minimum safe padding.
+  // Content must respect minimum safe padding (separate checks for X and Y directions).
   float actualLeft = bounds.x;
   float actualTop = bounds.y;
   float actualRight = canvasWidth - boundsRight;
   float actualBottom = canvasHeight - boundsBottom;
-  float minActual = std::min({actualLeft, actualTop, actualRight, actualBottom});
 
-  if (minActual < minPadding) {
+  if (actualLeft < minPaddingX || actualRight < minPaddingX) {
     issues.push_back({"outside-safe-zone", location,
-                      "Content is too close to canvas edge (min padding " +
-                          std::to_string(minActual) +
-                          "px, recommended >= " + std::to_string(minPadding) + "px)"});
+                      "Content is too close to canvas left/right edge (min padding " +
+                          std::to_string(std::min(actualLeft, actualRight)) +
+                          "px, recommended >= " + std::to_string(minPaddingX) + "px)"});
+    return;
+  }
+
+  if (actualTop < minPaddingY || actualBottom < minPaddingY) {
+    issues.push_back({"outside-safe-zone", location,
+                      "Content is too close to canvas top/bottom edge (min padding " +
+                          std::to_string(std::min(actualTop, actualBottom)) +
+                          "px, recommended >= " + std::to_string(minPaddingY) + "px)"});
+  }
+}
+
+// Helper to check a single color source for hardcoded theme colors.
+static void CheckColorSource(const ColorSource* source, const std::string& painterType,
+                             const std::string& location, std::vector<LintIssue>& issues) {
+  // Only check SolidColor nodes. Gradients, patterns, and resource references (other
+  // ColorSource subtypes) are intentional design choices and are not flagged.
+  if (source == nullptr || source->nodeType() != NodeType::SolidColor) {
+    return;
+  }
+  auto* solid = static_cast<const SolidColor*>(source);
+  // Only flag fully opaque hardcoded colors. Semi-transparent colors (e.g. overlays) are
+  // legitimate uses that don't break theme switching in the same way.
+  if (!IsHardcodedOpaqueColor(solid->color)) {
+    return;
+  }
+  // Pure white and pure black are the worst offenders for theme incompatibility:
+  // white is invisible on light backgrounds, black is invisible on dark backgrounds.
+  // currentColor or a theme-aware resource reference should be used instead.
+  bool isWhite = IsPureWhite(solid->color);
+  bool isBlack = solid->color.red <= COLOR_NEAR_ZERO_THRESHOLD &&
+                 solid->color.green <= COLOR_NEAR_ZERO_THRESHOLD &&
+                 solid->color.blue <= COLOR_NEAR_ZERO_THRESHOLD;
+  if (isWhite || isBlack) {
+    std::string colorName = isWhite ? "white (#FFFFFF)" : "black (#000000)";
+    issues.push_back(
+        {"hardcoded-theme-color", location,
+         painterType + " uses hardcoded " + colorName +
+             " — use currentColor or a theme-aware resource reference for theme compatibility"});
   }
 }
 
 // Color rules — hardcoded colors break dark/light theme compatibility.
-static void CheckColorRules(const Layer* layer, const std::string& location,
+static void CheckColorRules(const std::string& location,
+                            const std::vector<const Fill*>& fills,
+                            const std::vector<const Stroke*>& strokes,
                             std::vector<LintIssue>& issues) {
-  std::vector<const Fill*> fills;
-  CollectFills(layer->contents, fills);
-  std::vector<const Stroke*> strokes;
-  CollectStrokes(layer->contents, strokes);
-
-  auto checkColorSource = [&](const ColorSource* source, const std::string& painterType) {
-    // Only check SolidColor nodes. Gradients, patterns, and resource references (other
-    // ColorSource subtypes) are intentional design choices and are not flagged.
-    if (source == nullptr || source->nodeType() != NodeType::SolidColor) {
-      return;
-    }
-    auto* solid = static_cast<const SolidColor*>(source);
-    // Only flag fully opaque hardcoded colors. Semi-transparent colors (e.g. overlays) are
-    // legitimate uses that don't break theme switching in the same way.
-    if (!IsHardcodedOpaqueColor(solid->color)) {
-      return;
-    }
-    // Pure white and pure black are the worst offenders for theme incompatibility:
-    // white is invisible on light backgrounds, black is invisible on dark backgrounds.
-    // currentColor or a theme-aware resource reference should be used instead.
-    bool isWhite = IsPureWhite(solid->color);
-    bool isBlack = solid->color.red <= kColorNearZeroThreshold &&
-                   solid->color.green <= kColorNearZeroThreshold &&
-                   solid->color.blue <= kColorNearZeroThreshold;
-    if (isWhite || isBlack) {
-      std::string colorName = isWhite ? "white (#FFFFFF)" : "black (#000000)";
-      issues.push_back(
-          {"hardcoded-theme-color", location,
-           painterType + " uses hardcoded " + colorName +
-               " — use currentColor or a theme-aware resource reference for theme compatibility"});
-    }
-  };
-
   for (auto* fill : fills) {
-    checkColorSource(fill->color, "Fill");
+    CheckColorSource(fill->color, "Fill", location, issues);
   }
   for (auto* stroke : strokes) {
-    checkColorSource(stroke->color, "Stroke");
+    CheckColorSource(stroke->color, "Stroke", location, issues);
   }
 }
 
@@ -431,10 +459,12 @@ static void CheckLayer(const Layer* layer, float canvasWidth, float canvasHeight
   std::string location = LayerLabel(layer);
   std::vector<const Stroke*> strokes;
   CollectStrokes(layer->contents, strokes);
+  std::vector<const Fill*> fills;
+  CollectFills(layer->contents, fills);
   CheckPixelAlignment(layer, location, strokes, issues);
   CheckStrokeWidth(layer, canvasSize, location, strokes, issues);
   CheckSafeZone(layer, canvasWidth, canvasHeight, location, issues);
-  CheckColorRules(layer, location, issues);
+  CheckColorRules(location, fills, strokes, issues);
 
   for (auto* child : layer->children) {
     CheckLayer(child, canvasWidth, canvasHeight, issues);
