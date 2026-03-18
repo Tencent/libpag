@@ -18,6 +18,7 @@ Read as needed:
 |-----------|---------|
 | `attributes.md` | Attribute defaults, enumerations, required attributes |
 | `cli.md` | CLI tool usage — `optimize`, `render`, `validate`, `bounds` commands |
+| `pagx-quality-rules.md` | Visual and structural quality rules checked by `pagx lint` and `pagx validate` |
 
 ---
 
@@ -83,6 +84,8 @@ After all optimizations, verify the following:
 - [ ] `<Resources>` placed after all Layers; all `@id` references resolve
 - [ ] Repeater copies reasonable (~200 single, ~500 nested product)
 - [ ] Visual stacking order preserved (see **Stacking Order** below)
+- [ ] Run `pagx lint <file>` — no issues, or all reported issues reviewed and accepted
+  (see `pagx-quality-rules.md` for the full rule list)
 - [ ] Rendered screenshot matches expected design (layout, alignment, consistent spacing)
   (use the Verification and Correction Loop in `generate-guide.md` for the full methodology)
 
