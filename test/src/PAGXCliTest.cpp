@@ -54,6 +54,18 @@ static std::string TestResourcePath(const std::string& name) {
   return ProjectPath::Absolute("resources/cli/" + name);
 }
 
+// Bad-case fixtures: PAGX files that violate a quality rule.
+// Each bad-case test asserts that the checker DETECTS the issue (no missed detections).
+static std::string BadCase(const std::string& name) {
+  return ProjectPath::Absolute("resources/cli/bad_cases/" + name);
+}
+
+// Good-case fixtures: PAGX files that comply with all quality rules.
+// Each good-case test asserts that the checker raises NO issue (no false positives).
+static std::string GoodCase(const std::string& name) {
+  return ProjectPath::Absolute("resources/cli/good_cases/" + name);
+}
+
 static std::string CopyToTemp(const std::string& resourceName, const std::string& tempName) {
   auto src = TestResourcePath(resourceName);
   auto dst = TempDir() + "/" + tempName;
@@ -119,36 +131,48 @@ static size_t CountOccurrences(const std::string& text, const std::string& patte
 // Validate tests
 //==============================================================================
 
+// Expected: validate passes (exit 0). Observable: no error output. A well-formed PAGX file
+// with all required attributes present is the baseline for a passing validate run.
 CLI_TEST(PAGXCliTest, Validate_ValidFile) {
   auto path = TestResourcePath("validate_simple.pagx");
   auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
   EXPECT_EQ(ret, 0);
 }
 
+// Expected: validate fails (non-zero exit). Observable: error output about missing required
+// attribute. A PAGX file with a mandatory attribute omitted is structurally invalid.
 CLI_TEST(PAGXCliTest, Validate_MissingAttribute) {
-  auto path = TestResourcePath("validate_missing_attr.pagx");
+  auto path = BadCase("validate_missing_attr.pagx");
   auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
   EXPECT_NE(ret, 0);
 }
 
+// Expected: validate fails (non-zero exit). Observable: XML parse error in output. A file
+// with non-XML content cannot be parsed at all — this is the earliest failure gate.
 CLI_TEST(PAGXCliTest, Validate_NonXmlFile) {
   auto path = TestResourcePath("validate_not_xml.pagx");
   auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
   EXPECT_NE(ret, 0);
 }
 
+// Expected: validate fails (non-zero exit). Observable: XML parse error in output. A file
+// with broken XML structure (unclosed tags, etc.) fails before schema validation.
 CLI_TEST(PAGXCliTest, Validate_MalformedXml) {
-  auto path = TestResourcePath("validate_malformed.pagx");
+  auto path = BadCase("validate_malformed.pagx");
   auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
   EXPECT_NE(ret, 0);
 }
 
+// Expected: validate fails (non-zero exit). Observable: error about unexpected root element.
+// A PAGX file must have a specific root tag; any other root makes the whole file invalid.
 CLI_TEST(PAGXCliTest, Validate_InvalidRootElement) {
-  auto path = TestResourcePath("validate_wrong_root.pagx");
+  auto path = BadCase("validate_wrong_root.pagx");
   auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
   EXPECT_NE(ret, 0);
 }
 
+// Expected: validate passes (exit 0). Observable: output is valid JSON. The --json flag
+// switches output format; a clean file should still return 0 in JSON mode.
 CLI_TEST(PAGXCliTest, Validate_JsonFormat) {
   auto path = TestResourcePath("validate_simple.pagx");
   auto ret = CallRun(pagx::cli::RunValidate, {"validate", "--json", path});
@@ -161,8 +185,12 @@ CLI_TEST(PAGXCliTest, Validate_MissingFile) {
 }
 
 // Semantic rule tests (validate returns non-zero on violation)
+
+// Expected: validate fails (non-zero exit). Observable: error message contains "Fill/Stroke before
+// MergePath". A Fill inside MergePath scope is silently discarded at runtime — validate catches
+// this authoring mistake before the file ships.
 CLI_TEST(PAGXCliTest, Validate_MergePathClearsFill) {
-  auto path = TestResourcePath("validate_fmt_mergepath_clears_fill.pagx");
+  auto path = BadCase("validate_fmt_mergepath_clears_fill.pagx");
   std::string errOutput;
   std::streambuf* oldCerr = std::cerr.rdbuf();
   std::ostringstream oss;
@@ -174,14 +202,19 @@ CLI_TEST(PAGXCliTest, Validate_MergePathClearsFill) {
   EXPECT_TRUE(errOutput.find("Fill/Stroke before MergePath") != std::string::npos);
 }
 
+// Expected: validate passes (exit 0). Observable: no error output. MergePath with no preceding
+// Fill/Stroke is valid usage — verifies no false positive.
 CLI_TEST(PAGXCliTest, Validate_MergePathIsolated) {
-  auto path = TestResourcePath("validate_fmt_mergepath_isolated.pagx");
+  auto path = GoodCase("validate_fmt_mergepath_isolated.pagx");
   auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
   EXPECT_EQ(ret, 0);
 }
 
+// Expected: validate fails (non-zero exit). Observable: error message contains "will be ignored
+// because TextBox". An explicit position attribute is ignored at runtime when TextBox is
+// present — validate flags this silent override to prevent layout confusion.
 CLI_TEST(PAGXCliTest, Validate_TextBoxOverridesPosition) {
-  auto path = TestResourcePath("validate_fmt_textbox_overrides_position.pagx");
+  auto path = BadCase("validate_fmt_textbox_overrides_position.pagx");
   std::string errOutput;
   std::streambuf* oldCerr = std::cerr.rdbuf();
   std::ostringstream oss;
@@ -193,8 +226,10 @@ CLI_TEST(PAGXCliTest, Validate_TextBoxOverridesPosition) {
   EXPECT_TRUE(errOutput.find("will be ignored because TextBox") != std::string::npos);
 }
 
+// Expected: validate passes (exit 0). Observable: no error output. TextBox used without
+// conflicting position/anchor attributes — verifies no false positive.
 CLI_TEST(PAGXCliTest, Validate_TextBoxClean) {
-  auto path = TestResourcePath("validate_fmt_textbox_clean.pagx");
+  auto path = GoodCase("validate_fmt_textbox_clean.pagx");
   auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
   EXPECT_EQ(ret, 0);
 }
@@ -1157,8 +1192,12 @@ CLI_TEST(PAGXCliTest, Lint_C13_SimpleRectangleMask) {
 //==============================================================================
 
 // Pixel alignment
+
+// Expected: lint reports "pixel-alignment" issue. Observable: output contains "pixel-alignment".
+// A layer with coordinates not on the 0.5px grid (e.g., x=10.3) will appear blurry on
+// non-retina screens because the renderer sub-pixel-blends adjacent pixels.
 CLI_TEST(PAGXCliTest, Lint_MisalignedCoord) {
-  auto inputPath = TestResourcePath("lint_vis_misaligned_coord.pagx");
+  auto inputPath = BadCase("lint_vis_misaligned_coord.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1170,8 +1209,10 @@ CLI_TEST(PAGXCliTest, Lint_MisalignedCoord) {
   EXPECT_TRUE(output.find("pixel-alignment") != std::string::npos);
 }
 
+// Expected: lint reports no "pixel-alignment" issue. Observable: output does NOT contain
+// "pixel-alignment". Coordinates on 0.5px grid are valid — verifies no false positive.
 CLI_TEST(PAGXCliTest, Lint_AlignedCoord) {
-  auto inputPath = TestResourcePath("lint_vis_aligned_coord.pagx");
+  auto inputPath = GoodCase("lint_vis_aligned_coord.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1184,8 +1225,12 @@ CLI_TEST(PAGXCliTest, Lint_AlignedCoord) {
 }
 
 // Coordinate precision
+
+// Expected: lint reports "coord-precision" issue. Observable: output contains "coord-precision".
+// A coordinate with more than 2 decimal places (e.g., x=10.123) is effectively noise:
+// it cannot be rendered more precisely than the display pixel grid.
 CLI_TEST(PAGXCliTest, Lint_ExcessCoordPrecision) {
-  auto inputPath = TestResourcePath("lint_vis_excess_coord_precision.pagx");
+  auto inputPath = BadCase("lint_vis_excess_coord_precision.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1197,8 +1242,10 @@ CLI_TEST(PAGXCliTest, Lint_ExcessCoordPrecision) {
   EXPECT_TRUE(output.find("coord-precision") != std::string::npos);
 }
 
+// Expected: lint reports no "coord-precision" issue. Observable: output does NOT contain
+// "coord-precision". Coordinates with ≤2 decimal places are valid — verifies no false positive.
 CLI_TEST(PAGXCliTest, Lint_CleanCoordPrecision) {
-  auto inputPath = TestResourcePath("lint_vis_clean_coord_precision.pagx");
+  auto inputPath = GoodCase("lint_vis_clean_coord_precision.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1211,8 +1258,12 @@ CLI_TEST(PAGXCliTest, Lint_CleanCoordPrecision) {
 }
 
 // Stroke width — minimum
+
+// Expected: lint reports "stroke-too-thin" issue. Observable: output contains "stroke-too-thin".
+// A stroke width below 1px (e.g., 0.5px) renders as a faint ghost line on most displays;
+// it was likely a design oversight rather than intentional style.
 CLI_TEST(PAGXCliTest, Lint_ThinStroke) {
-  auto inputPath = TestResourcePath("lint_vis_thin_stroke.pagx");
+  auto inputPath = BadCase("lint_vis_thin_stroke.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1224,8 +1275,10 @@ CLI_TEST(PAGXCliTest, Lint_ThinStroke) {
   EXPECT_TRUE(output.find("stroke-too-thin") != std::string::npos);
 }
 
+// Expected: lint reports no "stroke-too-thin" issue. Observable: output does NOT contain
+// "stroke-too-thin". Stroke ≥1px is within the valid minimum — verifies no false positive.
 CLI_TEST(PAGXCliTest, Lint_NormalStroke) {
-  auto inputPath = TestResourcePath("lint_vis_normal_stroke.pagx");
+  auto inputPath = GoodCase("lint_vis_normal_stroke.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1238,8 +1291,12 @@ CLI_TEST(PAGXCliTest, Lint_NormalStroke) {
 }
 
 // Stroke width — consistency
+
+// Expected: lint reports "stroke-inconsistent" issue. Observable: output contains
+// "stroke-inconsistent". Multiple strokes with different widths in the same composition
+// produce a visually unbalanced icon; this is almost always unintentional.
 CLI_TEST(PAGXCliTest, Lint_InconsistentStroke) {
-  auto inputPath = TestResourcePath("lint_vis_inconsistent_stroke.pagx");
+  auto inputPath = BadCase("lint_vis_inconsistent_stroke.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1251,8 +1308,10 @@ CLI_TEST(PAGXCliTest, Lint_InconsistentStroke) {
   EXPECT_TRUE(output.find("stroke-inconsistent") != std::string::npos);
 }
 
+// Expected: lint reports no "stroke-inconsistent" issue. Observable: output does NOT contain
+// "stroke-inconsistent". All strokes share the same width — verifies no false positive.
 CLI_TEST(PAGXCliTest, Lint_ConsistentStroke) {
-  auto inputPath = TestResourcePath("lint_vis_consistent_stroke.pagx");
+  auto inputPath = GoodCase("lint_vis_consistent_stroke.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1265,8 +1324,12 @@ CLI_TEST(PAGXCliTest, Lint_ConsistentStroke) {
 }
 
 // Stroke width — canvas-size range
+
+// Expected: lint reports "stroke-out-of-range" issue. Observable: output contains
+// "stroke-out-of-range". A stroke that is too thick relative to the icon canvas (e.g., 8px on a
+// 24×24 canvas) fills the shape rather than outlining it, losing legibility.
 CLI_TEST(PAGXCliTest, Lint_StrokeOutOfRange) {
-  auto inputPath = TestResourcePath("lint_vis_stroke_out_of_range.pagx");
+  auto inputPath = BadCase("lint_vis_stroke_out_of_range.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1279,8 +1342,12 @@ CLI_TEST(PAGXCliTest, Lint_StrokeOutOfRange) {
 }
 
 // Stroke — corner radius to stroke width ratio
+
+// Expected: lint reports "stroke-corner-ratio" issue. Observable: output contains
+// "stroke-corner-ratio". When stroke width exceeds corner radius, the inner curve of a rounded
+// corner inverts, creating a sharp pinch instead of a smooth arc.
 CLI_TEST(PAGXCliTest, Lint_StrokeCornerRatio) {
-  auto inputPath = TestResourcePath("lint_vis_stroke_corner_ratio.pagx");
+  auto inputPath = BadCase("lint_vis_stroke_corner_ratio.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1293,8 +1360,12 @@ CLI_TEST(PAGXCliTest, Lint_StrokeCornerRatio) {
 }
 
 // Safe zone
+
+// Expected: lint reports "outside-safe-zone" issue. Observable: output contains
+// "outside-safe-zone". Content placed beyond the safe zone inset (typically 10% per edge)
+// risks being clipped or visually crowded when the icon is displayed in small sizes.
 CLI_TEST(PAGXCliTest, Lint_OutsideSafeZone) {
-  auto inputPath = TestResourcePath("lint_vis_outside_safezone.pagx");
+  auto inputPath = BadCase("lint_vis_outside_safezone.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1306,8 +1377,10 @@ CLI_TEST(PAGXCliTest, Lint_OutsideSafeZone) {
   EXPECT_TRUE(output.find("outside-safe-zone") != std::string::npos);
 }
 
+// Expected: lint reports no safe-zone issue. Observable: output does NOT contain
+// "outside-safe-zone". Content within the inset is valid — verifies no false positive.
 CLI_TEST(PAGXCliTest, Lint_InsideSafeZone) {
-  auto inputPath = TestResourcePath("lint_vis_inside_safezone.pagx");
+  auto inputPath = GoodCase("lint_vis_inside_safezone.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1319,8 +1392,11 @@ CLI_TEST(PAGXCliTest, Lint_InsideSafeZone) {
   EXPECT_TRUE(output.find("outside-safe-zone") == std::string::npos);
 }
 
+// Expected: lint reports "touches-canvas-edge" issue. Observable: output contains
+// "touches-canvas-edge". A layer whose bounding box reaches the canvas boundary provides no
+// visual breathing room; in tight grid layouts the icon appears to collide with adjacent icons.
 CLI_TEST(PAGXCliTest, Lint_TouchesCanvasEdge) {
-  auto inputPath = TestResourcePath("lint_vis_touches_canvas_edge.pagx");
+  auto inputPath = BadCase("lint_vis_touches_canvas_edge.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1333,8 +1409,12 @@ CLI_TEST(PAGXCliTest, Lint_TouchesCanvasEdge) {
 }
 
 // Theme color — hardcoded black
+
+// Expected: lint reports "hardcoded-theme-color" issue. Observable: output contains
+// "hardcoded-theme-color". A fill or stroke hardcoded to exact black (#000000) cannot be
+// overridden by the icon system's theme engine, breaking dark-mode and tinted variants.
 CLI_TEST(PAGXCliTest, Lint_HardcodedBlack) {
-  auto inputPath = TestResourcePath("lint_vis_hardcoded_black.pagx");
+  auto inputPath = BadCase("lint_vis_hardcoded_black.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1346,8 +1426,11 @@ CLI_TEST(PAGXCliTest, Lint_HardcodedBlack) {
   EXPECT_TRUE(output.find("hardcoded-theme-color") != std::string::npos);
 }
 
+// Expected: lint reports no "hardcoded-theme-color" issue. Observable: output does NOT contain
+// "hardcoded-theme-color". A fill using a theme color reference (non-black/white) is valid —
+// verifies no false positive.
 CLI_TEST(PAGXCliTest, Lint_ThemeColor) {
-  auto inputPath = TestResourcePath("lint_vis_theme_color.pagx");
+  auto inputPath = GoodCase("lint_vis_theme_color.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1360,8 +1443,12 @@ CLI_TEST(PAGXCliTest, Lint_ThemeColor) {
 }
 
 // Theme color — hardcoded white
+
+// Expected: lint reports "hardcoded-theme-color" issue. Observable: output contains
+// "hardcoded-theme-color". Same rationale as hardcoded black — pure white (#FFFFFF) is
+// equally unthemeable and must be replaced with a theme token.
 CLI_TEST(PAGXCliTest, Lint_HardcodedWhite) {
-  auto inputPath = TestResourcePath("lint_vis_hardcoded_white.pagx");
+  auto inputPath = BadCase("lint_vis_hardcoded_white.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1374,8 +1461,13 @@ CLI_TEST(PAGXCliTest, Lint_HardcodedWhite) {
 }
 
 // Odd stroke alignment — layer position misaligned (integer, not half-pixel)
+
+// Expected: lint reports "odd-stroke-alignment" issue. Observable: output contains
+// "odd-stroke-alignment". A stroke with odd pixel width centered on an integer coordinate
+// straddles two pixels equally, causing anti-aliased blur; shifting to a half-pixel position
+// aligns the stroke center to a pixel boundary and produces a crisp line.
 CLI_TEST(PAGXCliTest, Lint_OddStrokeMisaligned) {
-  auto inputPath = TestResourcePath("lint_vis_odd_stroke_misaligned.pagx");
+  auto inputPath = BadCase("lint_vis_odd_stroke_misaligned.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1388,8 +1480,12 @@ CLI_TEST(PAGXCliTest, Lint_OddStrokeMisaligned) {
 }
 
 // Odd stroke alignment — layer position on strict half-pixel (should pass)
+
+// Expected: lint reports no "odd-stroke-alignment" issue. Observable: output does NOT contain
+// "odd-stroke-alignment". Odd-width stroke on a half-pixel position is correct — verifies no
+// false positive.
 CLI_TEST(PAGXCliTest, Lint_OddStrokeAligned) {
-  auto inputPath = TestResourcePath("lint_vis_odd_stroke_aligned.pagx");
+  auto inputPath = GoodCase("lint_vis_odd_stroke_aligned.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1402,8 +1498,12 @@ CLI_TEST(PAGXCliTest, Lint_OddStrokeAligned) {
 }
 
 // Pixel alignment — misaligned Ellipse geometry
+
+// Expected: lint reports "pixel-alignment" issue. Observable: output contains "pixel-alignment".
+// Same rule as coordinate misalignment, but applied to Ellipse geometry attributes directly.
+// Ellipses are particularly sensitive because sub-pixel offsets create asymmetric anti-aliasing.
 CLI_TEST(PAGXCliTest, Lint_EllipseMisaligned) {
-  auto inputPath = TestResourcePath("lint_vis_ellipse_misaligned.pagx");
+  auto inputPath = BadCase("lint_vis_ellipse_misaligned.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1416,8 +1516,12 @@ CLI_TEST(PAGXCliTest, Lint_EllipseMisaligned) {
 }
 
 // Stroke range — canvas 16x16: stroke 2px exceeds safe range [1.0, 1.5]px
+
+// Expected: lint reports "stroke-out-of-range" issue. Observable: output contains
+// "stroke-out-of-range". On a 16×16 canvas, a 2px stroke is proportionally too thick:
+// it would visually dominate the icon and leave little room for the fill shape.
 CLI_TEST(PAGXCliTest, Lint_StrokeOutOfRangeSmallCanvas) {
-  auto inputPath = TestResourcePath("lint_vis_stroke_range_small_canvas.pagx");
+  auto inputPath = BadCase("lint_vis_stroke_range_small_canvas.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1430,8 +1534,12 @@ CLI_TEST(PAGXCliTest, Lint_StrokeOutOfRangeSmallCanvas) {
 }
 
 // Stroke range — canvas 64x64 (>48px): no range enforced, should pass
+
+// Expected: lint reports no "stroke-out-of-range" issue. Observable: output does NOT contain
+// "stroke-out-of-range". Canvas larger than 48px has no strict stroke range — verifies the
+// rule does not over-trigger on larger canvases.
 CLI_TEST(PAGXCliTest, Lint_StrokeLargeCanvasNoRange) {
-  auto inputPath = TestResourcePath("lint_vis_stroke_range_large_canvas.pagx");
+  auto inputPath = GoodCase("lint_vis_stroke_range_large_canvas.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1444,8 +1552,12 @@ CLI_TEST(PAGXCliTest, Lint_StrokeLargeCanvasNoRange) {
 }
 
 // Corner ratio — rounded rectangle with no stroke: should not flag
+
+// Expected: lint reports no "stroke-corner-ratio" issue. Observable: output does NOT contain
+// "stroke-corner-ratio". The ratio rule only applies when a stroke is present — a fill-only
+// rounded rectangle is always valid regardless of corner size.
 CLI_TEST(PAGXCliTest, Lint_CornerRatioNoStroke) {
-  auto inputPath = TestResourcePath("lint_vis_corner_no_stroke.pagx");
+  auto inputPath = GoodCase("lint_vis_corner_no_stroke.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1458,8 +1570,12 @@ CLI_TEST(PAGXCliTest, Lint_CornerRatioNoStroke) {
 }
 
 // Safe zone — content with generous padding: should pass
+
+// Expected: lint reports no safe-zone issue. Observable: output does NOT contain
+// "outside-safe-zone" or "touches-canvas-edge". Content well within the inset with padding
+// on all sides is the ideal authoring pattern — verifies no false positive.
 CLI_TEST(PAGXCliTest, Lint_SafeZoneBoundaryPass) {
-  auto inputPath = TestResourcePath("lint_vis_safezone_boundary_pass.pagx");
+  auto inputPath = GoodCase("lint_vis_safezone_boundary_pass.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1488,7 +1604,7 @@ CLI_TEST(PAGXCliTest, Lint_MissingFileArg) {
 
 CLI_TEST(PAGXCliTest, Lint_UnknownOption) {
   // Unknown flag passed — should print error message and return 0.
-  auto inputPath = TestResourcePath("lint_vis_aligned_coord.pagx");
+  auto inputPath = GoodCase("lint_vis_aligned_coord.pagx");
   std::string errOutput;
   std::streambuf* oldCerr = std::cerr.rdbuf();
   std::ostringstream oss;
@@ -1502,7 +1618,7 @@ CLI_TEST(PAGXCliTest, Lint_UnknownOption) {
 
 CLI_TEST(PAGXCliTest, Lint_MultipleFiles) {
   // Two file arguments provided — should reject with error and return 0.
-  auto inputPath = TestResourcePath("lint_vis_aligned_coord.pagx");
+  auto inputPath = GoodCase("lint_vis_aligned_coord.pagx");
   std::string errOutput;
   std::streambuf* oldCerr = std::cerr.rdbuf();
   std::ostringstream oss;
@@ -1528,8 +1644,12 @@ CLI_TEST(PAGXCliTest, Lint_NonexistentFile) {
 }
 
 // MergePath — multiple MergePaths: first Fill+MergePath triggers violation
+
+// Expected: validate fails (non-zero exit). Observable: error message contains "Fill/Stroke before
+// MergePath". With multiple MergePath nodes, the first one that has a preceding Fill/Stroke in
+// scope triggers the violation.
 CLI_TEST(PAGXCliTest, Validate_MultipleMergePaths) {
-  auto path = TestResourcePath("validate_fmt_mergepath_multiple.pagx");
+  auto path = BadCase("validate_fmt_mergepath_multiple.pagx");
   std::string errOutput;
   std::streambuf* oldCerr = std::cerr.rdbuf();
   std::ostringstream oss;
@@ -1542,8 +1662,12 @@ CLI_TEST(PAGXCliTest, Validate_MultipleMergePaths) {
 }
 
 // TextBox layout override — non-Start textAnchor with TextBox present
+
+// Expected: validate fails (non-zero exit). Observable: error message contains "will be ignored
+// because TextBox". A non-Start textAnchor (e.g., Center/End) has no effect when TextBox is
+// present — TextBox fully controls text layout, making the anchor attribute misleading.
 CLI_TEST(PAGXCliTest, Validate_TextBoxOverridesAnchor) {
-  auto path = TestResourcePath("validate_fmt_textbox_overrides_anchor.pagx");
+  auto path = BadCase("validate_fmt_textbox_overrides_anchor.pagx");
   std::string errOutput;
   std::streambuf* oldCerr = std::cerr.rdbuf();
   std::ostringstream oss;
@@ -1556,8 +1680,12 @@ CLI_TEST(PAGXCliTest, Validate_TextBoxOverridesAnchor) {
 }
 
 // TextBox layout override — explicit position with TextBox present
+
+// Expected: validate fails (non-zero exit). Observable: error message contains "will be ignored
+// because TextBox". An explicit text position attribute is silently discarded when TextBox is
+// active; authors typically don't realize their position value has no effect.
 CLI_TEST(PAGXCliTest, Validate_TextBoxOverridesTextPosition) {
-  auto path = TestResourcePath("validate_fmt_textbox_overrides_text_position.pagx");
+  auto path = BadCase("validate_fmt_textbox_overrides_text_position.pagx");
   std::string errOutput;
   std::streambuf* oldCerr = std::cerr.rdbuf();
   std::ostringstream oss;
