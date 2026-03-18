@@ -9,7 +9,7 @@
     </LinearGradient>
   </Resources>
   <Layer>
-    <Rectangle center="100,100" size="100,100"/>
+    <Rectangle position="100,100" size="100,100"/>
     <Fill color="#4CAF50"/>
   </Layer>
 </pagx>

@@ -21,24 +21,24 @@
   </Layer>
   <!-- Off-canvas layer -->
   <Layer id="hidden" x="-500" y="0">
-    <Rectangle center="0,0" size="100,100"/>
+    <Rectangle position="0,0" size="100,100"/>
     <Fill color="#000000"/>
   </Layer>
   <!-- Duplicate layers for composition extraction -->
   <Layer x="280" y="100">
-    <Rectangle center="0,0" size="60,60" roundness="8"/>
+    <Rectangle position="0,0" size="60,60" roundness="8"/>
     <Fill color="#9B59B6"/>
   </Layer>
   <Layer x="350" y="100">
-    <Rectangle center="0,0" size="60,60" roundness="8"/>
+    <Rectangle position="0,0" size="60,60" roundness="8"/>
     <Fill color="#9B59B6"/>
   </Layer>
   <Layer x="280" y="180">
-    <Rectangle center="0,0" size="60,60" roundness="8"/>
+    <Rectangle position="0,0" size="60,60" roundness="8"/>
     <Fill color="#9B59B6"/>
   </Layer>
   <Layer x="350" y="180">
-    <Rectangle center="0,0" size="60,60" roundness="8"/>
+    <Rectangle position="0,0" size="60,60" roundness="8"/>
     <Fill color="#9B59B6"/>
   </Layer>
   <!-- Empty layer at end -->

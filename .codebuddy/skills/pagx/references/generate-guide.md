@@ -109,8 +109,8 @@ This isolates defects: if something breaks, it was the last thing added.
 
   ```xml
   <Group>
-    <Ellipse center="-4,-3" size="5,6"/>
-    <Ellipse center="4,-3" size="5,6"/>
+    <Ellipse position="-4,-3" size="5,6"/>
+    <Ellipse position="4,-3" size="5,6"/>
     <Fill color="#E0E7FF"/>
   </Group>
   ```
@@ -126,11 +126,22 @@ This isolates defects: if something breaks, it was the last thing added.
   </Group>
   ```
 
-**Mandatory measurement after each block** — do not rely on coordinate estimation. After
-completing each block (or group of related blocks), immediately run `pagx render` and
-`pagx bounds` to verify alignment. Coordinates that "look correct" in source often produce
-visible misalignment in the rendered output due to asymmetric shapes, stroke width offsets,
-or text baseline differences. Measure first, then adjust — never skip this step.
+**Mandatory alignment and spacing after each block** — when in doubt, align. Over-aligning
+is harmless; subtle misalignment is not.
+
+After completing each block (or group of related blocks), actively scan for **every** pair or
+group of Layers that are visually close — shared edges, similar positions, nearly equal gaps.
+Do not limit this to obvious cases; any two values within a few pixels of each other should
+be unified to the exact same value. Common scenarios include but are not limited to:
+
+- Same-row elements should share a vertical center (icon + label, price + badge)
+- Same-column elements should share a left edge or horizontal center (list items, cards)
+- Content should be centered on its canvas or container background
+- Sibling elements in a row/column should have equal gaps between them
+- Container padding should be symmetric (left = right, top = bottom)
+- Similar containers (cards, buttons, badges) should use the same internal padding
+
+Use `pagx bounds` to measure, then adjust coordinates to equalize.
 
 ### Step 4: Localize Coordinates
 
@@ -139,11 +150,10 @@ Layer `x`/`y` carries the block offset; internal coordinates start from `0,0`. S
 
 ### Step 5: Verify and Refine
 
-After each render, **read the rendered screenshot first** — visual inspection is the primary
-check. Identify any visible issues (misalignment, uneven spacing, clipping, mismatched
-proportions), then use `pagx bounds` to measure and compute corrections. Fix, re-render,
-and re-inspect until correct. See the **Verification and Correction Loop** section at the
-end of this document for the full methodology.
+After each render, follow the **Verification and Correction Loop** at the end of this
+document — run `pagx bounds` first to detect misalignment by numbers, fix with
+coordinate adjustment, then visually confirm. Do not skip bounds measurement even if
+the screenshot looks correct.
 
 After verification passes, continue to `optimize-guide.md` for optimization review.
 
@@ -151,89 +161,68 @@ After verification passes, continue to `optimize-guide.md` for optimization revi
 
 ## Verification and Correction Loop
 
-After **every render**, follow this loop until the output matches the design intent. Do not
-skip steps or assume coordinates are correct — always measure.
+After **every render**, follow this loop until the output matches the design intent.
 
-### 1. Render and Inspect
+### 1. Measure All Layers
 
-```bash
-pagx render input.pagx            # output alongside the source file
-pagx render --scale 2 input.pagx  # 2x resolution for detail inspection
-```
-
-**Read the rendered image** and identify all visible issues. Common problems:
-
-- Element visibly off-center or lopsided
-- Uneven spacing between sibling elements (e.g., icons in a row)
-- Related parts misaligned (e.g., a label not centered in its button, an icon not
-  centered on its background circle)
-- Text clipped or overflowing its container
-- Elements overlapping when they should not, or gaps where they should connect
-
-List every issue before proceeding to measurement.
-
-### 2. Measure with `pagx bounds`
-
-For each issue identified above, measure the relevant elements:
+Run `pagx bounds` unconditionally — do not skip this step even if the screenshot looks correct:
 
 ```bash
-pagx bounds input.pagx                                   # all layers
-pagx bounds --xpath "//Layer[@id='myButton']" input.pagx  # by id
-pagx bounds --xpath "/pagx/Layer[2]" input.pagx           # by position
+pagx bounds input.pagx
 ```
 
-Output: `x=<left> y=<top> width=<w> height=<h>` per element.
+This outputs `x=<left> y=<top> width=<w> height=<h>` for every layer. Use `--id` or `--xpath`
+for targeted measurement when needed (see `cli.md`).
 
-### 3. Apply Alignment Checks
+### 2. Check Alignment, Spacing, and Padding by Numbers
+
+Scan the bounds data for any misalignment, uneven spacing, or asymmetric padding. Fixes
+in one area can introduce regressions elsewhere — always re-check everything.
+
+**Alignment** — elements that should share an edge or center:
+```
+A.center_y = A.bounds_y + A.bounds_height / 2
+B.center_y = B.bounds_y + B.bounds_height / 2
+→ difference should be 0 (same for center_x, left edges, etc.)
+```
+
+**Container padding** — compute all four sides and compare:
+```
+padding_left   = inner.x - outer.x
+padding_right  = (outer.x + outer.width)  - (inner.x + inner.width)
+padding_top    = inner.y - outer.y
+padding_bottom = (outer.y + outer.height) - (inner.y + inner.height)
+```
+Left should equal right; top should equal bottom. Prefer all four equal when the design
+allows.
+
+**Element gaps** — measure actual gaps between adjacent elements:
+```
+gap = B.bounds_start - (A.bounds_start + A.bounds_size)
+```
+All gaps in the same visual context should use the same value. Any two gaps within a few
+pixels of each other should be unified to one value.
 
 **Visual center** — content that should be centered on a `W × H` canvas:
 ```
 center_x = bounds_x + bounds_width / 2   → should ≈ W / 2
 center_y = bounds_y + bounds_height / 2   → should ≈ H / 2
-delta_x  = W / 2 - center_x              → apply to Layer x
-delta_y  = H / 2 - center_y              → apply to Layer y
 ```
-The visual center often differs from Layer `x`/`y` when content is asymmetric (e.g., an
-icon with a tail extending to one side). Always compute from bounds, not from coordinates.
+Compute from bounds, not from Layer `x`/`y` — asymmetric content shifts the visual center.
 
-**Spacing consistency** — sibling elements that should be evenly spaced:
-```
-gap_i = next_i.bounds_start - (prev_i.bounds_start + prev_i.bounds_size)
-```
-All gaps should be equal (tolerance ±2px). If one gap differs, adjust the outlier element's
-position, not all others.
+### 3. Fix Issues
 
-**Containment** — inner content must fit within an outer shape:
-```
-inner.x ≥ outer.x + padding
-inner.y ≥ outer.y + padding
-inner.x + inner.width  ≤ outer.x + outer.width  - padding
-inner.y + inner.height ≤ outer.y + outer.height - padding
-```
-If padding is uneven, the inner element appears off-center within the outer.
+- **Alignment or spacing off** → adjust Layer `x`/`y` or element `position`/`center` to equalize values
 
-**Related-element alignment** — parts that logically belong together should share a visual
-axis. For example:
-- A label and its icon should share the same vertical center (`center_y` equal ±1px)
-- Stacked sub-parts (e.g., icon above label, header above body) should share `center_x`
-- An indicator dot should be horizontally centered under its corresponding tab label
+### 4. Re-render and Visually Confirm
 
-For each pair, compute both center coordinates from bounds and compare.
+After applying fixes, re-render and **read the screenshot** to confirm:
 
-### 4. Fix and Re-verify
+- No new issues introduced (one fix can shift other elements)
+- Overall visual balance looks correct
+- Text is not clipped or overflowing
 
-For every misalignment found:
-
-1. **Compute the correction** — calculate the exact delta from the bounds measurements
-2. **Apply to coordinates** — adjust Layer `x`/`y` or element `position`/`center`
-3. **Re-render** — `pagx render` to produce a new screenshot
-4. **Re-inspect the screenshot** — read the image and confirm the fix visually
-5. **Re-measure if needed** — run `pagx bounds` again if the visual check is ambiguous
-
-**Do not batch fixes blindly** — after applying corrections, always re-render and re-read
-the screenshot. One fix can shift other elements (e.g., centering a parent shifts all children).
-
-Repeat this loop until no visible issues remain.
+If any issues remain, return to step 1. Repeat until clean.
 
 ### 5. Structural Checks
 

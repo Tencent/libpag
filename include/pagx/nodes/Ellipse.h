@@ -31,9 +31,9 @@ namespace pagx {
 class RTTR_AUTO_REGISTER_CLASS Ellipse : public Element {
  public:
   /**
-   * The center point of the ellipse.
+   * The position of the ellipse center point.
    */
-  Point center = {};
+  Point position = {};
 
   /**
    * The size of the ellipse. The default value is {100, 100}.

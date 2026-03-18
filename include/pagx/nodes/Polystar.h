@@ -31,9 +31,9 @@ namespace pagx {
 class RTTR_AUTO_REGISTER_CLASS Polystar : public Element {
  public:
   /**
-   * The center point of the polystar.
+   * The position of the polystar center point.
    */
-  Point center = {};
+  Point position = {};
 
   /**
    * The type of polystar shape, either Star or Polygon. The default value is Star.

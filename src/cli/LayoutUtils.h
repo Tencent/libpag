@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,19 +18,14 @@
 
 #pragma once
 
-#include <atomic>
-#include <memory>
-#include <mutex>
+#include <string>
+#include "pagx/PAGXDocument.h"
 
-namespace pag {
-class ScopedLock {
- public:
-  ScopedLock(const std::shared_ptr<std::mutex>& first, const std::shared_ptr<std::mutex>& second);
+namespace pagx::cli {
 
-  ~ScopedLock();
+/**
+ * Returns a display label for a Layer (id, name, or "(unnamed)").
+ */
+std::string GetLayerLabel(const Layer* layer);
 
- private:
-  std::shared_ptr<std::mutex> firstLocker = nullptr;
-  std::shared_ptr<std::mutex> secondLocker = nullptr;
-};
-}  // namespace pag
+}  // namespace pagx::cli

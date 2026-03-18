@@ -84,7 +84,6 @@ int main(int argc, char* argv[]) {
   if (command == "optimize") {
     return pagx::cli::RunOptimize(argc - 1, argv + 1);
   }
-
   std::cerr << "pagx: unknown command '" << command << "'\n";
   std::cerr << "Run 'pagx --help' for usage.\n";
   return 1;

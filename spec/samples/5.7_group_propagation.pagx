@@ -3,11 +3,11 @@
 <pagx version="1.0" width="400" height="400">
   <Layer>
     <Group>
-      <Rectangle center="140,200" size="160,160" roundness="24"/>
+      <Rectangle position="140,200" size="160,160" roundness="24"/>
       <Fill color="#F43F5E"/>
     </Group>
     <Group>
-      <Ellipse center="260,200" size="160,160"/>
+      <Ellipse position="260,200" size="160,160"/>
       <Fill color="#06B6D4"/>
     </Group>
     <!-- Semi-transparent overlay applied to both shapes -->

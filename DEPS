@@ -7,12 +7,12 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "0f4264d14ce6c8d1185d27dc9e2e6ee758a8bbcb",
+        "commit": "9e11e4fbd54903a807f2a3708f6b6637a0892252",
         "dir": "third_party/vendor_tools"
       },
       {
         "url": "${PAG_GROUP}/tgfx.git",
-        "commit": "c8a10c1bc66bc44ea5fd81eaf0dc6f1bca0caf06",
+        "commit": "fbe11534603ae58da2ad66c9d6b14b72f0b8d33f",
         "dir": "third_party/tgfx"
       },
       {
@@ -44,6 +44,11 @@
         "url": "https://github.com/Tehreer/SheenBidi.git",
         "commit": "cfe430e7375a7845b679adae9d51dac6deaa8858",
         "dir": "third_party/SheenBidi"
+      },
+      {
+        "url": "https://github.com/GNOME/libxml2.git",
+        "commit": "3d840e17858de03a09fba8b202e3a89267d5795a",
+        "dir": "third_party/libxml2"
       }
     ]
   },
