@@ -49,7 +49,7 @@ std::vector<LintIssue> LintDocument(const pagx::PAGXDocument* document);
 /**
  * Reports visual quality issues for a PAGX file. Always returns 0 — lint results are advisory
  * only and must not block the generation pipeline.
- * Supports --format json for structured output.
+ * Supports --json option for structured output.
  */
 int RunLint(int argc, char* argv[]);
 
