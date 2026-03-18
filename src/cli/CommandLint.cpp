@@ -523,6 +523,10 @@ int RunLint(int argc, char* argv[]) {
       std::cerr << "pagx lint: unknown option '" << argv[i] << "'\n";
       return 0;
     } else {
+      if (!filePath.empty()) {
+        std::cerr << "pagx lint: multiple input files specified; only one is supported\n";
+        return 0;
+      }
       filePath = argv[i];
     }
   }
