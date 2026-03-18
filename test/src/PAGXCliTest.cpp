@@ -1500,6 +1500,20 @@ CLI_TEST(PAGXCliTest, Lint_UnknownOption) {
   EXPECT_TRUE(errOutput.find("unknown option") != std::string::npos);
 }
 
+CLI_TEST(PAGXCliTest, Lint_MultipleFiles) {
+  // Two file arguments provided — should reject with error and return 0.
+  auto inputPath = TestResourcePath("lint_vis001_aligned.pagx");
+  std::string errOutput;
+  std::streambuf* oldCerr = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath, inputPath});
+  std::cerr.rdbuf(oldCerr);
+  errOutput = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(errOutput.find("multiple input files") != std::string::npos);
+}
+
 CLI_TEST(PAGXCliTest, Lint_NonexistentFile) {
   // File does not exist — LintFile returns a load-error issue with empty ruleId.
   std::string output;
