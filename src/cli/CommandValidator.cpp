@@ -40,8 +40,22 @@ namespace pagx::cli {
 
 // --- Semantic rule checks on the parsed document model ---
 
-// FMT-043: MergePath in a scope preceded by Fill/Stroke will clear those effects.
-// Check a flat elements vector (one layer or group scope).
+// CheckFmt043Scope: Validates FMT-043 rule in a flat element scope (one layer or group).
+//
+// FMT-043: MergePath consumes and clears all preceding Fill/Stroke effects within the same
+// scope. Any painter (Fill/Stroke) placed before MergePath in the element list will be
+// silently discarded at render time, producing an icon that looks wrong with no error.
+//
+// Detection algorithm (state machine over the element list):
+//   1. Track whether any Fill/Stroke has been seen before a MergePath.
+//   2. On MergePath: if flag is set, report an error; then reset the flag.
+//   3. Reason for reset: MergePath is a rendering "break point". Painters added AFTER
+//      MergePath form a new, independent accumulation phase and are not cleared.
+//      Resetting ensures we don't double-report for a second MergePath in the same scope.
+//   4. Recurse into Groups, which form their own independent scope.
+//
+// Data flow: called per-layer by CheckSemanticRulesLayer; errors flow into the shared
+// ValidationError list returned to the caller of RunValidate.
 static void CheckFmt043Scope(const std::vector<Element*>& elements, const std::string& scopeLabel,
                              std::vector<ValidationError>& errors) {
   bool hasPainterBeforeMergePath = false;
@@ -57,17 +71,35 @@ static void CheckFmt043Scope(const std::vector<Element*>& elements, const std::s
                       " Isolate pre-MergePath rendering in a separate Group.";
         errors.push_back(std::move(err));
       }
-      // Reset: painters after MergePath belong to a new accumulation phase.
+      // Reset: painters after MergePath belong to a new accumulation phase and are not cleared.
       hasPainterBeforeMergePath = false;
     } else if (type == NodeType::Group) {
-      // Recurse into groups for their own scope.
+      // Recurse into groups — each group is its own isolated scope for FMT-043.
       auto* group = static_cast<const Group*>(element);
       CheckFmt043Scope(group->elements, scopeLabel + "/<Group>", errors);
     }
   }
 }
 
-// FMT-051: Text with position or non-Start textAnchor when TextBox is present in the same scope.
+// CheckFmt051Scope: Validates FMT-051 rule in a flat element scope (one layer or group).
+//
+// FMT-051: When a TextBox is present in a scope, it takes full control of text layout and
+// silently ignores Text.position and Text.textAnchor. Authors who set these attributes
+// expecting them to take effect will get a visually wrong result with no error.
+//
+// Detection logic:
+//   - Collect all Text and TextBox nodes in the scope (pass 1).
+//   - If no TextBox is present, nothing to validate — return early.
+//   - For each Text, check two conditions:
+//       hasPosition: position != (0, 0). Zero is the default; any non-zero value means the
+//         author explicitly placed the text, but TextBox will override it.
+//       hasNonDefaultAnchor: textAnchor != TextAnchor::Start. Start is the default value;
+//         any other alignment signals intentional layout that TextBox will discard.
+//   - Report one error per scope (break after first hit) to avoid flooding the error list
+//     when multiple Text elements share the same problem. Author fixes one, re-validates.
+//
+// Data flow: called per-layer by CheckSemanticRulesLayer; errors flow into the shared
+// ValidationError list returned to the caller of RunValidate.
 static void CheckFmt051Scope(const std::vector<Element*>& elements, const std::string& scopeLabel,
                              std::vector<ValidationError>& errors) {
   bool hasTextBox = false;
@@ -87,7 +119,9 @@ static void CheckFmt051Scope(const std::vector<Element*>& elements, const std::s
     return;
   }
   for (auto* text : texts) {
+    // position == (0,0) is the default — any non-zero value signals intentional placement.
     bool hasPosition = text->position.x != 0.0f || text->position.y != 0.0f;
+    // TextAnchor::Start is the default — any other value signals intentional alignment.
     bool hasNonDefaultAnchor = text->textAnchor != TextAnchor::Start;
     if (hasPosition || hasNonDefaultAnchor) {
       ValidationError err = {};
@@ -95,7 +129,9 @@ static void CheckFmt051Scope(const std::vector<Element*>& elements, const std::s
                     ": Text has 'position' or 'textAnchor' that will be ignored because TextBox"
                     " overrides text layout. Remove these attributes from the Text element.";
       errors.push_back(std::move(err));
-      break;  // One error per scope is enough.
+      // Report only the first offending Text per scope. Author should fix it and re-validate
+      // rather than seeing a flood of identical errors for multiple Text elements.
+      break;
     }
   }
 }

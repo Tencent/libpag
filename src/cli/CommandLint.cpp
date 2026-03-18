@@ -98,8 +98,18 @@ static void CollectFills(const std::vector<Element*>& elements, std::vector<cons
   }
 }
 
-// Returns the bounding box of all geometry elements (Rectangle, Ellipse, Path) in the element
-// list, recursing into Groups. Returns an empty Rect if no geometry is found.
+// CollectGeometryBounds: Computes the union bounding box of all geometry in the element list.
+//
+// Handles three geometry node types:
+//   Rectangle / Ellipse: both use a center-based coordinate model (position = center point,
+//     size = width/height). Converted to LTRB by subtracting/adding half-dimensions.
+//   Path: bounds are read directly from PathData::getBounds(). Skipped if data is null or empty.
+//   Group: recursed into; the group's child bounds are unioned into the running result.
+//
+// Returns an empty Rect{} (width == height == 0) if no geometry is found in the list.
+// Used by CheckSafeZone (VIS-020/022) to determine whether the layer's content falls within
+// the safe-zone inset. The const_cast on PathData is required because getBounds() is non-const
+// (it caches the result internally) but we hold a const pointer from the document model.
 static Rect CollectGeometryBounds(const std::vector<Element*>& elements) {
   bool found = false;
   Rect bounds = {};
@@ -268,7 +278,13 @@ static void CheckStrokeWidth(const Layer* layer, float canvasSize, const std::st
     }
   }
 
-  // VIS-012: recommended stroke width ranges by canvas size.
+  // VIS-012: Recommended stroke width ranges by canvas size.
+  // Values derived from visual balance guidelines for icon design:
+  //   - Minimum: thin enough to render cleanly at the given pixel density.
+  //   - Maximum: thick enough to stay visually light; exceeding this makes strokes dominate.
+  // Entries are ordered by increasing maxCanvasSize; the first matching entry is used.
+  // Canvas sizes above 48px have no enforced range (icons at that scale have more freedom).
+  // Source: pagx-visual-rules.md VIS-012.
   struct StrokeRange {
     float maxCanvasSize;
     float minSafe;
@@ -373,14 +389,20 @@ static void CheckColorRules(const Layer* layer, const std::string& location,
   CollectStrokes(layer->contents, strokes);
 
   auto checkColorSource = [&](const ColorSource* source, const std::string& painterType) {
+    // Only check SolidColor nodes. Gradients, patterns, and resource references (other
+    // ColorSource subtypes) are intentional design choices and are not flagged.
     if (source == nullptr || source->nodeType() != NodeType::SolidColor) {
       return;
     }
     auto* solid = static_cast<const SolidColor*>(source);
+    // Only flag fully opaque hardcoded colors. Semi-transparent colors (e.g. overlays) are
+    // legitimate uses that don't break theme switching in the same way.
     if (!IsHardcodedOpaqueColor(solid->color)) {
       return;
     }
-    // VIS-100/101: Warn on hardcoded white or black as the sole color.
+    // VIS-101: Pure white and pure black are the worst offenders for theme incompatibility:
+    // white is invisible on light backgrounds, black is invisible on dark backgrounds.
+    // currentColor or a theme-aware resource reference should be used instead.
     bool isWhite = IsPureWhite(solid->color);
     bool isBlack = solid->color.red <= kColorNearZeroThreshold &&
                    solid->color.green <= kColorNearZeroThreshold &&
