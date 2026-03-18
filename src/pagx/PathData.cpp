@@ -75,7 +75,7 @@ void PathData::setPathData(const PathData& other) {
   _boundsDirty = true;
 }
 
-Rect PathData::getBounds() const {
+Rect PathData::getBounds() {
   if (!_boundsDirty) {
     return _cachedBounds;
   }
