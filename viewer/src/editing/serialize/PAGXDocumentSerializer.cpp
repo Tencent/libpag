@@ -23,14 +23,12 @@
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
-#include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
-#include "pagx/nodes/Element.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
@@ -61,112 +59,6 @@
 #include "pagx/nodes/TrimPath.h"
 
 namespace pag::PAGXDocumentSerializer {
-
-// Helper function to get RTTR type for a PAGX node type
-static rttr::type GetRttrTypeForNodeType(pagx::NodeType nodeType) {
-  switch (nodeType) {
-    case pagx::NodeType::PathData:
-      return rttr::type::get<pagx::PathData>();
-    case pagx::NodeType::Image:
-      return rttr::type::get<pagx::Image>();
-    case pagx::NodeType::Composition:
-      return rttr::type::get<pagx::Composition>();
-    case pagx::NodeType::SolidColor:
-      return rttr::type::get<pagx::SolidColor>();
-    case pagx::NodeType::LinearGradient:
-      return rttr::type::get<pagx::LinearGradient>();
-    case pagx::NodeType::RadialGradient:
-      return rttr::type::get<pagx::RadialGradient>();
-    case pagx::NodeType::ConicGradient:
-      return rttr::type::get<pagx::ConicGradient>();
-    case pagx::NodeType::DiamondGradient:
-      return rttr::type::get<pagx::DiamondGradient>();
-    case pagx::NodeType::ImagePattern:
-      return rttr::type::get<pagx::ImagePattern>();
-    case pagx::NodeType::ColorStop:
-      return rttr::type::get<pagx::ColorStop>();
-    case pagx::NodeType::Font:
-      return rttr::type::get<pagx::Font>();
-    case pagx::NodeType::Glyph:
-      return rttr::type::get<pagx::GlyphRun>();
-    case pagx::NodeType::Layer:
-      return rttr::type::get<pagx::Layer>();
-    case pagx::NodeType::DropShadowStyle:
-      return rttr::type::get<pagx::DropShadowStyle>();
-    case pagx::NodeType::InnerShadowStyle:
-      return rttr::type::get<pagx::InnerShadowStyle>();
-    case pagx::NodeType::BackgroundBlurStyle:
-      return rttr::type::get<pagx::BackgroundBlurStyle>();
-    case pagx::NodeType::BlurFilter:
-      return rttr::type::get<pagx::BlurFilter>();
-    case pagx::NodeType::DropShadowFilter:
-      return rttr::type::get<pagx::DropShadowFilter>();
-    case pagx::NodeType::InnerShadowFilter:
-      return rttr::type::get<pagx::InnerShadowFilter>();
-    case pagx::NodeType::BlendFilter:
-      return rttr::type::get<pagx::BlendFilter>();
-    case pagx::NodeType::ColorMatrixFilter:
-      return rttr::type::get<pagx::ColorMatrixFilter>();
-    case pagx::NodeType::Rectangle:
-      return rttr::type::get<pagx::Rectangle>();
-    case pagx::NodeType::Ellipse:
-      return rttr::type::get<pagx::Ellipse>();
-    case pagx::NodeType::Polystar:
-      return rttr::type::get<pagx::Polystar>();
-    case pagx::NodeType::Path:
-      return rttr::type::get<pagx::Path>();
-    case pagx::NodeType::Text:
-      return rttr::type::get<pagx::Text>();
-    case pagx::NodeType::Fill:
-      return rttr::type::get<pagx::Fill>();
-    case pagx::NodeType::Stroke:
-      return rttr::type::get<pagx::Stroke>();
-    case pagx::NodeType::TrimPath:
-      return rttr::type::get<pagx::TrimPath>();
-    case pagx::NodeType::RoundCorner:
-      return rttr::type::get<pagx::RoundCorner>();
-    case pagx::NodeType::MergePath:
-      return rttr::type::get<pagx::MergePath>();
-    case pagx::NodeType::TextModifier:
-      return rttr::type::get<pagx::TextModifier>();
-    case pagx::NodeType::TextPath:
-      return rttr::type::get<pagx::TextPath>();
-    case pagx::NodeType::TextBox:
-      return rttr::type::get<pagx::TextBox>();
-    case pagx::NodeType::Group:
-      return rttr::type::get<pagx::Group>();
-    case pagx::NodeType::Repeater:
-      return rttr::type::get<pagx::Repeater>();
-    case pagx::NodeType::RangeSelector:
-      return rttr::type::get<pagx::RangeSelector>();
-    case pagx::NodeType::GlyphRun:
-      return rttr::type::get<pagx::GlyphRun>();
-    default:
-      return rttr::type::get<pagx::Node>();
-  }
-}
-
-// Helper macro to simplify casting and getting property value for each node type
-#define SERIALIZE_NODE_CASE(NodeTypeEnum, NodeClass)                       \
-  case pagx::NodeType::NodeTypeEnum: {                                     \
-    auto* derivedPtr = static_cast<pagx::NodeClass*>(nodePtr);             \
-    auto properties = rttr::type::get<pagx::NodeClass>().get_properties(); \
-    for (const auto& property : properties) {                              \
-      if (property.get_metadata("NO_SERIALIZE")) {                         \
-        continue;                                                          \
-      }                                                                    \
-      auto propertyName = property.get_name().to_string();                 \
-      if (propertyName == "id") {                                          \
-        continue;                                                          \
-      }                                                                    \
-      auto variant = property.get_value(*derivedPtr);                      \
-      auto childNode = std::make_unique<PAGTreeNode>(treeNode);            \
-      childNode->setName(propertyName.c_str());                            \
-      SerializeVariant(variant, childNode.get());                          \
-      treeNode->appendChild(std::move(childNode));                         \
-    }                                                                      \
-    break;                                                                 \
-  }
 
 static rttr::instance GetWrappedInstance(const rttr::instance& item) {
   return item.get_type().get_raw_type().is_wrapper() ? item.get_wrapped_instance() : item;
@@ -237,7 +129,101 @@ static QString TransformEnumToQString(const rttr::variant& value) {
     return QString::fromStdString(std::to_string(num));
   }
 
-  return "<null>";
+  return "null";
+}
+
+// Check if the variant is a Node pointer type (regardless of whether the pointer is null)
+static bool IsNodePointerType(const rttr::variant& value) {
+  auto type = value.get_type();
+  auto wrappedType = GetWrappedType(type);
+
+  if (!wrappedType.is_pointer()) {
+    return false;
+  }
+
+  auto rawType = wrappedType.get_raw_type();
+
+  // Check if the type is Node* or derived from Node
+  // With RTTR_ENABLE() macros in place, is_derived_from works correctly
+  return rawType == rttr::type::get<pagx::Node>() || rawType.is_derived_from<pagx::Node>();
+}
+
+// Try to extract a Node* from a variant
+// Returns: pair<bool, Node*> where bool indicates if it's a Node pointer type
+//          - {false, nullptr}: not a Node pointer type
+//          - {true, nullptr}: is a Node pointer type, but the pointer value is nullptr
+//          - {true, ptr}: is a Node pointer type with valid pointer
+static std::pair<bool, pagx::Node*> TryExtractNodePointer(const rttr::variant& value) {
+  if (!IsNodePointerType(value)) {
+    return {false, nullptr};
+  }
+
+  auto realValue = value.extract_wrapped_value();
+  void* ptr = nullptr;
+  if (realValue.convert(ptr) && ptr != nullptr) {
+    return {true, static_cast<pagx::Node*>(ptr)};
+  }
+
+  return {true, nullptr};
+}
+
+// Serialize a Node pointer by casting to its actual derived type based on nodeType()
+static void SerializeNodeAsDerived(pagx::Node* nodePtr, PAGTreeNode* treeNode) {
+  if (nodePtr == nullptr) {
+    treeNode->setValue("nullptr");
+    return;
+  }
+
+#define SERIALIZE_NODE_CASE(EnumValue, ClassName)                         \
+  case pagx::NodeType::EnumValue:                                         \
+    SerializeInstance(*static_cast<pagx::ClassName*>(nodePtr), treeNode); \
+    return;
+
+  switch (nodePtr->nodeType()) {
+    SERIALIZE_NODE_CASE(PathData, PathData)
+    SERIALIZE_NODE_CASE(Image, Image)
+    SERIALIZE_NODE_CASE(Composition, Composition)
+    SERIALIZE_NODE_CASE(SolidColor, SolidColor)
+    SERIALIZE_NODE_CASE(LinearGradient, LinearGradient)
+    SERIALIZE_NODE_CASE(RadialGradient, RadialGradient)
+    SERIALIZE_NODE_CASE(ConicGradient, ConicGradient)
+    SERIALIZE_NODE_CASE(DiamondGradient, DiamondGradient)
+    SERIALIZE_NODE_CASE(ImagePattern, ImagePattern)
+    SERIALIZE_NODE_CASE(ColorStop, ColorStop)
+    SERIALIZE_NODE_CASE(Font, Font)
+    SERIALIZE_NODE_CASE(Glyph, Glyph)
+    SERIALIZE_NODE_CASE(Layer, Layer)
+    SERIALIZE_NODE_CASE(DropShadowStyle, DropShadowStyle)
+    SERIALIZE_NODE_CASE(InnerShadowStyle, InnerShadowStyle)
+    SERIALIZE_NODE_CASE(BackgroundBlurStyle, BackgroundBlurStyle)
+    SERIALIZE_NODE_CASE(BlurFilter, BlurFilter)
+    SERIALIZE_NODE_CASE(DropShadowFilter, DropShadowFilter)
+    SERIALIZE_NODE_CASE(InnerShadowFilter, InnerShadowFilter)
+    SERIALIZE_NODE_CASE(BlendFilter, BlendFilter)
+    SERIALIZE_NODE_CASE(ColorMatrixFilter, ColorMatrixFilter)
+    SERIALIZE_NODE_CASE(Rectangle, Rectangle)
+    SERIALIZE_NODE_CASE(Ellipse, Ellipse)
+    SERIALIZE_NODE_CASE(Polystar, Polystar)
+    SERIALIZE_NODE_CASE(Path, Path)
+    SERIALIZE_NODE_CASE(Text, Text)
+    SERIALIZE_NODE_CASE(Fill, Fill)
+    SERIALIZE_NODE_CASE(Stroke, Stroke)
+    SERIALIZE_NODE_CASE(TrimPath, TrimPath)
+    SERIALIZE_NODE_CASE(RoundCorner, RoundCorner)
+    SERIALIZE_NODE_CASE(MergePath, MergePath)
+    SERIALIZE_NODE_CASE(TextModifier, TextModifier)
+    SERIALIZE_NODE_CASE(TextPath, TextPath)
+    SERIALIZE_NODE_CASE(TextBox, TextBox)
+    SERIALIZE_NODE_CASE(Group, Group)
+    SERIALIZE_NODE_CASE(Repeater, Repeater)
+    SERIALIZE_NODE_CASE(RangeSelector, RangeSelector)
+    SERIALIZE_NODE_CASE(GlyphRun, GlyphRun)
+  }
+
+#undef SERIALIZE_NODE_CASE
+
+  // Fallback to base Node if unknown type
+  SerializeInstance(*nodePtr, treeNode);
 }
 
 static void SerializeInstance(const rttr::instance& item, PAGTreeNode* node) {
@@ -259,11 +245,6 @@ static void SerializeInstance(const rttr::instance& item, PAGTreeNode* node) {
   }
 }
 
-// Forward declarations
-static void SerializeNode(pagx::Node* nodePtr, PAGTreeNode* treeNode);
-static void SerializeSequentialContainer(const rttr::variant_sequential_view& view,
-                                         PAGTreeNode* node);
-
 static void SerializeVariant(const rttr::variant& value, PAGTreeNode* node) {
   auto wrappedType = GetWrappedType(value.get_type());
   bool isWrapped = wrappedType != value.get_type();
@@ -271,28 +252,29 @@ static void SerializeVariant(const rttr::variant& value, PAGTreeNode* node) {
 
   // Check for nullptr in various ways
   if (value.can_convert<std::nullptr_t>()) {
-    node->setValue("<null>");
+    node->setValue("nullptr");
     return;
   }
 
   // Check if it's a pointer type
   if (wrappedType.is_pointer()) {
+    // For Node pointers, use SerializeNodeAsDerived to properly detect derived type
+    auto [isNodePtr, nodePtr] = TryExtractNodePointer(value);
+    if (isNodePtr) {
+      SerializeNodeAsDerived(nodePtr, node);
+      return;
+    }
+    // For other pointer types, check if null
     void* ptr = nullptr;
     if (value.convert(ptr) || realValue.convert(ptr)) {
       if (ptr == nullptr) {
-        node->setValue("<null>");
+        node->setValue("nullptr");
         return;
       }
     }
-    // Check if it's a pointer to pagx::Node derived class
-    auto rawType = wrappedType.get_raw_type();
-    if (rawType.is_derived_from<pagx::Node>() || rawType == rttr::type::get<pagx::Node>()) {
-      pagx::Node* nodePtr = nullptr;
-      if (realValue.convert(nodePtr) && nodePtr != nullptr) {
-        SerializeNode(nodePtr, node);
-        return;
-      }
-    }
+    // For other pointer types, dereference and serialize the actual object
+    SerializeInstance(realValue, node);
+    return;
   }
 
   if (wrappedType.is_arithmetic()) {
@@ -320,7 +302,7 @@ static void SerializeVariant(const rttr::variant& value, PAGTreeNode* node) {
       // Try to provide a more meaningful representation for unknown types
       str = wrappedType.get_name().to_string();
       if (str.empty()) {
-        str = "<unknown>";
+        str = "(unknown)";
       }
     }
     node->setValue(str.c_str());
@@ -352,17 +334,18 @@ static void SerializeSequentialContainer(const rttr::variant_sequential_view& vi
       } else if (type == rttr::type::get<std::string>()) {
         childNode->setValue(wrappedValue.to_string().c_str());
       } else if (type.is_pointer()) {
-        // Check if it's a pointer to pagx::Node derived class
-        auto rawType = type.get_raw_type();
-        if (rawType.is_derived_from<pagx::Node>() || rawType == rttr::type::get<pagx::Node>()) {
-          pagx::Node* nodePtr = nullptr;
-          if (wrappedValue.convert(nodePtr) && nodePtr != nullptr) {
-            SerializeNode(nodePtr, childNode.get());
-          } else {
-            childNode->setValue("<null>");
-          }
+        // For Node pointers, use SerializeNodeAsDerived to properly detect derived type
+        auto [isNodePtr, nodePtr] = TryExtractNodePointer(wrappedValue);
+        if (isNodePtr) {
+          SerializeNodeAsDerived(nodePtr, childNode.get());
         } else {
-          SerializeInstance(wrappedValue, childNode.get());
+          // For other pointer types, check if null
+          void* ptr = nullptr;
+          if (wrappedValue.convert(ptr) && ptr != nullptr) {
+            SerializeInstance(wrappedValue, childNode.get());
+          } else {
+            childNode->setValue("nullptr");
+          }
         }
       } else {
         SerializeInstance(wrappedValue, childNode.get());
@@ -370,114 +353,6 @@ static void SerializeSequentialContainer(const rttr::variant_sequential_view& vi
     }
     index++;
     node->appendChild(std::move(childNode));
-  }
-}
-
-static void SerializeNode(pagx::Node* nodePtr, PAGTreeNode* treeNode) {
-  if (nodePtr == nullptr) {
-    treeNode->setValue("<null>");
-    return;
-  }
-  // Get the derived type by using nodeType(), avoiding name conflicts with pag:: types
-  auto type = GetRttrTypeForNodeType(nodePtr->nodeType());
-  treeNode->setValue(type.get_name().data());
-
-  // Serialize id from base Node class
-  if (!nodePtr->id.empty()) {
-    auto idNode = std::make_unique<PAGTreeNode>(treeNode);
-    idNode->setName("id");
-    idNode->setValue(QString::fromStdString(nodePtr->id));
-    treeNode->appendChild(std::move(idNode));
-  }
-
-  // Get properties using correctly typed instance for each node type
-  switch (nodePtr->nodeType()) {
-    SERIALIZE_NODE_CASE(PathData, PathData)
-    SERIALIZE_NODE_CASE(Image, Image)
-    SERIALIZE_NODE_CASE(Composition, Composition)
-    SERIALIZE_NODE_CASE(SolidColor, SolidColor)
-    SERIALIZE_NODE_CASE(LinearGradient, LinearGradient)
-    SERIALIZE_NODE_CASE(RadialGradient, RadialGradient)
-    SERIALIZE_NODE_CASE(ConicGradient, ConicGradient)
-    SERIALIZE_NODE_CASE(DiamondGradient, DiamondGradient)
-    SERIALIZE_NODE_CASE(ImagePattern, ImagePattern)
-    SERIALIZE_NODE_CASE(ColorStop, ColorStop)
-    SERIALIZE_NODE_CASE(Font, Font)
-    SERIALIZE_NODE_CASE(Layer, Layer)
-    SERIALIZE_NODE_CASE(DropShadowStyle, DropShadowStyle)
-    SERIALIZE_NODE_CASE(InnerShadowStyle, InnerShadowStyle)
-    SERIALIZE_NODE_CASE(BackgroundBlurStyle, BackgroundBlurStyle)
-    SERIALIZE_NODE_CASE(BlurFilter, BlurFilter)
-    SERIALIZE_NODE_CASE(DropShadowFilter, DropShadowFilter)
-    SERIALIZE_NODE_CASE(InnerShadowFilter, InnerShadowFilter)
-    SERIALIZE_NODE_CASE(BlendFilter, BlendFilter)
-    SERIALIZE_NODE_CASE(ColorMatrixFilter, ColorMatrixFilter)
-    SERIALIZE_NODE_CASE(Rectangle, Rectangle)
-    SERIALIZE_NODE_CASE(Ellipse, Ellipse)
-    SERIALIZE_NODE_CASE(Polystar, Polystar)
-    SERIALIZE_NODE_CASE(Path, Path)
-    SERIALIZE_NODE_CASE(Text, Text)
-    SERIALIZE_NODE_CASE(Fill, Fill)
-    SERIALIZE_NODE_CASE(Stroke, Stroke)
-    SERIALIZE_NODE_CASE(TrimPath, TrimPath)
-    SERIALIZE_NODE_CASE(RoundCorner, RoundCorner)
-    SERIALIZE_NODE_CASE(MergePath, MergePath)
-    SERIALIZE_NODE_CASE(TextModifier, TextModifier)
-    SERIALIZE_NODE_CASE(TextPath, TextPath)
-    SERIALIZE_NODE_CASE(TextBox, TextBox)
-    SERIALIZE_NODE_CASE(Group, Group)
-    SERIALIZE_NODE_CASE(Repeater, Repeater)
-    SERIALIZE_NODE_CASE(RangeSelector, RangeSelector)
-    SERIALIZE_NODE_CASE(GlyphRun, GlyphRun)
-    case pagx::NodeType::Glyph: {
-      // Glyph uses GlyphRun class
-      auto* derivedPtr = static_cast<pagx::GlyphRun*>(nodePtr);
-      auto properties = rttr::type::get<pagx::GlyphRun>().get_properties();
-      for (const auto& property : properties) {
-        if (property.get_metadata("NO_SERIALIZE")) {
-          continue;
-        }
-        auto propertyName = property.get_name().to_string();
-        if (propertyName == "id") {
-          continue;
-        }
-        auto variant = property.get_value(*derivedPtr);
-        auto childNode = std::make_unique<PAGTreeNode>(treeNode);
-        childNode->setName(propertyName.c_str());
-        SerializeVariant(variant, childNode.get());
-        treeNode->appendChild(std::move(childNode));
-      }
-      break;
-    }
-    default:
-      break;
-  }
-}
-
-#undef SERIALIZE_NODE_CASE
-
-static void SerializeNodes(const std::vector<std::unique_ptr<pagx::Node>>& nodes,
-                           PAGTreeNode* node) {
-  node->setValue(QString("Node[%1]").arg(static_cast<int>(nodes.size())));
-  int index = 0;
-  for (const auto& nodePtr : nodes) {
-    auto childNode = std::make_unique<PAGTreeNode>(node);
-    childNode->setName(QString::number(index));
-    SerializeNode(nodePtr.get(), childNode.get());
-    node->appendChild(std::move(childNode));
-    index++;
-  }
-}
-
-static void SerializeLayers(const std::vector<pagx::Layer*>& layers, PAGTreeNode* node) {
-  node->setValue(QString("Layer[%1]").arg(static_cast<int>(layers.size())));
-  int index = 0;
-  for (auto* layer : layers) {
-    auto childNode = std::make_unique<PAGTreeNode>(node);
-    childNode->setName(QString::number(index));
-    SerializeNode(layer, childNode.get());
-    node->appendChild(std::move(childNode));
-    index++;
   }
 }
 
@@ -490,7 +365,7 @@ static void AddProperty(PAGTreeNode* parent, const QString& name, const QString&
 
 void Serialize(const std::shared_ptr<pagx::PAGXDocument>& document, PAGTreeNode* node) {
   if (document == nullptr) {
-    node->setValue("<null>");
+    node->setValue("nullptr");
     return;
   }
 
@@ -504,13 +379,33 @@ void Serialize(const std::shared_ptr<pagx::PAGXDocument>& document, PAGTreeNode*
   // Serialize layers
   auto layersNode = std::make_unique<PAGTreeNode>(node);
   layersNode->setName("layers");
-  SerializeLayers(document->layers, layersNode.get());
+  layersNode->setValue(QString("Layer[%1]").arg(static_cast<int>(document->layers.size())));
+  int index = 0;
+  for (auto* layer : document->layers) {
+    auto childNode = std::make_unique<PAGTreeNode>(layersNode.get());
+    childNode->setName(QString::number(index));
+    if (layer != nullptr) {
+      SerializeInstance(*layer, childNode.get());
+    } else {
+      childNode->setValue("nullptr");
+    }
+    layersNode->appendChild(std::move(childNode));
+    index++;
+  }
   node->appendChild(std::move(layersNode));
 
   // Serialize nodes (unique_ptr vector)
   auto nodesNode = std::make_unique<PAGTreeNode>(node);
   nodesNode->setName("nodes");
-  SerializeNodes(document->nodes, nodesNode.get());
+  nodesNode->setValue(QString("Node[%1]").arg(static_cast<int>(document->nodes.size())));
+  index = 0;
+  for (const auto& nodePtr : document->nodes) {
+    auto childNode = std::make_unique<PAGTreeNode>(nodesNode.get());
+    childNode->setName(QString::number(index));
+    SerializeNodeAsDerived(nodePtr.get(), childNode.get());
+    nodesNode->appendChild(std::move(childNode));
+    index++;
+  }
   node->appendChild(std::move(nodesNode));
 
   // Serialize errors
@@ -518,7 +413,7 @@ void Serialize(const std::shared_ptr<pagx::PAGXDocument>& document, PAGTreeNode*
     auto errorsNode = std::make_unique<PAGTreeNode>(node);
     errorsNode->setName("errors");
     errorsNode->setValue(QString("string[%1]").arg(static_cast<int>(document->errors.size())));
-    int index = 0;
+    index = 0;
     for (const auto& error : document->errors) {
       auto childNode = std::make_unique<PAGTreeNode>(errorsNode.get());
       childNode->setName(QString::number(index));
