@@ -1197,6 +1197,19 @@ CLI_TEST(PAGXCliTest, Lint_VIS003_ExcessPrecision) {
   EXPECT_TRUE(output.find("VIS-003") != std::string::npos);
 }
 
+CLI_TEST(PAGXCliTest, Lint_VIS003_CleanPrecision) {
+  auto inputPath = TestResourcePath("lint_vis003_clean_precision.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-003") == std::string::npos);
+}
+
 // VIS-010: minimum stroke width
 CLI_TEST(PAGXCliTest, Lint_VIS010_ThinStroke) {
   auto inputPath = TestResourcePath("lint_vis010_thin_stroke.pagx");
@@ -1209,6 +1222,19 @@ CLI_TEST(PAGXCliTest, Lint_VIS010_ThinStroke) {
   output = oss.str();
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(output.find("VIS-010") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_VIS010_NormalStroke) {
+  auto inputPath = TestResourcePath("lint_vis010_normal_stroke.pagx");
+  std::string output;
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cout.rdbuf(old);
+  output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("VIS-010") == std::string::npos);
 }
 
 // VIS-011: stroke width consistency
