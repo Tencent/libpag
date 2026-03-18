@@ -1,7 +1,9 @@
 # PAGX Lint Rules
 
-Constraints enforced by `pagx lint` and `pagx validate`. Apply these when generating or
-editing PAGX files to produce clean, lint-free output.
+Advisory visual quality checks run by `pagx lint`. Always exits 0 — these are not blocking
+errors. Surface issues to the designer for review; they decide whether to request changes.
+
+For blocking format and semantic errors, run `pagx validate` (see `cli.md`).
 
 > **Batch coverage**: Initial 10 rules. Full set (73 rules) added incrementally.
 
@@ -23,8 +25,8 @@ Round to the nearest 0.5px (e.g. 10.3 → 10.5).
 
 **Canvas-size range**: For icons with canvas ≤ 48px, keep stroke width within:
 
-| Canvas  | Min  | Max  |
-|---------|------|------|
+| Canvas  | Min   | Max   |
+|---------|-------|-------|
 | ≤ 16px  | 1.0px | 1.5px |
 | ≤ 24px  | 1.0px | 2.5px |
 | ≤ 32px  | 1.5px | 3.0px |
@@ -49,16 +51,3 @@ edges).
 **Theme colors**: Use `currentColor` or a theme resource reference (`@id`) for foreground
 fills and strokes. Do not hardcode pure black (`#000000`) or pure white (`#FFFFFF`) as
 fully opaque solid colors — these break theme switching.
-
----
-
-## Validate Constraints
-
-These are hard errors caught by `pagx validate`. The file is invalid if violated.
-
-**MergePath scope**: Place all `Fill`/`Stroke` painters **after** `MergePath` in the same
-element scope. Painters before `MergePath` are silently cleared at runtime. Use a `Group`
-to isolate any pre-MergePath rendering.
-
-**TextBox layout**: When `TextBox` is present in a scope, do not set `position` or
-`textAnchor` on sibling `Text` elements — `TextBox` overrides them silently.

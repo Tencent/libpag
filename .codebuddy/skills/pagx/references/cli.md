@@ -98,6 +98,25 @@ in the commit.
 
 ---
 
+## pagx lint
+
+Run advisory visual quality checks on a PAGX file. Always exits 0 — results are informational
+only and never block the pipeline. Surface the issue list to the designer for review; they
+decide whether to request changes. For the full rule list and descriptions, see `pagx-lint.md`.
+
+```bash
+pagx lint input.pagx
+pagx lint --json input.pagx
+```
+
+Text output: `filename: N lint issue(s)` followed by `  [rule-id] location: message` per issue,
+or `filename: no issues found` if clean. JSON output includes `file` and `issues` array with
+`ruleId`, `location`, and `message` fields.
+
+Exit code is always 0.
+
+---
+
 ## pagx validate
 
 Validate a PAGX file against the specification schema. Note: `pagx optimize` already includes
