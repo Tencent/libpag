@@ -1488,7 +1488,7 @@ CLI_TEST(PAGXCliTest, Lint_MissingFileArg) {
 
 CLI_TEST(PAGXCliTest, Lint_UnknownOption) {
   // Unknown flag passed — should print error message and return 0.
-  auto inputPath = TestResourcePath("lint_vis001_aligned_coord.pagx");
+  auto inputPath = TestResourcePath("lint_vis001_aligned.pagx");
   std::string errOutput;
   std::streambuf* oldCerr = std::cerr.rdbuf();
   std::ostringstream oss;
