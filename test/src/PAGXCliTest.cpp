@@ -1326,38 +1326,7 @@ CLI_TEST(PAGXCliTest, Lint_StrokeCornerRatio) {
   EXPECT_TRUE(output.find("stroke-corner-ratio") != std::string::npos);
 }
 
-// Safe zone
-
-// Expected: lint reports "outside-safe-zone" issue. Observable: output contains
-// "outside-safe-zone". Content placed beyond the safe zone inset (typically 10% per edge)
-// risks being clipped or visually crowded when the icon is displayed in small sizes.
-CLI_TEST(PAGXCliTest, Lint_OutsideSafeZone) {
-  auto inputPath = BadCase("lint_vis_outside_safezone.pagx");
-  std::string output;
-  std::streambuf* old = std::cout.rdbuf();
-  std::ostringstream oss;
-  std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
-  std::cout.rdbuf(old);
-  output = oss.str();
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("outside-safe-zone") != std::string::npos);
-}
-
-// Expected: lint reports no safe-zone issue. Observable: output does NOT contain
-// "outside-safe-zone". Content within the inset is valid — verifies no false positive.
-CLI_TEST(PAGXCliTest, Lint_InsideSafeZone) {
-  auto inputPath = GoodCase("lint_vis_inside_safezone.pagx");
-  std::string output;
-  std::streambuf* old = std::cout.rdbuf();
-  std::ostringstream oss;
-  std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
-  std::cout.rdbuf(old);
-  output = oss.str();
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("outside-safe-zone") == std::string::npos);
-}
+// Canvas edge
 
 // Expected: lint reports "touches-canvas-edge" issue. Observable: output contains
 // "touches-canvas-edge". A layer whose bounding box reaches the canvas boundary provides no
@@ -1536,11 +1505,10 @@ CLI_TEST(PAGXCliTest, Lint_CornerRatioNoStroke) {
   EXPECT_TRUE(output.find("stroke-corner-ratio") == std::string::npos);
 }
 
-// Safe zone — content with generous padding: should pass
+// Canvas edge — content well within boundary: should pass
 
-// Expected: lint reports no safe-zone issue. Observable: output does NOT contain
-// "outside-safe-zone" or "touches-canvas-edge". Content well within the inset with padding
-// on all sides is the ideal authoring pattern — verifies no false positive.
+// Expected: lint reports no canvas-edge issue. Observable: output does NOT contain
+// "touches-canvas-edge". Content well within the canvas boundary verifies no false positive.
 CLI_TEST(PAGXCliTest, Lint_SafeZoneBoundaryPass) {
   auto inputPath = GoodCase("lint_vis_safezone_boundary_pass.pagx");
   std::string output;
@@ -1551,7 +1519,6 @@ CLI_TEST(PAGXCliTest, Lint_SafeZoneBoundaryPass) {
   std::cout.rdbuf(old);
   output = oss.str();
   EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("outside-safe-zone") == std::string::npos);
   EXPECT_TRUE(output.find("touches-canvas-edge") == std::string::npos);
 }
 

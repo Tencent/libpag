@@ -354,17 +354,12 @@ static void CheckStrokeWidth(const Layer* layer, float canvasSize, const std::st
   CheckCornerRadiusRatio(layer->contents, location, strokes, issues);
 }
 
-// Safe-zone minimum padding: 8.3% (1/12) of canvas edge.
-static constexpr float SAFE_ZONE_PADDING_RATIO = 0.083f;
-
-// Safe zone / canvas margin checks.
+// Canvas boundary check: geometry must stay strictly inside the canvas (no touching edges).
 static void CheckSafeZone(const Layer* layer, float canvasWidth, float canvasHeight,
                           const std::string& location, std::vector<LintIssue>& issues) {
   if (canvasWidth <= 0.0f || canvasHeight <= 0.0f) {
     return;
   }
-  float minPaddingX = canvasWidth * SAFE_ZONE_PADDING_RATIO;
-  float minPaddingY = canvasHeight * SAFE_ZONE_PADDING_RATIO;
 
   Rect bounds = CollectGeometryBounds(layer->contents);
   if (bounds.isEmpty()) {
@@ -372,41 +367,18 @@ static void CheckSafeZone(const Layer* layer, float canvasWidth, float canvasHei
   }
 
   // Geometry coordinates are relative to the layer origin. Translate to canvas space by adding
-  // the layer's x/y offset so that safe-zone checks are against the correct absolute positions.
+  // the layer's x/y offset so that the check is against the correct absolute positions.
   bounds.x += layer->x;
   bounds.y += layer->y;
 
   float boundsRight = bounds.x + bounds.width;
   float boundsBottom = bounds.y + bounds.height;
 
-  // No edge must touch or exceed canvas boundary.
   if (bounds.x <= 0.0f || bounds.y <= 0.0f || boundsRight >= canvasWidth ||
       boundsBottom >= canvasHeight) {
     issues.push_back({"touches-canvas-edge", location,
                       "Content touches or exceeds canvas boundary — all elements must stay "
                       "within canvas bounds"});
-    return;
-  }
-
-  // Content must respect minimum safe padding (separate checks for X and Y directions).
-  float actualLeft = bounds.x;
-  float actualTop = bounds.y;
-  float actualRight = canvasWidth - boundsRight;
-  float actualBottom = canvasHeight - boundsBottom;
-
-  if (actualLeft < minPaddingX || actualRight < minPaddingX) {
-    issues.push_back({"outside-safe-zone", location,
-                      "Content is too close to canvas left/right edge (min padding " +
-                          std::to_string(std::min(actualLeft, actualRight)) +
-                          "px, recommended >= " + std::to_string(minPaddingX) + "px)"});
-    return;
-  }
-
-  if (actualTop < minPaddingY || actualBottom < minPaddingY) {
-    issues.push_back({"outside-safe-zone", location,
-                      "Content is too close to canvas top/bottom edge (min padding " +
-                          std::to_string(std::min(actualTop, actualBottom)) +
-                          "px, recommended >= " + std::to_string(minPaddingY) + "px)"});
   }
 }
 

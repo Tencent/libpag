@@ -42,9 +42,6 @@ position to be on a **strict half-pixel** (0.5, 1.5, 2.5, …), not an integer.
 **Canvas edge**: All geometry must stay strictly inside the canvas boundary (no touching
 edges).
 
-**Minimum padding**: Keep a minimum inset of `canvasWidth × 0.083` (≈ 8.3%) from every
-canvas edge.
-
 ---
 
 ## Color Rules
