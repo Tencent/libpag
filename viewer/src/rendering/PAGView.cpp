@@ -40,18 +40,19 @@ static void reportPAGFIleInfo(const std::shared_ptr<PAGFile>& pagFile, size_t le
 
 PAGView::PAGView(QQuickItem* parent) : ContentView(parent) {
   setFlag(ItemHasContents, true);
-  drawable = GPUDrawable::MakeFrom(this);
   pagPlayer = std::make_unique<PAGPlayer>();
-  auto pagSurface = PAGSurface::MakeFrom(drawable);
-  pagPlayer->setSurface(pagSurface);
   renderThread = std::make_unique<PAGRenderThread>(this);
   renderThread->moveToThread(renderThread.get());
-  drawable->moveToThread(renderThread.get());
   audioPlayer = std::make_unique<PAGAudioPlayer>();
   resizeTimer = std::make_unique<QTimer>();
   connect(resizeTimer.get(), &QTimer::timeout, this, &PAGView::sizeChangedDelayHandle);
   connect(audioPlayer.get(), &PAGAudioPlayer::audioTimeChanged, this, &PAGView::onAudioTimeChanged,
           Qt::QueuedConnection);
+  if (window() != nullptr) {
+    initDrawable();
+  } else {
+    connect(this, &QQuickItem::windowChanged, this, &PAGView::onWindowChanged);
+  }
 }
 
 void PAGView::flush() const {
@@ -84,6 +85,26 @@ PAGView::~PAGView() {
   renderThread->wait();
 }
 
+void PAGView::onWindowChanged(QQuickWindow* win) {
+  if (win != nullptr) {
+    disconnect(this, &QQuickItem::windowChanged, this, &PAGView::onWindowChanged);
+    initDrawable();
+  }
+}
+
+void PAGView::initDrawable() {
+  if (drawable != nullptr) {
+    return;
+  }
+  drawable = GPUDrawable::MakeFrom(this);
+  if (drawable == nullptr) {
+    return;
+  }
+  auto pagSurface = PAGSurface::MakeFrom(drawable);
+  pagPlayer->setSurface(pagSurface);
+  drawable->moveToThread(renderThread.get());
+}
+
 int PAGView::getWidth() const {
   if (pagFile == nullptr) {
     return 0;
@@ -99,7 +120,7 @@ int PAGView::getHeight() const {
 }
 
 bool PAGView::hasAnimation() const {
-  return pagFile != nullptr && pagFile->duration() > 0;
+  return true;
 }
 
 int PAGView::getEditableTextLayerCount() const {

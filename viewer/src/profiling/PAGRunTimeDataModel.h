@@ -92,10 +92,10 @@ class PAGRunTimeDataModel : public QObject {
   int64_t lastUpdatedFrame = -1;
   int chartDataSize = 0;
   bool pagxMode = false;
-  PAGFileInfoModel fileInfoModel = {};
-  PAGChartDataModel chartDataModel = {};
-  PAGFrameDisplayInfoModel frameDisplayInfoModel = {};
-  PAGNodeStatsModel nodeStatsModel = {};
+  PAGFileInfoModel fileInfoModel{};
+  PAGChartDataModel chartDataModel{};
+  PAGFrameDisplayInfoModel frameDisplayInfoModel{};
+  PAGNodeStatsModel nodeStatsModel{};
   QVector<FrameTimeMetrics> frameTimeMetricsVector = {};
 };
 }  // namespace pag

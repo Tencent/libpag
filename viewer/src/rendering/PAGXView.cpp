@@ -27,17 +27,38 @@ namespace pag {
 
 PAGXView::PAGXView(QQuickItem* parent) : ContentView(parent) {
   setFlag(ItemHasContents, true);
-  drawable = GPUDrawable::MakeFrom(this, nullptr);
   renderThread = std::make_unique<PAGXRenderThread>(this);
   renderThread->moveToThread(renderThread.get());
-  drawable->moveToThread(renderThread.get());
   resizeTimer = std::make_unique<QTimer>();
   connect(resizeTimer.get(), &QTimer::timeout, this, &PAGXView::sizeChangedDelayHandle);
+  if (window() != nullptr) {
+    initDrawable();
+  } else {
+    connect(this, &QQuickItem::windowChanged, this, &PAGXView::onWindowChanged);
+  }
 }
 
 PAGXView::~PAGXView() {
   QMetaObject::invokeMethod(renderThread.get(), "shutDown", Qt::QueuedConnection);
   renderThread->wait();
+}
+
+void PAGXView::onWindowChanged(QQuickWindow* win) {
+  if (win != nullptr) {
+    disconnect(this, &QQuickItem::windowChanged, this, &PAGXView::onWindowChanged);
+    initDrawable();
+  }
+}
+
+void PAGXView::initDrawable() {
+  if (drawable != nullptr) {
+    return;
+  }
+  drawable = GPUDrawable::MakeFrom(this, nullptr);
+  if (drawable == nullptr) {
+    return;
+  }
+  drawable->moveToThread(renderThread.get());
 }
 
 void PAGXView::sizeChangedDelayHandle() {

@@ -19,6 +19,7 @@
 #pragma once
 
 #include <QOpenGLContext>
+#include <QQuickWindow>
 #include <QTimer>
 #include "ContentView.h"
 #include "pagx/PAGXDocument.h"
@@ -61,6 +62,7 @@ class PAGXView : public ContentView {
   void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
 
   Q_SLOT void sizeChangedDelayHandle();
+  Q_SLOT void onWindowChanged(QQuickWindow* win);
 
   Q_INVOKABLE bool setFile(const QString& filePath) override;
   Q_INVOKABLE void firstFrame() override;
@@ -81,6 +83,7 @@ class PAGXView : public ContentView {
   };
 
  private:
+  void initDrawable();
   RenderTimeMetrics renderPAGX();
   void clearContent();
   void updateAnimationState();
