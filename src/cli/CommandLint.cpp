@@ -461,7 +461,7 @@ std::vector<LintIssue> LintDocument(const PAGXDocument* document) {
 std::vector<LintIssue> LintFile(const std::string& filePath) {
   auto document = PAGXImporter::FromFile(filePath);
   if (document == nullptr) {
-    return {{"", "", "Failed to load file: " + filePath}};
+    return {{"ERR-LOAD", "", "Failed to load file: " + filePath}};
   }
   return LintDocument(document.get());
 }
