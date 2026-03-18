@@ -69,7 +69,7 @@ static void CheckMergePathPainterScope(const std::vector<Element*>& elements,
       if (hasPainterBeforeMergePath) {
         ValidationError err = {};
         err.message = scopeLabel +
-                      ": Fill/Stroke before MergePath will be cleared by MergePath."
+                      ": Fill/Stroke-before-MergePath will be cleared by MergePath."
                       " Isolate pre-MergePath rendering in a separate Group.";
         errors.push_back(std::move(err));
       }
@@ -130,7 +130,7 @@ static void CheckTextBoxLayoutOverrideScope(const std::vector<Element*>& element
     if (hasPosition || hasNonDefaultAnchor) {
       ValidationError err = {};
       err.message = scopeLabel +
-                    ": Text has 'position' or 'textAnchor' that will be ignored because TextBox"
+                    ": Text has 'position' or 'textAnchor' that will-be-ignored-because-TextBox"
                     " overrides text layout. Remove these attributes from the Text element.";
       errors.push_back(std::move(err));
       // Report only the first offending Text per scope. Author should fix it and re-validate

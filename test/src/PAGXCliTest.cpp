@@ -199,7 +199,7 @@ CLI_TEST(PAGXCliTest, Validate_MergePathClearsFill) {
   std::cerr.rdbuf(oldCerr);
   errOutput = oss.str();
   EXPECT_NE(ret, 0);
-  EXPECT_TRUE(errOutput.find("Fill/Stroke before MergePath") != std::string::npos);
+  EXPECT_TRUE(errOutput.find("Fill/Stroke-before-MergePath") != std::string::npos);
 }
 
 // Expected: validate passes (exit 0). Observable: no error output. MergePath with no preceding
@@ -223,7 +223,7 @@ CLI_TEST(PAGXCliTest, Validate_TextBoxOverridesPosition) {
   std::cerr.rdbuf(oldCerr);
   errOutput = oss.str();
   EXPECT_NE(ret, 0);
-  EXPECT_TRUE(errOutput.find("will be ignored because TextBox") != std::string::npos);
+  EXPECT_TRUE(errOutput.find("will-be-ignored-because-TextBox") != std::string::npos);
 }
 
 // Expected: validate passes (exit 0). Observable: no error output. TextBox used without
@@ -1658,7 +1658,7 @@ CLI_TEST(PAGXCliTest, Validate_MultipleMergePaths) {
   std::cerr.rdbuf(oldCerr);
   errOutput = oss.str();
   EXPECT_NE(ret, 0);
-  EXPECT_TRUE(errOutput.find("Fill/Stroke before MergePath") != std::string::npos);
+  EXPECT_TRUE(errOutput.find("Fill/Stroke-before-MergePath") != std::string::npos);
 }
 
 // TextBox layout override — non-Start textAnchor with TextBox present
@@ -1676,7 +1676,7 @@ CLI_TEST(PAGXCliTest, Validate_TextBoxOverridesAnchor) {
   std::cerr.rdbuf(oldCerr);
   errOutput = oss.str();
   EXPECT_NE(ret, 0);
-  EXPECT_TRUE(errOutput.find("will be ignored because TextBox") != std::string::npos);
+  EXPECT_TRUE(errOutput.find("will-be-ignored-because-TextBox") != std::string::npos);
 }
 
 // TextBox layout override — explicit position with TextBox present
@@ -1694,7 +1694,7 @@ CLI_TEST(PAGXCliTest, Validate_TextBoxOverridesTextPosition) {
   std::cerr.rdbuf(oldCerr);
   errOutput = oss.str();
   EXPECT_NE(ret, 0);
-  EXPECT_TRUE(errOutput.find("will be ignored because TextBox") != std::string::npos);
+  EXPECT_TRUE(errOutput.find("will-be-ignored-because-TextBox") != std::string::npos);
 }
 
 }  // namespace pag
