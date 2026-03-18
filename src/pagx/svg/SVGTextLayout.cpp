@@ -243,7 +243,11 @@ SVGTextLayoutResult ComputeTextLayout(const SVGTextLayoutParams& params) {
             break;
         }
       }
-      result.firstLineY = textBox->position.y + yOffset + ascent;
+      // Half-leading: the extra space (lineHeight − fontSize) is split equally above and below
+      // the em square, matching the CSS half-leading model. Without this, the text baseline sits
+      // too high, causing the visual center of glyphs to appear above the vertical center.
+      float halfLeading = (result.lineHeight - fontSize) / 2.0f;
+      result.firstLineY = textBox->position.y + yOffset + halfLeading + ascent;
     } else {
       switch (textBox->paragraphAlign) {
         case ParagraphAlign::Middle:
