@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- VIS-013: Rectangle with roundness but no stroke — should NOT trigger VIS-013 -->
+<!-- Rectangle with roundness but no stroke — should not flag corner ratio -->
 <pagx version="1.0" width="24" height="24">
   <Layer name="RoundedNoStroke">
     <Rectangle position="12,12" size="18,18" roundness="8"/>

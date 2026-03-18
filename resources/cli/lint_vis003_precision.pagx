@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- VIS-003: Coordinate with excessive decimal precision -->
+<!-- Coordinate with excessive decimal precision -->
 <pagx version="1.0" width="24" height="24">
   <Layer name="NoisyCoord">
     <Rectangle position="12.00001,12.00002" size="18,18"/>

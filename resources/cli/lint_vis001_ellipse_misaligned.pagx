@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- VIS-001: Ellipse center not aligned to 0.5px grid -->
+<!-- Ellipse center not aligned to 0.5px grid -->
 <pagx version="1.0" width="24" height="24">
   <Layer name="MisalignedEllipse">
     <Ellipse position="12.3,11.7" size="18,18"/>

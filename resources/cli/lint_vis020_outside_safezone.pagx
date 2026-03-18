@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- VIS-020: Content too close to edge (0.5px padding, below 2px minimum) -->
+<!-- Content too close to edge (0.5px padding, below 2px minimum) -->
 <pagx version="1.0" width="24" height="24">
   <Layer name="TooCloseToEdge">
     <Rectangle position="12,12" size="23,23"/>

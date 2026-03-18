@@ -107,8 +107,8 @@ static void CollectFills(const std::vector<Element*>& elements, std::vector<cons
 //   Group: recursed into; the group's child bounds are unioned into the running result.
 //
 // Returns an empty Rect{} (width == height == 0) if no geometry is found in the list.
-// Used by CheckSafeZone (VIS-020/022) to determine whether the layer's content falls within
-// the safe-zone inset. The const_cast on PathData is required because getBounds() is non-const
+// Used by CheckSafeZone to determine whether the layer's content falls within the safe-zone
+// inset. The const_cast on PathData is required because getBounds() is non-const
 // (it caches the result internally) but we hold a const pointer from the document model.
 static Rect CollectGeometryBounds(const std::vector<Element*>& elements) {
   bool found = false;
@@ -176,17 +176,17 @@ static bool IsHardcodedOpaqueColor(const Color& color) {
 
 // --- Per-layer rule checks ---
 
-// VIS-001/002/003: Pixel alignment and coordinate precision.
+// Pixel alignment and coordinate precision checks.
 static void CheckPixelAlignment(const Layer* layer, const std::string& location,
                                 const std::vector<const Stroke*>& strokes,
                                 std::vector<LintIssue>& issues) {
   auto checkCoord = [&](float value, const std::string& name) {
     if (ExceedsPrecision(value)) {
-      issues.push_back({"VIS-003", location,
+      issues.push_back({"coord-precision", location,
                         name + " (" + std::to_string(value) +
                             ") has more than 4 decimal places — likely floating-point noise"});
     } else if (!IsHalfPixelAligned(value)) {
-      issues.push_back({"VIS-001", location,
+      issues.push_back({"pixel-alignment", location,
                         name + " (" + std::to_string(value) +
                             ") is not aligned to 0.5px grid — may cause blurry rendering"});
     }
@@ -228,7 +228,7 @@ static void CheckPixelAlignment(const Layer* layer, const std::string& location,
     }
   }
 
-  // VIS-002: For strokes, check that stroke center sits on the correct boundary.
+  // Odd-stroke alignment: stroke center must sit on the correct pixel boundary.
   for (auto* stroke : strokes) {
     float width = stroke->width;
     bool isIntegerWidth = std::fabs(width - std::round(width)) < kAlignmentEpsilon;
@@ -236,7 +236,7 @@ static void CheckPixelAlignment(const Layer* layer, const std::string& location,
     if (isOddWidth) {
       // Odd stroke width: stroke center must be on strict 0.5px boundary (layer at half-pixel)
       if (!IsStrictHalfPixel(layer->x) || !IsStrictHalfPixel(layer->y)) {
-        issues.push_back({"VIS-002", location,
+        issues.push_back({"odd-stroke-alignment", location,
                           "Stroke width " + std::to_string(width) +
                               "px is odd — layer position should be on 0.5px boundary for "
                               "crisp rendering"});
@@ -246,7 +246,7 @@ static void CheckPixelAlignment(const Layer* layer, const std::string& location,
   }
 }
 
-// VIS-010/011/012/013: Stroke width constraints.
+// Stroke width constraint checks.
 static void CheckStrokeWidth(const Layer* layer, float canvasSize, const std::string& location,
                              const std::vector<const Stroke*>& strokes,
                              std::vector<LintIssue>& issues) {
@@ -254,22 +254,22 @@ static void CheckStrokeWidth(const Layer* layer, float canvasSize, const std::st
     return;
   }
 
-  // VIS-010: Minimum stroke width.
+  // Minimum stroke width.
   for (auto* stroke : strokes) {
     if (stroke->width < 0.5f) {
-      issues.push_back({"VIS-010", location,
+      issues.push_back({"stroke-too-thin", location,
                         "Stroke width (" + std::to_string(stroke->width) +
                             "px) is below 0.5px and may disappear at small icon sizes"});
     }
   }
 
-  // VIS-011: Stroke width consistency across all strokes in this layer.
+  // Stroke width consistency across all strokes in this layer.
   if (strokes.size() > 1) {
     float referenceWidth = strokes[0]->width;
     for (size_t i = 1; i < strokes.size(); ++i) {
       float delta = std::fabs(strokes[i]->width - referenceWidth);
       if (delta > 0.25f) {
-        issues.push_back({"VIS-011", location,
+        issues.push_back({"stroke-inconsistent", location,
                           "Stroke widths are inconsistent: " + std::to_string(referenceWidth) +
                               "px vs " + std::to_string(strokes[i]->width) +
                               "px (tolerance ±0.25px)"});
@@ -278,19 +278,18 @@ static void CheckStrokeWidth(const Layer* layer, float canvasSize, const std::st
     }
   }
 
-  // VIS-012: Recommended stroke width ranges by canvas size.
+  // Recommended stroke width ranges by canvas size.
   // Values derived from visual balance guidelines for icon design:
   //   - Minimum: thin enough to render cleanly at the given pixel density.
   //   - Maximum: thick enough to stay visually light; exceeding this makes strokes dominate.
   // Entries are ordered by increasing maxCanvasSize; the first matching entry is used.
   // Canvas sizes above 48px have no enforced range (icons at that scale have more freedom).
-  // Source: pagx-visual-rules.md VIS-012.
   struct StrokeRange {
     float maxCanvasSize;
     float minSafe;
     float maxSafe;
   };
-  static constexpr StrokeRange kVis012StrokeRanges[] = {
+  static constexpr StrokeRange kStrokeRanges[] = {
       {16.0f, 1.0f, 1.5f},
       {24.0f, 1.0f, 2.5f},
       {32.0f, 1.5f, 3.0f},
@@ -299,7 +298,7 @@ static void CheckStrokeWidth(const Layer* layer, float canvasSize, const std::st
   if (canvasSize > 0) {
     float minSafe = 0.0f;
     float maxSafe = 0.0f;
-    for (const auto& range : kVis012StrokeRanges) {
+    for (const auto& range : kStrokeRanges) {
       if (canvasSize <= range.maxCanvasSize) {
         minSafe = range.minSafe;
         maxSafe = range.maxSafe;
@@ -309,7 +308,7 @@ static void CheckStrokeWidth(const Layer* layer, float canvasSize, const std::st
     if (maxSafe > 0.0f) {
       for (auto* stroke : strokes) {
         if (stroke->width < minSafe || stroke->width > maxSafe) {
-          issues.push_back({"VIS-012", location,
+          issues.push_back({"stroke-out-of-range", location,
                             "Stroke width (" + std::to_string(stroke->width) +
                                 "px) is outside recommended range [" + std::to_string(minSafe) +
                                 ", " + std::to_string(maxSafe) + "]px for " +
@@ -320,14 +319,14 @@ static void CheckStrokeWidth(const Layer* layer, float canvasSize, const std::st
     }
   }
 
-  // VIS-013: Corner radius to stroke width ratio must not exceed 4.
+  // Corner radius to stroke width ratio must not exceed 4.
   for (auto* element : layer->contents) {
     if (element->nodeType() == NodeType::Rectangle) {
       auto* rect = static_cast<const Rectangle*>(element);
       if (rect->roundness > 0.0f && !strokes.empty()) {
         float referenceWidth = strokes[0]->width;
         if (referenceWidth > 0.0f && (rect->roundness / referenceWidth) > 4.0f) {
-          issues.push_back({"VIS-013", location,
+          issues.push_back({"stroke-corner-ratio", location,
                             "Corner radius (" + std::to_string(rect->roundness) +
                                 "px) to stroke width (" + std::to_string(referenceWidth) +
                                 "px) ratio exceeds 4 — may produce visual overlapping artifacts"});
@@ -337,10 +336,10 @@ static void CheckStrokeWidth(const Layer* layer, float canvasSize, const std::st
   }
 }
 
-// VIS-021: content must stay within 8.3% (1/12) of canvas edge.
+// Safe-zone minimum padding: 8.3% (1/12) of canvas edge.
 static constexpr float kSafeZonePaddingRatio = 0.083f;
 
-// VIS-020/021/022: Safe zone / margins.
+// Safe zone / canvas margin checks.
 static void CheckSafeZone(const Layer* layer, float canvasWidth, float canvasHeight,
                           const std::string& location, std::vector<LintIssue>& issues) {
   if (canvasWidth <= 0.0f || canvasHeight <= 0.0f) {
@@ -356,16 +355,16 @@ static void CheckSafeZone(const Layer* layer, float canvasWidth, float canvasHei
   float boundsRight = bounds.x + bounds.width;
   float boundsBottom = bounds.y + bounds.height;
 
-  // VIS-022: No edge must touch or exceed canvas boundary.
+  // No edge must touch or exceed canvas boundary.
   if (bounds.x <= 0.0f || bounds.y <= 0.0f || boundsRight >= canvasWidth ||
       boundsBottom >= canvasHeight) {
-    issues.push_back({"VIS-022", location,
+    issues.push_back({"touches-canvas-edge", location,
                       "Content touches or exceeds canvas boundary — all elements must stay "
                       "within canvas bounds"});
     return;
   }
 
-  // VIS-020: Content must respect minimum safe padding.
+  // Content must respect minimum safe padding.
   float actualLeft = bounds.x;
   float actualTop = bounds.y;
   float actualRight = canvasWidth - boundsRight;
@@ -373,14 +372,14 @@ static void CheckSafeZone(const Layer* layer, float canvasWidth, float canvasHei
   float minActual = std::min({actualLeft, actualTop, actualRight, actualBottom});
 
   if (minActual < minPadding) {
-    issues.push_back({"VIS-020", location,
+    issues.push_back({"outside-safe-zone", location,
                       "Content is too close to canvas edge (min padding " +
                           std::to_string(minActual) +
                           "px, recommended >= " + std::to_string(minPadding) + "px)"});
   }
 }
 
-// VIS-100/101: Color rules — hardcoded colors break dark/light theme compatibility.
+// Color rules — hardcoded colors break dark/light theme compatibility.
 static void CheckColorRules(const Layer* layer, const std::string& location,
                             std::vector<LintIssue>& issues) {
   std::vector<const Fill*> fills;
@@ -400,7 +399,7 @@ static void CheckColorRules(const Layer* layer, const std::string& location,
     if (!IsHardcodedOpaqueColor(solid->color)) {
       return;
     }
-    // VIS-101: Pure white and pure black are the worst offenders for theme incompatibility:
+    // Pure white and pure black are the worst offenders for theme incompatibility:
     // white is invisible on light backgrounds, black is invisible on dark backgrounds.
     // currentColor or a theme-aware resource reference should be used instead.
     bool isWhite = IsPureWhite(solid->color);
@@ -410,7 +409,7 @@ static void CheckColorRules(const Layer* layer, const std::string& location,
     if (isWhite || isBlack) {
       std::string colorName = isWhite ? "white (#FFFFFF)" : "black (#000000)";
       issues.push_back(
-          {"VIS-101", location,
+          {"hardcoded-theme-color", location,
            painterType + " uses hardcoded " + colorName +
                " — use currentColor or a theme-aware resource reference for theme compatibility"});
     }

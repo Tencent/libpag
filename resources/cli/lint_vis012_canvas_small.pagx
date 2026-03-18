@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- VIS-012: Canvas 16x16, stroke width 2px exceeds safe range [1.0, 1.5]px -->
+<!-- Canvas 16x16, stroke width 2px exceeds safe range [1.0, 1.5]px -->
 <pagx version="1.0" width="16" height="16">
   <Layer name="StrokeTooWide16">
     <Rectangle position="8,8" size="12,12"/>

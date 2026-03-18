@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- FMT-043: Multiple MergePaths — first Fill+MergePath triggers, second is separate phase -->
+<!-- Multiple MergePaths — first Fill+MergePath triggers, second is separate phase -->
 <pagx version="1.0" width="24" height="24">
   <Layer name="MultipleMerges">
     <Rectangle size="20,20"/>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- VIS-010 compliant: stroke width 1px is above the 0.5px minimum -->
+<!-- compliant: stroke width 1px is above the 0.5px minimum -->
 <pagx version="1.0" width="24" height="24">
   <Layer name="NormalStroke">
     <Rectangle position="12,12" size="18,18"/>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- VIS-012: Canvas 64x64 (>48), no safe range applies, stroke width 5px should not trigger -->
+<!-- Canvas 64x64 (>48), no safe range applies, stroke width 5px should not trigger -->
 <pagx version="1.0" width="64" height="64">
   <Layer name="StrokeNoRange64">
     <Rectangle position="32,32" size="48,48"/>

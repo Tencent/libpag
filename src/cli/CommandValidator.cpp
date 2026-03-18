@@ -40,9 +40,10 @@ namespace pagx::cli {
 
 // --- Semantic rule checks on the parsed document model ---
 
-// CheckFmt043Scope: Validates FMT-043 rule in a flat element scope (one layer or group).
+// CheckMergePathPainterScope: Validates that no Fill/Stroke appears before a MergePath
+// in the same element scope (one layer or group).
 //
-// FMT-043: MergePath consumes and clears all preceding Fill/Stroke effects within the same
+// MergePath consumes and clears all preceding Fill/Stroke effects within the same
 // scope. Any painter (Fill/Stroke) placed before MergePath in the element list will be
 // silently discarded at render time, producing an icon that looks wrong with no error.
 //
@@ -56,7 +57,7 @@ namespace pagx::cli {
 //
 // Data flow: called per-layer by CheckSemanticRulesLayer; errors flow into the shared
 // ValidationError list returned to the caller of RunValidate.
-static void CheckFmt043Scope(const std::vector<Element*>& elements, const std::string& scopeLabel,
+static void CheckMergePathPainterScope(const std::vector<Element*>& elements, const std::string& scopeLabel,
                              std::vector<ValidationError>& errors) {
   bool hasPainterBeforeMergePath = false;
   for (auto* element : elements) {
@@ -66,7 +67,7 @@ static void CheckFmt043Scope(const std::vector<Element*>& elements, const std::s
     } else if (type == NodeType::MergePath) {
       if (hasPainterBeforeMergePath) {
         ValidationError err = {};
-        err.message = "[FMT-043] " + scopeLabel +
+        err.message = scopeLabel +
                       ": Fill/Stroke before MergePath will be cleared by MergePath."
                       " Isolate pre-MergePath rendering in a separate Group.";
         errors.push_back(std::move(err));
@@ -74,16 +75,17 @@ static void CheckFmt043Scope(const std::vector<Element*>& elements, const std::s
       // Reset: painters after MergePath belong to a new accumulation phase and are not cleared.
       hasPainterBeforeMergePath = false;
     } else if (type == NodeType::Group) {
-      // Recurse into groups — each group is its own isolated scope for FMT-043.
+      // Recurse into groups — each group is its own isolated scope for this check.
       auto* group = static_cast<const Group*>(element);
-      CheckFmt043Scope(group->elements, scopeLabel + "/<Group>", errors);
+      CheckMergePathPainterScope(group->elements, scopeLabel + "/<Group>", errors);
     }
   }
 }
 
-// CheckFmt051Scope: Validates FMT-051 rule in a flat element scope (one layer or group).
+// CheckTextBoxLayoutOverrideScope: Validates that Text elements inside a TextBox scope
+// do not carry position or textAnchor attributes that will be silently ignored.
 //
-// FMT-051: When a TextBox is present in a scope, it takes full control of text layout and
+// When a TextBox is present in a scope, it takes full control of text layout and
 // silently ignores Text.position and Text.textAnchor. Authors who set these attributes
 // expecting them to take effect will get a visually wrong result with no error.
 //
@@ -100,7 +102,7 @@ static void CheckFmt043Scope(const std::vector<Element*>& elements, const std::s
 //
 // Data flow: called per-layer by CheckSemanticRulesLayer; errors flow into the shared
 // ValidationError list returned to the caller of RunValidate.
-static void CheckFmt051Scope(const std::vector<Element*>& elements, const std::string& scopeLabel,
+static void CheckTextBoxLayoutOverrideScope(const std::vector<Element*>& elements, const std::string& scopeLabel,
                              std::vector<ValidationError>& errors) {
   bool hasTextBox = false;
   std::vector<const Text*> texts;
@@ -112,7 +114,7 @@ static void CheckFmt051Scope(const std::vector<Element*>& elements, const std::s
       texts.push_back(static_cast<const Text*>(element));
     } else if (type == NodeType::Group) {
       auto* group = static_cast<const Group*>(element);
-      CheckFmt051Scope(group->elements, scopeLabel + "/<Group>", errors);
+      CheckTextBoxLayoutOverrideScope(group->elements, scopeLabel + "/<Group>", errors);
     }
   }
   if (!hasTextBox) {
@@ -125,7 +127,7 @@ static void CheckFmt051Scope(const std::vector<Element*>& elements, const std::s
     bool hasNonDefaultAnchor = text->textAnchor != TextAnchor::Start;
     if (hasPosition || hasNonDefaultAnchor) {
       ValidationError err = {};
-      err.message = "[FMT-051] " + scopeLabel +
+      err.message = scopeLabel +
                     ": Text has 'position' or 'textAnchor' that will be ignored because TextBox"
                     " overrides text layout. Remove these attributes from the Text element.";
       errors.push_back(std::move(err));
@@ -141,8 +143,8 @@ static void CheckSemanticRulesLayer(const Layer* layer, std::vector<ValidationEr
   if (!layer->name.empty()) {
     label += "[" + layer->name + "]";
   }
-  CheckFmt043Scope(layer->contents, label, errors);
-  CheckFmt051Scope(layer->contents, label, errors);
+  CheckMergePathPainterScope(layer->contents, label, errors);
+  CheckTextBoxLayoutOverrideScope(layer->contents, label, errors);
   for (auto* child : layer->children) {
     CheckSemanticRulesLayer(child, errors);
   }

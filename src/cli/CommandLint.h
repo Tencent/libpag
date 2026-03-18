@@ -34,15 +34,14 @@ struct LintIssue {
 };
 
 /**
- * Runs visual quality checks (VIS-xxx rules) on a PAGX document loaded from the given file.
+ * Runs visual quality checks on a PAGX document loaded from the given file.
  * Returns all issues found. An empty vector means no issues detected.
  */
 std::vector<LintIssue> LintFile(const std::string& filePath);
 
 /**
  * Checks visual quality rules against a pre-loaded document.
- * Covers VIS-001/002/003 (pixel alignment), VIS-010/011/012/013 (stroke width),
- * VIS-020/021/022 (safe zone), and VIS-100/101 (color hardcoding).
+ * Covers pixel alignment, stroke width constraints, safe zone margins, and theme color usage.
  */
 std::vector<LintIssue> LintDocument(const pagx::PAGXDocument* document);
 

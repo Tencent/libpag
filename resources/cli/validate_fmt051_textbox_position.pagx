@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- FMT-051 violation: Text has position set but TextBox overrides it -->
+<!-- violation: Text has position set but TextBox overrides it -->
 <pagx version="1.0" width="200" height="100">
   <Layer name="BadTextBox">
     <Text text="Hello" fontFamily="Arial" fontSize="24" position="100,50" textAnchor="center"/>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- VIS-003 compliant: coordinate rounded to integer (zero decimal places) -->
+<!-- compliant: coordinate rounded to integer (zero decimal places) -->
 <pagx version="1.0" width="24" height="24">
   <Layer name="CleanCoord">
     <Rectangle position="12,12" size="18,18"/>

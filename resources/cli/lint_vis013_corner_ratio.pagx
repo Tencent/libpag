@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- VIS-013: Corner radius / stroke width ratio = 20/1 = 20, exceeds 4 -->
+<!-- Corner radius / stroke width ratio = 20/1 = 20, exceeds 4 -->
 <pagx version="1.0" width="24" height="24">
   <Layer name="HighCornerRatio">
     <Rectangle position="12,12" size="18,18" roundness="20"/>
