@@ -833,7 +833,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_LayerPosition) {
   doc->layers.push_back(layer);
 
   auto svg = pagx::SVGExporter::ToSVG(*doc);
-  EXPECT_NE(svg.find("translate("), std::string::npos);
+  EXPECT_NE(svg.find("matrix("), std::string::npos);
   SaveFile(svg, "PAGXSVGTest/svg_export_layer_position.svg");
 }
 
