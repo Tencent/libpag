@@ -1094,13 +1094,8 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
 
 void SVGWriter::writeTextAsPath(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
                                 const std::string& transform) {
-  // Compute TextBox-aligned position via ComputeTextLayout.
-  auto layout = ComputeTextLayout(
-      {&text->text, text->fontSize, text->letterSpacing, text->position, text->textAnchor,
-       fs.textBox});
-
-  float textPosX = layout.x;
-  float textPosY = layout.isMultiLine ? layout.firstLineY : layout.y;
+  float textPosX = text->position.x;
+  float textPosY = text->position.y;
 
   auto glyphPaths = ComputeGlyphPaths(*text, textPosX, textPosY);
   if (glyphPaths.empty()) {
