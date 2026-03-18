@@ -18,7 +18,7 @@ Read as needed:
 |-----------|---------|
 | `attributes.md` | Attribute defaults, enumerations, required attributes |
 | `cli.md` | CLI tool usage — `optimize`, `render`, `validate`, `bounds` commands |
-| `pagx-lint.md` | Visual and structural quality rules checked by `pagx lint` and `pagx validate` |
+| `pagx-lint.md` | Visual quality rules checked by `pagx lint` |
 
 ---
 

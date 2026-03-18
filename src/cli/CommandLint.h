@@ -41,7 +41,7 @@ std::vector<LintIssue> LintFile(const std::string& filePath);
 
 /**
  * Checks visual quality rules against a pre-loaded document.
- * Covers pixel alignment, stroke width constraints, safe zone margins, and theme color usage.
+ * Covers pixel alignment, stroke width constraints, canvas edge clearance, and theme color usage.
  */
 std::vector<LintIssue> LintDocument(const pagx::PAGXDocument* document);
 
