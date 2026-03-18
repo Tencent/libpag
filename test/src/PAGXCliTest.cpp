@@ -162,7 +162,7 @@ CLI_TEST(PAGXCliTest, Validate_MissingFile) {
 
 // Semantic rule tests (validate returns non-zero on violation)
 CLI_TEST(PAGXCliTest, Validate_MergePathClearsFill) {
-  auto path = TestResourcePath("validate_fmt043_mergepath_clears_fill.pagx");
+  auto path = TestResourcePath("validate_fmt_mergepath_clears_fill.pagx");
   std::string errOutput;
   std::streambuf* oldCerr = std::cerr.rdbuf();
   std::ostringstream oss;
@@ -175,13 +175,13 @@ CLI_TEST(PAGXCliTest, Validate_MergePathClearsFill) {
 }
 
 CLI_TEST(PAGXCliTest, Validate_MergePathIsolated) {
-  auto path = TestResourcePath("validate_fmt043_merge_isolated.pagx");
+  auto path = TestResourcePath("validate_fmt_mergepath_isolated.pagx");
   auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
   EXPECT_EQ(ret, 0);
 }
 
 CLI_TEST(PAGXCliTest, Validate_TextBoxOverridesPosition) {
-  auto path = TestResourcePath("validate_fmt051_textbox_position.pagx");
+  auto path = TestResourcePath("validate_fmt_textbox_overrides_position.pagx");
   std::string errOutput;
   std::streambuf* oldCerr = std::cerr.rdbuf();
   std::ostringstream oss;
@@ -194,7 +194,7 @@ CLI_TEST(PAGXCliTest, Validate_TextBoxOverridesPosition) {
 }
 
 CLI_TEST(PAGXCliTest, Validate_TextBoxClean) {
-  auto path = TestResourcePath("validate_fmt051_textbox_clean.pagx");
+  auto path = TestResourcePath("validate_fmt_textbox_clean.pagx");
   auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
   EXPECT_EQ(ret, 0);
 }
@@ -1158,7 +1158,7 @@ CLI_TEST(PAGXCliTest, Lint_C13_SimpleRectangleMask) {
 
 // Pixel alignment
 CLI_TEST(PAGXCliTest, Lint_MisalignedCoord) {
-  auto inputPath = TestResourcePath("lint_vis001_misaligned.pagx");
+  auto inputPath = TestResourcePath("lint_vis_misaligned_coord.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1171,7 +1171,7 @@ CLI_TEST(PAGXCliTest, Lint_MisalignedCoord) {
 }
 
 CLI_TEST(PAGXCliTest, Lint_AlignedCoord) {
-  auto inputPath = TestResourcePath("lint_vis001_aligned.pagx");
+  auto inputPath = TestResourcePath("lint_vis_aligned_coord.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1185,7 +1185,7 @@ CLI_TEST(PAGXCliTest, Lint_AlignedCoord) {
 
 // Coordinate precision
 CLI_TEST(PAGXCliTest, Lint_ExcessCoordPrecision) {
-  auto inputPath = TestResourcePath("lint_vis003_precision.pagx");
+  auto inputPath = TestResourcePath("lint_vis_excess_coord_precision.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1198,7 +1198,7 @@ CLI_TEST(PAGXCliTest, Lint_ExcessCoordPrecision) {
 }
 
 CLI_TEST(PAGXCliTest, Lint_CleanCoordPrecision) {
-  auto inputPath = TestResourcePath("lint_vis003_clean_precision.pagx");
+  auto inputPath = TestResourcePath("lint_vis_clean_coord_precision.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1212,7 +1212,7 @@ CLI_TEST(PAGXCliTest, Lint_CleanCoordPrecision) {
 
 // Stroke width — minimum
 CLI_TEST(PAGXCliTest, Lint_ThinStroke) {
-  auto inputPath = TestResourcePath("lint_vis010_thin_stroke.pagx");
+  auto inputPath = TestResourcePath("lint_vis_thin_stroke.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1225,7 +1225,7 @@ CLI_TEST(PAGXCliTest, Lint_ThinStroke) {
 }
 
 CLI_TEST(PAGXCliTest, Lint_NormalStroke) {
-  auto inputPath = TestResourcePath("lint_vis010_normal_stroke.pagx");
+  auto inputPath = TestResourcePath("lint_vis_normal_stroke.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1239,7 +1239,7 @@ CLI_TEST(PAGXCliTest, Lint_NormalStroke) {
 
 // Stroke width — consistency
 CLI_TEST(PAGXCliTest, Lint_InconsistentStroke) {
-  auto inputPath = TestResourcePath("lint_vis011_inconsistent_stroke.pagx");
+  auto inputPath = TestResourcePath("lint_vis_inconsistent_stroke.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1252,7 +1252,7 @@ CLI_TEST(PAGXCliTest, Lint_InconsistentStroke) {
 }
 
 CLI_TEST(PAGXCliTest, Lint_ConsistentStroke) {
-  auto inputPath = TestResourcePath("lint_vis011_consistent_stroke.pagx");
+  auto inputPath = TestResourcePath("lint_vis_consistent_stroke.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1266,7 +1266,7 @@ CLI_TEST(PAGXCliTest, Lint_ConsistentStroke) {
 
 // Stroke width — canvas-size range
 CLI_TEST(PAGXCliTest, Lint_StrokeOutOfRange) {
-  auto inputPath = TestResourcePath("lint_vis012_stroke_out_of_range.pagx");
+  auto inputPath = TestResourcePath("lint_vis_stroke_out_of_range.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1280,7 +1280,7 @@ CLI_TEST(PAGXCliTest, Lint_StrokeOutOfRange) {
 
 // Stroke — corner radius to stroke width ratio
 CLI_TEST(PAGXCliTest, Lint_StrokeCornerRatio) {
-  auto inputPath = TestResourcePath("lint_vis013_corner_ratio.pagx");
+  auto inputPath = TestResourcePath("lint_vis_stroke_corner_ratio.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1294,7 +1294,7 @@ CLI_TEST(PAGXCliTest, Lint_StrokeCornerRatio) {
 
 // Safe zone
 CLI_TEST(PAGXCliTest, Lint_OutsideSafeZone) {
-  auto inputPath = TestResourcePath("lint_vis020_outside_safezone.pagx");
+  auto inputPath = TestResourcePath("lint_vis_outside_safezone.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1307,7 +1307,7 @@ CLI_TEST(PAGXCliTest, Lint_OutsideSafeZone) {
 }
 
 CLI_TEST(PAGXCliTest, Lint_InsideSafeZone) {
-  auto inputPath = TestResourcePath("lint_vis020_inside_safezone.pagx");
+  auto inputPath = TestResourcePath("lint_vis_inside_safezone.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1320,7 +1320,7 @@ CLI_TEST(PAGXCliTest, Lint_InsideSafeZone) {
 }
 
 CLI_TEST(PAGXCliTest, Lint_TouchesCanvasEdge) {
-  auto inputPath = TestResourcePath("lint_vis022_touches_boundary.pagx");
+  auto inputPath = TestResourcePath("lint_vis_touches_canvas_edge.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1334,7 +1334,7 @@ CLI_TEST(PAGXCliTest, Lint_TouchesCanvasEdge) {
 
 // Theme color — hardcoded black
 CLI_TEST(PAGXCliTest, Lint_HardcodedBlack) {
-  auto inputPath = TestResourcePath("lint_vis101_hardcoded_black.pagx");
+  auto inputPath = TestResourcePath("lint_vis_hardcoded_black.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1347,7 +1347,7 @@ CLI_TEST(PAGXCliTest, Lint_HardcodedBlack) {
 }
 
 CLI_TEST(PAGXCliTest, Lint_ThemeColor) {
-  auto inputPath = TestResourcePath("lint_vis101_theme_color.pagx");
+  auto inputPath = TestResourcePath("lint_vis_theme_color.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1361,7 +1361,7 @@ CLI_TEST(PAGXCliTest, Lint_ThemeColor) {
 
 // Theme color — hardcoded white
 CLI_TEST(PAGXCliTest, Lint_HardcodedWhite) {
-  auto inputPath = TestResourcePath("lint_vis101_hardcoded_white.pagx");
+  auto inputPath = TestResourcePath("lint_vis_hardcoded_white.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1375,7 +1375,7 @@ CLI_TEST(PAGXCliTest, Lint_HardcodedWhite) {
 
 // Odd stroke alignment — layer position misaligned (integer, not half-pixel)
 CLI_TEST(PAGXCliTest, Lint_OddStrokeMisaligned) {
-  auto inputPath = TestResourcePath("lint_vis002_odd_stroke_misaligned.pagx");
+  auto inputPath = TestResourcePath("lint_vis_odd_stroke_misaligned.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1389,7 +1389,7 @@ CLI_TEST(PAGXCliTest, Lint_OddStrokeMisaligned) {
 
 // Odd stroke alignment — layer position on strict half-pixel (should pass)
 CLI_TEST(PAGXCliTest, Lint_OddStrokeAligned) {
-  auto inputPath = TestResourcePath("lint_vis002_odd_stroke_aligned.pagx");
+  auto inputPath = TestResourcePath("lint_vis_odd_stroke_aligned.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1403,7 +1403,7 @@ CLI_TEST(PAGXCliTest, Lint_OddStrokeAligned) {
 
 // Pixel alignment — misaligned Ellipse geometry
 CLI_TEST(PAGXCliTest, Lint_EllipseMisaligned) {
-  auto inputPath = TestResourcePath("lint_vis001_ellipse_misaligned.pagx");
+  auto inputPath = TestResourcePath("lint_vis_ellipse_misaligned.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1417,7 +1417,7 @@ CLI_TEST(PAGXCliTest, Lint_EllipseMisaligned) {
 
 // Stroke range — canvas 16x16: stroke 2px exceeds safe range [1.0, 1.5]px
 CLI_TEST(PAGXCliTest, Lint_StrokeOutOfRangeSmallCanvas) {
-  auto inputPath = TestResourcePath("lint_vis012_canvas_small.pagx");
+  auto inputPath = TestResourcePath("lint_vis_stroke_range_small_canvas.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1431,7 +1431,7 @@ CLI_TEST(PAGXCliTest, Lint_StrokeOutOfRangeSmallCanvas) {
 
 // Stroke range — canvas 64x64 (>48px): no range enforced, should pass
 CLI_TEST(PAGXCliTest, Lint_StrokeLargeCanvasNoRange) {
-  auto inputPath = TestResourcePath("lint_vis012_canvas_large.pagx");
+  auto inputPath = TestResourcePath("lint_vis_stroke_range_large_canvas.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1445,7 +1445,7 @@ CLI_TEST(PAGXCliTest, Lint_StrokeLargeCanvasNoRange) {
 
 // Corner ratio — rounded rectangle with no stroke: should not flag
 CLI_TEST(PAGXCliTest, Lint_CornerRatioNoStroke) {
-  auto inputPath = TestResourcePath("lint_vis013_no_stroke.pagx");
+  auto inputPath = TestResourcePath("lint_vis_corner_no_stroke.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1459,7 +1459,7 @@ CLI_TEST(PAGXCliTest, Lint_CornerRatioNoStroke) {
 
 // Safe zone — content with generous padding: should pass
 CLI_TEST(PAGXCliTest, Lint_SafeZoneBoundaryPass) {
-  auto inputPath = TestResourcePath("lint_vis020_boundary_pass.pagx");
+  auto inputPath = TestResourcePath("lint_vis_safezone_boundary_pass.pagx");
   std::string output;
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
@@ -1488,7 +1488,7 @@ CLI_TEST(PAGXCliTest, Lint_MissingFileArg) {
 
 CLI_TEST(PAGXCliTest, Lint_UnknownOption) {
   // Unknown flag passed — should print error message and return 0.
-  auto inputPath = TestResourcePath("lint_vis001_aligned.pagx");
+  auto inputPath = TestResourcePath("lint_vis_aligned_coord.pagx");
   std::string errOutput;
   std::streambuf* oldCerr = std::cerr.rdbuf();
   std::ostringstream oss;
@@ -1502,7 +1502,7 @@ CLI_TEST(PAGXCliTest, Lint_UnknownOption) {
 
 CLI_TEST(PAGXCliTest, Lint_MultipleFiles) {
   // Two file arguments provided — should reject with error and return 0.
-  auto inputPath = TestResourcePath("lint_vis001_aligned.pagx");
+  auto inputPath = TestResourcePath("lint_vis_aligned_coord.pagx");
   std::string errOutput;
   std::streambuf* oldCerr = std::cerr.rdbuf();
   std::ostringstream oss;
@@ -1529,7 +1529,7 @@ CLI_TEST(PAGXCliTest, Lint_NonexistentFile) {
 
 // MergePath — multiple MergePaths: first Fill+MergePath triggers violation
 CLI_TEST(PAGXCliTest, Validate_MultipleMergePaths) {
-  auto path = TestResourcePath("validate_fmt043_multiple_merges.pagx");
+  auto path = TestResourcePath("validate_fmt_mergepath_multiple.pagx");
   std::string errOutput;
   std::streambuf* oldCerr = std::cerr.rdbuf();
   std::ostringstream oss;
@@ -1543,7 +1543,7 @@ CLI_TEST(PAGXCliTest, Validate_MultipleMergePaths) {
 
 // TextBox layout override — non-Start textAnchor with TextBox present
 CLI_TEST(PAGXCliTest, Validate_TextBoxOverridesAnchor) {
-  auto path = TestResourcePath("validate_fmt051_text_anchor_only.pagx");
+  auto path = TestResourcePath("validate_fmt_textbox_overrides_anchor.pagx");
   std::string errOutput;
   std::streambuf* oldCerr = std::cerr.rdbuf();
   std::ostringstream oss;
@@ -1557,7 +1557,7 @@ CLI_TEST(PAGXCliTest, Validate_TextBoxOverridesAnchor) {
 
 // TextBox layout override — explicit position with TextBox present
 CLI_TEST(PAGXCliTest, Validate_TextBoxOverridesTextPosition) {
-  auto path = TestResourcePath("validate_fmt051_text_position_only.pagx");
+  auto path = TestResourcePath("validate_fmt_textbox_overrides_text_position.pagx");
   std::string errOutput;
   std::streambuf* oldCerr = std::cerr.rdbuf();
   std::ostringstream oss;
