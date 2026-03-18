@@ -1,4 +1,4 @@
-# PAGX Quality Rules
+# PAGX Hard Rules
 
 Constraints enforced by `pagx lint` and `pagx validate`. Apply these when generating or
 editing PAGX files to produce clean, lint-free output.
