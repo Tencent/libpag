@@ -458,9 +458,9 @@ class SVGWriter {
   void writeLayer(SVGBuilder& out, const Layer* layer);
 
  private:
-  SVGBuilder* _defs;
-  SVGWriterContext* _context;
-  bool _convertTextToPath;
+  SVGBuilder* _defs = nullptr;
+  SVGWriterContext* _context = nullptr;
+  bool _convertTextToPath = true;
 
   std::string generateId(const std::string& prefix) {
     return _context->generateId(prefix);
