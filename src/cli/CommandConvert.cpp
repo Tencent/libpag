@@ -56,7 +56,7 @@ static void PrintUsage() {
       << "is inferred from file extensions (e.g. .pagx -> .svg or .svg -> .pagx).\n"
       << "\n"
       << "Options:\n"
-      << "  -f <format>               Override output format (svg, pagx)\n"
+      << "  --force <format>            Override output format (svg, pagx)\n"
       << "\n"
       << "SVG output options:\n"
       << "  --indent <n>              Indentation spaces (default: 2, valid range: 0-16)\n"
@@ -72,7 +72,7 @@ static void PrintUsage() {
       << "  pagx convert input.pagx output.svg          # PAGX to SVG\n"
       << "  pagx convert input.svg output.pagx           # SVG to PAGX\n"
       << "  pagx convert --indent 4 input.pagx out.svg   # PAGX to SVG with 4-space indent\n"
-      << "  pagx convert -f svg input.pagx output        # force SVG output format\n";
+      << "  pagx convert --force svg input.pagx output        # force SVG output format\n";
 }
 
 static std::string InferFormat(const std::string& path) {
@@ -94,7 +94,7 @@ static int ParseOptions(int argc, char* argv[], ConvertOptions* options) {
   int i = 1;
   while (i < argc) {
     std::string arg = argv[i];
-    if (arg == "-f" && i + 1 < argc) {
+    if (arg == "--force" && i + 1 < argc) {
       options->outputFormat = argv[++i];
     } else if (arg == "--indent" && i + 1 < argc) {
       char* endPtr = nullptr;
@@ -148,7 +148,7 @@ static int ParseOptions(int argc, char* argv[], ConvertOptions* options) {
   }
   if (options->outputFormat.empty()) {
     std::cerr << "pagx convert: error: cannot infer output format from '"
-              << options->outputFile << "', use -f to specify\n";
+              << options->outputFile << "', use --force to specify\n";
     return 1;
   }
   return 0;
