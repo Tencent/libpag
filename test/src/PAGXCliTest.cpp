@@ -1224,39 +1224,6 @@ CLI_TEST(PAGXCliTest, Lint_AlignedCoord) {
   EXPECT_TRUE(output.find("pixel-alignment") == std::string::npos);
 }
 
-// Coordinate precision
-
-// Expected: lint reports "coord-precision" issue. Observable: output contains "coord-precision".
-// A coordinate with more than 2 decimal places (e.g., x=10.123) is effectively noise:
-// it cannot be rendered more precisely than the display pixel grid.
-CLI_TEST(PAGXCliTest, Lint_ExcessCoordPrecision) {
-  auto inputPath = BadCase("lint_vis_excess_coord_precision.pagx");
-  std::string output;
-  std::streambuf* old = std::cout.rdbuf();
-  std::ostringstream oss;
-  std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
-  std::cout.rdbuf(old);
-  output = oss.str();
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("coord-precision") != std::string::npos);
-}
-
-// Expected: lint reports no "coord-precision" issue. Observable: output does NOT contain
-// "coord-precision". Coordinates with ≤2 decimal places are valid — verifies no false positive.
-CLI_TEST(PAGXCliTest, Lint_CleanCoordPrecision) {
-  auto inputPath = GoodCase("lint_vis_clean_coord_precision.pagx");
-  std::string output;
-  std::streambuf* old = std::cout.rdbuf();
-  std::ostringstream oss;
-  std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
-  std::cout.rdbuf(old);
-  output = oss.str();
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("coord-precision") == std::string::npos);
-}
-
 // Stroke width — minimum
 
 // Expected: lint reports "stroke-too-thin" issue. Observable: output contains "stroke-too-thin".

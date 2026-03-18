@@ -13,9 +13,6 @@ editing PAGX files to produce clean, lint-free output.
 Path on-curve endpoints) must be on the **0.5px grid** — `value × 2` must be an integer.
 Round to the nearest 0.5px (e.g. 10.3 → 10.5).
 
-**Coordinate precision**: Use at most **2 decimal places**. Sub-0.01px precision is
-floating-point noise and will be flagged.
-
 ---
 
 ## Stroke Rules

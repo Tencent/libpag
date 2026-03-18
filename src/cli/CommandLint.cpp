@@ -68,20 +68,13 @@ static bool IsStrictHalfPixel(float value) {
   return std::fmod(std::fabs(nearest), 2.0f) > 0.5f;
 }
 
-// Returns true if the value has more than 4 decimal places of precision.
-static bool ExceedsPrecision(float value) {
-  float rounded = std::round(value * 1e4f) / 1e4f;
-  return std::fabs(value - rounded) > 1e-6f;
-}
-
-// Checks coordinate precision and pixel alignment for a single coordinate value.
+// Checks pixel alignment for a single coordinate value. Any value not on the 0.5px grid
+// (including floating-point noise values) is reported as pixel-alignment. A separate
+// coord-precision rule is unnecessary: values with excessive decimal places will also
+// fail this check, so pixel-alignment subsumes both concerns.
 static void CheckCoordinate(float value, const std::string& name, const std::string& location,
                             std::vector<LintIssue>& issues) {
-  if (ExceedsPrecision(value)) {
-    issues.push_back({"coord-precision", location,
-                      name + " (" + std::to_string(value) +
-                          ") has more than 4 decimal places — likely floating-point noise"});
-  } else if (!IsHalfPixelAligned(value)) {
+  if (!IsHalfPixelAligned(value)) {
     issues.push_back({"pixel-alignment", location,
                       name + " (" + std::to_string(value) +
                           ") is not aligned to 0.5px grid — may cause blurry rendering"});
