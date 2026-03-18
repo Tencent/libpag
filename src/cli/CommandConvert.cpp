@@ -28,18 +28,24 @@
 
 namespace pagx::cli {
 
+struct SVGExportOptions {
+  int indent = 2;
+  bool noXmlDeclaration = false;
+  bool noConvertTextToPath = false;
+};
+
+struct SVGImportOptions {
+  bool expandUse = true;
+  bool flattenTransforms = false;
+  bool preserveUnknown = false;
+};
+
 struct ConvertOptions {
   std::string inputFile = {};
   std::string outputFile = {};
   std::string outputFormat = {};
-  // SVG export options
-  int indent = 2;
-  bool noXmlDeclaration = false;
-  bool noConvertTextToPath = false;
-  // SVG import options
-  bool expandUse = true;
-  bool flattenTransforms = false;
-  bool preserveUnknown = false;
+  SVGExportOptions svgExport = {};
+  SVGImportOptions svgImport = {};
 };
 
 static void PrintUsage() {
@@ -98,17 +104,17 @@ static int ParseOptions(int argc, char* argv[], ConvertOptions* options) {
                   << "' (must be 0-16)\n";
         return 1;
       }
-      options->indent = static_cast<int>(value);
+      options->svgExport.indent = static_cast<int>(value);
     } else if (arg == "--no-xml-declaration") {
-      options->noXmlDeclaration = true;
+      options->svgExport.noXmlDeclaration = true;
     } else if (arg == "--no-convert-text-to-path") {
-      options->noConvertTextToPath = true;
+      options->svgExport.noConvertTextToPath = true;
     } else if (arg == "--no-expand-use") {
-      options->expandUse = false;
+      options->svgImport.expandUse = false;
     } else if (arg == "--flatten-transforms") {
-      options->flattenTransforms = true;
+      options->svgImport.flattenTransforms = true;
     } else if (arg == "--preserve-unknown") {
-      options->preserveUnknown = true;
+      options->svgImport.preserveUnknown = true;
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();
       return -1;
@@ -161,9 +167,9 @@ static int ConvertToSVG(const ConvertOptions& options) {
   }
 
   SVGExporter::Options svgOptions = {};
-  svgOptions.indent = options.indent;
-  svgOptions.xmlDeclaration = !options.noXmlDeclaration;
-  svgOptions.convertTextToPath = !options.noConvertTextToPath;
+  svgOptions.indent = options.svgExport.indent;
+  svgOptions.xmlDeclaration = !options.svgExport.noXmlDeclaration;
+  svgOptions.convertTextToPath = !options.svgExport.noConvertTextToPath;
 
   if (!SVGExporter::ToFile(*document, options.outputFile, svgOptions)) {
     std::cerr << "pagx convert: error: failed to write '" << options.outputFile << "'\n";
@@ -183,9 +189,9 @@ static int ConvertToPAGX(const ConvertOptions& options) {
   }
 
   SVGImporter::Options svgOptions = {};
-  svgOptions.expandUseReferences = options.expandUse;
-  svgOptions.flattenTransforms = options.flattenTransforms;
-  svgOptions.preserveUnknownElements = options.preserveUnknown;
+  svgOptions.expandUseReferences = options.svgImport.expandUse;
+  svgOptions.flattenTransforms = options.svgImport.flattenTransforms;
+  svgOptions.preserveUnknownElements = options.svgImport.preserveUnknown;
 
   auto document = SVGImporter::Parse(options.inputFile, svgOptions);
   if (document == nullptr) {
