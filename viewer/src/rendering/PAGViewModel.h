@@ -63,6 +63,8 @@ class PAGViewModel : public ContentViewModel {
 
   Q_SLOT void onAudioTimeChanged(int64_t audioTime);
 
+  bool hasAudio() const;
+
  private:
   void setProgressInternal(double progress, bool isAudioSeek);
 

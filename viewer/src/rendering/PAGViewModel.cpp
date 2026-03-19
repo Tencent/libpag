@@ -287,6 +287,10 @@ void PAGViewModel::onAudioTimeChanged(int64_t audioTime) {
   }
 }
 
+bool PAGViewModel::hasAudio() const {
+  return audioPlayer != nullptr && !audioPlayer->isEmpty();
+}
+
 void PAGViewModel::setProgressInternal(double progress, bool isAudioSeek) {
   if (isAudioSeek) {
     audioPlayer->setProgress(progress);
