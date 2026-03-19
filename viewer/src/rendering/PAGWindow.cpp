@@ -19,10 +19,9 @@
 #include "PAGWindow.h"
 #include <QQmlContext>
 #include <QSettings>
-#include "PAGRenderThread.h"
 #include "PAGViewer.h"
 #include "PAGWindowHelper.h"
-#include "PAGXRenderThread.h"
+#include "RenderThread.h"
 #include "profiling/PAGRunTimeDataModel.h"
 #include "task/PAGTaskFactory.h"
 
@@ -86,25 +85,27 @@ void PAGWindow::disconnectContentViewSignals() {
              &PAGImageLayerModel::setPAGFile);
 
   if (pagView != nullptr) {
-    PAGRenderThread* renderThread = pagView->getRenderThread();
+    RenderThread* renderThread = pagView->getRenderThread();
     disconnect(textLayerModel.get(), &PAGTextLayerModel::textChanged, renderThread,
-               &PAGRenderThread::flush);
+               &RenderThread::flush);
     disconnect(imageLayerModel.get(), &PAGImageLayerModel::imageChanged, renderThread,
-               &PAGRenderThread::flush);
-    disconnect(renderThread, &PAGRenderThread::frameTimeMetricsReady, runTimeDataModel.get(),
-               &PAGRunTimeDataModel::updateData);
+               &RenderThread::flush);
+    disconnect(renderThread, SIGNAL(frameTimeMetricsReady(int64_t, int64_t, int64_t, int64_t)),
+               runTimeDataModel.get(), SLOT(updateData(int64_t, int64_t, int64_t, int64_t)));
     disconnect(window, &QQuickWindow::afterRendering, pagView, &PAGView::flush);
   }
+
   auto* pagxView = qobject_cast<PAGXView*>(contentView);
   if (pagxView != nullptr) {
-    PAGXRenderThread* pagxRenderThread = pagxView->getRenderThread();
-    disconnect(pagxRenderThread, &PAGXRenderThread::renderTimeReady, runTimeDataModel.get(),
-               &PAGRunTimeDataModel::updatePAGXRenderTime);
-    disconnect(window, &QQuickWindow::afterRendering, pagxView, &PAGXView::flush);
+    RenderThread* renderThread = pagxView->getRenderThread();
+    disconnect(renderThread, SIGNAL(renderTimeReady(int64_t, int64_t, int64_t)),
+               runTimeDataModel.get(), SLOT(updatePAGXRenderTime(int64_t, int64_t, int64_t)));
+    disconnect(window, &QQuickWindow::afterRendering, pagxView,
+               static_cast<void (PAGXView::*)() const>(&PAGXView::flush));
   }
 }
 
-void PAGWindow::connectContentViewSignals() {
+void PAGWindow::connectBaseContentViewSignals() {
   if (contentView == nullptr) {
     return;
   }
@@ -126,24 +127,31 @@ void PAGWindow::connectContentViewSignals() {
           &PAGTextLayerModel::setPAGFile);
   connect(contentView, &ContentView::pagFileChanged, imageLayerModel.get(),
           &PAGImageLayerModel::setPAGFile);
+}
+
+void PAGWindow::connectFormatSpecificSignals() {
+  if (contentView == nullptr) {
+    return;
+  }
 
   if (pagView != nullptr) {
-    PAGRenderThread* renderThread = pagView->getRenderThread();
+    RenderThread* renderThread = pagView->getRenderThread();
     connect(textLayerModel.get(), &PAGTextLayerModel::textChanged, renderThread,
-            &PAGRenderThread::flush);
+            &RenderThread::flush);
     connect(imageLayerModel.get(), &PAGImageLayerModel::imageChanged, renderThread,
-            &PAGRenderThread::flush);
-    connect(renderThread, &PAGRenderThread::frameTimeMetricsReady, runTimeDataModel.get(),
-            &PAGRunTimeDataModel::updateData);
+            &RenderThread::flush);
+    connect(renderThread, SIGNAL(frameTimeMetricsReady(int64_t, int64_t, int64_t, int64_t)),
+            runTimeDataModel.get(), SLOT(updateData(int64_t, int64_t, int64_t, int64_t)));
     connect(window, &QQuickWindow::afterRendering, pagView, &PAGView::flush);
   }
 
   auto* pagxView = qobject_cast<PAGXView*>(contentView);
   if (pagxView != nullptr) {
-    PAGXRenderThread* pagxRenderThread = pagxView->getRenderThread();
-    connect(pagxRenderThread, &PAGXRenderThread::renderTimeReady, runTimeDataModel.get(),
-            &PAGRunTimeDataModel::updatePAGXRenderTime);
-    connect(window, &QQuickWindow::afterRendering, pagxView, &PAGXView::flush);
+    RenderThread* renderThread = pagxView->getRenderThread();
+    connect(renderThread, SIGNAL(renderTimeReady(int64_t, int64_t, int64_t)),
+            runTimeDataModel.get(), SLOT(updatePAGXRenderTime(int64_t, int64_t, int64_t)));
+    connect(window, &QQuickWindow::afterRendering, pagxView,
+            static_cast<void (PAGXView::*)() const>(&PAGXView::flush));
   }
 }
 
@@ -197,7 +205,8 @@ void PAGWindow::open() {
   connect(windowHelper.get(), &PAGWindowHelper::contentViewChanged, this,
           &PAGWindow::onContentViewChanged);
 
-  connectContentViewSignals();
+  connectBaseContentViewSignals();
+  connectFormatSpecificSignals();
 }
 
 bool PAGWindow::isUseEnglish() {

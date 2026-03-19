@@ -19,11 +19,17 @@
 #pragma once
 
 #include <QQuickItem>
+#include <QTimer>
+#include <atomic>
+#include <memory>
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "pagx/PAGXDocument.h"
+#include "platform/qt/GPUDrawable.h"
 
 namespace pag {
+
+class RenderThread;
 
 /**
  * Base class for content views that can display PAG or PAGX files.
@@ -33,7 +39,7 @@ class ContentView : public QQuickItem {
   Q_OBJECT
  public:
   explicit ContentView(QQuickItem* parent = nullptr);
-  ~ContentView() override = default;
+  ~ContentView() override;
 
   Q_PROPERTY(int pagWidth READ getWidth NOTIFY widthChanged)
   Q_PROPERTY(int pagHeight READ getHeight NOTIFY heightChanged)
@@ -89,5 +95,20 @@ class ContentView : public QQuickItem {
   Q_INVOKABLE virtual void lastFrame() = 0;
   Q_INVOKABLE virtual void nextFrame() = 0;
   Q_INVOKABLE virtual void previousFrame() = 0;
-};
+
+  RenderThread* getRenderThread() const;
+
+  // Public members accessible to child classes and RenderThread
+  std::shared_ptr<GPUDrawable> drawable = nullptr;
+
+ protected:
+  Q_SLOT void sizeChangedDelayHandle();
+  Q_SLOT void onWindowChanged(QQuickWindow* win);
+
+  virtual void initDrawable();
+  virtual void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry);
+
+  std::unique_ptr<RenderThread> renderThread = nullptr;
+  std::unique_ptr<QTimer> resizeTimer = nullptr;
+  std::atomic_bool sizeChanged = false;
 }  // namespace pag

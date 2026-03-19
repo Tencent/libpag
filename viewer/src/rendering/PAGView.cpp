@@ -18,6 +18,7 @@
 
 #include "PAGView.h"
 #include <QSGImageNode>
+#include "RenderThread.h"
 #include "pag/file.h"
 #include "tgfx/core/Clock.h"
 #include "version.h"
@@ -39,32 +40,18 @@ static void reportPAGFIleInfo(const std::shared_ptr<PAGFile>& pagFile, size_t le
 }
 
 PAGView::PAGView(QQuickItem* parent) : ContentView(parent) {
-  setFlag(ItemHasContents, true);
   pagPlayer = std::make_unique<PAGPlayer>();
-  renderThread = std::make_unique<PAGRenderThread>(this);
+  renderThread = std::make_unique<RenderThread>(this, RenderThread::ViewType::PAG);
   renderThread->moveToThread(renderThread.get());
   audioPlayer = std::make_unique<PAGAudioPlayer>();
-  resizeTimer = std::make_unique<QTimer>();
-  connect(resizeTimer.get(), &QTimer::timeout, this, &PAGView::sizeChangedDelayHandle);
   connect(audioPlayer.get(), &PAGAudioPlayer::audioTimeChanged, this, &PAGView::onAudioTimeChanged,
           Qt::QueuedConnection);
-  if (window() != nullptr) {
-    initDrawable();
-  } else {
-    connect(this, &QQuickItem::windowChanged, this, &PAGView::onWindowChanged);
-  }
 }
 
 void PAGView::flush() const {
   if (isPlaying_) {
     QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
   }
-}
-
-void PAGView::sizeChangedDelayHandle() {
-  resizeTimer->stop();
-  sizeChanged = true;
-  QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
 }
 
 void PAGView::onAudioTimeChanged(int64_t audioTime) {
@@ -81,15 +68,7 @@ void PAGView::onAudioTimeChanged(int64_t audioTime) {
 }
 
 PAGView::~PAGView() {
-  QMetaObject::invokeMethod(renderThread.get(), "shutDown", Qt::QueuedConnection);
-  renderThread->wait();
-}
-
-void PAGView::onWindowChanged(QQuickWindow* win) {
-  if (win != nullptr) {
-    disconnect(this, &QQuickItem::windowChanged, this, &PAGView::onWindowChanged);
-    initDrawable();
-  }
+  // Destructor implemented by ContentView
 }
 
 void PAGView::initDrawable() {
@@ -258,8 +237,7 @@ void PAGView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometr
   if (newGeometry == oldGeometry) {
     return;
   }
-  QQuickItem::geometryChange(newGeometry, oldGeometry);
-  resizeTimer->start(400);
+  ContentView::geometryChange(newGeometry, oldGeometry);
 }
 
 bool PAGView::setFile(const QString& filePath) {
@@ -364,10 +342,6 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
   }
   return node;
-}
-
-PAGRenderThread* PAGView::getRenderThread() const {
-  return renderThread.get();
 }
 
 void PAGView::setProgressInternal(double progress, bool isAudioSeek) {

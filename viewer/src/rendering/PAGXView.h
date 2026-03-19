@@ -20,10 +20,8 @@
 
 #include <QOpenGLContext>
 #include <QQuickWindow>
-#include <QTimer>
 #include "ContentView.h"
 #include "pagx/PAGXDocument.h"
-#include "platform/qt/GPUDrawable.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
 
@@ -62,7 +60,6 @@ class PAGXView : public ContentView {
   void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
 
   Q_SLOT void sizeChangedDelayHandle();
-  Q_SLOT void onWindowChanged(QQuickWindow* win);
 
   Q_INVOKABLE bool setFile(const QString& filePath) override;
   Q_INVOKABLE void firstFrame() override;
@@ -71,8 +68,6 @@ class PAGXView : public ContentView {
   Q_INVOKABLE void previousFrame() override;
 
   void flush() const;
-
-  PAGXRenderThread* getRenderThread() const;
 
   QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
 
@@ -83,16 +78,12 @@ class PAGXView : public ContentView {
   };
 
  private:
-  void initDrawable();
+  void initDrawable() override;
   RenderTimeMetrics renderPAGX();
   void clearContent();
   void updateAnimationState();
 
-  std::atomic_bool sizeChanged = false;
   std::atomic_bool needsRender = false;
-  std::unique_ptr<QTimer> resizeTimer = nullptr;
-  std::shared_ptr<GPUDrawable> drawable = nullptr;
-  std::unique_ptr<PAGXRenderThread> renderThread = nullptr;
 
   std::shared_ptr<pagx::PAGXDocument> pagxDocument = nullptr;
   std::shared_ptr<tgfx::Layer> pagxContentLayer = nullptr;
@@ -108,6 +99,6 @@ class PAGXView : public ContentView {
   bool isPlaying_ = false;
   int64_t lastPlayTime = 0;
 
-  friend class PAGXRenderThread;
+  friend class RenderThread;
 };
 }  // namespace pag

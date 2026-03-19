@@ -20,11 +20,8 @@
 
 #include <QOpenGLContext>
 #include <QQuickWindow>
-#include <QTimer>
 #include "ContentView.h"
 #include "audio/PAGAudioPlayer.h"
-#include "platform/qt/GPUDrawable.h"
-#include "rendering/PAGRenderThread.h"
 
 namespace pag {
 
@@ -57,9 +54,7 @@ class PAGView : public ContentView {
   void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
 
   Q_SLOT void flush() const;
-  Q_SLOT void sizeChangedDelayHandle();
   Q_SLOT void onAudioTimeChanged(int64_t audioTime);
-  Q_SLOT void onWindowChanged(QQuickWindow* win);
 
   Q_INVOKABLE bool setFile(const QString& filePath) override;
   Q_INVOKABLE void firstFrame() override;
@@ -68,29 +63,24 @@ class PAGView : public ContentView {
   Q_INVOKABLE void previousFrame() override;
 
   QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
-  PAGRenderThread* getRenderThread() const;
 
  private:
   void setProgressInternal(double progress, bool isAudioSeek);
-  void initDrawable();
+  void initDrawable() override;
 
   int editableTextLayerCount = 0;
   int editableImageLayerCount = 0;
   int64_t lastPlayTime = 0;
   bool isPlaying_ = true;
-  std::atomic_bool sizeChanged = false;
   qreal lastWidth = 0;
   qreal lastHeight = 0;
   qreal lastPixelRatio = 1;
   double progress = 0.0;
   double progressPerFrame = 0.0;
-  std::unique_ptr<QTimer> resizeTimer = nullptr;
   std::unique_ptr<PAGPlayer> pagPlayer = nullptr;
-  std::unique_ptr<PAGRenderThread> renderThread = nullptr;
   std::shared_ptr<PAGFile> pagFile = nullptr;
-  std::shared_ptr<GPUDrawable> drawable = nullptr;
   std::unique_ptr<PAGAudioPlayer> audioPlayer = nullptr;
 
-  friend class PAGRenderThread;
+  friend class RenderThread;
 };
 }  // namespace pag

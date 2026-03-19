@@ -24,7 +24,6 @@
 #include "ContentView.h"
 #include "PAGView.h"
 #include "PAGWindowHelper.h"
-#include "PAGXView.h"
 #include "editing/PAGEditAttributeModel.h"
 #include "editing/PAGImageLayerModel.h"
 #include "editing/PAGImageProvider.h"
@@ -53,7 +52,8 @@ class PAGWindow : public QObject {
   static QList<PAGWindow*> AllWindows;
 
  private:
-  void connectContentViewSignals();
+  void connectBaseContentViewSignals();
+  void connectFormatSpecificSignals();
   void disconnectContentViewSignals();
 
   QString filePath = "";

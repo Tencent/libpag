@@ -18,7 +18,7 @@
 
 #include "PAGXView.h"
 #include <QSGImageNode>
-#include "PAGXRenderThread.h"
+#include "RenderThread.h"
 #include "pagx/PAGXImporter.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/core/Clock.h"
@@ -26,28 +26,12 @@
 namespace pag {
 
 PAGXView::PAGXView(QQuickItem* parent) : ContentView(parent) {
-  setFlag(ItemHasContents, true);
-  renderThread = std::make_unique<PAGXRenderThread>(this);
+  renderThread = std::make_unique<RenderThread>(this, RenderThread::ViewType::PAGX);
   renderThread->moveToThread(renderThread.get());
-  resizeTimer = std::make_unique<QTimer>();
-  connect(resizeTimer.get(), &QTimer::timeout, this, &PAGXView::sizeChangedDelayHandle);
-  if (window() != nullptr) {
-    initDrawable();
-  } else {
-    connect(this, &QQuickItem::windowChanged, this, &PAGXView::onWindowChanged);
-  }
 }
 
 PAGXView::~PAGXView() {
-  QMetaObject::invokeMethod(renderThread.get(), "shutDown", Qt::QueuedConnection);
-  renderThread->wait();
-}
-
-void PAGXView::onWindowChanged(QQuickWindow* win) {
-  if (win != nullptr) {
-    disconnect(this, &QQuickItem::windowChanged, this, &PAGXView::onWindowChanged);
-    initDrawable();
-  }
+  // Destructor implemented by ContentView
 }
 
 void PAGXView::initDrawable() {
@@ -72,10 +56,6 @@ void PAGXView::flush() const {
   if (displayList != nullptr) {
     QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
   }
-}
-
-PAGXRenderThread* PAGXView::getRenderThread() const {
-  return renderThread.get();
 }
 
 int PAGXView::getWidth() const {
@@ -212,7 +192,7 @@ void PAGXView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeomet
   if (newGeometry == oldGeometry) {
     return;
   }
-  QQuickItem::geometryChange(newGeometry, oldGeometry);
+  ContentView::geometryChange(newGeometry, oldGeometry);
   if (displayList != nullptr && !needsRender) {
     resizeTimer->start(400);
   }

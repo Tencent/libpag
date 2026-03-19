@@ -17,10 +17,56 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ContentView.h"
+#include <QQuickWindow>
+#include "RenderThread.h"
 
 namespace pag {
 
 ContentView::ContentView(QQuickItem* parent) : QQuickItem(parent) {
+  setFlag(ItemHasContents, true);
+  resizeTimer = std::make_unique<QTimer>();
+  connect(resizeTimer.get(), &QTimer::timeout, this, &ContentView::sizeChangedDelayHandle);
+  if (window() != nullptr) {
+    initDrawable();
+  } else {
+    connect(this, &QQuickItem::windowChanged, this, &ContentView::onWindowChanged);
+  }
+}
+
+ContentView::~ContentView() {
+  if (renderThread != nullptr) {
+    QMetaObject::invokeMethod(renderThread.get(), "shutDown", Qt::QueuedConnection);
+    renderThread->wait();
+  }
+}
+
+void ContentView::onWindowChanged(QQuickWindow* win) {
+  if (win != nullptr) {
+    disconnect(this, &QQuickItem::windowChanged, this, &ContentView::onWindowChanged);
+    initDrawable();
+  }
+}
+
+void ContentView::initDrawable() {
+  // Base implementation does nothing, subclasses will override
+}
+
+void ContentView::sizeChangedDelayHandle() {
+  resizeTimer->stop();
+  sizeChanged = true;
+  QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
+}
+
+void ContentView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) {
+  if (newGeometry == oldGeometry) {
+    return;
+  }
+  QQuickItem::geometryChange(newGeometry, oldGeometry);
+  resizeTimer->start(400);
+}
+
+RenderThread* ContentView::getRenderThread() const {
+  return renderThread.get();
 }
 
 }  // namespace pag
