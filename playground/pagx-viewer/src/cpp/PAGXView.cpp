@@ -433,4 +433,17 @@ void PAGXView::updateAdaptiveTileRefinement() {
   }
 }
 
+void PAGXView::setBackgroundMode(const std::string& mode) {
+  if (!backgroundLayer) {
+    return;
+  }
+  BackgroundMode bgMode = BackgroundMode::Grid;
+  if (mode == "white") {
+    bgMode = BackgroundMode::White;
+  } else if (mode == "black") {
+    bgMode = BackgroundMode::Black;
+  }
+  backgroundLayer->setBackgroundMode(bgMode);
+}
+
 }  // namespace pagx

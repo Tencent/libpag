@@ -44,6 +44,7 @@ EMSCRIPTEN_BINDINGS(PAGXPlayground) {
       .function("_updateZoomScaleAndOffset", &pagx::PAGXView::updateZoomScaleAndOffset)
       .function("_setBackgroundColor", &pagx::PAGXView::setBackgroundColor)
       .function("_clearBackgroundColor", &pagx::PAGXView::clearBackgroundColor)
+      .function("_setBackgroundMode", &pagx::PAGXView::setBackgroundMode)
       .function("_draw", &pagx::PAGXView::draw)
       .function("_contentWidth", &pagx::PAGXView::contentWidth)
       .function("_contentHeight", &pagx::PAGXView::contentHeight);

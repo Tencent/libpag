@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PAGX Viewer",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Preview PAGX vector graphics files directly in Chrome browser. Drag and drop .pagx files to preview them.",
   "icons": {
     "16": "icons/pagx_icon_16x16.png",

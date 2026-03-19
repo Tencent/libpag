@@ -38,8 +38,10 @@ interface PAGXView {
     updateSize: () => void;
     updateZoomScaleAndOffset: (zoom: number, offsetX: number, offsetY: number) => void;
     draw: () => void;
+    setBackgroundMode: (mode: string) => void;
     contentWidth: () => number;
     contentHeight: () => number;
+    delete?: () => void;
 }
 
 interface StringVector {
@@ -925,13 +927,8 @@ const CODE_ICON_COLOR_ON = '#1e7aeb';
 const CODE_ICON_COLOR_OFF = '#8a8a8a';
 
 function applyBackgroundMode(mode: 'grid' | 'white' | 'black'): void {
-    const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
-    if (!canvas) {
-        return;
-    }
-    canvas.classList.remove('canvas-bg-grid', 'canvas-bg-white', 'canvas-bg-black');
-    canvas.classList.add(`canvas-bg-${mode}`);
     playgroundState.backgroundMode = mode;
+    playgroundState.pagxView?.setBackgroundMode(mode);
 }
 
 function setupBackgroundModeMenu(): void {
