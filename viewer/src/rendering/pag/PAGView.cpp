@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "rendering/pag/PAGView.h"
-#include "rendering/pag/PAGRenderer.h"
 #include "rendering/RenderThread.h"
+#include "rendering/pag/PAGRenderer.h"
 #include "tgfx/core/Clock.h"
 
 namespace pag {

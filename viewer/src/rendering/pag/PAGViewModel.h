@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "rendering/ContentViewModel.h"
 #include "audio/PAGAudioPlayer.h"
 #include "pag/pag.h"
+#include "rendering/ContentViewModel.h"
 
 namespace pag {
 

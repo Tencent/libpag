@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "rendering/ContentViewModel.h"
 #include "pagx/PAGXDocument.h"
+#include "rendering/ContentViewModel.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
 

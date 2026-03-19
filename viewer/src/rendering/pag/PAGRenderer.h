@@ -20,8 +20,8 @@
 
 #include <atomic>
 #include <memory>
-#include "rendering/IContentRenderer.h"
 #include "pag/pag.h"
+#include "rendering/IContentRenderer.h"
 
 namespace pag {
 

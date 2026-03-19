@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "rendering/pagx/PAGXView.h"
-#include "rendering/pagx/PAGXRenderer.h"
 #include "rendering/RenderThread.h"
+#include "rendering/pagx/PAGXRenderer.h"
 
 namespace pag {
 

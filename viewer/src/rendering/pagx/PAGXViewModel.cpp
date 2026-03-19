@@ -18,9 +18,9 @@
 
 #include "rendering/pagx/PAGXViewModel.h"
 #include <QQuickWindow>
-#include "rendering/pagx/PAGXView.h"
 #include "pagx/PAGXImporter.h"
 #include "renderer/LayerBuilder.h"
+#include "rendering/pagx/PAGXView.h"
 #include "tgfx/core/Clock.h"
 
 namespace pag {

@@ -18,8 +18,8 @@
 
 #include "rendering/pag/PAGViewModel.h"
 #include <QQuickWindow>
-#include "rendering/pag/PAGView.h"
 #include "pag/file.h"
+#include "rendering/pag/PAGView.h"
 #include "tgfx/core/Clock.h"
 #include "version.h"
 
