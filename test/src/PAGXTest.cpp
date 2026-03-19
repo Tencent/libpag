@@ -37,6 +37,7 @@
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
@@ -3427,6 +3428,165 @@ PAGX_TEST(PAGXTest, LayerConstraintRoundTripNanOmitted) {
 PAGX_TEST(PAGXTest, SkillExamples) {
   TestMarkdownExamples(
       context, ProjectPath::Absolute(".codebuddy/skills/pagx/references/examples.md"), "skills_");
+}
+
+/**
+ * Test case: Verify resource cross-references resolve regardless of XML declaration order.
+ * Resources declared later in <Resources> should be referenceable by earlier resources via '@id'.
+ */
+PAGX_TEST(PAGXTest, ResourceCrossReference) {
+  // ImagePattern references an Image that is declared AFTER it in the XML.
+  std::string xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="100" height="100">
+  <Resources>
+    <ImagePattern id="pattern1" image="@img1"/>
+    <Image id="img1" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="/>
+  </Resources>
+  <Layer>
+    <Rectangle size="100,100"/>
+    <Fill color="@pattern1"/>
+  </Layer>
+</pagx>)";
+
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->errors.empty())
+      << "Unexpected errors: " << (doc->errors.empty() ? "" : doc->errors[0]);
+
+  auto* pattern = doc->findNode<pagx::ImagePattern>("pattern1");
+  ASSERT_TRUE(pattern != nullptr);
+  EXPECT_TRUE(pattern->image != nullptr)
+      << "ImagePattern should resolve forward reference to Image";
+
+  auto* image = doc->findNode<pagx::Image>("img1");
+  ASSERT_TRUE(image != nullptr);
+  EXPECT_EQ(pattern->image, image);
+  EXPECT_TRUE(image->data != nullptr);
+}
+
+/**
+ * Test case: Verify Glyph nodes inside Font can reference Image resources declared after the Font.
+ */
+PAGX_TEST(PAGXTest, ResourceCrossReferenceGlyphImage) {
+  std::string xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="100" height="100">
+  <Resources>
+    <Font id="font1">
+      <Glyph image="@emoji1" advance="16"/>
+    </Font>
+    <Image id="emoji1" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="/>
+  </Resources>
+  <Layer>
+    <Text text="A" fontFamily="Test" fontSize="16">
+      <GlyphRun font="@font1" fontSize="16" glyphs="1" positions="0,0"/>
+    </Text>
+    <Fill color="#000000"/>
+  </Layer>
+</pagx>)";
+
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->errors.empty())
+      << "Unexpected errors: " << (doc->errors.empty() ? "" : doc->errors[0]);
+
+  auto* font = doc->findNode<pagx::Font>("font1");
+  ASSERT_TRUE(font != nullptr);
+  ASSERT_EQ(font->glyphs.size(), 1u);
+  EXPECT_TRUE(font->glyphs[0]->image != nullptr)
+      << "Glyph should resolve forward reference to Image";
+
+  auto* image = doc->findNode<pagx::Image>("emoji1");
+  ASSERT_TRUE(image != nullptr);
+  EXPECT_EQ(font->glyphs[0]->image, image);
+}
+
+/**
+ * Test case: Verify Layer composition attribute can reference a Composition declared after it.
+ */
+PAGX_TEST(PAGXTest, ResourceCrossReferenceComposition) {
+  std::string xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="200">
+  <Layer composition="@comp1">
+    <Rectangle size="200,200"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+  <Resources>
+    <Composition id="comp1" width="100" height="100">
+      <Layer>
+        <Rectangle size="50,50"/>
+        <Fill color="#00FF00"/>
+      </Layer>
+    </Composition>
+  </Resources>
+</pagx>)";
+
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->errors.empty())
+      << "Unexpected errors: " << (doc->errors.empty() ? "" : doc->errors[0]);
+
+  ASSERT_GE(doc->layers.size(), 1u);
+  auto* layer = doc->layers[0];
+  EXPECT_TRUE(layer->composition != nullptr)
+      << "Layer should resolve forward reference to Composition";
+
+  auto* comp = doc->findNode<pagx::Composition>("comp1");
+  ASSERT_TRUE(comp != nullptr);
+  EXPECT_EQ(layer->composition, comp);
+  EXPECT_FLOAT_EQ(comp->width, 100);
+  EXPECT_FLOAT_EQ(comp->height, 100);
+  ASSERT_EQ(comp->layers.size(), 1u);
+}
+
+/**
+ * Test case: Verify multiple resources with mutual cross-references all resolve correctly.
+ * A gradient references an image pattern which references an image — all in reverse declaration
+ * order.
+ */
+PAGX_TEST(PAGXTest, ResourceCrossReferenceChain) {
+  // Declare resources in reverse dependency order: PathData -> Font -> Image.
+  // Font's Glyph references PathData declared after it, and also references Image declared after it.
+  std::string xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="100" height="100">
+  <Resources>
+    <Font id="font1">
+      <Glyph path="@path1" advance="10"/>
+      <Glyph image="@img1" advance="16"/>
+    </Font>
+    <PathData id="path1" data="M0 0 L10 0 L10 10 L0 10 Z"/>
+    <Image id="img1" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="/>
+  </Resources>
+  <Layer>
+    <Text text="AB" fontFamily="Test" fontSize="16">
+      <GlyphRun font="@font1" fontSize="16" glyphs="1,2" positions="0,0;16,0"/>
+    </Text>
+    <Fill color="#000000"/>
+  </Layer>
+</pagx>)";
+
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->errors.empty())
+      << "Unexpected errors: " << (doc->errors.empty() ? "" : doc->errors[0]);
+
+  auto* font = doc->findNode<pagx::Font>("font1");
+  ASSERT_TRUE(font != nullptr);
+  ASSERT_EQ(font->glyphs.size(), 2u);
+
+  // First glyph references PathData declared after Font.
+  EXPECT_TRUE(font->glyphs[0]->path != nullptr)
+      << "Glyph should resolve forward reference to PathData";
+  auto* pathData = doc->findNode<pagx::PathData>("path1");
+  ASSERT_TRUE(pathData != nullptr);
+  EXPECT_EQ(font->glyphs[0]->path, pathData);
+  EXPECT_FALSE(pathData->isEmpty());
+
+  // Second glyph references Image declared after Font.
+  EXPECT_TRUE(font->glyphs[1]->image != nullptr)
+      << "Glyph should resolve forward reference to Image";
+  auto* image = doc->findNode<pagx::Image>("img1");
+  ASSERT_TRUE(image != nullptr);
+  EXPECT_EQ(font->glyphs[1]->image, image);
 }
 
 }  // namespace pag
