@@ -46,6 +46,13 @@ class ContentView : public QQuickItem {
   virtual ContentViewModel* getViewModel() const = 0;
   RenderThread* getRenderThread() const;
 
+  /**
+   * Updates the QSG texture node with the current drawable's texture.
+   * Handles both node creation and texture binding.
+   * Returns the updated node, or nullptr if drawable is not available.
+   */
+  QSGNode* updateTextureNode(QSGNode* oldNode);
+
   Q_SLOT virtual void flush() const = 0;
 
   friend class RenderThread;

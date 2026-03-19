@@ -18,6 +18,7 @@
 
 #include "ContentView.h"
 #include <QQuickWindow>
+#include <QSGImageNode>
 #include "RenderThread.h"
 
 namespace pag {
@@ -68,6 +69,22 @@ void ContentView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeo
 
 RenderThread* ContentView::getRenderThread() const {
   return renderThread.get();
+}
+
+QSGNode* ContentView::updateTextureNode(QSGNode* oldNode) {
+  auto node = static_cast<QSGImageNode*>(oldNode);
+  if (drawable != nullptr) {
+    auto texture = drawable->getTexture();
+    if (texture) {
+      if (node == nullptr) {
+        node = window()->createImageNode();
+      }
+      node->setTexture(texture);
+      node->markDirty(QSGNode::DirtyMaterial);
+      node->setRect(boundingRect());
+    }
+  }
+  return node;
 }
 
 }  // namespace pag

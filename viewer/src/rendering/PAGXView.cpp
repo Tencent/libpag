@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGXView.h"
-#include <QSGImageNode>
 #include "PAGXRenderer.h"
 #include "RenderThread.h"
 
@@ -84,20 +83,7 @@ QSGNode* PAGXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     renderThread->start();
   }
 
-  auto node = static_cast<QSGImageNode*>(oldNode);
-  if (drawable != nullptr) {
-    auto texture = drawable->getTexture();
-    if (texture) {
-      if (node == nullptr) {
-        node = window()->createImageNode();
-      }
-      node->setTexture(texture);
-      node->markDirty(QSGNode::DirtyMaterial);
-      node->setRect(boundingRect());
-    }
-  }
-
-  return node;
+  return updateTextureNode(oldNode);
 }
 
 }  // namespace pag

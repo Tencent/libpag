@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGView.h"
-#include <QSGImageNode>
 #include "PAGRenderer.h"
 #include "RenderThread.h"
 #include "tgfx/core/Clock.h"
@@ -75,18 +74,7 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     renderThread->start();
   }
 
-  auto node = static_cast<QSGImageNode*>(oldNode);
-  if (drawable != nullptr) {
-    auto texture = drawable->getTexture();
-    if (texture) {
-      if (node == nullptr) {
-        node = window()->createImageNode();
-      }
-      node->setTexture(texture);
-      node->markDirty(QSGNode::DirtyMaterial);
-      node->setRect(boundingRect());
-    }
-  }
+  auto node = updateTextureNode(oldNode);
 
   auto timeNow = tgfx::Clock::Now();
   auto displayTime = timeNow - viewModel->lastPlayTime;
