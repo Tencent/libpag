@@ -969,9 +969,18 @@ function updateCodePanelContent(): void {
         return;
     }
     if (playgroundState.pagxText) {
-        codeContent.innerHTML = highlightXml(playgroundState.pagxText);
+        const highlighted = highlightXml(playgroundState.pagxText);
+        const lines = highlighted.split('\n');
+        const rows = lines.map((line, index) => {
+            const lineNum = index + 1;
+            return `<tr><td class="code-line-number" data-line="${lineNum}"></td>` +
+                   `<td class="code-line-content">${line || ' '}</td></tr>`;
+        });
+        codeContent.innerHTML = rows.join('');
     } else {
-        codeContent.textContent = '(No PAGX data loaded)';
+        codeContent.innerHTML =
+            '<tr><td class="code-line-number" data-line="1"></td>' +
+            '<td class="code-line-content">(No PAGX data loaded)</td></tr>';
     }
 }
 

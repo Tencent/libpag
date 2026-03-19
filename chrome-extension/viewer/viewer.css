@@ -404,19 +404,53 @@ html, body {
 .code-panel-content {
     flex: 1;
     margin: 0;
-    padding: 16px;
+    padding: 0;
     overflow: auto;
     font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
     font-size: 13px;
     line-height: 1.6;
     color: #d4d4d4;
     tab-size: 2;
-    white-space: pre;
-    word-wrap: normal;
 }
 
-.code-panel-content code {
-    display: block;
+.code-table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.code-table td {
+    vertical-align: top;
+    padding: 0;
+}
+
+.code-line-number {
+    width: 1px;
+    white-space: nowrap;
+    padding: 0 12px 0 16px;
+    text-align: right;
+    color: rgba(255, 255, 255, 0.25);
+    user-select: none;
+    cursor: default;
+}
+
+.code-line-number::before {
+    content: attr(data-line);
+}
+
+.code-line-content {
+    white-space: pre;
+    word-wrap: normal;
+    padding: 0 16px 0 12px;
+}
+
+.code-table tr:first-child .code-line-number,
+.code-table tr:first-child .code-line-content {
+    padding-top: 16px;
+}
+
+.code-table tr:last-child .code-line-number,
+.code-table tr:last-child .code-line-content {
+    padding-bottom: 16px;
 }
 
 /* XML syntax highlighting */
