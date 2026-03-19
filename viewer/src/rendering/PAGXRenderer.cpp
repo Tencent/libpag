@@ -54,6 +54,7 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
   }
   auto context = device->lockContext();
   if (context == nullptr) {
+    device->unlock();
     return metrics;
   }
   auto surface = view->drawable->getSurface(context, false);

@@ -39,17 +39,16 @@ void RenderThread::flush() {
 }
 
 void RenderThread::shutDown() {
-  if (view == nullptr) {
+  if (view == nullptr || QGuiApplication::instance() == nullptr) {
     exit();
     return;
   }
-  if (QGuiApplication::instance() != nullptr) {
-    auto mainThread = QGuiApplication::instance()->thread();
-    if (view->drawable != nullptr) {
-      view->drawable->moveToThread(mainThread);
-    }
-    moveToThread(mainThread);
+  auto mainThread = QGuiApplication::instance()->thread();
+  auto drawablePtr = view->drawable;  // Capture current value to avoid TOCTOU issue
+  if (drawablePtr != nullptr) {
+    drawablePtr->moveToThread(mainThread);
   }
+  moveToThread(mainThread);
   exit();
 }
 

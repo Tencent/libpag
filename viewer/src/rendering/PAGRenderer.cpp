@@ -31,7 +31,9 @@ bool PAGRenderer::isReady() const {
 
 void PAGRenderer::updateSize() {
   auto pagSurface = view->viewModel->pagPlayer->getSurface();
-  pagSurface->updateSize();
+  if (pagSurface != nullptr) {
+    pagSurface->updateSize();
+  }
 }
 
 IContentRenderer::RenderMetrics PAGRenderer::flush() {
@@ -42,13 +44,18 @@ IContentRenderer::RenderMetrics PAGRenderer::flush() {
   if (view->sizeChanged.exchange(false)) {
     updateSize();
   }
-  view->viewModel->pagPlayer->flush();
-  double progress = view->viewModel->pagFile->getProgress();
+  auto player = view->viewModel->pagPlayer;
+  auto file = view->viewModel->pagFile;
+  if (!player || !file) {
+    return metrics;
+  }
+  player->flush();
+  double progress = file->getProgress();
   metrics.currentFrame = static_cast<int64_t>(
       std::round((view->viewModel->getTotalFrame().toDouble() - 1) * progress));
-  metrics.renderTime = view->viewModel->pagPlayer->renderingTime();
-  metrics.presentTime = view->viewModel->pagPlayer->presentingTime();
-  metrics.imageDecodeTime = view->viewModel->pagPlayer->imageDecodingTime();
+  metrics.renderTime = player->renderingTime();
+  metrics.presentTime = player->presentingTime();
+  metrics.imageDecodeTime = player->imageDecodingTime();
   metrics.rendered = true;
   QMetaObject::invokeMethod(view, "update", Qt::QueuedConnection);
   return metrics;
