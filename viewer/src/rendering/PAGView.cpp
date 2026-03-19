@@ -86,27 +86,21 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     node->setRect(boundingRect());
   }
 
-  // For content with audio, progress is controlled by audio thread.
-  // For content without audio, progress is driven by display time.
-  if (!viewModel->hasAudio()) {
-    auto timeNow = tgfx::Clock::Now();
-    auto displayTime = timeNow - viewModel->lastPlayTime;
-    viewModel->lastPlayTime = timeNow;
+  auto timeNow = tgfx::Clock::Now();
+  auto displayTime = timeNow - viewModel->lastPlayTime;
+  viewModel->lastPlayTime = timeNow;
 
-    if (viewModel->isPlaying_) {
-      auto duration = viewModel->pagPlayer->duration();
-      if (duration > 0) {
-        auto newProgress =
-            static_cast<double>(displayTime) / static_cast<double>(duration) + viewModel->progress;
-        if (newProgress > 1.0) {
-          newProgress = 0.0;
-        }
-        viewModel->setProgressInternal(newProgress, false);
+  if (viewModel->isPlaying_) {
+    auto duration = viewModel->pagPlayer->duration();
+    if (duration > 0) {
+      auto newProgress =
+          static_cast<double>(displayTime) / static_cast<double>(duration) + viewModel->progress;
+      if (newProgress > 1.0) {
+        newProgress = 0.0;
       }
-    } else {
-      triggerFlush();
+      viewModel->setProgressInternal(newProgress, false);
     }
-  } else if (viewModel->isPlaying_) {
+  } else {
     triggerFlush();
   }
 

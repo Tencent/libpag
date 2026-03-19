@@ -25,6 +25,9 @@
 
 namespace pag {
 
+constexpr int64_t MaxAudioLeadThreshold = 25000;
+constexpr int64_t MinAudioLagThreshold = -100000;
+
 static void reportPAGFileInfo(const std::shared_ptr<PAGFile>& pagFile, size_t length) {
   QVariantMap map;
   map["Event"] = "OPEN_PAG";
@@ -272,15 +275,16 @@ void PAGViewModel::previousFrame() {
 }
 
 void PAGViewModel::onAudioTimeChanged(int64_t audioTime) {
-  if (!isPlaying_) {
-    return;
-  }
+  auto timeNow = tgfx::Clock::Now();
+  auto displayTime = timeNow - lastPlayTime;
   auto duration = static_cast<double>(pagPlayer->duration());
-  if (duration <= 0) {
-    return;
+  auto currentDisplayTime = static_cast<int64_t>(progress * duration) + displayTime;
+  if (audioTime == 0 || (audioTime - currentDisplayTime > MaxAudioLeadThreshold)) {
+    lastPlayTime = timeNow;
+    setProgressInternal(static_cast<double>(audioTime) / duration, false);
+  } else if (audioTime - currentDisplayTime < MinAudioLagThreshold) {
+    lastPlayTime = timeNow;
   }
-  lastPlayTime = tgfx::Clock::Now();
-  setProgressInternal(static_cast<double>(audioTime) / duration, false);
 }
 
 bool PAGViewModel::hasAudio() const {
