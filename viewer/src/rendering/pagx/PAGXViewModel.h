@@ -1,0 +1,88 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+#include "rendering/ContentViewModel.h"
+#include "pagx/PAGXDocument.h"
+#include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/Layer.h"
+
+namespace pag {
+
+class PAGXView;
+
+/**
+ * ViewModel for PAGX format content. Owns PAGXDocument and DisplayList,
+ * and manages playback state for PAGX content.
+ */
+class PAGXViewModel : public ContentViewModel {
+  Q_OBJECT
+ public:
+  explicit PAGXViewModel(PAGXView* view, QObject* parent = nullptr);
+
+  int getWidth() const override;
+  int getHeight() const override;
+  bool hasAnimation() const override;
+  bool isPlaying() const override;
+  double getProgress() const override;
+  QString getTotalFrame() const override;
+  QString getCurrentFrame() const override;
+  QString getDuration() const override;
+  QString getFilePath() const override;
+  QString getDisplayedTime() const override;
+  QColor getBackgroundColor() const override;
+  QSizeF getPreferredSize() const override;
+  int getEditableTextLayerCount() const override;
+  int getEditableImageLayerCount() const override;
+  bool getShowVideoFrames() const override;
+
+  void setIsPlaying(bool isPlaying) override;
+  void setProgress(double progress) override;
+  void setShowVideoFrames(bool isShow) override;
+
+  Q_INVOKABLE bool loadFile(const QString& filePath) override;
+  Q_INVOKABLE void firstFrame() override;
+  Q_INVOKABLE void lastFrame() override;
+  Q_INVOKABLE void nextFrame() override;
+  Q_INVOKABLE void previousFrame() override;
+
+ private:
+  void clearContent();
+  void updateAnimationState();
+
+  PAGXView* view = nullptr;
+  std::atomic_bool needsRender = false;
+  std::shared_ptr<pagx::PAGXDocument> pagxDocument = nullptr;
+  std::shared_ptr<tgfx::Layer> pagxContentLayer = nullptr;
+  std::unique_ptr<tgfx::DisplayList> displayList = nullptr;
+  int pagxWidth = 0;
+  int pagxHeight = 0;
+  std::string currentFilePath = {};
+  int64_t totalFrames = 1;
+  float frameRate = 0.0f;
+  double progress = 0.0;
+  double progressPerFrame = 1.0;
+  bool isPlaying_ = false;
+  int64_t lastPlayTime = 0;
+
+  friend class PAGXView;
+  friend class PAGXRenderer;
+};
+
+}  // namespace pag

@@ -24,8 +24,8 @@
 #include "PAGViewer.h"
 #include "maintenance/PluginInstallerModel.h"
 #include "profiling/PAGRunTimeDataModel.h"
-#include "rendering/PAGView.h"
-#include "rendering/PAGXView.h"
+#include "rendering/pag/PAGView.h"
+#include "rendering/pagx/PAGXView.h"
 #include "task/PAGTaskFactory.h"
 
 int main(int argc, char* argv[]) {
