@@ -106,9 +106,10 @@ class ContentView : public QQuickItem {
   Q_SLOT void onWindowChanged(QQuickWindow* win);
 
   virtual void initDrawable();
-  virtual void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry);
+  virtual void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
 
   std::unique_ptr<RenderThread> renderThread = nullptr;
   std::unique_ptr<QTimer> resizeTimer = nullptr;
   std::atomic_bool sizeChanged = false;
+};
 }  // namespace pag
