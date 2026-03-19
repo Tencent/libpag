@@ -27,8 +27,6 @@
 
 namespace pag {
 
-class PAGXRenderThread;
-
 /**
  * PAGXView is a view for rendering PAGX files.
  */
