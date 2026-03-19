@@ -73,6 +73,9 @@ class PlaygroundState {
     fontData: Uint8Array | null = null;
     emojiFontData: Uint8Array | null = null;
     pagxSourceUrl: string = '';
+    pagxText: string = '';
+    backgroundMode: 'grid' | 'white' | 'black' = 'grid';
+    codeViewVisible: boolean = false;
 }
 
 class LoadingProgress {
@@ -600,8 +603,7 @@ function updateSize() {
     }
     playgroundState.resized = false;
     const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
-    const container = document.getElementById('container') as HTMLDivElement;
-    const screenRect = container.getBoundingClientRect();
+    const screenRect = canvas.getBoundingClientRect();
     const scaleFactor = window.devicePixelRatio;
     canvas.width = screenRect.width * scaleFactor;
     canvas.height = screenRect.height * scaleFactor;
@@ -822,6 +824,9 @@ async function loadPAGXData(data: Uint8Array, name: string, baseURL: string) {
             throw new Error('File is empty');
         }
 
+        // Store raw PAGX text for code viewer
+        playgroundState.pagxText = new TextDecoder().decode(data);
+
         const toolbar = document.getElementById('toolbar') as HTMLDivElement;
         const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
         const fileNameEl = document.getElementById('file-name');
@@ -831,6 +836,7 @@ async function loadPAGXData(data: Uint8Array, name: string, baseURL: string) {
         await loadExternalFiles(baseURL);
         playgroundState.pagxView.buildLayers();
         gestureManager.resetTransform(playgroundState);
+        applyBackgroundMode(playgroundState.backgroundMode);
         updateSize();
         draw();
         hideDropZone();
@@ -840,6 +846,11 @@ async function loadPAGXData(data: Uint8Array, name: string, baseURL: string) {
             fileNameEl.textContent = name;
         }
         document.title = 'PAGX Viewer - ' + name;
+
+        // Update code panel if currently visible
+        if (playgroundState.codeViewVisible) {
+            updateCodePanelContent();
+        }
     } finally {
         playgroundState.isLoading = false;
     }
@@ -896,6 +907,163 @@ async function loadPAGXFile(file: File) {
         console.error('Failed to load PAGX file:', error);
         showErrorUI('Failed to load file. Please check the file format.');
     }
+}
+
+// SVG path for the code icon (shared between on/off states)
+const CODE_ICON_PATH = 'M128 128h768a42.666667 42.666667 0 0 1 42.666667 42.666667v682.666666a42.666667 42.666667 0 0 1-42.666667 42.666667H128a42.666667 42.666667 0 0 1-42.666667-42.666667V170.666667a42.666667 42.666667 0 0 1 42.666667-42.666667z m42.666667 85.333333v597.333334h682.666666V213.333333H170.666667z m682.666666 298.666667l-150.826666 150.869333-60.373334-60.373333L732.672 512 642.133333 421.504l60.373334-60.373333L853.333333 512zM291.328 512l90.538667 90.496-60.330667 60.373333L170.666667 512l150.869333-150.869333L381.866667 421.546667 291.328 512z m188.416 213.333333H388.949333l155.306667-426.666666h90.794667l-155.306667 426.666666z';
+const CODE_ICON_COLOR_ON = '#1e7aeb';
+const CODE_ICON_COLOR_OFF = '#8a8a8a';
+
+function applyBackgroundMode(mode: 'grid' | 'white' | 'black'): void {
+    const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
+    if (!canvas) {
+        return;
+    }
+    canvas.classList.remove('canvas-bg-grid', 'canvas-bg-white', 'canvas-bg-black');
+    canvas.classList.add(`canvas-bg-${mode}`);
+    playgroundState.backgroundMode = mode;
+}
+
+function setupBackgroundModeMenu(): void {
+    const bgModeBtn = document.getElementById('bg-mode-btn');
+    const bgMenu = document.getElementById('bg-menu');
+    if (!bgModeBtn || !bgMenu) {
+        return;
+    }
+
+    bgModeBtn.addEventListener('click', (e: Event) => {
+        e.stopPropagation();
+        const isHidden = bgMenu.classList.contains('hidden');
+        bgMenu.classList.toggle('hidden', !isHidden);
+        bgModeBtn.setAttribute('aria-expanded', String(isHidden));
+    });
+
+    bgMenu.addEventListener('click', (e: Event) => {
+        const target = (e.target as HTMLElement).closest('.bg-menu-item') as HTMLElement | null;
+        if (!target) {
+            return;
+        }
+        const mode = target.dataset.bg as 'grid' | 'white' | 'black';
+        if (!mode) {
+            return;
+        }
+        // Update active state in menu
+        bgMenu.querySelectorAll('.bg-menu-item').forEach(item => item.classList.remove('active'));
+        target.classList.add('active');
+        applyBackgroundMode(mode);
+        bgMenu.classList.add('hidden');
+        bgModeBtn.setAttribute('aria-expanded', 'false');
+        // Redraw to reflect background change
+        draw();
+    });
+
+    // Close menu when clicking outside
+    document.addEventListener('click', () => {
+        bgMenu.classList.add('hidden');
+        bgModeBtn.setAttribute('aria-expanded', 'false');
+    });
+}
+
+function highlightXml(text: string): string {
+    // Escape HTML entities first
+    let escaped = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+    // Highlight XML comments: <!-- ... -->
+    escaped = escaped.replace(
+        /&lt;!--[\s\S]*?--&gt;/g,
+        match => `<span class="xml-comment">${match}</span>`
+    );
+
+    // Highlight XML declaration: <?xml ... ?>
+    escaped = escaped.replace(
+        /&lt;\?[\s\S]*?\?&gt;/g,
+        match => `<span class="xml-declaration">${match}</span>`
+    );
+
+    // Highlight tags and attributes
+    escaped = escaped.replace(
+        /(&lt;\/?)([\w:.-]+)((?:\s+[\s\S]*?)?)(\/?&gt;)/g,
+        (_match, open, tagName, attrs, close) => {
+            let highlightedAttrs = attrs;
+            if (attrs) {
+                highlightedAttrs = attrs.replace(
+                    /([\w:.-]+)(\s*=\s*)(&quot;[^&]*&quot;)/g,
+                    '<span class="xml-attr-name">$1</span>$2<span class="xml-attr-value">$3</span>'
+                );
+            }
+            return `<span class="xml-tag">${open}${tagName}</span>${highlightedAttrs}<span class="xml-tag">${close}</span>`;
+        }
+    );
+
+    return escaped;
+}
+
+function updateCodePanelContent(): void {
+    const codeContent = document.getElementById('code-content');
+    if (!codeContent) {
+        return;
+    }
+    if (playgroundState.pagxText) {
+        codeContent.innerHTML = highlightXml(playgroundState.pagxText);
+    } else {
+        codeContent.textContent = '(No PAGX data loaded)';
+    }
+}
+
+function toggleCodeView(visible: boolean): void {
+    const container = document.getElementById('container') as HTMLDivElement;
+    const codePanel = document.getElementById('code-panel') as HTMLDivElement;
+    const codeToggleBtn = document.getElementById('code-toggle-btn') as HTMLButtonElement;
+    if (!container || !codePanel || !codeToggleBtn) {
+        return;
+    }
+
+    playgroundState.codeViewVisible = visible;
+
+    if (visible) {
+        container.classList.add('split-view');
+        codePanel.classList.remove('hidden');
+        codeToggleBtn.classList.add('active');
+        codeToggleBtn.setAttribute('aria-pressed', 'true');
+        // Update icon color to blue (on)
+        const svgPath = codeToggleBtn.querySelector('path');
+        if (svgPath) {
+            svgPath.setAttribute('fill', CODE_ICON_COLOR_ON);
+        }
+        updateCodePanelContent();
+    } else {
+        container.classList.remove('split-view');
+        codePanel.classList.add('hidden');
+        codeToggleBtn.classList.remove('active');
+        codeToggleBtn.setAttribute('aria-pressed', 'false');
+        // Update icon color to gray (off)
+        const svgPath = codeToggleBtn.querySelector('path');
+        if (svgPath) {
+            svgPath.setAttribute('fill', CODE_ICON_COLOR_OFF);
+        }
+    }
+
+    // Canvas size changed due to split-view toggle, need to update
+    if (playgroundState.pagxView) {
+        requestAnimationFrame(() => {
+            updateSize();
+            draw();
+        });
+    }
+}
+
+function setupCodeToggle(): void {
+    const codeToggleBtn = document.getElementById('code-toggle-btn');
+    if (!codeToggleBtn) {
+        return;
+    }
+    codeToggleBtn.addEventListener('click', () => {
+        toggleCodeView(!playgroundState.codeViewVisible);
+    });
 }
 
 function setupDragAndDrop() {
@@ -974,6 +1142,9 @@ function setupDragAndDrop() {
     resetBtn.addEventListener('click', () => {
         gestureManager.resetTransform(playgroundState);
     });
+
+    setupBackgroundModeMenu();
+    setupCodeToggle();
 
     fileInput.addEventListener('change', () => {
         const files = fileInput.files;
