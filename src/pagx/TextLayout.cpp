@@ -320,10 +320,16 @@ class TextLayoutContext {
         allText.insert(allText.end(), propagated.begin(), propagated.end());
       } else if (element->nodeType() == NodeType::TextBox) {
         auto* tb = static_cast<TextBox*>(element);
-        textBox = tb;
-        // Recurse into TextBox children to collect Text elements.
-        auto propagated = processScope(tb->elements);
-        allText.insert(allText.end(), propagated.begin(), propagated.end());
+        if (!tb->elements.empty()) {
+          // Container mode: TextBox owns its children. Process them as an isolated scope.
+          auto childText = processScope(tb->elements);
+          if (!childText.empty()) {
+            processTextWithLayout(childText, tb);
+          }
+        } else {
+          // Legacy modifier mode: TextBox applies to accumulated Text in this scope.
+          textBox = tb;
+        }
       }
     }
     if (textBox != nullptr && !allText.empty()) {
@@ -1350,7 +1356,7 @@ class TextLayoutContext {
     std::unordered_map<Text*, std::vector<PositionedGlyph>> textGlyphs = {};
 
     bool overflowHidden = textBox->overflow == Overflow::Hidden;
-    float boxBottom = textBox->position.y + boxHeight;
+    float boxBottom = boxHeight;
     // Use relative coordinates for baseline calculation, then add textBox position at the end.
     float relativeTop = 0;
     float baselineY = 0;
@@ -1393,22 +1399,22 @@ class TextLayoutContext {
 
       if (line.glyphs.empty()) {
         relativeBaseline = (relativeTop + line.maxLineHeight) * line.roundingRatio;
-        baselineY = textBox->position.y + roundf(relativeBaseline + yOffset);
+        baselineY = roundf(relativeBaseline + yOffset);
       } else if (!precomputedBaselines.empty()) {
         // Bottom/Center alignment: use pre-computed baselines anchored from the last line.
         relativeBaseline = precomputedBaselines[lineIdx];
-        baselineY = textBox->position.y + roundf(relativeBaseline + yOffset);
+        baselineY = roundf(relativeBaseline + yOffset);
       } else if (hasPrevBaseline && textBox->lineHeight > 0) {
         // Fixed line height, subsequent lines: baseline = prevBaseline + lineHeight.
         // This produces equal baseline-to-baseline spacing matching Figma's behavior where
         // subsequent lines have their leading added above rather than split above and below.
         relativeBaseline = prevRelativeBaseline + lines[lineIdx - 1].maxLineHeight;
-        baselineY = textBox->position.y + roundf(relativeBaseline + yOffset);
+        baselineY = roundf(relativeBaseline + yOffset);
       } else {
         // Auto line height or first content line: use half-leading model.
         float halfLeading = (line.maxLineHeight - line.metricsHeight) / 2;
         relativeBaseline = (relativeTop + halfLeading + line.maxAscent) * line.roundingRatio;
-        baselineY = textBox->position.y + roundf(relativeBaseline + yOffset);
+        baselineY = roundf(relativeBaseline + yOffset);
       }
       prevRelativeBaseline = relativeBaseline;
       hasPrevBaseline = !line.glyphs.empty();
@@ -1424,7 +1430,7 @@ class TextLayoutContext {
 
       // Horizontal alignment. In RTL paragraphs, Start means right-aligned and End means
       // left-aligned.
-      float xOffset = textBox->position.x;
+      float xOffset = 0;
       float justifyExtraPerGap = 0;
       bool isStartAligned = (textBox->textAlign == TextAlign::Start && !paragraphRTL) ||
                             (textBox->textAlign == TextAlign::End && paragraphRTL);
@@ -1871,7 +1877,7 @@ class TextLayoutContext {
     // ParagraphAlign controls the block-flow direction (horizontal in vertical mode).
     // Columns go right-to-left, so Near = right-aligned, Far = left-aligned.
     // xStart is where the right edge of the first column starts.
-    float xStart = textBox->position.x;
+    float xStart = 0;
     if (boxWidth > 0) {
       switch (textBox->paragraphAlign) {
         case ParagraphAlign::Near:
@@ -1909,7 +1915,7 @@ class TextLayoutContext {
     std::unordered_map<Text*, std::vector<VerticalPositionedGlyph>> textGlyphs = {};
 
     bool overflowHidden = textBox->overflow == Overflow::Hidden;
-    float boxLeft = textBox->position.x;
+    float boxLeft = 0;
     float columnX = xStart;
 
     for (size_t colIdx = 0; colIdx < columns.size(); colIdx++) {
@@ -1972,7 +1978,7 @@ class TextLayoutContext {
         }
       }
 
-      float currentY = textBox->position.y + inlineOffset;
+      float currentY = inlineOffset;
 
       for (size_t glyphIdx = 0; glyphIdx < column.glyphs.size(); glyphIdx++) {
         auto& vg = column.glyphs[glyphIdx];

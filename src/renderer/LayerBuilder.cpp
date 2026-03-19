@@ -639,9 +639,13 @@ class LayerBuilderContext {
     elements.reserve(node->elements.size());
 
     for (const auto& element : node->elements) {
-      // Skip TextBox modifier - layout has been baked into GlyphRun positions by TextLayout
+      // Skip empty TextBox modifier (no children) - layout has been baked into GlyphRun positions
+      // by TextLayout. TextBox with children is rendered as a Group.
       if (element->nodeType() == NodeType::TextBox) {
-        continue;
+        auto* textBox = static_cast<const TextBox*>(element);
+        if (textBox->elements.empty()) {
+          continue;
+        }
       }
 
       auto tgfxElement = convertVectorElement(element);

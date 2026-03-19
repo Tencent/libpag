@@ -20,6 +20,7 @@ The most common icon structure:
 ```xml
 <pagx version="1.0" width="200" height="200">
   <Layer width="200" height="200">
+      
     <!-- Background -->
     <Group centerX="0" centerY="0">
       <Ellipse size="180,180"/>

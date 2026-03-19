@@ -159,6 +159,14 @@ static void PrintOptimizeUsage() {
             << "  -h, --help            Show this help message\n";
 }
 
+// --- Helper: Check if any constraint attribute is set ---
+
+static bool HasConstraintAttributes(float left, float right, float top, float bottom, float centerX,
+                                    float centerY) {
+  return !std::isnan(left) || !std::isnan(right) || !std::isnan(top) || !std::isnan(bottom) ||
+         !std::isnan(centerX) || !std::isnan(centerY);
+}
+
 // --- Optimization #1: Remove empty elements ---
 
 static bool IsEmptyLayer(const Layer* layer) {
@@ -221,8 +229,7 @@ static int RemoveEmptyNodes(PAGXDocument* document) {
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Layer) {
       auto layer = static_cast<Layer*>(node.get());
-      count += RemoveEmptyLayers(layer->children,
-                                 layer->layout != LayoutMode::Constraint);
+      count += RemoveEmptyLayers(layer->children, layer->layout != LayoutMode::Constraint);
       count += RemoveEmptyElements(layer->contents);
     } else if (node->nodeType() == NodeType::Group || node->nodeType() == NodeType::TextBox) {
       auto group = static_cast<Group*>(node.get());
@@ -272,6 +279,21 @@ static bool CanDowngradeToGroup(const Layer* layer) {
     return false;
   }
   if (!layer->customData.empty()) {
+    return false;
+  }
+  // Groups cannot participate in container layout — do not suggest downgrade for layers with
+  // layout-related attributes that would be lost.
+  if (layer->layout != LayoutMode::Constraint || layer->flex != 0.0f) {
+    return false;
+  }
+  if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
+    return false;
+  }
+  if (HasConstraintAttributes(layer->left, layer->right, layer->top, layer->bottom, layer->centerX,
+                              layer->centerY)) {
+    return false;
+  }
+  if (!layer->includeInLayout) {
     return false;
   }
   return true;
@@ -351,7 +373,7 @@ static void CollectLintHintsFromContents(const Layer* layer, std::vector<LintHin
           }
 
           // Recurse into Group with the full product from this level
-          if (type == NodeType::Group) {
+          if (type == NodeType::Group || type == NodeType::TextBox) {
             auto group = static_cast<const Group*>(element);
             checkElements(group->elements, localProduct);
           }
@@ -416,7 +438,7 @@ static bool HasHighCostElements(const Layer* layer) {
           if (type == NodeType::Repeater) {
             return true;
           }
-          if (type == NodeType::Group) {
+          if (type == NodeType::Group || type == NodeType::TextBox) {
             auto group = static_cast<const Group*>(element);
             if (checkElements(group->elements)) {
               return true;
@@ -508,7 +530,9 @@ static bool IsMaskASimpleRectangle(const Layer* mask) {
 
 static void CollectLintHints(const Layer* layer, std::vector<LintHint>& hints, bool isRoot) {
   // Hint: child Layers that could be downgraded to Groups.
-  if (!isRoot && !layer->children.empty()) {
+  // Skip when this layer uses container layout — child Layers are layout slots and Groups cannot
+  // participate in container layout flow.
+  if (!isRoot && !layer->children.empty() && layer->layout == LayoutMode::Constraint) {
     bool allDowngradable = true;
     for (auto* child : layer->children) {
       if (!CanDowngradeToGroup(child)) {
@@ -816,7 +840,7 @@ static void CollectReferencedNodes(const std::vector<Element*>& elements,
           }
         }
       }
-    } else if (type == NodeType::Group) {
+    } else if (type == NodeType::Group || type == NodeType::TextBox) {
       auto group = static_cast<const Group*>(element);
       CollectReferencedNodes(group->elements, referenced);
     } else if (type == NodeType::TextPath) {
@@ -896,9 +920,21 @@ static bool IsModifier(NodeType type) {
 }
 
 static bool HasDefaultGroupTransform(const Group* group) {
-  return group->anchor.x == 0 && group->anchor.y == 0 && group->position.x == 0 &&
-         group->position.y == 0 && group->rotation == 0 && group->scale.x == 1 &&
-         group->scale.y == 1 && group->skew == 0 && group->skewAxis == 0 && group->alpha == 1;
+  if (group->anchor.x != 0 || group->anchor.y != 0 || group->position.x != 0 ||
+      group->position.y != 0 || group->rotation != 0 || group->scale.x != 1 ||
+      group->scale.y != 1 || group->skew != 0 || group->skewAxis != 0 || group->alpha != 1) {
+    return false;
+  }
+  // Groups with constraint attributes or layout size cannot be merged — each Group serves as an
+  // independent constraint reference frame and merging would lose positioning semantics.
+  if (HasConstraintAttributes(group->left, group->right, group->top, group->bottom, group->centerX,
+                              group->centerY)) {
+    return false;
+  }
+  if (!std::isnan(group->width) || !std::isnan(group->height)) {
+    return false;
+  }
+  return true;
 }
 
 // Split a Group's elements into geometry and painters. Returns false if the Group contains
@@ -1277,28 +1313,51 @@ static bool ShouldSkipLocalization(const Layer* layer) {
   if (layer->contents.empty()) {
     return true;
   }
+  // Skip localization when the Layer itself uses constraint attributes, as constraints override
+  // x/y at layout time — modifying x/y via localization would be overwritten, leaving the
+  // internal coordinate offsets incorrect.
+  if (HasConstraintAttributes(layer->left, layer->right, layer->top, layer->bottom, layer->centerX,
+                              layer->centerY)) {
+    return true;
+  }
   // Skip localization for layers with constraint-based elements, as constraints imply
   // precise layout control that should be preserved.
   for (auto* element : layer->contents) {
     auto type = element->nodeType();
     if (type == NodeType::Rectangle) {
       auto rect = static_cast<const Rectangle*>(element);
-      if (!std::isnan(rect->left) || !std::isnan(rect->right) || !std::isnan(rect->centerX) ||
-          !std::isnan(rect->top) || !std::isnan(rect->bottom) || !std::isnan(rect->centerY)) {
+      if (HasConstraintAttributes(rect->left, rect->right, rect->top, rect->bottom, rect->centerX,
+                                  rect->centerY)) {
         return true;
       }
     } else if (type == NodeType::Ellipse) {
       auto ellipse = static_cast<const Ellipse*>(element);
-      if (!std::isnan(ellipse->left) || !std::isnan(ellipse->right) ||
-          !std::isnan(ellipse->centerX) || !std::isnan(ellipse->top) ||
-          !std::isnan(ellipse->bottom) || !std::isnan(ellipse->centerY)) {
+      if (HasConstraintAttributes(ellipse->left, ellipse->right, ellipse->top, ellipse->bottom,
+                                  ellipse->centerX, ellipse->centerY)) {
         return true;
       }
     } else if (type == NodeType::Polystar) {
       auto polystar = static_cast<const Polystar*>(element);
-      if (!std::isnan(polystar->left) || !std::isnan(polystar->right) ||
-          !std::isnan(polystar->centerX) || !std::isnan(polystar->top) ||
-          !std::isnan(polystar->bottom) || !std::isnan(polystar->centerY)) {
+      if (HasConstraintAttributes(polystar->left, polystar->right, polystar->top, polystar->bottom,
+                                  polystar->centerX, polystar->centerY)) {
+        return true;
+      }
+    } else if (type == NodeType::Path) {
+      auto path = static_cast<const Path*>(element);
+      if (HasConstraintAttributes(path->left, path->right, path->top, path->bottom, path->centerX,
+                                  path->centerY)) {
+        return true;
+      }
+    } else if (type == NodeType::Text) {
+      auto text = static_cast<const Text*>(element);
+      if (HasConstraintAttributes(text->left, text->right, text->top, text->bottom, text->centerX,
+                                  text->centerY)) {
+        return true;
+      }
+    } else if (type == NodeType::Group || type == NodeType::TextBox) {
+      auto group = static_cast<const Group*>(element);
+      if (HasConstraintAttributes(group->left, group->right, group->top, group->bottom,
+                                  group->centerX, group->centerY)) {
         return true;
       }
     }
@@ -1888,7 +1947,14 @@ static std::string GenerateUniqueId(PAGXDocument* document, const std::string& p
 static void CollectCandidateLayers(Layer* layer,
                                    std::unordered_map<size_t, std::vector<Layer*>>& hashGroups) {
   if (!layer->contents.empty() && layer->composition == nullptr && layer->matrix.isIdentity() &&
-      layer->children.empty() && layer->styles.empty() && layer->filters.empty()) {
+      layer->children.empty() && layer->styles.empty() && layer->filters.empty() &&
+      // Exclude layers with flex sizing — their dimensions are dynamically assigned by the parent
+      // container layout, so a fixed-size Composition would not match the actual rendered size.
+      layer->flex == 0.0f &&
+      // Exclude layers with constraint attributes — their position/size depends on the parent
+      // container, which may differ across instances.
+      !HasConstraintAttributes(layer->left, layer->right, layer->top, layer->bottom, layer->centerX,
+                               layer->centerY)) {
     auto hash = HashLayerStructure(layer);
     hashGroups[hash].push_back(layer);
   }

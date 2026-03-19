@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="400" height="400">
-  <Layer name="text">
-    <Rectangle position="200,175" size="200,50"/>
-    <Stroke color="#CCC" width="1"/>
-    <TextBox position="100,150" width="200" height="50">
+  <Layer name="text" x="100" y="150" width="300" height="200">
+    <Rectangle size="200,50"/>
+    <Stroke color="#CCCCCC"/>
+    <TextBox width="200" height="50">
       <Text text="Hello" fontFamily="Arial" fontSize="20"/>
-      <Fill color="#000"/>
+      <Fill color="#000000"/>
     </TextBox>
   </Layer>
 </pagx>
