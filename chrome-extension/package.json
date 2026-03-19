@@ -1,0 +1,22 @@
+{
+  "name": "pagx-chrome-extension",
+  "version": "1.0.0",
+  "description": "PAGX Viewer - Chrome Extension for previewing PAGX files",
+  "type": "module",
+  "scripts": {
+    "build": "rollup -c rollup.config.js"
+  },
+  "devDependencies": {
+    "@rollup/plugin-alias": "~5.1.1",
+    "@rollup/plugin-commonjs": "~28.0.3",
+    "@rollup/plugin-json": "~6.1.0",
+    "@rollup/plugin-node-resolve": "~16.0.1",
+    "@types/emscripten": "~1.39.6",
+    "esbuild": "~0.15.14",
+    "rollup": "~2.79.1",
+    "rollup-plugin-esbuild": "~4.10.3",
+    "typescript": "~5.0.3"
+  },
+  "license": "Apache-2.0",
+  "author": "Tencent"
+}

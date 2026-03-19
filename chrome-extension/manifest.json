@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "PAGX Viewer",
+  "version": "1.0.1",
+  "description": "Preview PAGX vector graphics files directly in Chrome browser. Drag and drop .pagx files to preview them.",
+  "icons": {
+    "16": "icons/pagx_icon_16x16.png",
+    "48": "icons/pagx_icon_48x48.png",
+    "128": "icons/pagx_icon_128x128.png"
+  },
+
+  "action": {
+    "default_icon": "icons/pagx_icon_16x16.png",
+    "default_title": "PAGX Viewer - Preview PAGX files"
+  },
+
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "webNavigation"
+  ],
+
+  "host_permissions": [
+    "file:///*",
+    "<all_urls>"
+  ],
+
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+
+  "cross_origin_embedder_policy": {
+    "value": "require-corp"
+  },
+  "cross_origin_opener_policy": {
+    "value": "same-origin"
+  },
+
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "viewer/viewer.html",
+        "viewer/viewer.css",
+        "viewer/viewer.js",
+        "wasm/*",
+        "fonts/*"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
