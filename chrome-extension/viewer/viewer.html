@@ -24,8 +24,38 @@
                 <path d="M3 3v5h5"/>
             </svg>
         </button>
+        <div class="toolbar-btn-wrapper">
+            <button id="bg-mode-btn" class="toolbar-btn" title="Background Mode" aria-label="Switch background mode" aria-haspopup="true" aria-expanded="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <path d="M3 3h9v9H3zM12 12h9v9h-9z" fill="currentColor" opacity="0.3"/>
+                </svg>
+            </button>
+            <div id="bg-menu" class="bg-menu hidden" role="menu" aria-label="Background mode options">
+                <button class="bg-menu-item active" role="menuitem" data-bg="grid">
+                    <span class="bg-menu-icon bg-preview-grid"></span>Grid
+                </button>
+                <button class="bg-menu-item" role="menuitem" data-bg="white">
+                    <span class="bg-menu-icon bg-preview-white"></span>White
+                </button>
+                <button class="bg-menu-item" role="menuitem" data-bg="black">
+                    <span class="bg-menu-icon bg-preview-black"></span>Black
+                </button>
+            </div>
+        </div>
+        <button id="code-toggle-btn" class="toolbar-btn" title="View PAGX Source" aria-label="Toggle PAGX source view" aria-pressed="false">
+            <svg viewBox="0 0 1024 1024" aria-hidden="true">
+                <path d="M128 128h768a42.666667 42.666667 0 0 1 42.666667 42.666667v682.666666a42.666667 42.666667 0 0 1-42.666667 42.666667H128a42.666667 42.666667 0 0 1-42.666667-42.666667V170.666667a42.666667 42.666667 0 0 1 42.666667-42.666667z m42.666667 85.333333v597.333334h682.666666V213.333333H170.666667z m682.666666 298.666667l-150.826666 150.869333-60.373334-60.373333L732.672 512 642.133333 421.504l60.373334-60.373333L853.333333 512zM291.328 512l90.538667 90.496-60.330667 60.373333L170.666667 512l150.869333-150.869333L381.866667 421.546667 291.328 512z m188.416 213.333333H388.949333l155.306667-426.666666h90.794667l-155.306667 426.666666z" fill="#8a8a8a"/>
+            </svg>
+        </button>
         <span class="toolbar-divider" aria-hidden="true"></span>
         <span id="file-name" class="file-name" aria-label="Current file name"></span>
+    </div>
+    <div id="code-panel" class="code-panel hidden">
+        <div class="code-panel-header">
+            <span class="code-panel-title">PAGX Source</span>
+        </div>
+        <pre class="code-panel-content"><code id="code-content"></code></pre>
     </div>
     <div id="drop-zone" class="drop-zone" role="region" aria-label="File drop zone">
         <div id="drop-zone-content" class="drop-zone-content" role="button" tabindex="0"
