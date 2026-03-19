@@ -11,48 +11,50 @@
 </head>
 <body>
 <div id="container" class="container">
-    <canvas class="canvas hidden" id="pagx-canvas"></canvas>
-    <div id="toolbar" class="toolbar hidden">
-        <button id="open-btn" class="toolbar-btn" title="Open PAGX File">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <canvas class="canvas hidden" id="pagx-canvas" aria-label="PAGX preview canvas"></canvas>
+    <div id="toolbar" class="toolbar hidden" role="toolbar" aria-label="Viewer controls">
+        <button id="open-btn" class="toolbar-btn" title="Open PAGX File" aria-label="Open PAGX file">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
             </svg>
         </button>
-        <button id="reset-btn" class="toolbar-btn" title="Reset View">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <button id="reset-btn" class="toolbar-btn" title="Reset View" aria-label="Reset zoom and position">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                 <path d="M3 3v5h5"/>
             </svg>
         </button>
-        <span class="toolbar-divider"></span>
-        <span id="file-name" class="file-name"></span>
+        <span class="toolbar-divider" aria-hidden="true"></span>
+        <span id="file-name" class="file-name" aria-label="Current file name"></span>
     </div>
-    <div id="drop-zone" class="drop-zone">
-        <div id="drop-zone-content" class="drop-zone-content">
-            <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <div id="drop-zone" class="drop-zone" role="region" aria-label="File drop zone">
+        <div id="drop-zone-content" class="drop-zone-content" role="button" tabindex="0"
+             aria-label="Drop a PAGX file here or click to browse">
+            <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="17 8 12 3 7 8"/>
                 <line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
             <p class="drop-text">Drag & Drop PAGX file here</p>
             <p class="drop-subtext">or click to browse</p>
-            <input type="file" id="file-input" accept=".pagx" hidden/>
+            <input type="file" id="file-input" accept=".pagx" hidden aria-label="Select PAGX file"/>
         </div>
-        <div id="loading-content" class="loading-content hidden">
+        <div id="loading-content" class="loading-content hidden" role="status" aria-live="polite">
             <p class="loading-text">Loading...</p>
-            <div class="progress-container">
+            <div class="progress-container" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
                 <div id="progress-bar" class="progress-bar"></div>
             </div>
             <p id="progress-text" class="progress-text">0%</p>
         </div>
-        <div id="error-content" class="error-content hidden">
-            <svg class="error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <div id="error-content" class="error-content hidden" role="alert" aria-live="assertive">
+            <svg class="error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <circle cx="12" cy="12" r="10"/>
                 <line x1="12" y1="8" x2="12" y2="12"/>
                 <line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
             <p class="error-title">Failed to load file</p>
             <p id="error-message" class="error-message"></p>
+            <button id="retry-btn" class="retry-btn hidden" aria-label="Retry loading">Retry</button>
         </div>
     </div>
 </div>

@@ -79,9 +79,15 @@ html, body {
     box-sizing: border-box;
 }
 
-.drop-zone-content:hover {
+.drop-zone-content:hover,
+.drop-zone-content:focus-visible {
     border-color: #777;
     background: rgba(255, 255, 255, 0.04);
+}
+
+.drop-zone-content:focus-visible {
+    outline: 2px solid #0052d9;
+    outline-offset: 2px;
 }
 
 .drop-zone-content.hidden {
@@ -102,7 +108,7 @@ html, body {
 }
 
 .drop-subtext {
-    color: #666;
+    color: #999;
     font-size: 14px;
     margin: 0;
 }
@@ -186,13 +192,37 @@ html, body {
 }
 
 .error-message {
-    color: #888;
+    color: #999;
     font-size: 14px;
     margin: 0 0 24px 0;
     max-width: 400px;
     text-align: center;
     word-break: break-word;
     white-space: pre-line;
+}
+
+.retry-btn {
+    padding: 10px 32px;
+    background: #0052d9;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.retry-btn:hover {
+    background: #0062e9;
+}
+
+.retry-btn:focus-visible {
+    outline: 2px solid #0052d9;
+    outline-offset: 2px;
+}
+
+.retry-btn.hidden {
+    display: none;
 }
 
 .toolbar {
@@ -245,6 +275,11 @@ html, body {
 
 .toolbar-btn:active {
     background: rgba(255, 255, 255, 0.2);
+}
+
+.toolbar-btn:focus-visible {
+    outline: 2px solid #0052d9;
+    outline-offset: 2px;
 }
 
 .toolbar-divider {

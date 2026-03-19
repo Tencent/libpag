@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+viewer/viewer.js
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
