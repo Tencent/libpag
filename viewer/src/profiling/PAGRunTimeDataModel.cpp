@@ -81,7 +81,7 @@ void PAGRunTimeDataModel::setChartDataSize(int chartDataSize) {
 
 void PAGRunTimeDataModel::updateData(int64_t currentFrame, int64_t renderTime, int64_t presentTime,
                                      int64_t imageDecodeTime) {
-  if (this->currentFrame == currentFrame) {
+  if (currentFrame < 0 || this->currentFrame == currentFrame) {
     return;
   }
   this->currentFrame = currentFrame;
