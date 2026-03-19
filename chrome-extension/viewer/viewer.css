@@ -378,7 +378,8 @@ html, body {
 }
 
 .split-divider.dragging .split-divider-line {
-    background: rgba(30, 122, 235, 0.5);
+    background: rgba(30, 122, 235, 0.7);
+    width: 3px;
 }
 
 .split-divider.hidden {
