@@ -44,7 +44,10 @@ local.properties
 
 # CodeBuddy
 .codebuddy/designs/
-CODEBUDDY.local.md
+
+# Local config
+*.local.json
+*.local.md
 
 # Skill runtime cache
 .cr-cache/
