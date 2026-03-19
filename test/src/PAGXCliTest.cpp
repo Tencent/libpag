@@ -490,6 +490,128 @@ CLI_TEST(PAGXCliTest, Optimize_NoExtractSingleLayer) {
 }
 
 //==============================================================================
+// Optimize tests — Layout-aware constraint safety
+//==============================================================================
+
+// Localize: skip when Layer itself has constraint attributes (left/top etc.)
+// Modifying x/y on a constrained Layer would be overwritten by the layout engine.
+CLI_TEST(PAGXCliTest, Optimize_LocalizeSkipLayerConstraints) {
+  auto inputPath = TestResourcePath("optimize_localize_skip_constraints.pagx");
+  auto outputPath = TempDir() + "/localize_skip_constraints_out.pagx";
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // Layer has left="50" top="30" — localization must be skipped entirely.
+  // Internal Rectangle position should remain unchanged at 100,80.
+  EXPECT_TRUE(output.find("position=\"100,80\"") != std::string::npos);
+  EXPECT_TRUE(output.find("left=\"50\"") != std::string::npos);
+}
+
+// Localize: skip when contents have Text with constraint attributes.
+CLI_TEST(PAGXCliTest, Optimize_LocalizeSkipTextConstraint) {
+  auto inputPath = TestResourcePath("optimize_localize_skip_text_constraint.pagx");
+  auto outputPath = TempDir() + "/localize_skip_text_out.pagx";
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // Text has centerX="0" centerY="0" — localization must be skipped.
+  EXPECT_TRUE(output.find("centerX=\"0\"") != std::string::npos);
+  EXPECT_TRUE(output.find("centerY=\"0\"") != std::string::npos);
+}
+
+// Localize: skip when contents have Group with constraint attributes.
+CLI_TEST(PAGXCliTest, Optimize_LocalizeSkipGroupConstraint) {
+  auto inputPath = TestResourcePath("optimize_localize_skip_group_constraint.pagx");
+  auto outputPath = TempDir() + "/localize_skip_group_out.pagx";
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // Group has left="20" right="20" — localization must be skipped.
+  EXPECT_TRUE(output.find("left=\"20\"") != std::string::npos);
+  EXPECT_TRUE(output.find("right=\"20\"") != std::string::npos);
+}
+
+// Localize: skip when contents have Path with constraint attributes.
+CLI_TEST(PAGXCliTest, Optimize_LocalizeSkipPathConstraint) {
+  auto inputPath = TestResourcePath("optimize_localize_skip_path_constraint.pagx");
+  auto outputPath = TempDir() + "/localize_skip_path_out.pagx";
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // Path has left="10" right="10" — localization must be skipped.
+  EXPECT_TRUE(output.find("left=\"10\"") != std::string::npos);
+  EXPECT_TRUE(output.find("right=\"10\"") != std::string::npos);
+}
+
+// MergeGroups: do not merge Groups that have constraint attributes.
+CLI_TEST(PAGXCliTest, Optimize_NoMergeConstrainedGroups) {
+  auto inputPath = TestResourcePath("optimize_no_merge_constrained_groups.pagx");
+  auto outputPath = TempDir() + "/no_merge_constrained_out.pagx";
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // Two Groups with different constraints must remain separate (2 Groups, 2 Fills).
+  EXPECT_EQ(CountOccurrences(output, "<Group"), 2u);
+  EXPECT_EQ(CountOccurrences(output, "<Fill"), 2u);
+}
+
+// MergeGroups: do not merge Groups that have explicit layout size (width/height).
+CLI_TEST(PAGXCliTest, Optimize_NoMergeSizedGroups) {
+  auto inputPath = TestResourcePath("optimize_no_merge_sized_groups.pagx");
+  auto outputPath = TempDir() + "/no_merge_sized_out.pagx";
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // Two Groups with different width/height must remain separate.
+  EXPECT_EQ(CountOccurrences(output, "<Group"), 2u);
+}
+
+// ExtractCompositions: do not extract Layers with flex > 0 (dynamic sizing).
+CLI_TEST(PAGXCliTest, Optimize_NoExtractFlexLayers) {
+  auto inputPath = TestResourcePath("optimize_no_extract_flex_layers.pagx");
+  auto outputPath = TempDir() + "/no_extract_flex_out.pagx";
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // Identical flex Layers must not be extracted — their size is dynamic.
+  EXPECT_TRUE(output.find("<Composition") == std::string::npos);
+}
+
+// ExtractCompositions: do not extract Layers with constraint attributes.
+CLI_TEST(PAGXCliTest, Optimize_NoExtractConstrainedLayers) {
+  auto inputPath = TestResourcePath("optimize_no_extract_constrained_layers.pagx");
+  auto outputPath = TempDir() + "/no_extract_constrained_out.pagx";
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // Identical constrained Layers must not be extracted.
+  EXPECT_TRUE(output.find("<Composition") == std::string::npos);
+}
+
+// RemoveEmpty: preserve empty Layer in container layout (sized spacer).
+CLI_TEST(PAGXCliTest, Optimize_KeepLayoutEmptyLayer) {
+  auto inputPath = TestResourcePath("optimize_keep_layout_empty.pagx");
+  auto outputPath = TempDir() + "/keep_layout_empty_out.pagx";
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // The empty middle Layer (width="100" height="100") must be preserved as a layout spacer.
+  EXPECT_EQ(CountOccurrences(output, "<Layer"), 4u);
+}
+
+// RemoveOffCanvas: preserve off-canvas Layers participating in container layout.
+CLI_TEST(PAGXCliTest, Optimize_KeepOffCanvasLayoutLayer) {
+  auto inputPath = TestResourcePath("optimize_keep_offcanvas_layout.pagx");
+  auto outputPath = TempDir() + "/keep_offcanvas_layout_out.pagx";
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // The third Layer is off-canvas (x > 200) but participates in horizontal layout.
+  // It must be preserved to maintain correct layout for visible siblings.
+  EXPECT_EQ(CountOccurrences(output, "<Layer"), 4u);
+}
+
+//==============================================================================
 // Optimize tests — DryRun, general, and error handling
 //==============================================================================
 

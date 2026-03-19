@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="600" height="200">
+  <Layer layout="horizontal" width="600" height="200">
+    <Layer flex="1">
+      <Rectangle position="50,50" size="80,60"/>
+      <Fill color="#FF0000"/>
+    </Layer>
+    <Layer flex="1">
+      <Rectangle position="50,50" size="80,60"/>
+      <Fill color="#FF0000"/>
+    </Layer>
+  </Layer>
+</pagx>

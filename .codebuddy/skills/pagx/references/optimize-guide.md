@@ -309,6 +309,9 @@ A child Layer can be downgraded to Group when **all** of the following are true:
    | Child nodes | styles, filters, child Layers |
    | Attributes | mask, maskType, blendMode (non-default), composition, scrollRect, visible="false", id (if referenced), name, matrix, matrix3D, preserve3D, groupOpacity, passThroughBackground |
    | Container layout | `layout`, `gap`, `flex`, `padding`, `alignment`, `arrangement` |
+   | Layout sizing | `width`, `height` (explicit layout dimensions) |
+   | Constraint positioning | `left`, `right`, `top`, `bottom`, `centerX`, `centerY` |
+   | Layout participation | `includeInLayout="false"` |
 4. Downgrade does not change visual stacking order among siblings (see All-or-Nothing Rule above)
 5. The Layer is a sub-element within the same logical block — not a distinct independent block
 
@@ -435,6 +438,8 @@ mask / blendMode / alpha / name → merge into one Layer.
 **Do not merge** when any of the following apply:
 - Layers are managed by parent container layout (parent has `layout` attribute) — each child
   Layer is a layout slot; merging collapses distinct slots into one
+- Layers use constraint attributes (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`) for
+  positioning — each Layer is an independent constraint container; merging loses positioning
 - Layers serve as constraint layout containers for elements with different painters —
   merging would break painter scope isolation (see `design-patterns.md` §1)
 
@@ -516,6 +521,9 @@ Three checks (fail any one → do not merge):
    merging pulls extra geometry into the modifier's reach.
 3. **Adjacent**: Only merge direct siblings with nothing between them — intervening elements
    would be swallowed or reordered.
+4. **No constraints or layout size**: Groups with constraint attributes
+   (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`) or explicit `width`/`height` serve as
+   independent positioning/sizing units — merging loses their constraint semantics.
 
 ### DropShadowStyle Scope
 
@@ -535,6 +543,10 @@ DropShadowStyle computes shadow from the entire Layer's opaque content (includin
 - `visible="false"` Layer is not "empty" — likely a mask definition.
 - Empty Layer may serve as mask target (`id` referenced). Verify before removing.
 - **Mask layers must not be moved** in the layer tree.
+- **Layout spacers**: In a container layout parent (`layout="horizontal"` or `"vertical"`),
+  empty child Layers with `includeInLayout="true"` (default) must not be removed — they may
+  serve as spacing placeholders (e.g., `flex="1"` spacer or fixed-size gap). Automated by
+  `pagx optimize`.
 
 ### Default Attribute Values
 
@@ -617,6 +629,10 @@ coordinates relative to the geometry element's local origin (not canvas-absolute
 - DropShadowStyle scope is unchanged by Composition extraction (instance remains a child).
 - No parameterization — instances differing beyond position cannot share a Composition.
 - Geometry does not propagate outside the Composition boundary.
+- **Dynamic-size Layers cannot be extracted**: Layers with `flex` > 0 or constraint attributes
+  (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`) have their size dynamically assigned by
+  the parent layout engine. Composition requires fixed `width`×`height`, so these Layers must
+  not be extracted — even if their internal structure is identical.
 
 ### PathData & Color Source Reuse
 
