@@ -20,7 +20,6 @@
 
 #include <optional>
 #include <string>
-#include <unordered_map>
 #include <vector>
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/LayerFilter.h"
