@@ -1,8 +1,8 @@
 # PAGX Generation Guide
 
-Complete methodology for generating PAGX files from visual descriptions — from reference
-analysis through verification. After generation, continue to `optimize-guide.md` for
-optimization review.
+Complete methodology for generating PAGX files from visual descriptions — from analysis
+through verification. This guide is self-contained: follow it to produce correct output
+without relying on post-processing.
 
 ## References
 
@@ -14,54 +14,39 @@ Read before starting generation:
 | `design-patterns.md` | Structure decisions, text layout, practical pitfall patterns |
 | `examples.md` | Structural patterns for Icons, UI, Logos, Charts, Decorative backgrounds |
 
-Read these as needed:
+Read as needed:
 
 | Reference | Content |
 |-----------|---------|
 | `attributes.md` | Attribute defaults, enumerations, required attributes |
-| `cli.md` | CLI tool usage — `render`, `bounds` commands |
+| `cli.md` | CLI tool usage — `render`, `bounds`, `font info` commands |
 
 ---
 
-## Generation Steps
+## Step 1: Analyze the Reference
 
-When generating PAGX from a visual description, follow these steps:
+Systematically decompose the visual before writing any code:
 
-### Step 1: Analyze the Reference
+1. **Layer structure** — how many distinct depth layers? Background vs foreground?
+2. **Rendering technique** — filled shapes, stroked line art, or both?
+3. **Color scheme** — exact colors, gradients, transparency?
+4. **Shape vocabulary** — geometric primitives or freeform curves?
+5. **Text inventory** — list all text elements with approximate font sizes.
 
-When working from a reference image or style description, systematically decompose it before
-writing any code:
+Document these observations before proceeding.
 
-1. **Layer structure** — how many distinct depth layers? What is background vs foreground?
-2. **Rendering technique** — are shapes filled (solid) or stroked (line art)? Both?
-3. **Color scheme** — extract the exact colors. How many unique colors? Any gradients?
-4. **Shape vocabulary** — geometric (circles, polygons) or organic (freeform curves)?
-5. **Level of detail** — is it highly detailed or intentionally abstract/minimal?
+---
 
-Document these observations before proceeding. This prevents mid-generation style drift.
+## Step 2: Decompose into Structure
 
-### Step 2: Decompose into Blocks
+### Component Tree
 
-Identify independent visual units. Each becomes a `<Layer>`. Examples: a card, a button,
-an icon, a text block, a chart axis, a decorative background — any element that could be
-repositioned as a whole.
-
-Determine canvas size (`width`/`height`) and each block's position. Use integer values.
-Use `pagx bounds` for element boundaries.
-
-**Layer tree = visual component tree.** The Layer hierarchy must reflect the semantic
-containment structure of the visual content — not a flat list of shapes. Apply this rule
-recursively from the canvas level down to the smallest components:
+Identify independent visual units — each becomes a `<Layer>`. The hierarchy reflects
+semantic containment, not a flat list:
 
 > A Layer represents a content unit that remains **visually complete** when moved as a whole.
-> If moving a Layer leaves behind a sibling that loses its visual meaning (e.g., a label
-> without its background, a price without its discount tag), those siblings belong under the
-> same parent Layer.
-
-The test: for any two sibling Layers, ask "can I move one without the other and both still
-make visual sense?" If not, they should share a parent.
-
-**Example** — a profile header decomposes into nested Layers:
+> If moving a Layer leaves behind a sibling that loses meaning, those siblings belong under
+> the same parent Layer.
 
 ```
 ProfileHeader (Layer)
@@ -76,176 +61,87 @@ ProfileHeader (Layer)
     └── label (Group: icon + "Edit" text)
 ```
 
-- Moving `ProfileHeader` carries everything — the entire header relocates.
-- Moving `AvatarGroup` carries the photo and the online badge together; `UserInfo` stays.
-- Moving `OnlineBadge` alone repositions only the dot on the avatar.
-- `Username` and `Bio` are Groups (not Layers) because they are internal parts of `UserInfo`
-  that need no Layer-exclusive features — but they must not be top-level siblings outside
-  `UserInfo`, or moving the user info block would leave orphaned text behind.
+Extract repeated subtrees as `<Composition>` in Resources when the same structure appears
+at 2+ positions (differing only in position).
 
-**After building the component tree, decide layout for each container** using the two-step
-process from `design-patterns.md` §Layout Decisions:
+### Layout Decisions (Top-Down)
 
-1. **Step 1 — Container mode**: choose `layout="horizontal"/"vertical"` or absolute (default)
-   based on how child Layers are arranged. Set `gap`, `padding`, `alignment`.
-2. **Step 2 — Internal positioning**: use constraint attributes for backgrounds, text, icons.
+For each container, decide layout **before writing content** — this mirrors CSS Flexbox:
 
-Apply recursively to nested containers. See `design-patterns.md` for detailed patterns.
+1. **Container mode** — look at child Layers:
+   - Row → `layout="horizontal"` + `gap` + `padding` + `alignment`
+   - Column → `layout="vertical"` + `gap` + `padding` + `alignment`
+   - Overlapping / free-form → absolute (default)
 
-**When to set explicit `width`/`height`** — set dimensions when you need a specific reference
-frame, not when the measured or layout-assigned size is sufficient:
-- Root Layer typically matches canvas size.
-- Layout containers (`layout="horizontal"/"vertical"`) that need a fixed size — otherwise
-  the engine measures children and uses that.
-- Containers where `right`/`bottom`/`centerX`/`centerY` or opposite-pair constraints should
-  reference a specific design size rather than the content's measured size.
+2. **Internal positioning** — for VectorElements inside a Layer, use constraint attributes
+   (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`).
 
-### Step 3: Build Incrementally
+Apply recursively from root to leaf. See `design-patterns.md` §Layout Decisions for the
+full two-step process and patterns.
 
-For each block, construct the internal VectorElement tree:
+### Sizing Rules
 
-1. Place geometry elements (Rectangle, Ellipse, Text, etc.)
-2. Add modifiers if needed (TextBox, TrimPath, Repeater, etc.)
-3. Add painters (Fill, Stroke) — see `design-patterns.md` §1 Painter Scope Isolation
-4. Wrap sub-elements in Groups when they need different painters (`spec-essentials.md` §4).
-   When using constraint layout, constrained shapes needing different painters must each be
-   in a separate Layer (not Group) — see `design-patterns.md` §1 Painter Scope Isolation.
-5. Extract repeated subtrees as `<Composition>` in Resources
+- **Container layout children**: the layout engine computes positions — never set `x`/`y`
+  on children in layout flow.
+- **Three-state child sizing**: explicit `width`/`height` = fixed; no size + `flex=0` =
+  content-measured; no size + `flex>0` = proportional share. Choose one — do not combine
+  `flex` with explicit main-axis size (explicit size takes precedence, `flex` is ignored).
+- **`arrangement="spaceBetween"`** to push items to container edges — not empty flex spacer
+  Layers.
+- **`alignment="stretch"`** is essential for nested layouts (e.g., vertical parent with
+  horizontal rows) — without it, rows shrink-wrap and flex children get zero width.
 
-**Build in layers of complexity** — do not generate the full design in one shot:
+### Origin-Based Positioning
 
-1. **Core structure first** — backgrounds, primary shapes, main text. Render and verify.
-2. **Add secondary elements** — one category at a time. Re-render after each addition.
-3. **Polish** — fine-tune spacing, alignment, and visual balance.
+Write coordinates **relative to their immediate container** from the start:
 
-This isolates defects: if something breaks, it was the last thing added.
+| Content Type | How to Position |
+|--------------|----------------|
+| Layout-managed (container/constraint) | Use layout attributes — engine computes positions |
+| Absolute-positioned (fallback) | Layer `x`/`y` for block offset; internal elements from `0,0` |
 
-**Painter efficiency** — write compact painter scope from the start to avoid redundancy:
-
-- **Same Fill/Stroke → share scope**: When generating symmetric or paired elements (two eyes,
-  two legs, two buttons) with identical painters, place all geometry in one Group with a shared
-  painter.
-
-  ```xml
-  <Group>
-    <Ellipse left="-6.5" top="-6" size="5,6"/>
-    <Ellipse left="1.5" top="-6" size="5,6"/>
-    <Fill color="#E0E7FF"/>
-  </Group>
-  ```
-
-- **Fill + Stroke on same geometry → one Group**: A painter does not clear the geometry list.
-  When a shape needs both Fill and Stroke, declare the geometry once with both painters.
-
-  ```xml
-  <Group>
-    <Ellipse size="80,20"/>
-    <Fill color="#1F1240"/>
-    <Stroke color="#8B5CF625" width="1.5"/>
-  </Group>
-  ```
-
-**Auto layout mental model** — the two-step process mirrors CSS Flexbox. The core principle
-is **declare structure first, position content second**: set the container's direction
-(`layout`), `padding`, and `gap` first, then declare children — the engine computes their
-positions automatically.
-
-Key rules (details in `spec-essentials.md` §3a Container Layout):
-
-- **No width + flex=0 (default) = content-measured** — children without explicit main-axis
-  size default to their content bounds. Children with `flex` > 0 share remaining space
-  proportionally by flex weight. Use `flex="1"` on all children for equal distribution.
-  Children with explicit size are fixed.
-- **`alignment="stretch"`** — essential for nested layouts (e.g., vertical parent with
-  horizontal rows). Without it, rows shrink-wrap and flexible cells get zero width.
-- **Background fills** — in known-size containers use `size` directly; in dynamic-size
-  containers (flex, stretch) use `left="0" right="0" top="0" bottom="0"` to auto-fill.
-
-See `design-patterns.md` §Container Layout — Key Patterns for the full grid layout template.
-
-### Step 4: Localize Coordinates
-
-| Content Type | AI Action | Reason |
-|--------------|-----------|--------|
-| **Layout-managed** (constraint/container) | **DO NOTHING** — engine handles it | `x`/`y`/`position` are overwritten by layout engine |
-| **Absolute-positioned** (fallback) | Set Layer `x`/`y` for block offset; internal coords from `0,0` | See `optimize-guide.md` §Coordinate Localization |
-
-> **Rule**: If you used constraints or container layout, skip manual coordinate setting — the engine computes positions.
-
-### Step 5: Verify and Refine
-
-After each render, follow the **Verification and Correction Loop** at the end of this
-document. For layout-managed content, focus on verifying that layout attributes (`layout`,
-`gap`, `padding`, `alignment`, `arrangement`, constraint attributes) produce the intended
-result. For absolute-positioned content, run `pagx bounds` to detect misalignment.
-
-After verification passes, continue to `optimize-guide.md` for optimization review.
+**Children must start from `(0,0)`** — within any Layer or Group, position the first child
+element at the origin. Avoid negative coordinates and avoid leaving empty margins between
+`(0,0)` and the top-left of the nearest child. The engine measures content-measured
+containers from `(0,0)` to the bottom-right extent: negative coordinates are excluded from
+measured bounds, and empty top-left margins inflate the bounds. Both cause layout
+miscalculation in auto-sized containers.
 
 ---
 
-## Verification and Correction Loop
+## Step 3: Build Content
 
-After **every render**, follow this loop until the output matches the design intent.
+For each block, construct the VectorElement tree following these principles.
 
-### 1. Measure All Layers
+### Geometry and Painters
 
-Run `pagx bounds` unconditionally — do not skip this step even if the screenshot looks correct:
+1. Place geometry elements (Rectangle, Ellipse, Path, Text, etc.)
+2. Add painters (Fill, Stroke) — they render all geometry accumulated in the current scope
+3. Wrap sub-elements in **Groups** when they need different painters
+4. With constraint layout, constrained shapes needing different painters must each be in a
+   separate **Layer** — see `design-patterns.md` §1 Painter Scope Isolation
 
-```bash
-pagx bounds input.pagx
+**Painter efficiency** — share scope when possible:
+
+```xml
+<!-- Same fill on paired elements → one Group -->
+<Group>
+  <Ellipse left="-6.5" top="-6" size="5,6"/>
+  <Ellipse left="1.5" top="-6" size="5,6"/>
+  <Fill color="#E0E7FF"/>
+</Group>
+
+<!-- Fill + Stroke on same geometry → one Group, geometry declared once -->
+<Group>
+  <Ellipse size="80,20"/>
+  <Fill color="#1F1240"/>
+  <Stroke color="#8B5CF625" width="1.5"/>
+</Group>
 ```
 
-This outputs `x=<left> y=<top> width=<w> height=<h>` for every layer. Use `--id` or `--xpath`
-for targeted measurement when needed (see `cli.md`).
+### Text Positioning
 
-### 2. Check Layout and Alignment
-
-**For layout-managed content**, verify layout attributes produce the intended result:
-- Container `layout` direction matches the visual arrangement
-- `gap` value matches the intended spacing between children
-- `padding` is consistent and matches the design
-- `alignment` and `arrangement` produce the correct distribution
-- Constraint attributes (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`) position
-  elements correctly
-- Containers using `right`/`bottom`/`centerX`/`centerY` constraints have appropriate
-  `width`/`height` (explicit, layout-assigned, or measured)
-
-**For absolute-positioned content**, scan bounds data for misalignment:
-- Elements that should share an edge or center: compute `center_y = bounds_y + bounds_height / 2`
-  and compare
-- Gaps between adjacent elements should be equal within the same visual context
-- Content that should be centered: `bounds_x + bounds_width / 2 ≈ canvas_width / 2`
-
-### 3. Fix Issues
-
-- **Layout issues** → adjust `layout`/`gap`/`padding`/`alignment`/`arrangement` or constraint
-  attributes
-- **Absolute positioning off** → adjust Layer `x`/`y` or element `position` to equalize values
-
-### 4. Re-render and Visually Confirm
-
-After applying fixes, re-render and **read the screenshot** to confirm:
-
-- No new issues introduced (one fix can shift other elements)
-- Overall visual balance looks correct
-- Text is not clipped or overflowing
-
-If any issues remain, return to step 1. Repeat until clean.
-
-### 5. Structural Checks
-
-After alignment is correct, verify structural integrity:
-
-- **Shared transforms**: Elements that move/rotate/scale together MUST be in the same
-  `<Group>`. Separate Groups with the same rotation rotate around different origins.
-- **Painter consistency**: Stroke widths within one visual unit should be intentionally
-  close (e.g., main `width="6"`, detail `width="4"`), not wildly different.
-- **Path complexity**: A single Path with >15 curve segments is fragile. Consider
-  decomposing into simpler primitives (Rectangle, Ellipse).
-
-### 6. Text Positioning
-
-**Single-line labels and values** — use Text with constraints directly:
+**Single-line text** — use Text with constraints directly:
 
 ```xml
 <!-- Centered in container -->
@@ -255,46 +151,92 @@ After alignment is correct, verify structural integrity:
 <!-- Left-aligned, vertically centered -->
 <Text text="Label" fontFamily="Arial" fontSize="14" left="16" centerY="0"/>
 <Fill color="#333"/>
-
-<!-- Right-aligned, vertically centered -->
-<Text text="$99" fontFamily="Arial" fontSize="20" right="16" centerY="0"/>
-<Fill color="#10B981"/>
 ```
 
-**When to add TextBox** — when you need one of these features:
-- **Multiline wrapping**: text must wrap at a boundary → `TextBox` with `width` or
-  `left`+`right` constraints (requires container with known width)
-- **Per-line alignment**: center/end alignment of individual lines → `textAlign`
-- **Rich text**: multiple Text elements with different styles unified into one text block
-- **Vertical centering in a fill area**: TextBox with `paragraphAlign="middle"` in a
-  container with known height (e.g., button labels)
+**When to add TextBox** — only when you need multiline wrapping, per-line alignment
+(`textAlign`), rich text (multiple styles in Groups), or vertical centering in a fill area
+(`paragraphAlign="middle"`). See `design-patterns.md` §Text Layout Decisions for complete
+patterns.
 
-```xml
-<!-- Multiline wrapped text -->
-<TextBox left="20" right="20" top="10" textAlign="center">
-  <Text text="Long text that wraps..." fontFamily="Arial" fontSize="14"/>
-  <Fill color="#333"/>
-</TextBox>
+**TextBox requires a known container width** for wrapping. When the parent is
+content-measured (no explicit width, no layout-assigned width), opposite-pair constraints
+(`left="0" right="0"`) create circular dependency — use `centerX`/`centerY` on Text
+instead. See `design-patterns.md` §9 for details.
 
-<!-- Button label centered in a known-size container -->
-<TextBox left="0" right="0" top="0" bottom="0"
-         textAlign="center" paragraphAlign="middle">
-  <Text text="Submit" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-  <Fill color="#FFF"/>
-</TextBox>
-```
+Do not set `textAnchor` when using TextBox or constraint attributes — it shifts bounds
+per line and compounds with constraint positioning unpredictably.
 
-Note: `textAnchor` shifts bounds per line while constraints translate the entire bounds —
-they compound. Use TextBox `textAlign` for multiline alignment instead.
+### PAGX-Specific Format Rules
 
-### 7. Text Measurement (Debugging Only)
+These constraints differ from CSS/SVG and must be respected during generation:
 
-`pagx font info` is a debugging tool for investigating text clipping, misalignment, or
-unexpected wrapping — not part of the generation workflow.
+- **`roundness` is a single value** — applied uniformly to all corners. Per-corner values
+  like CSS `border-radius: 10 5 8 6` are not supported. Auto-limited to
+  `min(roundness, width/2, height/2)`. For mixed corners, use a mask or composite Rectangles.
+
+- **Constraint mutual exclusion** — per axis, use only one of:
+  - `left` alone, `right` alone, `centerX` alone
+  - `left`+`right` pair (stretches/derives)
+  - Never combine `left`+`centerX` or `right`+`centerX`
+
+- **Rectangular clipping** — prefer `scrollRect` over mask. It is GPU-accelerated with no
+  texture overhead:
+
+  ```xml
+  <Layer scrollRect="0,0,400,300"><!-- content clipped to rect --></Layer>
+  ```
+
+  Reserve mask for non-rectangular or soft-edge clipping.
+
+- **Gradient/pattern coordinates** are relative to the **geometry element's local origin**,
+  not canvas coordinates. A Rectangle at `left="200"` with `size="100,100"` uses
+  `startPoint="0,50" endPoint="100,50"` for a horizontal gradient — not `"200,50"` etc.
+
+---
+
+## Step 4: Verify and Refine
+
+After **every render**, follow this loop until the output matches the design intent.
+
+### 1. Measure
+
+Run `pagx bounds` to get exact dimensions of every layer:
 
 ```bash
-pagx font info --name "Arial" --size 24
+pagx bounds input.pagx
 ```
-- **Single-line height**: `ascent + descent + leading`
-- **Baseline position**: element top + `ascent`
-- **Text width**: render into PAGX and measure with `pagx bounds`
+
+Use `--id` or `--xpath` for targeted measurement (see `cli.md`).
+
+### 2. Check Layout
+
+**Layout-managed content** — verify:
+- Container `layout` direction, `gap`, `padding` match design
+- `alignment` and `arrangement` produce correct distribution
+- Constraint attributes position elements correctly
+
+**Absolute-positioned content** — scan bounds for alignment, consistent gaps, and
+centering.
+
+### 3. Fix and Re-render
+
+- Layout issues → adjust layout/constraint attributes
+- Absolute positioning → adjust `x`/`y`
+
+After fixes, re-render and **read the screenshot** to confirm no new issues. Repeat until
+clean.
+
+---
+
+## Step 5: Automated Formatting
+
+Run `pagx optimize` as a final formatting pass — it applies safe mechanical transformations
+(empty element removal, resource deduplication, coordinate localization, consistent
+formatting):
+
+```bash
+pagx optimize -o output.pagx input.pagx
+```
+
+This step is for cleanup only. All structural correctness, layout decisions, and format
+constraints must already be handled in Steps 1–4.
