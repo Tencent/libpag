@@ -529,7 +529,7 @@ static std::pair<float, float> MeasureLayer(const Layer* layer, FontConfig* font
     return {measuredWidth, measuredHeight};
   }
 
-  if (layer->layout != LayoutMode::Absolute && !layer->children.empty()) {
+  if (layer->layout != LayoutMode::Constraint && !layer->children.empty()) {
     // Layout container: measure from child Layers along the layout axis.
     bool horizontal = (layer->layout == LayoutMode::Horizontal);
 
@@ -610,7 +610,7 @@ static void LayoutLayer(Layer* layer, FontConfig* fontProvider) {
   // Step 1: If this Layer has layout but missing dimensions, use measured sizes.
   // The parent's PerformContainerLayout may have already assigned sizes for flexible children.
   // This handles the case where this Layer is a top-level container without explicit dimensions.
-  if (layer->layout != LayoutMode::Absolute && !layer->children.empty()) {
+  if (layer->layout != LayoutMode::Constraint && !layer->children.empty()) {
     if (std::isnan(layer->width) || std::isnan(layer->height)) {
       auto measured = MeasureLayer(layer, fontProvider);
       if (std::isnan(layer->width)) {
@@ -623,14 +623,14 @@ static void LayoutLayer(Layer* layer, FontConfig* fontProvider) {
   }
 
   // Step 2: Container layout — arrange child Layers and assign flexible sizes.
-  if (layer->layout != LayoutMode::Absolute && !layer->children.empty()) {
+  if (layer->layout != LayoutMode::Constraint && !layer->children.empty()) {
     PerformContainerLayout(layer, fontProvider);
   }
 
   // Step 3: For non-layout Layers without explicit dimensions, adopt measured sizes so that
   // constraint layout within contents can work. Skip if dimensions are already set.
   // Also skip if this Layer has no contents and no children (nothing to measure or constrain).
-  if (layer->layout == LayoutMode::Absolute &&
+  if (layer->layout == LayoutMode::Constraint &&
       (std::isnan(layer->width) || std::isnan(layer->height)) &&
       (!layer->contents.empty() || !layer->children.empty())) {
     auto measured = MeasureLayer(layer, fontProvider);
@@ -665,7 +665,7 @@ static void LayoutLayer(Layer* layer, FontConfig* fontProvider) {
       if (!hasConstraints) {
         continue;
       }
-      bool applyConstraints = layer->layout == LayoutMode::Absolute || !child->includeInLayout;
+      bool applyConstraints = layer->layout == LayoutMode::Constraint || !child->includeInLayout;
       if (!applyConstraints) {
         continue;
       }

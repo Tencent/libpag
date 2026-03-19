@@ -633,7 +633,7 @@ Layer child elements are automatically categorized into four collections by type
 | `composition` | idref | - | Composition reference "@id" |
 | `width` | float | - | Layout width (see §6) |
 | `height` | float | - | Layout height (see §6) |
-| `layout` | LayoutMode | absolute | Layout mode for child layers (see §6) |
+| `layout` | LayoutMode | constraint | Layout mode for child layers (see §6) |
 | `gap` | float | 0 | Child Layer spacing (see §6) |
 | `padding` | float or "t,r,b,l" | 0 | Inner padding (see §6) |
 | `alignment` | Alignment | start | Cross-axis alignment (see §6) |
@@ -1800,7 +1800,7 @@ Auto layout enables elements to declare layout intent, and the engine automatica
 
 The `width`/`height` attributes declare a container's layout size — the shared foundation for both layout mechanisms. Container layout uses it to determine available space for child Layers; constraint layout uses it as the positioning reference frame. Both Layer and Group can have layout sizes.
 
-For child Layers, container layout and constraint layout are **mutually exclusive** — a child participating in container layout is sized by the container; a child outside (absolute parent or `includeInLayout="false"`) is sized by constraints:
+For child Layers, container layout and constraint layout are **mutually exclusive** — a child participating in container layout is sized by the container; a child outside (constraint parent or `includeInLayout="false"`) is sized by constraints:
 
 **In container layout** (child participates in `layout="horizontal"/"vertical"`):
 - Main axis: explicit `width`/`height` → fixed (flex ignored); no explicit size with `flex=0` (default) → content-measured; no explicit size with `flex>0` → proportional share of remaining space by flex weight
@@ -1834,7 +1834,7 @@ All three child Layers have no `width` set and `flex="1"`, equally sharing avail
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `layout` | LayoutMode | absolute | Main axis direction for child layer arrangement |
+| `layout` | LayoutMode | constraint | Main axis direction for child layer arrangement |
 | `gap` | float | 0 | Spacing between adjacent child Layers |
 | `flex` | float | 0 | Flex weight for main-axis sizing. When a child has no explicit main-axis size: `flex=0` (default) uses content-measured size; `flex>0` takes a proportional share of remaining space by weight. Ignored when explicit `width`/`height` is set on the main axis |
 | `padding` | float or "t,r,b,l" | 0 | Inner padding. Supports single value (uniform), two values (vertical,horizontal), four values (top,right,bottom,left), consistent with CSS shorthand |
@@ -1846,7 +1846,7 @@ All three child Layers have no `width` set and `flex="1"`, equally sharing avail
 
 | Value | Description |
 |-------|-------------|
-| `absolute` | No auto layout; child layers use absolute positioning (default) |
+| `constraint` | Arrange child layers using constraint-based positioning (default) |
 | `horizontal` | Main axis horizontal, cross axis vertical |
 | `vertical` | Main axis vertical, cross axis horizontal |
 
@@ -1909,7 +1909,7 @@ When a Layer has `layout` set, all child Layer positions are determined by the l
 Constraint layout allows content nodes to declare positional relationships with their container, and the engine automatically calculates coordinates. Supported elements:
 
 - **Layer contents**: Geometry elements (Rectangle, Ellipse, Polystar, Path), Text, TextBox, and Group
-- **Child Layers**: When the parent Layer has no container layout (`layout="absolute"`, the default), or the child Layer has `includeInLayout="false"`
+- **Child Layers**: When the parent Layer has no container layout (`layout="constraint"`, the default), or the child Layer has `includeInLayout="false"`
 
 ```xml
 <!-- Rectangle fills container with 10px margins -->
@@ -2045,7 +2045,7 @@ The vertical axis follows the same pattern.
 
 Child Layer constraint attributes override the child Layer's `x`/`y`. Activation conditions:
 
-1. **Parent Layer has no container layout**: `layout` is `absolute` (default), or
+1. **Parent Layer has no container layout**: `layout` is `constraint` (default), or
 2. **Child Layer leaves the layout flow**: `includeInLayout="false"`
 
 ```xml
@@ -2155,7 +2155,7 @@ Layer / Group
 | **TileMode** | `clamp`, `repeat`, `mirror`, `decal` |
 | **FilterMode** | `nearest`, `linear` |
 | **MipmapMode** | `none`, `nearest`, `linear` |
-| **LayoutMode** | `absolute`, `horizontal`, `vertical` |
+| **LayoutMode** | `constraint`, `horizontal`, `vertical` |
 | **Alignment** | `start`, `center`, `end`, `stretch` |
 | **Arrangement** | `start`, `center`, `end`, `spaceBetween` |
 

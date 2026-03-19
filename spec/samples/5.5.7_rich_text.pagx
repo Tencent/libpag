@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates rich text with mixed styles -->
 <pagx version="1.0" width="400" height="400">
-  <Layer>
-    <Text text="Rich Text" fontFamily="Arial" fontStyle="Bold" fontSize="42" position="200,105" textAnchor="center"/>
+  <Layer left="200" top="105">
+    <Text text="Rich Text" fontFamily="Arial" fontStyle="Bold" fontSize="42" textAnchor="center"/>
     <Fill>
       <LinearGradient startPoint="-200,0" endPoint="0,0">
         <ColorStop offset="0" color="#8B5CF6"/>
@@ -73,11 +73,11 @@
       <Text text=" rich text." fontFamily="Arial" fontSize="20"/>
       <Fill color="#475569"/>
     </Group>
-    <TextBox position="0,142" size="400,0" lineHeight="48" textAlign="center"/>
+    <TextBox left="0" top="142" size="400,0" lineHeight="48" textAlign="center"/>
   </Layer>
 
-  <Layer>
-    <Text text="Gradient Fill" fontFamily="Arial" fontStyle="Bold" fontSize="28" position="200,310" textAnchor="center"/>
+  <Layer left="200" top="310">
+    <Text text="Gradient Fill" fontFamily="Arial" fontStyle="Bold" fontSize="28" textAnchor="center"/>
     <Fill>
       <LinearGradient startPoint="-100,0" endPoint="100,0">
         <ColorStop offset="0" color="#F43F5E"/>

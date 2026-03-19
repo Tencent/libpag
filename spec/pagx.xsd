@@ -322,7 +322,7 @@
 
   <xs:simpleType name="LayoutModeType">
     <xs:restriction base="xs:string">
-      <xs:enumeration value="absolute"/>
+      <xs:enumeration value="constraint"/>
       <xs:enumeration value="horizontal"/>
       <xs:enumeration value="vertical"/>
     </xs:restriction>
@@ -916,7 +916,7 @@
     <xs:attribute name="composition" type="IdRefType"/>
     <xs:attribute name="width" type="xs:decimal"/>
     <xs:attribute name="height" type="xs:decimal"/>
-    <xs:attribute name="layout" type="LayoutModeType" default="absolute"/>
+    <xs:attribute name="layout" type="LayoutModeType" default="constraint"/>
     <xs:attribute name="gap" type="xs:decimal" default="0"/>
     <xs:attribute name="flex" type="xs:decimal" default="0"/>
     <xs:attribute name="padding" type="PaddingType"/>

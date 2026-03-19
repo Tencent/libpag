@@ -25,9 +25,9 @@ namespace pagx {
  */
 enum class LayoutMode {
   /**
-   * No auto layout. Child layers use absolute positioning.
+   * Arrange child layers using constraint-based positioning.
    */
-  Absolute,
+  Constraint,
   /**
    * Arrange child layers horizontally from left to right.
    */

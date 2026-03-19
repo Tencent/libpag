@@ -92,11 +92,11 @@ static void CheckAutoLayoutPatterns(const PAGXDocument* doc, std::vector<Validat
     }
 
     // Check: Container layout with child constraints (provably ignored).
-    // Constraint attributes on a child Layer are only effective when the parent uses absolute
+    // Constraint attributes on a child Layer are only effective when the parent uses constraint
     // layout or the child has includeInLayout="false". When a child participates in container
-    // layout flow (includeInLayout=true, parent layout != absolute), constraints are silently
+    // layout flow (includeInLayout=true, parent layout != constraint), constraints are silently
     // ignored — this is almost always unintentional.
-    if (layer->layout != LayoutMode::Absolute) {
+    if (layer->layout != LayoutMode::Constraint) {
       for (const auto& child : layer->children) {
         if (child == nullptr || !child->includeInLayout) {
           continue;  // includeInLayout="false" children CAN use constraints

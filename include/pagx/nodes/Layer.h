@@ -165,9 +165,9 @@ class Layer : public Node {
 
   /**
    * The layout mode for arranging child layers. When set to Horizontal or Vertical, child layers
-   * are automatically positioned along this axis. The default value is Absolute.
+   * are automatically positioned along this axis. The default value is Constraint.
    */
-  LayoutMode layout = LayoutMode::Absolute;
+  LayoutMode layout = LayoutMode::Constraint;
 
   /**
    * The spacing between adjacent child layers in the layout direction. The default value is 0.
@@ -205,39 +205,39 @@ class Layer : public Node {
 
   /**
    * Distance from the left edge of the parent Layer. Takes effect when the parent has no container
-   * layout (absolute mode) or when this layer has includeInLayout=false. NAN means not set.
+   * layout (constraint mode) or when this layer has includeInLayout=false. NAN means not set.
    */
   float left = NAN;
 
   /**
    * Distance from the right edge of the parent Layer. Takes effect when the parent has no container
-   * layout (absolute mode) or when this layer has includeInLayout=false. NAN means not set.
+   * layout (constraint mode) or when this layer has includeInLayout=false. NAN means not set.
    */
   float right = NAN;
 
   /**
    * Distance from the top edge of the parent Layer. Takes effect when the parent has no container
-   * layout (absolute mode) or when this layer has includeInLayout=false. NAN means not set.
+   * layout (constraint mode) or when this layer has includeInLayout=false. NAN means not set.
    */
   float top = NAN;
 
   /**
    * Distance from the bottom edge of the parent Layer. Takes effect when the parent has no
-   * container layout (absolute mode) or when this layer has includeInLayout=false. NAN means not
+   * container layout (constraint mode) or when this layer has includeInLayout=false. NAN means not
    * set.
    */
   float bottom = NAN;
 
   /**
    * Horizontal offset from the center of the parent Layer. Takes effect when the parent has no
-   * container layout (absolute mode) or when this layer has includeInLayout=false. NAN means not
+   * container layout (constraint mode) or when this layer has includeInLayout=false. NAN means not
    * set.
    */
   float centerX = NAN;
 
   /**
    * Vertical offset from the center of the parent Layer. Takes effect when the parent has no
-   * container layout (absolute mode) or when this layer has includeInLayout=false. NAN means not
+   * container layout (constraint mode) or when this layer has includeInLayout=false. NAN means not
    * set.
    */
   float centerY = NAN;

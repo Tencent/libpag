@@ -12,7 +12,7 @@
         <Text text="Design Review" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#FFF"/>
       </Group>
-      <TextBox position="12,28" size="296,32" textAlign="center" paragraphAlign="middle"/>
+      <TextBox left="12" top="28" size="296,32" textAlign="center" paragraphAlign="middle"/>
     </Layer>
 
     <!-- Card 2 -->
@@ -24,7 +24,7 @@
         <Text text="Sprint Planning" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#FFF"/>
       </Group>
-      <TextBox position="12,28" size="296,32" textAlign="center" paragraphAlign="middle"/>
+      <TextBox left="12" top="28" size="296,32" textAlign="center" paragraphAlign="middle"/>
     </Layer>
 
     <!-- Card 3 -->
@@ -36,7 +36,7 @@
         <Text text="Bug Report #42" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#FFF"/>
       </Group>
-      <TextBox position="12,28" size="296,32" textAlign="center" paragraphAlign="middle"/>
+      <TextBox left="12" top="28" size="296,32" textAlign="center" paragraphAlign="middle"/>
     </Layer>
 
     <!-- Notification badge: a Layer leaves the layout flow -->

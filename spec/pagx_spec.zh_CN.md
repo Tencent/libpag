@@ -633,7 +633,7 @@ Layer 的子元素按类型自动归类为四个集合：
 | `composition` | idref | - | 合成引用 "@id" |
 | `width` | float | - | 布局宽度（见 §6） |
 | `height` | float | - | 布局高度（见 §6） |
-| `layout` | LayoutMode | absolute | 子图层布局模式（见 §6） |
+| `layout` | LayoutMode | constraint | 子图层布局模式（见 §6） |
 | `gap` | float | 0 | 子 Layer 间距（见 §6） |
 | `padding` | float 或 "t,r,b,l" | 0 | 内边距（见 §6） |
 | `alignment` | Alignment | start | 交叉轴对齐（见 §6） |
@@ -1801,7 +1801,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 - 主轴：有显式 `width`/`height` → 固定（忽略 flex）；无显式尺寸且 `flex=0`（默认）→ 内容测量；无显式尺寸且 `flex>0` → 按 flex 权重按比例分配剩余空间
 - 交叉轴：`alignment="stretch"` 为未设交叉轴尺寸的子元素拉伸填满（已设交叉轴尺寸的保持不变）
 
-**约束布局中**（父容器为 absolute 布局或子 Layer 设 `includeInLayout="false"`）：
+**约束布局中**（父容器为 constraint 布局或子 Layer 设 `includeInLayout="false"`）：
 1. **对边约束**：对边同设约束（`left`+`right` 或 `top`+`bottom`）从父容器推导尺寸（如 `width = 父.width - left - right`），**始终覆盖**显式尺寸
 2. **显式声明**：直接设置 `width`/`height` 属性
 3. **内容测量**：引擎自动从内容边界（content bounds）计算尺寸。对 Group 而言，测量值 = 内部所有元素相对于本地原点 (0,0) 的右下角坐标（maxX, maxY），确保测量结果不受内部元素排放位置的影响
@@ -1829,7 +1829,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `layout` | LayoutMode | absolute | 子图层排列的主轴方向 |
+| `layout` | LayoutMode | constraint | 子图层排列的主轴方向 |
 | `gap` | float | 0 | 相邻子 Layer 之间的间距 |
 | `flex` | float | 0 | 主轴弹性权重。子元素无显式主轴尺寸时：`flex=0`（默认）使用内容测量尺寸；`flex>0` 按权重按比例分配剩余空间。设置了显式 `width`/`height` 时忽略此属性 |
 | `padding` | float 或 "t,r,b,l" | 0 | 内边距。支持单值（四边均匀）、两值（垂直,水平）、四值（上,右,下,左），与 CSS shorthand 一致 |
@@ -1841,7 +1841,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 
 | 值 | 说明 |
 |------|------|
-| `absolute` | 无自动布局，子图层使用绝对定位（默认值） |
+| `constraint` | 使用约束布局来定位子图层（默认值） |
 | `horizontal` | 主轴水平方向，交叉轴垂直方向 |
 | `vertical` | 主轴垂直方向，交叉轴水平方向 |
 
@@ -1904,7 +1904,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 约束布局让元素声明与所属容器的位置关系，引擎自动计算坐标。支持约束属性的元素包括：
 
 - **图层内容节点**：几何元素（Rectangle、Ellipse、Polystar、Path）、Text、TextBox 和 Group
-- **子 Layer**：当父 Layer 无容器布局（`layout="absolute"`，默认值），或子 Layer 设了 `includeInLayout="false"` 时
+- **子 Layer**：当父 Layer 无容器布局（`layout="constraint"`，默认值），或子 Layer 设了 `includeInLayout="false"` 时
 
 ```xml
 <!-- Rectangle 铺满容器并留出 10px 边距 -->
@@ -2040,7 +2040,7 @@ left=L, right=R:  position.x = L, layoutWidth = W - L - R
 
 子 Layer 的约束属性覆盖其 `x`/`y`。生效条件：
 
-1. **父 Layer 无容器布局**：`layout` 为 `absolute`（默认值），或
+1. **父 Layer 无容器布局**：`layout` 为 `constraint`（默认值），或
 2. **子 Layer 脱离布局流**：`includeInLayout="false"`
 
 ```xml
@@ -2150,7 +2150,7 @@ Layer / Group
 | **TileMode** | `clamp`, `repeat`, `mirror`, `decal` |
 | **FilterMode** | `nearest`, `linear` |
 | **MipmapMode** | `none`, `nearest`, `linear` |
-| **LayoutMode** | `absolute`, `horizontal`, `vertical` |
+| **LayoutMode** | `constraint`, `horizontal`, `vertical` |
 | **Alignment** | `start`, `center`, `end`, `stretch` |
 | **Arrangement** | `start`, `center`, `end`, `spaceBetween` |
 

@@ -223,7 +223,7 @@ DEFINE_ENUM_CONVERSION(RepeaterOrder, RepeaterOrder::BelowOriginal,
                        {RepeaterOrder::BelowOriginal, "belowOriginal"},
                        {RepeaterOrder::AboveOriginal, "aboveOriginal"})
 
-DEFINE_ENUM_CONVERSION(LayoutMode, LayoutMode::Absolute, {LayoutMode::Absolute, "absolute"},
+DEFINE_ENUM_CONVERSION(LayoutMode, LayoutMode::Constraint, {LayoutMode::Constraint, "constraint"},
                        {LayoutMode::Horizontal, "horizontal"}, {LayoutMode::Vertical, "vertical"})
 
 DEFINE_ENUM_CONVERSION(Alignment, Alignment::Start, {Alignment::Start, "start"},

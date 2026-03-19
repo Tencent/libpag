@@ -1180,7 +1180,7 @@ static void writeLayer(XMLBuilder& xml, const Layer* node, const Options& option
   xml.addAttribute("y", node->y);
   xml.addOptionalAttribute("width", node->width);
   xml.addOptionalAttribute("height", node->height);
-  if (node->layout != LayoutMode::Absolute) {
+  if (node->layout != LayoutMode::Constraint) {
     xml.addAttribute("layout", LayoutModeToString(node->layout));
   }
   xml.addAttribute("gap", node->gap);
