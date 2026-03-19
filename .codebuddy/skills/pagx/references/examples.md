@@ -173,80 +173,89 @@ demonstrates the recursive two-step layout process — the card participates in 
 layout AND manages its own children's layout.
 
 ```xml
-<pagx version="1.0" width="400" height="400">
-  <Layer width="400" height="400" layout="vertical" gap="16" padding="20" alignment="stretch">
-    <!-- Card: flexible height, internal vertical layout -->
-    <Layer layout="vertical" gap="12" padding="16" alignment="stretch">
-      <!-- Background (excluded from layout flow) -->
-      <Layer includeInLayout="false" left="0" right="0" top="0" bottom="0">
+<pagx version="1.0" width="380" height="280">
+  <Layer width="380" height="280">
+    <!-- Page background -->
+    <Rectangle left="0" right="0" top="0" bottom="0" size="1,1"/>
+    <Fill color="#F1F5F9"/>
+    <!-- Content column -->
+    <Layer left="0" right="0" top="0" bottom="0"
+           layout="vertical" gap="12" padding="20" alignment="stretch">
+      <!-- Card: fixed height, internal vertical layout -->
+      <Layer height="180" layout="vertical" gap="12" padding="16" alignment="stretch">
+        <!-- Background (excluded from layout flow) -->
+        <Layer includeInLayout="false" left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="12"/>
+          <Fill color="#FFF"/>
+          <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000015"/>
+        </Layer>
+        <!-- Title row: icon + text -->
+        <Layer height="24" layout="horizontal" gap="8" alignment="center">
+          <Layer width="24" height="24">
+            <Ellipse left="0" right="0" top="0" bottom="0"/>
+            <Fill color="#6366F1"/>
+          </Layer>
+          <Layer height="24">
+            <Group left="0" right="0" top="0" bottom="0">
+              <Text text="Account Balance" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+              <Fill color="#1E293B"/>
+              <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle"/>
+            </Group>
+          </Layer>
+        </Layer>
+        <!-- Value display -->
+        <Layer height="40">
+          <Group left="0" top="0">
+            <Text text="$12,580.00" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+            <Fill color="#1E293B"/>
+            <TextBox left="0" top="0"/>
+          </Group>
+        </Layer>
+        <!-- Action buttons: two equal-width buttons -->
+        <Layer height="44" layout="horizontal" gap="12" alignment="stretch">
+          <Layer>
+            <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="10"/>
+            <Fill color="#6366F1"/>
+            <Group left="0" right="0" top="0" bottom="0">
+              <Text text="Send" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+              <Fill color="#FFF"/>
+              <TextBox left="0" right="0" top="0" bottom="0"
+                       textAlign="center" paragraphAlign="middle"/>
+            </Group>
+          </Layer>
+          <Layer>
+            <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="10"/>
+            <Fill color="#F1F5F9"/>
+            <Stroke color="#CBD5E1" width="1" align="inside"/>
+            <Group left="0" right="0" top="0" bottom="0">
+              <Text text="Request" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+              <Fill color="#1E293B"/>
+              <TextBox left="0" right="0" top="0" bottom="0"
+                       textAlign="center" paragraphAlign="middle"/>
+            </Group>
+          </Layer>
+        </Layer>
+      </Layer>
+      <!-- Second card (same pattern, abbreviated) -->
+      <Layer height="48">
         <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="12"/>
         <Fill color="#FFF"/>
         <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000015"/>
-      </Layer>
-      <!-- Title row: icon + text -->
-      <Layer height="24" layout="horizontal" gap="8" alignment="center">
-        <Layer width="24" height="24">
-          <Ellipse left="0" right="0" top="0" bottom="0"/>
-          <Fill color="#6366F1"/>
-        </Layer>
-        <Layer height="24">
-          <Group left="0" right="0" top="0" bottom="0">
-            <Text text="Account Balance" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-            <Fill color="#1E293B"/>
-            <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle"/>
-          </Group>
-        </Layer>
-      </Layer>
-      <!-- Value display -->
-      <Layer height="40">
-        <Group left="0" top="0">
-          <Text text="$12,580.00" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+        <Group left="0" right="0" top="0" bottom="0">
+          <Text text="Recent Activity" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
           <Fill color="#1E293B"/>
-          <TextBox left="0" top="0"/>
+          <TextBox left="16" top="0" bottom="0" paragraphAlign="middle"/>
         </Group>
       </Layer>
-      <!-- Action buttons: two equal-width buttons -->
-      <Layer height="44" layout="horizontal" gap="12" alignment="stretch">
-        <Layer>
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="10"/>
-          <Fill color="#6366F1"/>
-          <Group left="0" right="0" top="0" bottom="0">
-            <Text text="Send" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-            <Fill color="#FFF"/>
-            <TextBox left="0" right="0" top="0" bottom="0"
-                     textAlign="center" paragraphAlign="middle"/>
-          </Group>
-        </Layer>
-        <Layer>
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="10"/>
-          <Fill color="#E2E8F0"/>
-          <Group left="0" right="0" top="0" bottom="0">
-            <Text text="Request" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-            <Fill color="#1E293B"/>
-            <TextBox left="0" right="0" top="0" bottom="0"
-                     textAlign="center" paragraphAlign="middle"/>
-          </Group>
-        </Layer>
-      </Layer>
-    </Layer>
-    <!-- Second card (same pattern, abbreviated) -->
-    <Layer height="80">
-      <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="12"/>
-      <Fill color="#FFF"/>
-      <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000015"/>
-      <Group left="0" right="0" top="0" bottom="0">
-        <Text text="Recent Activity" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <Fill color="#1E293B"/>
-        <TextBox left="16" top="0" bottom="0" paragraphAlign="middle"/>
-      </Group>
     </Layer>
   </Layer>
 </pagx>
 ```
 
-**Pattern**: The first card uses `layout="vertical" gap="12" padding="16" alignment="stretch"`
-to arrange its children — title row, value display, and action buttons — without any manual
-coordinate calculation. Key structural choices:
+**Pattern**: The first card uses fixed `height="180"` with
+`layout="vertical" gap="12" padding="16" alignment="stretch"` to arrange its children — title
+row, value display, and action buttons — without any manual coordinate calculation. Key
+structural choices:
 
 - **Background as overlay**: `includeInLayout="false"` + stretch constraints keeps the
   background Rectangle out of the layout flow while filling the card's computed size.
@@ -256,6 +265,9 @@ coordinate calculation. Key structural choices:
   `alignment="stretch"` — buttons fill cross-axis height automatically.
 - **Recursive layout**: outer vertical → card vertical → title horizontal → button horizontal.
   Each level follows the same two-step process (choose container mode, then position internals).
+
+For a **flexible height** example — where some children have fixed height and others expand to
+fill remaining space — see Dashboard Layout below.
 
 ### Dashboard Layout (Container Layout)
 
