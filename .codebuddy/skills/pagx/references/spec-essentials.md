@@ -113,7 +113,7 @@ pagx
 | `width`, `height` | — | Layout size for constraint and container layout reference. When omitted, the engine measures content or derives from parent layout. Set explicitly for a specific design size. |
 | `layout` | absolute | `absolute` (default), `horizontal`, or `vertical` — sets layout mode for child Layers |
 | `gap` | 0 | Spacing between adjacent child Layers along the main axis |
-| `padding` | 0 | Inner padding (single value, "v,h", or "t,r,b,l" — 3-value shorthand NOT supported) |
+| `padding` | 0 | Inner padding: `"all"`, `"v,h"`, `"t,h,b"`, or `"t,r,b,l"` (CSS-compatible shorthand) |
 | `alignment` | start | Cross-axis alignment of children: `start` / `center` / `end` / `stretch` |
 | `arrangement` | start | Main-axis distribution: `start` / `center` / `end` / `spaceBetween` |
 | `includeInLayout` | true | Whether to participate in parent's container layout |
@@ -189,7 +189,8 @@ use style for solid shadow outlines.
 ## 3a. Auto Layout
 
 PAGX supports two complementary layout mechanisms that together eliminate manual coordinate calculation.
-**Constraint layout is the primary mechanism for positioning elements.** Both are optional — files without
+**Container layout** arranges child Layers in rows or columns. **Constraint layout** positions elements
+relative to their container's edges or center. Both are optional — files without
 layout attributes behave exactly as before (absolute positioning).
 
 ### Container Layout (between Layers)

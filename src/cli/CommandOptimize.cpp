@@ -162,6 +162,11 @@ static void PrintOptimizeUsage() {
 // --- Optimization #1: Remove empty elements ---
 
 static bool IsEmptyLayer(const Layer* layer) {
+  // Layers with explicit size are intentional (e.g., spacers in container layouts).
+  // Preserve them even if visually empty, as they serve as layout placeholders.
+  if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
+    return false;
+  }
   return layer->contents.empty() && layer->children.empty() && layer->composition == nullptr &&
          layer->styles.empty() && layer->filters.empty();
 }

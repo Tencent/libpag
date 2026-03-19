@@ -115,6 +115,17 @@
     </xs:restriction>
   </xs:simpleType>
 
+  <!-- Padding: supports three shorthand forms:
+       - Single value: all four sides (e.g., "20")
+       - Two values: vertical, horizontal (e.g., "10,20")
+       - Four values: top, right, bottom, left (e.g., "10,20,10,20")
+  -->
+  <xs:simpleType name="PaddingType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="-?[0-9]*\.?[0-9]+(,-?[0-9]*\.?[0-9]+)*"/>
+    </xs:restriction>
+  </xs:simpleType>
+
   <!-- ========================= Enumeration Types ========================= -->
 
   <xs:simpleType name="BlendModeType">
@@ -309,11 +320,54 @@
     </xs:restriction>
   </xs:simpleType>
 
+  <xs:simpleType name="LayoutModeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="absolute"/>
+      <xs:enumeration value="horizontal"/>
+      <xs:enumeration value="vertical"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="AlignmentType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="start"/>
+      <xs:enumeration value="center"/>
+      <xs:enumeration value="end"/>
+      <xs:enumeration value="stretch"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ArrangementType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="start"/>
+      <xs:enumeration value="center"/>
+      <xs:enumeration value="end"/>
+      <xs:enumeration value="spaceBetween"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ColorSpaceType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="sRGB"/>
+      <xs:enumeration value="p3"/>
+    </xs:restriction>
+  </xs:simpleType>
+
   <!-- ========================= Attribute Groups ========================= -->
 
   <!-- Common attributes available on any element: id and data-* -->
   <xs:attributeGroup name="CommonAttributes">
     <xs:attribute name="id" type="xs:string"/>
+  </xs:attributeGroup>
+
+  <!-- Constraint layout attributes shared by positionable elements -->
+  <xs:attributeGroup name="ConstraintAttributes">
+    <xs:attribute name="left" type="xs:decimal"/>
+    <xs:attribute name="right" type="xs:decimal"/>
+    <xs:attribute name="top" type="xs:decimal"/>
+    <xs:attribute name="bottom" type="xs:decimal"/>
+    <xs:attribute name="centerX" type="xs:decimal"/>
+    <xs:attribute name="centerY" type="xs:decimal"/>
   </xs:attributeGroup>
 
   <!-- ========================= Color Source Elements ========================= -->
@@ -326,10 +380,15 @@
     <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
-  <!-- SolidColor -->
+  <!-- SolidColor: color attribute is preferred; red/green/blue/alpha/colorSpace are fallback -->
   <xs:complexType name="SolidColorType">
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="color" type="ColorType" use="required"/>
+    <xs:attribute name="color" type="ColorType"/>
+    <xs:attribute name="red" type="xs:decimal" default="0"/>
+    <xs:attribute name="green" type="xs:decimal" default="0"/>
+    <xs:attribute name="blue" type="xs:decimal" default="0"/>
+    <xs:attribute name="alpha" type="xs:decimal" default="1"/>
+    <xs:attribute name="colorSpace" type="ColorSpaceType" default="sRGB"/>
     <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
@@ -465,26 +524,28 @@
   <!-- Rectangle -->
   <xs:complexType name="RectangleType">
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="center" type="PointType" default="0,0"/>
+    <xs:attribute name="position" type="PointType"/>
     <xs:attribute name="size" type="SizeType" default="100,100"/>
     <xs:attribute name="roundness" type="xs:decimal" default="0"/>
     <xs:attribute name="reversed" type="BoolType" default="false"/>
+    <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- Ellipse -->
   <xs:complexType name="EllipseType">
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="center" type="PointType" default="0,0"/>
+    <xs:attribute name="position" type="PointType"/>
     <xs:attribute name="size" type="SizeType" default="100,100"/>
     <xs:attribute name="reversed" type="BoolType" default="false"/>
+    <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- Polystar -->
   <xs:complexType name="PolystarType">
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="center" type="PointType" default="0,0"/>
+    <xs:attribute name="position" type="PointType"/>
     <xs:attribute name="type" type="PolystarTypeType" default="star"/>
     <xs:attribute name="pointCount" type="xs:decimal" default="5"/>
     <xs:attribute name="outerRadius" type="xs:decimal" default="100"/>
@@ -493,6 +554,7 @@
     <xs:attribute name="outerRoundness" type="xs:decimal" default="0"/>
     <xs:attribute name="innerRoundness" type="xs:decimal" default="0"/>
     <xs:attribute name="reversed" type="BoolType" default="false"/>
+    <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
@@ -501,6 +563,8 @@
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="data" type="xs:string" use="required"/>
     <xs:attribute name="reversed" type="BoolType" default="false"/>
+    <xs:attribute name="position" type="PointType" default="0,0"/>
+    <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
@@ -519,6 +583,7 @@
     <xs:attribute name="fauxBold" type="BoolType" default="false"/>
     <xs:attribute name="fauxItalic" type="BoolType" default="false"/>
     <xs:attribute name="textAnchor" type="TextAnchorType" default="start"/>
+    <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
@@ -648,6 +713,7 @@
     <xs:attribute name="lineHeight" type="xs:decimal" default="0"/>
     <xs:attribute name="wordWrap" type="BoolType" default="true"/>
     <xs:attribute name="overflow" type="OverflowType" default="visible"/>
+    <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
@@ -799,6 +865,9 @@
     <xs:attribute name="skew" type="xs:decimal" default="0"/>
     <xs:attribute name="skewAxis" type="xs:decimal" default="0"/>
     <xs:attribute name="alpha" type="xs:decimal" default="1"/>
+    <xs:attribute name="width" type="xs:decimal"/>
+    <xs:attribute name="height" type="xs:decimal"/>
+    <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
@@ -845,6 +914,15 @@
     <xs:attribute name="mask" type="IdRefType"/>
     <xs:attribute name="maskType" type="MaskTypeType" default="alpha"/>
     <xs:attribute name="composition" type="IdRefType"/>
+    <xs:attribute name="width" type="xs:decimal"/>
+    <xs:attribute name="height" type="xs:decimal"/>
+    <xs:attribute name="layout" type="LayoutModeType" default="absolute"/>
+    <xs:attribute name="gap" type="xs:decimal" default="0"/>
+    <xs:attribute name="padding" type="PaddingType"/>
+    <xs:attribute name="alignment" type="AlignmentType" default="start"/>
+    <xs:attribute name="arrangement" type="ArrangementType" default="start"/>
+    <xs:attribute name="includeInLayout" type="BoolType" default="true"/>
+    <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 

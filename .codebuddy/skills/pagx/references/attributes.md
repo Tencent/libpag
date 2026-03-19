@@ -538,3 +538,5 @@ These defaults are counter-intuitive and commonly forgotten:
 | **BlurFilter** | `tileMode` | `decal` | May assume `clamp` |
 | **Layer** | `alignment` | `start` | Often assumed `center` |
 | **Layer** | `arrangement` | `start` | Often assumed `center` |
+
+

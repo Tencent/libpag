@@ -83,22 +83,25 @@ ProfileHeader (Layer)
   that need no Layer-exclusive features — but they must not be top-level siblings outside
   `UserInfo`, or moving the user info block would leave orphaned text behind.
 
-**After building the component tree, decide layout for each container** — see
-`design-patterns.md` §Layout Decisions for the full decision tree. Key choices:
+**After building the component tree, decide layout for each container** using the two-step
+process from `design-patterns.md` §Layout Decisions. For each container Layer, always
+complete both steps in order:
 
-- **Constraint layout** (inside Layers, **PRIMARY**): use `left`/`right`/`top`/`bottom`/`centerX`/`centerY`
-  on VectorElements or child Layers to declare position relative to container. This is the preferred
-  approach for most positioning needs — it eliminates manual coordinate calculation and is more maintainable.
-  Use for backgrounds, centered text, edge-aligned elements, and any child inside a Layer.
-  - On VectorElements: constraints always work — the container always has a size (explicit,
-    layout-assigned, or measured from content).
-  - On child Layers: constraints work when parent uses absolute layout (default) or child has
-    `includeInLayout="false"`.
-- **Container layout** (between Layers): set `layout` on a parent to arrange child Layers
-  in a row or column. Use for rows/columns of elements (headers, card grids, list items, toolbars).
-  The layout engine automatically computes child positioning — no manual coordinate entry needed.
-- **Absolute positioning** (fallback only): use `x`/`y` on Layers or `position` on elements only for
-  irregular freeform compositions with overlapping elements. Avoid unless necessary.
+1. **Step 1 — Container mode** (how child Layers are arranged): look at this Layer's child
+   Layers. If they form a row → `layout="horizontal"`; a column → `layout="vertical"`;
+   free-form → absolute (default). Set `gap`, `padding`, `alignment` for the container.
+   Make this decision **before writing any internal elements**.
+2. **Step 2 — Internal positioning** (how VectorElements are placed inside): use constraint
+   attributes (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`) for backgrounds, text,
+   icons, and overlay elements. Constraints reference the container's size — which is now
+   known from Step 1 (explicit, layout-assigned, or measured).
+
+- **Absolute positioning** (`x`/`y` on Layers, `position` on elements): only for irregular
+  freeform compositions with overlapping elements. Avoid unless necessary.
+
+**Apply recursively**: each child Layer that itself contains child Layers repeats the same
+two-step process. A card inside a vertical list is a container for its own children —
+decide its internal layout mode before positioning its elements.
 
 **When to set explicit `width`/`height`** — set dimensions when you need a specific reference
 frame, not when the measured or layout-assigned size is sufficient:
@@ -153,8 +156,8 @@ This isolates defects: if something breaks, it was the last thing added.
   </Group>
   ```
 
-**Auto layout mental model** — think of it like CSS Flexbox. The core principle is
-**declare intent, not coordinates**:
+**Auto layout mental model** — the two-step process mirrors CSS Flexbox. The core principle
+is **declare structure first, position content second**:
 
 1. **Outside-in**: set the container's direction (`layout`), `padding`, and `gap` first.
    Then declare children — the engine computes their positions automatically.
@@ -187,15 +190,6 @@ This isolates defects: if something breaks, it was the last thing added.
    explicitly or use `alignment="stretch"` from a parent.
 
 See `design-patterns.md` §Container Layout — Key Patterns for the full grid layout template.
-
-**Leverage auto layout for alignment and positioning** — **eliminate manual coordinate
-calculation**. Let the layout engine handle positioning:
-
-- **Constraint-based** (PRIMARY): use `left`/`top`/`centerX`/`centerY` for edge-based positioning.
-  Background fills: `left="0" right="0" top="0" bottom="0"`. Centering: `centerX="0"` / `centerY="0"`.
-- **Container layout**: use `gap`/`padding`/`alignment` instead of manual offsets.
-- **Manual positioning** (`position`, `x`/`y`): only for irregular freeform overlapping
-  compositions. See `design-patterns.md` §Layout Decisions for the full decision tree.
 
 ### Step 4: Localize Coordinates
 

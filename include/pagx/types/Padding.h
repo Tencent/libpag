@@ -21,9 +21,10 @@
 namespace pagx {
 
 /**
- * Padding defines the inner spacing of a layout container. Supports three shorthand forms:
+ * Padding defines the inner spacing of a layout container. Supports four shorthand forms:
  * - Single value: all four sides equal (e.g., "20")
  * - Two values: vertical, horizontal (e.g., "10,20")
+ * - Three values: top, horizontal, bottom (CSS-compatible, e.g., "10,20,10")
  * - Four values: top, right, bottom, left (e.g., "10,20,10,20")
  */
 struct Padding {

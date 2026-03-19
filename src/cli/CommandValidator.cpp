@@ -79,6 +79,61 @@ static void PrintErrorsJson(const std::vector<ValidationError>& errors, const st
   std::cout << "}\n";
 }
 
+// Heuristic checks for auto layout patterns.
+// Only flags cases where constraint attributes are provably ignored by the layout engine.
+static void CheckAutoLayoutPatterns(const PAGXDocument* doc, std::vector<ValidationError>& errors) {
+  if (doc == nullptr || doc->layers.empty()) {
+    return;
+  }
+
+  std::function<void(const Layer*)> checkLayer = [&](const Layer* layer) {
+    if (layer == nullptr) {
+      return;
+    }
+
+    // Check: Container layout with child constraints (provably ignored).
+    // Constraint attributes on a child Layer are only effective when the parent uses absolute
+    // layout or the child has includeInLayout="false". When a child participates in container
+    // layout flow (includeInLayout=true, parent layout != absolute), constraints are silently
+    // ignored — this is almost always unintentional.
+    if (layer->layout != LayoutMode::Absolute) {
+      for (const auto& child : layer->children) {
+        if (child == nullptr || !child->includeInLayout) {
+          continue;  // includeInLayout="false" children CAN use constraints
+        }
+        bool hasConstraints =
+            (!std::isnan(child->left) || !std::isnan(child->right) || !std::isnan(child->centerX) ||
+             !std::isnan(child->top) || !std::isnan(child->bottom) || !std::isnan(child->centerY));
+        if (hasConstraints) {
+          std::string attrs = {};
+          if (!std::isnan(child->left)) attrs += "left ";
+          if (!std::isnan(child->right)) attrs += "right ";
+          if (!std::isnan(child->centerX)) attrs += "centerX ";
+          if (!std::isnan(child->top)) attrs += "top ";
+          if (!std::isnan(child->bottom)) attrs += "bottom ";
+          if (!std::isnan(child->centerY)) attrs += "centerY ";
+          ValidationError error = {};
+          error.line = 0;
+          error.message = "Constraint attributes (" + attrs +
+                          ") on child Layer will be ignored because the parent uses container "
+                          "layout. Use 'padding'/'gap' on the parent, or set "
+                          "includeInLayout='false' on the child to enable constraints.";
+          errors.push_back(std::move(error));
+        }
+      }
+    }
+
+    // Recursively check children
+    for (const auto& child : layer->children) {
+      checkLayer(child);
+    }
+  };
+
+  for (const auto& layer : doc->layers) {
+    checkLayer(layer);
+  }
+}
+
 static void PrintUsage() {
   std::cout << "Usage: pagx validate [options] <file.pagx>\n"
             << "\n"
@@ -158,6 +213,8 @@ std::vector<ValidationError> ValidateFile(const std::string& filePath) {
       }
       errors.push_back(std::move(error));
     }
+    // Heuristic validation: check for common auto layout patterns
+    CheckAutoLayoutPatterns(pagxDoc.get(), errors);
   }
 
   return errors;

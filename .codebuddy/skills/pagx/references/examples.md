@@ -34,12 +34,9 @@ The most common icon structure:
 </pagx>
 ```
 
-**Pattern**: The root container Layer has explicit `width`/`height` (matching canvas), giving constraint
-attributes a clear reference frame. Background and foreground Groups use `centerX="0" centerY="0"` to
-center within the Layer. Geometry elements inside each Group use their default position (origin-centered
-for Ellipse, origin-relative for Path). Groups isolate each painter scope (Fill vs. Stroke).
-Foreground path is symmetric around origin. **Prefer Stroke for icons** —
-2-3px coordinate imprecision is barely visible at wider stroke widths.
+**Pattern**: Groups isolate painter scope (Fill vs. Stroke); `centerX/centerY="0"` centers
+each Group. **Prefer Stroke for icons** — 2-3px coordinate imprecision is barely visible at
+wider stroke widths.
 
 ### Background + Foreground (Mixed)
 
@@ -64,11 +61,8 @@ Fill for solid areas, Stroke for line details:
 </pagx>
 ```
 
-**Pattern**: Groups isolate different painters (Fill vs. Stroke). Mixed technique
-(Stroke for lines + Fill for solids) is a common and effective combination. Each Group uses
-`centerX/centerY` to position within the parent Layer. The third Group uses `centerY="15"`
-to offset the Ellipse downward from center. Geometry elements inside Groups use their default
-position (origin-centered for Rectangle/Ellipse).
+**Pattern**: Mixed technique — Stroke for lines + Fill for solids. `centerY="15"` offsets
+the Ellipse downward from center.
 
 ### Multi-Layer Depth
 
@@ -93,16 +87,15 @@ For icons with visible depth:
 </pagx>
 ```
 
-**Pattern**: Three concentric Groups, all using `centerX="0" centerY="0"` to center within the Layer.
-Middle Group creates depth with just a second fill color — no additional rendering technique needed.
+**Pattern**: Middle Group creates depth with just a second fill color — no additional technique needed.
 
 ---
 
 ## UI Components
 
 Structural patterns for application interface elements. Most UI components benefit from auto
-layout — use constraint layout for positioning elements within a Layer, and container layout
-for arranging child Layers in rows or columns.
+layout — use container layout for arranging child Layers in rows or columns, and constraint
+layout for positioning elements within a Layer.
 
 ### Card with Shadow
 
@@ -123,10 +116,7 @@ for arranging child Layers in rows or columns.
 </pagx>
 ```
 
-**Pattern**: Constraint layout (`left/right/top/bottom="0"`) stretches Rectangle to fill its
-container — no manual size calculation needed. The card Layer uses `left`/`right`/`top` constraints
-to position relative to parent edges — more maintainable than manual `x`/`y` offsets. White cards
-need a non-white background to be visible.
+**Pattern**: White cards need a non-white background to be visible.
 
 ### Button with Centered Label
 
@@ -150,10 +140,8 @@ need a non-white background to be visible.
 </pagx>
 ```
 
-**Pattern**: Button Layer positioned with `left`/`top` constraints (not `x`/`y`). TextBox with
-`left/right/top/bottom="0"` stretches to fill the button, then `textAlign`/`paragraphAlign` centers
-text within. No manual coordinate calculation needed. Group isolates the text's Fill from the
-rectangle's Fill.
+**Pattern**: TextBox with stretch constraints fills the button area, then `textAlign`/`paragraphAlign`
+centers text within. Group isolates text Fill from rectangle Fill.
 
 ### Icon + Label Row
 
@@ -175,9 +163,99 @@ rectangle's Fill.
 </pagx>
 ```
 
-**Pattern**: Container layout (`layout="horizontal"`) with `alignment="center"` vertically
-centers children. The icon Layer has fixed size; the label Layer is flexible and takes
-remaining space. No manual coordinate calculation.
+**Pattern**: Icon Layer has fixed size; label Layer is flexible (takes remaining space).
+
+### Card with Internal Layout (Container Layout)
+
+A common pattern: a card that is a child in an outer container, with its own internal
+container layout for arranging title, content, and action areas vertically. This
+demonstrates the recursive two-step layout process — the card participates in its parent's
+layout AND manages its own children's layout.
+
+```xml
+<pagx version="1.0" width="400" height="400">
+  <Layer width="400" height="400" layout="vertical" gap="16" padding="20" alignment="stretch">
+    <!-- Card: flexible height, internal vertical layout -->
+    <Layer layout="vertical" gap="12" padding="16" alignment="stretch">
+      <!-- Background (excluded from layout flow) -->
+      <Layer includeInLayout="false" left="0" right="0" top="0" bottom="0">
+        <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="12"/>
+        <Fill color="#FFF"/>
+        <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000015"/>
+      </Layer>
+      <!-- Title row: icon + text -->
+      <Layer height="24" layout="horizontal" gap="8" alignment="center">
+        <Layer width="24" height="24">
+          <Ellipse left="0" right="0" top="0" bottom="0"/>
+          <Fill color="#6366F1"/>
+        </Layer>
+        <Layer height="24">
+          <Group left="0" right="0" top="0" bottom="0">
+            <Text text="Account Balance" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+            <Fill color="#1E293B"/>
+            <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle"/>
+          </Group>
+        </Layer>
+      </Layer>
+      <!-- Value display -->
+      <Layer height="40">
+        <Group left="0" top="0">
+          <Text text="$12,580.00" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+          <Fill color="#1E293B"/>
+          <TextBox left="0" top="0"/>
+        </Group>
+      </Layer>
+      <!-- Action buttons: two equal-width buttons -->
+      <Layer height="44" layout="horizontal" gap="12" alignment="stretch">
+        <Layer>
+          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="10"/>
+          <Fill color="#6366F1"/>
+          <Group left="0" right="0" top="0" bottom="0">
+            <Text text="Send" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+            <Fill color="#FFF"/>
+            <TextBox left="0" right="0" top="0" bottom="0"
+                     textAlign="center" paragraphAlign="middle"/>
+          </Group>
+        </Layer>
+        <Layer>
+          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="10"/>
+          <Fill color="#E2E8F0"/>
+          <Group left="0" right="0" top="0" bottom="0">
+            <Text text="Request" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+            <Fill color="#1E293B"/>
+            <TextBox left="0" right="0" top="0" bottom="0"
+                     textAlign="center" paragraphAlign="middle"/>
+          </Group>
+        </Layer>
+      </Layer>
+    </Layer>
+    <!-- Second card (same pattern, abbreviated) -->
+    <Layer height="80">
+      <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="12"/>
+      <Fill color="#FFF"/>
+      <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000015"/>
+      <Group left="0" right="0" top="0" bottom="0">
+        <Text text="Recent Activity" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+        <Fill color="#1E293B"/>
+        <TextBox left="16" top="0" bottom="0" paragraphAlign="middle"/>
+      </Group>
+    </Layer>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: The first card uses `layout="vertical" gap="12" padding="16" alignment="stretch"`
+to arrange its children — title row, value display, and action buttons — without any manual
+coordinate calculation. Key structural choices:
+
+- **Background as overlay**: `includeInLayout="false"` + stretch constraints keeps the
+  background Rectangle out of the layout flow while filling the card's computed size.
+- **Title row nests horizontal layout**: the title Layer is itself a horizontal container
+  with icon (fixed 24×24) + label (flexible width).
+- **Equal-width buttons**: two flexible children in a horizontal container with
+  `alignment="stretch"` — buttons fill cross-axis height automatically.
+- **Recursive layout**: outer vertical → card vertical → title horizontal → button horizontal.
+  Each level follows the same two-step process (choose container mode, then position internals).
 
 ### Dashboard Layout (Container Layout)
 
@@ -227,12 +305,8 @@ remaining space. No manual coordinate calculation.
 </pagx>
 ```
 
-**Pattern**: Outer container uses `layout="vertical"` to stack header, content, and footer (no manual
-coordinate calculation). Header TextBox positioned with `left` constraint instead of `position`.
-The content row uses `layout="horizontal"` — three child Layers without `width` equally share available
-space. Header and footer have fixed `height`; the content row is flexible. `padding` on the outermost
-Layer provides consistent margins. All backgrounds use `left/right/top/bottom="0"` to fill containers
-without manual size calculation.
+**Pattern**: Header and footer have fixed `height`; the content row is flexible. Three child
+Layers without `width` equally share available space.
 
 ### Vertical List (Container Layout)
 
@@ -270,9 +344,7 @@ without manual size calculation.
 </pagx>
 ```
 
-**Pattern**: Container layout (`layout="vertical"` + `gap`) eliminates manual coordinate offsets.
-Each item is a standalone Layer with constraint-based backgrounds and constraint-positioned TextBox.
-TextBox uses `left` constraint for left-margin alignment.
+**Pattern**: TextBox uses `left` constraint for left-margin alignment.
 
 ### Progress Bar
 
@@ -293,9 +365,8 @@ TextBox uses `left` constraint for left-margin alignment.
 </pagx>
 ```
 
-**Pattern**: Track positioned with `centerX/centerY="0"` constraints (centered). Fill bar uses
-`left` constraint to align with track left edge, and `centerY="0"` for vertical centering. Constraints
-eliminate manual offset calculation — more maintainable than `position="10,11"`.
+**Pattern**: Track centered with `centerX/centerY="0"`; fill bar uses `left` + `centerY="0"`
+for left-aligned vertical centering.
 
 ### Avatar with Circular Mask
 
@@ -320,10 +391,8 @@ eliminate manual offset calculation — more maintainable than `position="10,11"
 </Resources>
 ```
 
-**Pattern**: Invisible Layer with geometry defines clip shape; image Layer references via
-`mask="@id"`. Use opaque fill in mask layer — `maskType="alpha"` (default) means fully
-opaque = fully visible. Rectangle size matches Ellipse size to ensure full coverage. Mask
-and content Layers share the same `left`/`top` constraints to align.
+**Pattern**: Use opaque fill in mask layer — `maskType="alpha"` (default) means fully opaque =
+fully visible. Mask and content Layers share the same constraints to align.
 
 ---
 
@@ -353,12 +422,9 @@ often combine Polystar with gradients and layer styles for depth.
 </pagx>
 ```
 
-**Pattern**: MergePath merges all accumulated geometry into one path, then **clears all
-previously rendered Fill/Stroke** in the current scope. Place all boolean-participating
-geometry before MergePath, then apply painters after. The Ellipse uses `left`/`top`
-constraints to position the cutout hole relative to the parent Layer. If other content
-must survive the merge, isolate it in a separate Group — see `spec-essentials.md` §4
-MergePath for details.
+**Pattern**: Place all boolean-participating geometry before MergePath, then painters after.
+MergePath **clears all previously rendered Fill/Stroke** — isolate surviving content in a
+separate Group (see `spec-essentials.md` §4).
 
 ### Star Badge (Polystar + RadialGradient)
 
@@ -380,9 +446,9 @@ MergePath for details.
 </pagx>
 ```
 
-**Pattern**: Polystar default `rotation="0"` already points the first vertex upward. No rotation needed for an upright star.
-RadialGradient coordinates are **relative to the geometry element's local origin** — `center`
-defaults to `0,0` which aligns with Polystar position, `radius` matches `outerRadius`.
+**Pattern**: Polystar `rotation="0"` points the first vertex upward — no rotation needed.
+RadialGradient `center` defaults to `0,0` (aligns with Polystar origin); `radius` matches
+`outerRadius`.
 
 ### Embossed Token (InnerShadowStyle)
 
@@ -406,10 +472,8 @@ defaults to `0,0` which aligns with Polystar position, `radius` matches `outerRa
 </pagx>
 ```
 
-**Pattern**: Dual InnerShadowStyle creates an embossed/neumorphic effect — dark shadow from
-top-left simulates depth, light shadow from bottom-right simulates a highlight edge. Multiple
-layer styles stack in document order. A tinted background and DropShadowStyle help the
-effect stand out.
+**Pattern**: Dual InnerShadowStyle — dark shadow from top-left simulates depth, light from
+bottom-right simulates highlight. Styles stack in document order.
 
 ---
 
@@ -453,67 +517,10 @@ use Group `rotation` to reposition the start point.
 </pagx>
 ```
 
-**Pattern**: Ellipse path starts at 12 o'clock and goes clockwise. `TrimPath end="0.75"`
-draws a 270° arc; `offset="-135"` (in degrees) rotates the starting point by -135° so the gap
-sits at the bottom (centered at 6 o'clock). The value arc uses the same offset but a smaller
-`end` to show progress — `end="0.5"` represents 67% of the 270° track. Each arc Group uses
-`centerX="0" centerY="0"` to center within the Layer.
-
-Tick marks use a Repeater with `rotation="30"` and `anchor="70,70"` (matching the Ellipse center)
-to distribute evenly around the arc. The Rectangle is positioned via `left`/`top` constraints so
-that the constraint layout resolves its position for the Repeater to rotate. The TextBox uses
-`centerX/centerY="0"` with `size="80,36"` to center the text region within the Layer —
-typical for gauge/dial center labels.
-
-### Donut Chart (Multi-segment TrimPath)
-
-```xml
-<pagx version="1.0" width="200" height="200">
-  <Layer width="200" height="200">
-    <!-- Segment 1: 40% (0 to 0.4) -->
-    <Group centerX="0" centerY="0">
-      <Ellipse size="140,140"/>
-      <TrimPath end="0.38"/>
-      <Stroke color="#3B82F6" width="20"/>
-    </Group>
-    <!-- Segment 2: 30% (0.4 to 0.7) -->
-    <Group centerX="0" centerY="0">
-      <Ellipse size="140,140"/>
-      <TrimPath start="0.4" end="0.68"/>
-      <Stroke color="#10B981" width="20"/>
-    </Group>
-    <!-- Segment 3: 20% (0.7 to 0.9) -->
-    <Group centerX="0" centerY="0">
-      <Ellipse size="140,140"/>
-      <TrimPath start="0.7" end="0.88"/>
-      <Stroke color="#F59E0B" width="20"/>
-    </Group>
-    <!-- Segment 4: 10% (0.9 to 1.0) -->
-    <Group centerX="0" centerY="0">
-      <Ellipse size="140,140"/>
-      <TrimPath start="0.9" end="0.98"/>
-      <Stroke color="#EF4444" width="20"/>
-    </Group>
-  </Layer>
-</pagx>
-```
-
-**Pattern**: Multiple Groups each draw one segment of the donut using `TrimPath start/end`.
-Small gaps between segments (e.g., `end="0.38"` instead of `0.4`) create visual separation.
-All Groups share the same Ellipse size so segments align on the same ring. Thick Stroke
-`width` makes the donut visually distinct from a thin ring progress indicator.
-
-**Gradient stroke variant**: for a ring progress indicator with gradient color, apply a
-LinearGradient directly inside the Stroke element:
-
-```xml
-<Stroke width="10" cap="round">
-  <LinearGradient startPoint="-70,-70" endPoint="70,70">
-    <ColorStop offset="0" color="#06B6D4"/>
-    <ColorStop offset="1" color="#8B5CF6"/>
-  </LinearGradient>
-</Stroke>
-```
+**Pattern**: `TrimPath end="0.75"` draws a 270° arc; `offset="-135"` rotates the start
+point so the gap sits at bottom. The value arc uses the same offset but smaller `end` —
+`end="0.5"` = 67% of the 270° track. Tick Repeater uses `anchor="70,70"` (Ellipse center)
+to rotate around the arc center.
 
 ### Bar Chart
 
@@ -540,12 +547,161 @@ LinearGradient directly inside the Stroke element:
 </pagx>
 ```
 
-**Pattern**: Each bar uses `left`/`bottom="0"` constraints to bottom-align within the chart
-area. The Group uses stretch constraints (`left/right/top/bottom="0"`) to inherit the
-parent Layer's size, providing a valid constraint container for the bars. Multiple bar
-Rectangles share a single Fill via painter scope (Group). The Baseline Layer has explicit
-`height="1"` with stretch Rectangle. Bars with different heights **cannot** use Repeater
-(no per-copy parameterization).
+**Pattern**: Each bar uses `left` + `bottom="0"` to bottom-align. Multiple Rectangles share
+one Fill via painter scope. Bars with different heights **cannot** use Repeater (no per-copy
+parameterization).
+
+### Line Chart (Path from Data Points)
+
+```xml
+<pagx version="1.0" width="300" height="200">
+  <Layer width="300" height="200">
+    <!-- Chart area with margins -->
+    <Layer left="30" right="20" top="20" bottom="30">
+      <!-- Grid lines -->
+      <Group left="0" right="0" top="0" bottom="0">
+        <Path data="M 0,0 L 250,0 M 0,37 L 250,37 M 0,75 L 250,75 M 0,112 L 250,112 M 0,150 L 250,150"/>
+        <Stroke color="#F1F5F9" width="1"/>
+      </Group>
+      <!-- Data line -->
+      <Group left="0" right="0" top="0" bottom="0">
+        <Path data="M 0,120 L 62,90 L 125,105 L 187,45 L 250,30"/>
+        <Stroke color="#3B82F6" width="2" cap="round" join="round"/>
+      </Group>
+      <!-- Fill area under line (same path, closed to bottom) -->
+      <Group left="0" right="0" top="0" bottom="0">
+        <Path data="M 0,120 L 62,90 L 125,105 L 187,45 L 250,30 L 250,150 L 0,150 Z"/>
+        <Fill color="#3B82F610"/>
+      </Group>
+      <!-- Data points -->
+      <Group left="0" right="0" top="0" bottom="0">
+        <Ellipse left="-3" top="117" size="6,6"/>
+        <Ellipse left="59" top="87" size="6,6"/>
+        <Ellipse left="122" top="102" size="6,6"/>
+        <Ellipse left="184" top="42" size="6,6"/>
+        <Ellipse left="247" top="27" size="6,6"/>
+        <Fill color="#3B82F6"/>
+      </Group>
+    </Layer>
+    <!-- Baseline -->
+    <Layer left="30" right="20" bottom="30" height="1">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#CBD5E1"/>
+    </Layer>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: Each data point becomes a coordinate in the Path `M`/`L` string. The area fill
+reuses the same points, appends lines down to the baseline, and closes with `Z`. Grid lines
+are a single multi-M Path.
+
+### Donut Chart (TrimPath + Legend)
+
+```xml
+<pagx version="1.0" width="340" height="200">
+  <Layer width="340" height="200">
+    <!-- Donut -->
+    <Layer left="20" top="20" width="160" height="160">
+      <!-- Segment 1: 40% (0 to 0.4) -->
+      <Group centerX="0" centerY="0">
+        <Ellipse size="130,130"/>
+        <TrimPath end="0.38"/>
+        <Stroke color="#3B82F6" width="18"/>
+      </Group>
+      <!-- Segment 2: 30% (0.4 to 0.7) -->
+      <Group centerX="0" centerY="0">
+        <Ellipse size="130,130"/>
+        <TrimPath start="0.4" end="0.68"/>
+        <Stroke color="#10B981" width="18"/>
+      </Group>
+      <!-- Segment 3: 20% (0.7 to 0.9) -->
+      <Group centerX="0" centerY="0">
+        <Ellipse size="130,130"/>
+        <TrimPath start="0.7" end="0.88"/>
+        <Stroke color="#F59E0B" width="18"/>
+      </Group>
+      <!-- Segment 4: 10% (0.9 to 1.0) -->
+      <Group centerX="0" centerY="0">
+        <Ellipse size="130,130"/>
+        <TrimPath start="0.9" end="0.98"/>
+        <Stroke color="#EF4444" width="18"/>
+      </Group>
+    </Layer>
+    <!-- Legend -->
+    <Layer left="200" top="40" width="120" height="120" layout="vertical" gap="12">
+      <Layer height="20" layout="horizontal" gap="8" alignment="center">
+        <Layer width="10" height="10">
+          <Ellipse left="0" right="0" top="0" bottom="0"/>
+          <Fill color="#3B82F6"/>
+        </Layer>
+        <Layer height="20">
+          <Group left="0" right="0" top="0" bottom="0">
+            <Text text="Sales 40%" fontFamily="Arial" fontSize="12"/>
+            <Fill color="#334155"/>
+            <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle"/>
+          </Group>
+        </Layer>
+      </Layer>
+      <Layer height="20" layout="horizontal" gap="8" alignment="center">
+        <Layer width="10" height="10">
+          <Ellipse left="0" right="0" top="0" bottom="0"/>
+          <Fill color="#10B981"/>
+        </Layer>
+        <Layer height="20">
+          <Group left="0" right="0" top="0" bottom="0">
+            <Text text="Growth 30%" fontFamily="Arial" fontSize="12"/>
+            <Fill color="#334155"/>
+            <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle"/>
+          </Group>
+        </Layer>
+      </Layer>
+      <Layer height="20" layout="horizontal" gap="8" alignment="center">
+        <Layer width="10" height="10">
+          <Ellipse left="0" right="0" top="0" bottom="0"/>
+          <Fill color="#F59E0B"/>
+        </Layer>
+        <Layer height="20">
+          <Group left="0" right="0" top="0" bottom="0">
+            <Text text="Costs 20%" fontFamily="Arial" fontSize="12"/>
+            <Fill color="#334155"/>
+            <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle"/>
+          </Group>
+        </Layer>
+      </Layer>
+      <Layer height="20" layout="horizontal" gap="8" alignment="center">
+        <Layer width="10" height="10">
+          <Ellipse left="0" right="0" top="0" bottom="0"/>
+          <Fill color="#EF4444"/>
+        </Layer>
+        <Layer height="20">
+          <Group left="0" right="0" top="0" bottom="0">
+            <Text text="Other 10%" fontFamily="Arial" fontSize="12"/>
+            <Fill color="#334155"/>
+            <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle"/>
+          </Group>
+        </Layer>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: Small gaps between segments (e.g., `end="0.38"` instead of `0.4`) create visual
+separation. Legend uses nested container layout — vertical rows of horizontal [dot + label]
+pairs. Color dot has fixed size; label is flexible.
+
+**Gradient stroke variant**: for a ring progress indicator with gradient color, apply a
+LinearGradient directly inside the Stroke element:
+
+```xml
+<Stroke width="10" cap="round">
+  <LinearGradient startPoint="-70,-70" endPoint="70,70">
+    <ColorStop offset="0" color="#06B6D4"/>
+    <ColorStop offset="1" color="#8B5CF6"/>
+  </LinearGradient>
+</Stroke>
+```
 
 ---
 
@@ -588,12 +744,8 @@ and BackgroundBlurStyle for frosted glass.
 </pagx>
 ```
 
-**Pattern**: RadialGradient fading to transparent + BlurFilter creates soft glow orbs.
-`blendMode="screen"` brightens the background additively. Keep blur radius as small as
-visually acceptable — blur cost scales with radius. See `optimize-guide.md` §Blur & Opacity
-for performance guidance. Glow orbs use `left`/`top` constraints to position within the
-container (note: `left`/`top` on Layer positions the Layer's content origin, so glow extends
-beyond these edges based on its size).
+**Pattern**: RadialGradient fading to transparent + BlurFilter creates soft glows.
+`blendMode="screen"` brightens additively. Keep blur radius minimal — cost scales with radius.
 
 ### Reusable Card Grid (Composition)
 
@@ -623,12 +775,9 @@ beyond these edges based on its size).
 </pagx>
 ```
 
-**Pattern**: Composition has its own coordinate system with origin at the **top-left corner**.
-Internal geometry uses `left/right/top/bottom="0"` constraints to fill the Composition bounds
-(no manual `position="(width/2, height/2)"` needed). The referencing Layer uses `left`/`top`
-constraints to position the Composition in the parent container. White cards need a non-white
-background to be visible. See `optimize-guide.md` §Composition Resource Reuse for coordinate
-conversion details and gradient handling.
+**Pattern**: Composition origin is at the **top-left corner** — internal geometry uses
+stretch constraints to fill bounds (no manual center calculation). See `optimize-guide.md`
+§Composition Resource Reuse for coordinate conversion and gradient handling.
 
 ### Frosted Panel (BackgroundBlurStyle)
 
@@ -655,7 +804,5 @@ conversion details and gradient handling.
 </pagx>
 ```
 
-**Pattern**: BackgroundBlurStyle blurs the **layer background** (everything already rendered
-below this Layer), clipped by the Layer's opaque content. A semi-transparent Fill lets the
-blurred background show through. This Layer must have content below it to blur — placing it
-on an empty background produces no visible effect.
+**Pattern**: BackgroundBlurStyle blurs everything rendered **below** this Layer, clipped by
+opaque content. Must have content below to blur — empty background produces no effect.

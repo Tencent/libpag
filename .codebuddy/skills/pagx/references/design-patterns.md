@@ -90,28 +90,54 @@ Single-use gradient or path?
 
 ## Layout Decisions
 
-### When to Use Each Layout Mechanism
+### Two-Step Layout Process
 
-PAGX offers three ways to position elements. **Constraint layout should be your first choice**
-for most positioning needs — it is intuitive (edge-based), maintainable,
-and eliminates manual coordinate calculation. Choose based on the specific context:
+PAGX layout decisions follow two steps in a fixed order. Always complete Step 1 before
+Step 2 — this matches how CSS Flexbox works: you set the container's `display: flex` and
+`flex-direction` before positioning individual children.
+
+#### Step 1: Choose Container Mode (child Layer arrangement)
+
+Look at the child Layers inside the current Layer. How are they spatially related?
 
 ```
-VectorElements (shapes, text, groups) inside a Layer need positioning?
-  → Use constraint attributes (left/right/top/bottom/centerX/centerY) ← PRIMARY
+This Layer has multiple child Layers?
+├─ They form a row    → layout="horizontal" + gap/padding/alignment
+├─ They form a column → layout="vertical" + gap/padding/alignment
+└─ Free-form / overlapping → absolute layout (default) + constraint attributes on each child Layer
 
-Child Layers (inside a parent Layer) need positioning?
-  → Parent uses absolute layout (default)? → Use constraint attributes on child Layers ← PRIMARY
-  → Parent uses container layout?         → Use x/y OR includeInLayout="false" + constraints for overlays
-
-Parent Layer has multiple child Layers to arrange?
-  → Children form a row?    → layout="horizontal" + gap/padding/alignment
-  → Children form a column? → layout="vertical" + gap/padding/alignment
-  → Free-form placement?    → layout="absolute" (default), then position children via constraint attributes
-
-Only resort to absolute positioning (x/y for Layers, position for elements) when:
-  → Freeform overlapping composition where neither constraint nor container layout applies
+This Layer has only VectorElements (no child Layers)?
+└─ No container mode needed — go directly to Step 2
 ```
+
+This decision is made **before writing any internal elements**. When you see a card
+containing "header + body + buttons" stacked vertically, immediately set
+`layout="vertical"` — do not wait until you encounter the background Rectangle.
+
+#### Step 2: Position Internal Elements (inside the container)
+
+Now that the container mode is decided, position VectorElements and overlays using
+constraint attributes (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`):
+
+```
+Background Rectangle that fills the container?
+  → left="0" right="0" top="0" bottom="0" size="1,1"
+  → In a container-layout parent: wrap in a Layer with includeInLayout="false"
+
+Text label at a specific position?
+  → Use TextBox + constraint attributes (left/centerX/centerY etc.)
+
+Decorative element or badge overlay?
+  → Use constraint attributes for edge/center alignment
+
+Freeform overlapping composition?
+  → Use x/y on Layers or position on elements (last resort)
+```
+
+**Why this order matters**: Step 1 determines how child Layers are sized and arranged.
+Step 2 relies on the container having a known size (explicit, layout-assigned, or measured)
+as the reference frame for constraints. Reversing the order leads to manual coordinate
+calculation and brittle layouts.
 
 ### Container Layout — Key Patterns
 
@@ -277,8 +303,11 @@ Any valid single-axis combination works.
 
 ### Per-Child Cross-Axis Override
 
-Parent `alignment` applies to all children. To override one child's cross-axis position, wrap
-it in a nested container (similar to CSS `align-self`):
+Parent `alignment` applies to all children uniformly — there is no per-child `alignment`
+attribute (unlike CSS `align-self`). Constraint attributes (`top`/`bottom`/`centerY`) on
+a child Layer in container layout flow are **ignored** because the layout engine controls
+positioning. To override one child's cross-axis position, wrap it in a nested container
+that uses internal layout to achieve the desired alignment:
 
 ```xml
 <Layer width="400" height="200" layout="horizontal" alignment="center">
@@ -290,6 +319,10 @@ it in a nested container (similar to CSS `align-self`):
   </Layer>
 </Layer>
 ```
+
+The wrapper Layer receives `alignment="center"` from the parent (cross-axis height = 200),
+then its internal `layout="vertical"` places content at the top with a flexible spacer
+below — effectively simulating top-alignment for this child only.
 
 ---
 
