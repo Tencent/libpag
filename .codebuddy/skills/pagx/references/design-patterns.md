@@ -616,47 +616,29 @@ force-break per character (`boxWidth ≈ 0`).
 Opposite-pair constraints work correctly when the container has a known size (explicit
 `width`/`height` or layout-assigned by parent).
 
-### 10. Partial Roundness (Top-Round / Bottom-Flat)
+### 10. Partial Roundness (e.g. Top-Round Bottom-Flat)
 
-Rectangle `roundness` is a single value — all four corners share the same radius. There is
-no per-corner attribute (CSS `border-radius: 20px 20px 0 0` has no direct equivalent).
-
-For shapes that need some corners rounded and others square (e.g., a tab bar with rounded
-top corners and flat bottom edges), use a **contour mask** composed of two overlapping
-Rectangles:
+Rectangle `roundness` applies to all four corners uniformly. For per-corner control (like
+a tab bar with only top corners rounded), mask with two overlapping Rectangles — one
+rounded, one square covering the corners you want flat:
 
 ```xml
-<!-- Tab bar: rounded top-left and top-right, square bottom -->
 <Layer left="0" right="0" bottom="0" height="83">
-  <!-- Mask: rounded rect + square rect that covers the bottom corners -->
   <Layer id="tabMask" visible="false">
     <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="20"/>
     <Fill color="#FFF"/>
+    <!-- Square rect covers bottom 20px, flattening bottom corners -->
     <Rectangle left="0" right="0" top="20" bottom="0" size="1,1"/>
     <Fill color="#FFF"/>
   </Layer>
-  <!-- Masked content -->
   <Layer left="0" right="0" top="0" bottom="0" mask="@tabMask" maskType="contour">
     <Rectangle left="0" right="0" top="0" bottom="0" size="1,1"/>
     <Fill color="#FFFFFFD9"/>
     <BackgroundBlurStyle blurX="20" blurY="20"/>
   </Layer>
-  <!-- Tab items go here -->
 </Layer>
 ```
 
-**How it works**: The first Rectangle (roundness 20) produces a shape with all four corners
-rounded. The second Rectangle covers the bottom portion (from `top="20"` downward) with
-square corners, filling in the rounded bottom corners. Together they form a contour with
-only the top corners rounded. `maskType="contour"` uses this combined shape as a binary
-clip mask.
-
-**Variations** — adjust which corners stay rounded by changing the covering Rectangle's
-constraints:
-
-| Goal | Covering Rectangle |
-|------|-------------------|
-| Top-round, bottom-flat | `left="0" right="0" top="20" bottom="0"` |
-| Bottom-round, top-flat | `left="0" right="0" top="0" bottom="20"` |
-| Left-round, right-flat | `left="20" right="0" top="0" bottom="0"` |
-| Top-left only rounded | Two covering rects: `top="20"` full-width + `left="20"` top portion |
+The covering Rectangle's inset (`top="20"`) must be ≥ `roundness` to fully flatten those
+corners. Flip the constraint direction to flatten other edges instead (e.g. `bottom="20"`
+for top-flat).
