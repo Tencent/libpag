@@ -95,6 +95,12 @@ playground/.pagx.wasm-mt.md5
 playground/node_modules
 playground/package-lock.json
 
+# PAGX Chrome Extension packaging outputs
+pagx-viewer-*.crx
+pagx-viewer-*.zip
+pagx-viewer.pem
+build-wasm-mt/
+
 # PAGX Site
 public
 
