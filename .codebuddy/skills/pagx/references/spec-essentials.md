@@ -97,8 +97,8 @@ pagx
 
 ### Key Layer Concepts
 
-- **Layer Content** = steps 2-5 combined (background content + child layers + foreground
-  content). Does **not** include styles or filters.
+- **Layer Content** = background painters + child Layers + foreground painters. Does **not**
+  include styles or filters.
 - **Layer Contour** = a binary mask derived from layer content. Geometry with alpha=0 fills is
   still included. Solid/gradient fills → opaque white; image fills retain transparent pixels,
   convert others to opaque. Used by `maskType="contour"` and DropShadowStyle `showBehindLayer=false`.
@@ -229,16 +229,11 @@ Key rules:
 - **spaceBetween and gap**: When both are set, `gap` serves as base spacing in the
   available-space calculation, then `spaceBetween` redistributes the remaining space.
   The combination can produce unintuitive results — prefer using only one of them.
-- **Stretch alignment** (container layout only): When the parent sets `alignment="stretch"`,
-  children **without** an explicit cross-axis size are stretched to fill the cross-axis
-  available space (container cross-axis size minus padding). Children **with** explicit
-  cross-axis `width`/`height` keep their size — stretch skips them. (Stretch only checks
-  cross-axis sizing, regardless of whether the child is fixed or flexible on the main axis.)
-  In a vertical container, stretch fills width; in a horizontal container, stretch fills height.
-  **For nested layouts** (e.g., vertical parent with horizontal child rows), stretch is
-  crucial: it sets the row's width to the parent's available width, which then becomes the
-  row's container size for distributing its own flexible children. Without stretch, the row
-  would shrink-wrap its content and its flexible children would get zero width.
+- **Stretch alignment** (container layout only): When `alignment="stretch"`, children without
+  explicit cross-axis size fill the available space. Children with explicit size keep it.
+  **For nested layouts** (e.g., vertical parent with horizontal rows), stretch is crucial:
+  it propagates width to rows, which then distribute to their flexible children. Without
+  stretch, rows shrink-wrap and flexible children get zero width.
 - **Pixel grid alignment**: All layout-computed **Layer** coordinates (`x`/`y`) and sizes
   (`width`/`height`) are rounded to the nearest integer pixel. VectorElement positions
   computed by constraint layout retain sub-pixel precision.

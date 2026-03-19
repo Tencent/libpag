@@ -1,12 +1,11 @@
 ---
 name: pagx
 description: >-
-  Generates well-structured PAGX files from visual descriptions and optimizes existing ones for size
-  and rendering performance. Supports two complementary auto layout mechanisms: **constraint layout**
-  (position elements via edge-based constraints) and **container layout**
-  (arrange child Layers in rows/columns). Use when user asks to create, write, or design PAGX content,
-  optimize or simplify a .pagx file, review PAGX structure, run pagx CLI commands (render, validate,
-  format, optimize, bounds, font info/embed), or look up PAGX element attributes and syntax.
+  Generates well-structured PAGX files from visual descriptions and optimizes existing ones
+  for size and rendering performance. Use when user asks to create, write, or design PAGX
+  content, optimize or simplify a .pagx file, review PAGX structure, run pagx CLI commands
+  (render, validate, format, optimize, bounds, font info/embed), or look up PAGX element
+  attributes and syntax.
 ---
 
 # PAGX Skill

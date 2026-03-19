@@ -293,13 +293,8 @@ constraint on the other axis for common UI positioning patterns:
 </Layer>
 ```
 
-Each axis is resolved independently:
-- `left` / `right` / `centerX` control horizontal positioning and sizing
-- `top` / `bottom` / `centerY` control vertical positioning and sizing
-- **Opposite-pair combinations** (`left`+`right` or `top`+`bottom`) derive dimensions from
-  parent container — for child Layers this **ALWAYS OVERRIDES** any explicit `width`/`height`;
-  for VectorElements the behavior depends on element type (stretch/scale to fit/derive size)
-Any valid single-axis combination works.
+Each axis is resolved independently — any valid single-axis combination works. See
+`spec-essentials.md` §3a for the full constraint resolution rules.
 
 ### Per-Child Alignment via Nested Containers
 

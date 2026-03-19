@@ -84,24 +84,13 @@ ProfileHeader (Layer)
   `UserInfo`, or moving the user info block would leave orphaned text behind.
 
 **After building the component tree, decide layout for each container** using the two-step
-process from `design-patterns.md` §Layout Decisions. For each container Layer, always
-complete both steps in order:
+process from `design-patterns.md` §Layout Decisions:
 
-1. **Step 1 — Container mode** (how child Layers are arranged): look at this Layer's child
-   Layers. If they form a row → `layout="horizontal"`; a column → `layout="vertical"`;
-   free-form → absolute (default). Set `gap`, `padding`, `alignment` for the container.
-   Make this decision **before writing any internal elements**.
-2. **Step 2 — Internal positioning** (how VectorElements are placed inside): use constraint
-   attributes (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`) for backgrounds, text,
-   icons, and overlay elements. Constraints reference the container's size — which is now
-   known from Step 1 (explicit, layout-assigned, or measured).
+1. **Step 1 — Container mode**: choose `layout="horizontal"/"vertical"` or absolute (default)
+   based on how child Layers are arranged. Set `gap`, `padding`, `alignment`.
+2. **Step 2 — Internal positioning**: use constraint attributes for backgrounds, text, icons.
 
-- **Absolute positioning** (`x`/`y` on Layers, `position` on elements): only for irregular
-  freeform compositions with overlapping elements. Avoid unless necessary.
-
-**Apply recursively**: each child Layer that itself contains child Layers repeats the same
-two-step process. A card inside a vertical list is a container for its own children —
-decide its internal layout mode before positioning its elements.
+Apply recursively to nested containers. See `design-patterns.md` for detailed patterns.
 
 **When to set explicit `width`/`height`** — set dimensions when you need a specific reference
 frame, not when the measured or layout-assigned size is sufficient:
@@ -157,37 +146,18 @@ This isolates defects: if something breaks, it was the last thing added.
   ```
 
 **Auto layout mental model** — the two-step process mirrors CSS Flexbox. The core principle
-is **declare structure first, position content second**:
+is **declare structure first, position content second**: set the container's direction
+(`layout`), `padding`, and `gap` first, then declare children — the engine computes their
+positions automatically.
 
-1. **Outside-in**: set the container's direction (`layout`), `padding`, and `gap` first.
-   Then declare children — the engine computes their positions automatically.
-2. **No width = flexible = equal share**: a child without `width` (in horizontal layout)
-   or `height` (in vertical layout) is flexible. **Children WITH explicit main-axis size are fixed**
-   and do NOT participate in equal distribution. Only flexible children equally share the
-   remaining space after fixed children, gaps, and padding are subtracted. This is the
-   single most important rule — it eliminates manual width/height calculation.
-   (This requires the parent to have main-axis size — either explicit or assigned by
-   the parent's parent using `alignment="stretch"`. Without it, the parent measures
-   children's content to determine its size — see rule 6.)
-3. **`alignment="stretch"`**: stretches children **without** explicit cross-axis size to fill
-   the cross-axis available space. Children with explicit cross-axis size keep their size.
-   In a vertical container, this stretches width; in a horizontal container, this stretches
-   height. **Essential for grid layouts** where inner horizontal rows must span the full
-   width — without it, rows shrink-wrap their content and flexible cells get zero width.
-4. **Background fills**: use `left="0" right="0" top="0" bottom="0" size="1,1"` on Rectangle
-   to auto-fill whatever size the engine assigns to the container. Never hard-code background
-   size to match container dimensions.
-5. **Engine writes sizes back**: when the engine computes a flexible child's size, it writes
-   `width`/`height` back to the child. Inner elements can then use `left`/`right`/`centerX`
-   etc. with that computed size as their reference frame.
-6. **Content-measured containers** (no explicit main-axis size): the engine measures all
-   children's content bounds first, then uses the sum (+ gaps + padding) as the container's
-   main-axis size. After that, flexible children **equally share** the measured space — they
-   do NOT retain their individual measured sizes. Practical implication: with only flexible
-   children, each child gets `totalMeasured / N` width, which equals the average of all
-   children's content widths. Useful for containers that should shrink-wrap their content
-   (e.g., inline tags, auto-sized buttons). When you need a specific container width, set it
-   explicitly or use `alignment="stretch"` from a parent.
+Key rules (details in `spec-essentials.md` §3a Container Layout):
+
+- **No width = flexible = equal share** — children without explicit main-axis size equally
+  share remaining space. Children with explicit size are fixed.
+- **`alignment="stretch"`** — essential for nested layouts (e.g., vertical parent with
+  horizontal rows). Without it, rows shrink-wrap and flexible cells get zero width.
+- **Background fills** — use `left="0" right="0" top="0" bottom="0" size="1,1"` on
+  Rectangle to auto-fill whatever size the engine assigns. Never hard-code background size.
 
 See `design-patterns.md` §Container Layout — Key Patterns for the full grid layout template.
 

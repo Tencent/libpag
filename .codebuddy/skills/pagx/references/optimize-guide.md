@@ -46,9 +46,9 @@ pagx optimize -o output.pagx input.pagx
 Check for issues that automated optimization cannot fix:
 
 - **Manual coordinate calculation** — hand-calculated `x`/`y` or `position` values that
-  should be replaced by constraint layout (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`)
-  or container layout (`layout`/`gap`/`padding`). Constraint layout is the preferred
-  positioning mechanism — see `design-patterns.md` §Layout Decisions.
+  should be replaced by container layout (`layout`/`gap`/`padding`) for arranging child Layers,
+  or constraint layout (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`) for positioning
+  internal elements. See `design-patterns.md` §Layout Decisions.
 - **Inconsistent layout attributes** — container Layers with different `gap` or `padding`
   values for visually similar contexts that should be unified.
 - **Redundant Layer nesting** — child Layers that should be Groups (no styles, filters, or
