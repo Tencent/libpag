@@ -390,10 +390,10 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
     layer->alpha = strtof(opacity.c_str(), nullptr);
   }
 
-  std::string mixBlendMode = getAttribute(element, "mix-blend-mode");
-  if (!mixBlendMode.empty()) {
-    layer->blendMode = SVGBlendModeFromString(mixBlendMode);
-  }
+  // std::string mixBlendMode = getAttribute(element, "mix-blend-mode");
+  // if (!mixBlendMode.empty()) {
+  //   layer->blendMode = SVGBlendModeFromString(mixBlendMode);
+  // }
 
   // Handle mask attribute.
   std::string maskAttr = getAttribute(element, "mask");
