@@ -13,7 +13,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OUTPUT_DIR="${SCRIPT_DIR}/.."
+OUTPUT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 VERSION=$(grep '"version"' "${SCRIPT_DIR}/manifest.json" | head -1 | sed 's/.*: *"\([^"]*\)".*/\1/')
 FORMAT="${1:-crx}"
 PEM_ARG=""
@@ -108,7 +108,29 @@ package_zip() {
 package_crx() {
   local PEM_FILE="${PEM_ARG:-${OUTPUT_DIR}/pagx-viewer.pem}"
   local CRX_NAME="pagx-viewer-v${VERSION}.crx"
+
+  # Require a valid PEM file
+  if [ ! -f "${PEM_FILE}" ]; then
+    echo "Error: Private key file not found: ${PEM_FILE}"
+    echo ""
+    if [ -z "${PEM_ARG}" ]; then
+      echo "No --key option specified and no default key found at:"
+      echo "  ${PEM_FILE}"
+    else
+      echo "The specified key file does not exist:"
+      echo "  ${PEM_FILE}"
+    fi
+    echo ""
+    echo "To generate a new key, create a CRX via Chrome manually first:"
+    echo "  1. Open chrome://extensions/ and enable Developer mode"
+    echo "  2. Click 'Pack extension' with the extension directory"
+    echo "  3. A .pem file will be generated alongside the .crx"
+    echo "  4. Then run: bash package.sh crx --key /path/to/your.pem"
+    exit 1
+  fi
+
   echo "Packaging PAGX Viewer v${VERSION} (CRX for local distribution)..."
+  echo "Using private key: ${PEM_FILE}"
 
   # Create clean dist directory
   local DIST_DIR
@@ -137,12 +159,7 @@ package_crx() {
 
   # Pack extension using Chrome
   rm -f "${OUTPUT_DIR}/${CRX_NAME}"
-
-  if [ -f "${PEM_FILE}" ]; then
-    "${CHROME_BIN}" --pack-extension="${DIST_DIR}" --pack-extension-key="${PEM_FILE}" --no-message-box 2>/dev/null || true
-  else
-    "${CHROME_BIN}" --pack-extension="${DIST_DIR}" --no-message-box 2>/dev/null || true
-  fi
+  "${CHROME_BIN}" --pack-extension="${DIST_DIR}" --pack-extension-key="${PEM_FILE}" --no-message-box 2>/dev/null || true
 
   # Chrome generates .crx and .pem next to the dist directory
   local GENERATED_CRX="${DIST_DIR}.crx"
@@ -154,15 +171,9 @@ package_crx() {
     exit 1
   fi
 
-  # Move outputs to target location
+  # Move CRX to target location, clean up generated PEM (we already have one)
   mv "${GENERATED_CRX}" "${OUTPUT_DIR}/${CRX_NAME}"
-  if [ -f "${GENERATED_PEM}" ] && [ ! -f "${PEM_FILE}" ]; then
-    mv "${GENERATED_PEM}" "${PEM_FILE}"
-    echo "Private key saved: ${PEM_FILE}"
-    echo "  (Keep this file safe — needed for future updates with the same extension ID)"
-  elif [ -f "${GENERATED_PEM}" ]; then
-    rm -f "${GENERATED_PEM}"
-  fi
+  rm -f "${GENERATED_PEM}"
 
   # Cleanup
   rm -rf "${DIST_DIR}"
