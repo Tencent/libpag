@@ -18,6 +18,7 @@
 
 import PAGXWasm from '../wasm/pagx-playground';
 import { TGFXBind } from '@tgfx/binding';
+import { getCached, putCache, clearStaleCache } from './cache-manager';
 
 interface PAGXModule {
     GL: any;
@@ -409,12 +410,15 @@ class GestureManager implements GestureManagerInterface {
     }
 }
 
+const LOADING_TIMEOUT_MS = 60000;
+
 const playgroundState = new PlaygroundState();
 const gestureManager = new GestureManager();
 const loadingProgress = new LoadingProgress();
 let animationLoopRunning = false;
 let wasmLoadPromise: Promise<void> | null = null;
 let fontLoadPromise: Promise<void> | null = null;
+let loadingTimeoutId: number | null = null;
 
 function updateProgressUI(): void {
     const progressBar = document.getElementById('progress-bar');
@@ -480,13 +484,25 @@ async function fetchWithProgress(
 async function loadFonts(): Promise<void> {
     const loadFont = async (
         url: string,
+        cacheKey: string,
         onProgress: (loaded: number, total: number) => void,
         onDone: () => void
     ): Promise<Uint8Array | null> => {
         try {
+            // Try cache first
+            const cached = await getCached(cacheKey);
+            if (cached) {
+                console.log(`[PAGX Viewer] Font loaded from cache: ${cacheKey}`);
+                onDone();
+                updateProgressUI();
+                return new Uint8Array(cached);
+            }
+            
             const buffer = await fetchWithProgress(url, onProgress);
             onDone();
             updateProgressUI();
+            // Cache for next time (non-blocking)
+            putCache(cacheKey, buffer);
             return new Uint8Array(buffer);
         } catch (error) {
             console.warn(`Error loading font ${url}:`, error);
@@ -499,6 +515,7 @@ async function loadFonts(): Promise<void> {
     const [fontData, emojiFontData] = await Promise.all([
         loadFont(
             FONT_URL,
+            'font-noto-sans',
             (loaded, total) => {
                 loadingProgress.fontLoaded = loaded;
                 if (total > 0) {
@@ -510,6 +527,7 @@ async function loadFonts(): Promise<void> {
         ),
         loadFont(
             EMOJI_FONT_URL,
+            'font-noto-emoji',
             (loaded, total) => {
                 loadingProgress.emojiFontLoaded = loaded;
                 if (total > 0) {
@@ -525,15 +543,27 @@ async function loadFonts(): Promise<void> {
 }
 
 async function loadWasm(): Promise<void> {
-    const wasmBuffer = await fetchWithProgress(WASM_URL, (loaded, total) => {
-        loadingProgress.wasmLoaded = loaded;
-        if (total > 0) {
-            loadingProgress.wasmTotal = total;
-        }
+    // Try cache first
+    let wasmBuffer: ArrayBuffer;
+    const cached = await getCached('wasm-binary');
+    if (cached) {
+        console.log('[PAGX Viewer] WASM loaded from cache');
+        wasmBuffer = cached;
+        loadingProgress.wasmDone = true;
         updateProgressUI();
-    });
-    loadingProgress.wasmDone = true;
-    updateProgressUI();
+    } else {
+        wasmBuffer = await fetchWithProgress(WASM_URL, (loaded, total) => {
+            loadingProgress.wasmLoaded = loaded;
+            if (total > 0) {
+                loadingProgress.wasmTotal = total;
+            }
+            updateProgressUI();
+        });
+        loadingProgress.wasmDone = true;
+        updateProgressUI();
+        // Cache for next time (non-blocking)
+        putCache('wasm-binary', wasmBuffer);
+    }
 
     const module = await PAGXWasm({
         locateFile: (file: string) => chrome.runtime.getURL('wasm/' + file),
@@ -699,8 +729,12 @@ function showDropZoneUI(): void {
     setDropZoneState('dropzone');
 }
 
-function showErrorUI(message: string): void {
+function showErrorUI(message: string, showRetry: boolean = false): void {
     setDropZoneState('error', message);
+    const retryBtn = document.getElementById('retry-btn');
+    if (retryBtn) {
+        retryBtn.classList.toggle('hidden', !showRetry);
+    }
 }
 
 function hideDropZone(): void {
@@ -811,10 +845,26 @@ async function loadPAGXData(data: Uint8Array, name: string, baseURL: string) {
     }
 }
 
+function startLoadingTimeout(): void {
+    clearLoadingTimeout();
+    loadingTimeoutId = window.setTimeout(() => {
+        loadingTimeoutId = null;
+        showErrorUI('Loading timed out. Please check your network and try again.', true);
+    }, LOADING_TIMEOUT_MS);
+}
+
+function clearLoadingTimeout(): void {
+    if (loadingTimeoutId !== null) {
+        clearTimeout(loadingTimeoutId);
+        loadingTimeoutId = null;
+    }
+}
+
 async function prepareForLoading(): Promise<void> {
     hidePlaybackUI();
     showLoadingUI();
     resetProgressUI();
+    startLoadingTimeout();
     await new Promise(resolve => requestAnimationFrame(resolve));
 
     if (!wasmLoadPromise) {
@@ -826,6 +876,7 @@ async function prepareForLoading(): Promise<void> {
 
     const loadingStartTime = Date.now();
     await Promise.all([wasmLoadPromise, fontLoadPromise]);
+    clearLoadingTimeout();
     updateProgressUI();
 
     const elapsed = Date.now() - loadingStartTime;
@@ -891,13 +942,30 @@ function setupDragAndDrop() {
         }
     }, false);
 
-    dropZoneContent.addEventListener('click', () => {
-        fileInput.click();
+    const openFilePicker = () => fileInput.click();
+
+    dropZoneContent.addEventListener('click', openFilePicker);
+    dropZoneContent.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openFilePicker();
+        }
     });
 
-    errorContent.addEventListener('click', () => {
-        fileInput.click();
-    });
+    errorContent.addEventListener('click', openFilePicker);
+
+    const retryBtn = document.getElementById('retry-btn') as HTMLButtonElement;
+    if (retryBtn) {
+        retryBtn.addEventListener('click', (e: Event) => {
+            e.stopPropagation();
+            wasmLoadPromise = null;
+            fontLoadPromise = null;
+            showLoadingUI();
+            prepareForLoading().catch(error => {
+                showErrorUI('Retry failed: ' + (error instanceof Error ? error.message : String(error)), true);
+            });
+        });
+    }
 
     openBtn.addEventListener('click', () => {
         fileInput.click();
@@ -916,33 +984,6 @@ function setupDragAndDrop() {
     });
 }
 
-function checkWebGL2Support(): boolean {
-    const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl2');
-    return gl !== null;
-}
-
-function checkWasmSupport(): boolean {
-    try {
-        if (typeof WebAssembly === 'object' &&
-            typeof WebAssembly.instantiate === 'function') {
-            const module = new WebAssembly.Module(new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]));
-            return module instanceof WebAssembly.Module;
-        }
-    } catch (e) {
-        // WebAssembly not supported
-    }
-    return false;
-}
-
-function getBrowserRequirements(): string {
-    return `Minimum browser versions required:
-• Chrome 69+
-• Firefox 79+
-• Safari 15+
-• Edge 79+`;
-}
-
 if (typeof window !== 'undefined') {
     let resizeTimeout: number | null = null;
 
@@ -950,6 +991,9 @@ if (typeof window !== 'undefined') {
         setupDragAndDrop();
 
         console.log('[PAGX Viewer] Starting initialization...');
+
+        // Clean up stale cache from previous versions (non-blocking)
+        clearStaleCache();
 
         wasmLoadPromise = loadWasm().catch(error => {
             console.error('[PAGX Viewer] WASM load failed:', error);
