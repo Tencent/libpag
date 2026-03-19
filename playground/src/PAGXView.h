@@ -52,6 +52,8 @@ class PAGXView {
 
   void draw();
 
+  void setBackgroundMode(const std::string& mode);
+
   float contentWidth() const {
     return pagxWidth;
   }

@@ -39,6 +39,7 @@ EMSCRIPTEN_BINDINGS(PAGXPlayground) {
       .function("updateSize", &pagx::PAGXView::updateSize)
       .function("updateZoomScaleAndOffset", &pagx::PAGXView::updateZoomScaleAndOffset)
       .function("draw", &pagx::PAGXView::draw)
+      .function("setBackgroundMode", &pagx::PAGXView::setBackgroundMode)
       .function("contentWidth", &pagx::PAGXView::contentWidth)
       .function("contentHeight", &pagx::PAGXView::contentHeight);
 }

@@ -22,37 +22,64 @@
 namespace pagx {
 
 std::shared_ptr<GridBackgroundLayer> GridBackgroundLayer::Make(int width, int height,
-                                                               float density) {
-  return std::shared_ptr<GridBackgroundLayer>(new GridBackgroundLayer(width, height, density));
+                                                               float density,
+                                                               BackgroundMode mode) {
+  return std::shared_ptr<GridBackgroundLayer>(
+      new GridBackgroundLayer(width, height, density, mode));
 }
 
-GridBackgroundLayer::GridBackgroundLayer(int width, int height, float density)
-    : width(width), height(height), density(density) {
+GridBackgroundLayer::GridBackgroundLayer(int width, int height, float density,
+                                         BackgroundMode mode)
+    : width(width), height(height), density(density), mode(mode) {
   invalidateContent();
 }
 
-void GridBackgroundLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
-  tgfx::LayerPaint backgroundPaint(tgfx::Color::White());
-  recorder->addRect(tgfx::Rect::MakeWH(static_cast<float>(width), static_cast<float>(height)),
-                    backgroundPaint);
-
-  tgfx::LayerPaint tilePaint(tgfx::Color{0.8f, 0.8f, 0.8f, 1.f});
-  // Use fixed logical size (32px) so the grid looks the same on all screens.
-  int logicalTileSize = 32;
-  int tileSize = static_cast<int>(static_cast<float>(logicalTileSize) * density);
-  if (tileSize <= 0) {
-    tileSize = logicalTileSize;
+void GridBackgroundLayer::setBackgroundMode(BackgroundMode newMode) {
+  if (mode != newMode) {
+    mode = newMode;
+    invalidateContent();
   }
-  for (int y = 0; y < height; y += tileSize) {
-    bool draw = (y / tileSize) % 2 == 1;
-    for (int x = 0; x < width; x += tileSize) {
-      if (draw) {
-        recorder->addRect(
-            tgfx::Rect::MakeXYWH(static_cast<float>(x), static_cast<float>(y),
-                                 static_cast<float>(tileSize), static_cast<float>(tileSize)),
-            tilePaint);
+}
+
+void GridBackgroundLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
+  switch (mode) {
+    case BackgroundMode::Grid: {
+      tgfx::LayerPaint backgroundPaint(tgfx::Color::White());
+      recorder->addRect(
+          tgfx::Rect::MakeWH(static_cast<float>(width), static_cast<float>(height)),
+          backgroundPaint);
+
+      tgfx::LayerPaint tilePaint(tgfx::Color{0.8f, 0.8f, 0.8f, 1.f});
+      int logicalTileSize = 32;
+      int tileSize = static_cast<int>(static_cast<float>(logicalTileSize) * density);
+      if (tileSize <= 0) {
+        tileSize = logicalTileSize;
       }
-      draw = !draw;
+      for (int y = 0; y < height; y += tileSize) {
+        bool draw = (y / tileSize) % 2 == 1;
+        for (int x = 0; x < width; x += tileSize) {
+          if (draw) {
+            recorder->addRect(tgfx::Rect::MakeXYWH(static_cast<float>(x), static_cast<float>(y),
+                                                   static_cast<float>(tileSize),
+                                                   static_cast<float>(tileSize)),
+                              tilePaint);
+          }
+          draw = !draw;
+        }
+      }
+      break;
+    }
+    case BackgroundMode::White: {
+      tgfx::LayerPaint paint(tgfx::Color::White());
+      recorder->addRect(tgfx::Rect::MakeWH(static_cast<float>(width), static_cast<float>(height)),
+                        paint);
+      break;
+    }
+    case BackgroundMode::Black: {
+      tgfx::LayerPaint paint(tgfx::Color::Black());
+      recorder->addRect(tgfx::Rect::MakeWH(static_cast<float>(width), static_cast<float>(height)),
+                        paint);
+      break;
     }
   }
 }
