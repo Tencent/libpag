@@ -44,9 +44,9 @@ IContentRenderer::RenderMetrics PAGRenderer::flush() {
   if (view->sizeChanged.exchange(false)) {
     updateSize();
   }
-  auto player = view->viewModel->pagPlayer;
-  auto file = view->viewModel->pagFile;
-  if (!player || !file) {
+  auto* player = view->viewModel->pagPlayer.get();
+  auto* file = view->viewModel->pagFile.get();
+  if (player == nullptr || file == nullptr) {
     return metrics;
   }
   player->flush();
