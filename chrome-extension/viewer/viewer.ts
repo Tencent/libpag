@@ -608,11 +608,12 @@ function updateSize() {
     const scaleFactor = window.devicePixelRatio;
     let canvasWidth = containerRect.width;
     let canvasHeight = containerRect.height;
+    const dividerSize = 4;
     if (playgroundState.codeViewVisible) {
         if (window.innerWidth <= 600) {
-            canvasHeight = containerRect.height / 2;
+            canvasHeight = (containerRect.height - dividerSize) / 2;
         } else {
-            canvasWidth = containerRect.width / 2;
+            canvasWidth = (containerRect.width - dividerSize) / 2;
         }
     }
     canvas.width = canvasWidth * scaleFactor;
@@ -977,6 +978,7 @@ function toggleCodeView(visible: boolean): void {
     const container = document.getElementById('container') as HTMLDivElement;
     const codePanel = document.getElementById('code-panel') as HTMLDivElement;
     const codeToggleBtn = document.getElementById('code-toggle-btn') as HTMLButtonElement;
+    const splitDivider = document.getElementById('split-divider') as HTMLDivElement;
     if (!container || !codePanel || !codeToggleBtn) {
         return;
     }
@@ -986,6 +988,7 @@ function toggleCodeView(visible: boolean): void {
     if (visible) {
         container.classList.add('split-view');
         codePanel.classList.remove('hidden');
+        splitDivider?.classList.remove('hidden');
         codeToggleBtn.classList.add('active');
         codeToggleBtn.setAttribute('aria-pressed', 'true');
         // Update icon color to blue (on)
@@ -997,6 +1000,7 @@ function toggleCodeView(visible: boolean): void {
     } else {
         container.classList.remove('split-view');
         codePanel.classList.add('hidden');
+        splitDivider?.classList.add('hidden');
         codeToggleBtn.classList.remove('active');
         codeToggleBtn.setAttribute('aria-pressed', 'false');
         // Update icon color to gray (off)

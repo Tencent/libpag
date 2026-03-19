@@ -19,7 +19,7 @@ html, body {
 
 .container.split-view .canvas {
     left: 0;
-    right: 50%;
+    right: calc(50% + 2px);
 }
 
 .canvas {
@@ -301,16 +301,55 @@ html, body {
     position: absolute;
     top: 0;
     right: 0;
-    width: 50%;
+    width: calc(50% - 2px);
     height: 100%;
     z-index: 2;
     display: flex;
     flex-direction: column;
     background: #1e1e2e;
-    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    border-left: none;
 }
 
 .code-panel.hidden {
+    display: none;
+}
+
+/* Split-view divider */
+.split-divider {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 100%;
+    z-index: 3;
+    background: #2a2a3e;
+    cursor: col-resize;
+    transition: background 0.15s ease;
+}
+
+.split-divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px;
+    height: 32px;
+    border-radius: 1px;
+    background: rgba(255, 255, 255, 0.2);
+    transition: background 0.15s ease;
+}
+
+.split-divider:hover {
+    background: #3a3a5e;
+}
+
+.split-divider:hover::after {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+.split-divider.hidden {
     display: none;
 }
 
@@ -319,7 +358,7 @@ html, body {
     align-items: center;
     padding: 10px 16px;
     background: rgba(0, 0, 0, 0.3);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     flex-shrink: 0;
 }
 
@@ -419,13 +458,28 @@ html, body {
 
     .code-panel {
         width: 100%;
-        height: 50%;
-        top: 50%;
+        height: calc(50% - 2px);
+        top: auto;
+        bottom: 0;
         border-left: none;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        border-top: none;
+    }
+
+    .split-divider {
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 100%;
+        height: 4px;
+        cursor: row-resize;
+    }
+
+    .split-divider::after {
+        width: 32px;
+        height: 2px;
     }
 
     .container.split-view .canvas {
-        bottom: 50%;
+        bottom: calc(50% + 2px);
     }
 }
