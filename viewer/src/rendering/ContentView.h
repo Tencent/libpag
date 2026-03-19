@@ -51,7 +51,7 @@ class ContentView : public QQuickItem {
   friend class RenderThread;
 
  protected:
-  Q_SLOT void sizeChangedDelayHandle();
+  Q_SLOT virtual void sizeChangedDelayHandle();
   Q_SLOT void onWindowChanged(QQuickWindow* win);
 
   virtual void initDrawable();
