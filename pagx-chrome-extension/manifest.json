@@ -17,8 +17,7 @@
   "permissions": [
     "activeTab",
     "scripting",
-    "webNavigation",
-    "downloads"
+    "webNavigation"
   ],
 
   "host_permissions": [

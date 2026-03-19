@@ -2,14 +2,6 @@
 
 Preview PAGX vector graphics files directly in Chrome browser.
 
-## Features
-
-- Drag and drop `.pagx` files into the viewer page
-- Drag `.pagx` files onto the Chrome Dock icon (macOS) or Taskbar icon (Windows) to open directly
-- Split-view with PAGX source code viewer and syntax highlighting
-- Draggable split divider with line numbers
-- WebGL2 rendering via WASM engine
-
 ## Prerequisites
 
 - Node.js (for building viewer.js)
@@ -39,17 +31,7 @@ After building, load the extension in Chrome for development:
 1. Open `chrome://extensions/`
 2. Enable **Developer mode** (top right toggle)
 3. Click **Load unpacked** and select the `pagx-chrome-extension/` directory
-4. Click the extension details and enable **Allow access to file URLs**
-
-> **Important**: The "Allow access to file URLs" permission is required for opening local `.pagx` files. Without it, dragging files to the Dock/Taskbar icon or opening `file://` URLs will not work.
-
-### Opening PAGX Files
-
-There are three ways to open a `.pagx` file:
-
-1. **Drag & drop into viewer**: Open the extension's viewer page, then drag a `.pagx` file onto it
-2. **Drag to Chrome icon**: Drag a `.pagx` file onto the Chrome icon in the macOS Dock or Windows Taskbar
-3. **Open file URL**: Navigate to a `file:///path/to/file.pagx` URL in Chrome's address bar
+4. Enable **Allow access to file URLs** in the extension details
 
 Changes to `.css` and `.html` files take effect after refreshing the extension page.
 Changes to `.ts` files require rebuilding:
