@@ -320,33 +320,65 @@ html, body {
     top: 0;
     left: 50%;
     transform: translateX(-50%);
-    width: 4px;
+    width: 24px;
     height: 100%;
     z-index: 3;
-    background: #2a2a3e;
     cursor: col-resize;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+}
+
+.split-divider-line {
+    flex: 1;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.25);
     transition: background 0.15s ease;
 }
 
-.split-divider::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 2px;
+.split-divider-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
     height: 32px;
-    border-radius: 1px;
-    background: rgba(255, 255, 255, 0.2);
-    transition: background 0.15s ease;
+    border-radius: 50%;
+    background: rgba(40, 40, 60, 0.85);
+    border: 1.5px solid rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.6);
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+    backdrop-filter: blur(4px);
 }
 
-.split-divider:hover {
-    background: #3a3a5e;
+.split-divider-handle svg {
+    width: 12px;
+    height: 12px;
+    margin: -1px;
 }
 
-.split-divider:hover::after {
+.split-divider:hover .split-divider-line {
     background: rgba(255, 255, 255, 0.4);
+}
+
+.split-divider:hover .split-divider-handle {
+    background: rgba(50, 50, 80, 0.95);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.9);
+    transform: scale(1.1);
+}
+
+.split-divider.dragging .split-divider-handle {
+    background: rgba(30, 122, 235, 0.8);
+    border-color: rgba(30, 122, 235, 0.9);
+    color: #fff;
+    transform: scale(1.15);
+}
+
+.split-divider.dragging .split-divider-line {
+    background: rgba(30, 122, 235, 0.5);
 }
 
 .split-divider.hidden {
@@ -470,13 +502,15 @@ html, body {
         top: 50%;
         transform: translateY(-50%);
         width: 100%;
-        height: 4px;
+        height: 24px;
         cursor: row-resize;
+        flex-direction: row;
     }
 
-    .split-divider::after {
-        width: 32px;
-        height: 2px;
+    .split-divider-line {
+        flex: 1;
+        width: auto;
+        height: 1px;
     }
 
     .container.split-view .canvas {

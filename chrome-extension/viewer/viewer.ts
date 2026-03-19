@@ -76,6 +76,7 @@ class PlaygroundState {
     pagxSourceUrl: string = '';
     pagxText: string = '';
     codeViewVisible: boolean = false;
+    splitRatio: number = 0.5;
 }
 
 class LoadingProgress {
@@ -613,7 +614,7 @@ function updateSize() {
         if (window.innerWidth <= 600) {
             canvasHeight = (containerRect.height - dividerSize) / 2;
         } else {
-            canvasWidth = (containerRect.width - dividerSize) / 2;
+            canvasWidth = containerRect.width * playgroundState.splitRatio - dividerSize / 2;
         }
     }
     canvas.width = canvasWidth * scaleFactor;
@@ -986,12 +987,21 @@ function toggleCodeView(visible: boolean): void {
     playgroundState.codeViewVisible = visible;
 
     if (visible) {
+        playgroundState.splitRatio = 0.5;
         container.classList.add('split-view');
         codePanel.classList.remove('hidden');
         splitDivider?.classList.remove('hidden');
+        // Reset inline styles from previous drag
+        const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
+        if (canvas) {
+            canvas.style.right = '';
+        }
+        if (splitDivider) {
+            splitDivider.style.left = '';
+        }
+        codePanel.style.width = '';
         codeToggleBtn.classList.add('active');
         codeToggleBtn.setAttribute('aria-pressed', 'true');
-        // Update icon color to blue (on)
         const svgPath = codeToggleBtn.querySelector('path');
         if (svgPath) {
             svgPath.setAttribute('fill', CODE_ICON_COLOR_ON);
@@ -1001,9 +1011,17 @@ function toggleCodeView(visible: boolean): void {
         container.classList.remove('split-view');
         codePanel.classList.add('hidden');
         splitDivider?.classList.add('hidden');
+        // Reset inline styles
+        const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
+        if (canvas) {
+            canvas.style.right = '';
+        }
+        if (splitDivider) {
+            splitDivider.style.left = '';
+        }
+        codePanel.style.width = '';
         codeToggleBtn.classList.remove('active');
         codeToggleBtn.setAttribute('aria-pressed', 'false');
-        // Update icon color to gray (off)
         const svgPath = codeToggleBtn.querySelector('path');
         if (svgPath) {
             svgPath.setAttribute('fill', CODE_ICON_COLOR_OFF);
@@ -1027,6 +1045,69 @@ function setupCodeToggle(): void {
     codeToggleBtn.addEventListener('click', () => {
         toggleCodeView(!playgroundState.codeViewVisible);
     });
+}
+
+function setupSplitDividerDrag(): void {
+    const divider = document.getElementById('split-divider');
+    const container = document.getElementById('container');
+    if (!divider || !container) {
+        return;
+    }
+
+    let isDragging = false;
+
+    const onMouseDown = (e: MouseEvent) => {
+        if (!playgroundState.codeViewVisible) {
+            return;
+        }
+        e.preventDefault();
+        isDragging = true;
+        divider.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+        if (!isDragging) {
+            return;
+        }
+        const containerRect = container.getBoundingClientRect();
+        const minRatio = 0.2;
+        const maxRatio = 0.8;
+        let ratio = (e.clientX - containerRect.left) / containerRect.width;
+        ratio = Math.max(minRatio, Math.min(maxRatio, ratio));
+        const percent = ratio * 100;
+
+        const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
+        const codePanel = document.getElementById('code-panel') as HTMLDivElement;
+        if (!canvas || !codePanel) {
+            return;
+        }
+
+        // Update layout positions
+        canvas.style.right = `calc(${100 - percent}% + 2px)`;
+        divider.style.left = `${percent}%`;
+        codePanel.style.width = `calc(${100 - percent}% - 2px)`;
+
+        // Update canvas internal size
+        playgroundState.splitRatio = ratio;
+        updateSize();
+    };
+
+    const onMouseUp = () => {
+        if (!isDragging) {
+            return;
+        }
+        isDragging = false;
+        divider.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        draw();
+    };
+
+    divider.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
 }
 
 function setupDragAndDrop() {
@@ -1107,6 +1188,7 @@ function setupDragAndDrop() {
     });
 
     setupCodeToggle();
+    setupSplitDividerDrag();
 
     fileInput.addEventListener('change', () => {
         const files = fileInput.files;
