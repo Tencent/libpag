@@ -22,7 +22,6 @@
 #include <QString>
 #include <QTranslator>
 #include "ContentView.h"
-#include "PAGView.h"
 #include "PAGWindowHelper.h"
 #include "editing/PAGEditAttributeModel.h"
 #include "editing/PAGImageLayerModel.h"
@@ -52,14 +51,12 @@ class PAGWindow : public QObject {
   static QList<PAGWindow*> AllWindows;
 
  private:
-  void connectBaseContentViewSignals();
-  void connectFormatSpecificSignals();
+  void connectContentViewSignals();
   void disconnectContentViewSignals();
 
   QString filePath = "";
   QQuickWindow* window = nullptr;
   ContentView* contentView = nullptr;
-  PAGView* pagView = nullptr;  // Only valid when content type is PAG
   std::unique_ptr<QTranslator> translator = nullptr;
   std::unique_ptr<PAGWindowHelper> windowHelper = nullptr;
   std::unique_ptr<QQmlApplicationEngine> engine = nullptr;

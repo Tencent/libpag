@@ -22,9 +22,7 @@
 #include <QQuickWindow>
 #include "ContentView.h"
 #include "PAGXRenderer.h"
-#include "pagx/PAGXDocument.h"
-#include "tgfx/layers/DisplayList.h"
-#include "tgfx/layers/Layer.h"
+#include "PAGXViewModel.h"
 
 namespace pag {
 
@@ -37,60 +35,24 @@ class PAGXView : public ContentView {
   explicit PAGXView(QQuickItem* parent = nullptr);
   ~PAGXView() override;
 
-  int getWidth() const override;
-  int getHeight() const override;
-  bool hasAnimation() const override;
-  bool isPlaying() const override;
-  double getProgress() const override;
-  QString getTotalFrame() const override;
-  QString getCurrentFrame() const override;
-  QString getDuration() const override;
-  QString getFilePath() const override;
-  QString getDisplayedTime() const override;
-  QColor getBackgroundColor() const override;
-  QSizeF getPreferredSize() const override;
-  int getEditableTextLayerCount() const override;
-  int getEditableImageLayerCount() const override;
-  bool getShowVideoFrames() const override;
-
-  void setIsPlaying(bool isPlaying) override;
-  void setProgress(double progress) override;
-  void setShowVideoFrames(bool isShow) override;
-  void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
+  ContentViewModel* getViewModel() const override;
 
   Q_SLOT void sizeChangedDelayHandle();
 
-  Q_INVOKABLE bool setFile(const QString& filePath) override;
-  Q_INVOKABLE void firstFrame() override;
-  Q_INVOKABLE void lastFrame() override;
-  Q_INVOKABLE void nextFrame() override;
-  Q_INVOKABLE void previousFrame() override;
-
-  void flush() const;
-
+  void flush() const override;
+  void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
   QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
+
+  // Called by PAGXViewModel to trigger a render-thread flush.
+  void triggerFlush() const;
 
  private:
   void initDrawable() override;
-  void clearContent();
-  void updateAnimationState();
 
-  std::atomic_bool needsRender = false;
-
-  std::shared_ptr<pagx::PAGXDocument> pagxDocument = nullptr;
-  std::shared_ptr<tgfx::Layer> pagxContentLayer = nullptr;
-  std::unique_ptr<tgfx::DisplayList> displayList = nullptr;
-  int pagxWidth = 0;
-  int pagxHeight = 0;
-  std::string currentFilePath = {};
-
-  int64_t totalFrames = 1;
-  float frameRate = 0.0f;
-  double progress = 0.0;
-  double progressPerFrame = 1.0;
-  bool isPlaying_ = false;
-  int64_t lastPlayTime = 0;
+  std::unique_ptr<PAGXViewModel> viewModel = nullptr;
 
   friend class PAGXRenderer;
+  friend class PAGXViewModel;
 };
+
 }  // namespace pag

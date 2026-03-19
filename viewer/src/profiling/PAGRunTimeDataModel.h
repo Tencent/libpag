@@ -77,6 +77,8 @@ class PAGRunTimeDataModel : public QObject {
   Q_SLOT void updateData(int64_t currentFrame, int64_t renderTime, int64_t presentTime,
                          int64_t imageDecodeTime);
   Q_SLOT void updatePAGXRenderTime(int64_t renderTime, int64_t imageTime, int64_t presentTime);
+  Q_SLOT void updateMetrics(int64_t renderTime, int64_t presentTime, int64_t imageDecodeTime,
+                            int64_t currentFrame);
 
   void setPAGFile(std::shared_ptr<PAGFile> pagFile);
   void setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pagxDocument);

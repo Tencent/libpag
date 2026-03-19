@@ -25,11 +25,12 @@ PAGRenderer::PAGRenderer(PAGView* view) : view(view) {
 }
 
 bool PAGRenderer::isReady() const {
-  return view != nullptr && view->pagPlayer != nullptr && view->pagFile != nullptr;
+  return view != nullptr && view->viewModel->pagPlayer != nullptr &&
+         view->viewModel->pagFile != nullptr;
 }
 
 void PAGRenderer::updateSize() {
-  auto pagSurface = view->pagPlayer->getSurface();
+  auto pagSurface = view->viewModel->pagPlayer->getSurface();
   pagSurface->updateSize();
 }
 
@@ -42,13 +43,13 @@ IContentRenderer::RenderMetrics PAGRenderer::flush() {
     view->sizeChanged = false;
     updateSize();
   }
-  view->pagPlayer->flush();
-  double progress = view->pagFile->getProgress();
-  metrics.currentFrame =
-      static_cast<int64_t>(std::round((view->getTotalFrame().toDouble() - 1) * progress));
-  metrics.renderTime = view->pagPlayer->renderingTime();
-  metrics.presentTime = view->pagPlayer->presentingTime();
-  metrics.imageDecodeTime = view->pagPlayer->imageDecodingTime();
+  view->viewModel->pagPlayer->flush();
+  double progress = view->viewModel->pagFile->getProgress();
+  metrics.currentFrame = static_cast<int64_t>(
+      std::round((view->viewModel->getTotalFrame().toDouble() - 1) * progress));
+  metrics.renderTime = view->viewModel->pagPlayer->renderingTime();
+  metrics.presentTime = view->viewModel->pagPlayer->presentingTime();
+  metrics.imageDecodeTime = view->viewModel->pagPlayer->imageDecodingTime();
   QMetaObject::invokeMethod(view, "update", Qt::QueuedConnection);
   return metrics;
 }

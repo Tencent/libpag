@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -20,58 +20,34 @@
 #include <QSGImageNode>
 #include "PAGRenderer.h"
 #include "RenderThread.h"
-#include "pag/file.h"
 #include "tgfx/core/Clock.h"
-#include "version.h"
 
 namespace pag {
 
-constexpr int64_t MaxAudioLeadThreshold = 25000;
-constexpr int64_t MinAudioLagThreshold = -100000;
-
-static void reportPAGFIleInfo(const std::shared_ptr<PAGFile>& pagFile, size_t length) {
-  QVariantMap map;
-  map["Event"] = "OPEN_PAG";
-  map["FileSize"] = QString::number(length);
-  map["PAGLayerCount"] = QString::number(pagFile->numChildren());
-  map["VideoCompositionCount"] = QString::number(pagFile->numVideos());
-  map["PAGTextLayerCount"] = QString::number(pagFile->numTexts());
-  map["PAGImageLayerCount"] = QString::number(pagFile->numImages());
-  qDebug() << map;
-}
-
 PAGView::PAGView(QQuickItem* parent) : ContentView(parent) {
-  pagPlayer = std::make_unique<PAGPlayer>();
+  viewModel = std::make_unique<PAGViewModel>(this);
   auto pagRenderer = std::make_unique<PAGRenderer>(this);
   renderThread = std::make_unique<RenderThread>(this, pagRenderer.get());
   contentRenderer = std::move(pagRenderer);
   renderThread->moveToThread(renderThread.get());
-  audioPlayer = std::make_unique<PAGAudioPlayer>();
-  connect(audioPlayer.get(), &PAGAudioPlayer::audioTimeChanged, this, &PAGView::onAudioTimeChanged,
-          Qt::QueuedConnection);
-}
-
-void PAGView::flush() const {
-  if (isPlaying_) {
-    QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
-  }
-}
-
-void PAGView::onAudioTimeChanged(int64_t audioTime) {
-  auto timeNow = tgfx::Clock::Now();
-  auto displayTime = timeNow - lastPlayTime;
-  auto duration = static_cast<double>(pagPlayer->duration());
-  auto currentDisplayTime = static_cast<int64_t>(progress * duration) + displayTime;
-  if (audioTime == 0 || (audioTime - currentDisplayTime > MaxAudioLeadThreshold)) {
-    lastPlayTime = timeNow;
-    setProgressInternal(static_cast<double>(audioTime) / duration, false);
-  } else if (audioTime - currentDisplayTime < MinAudioLagThreshold) {
-    lastPlayTime = timeNow;
-  }
 }
 
 PAGView::~PAGView() {
   // Destructor implemented by ContentView
+}
+
+ContentViewModel* PAGView::getViewModel() const {
+  return viewModel.get();
+}
+
+void PAGView::triggerFlush() const {
+  QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
+}
+
+void PAGView::flush() const {
+  if (viewModel->isPlaying()) {
+    triggerFlush();
+  }
 }
 
 void PAGView::initDrawable() {
@@ -83,157 +59,8 @@ void PAGView::initDrawable() {
     return;
   }
   auto pagSurface = PAGSurface::MakeFrom(drawable);
-  pagPlayer->setSurface(pagSurface);
+  viewModel->pagPlayer->setSurface(pagSurface);
   drawable->moveToThread(renderThread.get());
-}
-
-int PAGView::getWidth() const {
-  if (pagFile == nullptr) {
-    return 0;
-  }
-  return pagFile->width();
-}
-
-int PAGView::getHeight() const {
-  if (pagFile == nullptr) {
-    return 0;
-  }
-  return pagFile->height();
-}
-
-bool PAGView::hasAnimation() const {
-  return true;
-}
-
-int PAGView::getEditableTextLayerCount() const {
-  return editableTextLayerCount;
-}
-
-int PAGView::getEditableImageLayerCount() const {
-  return editableImageLayerCount;
-}
-
-QString PAGView::getTotalFrame() const {
-  if (pagFile == nullptr) {
-    return "0";
-  }
-  int64_t totalFrames =
-      static_cast<int64_t>(std::round(getDuration().toLongLong() * pagFile->frameRate() / 1000.0));
-  if (totalFrames < 1) {
-    totalFrames = 0;
-  }
-  return QString::number(totalFrames);
-}
-
-QString PAGView::getCurrentFrame() const {
-  int64_t totalFrames = getTotalFrame().toLongLong();
-  auto currentFrame =
-      static_cast<int64_t>(std::floor(getProgress() * static_cast<double>(totalFrames)));
-  return QString::number(currentFrame);
-}
-
-bool PAGView::isPlaying() const {
-  return isPlaying_;
-}
-
-bool PAGView::getShowVideoFrames() const {
-  if (pagPlayer == nullptr) {
-    return false;
-  }
-  return pagPlayer->videoEnabled();
-}
-
-QString PAGView::getDuration() const {
-  if (pagPlayer == nullptr) {
-    return "0";
-  }
-  return QString::number(pagPlayer->duration() / 1000);
-}
-
-double PAGView::getProgress() const {
-  return progress;
-}
-
-QString PAGView::getFilePath() const {
-  if (pagFile == nullptr) {
-    return "";
-  }
-  return QString::fromLocal8Bit(pagFile->path().data());
-}
-
-QString PAGView::getDisplayedTime() const {
-  int64_t displayedTime =
-      static_cast<int64_t>(std::round(getProgress() * getDuration().toLongLong() / 1000.0));
-  int64_t displayedSeconds = displayedTime % 60;
-  int64_t displayedMinutes = (displayedTime / 60) % 60;
-  return QString("%1:%2")
-      .arg(displayedMinutes, 2, 10, QChar('0'))
-      .arg(displayedSeconds, 2, 10, QChar('0'));
-}
-
-QColor PAGView::getBackgroundColor() const {
-  if (pagFile == nullptr) {
-    return QColorConstants::Black;
-  }
-  auto color = pagFile->getFile()->getRootLayer()->composition->backgroundColor;
-  return QColor::fromRgb((int32_t)color.red, (int32_t)color.green, (int32_t)color.blue);
-}
-
-QSizeF PAGView::getPreferredSize() const {
-  auto quickWindow = window();
-  int pagWidth = getWidth();
-  int pagHeight = getHeight();
-  if (quickWindow == nullptr || pagWidth == 0 || pagHeight == 0) {
-    return {0, 0};
-  }
-  auto screen = quickWindow->screen();
-  QSize screenSize = screen->availableVirtualSize();
-  qreal maxHeight = screenSize.height() * 0.8;
-  qreal minHeight = quickWindow->minimumHeight();
-  qreal width = 0;
-  qreal height = 0;
-
-  if (pagHeight < minHeight) {
-    height = minHeight;
-    width = pagWidth * height / pagHeight;
-  } else {
-    height = pagHeight;
-    width = pagWidth;
-  }
-
-  if (height > maxHeight) {
-    width = width * maxHeight / height;
-    height = maxHeight;
-  }
-
-  return {width, height};
-}
-
-void PAGView::setIsPlaying(bool isPlaying) {
-  if (this->isPlaying_ == isPlaying) {
-    return;
-  }
-  audioPlayer->setIsPlaying(isPlaying);
-  this->isPlaying_ = isPlaying;
-  Q_EMIT isPlayingChanged(isPlaying);
-  if (isPlaying) {
-    lastPlayTime = tgfx::Clock::Now();
-    QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
-  }
-}
-
-void PAGView::setShowVideoFrames(bool isShow) {
-  if (pagPlayer == nullptr) {
-    return;
-  }
-  pagPlayer->setVideoEnabled(isShow);
-}
-
-void PAGView::setProgress(double progress) {
-  if (this->progress == progress) {
-    return;
-  }
-  setProgressInternal(progress, true);
 }
 
 void PAGView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) {
@@ -241,74 +68,6 @@ void PAGView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometr
     return;
   }
   ContentView::geometryChange(newGeometry, oldGeometry);
-}
-
-bool PAGView::setFile(const QString& filePath) {
-  auto strPath = std::string(filePath.toLocal8Bit());
-  if (filePath.startsWith("file://")) {
-    strPath = std::string(QUrl(filePath).toLocalFile().toLocal8Bit());
-  }
-  auto byteData = pag::ByteData::FromPath(strPath);
-  if (byteData == nullptr) {
-    return false;
-  }
-
-  auto newPagFile = pag::PAGFile::Load(byteData->data(), byteData->length());
-  if (newPagFile == nullptr) {
-    return false;
-  }
-
-  setIsPlaying(false);
-  pagFile = newPagFile;
-  pagFile->getFile()->path = strPath;
-  pagPlayer->setComposition(pagFile);
-  audioPlayer->setComposition(pagFile);
-  setSize(getPreferredSize());
-  sizeChanged = true;
-  progressPerFrame = 1.0 / (pagFile->frameRate() * pagFile->duration() / 1000000);
-  Q_EMIT fileChanged(pagFile->getFile());
-  Q_EMIT filePathChanged(QString::fromLocal8Bit(strPath.data()));
-  Q_EMIT pagFileChanged(pagFile);
-  audioPlayer->setVolume(1.0f);
-  setProgressInternal(0, true);
-  setIsPlaying(true);
-
-  editableTextLayerCount = static_cast<int>(pagFile->getEditableIndices(LayerType::Text).size());
-  editableImageLayerCount = static_cast<int>(pagFile->getEditableIndices(LayerType::Image).size());
-  Q_EMIT editableTextLayerCountChanged(editableTextLayerCount);
-  Q_EMIT editableImageLayerCountChanged(editableImageLayerCount);
-
-  reportPAGFIleInfo(pagFile, byteData->length());
-
-  return true;
-}
-
-void PAGView::firstFrame() {
-  setIsPlaying(false);
-  setProgress(0);
-}
-
-void PAGView::lastFrame() {
-  setIsPlaying(false);
-  setProgress(1);
-}
-
-void PAGView::nextFrame() {
-  setIsPlaying(false);
-  auto progress = this->progress + progressPerFrame;
-  if (progress > 1) {
-    progress = 0.0;
-  }
-  setProgress(progress);
-}
-
-void PAGView::previousFrame() {
-  setIsPlaying(false);
-  auto progress = this->progress - progressPerFrame;
-  if (progress < 0) {
-    progress = 1.0;
-  }
-  setProgress(progress);
 }
 
 QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
@@ -328,33 +87,23 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   }
 
   auto timeNow = tgfx::Clock::Now();
-  auto displayTime = timeNow - lastPlayTime;
-  lastPlayTime = timeNow;
+  auto displayTime = timeNow - viewModel->lastPlayTime;
+  viewModel->lastPlayTime = timeNow;
 
-  if (isPlaying_) {
-    auto duration = pagPlayer->duration();
+  if (viewModel->isPlaying_) {
+    auto duration = viewModel->pagPlayer->duration();
     if (duration > 0) {
-      auto progress =
-          static_cast<double>(displayTime) / static_cast<double>(duration) + this->progress;
-      if (progress > 1.0) {
-        progress = 0.0;
+      auto newProgress =
+          static_cast<double>(displayTime) / static_cast<double>(duration) + viewModel->progress;
+      if (newProgress > 1.0) {
+        newProgress = 0.0;
       }
-      setProgressInternal(progress, false);
+      viewModel->setProgressInternal(newProgress, false);
     }
   } else {
-    QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
+    triggerFlush();
   }
   return node;
-}
-
-void PAGView::setProgressInternal(double progress, bool isAudioSeek) {
-  if (isAudioSeek) {
-    audioPlayer->setProgress(progress);
-  }
-  pagPlayer->setProgress(progress);
-  this->progress = progress;
-  Q_EMIT progressChanged(progress);
-  QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
 }
 
 }  // namespace pag

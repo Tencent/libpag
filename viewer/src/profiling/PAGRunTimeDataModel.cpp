@@ -159,6 +159,15 @@ void PAGRunTimeDataModel::updatePAGXRenderTime(int64_t renderTime, int64_t image
   Q_EMIT frameDisplayInfoModelChanged();
 }
 
+void PAGRunTimeDataModel::updateMetrics(int64_t renderTime, int64_t presentTime,
+                                        int64_t imageDecodeTime, int64_t currentFrame) {
+  if (currentFrame == -1) {
+    updatePAGXRenderTime(renderTime, imageDecodeTime, presentTime);
+  } else {
+    updateData(currentFrame, renderTime, presentTime, imageDecodeTime);
+  }
+}
+
 void PAGRunTimeDataModel::updateChartData() {
   if (totalFrame == 0) {
     return;
