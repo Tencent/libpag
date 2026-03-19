@@ -152,30 +152,6 @@ static BlendFilter* parseBlendFilter(const DOMNode* node, PAGXDocument* doc);
 static ColorMatrixFilter* parseColorMatrixFilter(const DOMNode* node, PAGXDocument* doc);
 
 //==============================================================================
-// Custom data parsing
-//==============================================================================
-
-static void parseCustomData(const DOMNode* xmlNode, Node* node) {
-  for (const auto& attr : xmlNode->attributes) {
-    if (attr.name.length() > 5 && attr.name.compare(0, 5, "data-") == 0) {
-      auto key = attr.name.substr(5);
-      if (Node::IsValidCustomDataKey(key)) {
-        node->customData[std::move(key)] = attr.value;
-      }
-    }
-  }
-}
-
-template <typename T>
-static T* makeNodeFromXML(const DOMNode* xmlNode, PAGXDocument* doc) {
-  auto* node = doc->makeNode<T>(getAttribute(xmlNode, "id"));
-  if (node) {
-    parseCustomData(xmlNode, node);
-  }
-  return node;
-}
-
-//==============================================================================
 // Internal parser implementation
 //==============================================================================
 
@@ -229,7 +205,8 @@ static std::optional<float> getOptionalFloatAttribute(const DOMNode* node, const
 static Constraints parseConstraints(const DOMNode* node, PAGXDocument* doc);
 
 static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
-  auto layer = makeNodeFromXML<Layer>(node, doc);
+  auto id = getAttribute(node, "id");
+  auto layer = doc->makeNode<Layer>(id);
   if (!layer) {
     return nullptr;
   }
@@ -299,6 +276,13 @@ static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
     if (!layer->composition) {
       reportError(doc, node,
                   "Resource '" + compositionAttr + "' not found for 'composition' attribute.");
+    }
+  }
+
+  // Parse data-* custom attributes.
+  for (const auto& attr : node->attributes) {
+    if (attr.name.length() > 5 && attr.name.compare(0, 5, "data-") == 0) {
+      layer->customData[attr.name.substr(5)] = attr.value;
     }
   }
 
@@ -535,7 +519,7 @@ static LayerFilter* parseLayerFilter(const DOMNode* node, PAGXDocument* doc) {
 //==============================================================================
 
 static Rectangle* parseRectangle(const DOMNode* node, PAGXDocument* doc) {
-  auto rect = makeNodeFromXML<Rectangle>(node, doc);
+  auto rect = doc->makeNode<Rectangle>(getAttribute(node, "id"));
   if (!rect) {
     return nullptr;
   }
@@ -548,7 +532,7 @@ static Rectangle* parseRectangle(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static Ellipse* parseEllipse(const DOMNode* node, PAGXDocument* doc) {
-  auto ellipse = makeNodeFromXML<Ellipse>(node, doc);
+  auto ellipse = doc->makeNode<Ellipse>(getAttribute(node, "id"));
   if (!ellipse) {
     return nullptr;
   }
@@ -560,7 +544,7 @@ static Ellipse* parseEllipse(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static Polystar* parsePolystar(const DOMNode* node, PAGXDocument* doc) {
-  auto polystar = makeNodeFromXML<Polystar>(node, doc);
+  auto polystar = doc->makeNode<Polystar>(getAttribute(node, "id"));
   if (!polystar) {
     return nullptr;
   }
@@ -578,7 +562,8 @@ static Polystar* parsePolystar(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static Path* parsePath(const DOMNode* node, PAGXDocument* doc) {
-  auto path = makeNodeFromXML<Path>(node, doc);
+  auto id = getAttribute(node, "id");
+  auto path = doc->makeNode<Path>(id);
   if (!path) {
     return nullptr;
   }
@@ -603,7 +588,7 @@ static Path* parsePath(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static Text* parseText(const DOMNode* node, PAGXDocument* doc) {
-  auto text = makeNodeFromXML<Text>(node, doc);
+  auto text = doc->makeNode<Text>(getAttribute(node, "id"));
   if (!text) {
     return nullptr;
   }
@@ -694,7 +679,8 @@ static ColorSource* parseChildColorSource(const DOMNode* node, PAGXDocument* doc
 }
 
 static Fill* parseFill(const DOMNode* node, PAGXDocument* doc) {
-  auto fill = makeNodeFromXML<Fill>(node, doc);
+  auto id = getAttribute(node, "id");
+  auto fill = doc->makeNode<Fill>(id);
   if (!fill) {
     return nullptr;
   }
@@ -711,7 +697,8 @@ static Fill* parseFill(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static Stroke* parseStroke(const DOMNode* node, PAGXDocument* doc) {
-  auto stroke = makeNodeFromXML<Stroke>(node, doc);
+  auto id = getAttribute(node, "id");
+  auto stroke = doc->makeNode<Stroke>(id);
   if (!stroke) {
     return nullptr;
   }
@@ -742,7 +729,7 @@ static Stroke* parseStroke(const DOMNode* node, PAGXDocument* doc) {
 //==============================================================================
 
 static TrimPath* parseTrimPath(const DOMNode* node, PAGXDocument* doc) {
-  auto trim = makeNodeFromXML<TrimPath>(node, doc);
+  auto trim = doc->makeNode<TrimPath>(getAttribute(node, "id"));
   if (!trim) {
     return nullptr;
   }
@@ -754,7 +741,7 @@ static TrimPath* parseTrimPath(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static RoundCorner* parseRoundCorner(const DOMNode* node, PAGXDocument* doc) {
-  auto round = makeNodeFromXML<RoundCorner>(node, doc);
+  auto round = doc->makeNode<RoundCorner>(getAttribute(node, "id"));
   if (!round) {
     return nullptr;
   }
@@ -763,7 +750,7 @@ static RoundCorner* parseRoundCorner(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static MergePath* parseMergePath(const DOMNode* node, PAGXDocument* doc) {
-  auto merge = makeNodeFromXML<MergePath>(node, doc);
+  auto merge = doc->makeNode<MergePath>(getAttribute(node, "id"));
   if (!merge) {
     return nullptr;
   }
@@ -772,7 +759,8 @@ static MergePath* parseMergePath(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static TextModifier* parseTextModifier(const DOMNode* node, PAGXDocument* doc) {
-  auto modifier = makeNodeFromXML<TextModifier>(node, doc);
+  auto id = getAttribute(node, "id");
+  auto modifier = doc->makeNode<TextModifier>(id);
   if (!modifier) {
     return nullptr;
   }
@@ -818,7 +806,8 @@ static TextModifier* parseTextModifier(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static TextPath* parseTextPath(const DOMNode* node, PAGXDocument* doc) {
-  auto textPath = makeNodeFromXML<TextPath>(node, doc);
+  auto id = getAttribute(node, "id");
+  auto textPath = doc->makeNode<TextPath>(id);
   if (!textPath) {
     return nullptr;
   }
@@ -847,7 +836,7 @@ static TextPath* parseTextPath(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static TextBox* parseTextBox(const DOMNode* node, PAGXDocument* doc) {
-  auto textBox = makeNodeFromXML<TextBox>(node, doc);
+  auto textBox = doc->makeNode<TextBox>(getAttribute(node, "id"));
   if (!textBox) {
     return nullptr;
   }
@@ -864,7 +853,7 @@ static TextBox* parseTextBox(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static Repeater* parseRepeater(const DOMNode* node, PAGXDocument* doc) {
-  auto repeater = makeNodeFromXML<Repeater>(node, doc);
+  auto repeater = doc->makeNode<Repeater>(getAttribute(node, "id"));
   if (!repeater) {
     return nullptr;
   }
@@ -881,7 +870,7 @@ static Repeater* parseRepeater(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static Group* parseGroup(const DOMNode* node, PAGXDocument* doc) {
-  auto group = makeNodeFromXML<Group>(node, doc);
+  auto group = doc->makeNode<Group>(getAttribute(node, "id"));
   if (!group) {
     return nullptr;
   }
@@ -919,7 +908,7 @@ static Group* parseGroup(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static RangeSelector* parseRangeSelector(const DOMNode* node, PAGXDocument* doc) {
-  auto selector = makeNodeFromXML<RangeSelector>(node, doc);
+  auto selector = doc->makeNode<RangeSelector>(getAttribute(node, "id"));
   if (!selector) {
     return nullptr;
   }
@@ -942,7 +931,7 @@ static RangeSelector* parseRangeSelector(const DOMNode* node, PAGXDocument* doc)
 //==============================================================================
 
 static SolidColor* parseSolidColor(const DOMNode* node, PAGXDocument* doc) {
-  auto solid = makeNodeFromXML<SolidColor>(node, doc);
+  auto solid = doc->makeNode<SolidColor>(getAttribute(node, "id"));
   if (!solid) {
     return nullptr;
   }
@@ -983,7 +972,7 @@ static void parseGradientCommon(const DOMNode* node, PAGXDocument* doc, Matrix& 
 }
 
 static LinearGradient* parseLinearGradient(const DOMNode* node, PAGXDocument* doc) {
-  auto gradient = makeNodeFromXML<LinearGradient>(node, doc);
+  auto gradient = doc->makeNode<LinearGradient>(getAttribute(node, "id"));
   if (!gradient) {
     return nullptr;
   }
@@ -994,7 +983,7 @@ static LinearGradient* parseLinearGradient(const DOMNode* node, PAGXDocument* do
 }
 
 static RadialGradient* parseRadialGradient(const DOMNode* node, PAGXDocument* doc) {
-  auto gradient = makeNodeFromXML<RadialGradient>(node, doc);
+  auto gradient = doc->makeNode<RadialGradient>(getAttribute(node, "id"));
   if (!gradient) {
     return nullptr;
   }
@@ -1005,7 +994,7 @@ static RadialGradient* parseRadialGradient(const DOMNode* node, PAGXDocument* do
 }
 
 static ConicGradient* parseConicGradient(const DOMNode* node, PAGXDocument* doc) {
-  auto gradient = makeNodeFromXML<ConicGradient>(node, doc);
+  auto gradient = doc->makeNode<ConicGradient>(getAttribute(node, "id"));
   if (!gradient) {
     return nullptr;
   }
@@ -1017,7 +1006,7 @@ static ConicGradient* parseConicGradient(const DOMNode* node, PAGXDocument* doc)
 }
 
 static DiamondGradient* parseDiamondGradient(const DOMNode* node, PAGXDocument* doc) {
-  auto gradient = makeNodeFromXML<DiamondGradient>(node, doc);
+  auto gradient = doc->makeNode<DiamondGradient>(getAttribute(node, "id"));
   if (!gradient) {
     return nullptr;
   }
@@ -1028,7 +1017,8 @@ static DiamondGradient* parseDiamondGradient(const DOMNode* node, PAGXDocument* 
 }
 
 static ImagePattern* parseImagePattern(const DOMNode* node, PAGXDocument* doc) {
-  auto pattern = makeNodeFromXML<ImagePattern>(node, doc);
+  auto id = getAttribute(node, "id");
+  auto pattern = doc->makeNode<ImagePattern>(id);
   if (!pattern) {
     return nullptr;
   }
@@ -1051,7 +1041,7 @@ static ImagePattern* parseImagePattern(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static ColorStop* parseColorStop(const DOMNode* node, PAGXDocument* doc) {
-  auto stop = makeNodeFromXML<ColorStop>(node, doc);
+  auto stop = doc->makeNode<ColorStop>();
   stop->offset = getFloatAttribute(node, "offset", 0, doc);
   auto colorStr = getAttribute(node, "color");
   if (!colorStr.empty()) {
@@ -1065,7 +1055,8 @@ static ColorStop* parseColorStop(const DOMNode* node, PAGXDocument* doc) {
 //==============================================================================
 
 static Image* parseImage(const DOMNode* node, PAGXDocument* doc) {
-  auto image = makeNodeFromXML<Image>(node, doc);
+  auto id = getAttribute(node, "id");
+  auto image = doc->makeNode<Image>(id);
   if (!image) {
     return nullptr;
   }
@@ -1080,7 +1071,8 @@ static Image* parseImage(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static PathData* parsePathData(const DOMNode* node, PAGXDocument* doc) {
-  auto pathData = makeNodeFromXML<PathData>(node, doc);
+  auto id = getAttribute(node, "id");
+  auto pathData = doc->makeNode<PathData>(id);
   if (!pathData) {
     return nullptr;
   }
@@ -1092,7 +1084,7 @@ static PathData* parsePathData(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static Composition* parseComposition(const DOMNode* node, PAGXDocument* doc) {
-  auto comp = makeNodeFromXML<Composition>(node, doc);
+  auto comp = doc->makeNode<Composition>(getAttribute(node, "id"));
   if (!comp) {
     return nullptr;
   }
@@ -1118,7 +1110,7 @@ static Composition* parseComposition(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static Font* parseFont(const DOMNode* node, PAGXDocument* doc) {
-  auto font = makeNodeFromXML<Font>(node, doc);
+  auto font = doc->makeNode<Font>(getAttribute(node, "id"));
   if (!font) {
     return nullptr;
   }
@@ -1142,7 +1134,7 @@ static Font* parseFont(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static Glyph* parseGlyph(const DOMNode* node, PAGXDocument* doc) {
-  auto glyph = makeNodeFromXML<Glyph>(node, doc);
+  auto glyph = doc->makeNode<Glyph>(getAttribute(node, "id"));
   if (!glyph) {
     return nullptr;
   }
@@ -1218,7 +1210,7 @@ static std::vector<Point> parseSemicolonSeparatedPoints(const std::string& str) 
 }
 
 static GlyphRun* parseGlyphRun(const DOMNode* node, PAGXDocument* doc) {
-  auto run = makeNodeFromXML<GlyphRun>(node, doc);
+  auto run = doc->makeNode<GlyphRun>(getAttribute(node, "id"));
   if (!run) {
     return nullptr;
   }
@@ -1315,7 +1307,7 @@ static void parseShadowAttributes(const DOMNode* node, PAGXDocument* doc, float&
 }
 
 static DropShadowStyle* parseDropShadowStyle(const DOMNode* node, PAGXDocument* doc) {
-  auto style = makeNodeFromXML<DropShadowStyle>(node, doc);
+  auto style = doc->makeNode<DropShadowStyle>(getAttribute(node, "id"));
   if (!style) {
     return nullptr;
   }
@@ -1328,7 +1320,7 @@ static DropShadowStyle* parseDropShadowStyle(const DOMNode* node, PAGXDocument* 
 }
 
 static InnerShadowStyle* parseInnerShadowStyle(const DOMNode* node, PAGXDocument* doc) {
-  auto style = makeNodeFromXML<InnerShadowStyle>(node, doc);
+  auto style = doc->makeNode<InnerShadowStyle>(getAttribute(node, "id"));
   if (!style) {
     return nullptr;
   }
@@ -1340,7 +1332,7 @@ static InnerShadowStyle* parseInnerShadowStyle(const DOMNode* node, PAGXDocument
 }
 
 static BackgroundBlurStyle* parseBackgroundBlurStyle(const DOMNode* node, PAGXDocument* doc) {
-  auto style = makeNodeFromXML<BackgroundBlurStyle>(node, doc);
+  auto style = doc->makeNode<BackgroundBlurStyle>(getAttribute(node, "id"));
   if (!style) {
     return nullptr;
   }
@@ -1357,7 +1349,7 @@ static BackgroundBlurStyle* parseBackgroundBlurStyle(const DOMNode* node, PAGXDo
 //==============================================================================
 
 static BlurFilter* parseBlurFilter(const DOMNode* node, PAGXDocument* doc) {
-  auto filter = makeNodeFromXML<BlurFilter>(node, doc);
+  auto filter = doc->makeNode<BlurFilter>(getAttribute(node, "id"));
   if (!filter) {
     return nullptr;
   }
@@ -1368,7 +1360,7 @@ static BlurFilter* parseBlurFilter(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static DropShadowFilter* parseDropShadowFilter(const DOMNode* node, PAGXDocument* doc) {
-  auto filter = makeNodeFromXML<DropShadowFilter>(node, doc);
+  auto filter = doc->makeNode<DropShadowFilter>(getAttribute(node, "id"));
   if (!filter) {
     return nullptr;
   }
@@ -1379,7 +1371,7 @@ static DropShadowFilter* parseDropShadowFilter(const DOMNode* node, PAGXDocument
 }
 
 static InnerShadowFilter* parseInnerShadowFilter(const DOMNode* node, PAGXDocument* doc) {
-  auto filter = makeNodeFromXML<InnerShadowFilter>(node, doc);
+  auto filter = doc->makeNode<InnerShadowFilter>(getAttribute(node, "id"));
   if (!filter) {
     return nullptr;
   }
@@ -1390,7 +1382,7 @@ static InnerShadowFilter* parseInnerShadowFilter(const DOMNode* node, PAGXDocume
 }
 
 static BlendFilter* parseBlendFilter(const DOMNode* node, PAGXDocument* doc) {
-  auto filter = makeNodeFromXML<BlendFilter>(node, doc);
+  auto filter = doc->makeNode<BlendFilter>(getAttribute(node, "id"));
   if (!filter) {
     return nullptr;
   }
@@ -1403,7 +1395,7 @@ static BlendFilter* parseBlendFilter(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static ColorMatrixFilter* parseColorMatrixFilter(const DOMNode* node, PAGXDocument* doc) {
-  auto filter = makeNodeFromXML<ColorMatrixFilter>(node, doc);
+  auto filter = doc->makeNode<ColorMatrixFilter>(getAttribute(node, "id"));
   if (!filter) {
     return nullptr;
   }
@@ -1829,7 +1821,6 @@ static void parseDocument(const DOMNode* root, PAGXDocument* doc) {
   doc->version = getAttribute(root, "version", "1.0");
   doc->width = getFloatAttribute(root, "width", 0, doc);
   doc->height = getFloatAttribute(root, "height", 0, doc);
-  parseCustomData(root, doc);
 
   // First pass: Parse Resources.
   auto child = root->getFirstChild("Resources");

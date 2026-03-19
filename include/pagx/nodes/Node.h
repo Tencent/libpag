@@ -19,7 +19,6 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 
 namespace pagx {
 
@@ -28,12 +27,6 @@ namespace pagx {
  * resources (Image, Composition, ColorSources) and elements (shapes, painters, modifiers, etc.).
  */
 enum class NodeType {
-  // Document
-  /**
-   * The root document node.
-   */
-  Document,
-
   // Resources
   /**
    * A reusable path data resource.
@@ -210,32 +203,6 @@ class Node {
    * The unique identifier of this node. Used for referencing the node by ID (e.g., "@id").
    */
   std::string id = {};
-
-  /**
-   * Custom data attributes. The keys are stored without the "data-" prefix. Each key must contain
-   * only lowercase letters, digits, and hyphens, must not end with a hyphen, and must have at least
-   * one character. Values are arbitrary strings interpreted by the creating application. These
-   * attributes are not processed at runtime and are used only for passing metadata between tools or
-   * storing debug information.
-   */
-  std::unordered_map<std::string, std::string> customData = {};
-
-  /**
-   * Returns true if the given key is a valid custom data key. A valid key contains only lowercase
-   * letters ('a'-'z'), digits ('0'-'9'), and hyphens ('-'), must not be empty, and must not end
-   * with a hyphen. The key should not include the "data-" prefix.
-   */
-  static bool IsValidCustomDataKey(const std::string& key) {
-    if (key.empty() || key.front() == '-' || key.back() == '-') {
-      return false;
-    }
-    for (auto c : key) {
-      if ((c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '-') {
-        return false;
-      }
-    }
-    return true;
-  }
 
   virtual ~Node() = default;
 

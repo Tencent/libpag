@@ -262,7 +262,7 @@ is sequential and forward-only.
 <Rectangle position="100,50" size="200,100" roundness="10"/>
 ```
 
-- `position` (default 0,0), `size` (default 100,100), `roundness` (default 0), `reversed` (default false)
+- `position` is the **center point** of the rectangle (default 0,0), `size` (default 100,100), `roundness` (default 0), `reversed` (default false)
 - Bounds: left = position.x - width/2, top = position.y - height/2
 - Roundness auto-limited to `min(roundness, width/2, height/2)`
 
@@ -272,7 +272,7 @@ is sequential and forward-only.
 <Ellipse position="100,50" size="200,100"/>
 ```
 
-- Same `position`/`size`/`reversed` as Rectangle, no roundness.
+- Same `position`/`size`/`reversed` as Rectangle (`position` = center point), no roundness.
 
 ### Polystar
 
@@ -280,6 +280,7 @@ is sequential and forward-only.
 <Polystar position="0,0" type="star" pointCount="5" outerRadius="100" innerRadius="50"/>
 ```
 
+- `position` is the **center point** from which vertices radiate outward
 - `type`: `polygon` (outer only) or `star` (outer + inner alternating)
 - Supports fractional `pointCount` (incomplete last corner)
 
