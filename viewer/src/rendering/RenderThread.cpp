@@ -19,63 +19,20 @@
 #include "RenderThread.h"
 #include <QGuiApplication>
 #include "ContentView.h"
-#include "PAGView.h"
-#include "PAGXView.h"
 
 namespace pag {
 
-RenderThread::RenderThread(ContentView* view, ViewType type) : view(view), viewType(type) {
+RenderThread::RenderThread(ContentView* view, IContentRenderer* renderer)
+    : view(view), renderer(renderer) {
 }
 
 void RenderThread::flush() {
-  if (view == nullptr) {
+  if (renderer == nullptr) {
     return;
   }
-  if (viewType == ViewType::PAG) {
-    flushPAG();
-  } else {
-    flushPAGX();
-  }
-}
-
-void RenderThread::flushPAG() {
-  auto pagView = static_cast<PAGView*>(view);
-  if (pagView->pagPlayer == nullptr || pagView->pagFile == nullptr) {
-    return;
-  }
-  if (pagView->sizeChanged) {
-    pagView->sizeChanged = false;
-    auto pagSurface = pagView->pagPlayer->getSurface();
-    pagSurface->updateSize();
-  }
-  pagView->pagPlayer->flush();
-  double progress = pagView->pagFile->getProgress();
-  int64_t currentFrame =
-      static_cast<int64_t>(std::round((pagView->getTotalFrame().toDouble() - 1) * progress));
-  int64_t renderingTime = pagView->pagPlayer->renderingTime();
-  int64_t presentingTime = pagView->pagPlayer->presentingTime();
-  int64_t imageDecodingTime = pagView->pagPlayer->imageDecodingTime();
-  Q_EMIT frameTimeMetricsReady(currentFrame, renderingTime, presentingTime, imageDecodingTime);
-  QMetaObject::invokeMethod(pagView, "update", Qt::QueuedConnection);
-}
-
-void RenderThread::flushPAGX() {
-  auto pagxView = static_cast<PAGXView*>(view);
-  if (pagxView == nullptr) {
-    return;
-  }
-  if (pagxView->sizeChanged) {
-    pagxView->sizeChanged = false;
-    pagxView->drawable->updateSize();
-  }
-  if (!pagxView->needsRender) {
-    return;
-  }
-  pagxView->needsRender = false;
-
-  auto metrics = pagxView->renderPAGX();
-
-  Q_EMIT renderTimeReady(metrics.renderTime, metrics.imageTime, metrics.presentTime);
+  auto metrics = renderer->flush();
+  Q_EMIT renderMetricsReady(metrics.renderTime, metrics.presentTime, metrics.imageDecodeTime,
+                            metrics.currentFrame);
 }
 
 void RenderThread::shutDown() {

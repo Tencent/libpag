@@ -21,6 +21,7 @@
 #include <QOpenGLContext>
 #include <QQuickWindow>
 #include "ContentView.h"
+#include "PAGXRenderer.h"
 #include "pagx/PAGXDocument.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
@@ -69,15 +70,8 @@ class PAGXView : public ContentView {
 
   QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
 
-  struct RenderTimeMetrics {
-    int64_t renderTime = 0;
-    int64_t imageTime = 0;
-    int64_t presentTime = 0;
-  };
-
  private:
   void initDrawable() override;
-  RenderTimeMetrics renderPAGX();
   void clearContent();
   void updateAnimationState();
 
@@ -97,6 +91,6 @@ class PAGXView : public ContentView {
   bool isPlaying_ = false;
   int64_t lastPlayTime = 0;
 
-  friend class RenderThread;
+  friend class PAGXRenderer;
 };
 }  // namespace pag

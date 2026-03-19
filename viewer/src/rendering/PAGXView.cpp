@@ -18,6 +18,7 @@
 
 #include "PAGXView.h"
 #include <QSGImageNode>
+#include "PAGXRenderer.h"
 #include "RenderThread.h"
 #include "pagx/PAGXImporter.h"
 #include "renderer/LayerBuilder.h"
@@ -26,7 +27,9 @@
 namespace pag {
 
 PAGXView::PAGXView(QQuickItem* parent) : ContentView(parent) {
-  renderThread = std::make_unique<RenderThread>(this, RenderThread::ViewType::PAGX);
+  auto pagxRenderer = std::make_unique<PAGXRenderer>(this);
+  renderThread = std::make_unique<RenderThread>(this, pagxRenderer.get());
+  contentRenderer = std::move(pagxRenderer);
   renderThread->moveToThread(renderThread.get());
 }
 
@@ -310,64 +313,6 @@ QSGNode* PAGXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   }
 
   return node;
-}
-
-PAGXView::RenderTimeMetrics PAGXView::renderPAGX() {
-  RenderTimeMetrics metrics = {};
-  if (displayList == nullptr || drawable == nullptr) {
-    return metrics;
-  }
-
-  auto device = drawable->getDevice();
-  if (device == nullptr) {
-    return metrics;
-  }
-
-  auto context = device->lockContext();
-  if (context == nullptr) {
-    return metrics;
-  }
-
-  auto surface = drawable->getSurface(context, false);
-  if (surface == nullptr) {
-    device->unlock();
-    return metrics;
-  }
-
-  if (pagxContentLayer != nullptr && pagxWidth > 0 && pagxHeight > 0) {
-    int surfaceWidth = surface->width();
-    int surfaceHeight = surface->height();
-    float scaleX = static_cast<float>(surfaceWidth) / static_cast<float>(pagxWidth);
-    float scaleY = static_cast<float>(surfaceHeight) / static_cast<float>(pagxHeight);
-    float scale = std::min(scaleX, scaleY);
-    float offsetX =
-        (static_cast<float>(surfaceWidth) - static_cast<float>(pagxWidth) * scale) * 0.5f;
-    float offsetY =
-        (static_cast<float>(surfaceHeight) - static_cast<float>(pagxHeight) * scale) * 0.5f;
-    auto matrix = tgfx::Matrix::MakeTrans(offsetX, offsetY);
-    matrix.preScale(scale, scale);
-    pagxContentLayer->setMatrix(matrix);
-  }
-
-  auto renderStart = tgfx::Clock::Now();
-  auto canvas = surface->getCanvas();
-  canvas->clear();
-  displayList->render(surface.get());
-  auto recording = context->flush();
-  metrics.renderTime = tgfx::Clock::Now() - renderStart;
-
-  auto imageStart = tgfx::Clock::Now();
-  if (recording) {
-    context->submit(std::move(recording));
-  }
-  metrics.imageTime = tgfx::Clock::Now() - imageStart;
-
-  auto presentStart = tgfx::Clock::Now();
-  drawable->present(context);
-  metrics.presentTime = tgfx::Clock::Now() - presentStart;
-
-  device->unlock();
-  return metrics;
 }
 
 void PAGXView::updateAnimationState() {

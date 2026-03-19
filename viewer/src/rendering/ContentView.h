@@ -22,6 +22,7 @@
 #include <QTimer>
 #include <atomic>
 #include <memory>
+#include "IContentRenderer.h"
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "pagx/PAGXDocument.h"
@@ -106,6 +107,7 @@ class ContentView : public QQuickItem {
   virtual void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
 
   std::shared_ptr<GPUDrawable> drawable = nullptr;
+  std::unique_ptr<IContentRenderer> contentRenderer = nullptr;
   std::unique_ptr<RenderThread> renderThread = nullptr;
   std::unique_ptr<QTimer> resizeTimer = nullptr;
   std::atomic_bool sizeChanged = false;

@@ -18,35 +18,27 @@
 
 #pragma once
 
-#include <QThread>
+#include <atomic>
 #include "IContentRenderer.h"
 
 namespace pag {
 
-class ContentView;
+class PAGXView;
 
 /**
- * Unified render thread for both PAG and PAGX content.
- * Delegates all format-specific rendering to an IContentRenderer implementation.
+ * Renderer implementation for PAGX format content. Executes tgfx DisplayList rendering
+ * and collects per-frame timing metrics.
  */
-class RenderThread : public QThread {
-  Q_OBJECT
+class PAGXRenderer : public IContentRenderer {
  public:
-  explicit RenderThread(ContentView* view, IContentRenderer* renderer);
+  explicit PAGXRenderer(PAGXView* view);
 
-  /**
-   * Emitted after each rendered frame with timing metrics.
-   * currentFrame is -1 for content types that have no frame index (e.g. static PAGX).
-   */
-  Q_SIGNAL void renderMetricsReady(int64_t renderTime, int64_t presentTime, int64_t imageDecodeTime,
-                                   int64_t currentFrame);
-
-  Q_SLOT void flush();
-  Q_SLOT void shutDown();
+  RenderMetrics flush() override;
+  void updateSize() override;
+  bool isReady() const override;
 
  private:
-  ContentView* view = nullptr;
-  IContentRenderer* renderer = nullptr;
+  PAGXView* view = nullptr;
 };
 
 }  // namespace pag

@@ -18,35 +18,41 @@
 
 #pragma once
 
-#include <QThread>
-#include "IContentRenderer.h"
+#include <cstdint>
 
 namespace pag {
 
-class ContentView;
-
 /**
- * Unified render thread for both PAG and PAGX content.
- * Delegates all format-specific rendering to an IContentRenderer implementation.
+ * Interface for format-specific rendering logic used by RenderThread.
+ * Implementations are responsible for executing one frame of rendering and reporting metrics.
  */
-class RenderThread : public QThread {
-  Q_OBJECT
+class IContentRenderer {
  public:
-  explicit RenderThread(ContentView* view, IContentRenderer* renderer);
+  struct RenderMetrics {
+    int64_t renderTime = 0;
+    int64_t presentTime = 0;
+    int64_t imageDecodeTime = 0;
+    // Frame index within the animation; -1 means not applicable (e.g. static PAGX content).
+    int64_t currentFrame = -1;
+  };
+
+  virtual ~IContentRenderer() = default;
 
   /**
-   * Emitted after each rendered frame with timing metrics.
-   * currentFrame is -1 for content types that have no frame index (e.g. static PAGX).
+   * Performs one frame of rendering. Called from the render thread.
+   * Returns metrics for the completed frame, or a zero-initialized struct if rendering was skipped.
    */
-  Q_SIGNAL void renderMetricsReady(int64_t renderTime, int64_t presentTime, int64_t imageDecodeTime,
-                                   int64_t currentFrame);
+  virtual RenderMetrics flush() = 0;
 
-  Q_SLOT void flush();
-  Q_SLOT void shutDown();
+  /**
+   * Notifies the renderer that the drawable surface size has changed. Called from the render thread.
+   */
+  virtual void updateSize() = 0;
 
- private:
-  ContentView* view = nullptr;
-  IContentRenderer* renderer = nullptr;
+  /**
+   * Returns true if the renderer has all required resources ready to render.
+   */
+  virtual bool isReady() const = 0;
 };
 
 }  // namespace pag

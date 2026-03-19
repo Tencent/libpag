@@ -18,6 +18,7 @@
 
 #include "PAGView.h"
 #include <QSGImageNode>
+#include "PAGRenderer.h"
 #include "RenderThread.h"
 #include "pag/file.h"
 #include "tgfx/core/Clock.h"
@@ -41,7 +42,9 @@ static void reportPAGFIleInfo(const std::shared_ptr<PAGFile>& pagFile, size_t le
 
 PAGView::PAGView(QQuickItem* parent) : ContentView(parent) {
   pagPlayer = std::make_unique<PAGPlayer>();
-  renderThread = std::make_unique<RenderThread>(this, RenderThread::ViewType::PAG);
+  auto pagRenderer = std::make_unique<PAGRenderer>(this);
+  renderThread = std::make_unique<RenderThread>(this, pagRenderer.get());
+  contentRenderer = std::move(pagRenderer);
   renderThread->moveToThread(renderThread.get());
   audioPlayer = std::make_unique<PAGAudioPlayer>();
   connect(audioPlayer.get(), &PAGAudioPlayer::audioTimeChanged, this, &PAGView::onAudioTimeChanged,

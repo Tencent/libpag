@@ -21,6 +21,7 @@
 #include <QOpenGLContext>
 #include <QQuickWindow>
 #include "ContentView.h"
+#include "PAGRenderer.h"
 #include "audio/PAGAudioPlayer.h"
 
 namespace pag {
@@ -81,6 +82,6 @@ class PAGView : public ContentView {
   std::shared_ptr<PAGFile> pagFile = nullptr;
   std::unique_ptr<PAGAudioPlayer> audioPlayer = nullptr;
 
-  friend class RenderThread;
+  friend class PAGRenderer;
 };
 }  // namespace pag
