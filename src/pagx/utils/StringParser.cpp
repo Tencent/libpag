@@ -365,19 +365,13 @@ Padding PaddingFromString(const std::string& str) {
     p.bottom = values[0];
     p.right = values[1];
     p.left = values[1];
-  } else if (values.size() == 3) {
-    // CSS-style: top, horizontal, bottom
-    p.top = values[0];
-    p.right = values[1];
-    p.bottom = values[2];
-    p.left = values[1];
   } else if (values.size() >= 4) {
     p.top = values[0];
     p.right = values[1];
     p.bottom = values[2];
     p.left = values[3];
   } else if (!str.empty()) {
-    LOGE("Invalid Padding value: \"%s\" (expected 1, 2, 3, or 4 numbers)", str.c_str());
+    LOGE("Invalid Padding value: \"%s\" (expected 1, 2, or 4 numbers)", str.c_str());
   }
   return p;
 }

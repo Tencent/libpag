@@ -378,7 +378,9 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       auto grad = static_cast<const LinearGradient*>(node);
       xml.openElement("LinearGradient");
       xml.addAttribute("id", grad->id);
-      xml.addRequiredAttribute("startPoint", pointToString(grad->startPoint));
+      if (grad->startPoint.x != 0 || grad->startPoint.y != 0) {
+        xml.addAttribute("startPoint", pointToString(grad->startPoint));
+      }
       xml.addRequiredAttribute("endPoint", pointToString(grad->endPoint));
       writeCustomData(xml, node);
       writeGradientMatrixAndStops(xml, grad->matrix, grad->colorStops);

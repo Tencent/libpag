@@ -272,7 +272,7 @@ static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
   if (!paddingStr.empty()) {
     auto paddingValues = ParseFloatList(paddingStr);
     auto count = paddingValues.size();
-    if (count != 1 && count != 2 && count != 3 && count < 4) {
+    if (count != 1 && count != 2 && count < 4) {
       reportError(doc, node, "Invalid value '" + paddingStr + "' for 'padding' attribute.");
     }
     layer->padding = PaddingFromString(paddingStr);
