@@ -5,8 +5,8 @@ import "components"
 Item {
     id: form
     required property var contentView
-    property bool hasPAGFile: (contentView && contentView.filePath !== "")
-    property bool hasAnimation: (contentView && contentView.hasAnimation)
+    property bool hasPAGFile: (contentView && contentView.viewModel.filePath !== "")
+    property bool hasAnimation: (contentView && contentView.viewModel.hasAnimation)
 
     property bool updateAvailable: false
 
@@ -105,11 +105,11 @@ Item {
                 display: AbstractButton.IconOnly
                 opacity: enabled ? (pressed ? 1 : hovered ? 0.9 : 0.8) : 0.3
                 background: Image {
-                    source: ((contentView && contentView.isPlaying) || form.lastPlayStatusIsPlaying) ? "qrc:/images/pause.png" : "qrc:/images/play.png"
+                    source: ((contentView && contentView.viewModel.isPlaying) || form.lastPlayStatusIsPlaying) ? "qrc:/images/pause.png" : "qrc:/images/play.png"
                 }
                 onClicked: {
                     if (contentView) {
-                        contentView.isPlaying = !contentView.isPlaying;
+                        contentView.viewModel.isPlaying = !contentView.viewModel.isPlaying;
                     }
                 }
             }
@@ -128,7 +128,7 @@ Item {
                 }
                 onPressAndHold: {
                     if (contentView) {
-                        contentView.previousFrame();
+                        contentView.viewModel.previousFrame();
                     }
                     longPressPreTimer.start();
                 }
@@ -137,7 +137,7 @@ Item {
                 }
                 onClicked: {
                     if (contentView) {
-                        contentView.previousFrame();
+                        contentView.viewModel.previousFrame();
                     }
                 }
 
@@ -148,7 +148,7 @@ Item {
                     running: false
                     onTriggered: {
                         if (contentView) {
-                            contentView.previousFrame();
+                            contentView.viewModel.previousFrame();
                         }
                     }
                 }
@@ -168,7 +168,7 @@ Item {
                 }
                 onPressAndHold: {
                     if (contentView) {
-                        contentView.nextFrame();
+                        contentView.viewModel.nextFrame();
                     }
                     longPressNextTimer.start();
                 }
@@ -177,7 +177,7 @@ Item {
                 }
                 onClicked: {
                     if (contentView) {
-                        contentView.nextFrame();
+                        contentView.viewModel.nextFrame();
                     }
                 }
 
@@ -188,7 +188,7 @@ Item {
                     running: false
                     onTriggered: {
                         if (contentView) {
-                            contentView.nextFrame();
+                            contentView.viewModel.nextFrame();
                         }
                     }
                 }

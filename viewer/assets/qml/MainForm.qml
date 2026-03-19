@@ -9,8 +9,8 @@ SplitView {
     required property int resizeHandleSize
 
     property var contentView: contentViewLoader.item
-    property bool hasPAGFile: contentView && contentView.filePath !== ""
-    property bool hasAnimation: contentView && contentView.hasAnimation
+    property bool hasPAGFile: contentView && contentView.viewModel.filePath !== ""
+    property bool hasAnimation: contentView && contentView.viewModel.hasAnimation
 
     property bool isBackgroundOn: false
 
@@ -65,7 +65,7 @@ SplitView {
 
         // Same view type - just load the file directly
         if (contentViewLoader.status === Loader.Ready && contentView) {
-            return contentView.setFile(filePath);
+            return contentView.viewModel.loadFile(filePath);
         }
         // Loader not ready yet, queue the file for loading after initialization
         pendingFilePath = filePath;
@@ -112,7 +112,7 @@ SplitView {
                     pendingFilePath = "";
                     Qt.callLater(function () {
                         if (item) {
-                            item.setFile(filePath);
+                            item.viewModel.loadFile(filePath);
                         }
                     });
                 }
@@ -155,7 +155,7 @@ SplitView {
             anchors.bottomMargin: controlFormHeight + 9
             onClicked: {
                 if (contentView) {
-                    contentView.isPlaying = !contentView.isPlaying;
+                    contentView.viewModel.isPlaying = !contentView.viewModel.isPlaying;
                 }
             }
         }
@@ -303,8 +303,8 @@ SplitView {
                                 Rectangle {
                                     id: textListContainer
                                     width: parent.width
-                                    height: isTextListOpen ? ((contentView ? contentView.editableTextLayerCount : 0) * 40 + 44) : 32
-                                    visible: contentView && contentView.editableTextLayerCount > 0
+                                    height: isTextListOpen ? ((contentView ? contentView.viewModel.editableTextLayerCount : 0) * 40 + 44) : 32
+                                    visible: contentView && contentView.viewModel.editableTextLayerCount > 0
                                     color: "#20202A"
 
                                     Row {
@@ -366,7 +366,7 @@ SplitView {
 
                                     TextListView {
                                         id: textListView
-                                        height: (contentView ? contentView.editableTextLayerCount : 0) * 40
+                                        height: (contentView ? contentView.viewModel.editableTextLayerCount : 0) * 40
                                         textHeight: 40
                                         textModel: textLayerModel
                                         visible: isTextListOpen && height > 0
@@ -385,8 +385,8 @@ SplitView {
                                 Rectangle {
                                     id: imageListContainer
                                     width: parent.width
-                                    height: isImageListOpen ? ((contentView ? contentView.editableImageLayerCount : 0) * 60 + 44) : 32
-                                    visible: contentView && contentView.editableImageLayerCount > 0
+                                    height: isImageListOpen ? ((contentView ? contentView.viewModel.editableImageLayerCount : 0) * 60 + 44) : 32
+                                    visible: contentView && contentView.viewModel.editableImageLayerCount > 0
                                     color: "#20202A"
 
                                     Row {
@@ -448,7 +448,7 @@ SplitView {
 
                                     ImageListView {
                                         id: imageListView
-                                        height: (contentView ? contentView.editableImageLayerCount : 0) * 60
+                                        height: (contentView ? contentView.viewModel.editableImageLayerCount : 0) * 60
                                         imageHeight: 60
                                         imageModel: imageLayerModel
                                         visible: isImageListOpen && height > 0
