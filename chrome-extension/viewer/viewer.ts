@@ -978,8 +978,9 @@ if (typeof window !== 'undefined') {
                         ''
                     );
                 } else {
-                    console.error('[PAGX Viewer] No PAGX data from background, response:', response);
-                    showErrorUI('Failed to load PAGX data from background');
+                    // No cached data (e.g. page was refreshed). Show the drop zone.
+                    console.log('[PAGX Viewer] No cached data for this tab, showing drop zone');
+                    showDropZoneUI();
                 }
             } catch (error) {
                 console.error('[PAGX Viewer] Failed to load PAGX:', error);
