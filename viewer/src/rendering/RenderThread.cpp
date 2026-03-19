@@ -39,9 +39,13 @@ void RenderThread::flush() {
 }
 
 void RenderThread::shutDown() {
-  if (QGuiApplication::instance()) {
+  if (view == nullptr) {
+    exit();
+    return;
+  }
+  if (QGuiApplication::instance() != nullptr) {
     auto mainThread = QGuiApplication::instance()->thread();
-    if (view->drawable) {
+    if (view->drawable != nullptr) {
       view->drawable->moveToThread(mainThread);
     }
     moveToThread(mainThread);

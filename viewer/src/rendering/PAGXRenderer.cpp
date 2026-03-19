@@ -26,7 +26,8 @@ PAGXRenderer::PAGXRenderer(PAGXView* view) : view(view) {
 }
 
 bool PAGXRenderer::isReady() const {
-  return view != nullptr && view->viewModel->displayList != nullptr && view->drawable != nullptr;
+  return view != nullptr && view->viewModel != nullptr && view->viewModel->displayList != nullptr &&
+         view->drawable != nullptr;
 }
 
 void PAGXRenderer::updateSize() {
@@ -40,10 +41,9 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
     view->sizeChanged = false;
     updateSize();
   }
-  if (!viewModel->needsRender) {
+  if (!viewModel->needsRender.exchange(false)) {
     return metrics;
   }
-  viewModel->needsRender = false;
   if (!isReady()) {
     return metrics;
   }

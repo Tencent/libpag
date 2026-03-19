@@ -25,7 +25,7 @@ PAGRenderer::PAGRenderer(PAGView* view) : view(view) {
 }
 
 bool PAGRenderer::isReady() const {
-  return view != nullptr && view->viewModel->pagPlayer != nullptr &&
+  return view != nullptr && view->viewModel != nullptr && view->viewModel->pagPlayer != nullptr &&
          view->viewModel->pagFile != nullptr;
 }
 
@@ -39,8 +39,7 @@ IContentRenderer::RenderMetrics PAGRenderer::flush() {
   if (!isReady()) {
     return metrics;
   }
-  if (view->sizeChanged) {
-    view->sizeChanged = false;
+  if (view->sizeChanged.exchange(false)) {
     updateSize();
   }
   view->viewModel->pagPlayer->flush();

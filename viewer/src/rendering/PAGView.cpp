@@ -76,14 +76,16 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   }
 
   auto node = static_cast<QSGImageNode*>(oldNode);
-  auto texture = drawable->getTexture();
-  if (texture) {
-    if (node == nullptr) {
-      node = window()->createImageNode();
+  if (drawable != nullptr) {
+    auto texture = drawable->getTexture();
+    if (texture) {
+      if (node == nullptr) {
+        node = window()->createImageNode();
+      }
+      node->setTexture(texture);
+      node->markDirty(QSGNode::DirtyMaterial);
+      node->setRect(boundingRect());
     }
-    node->setTexture(texture);
-    node->markDirty(QSGNode::DirtyMaterial);
-    node->setRect(boundingRect());
   }
 
   auto timeNow = tgfx::Clock::Now();

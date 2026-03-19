@@ -34,9 +34,8 @@ ContentView::ContentView(QQuickItem* parent) : QQuickItem(parent) {
 }
 
 ContentView::~ContentView() {
-  if (renderThread != nullptr) {
-    QMetaObject::invokeMethod(renderThread.get(), "shutDown", Qt::QueuedConnection);
-    renderThread->wait();
+  if (renderThread != nullptr && renderThread->isRunning()) {
+    QMetaObject::invokeMethod(renderThread.get(), "shutDown", Qt::BlockingQueuedConnection);
   }
 }
 
