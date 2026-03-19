@@ -22,29 +22,19 @@
 
 namespace pagx {
 
-enum class BackgroundMode {
-  Grid,
-  White,
-  Black,
-};
-
 class GridBackgroundLayer : public tgfx::Layer {
  public:
-  static std::shared_ptr<GridBackgroundLayer> Make(int width, int height, float density,
-                                                    BackgroundMode mode = BackgroundMode::Grid);
-
-  void setBackgroundMode(BackgroundMode mode);
+  static std::shared_ptr<GridBackgroundLayer> Make(int width, int height, float density);
 
  protected:
   void onUpdateContent(tgfx::LayerRecorder* recorder) override;
 
  private:
-  GridBackgroundLayer(int width, int height, float density, BackgroundMode mode);
+  GridBackgroundLayer(int width, int height, float density);
 
   int width = 0;
   int height = 0;
   float density = 1.f;
-  BackgroundMode mode = BackgroundMode::Grid;
 };
 
 }  // namespace pagx
