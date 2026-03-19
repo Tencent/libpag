@@ -1185,6 +1185,25 @@ function setupDragAndDrop() {
 
     resetBtn.addEventListener('click', () => {
         gestureManager.resetTransform(playgroundState);
+        if (playgroundState.codeViewVisible && playgroundState.splitRatio !== 0.5) {
+            playgroundState.splitRatio = 0.5;
+            const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
+            if (canvas) {
+                canvas.style.right = '';
+            }
+            const splitDivider = document.getElementById('split-divider');
+            if (splitDivider) {
+                splitDivider.style.left = '';
+            }
+            const codePanel = document.getElementById('code-panel');
+            if (codePanel) {
+                codePanel.style.width = '';
+            }
+            requestAnimationFrame(() => {
+                updateSize();
+                draw();
+            });
+        }
     });
 
     setupCodeToggle();
