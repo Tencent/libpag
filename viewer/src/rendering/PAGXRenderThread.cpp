@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGXRenderThread.h"
+#include <QGuiApplication>
 #include "PAGXView.h"
 
 namespace pag {
@@ -43,6 +44,13 @@ void PAGXRenderThread::flush() {
 }
 
 void PAGXRenderThread::shutDown() {
-  quit();
+  if (QGuiApplication::instance()) {
+    auto mainThread = QGuiApplication::instance()->thread();
+    if (pagxView->drawable) {
+      pagxView->drawable->moveToThread(mainThread);
+    }
+    moveToThread(mainThread);
+  }
+  exit();
 }
 }  // namespace pag
