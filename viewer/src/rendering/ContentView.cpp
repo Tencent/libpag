@@ -54,7 +54,9 @@ void ContentView::initDrawable() {
 void ContentView::sizeChangedDelayHandle() {
   resizeTimer->stop();
   sizeChanged = true;
-  QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
+  if (renderThread != nullptr) {
+    QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
+  }
 }
 
 void ContentView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) {

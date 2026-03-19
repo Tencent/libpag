@@ -98,9 +98,6 @@ class ContentView : public QQuickItem {
 
   RenderThread* getRenderThread() const;
 
-  // Public members accessible to child classes and RenderThread
-  std::shared_ptr<GPUDrawable> drawable = nullptr;
-
  protected:
   Q_SLOT void sizeChangedDelayHandle();
   Q_SLOT void onWindowChanged(QQuickWindow* win);
@@ -108,6 +105,7 @@ class ContentView : public QQuickItem {
   virtual void initDrawable();
   virtual void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
 
+  std::shared_ptr<GPUDrawable> drawable = nullptr;
   std::unique_ptr<RenderThread> renderThread = nullptr;
   std::unique_ptr<QTimer> resizeTimer = nullptr;
   std::atomic_bool sizeChanged = false;
