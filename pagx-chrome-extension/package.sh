@@ -3,10 +3,14 @@
 # Package script for PAGX Chrome Extension
 #
 # Usage:
-#   bash package.sh                    # Default: generate .crx for local distribution
-#   bash package.sh crx                # Generate .crx for local distribution
-#   bash package.sh crx --key KEY.pem  # Generate .crx with specified private key
-#   bash package.sh zip                # Generate .zip for Chrome Web Store submission
+#   bash package.sh --key KEY.pem       # Generate .crx with specified private key
+#   bash package.sh crx --key KEY.pem   # Same as above (crx is the default format)
+#   bash package.sh zip                 # Generate .zip for Chrome Web Store submission
+#
+# Examples:
+#   bash package.sh --key ~/keys/pagx-viewer.pem
+#   bash package.sh crx --key /path/to/pagx-viewer.pem
+#   bash package.sh zip
 #
 # Run build.sh first to generate all build artifacts.
 
@@ -15,13 +19,16 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 VERSION=$(grep '"version"' "${SCRIPT_DIR}/manifest.json" | head -1 | sed 's/.*: *"\([^"]*\)".*/\1/')
-FORMAT="${1:-crx}"
+FORMAT=""
 PEM_ARG=""
 
-# Parse optional --key argument
-shift 2>/dev/null || true
+# Parse all arguments
 while [ $# -gt 0 ]; do
   case "$1" in
+    crx|zip)
+      FORMAT="$1"
+      shift
+      ;;
     --key)
       if [ -z "$2" ] || [ ! -f "$2" ]; then
         echo "Error: --key requires a valid .pem file path."
@@ -30,12 +37,21 @@ while [ $# -gt 0 ]; do
       PEM_ARG="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"
       shift 2
       ;;
+    -h|--help|help)
+      FORMAT="help"
+      shift
+      ;;
     *)
-      echo "Unknown option: $1"
-      exit 1
+      echo "Error: Unknown option '$1'"
+      echo ""
+      FORMAT="help"
+      break
       ;;
   esac
 done
+
+# Default format
+FORMAT="${FORMAT:-crx}"
 
 # Verify build artifacts exist
 MISSING=()
@@ -197,15 +213,21 @@ case "${FORMAT}" in
   crx)
     package_crx
     ;;
-  *)
-    echo "Usage: bash package.sh [crx|zip] [OPTIONS]"
+  help|*)
+    echo "Usage: bash package.sh [FORMAT] [OPTIONS]"
     echo ""
     echo "Formats:"
     echo "  crx  - Generate .crx for local distribution (default)"
     echo "  zip  - Generate .zip for Chrome Web Store submission"
     echo ""
-    echo "Options (crx only):"
-    echo "  --key PATH  - Path to .pem private key file (reuse to keep same Extension ID)"
+    echo "Options:"
+    echo "  --key PATH  - Path to .pem private key file (required for crx)"
+    echo "  --help      - Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  bash package.sh --key ~/keys/pagx-viewer.pem"
+    echo "  bash package.sh crx --key /path/to/pagx-viewer.pem"
+    echo "  bash package.sh zip"
     exit 1
     ;;
 esac
