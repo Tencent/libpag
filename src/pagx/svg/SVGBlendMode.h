@@ -18,18 +18,17 @@
 
 #pragma once
 
-#include <cstring>
 #include <string>
 #include "pagx/types/BlendMode.h"
 
 namespace pagx {
 
 struct SVGBlendModeEntry {
-  BlendMode mode;
-  const char* name;
+  BlendMode mode = BlendMode::Normal;
+  const char* name = nullptr;
 };
 
-static constexpr SVGBlendModeEntry kSVGBlendModes[] = {
+static constexpr SVGBlendModeEntry SVG_BLEND_MODES[] = {
     {BlendMode::Normal, "normal"},
     {BlendMode::Multiply, "multiply"},
     {BlendMode::Screen, "screen"},
@@ -49,7 +48,7 @@ static constexpr SVGBlendModeEntry kSVGBlendModes[] = {
 };
 
 inline const char* BlendModeToSVGString(BlendMode mode) {
-  for (const auto& entry : kSVGBlendModes) {
+  for (const auto& entry : SVG_BLEND_MODES) {
     if (entry.mode == mode) {
       return entry.name;
     }
@@ -58,7 +57,7 @@ inline const char* BlendModeToSVGString(BlendMode mode) {
 }
 
 inline BlendMode SVGBlendModeFromString(const std::string& str) {
-  for (const auto& entry : kSVGBlendModes) {
+  for (const auto& entry : SVG_BLEND_MODES) {
     if (str == entry.name) {
       return entry.mode;
     }
