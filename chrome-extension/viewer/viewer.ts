@@ -38,7 +38,6 @@ interface PAGXView {
     updateSize: () => void;
     updateZoomScaleAndOffset: (zoom: number, offsetX: number, offsetY: number) => void;
     draw: () => void;
-    setBackgroundMode: (mode: string) => void;
     contentWidth: () => number;
     contentHeight: () => number;
     delete?: () => void;
@@ -76,7 +75,6 @@ class PlaygroundState {
     emojiFontData: Uint8Array | null = null;
     pagxSourceUrl: string = '';
     pagxText: string = '';
-    backgroundMode: 'grid' | 'white' | 'black' = 'grid';
     codeViewVisible: boolean = false;
 }
 
@@ -848,7 +846,6 @@ async function loadPAGXData(data: Uint8Array, name: string, baseURL: string) {
         await loadExternalFiles(baseURL);
         playgroundState.pagxView.buildLayers();
         gestureManager.resetTransform(playgroundState);
-        applyBackgroundMode(playgroundState.backgroundMode);
         hideDropZone();
         canvas.classList.remove('hidden');
         toolbar.classList.remove('hidden');
@@ -925,51 +922,6 @@ async function loadPAGXFile(file: File) {
 const CODE_ICON_PATH = 'M128 128h768a42.666667 42.666667 0 0 1 42.666667 42.666667v682.666666a42.666667 42.666667 0 0 1-42.666667 42.666667H128a42.666667 42.666667 0 0 1-42.666667-42.666667V170.666667a42.666667 42.666667 0 0 1 42.666667-42.666667z m42.666667 85.333333v597.333334h682.666666V213.333333H170.666667z m682.666666 298.666667l-150.826666 150.869333-60.373334-60.373333L732.672 512 642.133333 421.504l60.373334-60.373333L853.333333 512zM291.328 512l90.538667 90.496-60.330667 60.373333L170.666667 512l150.869333-150.869333L381.866667 421.546667 291.328 512z m188.416 213.333333H388.949333l155.306667-426.666666h90.794667l-155.306667 426.666666z';
 const CODE_ICON_COLOR_ON = '#1e7aeb';
 const CODE_ICON_COLOR_OFF = '#8a8a8a';
-
-function applyBackgroundMode(mode: 'grid' | 'white' | 'black'): void {
-    playgroundState.backgroundMode = mode;
-    playgroundState.pagxView?.setBackgroundMode(mode);
-}
-
-function setupBackgroundModeMenu(): void {
-    const bgModeBtn = document.getElementById('bg-mode-btn');
-    const bgMenu = document.getElementById('bg-menu');
-    if (!bgModeBtn || !bgMenu) {
-        return;
-    }
-
-    bgModeBtn.addEventListener('click', (e: Event) => {
-        e.stopPropagation();
-        const isHidden = bgMenu.classList.contains('hidden');
-        bgMenu.classList.toggle('hidden', !isHidden);
-        bgModeBtn.setAttribute('aria-expanded', String(isHidden));
-    });
-
-    bgMenu.addEventListener('click', (e: Event) => {
-        const target = (e.target as HTMLElement).closest('.bg-menu-item') as HTMLElement | null;
-        if (!target) {
-            return;
-        }
-        const mode = target.dataset.bg as 'grid' | 'white' | 'black';
-        if (!mode) {
-            return;
-        }
-        // Update active state in menu
-        bgMenu.querySelectorAll('.bg-menu-item').forEach(item => item.classList.remove('active'));
-        target.classList.add('active');
-        applyBackgroundMode(mode);
-        bgMenu.classList.add('hidden');
-        bgModeBtn.setAttribute('aria-expanded', 'false');
-        // Redraw to reflect background change
-        draw();
-    });
-
-    // Close menu when clicking outside
-    document.addEventListener('click', () => {
-        bgMenu.classList.add('hidden');
-        bgModeBtn.setAttribute('aria-expanded', 'false');
-    });
-}
 
 function highlightXml(text: string): string {
     // Escape HTML entities first
@@ -1150,7 +1102,6 @@ function setupDragAndDrop() {
         gestureManager.resetTransform(playgroundState);
     });
 
-    setupBackgroundModeMenu();
     setupCodeToggle();
 
     fileInput.addEventListener('change', () => {
