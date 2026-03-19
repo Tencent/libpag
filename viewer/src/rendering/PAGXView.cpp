@@ -38,10 +38,6 @@ ContentViewModel* PAGXView::getViewModel() const {
   return viewModel.get();
 }
 
-void PAGXView::triggerFlush() const {
-  QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
-}
-
 void PAGXView::initDrawable() {
   if (drawable != nullptr) {
     return;
@@ -50,7 +46,9 @@ void PAGXView::initDrawable() {
   if (drawable == nullptr) {
     return;
   }
-  drawable->moveToThread(renderThread.get());
+  if (renderThread != nullptr) {
+    drawable->moveToThread(renderThread.get());
+  }
 }
 
 void PAGXView::sizeChangedDelayHandle() {

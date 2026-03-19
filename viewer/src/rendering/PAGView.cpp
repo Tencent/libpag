@@ -39,10 +39,6 @@ ContentViewModel* PAGView::getViewModel() const {
   return viewModel.get();
 }
 
-void PAGView::triggerFlush() const {
-  QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
-}
-
 void PAGView::flush() const {
   if (viewModel->isPlaying()) {
     triggerFlush();
@@ -59,7 +55,9 @@ void PAGView::initDrawable() {
   }
   auto pagSurface = PAGSurface::MakeFrom(drawable);
   viewModel->pagPlayer->setSurface(pagSurface);
-  drawable->moveToThread(renderThread.get());
+  if (renderThread != nullptr) {
+    drawable->moveToThread(renderThread.get());
+  }
 }
 
 void PAGView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) {

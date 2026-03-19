@@ -55,6 +55,9 @@ class ContentView : public QQuickItem {
 
   Q_SLOT virtual void flush() const = 0;
 
+  // Schedules a render-thread flush via a queued connection.
+  void triggerFlush() const;
+
   friend class RenderThread;
 
  protected:

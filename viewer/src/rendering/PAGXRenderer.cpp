@@ -37,8 +37,7 @@ void PAGXRenderer::updateSize() {
 IContentRenderer::RenderMetrics PAGXRenderer::flush() {
   RenderMetrics metrics = {};
   auto viewModel = view->viewModel.get();
-  if (view->sizeChanged) {
-    view->sizeChanged = false;
+  if (view->sizeChanged.exchange(false)) {
     updateSize();
   }
   if (!viewModel->needsRender.exchange(false)) {

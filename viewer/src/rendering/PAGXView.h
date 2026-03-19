@@ -43,9 +43,6 @@ class PAGXView : public ContentView {
   void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
   QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
 
-  // Called by PAGXViewModel to trigger a render-thread flush.
-  void triggerFlush() const;
-
  private:
   void initDrawable() override;
 

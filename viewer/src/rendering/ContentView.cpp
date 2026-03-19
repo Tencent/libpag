@@ -71,6 +71,10 @@ RenderThread* ContentView::getRenderThread() const {
   return renderThread.get();
 }
 
+void ContentView::triggerFlush() const {
+  QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
+}
+
 QSGNode* ContentView::updateTextureNode(QSGNode* oldNode) {
   auto node = static_cast<QSGImageNode*>(oldNode);
   if (drawable != nullptr) {
