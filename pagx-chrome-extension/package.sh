@@ -3,9 +3,10 @@
 # Package script for PAGX Chrome Extension
 #
 # Usage:
-#   bash package.sh          # Default: generate .crx for local distribution
-#   bash package.sh crx      # Generate .crx for local distribution
-#   bash package.sh zip      # Generate .zip for Chrome Web Store submission
+#   bash package.sh                    # Default: generate .crx for local distribution
+#   bash package.sh crx                # Generate .crx for local distribution
+#   bash package.sh crx --key KEY.pem  # Generate .crx with specified private key
+#   bash package.sh zip                # Generate .zip for Chrome Web Store submission
 #
 # Run build.sh first to generate all build artifacts.
 
@@ -15,6 +16,26 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_DIR="${SCRIPT_DIR}/.."
 VERSION=$(grep '"version"' "${SCRIPT_DIR}/manifest.json" | head -1 | sed 's/.*: *"\([^"]*\)".*/\1/')
 FORMAT="${1:-crx}"
+PEM_ARG=""
+
+# Parse optional --key argument
+shift 2>/dev/null || true
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --key)
+      if [ -z "$2" ] || [ ! -f "$2" ]; then
+        echo "Error: --key requires a valid .pem file path."
+        exit 1
+      fi
+      PEM_ARG="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"
+      shift 2
+      ;;
+    *)
+      echo "Unknown option: $1"
+      exit 1
+      ;;
+  esac
+done
 
 # Verify build artifacts exist
 MISSING=()
@@ -85,7 +106,7 @@ package_zip() {
 }
 
 package_crx() {
-  local PEM_FILE="${OUTPUT_DIR}/pagx-viewer.pem"
+  local PEM_FILE="${PEM_ARG:-${OUTPUT_DIR}/pagx-viewer.pem}"
   local CRX_NAME="pagx-viewer-v${VERSION}.crx"
   echo "Packaging PAGX Viewer v${VERSION} (CRX for local distribution)..."
 
@@ -166,9 +187,14 @@ case "${FORMAT}" in
     package_crx
     ;;
   *)
-    echo "Usage: bash package.sh [crx|zip]"
+    echo "Usage: bash package.sh [crx|zip] [OPTIONS]"
+    echo ""
+    echo "Formats:"
     echo "  crx  - Generate .crx for local distribution (default)"
     echo "  zip  - Generate .zip for Chrome Web Store submission"
+    echo ""
+    echo "Options (crx only):"
+    echo "  --key PATH  - Path to .pem private key file (reuse to keep same Extension ID)"
     exit 1
     ;;
 esac
