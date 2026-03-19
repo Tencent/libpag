@@ -24,9 +24,9 @@
 #include "cli/CliUtils.h"
 #include "cli/LayoutUtils.h"
 #include "cli/XPathQuery.h"
+#include "pagx/FontProvider.h"
 #include "pagx/PAGXImporter.h"
 #include "renderer/LayerBuilder.h"
-#include "renderer/TextLayout.h"
 #include "tgfx/layers/Layer.h"
 
 namespace pagx::cli {
@@ -157,9 +157,9 @@ int RunBounds(int argc, char* argv[]) {
   }
 
   // Build layer tree with mapping.
-  TextLayout textLayout = {};
-  SetupSystemFallbackFonts(textLayout);
-  auto buildResult = LayerBuilder::BuildWithMap(document.get(), &textLayout);
+  FontConfig fontProvider = {};
+  SetupSystemFallbackFonts(fontProvider);
+  auto buildResult = LayerBuilder::BuildWithMap(document.get(), &fontProvider);
   if (buildResult.root == nullptr) {
     std::cerr << "pagx bounds: failed to build layer tree\n";
     return 1;

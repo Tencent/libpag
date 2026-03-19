@@ -18,7 +18,8 @@
 
 #pragma once
 
-#include <optional>
+#include <cmath>
+#include <string>
 
 namespace pagx {
 
@@ -29,28 +30,51 @@ namespace pagx {
  * Constraint types:
  * - Single-edge (left, right, top, bottom): positions the element without changing its size.
  * - Opposite-edges (left+right or top+bottom): defines a target area. Stretchable elements
- *   (Rectangle, Ellipse, TextBox) fill the area; others center within it.
+ *   (Rectangle, Ellipse, TextBox) and Group fill the area — stretchable types resize their
+ *   rendered shape, while Group derives layout dimensions without affecting rendering. Other
+ *   types (Polystar, Path, Text) center within the area.
  * - Center (centerX, centerY): positions the element center relative to the container center.
  *   A value of 0 means perfectly centered.
  */
 struct Constraints {
-  std::optional<float> left = std::nullopt;
-  std::optional<float> right = std::nullopt;
-  std::optional<float> top = std::nullopt;
-  std::optional<float> bottom = std::nullopt;
-  std::optional<float> centerX = std::nullopt;
-  std::optional<float> centerY = std::nullopt;
+  float left = NAN;
+  float right = NAN;
+  float top = NAN;
+  float bottom = NAN;
+  float centerX = NAN;
+  float centerY = NAN;
 
   bool hasHorizontal() const {
-    return left.has_value() || right.has_value() || centerX.has_value();
+    return !std::isnan(left) || !std::isnan(right) || !std::isnan(centerX);
   }
 
   bool hasVertical() const {
-    return top.has_value() || bottom.has_value() || centerY.has_value();
+    return !std::isnan(top) || !std::isnan(bottom) || !std::isnan(centerY);
   }
 
   bool hasAny() const {
     return hasHorizontal() || hasVertical();
+  }
+
+  /**
+   * Validates constraint combinations against the spec rules. Each axis allows either a single
+   * edge (left/right/centerX) or opposite edges (left+right). CenterX cannot combine with
+   * left or right. Returns false with a diagnostic message when constraints conflict.
+   */
+  bool isValid(std::string& errorMessage) const {
+    if (!std::isnan(centerX) && (!std::isnan(left) || !std::isnan(right))) {
+      errorMessage =
+          "Conflicting horizontal constraints: centerX cannot be combined with left or right. "
+          "Use either one edge (left/right/centerX) or two opposite edges (left+right).";
+      return false;
+    }
+    if (!std::isnan(centerY) && (!std::isnan(top) || !std::isnan(bottom))) {
+      errorMessage =
+          "Conflicting vertical constraints: centerY cannot be combined with top or bottom. "
+          "Use either one edge (top/bottom/centerY) or two opposite edges (top+bottom).";
+      return false;
+    }
+    return true;
   }
 };
 

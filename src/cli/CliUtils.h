@@ -24,7 +24,7 @@
 #include <string>
 #include <vector>
 #include "SystemFonts.h"
-#include "renderer/TextLayout.h"
+#include "pagx/FontProvider.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx::cli {
@@ -63,13 +63,13 @@ static inline std::shared_ptr<tgfx::Typeface> ResolveSystemTypeface(const std::s
 }
 
 /**
- * Adds system fallback fonts to the given TextLayout as deferred entries. Fonts are loaded on
+ * Adds system fallback fonts to the given FontConfig as deferred entries. Fonts are loaded on
  * demand during text shaping, not upfront.
  */
-inline void SetupSystemFallbackFonts(TextLayout& textLayout) {
+inline void SetupSystemFallbackFonts(FontConfig& fontProvider) {
   auto locations = SystemFonts::FallbackTypefaces();
   for (const auto& loc : locations) {
-    textLayout.addFallbackFont(loc.path, loc.ttcIndex, loc.fontFamily, loc.fontStyle);
+    fontProvider.addFallbackFont(loc.path, loc.ttcIndex, loc.fontFamily, loc.fontStyle);
   }
 }
 

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates all single-edge and center constraint combinations.
+     A 3x3 grid of colored squares, each using a different constraint pair:
+       Row 1: left+top,     centerX+top,     right+top
+       Row 2: left+centerY, centerX+centerY, right+centerY
+       Row 3: left+bottom,  centerX+bottom,  right+bottom
+     Two child Layer overlays show Layer-level constraint positioning. -->
+<pagx version="1.0" width="400" height="400">
+  <Layer width="360" height="360" left="20" top="20">
+    <!-- Dashed container border -->
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+    <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+
+    <!-- Row 1 -->
+    <Group left="0" right="0" top="0" bottom="0">
+      <Rectangle left="20" top="20" size="72,72" roundness="10"/>
+      <Fill color="#6366F1"/>
+    </Group>
+    <Group left="0" right="0" top="0" bottom="0">
+      <Rectangle centerX="0" top="20" size="72,72" roundness="10"/>
+      <Fill color="#818CF8"/>
+    </Group>
+    <Group left="0" right="0" top="0" bottom="0">
+      <Rectangle right="20" top="20" size="72,72" roundness="10"/>
+      <Fill color="#F43F5E"/>
+    </Group>
+
+    <!-- Row 2 -->
+    <Group left="0" right="0" top="0" bottom="0">
+      <Rectangle left="20" centerY="0" size="72,72" roundness="10"/>
+      <Fill color="#8B5CF6"/>
+    </Group>
+    <Group left="0" right="0" top="0" bottom="0">
+      <Rectangle centerX="0" centerY="0" size="72,72" roundness="10"/>
+      <Fill color="#10B981"/>
+    </Group>
+    <Group left="0" right="0" top="0" bottom="0">
+      <Rectangle right="20" centerY="0" size="72,72" roundness="10"/>
+      <Fill color="#EC4899"/>
+    </Group>
+
+    <!-- Row 3 -->
+    <Group left="0" right="0" top="0" bottom="0">
+      <Rectangle left="20" bottom="20" size="72,72" roundness="10"/>
+      <Fill color="#F59E0B"/>
+    </Group>
+    <Group left="0" right="0" top="0" bottom="0">
+      <Rectangle centerX="0" bottom="20" size="72,72" roundness="10"/>
+      <Fill color="#F97316"/>
+    </Group>
+    <Group left="0" right="0" top="0" bottom="0">
+      <Rectangle right="20" bottom="20" size="72,72" roundness="10"/>
+      <Fill color="#06B6D4"/>
+    </Group>
+
+    <!-- Child Layer: left+right derives width, centered vertically -->
+    <Layer left="20" right="20" centerY="-62" height="16">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="3"/>
+      <Fill color="#6366F118"/>
+      <Stroke color="#6366F1" width="1" dashes="4,3"/>
+    </Layer>
+
+    <!-- Child Layer: centerX + centerY with offset -->
+    <Layer centerX="0" centerY="62" width="120" height="16">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="3"/>
+      <Fill color="#F43F5E18"/>
+      <Stroke color="#F43F5E" width="1" dashes="4,3"/>
+    </Layer>
+  </Layer>
+</pagx>

@@ -38,6 +38,20 @@ they **must not** be omitted.
 
 | Attribute | Type | Default |
 |-----------|------|---------|
+| `width` | float | — |
+| `height` | float | — |
+| `layout` | LayoutMode | absolute |
+| `gap` | float | 0 |
+| `padding` | Padding | 0 |
+| `alignment` | Alignment | start |
+| `arrangement` | Arrangement | start |
+| `includeInLayout` | bool | true |
+| `left` | float | — |
+| `right` | float | — |
+| `top` | float | — |
+| `bottom` | float | — |
+| `centerX` | float | — |
+| `centerY` | float | — |
 | `name` | string | "" |
 | `visible` | bool | true |
 | `alpha` | float | 1 |
@@ -45,16 +59,28 @@ they **must not** be omitted.
 | `x` | float | 0 |
 | `y` | float | 0 |
 | `matrix` | Matrix | identity |
+| `matrix3D` | Matrix3D | — |
 | `preserve3D` | bool | false |
 | `antiAlias` | bool | true |
 | `groupOpacity` | bool | false |
 | `passThroughBackground` | bool | true |
+| `scrollRect` | Rect | — |
+| `mask` | idref | — |
+| `composition` | idref | — |
 | `maskType` | MaskType | alpha |
 
 ### Group
 
 | Attribute | Type | Default |
 |-----------|------|---------|
+| `width` | float | — |
+| `height` | float | — |
+| `left` | float | — |
+| `right` | float | — |
+| `top` | float | — |
+| `bottom` | float | — |
+| `centerX` | float | — |
+| `centerY` | float | — |
 | `anchor` | Point | 0,0 |
 | `position` | Point | 0,0 |
 | `rotation` | float | 0 |
@@ -67,29 +93,28 @@ they **must not** be omitted.
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `position` | Point | 0,0 |
 | `size` | Size | 100,100 |
 | `roundness` | float | 0 |
 | `reversed` | bool | false |
+| `position` | Point | (center of bounding box) |
 
-> `position` is the **center point** of the rectangle, not the top-left corner.
-> Bounds: `left = position.x − width/2`, `top = position.y − height/2`.
+Also supports constraint attributes (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`) —
+see §Constraint Attributes below.
 
 ### Ellipse
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `position` | Point | 0,0 |
 | `size` | Size | 100,100 |
 | `reversed` | bool | false |
+| `position` | Point | (center of bounding box) |
 
-> `position` is the **center point** of the ellipse, not the top-left corner.
+Also supports constraint attributes — see §Constraint Attributes below.
 
 ### Polystar
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `position` | Point | 0,0 |
 | `type` | PolystarType | star |
 | `pointCount` | float | 5 |
 | `outerRadius` | float | 100 |
@@ -98,16 +123,19 @@ they **must not** be omitted.
 | `outerRoundness` | float | 0 |
 | `innerRoundness` | float | 0 |
 | `reversed` | bool | false |
+| `position` | Point | (center of bounding box) |
 
-> `position` is the **center point** of the polystar, not the top-left corner.
-> Vertices are computed relative to this center (see spec §4.4).
+Also supports constraint attributes — see §Constraint Attributes below.
 
 ### Path
 
 | Attribute | Type | Default |
 |-----------|------|---------|
 | `data` | string/idref | (required) |
+| `position` | Point | 0,0 |
 | `reversed` | bool | false |
+
+> `position` is the **coordinate system origin**. When `position="0,0"`, path data coordinates directly define drawing positions.
 
 ### Fill
 
@@ -380,6 +408,29 @@ they **must not** be omitted.
 | `reversed` | bool | false |
 | `forceAlignment` | bool | false |
 
+### Constraint Attributes (Geometry Elements, Text, TextBox, Groups, and Child Layers)
+
+These attributes position or stretch an element relative to its container (constraint layout).
+The container's size comes from explicit `width`/`height`, parent layout assignment, or
+content measurement (every container always has a size). `left`/`top` alone work without any
+container size dependency; `right`/`bottom`/`centerX`/`centerY` reference the container's size.
+
+**VectorElements** (contents inside a Layer/Group) always use constraint attributes,
+regardless of the parent's `layout` mode.
+
+For **child Layers**, constraints are only active when:
+- The parent Layer uses absolute layout (default, no `layout` set or `layout="absolute"`), or
+- The child Layer has `includeInLayout="false"` (opted out of container layout flow)
+
+| Attribute | Type | Default | Note |
+|-----------|------|---------|------|
+| `left` | float | — | Distance from element left edge to container left edge |
+| `right` | float | — | Distance from element right edge to container right edge |
+| `top` | float | — | Distance from element top edge to container top edge |
+| `bottom` | float | — | Distance from element bottom edge to container bottom edge |
+| `centerX` | float | — | Horizontal offset from container center (0 = centered) |
+| `centerY` | float | — | Vertical offset from container center (0 = centered) |
+
 ### TextBox
 
 | Attribute | Type | Default |
@@ -436,6 +487,14 @@ Path `data` uses SVG `<path d="...">` syntax exactly. Uppercase = absolute, lowe
 | **StrokeAlign** | `center`, `inside`, `outside` |
 | **LayerPlacement** | `background`, `foreground` |
 
+### Layout Related
+
+| Enum | Values |
+|------|--------|
+| **Layout** | `absolute`, `horizontal`, `vertical` |
+| **Alignment** | `start`, `center`, `end`, `stretch` |
+| **Arrangement** | `start`, `center`, `end`, `spaceBetween` |
+
 ### Geometry Element Related
 
 | Enum | Values |
@@ -466,7 +525,6 @@ These defaults are counter-intuitive and commonly forgotten:
 
 | Element | Attribute | Default | Common Misconception |
 |---------|-----------|---------|---------------------|
-| **Rectangle/Ellipse/Polystar** | `position` | `0,0` | Often assumed to be top-left corner; it is actually the **center point** of the shape |
 | **Repeater** | `position` | `100,100` | Often assumed `0,0` |
 | **Repeater** | `copies` | `3` | Often assumed `1` |
 | **Rectangle/Ellipse** | `size` | `100,100` | May forget there is a default |
@@ -478,3 +536,5 @@ These defaults are counter-intuitive and commonly forgotten:
 | **Stroke** | `miterLimit` | `4` | Often assumed `10` (SVG default) |
 | **BackgroundBlurStyle** | `tileMode` | `mirror` | May assume `clamp` |
 | **BlurFilter** | `tileMode` | `decal` | May assume `clamp` |
+| **Layer** | `alignment` | `start` | Often assumed `center` |
+| **Layer** | `arrangement` | `start` | Often assumed `center` |

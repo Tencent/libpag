@@ -18,42 +18,6 @@
 
 #pragma once
 
-#include <memory>
-#include <unordered_map>
-#include <vector>
-#include "tgfx/core/Point.h"
-#include "tgfx/core/TextBlob.h"
-
-namespace pagx {
-
-class Text;
-
-/**
- * Shaped text data containing the TextBlob and per-glyph anchor offsets.
- */
-struct ShapedText {
-  /**
-   * The shaped TextBlob containing glyph positions.
-   */
-  std::shared_ptr<tgfx::TextBlob> textBlob = nullptr;
-
-  /**
-   * Per-glyph anchor offsets relative to default anchor (advance * 0.5, 0).
-   */
-  std::vector<tgfx::Point> anchors = {};
-};
-
-/**
- * Mapping from Text nodes to their shaped text data.
- */
-using ShapedTextMap = std::unordered_map<const Text*, ShapedText>;
-
-/**
- * TextLayout output containing shaped text and stable Text iteration order.
- */
-struct TextLayoutResult {
-  ShapedTextMap shapedTextMap = {};
-  std::vector<Text*> textOrder = {};
-};
-
-}  // namespace pagx
+// ShapedText definition lives in src/pagx/ShapedText.h. This header exists for backward
+// compatibility so that existing #include "renderer/ShapedText.h" directives continue to work.
+#include "pagx/ShapedText.h"

@@ -19,7 +19,9 @@
 #include "LayerBuilder.h"
 #include <tuple>
 #include <unordered_map>
+#include "TextLayout.h"
 #include "ToTGFX.h"
+#include "pagx/Layout.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -314,6 +316,7 @@ class LayerBuilderContext {
 
   std::shared_ptr<tgfx::ShapePath> convertPath(const Path* node) {
     auto shapePath = tgfx::ShapePath::Make();
+    shapePath->setPosition(ToTGFX(node->position));
     if (node->data) {
       shapePath->setPath(ToTGFX(*node->data));
     }
@@ -821,29 +824,31 @@ class LayerBuilderContext {
 
 // Public API implementation
 
-static TextLayoutResult PerformTextLayout(PAGXDocument* document, TextLayout* textLayout) {
-  if (textLayout != nullptr) {
-    return textLayout->layout(document);
-  }
-  TextLayout defaultTextLayout;
-  return defaultTextLayout.layout(document);
-}
-
-std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, TextLayout* textLayout) {
+std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, FontConfig* fontProvider) {
   if (document == nullptr) {
     return nullptr;
   }
-  auto layoutResult = PerformTextLayout(document, textLayout);
-  LayerBuilderContext context(layoutResult.shapedTextMap);
+
+  // Perform unified layout through Layout class
+  Layout layout(fontProvider);
+  layout.apply(document);
+
+  // Build layer tree using shaped text from layout
+  LayerBuilderContext context(layout.shapedTextMap());
   return context.build(*document);
 }
 
-LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document, TextLayout* textLayout) {
+LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document, FontConfig* fontProvider) {
   if (document == nullptr) {
     return {};
   }
-  auto layoutResult = PerformTextLayout(document, textLayout);
-  LayerBuilderContext context(layoutResult.shapedTextMap);
+
+  // Perform unified layout through Layout class
+  Layout layout(fontProvider);
+  layout.apply(document);
+
+  // Build layer tree using shaped text from layout
+  LayerBuilderContext context(layout.shapedTextMap());
   return context.buildWithMap(*document);
 }
 

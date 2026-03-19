@@ -45,6 +45,12 @@ pagx optimize -o output.pagx input.pagx
 
 Check for issues that automated optimization cannot fix:
 
+- **Manual coordinate calculation** — hand-calculated `x`/`y` or `position` values that
+  should be replaced by constraint layout (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`)
+  or container layout (`layout`/`gap`/`padding`). Constraint layout is the preferred
+  positioning mechanism — see `design-patterns.md` §Layout Decisions.
+- **Inconsistent layout attributes** — container Layers with different `gap` or `padding`
+  values for visually similar contexts that should be unified.
 - **Redundant Layer nesting** — child Layers that should be Groups (no styles, filters, or
   mask needed). See **Layer/Group Optimization** below.
 - **Scattered blocks** — one logical visual unit split across multiple sibling Layers that
@@ -67,8 +73,8 @@ Check for issues that automated optimization cannot fix:
 - **Path complexity** — a single Path with >15 curve segments is fragile and slow. Consider
   decomposing into simpler primitives (Rectangle, Ellipse).
 - **Style inconsistency** — structurally similar elements (e.g., cards in a set, buttons in
-  a row) using different structural patterns (Layer vs Group, `x`/`y` vs `position`) that
-  should be unified for maintainability.
+  a row) using different structural patterns (Layer vs Group, constraint vs absolute positioning)
+  that should be unified for maintainability.
 
 ### Step 3: Final Verification
 
@@ -79,6 +85,11 @@ After all optimizations, verify the following:
   (`attributes.md`)
 - [ ] Painter scope isolation correct (`design-patterns.md` §1)
 - [ ] Text `position`/`textAnchor` not set when TextBox is present (`design-patterns.md` §2)
+  - [ ] `textAnchor` and constraint attributes not mixed on the same Text (`design-patterns.md` §3)
+  - [ ] All positioning uses constraint attributes where possible (fallback to `position`/`x`/`y`
+    only for irregular freeform compositions)
+- [ ] Containers have explicit `width`/`height` where a specific design size is intended
+  (not needed when measured or layout-assigned size is correct)
 - [ ] Internal coordinates relative to Layer origin (see **Coordinate Localization** below)
 - [ ] `<Resources>` placed after all Layers; all `@id` references resolve
 - [ ] Repeater copies reasonable (~200 single, ~500 nested product)
@@ -141,17 +152,19 @@ Understanding the PAGX renderer's cost model helps identify performance bottlene
 
 ### Optimization Scenarios
 
-The core principle leads to three scenarios. In every case, the Layer carries the block's
-offset via `x`/`y`, and internal elements use coordinates **relative to the Layer's origin
-(0,0)**.
+The core principle leads to three scenarios. In every case, prefer constraint attributes
+(`left`/`top`/`centerX`/`centerY`) for positioning. For absolute-
+positioned blocks, the Layer carries the block's offset, and internal elements use coordinates
+**relative to the Layer's origin (0,0)**.
 
 #### Scenario A: Split an Over-Packed Layer
 
 **Problem**: One Layer contains multiple distinct logical blocks that cannot be independently
 moved.
 
-**Fix**: Split into separate Layers — one per logical block. Set each Layer's `x`/`y` to the
-block's position, convert internal coordinates to Layer-relative.
+**Fix**: Split into separate Layers — one per logical block. Use constraint attributes
+(`left`/`top`) for positioning, or `x`/`y` as fallback. Convert internal
+coordinates to Layer-relative.
 
 ```xml
 <!-- Before: two independent blocks crammed into one Layer -->
@@ -283,24 +296,29 @@ single child can be flattened entirely.
 
 ### Downgrade Checklist
 
+> ⚠️ **CRITICAL — All-or-Nothing Rule**: Within a parent, Groups always render BELOW child Layers
+> (regardless of XML order). Partial downgrade breaks stacking. **Downgrade ALL qualifying siblings or NONE.**
+
 A child Layer can be downgraded to Group when **all** of the following are true:
 
 1. NOT a direct child of `<pagx>` or `<Composition>`
-2. Does not use any **Layer-exclusive feature**:
-   - **Child nodes**: styles, filters, child Layers
-   - **Attributes**: mask, maskType, blendMode (non-default), composition, scrollRect,
-     visible="false", id (if referenced), name, matrix, matrix3D, preserve3D, groupOpacity,
-     passThroughBackground
-3. Downgrade does not change visual stacking order among siblings
-4. The Layer is a sub-element within the same logical block — not a distinct independent block
+2. NOT managed by parent container layout (parent has `layout` attribute) — Groups drop out of layout flow
+3. Does not use any **Layer-exclusive feature**:
+   | Category | Features |
+   |----------|----------|
+   | Child nodes | styles, filters, child Layers |
+   | Attributes | mask, maskType, blendMode (non-default), composition, scrollRect, visible="false", id (if referenced), name, matrix, matrix3D, preserve3D, groupOpacity, passThroughBackground |
+   | Container layout | `layout`, `gap`, `padding`, `alignment`, `arrangement` |
+4. Downgrade does not change visual stacking order among siblings (see All-or-Nothing Rule above)
+5. The Layer is a sub-element within the same logical block — not a distinct independent block
 
-### Stacking Order and the All-or-Nothing Rule
+### Stacking Order Details
 
-Within a parent Layer, **contents** (Groups, geometry, painters) always render below **children**
-(child Layers) — regardless of XML source order. Partial downgrade moves newly created Groups
-from children to contents, breaking stacking.
+Within a parent Layer, render order is:
+1. **contents** (Groups, geometry, painters) — always first
+2. **children** (child Layers) — always second
 
-**Rule**: Either downgrade **all** qualifying sibling Layers or **none**.
+This is independent of XML source order.
 
 ```xml
 <!-- Layer B has DropShadowStyle → cannot downgrade ANY sibling -->
@@ -321,9 +339,16 @@ coordinates from canvas-absolute to Layer-relative.**
 
 ### Principle
 
-A Layer's `x`/`y` carries the **block-level offset**. Internal elements use coordinates
-**relative to the Layer's origin (0,0)**. This lets the block be repositioned by changing
-a single `x`/`y` value.
+Prefer constraint attributes (`left`/`top`/`centerX`/`centerY`) for positioning — they
+eliminate manual coordinate calculation and are more maintainable. For absolute-positioned
+blocks (fallback), the Layer's `x`/`y` carries the **block-level offset**, and internal
+elements use coordinates **relative to the Layer's origin (0,0)**.
+
+**Layout-managed content**: When a parent Layer uses container layout (`layout` attribute),
+child Layer positions are computed by the layout engine — do not set `x`/`y` manually.
+When constraint attributes are used on VectorElements or child Layers, the engine computes
+positions automatically — do not set `position` (or `x`/`y` for Layers) manually on constrained
+axes. Coordinate localization only applies to the remaining absolute-positioned content.
 
 ### How
 
@@ -406,6 +431,12 @@ Fill / Stroke.
 
 **Auto-apply**. Multiple adjacent Layers with identical painters and no individual filters /
 mask / blendMode / alpha / name → merge into one Layer.
+
+**Do not merge** when any of the following apply:
+- Layers are managed by parent container layout (parent has `layout` attribute) — each child
+  Layer is a layout slot; merging collapses distinct slots into one
+- Layers serve as constraint layout containers for elements with different painters —
+  merging would break painter scope isolation (see `design-patterns.md` §1)
 
 > When the motivation is semantic grouping (one scattered block), see **Scenario B**.
 > Cross-Layer Merging here focuses on **painter deduplication**.
@@ -513,7 +544,8 @@ counter-intuitive defaults (Repeater `position="100,100"`, `copies="3"`, etc.) a
 
 ### Writing Clean Attributes
 
-- Use `x`/`y` for translation instead of `matrix="1,0,0,1,tx,ty"`
+- Use constraint attributes for positioning; use `x`/`y`
+  (instead of `matrix="1,0,0,1,tx,ty"`) as fallback for absolute positioning
 - Clean integers: `100` not `100.0`, `0` not `-2.18e-06`
 - Short hex: `#F00` instead of `#FF0000`
 - No spaces after commas: `"30,-20"` not `"30, -20"`
@@ -525,17 +557,19 @@ counter-intuitive defaults (Repeater `position="100,100"`, `copies="3"`, etc.) a
 ### Composition Resource Reuse
 
 When 2+ layer subtrees have identical internal structure (differing only in position), extract
-into a `<Composition>` and instantiate via `<Layer composition="@id"/>`.
+into a `<Composition>` and instantiate via `<Layer composition="@id"/>`. Position referencing
+Layers with constraint attributes (`left`/`top`).
 
-**Coordinate conversion**: Composition origin is at the top-left corner. Given an original
-Layer at `(layerX, layerY)` with geometry using `position="cx,cy"`:
+**Coordinate conversion**: Composition origin is at the top-left corner. Use constraint
+attributes inside Composition for positioning. Given an original Layer at `(layerX, layerY)`
+with geometry of size `(w, h)`:
 
 ```
 Composition width  = geometry width
 Composition height = geometry height
-Internal position   = (width/2, height/2)
-Reference Layer x  = layerX - width/2 + cx
-Reference Layer y  = layerY - height/2 + cy
+Internal geometry   = use left="0" right="0" top="0" bottom="0" to fill
+Reference Layer left = layerX - w/2 + cx   (or use constraint attributes)
+Reference Layer top  = layerY - h/2 + cy
 ```
 
 ```xml
@@ -548,17 +582,17 @@ Reference Layer y  = layerY - height/2 + cy
 <Layer x="280" y="195"><!-- same content --></Layer>
 <!-- ... repeated 5 times -->
 
-<!-- After -->
+<!-- After: Composition with constraint layout -->
 <Composition id="cardBg" width="100" height="80">
-  <Layer>
-    <Rectangle position="50,40" size="100,80" roundness="12"/>
+  <Layer width="100" height="80">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
     <Fill color="#1E293B"/>
     <Stroke color="#334155" width="1"/>
   </Layer>
 </Composition>
 
-<Layer composition="@cardBg" x="110" y="155"/>
-<Layer composition="@cardBg" x="230" y="155"/>
+<Layer composition="@cardBg" left="110" top="155"/>
+<Layer composition="@cardBg" left="230" top="155"/>
 <!-- ... -->
 ```
 

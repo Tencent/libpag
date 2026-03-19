@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Vertical layout: arrangement and alignment combinations -->
+<pagx version="1.0" width="440" height="520">
+  <!-- Background -->
+  <Layer>
+    <Rectangle position="220,260" size="440,520"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">
+    <!-- Row 1 -->
+    <Layer layout="horizontal" gap="20">
+      <!-- 1. Vertical arrangement=center: two items centered vertically -->
+      <Layer width="180" height="220" layout="vertical" arrangement="center" gap="10">
+        <Rectangle position="90,110" size="180,220" roundness="4"/>
+        <Fill color="#E2E8F0"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer width="160" height="60">
+          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Fill color="#6366F1"/>
+        </Layer>
+        <Layer width="160" height="80">
+          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Fill color="#F43F5E"/>
+        </Layer>
+      </Layer>
+
+      <!-- 2. Vertical arrangement=end: two items pushed to bottom -->
+      <Layer width="180" height="220" layout="vertical" arrangement="end" gap="10">
+        <Rectangle position="90,110" size="180,220" roundness="4"/>
+        <Fill color="#E2E8F0"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer width="160" height="60">
+          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Fill color="#6366F1"/>
+        </Layer>
+        <Layer width="160" height="80">
+          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Fill color="#F43F5E"/>
+        </Layer>
+      </Layer>
+    </Layer>
+
+    <!-- Row 2 -->
+    <Layer layout="horizontal" gap="20">
+      <!-- 3. Vertical alignment=center: cross-axis (X) centering with different widths -->
+      <Layer width="180" height="220" layout="vertical" alignment="center" gap="10">
+        <Rectangle position="90,110" size="180,220" roundness="4"/>
+        <Fill color="#E2E8F0"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer width="80" height="60">
+          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Fill color="#10B981"/>
+        </Layer>
+        <Layer width="140" height="60">
+          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Fill color="#F59E0B"/>
+        </Layer>
+        <Layer width="60" height="60">
+          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Fill color="#06B6D4"/>
+        </Layer>
+      </Layer>
+
+      <!-- 4. Vertical alignment=end: cross-axis (X) right-aligned -->
+      <Layer width="180" height="220" layout="vertical" alignment="end" gap="10">
+        <Rectangle position="90,110" size="180,220" roundness="4"/>
+        <Fill color="#E2E8F0"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer width="80" height="60">
+          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Fill color="#10B981"/>
+        </Layer>
+        <Layer width="140" height="60">
+          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Fill color="#F59E0B"/>
+        </Layer>
+        <Layer width="60" height="60">
+          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Fill color="#06B6D4"/>
+        </Layer>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

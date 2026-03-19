@@ -132,6 +132,11 @@ class PathData : public Node {
    */
   void setPathData(const PathData& other);
 
+  /**
+   * Scales all points uniformly by the given factor.
+   */
+  void scalePoints(float scale);
+
   NodeType nodeType() const override {
     return NodeType::PathData;
   }

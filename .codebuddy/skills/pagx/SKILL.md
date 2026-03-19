@@ -1,11 +1,12 @@
 ---
 name: pagx
 description: >-
-  Generates well-structured PAGX files from visual descriptions and optimizes existing
-  ones for size and rendering performance. Use when user asks to create, write, or
-  design PAGX content, optimize or simplify a .pagx file, review PAGX structure, run
-  pagx CLI commands (render, validate, format, optimize, bounds, font info/embed), or
-  look up PAGX element attributes and syntax.
+  Generates well-structured PAGX files from visual descriptions and optimizes existing ones for size
+  and rendering performance. Supports two complementary auto layout mechanisms: **constraint layout**
+  (position elements via edge-based constraints — the primary positioning method) and **container layout**
+  (arrange child Layers in rows/columns). Use when user asks to create, write, or design PAGX content,
+  optimize or simplify a .pagx file, review PAGX structure, run pagx CLI commands (render, validate,
+  format, optimize, bounds, font info/embed), or look up PAGX element attributes and syntax.
 ---
 
 # PAGX Skill
@@ -15,7 +16,7 @@ at the top — read those as directed by the guide.
 
 ## Guides
 
-### Generate — `generate-guide.md`
+### Generate — `references/generate-guide.md`
 
 **When**: User asks to create, write, or design a new PAGX file from a text description,
 reference image, or design spec.
@@ -24,7 +25,7 @@ reference image, or design spec.
 incremental construction, text layout, coordinate handling, common pitfalls, and a
 screenshot-based verification loop. Scene-specific examples are indexed inside.
 
-### Optimize — `optimize-guide.md`
+### Optimize — `references/optimize-guide.md`
 
 **When**: User asks to optimize, simplify, or review an existing PAGX file. Also used as
 the final step after generating a new file.
@@ -41,7 +42,7 @@ generation or optimization task.
 
 | Reference | Content |
 |-----------|--------|
-| `spec-essentials.md` | Node types, Layer rendering pipeline, painter scope, text system, masking, resources |
-| `design-patterns.md` | Structure decisions (Layer vs Group), text layout patterns, practical pitfall patterns |
-| `attributes.md` | Attribute defaults, enumerations, required attributes |
-| `cli.md` | CLI commands — `render`, `validate`, `optimize`, `format`, `bounds`, `font info`, `font embed` |
+| `references/spec-essentials.md` | Node types, Layer rendering pipeline, auto layout (container + constraint), painter scope, text system, masking, resources |
+| `references/design-patterns.md` | Structure decisions (Layer vs Group), layout patterns (container, constraint, Layer constraint), text layout, practical pitfall patterns |
+| `references/attributes.md` | Attribute defaults, enumerations, required attributes |
+| `references/cli.md` | CLI commands — `render`, `validate`, `optimize`, `format`, `bounds`, `font info`, `font embed` |

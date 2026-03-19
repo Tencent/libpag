@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <optional>
+#include <cmath>
 #include <string>
 #include <vector>
 #include "pagx/nodes/Element.h"
@@ -28,7 +28,7 @@
 #include "pagx/types/Alignment.h"
 #include "pagx/types/Arrangement.h"
 #include "pagx/types/BlendMode.h"
-#include "pagx/types/LayoutDirection.h"
+#include "pagx/types/LayoutMode.h"
 #include "pagx/types/MaskType.h"
 #include "pagx/types/Matrix.h"
 #include "pagx/types/Matrix3D.h"
@@ -152,40 +152,22 @@ class Layer : public Node {
   std::vector<Layer*> children = {};
 
   /**
-   * The layout width of the layer. When set, enables constraint layout for contents.
+   * The layout width of the layer. When set, enables constraint layout for contents. NaN means
+   * not set.
    */
-  std::optional<float> width = std::nullopt;
+  float width = NAN;
 
   /**
-   * The layout height of the layer. When set, enables constraint layout for contents.
+   * The layout height of the layer. When set, enables constraint layout for contents. NaN means
+   * not set.
    */
-  std::optional<float> height = std::nullopt;
+  float height = NAN;
 
   /**
-   * The minimum width constraint for flexible sizing in a layout container.
+   * The layout mode for arranging child layers. When set to Horizontal or Vertical, child layers
+   * are automatically positioned along this axis. The default value is Absolute.
    */
-  std::optional<float> minWidth = std::nullopt;
-
-  /**
-   * The maximum width constraint for flexible sizing in a layout container.
-   */
-  std::optional<float> maxWidth = std::nullopt;
-
-  /**
-   * The minimum height constraint for flexible sizing in a layout container.
-   */
-  std::optional<float> minHeight = std::nullopt;
-
-  /**
-   * The maximum height constraint for flexible sizing in a layout container.
-   */
-  std::optional<float> maxHeight = std::nullopt;
-
-  /**
-   * Enables auto layout and sets the arrangement direction. When set, child layers are
-   * automatically positioned along this axis. When not set, children use absolute positioning.
-   */
-  std::optional<LayoutDirection> layout = std::nullopt;
+  LayoutMode layout = LayoutMode::Absolute;
 
   /**
    * The spacing between adjacent child layers in the layout direction. The default value is 0.
@@ -198,12 +180,6 @@ class Layer : public Node {
   Padding padding = {};
 
   /**
-   * Whether child elements can wrap to the next line when they exceed the main axis. The default
-   * value is false.
-   */
-  bool layoutWrap = false;
-
-  /**
    * The alignment of child elements along the cross axis. The default value is Start.
    */
   Alignment alignment = Alignment::Start;
@@ -214,9 +190,55 @@ class Layer : public Node {
   Arrangement arrangement = Arrangement::Start;
 
   /**
-   * Custom data attributes. The keys are stored without the "data-" prefix.
+   * Whether this layer participates in its parent's container layout. When false, the layer is
+   * excluded from the layout flow (not measured, not positioned) but remains visible at its own
+   * x/y coordinates. The default value is true.
    */
-  std::unordered_map<std::string, std::string> customData = {};
+  bool includeInLayout = true;
+
+  /**
+   * Distance from the left edge of the parent Layer. Takes effect when the parent has no container
+   * layout (absolute mode) or when this layer has includeInLayout=false. NAN means not set.
+   */
+  float left = NAN;
+
+  /**
+   * Distance from the right edge of the parent Layer. Takes effect when the parent has no container
+   * layout (absolute mode) or when this layer has includeInLayout=false. NAN means not set.
+   */
+  float right = NAN;
+
+  /**
+   * Distance from the top edge of the parent Layer. Takes effect when the parent has no container
+   * layout (absolute mode) or when this layer has includeInLayout=false. NAN means not set.
+   */
+  float top = NAN;
+
+  /**
+   * Distance from the bottom edge of the parent Layer. Takes effect when the parent has no
+   * container layout (absolute mode) or when this layer has includeInLayout=false. NAN means not
+   * set.
+   */
+  float bottom = NAN;
+
+  /**
+   * Horizontal offset from the center of the parent Layer. Takes effect when the parent has no
+   * container layout (absolute mode) or when this layer has includeInLayout=false. NAN means not
+   * set.
+   */
+  float centerX = NAN;
+
+  /**
+   * Vertical offset from the center of the parent Layer. Takes effect when the parent has no
+   * container layout (absolute mode) or when this layer has includeInLayout=false. NAN means not
+   * set.
+   */
+  float centerY = NAN;
+
+  // Layout measurement cache, managed by AutoLayout.
+  mutable bool measureCached = false;
+  mutable float cachedMeasuredWidth = 0;
+  mutable float cachedMeasuredHeight = 0;
 
   NodeType nodeType() const override {
     return NodeType::Layer;

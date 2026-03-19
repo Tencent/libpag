@@ -24,6 +24,8 @@
 #include <string>
 #include <vector>
 #include "cli/CliUtils.h"
+#include "pagx/PAGXDocument.h"
+#include "pagx/PAGXImporter.h"
 #include "pagx_xsd.h"
 
 namespace pagx::cli {
@@ -135,6 +137,28 @@ std::vector<ValidationError> ValidateFile(const std::string& filePath) {
   xmlSchemaFreeValidCtxt(validCtxt);
   xmlSchemaFree(schema);
   xmlFreeDoc(doc);
+
+  // Application-level validation: load the document and collect semantic errors such as
+  // conflicting constraint combinations that the XSD schema cannot express.
+  auto pagxDoc = pagx::PAGXImporter::FromFile(filePath);
+  if (pagxDoc != nullptr) {
+    for (const auto& errorStr : pagxDoc->errors) {
+      ValidationError error = {};
+      // Parse "line {number}: {message}" format from PAGXImporter.
+      if (errorStr.compare(0, 5, "line ") == 0) {
+        auto colonPos = errorStr.find(':', 5);
+        if (colonPos != std::string::npos) {
+          error.line = std::stoi(errorStr.substr(5, colonPos - 5));
+          error.message = errorStr.substr(colonPos + 2);  // skip ": "
+        } else {
+          error.message = errorStr;
+        }
+      } else {
+        error.message = errorStr;
+      }
+      errors.push_back(std::move(error));
+    }
+  }
 
   return errors;
 }

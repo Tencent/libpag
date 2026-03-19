@@ -19,10 +19,6 @@
 #include "TextLayout.h"
 #include <algorithm>
 #include <cmath>
-#include "LineBreaker.h"
-#include "PunctuationSquash.h"
-#include "ToTGFX.h"
-#include "VerticalTextUtils.h"
 #include "base/utils/MathUtil.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Font.h"
@@ -31,17 +27,22 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/utils/Base64.h"
+#include "renderer/LineBreaker.h"
+#include "renderer/PunctuationSquash.h"
+#include "renderer/ToTGFX.h"
+#include "renderer/VerticalTextUtils.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/TextBlob.h"
 #include "tgfx/core/TextBlobBuilder.h"
 #include "tgfx/core/UTF.h"
 #ifdef PAG_USE_HARFBUZZ
-#include "HarfBuzzShaper.h"
+#include "renderer/HarfBuzzShaper.h"
 #endif
 #ifdef PAG_BUILD_PAGX
-#include "BidiResolver.h"
+#include "renderer/BidiResolver.h"
 #endif
 
 namespace pagx {
@@ -63,66 +64,14 @@ static size_t DecodeUTF8Char(const char* data, size_t remaining, int32_t* unicha
   return static_cast<size_t>(ptr - data);
 }
 
-TypefaceHolder::TypefaceHolder(std::shared_ptr<tgfx::Typeface> typeface)
-    : typeface(std::move(typeface)) {
-  if (this->typeface != nullptr) {
-    fontFamily = this->typeface->fontFamily();
-    fontStyle = this->typeface->fontStyle();
-  }
-}
-
-TypefaceHolder::TypefaceHolder(std::string path, int ttcIndex, std::string fontFamily,
-                               std::string fontStyle)
-    : path(std::move(path)), fontFamily(std::move(fontFamily)), fontStyle(std::move(fontStyle)),
-      ttcIndex(ttcIndex) {
-}
-
-std::shared_ptr<tgfx::Typeface> TypefaceHolder::getTypeface() {
-  if (typeface == nullptr) {
-    if (!path.empty()) {
-      typeface = tgfx::Typeface::MakeFromPath(path, ttcIndex);
-    } else if (!fontFamily.empty()) {
-      typeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
-    }
-  }
-  return typeface;
-}
-
-const std::string& TypefaceHolder::getFontFamily() const {
-  return fontFamily;
-}
-
-const std::string& TypefaceHolder::getFontStyle() const {
-  return fontStyle;
-}
-
-void TextLayout::registerTypeface(std::shared_ptr<tgfx::Typeface> typeface) {
-  if (typeface == nullptr) {
-    return;
-  }
-  FontKey key = {};
-  key.family = typeface->fontFamily();
-  key.style = typeface->fontStyle();
-  registeredTypefaces[key] = std::move(typeface);
-}
-
-void TextLayout::addFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces) {
-  for (auto& tf : typefaces) {
-    fallbackTypefaces.emplace_back(std::move(tf));
-  }
-}
-
-void TextLayout::addFallbackFont(const std::string& path, int ttcIndex,
-                                 const std::string& fontFamily, const std::string& fontStyle) {
-  fallbackTypefaces.emplace_back(path, ttcIndex, fontFamily, fontStyle);
-}
-
 // Build context that maintains state during text layout
 class TextLayoutContext {
  public:
-  TextLayoutContext(TextLayout* textLayout, PAGXDocument* document)
-      : textLayout(textLayout), document(document) {
+  TextLayoutContext(FontConfig* fontConfig, PAGXDocument* document)
+      : fontConfig_(fontConfig), document(document) {
   }
+
+  friend class TextLayout;
 
   TextLayoutResult run() {
     if (document == nullptr) {
@@ -227,8 +176,6 @@ class TextLayoutContext {
 #endif
   };
 
-  using FontKey = TextLayout::FontKey;
-
   // Splits a text range into segments by newlines and tabs, appending to the output vector.
   static void SplitTextSegments(const std::string& content, size_t rangeStart, size_t rangeLength,
                                 uint8_t bidiLevel, std::vector<TextSegment>& segments) {
@@ -329,31 +276,6 @@ class TextLayoutContext {
       result.emplace(text, std::move(shapedText));
       textOrder.push_back(text);
     }
-  }
-
-  static int StylePriority(const std::string& style) {
-    if (style == "Regular") {
-      return 0;
-    }
-    if (style == "Medium") {
-      return 1;
-    }
-    if (style == "Normal") {
-      return 2;
-    }
-    return 3;
-  }
-
-  static bool IsPreferredFontKey(const FontKey& candidate, const FontKey& current) {
-    int candidatePriority = StylePriority(candidate.style);
-    int currentPriority = StylePriority(current.style);
-    if (candidatePriority != currentPriority) {
-      return candidatePriority < currentPriority;
-    }
-    if (candidate.style != current.style) {
-      return candidate.style < current.style;
-    }
-    return candidate.family < current.family;
   }
 
   void processLayer(Layer* layer) {
@@ -863,14 +785,18 @@ class TextLayoutContext {
 #ifdef PAG_USE_HARFBUZZ
     // Build fallback fonts list for HarfBuzz shaping.
     std::vector<tgfx::Font> fallbackFonts = {};
-    fallbackFonts.reserve(textLayout->fallbackTypefaces.size());
-    for (auto& holder : textLayout->fallbackTypefaces) {
-      auto fallback = holder.getTypeface();
-      if (fallback != nullptr && fallback != primaryTypeface) {
-        tgfx::Font fallbackFont(fallback, text->fontSize);
-        fallbackFont.setFauxBold(text->fauxBold);
-        fallbackFont.setFauxItalic(text->fauxItalic);
-        fallbackFonts.push_back(std::move(fallbackFont));
+    auto* fp = fontConfig_;
+    if (fp != nullptr) {
+      auto& holders = fp->fallbackTypefaces;
+      fallbackFonts.reserve(holders.size());
+      for (auto& holder : holders) {
+        auto fallback = holder.getTypeface();
+        if (fallback != nullptr && fallback != primaryTypeface) {
+          tgfx::Font fallbackFont(fallback, text->fontSize);
+          fallbackFont.setFauxBold(text->fauxBold);
+          fallbackFont.setFauxItalic(text->fauxItalic);
+          fallbackFonts.push_back(std::move(fallbackFont));
+        }
       }
     }
 
@@ -1026,7 +952,8 @@ class TextLayoutContext {
       std::shared_ptr<tgfx::Typeface> glyphTypeface = primaryTypeface;
 
       if (glyphID == 0) {
-        for (auto& holder : textLayout->fallbackTypefaces) {
+        auto& fbHolders = fontConfig_->fallbackTypefaces;
+        for (auto& holder : fbHolders) {
           auto fallback = holder.getTypeface();
           if (fallback == nullptr || fallback == primaryTypeface) {
             continue;
@@ -2172,72 +2099,63 @@ class TextLayoutContext {
 
   std::shared_ptr<tgfx::Typeface> findTypeface(const std::string& fontFamily,
                                                const std::string& fontStyle) {
-    // First, try exact match from registered typefaces
-    if (!fontFamily.empty()) {
-      FontKey key = {};
-      key.family = fontFamily;
-      key.style = fontStyle.empty() ? "Regular" : fontStyle;
-      auto it = textLayout->registeredTypefaces.find(key);
-      if (it != textLayout->registeredTypefaces.end()) {
-        return it->second;
-      }
-
-      // Try matching family only (any style)
-      std::shared_ptr<tgfx::Typeface> bestTypeface = nullptr;
-      FontKey bestKey = {};
-      bool hasBest = false;
-      for (const auto& pair : textLayout->registeredTypefaces) {
-        if (pair.first.family != fontFamily) {
-          continue;
-        }
-        if (!hasBest) {
-          bestKey = pair.first;
-          bestTypeface = pair.second;
-          hasBest = true;
-          continue;
-        }
-        if (IsPreferredFontKey(pair.first, bestKey)) {
-          bestKey = pair.first;
-          bestTypeface = pair.second;
-        }
-      }
-      if (hasBest) {
-        return bestTypeface;
-      }
-    }
-
-    // Then, try fallback typefaces by family name (no Typeface loading needed for comparison).
-    if (!fontFamily.empty()) {
-      for (auto& holder : textLayout->fallbackTypefaces) {
-        if (holder.getFontFamily() == fontFamily) {
-          return holder.getTypeface();
-        }
-      }
-    }
-
-    // Use first fallback typeface
-    if (!textLayout->fallbackTypefaces.empty()) {
-      return textLayout->fallbackTypefaces[0].getTypeface();
-    }
-
-    // Last resort: try system font
-    if (!fontFamily.empty()) {
-      return tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
-    }
-
-    return nullptr;
+    return TextLayout::FindTypeface(fontFamily, fontStyle, fontConfig_);
   }
 
-  TextLayout* textLayout = nullptr;
+  FontConfig* fontConfig_ = nullptr;
   PAGXDocument* document = nullptr;
   ShapedTextMap result = {};
   std::vector<Text*> textOrder = {};
   std::unordered_map<const Font*, std::shared_ptr<tgfx::Typeface>> fontCache = {};
 };
 
-TextLayoutResult TextLayout::layout(PAGXDocument* document) {
-  TextLayoutContext context(this, document);
+TextLayoutResult TextLayout::Layout(PAGXDocument* document, FontConfig* fontConfig) {
+  TextLayoutContext context(fontConfig, document);
   return context.run();
+}
+
+std::shared_ptr<tgfx::Typeface> TextLayout::FindTypeface(const std::string& fontFamily,
+                                                         const std::string& fontStyle,
+                                                         FontConfig* fontConfig) {
+  if (fontConfig != nullptr) {
+    return fontConfig->findTypeface(fontFamily, fontStyle);
+  }
+  return tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
+}
+
+Rect TextLayout::MeasureText(const Text* text, FontConfig* fontConfig) {
+  if (text == nullptr) {
+    return {};
+  }
+
+  // If text has embedded GlyphRuns, create a temporary TextLayoutContext to measure
+  if (!text->glyphRuns.empty()) {
+    TextLayoutContext context(fontConfig, nullptr);
+    auto shapedText = context.buildShapedTextFromEmbeddedGlyphRuns(text);
+    if (shapedText.textBlob != nullptr) {
+      auto bounds = shapedText.textBlob->getBounds();
+      return Rect::MakeLTRB(bounds.left, bounds.top, bounds.right, bounds.bottom);
+    }
+    return {};
+  }
+
+  // For text without embedded GlyphRuns, use TextBlob::MakeFrom for fast accurate measurement
+  auto typeface = FindTypeface(text->fontFamily, text->fontStyle, fontConfig);
+  if (typeface == nullptr) {
+    return {};
+  }
+
+  tgfx::Font font(typeface, text->fontSize);
+  font.setFauxBold(text->fauxBold);
+  font.setFauxItalic(text->fauxItalic);
+
+  auto textBlob = tgfx::TextBlob::MakeFrom(text->text, font);
+  if (textBlob == nullptr) {
+    return {};
+  }
+
+  auto bounds = textBlob->getBounds();
+  return Rect::MakeLTRB(bounds.left, bounds.top, bounds.right, bounds.bottom);
 }
 
 }  // namespace pagx

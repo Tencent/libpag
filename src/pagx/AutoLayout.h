@@ -21,6 +21,7 @@
 namespace pagx {
 
 class PAGXDocument;
+class FontConfig;
 
 /// Performs auto layout on a parsed PAGX document. This includes container layout (arranging child
 /// Layers within a parent Layer that has `layout` set) and constraint layout (positioning elements
@@ -28,7 +29,10 @@ class PAGXDocument;
 class AutoLayout {
  public:
   /// Applies auto layout to all layers in the document. Called once after parsing, before rendering.
-  static void Apply(PAGXDocument* document);
+  /// @param document The document to apply layout to.
+  /// @param fontProvider Optional font config for precise text measurement. If nullptr, falls back
+  ///                     to system fonts or returns empty bounds for Text elements.
+  static void Apply(PAGXDocument* document, FontConfig* fontProvider = nullptr);
 };
 
 }  // namespace pagx

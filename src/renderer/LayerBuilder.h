@@ -20,7 +20,7 @@
 
 #include <memory>
 #include <unordered_map>
-#include "TextLayout.h"
+#include "pagx/FontProvider.h"
 #include "pagx/PAGXDocument.h"
 #include "tgfx/layers/Layer.h"
 
@@ -44,25 +44,23 @@ class LayerBuilder {
   /**
    * Builds a layer tree from a PAGXDocument.
    * @param document The document to build from.
-   * @param textLayout Optional text layout for text rendering. If nullptr, a default TextLayout is
-   *                   created internally. Pass a custom TextLayout to use registered typefaces
-   *                   and fallback fonts.
+   * @param fontProvider Optional font config for text measurement and rendering. If nullptr,
+   *                     only system fonts are available.
    * @return The root layer of the built layer tree.
    */
   static std::shared_ptr<tgfx::Layer> Build(PAGXDocument* document,
-                                            TextLayout* textLayout = nullptr);
+                                            FontConfig* fontProvider = nullptr);
 
   /**
    * Builds a layer tree and returns a mapping from PAGX Layer nodes to tgfx::Layer objects. This
    * mapping allows callers to look up the rendered layer for any PAGX Layer node.
    * @param document The document to build from.
-   * @param textLayout Optional text layout for text rendering. If nullptr, a default TextLayout is
-   *                   created internally. Pass a custom TextLayout to use registered typefaces
-   *                   and fallback fonts.
+   * @param fontProvider Optional font config for text measurement and rendering. If nullptr,
+   *                     only system fonts are available.
    * @return A LayerBuildResult containing the root layer and a mapping from PAGX Layer nodes to
    *         their corresponding tgfx::Layer objects.
    */
-  static LayerBuildResult BuildWithMap(PAGXDocument* document, TextLayout* textLayout = nullptr);
+  static LayerBuildResult BuildWithMap(PAGXDocument* document, FontConfig* fontProvider = nullptr);
 };
 
 }  // namespace pagx

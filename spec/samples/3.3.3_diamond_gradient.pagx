@@ -3,7 +3,7 @@
 <pagx version="1.0" width="400" height="400">
   <!-- Rectangle size=320x320, half=160. Diamond radius=160 so corners touch rect edges exactly -->
   <Layer>
-    <Rectangle position="200,200" size="320,320" roundness="24"/>
+    <Rectangle left="40" top="40" size="320,320" roundness="24"/>
     <Fill>
       <DiamondGradient center="200,200" radius="160">
         <ColorStop offset="0" color="#FBBF24"/>

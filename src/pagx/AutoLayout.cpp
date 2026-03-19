@@ -19,12 +19,18 @@
 #include "AutoLayout.h"
 #include <algorithm>
 #include <cmath>
-#include <optional>
+#include <limits>
+#include <string>
 #include <utility>
 #include <vector>
+#include "base/utils/Log.h"
+#include "pagx/FontProvider.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/layout/ElementConstraint.h"
+#include "pagx/layout/ElementMeasure.h"
+#include "pagx/layout/ElementTransform.h"
+#include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Ellipse.h"
-#include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Path.h"
@@ -35,478 +41,246 @@
 #include "pagx/types/Alignment.h"
 #include "pagx/types/Arrangement.h"
 #include "pagx/types/Constraints.h"
-#include "pagx/types/LayoutDirection.h"
+#include "pagx/types/LayoutMode.h"
 #include "pagx/types/Rect.h"
+#include "tgfx/core/Font.h"
+#include "tgfx/core/TextBlob.h"
+#include "tgfx/core/Typeface.h"
 
 namespace pagx {
 
-// Computes the bounds of a Text element from its GlyphRuns (precise) or estimates from text
-// properties (fallback). Returns the axis-aligned bounding box.
-static Rect ComputeTextBounds(const Text* text) {
-  float minX = std::numeric_limits<float>::max();
-  float minY = std::numeric_limits<float>::max();
-  float maxX = std::numeric_limits<float>::lowest();
-  float maxY = std::numeric_limits<float>::lowest();
-  bool hasGlyph = false;
-
-  // Use GlyphRuns if available (precise).
-  if (!text->glyphRuns.empty()) {
-    for (auto* glyphRun : text->glyphRuns) {
-      if (glyphRun == nullptr || glyphRun->glyphs.empty()) {
-        continue;
-      }
-      // Use GlyphRun position as base (in text coordinate space).
-      float baseX = glyphRun->x;
-      float baseY = glyphRun->y;
-      // Accumulate bounds from all glyphs.
-      for (size_t i = 0; i < glyphRun->glyphs.size(); i++) {
-        float glyphX = baseX;
-        if (i < glyphRun->xOffsets.size()) {
-          glyphX += glyphRun->xOffsets[i];
-        }
-        if (i < glyphRun->positions.size()) {
-          glyphX += glyphRun->positions[i].x;
-        }
-        float glyphY = baseY;
-        if (i < glyphRun->positions.size()) {
-          glyphY += glyphRun->positions[i].y;
-        }
-        // Estimate glyph bounds as a box (advance * scale, fontSize * scale).
-        // This is conservative: actual glyph bounds depend on font metrics.
-        float scaleX = 1.0f;
-        float scaleY = 1.0f;
-        if (i < glyphRun->scales.size()) {
-          scaleX = glyphRun->scales[i].x;
-          scaleY = glyphRun->scales[i].y;
-        }
-        float glyphWidth = glyphRun->fontSize * 0.6f * scaleX;     // Rough advance estimate
-        float glyphHeight = glyphRun->fontSize * scaleY;           // Full height
-        float glyphYOffset = -glyphRun->fontSize * 0.8f * scaleY;  // Ascent estimate
-        minX = std::min(minX, glyphX - glyphWidth * 0.5f);
-        minY = std::min(minY, glyphY + glyphYOffset);
-        maxX = std::max(maxX, glyphX + glyphWidth * 0.5f);
-        maxY = std::max(maxY, glyphY + glyphHeight * 0.2f);
-        hasGlyph = true;
-      }
-    }
-  }
-
-  // Fallback: estimate from text properties.
-  if (!hasGlyph) {
-    float estimatedWidth = static_cast<float>(text->text.size()) * text->fontSize * 0.6f;
-    float ascent = text->fontSize * 0.8f;
-    float descent = text->fontSize * 0.2f;
-    float boundsX = 0.0f;
-    float boundsY = -ascent;
-    if (text->textAnchor == TextAnchor::Center) {
-      boundsX = -estimatedWidth * 0.5f;
-    } else if (text->textAnchor == TextAnchor::End) {
-      boundsX = -estimatedWidth;
-    }
-    minX = boundsX;
-    minY = boundsY;
-    maxX = boundsX + estimatedWidth;
-    maxY = boundsY + (ascent + descent);
-  }
-
-  if (minX > maxX) {
+// Computes the bounds of a Text element using tgfx::TextBlob::getTightBounds() for precise
+// measurement. Falls back to estimation when font is unavailable.
+// Returns bounds in absolute coordinates (including text->position and textAnchor).
+static Rect ComputeTextBounds(const Text* text, FontConfig* fontProvider) {
+  if (text == nullptr || text->text.empty()) {
     return {};
   }
-  float width = maxX - minX;
-  float height = maxY - minY;
-  return Rect::MakeXYWH(text->position.x + minX, text->position.y + minY, width, height);
+
+  std::shared_ptr<tgfx::Typeface> typeface = nullptr;
+  if (fontProvider != nullptr) {
+    typeface = fontProvider->findTypeface(text->fontFamily, text->fontStyle);
+  }
+  if (typeface == nullptr) {
+    typeface = tgfx::Typeface::MakeFromName(text->fontFamily, text->fontStyle);
+  }
+
+  float textWidth;
+  float textHeight;
+  float boundsTop;  // Y offset from baseline to top of bounds (negative = above baseline)
+
+  if (typeface != nullptr) {
+    tgfx::Font font(typeface, text->fontSize);
+    font.setFauxBold(text->fauxBold);
+    font.setFauxItalic(text->fauxItalic);
+    auto textBlob = tgfx::TextBlob::MakeFrom(text->text, font);
+    if (textBlob != nullptr) {
+      auto bounds = textBlob->getTightBounds();
+      textWidth = bounds.right - bounds.left;
+      textHeight = bounds.bottom - bounds.top;
+      boundsTop = bounds.top;
+    } else {
+      textWidth = static_cast<float>(text->text.size()) * text->fontSize * 0.6f;
+      textHeight = text->fontSize;
+      boundsTop = -text->fontSize * 0.8f;
+    }
+  } else {
+    textWidth = static_cast<float>(text->text.size()) * text->fontSize * 0.6f;
+    textHeight = text->fontSize;
+    boundsTop = -text->fontSize * 0.8f;
+  }
+
+  // Coordinate convention: position.x is the anchor point, position.y is the baseline.
+  // boundsTop is relative to baseline (negative = above), so boundsY = baseline + boundsTop.
+  float boundsX = text->position.x;
+  float boundsY = text->position.y + boundsTop;
+  if (text->textAnchor == TextAnchor::Center) {
+    boundsX = text->position.x - textWidth * 0.5f;
+  } else if (text->textAnchor == TextAnchor::End) {
+    boundsX = text->position.x - textWidth;
+  }
+  return Rect::MakeXYWH(boundsX, boundsY, textWidth, textHeight);
 }
 
-// Returns the content bounds of an element in its local coordinate system, without applying
-// constraints. For center-anchored elements (Rectangle, Ellipse), the bounds are symmetric around
-// position. For origin-anchored elements (Path, Group), the bounds start from the content's actual
-// coordinates.
-static Rect GetContentBounds(const Element* element) {
-  switch (element->nodeType()) {
-    case NodeType::Rectangle: {
-      auto* rect = static_cast<const Rectangle*>(element);
-      float halfW = rect->size.width * 0.5f;
-      float halfH = rect->size.height * 0.5f;
-      return Rect::MakeXYWH(rect->position.x - halfW, rect->position.y - halfH, rect->size.width,
-                            rect->size.height);
-    }
-    case NodeType::Ellipse: {
-      auto* ellipse = static_cast<const Ellipse*>(element);
-      float halfW = ellipse->size.width * 0.5f;
-      float halfH = ellipse->size.height * 0.5f;
-      return Rect::MakeXYWH(ellipse->position.x - halfW, ellipse->position.y - halfH,
-                            ellipse->size.width, ellipse->size.height);
-    }
-    case NodeType::Polystar: {
-      auto* polystar = static_cast<const Polystar*>(element);
-      float r = polystar->outerRadius;
-      return Rect::MakeXYWH(polystar->position.x - r, polystar->position.y - r, r * 2.0f, r * 2.0f);
-    }
-    case NodeType::Path: {
-      auto* path = static_cast<const Path*>(element);
-      if (path->data != nullptr) {
-        auto bounds = path->data->getBounds();
-        return Rect::MakeXYWH(path->position.x + bounds.x, path->position.y + bounds.y,
-                              bounds.width, bounds.height);
-      }
-      return {};
-    }
-    case NodeType::Text: {
-      return ComputeTextBounds(static_cast<const Text*>(element));
-    }
-    case NodeType::TextBox: {
-      auto* textBox = static_cast<const TextBox*>(element);
-      return Rect::MakeXYWH(textBox->position.x, textBox->position.y, textBox->size.width,
-                            textBox->size.height);
-    }
-    case NodeType::Group: {
-      auto* group = static_cast<const Group*>(element);
-      if (group->width.has_value() && group->height.has_value()) {
-        return Rect::MakeXYWH(group->position.x, group->position.y, *group->width, *group->height);
-      }
-      // Without explicit dimensions, compute bounds from child elements.
-      float minX = std::numeric_limits<float>::max();
-      float minY = std::numeric_limits<float>::max();
-      float maxX = std::numeric_limits<float>::lowest();
-      float maxY = std::numeric_limits<float>::lowest();
-      bool hasContent = false;
-      for (auto* child : group->elements) {
-        auto childBounds = GetContentBounds(child);
-        if (childBounds.isEmpty()) {
-          continue;
-        }
-        hasContent = true;
-        minX = std::min(minX, childBounds.x);
-        minY = std::min(minY, childBounds.y);
-        maxX = std::max(maxX, childBounds.x + childBounds.width);
-        maxY = std::max(maxY, childBounds.y + childBounds.height);
-      }
-      if (!hasContent) {
-        return Rect::MakeXYWH(group->position.x, group->position.y, 0, 0);
-      }
-      return Rect::MakeXYWH(group->position.x + minX, group->position.y + minY, maxX - minX,
-                            maxY - minY);
-    }
-    default:
-      return {};
-  }
+// Local wrapper for ElementMeasure::GetContentBounds that uses ComputeTextBounds.
+static Rect GetContentBounds(const Element* element, FontConfig* fontProvider) {
+  return ElementMeasure::GetContentBounds(
+      element, [fontProvider](const Text* text) { return ComputeTextBounds(text, fontProvider); });
 }
 
-// Returns true if the element type supports stretching when opposite edges are both constrained.
-static bool IsStretchable(NodeType type) {
-  return type == NodeType::Rectangle || type == NodeType::Ellipse || type == NodeType::TextBox;
-}
-
-// Returns the constraints for an element, or nullptr if the element has no constraint support.
-static const Constraints* GetConstraints(const Element* element) {
-  switch (element->nodeType()) {
-    case NodeType::Rectangle:
-      return &static_cast<const Rectangle*>(element)->constraints;
-    case NodeType::Ellipse:
-      return &static_cast<const Ellipse*>(element)->constraints;
-    case NodeType::Polystar:
-      return &static_cast<const Polystar*>(element)->constraints;
-    case NodeType::Path:
-      return &static_cast<const Path*>(element)->constraints;
-    case NodeType::Text:
-      return &static_cast<const Text*>(element)->constraints;
-    case NodeType::TextBox:
-      return &static_cast<const TextBox*>(element)->constraints;
-    case NodeType::Group:
-      return &static_cast<const Group*>(element)->constraints;
-    default:
-      return nullptr;
-  }
-}
-
-// Applies horizontal constraint to a stretchable element, modifying its size and position.
-static void ApplyHorizontalStretch(Element* element, float newWidth, float newCenterX) {
-  switch (element->nodeType()) {
-    case NodeType::Rectangle: {
-      auto* rect = static_cast<Rectangle*>(element);
-      rect->size.width = newWidth;
-      rect->position.x = newCenterX;
-      break;
-    }
-    case NodeType::Ellipse: {
-      auto* ellipse = static_cast<Ellipse*>(element);
-      ellipse->size.width = newWidth;
-      ellipse->position.x = newCenterX;
-      break;
-    }
-    case NodeType::TextBox: {
-      auto* textBox = static_cast<TextBox*>(element);
-      textBox->size.width = newWidth;
-      textBox->position.x = newCenterX - newWidth * 0.5f;
-      break;
-    }
-    default:
-      break;
-  }
-}
-
-// Applies vertical constraint to a stretchable element, modifying its size and position.
-static void ApplyVerticalStretch(Element* element, float newHeight, float newCenterY) {
-  switch (element->nodeType()) {
-    case NodeType::Rectangle: {
-      auto* rect = static_cast<Rectangle*>(element);
-      rect->size.height = newHeight;
-      rect->position.y = newCenterY;
-      break;
-    }
-    case NodeType::Ellipse: {
-      auto* ellipse = static_cast<Ellipse*>(element);
-      ellipse->size.height = newHeight;
-      ellipse->position.y = newCenterY;
-      break;
-    }
-    case NodeType::TextBox: {
-      auto* textBox = static_cast<TextBox*>(element);
-      textBox->size.height = newHeight;
-      textBox->position.y = newCenterY - newHeight * 0.5f;
-      break;
-    }
-    default:
-      break;
-  }
-}
-
-// Applies a horizontal translation to an element's position.
-static void TranslateX(Element* element, float tx) {
-  switch (element->nodeType()) {
-    case NodeType::Rectangle:
-      static_cast<Rectangle*>(element)->position.x += tx;
-      break;
-    case NodeType::Ellipse:
-      static_cast<Ellipse*>(element)->position.x += tx;
-      break;
-    case NodeType::Polystar:
-      static_cast<Polystar*>(element)->position.x += tx;
-      break;
-    case NodeType::Path:
-      static_cast<Path*>(element)->position.x += tx;
-      break;
-    case NodeType::Text:
-      static_cast<Text*>(element)->position.x += tx;
-      break;
-    case NodeType::TextBox:
-      static_cast<TextBox*>(element)->position.x += tx;
-      break;
-    case NodeType::Group:
-      static_cast<Group*>(element)->position.x += tx;
-      break;
-    default:
-      break;
-  }
-}
-
-// Applies a vertical translation to an element's position.
-static void TranslateY(Element* element, float ty) {
-  switch (element->nodeType()) {
-    case NodeType::Rectangle:
-      static_cast<Rectangle*>(element)->position.y += ty;
-      break;
-    case NodeType::Ellipse:
-      static_cast<Ellipse*>(element)->position.y += ty;
-      break;
-    case NodeType::Polystar:
-      static_cast<Polystar*>(element)->position.y += ty;
-      break;
-    case NodeType::Path:
-      static_cast<Path*>(element)->position.y += ty;
-      break;
-    case NodeType::Text:
-      static_cast<Text*>(element)->position.y += ty;
-      break;
-    case NodeType::TextBox:
-      static_cast<TextBox*>(element)->position.y += ty;
-      break;
-    case NodeType::Group:
-      static_cast<Group*>(element)->position.y += ty;
-      break;
-    default:
-      break;
-  }
-}
-
-// Updates the layout width/height of a Group element derived from constraints.
-static void UpdateGroupLayoutSize(Group* group, std::optional<float> derivedWidth,
-                                  std::optional<float> derivedHeight) {
-  if (derivedWidth.has_value() && !group->width.has_value()) {
-    group->width = derivedWidth;
-  }
-  if (derivedHeight.has_value() && !group->height.has_value()) {
-    group->height = derivedHeight;
-  }
+// Local wrapper for ElementMeasure::GetMeasuredBounds that uses ComputeTextBounds.
+static Rect GetMeasuredBounds(const Element* element, FontConfig* fontProvider) {
+  return ElementMeasure::GetMeasuredBounds(
+      element, [fontProvider](const Text* text) { return ComputeTextBounds(text, fontProvider); });
 }
 
 // Applies constraint layout to a single element within a container of the given dimensions.
-static void ApplyConstraintToElement(Element* element, float containerWidth,
-                                     float containerHeight) {
-  auto* constraints = GetConstraints(element);
-  if (constraints == nullptr || !constraints->hasAny()) {
+// When skipScaling is true, non-stretchable elements will center without scaling (used for Text
+// elements controlled by a TextBox).
+static void ApplyConstraintToElement(Element* element, float containerWidth, float containerHeight,
+                                     FontConfig* fontProvider, bool skipScaling = false) {
+  auto constraints = ElementConstraint::GetConstraints(element);
+  if (!constraints.hasAny()) {
     return;
   }
-  auto bounds = GetContentBounds(element);
+  std::string errorMessage;
+  if (!constraints.isValid(errorMessage)) {
+    LOGE("[Layout Warning] %s", errorMessage.c_str());
+  }
+  auto bounds = GetContentBounds(element, fontProvider);
   auto type = element->nodeType();
-  bool stretchable = IsStretchable(type);
+  bool stretchable = ElementConstraint::IsStretchable(type);
+
+  // --- Proportional scaling for non-stretchable, non-Group elements ---
+  // When opposite-edge constraints define a target area, scale the element to fit while preserving
+  // aspect ratio. Each axis with opposite-edge constraints contributes a candidate scale factor;
+  // the minimum is used so the element fits without exceeding the area. An axis without
+  // opposite-edge constraints uses the measured size (scale factor = 1), so single-axis constraints
+  // only scale when the target is smaller or larger than the original.
+  if (!stretchable && !skipScaling && type != NodeType::Group) {
+    bool hasLeftRight = !std::isnan(constraints.left) && !std::isnan(constraints.right);
+    bool hasTopBottom = !std::isnan(constraints.top) && !std::isnan(constraints.bottom);
+    if (hasLeftRight || hasTopBottom) {
+      float scale = 0.0f;
+      if (hasLeftRight && bounds.width > 0) {
+        float areaWidth = containerWidth - constraints.left - constraints.right;
+        scale = areaWidth / bounds.width;
+      }
+      if (hasTopBottom && bounds.height > 0) {
+        float scaleY = (containerHeight - constraints.top - constraints.bottom) / bounds.height;
+        scale = (scale > 0) ? std::min(scale, scaleY) : scaleY;
+      }
+      if (scale > 0 && scale != 1.0f) {
+        ElementTransform::ApplyScaling(element, scale);
+        bounds = GetContentBounds(element, fontProvider);
+      }
+    }
+  }
 
   // --- Horizontal axis ---
-  bool hasLeft = constraints->left.has_value();
-  bool hasRight = constraints->right.has_value();
-  bool hasCenterX = constraints->centerX.has_value();
+  bool hasLeft = !std::isnan(constraints.left);
+  bool hasRight = !std::isnan(constraints.right);
+  bool hasCenterX = !std::isnan(constraints.centerX);
 
   if (hasLeft && hasRight) {
-    float left = *constraints->left;
-    float right = *constraints->right;
+    float left = constraints.left;
+    float right = constraints.right;
     float areaWidth = containerWidth - left - right;
-    if (stretchable) {
+    if (type == NodeType::Group) {
+      // Group aligns to the target area and derives layout width.
+      auto* group = static_cast<Group*>(element);
+      group->position.x = left;
+      ElementTransform::UpdateGroupLayoutSize(group, areaWidth, NAN);
+    } else if (stretchable) {
       // Stretch to fill the target area.
       float newCenterX = left + areaWidth * 0.5f;
-      ApplyHorizontalStretch(element, areaWidth, newCenterX);
+      ElementTransform::ApplyHorizontalStretch(element, areaWidth, newCenterX);
     } else {
-      // Degrade to centering within the target area.
+      // Center within the target area (already scaled proportionally above).
       float tx = left + (areaWidth - bounds.width) * 0.5f - bounds.x;
-      TranslateX(element, tx);
-    }
-    // Derive Group layout width from constraints.
-    if (type == NodeType::Group) {
-      UpdateGroupLayoutSize(static_cast<Group*>(element), areaWidth, std::nullopt);
+      ElementTransform::TranslateX(element, tx);
     }
   } else if (hasLeft) {
-    float tx = *constraints->left - bounds.x;
-    TranslateX(element, tx);
+    float tx = constraints.left - bounds.x;
+    ElementTransform::TranslateX(element, tx);
   } else if (hasRight) {
-    float tx = (containerWidth - *constraints->right) - (bounds.x + bounds.width);
-    TranslateX(element, tx);
+    float tx = (containerWidth - constraints.right) - (bounds.x + bounds.width);
+    ElementTransform::TranslateX(element, tx);
   } else if (hasCenterX) {
     float boundsCenter = bounds.x + bounds.width * 0.5f;
-    float tx = (containerWidth * 0.5f + *constraints->centerX) - boundsCenter;
-    TranslateX(element, tx);
+    float tx = (containerWidth * 0.5f + constraints.centerX) - boundsCenter;
+    ElementTransform::TranslateX(element, tx);
   }
 
   // --- Vertical axis ---
-  bool hasTop = constraints->top.has_value();
-  bool hasBottom = constraints->bottom.has_value();
-  bool hasCenterY = constraints->centerY.has_value();
+  bool hasTop = !std::isnan(constraints.top);
+  bool hasBottom = !std::isnan(constraints.bottom);
+  bool hasCenterY = !std::isnan(constraints.centerY);
 
   if (hasTop && hasBottom) {
-    float top = *constraints->top;
-    float bottom = *constraints->bottom;
+    float top = constraints.top;
+    float bottom = constraints.bottom;
     float areaHeight = containerHeight - top - bottom;
-    if (stretchable) {
+    if (type == NodeType::Group) {
+      // Group aligns to the target area and derives layout height.
+      auto* group = static_cast<Group*>(element);
+      group->position.y = top;
+      ElementTransform::UpdateGroupLayoutSize(group, NAN, areaHeight);
+    } else if (stretchable) {
       // Stretch to fill the target area.
       float newCenterY = top + areaHeight * 0.5f;
-      ApplyVerticalStretch(element, areaHeight, newCenterY);
+      ElementTransform::ApplyVerticalStretch(element, areaHeight, newCenterY);
     } else {
-      // Degrade to centering within the target area.
+      // Center within the target area (already scaled proportionally above).
       float ty = top + (areaHeight - bounds.height) * 0.5f - bounds.y;
-      TranslateY(element, ty);
-    }
-    // Derive Group layout height from constraints.
-    if (type == NodeType::Group) {
-      UpdateGroupLayoutSize(static_cast<Group*>(element), std::nullopt, areaHeight);
+      ElementTransform::TranslateY(element, ty);
     }
   } else if (hasTop) {
-    float ty = *constraints->top - bounds.y;
-    TranslateY(element, ty);
+    float ty = constraints.top - bounds.y;
+    ElementTransform::TranslateY(element, ty);
   } else if (hasBottom) {
-    float ty = (containerHeight - *constraints->bottom) - (bounds.y + bounds.height);
-    TranslateY(element, ty);
+    float ty = (containerHeight - constraints.bottom) - (bounds.y + bounds.height);
+    ElementTransform::TranslateY(element, ty);
   } else if (hasCenterY) {
     float boundsCenter = bounds.y + bounds.height * 0.5f;
-    float ty = (containerHeight * 0.5f + *constraints->centerY) - boundsCenter;
-    TranslateY(element, ty);
+    float ty = (containerHeight * 0.5f + constraints.centerY) - boundsCenter;
+    ElementTransform::TranslateY(element, ty);
   }
 }
 
 // Forward declarations for recursive processing.
 static void ProcessConstraintLayout(const std::vector<Element*>& elements, float containerWidth,
-                                    float containerHeight);
-static std::pair<float, float> MeasureLayer(const Layer* layer);
-static void LayoutLayer(Layer* layer);
+                                    float containerHeight, FontConfig* fontProvider);
+static std::pair<float, float> MeasureLayer(const Layer* layer, FontConfig* fontProvider);
+static void LayoutLayer(Layer* layer, FontConfig* fontProvider);
 
-// Applies constraint layout to all elements within a container. Group elements with layout
-// dimensions are processed recursively.
+// Applies constraint layout to all elements within a container. Group elements are always
+// processed recursively: explicit or constraint-derived dimensions are used when available,
+// otherwise the Group's content bounds are measured as a fallback reference frame.
 static void ProcessConstraintLayout(const std::vector<Element*>& elements, float containerWidth,
-                                    float containerHeight) {
+                                    float containerHeight, FontConfig* fontProvider) {
+  // Check if any TextBox exists in this scope. When present, Text elements are controlled by the
+  // TextBox for typesetting, so their fontSize should not be modified by proportional scaling.
+  bool hasTextBox = false;
   for (auto* element : elements) {
-    ApplyConstraintToElement(element, containerWidth, containerHeight);
+    if (element->nodeType() == NodeType::TextBox) {
+      hasTextBox = true;
+      break;
+    }
+  }
 
-    // Recursively process Group children if the Group has layout dimensions.
+  for (auto* element : elements) {
+    bool skipScaling = hasTextBox && element->nodeType() == NodeType::Text;
+    ApplyConstraintToElement(element, containerWidth, containerHeight, fontProvider, skipScaling);
+
     if (element->nodeType() == NodeType::Group) {
       auto* group = static_cast<Group*>(element);
-      if (group->width.has_value() || group->height.has_value()) {
-        float groupW = group->width.value_or(0);
-        float groupH = group->height.value_or(0);
-        ProcessConstraintLayout(group->elements, groupW, groupH);
+      float groupW = group->width;
+      float groupH = group->height;
+      // Fall back to measured content bounds when no explicit dimensions.
+      if (std::isnan(groupW) || std::isnan(groupH)) {
+        auto bounds = GetContentBounds(group, fontProvider);
+        if (std::isnan(groupW)) {
+          groupW = bounds.width;
+        }
+        if (std::isnan(groupH)) {
+          groupH = bounds.height;
+        }
       }
+      ProcessConstraintLayout(group->elements, groupW, groupH, fontProvider);
     }
   }
-}
-
-// Returns the measured bounds of an element for bottom-up size calculation.
-// Constraints affect measurement:
-// - Opposite-edge constraints (left+right or top+bottom) reset position to 0 (the constraint
-//   area becomes the reference frame). Stretchable types also reset size to 0 (they follow
-//   container). Non-stretchable types keep their original size.
-// - Single-edge constraints (left, right, top, or bottom) reset position to 0 but keep size.
-// - Center constraints (centerX, centerY) don't affect size, position reset not needed.
-static Rect GetMeasuredBounds(const Element* element) {
-  auto bounds = GetContentBounds(element);
-  if (bounds.isEmpty()) {
-    return {};
-  }
-  auto* constraints = GetConstraints(element);
-  if (constraints == nullptr) {
-    return bounds;
-  }
-  bool stretchable = IsStretchable(element->nodeType());
-  bool hasLeft = constraints->left.has_value();
-  bool hasRight = constraints->right.has_value();
-  bool hasTop = constraints->top.has_value();
-  bool hasBottom = constraints->bottom.has_value();
-
-  // --- Horizontal axis ---
-  if (hasLeft && hasRight) {
-    // Opposite-edge constraint: position is determined by the constraint area.
-    bounds.x = 0;
-    if (stretchable) {
-      // Stretchable elements follow the container width.
-      bounds.width = 0;
-    }
-    // Non-stretchable elements keep their original width, centered in the constraint area.
-  } else if (hasLeft || hasRight) {
-    // Single-edge constraint: position is anchored, but reset to 0 for measurement.
-    bounds.x = 0;
-  }
-
-  // --- Vertical axis ---
-  if (hasTop && hasBottom) {
-    // Opposite-edge constraint: position is determined by the constraint area.
-    bounds.y = 0;
-    if (stretchable) {
-      // Stretchable elements follow the container height.
-      bounds.height = 0;
-    }
-    // Non-stretchable elements keep their original height, centered in the constraint area.
-  } else if (hasTop || hasBottom) {
-    // Single-edge constraint: position is anchored, but reset to 0 for measurement.
-    bounds.y = 0;
-  }
-
-  return bounds;
 }
 
 // Computes the measured content size of a Layer (width and height) for bottom-up measurement.
 // Considers constraints on content elements: stretchable elements with opposite-edge constraints
 // contribute 0 on the constrained axis (they follow the container).
-static std::pair<float, float> MeasureLayerContents(const Layer* layer) {
+static std::pair<float, float> MeasureLayerContents(const Layer* layer, FontConfig* fontProvider) {
   float measuredWidth = 0;
   float measuredHeight = 0;
 
   for (auto* element : layer->contents) {
-    auto bounds = GetMeasuredBounds(element);
+    auto bounds = GetMeasuredBounds(element, fontProvider);
     if (bounds.isEmpty()) {
       continue;
     }
@@ -516,7 +290,10 @@ static std::pair<float, float> MeasureLayerContents(const Layer* layer) {
 
   // Also consider child Layers (recursively).
   for (auto* child : layer->children) {
-    auto childMeasured = MeasureLayer(child);
+    if (!child->visible) {
+      continue;
+    }
+    auto childMeasured = MeasureLayer(child, fontProvider);
     float cx = child->x + childMeasured.first;
     float cy = child->y + childMeasured.second;
     measuredWidth = std::max(measuredWidth, cx);
@@ -526,34 +303,16 @@ static std::pair<float, float> MeasureLayerContents(const Layer* layer) {
   return {measuredWidth > 0 ? measuredWidth : 0, measuredHeight > 0 ? measuredHeight : 0};
 }
 
-// Clamps a value within min/max constraints. Used for flexible child sizing.
-static float ClampSize(float value, std::optional<float> minVal, std::optional<float> maxVal) {
-  if (minVal.has_value()) {
-    value = std::max(value, *minVal);
-  }
-  if (maxVal.has_value()) {
-    value = std::min(value, *maxVal);
-  }
-  return value;
-}
-
-// Represents a row/column of children in wrap mode.
-struct WrapLine {
-  std::vector<size_t> childIndices = {};
-  float mainAxisUsed = 0;
-  float crossAxisSize = 0;
-};
-
 // Performs container layout on a parent Layer that has `layout` set. Arranges child Layers
 // along the main axis, distributes flexible sizes, and applies alignment/arrangement.
 // The result is that each child Layer gets assigned x, y, width, and height based on the
 // container's layout parameters and the child's own size properties and constraints.
-static void PerformContainerLayout(Layer* parent) {
-  auto direction = *parent->layout;
-  bool horizontal = (direction == LayoutDirection::Horizontal);
+static void PerformContainerLayout(Layer* parent, FontConfig* fontProvider) {
+  auto direction = parent->layout;
+  bool horizontal = (direction == LayoutMode::Horizontal);
 
-  float containerMainSize = horizontal ? parent->width.value_or(0) : parent->height.value_or(0);
-  float containerCrossSize = horizontal ? parent->height.value_or(0) : parent->width.value_or(0);
+  float containerMainSize = horizontal ? parent->width : parent->height;
+  float containerCrossSize = horizontal ? parent->height : parent->width;
 
   float paddingMainStart = horizontal ? parent->padding.left : parent->padding.top;
   float paddingMainEnd = horizontal ? parent->padding.right : parent->padding.bottom;
@@ -569,10 +328,15 @@ static void PerformContainerLayout(Layer* parent) {
 
   size_t childCount = children.size();
 
-  // Measure all children once upfront to avoid repeated measurement.
+  // Measure all participating children once upfront to avoid repeated measurement.
+  // A child participates if it is visible and included in layout.
   std::vector<std::pair<float, float>> childMeasuredSizes(childCount);
+  std::vector<bool> isParticipating(childCount, false);
   for (size_t i = 0; i < childCount; i++) {
-    childMeasuredSizes[i] = MeasureLayer(children[i]);
+    isParticipating[i] = children[i]->visible && children[i]->includeInLayout;
+    if (isParticipating[i]) {
+      childMeasuredSizes[i] = MeasureLayer(children[i], fontProvider);
+    }
   }
 
   // Determine which children have fixed vs flexible main-axis sizes.
@@ -583,249 +347,205 @@ static void PerformContainerLayout(Layer* parent) {
   std::vector<float> childCrossSizes(childCount, 0);
 
   for (size_t i = 0; i < childCount; i++) {
+    if (!isParticipating[i]) {
+      continue;
+    }
     auto* child = children[i];
-    bool hasMainSize = horizontal ? child->width.has_value() : child->height.has_value();
-    if (hasMainSize) {
+    float mainSize = horizontal ? child->width : child->height;
+    if (!std::isnan(mainSize)) {
       isFixed[i] = true;
-      childMainSizes[i] = horizontal ? *child->width : *child->height;
+      childMainSizes[i] = mainSize;
     }
     // Flexible children: childMainSizes[i] stays 0, will be set during distribution.
 
-    bool hasCrossSize = horizontal ? child->height.has_value() : child->width.has_value();
-    if (hasCrossSize) {
-      childCrossSizes[i] = horizontal ? *child->height : *child->width;
+    float crossSize = horizontal ? child->height : child->width;
+    if (!std::isnan(crossSize)) {
+      childCrossSizes[i] = crossSize;
     } else {
       // Use pre-measured cross size to avoid redundant MeasureLayer calls.
       childCrossSizes[i] = horizontal ? childMeasuredSizes[i].second : childMeasuredSizes[i].first;
     }
   }
 
-  // Split children into wrap lines if layoutWrap is enabled.
-  std::vector<WrapLine> lines = {};
-
-  if (parent->layoutWrap) {
-    WrapLine currentLine = {};
-    for (size_t i = 0; i < childCount; i++) {
-      float itemMain = childMainSizes[i];
-      float neededMain = currentLine.mainAxisUsed;
-      if (!currentLine.childIndices.empty()) {
-        neededMain += parent->gap;
-      }
-      neededMain += itemMain;
-
-      if (!currentLine.childIndices.empty() && neededMain > availableMain) {
-        lines.push_back(std::move(currentLine));
-        currentLine = {};
-      }
-
-      if (!currentLine.childIndices.empty()) {
-        currentLine.mainAxisUsed += parent->gap;
-      }
-      currentLine.childIndices.push_back(i);
-      currentLine.mainAxisUsed += itemMain;
-      currentLine.crossAxisSize = std::max(currentLine.crossAxisSize, childCrossSizes[i]);
+  // Collect all participating child indices.
+  std::vector<size_t> indices = {};
+  for (size_t i = 0; i < childCount; i++) {
+    if (!isParticipating[i]) {
+      continue;
     }
-    if (!currentLine.childIndices.empty()) {
-      lines.push_back(std::move(currentLine));
-    }
-  } else {
-    WrapLine singleLine = {};
-    for (size_t i = 0; i < childCount; i++) {
-      singleLine.childIndices.push_back(i);
-    }
-    lines.push_back(std::move(singleLine));
+    indices.push_back(i);
   }
 
-  // Process each line: distribute flexible sizes, then position children.
-  float crossOffset = paddingCrossStart;
+  size_t visibleCount = indices.size();
+  float totalGap = parent->gap * static_cast<float>(visibleCount > 1 ? visibleCount - 1 : 0);
 
-  for (auto& line : lines) {
-    auto& indices = line.childIndices;
-    size_t lineChildCount = indices.size();
-    float totalGap = parent->gap * static_cast<float>(lineChildCount > 1 ? lineChildCount - 1 : 0);
+  // Calculate fixed total. Flexible items contribute 0 to fixed total.
+  float fixedTotal = 0;
+  std::vector<size_t> flexIndices = {};
+  for (auto idx : indices) {
+    if (isFixed[idx]) {
+      fixedTotal += childMainSizes[idx];
+    } else {
+      flexIndices.push_back(idx);
+    }
+  }
 
-    // Calculate fixed total. Flexible items contribute 0 to fixed total.
-    float fixedTotal = 0;
-    std::vector<size_t> flexIndices = {};
-    for (auto idx : indices) {
-      if (isFixed[idx]) {
-        fixedTotal += childMainSizes[idx];
+  // Distribute available space equally among flexible children.
+  float totalFlexSpace = availableMain - fixedTotal - totalGap;
+  if (!flexIndices.empty() && totalFlexSpace > 0) {
+    float share = totalFlexSpace / static_cast<float>(flexIndices.size());
+    for (auto idx : flexIndices) {
+      childMainSizes[idx] = share;
+    }
+  }
+
+  // Assign computed sizes back to children (set width/height if they were flexible).
+  // Use rounding error propagation to ensure sizes sum to the exact container width.
+  float roundOff = 0;
+  for (auto idx : indices) {
+    auto* child = children[idx];
+    if (!isFixed[idx]) {
+      float rawSize = childMainSizes[idx];
+      float roundedSize = std::round(rawSize + roundOff);
+      roundOff += rawSize - roundedSize;
+      childMainSizes[idx] = roundedSize;
+      if (horizontal) {
+        child->width = roundedSize;
       } else {
-        flexIndices.push_back(idx);
+        child->height = roundedSize;
       }
     }
+  }
 
-    // Distribute available space equally among flexible children using max-min fairness.
-    float totalFlexSpace = availableMain - fixedTotal - totalGap;
-    if (!flexIndices.empty() && totalFlexSpace > 0) {
-      std::vector<size_t> uncapped = flexIndices;
-      float spaceLeft = totalFlexSpace;
+  // Calculate the actual total main size used.
+  float totalMain = 0;
+  for (auto idx : indices) {
+    totalMain += childMainSizes[idx];
+  }
+  totalMain += totalGap;
 
-      // Iteratively assign equal shares, respecting min/max constraints.
-      while (!uncapped.empty() && spaceLeft > 0.01f) {
-        float share = spaceLeft / static_cast<float>(uncapped.size());
-        std::vector<size_t> nextUncapped = {};
-        float usedThisRound = 0;
-        for (auto idx : uncapped) {
-          auto* child = children[idx];
-          float clamped = horizontal ? ClampSize(share, child->minWidth, child->maxWidth)
-                                     : ClampSize(share, child->minHeight, child->maxHeight);
-          if (clamped != share) {
-            childMainSizes[idx] = clamped;
-            usedThisRound += clamped;
+  // Calculate main-axis starting position based on arrangement.
+  float mainOffset = paddingMainStart;
+  float extraGap = 0;
+
+  switch (parent->arrangement) {
+    case Arrangement::Start:
+      break;
+    case Arrangement::Center:
+      mainOffset += (availableMain - totalMain) * 0.5f;
+      break;
+    case Arrangement::End:
+      mainOffset += (availableMain - totalMain);
+      break;
+    case Arrangement::SpaceBetween:
+      if (visibleCount > 1) {
+        float totalChildMain = totalMain - totalGap;
+        float spaceToDistribute = availableMain - totalChildMain;
+        extraGap = spaceToDistribute / static_cast<float>(visibleCount - 1);
+      }
+      break;
+  }
+
+  // Compute the cross-axis reference size for alignment.
+  float alignCrossSize = (containerCrossSize - paddingCrossStart - paddingCrossEnd);
+
+  // Position each child along the main axis and cross axis.
+  for (auto idx : indices) {
+    auto* child = children[idx];
+
+    // Main axis position.
+    float mainPos = mainOffset;
+
+    // Cross axis position with alignment.
+    float childCross = childCrossSizes[idx];
+    float crossPos = paddingCrossStart;
+    switch (parent->alignment) {
+      case Alignment::Start:
+        break;
+      case Alignment::Center:
+        crossPos += (alignCrossSize - childCross) * 0.5f;
+        break;
+      case Alignment::End:
+        crossPos += (alignCrossSize - childCross);
+        break;
+      case Alignment::Stretch: {
+        // Stretch only affects children WITHOUT explicit cross-axis size (CSS behavior)
+        float explicitCross = horizontal ? child->height : child->width;
+        if (std::isnan(explicitCross)) {
+          childCross = alignCrossSize;
+          childCrossSizes[idx] = childCross;
+          if (horizontal) {
+            child->height = childCross;
           } else {
-            childMainSizes[idx] = share;
-            usedThisRound += share;
-            nextUncapped.push_back(idx);
+            child->width = childCross;
           }
         }
-        spaceLeft -= usedThisRound;
-        uncapped = std::move(nextUncapped);
-      }
-    } else if (!flexIndices.empty()) {
-      // No available space: apply min constraints only.
-      for (auto idx : flexIndices) {
-        auto* child = children[idx];
-        if (horizontal && child->minWidth.has_value()) {
-          childMainSizes[idx] = *child->minWidth;
-        } else if (!horizontal && child->minHeight.has_value()) {
-          childMainSizes[idx] = *child->minHeight;
-        }
-      }
-    }
-
-    // Assign computed sizes back to children (set width/height if they were flexible).
-    for (auto idx : indices) {
-      auto* child = children[idx];
-      if (!isFixed[idx]) {
-        if (horizontal) {
-          child->width = childMainSizes[idx];
-        } else {
-          child->height = childMainSizes[idx];
-        }
-      }
-    }
-
-    // Calculate the actual total main size used by this line.
-    float totalMain = 0;
-    for (auto idx : indices) {
-      totalMain += childMainSizes[idx];
-    }
-    totalMain += totalGap;
-
-    // Calculate main-axis starting position based on arrangement.
-    float mainOffset = paddingMainStart;
-    float extraGap = 0;
-
-    switch (parent->arrangement) {
-      case Arrangement::Start:
         break;
-      case Arrangement::Center:
-        mainOffset += (availableMain - totalMain) * 0.5f;
-        break;
-      case Arrangement::End:
-        mainOffset += (availableMain - totalMain);
-        break;
-      case Arrangement::SpaceBetween:
-        if (lineChildCount > 1) {
-          float totalChildMain = totalMain - totalGap;
-          float spaceToDistribute = availableMain - totalChildMain;
-          extraGap = spaceToDistribute / static_cast<float>(lineChildCount - 1);
-        }
-        break;
-    }
-
-    // Compute the max cross-axis size for this line (used for wrap mode line advancement).
-    float lineCrossSize = 0;
-    for (auto idx : indices) {
-      lineCrossSize = std::max(lineCrossSize, childCrossSizes[idx]);
-    }
-
-    // Compute the cross-axis reference size for alignment. In non-wrap mode, use the container's
-    // available cross-axis space. In wrap mode, use the line's max cross-axis size.
-    float alignCrossSize = parent->layoutWrap
-                               ? lineCrossSize
-                               : (containerCrossSize - paddingCrossStart - paddingCrossEnd);
-
-    // Position each child along the main axis and cross axis.
-    for (auto idx : indices) {
-      auto* child = children[idx];
-
-      // Main axis position.
-      float mainPos = mainOffset;
-
-      // Cross axis position with alignment.
-      float childCross = childCrossSizes[idx];
-      float crossPos = crossOffset;
-      switch (parent->alignment) {
-        case Alignment::Start:
-          break;
-        case Alignment::Center:
-          crossPos += (alignCrossSize - childCross) * 0.5f;
-          break;
-        case Alignment::End:
-          crossPos += (alignCrossSize - childCross);
-          break;
-      }
-
-      if (horizontal) {
-        child->x = mainPos;
-        child->y = crossPos;
-      } else {
-        child->x = crossPos;
-        child->y = mainPos;
-      }
-
-      mainOffset += childMainSizes[idx];
-      if (parent->arrangement == Arrangement::SpaceBetween) {
-        mainOffset += extraGap;
-      } else {
-        mainOffset += parent->gap;
       }
     }
 
-    crossOffset += lineCrossSize + parent->gap;
+    if (horizontal) {
+      child->x = mainPos;
+      child->y = crossPos;
+    } else {
+      child->x = crossPos;
+      child->y = mainPos;
+    }
+
+    mainOffset += childMainSizes[idx];
+    if (parent->arrangement == Arrangement::SpaceBetween) {
+      mainOffset += extraGap;
+    } else {
+      mainOffset += parent->gap;
+    }
   }
 }
 
 // Measures the desired size of a Layer by examining its contents and children (bottom-up).
 // Returns {width, height}. For each axis: if the Layer has an explicit dimension, that is used;
 // otherwise, the size is derived from content bounds and child Layers.
-static std::pair<float, float> MeasureLayer(const Layer* layer) {
+static std::pair<float, float> MeasureLayer(const Layer* layer, FontConfig* fontProvider) {
+  if (layer->measureCached) {
+    return {layer->cachedMeasuredWidth, layer->cachedMeasuredHeight};
+  }
   float measuredWidth = 0;
   float measuredHeight = 0;
 
-  if (layer->width.has_value()) {
-    measuredWidth = *layer->width;
+  if (!std::isnan(layer->width)) {
+    measuredWidth = layer->width;
   }
-  if (layer->height.has_value()) {
-    measuredHeight = *layer->height;
+  if (!std::isnan(layer->height)) {
+    measuredHeight = layer->height;
   }
 
   // If both dimensions are explicit, no measurement needed.
-  if (layer->width.has_value() && layer->height.has_value()) {
+  if (!std::isnan(layer->width) && !std::isnan(layer->height)) {
     return {measuredWidth, measuredHeight};
   }
 
-  if (layer->layout.has_value() && !layer->children.empty()) {
+  if (layer->layout != LayoutMode::Absolute && !layer->children.empty()) {
     // Layout container: measure from child Layers along the layout axis.
-    bool horizontal = (*layer->layout == LayoutDirection::Horizontal);
-    size_t childCount = layer->children.size();
+    bool horizontal = (layer->layout == LayoutMode::Horizontal);
 
     float paddingMainStart = horizontal ? layer->padding.left : layer->padding.top;
     float paddingMainEnd = horizontal ? layer->padding.right : layer->padding.bottom;
     float paddingCrossStart = horizontal ? layer->padding.top : layer->padding.left;
     float paddingCrossEnd = horizontal ? layer->padding.bottom : layer->padding.right;
 
-    bool needsMainAxis = !(horizontal ? layer->width.has_value() : layer->height.has_value());
-    bool needsCrossAxis = !(horizontal ? layer->height.has_value() : layer->width.has_value());
+    bool needsMainAxis = horizontal ? std::isnan(layer->width) : std::isnan(layer->height);
+    bool needsCrossAxis = horizontal ? std::isnan(layer->height) : std::isnan(layer->width);
 
     // Measure children once, reuse for both axes.
     if (needsMainAxis || needsCrossAxis) {
       float totalMain = 0;
       float maxCross = 0;
+      size_t visibleChildCount = 0;
       for (auto* child : layer->children) {
-        auto childMeasured = MeasureLayer(child);
+        if (!child->visible || !child->includeInLayout) {
+          continue;
+        }
+        visibleChildCount++;
+        auto childMeasured = MeasureLayer(child, fontProvider);
         if (needsMainAxis) {
           totalMain += horizontal ? childMeasured.first : childMeasured.second;
         }
@@ -835,7 +555,8 @@ static std::pair<float, float> MeasureLayer(const Layer* layer) {
         }
       }
       if (needsMainAxis) {
-        float totalGap = layer->gap * static_cast<float>(childCount > 1 ? childCount - 1 : 0);
+        float totalGap =
+            layer->gap * static_cast<float>(visibleChildCount > 1 ? visibleChildCount - 1 : 0);
         float mainSize = totalMain + totalGap + paddingMainStart + paddingMainEnd;
         if (horizontal) {
           measuredWidth = mainSize;
@@ -854,85 +575,229 @@ static std::pair<float, float> MeasureLayer(const Layer* layer) {
     }
   } else {
     // Non-layout Layer: measure from contents, considering constraint flexibility.
-    auto contentSize = MeasureLayerContents(layer);
-    if (!layer->width.has_value()) {
+    auto contentSize = MeasureLayerContents(layer, fontProvider);
+    if (std::isnan(layer->width)) {
       measuredWidth = contentSize.first;
     }
-    if (!layer->height.has_value()) {
+    if (std::isnan(layer->height)) {
       measuredHeight = contentSize.second;
     }
   }
 
-  // Apply min/max constraints to measured dimensions (applies to all Layers, not just layout).
-  if (!layer->width.has_value()) {
-    measuredWidth = ClampSize(measuredWidth, layer->minWidth, layer->maxWidth);
-  }
-  if (!layer->height.has_value()) {
-    measuredHeight = ClampSize(measuredHeight, layer->minHeight, layer->maxHeight);
-  }
-
+  layer->measureCached = true;
+  layer->cachedMeasuredWidth = measuredWidth;
+  layer->cachedMeasuredHeight = measuredHeight;
   return {measuredWidth, measuredHeight};
+}
+
+static void ClearMeasureCache(Layer* layer) {
+  layer->measureCached = false;
+  for (auto* child : layer->children) {
+    ClearMeasureCache(child);
+  }
 }
 
 // Layout phase (top-down): determines final sizes and positions for all Layers and their contents.
 // Measurement happens as needed when dimensions are not explicit. Each axis is measured
 // independently to avoid redundant computation.
-static void LayoutLayer(Layer* layer) {
+static void LayoutLayer(Layer* layer, FontConfig* fontProvider) {
   // Step 1: If this Layer has layout but missing dimensions, use measured sizes.
   // The parent's PerformContainerLayout may have already assigned sizes for flexible children.
   // This handles the case where this Layer is a top-level container without explicit dimensions.
-  if (layer->layout.has_value() && !layer->children.empty()) {
-    if (!layer->width.has_value() || !layer->height.has_value()) {
-      auto measured = MeasureLayer(layer);
-      if (!layer->width.has_value()) {
+  if (layer->layout != LayoutMode::Absolute && !layer->children.empty()) {
+    if (std::isnan(layer->width) || std::isnan(layer->height)) {
+      auto measured = MeasureLayer(layer, fontProvider);
+      if (std::isnan(layer->width)) {
         layer->width = measured.first;
       }
-      if (!layer->height.has_value()) {
+      if (std::isnan(layer->height)) {
         layer->height = measured.second;
       }
     }
   }
 
   // Step 2: Container layout — arrange child Layers and assign flexible sizes.
-  if (layer->layout.has_value() && !layer->children.empty()) {
-    PerformContainerLayout(layer);
+  if (layer->layout != LayoutMode::Absolute && !layer->children.empty()) {
+    PerformContainerLayout(layer, fontProvider);
   }
 
   // Step 3: For non-layout Layers without explicit dimensions, adopt measured sizes so that
   // constraint layout within contents can work. Skip if dimensions are already set.
   // Also skip if this Layer has no contents and no children (nothing to measure or constrain).
-  if (!layer->layout.has_value() && (!layer->width.has_value() || !layer->height.has_value()) &&
+  if (layer->layout == LayoutMode::Absolute &&
+      (std::isnan(layer->width) || std::isnan(layer->height)) &&
       (!layer->contents.empty() || !layer->children.empty())) {
-    auto measured = MeasureLayer(layer);
-    if (!layer->width.has_value()) {
+    auto measured = MeasureLayer(layer, fontProvider);
+    if (std::isnan(layer->width)) {
       layer->width = measured.first;
     }
-    if (!layer->height.has_value()) {
+    if (std::isnan(layer->height)) {
       layer->height = measured.second;
     }
   }
 
   // Step 4: Constraint layout — position elements within this Layer.
   // Skip if there are no contents to constrain.
-  if (!layer->contents.empty() && (layer->width.has_value() || layer->height.has_value())) {
-    float containerW = layer->width.value_or(0);
-    float containerH = layer->height.value_or(0);
-    ProcessConstraintLayout(layer->contents, containerW, containerH);
+  if (!layer->contents.empty() && (!std::isnan(layer->width) || !std::isnan(layer->height))) {
+    float containerW = std::isnan(layer->width) ? 0 : layer->width;
+    float containerH = std::isnan(layer->height) ? 0 : layer->height;
+    ProcessConstraintLayout(layer->contents, containerW, containerH, fontProvider);
   }
 
-  // Step 5: Recurse into child Layers.
+  // Step 5: Apply constraint layout to child Layers that have constraint properties.
+  // Constraints on child Layers take effect when:
+  // - The parent uses absolute layout (no container layout), or
+  // - The child has includeInLayout=false (opted out of container layout flow).
+  if (!layer->children.empty() && !std::isnan(layer->width) && !std::isnan(layer->height)) {
+    for (auto* child : layer->children) {
+      if (!child->visible) {
+        continue;
+      }
+      bool hasConstraints = !std::isnan(child->left) || !std::isnan(child->right) ||
+                            !std::isnan(child->top) || !std::isnan(child->bottom) ||
+                            !std::isnan(child->centerX) || !std::isnan(child->centerY);
+      if (!hasConstraints) {
+        continue;
+      }
+      bool applyConstraints = layer->layout == LayoutMode::Absolute || !child->includeInLayout;
+      if (!applyConstraints) {
+        continue;
+      }
+      auto childMeasured = MeasureLayer(child, fontProvider);
+      float childWidth = std::isnan(child->width) ? childMeasured.first : child->width;
+      float childHeight = std::isnan(child->height) ? childMeasured.second : child->height;
+
+      // Horizontal axis
+      bool hasLeft = !std::isnan(child->left);
+      bool hasRight = !std::isnan(child->right);
+      bool hasCenterX = !std::isnan(child->centerX);
+      if (hasLeft && hasRight) {
+        child->x = child->left;
+        child->width = layer->width - child->left - child->right;
+      } else if (hasLeft) {
+        child->x = child->left;
+      } else if (hasRight) {
+        child->x = layer->width - child->right - childWidth;
+      } else if (hasCenterX) {
+        child->x = (layer->width - childWidth) * 0.5f + child->centerX;
+      }
+
+      // Vertical axis
+      bool hasTop = !std::isnan(child->top);
+      bool hasBottom = !std::isnan(child->bottom);
+      bool hasCenterY = !std::isnan(child->centerY);
+      if (hasTop && hasBottom) {
+        child->y = child->top;
+        child->height = layer->height - child->top - child->bottom;
+      } else if (hasTop) {
+        child->y = child->top;
+      } else if (hasBottom) {
+        child->y = layer->height - child->bottom - childHeight;
+      } else if (hasCenterY) {
+        child->y = (layer->height - childHeight) * 0.5f + child->centerY;
+      }
+    }
+  }
+
+  // Step 6: Recurse into visible child Layers.
   for (auto* child : layer->children) {
-    LayoutLayer(child);
+    if (!child->visible) {
+      continue;
+    }
+    LayoutLayer(child, fontProvider);
   }
 }
 
-void AutoLayout::Apply(PAGXDocument* document) {
+// Rounds all layout-computed coordinates and sizes to integer pixels to avoid subpixel rendering.
+static void SnapToPixelGrid(Layer* layer) {
+  layer->x = std::round(layer->x);
+  layer->y = std::round(layer->y);
+  if (!std::isnan(layer->width)) {
+    layer->width = std::round(layer->width);
+  }
+  if (!std::isnan(layer->height)) {
+    layer->height = std::round(layer->height);
+  }
+  for (auto* child : layer->children) {
+    SnapToPixelGrid(child);
+  }
+}
+
+// Applies constraint layout and auto layout to a set of layers within a container of the given
+// dimensions. Used for both document-level layers and Composition layers.
+static void ApplyLayoutToLayers(const std::vector<Layer*>& layers, float containerWidth,
+                                float containerHeight, FontConfig* fontProvider) {
+  for (auto* layer : layers) {
+    ClearMeasureCache(layer);
+  }
+  // Apply constraint layout for layers using the container dimensions.
+  for (auto* layer : layers) {
+    if (!layer->visible) {
+      continue;
+    }
+    bool hasConstraints = !std::isnan(layer->left) || !std::isnan(layer->right) ||
+                          !std::isnan(layer->top) || !std::isnan(layer->bottom) ||
+                          !std::isnan(layer->centerX) || !std::isnan(layer->centerY);
+    if (!hasConstraints) {
+      continue;
+    }
+    auto measured = MeasureLayer(layer, fontProvider);
+    float childWidth = std::isnan(layer->width) ? measured.first : layer->width;
+    float childHeight = std::isnan(layer->height) ? measured.second : layer->height;
+
+    // Horizontal axis
+    bool hasLeft = !std::isnan(layer->left);
+    bool hasRight = !std::isnan(layer->right);
+    bool hasCenterX = !std::isnan(layer->centerX);
+    if (hasLeft && hasRight) {
+      layer->x = layer->left;
+      layer->width = containerWidth - layer->left - layer->right;
+    } else if (hasLeft) {
+      layer->x = layer->left;
+    } else if (hasRight) {
+      layer->x = containerWidth - layer->right - childWidth;
+    } else if (hasCenterX) {
+      layer->x = (containerWidth - childWidth) * 0.5f + layer->centerX;
+    }
+
+    // Vertical axis
+    bool hasTop = !std::isnan(layer->top);
+    bool hasBottom = !std::isnan(layer->bottom);
+    bool hasCenterY = !std::isnan(layer->centerY);
+    if (hasTop && hasBottom) {
+      layer->y = layer->top;
+      layer->height = containerHeight - layer->top - layer->bottom;
+    } else if (hasTop) {
+      layer->y = layer->top;
+    } else if (hasBottom) {
+      layer->y = containerHeight - layer->bottom - childHeight;
+    } else if (hasCenterY) {
+      layer->y = (containerHeight - childHeight) * 0.5f + layer->centerY;
+    }
+  }
+  for (auto* layer : layers) {
+    LayoutLayer(layer, fontProvider);
+  }
+  for (auto* layer : layers) {
+    SnapToPixelGrid(layer);
+  }
+}
+
+void AutoLayout::Apply(PAGXDocument* document, FontConfig* fontProvider) {
   if (document == nullptr) {
     return;
   }
-  for (auto* layer : document->layers) {
-    LayoutLayer(layer);
+  // Process Composition layers first, since they may be referenced by document layers.
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      auto* comp = static_cast<Composition*>(node.get());
+      if (!comp->layers.empty()) {
+        ApplyLayoutToLayers(comp->layers, comp->width, comp->height, fontProvider);
+      }
+    }
   }
+  // Process document-level layers.
+  ApplyLayoutToLayers(document->layers, document->width, document->height, fontProvider);
 }
 
 }  // namespace pagx

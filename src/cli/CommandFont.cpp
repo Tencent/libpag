@@ -238,14 +238,14 @@ static int RunFontEmbed(int argc, char* argv[]) {
   }
 
   // Load font files.
-  TextLayout textLayout = {};
+  FontConfig fontProvider = {};
   for (const auto& fontFile : options.fontFiles) {
     auto typeface = tgfx::Typeface::MakeFromPath(fontFile);
     if (typeface == nullptr) {
       std::cerr << "pagx font embed: failed to load font '" << fontFile << "'\n";
       return 1;
     }
-    textLayout.registerTypeface(typeface);
+    fontProvider.registerTypeface(typeface);
   }
 
   // Resolve fallback typefaces: user-specified first, then system fallbacks.
@@ -256,18 +256,18 @@ static int RunFontEmbed(int argc, char* argv[]) {
       std::cerr << "pagx font embed: fallback font '" << fallbackStr << "' not found\n";
       return 1;
     }
-    textLayout.registerTypeface(typeface);
+    fontProvider.registerTypeface(typeface);
     fallbackTypefaces.push_back(typeface);
   }
   if (!fallbackTypefaces.empty()) {
-    textLayout.addFallbackTypefaces(std::move(fallbackTypefaces));
+    fontProvider.addFallbackTypefaces(std::move(fallbackTypefaces));
   }
   auto systemFallbacks = SystemFonts::FallbackTypefaces();
   for (const auto& loc : systemFallbacks) {
-    textLayout.addFallbackFont(loc.path, loc.ttcIndex, loc.fontFamily, loc.fontStyle);
+    fontProvider.addFallbackFont(loc.path, loc.ttcIndex, loc.fontFamily, loc.fontStyle);
   }
 
-  auto result = textLayout.layout(document.get());
+  auto result = TextLayout::Layout(document.get(), &fontProvider);
 
   FontEmbedder embedder = {};
   if (!embedder.embed(document.get(), result.shapedTextMap, result.textOrder)) {

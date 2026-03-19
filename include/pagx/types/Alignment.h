@@ -35,7 +35,12 @@ enum class Alignment {
   /**
    * Align children to the end of the cross axis.
    */
-  End
+  End,
+  /**
+   * Stretch children without explicit cross-axis size to fill the available cross-axis space.
+   * Children that already have an explicit cross-axis size are not affected.
+   */
+  Stretch
 };
 
 }  // namespace pagx

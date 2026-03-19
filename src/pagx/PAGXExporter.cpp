@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXExporter.h"
+#include <cmath>
 #include <cstdio>
-#include <optional>
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
@@ -137,12 +137,12 @@ class XMLBuilder {
     }
   }
 
-  void addOptionalAttribute(const char* name, const std::optional<float>& value) {
-    if (value.has_value()) {
+  void addOptionalAttribute(const char* name, float value) {
+    if (!std::isnan(value)) {
       buffer += " ";
       buffer += name;
       buffer += "=\"";
-      buffer += FloatToString(*value);
+      buffer += FloatToString(value);
       buffer += "\"";
     }
   }
@@ -290,6 +290,14 @@ static std::string pointListToString(const std::vector<Point>& points) {
   return result;
 }
 
+static bool shouldSkipPosition(const Point& position, const Point& defaultPos, float left,
+                               float right, float centerX, float top, float bottom, float centerY) {
+  bool hasH = !std::isnan(left) || !std::isnan(right) || !std::isnan(centerX);
+  bool hasV = !std::isnan(top) || !std::isnan(bottom) || !std::isnan(centerY);
+  bool isDefault = (position.x == defaultPos.x && position.y == defaultPos.y);
+  return (hasH && hasV) || isDefault;
+}
+
 //==============================================================================
 // Forward declarations
 //==============================================================================
@@ -302,15 +310,6 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node);
 static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node);
 static void writeResource(XMLBuilder& xml, const Node* node, const Options& options);
 static void writeLayer(XMLBuilder& xml, const Layer* node, const Options& options);
-
-static void writeConstraints(XMLBuilder& xml, const Constraints& c) {
-  xml.addOptionalAttribute("left", c.left);
-  xml.addOptionalAttribute("right", c.right);
-  xml.addOptionalAttribute("top", c.top);
-  xml.addOptionalAttribute("bottom", c.bottom);
-  xml.addOptionalAttribute("centerX", c.centerX);
-  xml.addOptionalAttribute("centerY", c.centerY);
-}
 
 static void writeCustomData(XMLBuilder& xml, const Node* node) {
   for (const auto& [key, value] : node->customData) {
@@ -464,7 +463,9 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Rectangle: {
       auto rect = static_cast<const Rectangle*>(node);
       xml.openElement("Rectangle");
-      if (rect->position.x != 0 || rect->position.y != 0) {
+      Point rectDefaultPos = {rect->size.width * 0.5f, rect->size.height * 0.5f};
+      if (!shouldSkipPosition(rect->position, rectDefaultPos, rect->left, rect->right,
+                              rect->centerX, rect->top, rect->bottom, rect->centerY)) {
         xml.addAttribute("position", pointToString(rect->position));
       }
       if (rect->size.width != 100 || rect->size.height != 100) {
@@ -472,7 +473,12 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       }
       xml.addAttribute("roundness", rect->roundness);
       xml.addAttribute("reversed", rect->reversed);
-      writeConstraints(xml, rect->constraints);
+      xml.addOptionalAttribute("left", rect->left);
+      xml.addOptionalAttribute("right", rect->right);
+      xml.addOptionalAttribute("top", rect->top);
+      xml.addOptionalAttribute("bottom", rect->bottom);
+      xml.addOptionalAttribute("centerX", rect->centerX);
+      xml.addOptionalAttribute("centerY", rect->centerY);
       writeCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -480,14 +486,21 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Ellipse: {
       auto ellipse = static_cast<const Ellipse*>(node);
       xml.openElement("Ellipse");
-      if (ellipse->position.x != 0 || ellipse->position.y != 0) {
+      Point ellipseDefaultPos = {ellipse->size.width * 0.5f, ellipse->size.height * 0.5f};
+      if (!shouldSkipPosition(ellipse->position, ellipseDefaultPos, ellipse->left, ellipse->right,
+                              ellipse->centerX, ellipse->top, ellipse->bottom, ellipse->centerY)) {
         xml.addAttribute("position", pointToString(ellipse->position));
       }
       if (ellipse->size.width != 100 || ellipse->size.height != 100) {
         xml.addAttribute("size", sizeToString(ellipse->size));
       }
       xml.addAttribute("reversed", ellipse->reversed);
-      writeConstraints(xml, ellipse->constraints);
+      xml.addOptionalAttribute("left", ellipse->left);
+      xml.addOptionalAttribute("right", ellipse->right);
+      xml.addOptionalAttribute("top", ellipse->top);
+      xml.addOptionalAttribute("bottom", ellipse->bottom);
+      xml.addOptionalAttribute("centerX", ellipse->centerX);
+      xml.addOptionalAttribute("centerY", ellipse->centerY);
       writeCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -495,7 +508,14 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Polystar: {
       auto polystar = static_cast<const Polystar*>(node);
       xml.openElement("Polystar");
-      if (polystar->position.x != 0 || polystar->position.y != 0) {
+      auto tempPolystar = *polystar;
+      tempPolystar.position = {};
+      auto polyBounds = tempPolystar.computeBounds();
+      Point polyDefaultPos = {polyBounds.x + polyBounds.width * 0.5f,
+                              polyBounds.y + polyBounds.height * 0.5f};
+      if (!shouldSkipPosition(polystar->position, polyDefaultPos, polystar->left, polystar->right,
+                              polystar->centerX, polystar->top, polystar->bottom,
+                              polystar->centerY)) {
         xml.addAttribute("position", pointToString(polystar->position));
       }
       xml.addAttribute("type", PolystarTypeToString(polystar->type));
@@ -506,7 +526,12 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addAttribute("outerRoundness", polystar->outerRoundness);
       xml.addAttribute("innerRoundness", polystar->innerRoundness);
       xml.addAttribute("reversed", polystar->reversed);
-      writeConstraints(xml, polystar->constraints);
+      xml.addOptionalAttribute("left", polystar->left);
+      xml.addOptionalAttribute("right", polystar->right);
+      xml.addOptionalAttribute("top", polystar->top);
+      xml.addOptionalAttribute("bottom", polystar->bottom);
+      xml.addOptionalAttribute("centerX", polystar->centerX);
+      xml.addOptionalAttribute("centerY", polystar->centerY);
       writeCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -522,10 +547,16 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
         xml.addAttribute("data", PathDataToSVGString(*path->data));
       }
       xml.addAttribute("reversed", path->reversed);
-      if (path->position.x != 0 || path->position.y != 0) {
+      if (!shouldSkipPosition(path->position, {0, 0}, path->left, path->right, path->centerX,
+                              path->top, path->bottom, path->centerY)) {
         xml.addAttribute("position", pointToString(path->position));
       }
-      writeConstraints(xml, path->constraints);
+      xml.addOptionalAttribute("left", path->left);
+      xml.addOptionalAttribute("right", path->right);
+      xml.addOptionalAttribute("top", path->top);
+      xml.addOptionalAttribute("bottom", path->bottom);
+      xml.addOptionalAttribute("centerX", path->centerX);
+      xml.addOptionalAttribute("centerY", path->centerY);
       writeCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -536,7 +567,8 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       if (!text->text.empty()) {
         xml.addAttribute("text", text->text);
       }
-      if (text->position.x != 0 || text->position.y != 0) {
+      if (!shouldSkipPosition(text->position, {0, 0}, text->left, text->right, text->centerX,
+                              text->top, text->bottom, text->centerY)) {
         xml.addAttribute("position", pointToString(text->position));
       }
       xml.addAttribute("fontFamily", text->fontFamily);
@@ -550,7 +582,12 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       if (text->textAnchor != TextAnchor::Start) {
         xml.addAttribute("textAnchor", TextAnchorToString(text->textAnchor));
       }
-      writeConstraints(xml, text->constraints);
+      xml.addOptionalAttribute("left", text->left);
+      xml.addOptionalAttribute("right", text->right);
+      xml.addOptionalAttribute("top", text->top);
+      xml.addOptionalAttribute("bottom", text->bottom);
+      xml.addOptionalAttribute("centerX", text->centerX);
+      xml.addOptionalAttribute("centerY", text->centerY);
       writeCustomData(xml, node);
       if (options.skipGlyphData || text->glyphRuns.empty()) {
         xml.closeElementSelfClosing();
@@ -795,7 +832,8 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::TextBox: {
       auto textBox = static_cast<const TextBox*>(node);
       xml.openElement("TextBox");
-      if (textBox->position.x != 0 || textBox->position.y != 0) {
+      if (!shouldSkipPosition(textBox->position, {0, 0}, textBox->left, textBox->right,
+                              textBox->centerX, textBox->top, textBox->bottom, textBox->centerY)) {
         xml.addAttribute("position", pointToString(textBox->position));
       }
       if (textBox->size.width != 0 || textBox->size.height != 0) {
@@ -817,7 +855,12 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       if (textBox->overflow != Overflow::Visible) {
         xml.addAttribute("overflow", OverflowToString(textBox->overflow));
       }
-      writeConstraints(xml, textBox->constraints);
+      xml.addOptionalAttribute("left", textBox->left);
+      xml.addOptionalAttribute("right", textBox->right);
+      xml.addOptionalAttribute("top", textBox->top);
+      xml.addOptionalAttribute("bottom", textBox->bottom);
+      xml.addOptionalAttribute("centerX", textBox->centerX);
+      xml.addOptionalAttribute("centerY", textBox->centerY);
       writeCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -852,7 +895,8 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       if (group->anchor.x != 0 || group->anchor.y != 0) {
         xml.addAttribute("anchor", pointToString(group->anchor));
       }
-      if (group->position.x != 0 || group->position.y != 0) {
+      if (!shouldSkipPosition(group->position, {0, 0}, group->left, group->right, group->centerX,
+                              group->top, group->bottom, group->centerY)) {
         xml.addAttribute("position", pointToString(group->position));
       }
       xml.addAttribute("rotation", group->rotation);
@@ -864,7 +908,12 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addAttribute("alpha", group->alpha, 1.0f);
       xml.addOptionalAttribute("width", group->width);
       xml.addOptionalAttribute("height", group->height);
-      writeConstraints(xml, group->constraints);
+      xml.addOptionalAttribute("left", group->left);
+      xml.addOptionalAttribute("right", group->right);
+      xml.addOptionalAttribute("top", group->top);
+      xml.addOptionalAttribute("bottom", group->bottom);
+      xml.addOptionalAttribute("centerX", group->centerX);
+      xml.addOptionalAttribute("centerY", group->centerY);
       writeCustomData(xml, node);
       if (group->elements.empty()) {
         xml.closeElementSelfClosing();
@@ -1131,24 +1180,26 @@ static void writeLayer(XMLBuilder& xml, const Layer* node, const Options& option
   xml.addAttribute("y", node->y);
   xml.addOptionalAttribute("width", node->width);
   xml.addOptionalAttribute("height", node->height);
-  xml.addOptionalAttribute("minWidth", node->minWidth);
-  xml.addOptionalAttribute("maxWidth", node->maxWidth);
-  xml.addOptionalAttribute("minHeight", node->minHeight);
-  xml.addOptionalAttribute("maxHeight", node->maxHeight);
-  if (node->layout.has_value()) {
-    xml.addAttribute("layout", LayoutDirectionToString(*node->layout));
+  if (node->layout != LayoutMode::Absolute) {
+    xml.addAttribute("layout", LayoutModeToString(node->layout));
   }
   xml.addAttribute("gap", node->gap);
   if (!node->padding.isZero()) {
     xml.addAttribute("padding", PaddingToString(node->padding));
   }
-  xml.addAttribute("layoutWrap", node->layoutWrap);
   if (node->alignment != Alignment::Start) {
     xml.addAttribute("alignment", AlignmentToString(node->alignment));
   }
   if (node->arrangement != Arrangement::Start) {
     xml.addAttribute("arrangement", ArrangementToString(node->arrangement));
   }
+  xml.addAttribute("includeInLayout", node->includeInLayout, true);
+  xml.addOptionalAttribute("left", node->left);
+  xml.addOptionalAttribute("right", node->right);
+  xml.addOptionalAttribute("top", node->top);
+  xml.addOptionalAttribute("bottom", node->bottom);
+  xml.addOptionalAttribute("centerX", node->centerX);
+  xml.addOptionalAttribute("centerY", node->centerY);
   if (!node->matrix.isIdentity()) {
     xml.addAttribute("matrix", MatrixToString(node->matrix));
   }

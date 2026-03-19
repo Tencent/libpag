@@ -37,11 +37,12 @@ effective combination.
 
 ### Layer Count
 
-Minimize layers — each additional Layer adds alignment complexity:
+Use Layers purposefully — each should serve a clear structural or visual role:
 
-- Use the fewest Layers that achieve the required visual separation
-- Use Groups (not child Layers) for internal structure within a layer
-- Only add a Layer when Layer-exclusive features are needed (styles, filters, mask, blendMode)
+- Use Groups for internal structure when no Layer-exclusive features are needed
+- Add a Layer when styles, filters, mask, blendMode, or container layout is needed
+- With constraint layout, each shape needing independent Fill/Stroke requires its own Layer
+  (see §1 Painter Scope Isolation)
 
 ### Layer vs Group
 
@@ -51,6 +52,11 @@ Is this a direct child of <pagx> or <Composition>?
 
 Does this need styles, filters, mask, blendMode, composition, or scrollRect?
   → YES: Must be Layer
+
+Are you using constraint layout, and does this element need independent Fill/Stroke?
+  → YES: Use Layer (even if just wrapping a single constrained shape)
+         Container Layout and Constraint Layout patterns require per-shape Layers
+         for proper painter scope isolation (see §1 Painter Scope Isolation)
 
 Is this an independent visual unit (could be repositioned as a whole)?
   → YES: Use Layer
@@ -82,6 +88,211 @@ Single-use gradient or path?
 
 ---
 
+## Layout Decisions
+
+### When to Use Each Layout Mechanism
+
+PAGX offers three ways to position elements. **Constraint layout should be your first choice**
+for most positioning needs — it is intuitive (edge-based), maintainable,
+and eliminates manual coordinate calculation. Choose based on the specific context:
+
+```
+VectorElements (shapes, text, groups) inside a Layer need positioning?
+  → Use constraint attributes (left/right/top/bottom/centerX/centerY) ← PRIMARY
+
+Child Layers (inside a parent Layer) need positioning?
+  → Parent uses absolute layout (default)? → Use constraint attributes on child Layers ← PRIMARY
+  → Parent uses container layout?         → Use x/y OR includeInLayout="false" + constraints for overlays
+
+Parent Layer has multiple child Layers to arrange?
+  → Children form a row?    → layout="horizontal" + gap/padding/alignment
+  → Children form a column? → layout="vertical" + gap/padding/alignment
+  → Free-form placement?    → layout="absolute" (default), then position children via constraint attributes
+
+Only resort to absolute positioning (x/y for Layers, position for elements) when:
+  → Freeform overlapping composition where neither constraint nor container layout applies
+```
+
+### Container Layout — Key Patterns
+
+All container layout patterns derive from two primitives:
+
+1. **Fixed vs flexible sizing**: child with `width`/`height` = fixed; child without = flexible (equally shares remaining space). Similar to CSS `flex: 1`.
+2. **Nesting**: combining vertical and horizontal containers produces any 2D layout (grids, sidebars, dashboards). This replaces CSS Grid and `flex-wrap`.
+
+**Equal columns/rows** — children without `width`/`height` share space equally:
+
+```xml
+<Layer width="600" height="200" layout="horizontal" gap="12" padding="16">
+  <Layer><!-- 1/3 width --></Layer>
+  <Layer><!-- 1/3 width --></Layer>
+  <Layer><!-- 1/3 width --></Layer>
+</Layer>
+```
+
+**Fixed + flexible mix** — fixed header/footer + flexible content area:
+
+```xml
+<Layer width="600" height="400" layout="vertical">
+  <Layer height="48"><!-- fixed header --></Layer>
+  <Layer><!-- flexible content, fills remaining space --></Layer>
+  <Layer height="40"><!-- fixed footer --></Layer>
+</Layer>
+```
+
+**Grid via nesting** — outer vertical + inner horizontal rows:
+
+```xml
+<Layer width="600" height="400" layout="vertical" gap="12">
+  <Layer layout="horizontal" gap="12">
+    <Layer><!-- row 1, col 1 --></Layer>
+    <Layer><!-- row 1, col 2 --></Layer>
+  </Layer>
+  <Layer layout="horizontal" gap="12">
+    <Layer><!-- row 2, col 1 --></Layer>
+    <Layer><!-- row 2, col 2 --></Layer>
+  </Layer>
+</Layer>
+```
+
+**Grid layout with consistent margins (RECOMMENDED TEMPLATE)** — the most common pattern for
+card grids, dashboards, and tile layouts. Key principles:
+
+1. Outer container: `layout="vertical"` + `alignment="stretch"` + `padding` + `gap`
+2. Each row: `layout="horizontal"` + `gap` — **no width** (stretch fills it from parent)
+3. Each cell: only `height` — **no width** (flexible, equally shares row width)
+4. Background Rectangle: `left="0" right="0" top="0" bottom="0" size="1,1"` (auto-fills cell)
+
+```xml
+<Layer left="0" right="0" top="0" bottom="0"
+       layout="vertical" gap="20" padding="30" alignment="stretch">
+  <!-- Row 1: 3 equal cells -->
+  <Layer layout="horizontal" gap="20">
+    <Layer height="200">
+      <!-- Background auto-fills cell -->
+      <Layer left="0" right="0" top="0" bottom="0">
+        <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="12"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <!-- Content constrained within cell -->
+      <Layer left="0" right="0" top="0" bottom="0">
+        <!-- ... shapes, text, etc. using constraint attributes ... -->
+      </Layer>
+    </Layer>
+    <Layer height="200"><!-- cell 2, same pattern --></Layer>
+    <Layer height="200"><!-- cell 3, same pattern --></Layer>
+  </Layer>
+  <!-- Row 2: 2 equal cells -->
+  <Layer layout="horizontal" gap="20">
+    <Layer height="200"><!-- cell 4 --></Layer>
+    <Layer height="200"><!-- cell 5 --></Layer>
+  </Layer>
+</Layer>
+```
+
+Why this works: `alignment="stretch"` on the vertical parent fills row widths → rows' flexible
+cells equally share the width → engine writes computed sizes back as their reference frame.
+**No math required** — only declare padding, gap, height.
+
+### Constraint Layout — Key Patterns
+
+**Background fill** — Rectangle stretches to fill container:
+
+```xml
+<Layer width="300" height="200">
+  <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="12"/>
+  <Fill color="#1E293B"/>
+</Layer>
+```
+
+The `size="1,1"` is a convention to signal "size determined by constraints" — opposite-edge
+constraints overwrite the size to match the container. Any initial size value works (the
+default `100,100` is also fine), but `1,1` is preferred for clarity and smaller file size.
+
+**Centered content** — Text centered in container:
+
+```xml
+<Layer width="300" height="200">
+  <Group>
+    <Text text="Hello" fontFamily="Arial" fontSize="16"/>
+    <Fill color="#FFF"/>
+    <TextBox left="0" right="0" top="0" bottom="0"
+             textAlign="center" paragraphAlign="middle"/>
+  </Group>
+</Layer>
+```
+
+**Inset background with padding** — Group derives size from constraints:
+
+```xml
+<Layer width="400" height="300">
+  <Group left="20" right="20" top="20" bottom="20">
+    <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="12"/>
+    <Fill color="#1E293B"/>
+  </Group>
+</Layer>
+```
+
+**Opposite-pair behaviors by element type** — the same `left`+`right` (or `top`+`bottom`)
+constraints produce different results depending on the element type. See
+`spec-essentials.md` §3a Opposite-pair behavior table for the full rules. Quick reference:
+Rectangle/Ellipse/TextBox **stretch** | Path/Polystar/Text **scale** (fit mode) |
+Group **derives layout size** for children.
+
+**Mixed single-edge and center constraints** — combine one edge constraint with a center
+constraint on the other axis for common UI positioning patterns:
+
+```xml
+<Layer width="400" height="60">
+  <!-- Left-aligned + vertically centered (button label) -->
+  <Group>
+    <Text text="Submit" fontFamily="Arial" fontSize="16"/>
+    <Fill color="#FFF"/>
+    <TextBox left="16" centerY="0"/>
+  </Group>
+
+  <!-- Right-aligned + vertically centered (price tag) -->
+  <Group>
+    <Text text="$99" fontFamily="Arial" fontSize="20"/>
+    <Fill color="#10B981"/>
+    <TextBox right="16" centerY="0"/>
+  </Group>
+
+  <!-- Horizontally centered + top-aligned (section title) -->
+  <Group>
+    <Text text="Header" fontFamily="Arial" fontSize="14"/>
+    <Fill color="#666"/>
+    <TextBox centerX="0" top="8"/>
+  </Group>
+</Layer>
+```
+
+Each axis is resolved independently:
+- `left` / `right` / `centerX` control horizontal positioning and sizing
+- `top` / `bottom` / `centerY` control vertical positioning and sizing
+- **Opposite-pair combinations** (`left`+`right` or `top`+`bottom`) derive dimensions from
+  parent container — for child Layers this **ALWAYS OVERRIDES** any explicit `width`/`height`;
+  for VectorElements the behavior depends on element type (stretch/scale to fit/derive size)
+Any valid single-axis combination works.
+
+### Per-Child Cross-Axis Override
+
+Parent `alignment` applies to all children. To override one child's cross-axis position, wrap
+it in a nested container (similar to CSS `align-self`):
+
+```xml
+<Layer width="400" height="200" layout="horizontal" alignment="center">
+  <Layer width="100" height="60"><!-- centered by parent --></Layer>
+  <!-- This child aligns to top instead -->
+  <Layer width="100" layout="vertical">
+    <Layer height="40"><!-- content at top --></Layer>
+    <Layer><!-- spacer fills remaining space --></Layer>
+  </Layer>
+</Layer>
+```
+
+---
+
 ## Text Layout Decisions
 
 Code snippets below use placeholder fonts and colors to illustrate structure.
@@ -89,12 +300,22 @@ Code snippets below use placeholder fonts and colors to illustrate structure.
 ### Single-Line Text
 
 ```xml
-<!-- Bare Text — position controls placement directly -->
-<Text text="Label" fontFamily="Arial" fontSize="14" position="50,20"/>
-<Fill color="#333"/>
+<!-- Use constraints (preferred) -->
+<Group>
+  <Text text="Label" fontFamily="Arial" fontSize="14"/>
+  <Fill color="#333"/>
+  <TextBox left="50" top="20"/>
+</Group>
 ```
 
-Use when: simple label, no wrapping, no alignment needed.
+Use when: simple label, no wrapping, no alignment needed. TextBox `left`/`top` constraints
+position the text within the container.
+
+```xml
+<Text text="Label" fontFamily="Arial" fontSize="14"/>
+<Fill color="#333"/>
+<TextBox left="50" top="20"/>
+```
 
 ### Multi-Line or Wrapped Text
 
@@ -102,10 +323,16 @@ Use when: simple label, no wrapping, no alignment needed.
 <!-- TextBox controls all layout -->
 <Text text="Long text that wraps..." fontFamily="Arial" fontSize="14"/>
 <Fill color="#333"/>
-<TextBox position="0,0" size="300,0" textAlign="start"/>
+<TextBox left="0" top="0" size="300,0" textAlign="start"/>
 ```
 
-Use when: text should wrap at a boundary or align within a region.
+Use when: text should wrap at a boundary or align within a region. When the TextBox is inside
+a container with known dimensions, use constraints to derive the text area:
+
+```xml
+<!-- Use constraints to derive text area from container -->
+<TextBox left="20" right="20" top="10" textAlign="start"/>
+```
 
 ### Rich Text (Mixed Styles)
 
@@ -119,12 +346,18 @@ Use when: text should wrap at a boundary or align within a region.
     <Text text="normal part" fontFamily="Arial" fontSize="14"/>
     <Fill color="#666"/>
   </Group>
-  <TextBox position="0,0" size="400,100"/>
+  <TextBox size="400,100"/>
 </Group>
 ```
 
 Use when: text segments have different font sizes, weights, or colors. Each segment needs
-its own Group for painter scope isolation.
+its own Group for painter scope isolation. When the Group is inside a container,
+prefer constraint attributes on the TextBox:
+
+```xml
+<!-- Use constraints -->
+<TextBox left="0" right="0" top="0" bottom="0" textAlign="start"/>
+```
 
 ### Text Alignment Options
 
@@ -151,7 +384,9 @@ For required attributes see `attributes.md`; for coordinate localization see
 
 ### 1. Painter Scope Isolation
 
-When different geometry needs different painters, isolate in separate Groups:
+When different geometry needs different painters, choose based on layout context:
+
+**Without layout or constraints** — use Groups to isolate painters:
 
 ```xml
 <Layer>
@@ -160,9 +395,28 @@ When different geometry needs different painters, isolate in separate Groups:
     <Fill color="#F00"/>
   </Group>
   <Group>
-    <Ellipse position="50,50" size="30,30"/>
+    <Ellipse left="35" top="35" size="30,30"/>
     <Stroke color="#000" width="1"/>
   </Group>
+</Layer>
+```
+
+**With constraint layout** — wrap each constrained shape in its own Layer to isolate Fill scope.
+
+> **Why separate Layers?** Without them, the second Fill applies to ALL preceding shapes in scope.
+> Child Layers inherit parent dimensions as their constraint reference frame while isolating painter scope.
+
+```xml
+<!-- Multiple constrained shapes needing different fills -->
+<Layer width="300" height="200">
+  <Layer>
+    <Rectangle left="10" top="10" size="80,80" roundness="8"/>
+    <Fill color="#6366F1"/>
+  </Layer>
+  <Layer>
+    <Ellipse left="40" right="40" centerY="0" size="60,60"/>
+    <Fill color="#F43F5E"/>
+  </Layer>
 </Layer>
 ```
 
@@ -177,7 +431,13 @@ them. Additional behaviors beyond what `spec-essentials.md` §7 covers:
 - `lineHeight=0` (auto) calculates from font metrics (`ascent + descent + leading`), not
   from `fontSize`.
 
-### 3. Modifier Scope Isolation
+### 3. Do Not Mix textAnchor with Constraints
+
+**Do not** set `textAnchor` on Text when using constraint attributes — `textAnchor` shifts
+bounds per line while constraints translate the entire bounds, producing compounding offsets.
+For multiline center/end alignment inside auto-layout containers, use TextBox + `textAlign`.
+
+### 4. Modifier Scope Isolation
 
 When only one Path needs a shape modifier, isolate it in its own Group:
 
@@ -193,7 +453,7 @@ When only one Path needs a shape modifier, isolate it in its own Group:
 </Group>
 ```
 
-### 4. Fill + Stroke on Same Geometry
+### 5. Fill + Stroke on Same Geometry
 
 Declare geometry once with both painters in one Group — painters do not clear geometry:
 
@@ -203,4 +463,73 @@ Declare geometry once with both painters in one Group — painters do not clear 
   <Fill color="#E2E8F0"/>
   <Stroke color="#94A3B8" width="1"/>
 </Group>
+```
+
+### 6. Container Size for Constraints
+
+Constraint attributes always work — every container has a size from one of three sources
+(highest priority first):
+
+1. **Explicit** `width`/`height` set on the Layer or Group
+2. **Layout-assigned**: parent container layout computes and writes back the size (e.g., flexible child in a horizontal layout)
+3. **Measured**: engine measures child content bounds as fallback
+
+`left`/`top` alone do not depend on container size at all (they position the element's edge
+directly). `right`/`bottom`/`centerX`/`centerY` and opposite-pair combinations reference the
+container size — which is always available from one of the three sources above.
+
+**When to set explicit `width`/`height`**: when you need the container to be a specific design
+size rather than shrink-wrapping its content. For example, a 300×200 card where a Rectangle
+should stretch to fill:
+
+```xml
+<Layer width="300" height="200">
+  <Rectangle left="0" right="0" top="0" bottom="0" size="1,1"/>
+  <Fill color="#F00"/>
+</Layer>
+```
+
+When the container's measured or layout-assigned size is exactly what you want, explicit
+dimensions are unnecessary.
+
+### 7. Overlay Elements Inside Layout Containers
+
+When a parent Layer has `layout` set, child Layers participate in the layout flow by default.
+To exempt a child (e.g., a badge or tooltip), set `includeInLayout="false"` and position it
+with constraint attributes. The child remains visible but occupies no space in the flow.
+
+**Badge / notification dot** — positioned at a corner, independent of layout flow:
+
+```xml
+<Layer width="400" height="300" layout="vertical" gap="12">
+  <Layer><!-- content --></Layer>
+  <!-- Badge at top-right corner -->
+  <Layer right="-4" top="-4" width="20" height="20" includeInLayout="false">
+    <Ellipse left="0" right="0" top="0" bottom="0" size="1,1"/>
+    <Fill color="#EF4444"/>
+  </Layer>
+</Layer>
+```
+
+Same pattern for other overlays: use `centerX="0" centerY="0"` for centered watermarks,
+`left`/`top` for decorative corner elements — all with `includeInLayout="false"`.
+
+Key points: `includeInLayout="false"` children can use **any** constraint attribute
+(`left`/`right`/`top`/`bottom`/`centerX`/`centerY`) regardless of parent layout mode.
+They are positioned relative to the parent's `width`×`height`.
+
+### 8. Child Layer Constraint Positioning
+
+When the parent Layer uses absolute layout (default), child Layers can use constraint
+attributes instead of `x`/`y` for more expressive positioning:
+
+```xml
+<Layer width="400" height="300">
+  <!-- Full-width header with 20px margins -->
+  <Layer left="20" right="20" top="0" height="60"><!-- header --></Layer>
+  <!-- Centered content area -->
+  <Layer centerX="0" top="80" width="300" height="160"><!-- content --></Layer>
+  <!-- Bottom-right action button -->
+  <Layer right="20" bottom="20" width="80" height="36"><!-- button --></Layer>
+</Layer>
 ```

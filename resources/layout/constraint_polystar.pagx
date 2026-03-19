@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Constraint layout: Polystar element with proportional scaling -->
+<!-- Fully automatic layout: containers are flexible (no width) — auto-equal distribution -->
+<pagx version="1.0" width="800" height="530">
+  <!-- Background -->
+  <Layer>
+    <Rectangle position="400,265" size="800,530"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+
+  <!-- Main vertical layout, alignment=stretch -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="30" padding="30" alignment="stretch">
+
+    <!-- Row 1: Single-edge positioning + Dual-axis fit -->
+    <Layer layout="horizontal" gap="30">
+
+      <!-- Container 1: Single-edge positioning -->
+      <Layer height="220">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Polystar left="15" top="15" type="star" pointCount="5" outerRadius="30" innerRadius="12"/>
+          <Fill color="#6366F1"/>
+        </Layer>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Polystar right="15" top="15" type="star" pointCount="5" outerRadius="30" innerRadius="12"/>
+          <Fill color="#F43F5E"/>
+        </Layer>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Polystar centerX="0" centerY="0" type="polygon" pointCount="6" outerRadius="35"/>
+          <Fill color="#10B981"/>
+        </Layer>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Polystar left="15" bottom="15" type="polygon" pointCount="5" outerRadius="30"/>
+          <Fill color="#F59E0B"/>
+        </Layer>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Polystar right="15" bottom="15" type="star" pointCount="4" outerRadius="30" innerRadius="12"/>
+          <Fill color="#06B6D4"/>
+        </Layer>
+      </Layer>
+
+      <!-- Container 2: Dual-axis fit scaling (single 5-point star) -->
+      <Layer height="220">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Polystar left="60" right="60" top="40" bottom="40" type="star" pointCount="5" outerRadius="100" innerRadius="38"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="300,160">
+              <ColorStop offset="0" color="#EC4899"/>
+              <ColorStop offset="1" color="#F472B6"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+      </Layer>
+
+    </Layer>
+
+    <!-- Row 2: Single-axis and dual-axis edge constraints -->
+    <Layer layout="horizontal" gap="30">
+
+      <!-- Container 3: Horizontal-only constraint (left+right), vertically centered -->
+      <Layer height="220">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Polystar left="0" right="0" centerY="0" type="star" pointCount="5" outerRadius="100" innerRadius="38"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="200,150">
+              <ColorStop offset="0" color="#FBBF24"/>
+              <ColorStop offset="1" color="#F59E0B"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+      </Layer>
+
+      <!-- Container 4: Vertical-only constraint (top+bottom), horizontally centered -->
+      <Layer height="220">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Polystar centerX="0" top="0" bottom="0" type="star" pointCount="5" outerRadius="100" innerRadius="38"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="200,240">
+              <ColorStop offset="0" color="#06B6D4"/>
+              <ColorStop offset="1" color="#0891B2"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+      </Layer>
+
+      <!-- Container 5: All-edge constraint (left+right+top+bottom), fully fit -->
+      <Layer width="355" height="220">
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Polystar left="0" right="0" top="0" bottom="0" type="star" pointCount="5" outerRadius="100" innerRadius="38"/>
+          <Fill>
+            <LinearGradient startPoint="0,0" endPoint="300,240">
+              <ColorStop offset="0" color="#EC4899"/>
+              <ColorStop offset="1" color="#BE185D"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+      </Layer>
+
+    </Layer>
+
+  </Layer>
+</pagx>

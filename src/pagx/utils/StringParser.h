@@ -37,7 +37,7 @@
 #include "pagx/types/ColorSpace.h"
 #include "pagx/types/FilterMode.h"
 #include "pagx/types/LayerPlacement.h"
-#include "pagx/types/LayoutDirection.h"
+#include "pagx/types/LayoutMode.h"
 #include "pagx/types/Matrix.h"
 #include "pagx/types/MipmapMode.h"
 #include "pagx/types/Padding.h"
@@ -56,110 +56,133 @@ const char* NodeTypeName(NodeType type);
 //==============================================================================
 std::string BlendModeToString(BlendMode mode);
 BlendMode BlendModeFromString(const std::string& str);
+bool IsValidBlendModeString(const std::string& str);
 
 //==============================================================================
 // FillRule
 //==============================================================================
 std::string FillRuleToString(FillRule rule);
 FillRule FillRuleFromString(const std::string& str);
+bool IsValidFillRuleString(const std::string& str);
 
 //==============================================================================
 // LineCap, LineJoin, StrokeAlign
 //==============================================================================
 std::string LineCapToString(LineCap cap);
 LineCap LineCapFromString(const std::string& str);
+bool IsValidLineCapString(const std::string& str);
 std::string LineJoinToString(LineJoin join);
 LineJoin LineJoinFromString(const std::string& str);
+bool IsValidLineJoinString(const std::string& str);
 std::string StrokeAlignToString(StrokeAlign align);
 StrokeAlign StrokeAlignFromString(const std::string& str);
+bool IsValidStrokeAlignString(const std::string& str);
 
 //==============================================================================
 // TileMode
 //==============================================================================
 std::string TileModeToString(TileMode mode);
 TileMode TileModeFromString(const std::string& str);
+bool IsValidTileModeString(const std::string& str);
 
 //==============================================================================
 // LayerPlacement
 //==============================================================================
 std::string LayerPlacementToString(LayerPlacement placement);
 LayerPlacement LayerPlacementFromString(const std::string& str);
+bool IsValidLayerPlacementString(const std::string& str);
 
 //==============================================================================
 // ColorSpace
 //==============================================================================
 std::string ColorSpaceToString(ColorSpace space);
 ColorSpace ColorSpaceFromString(const std::string& str);
+bool IsValidColorSpaceString(const std::string& str);
 
 //==============================================================================
 // TrimType
 //==============================================================================
 std::string TrimTypeToString(TrimType type);
 TrimType TrimTypeFromString(const std::string& str);
+bool IsValidTrimTypeString(const std::string& str);
 
 //==============================================================================
 // MaskType
 //==============================================================================
 std::string MaskTypeToString(MaskType type);
 MaskType MaskTypeFromString(const std::string& str);
+bool IsValidMaskTypeString(const std::string& str);
 
 //==============================================================================
 // PolystarType
 //==============================================================================
 std::string PolystarTypeToString(PolystarType type);
 PolystarType PolystarTypeFromString(const std::string& str);
+bool IsValidPolystarTypeString(const std::string& str);
 
 //==============================================================================
 // MergePathMode
 //==============================================================================
 std::string MergePathModeToString(MergePathMode mode);
 MergePathMode MergePathModeFromString(const std::string& str);
+bool IsValidMergePathModeString(const std::string& str);
 
 //==============================================================================
 // FilterMode, MipmapMode
 //==============================================================================
 std::string FilterModeToString(FilterMode mode);
 FilterMode FilterModeFromString(const std::string& str);
+bool IsValidFilterModeString(const std::string& str);
 std::string MipmapModeToString(MipmapMode mode);
 MipmapMode MipmapModeFromString(const std::string& str);
+bool IsValidMipmapModeString(const std::string& str);
 
 //==============================================================================
 // TextAlign, ParagraphAlign, TextAnchor, WritingMode, Overflow
 //==============================================================================
 std::string TextAlignToString(TextAlign align);
 TextAlign TextAlignFromString(const std::string& str);
+bool IsValidTextAlignString(const std::string& str);
 std::string ParagraphAlignToString(ParagraphAlign align);
 ParagraphAlign ParagraphAlignFromString(const std::string& str);
+bool IsValidParagraphAlignString(const std::string& str);
 std::string TextAnchorToString(TextAnchor anchor);
 TextAnchor TextAnchorFromString(const std::string& str);
+bool IsValidTextAnchorString(const std::string& str);
 std::string WritingModeToString(WritingMode mode);
 WritingMode WritingModeFromString(const std::string& str);
+bool IsValidWritingModeString(const std::string& str);
 std::string OverflowToString(Overflow value);
 Overflow OverflowFromString(const std::string& str);
+bool IsValidOverflowString(const std::string& str);
 
 //==============================================================================
 // RepeaterOrder
 //==============================================================================
 std::string RepeaterOrderToString(RepeaterOrder order);
 RepeaterOrder RepeaterOrderFromString(const std::string& str);
+bool IsValidRepeaterOrderString(const std::string& str);
 
 //==============================================================================
-// LayoutDirection
+// LayoutMode
 //==============================================================================
-std::string LayoutDirectionToString(LayoutDirection dir);
-LayoutDirection LayoutDirectionFromString(const std::string& str);
+std::string LayoutModeToString(LayoutMode mode);
+LayoutMode LayoutModeFromString(const std::string& str);
+bool IsValidLayoutModeString(const std::string& str);
 
 //==============================================================================
 // Alignment
 //==============================================================================
 std::string AlignmentToString(Alignment align);
 Alignment AlignmentFromString(const std::string& str);
+bool IsValidAlignmentString(const std::string& str);
 
 //==============================================================================
 // Arrangement
 //==============================================================================
 std::string ArrangementToString(Arrangement arr);
 Arrangement ArrangementFromString(const std::string& str);
+bool IsValidArrangementString(const std::string& str);
 
 //==============================================================================
 // Padding
@@ -172,10 +195,13 @@ std::string PaddingToString(const Padding& padding);
 //==============================================================================
 std::string SelectorUnitToString(SelectorUnit unit);
 SelectorUnit SelectorUnitFromString(const std::string& str);
+bool IsValidSelectorUnitString(const std::string& str);
 std::string SelectorShapeToString(SelectorShape shape);
 SelectorShape SelectorShapeFromString(const std::string& str);
+bool IsValidSelectorShapeString(const std::string& str);
 std::string SelectorModeToString(SelectorMode mode);
 SelectorMode SelectorModeFromString(const std::string& str);
+bool IsValidSelectorModeString(const std::string& str);
 
 //==============================================================================
 // Color

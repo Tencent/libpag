@@ -18,8 +18,8 @@
 
 #pragma once
 
+#include <cmath>
 #include "pagx/nodes/Element.h"
-#include "pagx/types/Constraints.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/Size.h"
 
@@ -31,7 +31,8 @@ namespace pagx {
 class Rectangle : public Element {
  public:
   /**
-   * The position of the rectangle center point.
+   * The center point of the rectangle. When not explicitly set, defaults to the center of the
+   * bounding box so that the top-left corner aligns with the origin (0, 0).
    */
   Point position = {};
 
@@ -41,7 +42,7 @@ class Rectangle : public Element {
   Size size = {100.0f, 100.0f};
 
   /**
-   * The corner roundness of the rectangle, ranging from 0 to 100. The default value is 0.
+   * The corner roundness of the rectangle in pixels. The default value is 0.
    */
   float roundness = 0.0f;
 
@@ -51,9 +52,34 @@ class Rectangle : public Element {
   bool reversed = false;
 
   /**
-   * Constraint attributes for positioning relative to the containing Layer or Group.
+   * Distance from the left edge of the containing Layer or Group. NAN means not set.
    */
-  Constraints constraints = {};
+  float left = NAN;
+
+  /**
+   * Distance from the right edge of the containing Layer or Group. NAN means not set.
+   */
+  float right = NAN;
+
+  /**
+   * Distance from the top edge of the containing Layer or Group. NAN means not set.
+   */
+  float top = NAN;
+
+  /**
+   * Distance from the bottom edge of the containing Layer or Group. NAN means not set.
+   */
+  float bottom = NAN;
+
+  /**
+   * Horizontal offset from the center of the containing Layer or Group. NAN means not set.
+   */
+  float centerX = NAN;
+
+  /**
+   * Vertical offset from the center of the containing Layer or Group. NAN means not set.
+   */
+  float centerY = NAN;
 
   NodeType nodeType() const override {
     return NodeType::Rectangle;

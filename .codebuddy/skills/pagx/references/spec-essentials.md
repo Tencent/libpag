@@ -110,7 +110,16 @@ pagx
 
 | Attribute | Default | Note |
 |-----------|---------|------|
-| `x`, `y` | 0 | Position (overridden by `matrix` if set) |
+| `width`, `height` | — | Layout size for constraint and container layout reference. When omitted, the engine measures content or derives from parent layout. Set explicitly for a specific design size. |
+| `layout` | absolute | `absolute` (default), `horizontal`, or `vertical` — sets layout mode for child Layers |
+| `gap` | 0 | Spacing between adjacent child Layers along the main axis |
+| `padding` | 0 | Inner padding (single value, "v,h", or "t,r,b,l" — 3-value shorthand NOT supported) |
+| `alignment` | start | Cross-axis alignment of children: `start` / `center` / `end` / `stretch` |
+| `arrangement` | start | Main-axis distribution: `start` / `center` / `end` / `spaceBetween` |
+| `includeInLayout` | true | Whether to participate in parent's container layout |
+| `left/right/top/bottom` | — | Constraint positioning relative to parent (see §3a Constraint Layout) |
+| `centerX`, `centerY` | — | Constraint centering relative to parent (see §3a Constraint Layout) |
+| `x`, `y` | 0 | Position (overridden by `matrix` if set; overridden by parent container layout or constraints) |
 | `matrix` | identity | Overrides x/y; overridden by `matrix3D` |
 | `alpha` | 1 | Opacity 0~1 |
 | `blendMode` | normal | Blend mode (same names as CSS `mix-blend-mode`, but camelCase e.g. `colorBurn`) |
@@ -174,6 +183,156 @@ Filters chain in document order: each filter's output becomes the next filter's 
 **DropShadowFilter vs DropShadowStyle**: The filter preserves semi-transparency from the
 original content. The style converts to opaque first. Use filter when per-pixel alpha matters;
 use style for solid shadow outlines.
+
+---
+
+## 3a. Auto Layout
+
+PAGX supports two complementary layout mechanisms that together eliminate manual coordinate calculation.
+**Constraint layout is the primary mechanism for positioning elements.** Both are optional — files without
+layout attributes behave exactly as before (absolute positioning).
+
+### Container Layout (between Layers)
+
+A parent Layer with `layout` set arranges its visible child Layers along the specified axis.
+The layout engine computes child `x`/`y` positions automatically.
+
+```xml
+<Layer width="920" height="200" layout="horizontal" gap="14" padding="20">
+  <Layer><!-- Card A: flexible, shares space equally --></Layer>
+  <Layer><!-- Card B --></Layer>
+  <Layer width="200"><!-- Card C: fixed width --></Layer>
+</Layer>
+```
+
+Key rules:
+- **Activation**: Container layout is only active when `layout` is set. Without it, child Layers
+  use `x`/`y` absolute positioning as before.
+- **Child sizing**: Children with explicit `width`/`height` have fixed size. Children without
+  are flexible — they **equally share** remaining space after subtracting fixed children, gaps,
+  and padding. If fixed children + gaps + padding already exceed the container's main-axis size,
+  flexible children receive **zero size** (they remain in layout but contribute no space).
+  When the parent has no main-axis size, the parent's size is determined by content measurement:
+  each flexible child's main-axis size is determined by its own content bounds, and the parent
+  shrinks to fit all children's content.
+- **Flexible children get layout size**: The engine-computed `width`/`height` for flexible
+  children serves as their layout size — the same as if `width`/`height` were set explicitly.
+  For example, a flexible child Layer getting `width=284` from the layout engine can use
+  `left`/`right` constraints internally with that 284px as the reference frame.
+- **Layout participation**: Every visible child Layer with `includeInLayout="true"` (the default)
+  participates in the layout flow. Setting `includeInLayout="false"` on a child Layer removes it
+  from the flow — it occupies no space and doesn't affect container measurement, but remains
+  visible. It can be positioned using `x`/`y` or **constraint attributes** (`left`/`right`/
+  `top`/`bottom`/`centerX`/`centerY`) — constraints are always effective on
+  `includeInLayout="false"` children regardless of parent layout mode.
+- **spaceBetween and gap**: When both are set, `gap` serves as base spacing in the
+  available-space calculation, then `spaceBetween` redistributes the remaining space.
+  The combination can produce unintuitive results — prefer using only one of them.
+- **Stretch alignment** (container layout only): When the parent sets `alignment="stretch"`,
+  children **without** an explicit cross-axis size are stretched to fill the cross-axis
+  available space (container cross-axis size minus padding). Children **with** explicit
+  cross-axis `width`/`height` keep their size — stretch skips them. (Stretch only checks
+  cross-axis sizing, regardless of whether the child is fixed or flexible on the main axis.)
+  In a vertical container, stretch fills width; in a horizontal container, stretch fills height.
+  **For nested layouts** (e.g., vertical parent with horizontal child rows), stretch is
+  crucial: it sets the row's width to the parent's available width, which then becomes the
+  row's container size for distributing its own flexible children. Without stretch, the row
+  would shrink-wrap its content and its flexible children would get zero width.
+- **Pixel grid alignment**: All layout-computed **Layer** coordinates (`x`/`y`) and sizes
+  (`width`/`height`) are rounded to the nearest integer pixel. VectorElement positions
+  computed by constraint layout retain sub-pixel precision.
+
+### Constraint Layout (inside Layers and between Layers)
+
+Elements inside a Layer (or Group) can use constraint attributes to
+declare their position relative to the container. Supported elements:
+
+- **Layer contents**: Geometry elements (Rectangle, Ellipse, Polystar, Path), Text, TextBox, Group
+- **Child Layers**: when the parent uses absolute layout (default), or the child has `includeInLayout="false"`
+
+| Attribute | Effect |
+|-----------|--------|
+| `left` | Distance from element's left edge to container's left edge |
+| `right` | Distance from element's right edge to container's right edge |
+| `top` | Distance from element's top edge to container's top edge |
+| `bottom` | Distance from element's bottom edge to container's bottom edge |
+| `centerX` | Horizontal offset from container center (0 = centered) |
+| `centerY` | Vertical offset from container center (0 = centered) |
+
+**Opposite-pair behavior** (`left`+`right` or `top`+`bottom`):
+
+| Element Type | Behavior | Details |
+|--------------|----------|--------|
+| Rectangle, Ellipse, TextBox | **STRETCH** | Resize to fill target area |
+| Path, Polystar | **SCALE TO FIT** | Single-axis: scale to exactly fill, other axis proportional; Both-axis: use smaller scale factor (fit mode), center on longer axis |
+| Text | **SCALE TO FIT** | Same as Path/Polystar — fontSize is rewritten to match the scale factor |
+| Group | **DERIVE SIZE** | Align to target area; set layout size for child constraint reference |
+| Child Layer | **ALWAYS OVERRIDE** | Opposite-pair constraints always override: `width = parent.width - left - right`, `x = left` |
+
+> **Key distinction**: VectorElements (stretch/scale) vs Layer (derive only — no stretch/scale).
+
+Key rules:
+- **Direct parent container**: Constraints always reference the **immediate parent container**
+  (Layer or Group) — not any ancestor further up. Layout sizes propagate level by level:
+  each container resolves its own size, then its children's constraints reference that size.
+- **Size resolution** — container layout and constraint layout are **mutually exclusive** on
+  any given child Layer. A child in container layout flow is sized by the container; a child
+  outside (absolute parent or `includeInLayout="false"`) is sized by constraints.
+  **VectorElements** (contents inside a Layer/Group) always use constraint layout regardless
+  of the parent's `layout` mode.
+
+  **In container layout** (child Layer participates in `layout="horizontal"/"vertical"`):
+  - Main axis: explicit `width`/`height` → fixed; no explicit size → flexible (equal share)
+  - Cross axis: `alignment="stretch"` fills children without explicit cross-axis size;
+    children with explicit cross-axis size keep it
+
+  **In constraint layout** (child Layer with absolute parent or `includeInLayout="false"`;
+  VectorElements always):
+  1. Opposite-pair constraints (`left`+`right` or `top`+`bottom`) — **ALWAYS OVERRIDE**
+     explicit `width`/`height`
+  2. Explicit `width`/`height` attribute
+  3. Content measurement (automatic from child element bounds)
+- **Content Bounds**: Constraint "edges" refer to an element's content bounds edges. Bounds
+  differ by element type:
+  - **Frame-aligned** (Rectangle, Ellipse, TextBox, Group, Layer): bounds = [0, width] × [0,
+    height] in local coordinates. `left="0"` aligns the logical frame's left edge to the container.
+  - **Pixel-aligned** (Path, Text): bounds = actual rendered pixel boundary. `left="0"` shifts
+    content so rendered pixels touch the container's left edge.
+  - Both ensure `left="0"` means "content aligns with container edge" — the difference is whether
+    "content" means logical frame or rendered pixels.
+  - **Group/Layer measured bounds**: When Group or Layer has no explicit `width`/`height`, its
+    size is measured from (0,0) to the bottom-right extent of all children. This means:
+    (1) children in negative coordinates are rendered but excluded from measured bounds;
+    (2) empty space between (0,0) and the top-left of the nearest child is included in
+    measured bounds. For correct measurement, position children starting from (0,0) —
+    avoid negative coordinates and avoid leaving empty margins at the top-left corner.
+- **Unset, not zero**: Constraint attributes default to unset (not zero).
+- **Overrides position**: Constraints override the element's `position` attribute on the
+  constrained axis.
+- **Mutual exclusion** — valid combinations per axis:
+  - `left` alone, `right` alone, `centerX` alone
+  - `left`+`right` pair (opposite-pair → derives/stretches)
+  - **Invalid**: `left`+`centerX`, `right`+`centerX`, `left`+`right`+`centerX`
+- **Choose by design intent**: Pick the constraint edge that matches where the element is
+  anchored — not the one that requires manual offset calculation.
+  - top-right corner → `right`+`top` (not `left` with a computed value)
+  - bottom-center → `centerX`+`bottom`
+  - fill parent → `left="0" right="0" top="0" bottom="0"`
+
+### Child Layer Constraints
+
+Child Layers use constraints when the parent has **absolute layout** (default) or the child
+has **`includeInLayout="false"`**. Opposite-pair constraints **always override** explicit
+dimensions (`width = parent.width - left - right`). Top-level Layers (direct children of
+`<pagx>` or `<Composition>`) can also use constraints — the document/composition
+`width`×`height` serves as their container size.
+
+```xml
+<Layer width="400" height="300">
+  <Layer left="20" right="20" top="50"><!-- width derived: 360 --></Layer>
+  <Layer centerX="0" bottom="20" width="100" height="40"><!-- centered, fixed size --></Layer>
+</Layer>
+```
 
 ---
 
@@ -259,28 +418,30 @@ is sequential and forward-only.
 ### Rectangle
 
 ```xml
-<Rectangle position="100,50" size="200,100" roundness="10"/>
+<Rectangle size="200,100" roundness="10"/>
 ```
 
-- `position` is the **center point** of the rectangle (default 0,0), `size` (default 100,100), `roundness` (default 0), `reversed` (default false)
-- Bounds: left = position.x - width/2, top = position.y - height/2
+- `size` (default 100,100), `roundness` (default 0), `reversed` (default false)
+- `position` is the center point; defaults to center of bounding box when omitted
+- Supports constraint attributes (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`)
 - Roundness auto-limited to `min(roundness, width/2, height/2)`
 
 ### Ellipse
 
 ```xml
-<Ellipse position="100,50" size="200,100"/>
+<Ellipse size="200,100"/>
 ```
 
-- Same `position`/`size`/`reversed` as Rectangle (`position` = center point), no roundness.
+- Same attributes as Rectangle, no roundness
+- `position` is the center point; defaults to center of bounding box when omitted
 
 ### Polystar
 
 ```xml
-<Polystar position="0,0" type="star" pointCount="5" outerRadius="100" innerRadius="50"/>
+<Polystar type="star" pointCount="5" outerRadius="100" innerRadius="50"/>
 ```
 
-- `position` is the **center point** from which vertices radiate outward
+- `position` is the center point; defaults to center of bounding box when omitted
 - `type`: `polygon` (outer only) or `star` (outer + inner alternating)
 - Supports fractional `pointCount` (incomplete last corner)
 
@@ -297,10 +458,13 @@ is sequential and forward-only.
 ### Text
 
 ```xml
-<Text text="Hello" fontFamily="Arial" fontSize="24" position="0,0" textAnchor="start"/>
+<Text text="Hello" fontFamily="Arial" fontSize="24"/>
 ```
 
-- `position`: y is baseline. `textAnchor`: start / center / end.
+- Supports constraint attributes for positioning. Opposite-pair (`left`+`right` or
+  `top`+`bottom`) triggers **scale to fit**. Use TextBox for multiline layout and alignment.
+- **Do not** set `textAnchor` when using constraint attributes — they interact badly.
+  For multiline center/end alignment, use TextBox with `textAlign` instead.
 - `fauxBold` / `fauxItalic`: algorithmic bold / italic (default false).
 - **CDATA** for special characters: `<![CDATA[A < B]]>`.
 - `\n` in `text` attribute (as `&#10;`) triggers line breaks.
@@ -359,11 +523,11 @@ and color source together.
   <Fill color="#000"/>
   <Text text="Body" fontFamily="Arial" fontSize="16"/>
   <Fill color="#666"/>
-  <TextBox position="50,50" size="300,200" textAlign="center" paragraphAlign="near"/>
+  <TextBox left="50" top="50" size="300,200" textAlign="center" paragraphAlign="near"/>
 </Group>
 ```
 
-- `position` (0,0): top-left of text area
+- `position` (0,0): top-left of text area — prefer constraint attributes (`left`/`top`)
 - `size` (0,0): 0 = no boundary in that dimension
 - `textAlign`: start / center / end / justify
 - `paragraphAlign`: near / middle / far (direction-neutral)
@@ -418,28 +582,15 @@ If you need both shape modifiers and text effects on the same text, use separate
 
 ### Rich Text Pattern
 
-Multiple Text elements in one Group, each with independent Fill/Stroke, unified by TextBox:
-
-```xml
-<Group>
-  <Group>
-    <Text text="Bold " fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
-    <Fill color="#000"/>
-  </Group>
-  <Group>
-    <Text text="and normal" fontFamily="Arial" fontSize="16"/>
-    <Fill color="#666"/>
-  </Group>
-  <TextBox position="0,0" size="300,100"/>
-</Group>
-```
+Multiple Text elements in one Group, each with independent Fill/Stroke, unified by TextBox.
+See `design-patterns.md` §Rich Text (Mixed Styles) for examples and usage guidance.
 
 ---
 
 ## 8. Repeater
 
 ```xml
-<Rectangle position="0,0" size="20,20"/>
+<Rectangle size="20,20"/>
 <Fill color="#F00"/>
 <Repeater copies="5" position="30,0" rotation="10" startAlpha="1" endAlpha="0.3"/>
 ```
@@ -468,7 +619,7 @@ Multiple Text elements in one Group, each with independent Fill/Stroke, unified 
 
 ```xml
 <Layer id="maskLayer" visible="false">
-  <Ellipse position="100,100" size="150,150"/>
+  <Ellipse size="150,150"/>
   <Fill color="#FFF"/>
 </Layer>
 <Layer mask="@maskLayer">
@@ -476,6 +627,7 @@ Multiple Text elements in one Group, each with independent Fill/Stroke, unified 
 </Layer>
 ```
 
+- Mask and masked layers should use constraint attributes for positioning.
 - Mask layer itself is **not rendered** (`visible` ignored for masks).
 - Mask layer transforms do **not** affect the masked layer.
 - `maskType`: `alpha` (default), `luminance`, `contour`.
@@ -509,15 +661,28 @@ Multiple Text elements in one Group, each with independent Fill/Stroke, unified 
 
 ```xml
 <Composition id="card" width="200" height="100">
-  <Layer>...</Layer>
+  <!-- Top-level Layers use Composition width×height as constraint container -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+    <Fill color="#FFF"/>
+    <Group>
+      <Text text="Card Title" fontFamily="Arial" fontSize="14"/>
+      <Fill color="#333"/>
+      <TextBox left="12" right="12" centerY="0" textAlign="start"/>
+    </Group>
+  </Layer>
 </Composition>
 
-<Layer composition="@card" x="50" y="50"/>
-<Layer composition="@card" x="300" y="50"/>
+<Layer composition="@card" left="50" top="50"/>
+<Layer composition="@card" left="300" top="50"/>
 ```
 
 - Own coordinate system (origin at top-left of the Composition bounds).
-- Referencing Layer's `x`/`y` positions the Composition's origin in parent coordinates.
+- Top-level Layers inside Composition can use constraints — the Composition's `width`×`height`
+  serves as their container size (same as `<pagx>` dimensions for document-level Layers).
+- Internal geometry should use constraint attributes (e.g., `left/right/top/bottom="0"` to fill bounds).
+- Container layout (`layout="horizontal"/"vertical"`) also works inside Compositions.
+- Referencing Layer uses constraint attributes (`left`/`top`) to position the Composition in the parent.
 
 ### Font (Embedded)
 
@@ -530,3 +695,4 @@ Multiple Text elements in one Group, each with independent Fill/Stroke, unified 
 
 - GlyphID = list index + 1 (GlyphID 0 = missing glyph).
 - All Glyphs in one Font must be the same type (all path or all image).
+

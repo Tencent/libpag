@@ -3,7 +3,7 @@
 <pagx version="1.0" width="400" height="400">
   <!-- Main content card with modern gradient -->
   <Layer name="content">
-    <Rectangle position="200,200" size="240,240" roundness="40"/>
+    <Rectangle left="80" top="80" size="240,240" roundness="40"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="240,240">
         <ColorStop offset="0" color="#6366F1"/>

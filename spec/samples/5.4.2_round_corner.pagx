@@ -2,11 +2,11 @@
 <pagx version="1.0" width="400" height="400">
   <!-- Original sharp rectangle (reference) -->
   <Layer>
-    <Rectangle position="120,120" size="140,140"/>
+    <Rectangle left="50" top="50" size="140,140"/>
     <Stroke color="#94A3B840" width="2" dashes="4,4"/>
   </Layer>
   <Layer>
-    <Rectangle position="120,120" size="140,140"/>
+    <Rectangle left="50" top="50" size="140,140"/>
     <RoundCorner radius="30"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="140,140">
@@ -18,11 +18,11 @@
   </Layer>
   <!-- Original star (reference) -->
   <Layer>
-    <Polystar position="290,120" type="star" pointCount="5" outerRadius="70" innerRadius="32" rotation="-90"/>
+    <Polystar position="290,120" type="star" pointCount="5" outerRadius="70" innerRadius="32"/>
     <Stroke color="#94A3B840" width="2" dashes="4,4"/>
   </Layer>
   <Layer>
-    <Polystar position="290,120" type="star" pointCount="5" outerRadius="70" innerRadius="32" rotation="-90"/>
+    <Polystar position="290,120" type="star" pointCount="5" outerRadius="70" innerRadius="32"/>
     <RoundCorner radius="12"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="140,140">

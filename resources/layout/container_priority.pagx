@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Container layout takes priority over constraints: constraints ignored in horizontal layout -->
+<pagx version="1.0" width="600" height="400">
+  <!-- Background -->
+  <Layer>
+    <Rectangle left="0" top="0" size="600,400"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+
+  <!-- Main container: horizontal layout with centering overrides child constraints -->
+  <Layer width="600" height="400" layout="horizontal" gap="20" padding="20" arrangement="center" alignment="center">
+    <!-- Container border -->
+    <Rectangle left="0" top="0" size="600,400"/>
+    <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+
+    <!-- Box 1: has constraint left=20 top=20, but ignored by container layout -->
+    <Layer width="150" height="150" left="20" top="20">
+      <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+      <Fill color="#FF6B6B"/>
+    </Layer>
+
+    <!-- Box 2: has constraint right=20 bottom=20, but ignored by container layout -->
+    <Layer width="150" height="150" right="20" bottom="20">
+      <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+      <Fill color="#4ECDC4"/>
+    </Layer>
+
+    <!-- Box 3: has constraint left=20 bottom=20, but ignored by container layout -->
+    <Layer width="150" height="150" left="20" bottom="20">
+      <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+      <Fill color="#45B7D1"/>
+    </Layer>
+  </Layer>
+</pagx>

@@ -18,11 +18,11 @@
 
 #pragma once
 
+#include <cmath>
 #include <string>
 #include <vector>
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/GlyphRun.h"
-#include "pagx/types/Constraints.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/TextAnchor.h"
 
@@ -95,9 +95,34 @@ class Text : public Element {
   std::vector<GlyphRun*> glyphRuns = {};
 
   /**
-   * Constraint attributes for positioning relative to the containing Layer or Group.
+   * Distance from the left edge of the containing Layer or Group. NAN means not set.
    */
-  Constraints constraints = {};
+  float left = NAN;
+
+  /**
+   * Distance from the right edge of the containing Layer or Group. NAN means not set.
+   */
+  float right = NAN;
+
+  /**
+   * Distance from the top edge of the containing Layer or Group. NAN means not set.
+   */
+  float top = NAN;
+
+  /**
+   * Distance from the bottom edge of the containing Layer or Group. NAN means not set.
+   */
+  float bottom = NAN;
+
+  /**
+   * Horizontal offset from the center of the containing Layer or Group. NAN means not set.
+   */
+  float centerX = NAN;
+
+  /**
+   * Vertical offset from the center of the containing Layer or Group. NAN means not set.
+   */
+  float centerY = NAN;
 
   NodeType nodeType() const override {
     return NodeType::Text;

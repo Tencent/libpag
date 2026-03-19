@@ -16,10 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include "pagx/AutoLayout.h"
+#include "pagx/FontProvider.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
@@ -34,24 +37,34 @@
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
+#include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
+#include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/svg/SVGPathParser.h"
+#include "pagx/types/Alignment.h"
+#include "pagx/types/Arrangement.h"
+#include "pagx/types/Constraints.h"
+#include "pagx/types/LayoutMode.h"
+#include "pagx/types/Padding.h"
 #include "pagx/utils/StringParser.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/ShapedText.h"
 #include "renderer/TextLayout.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Font.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/core/TextBlob.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
@@ -136,9 +149,9 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
 
   std::sort(svgFiles.begin(), svgFiles.end());
 
-  // Create TextLayout for text layout
-  pagx::TextLayout textLayout;
-  textLayout.addFallbackTypefaces(GetFallbackTypefaces());
+  // Create FontConfig for text layout
+  pagx::FontConfig svgFontProvider;
+  svgFontProvider.addFallbackTypefaces(GetFallbackTypefaces());
 
   for (const auto& svgPath : svgFiles) {
     std::string baseName = std::filesystem::path(svgPath).stem().string();
@@ -158,12 +171,13 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
     }
 
     // Step 2: Typeset text elements and embed fonts
-    auto layoutResult = textLayout.layout(doc.get());
+    auto layoutResult = pagx::TextLayout::Layout(doc.get(), &svgFontProvider);
     pagx::FontEmbedder().embed(doc.get(), layoutResult.shapedTextMap, layoutResult.textOrder);
 
     // Step 3: Export to XML and save as PAGX file
     std::string xml = pagx::PAGXExporter::ToXML(*doc);
-    std::string pagxPath = SavePAGXFile(xml, "PAGXTest/" + baseName + ".pagx");
+    auto key = "svg_" + baseName;
+    std::string pagxPath = SavePAGXFile(xml, "PAGXTest/" + key + ".pagx");
 
     // Step 4: Load PAGX file and build layer tree (this is the viewer's actual path)
     auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
@@ -198,7 +212,7 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
     container->addChild(layer);
     displayList.root()->addChild(container);
     displayList.render(pagxSurface.get(), false);
-    EXPECT_TRUE(Baseline::Compare(pagxSurface, "PAGXTest/" + baseName)) << baseName;
+    EXPECT_TRUE(Baseline::Compare(pagxSurface, "PAGXTest/" + key)) << key;
   }
 }
 
@@ -451,9 +465,9 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
       MakeCenteredTextGroup(doc.get(), "Embedded Font", 18, 120, 115, {0.5f, 0.5f, 0.5f, 1.0f}));
   doc->layers.push_back(layer);
 
-  pagx::TextLayout textLayout;
-  textLayout.addFallbackTypefaces(GetFallbackTypefaces());
-  auto layoutResult = textLayout.layout(doc.get());
+  pagx::FontConfig embedFontProvider;
+  embedFontProvider.addFallbackTypefaces(GetFallbackTypefaces());
+  auto layoutResult = pagx::TextLayout::Layout(doc.get(), &embedFontProvider);
   ASSERT_FALSE(layoutResult.shapedTextMap.empty());
   pagx::FontEmbedder().embed(doc.get(), layoutResult.shapedTextMap, layoutResult.textOrder);
 
@@ -531,7 +545,121 @@ PAGX_TEST(PAGXTest, FontGlyphRoundTrip) {
   SavePAGXFile(xml, "PAGXTest/font_glyph_roundtrip.pagx");
 }
 
-static void TestPAGXDirectory(tgfx::Context* context, const std::string& directory) {
+static std::string TitleToKey(const std::string& title) {
+  // Convert to lowercase with underscores, stripping parentheses but keeping their content
+  std::string key;
+  for (char ch : title) {
+    if (ch == '(' || ch == ')') {
+      continue;
+    }
+    if (std::isalnum(static_cast<unsigned char>(ch))) {
+      key += static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+    } else if (!key.empty() && key.back() != '_') {
+      key += '_';
+    }
+  }
+  // Trim trailing underscore
+  if (!key.empty() && key.back() == '_') {
+    key.pop_back();
+  }
+  return key;
+}
+
+static std::vector<std::pair<std::string, std::string>> ExtractMarkdownExamples(
+    const std::string& markdownPath) {
+  std::vector<std::pair<std::string, std::string>> examples;
+  std::ifstream file(markdownPath);
+  if (!file.is_open()) {
+    return examples;
+  }
+
+  std::string currentTitle;
+  bool inCodeBlock = false;
+  std::string codeContent;
+
+  std::string line;
+  while (std::getline(file, line)) {
+    if (!inCodeBlock) {
+      // Track the most recent ### heading
+      if (line.size() > 4 && line.substr(0, 4) == "### ") {
+        currentTitle = line.substr(4);
+      }
+      // Detect start of xml code block
+      if (line.size() >= 5 && line.substr(0, 5) == "```xm") {
+        inCodeBlock = true;
+        codeContent.clear();
+      }
+    } else {
+      if (line == "```") {
+        inCodeBlock = false;
+        // Only keep complete PAGX documents (skip code snippets)
+        auto trimmed = codeContent;
+        auto pos = trimmed.find_first_not_of(" \t\n\r");
+        if (pos != std::string::npos) {
+          trimmed = trimmed.substr(pos);
+        }
+        if (trimmed.substr(0, 5) == "<pagx" && !currentTitle.empty()) {
+          examples.emplace_back(TitleToKey(currentTitle), codeContent);
+        }
+      } else {
+        if (!codeContent.empty()) {
+          codeContent += "\n";
+        }
+        codeContent += line;
+      }
+    }
+  }
+  return examples;
+}
+
+static void TestMarkdownExamples(tgfx::Context* context, const std::string& markdownPath,
+                                 const std::string& prefix = "") {
+  auto examples = ExtractMarkdownExamples(markdownPath);
+  ASSERT_FALSE(examples.empty()) << "No examples found in: " << markdownPath;
+
+  pagx::FontConfig fontProvider;
+  fontProvider.addFallbackTypefaces(GetFallbackTypefaces());
+
+  for (const auto& [name, xmlContent] : examples) {
+    auto key = prefix + name;
+
+    SavePAGXFile(xmlContent, "PAGXTest/" + key + ".pagx");
+
+    auto doc = pagx::PAGXImporter::FromXML(xmlContent);
+    if (!doc) {
+      ADD_FAILURE() << "Failed to parse XML for: " << key;
+      continue;
+    }
+    if (!doc->errors.empty()) {
+      std::string errorLog;
+      for (const auto& error : doc->errors) {
+        errorLog += "\n  " + error;
+      }
+      ADD_FAILURE() << "Parse errors in " << key << ":" << errorLog;
+    }
+
+    auto layer = pagx::LayerBuilder::Build(doc.get(), &fontProvider);
+    if (!layer) {
+      ADD_FAILURE() << "Failed to build layer for: " << key;
+      continue;
+    }
+
+    auto surface =
+        Surface::Make(context, static_cast<int>(doc->width), static_cast<int>(doc->height));
+    if (!surface) {
+      ADD_FAILURE() << "Failed to create surface for: " << key;
+      continue;
+    }
+    DisplayList displayList;
+    displayList.root()->addChild(layer);
+    displayList.render(surface.get(), false);
+
+    EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/" + key)) << key;
+  }
+}
+
+static void TestPAGXDirectory(tgfx::Context* context, const std::string& directory,
+                              const std::string& prefix = "") {
   std::vector<std::string> files = {};
   for (const auto& entry : std::filesystem::directory_iterator(directory)) {
     if (entry.path().extension() == ".pagx") {
@@ -540,11 +668,11 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
   }
   std::sort(files.begin(), files.end());
 
-  pagx::TextLayout textLayout;
-  textLayout.addFallbackTypefaces(GetFallbackTypefaces());
+  pagx::FontConfig fontProvider;
+  fontProvider.addFallbackTypefaces(GetFallbackTypefaces());
 
   for (const auto& filePath : files) {
-    auto baseName = std::filesystem::path(filePath).stem().string();
+    auto key = prefix + std::filesystem::path(filePath).stem().string();
 
     auto doc = pagx::PAGXImporter::FromFile(filePath);
     if (!doc) {
@@ -556,10 +684,10 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
       for (const auto& error : doc->errors) {
         errorLog += "\n  " + error;
       }
-      ADD_FAILURE() << "Parse errors in " << baseName << ":" << errorLog;
+      ADD_FAILURE() << "Parse errors in " << key << ":" << errorLog;
     }
 
-    auto layer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
+    auto layer = pagx::LayerBuilder::Build(doc.get(), &fontProvider);
     if (!layer) {
       ADD_FAILURE() << "Failed to build layer: " << filePath;
       continue;
@@ -575,7 +703,7 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
     displayList.root()->addChild(layer);
     displayList.render(surface.get(), false);
 
-    EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/" + baseName)) << baseName;
+    EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/" + key)) << key;
   }
 }
 
@@ -583,7 +711,7 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
  * Test all PAGX sample files in spec/samples directory.
  * Renders each sample and compares with baseline screenshots.
  */
-PAGX_TEST(PAGXTest, SampleFiles) {
+PAGX_TEST(PAGXTest, SpecSamples) {
   TestPAGXDirectory(context, ProjectPath::Absolute("spec/samples"));
 }
 
@@ -591,7 +719,15 @@ PAGX_TEST(PAGXTest, SampleFiles) {
  * Test all text-related PAGX files in resources/text directory.
  */
 PAGX_TEST(PAGXTest, TextFiles) {
-  TestPAGXDirectory(context, ProjectPath::Absolute("resources/text"));
+  TestPAGXDirectory(context, ProjectPath::Absolute("resources/text"), "text_");
+}
+
+/**
+ * Test all layout-related PAGX files in resources/layout directory.
+ * Tests container layout and constraint layout behaviors with visual verification.
+ */
+PAGX_TEST(PAGXTest, LayoutFiles) {
+  TestPAGXDirectory(context, ProjectPath::Absolute("resources/layout"), "layout_");
 }
 
 /**
@@ -969,6 +1105,2328 @@ PAGX_TEST(PAGXTest, CustomDataKeyValidation) {
   EXPECT_EQ(doc->layers[0]->customData.at("ok"), "1");
   EXPECT_EQ(doc->layers[0]->customData.count("Bad"), 0u);
   EXPECT_EQ(doc->layers[0]->customData.count("has_underscore"), 0u);
+}
+
+// =====================================================================================
+// Auto Layout - Container Layout - Basic
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutHorizontalEqualWidth) {
+  auto doc = pagx::PAGXDocument::Make(920, 200);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 920;
+  parent->height = 200;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->gap = 14;
+  parent->padding = pagx::Padding{20, 20, 20, 20};
+
+  auto card1 = doc->makeNode<pagx::Layer>();
+  auto card2 = doc->makeNode<pagx::Layer>();
+  auto card3 = doc->makeNode<pagx::Layer>();
+
+  parent->children = {card1, card2, card3};
+
+  for (auto* card : {card1, card2, card3}) {
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->size = {100, 100};
+    rect->position = {0, 0};
+    card->contents.push_back(rect);
+  }
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  float expectedChildWidth = 284.0f;
+
+  EXPECT_EQ(card1->width, expectedChildWidth);
+  EXPECT_EQ(card2->width, expectedChildWidth);
+  EXPECT_EQ(card3->width, expectedChildWidth);
+
+  EXPECT_EQ(card1->x, 20.0f);
+  EXPECT_EQ(card2->x, 20 + 284 + 14);
+  EXPECT_EQ(card3->x, 20 + 284 * 2 + 14 * 2);
+}
+
+PAGX_TEST(PAGXTest, LayoutVerticalStart) {
+  auto doc = pagx::PAGXDocument::Make(400, 600);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 600;
+  parent->layout = pagx::LayoutMode::Vertical;
+  parent->gap = 10;
+
+  auto child1 = doc->makeNode<pagx::Layer>();
+  auto child2 = doc->makeNode<pagx::Layer>();
+
+  parent->children = {child1, child2};
+
+  child1->height = 100;
+  child2->height = 150;
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_EQ(child1->y, 0.0f);
+  EXPECT_EQ(child2->y, 110.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutArrangementCenter) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 200;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->arrangement = pagx::Arrangement::Center;
+  parent->gap = 0;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  parent->children = {child};
+
+  child->width = 100;
+  child->height = 100;
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_EQ(child->x, 150.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutArrangementSpaceBetween) {
+  auto doc = pagx::PAGXDocument::Make(400, 100);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 100;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->arrangement = pagx::Arrangement::SpaceBetween;
+  parent->gap = 0;
+
+  auto child1 = doc->makeNode<pagx::Layer>();
+  auto child2 = doc->makeNode<pagx::Layer>();
+
+  parent->children = {child1, child2};
+
+  child1->width = 50;
+  child1->height = 50;
+  child2->width = 50;
+  child2->height = 50;
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_EQ(child1->x, 0.0f);
+  EXPECT_EQ(child2->x, 350.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutAlignmentCenter) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->alignment = pagx::Alignment::Center;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  parent->children = {child};
+
+  child->width = 100;
+  child->height = 50;
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_EQ(child->y, 125.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Container Layout - Arrangement End
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutArrangementEnd) {
+  auto doc = pagx::PAGXDocument::Make(400, 100);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 100;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->arrangement = pagx::Arrangement::End;
+  parent->gap = 0;
+
+  auto child1 = doc->makeNode<pagx::Layer>();
+  auto child2 = doc->makeNode<pagx::Layer>();
+  parent->children = {child1, child2};
+
+  child1->width = 50;
+  child1->height = 50;
+  child2->width = 50;
+  child2->height = 50;
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_EQ(child1->x, 300.0f);
+  EXPECT_EQ(child2->x, 350.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Container Layout - Alignment End
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutAlignmentEnd) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->alignment = pagx::Alignment::End;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  parent->children = {child};
+
+  child->width = 100;
+  child->height = 50;
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_EQ(child->y, 250.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Container Layout - Padding
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutPadding) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 200;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->padding = pagx::Padding{40, 30, 20, 50};
+
+  auto child = doc->makeNode<pagx::Layer>();
+  parent->children = {child};
+
+  child->width = 100;
+  child->height = 80;
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_EQ(child->x, 50.0f);
+  EXPECT_EQ(child->y, 40.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutPaddingWithFlex) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 200;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->padding = pagx::Padding{10, 10, 10, 10};
+  parent->gap = 0;
+
+  auto child1 = doc->makeNode<pagx::Layer>();
+  auto child2 = doc->makeNode<pagx::Layer>();
+  parent->children = {child1, child2};
+
+  child1->height = 50;
+  child2->height = 50;
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_EQ(child1->width, 190.0f);
+  EXPECT_EQ(child2->width, 190.0f);
+  EXPECT_EQ(child1->x, 10.0f);
+  EXPECT_EQ(child2->x, 200.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Container Layout - Flex Distribution
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutFlexEqualDistribution) {
+  auto doc = pagx::PAGXDocument::Make(300, 100);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 300;
+  parent->height = 100;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->gap = 0;
+
+  auto child1 = doc->makeNode<pagx::Layer>();
+  auto child2 = doc->makeNode<pagx::Layer>();
+  auto child3 = doc->makeNode<pagx::Layer>();
+  parent->children = {child1, child2, child3};
+
+  child1->height = 50;
+  child2->height = 50;
+  child3->height = 50;
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_EQ(child1->width, 100.0f);
+  EXPECT_EQ(child2->width, 100.0f);
+  EXPECT_EQ(child3->width, 100.0f);
+  EXPECT_EQ(child1->x, 0.0f);
+  EXPECT_EQ(child2->x, 100.0f);
+  EXPECT_EQ(child3->x, 200.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutFlexMixedWithFixed) {
+  auto doc = pagx::PAGXDocument::Make(400, 100);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 100;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->gap = 0;
+
+  auto child1 = doc->makeNode<pagx::Layer>();
+  auto child2 = doc->makeNode<pagx::Layer>();
+  auto child3 = doc->makeNode<pagx::Layer>();
+  parent->children = {child1, child2, child3};
+
+  child1->width = 100;
+  child1->height = 50;
+  child2->height = 50;
+  child3->height = 50;
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_EQ(child1->width, 100.0f);
+  EXPECT_EQ(child2->width, 150.0f);
+  EXPECT_EQ(child3->width, 150.0f);
+  EXPECT_EQ(child1->x, 0.0f);
+  EXPECT_EQ(child2->x, 100.0f);
+  EXPECT_EQ(child3->x, 250.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Container Layout - Visibility
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutHiddenChildSkipped) {
+  auto doc = pagx::PAGXDocument::Make(300, 100);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 300;
+  parent->height = 100;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->gap = 0;
+
+  auto child1 = doc->makeNode<pagx::Layer>();
+  auto child2 = doc->makeNode<pagx::Layer>();
+  auto child3 = doc->makeNode<pagx::Layer>();
+  parent->children = {child1, child2, child3};
+
+  child1->width = 100;
+  child1->height = 100;
+  child2->width = 100;
+  child2->height = 100;
+  child2->visible = false;
+  child3->width = 100;
+  child3->height = 100;
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_EQ(child1->x, 0.0f);
+  EXPECT_EQ(child3->x, 100.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Container Layout - Edge Cases
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutEmptyContainer) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 200;
+  parent->layout = pagx::LayoutMode::Horizontal;
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_EQ(parent->width, 400.0f);
+  EXPECT_EQ(parent->height, 200.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutAllFixedNoFlexSpace) {
+  auto doc = pagx::PAGXDocument::Make(300, 100);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 300;
+  parent->height = 100;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->gap = 0;
+
+  auto child1 = doc->makeNode<pagx::Layer>();
+  auto child2 = doc->makeNode<pagx::Layer>();
+  auto child3 = doc->makeNode<pagx::Layer>();
+  parent->children = {child1, child2, child3};
+
+  child1->width = 100;
+  child1->height = 100;
+  child2->width = 100;
+  child2->height = 100;
+  child3->width = 100;
+  child3->height = 100;
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_EQ(child1->x, 0.0f);
+  EXPECT_EQ(child2->x, 100.0f);
+  EXPECT_EQ(child3->x, 200.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutOverflow) {
+  auto doc = pagx::PAGXDocument::Make(250, 100);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 250;
+  parent->height = 100;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->gap = 0;
+
+  auto child1 = doc->makeNode<pagx::Layer>();
+  auto child2 = doc->makeNode<pagx::Layer>();
+  auto child3 = doc->makeNode<pagx::Layer>();
+  parent->children = {child1, child2, child3};
+
+  child1->width = 100;
+  child1->height = 100;
+  child2->width = 100;
+  child2->height = 100;
+  child3->width = 100;
+  child3->height = 100;
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_EQ(child1->x, 0.0f);
+  EXPECT_EQ(child2->x, 100.0f);
+  EXPECT_EQ(child3->x, 200.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Container Layout - Nested
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutNested) {
+  auto doc = pagx::PAGXDocument::Make(500, 200);
+  auto outer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(outer);
+
+  outer->width = 500;
+  outer->height = 200;
+  outer->layout = pagx::LayoutMode::Horizontal;
+  outer->gap = 0;
+
+  auto left = doc->makeNode<pagx::Layer>();
+  left->width = 200;
+  left->height = 200;
+
+  auto right = doc->makeNode<pagx::Layer>();
+  right->height = 200;
+  right->layout = pagx::LayoutMode::Vertical;
+  right->gap = 10;
+
+  outer->children = {left, right};
+
+  auto inner1 = doc->makeNode<pagx::Layer>();
+  auto inner2 = doc->makeNode<pagx::Layer>();
+  inner1->height = 80;
+  inner2->height = 80;
+  right->children = {inner1, inner2};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_EQ(right->width, 300.0f);
+  EXPECT_EQ(right->x, 200.0f);
+
+  EXPECT_EQ(inner1->y, 0.0f);
+  EXPECT_EQ(inner2->y, 90.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Container Layout - Measurement (bottom-up)
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutMeasureFromChildren) {
+  auto doc = pagx::PAGXDocument::Make(800, 600);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->gap = 20;
+
+  auto child1 = doc->makeNode<pagx::Layer>();
+  auto child2 = doc->makeNode<pagx::Layer>();
+  parent->children = {child1, child2};
+
+  child1->width = 100;
+  child1->height = 80;
+  child2->width = 100;
+  child2->height = 60;
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_EQ(parent->width, 220.0f);
+  EXPECT_EQ(parent->height, 80.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Container Layout - Pixel Grid Snap
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutSnapToPixelGrid) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 100;
+  parent->height = 100;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->gap = 0;
+
+  auto child1 = doc->makeNode<pagx::Layer>();
+  auto child2 = doc->makeNode<pagx::Layer>();
+  auto child3 = doc->makeNode<pagx::Layer>();
+  parent->children = {child1, child2, child3};
+
+  child1->height = 50;
+  child2->height = 50;
+  child3->height = 50;
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_EQ(child1->x, std::round(child1->x));
+  EXPECT_EQ(child1->width, std::round(child1->width));
+  EXPECT_EQ(child2->x, std::round(child2->x));
+  EXPECT_EQ(child2->width, std::round(child2->width));
+  EXPECT_EQ(child3->x, std::round(child3->x));
+  EXPECT_EQ(child3->width, std::round(child3->width));
+
+  EXPECT_EQ(child1->width + child2->width + child3->width, 100.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Container Layout - Measurement Cache
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutMeasureCacheIdempotent) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 200;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->gap = 10;
+
+  auto child1 = doc->makeNode<pagx::Layer>();
+  auto child2 = doc->makeNode<pagx::Layer>();
+  parent->children = {child1, child2};
+
+  child1->height = 80;
+  child2->width = 100;
+  child2->height = 80;
+
+  pagx::AutoLayout::Apply(doc.get());
+  float w1 = child1->width;
+  float x1 = child1->x;
+  float w2 = child2->width;
+  float x2 = child2->x;
+
+  pagx::AutoLayout::Apply(doc.get());
+  EXPECT_EQ(child1->width, w1);
+  EXPECT_EQ(child1->x, x1);
+  EXPECT_EQ(child2->width, w2);
+  EXPECT_EQ(child2->x, x2);
+}
+
+// =====================================================================================
+// Auto Layout - Constraint Layout - Single Edge
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutConstraintLeft) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 200;
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {100, 50};
+  rect->position = {0, 0};
+  rect->left = 20;
+
+  layer->contents.push_back(rect);
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_FLOAT_EQ(rect->position.x, 70.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutConstraintRight) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 200;
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {100, 50};
+  rect->position = {0, 0};
+  rect->right = 30;
+
+  layer->contents.push_back(rect);
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_FLOAT_EQ(rect->position.x, 320.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutConstraintTop) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 200;
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {100, 50};
+  rect->position = {0, 0};
+  rect->top = 25;
+
+  layer->contents.push_back(rect);
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_FLOAT_EQ(rect->position.y, 50.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutConstraintBottom) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 200;
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {100, 50};
+  rect->position = {0, 0};
+  rect->bottom = 40;
+
+  layer->contents.push_back(rect);
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_FLOAT_EQ(rect->position.y, 135.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutConstraintCenterX) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 200;
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {100, 50};
+  rect->position = {100, 100};
+  rect->centerX = 0;
+
+  layer->contents.push_back(rect);
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_FLOAT_EQ(rect->position.x, 200.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutConstraintCenterY) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 200;
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {100, 50};
+  rect->position = {0, 0};
+  rect->centerY = 10;
+
+  layer->contents.push_back(rect);
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_FLOAT_EQ(rect->position.y, 110.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Constraint Layout - Stretch (Ellipse)
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutConstraintStretchEllipse) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 200;
+
+  auto ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->size = {100, 50};
+  ellipse->position = {0, 0};
+  ellipse->left = 20;
+  ellipse->right = 20;
+
+  layer->contents.push_back(ellipse);
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_FLOAT_EQ(ellipse->size.width, 360.0f);
+  EXPECT_FLOAT_EQ(ellipse->position.x, 200.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutConstraintStretchEllipseVertical) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 200;
+
+  auto ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->size = {100, 50};
+  ellipse->position = {0, 0};
+  ellipse->top = 15;
+  ellipse->bottom = 15;
+
+  layer->contents.push_back(ellipse);
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_FLOAT_EQ(ellipse->size.height, 170.0f);
+  EXPECT_FLOAT_EQ(ellipse->position.y, 100.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Constraint Layout - Stretch (Rectangle, TextBox)
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutConstraintStretchRectangle) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 200;
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {100, 50};
+  rect->position = {0, 0};
+  rect->left = 10;
+  rect->right = 10;
+
+  layer->contents.push_back(rect);
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_FLOAT_EQ(rect->size.width, 380.0f);
+  EXPECT_FLOAT_EQ(rect->position.x, 200.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutConstraintStretchTextBox) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 200;
+
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->size = {100, 50};
+  textBox->position = {0, 0};
+  textBox->left = 30;
+  textBox->right = 30;
+  textBox->top = 20;
+  textBox->bottom = 20;
+
+  layer->contents.push_back(textBox);
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // Horizontal: 400 - 30 - 30 = 340
+  EXPECT_FLOAT_EQ(textBox->size.width, 340.0f);
+  EXPECT_FLOAT_EQ(textBox->position.x, 30.0f);
+  // Vertical: 200 - 20 - 20 = 160
+  EXPECT_FLOAT_EQ(textBox->size.height, 160.0f);
+  EXPECT_FLOAT_EQ(textBox->position.y, 20.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Constraint Layout - Proportional Scaling
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarHorizontal) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 200;
+
+  auto star = doc->makeNode<pagx::Polystar>();
+  star->outerRadius = 30;
+  star->innerRadius = 15;
+  star->position = {0, 0};
+  star->left = 50;
+  star->right = 50;
+
+  layer->contents.push_back(star);
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // Polystar bounds (computed from precise vertex positions, not simplified square):
+  // For Star with pointCount=5, rotation=0, width ≈ 2.0 * outerRadius, height ≈ 1.809 * outerRadius
+  // bounds.width ≈ 57.06, area width = 400 - 50 - 50 = 300
+  // scale = 300 / 57.06 ≈ 5.259
+  EXPECT_FLOAT_EQ(star->outerRadius, 157.7193336357f);
+  EXPECT_FLOAT_EQ(star->innerRadius, 78.8596668179f);
+  EXPECT_FLOAT_EQ(star->position.x, 200.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarVertical) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 200;
+
+  auto star = doc->makeNode<pagx::Polystar>();
+  star->outerRadius = 25;
+  star->innerRadius = 10;
+  star->position = {0, 0};
+  star->top = 20;
+  star->bottom = 20;
+
+  layer->contents.push_back(star);
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // Polystar bounds (computed from precise vertex positions):
+  // bounds.height ≈ 1.809 * outerRadius ≈ 45.225
+  // area height = 200 - 20 - 20 = 160
+  // scale = 160 / 45.225 ≈ 3.538
+  EXPECT_FLOAT_EQ(star->outerRadius, 88.4458247200f);
+  EXPECT_FLOAT_EQ(star->innerRadius, 35.3783298880f);
+  EXPECT_FLOAT_EQ(star->position.y, 108.4458247200f);
+}
+
+PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarBothAxes) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 200;
+
+  auto star = doc->makeNode<pagx::Polystar>();
+  star->outerRadius = 20;
+  star->innerRadius = 10;
+  star->position = {0, 0};
+  star->left = 20;
+  star->right = 20;
+  star->top = 10;
+  star->bottom = 10;
+
+  layer->contents.push_back(star);
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // Polystar bounds (computed from precise vertex positions):
+  // bounds.width ≈ 38.042, bounds.height ≈ 36.180
+  // areaWidth = 360, areaHeight = 180
+  // scaleX = 360 / 38.042 ≈ 9.463, scaleY = 180 / 36.180 ≈ 4.975
+  // scale = min(9.463, 4.975) ≈ 4.975
+  EXPECT_FLOAT_EQ(star->outerRadius, 99.5015528100f);
+  EXPECT_FLOAT_EQ(star->innerRadius, 49.7507764050f);
+  // Scaled bounds = (-99.5, -90, 199, 180)
+  // Horizontal: tx = 20 + (360 - 199) * 0.5 - (-99.5) = 200, position.x = 200
+  // Vertical: ty = 10 + (180 - 180) * 0.5 - (-90) = 100, position.y = 100
+  EXPECT_FLOAT_EQ(star->position.x, 200.0f);
+  EXPECT_FLOAT_EQ(star->position.y, 109.5015528100f);
+}
+
+PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 200;
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+  auto fontFamily = typeface->fontFamily();
+  auto fontStyle = typeface->fontStyle();
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Hello";
+  text->fontFamily = fontFamily;
+  text->fontStyle = fontStyle;
+  text->fontSize = 24;
+  text->position = {0, 0};
+  text->left = 20;
+  text->right = 20;
+  text->top = 10;
+  text->bottom = 10;
+
+  // Compute original text bounds to derive expected scale.
+  tgfx::Font font(typeface, 24);
+  auto blob = tgfx::TextBlob::MakeFrom("Hello", font);
+  ASSERT_NE(blob, nullptr);
+  auto bounds = blob->getTightBounds();
+  float origWidth = bounds.right - bounds.left;
+  float origHeight = bounds.bottom - bounds.top;
+
+  layer->contents.push_back(text);
+
+  pagx::FontConfig fontProvider;
+  fontProvider.registerTypeface(typeface);
+  pagx::AutoLayout::Apply(doc.get(), &fontProvider);
+
+  // Proportional scaling: areaWidth = 360, areaHeight = 180
+  float scaleX = 360 / origWidth;
+  float scaleY = 180 / origHeight;
+  float scale = std::min(scaleX, scaleY);
+  float expectedFontSize = 24 * scale;
+  EXPECT_FLOAT_EQ(text->fontSize, expectedFontSize);
+  // After scaling, fontSize changed. Verify position is within the target area.
+  EXPECT_GE(text->position.x, 20);
+  EXPECT_LE(text->position.x, 380);
+  EXPECT_GE(text->position.y, 10);
+  EXPECT_LE(text->position.y, 190);
+}
+
+PAGX_TEST(PAGXTest, LayoutConstraintScaleTextSingleAxis) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 200;
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+  auto fontFamily = typeface->fontFamily();
+  auto fontStyle = typeface->fontStyle();
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Hi";
+  text->fontFamily = fontFamily;
+  text->fontStyle = fontStyle;
+  text->fontSize = 50;
+  text->position = {0, 0};
+  text->left = 10;
+  text->right = 10;
+
+  // Compute original text bounds to derive expected scale.
+  tgfx::Font font(typeface, 50);
+  auto blob = tgfx::TextBlob::MakeFrom("Hi", font);
+  ASSERT_NE(blob, nullptr);
+  auto bounds = blob->getTightBounds();
+  float origWidth = bounds.right - bounds.left;
+
+  layer->contents.push_back(text);
+
+  pagx::FontConfig fontProvider;
+  fontProvider.registerTypeface(typeface);
+  pagx::AutoLayout::Apply(doc.get(), &fontProvider);
+
+  // areaWidth = 380, scale = 380 / origWidth
+  float expectedFontSize = 50 * 380 / origWidth;
+  EXPECT_FLOAT_EQ(text->fontSize, expectedFontSize);
+}
+
+PAGX_TEST(PAGXTest, LayoutConstraintScaleTextSkipWithTextBox) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 200;
+
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->size = {200, 100};
+  textBox->position = {100, 50};
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Hello";
+  text->fontSize = 24;
+  text->position = {0, 0};
+  text->left = 20;
+  text->right = 20;
+  text->top = 10;
+  text->bottom = 10;
+
+  layer->contents = {textBox, text};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // TextBox exists in the same scope, so Text should skip scaling.
+  // fontSize remains unchanged.
+  EXPECT_FLOAT_EQ(text->fontSize, 24.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutConstraintScaleExactFit) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 200;
+
+  auto star = doc->makeNode<pagx::Polystar>();
+  star->outerRadius = 50;
+  star->innerRadius = 25;
+  star->position = {0, 0};
+  // Polystar bounds: bounds.width ≈ 95.106
+  // areaWidth = 400 - 150 - 150 = 100
+  // scale = 100 / 95.106 ≈ 1.0515 (not 1.0, so scaling applies)
+  star->left = 150;
+  star->right = 150;
+
+  layer->contents.push_back(star);
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // scale ≈ 1.0515
+  EXPECT_FLOAT_EQ(star->outerRadius, 52.5731112119f);
+  EXPECT_FLOAT_EQ(star->innerRadius, 26.2865556060f);
+  EXPECT_FLOAT_EQ(star->position.x, 200.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutConstraintScalePath) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 200;
+
+  auto path = doc->makeNode<pagx::Path>();
+  path->data = doc->makeNode<pagx::PathData>();
+  path->data->moveTo(0, 0);
+  path->data->lineTo(60, 0);
+  path->data->lineTo(30, 40);
+  path->data->close();
+  path->position = {0, 0};
+  path->left = 20;
+  path->right = 20;
+
+  layer->contents.push_back(path);
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // Path bounds = (0, 0, 60, 40). Single-axis constraint: areaWidth = 360
+  // Proportional scaling: scale = 360 / 60 = 6.0
+  // Scaled points: (0,0)->(360,0)->(180,240), new bounds = (0, 0, 360, 240)
+  EXPECT_FLOAT_EQ(path->position.x, 20.0f);
+  // Verify points were actually scaled
+  auto& points = path->data->points();
+  EXPECT_FLOAT_EQ(points[1].x, 360.0f);  // 60 * 6
+  EXPECT_FLOAT_EQ(points[2].x, 180.0f);  // 30 * 6
+  EXPECT_FLOAT_EQ(points[2].y, 240.0f);  // 40 * 6
+}
+
+PAGX_TEST(PAGXTest, LayoutConstraintScalePathBothAxes) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 300;
+
+  auto path = doc->makeNode<pagx::Path>();
+  path->data = doc->makeNode<pagx::PathData>();
+  path->data->moveTo(0, 0);
+  path->data->lineTo(100, 0);
+  path->data->lineTo(100, 50);
+  path->data->lineTo(0, 50);
+  path->data->close();
+  path->position = {0, 0};
+  path->left = 50;
+  path->right = 50;
+  path->top = 50;
+  path->bottom = 50;
+
+  layer->contents.push_back(path);
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // Path bounds = (0, 0, 100, 50)
+  // areaWidth = 300, scaleX = 300 / 100 = 3.0
+  // areaHeight = 200, scaleY = 200 / 50 = 4.0
+  // scale = min(3.0, 4.0) = 3.0
+  // Scaled bounds: (0, 0, 300, 150)
+  auto& points = path->data->points();
+  EXPECT_FLOAT_EQ(points[1].x, 300.0f);  // 100 * 3
+  EXPECT_FLOAT_EQ(points[2].y, 150.0f);  // 50 * 3
+  // Centered vertically: 50 + (200 - 150) * 0.5 - 0 = 75
+  EXPECT_FLOAT_EQ(path->position.x, 50.0f);
+  EXPECT_FLOAT_EQ(path->position.y, 75.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Constraint Layout - Group
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutGroupDerivedSize) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 300;
+
+  auto group = doc->makeNode<pagx::Group>();
+  group->position = {0, 0};
+  group->left = 20;
+  group->right = 20;
+  group->top = 30;
+  group->bottom = 30;
+
+  layer->contents.push_back(group);
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_EQ(group->width, 360.0f);
+  EXPECT_EQ(group->height, 240.0f);
+  EXPECT_EQ(group->position.x, 20.0f);
+  EXPECT_EQ(group->position.y, 30.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutConstraintGroupRecursive) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 200;
+
+  auto group = doc->makeNode<pagx::Group>();
+  group->position = {0, 0};
+  group->left = 20;
+  group->right = 20;
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {100, 50};
+  rect->position = {0, 0};
+  rect->left = 10;
+  rect->right = 10;
+
+  group->elements.push_back(rect);
+  layer->contents.push_back(group);
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_EQ(group->width, 360.0f);
+  EXPECT_EQ(group->position.x, 20.0f);
+  EXPECT_FLOAT_EQ(rect->size.width, 340.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Constraint Layout - Multiple Elements
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutConstraintMultipleElements) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 300;
+
+  auto rect1 = doc->makeNode<pagx::Rectangle>();
+  rect1->size = {80, 40};
+  rect1->position = {0, 0};
+  rect1->left = 10;
+
+  auto rect2 = doc->makeNode<pagx::Rectangle>();
+  rect2->size = {80, 40};
+  rect2->position = {0, 0};
+  rect2->right = 10;
+
+  auto rect3 = doc->makeNode<pagx::Rectangle>();
+  rect3->size = {80, 40};
+  rect3->position = {0, 0};
+  rect3->centerX = 0;
+  rect3->centerY = 0;
+
+  layer->contents = {rect1, rect2, rect3};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_FLOAT_EQ(rect1->position.x, 50.0f);
+  EXPECT_FLOAT_EQ(rect2->position.x, 350.0f);
+  EXPECT_FLOAT_EQ(rect3->position.x, 200.0f);
+  EXPECT_FLOAT_EQ(rect3->position.y, 150.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Constraint Layout - Validation
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutConstraintConflictCenterXWithLeftRight) {
+  pagx::Constraints c = {};
+  c.centerX = 0;
+  c.left = 10;
+  std::string errorMessage;
+  EXPECT_FALSE(c.isValid(errorMessage));
+  EXPECT_FALSE(errorMessage.empty());
+}
+
+PAGX_TEST(PAGXTest, LayoutConstraintConflictCenterYWithTopBottom) {
+  pagx::Constraints c = {};
+  c.centerY = 0;
+  c.bottom = 10;
+  std::string errorMessage;
+  EXPECT_FALSE(c.isValid(errorMessage));
+  EXPECT_FALSE(errorMessage.empty());
+}
+
+PAGX_TEST(PAGXTest, LayoutConstraintValidCombination) {
+  pagx::Constraints c = {};
+  c.left = 10;
+  c.right = 10;
+  c.top = 20;
+  c.bottom = 20;
+  std::string errorMessage;
+  EXPECT_TRUE(c.isValid(errorMessage));
+  EXPECT_TRUE(errorMessage.empty());
+}
+
+// =====================================================================================
+// Auto Layout - Container Layout - includeInLayout
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutContainerIncludeInLayout) {
+  auto doc = pagx::PAGXDocument::Make(600, 200);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 600;
+  parent->height = 200;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->gap = 10;
+
+  // A decoration layer that should not participate in layout.
+  auto badge = doc->makeNode<pagx::Layer>();
+  badge->width = 40;
+  badge->height = 40;
+  badge->x = 550;
+  badge->y = 5;
+  badge->includeInLayout = false;
+
+  auto child1 = doc->makeNode<pagx::Layer>();
+  child1->width = 200;
+  child1->height = 100;
+
+  auto child2 = doc->makeNode<pagx::Layer>();
+  child2->width = 200;
+  child2->height = 100;
+
+  parent->children = {badge, child1, child2};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // badge is excluded from layout: its x/y should remain unchanged.
+  EXPECT_FLOAT_EQ(badge->x, 550.0f);
+  EXPECT_FLOAT_EQ(badge->y, 5.0f);
+
+  // child1 and child2 are laid out as if badge doesn't exist.
+  EXPECT_FLOAT_EQ(child1->x, 0.0f);
+  EXPECT_FLOAT_EQ(child2->x, 210.0f);  // 200 + 10
+}
+
+PAGX_TEST(PAGXTest, LayoutContainerIncludeInLayoutMeasure) {
+  auto doc = pagx::PAGXDocument::Make(600, 200);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  // Parent has no explicit width — should be measured from participating children only.
+  parent->height = 200;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->gap = 10;
+
+  auto badge = doc->makeNode<pagx::Layer>();
+  badge->width = 500;
+  badge->height = 40;
+  badge->includeInLayout = false;
+
+  auto child1 = doc->makeNode<pagx::Layer>();
+  child1->width = 100;
+  child1->height = 80;
+
+  auto child2 = doc->makeNode<pagx::Layer>();
+  child2->width = 100;
+  child2->height = 80;
+
+  parent->children = {badge, child1, child2};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // Measured width = 100 + 10 + 100 = 210 (badge excluded).
+  EXPECT_FLOAT_EQ(parent->width, 210.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Container Layout - Alignment::Stretch
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutContainerStretch) {
+  auto doc = pagx::PAGXDocument::Make(600, 200);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 600;
+  parent->height = 200;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->alignment = pagx::Alignment::Stretch;
+  parent->gap = 10;
+
+  auto child1 = doc->makeNode<pagx::Layer>();
+  child1->width = 200;
+  // height is NaN — should be stretched to 200.
+
+  auto child2 = doc->makeNode<pagx::Layer>();
+  child2->width = 200;
+  // height is NaN — should be stretched to 200.
+
+  parent->children = {child1, child2};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_FLOAT_EQ(child1->height, 200.0f);
+  EXPECT_FLOAT_EQ(child2->height, 200.0f);
+  EXPECT_FLOAT_EQ(child1->y, 0.0f);
+  EXPECT_FLOAT_EQ(child2->y, 0.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutContainerStretchWithPadding) {
+  auto doc = pagx::PAGXDocument::Make(600, 200);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 600;
+  parent->height = 200;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->alignment = pagx::Alignment::Stretch;
+  parent->padding = {10, 20, 10, 20};
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 200;
+  // height is NaN — should be stretched to 200 - 10 - 10 = 180.
+
+  parent->children = {child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_FLOAT_EQ(child->height, 180.0f);
+  EXPECT_FLOAT_EQ(child->y, 10.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutContainerStretchExplicitSize) {
+  auto doc = pagx::PAGXDocument::Make(600, 200);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 600;
+  parent->height = 200;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->alignment = pagx::Alignment::Stretch;
+
+  auto child1 = doc->makeNode<pagx::Layer>();
+  child1->width = 200;
+  child1->height = 80;  // Explicit height — should NOT be stretched.
+
+  auto child2 = doc->makeNode<pagx::Layer>();
+  child2->width = 200;
+  // height is NaN — should be stretched to 200.
+
+  parent->children = {child1, child2};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // child1 has explicit height, not affected by Stretch.
+  EXPECT_FLOAT_EQ(child1->height, 80.0f);
+  // child2 has no explicit height, stretched.
+  EXPECT_FLOAT_EQ(child2->height, 200.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutContainerStretchVertical) {
+  auto doc = pagx::PAGXDocument::Make(600, 400);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 600;
+  parent->height = 400;
+  parent->layout = pagx::LayoutMode::Vertical;
+  parent->alignment = pagx::Alignment::Stretch;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->height = 100;
+  // width is NaN — in vertical layout, cross axis is width, should be stretched to 600.
+
+  parent->children = {child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_FLOAT_EQ(child->width, 600.0f);
+  EXPECT_FLOAT_EQ(child->x, 0.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutIncludeInLayoutWithStretch) {
+  auto doc = pagx::PAGXDocument::Make(600, 200);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 600;
+  parent->height = 200;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->alignment = pagx::Alignment::Stretch;
+
+  // badge: excluded from layout, should NOT be stretched.
+  auto badge = doc->makeNode<pagx::Layer>();
+  badge->width = 40;
+  badge->height = 40;
+  badge->x = 550;
+  badge->y = 5;
+  badge->includeInLayout = false;
+
+  // child: no explicit height, should be stretched to 200.
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 200;
+
+  parent->children = {badge, child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // badge is excluded: its height remains 40, position unchanged.
+  EXPECT_FLOAT_EQ(badge->height, 40.0f);
+  EXPECT_FLOAT_EQ(badge->x, 550.0f);
+  EXPECT_FLOAT_EQ(badge->y, 5.0f);
+
+  // child is stretched.
+  EXPECT_FLOAT_EQ(child->height, 200.0f);
+  EXPECT_FLOAT_EQ(child->x, 0.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutIncludeInLayoutMixedVisibility) {
+  auto doc = pagx::PAGXDocument::Make(600, 200);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  // Parent has no explicit width — measured from participating children.
+  parent->height = 200;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->gap = 10;
+
+  // child1: visible=true, includeInLayout=false -> visible but excluded from layout.
+  auto child1 = doc->makeNode<pagx::Layer>();
+  child1->width = 500;
+  child1->height = 100;
+  child1->includeInLayout = false;
+
+  // child2: visible=false, includeInLayout=true -> invisible, excluded from layout.
+  auto child2 = doc->makeNode<pagx::Layer>();
+  child2->width = 300;
+  child2->height = 100;
+  child2->visible = false;
+
+  // child3: visible=true, includeInLayout=true -> participates normally.
+  auto child3 = doc->makeNode<pagx::Layer>();
+  child3->width = 100;
+  child3->height = 80;
+
+  // child4: visible=true, includeInLayout=true -> participates normally.
+  auto child4 = doc->makeNode<pagx::Layer>();
+  child4->width = 100;
+  child4->height = 80;
+
+  parent->children = {child1, child2, child3, child4};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // Only child3 and child4 participate: measured width = 100 + 10 + 100 = 210.
+  EXPECT_FLOAT_EQ(parent->width, 210.0f);
+  // child3 and child4 are positioned as the only participants.
+  EXPECT_FLOAT_EQ(child3->x, 0.0f);
+  EXPECT_FLOAT_EQ(child4->x, 110.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Container + Constraint combined
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutContainerWithConstraints) {
+  auto doc = pagx::PAGXDocument::Make(600, 400);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 600;
+  parent->height = 400;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->gap = 0;
+
+  auto left = doc->makeNode<pagx::Layer>();
+  auto right = doc->makeNode<pagx::Layer>();
+  parent->children = {left, right};
+
+  left->height = 400;
+  right->height = 400;
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {80, 80};
+  rect->position = {0, 0};
+  rect->centerX = 0;
+  rect->centerY = 0;
+  left->contents.push_back(rect);
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_EQ(left->width, 300.0f);
+  EXPECT_EQ(right->width, 300.0f);
+
+  EXPECT_FLOAT_EQ(rect->position.x, 150.0f);
+  EXPECT_FLOAT_EQ(rect->position.y, 200.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Round-trip: Layout Attributes
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutRoundTripAttributes) {
+  auto doc = pagx::PAGXDocument::Make(500, 400);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->name = "LayoutLayer";
+  layer->width = 500;
+  layer->height = 400;
+  layer->layout = pagx::LayoutMode::Vertical;
+  layer->gap = 15;
+  layer->padding = pagx::Padding{10, 20, 30, 40};
+  layer->alignment = pagx::Alignment::Center;
+  layer->arrangement = pagx::Arrangement::SpaceBetween;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 100;
+  child->height = 50;
+  layer->children.push_back(child);
+
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+
+  auto doc2 = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc2 != nullptr);
+  ASSERT_GE(doc2->layers.size(), 1u);
+
+  auto* layer2 = doc2->layers[0];
+
+  EXPECT_EQ(layer2->layout, pagx::LayoutMode::Vertical);
+
+  EXPECT_FLOAT_EQ(layer2->gap, 15.0f);
+
+  EXPECT_FLOAT_EQ(layer2->padding.top, 10.0f);
+  EXPECT_FLOAT_EQ(layer2->padding.right, 20.0f);
+  EXPECT_FLOAT_EQ(layer2->padding.bottom, 30.0f);
+  EXPECT_FLOAT_EQ(layer2->padding.left, 40.0f);
+
+  EXPECT_EQ(layer2->alignment, pagx::Alignment::Center);
+  EXPECT_EQ(layer2->arrangement, pagx::Arrangement::SpaceBetween);
+
+  auto* child2 = layer2->children[0];
+  // includeInLayout defaults to true and is not written when true.
+  EXPECT_TRUE(child2->includeInLayout);
+}
+
+PAGX_TEST(PAGXTest, LayoutRoundTripIncludeInLayout) {
+  auto doc = pagx::PAGXDocument::Make(600, 200);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 600;
+  parent->height = 200;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->gap = 10;
+
+  auto badge = doc->makeNode<pagx::Layer>();
+  badge->width = 40;
+  badge->height = 40;
+  badge->x = 550;
+  badge->y = 5;
+  badge->includeInLayout = false;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 200;
+  child->height = 100;
+
+  parent->children = {badge, child};
+
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+  EXPECT_NE(xml.find("includeInLayout=\"false\""), std::string::npos);
+
+  auto doc2 = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc2 != nullptr);
+  ASSERT_GE(doc2->layers.size(), 1u);
+
+  auto* parent2 = doc2->layers[0];
+  ASSERT_EQ(parent2->children.size(), 2u);
+  EXPECT_FALSE(parent2->children[0]->includeInLayout);
+  EXPECT_TRUE(parent2->children[1]->includeInLayout);
+
+  // Verify layout still works correctly after round-trip.
+  pagx::AutoLayout::Apply(doc2.get());
+  EXPECT_FLOAT_EQ(parent2->children[0]->x, 550.0f);
+  EXPECT_FLOAT_EQ(parent2->children[0]->y, 5.0f);
+  EXPECT_FLOAT_EQ(parent2->children[1]->x, 0.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutRoundTripAlignmentStretch) {
+  auto doc = pagx::PAGXDocument::Make(600, 200);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 600;
+  parent->height = 200;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->alignment = pagx::Alignment::Stretch;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 200;
+  parent->children = {child};
+
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+  EXPECT_NE(xml.find("alignment=\"stretch\""), std::string::npos);
+
+  auto doc2 = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc2 != nullptr);
+  ASSERT_GE(doc2->layers.size(), 1u);
+
+  auto* parent2 = doc2->layers[0];
+  EXPECT_EQ(parent2->alignment, pagx::Alignment::Stretch);
+
+  // Verify stretch behavior works after round-trip.
+  pagx::AutoLayout::Apply(doc2.get());
+  EXPECT_FLOAT_EQ(parent2->children[0]->height, 200.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutRoundTripConstraints) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 300;
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {100, 50};
+  rect->position = {0, 0};
+  rect->left = 10;
+  rect->right = 20;
+  rect->top = 30;
+  rect->bottom = 40;
+
+  auto ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->size = {80, 60};
+  ellipse->position = {0, 0};
+  ellipse->centerX = 5;
+  ellipse->centerY = -10;
+
+  layer->contents = {rect, ellipse};
+
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+
+  EXPECT_NE(xml.find("left=\"10\""), std::string::npos);
+  EXPECT_NE(xml.find("right=\"20\""), std::string::npos);
+  EXPECT_NE(xml.find("top=\"30\""), std::string::npos);
+  EXPECT_NE(xml.find("bottom=\"40\""), std::string::npos);
+  EXPECT_NE(xml.find("centerX=\"5\""), std::string::npos);
+  EXPECT_NE(xml.find("centerY=\"-10\""), std::string::npos);
+}
+
+// =====================================================================================
+// Auto Layout - Layer Constraint Layout - Single Edge (Absolute mode)
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayerConstraintLeft) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 100;
+  child->height = 60;
+  child->left = 30;
+
+  parent->children = {child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_FLOAT_EQ(child->x, 30.0f);
+}
+
+PAGX_TEST(PAGXTest, LayerConstraintRight) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 100;
+  child->height = 60;
+  child->right = 20;
+
+  parent->children = {child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // x = parentWidth - right - childWidth = 400 - 20 - 100 = 280
+  EXPECT_FLOAT_EQ(child->x, 280.0f);
+}
+
+PAGX_TEST(PAGXTest, LayerConstraintTop) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 100;
+  child->height = 60;
+  child->top = 40;
+
+  parent->children = {child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_FLOAT_EQ(child->y, 40.0f);
+}
+
+PAGX_TEST(PAGXTest, LayerConstraintBottom) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 100;
+  child->height = 60;
+  child->bottom = 25;
+
+  parent->children = {child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // y = parentHeight - bottom - childHeight = 300 - 25 - 60 = 215
+  EXPECT_FLOAT_EQ(child->y, 215.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Layer Constraint Layout - Center (Absolute mode)
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayerConstraintCenterX) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 100;
+  child->height = 60;
+  child->centerX = 0;
+
+  parent->children = {child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // x = (parentWidth - childWidth) / 2 + centerX = (400 - 100) / 2 + 0 = 150
+  EXPECT_FLOAT_EQ(child->x, 150.0f);
+}
+
+PAGX_TEST(PAGXTest, LayerConstraintCenterY) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 100;
+  child->height = 60;
+  child->centerY = 0;
+
+  parent->children = {child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // y = (parentHeight - childHeight) / 2 + centerY = (300 - 60) / 2 + 0 = 120
+  EXPECT_FLOAT_EQ(child->y, 120.0f);
+}
+
+PAGX_TEST(PAGXTest, LayerConstraintCenterXWithOffset) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 100;
+  child->height = 60;
+  child->centerX = 20;
+  child->centerY = -10;
+
+  parent->children = {child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // x = (400 - 100) / 2 + 20 = 170
+  EXPECT_FLOAT_EQ(child->x, 170.0f);
+  // y = (300 - 60) / 2 + (-10) = 110
+  EXPECT_FLOAT_EQ(child->y, 110.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Layer Constraint Layout - Opposite Edges Derive Size
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayerConstraintLeftRightDeriveWidth) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->height = 60;
+  // width is NAN — should be derived from left + right.
+  child->left = 30;
+  child->right = 50;
+
+  parent->children = {child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // x = left = 30
+  EXPECT_FLOAT_EQ(child->x, 30.0f);
+  // width = parentWidth - left - right = 400 - 30 - 50 = 320
+  EXPECT_FLOAT_EQ(child->width, 320.0f);
+}
+
+PAGX_TEST(PAGXTest, LayerConstraintTopBottomDeriveHeight) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 100;
+  // height is NAN — should be derived from top + bottom.
+  child->top = 20;
+  child->bottom = 40;
+
+  parent->children = {child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // y = top = 20
+  EXPECT_FLOAT_EQ(child->y, 20.0f);
+  // height = parentHeight - top - bottom = 300 - 20 - 40 = 240
+  EXPECT_FLOAT_EQ(child->height, 240.0f);
+}
+
+PAGX_TEST(PAGXTest, LayerConstraintAllFourEdges) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+
+  // Both width and height are NAN — both should be derived.
+  auto child = doc->makeNode<pagx::Layer>();
+  child->left = 10;
+  child->right = 20;
+  child->top = 30;
+  child->bottom = 40;
+
+  parent->children = {child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_FLOAT_EQ(child->x, 10.0f);
+  EXPECT_FLOAT_EQ(child->y, 30.0f);
+  EXPECT_FLOAT_EQ(child->width, 370.0f);   // 400 - 10 - 20
+  EXPECT_FLOAT_EQ(child->height, 230.0f);  // 300 - 30 - 40
+}
+
+PAGX_TEST(PAGXTest, LayerConstraintLeftRightOverridesExplicitWidth) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 100;  // Explicit width — overridden by left+right.
+  child->height = 60;
+  child->left = 30;
+  child->right = 50;
+
+  parent->children = {child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_FLOAT_EQ(child->x, 30.0f);
+  EXPECT_FLOAT_EQ(child->width, 320.0f);  // 400 - 30 - 50, left+right overrides explicit width.
+}
+
+// =====================================================================================
+// Auto Layout - Layer Constraint Layout - Combined Axes
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayerConstraintLeftAndTop) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 100;
+  child->height = 60;
+  child->left = 15;
+  child->top = 25;
+
+  parent->children = {child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_FLOAT_EQ(child->x, 15.0f);
+  EXPECT_FLOAT_EQ(child->y, 25.0f);
+}
+
+PAGX_TEST(PAGXTest, LayerConstraintRightAndBottom) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 100;
+  child->height = 60;
+  child->right = 10;
+  child->bottom = 20;
+
+  parent->children = {child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // x = 400 - 10 - 100 = 290
+  EXPECT_FLOAT_EQ(child->x, 290.0f);
+  // y = 300 - 20 - 60 = 220
+  EXPECT_FLOAT_EQ(child->y, 220.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Layer Constraint Layout - includeInLayout=false
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayerConstraintWithIncludeInLayoutFalse) {
+  auto doc = pagx::PAGXDocument::Make(600, 400);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 600;
+  parent->height = 400;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->gap = 10;
+
+  // This child opts out of layout flow but has constraints.
+  auto overlay = doc->makeNode<pagx::Layer>();
+  overlay->width = 200;
+  overlay->height = 100;
+  overlay->includeInLayout = false;
+  overlay->right = 20;
+  overlay->bottom = 30;
+
+  // Normal layout children.
+  auto child1 = doc->makeNode<pagx::Layer>();
+  child1->width = 150;
+  child1->height = 100;
+
+  auto child2 = doc->makeNode<pagx::Layer>();
+  child2->width = 150;
+  child2->height = 100;
+
+  parent->children = {overlay, child1, child2};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // overlay: excluded from container layout, constraints apply.
+  // x = 600 - 20 - 200 = 380
+  EXPECT_FLOAT_EQ(overlay->x, 380.0f);
+  // y = 400 - 30 - 100 = 270
+  EXPECT_FLOAT_EQ(overlay->y, 270.0f);
+
+  // child1 and child2 are laid out normally without overlay.
+  EXPECT_FLOAT_EQ(child1->x, 0.0f);
+  EXPECT_FLOAT_EQ(child2->x, 160.0f);  // 150 + 10
+}
+
+PAGX_TEST(PAGXTest, LayerConstraintIncludeInLayoutFalseDeriveSize) {
+  auto doc = pagx::PAGXDocument::Make(600, 400);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 600;
+  parent->height = 400;
+  parent->layout = pagx::LayoutMode::Horizontal;
+
+  // Overlay with no explicit size — derived from constraints.
+  auto overlay = doc->makeNode<pagx::Layer>();
+  overlay->includeInLayout = false;
+  overlay->left = 50;
+  overlay->right = 50;
+  overlay->top = 40;
+  overlay->bottom = 60;
+
+  parent->children = {overlay};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_FLOAT_EQ(overlay->x, 50.0f);
+  EXPECT_FLOAT_EQ(overlay->y, 40.0f);
+  EXPECT_FLOAT_EQ(overlay->width, 500.0f);   // 600 - 50 - 50
+  EXPECT_FLOAT_EQ(overlay->height, 300.0f);  // 400 - 40 - 60
+}
+
+// =====================================================================================
+// Auto Layout - Layer Constraint Layout - Priority (container layout wins)
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayerConstraintIgnoredInContainerLayout) {
+  auto doc = pagx::PAGXDocument::Make(600, 400);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 600;
+  parent->height = 400;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->gap = 10;
+
+  // This child has constraints but also participates in container layout.
+  // Container layout should take priority — constraints ignored.
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 200;
+  child->height = 100;
+  child->left = 999;  // Should be ignored.
+  child->top = 999;   // Should be ignored.
+
+  auto child2 = doc->makeNode<pagx::Layer>();
+  child2->width = 200;
+  child2->height = 100;
+
+  parent->children = {child, child2};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // Container layout positions: child at x=0, child2 at x=210.
+  EXPECT_FLOAT_EQ(child->x, 0.0f);
+  EXPECT_FLOAT_EQ(child->y, 0.0f);
+  EXPECT_FLOAT_EQ(child2->x, 210.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Layer Constraint Layout - No constraint, no change
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayerNoConstraintUnchanged) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 100;
+  child->height = 60;
+  child->x = 55;
+  child->y = 77;
+  // No constraints — x/y should remain unchanged.
+
+  parent->children = {child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_FLOAT_EQ(child->x, 55.0f);
+  EXPECT_FLOAT_EQ(child->y, 77.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Layer Constraint Layout - Invisible child skipped
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayerConstraintInvisibleChildSkipped) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 100;
+  child->height = 60;
+  child->visible = false;
+  child->left = 30;
+  child->top = 40;
+  child->x = 0;
+  child->y = 0;
+
+  parent->children = {child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // Invisible child is skipped — x/y unchanged.
+  EXPECT_FLOAT_EQ(child->x, 0.0f);
+  EXPECT_FLOAT_EQ(child->y, 0.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Layer Constraint Layout - Multiple children
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayerConstraintMultipleChildren) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+
+  auto topLeft = doc->makeNode<pagx::Layer>();
+  topLeft->width = 80;
+  topLeft->height = 60;
+  topLeft->left = 10;
+  topLeft->top = 10;
+
+  auto bottomRight = doc->makeNode<pagx::Layer>();
+  bottomRight->width = 80;
+  bottomRight->height = 60;
+  bottomRight->right = 10;
+  bottomRight->bottom = 10;
+
+  auto centered = doc->makeNode<pagx::Layer>();
+  centered->width = 120;
+  centered->height = 80;
+  centered->centerX = 0;
+  centered->centerY = 0;
+
+  parent->children = {topLeft, bottomRight, centered};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // topLeft: x=10, y=10
+  EXPECT_FLOAT_EQ(topLeft->x, 10.0f);
+  EXPECT_FLOAT_EQ(topLeft->y, 10.0f);
+
+  // bottomRight: x=400-10-80=310, y=300-10-60=230
+  EXPECT_FLOAT_EQ(bottomRight->x, 310.0f);
+  EXPECT_FLOAT_EQ(bottomRight->y, 230.0f);
+
+  // centered: x=(400-120)/2=140, y=(300-80)/2=110
+  EXPECT_FLOAT_EQ(centered->x, 140.0f);
+  EXPECT_FLOAT_EQ(centered->y, 110.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Layer Constraint Layout - Measured child size (no explicit width/height)
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayerConstraintMeasuredChildSize) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+
+  // Child has no explicit width/height, but has a Rectangle content to measure.
+  auto child = doc->makeNode<pagx::Layer>();
+  child->right = 20;
+  child->bottom = 30;
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {80, 50};
+  rect->position = {40, 25};  // Center-anchored: bounds are (0, 0, 80, 50)
+  child->contents.push_back(rect);
+
+  parent->children = {child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // Measured childWidth = 80, childHeight = 50.
+  // x = parentWidth - right - childWidth = 400 - 20 - 80 = 300
+  EXPECT_FLOAT_EQ(child->x, 300.0f);
+  // y = parentHeight - bottom - childHeight = 300 - 30 - 50 = 220
+  EXPECT_FLOAT_EQ(child->y, 220.0f);
+}
+
+// =====================================================================================
+// Auto Layout - Layer Constraint Layout - Round-trip XML
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayerConstraintRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 100;
+  child->height = 60;
+  child->left = 15;
+  child->right = 25;
+  child->top = 35;
+  child->bottom = 45;
+  child->centerX = 5;
+  child->centerY = -10;
+  parent->children = {child};
+
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+
+  // Verify constraint attributes appear in XML.
+  EXPECT_NE(xml.find("left=\"15\""), std::string::npos);
+  EXPECT_NE(xml.find("right=\"25\""), std::string::npos);
+  EXPECT_NE(xml.find("top=\"35\""), std::string::npos);
+  EXPECT_NE(xml.find("bottom=\"45\""), std::string::npos);
+  EXPECT_NE(xml.find("centerX=\"5\""), std::string::npos);
+  EXPECT_NE(xml.find("centerY=\"-10\""), std::string::npos);
+
+  auto doc2 = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc2 != nullptr);
+  ASSERT_GE(doc2->layers.size(), 1u);
+
+  auto* parent2 = doc2->layers[0];
+  ASSERT_EQ(parent2->children.size(), 1u);
+
+  auto* child2 = parent2->children[0];
+  EXPECT_FLOAT_EQ(child2->left, 15.0f);
+  EXPECT_FLOAT_EQ(child2->right, 25.0f);
+  EXPECT_FLOAT_EQ(child2->top, 35.0f);
+  EXPECT_FLOAT_EQ(child2->bottom, 45.0f);
+  EXPECT_FLOAT_EQ(child2->centerX, 5.0f);
+  EXPECT_FLOAT_EQ(child2->centerY, -10.0f);
+}
+
+PAGX_TEST(PAGXTest, LayerConstraintRoundTripNanOmitted) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+
+  // Child with only left and top set — others remain NAN.
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 100;
+  child->height = 60;
+  child->left = 10;
+  child->top = 20;
+  parent->children = {child};
+
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+
+  // Only left and top should appear; right/bottom/centerX/centerY should be omitted.
+  EXPECT_NE(xml.find("left=\"10\""), std::string::npos);
+  EXPECT_NE(xml.find("top=\"20\""), std::string::npos);
+
+  auto doc2 = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc2 != nullptr);
+
+  auto* child2 = doc2->layers[0]->children[0];
+  EXPECT_FLOAT_EQ(child2->left, 10.0f);
+  EXPECT_FLOAT_EQ(child2->top, 20.0f);
+  EXPECT_TRUE(std::isnan(child2->right));
+  EXPECT_TRUE(std::isnan(child2->bottom));
+  EXPECT_TRUE(std::isnan(child2->centerX));
+  EXPECT_TRUE(std::isnan(child2->centerY));
+}
+
+/**
+ * Test all PAGX examples embedded in the skill examples.md documentation.
+ * Extracts complete PAGX documents from markdown code blocks and renders them.
+ */
+PAGX_TEST(PAGXTest, SkillExamples) {
+  TestMarkdownExamples(
+      context, ProjectPath::Absolute(".codebuddy/skills/pagx/references/examples.md"), "skills_");
 }
 
 }  // namespace pag

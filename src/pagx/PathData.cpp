@@ -75,6 +75,14 @@ void PathData::setPathData(const PathData& other) {
   _boundsDirty = true;
 }
 
+void PathData::scalePoints(float scale) {
+  for (auto& point : _points) {
+    point.x *= scale;
+    point.y *= scale;
+  }
+  _boundsDirty = true;
+}
+
 Rect PathData::getBounds() {
   if (!_boundsDirty) {
     return _cachedBounds;

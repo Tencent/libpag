@@ -21,9 +21,13 @@
 namespace pagx {
 
 /**
- * The direction of auto layout for arranging child layers.
+ * The mode of auto layout for arranging child layers.
  */
-enum class LayoutDirection {
+enum class LayoutMode {
+  /**
+   * No auto layout. Child layers use absolute positioning.
+   */
+  Absolute,
   /**
    * Arrange child layers horizontally from left to right.
    */

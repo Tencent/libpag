@@ -12,12 +12,12 @@ Read before starting generation:
 |-----------|---------|
 | `spec-essentials.md` | Format specification — node types, processing model, attribute rules |
 | `design-patterns.md` | Structure decisions, text layout, practical pitfall patterns |
+| `examples.md` | Structural patterns for Icons, UI, Logos, Charts, Decorative backgrounds |
 
 Read these as needed:
 
 | Reference | Content |
 |-----------|---------|
-| `examples.md` | Structural patterns for Icons, UI, Logos, Charts, Decorative backgrounds |
 | `attributes.md` | Attribute defaults, enumerations, required attributes |
 | `cli.md` | CLI tool usage — `render`, `bounds`, `font info` commands |
 
@@ -83,6 +83,31 @@ ProfileHeader (Layer)
   that need no Layer-exclusive features — but they must not be top-level siblings outside
   `UserInfo`, or moving the user info block would leave orphaned text behind.
 
+**After building the component tree, decide layout for each container** — see
+`design-patterns.md` §Layout Decisions for the full decision tree. Key choices:
+
+- **Constraint layout** (inside Layers, **PRIMARY**): use `left`/`right`/`top`/`bottom`/`centerX`/`centerY`
+  on VectorElements or child Layers to declare position relative to container. This is the preferred
+  approach for most positioning needs — it eliminates manual coordinate calculation and is more maintainable.
+  Use for backgrounds, centered text, edge-aligned elements, and any child inside a Layer.
+  - On VectorElements: constraints always work — the container always has a size (explicit,
+    layout-assigned, or measured from content).
+  - On child Layers: constraints work when parent uses absolute layout (default) or child has
+    `includeInLayout="false"`.
+- **Container layout** (between Layers): set `layout` on a parent to arrange child Layers
+  in a row or column. Use for rows/columns of elements (headers, card grids, list items, toolbars).
+  The layout engine automatically computes child positioning — no manual coordinate entry needed.
+- **Absolute positioning** (fallback only): use `x`/`y` on Layers or `position` on elements only for
+  irregular freeform compositions with overlapping elements. Avoid unless necessary.
+
+**When to set explicit `width`/`height`** — set dimensions when you need a specific reference
+frame, not when the measured or layout-assigned size is sufficient:
+- Root Layer typically matches canvas size.
+- Layout containers (`layout="horizontal"/"vertical"`) that need a fixed size — otherwise
+  the engine measures children and uses that.
+- Containers where `right`/`bottom`/`centerX`/`centerY` or opposite-pair constraints should
+  reference a specific design size rather than the content's measured size.
+
 ### Step 3: Build Incrementally
 
 For each block, construct the internal VectorElement tree:
@@ -90,7 +115,9 @@ For each block, construct the internal VectorElement tree:
 1. Place geometry elements (Rectangle, Ellipse, Text, etc.)
 2. Add modifiers if needed (TextBox, TrimPath, Repeater, etc.)
 3. Add painters (Fill, Stroke) — see `design-patterns.md` §1 Painter Scope Isolation
-4. Wrap sub-elements in Groups when they need different painters (`spec-essentials.md` §4)
+4. Wrap sub-elements in Groups when they need different painters (`spec-essentials.md` §4).
+   When using constraint layout, constrained shapes needing different painters must each be
+   in a separate Layer (not Group) — see `design-patterns.md` §1 Painter Scope Isolation.
 5. Extract repeated subtrees as `<Composition>` in Resources
 
 **Build in layers of complexity** — do not generate the full design in one shot:
@@ -109,8 +136,8 @@ This isolates defects: if something breaks, it was the last thing added.
 
   ```xml
   <Group>
-    <Ellipse position="-4,-3" size="5,6"/>
-    <Ellipse position="4,-3" size="5,6"/>
+    <Ellipse left="-6.5" top="-6" size="5,6"/>
+    <Ellipse left="1.5" top="-6" size="5,6"/>
     <Fill color="#E0E7FF"/>
   </Group>
   ```
@@ -126,34 +153,65 @@ This isolates defects: if something breaks, it was the last thing added.
   </Group>
   ```
 
-**Mandatory alignment and spacing after each block** — when in doubt, align. Over-aligning
-is harmless; subtle misalignment is not.
+**Auto layout mental model** — think of it like CSS Flexbox. The core principle is
+**declare intent, not coordinates**:
 
-After completing each block (or group of related blocks), actively scan for **every** pair or
-group of Layers that are visually close — shared edges, similar positions, nearly equal gaps.
-Do not limit this to obvious cases; any two values within a few pixels of each other should
-be unified to the exact same value. Common scenarios include but are not limited to:
+1. **Outside-in**: set the container's direction (`layout`), `padding`, and `gap` first.
+   Then declare children — the engine computes their positions automatically.
+2. **No width = flexible = equal share**: a child without `width` (in horizontal layout)
+   or `height` (in vertical layout) is flexible. **Children WITH explicit main-axis size are fixed**
+   and do NOT participate in equal distribution. Only flexible children equally share the
+   remaining space after fixed children, gaps, and padding are subtracted. This is the
+   single most important rule — it eliminates manual width/height calculation.
+   (This requires the parent to have main-axis size — either explicit or assigned by
+   the parent's parent using `alignment="stretch"`. Without it, the parent measures
+   children's content to determine its size — see rule 6.)
+3. **`alignment="stretch"`**: stretches children **without** explicit cross-axis size to fill
+   the cross-axis available space. Children with explicit cross-axis size keep their size.
+   In a vertical container, this stretches width; in a horizontal container, this stretches
+   height. **Essential for grid layouts** where inner horizontal rows must span the full
+   width — without it, rows shrink-wrap their content and flexible cells get zero width.
+4. **Background fills**: use `left="0" right="0" top="0" bottom="0" size="1,1"` on Rectangle
+   to auto-fill whatever size the engine assigns to the container. Never hard-code background
+   size to match container dimensions.
+5. **Engine writes sizes back**: when the engine computes a flexible child's size, it writes
+   `width`/`height` back to the child. Inner elements can then use `left`/`right`/`centerX`
+   etc. with that computed size as their reference frame.
+6. **Content-measured containers** (no explicit main-axis size): the engine measures all
+   children's content bounds first, then uses the sum (+ gaps + padding) as the container's
+   main-axis size. After that, flexible children **equally share** the measured space — they
+   do NOT retain their individual measured sizes. Practical implication: with only flexible
+   children, each child gets `totalMeasured / N` width, which equals the average of all
+   children's content widths. Useful for containers that should shrink-wrap their content
+   (e.g., inline tags, auto-sized buttons). When you need a specific container width, set it
+   explicitly or use `alignment="stretch"` from a parent.
 
-- Same-row elements should share a vertical center (icon + label, price + badge)
-- Same-column elements should share a left edge or horizontal center (list items, cards)
-- Content should be centered on its canvas or container background
-- Sibling elements in a row/column should have equal gaps between them
-- Container padding should be symmetric (left = right, top = bottom)
-- Similar containers (cards, buttons, badges) should use the same internal padding
+See `design-patterns.md` §Container Layout — Key Patterns for the full grid layout template.
 
-Use `pagx bounds` to measure, then adjust coordinates to equalize.
+**Leverage auto layout for alignment and positioning** — **eliminate manual coordinate
+calculation**. Let the layout engine handle positioning:
+
+- **Constraint-based** (PRIMARY): use `left`/`top`/`centerX`/`centerY` for edge-based positioning.
+  Background fills: `left="0" right="0" top="0" bottom="0"`. Centering: `centerX="0"` / `centerY="0"`.
+- **Container layout**: use `gap`/`padding`/`alignment` instead of manual offsets.
+- **Manual positioning** (`position`, `x`/`y`): only for irregular freeform overlapping
+  compositions. See `design-patterns.md` §Layout Decisions for the full decision tree.
 
 ### Step 4: Localize Coordinates
 
-Layer `x`/`y` carries the block offset; internal coordinates start from `0,0`. See
-`optimize-guide.md` §Coordinate Localization for the full conversion procedure.
+| Content Type | AI Action | Reason |
+|--------------|-----------|--------|
+| **Layout-managed** (constraint/container) | **DO NOTHING** — engine handles it | `x`/`y`/`position` are overwritten by layout engine |
+| **Absolute-positioned** (fallback) | Set Layer `x`/`y` for block offset; internal coords from `0,0` | See `optimize-guide.md` §Coordinate Localization |
+
+> **Rule**: If you used constraints or container layout, skip manual coordinate setting — the engine computes positions.
 
 ### Step 5: Verify and Refine
 
 After each render, follow the **Verification and Correction Loop** at the end of this
-document — run `pagx bounds` first to detect misalignment by numbers, fix with
-coordinate adjustment, then visually confirm. Do not skip bounds measurement even if
-the screenshot looks correct.
+document. For layout-managed content, focus on verifying that layout attributes (`layout`,
+`gap`, `padding`, `alignment`, `arrangement`, constraint attributes) produce the intended
+result. For absolute-positioned content, run `pagx bounds` to detect misalignment.
 
 After verification passes, continue to `optimize-guide.md` for optimization review.
 
@@ -174,45 +232,29 @@ pagx bounds input.pagx
 This outputs `x=<left> y=<top> width=<w> height=<h>` for every layer. Use `--id` or `--xpath`
 for targeted measurement when needed (see `cli.md`).
 
-### 2. Check Alignment, Spacing, and Padding by Numbers
+### 2. Check Layout and Alignment
 
-Scan the bounds data for any misalignment, uneven spacing, or asymmetric padding. Fixes
-in one area can introduce regressions elsewhere — always re-check everything.
+**For layout-managed content**, verify layout attributes produce the intended result:
+- Container `layout` direction matches the visual arrangement
+- `gap` value matches the intended spacing between children
+- `padding` is consistent and matches the design
+- `alignment` and `arrangement` produce the correct distribution
+- Constraint attributes (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`) position
+  elements correctly
+- Containers using `right`/`bottom`/`centerX`/`centerY` constraints have appropriate
+  `width`/`height` (explicit, layout-assigned, or measured)
 
-**Alignment** — elements that should share an edge or center:
-```
-A.center_y = A.bounds_y + A.bounds_height / 2
-B.center_y = B.bounds_y + B.bounds_height / 2
-→ difference should be 0 (same for center_x, left edges, etc.)
-```
-
-**Container padding** — compute all four sides and compare:
-```
-padding_left   = inner.x - outer.x
-padding_right  = (outer.x + outer.width)  - (inner.x + inner.width)
-padding_top    = inner.y - outer.y
-padding_bottom = (outer.y + outer.height) - (inner.y + inner.height)
-```
-Left should equal right; top should equal bottom. Prefer all four equal when the design
-allows.
-
-**Element gaps** — measure actual gaps between adjacent elements:
-```
-gap = B.bounds_start - (A.bounds_start + A.bounds_size)
-```
-All gaps in the same visual context should use the same value. Any two gaps within a few
-pixels of each other should be unified to one value.
-
-**Visual center** — content that should be centered on a `W × H` canvas:
-```
-center_x = bounds_x + bounds_width / 2   → should ≈ W / 2
-center_y = bounds_y + bounds_height / 2   → should ≈ H / 2
-```
-Compute from bounds, not from Layer `x`/`y` — asymmetric content shifts the visual center.
+**For absolute-positioned content**, scan bounds data for misalignment:
+- Elements that should share an edge or center: compute `center_y = bounds_y + bounds_height / 2`
+  and compare
+- Gaps between adjacent elements should be equal within the same visual context
+- Content that should be centered: `bounds_x + bounds_width / 2 ≈ canvas_width / 2`
 
 ### 3. Fix Issues
 
-- **Alignment or spacing off** → adjust Layer `x`/`y` or element `position`/`center` to equalize values
+- **Layout issues** → adjust `layout`/`gap`/`padding`/`alignment`/`arrangement` or constraint
+  attributes
+- **Absolute positioning off** → adjust Layer `x`/`y` or element `position` to equalize values
 
 ### 4. Re-render and Visually Confirm
 
@@ -244,3 +286,21 @@ pagx font info --name "Arial" --size 24
 - **Single-line height**: `ascent + descent + leading`
 - **Baseline position**: element top + `ascent`
 - **Text width**: render into PAGX and measure with `pagx bounds`
+
+### 7. Text Positioning
+
+Use constraint attributes (`left`/`right`/`centerX`…) to position Text elements.
+For multiline alignment (center/end per line), use `TextBox` with `textAlign`.
+
+```xml
+<!-- Single-line label, centered via constraints -->
+<Text text="Label" fontFamily="Arial" fontSize="14" centerX="0" centerY="0"/>
+<Fill/>
+
+<!-- Multiline text, centered via TextBox -->
+<Text text="Line 1&#10;Line 2" fontFamily="Arial" fontSize="24"/>
+<Fill/>
+<TextBox left="20" right="20" top="10" textAlign="center"/>
+```
+
+**Do not** set `textAnchor` on Text when using constraint attributes — they interact badly.

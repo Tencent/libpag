@@ -1235,9 +1235,9 @@ static int RemoveOffCanvasChildren(
 }
 
 static int RemoveOffCanvasLayers(PAGXDocument* document) {
-  TextLayout textLayout = {};
-  SetupSystemFallbackFonts(textLayout);
-  auto result = LayerBuilder::BuildWithMap(document, &textLayout);
+  FontConfig fontProvider = {};
+  SetupSystemFallbackFonts(fontProvider);
+  auto result = LayerBuilder::BuildWithMap(document, &fontProvider);
   if (result.root == nullptr) {
     return 0;
   }
@@ -1259,6 +1259,32 @@ static bool ShouldSkipLocalization(const Layer* layer) {
   }
   if (layer->contents.empty()) {
     return true;
+  }
+  // Skip localization for layers with constraint-based elements, as constraints imply
+  // precise layout control that should be preserved.
+  for (auto* element : layer->contents) {
+    auto type = element->nodeType();
+    if (type == NodeType::Rectangle) {
+      auto rect = static_cast<const Rectangle*>(element);
+      if (!std::isnan(rect->left) || !std::isnan(rect->right) || !std::isnan(rect->centerX) ||
+          !std::isnan(rect->top) || !std::isnan(rect->bottom) || !std::isnan(rect->centerY)) {
+        return true;
+      }
+    } else if (type == NodeType::Ellipse) {
+      auto ellipse = static_cast<const Ellipse*>(element);
+      if (!std::isnan(ellipse->left) || !std::isnan(ellipse->right) ||
+          !std::isnan(ellipse->centerX) || !std::isnan(ellipse->top) ||
+          !std::isnan(ellipse->bottom) || !std::isnan(ellipse->centerY)) {
+        return true;
+      }
+    } else if (type == NodeType::Polystar) {
+      auto polystar = static_cast<const Polystar*>(element);
+      if (!std::isnan(polystar->left) || !std::isnan(polystar->right) ||
+          !std::isnan(polystar->centerX) || !std::isnan(polystar->top) ||
+          !std::isnan(polystar->bottom) || !std::isnan(polystar->centerY)) {
+        return true;
+      }
+    }
   }
   return false;
 }
@@ -1380,8 +1406,11 @@ static void ComputeLocalizationOffset(const std::vector<Element*>& contents, flo
   }
 
   if (hasGeometry) {
-    offsetX = (minX + maxX) * 0.5f;
-    offsetY = (minY + maxY) * 0.5f;
+    // Use bounding box top-left as offset, not center. This ensures that after
+    // localization, element positions can match default values and be skipped during
+    // export, preserving rendering consistency through the optimize-export-import cycle.
+    offsetX = minX;
+    offsetY = minY;
   }
 }
 
@@ -1548,6 +1577,7 @@ static void LocalizeLayerCoordinates(PAGXDocument* document, Layer* layer, int& 
       layer->x += offsetX;
       layer->y += offsetY;
       ApplyLocalizationToElements(document, layer->contents, offsetX, offsetY);
+      OffsetColorSourcesInContents(document, layer->contents, offsetX, offsetY);
       count++;
     }
   }

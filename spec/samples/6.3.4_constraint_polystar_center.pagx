@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates Polystar centered over stretched Rectangle using constraints -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Container with dashed border -->
+  <Layer width="360" height="360" left="20" top="20">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+    <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+  </Layer>
+
+  <!-- Rectangle stretches to fill with margins -->
+  <Layer width="360" height="360" left="20" top="20">
+    <Rectangle left="20" right="20" top="20" bottom="20" roundness="20"/>
+    <Fill color="#6366F1"/>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F150"/>
+  </Layer>
+
+  <!-- Polystar centered using centerX and centerY constraints -->
+  <Layer width="360" height="360" left="20" top="20">
+    <Polystar centerX="0" centerY="0" size="120,120" points="5" innerRadius="36"/>
+    <Fill color="#FBBF24"/>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F59E0B60"/>
+  </Layer>
+</pagx>

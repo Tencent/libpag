@@ -345,8 +345,11 @@ CLI_TEST(PAGXCliTest, Optimize_LocalizeRectangle) {
   auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("x=\"200\"") != std::string::npos);
-  EXPECT_TRUE(output.find("y=\"300\"") != std::string::npos);
+  // After localization with offset = bbox top-left, Rectangle at (200,300) with size 100x100
+  // has bbox left/top = (150, 250), so Layer moves to x=150, y=250.
+  // Rectangle position becomes (200-150, 300-250) = (50,50) = default, so position is omitted.
+  EXPECT_TRUE(output.find("x=\"150\"") != std::string::npos);
+  EXPECT_TRUE(output.find("y=\"250\"") != std::string::npos);
   EXPECT_TRUE(output.find("position=") == std::string::npos);
 }
 
@@ -356,8 +359,10 @@ CLI_TEST(PAGXCliTest, Optimize_LocalizeEllipse) {
   auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("x=\"150\"") != std::string::npos);
-  EXPECT_TRUE(output.find("y=\"250\"") != std::string::npos);
+  // Ellipse at (150,250) with size 80x80 has bbox left/top = (110, 210).
+  // Layer moves to x=110, y=210, ellipse position becomes (40,40) = default.
+  EXPECT_TRUE(output.find("x=\"110\"") != std::string::npos);
+  EXPECT_TRUE(output.find("y=\"210\"") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Optimize_LocalizePolystar) {
@@ -366,8 +371,10 @@ CLI_TEST(PAGXCliTest, Optimize_LocalizePolystar) {
   auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("x=\"300\"") != std::string::npos);
-  EXPECT_TRUE(output.find("y=\"200\"") != std::string::npos);
+  // Polystar at (300,200) with outerRadius=40 has bbox left/top = (260, 160).
+  // Layer moves to x=260, y=160, polystar position becomes (40,40) = default.
+  EXPECT_TRUE(output.find("x=\"260\"") != std::string::npos);
+  EXPECT_TRUE(output.find("y=\"160\"") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Optimize_LocalizeTextBox) {

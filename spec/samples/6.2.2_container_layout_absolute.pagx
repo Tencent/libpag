@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates includeInLayout: badge overlay leaves the layout flow -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Vertical card list with an absolute-positioned notification badge -->
+  <Layer width="360" height="360" layout="vertical" gap="16" padding="20" left="20" top="20">
+    <!-- Card 1 -->
+    <Layer height="88">
+      <Rectangle left="0" top="0" size="320,88" roundness="16"/>
+      <Fill color="#6366F1"/>
+      <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F150"/>
+      <Group>
+        <Text text="Design Review" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
+        <Fill color="#FFF"/>
+      </Group>
+      <TextBox position="12,28" size="296,32" textAlign="center" paragraphAlign="middle"/>
+    </Layer>
+
+    <!-- Card 2 -->
+    <Layer height="88">
+      <Rectangle left="0" top="0" size="320,88" roundness="16"/>
+      <Fill color="#10B981"/>
+      <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#10B98150"/>
+      <Group>
+        <Text text="Sprint Planning" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
+        <Fill color="#FFF"/>
+      </Group>
+      <TextBox position="12,28" size="296,32" textAlign="center" paragraphAlign="middle"/>
+    </Layer>
+
+    <!-- Card 3 -->
+    <Layer height="88">
+      <Rectangle left="0" top="0" size="320,88" roundness="16"/>
+      <Fill color="#F59E0B"/>
+      <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F59E0B50"/>
+      <Group>
+        <Text text="Bug Report #42" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
+        <Fill color="#FFF"/>
+      </Group>
+      <TextBox position="12,28" size="296,32" textAlign="center" paragraphAlign="middle"/>
+    </Layer>
+
+    <!-- Notification badge: a Layer leaves the layout flow -->
+    <Layer width="32" height="32" left="324" top="4" includeInLayout="false">
+      <Ellipse left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#EF4444"/>
+      <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#EF444460"/>
+      <Group>
+        <Text text="3" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
+        <Fill color="#FFF"/>
+      </Group>
+      <TextBox centerX="0" centerY="0" size="32,32" textAlign="center" paragraphAlign="middle"/>
+    </Layer>
+  </Layer>
+</pagx>

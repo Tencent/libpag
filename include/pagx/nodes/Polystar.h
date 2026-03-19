@@ -18,10 +18,13 @@
 
 #pragma once
 
+#include <algorithm>
+#include <cmath>
+#include <limits>
 #include "pagx/nodes/Element.h"
-#include "pagx/types/Constraints.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/PolystarType.h"
+#include "pagx/types/Rect.h"
 
 namespace pagx {
 
@@ -31,7 +34,8 @@ namespace pagx {
 class Polystar : public Element {
  public:
   /**
-   * The position of the polystar center point.
+   * The center point of the polystar. When not explicitly set, defaults to the center of the
+   * bounding box so that the top-left corner aligns with the origin (0, 0).
    */
   Point position = {};
 
@@ -77,12 +81,78 @@ class Polystar : public Element {
   bool reversed = false;
 
   /**
-   * Constraint attributes for positioning relative to the containing Layer or Group.
+   * Distance from the left edge of the containing Layer or Group. NAN means not set.
    */
-  Constraints constraints = {};
+  float left = NAN;
+
+  /**
+   * Distance from the right edge of the containing Layer or Group. NAN means not set.
+   */
+  float right = NAN;
+
+  /**
+   * Distance from the top edge of the containing Layer or Group. NAN means not set.
+   */
+  float top = NAN;
+
+  /**
+   * Distance from the bottom edge of the containing Layer or Group. NAN means not set.
+   */
+  float bottom = NAN;
+
+  /**
+   * Horizontal offset from the center of the containing Layer or Group. NAN means not set.
+   */
+  float centerX = NAN;
+
+  /**
+   * Vertical offset from the center of the containing Layer or Group. NAN means not set.
+   */
+  float centerY = NAN;
 
   NodeType nodeType() const override {
     return NodeType::Polystar;
+  }
+
+  /**
+   * Computes the tight bounding box of the polystar by iterating over all vertices.
+   * Unlike using outerRadius as a square, this accounts for the actual vertex positions
+   * determined by pointCount, rotation, and innerRadius (for star type).
+   */
+  Rect computeBounds() const {
+    auto numPoints = static_cast<int>(ceilf(pointCount));
+    float startAngle = (rotation - 90.0f) * static_cast<float>(M_PI) / 180.0f;
+    float minX = std::numeric_limits<float>::max();
+    float minY = std::numeric_limits<float>::max();
+    float maxX = std::numeric_limits<float>::lowest();
+    float maxY = std::numeric_limits<float>::lowest();
+    if (type == PolystarType::Star) {
+      float angleStep = static_cast<float>(M_PI) / pointCount;
+      float angle = startAngle;
+      for (int i = 0; i < numPoints * 2; i++) {
+        float radius = (i % 2 == 0) ? outerRadius : innerRadius;
+        float vx = radius * cosf(angle);
+        float vy = radius * sinf(angle);
+        minX = std::min(minX, vx);
+        minY = std::min(minY, vy);
+        maxX = std::max(maxX, vx);
+        maxY = std::max(maxY, vy);
+        angle += angleStep;
+      }
+    } else {
+      float angleStep = 2.0f * static_cast<float>(M_PI) / static_cast<float>(numPoints);
+      float angle = startAngle;
+      for (int i = 0; i < numPoints; i++) {
+        float vx = outerRadius * cosf(angle);
+        float vy = outerRadius * sinf(angle);
+        minX = std::min(minX, vx);
+        minY = std::min(minY, vy);
+        maxX = std::max(maxX, vx);
+        maxY = std::max(maxY, vy);
+        angle += angleStep;
+      }
+    }
+    return Rect::MakeXYWH(position.x + minX, position.y + minY, maxX - minX, maxY - minY);
   }
 
  private:

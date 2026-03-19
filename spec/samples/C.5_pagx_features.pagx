@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="1600" height="1200">
-  <Layer name="Background">
-    <Rectangle position="800,600" size="1600,1200"/>
+  <Layer name="Background" left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="@bgGradient"/>
   </Layer>
   <Layer name="GlowB" alpha="0.22">
-    <Ellipse position="1560,300" size="700,550"/>
+    <Ellipse left="1210" top="25" size="700,550"/>
     <Fill color="#38BDF8"/>
     <BlurFilter blurX="220" blurY="200"/>
   </Layer>
   <Layer name="GlowC" alpha="0.18">
-    <Ellipse position="350,1050" size="500,350"/>
+    <Ellipse left="100" top="875" size="500,350"/>
     <Fill color="#10B981"/>
     <BlurFilter blurX="180" blurY="130"/>
   </Layer>
-  <Layer name="OrbitRing" alpha="0.18" x="800" y="530">
-    <Ellipse size="760,760"/>
+  <Layer name="OrbitRing" alpha="0.18" left="800" top="530">
+<Ellipse size="760,760" left="-380" top="-380" />
     <Stroke color="#334155" width="1"/>
   </Layer>
   <Layer name="Grid" alpha="0.05">
@@ -26,18 +26,18 @@
     </Group>
     <Repeater copies="10" position="0,120"/>
   </Layer>
-  <Layer name="Core" x="800" y="530">
+  <Layer name="Core" left="800" top="530">
     <Layer alpha="0.2">
-      <Ellipse size="320,320"/>
+<Ellipse size="320,320" left="-160" top="-160" />
       <Fill color="#3B82F6"/>
       <BlurFilter blurX="80" blurY="80"/>
     </Layer>
     <Layer>
-      <Ellipse size="260,260"/>
+<Ellipse size="260,260" left="-130" top="-130" />
       <Stroke color="#475569" width="2"/>
     </Layer>
     <Layer alpha="0.7">
-      <Ellipse size="310,310"/>
+<Ellipse size="310,310" left="-155" top="-155" />
       <TrimPath end="0.77"/>
       <Stroke width="2.5" cap="round">
         <ConicGradient>
@@ -51,7 +51,7 @@
       <Path data="M 0 -155 L 0 -163 M 155 0 L 163 0 M 0 155 L 0 163 M -155 0 L -163 0"/>
       <Stroke color="#94A3B8" width="1.5" cap="round"/>
     </Layer>
-    <Layer x="0" y="-10">
+    <Layer left="0" top="-10">
       <Text text="PAGX" position="0,10" fontFamily="Arial" fontStyle="Bold" fontSize="52" textAnchor="center"/>
       <Fill color="#FFF"/>
       <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#06B6D440"/>
@@ -67,19 +67,19 @@
     </Group>
   </Layer>
   <Layer name="ConnectorDots" alpha="0.7">
-    <Ellipse position="800,375" size="6,6"/>
-    <Ellipse position="954,511" size="6,6"/>
-    <Ellipse position="903,646" size="6,6"/>
-    <Ellipse position="697,646" size="6,6"/>
-    <Ellipse position="646,511" size="6,6"/>
+    <Ellipse left="797" top="372" size="6,6"/>
+    <Ellipse left="951" top="508" size="6,6"/>
+    <Ellipse left="900" top="643" size="6,6"/>
+    <Ellipse left="694" top="643" size="6,6"/>
+    <Ellipse left="643" top="508" size="6,6"/>
     <Fill color="#06B6D4"/>
   </Layer>
   <Layer name="Connectors" alpha="0.35">
     <Path data="M 800 375 L 800 240 M 954 511 L 1119 466 M 903 646 L 989 790 M 697 646 L 611 790 M 646 511 L 481 466"/>
     <Stroke color="@accentLine" width="2" dashes="8,14"/>
   </Layer>
-  <Layer name="CardReadable" x="800" y="160">
-    <Rectangle position="0,0" size="400,160" roundness="20"/>
+  <Layer name="CardReadable" left="800" top="160">
+    <Rectangle left="-200" top="-80" size="400,160" roundness="20"/>
     <Fill color="#1E293B80"/>
     <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetY="4" blurX="24" blurY="24" color="#00000060"/>
@@ -93,7 +93,7 @@
         </LinearGradient>
       </Stroke>
     </Layer>
-    <Layer x="-120" y="0">
+    <Layer left="-120" top="0">
       <Group>
         <Path data="M -22 -32 L 6 -32 L 22 -16 L 22 36 L -22 36 Z"/>
         <Stroke color="#F43F5E" width="2" join="round"/>
@@ -112,11 +112,11 @@
         <Stroke color="#F43F5E" width="1.5" cap="round"/>
       </Group>
     </Layer>
-    <Layer x="-50" y="-20">
+    <Layer left="-50" top="-20">
       <Text text="Readable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <Fill color="#F43F5E"/>
     </Layer>
-    <Layer x="-50" y="-7">
+    <Layer left="-50" top="-7">
       <Group>
         <Text text="Plain-text XML, easy to diff, debug, and AI-generate." fontFamily="Arial" fontSize="16"/>
         <Fill color="#CBD5E1"/>
@@ -124,8 +124,8 @@
       <TextBox size="220,0" lineHeight="22"/>
     </Layer>
   </Layer>
-  <Layer name="CardComprehensive" x="1319" y="466">
-    <Rectangle position="0,0" size="400,160" roundness="20"/>
+  <Layer name="CardComprehensive" left="1319" top="466">
+    <Rectangle left="-200" top="-80" size="400,160" roundness="20"/>
     <Fill color="#1E293B80"/>
     <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetY="4" blurX="24" blurY="24" color="#00000060"/>
@@ -139,28 +139,28 @@
         </LinearGradient>
       </Stroke>
     </Layer>
-    <Layer x="-120" y="-2">
+    <Layer left="-120" top="-2">
       <Group>
-        <Rectangle position="-5,-18" size="52,32" roundness="6"/>
+        <Rectangle left="-31" top="-34" size="52,32" roundness="6"/>
         <Stroke color="#38BDF8" width="2"/>
         <Fill color="#38BDF820"/>
       </Group>
       <Group>
-        <Rectangle position="5,2" size="52,32" roundness="6"/>
+        <Rectangle left="-21" top="-14" size="52,32" roundness="6"/>
         <Stroke color="#38BDF8" width="2"/>
         <Fill color="#38BDF815"/>
       </Group>
       <Group>
-        <Rectangle position="15,22" size="52,32" roundness="6"/>
+        <Rectangle left="-11" top="6" size="52,32" roundness="6"/>
         <Stroke color="#38BDF8" width="2"/>
         <Fill color="#38BDF810"/>
       </Group>
     </Layer>
-    <Layer x="-50" y="-20">
+    <Layer left="-50" top="-20">
       <Text text="Comprehensive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <Fill color="#38BDF8"/>
     </Layer>
-    <Layer x="-50" y="-7">
+    <Layer left="-50" top="-7">
       <Group>
         <Text text="Covers vectors, images, text, effects, and masks." fontFamily="Arial" fontSize="16"/>
         <Fill color="#CBD5E1"/>
@@ -168,8 +168,8 @@
       <TextBox size="220,0" lineHeight="22"/>
     </Layer>
   </Layer>
-  <Layer name="CardExpressive" x="281" y="466">
-    <Rectangle position="0,0" size="400,160" roundness="20"/>
+  <Layer name="CardExpressive" left="281" top="466">
+    <Rectangle left="-200" top="-80" size="400,160" roundness="20"/>
     <Fill color="#1E293B80"/>
     <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetY="4" blurX="24" blurY="24" color="#00000060"/>
@@ -183,9 +183,9 @@
         </LinearGradient>
       </Stroke>
     </Layer>
-    <Layer x="-110" y="-2">
+    <Layer left="-110" top="-2">
       <Group>
-        <Rectangle position="-22,0" size="32,72" roundness="5"/>
+        <Rectangle left="-38" top="-36" size="32,72" roundness="5"/>
         <Stroke color="#A855F7" width="2"/>
         <Fill color="#A855F720"/>
       </Group>
@@ -198,7 +198,7 @@
         <Stroke color="#A855F7" width="2" cap="round" join="round"/>
       </Group>
       <Group>
-        <Ellipse position="22,-28" size="18,18"/>
+        <Ellipse left="13" top="-37" size="18,18"/>
         <Stroke color="#A855F7" width="1.5"/>
       </Group>
       <Group>
@@ -211,11 +211,11 @@
         <Fill color="#A855F715"/>
       </Group>
     </Layer>
-    <Layer x="-50" y="-20">
+    <Layer left="-50" top="-20">
       <Text text="Expressive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <Fill color="#A855F7"/>
     </Layer>
-    <Layer x="-50" y="-7">
+    <Layer left="-50" top="-7">
       <Group>
         <Text text="Compact structure for both static and animated content." fontFamily="Arial" fontSize="16"/>
         <Fill color="#CBD5E1"/>
@@ -223,8 +223,8 @@
       <TextBox size="220,0" lineHeight="22"/>
     </Layer>
   </Layer>
-  <Layer name="CardInteroperable" x="499" y="870">
-    <Rectangle position="0,0" size="400,160" roundness="20"/>
+  <Layer name="CardInteroperable" left="499" top="870">
+    <Rectangle left="-200" top="-80" size="400,160" roundness="20"/>
     <Fill color="#1E293B80"/>
     <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetY="4" blurX="24" blurY="24" color="#00000060"/>
@@ -238,10 +238,10 @@
         </LinearGradient>
       </Stroke>
     </Layer>
-    <Layer x="-110" y="0">
+    <Layer left="-110" top="0">
       <Group>
-        <Ellipse position="-18,0" size="40,40"/>
-        <Ellipse position="18,0" size="40,40"/>
+        <Ellipse left="-38" top="-20" size="40,40"/>
+        <Ellipse left="-2" top="-20" size="40,40"/>
         <Stroke color="#10B981" width="2"/>
       </Group>
       <Group>
@@ -253,11 +253,11 @@
         <Stroke color="#10B981" width="1" dashes="3,3"/>
       </Group>
     </Layer>
-    <Layer x="-50" y="-20">
+    <Layer left="-50" top="-20">
       <Text text="Interoperable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <Fill color="#10B981"/>
     </Layer>
-    <Layer x="-50" y="-7">
+    <Layer left="-50" top="-7">
       <Group>
         <Text text="Bridges AE, Figma, SVG, PDF, and more seamlessly." fontFamily="Arial" fontSize="16"/>
         <Fill color="#CBD5E1"/>
@@ -265,8 +265,8 @@
       <TextBox size="220,0" lineHeight="22"/>
     </Layer>
   </Layer>
-  <Layer name="CardDeployable" x="1101" y="870">
-    <Rectangle position="0,0" size="400,160" roundness="20"/>
+  <Layer name="CardDeployable" left="1101" top="870">
+    <Rectangle left="-200" top="-80" size="400,160" roundness="20"/>
     <Fill color="#1E293B80"/>
     <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetY="4" blurX="24" blurY="24" color="#00000060"/>
@@ -280,7 +280,7 @@
         </LinearGradient>
       </Stroke>
     </Layer>
-    <Layer x="-120" y="-2">
+    <Layer left="-120" top="-2">
       <Group>
         <Path data="M 0 -40 C 10 -35 18 -20 18 0 L 18 22 L -18 22 L -18 0 C -18 -20 -10 -35 0 -40 Z"/>
         <Stroke color="#FBBF24" width="2" join="round"/>
@@ -292,7 +292,7 @@
         <Fill color="#FBBF2415"/>
       </Group>
       <Group>
-        <Ellipse position="0,-10" size="12,12"/>
+        <Ellipse left="-6" top="-16" size="12,12"/>
         <Stroke color="#FBBF24" width="2"/>
       </Group>
       <Group>
@@ -300,11 +300,11 @@
         <Stroke color="#FB923C" width="2" cap="round" join="round"/>
       </Group>
     </Layer>
-    <Layer x="-50" y="-20">
+    <Layer left="-50" top="-20">
       <Text text="Deployable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
       <Fill color="#FBBF24"/>
     </Layer>
-    <Layer x="-50" y="-7">
+    <Layer left="-50" top="-7">
       <Group>
         <Text text="One-click export to binary PAG with high performance." fontFamily="Arial" fontSize="16"/>
         <Fill color="#CBD5E1"/>
@@ -312,7 +312,7 @@
       <TextBox size="220,0" lineHeight="22"/>
     </Layer>
   </Layer>
-  <Layer name="Pipeline" x="800" y="1070">
+  <Layer name="Pipeline" left="800" top="1070">
     <Group alpha="0.18">
       <Path data="M -400 -40 L 400 -40"/>
       <Stroke width="1">
@@ -326,7 +326,7 @@
       </Stroke>
     </Group>
     <Group position="-180,0">
-      <Rectangle position="0,0" size="120,40" roundness="20"/>
+      <Rectangle left="-60" top="-20" size="120,40" roundness="20"/>
       <Fill color="#6366F120"/>
       <Stroke color="#6366F160" width="1"/>
       <Group position="0,5">
@@ -339,7 +339,7 @@
       <Stroke color="#64748B" width="2" cap="round" join="round"/>
     </Group>
     <Group>
-      <Rectangle position="0,0" size="100,40" roundness="20"/>
+      <Rectangle left="-50" top="-20" size="100,40" roundness="20"/>
       <Fill color="#EC489920"/>
       <Stroke color="#EC489960" width="1"/>
       <Group position="0,5">
@@ -352,7 +352,7 @@
       <Stroke color="#64748B" width="2" cap="round" join="round"/>
     </Group>
     <Group position="190,0">
-      <Rectangle position="0,0" size="140,40" roundness="20"/>
+      <Rectangle left="-70" top="-20" size="140,40" roundness="20"/>
       <Fill color="#34D39920"/>
       <Stroke color="#34D39960" width="1"/>
       <Group position="0,5">
@@ -361,7 +361,7 @@
       </Group>
     </Group>
   </Layer>
-  <Layer name="BottomTagline" x="800" y="1130">
+  <Layer name="BottomTagline" left="800" top="1130">
     <Text text="Design  -  Develop  -  Deploy" fontFamily="Arial" fontSize="16" textAnchor="center"/>
     <Fill color="#64748B"/>
   </Layer>
@@ -371,10 +371,10 @@
       <Stroke color="#64748B" width="1" cap="round" join="round"/>
     </Group>
     <Group>
-      <Ellipse position="50,50" size="4,4"/>
-      <Ellipse position="1550,50" size="4,4"/>
-      <Ellipse position="50,1150" size="4,4"/>
-      <Ellipse position="1550,1150" size="4,4"/>
+      <Ellipse left="48" top="48" size="4,4"/>
+      <Ellipse left="1548" top="48" size="4,4"/>
+      <Ellipse left="48" top="1148" size="4,4"/>
+      <Ellipse left="1548" top="1148" size="4,4"/>
       <Fill color="#64748B"/>
     </Group>
   </Layer>
