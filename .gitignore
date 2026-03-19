@@ -49,6 +49,9 @@ local.properties
 *.local.json
 *.local.md
 
+# Claude worktrees
+.claude/worktrees/
+
 # Skill runtime cache
 .cr-cache/
 
