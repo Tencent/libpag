@@ -149,9 +149,6 @@ void PAGRunTimeDataModel::setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pa
 
 void PAGRunTimeDataModel::updatePAGXRenderTime(int64_t renderTime, int64_t imageTime,
                                                int64_t presentTime) {
-  if (!pagxMode) {
-    return;
-  }
   FrameDisplayInfo renderInfo("Render", "#0096D8", renderTime, renderTime, renderTime);
   FrameDisplayInfo presentInfo("Present", "#DDB259", presentTime, presentTime, presentTime);
   FrameDisplayInfo imageDecodeInfo("Image", "#74AD59", imageTime, imageTime, imageTime);
