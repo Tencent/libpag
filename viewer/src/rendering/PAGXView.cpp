@@ -74,7 +74,7 @@ void PAGXView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeomet
     return;
   }
   ContentView::geometryChange(newGeometry, oldGeometry);
-  if (viewModel->displayList != nullptr && !viewModel->needsRender) {
+  if (viewModel->displayList != nullptr) {
     resizeTimer->start(400);
   }
 }
