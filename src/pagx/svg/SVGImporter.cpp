@@ -25,6 +25,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/SolidColor.h"
+#include "pagx/svg/SVGBlendMode.h"
 #include "pagx/svg/SVGParserContext.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/StringParser.h"
@@ -386,6 +387,11 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
   std::string opacity = getAttribute(element, "opacity");
   if (!opacity.empty()) {
     layer->alpha = strtof(opacity.c_str(), nullptr);
+  }
+
+  std::string mixBlendMode = getAttribute(element, "mix-blend-mode");
+  if (!mixBlendMode.empty()) {
+    layer->blendMode = SVGBlendModeFromString(mixBlendMode);
   }
 
   // Handle mask attribute.
