@@ -3,6 +3,8 @@ node_modules/
 
 # Build outputs
 viewer/viewer.js
+wasm/
+fonts/
 
 # macOS
 .DS_Store
