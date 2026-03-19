@@ -301,28 +301,29 @@ Each axis is resolved independently:
   for VectorElements the behavior depends on element type (stretch/scale to fit/derive size)
 Any valid single-axis combination works.
 
-### Per-Child Cross-Axis Override
+### Per-Child Alignment via Nested Containers
 
 Parent `alignment` applies to all children uniformly — there is no per-child `alignment`
 attribute (unlike CSS `align-self`). Constraint attributes (`top`/`bottom`/`centerY`) on
 a child Layer in container layout flow are **ignored** because the layout engine controls
-positioning. To override one child's cross-axis position, wrap it in a nested container
-that uses internal layout to achieve the desired alignment:
+positioning. To give one child a different cross-axis alignment, wrap it in a nested
+container whose internal layout achieves the desired effect:
 
 ```xml
 <Layer width="400" height="200" layout="horizontal" alignment="center">
   <Layer width="100" height="60"><!-- centered by parent --></Layer>
-  <!-- This child aligns to top instead -->
+  <!-- This child needs top-alignment instead of center -->
   <Layer width="100" layout="vertical">
-    <Layer height="40"><!-- content at top --></Layer>
-    <Layer><!-- spacer fills remaining space --></Layer>
+    <Layer height="40"><!-- content pinned to top --></Layer>
+    <Layer><!-- flexible remainder pushes content up --></Layer>
   </Layer>
 </Layer>
 ```
 
-The wrapper Layer receives `alignment="center"` from the parent (cross-axis height = 200),
-then its internal `layout="vertical"` places content at the top with a flexible spacer
-below — effectively simulating top-alignment for this child only.
+The wrapper Layer receives cross-axis height (200) from the parent's `alignment="center"`.
+Its internal `layout="vertical"` then arranges: a fixed-height content Layer at the top,
+and a flexible Layer that absorbs the remaining space — effectively top-aligning this
+child while siblings stay centered.
 
 ---
 
