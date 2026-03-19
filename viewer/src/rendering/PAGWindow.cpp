@@ -21,6 +21,7 @@
 #include <QSettings>
 #include "PAGViewer.h"
 #include "PAGWindowHelper.h"
+#include "PAGXView.h"
 #include "RenderThread.h"
 #include "profiling/PAGRunTimeDataModel.h"
 #include "task/PAGTaskFactory.h"
@@ -57,7 +58,8 @@ void PAGWindow::onContentViewChanged(ContentView* newContentView) {
   disconnectContentViewSignals();
   contentView = newContentView;
   pagView = qobject_cast<PAGView*>(contentView);
-  connectContentViewSignals();
+  connectBaseContentViewSignals();
+  connectFormatSpecificSignals();
 }
 
 void PAGWindow::disconnectContentViewSignals() {
