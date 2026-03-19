@@ -64,7 +64,7 @@ void PAGXView::sizeChangedDelayHandle() {
 }
 
 void PAGXView::flush() const {
-  if (viewModel->displayList != nullptr) {
+  if (viewModel->needsRender) {
     triggerFlush();
   }
 }

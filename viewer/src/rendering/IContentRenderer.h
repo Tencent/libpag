@@ -34,13 +34,16 @@ class IContentRenderer {
     int64_t imageDecodeTime = 0;
     // Frame index within the animation; -1 means not applicable (e.g. static PAGX content).
     int64_t currentFrame = -1;
+    // True if rendering actually occurred; false if the frame was skipped.
+    bool rendered = false;
   };
 
   virtual ~IContentRenderer() = default;
 
   /**
    * Performs one frame of rendering. Called from the render thread.
-   * Returns metrics for the completed frame, or a zero-initialized struct if rendering was skipped.
+   * Returns metrics for the completed frame, with rendered=true if rendering occurred, or
+   * rendered=false if the frame was skipped.
    */
   virtual RenderMetrics flush() = 0;
 

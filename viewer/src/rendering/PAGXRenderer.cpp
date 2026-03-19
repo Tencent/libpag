@@ -97,6 +97,7 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
   view->drawable->present(context);
   metrics.presentTime = tgfx::Clock::Now() - presentStart;
 
+  metrics.rendered = true;
   device->unlock();
   return metrics;
 }
