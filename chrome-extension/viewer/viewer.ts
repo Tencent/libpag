@@ -603,12 +603,22 @@ function updateSize() {
     }
     playgroundState.resized = false;
     const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
-    const screenRect = canvas.getBoundingClientRect();
+    const container = document.getElementById('container') as HTMLDivElement;
+    const containerRect = container.getBoundingClientRect();
     const scaleFactor = window.devicePixelRatio;
-    canvas.width = screenRect.width * scaleFactor;
-    canvas.height = screenRect.height * scaleFactor;
-    canvas.style.width = screenRect.width + "px";
-    canvas.style.height = screenRect.height + "px";
+    let canvasWidth = containerRect.width;
+    let canvasHeight = containerRect.height;
+    if (playgroundState.codeViewVisible) {
+        if (window.innerWidth <= 600) {
+            canvasHeight = containerRect.height / 2;
+        } else {
+            canvasWidth = containerRect.width / 2;
+        }
+    }
+    canvas.width = canvasWidth * scaleFactor;
+    canvas.height = canvasHeight * scaleFactor;
+    canvas.style.width = canvasWidth + "px";
+    canvas.style.height = canvasHeight + "px";
     playgroundState.pagxView.updateSize();
 }
 
@@ -837,11 +847,11 @@ async function loadPAGXData(data: Uint8Array, name: string, baseURL: string) {
         playgroundState.pagxView.buildLayers();
         gestureManager.resetTransform(playgroundState);
         applyBackgroundMode(playgroundState.backgroundMode);
-        updateSize();
-        draw();
         hideDropZone();
         canvas.classList.remove('hidden');
         toolbar.classList.remove('hidden');
+        updateSize();
+        draw();
         if (fileNameEl) {
             fileNameEl.textContent = name;
         }
