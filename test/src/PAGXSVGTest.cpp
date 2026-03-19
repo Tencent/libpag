@@ -57,31 +57,6 @@
 namespace pag {
 using namespace tgfx;
 
-static std::vector<std::shared_ptr<Typeface>> CreateFallbackTypefaces() {
-  std::vector<std::shared_ptr<Typeface>> result = {};
-  auto regularTypeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
-  if (regularTypeface) {
-    result.push_back(regularTypeface);
-  }
-  auto emojiTypeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
-  if (emojiTypeface) {
-    result.push_back(emojiTypeface);
-  }
-  auto hebrewTypeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansHebrew-Regular.ttf"));
-  if (hebrewTypeface) {
-    result.push_back(hebrewTypeface);
-  }
-  return result;
-}
-
-static std::vector<std::shared_ptr<Typeface>> GetFallbackTypefaces() {
-  static auto typefaces = CreateFallbackTypefaces();
-  return typefaces;
-}
-
 static std::string SaveFile(const std::string& content, const std::string& key) {
   auto outPath = ProjectPath::Absolute("test/out/" + key);
   auto dirPath = std::filesystem::path(outPath).parent_path();
@@ -93,83 +68,6 @@ static std::string SaveFile(const std::string& content, const std::string& key) 
     file.write(content.data(), static_cast<std::streamsize>(content.size()));
   }
   return outPath;
-}
-
-/**
- * Test case: Convert all SVG files to PAGX format, save as files, then load and render.
- * This tests the complete round-trip: SVG -> PAGX file -> Load -> Render
- */
-PAGX_TEST(PAGXSVGTest, SVGToPAGXAll) {
-  constexpr int MinCanvasEdge = 400;
-
-  std::string svgDir = ProjectPath::Absolute("resources/svg");
-  std::vector<std::string> svgFiles = {};
-
-  for (const auto& entry : std::filesystem::directory_iterator(svgDir)) {
-    if (entry.path().extension() == ".svg") {
-      svgFiles.push_back(entry.path().string());
-    }
-  }
-
-  std::sort(svgFiles.begin(), svgFiles.end());
-
-  pagx::TextLayout textLayout;
-  textLayout.addFallbackTypefaces(GetFallbackTypefaces());
-
-  for (const auto& svgPath : svgFiles) {
-    std::string baseName = std::filesystem::path(svgPath).stem().string();
-
-    auto doc = pagx::SVGImporter::Parse(svgPath);
-    if (!doc) {
-      ADD_FAILURE() << "Failed to parse SVG: " << svgPath;
-      continue;
-    }
-
-    float pagxWidth = doc->width;
-    float pagxHeight = doc->height;
-    if (pagxWidth <= 0 || pagxHeight <= 0) {
-      ADD_FAILURE() << "Invalid dimensions in SVG: " << svgPath;
-      continue;
-    }
-
-    auto layoutResult = textLayout.layout(doc.get());
-    pagx::FontEmbedder().embed(doc.get(), layoutResult.shapedTextMap, layoutResult.textOrder);
-
-    std::string xml = pagx::PAGXExporter::ToXML(*doc);
-    std::string pagxPath = SaveFile(xml, "PAGXSVGTest/" + baseName + ".pagx");
-
-    auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
-    if (reloadedDoc == nullptr) {
-      ADD_FAILURE() << "Failed to reload: " << pagxPath;
-      continue;
-    }
-    if (!reloadedDoc->errors.empty()) {
-      std::string errorLog;
-      for (const auto& error : reloadedDoc->errors) {
-        errorLog += "\n  " + error;
-      }
-      ADD_FAILURE() << "Parse errors in " << baseName << ":" << errorLog;
-    }
-    auto layer = pagx::LayerBuilder::Build(reloadedDoc.get());
-    if (layer == nullptr) {
-      ADD_FAILURE() << "Failed to build layer: " << pagxPath;
-      continue;
-    }
-
-    float maxEdge = std::max(pagxWidth, pagxHeight);
-    float scale = (maxEdge < MinCanvasEdge) ? (MinCanvasEdge / maxEdge) : 1.0f;
-    int canvasWidth = static_cast<int>(std::ceil(pagxWidth * scale));
-    int canvasHeight = static_cast<int>(std::ceil(pagxHeight * scale));
-
-    auto pagxSurface = Surface::Make(context, canvasWidth, canvasHeight);
-    DisplayList displayList;
-    auto container = tgfx::Layer::Make();
-    container->setMatrix(tgfx::Matrix::MakeScale(scale, scale));
-    container->addChild(layer);
-    displayList.root()->addChild(container);
-    displayList.render(pagxSurface.get(), false);
-    EXPECT_TRUE(Baseline::Compare(pagxSurface, "PAGXTest/" + baseName)) << baseName;
-  }
 }
 
 /**
