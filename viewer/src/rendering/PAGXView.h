@@ -37,7 +37,7 @@ class PAGXView : public ContentView {
 
   ContentViewModel* getViewModel() const override;
 
-  Q_SLOT void sizeChangedDelayHandle();
+  Q_SLOT void sizeChangedDelayHandle() override;
 
   void flush() const override;
   void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
