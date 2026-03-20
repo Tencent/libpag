@@ -3752,4 +3752,78 @@ PAGX_TEST(PAGXTest, ResourceCrossReferenceChain) {
   EXPECT_EQ(font->glyphs[1]->image, image);
 }
 
+// =====================================================================================
+// Auto Layout - Constraint Priority (centerX/centerY highest priority)
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayerConstraintCenterXOverridesLeft) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+
+  // When both centerX and left are set, centerX should win (higher priority).
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 100;
+  child->height = 60;
+  child->centerX = 0;   // Horizontal center
+  child->left = 50;     // Should be ignored
+
+  parent->children = {child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // Position should be from centerX: (400 - 100) / 2 + 0 = 150
+  // NOT from left: 50
+  EXPECT_FLOAT_EQ(child->x, 150.0f) << "centerX should override left";
+}
+
+PAGX_TEST(PAGXTest, LayerConstraintCenterYOverridesTop) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+
+  // When both centerY and top are set, centerY should win (higher priority).
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 100;
+  child->height = 60;
+  child->centerY = 0;   // Vertical center
+  child->top = 40;      // Should be ignored
+
+  parent->children = {child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // Position should be from centerY: (300 - 60) / 2 + 0 = 120
+  // NOT from top: 40
+  EXPECT_FLOAT_EQ(child->y, 120.0f) << "centerY should override top";
+}
+
+PAGX_TEST(PAGXTest, LayerConstraintCenterYMeasurementContribution) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->layout = pagx::LayoutMode::Constraint;
+  // No explicit height
+
+  auto child = doc->makeNode<pagx::Rectangle>();
+  child->size = {80, 60};
+  child->position = {0, 0};
+  child->centerY = -30;  // Contributes |-30| * 2 = 60 to measurement
+
+  parent->contents = {child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // Parent height should measure from child: |-30| * 2 + 60 = 120
+  EXPECT_FLOAT_EQ(parent->height, 120.0f)
+      << "Parent should measure centerY contribution as |centerY| * 2 + content_height";
+}
+
 }  // namespace pag
