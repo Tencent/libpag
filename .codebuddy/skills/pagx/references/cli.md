@@ -232,13 +232,13 @@ pagx convert input.svg output.pagx                   # SVG to PAGX
 pagx convert --indent 4 input.pagx output.svg        # PAGX to SVG with 4-space indent
 pagx convert --no-xml-declaration input.pagx out.svg
 pagx convert --no-convert-text-to-path input.pagx out.svg  # keep <text> elements
-pagx convert --force svg input.pagx output                # force SVG output format
+pagx convert --format svg input.pagx output               # specify SVG output format
 pagx convert --no-expand-use input.svg output.pagx   # SVG to PAGX without expanding <use>
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--force <format>` | Override output format (`svg`, `pagx`; default: inferred from output extension) |
+| `--format <format>` | Override output format (`svg`, `pagx`; default: inferred from output extension) |
 | `--indent <n>` | SVG indentation spaces (default: 2, valid range: 0–16) |
 | `--no-xml-declaration` | Omit the `<?xml ...?>` declaration (SVG output only) |
 | `--no-convert-text-to-path` | Keep text as `<text>` elements instead of converting to `<path>` (SVG output only) |
@@ -246,6 +246,6 @@ pagx convert --no-expand-use input.svg output.pagx   # SVG to PAGX without expan
 | `--flatten-transforms` | Flatten nested transforms into single matrices (SVG input only) |
 | `--preserve-unknown` | Preserve unsupported SVG elements as Unknown nodes (SVG input only) |
 
-The command takes two positional arguments: `<input>` and `<output>`. Use `--force` when the
+The command takes two positional arguments: `<input>` and `<output>`. Use `--format` when the
 output extension does not make the format unambiguous. On success the command prints
 `pagx convert: wrote <path>` and exits 0; on failure it prints an error and exits 1.

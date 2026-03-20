@@ -1163,7 +1163,7 @@ CLI_TEST(PAGXCliTest, Convert_PagxToSvg_NoXmlDeclaration) {
 CLI_TEST(PAGXCliTest, Convert_PagxToSvg_ForceFormat) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   auto outputPath = TempDir() + "/ConvertSVG_ForceFormat.out";
-  auto ret = CallRun(pagx::cli::RunConvert, {"convert", "--force", "svg", inputPath, outputPath});
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", "--format", "svg", inputPath, outputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_NE(output.find("<svg"), std::string::npos);
