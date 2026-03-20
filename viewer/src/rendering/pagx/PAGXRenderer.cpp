@@ -21,16 +21,21 @@
 
 namespace pag {
 
-PAGXRenderer::PAGXRenderer(PAGXViewModel* viewModel, ContentView* contentView)
-    : viewModel(viewModel), contentView(contentView) {
+PAGXRenderer::PAGXRenderer(PAGXViewModel* viewModel) : viewModel(viewModel) {
+}
+
+void PAGXRenderer::setDrawable(GPUDrawable* drawable) {
+  this->drawable = drawable;
 }
 
 bool PAGXRenderer::isReady() const {
-  return viewModel != nullptr && contentView->getDrawable() != nullptr;
+  return viewModel != nullptr && drawable != nullptr;
 }
 
 void PAGXRenderer::updateSize() {
-  contentView->getDrawable()->updateSize();
+  if (drawable != nullptr) {
+    drawable->updateSize();
+  }
 }
 
 IContentRenderer::RenderMetrics PAGXRenderer::flush() {
@@ -47,7 +52,7 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
     return metrics;
   }
 
-  auto* drawable = contentView->getDrawable();
+  auto* drawable = this->drawable;
   auto device = drawable->getDevice();
   if (device == nullptr) {
     return metrics;

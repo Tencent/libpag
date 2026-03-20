@@ -25,6 +25,8 @@
 
 namespace pag {
 
+class PAGXRenderer;
+
 /**
  * PAGXView is a view for rendering PAGX files.
  */
@@ -48,6 +50,7 @@ class PAGXView : public ContentView {
   Q_SLOT void onPreferredSizeChanged();
 
   std::unique_ptr<PAGXViewModel> viewModel = nullptr;
+  PAGXRenderer* pagxRenderer_ = nullptr;
 };
 
 }  // namespace pag

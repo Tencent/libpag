@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "rendering/ContentView.h"
 #include "rendering/IContentRenderer.h"
 #include "rendering/pagx/PAGXViewModel.h"
+#include "platform/qt/GPUDrawable.h"
 
 namespace pag {
 
@@ -30,7 +30,9 @@ namespace pag {
  */
 class PAGXRenderer : public IContentRenderer {
  public:
-  explicit PAGXRenderer(PAGXViewModel* viewModel, ContentView* contentView);
+  explicit PAGXRenderer(PAGXViewModel* viewModel);
+
+  void setDrawable(GPUDrawable* drawable);
 
   RenderMetrics flush() override;
   void updateSize() override;
@@ -38,7 +40,7 @@ class PAGXRenderer : public IContentRenderer {
 
  private:
   PAGXViewModel* viewModel = nullptr;
-  ContentView* contentView = nullptr;
+  GPUDrawable* drawable = nullptr;
 };
 
 }  // namespace pag
