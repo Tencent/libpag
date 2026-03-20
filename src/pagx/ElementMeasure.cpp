@@ -104,11 +104,18 @@ Rect ElementMeasure::GetMeasuredBounds(const Element* element, const TextMeasure
   bool stretchable = ElementConstraint::IsStretchable(element->nodeType());
   bool hasLeft = !std::isnan(constraints.left);
   bool hasRight = !std::isnan(constraints.right);
+  bool hasCenterX = !std::isnan(constraints.centerX);
   bool hasTop = !std::isnan(constraints.top);
   bool hasBottom = !std::isnan(constraints.bottom);
+  bool hasCenterY = !std::isnan(constraints.centerY);
 
   // --- Horizontal axis ---
-  if (hasLeft && hasRight) {
+  // Priority: centerX > (left + right) > left > right
+  if (hasCenterX) {
+    // Center-positioned: element extends centerX offset in both directions.
+    bounds.x = 0;
+    bounds.width = std::abs(constraints.centerX) * 2 + bounds.width;
+  } else if (hasLeft && hasRight) {
     float left = constraints.left;
     float right = constraints.right;
     if (stretchable) {
@@ -131,7 +138,12 @@ Rect ElementMeasure::GetMeasuredBounds(const Element* element, const TextMeasure
   }
 
   // --- Vertical axis ---
-  if (hasTop && hasBottom) {
+  // Priority: centerY > (top + bottom) > top > bottom
+  if (hasCenterY) {
+    // Center-positioned: element extends centerY offset in both directions.
+    bounds.y = 0;
+    bounds.height = std::abs(constraints.centerY) * 2 + bounds.height;
+  } else if (hasTop && hasBottom) {
     float top = constraints.top;
     float bottom = constraints.bottom;
     if (stretchable) {

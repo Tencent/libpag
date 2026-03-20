@@ -691,33 +691,37 @@ static void LayoutLayer(Layer* layer, FontConfig* fontProvider) {
       float childHeight = std::isnan(child->height) ? childMeasured.second : child->height;
 
       // Horizontal axis
+      // Priority: centerX > (left + right) > left > right
       bool hasLeft = !std::isnan(child->left);
       bool hasRight = !std::isnan(child->right);
       bool hasCenterX = !std::isnan(child->centerX);
-      if (hasLeft && hasRight) {
+      if (hasCenterX) {
+        // centerX has highest priority: position at center with offset
+        child->x = (layer->width - childWidth) * 0.5f + child->centerX;
+      } else if (hasLeft && hasRight) {
         child->x = child->left;
         child->width = layer->width - child->left - child->right;
       } else if (hasLeft) {
         child->x = child->left;
       } else if (hasRight) {
         child->x = layer->width - child->right - childWidth;
-      } else if (hasCenterX) {
-        child->x = (layer->width - childWidth) * 0.5f + child->centerX;
       }
 
       // Vertical axis
+      // Priority: centerY > (top + bottom) > top > bottom
       bool hasTop = !std::isnan(child->top);
       bool hasBottom = !std::isnan(child->bottom);
       bool hasCenterY = !std::isnan(child->centerY);
-      if (hasTop && hasBottom) {
+      if (hasCenterY) {
+        // centerY has highest priority: position at center with offset
+        child->y = (layer->height - childHeight) * 0.5f + child->centerY;
+      } else if (hasTop && hasBottom) {
         child->y = child->top;
         child->height = layer->height - child->top - child->bottom;
       } else if (hasTop) {
         child->y = child->top;
       } else if (hasBottom) {
         child->y = layer->height - child->bottom - childHeight;
-      } else if (hasCenterY) {
-        child->y = (layer->height - childHeight) * 0.5f + child->centerY;
       }
     }
   }
