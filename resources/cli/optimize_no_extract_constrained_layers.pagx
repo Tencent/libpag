@@ -2,11 +2,11 @@
 <pagx version="1.0" width="400" height="300">
   <Layer width="400" height="300">
     <Layer left="20" top="20">
-      <Rectangle position="50,50" size="80,60"/>
+      <Rectangle left="10" top="20" size="80,60"/>
       <Fill color="#FF0000"/>
     </Layer>
     <Layer right="20" top="20">
-      <Rectangle position="50,50" size="80,60"/>
+      <Rectangle left="10" top="20" size="80,60"/>
       <Fill color="#FF0000"/>
     </Layer>
   </Layer>

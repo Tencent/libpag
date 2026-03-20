@@ -3,14 +3,14 @@
 <pagx version="1.0" width="600" height="400">
   <!-- Background -->
   <Layer>
-    <Rectangle left="0" top="0" size="600,400"/>
+    <Rectangle size="600,400"/>
     <Fill color="#F8FAFC"/>
   </Layer>
 
   <!-- Main container: horizontal layout with centering overrides child constraints -->
   <Layer width="600" height="400" layout="horizontal" gap="20" padding="20" arrangement="center" alignment="center">
     <!-- Container border -->
-    <Rectangle left="0" top="0" size="600,400"/>
+    <Rectangle size="600,400"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
 
     <!-- Box 1: has constraint left=20 top=20, but ignored by container layout -->

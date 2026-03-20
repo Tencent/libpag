@@ -2,7 +2,7 @@
 <pagx version="1.0" width="200" height="200">
   <Layer name="main">
     <Group/>
-    <Rectangle position="100,100" size="100,100"/>
+    <Rectangle size="100,100"/>
     <Fill color="#FF0000"/>
   </Layer>
 </pagx>

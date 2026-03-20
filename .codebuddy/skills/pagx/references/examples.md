@@ -671,58 +671,45 @@ opaque content. Must have content below to blur — empty background produces no
 
 ```xml
 <pagx version="1.0" width="430" height="123">
-  <Layer left="20" right="20" top="20" bottom="20">
+  <Layer width="430" height="123">
+    <!-- Light background to make white tab bar visible -->
+    <Rectangle size="430,123"/>
+    <Fill color="#F1F5F9"/>
+    <Layer left="20" right="20" top="20" bottom="20">
     <!-- Top-round shape: intersect rounded rect with straight rect to flatten bottom corners -->
     <Rectangle left="0" right="0" top="0" bottom="-20" roundness="20"/>
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <MergePath mode="intersect"/>
-    <Fill>
-      <LinearGradient startPoint="0,0" endPoint="0,83">
-        <ColorStop offset="0" color="#F8FAFC"/>
-        <ColorStop offset="1" color="#E2E8F0"/>
-      </LinearGradient>
-    </Fill>
-    <Stroke color="#00000020" width="1"/>
+    <Fill color="#FFF"/>
     <!-- Tab items -->
-    <Layer left="0" right="0" top="0" bottom="0" layout="horizontal">
-      <Layer flex="1" layout="vertical" gap="2" arrangement="center" alignment="center">
-        <Layer width="24" height="24">
-          <Ellipse left="0" right="0" top="0" bottom="0"/>
+    <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" arrangement="spaceEvenly" alignment="center">
+      <Layer>
+        <Ellipse centerX="0" size="24,24"/>
+        <Fill color="#6366F1"/>
+        <TextBox top="26" textAlign="center">
+          <Text text="Home" fontFamily="Arial" fontSize="10"/>
           <Fill color="#6366F1"/>
-        </Layer>
-        <Layer>
-          <TextBox width="78" height="14" textAlign="center">
-            <Text text="Home" fontFamily="Arial" fontSize="10"/>
-            <Fill color="#6366F1"/>
-          </TextBox>
-        </Layer>
+        </TextBox>
       </Layer>
-      <Layer flex="1" layout="vertical" gap="2" arrangement="center" alignment="center">
-        <Layer width="24" height="24">
-          <Ellipse left="0" right="0" top="0" bottom="0"/>
-          <Fill color="#999"/>
-        </Layer>
-        <Layer>
-          <TextBox width="78" height="14" textAlign="center">
-            <Text text="Search" fontFamily="Arial" fontSize="10"/>
-            <Fill color="#999"/>
-          </TextBox>
-        </Layer>
+      <Layer>
+        <Ellipse centerX="0" size="24,24"/>
+        <Fill color="#94A3B8"/>
+        <TextBox top="26" textAlign="center">
+          <Text text="Search" fontFamily="Arial" fontSize="10"/>
+          <Fill color="#94A3B8"/>
+        </TextBox>
       </Layer>
-      <Layer flex="1" layout="vertical" gap="2" arrangement="center" alignment="center">
-        <Layer width="24" height="24">
-          <Ellipse left="0" right="0" top="0" bottom="0"/>
-          <Fill color="#999"/>
-        </Layer>
-        <Layer>
-          <TextBox width="78" height="14" textAlign="center">
-            <Text text="Profile" fontFamily="Arial" fontSize="10"/>
-            <Fill color="#999"/>
-          </TextBox>
-        </Layer>
+      <Layer>
+        <Ellipse centerX="0" size="24,24"/>
+        <Fill color="#94A3B8"/>
+        <TextBox top="26" textAlign="center">
+          <Text text="Profile" fontFamily="Arial" fontSize="10"/>
+          <Fill color="#94A3B8"/>
+        </TextBox>
       </Layer>
     </Layer>
-    <DropShadowStyle offsetY="2" blurX="12" blurY="12" color="#00000030"/>
+    <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000020"/>
+    </Layer>
   </Layer>
 </pagx>
 ```

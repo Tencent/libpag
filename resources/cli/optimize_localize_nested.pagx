@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="400" height="400">
   <Layer name="parent">
-    <Rectangle position="200,200" size="200,200"/>
+    <Rectangle left="100" top="100" size="200,200"/>
     <Fill color="#EEE"/>
     <Layer name="child">
-      <Rectangle position="300,300" size="50,50"/>
+      <Rectangle left="275" top="275" size="50,50"/>
       <Fill color="#FF0000"/>
     </Layer>
   </Layer>

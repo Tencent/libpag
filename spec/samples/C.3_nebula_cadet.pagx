@@ -66,17 +66,17 @@
   </Layer>
   <Layer name="StarBursts">
     <Layer>
-      <Polystar position="220,130" type="star" pointCount="4" outerRadius="8" innerRadius="3" rotation="45"/>
+      <Polystar type="star" pointCount="4" outerRadius="8" innerRadius="3" rotation="45" left="212" top="122"/>
       <Fill color="#FFFFFFEE"/>
       <DropShadowStyle blurX="6" blurY="6" color="#7DD3FC80"/>
     </Layer>
     <Layer>
-      <Polystar position="620,210" type="star" pointCount="4" outerRadius="7" innerRadius="3" rotation="45"/>
+      <Polystar type="star" pointCount="4" outerRadius="7" innerRadius="3" rotation="45" left="613" top="203"/>
       <Fill color="#FFFFFFDD"/>
       <DropShadowStyle blurX="6" blurY="6" color="#C084FC80"/>
     </Layer>
     <Layer>
-      <Polystar position="700,420" type="star" pointCount="4" outerRadius="6" innerRadius="2" rotation="45"/>
+      <Polystar type="star" pointCount="4" outerRadius="6" innerRadius="2" rotation="45" left="694" top="414"/>
       <Fill color="#FFFFFFCC"/>
       <DropShadowStyle blurX="5" blurY="5" color="#22D3EE80"/>
     </Layer>
@@ -140,7 +140,7 @@
   </Layer>
   <Layer name="Avatar">
     <Group>
-      <Polystar position="70,65" type="polygon" pointCount="6" outerRadius="36" rotation="30"/>
+      <Polystar type="polygon" pointCount="6" outerRadius="36" rotation="30" left="34" top="29"/>
       <Stroke width="2">
         <LinearGradient startPoint="34,29" endPoint="106,101">
           <ColorStop offset="0" color="#38BDF8"/>
@@ -164,12 +164,12 @@
     <DropShadowStyle blurX="10" blurY="10" color="#1D4ED880"/>
   </Layer>
   <Layer name="PlayerName">
-    <Text text="NEBULA CADET" position="120,45" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
+    <Text text="NEBULA CADET" left="120" top="45" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
     <Fill color="#E2E8F0"/>
   </Layer>
   <Layer name="PlayerIdRow">
     <Group>
-      <Text text="#A17X9" position="120,63" fontFamily="Arial" fontSize="11"/>
+      <Text text="#A17X9" left="120" top="63" fontFamily="Arial" fontSize="11"/>
       <Fill color="#7DD3FC"/>
     </Group>
     <Layer name="LevelBadge">
@@ -240,7 +240,7 @@
       <Stroke color="#F8D477" width="1"/>
     </Group>
     <Group>
-      <Text text="12,450" position="656,52" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+      <Text text="12,450" left="656" top="52" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
       <Fill color="#F8FAFC"/>
     </Group>
   </Layer>
@@ -253,7 +253,7 @@
       </LinearGradient>
     </Fill>
     <Stroke color="#334155" width="1"/>
-    <Group position="628,74">
+    <Group left="628" top="74">
       <Path data="@IconDiamond"/>
       <Fill>
         <LinearGradient startPoint="0,8" endPoint="16,8">
@@ -263,13 +263,13 @@
       </Fill>
     </Group>
     <Group>
-      <Text text="860" position="656,86" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+      <Text text="860" left="656" top="86" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
       <Fill color="#F8FAFC"/>
     </Group>
   </Layer>
   <Layer name="MenuButtons" width="340" height="262" layout="vertical" gap="14" left="230" top="179">
     <Layer name="StartButton" height="78">
-      <Rectangle left="0" top="0" size="340,78" roundness="28"/>
+      <Rectangle size="340,78" roundness="28"/>
       <Fill>
         <LinearGradient startPoint="0,39" endPoint="340,39">
           <ColorStop offset="0" color="#00FFC6"/>
@@ -282,7 +282,7 @@
         <Rectangle left="15" top="12" size="310,34" roundness="18"/>
         <Fill color="#FFFFFF22"/>
       </Group>
-      <Group position="50,27">
+      <Group left="50" top="27">
         <Path data="@IconPlay"/>
         <Fill color="#ECFEFF"/>
       </Group>
@@ -294,7 +294,7 @@
       <DropShadowStyle offsetY="12" blurX="18" blurY="18" color="#00FFC066"/>
     </Layer>
     <Layer name="ShopButton" height="78">
-      <Rectangle left="0" top="0" size="340,78" roundness="28"/>
+      <Rectangle size="340,78" roundness="28"/>
       <Fill>
         <LinearGradient startPoint="0,39" endPoint="340,39">
           <ColorStop offset="0" color="#FFD166"/>
@@ -302,7 +302,7 @@
         </LinearGradient>
       </Fill>
       <Stroke color="#FFD166" width="1.5"/>
-      <Group position="50,27">
+      <Group left="50" top="27">
         <Path data="@IconCart"/>
         <Fill color="#FFF7ED"/>
       </Group>
@@ -313,7 +313,7 @@
       <DropShadowStyle offsetY="10" blurX="16" blurY="16" color="#F59E0B66"/>
     </Layer>
     <Layer name="RankButton" height="78">
-      <Rectangle left="0" top="0" size="340,78" roundness="28"/>
+      <Rectangle size="340,78" roundness="28"/>
       <Fill>
         <LinearGradient startPoint="0,39" endPoint="340,39">
           <ColorStop offset="0" color="#7C3AED"/>
@@ -321,7 +321,7 @@
         </LinearGradient>
       </Fill>
       <Stroke color="#C084FC" width="1.5"/>
-      <Group position="50,27">
+      <Group left="50" top="27">
         <Path data="@IconCrown"/>
         <Fill color="#FDF2F8"/>
       </Group>
@@ -347,7 +347,7 @@
       <Layer composition="@navButton"/>
       <Layer left="11" top="11">
         <Group>
-          <Polystar position="12,12" type="star" pointCount="8" outerRadius="10" innerRadius="6"/>
+          <Polystar type="star" pointCount="8" outerRadius="10" innerRadius="6" left="2" top="2"/>
           <Stroke color="#93C5FD" width="2"/>
         </Group>
         <Group>
@@ -391,19 +391,19 @@
   </Layer>
   <Layer name="HexDecor" alpha="0.6">
     <Group>
-      <Polystar position="120,200" type="polygon" pointCount="6" outerRadius="14" rotation="30"/>
+      <Polystar type="polygon" pointCount="6" outerRadius="14" rotation="30" left="106" top="186"/>
       <Stroke color="#1D4ED8" width="1"/>
     </Group>
     <Group>
-      <Polystar position="680,240" type="polygon" pointCount="6" outerRadius="12" rotation="30"/>
+      <Polystar type="polygon" pointCount="6" outerRadius="12" rotation="30" left="668" top="228"/>
       <Stroke color="#38BDF8" width="1"/>
     </Group>
     <Group>
-      <Polystar position="180,420" type="polygon" pointCount="6" outerRadius="10" rotation="30"/>
+      <Polystar type="polygon" pointCount="6" outerRadius="10" rotation="30" left="170" top="410"/>
       <Stroke color="#22D3EE" width="1"/>
     </Group>
     <Group>
-      <Polystar position="640,420" type="polygon" pointCount="6" outerRadius="12" rotation="30"/>
+      <Polystar type="polygon" pointCount="6" outerRadius="12" rotation="30" left="628" top="408"/>
       <Stroke color="#A78BFA" width="1"/>
     </Group>
   </Layer>

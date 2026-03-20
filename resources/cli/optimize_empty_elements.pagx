@@ -6,7 +6,7 @@
   <Layer id="empty1"/>
   <!-- Valid layer -->
   <Layer id="valid">
-    <Rectangle position="100,100" size="100,100"/>
+    <Rectangle left="50" top="50" size="100,100"/>
     <Fill color="#FF0000"/>
   </Layer>
   <!-- Another empty layer -->
@@ -14,7 +14,7 @@
   <!-- Empty group inside layer -->
   <Layer id="withEmptyGroup">
     <Group/>
-    <Rectangle position="50,50" size="50,50"/>
+    <Rectangle left="25" top="25" size="50,50"/>
     <Fill color="#0000FF"/>
   </Layer>
 </pagx>

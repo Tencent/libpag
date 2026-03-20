@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="200" height="200">
   <Layer name="gradient_fill">
-    <Rectangle position="50,50" size="100,100"/>
+    <Rectangle size="100,100"/>
     <Fill color="@grad1"/>
   </Layer>
   <Resources>

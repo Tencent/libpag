@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test file for C6: Repeater with copies > 200 -->
 <pagx version="1.0" width="200" height="100">
-  <Layer x="10" y="10" name="HighCopies">
-    <Rectangle position="0,0" size="10,10"/>
+  <Layer left="10" top="10" name="HighCopies">
+    <Rectangle left="-5" top="-5" size="10,10"/>
     <Fill color="#FF0000"/>
     <Repeater copies="250" position="15,0"/>
   </Layer>

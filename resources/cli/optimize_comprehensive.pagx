@@ -11,34 +11,34 @@
   <!-- Empty layer -->
   <Layer id="emptyTop"/>
   <!-- Visible content with duplicate path reference -->
-  <Layer x="50" y="130">
+  <Layer left="50" top="130">
     <Path data="@dup1"/>
     <Fill color="#FF6B6B"/>
   </Layer>
-  <Layer x="150" y="130">
+  <Layer left="150" top="130">
     <Path data="@dup2"/>
     <Fill color="#4ECDC4"/>
   </Layer>
   <!-- Off-canvas layer -->
-  <Layer id="hidden" x="-500" y="0">
-    <Rectangle position="0,0" size="100,100"/>
+  <Layer id="hidden" left="-500">
+    <Rectangle left="-50" top="-50" size="100,100"/>
     <Fill color="#000000"/>
   </Layer>
   <!-- Duplicate layers for composition extraction -->
-  <Layer x="280" y="100">
-    <Rectangle position="0,0" size="60,60" roundness="8"/>
+  <Layer left="280" top="100">
+    <Rectangle left="-30" top="-30" size="60,60" roundness="8"/>
     <Fill color="#9B59B6"/>
   </Layer>
-  <Layer x="350" y="100">
-    <Rectangle position="0,0" size="60,60" roundness="8"/>
+  <Layer left="350" top="100">
+    <Rectangle left="-30" top="-30" size="60,60" roundness="8"/>
     <Fill color="#9B59B6"/>
   </Layer>
-  <Layer x="280" y="180">
-    <Rectangle position="0,0" size="60,60" roundness="8"/>
+  <Layer left="280" top="180">
+    <Rectangle left="-30" top="-30" size="60,60" roundness="8"/>
     <Fill color="#9B59B6"/>
   </Layer>
-  <Layer x="350" y="180">
-    <Rectangle position="0,0" size="60,60" roundness="8"/>
+  <Layer left="350" top="180">
+    <Rectangle left="-30" top="-30" size="60,60" roundness="8"/>
     <Fill color="#9B59B6"/>
   </Layer>
   <!-- Empty layer at end -->

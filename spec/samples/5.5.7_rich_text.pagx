@@ -13,7 +13,7 @@
 
   <!-- Rich text: multiple Groups with different styles in one TextBox -->
   <Layer>
-    <TextBox left="0" top="142" width="400" height="0" lineHeight="48" textAlign="center">
+    <TextBox top="142" width="400" height="0" lineHeight="48" textAlign="center">
       <Group>
         <Text text="Supports " fontFamily="Arial" fontSize="20"/>
         <Fill color="#475569"/>

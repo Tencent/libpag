@@ -1585,16 +1585,40 @@ static void ApplyLocalizationToElements(PAGXDocument* document,
       auto rect = static_cast<Rectangle*>(element);
       rect->position.x -= offsetX;
       rect->position.y -= offsetY;
+      if (!std::isnan(rect->left)) {
+        rect->left -= offsetX;
+      }
+      if (!std::isnan(rect->top)) {
+        rect->top -= offsetY;
+      }
     } else if (type == NodeType::Ellipse) {
       auto ellipse = static_cast<Ellipse*>(element);
       ellipse->position.x -= offsetX;
       ellipse->position.y -= offsetY;
+      if (!std::isnan(ellipse->left)) {
+        ellipse->left -= offsetX;
+      }
+      if (!std::isnan(ellipse->top)) {
+        ellipse->top -= offsetY;
+      }
     } else if (type == NodeType::Polystar) {
       auto polystar = static_cast<Polystar*>(element);
       polystar->position.x -= offsetX;
       polystar->position.y -= offsetY;
+      if (!std::isnan(polystar->left)) {
+        polystar->left -= offsetX;
+      }
+      if (!std::isnan(polystar->top)) {
+        polystar->top -= offsetY;
+      }
     } else if (type == NodeType::Path) {
       auto path = static_cast<Path*>(element);
+      if (!std::isnan(path->left)) {
+        path->left -= offsetX;
+      }
+      if (!std::isnan(path->top)) {
+        path->top -= offsetY;
+      }
       if (path->data != nullptr && !path->data->isEmpty()) {
         auto it = offsetPathMap.find(path->data);
         if (it != offsetPathMap.end()) {
@@ -1611,6 +1635,12 @@ static void ApplyLocalizationToElements(PAGXDocument* document,
       auto text = static_cast<Text*>(element);
       text->position.x -= offsetX;
       text->position.y -= offsetY;
+      if (!std::isnan(text->left)) {
+        text->left -= offsetX;
+      }
+      if (!std::isnan(text->top)) {
+        text->top -= offsetY;
+      }
       for (auto* run : text->glyphRuns) {
         run->x -= offsetX;
         run->y -= offsetY;
@@ -1619,10 +1649,22 @@ static void ApplyLocalizationToElements(PAGXDocument* document,
       auto textBox = static_cast<TextBox*>(element);
       textBox->position.x -= offsetX;
       textBox->position.y -= offsetY;
+      if (!std::isnan(textBox->left)) {
+        textBox->left -= offsetX;
+      }
+      if (!std::isnan(textBox->top)) {
+        textBox->top -= offsetY;
+      }
     } else if (type == NodeType::Group) {
       auto group = static_cast<Group*>(element);
       group->position.x -= offsetX;
       group->position.y -= offsetY;
+      if (!std::isnan(group->left)) {
+        group->left -= offsetX;
+      }
+      if (!std::isnan(group->top)) {
+        group->top -= offsetY;
+      }
     }
   }
 }
@@ -1956,10 +1998,12 @@ static void CollectCandidateLayers(Layer* layer,
       // Exclude layers with flex sizing — their dimensions are dynamically assigned by the parent
       // container layout, so a fixed-size Composition would not match the actual rendered size.
       layer->flex == 0.0f &&
-      // Exclude layers with constraint attributes — their position/size depends on the parent
-      // container, which may differ across instances.
-      !HasConstraintAttributes(layer->left, layer->right, layer->top, layer->bottom, layer->centerX,
-                               layer->centerY)) {
+      // Exclude layers with constraint attributes that depend on parent dimensions — opposite-edge
+      // constraints (right, bottom) and alignment constraints (centerX, centerY) make the layer's
+      // position/size parent-dependent, so a fixed-size Composition would not match across instances.
+      // Single-edge constraints (left, top) are equivalent to x/y positioning and are safe to extract.
+      std::isnan(layer->right) && std::isnan(layer->bottom) && std::isnan(layer->centerX) &&
+      std::isnan(layer->centerY)) {
     auto hash = HashLayerStructure(layer);
     hashGroups[hash].push_back(layer);
   }
@@ -2040,12 +2084,18 @@ static int ExtractCompositions(PAGXDocument* document) {
     comp->layers.push_back(innerLayer);
 
     // Replace each layer's contents with a composition reference. Adjust each layer's x/y
-    // to compensate for the coordinate shift applied inside the Composition.
+    // (and left/top if set) to compensate for the coordinate shift applied inside the Composition.
     for (auto* layer : candidate.layers) {
       layer->contents.clear();
       layer->composition = comp;
       layer->x += candidate.minX;
       layer->y += candidate.minY;
+      if (!std::isnan(layer->left)) {
+        layer->left += candidate.minX;
+      }
+      if (!std::isnan(layer->top)) {
+        layer->top += candidate.minY;
+      }
     }
     count += static_cast<int>(candidate.layers.size());
   }

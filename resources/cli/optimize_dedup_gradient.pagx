@@ -11,12 +11,12 @@
       <ColorStop offset="1" color="#0000FF"/>
     </LinearGradient>
   </Resources>
-  <Layer x="75" y="50">
-    <Rectangle position="0,0" size="100,50"/>
+  <Layer left="75" top="50">
+    <Rectangle left="-50" top="-25" size="100,50"/>
     <Fill color="@grad1"/>
   </Layer>
-  <Layer x="225" y="50">
-    <Rectangle position="0,0" size="100,50"/>
+  <Layer left="225" top="50">
+    <Rectangle left="-50" top="-25" size="100,50"/>
     <Fill color="@grad2"/>
   </Layer>
 </pagx>

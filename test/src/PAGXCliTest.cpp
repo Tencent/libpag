@@ -370,12 +370,10 @@ CLI_TEST(PAGXCliTest, Optimize_LocalizeRectangle) {
   auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
-  // After localization with offset = bbox top-left, Rectangle at (200,300) with size 100x100
-  // has bbox left/top = (150, 250), so Layer moves to x=150, y=250.
-  // Rectangle position becomes (200-150, 300-250) = (50,50) = default, so position is omitted.
-  EXPECT_TRUE(output.find("x=\"150\"") != std::string::npos);
-  EXPECT_TRUE(output.find("y=\"250\"") != std::string::npos);
-  EXPECT_TRUE(output.find("position=") == std::string::npos);
+  // Input already uses constraint-based positioning (left/top), so no localization is needed.
+  // Verify that left/top are preserved correctly.
+  EXPECT_TRUE(output.find("left=\"150\"") != std::string::npos);
+  EXPECT_TRUE(output.find("top=\"250\"") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Optimize_LocalizeEllipse) {
@@ -384,10 +382,9 @@ CLI_TEST(PAGXCliTest, Optimize_LocalizeEllipse) {
   auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
-  // Ellipse at (150,250) with size 80x80 has bbox left/top = (110, 210).
-  // Layer moves to x=110, y=210, ellipse position becomes (40,40) = default.
-  EXPECT_TRUE(output.find("x=\"110\"") != std::string::npos);
-  EXPECT_TRUE(output.find("y=\"210\"") != std::string::npos);
+  // Input already uses constraint-based positioning (left/top), so no localization is needed.
+  EXPECT_TRUE(output.find("left=\"110\"") != std::string::npos);
+  EXPECT_TRUE(output.find("top=\"210\"") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Optimize_LocalizePolystar) {
@@ -396,10 +393,9 @@ CLI_TEST(PAGXCliTest, Optimize_LocalizePolystar) {
   auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
-  // Polystar at (300,200) with outerRadius=40 has bbox left/top = (260, 160).
-  // Layer moves to x=260, y=160, polystar position becomes (40,40) = default.
-  EXPECT_TRUE(output.find("x=\"260\"") != std::string::npos);
-  EXPECT_TRUE(output.find("y=\"160\"") != std::string::npos);
+  // Input already uses constraint-based positioning (left/top), so no localization is needed.
+  EXPECT_TRUE(output.find("left=\"260\"") != std::string::npos);
+  EXPECT_TRUE(output.find("top=\"160\"") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Optimize_LocalizeTextBox) {
@@ -418,7 +414,9 @@ CLI_TEST(PAGXCliTest, Optimize_LocalizeSkipMatrix) {
   auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("position=\"200,200\"") != std::string::npos);
+  // Input already uses constraint-based positioning (left/top), so no localization is needed.
+  EXPECT_TRUE(output.find("left=\"150\"") != std::string::npos);
+  EXPECT_TRUE(output.find("top=\"150\"") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Optimize_LocalizeAlreadyAtOrigin) {
@@ -502,8 +500,9 @@ CLI_TEST(PAGXCliTest, Optimize_LocalizeSkipLayerConstraints) {
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   // Layer has left="50" top="30" — localization must be skipped entirely.
-  // Internal Rectangle position should remain unchanged at 100,80.
-  EXPECT_TRUE(output.find("position=\"100,80\"") != std::string::npos);
+  // Internal Rectangle uses left/top constraints which should be preserved unchanged.
+  EXPECT_TRUE(output.find("left=\"70\"") != std::string::npos);
+  EXPECT_TRUE(output.find("top=\"60\"") != std::string::npos);
   EXPECT_TRUE(output.find("left=\"50\"") != std::string::npos);
 }
 
@@ -618,10 +617,12 @@ CLI_TEST(PAGXCliTest, Optimize_LocalizeSkipLayoutChild) {
   auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
-  // Child Layers in horizontal layout — their x/y is computed by the layout engine.
-  // Localization must not modify their positions. Original positions should be preserved.
-  EXPECT_TRUE(output.find("position=\"50,50\"") != std::string::npos);
-  EXPECT_TRUE(output.find("position=\"60,40\"") != std::string::npos);
+  // Child Layers in horizontal layout — their position is computed by the layout engine.
+  // Localization must not modify their positions. Original constraint values should be preserved.
+  EXPECT_TRUE(output.find("left=\"10\"") != std::string::npos);
+  EXPECT_TRUE(output.find("top=\"20\"") != std::string::npos);
+  EXPECT_TRUE(output.find("left=\"20\"") != std::string::npos);
+  EXPECT_TRUE(output.find("top=\"10\"") != std::string::npos);
 }
 
 //==============================================================================
@@ -720,11 +721,11 @@ CLI_TEST(PAGXCliTest, Format_AttributeReordering) {
   ASSERT_NE(namePos, std::string::npos);
   ASSERT_NE(alphaPos, std::string::npos);
   EXPECT_LT(namePos, alphaPos);
-  auto positionPos = output.find("position=");
+  auto leftPos = output.find("left=");
   auto sizePos = output.find("size=");
-  ASSERT_NE(positionPos, std::string::npos);
+  ASSERT_NE(leftPos, std::string::npos);
   ASSERT_NE(sizePos, std::string::npos);
-  EXPECT_LT(positionPos, sizePos);
+  EXPECT_LT(leftPos, sizePos);
 }
 
 CLI_TEST(PAGXCliTest, Format_PreservesValues) {

@@ -3,14 +3,14 @@
 <pagx version="1.0" width="336" height="200">
   <!-- Background -->
   <Layer>
-    <Rectangle left="0" top="0" size="336,200"/>
+    <Rectangle size="336,200"/>
     <Fill color="#F8FAFC"/>
   </Layer>
 
   <!-- Main container: Horizontal layout with 2 children + 1 overlay -->
   <Layer width="336" height="200" layout="horizontal" gap="12" padding="12">
     <!-- Container border -->
-    <Rectangle left="0" top="0" size="336,200"/>
+    <Rectangle size="336,200"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
 
     <!-- Child 1: Participates in horizontal layout -->

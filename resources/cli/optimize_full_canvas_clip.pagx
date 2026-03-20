@@ -2,11 +2,11 @@
 <!-- File with full-canvas clip mask that should be removed -->
 <pagx version="1.0" width="200" height="200">
   <Layer id="maskLayer">
-    <Rectangle position="100,100" size="200,200"/>
+    <Rectangle size="200,200"/>
     <Fill color="#FFFFFF"/>
   </Layer>
   <Layer mask="@maskLayer">
-    <Ellipse position="100,100" size="150,150"/>
+    <Ellipse left="25" top="25" size="150,150"/>
     <Fill color="#E91E63"/>
   </Layer>
 </pagx>

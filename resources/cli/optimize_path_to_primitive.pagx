@@ -7,11 +7,11 @@
     <!-- This path describes an ellipse centered at origin -->
     <PathData id="circlePath" data="M 0 -40 C 22 -40 40 -22 40 0 C 40 22 22 40 0 40 C -22 40 -40 22 -40 0 C -40 -22 -22 -40 0 -40 Z"/>
   </Resources>
-  <Layer x="100" y="100">
+  <Layer left="100" top="100">
     <Path data="@rectPath"/>
     <Fill color="#FF6B6B"/>
   </Layer>
-  <Layer x="220" y="100">
+  <Layer left="220" top="100">
     <Path data="@circlePath"/>
     <Fill color="#4ECDC4"/>
   </Layer>

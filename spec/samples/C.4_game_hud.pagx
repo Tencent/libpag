@@ -6,7 +6,7 @@
   </Layer>
   <Layer name="Background">
     <Layer>
-      <Rectangle left="0" top="0" size="800,600"/>
+      <Rectangle size="800,600"/>
       <Fill>
         <RadialGradient center="400,300" radius="500">
           <ColorStop offset="0" color="#001122"/>
@@ -16,20 +16,20 @@
       </Fill>
     </Layer>
     <Layer alpha="0.15">
-      <Rectangle left="0" top="-0.5" size="800,1"/>
+      <Rectangle top="-0.5" size="800,1"/>
       <Repeater copies="35" position="0,17"/>
-      <Group position="400,300" rotation="60">
+      <Group left="400" top="300" rotation="60">
         <Rectangle left="-600" top="-510.5" size="1200,1"/>
         <Repeater copies="60" position="0,17"/>
       </Group>
-      <Group position="400,300" rotation="-60">
+      <Group left="400" top="300" rotation="-60">
         <Rectangle left="-600" top="-510.5" size="1200,1"/>
         <Repeater copies="60" position="0,17"/>
       </Group>
       <Fill color="#0066AA"/>
     </Layer>
     <Layer>
-      <Rectangle left="0" top="0" size="800,600"/>
+      <Rectangle size="800,600"/>
       <Fill>
         <RadialGradient center="400,300" radius="600">
           <ColorStop offset="0.6" color="#00000000"/>
@@ -109,11 +109,11 @@
     </Layer>
     <Layer name="HealthText">
       <Layer>
-        <Text text="100%" position="-240,10" fontFamily="Arial" fontStyle="Bold" fontSize="24" textAnchor="end"/>
+        <Text text="100%" left="-240" top="10" fontFamily="Arial" fontStyle="Bold" fontSize="24" textAnchor="end"/>
         <Fill color="#FFF"/>
       </Layer>
       <Layer>
-        <Text text="STRUCTURAL INTEGRITY" position="-240,25" fontFamily="Arial" fontSize="10" textAnchor="end"/>
+        <Text text="STRUCTURAL INTEGRITY" left="-240" top="25" fontFamily="Arial" fontSize="10" textAnchor="end"/>
         <Fill color="#0088FF"/>
       </Layer>
     </Layer>
@@ -150,11 +150,11 @@
     </Layer>
     <Layer name="EnergyText">
       <Layer>
-        <Text text="60%" position="240,10" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+        <Text text="60%" left="240" top="10" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
         <Fill color="#FFF"/>
       </Layer>
       <Layer>
-        <Text text="PLASMA RESERVES" position="240,25" fontFamily="Arial" fontSize="10"/>
+        <Text text="PLASMA RESERVES" left="240" top="25" fontFamily="Arial" fontSize="10"/>
         <Fill color="#0088FF"/>
       </Layer>
     </Layer>
@@ -168,11 +168,11 @@
     </Layer>
     <Layer name="WeaponInfo">
       <Layer>
-        <Text text="MK-IV RAILGUN" position="0,-15" fontFamily="Arial" fontStyle="Bold" fontSize="20" textAnchor="center"/>
+        <Text text="MK-IV RAILGUN" top="-15" fontFamily="Arial" fontStyle="Bold" fontSize="20" textAnchor="center"/>
         <Fill color="#FFF"/>
       </Layer>
       <Layer>
-        <Text text="[ BURST MODE ]" position="0,5" fontFamily="Arial" fontSize="12" textAnchor="center"/>
+        <Text text="[ BURST MODE ]" top="5" fontFamily="Arial" fontSize="12" textAnchor="center"/>
         <Fill color="#FFAA00"/>
       </Layer>
     </Layer>

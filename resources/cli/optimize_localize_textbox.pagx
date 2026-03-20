@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="400" height="400">
-  <Layer name="text" x="100" y="150" width="300" height="200">
+  <Layer name="text" left="100" top="150" width="300" height="200">
     <Rectangle size="200,50"/>
     <Stroke color="#CCCCCC"/>
     <TextBox width="200" height="50">

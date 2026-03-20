@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="600" height="420" version="1.0">
   <!-- Box A: Latin extended characters (2-byte UTF-8: é, ü, ï) -->
-  <Layer x="50" y="30">
+  <Layer left="50" top="30">
     <Group>
-      <Rectangle position="125,25" size="250,50"/>
+      <Rectangle size="250,50"/>
       <Stroke/>
     </Group>
     <TextBox width="250" height="50">
@@ -13,21 +13,21 @@
   </Layer>
 
   <!-- Box B: Tab character handling -->
-  <Layer x="330" y="30">
+  <Layer left="330" top="30">
     <Group>
-      <Rectangle position="110,25" size="220,50"/>
+      <Rectangle size="220,50"/>
       <Stroke/>
     </Group>
     <TextBox width="220" height="50">
-      <Text fontFamily="NotoSansSC" fontSize="20"><![CDATA[你好	World	测试]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="20"><![CDATA[你好\tWorld\t测试]]></Text>
       <Fill/>
     </TextBox>
   </Layer>
 
   <!-- Box C: Mixed CJK scripts (Hiragana + Katakana + Kanji) -->
-  <Layer x="50" y="110">
+  <Layer left="50" top="110">
     <Group>
-      <Rectangle position="125,50" size="250,100"/>
+      <Rectangle size="250,100"/>
       <Stroke/>
     </Group>
     <TextBox width="250" height="100">
@@ -37,9 +37,9 @@
   </Layer>
 
   <!-- Box D: Fullwidth characters -->
-  <Layer x="330" y="110">
+  <Layer left="330" top="110">
     <Group>
-      <Rectangle position="110,25" size="220,50"/>
+      <Rectangle size="220,50"/>
       <Stroke/>
     </Group>
     <TextBox width="220" height="50">
@@ -49,9 +49,9 @@
   </Layer>
 
   <!-- Box E: Multiple consecutive empty lines -->
-  <Layer x="50" y="230">
+  <Layer left="50" top="230">
     <Group>
-      <Rectangle position="110,65" size="220,130"/>
+      <Rectangle size="220,130"/>
       <Stroke/>
     </Group>
     <TextBox width="220" height="130">

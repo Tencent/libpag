@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="200" height="200">
   <Layer name="fills">
-    <Rectangle position="50,50" size="100,100"/>
+    <Rectangle size="100,100"/>
     <Fill color="@g1"/>
-    <Rectangle position="150,50" size="100,100"/>
+    <Rectangle left="100" size="100,100"/>
     <Fill color="@g2"/>
   </Layer>
   <Resources>

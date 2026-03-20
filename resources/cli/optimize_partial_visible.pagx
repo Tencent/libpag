@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="200" height="200">
-  <Layer name="partial" x="180" y="100">
+  <Layer name="partial" left="180" top="100">
 <Rectangle size="50,50" left="-25" top="-25" />
     <Fill color="#FF0000"/>
   </Layer>

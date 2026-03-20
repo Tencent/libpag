@@ -104,7 +104,7 @@
           <Group left="20" right="20" top="20" bottom="20">
             <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="12"/>
             <Fill color="#1E293B"/>
-            <Group width="160" height="75" centerX="0" top="0">
+            <Group width="160" height="75" centerX="0">
               <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
               <Fill color="#6366F1"/>
             </Group>

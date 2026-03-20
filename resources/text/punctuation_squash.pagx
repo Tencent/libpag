@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="700" height="500" version="1.0">
   <!-- Box A: Opening + Closing + Opening squash (「」「」) -->
-  <Layer x="50" y="50">
+  <Layer left="50" top="50">
     <Group>
-      <Rectangle position="150,30" size="300,60"/>
+      <Rectangle size="300,60"/>
       <Stroke/>
     </Group>
     <TextBox width="300" height="60">
@@ -12,10 +12,10 @@
     </TextBox>
   </Layer>
 
-  <!-- Box B: Closing + Opening squash (。「) -->
-  <Layer x="50" y="120">
+  <!-- Box B: Closing + Opening squash (。」) -->
+  <Layer left="50" top="120">
     <Group>
-      <Rectangle position="150,30" size="300,60"/>
+      <Rectangle size="300,60"/>
       <Stroke/>
     </Group>
     <TextBox width="300" height="60">
@@ -25,9 +25,9 @@
   </Layer>
 
   <!-- Box C: Closing + Closing adjacent squash (、。) -->
-  <Layer x="400" y="50">
+  <Layer left="400" top="50">
     <Group>
-      <Rectangle position="125,30" size="250,60"/>
+      <Rectangle size="250,60"/>
       <Stroke/>
     </Group>
     <TextBox width="250" height="60">
@@ -37,9 +37,9 @@
   </Layer>
 
   <!-- Box D: MiddleDot + Opening squash (・「) -->
-  <Layer x="400" y="120">
+  <Layer left="400" top="120">
     <Group>
-      <Rectangle position="125,30" size="250,60"/>
+      <Rectangle size="250,60"/>
       <Stroke/>
     </Group>
     <TextBox width="250" height="60">
@@ -49,9 +49,9 @@
   </Layer>
 
   <!-- Box E: Line-start Opening squash -->
-  <Layer x="50" y="200">
+  <Layer left="50" top="200">
     <Group>
-      <Rectangle position="150,30" size="300,60"/>
+      <Rectangle size="300,60"/>
       <Stroke/>
     </Group>
     <TextBox width="300" height="60">
@@ -61,9 +61,9 @@
   </Layer>
 
   <!-- Box F: Line-end Closing squash -->
-  <Layer x="400" y="200">
+  <Layer left="400" top="200">
     <Group>
-      <Rectangle position="125,30" size="250,60"/>
+      <Rectangle size="250,60"/>
       <Stroke/>
     </Group>
     <TextBox width="250" height="60">
@@ -73,9 +73,9 @@
   </Layer>
 
   <!-- Box G: Compound squash (multiple punctuation types in sequence) -->
-  <Layer x="50" y="300">
+  <Layer left="50" top="300">
     <Group>
-      <Rectangle position="125,60" size="250,120"/>
+      <Rectangle size="250,120"/>
       <Stroke/>
     </Group>
     <TextBox width="250" height="120">
@@ -85,9 +85,9 @@
   </Layer>
 
   <!-- Box H: Vertical text punctuation squash -->
-  <Layer x="350" y="300">
+  <Layer left="350" top="300">
     <Group>
-      <Rectangle position="50,80" size="100,160"/>
+      <Rectangle size="100,160"/>
       <Stroke/>
     </Group>
     <TextBox width="100" height="160" writingMode="vertical">
@@ -97,9 +97,9 @@
   </Layer>
 
   <!-- Box I: Normal CJK punctuation baseline (no squash expected) -->
-  <Layer x="50" y="430">
+  <Layer left="50" top="430">
     <Group>
-      <Rectangle position="150,25" size="300,50"/>
+      <Rectangle size="300,50"/>
       <Stroke/>
     </Group>
     <TextBox width="300" height="50">

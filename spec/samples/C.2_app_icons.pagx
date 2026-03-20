@@ -213,7 +213,7 @@
             <Fill color="#1E2433"/>
           </Group>
           <Group>
-            <Text text="17" position="0,12" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
+            <Text text="17" top="12" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
             <Fill color="#EF4444"/>
           </Group>
         </Layer>

@@ -11,9 +11,9 @@
 
   <!-- Box A: Forced break — long word (376px total) must split mid-character -->
   <!-- width=100px, 4 lines, height=140 -->
-  <Layer x="20" y="20">
+  <Layer left="20" top="20">
     <Group>
-      <Rectangle position="50,70" size="100,140"/>
+      <Rectangle size="100,140"/>
       <Stroke/>
     </Group>
     <TextBox width="100" height="140">
@@ -24,9 +24,9 @@
 
   <!-- Box B: Space break — "Hello"=59 " "=5 "World"=67 → 131px. -->
   <!-- width=132: "Hello World"=131<132 fits, "Test"=47 wraps. 2 lines, height=70 -->
-  <Layer x="140" y="20">
+  <Layer left="140" top="20">
     <Group>
-      <Rectangle position="66,35" size="132,70"/>
+      <Rectangle size="132,70"/>
       <Stroke/>
     </Group>
     <TextBox width="132" height="70">
@@ -39,9 +39,9 @@
   <!-- "well-"=54 "known"=77 → 131. width=132: "well-known"=131<132 fits. -->
   <!-- " "=5 "self-"=47 → 131+5+47=183>132. Break after space: "well-known" line1. -->
   <!-- "self-"=47 "driving"=80 → 127<132. "self-driving"=127<132 fits? Actually 3 lines. h=105 -->
-  <Layer x="290" y="20">
+  <Layer left="290" top="20">
     <Group>
-      <Rectangle position="66,53" size="132,105"/>
+      <Rectangle size="132,105"/>
       <Stroke/>
     </Group>
     <TextBox width="132" height="105">
@@ -54,9 +54,9 @@
   <!-- "path/"=62 "to/"=33 → 95. width=96: "path/to/"=95<96 fits. -->
   <!-- "some/"=70 → 95+70=165>96 wraps. "some/"=70<96 fits line2. "file"=35<96 fits too. -->
   <!-- "some/file"=105>96, so "some/" line2, "file" line3. 3 lines, h=105 -->
-  <Layer x="440" y="20">
+  <Layer left="440" top="20">
     <Group>
-      <Rectangle position="48,53" size="96,105"/>
+      <Rectangle size="96,105"/>
       <Stroke/>
     </Group>
     <TextBox width="96" height="105">
@@ -75,9 +75,9 @@
   <!-- "over"=50 (+SHY=0). 50<90 fits line3. "view"=52<90 fits line4? -->
   <!-- "over"=50+SHY+... need to check if "overview" is one word. It is two: "over­view". -->
   <!-- So: line1="Compre", line2="hensive", line3="over", line4="view". 4 lines, h=140 -->
-  <Layer x="20" y="180">
+  <Layer left="20" top="180">
     <Group>
-      <Rectangle position="45,70" size="90,140"/>
+      <Rectangle size="90,140"/>
       <Stroke/>
     </Group>
     <TextBox width="90" height="140">
@@ -89,9 +89,9 @@
   <!-- Box F: ZWSP break (BA) — U+200B zero-width space allows break -->
   <!-- "Super"=66 (+ZWSP=0). width=67: "Super"=66<67 fits, break at ZWSP. -->
   <!-- "Long"=57<67 line2. "Word"=60<67 line3. "Here"=52<67 line4. 4 lines, h=140 -->
-  <Layer x="130" y="180">
+  <Layer left="130" top="180">
     <Group>
-      <Rectangle position="34,70" size="67,140"/>
+      <Rectangle size="67,140" left="0.5"/>
       <Stroke/>
     </Group>
     <TextBox width="67" height="140">
@@ -104,9 +104,9 @@
   <!-- AB⁠CD⁠EF = 15+16+0+15+16+0+14+13 = 89. " "=5 "GH"=17+17=34. -->
   <!-- width=90: "ABCDEF"=89<90 fits (WJ keeps them together). -->
   <!-- 89+5=94>90 → "ABCDEF" line1. "GH"=34 " "=5 "IJ"=20 → 59<90 line2. 2 lines, h=70 -->
-  <Layer x="220" y="180">
+  <Layer left="220" top="180">
     <Group>
-      <Rectangle position="45,35" size="90,70"/>
+      <Rectangle size="90,70"/>
       <Stroke/>
     </Group>
     <TextBox width="90" height="70">
@@ -125,9 +125,9 @@
   <!-- But ￥ is PR class — cannot break between ￥ and 9. So ￥ can't be at line end. -->
   <!-- Backtrack: "好" line1 (24<49). "￥9"=37<49 line2. "吧"=24<49 line3. -->
   <!-- Key: ￥ stays with 9, not stranded at end of line1. 3 lines, h=105 -->
-  <Layer x="20" y="370">
+  <Layer left="20" top="370">
     <Group>
-      <Rectangle position="25,53" size="49,105"/>
+      <Rectangle size="49,105" left="0.5" top="0.5"/>
       <Stroke/>
     </Group>
     <TextBox width="49" height="105">
@@ -142,9 +142,9 @@
   <!-- But % is PO class — cannot break between 9 and %. -->
   <!-- Backtrack: "好" line1 (24<49). "9%"=35<49 line2. "吧"=24<49 line3. -->
   <!-- Key: % stays with 9, not pushed to start of next line alone. 3 lines, h=105 -->
-  <Layer x="90" y="370">
+  <Layer left="90" top="370">
     <Group>
-      <Rectangle position="25,53" size="49,105"/>
+      <Rectangle size="49,105" left="0.5" top="0.5"/>
       <Stroke/>
     </Group>
     <TextBox width="49" height="105">
@@ -159,9 +159,9 @@
   <!-- But next … is IN class — …… are inseparable, can't break between them. -->
   <!-- Backtrack: "等等" line1 (48<73). "……"=48<73 line2. "好"=24<73 line3. -->
   <!-- Key: …… stay together, not split across lines. 3 lines, h=105 -->
-  <Layer x="160" y="370">
+  <Layer left="160" top="370">
     <Group>
-      <Rectangle position="37,53" size="73,105"/>
+      <Rectangle size="73,105" left="0.5" top="0.5"/>
       <Stroke/>
     </Group>
     <TextBox width="73" height="105">
@@ -176,9 +176,9 @@
   <!-- But next — is IN class — —— are inseparable, can't break between them. -->
   <!-- Backtrack: "前言" line1 (48<70). "——"=42<70 line2. "正"=24<70 line3. -->
   <!-- Key: —— stay together. 3 lines, h=105 -->
-  <Layer x="250" y="370">
+  <Layer left="250" top="370">
     <Group>
-      <Rectangle position="35,53" size="70,105"/>
+      <Rectangle size="70,105" top="0.5"/>
       <Stroke/>
     </Group>
     <TextBox width="70" height="105">
@@ -198,9 +198,9 @@
   <!-- "说完了" line1 (72<97). "「引用」"=120>97. "「引用"=96<97 fits. -->
   <!-- 」 is CL — can't be at line start. "「引用」"=120>97 but 」 pulled in → "「引用」"=120>97. -->
   <!-- Hmm, "「引用"=96<97 line2, "」好"=48<97 line3. 3 lines, h=105 -->
-  <Layer x="340" y="370">
+  <Layer left="340" top="370">
     <Group>
-      <Rectangle position="49,53" size="97,105"/>
+      <Rectangle size="97,105" left="0.5" top="0.5"/>
       <Stroke/>
     </Group>
     <TextBox width="97" height="105">
@@ -215,9 +215,9 @@
   <!-- But 」 is CL — prohibited at line start. Pull 」 back with 是的. -->
   <!-- "是的」"=72>49 → forced overflow but CL rule requires it. -->
   <!-- Use width=73: "是的」"=72<73 fits line1. "然后"=48<73 line2. 2 lines, h=70 -->
-  <Layer x="460" y="370">
+  <Layer left="460" top="370">
     <Group>
-      <Rectangle position="37,35" size="73,70"/>
+      <Rectangle size="73,70" left="0.5"/>
       <Stroke/>
     </Group>
     <TextBox width="73" height="70">
@@ -232,9 +232,9 @@
   <!-- But ー is NS — prohibited at line start. Pull ー back with ゲ. -->
   <!-- "ゲー"=48>25 forced overflow. Use width=49: "ゲー"=48<49 fits. "ム好"=48<49. -->
   <!-- 2 lines, h=70 -->
-  <Layer x="20" y="530">
+  <Layer left="20" top="530">
     <Group>
-      <Rectangle position="25,35" size="49,70"/>
+      <Rectangle size="49,70" left="0.5"/>
       <Stroke/>
     </Group>
     <TextBox width="49" height="70">
@@ -248,9 +248,9 @@
   <!-- width=97: 说+"=24+24=48<97. 说+"好=72<97. 说+"好"=96<97 fits. -->
   <!-- 说+"好"+吧=120>97 → "说"好"" line1. "吧" line2. -->
   <!-- Key: " does not separate from 好. 2 lines, h=70 -->
-  <Layer x="90" y="530">
+  <Layer left="90" top="530">
     <Group>
-      <Rectangle position="49,35" size="97,70"/>
+      <Rectangle size="97,70" left="0.5"/>
       <Stroke/>
     </Group>
     <TextBox width="97" height="70">
