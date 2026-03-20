@@ -103,8 +103,10 @@ void PAGRunTimeDataModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
     chartDataModel.clearItems();
     frameTimeMetricsVector.clear();
     fileInfoModel.setPAGFile(nullptr);
+    nodeStatsModel.setPAGXDocument(nullptr);
     updateFrameDisplayInfo(0, 0, 0);
     Q_EMIT fileInfoModelChanged();
+    Q_EMIT nodeStatsModelChanged();
     Q_EMIT hasFrameTimelineChanged();
     Q_EMIT dataChanged();
     return;
@@ -118,8 +120,10 @@ void PAGRunTimeDataModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
   frameTimeMetricsVector.squeeze();
   frameTimeMetricsVector.clear();
   fileInfoModel.setPAGFile(pagFile);
+  nodeStatsModel.setPAGXDocument(nullptr);
   updateFrameDisplayInfo(0, 0, 0);
   Q_EMIT fileInfoModelChanged();
+  Q_EMIT nodeStatsModelChanged();
   Q_EMIT hasFrameTimelineChanged();
   Q_EMIT dataChanged();
 }
