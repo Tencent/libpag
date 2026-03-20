@@ -46,13 +46,12 @@ IContentRenderer::RenderMetrics PAGRenderer::flush() {
   }
   auto* player = viewModel->getPAGPlayer();
   auto* file = viewModel->getPAGFile();
-  if (player == nullptr || file == nullptr) {
-    return metrics;
-  }
   player->flush();
   double progress = file->getProgress();
+  auto totalFrames =
+      static_cast<int64_t>(std::round(player->duration() * file->frameRate() / 1000000.0));
   metrics.currentFrame =
-      static_cast<int64_t>(std::round((viewModel->getTotalFrame().toDouble() - 1) * progress));
+      static_cast<int64_t>(std::round(static_cast<double>(totalFrames - 1) * progress));
   metrics.renderTime = player->renderingTime();
   metrics.presentTime = player->presentingTime();
   metrics.imageDecodeTime = player->imageDecodingTime();

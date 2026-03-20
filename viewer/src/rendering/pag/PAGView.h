@@ -35,7 +35,6 @@ class PAGView : public ContentView {
 
   Q_SLOT void flush() const override;
 
-  void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
   QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
 
  private:

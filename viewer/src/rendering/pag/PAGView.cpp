@@ -100,13 +100,6 @@ void PAGView::onAudioTimeChanged(int64_t audioTime) {
   }
 }
 
-void PAGView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) {
-  if (newGeometry == oldGeometry) {
-    return;
-  }
-  ContentView::geometryChange(newGeometry, oldGeometry);
-}
-
 QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   if (!renderThread->isRunning()) {
     renderThread->start();
@@ -129,8 +122,6 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
       }
       viewModel->setProgressInternal(newProgress, false);
     }
-  } else {
-    triggerFlush();
   }
 
   return node;
