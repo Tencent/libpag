@@ -58,7 +58,7 @@ const PAGNodeStatsModel* PAGRunTimeDataModel::getNodeStatsModel() const {
 }
 
 bool PAGRunTimeDataModel::hasFrameTimeline() const {
-  return !frameTimeMetricsVector.isEmpty();
+  return frameModeEnabled;
 }
 
 void PAGRunTimeDataModel::setCurrentFrame(const QString& currentFrame) {
@@ -96,6 +96,7 @@ void PAGRunTimeDataModel::updateData(int64_t currentFrame, int64_t renderTime, i
 
 void PAGRunTimeDataModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
   if (pagFile == nullptr) {
+    frameModeEnabled = false;
     totalFrame = 0;
     currentFrame = -1;
     lastUpdatedFrame = -1;
@@ -108,6 +109,7 @@ void PAGRunTimeDataModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
     Q_EMIT dataChanged();
     return;
   }
+  frameModeEnabled = true;
   totalFrame = TimeToFrame(pagFile->duration(), pagFile->frameRate());
   currentFrame = -1;
   lastUpdatedFrame = -1;
@@ -123,6 +125,7 @@ void PAGRunTimeDataModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
 }
 
 void PAGRunTimeDataModel::setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pagxDocument) {
+  frameModeEnabled = false;
   totalFrame = pagxDocument ? 1 : 0;
   currentFrame = pagxDocument ? 0 : -1;
   lastUpdatedFrame = -1;
