@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates Rectangle shape with various roundness values -->
 <pagx version="1.0" width="400" height="400">
-  <Layer width="400" height="400" layout="vertical" alignment="stretch">
+  <Layer width="400" height="400" layout="vertical">
     <!-- Row 1 -->
-    <Layer layout="horizontal" alignment="stretch" flex="1">
+    <Layer layout="horizontal" flex="1">
       <!-- Sharp rectangle -->
       <Layer flex="1">
         <Rectangle centerX="0" centerY="0" size="140,140"/>
@@ -26,7 +26,7 @@
       </Layer>
     </Layer>
     <!-- Row 2 -->
-    <Layer layout="horizontal" alignment="stretch" flex="1">
+    <Layer layout="horizontal" flex="1">
       <!-- Fully rounded rectangle (pill shape) -->
       <Layer flex="1">
         <Rectangle centerX="0" centerY="0" size="140,140" roundness="70"/>

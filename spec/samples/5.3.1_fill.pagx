@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates different fill types -->
 <pagx version="1.0" width="400" height="400">
-  <Layer width="400" height="400" layout="vertical" alignment="stretch">
+  <Layer width="400" height="400" layout="vertical">
     <!-- Row 1: solid and gradient fills -->
-    <Layer layout="horizontal" alignment="stretch" flex="1">
+    <Layer layout="horizontal" flex="1">
       <!-- Solid color fill -->
       <Layer flex="1">
         <Rectangle centerX="0" centerY="0" size="140,140" roundness="24"/>

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates Ellipse shape -->
 <pagx version="1.0" width="400" height="400">
-  <Layer width="400" height="400" layout="vertical" alignment="stretch">
+  <Layer width="400" height="400" layout="vertical">
     <!-- Row 1 -->
-    <Layer layout="horizontal" alignment="stretch" flex="1">
+    <Layer layout="horizontal" flex="1">
       <!-- Perfect circle -->
       <Layer flex="1">
         <Ellipse centerX="0" centerY="0" size="140,140"/>
@@ -26,7 +26,7 @@
       </Layer>
     </Layer>
     <!-- Row 2 -->
-    <Layer layout="horizontal" alignment="stretch" flex="1">
+    <Layer layout="horizontal" flex="1">
       <!-- Vertical ellipse -->
       <Layer flex="1">
         <Ellipse centerX="0" centerY="0" size="100,160"/>

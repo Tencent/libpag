@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="400" height="400">
-  <Layer width="400" height="400" layout="vertical" alignment="stretch">
+  <Layer width="400" height="400" layout="vertical">
     <!-- Row 1: stroke styles -->
-    <Layer layout="horizontal" alignment="stretch" flex="1">
+    <Layer layout="horizontal" flex="1">
       <Layer flex="1">
         <Rectangle centerX="0" centerY="0" size="130,130" roundness="20"/>
         <Stroke color="#06B6D4" width="8" cap="round" join="round"/>
