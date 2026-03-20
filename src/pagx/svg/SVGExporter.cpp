@@ -504,12 +504,13 @@ class SVGWriter {
   // Mask / clip-path defs
   using ContentWriter = void (SVGWriter::*)(SVGBuilder&, const Layer*);
   std::string writeMaskOrClipDef(const Layer* maskLayer, const char* tag, const char* idPrefix,
-                                 ContentWriter writer);
+                                 ContentWriter writer,
+                                 MaskType maskType = MaskType::Contour);
   void writeMaskContent(SVGBuilder& out, const Layer* layer);
   void writeClipPathContent(SVGBuilder& out, const Layer* layer);
   void writeClipPathContentRecursive(SVGBuilder& out, const Layer* layer,
                                      const Matrix& parentMatrix = {});
-  std::string writeMaskDef(const Layer* maskLayer);
+  std::string writeMaskDef(const Layer* maskLayer, MaskType maskType = MaskType::Alpha);
   std::string writeClipPathDef(const Layer* maskLayer);
 
   // Fill / stroke attribute helpers
@@ -885,11 +886,15 @@ std::string SVGWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters)
 //==============================================================================
 
 std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, const char* tag,
-                                          const char* idPrefix, ContentWriter writer) {
+                                          const char* idPrefix, ContentWriter writer,
+                                          MaskType maskType) {
   std::string defId = maskLayer->id.empty() ? generateId(idPrefix) : maskLayer->id;
   SVGBuilder paintDefs(_indentSpaces);
   _defs->openElement(tag);
   _defs->addAttribute("id", defId);
+  if (maskType == MaskType::Alpha) {
+    _defs->addAttribute("style", "mask-type:alpha");
+  }
   _defs->closeElementStart();
   SVGWriter nestedWriter(&paintDefs, _context, _indentSpaces, _convertTextToPath);
   (nestedWriter.*writer)(*_defs, maskLayer);
@@ -923,8 +928,8 @@ void SVGWriter::writeClipPathContentRecursive(SVGBuilder& out, const Layer* laye
   }
 }
 
-std::string SVGWriter::writeMaskDef(const Layer* maskLayer) {
-  return writeMaskOrClipDef(maskLayer, "mask", "mask", &SVGWriter::writeMaskContent);
+std::string SVGWriter::writeMaskDef(const Layer* maskLayer, MaskType maskType) {
+  return writeMaskOrClipDef(maskLayer, "mask", "mask", &SVGWriter::writeMaskContent, maskType);
 }
 
 std::string SVGWriter::writeClipPathDef(const Layer* maskLayer) {
@@ -1319,7 +1324,7 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
       out.addAttribute("clip-path", "url(#" + clipId + ")");
     } else {
       // Alpha and Luminance masking use <mask> which supports alpha channel.
-      auto maskId = writeMaskDef(layer->mask);
+      auto maskId = writeMaskDef(layer->mask, layer->maskType);
       out.addAttribute("mask", "url(#" + maskId + ")");
     }
   }
