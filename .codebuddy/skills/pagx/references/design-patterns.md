@@ -121,11 +121,13 @@ constraint attributes (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`):
 
 ```
 Background Rectangle that fills the container?
-  → left="0" right="0" top="0" bottom="0" size="1,1"
+  → Known size: use size directly (e.g., size="300,200")
+  → Dynamic size: use left="0" right="0" top="0" bottom="0"
   → In a container-layout parent: wrap in a Layer with includeInLayout="false"
 
 Text label at a specific position?
-  → Use TextBox + constraint attributes (left/centerX/centerY etc.)
+  → Single-line: use Text + constraint attributes directly
+  → Multiline/alignment needed: use TextBox + constraint attributes
 
 Decorative element or badge overlay?
   → Use constraint attributes for edge/center alignment
@@ -187,7 +189,7 @@ card grids, dashboards, and tile layouts. Key principles:
 1. Outer container: `layout="vertical"` + `alignment="stretch"` + `padding` + `gap`
 2. Each row: `layout="horizontal"` + `gap` — **no width** (stretch fills it from parent)
 3. Each cell: `flex="1"` + `height` — **no width** (flex children equally share row width)
-4. Background Rectangle: `left="0" right="0" top="0" bottom="0" size="1,1"` (auto-fills cell)
+4. Background Rectangle: `left="0" right="0" top="0" bottom="0"` (auto-fills cell)
 
 ```xml
 <Layer left="0" right="0" top="0" bottom="0"
@@ -197,7 +199,7 @@ card grids, dashboards, and tile layouts. Key principles:
     <Layer flex="1" height="200">
       <!-- Background auto-fills cell -->
       <Layer left="0" right="0" top="0" bottom="0">
-        <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="12"/>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
         <Fill color="#1E293B"/>
       </Layer>
       <!-- Content constrained within cell -->
@@ -222,24 +224,34 @@ cells (`flex="1"`) equally share the width → engine writes computed sizes back
 
 ### Constraint Layout — Key Patterns
 
-**Background fill** — Rectangle stretches to fill container:
+**When to use opposite-pair constraints** (`left="0" right="0"` etc.): when the container's
+size is dynamic (layout-assigned by flex, stretch, or content measurement) and the element
+needs to fill it. When the container has a known fixed size, use `size` directly.
+
+**Background fill in a known-size container** — use `size` directly:
 
 ```xml
 <Layer width="300" height="200">
-  <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="12"/>
+  <Rectangle size="300,200" roundness="12"/>
   <Fill color="#1E293B"/>
 </Layer>
 ```
 
-The `size="1,1"` is a convention to signal "size determined by constraints" — opposite-edge
-constraints overwrite the size to match the container. Any initial size value works (the
-default `100,100` is also fine), but `1,1` is preferred for clarity and smaller file size.
+**Background fill in a dynamic-size container** — opposite-pair constraints stretch to fill:
 
-**Centered content** — Text centered in container:
+```xml
+<!-- Container size assigned by parent layout (flex, stretch, etc.) -->
+<Layer flex="1">
+  <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+  <Fill color="#1E293B"/>
+</Layer>
+```
+
+**Centered content** — TextBox with `textAlign="center"` and `paragraphAlign="middle"`:
 
 ```xml
 <Layer width="300" height="200">
-  <Group>
+  <Group left="0" right="0" top="0" bottom="0">
     <Text text="Hello" fontFamily="Arial" fontSize="16"/>
     <Fill color="#FFF"/>
     <TextBox left="0" right="0" top="0" bottom="0"
@@ -253,7 +265,7 @@ default `100,100` is also fine), but `1,1` is preferred for clarity and smaller 
 ```xml
 <Layer width="400" height="300">
   <Group left="20" right="20" top="20" bottom="20">
-    <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="12"/>
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
     <Fill color="#1E293B"/>
   </Group>
 </Layer>
@@ -270,26 +282,21 @@ constraint on the other axis for common UI positioning patterns:
 
 ```xml
 <Layer width="400" height="60">
-  <!-- Left-aligned + vertically centered (button label) -->
-  <Group>
-    <Text text="Submit" fontFamily="Arial" fontSize="16"/>
-    <Fill color="#FFF"/>
-    <TextBox left="16" centerY="0"/>
-  </Group>
+  <!-- Left-aligned + vertically centered -->
+  <Text text="Submit" fontFamily="Arial" fontSize="16" left="16" centerY="0"/>
+  <Fill color="#FFF"/>
+</Layer>
 
-  <!-- Right-aligned + vertically centered (price tag) -->
-  <Group>
-    <Text text="$99" fontFamily="Arial" fontSize="20"/>
-    <Fill color="#10B981"/>
-    <TextBox right="16" centerY="0"/>
-  </Group>
+<Layer width="400" height="60">
+  <!-- Right-aligned + vertically centered -->
+  <Text text="$99" fontFamily="Arial" fontSize="20" right="16" centerY="0"/>
+  <Fill color="#10B981"/>
+</Layer>
 
-  <!-- Horizontally centered + top-aligned (section title) -->
-  <Group>
-    <Text text="Header" fontFamily="Arial" fontSize="14"/>
-    <Fill color="#666"/>
-    <TextBox centerX="0" top="8"/>
-  </Group>
+<Layer width="400" height="60">
+  <!-- Horizontally centered + top-aligned -->
+  <Text text="Header" fontFamily="Arial" fontSize="14" centerX="0" top="8"/>
+  <Fill color="#666"/>
 </Layer>
 ```
 
@@ -329,21 +336,30 @@ Code snippets below use placeholder fonts and colors to illustrate structure.
 ### Single-Line Text
 
 ```xml
-<!-- Use constraints (preferred) -->
-<Group>
-  <Text text="Label" fontFamily="Arial" fontSize="14"/>
-  <Fill color="#333"/>
-  <TextBox left="50" top="20"/>
-</Group>
+<!-- Centered in container -->
+<Text text="30" fontFamily="Arial" fontStyle="Bold" fontSize="48" centerX="0" centerY="0"/>
+<Fill color="#FFF"/>
+
+<!-- Left-aligned with margin -->
+<Text text="Label" fontFamily="Arial" fontSize="14" left="16" top="12"/>
+<Fill color="#333"/>
+
+<!-- Right-aligned, vertically centered -->
+<Text text="$99" fontFamily="Arial" fontSize="20" right="16" centerY="0"/>
+<Fill color="#10B981"/>
 ```
 
-Use when: simple label, no wrapping, no alignment needed. TextBox `left`/`top` constraints
-position the text within the container.
+Add TextBox when text wrapping, per-line alignment, or vertical centering in a filled
+area is needed:
 
 ```xml
-<Text text="Label" fontFamily="Arial" fontSize="14"/>
-<Fill color="#333"/>
-<TextBox left="50" top="20"/>
+<!-- Button label: horizontal + vertical centering in a filled area -->
+<Group left="0" right="0" top="0" bottom="0">
+  <Text text="Submit" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+  <Fill color="#FFF"/>
+  <TextBox left="0" right="0" top="0" bottom="0"
+           textAlign="center" paragraphAlign="middle"/>
+</Group>
 ```
 
 ### Multi-Line or Wrapped Text
@@ -451,8 +467,7 @@ When different geometry needs different painters, choose based on layout context
 
 ### 2. TextBox Layout Rules
 
-Do not set `position` or `textAnchor` on Text when TextBox is present — TextBox overrides
-them. Additional behaviors beyond what `spec-essentials.md` §7 covers:
+Additional behaviors beyond what `spec-essentials.md` §7 covers:
 
 - TextBox is a **pre-layout-only** node — it disappears from the render tree after typesetting.
 - `overflow="hidden"` discards **entire lines/columns**, not partial content. Unlike CSS
@@ -460,11 +475,10 @@ them. Additional behaviors beyond what `spec-essentials.md` §7 covers:
 - `lineHeight=0` (auto) calculates from font metrics (`ascent + descent + leading`), not
   from `fontSize`.
 
-### 3. Do Not Mix textAnchor with Constraints
+### 3. textAnchor and Constraint Interaction
 
-**Do not** set `textAnchor` on Text when using constraint attributes — `textAnchor` shifts
-bounds per line while constraints translate the entire bounds, producing compounding offsets.
-For multiline center/end alignment inside auto-layout containers, use TextBox + `textAlign`.
+`textAnchor` shifts bounds per line while constraints translate the entire bounds — they
+compound. For multiline alignment, use TextBox `textAlign` instead.
 
 ### 4. Modifier Scope Isolation
 
@@ -513,7 +527,7 @@ should stretch to fill:
 
 ```xml
 <Layer width="300" height="200">
-  <Rectangle left="0" right="0" top="0" bottom="0" size="1,1"/>
+  <Rectangle left="0" right="0" top="0" bottom="0"/>
   <Fill color="#F00"/>
 </Layer>
 ```
@@ -534,7 +548,7 @@ with constraint attributes. The child remains visible but occupies no space in t
   <Layer><!-- content --></Layer>
   <!-- Badge at top-right corner -->
   <Layer right="-4" top="-4" width="20" height="20" includeInLayout="false">
-    <Ellipse left="0" right="0" top="0" bottom="0" size="1,1"/>
+    <Ellipse left="0" right="0" top="0" bottom="0"/>
     <Fill color="#EF4444"/>
   </Layer>
 </Layer>
@@ -562,3 +576,39 @@ attributes instead of `x`/`y` for more expressive positioning:
   <Layer right="20" bottom="20" width="80" height="36"><!-- button --></Layer>
 </Layer>
 ```
+
+### 9. Opposite-Pair Constraints in Content-Measured Containers
+
+Opposite-pair constraints (`left="0" right="0"`) inside a content-measured container
+create a circular dependency — child stretches to container size, but container measures
+from child. The engine resolves this with near-zero size, causing TextBox text to
+force-break per character (`boxWidth ≈ 0`).
+
+**Problem:**
+
+```xml
+<!-- Parent has no explicit width — measured from content -->
+<Layer layout="vertical">
+  <Layer height="60">
+    <Group left="0" right="0" top="0" bottom="0">
+      <Text text="30" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
+      <Fill color="#FFF"/>
+      <TextBox left="0" right="0" top="0" bottom="0"
+               textAlign="center" paragraphAlign="middle"/>
+      <!-- boxWidth ≈ 0 → "3" and "0" on separate lines -->
+    </Group>
+  </Layer>
+</Layer>
+```
+
+**Solution:**
+
+```xml
+<Layer height="60">
+  <Text text="30" fontFamily="Arial" fontStyle="Bold" fontSize="48" centerX="0" centerY="0"/>
+  <Fill color="#FFF"/>
+</Layer>
+```
+
+Opposite-pair constraints work correctly when the container has a known size (explicit
+`width`/`height` or layout-assigned by parent).

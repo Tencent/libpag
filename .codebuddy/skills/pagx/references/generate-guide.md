@@ -158,8 +158,8 @@ Key rules (details in `spec-essentials.md` §3a Container Layout):
   Children with explicit size are fixed.
 - **`alignment="stretch"`** — essential for nested layouts (e.g., vertical parent with
   horizontal rows). Without it, rows shrink-wrap and flexible cells get zero width.
-- **Background fills** — use `left="0" right="0" top="0" bottom="0" size="1,1"` on
-  Rectangle to auto-fill whatever size the engine assigns. Never hard-code background size.
+- **Background fills** — in known-size containers use `size` directly; in dynamic-size
+  containers (flex, stretch) use `left="0" right="0" top="0" bottom="0"` to auto-fill.
 
 See `design-patterns.md` §Container Layout — Key Patterns for the full grid layout template.
 
@@ -243,30 +243,58 @@ After alignment is correct, verify structural integrity:
 - **Path complexity**: A single Path with >15 curve segments is fragile. Consider
   decomposing into simpler primitives (Rectangle, Ellipse).
 
-### 6. Text Measurement
+### 6. Text Positioning
 
-Use `pagx font info` for precise font metrics before positioning text:
+**Single-line labels and values** — use Text with constraints directly:
+
+```xml
+<!-- Centered in container -->
+<Text text="30" fontFamily="Arial" fontStyle="Bold" fontSize="48" centerX="0" centerY="0"/>
+<Fill color="#FFF"/>
+
+<!-- Left-aligned, vertically centered -->
+<Text text="Label" fontFamily="Arial" fontSize="14" left="16" centerY="0"/>
+<Fill color="#333"/>
+
+<!-- Right-aligned, vertically centered -->
+<Text text="$99" fontFamily="Arial" fontSize="20" right="16" centerY="0"/>
+<Fill color="#10B981"/>
+```
+
+**When to add TextBox** — when you need one of these features:
+- **Multiline wrapping**: text must wrap at a boundary → `TextBox` with `size` or
+  `left`+`right` constraints (requires container with known width)
+- **Per-line alignment**: center/end alignment of individual lines → `textAlign`
+- **Rich text**: multiple Text elements with different styles unified into one text block
+- **Vertical centering in a fill area**: TextBox with `paragraphAlign="middle"` in a
+  container with known height (e.g., button labels)
+
+```xml
+<!-- Multiline wrapped text -->
+<Text text="Long text that wraps..." fontFamily="Arial" fontSize="14"/>
+<Fill color="#333"/>
+<TextBox left="20" right="20" top="10" textAlign="center"/>
+
+<!-- Button label centered in a known-size container -->
+<Group left="0" right="0" top="0" bottom="0">
+  <Text text="Submit" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+  <Fill color="#FFF"/>
+  <TextBox left="0" right="0" top="0" bottom="0"
+           textAlign="center" paragraphAlign="middle"/>
+</Group>
+```
+
+Note: `textAnchor` shifts bounds per line while constraints translate the entire bounds —
+they compound. Use TextBox `textAlign` for multiline alignment instead.
+
+### 7. Text Measurement (Debugging Only)
+
+`pagx font info` is a debugging tool for investigating text clipping, misalignment, or
+unexpected wrapping — not part of the generation workflow.
+
 ```bash
 pagx font info --name "Arial" --size 24
 ```
 - **Single-line height**: `ascent + descent + leading`
 - **Baseline position**: element top + `ascent`
 - **Text width**: render into PAGX and measure with `pagx bounds`
-
-### 7. Text Positioning
-
-Use constraint attributes (`left`/`right`/`centerX`…) to position Text elements.
-For multiline alignment (center/end per line), use `TextBox` with `textAlign`.
-
-```xml
-<!-- Single-line label, centered via constraints -->
-<Text text="Label" fontFamily="Arial" fontSize="14" centerX="0" centerY="0"/>
-<Fill/>
-
-<!-- Multiline text, centered via TextBox -->
-<Text text="Line 1&#10;Line 2" fontFamily="Arial" fontSize="24"/>
-<Fill/>
-<TextBox left="20" right="20" top="10" textAlign="center"/>
-```
-
-**Do not** set `textAnchor` on Text when using constraint attributes — they interact badly.

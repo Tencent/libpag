@@ -97,6 +97,47 @@ Structural patterns for application interface elements. Most UI components benef
 layout — use container layout for arranging child Layers in rows or columns, and constraint
 layout for positioning elements within a Layer.
 
+### Simple Text Labels
+
+Single-line labels positioned with Text constraint attributes directly:
+
+```xml
+<pagx version="1.0" width="300" height="200">
+  <Layer width="300" height="200">
+    <Group>
+      <Rectangle size="300,200" roundness="12"/>
+      <Fill color="#1E293B"/>
+    </Group>
+    <Group left="0" right="0" top="0" bottom="0">
+      <Text text="30" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
+      <Fill color="#FFF"/>
+      <TextBox left="0" right="0" top="0" bottom="0"
+               textAlign="center" paragraphAlign="middle"/>
+    </Group>
+  </Layer>
+</pagx>
+```
+
+**Multiple labels with different painters**:
+
+```xml
+<Layer width="300" height="100">
+  <Group>
+    <Rectangle size="300,100" roundness="12"/>
+    <Fill color="#1E293B"/>
+  </Group>
+  <Group>
+    <Text text="Balance" fontFamily="Arial" fontSize="12" left="16" top="12"/>
+    <Fill color="#94A3B8"/>
+  </Group>
+  <Group>
+    <Text text="$12,580" fontFamily="Arial" fontStyle="Bold" fontSize="28"
+          left="16" top="32"/>
+    <Fill color="#FFF"/>
+  </Group>
+</Layer>
+```
+
 ### Card with Shadow
 
 ```xml
@@ -176,7 +217,7 @@ layout AND manages its own children's layout.
 <pagx version="1.0" width="380" height="280">
   <Layer width="380" height="280">
     <!-- Page background -->
-    <Rectangle left="0" right="0" top="0" bottom="0" size="1,1"/>
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
     <!-- Content column -->
     <Layer left="0" right="0" top="0" bottom="0"
@@ -185,7 +226,7 @@ layout AND manages its own children's layout.
       <Layer height="180" layout="vertical" gap="12" padding="16" alignment="stretch">
         <!-- Background (excluded from layout flow) -->
         <Layer includeInLayout="false" left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="12"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
           <Fill color="#FFF"/>
           <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000015"/>
         </Layer>
@@ -205,16 +246,14 @@ layout AND manages its own children's layout.
         </Layer>
         <!-- Value display -->
         <Layer height="40">
-          <Group left="0" top="0">
-            <Text text="$12,580.00" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
-            <Fill color="#1E293B"/>
-            <TextBox left="0" top="0"/>
-          </Group>
+          <Text text="$12,580.00" fontFamily="Arial" fontStyle="Bold" fontSize="28"
+                left="0" centerY="0"/>
+          <Fill color="#1E293B"/>
         </Layer>
         <!-- Action buttons: two equal-width buttons -->
         <Layer height="44" layout="horizontal" gap="12" alignment="stretch">
           <Layer flex="1">
-            <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="10"/>
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
             <Fill color="#6366F1"/>
             <Group left="0" right="0" top="0" bottom="0">
               <Text text="Send" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
@@ -224,7 +263,7 @@ layout AND manages its own children's layout.
             </Group>
           </Layer>
           <Layer flex="1">
-            <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="10"/>
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
             <Fill color="#F1F5F9"/>
             <Stroke color="#CBD5E1" width="1" align="inside"/>
             <Group left="0" right="0" top="0" bottom="0">
@@ -238,7 +277,7 @@ layout AND manages its own children's layout.
       </Layer>
       <!-- Second card (same pattern, abbreviated) -->
       <Layer height="48">
-        <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="12"/>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
         <Fill color="#FFF"/>
         <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000015"/>
         <Group left="0" right="0" top="0" bottom="0">
@@ -253,18 +292,16 @@ layout AND manages its own children's layout.
 ```
 
 **Pattern**: The first card uses fixed `height="180"` with
-`layout="vertical" gap="12" padding="16" alignment="stretch"` to arrange its children — title
-row, value display, and action buttons — without any manual coordinate calculation. Key
+`layout="vertical" gap="12" padding="16" alignment="stretch"` to arrange children. Key
 structural choices:
 
-- **Background as overlay**: `includeInLayout="false"` + stretch constraints keeps the
-  background Rectangle out of the layout flow while filling the card's computed size.
-- **Title row nests horizontal layout**: the title Layer is itself a horizontal container
-  with icon (fixed 24×24) + label (flexible width).
-- **Equal-width buttons**: two flex children (`flex="1"`) in a horizontal container with
+- **Background as overlay**: `includeInLayout="false"` + stretch constraints keeps background
+  out of layout flow while filling the card's computed size.
+- **Title row nested horizontal layout**: icon (fixed 24×24) + label (flexible width).
+- **Equal-width buttons**: two flex children (`flex="1"`) in horizontal container with
   `alignment="stretch"` — buttons fill cross-axis height automatically.
-- **Recursive layout**: outer vertical → card vertical → title horizontal → button horizontal.
-  Each level follows the same two-step process (choose container mode, then position internals).
+- **Text layout**: buttons use TextBox for `textAlign`/`paragraphAlign` centering; title uses
+  TextBox for `paragraphAlign="middle"`; value display uses Text constraints directly.
 
 For a **flexible height** example — where some children have fixed height and others expand to
 fill remaining space — see Dashboard Layout below.

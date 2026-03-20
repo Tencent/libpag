@@ -665,7 +665,7 @@ See `design-patterns.md` §Rich Text (Mixed Styles) for examples and usage guida
 <Composition id="card" width="200" height="100">
   <!-- Top-level Layers use Composition width×height as constraint container -->
   <Layer left="0" right="0" top="0" bottom="0">
-    <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
     <Fill color="#FFF"/>
     <Group>
       <Text text="Card Title" fontFamily="Arial" fontSize="14"/>
