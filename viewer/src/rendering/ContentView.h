@@ -23,7 +23,6 @@
 #include <atomic>
 #include <memory>
 #include "ContentViewModel.h"
-#include "IContentRenderer.h"
 #include "platform/qt/GPUDrawable.h"
 
 namespace pag {
