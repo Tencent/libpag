@@ -65,27 +65,13 @@ void PAGXView::onPreferredSizeChanged() {
 }
 
 void PAGXView::sizeChangedDelayHandle() {
-  resizeTimer->stop();
-  sizeChanged = true;
+  ContentView::sizeChangedDelayHandle();
   viewModel->markNeedsRender();
-  if (renderThread != nullptr) {
-    triggerFlush();
-  }
 }
 
 void PAGXView::flush() const {
   if (viewModel->hasContent()) {
     triggerFlush();
-  }
-}
-
-void PAGXView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) {
-  if (newGeometry == oldGeometry) {
-    return;
-  }
-  ContentView::geometryChange(newGeometry, oldGeometry);
-  if (viewModel->hasContent()) {
-    resizeTimer->start(400);
   }
 }
 

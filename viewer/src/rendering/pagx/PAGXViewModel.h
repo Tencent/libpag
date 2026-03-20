@@ -64,8 +64,8 @@ class PAGXViewModel : public ContentViewModel {
   Q_INVOKABLE void previousFrame() override;
 
   struct RenderState {
-    tgfx::DisplayList* displayList = nullptr;
-    tgfx::Layer* contentLayer = nullptr;
+    std::shared_ptr<tgfx::DisplayList> displayList;
+    std::shared_ptr<tgfx::Layer> contentLayer;
     int contentWidth = 0;
     int contentHeight = 0;
   };
@@ -73,8 +73,8 @@ class PAGXViewModel : public ContentViewModel {
   void setWindow(QQuickWindow* window);
   bool takeNeedsRender();
   void markNeedsRender();
-  RenderState lockRenderState();
-  void unlockRenderState();
+  // Returns a snapshot of render state with shared ownership; safe to use without holding any lock.
+  RenderState getRenderState() const;
   bool hasContent() const;
 
   Q_SIGNAL void pagxDocumentChanged(std::shared_ptr<pagx::PAGXDocument> pagxDocument);
@@ -90,7 +90,7 @@ class PAGXViewModel : public ContentViewModel {
   mutable std::mutex renderMutex;
   std::shared_ptr<pagx::PAGXDocument> pagxDocument = nullptr;
   std::shared_ptr<tgfx::Layer> pagxContentLayer = nullptr;
-  std::unique_ptr<tgfx::DisplayList> displayList = nullptr;
+  std::shared_ptr<tgfx::DisplayList> displayList = nullptr;
   int pagxWidth = 0;
   int pagxHeight = 0;
   std::string currentFilePath = {};

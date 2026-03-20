@@ -139,13 +139,9 @@ void PAGXViewModel::markNeedsRender() {
   needsRender = true;
 }
 
-PAGXViewModel::RenderState PAGXViewModel::lockRenderState() {
-  renderMutex.lock();
-  return {displayList.get(), pagxContentLayer.get(), pagxWidth, pagxHeight};
-}
-
-void PAGXViewModel::unlockRenderState() {
-  renderMutex.unlock();
+PAGXViewModel::RenderState PAGXViewModel::getRenderState() const {
+  std::lock_guard<std::mutex> lock(renderMutex);
+  return {displayList, pagxContentLayer, pagxWidth, pagxHeight};
 }
 
 bool PAGXViewModel::hasContent() const {
@@ -202,7 +198,7 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
     return false;
   }
 
-  auto newDisplayList = std::make_unique<tgfx::DisplayList>();
+  auto newDisplayList = std::make_shared<tgfx::DisplayList>();
   newDisplayList->root()->addChild(newContentLayer);
 
   {
@@ -265,16 +261,6 @@ void PAGXViewModel::clearContent() {
   pagxDocument = nullptr;
   pagxContentLayer = nullptr;
   displayList = nullptr;
-  pagxWidth = 0;
-  pagxHeight = 0;
-  currentFilePath = {};
-  totalFrames = 1;
-  frameRate = 0.0f;
-  progress = 0.0;
-  progressPerFrame = 1.0;
-  isPlaying_ = false;
-  needsRender = false;
-  // Note: called only while holding renderMutex (from loadFile) or during destruction.
 }
 
 void PAGXViewModel::updateAnimationState() {

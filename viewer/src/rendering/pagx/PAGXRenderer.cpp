@@ -45,15 +45,7 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
     return metrics;
   }
 
-  auto state = viewModel->lockRenderState();
-  // Use a scope guard to ensure unlock even on early return.
-  struct RenderStateGuard {
-    PAGXViewModel* vm;
-    ~RenderStateGuard() {
-      vm->unlockRenderState();
-    }
-  } guard{viewModel};
-
+  auto state = viewModel->getRenderState();
   if (state.displayList == nullptr) {
     return metrics;
   }
