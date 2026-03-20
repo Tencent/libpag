@@ -504,8 +504,7 @@ class SVGWriter {
   // Mask / clip-path defs
   using ContentWriter = void (SVGWriter::*)(SVGBuilder&, const Layer*);
   std::string writeMaskOrClipDef(const Layer* maskLayer, const char* tag, const char* idPrefix,
-                                 ContentWriter writer,
-                                 MaskType maskType = MaskType::Contour);
+                                 ContentWriter writer, MaskType maskType = MaskType::Contour);
   void writeMaskContent(SVGBuilder& out, const Layer* layer);
   void writeClipPathContent(SVGBuilder& out, const Layer* layer);
   void writeClipPathContentRecursive(SVGBuilder& out, const Layer* layer,
