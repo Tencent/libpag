@@ -64,7 +64,8 @@ void PAGWindow::disconnectContentViewSignals() {
     return;
   }
   auto* viewModel = contentView->getViewModel();
-  auto* taskFactory = window->findChild<PAGTaskFactory*>("taskFactory");
+  auto* hostWindow = contentView->window();
+  auto* taskFactory = hostWindow ? hostWindow->findChild<PAGTaskFactory*>("taskFactory") : nullptr;
   if (taskFactory) {
     disconnect(viewModel, &ContentViewModel::filePathChanged, taskFactory,
                &PAGTaskFactory::setFilePath);
@@ -95,7 +96,9 @@ void PAGWindow::disconnectContentViewSignals() {
              &RenderThread::flush);
   disconnect(renderThread, &RenderThread::renderMetricsReady, runTimeDataModel.get(),
              &PAGRunTimeDataModel::updateMetrics);
-  disconnect(window, &QQuickWindow::afterRendering, contentView, &ContentView::flush);
+  if (hostWindow) {
+    disconnect(hostWindow, &QQuickWindow::afterRendering, contentView, &ContentView::flush);
+  }
 }
 
 void PAGWindow::connectContentViewSignals() {
@@ -103,7 +106,8 @@ void PAGWindow::connectContentViewSignals() {
     return;
   }
   auto* viewModel = contentView->getViewModel();
-  auto* taskFactory = window->findChild<PAGTaskFactory*>("taskFactory");
+  auto* hostWindow = contentView->window();
+  auto* taskFactory = hostWindow ? hostWindow->findChild<PAGTaskFactory*>("taskFactory") : nullptr;
   if (taskFactory) {
     connect(viewModel, &ContentViewModel::filePathChanged, taskFactory,
             &PAGTaskFactory::setFilePath);
@@ -134,7 +138,9 @@ void PAGWindow::connectContentViewSignals() {
           &RenderThread::flush);
   connect(renderThread, &RenderThread::renderMetricsReady, runTimeDataModel.get(),
           &PAGRunTimeDataModel::updateMetrics);
-  connect(window, &QQuickWindow::afterRendering, contentView, &ContentView::flush);
+  if (hostWindow) {
+    connect(hostWindow, &QQuickWindow::afterRendering, contentView, &ContentView::flush);
+  }
 }
 
 void PAGWindow::open() {
