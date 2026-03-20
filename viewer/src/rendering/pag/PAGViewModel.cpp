@@ -220,7 +220,7 @@ bool PAGViewModel::loadFile(const QString& filePath) {
   pagFile = newPagFile;
   pagFile->getFile()->path = strPath;
   pagPlayer->setComposition(pagFile);
-  audioPlayer->setComposition(pagFile, pagFile->duration());
+  audioPlayer->setComposition(pagFile);
   progressPerFrame = 1.0 / (pagFile->frameRate() * pagFile->duration() / 1000000);
   Q_EMIT fileChanged(pagFile->getFile());
   Q_EMIT filePathChanged(QString::fromLocal8Bit(strPath.data()));

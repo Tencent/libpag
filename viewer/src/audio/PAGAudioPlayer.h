@@ -33,7 +33,7 @@ class PAGAudioPlayer : public QObject {
   void setVolume(float volume);
   void setProgress(double percent);
   void setIsPlaying(bool isPlaying);
-  void setComposition(std::shared_ptr<PAGFile> pagFile, int64_t duration);
+  void setComposition(std::shared_ptr<PAGFile> pagFile);
   bool isEmpty() const;
 
   Q_SIGNAL void audioTimeChanged(int64_t audioTime);
