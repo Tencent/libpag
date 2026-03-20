@@ -308,7 +308,7 @@ A child Layer can be downgraded to Group when **all** of the following are true:
    |----------|----------|
    | Child nodes | styles, filters, child Layers |
    | Attributes | mask, maskType, blendMode (non-default), composition, scrollRect, visible="false", id (if referenced), name, matrix, matrix3D, preserve3D, groupOpacity, passThroughBackground |
-   | Container layout | `layout`, `gap`, `padding`, `alignment`, `arrangement` |
+   | Container layout | `layout`, `gap`, `flex`, `padding`, `alignment`, `arrangement` |
 4. Downgrade does not change visual stacking order among siblings (see All-or-Nothing Rule above)
 5. The Layer is a sub-element within the same logical block — not a distinct independent block
 

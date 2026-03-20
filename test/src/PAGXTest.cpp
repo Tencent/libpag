@@ -1130,6 +1130,7 @@ PAGX_TEST(PAGXTest, LayoutHorizontalEqualWidth) {
   parent->children = {card1, card2, card3};
 
   for (auto* card : {card1, card2, card3}) {
+    card->flex = 1;
     auto rect = doc->makeNode<pagx::Rectangle>();
     rect->size = {100, 100};
     rect->position = {0, 0};
@@ -1339,7 +1340,9 @@ PAGX_TEST(PAGXTest, LayoutPaddingWithFlex) {
   auto child2 = doc->makeNode<pagx::Layer>();
   parent->children = {child1, child2};
 
+  child1->flex = 1;
   child1->height = 50;
+  child2->flex = 1;
   child2->height = 50;
 
   pagx::AutoLayout::Apply(doc.get());
@@ -1369,8 +1372,11 @@ PAGX_TEST(PAGXTest, LayoutFlexEqualDistribution) {
   auto child3 = doc->makeNode<pagx::Layer>();
   parent->children = {child1, child2, child3};
 
+  child1->flex = 1;
   child1->height = 50;
+  child2->flex = 1;
   child2->height = 50;
+  child3->flex = 1;
   child3->height = 50;
 
   pagx::AutoLayout::Apply(doc.get());
@@ -1400,7 +1406,9 @@ PAGX_TEST(PAGXTest, LayoutFlexMixedWithFixed) {
 
   child1->width = 100;
   child1->height = 50;
+  child2->flex = 1;
   child2->height = 50;
+  child3->flex = 1;
   child3->height = 50;
 
   pagx::AutoLayout::Apply(doc.get());
@@ -1411,6 +1419,147 @@ PAGX_TEST(PAGXTest, LayoutFlexMixedWithFixed) {
   EXPECT_EQ(child1->x, 0.0f);
   EXPECT_EQ(child2->x, 100.0f);
   EXPECT_EQ(child3->x, 250.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutFlexWeightedDistribution) {
+  auto doc = pagx::PAGXDocument::Make(600, 100);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 600;
+  parent->height = 100;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->gap = 0;
+
+  auto child1 = doc->makeNode<pagx::Layer>();
+  auto child2 = doc->makeNode<pagx::Layer>();
+  auto child3 = doc->makeNode<pagx::Layer>();
+  parent->children = {child1, child2, child3};
+
+  child1->flex = 1;
+  child1->height = 50;
+  child2->flex = 2;
+  child2->height = 50;
+  child3->flex = 3;
+  child3->height = 50;
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  EXPECT_EQ(child1->width, 100.0f);
+  EXPECT_EQ(child2->width, 200.0f);
+  EXPECT_EQ(child3->width, 300.0f);
+  EXPECT_EQ(child1->x, 0.0f);
+  EXPECT_EQ(child2->x, 100.0f);
+  EXPECT_EQ(child3->x, 300.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutFlexContentMeasuredDefault) {
+  auto doc = pagx::PAGXDocument::Make(600, 200);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 600;
+  parent->height = 200;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->gap = 0;
+
+  // Child with no width and flex=0 (default) should use content-measured size.
+  auto child = doc->makeNode<pagx::Layer>();
+  parent->children = {child};
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {80, 40};
+  rect->position = {40, 20};
+  child->contents.push_back(rect);
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // Content-measured width = 80 (from rectangle).
+  EXPECT_EQ(child->width, 80.0f);
+  EXPECT_EQ(child->x, 0.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutFlexMixedWithContentMeasured) {
+  auto doc = pagx::PAGXDocument::Make(600, 100);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 600;
+  parent->height = 100;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->gap = 0;
+
+  // Fixed child: width=100.
+  auto fixedChild = doc->makeNode<pagx::Layer>();
+  fixedChild->width = 100;
+  fixedChild->height = 50;
+
+  // Content-measured child: no width, flex=0, has a 80px-wide rectangle.
+  auto measuredChild = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {80, 40};
+  rect->position = {40, 20};
+  measuredChild->contents.push_back(rect);
+
+  // Flex child: no width, flex=1, takes remaining space.
+  auto flexChild = doc->makeNode<pagx::Layer>();
+  flexChild->flex = 1;
+  flexChild->height = 50;
+
+  parent->children = {fixedChild, measuredChild, flexChild};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // fixed=100, measured=80, flex gets 600-100-80=420.
+  EXPECT_EQ(fixedChild->width, 100.0f);
+  EXPECT_EQ(measuredChild->width, 80.0f);
+  EXPECT_EQ(flexChild->width, 420.0f);
+  EXPECT_EQ(fixedChild->x, 0.0f);
+  EXPECT_EQ(measuredChild->x, 100.0f);
+  EXPECT_EQ(flexChild->x, 180.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutFlexRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 200;
+  parent->layout = pagx::LayoutMode::Horizontal;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->flex = 2.5f;
+  child->height = 100;
+  parent->children.push_back(child);
+
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+
+  auto doc2 = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc2 != nullptr);
+  ASSERT_GE(doc2->layers.size(), 1u);
+
+  auto* parent2 = doc2->layers[0];
+  ASSERT_FALSE(parent2->children.empty());
+
+  auto* child2 = parent2->children[0];
+  EXPECT_FLOAT_EQ(child2->flex, 2.5f);
+}
+
+PAGX_TEST(PAGXTest, LayoutFlexZeroNotExported) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+
+  layer->width = 400;
+  layer->height = 200;
+  layer->flex = 0;
+
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+  // flex=0 (default) should not appear in XML output.
+  EXPECT_EQ(xml.find("flex="), std::string::npos);
 }
 
 // =====================================================================================
@@ -1542,6 +1691,7 @@ PAGX_TEST(PAGXTest, LayoutNested) {
   left->height = 200;
 
   auto right = doc->makeNode<pagx::Layer>();
+  right->flex = 1;
   right->height = 200;
   right->layout = pagx::LayoutMode::Vertical;
   right->gap = 10;
@@ -1609,8 +1759,11 @@ PAGX_TEST(PAGXTest, LayoutSnapToPixelGrid) {
   auto child3 = doc->makeNode<pagx::Layer>();
   parent->children = {child1, child2, child3};
 
+  child1->flex = 1;
   child1->height = 50;
+  child2->flex = 1;
   child2->height = 50;
+  child3->flex = 1;
   child3->height = 50;
 
   pagx::AutoLayout::Apply(doc.get());
@@ -1643,6 +1796,7 @@ PAGX_TEST(PAGXTest, LayoutMeasureCacheIdempotent) {
   auto child2 = doc->makeNode<pagx::Layer>();
   parent->children = {child1, child2};
 
+  child1->flex = 1;
   child1->height = 80;
   child2->width = 100;
   child2->height = 80;
@@ -2609,7 +2763,9 @@ PAGX_TEST(PAGXTest, LayoutContainerWithConstraints) {
   auto right = doc->makeNode<pagx::Layer>();
   parent->children = {left, right};
 
+  left->flex = 1;
   left->height = 400;
+  right->flex = 1;
   right->height = 400;
 
   auto rect = doc->makeNode<pagx::Rectangle>();

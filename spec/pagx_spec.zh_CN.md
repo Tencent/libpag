@@ -1798,7 +1798,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 对于子 Layer，容器布局和约束布局是**互斥**的——参与容器布局的子 Layer 由容器控制尺寸，不参与的由约束控制：
 
 **容器布局中**（子 Layer 参与 `layout="horizontal"/"vertical"`）：
-- 主轴：有显式 `width`/`height` → 固定；无显式尺寸 → 弹性（均分剩余空间）
+- 主轴：有显式 `width`/`height` → 固定（忽略 flex）；无显式尺寸且 `flex=0`（默认）→ 内容测量；无显式尺寸且 `flex>0` → 按 flex 权重按比例分配剩余空间
 - 交叉轴：`alignment="stretch"` 为未设交叉轴尺寸的子元素拉伸填满（已设交叉轴尺寸的保持不变）
 
 **约束布局中**（父容器为 absolute 布局或子 Layer 设 `includeInLayout="false"`）：
@@ -1817,13 +1817,13 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 ```xml
 <!-- 三个等宽卡片水平排列 -->
 <Layer width="920" height="200" layout="horizontal" gap="14" padding="20">
-  <Layer><!-- 卡片 A --></Layer>
-  <Layer><!-- 卡片 B --></Layer>
-  <Layer><!-- 卡片 C --></Layer>
+  <Layer flex="1"><!-- 卡片 A --></Layer>
+  <Layer flex="1"><!-- 卡片 B --></Layer>
+  <Layer flex="1"><!-- 卡片 C --></Layer>
 </Layer>
 ```
 
-三个子 Layer 均未设 `width`，等分可用宽度：`(920 - 40 - 28) / 3 = 284`。
+三个子 Layer 均未设 `width` 且 `flex="1"`，等分可用宽度：`(920 - 40 - 28) / 3 = 284`。
 
 #### 属性
 
@@ -1831,6 +1831,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 |------|------|--------|------|
 | `layout` | LayoutMode | absolute | 子图层排列的主轴方向 |
 | `gap` | float | 0 | 相邻子 Layer 之间的间距 |
+| `flex` | float | 0 | 主轴弹性权重。子元素无显式主轴尺寸时：`flex=0`（默认）使用内容测量尺寸；`flex>0` 按权重按比例分配剩余空间。设置了显式 `width`/`height` 时忽略此属性 |
 | `padding` | float 或 "t,r,b,l" | 0 | 内边距。支持单值（四边均匀）、两值（垂直,水平）、四值（上,右,下,左），与 CSS shorthand 一致 |
 | `alignment` | Alignment | start | 交叉轴对齐方式 |
 | `arrangement` | Arrangement | start | 主轴排布方式 |
@@ -1864,10 +1865,11 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 
 #### 子元素尺寸
 
-子 Layer 的主轴尺寸有两种状态：
+子 Layer 的主轴尺寸有三种状态：
 
-- **固定尺寸**：主轴方向设了 `width`/`height`，不随父容器变化。
-- **弹性尺寸**：主轴方向未设 `width`/`height`。当父容器有确定的主轴尺寸时，剩余空间（减去固定子元素和间距后）在所有弹性子元素之间等分。当父容器主轴尺寸由内容测量决定时，每个弹性子元素的主轴尺寸由其自身内容 bounds 决定，父容器收缩到恰好容纳所有子元素。
+- **固定尺寸**：主轴方向设了 `width`/`height`，不随父容器变化。`flex` 属性被忽略。
+- **内容测量尺寸**：主轴方向未设显式 `width`/`height` 且 `flex=0`（默认）。尺寸由子元素自身内容 bounds 决定。
+- **弹性尺寸**：主轴方向未设显式 `width`/`height` 且 `flex>0`。当父容器有确定的主轴尺寸时，剩余空间（减去固定和内容测量子元素及间距后）按 `flex` 权重在弹性子元素之间按比例分配。当父容器主轴尺寸由内容测量决定时，弹性子元素退化为内容测量尺寸，父容器收缩到恰好容纳所有子元素。
 
 交叉轴尺寸：有显式 `width`/`height` 则使用；当父容器 `alignment="stretch"` 时，未设交叉轴尺寸的子 Layer 拉伸填满交叉轴可用空间（容器交叉轴尺寸减去两侧 padding）；否则由内容 bounds 决定。
 

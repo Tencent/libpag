@@ -12,10 +12,10 @@
   <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30" alignment="stretch">
 
     <!-- Row 1: Single-edge positioning + Horizontal-only scaling -->
-    <Layer layout="horizontal" gap="20">
+    <Layer flex="1" layout="horizontal" gap="20">
 
       <!-- Container 1: Single-edge positioning -->
-      <Layer height="220">
+      <Layer height="220" flex="1">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -48,7 +48,7 @@
       </Layer>
 
       <!-- Right side: vertical stack of 3 horizontal-scaling containers -->
-      <Layer height="220" layout="vertical" gap="10" alignment="stretch">
+      <Layer flex="1" height="220" layout="vertical" gap="10" alignment="stretch">
 
         <!-- Container 2a: Horizontal-only scaling - wide area (flexible, fills row width) -->
         <Layer height="60">
@@ -106,10 +106,10 @@
     </Layer>
 
     <!-- Row 2: Vertical-only + Dual-axis containers -->
-    <Layer layout="horizontal" gap="20">
+    <Layer flex="1" layout="horizontal" gap="20">
 
       <!-- Container 3: Vertical-only scaling (top+bottom) -->
-      <Layer height="220">
+      <Layer height="220" flex="1">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -127,7 +127,7 @@
       </Layer>
 
       <!-- Container 4: Dual-axis fit scaling - square container -->
-      <Layer height="220">
+      <Layer height="220" flex="1">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -145,7 +145,7 @@
       </Layer>
 
       <!-- Container 5: Dual-axis fit in wide container -->
-      <Layer height="220">
+      <Layer height="220" flex="1">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>

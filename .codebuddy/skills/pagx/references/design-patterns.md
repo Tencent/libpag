@@ -143,25 +143,25 @@ calculation and brittle layouts.
 
 All container layout patterns derive from two primitives:
 
-1. **Fixed vs flexible sizing**: child with `width`/`height` = fixed; child without = flexible (equally shares remaining space). Similar to CSS `flex: 1`.
+1. **Three-state sizing**: child with explicit `width`/`height` = fixed; child without explicit size + `flex="0"` (default) = content-measured; child without explicit size + `flex` > 0 = proportional share of remaining space by flex weight. Use `flex="1"` on all children for equal distribution (similar to CSS `flex: 1`).
 2. **Nesting**: combining vertical and horizontal containers produces any 2D layout (grids, sidebars, dashboards). This replaces CSS Grid and `flex-wrap`.
 
-**Equal columns/rows** — children without `width`/`height` share space equally:
+**Equal columns/rows** — children with `flex="1"` share space equally:
 
 ```xml
 <Layer width="600" height="200" layout="horizontal" gap="12" padding="16">
-  <Layer><!-- 1/3 width --></Layer>
-  <Layer><!-- 1/3 width --></Layer>
-  <Layer><!-- 1/3 width --></Layer>
+  <Layer flex="1"><!-- 1/3 width --></Layer>
+  <Layer flex="1"><!-- 1/3 width --></Layer>
+  <Layer flex="1"><!-- 1/3 width --></Layer>
 </Layer>
 ```
 
-**Fixed + flexible mix** — fixed header/footer + flexible content area:
+**Fixed + flex mix** — fixed header/footer + flex content area:
 
 ```xml
 <Layer width="600" height="400" layout="vertical">
   <Layer height="48"><!-- fixed header --></Layer>
-  <Layer><!-- flexible content, fills remaining space --></Layer>
+  <Layer flex="1"><!-- flex content, fills remaining space --></Layer>
   <Layer height="40"><!-- fixed footer --></Layer>
 </Layer>
 ```
@@ -171,12 +171,12 @@ All container layout patterns derive from two primitives:
 ```xml
 <Layer width="600" height="400" layout="vertical" gap="12">
   <Layer layout="horizontal" gap="12">
-    <Layer><!-- row 1, col 1 --></Layer>
-    <Layer><!-- row 1, col 2 --></Layer>
+    <Layer flex="1"><!-- row 1, col 1 --></Layer>
+    <Layer flex="1"><!-- row 1, col 2 --></Layer>
   </Layer>
   <Layer layout="horizontal" gap="12">
-    <Layer><!-- row 2, col 1 --></Layer>
-    <Layer><!-- row 2, col 2 --></Layer>
+    <Layer flex="1"><!-- row 2, col 1 --></Layer>
+    <Layer flex="1"><!-- row 2, col 2 --></Layer>
   </Layer>
 </Layer>
 ```
@@ -186,7 +186,7 @@ card grids, dashboards, and tile layouts. Key principles:
 
 1. Outer container: `layout="vertical"` + `alignment="stretch"` + `padding` + `gap`
 2. Each row: `layout="horizontal"` + `gap` — **no width** (stretch fills it from parent)
-3. Each cell: only `height` — **no width** (flexible, equally shares row width)
+3. Each cell: `flex="1"` + `height` — **no width** (flex children equally share row width)
 4. Background Rectangle: `left="0" right="0" top="0" bottom="0" size="1,1"` (auto-fills cell)
 
 ```xml
@@ -194,7 +194,7 @@ card grids, dashboards, and tile layouts. Key principles:
        layout="vertical" gap="20" padding="30" alignment="stretch">
   <!-- Row 1: 3 equal cells -->
   <Layer layout="horizontal" gap="20">
-    <Layer height="200">
+    <Layer flex="1" height="200">
       <!-- Background auto-fills cell -->
       <Layer left="0" right="0" top="0" bottom="0">
         <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="12"/>
@@ -205,19 +205,19 @@ card grids, dashboards, and tile layouts. Key principles:
         <!-- ... shapes, text, etc. using constraint attributes ... -->
       </Layer>
     </Layer>
-    <Layer height="200"><!-- cell 2, same pattern --></Layer>
-    <Layer height="200"><!-- cell 3, same pattern --></Layer>
+    <Layer flex="1" height="200"><!-- cell 2, same pattern --></Layer>
+    <Layer flex="1" height="200"><!-- cell 3, same pattern --></Layer>
   </Layer>
   <!-- Row 2: 2 equal cells -->
   <Layer layout="horizontal" gap="20">
-    <Layer height="200"><!-- cell 4 --></Layer>
-    <Layer height="200"><!-- cell 5 --></Layer>
+    <Layer flex="1" height="200"><!-- cell 4 --></Layer>
+    <Layer flex="1" height="200"><!-- cell 5 --></Layer>
   </Layer>
 </Layer>
 ```
 
-Why this works: `alignment="stretch"` on the vertical parent fills row widths → rows' flexible
-cells equally share the width → engine writes computed sizes back as their reference frame.
+Why this works: `alignment="stretch"` on the vertical parent fills row widths → rows' flex
+cells (`flex="1"`) equally share the width → engine writes computed sizes back as their reference frame.
 **No math required** — only declare padding, gap, height.
 
 ### Constraint Layout — Key Patterns
@@ -310,7 +310,7 @@ container whose internal layout achieves the desired effect:
   <!-- This child needs top-alignment instead of center -->
   <Layer width="100" layout="vertical">
     <Layer height="40"><!-- content pinned to top --></Layer>
-    <Layer><!-- flexible remainder pushes content up --></Layer>
+    <Layer flex="1"><!-- flex remainder pushes content up --></Layer>
   </Layer>
 </Layer>
 ```
@@ -500,7 +500,7 @@ Constraint attributes always work — every container has a size from one of thr
 (highest priority first):
 
 1. **Explicit** `width`/`height` set on the Layer or Group
-2. **Layout-assigned**: parent container layout computes and writes back the size (e.g., flexible child in a horizontal layout)
+2. **Layout-assigned**: parent container layout computes and writes back the size (e.g., flex child in a horizontal layout)
 3. **Measured**: engine measures child content bounds as fallback
 
 `left`/`top` alone do not depend on container size at all (they position the element's edge

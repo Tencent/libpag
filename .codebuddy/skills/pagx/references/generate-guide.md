@@ -152,8 +152,10 @@ positions automatically.
 
 Key rules (details in `spec-essentials.md` §3a Container Layout):
 
-- **No width = flexible = equal share** — children without explicit main-axis size equally
-  share remaining space. Children with explicit size are fixed.
+- **No width + flex=0 (default) = content-measured** — children without explicit main-axis
+  size default to their content bounds. Children with `flex` > 0 share remaining space
+  proportionally by flex weight. Use `flex="1"` on all children for equal distribution.
+  Children with explicit size are fixed.
 - **`alignment="stretch"`** — essential for nested layouts (e.g., vertical parent with
   horizontal rows). Without it, rows shrink-wrap and flexible cells get zero width.
 - **Background fills** — use `left="0" right="0" top="0" bottom="0" size="1,1"` on

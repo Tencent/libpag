@@ -1184,6 +1184,7 @@ static void writeLayer(XMLBuilder& xml, const Layer* node, const Options& option
     xml.addAttribute("layout", LayoutModeToString(node->layout));
   }
   xml.addAttribute("gap", node->gap);
+  xml.addAttribute("flex", node->flex);
   if (!node->padding.isZero()) {
     xml.addAttribute("padding", PaddingToString(node->padding));
   }

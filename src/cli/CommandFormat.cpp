@@ -52,9 +52,11 @@ static void PrintFormatUsage() {
 // clang-format off
 static const std::unordered_map<std::string, std::vector<const char*>> ATTRIBUTE_ORDER = {
     {"pagx", {"version", "width", "height"}},
-    {"Layer", {"id", "name", "visible", "alpha", "blendMode", "x", "y", "matrix", "matrix3D",
-               "preserve3D", "antiAlias", "groupOpacity", "passThroughBackground",
-               "scrollRect", "mask", "maskType", "composition"}},
+    {"Layer", {"id", "name", "visible", "alpha", "blendMode", "x", "y", "width", "height",
+               "layout", "gap", "flex", "padding", "alignment", "arrangement", "includeInLayout",
+               "left", "right", "top", "bottom", "centerX", "centerY",
+               "matrix", "matrix3D", "preserve3D", "antiAlias", "groupOpacity",
+               "passThroughBackground", "scrollRect", "mask", "maskType", "composition"}},
     {"Rectangle", {"position", "size", "roundness", "reversed"}},
     {"Ellipse", {"position", "size", "reversed"}},
     {"Polystar", {"position", "type", "pointCount", "outerRadius", "innerRadius", "rotation",

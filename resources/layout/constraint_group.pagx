@@ -14,9 +14,9 @@
   <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30" alignment="stretch">
     
     <!-- Row 1: 4 equal-width containers (flexible, no width specified) -->
-    <Layer layout="horizontal" gap="20">
+    <Layer flex="1" layout="horizontal" gap="20">
       <!-- Container 1 -->
-      <Layer height="200">
+      <Layer height="200" flex="1">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -35,7 +35,7 @@
       </Layer>
 
       <!-- Container 2 -->
-      <Layer height="200">
+      <Layer height="200" flex="1">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -54,7 +54,7 @@
       </Layer>
 
       <!-- Container 3 -->
-      <Layer height="200">
+      <Layer height="200" flex="1">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -73,7 +73,7 @@
       </Layer>
 
       <!-- Container 4 -->
-      <Layer height="200">
+      <Layer height="200" flex="1">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -93,9 +93,9 @@
     </Layer>
 
     <!-- Row 2: 3 equal-width containers (flexible, no width specified) -->
-    <Layer layout="horizontal" gap="20">
+    <Layer flex="1" layout="horizontal" gap="20">
       <!-- Container 5 -->
-      <Layer height="200">
+      <Layer height="200" flex="1">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -117,7 +117,7 @@
       </Layer>
 
       <!-- Container 6 -->
-      <Layer height="200">
+      <Layer height="200" flex="1">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -136,7 +136,7 @@
       </Layer>
 
       <!-- Container 7 -->
-      <Layer height="200">
+      <Layer height="200" flex="1">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -158,9 +158,9 @@
     </Layer>
 
     <!-- Row 3: 3 equal-width containers (flexible, no width specified) -->
-    <Layer layout="horizontal" gap="20">
+    <Layer flex="1" layout="horizontal" gap="20">
       <!-- Container 8 -->
-      <Layer height="200">
+      <Layer height="200" flex="1">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -178,7 +178,7 @@
       </Layer>
 
       <!-- Container 9 -->
-      <Layer height="200">
+      <Layer height="200" flex="1">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -210,7 +210,7 @@
       </Layer>
 
       <!-- Container 10 -->
-      <Layer height="200">
+      <Layer height="200" flex="1">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>

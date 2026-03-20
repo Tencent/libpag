@@ -11,7 +11,7 @@
   <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">
 
     <!-- Row 1 -->
-    <Layer layout="horizontal" gap="20">
+    <Layer flex="1" layout="horizontal" gap="20">
 
       <!-- 1. Vertical layout + spaceBetween: items pushed to top and bottom -->
       <Layer width="180" height="220" layout="vertical" arrangement="spaceBetween" gap="10">
@@ -76,7 +76,7 @@
     </Layer>
 
     <!-- Row 2 -->
-    <Layer layout="horizontal" gap="20">
+    <Layer flex="1" layout="horizontal" gap="20">
 
       <!-- 5. Alignment=stretch in vertical layout -->
       <Layer width="180" height="220" layout="vertical" alignment="stretch" gap="10">
@@ -125,7 +125,7 @@
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <!-- Nested vertical column 1 -->
-        <Layer layout="vertical" gap="8">
+        <Layer flex="1" layout="vertical" gap="8">
           <Layer width="70" height="50">
             <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="6"/>
             <Fill color="#FCA5A5"/>
@@ -136,7 +136,7 @@
           </Layer>
         </Layer>
         <!-- Nested vertical column 2 -->
-        <Layer layout="vertical" gap="8">
+        <Layer flex="1" layout="vertical" gap="8">
           <Layer width="70" height="50">
             <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="6"/>
             <Fill color="#A5F3FC"/>

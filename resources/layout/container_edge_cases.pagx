@@ -12,7 +12,7 @@
   <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">
 
     <!-- Row 1 -->
-    <Layer layout="horizontal" gap="20">
+    <Layer flex="1" layout="horizontal" gap="20">
 
       <!-- 1. Pixel grid alignment: 7 flex items in 500px yields non-integer widths -->
       <!-- Available = 500 - 10*2 - 8*6 = 432, each = 432/7 = 61.71... -->
@@ -20,31 +20,31 @@
         <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        <Layer height="200">
+        <Layer height="200" flex="1">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
           <Fill color="#6366F1"/>
         </Layer>
-        <Layer height="200">
+        <Layer height="200" flex="1">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
           <Fill color="#818CF8"/>
         </Layer>
-        <Layer height="200">
+        <Layer height="200" flex="1">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
           <Fill color="#A78BFA"/>
         </Layer>
-        <Layer height="200">
+        <Layer height="200" flex="1">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
           <Fill color="#C4B5FD"/>
         </Layer>
-        <Layer height="200">
+        <Layer height="200" flex="1">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
           <Fill color="#8B5CF6"/>
         </Layer>
-        <Layer height="200">
+        <Layer height="200" flex="1">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
           <Fill color="#7C3AED"/>
         </Layer>
-        <Layer height="200">
+        <Layer height="200" flex="1">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
           <Fill color="#6D28D9"/>
         </Layer>
@@ -76,7 +76,7 @@
     </Layer>
 
     <!-- Row 2 -->
-    <Layer layout="horizontal" gap="20">
+    <Layer flex="1" layout="horizontal" gap="20">
 
       <!-- 3. Opposite-pair overrides explicit Layer width: left+right should win -->
       <Layer width="260" height="220">
@@ -114,8 +114,8 @@
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
           <Fill color="#6366F1"/>
         </Layer>
-        <Layer layout="horizontal" gap="6" alignment="stretch">
-          <Layer layout="vertical" gap="4">
+        <Layer flex="1" layout="horizontal" gap="6" alignment="stretch">
+          <Layer flex="1" layout="vertical" gap="4">
             <Layer width="80" height="30">
               <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="6"/>
               <Fill color="#F43F5E"/>
@@ -125,7 +125,7 @@
               <Fill color="#FB7185"/>
             </Layer>
           </Layer>
-          <Layer layout="vertical" gap="4">
+          <Layer flex="1" layout="vertical" gap="4">
             <Layer width="80" height="30">
               <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="6"/>
               <Fill color="#10B981"/>
@@ -143,7 +143,7 @@
       </Layer>
 
       <!-- 5. HUG with fixed-width children of different sizes -->
-      <Layer layout="horizontal" gap="10" padding="15">
+      <Layer flex="1" layout="horizontal" gap="10" padding="15">
         <!-- Border -->
         <Layer left="0" right="0" top="0" bottom="0" includeInLayout="false">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>

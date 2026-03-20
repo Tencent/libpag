@@ -163,7 +163,7 @@ centers text within. Group isolates text Fill from rectangle Fill.
 </pagx>
 ```
 
-**Pattern**: Icon Layer has fixed size; label Layer is flexible (takes remaining space).
+**Pattern**: Icon Layer has fixed size; label Layer is flexible (no explicit width, sized by content).
 
 ### Card with Internal Layout (Container Layout)
 
@@ -213,7 +213,7 @@ layout AND manages its own children's layout.
         </Layer>
         <!-- Action buttons: two equal-width buttons -->
         <Layer height="44" layout="horizontal" gap="12" alignment="stretch">
-          <Layer>
+          <Layer flex="1">
             <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="10"/>
             <Fill color="#6366F1"/>
             <Group left="0" right="0" top="0" bottom="0">
@@ -223,7 +223,7 @@ layout AND manages its own children's layout.
                        textAlign="center" paragraphAlign="middle"/>
             </Group>
           </Layer>
-          <Layer>
+          <Layer flex="1">
             <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="10"/>
             <Fill color="#F1F5F9"/>
             <Stroke color="#CBD5E1" width="1" align="inside"/>
@@ -261,7 +261,7 @@ structural choices:
   background Rectangle out of the layout flow while filling the card's computed size.
 - **Title row nests horizontal layout**: the title Layer is itself a horizontal container
   with icon (fixed 24×24) + label (flexible width).
-- **Equal-width buttons**: two flexible children in a horizontal container with
+- **Equal-width buttons**: two flex children (`flex="1"`) in a horizontal container with
   `alignment="stretch"` — buttons fill cross-axis height automatically.
 - **Recursive layout**: outer vertical → card vertical → title horizontal → button horizontal.
   Each level follows the same two-step process (choose container mode, then position internals).
@@ -285,18 +285,18 @@ fill remaining space — see Dashboard Layout below.
       </Group>
     </Layer>
     <!-- Content: 3 equal columns -->
-    <Layer layout="horizontal" gap="16">
-      <Layer>
+    <Layer flex="1" layout="horizontal" gap="16">
+      <Layer flex="1">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
         <Fill color="#FFF"/>
         <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000010"/>
       </Layer>
-      <Layer>
+      <Layer flex="1">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
         <Fill color="#FFF"/>
         <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000010"/>
       </Layer>
-      <Layer>
+      <Layer flex="1">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
         <Fill color="#FFF"/>
         <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000010"/>
@@ -317,8 +317,8 @@ fill remaining space — see Dashboard Layout below.
 </pagx>
 ```
 
-**Pattern**: Header and footer have fixed `height`; the content row is flexible. Three child
-Layers without `width` equally share available space.
+**Pattern**: Header and footer have fixed `height`; the content row uses `flex="1"` to fill
+remaining space. Three child Layers with `flex="1"` equally share available width.
 
 ### Vertical List (Container Layout)
 

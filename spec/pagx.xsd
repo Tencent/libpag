@@ -918,6 +918,7 @@
     <xs:attribute name="height" type="xs:decimal"/>
     <xs:attribute name="layout" type="LayoutModeType" default="absolute"/>
     <xs:attribute name="gap" type="xs:decimal" default="0"/>
+    <xs:attribute name="flex" type="xs:decimal" default="0"/>
     <xs:attribute name="padding" type="PaddingType"/>
     <xs:attribute name="alignment" type="AlignmentType" default="start"/>
     <xs:attribute name="arrangement" type="ArrangementType" default="start"/>

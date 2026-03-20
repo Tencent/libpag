@@ -12,10 +12,10 @@
   <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30" alignment="stretch">
 
     <!-- Row 1: Single-edge positioning + Horizontal-only scaling -->
-    <Layer layout="horizontal" gap="20">
+    <Layer flex="1" layout="horizontal" gap="20">
 
       <!-- Container 1: Single-edge positioning -->
-      <Layer height="250">
+      <Layer height="250" flex="1">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -38,7 +38,7 @@
       </Layer>
 
       <!-- Container 2: Horizontal-only scaling (left+right) -->
-      <Layer height="250">
+      <Layer height="250" flex="1">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -68,10 +68,10 @@
     </Layer>
 
     <!-- Row 2: Vertical-only + Dual-axis containers -->
-    <Layer layout="horizontal" gap="20">
+    <Layer flex="1" layout="horizontal" gap="20">
 
       <!-- Container 3: Vertical-only scaling (top+bottom) -->
-      <Layer height="250">
+      <Layer height="250" flex="1">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -89,7 +89,7 @@
       </Layer>
 
       <!-- Container 4: Dual-axis fit scaling -->
-      <Layer height="250">
+      <Layer height="250" flex="1">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -107,7 +107,7 @@
       </Layer>
 
       <!-- Container 5: Dual-axis fit, wide and tall -->
-      <Layer height="250">
+      <Layer height="250" flex="1">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>

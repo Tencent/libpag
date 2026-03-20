@@ -1803,7 +1803,7 @@ The `width`/`height` attributes declare a container's layout size — the shared
 For child Layers, container layout and constraint layout are **mutually exclusive** — a child participating in container layout is sized by the container; a child outside (absolute parent or `includeInLayout="false"`) is sized by constraints:
 
 **In container layout** (child participates in `layout="horizontal"/"vertical"`):
-- Main axis: explicit `width`/`height` → fixed; no explicit size → flexible (equal share)
+- Main axis: explicit `width`/`height` → fixed (flex ignored); no explicit size with `flex=0` (default) → content-measured; no explicit size with `flex>0` → proportional share of remaining space by flex weight
 - Cross axis: `alignment="stretch"` fills children without explicit cross-axis size (children with explicit cross-axis size keep it)
 
 **In constraint layout** (absolute parent or `includeInLayout="false"`):
@@ -1822,13 +1822,13 @@ Setting the `layout` attribute to `horizontal` or `vertical` on a parent Layer c
 ```xml
 <!-- Three equal-width cards arranged horizontally -->
 <Layer width="920" height="200" layout="horizontal" gap="14" padding="20">
-  <Layer><!-- Card A --></Layer>
-  <Layer><!-- Card B --></Layer>
-  <Layer><!-- Card C --></Layer>
+  <Layer flex="1"><!-- Card A --></Layer>
+  <Layer flex="1"><!-- Card B --></Layer>
+  <Layer flex="1"><!-- Card C --></Layer>
 </Layer>
 ```
 
-All three child Layers have no `width` set, equally sharing available width: `(920 - 40 - 28) / 3 = 284`.
+All three child Layers have no `width` set and `flex="1"`, equally sharing available width: `(920 - 40 - 28) / 3 = 284`.
 
 #### Attributes
 
@@ -1836,6 +1836,7 @@ All three child Layers have no `width` set, equally sharing available width: `(9
 |-----------|------|---------|-------------|
 | `layout` | LayoutMode | absolute | Main axis direction for child layer arrangement |
 | `gap` | float | 0 | Spacing between adjacent child Layers |
+| `flex` | float | 0 | Flex weight for main-axis sizing. When a child has no explicit main-axis size: `flex=0` (default) uses content-measured size; `flex>0` takes a proportional share of remaining space by weight. Ignored when explicit `width`/`height` is set on the main axis |
 | `padding` | float or "t,r,b,l" | 0 | Inner padding. Supports single value (uniform), two values (vertical,horizontal), four values (top,right,bottom,left), consistent with CSS shorthand |
 | `alignment` | Alignment | start | Cross-axis alignment |
 | `arrangement` | Arrangement | start | Main-axis arrangement |
@@ -1869,10 +1870,11 @@ All three child Layers have no `width` set, equally sharing available width: `(9
 
 #### Child Element Sizing
 
-Child Layer main-axis sizing has two states:
+Child Layer main-axis sizing has three states:
 
-- **Fixed size**: `width`/`height` set on the main axis; does not change with parent container.
-- **Flexible size**: `width`/`height` not set on the main axis. When parent has a determined main-axis size, remaining space (after fixed children and gaps) is equally distributed among all flexible children. When parent's main-axis size is determined by content measurement, each flexible child's main-axis size is determined by its own content bounds, and the parent shrinks to fit all children's content.
+- **Fixed size**: `width`/`height` set on the main axis; does not change with parent container. The `flex` attribute is ignored.
+- **Content-measured size**: No explicit main-axis `width`/`height` and `flex=0` (default). Size is determined by the child's own content bounds.
+- **Flex size**: No explicit main-axis `width`/`height` and `flex>0`. When the parent has a determined main-axis size, remaining space (after fixed and content-measured children and gaps) is distributed proportionally among flex children by their `flex` weight. When the parent's main-axis size is determined by content measurement, each flex child's main-axis size falls back to its own content bounds, and the parent shrinks to fit all children's content.
 
 Cross-axis: Uses explicit `width`/`height` if set; when the parent has `alignment="stretch"`, child Layers without explicit cross-axis size stretch to fill cross-axis available space (container cross-axis size minus padding on both sides); otherwise determined by content bounds.
 

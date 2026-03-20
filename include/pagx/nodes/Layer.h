@@ -175,6 +175,13 @@ class Layer : public Node {
   float gap = 0.0f;
 
   /**
+   * The flex grow factor for this layer within a container layout. When a child has no explicit
+   * main-axis size: flex=0 (default) uses content-measured size; flex>0 distributes remaining space
+   * proportionally among flex children by weight. Ignored when an explicit width/height is set.
+   */
+  float flex = 0.0f;
+
+  /**
    * The inner padding of the layout container. The default value is zero on all sides.
    */
   Padding padding = {};

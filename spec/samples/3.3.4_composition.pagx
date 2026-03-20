@@ -2,9 +2,9 @@
 <!-- Demonstrates composition (reusable component) -->
 <pagx version="1.0" width="400" height="400">
   <Layer width="400" height="400" layout="vertical" gap="50" padding="60,100,60,100">
-    <Layer composition="@buttonComp"/>
-    <Layer composition="@buttonComp"/>
-    <Layer composition="@buttonComp"/>
+    <Layer flex="1" composition="@buttonComp"/>
+    <Layer flex="1" composition="@buttonComp"/>
+    <Layer flex="1" composition="@buttonComp"/>
   </Layer>
   <Resources>
     <Composition id="buttonComp" width="200" height="60">

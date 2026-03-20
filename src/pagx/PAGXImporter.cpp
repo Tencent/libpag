@@ -313,6 +313,7 @@ static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
   layer->height = getFloatAttributeOrNaN(node, "height", doc);
   layer->layout = GET_ENUM(node, "layout", "absolute", doc, LayoutMode);
   layer->gap = getFloatAttribute(node, "gap", 0, doc);
+  layer->flex = getFloatAttribute(node, "flex", 0, doc);
   auto paddingStr = getAttribute(node, "padding");
   if (!paddingStr.empty()) {
     auto paddingValues = ParseFloatList(paddingStr);

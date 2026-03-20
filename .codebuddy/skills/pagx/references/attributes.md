@@ -42,6 +42,7 @@ they **must not** be omitted.
 | `height` | float | — |
 | `layout` | LayoutMode | absolute |
 | `gap` | float | 0 |
+| `flex` | float | 0 |
 | `padding` | Padding | 0 |
 | `alignment` | Alignment | start |
 | `arrangement` | Arrangement | start |

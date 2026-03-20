@@ -9,7 +9,7 @@
 
   <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">
     <!-- Row 1 -->
-    <Layer layout="horizontal" gap="20">
+    <Layer flex="1" layout="horizontal" gap="20">
       <!-- 1. Vertical arrangement=center: two items centered vertically -->
       <Layer width="180" height="220" layout="vertical" arrangement="center" gap="10">
         <Rectangle position="90,110" size="180,220" roundness="4"/>
@@ -42,7 +42,7 @@
     </Layer>
 
     <!-- Row 2 -->
-    <Layer layout="horizontal" gap="20">
+    <Layer flex="1" layout="horizontal" gap="20">
       <!-- 3. Vertical alignment=center: cross-axis (X) centering with different widths -->
       <Layer width="180" height="220" layout="vertical" alignment="center" gap="10">
         <Rectangle position="90,110" size="180,220" roundness="4"/>

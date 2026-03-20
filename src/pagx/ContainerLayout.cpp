@@ -58,10 +58,12 @@ void ContainerLayout::Apply(Layer* parent, const MeasureFunc& measureLayer) {
     }
   }
 
-  // Determine which children have fixed vs flexible main-axis sizes.
-  // A child with explicit width/height on the main axis is "fixed"; otherwise "flexible".
-  // Flexible children get equal shares of available space (no intrinsic basis).
-  std::vector<bool> isFixed(childCount, false);
+  // Determine child main-axis sizing with three-state logic:
+  // 1. Explicit width/height → fixed size (flex ignored)
+  // 2. No explicit size, flex=0 (default) → content-measured size
+  // 3. No explicit size, flex>0 → proportional share of remaining space
+  enum class SizeMode { Fixed, ContentMeasured, Flex };
+  std::vector<SizeMode> sizeMode(childCount, SizeMode::Fixed);
   std::vector<float> childMainSizes(childCount, 0);
   std::vector<float> childCrossSizes(childCount, 0);
 
@@ -72,8 +74,14 @@ void ContainerLayout::Apply(Layer* parent, const MeasureFunc& measureLayer) {
     auto* child = children[i];
     float mainSize = horizontal ? child->width : child->height;
     if (!std::isnan(mainSize)) {
-      isFixed[i] = true;
+      sizeMode[i] = SizeMode::Fixed;
       childMainSizes[i] = mainSize;
+    } else if (child->flex > 0) {
+      sizeMode[i] = SizeMode::Flex;
+      childMainSizes[i] = 0;
+    } else {
+      sizeMode[i] = SizeMode::ContentMeasured;
+      childMainSizes[i] = horizontal ? childMeasuredSizes[i].first : childMeasuredSizes[i].second;
     }
 
     float crossSize = horizontal ? child->height : child->width;
@@ -96,41 +104,40 @@ void ContainerLayout::Apply(Layer* parent, const MeasureFunc& measureLayer) {
   size_t visibleCount = indices.size();
   float totalGap = parent->gap * static_cast<float>(visibleCount > 1 ? visibleCount - 1 : 0);
 
-  // Calculate fixed total. Flexible items contribute 0 to fixed total.
-  float fixedTotal = 0;
+  // Calculate non-flex total and collect flex items with their weights.
+  float nonFlexTotal = 0;
+  float totalFlex = 0;
   std::vector<size_t> flexIndices = {};
   for (auto idx : indices) {
-    if (isFixed[idx]) {
-      fixedTotal += childMainSizes[idx];
-    } else {
+    if (sizeMode[idx] == SizeMode::Flex) {
+      totalFlex += children[idx]->flex;
       flexIndices.push_back(idx);
+    } else {
+      nonFlexTotal += childMainSizes[idx];
     }
   }
 
-  // Distribute available space equally among flexible children.
-  float totalFlexSpace = availableMain - fixedTotal - totalGap;
-  if (!flexIndices.empty() && totalFlexSpace > 0) {
-    float share = totalFlexSpace / static_cast<float>(flexIndices.size());
+  // Distribute remaining space proportionally among flex children by weight.
+  float totalFlexSpace = availableMain - nonFlexTotal - totalGap;
+  if (!flexIndices.empty() && totalFlexSpace > 0 && totalFlex > 0) {
     for (auto idx : flexIndices) {
-      childMainSizes[idx] = share;
+      childMainSizes[idx] = totalFlexSpace * children[idx]->flex / totalFlex;
     }
   }
 
-  // Assign computed sizes back to children (set width/height if they were flexible).
+  // Assign computed sizes back to flex children (set width/height).
   // Use rounding error propagation to ensure sizes sum to the exact container width.
   float roundOff = 0;
-  for (auto idx : indices) {
+  for (auto idx : flexIndices) {
     auto* child = children[idx];
-    if (!isFixed[idx]) {
-      float rawSize = childMainSizes[idx];
-      float roundedSize = std::round(rawSize + roundOff);
-      roundOff += rawSize - roundedSize;
-      childMainSizes[idx] = roundedSize;
-      if (horizontal) {
-        child->width = roundedSize;
-      } else {
-        child->height = roundedSize;
-      }
+    float rawSize = childMainSizes[idx];
+    float roundedSize = std::round(rawSize + roundOff);
+    roundOff += rawSize - roundedSize;
+    childMainSizes[idx] = roundedSize;
+    if (horizontal) {
+      child->width = roundedSize;
+    } else {
+      child->height = roundedSize;
     }
   }
 

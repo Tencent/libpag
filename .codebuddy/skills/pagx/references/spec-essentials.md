@@ -113,6 +113,7 @@ pagx
 | `width`, `height` | — | Layout size for constraint and container layout reference. When omitted, the engine measures content or derives from parent layout. Set explicitly for a specific design size. |
 | `layout` | absolute | `absolute` (default), `horizontal`, or `vertical` — sets layout mode for child Layers |
 | `gap` | 0 | Spacing between adjacent child Layers along the main axis |
+| `flex` | 0 | Flex weight for proportional sizing in container layout. 0 = content-measured (default); >0 = share remaining space by weight |
 | `padding` | 0 | Inner padding: `"all"`, `"v,h"`, `"t,h,b"`, or `"t,r,b,l"` (CSS-compatible shorthand) |
 | `alignment` | start | Cross-axis alignment of children: `start` / `center` / `end` / `stretch` |
 | `arrangement` | start | Main-axis distribution: `start` / `center` / `end` / `spaceBetween` |
@@ -200,8 +201,8 @@ The layout engine computes child `x`/`y` positions automatically.
 
 ```xml
 <Layer width="920" height="200" layout="horizontal" gap="14" padding="20">
-  <Layer><!-- Card A: flexible, shares space equally --></Layer>
-  <Layer><!-- Card B --></Layer>
+  <Layer flex="1"><!-- Card A: flex, shares space equally --></Layer>
+  <Layer flex="1"><!-- Card B --></Layer>
   <Layer width="200"><!-- Card C: fixed width --></Layer>
 </Layer>
 ```
@@ -209,16 +210,21 @@ The layout engine computes child `x`/`y` positions automatically.
 Key rules:
 - **Activation**: Container layout is only active when `layout` is set. Without it, child Layers
   use `x`/`y` absolute positioning as before.
-- **Child sizing**: Children with explicit `width`/`height` have fixed size. Children without
-  are flexible — they **equally share** remaining space after subtracting fixed children, gaps,
-  and padding. If fixed children + gaps + padding already exceed the container's main-axis size,
-  flexible children receive **zero size** (they remain in layout but contribute no space).
+- **Child sizing (three-state logic)**:
+  1. **Fixed**: Children with explicit `width`/`height` have fixed size (`flex` is ignored).
+  2. **Content-measured** (default): Children without explicit size and `flex="0"` (default)
+     are sized by their own content bounds.
+  3. **Flex**: Children without explicit size and `flex` > 0 share remaining space (after
+     subtracting fixed children, content-measured children, gaps, and padding) proportionally
+     by their `flex` weight. For example, `flex="1"` and `flex="2"` split remaining space 1:2.
+     If remaining space is zero or negative, flex children receive **zero size** (they remain
+     in layout but contribute no space).
   When the parent has no main-axis size, the parent's size is determined by content measurement:
-  each flexible child's main-axis size is determined by its own content bounds, and the parent
-  shrinks to fit all children's content.
-- **Flexible children get layout size**: The engine-computed `width`/`height` for flexible
+  flex children contribute zero to measurement, and the parent shrinks to fit fixed and
+  content-measured children.
+- **Flex children get layout size**: The engine-computed `width`/`height` for flex
   children serves as their layout size — the same as if `width`/`height` were set explicitly.
-  For example, a flexible child Layer getting `width=284` from the layout engine can use
+  For example, a flex child Layer getting `width=284` from the layout engine can use
   `left`/`right` constraints internally with that 284px as the reference frame.
 - **Layout participation**: Every visible child Layer with `includeInLayout="true"` (the default)
   participates in the layout flow. Setting `includeInLayout="false"` on a child Layer removes it
@@ -278,7 +284,7 @@ Key rules:
   of the parent's `layout` mode.
 
   **In container layout** (child Layer participates in `layout="horizontal"/"vertical"`):
-  - Main axis: explicit `width`/`height` → fixed; no explicit size → flexible (equal share)
+  - Main axis: explicit `width`/`height` → fixed; no explicit size + `flex`=0 → content-measured; no explicit size + `flex`>0 → proportional share
   - Cross axis: `alignment="stretch"` fills children without explicit cross-axis size;
     children with explicit cross-axis size keep it
 
