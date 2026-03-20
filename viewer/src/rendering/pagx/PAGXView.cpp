@@ -59,6 +59,7 @@ void PAGXView::initDrawable() {
 void PAGXView::onRequestSizeChanged() {
   sizeChanged = true;
   viewModel->markNeedsRender();
+  triggerFlush();
 }
 
 void PAGXView::onPreferredSizeChanged() {
