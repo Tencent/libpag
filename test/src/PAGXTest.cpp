@@ -21,6 +21,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <unordered_map>
 #include "pagx/AutoLayout.h"
 #include "pagx/FontProvider.h"
 #include "pagx/PAGXDocument.h"
@@ -577,6 +578,7 @@ static std::vector<std::pair<std::string, std::string>> ExtractMarkdownExamples(
   std::string currentTitle;
   bool inCodeBlock = false;
   std::string codeContent;
+  std::unordered_map<std::string, int> keyCounts;
 
   std::string line;
   while (std::getline(file, line)) {
@@ -600,7 +602,10 @@ static std::vector<std::pair<std::string, std::string>> ExtractMarkdownExamples(
           trimmed = trimmed.substr(pos);
         }
         if (trimmed.substr(0, 5) == "<pagx" && !currentTitle.empty()) {
-          examples.emplace_back(TitleToKey(currentTitle), codeContent);
+          auto baseKey = TitleToKey(currentTitle);
+          auto count = ++keyCounts[baseKey];
+          auto key = count > 1 ? baseKey + "_" + std::to_string(count) : baseKey;
+          examples.emplace_back(key, codeContent);
         }
       } else {
         if (!codeContent.empty()) {

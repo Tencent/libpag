@@ -23,6 +23,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "TextLayout.h"
 #include "base/utils/Log.h"
 #include "pagx/FontProvider.h"
 #include "pagx/PAGXDocument.h"
@@ -103,7 +104,23 @@ static Rect ComputeTextBounds(const Text* text, FontConfig* fontProvider) {
 }
 
 // Local wrapper for ElementMeasure::GetContentBounds that uses ComputeTextBounds.
+// For TextBox without explicit dimensions, performs a full typesetting pass to get accurate bounds.
 static Rect GetContentBounds(const Element* element, FontConfig* fontProvider) {
+  if (element->nodeType() == NodeType::TextBox) {
+    auto* textBox = static_cast<const TextBox*>(element);
+    float w = std::isnan(textBox->width) ? 0 : textBox->width;
+    float h = std::isnan(textBox->height) ? 0 : textBox->height;
+    if (w == 0 || h == 0) {
+      auto measured = TextLayout::MeasureTextBox(textBox, fontProvider);
+      if (w == 0) {
+        w = measured.width;
+      }
+      if (h == 0) {
+        h = measured.height;
+      }
+    }
+    return Rect::MakeXYWH(0, 0, w, h);
+  }
   return ElementMeasure::GetContentBounds(
       element, [fontProvider](const Text* text) { return ComputeTextBounds(text, fontProvider); });
 }

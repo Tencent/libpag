@@ -2168,4 +2168,54 @@ Rect TextLayout::MeasureText(const Text* text, FontConfig* fontConfig) {
   return Rect::MakeLTRB(bounds.left, bounds.top, bounds.right, bounds.bottom);
 }
 
+Rect TextLayout::MeasureTextBox(const TextBox* textBox, FontConfig* fontConfig) {
+  if (textBox == nullptr || textBox->elements.empty()) {
+    return {};
+  }
+  TextLayoutContext context(fontConfig, nullptr);
+  auto childText = context.processScope(textBox->elements);
+  if (childText.empty()) {
+    return {};
+  }
+  // Shape and concatenate all glyphs (same as processTextWithLayout).
+  std::vector<TextLayoutContext::GlyphInfo> allGlyphs = {};
+  float totalWidth = 0;
+  bool isVertical = textBox->writingMode == WritingMode::Vertical;
+  for (auto* text : childText) {
+    TextLayoutContext::ShapedInfo info = {};
+    info.text = text;
+    if (!text->text.empty()) {
+      context.shapeText(text, info, isVertical);
+    }
+    for (auto& g : info.allGlyphs) {
+      if (g.unichar != '\n') {
+        g.xPosition += totalWidth;
+      }
+    }
+    allGlyphs.insert(allGlyphs.end(), info.allGlyphs.begin(), info.allGlyphs.end());
+    totalWidth += info.totalWidth;
+  }
+  if (allGlyphs.empty()) {
+    return {};
+  }
+  if (isVertical) {
+    auto columns = context.layoutColumns(allGlyphs, textBox);
+    float totalColumnWidth = 0;
+    float maxColumnHeight = 0;
+    for (auto& col : columns) {
+      totalColumnWidth += col.maxColumnWidth;
+      maxColumnHeight = std::max(maxColumnHeight, col.height);
+    }
+    return Rect::MakeXYWH(0, 0, totalColumnWidth, maxColumnHeight);
+  }
+  auto lines = context.layoutLines(allGlyphs, textBox);
+  float maxLineWidth = 0;
+  float totalHeight = 0;
+  for (auto& line : lines) {
+    maxLineWidth = std::max(maxLineWidth, line.width);
+    totalHeight += line.maxLineHeight;
+  }
+  return Rect::MakeXYWH(0, 0, maxLineWidth, totalHeight);
+}
+
 }  // namespace pagx

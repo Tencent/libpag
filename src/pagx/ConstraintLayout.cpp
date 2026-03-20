@@ -153,7 +153,7 @@ void ConstraintLayout::Apply(const std::vector<Element*>& elements, float contai
   for (auto* element : elements) {
     ApplyConstraintToElement(element, containerWidth, containerHeight, measureText);
 
-    if (element->nodeType() == NodeType::Group) {
+    if (element->nodeType() == NodeType::Group || element->nodeType() == NodeType::TextBox) {
       auto* group = static_cast<Group*>(element);
       float groupW = group->width;
       float groupH = group->height;

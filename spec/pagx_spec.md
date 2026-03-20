@@ -1354,13 +1354,12 @@ Text modifiers transform individual glyphs within text.
 When a text modifier is encountered, **all glyph lists** accumulated in the context are combined into a unified glyph list for the operation:
 
 ```xml
-<Group>
+<TextBox position="100,50" width="200" height="100" textAlign="center">
   <Text text="Hello " fontFamily="Arial" fontSize="24"/>
   <Text text="World" fontFamily="Arial" fontSize="24"/>
   <TextModifier position="0,-5"/>
-  <TextBox position="100,50" textAlign="center"/>
   <Fill color="#333333"/>
-</Group>
+</TextBox>
 ```
 
 #### 5.5.2 Text to Shape Conversion
@@ -1568,30 +1567,26 @@ redistributed evenly to fill the available path length.
 
 #### 5.5.6 TextBox
 
-TextBox is a text layout node that applies typography to accumulated Text elements. It re-layouts all glyph positions according to its own position, size, and alignment settings. The layout results are written into each Text element's GlyphRun data with inverse-transform compensation, so that Text's own position and parent Group transforms remain effective in the rendering pipeline. The first line is positioned using the line-box model: the line box near edge is aligned to the near edge of the text area, and the baseline is placed at `halfLeading + ascent` from the near edge, where `halfLeading = (lineHeight - metricsHeight) / 2` and `metricsHeight = ascent + descent + leading` from the font metrics. Following CSS Writing Modes conventions, `lineHeight` is a logical property that always applies to the block-axis dimension of a line box. In vertical mode, it controls the column width rather than the line height. Columns are spaced by `lineHeight` (center-to-center distance). When `lineHeight` is 0 (auto), the column width is calculated from font metrics (ascent + descent + leading), same as horizontal auto line height. Columns flow from right to left.
+TextBox is a text layout container that inherits from Group. It applies typography to Text elements within its scope. TextBox re-layouts all glyph positions according to its layout dimensions (`width`/`height`) and alignment settings. The layout results are written into each Text element's GlyphRun data with inverse-transform compensation, so that Text's own position and parent Group transforms remain effective in the rendering pipeline. The first line is positioned using the line-box model: the line box near edge is aligned to the near edge of the text area, and the baseline is placed at `halfLeading + ascent` from the near edge, where `halfLeading = (lineHeight - metricsHeight) / 2` and `metricsHeight = ascent + descent + leading` from the font metrics. Following CSS Writing Modes conventions, `lineHeight` is a logical property that always applies to the block-axis dimension of a line box. In vertical mode, it controls the column width rather than the line height. Columns are spaced by `lineHeight` (center-to-center distance). When `lineHeight` is 0 (auto), the column width is calculated from font metrics (ascent + descent + leading), same as horizontal auto line height. Columns flow from right to left.
 
-TextBox is a **pre-layout-only** node: it is processed during the typesetting stage before rendering and is not instantiated in the render tree. If all accumulated Text elements already contain embedded GlyphRun data, the TextBox is skipped during typesetting. However, the TextBox node should still be retained even when embedded GlyphRun data and fonts are present, as design tools may read its layout attributes (size, alignment, wordWrap, etc.) for editing purposes.
+TextBox is a **pre-layout-only** node: it is processed during the typesetting stage before rendering and is not instantiated in the render tree. If all accumulated Text elements already contain embedded GlyphRun data, the TextBox is skipped during typesetting. However, the TextBox node should still be retained even when embedded GlyphRun data and fonts are present, as design tools may read its layout attributes (`width`, `height`, `textAlign`, `paragraphAlign`, `lineHeight`, `wordWrap`, `overflow`, etc.) for editing purposes.
 
-Unlike other modifiers that operate on accumulated results in a chain (e.g., TrimPath modifies the path output of previous elements), TextBox only affects the **initial layout** of Text elements. It determines glyph positions before the modifier chain begins. Subsequent modifiers such as TextPath and TextModifier operate on the TextBox layout results. The position of TextBox in the node order does not change this behavior.
+As a container, TextBox processes its child Text elements and text modifiers (TextModifier, TextPath, etc.) in an isolated scope. Text elements inside a TextBox are laid out by the TextBox's typography settings first; subsequent text modifiers within the TextBox then operate on those layout results. TextBox only affects the **initial layout** of Text elements — it determines glyph positions before the text modifier chain begins.
 
 > [Sample](samples/5.5.6_text_box.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `position` | Point | 0,0 | Top-left corner of the text area |
-| `size` | Size | 0,0 | Layout size. When width or height is 0, text has no boundary in that dimension, which may cause wordWrap or overflow to have no effect |
+| `width` | float | NaN | Layout width. NaN means no boundary in this dimension, which may cause wordWrap or overflow to have no effect |
+| `height` | float | NaN | Layout height. NaN means no boundary in this dimension, which may cause wordWrap or overflow to have no effect |
 | `textAlign` | TextAlign | start | Text alignment along the inline direction |
 | `paragraphAlign` | ParagraphAlign | near | Paragraph alignment along the block-flow direction |
 | `writingMode` | WritingMode | horizontal | Layout direction |
 | `lineHeight` | float | 0 | Line height in pixels. 0 means auto (calculated from font metrics: ascent + descent + leading). Following CSS Writing Modes conventions, this is a logical property: in vertical mode it controls column width |
-| `wordWrap` | bool | true | Enable automatic word wrapping at the box width boundary (horizontal mode) or height boundary (vertical mode). Has no effect when that dimension of size is 0 |
-| `overflow` | Overflow | visible | Overflow behavior when text exceeds the box height (horizontal mode) or width (vertical mode). Has no effect when that dimension of size is 0 |
-| `left` | float | - | Constraint positioning: distance from container's left edge (see §6.3) |
-| `right` | float | - | Constraint positioning: distance from container's right edge (see §6.3) |
-| `top` | float | - | Constraint positioning: distance from container's top edge (see §6.3) |
-| `bottom` | float | - | Constraint positioning: distance from container's bottom edge (see §6.3) |
-| `centerX` | float | - | Constraint centering: horizontal offset from container center (see §6.3) |
-| `centerY` | float | - | Constraint centering: vertical offset from container center (see §6.3) |
+| `wordWrap` | bool | true | Enable automatic word wrapping at the box width boundary (horizontal mode) or height boundary (vertical mode). Has no effect when that dimension is NaN |
+| `overflow` | Overflow | visible | Overflow behavior when text exceeds the box height (horizontal mode) or width (vertical mode). Has no effect when that dimension is NaN |
+
+TextBox inherits all Group attributes (`position`, `anchor`, `rotation`, `scale`, `skew`, `skewAxis`, `alpha`, and constraint attributes `left`, `right`, `top`, `bottom`, `centerX`, `centerY`). The `position` attribute specifies the top-left corner of the text area in the parent coordinate system.
 
 **TextAlign (Text Alignment)**:
 
@@ -1624,15 +1619,15 @@ Aligns text lines or columns along the block-flow direction. Uses direction-neut
 | Value | Description |
 |-------|-------------|
 | `visible` | Text exceeding box boundaries is still rendered (default) |
-| `hidden` | Lines that exceed the box height (horizontal mode) or columns that exceed the box width (vertical mode) are discarded entirely. Partial lines/columns are never shown. Has no effect when that dimension of size is 0 |
+| `hidden` | Lines that exceed the box height (horizontal mode) or columns that exceed the box width (vertical mode) are discarded entirely. Partial lines/columns are never shown. Has no effect when that dimension is NaN |
 
 #### 5.5.7 Rich Text
 
-Rich text is achieved through multiple Text elements within a Group, each Text having independent Fill/Stroke styles. TextBox provides unified typography.
+Rich text is achieved through multiple Text elements within a TextBox, each wrapped in a Group with independent Fill/Stroke styles. TextBox provides unified typography.
 
 > [Sample](samples/5.5.7_rich_text.pagx)
 
-**Note**: Each Group's Text + Fill/Stroke defines a text segment with independent styling. TextBox treats all segments as a single unit for typography, enabling auto-wrapping and alignment.
+**Note**: Each Group's Text + Fill/Stroke defines a text segment with independent styling. TextBox contains all segments as children and treats them as a single unit for typography, enabling auto-wrapping and alignment.
 
 ### 5.6 Repeater
 
@@ -1976,7 +1971,7 @@ Setting both `left` + `right` (or `top` + `bottom`) defines a target area (conta
 | Element | Opposite-Edge Behavior | Description |
 |---------|----------------------|-------------|
 | Rectangle, Ellipse | Stretch shape | Modify `size` to fill the target area, changing rendered shape |
-| TextBox | Stretch typesetting area | Modify `size` to fill the target area, changing text layout bounds |
+| TextBox | Stretch typesetting area | Modify `width` and `height` to fill the target area, changing text layout bounds |
 | Group | Derive layout dimensions | Align to the target area and set layout dimensions; children re-layout according to the new size, no effect on rendering |
 | Child Layer | Derive dimensions or position | Always derive dimensions from parent (`width = parent.width - left - right`), overriding any explicit `width`/`height` |
 | Polystar, Path, Text | Scale to fit | Single-axis: scale to exactly fill that axis, other axis scales proportionally; both-axis: use the smaller scale factor (fit mode), center along the longer axis |
@@ -1985,8 +1980,8 @@ Setting both `left` + `right` (or `top` + `bottom`) defines a target area (conta
 
 ```
 left=L, right=R:  new width = W - L - R
-                  Rectangle/Ellipse: position.x = L + width/2 (anchor at geometric center)
-                  TextBox: position.x = L (anchor at top-left)
+                  Rectangle/Ellipse: size.width = new width, position.x = L + width/2 (anchor at geometric center)
+                  TextBox: width = new width, position.x = L (anchor at top-left)
 ```
 
 The vertical axis follows the same pattern.

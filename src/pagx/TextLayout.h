@@ -27,6 +27,8 @@
 
 namespace pagx {
 
+class TextBox;
+
 /**
  * TextLayout performs text layout on PAGXDocument, converting Text elements into positioned glyph
  * data (TextBlob). It handles font matching, fallback, text shaping, and layout (alignment, line
@@ -51,6 +53,16 @@ class TextLayout {
    * @return The bounding rectangle of the text.
    */
   static Rect MeasureText(const Text* text, FontConfig* fontConfig = nullptr);
+
+  /**
+   * Measures the content bounds of a TextBox by performing a full typesetting pass on its child
+   * Text elements. Uses the TextBox's width/height (NaN means no boundary) and alignment settings.
+   * Returns the tight bounds of the typeset result.
+   * @param textBox The TextBox to measure.
+   * @param fontConfig Optional font config for font matching.
+   * @return The tight bounding rectangle of the typeset text.
+   */
+  static Rect MeasureTextBox(const TextBox* textBox, FontConfig* fontConfig = nullptr);
 
   /**
    * Finds a typeface matching the given font family and style.
