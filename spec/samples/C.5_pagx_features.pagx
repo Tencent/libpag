@@ -117,11 +117,10 @@
       <Fill color="#F43F5E"/>
     </Layer>
     <Layer left="-50" top="-7">
-      <Group>
+      <TextBox width="220" height="0" lineHeight="22">
         <Text text="Plain-text XML, easy to diff, debug, and AI-generate." fontFamily="Arial" fontSize="16"/>
         <Fill color="#CBD5E1"/>
-      </Group>
-      <TextBox size="220,0" lineHeight="22"/>
+      </TextBox>
     </Layer>
   </Layer>
   <Layer name="CardComprehensive" left="1319" top="466">
@@ -161,11 +160,10 @@
       <Fill color="#38BDF8"/>
     </Layer>
     <Layer left="-50" top="-7">
-      <Group>
+      <TextBox width="220" height="0" lineHeight="22">
         <Text text="Covers vectors, images, text, effects, and masks." fontFamily="Arial" fontSize="16"/>
         <Fill color="#CBD5E1"/>
-      </Group>
-      <TextBox size="220,0" lineHeight="22"/>
+      </TextBox>
     </Layer>
   </Layer>
   <Layer name="CardExpressive" left="281" top="466">
@@ -216,11 +214,10 @@
       <Fill color="#A855F7"/>
     </Layer>
     <Layer left="-50" top="-7">
-      <Group>
+      <TextBox width="220" height="0" lineHeight="22">
         <Text text="Compact structure for both static and animated content." fontFamily="Arial" fontSize="16"/>
         <Fill color="#CBD5E1"/>
-      </Group>
-      <TextBox size="220,0" lineHeight="22"/>
+      </TextBox>
     </Layer>
   </Layer>
   <Layer name="CardInteroperable" left="499" top="870">
@@ -258,11 +255,10 @@
       <Fill color="#10B981"/>
     </Layer>
     <Layer left="-50" top="-7">
-      <Group>
+      <TextBox width="220" height="0" lineHeight="22">
         <Text text="Bridges AE, Figma, SVG, PDF, and more seamlessly." fontFamily="Arial" fontSize="16"/>
         <Fill color="#CBD5E1"/>
-      </Group>
-      <TextBox size="220,0" lineHeight="22"/>
+      </TextBox>
     </Layer>
   </Layer>
   <Layer name="CardDeployable" left="1101" top="870">
@@ -305,11 +301,10 @@
       <Fill color="#FBBF24"/>
     </Layer>
     <Layer left="-50" top="-7">
-      <Group>
+      <TextBox width="220" height="0" lineHeight="22">
         <Text text="One-click export to binary PAG with high performance." fontFamily="Arial" fontSize="16"/>
         <Fill color="#CBD5E1"/>
-      </Group>
-      <TextBox size="220,0" lineHeight="22"/>
+      </TextBox>
     </Layer>
   </Layer>
   <Layer name="Pipeline" left="800" top="1070">

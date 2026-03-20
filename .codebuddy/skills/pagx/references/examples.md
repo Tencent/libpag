@@ -108,12 +108,11 @@ Single-line labels positioned with Text constraint attributes directly:
       <Rectangle size="300,200" roundness="12"/>
       <Fill color="#1E293B"/>
     </Group>
-    <Group left="0" right="0" top="0" bottom="0">
+    <TextBox left="0" right="0" top="0" bottom="0"
+             textAlign="center" paragraphAlign="middle">
       <Text text="30" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
       <Fill color="#FFF"/>
-      <TextBox left="0" right="0" top="0" bottom="0"
-               textAlign="center" paragraphAlign="middle"/>
-    </Group>
+    </TextBox>
   </Layer>
 </pagx>
 ```
@@ -168,13 +167,12 @@ Single-line labels positioned with Text constraint attributes directly:
     <Layer left="20" top="18" width="160" height="44">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="22"/>
       <Fill color="#3B82F6"/>
-      <Group left="0" right="0" top="0" bottom="0">
+      <TextBox left="0" right="0" top="0" bottom="0"
+               textAlign="center" paragraphAlign="middle">
         <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
         <Fill color="#FFF"/>
         <!-- TextBox with constraints stretches to fill button, centers text -->
-        <TextBox left="0" right="0" top="0" bottom="0"
-                 textAlign="center" paragraphAlign="middle"/>
-      </Group>
+      </TextBox>
       <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#3B82F640"/>
     </Layer>
   </Layer>
@@ -182,7 +180,7 @@ Single-line labels positioned with Text constraint attributes directly:
 ```
 
 **Pattern**: TextBox with stretch constraints fills the button area, then `textAlign`/`paragraphAlign`
-centers text within. Group isolates text Fill from rectangle Fill.
+centers text within. TextBox isolates text Fill from rectangle Fill.
 
 ### Icon + Label Row
 
@@ -194,11 +192,10 @@ centers text within. Group isolates text Fill from rectangle Fill.
       <Fill color="#10B981"/>
     </Layer>
     <Layer height="24">
-      <Group left="0" right="0" top="0" bottom="0">
+      <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle">
         <Text text="Online" fontFamily="Arial" fontSize="14"/>
         <Fill color="#374151"/>
-        <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle"/>
-      </Group>
+      </TextBox>
     </Layer>
   </Layer>
 </pagx>
@@ -237,11 +234,10 @@ layout AND manages its own children's layout.
             <Fill color="#6366F1"/>
           </Layer>
           <Layer height="24">
-            <Group left="0" right="0" top="0" bottom="0">
+            <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle">
               <Text text="Account Balance" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
               <Fill color="#1E293B"/>
-              <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle"/>
-            </Group>
+            </TextBox>
           </Layer>
         </Layer>
         <!-- Value display -->
@@ -255,23 +251,21 @@ layout AND manages its own children's layout.
           <Layer flex="1">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
             <Fill color="#6366F1"/>
-            <Group left="0" right="0" top="0" bottom="0">
+            <TextBox left="0" right="0" top="0" bottom="0"
+                     textAlign="center" paragraphAlign="middle">
               <Text text="Send" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
               <Fill color="#FFF"/>
-              <TextBox left="0" right="0" top="0" bottom="0"
-                       textAlign="center" paragraphAlign="middle"/>
-            </Group>
+            </TextBox>
           </Layer>
           <Layer flex="1">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
             <Fill color="#F1F5F9"/>
             <Stroke color="#CBD5E1" width="1" align="inside"/>
-            <Group left="0" right="0" top="0" bottom="0">
+            <TextBox left="0" right="0" top="0" bottom="0"
+                     textAlign="center" paragraphAlign="middle">
               <Text text="Request" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
               <Fill color="#1E293B"/>
-              <TextBox left="0" right="0" top="0" bottom="0"
-                       textAlign="center" paragraphAlign="middle"/>
-            </Group>
+            </TextBox>
           </Layer>
         </Layer>
       </Layer>
@@ -280,11 +274,10 @@ layout AND manages its own children's layout.
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
         <Fill color="#FFF"/>
         <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000015"/>
-        <Group left="0" right="0" top="0" bottom="0">
+        <TextBox left="16" top="0" bottom="0" paragraphAlign="middle">
           <Text text="Recent Activity" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
           <Fill color="#1E293B"/>
-          <TextBox left="16" top="0" bottom="0" paragraphAlign="middle"/>
-        </Group>
+        </TextBox>
       </Layer>
     </Layer>
   </Layer>
@@ -315,11 +308,10 @@ fill remaining space — see Dashboard Layout below.
     <Layer height="48">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
       <Fill color="#1E293B"/>
-      <Group left="0" right="0" top="0" bottom="0">
+      <TextBox left="16" top="0" bottom="0" paragraphAlign="middle">
         <Text text="Dashboard" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
         <Fill color="#FFF"/>
-        <TextBox left="16" top="0" bottom="0" paragraphAlign="middle"/>
-      </Group>
+      </TextBox>
     </Layer>
     <!-- Content: 3 equal columns -->
     <Layer flex="1" layout="horizontal" gap="16">
@@ -343,12 +335,11 @@ fill remaining space — see Dashboard Layout below.
     <Layer height="40">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
       <Fill color="#F8FAFC"/>
-      <Group left="0" right="0" top="0" bottom="0">
+      <TextBox left="0" right="0" top="0" bottom="0"
+               textAlign="center" paragraphAlign="middle">
         <Text text="© 2025 Dashboard" fontFamily="Arial" fontSize="12"/>
         <Fill color="#94A3B8"/>
-        <TextBox left="0" right="0" top="0" bottom="0"
-                 textAlign="center" paragraphAlign="middle"/>
-      </Group>
+      </TextBox>
     </Layer>
   </Layer>
 </pagx>
@@ -365,29 +356,26 @@ remaining space. Three child Layers with `flex="1"` equally share available widt
     <Layer height="48">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
       <Fill color="#F1F5F9"/>
-      <Group left="0" right="0" top="0" bottom="0">
+      <TextBox left="12" top="0" bottom="0" paragraphAlign="middle">
         <Text text="Item 1" fontFamily="Arial" fontSize="14"/>
         <Fill color="#1E293B"/>
-        <TextBox left="12" top="0" bottom="0" paragraphAlign="middle"/>
-      </Group>
+      </TextBox>
     </Layer>
     <Layer height="48">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
       <Fill color="#F1F5F9"/>
-      <Group left="0" right="0" top="0" bottom="0">
+      <TextBox left="12" top="0" bottom="0" paragraphAlign="middle">
         <Text text="Item 2" fontFamily="Arial" fontSize="14"/>
         <Fill color="#1E293B"/>
-        <TextBox left="12" top="0" bottom="0" paragraphAlign="middle"/>
-      </Group>
+      </TextBox>
     </Layer>
     <Layer height="48">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
       <Fill color="#F1F5F9"/>
-      <Group left="0" right="0" top="0" bottom="0">
+      <TextBox left="12" top="0" bottom="0" paragraphAlign="middle">
         <Text text="Item 3" fontFamily="Arial" fontSize="14"/>
         <Fill color="#1E293B"/>
-        <TextBox left="12" top="0" bottom="0" paragraphAlign="middle"/>
-      </Group>
+      </TextBox>
     </Layer>
   </Layer>
 </pagx>
@@ -556,12 +544,11 @@ use Group `rotation` to reposition the start point.
       <Repeater copies="10" anchor="70,70" position="0,0" rotation="30" offset="7.5"/>
     </Group>
     <!-- Center percentage text -->
-    <Group left="0" right="0" top="0" bottom="0">
+    <TextBox centerX="0" centerY="0" width="80" height="36"
+             textAlign="center" paragraphAlign="middle">
       <Text text="67%" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
       <Fill color="#1E293B"/>
-      <TextBox centerX="0" centerY="0" size="80,36"
-               textAlign="center" paragraphAlign="middle"/>
-    </Group>
+    </TextBox>
   </Layer>
 </pagx>
 ```
@@ -685,11 +672,10 @@ are a single multi-M Path.
           <Fill color="#3B82F6"/>
         </Layer>
         <Layer height="20">
-          <Group left="0" right="0" top="0" bottom="0">
+          <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle">
             <Text text="Sales 40%" fontFamily="Arial" fontSize="12"/>
             <Fill color="#334155"/>
-            <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle"/>
-          </Group>
+          </TextBox>
         </Layer>
       </Layer>
       <Layer height="20" layout="horizontal" gap="8" alignment="center">
@@ -698,11 +684,10 @@ are a single multi-M Path.
           <Fill color="#10B981"/>
         </Layer>
         <Layer height="20">
-          <Group left="0" right="0" top="0" bottom="0">
+          <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle">
             <Text text="Growth 30%" fontFamily="Arial" fontSize="12"/>
             <Fill color="#334155"/>
-            <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle"/>
-          </Group>
+          </TextBox>
         </Layer>
       </Layer>
       <Layer height="20" layout="horizontal" gap="8" alignment="center">
@@ -711,11 +696,10 @@ are a single multi-M Path.
           <Fill color="#F59E0B"/>
         </Layer>
         <Layer height="20">
-          <Group left="0" right="0" top="0" bottom="0">
+          <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle">
             <Text text="Costs 20%" fontFamily="Arial" fontSize="12"/>
             <Fill color="#334155"/>
-            <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle"/>
-          </Group>
+          </TextBox>
         </Layer>
       </Layer>
       <Layer height="20" layout="horizontal" gap="8" alignment="center">
@@ -724,11 +708,10 @@ are a single multi-M Path.
           <Fill color="#EF4444"/>
         </Layer>
         <Layer height="20">
-          <Group left="0" right="0" top="0" bottom="0">
+          <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle">
             <Text text="Other 10%" fontFamily="Arial" fontSize="12"/>
             <Fill color="#334155"/>
-            <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle"/>
-          </Group>
+          </TextBox>
         </Layer>
       </Layer>
     </Layer>

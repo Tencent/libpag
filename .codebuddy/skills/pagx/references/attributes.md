@@ -19,7 +19,7 @@ they **must not** be omitted.
 | **PathData** | `data` |
 | **Glyph** | `advance` |
 | **SolidColor** | `color` |
-| **LinearGradient** | `startPoint`, `endPoint` |
+| **LinearGradient** | `endPoint` |
 | **RadialGradient** | `radius` |
 | **DiamondGradient** | `radius` |
 | **ColorStop** | `offset`, `color` |
@@ -204,7 +204,7 @@ Also supports constraint attributes — see §Constraint Attributes below.
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `startPoint` | Point | (required) |
+| `startPoint` | Point | `0,0` |
 | `endPoint` | Point | (required) |
 | `matrix` | Matrix | identity |
 
@@ -434,10 +434,32 @@ For **child Layers**, constraints are only active when:
 
 ### TextBox
 
+TextBox inherits from Group — it has all Group attributes plus its own text layout properties.
+
+**Inherited from Group:**
+
 | Attribute | Type | Default |
 |-----------|------|---------|
+| `width` | float | NaN |
+| `height` | float | NaN |
+| `left` | float | — |
+| `right` | float | — |
+| `top` | float | — |
+| `bottom` | float | — |
+| `centerX` | float | — |
+| `centerY` | float | — |
+| `anchor` | Point | 0,0 |
 | `position` | Point | 0,0 |
-| `size` | Size | 0,0 |
+| `rotation` | float | 0 |
+| `scale` | Point | 1,1 |
+| `skew` | float | 0 |
+| `skewAxis` | float | 0 |
+| `alpha` | float | 1 |
+
+**TextBox-specific:**
+
+| Attribute | Type | Default |
+|-----------|------|---------|
 | `textAlign` | TextAlign | start |
 | `paragraphAlign` | ParagraphAlign | near |
 | `writingMode` | WritingMode | horizontal |
@@ -533,6 +555,7 @@ These defaults are counter-intuitive and commonly forgotten:
 | **Polystar** | `outerRadius` | `100` | May forget there is a default |
 | **Polystar** | `innerRadius` | `50` | May forget there is a default |
 | **TextBox** | `lineHeight` | `0` (auto) | Often assumed non-zero pixel value |
+| **TextBox** | `width`, `height` | `NaN` (auto-sizing) | Often assumed `0` — NaN means no boundary |
 | **RoundCorner** | `radius` | `10` | Often assumed `0` |
 | **Stroke** | `miterLimit` | `4` | Often assumed `10` (SVG default) |
 | **BackgroundBlurStyle** | `tileMode` | `mirror` | May assume `clamp` |

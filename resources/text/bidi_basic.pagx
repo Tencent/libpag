@@ -6,11 +6,10 @@
       <Rectangle position="125,25" size="250,50"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="250" height="50">
       <Text fontFamily="NotoSansSC" fontSize="22"><![CDATA[שלום עולם]]></Text>
-      <TextBox size="250,50"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box B: Hebrew + LTR digits (digits stay LTR in RTL context) -->
@@ -19,11 +18,10 @@
       <Rectangle position="110,25" size="220,50"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="220" height="50">
       <Text fontFamily="NotoSansSC" fontSize="20"><![CDATA[מחיר: $99.50]]></Text>
-      <TextBox size="220,50"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box C: Hebrew + Latin mixed (BiDi boundary) -->
@@ -32,11 +30,10 @@
       <Rectangle position="200,25" size="400,50"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="400" height="50">
       <Text fontFamily="NotoSansSC" fontSize="20"><![CDATA[שלום Hello עולם World]]></Text>
-      <TextBox size="400,50"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box D: CJK + digits mixed (LTR paragraph with embedded numbers) -->
@@ -45,11 +42,10 @@
       <Rectangle position="200,25" size="400,50"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="400" height="50">
       <Text fontFamily="NotoSansSC" fontSize="20"><![CDATA[版本 v2.0.1 发布 共 123 项更新]]></Text>
-      <TextBox size="400,50"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box E: Multi-line with mixed scripts and line wrapping -->
@@ -58,11 +54,10 @@
       <Rectangle position="150,50" size="300,100"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="300" height="100">
       <Text fontFamily="NotoSansSC" fontSize="18"><![CDATA[שלום Hello 你好 World עולם 世界]]></Text>
-      <TextBox size="300,100"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box F: Hebrew multi-line with word wrap -->
@@ -71,11 +66,10 @@
       <Rectangle position="100,50" size="200,100"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="200" height="100">
       <Text fontFamily="NotoSansSC" fontSize="18"><![CDATA[זהו טקסט ארוך בעברית שצריך לעבור שורה]]></Text>
-      <TextBox size="200,100"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
 </pagx>

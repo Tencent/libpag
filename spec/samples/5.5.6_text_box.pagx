@@ -10,7 +10,7 @@
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         </Layer>
         <Layer flex="1">
-          <Group>
+          <TextBox position="0,0" width="180" height="180" lineHeight="28" textAlign="justify">
             <Text text="Justify aligns words evenly 分布在 each full line." fontFamily="Arial" fontSize="18"/>
             <Fill>
               <LinearGradient startPoint="0,0" endPoint="180,0">
@@ -18,8 +18,7 @@
                 <ColorStop offset="1" color="#8B5CF6"/>
               </LinearGradient>
             </Fill>
-          </Group>
-          <TextBox position="0,0" size="180,180" lineHeight="28" textAlign="justify"/>
+          </TextBox>
           <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F130"/>
         </Layer>
       </Layer>
@@ -30,7 +29,7 @@
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         </Layer>
         <Layer>
-          <Group>
+          <TextBox position="0,0" width="180" height="180" textAlign="center" paragraphAlign="middle">
             <Text text="Centered&#10;Horizontally&#10;&amp;&#10;Vertically" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
             <Fill>
               <LinearGradient startPoint="0,0" endPoint="180,100">
@@ -38,8 +37,7 @@
                 <ColorStop offset="1" color="#EC4899"/>
               </LinearGradient>
             </Fill>
-          </Group>
-          <TextBox position="0,0" size="180,180" textAlign="center" paragraphAlign="middle"/>
+          </TextBox>
           <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F43F5E30"/>
         </Layer>
       </Layer>
@@ -52,7 +50,7 @@
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         </Layer>
         <Layer>
-          <Group>
+          <TextBox position="0,0" width="180" height="180" writingMode="vertical" textAlign="justify">
             <Text text="春眠不觉 Dawn 处处闻啼鸟 Night 来风雨声花落知多少" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
             <Fill>
               <LinearGradient startPoint="180,0" endPoint="0,180">
@@ -60,8 +58,7 @@
                 <ColorStop offset="1" color="#F43F5E"/>
               </LinearGradient>
             </Fill>
-          </Group>
-          <TextBox position="0,0" size="180,180" writingMode="vertical" textAlign="justify"/>
+          </TextBox>
           <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F59E0B30"/>
         </Layer>
       </Layer>
@@ -72,7 +69,7 @@
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         </Layer>
         <Layer>
-          <Group>
+          <TextBox position="0,0" width="180" height="180" writingMode="vertical" textAlign="center" paragraphAlign="middle">
             <Text text="竖排文本&#10;居中对齐" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
             <Fill>
               <LinearGradient startPoint="0,0" endPoint="180,180">
@@ -80,8 +77,7 @@
                 <ColorStop offset="1" color="#10B981"/>
               </LinearGradient>
             </Fill>
-          </Group>
-          <TextBox position="0,0" size="180,180" writingMode="vertical" textAlign="center" paragraphAlign="middle"/>
+          </TextBox>
           <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D430"/>
         </Layer>
       </Layer>

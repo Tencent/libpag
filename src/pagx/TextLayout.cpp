@@ -319,7 +319,11 @@ class TextLayoutContext {
         auto propagated = processScope(static_cast<Group*>(element)->elements);
         allText.insert(allText.end(), propagated.begin(), propagated.end());
       } else if (element->nodeType() == NodeType::TextBox) {
-        textBox = static_cast<const TextBox*>(element);
+        auto* tb = static_cast<TextBox*>(element);
+        textBox = tb;
+        // Recurse into TextBox children to collect Text elements.
+        auto propagated = processScope(tb->elements);
+        allText.insert(allText.end(), propagated.begin(), propagated.end());
       }
     }
     if (textBox != nullptr && !allText.empty()) {
@@ -1029,7 +1033,7 @@ class TextLayoutContext {
     auto* currentLine = &lines.back();
     float currentLineWidth = 0;
     int lastBreakIndex = -1;
-    float boxWidth = textBox->size.width;
+    float boxWidth = std::isnan(textBox->width) ? 0 : textBox->width;
     bool doWrap = textBox->wordWrap && boxWidth > 0;
     // Tracks the fontLineHeight of the \n that created the current line.
     // Used as the fallback height for empty lines (e.g. consecutive \n\n).
@@ -1299,8 +1303,8 @@ class TextLayoutContext {
       return;
     }
 
-    float boxWidth = textBox->size.width;
-    float boxHeight = textBox->size.height;
+    float boxWidth = std::isnan(textBox->width) ? 0 : textBox->width;
+    float boxHeight = std::isnan(textBox->height) ? 0 : textBox->height;
 
     // Calculate total height using line-box model: each line contributes its full lineHeight.
     float totalHeight = 0;
@@ -1674,7 +1678,7 @@ class TextLayoutContext {
     columns.emplace_back();
     auto* currentColumn = &columns.back();
     float currentColumnHeight = 0;
-    float boxHeight = textBox->size.height;
+    float boxHeight = std::isnan(textBox->height) ? 0 : textBox->height;
     bool doWrap = textBox->wordWrap && boxHeight > 0;
     int lastBreakIndex = -1;
     // Tracks the fontLineHeight of the \n that created the current column.
@@ -1855,8 +1859,8 @@ class TextLayoutContext {
       return;
     }
 
-    float boxWidth = textBox->size.width;
-    float boxHeight = textBox->size.height;
+    float boxWidth = std::isnan(textBox->width) ? 0 : textBox->width;
+    float boxHeight = std::isnan(textBox->height) ? 0 : textBox->height;
 
     // Calculate total width: all columns use maxColumnWidth (line-box model).
     float totalWidth = 0;

@@ -253,7 +253,7 @@ static void ProcessConstraintLayout(const std::vector<Element*>& elements, float
     bool skipScaling = hasTextBox && element->nodeType() == NodeType::Text;
     ApplyConstraintToElement(element, containerWidth, containerHeight, fontProvider, skipScaling);
 
-    if (element->nodeType() == NodeType::Group) {
+    if (element->nodeType() == NodeType::Group || element->nodeType() == NodeType::TextBox) {
       auto* group = static_cast<Group*>(element);
       float groupW = group->width;
       float groupH = group->height;

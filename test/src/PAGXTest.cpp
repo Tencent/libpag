@@ -2021,7 +2021,8 @@ PAGX_TEST(PAGXTest, LayoutConstraintStretchTextBox) {
   layer->height = 200;
 
   auto textBox = doc->makeNode<pagx::TextBox>();
-  textBox->size = {100, 50};
+  textBox->width = 100;
+  textBox->height = 50;
   textBox->position = {0, 0};
   textBox->left = 30;
   textBox->right = 30;
@@ -2033,10 +2034,10 @@ PAGX_TEST(PAGXTest, LayoutConstraintStretchTextBox) {
   pagx::AutoLayout::Apply(doc.get());
 
   // Horizontal: 400 - 30 - 30 = 340
-  EXPECT_FLOAT_EQ(textBox->size.width, 340.0f);
+  EXPECT_FLOAT_EQ(textBox->width, 340.0f);
   EXPECT_FLOAT_EQ(textBox->position.x, 30.0f);
   // Vertical: 200 - 20 - 20 = 160
-  EXPECT_FLOAT_EQ(textBox->size.height, 160.0f);
+  EXPECT_FLOAT_EQ(textBox->height, 160.0f);
   EXPECT_FLOAT_EQ(textBox->position.y, 20.0f);
 }
 
@@ -2237,7 +2238,8 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextSkipWithTextBox) {
   layer->height = 200;
 
   auto textBox = doc->makeNode<pagx::TextBox>();
-  textBox->size = {200, 100};
+  textBox->width = 200;
+  textBox->height = 100;
   textBox->position = {100, 50};
 
   auto text = doc->makeNode<pagx::Text>();

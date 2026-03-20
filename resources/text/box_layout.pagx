@@ -8,11 +8,10 @@
       <Rectangle position="75,60" size="150,120"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="150" height="120">
       <Text text="你好世界，这是测试文本。" fontFamily="NotoSansSC" fontSize="20"/>
-      <TextBox size="150,120"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box B: Overflow hidden -->
@@ -21,11 +20,10 @@
       <Rectangle position="75,40" size="150,80"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="150" height="80" overflow="hidden">
       <Text text="Overflow text that is very long and should be clipped by the box boundary." fontFamily="NotoSansSC" fontSize="18"/>
-      <TextBox size="150,80" overflow="hidden"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box C: Justify alignment -->
@@ -34,11 +32,10 @@
       <Rectangle position="75,40" size="150,80"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="150" height="80" textAlign="justify">
       <Text text="Justify this line&#10;Last line start" fontFamily="NotoSansSC" fontSize="18"/>
-      <TextBox size="150,80" textAlign="justify"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- === Row 2: Empty lines and rich text === -->
@@ -49,11 +46,10 @@
       <Rectangle position="60,65" size="120,130"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="120" height="130">
       <Text text="&#10;Line2&#10;&#10;Line4" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
-      <TextBox size="120,130"/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box E: Rich text + end alignment -->
@@ -62,7 +58,7 @@
       <Rectangle position="115,60" size="230,120"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="230" height="120" textAlign="end">
       <Group>
         <Text text="Right" fontFamily="NotoSansSC" fontSize="24"/>
         <Fill/>
@@ -71,8 +67,7 @@
         <Text text="Align" fontFamily="NotoSansSC" fontSize="36"/>
         <Fill/>
       </Group>
-      <TextBox size="230,120" textAlign="end"/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- === Row 3: Paragraph alignment near/middle/far === -->
@@ -83,11 +78,10 @@
       <Rectangle position="75,40" size="150,80"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="150" height="80">
       <Text text="aaAÂẤ" fontFamily="NotoSansSC" fontSize="32"/>
-      <TextBox size="150,80"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box G: ParagraphAlign middle -->
@@ -96,11 +90,10 @@
       <Rectangle position="75,40" size="150,80"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="150" height="80" paragraphAlign="middle">
       <Text text="aaAÂẤ" fontFamily="NotoSansSC" fontSize="32"/>
-      <TextBox size="150,80" paragraphAlign="middle"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box H: ParagraphAlign far -->
@@ -109,11 +102,10 @@
       <Rectangle position="75,40" size="150,80"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="150" height="80" paragraphAlign="far">
       <Text text="aaAÂẤ" fontFamily="NotoSansSC" fontSize="32"/>
-      <TextBox size="150,80" paragraphAlign="far"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- === Row 4: Line height === -->
@@ -124,7 +116,7 @@
       <Rectangle position="100,90" size="200,180"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="200" height="180">
       <Group>
         <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
         <Fill/>
@@ -137,8 +129,7 @@
         <Text text="&#10;AB" fontFamily="NotoSansSC" fontSize="60"/>
         <Fill/>
       </Group>
-      <TextBox size="200,180"/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box J: Fixed lineHeight=40, mixed font sizes -->
@@ -147,7 +138,7 @@
       <Rectangle position="100,90" size="200,180"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="200" height="180" lineHeight="40">
       <Group>
         <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
         <Fill/>
@@ -160,8 +151,7 @@
         <Text text="&#10;AB" fontFamily="NotoSansSC" fontSize="60"/>
         <Fill/>
       </Group>
-      <TextBox size="200,180" lineHeight="40"/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box K: Fixed lineHeight=50, paragraphAlign far -->
@@ -170,11 +160,10 @@
       <Rectangle position="75,80" size="150,160"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="150" height="160" paragraphAlign="far" lineHeight="50">
       <Text text="Line1&#10;Line2" fontFamily="NotoSansSC" fontSize="24"/>
       <Fill/>
-      <TextBox size="150,160" paragraphAlign="far" lineHeight="50"/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- === Row 4 (continued): Line height with mixed sizes === -->
@@ -185,7 +174,7 @@
       <Rectangle position="75,90" size="150,180"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="150" height="180" paragraphAlign="far">
       <Group>
         <Text text="Large&#10;" fontFamily="NotoSansSC" fontSize="36"/>
         <Fill/>
@@ -198,8 +187,7 @@
         <Text text="Tiny" fontFamily="NotoSansSC" fontSize="16"/>
         <Fill/>
       </Group>
-      <TextBox size="150,180" paragraphAlign="far"/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box L2: Mixed font sizes with empty line — empty line height uses the \n that created it.
@@ -210,7 +198,7 @@
       <Rectangle position="100,90" size="200,180"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="200" height="180">
       <Group>
         <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
         <Fill/>
@@ -219,8 +207,7 @@
         <Text text="&#10;AB" fontFamily="NotoSansSC" fontSize="16"/>
         <Fill/>
       </Group>
-      <TextBox size="200,180"/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- === Row 5: Point text (no TextBox, multiline with anchor) === -->
@@ -266,66 +253,60 @@
   <!-- Box P: 6 anchor alignment combinations -->
   <Layer x="50" y="1025">
     <!-- TextAlign Start -->
-    <Group>
+    <TextBox>
       <Text text="Start" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
-      <TextBox/>
-    </Group>
+    </TextBox>
     <Group>
 <Ellipse size="6,6" left="-3" top="-3" />
       <Fill color="#F00"/>
     </Group>
 
     <!-- TextAlign Center -->
-    <Group>
+    <TextBox position="110,0" textAlign="center">
       <Text text="Center" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
-      <TextBox position="110,0" textAlign="center"/>
-    </Group>
+    </TextBox>
     <Group>
       <Ellipse position="110,0" size="6,6"/>
       <Fill color="#F00"/>
     </Group>
 
     <!-- TextAlign End -->
-    <Group>
+    <TextBox position="220,0" textAlign="end">
       <Text text="End" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
-      <TextBox position="220,0" textAlign="end"/>
-    </Group>
+    </TextBox>
     <Group>
       <Ellipse position="220,0" size="6,6"/>
       <Fill color="#F00"/>
     </Group>
 
     <!-- ParagraphAlign Near -->
-    <Group>
+    <TextBox position="330,0">
       <Text text="Near" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
-      <TextBox position="330,0"/>
-    </Group>
+    </TextBox>
     <Group>
       <Ellipse position="330,0" size="6,6"/>
       <Fill color="#F00"/>
     </Group>
 
     <!-- ParagraphAlign Middle -->
-    <Group>
+    <TextBox position="440,0" paragraphAlign="middle">
       <Text text="Middle" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
-      <TextBox position="440,0" paragraphAlign="middle"/>
-    </Group>
+    </TextBox>
     <Group>
       <Ellipse position="440,0" size="6,6"/>
       <Fill color="#F00"/>
     </Group>
 
     <!-- ParagraphAlign Far -->
-    <Group>
+    <TextBox position="550,0" paragraphAlign="far">
       <Text text="Far" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
-      <TextBox position="550,0" paragraphAlign="far"/>
-    </Group>
+    </TextBox>
     <Group>
       <Ellipse position="550,0" size="6,6"/>
       <Fill color="#F00"/>

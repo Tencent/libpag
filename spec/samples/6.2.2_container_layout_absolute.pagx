@@ -8,11 +8,10 @@
       <Rectangle left="0" top="0" size="320,88" roundness="16"/>
       <Fill color="#6366F1"/>
       <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F150"/>
-      <Group>
+      <TextBox left="12" top="28" width="296" height="32" textAlign="center" paragraphAlign="middle">
         <Text text="Design Review" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#FFF"/>
-      </Group>
-      <TextBox left="12" top="28" size="296,32" textAlign="center" paragraphAlign="middle"/>
+      </TextBox>
     </Layer>
 
     <!-- Card 2 -->
@@ -20,11 +19,10 @@
       <Rectangle left="0" top="0" size="320,88" roundness="16"/>
       <Fill color="#10B981"/>
       <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#10B98150"/>
-      <Group>
+      <TextBox left="12" top="28" width="296" height="32" textAlign="center" paragraphAlign="middle">
         <Text text="Sprint Planning" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#FFF"/>
-      </Group>
-      <TextBox left="12" top="28" size="296,32" textAlign="center" paragraphAlign="middle"/>
+      </TextBox>
     </Layer>
 
     <!-- Card 3 -->
@@ -32,11 +30,10 @@
       <Rectangle left="0" top="0" size="320,88" roundness="16"/>
       <Fill color="#F59E0B"/>
       <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F59E0B50"/>
-      <Group>
+      <TextBox left="12" top="28" width="296" height="32" textAlign="center" paragraphAlign="middle">
         <Text text="Bug Report #42" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#FFF"/>
-      </Group>
-      <TextBox left="12" top="28" size="296,32" textAlign="center" paragraphAlign="middle"/>
+      </TextBox>
     </Layer>
 
     <!-- Notification badge: a Layer leaves the layout flow -->
@@ -44,11 +41,10 @@
       <Ellipse left="0" right="0" top="0" bottom="0"/>
       <Fill color="#EF4444"/>
       <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#EF444460"/>
-      <Group>
+      <TextBox centerX="0" centerY="0" width="32" height="32" textAlign="center" paragraphAlign="middle">
         <Text text="3" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#FFF"/>
-      </Group>
-      <TextBox centerX="0" centerY="0" size="32,32" textAlign="center" paragraphAlign="middle"/>
+      </TextBox>
     </Layer>
   </Layer>
 </pagx>

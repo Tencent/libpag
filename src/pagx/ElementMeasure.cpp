@@ -62,8 +62,9 @@ Rect ElementMeasure::GetContentBounds(const Element* element, const TextMeasureF
     }
     case NodeType::TextBox: {
       auto* textBox = static_cast<const TextBox*>(element);
-      return Rect::MakeXYWH(textBox->position.x, textBox->position.y, textBox->size.width,
-                            textBox->size.height);
+      float w = std::isnan(textBox->width) ? 0 : textBox->width;
+      float h = std::isnan(textBox->height) ? 0 : textBox->height;
+      return Rect::MakeXYWH(textBox->position.x, textBox->position.y, w, h);
     }
     case NodeType::Group: {
       auto* group = static_cast<const Group*>(element);

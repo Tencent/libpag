@@ -333,7 +333,7 @@ Linear gradients interpolate along the direction from start point to end point.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `startPoint` | Point | (required) | Start point |
+| `startPoint` | Point | `0,0` | Start point |
 | `endPoint` | Point | (required) | End point |
 | `matrix` | Matrix | identity matrix | Transform matrix |
 

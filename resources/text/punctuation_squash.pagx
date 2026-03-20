@@ -6,11 +6,10 @@
       <Rectangle position="150,30" size="300,60"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="300" height="60">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[「你好」「世界」]]></Text>
-      <TextBox size="300,60"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box B: Closing + Opening squash (。「) -->
@@ -19,11 +18,10 @@
       <Rectangle position="150,30" size="300,60"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="300" height="60">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[这是。「测试」]]></Text>
-      <TextBox size="300,60"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box C: Closing + Closing adjacent squash (、。) -->
@@ -32,11 +30,10 @@
       <Rectangle position="125,30" size="250,60"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="250" height="60">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[测试、。文本]]></Text>
-      <TextBox size="250,60"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box D: MiddleDot + Opening squash (・「) -->
@@ -45,11 +42,10 @@
       <Rectangle position="125,30" size="250,60"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="250" height="60">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[你好・「世界」]]></Text>
-      <TextBox size="250,60"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box E: Line-start Opening squash -->
@@ -58,11 +54,10 @@
       <Rectangle position="150,30" size="300,60"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="300" height="60">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[「开头文本]]></Text>
-      <TextBox size="300,60"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box F: Line-end Closing squash -->
@@ -71,11 +66,10 @@
       <Rectangle position="125,30" size="250,60"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="250" height="60">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[结尾文本。]]></Text>
-      <TextBox size="250,60"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box G: Compound squash (multiple punctuation types in sequence) -->
@@ -84,11 +78,10 @@
       <Rectangle position="125,60" size="250,120"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="250" height="120">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[「你好」，「世界」。这是・「测试」]]></Text>
-      <TextBox size="250,120"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box H: Vertical text punctuation squash -->
@@ -97,11 +90,10 @@
       <Rectangle position="50,80" size="100,160"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="100" height="160" writingMode="vertical">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[「你好」。「世界」]]></Text>
-      <TextBox size="100,160" writingMode="vertical"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box I: Normal CJK punctuation baseline (no squash expected) -->
@@ -110,10 +102,9 @@
       <Rectangle position="150,25" size="300,50"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="300" height="50">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[你好，世界。测试！]]></Text>
-      <TextBox size="300,50"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 </pagx>

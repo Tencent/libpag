@@ -19,7 +19,7 @@ Read these as needed:
 | Reference | Content |
 |-----------|---------|
 | `attributes.md` | Attribute defaults, enumerations, required attributes |
-| `cli.md` | CLI tool usage — `render`, `bounds`, `font info` commands |
+| `cli.md` | CLI tool usage — `render`, `bounds` commands |
 
 ---
 
@@ -47,7 +47,7 @@ an icon, a text block, a chart axis, a decorative background — any element tha
 repositioned as a whole.
 
 Determine canvas size (`width`/`height`) and each block's position. Use integer values.
-Use `pagx font info` for precise text metrics, `pagx bounds` for element boundaries.
+Use `pagx bounds` for element boundaries.
 
 **Layer tree = visual component tree.** The Layer hierarchy must reflect the semantic
 containment structure of the visual content — not a flat list of shapes. Apply this rule
@@ -262,7 +262,7 @@ After alignment is correct, verify structural integrity:
 ```
 
 **When to add TextBox** — when you need one of these features:
-- **Multiline wrapping**: text must wrap at a boundary → `TextBox` with `size` or
+- **Multiline wrapping**: text must wrap at a boundary → `TextBox` with `width` or
   `left`+`right` constraints (requires container with known width)
 - **Per-line alignment**: center/end alignment of individual lines → `textAlign`
 - **Rich text**: multiple Text elements with different styles unified into one text block
@@ -271,17 +271,17 @@ After alignment is correct, verify structural integrity:
 
 ```xml
 <!-- Multiline wrapped text -->
-<Text text="Long text that wraps..." fontFamily="Arial" fontSize="14"/>
-<Fill color="#333"/>
-<TextBox left="20" right="20" top="10" textAlign="center"/>
+<TextBox left="20" right="20" top="10" textAlign="center">
+  <Text text="Long text that wraps..." fontFamily="Arial" fontSize="14"/>
+  <Fill color="#333"/>
+</TextBox>
 
 <!-- Button label centered in a known-size container -->
-<Group left="0" right="0" top="0" bottom="0">
+<TextBox left="0" right="0" top="0" bottom="0"
+         textAlign="center" paragraphAlign="middle">
   <Text text="Submit" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
   <Fill color="#FFF"/>
-  <TextBox left="0" right="0" top="0" bottom="0"
-           textAlign="center" paragraphAlign="middle"/>
-</Group>
+</TextBox>
 ```
 
 Note: `textAnchor` shifts bounds per line while constraints translate the entire bounds —

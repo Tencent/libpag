@@ -832,13 +832,25 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::TextBox: {
       auto textBox = static_cast<const TextBox*>(node);
       xml.openElement("TextBox");
+      // Group properties
+      if (textBox->anchor.x != 0 || textBox->anchor.y != 0) {
+        xml.addAttribute("anchor", pointToString(textBox->anchor));
+      }
       if (!shouldSkipPosition(textBox->position, {0, 0}, textBox->left, textBox->right,
                               textBox->centerX, textBox->top, textBox->bottom, textBox->centerY)) {
         xml.addAttribute("position", pointToString(textBox->position));
       }
-      if (textBox->size.width != 0 || textBox->size.height != 0) {
-        xml.addAttribute("size", sizeToString(textBox->size));
+      xml.addAttribute("rotation", textBox->rotation);
+      if (textBox->scale.x != 1 || textBox->scale.y != 1) {
+        xml.addAttribute("scale", pointToString(textBox->scale));
       }
+      xml.addAttribute("skew", textBox->skew);
+      xml.addAttribute("skewAxis", textBox->skewAxis);
+      xml.addAttribute("alpha", textBox->alpha, 1.0f);
+      // Layout dimensions
+      xml.addOptionalAttribute("width", textBox->width);
+      xml.addOptionalAttribute("height", textBox->height);
+      // TextBox typography properties
       if (textBox->textAlign != TextAlign::Start) {
         xml.addAttribute("textAlign", TextAlignToString(textBox->textAlign));
       }
@@ -855,6 +867,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       if (textBox->overflow != Overflow::Visible) {
         xml.addAttribute("overflow", OverflowToString(textBox->overflow));
       }
+      // Constraint properties
       xml.addOptionalAttribute("left", textBox->left);
       xml.addOptionalAttribute("right", textBox->right);
       xml.addOptionalAttribute("top", textBox->top);
@@ -862,7 +875,16 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addOptionalAttribute("centerX", textBox->centerX);
       xml.addOptionalAttribute("centerY", textBox->centerY);
       writeCustomData(xml, node);
-      xml.closeElementSelfClosing();
+      // Child elements
+      if (textBox->elements.empty()) {
+        xml.closeElementSelfClosing();
+      } else {
+        xml.closeElementStart();
+        for (const auto& element : textBox->elements) {
+          writeVectorElement(xml, element, options);
+        }
+        xml.closeElement();
+      }
       break;
     }
     case NodeType::Repeater: {

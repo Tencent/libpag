@@ -978,20 +978,49 @@ static TextBox* parseTextBox(const DOMNode* node, PAGXDocument* doc) {
   if (!textBox) {
     return nullptr;
   }
+  // Group properties
+  textBox->anchor = getPointAttribute(node, "anchor", {0, 0}, doc);
   textBox->position = getPointAttribute(node, "position", {0, 0}, doc);
-  textBox->size = getSizeAttribute(node, "size", {0, 0}, doc);
+  textBox->rotation = getFloatAttribute(node, "rotation", 0, doc);
+  textBox->scale = getPointAttribute(node, "scale", {1, 1}, doc);
+  textBox->skew = getFloatAttribute(node, "skew", 0, doc);
+  textBox->skewAxis = getFloatAttribute(node, "skewAxis", 0, doc);
+  textBox->alpha = getFloatAttribute(node, "alpha", 1, doc);
+  textBox->width = getFloatAttributeOrNaN(node, "width", doc);
+  textBox->height = getFloatAttributeOrNaN(node, "height", doc);
+  // TextBox typography properties
   textBox->textAlign = GET_ENUM(node, "textAlign", "start", doc, TextAlign);
   textBox->paragraphAlign = GET_ENUM(node, "paragraphAlign", "near", doc, ParagraphAlign);
   textBox->writingMode = GET_ENUM(node, "writingMode", "horizontal", doc, WritingMode);
   textBox->lineHeight = getFloatAttribute(node, "lineHeight", 0, doc);
   textBox->wordWrap = getBoolAttribute(node, "wordWrap", true, doc);
   textBox->overflow = GET_ENUM(node, "overflow", "visible", doc, Overflow);
+  // Constraint properties
   textBox->left = getFloatAttributeOrNaN(node, "left", doc);
   textBox->right = getFloatAttributeOrNaN(node, "right", doc);
   textBox->top = getFloatAttributeOrNaN(node, "top", doc);
   textBox->bottom = getFloatAttributeOrNaN(node, "bottom", doc);
   textBox->centerX = getFloatAttributeOrNaN(node, "centerX", doc);
   textBox->centerY = getFloatAttributeOrNaN(node, "centerY", doc);
+  // Child elements
+  auto child = node->firstChild;
+  while (child) {
+    if (child->type == DOMNodeType::Element) {
+      auto element = parseElement(child.get(), doc);
+      if (element) {
+        textBox->elements.push_back(element);
+      } else {
+        reportError(doc, child.get(),
+                    "Element '" + child->name +
+                        "' is not allowed in 'TextBox'."
+                        " Expected: Rectangle, Ellipse, Polystar, Path,"
+                        " Text, Fill, Stroke, TrimPath, RoundCorner,"
+                        " MergePath, TextModifier, TextPath,"
+                        " Repeater, Group.");
+      }
+    }
+    child = child->nextSibling;
+  }
   return textBox;
 }
 

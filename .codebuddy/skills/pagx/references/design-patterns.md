@@ -251,12 +251,11 @@ needs to fill it. When the container has a known fixed size, use `size` directly
 
 ```xml
 <Layer width="300" height="200">
-  <Group left="0" right="0" top="0" bottom="0">
+  <TextBox left="0" right="0" top="0" bottom="0"
+           textAlign="center" paragraphAlign="middle">
     <Text text="Hello" fontFamily="Arial" fontSize="16"/>
     <Fill color="#FFF"/>
-    <TextBox left="0" right="0" top="0" bottom="0"
-             textAlign="center" paragraphAlign="middle"/>
-  </Group>
+  </TextBox>
 </Layer>
 ```
 
@@ -354,21 +353,21 @@ area is needed:
 
 ```xml
 <!-- Button label: horizontal + vertical centering in a filled area -->
-<Group left="0" right="0" top="0" bottom="0">
+<TextBox left="0" right="0" top="0" bottom="0"
+         textAlign="center" paragraphAlign="middle">
   <Text text="Submit" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
   <Fill color="#FFF"/>
-  <TextBox left="0" right="0" top="0" bottom="0"
-           textAlign="center" paragraphAlign="middle"/>
-</Group>
+</TextBox>
 ```
 
 ### Multi-Line or Wrapped Text
 
 ```xml
 <!-- TextBox controls all layout -->
-<Text text="Long text that wraps..." fontFamily="Arial" fontSize="14"/>
-<Fill color="#333"/>
-<TextBox left="0" top="0" size="300,0" textAlign="start"/>
+<TextBox left="0" top="0" width="300" textAlign="start">
+  <Text text="Long text that wraps..." fontFamily="Arial" fontSize="14"/>
+  <Fill color="#333"/>
+</TextBox>
 ```
 
 Use when: text should wrap at a boundary or align within a region. When the TextBox is inside
@@ -376,13 +375,16 @@ a container with known dimensions, use constraints to derive the text area:
 
 ```xml
 <!-- Use constraints to derive text area from container -->
-<TextBox left="20" right="20" top="10" textAlign="start"/>
+<TextBox left="20" right="20" top="10" textAlign="start">
+  <Text text="Long text that wraps..." fontFamily="Arial" fontSize="14"/>
+  <Fill color="#333"/>
+</TextBox>
 ```
 
 ### Rich Text (Mixed Styles)
 
 ```xml
-<Group>
+<TextBox width="400" height="100">
   <Group>
     <Text text="Bold part " fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
     <Fill color="#000"/>
@@ -391,17 +393,18 @@ a container with known dimensions, use constraints to derive the text area:
     <Text text="normal part" fontFamily="Arial" fontSize="14"/>
     <Fill color="#666"/>
   </Group>
-  <TextBox size="400,100"/>
-</Group>
+</TextBox>
 ```
 
 Use when: text segments have different font sizes, weights, or colors. Each segment needs
-its own Group for painter scope isolation. When the Group is inside a container,
+its own Group for painter scope isolation. When the TextBox is inside a container,
 prefer constraint attributes on the TextBox:
 
 ```xml
 <!-- Use constraints -->
-<TextBox left="0" right="0" top="0" bottom="0" textAlign="start"/>
+<TextBox left="0" right="0" top="0" bottom="0" textAlign="start">
+  <!-- ... text segments ... -->
+</TextBox>
 ```
 
 ### Text Alignment Options
@@ -469,7 +472,8 @@ When different geometry needs different painters, choose based on layout context
 
 Additional behaviors beyond what `spec-essentials.md` §7 covers:
 
-- TextBox is a **pre-layout-only** node — it disappears from the render tree after typesetting.
+- TextBox inherits from **Group** — it is a container that holds child elements (Text, Fill,
+  Stroke, Groups, etc.) and provides text layout. It replaces the old Group+TextBox pattern.
 - `overflow="hidden"` discards **entire lines/columns**, not partial content. Unlike CSS
   pixel-level clipping, it drops any line whose baseline exceeds the box boundary.
 - `lineHeight=0` (auto) calculates from font metrics (`ascent + descent + leading`), not
@@ -590,13 +594,12 @@ force-break per character (`boxWidth ≈ 0`).
 <!-- Parent has no explicit width — measured from content -->
 <Layer layout="vertical">
   <Layer height="60">
-    <Group left="0" right="0" top="0" bottom="0">
+    <TextBox left="0" right="0" top="0" bottom="0"
+             textAlign="center" paragraphAlign="middle">
       <Text text="30" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
       <Fill color="#FFF"/>
-      <TextBox left="0" right="0" top="0" bottom="0"
-               textAlign="center" paragraphAlign="middle"/>
       <!-- boxWidth ≈ 0 → "3" and "0" on separate lines -->
-    </Group>
+    </TextBox>
   </Layer>
 </Layer>
 ```

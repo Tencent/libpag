@@ -53,6 +53,7 @@
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
@@ -271,9 +272,15 @@ class LayerBuilderContext {
         return convertTextModifier(static_cast<const TextModifier*>(node));
       case NodeType::Group:
         return convertGroup(static_cast<const Group*>(node));
-      case NodeType::TextBox:
-        // TextBox is handled in convertGroup, not converted directly.
-        return nullptr;
+      case NodeType::TextBox: {
+        auto* textBox = static_cast<const TextBox*>(node);
+        if (textBox->elements.empty()) {
+          // TextBox without children: layout modifier consumed by TextLayout.
+          return nullptr;
+        }
+        // TextBox with children: render as a Group.
+        return convertGroup(textBox);
+      }
       default:
         return nullptr;
     }

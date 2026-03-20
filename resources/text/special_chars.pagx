@@ -6,11 +6,10 @@
       <Rectangle position="125,25" size="250,50"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="250" height="50">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[café résumé naïve]]></Text>
-      <TextBox size="250,50"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box B: Tab character handling -->
@@ -19,11 +18,10 @@
       <Rectangle position="110,25" size="220,50"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="220" height="50">
       <Text fontFamily="NotoSansSC" fontSize="20"><![CDATA[你好	World	测试]]></Text>
-      <TextBox size="220,50"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box C: Mixed CJK scripts (Hiragana + Katakana + Kanji) -->
@@ -32,11 +30,10 @@
       <Rectangle position="125,50" size="250,100"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="250" height="100">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[平仮名カタカナ漢字混合テスト]]></Text>
-      <TextBox size="250,100"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box D: Fullwidth characters -->
@@ -45,11 +42,10 @@
       <Rectangle position="110,25" size="220,50"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="220" height="50">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[Ａ，Ｂ。Ｃ：Ｄ]]></Text>
-      <TextBox size="220,50"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box E: Multiple consecutive empty lines -->
@@ -58,14 +54,13 @@
       <Rectangle position="110,65" size="220,130"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="220" height="130">
       <Text fontFamily="NotoSansSC" fontSize="18"><![CDATA[Line1
 Line2
 
 Line4
 Line5]]></Text>
-      <TextBox size="220,130"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 </pagx>

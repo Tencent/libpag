@@ -99,7 +99,7 @@ void ElementTransform::ApplyHorizontalStretch(Element* element, float newWidth, 
     }
     case NodeType::TextBox: {
       auto* textBox = static_cast<TextBox*>(element);
-      textBox->size.width = newWidth;
+      textBox->width = newWidth;
       textBox->position.x = newCenterX - newWidth * 0.5f;
       break;
     }
@@ -124,7 +124,7 @@ void ElementTransform::ApplyVerticalStretch(Element* element, float newHeight, f
     }
     case NodeType::TextBox: {
       auto* textBox = static_cast<TextBox*>(element);
-      textBox->size.height = newHeight;
+      textBox->height = newHeight;
       textBox->position.y = newCenterY - newHeight * 0.5f;
       break;
     }

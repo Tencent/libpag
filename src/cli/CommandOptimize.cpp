@@ -171,9 +171,16 @@ static bool IsEmptyLayer(const Layer* layer) {
          layer->styles.empty() && layer->filters.empty();
 }
 
-static int RemoveEmptyLayers(std::vector<Layer*>& layers) {
+static int RemoveEmptyLayers(std::vector<Layer*>& layers, bool insideContainerLayout) {
   auto originalSize = static_cast<int>(layers.size());
-  layers.erase(std::remove_if(layers.begin(), layers.end(), IsEmptyLayer), layers.end());
+  layers.erase(std::remove_if(layers.begin(), layers.end(),
+                              [insideContainerLayout](const Layer* layer) {
+                                if (insideContainerLayout && layer->includeInLayout) {
+                                  return false;
+                                }
+                                return IsEmptyLayer(layer);
+                              }),
+               layers.end());
   return originalSize - static_cast<int>(layers.size());
 }
 
@@ -210,18 +217,19 @@ static int RemoveEmptyElements(std::vector<Element*>& elements) {
 static int RemoveEmptyNodes(PAGXDocument* document) {
   int count = 0;
   ClearEmptyMaskReferences(document);
-  count += RemoveEmptyLayers(document->layers);
+  count += RemoveEmptyLayers(document->layers, false);
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Layer) {
       auto layer = static_cast<Layer*>(node.get());
-      count += RemoveEmptyLayers(layer->children);
+      count += RemoveEmptyLayers(layer->children,
+                                 layer->layout != LayoutMode::Constraint);
       count += RemoveEmptyElements(layer->contents);
-    } else if (node->nodeType() == NodeType::Group) {
+    } else if (node->nodeType() == NodeType::Group || node->nodeType() == NodeType::TextBox) {
       auto group = static_cast<Group*>(node.get());
       count += RemoveEmptyElements(group->elements);
     } else if (node->nodeType() == NodeType::Composition) {
       auto composition = static_cast<Composition*>(node.get());
-      count += RemoveEmptyLayers(composition->layers);
+      count += RemoveEmptyLayers(composition->layers, false);
     }
   }
   return count;
@@ -960,7 +968,7 @@ static int MergeAdjacentGroupsInElements(PAGXDocument* document, std::vector<Ele
   int count = 0;
   // Recursively process nested Groups first.
   for (auto* element : elements) {
-    if (element->nodeType() == NodeType::Group) {
+    if (element->nodeType() == NodeType::Group || element->nodeType() == NodeType::TextBox) {
       auto group = static_cast<Group*>(element);
       count += MergeAdjacentGroupsInElements(document, group->elements);
     }
@@ -1055,7 +1063,7 @@ static int MergeAdjacentGroups(PAGXDocument* document) {
     if (node->nodeType() == NodeType::Layer) {
       auto layer = static_cast<Layer*>(node.get());
       count += MergeAdjacentGroupsInElements(document, layer->contents);
-    } else if (node->nodeType() == NodeType::Group) {
+    } else if (node->nodeType() == NodeType::Group || node->nodeType() == NodeType::TextBox) {
       auto group = static_cast<Group*>(node.get());
       count += MergeAdjacentGroupsInElements(document, group->elements);
     }
@@ -1084,7 +1092,7 @@ static void ReplacePathsWithPrimitives(PAGXDocument* document, int& rectCount, i
     std::vector<Element*>* elements = nullptr;
     if (node->nodeType() == NodeType::Layer) {
       elements = &static_cast<Layer*>(node.get())->contents;
-    } else if (node->nodeType() == NodeType::Group) {
+    } else if (node->nodeType() == NodeType::Group || node->nodeType() == NodeType::TextBox) {
       elements = &static_cast<Group*>(node.get())->elements;
     }
     if (elements == nullptr) {
@@ -1211,27 +1219,31 @@ static int RemoveFullCanvasClipMasks(PAGXDocument* document, const std::vector<L
 static int RemoveOffCanvasChildren(
     const std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>>& layerMap,
     const std::unordered_set<const Layer*>& maskedLayers, const tgfx::Rect& canvasRect,
-    tgfx::Layer* rootLayer, std::vector<Layer*>& layers) {
+    tgfx::Layer* rootLayer, std::vector<Layer*>& layers, bool insideContainerLayout) {
   int count = 0;
   size_t writeIndex = 0;
   for (size_t i = 0; i < layers.size(); i++) {
     auto* pagxLayer = layers[i];
     bool shouldRemove = false;
-    if (pagxLayer->visible && maskedLayers.find(pagxLayer) == maskedLayers.end() &&
-        pagxLayer->styles.empty() && pagxLayer->filters.empty()) {
-      auto it = layerMap.find(pagxLayer);
-      if (it != layerMap.end()) {
-        auto bounds = it->second->getBounds(rootLayer, true);
-        if (!tgfx::Rect::Intersects(bounds, canvasRect)) {
-          shouldRemove = true;
+    // Skip removal for layers participating in a container layout flow.
+    if (!(insideContainerLayout && pagxLayer->includeInLayout)) {
+      if (pagxLayer->visible && maskedLayers.find(pagxLayer) == maskedLayers.end() &&
+          pagxLayer->styles.empty() && pagxLayer->filters.empty()) {
+        auto it = layerMap.find(pagxLayer);
+        if (it != layerMap.end()) {
+          auto bounds = it->second->getBounds(rootLayer, true);
+          if (!tgfx::Rect::Intersects(bounds, canvasRect)) {
+            shouldRemove = true;
+          }
         }
       }
     }
     if (shouldRemove) {
       count++;
     } else {
+      bool childInContainer = pagxLayer->layout != LayoutMode::Constraint;
       count += RemoveOffCanvasChildren(layerMap, maskedLayers, canvasRect, rootLayer,
-                                       pagxLayer->children);
+                                       pagxLayer->children, childInContainer);
       layers[writeIndex++] = layers[i];
     }
   }
@@ -1250,7 +1262,7 @@ static int RemoveOffCanvasLayers(PAGXDocument* document) {
   std::unordered_set<const Layer*> maskedLayers = {};
   CollectMaskReferences(document->layers, maskedLayers);
   return RemoveOffCanvasChildren(result.layerMap, maskedLayers, canvasRect, result.root.get(),
-                                 document->layers);
+                                 document->layers, false);
 }
 
 // --- Optimization #8: Localize coordinates ---
@@ -1799,7 +1811,9 @@ static bool ElementsStructurallyEqual(const Element* a, const Element* b) {
   if (type == NodeType::TextBox) {
     auto tba = static_cast<const TextBox*>(a);
     auto tbb = static_cast<const TextBox*>(b);
-    return tba->position == tbb->position && tba->size == tbb->size &&
+    return tba->position == tbb->position &&
+           (tba->width == tbb->width || (std::isnan(tba->width) && std::isnan(tbb->width))) &&
+           (tba->height == tbb->height || (std::isnan(tba->height) && std::isnan(tbb->height))) &&
            tba->textAlign == tbb->textAlign && tba->paragraphAlign == tbb->paragraphAlign &&
            tba->writingMode == tbb->writingMode && tba->lineHeight == tbb->lineHeight &&
            tba->wordWrap == tbb->wordWrap && tba->overflow == tbb->overflow;

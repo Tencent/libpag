@@ -54,13 +54,13 @@ Color syntax follows **CSS Color Level 4** conventions: HEX and `srgb()` match C
 
 | Category | Nodes |
 |----------|-------|
-| **Containers** | `pagx`, `Resources`, `Layer`, `Group` |
+| **Containers** | `pagx`, `Resources`, `Layer`, `Group`, `TextBox` |
 | **Resources** | `Image`, `PathData`, `Composition`, `Font`, `Glyph` |
 | **Color Sources** | `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ImagePattern`, `ColorStop` |
 | **Layer Styles** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle` |
 | **Layer Filters** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter` |
 | **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` |
-| **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `TextBox`, `Repeater` |
+| **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `Repeater` |
 | **Painters** | `Fill`, `Stroke` |
 
 ### Document Containment Hierarchy
@@ -68,7 +68,7 @@ Color syntax follows **CSS Color Level 4** conventions: HEX and `srgb()` match C
 ```
 pagx
 ├── Layer*
-│   ├── VectorElements* (geometry, modifiers, painters, Groups)
+│   ├── VectorElements* (geometry, modifiers, painters, Groups, TextBox)
 │   ├── LayerStyles* (DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle)
 │   ├── LayerFilters* (BlurFilter, DropShadowFilter, ...)
 │   └── Layer* (child layers, recursive)
@@ -249,7 +249,7 @@ Key rules:
 Elements inside a Layer (or Group) can use constraint attributes to
 declare their position relative to the container. Supported elements:
 
-- **Layer contents**: Geometry elements (Rectangle, Ellipse, Polystar, Path), Text, TextBox, Group
+- **Layer contents**: Geometry elements (Rectangle, Ellipse, Polystar, Path), Text, Group, TextBox
 - **Child Layers**: when the parent uses absolute layout (default), or the child has `includeInLayout="false"`
 
 | Attribute | Effect |
@@ -361,7 +361,7 @@ Geometry Elements     Modifiers             Painters
 | Modifier Type | Affects | Notes |
 |---------------|---------|-------|
 | Shape modifiers (TrimPath, RoundCorner, MergePath) | Paths only | Triggers text-to-shape conversion |
-| Text modifiers (TextModifier, TextPath, TextBox) | Glyph lists only | No effect on Paths |
+| Text modifiers (TextModifier, TextPath) | Glyph lists only | No effect on Paths |
 | Repeater | Both | Does not trigger text-to-shape |
 
 **Key scope implications**:
@@ -503,7 +503,7 @@ is sequential and forward-only.
 | Type | Key Attributes | Coordinate Space |
 |------|----------------|-----------------|
 | `SolidColor` | color (required) | N/A |
-| `LinearGradient` | startPoint (required), endPoint (required) | Relative to geometry origin |
+| `LinearGradient` | startPoint (0,0), endPoint (required) | Relative to geometry origin |
 | `RadialGradient` | center (0,0), radius (required) | Relative to geometry origin |
 | `ConicGradient` | center (0,0), startAngle (0), endAngle (360) | Relative to geometry origin |
 | `DiamondGradient` | center (0,0), radius (required) | Relative to geometry origin |
@@ -517,31 +517,35 @@ and color source together.
 
 ## 7. Text System
 
-### TextBox (Text Layout)
+### TextBox (Text Layout Container)
+
+TextBox inherits from Group and serves as a text layout container. It has all Group attributes
+(anchor, position, rotation, scale, skew, skewAxis, alpha, width, height, constraint attributes)
+plus its own text layout properties. TextBox can contain child elements just like Group.
 
 ```xml
-<Group>
+<TextBox left="50" top="50" width="300" height="200" textAlign="center" paragraphAlign="near">
   <Text text="Title&#10;" fontFamily="Arial" fontSize="24"/>
   <Fill color="#000"/>
   <Text text="Body" fontFamily="Arial" fontSize="16"/>
   <Fill color="#666"/>
-  <TextBox left="50" top="50" size="300,200" textAlign="center" paragraphAlign="near"/>
-</Group>
+</TextBox>
 ```
 
-- `position` (0,0): top-left of text area — prefer constraint attributes (`left`/`top`)
-- `size` (0,0): 0 = no boundary in that dimension
+- `width` (NaN): text area width. NaN = auto-sizing (no horizontal boundary)
+- `height` (NaN): text area height. NaN = auto-sizing (no vertical boundary)
 - `textAlign`: start / center / end / justify
 - `paragraphAlign`: near / middle / far (direction-neutral)
 - `writingMode`: horizontal / vertical
-- `lineHeight`: 0 = auto (font metrics)
+- `lineHeight`: line box height in pixels, same as CSS `line-height`.
+  0 = auto (`ascent + descent + leading`)
 - `wordWrap` (true), `overflow` (visible / hidden)
 
 **Critical behavior**:
-- TextBox is a **pre-layout-only** node — processed during typesetting, not instantiated in
-  the render tree. Do not expect it to act as a visual container.
+- TextBox inherits from **Group** — it creates an isolated accumulation scope and supports
+  child elements, constraint attributes, and Group transforms (anchor, position, rotation,
+  scale, skew, skewAxis, alpha).
 - It **overrides** Text's `position` and `textAnchor` — do not set these on child Text.
-- `lineHeight=0` (auto): calculated from font metrics (`ascent + descent + leading`).
 - `overflow="hidden"`: discards **entire lines** (horizontal) or **entire columns** (vertical)
   that exceed the box. Similar in spirit to CSS `overflow: hidden` but with whole-line
   granularity, not pixel-level clipping.
@@ -577,14 +581,14 @@ When Text encounters a **shape modifier** (TrimPath, RoundCorner, MergePath):
 1. **Trigger**: any shape modifier in the same scope as accumulated Text.
 2. **Merge**: all glyphs of each Text merge into a **single Path** (not one Path per glyph).
 3. **Emoji loss**: emoji glyphs cannot convert to outlines — **silently discarded**.
-4. **Irreversible**: once converted, subsequent text modifiers (TextModifier, TextPath, TextBox)
+4. **Irreversible**: once converted, subsequent text modifiers (TextModifier, TextPath)
    have no effect.
 
 If you need both shape modifiers and text effects on the same text, use separate Groups.
 
 ### Rich Text Pattern
 
-Multiple Text elements in one Group, each with independent Fill/Stroke, unified by TextBox.
+Multiple Text elements in one TextBox, each with independent Fill/Stroke.
 See `design-patterns.md` §Rich Text (Mixed Styles) for examples and usage guidance.
 
 ---
@@ -667,11 +671,10 @@ See `design-patterns.md` §Rich Text (Mixed Styles) for examples and usage guida
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
     <Fill color="#FFF"/>
-    <Group>
+    <TextBox left="12" right="12" centerY="0" textAlign="start">
       <Text text="Card Title" fontFamily="Arial" fontSize="14"/>
       <Fill color="#333"/>
-      <TextBox left="12" right="12" centerY="0" textAlign="start"/>
-    </Group>
+    </TextBox>
   </Layer>
 </Composition>
 

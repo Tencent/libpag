@@ -398,7 +398,7 @@
       <xs:element name="ColorStop" type="ColorStopType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="startPoint" type="PointType" use="required"/>
+    <xs:attribute name="startPoint" type="PointType" default="0,0"/>
     <xs:attribute name="endPoint" type="PointType" use="required"/>
     <xs:attribute name="matrix" type="MatrixType"/>
     <xs:anyAttribute namespace="##any" processContents="skip"/>
@@ -704,9 +704,19 @@
 
   <!-- TextBox -->
   <xs:complexType name="TextBoxType">
+    <xs:sequence>
+      <xs:group ref="VectorElementGroup" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="anchor" type="PointType" default="0,0"/>
     <xs:attribute name="position" type="PointType" default="0,0"/>
-    <xs:attribute name="size" type="SizeType" default="0,0"/>
+    <xs:attribute name="rotation" type="xs:decimal" default="0"/>
+    <xs:attribute name="scale" type="PointType" default="1,1"/>
+    <xs:attribute name="skew" type="xs:decimal" default="0"/>
+    <xs:attribute name="skewAxis" type="xs:decimal" default="0"/>
+    <xs:attribute name="alpha" type="xs:decimal" default="1"/>
+    <xs:attribute name="width" type="xs:decimal"/>
+    <xs:attribute name="height" type="xs:decimal"/>
     <xs:attribute name="textAlign" type="TextAlignType" default="start"/>
     <xs:attribute name="paragraphAlign" type="ParagraphAlignType" default="near"/>
     <xs:attribute name="writingMode" type="WritingModeType" default="horizontal"/>

@@ -118,7 +118,7 @@ class Group : public Element {
     return NodeType::Group;
   }
 
- private:
+ protected:
   Group() = default;
 
   friend class PAGXDocument;

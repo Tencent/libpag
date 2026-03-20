@@ -194,6 +194,31 @@ CLI_TEST(PAGXCliTest, Optimize_KeepLayerWithComposition) {
   EXPECT_TRUE(output.find("composition=\"@comp1\"") != std::string::npos);
 }
 
+CLI_TEST(PAGXCliTest, Optimize_KeepFlexSpacer) {
+  auto inputPath = TestResourcePath("optimize_keep_flex_spacer.pagx");
+  auto outputPath = TempDir() + "/keep_flex_spacer_out.pagx";
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // Flex spacer with flex="1" should be preserved even though it has no content.
+  EXPECT_TRUE(output.find("flex_spacer") != std::string::npos);
+  EXPECT_TRUE(output.find("flex=\"1\"") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Optimize_OmitStartPointZero) {
+  auto inputPath = TestResourcePath("optimize_keep_startpoint.pagx");
+  auto outputPath = TempDir() + "/keep_startpoint_out.pagx";
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // LinearGradient with startPoint="0,0" should be omitted (default value).
+  EXPECT_TRUE(output.find("startPoint") == std::string::npos);
+  EXPECT_TRUE(output.find("endPoint=") != std::string::npos);
+  // Optimized file should still pass validation.
+  ret = CallRun(pagx::cli::RunValidate, {"validate", outputPath});
+  EXPECT_EQ(ret, 0);
+}
+
 //==============================================================================
 // Optimize tests — DeduplicatePathData
 //==============================================================================

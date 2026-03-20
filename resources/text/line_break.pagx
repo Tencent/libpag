@@ -16,11 +16,10 @@
       <Rectangle position="50,70" size="100,140"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="100" height="140">
       <Text text="Supercalifragilisticexpialidocious" fontFamily="NotoSansSC" fontSize="24"/>
-      <TextBox size="100,140"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box B: Space break — "Hello"=59 " "=5 "World"=67 → 131px. -->
@@ -30,11 +29,10 @@
       <Rectangle position="66,35" size="132,70"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="132" height="70">
       <Text text="Hello World Test" fontFamily="NotoSansSC" fontSize="24"/>
-      <TextBox size="132,70"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box C: Hyphen break (BA) — break allowed after "-" -->
@@ -46,11 +44,10 @@
       <Rectangle position="66,53" size="132,105"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="132" height="105">
       <Text text="well-known self-driving" fontFamily="NotoSansSC" fontSize="24"/>
-      <TextBox size="132,105"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box D: Slash break (BA) — break allowed after "/" -->
@@ -62,11 +59,10 @@
       <Rectangle position="48,53" size="96,105"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="96" height="105">
       <Text text="path/to/some/file" fontFamily="NotoSansSC" fontSize="24"/>
-      <TextBox size="96,105"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- ================================================================ -->
@@ -84,11 +80,10 @@
       <Rectangle position="45,70" size="90,140"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="90" height="140">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[Compre­hensive over­view]]></Text>
-      <TextBox size="90,140"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box F: ZWSP break (BA) — U+200B zero-width space allows break -->
@@ -99,11 +94,10 @@
       <Rectangle position="34,70" size="67,140"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="67" height="140">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[Super​Long​Word​Here]]></Text>
-      <TextBox size="67,140"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box G: Word Joiner (GL) — U+2060 prevents break -->
@@ -115,11 +109,10 @@
       <Rectangle position="45,35" size="90,70"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="90" height="70">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[AB⁠CD⁠EF GH IJ]]></Text>
-      <TextBox size="90,70"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- ================================================================ -->
@@ -137,11 +130,10 @@
       <Rectangle position="25,53" size="49,105"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="49" height="105">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[好￥9吧]]></Text>
-      <TextBox size="49,105"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box I: Postfix (PO) — % must not separate from preceding number -->
@@ -155,11 +147,10 @@
       <Rectangle position="25,53" size="49,105"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="49" height="105">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[好9%吧]]></Text>
-      <TextBox size="49,105"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box J: Inseparable ellipsis (IN) — …… must not break between the two … -->
@@ -173,11 +164,10 @@
       <Rectangle position="37,53" size="73,105"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="73" height="105">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[等等……好]]></Text>
-      <TextBox size="73,105"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box K: Inseparable dash (IN) — —— must not break between the two — -->
@@ -191,11 +181,10 @@
       <Rectangle position="35,53" size="70,105"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="70" height="105">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[前言——正]]></Text>
-      <TextBox size="70,105"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- ================================================================ -->
@@ -214,11 +203,10 @@
       <Rectangle position="49,53" size="97,105"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="97" height="105">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[说完了「引用」好]]></Text>
-      <TextBox size="97,105"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box M: Closing bracket (CL) — 」 must not appear at line start -->
@@ -232,11 +220,10 @@
       <Rectangle position="37,35" size="73,70"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="73" height="70">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[是的」然后]]></Text>
-      <TextBox size="73,70"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box N: NS class — prolonged sound ー must not appear at line start -->
@@ -250,11 +237,10 @@
       <Rectangle position="25,35" size="49,70"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="49" height="70">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[ゲーム好]]></Text>
-      <TextBox size="49,70"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 
   <!-- Box O: Quotation marks (QU) — quotes bind to adjacent content -->
@@ -267,10 +253,9 @@
       <Rectangle position="49,35" size="97,70"/>
       <Stroke/>
     </Group>
-    <Group>
+    <TextBox width="97" height="70">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[说"好"吧]]></Text>
-      <TextBox size="97,70"/>
       <Fill/>
-    </Group>
+    </TextBox>
   </Layer>
 </pagx>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="100">
+  <Layer name="row" width="300" height="100" layout="horizontal">
+    <Layer name="left" width="50" height="100">
+      <Rectangle size="50,100"/>
+      <Fill color="#FF0000"/>
+    </Layer>
+    <Layer name="flex_spacer" flex="1"/>
+    <Layer name="right" width="50" height="100">
+      <Rectangle size="50,100"/>
+      <Fill color="#0000FF"/>
+    </Layer>
+  </Layer>
+</pagx>
