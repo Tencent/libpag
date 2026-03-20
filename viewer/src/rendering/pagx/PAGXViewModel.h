@@ -88,7 +88,7 @@ class PAGXViewModel : public ContentViewModel {
 
   QQuickWindow* window = nullptr;
   std::atomic_bool needsRender = false;
-  std::mutex renderMutex;
+  std::mutex renderMutex = {};
   std::shared_ptr<pagx::PAGXDocument> pagxDocument = nullptr;
   std::shared_ptr<tgfx::Layer> pagxContentLayer = nullptr;
   std::shared_ptr<tgfx::DisplayList> displayList = nullptr;

@@ -57,6 +57,10 @@ bool PAGAudioReader::isEmpty() const {
   return empty;
 }
 
+int64_t PAGAudioReader::getDuration() const {
+  return composition != nullptr ? composition->duration() : 0;
+}
+
 void PAGAudioReader::setComposition(std::shared_ptr<PAGComposition> newComposition) {
   if (newComposition == composition) {
     return;

@@ -45,7 +45,6 @@ class PAGAudioPlayer : public QObject {
   Q_SIGNAL void isPlayingChanged(bool isPlaying);
   Q_SIGNAL void volumeChanged(float volume);
 
-  int64_t fileDuration = 0;
   std::shared_ptr<PAGAudioReader> audioReader = nullptr;
   std::shared_ptr<PAGAudioRender> audioRender = nullptr;
 };

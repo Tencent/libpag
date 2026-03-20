@@ -56,7 +56,6 @@ IContentRenderer::RenderMetrics PAGRenderer::flush() {
   metrics.presentTime = player->presentingTime();
   metrics.imageDecodeTime = player->imageDecodingTime();
   metrics.rendered = true;
-  QMetaObject::invokeMethod(contentView, "update", Qt::QueuedConnection);
   return metrics;
 }
 
