@@ -483,12 +483,7 @@ Additional behaviors beyond what `spec-essentials.md` §7 covers:
 - `lineHeight=0` (auto) calculates from font metrics (`ascent + descent + leading`), not
   from `fontSize`.
 
-### 3. textAnchor and Constraint Interaction
-
-`textAnchor` shifts bounds per line while constraints translate the entire bounds — they
-compound. For multiline alignment, use TextBox `textAlign` instead.
-
-### 4. Modifier Scope Isolation
+### 3. Modifier Scope Isolation
 
 When only one Path needs a shape modifier, isolate it in its own Group:
 
@@ -504,7 +499,7 @@ When only one Path needs a shape modifier, isolate it in its own Group:
 </Group>
 ```
 
-### 5. Fill + Stroke on Same Geometry
+### 4. Fill + Stroke on Same Geometry
 
 Declare geometry once with both painters in one Group — painters do not clear geometry:
 
@@ -516,7 +511,7 @@ Declare geometry once with both painters in one Group — painters do not clear 
 </Group>
 ```
 
-### 6. Container Size for Constraints
+### 5. Container Size for Constraints
 
 Constraint attributes always work — every container has a size from one of three sources
 (highest priority first):
@@ -543,7 +538,7 @@ should stretch to fill:
 When the container's measured or layout-assigned size is exactly what you want, explicit
 dimensions are unnecessary.
 
-### 7. Overlay Elements Inside Layout Containers
+### 6. Overlay Elements Inside Layout Containers
 
 When a parent Layer has `layout` set, child Layers participate in the layout flow by default.
 To exempt a child (e.g., a badge or tooltip), set `includeInLayout="false"` and position it
@@ -569,7 +564,7 @@ Key points: `includeInLayout="false"` children can use **any** constraint attrib
 (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`) regardless of parent layout mode.
 They are positioned relative to the parent's `width`×`height`.
 
-### 8. Child Layer Constraint Positioning
+### 7. Child Layer Constraint Positioning
 
 When the parent Layer uses absolute layout (default), child Layers can use constraint
 attributes instead of `x`/`y` for more expressive positioning:
@@ -585,7 +580,7 @@ attributes instead of `x`/`y` for more expressive positioning:
 </Layer>
 ```
 
-### 9. Opposite-Pair Constraints in Content-Measured Containers
+### 8. Opposite-Pair Constraints in Content-Measured Containers
 
 Opposite-pair constraints (`left="0" right="0"`) inside a content-measured container
 create a circular dependency — child stretches to container size, but container measures
@@ -620,7 +615,7 @@ force-break per character (`boxWidth ≈ 0`).
 Opposite-pair constraints work correctly when the container has a known size (explicit
 `width`/`height` or layout-assigned by parent).
 
-### 10. Partial Roundness (e.g. Top-Round Bottom-Flat)
+### 9. Partial Roundness (e.g. Top-Round Bottom-Flat)
 
 Rectangle `roundness` applies to all four corners uniformly. For per-corner control (like
 a tab bar with only top corners rounded), mask with two overlapping Rectangles — one

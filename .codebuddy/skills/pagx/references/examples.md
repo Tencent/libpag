@@ -13,14 +13,13 @@ as defaults.
 
 Icon-specific structural patterns.
 
-### Background + Foreground (Stroke)
+### Background + Foreground
 
 The most common icon structure:
 
 ```xml
 <pagx version="1.0" width="200" height="200">
   <Layer width="200" height="200">
-      
     <!-- Background -->
     <Group centerX="0" centerY="0">
       <Ellipse size="180,180"/>
@@ -37,58 +36,8 @@ The most common icon structure:
 
 **Pattern**: Groups isolate painter scope (Fill vs. Stroke); `centerX/centerY="0"` centers
 each Group. **Prefer Stroke for icons** — 2-3px coordinate imprecision is barely visible at
-wider stroke widths.
-
-### Background + Foreground (Mixed)
-
-Fill for solid areas, Stroke for line details:
-
-```xml
-<pagx version="1.0" width="200" height="200">
-  <Layer width="200" height="200">
-    <Group centerX="0" centerY="0">
-      <Rectangle size="160,160" roundness="32"/>
-      <Fill color="#ECFDF5"/>
-    </Group>
-    <Group centerX="0" centerY="0">
-      <Path data="M 0,30 L 15,0 L 45,0"/>
-      <Stroke color="#10B981" width="6" cap="round" join="round"/>
-    </Group>
-    <Group centerX="0" centerY="15">
-      <Ellipse size="40,25"/>
-      <Fill color="#10B981"/>
-    </Group>
-  </Layer>
-</pagx>
-```
-
-**Pattern**: Mixed technique — Stroke for lines + Fill for solids. `centerY="15"` offsets
-the Ellipse downward from center.
-
-### Multi-Layer Depth
-
-For icons with visible depth:
-
-```xml
-<pagx version="1.0" width="200" height="200">
-  <Layer width="200" height="200">
-    <Group centerX="0" centerY="0">
-      <Ellipse size="180,180"/>
-      <Fill color="#FEF3C7"/>
-    </Group>
-    <Group centerX="0" centerY="0">
-      <Ellipse size="140,140"/>
-      <Fill color="#FDE68A"/>
-    </Group>
-    <Group centerX="0" centerY="0">
-      <Path data="M 15,0 L 15,50 M 0,35 L 15,50 L 30,35"/>
-      <Stroke color="#D97706" width="6" cap="round" join="round"/>
-    </Group>
-  </Layer>
-</pagx>
-```
-
-**Pattern**: Middle Group creates depth with just a second fill color — no additional technique needed.
+wider stroke widths. Use Fill for solid areas when needed; mix Fill and Stroke in separate
+Groups. Add more Groups with smaller geometry for layered depth effects.
 
 ---
 
@@ -98,9 +47,9 @@ Structural patterns for application interface elements. Most UI components benef
 layout — use container layout for arranging child Layers in rows or columns, and constraint
 layout for positioning elements within a Layer.
 
-### Simple Text Labels
+### Text Label
 
-Single-line labels positioned with constraint attributes. Use `centerX`/`centerY` for centering — TextBox measures its own size automatically:
+TextBox with `centerX`/`centerY` for centering — auto-sizes to fit text:
 
 ```xml
 <pagx version="1.0" width="300" height="200">
@@ -117,27 +66,8 @@ Single-line labels positioned with constraint attributes. Use `centerX`/`centerY
 </pagx>
 ```
 
-**Multiple labels with different painters**:
-
-```xml
-<pagx version="1.0" width="300" height="100">
-  <Layer width="300" height="100">
-    <Group>
-      <Rectangle size="300,100" roundness="12"/>
-      <Fill color="#1E293B"/>
-    </Group>
-    <Group>
-      <Text text="Balance" fontFamily="Arial" fontSize="12" left="16" top="12"/>
-      <Fill color="#94A3B8"/>
-    </Group>
-    <Group>
-      <Text text="$12,580" fontFamily="Arial" fontStyle="Bold" fontSize="28"
-            left="16" top="32"/>
-      <Fill color="#FFF"/>
-    </Group>
-  </Layer>
-</pagx>
-```
+**Pattern**: TextBox auto-sizes and centers. For multiple labels with different colors, wrap each
+in its own Group for painter scope isolation, and use `left`/`top` constraints for positioning.
 
 ### Card with Shadow
 
@@ -160,25 +90,6 @@ Single-line labels positioned with constraint attributes. Use `centerX`/`centerY
 
 **Pattern**: White cards need a non-white background to be visible. Card uses complete
 constraint layout (left, right, top, bottom) to scale with parent, not fixed height.
-
-### Button with Centered Label
-
-```xml
-<pagx version="1.0" width="200" height="80">
-  <Layer left="20" top="18" width="160" height="44">
-    <Rectangle left="0" right="0" top="0" bottom="0" roundness="22"/>
-    <Fill color="#3B82F6"/>
-    <TextBox centerX="0" centerY="0">
-      <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-      <Fill color="#FFF"/>
-    </TextBox>
-    <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#3B82F640"/>
-  </Layer>
-</pagx>
-```
-
-**Pattern**: TextBox with `centerX`/`centerY` auto-sizes and centers text within the button.
-TextBox isolates text Fill from rectangle Fill.
 
 ### Icon + Label Row
 
@@ -314,41 +225,6 @@ fill remaining space — see Dashboard Layout below.
 
 **Pattern**: Header and footer have fixed `height`; the content row uses `flex="1"` to fill
 remaining space. Three child Layers with `flex="1"` equally share available width.
-
-### Vertical List (Container Layout)
-
-```xml
-<pagx version="1.0" width="400" height="340">
-  <Layer width="400" height="340" layout="vertical" gap="12" padding="20" alignment="stretch">
-    <Layer height="48">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-      <Fill color="#F1F5F9"/>
-      <TextBox left="12" centerY="0">
-        <Text text="Item 1" fontFamily="Arial" fontSize="14"/>
-        <Fill color="#1E293B"/>
-      </TextBox>
-    </Layer>
-    <Layer height="48">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-      <Fill color="#F1F5F9"/>
-      <TextBox left="12" centerY="0">
-        <Text text="Item 2" fontFamily="Arial" fontSize="14"/>
-        <Fill color="#1E293B"/>
-      </TextBox>
-    </Layer>
-    <Layer height="48">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-      <Fill color="#F1F5F9"/>
-      <TextBox left="12" centerY="0">
-        <Text text="Item 3" fontFamily="Arial" fontSize="14"/>
-        <Fill color="#1E293B"/>
-      </TextBox>
-    </Layer>
-  </Layer>
-</pagx>
-```
-
-**Pattern**: `left` + `centerY` positions text with left margin and vertical centering.
 
 ### Progress Bar
 
@@ -708,7 +584,7 @@ and BackgroundBlurStyle for frosted glass.
     <Fill color="#0F172A"/>
     <!-- Purple glow orb -->
     <Layer left="80" top="60" blendMode="screen">
-      <Ellipse position="0,0" size="200,200"/>
+      <Ellipse left="0" right="0" top="0" bottom="0" size="200,200"/>
       <Fill>
         <RadialGradient radius="100">
           <ColorStop offset="0" color="#8B5CF660"/>
@@ -719,7 +595,7 @@ and BackgroundBlurStyle for frosted glass.
     </Layer>
     <!-- Cyan glow orb -->
     <Layer left="320" top="240" blendMode="screen">
-      <Ellipse position="0,0" size="250,250"/>
+      <Ellipse left="0" right="0" top="0" bottom="0" size="250,250"/>
       <Fill>
         <RadialGradient radius="125">
           <ColorStop offset="0" color="#06B6D450"/>

@@ -85,7 +85,6 @@ After all optimizations, verify the following:
   (`attributes.md`)
 - [ ] Painter scope isolation correct (`design-patterns.md` §1)
 - [ ] Text `position`/`textAnchor` not set when TextBox is present (`design-patterns.md` §2)
-  - [ ] `textAnchor` and constraint attributes not mixed on the same Text (`design-patterns.md` §3)
   - [ ] All positioning uses constraint attributes where possible (fallback to `position`/`x`/`y`
     only for irregular freeform compositions)
 - [ ] Containers have explicit `width`/`height` where a specific design size is intended

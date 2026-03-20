@@ -161,10 +161,8 @@ wrapping, per-line alignment (`textAlign`), or rich text (multiple styles). See
 **TextBox requires a known container width** for wrapping. When the parent is
 content-measured (no explicit width, no layout-assigned width), opposite-pair constraints
 (`left="0" right="0"`) create circular dependency — use `centerX`/`centerY` on TextBox
-instead. See `design-patterns.md` §9 for details.
+instead. See `design-patterns.md` §8 for details.
 
-Do not set `textAnchor` when using TextBox or constraint attributes — it shifts bounds
-per line and compounds with constraint positioning unpredictably.
 
 ### PAGX-Specific Format Rules
 
