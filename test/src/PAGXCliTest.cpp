@@ -611,6 +611,19 @@ CLI_TEST(PAGXCliTest, Optimize_KeepOffCanvasLayoutLayer) {
   EXPECT_EQ(CountOccurrences(output, "<Layer"), 4u);
 }
 
+// Localize: skip child Layers whose x/y is managed by parent container layout.
+CLI_TEST(PAGXCliTest, Optimize_LocalizeSkipLayoutChild) {
+  auto inputPath = TestResourcePath("optimize_localize_skip_layout_child.pagx");
+  auto outputPath = TempDir() + "/localize_skip_layout_child_out.pagx";
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // Child Layers in horizontal layout — their x/y is computed by the layout engine.
+  // Localization must not modify their positions. Original positions should be preserved.
+  EXPECT_TRUE(output.find("position=\"50,50\"") != std::string::npos);
+  EXPECT_TRUE(output.find("position=\"60,40\"") != std::string::npos);
+}
+
 //==============================================================================
 // Optimize tests — DryRun, general, and error handling
 //==============================================================================

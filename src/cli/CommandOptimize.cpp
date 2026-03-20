@@ -1643,8 +1643,12 @@ static void OffsetColorSourcesInContents(PAGXDocument* document,
   }
 }
 
-static void LocalizeLayerCoordinates(PAGXDocument* document, Layer* layer, int& count) {
-  if (!ShouldSkipLocalization(layer)) {
+static void LocalizeLayerCoordinates(PAGXDocument* document, Layer* layer, int& count,
+                                     bool parentHasContainerLayout) {
+  // Skip localization when the parent uses container layout and this Layer participates —
+  // the layout engine will overwrite x/y, so modifying them here would be lost.
+  bool skipDueToParentLayout = parentHasContainerLayout && layer->includeInLayout;
+  if (!skipDueToParentLayout && !ShouldSkipLocalization(layer)) {
     float offsetX = 0.0f;
     float offsetY = 0.0f;
     ComputeLocalizationOffset(layer->contents, offsetX, offsetY);
@@ -1657,8 +1661,9 @@ static void LocalizeLayerCoordinates(PAGXDocument* document, Layer* layer, int& 
       count++;
     }
   }
+  bool thisHasContainerLayout = layer->layout != LayoutMode::Constraint;
   for (auto* child : layer->children) {
-    LocalizeLayerCoordinates(document, child, count);
+    LocalizeLayerCoordinates(document, child, count, thisHasContainerLayout);
   }
 }
 
@@ -1666,13 +1671,13 @@ static int LocalizeCoordinates(PAGXDocument* document) {
   int count = 0;
 
   for (auto* layer : document->layers) {
-    LocalizeLayerCoordinates(document, layer, count);
+    LocalizeLayerCoordinates(document, layer, count, false);
   }
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Composition) {
       auto comp = static_cast<Composition*>(node.get());
       for (auto* layer : comp->layers) {
-        LocalizeLayerCoordinates(document, layer, count);
+        LocalizeLayerCoordinates(document, layer, count, false);
       }
     }
   }
