@@ -57,10 +57,6 @@ const PAGNodeStatsModel* PAGRunTimeDataModel::getNodeStatsModel() const {
   return &nodeStatsModel;
 }
 
-bool PAGRunTimeDataModel::isPAGX() const {
-  return pagxMode;
-}
-
 void PAGRunTimeDataModel::setCurrentFrame(const QString& currentFrame) {
   if (this->currentFrame == currentFrame.toLongLong()) {
     return;
@@ -95,8 +91,6 @@ void PAGRunTimeDataModel::updateData(int64_t currentFrame, int64_t renderTime, i
 }
 
 void PAGRunTimeDataModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
-  bool wasPAGX = pagxMode;
-  pagxMode = false;
   if (pagFile == nullptr) {
     totalFrame = 0;
     currentFrame = -1;
@@ -106,9 +100,6 @@ void PAGRunTimeDataModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
     fileInfoModel.setPAGFile(nullptr);
     updateFrameDisplayInfo(0, 0, 0);
     Q_EMIT fileInfoModelChanged();
-    if (wasPAGX) {
-      Q_EMIT isPAGXChanged();
-    }
     Q_EMIT dataChanged();
     return;
   }
@@ -122,15 +113,10 @@ void PAGRunTimeDataModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
   fileInfoModel.setPAGFile(pagFile);
   updateFrameDisplayInfo(0, 0, 0);
   Q_EMIT fileInfoModelChanged();
-  if (wasPAGX) {
-    Q_EMIT isPAGXChanged();
-  }
   Q_EMIT dataChanged();
 }
 
 void PAGRunTimeDataModel::setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pagxDocument) {
-  bool wasPAGX = pagxMode;
-  pagxMode = true;
   totalFrame = pagxDocument ? 1 : 0;
   currentFrame = pagxDocument ? 0 : -1;
   lastUpdatedFrame = -1;
@@ -141,9 +127,6 @@ void PAGRunTimeDataModel::setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pa
   updateFrameDisplayInfo(0, 0, 0);
   Q_EMIT fileInfoModelChanged();
   Q_EMIT nodeStatsModelChanged();
-  if (!wasPAGX) {
-    Q_EMIT isPAGXChanged();
-  }
   Q_EMIT dataChanged();
 }
 

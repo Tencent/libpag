@@ -6,6 +6,8 @@ import QtQuick.Controls
 Item {
     id: element
 
+    required property var contentView
+
     property int defaultWidth: 300
     property int defaultHeight: 300
     property int sectionSpacing: 2
@@ -52,7 +54,7 @@ Item {
         enabled: runTimeDataModel !== null && runTimeDataModel.frameDisplayInfoModel !== null
 
         function onItemsChanged() {
-            if (runTimeDataModel && runTimeDataModel.isPAGX) {
+            if (contentView && contentView.viewModel.contentType !== ContentViewModel.PAG) {
                 pagxStatsColumn.totalTime = statistics.calculateTotalTime();
             }
         }
@@ -111,7 +113,7 @@ Item {
             id: fileInfoView
             height: 93
             width: parent.width
-            cellWidth: runTimeDataModel && runTimeDataModel.isPAGX ? width / 3 : width / 4
+            cellWidth: contentView && contentView.viewModel.contentType !== ContentViewModel.PAG ? width / 3 : width / 4
             cellHeight: 46
             boundsBehavior: Flickable.StopAtBounds
             keyNavigationWraps: false
@@ -123,7 +125,7 @@ Item {
                 height: fileInfoView.cellHeight
 
                 Rectangle {
-                    property int columnsPerRow: runTimeDataModel && runTimeDataModel.isPAGX ? 3 : 4
+                    property int columnsPerRow: contentView && contentView.viewModel.contentType !== ContentViewModel.PAG ? 3 : 4
                     height: fileInfoView.cellHeight - 1
                     width: fileInfoView.cellWidth - ((index + 1) % columnsPerRow === 0 ? 0 : 1)
                     color: "#2D2D37"
@@ -227,7 +229,7 @@ Item {
             id: performanceChart
             height: 90
             width: parent.width
-            visible: !runTimeDataModel || !runTimeDataModel.isPAGX
+            visible: !contentView || contentView.viewModel.contentType === ContentViewModel.PAG
             color: "#00000000"
 
             Rectangle {
@@ -429,7 +431,7 @@ Item {
         /* Data Statistics */
         Rectangle {
             id: statistics
-            height: runTimeDataModel && runTimeDataModel.isPAGX ? pagxStatsColumn.height : 62
+            height: contentView && contentView.viewModel.contentType !== ContentViewModel.PAG ? pagxStatsColumn.height : 62
             width: parent.width
             color: "#00000000"
 
@@ -448,7 +450,7 @@ Item {
 
             Column {
                 id: pagxStatsColumn
-                visible: runTimeDataModel && runTimeDataModel.isPAGX
+                visible: contentView && contentView.viewModel.contentType !== ContentViewModel.PAG
                 width: parent.width
                 spacing: 1
 
@@ -573,7 +575,7 @@ Item {
 
             ListView {
                 id: dataListView
-                visible: !runTimeDataModel || !runTimeDataModel.isPAGX
+                visible: !contentView || contentView.viewModel.contentType === ContentViewModel.PAG
 
                 width: parent.width
                 boundsBehavior: ListView.StopAtBounds
@@ -671,7 +673,7 @@ Item {
         /* Node Statistics for PAGX */
         Rectangle {
             id: nodeStatistics
-            visible: runTimeDataModel && runTimeDataModel.isPAGX && runTimeDataModel.nodeStatsModel
+            visible: contentView && contentView.viewModel.contentType !== ContentViewModel.PAG && runTimeDataModel && runTimeDataModel.nodeStatsModel
             height: visible ? nodeStatsContent.height : 0
             width: parent.width
             color: "#00000000"
@@ -798,7 +800,7 @@ Item {
         /* Theoretical FPS for PAGX */
         Rectangle {
             id: fpsInfo
-            visible: runTimeDataModel && runTimeDataModel.isPAGX
+            visible: contentView && contentView.viewModel.contentType !== ContentViewModel.PAG
             height: visible ? 24 : 0
             width: parent.width
             color: "#2D2D37"

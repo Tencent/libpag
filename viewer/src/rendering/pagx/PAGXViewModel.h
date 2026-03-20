@@ -52,6 +52,7 @@ class PAGXViewModel : public ContentViewModel {
   int getEditableTextLayerCount() const override;
   int getEditableImageLayerCount() const override;
   bool getShowVideoFrames() const override;
+  ContentType getContentType() const override;
 
   void setIsPlaying(bool isPlaying) override;
   void setProgress(double progress) override;

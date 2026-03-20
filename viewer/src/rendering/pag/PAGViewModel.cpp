@@ -98,6 +98,10 @@ bool PAGViewModel::getShowVideoFrames() const {
   return pagPlayer->videoEnabled();
 }
 
+ContentViewModel::ContentType PAGViewModel::getContentType() const {
+  return ContentType::PAG;
+}
+
 QString PAGViewModel::getDuration() const {
   if (pagPlayer == nullptr) {
     return "0";

@@ -127,6 +127,10 @@ bool PAGXViewModel::getShowVideoFrames() const {
   return false;
 }
 
+ContentViewModel::ContentType PAGXViewModel::getContentType() const {
+  return ContentType::PAGX;
+}
+
 void PAGXViewModel::setWindow(QQuickWindow* win) {
   window = win;
 }

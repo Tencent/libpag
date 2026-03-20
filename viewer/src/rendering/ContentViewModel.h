@@ -34,6 +34,14 @@ namespace pag {
 class ContentViewModel : public QObject {
   Q_OBJECT
 
+ public:
+  enum class ContentType {
+    PAG,
+    PAGX,
+    PAGXAnimated,
+  };
+  Q_ENUM(ContentType)
+
   Q_PROPERTY(int width READ getWidth NOTIFY widthChanged)
   Q_PROPERTY(int height READ getHeight NOTIFY heightChanged)
   Q_PROPERTY(bool hasAnimation READ hasAnimation CONSTANT)
@@ -51,8 +59,8 @@ class ContentViewModel : public QObject {
   Q_PROPERTY(int editableImageLayerCount READ getEditableImageLayerCount NOTIFY
                  editableImageLayerCountChanged)
   Q_PROPERTY(bool showVideoFrames READ getShowVideoFrames WRITE setShowVideoFrames)
+  Q_PROPERTY(ContentType contentType READ getContentType CONSTANT)
 
- public:
   explicit ContentViewModel(QObject* parent = nullptr) : QObject(parent) {
   }
 
@@ -71,6 +79,7 @@ class ContentViewModel : public QObject {
   virtual int getEditableTextLayerCount() const = 0;
   virtual int getEditableImageLayerCount() const = 0;
   virtual bool getShowVideoFrames() const = 0;
+  virtual ContentType getContentType() const = 0;
 
   virtual void setIsPlaying(bool isPlaying) = 0;
   virtual void setProgress(double progress) = 0;

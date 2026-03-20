@@ -558,6 +558,7 @@ SplitView {
                             id: profilerForm
                             width: performance.width
                             height: contentHeight
+                            contentView: splitView.contentView
                         }
                     }
                 }
