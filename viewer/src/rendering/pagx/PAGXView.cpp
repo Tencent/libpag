@@ -31,6 +31,7 @@ PAGXView::PAGXView(QQuickItem* parent) : ContentView(parent) {
           &PAGXView::onPreferredSizeChanged);
   renderThread =
       std::make_unique<RenderThread>(this, std::make_unique<PAGXRenderer>(viewModel.get(), this));
+  connect(renderThread.get(), &RenderThread::rendered, this, &PAGXView::update);
   renderThread->moveToThread(renderThread.get());
 }
 

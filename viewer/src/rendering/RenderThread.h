@@ -36,6 +36,11 @@ class RenderThread : public QThread {
   explicit RenderThread(ContentView* view, std::unique_ptr<IContentRenderer> renderer);
 
   /**
+   * Emitted after each rendered frame to notify the view to present the new content.
+   */
+  Q_SIGNAL void rendered();
+
+  /**
    * Emitted after each rendered frame with timing metrics.
    * currentFrame is -1 for content types that have no frame index (e.g. static PAGX).
    */

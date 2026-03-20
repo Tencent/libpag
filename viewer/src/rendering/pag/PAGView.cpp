@@ -36,6 +36,7 @@ PAGView::PAGView(QQuickItem* parent) : ContentView(parent) {
   connect(viewModel.get(), &PAGViewModel::isPlayingChanged, this, &PAGView::onIsPlayingChanged);
   renderThread =
       std::make_unique<RenderThread>(this, std::make_unique<PAGRenderer>(viewModel.get()));
+  connect(renderThread.get(), &RenderThread::rendered, this, &PAGView::update);
   renderThread->moveToThread(renderThread.get());
 }
 

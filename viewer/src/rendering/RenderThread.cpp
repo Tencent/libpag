@@ -37,6 +37,7 @@ void RenderThread::flush() {
   if (!metrics.rendered) {
     return;
   }
+  Q_EMIT rendered();
   Q_EMIT renderMetricsReady(metrics.renderTime, metrics.presentTime, metrics.imageDecodeTime,
                             metrics.currentFrame);
 }
