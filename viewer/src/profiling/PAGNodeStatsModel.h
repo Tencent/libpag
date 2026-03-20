@@ -40,8 +40,7 @@ class PAGNodeStatsModel : public QAbstractListModel {
  public:
   enum class PAGNodeStatsRoles { NameRole = Qt::UserRole + 1, ColorRole, CountRole };
 
-  PAGNodeStatsModel();
-  explicit PAGNodeStatsModel(QObject* parent);
+  explicit PAGNodeStatsModel(QObject* parent = nullptr);
 
   QVariant data(const QModelIndex& index, int role) const override;
   int rowCount(const QModelIndex& parent) const override;

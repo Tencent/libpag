@@ -139,12 +139,12 @@ void PAGXViewModel::markNeedsRender() {
   needsRender = true;
 }
 
-PAGXViewModel::RenderState PAGXViewModel::getRenderState() const {
+PAGXViewModel::RenderState PAGXViewModel::getRenderState() {
   std::lock_guard<std::mutex> lock(renderMutex);
   return {displayList, pagxContentLayer, pagxWidth, pagxHeight};
 }
 
-bool PAGXViewModel::hasContent() const {
+bool PAGXViewModel::hasContent() {
   std::lock_guard<std::mutex> lock(renderMutex);
   return displayList != nullptr;
 }

@@ -93,9 +93,6 @@ PAGNodeStatItem::PAGNodeStatItem(const QString& name, const QString& color, int 
     : name(name), color(color), count(count) {
 }
 
-PAGNodeStatsModel::PAGNodeStatsModel() : QAbstractListModel(nullptr) {
-}
-
 PAGNodeStatsModel::PAGNodeStatsModel(QObject* parent) : QAbstractListModel(parent) {
 }
 

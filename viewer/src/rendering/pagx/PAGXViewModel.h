@@ -74,8 +74,8 @@ class PAGXViewModel : public ContentViewModel {
   bool takeNeedsRender();
   void markNeedsRender();
   // Returns a snapshot of render state with shared ownership; safe to use without holding any lock.
-  RenderState getRenderState() const;
-  bool hasContent() const;
+  RenderState getRenderState();
+  bool hasContent();
 
   Q_SIGNAL void pagxDocumentChanged(std::shared_ptr<pagx::PAGXDocument> pagxDocument);
   Q_SIGNAL void requestFlush();
@@ -87,7 +87,7 @@ class PAGXViewModel : public ContentViewModel {
 
   QQuickWindow* window = nullptr;
   std::atomic_bool needsRender = false;
-  mutable std::mutex renderMutex;
+  std::mutex renderMutex;
   std::shared_ptr<pagx::PAGXDocument> pagxDocument = nullptr;
   std::shared_ptr<tgfx::Layer> pagxContentLayer = nullptr;
   std::shared_ptr<tgfx::DisplayList> displayList = nullptr;
