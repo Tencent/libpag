@@ -18,6 +18,7 @@
 
 #include "rendering/pagx/PAGXViewModel.h"
 #include <QQuickWindow>
+#include "pag/pag.h"
 #include "pagx/PAGXImporter.h"
 #include "renderer/LayerBuilder.h"
 
@@ -197,7 +198,6 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
 
   auto newContentLayer = pagx::LayerBuilder::Build(document.get());
   if (newContentLayer == nullptr) {
-    Q_EMIT fileChanged(nullptr);
     Q_EMIT pagxDocumentChanged(nullptr);
     return false;
   }
@@ -217,11 +217,11 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
     displayList = std::move(newDisplayList);
     needsRender = true;
   }
-  Q_EMIT fileChanged(nullptr);
   Q_EMIT filePathChanged(QString::fromLocal8Bit(strPath.data()));
   Q_EMIT widthChanged(pagxWidth);
   Q_EMIT heightChanged(pagxHeight);
   Q_EMIT totalFrameChanged();
+  Q_EMIT hasAnimationChanged(hasAnimation());
   Q_EMIT preferredSizeChanged();
   Q_EMIT editableTextLayerCountChanged(0);
   Q_EMIT editableImageLayerCountChanged(0);

@@ -20,8 +20,7 @@
 
 namespace pag {
 
-PAGRenderer::PAGRenderer(PAGViewModel* viewModel, ContentView* contentView)
-    : viewModel(viewModel), contentView(contentView) {
+PAGRenderer::PAGRenderer(PAGViewModel* viewModel) : viewModel(viewModel) {
 }
 
 bool PAGRenderer::isReady() const {
@@ -40,9 +39,6 @@ IContentRenderer::RenderMetrics PAGRenderer::flush() {
   RenderMetrics metrics = {};
   if (!isReady()) {
     return metrics;
-  }
-  if (contentView->takeSizeChanged()) {
-    updateSize();
   }
   auto* player = viewModel->getPAGPlayer();
   auto* file = viewModel->getPAGFile();

@@ -35,9 +35,6 @@ void PAGXRenderer::updateSize() {
 
 IContentRenderer::RenderMetrics PAGXRenderer::flush() {
   RenderMetrics metrics = {};
-  if (contentView->takeSizeChanged()) {
-    updateSize();
-  }
   if (!viewModel->takeNeedsRender()) {
     return metrics;
   }

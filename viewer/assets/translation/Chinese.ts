@@ -371,57 +371,57 @@
 <context>
     <name>Profiler</name>
     <message>
-        <location filename="../qml/Profiler.qml" line="19"/>
+        <location filename="../qml/Profiler.qml" line="21"/>
         <source>Rendering time too long, suggest optimizing time cost to under %1 us</source>
         <translation>Rendering 耗时过大，请控制在 %1 微秒以内</translation>
     </message>
     <message>
-        <location filename="../qml/Profiler.qml" line="20"/>
+        <location filename="../qml/Profiler.qml" line="22"/>
         <source>Memory usage is too large, suggest optimizing memory cost to under 50M</source>
         <translation>内存占用过大，请控制在50M以内</translation>
     </message>
     <message>
-        <location filename="../qml/Profiler.qml" line="21"/>
+        <location filename="../qml/Profiler.qml" line="23"/>
         <source>(Run performance benchmark, results will be more accurate)</source>
         <translation>（运行一下性能基准测试，结果会更加准确）</translation>
     </message>
     <message>
-        <location filename="../qml/Profiler.qml" line="22"/>
+        <location filename="../qml/Profiler.qml" line="24"/>
         <source>Using too many video sequences can slow performance</source>
         <translation>视频序列过多会导致性能下降</translation>
     </message>
     <message>
-        <location filename="../qml/Profiler.qml" line="26"/>
+        <location filename="../qml/Profiler.qml" line="28"/>
         <source>Limit video sequences to two or fewer</source>
         <translation>建议将视频序列帧数量控制在两个以内</translation>
     </message>
     <message>
-        <location filename="../qml/Profiler.qml" line="690"/>
+        <location filename="../qml/Profiler.qml" line="692"/>
         <source>Node Distribution</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Profiler.qml" line="700"/>
+        <location filename="../qml/Profiler.qml" line="702"/>
         <source>nodes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Profiler.qml" line="807"/>
+        <location filename="../qml/Profiler.qml" line="809"/>
         <source>Theoretical FPS</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Profiler.qml" line="24"/>
+        <location filename="../qml/Profiler.qml" line="26"/>
         <source>Too many layers, Suggest combining same layers into composition</source>
         <translation>可能和 Layer 图层数量过多有关，建议使用预合成的方式合并相同图层</translation>
     </message>
     <message>
-        <location filename="../qml/Profiler.qml" line="25"/>
+        <location filename="../qml/Profiler.qml" line="27"/>
         <source>Sticker scale is too large, suggest reducing sticker scale</source>
         <translation>可能和贴纸缩放大小有关，建议减少贴纸缩放程度</translation>
     </message>
     <message>
-        <location filename="../qml/Profiler.qml" line="90"/>
+        <location filename="../qml/Profiler.qml" line="92"/>
         <source>File Info</source>
         <translation>文件信息</translation>
     </message>

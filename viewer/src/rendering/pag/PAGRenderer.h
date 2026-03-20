@@ -30,7 +30,7 @@ namespace pag {
  */
 class PAGRenderer : public IContentRenderer {
  public:
-  explicit PAGRenderer(PAGViewModel* viewModel, ContentView* contentView);
+  explicit PAGRenderer(PAGViewModel* viewModel);
 
   RenderMetrics flush() override;
   void updateSize() override;
@@ -38,7 +38,6 @@ class PAGRenderer : public IContentRenderer {
 
  private:
   PAGViewModel* viewModel = nullptr;
-  ContentView* contentView = nullptr;
 };
 
 }  // namespace pag

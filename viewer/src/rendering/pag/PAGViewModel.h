@@ -68,6 +68,7 @@ class PAGViewModel : public ContentViewModel {
   PAGFile* getPAGFile() const;
   void setProgressInternal(double progress, bool isAudioSeek);
 
+  Q_SIGNAL void fileChanged(std::shared_ptr<pag::File> file);
   Q_SIGNAL void pagFileChanged(std::shared_ptr<pag::PAGFile> pagFile);
   Q_SIGNAL void requestFlush();
   Q_SIGNAL void requestSizeChanged();

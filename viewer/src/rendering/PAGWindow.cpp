@@ -70,10 +70,9 @@ void PAGWindow::disconnectContentViewSignals() {
     disconnect(viewModel, &ContentViewModel::filePathChanged, taskFactory,
                &PAGTaskFactory::setFilePath);
   }
-  disconnect(viewModel, &ContentViewModel::fileChanged, treeViewModel.get(),
-             &PAGTreeViewModel::setFile);
-
   if (auto* pagVM = qobject_cast<PAGViewModel*>(viewModel)) {
+    disconnect(pagVM, &PAGViewModel::fileChanged, treeViewModel.get(),
+               &PAGTreeViewModel::setFile);
     disconnect(pagVM, &PAGViewModel::pagFileChanged, editAttributeModel.get(),
                &PAGEditAttributeModel::setPAGFile);
     disconnect(pagVM, &PAGViewModel::pagFileChanged, runTimeDataModel.get(),
@@ -112,10 +111,9 @@ void PAGWindow::connectContentViewSignals() {
     connect(viewModel, &ContentViewModel::filePathChanged, taskFactory,
             &PAGTaskFactory::setFilePath);
   }
-  connect(viewModel, &ContentViewModel::fileChanged, treeViewModel.get(),
-          &PAGTreeViewModel::setFile, Qt::QueuedConnection);
-
   if (auto* pagVM = qobject_cast<PAGViewModel*>(viewModel)) {
+    connect(pagVM, &PAGViewModel::fileChanged, treeViewModel.get(),
+            &PAGTreeViewModel::setFile, Qt::QueuedConnection);
     connect(pagVM, &PAGViewModel::pagFileChanged, editAttributeModel.get(),
             &PAGEditAttributeModel::setPAGFile);
     connect(pagVM, &PAGViewModel::pagFileChanged, runTimeDataModel.get(),

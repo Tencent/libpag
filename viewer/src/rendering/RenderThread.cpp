@@ -30,6 +30,9 @@ void RenderThread::flush() {
   if (renderer == nullptr) {
     return;
   }
+  if (view->takeSizeChanged()) {
+    renderer->updateSize();
+  }
   auto metrics = renderer->flush();
   if (!metrics.rendered) {
     return;

@@ -23,7 +23,6 @@
 #include <QSizeF>
 #include <QString>
 #include <memory>
-#include "pag/pag.h"
 
 namespace pag {
 
@@ -43,7 +42,7 @@ class ContentViewModel : public QObject {
 
   Q_PROPERTY(int width READ getWidth NOTIFY widthChanged)
   Q_PROPERTY(int height READ getHeight NOTIFY heightChanged)
-  Q_PROPERTY(bool hasAnimation READ hasAnimation CONSTANT)
+  Q_PROPERTY(bool hasAnimation READ hasAnimation NOTIFY hasAnimationChanged)
   Q_PROPERTY(bool isPlaying READ isPlaying WRITE setIsPlaying NOTIFY isPlayingChanged)
   Q_PROPERTY(double progress READ getProgress WRITE setProgress NOTIFY progressChanged)
   Q_PROPERTY(QString totalFrame READ getTotalFrame NOTIFY totalFrameChanged)
@@ -91,9 +90,9 @@ class ContentViewModel : public QObject {
   Q_INVOKABLE virtual void previousFrame() = 0;
 
   Q_SIGNAL void isPlayingChanged(bool isPlaying);
+  Q_SIGNAL void hasAnimationChanged(bool hasAnimation);
   Q_SIGNAL void progressChanged(double progress);
   Q_SIGNAL void filePathChanged(const QString& filePath);
-  Q_SIGNAL void fileChanged(std::shared_ptr<pag::File> file);
   Q_SIGNAL void editableTextLayerCountChanged(int count);
   Q_SIGNAL void editableImageLayerCountChanged(int count);
   Q_SIGNAL void widthChanged(int width);

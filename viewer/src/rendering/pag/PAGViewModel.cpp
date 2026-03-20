@@ -232,6 +232,7 @@ bool PAGViewModel::loadFile(const QString& filePath) {
   Q_EMIT widthChanged(getWidth());
   Q_EMIT heightChanged(getHeight());
   Q_EMIT totalFrameChanged();
+  Q_EMIT hasAnimationChanged(hasAnimation());
   Q_EMIT preferredSizeChanged();
   Q_EMIT requestSizeChanged();
   audioPlayer->setVolume(1.0f);
