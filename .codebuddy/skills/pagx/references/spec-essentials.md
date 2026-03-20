@@ -546,6 +546,9 @@ plus its own text layout properties. TextBox can contain child elements just lik
   child elements, constraint attributes, and Group transforms (anchor, position, rotation,
   scale, skew, skewAxis, alpha).
 - It **overrides** Text's `position` and `textAnchor` — do not set these on child Text.
+- **Vertical alignment**: Bare Text aligns baseline to y=0. TextBox corrects this — text
+  inside TextBox vertically centers within each line automatically. Always use TextBox
+  when text participates in auto-layout or needs vertical centering.
 - `overflow="hidden"`: discards **entire lines** (horizontal) or **entire columns** (vertical)
   that exceed the box. Similar in spirit to CSS `overflow: hidden` but with whole-line
   granularity, not pixel-level clipping.

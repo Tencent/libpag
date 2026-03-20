@@ -434,7 +434,7 @@ For **child Layers**, constraints are only active when:
 
 ### TextBox
 
-TextBox inherits from Group — it has all Group attributes plus its own text layout properties.
+Text layout container that inherits from Group. Bare Text aligns baseline to y=0 — TextBox corrects this so text vertically centers within each line automatically. Always use TextBox when text participates in auto-layout or needs vertical centering.
 
 **Inherited from Group:**
 

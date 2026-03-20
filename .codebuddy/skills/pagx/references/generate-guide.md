@@ -153,14 +153,14 @@ For each block, construct the VectorElement tree following these principles.
 <Fill color="#333"/>
 ```
 
-**When to add TextBox** — only when you need multiline wrapping, per-line alignment
-(`textAlign`), rich text (multiple styles in Groups), or vertical centering in a fill area
-(`paragraphAlign="middle"`). See `design-patterns.md` §Text Layout Decisions for complete
-patterns.
+**When to add TextBox** — Bare Text aligns baseline to y=0, causing unreliable vertical
+positioning in layouts. Always wrap Text in TextBox when it needs vertical centering,
+wrapping, per-line alignment (`textAlign`), or rich text (multiple styles). See
+`design-patterns.md` §Text Layout Decisions for complete patterns.
 
 **TextBox requires a known container width** for wrapping. When the parent is
 content-measured (no explicit width, no layout-assigned width), opposite-pair constraints
-(`left="0" right="0"`) create circular dependency — use `centerX`/`centerY` on Text
+(`left="0" right="0"`) create circular dependency — use `centerX`/`centerY` on TextBox
 instead. See `design-patterns.md` §9 for details.
 
 Do not set `textAnchor` when using TextBox or constraint attributes — it shifts bounds

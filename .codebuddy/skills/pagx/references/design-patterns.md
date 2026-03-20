@@ -348,8 +348,9 @@ Code snippets below use placeholder fonts and colors to illustrate structure.
 <Fill color="#10B981"/>
 ```
 
-Add TextBox when text wrapping, per-line alignment, or vertical centering in a filled
-area is needed:
+Add TextBox when text needs vertical centering, wrapping, per-line alignment, or rich text.
+Bare Text aligns baseline to y=0 — TextBox corrects this so text vertically centers within
+each line automatically, which is essential for auto-layout.
 
 ```xml
 <!-- Button label: horizontal + vertical centering in a filled area -->
@@ -474,6 +475,9 @@ Additional behaviors beyond what `spec-essentials.md` §7 covers:
 
 - TextBox inherits from **Group** — it is a container that holds child elements (Text, Fill,
   Stroke, Groups, etc.) and provides text layout. It replaces the old Group+TextBox pattern.
+- **Vertical alignment**: Bare Text aligns baseline to y=0. TextBox corrects this — text
+  inside TextBox vertically centers within each line automatically. Always wrap Text in
+  TextBox when it participates in auto-layout or needs vertical centering.
 - `overflow="hidden"` discards **entire lines/columns**, not partial content. Unlike CSS
   pixel-level clipping, it drops any line whose baseline exceeds the box boundary.
 - `lineHeight=0` (auto) calculates from font metrics (`ascent + descent + leading`), not

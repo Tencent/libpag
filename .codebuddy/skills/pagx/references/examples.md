@@ -100,7 +100,7 @@ layout for positioning elements within a Layer.
 
 ### Simple Text Labels
 
-Single-line labels positioned with Text constraint attributes directly:
+Single-line labels positioned with constraint attributes. Use `centerX`/`centerY` for centering — TextBox measures its own size automatically:
 
 ```xml
 <pagx version="1.0" width="300" height="200">
@@ -109,8 +109,7 @@ Single-line labels positioned with Text constraint attributes directly:
       <Rectangle size="300,200" roundness="12"/>
       <Fill color="#1E293B"/>
     </Group>
-    <TextBox left="0" right="0" top="0" bottom="0"
-             textAlign="center" paragraphAlign="middle">
+    <TextBox centerX="0" centerY="0">
       <Text text="30" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
       <Fill color="#FFF"/>
     </TextBox>
@@ -121,21 +120,23 @@ Single-line labels positioned with Text constraint attributes directly:
 **Multiple labels with different painters**:
 
 ```xml
-<Layer width="300" height="100">
-  <Group>
-    <Rectangle size="300,100" roundness="12"/>
-    <Fill color="#1E293B"/>
-  </Group>
-  <Group>
-    <Text text="Balance" fontFamily="Arial" fontSize="12" left="16" top="12"/>
-    <Fill color="#94A3B8"/>
-  </Group>
-  <Group>
-    <Text text="$12,580" fontFamily="Arial" fontStyle="Bold" fontSize="28"
-          left="16" top="32"/>
-    <Fill color="#FFF"/>
-  </Group>
-</Layer>
+<pagx version="1.0" width="300" height="100">
+  <Layer width="300" height="100">
+    <Group>
+      <Rectangle size="300,100" roundness="12"/>
+      <Fill color="#1E293B"/>
+    </Group>
+    <Group>
+      <Text text="Balance" fontFamily="Arial" fontSize="12" left="16" top="12"/>
+      <Fill color="#94A3B8"/>
+    </Group>
+    <Group>
+      <Text text="$12,580" fontFamily="Arial" fontStyle="Bold" fontSize="28"
+            left="16" top="32"/>
+      <Fill color="#FFF"/>
+    </Group>
+  </Layer>
+</pagx>
 ```
 
 ### Card with Shadow
@@ -144,11 +145,11 @@ Single-line labels positioned with Text constraint attributes directly:
 <pagx version="1.0" width="340" height="240">
   <Layer width="340" height="240">
     <!-- Background fills the entire canvas using constraint layout -->
-    <!-- Constraints (left="0" right="0" top="0" bottom="0") eliminate manual size calculation -->
+    <!-- Constraints (left="0" right="0" top="0" bottom="0") are derived automatically from parents -->
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
-    <!-- Card positioned with constraints: left/right/top margins, fixed height -->
-    <Layer left="20" right="20" top="20" height="200">
+    <!-- Card positioned with constraints: all sides have margins -->
+    <Layer left="20" right="20" top="20" bottom="20">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
       <Fill color="#FFFFFF"/>
       <DropShadowStyle offsetY="4" blurX="8" blurY="8" color="#00000020"/>
@@ -157,145 +158,111 @@ Single-line labels positioned with Text constraint attributes directly:
 </pagx>
 ```
 
-**Pattern**: White cards need a non-white background to be visible.
+**Pattern**: White cards need a non-white background to be visible. Card uses complete
+constraint layout (left, right, top, bottom) to scale with parent, not fixed height.
 
 ### Button with Centered Label
 
 ```xml
 <pagx version="1.0" width="200" height="80">
-  <Layer width="200" height="80">
-    <!-- Button uses constraint positioning instead of manual x/y offset -->
-    <Layer left="20" top="18" width="160" height="44">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="22"/>
-      <Fill color="#3B82F6"/>
-      <TextBox left="0" right="0" top="0" bottom="0"
-               textAlign="center" paragraphAlign="middle">
-        <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <Fill color="#FFF"/>
-        <!-- TextBox with constraints stretches to fill button, centers text -->
-      </TextBox>
-      <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#3B82F640"/>
-    </Layer>
+  <Layer left="20" top="18" width="160" height="44">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="22"/>
+    <Fill color="#3B82F6"/>
+    <TextBox centerX="0" centerY="0">
+      <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+      <Fill color="#FFF"/>
+    </TextBox>
+    <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#3B82F640"/>
   </Layer>
 </pagx>
 ```
 
-**Pattern**: TextBox with stretch constraints fills the button area, then `textAlign`/`paragraphAlign`
-centers text within. TextBox isolates text Fill from rectangle Fill.
+**Pattern**: TextBox with `centerX`/`centerY` auto-sizes and centers text within the button.
+TextBox isolates text Fill from rectangle Fill.
 
 ### Icon + Label Row
 
 ```xml
 <pagx version="1.0" width="120" height="40">
-  <Layer width="120" height="40" layout="horizontal" gap="8" padding="8" alignment="center">
-    <Layer width="24" height="24">
-      <Ellipse left="0" right="0" top="0" bottom="0"/>
+  <Layer width="120" height="40">
+    <Group left="8" centerY="0">
+      <Ellipse size="24,24"/>
       <Fill color="#10B981"/>
-    </Layer>
-    <Layer height="24">
-      <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle">
-        <Text text="Online" fontFamily="Arial" fontSize="14"/>
-        <Fill color="#374151"/>
-      </TextBox>
-    </Layer>
+    </Group>
+    <TextBox left="40" centerY="0">
+      <Text text="Online" fontFamily="Arial" fontSize="14"/>
+      <Fill color="#374151"/>
+    </TextBox>
   </Layer>
 </pagx>
 ```
 
-**Pattern**: Icon Layer has fixed size; label Layer is flexible (no explicit width, sized by content).
+**Pattern**: Simple two-element row uses constraint positioning directly — no container
+layout needed. `left="40"` = 8 padding + 24 icon + 8 gap.
 
 ### Card with Internal Layout (Container Layout)
 
-A common pattern: a card that is a child in an outer container, with its own internal
-container layout for arranging title, content, and action areas vertically. This
-demonstrates the recursive two-step layout process — the card participates in its parent's
-layout AND manages its own children's layout.
+A card with vertical container layout arranging title, value, and action buttons.
 
 ```xml
-<pagx version="1.0" width="380" height="280">
-  <Layer width="380" height="280">
-    <!-- Page background -->
+<pagx version="1.0" width="340" height="220">
+  <Layer width="340" height="220">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
-    <!-- Content column -->
-    <Layer left="0" right="0" top="0" bottom="0"
-           layout="vertical" gap="12" padding="20" alignment="stretch">
-      <!-- Card: fixed height, internal vertical layout -->
-      <Layer height="180" layout="vertical" gap="12" padding="16" alignment="stretch">
-        <!-- Background (excluded from layout flow) -->
-        <Layer includeInLayout="false" left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
-          <Fill color="#FFF"/>
-          <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000015"/>
-        </Layer>
-        <!-- Title row: icon + text -->
-        <Layer height="24" layout="horizontal" gap="8" alignment="center">
-          <Layer width="24" height="24">
-            <Ellipse left="0" right="0" top="0" bottom="0"/>
-            <Fill color="#6366F1"/>
-          </Layer>
-          <Layer height="24">
-            <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle">
-              <Text text="Account Balance" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-              <Fill color="#1E293B"/>
-            </TextBox>
-          </Layer>
-        </Layer>
-        <!-- Value display -->
-        <Layer height="40">
-          <Text text="$12,580.00" fontFamily="Arial" fontStyle="Bold" fontSize="28"
-                left="0" centerY="0"/>
-          <Fill color="#1E293B"/>
-        </Layer>
-        <!-- Action buttons: two equal-width buttons -->
-        <Layer height="44" layout="horizontal" gap="12" alignment="stretch">
-          <Layer flex="1">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
-            <Fill color="#6366F1"/>
-            <TextBox left="0" right="0" top="0" bottom="0"
-                     textAlign="center" paragraphAlign="middle">
-              <Text text="Send" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-              <Fill color="#FFF"/>
-            </TextBox>
-          </Layer>
-          <Layer flex="1">
-            <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
-            <Fill color="#F1F5F9"/>
-            <Stroke color="#CBD5E1" width="1" align="inside"/>
-            <TextBox left="0" right="0" top="0" bottom="0"
-                     textAlign="center" paragraphAlign="middle">
-              <Text text="Request" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-              <Fill color="#1E293B"/>
-            </TextBox>
-          </Layer>
-        </Layer>
-      </Layer>
-      <!-- Second card (same pattern, abbreviated) -->
-      <Layer height="48">
+    <!-- Card with internal vertical layout -->
+    <Layer left="20" right="20" top="20" bottom="20"
+           layout="vertical" gap="12" padding="16" alignment="stretch">
+      <!-- Background (excluded from layout flow) -->
+      <Layer includeInLayout="false" left="0" right="0" top="0" bottom="0">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
         <Fill color="#FFF"/>
         <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000015"/>
-        <TextBox left="16" top="0" bottom="0" paragraphAlign="middle">
-          <Text text="Recent Activity" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+      </Layer>
+      <!-- Title -->
+      <Layer height="20">
+        <TextBox centerY="0">
+          <Text text="Account Balance" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
           <Fill color="#1E293B"/>
         </TextBox>
+      </Layer>
+      <!-- Value -->
+      <Layer height="36">
+        <TextBox centerY="0">
+          <Text text="$12,580" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+          <Fill color="#1E293B"/>
+        </TextBox>
+      </Layer>
+      <!-- Action buttons: two equal-width buttons -->
+      <Layer height="44" layout="horizontal" gap="12" alignment="stretch">
+        <Layer flex="1">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
+          <Fill color="#6366F1"/>
+          <TextBox centerX="0" centerY="0">
+            <Text text="Send" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+            <Fill color="#FFF"/>
+          </TextBox>
+        </Layer>
+        <Layer flex="1">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
+          <Fill color="#F1F5F9"/>
+          <Stroke color="#CBD5E1" width="1" align="inside"/>
+          <TextBox centerX="0" centerY="0">
+            <Text text="Request" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+            <Fill color="#1E293B"/>
+          </TextBox>
+        </Layer>
       </Layer>
     </Layer>
   </Layer>
 </pagx>
 ```
 
-**Pattern**: The first card uses fixed `height="180"` with
-`layout="vertical" gap="12" padding="16" alignment="stretch"` to arrange children. Key
-structural choices:
+**Pattern**: Key structural choices:
 
 - **Background as overlay**: `includeInLayout="false"` + stretch constraints keeps background
   out of layout flow while filling the card's computed size.
-- **Title row nested horizontal layout**: icon (fixed 24×24) + label (flexible width).
-- **Equal-width buttons**: two flex children (`flex="1"`) in horizontal container with
-  `alignment="stretch"` — buttons fill cross-axis height automatically.
-- **Text layout**: buttons use TextBox for `textAlign`/`paragraphAlign` centering; title uses
-  TextBox for `paragraphAlign="middle"`; value display uses Text constraints directly.
+- **Equal-width buttons**: `flex="1"` children in horizontal container with
+  `alignment="stretch"` — buttons fill both axes automatically.
 
 For a **flexible height** example — where some children have fixed height and others expand to
 fill remaining space — see Dashboard Layout below.
@@ -309,7 +276,7 @@ fill remaining space — see Dashboard Layout below.
     <Layer height="48">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
       <Fill color="#1E293B"/>
-      <TextBox left="16" top="0" bottom="0" paragraphAlign="middle">
+      <TextBox left="16" centerY="0">
         <Text text="Dashboard" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
         <Fill color="#FFF"/>
       </TextBox>
@@ -336,8 +303,7 @@ fill remaining space — see Dashboard Layout below.
     <Layer height="40">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
       <Fill color="#F8FAFC"/>
-      <TextBox left="0" right="0" top="0" bottom="0"
-               textAlign="center" paragraphAlign="middle">
+      <TextBox centerX="0" centerY="0">
         <Text text="© 2025 Dashboard" fontFamily="Arial" fontSize="12"/>
         <Fill color="#94A3B8"/>
       </TextBox>
@@ -357,7 +323,7 @@ remaining space. Three child Layers with `flex="1"` equally share available widt
     <Layer height="48">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
       <Fill color="#F1F5F9"/>
-      <TextBox left="12" top="0" bottom="0" paragraphAlign="middle">
+      <TextBox left="12" centerY="0">
         <Text text="Item 1" fontFamily="Arial" fontSize="14"/>
         <Fill color="#1E293B"/>
       </TextBox>
@@ -365,7 +331,7 @@ remaining space. Three child Layers with `flex="1"` equally share available widt
     <Layer height="48">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
       <Fill color="#F1F5F9"/>
-      <TextBox left="12" top="0" bottom="0" paragraphAlign="middle">
+      <TextBox left="12" centerY="0">
         <Text text="Item 2" fontFamily="Arial" fontSize="14"/>
         <Fill color="#1E293B"/>
       </TextBox>
@@ -373,7 +339,7 @@ remaining space. Three child Layers with `flex="1"` equally share available widt
     <Layer height="48">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
       <Fill color="#F1F5F9"/>
-      <TextBox left="12" top="0" bottom="0" paragraphAlign="middle">
+      <TextBox left="12" centerY="0">
         <Text text="Item 3" fontFamily="Arial" fontSize="14"/>
         <Fill color="#1E293B"/>
       </TextBox>
@@ -382,20 +348,20 @@ remaining space. Three child Layers with `flex="1"` equally share available widt
 </pagx>
 ```
 
-**Pattern**: TextBox uses `left` constraint for left-margin alignment.
+**Pattern**: `left` + `centerY` positions text with left margin and vertical centering.
 
 ### Progress Bar
 
 ```xml
 <pagx version="1.0" width="260" height="30">
   <Layer width="260" height="30">
-    <!-- Track centered with centerX/centerY constraints -->
+    <!-- Track -->
     <Group centerX="0" centerY="0">
       <Rectangle size="240,8" roundness="4"/>
       <Fill color="#E2E8F0"/>
     </Group>
-    <!-- Fill bar using constraint positioning (left-aligned, vertically centered) -->
-    <Group left="0" right="0" top="0" bottom="0">
+    <!-- Fill bar -->
+    <Group>
       <Rectangle left="10" centerY="0" size="168,8" roundness="4"/>
       <Fill color="#3B82F6"/>
     </Group>
@@ -403,30 +369,31 @@ remaining space. Three child Layers with `flex="1"` equally share available widt
 </pagx>
 ```
 
-**Pattern**: Track centered with `centerX/centerY="0"`; fill bar uses `left` + `centerY="0"`
+**Pattern**: Track uses `centerX/centerY` for centering; fill bar uses `left` + `centerY`
 for left-aligned vertical centering.
 
 ### Avatar with Circular Mask
 
 ```xml
-<Layer width="120" height="120">
-  <!-- Mask layer (invisible, defines clip shape) -->
-  <Layer left="18" top="18" id="avatarClip" visible="false">
-    <Ellipse size="64,64"/>
-    <Fill color="#FFF"/>
+<pagx version="1.0" width="120" height="120">
+  <Layer width="120" height="120">
+    <!-- Mask layer (invisible, defines clip shape) -->
+    <Layer left="18" top="18" id="avatarClip" visible="false">
+      <Ellipse size="64,64"/>
+      <Fill color="#FFF"/>
+    </Layer>
+    <!-- Content layer with mask applied -->
+    <Layer left="18" top="18" mask="@avatarClip">
+      <Rectangle size="64,64"/>
+      <Fill>
+        <ImagePattern image="@avatar"/>
+      </Fill>
+    </Layer>
   </Layer>
-  <!-- Content layer with mask applied -->
-  <Layer left="18" top="18" mask="@avatarClip">
-    <Rectangle size="64,64"/>
-    <Fill>
-      <ImagePattern image="@avatar"/>
-    </Fill>
-  </Layer>
-</Layer>
-
-<Resources>
-  <Image id="avatar" source="avatar.png"/>
-</Resources>
+  <Resources>
+    <Image id="avatar" source="avatar.png"/>
+  </Resources>
+</pagx>
 ```
 
 **Pattern**: Use opaque fill in mask layer — `maskType="alpha"` (default) means fully opaque =
@@ -493,10 +460,8 @@ RadialGradient `center` defaults to `0,0` (aligns with Polystar origin); `radius
 ```xml
 <pagx version="1.0" width="200" height="200">
   <Layer width="200" height="200">
-    <Layer left="0" right="0" top="0" bottom="0">
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
-      <Fill color="#E2E8F0"/>
-    </Layer>
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#E2E8F0"/>
     <Layer centerX="0" centerY="0" width="140" height="140">
       <Ellipse left="0" right="0" top="0" bottom="0"/>
       <Fill color="#CBD5E1"/>
@@ -545,8 +510,7 @@ use Group `rotation` to reposition the start point.
       <Repeater copies="10" anchor="70,70" position="0,0" rotation="30" offset="7.5"/>
     </Group>
     <!-- Center percentage text -->
-    <TextBox centerX="0" centerY="0" width="80" height="36"
-             textAlign="center" paragraphAlign="middle">
+    <TextBox centerX="0" centerY="0">
       <Text text="67%" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
       <Fill color="#1E293B"/>
     </TextBox>
@@ -667,53 +631,45 @@ are a single multi-M Path.
     </Layer>
     <!-- Legend -->
     <Layer left="200" top="40" width="120" height="120" layout="vertical" gap="12">
-      <Layer height="20" layout="horizontal" gap="8" alignment="center">
-        <Layer width="10" height="10">
-          <Ellipse left="0" right="0" top="0" bottom="0"/>
+      <Layer height="20">
+        <Group left="0" centerY="0">
+          <Ellipse size="10,10"/>
           <Fill color="#3B82F6"/>
-        </Layer>
-        <Layer height="20">
-          <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle">
-            <Text text="Sales 40%" fontFamily="Arial" fontSize="12"/>
-            <Fill color="#334155"/>
-          </TextBox>
-        </Layer>
+        </Group>
+        <TextBox left="18" centerY="0">
+          <Text text="Sales 40%" fontFamily="Arial" fontSize="12"/>
+          <Fill color="#334155"/>
+        </TextBox>
       </Layer>
-      <Layer height="20" layout="horizontal" gap="8" alignment="center">
-        <Layer width="10" height="10">
-          <Ellipse left="0" right="0" top="0" bottom="0"/>
+      <Layer height="20">
+        <Group left="0" centerY="0">
+          <Ellipse size="10,10"/>
           <Fill color="#10B981"/>
-        </Layer>
-        <Layer height="20">
-          <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle">
-            <Text text="Growth 30%" fontFamily="Arial" fontSize="12"/>
-            <Fill color="#334155"/>
-          </TextBox>
-        </Layer>
+        </Group>
+        <TextBox left="18" centerY="0">
+          <Text text="Growth 30%" fontFamily="Arial" fontSize="12"/>
+          <Fill color="#334155"/>
+        </TextBox>
       </Layer>
-      <Layer height="20" layout="horizontal" gap="8" alignment="center">
-        <Layer width="10" height="10">
-          <Ellipse left="0" right="0" top="0" bottom="0"/>
+      <Layer height="20">
+        <Group left="0" centerY="0">
+          <Ellipse size="10,10"/>
           <Fill color="#F59E0B"/>
-        </Layer>
-        <Layer height="20">
-          <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle">
-            <Text text="Costs 20%" fontFamily="Arial" fontSize="12"/>
-            <Fill color="#334155"/>
-          </TextBox>
-        </Layer>
+        </Group>
+        <TextBox left="18" centerY="0">
+          <Text text="Costs 20%" fontFamily="Arial" fontSize="12"/>
+          <Fill color="#334155"/>
+        </TextBox>
       </Layer>
-      <Layer height="20" layout="horizontal" gap="8" alignment="center">
-        <Layer width="10" height="10">
-          <Ellipse left="0" right="0" top="0" bottom="0"/>
+      <Layer height="20">
+        <Group left="0" centerY="0">
+          <Ellipse size="10,10"/>
           <Fill color="#EF4444"/>
-        </Layer>
-        <Layer height="20">
-          <TextBox left="0" right="0" top="0" bottom="0" paragraphAlign="middle">
-            <Text text="Other 10%" fontFamily="Arial" fontSize="12"/>
-            <Fill color="#334155"/>
-          </TextBox>
-        </Layer>
+        </Group>
+        <TextBox left="18" centerY="0">
+          <Text text="Other 10%" fontFamily="Arial" fontSize="12"/>
+          <Fill color="#334155"/>
+        </TextBox>
       </Layer>
     </Layer>
   </Layer>
@@ -721,8 +677,7 @@ are a single multi-M Path.
 ```
 
 **Pattern**: Small gaps between segments (e.g., `end="0.38"` instead of `0.4`) create visual
-separation. Legend uses nested container layout — vertical rows of horizontal [dot + label]
-pairs. Color dot has fixed size; label is flexible.
+separation. Legend rows use constraint positioning (dot + label), vertical layout for row spacing.
 
 **Gradient stroke variant**: for a ring progress indicator with gradient color, apply a
 LinearGradient directly inside the Stroke element:
@@ -786,10 +741,8 @@ and BackgroundBlurStyle for frosted glass.
 <pagx version="1.0" width="500" height="120">
   <Layer width="500" height="120">
     <!-- Light background to make white cards visible -->
-    <Layer left="0" right="0" top="0" bottom="0">
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
-      <Fill color="#F1F5F9"/>
-    </Layer>
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
     <!-- Reference Composition instances with constraint positioning -->
     <Layer composition="@card" left="20" top="20"/>
     <Layer composition="@card" left="170" top="20"/>
