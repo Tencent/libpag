@@ -123,14 +123,14 @@
       <Text text="PWR: 88%" fontFamily="Arial" fontSize="12"/>
       <Fill color="#00CCFF" alpha="0.7"/>
     </Group>
-    <Group position="0,18">
+    <Layer top="18">
       <Text text="RADAR: ACT" fontFamily="Arial" fontSize="12"/>
       <Fill color="#00CCFF" alpha="0.7"/>
-    </Group>
-    <Group position="0,36">
+    </Layer>
+    <Layer top="36">
       <Text text="SHIELD: OK" fontFamily="Arial" fontSize="12"/>
       <Fill color="#00CCFF" alpha="0.7"/>
-    </Group>
+    </Layer>
   </Layer>
   <Layer name="RightSide" left="400" top="300">
     <Layer>
