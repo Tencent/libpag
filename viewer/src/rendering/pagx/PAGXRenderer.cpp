@@ -26,8 +26,7 @@ PAGXRenderer::PAGXRenderer(PAGXViewModel* viewModel, ContentView* contentView)
 }
 
 bool PAGXRenderer::isReady() const {
-  return viewModel != nullptr && viewModel->getDisplayList() != nullptr &&
-         contentView->getDrawable() != nullptr;
+  return viewModel != nullptr && contentView->getDrawable() != nullptr;
 }
 
 void PAGXRenderer::updateSize() {
@@ -43,6 +42,19 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
     return metrics;
   }
   if (!isReady()) {
+    return metrics;
+  }
+
+  auto state = viewModel->lockRenderState();
+  // Use a scope guard to ensure unlock even on early return.
+  struct RenderStateGuard {
+    PAGXViewModel* vm;
+    ~RenderStateGuard() {
+      vm->unlockRenderState();
+    }
+  } guard{viewModel};
+
+  if (state.displayList == nullptr) {
     return metrics;
   }
 
@@ -62,28 +74,26 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
     return metrics;
   }
 
-  auto* contentLayer = viewModel->getContentLayer();
-  int contentWidth = viewModel->getContentWidth();
-  int contentHeight = viewModel->getContentHeight();
-  if (contentLayer != nullptr && contentWidth > 0 && contentHeight > 0) {
+  if (state.contentLayer != nullptr && state.contentWidth > 0 && state.contentHeight > 0) {
     int surfaceWidth = surface->width();
     int surfaceHeight = surface->height();
-    float scaleX = static_cast<float>(surfaceWidth) / static_cast<float>(contentWidth);
-    float scaleY = static_cast<float>(surfaceHeight) / static_cast<float>(contentHeight);
+    float scaleX = static_cast<float>(surfaceWidth) / static_cast<float>(state.contentWidth);
+    float scaleY = static_cast<float>(surfaceHeight) / static_cast<float>(state.contentHeight);
     float scale = std::min(scaleX, scaleY);
     float offsetX =
-        (static_cast<float>(surfaceWidth) - static_cast<float>(contentWidth) * scale) * 0.5f;
+        (static_cast<float>(surfaceWidth) - static_cast<float>(state.contentWidth) * scale) * 0.5f;
     float offsetY =
-        (static_cast<float>(surfaceHeight) - static_cast<float>(contentHeight) * scale) * 0.5f;
+        (static_cast<float>(surfaceHeight) - static_cast<float>(state.contentHeight) * scale) *
+        0.5f;
     auto matrix = tgfx::Matrix::MakeTrans(offsetX, offsetY);
     matrix.preScale(scale, scale);
-    contentLayer->setMatrix(matrix);
+    state.contentLayer->setMatrix(matrix);
   }
 
   auto renderStart = tgfx::Clock::Now();
   auto canvas = surface->getCanvas();
   canvas->clear();
-  viewModel->getDisplayList()->render(surface.get());
+  state.displayList->render(surface.get());
   auto recording = context->flush();
   metrics.renderTime = tgfx::Clock::Now() - renderStart;
 

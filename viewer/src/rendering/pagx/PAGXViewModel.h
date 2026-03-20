@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <mutex>
 #include "pagx/PAGXDocument.h"
 #include "rendering/ContentViewModel.h"
 #include "tgfx/layers/DisplayList.h"
@@ -62,13 +63,19 @@ class PAGXViewModel : public ContentViewModel {
   Q_INVOKABLE void nextFrame() override;
   Q_INVOKABLE void previousFrame() override;
 
+  struct RenderState {
+    tgfx::DisplayList* displayList = nullptr;
+    tgfx::Layer* contentLayer = nullptr;
+    int contentWidth = 0;
+    int contentHeight = 0;
+  };
+
   void setWindow(QQuickWindow* window);
   bool takeNeedsRender();
   void markNeedsRender();
-  tgfx::DisplayList* getDisplayList() const;
-  tgfx::Layer* getContentLayer() const;
-  int getContentWidth() const;
-  int getContentHeight() const;
+  RenderState lockRenderState();
+  void unlockRenderState();
+  bool hasContent() const;
 
   Q_SIGNAL void pagxDocumentChanged(std::shared_ptr<pagx::PAGXDocument> pagxDocument);
   Q_SIGNAL void requestFlush();
@@ -80,6 +87,7 @@ class PAGXViewModel : public ContentViewModel {
 
   QQuickWindow* window = nullptr;
   std::atomic_bool needsRender = false;
+  mutable std::mutex renderMutex;
   std::shared_ptr<pagx::PAGXDocument> pagxDocument = nullptr;
   std::shared_ptr<tgfx::Layer> pagxContentLayer = nullptr;
   std::unique_ptr<tgfx::DisplayList> displayList = nullptr;

@@ -63,6 +63,10 @@ void PAGView::initDrawable() {
   }
   viewModel->setWindow(this->window());
   auto pagSurface = PAGSurface::MakeFrom(drawable);
+  if (pagSurface == nullptr) {
+    drawable = nullptr;
+    return;
+  }
   viewModel->getPAGPlayer()->setSurface(pagSurface);
   if (renderThread != nullptr) {
     drawable->moveToThread(renderThread.get());
@@ -106,6 +110,7 @@ void PAGView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometr
 QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   if (!renderThread->isRunning()) {
     renderThread->start();
+    lastPlayTime = tgfx::Clock::Now();
   }
 
   auto node = updateTextureNode(oldNode);

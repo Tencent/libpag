@@ -74,7 +74,7 @@ void PAGXView::sizeChangedDelayHandle() {
 }
 
 void PAGXView::flush() const {
-  if (viewModel->getDisplayList() != nullptr) {
+  if (viewModel->hasContent()) {
     triggerFlush();
   }
 }
@@ -84,7 +84,7 @@ void PAGXView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeomet
     return;
   }
   ContentView::geometryChange(newGeometry, oldGeometry);
-  if (viewModel->getDisplayList() != nullptr) {
+  if (viewModel->hasContent()) {
     resizeTimer->start(400);
   }
 }

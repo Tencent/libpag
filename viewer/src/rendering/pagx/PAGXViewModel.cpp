@@ -139,20 +139,18 @@ void PAGXViewModel::markNeedsRender() {
   needsRender = true;
 }
 
-tgfx::DisplayList* PAGXViewModel::getDisplayList() const {
-  return displayList.get();
+PAGXViewModel::RenderState PAGXViewModel::lockRenderState() {
+  renderMutex.lock();
+  return {displayList.get(), pagxContentLayer.get(), pagxWidth, pagxHeight};
 }
 
-tgfx::Layer* PAGXViewModel::getContentLayer() const {
-  return pagxContentLayer.get();
+void PAGXViewModel::unlockRenderState() {
+  renderMutex.unlock();
 }
 
-int PAGXViewModel::getContentWidth() const {
-  return pagxWidth;
-}
-
-int PAGXViewModel::getContentHeight() const {
-  return pagxHeight;
+bool PAGXViewModel::hasContent() const {
+  std::lock_guard<std::mutex> lock(renderMutex);
+  return displayList != nullptr;
 }
 
 void PAGXViewModel::setIsPlaying(bool isPlaying) {
@@ -197,26 +195,28 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
     return false;
   }
 
-  clearContent();
-  currentFilePath = strPath;
-  pagxDocument = document;
-  pagxWidth = static_cast<int>(document->width);
-  pagxHeight = static_cast<int>(document->height);
-
-  pagxContentLayer = pagx::LayerBuilder::Build(document.get());
-  if (pagxContentLayer == nullptr) {
-    clearContent();
+  auto newContentLayer = pagx::LayerBuilder::Build(document.get());
+  if (newContentLayer == nullptr) {
     Q_EMIT fileChanged(nullptr);
     Q_EMIT pagxDocumentChanged(nullptr);
     return false;
   }
 
-  updateAnimationState();
+  auto newDisplayList = std::make_unique<tgfx::DisplayList>();
+  newDisplayList->root()->addChild(newContentLayer);
 
-  displayList = std::make_unique<tgfx::DisplayList>();
-  displayList->root()->addChild(pagxContentLayer);
-
-  needsRender = true;
+  {
+    std::lock_guard<std::mutex> lock(renderMutex);
+    clearContent();
+    currentFilePath = strPath;
+    pagxDocument = document;
+    pagxWidth = static_cast<int>(document->width);
+    pagxHeight = static_cast<int>(document->height);
+    pagxContentLayer = newContentLayer;
+    updateAnimationState();
+    displayList = std::move(newDisplayList);
+    needsRender = true;
+  }
   Q_EMIT fileChanged(nullptr);
   Q_EMIT filePathChanged(QString::fromLocal8Bit(strPath.data()));
   Q_EMIT widthChanged(pagxWidth);
@@ -274,6 +274,7 @@ void PAGXViewModel::clearContent() {
   progressPerFrame = 1.0;
   isPlaying_ = false;
   needsRender = false;
+  // Note: called only while holding renderMutex (from loadFile) or during destruction.
 }
 
 void PAGXViewModel::updateAnimationState() {
