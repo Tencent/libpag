@@ -3,8 +3,8 @@
 <!-- Fully automatic layout: containers are flexible (no width) — auto-equal distribution -->
 <pagx version="1.0" width="800" height="590">
   <!-- Background -->
-  <Layer>
-    <Rectangle position="400,295" size="800,590"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F8FAFC"/>
   </Layer>
 

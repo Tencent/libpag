@@ -2,8 +2,8 @@
 <!-- Flex layout: equal distribution, spaceBetween, mixed fixed/flex, and grid -->
 <pagx version="1.0" width="820" height="380">
   <!-- Background -->
-  <Layer>
-    <Rectangle position="410,190" size="820,380"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F8FAFC"/>
   </Layer>
 
@@ -12,7 +12,7 @@
     <Layer layout="horizontal" gap="20">
       <!-- 1. Horizontal flex: 3 equal-width cards with gap and padding -->
       <Layer width="370" height="150" layout="horizontal" gap="10" padding="10">
-        <Rectangle position="185,75" size="370,150" roundness="4"/>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Fill color="#E6E6E6"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer height="130" flex="1">
@@ -31,7 +31,7 @@
 
       <!-- 2. Horizontal spaceBetween + center alignment: 4 items with different heights -->
       <Layer width="370" height="150" layout="horizontal" arrangement="spaceBetween" alignment="center" gap="0">
-        <Rectangle position="185,75" size="370,150" roundness="4"/>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Fill color="#E6E6E6"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="60" height="60">
@@ -57,7 +57,7 @@
     <Layer layout="horizontal" gap="20">
       <!-- 3. Mixed fixed-width and flex items -->
       <Layer width="370" height="150" layout="horizontal" gap="10" padding="10">
-        <Rectangle position="185,75" size="370,150" roundness="4"/>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Fill color="#E6E6E6"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <!-- Fixed 80px -->
@@ -84,7 +84,7 @@
 
       <!-- 4. 3x3 Grid: vertical outer with 3 horizontal rows -->
       <Layer width="370" height="150" layout="horizontal" gap="10" padding="10">
-        <Rectangle position="185,75" size="370,150" roundness="4"/>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Fill color="#E6E6E6"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="60" height="130">

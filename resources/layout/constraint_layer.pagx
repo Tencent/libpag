@@ -2,44 +2,44 @@
 <!-- Layer constraint layout in absolute mode: child Layers positioned by constraints within parent -->
 <pagx version="1.0" width="600" height="400">
   <!-- Background -->
-  <Layer>
-    <Rectangle position="300,200" size="600,400"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F8FAFC"/>
   </Layer>
 
   <!-- Parent container with explicit size, default absolute layout -->
   <Layer width="600" height="400">
     <!-- Container border -->
-    <Rectangle position="300,200" size="600,400"/>
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
 
     <!-- Box 1: top-left corner (left=20, top=20) -->
     <Layer width="80" height="60" left="20" top="20">
-      <Rectangle position="40,30" size="80,60" roundness="8"/>
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
       <Fill color="#FF6B6B"/>
     </Layer>
 
     <!-- Box 2: top-right corner (right=20, top=20) -->
     <Layer width="80" height="60" right="20" top="20">
-      <Rectangle position="40,30" size="80,60" roundness="8"/>
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
       <Fill color="#4ECDC4"/>
     </Layer>
 
     <!-- Box 3: bottom-left corner (left=20, bottom=20) -->
     <Layer width="80" height="60" left="20" bottom="20">
-      <Rectangle position="40,30" size="80,60" roundness="8"/>
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
       <Fill color="#45B7D1"/>
     </Layer>
 
     <!-- Box 4: bottom-right corner (right=20, bottom=20) -->
     <Layer width="80" height="60" right="20" bottom="20">
-      <Rectangle position="40,30" size="80,60" roundness="8"/>
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
       <Fill color="#FFA07A"/>
     </Layer>
 
     <!-- Box 5: centered (centerX=0, centerY=0) -->
     <Layer width="100" height="80" centerX="0" centerY="0">
-      <Rectangle position="50,40" size="100,80" roundness="8"/>
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
       <Fill color="#95E1D3"/>
     </Layer>
 

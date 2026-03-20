@@ -2,8 +2,8 @@
 <!-- Vertical layout: arrangement and alignment combinations -->
 <pagx version="1.0" width="440" height="520">
   <!-- Background -->
-  <Layer>
-    <Rectangle position="220,260" size="440,520"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F8FAFC"/>
   </Layer>
 
@@ -12,7 +12,7 @@
     <Layer flex="1" layout="horizontal" gap="20">
       <!-- 1. Vertical arrangement=center: two items centered vertically -->
       <Layer width="180" height="220" layout="vertical" arrangement="center" gap="10">
-        <Rectangle position="90,110" size="180,220" roundness="4"/>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="160" height="60">
@@ -27,7 +27,7 @@
 
       <!-- 2. Vertical arrangement=end: two items pushed to bottom -->
       <Layer width="180" height="220" layout="vertical" arrangement="end" gap="10">
-        <Rectangle position="90,110" size="180,220" roundness="4"/>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="160" height="60">
@@ -45,7 +45,7 @@
     <Layer flex="1" layout="horizontal" gap="20">
       <!-- 3. Vertical alignment=center: cross-axis (X) centering with different widths -->
       <Layer width="180" height="220" layout="vertical" alignment="center" gap="10">
-        <Rectangle position="90,110" size="180,220" roundness="4"/>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="80" height="60">
@@ -64,7 +64,7 @@
 
       <!-- 4. Vertical alignment=end: cross-axis (X) right-aligned -->
       <Layer width="180" height="220" layout="vertical" alignment="end" gap="10">
-        <Rectangle position="90,110" size="180,220" roundness="4"/>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="80" height="60">
