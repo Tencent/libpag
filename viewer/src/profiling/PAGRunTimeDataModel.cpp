@@ -57,6 +57,10 @@ const PAGNodeStatsModel* PAGRunTimeDataModel::getNodeStatsModel() const {
   return &nodeStatsModel;
 }
 
+bool PAGRunTimeDataModel::hasFrameTimeline() const {
+  return !frameTimeMetricsVector.isEmpty();
+}
+
 void PAGRunTimeDataModel::setCurrentFrame(const QString& currentFrame) {
   if (this->currentFrame == currentFrame.toLongLong()) {
     return;
@@ -100,6 +104,7 @@ void PAGRunTimeDataModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
     fileInfoModel.setPAGFile(nullptr);
     updateFrameDisplayInfo(0, 0, 0);
     Q_EMIT fileInfoModelChanged();
+    Q_EMIT hasFrameTimelineChanged();
     Q_EMIT dataChanged();
     return;
   }
@@ -113,6 +118,7 @@ void PAGRunTimeDataModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
   fileInfoModel.setPAGFile(pagFile);
   updateFrameDisplayInfo(0, 0, 0);
   Q_EMIT fileInfoModelChanged();
+  Q_EMIT hasFrameTimelineChanged();
   Q_EMIT dataChanged();
 }
 
@@ -127,6 +133,7 @@ void PAGRunTimeDataModel::setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pa
   updateFrameDisplayInfo(0, 0, 0);
   Q_EMIT fileInfoModelChanged();
   Q_EMIT nodeStatsModelChanged();
+  Q_EMIT hasFrameTimelineChanged();
   Q_EMIT dataChanged();
 }
 

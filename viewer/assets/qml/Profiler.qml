@@ -54,7 +54,7 @@ Item {
         enabled: runTimeDataModel !== null && runTimeDataModel.frameDisplayInfoModel !== null
 
         function onItemsChanged() {
-            if (contentView && contentView.viewModel.contentType !== ContentViewModel.PAG) {
+            if (runTimeDataModel && !runTimeDataModel.hasFrameTimeline) {
                 pagxStatsColumn.totalTime = statistics.calculateTotalTime();
             }
         }
@@ -113,7 +113,7 @@ Item {
             id: fileInfoView
             height: 93
             width: parent.width
-            cellWidth: contentView && contentView.viewModel.contentType !== ContentViewModel.PAG ? width / 3 : width / 4
+            cellWidth: runTimeDataModel && runTimeDataModel.nodeStatsModel.totalCount > 0 ? width / 3 : width / 4
             cellHeight: 46
             boundsBehavior: Flickable.StopAtBounds
             keyNavigationWraps: false
@@ -125,7 +125,7 @@ Item {
                 height: fileInfoView.cellHeight
 
                 Rectangle {
-                    property int columnsPerRow: contentView && contentView.viewModel.contentType !== ContentViewModel.PAG ? 3 : 4
+                    property int columnsPerRow: runTimeDataModel && runTimeDataModel.nodeStatsModel.totalCount > 0 ? 3 : 4
                     height: fileInfoView.cellHeight - 1
                     width: fileInfoView.cellWidth - ((index + 1) % columnsPerRow === 0 ? 0 : 1)
                     color: "#2D2D37"
@@ -229,7 +229,7 @@ Item {
             id: performanceChart
             height: 90
             width: parent.width
-            visible: !contentView || contentView.viewModel.contentType === ContentViewModel.PAG
+            visible: runTimeDataModel && runTimeDataModel.hasFrameTimeline
             color: "#00000000"
 
             Rectangle {
@@ -431,7 +431,7 @@ Item {
         /* Data Statistics */
         Rectangle {
             id: statistics
-            height: contentView && contentView.viewModel.contentType !== ContentViewModel.PAG ? pagxStatsColumn.height : 62
+            height: runTimeDataModel && !runTimeDataModel.hasFrameTimeline ? pagxStatsColumn.height : 62
             width: parent.width
             color: "#00000000"
 
@@ -450,7 +450,7 @@ Item {
 
             Column {
                 id: pagxStatsColumn
-                visible: contentView && contentView.viewModel.contentType !== ContentViewModel.PAG
+                visible: runTimeDataModel && !runTimeDataModel.hasFrameTimeline
                 width: parent.width
                 spacing: 1
 
@@ -575,7 +575,7 @@ Item {
 
             ListView {
                 id: dataListView
-                visible: !contentView || contentView.viewModel.contentType === ContentViewModel.PAG
+                visible: runTimeDataModel && runTimeDataModel.hasFrameTimeline
 
                 width: parent.width
                 boundsBehavior: ListView.StopAtBounds
@@ -673,7 +673,7 @@ Item {
         /* Node Statistics for PAGX */
         Rectangle {
             id: nodeStatistics
-            visible: contentView && contentView.viewModel.contentType !== ContentViewModel.PAG && runTimeDataModel && runTimeDataModel.nodeStatsModel
+            visible: runTimeDataModel && runTimeDataModel.nodeStatsModel.totalCount > 0
             height: visible ? nodeStatsContent.height : 0
             width: parent.width
             color: "#00000000"
@@ -800,7 +800,7 @@ Item {
         /* Theoretical FPS for PAGX */
         Rectangle {
             id: fpsInfo
-            visible: contentView && contentView.viewModel.contentType !== ContentViewModel.PAG
+            visible: runTimeDataModel && !runTimeDataModel.hasFrameTimeline
             height: visible ? 24 : 0
             width: parent.width
             color: "#2D2D37"

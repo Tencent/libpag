@@ -38,7 +38,6 @@ class ContentViewModel : public QObject {
   enum class ContentType {
     PAG,
     PAGX,
-    PAGXAnimated,
   };
   Q_ENUM(ContentType)
 
