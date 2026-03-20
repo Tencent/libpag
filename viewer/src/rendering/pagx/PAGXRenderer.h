@@ -18,12 +18,11 @@
 
 #pragma once
 
-#include <atomic>
+#include "rendering/ContentView.h"
 #include "rendering/IContentRenderer.h"
+#include "rendering/pagx/PAGXViewModel.h"
 
 namespace pag {
-
-class PAGXView;
 
 /**
  * Renderer implementation for PAGX format content. Executes tgfx DisplayList rendering
@@ -31,14 +30,15 @@ class PAGXView;
  */
 class PAGXRenderer : public IContentRenderer {
  public:
-  explicit PAGXRenderer(PAGXView* view);
+  explicit PAGXRenderer(PAGXViewModel* viewModel, ContentView* contentView);
 
   RenderMetrics flush() override;
   void updateSize() override;
   bool isReady() const override;
 
  private:
-  PAGXView* view = nullptr;
+  PAGXViewModel* viewModel = nullptr;
+  ContentView* contentView = nullptr;
 };
 
 }  // namespace pag

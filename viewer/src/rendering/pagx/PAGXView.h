@@ -21,7 +21,6 @@
 #include <QOpenGLContext>
 #include <QQuickWindow>
 #include "rendering/ContentView.h"
-#include "rendering/pagx/PAGXRenderer.h"
 #include "rendering/pagx/PAGXViewModel.h"
 
 namespace pag {
@@ -46,10 +45,10 @@ class PAGXView : public ContentView {
  private:
   void initDrawable() override;
 
-  std::unique_ptr<PAGXViewModel> viewModel = nullptr;
+  Q_SLOT void onRequestSizeChanged();
+  Q_SLOT void onPreferredSizeChanged();
 
-  friend class PAGXRenderer;
-  friend class PAGXViewModel;
+  std::unique_ptr<PAGXViewModel> viewModel = nullptr;
 };
 
 }  // namespace pag

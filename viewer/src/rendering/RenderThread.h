@@ -19,6 +19,7 @@
 #pragma once
 
 #include <QThread>
+#include <memory>
 #include "IContentRenderer.h"
 
 namespace pag {
@@ -32,7 +33,7 @@ class ContentView;
 class RenderThread : public QThread {
   Q_OBJECT
  public:
-  explicit RenderThread(ContentView* view, IContentRenderer* renderer);
+  explicit RenderThread(ContentView* view, std::unique_ptr<IContentRenderer> renderer);
 
   /**
    * Emitted after each rendered frame with timing metrics.
@@ -46,7 +47,7 @@ class RenderThread : public QThread {
 
  private:
   ContentView* view = nullptr;
-  IContentRenderer* renderer = nullptr;
+  std::unique_ptr<IContentRenderer> renderer = nullptr;
 };
 
 }  // namespace pag

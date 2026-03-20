@@ -22,8 +22,8 @@
 
 namespace pag {
 
-RenderThread::RenderThread(ContentView* view, IContentRenderer* renderer)
-    : view(view), renderer(renderer) {
+RenderThread::RenderThread(ContentView* view, std::unique_ptr<IContentRenderer> renderer)
+    : view(view), renderer(std::move(renderer)) {
 }
 
 void RenderThread::flush() {

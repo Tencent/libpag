@@ -23,10 +23,14 @@
 namespace pag {
 
 PAGXView::PAGXView(QQuickItem* parent) : ContentView(parent) {
-  viewModel = std::make_unique<PAGXViewModel>(this);
-  auto pagxRenderer = std::make_unique<PAGXRenderer>(this);
-  renderThread = std::make_unique<RenderThread>(this, pagxRenderer.get());
-  contentRenderer = std::move(pagxRenderer);
+  viewModel = std::make_unique<PAGXViewModel>();
+  connect(viewModel.get(), &PAGXViewModel::requestFlush, this, &PAGXView::triggerFlush);
+  connect(viewModel.get(), &PAGXViewModel::requestSizeChanged, this,
+          &PAGXView::onRequestSizeChanged);
+  connect(viewModel.get(), &PAGXViewModel::preferredSizeChanged, this,
+          &PAGXView::onPreferredSizeChanged);
+  renderThread =
+      std::make_unique<RenderThread>(this, std::make_unique<PAGXRenderer>(viewModel.get(), this));
   renderThread->moveToThread(renderThread.get());
 }
 
@@ -46,22 +50,31 @@ void PAGXView::initDrawable() {
   if (drawable == nullptr) {
     return;
   }
+  viewModel->setWindow(this->window());
   if (renderThread != nullptr) {
     drawable->moveToThread(renderThread.get());
   }
 }
 
+void PAGXView::onRequestSizeChanged() {
+  sizeChanged = true;
+}
+
+void PAGXView::onPreferredSizeChanged() {
+  setSize(viewModel->getPreferredSize());
+}
+
 void PAGXView::sizeChangedDelayHandle() {
   resizeTimer->stop();
   sizeChanged = true;
-  viewModel->needsRender = true;
+  viewModel->markNeedsRender();
   if (renderThread != nullptr) {
     triggerFlush();
   }
 }
 
 void PAGXView::flush() const {
-  if (viewModel->needsRender) {
+  if (viewModel->getDisplayList() != nullptr) {
     triggerFlush();
   }
 }
@@ -71,7 +84,7 @@ void PAGXView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeomet
     return;
   }
   ContentView::geometryChange(newGeometry, oldGeometry);
-  if (viewModel->displayList != nullptr) {
+  if (viewModel->getDisplayList() != nullptr) {
     resizeTimer->start(400);
   }
 }

@@ -28,6 +28,8 @@
 #include "editing/PAGImageProvider.h"
 #include "editing/PAGTextLayerModel.h"
 #include "editing/PAGTreeViewModel.h"
+#include "pag/PAGViewModel.h"
+#include "pagx/PAGXViewModel.h"
 #include "profiling/PAGBenchmarkModel.h"
 #include "profiling/PAGRunTimeDataModel.h"
 
@@ -41,7 +43,7 @@ class PAGWindow : public QObject {
 
   Q_SLOT void openFile(QString path);
   Q_SLOT void onPAGViewerDestroyed();
-  Q_SLOT void onContentViewChanged(ContentView* newContentView);
+  Q_INVOKABLE void notifyContentViewChanged(ContentView* newContentView);
 
   void open();
   QString getFilePath();

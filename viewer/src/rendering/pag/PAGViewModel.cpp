@@ -19,14 +19,10 @@
 #include "rendering/pag/PAGViewModel.h"
 #include <QQuickWindow>
 #include "pag/file.h"
-#include "rendering/pag/PAGView.h"
 #include "tgfx/core/Clock.h"
 #include "version.h"
 
 namespace pag {
-
-constexpr int64_t MaxAudioLeadThreshold = 25000;
-constexpr int64_t MinAudioLagThreshold = -100000;
 
 static void reportPAGFileInfo(const std::shared_ptr<PAGFile>& pagFile, size_t length) {
   QVariantMap map;
@@ -39,11 +35,11 @@ static void reportPAGFileInfo(const std::shared_ptr<PAGFile>& pagFile, size_t le
   qDebug() << map;
 }
 
-PAGViewModel::PAGViewModel(PAGView* view, QObject* parent) : ContentViewModel(parent), view(view) {
+PAGViewModel::PAGViewModel(QObject* parent) : ContentViewModel(parent) {
   pagPlayer = std::make_unique<PAGPlayer>();
   audioPlayer = std::make_unique<PAGAudioPlayer>();
   connect(audioPlayer.get(), &PAGAudioPlayer::audioTimeChanged, this,
-          &PAGViewModel::onAudioTimeChanged, Qt::QueuedConnection);
+          &PAGViewModel::audioTimeChanged, Qt::QueuedConnection);
 }
 
 int PAGViewModel::getWidth() const {
@@ -139,19 +135,15 @@ QColor PAGViewModel::getBackgroundColor() const {
 }
 
 QSizeF PAGViewModel::getPreferredSize() const {
-  if (view == nullptr) {
-    return {0, 0};
-  }
-  auto quickWindow = view->window();
   int pagWidth = getWidth();
   int pagHeight = getHeight();
-  if (quickWindow == nullptr || pagWidth == 0 || pagHeight == 0) {
+  if (window == nullptr || pagWidth == 0 || pagHeight == 0) {
     return {0, 0};
   }
-  auto screen = quickWindow->screen();
+  auto screen = window->screen();
   QSize screenSize = screen->availableVirtualSize();
   qreal maxHeight = screenSize.height() * 0.8;
-  qreal minHeight = quickWindow->minimumHeight();
+  qreal minHeight = window->minimumHeight();
   qreal width = 0;
   qreal height = 0;
 
@@ -171,6 +163,18 @@ QSizeF PAGViewModel::getPreferredSize() const {
   return {width, height};
 }
 
+void PAGViewModel::setWindow(QQuickWindow* win) {
+  window = win;
+}
+
+PAGPlayer* PAGViewModel::getPAGPlayer() const {
+  return pagPlayer.get();
+}
+
+PAGFile* PAGViewModel::getPAGFile() const {
+  return pagFile.get();
+}
+
 void PAGViewModel::setIsPlaying(bool isPlaying) {
   if (this->isPlaying_ == isPlaying) {
     return;
@@ -179,10 +183,7 @@ void PAGViewModel::setIsPlaying(bool isPlaying) {
   this->isPlaying_ = isPlaying;
   Q_EMIT isPlayingChanged(isPlaying);
   if (isPlaying) {
-    lastPlayTime = tgfx::Clock::Now();
-    if (view != nullptr) {
-      view->triggerFlush();
-    }
+    Q_EMIT requestFlush();
   }
 }
 
@@ -220,10 +221,6 @@ bool PAGViewModel::loadFile(const QString& filePath) {
   pagFile->getFile()->path = strPath;
   pagPlayer->setComposition(pagFile);
   audioPlayer->setComposition(pagFile);
-  if (view != nullptr) {
-    view->setSize(getPreferredSize());
-  }
-  view->sizeChanged = true;
   progressPerFrame = 1.0 / (pagFile->frameRate() * pagFile->duration() / 1000000);
   Q_EMIT fileChanged(pagFile->getFile());
   Q_EMIT filePathChanged(QString::fromLocal8Bit(strPath.data()));
@@ -232,6 +229,7 @@ bool PAGViewModel::loadFile(const QString& filePath) {
   Q_EMIT heightChanged(getHeight());
   Q_EMIT totalFrameChanged();
   Q_EMIT preferredSizeChanged();
+  Q_EMIT requestSizeChanged();
   audioPlayer->setVolume(1.0f);
   setProgressInternal(0, true);
   setIsPlaying(true);
@@ -274,19 +272,6 @@ void PAGViewModel::previousFrame() {
   setProgress(newProgress);
 }
 
-void PAGViewModel::onAudioTimeChanged(int64_t audioTime) {
-  auto timeNow = tgfx::Clock::Now();
-  auto displayTime = timeNow - lastPlayTime;
-  auto duration = static_cast<double>(pagPlayer->duration());
-  auto currentDisplayTime = static_cast<int64_t>(progress * duration) + displayTime;
-  if (audioTime == 0 || (audioTime - currentDisplayTime > MaxAudioLeadThreshold)) {
-    lastPlayTime = timeNow;
-    setProgressInternal(static_cast<double>(audioTime) / duration, false);
-  } else if (audioTime - currentDisplayTime < MinAudioLagThreshold) {
-    lastPlayTime = timeNow;
-  }
-}
-
 bool PAGViewModel::hasAudio() const {
   return audioPlayer != nullptr && !audioPlayer->isEmpty();
 }
@@ -298,9 +283,7 @@ void PAGViewModel::setProgressInternal(double progress, bool isAudioSeek) {
   pagPlayer->setProgress(progress);
   this->progress = progress;
   Q_EMIT progressChanged(progress);
-  if (view != nullptr) {
-    view->triggerFlush();
-  }
+  Q_EMIT requestFlush();
 }
 
 }  // namespace pag

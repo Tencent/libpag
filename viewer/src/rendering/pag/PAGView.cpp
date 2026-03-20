@@ -23,11 +23,19 @@
 
 namespace pag {
 
+static constexpr int64_t MaxAudioLeadThreshold = 25000;
+static constexpr int64_t MinAudioLagThreshold = -100000;
+
 PAGView::PAGView(QQuickItem* parent) : ContentView(parent) {
-  viewModel = std::make_unique<PAGViewModel>(this);
-  auto pagRenderer = std::make_unique<PAGRenderer>(this);
-  renderThread = std::make_unique<RenderThread>(this, pagRenderer.get());
-  contentRenderer = std::move(pagRenderer);
+  viewModel = std::make_unique<PAGViewModel>();
+  connect(viewModel.get(), &PAGViewModel::requestFlush, this, &PAGView::triggerFlush);
+  connect(viewModel.get(), &PAGViewModel::requestSizeChanged, this, &PAGView::onRequestSizeChanged);
+  connect(viewModel.get(), &PAGViewModel::preferredSizeChanged, this,
+          &PAGView::onPreferredSizeChanged);
+  connect(viewModel.get(), &PAGViewModel::audioTimeChanged, this, &PAGView::onAudioTimeChanged);
+  connect(viewModel.get(), &PAGViewModel::isPlayingChanged, this, &PAGView::onIsPlayingChanged);
+  renderThread =
+      std::make_unique<RenderThread>(this, std::make_unique<PAGRenderer>(viewModel.get(), this));
   renderThread->moveToThread(renderThread.get());
 }
 
@@ -53,10 +61,38 @@ void PAGView::initDrawable() {
   if (drawable == nullptr) {
     return;
   }
+  viewModel->setWindow(this->window());
   auto pagSurface = PAGSurface::MakeFrom(drawable);
-  viewModel->pagPlayer->setSurface(pagSurface);
+  viewModel->getPAGPlayer()->setSurface(pagSurface);
   if (renderThread != nullptr) {
     drawable->moveToThread(renderThread.get());
+  }
+}
+
+void PAGView::onRequestSizeChanged() {
+  sizeChanged = true;
+}
+
+void PAGView::onPreferredSizeChanged() {
+  setSize(viewModel->getPreferredSize());
+}
+
+void PAGView::onIsPlayingChanged(bool isPlaying) {
+  if (isPlaying) {
+    lastPlayTime = tgfx::Clock::Now();
+  }
+}
+
+void PAGView::onAudioTimeChanged(int64_t audioTime) {
+  auto timeNow = tgfx::Clock::Now();
+  auto displayTime = timeNow - lastPlayTime;
+  auto duration = static_cast<double>(viewModel->getPAGPlayer()->duration());
+  auto currentDisplayTime = static_cast<int64_t>(viewModel->getProgress() * duration) + displayTime;
+  if (audioTime == 0 || (audioTime - currentDisplayTime > MaxAudioLeadThreshold)) {
+    lastPlayTime = timeNow;
+    viewModel->setProgressInternal(static_cast<double>(audioTime) / duration, false);
+  } else if (audioTime - currentDisplayTime < MinAudioLagThreshold) {
+    lastPlayTime = timeNow;
   }
 }
 
@@ -75,14 +111,14 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   auto node = updateTextureNode(oldNode);
 
   auto timeNow = tgfx::Clock::Now();
-  auto displayTime = timeNow - viewModel->lastPlayTime;
-  viewModel->lastPlayTime = timeNow;
+  auto displayTime = timeNow - lastPlayTime;
+  lastPlayTime = timeNow;
 
-  if (viewModel->isPlaying_) {
-    auto duration = viewModel->pagPlayer->duration();
+  if (viewModel->isPlaying()) {
+    auto duration = viewModel->getPAGPlayer()->duration();
     if (duration > 0) {
-      auto newProgress =
-          static_cast<double>(displayTime) / static_cast<double>(duration) + viewModel->progress;
+      auto newProgress = static_cast<double>(displayTime) / static_cast<double>(duration) +
+                         viewModel->getProgress();
       if (newProgress > 1.0) {
         newProgress = 0.0;
       }

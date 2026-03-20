@@ -24,7 +24,6 @@
 #include <QString>
 #include <memory>
 #include "pag/pag.h"
-#include "pagx/PAGXDocument.h"
 
 namespace pag {
 
@@ -87,8 +86,6 @@ class ContentViewModel : public QObject {
   Q_SIGNAL void progressChanged(double progress);
   Q_SIGNAL void filePathChanged(const QString& filePath);
   Q_SIGNAL void fileChanged(std::shared_ptr<pag::File> file);
-  Q_SIGNAL void pagFileChanged(std::shared_ptr<pag::PAGFile> pagFile);
-  Q_SIGNAL void pagxDocumentChanged(std::shared_ptr<pagx::PAGXDocument> pagxDocument);
   Q_SIGNAL void editableTextLayerCountChanged(int count);
   Q_SIGNAL void editableImageLayerCountChanged(int count);
   Q_SIGNAL void widthChanged(int width);

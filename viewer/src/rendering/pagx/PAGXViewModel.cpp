@@ -20,13 +20,10 @@
 #include <QQuickWindow>
 #include "pagx/PAGXImporter.h"
 #include "renderer/LayerBuilder.h"
-#include "rendering/pagx/PAGXView.h"
-#include "tgfx/core/Clock.h"
 
 namespace pag {
 
-PAGXViewModel::PAGXViewModel(PAGXView* view, QObject* parent)
-    : ContentViewModel(parent), view(view) {
+PAGXViewModel::PAGXViewModel(QObject* parent) : ContentViewModel(parent) {
 }
 
 int PAGXViewModel::getWidth() const {
@@ -92,17 +89,13 @@ QColor PAGXViewModel::getBackgroundColor() const {
 }
 
 QSizeF PAGXViewModel::getPreferredSize() const {
-  if (view == nullptr) {
+  if (window == nullptr || pagxWidth == 0 || pagxHeight == 0) {
     return {0, 0};
   }
-  auto quickWindow = view->window();
-  if (quickWindow == nullptr || pagxWidth == 0 || pagxHeight == 0) {
-    return {0, 0};
-  }
-  auto screen = quickWindow->screen();
+  auto screen = window->screen();
   QSize screenSize = screen->availableVirtualSize();
   qreal maxHeight = screenSize.height() * 0.8;
-  qreal minHeight = quickWindow->minimumHeight();
+  qreal minHeight = window->minimumHeight();
   qreal width = 0;
   qreal height = 0;
 
@@ -134,6 +127,34 @@ bool PAGXViewModel::getShowVideoFrames() const {
   return false;
 }
 
+void PAGXViewModel::setWindow(QQuickWindow* win) {
+  window = win;
+}
+
+bool PAGXViewModel::takeNeedsRender() {
+  return needsRender.exchange(false);
+}
+
+void PAGXViewModel::markNeedsRender() {
+  needsRender = true;
+}
+
+tgfx::DisplayList* PAGXViewModel::getDisplayList() const {
+  return displayList.get();
+}
+
+tgfx::Layer* PAGXViewModel::getContentLayer() const {
+  return pagxContentLayer.get();
+}
+
+int PAGXViewModel::getContentWidth() const {
+  return pagxWidth;
+}
+
+int PAGXViewModel::getContentHeight() const {
+  return pagxHeight;
+}
+
 void PAGXViewModel::setIsPlaying(bool isPlaying) {
   if (!hasAnimation()) {
     isPlaying = false;
@@ -143,9 +164,8 @@ void PAGXViewModel::setIsPlaying(bool isPlaying) {
   }
   isPlaying_ = isPlaying;
   Q_EMIT isPlayingChanged(isPlaying);
-  if (isPlaying && view != nullptr) {
-    lastPlayTime = tgfx::Clock::Now();
-    view->triggerFlush();
+  if (isPlaying) {
+    Q_EMIT requestFlush();
   }
 }
 
@@ -156,9 +176,7 @@ void PAGXViewModel::setProgress(double newProgress) {
   progress = newProgress;
   Q_EMIT progressChanged(progress);
   needsRender = true;
-  if (view != nullptr) {
-    view->triggerFlush();
-  }
+  Q_EMIT requestFlush();
 }
 
 void PAGXViewModel::setShowVideoFrames(bool) {
@@ -198,13 +216,7 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
   displayList = std::make_unique<tgfx::DisplayList>();
   displayList->root()->addChild(pagxContentLayer);
 
-  if (view != nullptr) {
-    view->sizeChanged = true;
-    needsRender = true;
-    view->setSize(getPreferredSize());
-    view->triggerFlush();
-  }
-
+  needsRender = true;
   Q_EMIT fileChanged(nullptr);
   Q_EMIT filePathChanged(QString::fromLocal8Bit(strPath.data()));
   Q_EMIT widthChanged(pagxWidth);
@@ -213,6 +225,7 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
   Q_EMIT preferredSizeChanged();
   Q_EMIT editableTextLayerCountChanged(0);
   Q_EMIT editableImageLayerCountChanged(0);
+  Q_EMIT requestSizeChanged();
   // pagxDocumentChanged is connected with Qt::QueuedConnection, so tree building
   // happens asynchronously and won't block the render.
   Q_EMIT pagxDocumentChanged(pagxDocument);
@@ -260,7 +273,7 @@ void PAGXViewModel::clearContent() {
   progress = 0.0;
   progressPerFrame = 1.0;
   isPlaying_ = false;
-  lastPlayTime = 0;
+  needsRender = false;
 }
 
 void PAGXViewModel::updateAnimationState() {
@@ -270,7 +283,6 @@ void PAGXViewModel::updateAnimationState() {
   progress = 0.0;
   progressPerFrame = 1.0;
   isPlaying_ = false;
-  lastPlayTime = 0;
 }
 
 }  // namespace pag

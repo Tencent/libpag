@@ -23,9 +23,9 @@
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
 
-namespace pag {
+class QQuickWindow;
 
-class PAGXView;
+namespace pag {
 
 /**
  * ViewModel for PAGX format content. Owns PAGXDocument and DisplayList,
@@ -34,7 +34,7 @@ class PAGXView;
 class PAGXViewModel : public ContentViewModel {
   Q_OBJECT
  public:
-  explicit PAGXViewModel(PAGXView* view, QObject* parent = nullptr);
+  explicit PAGXViewModel(QObject* parent = nullptr);
 
   int getWidth() const override;
   int getHeight() const override;
@@ -62,11 +62,23 @@ class PAGXViewModel : public ContentViewModel {
   Q_INVOKABLE void nextFrame() override;
   Q_INVOKABLE void previousFrame() override;
 
+  void setWindow(QQuickWindow* window);
+  bool takeNeedsRender();
+  void markNeedsRender();
+  tgfx::DisplayList* getDisplayList() const;
+  tgfx::Layer* getContentLayer() const;
+  int getContentWidth() const;
+  int getContentHeight() const;
+
+  Q_SIGNAL void pagxDocumentChanged(std::shared_ptr<pagx::PAGXDocument> pagxDocument);
+  Q_SIGNAL void requestFlush();
+  Q_SIGNAL void requestSizeChanged();
+
  private:
   void clearContent();
   void updateAnimationState();
 
-  PAGXView* view = nullptr;
+  QQuickWindow* window = nullptr;
   std::atomic_bool needsRender = false;
   std::shared_ptr<pagx::PAGXDocument> pagxDocument = nullptr;
   std::shared_ptr<tgfx::Layer> pagxContentLayer = nullptr;
@@ -79,10 +91,6 @@ class PAGXViewModel : public ContentViewModel {
   double progress = 0.0;
   double progressPerFrame = 1.0;
   bool isPlaying_ = false;
-  int64_t lastPlayTime = 0;
-
-  friend class PAGXView;
-  friend class PAGXRenderer;
 };
 
 }  // namespace pag

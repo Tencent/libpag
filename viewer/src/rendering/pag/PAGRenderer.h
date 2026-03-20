@@ -18,14 +18,11 @@
 
 #pragma once
 
-#include <atomic>
-#include <memory>
-#include "pag/pag.h"
+#include "rendering/ContentView.h"
 #include "rendering/IContentRenderer.h"
+#include "rendering/pag/PAGViewModel.h"
 
 namespace pag {
-
-class PAGView;
 
 /**
  * Renderer implementation for PAG format content. Executes PAGPlayer flush and collects
@@ -33,14 +30,15 @@ class PAGView;
  */
 class PAGRenderer : public IContentRenderer {
  public:
-  explicit PAGRenderer(PAGView* view);
+  explicit PAGRenderer(PAGViewModel* viewModel, ContentView* contentView);
 
   RenderMetrics flush() override;
   void updateSize() override;
   bool isReady() const override;
 
  private:
-  PAGView* view = nullptr;
+  PAGViewModel* viewModel = nullptr;
+  ContentView* contentView = nullptr;
 };
 
 }  // namespace pag

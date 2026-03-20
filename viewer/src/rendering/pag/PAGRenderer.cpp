@@ -17,20 +17,20 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "rendering/pag/PAGRenderer.h"
-#include "rendering/pag/PAGView.h"
 
 namespace pag {
 
-PAGRenderer::PAGRenderer(PAGView* view) : view(view) {
+PAGRenderer::PAGRenderer(PAGViewModel* viewModel, ContentView* contentView)
+    : viewModel(viewModel), contentView(contentView) {
 }
 
 bool PAGRenderer::isReady() const {
-  return view != nullptr && view->viewModel != nullptr && view->viewModel->pagPlayer != nullptr &&
-         view->viewModel->pagFile != nullptr;
+  return viewModel != nullptr && viewModel->getPAGPlayer() != nullptr &&
+         viewModel->getPAGFile() != nullptr;
 }
 
 void PAGRenderer::updateSize() {
-  auto pagSurface = view->viewModel->pagPlayer->getSurface();
+  auto pagSurface = viewModel->getPAGPlayer()->getSurface();
   if (pagSurface != nullptr) {
     pagSurface->updateSize();
   }
@@ -41,23 +41,23 @@ IContentRenderer::RenderMetrics PAGRenderer::flush() {
   if (!isReady()) {
     return metrics;
   }
-  if (view->sizeChanged.exchange(false)) {
+  if (contentView->takeSizeChanged()) {
     updateSize();
   }
-  auto* player = view->viewModel->pagPlayer.get();
-  auto* file = view->viewModel->pagFile.get();
+  auto* player = viewModel->getPAGPlayer();
+  auto* file = viewModel->getPAGFile();
   if (player == nullptr || file == nullptr) {
     return metrics;
   }
   player->flush();
   double progress = file->getProgress();
-  metrics.currentFrame = static_cast<int64_t>(
-      std::round((view->viewModel->getTotalFrame().toDouble() - 1) * progress));
+  metrics.currentFrame =
+      static_cast<int64_t>(std::round((viewModel->getTotalFrame().toDouble() - 1) * progress));
   metrics.renderTime = player->renderingTime();
   metrics.presentTime = player->presentingTime();
   metrics.imageDecodeTime = player->imageDecodingTime();
   metrics.rendered = true;
-  QMetaObject::invokeMethod(view, "update", Qt::QueuedConnection);
+  QMetaObject::invokeMethod(contentView, "update", Qt::QueuedConnection);
   return metrics;
 }
 

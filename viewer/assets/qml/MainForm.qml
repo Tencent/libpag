@@ -105,7 +105,7 @@ SplitView {
             sourceComponent: currentViewType === "pagx" ? pagxViewComponent : pagViewComponent
 
             onLoaded: {
-                windowHelper.notifyContentViewChanged(item);
+                pagWindow.notifyContentViewChanged(item);
 
                 if (pendingFilePath !== "") {
                     let filePath = pendingFilePath;

@@ -22,9 +22,9 @@
 #include "pag/pag.h"
 #include "rendering/ContentViewModel.h"
 
-namespace pag {
+class QQuickWindow;
 
-class PAGView;
+namespace pag {
 
 /**
  * ViewModel for PAG format content. Owns PAGPlayer, PAGFile and PAGAudioPlayer,
@@ -33,7 +33,7 @@ class PAGView;
 class PAGViewModel : public ContentViewModel {
   Q_OBJECT
  public:
-  explicit PAGViewModel(PAGView* view, QObject* parent = nullptr);
+  explicit PAGViewModel(QObject* parent = nullptr);
 
   int getWidth() const override;
   int getHeight() const override;
@@ -61,26 +61,27 @@ class PAGViewModel : public ContentViewModel {
   Q_INVOKABLE void nextFrame() override;
   Q_INVOKABLE void previousFrame() override;
 
-  Q_SLOT void onAudioTimeChanged(int64_t audioTime);
-
   bool hasAudio() const;
-
- private:
+  void setWindow(QQuickWindow* window);
+  PAGPlayer* getPAGPlayer() const;
+  PAGFile* getPAGFile() const;
   void setProgressInternal(double progress, bool isAudioSeek);
 
-  PAGView* view = nullptr;
+  Q_SIGNAL void pagFileChanged(std::shared_ptr<pag::PAGFile> pagFile);
+  Q_SIGNAL void requestFlush();
+  Q_SIGNAL void requestSizeChanged();
+  Q_SIGNAL void audioTimeChanged(int64_t audioTime);
+
+ private:
+  QQuickWindow* window = nullptr;
   int editableTextLayerCount = 0;
   int editableImageLayerCount = 0;
-  int64_t lastPlayTime = 0;
   bool isPlaying_ = true;
   double progress = 0.0;
   double progressPerFrame = 0.0;
   std::unique_ptr<PAGPlayer> pagPlayer = nullptr;
   std::shared_ptr<PAGFile> pagFile = nullptr;
   std::unique_ptr<PAGAudioPlayer> audioPlayer = nullptr;
-
-  friend class PAGView;
-  friend class PAGRenderer;
 };
 
 }  // namespace pag

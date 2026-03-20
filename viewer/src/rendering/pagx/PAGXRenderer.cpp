@@ -17,37 +17,37 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "rendering/pagx/PAGXRenderer.h"
-#include "rendering/pagx/PAGXView.h"
 #include "tgfx/core/Clock.h"
 
 namespace pag {
 
-PAGXRenderer::PAGXRenderer(PAGXView* view) : view(view) {
+PAGXRenderer::PAGXRenderer(PAGXViewModel* viewModel, ContentView* contentView)
+    : viewModel(viewModel), contentView(contentView) {
 }
 
 bool PAGXRenderer::isReady() const {
-  return view != nullptr && view->viewModel != nullptr && view->viewModel->displayList != nullptr &&
-         view->drawable != nullptr;
+  return viewModel != nullptr && viewModel->getDisplayList() != nullptr &&
+         contentView->getDrawable() != nullptr;
 }
 
 void PAGXRenderer::updateSize() {
-  view->drawable->updateSize();
+  contentView->getDrawable()->updateSize();
 }
 
 IContentRenderer::RenderMetrics PAGXRenderer::flush() {
   RenderMetrics metrics = {};
-  auto viewModel = view->viewModel.get();
-  if (view->sizeChanged.exchange(false)) {
+  if (contentView->takeSizeChanged()) {
     updateSize();
   }
-  if (!viewModel->needsRender.exchange(false)) {
+  if (!viewModel->takeNeedsRender()) {
     return metrics;
   }
   if (!isReady()) {
     return metrics;
   }
 
-  auto device = view->drawable->getDevice();
+  auto* drawable = contentView->getDrawable();
+  auto device = drawable->getDevice();
   if (device == nullptr) {
     return metrics;
   }
@@ -56,34 +56,34 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
     device->unlock();
     return metrics;
   }
-  auto surface = view->drawable->getSurface(context, false);
+  auto surface = drawable->getSurface(context, false);
   if (surface == nullptr) {
     device->unlock();
     return metrics;
   }
 
-  if (viewModel->pagxContentLayer != nullptr && viewModel->pagxWidth > 0 &&
-      viewModel->pagxHeight > 0) {
+  auto* contentLayer = viewModel->getContentLayer();
+  int contentWidth = viewModel->getContentWidth();
+  int contentHeight = viewModel->getContentHeight();
+  if (contentLayer != nullptr && contentWidth > 0 && contentHeight > 0) {
     int surfaceWidth = surface->width();
     int surfaceHeight = surface->height();
-    float scaleX = static_cast<float>(surfaceWidth) / static_cast<float>(viewModel->pagxWidth);
-    float scaleY = static_cast<float>(surfaceHeight) / static_cast<float>(viewModel->pagxHeight);
+    float scaleX = static_cast<float>(surfaceWidth) / static_cast<float>(contentWidth);
+    float scaleY = static_cast<float>(surfaceHeight) / static_cast<float>(contentHeight);
     float scale = std::min(scaleX, scaleY);
     float offsetX =
-        (static_cast<float>(surfaceWidth) - static_cast<float>(viewModel->pagxWidth) * scale) *
-        0.5f;
+        (static_cast<float>(surfaceWidth) - static_cast<float>(contentWidth) * scale) * 0.5f;
     float offsetY =
-        (static_cast<float>(surfaceHeight) - static_cast<float>(viewModel->pagxHeight) * scale) *
-        0.5f;
+        (static_cast<float>(surfaceHeight) - static_cast<float>(contentHeight) * scale) * 0.5f;
     auto matrix = tgfx::Matrix::MakeTrans(offsetX, offsetY);
     matrix.preScale(scale, scale);
-    viewModel->pagxContentLayer->setMatrix(matrix);
+    contentLayer->setMatrix(matrix);
   }
 
   auto renderStart = tgfx::Clock::Now();
   auto canvas = surface->getCanvas();
   canvas->clear();
-  viewModel->displayList->render(surface.get());
+  viewModel->getDisplayList()->render(surface.get());
   auto recording = context->flush();
   metrics.renderTime = tgfx::Clock::Now() - renderStart;
 
@@ -94,7 +94,7 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
   metrics.imageDecodeTime = tgfx::Clock::Now() - imageStart;
 
   auto presentStart = tgfx::Clock::Now();
-  view->drawable->present(context);
+  drawable->present(context);
   metrics.presentTime = tgfx::Clock::Now() - presentStart;
 
   metrics.rendered = true;

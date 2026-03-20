@@ -71,6 +71,14 @@ RenderThread* ContentView::getRenderThread() const {
   return renderThread.get();
 }
 
+bool ContentView::takeSizeChanged() {
+  return sizeChanged.exchange(false);
+}
+
+GPUDrawable* ContentView::getDrawable() const {
+  return drawable.get();
+}
+
 void ContentView::triggerFlush() const {
   QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
 }
