@@ -117,7 +117,7 @@ Layer children should be written in this order for consistency:
 
 ### Attribute Order
 
-Write `id`/`name`/`version` first, then sizing/constraint attributes (`width`, `height`, `left`, `right`, `top`, `bottom`, `centerX`, `centerY`, `flex`), then child layout attributes (`layout`, `gap`, `padding`, `alignment`, `arrangement`), then everything else.
+Write `id`/`name`/`version` first, then constraint/sizing attributes (`left`, `right`, `top`, `bottom`, `centerX`, `centerY`, `flex`, `width`, `height`), then child layout attributes (`layout`, `gap`, `padding`, `alignment`, `arrangement`), then everything else.
 
 ### Layer Attributes (key ones)
 
