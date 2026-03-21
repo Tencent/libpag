@@ -18,9 +18,9 @@
 
 #pragma once
 
+#include "platform/qt/GPUDrawable.h"
 #include "rendering/IContentRenderer.h"
 #include "rendering/pagx/PAGXViewModel.h"
-#include "platform/qt/GPUDrawable.h"
 
 namespace pag {
 
