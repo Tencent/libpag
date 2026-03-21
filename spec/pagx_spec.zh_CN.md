@@ -2228,3 +2228,95 @@ Layer / Group
 
 > [Sample](samples/C.6_space_explorer.pagx)
 
+
+---
+
+## 附录 D：实现架构
+
+### D.1 LayoutElement 类层次
+
+PAGX 运行时实现使用以下类层次结构来管理支持基于约束定位的元素：
+
+```
+Element（基类）
+├── LayoutElement（支持约束）
+│   ├── Rectangle
+│   ├── Ellipse
+│   ├── Polystar
+│   ├── Path
+│   ├── Text
+│   └── Group
+│       └── TextBox
+├── Fill
+├── Stroke
+├── TrimPath
+└── ...（其他非布局元素）
+```
+
+**LayoutElement** 统一了所有参与约束定位的几何元素和修饰符的约束属性管理。这种设计提供：
+
+- 集中式约束属性声明（left、right、top、bottom、centerX、centerY）
+- 统一的约束处理逻辑（ConstraintLayout 模块）
+- 跨元素类型的一致测量和定位行为
+
+### D.2 统一约束布局模块
+
+`ConstraintLayout` 模块为 Element 和 Layer 对象提供了单一、一致的约束定位逻辑实现：
+
+- **ApplyElementConstraints()**：对容器内的内容元素应用约束
+- **ApplyLayerConstraints()**：对子图层应用约束（带测量的维度）
+- **ApplyElementsConstraints()**：递归处理层级元素结构
+
+这种统一的方法：
+- 消除 Element 和 Layer 约束处理之间的逻辑重复
+- 确保约束优先级规则在所有节点类型中一致应用
+- 简化维护和对约束逻辑的未来增强
+
+### D.3 布局结果分离存储
+
+为了保持用户指定的尺寸和布局计算结果之间的清晰分离：
+
+- **LayoutElement** 和 **Layer** 提供 `layoutX`、`layoutY`、`layoutWidth`、`layoutHeight` 属性
+- 这些属性由布局引擎计算并存储为 mutable 属性
+- 渲染系统可以在可用时优先使用这些布局计算值
+- 原始的 `width`、`height`、`position` 属性保持不被约束逻辑修改
+
+这个架构能够：
+- 保留原始数据中的用户意图
+- 清晰区分源值和计算值
+- 为渲染系统提供灵活性来优先使用布局结果
+
+### D.4 虚方法钩子的可扩展性
+
+**Layer** 提供虚方法以支持自定义布局行为：
+
+- **measure()**：根据内容和子层测量所需大小（自下而上）
+- **layoutChildren()**：对子 Layer 执行容器布局
+- **layoutContents()**：根据约束定位元素
+- **snapToPixelGrid()**：将坐标舍入到整数像素
+
+这些方法能够：
+- 子类在不修改核心布局引擎的情况下定制布局行为
+- 为专用 Layout 类型提供清晰的扩展点（例如自定义容器）
+- 分层组合布局逻辑
+
+### D.5 自动布局管道
+
+自动布局过程遵循以下步骤：
+
+1. **清除测量缓存**：为新计算重置缓存的尺寸
+2. **顶层约束应用**：对根级 Layer 应用约束
+3. **分层布局**：对每个 Layer：
+   - 测量大小（自下而上）如果没有显式设置
+   - 如果设置了布局模式，执行容器布局（flex、gap、alignment）
+   - 在该 Layer 内应用元素约束
+   - 应用子 Layer 约束
+   - 递归布局子 Layer
+4. **像素对齐**：将所有坐标舍入到整数像素
+
+这个管道确保：
+- 正确的约束优先级和依赖关系解析
+- 高效的缓存测量
+- 正确处理嵌套层次结构
+- 完美的像素级渲染输出
+

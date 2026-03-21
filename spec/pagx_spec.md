@@ -2228,3 +2228,95 @@ An illustrated alien planet scene with an astronaut, exotic flora, alien creatur
 
 > [Sample](samples/C.6_space_explorer.pagx)
 
+
+---
+
+## Appendix D: Implementation Architecture
+
+### D.1 LayoutElement Hierarchy
+
+The PAGX runtime implementation uses the following class hierarchy for elements that support constraint-based positioning:
+
+```
+Element (base class)
+├── LayoutElement (supports constraints)
+│   ├── Rectangle
+│   ├── Ellipse
+│   ├── Polystar
+│   ├── Path
+│   ├── Text
+│   └── Group
+│       └── TextBox
+├── Fill
+├── Stroke
+├── TrimPath
+└── ... (other non-layout elements)
+```
+
+**LayoutElement** unifies constraint attribute management across all geometry elements and modifiers that participate in constraint positioning. This design provides:
+
+- Centralized constraint attribute declarations (left, right, top, bottom, centerX, centerY)
+- Unified constraint handling logic in the ConstraintLayout module
+- Consistent measurement and positioning behavior across element types
+
+### D.2 Unified Constraint Layout Module
+
+The `ConstraintLayout` module provides a single, consistent implementation of constraint positioning logic for both Element and Layer objects:
+
+- **ApplyElementConstraints()**: Applies constraints to content elements within a container
+- **ApplyLayerConstraints()**: Applies constraints to child Layers with measured dimensions
+- **ApplyElementsConstraints()**: Recursively processes hierarchical element structures
+
+This unified approach:
+- Eliminates logic duplication between Element and Layer constraint handling
+- Ensures constraint priority rules are consistently applied across all node types
+- Simplifies maintenance and future enhancements to constraint logic
+
+### D.3 Layout Result Separation
+
+To maintain clear separation between user-specified dimensions and layout-computed results:
+
+- **LayoutElement** and **Layer** provide `layoutX`, `layoutY`, `layoutWidth`, `layoutHeight` properties
+- These are computed by the layout engine and stored as mutable properties
+- Rendering systems can prioritize these layout-computed values when available
+- Original `width`, `height`, `position` properties remain unmodified by constraint logic
+
+This architecture enables:
+- Preservation of user intent in the original data
+- Clear distinction between source and computed values
+- Flexibility for rendering systems to prioritize layout results
+
+### D.4 Virtual Method Hooks for Extensibility
+
+**Layer** provides virtual methods for custom layout behavior:
+
+- **measure()**: Measures desired size based on contents and children (bottom-up)
+- **layoutChildren()**: Performs container layout on child Layers
+- **layoutContents()**: Positions elements based on constraints
+- **snapToPixelGrid()**: Rounds coordinates to integer pixels
+
+These methods allow:
+- Subclasses to customize layout behavior without modifying the core layout engine
+- Clear extension points for specialized Layout types (e.g., custom containers)
+- Layered composition of layout logic
+
+### D.5 Auto Layout Pipeline
+
+The auto layout process follows this sequence:
+
+1. **Clear Measurement Cache**: Reset cached dimensions for fresh calculation
+2. **Top-Level Constraint Application**: Apply constraints to root-level Layers
+3. **Hierarchical Layout**: For each Layer:
+   - Measure size (bottom-up) if not explicitly set
+   - Perform container layout (flex, gap, alignment) if layout mode is set
+   - Apply element constraints within this Layer
+   - Apply child Layer constraints
+   - Recursively layout child Layers
+4. **Pixel Snapping**: Round all coordinates to integer pixels
+
+This pipeline ensures:
+- Correct constraint priority and dependency resolution
+- Efficient measurement with caching
+- Proper handling of nested hierarchies
+- Pixel-perfect rendering output
+
