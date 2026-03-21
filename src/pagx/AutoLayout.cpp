@@ -23,7 +23,6 @@
 #include <utility>
 #include <vector>
 #include "ConstraintLayout.h"
-#include "base/utils/Log.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/layout/ElementMeasure.h"
 #include "pagx/layout/LayoutUtils.h"
