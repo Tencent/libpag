@@ -36,6 +36,11 @@ class RenderThread : public QThread {
   explicit RenderThread(ContentView* view, std::unique_ptr<IContentRenderer> renderer);
 
   /**
+   * Sets the drawable on the renderer. Call from main thread after drawable is initialized.
+   */
+  void setDrawable(GPUDrawable* drawable);
+
+  /**
    * Emitted after each rendered frame to notify the view to present the new content.
    */
   Q_SIGNAL void rendered();

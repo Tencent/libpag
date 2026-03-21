@@ -32,7 +32,7 @@ class PAGXRenderer : public IContentRenderer {
  public:
   explicit PAGXRenderer(PAGXViewModel* viewModel);
 
-  void setDrawable(GPUDrawable* drawable);
+  void setDrawable(GPUDrawable* drawable) override;
 
   RenderMetrics flush() override;
   void updateSize() override;

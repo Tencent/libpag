@@ -26,6 +26,12 @@ RenderThread::RenderThread(ContentView* view, std::unique_ptr<IContentRenderer> 
     : view(view), renderer(std::move(renderer)) {
 }
 
+void RenderThread::setDrawable(GPUDrawable* drawable) {
+  if (renderer != nullptr) {
+    renderer->setDrawable(drawable);
+  }
+}
+
 void RenderThread::flush() {
   if (renderer == nullptr) {
     return;

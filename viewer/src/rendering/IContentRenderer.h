@@ -22,6 +22,8 @@
 
 namespace pag {
 
+class GPUDrawable;
+
 /**
  * Interface for format-specific rendering logic used by RenderThread.
  * Implementations are responsible for executing one frame of rendering and reporting metrics.
@@ -56,6 +58,14 @@ class IContentRenderer {
    * Returns true if the renderer has all required resources ready to render.
    */
   virtual bool isReady() const = 0;
+
+  /**
+   * Sets the drawable surface for rendering. Default implementation does nothing.
+   * Override in renderers that need direct drawable access.
+   */
+  virtual void setDrawable(GPUDrawable* drawable) {
+    (void)drawable;
+  }
 };
 
 }  // namespace pag

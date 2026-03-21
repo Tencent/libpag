@@ -50,7 +50,6 @@ class PAGXView : public ContentView {
   Q_SLOT void onPreferredSizeChanged();
 
   std::unique_ptr<PAGXViewModel> viewModel = nullptr;
-  PAGXRenderer* pagxRenderer_ = nullptr;
 };
 
 }  // namespace pag

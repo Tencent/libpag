@@ -29,10 +29,8 @@ PAGXView::PAGXView(QQuickItem* parent) : ContentView(parent) {
           &PAGXView::onRequestSizeChanged);
   connect(viewModel.get(), &PAGXViewModel::preferredSizeChanged, this,
           &PAGXView::onPreferredSizeChanged);
-  auto pagxRenderer = std::make_unique<PAGXRenderer>(viewModel.get());
-  pagxRenderer_ = pagxRenderer.get();
   renderThread =
-      std::make_unique<RenderThread>(this, std::move(pagxRenderer));
+      std::make_unique<RenderThread>(this, std::make_unique<PAGXRenderer>(viewModel.get()));
   connect(renderThread.get(), &RenderThread::rendered, this, &PAGXView::update,
           Qt::QueuedConnection);
   renderThread->moveToThread(renderThread.get());
@@ -54,8 +52,8 @@ void PAGXView::initDrawable() {
   if (drawable == nullptr) {
     return;
   }
-  if (pagxRenderer_ != nullptr) {
-    pagxRenderer_->setDrawable(drawable.get());
+  if (renderThread != nullptr) {
+    renderThread->setDrawable(drawable.get());
   }
   viewModel->setWindow(this->window());
   if (renderThread != nullptr) {
