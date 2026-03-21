@@ -32,12 +32,6 @@ namespace pagx {
  * Group, and TextBox. Elements that do not participate in constraint layout (Fill, Stroke,
  * TrimPath, RoundCorner, MergePath, TextModifier, TextPath, Repeater) inherit directly from
  * Element.
- *
- * Layout Result Storage:
- * During layout computation, LayoutElement stores computed positions and sizes in layoutX, layoutY,
- * layoutWidth, layoutHeight (marked mutable for const context). These are computed properties
- * derived from user-set values plus constraint resolution. Rendering systems should prioritize
- * these layout values when available.
  */
 class LayoutElement : public Element {
  public:
@@ -72,55 +66,6 @@ class LayoutElement : public Element {
    * Vertical offset from the center of the containing Layer or Group. NAN means not set.
    */
   float centerY = NAN;
-
-  /**
-   * Applies layout result for size. Called during layout computation to set the computed
-   * dimensions. For most elements, this updates position and size; for special types like Group,
-   * it may trigger additional layout logic.
-   *
-   * @param layoutWidth The computed layout width
-   * @param layoutHeight The computed layout height
-   */
-  virtual void setLayoutBoundsSize(float layoutWidth, float layoutHeight) {
-    layoutX = 0;
-    layoutY = 0;
-    layoutWidth_ = layoutWidth;
-    layoutHeight_ = layoutHeight;
-  }
-
-  /**
-   * Applies layout result for position. Called during constraint positioning to update computed
-   * position without modifying size.
-   *
-   * @param layoutX The computed layout X position
-   * @param layoutY The computed layout Y position
-   */
-  virtual void setLayoutBoundsPosition(float layoutX_, float layoutY_) {
-    layoutX = layoutX_;
-    layoutY = layoutY_;
-  }
-
-  /**
-   * Computed position X from layout system (mutable allows write from const layout functions).
-   */
-  mutable float layoutX = 0;
-
-  /**
-   * Computed position Y from layout system (mutable allows write from const layout functions).
-   */
-  mutable float layoutY = 0;
-
-  /**
-   * Computed width from layout system (mutable allows write from const layout functions).
-   * NAN means not computed.
-   */
-  mutable float layoutWidth_ = NAN;
-
-  /**
-   * Computed height from layout system (mutable allows write from const layout functions).
-   * NAN means not computed.
-   */
-  mutable float layoutHeight_ = NAN;
 
  protected:
   LayoutElement() = default;

@@ -1991,7 +1991,7 @@ The vertical axis follows the same pattern.
 **Derive layout dimensions** (Group):
 
 ```
-left=L, right=R:  position.x = L, layoutWidth = W - L - R
+left=L, right=R:  position.x = L, width = W - L - R
 ```
 
 The vertical axis follows the same pattern.
@@ -2272,35 +2272,7 @@ This unified approach:
 - Ensures constraint priority rules are consistently applied across all node types
 - Simplifies maintenance and future enhancements to constraint logic
 
-### D.3 Layout Result Separation
-
-To maintain clear separation between user-specified dimensions and layout-computed results:
-
-- **LayoutElement** and **Layer** provide `layoutX`, `layoutY`, `layoutWidth`, `layoutHeight` properties
-- These are computed by the layout engine and stored as mutable properties
-- Rendering systems can prioritize these layout-computed values when available
-- Original `width`, `height`, `position` properties remain unmodified by constraint logic
-
-This architecture enables:
-- Preservation of user intent in the original data
-- Clear distinction between source and computed values
-- Flexibility for rendering systems to prioritize layout results
-
-### D.4 Virtual Method Hooks for Extensibility
-
-**Layer** provides virtual methods for custom layout behavior:
-
-- **measure()**: Measures desired size based on contents and children (bottom-up)
-- **layoutChildren()**: Performs container layout on child Layers
-- **layoutContents()**: Positions elements based on constraints
-- **snapToPixelGrid()**: Rounds coordinates to integer pixels
-
-These methods allow:
-- Subclasses to customize layout behavior without modifying the core layout engine
-- Clear extension points for specialized Layout types (e.g., custom containers)
-- Layered composition of layout logic
-
-### D.5 Auto Layout Pipeline
+### D.3 Auto Layout Pipeline
 
 The auto layout process follows this sequence:
 

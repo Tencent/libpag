@@ -38,7 +38,6 @@
 namespace pagx {
 
 class Composition;
-class FontConfig;
 
 /**
  * Layer represents a layer node that can contain vector elements, layer styles, filters, and child
@@ -239,60 +238,6 @@ class Layer : public Node {
    * container layout or when this layer has includeInLayout=false. NAN means not set.
    */
   float centerY = NAN;
-
-  /**
-   * Measures the desired size of this Layer based on its contents and children (bottom-up).
-   * Subclasses can override to provide custom measurement logic.
-   *
-   * @param fontProvider Font provider for text measurement
-   * @return {width, height} pair representing measured dimensions
-   */
-  virtual std::pair<float, float> measure(FontConfig* /* fontProvider */) {
-    return {NAN, NAN};
-  }
-
-  /**
-   * Performs layout on child Layers (container layout logic).
-   * Subclasses can override to provide custom container layout.
-   *
-   * @param fontProvider Font provider for text measurement
-   */
-  virtual void layoutChildren(FontConfig* /* fontProvider */) {}
-
-  /**
-   * Positions elements within this Layer based on their constraint attributes.
-   * Subclasses can override to provide custom element constraint logic.
-   *
-   * @param fontProvider Font provider for text measurement
-   */
-  virtual void layoutContents(FontConfig* /* fontProvider */) {}
-
-  /**
-   * Rounds all layout coordinates and sizes to integer pixels.
-   * Subclasses can override for custom pixel-snapping behavior.
-   */
-  virtual void snapToPixelGrid() {
-    x = std::round(x);
-    y = std::round(y);
-    if (!std::isnan(width)) {
-      width = std::round(width);
-    }
-    if (!std::isnan(height)) {
-      height = std::round(height);
-    }
-  }
-
-  /**
-   * Computed layout width from layout system (mutable allows write from const layout functions).
-   * NAN means not computed. When available, rendering systems should prefer layoutWidth over width.
-   */
-  mutable float layoutWidth = NAN;
-
-  /**
-   * Computed layout height from layout system (mutable allows write from const layout functions).
-   * NAN means not computed. When available, rendering systems should prefer layoutHeight over height.
-   */
-  mutable float layoutHeight = NAN;
 
   // Layout measurement cache, managed by AutoLayout.
   mutable bool measureCached = false;

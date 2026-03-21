@@ -1991,7 +1991,7 @@ left=L, right=R:  新 width = W - L - R
 **推导布局尺寸**（Group）：
 
 ```
-left=L, right=R:  position.x = L, layoutWidth = W - L - R
+left=L, right=R:  position.x = L, width = W - L - R
 ```
 
 垂直轴同理。
@@ -2272,35 +2272,7 @@ Element（基类）
 - 确保约束优先级规则在所有节点类型中一致应用
 - 简化维护和对约束逻辑的未来增强
 
-### D.3 布局结果分离存储
-
-为了保持用户指定的尺寸和布局计算结果之间的清晰分离：
-
-- **LayoutElement** 和 **Layer** 提供 `layoutX`、`layoutY`、`layoutWidth`、`layoutHeight` 属性
-- 这些属性由布局引擎计算并存储为 mutable 属性
-- 渲染系统可以在可用时优先使用这些布局计算值
-- 原始的 `width`、`height`、`position` 属性保持不被约束逻辑修改
-
-这个架构能够：
-- 保留原始数据中的用户意图
-- 清晰区分源值和计算值
-- 为渲染系统提供灵活性来优先使用布局结果
-
-### D.4 虚方法钩子的可扩展性
-
-**Layer** 提供虚方法以支持自定义布局行为：
-
-- **measure()**：根据内容和子层测量所需大小（自下而上）
-- **layoutChildren()**：对子 Layer 执行容器布局
-- **layoutContents()**：根据约束定位元素
-- **snapToPixelGrid()**：将坐标舍入到整数像素
-
-这些方法能够：
-- 子类在不修改核心布局引擎的情况下定制布局行为
-- 为专用 Layout 类型提供清晰的扩展点（例如自定义容器）
-- 分层组合布局逻辑
-
-### D.5 自动布局管道
+### D.3 自动布局管道
 
 自动布局过程遵循以下步骤：
 
