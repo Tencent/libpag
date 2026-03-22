@@ -607,7 +607,7 @@ All three child Layers have no `width` set and `flex="1"`, equally sharing avail
 | `start` | Align to cross-axis start edge |
 | `center` | Center along cross-axis |
 | `end` | Align to cross-axis end edge |
-| `stretch` | Stretch to fill cross-axis available space (only affects child Layers without explicit cross-axis size) |
+| `stretch` | Stretch to fill cross-axis available space, i.e. container cross-axis size minus padding (only affects child Layers without explicit cross-axis size) |
 
 **Arrangement (Main-Axis)**:
 
@@ -675,12 +675,12 @@ Constraint attributes allow content nodes to declare positional relationships wi
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `left` | float | - | Distance from element's left edge to container's left edge |
-| `right` | float | - | Distance from element's right edge to container's right edge |
-| `top` | float | - | Distance from element's top edge to container's top edge |
-| `bottom` | float | - | Distance from element's bottom edge to container's bottom edge |
-| `centerX` | float | - | Horizontal offset of element center from container center (0 = horizontally centered) |
-| `centerY` | float | - | Vertical offset of element center from container center (0 = vertically centered) |
+| `left` | float | - | Distance from left edge to container's left edge |
+| `right` | float | - | Distance from right edge to container's right edge |
+| `top` | float | - | Distance from top edge to container's top edge |
+| `bottom` | float | - | Distance from bottom edge to container's bottom edge |
+| `centerX` | float | - | Horizontal offset from container center (0 = horizontally centered) |
+| `centerY` | float | - | Vertical offset from container center (0 = vertically centered) |
 
 **Combination rules**: On each axis, only one of the following may be used: a single-edge constraint (`left`, `right`, or `centerX`), or an opposite-edge pair (`left` + `right`). The vertical axis follows the same pattern (`top` / `bottom` / `centerY`, or `top` + `bottom`).
 
@@ -825,11 +825,11 @@ After layout computation completes, the engine rounds all Layer `x`, `y`, `width
 
 ## 5. Layer System
 
-Layers are the fundamental organizational units for PAGX content, offering comprehensive control over visual effects.
+Layers are the fundamental organizational units for PAGX content. Each Layer serves two roles: it is a **container** that holds VectorElements (geometry, modifiers, painters) and child Layers in a hierarchical structure, and it is the **application point** for visual effects — styles, filters, blend modes, and masks all operate at the Layer level. For layout mechanics (sizing, positioning, and arrangement of Layers), see §4.
 
 ### 5.1 Core Concepts
 
-This section introduces the core concepts of the layer system. These concepts form the foundation for understanding layer styles, filters, and masks.
+This section introduces the core concepts of the layer rendering pipeline. These concepts — layer content, layer contour, and layer background — form the foundation for understanding how layer styles, filters, and masks compute their effects.
 
 #### Layer Rendering Pipeline
 
@@ -921,12 +921,13 @@ Layer child elements are automatically categorized into four collections by type
 | `alignment` | Alignment | stretch | Cross-axis alignment (see §4) |
 | `arrangement` | Arrangement | start | Main-axis arrangement (see §4) |
 | `includeInLayout` | bool | true | Whether to participate in parent container layout (see §4) |
-| `left` | float | - | As a child Layer, distance from parent container's left edge (see §4.3) |
-| `right` | float | - | As a child Layer, distance from parent container's right edge (see §4.3) |
-| `top` | float | - | As a child Layer, distance from parent container's top edge (see §4.3) |
-| `bottom` | float | - | As a child Layer, distance from parent container's bottom edge (see §4.3) |
-| `centerX` | float | - | As a child Layer, horizontal offset of center from parent container center (see §4.3) |
-| `centerY` | float | - | As a child Layer, vertical offset of center from parent container center (see §4.3) |
+| `flex` | float | 0 | Flex weight for main-axis proportional sizing in parent container layout (see §4.2) |
+| `left` | float | - | Distance from left edge to container's left edge (see §4.3) |
+| `right` | float | - | Distance from right edge to container's right edge (see §4.3) |
+| `top` | float | - | Distance from top edge to container's top edge (see §4.3) |
+| `bottom` | float | - | Distance from bottom edge to container's bottom edge (see §4.3) |
+| `centerX` | float | - | Horizontal offset from container center (see §4.3) |
+| `centerY` | float | - | Vertical offset from container center (see §4.3) |
 
 **groupOpacity**: When `false` (default), the layer's `alpha` is applied independently to each child element, which may cause overlapping semi-transparent children to appear darker at intersections. When `true`, all layer content is first composited into an offscreen buffer, then `alpha` is applied to the buffer as a whole, producing uniform transparency across the entire layer.
 
@@ -1209,12 +1210,12 @@ Rectangles are defined from center point with uniform corner rounding support.
 | `size` | Size | 100,100 | Dimensions "width,height" |
 | `roundness` | float | 0 | Corner radius |
 | `reversed` | bool | false | Reverse path direction |
-| `left` | float | - | Constraint positioning: distance from element's left edge to container's left edge (see §4.3) |
-| `right` | float | - | Constraint positioning: distance from element's right edge to container's right edge (see §4.3) |
-| `top` | float | - | Constraint positioning: distance from element's top edge to container's top edge (see §4.3) |
-| `bottom` | float | - | Constraint positioning: distance from element's bottom edge to container's bottom edge (see §4.3) |
-| `centerX` | float | - | Constraint positioning: horizontal offset of element center from container center (see §4.3) |
-| `centerY` | float | - | Constraint positioning: vertical offset of element center from container center (see §4.3) |
+| `left` | float | - | Distance from left edge to container's left edge (see §4.3) |
+| `right` | float | - | Distance from right edge to container's right edge (see §4.3) |
+| `top` | float | - | Distance from top edge to container's top edge (see §4.3) |
+| `bottom` | float | - | Distance from bottom edge to container's bottom edge (see §4.3) |
+| `centerX` | float | - | Horizontal offset from container center (see §4.3) |
+| `centerY` | float | - | Vertical offset from container center (see §4.3) |
 
 **Calculation Rules**:
 ```
@@ -1247,12 +1248,12 @@ Ellipses are defined from center point.
 | `position` | Point | (center of bounding box) | Center point coordinate, computed from constraint attributes when set. When not set, defaults to `(size.width/2, size.height/2)`, placing the top-left corner at the origin. Prefer constraint attributes (`left`/`top`) for positioning |
 | `size` | Size | 100,100 | Dimensions "width,height" |
 | `reversed` | bool | false | Reverse path direction |
-| `left` | float | - | Constraint positioning: distance from element's left edge to container's left edge (see §4.3) |
-| `right` | float | - | Constraint positioning: distance from element's right edge to container's right edge (see §4.3) |
-| `top` | float | - | Constraint positioning: distance from element's top edge to container's top edge (see §4.3) |
-| `bottom` | float | - | Constraint positioning: distance from element's bottom edge to container's bottom edge (see §4.3) |
-| `centerX` | float | - | Constraint positioning: horizontal offset of element center from container center (see §4.3) |
-| `centerY` | float | - | Constraint positioning: vertical offset of element center from container center (see §4.3) |
+| `left` | float | - | Distance from left edge to container's left edge (see §4.3) |
+| `right` | float | - | Distance from right edge to container's right edge (see §4.3) |
+| `top` | float | - | Distance from top edge to container's top edge (see §4.3) |
+| `bottom` | float | - | Distance from bottom edge to container's bottom edge (see §4.3) |
+| `centerX` | float | - | Horizontal offset from container center (see §4.3) |
+| `centerY` | float | - | Vertical offset from container center (see §4.3) |
 
 **Calculation Rules**:
 ```
@@ -1287,12 +1288,12 @@ Supports both regular polygon and star modes.
 | `outerRoundness` | float | 0 | Outer corner roundness 0~1 |
 | `innerRoundness` | float | 0 | Inner corner roundness 0~1 |
 | `reversed` | bool | false | Reverse path direction |
-| `left` | float | - | Constraint positioning: distance from element's left edge to container's left edge (see §4.3) |
-| `right` | float | - | Constraint positioning: distance from element's right edge to container's right edge (see §4.3) |
-| `top` | float | - | Constraint positioning: distance from element's top edge to container's top edge (see §4.3) |
-| `bottom` | float | - | Constraint positioning: distance from element's bottom edge to container's bottom edge (see §4.3) |
-| `centerX` | float | - | Constraint positioning: horizontal offset of element center from container center (see §4.3) |
-| `centerY` | float | - | Constraint positioning: vertical offset of element center from container center (see §4.3) |
+| `left` | float | - | Distance from left edge to container's left edge (see §4.3) |
+| `right` | float | - | Distance from right edge to container's right edge (see §4.3) |
+| `top` | float | - | Distance from top edge to container's top edge (see §4.3) |
+| `bottom` | float | - | Distance from bottom edge to container's bottom edge (see §4.3) |
+| `centerX` | float | - | Horizontal offset from container center (see §4.3) |
+| `centerY` | float | - | Vertical offset from container center (see §4.3) |
 
 **PolystarType**:
 
@@ -1348,12 +1349,12 @@ Defines arbitrary shapes using SVG path syntax, supporting inline data or refere
 | `data` | string/idref | (required) | SVG path data or PathData resource reference "@id" |
 | `position` | Point | 0,0 | Offset of the path coordinate system origin. Prefer constraint attributes (`left`/`top`) for positioning |
 | `reversed` | bool | false | Reverse path direction |
-| `left` | float | - | Constraint positioning: distance from element's left edge to container's left edge (see §4.3) |
-| `right` | float | - | Constraint positioning: distance from element's right edge to container's right edge (see §4.3) |
-| `top` | float | - | Constraint positioning: distance from element's top edge to container's top edge (see §4.3) |
-| `bottom` | float | - | Constraint positioning: distance from element's bottom edge to container's bottom edge (see §4.3) |
-| `centerX` | float | - | Constraint positioning: horizontal offset of element center from container center (see §4.3) |
-| `centerY` | float | - | Constraint positioning: vertical offset of element center from container center (see §4.3) |
+| `left` | float | - | Distance from left edge to container's left edge (see §4.3) |
+| `right` | float | - | Distance from right edge to container's right edge (see §4.3) |
+| `top` | float | - | Distance from top edge to container's top edge (see §4.3) |
+| `bottom` | float | - | Distance from bottom edge to container's bottom edge (see §4.3) |
+| `centerX` | float | - | Horizontal offset from container center (see §4.3) |
+| `centerY` | float | - | Vertical offset from container center (see §4.3) |
 
 **Example**:
 
@@ -1378,12 +1379,12 @@ Text elements provide geometric shapes for text content. Unlike shape elements t
 | `fauxBold` | bool | false | Faux bold (algorithmically bolded) |
 | `fauxItalic` | bool | false | Faux italic (algorithmically slanted) |
 | `textAnchor` | TextAnchor | start | Text anchor alignment relative to the origin (see below). Ignored when a TextBox controls the layout |
-| `left` | float | - | Constraint positioning: distance from element's left edge to container's left edge (see §4.3) |
-| `right` | float | - | Constraint positioning: distance from element's right edge to container's right edge (see §4.3) |
-| `top` | float | - | Constraint positioning: distance from element's top edge to container's top edge (see §4.3) |
-| `bottom` | float | - | Constraint positioning: distance from element's bottom edge to container's bottom edge (see §4.3) |
-| `centerX` | float | - | Constraint positioning: horizontal offset of element center from container center (see §4.3) |
-| `centerY` | float | - | Constraint positioning: vertical offset of element center from container center (see §4.3) |
+| `left` | float | - | Distance from left edge to container's left edge (see §4.3) |
+| `right` | float | - | Distance from right edge to container's right edge (see §4.3) |
+| `top` | float | - | Distance from top edge to container's top edge (see §4.3) |
+| `bottom` | float | - | Distance from bottom edge to container's bottom edge (see §4.3) |
+| `centerX` | float | - | Horizontal offset from container center (see §4.3) |
+| `centerY` | float | - | Vertical offset from container center (see §4.3) |
 
 Child elements: `CDATA` text, `GlyphRun`*
 
@@ -1897,12 +1898,12 @@ As a container, TextBox processes its child Text elements and text modifiers (Te
 | `lineHeight` | float | 0 | Line height in pixels. 0 means auto (calculated from font metrics: ascent + descent + leading). Following CSS Writing Modes conventions, this is a logical property: in vertical mode it controls column width |
 | `wordWrap` | bool | true | Enable automatic word wrapping at the box width boundary (horizontal mode) or height boundary (vertical mode). Has no effect when that dimension is NaN |
 | `overflow` | Overflow | visible | Overflow behavior when text exceeds the box height (horizontal mode) or width (vertical mode). Has no effect when that dimension is NaN |
-| `left` | float | - | Constraint positioning: distance from element's left edge to container's left edge (see §4.3) |
-| `right` | float | - | Constraint positioning: distance from element's right edge to container's right edge (see §4.3) |
-| `top` | float | - | Constraint positioning: distance from element's top edge to container's top edge (see §4.3) |
-| `bottom` | float | - | Constraint positioning: distance from element's bottom edge to container's bottom edge (see §4.3) |
-| `centerX` | float | - | Constraint positioning: horizontal offset of element center from container center (see §4.3) |
-| `centerY` | float | - | Constraint positioning: vertical offset of element center from container center (see §4.3) |
+| `left` | float | - | Distance from left edge to container's left edge (see §4.3) |
+| `right` | float | - | Distance from right edge to container's right edge (see §4.3) |
+| `top` | float | - | Distance from top edge to container's top edge (see §4.3) |
+| `bottom` | float | - | Distance from bottom edge to container's bottom edge (see §4.3) |
+| `centerX` | float | - | Horizontal offset from container center (see §4.3) |
+| `centerY` | float | - | Vertical offset from container center (see §4.3) |
 
 TextBox inherits all Group attributes (`position`, `anchor`, `rotation`, `scale`, `skew`, `skewAxis`, `alpha`, and constraint attributes `left`, `right`, `top`, `bottom`, `centerX`, `centerY`). The `position` attribute specifies the top-left corner of the text area in the parent coordinate system. Prefer constraint attributes (`left`/`top`) for positioning — when constraints are set, `position` is computed automatically.
 
@@ -2036,12 +2037,12 @@ Group is a VectorElement container with transform properties.
 | `alpha` | float | 1 | Opacity 0~1 |
 | `width` | float | - | Layout width (see §4) |
 | `height` | float | - | Layout height (see §4) |
-| `left` | float | - | Constraint positioning: distance from container's left edge (see §4.3) |
-| `right` | float | - | Constraint positioning: distance from container's right edge (see §4.3) |
-| `top` | float | - | Constraint positioning: distance from container's top edge (see §4.3) |
-| `bottom` | float | - | Constraint positioning: distance from container's bottom edge (see §4.3) |
-| `centerX` | float | - | Constraint centering: horizontal offset from container center (see §4.3) |
-| `centerY` | float | - | Constraint centering: vertical offset from container center (see §4.3) |
+| `left` | float | - | Distance from left edge to container's left edge (see §4.3) |
+| `right` | float | - | Distance from right edge to container's right edge (see §4.3) |
+| `top` | float | - | Distance from top edge to container's top edge (see §4.3) |
+| `bottom` | float | - | Distance from bottom edge to container's bottom edge (see §4.3) |
+| `centerX` | float | - | Horizontal offset from container center (see §4.3) |
+| `centerY` | float | - | Vertical offset from container center (see §4.3) |
 
 #### Transform Order
 
