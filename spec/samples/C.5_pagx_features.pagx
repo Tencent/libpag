@@ -67,7 +67,7 @@
       </Layer>
     </Layer>
     <Text text="An XML-based markup language for describing animated vector graphics." fontFamily="Arial" fontSize="12"/>
-    <TextPath path="M -141 0 A 141 141 0 0 0 141 0" forceAlignment="true" centerX="0" bottom="163"/>
+    <TextPath path="M -141 0 A 141 141 0 0 0 141 0" forceAlignment="true" centerX="0" top="163"/>
     <Fill color="#64748B60"/>
   </Layer>
   <Layer name="ConnectorDots" alpha="0.7">
