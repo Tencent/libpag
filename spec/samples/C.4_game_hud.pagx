@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="800" height="600">
   <Layer id="triangleMask" visible="false">
-<Polystar left="-40" type="polygon" pointCount="3" outerRadius="80" rotation="90"/>
+    <Polystar left="-40" type="polygon" pointCount="3" outerRadius="80" rotation="90"/>
     <Fill color="#FFF"/>
   </Layer>
   <Layer name="Background">
@@ -50,20 +50,20 @@
       <Repeater copies="60" offset="0.5" rotation="6"/>
     </Layer>
     <Layer rotation="15">
-<Ellipse left="-190" top="-190" size="380,380"/>
+      <Ellipse left="-190" top="-190" size="380,380"/>
       <Stroke color="#0FF" width="1" alpha="0.4" dashes="60,40"/>
     </Layer>
     <Layer rotation="-20">
-<Ellipse left="-180" top="-180" size="360,360"/>
+      <Ellipse left="-180" top="-180" size="360,360"/>
       <Stroke color="#0088FF" width="2" alpha="0.5" dashes="10,80"/>
     </Layer>
     <Layer>
-<Ellipse left="-150" top="-150" size="300,300"/>
+      <Ellipse left="-150" top="-150" size="300,300"/>
       <Stroke color="#00CCFF" width="3"/>
       <DropShadowStyle blurX="8" blurY="8" color="#00CCFF80"/>
     </Layer>
     <Layer>
-<Polystar left="-40" type="polygon" pointCount="3" outerRadius="80" rotation="90"/>
+      <Polystar left="-40" type="polygon" pointCount="3" outerRadius="80" rotation="90"/>
       <Stroke color="#FFAA00" width="4"/>
       <Fill>
         <RadialGradient radius="80">
@@ -84,18 +84,18 @@
       </Fill>
     </Layer>
     <Layer>
-<Ellipse left="-3" top="-3" size="6,6"/>
+      <Ellipse left="-3" top="-3" size="6,6"/>
       <Fill color="#FFF"/>
       <Path data="M -20 0 L 20 0 M 0 -20 L 0 20"/>
       <Stroke color="#FFF" width="1" alpha="0.5"/>
     </Layer>
   </Layer>
-  <Layer name="LeftSide" left="400" top="300">
-    <Layer>
+  <Layer name="LeftSide" left="400" top="0" bottom="0">
+    <Layer top="300">
       <Path data="@healthArc"/>
       <Stroke color="#002233" width="24" cap="butt"/>
     </Layer>
-    <Layer>
+    <Layer top="300">
       <Path data="@healthArc"/>
       <Stroke width="20" cap="butt" dashes="4,2">
         <LinearGradient startPoint="-180,100" endPoint="-180,-100">
@@ -107,37 +107,47 @@
       <TrimPath end="0.85"/>
       <DropShadowStyle blurX="5" blurY="5" color="#FF000040"/>
     </Layer>
-    <Layer name="HealthText">
+    <Layer name="HealthText" left="-440" width="200" centerY="0" layout="vertical" alignment="end">
       <Layer>
-        <Text left="-240" top="10" text="100%" fontFamily="Arial" fontStyle="Bold" fontSize="24" textAnchor="end"/>
-        <Fill color="#FFF"/>
+        <TextBox>
+          <Text text="100%" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+          <Fill color="#FFF"/>
+        </TextBox>
       </Layer>
       <Layer>
-        <Text left="-240" top="25" text="STRUCTURAL INTEGRITY" fontFamily="Arial" fontSize="10" textAnchor="end"/>
-        <Fill color="#0088FF"/>
+        <TextBox>
+          <Text text="STRUCTURAL INTEGRITY" fontFamily="Arial" fontSize="10"/>
+          <Fill color="#0088FF"/>
+        </TextBox>
       </Layer>
     </Layer>
   </Layer>
-  <Layer name="SystemStats" left="50" top="60">
-    <Group>
-      <Text text="PWR: 88%" fontFamily="Arial" fontSize="12"/>
-      <Fill color="#00CCFF" alpha="0.7"/>
-    </Group>
-    <Layer top="18">
-      <Text text="RADAR: ACT" fontFamily="Arial" fontSize="12"/>
-      <Fill color="#00CCFF" alpha="0.7"/>
-    </Layer>
-    <Layer top="36">
-      <Text text="SHIELD: OK" fontFamily="Arial" fontSize="12"/>
-      <Fill color="#00CCFF" alpha="0.7"/>
-    </Layer>
-  </Layer>
-  <Layer name="RightSide" left="400" top="300">
+  <Layer name="SystemStats" left="50" top="48" layout="vertical">
     <Layer>
+      <TextBox>
+        <Text text="PWR: 88%" fontFamily="Arial" fontSize="12"/>
+        <Fill color="#00CCFF" alpha="0.7"/>
+      </TextBox>
+    </Layer>
+    <Layer>
+      <TextBox>
+        <Text text="RADAR: ACT" fontFamily="Arial" fontSize="12"/>
+        <Fill color="#00CCFF" alpha="0.7"/>
+      </TextBox>
+    </Layer>
+    <Layer>
+      <TextBox>
+        <Text text="SHIELD: OK" fontFamily="Arial" fontSize="12"/>
+        <Fill color="#00CCFF" alpha="0.7"/>
+      </TextBox>
+    </Layer>
+  </Layer>
+  <Layer name="RightSide" left="400" top="0" bottom="0">
+    <Layer top="300">
       <Path data="@energyArc"/>
       <Stroke color="#002233" width="24" cap="butt"/>
     </Layer>
-    <Layer>
+    <Layer top="300">
       <Path data="@energyArc"/>
       <Stroke width="20" cap="butt" dashes="10,2">
         <LinearGradient startPoint="180,-100" endPoint="180,100">
@@ -148,60 +158,68 @@
       <TrimPath end="0.6"/>
       <DropShadowStyle blurX="5" blurY="5" color="#00FFFF40"/>
     </Layer>
-    <Layer name="EnergyText">
+    <Layer name="EnergyText" left="240" centerY="0" layout="vertical">
       <Layer>
-        <Text left="240" top="10" text="60%" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-        <Fill color="#FFF"/>
+        <TextBox>
+          <Text text="60%" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+          <Fill color="#FFF"/>
+        </TextBox>
       </Layer>
       <Layer>
-        <Text left="240" top="25" text="PLASMA RESERVES" fontFamily="Arial" fontSize="10"/>
-        <Fill color="#0088FF"/>
+        <TextBox>
+          <Text text="PLASMA RESERVES" fontFamily="Arial" fontSize="10"/>
+          <Fill color="#0088FF"/>
+        </TextBox>
       </Layer>
     </Layer>
   </Layer>
-  <Layer name="Bottom" left="400" top="520">
+  <Layer name="Bottom" left="200" top="480" width="400" height="60">
     <Layer>
-      <Path data="M -200 0 L -180 -40 L 180 -40 L 200 0 L 180 20 L -180 20 Z"/>
+      <Path data="M 0 40 L 20 0 L 380 0 L 400 40 L 380 60 L 20 60 Z"/>
       <Fill color="#001122" alpha="0.95"/>
       <Stroke color="#0066AA" width="2"/>
       <DropShadowStyle blurX="15" blurY="15" color="#000"/>
     </Layer>
-    <Layer name="WeaponInfo">
+    <Layer name="WeaponInfo" centerX="0" centerY="0" layout="vertical" alignment="center">
       <Layer>
-        <Text top="-15" text="MK-IV RAILGUN" fontFamily="Arial" fontStyle="Bold" fontSize="20" textAnchor="center"/>
-        <Fill color="#FFF"/>
+        <TextBox>
+          <Text text="MK-IV RAILGUN" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+          <Fill color="#FFF"/>
+        </TextBox>
       </Layer>
       <Layer>
-        <Text top="5" text="[ BURST MODE ]" fontFamily="Arial" fontSize="12" textAnchor="center"/>
-        <Fill color="#FFAA00"/>
+        <TextBox>
+          <Text text="[ BURST MODE ]" fontFamily="Arial" fontSize="12"/>
+          <Fill color="#FFAA00"/>
+        </TextBox>
       </Layer>
     </Layer>
-    <Layer top="30">
+    <Layer top="70">
       <Group>
-        <Rectangle left="-20" top="-2" size="40,4"/>
+        <Rectangle left="180" top="-2" size="40,4"/>
         <Fill color="#004488"/>
       </Group>
       <Group>
-        <Rectangle left="-35" top="-2" size="10,4"/>
-        <Rectangle left="25" top="-2" size="10,4"/>
+        <Rectangle left="165" top="-2" size="10,4"/>
+        <Rectangle left="225" top="-2" size="10,4"/>
         <Fill color="#002244"/>
       </Group>
     </Layer>
   </Layer>
   <Layer name="Radar" left="100" top="500">
     <Group>
-<Ellipse left="-70" top="-70" size="140,140"/>
+      <Ellipse left="-70" top="-70" size="140,140"/>
       <Fill color="#001122" alpha="0.9"/>
       <Stroke color="#0066AA" width="2"/>
     </Group>
     <Group>
-<Ellipse left="-50" top="-50" size="100,100"/>
-<Ellipse left="-25" top="-25" size="50,50"/>
+      <Ellipse left="-50" top="-50" size="100,100"/>
+      <Ellipse left="-25" top="-25" size="50,50"/>
       <Path data="M -70 0 L 70 0 M 0 -70 L 0 70"/>
       <Stroke color="#004488" width="1"/>
     </Group>
     <Layer rotation="-45">
-<Ellipse left="-65" top="-65" size="130,130"/>
+      <Ellipse left="-65" top="-65" size="130,130"/>
       <Fill>
         <ConicGradient endAngle="90">
           <ColorStop offset="0" color="#00FF0000"/>
@@ -216,17 +234,20 @@
       <DropShadowStyle blurX="4" blurY="4" color="#F00"/>
     </Layer>
     <Layer>
-<Ellipse left="-2" top="-2" size="4,4"/>
+      <Ellipse left="-2" top="-2" size="4,4"/>
       <Fill color="#FFF"/>
     </Layer>
   </Layer>
-  <Layer name="Objectives" left="400" top="50">
-    <Text text="MISSION OBJECTIVES:  [ ] INFILTRATE BASE  [ ] HACK TERMINAL  [x] SECURE PERIMETER" fontFamily="Arial" fontStyle="Bold" fontSize="12" textAnchor="center"/>
-    <Fill color="#FFF"/>
+  <Layer name="Objectives" centerX="0" top="36">
+    <TextBox>
+      <Text text="MISSION OBJECTIVES:  [ ] INFILTRATE BASE  [ ] HACK TERMINAL  [x] SECURE PERIMETER" fontFamily="Arial"
+            fontStyle="Bold" fontSize="12"/>
+      <Fill color="#FFF"/>
+    </TextBox>
     <DropShadowStyle blurX="2" blurY="2" color="#000"/>
   </Layer>
   <Layer name="StatusIcons" left="706" top="70">
-<Rectangle left="-4" top="-4" size="8,8"/>
+    <Rectangle left="-4" top="-4" size="8,8"/>
     <Stroke color="#FFAA00" width="1"/>
     <Repeater copies="3" position="15,0"/>
     <DropShadowStyle blurX="5" blurY="5" color="#FFAA00"/>
@@ -254,7 +275,8 @@
     </Layer>
   </Layer>
   <Layer name="Corners">
-    <Path data="M 40 100 L 40 40 L 100 40 M 760 100 L 760 40 L 700 40 M 40 500 L 40 560 L 100 560 M 760 500 L 760 560 L 700 560"/>
+    <Path
+        data="M 40 100 L 40 40 L 100 40 M 760 100 L 760 40 L 700 40 M 40 500 L 40 560 L 100 560 M 760 500 L 760 560 L 700 560"/>
     <Stroke color="#00CCFF" width="4"/>
   </Layer>
   <Resources>

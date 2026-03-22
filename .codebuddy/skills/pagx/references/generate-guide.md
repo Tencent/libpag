@@ -11,7 +11,7 @@ Read before starting generation:
 | Reference | Content |
 |-----------|---------|
 | `spec-essentials.md` | Format specification — node types, processing model, attribute rules |
-| `design-patterns.md` | Structure decisions, text layout, practical pitfall patterns |
+| `design-patterns.md` | Structure decisions, text layout, key implementation patterns |
 | `examples.md` | Structural patterns for Icons, UI, Logos, Charts, Decorative backgrounds |
 
 Read as needed:
@@ -66,7 +66,8 @@ at 2+ positions (differing only in position).
 
 ### Layout Decisions (Top-Down)
 
-For each container, decide layout **before writing content** — this mirrors CSS Flexbox:
+For each container, **think in CSS Flexbox first** then translate to PAGX
+(see `design-patterns.md` §Leverage Familiar Concepts for the full mapping):
 
 1. **Container mode** — look at child Layers:
    - Row → `layout="horizontal"` + `gap` + `padding` + `alignment`
@@ -76,38 +77,24 @@ For each container, decide layout **before writing content** — this mirrors CS
 2. **Internal positioning** — for VectorElements inside a Layer, use constraint attributes
    (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`).
 
-Apply recursively from root to leaf. See `design-patterns.md` §Layout Decisions for the
-full two-step process and patterns.
+Apply recursively from root to leaf. See `design-patterns.md` §Container Layout for
+common patterns and examples.
 
 ### Sizing Rules
 
-- **Container layout children**: the layout engine computes positions — never set `left`/`top`
-  on children in layout flow.
-- **Three-state child sizing**: explicit `width`/`height` = fixed; no size + `flex=0` =
-  content-measured; no size + `flex>0` = proportional share. Choose one — do not combine
-  `flex` with explicit main-axis size (explicit size takes precedence, `flex` is ignored).
-- **`arrangement="spaceBetween"`** to push items to container edges — not empty flex spacer
-  Layers. Use **`arrangement="spaceEvenly"`** for equal spacing including edges, or
-  **`arrangement="spaceAround"`** for equal spacing on each side with half-size edges.
-- **`alignment`** defaults to `stretch` — children without explicit cross-axis size fill
-  the available space automatically. Use `alignment="start"` only when you want children
-  to keep their content size on the cross axis.
+Container layout children are sized by the engine — never set `left`/`top` on children in
+layout flow. Do not combine `flex` with explicit main-axis size (explicit size takes
+precedence, `flex` is ignored). Prefer `arrangement` over empty flex spacer Layers.
+
+See `spec-essentials.md` §3 Container Layout for complete three-state sizing rules.
 
 ### Origin-Based Positioning
 
-Write coordinates **relative to their immediate container** from the start:
+Children must start from (0,0) — the engine measures content-measured containers from (0,0)
+to the bottom-right extent. Negative coordinates and top-left empty margins cause incorrect
+measured bounds.
 
-| Content Type | How to Position |
-|--------------|----------------|
-| Layout-managed (container layout/constraint positioning) | Use layout attributes — engine computes positions |
-| Absolute-positioned | Layer `left`/`top` for block offset; internal elements from `0,0` |
-
-**Children must start from `(0,0)`** — within any Layer or Group, position the first child
-element at the origin. Avoid negative coordinates and avoid leaving empty margins between
-`(0,0)` and the top-left of the nearest child. The engine measures content-measured
-containers from `(0,0)` to the bottom-right extent: negative coordinates are excluded from
-measured bounds, and empty top-left margins inflate the bounds. Both cause layout
-miscalculation in auto-sized containers.
+See `design-patterns.md` §6 Origin-Based Internal Layout for coordinate localization details.
 
 ---
 
@@ -143,27 +130,26 @@ For each block, construct the VectorElement tree following these principles.
 
 ### Text Positioning
 
-**Single-line text** — use Text with constraints directly:
+Text is a content-only element — it renders from the baseline, making direct positioning
+dependent on font metrics. Always wrap Text in TextBox, which handles measurement and
+provides accurate bounding box for constraint positioning.
 
 ```xml
 <!-- Centered in container -->
-<Text text="30" fontFamily="Arial" fontStyle="Bold" fontSize="48" centerX="0" centerY="0"/>
-<Fill color="#FFF"/>
+<TextBox centerX="0" centerY="0">
+  <Text text="30" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
+  <Fill color="#FFF"/>
+</TextBox>
 
 <!-- Left-aligned, vertically centered -->
-<Text text="Label" fontFamily="Arial" fontSize="14" left="16" centerY="0"/>
-<Fill color="#333"/>
+<TextBox left="16" centerY="0">
+  <Text text="Label" fontFamily="Arial" fontSize="14"/>
+  <Fill color="#333"/>
+</TextBox>
 ```
 
-**When to add TextBox** — Bare Text aligns baseline to y=0, causing unreliable vertical
-positioning in layouts. Always wrap Text in TextBox when it needs vertical centering,
-wrapping, per-line alignment (`textAlign`), or rich text (multiple styles). See
-`design-patterns.md` §Text Layout Decisions for complete patterns.
-
-**TextBox requires a known container width** for wrapping. When the parent is
-content-measured (no explicit width, no layout-assigned width), opposite-pair constraints
-(`left="0" right="0"`) create circular dependency — use `centerX`/`centerY` on TextBox
-instead. See `design-patterns.md` §8 for details.
+See `design-patterns.md` §Container Layout for alignment attributes and rich text
+patterns.
 
 
 ### PAGX-Specific Format Rules

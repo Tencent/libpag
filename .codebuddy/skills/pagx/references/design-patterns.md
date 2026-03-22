@@ -3,6 +3,22 @@
 Shared practical knowledge for both generation and optimization — structure decisions,
 text layout patterns, and key implementation patterns.
 
+## Leverage Familiar Concepts
+
+Many PAGX features map directly to CSS/SVG concepts you already know. **Always think in
+the familiar concept first, then translate to PAGX** — never learn PAGX features from
+scratch when an equivalent exists:
+
+| Think in... | Translate to PAGX |
+|---|---|
+| CSS Flexbox (`flex-direction`, `flex`, `gap`, `align-items`, `justify-content`) | Container layout (`layout`, `flex`, `gap`, `alignment`, `arrangement`) — see §Container Layout |
+| SVG `<path d="...">` | `<Path data="..."/>` — identical syntax, copy `d` values directly |
+| CSS `box-shadow: offsetX offsetY blur color` | `<DropShadowStyle offsetX offsetY blurX blurY color/>` |
+| CSS `backdrop-filter: blur(N)` | `<BackgroundBlurStyle blurX="N" blurY="N"/>` |
+| CSS `linear-gradient(angle, stops)` | `<LinearGradient startPoint endPoint>` — convert angle to coordinates on the geometry bounds |
+| CSS `radial-gradient(circle R at cx cy, stops)` | `<RadialGradient center="cx,cy" radius="R">` |
+| CSS `text-align`, `line-height`, `overflow` | TextBox `textAlign`, `lineHeight`, `overflow` — same names and semantics |
+
 ---
 
 ## Structure Decision Tree
@@ -34,9 +50,9 @@ effective combination.
 - **Over-detailing**: At small icon sizes, fine details (small dots, thin lines, tiny text
   labels) may become indistinguishable noise. Evaluate whether each detail remains legible
   at the target render size before including it.
-- **Path data from SVG**: PAGX Path `data` uses SVG `<path d="...">` syntax verbatim.
-  Generate icons as SVG mentally, then copy the `d` value directly into `<Path data="..."/>`.
-  Never hand-calculate path coordinates — produce them as you would for SVG.
+- **Path data from SVG**: Generate icons as SVG mentally, then copy the `d` value directly
+  into `<Path data="..."/>` — see §Leverage Familiar Concepts. Never hand-calculate path
+  coordinates.
 
 ### Layer Count
 
@@ -119,6 +135,15 @@ Constraint Positioning for full rules and the center sizing requirement.
 ```
 
 ### Container Layout
+
+PAGX container layout is a subset of CSS Flexbox — see §Leverage Familiar Concepts for
+the attribute mapping. **Design layouts using Flexbox thinking first**, then translate.
+
+Not in PAGX: `margin` (use uniform `gap` or spacer Layers), `flex-wrap` (no wrapping).
+
+**Never fall back to absolute constraint positioning when the layout is expressible as
+nested flex containers.** Constraint positioning is for overlay elements and single-element
+placement — not for arranging rows and columns of content.
 
 See `spec-essentials.md` §3 Container Layout for core rules (three-state sizing, flex,
 alignment, layout participation). Below are common patterns.

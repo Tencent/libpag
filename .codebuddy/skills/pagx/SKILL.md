@@ -1,11 +1,10 @@
 ---
 name: pagx
 description: >-
-  Creates, edits, and optimizes .pagx files for vector graphics and motion design.
-  Use when user asks to create, write, generate, edit, modify, update, fix, review,
-  debug, or optimize a PAGX file, asks about PAGX syntax, elements, attributes, or
-  layout, runs pagx CLI commands (render, validate, format, optimize, bounds, font
-  info/embed), or mentions ".pagx" files in any context.
+  PAGX (.pagx) file handler. MUST invoke for ANY task involving PAGX format or
+  ".pagx" files — including create, edit, optimize, review, debug, or query syntax.
+  Also invoke when user runs pagx CLI commands (render, validate, format, optimize,
+  bounds, font info/embed) or asks about PAGX elements, attributes, or layout.
 ---
 
 # PAGX Skill

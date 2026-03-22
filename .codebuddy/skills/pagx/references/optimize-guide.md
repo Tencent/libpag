@@ -10,7 +10,7 @@ Read before starting optimization:
 | Reference | Content |
 |-----------|---------|
 | `spec-essentials.md` | Format specification — node types, processing model, attribute rules |
-| `design-patterns.md` | Structure decisions, text layout, practical pitfall patterns |
+| `design-patterns.md` | Structure decisions, text layout, key implementation patterns |
 
 Read as needed:
 
@@ -48,7 +48,7 @@ Check for issues that automated optimization cannot fix:
 - **Manual coordinate calculation** — hand-calculated `left`/`top` values that
   should be replaced by container layout (`layout`/`gap`/`padding`) for arranging child Layers,
   or constraint positioning (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`) for positioning
-  internal elements. See `design-patterns.md` §Layout Decisions.
+  internal elements. See `spec-essentials.md` §3 Auto Layout.
 - **Inconsistent layout attributes** — container Layers with different `gap` or `padding`
   values for visually similar contexts that should be unified.
 - **Redundant Layer nesting** — child Layers that should be Groups (no styles, filters, or
@@ -60,7 +60,7 @@ Check for issues that automated optimization cannot fix:
 - **Duplicate painters** — identical Fill/Stroke across Groups or Layers that could share
   scope. See **Painter Merging** below.
 - **Manual text positioning** — hand-positioned Text elements that should use TextBox for
-  automatic layout (`design-patterns.md` §Text Layout).
+  automatic layout (`design-patterns.md` §Container Layout).
 - **Repeater count** — single Repeater should stay under ~200 copies; nested Repeater product
   under ~500. See **Repeater Optimization** below.
 - **Blur cost** — BlurFilter / DropShadowStyle cost is proportional to blur radius. Use the
@@ -84,11 +84,11 @@ After all optimizations, verify the following:
 - [ ] All required attributes present; no redundant default-value attributes
   (`attributes.md`)
 - [ ] Painter scope isolation correct (`design-patterns.md` §1)
-- [ ] Text `textAnchor` not set when TextBox is present (`design-patterns.md` §2)
+- [ ] Text `textAnchor` not set when TextBox is present (`design-patterns.md` §Container Layout)
   - [ ] All positioning uses constraint attributes (`left`/`top`/`centerX`/`centerY`)
 - [ ] Containers have explicit `width`/`height` where a specific design size is intended
   (not needed when measured or layout-assigned size is correct)
-- [ ] Internal coordinates relative to Layer origin (see **Coordinate Localization** below)
+- [ ] Internal coordinates relative to Layer origin (`design-patterns.md` §6 Origin-Based Internal Layout)
 - [ ] `<Resources>` placed after all Layers; all `@id` references resolve
 - [ ] Repeater copies reasonable (~200 single, ~500 nested product)
 - [ ] Visual stacking order preserved (see **Stacking Order** below)
@@ -334,42 +334,15 @@ This is independent of XML source order.
 
 ## Coordinate Localization
 
-All three Layer/Group optimization scenarios share a common sub-step: **converting internal
-coordinates from canvas-absolute to Layer-relative.**
-
-### Principle
-
-Prefer constraint attributes (`left`/`top`/`centerX`/`centerY`) for positioning — they
-eliminate manual coordinate calculation and are more maintainable. For absolute-positioned
-blocks (fallback), the Layer's `left`/`top` carries the **block-level offset**, and internal
-elements use coordinates **relative to the Layer's origin (0,0)**.
-
-**Layout-managed content**: When a parent Layer uses container layout (`layout` attribute),
-child Layer positions are computed by the layout engine — do not set `left`/`top` manually.
-When constraint attributes are used on VectorElements or child Layers, the engine computes
-positions automatically — do not set `left`/`top` manually on constrained
-axes. Coordinate localization only applies to the remaining absolute-positioned content.
-
-### How
+See `design-patterns.md` §6 Origin-Based Internal Layout and §Coordinate Localization
+for the concept and rules. During optimization, apply coordinate localization when
+extracting or restructuring Layer/Group containers:
 
 1. Identify the block's anchor position in canvas space → set as Layer `left`/`top`
-2. Subtract the Layer's left/top from all internal coordinate values
-3. The goal: the first content element starts at or near `0,0`
+2. Subtract the Layer's left/top from all internal layout-controlling coordinates
+3. The first content element starts at exactly (0,0)
 
-### Which Coordinates Matter
-
-Focus on the **layout-controlling nodes**:
-
-- **Text + TextBox**: TextBox constraint attributes control layout
-- **Text + TextPath**: TextPath's path origin controls layout
-- **Bare Text**: Text's constraint attributes control layout
-- **Geometry elements**: constraint attributes (`left`/`top`) control placement
-
-### Caveats
-
-- Gradient coordinates are relative to the geometry element's local origin — **not** affected
-  by Layer left/top changes (no conversion needed).
-- For nested child Layers, apply the same principle recursively.
+For nested child Layers, apply the same steps recursively.
 
 ---
 

@@ -121,12 +121,9 @@ A card with vertical container layout, rich text header, and action buttons.
     <!-- Card with internal vertical layout -->
     <Layer left="20" right="20" top="20" bottom="20"
            layout="vertical" gap="12" padding="16">
-      <!-- Background (excluded from layout flow) -->
-      <Layer includeInLayout="false" left="0" right="0" top="0" bottom="0">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
-        <Fill color="#FFF"/>
-        <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000015"/>
-      </Layer>
+      <!-- Background: VectorElements don't participate in layout, write them directly -->
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+      <Fill color="#FFF"/>
       <!-- Title + Value (rich text: different sizes and colors) -->
       <Layer>
         <TextBox>
@@ -160,6 +157,7 @@ A card with vertical container layout, rich text header, and action buttons.
           </TextBox>
         </Layer>
       </Layer>
+      <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000015"/>
     </Layer>
   </Layer>
 </pagx>
@@ -167,10 +165,12 @@ A card with vertical container layout, rich text header, and action buttons.
 
 **Pattern**: Key structural choices:
 
+- **Background directly on layout Layer**: VectorElements (Rectangle, Fill, etc.) don't
+  participate in container layout — write them directly on the same Layer that has `layout`.
+  No need for a separate `includeInLayout="false"` wrapper Layer. DropShadowStyle goes at the
+  end per convention — it applies to the entire Layer content regardless of position.
 - **Rich text**: Multiple Text segments with different styles in one TextBox — each wrapped
   in a Group for painter scope isolation. Use `&#10;` for line breaks between segments.
-- **Background as overlay**: `includeInLayout="false"` + stretch constraints keeps background
-  out of layout flow while filling the card's computed size.
 - **Equal-width buttons**: `flex="1"` children in horizontal container — buttons fill
   both axes automatically (default stretch alignment).
 
@@ -302,7 +302,7 @@ often combine Polystar with gradients and layer styles for depth.
 
 **Pattern**: Place all boolean-participating geometry before MergePath, then painters after.
 MergePath **clears all previously rendered Fill/Stroke** — isolate surviving content in a
-separate Group (see `spec-essentials.md` §4).
+separate Group (see `spec-essentials.md` §5).
 
 ### Star Badge (Polystar)
 
