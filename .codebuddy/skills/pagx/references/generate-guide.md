@@ -212,17 +212,3 @@ centering.
 After fixes, re-render and **read the screenshot** to confirm no new issues. Repeat until
 clean.
 
----
-
-## Step 5: Automated Formatting
-
-Run `pagx optimize` as a final formatting pass — it applies safe mechanical transformations
-(empty element removal, resource deduplication, coordinate localization, consistent
-formatting):
-
-```bash
-pagx optimize -o output.pagx input.pagx
-```
-
-This step is for cleanup only. All structural correctness, layout decisions, and format
-constraints must already be handled in Steps 1–4.

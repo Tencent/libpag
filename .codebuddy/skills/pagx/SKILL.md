@@ -25,8 +25,7 @@ screenshot-based verification loop. Scene-specific examples are indexed inside.
 
 ### Optimize — `references/optimize-guide.md`
 
-**When**: User asks to optimize, simplify, or review an existing PAGX file. Also used as
-the final step after generating a new file.
+**When**: User asks to optimize, simplify, or review an existing PAGX file.
 
 **What it provides**: Automated optimization via `pagx optimize`, manual structure and
 performance review patterns, and a final verification checklist.
