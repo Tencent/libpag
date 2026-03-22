@@ -66,9 +66,9 @@
         </TextBox>
       </Layer>
     </Layer>
-    <Group centerX="0" centerY="0">
+    <Group centerY="0">
       <Text text="An XML-based markup language for describing animated vector graphics." fontFamily="Arial" fontSize="12"/>
-      <TextPath path="M -141 0 A 141 141 0 0 0 141 0" forceAlignment="true"/>
+      <TextPath path="M -141 0 A 141 141 0 0 0 141 0" forceAlignment="true" centerX="0"/>
       <Fill color="#64748B60"/>
     </Group>
   </Layer>
