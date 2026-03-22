@@ -66,11 +66,9 @@
         </TextBox>
       </Layer>
     </Layer>
-    <Group centerY="0">
-      <Text text="An XML-based markup language for describing animated vector graphics." fontFamily="Arial" fontSize="12"/>
-      <TextPath path="M -141 0 A 141 141 0 0 0 141 0" forceAlignment="true" centerX="0"/>
-      <Fill color="#64748B60"/>
-    </Group>
+    <Text text="An XML-based markup language for describing animated vector graphics." fontFamily="Arial" fontSize="12"/>
+    <TextPath path="M -141 0 A 141 141 0 0 0 141 0" forceAlignment="true" centerX="0" bottom="163"/>
+    <Fill color="#64748B60"/>
   </Layer>
   <Layer name="ConnectorDots" alpha="0.7">
     <Ellipse left="797" top="372" size="6,6"/>
