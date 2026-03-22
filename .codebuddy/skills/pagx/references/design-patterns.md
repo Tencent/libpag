@@ -11,7 +11,7 @@ scratch when an equivalent exists:
 
 | Think in... | Translate to PAGX |
 |---|---|
-| CSS Flexbox (`flex-direction`, `flex`, `gap`, `align-items`, `justify-content`) | Container layout (`layout`, `flex`, `gap`, `alignment`, `arrangement`) — see §Container Layout |
+| CSS Flexbox (`flex-direction`, `flex`, `gap`, `align-items`, `justify-content`, `padding`) | Container layout (`layout`, `flex`, `gap`, `alignment`, `arrangement`, `padding`) — see §Container Layout. **Important**: `padding` only affects container layout children, not constraint positioning |
 | SVG `<path d="...">` | `<Path data="..."/>` — identical syntax, copy `d` values directly |
 | CSS `box-shadow: offsetX offsetY blur color` | `<DropShadowStyle offsetX offsetY blurX blurY color/>` |
 | CSS `backdrop-filter: blur(N)` | `<BackgroundBlurStyle blurX="N" blurY="N"/>` |
@@ -140,6 +140,8 @@ PAGX container layout is a subset of CSS Flexbox — see §Leverage Familiar Con
 the attribute mapping. **Design layouts using Flexbox thinking first**, then translate.
 
 Not in PAGX: `margin` (use uniform `gap` or spacer Layers), `flex-wrap` (no wrapping).
+
+**Critical limitation**: `padding` only affects container layout (`layout="horizontal"` or `layout="vertical"`). It does **not** apply to constraint positioning. For content-measured containers using constraints (e.g., white cards with `left`/`right`/`top`/`bottom` sub-layers), use explicit sizing or rely on constraint positioning alone — `padding` will be ignored.
 
 **Never fall back to absolute constraint positioning when the layout is expressible as
 nested flex containers.** Constraint positioning is for overlay elements and single-element

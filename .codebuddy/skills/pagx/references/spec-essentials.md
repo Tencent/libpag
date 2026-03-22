@@ -300,7 +300,7 @@ Write `id`/`name`/`version` first, then constraint/sizing attributes (`left`, `r
 | `layout` | none | `none` (default), `horizontal`, or `vertical` — sets container layout mode for child Layers |
 | `gap` | 0 | Spacing between adjacent child Layers along the main axis |
 | `flex` | 0 | Flex weight for proportional sizing in container layout. 0 = content-measured (default); >0 = share remaining space by weight |
-| `padding` | 0 | Inner padding: `"all"`, `"v,h"`, `"t,h,b"`, or `"t,r,b,l"` (CSS-compatible shorthand) |
+| `padding` | 0 | Inner padding of the container: `"all"`, `"v,h"`, `"t,h,b"`, or `"t,r,b,l"` (CSS-compatible shorthand). **Only applies in container layout mode** (`layout` is set). Has no effect on constraint positioning |
 | `alignment` | stretch | Cross-axis alignment of children: `start` / `center` / `end` / `stretch` |
 | `arrangement` | start | Main-axis distribution: `start` / `center` / `end` / `spaceBetween` / `spaceEvenly` / `spaceAround` |
 | `includeInLayout` | true | Whether to participate in parent's container layout |
