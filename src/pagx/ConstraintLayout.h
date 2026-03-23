@@ -25,7 +25,6 @@ namespace pagx {
 
 class Element;
 class Layer;
-class Group;
 class FontConfig;
 
 /**
@@ -68,16 +67,6 @@ class ConstraintLayout {
    */
   static void ApplyLayerConstraints(Layer* layer, float parentWidth, float parentHeight,
                                     float measuredWidth, float measuredHeight);
-
-  /**
-   * Applies constraint positioning to a Layer within a parent Layer of given dimensions.
-   * Handles opposite-edge constraints that modify layer width/height.
-   *
-   * @param layer The layer to constrain
-   * @param parentWidth The width of the parent layer
-   * @param parentHeight The height of the parent layer
-   */
-  static void ApplyLayerConstraints(Layer* layer, float parentWidth, float parentHeight);
 
   /**
    * Recursively applies constraint positioning to all elements within a container (Group or

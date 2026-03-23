@@ -19,130 +19,36 @@
 #include "AutoLayout.h"
 #include <algorithm>
 #include <cmath>
-#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
 #include "ConstraintLayout.h"
-#include "TextLayout.h"
 #include "base/utils/Log.h"
-#include "pagx/FontProvider.h"
 #include "pagx/PAGXDocument.h"
-#include "pagx/layout/ElementConstraint.h"
 #include "pagx/layout/ElementMeasure.h"
-#include "pagx/layout/ElementTransform.h"
+#include "pagx/layout/LayoutUtils.h"
 #include "pagx/nodes/Composition.h"
-#include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Layer.h"
-#include "pagx/nodes/Path.h"
-#include "pagx/nodes/Polystar.h"
-#include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/types/Alignment.h"
 #include "pagx/types/Arrangement.h"
-#include "pagx/types/Constraints.h"
 #include "pagx/types/LayoutMode.h"
 #include "pagx/types/Rect.h"
-#include "tgfx/core/Font.h"
-#include "tgfx/core/TextBlob.h"
-#include "tgfx/core/Typeface.h"
 
 namespace pagx {
 
-// Computes the bounds of a Text element using tgfx::TextBlob::getTightBounds() for precise
-// measurement. Falls back to estimation when font is unavailable.
-// Returns bounds in absolute coordinates (including text->position and textAnchor).
-static Rect ComputeTextBounds(const Text* text, FontConfig* fontProvider) {
-  if (text == nullptr || text->text.empty()) {
-    return {};
-  }
-
-  std::shared_ptr<tgfx::Typeface> typeface = nullptr;
-  if (fontProvider != nullptr) {
-    typeface = fontProvider->findTypeface(text->fontFamily, text->fontStyle);
-  }
-  if (typeface == nullptr) {
-    typeface = tgfx::Typeface::MakeFromName(text->fontFamily, text->fontStyle);
-  }
-
-  float textWidth;
-  float textHeight;
-  float boundsTop;  // Y offset from baseline to top of bounds (negative = above baseline)
-
-  if (typeface != nullptr) {
-    tgfx::Font font(typeface, text->fontSize);
-    font.setFauxBold(text->fauxBold);
-    font.setFauxItalic(text->fauxItalic);
-    auto textBlob = tgfx::TextBlob::MakeFrom(text->text, font);
-    if (textBlob != nullptr) {
-      auto bounds = textBlob->getTightBounds();
-      textWidth = bounds.right - bounds.left;
-      textHeight = bounds.bottom - bounds.top;
-      boundsTop = bounds.top;
-    } else {
-      textWidth = static_cast<float>(text->text.size()) * text->fontSize * 0.6f;
-      textHeight = text->fontSize;
-      boundsTop = -text->fontSize * 0.8f;
-    }
-  } else {
-    textWidth = static_cast<float>(text->text.size()) * text->fontSize * 0.6f;
-    textHeight = text->fontSize;
-    boundsTop = -text->fontSize * 0.8f;
-  }
-
-  // Coordinate convention: position.x is the anchor point, position.y is the baseline.
-  // boundsTop is relative to baseline (negative = above), so boundsY = baseline + boundsTop.
-  float boundsX = text->position.x;
-  float boundsY = text->position.y + boundsTop;
-  if (text->textAnchor == TextAnchor::Center) {
-    boundsX = text->position.x - textWidth * 0.5f;
-  } else if (text->textAnchor == TextAnchor::End) {
-    boundsX = text->position.x - textWidth;
-  }
-  return Rect::MakeXYWH(boundsX, boundsY, textWidth, textHeight);
-}
-
-// Local wrapper for ElementMeasure::GetContentBounds that uses ComputeTextBounds.
-// For TextBox with unset dimensions (NaN), performs a full typesetting pass to measure content
-// size, then writes the measured dimensions back. This ensures subsequent typesetting uses a
-// determined box size for alignment (textAlign, paragraphAlign). Explicitly set dimensions
-// (including 0) are preserved as-is.
-static Rect GetContentBounds(const Element* element, FontConfig* fontProvider) {
-  if (element->nodeType() == NodeType::TextBox) {
-    auto* textBox = const_cast<TextBox*>(static_cast<const TextBox*>(element));
-    bool needW = std::isnan(textBox->width);
-    bool needH = std::isnan(textBox->height);
-    if (needW || needH) {
-      auto measured = TextLayout::MeasureTextBox(textBox, fontProvider);
-      if (needW) {
-        textBox->width = measured.width;
-      }
-      if (needH) {
-        textBox->height = measured.height;
-      }
-    }
-    return Rect::MakeXYWH(0, 0, textBox->width, textBox->height);
-  }
-  return ElementMeasure::GetContentBounds(
-      element, [fontProvider](const Text* text) { return ComputeTextBounds(text, fontProvider); });
-}
-
-// Local wrapper for ElementMeasure::GetMeasuredBounds that uses ComputeTextBounds.
-// For TextBox, ensures measurement write-back happens before ElementMeasure reads dimensions.
+// Wraps ElementMeasure::GetMeasuredBounds with TextBox write-back support. Triggers
+// LayoutUtils::GetContentBounds first for TextBox to ensure dimensions are determined.
 static Rect GetMeasuredBounds(const Element* element, FontConfig* fontProvider) {
   if (element->nodeType() == NodeType::TextBox) {
-    // Trigger measurement write-back so ElementMeasure sees determined dimensions.
-    GetContentBounds(element, fontProvider);
+    LayoutUtils::GetContentBounds(element, fontProvider);
   }
-  return ElementMeasure::GetMeasuredBounds(
-      element, [fontProvider](const Text* text) { return ComputeTextBounds(text, fontProvider); });
+  return ElementMeasure::GetMeasuredBounds(element, [fontProvider](const Text* text) {
+    return LayoutUtils::ComputeTextBounds(text, fontProvider);
+  });
 }
-
-// Applies constraint positioning to a single element within a container of the given dimensions.
-// When skipScaling is true, non-stretchable elements will center without scaling (used for Text
-// elements controlled by a TextBox).
 
 // Forward declarations for recursive processing.
 static std::pair<float, float> MeasureLayer(const Layer* layer, FontConfig* fontProvider);
@@ -554,7 +460,8 @@ static void LayoutLayer(Layer* layer, FontConfig* fontProvider) {
   if (!layer->contents.empty() && (!std::isnan(layer->width) || !std::isnan(layer->height))) {
     float containerW = std::isnan(layer->width) ? 0 : layer->width;
     float containerH = std::isnan(layer->height) ? 0 : layer->height;
-    ConstraintLayout::ApplyElementsConstraints(layer->contents, containerW, containerH, fontProvider);
+    ConstraintLayout::ApplyElementsConstraints(layer->contents, containerW, containerH,
+                                               fontProvider);
   }
 
   // Step 5: Apply constraint positioning to child Layers.
@@ -577,8 +484,8 @@ static void LayoutLayer(Layer* layer, FontConfig* fontProvider) {
         continue;
       }
       auto childMeasured = MeasureLayer(child, fontProvider);
-      ConstraintLayout::ApplyLayerConstraints(child, layer->width, layer->height, childMeasured.first,
-                                              childMeasured.second);
+      ConstraintLayout::ApplyLayerConstraints(child, layer->width, layer->height,
+                                              childMeasured.first, childMeasured.second);
     }
   }
 
