@@ -18,12 +18,14 @@
 
 #pragma once
 
+#include "pagx/defines.h"
+
 namespace pagx {
 
 /**
  * A rectangle defined by position and size.
  */
-struct Rect {
+struct RTTR_AUTO_REGISTER_CLASS Rect {
   /**
    * The x coordinate of the rectangle origin.
    */

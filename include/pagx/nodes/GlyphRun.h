@@ -20,6 +20,7 @@
 
 #include <cstdint>
 #include <vector>
+#include "pagx/defines.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Point.h"
 
@@ -31,7 +32,7 @@ class Font;
  * GlyphRun defines pre-shaped glyph data for a segment of text. Each GlyphRun independently
  * references a font resource.
  */
-class GlyphRun : public Node {
+class RTTR_AUTO_REGISTER_CLASS GlyphRun : public Node {
  public:
   /**
    * Reference to the Font resource.
@@ -98,6 +99,8 @@ class GlyphRun : public Node {
   NodeType nodeType() const override {
     return NodeType::GlyphRun;
   }
+
+  RTTR_ENABLE(Node)
 
  private:
   GlyphRun() = default;

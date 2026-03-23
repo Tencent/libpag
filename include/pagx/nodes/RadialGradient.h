@@ -19,6 +19,7 @@
 #pragma once
 
 #include <vector>
+#include "pagx/defines.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/types/Matrix.h"
@@ -29,7 +30,7 @@ namespace pagx {
 /**
  * A radial gradient color source that produces a gradient radiating from a center point.
  */
-class RadialGradient : public ColorSource {
+class RTTR_AUTO_REGISTER_CLASS RadialGradient : public ColorSource {
  public:
   /**
    * The center point of the gradient.
@@ -54,6 +55,8 @@ class RadialGradient : public ColorSource {
   NodeType nodeType() const override {
     return NodeType::RadialGradient;
   }
+
+  RTTR_ENABLE(ColorSource)
 
  private:
   RadialGradient() = default;

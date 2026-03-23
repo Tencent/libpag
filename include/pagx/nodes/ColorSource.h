@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "pagx/defines.h"
 #include "pagx/nodes/Node.h"
 
 namespace pagx {
@@ -27,7 +28,10 @@ namespace pagx {
  * ColorSource can be used both inline in painters and as standalone resources in defs.
  * Inherits from Node so it can be stored in resources and referenced by ID.
  */
-class ColorSource : public Node {
+class RTTR_AUTO_REGISTER_CLASS ColorSource : public Node {
+ public:
+  RTTR_ENABLE(Node)
+
  protected:
   ColorSource() = default;
 

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "pagx/defines.h"
 #include "pagx/nodes/LayerFilter.h"
 #include "pagx/types/Color.h"
 
@@ -26,7 +27,7 @@ namespace pagx {
 /**
  * An inner shadow filter that renders a shadow inside the layer content.
  */
-class InnerShadowFilter : public LayerFilter {
+class RTTR_AUTO_REGISTER_CLASS InnerShadowFilter : public LayerFilter {
  public:
   /**
    * The horizontal offset of the shadow in pixels. The default value is 0.
@@ -61,6 +62,8 @@ class InnerShadowFilter : public LayerFilter {
   NodeType nodeType() const override {
     return NodeType::InnerShadowFilter;
   }
+
+  RTTR_ENABLE(LayerFilter)
 
  private:
   InnerShadowFilter() = default;

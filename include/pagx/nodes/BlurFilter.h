@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "pagx/defines.h"
 #include "pagx/nodes/LayerFilter.h"
 #include "pagx/types/TileMode.h"
 
@@ -26,7 +27,7 @@ namespace pagx {
 /**
  * A blur filter that applies a Gaussian blur effect to the layer.
  */
-class BlurFilter : public LayerFilter {
+class RTTR_AUTO_REGISTER_CLASS BlurFilter : public LayerFilter {
  public:
   /**
    * The horizontal blur radius in pixels. The default value is 0.
@@ -46,6 +47,8 @@ class BlurFilter : public LayerFilter {
   NodeType nodeType() const override {
     return NodeType::BlurFilter;
   }
+
+  RTTR_ENABLE(LayerFilter)
 
  private:
   BlurFilter() = default;

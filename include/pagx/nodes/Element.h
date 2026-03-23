@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "pagx/defines.h"
 #include "pagx/nodes/Node.h"
 
 namespace pagx {
@@ -27,9 +28,11 @@ namespace pagx {
  * Ellipse, Polystar, Path, Text), painters (Fill, Stroke), modifiers (TrimPath, RoundCorner,
  * MergePath), text elements (TextModifier, TextPath, TextBox), and containers (Group, Repeater).
  */
-class Element : public Node {
+class RTTR_AUTO_REGISTER_CLASS Element : public Node {
  public:
   ~Element() override = default;
+
+  RTTR_ENABLE(Node)
 
  protected:
   Element() = default;

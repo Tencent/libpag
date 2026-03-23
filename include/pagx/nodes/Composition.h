@@ -19,6 +19,7 @@
 #pragma once
 
 #include <vector>
+#include "pagx/defines.h"
 #include "pagx/nodes/Node.h"
 
 namespace pagx {
@@ -29,7 +30,7 @@ class Layer;
  * Composition represents a reusable composition resource that contains a set of layers. It can be
  * referenced by a Layer's composition property to create instances.
  */
-class Composition : public Node {
+class RTTR_AUTO_REGISTER_CLASS Composition : public Node {
  public:
   /**
    * The width of the composition in pixels.
@@ -49,6 +50,8 @@ class Composition : public Node {
   NodeType nodeType() const override {
     return NodeType::Composition;
   }
+
+  RTTR_ENABLE(Node)
 
  private:
   Composition() = default;

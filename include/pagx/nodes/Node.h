@@ -20,6 +20,7 @@
 
 #include <string>
 #include <unordered_map>
+#include "pagx/defines.h"
 
 namespace pagx {
 
@@ -27,12 +28,13 @@ namespace pagx {
  * NodeType enumerates all types of nodes that can be stored in a PAGX document. This includes
  * resources (Image, Composition, ColorSources) and elements (shapes, painters, modifiers, etc.).
  */
-enum class NodeType {
+enum class RTTR_AUTO_REGISTER_CLASS NodeType {
   // Document
   /**
    * The root document node.
    */
   Document,
+
 
   // Resources
   /**
@@ -204,7 +206,7 @@ enum class NodeType {
  * document's resources list and referenced by ID (e.g., "@resourceId"). Each node has a unique
  * identifier and a type.
  */
-class Node {
+class RTTR_AUTO_REGISTER_CLASS Node {
  public:
   /**
    * The unique identifier of this node. Used for referencing the node by ID (e.g., "@id").
@@ -243,6 +245,8 @@ class Node {
    * Returns the node type of this node.
    */
   virtual NodeType nodeType() const = 0;
+
+  RTTR_ENABLE()
 
  protected:
   Node() = default;
