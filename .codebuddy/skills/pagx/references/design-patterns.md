@@ -250,17 +250,7 @@ child a different cross-axis alignment, wrap it in a nested container with its o
 
 **Overlay elements**: Set `includeInLayout="false"` on a child Layer to exempt it from
 layout flow. It can then use any constraint attribute, positioned relative to the parent's
-size.
-
-```xml
-<Layer width="400" height="300" layout="vertical" gap="12">
-  <Layer><!-- content --></Layer>
-  <Layer right="-4" top="-4" width="20" height="20" includeInLayout="false">
-    <Ellipse left="0" right="0" top="0" bottom="0"/>
-    <Fill color="#EF4444"/>
-  </Layer>
-</Layer>
-```
+size. See `examples.md` §Notification Badge for a complete example.
 
 #### TextBox Layout Patterns
 
