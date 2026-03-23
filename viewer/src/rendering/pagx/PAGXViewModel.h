@@ -79,8 +79,6 @@ class PAGXViewModel : public ContentViewModel {
   bool hasContent();
 
   Q_SIGNAL void pagxDocumentChanged(std::shared_ptr<pagx::PAGXDocument> pagxDocument);
-  Q_SIGNAL void requestFlush();
-  Q_SIGNAL void requestSizeChanged();
 
  private:
   void clearContent();

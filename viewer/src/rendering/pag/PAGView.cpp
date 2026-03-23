@@ -28,8 +28,9 @@ static constexpr int64_t MinAudioLagThreshold = -100000;
 
 PAGView::PAGView(QQuickItem* parent) : ContentView(parent) {
   viewModel = std::make_unique<PAGViewModel>();
-  connect(viewModel.get(), &PAGViewModel::requestFlush, this, &PAGView::triggerFlush);
-  connect(viewModel.get(), &PAGViewModel::requestSizeChanged, this, &PAGView::onRequestSizeChanged);
+  connect(viewModel.get(), &ContentViewModel::requestFlush, this, &PAGView::triggerFlush);
+  connect(viewModel.get(), &ContentViewModel::contentSizeChanged, this,
+          &PAGView::onRequestSizeChanged);
   connect(viewModel.get(), &PAGViewModel::preferredSizeChanged, this,
           &PAGView::onPreferredSizeChanged);
   connect(viewModel.get(), &PAGViewModel::audioTimeChanged, this, &PAGView::onAudioTimeChanged);
@@ -85,19 +86,29 @@ void PAGView::onPreferredSizeChanged() {
 
 void PAGView::onIsPlayingChanged(bool isPlaying) {
   if (isPlaying) {
+    std::lock_guard<std::mutex> lock(lastPlayTimeMutex);
     lastPlayTime = tgfx::Clock::Now();
   }
 }
 
 void PAGView::onAudioTimeChanged(int64_t audioTime) {
   auto timeNow = tgfx::Clock::Now();
-  auto displayTime = timeNow - lastPlayTime;
+  int64_t lastPlayTimeCopy = 0;
+  {
+    std::lock_guard<std::mutex> lock(lastPlayTimeMutex);
+    lastPlayTimeCopy = lastPlayTime;
+  }
+  auto displayTime = timeNow - lastPlayTimeCopy;
   auto duration = static_cast<double>(viewModel->getPAGPlayer()->duration());
   auto currentDisplayTime = static_cast<int64_t>(viewModel->getProgress() * duration) + displayTime;
   if (audioTime == 0 || (audioTime - currentDisplayTime > MaxAudioLeadThreshold)) {
-    lastPlayTime = timeNow;
+    {
+      std::lock_guard<std::mutex> lock(lastPlayTimeMutex);
+      lastPlayTime = timeNow;
+    }
     viewModel->setProgressInternal(static_cast<double>(audioTime) / duration, false);
   } else if (audioTime - currentDisplayTime < MinAudioLagThreshold) {
+    std::lock_guard<std::mutex> lock(lastPlayTimeMutex);
     lastPlayTime = timeNow;
   }
 }
@@ -105,14 +116,22 @@ void PAGView::onAudioTimeChanged(int64_t audioTime) {
 QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   if (!renderThread->isRunning()) {
     renderThread->start();
-    lastPlayTime = tgfx::Clock::Now();
+    {
+      std::lock_guard<std::mutex> lock(lastPlayTimeMutex);
+      lastPlayTime = tgfx::Clock::Now();
+    }
   }
 
   auto node = updateTextureNode(oldNode);
 
   auto timeNow = tgfx::Clock::Now();
-  auto displayTime = timeNow - lastPlayTime;
-  lastPlayTime = timeNow;
+  int64_t lastPlayTimeCopy = 0;
+  {
+    std::lock_guard<std::mutex> lock(lastPlayTimeMutex);
+    lastPlayTimeCopy = lastPlayTime;
+    lastPlayTime = timeNow;
+  }
+  auto displayTime = timeNow - lastPlayTimeCopy;
 
   if (viewModel->isPlaying()) {
     auto duration = viewModel->getPAGPlayer()->duration();

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <mutex>
 #include "audio/PAGAudioPlayer.h"
 #include "pag/pag.h"
 #include "rendering/ContentViewModel.h"
@@ -70,12 +71,11 @@ class PAGViewModel : public ContentViewModel {
 
   Q_SIGNAL void fileChanged(std::shared_ptr<pag::File> file);
   Q_SIGNAL void pagFileChanged(std::shared_ptr<pag::PAGFile> pagFile);
-  Q_SIGNAL void requestFlush();
-  Q_SIGNAL void requestSizeChanged();
   Q_SIGNAL void audioTimeChanged(int64_t audioTime);
 
  private:
   QQuickWindow* window = nullptr;
+  mutable std::mutex progressMutex = {};
   int editableTextLayerCount = 0;
   int editableImageLayerCount = 0;
   bool isPlaying_ = true;

@@ -20,6 +20,7 @@
 
 #include <QOpenGLContext>
 #include <QQuickWindow>
+#include <mutex>
 #include "rendering/ContentView.h"
 #include "rendering/pag/PAGViewModel.h"
 
@@ -45,6 +46,7 @@ class PAGView : public ContentView {
   Q_SLOT void onAudioTimeChanged(int64_t audioTime);
   Q_SLOT void onIsPlayingChanged(bool isPlaying);
 
+  mutable std::mutex lastPlayTimeMutex = {};
   int64_t lastPlayTime = 0;
   std::unique_ptr<PAGViewModel> viewModel = nullptr;
 };

@@ -110,6 +110,7 @@ QString PAGViewModel::getDuration() const {
 }
 
 double PAGViewModel::getProgress() const {
+  std::lock_guard<std::mutex> lock(progressMutex);
   return progress;
 }
 
@@ -237,7 +238,7 @@ bool PAGViewModel::loadFile(const QString& filePath) {
   Q_EMIT totalFrameChanged();
   Q_EMIT hasAnimationChanged(hasAnimation());
   Q_EMIT preferredSizeChanged();
-  Q_EMIT requestSizeChanged();
+  Q_EMIT contentSizeChanged();
   audioPlayer->setVolume(1.0f);
   setProgressInternal(0, true);
   setIsPlaying(true);
@@ -289,7 +290,10 @@ void PAGViewModel::setProgressInternal(double progress, bool isAudioSeek) {
     audioPlayer->setProgress(progress);
   }
   pagPlayer->setProgress(progress);
-  this->progress = progress;
+  {
+    std::lock_guard<std::mutex> lock(progressMutex);
+    this->progress = progress;
+  }
   Q_EMIT progressChanged(progress);
   Q_EMIT requestFlush();
 }

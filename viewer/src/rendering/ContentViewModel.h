@@ -99,6 +99,8 @@ class ContentViewModel : public QObject {
   Q_SIGNAL void heightChanged(int height);
   Q_SIGNAL void totalFrameChanged();
   Q_SIGNAL void preferredSizeChanged();
+  Q_SIGNAL void requestFlush();
+  Q_SIGNAL void contentSizeChanged();
 };
 
 }  // namespace pag

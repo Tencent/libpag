@@ -24,8 +24,8 @@ namespace pag {
 
 PAGXView::PAGXView(QQuickItem* parent) : ContentView(parent) {
   viewModel = std::make_unique<PAGXViewModel>();
-  connect(viewModel.get(), &PAGXViewModel::requestFlush, this, &PAGXView::triggerFlush);
-  connect(viewModel.get(), &PAGXViewModel::requestSizeChanged, this,
+  connect(viewModel.get(), &ContentViewModel::requestFlush, this, &PAGXView::triggerFlush);
+  connect(viewModel.get(), &ContentViewModel::contentSizeChanged, this,
           &PAGXView::onRequestSizeChanged);
   connect(viewModel.get(), &PAGXViewModel::preferredSizeChanged, this,
           &PAGXView::onPreferredSizeChanged);

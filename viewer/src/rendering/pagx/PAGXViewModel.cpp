@@ -228,7 +228,7 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
   Q_EMIT preferredSizeChanged();
   Q_EMIT editableTextLayerCountChanged(0);
   Q_EMIT editableImageLayerCountChanged(0);
-  Q_EMIT requestSizeChanged();
+  Q_EMIT contentSizeChanged();
   // pagxDocumentChanged is connected with Qt::QueuedConnection, so tree building
   // happens asynchronously and won't block the render.
   Q_EMIT pagxDocumentChanged(pagxDocument);
