@@ -40,7 +40,7 @@
       <Ellipse centerX="0" centerY="0" size="310,310"/>
       <TrimPath end="0.77"/>
       <Stroke width="2.5" cap="round">
-        <ConicGradient>
+        <ConicGradient center="163,163">
           <ColorStop offset="0" color="#06B6D400"/>
           <ColorStop offset="0.77" color="#06B6D4"/>
           <ColorStop offset="1" color="#06B6D400"/>
