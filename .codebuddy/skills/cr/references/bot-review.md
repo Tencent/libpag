@@ -150,8 +150,8 @@ In addition to the base reviewer prompt from `teams-review.md`:
 ### Verification completion signal
 
 After forwarding the last reviewer's report to the verifier, send a separate
-message stating: "All reviewer reports have been forwarded. Please finalize
-your verdicts for all issues above."
+message stating: "All N reviewer reports have been forwarded. Please finalize
+your verdicts for all issues above." (Replace N with the actual reviewer count.)
 
 ### After review
 
@@ -163,9 +163,9 @@ as fixers since bot mode only comments and never applies fixes.
 ## Phase 3: Filter — coordinator only
 
 See `teams-review.md` → Phase 3: Filter (entry conditions, stance), with the
-following bot-specific adjustments. Bot mode skips the Existence check step
-(teams-review.md Phase 3.2) — verifiers already confirmed issue existence during
-the review phase.
+following bot-specific adjustments. Bot mode skips Phase 3.2 (Existence check)
+from teams-review.md — verifiers already validated issue existence through their
+CONFIRM verdicts during the review phase.
 
 ### 3.1 De-dup
 
