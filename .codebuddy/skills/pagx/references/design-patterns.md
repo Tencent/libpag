@@ -288,15 +288,13 @@ size.
 </TextBox>
 ```
 
-**Rich text** — multiple Text segments with different styles share one TextBox. Each
-segment uses a Group for painter scope isolation:
+**Rich text** — multiple Text segments with different styles share one TextBox. The first
+segment sits directly in the TextBox; subsequent segments use Groups for painter scope isolation:
 
 ```xml
 <TextBox left="0" right="0" top="0" bottom="0" textAlign="start">
-  <Group>
-    <Text text="Bold part " fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-    <Fill color="#000"/>
-  </Group>
+  <Text text="Bold part " fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+  <Fill color="#000"/>
   <Group>
     <Text text="normal part" fontFamily="Arial" fontSize="14"/>
     <Fill color="#666"/>
@@ -314,16 +312,16 @@ For required attributes see `attributes.md`; for coordinate localization see
 
 ### 1. Painter Scope Isolation
 
-When different geometry needs different painters, choose based on layout context:
+When different geometry needs different painters, choose based on layout context.
+**The first geometry+painters in a scope (Layer, Group, or TextBox) never need a Group wrapper**
+— only subsequent elements need isolation to avoid inheriting accumulated geometry.
 
 **Without layout or constraints** — use Groups to isolate painters:
 
 ```xml
 <Layer>
-  <Group>
-    <Rectangle size="100,100"/>
-    <Fill color="#F00"/>
-  </Group>
+  <Rectangle size="100,100"/>
+  <Fill color="#F00"/>
   <Group>
     <Ellipse left="35" top="35" size="30,30"/>
     <Stroke color="#000" width="1"/>

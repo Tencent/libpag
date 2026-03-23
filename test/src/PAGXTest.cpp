@@ -634,15 +634,23 @@ static void TestMarkdownExamples(tgfx::Context* context, const std::string& mark
   auto examples = ExtractMarkdownExamples(markdownPath);
   ASSERT_FALSE(examples.empty()) << "No examples found in: " << markdownPath;
 
+  // Ensure output directory exists, then copy test image for examples referencing "avatar.jpg".
+  auto outDir = std::filesystem::path(ProjectPath::Absolute("test/out/PAGXTest"));
+  std::filesystem::create_directories(outDir);
+  std::filesystem::copy_file(ProjectPath::Absolute("resources/apitest/imageReplacement.jpg"),
+                             outDir / "avatar.jpg",
+                             std::filesystem::copy_options::overwrite_existing);
+
   pagx::FontConfig fontProvider;
   fontProvider.addFallbackTypefaces(GetFallbackTypefaces());
 
   for (const auto& [name, xmlContent] : examples) {
     auto key = prefix + name;
 
-    SavePAGXFile(xmlContent, "PAGXTest/" + key + ".pagx");
+    auto pagxPath = SavePAGXFile(xmlContent, "PAGXTest/" + key + ".pagx");
 
-    auto doc = pagx::PAGXImporter::FromXML(xmlContent);
+    // Load via FromFile so relative image paths resolve against the pagx directory.
+    auto doc = pagx::PAGXImporter::FromFile(pagxPath);
     if (!doc) {
       ADD_FAILURE() << "Failed to parse XML for: " << key;
       continue;
@@ -4172,6 +4180,109 @@ PAGX_TEST(PAGXTest, GroupConstraintLayoutUseMeasuredSize) {
   // rect2 should be positioned at left=200 within the Group's measured frame.
   auto pos2 = rect2->position;
   EXPECT_FLOAT_EQ(pos2.x, 240.0f) << "rect2.position.x = left + width/2 = 200 + 40 = 240";
+}
+
+/**
+ * Test case: ImagePattern supports inline image file path and data URI in addition to @id
+ * reference.
+ */
+PAGX_TEST(PAGXTest, ImagePatternInlineImage) {
+  // Test 1: Inline file path
+  std::string xml1 = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="100" height="100">
+  <Layer>
+    <Rectangle size="100,100"/>
+    <Fill>
+      <ImagePattern image="avatar.png"/>
+    </Fill>
+  </Layer>
+</pagx>)";
+
+  auto doc1 = pagx::PAGXImporter::FromXML(xml1);
+  ASSERT_TRUE(doc1 != nullptr);
+  EXPECT_TRUE(doc1->errors.empty())
+      << "Unexpected errors: " << (doc1->errors.empty() ? "" : doc1->errors[0]);
+  ASSERT_EQ(doc1->layers.size(), 1u);
+  auto* fill1 = static_cast<pagx::Fill*>(doc1->layers[0]->contents[1]);
+  auto* pattern1 = static_cast<pagx::ImagePattern*>(fill1->color);
+  ASSERT_TRUE(pattern1 != nullptr);
+  ASSERT_TRUE(pattern1->image != nullptr);
+  EXPECT_TRUE(pattern1->image->id.empty());
+  EXPECT_EQ(pattern1->image->filePath, "avatar.png");
+  EXPECT_TRUE(pattern1->image->data == nullptr);
+
+  // Test 2: Inline base64 data URI
+  std::string xml2 = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="100" height="100">
+  <Layer>
+    <Rectangle size="100,100"/>
+    <Fill>
+      <ImagePattern image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="/>
+    </Fill>
+  </Layer>
+</pagx>)";
+
+  auto doc2 = pagx::PAGXImporter::FromXML(xml2);
+  ASSERT_TRUE(doc2 != nullptr);
+  EXPECT_TRUE(doc2->errors.empty())
+      << "Unexpected errors: " << (doc2->errors.empty() ? "" : doc2->errors[0]);
+  ASSERT_EQ(doc2->layers.size(), 1u);
+  auto* fill2 = static_cast<pagx::Fill*>(doc2->layers[0]->contents[1]);
+  auto* pattern2 = static_cast<pagx::ImagePattern*>(fill2->color);
+  ASSERT_TRUE(pattern2 != nullptr);
+  ASSERT_TRUE(pattern2->image != nullptr);
+  EXPECT_TRUE(pattern2->image->id.empty());
+  EXPECT_TRUE(pattern2->image->data != nullptr);
+  EXPECT_TRUE(pattern2->image->filePath.empty());
+
+  // Test 3: Round-trip for inline file path
+  std::string exported1 = pagx::PAGXExporter::ToXML(*doc1);
+  EXPECT_NE(exported1.find("image=\"avatar.png\""), std::string::npos);
+  auto doc3 = pagx::PAGXImporter::FromXML(exported1);
+  ASSERT_TRUE(doc3 != nullptr);
+  EXPECT_TRUE(doc3->errors.empty());
+  auto* fill3 = static_cast<pagx::Fill*>(doc3->layers[0]->contents[1]);
+  auto* pattern3 = static_cast<pagx::ImagePattern*>(fill3->color);
+  ASSERT_TRUE(pattern3 != nullptr);
+  ASSERT_TRUE(pattern3->image != nullptr);
+  EXPECT_EQ(pattern3->image->filePath, "avatar.png");
+
+  // Test 4: Round-trip for inline base64 data URI
+  std::string exported2 = pagx::PAGXExporter::ToXML(*doc2);
+  EXPECT_NE(exported2.find("data:image/png;base64,"), std::string::npos);
+  auto doc4 = pagx::PAGXImporter::FromXML(exported2);
+  ASSERT_TRUE(doc4 != nullptr);
+  EXPECT_TRUE(doc4->errors.empty());
+  auto* fill4 = static_cast<pagx::Fill*>(doc4->layers[0]->contents[1]);
+  auto* pattern4 = static_cast<pagx::ImagePattern*>(fill4->color);
+  ASSERT_TRUE(pattern4 != nullptr);
+  ASSERT_TRUE(pattern4->image != nullptr);
+  EXPECT_TRUE(pattern4->image->data != nullptr);
+
+  // Test 5: @id reference still works (backward compatibility)
+  std::string xml5 = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="100" height="100">
+  <Layer>
+    <Rectangle size="100,100"/>
+    <Fill>
+      <ImagePattern image="@img1"/>
+    </Fill>
+  </Layer>
+  <Resources>
+    <Image id="img1" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="/>
+  </Resources>
+</pagx>)";
+
+  auto doc5 = pagx::PAGXImporter::FromXML(xml5);
+  ASSERT_TRUE(doc5 != nullptr);
+  EXPECT_TRUE(doc5->errors.empty())
+      << "Unexpected errors: " << (doc5->errors.empty() ? "" : doc5->errors[0]);
+  auto* fill5 = static_cast<pagx::Fill*>(doc5->layers[0]->contents[1]);
+  auto* pattern5 = static_cast<pagx::ImagePattern*>(fill5->color);
+  ASSERT_TRUE(pattern5 != nullptr);
+  ASSERT_TRUE(pattern5->image != nullptr);
+  EXPECT_EQ(pattern5->image->id, "img1");
+  EXPECT_TRUE(pattern5->image->data != nullptr);
 }
 
 }  // namespace pag

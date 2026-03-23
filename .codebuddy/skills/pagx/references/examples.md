@@ -11,9 +11,9 @@ as defaults.
 
 ## UI Components
 
-Structural patterns for application interface elements. Most UI components benefit from auto
-layout — use container layout for arranging child Layers in rows or columns, and constraint
-layout for positioning elements within a Layer.
+Structural patterns for application interface elements. **Always prefer container layout and
+constraint positioning over absolute coordinates** — use container layout for arranging child
+Layers in rows or columns, and constraint layout for positioning elements within a Layer.
 
 ### Background + Foreground Shape
 
@@ -34,14 +34,8 @@ A common pattern for icons, indicators, and badges — background shape with a f
 </pagx>
 ```
 
-**Pattern**: Background shape + Fill sit directly on the Layer (no Group needed — painter scope
-resets at each Group boundary, so the background Fill is consumed before the Group begins).
-Foreground symbol lives in a Group with its own painters. Use `centerX/centerY="0"` on both
-the Layer (to center within the canvas) and the foreground Group (to center within the Layer).
-Add more Groups for layered foreground elements with different painters.
-
-**Path data tip**: Path `data` uses the same syntax as SVG `<path d="...">` — generate the
-shape in SVG first, then copy the `d` attribute value directly into PAGX `data`.
+**Pattern**: Background shape + Fill directly on the Layer; foreground in a Group with its own
+painters. Path `data` uses SVG `<path d="...">` syntax — generate in SVG, copy `d` value over.
 
 ### Text Label
 
@@ -50,10 +44,8 @@ TextBox with `centerX`/`centerY` for centering — auto-sizes to fit text:
 ```xml
 <pagx version="1.0" width="300" height="200">
   <Layer width="300" height="200">
-    <Group>
-      <Rectangle size="300,200" roundness="12"/>
-      <Fill color="#1E293B"/>
-    </Group>
+    <Rectangle size="300,200" roundness="12"/>
+    <Fill color="#1E293B"/>
     <TextBox centerX="0" centerY="0">
       <Text text="30" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
       <Fill color="#FFF"/>
@@ -65,35 +57,13 @@ TextBox with `centerX`/`centerY` for centering — auto-sizes to fit text:
 **Pattern**: TextBox auto-sizes and centers. For multiple labels with different colors, wrap each
 in its own Group for painter scope isolation, and use `left`/`top` constraints for positioning.
 
-### Card with Shadow
-
-```xml
-<pagx version="1.0" width="340" height="240">
-  <Layer width="340" height="240">
-    <Rectangle size="340,240"/>
-    <Fill color="#F1F5F9"/>
-    <!-- Card positioned with constraints: all sides have margins -->
-    <Layer left="20" right="20" top="20" bottom="20">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
-      <Fill color="#FFFFFF"/>
-      <DropShadowStyle offsetY="4" blurX="8" blurY="8" color="#00000020"/>
-    </Layer>
-  </Layer>
-</pagx>
-```
-
-**Pattern**: White cards need a non-white background to be visible. Background uses `size`
-(known container dimensions); card Layer uses opposite-pair constraints to scale with margins.
-
 ### Icon + Label Row
 
 ```xml
 <pagx version="1.0" width="120" height="40">
   <Layer width="120" height="40">
-    <Group left="8" centerY="0">
-      <Ellipse size="24,24"/>
-      <Fill color="#10B981"/>
-    </Group>
+    <Ellipse left="8" centerY="0" size="24,24"/>
+    <Fill color="#10B981"/>
     <TextBox left="40" centerY="0">
       <Text text="Online" fontFamily="Arial" fontSize="14"/>
       <Fill color="#374151"/>
@@ -110,51 +80,43 @@ layout needed. `left="40"` = 8 padding + 24 icon + 8 gap.
 A card with vertical container layout, rich text header, and action buttons.
 
 ```xml
-<pagx version="1.0" width="340" height="200">
-  <Layer width="340" height="200">
-    <Rectangle size="340,200"/>
-    <Fill color="#F1F5F9"/>
-    <!-- Card with internal vertical layout -->
-    <Layer left="20" right="20" top="20" bottom="20"
-           layout="vertical" gap="12" padding="16">
-      <!-- Background: VectorElements don't participate in layout, write them directly -->
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
-      <Fill color="#FFF"/>
-      <!-- Title + Value (rich text: different sizes and colors) -->
-      <Layer>
-        <TextBox>
-          <Group>
-            <Text text="Account Balance&#10;" fontFamily="Arial" fontSize="14"/>
-            <Fill color="#64748B"/>
-          </Group>
-          <Group>
-            <Text text="$12,580" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
-            <Fill color="#1E293B"/>
-          </Group>
+<pagx version="1.0" width="300" height="160">
+  <Layer width="300" height="160" layout="vertical" gap="12" padding="16">
+    <!-- Background: VectorElements don't participate in layout -->
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+    <Fill color="#FFF"/>
+    <!-- Title + Value (rich text: different sizes and colors) -->
+    <Layer>
+      <TextBox>
+        <Text text="Account Balance&#10;" fontFamily="Arial" fontSize="14"/>
+        <Fill color="#64748B"/>
+        <Group>
+          <Text text="$12,580" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+          <Fill color="#1E293B"/>
+        </Group>
+      </TextBox>
+    </Layer>
+    <!-- Action buttons: two equal-width buttons -->
+    <Layer height="44" layout="horizontal" gap="12">
+      <Layer flex="1">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
+        <Fill color="#6366F1"/>
+        <TextBox centerX="0" centerY="0">
+          <Text text="Send" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+          <Fill color="#FFF"/>
         </TextBox>
       </Layer>
-      <!-- Action buttons: two equal-width buttons -->
-      <Layer height="44" layout="horizontal" gap="12">
-        <Layer flex="1">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
-          <Fill color="#6366F1"/>
-          <TextBox centerX="0" centerY="0">
-            <Text text="Send" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-            <Fill color="#FFF"/>
-          </TextBox>
-        </Layer>
-        <Layer flex="1">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
-          <Fill color="#F1F5F9"/>
-          <Stroke color="#CBD5E1" width="1" align="inside"/>
-          <TextBox centerX="0" centerY="0">
-            <Text text="Request" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-            <Fill color="#1E293B"/>
-          </TextBox>
-        </Layer>
+      <Layer flex="1">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
+        <Fill color="#F1F5F9"/>
+        <Stroke color="#CBD5E1" width="1" align="inside"/>
+        <TextBox centerX="0" centerY="0">
+          <Text text="Request" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+          <Fill color="#1E293B"/>
+        </TextBox>
       </Layer>
-      <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000015"/>
     </Layer>
+    <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000015"/>
   </Layer>
 </pagx>
 ```
@@ -163,8 +125,8 @@ A card with vertical container layout, rich text header, and action buttons.
 
 - **Background directly on layout Layer**: VectorElements (Rectangle, Fill, etc.) don't
   participate in container layout — write them directly on the same Layer that has `layout`.
-  No need for a separate `includeInLayout="false"` wrapper Layer. DropShadowStyle goes at the
-  end per convention — it applies to the entire Layer content regardless of position.
+  `padding` controls the inset for child Layers while the background Rectangle stretches to
+  full bounds. DropShadowStyle goes at the end — it applies to the entire Layer content.
 - **Rich text**: Multiple Text segments with different styles in one TextBox — each wrapped
   in a Group for painter scope isolation. Use `&#10;` for line breaks between segments.
 - **Equal-width buttons**: `flex="1"` children in horizontal container — buttons fill
@@ -225,10 +187,8 @@ remaining space. Three child Layers with `flex="1"` equally share available widt
 <pagx version="1.0" width="260" height="30">
   <Layer width="260" height="30">
     <!-- Track -->
-    <Group centerX="0" centerY="0">
-      <Rectangle size="240,8" roundness="4"/>
-      <Fill color="#E2E8F0"/>
-    </Group>
+    <Rectangle centerX="0" centerY="0" size="240,8" roundness="4"/>
+    <Fill color="#E2E8F0"/>
     <!-- Fill bar -->
     <Group>
       <Rectangle left="10" centerY="0" size="168,8" roundness="4"/>
@@ -246,9 +206,9 @@ for left-aligned vertical centering.
 ```xml
 <pagx version="1.0" width="120" height="120">
   <Layer width="120" height="120">
-    <Ellipse centerX="0" centerY="0" size="64,64"/>
+    <Ellipse centerX="0" centerY="0" size="110,110"/>
     <Fill>
-      <ImagePattern image="avatar.png"/>
+      <ImagePattern image="avatar.jpg" matrix="1,0,0,1,5,5"/>
     </Fill>
   </Layer>
 </pagx>
@@ -351,11 +311,9 @@ use Group `rotation` to reposition the start point.
 <pagx version="1.0" width="200" height="200">
   <Layer width="200" height="200">
     <!-- Background track: 270-degree arc with gap at bottom -->
-    <Group centerX="0" centerY="0">
-      <Ellipse size="140,140"/>
-      <TrimPath end="0.75" offset="-135"/>
-      <Stroke color="#E2E8F0" width="10" cap="round"/>
-    </Group>
+    <Ellipse centerX="0" centerY="0" size="140,140"/>
+    <TrimPath end="0.75" offset="-135"/>
+    <Stroke color="#E2E8F0" width="10" cap="round"/>
     <!-- Value fill (67% of 270 degrees = 0.5 of full circle) -->
     <Group centerX="0" centerY="0">
       <Ellipse size="140,140"/>
@@ -389,14 +347,12 @@ to rotate around the arc center.
   <Layer width="300" height="200">
     <!-- Bars -->
     <Layer left="30" right="20" top="30" bottom="20">
-      <Group left="0" right="0" top="0" bottom="0">
-        <Rectangle left="0" bottom="0" size="30,80" roundness="4"/>
-        <Rectangle left="50" bottom="0" size="30,130" roundness="4"/>
-        <Rectangle left="100" bottom="0" size="30,60" roundness="4"/>
-        <Rectangle left="150" bottom="0" size="30,110" roundness="4"/>
-        <Rectangle left="200" bottom="0" size="30,90" roundness="4"/>
-        <Fill color="#3B82F6"/>
-      </Group>
+      <Rectangle left="0" bottom="0" size="30,80" roundness="4"/>
+      <Rectangle left="50" bottom="0" size="30,130" roundness="4"/>
+      <Rectangle left="100" bottom="0" size="30,60" roundness="4"/>
+      <Rectangle left="150" bottom="0" size="30,110" roundness="4"/>
+      <Rectangle left="200" bottom="0" size="30,90" roundness="4"/>
+      <Fill color="#3B82F6"/>
     </Layer>
     <!-- Baseline -->
     <Layer left="30" right="20" bottom="20" height="1">
@@ -419,10 +375,8 @@ parameterization).
     <!-- Chart area with margins -->
     <Layer left="30" right="20" top="20" bottom="30">
       <!-- Grid lines -->
-      <Group left="0" right="0" top="0" bottom="0">
-        <Path data="M 0,0 L 250,0 M 0,37 L 250,37 M 0,75 L 250,75 M 0,112 L 250,112 M 0,150 L 250,150"/>
-        <Stroke color="#F1F5F9" width="1"/>
-      </Group>
+      <Path data="M 0,0 L 250,0 M 0,37 L 250,37 M 0,75 L 250,75 M 0,112 L 250,112 M 0,150 L 250,150"/>
+      <Stroke color="#F1F5F9" width="1"/>
       <!-- Data line -->
       <Group left="0" right="0" top="0" bottom="0">
         <Path data="M 0,120 L 62,90 L 125,105 L 187,45 L 250,30"/>
@@ -464,11 +418,9 @@ are a single multi-M Path.
     <!-- Donut -->
     <Layer left="20" top="20" width="160" height="160">
       <!-- Segment 1: 40% (0 to 0.4) -->
-      <Group centerX="0" centerY="0">
-        <Ellipse size="130,130"/>
-        <TrimPath end="0.38"/>
-        <Stroke color="#3B82F6" width="18"/>
-      </Group>
+      <Ellipse centerX="0" centerY="0" size="130,130"/>
+      <TrimPath end="0.38"/>
+      <Stroke color="#3B82F6" width="18"/>
       <!-- Segment 2: 30% (0.4 to 0.7) -->
       <Group centerX="0" centerY="0">
         <Ellipse size="130,130"/>
@@ -491,40 +443,32 @@ are a single multi-M Path.
     <!-- Legend -->
     <Layer left="200" top="40" width="120" height="120" layout="vertical" gap="12">
       <Layer height="20">
-        <Group left="0" centerY="0">
-          <Ellipse size="10,10"/>
-          <Fill color="#3B82F6"/>
-        </Group>
+        <Ellipse left="0" centerY="0" size="10,10"/>
+        <Fill color="#3B82F6"/>
         <TextBox left="18" centerY="0">
           <Text text="Sales 40%" fontFamily="Arial" fontSize="12"/>
           <Fill color="#334155"/>
         </TextBox>
       </Layer>
       <Layer height="20">
-        <Group left="0" centerY="0">
-          <Ellipse size="10,10"/>
-          <Fill color="#10B981"/>
-        </Group>
+        <Ellipse left="0" centerY="0" size="10,10"/>
+        <Fill color="#10B981"/>
         <TextBox left="18" centerY="0">
           <Text text="Growth 30%" fontFamily="Arial" fontSize="12"/>
           <Fill color="#334155"/>
         </TextBox>
       </Layer>
       <Layer height="20">
-        <Group left="0" centerY="0">
-          <Ellipse size="10,10"/>
-          <Fill color="#F59E0B"/>
-        </Group>
+        <Ellipse left="0" centerY="0" size="10,10"/>
+        <Fill color="#F59E0B"/>
         <TextBox left="18" centerY="0">
           <Text text="Costs 20%" fontFamily="Arial" fontSize="12"/>
           <Fill color="#334155"/>
         </TextBox>
       </Layer>
       <Layer height="20">
-        <Group left="0" centerY="0">
-          <Ellipse size="10,10"/>
-          <Fill color="#EF4444"/>
-        </Group>
+        <Ellipse left="0" centerY="0" size="10,10"/>
+        <Fill color="#EF4444"/>
         <TextBox left="18" centerY="0">
           <Text text="Other 10%" fontFamily="Arial" fontSize="12"/>
           <Fill color="#334155"/>

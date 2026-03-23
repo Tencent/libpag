@@ -139,7 +139,7 @@
   <Layer left="670" top="430">
     <Rectangle left="-45" top="-30" size="90,60" roundness="8"/>
     <Fill>
-      <ImagePattern image="@photo" tileModeX="clamp" tileModeY="clamp" matrix="0.23,0,0,0.23,-30,-30"/>
+      <ImagePattern image="pag_logo.png" tileModeX="clamp" tileModeY="clamp" matrix="0.23,0,0,0.23,-30,-30"/>
     </Fill>
     <Stroke color="#FFFFFF20" width="1"/>
     <DropShadowStyle offsetY="6" blurX="16" blurY="16" color="#00000060"/>
@@ -151,7 +151,6 @@
     <Fill color="#64748B"/>
   </Layer>
   <Resources>
-    <Image id="photo" source="pag_logo.png"/>
     <PathData id="wavePath" data="M 0 0 Q 30 -20 60 0 T 120 0 T 180 0"/>
     <Font id="iconFont">
       <Glyph path="M 0 -8 L 8 8 L -8 8 Z" advance="20"/>
