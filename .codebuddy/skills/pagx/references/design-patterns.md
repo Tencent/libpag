@@ -129,6 +129,13 @@ Is this a sub-element within a block (e.g., icon inside a button)?
   → YES: Use Group
 ```
 
+### MergePath vs Mask
+
+For combining or clipping opaque shapes, use **MergePath** (union, intersect, difference,
+xor) within a single Group — it keeps everything in one scope without extra Layers. Reserve
+Layer `mask` for cases that require **alpha or luminance masking** (e.g., semi-transparent
+gradient fade-outs, soft-edge vignettes).
+
 ### When to Extract Resources
 
 ```
