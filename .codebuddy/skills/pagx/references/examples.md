@@ -251,12 +251,12 @@ for left-aligned vertical centering.
 <pagx version="1.0" width="120" height="120">
   <Layer width="120" height="120">
     <!-- Mask layer (invisible, defines clip shape) -->
-    <Layer left="18" top="18" id="avatarClip" visible="false">
+    <Layer left="28" top="28" id="avatarClip" visible="false">
       <Ellipse size="64,64"/>
       <Fill color="#FFF"/>
     </Layer>
     <!-- Content layer with mask applied -->
-    <Layer left="18" top="18" mask="@avatarClip">
+    <Layer left="28" top="28" mask="@avatarClip">
       <Rectangle size="64,64"/>
       <Fill>
         <ImagePattern image="@avatar"/>
