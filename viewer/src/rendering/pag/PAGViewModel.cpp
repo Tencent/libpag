@@ -206,8 +206,11 @@ void PAGViewModel::setShowVideoFrames(bool isShow) {
 }
 
 void PAGViewModel::setProgress(double progress) {
-  if (this->progress == progress) {
-    return;
+  {
+    std::lock_guard<std::mutex> lock(progressMutex);
+    if (this->progress == progress) {
+      return;
+    }
   }
   setProgressInternal(progress, true);
 }

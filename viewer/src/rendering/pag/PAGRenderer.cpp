@@ -25,7 +25,7 @@ PAGRenderer::PAGRenderer(PAGViewModel* viewModel) : viewModel(viewModel) {
 
 bool PAGRenderer::isReady() const {
   return viewModel != nullptr && viewModel->getPAGPlayer() != nullptr &&
-         viewModel->getPAGFile() != nullptr;
+         viewModel->getPAGPlayer()->getComposition() != nullptr;
 }
 
 void PAGRenderer::updateSize() {
