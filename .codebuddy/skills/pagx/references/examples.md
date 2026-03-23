@@ -682,7 +682,7 @@ opaque content. Must have content below to blur — empty background produces no
     <MergePath mode="intersect"/>
     <Fill color="#FFF"/>
     <!-- Tab items -->
-    <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" arrangement="spaceEvenly" alignment="center">
+    <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" arrangement="spaceAround" alignment="center">
       <Layer>
         <Ellipse centerX="0" size="24,24"/>
         <Fill color="#6366F1"/>

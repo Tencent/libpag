@@ -18,10 +18,9 @@
 
 #pragma once
 
-#include <cmath>
 #include <string>
 #include <vector>
-#include "pagx/nodes/Element.h"
+#include "pagx/nodes/LayoutElement.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/TextAnchor.h"
@@ -36,7 +35,7 @@ namespace pagx {
  * - Runtime shaping mode: Performs text shaping at runtime using the text content and font
  *   properties. Results may vary slightly across platforms due to font and shaping differences.
  */
-class Text : public Element {
+class Text : public LayoutElement {
  public:
   /**
    * The text content to render. Supports newline characters (\n) for line breaks, which use a
@@ -93,36 +92,6 @@ class Text : public Element {
    * Pre-shaped glyph runs. When present, these are used for rendering instead of runtime shaping.
    */
   std::vector<GlyphRun*> glyphRuns = {};
-
-  /**
-   * Distance from the left edge of the containing Layer or Group. NAN means not set.
-   */
-  float left = NAN;
-
-  /**
-   * Distance from the right edge of the containing Layer or Group. NAN means not set.
-   */
-  float right = NAN;
-
-  /**
-   * Distance from the top edge of the containing Layer or Group. NAN means not set.
-   */
-  float top = NAN;
-
-  /**
-   * Distance from the bottom edge of the containing Layer or Group. NAN means not set.
-   */
-  float bottom = NAN;
-
-  /**
-   * Horizontal offset from the center of the containing Layer or Group. NAN means not set.
-   */
-  float centerX = NAN;
-
-  /**
-   * Vertical offset from the center of the containing Layer or Group. NAN means not set.
-   */
-  float centerY = NAN;
 
   NodeType nodeType() const override {
     return NodeType::Text;

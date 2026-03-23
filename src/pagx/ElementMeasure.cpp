@@ -78,7 +78,7 @@ Rect ElementMeasure::GetContentBounds(const Element* element, const TextMeasureF
       float maxX = 0;
       float maxY = 0;
       for (auto* child : group->elements) {
-        auto childBounds = GetContentBounds(child, measureText);
+        auto childBounds = GetMeasuredBounds(child, measureText);
         if (childBounds.isEmpty()) {
           continue;
         }

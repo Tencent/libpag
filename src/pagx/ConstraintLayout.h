@@ -18,40 +18,78 @@
 
 #pragma once
 
-#include <utility>
+#include <memory>
 #include <vector>
-#include "pagx/layout/ElementMeasure.h"
 
 namespace pagx {
 
-/// Performs constraint positioning on elements within a container, positioning them based on their
-/// constraint attributes (left, right, top, bottom, centerX, centerY).
+class Element;
+class Layer;
+class Group;
+class FontConfig;
+
+/**
+ * ConstraintLayout is a unified module for applying constraint-based positioning to both Element
+ * and Layer objects. It provides a single source of truth for constraint logic, eliminating
+ * duplication between element and layer constraint handling.
+ *
+ * Constraint Positioning Priority (both Element and Layer):
+ * - Horizontal: centerX > (left + right) > left > right
+ * - Vertical: centerY > (top + bottom) > top > bottom
+ */
 class ConstraintLayout {
  public:
-  /// Applies constraint positioning to all elements within a container.
-  /// @param elements The elements to position.
-  /// @param containerWidth The container width for constraint calculations.
-  /// @param containerHeight The container height for constraint calculations.
-  /// @param measureText Function to precisely measure Text element bounds.
-  static void Apply(const std::vector<Element*>& elements, float containerWidth,
-                    float containerHeight, const TextMeasureFunc& measureText);
+  /**
+   * Applies constraint positioning to an Element within a container of given dimensions.
+   * For non-stretchable elements, applies proportional scaling when opposite-edge constraints
+   * define a target area.
+   *
+   * @param element The element to constrain
+   * @param containerWidth The width of the container
+   * @param containerHeight The height of the container
+   * @param fontProvider Font provider for text measurement (can be nullptr)
+   * @param skipScaling If true, skips non-stretchable element scaling (for Text in TextBox)
+   */
+  static void ApplyElementConstraints(Element* element, float containerWidth, float containerHeight,
+                                      FontConfig* fontProvider, bool skipScaling = false);
 
-  /// Returns the content bounds of an element in its local coordinate system.
-  /// @param element The element to measure.
-  /// @param measureText Function to precisely measure Text element bounds.
-  static Rect GetContentBounds(const Element* element, const TextMeasureFunc& measureText);
+  /**
+   * Applies constraint positioning to a Layer within a parent Layer of given dimensions.
+   * Handles opposite-edge constraints that modify layer width/height.
+   * 
+   * Note: For measured child sizes when width/height are NaN, call this overload that
+   * provides the measured dimensions explicitly.
+   *
+   * @param layer The layer to constrain
+   * @param parentWidth The width of the parent layer
+   * @param parentHeight The height of the parent layer
+   * @param measuredWidth The measured width of the layer (used if layer->width is NaN)
+   * @param measuredHeight The measured height of the layer (used if layer->height is NaN)
+   */
+  static void ApplyLayerConstraints(Layer* layer, float parentWidth, float parentHeight,
+                                    float measuredWidth, float measuredHeight);
 
-  /// Returns the measured bounds of an element for bottom-up size calculation, considering
-  /// how constraints affect measurement.
-  /// @param element The element to measure.
-  /// @param measureText Function to precisely measure Text element bounds.
-  static Rect GetMeasuredBounds(const Element* element, const TextMeasureFunc& measureText);
+  /**
+   * Applies constraint positioning to a Layer within a parent Layer of given dimensions.
+   * Handles opposite-edge constraints that modify layer width/height.
+   *
+   * @param layer The layer to constrain
+   * @param parentWidth The width of the parent layer
+   * @param parentHeight The height of the parent layer
+   */
+  static void ApplyLayerConstraints(Layer* layer, float parentWidth, float parentHeight);
 
-  /// Computes the measured content size of a Layer's contents for bottom-up measurement.
-  /// @param elements The content elements of the Layer.
-  /// @param measureText Function to precisely measure Text element bounds.
-  static std::pair<float, float> MeasureContents(const std::vector<Element*>& elements,
-                                                 const TextMeasureFunc& measureText);
+  /**
+   * Recursively applies constraint positioning to all elements within a container (Group or
+   * Layer). Used internally for processing hierarchical element structures.
+   *
+   * @param elements The elements to constrain
+   * @param containerWidth The width of the container
+   * @param containerHeight The height of the container
+   * @param fontProvider Font provider for text measurement
+   */
+  static void ApplyElementsConstraints(const std::vector<Element*>& elements, float containerWidth,
+                                       float containerHeight, FontConfig* fontProvider);
 };
 
 }  // namespace pagx

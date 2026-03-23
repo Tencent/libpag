@@ -19,7 +19,7 @@
       <Stroke/>
     </Group>
     <TextBox width="220" height="50">
-      <Text fontFamily="NotoSansSC" fontSize="20"><![CDATA[你好\tWorld\t测试]]></Text>
+      <Text fontFamily="NotoSansSC" fontSize="20" text="你好&#9;World&#9;测试"/>
       <Fill/>
     </TextBox>
   </Layer>

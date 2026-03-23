@@ -4066,4 +4066,109 @@ PAGX_TEST(PAGXTest, LayoutIncludeInLayoutFalseNotAffectingMeasurement) {
   EXPECT_FLOAT_EQ(child2->x, 200.0f);
 }
 
+// =====================================================================================
+// Auto Layout - Group Constraint Measurement
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, GroupChildConstraintAffectsMeasurement) {
+  // When a Group has no explicit dimensions, its measured size should include
+  // constraint offsets from child elements (e.g., left, top).
+  auto doc = pagx::PAGXDocument::Make(400, 400);
+  auto root = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(root);
+
+  root->left = 0;
+  root->right = 0;
+  root->top = 0;
+  root->bottom = 0;
+  root->layout = pagx::LayoutMode::Vertical;
+  root->alignment = pagx::Alignment::Center;
+
+  auto row = doc->makeNode<pagx::Layer>();
+
+  auto group = doc->makeNode<pagx::Group>();
+  auto ellipse1 = doc->makeNode<pagx::Ellipse>();
+  ellipse1->size = {100, 100};
+  // No constraints — default position at center of bounding box.
+
+  auto ellipse2 = doc->makeNode<pagx::Ellipse>();
+  ellipse2->size = {100, 100};
+  ellipse2->left = 160;  // Offset 160px from container left edge.
+
+  group->elements = {ellipse1, ellipse2};
+  row->contents = {group};
+  root->children = {row};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // Group measured width should be 260 (0..100 for ellipse1, 160..260 for ellipse2).
+  // With alignment=center, row.x = (400 - 260) / 2 = 70.
+  EXPECT_FLOAT_EQ(row->x, 70.0f) << "Group child left constraint should contribute to measurement";
+  EXPECT_FLOAT_EQ(row->width, 260.0f) << "Row width should be measured as 260 from Group contents";
+}
+
+PAGX_TEST(PAGXTest, GroupChildCenterXConstraintAffectsMeasurement) {
+  // centerX constraint should contribute |centerX| * 2 + contentWidth to Group measurement.
+  auto doc = pagx::PAGXDocument::Make(400, 400);
+  auto root = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(root);
+
+  root->left = 0;
+  root->right = 0;
+  root->top = 0;
+  root->bottom = 0;
+  root->layout = pagx::LayoutMode::Vertical;
+  root->alignment = pagx::Alignment::Center;
+
+  auto row = doc->makeNode<pagx::Layer>();
+
+  auto group = doc->makeNode<pagx::Group>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {80, 60};
+  rect->centerX = 50;  // Contributes |50| * 2 + 80 = 180
+
+  group->elements = {rect};
+  row->contents = {group};
+  root->children = {row};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // Group measured width = |50| * 2 + 80 = 180.
+  EXPECT_FLOAT_EQ(row->width, 180.0f)
+      << "Group child centerX constraint should contribute to measurement";
+  EXPECT_FLOAT_EQ(row->x, 110.0f) << "Row centered: (400 - 180) / 2 = 110";
+}
+
+PAGX_TEST(PAGXTest, GroupConstraintLayoutUseMeasuredSize) {
+  // When a Group without explicit dimensions contains constrained children,
+  // constraint layout inside the Group should use the measured size (including
+  // child constraint offsets) as the reference frame.
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 200;
+
+  auto group = doc->makeNode<pagx::Group>();
+  // No explicit width/height — should be measured from children.
+
+  auto rect1 = doc->makeNode<pagx::Rectangle>();
+  rect1->size = {80, 60};
+  // No constraints — at default position.
+
+  auto rect2 = doc->makeNode<pagx::Rectangle>();
+  rect2->size = {80, 60};
+  rect2->left = 200;  // Offset from container left.
+
+  group->elements = {rect1, rect2};
+  parent->contents = {group};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // rect2 should be positioned at left=200 within the Group's measured frame.
+  auto pos2 = rect2->position;
+  EXPECT_FLOAT_EQ(pos2.x, 240.0f) << "rect2.position.x = left + width/2 = 200 + 40 = 240";
+}
+
 }  // namespace pag

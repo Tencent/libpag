@@ -20,7 +20,7 @@
 
 #include <cmath>
 #include <vector>
-#include "pagx/nodes/Element.h"
+#include "pagx/nodes/LayoutElement.h"
 #include "pagx/types/Point.h"
 
 namespace pagx {
@@ -30,7 +30,7 @@ namespace pagx {
  * shapes, painters, modifiers, and nested groups, allowing for hierarchical organization of
  * content.
  */
-class Group : public Element {
+class Group : public LayoutElement {
  public:
   /**
    * The anchor point for transformations.
@@ -83,36 +83,6 @@ class Group : public Element {
    * frame for its child elements. Does not affect rendering behavior. NaN means not set.
    */
   float height = NAN;
-
-  /**
-   * Distance from the left edge of the containing Layer or Group. NAN means not set.
-   */
-  float left = NAN;
-
-  /**
-   * Distance from the right edge of the containing Layer or Group. NAN means not set.
-   */
-  float right = NAN;
-
-  /**
-   * Distance from the top edge of the containing Layer or Group. NAN means not set.
-   */
-  float top = NAN;
-
-  /**
-   * Distance from the bottom edge of the containing Layer or Group. NAN means not set.
-   */
-  float bottom = NAN;
-
-  /**
-   * Horizontal offset from the center of the containing Layer or Group. NAN means not set.
-   */
-  float centerX = NAN;
-
-  /**
-   * Vertical offset from the center of the containing Layer or Group. NAN means not set.
-   */
-  float centerY = NAN;
 
   NodeType nodeType() const override {
     return NodeType::Group;

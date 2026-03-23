@@ -23,6 +23,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "ConstraintLayout.h"
 #include "TextLayout.h"
 #include "base/utils/Log.h"
 #include "pagx/FontProvider.h"
@@ -142,160 +143,11 @@ static Rect GetMeasuredBounds(const Element* element, FontConfig* fontProvider) 
 // Applies constraint positioning to a single element within a container of the given dimensions.
 // When skipScaling is true, non-stretchable elements will center without scaling (used for Text
 // elements controlled by a TextBox).
-static void ApplyConstraintToElement(Element* element, float containerWidth, float containerHeight,
-                                     FontConfig* fontProvider, bool skipScaling = false) {
-  auto constraints = ElementConstraint::GetConstraints(element);
-  if (!constraints.hasAny()) {
-    return;
-  }
-  std::string errorMessage;
-  if (!constraints.isValid(errorMessage)) {
-    LOGE("[Layout Warning] %s", errorMessage.c_str());
-  }
-  auto bounds = GetContentBounds(element, fontProvider);
-  auto type = element->nodeType();
-  bool stretchable = ElementConstraint::IsStretchable(type);
-
-  // --- Proportional scaling for non-stretchable, non-Group elements ---
-  // When opposite-edge constraints define a target area, scale the element to fit while preserving
-  // aspect ratio. Each axis with opposite-edge constraints contributes a candidate scale factor;
-  // the minimum is used so the element fits without exceeding the area. An axis without
-  // opposite-edge constraints uses the measured size (scale factor = 1), so single-axis constraints
-  // only scale when the target is smaller or larger than the original.
-  if (!stretchable && !skipScaling && type != NodeType::Group) {
-    bool hasLeftRight = !std::isnan(constraints.left) && !std::isnan(constraints.right);
-    bool hasTopBottom = !std::isnan(constraints.top) && !std::isnan(constraints.bottom);
-    if (hasLeftRight || hasTopBottom) {
-      float scale = 0.0f;
-      if (hasLeftRight && bounds.width > 0) {
-        float areaWidth = containerWidth - constraints.left - constraints.right;
-        scale = areaWidth / bounds.width;
-      }
-      if (hasTopBottom && bounds.height > 0) {
-        float scaleY = (containerHeight - constraints.top - constraints.bottom) / bounds.height;
-        scale = (scale > 0) ? std::min(scale, scaleY) : scaleY;
-      }
-      if (scale > 0 && scale != 1.0f) {
-        ElementTransform::ApplyScaling(element, scale);
-        bounds = GetContentBounds(element, fontProvider);
-      }
-    }
-  }
-
-  // --- Horizontal axis ---
-  bool hasLeft = !std::isnan(constraints.left);
-  bool hasRight = !std::isnan(constraints.right);
-  bool hasCenterX = !std::isnan(constraints.centerX);
-
-  if (hasLeft && hasRight) {
-    float left = constraints.left;
-    float right = constraints.right;
-    float areaWidth = containerWidth - left - right;
-    if (type == NodeType::Group) {
-      // Group aligns to the target area and derives layout width.
-      auto* group = static_cast<Group*>(element);
-      group->position.x = left;
-      ElementTransform::UpdateGroupLayoutSize(group, areaWidth, NAN);
-    } else if (stretchable) {
-      // Stretch to fill the target area.
-      float newCenterX = left + areaWidth * 0.5f;
-      ElementTransform::ApplyHorizontalStretch(element, areaWidth, newCenterX);
-    } else {
-      // Center within the target area (already scaled proportionally above).
-      float tx = left + (areaWidth - bounds.width) * 0.5f - bounds.x;
-      ElementTransform::TranslateX(element, tx);
-    }
-  } else if (hasLeft) {
-    float tx = constraints.left - bounds.x;
-    ElementTransform::TranslateX(element, tx);
-  } else if (hasRight) {
-    float tx = (containerWidth - constraints.right) - (bounds.x + bounds.width);
-    ElementTransform::TranslateX(element, tx);
-  } else if (hasCenterX) {
-    float boundsCenter = bounds.x + bounds.width * 0.5f;
-    float tx = (containerWidth * 0.5f + constraints.centerX) - boundsCenter;
-    ElementTransform::TranslateX(element, tx);
-  }
-
-  // --- Vertical axis ---
-  bool hasTop = !std::isnan(constraints.top);
-  bool hasBottom = !std::isnan(constraints.bottom);
-  bool hasCenterY = !std::isnan(constraints.centerY);
-
-  if (hasTop && hasBottom) {
-    float top = constraints.top;
-    float bottom = constraints.bottom;
-    float areaHeight = containerHeight - top - bottom;
-    if (type == NodeType::Group) {
-      // Group aligns to the target area and derives layout height.
-      auto* group = static_cast<Group*>(element);
-      group->position.y = top;
-      ElementTransform::UpdateGroupLayoutSize(group, NAN, areaHeight);
-    } else if (stretchable) {
-      // Stretch to fill the target area.
-      float newCenterY = top + areaHeight * 0.5f;
-      ElementTransform::ApplyVerticalStretch(element, areaHeight, newCenterY);
-    } else {
-      // Center within the target area (already scaled proportionally above).
-      float ty = top + (areaHeight - bounds.height) * 0.5f - bounds.y;
-      ElementTransform::TranslateY(element, ty);
-    }
-  } else if (hasTop) {
-    float ty = constraints.top - bounds.y;
-    ElementTransform::TranslateY(element, ty);
-  } else if (hasBottom) {
-    float ty = (containerHeight - constraints.bottom) - (bounds.y + bounds.height);
-    ElementTransform::TranslateY(element, ty);
-  } else if (hasCenterY) {
-    float boundsCenter = bounds.y + bounds.height * 0.5f;
-    float ty = (containerHeight * 0.5f + constraints.centerY) - boundsCenter;
-    ElementTransform::TranslateY(element, ty);
-  }
-}
 
 // Forward declarations for recursive processing.
-static void ProcessConstraintLayout(const std::vector<Element*>& elements, float containerWidth,
-                                    float containerHeight, FontConfig* fontProvider);
 static std::pair<float, float> MeasureLayer(const Layer* layer, FontConfig* fontProvider);
+static void PerformContainerLayout(Layer* parent, FontConfig* fontProvider);
 static void LayoutLayer(Layer* layer, FontConfig* fontProvider);
-
-// Applies constraint positioning to all elements within a container. Group elements are always
-// processed recursively: explicit or constraint-derived dimensions are used when available,
-// otherwise the Group's content bounds are measured as a fallback reference frame.
-static void ProcessConstraintLayout(const std::vector<Element*>& elements, float containerWidth,
-                                    float containerHeight, FontConfig* fontProvider) {
-  // Check if any TextBox exists in this scope. When present, Text elements are controlled by the
-  // TextBox for typesetting, so their fontSize should not be modified by proportional scaling.
-  bool hasTextBox = false;
-  for (auto* element : elements) {
-    if (element->nodeType() == NodeType::TextBox) {
-      hasTextBox = true;
-      break;
-    }
-  }
-
-  for (auto* element : elements) {
-    bool skipScaling = hasTextBox && element->nodeType() == NodeType::Text;
-    ApplyConstraintToElement(element, containerWidth, containerHeight, fontProvider, skipScaling);
-
-    if (element->nodeType() == NodeType::Group || element->nodeType() == NodeType::TextBox) {
-      auto* group = static_cast<Group*>(element);
-      float groupW = group->width;
-      float groupH = group->height;
-      // Fall back to measured content bounds when no explicit dimensions.
-      if (std::isnan(groupW) || std::isnan(groupH)) {
-        auto bounds = GetContentBounds(group, fontProvider);
-        if (std::isnan(groupW)) {
-          groupW = bounds.width;
-        }
-        if (std::isnan(groupH)) {
-          groupH = bounds.height;
-        }
-      }
-      ProcessConstraintLayout(group->elements, groupW, groupH, fontProvider);
-    }
-  }
-}
 
 // Computes the measured content size of a Layer (width and height) for bottom-up measurement.
 // Considers constraints on content elements: stretchable elements with opposite-edge constraints
@@ -702,7 +554,7 @@ static void LayoutLayer(Layer* layer, FontConfig* fontProvider) {
   if (!layer->contents.empty() && (!std::isnan(layer->width) || !std::isnan(layer->height))) {
     float containerW = std::isnan(layer->width) ? 0 : layer->width;
     float containerH = std::isnan(layer->height) ? 0 : layer->height;
-    ProcessConstraintLayout(layer->contents, containerW, containerH, fontProvider);
+    ConstraintLayout::ApplyElementsConstraints(layer->contents, containerW, containerH, fontProvider);
   }
 
   // Step 5: Apply constraint positioning to child Layers.
@@ -725,42 +577,8 @@ static void LayoutLayer(Layer* layer, FontConfig* fontProvider) {
         continue;
       }
       auto childMeasured = MeasureLayer(child, fontProvider);
-      float childWidth = std::isnan(child->width) ? childMeasured.first : child->width;
-      float childHeight = std::isnan(child->height) ? childMeasured.second : child->height;
-
-      // Horizontal axis
-      // Priority: centerX > (left + right) > left > right
-      bool hasLeft = !std::isnan(child->left);
-      bool hasRight = !std::isnan(child->right);
-      bool hasCenterX = !std::isnan(child->centerX);
-      if (hasCenterX) {
-        // centerX has highest priority: position at center with offset
-        child->x = (layer->width - childWidth) * 0.5f + child->centerX;
-      } else if (hasLeft && hasRight) {
-        child->x = child->left;
-        child->width = layer->width - child->left - child->right;
-      } else if (hasLeft) {
-        child->x = child->left;
-      } else if (hasRight) {
-        child->x = layer->width - child->right - childWidth;
-      }
-
-      // Vertical axis
-      // Priority: centerY > (top + bottom) > top > bottom
-      bool hasTop = !std::isnan(child->top);
-      bool hasBottom = !std::isnan(child->bottom);
-      bool hasCenterY = !std::isnan(child->centerY);
-      if (hasCenterY) {
-        // centerY has highest priority: position at center with offset
-        child->y = (layer->height - childHeight) * 0.5f + child->centerY;
-      } else if (hasTop && hasBottom) {
-        child->y = child->top;
-        child->height = layer->height - child->top - child->bottom;
-      } else if (hasTop) {
-        child->y = child->top;
-      } else if (hasBottom) {
-        child->y = layer->height - child->bottom - childHeight;
-      }
+      ConstraintLayout::ApplyLayerConstraints(child, layer->width, layer->height, childMeasured.first,
+                                              childMeasured.second);
     }
   }
 
@@ -795,50 +613,14 @@ static void ApplyLayoutToLayers(const std::vector<Layer*>& layers, float contain
   for (auto* layer : layers) {
     ClearMeasureCache(layer);
   }
-  // Apply constraint positioning for layers using the container dimensions.
+  // Apply constraint positioning for top-level layers using the container dimensions.
   for (auto* layer : layers) {
     if (!layer->visible) {
       continue;
     }
-    bool hasConstraints = !std::isnan(layer->left) || !std::isnan(layer->right) ||
-                          !std::isnan(layer->top) || !std::isnan(layer->bottom) ||
-                          !std::isnan(layer->centerX) || !std::isnan(layer->centerY);
-    if (!hasConstraints) {
-      continue;
-    }
     auto measured = MeasureLayer(layer, fontProvider);
-    float childWidth = std::isnan(layer->width) ? measured.first : layer->width;
-    float childHeight = std::isnan(layer->height) ? measured.second : layer->height;
-
-    // Horizontal axis
-    bool hasLeft = !std::isnan(layer->left);
-    bool hasRight = !std::isnan(layer->right);
-    bool hasCenterX = !std::isnan(layer->centerX);
-    if (hasLeft && hasRight) {
-      layer->x = layer->left;
-      layer->width = containerWidth - layer->left - layer->right;
-    } else if (hasLeft) {
-      layer->x = layer->left;
-    } else if (hasRight) {
-      layer->x = containerWidth - layer->right - childWidth;
-    } else if (hasCenterX) {
-      layer->x = (containerWidth - childWidth) * 0.5f + layer->centerX;
-    }
-
-    // Vertical axis
-    bool hasTop = !std::isnan(layer->top);
-    bool hasBottom = !std::isnan(layer->bottom);
-    bool hasCenterY = !std::isnan(layer->centerY);
-    if (hasTop && hasBottom) {
-      layer->y = layer->top;
-      layer->height = containerHeight - layer->top - layer->bottom;
-    } else if (hasTop) {
-      layer->y = layer->top;
-    } else if (hasBottom) {
-      layer->y = containerHeight - layer->bottom - childHeight;
-    } else if (hasCenterY) {
-      layer->y = (containerHeight - childHeight) * 0.5f + layer->centerY;
-    }
+    ConstraintLayout::ApplyLayerConstraints(layer, containerWidth, containerHeight, measured.first,
+                                            measured.second);
   }
   for (auto* layer : layers) {
     LayoutLayer(layer, fontProvider);

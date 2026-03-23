@@ -18,8 +18,7 @@
 
 #pragma once
 
-#include <cmath>
-#include "pagx/nodes/Element.h"
+#include "pagx/nodes/LayoutElement.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/Size.h"
 
@@ -28,7 +27,7 @@ namespace pagx {
 /**
  * Ellipse represents an ellipse shape defined by a center point and size.
  */
-class Ellipse : public Element {
+class Ellipse : public LayoutElement {
  public:
   /**
    * The center point of the ellipse. When not explicitly set, defaults to the center of the
@@ -45,36 +44,6 @@ class Ellipse : public Element {
    * Whether the path direction is reversed. The default value is false.
    */
   bool reversed = false;
-
-  /**
-   * Distance from the left edge of the containing Layer or Group. NAN means not set.
-   */
-  float left = NAN;
-
-  /**
-   * Distance from the right edge of the containing Layer or Group. NAN means not set.
-   */
-  float right = NAN;
-
-  /**
-   * Distance from the top edge of the containing Layer or Group. NAN means not set.
-   */
-  float top = NAN;
-
-  /**
-   * Distance from the bottom edge of the containing Layer or Group. NAN means not set.
-   */
-  float bottom = NAN;
-
-  /**
-   * Horizontal offset from the center of the containing Layer or Group. NAN means not set.
-   */
-  float centerX = NAN;
-
-  /**
-   * Vertical offset from the center of the containing Layer or Group. NAN means not set.
-   */
-  float centerY = NAN;
 
   NodeType nodeType() const override {
     return NodeType::Ellipse;
