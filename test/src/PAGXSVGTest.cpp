@@ -25,12 +25,16 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/SVGExporter.h"
 #include "pagx/SVGImporter.h"
+#include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
@@ -40,6 +44,7 @@
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextBox.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
@@ -731,6 +736,1001 @@ PAGX_TEST(PAGXSVGTest, SVGExport_LayerPosition) {
   auto svg = pagx::SVGExporter::ToSVG(*doc);
   EXPECT_NE(svg.find("matrix("), std::string::npos);
   SaveFile(svg, "PAGXSVGTest/svg_export_layer_position.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_XmlEscaping) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->id = "layer<\"test\">";
+  auto group = doc->makeNode<pagx::Group>();
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "A < B & C > D \"quoted\" 'apos'";
+  text->position = {100, 50};
+  text->fontFamily = "Arial";
+  text->fontSize = 16;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0, 0, 0, 1};
+  fill->color = solid;
+  group->elements.push_back(text);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+
+  pagx::SVGExporter::Options opts;
+  opts.convertTextToPath = false;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
+  EXPECT_NE(svg.find("&lt;"), std::string::npos);
+  EXPECT_NE(svg.find("&gt;"), std::string::npos);
+  EXPECT_NE(svg.find("&amp;"), std::string::npos);
+  EXPECT_NE(svg.find("&quot;"), std::string::npos);
+  EXPECT_NE(svg.find("&apos;"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_xml_escaping.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_DisplayP3Color) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {160, 160};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.2f, 0.1f, 0.9f};
+  solid->color.colorSpace = pagx::ColorSpace::DisplayP3;
+  fill->color = solid;
+  auto stroke = doc->makeNode<pagx::Stroke>();
+  auto strokeColor = doc->makeNode<pagx::SolidColor>();
+  strokeColor->color = {0.0f, 0.8f, 0.3f, 0.8f};
+  strokeColor->color.colorSpace = pagx::ColorSpace::DisplayP3;
+  stroke->color = strokeColor;
+  stroke->width = 3.0f;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  layer->contents.push_back(stroke);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("display-p3"), std::string::npos);
+  EXPECT_NE(svg.find("style="), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_display_p3.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_DisplayP3GradientStop) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {180, 180};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto grad = doc->makeNode<pagx::LinearGradient>();
+  grad->startPoint = {10, 10};
+  grad->endPoint = {190, 190};
+  auto stop1 = doc->makeNode<pagx::ColorStop>();
+  stop1->offset = 0.0f;
+  stop1->color = {1.0f, 0.0f, 0.0f, 0.8f};
+  stop1->color.colorSpace = pagx::ColorSpace::DisplayP3;
+  auto stop2 = doc->makeNode<pagx::ColorStop>();
+  stop2->offset = 1.0f;
+  stop2->color = {0.0f, 0.0f, 1.0f, 1.0f};
+  grad->colorStops = {stop1, stop2};
+  fill->color = grad;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("display-p3"), std::string::npos);
+  EXPECT_NE(svg.find("stop-color"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_display_p3_gradient.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_GroupTransformFull) {
+  auto doc = pagx::PAGXDocument::Make(400, 400);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto group = doc->makeNode<pagx::Group>();
+  group->anchor = {50, 50};
+  group->position = {200, 200};
+  group->scale = {1.5f, 0.8f};
+  group->rotation = 30.0f;
+  group->skew = 15.0f;
+  group->skewAxis = 45.0f;
+  group->alpha = 0.7f;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.4f, 0.2f, 0.8f, 1.0f};
+  fill->color = solid;
+  group->elements.push_back(rect);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("matrix("), std::string::npos);
+  EXPECT_NE(svg.find("opacity=\"0.7\""), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_group_transform_full.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_ColorMatrixFilter) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {150, 150};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.8f, 0.4f, 0.2f, 1.0f};
+  fill->color = solid;
+  auto cm = doc->makeNode<pagx::ColorMatrixFilter>();
+  cm->matrix = {0.33f, 0.33f, 0.33f, 0.0f, 0.0f, 0.33f, 0.33f, 0.33f, 0.0f, 0.0f,
+                0.33f, 0.33f, 0.33f, 0.0f, 0.0f, 0.0f,  0.0f,  0.0f,  1.0f, 0.0f};
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  layer->filters.push_back(cm);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("feColorMatrix"), std::string::npos);
+  EXPECT_NE(svg.find("type=\"matrix\""), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_color_matrix_filter.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_BlendFilter) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {150, 150};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.2f, 0.6f, 0.9f, 1.0f};
+  fill->color = solid;
+  auto blend = doc->makeNode<pagx::BlendFilter>();
+  blend->color = {1.0f, 0.5f, 0.0f, 0.8f};
+  blend->blendMode = pagx::BlendMode::Multiply;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  layer->filters.push_back(blend);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("feFlood"), std::string::npos);
+  EXPECT_NE(svg.find("feBlend"), std::string::npos);
+  EXPECT_NE(svg.find("flood-color="), std::string::npos);
+  EXPECT_NE(svg.find("flood-opacity="), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_blend_filter.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AsymmetricBlur) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {120, 120};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.5f, 0.5f, 0.5f, 1.0f};
+  fill->color = solid;
+  auto blur = doc->makeNode<pagx::BlurFilter>();
+  blur->blurX = 8;
+  blur->blurY = 2;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  layer->filters.push_back(blur);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("feGaussianBlur"), std::string::npos);
+  EXPECT_NE(svg.find("stdDeviation=\"8 2\""), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_asymmetric_blur.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AsymmetricDropShadow) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {100, 100};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.9f, 0.1f, 0.1f, 1.0f};
+  fill->color = solid;
+  auto shadow = doc->makeNode<pagx::DropShadowFilter>();
+  shadow->blurX = 10;
+  shadow->blurY = 3;
+  shadow->offsetX = 5;
+  shadow->offsetY = 5;
+  shadow->color = {0, 0, 0, 0.6f};
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  layer->filters.push_back(shadow);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("10 3"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_asymmetric_drop_shadow.svg");
+}
+
+static std::vector<uint8_t> MakeMinimalPNG(int width, int height) {
+  std::vector<uint8_t> png = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+                              0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52};
+  png.push_back(static_cast<uint8_t>((width >> 24) & 0xFF));
+  png.push_back(static_cast<uint8_t>((width >> 16) & 0xFF));
+  png.push_back(static_cast<uint8_t>((width >> 8) & 0xFF));
+  png.push_back(static_cast<uint8_t>(width & 0xFF));
+  png.push_back(static_cast<uint8_t>((height >> 24) & 0xFF));
+  png.push_back(static_cast<uint8_t>((height >> 16) & 0xFF));
+  png.push_back(static_cast<uint8_t>((height >> 8) & 0xFF));
+  png.push_back(static_cast<uint8_t>(height & 0xFF));
+  return png;
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_ImagePatternFill) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {180, 180};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto pattern = doc->makeNode<pagx::ImagePattern>();
+  auto image = doc->makeNode<pagx::Image>();
+  auto pngData = MakeMinimalPNG(64, 64);
+  image->data = pagx::Data::MakeWithCopy(pngData.data(), pngData.size());
+  pattern->image = image;
+  fill->color = pattern;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<pattern"), std::string::npos);
+  EXPECT_NE(svg.find("<image"), std::string::npos);
+  EXPECT_NE(svg.find("url(#pattern"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_image_pattern.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_ImagePatternTiling) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {180, 180};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto pattern = doc->makeNode<pagx::ImagePattern>();
+  auto image = doc->makeNode<pagx::Image>();
+  auto pngData = MakeMinimalPNG(32, 32);
+  image->data = pagx::Data::MakeWithCopy(pngData.data(), pngData.size());
+  pattern->image = image;
+  pattern->tileModeX = pagx::TileMode::Repeat;
+  pattern->tileModeY = pagx::TileMode::Repeat;
+  pattern->matrix = pagx::Matrix::Scale(0.5f, 0.5f);
+  fill->color = pattern;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<pattern"), std::string::npos);
+  EXPECT_NE(svg.find("patternContentUnits=\"objectBoundingBox\""), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_image_pattern_tiling.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_ImagePatternNoData) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {120, 120};
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto pattern = doc->makeNode<pagx::ImagePattern>();
+  auto image = doc->makeNode<pagx::Image>();
+  pattern->image = image;
+  fill->color = pattern;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("fill=\"none\""), std::string::npos);
+
+  auto fill2 = doc->makeNode<pagx::Fill>();
+  auto pattern2 = doc->makeNode<pagx::ImagePattern>();
+  fill2->color = pattern2;
+  auto layer2 = doc->makeNode<pagx::Layer>();
+  auto rect2 = doc->makeNode<pagx::Rectangle>();
+  rect2->position = {50, 50};
+  rect2->size = {80, 80};
+  layer2->contents.push_back(rect2);
+  layer2->contents.push_back(fill2);
+  doc->layers.push_back(layer2);
+
+  svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_FALSE(svg.empty());
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_ImagePatternFilePath) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {180, 180};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto pattern = doc->makeNode<pagx::ImagePattern>();
+  auto image = doc->makeNode<pagx::Image>();
+  image->filePath = "assets/texture.png";
+  pattern->image = image;
+  fill->color = pattern;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("assets/texture.png"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_image_pattern_filepath.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxElement) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->position = {10, 10};
+  textBox->size = {280, 180};
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Text inside a text box with wrapping";
+  text->position = {10, 30};
+  text->fontFamily = "Arial";
+  text->fontSize = 18;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.1f, 0.1f, 0.1f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(textBox);
+  layer->contents.push_back(text);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::SVGExporter::Options opts;
+  opts.convertTextToPath = false;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
+  EXPECT_NE(svg.find("<text"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_text_box.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_EmptyGradientStops) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {160, 160};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto grad = doc->makeNode<pagx::LinearGradient>();
+  grad->startPoint = {10, 10};
+  grad->endPoint = {190, 190};
+  fill->color = grad;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<linearGradient"), std::string::npos);
+  EXPECT_NE(svg.find("/>"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_empty_gradient.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_LayerBlendMode) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->blendMode = pagx::BlendMode::Multiply;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {150, 150};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.6f, 0.2f, 0.8f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("mix-blend-mode:multiply"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_blend_mode.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_CustomData) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->customData["name"] = "test-layer";
+  layer->customData["index"] = "42";
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {100, 100};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.5f, 0.5f, 0.5f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("data-name=\"test-layer\""), std::string::npos);
+  EXPECT_NE(svg.find("data-index=\"42\""), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_custom_data.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_MaskAlpha) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {150, 150};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.2f, 0.6f, 0.9f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+
+  auto maskLayer = doc->makeNode<pagx::Layer>();
+  auto maskCircle = doc->makeNode<pagx::Ellipse>();
+  maskCircle->position = {100, 100};
+  maskCircle->size = {120, 120};
+  auto maskFill = doc->makeNode<pagx::Fill>();
+  auto maskSolid = doc->makeNode<pagx::SolidColor>();
+  maskSolid->color = {1, 1, 1, 1};
+  maskFill->color = maskSolid;
+  maskLayer->contents.push_back(maskCircle);
+  maskLayer->contents.push_back(maskFill);
+
+  layer->mask = maskLayer;
+  layer->maskType = pagx::MaskType::Alpha;
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<mask"), std::string::npos);
+  EXPECT_NE(svg.find("mask-type:alpha"), std::string::npos);
+  EXPECT_NE(svg.find("mask=\"url(#"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_mask_alpha.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_MaskContour) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {150, 150};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.9f, 0.3f, 0.3f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+
+  auto maskLayer = doc->makeNode<pagx::Layer>();
+  auto maskEllipse = doc->makeNode<pagx::Ellipse>();
+  maskEllipse->position = {100, 100};
+  maskEllipse->size = {100, 100};
+  auto maskFill = doc->makeNode<pagx::Fill>();
+  auto maskSolid = doc->makeNode<pagx::SolidColor>();
+  maskSolid->color = {1, 1, 1, 1};
+  maskFill->color = maskSolid;
+  maskLayer->contents.push_back(maskEllipse);
+  maskLayer->contents.push_back(maskFill);
+
+  layer->mask = maskLayer;
+  layer->maskType = pagx::MaskType::Contour;
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<clipPath"), std::string::npos);
+  EXPECT_NE(svg.find("clip-path=\"url(#"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_mask_contour.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_MaskLuminance) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {150, 150};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.2f, 0.8f, 0.4f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+
+  auto maskLayer = doc->makeNode<pagx::Layer>();
+  auto maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->position = {100, 100};
+  maskRect->size = {100, 100};
+  auto maskFill = doc->makeNode<pagx::Fill>();
+  auto maskSolid = doc->makeNode<pagx::SolidColor>();
+  maskSolid->color = {1, 1, 1, 1};
+  maskFill->color = maskSolid;
+  maskLayer->contents.push_back(maskRect);
+  maskLayer->contents.push_back(maskFill);
+
+  layer->mask = maskLayer;
+  layer->maskType = pagx::MaskType::Luminance;
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<mask"), std::string::npos);
+  EXPECT_EQ(svg.find("mask-type:alpha"), std::string::npos);
+  EXPECT_NE(svg.find("mask=\"url(#"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_mask_luminance.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_InvisibleLayer) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->visible = false;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {150, 150};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("<rect"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_StrokeSquareBevel) {
+  auto doc = pagx::PAGXDocument::Make(300, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto path = doc->makeNode<pagx::Path>();
+  auto pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(20, 50);
+  pathData->lineTo(150, 20);
+  pathData->lineTo(280, 50);
+  path->data = pathData;
+  auto stroke = doc->makeNode<pagx::Stroke>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  stroke->color = solid;
+  stroke->width = 8.0f;
+  stroke->cap = pagx::LineCap::Square;
+  stroke->join = pagx::LineJoin::Bevel;
+  layer->contents.push_back(path);
+  layer->contents.push_back(stroke);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("stroke-linecap=\"square\""), std::string::npos);
+  EXPECT_NE(svg.find("stroke-linejoin=\"bevel\""), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_stroke_square_bevel.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_StrokeMiterLimit) {
+  auto doc = pagx::PAGXDocument::Make(300, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto path = doc->makeNode<pagx::Path>();
+  auto pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(20, 80);
+  pathData->lineTo(150, 10);
+  pathData->lineTo(280, 80);
+  path->data = pathData;
+  auto stroke = doc->makeNode<pagx::Stroke>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  stroke->color = solid;
+  stroke->width = 6.0f;
+  stroke->join = pagx::LineJoin::Miter;
+  stroke->miterLimit = 10.0f;
+  layer->contents.push_back(path);
+  layer->contents.push_back(stroke);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("stroke-miterlimit=\"10\""), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_stroke_miter_limit.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_GradientTransform) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {180, 180};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto grad = doc->makeNode<pagx::LinearGradient>();
+  grad->startPoint = {10, 10};
+  grad->endPoint = {190, 190};
+  grad->matrix = pagx::Matrix::Rotate(45.0f);
+  auto s1 = doc->makeNode<pagx::ColorStop>();
+  s1->offset = 0.0f;
+  s1->color = {1, 0, 0, 1};
+  auto s2 = doc->makeNode<pagx::ColorStop>();
+  s2->offset = 1.0f;
+  s2->color = {0, 0, 1, 1};
+  grad->colorStops = {s1, s2};
+  fill->color = grad;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("gradientTransform="), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_gradient_transform.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_ShadowOnly) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {100, 100};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.5f, 0.5f, 0.5f, 1.0f};
+  fill->color = solid;
+  auto shadow = doc->makeNode<pagx::DropShadowFilter>();
+  shadow->blurX = 5;
+  shadow->blurY = 5;
+  shadow->offsetX = 3;
+  shadow->offsetY = 3;
+  shadow->color = {0, 0, 0, 0.5f};
+  shadow->shadowOnly = true;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  layer->filters.push_back(shadow);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<filter"), std::string::npos);
+  EXPECT_EQ(svg.find("SourceGraphic"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_shadow_only.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_MultipleShadows) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {100, 100};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.8f, 0.8f, 0.8f, 1.0f};
+  fill->color = solid;
+  auto shadow1 = doc->makeNode<pagx::DropShadowFilter>();
+  shadow1->blurX = 4;
+  shadow1->blurY = 4;
+  shadow1->offsetX = 3;
+  shadow1->offsetY = 3;
+  shadow1->color = {0, 0, 0, 0.4f};
+  auto shadow2 = doc->makeNode<pagx::InnerShadowFilter>();
+  shadow2->blurX = 3;
+  shadow2->blurY = 3;
+  shadow2->offsetX = 1;
+  shadow2->offsetY = 1;
+  shadow2->color = {0, 0, 0, 0.3f};
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  layer->filters.push_back(shadow1);
+  layer->filters.push_back(shadow2);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<feMerge"), std::string::npos);
+  size_t mergeNodeCount = 0;
+  size_t pos = 0;
+  while ((pos = svg.find("feMergeNode", pos)) != std::string::npos) {
+    mergeNodeCount++;
+    pos++;
+  }
+  EXPECT_GE(mergeNodeCount, 3u);
+  SaveFile(svg, "PAGXSVGTest/svg_export_multiple_shadows.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_EmptyLayerSelfClosing) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->id = "empty-layer";
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("id=\"empty-layer\""), std::string::npos);
+  EXPECT_NE(svg.find("/>"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_StrokeOpacity) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {120, 120};
+  auto stroke = doc->makeNode<pagx::Stroke>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 0.5f};
+  stroke->color = solid;
+  stroke->width = 4.0f;
+  stroke->alpha = 0.8f;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(stroke);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("stroke-opacity="), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_stroke_opacity.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_TextAnchorEnd) {
+  auto doc = pagx::PAGXDocument::Make(300, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto group = doc->makeNode<pagx::Group>();
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Right aligned";
+  text->position = {280, 50};
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  text->textAnchor = pagx::TextAnchor::End;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0, 0, 0, 1};
+  fill->color = solid;
+  group->elements.push_back(text);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+
+  pagx::SVGExporter::Options opts;
+  opts.convertTextToPath = false;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
+  EXPECT_NE(svg.find("text-anchor=\"end\""), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_text_anchor_end.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoldItalic) {
+  auto doc = pagx::PAGXDocument::Make(300, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto group = doc->makeNode<pagx::Group>();
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Bold Italic Text";
+  text->position = {150, 50};
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  text->fontStyle = "BoldItalic";
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0, 0, 0, 1};
+  fill->color = solid;
+  group->elements.push_back(text);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+
+  pagx::SVGExporter::Options opts;
+  opts.convertTextToPath = false;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
+  EXPECT_NE(svg.find("font-weight=\"bold\""), std::string::npos);
+  EXPECT_NE(svg.find("font-style=\"italic\""), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_text_bold_italic.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_TextLetterSpacing) {
+  auto doc = pagx::PAGXDocument::Make(300, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto group = doc->makeNode<pagx::Group>();
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Spaced Out";
+  text->position = {150, 50};
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  text->letterSpacing = 5.0f;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0, 0, 0, 1};
+  fill->color = solid;
+  group->elements.push_back(text);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+
+  pagx::SVGExporter::Options opts;
+  opts.convertTextToPath = false;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
+  EXPECT_NE(svg.find("letter-spacing=\"5\""), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_text_letter_spacing.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_EmptyPath) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto path = doc->makeNode<pagx::Path>();
+  auto pathData = doc->makeNode<pagx::PathData>();
+  path->data = pathData;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents.push_back(path);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("<path"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_EmptyText) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto group = doc->makeNode<pagx::Group>();
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "";
+  text->fontSize = 20;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0, 0, 0, 1};
+  fill->color = solid;
+  group->elements.push_back(text);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+
+  pagx::SVGExporter::Options opts;
+  opts.convertTextToPath = false;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
+  EXPECT_EQ(svg.find("<text"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_NullFillColor) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {120, 120};
+  auto fill = doc->makeNode<pagx::Fill>();
+  fill->color = nullptr;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("fill=\"none\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_MaskNestedChildren) {
+  auto doc = pagx::PAGXDocument::Make(300, 300);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {150, 150};
+  rect->size = {200, 200};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.4f, 0.7f, 1.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+
+  auto maskLayer = doc->makeNode<pagx::Layer>();
+  maskLayer->matrix = pagx::Matrix::Translate(10, 10);
+  auto maskChild = doc->makeNode<pagx::Layer>();
+  auto maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->position = {100, 100};
+  maskRect->size = {80, 80};
+  auto maskFill = doc->makeNode<pagx::Fill>();
+  auto maskSolid = doc->makeNode<pagx::SolidColor>();
+  maskSolid->color = {1, 1, 1, 1};
+  maskFill->color = maskSolid;
+  maskChild->contents.push_back(maskRect);
+  maskChild->contents.push_back(maskFill);
+  maskLayer->children.push_back(maskChild);
+
+  layer->mask = maskLayer;
+  layer->maskType = pagx::MaskType::Alpha;
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<mask"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_mask_nested.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_ContourMaskNested) {
+  auto doc = pagx::PAGXDocument::Make(300, 300);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {150, 150};
+  rect->size = {200, 200};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.5f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+
+  auto maskLayer = doc->makeNode<pagx::Layer>();
+  maskLayer->matrix = pagx::Matrix::Translate(20, 20);
+  auto childLayer = doc->makeNode<pagx::Layer>();
+  childLayer->matrix = pagx::Matrix::Scale(1.2f, 1.2f);
+  auto maskEllipse = doc->makeNode<pagx::Ellipse>();
+  maskEllipse->position = {100, 100};
+  maskEllipse->size = {80, 80};
+  auto maskFill = doc->makeNode<pagx::Fill>();
+  auto maskSolid = doc->makeNode<pagx::SolidColor>();
+  maskSolid->color = {1, 1, 1, 1};
+  maskFill->color = maskSolid;
+  childLayer->contents.push_back(maskEllipse);
+  childLayer->contents.push_back(maskFill);
+  maskLayer->children.push_back(childLayer);
+
+  layer->mask = maskLayer;
+  layer->maskType = pagx::MaskType::Contour;
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<clipPath"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_contour_mask_nested.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_GradientStopOpacity) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {180, 180};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto grad = doc->makeNode<pagx::LinearGradient>();
+  grad->startPoint = {10, 100};
+  grad->endPoint = {190, 100};
+  auto s1 = doc->makeNode<pagx::ColorStop>();
+  s1->offset = 0.0f;
+  s1->color = {1, 0, 0, 0.3f};
+  auto s2 = doc->makeNode<pagx::ColorStop>();
+  s2->offset = 1.0f;
+  s2->color = {0, 0, 1, 0.7f};
+  grad->colorStops = {s1, s2};
+  fill->color = grad;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("stop-opacity="), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_gradient_stop_opacity.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_InnerShadowShadowOnly) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {120, 120};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.9f, 0.9f, 0.9f, 1.0f};
+  fill->color = solid;
+  auto innerShadow = doc->makeNode<pagx::InnerShadowFilter>();
+  innerShadow->blurX = 5;
+  innerShadow->blurY = 5;
+  innerShadow->offsetX = 2;
+  innerShadow->offsetY = 2;
+  innerShadow->color = {0, 0, 0, 0.4f};
+  innerShadow->shadowOnly = true;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  layer->filters.push_back(innerShadow);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("feComposite"), std::string::npos);
+  EXPECT_EQ(svg.find("SourceGraphic"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_inner_shadow_only.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_ToFileInvalidPath) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  EXPECT_FALSE(pagx::SVGExporter::ToFile(*doc, "/nonexistent/dir/file.svg"));
 }
 
 }  // namespace pag
