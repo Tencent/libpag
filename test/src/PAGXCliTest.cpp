@@ -604,114 +604,6 @@ CLI_TEST(PAGXCliTest, Optimize_NoMergeSizedGroups) {
   EXPECT_EQ(CountOccurrences(output, "<Group"), 2u);
 }
 
-// UnwrapFirstChildGroup: basic unwrap — first-child Group with no transform is removed.
-CLI_TEST(PAGXCliTest, Optimize_UnwrapBasic) {
-  auto inputPath = TestResourcePath("optimize_unwrap_basic.pagx");
-  auto outputPath = TempDir() + "/unwrap_basic_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // The first-child Group should be unwrapped, leaving no Group element.
-  EXPECT_EQ(CountOccurrences(output, "<Group"), 0u);
-  // The Rectangle and Fill from inside the Group should remain.
-  EXPECT_EQ(CountOccurrences(output, "<Rectangle"), 2u);
-  EXPECT_EQ(CountOccurrences(output, "<Fill"), 2u);
-}
-
-// UnwrapFirstChildGroup: keep Group with alpha != 1.
-CLI_TEST(PAGXCliTest, Optimize_UnwrapKeepAlpha) {
-  auto inputPath = TestResourcePath("optimize_unwrap_keep_alpha.pagx");
-  auto outputPath = TempDir() + "/unwrap_keep_alpha_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Group with alpha should be preserved.
-  EXPECT_EQ(CountOccurrences(output, "<Group"), 1u);
-}
-
-// UnwrapFirstChildGroup: keep Group with rotation.
-CLI_TEST(PAGXCliTest, Optimize_UnwrapKeepTransform) {
-  auto inputPath = TestResourcePath("optimize_unwrap_keep_transform.pagx");
-  auto outputPath = TempDir() + "/unwrap_keep_transform_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Group with rotation should be preserved.
-  EXPECT_EQ(CountOccurrences(output, "<Group"), 1u);
-}
-
-// UnwrapFirstChildGroup: keep Group with constraint attributes.
-CLI_TEST(PAGXCliTest, Optimize_UnwrapKeepConstrained) {
-  auto inputPath = TestResourcePath("optimize_unwrap_keep_constrained.pagx");
-  auto outputPath = TempDir() + "/unwrap_keep_constrained_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Group with constraint attributes should be preserved.
-  EXPECT_EQ(CountOccurrences(output, "<Group"), 1u);
-}
-
-// UnwrapFirstChildGroup: keep Group with explicit width/height.
-CLI_TEST(PAGXCliTest, Optimize_UnwrapKeepSized) {
-  auto inputPath = TestResourcePath("optimize_unwrap_keep_sized.pagx");
-  auto outputPath = TempDir() + "/unwrap_keep_sized_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Group with explicit size should be preserved.
-  EXPECT_EQ(CountOccurrences(output, "<Group"), 1u);
-}
-
-// UnwrapFirstChildGroup: offset is transferred to children.
-CLI_TEST(PAGXCliTest, Optimize_UnwrapOffset) {
-  auto inputPath = TestResourcePath("optimize_unwrap_offset.pagx");
-  auto outputPath = TempDir() + "/unwrap_offset_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // The Group should be unwrapped.
-  EXPECT_EQ(CountOccurrences(output, "<Group"), 0u);
-  // The Rectangle's position should absorb the Group's offset: left = 10+30 = 40, top = 10+20 = 30.
-  EXPECT_TRUE(output.find("left=\"40\"") != std::string::npos);
-  EXPECT_TRUE(output.find("top=\"30\"") != std::string::npos);
-}
-
-// UnwrapFirstChildGroup: nested first-child Groups are recursively unwrapped.
-CLI_TEST(PAGXCliTest, Optimize_UnwrapNested) {
-  auto inputPath = TestResourcePath("optimize_unwrap_nested.pagx");
-  auto outputPath = TempDir() + "/unwrap_nested_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Both nested first-child Groups should be unwrapped.
-  EXPECT_EQ(CountOccurrences(output, "<Group"), 0u);
-  EXPECT_EQ(CountOccurrences(output, "<Rectangle"), 2u);
-}
-
-// UnwrapFirstChildGroup: TextBox as first child is not unwrapped.
-CLI_TEST(PAGXCliTest, Optimize_UnwrapKeepTextBox) {
-  auto inputPath = TestResourcePath("optimize_unwrap_keep_textbox.pagx");
-  auto outputPath = TempDir() + "/unwrap_keep_textbox_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // TextBox must not be unwrapped — it has layout semantics.
-  EXPECT_TRUE(output.find("<TextBox") != std::string::npos);
-}
-
-// UnwrapFirstChildGroup: Group containing Repeater is still unwrapped as first child.
-CLI_TEST(PAGXCliTest, Optimize_UnwrapWithRepeater) {
-  auto inputPath = TestResourcePath("optimize_unwrap_keep_repeater.pagx");
-  auto outputPath = TempDir() + "/unwrap_with_repeater_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // First-child Group is unwrapped even if it contains a Repeater.
-  EXPECT_EQ(CountOccurrences(output, "<Group"), 0u);
-  // Both Repeaters should remain.
-  EXPECT_EQ(CountOccurrences(output, "<Repeater"), 2u);
-}
-
 // ExtractCompositions: do not extract Layers with flex > 0 (dynamic sizing).
 CLI_TEST(PAGXCliTest, Optimize_NoExtractFlexLayers) {
   auto inputPath = TestResourcePath("optimize_no_extract_flex_layers.pagx");
@@ -1290,10 +1182,6 @@ CLI_TEST(PAGXCliTest, OptimizeRender_ExtractComposition) {
 
 CLI_TEST(PAGXCliTest, OptimizeRender_Comprehensive) {
   TestOptimizeAndRender("OptimizeComprehensive", "optimize_comprehensive.pagx");
-}
-
-CLI_TEST(PAGXCliTest, OptimizeRender_UnwrapGroup) {
-  TestOptimizeAndRender("OptimizeUnwrapGroup", "optimize_unwrap_render.pagx");
 }
 
 //==============================================================================

@@ -166,8 +166,10 @@ moved.
 ```xml
 <!-- Before: two independent blocks crammed into one Layer -->
 <Layer>
+  <Group>
     <Rectangle left="110" top="115" size="120,130"/>
     <Stroke color="#000" width="1"/>
+  </Group>
   <!-- ...more content for block A... -->
   <Group>
     <Rectangle left="295" top="115" size="120,130"/>

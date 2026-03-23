@@ -74,7 +74,6 @@ struct OptimizeReport {
   int deduplicatedPathData = 0;
   int deduplicatedGradients = 0;
   int mergedGroups = 0;
-  int unwrappedGroups = 0;
   int unreferencedResources = 0;
   int pathToRectangle = 0;
   int pathToEllipse = 0;
@@ -87,9 +86,9 @@ struct OptimizeReport {
 
   int total() const {
     return emptyElements + deduplicatedPathData + deduplicatedGradients + mergedGroups +
-           unwrappedGroups + unreferencedResources + pathToRectangle + pathToEllipse +
-           fullCanvasClips + offCanvasLayers + coordinatesLocalized + pathDataLocalized +
-           redundantConstraints + compositionsExtracted;
+           unreferencedResources + pathToRectangle + pathToEllipse + fullCanvasClips +
+           offCanvasLayers + coordinatesLocalized + pathDataLocalized + redundantConstraints +
+           compositionsExtracted;
   }
 
   void print() const {
@@ -110,9 +109,6 @@ struct OptimizeReport {
     }
     if (mergedGroups > 0) {
       std::cout << "  - merged " << mergedGroups << " adjacent groups\n";
-    }
-    if (unwrappedGroups > 0) {
-      std::cout << "  - unwrapped " << unwrappedGroups << " redundant first-child groups\n";
     }
     if (unreferencedResources > 0) {
       std::cout << "  - removed " << unreferencedResources << " unreferenced resources\n";
@@ -156,7 +152,6 @@ static void PrintOptimizeUsage() {
             << "  2.  Deduplicate PathData resources\n"
             << "  3.  Deduplicate gradient resources\n"
             << "  4.  Merge adjacent Groups with identical painters\n"
-            << "  4b. Unwrap redundant first-child Groups\n"
             << "  5.  Replace Path with Rectangle/Ellipse\n"
             << "  6.  Remove full-canvas clip masks\n"
             << "  7.  Remove off-canvas invisible layers\n"
@@ -182,14 +177,6 @@ static bool HasConstraintAttributes(float left, float right, float top, float bo
   return !std::isnan(left) || !std::isnan(right) || !std::isnan(top) || !std::isnan(bottom) ||
          !std::isnan(centerX) || !std::isnan(centerY);
 }
-
-// Forward declarations for functions used by UnwrapFirstChildGroupInElements.
-static void ApplyLocalizationToElements(PAGXDocument* document,
-                                        const std::vector<Element*>& contents, float offsetX,
-                                        float offsetY);
-static void OffsetColorSourcesInContents(PAGXDocument* document,
-                                         const std::vector<Element*>& contents, float offsetX,
-                                         float offsetY);
 
 // --- Optimization #1: Remove empty elements ---
 
@@ -331,12 +318,10 @@ static void CollectLintHintsFromContents(const Layer* layer, std::vector<LintHin
         // First pass: scan all Repeaters at this level to compute the full product.
         // Repeater affects all sibling elements regardless of order.
         float localProduct = outerProduct;
-        int repeaterCount = 0;
         for (auto* element : elements) {
           if (element->nodeType() == NodeType::Repeater) {
             auto repeater = static_cast<const Repeater*>(element);
             localProduct *= repeater->copies;
-            repeaterCount++;
           }
         }
 
@@ -359,9 +344,8 @@ static void CollectLintHintsFromContents(const Layer* layer, std::vector<LintHin
                                          ") may cause performance issues"});
             }
 
-            // Multiple Repeaters: warn if total product > 500 and multiple Repeaters contribute
-            // (either from outer scope or multiple at this level).
-            if (localProduct > 500.0f && (outerProduct > 1.0f || repeaterCount > 1)) {
+            // Nested Repeater: warn if total product > 500 and there is an outer Repeater
+            if (localProduct > 500.0f && outerProduct > 1.0f) {
               auto name = layer->name.empty() ? layer->id : layer->name;
               hints.push_back({name, "Nested Repeater with product " +
                                          std::to_string(static_cast<int>(localProduct)) +
@@ -1130,78 +1114,6 @@ static int MergeAdjacentGroups(PAGXDocument* document) {
     } else if (node->nodeType() == NodeType::Group || node->nodeType() == NodeType::TextBox) {
       auto group = static_cast<Group*>(node.get());
       count += MergeAdjacentGroupsInElements(document, group->elements);
-    }
-  }
-  return count;
-}
-
-// --- Optimization #4b: Unwrap redundant first-child Groups ---
-
-static bool CanUnwrapFirstChildGroup(const Group* group) {
-  if (group->nodeType() != NodeType::Group) {
-    return false;
-  }
-  if (group->alpha != 1.0f) {
-    return false;
-  }
-  if (group->rotation != 0 || group->scale.x != 1 || group->scale.y != 1 || group->skew != 0 ||
-      group->skewAxis != 0) {
-    return false;
-  }
-  if (!std::isnan(group->width) || !std::isnan(group->height)) {
-    return false;
-  }
-  if (HasConstraintAttributes(group->left, group->right, group->top, group->bottom, group->centerX,
-                              group->centerY)) {
-    return false;
-  }
-  return true;
-}
-
-static int UnwrapFirstChildGroupInElements(PAGXDocument* document,
-                                           std::vector<Element*>& elements) {
-  int count = 0;
-  // Depth-first: recursively process nested Group/TextBox children first.
-  for (auto* element : elements) {
-    if (element->nodeType() == NodeType::Group || element->nodeType() == NodeType::TextBox) {
-      auto group = static_cast<Group*>(element);
-      count += UnwrapFirstChildGroupInElements(document, group->elements);
-    }
-  }
-  // Loop: unwrap the first element while it is a redundant Group.
-  while (!elements.empty() && elements[0]->nodeType() == NodeType::Group) {
-    auto group = static_cast<Group*>(elements[0]);
-    if (!CanUnwrapFirstChildGroup(group)) {
-      break;
-    }
-    // Compute net offset from Group's position - anchor.
-    float offsetX = group->position.x - group->anchor.x;
-    float offsetY = group->position.y - group->anchor.y;
-    if (std::abs(offsetX) >= 0.001f || std::abs(offsetY) >= 0.001f) {
-      // Transfer offset to children by passing negated values (the functions subtract).
-      ApplyLocalizationToElements(document, group->elements, -offsetX, -offsetY);
-      OffsetColorSourcesInContents(document, group->elements, -offsetX, -offsetY);
-    }
-    // Replace the Group with its children.
-    std::vector<Element*> newElements = {};
-    newElements.reserve(group->elements.size() + elements.size() - 1);
-    newElements.insert(newElements.end(), group->elements.begin(), group->elements.end());
-    newElements.insert(newElements.end(), elements.begin() + 1, elements.end());
-    elements = newElements;
-    count++;
-  }
-  return count;
-}
-
-static int UnwrapRedundantFirstChildGroups(PAGXDocument* document) {
-  int count = 0;
-  for (auto& node : document->nodes) {
-    if (node->nodeType() == NodeType::Layer) {
-      auto layer = static_cast<Layer*>(node.get());
-      count += UnwrapFirstChildGroupInElements(document, layer->contents);
-    } else if (node->nodeType() == NodeType::Group || node->nodeType() == NodeType::TextBox) {
-      auto group = static_cast<Group*>(node.get());
-      count += UnwrapFirstChildGroupInElements(document, group->elements);
     }
   }
   return count;
@@ -2361,7 +2273,6 @@ static OptimizeReport OptimizeDocument(PAGXDocument* document) {
   report.deduplicatedPathData = DeduplicatePathData(document);
   report.deduplicatedGradients = DeduplicateColorSources(document);
   report.mergedGroups = MergeAdjacentGroups(document);
-  report.unwrappedGroups = UnwrapRedundantFirstChildGroups(document);
   ReplacePathsWithPrimitives(document, report.pathToRectangle, report.pathToEllipse);
   report.fullCanvasClips = RemoveFullCanvasClipMasks(document, document->layers);
   report.offCanvasLayers = RemoveOffCanvasLayers(document);

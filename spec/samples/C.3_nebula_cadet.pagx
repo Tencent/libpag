@@ -40,6 +40,7 @@
       </Fill>
     </Layer>
     <Layer name="Stars" alpha="0.9">
+      <Group>
         <Ellipse left="119" top="79" size="2,2"/>
         <Ellipse left="178.5" top="108.5" size="3,3"/>
         <Ellipse left="259" top="89" size="2,2"/>
@@ -51,6 +52,7 @@
         <Ellipse left="738.5" top="148.5" size="3,3"/>
         <Ellipse left="89" top="159" size="2,2"/>
         <Fill color="#FFFFFFCC"/>
+      </Group>
       <Group>
         <Ellipse left="149" top="199" size="2,2"/>
         <Ellipse left="239" top="169" size="2,2"/>

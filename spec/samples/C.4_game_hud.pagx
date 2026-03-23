@@ -195,8 +195,10 @@
       </Layer>
     </Layer>
     <Layer top="70">
+      <Group>
         <Rectangle left="180" top="-2" size="40,4"/>
         <Fill color="#004488"/>
+      </Group>
       <Group>
         <Rectangle left="165" top="-2" size="10,4"/>
         <Rectangle left="225" top="-2" size="10,4"/>
@@ -205,9 +207,11 @@
     </Layer>
   </Layer>
   <Layer name="Radar" left="100" top="500">
+    <Group>
       <Ellipse left="-70" top="-70" size="140,140"/>
       <Fill color="#001122" alpha="0.9"/>
       <Stroke color="#0066AA" width="2"/>
+    </Group>
     <Group>
       <Ellipse left="-50" top="-50" size="100,100"/>
       <Ellipse left="-25" top="-25" size="50,50"/>

@@ -911,6 +911,7 @@ Layer 的子元素按类型自动归类为四个集合：
 | `groupOpacity` | bool | false | 组透明度 |
 | `passThroughBackground` | bool | true | 是否允许背景透传给子图层 |
 | `scrollRect` | Rect | - | 滚动裁剪区域 "x,y,w,h" |
+| `clipToBounds` | bool | false | 按图层边界裁剪内容（见 §5.5.2） |
 | `mask` | idref | - | 遮罩图层引用 "@id" |
 | `maskType` | MaskType | alpha | 遮罩类型 |
 | `composition` | idref | - | 合成引用 "@id" |
@@ -1114,7 +1115,13 @@ Layer 的子元素按类型自动归类为四个集合：
 
 > [Sample](samples/4.5.1_scroll_rect.pagx)
 
-#### 5.5.2 遮罩（Masking）
+#### 5.5.2 clipToBounds（边界裁剪）
+
+当 `clipToBounds="true"` 时，图层自动将内容裁剪到自身边界（`width` × `height`）。等效于设置 `scrollRect="0,0,width,height"`，但可配合自动布局使用——裁剪区域在布局计算出图层尺寸后确定。如果图层同时设置了显式的 `scrollRect`，则 `scrollRect` 优先，`clipToBounds` 被忽略。
+
+> [Sample](samples/4.5.3_clip_to_bounds.pagx)
+
+#### 5.5.3 遮罩（Masking）
 
 通过 `mask` 属性引用另一个图层作为遮罩。
 

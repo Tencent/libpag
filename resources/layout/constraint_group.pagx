@@ -142,6 +142,7 @@
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
+          <Group>
             <Group centerX="0" centerY="0" width="200" height="160">
               <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="10"/>
               <Fill>
@@ -151,6 +152,7 @@
                 </LinearGradient>
               </Fill>
             </Group>
+          </Group>
         </Layer>
       </Layer>
     </Layer>
