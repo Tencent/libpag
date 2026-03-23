@@ -72,9 +72,6 @@ static std::pair<float, float> MeasureLayerContents(const Layer* layer, FontConf
 
   // Also consider child Layers (recursively).
   for (auto* child : layer->children) {
-    if (!child->visible) {
-      continue;
-    }
     auto childMeasured = MeasureLayer(child, fontProvider);
     float cx = child->x + childMeasured.first;
     float cy = child->y + childMeasured.second;
@@ -111,11 +108,12 @@ static void PerformContainerLayout(Layer* parent, FontConfig* fontProvider) {
   size_t childCount = children.size();
 
   // Measure all participating children once upfront to avoid repeated measurement.
-  // A child participates if it is visible and included in layout.
+  // A child participates if it is included in layout. Visibility does not affect layout —
+  // invisible Layers still need correct sizes and positions.
   std::vector<std::pair<float, float>> childMeasuredSizes(childCount);
   std::vector<bool> isParticipating(childCount, false);
   for (size_t i = 0; i < childCount; i++) {
-    isParticipating[i] = children[i]->visible && children[i]->includeInLayout;
+    isParticipating[i] = children[i]->includeInLayout;
     if (isParticipating[i]) {
       childMeasuredSizes[i] = MeasureLayer(children[i], fontProvider);
     }
@@ -359,7 +357,7 @@ static std::pair<float, float> MeasureLayer(const Layer* layer, FontConfig* font
       float maxCross = 0;
       size_t visibleChildCount = 0;
       for (auto* child : layer->children) {
-        if (!child->visible || !child->includeInLayout) {
+        if (!child->includeInLayout) {
           continue;
         }
         visibleChildCount++;
@@ -469,9 +467,6 @@ static void LayoutLayer(Layer* layer, FontConfig* fontProvider) {
   // - The child has includeInLayout=false (opted out of container layout flow).
   if (!layer->children.empty() && !std::isnan(layer->width) && !std::isnan(layer->height)) {
     for (auto* child : layer->children) {
-      if (!child->visible) {
-        continue;
-      }
       bool hasConstraints = !std::isnan(child->left) || !std::isnan(child->right) ||
                             !std::isnan(child->top) || !std::isnan(child->bottom) ||
                             !std::isnan(child->centerX) || !std::isnan(child->centerY);
@@ -488,11 +483,10 @@ static void LayoutLayer(Layer* layer, FontConfig* fontProvider) {
     }
   }
 
-  // Step 6: Recurse into visible child Layers.
+  // Step 6: Recurse into child Layers.
+  // Layout is applied regardless of visibility — invisible Layers still need correct sizes and
+  // positions for constraint and container layout to work properly.
   for (auto* child : layer->children) {
-    if (!child->visible) {
-      continue;
-    }
     LayoutLayer(child, fontProvider);
   }
 }
@@ -521,9 +515,6 @@ static void ApplyLayoutToLayers(const std::vector<Layer*>& layers, float contain
   }
   // Apply constraint positioning for top-level layers using the container dimensions.
   for (auto* layer : layers) {
-    if (!layer->visible) {
-      continue;
-    }
     auto measured = MeasureLayer(layer, fontProvider);
     ConstraintLayout::ApplyLayerConstraints(layer, containerWidth, containerHeight, measured.first,
                                             measured.second);

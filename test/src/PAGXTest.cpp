@@ -1582,7 +1582,7 @@ PAGX_TEST(PAGXTest, LayoutFlexZeroNotExported) {
 // Auto Layout - Container Layout - Visibility
 // =====================================================================================
 
-PAGX_TEST(PAGXTest, LayoutHiddenChildSkipped) {
+PAGX_TEST(PAGXTest, LayoutHiddenChildNotSkipped) {
   auto doc = pagx::PAGXDocument::Make(300, 100);
   auto parent = doc->makeNode<pagx::Layer>();
   doc->layers.push_back(parent);
@@ -1607,8 +1607,10 @@ PAGX_TEST(PAGXTest, LayoutHiddenChildSkipped) {
 
   pagx::AutoLayout::Apply(doc.get());
 
+  // Visibility does not affect layout — invisible children still participate.
   EXPECT_EQ(child1->x, 0.0f);
-  EXPECT_EQ(child3->x, 100.0f);
+  EXPECT_EQ(child2->x, 100.0f);
+  EXPECT_EQ(child3->x, 200.0f);
 }
 
 // =====================================================================================
@@ -2730,13 +2732,13 @@ PAGX_TEST(PAGXTest, LayoutIncludeInLayoutMixedVisibility) {
   parent->layout = pagx::LayoutMode::Horizontal;
   parent->gap = 10;
 
-  // child1: visible=true, includeInLayout=false -> visible but excluded from layout.
+  // child1: visible=true, includeInLayout=false -> excluded from layout flow.
   auto child1 = doc->makeNode<pagx::Layer>();
   child1->width = 500;
   child1->height = 100;
   child1->includeInLayout = false;
 
-  // child2: visible=false, includeInLayout=true -> invisible, excluded from layout.
+  // child2: visible=false, includeInLayout=true -> still participates in layout.
   auto child2 = doc->makeNode<pagx::Layer>();
   child2->width = 300;
   child2->height = 100;
@@ -2756,11 +2758,12 @@ PAGX_TEST(PAGXTest, LayoutIncludeInLayoutMixedVisibility) {
 
   pagx::AutoLayout::Apply(doc.get());
 
-  // Only child3 and child4 participate: measured width = 100 + 10 + 100 = 210.
-  EXPECT_FLOAT_EQ(parent->width, 210.0f);
-  // child3 and child4 are positioned as the only participants.
-  EXPECT_FLOAT_EQ(child3->x, 0.0f);
-  EXPECT_FLOAT_EQ(child4->x, 110.0f);
+  // child2, child3, child4 participate: measured width = 300 + 10 + 100 + 10 + 100 = 520.
+  EXPECT_FLOAT_EQ(parent->width, 520.0f);
+  // child2 (invisible but still participates) is positioned first.
+  EXPECT_FLOAT_EQ(child2->x, 0.0f);
+  EXPECT_FLOAT_EQ(child3->x, 310.0f);
+  EXPECT_FLOAT_EQ(child4->x, 420.0f);
 }
 
 // =====================================================================================
@@ -3402,10 +3405,10 @@ PAGX_TEST(PAGXTest, LayerNoConstraintUnchanged) {
 }
 
 // =====================================================================================
-// Auto Layout - Layer Constraint Positioning - Invisible child skipped
+// Auto Layout - Layer Constraint Positioning - Invisible child still gets layout
 // =====================================================================================
 
-PAGX_TEST(PAGXTest, LayerConstraintInvisibleChildSkipped) {
+PAGX_TEST(PAGXTest, LayerConstraintInvisibleChildNotSkipped) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto parent = doc->makeNode<pagx::Layer>();
   doc->layers.push_back(parent);
@@ -3426,9 +3429,9 @@ PAGX_TEST(PAGXTest, LayerConstraintInvisibleChildSkipped) {
 
   pagx::AutoLayout::Apply(doc.get());
 
-  // Invisible child is skipped — x/y unchanged.
-  EXPECT_FLOAT_EQ(child->x, 0.0f);
-  EXPECT_FLOAT_EQ(child->y, 0.0f);
+  // Visibility does not affect layout — invisible child still gets constraint positioning.
+  EXPECT_FLOAT_EQ(child->x, 30.0f);
+  EXPECT_FLOAT_EQ(child->y, 40.0f);
 }
 
 // =====================================================================================

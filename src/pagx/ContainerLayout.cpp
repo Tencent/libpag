@@ -48,11 +48,12 @@ void ContainerLayout::Apply(Layer* parent, const MeasureFunc& measureLayer) {
   size_t childCount = children.size();
 
   // Measure all participating children once upfront to avoid repeated measurement.
-  // A child participates if it is visible and included in layout.
+  // A child participates if it is included in layout. Visibility does not affect layout —
+  // invisible Layers still need correct sizes and positions.
   std::vector<std::pair<float, float>> childMeasuredSizes(childCount);
   std::vector<bool> isParticipating(childCount, false);
   for (size_t i = 0; i < childCount; i++) {
-    isParticipating[i] = children[i]->visible && children[i]->includeInLayout;
+    isParticipating[i] = children[i]->includeInLayout;
     if (isParticipating[i]) {
       childMeasuredSizes[i] = measureLayer(children[i]);
     }
