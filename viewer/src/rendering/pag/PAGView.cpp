@@ -35,6 +35,7 @@ PAGView::PAGView(QQuickItem* parent) : ContentView(parent) {
           &PAGView::onPreferredSizeChanged);
   connect(viewModel.get(), &PAGViewModel::audioTimeChanged, this, &PAGView::onAudioTimeChanged);
   connect(viewModel.get(), &PAGViewModel::isPlayingChanged, this, &PAGView::onIsPlayingChanged);
+  connect(viewModel.get(), &PAGViewModel::fileChanged, this, &PAGView::onFileChanged);
   renderThread =
       std::make_unique<RenderThread>(this, std::make_unique<PAGRenderer>(viewModel.get()));
   connect(renderThread.get(), &RenderThread::rendered, this, &PAGView::update,
@@ -85,9 +86,15 @@ void PAGView::onPreferredSizeChanged() {
 }
 
 void PAGView::onIsPlayingChanged(bool isPlaying) {
+  if (isPlaying) {
+    std::lock_guard<std::mutex> lock(lastPlayTimeMutex);
+    lastPlayTime = tgfx::Clock::Now();
+  }
+}
+
+void PAGView::onFileChanged(std::shared_ptr<pag::File>) {
   std::lock_guard<std::mutex> lock(lastPlayTimeMutex);
   lastPlayTime = tgfx::Clock::Now();
-  (void)isPlaying;
 }
 
 void PAGView::onAudioTimeChanged(int64_t audioTime) {

@@ -45,6 +45,7 @@ class PAGView : public ContentView {
   Q_SLOT void onPreferredSizeChanged();
   Q_SLOT void onAudioTimeChanged(int64_t audioTime);
   Q_SLOT void onIsPlayingChanged(bool isPlaying);
+  Q_SLOT void onFileChanged(std::shared_ptr<pag::File> file);
 
   std::mutex lastPlayTimeMutex = {};
   int64_t lastPlayTime = 0;
