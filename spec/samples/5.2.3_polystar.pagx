@@ -3,7 +3,7 @@
 <pagx version="1.0" width="400" height="400">
   <Layer width="400" height="400" layout="vertical">
     <!-- Row 1: stars -->
-    <Layer layout="horizontal" flex="1">
+    <Layer flex="1" layout="horizontal">
       <!-- 5-pointed star -->
       <Layer flex="1">
         <Polystar centerX="0" centerY="0" type="star" pointCount="5" outerRadius="60" innerRadius="28"/>
@@ -26,7 +26,7 @@
       </Layer>
     </Layer>
     <!-- Row 2: polygons -->
-    <Layer layout="horizontal" flex="1">
+    <Layer flex="1" layout="horizontal">
       <!-- Hexagon -->
       <Layer flex="1">
         <Polystar centerX="0" centerY="0" type="polygon" pointCount="6" outerRadius="64"/>

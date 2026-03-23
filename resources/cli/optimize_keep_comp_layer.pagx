@@ -4,7 +4,7 @@
   <Resources>
     <Composition id="comp1" width="50" height="50">
       <Layer name="inner">
-<Rectangle size="50,50" left="-25" top="-25" />
+<Rectangle left="-25" top="-25" size="50,50"/>
         <Fill color="#FF0000"/>
       </Layer>
     </Composition>

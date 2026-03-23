@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="400" height="400">
   <Layer name="a" left="50" top="50">
-<Ellipse size="30,30" left="-15" top="-15" />
+<Ellipse left="-15" top="-15" size="30,30"/>
     <Fill color="#00FF00"/>
   </Layer>
   <Layer name="b" left="150" top="50">
-<Ellipse size="30,30" left="-15" top="-15" />
+<Ellipse left="-15" top="-15" size="30,30"/>
     <Fill color="#00FF00"/>
   </Layer>
   <Layer name="c" left="250" top="50">
-<Ellipse size="30,30" left="-15" top="-15" />
+<Ellipse left="-15" top="-15" size="30,30"/>
     <Fill color="#00FF00"/>
   </Layer>
   <Layer name="d" left="350" top="50">
-<Ellipse size="30,30" left="-15" top="-15" />
+<Ellipse left="-15" top="-15" size="30,30"/>
     <Fill color="#00FF00"/>
   </Layer>
 </pagx>

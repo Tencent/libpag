@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="400" height="400">
   <Layer>
-    <Group anchor="110,110" left="200" top="200" rotation="12">
+    <Group left="200" top="200" anchor="110,110" rotation="12">
       <Rectangle size="220,220" roundness="32"/>
       <Fill>
         <LinearGradient startPoint="0,0" endPoint="220,220">

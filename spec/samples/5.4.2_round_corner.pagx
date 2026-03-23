@@ -15,6 +15,7 @@
           <ColorStop offset="1" color="#059669"/>
         </LinearGradient>
       </Fill>
+      <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#10B98160"/>
     </Layer>
     <!-- Original star (reference) -->
     <Layer left="290" top="120">
@@ -30,6 +31,7 @@
           <ColorStop offset="1" color="#D97706"/>
         </LinearGradient>
       </Fill>
+      <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F59E0B60"/>
     </Layer>
     <Layer left="200" top="300">
       <Polystar type="polygon" pointCount="6" outerRadius="80"/>
@@ -40,7 +42,7 @@
           <ColorStop offset="1" color="#7C3AED"/>
         </LinearGradient>
       </Fill>
+      <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#8B5CF660"/>
     </Layer>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#00000050"/>
   </Layer>
 </pagx>

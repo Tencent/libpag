@@ -16,13 +16,13 @@
     <!-- Row 1: 4 equal-width containers (flexible, no width specified) -->
     <Layer flex="1" layout="horizontal" gap="20">
       <!-- Container 1 -->
-      <Layer height="200" flex="1">
+      <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
-          <Group width="135" height="120" centerX="0" centerY="0">
+          <Group centerX="0" centerY="0" width="135" height="120">
             <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="12"/>
             <Fill>
               <LinearGradient startPoint="0,0" endPoint="135,120">
@@ -35,7 +35,7 @@
       </Layer>
 
       <!-- Container 2 -->
-      <Layer height="200" flex="1">
+      <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -54,7 +54,7 @@
       </Layer>
 
       <!-- Container 3 -->
-      <Layer height="200" flex="1">
+      <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -73,7 +73,7 @@
       </Layer>
 
       <!-- Container 4 -->
-      <Layer height="200" flex="1">
+      <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -95,7 +95,7 @@
     <!-- Row 2: 3 equal-width containers (flexible, no width specified) -->
     <Layer flex="1" layout="horizontal" gap="20">
       <!-- Container 5 -->
-      <Layer height="200" flex="1">
+      <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -104,11 +104,11 @@
           <Group left="20" right="20" top="20" bottom="20">
             <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="12"/>
             <Fill color="#1E293B"/>
-            <Group width="160" height="75" centerX="0">
+            <Group centerX="0" width="160" height="75">
               <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
               <Fill color="#6366F1"/>
             </Group>
-            <Group width="160" height="75" centerX="0" bottom="0">
+            <Group bottom="0" centerX="0" width="160" height="75">
               <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
               <Fill color="#EC4899"/>
             </Group>
@@ -117,7 +117,7 @@
       </Layer>
 
       <!-- Container 6 -->
-      <Layer height="200" flex="1">
+      <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -136,7 +136,7 @@
       </Layer>
 
       <!-- Container 7 -->
-      <Layer height="200" flex="1">
+      <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -160,7 +160,7 @@
     <!-- Row 3: 3 equal-width containers (flexible, no width specified) -->
     <Layer flex="1" layout="horizontal" gap="20">
       <!-- Container 8 -->
-      <Layer height="200" flex="1">
+      <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -178,7 +178,7 @@
       </Layer>
 
       <!-- Container 9 -->
-      <Layer height="200" flex="1">
+      <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -187,7 +187,7 @@
           <Group left="20" right="20" top="20" bottom="20">
             <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="10"/>
             <Fill color="#F8FAFC"/>
-            <Group width="90" height="140" left="5" top="10">
+            <Group left="5" top="10" width="90" height="140">
               <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
               <Fill>
                 <LinearGradient startPoint="0,0" endPoint="90,140">
@@ -196,7 +196,7 @@
                 </LinearGradient>
               </Fill>
             </Group>
-            <Group width="90" height="140" right="5" top="10">
+            <Group right="5" top="10" width="90" height="140">
               <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
               <Fill>
                 <LinearGradient startPoint="0,0" endPoint="90,140">
@@ -210,7 +210,7 @@
       </Layer>
 
       <!-- Container 10 -->
-      <Layer height="200" flex="1">
+      <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>

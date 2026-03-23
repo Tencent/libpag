@@ -3,7 +3,7 @@
 <pagx version="1.0" width="400" height="400">
   <!-- Mask shape (invisible but used for masking) -->
   <Layer id="maskShape" visible="false">
-    <Polystar type="star" pointCount="5" outerRadius="150" innerRadius="70" left="50" top="50"/>
+    <Polystar left="50" top="50" type="star" pointCount="5" outerRadius="150" innerRadius="70"/>
     <Fill color="#FFF"/>
   </Layer>
   <Layer mask="@maskShape">

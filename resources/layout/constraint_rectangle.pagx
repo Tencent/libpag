@@ -15,7 +15,7 @@
     <Layer flex="1" layout="horizontal" gap="20">
 
       <!-- Container 1: Single-edge and center positioning -->
-      <Layer height="260" flex="1">
+      <Layer flex="1" height="260">
         <!-- Border -->
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
@@ -49,7 +49,7 @@
       </Layer>
 
       <!-- Container 2: Horizontal stretch (left+right) -->
-      <Layer height="260" flex="1">
+      <Layer flex="1" height="260">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -92,7 +92,7 @@
     <Layer flex="1" layout="horizontal" gap="20">
 
       <!-- Container 3: Vertical stretch (top+bottom) -->
-      <Layer height="260" flex="1">
+      <Layer flex="1" height="260">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -120,7 +120,7 @@
       </Layer>
 
       <!-- Container 4: Four-edge stretch -->
-      <Layer height="260" flex="1">
+      <Layer flex="1" height="260">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -137,7 +137,7 @@
       </Layer>
 
       <!-- Container 5: Asymmetric stretch -->
-      <Layer height="260" flex="1">
+      <Layer flex="1" height="260">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>

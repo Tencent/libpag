@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Test file for C8: Stroke with non-center alignment in Repeater -->
 <pagx version="1.0" width="200" height="100">
-  <Layer left="10" top="10" name="StrokeAlign">
+  <Layer name="StrokeAlign" left="10" top="10">
     <Rectangle left="-10" top="-10" size="20,20"/>
     <Stroke color="#000000" width="2" align="inside"/>
     <Repeater copies="10" position="25,0"/>

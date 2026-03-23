@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates composition (reusable component) -->
 <pagx version="1.0" width="400" height="400">
-  <Layer width="400" height="400" layout="vertical" alignment="center" arrangement="spaceBetween" padding="60">
+  <Layer width="400" height="400" layout="vertical" padding="60" alignment="center" arrangement="spaceBetween">
     <Layer composition="@buttonComp"/>
     <Layer composition="@buttonComp"/>
     <Layer composition="@buttonComp"/>

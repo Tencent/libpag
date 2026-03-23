@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="800" height="600">
   <Layer id="triangleMask" visible="false">
-<Polystar type="polygon" pointCount="3" outerRadius="80" rotation="90" left="-40"/>
+<Polystar left="-40" type="polygon" pointCount="3" outerRadius="80" rotation="90"/>
     <Fill color="#FFF"/>
   </Layer>
   <Layer name="Background">
@@ -50,20 +50,20 @@
       <Repeater copies="60" offset="0.5" rotation="6"/>
     </Layer>
     <Layer rotation="15">
-<Ellipse size="380,380" left="-190" top="-190" />
+<Ellipse left="-190" top="-190" size="380,380"/>
       <Stroke color="#0FF" width="1" alpha="0.4" dashes="60,40"/>
     </Layer>
     <Layer rotation="-20">
-<Ellipse size="360,360" left="-180" top="-180" />
+<Ellipse left="-180" top="-180" size="360,360"/>
       <Stroke color="#0088FF" width="2" alpha="0.5" dashes="10,80"/>
     </Layer>
     <Layer>
-<Ellipse size="300,300" left="-150" top="-150" />
+<Ellipse left="-150" top="-150" size="300,300"/>
       <Stroke color="#00CCFF" width="3"/>
       <DropShadowStyle blurX="8" blurY="8" color="#00CCFF80"/>
     </Layer>
     <Layer>
-<Polystar type="polygon" pointCount="3" outerRadius="80" rotation="90" left="-40"/>
+<Polystar left="-40" type="polygon" pointCount="3" outerRadius="80" rotation="90"/>
       <Stroke color="#FFAA00" width="4"/>
       <Fill>
         <RadialGradient radius="80">
@@ -84,7 +84,7 @@
       </Fill>
     </Layer>
     <Layer>
-<Ellipse size="6,6" left="-3" top="-3" />
+<Ellipse left="-3" top="-3" size="6,6"/>
       <Fill color="#FFF"/>
       <Path data="M -20 0 L 20 0 M 0 -20 L 0 20"/>
       <Stroke color="#FFF" width="1" alpha="0.5"/>
@@ -109,11 +109,11 @@
     </Layer>
     <Layer name="HealthText">
       <Layer>
-        <Text text="100%" left="-240" top="10" fontFamily="Arial" fontStyle="Bold" fontSize="24" textAnchor="end"/>
+        <Text left="-240" top="10" text="100%" fontFamily="Arial" fontStyle="Bold" fontSize="24" textAnchor="end"/>
         <Fill color="#FFF"/>
       </Layer>
       <Layer>
-        <Text text="STRUCTURAL INTEGRITY" left="-240" top="25" fontFamily="Arial" fontSize="10" textAnchor="end"/>
+        <Text left="-240" top="25" text="STRUCTURAL INTEGRITY" fontFamily="Arial" fontSize="10" textAnchor="end"/>
         <Fill color="#0088FF"/>
       </Layer>
     </Layer>
@@ -150,11 +150,11 @@
     </Layer>
     <Layer name="EnergyText">
       <Layer>
-        <Text text="60%" left="240" top="10" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+        <Text left="240" top="10" text="60%" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
         <Fill color="#FFF"/>
       </Layer>
       <Layer>
-        <Text text="PLASMA RESERVES" left="240" top="25" fontFamily="Arial" fontSize="10"/>
+        <Text left="240" top="25" text="PLASMA RESERVES" fontFamily="Arial" fontSize="10"/>
         <Fill color="#0088FF"/>
       </Layer>
     </Layer>
@@ -168,11 +168,11 @@
     </Layer>
     <Layer name="WeaponInfo">
       <Layer>
-        <Text text="MK-IV RAILGUN" top="-15" fontFamily="Arial" fontStyle="Bold" fontSize="20" textAnchor="center"/>
+        <Text top="-15" text="MK-IV RAILGUN" fontFamily="Arial" fontStyle="Bold" fontSize="20" textAnchor="center"/>
         <Fill color="#FFF"/>
       </Layer>
       <Layer>
-        <Text text="[ BURST MODE ]" top="5" fontFamily="Arial" fontSize="12" textAnchor="center"/>
+        <Text top="5" text="[ BURST MODE ]" fontFamily="Arial" fontSize="12" textAnchor="center"/>
         <Fill color="#FFAA00"/>
       </Layer>
     </Layer>
@@ -190,18 +190,18 @@
   </Layer>
   <Layer name="Radar" left="100" top="500">
     <Group>
-<Ellipse size="140,140" left="-70" top="-70" />
+<Ellipse left="-70" top="-70" size="140,140"/>
       <Fill color="#001122" alpha="0.9"/>
       <Stroke color="#0066AA" width="2"/>
     </Group>
     <Group>
-<Ellipse size="100,100" left="-50" top="-50" />
-<Ellipse size="50,50" left="-25" top="-25" />
+<Ellipse left="-50" top="-50" size="100,100"/>
+<Ellipse left="-25" top="-25" size="50,50"/>
       <Path data="M -70 0 L 70 0 M 0 -70 L 0 70"/>
       <Stroke color="#004488" width="1"/>
     </Group>
     <Layer rotation="-45">
-<Ellipse size="130,130" left="-65" top="-65" />
+<Ellipse left="-65" top="-65" size="130,130"/>
       <Fill>
         <ConicGradient endAngle="90">
           <ColorStop offset="0" color="#00FF0000"/>
@@ -216,7 +216,7 @@
       <DropShadowStyle blurX="4" blurY="4" color="#F00"/>
     </Layer>
     <Layer>
-<Ellipse size="4,4" left="-2" top="-2" />
+<Ellipse left="-2" top="-2" size="4,4"/>
       <Fill color="#FFF"/>
     </Layer>
   </Layer>
@@ -226,7 +226,7 @@
     <DropShadowStyle blurX="2" blurY="2" color="#000"/>
   </Layer>
   <Layer name="StatusIcons" left="706" top="70">
-<Rectangle size="8,8" left="-4" top="-4" />
+<Rectangle left="-4" top="-4" size="8,8"/>
     <Stroke color="#FFAA00" width="1"/>
     <Repeater copies="3" position="15,0"/>
     <DropShadowStyle blurX="5" blurY="5" color="#FFAA00"/>

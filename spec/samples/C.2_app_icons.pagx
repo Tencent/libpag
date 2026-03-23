@@ -3,34 +3,34 @@
 
   <!-- Background: Gray 900 -->
   <Layer name="Background" left="320" top="260">
-<Rectangle size="640,520" left="-320" top="-260" />
+    <Rectangle left="-320" top="-260" size="640,520"/>
     <Fill color="#111827"/>
   </Layer>
 
   <!-- Background: soft color fields -->
   <Layer name="BgPattern">
     <Layer left="60" top="60">
-<Ellipse size="320,320" left="-160" top="-160" />
+      <Ellipse left="-160" top="-160" size="320,320"/>
       <Fill color="#8B5CF6" alpha="0.2"/>
       <BlurFilter blurX="50" blurY="50"/>
     </Layer>
     <Layer left="560" top="80">
-<Ellipse size="280,280" left="-140" top="-140" />
+      <Ellipse left="-140" top="-140" size="280,280"/>
       <Fill color="#06B6D4" alpha="0.18"/>
       <BlurFilter blurX="50" blurY="50"/>
     </Layer>
     <Layer left="600" top="380">
-<Ellipse size="260,260" left="-130" top="-130" />
+      <Ellipse left="-130" top="-130" size="260,260"/>
       <Fill color="#3B82F6" alpha="0.16"/>
       <BlurFilter blurX="50" blurY="50"/>
     </Layer>
     <Layer left="80" top="480">
-<Ellipse size="300,300" left="-150" top="-150" />
+      <Ellipse left="-150" top="-150" size="300,300"/>
       <Fill color="#EC4899" alpha="0.18"/>
       <BlurFilter blurX="50" blurY="50"/>
     </Layer>
     <Layer left="320" top="260">
-<Ellipse size="200,200" left="-100" top="-100" />
+      <Ellipse left="-100" top="-100" size="200,200"/>
       <Fill color="#10B981" alpha="0.1"/>
       <BlurFilter blurX="40" blurY="40"/>
     </Layer>
@@ -39,250 +39,300 @@
   <!-- ==================== App Icons ==================== -->
 
   <!-- 3-row grid: vertical container with 3 horizontal rows -->
-  <Layer name="IconGrid" width="640" height="520" layout="vertical" gap="60" padding="38,44,0,44">
+  <Layer name="IconGrid" width="640" height="520" layout="vertical" padding="44" arrangement="spaceBetween">
     <!-- Row 1 -->
-    <Layer layout="horizontal" gap="88" height="110">
-      <Layer name="Home" width="72">
-        <Layer composition="@card"/>
-        <Layer left="36" top="36">
-          <Path data="M0 -18L-19 1L-14 1L-14 18L-5 18L-5 7L5 7L5 18L14 18L14 1L19 1Z"/>
-          <Fill color="#F97316"/>
+    <Layer height="110" layout="horizontal" arrangement="spaceBetween">
+      <Layer name="Home" layout="vertical" gap="10" alignment="center">
+        <Layer width="72" height="72">
+          <Layer composition="@card"/>
+          <Layer centerX="0" centerY="0">
+            <Path data="M19 0L0 19L5 19L5 36L14 36L14 25L24 25L24 36L33 36L33 19L38 19Z"/>
+            <Fill color="#F97316"/>
+          </Layer>
         </Layer>
-        <Layer left="36" top="94">
-          <Text text="Home" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-          <Fill color="#6B7280"/>
-        </Layer>
-      </Layer>
-
-      <Layer name="Search" width="72">
-        <Layer composition="@card"/>
-        <Layer left="36" top="36">
-          <Group>
-            <Ellipse left="-17" top="-17" size="26,26"/>
-            <Stroke color="#3B82F6" width="3.5"/>
-          </Group>
-          <Group>
-            <Path data="M6 6L16 16"/>
-            <Stroke color="#3B82F6" width="4" cap="round"/>
-          </Group>
-        </Layer>
-        <Layer left="36" top="94">
-          <Text text="Search" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-          <Fill color="#6B7280"/>
+        <Layer>
+          <TextBox>
+            <Text text="Home" fontFamily="Arial" fontSize="11"/>
+            <Fill color="#6B7280"/>
+          </TextBox>
         </Layer>
       </Layer>
 
-      <Layer name="Bell" width="72">
-        <Layer composition="@card"/>
-        <Layer left="36" top="36">
-          <Group>
-            <Path data="M-14 10C-14 0 -10 -12 0 -14C10 -12 14 0 14 10L17 14L-17 14Z"/>
-            <Fill color="#FBBF24"/>
-          </Group>
-          <Group>
-            <Path data="M0 -18L0 -12"/>
-            <Stroke color="#FBBF24" width="2.5" cap="round"/>
-          </Group>
-          <Group>
-            <Ellipse left="-4" top="13.5" size="8,5"/>
-            <Fill color="#FBBF24"/>
-          </Group>
+      <Layer name="Search" layout="vertical" gap="10" alignment="center">
+        <Layer width="72" height="72">
+          <Layer composition="@card"/>
+          <Layer centerX="0" centerY="0">
+            <Group>
+              <Ellipse top="0" size="26,26"/>
+              <Stroke color="#3B82F6" width="3.5"/>
+            </Group>
+            <Group>
+              <Path data="M23 23L33 33"/>
+              <Stroke color="#3B82F6" width="4" cap="round"/>
+            </Group>
+          </Layer>
         </Layer>
-        <Layer left="36" top="94">
-          <Text text="Bell" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-          <Fill color="#6B7280"/>
+        <Layer>
+          <TextBox>
+            <Text text="Search" fontFamily="Arial" fontSize="11"/>
+            <Fill color="#6B7280"/>
+          </TextBox>
         </Layer>
       </Layer>
 
-      <Layer name="Heart" width="72">
-        <Layer composition="@card"/>
-        <Layer left="36" top="36">
-          <Path data="M0 -7C-3 -17 -19 -20 -19 -7C-19 4 -7 12 0 19C7 12 19 4 19 -7C19 -20 3 -17 0 -7Z"/>
-          <Fill color="#EF4444"/>
+      <Layer name="Bell" layout="vertical" gap="10" alignment="center">
+        <Layer width="72" height="72">
+          <Layer composition="@card"/>
+          <Layer centerX="0" centerY="0">
+            <Group>
+              <Path data="M3 29C3 19 7 7 17 5C27 7 31 19 31 29L34 33L0 33Z"/>
+              <Fill color="#FBBF24"/>
+            </Group>
+            <Group>
+              <Path data="M17 0L17 6"/>
+              <Stroke color="#FBBF24" width="2.5" cap="round"/>
+            </Group>
+            <Group>
+              <Ellipse left="13" top="32.5" size="8,5"/>
+              <Fill color="#FBBF24"/>
+            </Group>
+          </Layer>
         </Layer>
-        <Layer left="36" top="94">
-          <Text text="Heart" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-          <Fill color="#6B7280"/>
+        <Layer>
+          <TextBox>
+            <Text text="Bell" fontFamily="Arial" fontSize="11"/>
+            <Fill color="#6B7280"/>
+          </TextBox>
+        </Layer>
+      </Layer>
+
+      <Layer name="Heart" layout="vertical" gap="10" alignment="center">
+        <Layer width="72" height="72">
+          <Layer composition="@card"/>
+          <Layer centerX="0" centerY="0">
+            <Path data="M19 13C16 3 0 0 0 13C0 24 12 32 19 39C26 32 38 24 38 13C38 0 22 3 19 13Z"/>
+            <Fill color="#EF4444"/>
+          </Layer>
+        </Layer>
+        <Layer>
+          <TextBox>
+            <Text text="Heart" fontFamily="Arial" fontSize="11"/>
+            <Fill color="#6B7280"/>
+          </TextBox>
         </Layer>
       </Layer>
     </Layer>
 
     <!-- Row 2 -->
-    <Layer layout="horizontal" gap="88" height="110">
-      <Layer name="Chat" width="72">
-        <Layer composition="@card"/>
-        <Layer left="36" top="36">
-          <Group>
-            <Path data="M-18 -10C-18 -15 -15 -17 -10 -17L10 -17C15 -17 18 -15 18 -10L18 5C18 10 15 12 10 12L2 12L-10 17L-4 12L-10 12C-15 12 -18 10 -18 5Z"/>
-            <Fill color="#10B981"/>
-          </Group>
-          <Group>
-            <Ellipse left="-9" top="-5" size="4,4"/>
-            <Ellipse left="-2" top="-5" size="4,4"/>
-            <Ellipse left="5" top="-5" size="4,4"/>
-            <Fill color="#1E2433"/>
-          </Group>
+    <Layer height="110" layout="horizontal" arrangement="spaceBetween">
+      <Layer name="Chat" layout="vertical" gap="10" alignment="center">
+        <Layer width="72" height="72">
+          <Layer composition="@card"/>
+          <Layer centerX="0" centerY="0">
+            <Group>
+              <Path
+                  data="M0 7C0 2 3 0 8 0L28 0C33 0 36 2 36 7L36 22C36 27 33 29 28 29L20 29L8 34L14 29L8 29C3 29 0 27 0 22Z"/>
+              <Fill color="#10B981"/>
+            </Group>
+            <Group>
+              <Ellipse left="9" top="12" size="4,4"/>
+              <Ellipse left="16" top="12" size="4,4"/>
+              <Ellipse left="23" top="12" size="4,4"/>
+              <Fill color="#1E2433"/>
+            </Group>
+          </Layer>
         </Layer>
-        <Layer left="36" top="94">
-          <Text text="Chat" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-          <Fill color="#6B7280"/>
-        </Layer>
-      </Layer>
-
-      <Layer name="Camera" width="72">
-        <Layer composition="@card"/>
-        <Layer left="36" top="36">
-          <Group>
-            <Rectangle left="-19" top="-11" size="38,26" roundness="5"/>
-            <Path data="M-7 -9L-4 -16L4 -16L7 -9"/>
-            <Fill color="#6366F1"/>
-          </Group>
-          <Group>
-            <Ellipse left="-8.5" top="-6.5" size="17,17"/>
-            <Fill color="#1E2433"/>
-          </Group>
-          <Group>
-            <Ellipse left="-5" top="-3" size="10,10"/>
-            <Stroke color="#6366F1" width="2.5"/>
-          </Group>
-        </Layer>
-        <Layer left="36" top="94">
-          <Text text="Camera" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-          <Fill color="#6B7280"/>
+        <Layer>
+          <TextBox>
+            <Text text="Chat" fontFamily="Arial" fontSize="11"/>
+            <Fill color="#6B7280"/>
+          </TextBox>
         </Layer>
       </Layer>
 
-      <Layer name="Settings" width="72">
-        <Layer composition="@card"/>
-        <Layer left="36" top="36">
-          <Group>
-            <Path data="M-2.8 -19.8L2.8 -19.8L3.5 -13.6L7.1 -12.1L12 -16L16 -12L12.1 -7.1L13.6 -3.5L19.8 -2.8L19.8 2.8L13.6 3.5L12.1 7.1L16 12L12 16L7.1 12.1L3.5 13.6L2.8 19.8L-2.8 19.8L-3.5 13.6L-7.1 12.1L-12 16L-16 12L-12.1 7.1L-13.6 3.5L-19.8 2.8L-19.8 -2.8L-13.6 -3.5L-12.1 -7.1L-16 -12L-12 -16L-7.1 -12.1L-3.5 -13.6Z"/>
-            <Fill color="#8B5CF6"/>
-          </Group>
-          <Group>
-<Ellipse size="14,14" left="-7" top="-7" />
-            <Fill color="#1E2433"/>
-          </Group>
-          <Group>
-<Ellipse size="5,5" left="-2.5" top="-2.5" />
-            <Fill color="#8B5CF6"/>
-          </Group>
+      <Layer name="Camera" layout="vertical" gap="10" alignment="center">
+        <Layer width="72" height="72">
+          <Layer composition="@card"/>
+          <Layer centerX="0" centerY="0">
+            <Group>
+              <Rectangle top="5" size="38,26" roundness="5"/>
+              <Path data="M12 7L15 0L23 0L26 7"/>
+              <Fill color="#6366F1"/>
+            </Group>
+            <Group>
+              <Ellipse left="10.5" top="9.5" size="17,17"/>
+              <Fill color="#1E2433"/>
+            </Group>
+            <Group>
+              <Ellipse left="14" top="13" size="10,10"/>
+              <Stroke color="#6366F1" width="2.5"/>
+            </Group>
+          </Layer>
         </Layer>
-        <Layer left="36" top="94">
-          <Text text="Settings" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-          <Fill color="#6B7280"/>
+        <Layer>
+          <TextBox>
+            <Text text="Camera" fontFamily="Arial" fontSize="11"/>
+            <Fill color="#6B7280"/>
+          </TextBox>
         </Layer>
       </Layer>
 
-      <Layer name="User" width="72">
-        <Layer composition="@card"/>
-        <Layer left="36" top="36">
-          <Group>
-<Ellipse size="46,46" left="-23" top="-23" />
-            <Fill color="#06B6D4"/>
-          </Group>
-          <Group>
-            <Ellipse left="-6" top="-17" size="12,12"/>
-            <Fill color="#1E2433"/>
-          </Group>
-          <Group>
-            <Path data="M-11 16C-11 4 -7 -2 0 -2C7 -2 11 4 11 16"/>
-            <Fill color="#1E2433"/>
-          </Group>
+      <Layer name="Settings" layout="vertical" gap="10" alignment="center">
+        <Layer width="72" height="72">
+          <Layer composition="@card"/>
+          <Layer centerX="0" centerY="0">
+            <Group>
+              <Path
+                  data="M17 0L22.6 0L23.3 6.2L26.9 7.7L31.8 3.8L35.8 7.8L31.9 12.7L33.4 16.3L39.6 17L39.6 22.6L33.4 23.3L31.9 26.9L35.8 31.8L31.8 35.8L26.9 31.9L23.3 33.4L22.6 39.6L17 39.6L16.3 33.4L12.7 31.9L7.8 35.8L3.8 31.8L7.7 26.9L6.2 23.3L0 22.6L0 17L6.2 16.3L7.7 12.7L3.8 7.8L7.8 3.8L12.7 7.7L16.3 6.2Z"/>
+              <Fill color="#8B5CF6"/>
+            </Group>
+            <Group>
+              <Ellipse left="12.8" top="12.8" size="14,14"/>
+              <Fill color="#1E2433"/>
+            </Group>
+            <Group>
+              <Ellipse left="17.3" top="17.3" size="5,5"/>
+              <Fill color="#8B5CF6"/>
+            </Group>
+          </Layer>
         </Layer>
-        <Layer left="36" top="94">
-          <Text text="User" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-          <Fill color="#6B7280"/>
+        <Layer>
+          <TextBox>
+            <Text text="Settings" fontFamily="Arial" fontSize="11"/>
+            <Fill color="#6B7280"/>
+          </TextBox>
+        </Layer>
+      </Layer>
+
+      <Layer name="User" layout="vertical" gap="10" alignment="center">
+        <Layer width="72" height="72">
+          <Layer composition="@card"/>
+          <Layer centerX="0" centerY="0">
+            <Group>
+              <Ellipse top="0" size="46,46"/>
+              <Fill color="#06B6D4"/>
+            </Group>
+            <Group>
+              <Ellipse left="17" top="6" size="12,12"/>
+              <Fill color="#1E2433"/>
+            </Group>
+            <Group>
+              <Path data="M12 39C12 27 16 21 23 21C30 21 34 27 34 39"/>
+              <Fill color="#1E2433"/>
+            </Group>
+          </Layer>
+        </Layer>
+        <Layer>
+          <TextBox>
+            <Text text="User" fontFamily="Arial" fontSize="11"/>
+            <Fill color="#6B7280"/>
+          </TextBox>
         </Layer>
       </Layer>
     </Layer>
 
     <!-- Row 3 -->
-    <Layer layout="horizontal" gap="88" height="110">
-      <Layer name="Calendar" width="72">
-        <Layer composition="@card"/>
-        <Layer left="36" top="36">
-          <Group>
-            <Rectangle left="-19" top="-17" size="38,38" roundness="6"/>
-            <Rectangle left="-10.5" top="-20.5" size="3,9" roundness="2"/>
-            <Rectangle left="7.5" top="-20.5" size="3,9" roundness="2"/>
-            <Fill color="#EF4444"/>
-          </Group>
-          <Group>
-            <Rectangle left="-15" top="-5" size="30,22" roundness="3"/>
-            <Fill color="#1E2433"/>
-          </Group>
-          <Group>
-            <Text text="17" top="12" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
-            <Fill color="#EF4444"/>
-          </Group>
+    <Layer height="110" layout="horizontal" arrangement="spaceBetween">
+      <Layer name="Calendar" layout="vertical" gap="10" alignment="center">
+        <Layer width="72" height="72">
+          <Layer composition="@card"/>
+          <Layer centerX="0" centerY="0">
+            <Group>
+              <Rectangle top="4" size="38,38" roundness="6"/>
+              <Rectangle left="8.5" size="3,9" roundness="2"/>
+              <Rectangle left="26.5" size="3,9" roundness="2"/>
+              <Fill color="#EF4444"/>
+            </Group>
+            <Group>
+              <Rectangle left="4" top="16" size="30,22" roundness="3"/>
+              <Fill color="#1E2433"/>
+            </Group>
+            <TextBox centerX="0" top="15">
+              <Text text="17" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
+              <Fill color="#EF4444"/>
+            </TextBox>
+          </Layer>
         </Layer>
-        <Layer left="36" top="94">
-          <Text text="Calendar" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-          <Fill color="#6B7280"/>
-        </Layer>
-      </Layer>
-
-      <Layer name="Lock" width="72">
-        <Layer composition="@card"/>
-        <Layer left="36" top="36">
-          <Group>
-            <Path data="M-10 -4L-10 -11C-10 -20 10 -20 10 -11L10 -4"/>
-            <Stroke color="#F97316" width="4" cap="round"/>
-          </Group>
-          <Group>
-            <Rectangle left="-15" top="-3" size="30,22" roundness="6"/>
-            <Fill color="#F97316"/>
-          </Group>
-          <Group>
-            <Ellipse left="-3.5" top="2.5" size="7,7"/>
-            <Rectangle left="-1.5" top="9" size="3,6" roundness="1"/>
-            <Fill color="#1E2433"/>
-          </Group>
-        </Layer>
-        <Layer left="36" top="94">
-          <Text text="Lock" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-          <Fill color="#6B7280"/>
+        <Layer>
+          <TextBox>
+            <Text text="Calendar" fontFamily="Arial" fontSize="11"/>
+            <Fill color="#6B7280"/>
+          </TextBox>
         </Layer>
       </Layer>
 
-      <Layer name="Music" width="72">
-        <Layer composition="@card"/>
-        <Layer left="36" top="36">
-          <Group>
-            <Path data="M-11 10L-11 -13L9 -18L9 5M-11 -8L9 -13"/>
-            <Stroke color="#EC4899" width="3.5" cap="round" join="round"/>
-          </Group>
-          <Group>
-            <Ellipse left="-17.5" top="8.5" size="15,11"/>
-            <Ellipse left="2.5" top="3.5" size="15,11"/>
-            <Fill color="#EC4899"/>
-          </Group>
+      <Layer name="Lock" layout="vertical" gap="10" alignment="center">
+        <Layer width="72" height="72">
+          <Layer composition="@card"/>
+          <Layer centerX="0" centerY="0">
+            <Group>
+              <Path data="M5 16L5 9C5 0 25 0 25 9L25 16"/>
+              <Stroke color="#F97316" width="4" cap="round"/>
+            </Group>
+            <Group>
+              <Rectangle top="17" size="30,22" roundness="6"/>
+              <Fill color="#F97316"/>
+            </Group>
+            <Group>
+              <Ellipse left="11.5" top="22.5" size="7,7"/>
+              <Rectangle left="13.5" top="29" size="3,6" roundness="1"/>
+              <Fill color="#1E2433"/>
+            </Group>
+          </Layer>
         </Layer>
-        <Layer left="36" top="94">
-          <Text text="Music" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-          <Fill color="#6B7280"/>
+        <Layer>
+          <TextBox>
+            <Text text="Lock" fontFamily="Arial" fontSize="11"/>
+            <Fill color="#6B7280"/>
+          </TextBox>
         </Layer>
       </Layer>
 
-      <Layer name="Download" width="72">
-        <Layer composition="@card"/>
-        <Layer left="36" top="36">
-          <Group>
-            <Ellipse left="-13" top="-18" size="24,22"/>
-            <Ellipse left="-20" top="-9" size="16,16"/>
-            <Ellipse left="1" top="-9" size="18,16"/>
-            <Ellipse left="-18" top="-4" size="34,10"/>
-            <Fill color="#3B82F6"/>
-          </Group>
-          <Group>
-            <Path data="M-1 7L-1 14M-4 12L-1 16L2 12"/>
-            <Stroke color="#3B82F6" width="3" cap="round" join="round"/>
-          </Group>
+      <Layer name="Music" layout="vertical" gap="10" alignment="center">
+        <Layer width="72" height="72">
+          <Layer composition="@card"/>
+          <Layer centerX="0" centerY="0">
+            <Group>
+              <Path data="M6.5 30L6.5 7L27.5 2L27.5 25M6.5 12L27.5 7"/>
+              <Stroke color="#EC4899" width="3.5" cap="round" join="round"/>
+            </Group>
+            <Group>
+              <Ellipse top="28.5" size="15,11"/>
+              <Ellipse left="20" top="23.5" size="15,11"/>
+              <Fill color="#EC4899"/>
+            </Group>
+          </Layer>
         </Layer>
-        <Layer left="36" top="94">
-          <Text text="Download" fontFamily="Arial" fontSize="11" textAnchor="center"/>
-          <Fill color="#6B7280"/>
+        <Layer>
+          <TextBox>
+            <Text text="Music" fontFamily="Arial" fontSize="11"/>
+            <Fill color="#6B7280"/>
+          </TextBox>
+        </Layer>
+      </Layer>
+
+      <Layer name="Download" layout="vertical" gap="10" alignment="center">
+        <Layer width="72" height="72">
+          <Layer composition="@card"/>
+          <Layer centerX="0" centerY="0">
+            <Group>
+              <Ellipse left="7" top="0" size="24,22"/>
+              <Ellipse top="9" size="16,16"/>
+              <Ellipse left="21" top="9" size="18,16"/>
+              <Ellipse left="2" top="14" size="34,10"/>
+              <Fill color="#3B82F6"/>
+            </Group>
+            <Group>
+              <Path data="M19 25L19 32M16 30L19 34L22 30"/>
+              <Stroke color="#3B82F6" width="3" cap="round" join="round"/>
+            </Group>
+          </Layer>
+        </Layer>
+        <Layer>
+          <TextBox>
+            <Text text="Download" fontFamily="Arial" fontSize="11"/>
+            <Fill color="#6B7280"/>
+          </TextBox>
         </Layer>
       </Layer>
     </Layer>

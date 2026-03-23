@@ -14,7 +14,7 @@
     <Layer flex="1" layout="horizontal" gap="20">
 
       <!-- 1. Vertical layout + spaceBetween: items pushed to top and bottom -->
-      <Layer width="180" height="220" layout="vertical" arrangement="spaceBetween" gap="10">
+      <Layer width="180" height="220" layout="vertical" gap="10" arrangement="spaceBetween">
         <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -29,7 +29,7 @@
       </Layer>
 
       <!-- 2. Vertical layout + end arrangement -->
-      <Layer width="180" height="220" layout="vertical" arrangement="end" gap="10">
+      <Layer width="180" height="220" layout="vertical" gap="10" arrangement="end">
         <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -94,7 +94,7 @@
       </Layer>
 
       <!-- 6. Horizontal layout + arrangement=end + gap -->
-      <Layer width="180" height="220" layout="horizontal" arrangement="end" gap="15">
+      <Layer width="180" height="220" layout="horizontal" gap="15" arrangement="end">
         <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -109,7 +109,7 @@
       </Layer>
 
       <!-- 7. Single child with spaceBetween (should revert to start behavior) -->
-      <Layer width="180" height="220" layout="vertical" arrangement="spaceBetween" gap="10">
+      <Layer width="180" height="220" layout="vertical" gap="10" arrangement="spaceBetween">
         <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>

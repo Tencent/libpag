@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="400" height="300">
   <Layer name="text_constrained" width="400" height="300">
-    <Text text="Hello" fontFamily="Arial" fontSize="20" centerX="0" centerY="0"/>
+    <Text centerX="0" centerY="0" text="Hello" fontFamily="Arial" fontSize="20"/>
     <Fill color="#000000"/>
   </Layer>
 </pagx>

@@ -14,8 +14,8 @@
     <Fill color="#10B981"/>
     <BlurFilter blurX="180" blurY="130"/>
   </Layer>
-  <Layer name="OrbitRing" alpha="0.18" left="800" top="530">
-<Ellipse size="760,760" left="-380" top="-380" />
+  <Layer name="OrbitRing" left="800" top="530" alpha="0.18">
+<Ellipse left="-380" top="-380" size="760,760"/>
     <Stroke color="#334155" width="1"/>
   </Layer>
   <Layer name="Grid" alpha="0.05">
@@ -28,16 +28,16 @@
   </Layer>
   <Layer name="Core" left="800" top="530">
     <Layer alpha="0.2">
-<Ellipse size="320,320" left="-160" top="-160" />
+<Ellipse left="-160" top="-160" size="320,320"/>
       <Fill color="#3B82F6"/>
       <BlurFilter blurX="80" blurY="80"/>
     </Layer>
     <Layer>
-<Ellipse size="260,260" left="-130" top="-130" />
+<Ellipse left="-130" top="-130" size="260,260"/>
       <Stroke color="#475569" width="2"/>
     </Layer>
     <Layer alpha="0.7">
-<Ellipse size="310,310" left="-155" top="-155" />
+<Ellipse left="-155" top="-155" size="310,310"/>
       <TrimPath end="0.77"/>
       <Stroke width="2.5" cap="round">
         <ConicGradient>
@@ -52,7 +52,7 @@
       <Stroke color="#94A3B8" width="1.5" cap="round"/>
     </Layer>
     <Layer top="-10">
-      <Text text="PAGX" top="10" fontFamily="Arial" fontStyle="Bold" fontSize="52" textAnchor="center"/>
+      <Text top="10" text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="52" textAnchor="center"/>
       <Fill color="#FFF"/>
       <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#06B6D440"/>
     </Layer>

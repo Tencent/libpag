@@ -19,16 +19,18 @@
     <Fill color="@glowCyan"/>
     <BlurFilter blurX="40" blurY="40"/>
   </Layer>
-  <Layer name="Title">
-    <Text text="PAGX" left="400" top="55" fontFamily="Arial" fontStyle="Bold" fontSize="56" textAnchor="center"/>
-    <Fill color="@titleGradient"/>
+  <Layer name="Title" width="800">
+    <TextBox centerX="0">
+      <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="56"/>
+      <Fill color="@titleGradient"/>
+    </TextBox>
   </Layer>
   <Layer name="Subtitle">
     <Text text="Portable Animated Graphics XML" fontFamily="Arial" fontSize="14"/>
     <TextPath path="M 220,135 Q 400,65 580,135" forceAlignment="true"/>
     <Fill color="#64748B"/>
   </Layer>
-  <Layer name="Cards" width="580" height="80" layout="horizontal" gap="20" left="110" top="155">
+  <Layer name="Cards" left="110" top="155" width="580" height="80" layout="horizontal" gap="20">
     <Layer name="Card1" width="100">
       <Layer composition="@cardBg"/>
       <Layer left="50" top="40">
@@ -48,7 +50,7 @@
     <Layer name="Card3" width="100">
       <Layer composition="@cardBg"/>
       <Layer left="50" top="40">
-        <Polystar type="star" pointCount="5" outerRadius="24" innerRadius="11" left="-24" top="-24"/>
+        <Polystar left="-24" top="-24" type="star" pointCount="5" outerRadius="24" innerRadius="11"/>
         <Fill color="@amber"/>
         <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#F59E0B80"/>
       </Layer>
@@ -56,7 +58,7 @@
     <Layer name="Card4" width="100">
       <Layer composition="@cardBg"/>
       <Layer left="50" top="40">
-        <Polystar type="polygon" pointCount="6" outerRadius="26" left="-26" top="-26"/>
+        <Polystar left="-26" top="-26" type="polygon" pointCount="6" outerRadius="26"/>
         <Fill color="@diamond"/>
         <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#14B8A680"/>
       </Layer>
@@ -70,16 +72,14 @@
       </Layer>
     </Layer>
   </Layer>
-  <Layer name="GetStartedButton" left="148" top="325">
-    <Layer>
-      <Rectangle left="-60" top="-18" size="120,36" roundness="18"/>
-      <Fill color="@buttonGradient"/>
-      <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#6366F180"/>
-    </Layer>
-    <Layer>
-      <Text text="Get Started" top="4" fontFamily="Arial" fontStyle="Bold" fontSize="13" textAnchor="center"/>
+  <Layer name="GetStartedButton" left="88" top="307">
+    <Rectangle size="120,36" roundness="18"/>
+    <Fill color="@buttonGradient"/>
+    <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#6366F180"/>
+    <TextBox centerX="0" centerY="0">
+      <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
       <Fill color="#FFF"/>
-    </Layer>
+    </TextBox>
   </Layer>
   <Layer name="Modifiers" top="325">
     <Group left="258">

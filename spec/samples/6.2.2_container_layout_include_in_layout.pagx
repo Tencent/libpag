@@ -2,7 +2,7 @@
 <!-- Demonstrates includeInLayout: badge overlay leaves the layout flow -->
 <pagx version="1.0" width="400" height="400">
   <!-- Vertical card list with a notification badge that leaves the layout flow -->
-  <Layer width="360" height="360" layout="vertical" gap="16" padding="20" left="20" top="20">
+  <Layer left="20" top="20" width="360" height="360" layout="vertical" gap="16" padding="20">
     <!-- Card 1 -->
     <Layer flex="1">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
@@ -11,6 +11,7 @@
         <Text text="Design Review" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#FFF"/>
       </TextBox>
+      <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F150"/>
     </Layer>
 
     <!-- Card 2 -->
@@ -21,6 +22,7 @@
         <Text text="Sprint Planning" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#FFF"/>
       </TextBox>
+      <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#10B98150"/>
     </Layer>
 
     <!-- Card 3 -->
@@ -31,17 +33,18 @@
         <Text text="Bug Report #42" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#FFF"/>
       </TextBox>
+      <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F59E0B50"/>
     </Layer>
 
     <!-- Notification badge: a Layer leaves the layout flow -->
-    <Layer width="32" height="32" right="4" top="4" includeInLayout="false">
+    <Layer right="4" top="4" width="32" height="32" includeInLayout="false">
       <Ellipse left="0" right="0" top="0" bottom="0"/>
       <Fill color="#EF4444"/>
       <TextBox centerX="0" centerY="0">
         <Text text="3" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#FFF"/>
       </TextBox>
+      <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#EF444460"/>
     </Layer>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#00000050"/>
   </Layer>
 </pagx>

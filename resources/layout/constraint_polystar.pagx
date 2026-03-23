@@ -15,7 +15,7 @@
     <Layer flex="1" layout="horizontal" gap="30">
 
       <!-- Container 1: Single-edge positioning -->
-      <Layer height="220" flex="1">
+      <Layer flex="1" height="220">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -43,7 +43,7 @@
       </Layer>
 
       <!-- Container 2: Dual-axis fit scaling (single 5-point star) -->
-      <Layer height="220" flex="1">
+      <Layer flex="1" height="220">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -65,7 +65,7 @@
     <Layer flex="1" layout="horizontal" gap="30">
 
       <!-- Container 3: Horizontal-only constraint (left+right), vertically centered -->
-      <Layer height="220" flex="1">
+      <Layer flex="1" height="220">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -82,13 +82,13 @@
       </Layer>
 
       <!-- Container 4: Vertical-only constraint (top+bottom), horizontally centered -->
-      <Layer height="220" flex="1">
+      <Layer flex="1" height="220">
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
-          <Polystar centerX="0" top="0" bottom="0" type="star" pointCount="5" outerRadius="100" innerRadius="38"/>
+          <Polystar top="0" bottom="0" centerX="0" type="star" pointCount="5" outerRadius="100" innerRadius="38"/>
           <Fill>
             <LinearGradient startPoint="0,0" endPoint="200,240">
               <ColorStop offset="0" color="#06B6D4"/>
