@@ -26,15 +26,16 @@ This specification is organized in the following order:
 
 1. **Basic Data Types**: Defines the fundamental data formats used throughout the document
 2. **Document Structure**: Describes the overall organization of a PAGX document
-3. **Layer System**: Defines layers and their related features (styles, filters, masks)
-4. **VectorElement System**: Defines vector elements within layers and their processing model
-5. **Auto Layout**: Defines layout size, container layout, and constraint positioning mechanisms
+3. **Auto Layout**: Defines layout size, container layout, and constraint positioning mechanisms
+4. **Layer System**: Defines layers and their related features (styles, filters, masks)
+5. **VectorElement System**: Defines vector elements within layers and their processing model
 
 **Appendices** (for quick reference):
 
 - **Appendix A**: Node hierarchy and containment relationships
 - **Appendix B**: Enumeration type reference
 - **Appendix C**: Common usage examples
+- **Appendix D**: Implementation architecture
 
 ---
 
@@ -541,1257 +542,11 @@ PAGX documents organize content in a hierarchical structure:
 
 ---
 
-## 4. Layer System
-
-Layers are the fundamental organizational units for PAGX content, offering comprehensive control over visual effects.
-
-### 4.1 Core Concepts
-
-This section introduces the core concepts of the layer system. These concepts form the foundation for understanding layer styles, filters, and masks.
-
-#### Layer Rendering Pipeline
-
-Painters (Fill, Stroke, etc.) bound to a layer are divided into background content and foreground content via the `placement` attribute, defaulting to background content. A single layer renders in the following order:
-
-1. **Layer Styles (below)**: Render layer styles positioned below content (e.g., drop shadows)
-2. **Background Content**: Render Fill and Stroke with `placement="background"`
-3. **Child Layers**: Recursively render all child layers in document order
-4. **Layer Styles (above)**: Render layer styles positioned above content (e.g., inner shadows)
-5. **Foreground Content**: Render Fill and Stroke with `placement="foreground"` (drawn above child layers)
-6. **Layer Filters**: Use the combined output of previous steps as input to the filter chain, applying all filters sequentially
-
-#### Layer Content
-
-**Layer content** refers to the complete rendering result of the layer's background content, child layers, and foreground content (steps 2, 3, and 5 in the rendering pipeline). It does not include layer styles or layer filters.
-
-Layer styles compute their effects based on layer content. For example, when fill is placed in background content and stroke is placed in foreground content, the stroke renders above child layers, but drop shadows are still calculated based on the complete layer content including fill, child layers, and stroke.
-
-#### Layer Contour
-
-**Layer contour** is a binary (opaque or fully transparent) mask derived from the layer content. Compared to normal layer content, layer contour has these differences:
-
-1. **Alpha=0 fills are included**: Geometry painted with completely transparent color is still included in the contour
-2. **Solid color / gradient fills**: Original colors are replaced with opaque white
-3. **Image fills**: Fully transparent pixels remain transparent; all other pixels become fully opaque
-
-Note: Geometry elements without painters (standalone Rectangle, Ellipse, etc.) do not participate in contour.
-
-#### Layer Background
-
-**Layer background** refers to the composited result of all rendered content below the current layer, including:
-- Rendering results of all sibling layers below the current layer and their subtrees
-- Layer styles already drawn below the current layer (excluding BackgroundBlurStyle itself)
-
-Layer background is primarily used for:
-
-- **Layer Styles**: Some layer styles require background as one of their input sources
-- **Blend Modes**: Some blend modes require background information for correct rendering
-
-**Background Pass-through**: The `passThroughBackground` attribute controls whether layer background passes through to child layers. When set to `false`, child layers' background-dependent styles cannot access the correct layer background. The following conditions automatically disable background pass-through:
-- Layer uses a non-`normal` blend mode
-- Layer has filters applied
-- Layer uses 3D transforms or projection transforms
-
-### 4.2 Layer
-
-`<Layer>` is the basic container for content and child layers.
-
-> [Sample](samples/4.2_layer.pagx)
-
-#### Child Elements
-
-Layer child elements are automatically categorized into four collections by type:
-
-| Child Element Type | Category | Description |
-|-------------------|----------|-------------|
-| VectorElement | contents | Geometry elements, modifiers, painters (participate in accumulation processing) |
-| LayerStyle | styles | DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle |
-| LayerFilter | filters | BlurFilter, DropShadowFilter, and other filters |
-| Layer | children | Nested child layers |
-
-**Recommended Order**: Although child element order does not affect parsing results, it is recommended to write them in the order: VectorElement → LayerStyle → LayerFilter → child Layer, for improved readability.
-
-#### Layer Attributes
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `name` | string | "" | Display name |
-| `visible` | bool | true | Whether visible |
-| `alpha` | float | 1 | Opacity 0~1 |
-| `blendMode` | BlendMode | normal | Blend mode |
-| `x` | float | 0 | X position (prefer constraint attribute `left`) |
-| `y` | float | 0 | Y position (prefer constraint attribute `top`) |
-| `matrix` | Matrix | identity matrix | 2D transform "a,b,c,d,tx,ty" |
-| `matrix3D` | Matrix | - | 3D transform (16 values, column-major) |
-| `preserve3D` | bool | false | Preserve 3D transform |
-| `antiAlias` | bool | true | Edge anti-aliasing |
-| `groupOpacity` | bool | false | Group opacity |
-| `passThroughBackground` | bool | true | Whether to pass background through to child layers |
-| `scrollRect` | Rect | - | Scroll clipping region "x,y,w,h" |
-| `mask` | idref | - | Mask layer reference "@id" |
-| `maskType` | MaskType | alpha | Mask type |
-| `composition` | idref | - | Composition reference "@id" |
-| `width` | float | - | Layout width (see §6) |
-| `height` | float | - | Layout height (see §6) |
-| `layout` | LayoutMode | none | Container layout mode for child layers (see §6) |
-| `gap` | float | 0 | Child Layer spacing (see §6) |
-| `padding` | float or "t,r,b,l" | 0 | Inner padding (see §6) |
-| `alignment` | Alignment | stretch | Cross-axis alignment (see §6) |
-| `arrangement` | Arrangement | start | Main-axis arrangement (see §6) |
-| `includeInLayout` | bool | true | Whether to participate in parent container layout (see §6) |
-| `left` | float | - | As a child Layer, distance from parent container's left edge (see §6.3) |
-| `right` | float | - | As a child Layer, distance from parent container's right edge (see §6.3) |
-| `top` | float | - | As a child Layer, distance from parent container's top edge (see §6.3) |
-| `bottom` | float | - | As a child Layer, distance from parent container's bottom edge (see §6.3) |
-| `centerX` | float | - | As a child Layer, horizontal offset of center from parent container center (see §6.3) |
-| `centerY` | float | - | As a child Layer, vertical offset of center from parent container center (see §6.3) |
-
-**groupOpacity**: When `false` (default), the layer's `alpha` is applied independently to each child element, which may cause overlapping semi-transparent children to appear darker at intersections. When `true`, all layer content is first composited into an offscreen buffer, then `alpha` is applied to the buffer as a whole, producing uniform transparency across the entire layer.
-
-**preserve3D**: When `false` (default), child layers with 3D transforms are flattened into the parent's 2D plane before compositing. When `true`, child layers retain their 3D positions and are rendered in a shared 3D space, enabling depth-based intersections and correct z-ordering among siblings. Similar to CSS `transform-style: preserve-3d`.
-
-**Transform Attribute Priority**: `x`/`y`, `matrix`, and `matrix3D` have an override relationship:
-- Only `x`/`y` set: Uses `x`/`y` for translation
-- `matrix` set: `matrix` overrides `x`/`y` values
-- `matrix3D` set: `matrix3D` overrides both `matrix` and `x`/`y` values
-
-**MaskType**:
-
-| Value | Description |
-|-------|-------------|
-| `alpha` | Alpha mask: Uses mask's alpha channel |
-| `luminance` | Luminance mask: Uses mask's luminance values |
-| `contour` | Contour mask: Uses mask's contour for clipping |
-
-**BlendMode**: See Section 2.9 for the complete blend mode table.
-
-### 4.3 Layer Styles
-
-Layer styles add visual effects above or below layer content without modifying the original.
-
-**Input Sources for Layer Styles**:
-
-All layer styles compute effects based on **layer content**. During computation, layer content is converted to its opaque counterpart: geometric shapes are rendered with their normal fills, then all semi-transparent pixels are converted to fully opaque (fully transparent pixels are preserved). This means shadows produced by semi-transparent fills appear the same as those from fully opaque fills.
-
-Some layer styles additionally use **layer contour** or **layer background** as input (see individual style descriptions). Definitions of layer contour and layer background are in Section 4.1.
-
-> [Sample](samples/4.3_layer_styles.pagx)
-
-**Common LayerStyle Attributes**:
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `blendMode` | BlendMode | normal | Blend mode (see Section 2.9) |
-| `excludeChildEffects` | bool | false | Whether to exclude child layer effects |
-
-**excludeChildEffects**: When `false` (default), the layer style computes based on the full layer content including child layers' rendering results. When `true`, child layers' styles and filters are excluded from the layer content used to compute this style, but child layers' base rendering results are still included.
-
-#### 4.3.1 DropShadowStyle
-
-Draws a drop shadow **below** the layer. Computes shadow shape based on opaque layer content.
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `offsetX` | float | 0 | X offset |
-| `offsetY` | float | 0 | Y offset |
-| `blurX` | float | 0 | X blur radius |
-| `blurY` | float | 0 | Y blur radius |
-| `color` | Color | #000000 | Shadow color |
-| `showBehindLayer` | bool | true | Whether shadow shows behind layer |
-
-**Rendering Steps**:
-1. Get opaque layer content and offset by `(offsetX, offsetY)`
-2. Apply Gaussian blur `(blurX, blurY)` to the offset content
-3. Fill the shadow region with `color`
-4. If `showBehindLayer="false"`, use layer contour as erase mask to cut out occluded portion
-
-**showBehindLayer**:
-- `true`: Shadow displays completely, including portion occluded by layer content
-- `false`: Portion of shadow occluded by layer content is cut out (using layer contour as erase mask)
-
-#### 4.3.2 BackgroundBlurStyle
-
-Applies blur effect to layer background **below** the layer. Computes effect based on **layer background**, using opaque layer content as mask for clipping.
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `blurX` | float | 0 | X blur radius |
-| `blurY` | float | 0 | Y blur radius |
-| `tileMode` | TileMode | mirror | Tile mode |
-
-**Rendering Steps**:
-1. Get layer background below layer bounds
-2. Apply Gaussian blur `(blurX, blurY)` to layer background
-3. Clip blurred result using opaque layer content as mask
-
-#### 4.3.3 InnerShadowStyle
-
-Draws an inner shadow **above** the layer, appearing inside the layer content. Computes shadow range based on opaque layer content.
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `offsetX` | float | 0 | X offset |
-| `offsetY` | float | 0 | Y offset |
-| `blurX` | float | 0 | X blur radius |
-| `blurY` | float | 0 | Y blur radius |
-| `color` | Color | #000000 | Shadow color |
-
-**Rendering Steps**:
-1. Get opaque layer content and offset by `(offsetX, offsetY)`
-2. Apply Gaussian blur `(blurX, blurY)` to the inverse of the offset content (exterior region)
-3. Fill the shadow region with `color`
-4. Intersect with opaque layer content, keeping only shadow inside content
-
-### 4.4 Layer Filters
-
-Layer filters are the final stage of layer rendering. All previously rendered results (including layer styles) accumulated in order serve as filter input. Filters are applied in chain fashion according to document order, with each filter's output becoming the next filter's input.
-
-Unlike layer styles (Section 4.3), which **independently render** visual effects above or below layer content, filters **modify** the layer's overall rendering output. Layer styles are applied before filters.
-
-> [Sample](samples/4.4_layer_filters.pagx)
-
-#### 4.4.1 BlurFilter
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `blurX` | float | 0 | X blur radius |
-| `blurY` | float | 0 | Y blur radius |
-| `tileMode` | TileMode | decal | Tile mode |
-
-#### 4.4.2 DropShadowFilter
-
-Generates shadow effect based on filter input. Unlike DropShadowStyle, the filter projects from original rendering content and preserves semi-transparency, whereas the style projects from opaque layer content.
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `offsetX` | float | 0 | X offset |
-| `offsetY` | float | 0 | Y offset |
-| `blurX` | float | 0 | X blur radius |
-| `blurY` | float | 0 | Y blur radius |
-| `color` | Color | #000000 | Shadow color |
-| `shadowOnly` | bool | false | Show shadow only |
-
-**Rendering Steps**:
-1. Offset filter input by `(offsetX, offsetY)`
-2. Extract alpha channel and apply Gaussian blur `(blurX, blurY)`
-3. Fill shadow region with `color`
-4. Composite shadow with filter input (`shadowOnly=false`) or output shadow only (`shadowOnly=true`)
-
-#### 4.4.3 InnerShadowFilter
-
-Draws shadow inside the filter input.
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `offsetX` | float | 0 | X offset |
-| `offsetY` | float | 0 | Y offset |
-| `blurX` | float | 0 | X blur radius |
-| `blurY` | float | 0 | Y blur radius |
-| `color` | Color | #000000 | Shadow color |
-| `shadowOnly` | bool | false | Show shadow only |
-
-**Rendering Steps**:
-1. Create inverse mask of filter input's alpha channel
-2. Offset and apply Gaussian blur
-3. Intersect with filter input's alpha channel
-4. Composite result with filter input (`shadowOnly=false`) or output shadow only (`shadowOnly=true`)
-
-#### 4.4.4 BlendFilter
-
-Overlays a specified color onto the layer using a specified blend mode.
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `color` | Color | (required) | Blend color |
-| `blendMode` | BlendMode | normal | Blend mode (see Section 2.9) |
-
-#### 4.4.5 ColorMatrixFilter
-
-Transforms colors using a 4×5 color matrix.
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `matrix` | Matrix | identity matrix | 4x5 color matrix (20 comma-separated floats) |
-
-**Matrix Format** (20 values, row-major):
-```
-| R' |   | m[0]  m[1]  m[2]  m[3]  m[4]  |   | R |
-| G' |   | m[5]  m[6]  m[7]  m[8]  m[9]  |   | G |
-| B' | = | m[10] m[11] m[12] m[13] m[14] | × | B |
-| A' |   | m[15] m[16] m[17] m[18] m[19] |   | A |
-                                            | 1 |
-```
-
-### 4.5 Clipping and Masking
-
-#### 4.5.1 scrollRect
-
-The `scrollRect` attribute defines the layer's visible region; content outside this region is clipped.
-
-> [Sample](samples/4.5.1_scroll_rect.pagx)
-
-#### 4.5.2 Masking
-
-Reference another layer as a mask using the `mask` attribute.
-
-> [Sample](samples/4.5.2_masking.pagx)
-
-**Masking Rules**:
-- The mask layer itself is not rendered (the `visible` attribute is ignored)
-- The mask layer's transforms do not affect the masked layer
-
----
-
-## 5. VectorElement System
-
-The VectorElement system defines how vector content within Layers is processed and rendered.
-
-### 5.1 Processing Model
-
-The VectorElement system employs an **accumulate-render** processing model: geometry elements accumulate in a rendering context, modifiers transform the accumulated geometry, and painters trigger final rendering.
-
-#### 5.1.1 Terminology
-
-| Term | Elements | Description |
-|------|----------|-------------|
-| **Geometry Elements** | Rectangle, Ellipse, Polystar, Path, Text | Elements providing geometric shapes; accumulate as a geometry list in the context |
-| **Modifiers** | TrimPath, RoundCorner, MergePath, TextModifier, TextPath, TextBox, Repeater | Transform accumulated geometry |
-| **Painters** | Fill, Stroke | Perform fill or stroke rendering on accumulated geometry |
-| **Containers** | Group | Create isolated scopes and apply matrix transforms; merge upon completion |
-
-#### 5.1.2 Internal Structure of Geometry Elements
-
-Geometry elements have different internal structures when accumulating in the context:
-
-| Element Type | Internal Structure | Description |
-|--------------|-------------------|-------------|
-| Shape elements (Rectangle, Ellipse, Polystar, Path) | Single Path | Each shape element produces one path |
-| Text element (Text) | Glyph list | A Text produces multiple glyphs after shaping |
-
-#### 5.1.3 Processing and Rendering Order
-
-VectorElements are processed sequentially in **document order**; elements appearing earlier are processed first. By default, painters processed earlier are rendered first (appearing below).
-
-Since Fill and Stroke can specify rendering to layer background or foreground via the `placement` attribute, the final rendering order may not exactly match document order. However, in the default case (all content as background), rendering order matches document order.
-
-#### 5.1.4 Unified Processing Flow
-
-```
-Geometry Elements        Modifiers              Painters
-┌──────────┐          ┌──────────┐          ┌──────────┐
-│Rectangle │          │ TrimPath │          │   Fill   │
-│ Ellipse  │          │RoundCorn │          │  Stroke  │
-│ Polystar │          │MergePath │          └────┬─────┘
-│   Path   │          │TextModif │               │
-│   Text   │          │ TextPath │               │
-└────┬─────┘          │TextBox   │               │
-     │                │ Repeater │               │
-     │                └────┬─────┘               │
-     │                     │                     │
-     │ Accumulate          │ Transform           │ Render
-     ▼                     ▼                     ▼
-┌─────────────────────────────────────────────────────────┐
-│ Geometry List [Path1, Path2, GlyphList1, GlyphList2...] │
-└─────────────────────────────────────────────────────────┘
-```
-
-**Rendering context** accumulates a geometry list where:
-- Each shape element contributes one Path
-- Each Text contributes a glyph list (containing multiple glyphs)
-
-#### 5.1.5 Modifier Scope
-
-Different modifiers have different scopes over elements in the geometry list:
-
-| Modifier Type | Target | Description |
-|---------------|--------|-------------|
-| Shape modifiers (TrimPath, RoundCorner, MergePath) | Paths only | Trigger forced conversion for text |
-| Text modifiers (TextModifier, TextPath, TextBox) | Glyph lists only | No effect on Paths |
-| Repeater | Paths + glyph lists | Affects all geometry simultaneously |
-
-### 5.2 Geometry Elements
-
-Geometry elements provide renderable shapes.
-
-#### 5.2.1 Rectangle
-
-Rectangles are defined from center point with uniform corner rounding support.
-
-```xml
-<Rectangle size="200,150" roundness="10" reversed="false"/>
-```
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `position` | Point | (center of bounding box) | Center point coordinate, computed from constraint attributes when set. When not set, defaults to `(size.width/2, size.height/2)`, placing the top-left corner at the origin. Prefer constraint attributes (`left`/`top`) for positioning |
-| `size` | Size | 100,100 | Dimensions "width,height" |
-| `roundness` | float | 0 | Corner radius |
-| `reversed` | bool | false | Reverse path direction |
-
-**Calculation Rules**:
-```
-rect.left   = position.x - size.width / 2
-rect.top    = position.y - size.height / 2
-rect.right  = position.x + size.width / 2
-rect.bottom = position.y + size.height / 2
-```
-
-**Corner Rounding**:
-- `roundness` value is automatically limited to `min(roundness, size.width/2, size.height/2)`
-- When `roundness >= min(size.width, size.height) / 2`, the shorter dimension becomes semicircular
-
-**Path Start Point**: Rectangle path starts from the **top-right corner**, drawn clockwise (`reversed="false"`).
-
-**Example**:
-
-> [Sample](samples/5.2.1_rectangle.pagx)
-
-#### 5.2.2 Ellipse
-
-Ellipses are defined from center point.
-
-```xml
-<Ellipse size="100,60" reversed="false"/>
-```
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `position` | Point | (center of bounding box) | Center point coordinate, computed from constraint attributes when set. When not set, defaults to `(size.width/2, size.height/2)`, placing the top-left corner at the origin. Prefer constraint attributes (`left`/`top`) for positioning |
-| `size` | Size | 100,100 | Dimensions "width,height" |
-| `reversed` | bool | false | Reverse path direction |
-
-**Calculation Rules**:
-```
-boundingRect.left   = position.x - size.width / 2
-boundingRect.top    = position.y - size.height / 2
-boundingRect.right  = position.x + size.width / 2
-boundingRect.bottom = position.y + size.height / 2
-```
-
-**Path Start Point**: Ellipse path starts from the **right midpoint** (3 o'clock position).
-
-**Example**:
-
-> [Sample](samples/5.2.2_ellipse.pagx)
-
-#### 5.2.3 Polystar
-
-Supports both regular polygon and star modes.
-
-```xml
-<Polystar type="star" pointCount="5" outerRadius="100" innerRadius="50" rotation="0" outerRoundness="0" innerRoundness="0" reversed="false"/>
-```
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `position` | Point | (center of bounding box) | Center point coordinate, computed from constraint attributes when set. When not set, defaults to the center of the computed bounding box, placing the top-left corner at the origin. Prefer constraint attributes (`left`/`top`) for positioning |
-| `type` | PolystarType | star | Type (see below) |
-| `pointCount` | float | 5 | Number of points (supports decimals) |
-| `outerRadius` | float | 100 | Outer radius |
-| `innerRadius` | float | 50 | Inner radius (star only) |
-| `rotation` | float | 0 | Rotation angle |
-| `outerRoundness` | float | 0 | Outer corner roundness 0~1 |
-| `innerRoundness` | float | 0 | Inner corner roundness 0~1 |
-| `reversed` | bool | false | Reverse path direction |
-
-**PolystarType**:
-
-| Value | Description |
-|-------|-------------|
-| `polygon` | Regular polygon: Uses outer radius only |
-| `star` | Star: Alternates between outer and inner radii |
-
-**Polygon Mode** (`type="polygon"`):
-- Uses only `outerRadius` and `outerRoundness`
-- `innerRadius` and `innerRoundness` are ignored
-
-**Star Mode** (`type="star"`):
-- Outer vertices at `outerRadius`
-- Inner vertices at `innerRadius`
-- Vertices alternate to form star shape
-
-**Vertex Calculation** (i-th outer vertex):
-```
-angle = rotation + (i / pointCount) * 360°
-x = position.x + outerRadius * cos(angle)
-y = position.y + outerRadius * sin(angle)
-```
-
-**Fractional Point Count**:
-- `pointCount` supports decimal values (e.g., `5.5`)
-- The fractional part determines how much of the final vertex is drawn, producing an incomplete corner
-- `pointCount <= 0` generates no path
-
-**Roundness**:
-- `outerRoundness` and `innerRoundness` range from 0~1
-- 0 means sharp corners; 1 means fully rounded
-- Roundness is achieved by adding Bézier control points at vertices
-
-**Example**:
-
-> [Sample](samples/5.2.3_polystar.pagx)
-
-#### 5.2.4 Path
-
-Defines arbitrary shapes using SVG path syntax, supporting inline data or references to PathData defined in Resources.
-
-```xml
-<!-- Inline path data -->
-<Path data="M 0 0 L 100 0 L 100 100 Z" reversed="false"/>
-
-<!-- Reference PathData resource -->
-<Path data="@curvePath" reversed="false"/>
-```
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `data` | string/idref | (required) | SVG path data or PathData resource reference "@id" |
-| `position` | Point | 0,0 | Offset of the path coordinate system origin. Prefer constraint attributes (`left`/`top`) for positioning |
-| `reversed` | bool | false | Reverse path direction |
-
-**Example**:
-
-> [Sample](samples/5.2.4_path.pagx)
-
-#### 5.2.5 Text
-
-Text elements provide geometric shapes for text content. Unlike shape elements that produce a single Path, Text produces a **glyph list** (multiple glyphs) after shaping, which accumulates in the rendering context's geometry list for subsequent modifier transformation or painter rendering.
-
-```xml
-<Text text="Hello World" left="100" top="200" fontFamily="Arial" fontStyle="Regular" fauxBold="true" fauxItalic="false" fontSize="24" letterSpacing="0" textAnchor="start"/>
-```
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `text` | string | "" | Text content |
-| `position` | Point | 0,0 | Text start position (y is baseline), computed from constraint attributes when set. Prefer constraint attributes (`left`/`top`) for positioning |
-| `fontFamily` | string | "" | Font family (empty string means system default) |
-| `fontStyle` | string | "" | Font variant (Regular, Bold, Italic, Bold Italic, etc.). Empty string means the font's default variant |
-| `fontSize` | float | 12 | Font size |
-| `letterSpacing` | float | 0 | Letter spacing |
-| `fauxBold` | bool | false | Faux bold (algorithmically bolded) |
-| `fauxItalic` | bool | false | Faux italic (algorithmically slanted) |
-| `textAnchor` | TextAnchor | start | Text anchor alignment relative to the origin (see below). Ignored when a TextBox controls the layout |
-
-Child elements: `CDATA` text, `GlyphRun`*
-
-**Text Content**: Typically use the `text` attribute to specify text content. When text contains XML special characters (`<`, `>`, `&`, etc.) or needs to preserve multi-line formatting, use a CDATA child node instead of the `text` attribute. Text does not allow direct plain text child nodes; CDATA wrapping is required.
-
-```xml
-<!-- Simple text: use text attribute -->
-<Text text="Hello World" fontFamily="Arial" fontSize="24"/>
-
-<!-- Contains special characters: use CDATA -->
-<Text fontFamily="Arial" fontSize="24"><![CDATA[A < B & C > D]]></Text>
-
-<!-- Multi-line text: use CDATA to preserve formatting -->
-<Text fontFamily="Arial" fontSize="24">
-<![CDATA[Line 1
-Line 2
-Line 3]]>
-</Text>
-```
-
-**Rendering Modes**: Text supports **pre-layout** and **runtime layout** modes. Pre-layout provides pre-computed glyphs and positions via GlyphRun child nodes, rendering with embedded fonts for cross-platform consistency. Runtime layout performs shaping and layout at runtime; due to platform differences in fonts and layout features, minor inconsistencies may occur. For pixel-perfect reproduction of design tool layouts, pre-layout is recommended.
-
-**TextAnchor (Text Anchor Alignment)**:
-
-Controls how text is positioned relative to its origin point.
-
-| Value | Description |
-|-------|-------------|
-| `start` | The origin is at the start of the text. No offset is applied |
-| `center` | The origin is at the center of the text. Text is offset by half its width to center on the origin |
-| `end` | The origin is at the end of the text. Text is offset by its full width so it ends at the origin |
-
-**Runtime Layout Rendering Flow**:
-1. Find system font based on `fontFamily` and `fontStyle`; if unavailable, select fallback font according to runtime-configured fallback list
-2. Shape using `text` attribute (or CDATA child node); newlines trigger line breaks (default 1.2× font size line height, customizable via TextBox)
-3. Apply typography parameters: `fontSize`, `letterSpacing`
-4. Construct glyph list and accumulate to rendering context
-
-**Runtime Layout Example**:
-
-> [Sample](samples/5.2.5_text.pagx)
-
-##### GlyphRun (Pre-layout Data)
-
-GlyphRun defines pre-layout data for a group of glyphs, each GlyphRun independently referencing one font resource.
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `font` | idref | (required) | Font resource reference `@id` |
-| `fontSize` | float | 12 | Rendering font size. Actual scale = `fontSize / font.unitsPerEm` |
-| `glyphs` | string | (required) | GlyphID sequence, comma-separated (0 means missing glyph) |
-| `x` | float | 0 | Overall X offset |
-| `y` | float | 0 | Overall Y offset |
-| `xOffsets` | string | - | Per-glyph X offset, comma-separated |
-| `positions` | string | - | Per-glyph (x,y) offset, semicolon-separated |
-| `anchors` | string | - | Per-glyph anchor offset (x,y), semicolon-separated. The anchor is the center point for scale, rotation, and skew transforms. Default anchor is (advance×0.5, 0) |
-| `scales` | string | - | Per-glyph scale (sx,sy), semicolon-separated. Scaling is applied around the anchor point. Default 1,1 |
-| `rotations` | string | - | Per-glyph rotation angle (degrees), comma-separated. Rotation is applied around the anchor point. Default 0 |
-| `skews` | string | - | Per-glyph skew angle (degrees), comma-separated. Skewing is applied around the anchor point. Default 0 |
-
-All attributes are optional and can be combined. When an attribute array is shorter than the glyph count, missing values use defaults.
-
-**Position Calculation**:
-
-```
-finalX[i] = x + xOffsets[i] + positions[i].x
-finalY[i] = y + positions[i].y
-```
-
-- When `xOffsets` is not specified, `xOffsets[i]` is treated as 0
-- When `positions` is not specified, `positions[i]` is treated as (0, 0)
-- When neither `xOffsets` nor `positions` is specified: First glyph positioned at (x, y), subsequent glyphs positioned by accumulating each Glyph's `advance` attribute
-
-**Transform Application Order**:
-
-When a glyph has scale, rotation, or skew transforms, they are applied in the following order (consistent with TextModifier):
-
-1. Translate to anchor (`translate(-anchor)`)
-2. Scale (`scale`)
-3. Skew (`skew`, along vertical axis)
-4. Rotate (`rotation`)
-5. Translate back from anchor (`translate(anchor)`)
-6. Translate to position (`translate(position)`)
-
-**Anchor**:
-
-- Each glyph's **default anchor** is at `(advance × 0.5, 0)`, the horizontal center at baseline
-- The `anchors` attribute records offsets relative to the default anchor, final anchor = default anchor + anchors[i]
-
-**Pre-layout Example**:
-
-> [Sample](samples/5.2.5_glyph_run.pagx)
-
-### 5.3 Painters
-
-Painters (Fill, Stroke) render all geometry (Paths and glyph lists) accumulated at the **current moment**.
-
-#### 5.3.1 Fill
-
-Fill draws the interior region of geometry using a specified color source.
-
-> [Sample](samples/5.3.1_fill.pagx)
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `color` | Color/idref | #000000 | Color value or color source reference, default black |
-| `alpha` | float | 1 | Opacity 0~1 |
-| `blendMode` | BlendMode | normal | Blend mode (see Section 2.9) |
-| `fillRule` | FillRule | winding | Fill rule (see below) |
-| `placement` | LayerPlacement | background | Rendering position (see Section 5.3.3) |
-
-Child elements: May embed one color source (SolidColor, LinearGradient, RadialGradient, ConicGradient, DiamondGradient, ImagePattern)
-
-**FillRule**:
-
-| Value | Description |
-|-------|-------------|
-| `winding` | Non-zero winding rule: Counts based on path direction; fills if non-zero |
-| `evenOdd` | Even-odd rule: Counts based on crossing count; fills if odd |
-
-**Text Fill**:
-- Text is filled per glyph
-- Supports color override for individual glyphs via TextModifier
-- Color override uses alpha blending: `finalColor = lerp(originalColor, overrideColor, overrideAlpha)`
-
-#### 5.3.2 Stroke
-
-Stroke draws lines along geometry boundaries.
-
-> [Sample](samples/5.3.2_stroke.pagx)
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `color` | Color/idref | #000000 | Color value or color source reference, default black |
-| `width` | float | 1 | Stroke width |
-| `alpha` | float | 1 | Opacity 0~1 |
-| `blendMode` | BlendMode | normal | Blend mode (see Section 2.9) |
-| `cap` | LineCap | butt | Line cap style (see below) |
-| `join` | LineJoin | miter | Line join style (see below) |
-| `miterLimit` | float | 4 | Miter limit |
-| `dashes` | string | - | Dash pattern "d1,d2,..." |
-| `dashOffset` | float | 0 | Dash offset |
-| `dashAdaptive` | bool | false | Scale dashes to equal length |
-| `align` | StrokeAlign | center | Stroke alignment (see below) |
-| `placement` | LayerPlacement | background | Rendering position (see Section 5.3.3) |
-
-**LineCap**:
-
-| Value | Description |
-|-------|-------------|
-| `butt` | Butt cap: Line does not extend beyond endpoints |
-| `round` | Round cap: Semicircular extension at endpoints |
-| `square` | Square cap: Rectangular extension at endpoints |
-
-**LineJoin**:
-
-| Value | Description |
-|-------|-------------|
-| `miter` | Miter join: Extends outer edges to form sharp corner |
-| `round` | Round join: Connected with circular arc |
-| `bevel` | Bevel join: Fills connection with triangle |
-
-**StrokeAlign**:
-
-| Value | Description |
-|-------|-------------|
-| `center` | Stroke centered on path (default) |
-| `inside` | Stroke inside closed path |
-| `outside` | Stroke outside closed path |
-
-Inside/outside stroke is achieved by:
-1. Stroking at double width
-2. Boolean operation with original shape (intersection for inside, difference for outside)
-
-**Dash Pattern**:
-- `dashes`: Defines dash segment length sequence, e.g., `"5,3"` means 5px solid + 3px gap
-- `dashOffset`: Dash start offset
-- `dashAdaptive`: When true, scales the dash intervals so that the dash segments have the same length
-
-#### 5.3.3 LayerPlacement
-
-The `placement` attribute of Fill and Stroke controls rendering order relative to child layers:
-
-| Value | Description |
-|-------|-------------|
-| `background` | Render **below** child layers (default) |
-| `foreground` | Render **above** child layers |
-
-### 5.4 Shape Modifiers
-
-Shape modifiers perform **in-place transformation** on accumulated Paths; for glyph lists, they trigger forced conversion to Paths.
-
-#### 5.4.1 TrimPath
-
-Trims paths to a specified start/end range.
-
-```xml
-<TrimPath start="0" end="0.5" offset="0" type="separate"/>
-```
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `start` | float | 0 | Start position 0~1 |
-| `end` | float | 1 | End position 0~1 |
-| `offset` | float | 0 | Offset in degrees; 360° equals one full cycle of the path length. For example, 180° shifts the trim range by half the path length |
-| `type` | TrimType | separate | Trim type (see below) |
-
-**TrimType**:
-
-| Value | Description |
-|-------|-------------|
-| `separate` | Separate mode: Each shape trimmed independently with same start/end parameters |
-| `continuous` | Continuous mode: All shapes treated as one continuous path, trimmed by total length ratio |
-
-**Edge Cases**:
-- `start > end`: The start and end values are mirrored (`start = 1 - start`, `end = 1 - end`) and all path directions are reversed, then normal trimming is applied. The resulting visual is the complementary segment of the path with reversed direction
-- Supports wrapping: When trim range exceeds [0,1], automatically wraps to other end of path
-- When total path length is 0, no operation is performed
-
-> [Sample](samples/5.4.1_trim_path.pagx)
-
-#### 5.4.2 RoundCorner
-
-Converts sharp corners of paths to rounded corners.
-
-```xml
-<RoundCorner radius="10"/>
-```
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `radius` | float | 10 | Corner radius |
-
-**Processing Rules**:
-- Only affects sharp corners (non-smooth connected vertices)
-- Corner radius is automatically limited to not exceed half the length of adjacent edges
-- `radius <= 0` performs no operation
-
-**Example**:
-
-> [Sample](samples/5.4.2_round_corner.pagx)
-
-#### 5.4.3 MergePath
-
-Merges all shapes into a single shape.
-
-```xml
-<MergePath mode="append"/>
-```
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `mode` | MergePathMode | append | Merge operation (see below) |
-
-**MergePathMode**:
-
-| Value | Description |
-|-------|-------------|
-| `append` | Append: Simply merge all paths without boolean operations (default) |
-| `union` | Union: Merge all shape coverage areas |
-| `intersect` | Intersect: Keep only overlapping areas of all shapes |
-| `xor` | XOR: Keep non-overlapping areas |
-| `difference` | Difference: Subtract subsequent shapes from first shape |
-
-**Important Behavior**:
-- MergePath **clears all previously accumulated Fill and Stroke effects** in the current scope; only the merged path remains in the geometry list
-- Current transformation matrices of shapes are applied during merge
-- Merged shape's transformation matrix resets to identity matrix
-
-**Example**:
-
-> [Sample](samples/5.4.3_merge_path.pagx)
-
-### 5.5 Text Modifiers
-
-Text modifiers transform individual glyphs within text.
-
-#### 5.5.1 Text Modifier Processing
-
-When a text modifier is encountered, **all glyph lists** accumulated in the context are combined into a unified glyph list for the operation:
-
-```xml
-<TextBox left="100" top="50" width="200" height="100" textAlign="center">
-  <Text text="Hello " fontFamily="Arial" fontSize="24"/>
-  <Text text="World" fontFamily="Arial" fontSize="24"/>
-  <TextModifier position="0,-5"/>
-  <Fill color="#333333"/>
-</TextBox>
-```
-
-#### 5.5.2 Text to Shape Conversion
-
-When text encounters a shape modifier, it is forcibly converted to shape paths:
-
-```
-Text Element           Shape Modifier          Subsequent Modifiers
-┌──────────┐          ┌──────────┐
-│   Text   │          │ TrimPath │
-└────┬─────┘          │RoundCorn │
-     │                │MergePath │
-     │ Accumulated    └────┬─────┘
-     │ Glyph List          │
-     ▼                     │ Triggers Conversion
-┌──────────────┐           │
-│ Glyph List   │───────────┼──────────────────────┐
-│ [H,e,l,l,o]  │           │                      │
-└──────────────┘           ▼                      ▼
-                  ┌──────────────┐      ┌──────────────────┐
-                  │ Merged into  │      │ Emoji Discarded  │
-                  │ Single Path  │      │ (Cannot convert) │
-                  └──────────────┘      └──────────────────┘
-                           │
-                           │ Subsequent text modifiers no longer effective
-                           ▼
-                  ┌──────────────┐
-                  │ TextModifier │ → Skipped (Already Path)
-                  └──────────────┘
-```
-
-**Conversion Rules**:
-
-1. **Trigger Condition**: Conversion triggered when text encounters TrimPath, RoundCorner, or MergePath
-2. **Merge into Single Path**: All glyphs of one Text merge into **one** Path, not one independent Path per glyph
-3. **Emoji Loss**: Emoji cannot be converted to path outlines; discarded during conversion
-4. **Irreversible Conversion**: After conversion becomes pure Path; subsequent text modifiers have no effect on it
-
-**Example**:
-
-```xml
-<Group>
-  <Text fontFamily="Arial" fontSize="24"><![CDATA[Hello 😀]]></Text>
-  <TrimPath start="0" end="0.5"/>
-  <TextModifier position="0,-10"/>
-  <Fill color="#333333"/>
-</Group>
-```
-
-#### 5.5.3 TextModifier
-
-Applies transforms and style overrides to glyphs within selected ranges. TextModifier may contain multiple RangeSelector child elements.
-
-```xml
-<TextModifier anchor="0,0" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1" fillColor="#FF0000" strokeColor="#000000" strokeWidth="1">
-  <RangeSelector start="0" end="0.5" shape="rampUp"/>
-  <RangeSelector start="0.5" end="1" shape="rampDown"/>
-</TextModifier>
-```
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `anchor` | Point | 0,0 | Anchor point offset, relative to glyph's default anchor position. Each glyph's default anchor is at `(advance × 0.5, 0)`, the horizontal center at baseline |
-| `position` | Point | 0,0 | Position offset |
-| `rotation` | float | 0 | Rotation |
-| `scale` | Point | 1,1 | Scale |
-| `skew` | float | 0 | Skew amount in degrees along the skewAxis direction |
-| `skewAxis` | float | 0 | Skew axis angle in degrees; defines the direction along which skewing is applied |
-| `alpha` | float | 1 | Opacity |
-| `fillColor` | Color | - | Fill color override |
-| `strokeColor` | Color | - | Stroke color override |
-| `strokeWidth` | float | - | Stroke width override |
-
-**Selector Calculation**:
-1. Calculate selection range based on RangeSelector's `start`, `end`, `offset` (supports any decimal value; automatically wraps when exceeding [0,1] range)
-2. Calculate raw influence value (0~1) for each glyph based on `shape`, then multiply by `weight`
-3. Combine multiple selectors according to `mode`, then clamp the combined result to [-1, 1]
-
-```
-factor = clamp(combine(rawInfluence₁ × weight₁, rawInfluence₂ × weight₂, ...), -1, 1)
-```
-
-**Transform Application**:
-
-Position and rotation are applied linearly with factor. Transforms are applied in the following order:
-
-1. Translate to negative anchor (`translate(-anchor × factor)`)
-2. Scale from identity (`scale(1 + (scale - 1) × factor)`)
-3. Skew (`skew(skew × factor, skewAxis)`)
-4. Rotate (`rotate(rotation × factor)`)
-5. Translate back to anchor (`translate(anchor × factor)`)
-6. Translate to position (`translate(position × factor)`)
-
-Opacity uses the absolute value of factor:
-
-```
-alphaFactor = 1 + (alpha - 1) × |factor|
-finalAlpha = originalAlpha × max(0, alphaFactor)
-```
-
-**Color Override**:
-
-Color override uses the absolute value of `factor` for alpha blending:
-
-```
-blendFactor = overrideColor.alpha × |factor|
-finalColor = blend(originalColor, overrideColor, blendFactor)
-```
-
-**Example**:
-
-> [Sample](samples/5.5.3_text_modifier.pagx)
-
-#### 5.5.4 RangeSelector
-
-Range selectors define the glyph range and influence degree for TextModifier.
-
-```xml
-<RangeSelector start="0" end="1" offset="0" unit="percentage" shape="square" easeIn="0" easeOut="0" mode="add" weight="1" randomOrder="false" randomSeed="0"/>
-```
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `start` | float | 0 | Selection start |
-| `end` | float | 1 | Selection end |
-| `offset` | float | 0 | Selection offset |
-| `unit` | SelectorUnit | percentage | Unit |
-| `shape` | SelectorShape | square | Shape |
-| `easeIn` | float | 0 | Ease in amount |
-| `easeOut` | float | 0 | Ease out amount |
-| `mode` | SelectorMode | add | Combine mode |
-| `weight` | float | 1 | Selector weight |
-| `randomOrder` | bool | false | Random order |
-| `randomSeed` | int | 0 | Random seed |
-
-**SelectorUnit**:
-
-| Value | Description |
-|-------|-------------|
-| `index` | Index: Calculate range by glyph index |
-| `percentage` | Percentage: Calculate range by percentage of total glyphs |
-
-**SelectorShape**:
-
-| Value | Description |
-|-------|-------------|
-| `square` | Square: 1 within range, 0 outside |
-| `rampUp` | Ramp Up: Linear increase from 0 to 1 |
-| `rampDown` | Ramp Down: Linear decrease from 1 to 0 |
-| `triangle` | Triangle: 1 at center, 0 at edges |
-| `round` | Round: Sinusoidal transition |
-| `smooth` | Smooth: Smoother transition curve |
-
-**SelectorMode**:
-
-| Value | Description |
-|-------|-------------|
-| `add` | Add: `result = a + b` |
-| `subtract` | Subtract: `result = b ≥ 0 ? a × (1 − b) : a × (−1 − b)` |
-| `intersect` | Intersect: `result = a × b` |
-| `min` | Min: `result = min(a, b)` |
-| `max` | Max: `result = max(a, b)` |
-| `difference` | Difference: `result = |a − b|` |
-
-#### 5.5.5 TextPath
-
-Arranges text along a specified path. The path can reference a PathData defined in Resources, or use
-inline path data. TextPath uses a baseline (a straight line defined by baselineOrigin and
-baselineAngle) as the text's reference line: glyphs are mapped from their positions along this
-baseline onto corresponding positions on the path curve, preserving their relative spacing and
-offsets. When forceAlignment is enabled, original glyph positions are ignored and glyphs are
-redistributed evenly to fill the available path length.
-
-> [Sample](samples/5.5.5_text_path.pagx)
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `path` | string/idref | (required) | SVG path data or PathData resource reference "@id" |
-| `baselineOrigin` | Point | 0,0 | Baseline origin, the starting point of the text reference line |
-| `baselineAngle` | float | 0 | Baseline angle in degrees, 0 for horizontal, 90 for vertical |
-| `firstMargin` | float | 0 | Start margin |
-| `lastMargin` | float | 0 | End margin |
-| `perpendicular` | bool | true | Perpendicular to path |
-| `reversed` | bool | false | Reverse direction |
-| `forceAlignment` | bool | false | Force stretch text to fill path |
-
-**Baseline**:
-- `baselineOrigin`: The starting point of the baseline in the TextPath's local coordinate space
-- `baselineAngle`: The angle of the baseline in degrees. 0 means a horizontal baseline (text flows left to right along X axis), 90 means a vertical baseline (text flows top to bottom along Y axis)
-- Each glyph's distance along the baseline determines where it lands on the curve, and its perpendicular offset from the baseline is preserved as a perpendicular offset from the curve
-
-**Margins**:
-- `firstMargin`: Start margin (offset inward from path start)
-- `lastMargin`: End margin (offset inward from path end)
-
-**Force Alignment**:
-- When `forceAlignment="true"`, glyphs are laid out consecutively using their advance widths, then spacing is adjusted proportionally to fill the path region between firstMargin and lastMargin
-
-**Glyph Positioning**:
-1. Calculate glyph center position on path
-2. Get path tangent direction at that position
-3. If `perpendicular="true"`, rotate glyph perpendicular to path
-
-**Closed Paths**: For closed paths, glyphs exceeding the range wrap to the other end of the path.
-
-#### 5.5.6 TextBox
-
-TextBox is a text layout container that inherits from Group. It applies typography to Text elements within its scope. TextBox re-layouts all glyph positions according to its layout dimensions (`width`/`height`) and alignment settings. The layout results are written into each Text element's GlyphRun data with inverse-transform compensation, so that Text's own position and parent Group transforms remain effective in the rendering pipeline. The first line is positioned using the line-box model: the line box near edge is aligned to the near edge of the text area, and the baseline is placed at `halfLeading + ascent` from the near edge, where `halfLeading = (lineHeight - metricsHeight) / 2` and `metricsHeight = ascent + descent + leading` from the font metrics. Following CSS Writing Modes conventions, `lineHeight` is a logical property that always applies to the block-axis dimension of a line box. In vertical mode, it controls the column width rather than the line height. Columns are spaced by `lineHeight` (center-to-center distance). When `lineHeight` is 0 (auto), the column width is calculated from font metrics (ascent + descent + leading), same as horizontal auto line height. Columns flow from right to left.
-
-TextBox is a **pre-layout-only** node: it is processed during the typesetting stage before rendering and is not instantiated in the render tree. If all accumulated Text elements already contain embedded GlyphRun data, the TextBox is skipped during typesetting. However, the TextBox node should still be retained even when embedded GlyphRun data and fonts are present, as design tools may read its layout attributes (`width`, `height`, `textAlign`, `paragraphAlign`, `lineHeight`, `wordWrap`, `overflow`, etc.) for editing purposes.
-
-As a container, TextBox processes its child Text elements and text modifiers (TextModifier, TextPath, etc.) in an isolated scope. Text elements inside a TextBox are laid out by the TextBox's typography settings first; subsequent text modifiers within the TextBox then operate on those layout results. TextBox only affects the **initial layout** of Text elements — it determines glyph positions before the text modifier chain begins.
-
-> [Sample](samples/5.5.6_text_box.pagx)
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `width` | float | NaN | Layout width. NaN means no boundary in this dimension, which may cause wordWrap or overflow to have no effect |
-| `height` | float | NaN | Layout height. NaN means no boundary in this dimension, which may cause wordWrap or overflow to have no effect |
-| `textAlign` | TextAlign | start | Text alignment along the inline direction |
-| `paragraphAlign` | ParagraphAlign | near | Paragraph alignment along the block-flow direction |
-| `writingMode` | WritingMode | horizontal | Layout direction |
-| `lineHeight` | float | 0 | Line height in pixels. 0 means auto (calculated from font metrics: ascent + descent + leading). Following CSS Writing Modes conventions, this is a logical property: in vertical mode it controls column width |
-| `wordWrap` | bool | true | Enable automatic word wrapping at the box width boundary (horizontal mode) or height boundary (vertical mode). Has no effect when that dimension is NaN |
-| `overflow` | Overflow | visible | Overflow behavior when text exceeds the box height (horizontal mode) or width (vertical mode). Has no effect when that dimension is NaN |
-
-TextBox inherits all Group attributes (`position`, `anchor`, `rotation`, `scale`, `skew`, `skewAxis`, `alpha`, and constraint attributes `left`, `right`, `top`, `bottom`, `centerX`, `centerY`). The `position` attribute specifies the top-left corner of the text area in the parent coordinate system. Prefer constraint attributes (`left`/`top`) for positioning — when constraints are set, `position` is computed automatically.
-
-**TextAlign (Text Alignment)**:
-
-| Value | Description |
-|-------|-------------|
-| `start` | Start alignment |
-| `center` | Center alignment |
-| `end` | End alignment |
-| `justify` | Justified (last line start-aligned) |
-
-**ParagraphAlign (Paragraph Alignment)**:
-
-Aligns text lines or columns along the block-flow direction. Uses direction-neutral names (Near/Far instead of Top/Bottom) that work correctly for both horizontal and vertical writing modes. In horizontal mode this controls vertical positioning; in vertical mode this controls horizontal positioning.
-
-| Value | Description |
-|-------|-------------|
-| `near` | Near-edge alignment (top in horizontal mode, right in vertical mode) using the line-box model. The first line box's near edge is aligned to the near edge of the text area. The baseline is positioned at `halfLeading + ascent` from the near edge, where `halfLeading = (lineHeight - metricsHeight) / 2`. |
-| `middle` | Middle alignment. The total text block size (sum of all line heights/column widths) is centered within the corresponding box dimension. |
-| `far` | Far-edge alignment (bottom in horizontal mode, left in vertical mode). The last line box's far edge is aligned to the far edge of the text area. |
-
-**WritingMode (Layout Direction)**:
-
-| Value | Description |
-|-------|-------------|
-| `horizontal` | Horizontal text |
-| `vertical` | Vertical text (columns arranged right-to-left, traditional CJK vertical layout) |
-
-**Overflow (Overflow Behavior)**:
-
-| Value | Description |
-|-------|-------------|
-| `visible` | Text exceeding box boundaries is still rendered (default) |
-| `hidden` | Lines that exceed the box height (horizontal mode) or columns that exceed the box width (vertical mode) are discarded entirely. Partial lines/columns are never shown. Has no effect when that dimension is NaN |
-
-#### 5.5.7 Rich Text
-
-Rich text is achieved through multiple Text elements within a TextBox, each wrapped in a Group with independent Fill/Stroke styles. TextBox provides unified typography.
-
-> [Sample](samples/5.5.7_rich_text.pagx)
-
-**Note**: Each Group's Text + Fill/Stroke defines a text segment with independent styling. TextBox contains all segments as children and treats them as a single unit for typography, enabling auto-wrapping and alignment.
-
-### 5.6 Repeater
-
-Repeater duplicates accumulated content and rendered styles, applying progressive transforms to each copy. Repeater affects both Paths and glyph lists simultaneously, and does not trigger text-to-shape conversion.
-
-```xml
-<Repeater copies="5" offset="1" order="belowOriginal" anchor="0,0" position="50,0" rotation="0" scale="1,1" startAlpha="1" endAlpha="0.2"/>
-```
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `copies` | float | 3 | Number of copies |
-| `offset` | float | 0 | Start offset |
-| `order` | RepeaterOrder | belowOriginal | Stacking order |
-| `anchor` | Point | 0,0 | Anchor point |
-| `position` | Point | 100,100 | Position offset per copy |
-| `rotation` | float | 0 | Rotation per copy |
-| `scale` | Point | 1,1 | Scale per copy |
-| `startAlpha` | float | 1 | First copy opacity |
-| `endAlpha` | float | 1 | Last copy opacity |
-
-**Transform Calculation** (i-th copy, i starts from 0):
-```
-progress = i + offset
-```
-
-Transforms are applied in the following order:
-
-1. Translate to negative anchor (`translate(-anchor)`)
-2. Scale exponentially (`scale(scale^progress)`)
-3. Rotate linearly (`rotate(rotation × progress)`)
-4. Translate linearly (`translate(position × progress)`)
-5. Translate back to anchor (`translate(anchor)`)
-
-**Opacity Interpolation**:
-```
-maxCount = ceil(copies)
-t = progress / maxCount
-alpha = lerp(startAlpha, endAlpha, t)
-// For the last copy, alpha is further multiplied by the fractional part of copies (see below)
-```
-
-**RepeaterOrder**:
-
-| Value | Description |
-|-------|-------------|
-| `belowOriginal` | Copies below original. Index 0 on top |
-| `aboveOriginal` | Copies above original. Index N-1 on top |
-
-**Fractional Copy Count**:
-
-When `copies` is a decimal (e.g., `3.5`), partial copies are achieved through **semi-transparent blending**:
-
-1. **Geometry copying**: Shapes and text are copied by `ceil(copies)` (i.e., 4), geometry itself is not scaled or clipped
-2. **Opacity adjustment**: The last copy's opacity is multiplied by the fractional part (e.g., 0.5), producing semi-transparent effect
-3. **Visual effect**: Simulates partial copies through opacity gradation
-
-**Example**: When `copies="2.3"`:
-- Copy 3 complete geometry copies
-- Copies 1, 2 render normally
-- Copy 3's opacity × 0.3, rendering semi-transparent
-
-**Edge Cases**:
-- `copies < 0`: No operation performed
-- `copies = 0`: Clear all accumulated content and rendered styles
-
-**Repeater Characteristics**:
-- **Simultaneous effect**: Copies all accumulated Paths and glyph lists
-- **Preserve text attributes**: Glyph lists retain glyph information after copying; subsequent text modifiers can still affect them
-- **Copy rendered styles**: Also copies already rendered fills and strokes
-
-> [Sample](samples/5.6_repeater.pagx)
-
-### 5.7 Group
-
-Group is a VectorElement container with transform properties.
-
-> [Sample](samples/5.7_group.pagx)
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `anchor` | Point | 0,0 | Anchor point "x,y" |
-| `position` | Point | 0,0 | Position "x,y", computed from constraint attributes when set. Prefer constraint attributes (`left`/`top`) for positioning |
-| `rotation` | float | 0 | Rotation angle |
-| `scale` | Point | 1,1 | Scale "sx,sy" |
-| `skew` | float | 0 | Skew amount |
-| `skewAxis` | float | 0 | Skew axis angle |
-| `alpha` | float | 1 | Opacity 0~1 |
-| `width` | float | - | Layout width (see §6) |
-| `height` | float | - | Layout height (see §6) |
-| `left` | float | - | Constraint positioning: distance from container's left edge (see §6.3) |
-| `right` | float | - | Constraint positioning: distance from container's right edge (see §6.3) |
-| `top` | float | - | Constraint positioning: distance from container's top edge (see §6.3) |
-| `bottom` | float | - | Constraint positioning: distance from container's bottom edge (see §6.3) |
-| `centerX` | float | - | Constraint centering: horizontal offset from container center (see §6.3) |
-| `centerY` | float | - | Constraint centering: vertical offset from container center (see §6.3) |
-
-#### Transform Order
-
-Transforms are applied in the following order:
-
-1. Translate to negative anchor point (`translate(-anchor)`)
-2. Scale (`scale`)
-3. Skew (`skew` along `skewAxis` direction)
-4. Rotate (`rotation`)
-5. Translate to position (`translate(position)`)
-
-**Skew Transform**:
-
-Skew is applied in the following order:
-
-1. Rotate to skew axis direction (`rotate(skewAxis)`)
-2. Shear along X axis (`shearX(tan(skew))`)
-3. Rotate back (`rotate(-skewAxis)`)
-
-#### Scope Isolation
-
-Groups create isolated scopes for geometry accumulation and rendering:
-
-- Geometry elements within the group accumulate only within the group
-- Painters within the group only render geometry accumulated within the group
-- Modifiers within the group only affect geometry accumulated within the group
-- The group's transform matrix applies to all content within the group
-- The group's `alpha` property applies to all rendered content within the group
-
-**Geometry Accumulation Rules**:
-
-- **Painters do not clear geometry**: After Fill and Stroke render, the geometry list remains unchanged; subsequent painters can still render the same geometry
-- **Child Group geometry propagates upward**: After a child Group completes, its geometry accumulates to the parent scope; painters at the end of the parent can render all child Group geometry
-- **Sibling Groups do not affect each other**: Each Group creates an independent accumulation starting point; it cannot see geometry from subsequent sibling Groups
-- **Isolate rendering scope**: Painters within a Group can only render geometry accumulated up to the current position, including this group and completed child Groups
-- **Layer is accumulation boundary**: Geometry propagates upward until reaching a Layer boundary; it does not pass across Layers
-
-**Example 1 - Basic Isolation**:
-> [Sample](samples/5.7_group_isolation.pagx)
-
-**Example 2 - Child Group Geometry Propagates Upward**:
-> [Sample](samples/5.7_group_propagation.pagx)
-
-**Example 3 - Multiple Painters Reuse Geometry**:
-> [Sample](samples/5.7_multiple_painters.pagx)
-
-#### Multiple Fills and Strokes
-
-Since painters do not clear the geometry list, the same geometry can have multiple Fills and Strokes applied consecutively.
-
-**Example 4 - Multiple Fills**:
-> [Sample](samples/5.7_multiple_fills.pagx)
-
-**Example 5 - Multiple Strokes**:
-> [Sample](samples/5.7_multiple_strokes.pagx)
-
-**Example 6 - Mixed Overlay**:
-> [Sample](samples/5.7_mixed_overlay.pagx)
-
-**Rendering Order**: Multiple painters render in document order; those appearing earlier are below.
-
----
-
-## 6. Auto Layout
+## 4. Auto Layout
 
 Auto layout enables elements to declare layout intent, and the engine automatically calculates coordinates and sizes. Layout operates at two levels: **container layout** arranges child Layers in rows or columns, and **constraint positioning** positions elements relative to their container's edges or center. They can be used separately or combined. All layout calculations are performed once during parsing; layout attributes are then discarded, and only the computed results remain at runtime.
 
-### 6.1 Layout Size
+### 4.1 Layout Size
 
 The `width`/`height` attributes declare a container's layout size — the shared foundation for both layout mechanisms. Container layout uses it to determine available space for child Layers; constraint positioning uses it as the reference frame. Both Layer and Group can have layout sizes.
 
@@ -1810,7 +565,7 @@ These sources ensure that containers nearly always have a size available during 
 
 Layout size itself has no direct rendering effect; it only passes size information downward for constraint positioning of child elements. Layout size and constraint calculations are performed in the element's local coordinate system. Transforms (via `matrix` attribute) are applied after layout calculations and do not participate in or affect layout.
 
-### 6.2 Container Layout
+### 4.2 Container Layout
 
 Setting the `layout` attribute to `horizontal` or `vertical` on a parent Layer causes all child Layers to arrange automatically along the specified axis. Semantically, this is a subset of CSS Flexbox.
 
@@ -1901,7 +656,7 @@ When a Layer has container layout (`layout="horizontal"` or `"vertical"`), all c
 >
 > [Sample](samples/6.2.2_container_layout_include_in_layout.pagx)
 
-### 6.3 Constraint Positioning
+### 4.3 Constraint Positioning
 
 Constraint attributes allow content nodes to declare positional relationships with their container, and the engine automatically calculates coordinates. Constraint positioning is a fundamental capability available to all nodes — it is not a layout mode. Supported elements:
 
@@ -1929,7 +684,7 @@ Constraint attributes allow content nodes to declare positional relationships wi
 
 **Combination rules**: On each axis, only one of the following may be used: a single-edge constraint (`left`, `right`, or `centerX`), or an opposite-edge pair (`left` + `right`). The vertical axis follows the same pattern (`top` / `bottom` / `centerY`, or `top` + `bottom`).
 
-**Activation**: Constraint attributes always reference the **immediate parent container** (Layer or Group)'s layout size, propagating level by level — each container resolves its own size first, then its children's constraints use that size as the reference frame. Since the engine automatically measures container sizes (see §6.1), constraints can generally always take effect. Different constraints have different levels of dependence on container size: `left`/`top` used alone have positioning formulas that do not involve container size (e.g., `tx = left - bounds.x`) and work correctly in any situation; `right`/`bottom`/`centerX`/`centerY` and opposite-edge constraints need to reference container size to calculate position.
+**Activation**: Constraint attributes always reference the **immediate parent container** (Layer or Group)'s layout size, propagating level by level — each container resolves its own size first, then its children's constraints use that size as the reference frame. Since the engine automatically measures container sizes (see §4.1), constraints can generally always take effect. Different constraints have different levels of dependence on container size: `left`/`top` used alone have positioning formulas that do not involve container size (e.g., `tx = left - bounds.x`) and work correctly in any situation; `right`/`bottom`/`centerX`/`centerY` and opposite-edge constraints need to reference container size to calculate position.
 
 **Content Bounds**: "Edges" in constraints refer to the edges of an element's content bounds. The starting point differs by element type:
 
@@ -2058,13 +813,1295 @@ Child Layer constraint attributes override the child Layer's `x`/`y`. Activation
 </Layer>
 ```
 
-### 6.4 Animation Compatibility
+### 4.4 Animation Compatibility
 
 All layout-related attributes (`width`, `height`, `layout`, `gap`, `padding`, `alignment`, `arrangement`, and constraint attributes `left`, `right`, `top`, `bottom`, `centerX`, `centerY`) do not exist at runtime. The layout engine computes once before the first render, writing results into each element's absolute coordinates (`position`, `size`), after which layout attributes are discarded.
 
 Consequently, animations cannot modify layout attributes. Instead, animations apply visual changes on top of the pre-computed layout results. For example, `transform` and `alpha` can be keyframed and are applied on top of layout results without triggering relayout.
 
 After layout computation completes, the engine rounds all Layer `x`, `y`, `width`, and `height` values to integer pixels, preventing blur from sub-pixel rendering.
+
+---
+
+## 5. Layer System
+
+Layers are the fundamental organizational units for PAGX content, offering comprehensive control over visual effects.
+
+### 5.1 Core Concepts
+
+This section introduces the core concepts of the layer system. These concepts form the foundation for understanding layer styles, filters, and masks.
+
+#### Layer Rendering Pipeline
+
+Painters (Fill, Stroke, etc.) bound to a layer are divided into background content and foreground content via the `placement` attribute, defaulting to background content. A single layer renders in the following order:
+
+1. **Layer Styles (below)**: Render layer styles positioned below content (e.g., drop shadows)
+2. **Background Content**: Render Fill and Stroke with `placement="background"`
+3. **Child Layers**: Recursively render all child layers in document order
+4. **Layer Styles (above)**: Render layer styles positioned above content (e.g., inner shadows)
+5. **Foreground Content**: Render Fill and Stroke with `placement="foreground"` (drawn above child layers)
+6. **Layer Filters**: Use the combined output of previous steps as input to the filter chain, applying all filters sequentially
+
+#### Layer Content
+
+**Layer content** refers to the complete rendering result of the layer's background content, child layers, and foreground content (steps 2, 3, and 5 in the rendering pipeline). It does not include layer styles or layer filters.
+
+Layer styles compute their effects based on layer content. For example, when fill is placed in background content and stroke is placed in foreground content, the stroke renders above child layers, but drop shadows are still calculated based on the complete layer content including fill, child layers, and stroke.
+
+#### Layer Contour
+
+**Layer contour** is a binary (opaque or fully transparent) mask derived from the layer content. Compared to normal layer content, layer contour has these differences:
+
+1. **Alpha=0 fills are included**: Geometry painted with completely transparent color is still included in the contour
+2. **Solid color / gradient fills**: Original colors are replaced with opaque white
+3. **Image fills**: Fully transparent pixels remain transparent; all other pixels become fully opaque
+
+Note: Geometry elements without painters (standalone Rectangle, Ellipse, etc.) do not participate in contour.
+
+#### Layer Background
+
+**Layer background** refers to the composited result of all rendered content below the current layer, including:
+- Rendering results of all sibling layers below the current layer and their subtrees
+- Layer styles already drawn below the current layer (excluding BackgroundBlurStyle itself)
+
+Layer background is primarily used for:
+
+- **Layer Styles**: Some layer styles require background as one of their input sources
+- **Blend Modes**: Some blend modes require background information for correct rendering
+
+**Background Pass-through**: The `passThroughBackground` attribute controls whether layer background passes through to child layers. When set to `false`, child layers' background-dependent styles cannot access the correct layer background. The following conditions automatically disable background pass-through:
+- Layer uses a non-`normal` blend mode
+- Layer has filters applied
+- Layer uses 3D transforms or projection transforms
+
+### 5.2 Layer
+
+`<Layer>` is the basic container for content and child layers.
+
+> [Sample](samples/4.2_layer.pagx)
+
+#### Child Elements
+
+Layer child elements are automatically categorized into four collections by type:
+
+| Child Element Type | Category | Description |
+|-------------------|----------|-------------|
+| VectorElement | contents | Geometry elements, modifiers, painters (participate in accumulation processing) |
+| LayerStyle | styles | DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle |
+| LayerFilter | filters | BlurFilter, DropShadowFilter, and other filters |
+| Layer | children | Nested child layers |
+
+**Recommended Order**: Although child element order does not affect parsing results, it is recommended to write them in the order: VectorElement → LayerStyle → LayerFilter → child Layer, for improved readability.
+
+#### Layer Attributes
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `name` | string | "" | Display name |
+| `visible` | bool | true | Whether visible |
+| `alpha` | float | 1 | Opacity 0~1 |
+| `blendMode` | BlendMode | normal | Blend mode |
+| `x` | float | 0 | X position (prefer constraint attribute `left`) |
+| `y` | float | 0 | Y position (prefer constraint attribute `top`) |
+| `matrix` | Matrix | identity matrix | 2D transform "a,b,c,d,tx,ty" |
+| `matrix3D` | Matrix | - | 3D transform (16 values, column-major) |
+| `preserve3D` | bool | false | Preserve 3D transform |
+| `antiAlias` | bool | true | Edge anti-aliasing |
+| `groupOpacity` | bool | false | Group opacity |
+| `passThroughBackground` | bool | true | Whether to pass background through to child layers |
+| `scrollRect` | Rect | - | Scroll clipping region "x,y,w,h" |
+| `mask` | idref | - | Mask layer reference "@id" |
+| `maskType` | MaskType | alpha | Mask type |
+| `composition` | idref | - | Composition reference "@id" |
+| `width` | float | - | Layout width (see §4) |
+| `height` | float | - | Layout height (see §4) |
+| `layout` | LayoutMode | none | Container layout mode for child layers (see §4) |
+| `gap` | float | 0 | Child Layer spacing (see §4) |
+| `padding` | float or "t,r,b,l" | 0 | Inner padding (see §4) |
+| `alignment` | Alignment | stretch | Cross-axis alignment (see §4) |
+| `arrangement` | Arrangement | start | Main-axis arrangement (see §4) |
+| `includeInLayout` | bool | true | Whether to participate in parent container layout (see §4) |
+| `left` | float | - | As a child Layer, distance from parent container's left edge (see §4.3) |
+| `right` | float | - | As a child Layer, distance from parent container's right edge (see §4.3) |
+| `top` | float | - | As a child Layer, distance from parent container's top edge (see §4.3) |
+| `bottom` | float | - | As a child Layer, distance from parent container's bottom edge (see §4.3) |
+| `centerX` | float | - | As a child Layer, horizontal offset of center from parent container center (see §4.3) |
+| `centerY` | float | - | As a child Layer, vertical offset of center from parent container center (see §4.3) |
+
+**groupOpacity**: When `false` (default), the layer's `alpha` is applied independently to each child element, which may cause overlapping semi-transparent children to appear darker at intersections. When `true`, all layer content is first composited into an offscreen buffer, then `alpha` is applied to the buffer as a whole, producing uniform transparency across the entire layer.
+
+**preserve3D**: When `false` (default), child layers with 3D transforms are flattened into the parent's 2D plane before compositing. When `true`, child layers retain their 3D positions and are rendered in a shared 3D space, enabling depth-based intersections and correct z-ordering among siblings. Similar to CSS `transform-style: preserve-3d`.
+
+**Transform Attribute Priority**: `x`/`y`, `matrix`, and `matrix3D` have an override relationship:
+- Only `x`/`y` set: Uses `x`/`y` for translation
+- `matrix` set: `matrix` overrides `x`/`y` values
+- `matrix3D` set: `matrix3D` overrides both `matrix` and `x`/`y` values
+
+**MaskType**:
+
+| Value | Description |
+|-------|-------------|
+| `alpha` | Alpha mask: Uses mask's alpha channel |
+| `luminance` | Luminance mask: Uses mask's luminance values |
+| `contour` | Contour mask: Uses mask's contour for clipping |
+
+**BlendMode**: See §2.9 for the complete blend mode table.
+
+### 5.3 Layer Styles
+
+Layer styles add visual effects above or below layer content without modifying the original.
+
+**Input Sources for Layer Styles**:
+
+All layer styles compute effects based on **layer content**. During computation, layer content is converted to its opaque counterpart: geometric shapes are rendered with their normal fills, then all semi-transparent pixels are converted to fully opaque (fully transparent pixels are preserved). This means shadows produced by semi-transparent fills appear the same as those from fully opaque fills.
+
+Some layer styles additionally use **layer contour** or **layer background** as input (see individual style descriptions). Definitions of layer contour and layer background are in §5.1.
+
+> [Sample](samples/4.3_layer_styles.pagx)
+
+**Common LayerStyle Attributes**:
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `blendMode` | BlendMode | normal | Blend mode (see §2.9) |
+| `excludeChildEffects` | bool | false | Whether to exclude child layer effects |
+
+**excludeChildEffects**: When `false` (default), the layer style computes based on the full layer content including child layers' rendering results. When `true`, child layers' styles and filters are excluded from the layer content used to compute this style, but child layers' base rendering results are still included.
+
+#### 5.3.1 DropShadowStyle
+
+Draws a drop shadow **below** the layer. Computes shadow shape based on opaque layer content.
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `offsetX` | float | 0 | X offset |
+| `offsetY` | float | 0 | Y offset |
+| `blurX` | float | 0 | X blur radius |
+| `blurY` | float | 0 | Y blur radius |
+| `color` | Color | #000000 | Shadow color |
+| `showBehindLayer` | bool | true | Whether shadow shows behind layer |
+
+**Rendering Steps**:
+1. Get opaque layer content and offset by `(offsetX, offsetY)`
+2. Apply Gaussian blur `(blurX, blurY)` to the offset content
+3. Fill the shadow region with `color`
+4. If `showBehindLayer="false"`, use layer contour as erase mask to cut out occluded portion
+
+**showBehindLayer**:
+- `true`: Shadow displays completely, including portion occluded by layer content
+- `false`: Portion of shadow occluded by layer content is cut out (using layer contour as erase mask)
+
+#### 5.3.2 BackgroundBlurStyle
+
+Applies blur effect to layer background **below** the layer. Computes effect based on **layer background**, using opaque layer content as mask for clipping.
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `blurX` | float | 0 | X blur radius |
+| `blurY` | float | 0 | Y blur radius |
+| `tileMode` | TileMode | mirror | Tile mode |
+
+**Rendering Steps**:
+1. Get layer background below layer bounds
+2. Apply Gaussian blur `(blurX, blurY)` to layer background
+3. Clip blurred result using opaque layer content as mask
+
+#### 5.3.3 InnerShadowStyle
+
+Draws an inner shadow **above** the layer, appearing inside the layer content. Computes shadow range based on opaque layer content.
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `offsetX` | float | 0 | X offset |
+| `offsetY` | float | 0 | Y offset |
+| `blurX` | float | 0 | X blur radius |
+| `blurY` | float | 0 | Y blur radius |
+| `color` | Color | #000000 | Shadow color |
+
+**Rendering Steps**:
+1. Get opaque layer content and offset by `(offsetX, offsetY)`
+2. Apply Gaussian blur `(blurX, blurY)` to the inverse of the offset content (exterior region)
+3. Fill the shadow region with `color`
+4. Intersect with opaque layer content, keeping only shadow inside content
+
+### 5.4 Layer Filters
+
+Layer filters are the final stage of layer rendering. All previously rendered results (including layer styles) accumulated in order serve as filter input. Filters are applied in chain fashion according to document order, with each filter's output becoming the next filter's input.
+
+Unlike layer styles (§5.3), which **independently render** visual effects above or below layer content, filters **modify** the layer's overall rendering output. Layer styles are applied before filters.
+
+> [Sample](samples/4.4_layer_filters.pagx)
+
+#### 5.4.1 BlurFilter
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `blurX` | float | 0 | X blur radius |
+| `blurY` | float | 0 | Y blur radius |
+| `tileMode` | TileMode | decal | Tile mode |
+
+#### 5.4.2 DropShadowFilter
+
+Generates shadow effect based on filter input. Unlike DropShadowStyle, the filter projects from original rendering content and preserves semi-transparency, whereas the style projects from opaque layer content.
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `offsetX` | float | 0 | X offset |
+| `offsetY` | float | 0 | Y offset |
+| `blurX` | float | 0 | X blur radius |
+| `blurY` | float | 0 | Y blur radius |
+| `color` | Color | #000000 | Shadow color |
+| `shadowOnly` | bool | false | Show shadow only |
+
+**Rendering Steps**:
+1. Offset filter input by `(offsetX, offsetY)`
+2. Extract alpha channel and apply Gaussian blur `(blurX, blurY)`
+3. Fill shadow region with `color`
+4. Composite shadow with filter input (`shadowOnly=false`) or output shadow only (`shadowOnly=true`)
+
+#### 5.4.3 InnerShadowFilter
+
+Draws shadow inside the filter input.
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `offsetX` | float | 0 | X offset |
+| `offsetY` | float | 0 | Y offset |
+| `blurX` | float | 0 | X blur radius |
+| `blurY` | float | 0 | Y blur radius |
+| `color` | Color | #000000 | Shadow color |
+| `shadowOnly` | bool | false | Show shadow only |
+
+**Rendering Steps**:
+1. Create inverse mask of filter input's alpha channel
+2. Offset and apply Gaussian blur
+3. Intersect with filter input's alpha channel
+4. Composite result with filter input (`shadowOnly=false`) or output shadow only (`shadowOnly=true`)
+
+#### 5.4.4 BlendFilter
+
+Overlays a specified color onto the layer using a specified blend mode.
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `color` | Color | (required) | Blend color |
+| `blendMode` | BlendMode | normal | Blend mode (see §2.9) |
+
+#### 5.4.5 ColorMatrixFilter
+
+Transforms colors using a 4×5 color matrix.
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `matrix` | Matrix | identity matrix | 4x5 color matrix (20 comma-separated floats) |
+
+**Matrix Format** (20 values, row-major):
+```
+| R' |   | m[0]  m[1]  m[2]  m[3]  m[4]  |   | R |
+| G' |   | m[5]  m[6]  m[7]  m[8]  m[9]  |   | G |
+| B' | = | m[10] m[11] m[12] m[13] m[14] | × | B |
+| A' |   | m[15] m[16] m[17] m[18] m[19] |   | A |
+                                            | 1 |
+```
+
+### 5.5 Clipping and Masking
+
+#### 5.5.1 scrollRect
+
+The `scrollRect` attribute defines the layer's visible region; content outside this region is clipped.
+
+> [Sample](samples/4.5.1_scroll_rect.pagx)
+
+#### 5.5.2 Masking
+
+Reference another layer as a mask using the `mask` attribute.
+
+> [Sample](samples/4.5.2_masking.pagx)
+
+**Masking Rules**:
+- The mask layer itself is not rendered (the `visible` attribute is ignored)
+- The mask layer's transforms do not affect the masked layer
+
+---
+
+## 6. VectorElement System
+
+The VectorElement system defines how vector content within Layers is processed and rendered.
+
+### 6.1 Processing Model
+
+The VectorElement system employs an **accumulate-render** processing model: geometry elements accumulate in a rendering context, modifiers transform the accumulated geometry, and painters trigger final rendering.
+
+#### 6.1.1 Terminology
+
+| Term | Elements | Description |
+|------|----------|-------------|
+| **Geometry Elements** | Rectangle, Ellipse, Polystar, Path, Text | Elements providing geometric shapes; accumulate as a geometry list in the context |
+| **Modifiers** | TrimPath, RoundCorner, MergePath, TextModifier, TextPath, TextBox, Repeater | Transform accumulated geometry |
+| **Painters** | Fill, Stroke | Perform fill or stroke rendering on accumulated geometry |
+| **Containers** | Group | Create isolated scopes and apply matrix transforms; merge upon completion |
+
+#### 6.1.2 Internal Structure of Geometry Elements
+
+Geometry elements have different internal structures when accumulating in the context:
+
+| Element Type | Internal Structure | Description |
+|--------------|-------------------|-------------|
+| Shape elements (Rectangle, Ellipse, Polystar, Path) | Single Path | Each shape element produces one path |
+| Text element (Text) | Glyph list | A Text produces multiple glyphs after shaping |
+
+#### 6.1.3 Processing and Rendering Order
+
+VectorElements are processed sequentially in **document order**; elements appearing earlier are processed first. By default, painters processed earlier are rendered first (appearing below).
+
+Since Fill and Stroke can specify rendering to layer background or foreground via the `placement` attribute, the final rendering order may not exactly match document order. However, in the default case (all content as background), rendering order matches document order.
+
+#### 6.1.4 Unified Processing Flow
+
+```
+Geometry Elements        Modifiers              Painters
+┌──────────┐          ┌──────────┐          ┌──────────┐
+│Rectangle │          │ TrimPath │          │   Fill   │
+│ Ellipse  │          │RoundCorn │          │  Stroke  │
+│ Polystar │          │MergePath │          └────┬─────┘
+│   Path   │          │TextModif │               │
+│   Text   │          │ TextPath │               │
+└────┬─────┘          │TextBox   │               │
+     │                │ Repeater │               │
+     │                └────┬─────┘               │
+     │                     │                     │
+     │ Accumulate          │ Transform           │ Render
+     ▼                     ▼                     ▼
+┌─────────────────────────────────────────────────────────┐
+│ Geometry List [Path1, Path2, GlyphList1, GlyphList2...] │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Rendering context** accumulates a geometry list where:
+- Each shape element contributes one Path
+- Each Text contributes a glyph list (containing multiple glyphs)
+
+#### 6.1.5 Modifier Scope
+
+Different modifiers have different scopes over elements in the geometry list:
+
+| Modifier Type | Target | Description |
+|---------------|--------|-------------|
+| Shape modifiers (TrimPath, RoundCorner, MergePath) | Paths only | Trigger forced conversion for text |
+| Text modifiers (TextModifier, TextPath, TextBox) | Glyph lists only | No effect on Paths |
+| Repeater | Paths + glyph lists | Affects all geometry simultaneously |
+
+### 6.2 Geometry Elements
+
+Geometry elements provide renderable shapes.
+
+#### 6.2.1 Rectangle
+
+Rectangles are defined from center point with uniform corner rounding support.
+
+```xml
+<Rectangle size="200,150" roundness="10" reversed="false"/>
+```
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `position` | Point | (center of bounding box) | Center point coordinate, computed from constraint attributes when set. When not set, defaults to `(size.width/2, size.height/2)`, placing the top-left corner at the origin. Prefer constraint attributes (`left`/`top`) for positioning |
+| `size` | Size | 100,100 | Dimensions "width,height" |
+| `roundness` | float | 0 | Corner radius |
+| `reversed` | bool | false | Reverse path direction |
+| `left` | float | - | Constraint positioning: distance from element's left edge to container's left edge (see §4.3) |
+| `right` | float | - | Constraint positioning: distance from element's right edge to container's right edge (see §4.3) |
+| `top` | float | - | Constraint positioning: distance from element's top edge to container's top edge (see §4.3) |
+| `bottom` | float | - | Constraint positioning: distance from element's bottom edge to container's bottom edge (see §4.3) |
+| `centerX` | float | - | Constraint positioning: horizontal offset of element center from container center (see §4.3) |
+| `centerY` | float | - | Constraint positioning: vertical offset of element center from container center (see §4.3) |
+
+**Calculation Rules**:
+```
+rect.left   = position.x - size.width / 2
+rect.top    = position.y - size.height / 2
+rect.right  = position.x + size.width / 2
+rect.bottom = position.y + size.height / 2
+```
+
+**Corner Rounding**:
+- `roundness` value is automatically limited to `min(roundness, size.width/2, size.height/2)`
+- When `roundness >= min(size.width, size.height) / 2`, the shorter dimension becomes semicircular
+
+**Path Start Point**: Rectangle path starts from the **top-right corner**, drawn clockwise (`reversed="false"`).
+
+**Example**:
+
+> [Sample](samples/5.2.1_rectangle.pagx)
+
+#### 6.2.2 Ellipse
+
+Ellipses are defined from center point.
+
+```xml
+<Ellipse size="100,60" reversed="false"/>
+```
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `position` | Point | (center of bounding box) | Center point coordinate, computed from constraint attributes when set. When not set, defaults to `(size.width/2, size.height/2)`, placing the top-left corner at the origin. Prefer constraint attributes (`left`/`top`) for positioning |
+| `size` | Size | 100,100 | Dimensions "width,height" |
+| `reversed` | bool | false | Reverse path direction |
+| `left` | float | - | Constraint positioning: distance from element's left edge to container's left edge (see §4.3) |
+| `right` | float | - | Constraint positioning: distance from element's right edge to container's right edge (see §4.3) |
+| `top` | float | - | Constraint positioning: distance from element's top edge to container's top edge (see §4.3) |
+| `bottom` | float | - | Constraint positioning: distance from element's bottom edge to container's bottom edge (see §4.3) |
+| `centerX` | float | - | Constraint positioning: horizontal offset of element center from container center (see §4.3) |
+| `centerY` | float | - | Constraint positioning: vertical offset of element center from container center (see §4.3) |
+
+**Calculation Rules**:
+```
+boundingRect.left   = position.x - size.width / 2
+boundingRect.top    = position.y - size.height / 2
+boundingRect.right  = position.x + size.width / 2
+boundingRect.bottom = position.y + size.height / 2
+```
+
+**Path Start Point**: Ellipse path starts from the **right midpoint** (3 o'clock position).
+
+**Example**:
+
+> [Sample](samples/5.2.2_ellipse.pagx)
+
+#### 6.2.3 Polystar
+
+Supports both regular polygon and star modes.
+
+```xml
+<Polystar type="star" pointCount="5" outerRadius="100" innerRadius="50" rotation="0" outerRoundness="0" innerRoundness="0" reversed="false"/>
+```
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `position` | Point | (center of bounding box) | Center point coordinate, computed from constraint attributes when set. When not set, defaults to the center of the computed bounding box, placing the top-left corner at the origin. Prefer constraint attributes (`left`/`top`) for positioning |
+| `type` | PolystarType | star | Type (see below) |
+| `pointCount` | float | 5 | Number of points (supports decimals) |
+| `outerRadius` | float | 100 | Outer radius |
+| `innerRadius` | float | 50 | Inner radius (star only) |
+| `rotation` | float | 0 | Rotation angle |
+| `outerRoundness` | float | 0 | Outer corner roundness 0~1 |
+| `innerRoundness` | float | 0 | Inner corner roundness 0~1 |
+| `reversed` | bool | false | Reverse path direction |
+| `left` | float | - | Constraint positioning: distance from element's left edge to container's left edge (see §4.3) |
+| `right` | float | - | Constraint positioning: distance from element's right edge to container's right edge (see §4.3) |
+| `top` | float | - | Constraint positioning: distance from element's top edge to container's top edge (see §4.3) |
+| `bottom` | float | - | Constraint positioning: distance from element's bottom edge to container's bottom edge (see §4.3) |
+| `centerX` | float | - | Constraint positioning: horizontal offset of element center from container center (see §4.3) |
+| `centerY` | float | - | Constraint positioning: vertical offset of element center from container center (see §4.3) |
+
+**PolystarType**:
+
+| Value | Description |
+|-------|-------------|
+| `polygon` | Regular polygon: Uses outer radius only |
+| `star` | Star: Alternates between outer and inner radii |
+
+**Polygon Mode** (`type="polygon"`):
+- Uses only `outerRadius` and `outerRoundness`
+- `innerRadius` and `innerRoundness` are ignored
+
+**Star Mode** (`type="star"`):
+- Outer vertices at `outerRadius`
+- Inner vertices at `innerRadius`
+- Vertices alternate to form star shape
+
+**Vertex Calculation** (i-th outer vertex):
+```
+angle = rotation + (i / pointCount) * 360°
+x = position.x + outerRadius * cos(angle)
+y = position.y + outerRadius * sin(angle)
+```
+
+**Fractional Point Count**:
+- `pointCount` supports decimal values (e.g., `5.5`)
+- The fractional part determines how much of the final vertex is drawn, producing an incomplete corner
+- `pointCount <= 0` generates no path
+
+**Roundness**:
+- `outerRoundness` and `innerRoundness` range from 0~1
+- 0 means sharp corners; 1 means fully rounded
+- Roundness is achieved by adding Bézier control points at vertices
+
+**Example**:
+
+> [Sample](samples/5.2.3_polystar.pagx)
+
+#### 6.2.4 Path
+
+Defines arbitrary shapes using SVG path syntax, supporting inline data or references to PathData defined in Resources.
+
+```xml
+<!-- Inline path data -->
+<Path data="M 0 0 L 100 0 L 100 100 Z" reversed="false"/>
+
+<!-- Reference PathData resource -->
+<Path data="@curvePath" reversed="false"/>
+```
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `data` | string/idref | (required) | SVG path data or PathData resource reference "@id" |
+| `position` | Point | 0,0 | Offset of the path coordinate system origin. Prefer constraint attributes (`left`/`top`) for positioning |
+| `reversed` | bool | false | Reverse path direction |
+| `left` | float | - | Constraint positioning: distance from element's left edge to container's left edge (see §4.3) |
+| `right` | float | - | Constraint positioning: distance from element's right edge to container's right edge (see §4.3) |
+| `top` | float | - | Constraint positioning: distance from element's top edge to container's top edge (see §4.3) |
+| `bottom` | float | - | Constraint positioning: distance from element's bottom edge to container's bottom edge (see §4.3) |
+| `centerX` | float | - | Constraint positioning: horizontal offset of element center from container center (see §4.3) |
+| `centerY` | float | - | Constraint positioning: vertical offset of element center from container center (see §4.3) |
+
+**Example**:
+
+> [Sample](samples/5.2.4_path.pagx)
+
+#### 6.2.5 Text
+
+Text elements provide geometric shapes for text content. Unlike shape elements that produce a single Path, Text produces a **glyph list** (multiple glyphs) after shaping, which accumulates in the rendering context's geometry list for subsequent modifier transformation or painter rendering.
+
+```xml
+<Text text="Hello World" left="100" top="200" fontFamily="Arial" fontStyle="Regular" fauxBold="true" fauxItalic="false" fontSize="24" letterSpacing="0" textAnchor="start"/>
+```
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `text` | string | "" | Text content |
+| `position` | Point | 0,0 | Text start position (y is baseline), computed from constraint attributes when set. Prefer constraint attributes (`left`/`top`) for positioning |
+| `fontFamily` | string | "" | Font family (empty string means system default) |
+| `fontStyle` | string | "" | Font variant (Regular, Bold, Italic, Bold Italic, etc.). Empty string means the font's default variant |
+| `fontSize` | float | 12 | Font size |
+| `letterSpacing` | float | 0 | Letter spacing |
+| `fauxBold` | bool | false | Faux bold (algorithmically bolded) |
+| `fauxItalic` | bool | false | Faux italic (algorithmically slanted) |
+| `textAnchor` | TextAnchor | start | Text anchor alignment relative to the origin (see below). Ignored when a TextBox controls the layout |
+| `left` | float | - | Constraint positioning: distance from element's left edge to container's left edge (see §4.3) |
+| `right` | float | - | Constraint positioning: distance from element's right edge to container's right edge (see §4.3) |
+| `top` | float | - | Constraint positioning: distance from element's top edge to container's top edge (see §4.3) |
+| `bottom` | float | - | Constraint positioning: distance from element's bottom edge to container's bottom edge (see §4.3) |
+| `centerX` | float | - | Constraint positioning: horizontal offset of element center from container center (see §4.3) |
+| `centerY` | float | - | Constraint positioning: vertical offset of element center from container center (see §4.3) |
+
+Child elements: `CDATA` text, `GlyphRun`*
+
+**Text Content**: Typically use the `text` attribute to specify text content. When text contains XML special characters (`<`, `>`, `&`, etc.) or needs to preserve multi-line formatting, use a CDATA child node instead of the `text` attribute. Text does not allow direct plain text child nodes; CDATA wrapping is required.
+
+```xml
+<!-- Simple text: use text attribute -->
+<Text text="Hello World" fontFamily="Arial" fontSize="24"/>
+
+<!-- Contains special characters: use CDATA -->
+<Text fontFamily="Arial" fontSize="24"><![CDATA[A < B & C > D]]></Text>
+
+<!-- Multi-line text: use CDATA to preserve formatting -->
+<Text fontFamily="Arial" fontSize="24">
+<![CDATA[Line 1
+Line 2
+Line 3]]>
+</Text>
+```
+
+**Rendering Modes**: Text supports **pre-layout** and **runtime layout** modes. Pre-layout provides pre-computed glyphs and positions via GlyphRun child nodes, rendering with embedded fonts for cross-platform consistency. Runtime layout performs shaping and layout at runtime; due to platform differences in fonts and layout features, minor inconsistencies may occur. For pixel-perfect reproduction of design tool layouts, pre-layout is recommended.
+
+**TextAnchor (Text Anchor Alignment)**:
+
+Controls how text is positioned relative to its origin point.
+
+| Value | Description |
+|-------|-------------|
+| `start` | The origin is at the start of the text. No offset is applied |
+| `center` | The origin is at the center of the text. Text is offset by half its width to center on the origin |
+| `end` | The origin is at the end of the text. Text is offset by its full width so it ends at the origin |
+
+**Runtime Layout Rendering Flow**:
+1. Find system font based on `fontFamily` and `fontStyle`; if unavailable, select fallback font according to runtime-configured fallback list
+2. Shape using `text` attribute (or CDATA child node); newlines trigger line breaks (default 1.2× font size line height, customizable via TextBox)
+3. Apply typography parameters: `fontSize`, `letterSpacing`
+4. Construct glyph list and accumulate to rendering context
+
+**Runtime Layout Example**:
+
+> [Sample](samples/5.2.5_text.pagx)
+
+##### GlyphRun (Pre-layout Data)
+
+GlyphRun defines pre-layout data for a group of glyphs, each GlyphRun independently referencing one font resource.
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `font` | idref | (required) | Font resource reference `@id` |
+| `fontSize` | float | 12 | Rendering font size. Actual scale = `fontSize / font.unitsPerEm` |
+| `glyphs` | string | (required) | GlyphID sequence, comma-separated (0 means missing glyph) |
+| `x` | float | 0 | Overall X offset |
+| `y` | float | 0 | Overall Y offset |
+| `xOffsets` | string | - | Per-glyph X offset, comma-separated |
+| `positions` | string | - | Per-glyph (x,y) offset, semicolon-separated |
+| `anchors` | string | - | Per-glyph anchor offset (x,y), semicolon-separated. The anchor is the center point for scale, rotation, and skew transforms. Default anchor is (advance×0.5, 0) |
+| `scales` | string | - | Per-glyph scale (sx,sy), semicolon-separated. Scaling is applied around the anchor point. Default 1,1 |
+| `rotations` | string | - | Per-glyph rotation angle (degrees), comma-separated. Rotation is applied around the anchor point. Default 0 |
+| `skews` | string | - | Per-glyph skew angle (degrees), comma-separated. Skewing is applied around the anchor point. Default 0 |
+
+All attributes are optional and can be combined. When an attribute array is shorter than the glyph count, missing values use defaults.
+
+**Position Calculation**:
+
+```
+finalX[i] = x + xOffsets[i] + positions[i].x
+finalY[i] = y + positions[i].y
+```
+
+- When `xOffsets` is not specified, `xOffsets[i]` is treated as 0
+- When `positions` is not specified, `positions[i]` is treated as (0, 0)
+- When neither `xOffsets` nor `positions` is specified: First glyph positioned at (x, y), subsequent glyphs positioned by accumulating each Glyph's `advance` attribute
+
+**Transform Application Order**:
+
+When a glyph has scale, rotation, or skew transforms, they are applied in the following order (consistent with TextModifier):
+
+1. Translate to anchor (`translate(-anchor)`)
+2. Scale (`scale`)
+3. Skew (`skew`, along vertical axis)
+4. Rotate (`rotation`)
+5. Translate back from anchor (`translate(anchor)`)
+6. Translate to position (`translate(position)`)
+
+**Anchor**:
+
+- Each glyph's **default anchor** is at `(advance × 0.5, 0)`, the horizontal center at baseline
+- The `anchors` attribute records offsets relative to the default anchor, final anchor = default anchor + anchors[i]
+
+**Pre-layout Example**:
+
+> [Sample](samples/5.2.5_glyph_run.pagx)
+
+### 6.3 Painters
+
+Painters (Fill, Stroke) render all geometry (Paths and glyph lists) accumulated at the **current moment**.
+
+#### 6.3.1 Fill
+
+Fill draws the interior region of geometry using a specified color source.
+
+> [Sample](samples/5.3.1_fill.pagx)
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `color` | Color/idref | #000000 | Color value or color source reference, default black |
+| `alpha` | float | 1 | Opacity 0~1 |
+| `blendMode` | BlendMode | normal | Blend mode (see §2.9) |
+| `fillRule` | FillRule | winding | Fill rule (see below) |
+| `placement` | LayerPlacement | background | Rendering position (see §6.3.3) |
+
+Child elements: May embed one color source (SolidColor, LinearGradient, RadialGradient, ConicGradient, DiamondGradient, ImagePattern)
+
+**FillRule**:
+
+| Value | Description |
+|-------|-------------|
+| `winding` | Non-zero winding rule: Counts based on path direction; fills if non-zero |
+| `evenOdd` | Even-odd rule: Counts based on crossing count; fills if odd |
+
+**Text Fill**:
+- Text is filled per glyph
+- Supports color override for individual glyphs via TextModifier
+- Color override uses alpha blending: `finalColor = lerp(originalColor, overrideColor, overrideAlpha)`
+
+#### 6.3.2 Stroke
+
+Stroke draws lines along geometry boundaries.
+
+> [Sample](samples/5.3.2_stroke.pagx)
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `color` | Color/idref | #000000 | Color value or color source reference, default black |
+| `width` | float | 1 | Stroke width |
+| `alpha` | float | 1 | Opacity 0~1 |
+| `blendMode` | BlendMode | normal | Blend mode (see §2.9) |
+| `cap` | LineCap | butt | Line cap style (see below) |
+| `join` | LineJoin | miter | Line join style (see below) |
+| `miterLimit` | float | 4 | Miter limit |
+| `dashes` | string | - | Dash pattern "d1,d2,..." |
+| `dashOffset` | float | 0 | Dash offset |
+| `dashAdaptive` | bool | false | Scale dashes to equal length |
+| `align` | StrokeAlign | center | Stroke alignment (see below) |
+| `placement` | LayerPlacement | background | Rendering position (see §6.3.3) |
+
+**LineCap**:
+
+| Value | Description |
+|-------|-------------|
+| `butt` | Butt cap: Line does not extend beyond endpoints |
+| `round` | Round cap: Semicircular extension at endpoints |
+| `square` | Square cap: Rectangular extension at endpoints |
+
+**LineJoin**:
+
+| Value | Description |
+|-------|-------------|
+| `miter` | Miter join: Extends outer edges to form sharp corner |
+| `round` | Round join: Connected with circular arc |
+| `bevel` | Bevel join: Fills connection with triangle |
+
+**StrokeAlign**:
+
+| Value | Description |
+|-------|-------------|
+| `center` | Stroke centered on path (default) |
+| `inside` | Stroke inside closed path |
+| `outside` | Stroke outside closed path |
+
+Inside/outside stroke is achieved by:
+1. Stroking at double width
+2. Boolean operation with original shape (intersection for inside, difference for outside)
+
+**Dash Pattern**:
+- `dashes`: Defines dash segment length sequence, e.g., `"5,3"` means 5px solid + 3px gap
+- `dashOffset`: Dash start offset
+- `dashAdaptive`: When true, scales the dash intervals so that the dash segments have the same length
+
+#### 6.3.3 LayerPlacement
+
+The `placement` attribute of Fill and Stroke controls rendering order relative to child layers:
+
+| Value | Description |
+|-------|-------------|
+| `background` | Render **below** child layers (default) |
+| `foreground` | Render **above** child layers |
+
+### 6.4 Shape Modifiers
+
+Shape modifiers perform **in-place transformation** on accumulated Paths; for glyph lists, they trigger forced conversion to Paths.
+
+#### 6.4.1 TrimPath
+
+Trims paths to a specified start/end range.
+
+```xml
+<TrimPath start="0" end="0.5" offset="0" type="separate"/>
+```
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `start` | float | 0 | Start position 0~1 |
+| `end` | float | 1 | End position 0~1 |
+| `offset` | float | 0 | Offset in degrees; 360° equals one full cycle of the path length. For example, 180° shifts the trim range by half the path length |
+| `type` | TrimType | separate | Trim type (see below) |
+
+**TrimType**:
+
+| Value | Description |
+|-------|-------------|
+| `separate` | Separate mode: Each shape trimmed independently with same start/end parameters |
+| `continuous` | Continuous mode: All shapes treated as one continuous path, trimmed by total length ratio |
+
+**Edge Cases**:
+- `start > end`: The start and end values are mirrored (`start = 1 - start`, `end = 1 - end`) and all path directions are reversed, then normal trimming is applied. The resulting visual is the complementary segment of the path with reversed direction
+- Supports wrapping: When trim range exceeds [0,1], automatically wraps to other end of path
+- When total path length is 0, no operation is performed
+
+> [Sample](samples/5.4.1_trim_path.pagx)
+
+#### 6.4.2 RoundCorner
+
+Converts sharp corners of paths to rounded corners.
+
+```xml
+<RoundCorner radius="10"/>
+```
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `radius` | float | 10 | Corner radius |
+
+**Processing Rules**:
+- Only affects sharp corners (non-smooth connected vertices)
+- Corner radius is automatically limited to not exceed half the length of adjacent edges
+- `radius <= 0` performs no operation
+
+**Example**:
+
+> [Sample](samples/5.4.2_round_corner.pagx)
+
+#### 6.4.3 MergePath
+
+Merges all shapes into a single shape.
+
+```xml
+<MergePath mode="append"/>
+```
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `mode` | MergePathMode | append | Merge operation (see below) |
+
+**MergePathMode**:
+
+| Value | Description |
+|-------|-------------|
+| `append` | Append: Simply merge all paths without boolean operations (default) |
+| `union` | Union: Merge all shape coverage areas |
+| `intersect` | Intersect: Keep only overlapping areas of all shapes |
+| `xor` | XOR: Keep non-overlapping areas |
+| `difference` | Difference: Subtract subsequent shapes from first shape |
+
+**Important Behavior**:
+- MergePath **clears all previously accumulated Fill and Stroke effects** in the current scope; only the merged path remains in the geometry list
+- Current transformation matrices of shapes are applied during merge
+- Merged shape's transformation matrix resets to identity matrix
+
+**Example**:
+
+> [Sample](samples/5.4.3_merge_path.pagx)
+
+### 6.5 Text Modifiers
+
+Text modifiers transform individual glyphs within text.
+
+#### 6.5.1 Text Modifier Processing
+
+When a text modifier is encountered, **all glyph lists** accumulated in the context are combined into a unified glyph list for the operation:
+
+```xml
+<TextBox left="100" top="50" width="200" height="100" textAlign="center">
+  <Text text="Hello " fontFamily="Arial" fontSize="24"/>
+  <Text text="World" fontFamily="Arial" fontSize="24"/>
+  <TextModifier position="0,-5"/>
+  <Fill color="#333333"/>
+</TextBox>
+```
+
+#### 6.5.2 Text to Shape Conversion
+
+When text encounters a shape modifier, it is forcibly converted to shape paths:
+
+```
+Text Element           Shape Modifier          Subsequent Modifiers
+┌──────────┐          ┌──────────┐
+│   Text   │          │ TrimPath │
+└────┬─────┘          │RoundCorn │
+     │                │MergePath │
+     │ Accumulated    └────┬─────┘
+     │ Glyph List          │
+     ▼                     │ Triggers Conversion
+┌──────────────┐           │
+│ Glyph List   │───────────┼──────────────────────┐
+│ [H,e,l,l,o]  │           │                      │
+└──────────────┘           ▼                      ▼
+                  ┌──────────────┐      ┌──────────────────┐
+                  │ Merged into  │      │ Emoji Discarded  │
+                  │ Single Path  │      │ (Cannot convert) │
+                  └──────────────┘      └──────────────────┘
+                           │
+                           │ Subsequent text modifiers no longer effective
+                           ▼
+                  ┌──────────────┐
+                  │ TextModifier │ → Skipped (Already Path)
+                  └──────────────┘
+```
+
+**Conversion Rules**:
+
+1. **Trigger Condition**: Conversion triggered when text encounters TrimPath, RoundCorner, or MergePath
+2. **Merge into Single Path**: All glyphs of one Text merge into **one** Path, not one independent Path per glyph
+3. **Emoji Loss**: Emoji cannot be converted to path outlines; discarded during conversion
+4. **Irreversible Conversion**: After conversion becomes pure Path; subsequent text modifiers have no effect on it
+
+**Example**:
+
+```xml
+<Group>
+  <Text fontFamily="Arial" fontSize="24"><![CDATA[Hello 😀]]></Text>
+  <TrimPath start="0" end="0.5"/>
+  <TextModifier position="0,-10"/>
+  <Fill color="#333333"/>
+</Group>
+```
+
+#### 6.5.3 TextModifier
+
+Applies transforms and style overrides to glyphs within selected ranges. TextModifier may contain multiple RangeSelector child elements.
+
+```xml
+<TextModifier anchor="0,0" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1" fillColor="#FF0000" strokeColor="#000000" strokeWidth="1">
+  <RangeSelector start="0" end="0.5" shape="rampUp"/>
+  <RangeSelector start="0.5" end="1" shape="rampDown"/>
+</TextModifier>
+```
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `anchor` | Point | 0,0 | Anchor point offset, relative to glyph's default anchor position. Each glyph's default anchor is at `(advance × 0.5, 0)`, the horizontal center at baseline |
+| `position` | Point | 0,0 | Position offset |
+| `rotation` | float | 0 | Rotation |
+| `scale` | Point | 1,1 | Scale |
+| `skew` | float | 0 | Skew amount in degrees along the skewAxis direction |
+| `skewAxis` | float | 0 | Skew axis angle in degrees; defines the direction along which skewing is applied |
+| `alpha` | float | 1 | Opacity |
+| `fillColor` | Color | - | Fill color override |
+| `strokeColor` | Color | - | Stroke color override |
+| `strokeWidth` | float | - | Stroke width override |
+
+**Selector Calculation**:
+1. Calculate selection range based on RangeSelector's `start`, `end`, `offset` (supports any decimal value; automatically wraps when exceeding [0,1] range)
+2. Calculate raw influence value (0~1) for each glyph based on `shape`, then multiply by `weight`
+3. Combine multiple selectors according to `mode`, then clamp the combined result to [-1, 1]
+
+```
+factor = clamp(combine(rawInfluence₁ × weight₁, rawInfluence₂ × weight₂, ...), -1, 1)
+```
+
+**Transform Application**:
+
+Position and rotation are applied linearly with factor. Transforms are applied in the following order:
+
+1. Translate to negative anchor (`translate(-anchor × factor)`)
+2. Scale from identity (`scale(1 + (scale - 1) × factor)`)
+3. Skew (`skew(skew × factor, skewAxis)`)
+4. Rotate (`rotate(rotation × factor)`)
+5. Translate back to anchor (`translate(anchor × factor)`)
+6. Translate to position (`translate(position × factor)`)
+
+Opacity uses the absolute value of factor:
+
+```
+alphaFactor = 1 + (alpha - 1) × |factor|
+finalAlpha = originalAlpha × max(0, alphaFactor)
+```
+
+**Color Override**:
+
+Color override uses the absolute value of `factor` for alpha blending:
+
+```
+blendFactor = overrideColor.alpha × |factor|
+finalColor = blend(originalColor, overrideColor, blendFactor)
+```
+
+**Example**:
+
+> [Sample](samples/5.5.3_text_modifier.pagx)
+
+#### 6.5.4 RangeSelector
+
+Range selectors define the glyph range and influence degree for TextModifier.
+
+```xml
+<RangeSelector start="0" end="1" offset="0" unit="percentage" shape="square" easeIn="0" easeOut="0" mode="add" weight="1" randomOrder="false" randomSeed="0"/>
+```
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `start` | float | 0 | Selection start |
+| `end` | float | 1 | Selection end |
+| `offset` | float | 0 | Selection offset |
+| `unit` | SelectorUnit | percentage | Unit |
+| `shape` | SelectorShape | square | Shape |
+| `easeIn` | float | 0 | Ease in amount |
+| `easeOut` | float | 0 | Ease out amount |
+| `mode` | SelectorMode | add | Combine mode |
+| `weight` | float | 1 | Selector weight |
+| `randomOrder` | bool | false | Random order |
+| `randomSeed` | int | 0 | Random seed |
+
+**SelectorUnit**:
+
+| Value | Description |
+|-------|-------------|
+| `index` | Index: Calculate range by glyph index |
+| `percentage` | Percentage: Calculate range by percentage of total glyphs |
+
+**SelectorShape**:
+
+| Value | Description |
+|-------|-------------|
+| `square` | Square: 1 within range, 0 outside |
+| `rampUp` | Ramp Up: Linear increase from 0 to 1 |
+| `rampDown` | Ramp Down: Linear decrease from 1 to 0 |
+| `triangle` | Triangle: 1 at center, 0 at edges |
+| `round` | Round: Sinusoidal transition |
+| `smooth` | Smooth: Smoother transition curve |
+
+**SelectorMode**:
+
+| Value | Description |
+|-------|-------------|
+| `add` | Add: `result = a + b` |
+| `subtract` | Subtract: `result = b ≥ 0 ? a × (1 − b) : a × (−1 − b)` |
+| `intersect` | Intersect: `result = a × b` |
+| `min` | Min: `result = min(a, b)` |
+| `max` | Max: `result = max(a, b)` |
+| `difference` | Difference: `result = |a − b|` |
+
+#### 6.5.5 TextPath
+
+Arranges text along a specified path. The path can reference a PathData defined in Resources, or use
+inline path data. TextPath uses a baseline (a straight line defined by baselineOrigin and
+baselineAngle) as the text's reference line: glyphs are mapped from their positions along this
+baseline onto corresponding positions on the path curve, preserving their relative spacing and
+offsets. When forceAlignment is enabled, original glyph positions are ignored and glyphs are
+redistributed evenly to fill the available path length.
+
+> [Sample](samples/5.5.5_text_path.pagx)
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `path` | string/idref | (required) | SVG path data or PathData resource reference "@id" |
+| `baselineOrigin` | Point | 0,0 | Baseline origin, the starting point of the text reference line |
+| `baselineAngle` | float | 0 | Baseline angle in degrees, 0 for horizontal, 90 for vertical |
+| `firstMargin` | float | 0 | Start margin |
+| `lastMargin` | float | 0 | End margin |
+| `perpendicular` | bool | true | Perpendicular to path |
+| `reversed` | bool | false | Reverse direction |
+| `forceAlignment` | bool | false | Force stretch text to fill path |
+
+**Baseline**:
+- `baselineOrigin`: The starting point of the baseline in the TextPath's local coordinate space
+- `baselineAngle`: The angle of the baseline in degrees. 0 means a horizontal baseline (text flows left to right along X axis), 90 means a vertical baseline (text flows top to bottom along Y axis)
+- Each glyph's distance along the baseline determines where it lands on the curve, and its perpendicular offset from the baseline is preserved as a perpendicular offset from the curve
+
+**Margins**:
+- `firstMargin`: Start margin (offset inward from path start)
+- `lastMargin`: End margin (offset inward from path end)
+
+**Force Alignment**:
+- When `forceAlignment="true"`, glyphs are laid out consecutively using their advance widths, then spacing is adjusted proportionally to fill the path region between firstMargin and lastMargin
+
+**Glyph Positioning**:
+1. Calculate glyph center position on path
+2. Get path tangent direction at that position
+3. If `perpendicular="true"`, rotate glyph perpendicular to path
+
+**Closed Paths**: For closed paths, glyphs exceeding the range wrap to the other end of the path.
+
+#### 6.5.6 TextBox
+
+TextBox is a text layout container that inherits from Group. It applies typography to Text elements within its scope. TextBox re-layouts all glyph positions according to its layout dimensions (`width`/`height`) and alignment settings. The layout results are written into each Text element's GlyphRun data with inverse-transform compensation, so that Text's own position and parent Group transforms remain effective in the rendering pipeline. The first line is positioned using the line-box model: the line box near edge is aligned to the near edge of the text area, and the baseline is placed at `halfLeading + ascent` from the near edge, where `halfLeading = (lineHeight - metricsHeight) / 2` and `metricsHeight = ascent + descent + leading` from the font metrics. Following CSS Writing Modes conventions, `lineHeight` is a logical property that always applies to the block-axis dimension of a line box. In vertical mode, it controls the column width rather than the line height. Columns are spaced by `lineHeight` (center-to-center distance). When `lineHeight` is 0 (auto), the column width is calculated from font metrics (ascent + descent + leading), same as horizontal auto line height. Columns flow from right to left.
+
+TextBox is a **pre-layout-only** node: it is processed during the typesetting stage before rendering and is not instantiated in the render tree. If all accumulated Text elements already contain embedded GlyphRun data, the TextBox is skipped during typesetting. However, the TextBox node should still be retained even when embedded GlyphRun data and fonts are present, as design tools may read its layout attributes (`width`, `height`, `textAlign`, `paragraphAlign`, `lineHeight`, `wordWrap`, `overflow`, etc.) for editing purposes.
+
+As a container, TextBox processes its child Text elements and text modifiers (TextModifier, TextPath, etc.) in an isolated scope. Text elements inside a TextBox are laid out by the TextBox's typography settings first; subsequent text modifiers within the TextBox then operate on those layout results. TextBox only affects the **initial layout** of Text elements — it determines glyph positions before the text modifier chain begins.
+
+> [Sample](samples/5.5.6_text_box.pagx)
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `width` | float | NaN | Layout width. NaN means no boundary in this dimension, which may cause wordWrap or overflow to have no effect |
+| `height` | float | NaN | Layout height. NaN means no boundary in this dimension, which may cause wordWrap or overflow to have no effect |
+| `textAlign` | TextAlign | start | Text alignment along the inline direction |
+| `paragraphAlign` | ParagraphAlign | near | Paragraph alignment along the block-flow direction |
+| `writingMode` | WritingMode | horizontal | Layout direction |
+| `lineHeight` | float | 0 | Line height in pixels. 0 means auto (calculated from font metrics: ascent + descent + leading). Following CSS Writing Modes conventions, this is a logical property: in vertical mode it controls column width |
+| `wordWrap` | bool | true | Enable automatic word wrapping at the box width boundary (horizontal mode) or height boundary (vertical mode). Has no effect when that dimension is NaN |
+| `overflow` | Overflow | visible | Overflow behavior when text exceeds the box height (horizontal mode) or width (vertical mode). Has no effect when that dimension is NaN |
+| `left` | float | - | Constraint positioning: distance from element's left edge to container's left edge (see §4.3) |
+| `right` | float | - | Constraint positioning: distance from element's right edge to container's right edge (see §4.3) |
+| `top` | float | - | Constraint positioning: distance from element's top edge to container's top edge (see §4.3) |
+| `bottom` | float | - | Constraint positioning: distance from element's bottom edge to container's bottom edge (see §4.3) |
+| `centerX` | float | - | Constraint positioning: horizontal offset of element center from container center (see §4.3) |
+| `centerY` | float | - | Constraint positioning: vertical offset of element center from container center (see §4.3) |
+
+TextBox inherits all Group attributes (`position`, `anchor`, `rotation`, `scale`, `skew`, `skewAxis`, `alpha`, and constraint attributes `left`, `right`, `top`, `bottom`, `centerX`, `centerY`). The `position` attribute specifies the top-left corner of the text area in the parent coordinate system. Prefer constraint attributes (`left`/`top`) for positioning — when constraints are set, `position` is computed automatically.
+
+**TextAlign (Text Alignment)**:
+
+| Value | Description |
+|-------|-------------|
+| `start` | Start alignment |
+| `center` | Center alignment |
+| `end` | End alignment |
+| `justify` | Justified (last line start-aligned) |
+
+**ParagraphAlign (Paragraph Alignment)**:
+
+Aligns text lines or columns along the block-flow direction. Uses direction-neutral names (Near/Far instead of Top/Bottom) that work correctly for both horizontal and vertical writing modes. In horizontal mode this controls vertical positioning; in vertical mode this controls horizontal positioning.
+
+| Value | Description |
+|-------|-------------|
+| `near` | Near-edge alignment (top in horizontal mode, right in vertical mode) using the line-box model. The first line box's near edge is aligned to the near edge of the text area. The baseline is positioned at `halfLeading + ascent` from the near edge, where `halfLeading = (lineHeight - metricsHeight) / 2`. |
+| `middle` | Middle alignment. The total text block size (sum of all line heights/column widths) is centered within the corresponding box dimension. |
+| `far` | Far-edge alignment (bottom in horizontal mode, left in vertical mode). The last line box's far edge is aligned to the far edge of the text area. |
+
+**WritingMode (Layout Direction)**:
+
+| Value | Description |
+|-------|-------------|
+| `horizontal` | Horizontal text |
+| `vertical` | Vertical text (columns arranged right-to-left, traditional CJK vertical layout) |
+
+**Overflow (Overflow Behavior)**:
+
+| Value | Description |
+|-------|-------------|
+| `visible` | Text exceeding box boundaries is still rendered (default) |
+| `hidden` | Lines that exceed the box height (horizontal mode) or columns that exceed the box width (vertical mode) are discarded entirely. Partial lines/columns are never shown. Has no effect when that dimension is NaN |
+
+#### 6.5.7 Rich Text
+
+Rich text is achieved through multiple Text elements within a TextBox, each wrapped in a Group with independent Fill/Stroke styles. TextBox provides unified typography.
+
+> [Sample](samples/5.5.7_rich_text.pagx)
+
+**Note**: Each Group's Text + Fill/Stroke defines a text segment with independent styling. TextBox contains all segments as children and treats them as a single unit for typography, enabling auto-wrapping and alignment.
+
+### 6.6 Repeater
+
+Repeater duplicates accumulated content and rendered styles, applying progressive transforms to each copy. Repeater affects both Paths and glyph lists simultaneously, and does not trigger text-to-shape conversion.
+
+```xml
+<Repeater copies="5" offset="1" order="belowOriginal" anchor="0,0" position="50,0" rotation="0" scale="1,1" startAlpha="1" endAlpha="0.2"/>
+```
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `copies` | float | 3 | Number of copies |
+| `offset` | float | 0 | Start offset |
+| `order` | RepeaterOrder | belowOriginal | Stacking order |
+| `anchor` | Point | 0,0 | Anchor point |
+| `position` | Point | 100,100 | Position offset per copy |
+| `rotation` | float | 0 | Rotation per copy |
+| `scale` | Point | 1,1 | Scale per copy |
+| `startAlpha` | float | 1 | First copy opacity |
+| `endAlpha` | float | 1 | Last copy opacity |
+
+**Transform Calculation** (i-th copy, i starts from 0):
+```
+progress = i + offset
+```
+
+Transforms are applied in the following order:
+
+1. Translate to negative anchor (`translate(-anchor)`)
+2. Scale exponentially (`scale(scale^progress)`)
+3. Rotate linearly (`rotate(rotation × progress)`)
+4. Translate linearly (`translate(position × progress)`)
+5. Translate back to anchor (`translate(anchor)`)
+
+**Opacity Interpolation**:
+```
+maxCount = ceil(copies)
+t = progress / maxCount
+alpha = lerp(startAlpha, endAlpha, t)
+// For the last copy, alpha is further multiplied by the fractional part of copies (see below)
+```
+
+**RepeaterOrder**:
+
+| Value | Description |
+|-------|-------------|
+| `belowOriginal` | Copies below original. Index 0 on top |
+| `aboveOriginal` | Copies above original. Index N-1 on top |
+
+**Fractional Copy Count**:
+
+When `copies` is a decimal (e.g., `3.5`), partial copies are achieved through **semi-transparent blending**:
+
+1. **Geometry copying**: Shapes and text are copied by `ceil(copies)` (i.e., 4), geometry itself is not scaled or clipped
+2. **Opacity adjustment**: The last copy's opacity is multiplied by the fractional part (e.g., 0.5), producing semi-transparent effect
+3. **Visual effect**: Simulates partial copies through opacity gradation
+
+**Example**: When `copies="2.3"`:
+- Copy 3 complete geometry copies
+- Copies 1, 2 render normally
+- Copy 3's opacity × 0.3, rendering semi-transparent
+
+**Edge Cases**:
+- `copies < 0`: No operation performed
+- `copies = 0`: Clear all accumulated content and rendered styles
+
+**Repeater Characteristics**:
+- **Simultaneous effect**: Copies all accumulated Paths and glyph lists
+- **Preserve text attributes**: Glyph lists retain glyph information after copying; subsequent text modifiers can still affect them
+- **Copy rendered styles**: Also copies already rendered fills and strokes
+
+> [Sample](samples/5.6_repeater.pagx)
+
+### 6.7 Group
+
+Group is a VectorElement container with transform properties.
+
+> [Sample](samples/5.7_group.pagx)
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `anchor` | Point | 0,0 | Anchor point "x,y" |
+| `position` | Point | 0,0 | Position "x,y", computed from constraint attributes when set. Prefer constraint attributes (`left`/`top`) for positioning |
+| `rotation` | float | 0 | Rotation angle |
+| `scale` | Point | 1,1 | Scale "sx,sy" |
+| `skew` | float | 0 | Skew amount |
+| `skewAxis` | float | 0 | Skew axis angle |
+| `alpha` | float | 1 | Opacity 0~1 |
+| `width` | float | - | Layout width (see §4) |
+| `height` | float | - | Layout height (see §4) |
+| `left` | float | - | Constraint positioning: distance from container's left edge (see §4.3) |
+| `right` | float | - | Constraint positioning: distance from container's right edge (see §4.3) |
+| `top` | float | - | Constraint positioning: distance from container's top edge (see §4.3) |
+| `bottom` | float | - | Constraint positioning: distance from container's bottom edge (see §4.3) |
+| `centerX` | float | - | Constraint centering: horizontal offset from container center (see §4.3) |
+| `centerY` | float | - | Constraint centering: vertical offset from container center (see §4.3) |
+
+#### Transform Order
+
+Transforms are applied in the following order:
+
+1. Translate to negative anchor point (`translate(-anchor)`)
+2. Scale (`scale`)
+3. Skew (`skew` along `skewAxis` direction)
+4. Rotate (`rotation`)
+5. Translate to position (`translate(position)`)
+
+**Skew Transform**:
+
+Skew is applied in the following order:
+
+1. Rotate to skew axis direction (`rotate(skewAxis)`)
+2. Shear along X axis (`shearX(tan(skew))`)
+3. Rotate back (`rotate(-skewAxis)`)
+
+#### Scope Isolation
+
+Groups create isolated scopes for geometry accumulation and rendering:
+
+- Geometry elements within the group accumulate only within the group
+- Painters within the group only render geometry accumulated within the group
+- Modifiers within the group only affect geometry accumulated within the group
+- The group's transform matrix applies to all content within the group
+- The group's `alpha` property applies to all rendered content within the group
+
+**Geometry Accumulation Rules**:
+
+- **Painters do not clear geometry**: After Fill and Stroke render, the geometry list remains unchanged; subsequent painters can still render the same geometry
+- **Child Group geometry propagates upward**: After a child Group completes, its geometry accumulates to the parent scope; painters at the end of the parent can render all child Group geometry
+- **Sibling Groups do not affect each other**: Each Group creates an independent accumulation starting point; it cannot see geometry from subsequent sibling Groups
+- **Isolate rendering scope**: Painters within a Group can only render geometry accumulated up to the current position, including this group and completed child Groups
+- **Layer is accumulation boundary**: Geometry propagates upward until reaching a Layer boundary; it does not pass across Layers
+
+**Example 1 - Basic Isolation**:
+> [Sample](samples/5.7_group_isolation.pagx)
+
+**Example 2 - Child Group Geometry Propagates Upward**:
+> [Sample](samples/5.7_group_propagation.pagx)
+
+**Example 3 - Multiple Painters Reuse Geometry**:
+> [Sample](samples/5.7_multiple_painters.pagx)
+
+#### Multiple Fills and Strokes
+
+Since painters do not clear the geometry list, the same geometry can have multiple Fills and Strokes applied consecutively.
+
+**Example 4 - Multiple Fills**:
+> [Sample](samples/5.7_multiple_fills.pagx)
+
+**Example 5 - Multiple Strokes**:
+> [Sample](samples/5.7_multiple_strokes.pagx)
+
+**Example 6 - Mixed Overlay**:
+> [Sample](samples/5.7_mixed_overlay.pagx)
+
+**Rendering Order**: Multiple painters render in document order; those appearing earlier are below.
 
 ---
 
@@ -2231,7 +2268,7 @@ An illustrated alien planet scene with an astronaut, exotic flora, alien creatur
 
 ---
 
-## Appendix D: Implementation Architecture
+## Appendix D. Implementation Architecture
 
 ### D.1 LayoutElement Hierarchy
 

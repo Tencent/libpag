@@ -2,7 +2,11 @@
 
 This file extracts the specification knowledge that AI must understand when generating or
 optimizing PAGX files. It is not a copy of the full spec — it is the **minimum essential
-subset** organized for quick comprehension.
+subset** organized around the core concepts most relevant to AI generation.
+
+Some sections are simplified from the full specification — low-frequency features such as
+placement, Layer Contour, and 3D transforms are omitted. When in doubt, consult the full
+spec for authoritative details.
 
 For complete attribute defaults and enumeration values, see `attributes.md`.
 For the full specification, see [PAGX Spec (online)](https://pag.io/pagx/latest/).
@@ -84,128 +88,30 @@ pagx
 
 ---
 
-## 3. Layer System
+## 3. Auto Layout
 
-### Layer Rendering Pipeline (6 steps)
+### Layout Model
 
-1. **Layer Styles (below)**: DropShadowStyle, BackgroundBlurStyle
-2. **Background Content**: Fill/Stroke with `placement="background"` (default)
-3. **Child Layers**: Recursively rendered in document order
-4. **Layer Styles (above)**: InnerShadowStyle
-5. **Foreground Content**: Fill/Stroke with `placement="foreground"`
-6. **Layer Filters**: Applied sequentially as a chain
+PAGX layout follows a single recursive pattern at every level:
 
-### Key Layer Concepts
+1. **Container has a deterministic size** — from one of three sources (highest priority first):
+   explicit `width`/`height`, parent layout-assigned, or measured from child content bounds
+   (measured bounds span from (0,0) to the bottom-right extent of children)
+2. **Children measure their content** — each child determines its own size from its content
+3. **Children position within the container** — using the container's size as reference frame
 
-- **Layer Content** = background painters + child Layers + foreground painters. Does **not**
-  include styles or filters.
-- **Layer Contour** = a binary mask derived from layer content. Geometry with alpha=0 fills is
-  still included. Solid/gradient fills → opaque white; image fills retain transparent pixels,
-  convert others to opaque. Used by `maskType="contour"` and DropShadowStyle `showBehindLayer=false`.
-- **Layer Background** = the composited result of everything already rendered **below** the
-  current layer. Used by BackgroundBlurStyle. Controlled by `passThroughBackground`: when
-  `false`, child layers lose access to the background.
+Two positioning mechanisms are available:
 
-### Layer Child Element Order
+- **Constraint positioning** — attributes (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`)
+  on any element, resolved against the parent container's size
+- **Container layout** — the parent arranges children automatically. Layer uses `layout` +
+  `alignment` to arrange child Layers; TextBox uses `textAlign` + `paragraphAlign` to
+  arrange text lines
 
-Layer children should be written in this order for consistency:
-
-1. **VectorElements** (contents): Geometry, modifiers, painters, Group, TextBox
-2. **Child Layers**: Nested `<Layer>` elements
-3. **LayerStyles**: DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle
-4. **LayerFilters**: BlurFilter, DropShadowFilter, etc.
-
-### Attribute Order
-
-Write `id`/`name`/`version` first, then constraint/sizing attributes (`left`, `right`, `top`, `bottom`, `centerX`, `centerY`, `flex`, `width`, `height`), then child layout attributes (`layout`, `gap`, `padding`, `alignment`, `arrangement`), then everything else.
-
-### Layer Attributes (key ones)
-
-| Attribute | Default | Note |
-|-----------|---------|------|
-| `width`, `height` | — | Layout size for constraint positioning and container layout reference. When omitted, the engine measures content or derives from parent layout. Set explicitly for a specific design size. |
-| `layout` | none | `none` (default), `horizontal`, or `vertical` — sets container layout mode for child Layers |
-| `gap` | 0 | Spacing between adjacent child Layers along the main axis |
-| `flex` | 0 | Flex weight for proportional sizing in container layout. 0 = content-measured (default); >0 = share remaining space by weight |
-| `padding` | 0 | Inner padding: `"all"`, `"v,h"`, `"t,h,b"`, or `"t,r,b,l"` (CSS-compatible shorthand) |
-| `alignment` | stretch | Cross-axis alignment of children: `start` / `center` / `end` / `stretch` |
-| `arrangement` | start | Main-axis distribution: `start` / `center` / `end` / `spaceBetween` / `spaceEvenly` / `spaceAround` |
-| `includeInLayout` | true | Whether to participate in parent's container layout |
-| `left/right/top/bottom` | — | Constraint positioning relative to parent (see §3a Constraint Positioning) |
-| `centerX`, `centerY` | — | Constraint centering relative to parent (see §3a Constraint Positioning) |
-| `matrix` | identity | 2D affine transform; overridden by `matrix3D` |
-| `alpha` | 1 | Opacity 0~1 |
-| `blendMode` | normal | Blend mode (same names as CSS `mix-blend-mode`, but camelCase e.g. `colorBurn`) |
-| `visible` | true | Whether rendered |
-| `groupOpacity` | false | When true, composites to offscreen buffer first |
-| `passThroughBackground` | true | When false, child layers lose access to background |
-| `mask` | - | Reference to mask layer via `@id` |
-| `maskType` | alpha | alpha / luminance / contour |
-| `composition` | - | Reference to Composition via `@id` |
-| `scrollRect` | - | Clipping region "x,y,w,h" |
-
-**maskType usage**:
-- `alpha`: mask layer's alpha channel controls visibility — use for soft-edge gradual masks.
-- `luminance`: mask layer's brightness controls visibility — use for luminance-based masking.
-- `contour`: binary clipping from mask layer's contour — use for hard-edge shape clipping.
-
-**Transform Priority**: `matrix3D` > `matrix` > `left`/`top`. Each overrides the previous.
-
-### Transform Matrix Formats
-
-**2D Matrix**: 6 comma-separated floats `"a,b,c,d,tx,ty"` — identical to CSS/SVG
-`matrix(a,b,c,d,tx,ty)`. Identity: `"1,0,0,1,0,0"`.
-
-**3D Matrix**: 16 comma-separated floats in column-major order. Identity:
-`"1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1"`. Used with `matrix3D` attribute on Layer.
-
-**preserve3D**: When `true`, child layers retain 3D positions and are rendered in a shared 3D
-space with depth-based z-ordering. When `false` (default), 3D children are flattened into 2D.
-Similar to CSS `transform-style: preserve-3d`.
-
-### Layer Styles
-
-All styles compute from **opaque layer content**: semi-transparent pixels become opaque,
-fully transparent pixels are preserved.
-
-| Style | Position | Input | Key Attributes |
-|-------|----------|-------|----------------|
-| `DropShadowStyle` | Below | Opaque layer content | offsetX/Y, blurX/Y, color, showBehindLayer |
-| `BackgroundBlurStyle` | Below | Layer background, clipped by opaque layer content | blurX/Y, tileMode |
-| `InnerShadowStyle` | Above | Inverse of opaque layer content | offsetX/Y, blurX/Y, color |
-
-- **showBehindLayer** (DropShadowStyle): `true` (default) shows the full shadow including
-  behind the layer. `false` uses layer contour to erase the occluded portion — only shadow
-  extending beyond the layer edge is visible.
-- **BackgroundBlurStyle**: blurs the **layer background** (content below this layer), then
-  clips the result using opaque layer content as a mask.
-
-### Layer Filters
-
-Filters are the **final stage** of layer rendering. Styles are applied **before** filters.
-Filters chain in document order: each filter's output becomes the next filter's input.
-
-| Filter | Key Attributes |
-|--------|----------------|
-| `BlurFilter` | blurX, blurY, tileMode |
-| `DropShadowFilter` | offsetX/Y, blurX/Y, color, shadowOnly |
-| `InnerShadowFilter` | offsetX/Y, blurX/Y, color, shadowOnly |
-| `BlendFilter` | color(required), blendMode |
-| `ColorMatrixFilter` | matrix(20 floats row-major) |
-
-**DropShadowFilter vs DropShadowStyle**: The filter preserves semi-transparency from the
-original content. The style converts to opaque first. Use filter when per-pixel alpha matters;
-use style for solid shadow outlines.
-
----
-
-## 3a. Auto Layout
-
-PAGX supports two complementary layout mechanisms that together eliminate manual coordinate calculation.
-**Container layout** arranges child Layers in rows or columns. **Constraint positioning** positions elements
-relative to their container's edges or center. Constraint positioning is a fundamental capability
-available to all nodes — it is not a layout mode. Both are optional — files without
-layout attributes behave exactly as before (absolute positioning).
+This model applies identically at every nesting depth. A Layer positions its children
+(including TextBox) via constraints or layout; a TextBox positions its text lines via
+text alignment rules. Each level is the same pattern: deterministic container size →
+child measurement → positioning.
 
 ### Container Layout (between Layers)
 
@@ -285,7 +191,6 @@ capability — it is not a layout mode. Supported elements:
 |--------------|----------|--------|
 | Rectangle, Ellipse, TextBox | **STRETCH** | Resize to fill target area |
 | Path, Polystar | **SCALE TO FIT** | Single-axis: scale to exactly fill, other axis proportional; Both-axis: use smaller scale factor (fit mode), center on longer axis |
-| Text | **SCALE TO FIT** | Same as Path/Polystar — fontSize is rewritten to match the scale factor |
 | Group | **DERIVE SIZE** | Align to target area; set layout size for child constraint reference |
 | Child Layer | **ALWAYS OVERRIDE** | Opposite-pair constraints always override: `width = parent.width - left - right`, `x = left` |
 
@@ -316,7 +221,7 @@ Key rules:
   differ by element type:
   - **Frame-aligned** (Rectangle, Ellipse, TextBox, Group, Layer): bounds = [0, width] × [0,
     height] in local coordinates. `left="0"` aligns the logical frame's left edge to the container.
-  - **Pixel-aligned** (Path, Text): bounds = actual rendered pixel boundary. `left="0"` shifts
+  - **Pixel-aligned** (Path): bounds = actual rendered pixel boundary. `left="0"` shifts
     content so rendered pixels touch the container's left edge.
   - Both ensure `left="0"` means "content aligns with container edge" — the difference is whether
     "content" means logical frame or rendered pixels.
@@ -326,6 +231,9 @@ Key rules:
     (2) empty space between (0,0) and the top-left of the nearest child is included in
     measured bounds. For correct measurement, position children starting from (0,0) —
     avoid negative coordinates and avoid leaving empty margins at the top-left corner.
+- **Center sizing requirement**: `centerX`/`centerY` reference the parent's center — the
+  parent must have a size that represents the intended design region (explicit `width`/`height`
+  or layout-assigned). Content-measured size reflects child extent, not the design region.
 - **Unset, not zero**: Constraint attributes default to unset (not zero).
 - **Overrides position**: Constraints override the element's `position` attribute on the
   constrained axis.
@@ -356,7 +264,99 @@ dimensions (`width = parent.width - left - right`). Top-level Layers (direct chi
 
 ---
 
-## 4. VectorElement Processing Model
+## 4. Layer System
+
+### Layer Rendering Pipeline (4 steps)
+
+1. **Layer Styles (below)**: DropShadowStyle, BackgroundBlurStyle
+2. **Layer Content**: VectorElements + child Layers (in document order)
+3. **Layer Styles (above)**: InnerShadowStyle
+4. **Layer Filters**: Applied sequentially as a chain
+
+### Key Layer Concepts
+
+- **Layer Content** = VectorElements + child Layers. Does **not** include styles or filters.
+- **Layer Background** = composited content below this layer — used by BackgroundBlurStyle.
+
+### Layer Child Element Order
+
+Layer children should be written in this order for consistency:
+
+1. **VectorElements** (contents): Geometry, modifiers, painters, Group, TextBox
+2. **Child Layers**: Nested `<Layer>` elements
+3. **LayerStyles**: DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle
+4. **LayerFilters**: BlurFilter, DropShadowFilter, etc.
+
+### Attribute Order
+
+Write `id`/`name`/`version` first, then constraint/sizing attributes (`left`, `right`, `top`, `bottom`, `centerX`, `centerY`, `flex`, `width`, `height`), then child layout attributes (`layout`, `gap`, `padding`, `alignment`, `arrangement`), then everything else.
+
+### Layer Attributes (key ones)
+
+| Attribute | Default | Note |
+|-----------|---------|------|
+| `width`, `height` | — | Layout size for constraint positioning and container layout reference. When omitted, the engine measures content or derives from parent layout. Set explicitly for a specific design size. |
+| `layout` | none | `none` (default), `horizontal`, or `vertical` — sets container layout mode for child Layers |
+| `gap` | 0 | Spacing between adjacent child Layers along the main axis |
+| `flex` | 0 | Flex weight for proportional sizing in container layout. 0 = content-measured (default); >0 = share remaining space by weight |
+| `padding` | 0 | Inner padding: `"all"`, `"v,h"`, `"t,h,b"`, or `"t,r,b,l"` (CSS-compatible shorthand) |
+| `alignment` | stretch | Cross-axis alignment of children: `start` / `center` / `end` / `stretch` |
+| `arrangement` | start | Main-axis distribution: `start` / `center` / `end` / `spaceBetween` / `spaceEvenly` / `spaceAround` |
+| `includeInLayout` | true | Whether to participate in parent's container layout |
+| `left/right/top/bottom` | — | Constraint positioning relative to parent (see §3 Constraint Positioning) |
+| `centerX`, `centerY` | — | Constraint centering relative to parent (see §3 Constraint Positioning) |
+| `matrix` | identity | 2D affine transform |
+| `alpha` | 1 | Opacity 0~1 |
+| `blendMode` | normal | Blend mode (same names as CSS `mix-blend-mode`, but camelCase e.g. `colorBurn`) |
+| `visible` | true | Whether rendered |
+| `mask` | - | Reference to mask layer via `@id` |
+| `maskType` | alpha | alpha / luminance / contour |
+| `composition` | - | Reference to Composition via `@id` |
+
+For advanced attributes (`matrix3D`, `preserve3D`, `groupOpacity`, `passThroughBackground`,
+`scrollRect`), see `attributes.md`.
+
+**maskType usage**:
+- `alpha`: mask layer's alpha channel controls visibility — use for soft-edge gradual masks.
+- `luminance`: mask layer's brightness controls visibility — use for luminance-based masking.
+- `contour`: binary clipping from mask layer's contour — use for hard-edge shape clipping.
+
+### Transform Matrix Format
+
+**2D Matrix**: 6 comma-separated floats `"a,b,c,d,tx,ty"` — identical to CSS/SVG
+`matrix(a,b,c,d,tx,ty)`. Identity: `"1,0,0,1,0,0"`.
+
+**Transform Priority**: `matrix` > `left`/`top`. Each overrides the previous.
+
+### Layer Styles
+
+All styles compute from **opaque layer content**: semi-transparent pixels become opaque,
+fully transparent pixels are preserved.
+
+| Style | Position | Key Attributes |
+|-------|----------|----------------|
+| `DropShadowStyle` | Below | offsetX/Y, blurX/Y, color |
+| `BackgroundBlurStyle` | Below | blurX/Y, tileMode |
+| `InnerShadowStyle` | Above | offsetX/Y, blurX/Y, color |
+
+### Layer Filters
+
+Filters are the **final stage** of layer rendering. Styles are applied **before** filters.
+Filters chain in document order: each filter's output becomes the next filter's input.
+
+| Filter | Key Attributes |
+|--------|----------------|
+| `BlurFilter` | blurX, blurY, tileMode |
+| `DropShadowFilter` | offsetX/Y, blurX/Y, color, shadowOnly |
+| `InnerShadowFilter` | offsetX/Y, blurX/Y, color, shadowOnly |
+| `BlendFilter` | color(required), blendMode |
+| `ColorMatrixFilter` | matrix(20 floats row-major) |
+
+DropShadowFilter preserves per-pixel alpha; DropShadowStyle converts to opaque first.
+
+---
+
+## 5. VectorElement Processing Model
 
 ### Accumulate-Render Flow
 
@@ -433,36 +433,42 @@ is sequential and forward-only.
 
 ---
 
-## 5. Geometry Elements
+## 6. Geometry Elements
 
 ### Rectangle
 
 ```xml
 <Rectangle size="200,100" roundness="10"/>
+<Rectangle left="20" top="20" size="100,60" roundness="8"/>
 ```
 
 - `size` (default 100,100), `roundness` (default 0), `reversed` (default false)
 - `position` is the center point; defaults to center of bounding box when omitted
-- **Positioning**: prefer constraint attributes (`left`/`top`/etc.) over `position`
+- **Constraint attributes**: `left`, `right`, `top`, `bottom`, `centerX`, `centerY`, `width`, `height` — see §3 Constraint Positioning
+- **Positioning**: prefer constraint attributes over `position`
 - Roundness auto-limited to `min(roundness, width/2, height/2)`
 
 ### Ellipse
 
 ```xml
 <Ellipse size="200,100"/>
+<Ellipse left="40" top="40" size="60,60"/>
 ```
 
 - Same attributes as Rectangle, no roundness
 - `position` is the center point; defaults to center of bounding box when omitted
+- **Constraint attributes**: `left`, `right`, `top`, `bottom`, `centerX`, `centerY`, `width`, `height` — see §3 Constraint Positioning
 - **Positioning**: prefer constraint attributes over `position`
 
 ### Polystar
 
 ```xml
 <Polystar type="star" pointCount="5" outerRadius="100" innerRadius="50"/>
+<Polystar left="50" top="50" type="star" pointCount="5" outerRadius="40" innerRadius="20"/>
 ```
 
 - `position` is the center point; defaults to center of bounding box when omitted
+- **Constraint attributes**: `left`, `right`, `top`, `bottom`, `centerX`, `centerY`, `width`, `height` — see §3 Constraint Positioning
 - **Positioning**: prefer constraint attributes over `position`
 - `type`: `polygon` (outer only) or `star` (outer + inner alternating)
 - Supports fractional `pointCount` (incomplete last corner)
@@ -471,22 +477,22 @@ is sequential and forward-only.
 
 ```xml
 <Path data="M 0 0 L 100 0 L 100 100 Z"/>
-<Path data="@pathId"/>  <!-- reference PathData resource -->
+<Path left="10" top="10" data="M 0 0 L 100 0 L 100 100 Z"/>
+<Path data="@pathId"/>
 ```
 
-- Path data follows **SVG `<path d="...">`** syntax exactly — same commands (M, L, H, V, C,
-  S, Q, T, A, Z), same semantics. Both absolute (uppercase) and relative (lowercase) supported.
+- Path data follows **SVG `<path d="...">`** syntax exactly — same commands (M, L, H, V, C, S, Q, T, A, Z), same semantics. Both absolute (uppercase) and relative (lowercase) supported.
+- **Constraint attributes**: `left`, `right`, `top`, `bottom`, `centerX`, `centerY`, `width`, `height` — see §3 Constraint Positioning
 
 ### Text
 
 ```xml
 <Text text="Hello" fontFamily="Arial" fontSize="24"/>
+<Text left="10" top="10" text="Hello" fontFamily="Arial" fontSize="24"/>
 ```
 
-- Supports constraint attributes for positioning. Opposite-pair (`left`+`right` or
-  `top`+`bottom`) triggers **scale to fit**. Use TextBox for multiline layout and alignment.
-- **Do not** set `textAnchor` when using constraint attributes — they interact badly.
-  For multiline center/end alignment, use TextBox with `textAlign` instead.
+- Text is a content-only element — always wrap in TextBox for positioning and measurement. TextBox handles proper measurement and constraint positioning.
+- **Constraint attributes** (supported but rarely used directly): `left`, `right`, `top`, `bottom`, `centerX`, `centerY` — typically applied via parent TextBox instead. See §3 Constraint Positioning and §8 TextBox.
 - `fauxBold` / `fauxItalic`: algorithmic bold / italic (default false).
 - **CDATA** for special characters: `<![CDATA[A < B]]>`.
 - `\n` in `text` attribute (as `&#10;`) triggers line breaks.
@@ -494,7 +500,7 @@ is sequential and forward-only.
 
 ---
 
-## 6. Painters
+## 7. Painters
 
 ### Fill
 
@@ -504,7 +510,7 @@ is sequential and forward-only.
 <Fill><LinearGradient startPoint="0,0" endPoint="100,0">...</LinearGradient></Fill>
 ```
 
-- `color` (default #000), `alpha` (1), `fillRule` (winding / evenOdd), `placement` (background)
+- `color` (default #000), `alpha` (1), `fillRule` (winding / evenOdd)
 - Can embed a color source child (inline definition for single-use).
 
 ### Stroke
@@ -516,7 +522,6 @@ is sequential and forward-only.
 - `width` (1), `cap` (butt/round/square), `join` (miter/round/bevel), `miterLimit` (4)
 - `dashes` ("5,3"), `dashOffset` (0), `dashAdaptive` (false)
 - `align` (center / inside / outside)
-- `placement` (background / foreground)
 
 ### Color Sources
 
@@ -535,7 +540,7 @@ and color source together.
 
 ---
 
-## 7. Text System
+## 8. Text System
 
 ### TextBox (Text Layout Container)
 
@@ -571,8 +576,7 @@ plus its own text layout properties. TextBox can contain child elements just lik
   scale, skew, skewAxis, alpha).
 - It **overrides** Text's `position` and `textAnchor` — do not set these on child Text.
 - **Vertical alignment**: Bare Text aligns baseline to y=0. TextBox corrects this — text
-  inside TextBox vertically centers within each line automatically. Always use TextBox
-  when text participates in auto-layout or needs vertical centering.
+  inside TextBox vertically centers within each line automatically. Always wrap Text in TextBox.
 - `overflow="hidden"`: discards **entire lines** (horizontal) or **entire columns** (vertical)
   that exceed the box. Similar in spirit to CSS `overflow: hidden` but with whole-line
   granularity, not pixel-level clipping.
@@ -616,11 +620,11 @@ If you need both shape modifiers and text effects on the same text, use separate
 ### Rich Text Pattern
 
 Multiple Text elements in one TextBox, each with independent Fill/Stroke.
-See `design-patterns.md` §Rich Text (Mixed Styles) for examples and usage guidance.
+See `design-patterns.md` §Container Layout for examples and usage guidance.
 
 ---
 
-## 8. Repeater
+## 9. Repeater
 
 ```xml
 <Rectangle size="20,20"/>
@@ -646,7 +650,7 @@ See `design-patterns.md` §Rich Text (Mixed Styles) for examples and usage guida
 
 ---
 
-## 9. Masking and Clipping
+## 10. Masking and Clipping
 
 ### Masking
 
@@ -675,7 +679,7 @@ See `design-patterns.md` §Rich Text (Mixed Styles) for examples and usage guida
 
 ---
 
-## 10. Resources
+## 11. Resources
 
 ### Image
 
@@ -727,4 +731,3 @@ See `design-patterns.md` §Rich Text (Mixed Styles) for examples and usage guida
 
 - GlyphID = list index + 1 (GlyphID 0 = missing glyph).
 - All Glyphs in one Font must be the same type (all path or all image).
-
