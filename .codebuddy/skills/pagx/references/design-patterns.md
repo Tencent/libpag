@@ -102,6 +102,9 @@ Use Layers purposefully — each should serve a clear structural or visual role:
 
 ### Layer vs Group
 
+> **Terminology**: In this decision tree, "element" refers to XML nodes (Layer, Group, etc.),
+> "visual unit" refers to a rendered component that could stand alone visually.
+
 ```
 Is this a direct child of <pagx> or <Composition>?
   → YES: Must be Layer (Groups cause a parse error)
@@ -150,9 +153,7 @@ See `spec-essentials.md` §3 Auto Layout for the core model and all rules.
 
 ### Constraint Positioning Patterns
 
-Constraint attributes work on all VectorElements (including TextPath), resolved against the parent container's
-deterministic size. Each axis is resolved independently. See `spec-essentials.md` §3
-Constraint Positioning for full rules and the center sizing requirement.
+See `spec-essentials.md` §3 Constraint Positioning for full rules. Common patterns:
 
 ```xml
 <!-- Single-edge: position by left/top -->
@@ -351,7 +352,7 @@ When different geometry needs different painters, choose based on layout context
 
 ### 2. TextBox Behaviors
 
-Additional behaviors beyond what `spec-essentials.md` §8 covers:
+Additional behaviors beyond what `spec-essentials.md` §8 Text System covers:
 
 - **Vertical baseline correction**: TextBox vertically centers text within each line
   automatically, which shifts text downward by approximately half a line height compared

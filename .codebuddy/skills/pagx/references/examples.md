@@ -311,7 +311,7 @@ separate Group (see `spec-essentials.md` §5).
   <Layer width="200" height="200">
     <!-- Root-level: constraints position the star -->
     <Layer centerX="0" centerY="0" width="160" height="160">
-      <Polystar centerX="0" centerY="0" type="star" pointCount="5" outerRadius="80" innerRadius="35"/>
+      <Polystar centerX="0" centerY="0" pointCount="5" outerRadius="80" innerRadius="35"/>
       <Fill>
         <RadialGradient radius="80">
           <ColorStop offset="0" color="#FBBF24"/>
@@ -592,7 +592,7 @@ and BackgroundBlurStyle for frosted glass.
     </Layer>
     <!-- Cyan glow orb -->
     <Layer left="320" top="240" blendMode="screen">
-      <Ellipse left="0" right="0" top="0" bottom="0" size="250,250"/>
+      <Ellipse size="250,250"/>
       <Fill>
         <RadialGradient radius="125">
           <ColorStop offset="0" color="#06B6D450"/>
@@ -686,7 +686,7 @@ opaque content. Must have content below to blur — empty background produces no
       <Layer>
         <Ellipse centerX="0" size="24,24"/>
         <Fill color="#6366F1"/>
-        <TextBox top="26" textAlign="center">
+        <TextBox centerX="0" top="26">
           <Text text="Home" fontFamily="Arial" fontSize="10"/>
           <Fill color="#6366F1"/>
         </TextBox>
@@ -694,7 +694,7 @@ opaque content. Must have content below to blur — empty background produces no
       <Layer>
         <Ellipse centerX="0" size="24,24"/>
         <Fill color="#94A3B8"/>
-        <TextBox top="26" textAlign="center">
+        <TextBox centerX="0" top="26">
           <Text text="Search" fontFamily="Arial" fontSize="10"/>
           <Fill color="#94A3B8"/>
         </TextBox>
@@ -702,7 +702,7 @@ opaque content. Must have content below to blur — empty background produces no
       <Layer>
         <Ellipse centerX="0" size="24,24"/>
         <Fill color="#94A3B8"/>
-        <TextBox top="26" textAlign="center">
+        <TextBox centerX="0" top="26">
           <Text text="Profile" fontFamily="Arial" fontSize="10"/>
           <Fill color="#94A3B8"/>
         </TextBox>
@@ -717,5 +717,5 @@ opaque content. Must have content below to blur — empty background produces no
 **Pattern**: Rectangle `roundness` applies to all four corners. To flatten specific corners,
 use `MergePath mode="intersect"` to intersect a rounded Rectangle with a straight-edged
 Rectangle — only the overlapping region remains. Here the rounded rect extends 20px below
-(`bottom="-20"`), and the straight rect clips it flush. Tab items use `flex="1"` for even
-distribution in horizontal layout.
+(`bottom="-20"`), and the straight rect clips it flush. Tab items use `arrangement="spaceAround"`
+for even distribution in horizontal layout.

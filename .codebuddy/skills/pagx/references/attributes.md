@@ -73,6 +73,16 @@ they **must not** be omitted.
 | `composition` | idref | — |
 | `maskType` | MaskType | alpha |
 
+### Composition
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `width` | float | (required) |
+| `height` | float | (required) |
+
+Composition contains child Layers. Its `width`×`height` serves as the constraint container
+for top-level Layers inside it (same role as `<pagx>` dimensions for document-level Layers).
+
 ### Group
 
 | Attribute | Type | Default |
@@ -214,6 +224,18 @@ Positioning: prefer constraint attributes over `position`. See §Constraint Attr
 | `startPoint` | Point | `0,0` |
 | `endPoint` | Point | (required) |
 | `matrix` | Matrix | identity |
+
+### ColorStop
+
+Child element of gradient color sources (LinearGradient, RadialGradient, ConicGradient, DiamondGradient).
+
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `offset` | float | (required) |
+| `color` | Color | (required) |
+
+- `offset`: Position along the gradient line, range 0.0 to 1.0 (0 = start, 1 = end)
+- Multiple ColorStops define the gradient transition; order them by ascending `offset`
 
 ### RadialGradient
 

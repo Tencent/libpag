@@ -300,14 +300,14 @@ A child Layer can be downgraded to Group when **all** of the following are true:
 
 1. NOT a direct child of `<pagx>` or `<Composition>`
 2. NOT managed by parent container layout (parent has `layout` attribute) — Groups drop out of layout flow
-3. Does not use any **Layer-exclusive feature**:
+3. Does not use any **Layer-exclusive feature** (features that behave differently or are unavailable on Group):
    | Category | Features |
    |----------|----------|
    | Child nodes | styles, filters, child Layers |
    | Attributes | mask, maskType, blendMode (non-default), composition, scrollRect, visible="false", id (if referenced), name, matrix, matrix3D, preserve3D, groupOpacity, passThroughBackground |
    | Container layout | `layout`, `gap`, `flex`, `padding`, `alignment`, `arrangement` |
    | Layout sizing | `width`, `height` (explicit layout dimensions) |
-   | Constraint positioning | `left`, `right`, `top`, `bottom`, `centerX`, `centerY` |
+   | Constraint positioning | `left`, `right`, `top`, `bottom`, `centerX`, `centerY` (Group supports these attributes but with different opposite-pair behavior — Derive Size vs Layer's Always Override) |
    | Layout participation | `includeInLayout="false"` |
 4. Downgrade does not change visual stacking order among siblings (see All-or-Nothing Rule above)
 5. The Layer is a sub-element within the same logical block — not a distinct independent block
