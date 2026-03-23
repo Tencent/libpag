@@ -15,9 +15,56 @@ Structural patterns for application interface elements. **Always prefer containe
 constraint positioning over absolute coordinates** — use container layout for arranging child
 Layers in rows or columns, and constraint layout for positioning elements within a Layer.
 
-### Background + Foreground Shape
+### Divider
 
-A common pattern for icons, indicators, and badges — background shape with a foreground symbol:
+```xml
+<pagx version="1.0" width="300" height="20">
+  <Layer width="300" height="20">
+    <Rectangle centerX="0" centerY="0" size="260,1"/>
+    <Fill color="#E2E8F0"/>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: A 1px-tall Rectangle serves as a horizontal divider — equivalent to HTML `<hr>`
+or CSS `border-bottom: 1px solid`. Use `centerX="0"` to center horizontally with side margins.
+
+### Button
+
+```xml
+<pagx version="1.0" width="200" height="60">
+  <Layer centerX="0" centerY="0" width="160" height="44">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="22"/>
+    <Fill color="#3B82F6"/>
+    <TextBox centerX="0" centerY="0">
+      <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+      <Fill color="#FFF"/>
+    </TextBox>
+    <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#3B82F640"/>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: The universal button structure — rounded Rectangle background + centered TextBox
+label. Like `<button>` with `border-radius`, `background-color`, and centered text.
+DropShadowStyle = CSS `box-shadow`.
+
+### Card with Shadow
+
+```xml
+<pagx version="1.0" width="340" height="240">
+  <Layer centerX="0" centerY="0" width="300" height="200">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+    <Fill color="#FFF"/>
+    <DropShadowStyle offsetY="4" blurX="8" blurY="8" color="#00000020"/>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: The simplest card — rounded Rectangle + white Fill + DropShadowStyle. Equivalent
+to a `<div>` with `border-radius`, `background: white`, and `box-shadow`.
+
+### Icon with Background
 
 ```xml
 <pagx version="1.0" width="200" height="200">
@@ -34,28 +81,10 @@ A common pattern for icons, indicators, and badges — background shape with a f
 </pagx>
 ```
 
-**Pattern**: Background shape + Fill directly on the Layer; foreground in a Group with its own
-painters. Path `data` uses SVG `<path d="...">` syntax — generate in SVG, copy `d` value over.
-
-### Text Label
-
-TextBox with `centerX`/`centerY` for centering — auto-sizes to fit text:
-
-```xml
-<pagx version="1.0" width="300" height="200">
-  <Layer width="300" height="200">
-    <Rectangle size="300,200" roundness="12"/>
-    <Fill color="#1E293B"/>
-    <TextBox centerX="0" centerY="0">
-      <Text text="30" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
-      <Fill color="#FFF"/>
-    </TextBox>
-  </Layer>
-</pagx>
-```
-
-**Pattern**: TextBox auto-sizes and centers. For multiple labels with different colors, wrap each
-in its own Group for painter scope isolation, and use `left`/`top` constraints for positioning.
+**Pattern**: Common structure for icons, indicators, and badges — background shape + Fill
+directly on the Layer, foreground in a Group with its own painters. Like an HTML `<div>` with
+`background-color` and a child SVG icon. Generate the icon as SVG mentally, then copy the `d`
+value directly into Path `data`.
 
 ### Icon + Label Row
 
@@ -73,20 +102,120 @@ in its own Group for painter scope isolation, and use `left`/`top` constraints f
 ```
 
 **Pattern**: Simple two-element row uses constraint positioning directly — no container
-layout needed. `left="40"` = 8 padding + 24 icon + 8 gap.
+layout needed. Like positioning two inline elements with fixed offsets.
+`left="40"` = 8 padding + 24 icon + 8 gap.
+
+### Progress Bar
+
+```xml
+<pagx version="1.0" width="260" height="30">
+  <Layer width="260" height="30">
+    <!-- Track -->
+    <Rectangle centerX="0" centerY="0" size="240,8" roundness="4"/>
+    <Fill color="#E2E8F0"/>
+    <!-- Fill bar -->
+    <Group centerY="0">
+      <Rectangle left="10" size="168,8" roundness="4"/>
+      <Fill color="#3B82F6"/>
+    </Group>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: Track uses `centerX/centerY` for centering; fill bar Group uses `centerY="0"`
+to center vertically within parent. Like an HTML `<progress>` element — two overlapping
+rounded rectangles (track + fill).
+
+### Gradient Text
+
+```xml
+<pagx version="1.0" width="300" height="80">
+  <Layer width="300" height="80">
+    <TextBox centerX="0" centerY="0">
+      <Text text="Premium" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
+      <Fill>
+        <LinearGradient startPoint="0,0" endPoint="200,0">
+          <ColorStop offset="0" color="#6366F1"/>
+          <ColorStop offset="1" color="#EC4899"/>
+        </LinearGradient>
+      </Fill>
+    </TextBox>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: LinearGradient inside Fill applies to text geometry — the PAGX equivalent of CSS
+`background: linear-gradient(...); -webkit-background-clip: text`. Gradient coordinates are
+relative to the TextBox's local origin.
+
+### Avatar with Circular Clip
+
+```xml
+<pagx version="1.0" width="130" height="130">
+  <Layer width="130" height="130">
+    <Ellipse centerX="0" centerY="0" size="110,110"/>
+    <Fill>
+      <ImagePattern image="avatar.jpg" matrix="1,0,0,1,10,10"/>
+    </Fill>
+    <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000040"/>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: Images can be filled into any shape — Ellipse, Rectangle, Path, or even complex
+shapes built with MergePath. Like CSS `clip-path: circle()` on an `<img>`, but more versatile.
+Define the clip shape first, then apply ImagePattern as the fill.
+
+### Notification Badge (includeInLayout)
+
+```xml
+<pagx version="1.0" width="200" height="96">
+  <Layer centerX="0" centerY="0" width="176" height="72" layout="vertical" gap="8">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+    <Fill color="#FFF"/>
+    <Layer height="32">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
+      <Fill color="#6366F1"/>
+      <TextBox centerX="0" centerY="0">
+        <Text text="Messages" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+        <Fill color="#FFF"/>
+      </TextBox>
+    </Layer>
+    <Layer height="32">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
+      <Fill color="#F1F5F9"/>
+      <TextBox centerX="0" centerY="0">
+        <Text text="Settings" fontFamily="Arial" fontSize="13"/>
+        <Fill color="#334155"/>
+      </TextBox>
+    </Layer>
+    <!-- Red dot: excluded from layout, positioned outside parent bounds -->
+    <Layer right="-6" top="-6" includeInLayout="false">
+      <Ellipse size="12,12"/>
+      <Fill color="#EF4444"/>
+    </Layer>
+    <DropShadowStyle offsetY="2" blurX="4" blurY="4" color="#00000015"/>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: `includeInLayout="false"` exempts the badge from the vertical layout flow —
+like CSS `position: absolute`, it overlays freely using constraint positioning relative to
+the parent Layer. Negative offsets (`right="-6" top="-6"`) place the dot outside the parent
+boundary (half the dot's diameter), centering it on the corner.
 
 ### Card with Internal Layout
 
 A card with vertical container layout, rich text header, and action buttons.
 
 ```xml
-<pagx version="1.0" width="300" height="160">
-  <Layer width="300" height="160" layout="vertical" gap="12" padding="16">
+<pagx version="1.0" width="324" height="184">
+  <Layer centerX="0" centerY="0" width="300" height="160" layout="vertical" padding="16">
     <!-- Background: VectorElements don't participate in layout -->
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
     <Fill color="#FFF"/>
-    <!-- Title + Value (rich text: different sizes and colors) -->
-    <Layer>
+    <!-- Title + Value (rich text: flex="1" absorbs remaining space) -->
+    <Layer flex="1">
       <TextBox>
         <Text text="Account Balance&#10;" fontFamily="Arial" fontSize="14"/>
         <Fill color="#64748B"/>
@@ -97,7 +226,7 @@ A card with vertical container layout, rich text header, and action buttons.
       </TextBox>
     </Layer>
     <!-- Action buttons: two equal-width buttons -->
-    <Layer height="44" layout="horizontal" gap="12">
+    <Layer height="40" layout="horizontal" gap="16">
       <Layer flex="1">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
         <Fill color="#6366F1"/>
@@ -133,169 +262,90 @@ A card with vertical container layout, rich text header, and action buttons.
   both axes automatically (default stretch alignment).
 
 For a **flexible height** example — where some children have fixed height and others expand to
-fill remaining space — see Dashboard Layout below.
+fill remaining space — see `design-patterns.md` §Fixed + flex mix.
 
-### Dashboard Layout
+### Card Grid (Composition)
 
 ```xml
-<pagx version="1.0" width="920" height="600">
-  <Layer width="920" height="600" layout="vertical" gap="16" padding="24">
-    <!-- Header -->
-    <Layer height="48">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-      <Fill color="#1E293B"/>
-      <TextBox left="16" centerY="0">
-        <Text text="Dashboard" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+<pagx version="1.0" width="500" height="120">
+  <Layer width="500" height="120" layout="horizontal" gap="20" padding="20">
+    <!-- Light background to make white cards visible -->
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+    <!-- Reference Composition instances -->
+    <Layer composition="@card" flex="1"/>
+    <Layer composition="@card" flex="1"/>
+    <Layer composition="@card" flex="1"/>
+  </Layer>
+
+  <Resources>
+    <Composition id="card" width="140" height="80">
+      <Layer left="0" right="0" top="0" bottom="0">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
         <Fill color="#FFF"/>
-      </TextBox>
-    </Layer>
-    <!-- Content: 3 equal columns -->
-    <Layer flex="1" layout="horizontal" gap="16">
-      <Layer flex="1">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
-        <Fill color="#FFF"/>
+        <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000020"/>
       </Layer>
-      <Layer flex="1">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
-        <Fill color="#FFF"/>
+    </Composition>
+  </Resources>
+</pagx>
+```
+
+**Pattern**: Composition = reusable component template, like a CSS class applied to multiple
+elements. Internal geometry uses stretch constraints (`inset: 0`) to fill bounds. Horizontal
+layout with `flex="1"` distributes instances evenly. See `optimize-guide.md` §Composition
+Resource Reuse for coordinate conversion and gradient handling.
+
+### Tab Bar (Partial Roundness)
+
+```xml
+<pagx version="1.0" width="430" height="123">
+  <Layer width="430" height="123">
+    <!-- Light background to make white tab bar visible -->
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+    <Layer left="20" right="20" top="20" bottom="20">
+    <!-- Top-round shape: intersect rounded rect with straight rect to flatten bottom corners -->
+    <Rectangle left="0" right="0" top="0" bottom="-20" roundness="20"/>
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <MergePath mode="intersect"/>
+    <Fill color="#FFF"/>
+    <!-- Tab items -->
+    <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" arrangement="spaceAround" alignment="center">
+      <Layer>
+        <Ellipse centerX="0" size="24,24"/>
+        <Fill color="#6366F1"/>
+        <TextBox centerX="0" top="26">
+          <Text text="Home" fontFamily="Arial" fontSize="10"/>
+          <Fill color="#6366F1"/>
+        </TextBox>
       </Layer>
-      <Layer flex="1">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
-        <Fill color="#FFF"/>
-      </Layer>
-      <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000010"/>
-    </Layer>
-    <!-- Footer -->
-    <Layer height="40">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-      <Fill color="#F8FAFC"/>
-      <TextBox centerX="0" centerY="0">
-        <Text text="© 2025 Dashboard" fontFamily="Arial" fontSize="12"/>
+      <Layer>
+        <Ellipse centerX="0" size="24,24"/>
         <Fill color="#94A3B8"/>
-      </TextBox>
+        <TextBox centerX="0" top="26">
+          <Text text="Search" fontFamily="Arial" fontSize="10"/>
+          <Fill color="#94A3B8"/>
+        </TextBox>
+      </Layer>
+      <Layer>
+        <Ellipse centerX="0" size="24,24"/>
+        <Fill color="#94A3B8"/>
+        <TextBox centerX="0" top="26">
+          <Text text="Profile" fontFamily="Arial" fontSize="10"/>
+          <Fill color="#94A3B8"/>
+        </TextBox>
+      </Layer>
+    </Layer>
+    <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000020"/>
     </Layer>
   </Layer>
 </pagx>
 ```
 
-**Pattern**: Header and footer have fixed `height`; the content row uses `flex="1"` to fill
-remaining space. Three child Layers with `flex="1"` equally share available width.
-
-### Progress Bar
-
-```xml
-<pagx version="1.0" width="260" height="30">
-  <Layer width="260" height="30">
-    <!-- Track -->
-    <Rectangle centerX="0" centerY="0" size="240,8" roundness="4"/>
-    <Fill color="#E2E8F0"/>
-    <!-- Fill bar -->
-    <Group>
-      <Rectangle left="10" centerY="0" size="168,8" roundness="4"/>
-      <Fill color="#3B82F6"/>
-    </Group>
-  </Layer>
-</pagx>
-```
-
-**Pattern**: Track uses `centerX/centerY` for centering; fill bar uses `left` + `centerY`
-for left-aligned vertical centering.
-
-### Avatar with Circular Clip
-
-```xml
-<pagx version="1.0" width="120" height="120">
-  <Layer width="120" height="120">
-    <Ellipse centerX="0" centerY="0" size="110,110"/>
-    <Fill>
-      <ImagePattern image="avatar.jpg" matrix="1,0,0,1,5,5"/>
-    </Fill>
-  </Layer>
-</pagx>
-```
-
-**Pattern**: Images can be filled into any shape — Ellipse, Rectangle, Path, or even complex
-shapes built with MergePath. Define the shape first, then apply ImagePattern as the fill. This
-eliminates the need for layer-level masks in most image clipping scenarios.
-
----
-
-## Logos & Badges
-
-Logo construction relies on MergePath boolean operations and precise Fill paths. Badges
-often combine Polystar with gradients and layer styles for depth.
-
-### Badge with Cutout (MergePath)
-
-```xml
-<pagx version="1.0" width="200" height="200">
-  <Layer width="200" height="200">
-    <Layer centerX="0" centerY="0" width="160" height="160">
-      <Rectangle size="160,160" roundness="32"/>
-      <Ellipse right="10" top="10" size="60,60"/>
-      <MergePath mode="difference"/>
-      <Fill>
-        <LinearGradient startPoint="0,0" endPoint="160,160">
-          <ColorStop offset="0" color="#6366F1"/>
-          <ColorStop offset="1" color="#EC4899"/>
-        </LinearGradient>
-      </Fill>
-      <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#6366F160"/>
-    </Layer>
-  </Layer>
-</pagx>
-```
-
-**Pattern**: Place all boolean-participating geometry before MergePath, then painters after.
-MergePath **clears all previously rendered Fill/Stroke** — isolate surviving content in a
-separate Group (see `spec-essentials.md` §5).
-
-### Star Badge (Polystar)
-
-```xml
-<pagx version="1.0" width="200" height="200">
-  <Layer width="200" height="200">
-    <!-- Root-level: constraints position the star -->
-    <Layer centerX="0" centerY="0" width="160" height="160">
-      <Polystar centerX="0" centerY="0" pointCount="5" outerRadius="80" innerRadius="35"/>
-      <Fill>
-        <RadialGradient radius="80">
-          <ColorStop offset="0" color="#FBBF24"/>
-          <ColorStop offset="1" color="#F59E0B"/>
-        </RadialGradient>
-      </Fill>
-      <DropShadowStyle offsetY="6" blurX="16" blurY="16" color="#F59E0B60"/>
-    </Layer>
-  </Layer>
-</pagx>
-```
-
-**Pattern**: Polystar `rotation="0"` points the first vertex upward — no rotation needed.
-RadialGradient `center` defaults to `0,0` (aligns with Polystar origin); `radius` matches
-`outerRadius`.
-
-### Embossed Token (InnerShadowStyle)
-
-```xml
-<pagx version="1.0" width="200" height="200">
-  <Layer width="200" height="200">
-    <Rectangle size="200,200"/>
-    <Fill color="#E2E8F0"/>
-    <Layer centerX="0" centerY="0" width="140" height="140">
-      <Ellipse size="140,140"/>
-      <Fill color="#CBD5E1"/>
-      <InnerShadowStyle offsetX="-5" offsetY="-5" blurX="10" blurY="10"
-                         color="#00000040"/>
-      <InnerShadowStyle offsetX="5" offsetY="5" blurX="10" blurY="10"
-                         color="#FFFFFF80"/>
-      <DropShadowStyle offsetY="4" blurX="8" blurY="8" color="#00000020"/>
-    </Layer>
-  </Layer>
-</pagx>
-```
-
-**Pattern**: Dual InnerShadowStyle — dark shadow from top-left simulates depth, light from
-bottom-right simulates highlight. Styles stack in document order.
+**Pattern**: Rectangle `roundness` applies to all four corners. CSS has `border-radius` per
+corner, but PAGX doesn't — to flatten specific corners, use `MergePath mode="intersect"` to
+clip a rounded rect with a straight-edged rect. Tab items use `arrangement="spaceAround"`
+(= CSS `justify-content: space-around`) for even distribution.
 
 ---
 
@@ -304,41 +354,6 @@ bottom-right simulates highlight. Styles stack in document order.
 Chart construction relies on TrimPath for arc control and Repeater `rotation` for radial
 patterns. **Key Ellipse knowledge**: Ellipse path starts at 12 o'clock and goes clockwise —
 use Group `rotation` to reposition the start point.
-
-### Circular Gauge (TrimPath + Repeater)
-
-```xml
-<pagx version="1.0" width="200" height="200">
-  <Layer width="200" height="200">
-    <!-- Background track: 270-degree arc with gap at bottom -->
-    <Ellipse centerX="0" centerY="0" size="140,140"/>
-    <TrimPath end="0.75" offset="-135"/>
-    <Stroke color="#E2E8F0" width="10" cap="round"/>
-    <!-- Value fill (67% of 270 degrees = 0.5 of full circle) -->
-    <Group centerX="0" centerY="0">
-      <Ellipse size="140,140"/>
-      <TrimPath end="0.5" offset="-135"/>
-      <Stroke color="#3B82F6" width="12" cap="round"/>
-    </Group>
-    <!-- Tick marks: 10 ticks spanning 270 degrees -->
-    <Group centerX="0" centerY="0" width="140" height="140">
-      <Rectangle left="69" top="6" size="2,8"/>
-      <Fill color="#94A3B8"/>
-      <Repeater copies="10" anchor="70,70" position="0,0" rotation="30" offset="7.5"/>
-    </Group>
-    <!-- Center percentage text -->
-    <TextBox centerX="0" centerY="0">
-      <Text text="67%" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
-      <Fill color="#1E293B"/>
-    </TextBox>
-  </Layer>
-</pagx>
-```
-
-**Pattern**: `TrimPath end="0.75"` draws a 270° arc; `offset="-135"` rotates the start
-point so the gap sits at bottom. The value arc uses the same offset but smaller `end` —
-`end="0.5"` = 67% of the 270° track. Tick Repeater uses `anchor="70,70"` (Ellipse center)
-to rotate around the arc center.
 
 ### Bar Chart
 
@@ -355,7 +370,7 @@ to rotate around the arc center.
       <Fill color="#3B82F6"/>
     </Layer>
     <!-- Baseline -->
-    <Layer left="30" right="20" bottom="20" height="1">
+    <Layer left="30" right="40" bottom="20" height="1">
       <Rectangle left="0" right="0" top="0" bottom="0"/>
       <Fill color="#CBD5E1"/>
     </Layer>
@@ -494,12 +509,47 @@ LinearGradient directly inside the Stroke element:
 </Stroke>
 ```
 
+### Circular Gauge (TrimPath + Repeater)
+
+```xml
+<pagx version="1.0" width="200" height="200">
+  <Layer width="200" height="200">
+    <!-- Background track: 270-degree arc with gap at bottom -->
+    <Ellipse centerX="0" centerY="0" size="140,140"/>
+    <TrimPath end="0.75" offset="-135"/>
+    <Stroke color="#E2E8F0" width="10" cap="round"/>
+    <!-- Value fill (67% of 270 degrees = 0.5 of full circle) -->
+    <Group centerX="0" centerY="0">
+      <Ellipse size="140,140"/>
+      <TrimPath end="0.5" offset="-135"/>
+      <Stroke color="#3B82F6" width="12" cap="round"/>
+    </Group>
+    <!-- Tick marks: 10 ticks spanning 270 degrees -->
+    <Group centerX="0" centerY="0" width="140" height="140">
+      <Rectangle left="69" top="6" size="2,8"/>
+      <Fill color="#94A3B8"/>
+      <Repeater copies="10" anchor="70,70" position="0,0" rotation="30" offset="7.5"/>
+    </Group>
+    <!-- Center percentage text -->
+    <TextBox centerX="0" centerY="0">
+      <Text text="67%" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+      <Fill color="#1E293B"/>
+    </TextBox>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: `TrimPath end="0.75"` draws a 270° arc; `offset="-135"` rotates the start
+point so the gap sits at bottom. The value arc uses the same offset but smaller `end` —
+`end="0.5"` = 67% of the 270° track. Tick Repeater uses `anchor="70,70"` (Ellipse center)
+to rotate around the arc center.
+
 ---
 
-## Decorative & Marketing
+## Decorative & Effects
 
-Decorative construction relies on blur effects for glow, Composition for content reuse,
-and BackgroundBlurStyle for frosted glass.
+Decorative construction relies on blur effects for glow and BackgroundBlurStyle for
+frosted glass.
 
 ### Glow Orbs (BlurFilter)
 
@@ -507,67 +557,27 @@ and BackgroundBlurStyle for frosted glass.
 <pagx version="1.0" width="400" height="300">
   <Layer width="400" height="300">
     <!-- Dark background -->
-    <Rectangle size="400,300"/>
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#0F172A"/>
     <!-- Purple glow orb -->
-    <Layer left="80" top="60" blendMode="screen">
+    <Layer left="-20" top="-40" blendMode="screen">
       <Ellipse size="200,200"/>
-      <Fill>
-        <RadialGradient radius="100">
-          <ColorStop offset="0" color="#8B5CF660"/>
-          <ColorStop offset="1" color="#8B5CF600"/>
-        </RadialGradient>
-      </Fill>
-      <BlurFilter blurX="25" blurY="25"/>
+      <Fill color="#8B5CF640"/>
+      <BlurFilter blurX="40" blurY="40"/>
     </Layer>
     <!-- Cyan glow orb -->
-    <Layer left="320" top="240" blendMode="screen">
+    <Layer left="195" top="115" blendMode="screen">
       <Ellipse size="250,250"/>
-      <Fill>
-        <RadialGradient radius="125">
-          <ColorStop offset="0" color="#06B6D450"/>
-          <ColorStop offset="1" color="#06B6D400"/>
-        </RadialGradient>
-      </Fill>
-      <BlurFilter blurX="30" blurY="30"/>
+      <Fill color="#06B6D430"/>
+      <BlurFilter blurX="50" blurY="50"/>
     </Layer>
   </Layer>
 </pagx>
 ```
 
-**Pattern**: RadialGradient fading to transparent + BlurFilter creates soft glows.
-`blendMode="screen"` brightens additively. Keep blur radius minimal — cost scales with radius.
-
-### Card Grid (Composition)
-
-```xml
-<pagx version="1.0" width="500" height="120">
-  <Layer width="500" height="120" layout="horizontal" gap="20" padding="20">
-    <!-- Light background to make white cards visible -->
-    <Rectangle size="500,120"/>
-    <Fill color="#F1F5F9"/>
-    <!-- Reference Composition instances -->
-    <Layer composition="@card" flex="1"/>
-    <Layer composition="@card" flex="1"/>
-    <Layer composition="@card" flex="1"/>
-  </Layer>
-
-  <Resources>
-    <Composition id="card" width="130" height="80">
-      <Layer width="130" height="80">
-        <Rectangle size="130,80" roundness="10"/>
-        <Fill color="#FFF"/>
-        <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000020"/>
-      </Layer>
-    </Composition>
-  </Resources>
-</pagx>
-```
-
-**Pattern**: Composition origin is at the **top-left corner** — internal geometry uses
-stretch constraints to fill bounds (no manual center calculation). Horizontal layout with
-`flex="1"` distributes instances evenly. See `optimize-guide.md` §Composition Resource Reuse
-for coordinate conversion and gradient handling.
+**Pattern**: Solid semi-transparent Fill + BlurFilter on an Ellipse — the standard glow
+technique (same as CSS `filter: blur()` on a colored circle). `blendMode="screen"` brightens
+additively. Keep blur radius minimal — cost scales with radius.
 
 ### Frosted Panel (BackgroundBlurStyle)
 
@@ -586,7 +596,7 @@ for coordinate conversion and gradient handling.
     </Layer>
     <!-- Frosted glass panel -->
     <Layer centerX="0" centerY="0" width="200" height="200">
-      <Rectangle size="200,200" roundness="16"/>
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#FFFFFF30"/>
       <BackgroundBlurStyle blurX="20" blurY="20"/>
     </Layer>
@@ -594,58 +604,82 @@ for coordinate conversion and gradient handling.
 </pagx>
 ```
 
-**Pattern**: BackgroundBlurStyle blurs everything rendered **below** this Layer, clipped by
-opaque content. Must have content below to blur — empty background produces no effect.
+**Pattern**: BackgroundBlurStyle = CSS `backdrop-filter: blur()`. Blurs everything rendered
+**below** this Layer, clipped by opaque content. Must have content below to blur — empty
+background produces no effect.
 
-### Tab Bar (Partial Roundness)
+---
+
+## Logos & Badges
+
+Logo construction relies on MergePath boolean operations and precise Fill paths. Badges
+often combine Polystar with gradients and layer styles for depth.
+
+### Badge with Cutout (MergePath)
 
 ```xml
-<pagx version="1.0" width="430" height="123">
-  <Layer width="430" height="123">
-    <!-- Light background to make white tab bar visible -->
-    <Rectangle size="430,123"/>
-    <Fill color="#F1F5F9"/>
-    <Layer left="20" right="20" top="20" bottom="20">
-    <!-- Top-round shape: intersect rounded rect with straight rect to flatten bottom corners -->
-    <Rectangle left="0" right="0" top="0" bottom="-20" roundness="20"/>
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
-    <MergePath mode="intersect"/>
-    <Fill color="#FFF"/>
-    <!-- Tab items -->
-    <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" arrangement="spaceAround" alignment="center">
-      <Layer>
-        <Ellipse centerX="0" size="24,24"/>
-        <Fill color="#6366F1"/>
-        <TextBox centerX="0" top="26">
-          <Text text="Home" fontFamily="Arial" fontSize="10"/>
-          <Fill color="#6366F1"/>
-        </TextBox>
-      </Layer>
-      <Layer>
-        <Ellipse centerX="0" size="24,24"/>
-        <Fill color="#94A3B8"/>
-        <TextBox centerX="0" top="26">
-          <Text text="Search" fontFamily="Arial" fontSize="10"/>
-          <Fill color="#94A3B8"/>
-        </TextBox>
-      </Layer>
-      <Layer>
-        <Ellipse centerX="0" size="24,24"/>
-        <Fill color="#94A3B8"/>
-        <TextBox centerX="0" top="26">
-          <Text text="Profile" fontFamily="Arial" fontSize="10"/>
-          <Fill color="#94A3B8"/>
-        </TextBox>
-      </Layer>
-    </Layer>
-    <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000020"/>
+<pagx version="1.0" width="200" height="200">
+  <Layer width="200" height="200">
+    <Layer centerX="0" centerY="0" width="160" height="160">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="32"/>
+      <Ellipse right="10" top="10" size="60,60"/>
+      <MergePath mode="difference"/>
+      <Fill>
+        <LinearGradient startPoint="0,0" endPoint="160,160">
+          <ColorStop offset="0" color="#6366F1"/>
+          <ColorStop offset="1" color="#EC4899"/>
+        </LinearGradient>
+      </Fill>
+      <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#6366F160"/>
     </Layer>
   </Layer>
 </pagx>
 ```
 
-**Pattern**: Rectangle `roundness` applies to all four corners. To flatten specific corners,
-use `MergePath mode="intersect"` to intersect a rounded Rectangle with a straight-edged
-Rectangle — only the overlapping region remains. Here the rounded rect extends 20px below
-(`bottom="-20"`), and the straight rect clips it flush. Tab items use `arrangement="spaceAround"`
-for even distribution in horizontal layout.
+**Pattern**: Place all boolean-participating geometry before MergePath, then painters after.
+MergePath **clears all previously rendered Fill/Stroke** — isolate surviving content in a
+separate Group (see `spec-essentials.md` §5).
+
+### Star Badge (Polystar)
+
+```xml
+<pagx version="1.0" width="200" height="200">
+  <Layer width="200" height="200">
+    <!-- Root-level: constraints position the star -->
+    <Layer centerX="0" centerY="0" width="160" height="160">
+      <Polystar centerX="0" centerY="0" pointCount="5" outerRadius="80" innerRadius="35"/>
+      <Fill>
+        <RadialGradient radius="80">
+          <ColorStop offset="0" color="#FBBF24"/>
+          <ColorStop offset="1" color="#F59E0B"/>
+        </RadialGradient>
+      </Fill>
+      <DropShadowStyle offsetY="6" blurX="16" blurY="16" color="#F59E0B60"/>
+    </Layer>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: Polystar `rotation="0"` points the first vertex upward — no rotation needed.
+RadialGradient `center` defaults to `0,0` (aligns with Polystar origin); `radius` matches
+`outerRadius`.
+
+### Input Field (InnerShadowStyle)
+
+```xml
+<pagx version="1.0" width="280" height="50">
+  <Layer centerX="0" centerY="0" width="260" height="40">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+    <Fill color="#FFF"/>
+    <Stroke color="#CBD5E1" width="1"/>
+    <InnerShadowStyle offsetY="2" blurX="4" blurY="4" color="#00000010"/>
+    <TextBox left="12" centerY="0">
+      <Text text="Enter your email..." fontFamily="Arial" fontSize="14"/>
+      <Fill color="#94A3B8"/>
+    </TextBox>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: InnerShadowStyle = CSS `box-shadow: inset` — adds a subtle inner shadow to
+create depth on form elements. Combined with Stroke border for the standard input field look.
