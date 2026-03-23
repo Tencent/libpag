@@ -163,9 +163,9 @@ as fixers since bot mode only comments and never applies fixes.
 ## Phase 3: Filter — coordinator only
 
 See `teams-review.md` → Phase 3: Filter (entry conditions, stance), with the
-following bot-specific adjustments. Bot mode skips Phase 3.2 (Existence check)
-from teams-review.md — verifiers already validated issue existence through their
-CONFIRM verdicts during the review phase.
+following bot-specific adjustments. Bot mode skips the Existence check step
+(teams-review.md § 3.2) — verifiers already validated issue existence through
+their CONFIRM verdicts during the review phase.
 
 ### 3.1 De-dup
 
