@@ -271,7 +271,12 @@ void PAGViewModel::lastFrame() {
 
 void PAGViewModel::nextFrame() {
   setIsPlaying(false);
-  auto newProgress = this->progress + progressPerFrame;
+  double currentProgress = 0.0;
+  {
+    std::lock_guard<std::mutex> lock(progressMutex);
+    currentProgress = progress;
+  }
+  auto newProgress = currentProgress + progressPerFrame;
   if (newProgress > 1) {
     newProgress = 0.0;
   }
@@ -280,7 +285,12 @@ void PAGViewModel::nextFrame() {
 
 void PAGViewModel::previousFrame() {
   setIsPlaying(false);
-  auto newProgress = this->progress - progressPerFrame;
+  double currentProgress = 0.0;
+  {
+    std::lock_guard<std::mutex> lock(progressMutex);
+    currentProgress = progress;
+  }
+  auto newProgress = currentProgress - progressPerFrame;
   if (newProgress < 0) {
     newProgress = 1.0;
   }

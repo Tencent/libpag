@@ -38,7 +38,7 @@ class PAGXView : public ContentView {
 
   ContentViewModel* getViewModel() const override;
 
-  void flush() const override;
+  Q_SLOT void flush() const override;
   QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
 
  private:

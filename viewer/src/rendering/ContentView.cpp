@@ -82,7 +82,9 @@ GPUDrawable* ContentView::getDrawable() const {
 }
 
 void ContentView::triggerFlush() const {
-  QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
+  if (renderThread != nullptr) {
+    QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
+  }
 }
 
 QSGNode* ContentView::updateTextureNode(QSGNode* oldNode) {
