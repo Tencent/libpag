@@ -369,6 +369,7 @@ static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
     layer->scrollRect = getRectAttribute(node, "scrollRect", {}, doc);
     layer->hasScrollRect = true;
   }
+  layer->clipToBounds = getBoolAttribute(node, "clipToBounds", false, doc);
 
   auto maskAttr = getAttribute(node, "mask");
   if (!maskAttr.empty() && maskAttr[0] == '@') {

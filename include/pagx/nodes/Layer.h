@@ -116,6 +116,13 @@ class Layer : public Node {
   bool hasScrollRect = false;
 
   /**
+   * Whether the layer clips its content to its own bounds. When true, auto layout expands this into
+   * a scrollRect using the layer's resolved width and height. Ignored if the layer already has a
+   * scrollRect or if both dimensions are unresolved. The default value is false.
+   */
+  bool clipToBounds = false;
+
+  /**
    * A reference to a mask layer.
    */
   Layer* mask = nullptr;

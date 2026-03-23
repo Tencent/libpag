@@ -25,7 +25,6 @@ they **must not** be omitted.
 | **ColorStop** | `offset`, `color` |
 | **ImagePattern** | `image` |
 | **BlendFilter** | `color` |
-| **ColorMatrixFilter** | `matrix` |
 | **Path** | `data` |
 | **GlyphRun** | `font`, `glyphs` |
 | **TextPath** | `path` |
@@ -116,6 +115,12 @@ for top-level Layers inside it (same role as `<pagx>` dimensions for document-le
 | `roundness` | float | 0 |
 | `reversed` | bool | false |
 | `position` | Point | (center of bounding box) |
+| `left` | float | — |
+| `right` | float | — |
+| `top` | float | — |
+| `bottom` | float | — |
+| `centerX` | float | — |
+| `centerY` | float | — |
 
 Positioning: prefer constraint attributes (`left`/`top`/`right`/`bottom`/`centerX`/`centerY`)
 over `position`. When constraints are set, `position` is computed automatically.
@@ -128,6 +133,12 @@ See §Constraint Attributes below.
 | `size` | Size | 100,100 |
 | `reversed` | bool | false |
 | `position` | Point | (center of bounding box) |
+| `left` | float | — |
+| `right` | float | — |
+| `top` | float | — |
+| `bottom` | float | — |
+| `centerX` | float | — |
+| `centerY` | float | — |
 
 Positioning: prefer constraint attributes over `position`. See §Constraint Attributes below.
 
@@ -144,6 +155,12 @@ Positioning: prefer constraint attributes over `position`. See §Constraint Attr
 | `innerRoundness` | float | 0 |
 | `reversed` | bool | false |
 | `position` | Point | (center of bounding box) |
+| `left` | float | — |
+| `right` | float | — |
+| `top` | float | — |
+| `bottom` | float | — |
+| `centerX` | float | — |
+| `centerY` | float | — |
 
 Positioning: prefer constraint attributes over `position`. See §Constraint Attributes below.
 
@@ -154,6 +171,12 @@ Positioning: prefer constraint attributes over `position`. See §Constraint Attr
 | `data` | string/idref | (required) |
 | `position` | Point | 0,0 |
 | `reversed` | bool | false |
+| `left` | float | — |
+| `right` | float | — |
+| `top` | float | — |
+| `bottom` | float | — |
+| `centerX` | float | — |
+| `centerY` | float | — |
 
 > `position` is the **coordinate system origin**. Prefer constraint attributes (`left`/`top`) for positioning. When `position="0,0"`, path data coordinates directly define drawing positions.
 
@@ -351,7 +374,7 @@ Child element of gradient color sources (LinearGradient, RadialGradient, ConicGr
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `matrix` | string | (required) |
+| `matrix` | string | identity |
 
 ### Font
 
@@ -364,6 +387,8 @@ Child element of gradient color sources (LinearGradient, RadialGradient, ConicGr
 | Attribute | Type | Default |
 |-----------|------|---------|
 | `advance` | float | (required) |
+| `path` | string | - |
+| `image` | string | - |
 | `offset` | Point | 0,0 |
 
 ### Text
@@ -372,9 +397,6 @@ Child element of gradient color sources (LinearGradient, RadialGradient, ConicGr
 |-----------|------|---------|
 | `text` | string | "" |
 | `position` | Point | 0,0 |
-
-> Text is content-only — always wrap in TextBox for positioning. TextBox uses constraint attributes.
-
 | `fontFamily` | string | "" |
 | `fontStyle` | string | "" |
 | `fontSize` | float | 12 |
@@ -382,6 +404,16 @@ Child element of gradient color sources (LinearGradient, RadialGradient, ConicGr
 | `fauxBold` | bool | false |
 | `fauxItalic` | bool | false |
 | `textAnchor` | TextAnchor | start |
+| `left` | float | — |
+| `right` | float | — |
+| `top` | float | — |
+| `bottom` | float | — |
+| `centerX` | float | — |
+| `centerY` | float | — |
+
+Positioning: prefer constraint attributes (`left`/`top`/`right`/`bottom`/`centerX`/`centerY`)
+over `position`. When constraints are set, `position` is computed automatically.
+See §Constraint Attributes below.
 
 ### GlyphRun
 
