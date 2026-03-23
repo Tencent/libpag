@@ -9,22 +9,22 @@ as defaults.
 
 ---
 
-## Icons
+## UI Components
 
-Icon-specific structural patterns.
+Structural patterns for application interface elements. Most UI components benefit from auto
+layout — use container layout for arranging child Layers in rows or columns, and constraint
+layout for positioning elements within a Layer.
 
-### Background + Foreground
+### Background + Foreground Shape
 
-The most common icon structure:
+A common pattern for icons, indicators, and badges — background shape with a foreground symbol:
 
 ```xml
 <pagx version="1.0" width="200" height="200">
-  <Layer width="200" height="200">
+  <Layer centerX="0" centerY="0" width="180" height="180">
     <!-- Background -->
-    <Group centerX="0" centerY="0">
-      <Ellipse size="180,180"/>
-      <Fill color="#EFF6FF"/>
-    </Group>
+    <Ellipse left="0" top="0" right="0" bottom="0"/>
+    <Fill color="#EFF6FF"/>
     <!-- Foreground symbol -->
     <Group centerX="0" centerY="0">
       <Path data="M 0,0 L 60,60 M 60,0 L 0,60"/>
@@ -34,18 +34,14 @@ The most common icon structure:
 </pagx>
 ```
 
-**Pattern**: Groups isolate painter scope (Fill vs. Stroke); `centerX/centerY="0"` centers
-each Group. **Prefer Stroke for icons** — 2-3px coordinate imprecision is barely visible at
-wider stroke widths. Use Fill for solid areas when needed; mix Fill and Stroke in separate
-Groups. Add more Groups with smaller geometry for layered depth effects.
+**Pattern**: Background shape + Fill sit directly on the Layer (no Group needed — painter scope
+resets at each Group boundary, so the background Fill is consumed before the Group begins).
+Foreground symbol lives in a Group with its own painters. Use `centerX/centerY="0"` on both
+the Layer (to center within the canvas) and the foreground Group (to center within the Layer).
+Add more Groups for layered foreground elements with different painters.
 
----
-
-## UI Components
-
-Structural patterns for application interface elements. Most UI components benefit from auto
-layout — use container layout for arranging child Layers in rows or columns, and constraint
-layout for positioning elements within a Layer.
+**Path data tip**: Path `data` uses the same syntax as SVG `<path d="...">` — generate the
+shape in SVG first, then copy the `d` attribute value directly into PAGX `data`.
 
 ### Text Label
 
@@ -245,32 +241,22 @@ remaining space. Three child Layers with `flex="1"` equally share available widt
 **Pattern**: Track uses `centerX/centerY` for centering; fill bar uses `left` + `centerY`
 for left-aligned vertical centering.
 
-### Avatar with Circular Mask
+### Avatar with Circular Clip
 
 ```xml
 <pagx version="1.0" width="120" height="120">
   <Layer width="120" height="120">
-    <!-- Mask layer (invisible, defines clip shape) -->
-    <Layer left="28" top="28" id="avatarClip" visible="false">
-      <Ellipse size="64,64"/>
-      <Fill color="#FFF"/>
-    </Layer>
-    <!-- Content layer with mask applied -->
-    <Layer left="28" top="28" mask="@avatarClip">
-      <Rectangle size="64,64"/>
-      <Fill>
-        <ImagePattern image="@avatar"/>
-      </Fill>
-    </Layer>
+    <Ellipse centerX="0" centerY="0" size="64,64"/>
+    <Fill>
+      <ImagePattern image="avatar.png"/>
+    </Fill>
   </Layer>
-  <Resources>
-    <Image id="avatar" source="avatar.png"/>
-  </Resources>
 </pagx>
 ```
 
-**Pattern**: Use opaque fill in mask layer — `maskType="alpha"` (default) means fully opaque =
-fully visible. Mask and content Layers share the same constraints to align.
+**Pattern**: Images can be filled into any shape — Ellipse, Rectangle, Path, or even complex
+shapes built with MergePath. Define the shape first, then apply ImagePattern as the fill. This
+eliminates the need for layer-level masks in most image clipping scenarios.
 
 ---
 

@@ -537,7 +537,7 @@ is sequential and forward-only.
 | `RadialGradient` | center (0,0), radius (required) | Relative to geometry origin |
 | `ConicGradient` | center (0,0), startAngle (0), endAngle (360) | Relative to geometry origin |
 | `DiamondGradient` | center (0,0), radius (required) | Relative to geometry origin |
-| `ImagePattern` | image (required), tileModeX/Y | Relative to geometry origin |
+| `ImagePattern` | image (required, `@id`/path/data URI), tileModeX/Y | Relative to geometry origin |
 
 All gradient/pattern coordinates are **relative to the geometry element's local coordinate
 system origin** (not canvas-absolute). External transforms (Group, Layer) affect both geometry

@@ -446,7 +446,7 @@
   <!-- ImagePattern -->
   <xs:complexType name="ImagePatternType">
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="image" type="IdRefType" use="required"/>
+    <xs:attribute name="image" type="xs:string" use="required"/>
     <xs:attribute name="tileModeX" type="TileModeType" default="clamp"/>
     <xs:attribute name="tileModeY" type="TileModeType" default="clamp"/>
     <xs:attribute name="filterMode" type="FilterModeType" default="linear"/>

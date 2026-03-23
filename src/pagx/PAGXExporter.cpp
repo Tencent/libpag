@@ -427,8 +427,16 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       auto pattern = static_cast<const ImagePattern*>(node);
       xml.openElement("ImagePattern");
       xml.addAttribute("id", pattern->id);
-      if (pattern->image != nullptr && !pattern->image->id.empty()) {
-        xml.addAttribute("image", "@" + pattern->image->id);
+      if (pattern->image != nullptr) {
+        if (!pattern->image->id.empty()) {
+          xml.addAttribute("image", "@" + pattern->image->id);
+        } else if (pattern->image->data) {
+          xml.addAttribute("image",
+                           "data:image/png;base64," + Base64Encode(pattern->image->data->bytes(),
+                                                                   pattern->image->data->size()));
+        } else if (!pattern->image->filePath.empty()) {
+          xml.addAttribute("image", pattern->image->filePath);
+        }
       }
       if (pattern->tileModeX != TileMode::Clamp) {
         xml.addAttribute("tileModeX", TileModeToString(pattern->tileModeX));

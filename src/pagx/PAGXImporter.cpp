@@ -1208,10 +1208,21 @@ static ImagePattern* parseImagePattern(const DOMNode* node, PAGXDocument* doc) {
     return nullptr;
   }
   auto imageAttr = getAttribute(node, "image");
-  if (!imageAttr.empty() && imageAttr[0] == '@') {
-    pattern->image = doc->findNode<Image>(imageAttr.substr(1));
-    if (!pattern->image) {
-      reportError(doc, node, "Resource '" + imageAttr + "' not found for 'image' attribute.");
+  if (!imageAttr.empty()) {
+    if (imageAttr[0] == '@') {
+      pattern->image = doc->findNode<Image>(imageAttr.substr(1));
+      if (!pattern->image) {
+        reportError(doc, node, "Resource '" + imageAttr + "' not found for 'image' attribute.");
+      }
+    } else {
+      // Inline image source (data URI or file path)
+      pattern->image = doc->makeNode<Image>();
+      auto data = DecodeBase64DataURI(imageAttr);
+      if (data) {
+        pattern->image->data = data;
+      } else {
+        pattern->image->filePath = imageAttr;
+      }
     }
   }
   pattern->tileModeX = GET_ENUM(node, "tileModeX", "clamp", doc, TileMode);

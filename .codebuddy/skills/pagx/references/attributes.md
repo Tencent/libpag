@@ -266,7 +266,7 @@ Child element of gradient color sources (LinearGradient, RadialGradient, ConicGr
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `image` | idref | (required) |
+| `image` | string/idref | (required) |
 | `tileModeX` | TileMode | clamp |
 | `tileModeY` | TileMode | clamp |
 | `filterMode` | FilterMode | linear |

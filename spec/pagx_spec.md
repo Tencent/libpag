@@ -418,11 +418,12 @@ Image patterns use an image as a color source.
 
 ```xml
 <ImagePattern image="@img1" tileModeX="repeat" tileModeY="repeat"/>
+<ImagePattern image="avatar.png" tileModeX="repeat" tileModeY="repeat"/>
 ```
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `image` | idref | (required) | Image reference "@id" |
+| `image` | string | (required) | Image source: `@id` resource reference, file path, or data URI |
 | `tileModeX` | TileMode | clamp | X-direction tile mode |
 | `tileModeY` | TileMode | clamp | Y-direction tile mode |
 | `filterMode` | FilterMode | linear | Texture filter mode |
