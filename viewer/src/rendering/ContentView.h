@@ -70,7 +70,8 @@ class ContentView : public QQuickItem {
   virtual void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
   // Called at the end of sizeChangedDelayHandle(). Subclasses may override to perform
   // additional work after a resize debounce, such as marking render state dirty.
-  virtual void onSizeChangedDelayHandled() {}
+  virtual void onSizeChangedDelayHandled() {
+  }
 
   std::shared_ptr<GPUDrawable> drawable = nullptr;
   std::unique_ptr<RenderThread> renderThread = nullptr;
