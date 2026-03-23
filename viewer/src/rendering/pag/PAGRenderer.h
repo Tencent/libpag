@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "rendering/ContentView.h"
 #include "rendering/IContentRenderer.h"
 #include "rendering/pag/PAGViewModel.h"
 

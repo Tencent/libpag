@@ -84,6 +84,9 @@ QString PAGViewModel::getCurrentFrame() const {
   int64_t totalFrames = getTotalFrame().toLongLong();
   auto currentFrame =
       static_cast<int64_t>(std::floor(getProgress() * static_cast<double>(totalFrames)));
+  if (currentFrame >= totalFrames) {
+    currentFrame = totalFrames - 1;
+  }
   return QString::number(currentFrame);
 }
 

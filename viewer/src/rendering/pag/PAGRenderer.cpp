@@ -41,7 +41,10 @@ IContentRenderer::RenderMetrics PAGRenderer::flush() {
     return metrics;
   }
   auto* player = viewModel->getPAGPlayer();
-  auto* file = viewModel->getPAGFile();
+  auto file = std::static_pointer_cast<PAGFile>(player->getComposition());
+  if (file == nullptr) {
+    return metrics;
+  }
   player->flush();
   double progress = file->getProgress();
   auto totalFrames =
