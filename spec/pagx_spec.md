@@ -660,7 +660,7 @@ When a Layer has container layout (`layout="horizontal"` or `"vertical"`), all c
 
 Constraint attributes allow content nodes to declare positional relationships with their container, and the engine automatically calculates coordinates. Constraint positioning is a fundamental capability available to all nodes — it is not a layout mode. Supported elements:
 
-- **Layer contents**: Geometry elements (Rectangle, Ellipse, Polystar, Path), Text, TextBox, and Group — constraint attributes always take effect
+- **Layer contents**: Geometry elements (Rectangle, Ellipse, Polystar, Path), Text, TextBox, Group, and TextPath — constraint attributes always take effect
 - **Child Layers**: When the parent Layer has no container layout (the default), or the child Layer has `includeInLayout="false"`
 
 ```xml
@@ -703,6 +703,7 @@ All content nodes have a `position` attribute representing the element's anchor 
 | Ellipse | Geometric center | Same as Rectangle |
 | Polystar | Geometric center | When not set, defaults to the center of the computed bounding box |
 | Path | Coordinate origin | `position="0,0"` means path data coordinates are used directly |
+| TextPath | Coordinate origin | Same as Path; constraint positioning shifts the path coordinate origin |
 | Text | Determined by `textAnchor` | `start`: baseline start; `center`: horizontal midpoint; `end`: end |
 | TextBox | Top-left corner | `position="0,0"` means text area starts at origin |
 | Group | Coordinate origin | `position="0,0"` means child coordinates are used directly |
@@ -731,7 +732,7 @@ Setting both `left` + `right` (or `top` + `bottom`) defines a target area (conta
 | TextBox | Stretch typesetting area | Modify `width` and `height` to fill the target area, changing text layout bounds |
 | Group | Derive layout dimensions | Align to the target area and set layout dimensions; children re-layout according to the new size, no effect on rendering |
 | Child Layer | Derive dimensions or position | Always derive dimensions from parent (`width = parent.width - left - right`), overriding any explicit `width`/`height` |
-| Polystar, Path, Text | Scale to fit | Single-axis: scale to exactly fill that axis, other axis scales proportionally; both-axis: use the smaller scale factor (fit mode), center along the longer axis |
+| Polystar, Path, Text, TextPath | Scale to fit | Single-axis: scale to exactly fill that axis, other axis scales proportionally; both-axis: use the smaller scale factor (fit mode), center along the longer axis |
 
 **Stretch** (Rectangle, Ellipse, TextBox):
 
@@ -1858,6 +1859,12 @@ redistributed evenly to fill the available path length.
 | `perpendicular` | bool | true | Perpendicular to path |
 | `reversed` | bool | false | Reverse direction |
 | `forceAlignment` | bool | false | Force stretch text to fill path |
+| `left` | float | - | Distance from left edge to container's left edge |
+| `right` | float | - | Distance from right edge to container's right edge |
+| `top` | float | - | Distance from top edge to container's top edge |
+| `bottom` | float | - | Distance from bottom edge to container's bottom edge |
+| `centerX` | float | - | Horizontal offset from container center (0 = centered) |
+| `centerY` | float | - | Vertical offset from container center (0 = centered) |
 
 **Baseline**:
 - `baselineOrigin`: The starting point of the baseline in the TextPath's local coordinate space
@@ -2285,6 +2292,7 @@ Element (base class)
 │   ├── Text
 │   └── Group
 │       └── TextBox
+├── TextPath (supports constraints, scale-to-fit)
 ├── Fill
 ├── Stroke
 ├── TrimPath

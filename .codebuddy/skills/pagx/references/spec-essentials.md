@@ -173,7 +173,7 @@ Elements inside a Layer (or Group) can use constraint attributes to
 declare their position relative to the container. Constraint positioning is a fundamental
 capability — it is not a layout mode. Supported elements:
 
-- **Layer contents**: Geometry elements (Rectangle, Ellipse, Polystar, Path), Text, Group, TextBox — always active
+- **Layer contents**: Geometry elements (Rectangle, Ellipse, Polystar, Path), Text, Group, TextBox, TextPath — always active
 - **Child Layers**: when the parent has no container layout (default), or the child has `includeInLayout="false"`
 
 | Attribute | Effect |
@@ -191,6 +191,7 @@ capability — it is not a layout mode. Supported elements:
 |--------------|----------|--------|
 | Rectangle, Ellipse, TextBox | **STRETCH** | Resize to fill target area |
 | Path, Polystar | **SCALE TO FIT** | Single-axis: scale to exactly fill, other axis proportional; Both-axis: use smaller scale factor (fit mode), center on longer axis |
+| TextPath | **SCALE TO FIT** | Same as Path — scales path data proportionally |
 | Group | **DERIVE SIZE** | Align to target area; set layout size for child constraint reference |
 | Child Layer | **ALWAYS OVERRIDE** | Opposite-pair constraints always override: `width = parent.width - left - right`, `x = left` |
 
@@ -380,6 +381,10 @@ Geometry Elements     Modifiers             Painters
 |---------------|---------|-------|
 | Shape modifiers (TrimPath, RoundCorner, MergePath) | Paths only | Triggers text-to-shape conversion |
 | Text modifiers (TextModifier, TextPath) | Glyph lists only | No effect on Paths |
+
+TextPath also supports **constraint-based positioning** (left, right, top, bottom, centerX, centerY)
+inherited from LayoutElement. When opposite-edge constraints are used, TextPath scales its path
+data proportionally (same as Path — scale-to-fit, not stretch).
 | Repeater | Both | Does not trigger text-to-shape |
 
 **Key scope implications**:
@@ -587,12 +592,13 @@ plus its own text layout properties. TextBox can contain child elements just lik
 
 ```xml
 <Text text="Curved" fontFamily="Arial" fontSize="24"/>
-<TextPath path="@curvePath" firstMargin="10"/>
+<TextPath path="@curvePath" centerX="0" centerY="0" firstMargin="10"/>
 <Fill color="#333"/>
 ```
 
 - Maps glyphs from a baseline onto a curved path.
 - `perpendicular` (true): rotate glyphs perpendicular to path.
+- **Constraint attributes**: `left`, `right`, `top`, `bottom`, `centerX`, `centerY` — see §3 Constraint Positioning. Opposite-pair constraints use scale-to-fit (same as Path).
 
 ### TextModifier + RangeSelector
 

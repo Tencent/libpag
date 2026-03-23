@@ -137,6 +137,11 @@ class PathData : public Node {
    */
   void scalePoints(float scale);
 
+  /**
+   * Translates all points by the given offset.
+   */
+  void translatePoints(float tx, float ty);
+
   NodeType nodeType() const override {
     return NodeType::PathData;
   }

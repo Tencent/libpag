@@ -825,6 +825,12 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addAttribute("perpendicular", textPath->perpendicular, true);
       xml.addAttribute("reversed", textPath->reversed);
       xml.addAttribute("forceAlignment", textPath->forceAlignment);
+      xml.addOptionalAttribute("left", textPath->left);
+      xml.addOptionalAttribute("right", textPath->right);
+      xml.addOptionalAttribute("top", textPath->top);
+      xml.addOptionalAttribute("bottom", textPath->bottom);
+      xml.addOptionalAttribute("centerX", textPath->centerX);
+      xml.addOptionalAttribute("centerY", textPath->centerY);
       writeCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;

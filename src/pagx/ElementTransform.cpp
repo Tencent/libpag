@@ -24,6 +24,7 @@
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextPath.h"
 
 namespace pagx {
 
@@ -41,6 +42,14 @@ void ElementTransform::TranslateX(Element* element, float tx) {
     case NodeType::Path:
       static_cast<Path*>(element)->position.x += tx;
       break;
+    case NodeType::TextPath: {
+      auto* textPath = static_cast<TextPath*>(element);
+      if (textPath->path != nullptr) {
+        textPath->path->translatePoints(tx, 0);
+      }
+      textPath->baselineOrigin.x += tx;
+      break;
+    }
     case NodeType::Text:
       static_cast<Text*>(element)->position.x += tx;
       break;
@@ -69,6 +78,14 @@ void ElementTransform::TranslateY(Element* element, float ty) {
     case NodeType::Path:
       static_cast<Path*>(element)->position.y += ty;
       break;
+    case NodeType::TextPath: {
+      auto* textPath = static_cast<TextPath*>(element);
+      if (textPath->path != nullptr) {
+        textPath->path->translatePoints(0, ty);
+      }
+      textPath->baselineOrigin.y += ty;
+      break;
+    }
     case NodeType::Text:
       static_cast<Text*>(element)->position.y += ty;
       break;
@@ -146,6 +163,15 @@ void ElementTransform::ApplyScaling(Element* element, float scale) {
       if (path->data != nullptr) {
         path->data->scalePoints(scale);
       }
+      break;
+    }
+    case NodeType::TextPath: {
+      auto* textPath = static_cast<TextPath*>(element);
+      if (textPath->path != nullptr) {
+        textPath->path->scalePoints(scale);
+      }
+      textPath->baselineOrigin.x *= scale;
+      textPath->baselineOrigin.y *= scale;
       break;
     }
     case NodeType::Text: {

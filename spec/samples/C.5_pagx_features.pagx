@@ -27,16 +27,16 @@
     <Repeater copies="10" position="0,120"/>
   </Layer>
   <Layer name="Core" width="326" height="326" centerX="0" centerY="-70">
-    <Layer alpha="0.2">
+    <Layer alpha="0.2" left="0" right="0" top="0" bottom="0">
       <Ellipse centerX="0" centerY="0" size="320,320"/>
       <Fill color="#3B82F6"/>
       <BlurFilter blurX="80" blurY="80"/>
     </Layer>
-    <Layer>
+    <Layer left="0" right="0" top="0" bottom="0">
       <Ellipse centerX="0" centerY="0" size="260,260"/>
       <Stroke color="#475569" width="2"/>
     </Layer>
-    <Layer alpha="0.7">
+    <Layer alpha="0.7" left="0" right="0" top="0" bottom="0">
       <Ellipse centerX="0" centerY="0" size="310,310"/>
       <TrimPath end="0.77"/>
       <Stroke width="2.5" cap="round">
@@ -47,7 +47,7 @@
         </ConicGradient>
       </Stroke>
     </Layer>
-    <Layer alpha="0.4">
+    <Layer alpha="0.4" left="0" right="0" top="0" bottom="0">
       <Path centerX="0" centerY="0" data="M 0 -155 L 0 -163 M 155 0 L 163 0 M 0 155 L 0 163 M -155 0 L -163 0"/>
       <Stroke color="#94A3B8" width="1.5" cap="round"/>
     </Layer>

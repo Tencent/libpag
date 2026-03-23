@@ -29,8 +29,8 @@ namespace pagx {
  * centerY) that define how the element is positioned relative to its containing Layer or Group.
  *
  * Elements that inherit from LayoutElement include: Rectangle, Ellipse, Polystar, Path, Text,
- * Group, and TextBox. Elements that do not participate in constraint layout (Fill, Stroke,
- * TrimPath, RoundCorner, MergePath, TextModifier, TextPath, Repeater) inherit directly from
+ * Group, TextBox, and TextPath. Elements that do not participate in constraint layout (Fill,
+ * Stroke, TrimPath, RoundCorner, MergePath, TextModifier, Repeater) inherit directly from
  * Element.
  */
 class LayoutElement : public Element {

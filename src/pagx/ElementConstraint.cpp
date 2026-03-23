@@ -24,7 +24,7 @@ namespace pagx {
 static bool IsLayoutElement(NodeType type) {
   return type == NodeType::Rectangle || type == NodeType::Ellipse || type == NodeType::Polystar ||
          type == NodeType::Path || type == NodeType::Text || type == NodeType::TextBox ||
-         type == NodeType::Group;
+         type == NodeType::Group || type == NodeType::TextPath;
 }
 
 bool ElementConstraint::IsStretchable(NodeType type) {

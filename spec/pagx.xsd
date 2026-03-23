@@ -701,6 +701,7 @@
     <xs:attribute name="perpendicular" type="BoolType" default="true"/>
     <xs:attribute name="reversed" type="BoolType" default="false"/>
     <xs:attribute name="forceAlignment" type="BoolType" default="false"/>
+    <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 

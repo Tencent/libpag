@@ -970,6 +970,12 @@ static TextPath* parseTextPath(const DOMNode* node, PAGXDocument* doc) {
   textPath->perpendicular = getBoolAttribute(node, "perpendicular", true, doc);
   textPath->reversed = getBoolAttribute(node, "reversed", false, doc);
   textPath->forceAlignment = getBoolAttribute(node, "forceAlignment", false, doc);
+  textPath->left = getFloatAttributeOrNaN(node, "left", doc);
+  textPath->right = getFloatAttributeOrNaN(node, "right", doc);
+  textPath->top = getFloatAttributeOrNaN(node, "top", doc);
+  textPath->bottom = getFloatAttributeOrNaN(node, "bottom", doc);
+  textPath->centerX = getFloatAttributeOrNaN(node, "centerX", doc);
+  textPath->centerY = getFloatAttributeOrNaN(node, "centerY", doc);
   return textPath;
 }
 

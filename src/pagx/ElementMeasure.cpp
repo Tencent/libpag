@@ -25,6 +25,7 @@
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextPath.h"
 
 namespace pagx {
 
@@ -60,6 +61,13 @@ Rect ElementMeasure::GetContentBounds(const Element* element, const TextMeasureF
     case NodeType::Text: {
       return measureText(static_cast<const Text*>(element));
     }
+    case NodeType::TextPath: {
+      auto* textPath = static_cast<const TextPath*>(element);
+      if (textPath->path != nullptr) {
+        return textPath->path->getBounds();
+      }
+      return {};
+    }
     case NodeType::TextBox: {
       auto* textBox = static_cast<const TextBox*>(element);
       float w = std::isnan(textBox->width) ? 0 : textBox->width;
@@ -93,6 +101,11 @@ Rect ElementMeasure::GetContentBounds(const Element* element, const TextMeasureF
 }
 
 Rect ElementMeasure::GetMeasuredBounds(const Element* element, const TextMeasureFunc& measureText) {
+  // Modifiers (like TextPath) have content bounds for constraint positioning but should not
+  // contribute to parent container measurement.
+  if (element->nodeType() == NodeType::TextPath) {
+    return {};
+  }
   auto bounds = GetContentBounds(element, measureText);
   if (bounds.isEmpty()) {
     return {};

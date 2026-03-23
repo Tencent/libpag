@@ -83,6 +83,14 @@ void PathData::scalePoints(float scale) {
   _boundsDirty = true;
 }
 
+void PathData::translatePoints(float tx, float ty) {
+  for (auto& point : _points) {
+    point.x += tx;
+    point.y += ty;
+  }
+  _boundsDirty = true;
+}
+
 Rect PathData::getBounds() {
   if (!_boundsDirty) {
     return _cachedBounds;

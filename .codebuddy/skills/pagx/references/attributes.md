@@ -349,7 +349,7 @@ Positioning: prefer constraint attributes over `position`. See §Constraint Attr
 | `text` | string | "" |
 | `position` | Point | 0,0 |
 
-> Prefer constraint attributes (`left`/`top`) over `position` for positioning.
+> Text is content-only — always wrap in TextBox for positioning. TextBox uses constraint attributes.
 
 | `fontFamily` | string | "" |
 | `fontStyle` | string | "" |
@@ -418,8 +418,18 @@ Positioning: prefer constraint attributes over `position`. See §Constraint Attr
 | `perpendicular` | bool | true |
 | `reversed` | bool | false |
 | `forceAlignment` | bool | false |
+| `left` | float | — |
+| `right` | float | — |
+| `top` | float | — |
+| `bottom` | float | — |
+| `centerX` | float | — |
+| `centerY` | float | — |
 
-### Constraint Attributes (Geometry Elements, Text, TextBox, Groups, and Child Layers)
+Positioning: prefer constraint attributes (`left`/`top`/`right`/`bottom`/`centerX`/`centerY`)
+for positioning. When constraints are set, the path coordinate origin is computed automatically.
+Opposite-pair constraints use scale-to-fit (same as Path). See §Constraint Attributes below.
+
+### Constraint Attributes (Geometry Elements, TextPath, TextBox, Groups, and Child Layers)
 
 These attributes position or stretch an element relative to its container.
 The container's size comes from explicit `width`/`height`, parent layout assignment, or
@@ -444,7 +454,7 @@ For **child Layers**, constraints are only active when:
 
 ### TextBox
 
-Text layout container that inherits from Group. Bare Text aligns baseline to y=0 — TextBox corrects this so text vertically centers within each line automatically. Always use TextBox when text participates in auto-layout or needs vertical centering.
+Text layout container that inherits from Group. Bare Text aligns baseline to y=0 — TextBox corrects this so text vertically centers within each line automatically. Always wrap Text in TextBox.
 
 **Inherited from Group:**
 
@@ -570,7 +580,7 @@ These defaults are counter-intuitive and commonly forgotten:
 | **Stroke** | `miterLimit` | `4` | Often assumed `10` (SVG default) |
 | **BackgroundBlurStyle** | `tileMode` | `mirror` | May assume `clamp` |
 | **BlurFilter** | `tileMode` | `decal` | May assume `clamp` |
-| **Layer** | `alignment` | `start` | Often assumed `center` |
+| **Layer** | `alignment` | `stretch` | Often assumed `center` (actually stretch fills children) |
 | **Layer** | `arrangement` | `start` | Often assumed `center` |
 
 
