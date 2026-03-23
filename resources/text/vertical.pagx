@@ -2,10 +2,8 @@
 <pagx version="1.0" width="700" height="600">
   <!-- Box A: Digits rotated 90° in vertical text (date format) -->
   <Layer left="30" top="20">
-    <Group>
-      <Rectangle size="60,250"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="60,250"/>
+    <Stroke/>
     <TextBox width="60" height="250" writingMode="vertical">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[2024 年 12 月 31 日]]></Text>
       <Fill/>
@@ -14,10 +12,8 @@
 
   <!-- Box B: Rotated digits and symbols (prices) + TextAlign Center -->
   <Layer left="110" top="20">
-    <Group>
-      <Rectangle size="100,250"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="100,250"/>
+    <Stroke/>
     <TextBox width="100" height="250" writingMode="vertical" textAlign="center">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[価格 $99.50 元 税込 $110.00]]></Text>
       <Fill/>
@@ -26,10 +22,8 @@
 
   <!-- Box C: Latin/CJK alternating (each char rotated individually) + explicit newline -->
   <Layer left="230" top="20">
-    <Group>
-      <Rectangle size="100,250"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="100,250"/>
+    <Stroke/>
     <TextBox width="100" height="250" writingMode="vertical">
       <Text text="Testing 123 你好&#10;World 456 世界 End" fontFamily="NotoSansSC" fontSize="22"/>
       <Fill/>
@@ -38,10 +32,8 @@
 
   <!-- Box D: CJK auto-wrap + overflow hidden -->
   <Layer left="350" top="20">
-    <Group>
-      <Rectangle size="80,200"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="80,200"/>
+    <Stroke/>
     <TextBox width="80" height="200" writingMode="vertical" overflow="hidden">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[春眠不觉晓处处闻啼鸟夜来风雨声花落知多少]]></Text>
       <Fill/>
@@ -50,10 +42,8 @@
 
   <!-- Box E1: ParagraphAlign Near -->
   <Layer left="460" top="20">
-    <Group>
-      <Rectangle size="60,250"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="60,250"/>
+    <Stroke/>
     <TextBox width="60" height="250" writingMode="vertical">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[竖排 Near 对齐]]></Text>
       <Fill/>
@@ -62,10 +52,8 @@
 
   <!-- Box E2: ParagraphAlign Middle -->
   <Layer left="540" top="20">
-    <Group>
-      <Rectangle size="60,250"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="60,250"/>
+    <Stroke/>
     <TextBox width="60" height="250" writingMode="vertical" paragraphAlign="middle">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[竖排 Middle 对齐]]></Text>
       <Fill/>
@@ -74,10 +62,8 @@
 
   <!-- Box E3: ParagraphAlign Far -->
   <Layer left="620" top="20">
-    <Group>
-      <Rectangle size="60,250"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="60,250"/>
+    <Stroke/>
     <TextBox width="60" height="250" writingMode="vertical" paragraphAlign="far">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[竖排 Far 对齐]]></Text>
       <Fill/>
@@ -86,10 +72,8 @@
 
   <!-- Box F1: TextAlign Start with Latin mix -->
   <Layer left="30" top="300">
-    <Group>
-      <Rectangle size="100,250"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="100,250"/>
+    <Stroke/>
     <TextBox width="100" height="250" writingMode="vertical">
       <Text text="你好 Hello&#10;世界大地" fontFamily="NotoSansSC" fontSize="24"/>
       <Fill/>
@@ -98,10 +82,8 @@
 
   <!-- Box F2: TextAlign End with Latin mix -->
   <Layer left="150" top="300">
-    <Group>
-      <Rectangle size="100,250"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="100,250"/>
+    <Stroke/>
     <TextBox width="100" height="250" writingMode="vertical" textAlign="end">
       <Text text="你好 Hello&#10;世界大地" fontFamily="NotoSansSC" fontSize="24"/>
       <Fill/>
@@ -110,10 +92,8 @@
 
   <!-- Box G: TextAlign Justify + lineHeight -->
   <Layer left="270" top="300">
-    <Group>
-      <Rectangle size="100,250"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="100,250"/>
+    <Stroke/>
     <TextBox width="100" height="250" writingMode="vertical" textAlign="justify" lineHeight="50">
       <Text text="春眠 Not 觉晓&#10;处处 Hear 啼鸟" fontFamily="NotoSansSC" fontSize="24"/>
       <Fill/>
@@ -122,10 +102,8 @@
 
   <!-- Box H: Pure Latin (each character rotated 90°) with column wrap -->
   <Layer left="390" top="300">
-    <Group>
-      <Rectangle size="100,250"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="100,250"/>
+    <Stroke/>
     <TextBox width="100" height="250" writingMode="vertical">
       <Text text="Hello World Test More Text Here" fontFamily="NotoSansSC" fontSize="24"/>
       <Fill/>

@@ -4285,4 +4285,130 @@ PAGX_TEST(PAGXTest, ImagePatternInlineImage) {
   EXPECT_TRUE(pattern5->image->data != nullptr);
 }
 
+// =====================================================================================
+// ClipToBounds
+// =====================================================================================
+
+/**
+ * Test that clipToBounds does not modify the original scrollRect/hasScrollRect on the PAGX node.
+ * The clipping is applied only at render time in LayerBuilder.
+ */
+PAGX_TEST(PAGXTest, ClipToBoundsDoesNotModifyNode) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+  parent->width = 200;
+  parent->height = 200;
+  parent->clipToBounds = true;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  parent->children = {child};
+  child->height = 100;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {300, 100};
+  child->contents.push_back(rect);
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // clipToBounds should not alter the original node data.
+  EXPECT_FALSE(parent->hasScrollRect);
+  EXPECT_EQ(parent->scrollRect.x, 0);
+  EXPECT_EQ(parent->scrollRect.y, 0);
+  EXPECT_EQ(parent->scrollRect.width, 0);
+  EXPECT_EQ(parent->scrollRect.height, 0);
+  EXPECT_TRUE(parent->clipToBounds);
+}
+
+/**
+ * Test that clipToBounds is parsed correctly from XML.
+ */
+PAGX_TEST(PAGXTest, ClipToBoundsParseFromXML) {
+  std::string xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="200">
+  <Layer width="200" height="200" clipToBounds="true">
+    <Rectangle size="300,300"/>
+    <Fill color="#F00"/>
+  </Layer>
+</pagx>)";
+
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  ASSERT_EQ(doc->layers.size(), 1u);
+  EXPECT_TRUE(doc->layers[0]->clipToBounds);
+  EXPECT_FALSE(doc->layers[0]->hasScrollRect);
+}
+
+/**
+ * Test that explicit scrollRect takes priority over clipToBounds.
+ */
+PAGX_TEST(PAGXTest, ClipToBoundsScrollRectPriority) {
+  std::string xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="200">
+  <Layer width="200" height="200" scrollRect="10,10,100,100" clipToBounds="true">
+    <Rectangle size="300,300"/>
+    <Fill color="#F00"/>
+  </Layer>
+</pagx>)";
+
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_EQ(doc->layers.size(), 1u);
+
+  auto* layer = doc->layers[0];
+  // scrollRect should be parsed, clipToBounds should also be true.
+  EXPECT_TRUE(layer->hasScrollRect);
+  EXPECT_TRUE(layer->clipToBounds);
+  EXPECT_EQ(layer->scrollRect.x, 10);
+  EXPECT_EQ(layer->scrollRect.y, 10);
+  EXPECT_EQ(layer->scrollRect.width, 100);
+  EXPECT_EQ(layer->scrollRect.height, 100);
+}
+
+/**
+ * Test that clipToBounds survives export and re-import (round trip).
+ */
+PAGX_TEST(PAGXTest, ClipToBoundsRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 200;
+  layer->height = 200;
+  layer->clipToBounds = true;
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+
+  auto doc2 = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc2 != nullptr);
+  ASSERT_EQ(doc2->layers.size(), 1u);
+  EXPECT_TRUE(doc2->layers[0]->clipToBounds);
+  EXPECT_FALSE(doc2->layers[0]->hasScrollRect);
+}
+
+/**
+ * Test that clipToBounds works with auto-measured container (no explicit dimensions).
+ */
+PAGX_TEST(PAGXTest, ClipToBoundsAutoMeasured) {
+  auto doc = pagx::PAGXDocument::Make(300, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+  // No explicit width/height — will be measured from children.
+  parent->layout = pagx::LayoutMode::Vertical;
+  parent->clipToBounds = true;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  parent->children = {child};
+  child->width = 200;
+  child->height = 100;
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // After layout, parent should have measured dimensions from children.
+  EXPECT_EQ(parent->width, 200);
+  EXPECT_EQ(parent->height, 100);
+  // Original node data should not be modified.
+  EXPECT_FALSE(parent->hasScrollRect);
+}
+
 }  // namespace pag

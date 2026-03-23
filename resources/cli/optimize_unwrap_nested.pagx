@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Group>
+      <Group>
+        <Rectangle left="10" top="10" size="80,80"/>
+        <Fill color="#FF0000"/>
+      </Group>
+    </Group>
+    <Rectangle left="100" top="100" size="50,50"/>
+    <Fill color="#0000FF"/>
+  </Layer>
+</pagx>

@@ -70,6 +70,7 @@ they **must not** be omitted.
 | `groupOpacity` | bool | false |
 | `passThroughBackground` | bool | true |
 | `scrollRect` | Rect | — |
+| `clipToBounds` | bool | false |
 | `mask` | idref | — |
 | `composition` | idref | — |
 | `maskType` | MaskType | alpha |

@@ -98,11 +98,9 @@
       </Stroke>
     </Layer>
     <Layer left="58" centerY="0">
-      <Group>
-        <Path data="M 0 0 L 28 0 L 44 16 L 44 68 L 0 68 Z"/>
-        <Stroke color="#F43F5E" width="2" join="round"/>
-        <Fill color="#F43F5E10"/>
-      </Group>
+      <Path data="M 0 0 L 28 0 L 44 16 L 44 68 L 0 68 Z"/>
+      <Stroke color="#F43F5E" width="2" join="round"/>
+      <Fill color="#F43F5E10"/>
       <Group>
         <Path data="M 28 0 L 28 16 L 44 16"/>
         <Stroke color="#F43F5E" width="1.5" join="round"/>
@@ -147,11 +145,9 @@
       </Stroke>
     </Layer>
     <Layer left="49" centerY="0">
-      <Group>
-        <Rectangle left="0" top="0" size="52,32" roundness="6"/>
-        <Stroke color="#38BDF8" width="2"/>
-        <Fill color="#38BDF820"/>
-      </Group>
+      <Rectangle left="0" top="0" size="52,32" roundness="6"/>
+      <Stroke color="#38BDF8" width="2"/>
+      <Fill color="#38BDF820"/>
       <Group>
         <Rectangle left="10" top="20" size="52,32" roundness="6"/>
         <Stroke color="#38BDF8" width="2"/>
@@ -194,11 +190,9 @@
       </Stroke>
     </Layer>
     <Layer left="52" centerY="0">
-      <Group>
-        <Rectangle left="0" top="1" size="32,72" roundness="5"/>
-        <Stroke color="#A855F7" width="2"/>
-        <Fill color="#A855F720"/>
-      </Group>
+      <Rectangle left="0" top="1" size="32,72" roundness="5"/>
+      <Stroke color="#A855F7" width="2"/>
+      <Fill color="#A855F720"/>
       <Group>
         <Path data="M 4 21 L 28 21 M 4 37 L 22 37 M 4 53 L 28 53"/>
         <Stroke color="#A855F7" width="1.5" cap="round"/>
@@ -252,11 +246,9 @@
       </Stroke>
     </Layer>
     <Layer left="42" centerY="0">
-      <Group>
-        <Ellipse left="10" top="18" size="40,40"/>
-        <Ellipse left="46" top="18" size="40,40"/>
-        <Stroke color="#10B981" width="2"/>
-      </Group>
+      <Ellipse left="10" top="18" size="40,40"/>
+      <Ellipse left="46" top="18" size="40,40"/>
+      <Stroke color="#10B981" width="2"/>
       <Group>
         <Path data="M 46 38 L 50 38"/>
         <Stroke color="#10B981" width="2" cap="round"/>
@@ -297,11 +289,9 @@
       </Stroke>
     </Layer>
     <Layer left="50" centerY="0">
-      <Group>
-        <Path data="M 30 0 C 40 5 48 20 48 40 L 48 62 L 12 62 L 12 40 C 12 20 20 5 30 0 Z"/>
-        <Stroke color="#FBBF24" width="2" join="round"/>
-        <Fill color="#FBBF2420"/>
-      </Group>
+      <Path data="M 30 0 C 40 5 48 20 48 40 L 48 62 L 12 62 L 12 40 C 12 20 20 5 30 0 Z"/>
+      <Stroke color="#FBBF24" width="2" join="round"/>
+      <Fill color="#FBBF2420"/>
       <Group>
         <Path data="M 12 52 L 0 70 L 12 65 Z M 48 52 L 60 70 L 48 65 Z"/>
         <Stroke color="#FBBF24" width="2" join="round"/>
@@ -387,10 +377,8 @@
     </TextBox>
   </Layer>
   <Layer name="Corners" alpha="0.2">
-    <Group>
-      <Path data="M 50 110 L 50 50 L 110 50 M 1490 50 L 1550 50 L 1550 110 M 50 1090 L 50 1150 L 110 1150 M 1490 1150 L 1550 1150 L 1550 1090"/>
-      <Stroke color="#64748B" width="1" cap="round" join="round"/>
-    </Group>
+    <Path data="M 50 110 L 50 50 L 110 50 M 1490 50 L 1550 50 L 1550 110 M 50 1090 L 50 1150 L 110 1150 M 1490 1150 L 1550 1150 L 1550 1090"/>
+    <Stroke color="#64748B" width="1" cap="round" join="round"/>
     <Group>
       <Ellipse left="48" top="48" size="4,4"/>
       <Ellipse left="1548" top="48" size="4,4"/>

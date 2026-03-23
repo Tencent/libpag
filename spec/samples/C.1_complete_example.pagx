@@ -82,11 +82,9 @@
     </TextBox>
   </Layer>
   <Layer name="Modifiers" top="325">
-    <Group left="258">
-      <Path data="@wavePath"/>
-      <TrimPath end="0.75"/>
-      <Stroke color="@cyan" width="3" cap="round"/>
-    </Group>
+    <Path left="258" data="@wavePath"/>
+    <TrimPath end="0.75"/>
+    <Stroke color="@cyan" width="3" cap="round"/>
     <Group left="368">
       <Rectangle left="-30" top="-20" size="60,40"/>
       <RoundCorner radius="10"/>

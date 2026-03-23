@@ -40,7 +40,6 @@
       </Fill>
     </Layer>
     <Layer name="Stars" alpha="0.9">
-      <Group>
         <Ellipse left="119" top="79" size="2,2"/>
         <Ellipse left="178.5" top="108.5" size="3,3"/>
         <Ellipse left="259" top="89" size="2,2"/>
@@ -52,7 +51,6 @@
         <Ellipse left="738.5" top="148.5" size="3,3"/>
         <Ellipse left="89" top="159" size="2,2"/>
         <Fill color="#FFFFFFCC"/>
-      </Group>
       <Group>
         <Ellipse left="149" top="199" size="2,2"/>
         <Ellipse left="239" top="169" size="2,2"/>
@@ -84,10 +82,8 @@
       </Layer>
     </Layer>
     <Layer name="HudRings" left="400" top="310" alpha="0.7">
-      <Group>
         <Ellipse left="-240" top="-240" size="480,480"/>
         <Stroke color="#1E3A8A" width="2" dashes="10,12"/>
-      </Group>
       <Group>
         <Ellipse left="-210" top="-210" size="420,420"/>
         <TrimPath start="0.1" end="0.4" offset="40"/>
@@ -151,10 +147,8 @@
       <Stroke color="#1D4ED8AA" width="1"/>
     </Layer>
     <Layer name="TechLines" alpha="0.6">
-      <Group>
         <Path data="M 80 130 L 160 130 L 200 170"/>
         <Stroke color="#38BDF8" width="1"/>
-      </Group>
       <Group>
         <Path data="M 720 130 L 640 130 L 600 170"/>
         <Stroke color="#A78BFA" width="1"/>
@@ -169,10 +163,8 @@
       </Group>
     </Layer>
     <Layer name="HexDecor" alpha="0.6">
-      <Group>
         <Polystar left="106" top="186" type="polygon" pointCount="6" outerRadius="14" rotation="30"/>
         <Stroke color="#1D4ED8" width="1"/>
-      </Group>
       <Group>
         <Polystar left="668" top="228" type="polygon" pointCount="6" outerRadius="12" rotation="30"/>
         <Stroke color="#38BDF8" width="1"/>
@@ -193,7 +185,6 @@
     <!-- Top Bar Area -->
     <Layer name="TopBarArea" width="760" height="90">
       <Layer name="Avatar">
-        <Group>
           <Polystar position="50,45" type="polygon" pointCount="6" outerRadius="36" rotation="30"/>
           <Stroke width="2">
             <LinearGradient startPoint="14,9" endPoint="86,81">
@@ -201,7 +192,6 @@
               <ColorStop offset="1" color="#A78BFA"/>
             </LinearGradient>
           </Stroke>
-        </Group>
         <Group>
           <Ellipse left="22" top="17" size="56,56"/>
           <Fill color="#0B1225"/>
@@ -244,10 +234,8 @@
         </Layer>
       </Layer>
       <Layer name="ExpBar">
-        <Group>
           <Rectangle left="100" top="54" size="280,10" roundness="5"/>
           <Fill color="#1E293B"/>
-        </Group>
         <Group>
           <Rectangle left="100" top="56" size="190,6" roundness="3"/>
           <Fill>
@@ -259,10 +247,8 @@
         </Group>
       </Layer>
       <Layer name="EnergyBar">
-        <Group>
           <Rectangle left="100" top="70" size="280,10" roundness="5"/>
           <Fill color="#172437"/>
-        </Group>
         <Group>
           <Rectangle left="100" top="72" size="160,6" roundness="3"/>
           <Fill>
@@ -402,10 +388,8 @@
         <Layer name="BottomButtonSettings" width="46">
           <Layer composition="@navButton"/>
           <Layer left="11" top="11">
-            <Group>
               <Polystar left="2" top="2" type="star" pointCount="8" outerRadius="10" innerRadius="6"/>
               <Stroke color="#93C5FD" width="2"/>
-            </Group>
             <Group>
               <Ellipse left="9" top="9" size="6,6"/>
               <Fill color="#93C5FD"/>

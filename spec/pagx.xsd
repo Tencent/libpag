@@ -924,6 +924,7 @@
     <xs:attribute name="groupOpacity" type="BoolType" default="false"/>
     <xs:attribute name="passThroughBackground" type="BoolType" default="true"/>
     <xs:attribute name="scrollRect" type="RectType"/>
+    <xs:attribute name="clipToBounds" type="BoolType" default="false"/>
     <xs:attribute name="mask" type="IdRefType"/>
     <xs:attribute name="maskType" type="MaskTypeType" default="alpha"/>
     <xs:attribute name="composition" type="IdRefType"/>

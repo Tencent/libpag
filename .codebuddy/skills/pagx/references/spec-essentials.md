@@ -314,8 +314,8 @@ Write `id`/`name`/`version` first, then constraint/sizing attributes (`left`, `r
 | `maskType` | alpha | alpha / luminance / contour |
 | `composition` | - | Reference to Composition via `@id` |
 
-For advanced attributes (`matrix3D`, `preserve3D`, `groupOpacity`, `passThroughBackground`,
-`scrollRect`), see `attributes.md`.
+For advanced attributes (`matrix3D`, `preserve3D`, `groupOpacity`, `passThroughBackground`),
+see `attributes.md`.
 
 **maskType usage**:
 - `alpha`: mask layer's alpha channel controls visibility — use for soft-edge gradual masks.
@@ -496,8 +496,8 @@ is sequential and forward-only.
 <Text left="10" top="10" text="Hello" fontFamily="Arial" fontSize="24"/>
 ```
 
-- Text is a content-only element — wrap in TextBox for positioning and measurement. TextBox handles proper measurement and constraint positioning. Exception: when using TextPath, Text can appear without TextBox wrapper.
-- **Constraint attributes**: Text supports `left`, `right`, `top`, `bottom`, `centerX`, `centerY`, but prefer applying constraints to the parent TextBox instead of directly on Text.
+- Text supports constraint attributes (`left`, `right`, `top`, `bottom`, `centerX`, `centerY`) for positioning within the container. Prefer wrapping Text in TextBox — TextBox handles measurement and provides accurate bounding box. Exception: when using TextPath, Text can appear without TextBox wrapper.
+- **Constraint attributes**: prefer applying constraints to the parent TextBox instead of directly on Text.
 - `fauxBold` / `fauxItalic`: algorithmic bold / italic (default false).
 - **CDATA** for special characters: `<![CDATA[A < B]]>`.
 - `\n` in `text` attribute (as `&#10;`) triggers line breaks.
@@ -675,13 +675,19 @@ See `design-patterns.md` §Container Layout for examples and usage guidance.
 - Mask layer transforms do **not** affect the masked layer.
 - `maskType`: `alpha` (default), `luminance`, `contour`.
 
-### scrollRect
+### clipToBounds
 
 ```xml
-<Layer scrollRect="10,10,300,200">
-  <!-- only content within the rect is visible -->
+<Layer width="400" height="300" clipToBounds="true">
+  <!-- content outside 400×300 bounds is clipped -->
 </Layer>
 ```
+
+Clips content to the layer's own bounds. Works with auto-layout — the clipping region is
+determined after layout resolves the layer's dimensions.
+
+For advanced cases requiring a custom clip region with offset (e.g. scroll views), use
+`scrollRect="x,y,w,h"` instead. `scrollRect` takes priority when both are set.
 
 ---
 

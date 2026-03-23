@@ -1250,6 +1250,7 @@ static void writeLayer(XMLBuilder& xml, const Layer* node, const Options& option
   if (node->hasScrollRect) {
     xml.addAttribute("scrollRect", rectToString(node->scrollRect));
   }
+  xml.addAttribute("clipToBounds", node->clipToBounds);
   if (node->mask != nullptr && !node->mask->id.empty()) {
     xml.addAttribute("mask", "@" + node->mask->id);
   }

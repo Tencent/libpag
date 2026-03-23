@@ -4,10 +4,8 @@
 
   <!-- Box A: CJK auto word wrap -->
   <Layer left="50" top="50">
-    <Group>
-      <Rectangle size="150,120"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="150,120"/>
+    <Stroke/>
     <TextBox width="150" height="120">
       <Text text="你好世界，这是测试文本。" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
@@ -16,10 +14,8 @@
 
   <!-- Box B: Overflow hidden -->
   <Layer left="220" top="50">
-    <Group>
-      <Rectangle size="150,80"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="150,80"/>
+    <Stroke/>
     <TextBox width="150" height="80" overflow="hidden">
       <Text text="Overflow text that is very long and should be clipped by the box boundary." fontFamily="NotoSansSC" fontSize="18"/>
       <Fill/>
@@ -28,10 +24,8 @@
 
   <!-- Box C: Justify alignment -->
   <Layer left="390" top="50">
-    <Group>
-      <Rectangle size="150,80"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="150,80"/>
+    <Stroke/>
     <TextBox width="150" height="80" textAlign="justify">
       <Text text="Justify this line&#10;Last line start" fontFamily="NotoSansSC" fontSize="18"/>
       <Fill/>
@@ -42,10 +36,8 @@
 
   <!-- Box D: Empty lines (\n at start + consecutive \n\n) -->
   <Layer left="50" top="200">
-    <Group>
-      <Rectangle size="120,130"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="120,130"/>
+    <Stroke/>
     <TextBox width="120" height="130">
       <Text text="&#10;Line2&#10;&#10;Line4" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
@@ -54,10 +46,8 @@
 
   <!-- Box E: Rich text + end alignment -->
   <Layer left="190" top="200">
-    <Group>
-      <Rectangle size="230,120"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="230,120"/>
+    <Stroke/>
     <TextBox width="230" height="120" textAlign="end">
       <Group>
         <Text text="Right" fontFamily="NotoSansSC" fontSize="24"/>
@@ -74,10 +64,8 @@
 
   <!-- Box F: ParagraphAlign near -->
   <Layer left="50" top="360">
-    <Group>
-      <Rectangle size="150,80"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="150,80"/>
+    <Stroke/>
     <TextBox width="150" height="80">
       <Text text="aaAÂẤ" fontFamily="NotoSansSC" fontSize="32"/>
       <Fill/>
@@ -86,10 +74,8 @@
 
   <!-- Box G: ParagraphAlign middle -->
   <Layer left="220" top="360">
-    <Group>
-      <Rectangle size="150,80"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="150,80"/>
+    <Stroke/>
     <TextBox width="150" height="80" paragraphAlign="middle">
       <Text text="aaAÂẤ" fontFamily="NotoSansSC" fontSize="32"/>
       <Fill/>
@@ -98,10 +84,8 @@
 
   <!-- Box H: ParagraphAlign far -->
   <Layer left="390" top="360">
-    <Group>
-      <Rectangle size="150,80"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="150,80"/>
+    <Stroke/>
     <TextBox width="150" height="80" paragraphAlign="far">
       <Text text="aaAÂẤ" fontFamily="NotoSansSC" fontSize="32"/>
       <Fill/>
@@ -112,10 +96,8 @@
 
   <!-- Box I: Auto lineHeight, mixed font sizes -->
   <Layer left="50" top="470">
-    <Group>
-      <Rectangle size="200,180"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="200,180"/>
+    <Stroke/>
     <TextBox width="200" height="180">
       <Group>
         <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
@@ -134,10 +116,8 @@
 
   <!-- Box J: Fixed lineHeight=40, mixed font sizes -->
   <Layer left="270" top="470">
-    <Group>
-      <Rectangle size="200,180"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="200,180"/>
+    <Stroke/>
     <TextBox width="200" height="180" lineHeight="40">
       <Group>
         <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
@@ -156,10 +136,8 @@
 
   <!-- Box K: Fixed lineHeight=50, paragraphAlign far -->
   <Layer left="490" top="470">
-    <Group>
-      <Rectangle size="150,160"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="150,160"/>
+    <Stroke/>
     <TextBox width="150" height="160" paragraphAlign="far" lineHeight="50">
       <Text text="Line1&#10;Line2" fontFamily="NotoSansSC" fontSize="24"/>
       <Fill/>
@@ -170,10 +148,8 @@
 
   <!-- Box L: 3-line mixed sizes, paragraphAlign far -->
   <Layer left="50" top="680">
-    <Group>
-      <Rectangle size="150,180"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="150,180"/>
+    <Stroke/>
     <TextBox width="150" height="180" paragraphAlign="far">
       <Group>
         <Text text="Large&#10;" fontFamily="NotoSansSC" fontSize="36"/>
@@ -194,10 +170,8 @@
        "Hg\n" at 40pt produces the empty line, "\nAB" at 16pt starts the next line.
        The empty line height should use 40pt metrics, not 16pt. -->
   <Layer left="240" top="680">
-    <Group>
-      <Rectangle size="200,180"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="200,180"/>
+    <Stroke/>
     <TextBox width="200" height="180">
       <Group>
         <Text text="Hg&#10;" fontFamily="NotoSansSC" fontSize="40"/>
@@ -247,10 +221,8 @@
 
   <!-- Box M: Point text, textAnchor=start (default) -->
   <Layer left="50" top="1000">
-    <Group>
-      <Text text="Line One&#10;Line Two&#10;Line Three" fontFamily="NotoSansSC" fontSize="24"/>
-      <Fill/>
-    </Group>
+    <Text text="Line One&#10;Line Two&#10;Line Three" fontFamily="NotoSansSC" fontSize="24"/>
+    <Fill/>
     <Group>
 <Ellipse left="-3" top="-3" size="6,6"/>
       <Fill color="#F00"/>
@@ -259,10 +231,8 @@
 
   <!-- Box N: Point text, textAnchor=center -->
   <Layer left="320" top="1000">
-    <Group>
-      <Text text="Center A&#10;Center BB&#10;Center CCC" fontFamily="NotoSansSC" fontSize="24" textAnchor="center"/>
-      <Fill/>
-    </Group>
+    <Text text="Center A&#10;Center BB&#10;Center CCC" fontFamily="NotoSansSC" fontSize="24" textAnchor="center"/>
+    <Fill/>
     <Group>
 <Ellipse left="-3" top="-3" size="6,6"/>
       <Fill color="#F00"/>
@@ -271,10 +241,8 @@
 
   <!-- Box O: Point text, textAnchor=end -->
   <Layer left="590" top="1000">
-    <Group>
-      <Text text="End X&#10;End YY&#10;End ZZZ" fontFamily="NotoSansSC" fontSize="24" textAnchor="end"/>
-      <Fill/>
-    </Group>
+    <Text text="End X&#10;End YY&#10;End ZZZ" fontFamily="NotoSansSC" fontSize="24" textAnchor="end"/>
+    <Fill/>
     <Group>
 <Ellipse left="-3" top="-3" size="6,6"/>
       <Fill color="#F00"/>

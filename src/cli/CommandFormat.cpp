@@ -56,7 +56,7 @@ static const std::unordered_map<std::string, std::vector<const char*>> ATTRIBUTE
                "layout", "gap", "flex", "padding", "alignment", "arrangement", "includeInLayout",
                "left", "right", "top", "bottom", "centerX", "centerY",
                "matrix", "matrix3D", "preserve3D", "antiAlias", "groupOpacity",
-               "passThroughBackground", "scrollRect", "mask", "maskType", "composition"}},
+               "passThroughBackground", "scrollRect", "clipToBounds", "mask", "maskType", "composition"}},
     {"Rectangle", {"left", "top", "right", "bottom", "centerX", "centerY",
                     "position", "size", "roundness", "reversed"}},
     {"Ellipse", {"left", "top", "right", "bottom", "centerX", "centerY",

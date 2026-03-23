@@ -68,7 +68,7 @@ Check for issues that automated optimization cannot fix:
 - **Stroke alignment** — `align="center"` (default) is GPU-accelerated; `"inside"` or
   `"outside"` require CPU operations.
 - **Mask type** — opaque solid-color fills → fast clip path; gradients with transparency or
-  images → slower texture mask. Prefer `scrollRect` over mask for rectangular clipping.
+  images → slower texture mask. Prefer `clipToBounds` over mask for rectangular clipping.
   See **Mask Optimization** below.
 - **Path complexity** — a single Path with >15 curve segments is fragile and slow. Consider
   decomposing into simpler primitives (Rectangle, Ellipse).
@@ -141,7 +141,7 @@ Understanding the PAGX renderer's cost model helps identify performance bottlene
 
 - **Use Layer** when the content is an independently positionable unit (button, badge, panel)
   — or when Layer-exclusive features are needed (styles, filters, mask, blendMode, composition,
-  scrollRect).
+  clipToBounds).
 - **Use Layer** to isolate complex static content from dynamic content for animation caching.
 - **Use Group** when the content is internal structure within a unit: painter scope isolation,
   shared transforms, sub-elements that are not independently positionable.
@@ -166,10 +166,8 @@ moved.
 ```xml
 <!-- Before: two independent blocks crammed into one Layer -->
 <Layer>
-  <Group>
     <Rectangle left="110" top="115" size="120,130"/>
     <Stroke color="#000" width="1"/>
-  </Group>
   <!-- ...more content for block A... -->
   <Group>
     <Rectangle left="295" top="115" size="120,130"/>
@@ -180,10 +178,8 @@ moved.
 
 <!-- After: each block is an independent Layer with origin-relative internals -->
 <Layer left="110" top="115">
-  <Group>
-    <Rectangle size="120,130"/>     <!-- position shifted to 0,0 -->
-    <Stroke color="#000" width="1"/>
-  </Group>
+  <Rectangle size="120,130"/>     <!-- position shifted to 0,0 -->
+  <Stroke color="#000" width="1"/>
   <!-- ... -->
 </Layer>
 <Layer left="295" top="115">
@@ -278,12 +274,10 @@ single child can be flattened entirely.
   </Layer>
 </Layer>
 
-<!-- After: downgraded to Groups -->
+<!-- After: downgraded to Groups; no-attribute first Group flattened -->
 <Layer left="20" top="80">
-  <Group>
-    <Rectangle size="200,40" roundness="8"/>
-    <Fill color="#E2E8F0"/>
-  </Group>
+  <Rectangle size="200,40" roundness="8"/>
+  <Fill color="#E2E8F0"/>
   <Group top="52">
     <Rectangle size="200,40" roundness="8"/>
     <Fill color="#E2E8F0"/>
@@ -304,7 +298,7 @@ A child Layer can be downgraded to Group when **all** of the following are true:
    | Category | Features |
    |----------|----------|
    | Child nodes | styles, filters, child Layers |
-   | Attributes | mask, maskType, blendMode (non-default), composition, scrollRect, visible="false", id (if referenced), name, matrix, matrix3D, preserve3D, groupOpacity, passThroughBackground |
+   | Attributes | mask, maskType, blendMode (non-default), composition, clipToBounds, visible="false", id (if referenced), name, matrix, matrix3D, preserve3D, groupOpacity, passThroughBackground |
    | Container layout | `layout`, `gap`, `flex`, `padding`, `alignment`, `arrangement` |
    | Layout sizing | `width`, `height` (explicit layout dimensions) |
    | Constraint positioning | `left`, `right`, `top`, `bottom`, `centerX`, `centerY` (Group supports these attributes but with different opposite-pair behavior — Derive Size vs Layer's Always Override) |
@@ -652,13 +646,13 @@ is not `luminance`.
 Any of: semi-transparent fill (`alpha < 1`), gradient with transparency, image-based fill,
 `maskType="luminance"`, mask layer has filters.
 
-### scrollRect vs Mask
+### clipToBounds vs Mask
 
-For rectangular clipping, prefer `scrollRect` — GPU clip with no texture overhead:
+For rectangular clipping, prefer `clipToBounds` — GPU clip with no texture overhead:
 
 ```xml
 <!-- Preferred -->
-<Layer scrollRect="0,0,400,300">...</Layer>
+<Layer width="400" height="300" clipToBounds="true">...</Layer>
 
 <!-- Avoid: mask for simple rectangular clip -->
 <Layer mask="@rectMask">...</Layer>

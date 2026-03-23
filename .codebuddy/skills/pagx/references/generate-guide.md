@@ -186,10 +186,10 @@ For each block, construct the VectorElement tree following these principles.
 
 ### Text Positioning
 
-Text is a content-only element — it renders from the baseline, making direct positioning
-dependent on font metrics. Wrap Text in TextBox, which handles measurement and
-provides accurate bounding box for constraint positioning. Exception: when using TextPath,
-Text can appear without TextBox wrapper.
+Text supports constraint attributes for positioning, but renders from the baseline, making
+bounding box dependent on font metrics. Prefer wrapping Text in TextBox, which handles
+measurement and provides accurate bounding box for constraint positioning. Exception:
+when using TextPath, Text can appear without TextBox wrapper.
 
 ```xml
 <!-- Centered in container -->
@@ -222,11 +222,11 @@ These constraints differ from CSS/SVG and must be respected during generation:
   - `left`+`right` pair (stretches/derives)
   - Never combine `left`+`centerX` or `right`+`centerX`
 
-- **Rectangular clipping** — prefer `scrollRect` over mask. It is GPU-accelerated with no
+- **Rectangular clipping** — prefer `clipToBounds` over mask. It is GPU-accelerated with no
   texture overhead:
 
   ```xml
-  <Layer scrollRect="0,0,400,300"><!-- content clipped to rect --></Layer>
+  <Layer width="400" height="300" clipToBounds="true"><!-- clips to layer bounds --></Layer>
   ```
 
   Reserve mask for non-rectangular or soft-edge clipping.

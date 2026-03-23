@@ -13,9 +13,11 @@ scratch when an equivalent exists:
 |---|---|
 | CSS Flexbox | Container layout — see detailed mapping below and §Container Layout |
 | SVG `<path d="...">` | `<Path data="..."/>` — identical syntax, copy `d` values directly |
+| SVG `<circle cx cy r>` | `<Ellipse>` with `size="d,d"` where d = 2r |
+| SVG `<rect x y w h rx>` | `<Rectangle>` with `size="w,h"` + `roundness="rx"` |
 | CSS `box-shadow: offsetX offsetY blur color` | `<DropShadowStyle offsetX offsetY blurX blurY color/>` |
 | CSS `backdrop-filter: blur(N)` | `<BackgroundBlurStyle blurX="N" blurY="N"/>` |
-| CSS `overflow: hidden` (pixel-level clip) | `<Layer scrollRect="x,y,w,h">` — rectangular clip on any Layer. TextBox `overflow` is line-level, not pixel-level |
+| CSS `overflow: hidden` (pixel-level clip) | `clipToBounds="true"` — rectangular clip on any Layer. TextBox `overflow` is line-level, not pixel-level |
 | CSS `linear-gradient(angle, stops)` | `<LinearGradient startPoint endPoint>` — convert angle to coordinates on the geometry bounds |
 | CSS `radial-gradient(circle R at cx cy, stops)` | `<RadialGradient center="cx,cy" radius="R">` |
 | CSS `text-align`, `line-height`, `overflow` | TextBox `textAlign`, `lineHeight`, `overflow` — same names and semantics |
@@ -78,27 +80,14 @@ effective combination.
 
 1. **Determine drawing size** from container and padding.
    E.g., 48×48 container with 12px padding → draw in 24×24.
-2. **Draw directly in PAGX nodes at target size** — Ellipse for circles, Rectangle for
-   rects, Path for irregular curves. Path `data` is standard SVG path syntax (M/L/C/A/Z) —
-   write it the same way you would write an SVG `<path d="...">`. Combine node types freely
-   (e.g., person icon = Ellipse head + Path body arc). Never use Path when a primitive exists.
+2. **Think in SVG, write in PAGX** — mentally compose the icon as SVG elements (`<circle>`,
+   `<rect>`, `<path>` with `stroke`/`fill`), then translate each to its PAGX equivalent using
+   the mapping table above. Path `data` is standard SVG `<path d>` syntax — copy directly.
 3. **Center in container** — wrap in a Group with `centerX="0" centerY="0"`.
 
-```xml
-<!-- 48×48 container, 24×24 icon -->
-<Layer width="48" height="48">
-  <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
-  <Fill color="#F0EAFF"/>
-  <Group centerX="0" centerY="0">
-    <Ellipse left="8" top="2" size="8,8"/>
-    <Path data="M 2,22 C 2,17 6,14 12,14 C 18,14 22,17 22,22"/>
-    <Stroke color="#7C5CFC" width="1.5" cap="round" join="round"/>
-  </Group>
-</Layer>
-```
-
-**Stroke vs Fill**: Outline icons (inactive) → `Stroke` with `cap="round" join="round"`,
-width 1.5–2px for 24×24. Filled icons (active) → `Fill` on closed paths.
+**Rendering approach**: Prefer Stroke (outline) by default. Use Fill only when the design
+explicitly requires solid icons (e.g., active tab state). Mixed (stroke + fill) for complex
+icons. See `examples.md` §Icons for complete examples.
 
 **Quality**: Keep foreground roughly square (~1.2:1 max). In a set, use the same drawing
 size, stroke width, and padding. Avoid fine details that become noise at small sizes.
@@ -121,7 +110,7 @@ Use Layers purposefully — each should serve a clear structural or visual role:
 Is this a direct child of <pagx> or <Composition>?
   → YES: Must be Layer (Groups cause a parse error)
 
-Does this need styles, filters, mask, blendMode, composition, or scrollRect?
+Does this need styles, filters, mask, blendMode, composition, or clipToBounds?
   → YES: Must be Layer
 
 Are you using constraint positioning, and does this element need independent Fill/Stroke?

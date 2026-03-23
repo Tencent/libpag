@@ -12,10 +12,8 @@
   <!-- Box A: Forced break — long word (376px total) must split mid-character -->
   <!-- width=100px, 4 lines, height=140 -->
   <Layer left="20" top="20">
-    <Group>
-      <Rectangle size="100,140"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="100,140"/>
+    <Stroke/>
     <TextBox width="100" height="140">
       <Text text="Supercalifragilisticexpialidocious" fontFamily="NotoSansSC" fontSize="24"/>
       <Fill/>
@@ -25,10 +23,8 @@
   <!-- Box B: Space break — "Hello"=59 " "=5 "World"=67 → 131px. -->
   <!-- width=132: "Hello World"=131<132 fits, "Test"=47 wraps. 2 lines, height=70 -->
   <Layer left="140" top="20">
-    <Group>
-      <Rectangle size="132,70"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="132,70"/>
+    <Stroke/>
     <TextBox width="132" height="70">
       <Text text="Hello World Test" fontFamily="NotoSansSC" fontSize="24"/>
       <Fill/>
@@ -40,10 +36,8 @@
   <!-- " "=5 "self-"=47 → 131+5+47=183>132. Break after space: "well-known" line1. -->
   <!-- "self-"=47 "driving"=80 → 127<132. "self-driving"=127<132 fits? Actually 3 lines. h=105 -->
   <Layer left="290" top="20">
-    <Group>
-      <Rectangle size="132,105"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="132,105"/>
+    <Stroke/>
     <TextBox width="132" height="105">
       <Text text="well-known self-driving" fontFamily="NotoSansSC" fontSize="24"/>
       <Fill/>
@@ -55,10 +49,8 @@
   <!-- "some/"=70 → 95+70=165>96 wraps. "some/"=70<96 fits line2. "file"=35<96 fits too. -->
   <!-- "some/file"=105>96, so "some/" line2, "file" line3. 3 lines, h=105 -->
   <Layer left="440" top="20">
-    <Group>
-      <Rectangle size="96,105"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="96,105"/>
+    <Stroke/>
     <TextBox width="96" height="105">
       <Text text="path/to/some/file" fontFamily="NotoSansSC" fontSize="24"/>
       <Fill/>
@@ -76,10 +68,8 @@
   <!-- "over"=50+SHY+... need to check if "overview" is one word. It is two: "over­view". -->
   <!-- So: line1="Compre", line2="hensive", line3="over", line4="view". 4 lines, h=140 -->
   <Layer left="20" top="180">
-    <Group>
-      <Rectangle size="90,140"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="90,140"/>
+    <Stroke/>
     <TextBox width="90" height="140">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[Compre­hensive over­view]]></Text>
       <Fill/>
@@ -90,10 +80,8 @@
   <!-- "Super"=66 (+ZWSP=0). width=67: "Super"=66<67 fits, break at ZWSP. -->
   <!-- "Long"=57<67 line2. "Word"=60<67 line3. "Here"=52<67 line4. 4 lines, h=140 -->
   <Layer left="130" top="180">
-    <Group>
-      <Rectangle left="0.5" size="67,140"/>
-      <Stroke/>
-    </Group>
+    <Rectangle left="0.5" size="67,140"/>
+    <Stroke/>
     <TextBox width="67" height="140">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[Super​Long​Word​Here]]></Text>
       <Fill/>
@@ -105,10 +93,8 @@
   <!-- width=90: "ABCDEF"=89<90 fits (WJ keeps them together). -->
   <!-- 89+5=94>90 → "ABCDEF" line1. "GH"=34 " "=5 "IJ"=20 → 59<90 line2. 2 lines, h=70 -->
   <Layer left="220" top="180">
-    <Group>
-      <Rectangle size="90,70"/>
-      <Stroke/>
-    </Group>
+    <Rectangle size="90,70"/>
+    <Stroke/>
     <TextBox width="90" height="70">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[AB⁠CD⁠EF GH IJ]]></Text>
       <Fill/>
@@ -126,10 +112,8 @@
   <!-- Backtrack: "好" line1 (24<49). "￥9"=37<49 line2. "吧"=24<49 line3. -->
   <!-- Key: ￥ stays with 9, not stranded at end of line1. 3 lines, h=105 -->
   <Layer left="20" top="370">
-    <Group>
-      <Rectangle left="0.5" top="0.5" size="49,105"/>
-      <Stroke/>
-    </Group>
+    <Rectangle left="0.5" top="0.5" size="49,105"/>
+    <Stroke/>
     <TextBox width="49" height="105">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[好￥9吧]]></Text>
       <Fill/>
@@ -143,10 +127,8 @@
   <!-- Backtrack: "好" line1 (24<49). "9%"=35<49 line2. "吧"=24<49 line3. -->
   <!-- Key: % stays with 9, not pushed to start of next line alone. 3 lines, h=105 -->
   <Layer left="90" top="370">
-    <Group>
-      <Rectangle left="0.5" top="0.5" size="49,105"/>
-      <Stroke/>
-    </Group>
+    <Rectangle left="0.5" top="0.5" size="49,105"/>
+    <Stroke/>
     <TextBox width="49" height="105">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[好9%吧]]></Text>
       <Fill/>
@@ -160,10 +142,8 @@
   <!-- Backtrack: "等等" line1 (48<73). "……"=48<73 line2. "好"=24<73 line3. -->
   <!-- Key: …… stay together, not split across lines. 3 lines, h=105 -->
   <Layer left="160" top="370">
-    <Group>
-      <Rectangle left="0.5" top="0.5" size="73,105"/>
-      <Stroke/>
-    </Group>
+    <Rectangle left="0.5" top="0.5" size="73,105"/>
+    <Stroke/>
     <TextBox width="73" height="105">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[等等……好]]></Text>
       <Fill/>
@@ -177,10 +157,8 @@
   <!-- Backtrack: "前言" line1 (48<70). "——"=42<70 line2. "正"=24<70 line3. -->
   <!-- Key: —— stay together. 3 lines, h=105 -->
   <Layer left="250" top="370">
-    <Group>
-      <Rectangle top="0.5" size="70,105"/>
-      <Stroke/>
-    </Group>
+    <Rectangle top="0.5" size="70,105"/>
+    <Stroke/>
     <TextBox width="70" height="105">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[前言——正]]></Text>
       <Fill/>
@@ -199,10 +177,8 @@
   <!-- 」 is CL — can't be at line start. "「引用」"=120>97 but 」 pulled in → "「引用」"=120>97. -->
   <!-- Hmm, "「引用"=96<97 line2, "」好"=48<97 line3. 3 lines, h=105 -->
   <Layer left="340" top="370">
-    <Group>
-      <Rectangle left="0.5" top="0.5" size="97,105"/>
-      <Stroke/>
-    </Group>
+    <Rectangle left="0.5" top="0.5" size="97,105"/>
+    <Stroke/>
     <TextBox width="97" height="105">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[说完了「引用」好]]></Text>
       <Fill/>
@@ -216,10 +192,8 @@
   <!-- "是的」"=72>49 → forced overflow but CL rule requires it. -->
   <!-- Use width=73: "是的」"=72<73 fits line1. "然后"=48<73 line2. 2 lines, h=70 -->
   <Layer left="460" top="370">
-    <Group>
-      <Rectangle left="0.5" size="73,70"/>
-      <Stroke/>
-    </Group>
+    <Rectangle left="0.5" size="73,70"/>
+    <Stroke/>
     <TextBox width="73" height="70">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[是的」然后]]></Text>
       <Fill/>
@@ -233,10 +207,8 @@
   <!-- "ゲー"=48>25 forced overflow. Use width=49: "ゲー"=48<49 fits. "ム好"=48<49. -->
   <!-- 2 lines, h=70 -->
   <Layer left="20" top="530">
-    <Group>
-      <Rectangle left="0.5" size="49,70"/>
-      <Stroke/>
-    </Group>
+    <Rectangle left="0.5" size="49,70"/>
+    <Stroke/>
     <TextBox width="49" height="70">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[ゲーム好]]></Text>
       <Fill/>
@@ -249,10 +221,8 @@
   <!-- 说+"好"+吧=120>97 → "说"好"" line1. "吧" line2. -->
   <!-- Key: " does not separate from 好. 2 lines, h=70 -->
   <Layer left="90" top="530">
-    <Group>
-      <Rectangle left="0.5" size="97,70"/>
-      <Stroke/>
-    </Group>
+    <Rectangle left="0.5" size="97,70"/>
+    <Stroke/>
     <TextBox width="97" height="70">
       <Text fontFamily="NotoSansSC" fontSize="24"><![CDATA[说"好"吧]]></Text>
       <Fill/>

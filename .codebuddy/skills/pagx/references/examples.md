@@ -9,6 +9,84 @@ as defaults.
 
 ---
 
+## Icons
+
+Icon patterns using the "Think in SVG, write in PAGX" approach. See `design-patterns.md`
+§Icon Generation for the methodology.
+
+### Stroke Icon (Outline / Inactive)
+
+```xml
+<pagx version="1.0" width="60" height="60">
+  <Layer width="60" height="60">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+    <Fill color="#EFF6FF"/>
+    <!-- Search icon: Ellipse ring + Path diagonal line -->
+    <Group centerX="0" centerY="0">
+      <Ellipse top="0" size="22,22"/>
+      <Stroke color="#3B82F6" width="2.5"/>
+      <Group>
+        <Path data="M19 19L28 28"/>
+        <Stroke color="#3B82F6" width="3" cap="round"/>
+      </Group>
+    </Group>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: Ellipse for circles + Path for lines/arcs — most stroke icons combine these two.
+Group isolates each part's Stroke. Use `cap="round"` on endpoints, width 1.5–2px at 22×22.
+
+### Fill Icon (Solid / Active)
+
+```xml
+<pagx version="1.0" width="60" height="60">
+  <Layer width="60" height="60">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+    <Fill color="#FFF7ED"/>
+    <!-- Heart icon: single closed Path -->
+    <Group centerX="0" centerY="0">
+      <Path data="M16 3C12 -2 4 -2 1 4C-2 10 1 16 16 28C31 16 34 10 31 4C28 -2 20 -2 16 3Z"/>
+      <Fill color="#F97316"/>
+    </Group>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: Single closed Path with `Fill` — for irregular shapes that can't be built from
+Rectangle/Ellipse. Path `data` uses SVG `<path d>` syntax directly.
+
+### Mixed Icon (Stroke + Fill)
+
+```xml
+<pagx version="1.0" width="60" height="60">
+  <Layer width="60" height="60">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+    <Fill color="#FFF7ED"/>
+    <!-- Lock icon: stroke arc + fill body + fill cutout -->
+    <Group centerX="0" centerY="0">
+      <Path data="M6 16L6 8C6 0 24 0 24 8L24 16"/>
+      <Stroke color="#F97316" width="3" cap="round"/>
+      <Group>
+        <Rectangle top="15" size="30,20" roundness="5"/>
+        <Fill color="#F97316"/>
+      </Group>
+      <Group>
+        <Ellipse left="11" top="20" size="8,8"/>
+        <Fill color="#FFF7ED"/>
+      </Group>
+    </Group>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: Stroke for outlines + Fill for solid areas in the same icon. Each rendering
+technique needs its own Group for painter scope isolation. All three icon examples above
+share the same structure: background Rectangle + Fill on the Layer, icon Group centered
+via `centerX="0" centerY="0"`. For circular backgrounds, replace Rectangle with Ellipse.
+
+---
+
 ## UI Components
 
 Structural patterns for application interface elements. **Always prefer container layout and
@@ -63,27 +141,6 @@ DropShadowStyle = CSS `box-shadow`.
 
 **Pattern**: The simplest card — rounded Rectangle + white Fill + DropShadowStyle. Equivalent
 to a `<div>` with `border-radius`, `background: white`, and `box-shadow`.
-
-### Icon with Background
-
-```xml
-<pagx version="1.0" width="200" height="200">
-  <Layer centerX="0" centerY="0" width="180" height="180">
-    <!-- Background -->
-    <Ellipse left="0" top="0" right="0" bottom="0"/>
-    <Fill color="#EFF6FF"/>
-    <!-- Foreground: 60×60 icon, centered in 180×180 container -->
-    <Group centerX="0" centerY="0">
-      <Path data="M 0,0 L 60,60 M 60,0 L 0,60"/>
-      <Stroke color="#3B82F6" width="7" cap="round"/>
-    </Group>
-  </Layer>
-</pagx>
-```
-
-**Pattern**: Background shape + Fill directly on the Layer, foreground in a centered Group.
-Draw the icon directly at its target size — use Ellipse/Rectangle for standard shapes,
-Path for irregular curves. See `design-patterns.md` §Icon Generation for the full workflow.
 
 ### Icon + Label Row
 
@@ -325,29 +382,58 @@ define once, instantiate multiple times. Internal geometry uses stretch constrai
       <Fill color="#FFF"/>
       <!-- Tab items -->
       <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" arrangement="spaceAround" alignment="center">
-        <Layer>
-          <Ellipse centerX="0" size="24,24"/>
-          <Fill color="#6366F1"/>
-          <TextBox centerX="0" top="26">
-            <Text text="Home" fontFamily="Arial" fontSize="10"/>
-            <Fill color="#6366F1"/>
-          </TextBox>
+        <!-- Home: filled (active) -->
+        <Layer layout="vertical" gap="2" alignment="center">
+          <Layer width="24" height="24">
+            <Group centerX="0" centerY="0">
+              <Path data="M12 0L0 12L3 12L3 22L9 22L9 15L15 15L15 22L21 22L21 12L24 12Z"/>
+              <Fill color="#6366F1"/>
+            </Group>
+          </Layer>
+          <Layer>
+            <TextBox textAlign="center">
+              <Text text="Home" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
+              <Fill color="#6366F1"/>
+            </TextBox>
+          </Layer>
         </Layer>
-        <Layer>
-          <Ellipse centerX="0" size="24,24"/>
-          <Fill color="#94A3B8"/>
-          <TextBox centerX="0" top="26">
-            <Text text="Search" fontFamily="Arial" fontSize="10"/>
-            <Fill color="#94A3B8"/>
-          </TextBox>
+        <!-- Search: stroke (inactive) -->
+        <Layer layout="vertical" gap="2" alignment="center">
+          <Layer width="24" height="24">
+            <Group centerX="0" centerY="0">
+              <Ellipse top="0" size="16,16"/>
+              <Stroke color="#94A3B8" width="2"/>
+              <Group>
+                <Path data="M14 14L20 20"/>
+                <Stroke color="#94A3B8" width="2.5" cap="round"/>
+              </Group>
+            </Group>
+          </Layer>
+          <Layer>
+            <TextBox textAlign="center">
+              <Text text="Search" fontFamily="Arial" fontSize="10"/>
+              <Fill color="#94A3B8"/>
+            </TextBox>
+          </Layer>
         </Layer>
-        <Layer>
-          <Ellipse centerX="0" size="24,24"/>
-          <Fill color="#94A3B8"/>
-          <TextBox centerX="0" top="26">
-            <Text text="Profile" fontFamily="Arial" fontSize="10"/>
-            <Fill color="#94A3B8"/>
-          </TextBox>
+        <!-- Profile: stroke (inactive) -->
+        <Layer layout="vertical" gap="2" alignment="center">
+          <Layer width="24" height="24">
+            <Group centerX="0" centerY="0">
+              <Ellipse left="6" top="1" size="10,10"/>
+              <Stroke color="#94A3B8" width="1.8"/>
+              <Group>
+                <Path data="M1 22C1 17 5 13 11 13C17 13 21 17 21 22"/>
+                <Stroke color="#94A3B8" width="1.8" cap="round"/>
+              </Group>
+            </Group>
+          </Layer>
+          <Layer>
+            <TextBox textAlign="center">
+              <Text text="Profile" fontFamily="Arial" fontSize="10"/>
+              <Fill color="#94A3B8"/>
+            </TextBox>
+          </Layer>
         </Layer>
       </Layer>
       <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000020"/>
@@ -359,15 +445,16 @@ define once, instantiate multiple times. Internal geometry uses stretch constrai
 **Pattern**: Rectangle `roundness` applies to all four corners. CSS has `border-radius` per
 corner, but PAGX doesn't — to flatten specific corners, use `MergePath mode="intersect"` to
 clip a rounded rect with a straight-edged rect. Tab items use `arrangement="spaceAround"`
-(= CSS `justify-content: space-around`) for even distribution.
+(= CSS `justify-content: space-around`) for even distribution. Active tab uses Fill; inactive
+tabs use Stroke — see §Icons and `design-patterns.md` §Icon Generation.
 
 ---
 
 ## Charts & Gauges
 
 Chart construction relies on TrimPath for arc control and Repeater `rotation` for radial
-patterns. **Key Ellipse knowledge**: Ellipse path starts at 12 o'clock and goes clockwise —
-use Group `rotation` to reposition the start point.
+patterns. **Key Ellipse knowledge**: Ellipse path starts at 3 o'clock (right midpoint) and
+goes clockwise — use Group `rotation` to reposition the start point.
 
 ### Bar Chart
 

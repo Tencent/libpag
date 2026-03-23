@@ -912,6 +912,7 @@ Layer child elements are automatically categorized into four collections by type
 | `groupOpacity` | bool | false | Group opacity |
 | `passThroughBackground` | bool | true | Whether to pass background through to child layers |
 | `scrollRect` | Rect | - | Scroll clipping region "x,y,w,h" |
+| `clipToBounds` | bool | false | Clip content to layer bounds (see §5.5.2) |
 | `mask` | idref | - | Mask layer reference "@id" |
 | `maskType` | MaskType | alpha | Mask type |
 | `composition` | idref | - | Composition reference "@id" |
@@ -1115,7 +1116,13 @@ The `scrollRect` attribute defines the layer's visible region; content outside t
 
 > [Sample](samples/4.5.1_scroll_rect.pagx)
 
-#### 5.5.2 Masking
+#### 5.5.2 clipToBounds
+
+When `clipToBounds="true"`, the layer automatically clips its content to the layer's own bounds (`width` × `height`). This is equivalent to setting `scrollRect="0,0,width,height"` but works with auto-layout — the clipping region is determined after layout resolves the layer's dimensions. If the layer also has an explicit `scrollRect`, `scrollRect` takes priority and `clipToBounds` is ignored.
+
+> [Sample](samples/4.5.3_clip_to_bounds.pagx)
+
+#### 5.5.3 Masking
 
 Reference another layer as a mask using the `mask` attribute.
 
@@ -1888,9 +1895,9 @@ redistributed evenly to fill the available path length.
 
 #### 6.5.6 TextBox
 
-TextBox is a text layout container that inherits from Group. It applies typography to Text elements within its scope. TextBox re-layouts all glyph positions according to its layout dimensions (`width`/`height`) and alignment settings. The layout results are written into each Text element's GlyphRun data with inverse-transform compensation, so that Text's own position and parent Group transforms remain effective in the rendering pipeline. The first line is positioned using the line-box model: the line box near edge is aligned to the near edge of the text area, and the baseline is placed at `halfLeading + ascent` from the near edge, where `halfLeading = (lineHeight - metricsHeight) / 2` and `metricsHeight = ascent + descent + leading` from the font metrics. Following CSS Writing Modes conventions, `lineHeight` is a logical property that always applies to the block-axis dimension of a line box. In vertical mode, it controls the column width rather than the line height. Columns are spaced by `lineHeight` (center-to-center distance). When `lineHeight` is 0 (auto), the column width is calculated from font metrics (ascent + descent + leading), same as horizontal auto line height. Columns flow from right to left.
+TextBox is a text layout container that inherits from Group. It applies typography to its child Text elements. TextBox re-layouts all glyph positions according to its layout dimensions (`width`/`height`) and alignment settings. The layout results are written into each Text element's GlyphRun data with inverse-transform compensation, so that Text's own position and parent Group transforms remain effective in the rendering pipeline. The first line is positioned using the line-box model: the line box near edge is aligned to the near edge of the text area, and the baseline is placed at `halfLeading + ascent` from the near edge, where `halfLeading = (lineHeight - metricsHeight) / 2` and `metricsHeight = ascent + descent + leading` from the font metrics. Following CSS Writing Modes conventions, `lineHeight` is a logical property that always applies to the block-axis dimension of a line box. In vertical mode, it controls the column width rather than the line height. Columns are spaced by `lineHeight` (center-to-center distance). When `lineHeight` is 0 (auto), the column width is calculated from font metrics (ascent + descent + leading), same as horizontal auto line height. Columns flow from right to left.
 
-TextBox is a **pre-layout-only** node: it is processed during the typesetting stage before rendering and is not instantiated in the render tree. If all accumulated Text elements already contain embedded GlyphRun data, the TextBox is skipped during typesetting. However, the TextBox node should still be retained even when embedded GlyphRun data and fonts are present, as design tools may read its layout attributes (`width`, `height`, `textAlign`, `paragraphAlign`, `lineHeight`, `wordWrap`, `overflow`, etc.) for editing purposes.
+TextBox is a **pre-layout-only** node: it is processed during the typesetting stage before rendering and is not instantiated in the render tree. If all child Text elements already contain embedded GlyphRun data, the TextBox is skipped during typesetting. However, the TextBox node should still be retained even when embedded GlyphRun data and fonts are present, as design tools may read its layout attributes (`width`, `height`, `textAlign`, `paragraphAlign`, `lineHeight`, `wordWrap`, `overflow`, etc.) for editing purposes.
 
 As a container, TextBox processes its child Text elements and text modifiers (TextModifier, TextPath, etc.) in an isolated scope. Text elements inside a TextBox are laid out by the TextBox's typography settings first; subsequent text modifiers within the TextBox then operate on those layout results. TextBox only affects the **initial layout** of Text elements — it determines glyph positions before the text modifier chain begins.
 
