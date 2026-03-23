@@ -44,7 +44,7 @@
       </Layer>
 
       <!-- 3. Horizontal padding (two values: v,h) -->
-      <Layer width="180" height="220" layout="horizontal" alignment="stretch" gap="8" padding="10,20">
+      <Layer width="180" height="220" layout="horizontal" gap="8" padding="10,20">
         <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -79,7 +79,7 @@
     <Layer flex="1" layout="horizontal" gap="20">
 
       <!-- 5. Alignment=stretch in vertical layout -->
-      <Layer width="180" height="220" layout="vertical" alignment="stretch" gap="10">
+      <Layer width="180" height="220" layout="vertical" gap="10">
         <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -94,7 +94,7 @@
       </Layer>
 
       <!-- 6. Horizontal layout + arrangement=end + gap -->
-      <Layer width="180" height="220" layout="horizontal" arrangement="end" alignment="stretch" gap="15">
+      <Layer width="180" height="220" layout="horizontal" arrangement="end" gap="15">
         <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -120,7 +120,7 @@
       </Layer>
 
       <!-- 8. Horizontal + vertical nested layout combo -->
-      <Layer width="180" height="220" layout="horizontal" alignment="stretch" gap="10">
+      <Layer width="180" height="220" layout="horizontal" gap="10">
         <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>

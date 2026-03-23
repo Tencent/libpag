@@ -39,7 +39,15 @@ enum class Arrangement {
   /**
    * Distribute children evenly with equal space between them.
    */
-  SpaceBetween
+  SpaceBetween,
+  /**
+   * Distribute children with equal space around them, including the edges.
+   */
+  SpaceEvenly,
+  /**
+   * Distribute children with equal space on each side, half-size space at the edges.
+   */
+  SpaceAround
 };
 
 }  // namespace pagx

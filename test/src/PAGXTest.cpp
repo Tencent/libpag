@@ -548,10 +548,21 @@ PAGX_TEST(PAGXTest, FontGlyphRoundTrip) {
 }
 
 static std::string TitleToKey(const std::string& title) {
-  // Convert to lowercase with underscores, stripping parentheses but keeping their content
+  // Convert to lowercase with underscores, ignoring parenthesized content (e.g., "(Composition)")
   std::string key;
+  int parenDepth = 0;
   for (char ch : title) {
-    if (ch == '(' || ch == ')') {
+    if (ch == '(') {
+      parenDepth++;
+      continue;
+    }
+    if (ch == ')') {
+      if (parenDepth > 0) {
+        parenDepth--;
+      }
+      continue;
+    }
+    if (parenDepth > 0) {
       continue;
     }
     if (std::isalnum(static_cast<unsigned char>(ch))) {
@@ -730,7 +741,7 @@ PAGX_TEST(PAGXTest, TextFiles) {
 
 /**
  * Test all layout-related PAGX files in resources/layout directory.
- * Tests container layout and constraint layout behaviors with visual verification.
+ * Tests container layout and constraint positioning behaviors with visual verification.
  */
 PAGX_TEST(PAGXTest, LayoutFiles) {
   TestPAGXDirectory(context, ProjectPath::Absolute("resources/layout"), "layout_");
@@ -1820,7 +1831,7 @@ PAGX_TEST(PAGXTest, LayoutMeasureCacheIdempotent) {
 }
 
 // =====================================================================================
-// Auto Layout - Constraint Layout - Single Edge
+// Auto Layout - Constraint Positioning - Single Edge
 // =====================================================================================
 
 PAGX_TEST(PAGXTest, LayoutConstraintLeft) {
@@ -1944,7 +1955,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintCenterY) {
 }
 
 // =====================================================================================
-// Auto Layout - Constraint Layout - Stretch (Ellipse)
+// Auto Layout - Constraint Positioning - Stretch (Ellipse)
 // =====================================================================================
 
 PAGX_TEST(PAGXTest, LayoutConstraintStretchEllipse) {
@@ -1992,7 +2003,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintStretchEllipseVertical) {
 }
 
 // =====================================================================================
-// Auto Layout - Constraint Layout - Stretch (Rectangle, TextBox)
+// Auto Layout - Constraint Positioning - Stretch (Rectangle, TextBox)
 // =====================================================================================
 
 PAGX_TEST(PAGXTest, LayoutConstraintStretchRectangle) {
@@ -2047,7 +2058,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintStretchTextBox) {
 }
 
 // =====================================================================================
-// Auto Layout - Constraint Layout - Proportional Scaling
+// Auto Layout - Constraint Positioning - Proportional Scaling
 // =====================================================================================
 
 PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarHorizontal) {
@@ -2365,7 +2376,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePathBothAxes) {
 }
 
 // =====================================================================================
-// Auto Layout - Constraint Layout - Group
+// Auto Layout - Constraint Positioning - Group
 // =====================================================================================
 
 PAGX_TEST(PAGXTest, LayoutGroupDerivedSize) {
@@ -2423,7 +2434,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintGroupRecursive) {
 }
 
 // =====================================================================================
-// Auto Layout - Constraint Layout - Multiple Elements
+// Auto Layout - Constraint Positioning - Multiple Elements
 // =====================================================================================
 
 PAGX_TEST(PAGXTest, LayoutConstraintMultipleElements) {
@@ -2461,7 +2472,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintMultipleElements) {
 }
 
 // =====================================================================================
-// Auto Layout - Constraint Layout - Validation
+// Auto Layout - Constraint Positioning - Validation
 // =====================================================================================
 
 PAGX_TEST(PAGXTest, LayoutConstraintConflictCenterXWithLeftRight) {
@@ -2899,7 +2910,8 @@ PAGX_TEST(PAGXTest, LayoutRoundTripAlignmentStretch) {
 
   std::string xml = pagx::PAGXExporter::ToXML(*doc);
   ASSERT_FALSE(xml.empty());
-  EXPECT_NE(xml.find("alignment=\"stretch\""), std::string::npos);
+  // Stretch is the default value, so it should NOT appear in the exported XML.
+  EXPECT_EQ(xml.find("alignment=\"stretch\""), std::string::npos);
 
   auto doc2 = pagx::PAGXImporter::FromXML(xml);
   ASSERT_TRUE(doc2 != nullptr);
@@ -2949,7 +2961,7 @@ PAGX_TEST(PAGXTest, LayoutRoundTripConstraints) {
 }
 
 // =====================================================================================
-// Auto Layout - Layer Constraint Layout - Single Edge (Absolute mode)
+// Auto Layout - Layer Constraint Positioning - Single Edge
 // =====================================================================================
 
 PAGX_TEST(PAGXTest, LayerConstraintLeft) {
@@ -3035,7 +3047,7 @@ PAGX_TEST(PAGXTest, LayerConstraintBottom) {
 }
 
 // =====================================================================================
-// Auto Layout - Layer Constraint Layout - Center (Absolute mode)
+// Auto Layout - Layer Constraint Positioning - Center
 // =====================================================================================
 
 PAGX_TEST(PAGXTest, LayerConstraintCenterX) {
@@ -3105,7 +3117,7 @@ PAGX_TEST(PAGXTest, LayerConstraintCenterXWithOffset) {
 }
 
 // =====================================================================================
-// Auto Layout - Layer Constraint Layout - Opposite Edges Derive Size
+// Auto Layout - Layer Constraint Positioning - Opposite Edges Derive Size
 // =====================================================================================
 
 PAGX_TEST(PAGXTest, LayerConstraintLeftRightDeriveWidth) {
@@ -3204,7 +3216,7 @@ PAGX_TEST(PAGXTest, LayerConstraintLeftRightOverridesExplicitWidth) {
 }
 
 // =====================================================================================
-// Auto Layout - Layer Constraint Layout - Combined Axes
+// Auto Layout - Layer Constraint Positioning - Combined Axes
 // =====================================================================================
 
 PAGX_TEST(PAGXTest, LayerConstraintLeftAndTop) {
@@ -3254,7 +3266,7 @@ PAGX_TEST(PAGXTest, LayerConstraintRightAndBottom) {
 }
 
 // =====================================================================================
-// Auto Layout - Layer Constraint Layout - includeInLayout=false
+// Auto Layout - Layer Constraint Positioning - includeInLayout=false
 // =====================================================================================
 
 PAGX_TEST(PAGXTest, LayerConstraintWithIncludeInLayoutFalse) {
@@ -3327,7 +3339,7 @@ PAGX_TEST(PAGXTest, LayerConstraintIncludeInLayoutFalseDeriveSize) {
 }
 
 // =====================================================================================
-// Auto Layout - Layer Constraint Layout - Priority (container layout wins)
+// Auto Layout - Layer Constraint Positioning - Priority (container layout wins)
 // =====================================================================================
 
 PAGX_TEST(PAGXTest, LayerConstraintIgnoredInContainerLayout) {
@@ -3363,7 +3375,7 @@ PAGX_TEST(PAGXTest, LayerConstraintIgnoredInContainerLayout) {
 }
 
 // =====================================================================================
-// Auto Layout - Layer Constraint Layout - No constraint, no change
+// Auto Layout - Layer Constraint Positioning - No constraint, no change
 // =====================================================================================
 
 PAGX_TEST(PAGXTest, LayerNoConstraintUnchanged) {
@@ -3390,7 +3402,7 @@ PAGX_TEST(PAGXTest, LayerNoConstraintUnchanged) {
 }
 
 // =====================================================================================
-// Auto Layout - Layer Constraint Layout - Invisible child skipped
+// Auto Layout - Layer Constraint Positioning - Invisible child skipped
 // =====================================================================================
 
 PAGX_TEST(PAGXTest, LayerConstraintInvisibleChildSkipped) {
@@ -3420,7 +3432,7 @@ PAGX_TEST(PAGXTest, LayerConstraintInvisibleChildSkipped) {
 }
 
 // =====================================================================================
-// Auto Layout - Layer Constraint Layout - Multiple children
+// Auto Layout - Layer Constraint Positioning - Multiple children
 // =====================================================================================
 
 PAGX_TEST(PAGXTest, LayerConstraintMultipleChildren) {
@@ -3467,7 +3479,7 @@ PAGX_TEST(PAGXTest, LayerConstraintMultipleChildren) {
 }
 
 // =====================================================================================
-// Auto Layout - Layer Constraint Layout - Measured child size (no explicit width/height)
+// Auto Layout - Layer Constraint Positioning - Measured child size (no explicit width/height)
 // =====================================================================================
 
 PAGX_TEST(PAGXTest, LayerConstraintMeasuredChildSize) {
@@ -3500,7 +3512,7 @@ PAGX_TEST(PAGXTest, LayerConstraintMeasuredChildSize) {
 }
 
 // =====================================================================================
-// Auto Layout - Layer Constraint Layout - Round-trip XML
+// Auto Layout - Layer Constraint Positioning - Round-trip XML
 // =====================================================================================
 
 PAGX_TEST(PAGXTest, LayerConstraintRoundTrip) {
@@ -3768,8 +3780,8 @@ PAGX_TEST(PAGXTest, LayerConstraintCenterXOverridesLeft) {
   auto child = doc->makeNode<pagx::Layer>();
   child->width = 100;
   child->height = 60;
-  child->centerX = 0;   // Horizontal center
-  child->left = 50;     // Should be ignored
+  child->centerX = 0;  // Horizontal center
+  child->left = 50;    // Should be ignored
 
   parent->children = {child};
 
@@ -3792,8 +3804,8 @@ PAGX_TEST(PAGXTest, LayerConstraintCenterYOverridesTop) {
   auto child = doc->makeNode<pagx::Layer>();
   child->width = 100;
   child->height = 60;
-  child->centerY = 0;   // Vertical center
-  child->top = 40;      // Should be ignored
+  child->centerY = 0;  // Vertical center
+  child->top = 40;     // Should be ignored
 
   parent->children = {child};
 
@@ -3809,7 +3821,7 @@ PAGX_TEST(PAGXTest, LayerConstraintCenterYMeasurementContribution) {
   auto parent = doc->makeNode<pagx::Layer>();
   doc->layers.push_back(parent);
 
-  parent->layout = pagx::LayoutMode::Constraint;
+  parent->layout = pagx::LayoutMode::None;
   // No explicit height
 
   auto child = doc->makeNode<pagx::Rectangle>();
@@ -3824,6 +3836,234 @@ PAGX_TEST(PAGXTest, LayerConstraintCenterYMeasurementContribution) {
   // Parent height should measure from child: |-30| * 2 + 60 = 120
   EXPECT_FLOAT_EQ(parent->height, 120.0f)
       << "Parent should measure centerY contribution as |centerY| * 2 + content_height";
+}
+
+// =====================================================================================
+// Auto Layout - Priority Combination Tests
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutContainerFlexVsExplicitSize) {
+  // Priority: explicit main-axis size > flex distribution.
+  // When a child has both flex>0 and explicit width, explicit width wins.
+  auto doc = pagx::PAGXDocument::Make(600, 200);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 600;
+  parent->height = 200;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->gap = 10;
+
+  // child1: has explicit width AND flex — explicit width should win.
+  auto child1 = doc->makeNode<pagx::Layer>();
+  child1->width = 150;
+  child1->height = 100;
+  child1->flex = 1;
+
+  // child2: no explicit width, flex=1 — gets remaining space.
+  auto child2 = doc->makeNode<pagx::Layer>();
+  child2->height = 100;
+  child2->flex = 1;
+
+  parent->children = {child1, child2};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // child1: explicit width=150 wins over flex.
+  EXPECT_FLOAT_EQ(child1->width, 150.0f) << "Explicit width should override flex";
+  // child2: remaining = 600 - 150 - 10(gap) = 440, flex share = 440/1 = 440.
+  EXPECT_FLOAT_EQ(child2->width, 440.0f) << "Flex child gets all remaining space";
+  // Positioning: child1 at x=0, child2 at x=160.
+  EXPECT_FLOAT_EQ(child1->x, 0.0f);
+  EXPECT_FLOAT_EQ(child2->x, 160.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutContainerStretchVsExplicitCross) {
+  // Priority: explicit cross-axis size > Stretch alignment.
+  // Stretch only fills children without explicit cross-axis size.
+  auto doc = pagx::PAGXDocument::Make(600, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 600;
+  parent->height = 300;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  parent->alignment = pagx::Alignment::Stretch;
+
+  // child1: explicit height — Stretch should NOT override it.
+  auto child1 = doc->makeNode<pagx::Layer>();
+  child1->width = 200;
+  child1->height = 100;
+
+  // child2: no explicit height — Stretch should fill to container height.
+  auto child2 = doc->makeNode<pagx::Layer>();
+  child2->width = 200;
+
+  parent->children = {child1, child2};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // child1: explicit height=100 preserved despite Stretch.
+  EXPECT_FLOAT_EQ(child1->height, 100.0f) << "Explicit cross-axis size overrides Stretch";
+  // child2: no explicit height, Stretch fills to container height=300.
+  EXPECT_FLOAT_EQ(child2->height, 300.0f) << "Stretch fills child without explicit cross-axis size";
+}
+
+PAGX_TEST(PAGXTest, LayoutContainerConstraintIgnoredForParticipant) {
+  // Priority: container layout > constraint attributes.
+  // A child participating in container layout has its left/right/top/bottom ignored,
+  // even if they form opposite-edge pairs.
+  auto doc = pagx::PAGXDocument::Make(600, 400);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 600;
+  parent->height = 400;
+  parent->layout = pagx::LayoutMode::Horizontal;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 100;
+  child->height = 80;
+  child->left = 20;   // Should be ignored (container layout active).
+  child->right = 30;  // Should be ignored.
+  child->top = 50;    // Should be ignored.
+
+  auto child2 = doc->makeNode<pagx::Layer>();
+  child2->width = 200;
+  child2->height = 80;
+
+  parent->children = {child, child2};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // Container layout positions child at x=0 (not left=20).
+  EXPECT_FLOAT_EQ(child->x, 0.0f) << "Container layout ignores left constraint";
+  EXPECT_FLOAT_EQ(child->y, 0.0f) << "Container layout ignores top constraint";
+  // Width remains 100 (explicit), NOT derived from left+right.
+  EXPECT_FLOAT_EQ(child->width, 100.0f) << "Explicit width preserved";
+  EXPECT_FLOAT_EQ(child2->x, 100.0f) << "Second child positioned after first";
+}
+
+PAGX_TEST(PAGXTest, LayerConstraintOppositeEdgeOverridesExplicitSize) {
+  // Priority in constraint positioning: opposite-edge constraint > explicit size.
+  // When left+right both set, derived width = parent.width - left - right,
+  // overriding any explicit width on the child.
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 400;
+  parent->height = 300;
+
+  auto child = doc->makeNode<pagx::Layer>();
+  child->width = 200;  // Explicit width — will be overridden.
+  child->height = 80;
+  child->left = 10;
+  child->right = 20;
+  child->top = 30;
+  child->bottom = 40;
+
+  parent->children = {child};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // Horizontal: left+right overrides explicit width.
+  EXPECT_FLOAT_EQ(child->x, 10.0f);
+  EXPECT_FLOAT_EQ(child->width, 370.0f) << "left+right derives width: 400 - 10 - 20 = 370";
+  // Vertical: top+bottom overrides explicit height.
+  EXPECT_FLOAT_EQ(child->y, 30.0f);
+  EXPECT_FLOAT_EQ(child->height, 230.0f) << "top+bottom derives height: 300 - 30 - 40 = 230";
+}
+
+PAGX_TEST(PAGXTest, LayoutNestedContainers) {
+  // Nested containers: outer Horizontal + inner Vertical, each with flex.
+  // Constraints on inner children are ignored because inner parent has container layout.
+  auto doc = pagx::PAGXDocument::Make(600, 400);
+  auto outer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(outer);
+
+  outer->width = 600;
+  outer->height = 400;
+  outer->layout = pagx::LayoutMode::Horizontal;
+  outer->alignment = pagx::Alignment::Stretch;  // Ensure children are stretched on cross-axis
+
+  // Left column: Vertical layout with flex children.
+  auto leftCol = doc->makeNode<pagx::Layer>();
+  leftCol->flex = 1;
+  leftCol->layout = pagx::LayoutMode::Vertical;
+
+  auto topItem = doc->makeNode<pagx::Layer>();
+  topItem->flex = 1;
+  topItem->centerY = -10;  // Should be ignored (parent has Vertical layout).
+
+  auto bottomItem = doc->makeNode<pagx::Layer>();
+  bottomItem->height = 100;
+
+  leftCol->children = {topItem, bottomItem};
+
+  // Right column: simple fixed size.
+  auto rightCol = doc->makeNode<pagx::Layer>();
+  rightCol->flex = 1;
+  rightCol->height = 400;
+
+  outer->children = {leftCol, rightCol};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // Outer Horizontal: each column gets 600 / 2 = 300.
+  EXPECT_FLOAT_EQ(leftCol->width, 300.0f) << "Left column flex=1 gets half width";
+  EXPECT_FLOAT_EQ(rightCol->width, 300.0f) << "Right column flex=1 gets half width";
+
+  // Left column is stretched to 400 on cross-axis (height).
+  EXPECT_FLOAT_EQ(leftCol->height, 400.0f) << "Left column stretched to parent cross-axis";
+
+  // topItem: flex=1 in Vertical, gets remaining = leftCol.height - bottomItem.height = 400 - 100 = 300.
+  // centerY should be ignored since parent is Vertical layout.
+  EXPECT_FLOAT_EQ(bottomItem->height, 100.0f) << "Bottom item keeps explicit height";
+  EXPECT_FLOAT_EQ(topItem->height, 300.0f) << "Top item flex=1 gets remaining: 400 - 100 = 300";
+  EXPECT_FLOAT_EQ(topItem->y, 0.0f) << "centerY ignored in container layout";
+  EXPECT_FLOAT_EQ(bottomItem->y, 300.0f) << "Bottom item positioned after top";
+}
+
+PAGX_TEST(PAGXTest, LayoutIncludeInLayoutFalseNotAffectingMeasurement) {
+  // includeInLayout=false children should not affect parent's measured size.
+  // Only participating children contribute to measurement.
+  auto doc = pagx::PAGXDocument::Make(600, 400);
+  auto parent = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(parent);
+
+  parent->width = 600;
+  // height is NAN — must be measured from children.
+  parent->layout = pagx::LayoutMode::Horizontal;
+
+  // overlay: excluded from layout, has large height — should NOT affect measurement.
+  auto overlay = doc->makeNode<pagx::Layer>();
+  overlay->width = 50;
+  overlay->height = 500;
+  overlay->includeInLayout = false;
+  overlay->centerY = 0;
+
+  // child1: participates in layout, height=80.
+  auto child1 = doc->makeNode<pagx::Layer>();
+  child1->width = 200;
+  child1->height = 80;
+
+  // child2: participates in layout, height=120 — determines measured cross-axis.
+  auto child2 = doc->makeNode<pagx::Layer>();
+  child2->width = 200;
+  child2->height = 120;
+
+  parent->children = {overlay, child1, child2};
+
+  pagx::AutoLayout::Apply(doc.get());
+
+  // Parent height measured from participating children only: max(80, 120) = 120.
+  // overlay's height=500 should NOT influence this.
+  EXPECT_FLOAT_EQ(parent->height, 120.0f)
+      << "includeInLayout=false child should not affect parent measurement";
+  // Participating children positioned normally.
+  EXPECT_FLOAT_EQ(child1->x, 0.0f);
+  EXPECT_FLOAT_EQ(child2->x, 200.0f);
 }
 
 }  // namespace pag

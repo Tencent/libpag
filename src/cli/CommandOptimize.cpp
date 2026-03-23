@@ -229,7 +229,7 @@ static int RemoveEmptyNodes(PAGXDocument* document) {
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Layer) {
       auto layer = static_cast<Layer*>(node.get());
-      count += RemoveEmptyLayers(layer->children, layer->layout != LayoutMode::Constraint);
+      count += RemoveEmptyLayers(layer->children, layer->layout != LayoutMode::None);
       count += RemoveEmptyElements(layer->contents);
     } else if (node->nodeType() == NodeType::Group || node->nodeType() == NodeType::TextBox) {
       auto group = static_cast<Group*>(node.get());
@@ -283,7 +283,7 @@ static bool CanDowngradeToGroup(const Layer* layer) {
   }
   // Groups cannot participate in container layout — do not suggest downgrade for layers with
   // layout-related attributes that would be lost.
-  if (layer->layout != LayoutMode::Constraint || layer->flex != 0.0f) {
+  if (layer->layout != LayoutMode::None || layer->flex != 0.0f) {
     return false;
   }
   if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
@@ -532,7 +532,7 @@ static void CollectLintHints(const Layer* layer, std::vector<LintHint>& hints, b
   // Hint: child Layers that could be downgraded to Groups.
   // Skip when this layer uses container layout — child Layers are layout slots and Groups cannot
   // participate in container layout flow.
-  if (!isRoot && !layer->children.empty() && layer->layout == LayoutMode::Constraint) {
+  if (!isRoot && !layer->children.empty() && layer->layout == LayoutMode::None) {
     bool allDowngradable = true;
     for (auto* child : layer->children) {
       if (!CanDowngradeToGroup(child)) {
@@ -1277,7 +1277,7 @@ static int RemoveOffCanvasChildren(
     if (shouldRemove) {
       count++;
     } else {
-      bool childInContainer = pagxLayer->layout != LayoutMode::Constraint;
+      bool childInContainer = pagxLayer->layout != LayoutMode::None;
       count += RemoveOffCanvasChildren(layerMap, maskedLayers, canvasRect, rootLayer,
                                        pagxLayer->children, childInContainer);
       layers[writeIndex++] = layers[i];
@@ -1661,7 +1661,7 @@ static void LocalizeLayerCoordinates(PAGXDocument* document, Layer* layer, int& 
       count++;
     }
   }
-  bool thisHasContainerLayout = layer->layout != LayoutMode::Constraint;
+  bool thisHasContainerLayout = layer->layout != LayoutMode::None;
   for (auto* child : layer->children) {
     LocalizeLayerCoordinates(document, child, count, thisHasContainerLayout);
   }

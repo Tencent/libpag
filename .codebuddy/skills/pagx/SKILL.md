@@ -41,7 +41,7 @@ generation or optimization task.
 
 | Reference | Content |
 |-----------|--------|
-| `references/spec-essentials.md` | Node types, Layer rendering pipeline, auto layout (container + constraint), painter scope, text system, masking, resources |
-| `references/design-patterns.md` | Structure decisions (Layer vs Group), layout patterns (container, constraint, Layer constraint), text layout, practical pitfall patterns |
+| `references/spec-essentials.md` | Node types, Layer rendering pipeline, auto layout (container layout + constraint positioning), painter scope, text system, masking, resources |
+| `references/design-patterns.md` | Structure decisions (Layer vs Group), layout patterns (container layout, constraint positioning, Layer constraints), text layout, practical pitfall patterns |
 | `references/attributes.md` | Attribute defaults, enumerations, required attributes |
 | `references/cli.md` | CLI commands — `render`, `validate`, `optimize`, `format`, `bounds`, `font info`, `font embed` |

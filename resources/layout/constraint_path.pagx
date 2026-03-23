@@ -9,7 +9,7 @@
   </Layer>
 
   <!-- Main vertical layout, alignment=stretch -->
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30" alignment="stretch">
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">
 
     <!-- Row 1: Single-edge positioning + Horizontal-only scaling -->
     <Layer flex="1" layout="horizontal" gap="20">

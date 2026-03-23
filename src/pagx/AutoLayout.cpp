@@ -104,34 +104,42 @@ static Rect ComputeTextBounds(const Text* text, FontConfig* fontProvider) {
 }
 
 // Local wrapper for ElementMeasure::GetContentBounds that uses ComputeTextBounds.
-// For TextBox without explicit dimensions, performs a full typesetting pass to get accurate bounds.
+// For TextBox with unset dimensions (NaN), performs a full typesetting pass to measure content
+// size, then writes the measured dimensions back. This ensures subsequent typesetting uses a
+// determined box size for alignment (textAlign, paragraphAlign). Explicitly set dimensions
+// (including 0) are preserved as-is.
 static Rect GetContentBounds(const Element* element, FontConfig* fontProvider) {
   if (element->nodeType() == NodeType::TextBox) {
-    auto* textBox = static_cast<const TextBox*>(element);
-    float w = std::isnan(textBox->width) ? 0 : textBox->width;
-    float h = std::isnan(textBox->height) ? 0 : textBox->height;
-    if (w == 0 || h == 0) {
+    auto* textBox = const_cast<TextBox*>(static_cast<const TextBox*>(element));
+    bool needW = std::isnan(textBox->width);
+    bool needH = std::isnan(textBox->height);
+    if (needW || needH) {
       auto measured = TextLayout::MeasureTextBox(textBox, fontProvider);
-      if (w == 0) {
-        w = measured.width;
+      if (needW) {
+        textBox->width = measured.width;
       }
-      if (h == 0) {
-        h = measured.height;
+      if (needH) {
+        textBox->height = measured.height;
       }
     }
-    return Rect::MakeXYWH(0, 0, w, h);
+    return Rect::MakeXYWH(0, 0, textBox->width, textBox->height);
   }
   return ElementMeasure::GetContentBounds(
       element, [fontProvider](const Text* text) { return ComputeTextBounds(text, fontProvider); });
 }
 
 // Local wrapper for ElementMeasure::GetMeasuredBounds that uses ComputeTextBounds.
+// For TextBox, ensures measurement write-back happens before ElementMeasure reads dimensions.
 static Rect GetMeasuredBounds(const Element* element, FontConfig* fontProvider) {
+  if (element->nodeType() == NodeType::TextBox) {
+    // Trigger measurement write-back so ElementMeasure sees determined dimensions.
+    GetContentBounds(element, fontProvider);
+  }
   return ElementMeasure::GetMeasuredBounds(
       element, [fontProvider](const Text* text) { return ComputeTextBounds(text, fontProvider); });
 }
 
-// Applies constraint layout to a single element within a container of the given dimensions.
+// Applies constraint positioning to a single element within a container of the given dimensions.
 // When skipScaling is true, non-stretchable elements will center without scaling (used for Text
 // elements controlled by a TextBox).
 static void ApplyConstraintToElement(Element* element, float containerWidth, float containerHeight,
@@ -251,7 +259,7 @@ static void ProcessConstraintLayout(const std::vector<Element*>& elements, float
 static std::pair<float, float> MeasureLayer(const Layer* layer, FontConfig* fontProvider);
 static void LayoutLayer(Layer* layer, FontConfig* fontProvider);
 
-// Applies constraint layout to all elements within a container. Group elements are always
+// Applies constraint positioning to all elements within a container. Group elements are always
 // processed recursively: explicit or constraint-derived dimensions are used when available,
 // otherwise the Group's content bounds are measured as a fallback reference frame.
 static void ProcessConstraintLayout(const std::vector<Element*>& elements, float containerWidth,
@@ -467,6 +475,20 @@ static void PerformContainerLayout(Layer* parent, FontConfig* fontProvider) {
         extraGap = spaceToDistribute / static_cast<float>(visibleCount - 1);
       }
       break;
+    case Arrangement::SpaceEvenly: {
+      float totalChildMain = totalMain - totalGap;
+      float spaceToDistribute = availableMain - totalChildMain;
+      extraGap = spaceToDistribute / static_cast<float>(visibleCount + 1);
+      mainOffset += extraGap;
+      break;
+    }
+    case Arrangement::SpaceAround: {
+      float totalChildMain = totalMain - totalGap;
+      float spaceToDistribute = availableMain - totalChildMain;
+      extraGap = spaceToDistribute / static_cast<float>(visibleCount);
+      mainOffset += extraGap * 0.5f;
+      break;
+    }
   }
 
   // Compute the cross-axis reference size for alignment.
@@ -516,7 +538,9 @@ static void PerformContainerLayout(Layer* parent, FontConfig* fontProvider) {
     }
 
     mainOffset += childMainSizes[idx];
-    if (parent->arrangement == Arrangement::SpaceBetween) {
+    if (parent->arrangement == Arrangement::SpaceBetween ||
+        parent->arrangement == Arrangement::SpaceEvenly ||
+        parent->arrangement == Arrangement::SpaceAround) {
       mainOffset += extraGap;
     } else {
       mainOffset += parent->gap;
@@ -546,7 +570,21 @@ static std::pair<float, float> MeasureLayer(const Layer* layer, FontConfig* font
     return {measuredWidth, measuredHeight};
   }
 
-  if (layer->layout != LayoutMode::Constraint && !layer->children.empty()) {
+  // If this Layer references a Composition, use the Composition's dimensions as intrinsic size.
+  if (layer->composition != nullptr) {
+    if (std::isnan(layer->width)) {
+      measuredWidth = layer->composition->width;
+    }
+    if (std::isnan(layer->height)) {
+      measuredHeight = layer->composition->height;
+    }
+    layer->measureCached = true;
+    layer->cachedMeasuredWidth = measuredWidth;
+    layer->cachedMeasuredHeight = measuredHeight;
+    return {measuredWidth, measuredHeight};
+  }
+
+  if (layer->layout != LayoutMode::None && !layer->children.empty()) {
     // Layout container: measure from child Layers along the layout axis.
     bool horizontal = (layer->layout == LayoutMode::Horizontal);
 
@@ -597,7 +635,7 @@ static std::pair<float, float> MeasureLayer(const Layer* layer, FontConfig* font
       }
     }
   } else {
-    // Non-layout Layer: measure from contents, considering constraint flexibility.
+    // Non-container Layer: measure from contents, considering constraint flexibility.
     auto contentSize = MeasureLayerContents(layer, fontProvider);
     if (std::isnan(layer->width)) {
       measuredWidth = contentSize.first;
@@ -627,7 +665,7 @@ static void LayoutLayer(Layer* layer, FontConfig* fontProvider) {
   // Step 1: If this Layer has layout but missing dimensions, use measured sizes.
   // The parent's PerformContainerLayout may have already assigned sizes for flexible children.
   // This handles the case where this Layer is a top-level container without explicit dimensions.
-  if (layer->layout != LayoutMode::Constraint && !layer->children.empty()) {
+  if (layer->layout != LayoutMode::None && !layer->children.empty()) {
     if (std::isnan(layer->width) || std::isnan(layer->height)) {
       auto measured = MeasureLayer(layer, fontProvider);
       if (std::isnan(layer->width)) {
@@ -640,14 +678,14 @@ static void LayoutLayer(Layer* layer, FontConfig* fontProvider) {
   }
 
   // Step 2: Container layout — arrange child Layers and assign flexible sizes.
-  if (layer->layout != LayoutMode::Constraint && !layer->children.empty()) {
+  if (layer->layout != LayoutMode::None && !layer->children.empty()) {
     PerformContainerLayout(layer, fontProvider);
   }
 
-  // Step 3: For non-layout Layers without explicit dimensions, adopt measured sizes so that
-  // constraint layout within contents can work. Skip if dimensions are already set.
-  // Also skip if this Layer has no contents and no children (nothing to measure or constrain).
-  if (layer->layout == LayoutMode::Constraint &&
+  // Step 3: For Layers without container layout and missing explicit dimensions, adopt measured
+  // sizes so that constraint positioning within contents can work. Skip if dimensions are already
+  // set. Also skip if this Layer has no contents and no children (nothing to measure or constrain).
+  if (layer->layout == LayoutMode::None &&
       (std::isnan(layer->width) || std::isnan(layer->height)) &&
       (!layer->contents.empty() || !layer->children.empty())) {
     auto measured = MeasureLayer(layer, fontProvider);
@@ -659,7 +697,7 @@ static void LayoutLayer(Layer* layer, FontConfig* fontProvider) {
     }
   }
 
-  // Step 4: Constraint layout — position elements within this Layer.
+  // Step 4: Constraint positioning — position elements within this Layer.
   // Skip if there are no contents to constrain.
   if (!layer->contents.empty() && (!std::isnan(layer->width) || !std::isnan(layer->height))) {
     float containerW = std::isnan(layer->width) ? 0 : layer->width;
@@ -667,9 +705,9 @@ static void LayoutLayer(Layer* layer, FontConfig* fontProvider) {
     ProcessConstraintLayout(layer->contents, containerW, containerH, fontProvider);
   }
 
-  // Step 5: Apply constraint layout to child Layers that have constraint properties.
+  // Step 5: Apply constraint positioning to child Layers.
   // Constraints on child Layers take effect when:
-  // - The parent uses absolute layout (no container layout), or
+  // - The parent has no container layout, or
   // - The child has includeInLayout=false (opted out of container layout flow).
   if (!layer->children.empty() && !std::isnan(layer->width) && !std::isnan(layer->height)) {
     for (auto* child : layer->children) {
@@ -682,7 +720,7 @@ static void LayoutLayer(Layer* layer, FontConfig* fontProvider) {
       if (!hasConstraints) {
         continue;
       }
-      bool applyConstraints = layer->layout == LayoutMode::Constraint || !child->includeInLayout;
+      bool applyConstraints = layer->layout == LayoutMode::None || !child->includeInLayout;
       if (!applyConstraints) {
         continue;
       }
@@ -750,14 +788,14 @@ static void SnapToPixelGrid(Layer* layer) {
   }
 }
 
-// Applies constraint layout and auto layout to a set of layers within a container of the given
+// Applies constraint positioning and auto layout to a set of layers within a container of the given
 // dimensions. Used for both document-level layers and Composition layers.
 static void ApplyLayoutToLayers(const std::vector<Layer*>& layers, float containerWidth,
                                 float containerHeight, FontConfig* fontProvider) {
   for (auto* layer : layers) {
     ClearMeasureCache(layer);
   }
-  // Apply constraint layout for layers using the container dimensions.
+  // Apply constraint positioning for layers using the container dimensions.
   for (auto* layer : layers) {
     if (!layer->visible) {
       continue;

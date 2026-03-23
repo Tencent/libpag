@@ -10,8 +10,8 @@
     <Fill color="#F8FAFC"/>
   </Layer>
 
-  <!-- Main container: vertical layout, padding=30, gap=20, alignment=stretch -->
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30" alignment="stretch">
+  <!-- Main container: vertical layout, padding=30, gap=20 -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">
     
     <!-- Row 1: 4 equal-width containers (flexible, no width specified) -->
     <Layer flex="1" layout="horizontal" gap="20">

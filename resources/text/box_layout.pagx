@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx width="700" height="1100" version="1.0">
+<pagx width="700" height="1200" version="1.0">
   <!-- === Row 1: Basic box text layout === -->
 
   <!-- Box A: CJK auto word wrap -->
@@ -166,7 +166,7 @@
     </TextBox>
   </Layer>
 
-  <!-- === Row 4 (continued): Line height with mixed sizes === -->
+  <!-- === Row 5: Line height with mixed sizes === -->
 
   <!-- Box L: 3-line mixed sizes, paragraphAlign far -->
   <Layer x="50" y="680">
@@ -210,10 +210,43 @@
     </TextBox>
   </Layer>
 
-  <!-- === Row 5: Point text (no TextBox, multiline with anchor) === -->
+  <!-- === Row 6: Partial dimensions (auto-measure one axis) === -->
+  <!-- Stroke rectangle with left/right/top/bottom=0 visualizes the final TextBox bounds. -->
+
+  <!-- Box Q: width=180, height auto-measured, textAlign=center. Text wraps at 180px. -->
+  <Layer x="50" y="890">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Stroke/>
+    <TextBox width="180" textAlign="center">
+      <Text text="Width set, height auto." fontFamily="NotoSansSC" fontSize="24"/>
+      <Fill/>
+    </TextBox>
+  </Layer>
+
+  <!-- Box R: height=90, width auto-measured. paragraphAlign=middle centers in 90px. -->
+  <Layer x="260" y="890">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Stroke/>
+    <TextBox height="90" paragraphAlign="middle">
+      <Text text="Height only" fontFamily="NotoSansSC" fontSize="24"/>
+      <Fill/>
+    </TextBox>
+  </Layer>
+
+  <!-- Box S: height=90, width auto-measured, vertical writing mode. Columns split at 90px. -->
+  <Layer x="480" y="890">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Stroke/>
+    <TextBox height="90" writingMode="vertical">
+      <Text text="竖排设高度宽度靠测量自动分列" fontFamily="NotoSansSC" fontSize="24"/>
+      <Fill/>
+    </TextBox>
+  </Layer>
+
+  <!-- === Row 7: Point text (no TextBox, multiline with anchor) === -->
 
   <!-- Box M: Point text, textAnchor=start (default) -->
-  <Layer x="50" y="890">
+  <Layer x="50" y="1000">
     <Group>
       <Text text="Line One&#10;Line Two&#10;Line Three" fontFamily="NotoSansSC" fontSize="24"/>
       <Fill/>
@@ -225,7 +258,7 @@
   </Layer>
 
   <!-- Box N: Point text, textAnchor=center -->
-  <Layer x="320" y="890">
+  <Layer x="320" y="1000">
     <Group>
       <Text text="Center A&#10;Center BB&#10;Center CCC" fontFamily="NotoSansSC" fontSize="24" textAnchor="center"/>
       <Fill/>
@@ -237,7 +270,7 @@
   </Layer>
 
   <!-- Box O: Point text, textAnchor=end -->
-  <Layer x="590" y="890">
+  <Layer x="590" y="1000">
     <Group>
       <Text text="End X&#10;End YY&#10;End ZZZ" fontFamily="NotoSansSC" fontSize="24" textAnchor="end"/>
       <Fill/>
@@ -248,12 +281,13 @@
     </Group>
   </Layer>
 
-  <!-- === Row 6: TextBox anchor mode (TextBox without size) === -->
+  <!-- === Row 8: TextBox anchor mode (width="0" height="0") === -->
 
-  <!-- Box P: 6 anchor alignment combinations -->
-  <Layer x="50" y="1025">
+  <!-- Box P: 6 anchor alignment combinations. Explicit zero size keeps anchor mode where
+       alignment offsets text relative to the TextBox position (marked by red dots). -->
+  <Layer x="50" y="1130">
     <!-- TextAlign Start -->
-    <TextBox>
+    <TextBox width="0" height="0">
       <Text text="Start" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
     </TextBox>
@@ -263,7 +297,7 @@
     </Group>
 
     <!-- TextAlign Center -->
-    <TextBox position="110,0" textAlign="center">
+    <TextBox position="110,0" width="0" height="0" textAlign="center">
       <Text text="Center" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
     </TextBox>
@@ -273,7 +307,7 @@
     </Group>
 
     <!-- TextAlign End -->
-    <TextBox position="220,0" textAlign="end">
+    <TextBox position="220,0" width="0" height="0" textAlign="end">
       <Text text="End" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
     </TextBox>
@@ -283,7 +317,7 @@
     </Group>
 
     <!-- ParagraphAlign Near -->
-    <TextBox position="330,0">
+    <TextBox position="330,0" width="0" height="0">
       <Text text="Near" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
     </TextBox>
@@ -293,7 +327,7 @@
     </Group>
 
     <!-- ParagraphAlign Middle -->
-    <TextBox position="440,0" paragraphAlign="middle">
+    <TextBox position="440,0" width="0" height="0" paragraphAlign="middle">
       <Text text="Middle" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
     </TextBox>
@@ -303,7 +337,7 @@
     </Group>
 
     <!-- ParagraphAlign Far -->
-    <TextBox position="550,0" paragraphAlign="far">
+    <TextBox position="550,0" width="0" height="0" paragraphAlign="far">
       <Text text="Far" fontFamily="NotoSansSC" fontSize="20"/>
       <Fill/>
     </TextBox>

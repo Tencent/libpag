@@ -45,9 +45,9 @@ pagx optimize -o output.pagx input.pagx
 
 Check for issues that automated optimization cannot fix:
 
-- **Manual coordinate calculation** — hand-calculated `x`/`y` or `position` values that
+- **Manual coordinate calculation** — hand-calculated `left`/`top` values that
   should be replaced by container layout (`layout`/`gap`/`padding`) for arranging child Layers,
-  or constraint layout (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`) for positioning
+  or constraint positioning (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`) for positioning
   internal elements. See `design-patterns.md` §Layout Decisions.
 - **Inconsistent layout attributes** — container Layers with different `gap` or `padding`
   values for visually similar contexts that should be unified.
@@ -73,7 +73,7 @@ Check for issues that automated optimization cannot fix:
 - **Path complexity** — a single Path with >15 curve segments is fragile and slow. Consider
   decomposing into simpler primitives (Rectangle, Ellipse).
 - **Style inconsistency** — structurally similar elements (e.g., cards in a set, buttons in
-  a row) using different structural patterns (Layer vs Group, constraint vs absolute positioning)
+  a row) using different structural patterns (Layer vs Group, constraint positioning vs absolute positioning)
   that should be unified for maintainability.
 
 ### Step 3: Final Verification
@@ -84,9 +84,8 @@ After all optimizations, verify the following:
 - [ ] All required attributes present; no redundant default-value attributes
   (`attributes.md`)
 - [ ] Painter scope isolation correct (`design-patterns.md` §1)
-- [ ] Text `position`/`textAnchor` not set when TextBox is present (`design-patterns.md` §2)
-  - [ ] All positioning uses constraint attributes where possible (fallback to `position`/`x`/`y`
-    only for irregular freeform compositions)
+- [ ] Text `textAnchor` not set when TextBox is present (`design-patterns.md` §2)
+  - [ ] All positioning uses constraint attributes (`left`/`top`/`centerX`/`centerY`)
 - [ ] Containers have explicit `width`/`height` where a specific design size is intended
   (not needed when measured or layout-assigned size is correct)
 - [ ] Internal coordinates relative to Layer origin (see **Coordinate Localization** below)
@@ -130,7 +129,7 @@ Understanding the PAGX renderer's cost model helps identify performance bottlene
 | Geometry propagation | No (boundary) | Yes (to parent) |
 | Styles / Filters / Mask | Supported | Not supported |
 | Composition / BlendMode | Supported | Not supported |
-| Transform | x/y, matrix, matrix3D | position, rotation, scale, skew |
+| Transform | left/top, matrix, matrix3D | left/top, rotation, scale, skew |
 | Alpha | Supported | Supported |
 | As `<pagx>`/`<Composition>` child | **Required** | **NOT allowed** |
 | Rendering cost | Creates extra surface | No extra surface |
@@ -162,33 +161,32 @@ positioned blocks, the Layer carries the block's offset, and internal elements u
 moved.
 
 **Fix**: Split into separate Layers — one per logical block. Use constraint attributes
-(`left`/`top`) for positioning, or `x`/`y` as fallback. Convert internal
-coordinates to Layer-relative.
+(`left`/`top`) for positioning. Convert internal coordinates to Layer-relative.
 
 ```xml
 <!-- Before: two independent blocks crammed into one Layer -->
 <Layer>
   <Group>
-    <Rectangle position="110,115" size="120,130"/>
+    <Rectangle left="110" top="115" size="120,130"/>
     <Stroke color="#000" width="1"/>
   </Group>
   <!-- ...more content for block A... -->
   <Group>
-    <Rectangle position="295,115" size="120,130"/>
+    <Rectangle left="295" top="115" size="120,130"/>
     <Stroke color="#000" width="1"/>
   </Group>
   <!-- ...more content for block B... -->
 </Layer>
 
 <!-- After: each block is an independent Layer with origin-relative internals -->
-<Layer x="110" y="115">
+<Layer left="110" top="115">
   <Group>
     <Rectangle size="120,130"/>     <!-- position shifted to 0,0 -->
     <Stroke color="#000" width="1"/>
   </Group>
   <!-- ... -->
 </Layer>
-<Layer x="295" y="115">
+<Layer left="295" top="115">
   <!-- same pattern -->
 </Layer>
 ```
@@ -212,16 +210,16 @@ the rest to Groups.
 
 ```xml
 <!-- Before: card background and content as independent siblings at different positions -->
-<Layer composition="@cardBg" x="110" y="155"/>
-<Layer x="160" y="195">
+<Layer composition="@cardBg" left="110" top="155"/>
+<Layer left="160" top="195">
   <Rectangle size="50,35" roundness="8"/>
   <Fill color="#F43F5E"/>
 </Layer>
 
 <!-- After: one parent Layer, content uses relative offset -->
-<Layer name="Card" x="110" y="155">
+<Layer name="Card" left="110" top="155">
   <Layer composition="@cardBg"/>
-  <Layer x="50" y="40">
+  <Layer left="50" top="40">
     <Rectangle size="50,35" roundness="8"/>
     <Fill color="#F43F5E"/>
   </Layer>
@@ -232,25 +230,25 @@ Same-position variant (button background + label at identical coordinates):
 
 ```xml
 <!-- Before -->
-<Layer x="148" y="325">
+<Layer left="148" top="325">
   <Rectangle size="120,36" roundness="18"/>
   <Fill color="@grad"/>
   <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#6366F180"/>
 </Layer>
-<Layer x="148" y="325">
+<Layer left="148" top="325">
   <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="13"
-        position="0,4" textAnchor="center"/>
+        centerX="0" top="4"/>
   <Fill color="#FFF"/>
 </Layer>
 
 <!-- After: one Layer, label becomes a Group -->
-<Layer x="148" y="325">
+<Layer left="148" top="325">
   <Rectangle size="120,36" roundness="18"/>
   <Fill color="@grad"/>
   <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#6366F180"/>
   <Group>
     <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="13"
-          position="0,4" textAnchor="center"/>
+          centerX="0" top="4"/>
     <Fill color="#FFF"/>
   </Group>
 </Layer>
@@ -263,30 +261,30 @@ Same-position variant (button background + label at identical coordinates):
 **Problem**: Child Layers inside a block do not use any Layer-exclusive features, wasting
 rendering surfaces.
 
-**Fix**: Downgrade to Groups. Convert Layer `x="X" y="Y"` → Group `position="X,Y"`. Remove
+**Fix**: Downgrade to Groups. Convert Layer `left="X" top="Y"` → Group `left="X" top="Y"`. Remove
 `name` attribute (Group does not support it). A no-attribute wrapper (Group or Layer) around a
 single child can be flattened entirely.
 
 ```xml
 <!-- Before: child Layers with no Layer-exclusive features -->
-<Layer x="20" y="80">
-  <Layer x="0" y="0">
+<Layer left="20" top="80">
+  <Layer left="0" top="0">
     <Rectangle size="200,40" roundness="8"/>
     <Fill color="#E2E8F0"/>
   </Layer>
-  <Layer x="0" y="52">
+  <Layer left="0" top="52">
     <Rectangle size="200,40" roundness="8"/>
     <Fill color="#E2E8F0"/>
   </Layer>
 </Layer>
 
 <!-- After: downgraded to Groups -->
-<Layer x="20" y="80">
+<Layer left="20" top="80">
   <Group>
     <Rectangle size="200,40" roundness="8"/>
     <Fill color="#E2E8F0"/>
   </Group>
-  <Group position="0,52">
+  <Group top="52">
     <Rectangle size="200,40" roundness="8"/>
     <Fill color="#E2E8F0"/>
   </Group>
@@ -343,34 +341,34 @@ coordinates from canvas-absolute to Layer-relative.**
 
 Prefer constraint attributes (`left`/`top`/`centerX`/`centerY`) for positioning — they
 eliminate manual coordinate calculation and are more maintainable. For absolute-positioned
-blocks (fallback), the Layer's `x`/`y` carries the **block-level offset**, and internal
+blocks (fallback), the Layer's `left`/`top` carries the **block-level offset**, and internal
 elements use coordinates **relative to the Layer's origin (0,0)**.
 
 **Layout-managed content**: When a parent Layer uses container layout (`layout` attribute),
-child Layer positions are computed by the layout engine — do not set `x`/`y` manually.
+child Layer positions are computed by the layout engine — do not set `left`/`top` manually.
 When constraint attributes are used on VectorElements or child Layers, the engine computes
-positions automatically — do not set `position` (or `x`/`y` for Layers) manually on constrained
+positions automatically — do not set `left`/`top` manually on constrained
 axes. Coordinate localization only applies to the remaining absolute-positioned content.
 
 ### How
 
-1. Identify the block's anchor position in canvas space → set as Layer `x`/`y`
-2. Subtract the Layer's x/y from all internal coordinate values (position, etc.)
+1. Identify the block's anchor position in canvas space → set as Layer `left`/`top`
+2. Subtract the Layer's left/top from all internal coordinate values
 3. The goal: the first content element starts at or near `0,0`
 
 ### Which Coordinates Matter
 
 Focus on the **layout-controlling nodes**:
 
-- **Text + TextBox**: TextBox `position` controls layout (Text `position` is ignored)
+- **Text + TextBox**: TextBox constraint attributes control layout
 - **Text + TextPath**: TextPath's path origin controls layout
-- **Bare Text**: Text's `position` attribute controls layout
-- **Geometry elements**: `position` controls placement
+- **Bare Text**: Text's constraint attributes control layout
+- **Geometry elements**: constraint attributes (`left`/`top`) control placement
 
 ### Caveats
 
 - Gradient coordinates are relative to the geometry element's local origin — **not** affected
-  by Layer x/y changes (no conversion needed).
+  by Layer left/top changes (no conversion needed).
 - For nested child Layers, apply the same principle recursively.
 
 ---
@@ -413,18 +411,18 @@ Fill / Stroke.
 ```xml
 <!-- Before -->
 <Group>
-  <Ellipse position="23,23" size="46,46"/>
+  <Ellipse left="23" top="23" size="46,46"/>
   <Stroke color="#3B82F6" width="1"/>
 </Group>
 <Group>
-  <Ellipse position="69,23" size="46,46"/>
+  <Ellipse left="69" top="23" size="46,46"/>
   <Stroke color="#3B82F6" width="1"/>
 </Group>
 
 <!-- After -->
 <Group>
-  <Ellipse position="23,23" size="46,46"/>
-  <Ellipse position="69,23" size="46,46"/>
+  <Ellipse left="23" top="23" size="46,46"/>
+  <Ellipse left="69" top="23" size="46,46"/>
   <Stroke color="#3B82F6" width="1"/>
 </Group>
 ```
@@ -439,7 +437,7 @@ mask / blendMode / alpha / name → merge into one Layer.
   Layer is a layout slot; merging collapses distinct slots into one
 - Layers use constraint attributes (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`) for
   positioning — each Layer is an independent constraint container; merging loses positioning
-- Layers serve as constraint layout containers for elements with different painters —
+- Layers serve as constraint positioning containers for elements with different painters —
   merging would break painter scope isolation (see `design-patterns.md` §1)
 
 > When the motivation is semantic grouping (one scattered block), see **Scenario B**.
@@ -447,15 +445,15 @@ mask / blendMode / alpha / name → merge into one Layer.
 
 ```xml
 <!-- Before: 3 adjacent Layers, each with same Stroke, no styles/filters/mask -->
-<Layer x="20" y="10"><Ellipse position="20,20" size="40,40"/><Stroke color="#3B82F6" width="1"/></Layer>
-<Layer x="80" y="10"><Ellipse position="20,20" size="40,40"/><Stroke color="#3B82F6" width="1"/></Layer>
-<Layer x="140" y="10"><Ellipse position="20,20" size="40,40"/><Stroke color="#3B82F6" width="1"/></Layer>
+<Layer left="20" top="10"><Ellipse left="20" top="20" size="40,40"/><Stroke color="#3B82F6" width="1"/></Layer>
+<Layer left="80" top="10"><Ellipse left="20" top="20" size="40,40"/><Stroke color="#3B82F6" width="1"/></Layer>
+<Layer left="140" top="10"><Ellipse left="20" top="20" size="40,40"/><Stroke color="#3B82F6" width="1"/></Layer>
 
 <!-- After: 1 Layer, 3 Ellipses sharing one Stroke -->
 <Layer>
-  <Ellipse position="40,30" size="40,40"/>
-  <Ellipse position="100,30" size="40,40"/>
-  <Ellipse position="160,30" size="40,40"/>
+  <Ellipse left="40" top="30" size="40,40"/>
+  <Ellipse left="100" top="30" size="40,40"/>
+  <Ellipse left="160" top="30" size="40,40"/>
   <Stroke color="#3B82F6" width="1"/>
 </Layer>
 ```
@@ -507,13 +505,13 @@ Three checks (fail any one → do not merge):
 <Group>
   <Rectangle size="100,40"/>
   <Fill color="#F00"/>
-  <Ellipse position="50,20" size="10,10"/>
+  <Ellipse left="50" top="20" size="10,10"/>
   <Stroke color="#000" width="1"/>
 </Group>
 
 <!-- CORRECT — different painter sets stay in separate scopes. -->
 <Group><Rectangle size="100,40"/><Fill color="#F00"/></Group>
-<Group><Ellipse position="50,20" size="10,10"/><Stroke color="#000" width="1"/></Group>
+<Group><Ellipse left="50" top="20" size="10,10"/><Stroke color="#000" width="1"/></Group>
 ```
 
 2. **No modifiers**: TrimPath / RoundCorner / MergePath apply to all geometry above them —
@@ -555,8 +553,8 @@ counter-intuitive defaults (Repeater `position="100,100"`, `copies="3"`, etc.) a
 
 ### Writing Clean Attributes
 
-- Use constraint attributes for positioning; use `x`/`y`
-  (instead of `matrix="1,0,0,1,tx,ty"`) as fallback for absolute positioning
+- Use constraint attributes for positioning; use `left`/`top`
+  (instead of `matrix="1,0,0,1,tx,ty"`) for absolute positioning
 - Clean integers: `100` not `100.0`, `0` not `-2.18e-06`
 - Short hex: `#F00` instead of `#FF0000`
 - No spaces after commas: `"30,-20"` not `"30, -20"`
@@ -585,15 +583,15 @@ Reference Layer top  = layerY - h/2 + cy
 
 ```xml
 <!-- Before: 5 identical cards, only x differs -->
-<Layer x="160" y="195">
+<Layer left="160" top="195">
   <Rectangle size="100,80" roundness="12"/>
   <Fill color="#1E293B"/>
   <Stroke color="#334155" width="1"/>
 </Layer>
-<Layer x="280" y="195"><!-- same content --></Layer>
+<Layer left="280" top="195"><!-- same content --></Layer>
 <!-- ... repeated 5 times -->
 
-<!-- After: Composition with constraint layout -->
+<!-- After: Composition with constraint positioning -->
 <Composition id="cardBg" width="100" height="80">
   <Layer width="100" height="80">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
@@ -612,13 +610,13 @@ coordinates relative to the geometry element's local origin (not canvas-absolute
 
 ```xml
 <!-- Before: canvas-absolute gradient -->
-<Ellipse position="23,23" size="46,46"/>
+<Ellipse left="23" top="23" size="46,46"/>
 <Fill>
   <LinearGradient startPoint="217,545" endPoint="263,545">...</LinearGradient>
 </Fill>
 
 <!-- After: geometry-relative gradient inside Composition -->
-<Ellipse position="23,23" size="46,46"/>
+<Ellipse left="23" top="23" size="46,46"/>
 <Fill>
   <LinearGradient startPoint="0,23" endPoint="46,23">...</LinearGradient>
 </Fill>
@@ -652,7 +650,7 @@ renderer fast paths (especially under Repeater).
 <!-- Before -->
 <Path data="M 10 50 L 30 50 L 30 200 L 10 200 Z"/>
 <!-- After -->
-<Rectangle position="20,125" size="20,150"/>
+<Rectangle left="20" top="125" size="20,150"/>
 ```
 
 Only convert when clearly a standard shape. Do not convert Bezier-based rounded rectangles
@@ -709,7 +707,7 @@ clipped area covers all frames. For staggered patterns, include one extra column
 
 ```xml
 <!-- Before: 70×40 = 2800 hexagons, ~40% outside 800×600 canvas -->
-<Group position="-400,0">
+<Group left="-400">
   <Path data="@hex"/>
   <Stroke color="#0066AA" width="1"/>
   <Repeater copies="70" position="20,0"/>
@@ -717,7 +715,7 @@ clipped area covers all frames. For staggered patterns, include one extra column
 <Repeater copies="40" position="10,17.32"/>
 
 <!-- After: 41×36 = 1476, same density, clipped to canvas -->
-<Group position="-10,0">
+<Group left="-10">
   <Path data="@hex"/>
   <Stroke color="#0066AA" width="1"/>
   <Repeater copies="41" position="20,0"/>
@@ -783,7 +781,7 @@ Both are **suggest to user** — they change visual appearance.
 
 The renderer caches Layer subtrees as textures. Proper structure keeps caches valid.
 
-**Cache-preserving** (reuse cached texture): `x`/`y`, `alpha`, rotation/scale (via matrix).
+**Cache-preserving** (reuse cached texture): `left`/`top`, `alpha`, rotation/scale (via matrix).
 
 **Cache-invalidating** (force re-render): child content change, add/remove child Layer,
 modify filters or styles list.

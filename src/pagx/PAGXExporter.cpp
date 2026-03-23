@@ -1202,7 +1202,7 @@ static void writeLayer(XMLBuilder& xml, const Layer* node, const Options& option
   xml.addAttribute("y", node->y);
   xml.addOptionalAttribute("width", node->width);
   xml.addOptionalAttribute("height", node->height);
-  if (node->layout != LayoutMode::Constraint) {
+  if (node->layout != LayoutMode::None) {
     xml.addAttribute("layout", LayoutModeToString(node->layout));
   }
   xml.addAttribute("gap", node->gap);
@@ -1210,7 +1210,7 @@ static void writeLayer(XMLBuilder& xml, const Layer* node, const Options& option
   if (!node->padding.isZero()) {
     xml.addAttribute("padding", PaddingToString(node->padding));
   }
-  if (node->alignment != Alignment::Start) {
+  if (node->alignment != Alignment::Stretch) {
     xml.addAttribute("alignment", AlignmentToString(node->alignment));
   }
   if (node->arrangement != Arrangement::Start) {

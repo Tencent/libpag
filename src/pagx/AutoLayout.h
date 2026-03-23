@@ -24,8 +24,8 @@ class PAGXDocument;
 class FontConfig;
 
 /// Performs auto layout on a parsed PAGX document. This includes container layout (arranging child
-/// Layers within a parent Layer that has `layout` set) and constraint layout (positioning elements
-/// within a Layer or Group that has layout dimensions).
+/// Layers within a parent Layer that has `layout` set) and constraint positioning (positioning
+/// elements within a Layer or Group that has layout dimensions).
 class AutoLayout {
  public:
   /// Applies auto layout to all layers in the document. Called once after parsing, before rendering.

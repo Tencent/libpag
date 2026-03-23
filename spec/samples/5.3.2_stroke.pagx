@@ -1,15 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="400" height="400">
-  <Layer>
-    <Layer>
-      <Rectangle left="45" top="45" size="130,130" roundness="20"/>
-      <Stroke color="#06B6D4" width="8" cap="round" join="round"/>
+  <Layer width="400" height="400" layout="vertical" alignment="stretch">
+    <!-- Row 1: stroke styles -->
+    <Layer layout="horizontal" alignment="stretch" flex="1">
+      <Layer flex="1">
+        <Rectangle centerX="0" centerY="0" size="130,130" roundness="20"/>
+        <Stroke color="#06B6D4" width="8" cap="round" join="round"/>
+      </Layer>
+      <Layer flex="1">
+        <Rectangle centerX="0" centerY="0" size="130,130" roundness="20"/>
+        <Stroke color="#8B5CF6" width="6" dashes="12,8" cap="round"/>
+      </Layer>
     </Layer>
-    <Layer>
-      <Rectangle left="225" top="45" size="130,130" roundness="20"/>
-      <Stroke color="#8B5CF6" width="6" dashes="12,8" cap="round"/>
-    </Layer>
-    <Layer>
+    <!-- Row 2: gradient stroke on path -->
+    <Layer flex="1">
       <Path data="M 50,300 Q 200,180 350,300"/>
       <Stroke width="10" cap="round">
         <LinearGradient startPoint="0,0" endPoint="300,0">

@@ -71,7 +71,7 @@ For each container, decide layout **before writing content** — this mirrors CS
 1. **Container mode** — look at child Layers:
    - Row → `layout="horizontal"` + `gap` + `padding` + `alignment`
    - Column → `layout="vertical"` + `gap` + `padding` + `alignment`
-   - Overlapping / free-form → absolute (default)
+   - Overlapping / free-form → no container layout (default)
 
 2. **Internal positioning** — for VectorElements inside a Layer, use constraint attributes
    (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`).
@@ -81,15 +81,17 @@ full two-step process and patterns.
 
 ### Sizing Rules
 
-- **Container layout children**: the layout engine computes positions — never set `x`/`y`
+- **Container layout children**: the layout engine computes positions — never set `left`/`top`
   on children in layout flow.
 - **Three-state child sizing**: explicit `width`/`height` = fixed; no size + `flex=0` =
   content-measured; no size + `flex>0` = proportional share. Choose one — do not combine
   `flex` with explicit main-axis size (explicit size takes precedence, `flex` is ignored).
 - **`arrangement="spaceBetween"`** to push items to container edges — not empty flex spacer
-  Layers.
-- **`alignment="stretch"`** is essential for nested layouts (e.g., vertical parent with
-  horizontal rows) — without it, rows shrink-wrap and flex children get zero width.
+  Layers. Use **`arrangement="spaceEvenly"`** for equal spacing including edges, or
+  **`arrangement="spaceAround"`** for equal spacing on each side with half-size edges.
+- **`alignment`** defaults to `stretch` — children without explicit cross-axis size fill
+  the available space automatically. Use `alignment="start"` only when you want children
+  to keep their content size on the cross axis.
 
 ### Origin-Based Positioning
 
@@ -97,8 +99,8 @@ Write coordinates **relative to their immediate container** from the start:
 
 | Content Type | How to Position |
 |--------------|----------------|
-| Layout-managed (container/constraint) | Use layout attributes — engine computes positions |
-| Absolute-positioned (fallback) | Layer `x`/`y` for block offset; internal elements from `0,0` |
+| Layout-managed (container layout/constraint positioning) | Use layout attributes — engine computes positions |
+| Absolute-positioned | Layer `left`/`top` for block offset; internal elements from `0,0` |
 
 **Children must start from `(0,0)`** — within any Layer or Group, position the first child
 element at the origin. Avoid negative coordinates and avoid leaving empty margins between
@@ -118,7 +120,7 @@ For each block, construct the VectorElement tree following these principles.
 1. Place geometry elements (Rectangle, Ellipse, Path, Text, etc.)
 2. Add painters (Fill, Stroke) — they render all geometry accumulated in the current scope
 3. Wrap sub-elements in **Groups** when they need different painters
-4. With constraint layout, constrained shapes needing different painters must each be in a
+4. With constraint positioning, constrained shapes needing different painters must each be in a
    separate **Layer** — see `design-patterns.md` §1 Painter Scope Isolation
 
 **Painter efficiency** — share scope when possible:
@@ -219,7 +221,7 @@ centering.
 ### 3. Fix and Re-render
 
 - Layout issues → adjust layout/constraint attributes
-- Absolute positioning → adjust `x`/`y`
+- Absolute positioning → adjust `left`/`top`
 
 After fixes, re-render and **read the screenshot** to confirm no new issues. Repeat until
 clean.

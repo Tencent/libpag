@@ -21,13 +21,13 @@
 namespace pagx {
 
 /**
- * The mode of auto layout for arranging child layers.
+ * The container layout mode for arranging child layers.
  */
 enum class LayoutMode {
   /**
-   * Arrange child layers using constraint-based positioning.
+   * No container layout. Child layers use their own x/y or constraint attributes for positioning.
    */
-  Constraint,
+  None,
   /**
    * Arrange child layers horizontally from left to right.
    */

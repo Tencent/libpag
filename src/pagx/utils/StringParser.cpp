@@ -223,16 +223,18 @@ DEFINE_ENUM_CONVERSION(RepeaterOrder, RepeaterOrder::BelowOriginal,
                        {RepeaterOrder::BelowOriginal, "belowOriginal"},
                        {RepeaterOrder::AboveOriginal, "aboveOriginal"})
 
-DEFINE_ENUM_CONVERSION(LayoutMode, LayoutMode::Constraint, {LayoutMode::Constraint, "constraint"},
+DEFINE_ENUM_CONVERSION(LayoutMode, LayoutMode::None, {LayoutMode::None, "none"},
                        {LayoutMode::Horizontal, "horizontal"}, {LayoutMode::Vertical, "vertical"})
 
-DEFINE_ENUM_CONVERSION(Alignment, Alignment::Start, {Alignment::Start, "start"},
+DEFINE_ENUM_CONVERSION(Alignment, Alignment::Stretch, {Alignment::Start, "start"},
                        {Alignment::Center, "center"}, {Alignment::End, "end"},
                        {Alignment::Stretch, "stretch"})
 
 DEFINE_ENUM_CONVERSION(Arrangement, Arrangement::Start, {Arrangement::Start, "start"},
                        {Arrangement::Center, "center"}, {Arrangement::End, "end"},
-                       {Arrangement::SpaceBetween, "spaceBetween"})
+                       {Arrangement::SpaceBetween, "spaceBetween"},
+                       {Arrangement::SpaceEvenly, "spaceEvenly"},
+                       {Arrangement::SpaceAround, "spaceAround"})
 
 std::string ColorSpaceToString(ColorSpace space) {
   switch (space) {

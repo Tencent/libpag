@@ -40,11 +40,11 @@ they **must not** be omitted.
 |-----------|------|---------|
 | `width` | float | — |
 | `height` | float | — |
-| `layout` | LayoutMode | absolute |
+| `layout` | LayoutMode | none |
 | `gap` | float | 0 |
 | `flex` | float | 0 |
 | `padding` | Padding | 0 |
-| `alignment` | Alignment | start |
+| `alignment` | Alignment | stretch |
 | `arrangement` | Arrangement | start |
 | `includeInLayout` | bool | true |
 | `left` | float | — |
@@ -59,6 +59,9 @@ they **must not** be omitted.
 | `blendMode` | BlendMode | normal |
 | `x` | float | 0 |
 | `y` | float | 0 |
+
+> Prefer constraint attributes (`left`/`top`) over `x`/`y` for positioning.
+
 | `matrix` | Matrix | identity |
 | `matrix3D` | Matrix3D | — |
 | `preserve3D` | bool | false |
@@ -84,6 +87,9 @@ they **must not** be omitted.
 | `centerY` | float | — |
 | `anchor` | Point | 0,0 |
 | `position` | Point | 0,0 |
+
+> Prefer constraint attributes (`left`/`top`) over `position` for positioning.
+
 | `rotation` | float | 0 |
 | `scale` | Point | 1,1 |
 | `skew` | float | 0 |
@@ -99,8 +105,9 @@ they **must not** be omitted.
 | `reversed` | bool | false |
 | `position` | Point | (center of bounding box) |
 
-Also supports constraint attributes (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`) —
-see §Constraint Attributes below.
+Positioning: prefer constraint attributes (`left`/`top`/`right`/`bottom`/`centerX`/`centerY`)
+over `position`. When constraints are set, `position` is computed automatically.
+See §Constraint Attributes below.
 
 ### Ellipse
 
@@ -110,7 +117,7 @@ see §Constraint Attributes below.
 | `reversed` | bool | false |
 | `position` | Point | (center of bounding box) |
 
-Also supports constraint attributes — see §Constraint Attributes below.
+Positioning: prefer constraint attributes over `position`. See §Constraint Attributes below.
 
 ### Polystar
 
@@ -126,7 +133,7 @@ Also supports constraint attributes — see §Constraint Attributes below.
 | `reversed` | bool | false |
 | `position` | Point | (center of bounding box) |
 
-Also supports constraint attributes — see §Constraint Attributes below.
+Positioning: prefer constraint attributes over `position`. See §Constraint Attributes below.
 
 ### Path
 
@@ -136,7 +143,7 @@ Also supports constraint attributes — see §Constraint Attributes below.
 | `position` | Point | 0,0 |
 | `reversed` | bool | false |
 
-> `position` is the **coordinate system origin**. When `position="0,0"`, path data coordinates directly define drawing positions.
+> `position` is the **coordinate system origin**. Prefer constraint attributes (`left`/`top`) for positioning. When `position="0,0"`, path data coordinates directly define drawing positions.
 
 ### Fill
 
@@ -341,6 +348,9 @@ Also supports constraint attributes — see §Constraint Attributes below.
 |-----------|------|---------|
 | `text` | string | "" |
 | `position` | Point | 0,0 |
+
+> Prefer constraint attributes (`left`/`top`) over `position` for positioning.
+
 | `fontFamily` | string | "" |
 | `fontStyle` | string | "" |
 | `fontSize` | float | 12 |
@@ -411,7 +421,7 @@ Also supports constraint attributes — see §Constraint Attributes below.
 
 ### Constraint Attributes (Geometry Elements, Text, TextBox, Groups, and Child Layers)
 
-These attributes position or stretch an element relative to its container (constraint layout).
+These attributes position or stretch an element relative to its container.
 The container's size comes from explicit `width`/`height`, parent layout assignment, or
 content measurement (every container always has a size). `left`/`top` alone work without any
 container size dependency; `right`/`bottom`/`centerX`/`centerY` reference the container's size.
@@ -420,7 +430,7 @@ container size dependency; `right`/`bottom`/`centerX`/`centerY` reference the co
 regardless of the parent's `layout` mode.
 
 For **child Layers**, constraints are only active when:
-- The parent Layer uses absolute layout (default, no `layout` set or `layout="absolute"`), or
+- The parent Layer has no container layout (default, no `layout` set or `layout="none"`), or
 - The child Layer has `includeInLayout="false"` (opted out of container layout flow)
 
 | Attribute | Type | Default | Note |
@@ -514,9 +524,9 @@ Path `data` uses SVG `<path d="...">` syntax exactly. Uppercase = absolute, lowe
 
 | Enum | Values |
 |------|--------|
-| **Layout** | `absolute`, `horizontal`, `vertical` |
+| **Layout** | `none`, `horizontal`, `vertical` |
 | **Alignment** | `start`, `center`, `end`, `stretch` |
-| **Arrangement** | `start`, `center`, `end`, `spaceBetween` |
+| **Arrangement** | `start`, `center`, `end`, `spaceBetween`, `spaceEvenly`, `spaceAround` |
 
 ### Geometry Element Related
 

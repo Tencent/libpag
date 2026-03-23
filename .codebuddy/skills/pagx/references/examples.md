@@ -120,7 +120,7 @@ A card with vertical container layout, rich text header, and action buttons.
     <Fill color="#F1F5F9"/>
     <!-- Card with internal vertical layout -->
     <Layer left="20" right="20" top="20" bottom="20"
-           layout="vertical" gap="12" padding="16" alignment="stretch">
+           layout="vertical" gap="12" padding="16">
       <!-- Background (excluded from layout flow) -->
       <Layer includeInLayout="false" left="0" right="0" top="0" bottom="0">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
@@ -141,7 +141,7 @@ A card with vertical container layout, rich text header, and action buttons.
         </TextBox>
       </Layer>
       <!-- Action buttons: two equal-width buttons -->
-      <Layer height="44" layout="horizontal" gap="12" alignment="stretch">
+      <Layer height="44" layout="horizontal" gap="12">
         <Layer flex="1">
           <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
           <Fill color="#6366F1"/>
@@ -171,8 +171,8 @@ A card with vertical container layout, rich text header, and action buttons.
   in a Group for painter scope isolation. Use `&#10;` for line breaks between segments.
 - **Background as overlay**: `includeInLayout="false"` + stretch constraints keeps background
   out of layout flow while filling the card's computed size.
-- **Equal-width buttons**: `flex="1"` children in horizontal container with
-  `alignment="stretch"` — buttons fill both axes automatically.
+- **Equal-width buttons**: `flex="1"` children in horizontal container — buttons fill
+  both axes automatically (default stretch alignment).
 
 For a **flexible height** example — where some children have fixed height and others expand to
 fill remaining space — see Dashboard Layout below.
@@ -181,7 +181,7 @@ fill remaining space — see Dashboard Layout below.
 
 ```xml
 <pagx version="1.0" width="920" height="600">
-  <Layer width="920" height="600" layout="vertical" gap="16" padding="24" alignment="stretch">
+  <Layer width="920" height="600" layout="vertical" gap="16" padding="24">
     <!-- Header -->
     <Layer height="48">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
@@ -192,22 +192,20 @@ fill remaining space — see Dashboard Layout below.
       </TextBox>
     </Layer>
     <!-- Content: 3 equal columns -->
-    <Layer flex="1" layout="horizontal" gap="16" alignment="stretch">
+    <Layer flex="1" layout="horizontal" gap="16">
       <Layer flex="1">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
         <Fill color="#FFF"/>
-        <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000010"/>
       </Layer>
       <Layer flex="1">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
         <Fill color="#FFF"/>
-        <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000010"/>
       </Layer>
       <Layer flex="1">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
         <Fill color="#FFF"/>
-        <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000010"/>
       </Layer>
+      <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000010"/>
     </Layer>
     <!-- Footer -->
     <Layer height="40">
@@ -614,14 +612,14 @@ and BackgroundBlurStyle for frosted glass.
 
 ```xml
 <pagx version="1.0" width="500" height="120">
-  <Layer width="500" height="120">
+  <Layer width="500" height="120" layout="horizontal" gap="20" padding="20">
     <!-- Light background to make white cards visible -->
     <Rectangle size="500,120"/>
     <Fill color="#F1F5F9"/>
-    <!-- Reference Composition instances with constraint positioning -->
-    <Layer composition="@card" left="20" top="20"/>
-    <Layer composition="@card" left="170" top="20"/>
-    <Layer composition="@card" left="320" top="20"/>
+    <!-- Reference Composition instances -->
+    <Layer composition="@card" flex="1"/>
+    <Layer composition="@card" flex="1"/>
+    <Layer composition="@card" flex="1"/>
   </Layer>
 
   <Resources>
@@ -637,8 +635,9 @@ and BackgroundBlurStyle for frosted glass.
 ```
 
 **Pattern**: Composition origin is at the **top-left corner** — internal geometry uses
-stretch constraints to fill bounds (no manual center calculation). See `optimize-guide.md`
-§Composition Resource Reuse for coordinate conversion and gradient handling.
+stretch constraints to fill bounds (no manual center calculation). Horizontal layout with
+`flex="1"` distributes instances evenly. See `optimize-guide.md` §Composition Resource Reuse
+for coordinate conversion and gradient handling.
 
 ### Frosted Panel (BackgroundBlurStyle)
 
@@ -667,3 +666,69 @@ stretch constraints to fill bounds (no manual center calculation). See `optimize
 
 **Pattern**: BackgroundBlurStyle blurs everything rendered **below** this Layer, clipped by
 opaque content. Must have content below to blur — empty background produces no effect.
+
+### Tab Bar (Partial Roundness)
+
+```xml
+<pagx version="1.0" width="430" height="123">
+  <Layer left="20" right="20" top="20" bottom="20">
+    <!-- Top-round shape: intersect rounded rect with straight rect to flatten bottom corners -->
+    <Rectangle left="0" right="0" top="0" bottom="-20" roundness="20"/>
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <MergePath mode="intersect"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="0,83">
+        <ColorStop offset="0" color="#F8FAFC"/>
+        <ColorStop offset="1" color="#E2E8F0"/>
+      </LinearGradient>
+    </Fill>
+    <Stroke color="#00000020" width="1"/>
+    <!-- Tab items -->
+    <Layer left="0" right="0" top="0" bottom="0" layout="horizontal">
+      <Layer flex="1" layout="vertical" gap="2" arrangement="center" alignment="center">
+        <Layer width="24" height="24">
+          <Ellipse left="0" right="0" top="0" bottom="0"/>
+          <Fill color="#6366F1"/>
+        </Layer>
+        <Layer>
+          <TextBox width="78" height="14" textAlign="center">
+            <Text text="Home" fontFamily="Arial" fontSize="10"/>
+            <Fill color="#6366F1"/>
+          </TextBox>
+        </Layer>
+      </Layer>
+      <Layer flex="1" layout="vertical" gap="2" arrangement="center" alignment="center">
+        <Layer width="24" height="24">
+          <Ellipse left="0" right="0" top="0" bottom="0"/>
+          <Fill color="#999"/>
+        </Layer>
+        <Layer>
+          <TextBox width="78" height="14" textAlign="center">
+            <Text text="Search" fontFamily="Arial" fontSize="10"/>
+            <Fill color="#999"/>
+          </TextBox>
+        </Layer>
+      </Layer>
+      <Layer flex="1" layout="vertical" gap="2" arrangement="center" alignment="center">
+        <Layer width="24" height="24">
+          <Ellipse left="0" right="0" top="0" bottom="0"/>
+          <Fill color="#999"/>
+        </Layer>
+        <Layer>
+          <TextBox width="78" height="14" textAlign="center">
+            <Text text="Profile" fontFamily="Arial" fontSize="10"/>
+            <Fill color="#999"/>
+          </TextBox>
+        </Layer>
+      </Layer>
+    </Layer>
+    <DropShadowStyle offsetY="2" blurX="12" blurY="12" color="#00000030"/>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: Rectangle `roundness` applies to all four corners. To flatten specific corners,
+use `MergePath mode="intersect"` to intersect a rounded Rectangle with a straight-edged
+Rectangle — only the overlapping region remains. Here the rounded rect extends 20px below
+(`bottom="-20"`), and the straight rect clips it flush. Tab items use `flex="1"` for even
+distribution in horizontal layout.

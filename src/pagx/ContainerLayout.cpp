@@ -168,6 +168,20 @@ void ContainerLayout::Apply(Layer* parent, const MeasureFunc& measureLayer) {
         extraGap = spaceToDistribute / static_cast<float>(visibleCount - 1);
       }
       break;
+    case Arrangement::SpaceEvenly: {
+      float totalChildMain = totalMain - totalGap;
+      float spaceToDistribute = availableMain - totalChildMain;
+      extraGap = spaceToDistribute / static_cast<float>(visibleCount + 1);
+      mainOffset += extraGap;
+      break;
+    }
+    case Arrangement::SpaceAround: {
+      float totalChildMain = totalMain - totalGap;
+      float spaceToDistribute = availableMain - totalChildMain;
+      extraGap = spaceToDistribute / static_cast<float>(visibleCount);
+      mainOffset += extraGap * 0.5f;
+      break;
+    }
   }
 
   // Compute the cross-axis reference size for alignment.
@@ -216,7 +230,9 @@ void ContainerLayout::Apply(Layer* parent, const MeasureFunc& measureLayer) {
     }
 
     mainOffset += childMainSizes[idx];
-    if (parent->arrangement == Arrangement::SpaceBetween) {
+    if (parent->arrangement == Arrangement::SpaceBetween ||
+        parent->arrangement == Arrangement::SpaceEvenly ||
+        parent->arrangement == Arrangement::SpaceAround) {
       mainOffset += extraGap;
     } else {
       mainOffset += parent->gap;

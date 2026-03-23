@@ -5,13 +5,11 @@
   <Layer width="360" height="170" left="20" top="20">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
     <Fill color="#6366F1"/>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F150"/>
-  </Layer>
-  <Layer width="360" height="170" left="20" top="20">
-    <TextBox left="24" right="24" top="24" bottom="24" textAlign="center" paragraphAlign="middle">
+    <TextBox left="24" right="24" top="24" bottom="24">
       <Text text="TextBox stretches its typesetting area using constraint attributes" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
       <Fill color="#FFF"/>
     </TextBox>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#00000050"/>
   </Layer>
 
   <!-- Lower card: Group derives size from constraints -->
@@ -20,11 +18,11 @@
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
       <Fill color="#10B981"/>
 
-      <TextBox centerX="0" centerY="0" width="200" height="60" textAlign="center" paragraphAlign="middle">
+      <TextBox centerX="0" centerY="0" width="200" height="60">
         <Text text="Group Layout" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
         <Fill color="#FFF"/>
       </TextBox>
     </Group>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#10B98150"/>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#00000050"/>
   </Layer>
 </pagx>

@@ -1,27 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates different fill types -->
 <pagx version="1.0" width="400" height="400">
-  <Layer>
-    <!-- Solid color fill -->
-    <Layer>
-      <Rectangle left="40" top="40" size="140,140" roundness="24"/>
-      <Fill color="#F43F5E"/>
-      <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F43F5E50"/>
+  <Layer width="400" height="400" layout="vertical" alignment="stretch">
+    <!-- Row 1: solid and gradient fills -->
+    <Layer layout="horizontal" alignment="stretch" flex="1">
+      <!-- Solid color fill -->
+      <Layer flex="1">
+        <Rectangle centerX="0" centerY="0" size="140,140" roundness="24"/>
+        <Fill color="#F43F5E"/>
+      </Layer>
+      <!-- Linear gradient fill -->
+      <Layer flex="1">
+        <Rectangle centerX="0" centerY="0" size="140,140" roundness="24"/>
+        <Fill>
+          <LinearGradient startPoint="0,0" endPoint="140,140">
+            <ColorStop offset="0" color="#6366F1"/>
+            <ColorStop offset="1" color="#8B5CF6"/>
+          </LinearGradient>
+        </Fill>
+      </Layer>
     </Layer>
-    <!-- Linear gradient fill -->
-    <Layer>
-      <Rectangle left="220" top="40" size="140,140" roundness="24"/>
-      <Fill>
-        <LinearGradient startPoint="0,0" endPoint="140,140">
-          <ColorStop offset="0" color="#6366F1"/>
-          <ColorStop offset="1" color="#8B5CF6"/>
-        </LinearGradient>
-      </Fill>
-      <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#8B5CF650"/>
-    </Layer>
-    <!-- Radial gradient fill -->
-    <Layer>
-      <Ellipse left="40" top="230" size="320,140"/>
+    <!-- Row 2: radial gradient fill -->
+    <Layer flex="1">
+      <Ellipse centerX="0" centerY="0" size="320,140"/>
       <Fill>
         <RadialGradient center="160,70" radius="170">
           <ColorStop offset="0" color="#FFF"/>
@@ -29,7 +30,7 @@
           <ColorStop offset="1" color="#0891B2"/>
         </RadialGradient>
       </Fill>
-      <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#06B6D450"/>
     </Layer>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#00000050"/>
   </Layer>
 </pagx>

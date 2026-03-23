@@ -1,30 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates opposite-edge constraints: stretchable elements fill target areas -->
 <pagx version="1.0" width="400" height="400">
-  <!-- Container with dashed border -->
   <Layer width="360" height="360" left="20" top="20">
+    <!-- Dashed container border -->
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-  </Layer>
 
-  <!-- Rectangle stretches to fill with 20px margins -->
-  <Layer width="360" height="360" left="20" top="20">
-    <Rectangle left="20" right="20" top="20" bottom="20" roundness="20"/>
-    <Fill color="#6366F1"/>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#6366F150"/>
-  </Layer>
+    <!-- Rectangle stretches to fill with 20px margins -->
+    <Group left="0" right="0" top="0" bottom="0">
+      <Rectangle left="20" right="20" top="20" bottom="20" roundness="20"/>
+      <Fill color="#6366F1"/>
+    </Group>
 
-  <!-- Ellipse stretches horizontally and vertically with larger margins -->
-  <Layer width="360" height="360" left="20" top="20">
-    <Ellipse left="40" right="40" top="120" bottom="120"/>
-    <Fill color="#F43F5E"/>
-    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#F43F5E50"/>
-  </Layer>
+    <!-- Ellipse stretches horizontally and vertically with larger margins -->
+    <Group left="0" right="0" top="0" bottom="0">
+      <Ellipse left="40" right="40" top="120" bottom="120"/>
+      <Fill color="#F43F5E"/>
+    </Group>
 
-  <!-- Small centered white rectangle as accent -->
-  <Layer width="360" height="360" left="20" top="20">
-    <Rectangle centerX="0" centerY="0" size="60,60" roundness="10"/>
-    <Fill color="#FFF"/>
-    <DropShadowStyle offsetY="4" blurX="16" blurY="16" color="#00000020"/>
+    <!-- Small centered white rectangle as accent -->
+    <Group left="0" right="0" top="0" bottom="0">
+      <Rectangle centerX="0" centerY="0" size="60,60" roundness="10"/>
+      <Fill color="#FFF"/>
+    </Group>
+    <DropShadowStyle offsetY="8" blurX="24" blurY="24" color="#00000050"/>
   </Layer>
 </pagx>

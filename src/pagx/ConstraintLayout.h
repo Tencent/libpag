@@ -24,11 +24,11 @@
 
 namespace pagx {
 
-/// Performs constraint layout on elements within a container, positioning them based on their
+/// Performs constraint positioning on elements within a container, positioning them based on their
 /// constraint attributes (left, right, top, bottom, centerX, centerY).
 class ConstraintLayout {
  public:
-  /// Applies constraint layout to all elements within a container.
+  /// Applies constraint positioning to all elements within a container.
   /// @param elements The elements to position.
   /// @param containerWidth The container width for constraint calculations.
   /// @param containerHeight The container height for constraint calculations.

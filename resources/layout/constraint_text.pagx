@@ -8,8 +8,8 @@
     <Fill color="#F8FAFC"/>
   </Layer>
 
-  <!-- Main vertical layout, alignment=stretch -->
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30" alignment="stretch">
+  <!-- Main vertical layout -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">
 
     <!-- Row 1: Single-edge positioning + Horizontal-only scaling -->
     <Layer flex="1" layout="horizontal" gap="20">
@@ -48,7 +48,7 @@
       </Layer>
 
       <!-- Right side: vertical stack of 3 horizontal-scaling containers -->
-      <Layer flex="1" height="220" layout="vertical" gap="10" alignment="stretch">
+      <Layer flex="1" height="220" layout="vertical" gap="10">
 
         <!-- Container 2a: Horizontal-only scaling - wide area (flexible, fills row width) -->
         <Layer height="60">

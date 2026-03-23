@@ -8,8 +8,8 @@
     <Fill color="#F8FAFC"/>
   </Layer>
 
-  <!-- Main vertical layout, alignment=stretch -->
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="30" padding="30" alignment="stretch">
+  <!-- Main vertical layout -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="30" padding="30">
 
     <!-- Row 1: Single-edge positioning + Dual-axis fit -->
     <Layer flex="1" layout="horizontal" gap="30">

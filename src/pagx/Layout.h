@@ -29,7 +29,7 @@ class PAGXDocument;
 /**
  * Layout performs unified auto layout and text shaping for a PAGXDocument. It coordinates:
  * - Container layout (arranging child Layers with flex, gap, alignment, etc.)
- * - Constraint layout (positioning elements relative to container bounds)
+ * - Constraint positioning (positioning elements relative to container bounds)
  * - Text shaping (converting Text elements into positioned glyph data)
  *
  * After calling apply(), the document's layer positions are updated in-place, and the shaped text

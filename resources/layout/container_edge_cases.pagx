@@ -9,14 +9,13 @@
     <Fill color="#F8FAFC"/>
   </Layer>
 
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30" alignment="start">
 
-    <!-- Row 1 -->
-    <Layer flex="1" layout="horizontal" gap="20">
+    <Layer flex="1" layout="horizontal" gap="20" alignment="start">
 
       <!-- 1. Pixel grid alignment: 7 flex items in 500px yields non-integer widths -->
       <!-- Available = 500 - 10*2 - 8*6 = 432, each = 432/7 = 61.71... -->
-      <Layer width="500" height="220" layout="horizontal" gap="8" padding="10">
+      <Layer width="500" height="220" layout="horizontal" gap="8" padding="10" alignment="start">
         <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -51,8 +50,8 @@
       </Layer>
 
       <!-- 2. Stretch mixed: some children have explicit cross-axis, some don't -->
-      <!-- alignment=stretch should only stretch children WITHOUT explicit height -->
-      <Layer width="240" height="220" layout="horizontal" gap="10" padding="10" alignment="stretch">
+      <!-- alignment defaults to stretch, only stretches children WITHOUT explicit height -->
+      <Layer width="240" height="220" layout="horizontal" gap="10" padding="10">
         <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
         <Fill color="#E2E8F0"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
@@ -75,8 +74,7 @@
 
     </Layer>
 
-    <!-- Row 2 -->
-    <Layer flex="1" layout="horizontal" gap="20">
+    <Layer flex="1" layout="horizontal" gap="20" alignment="start">
 
       <!-- 3. Opposite-pair overrides explicit Layer width: left+right should win -->
       <Layer width="260" height="220">
@@ -103,7 +101,7 @@
       </Layer>
 
       <!-- 4. Three-level nesting: vertical → horizontal → vertical -->
-      <Layer width="200" height="220" layout="vertical" gap="8" padding="10" alignment="stretch">
+      <Layer width="200" height="220" layout="vertical" gap="8" padding="10">
         <!-- Border -->
         <Layer left="0" right="0" top="0" bottom="0" includeInLayout="false">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
@@ -114,7 +112,7 @@
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
           <Fill color="#6366F1"/>
         </Layer>
-        <Layer flex="1" layout="horizontal" gap="6" alignment="stretch">
+        <Layer flex="1" layout="horizontal" gap="6">
           <Layer flex="1" layout="vertical" gap="4">
             <Layer width="80" height="30">
               <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="6"/>
@@ -142,8 +140,7 @@
         </Layer>
       </Layer>
 
-      <!-- 5. HUG with fixed-width children of different sizes -->
-      <Layer flex="1" layout="horizontal" gap="10" padding="15">
+      <Layer flex="1" layout="horizontal" gap="10" padding="15" alignment="start">
         <!-- Border -->
         <Layer left="0" right="0" top="0" bottom="0" includeInLayout="false">
           <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>

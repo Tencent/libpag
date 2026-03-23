@@ -7,9 +7,9 @@
     <Fill color="#F8FAFC"/>
   </Layer>
 
-  <Layer layout="vertical" gap="20" padding="30">
+  <Layer layout="vertical" gap="20" padding="30" alignment="start">
     <!-- Row 1: Three horizontal HUG layouts -->
-    <Layer flex="1" layout="horizontal" gap="20">
+    <Layer flex="1" layout="horizontal" gap="20" alignment="start">
       <!-- 1. Horizontal HUG: basic (three children, no padding) -->
       <Layer flex="1" layout="horizontal" gap="10">
         <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
@@ -66,9 +66,8 @@
     </Layer>
 
     <!-- Row 2: Vertical HUG layouts + nested HUG -->
-    <Layer flex="1" layout="horizontal" gap="20">
-      <!-- 4. Vertical HUG: basic (three children) -->
-      <Layer flex="1" layout="vertical" gap="10" padding="15">
+    <Layer flex="1" layout="horizontal" gap="20" alignment="start">
+      <Layer flex="1" layout="vertical" gap="10" padding="15" alignment="start">
         <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="150" height="60">
@@ -85,8 +84,7 @@
         </Layer>
       </Layer>
 
-      <!-- 5. Vertical HUG: varied child heights -->
-      <Layer flex="1" layout="vertical" gap="10" padding="15">
+      <Layer flex="1" layout="vertical" gap="10" padding="15" alignment="start">
         <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="150" height="40">
@@ -122,7 +120,7 @@
       </Layer>
 
       <!-- 7. Nested HUG: outer vertical, inner horizontal -->
-      <Layer flex="1" layout="vertical" gap="15" padding="15">
+      <Layer flex="1" layout="vertical" gap="15" padding="15" alignment="start">
         <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer flex="1" layout="horizontal" gap="10" padding="10">

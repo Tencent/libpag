@@ -73,14 +73,14 @@ class Group : public Element {
   std::vector<Element*> elements = {};
 
   /**
-   * The layout width of the group. When set, the group becomes a constraint layout reference frame
-   * for its child elements. Does not affect rendering behavior. NaN means not set.
+   * The layout width of the group. When set, the group becomes a constraint positioning reference
+   * frame for its child elements. Does not affect rendering behavior. NaN means not set.
    */
   float width = NAN;
 
   /**
-   * The layout height of the group. When set, the group becomes a constraint layout reference frame
-   * for its child elements. Does not affect rendering behavior. NaN means not set.
+   * The layout height of the group. When set, the group becomes a constraint positioning reference
+   * frame for its child elements. Does not affect rendering behavior. NaN means not set.
    */
   float height = NAN;
 

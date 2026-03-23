@@ -322,7 +322,7 @@
 
   <xs:simpleType name="LayoutModeType">
     <xs:restriction base="xs:string">
-      <xs:enumeration value="constraint"/>
+      <xs:enumeration value="none"/>
       <xs:enumeration value="horizontal"/>
       <xs:enumeration value="vertical"/>
     </xs:restriction>
@@ -343,6 +343,8 @@
       <xs:enumeration value="center"/>
       <xs:enumeration value="end"/>
       <xs:enumeration value="spaceBetween"/>
+      <xs:enumeration value="spaceEvenly"/>
+      <xs:enumeration value="spaceAround"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -360,7 +362,7 @@
     <xs:attribute name="id" type="xs:string"/>
   </xs:attributeGroup>
 
-  <!-- Constraint layout attributes shared by positionable elements -->
+  <!-- Constraint positioning attributes shared by positionable elements -->
   <xs:attributeGroup name="ConstraintAttributes">
     <xs:attribute name="left" type="xs:decimal"/>
     <xs:attribute name="right" type="xs:decimal"/>
@@ -926,11 +928,11 @@
     <xs:attribute name="composition" type="IdRefType"/>
     <xs:attribute name="width" type="xs:decimal"/>
     <xs:attribute name="height" type="xs:decimal"/>
-    <xs:attribute name="layout" type="LayoutModeType" default="constraint"/>
+    <xs:attribute name="layout" type="LayoutModeType" default="none"/>
     <xs:attribute name="gap" type="xs:decimal" default="0"/>
     <xs:attribute name="flex" type="xs:decimal" default="0"/>
     <xs:attribute name="padding" type="PaddingType"/>
-    <xs:attribute name="alignment" type="AlignmentType" default="start"/>
+    <xs:attribute name="alignment" type="AlignmentType" default="stretch"/>
     <xs:attribute name="arrangement" type="ArrangementType" default="start"/>
     <xs:attribute name="includeInLayout" type="BoolType" default="true"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>

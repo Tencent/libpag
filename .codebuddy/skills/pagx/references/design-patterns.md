@@ -41,7 +41,7 @@ Use Layers purposefully — each should serve a clear structural or visual role:
 
 - Use Groups for internal structure when no Layer-exclusive features are needed
 - Add a Layer when styles, filters, mask, blendMode, or container layout is needed
-- With constraint layout, each shape needing independent Fill/Stroke requires its own Layer
+- With constraint positioning, each shape needing independent Fill/Stroke requires its own Layer
   (see §1 Painter Scope Isolation)
 
 ### Layer vs Group
@@ -53,9 +53,9 @@ Is this a direct child of <pagx> or <Composition>?
 Does this need styles, filters, mask, blendMode, composition, or scrollRect?
   → YES: Must be Layer
 
-Are you using constraint layout, and does this element need independent Fill/Stroke?
+Are you using constraint positioning, and does this element need independent Fill/Stroke?
   → YES: Use Layer (even if just wrapping a single constrained shape)
-         Container Layout and Constraint Layout patterns require per-shape Layers
+         Container Layout and Constraint Positioning patterns require per-shape Layers
          for proper painter scope isolation (see §1 Painter Scope Isolation)
 
 Is this an independent visual unit (could be repositioned as a whole)?
@@ -104,7 +104,7 @@ Look at the child Layers inside the current Layer. How are they spatially relate
 This Layer has multiple child Layers?
 ├─ They form a row    → layout="horizontal" + gap/padding/alignment
 ├─ They form a column → layout="vertical" + gap/padding/alignment
-└─ Free-form / overlapping → absolute layout (default) + constraint attributes on each child Layer
+└─ Free-form / overlapping → no container layout (default) + constraint attributes on each child Layer
 
 This Layer has only VectorElements (no child Layers)?
 └─ No container mode needed — go directly to Step 2
@@ -133,7 +133,7 @@ Decorative element or badge overlay?
   → Use constraint attributes for edge/center alignment
 
 Freeform overlapping composition?
-  → Use x/y on Layers or position on elements (last resort)
+  → Use left/top on Layers and elements
 ```
 
 **Why this order matters**: Step 1 determines how child Layers are sized and arranged.
@@ -168,15 +168,16 @@ All container layout patterns derive from two primitives:
 </Layer>
 ```
 
-**Grid via nesting** — outer vertical + inner horizontal rows:
+**Grid via nesting** — outer vertical + inner horizontal rows. `flex="1"` on each row
+equally shares the vertical space, and the default stretch alignment fills row widths:
 
 ```xml
-<Layer width="600" height="400" layout="vertical" gap="12">
-  <Layer layout="horizontal" gap="12">
+<Layer width="600" height="400" layout="vertical" gap="12" padding="12">
+  <Layer layout="horizontal" gap="12" flex="1">
     <Layer flex="1"><!-- row 1, col 1 --></Layer>
     <Layer flex="1"><!-- row 1, col 2 --></Layer>
   </Layer>
-  <Layer layout="horizontal" gap="12">
+  <Layer layout="horizontal" gap="12" flex="1">
     <Layer flex="1"><!-- row 2, col 1 --></Layer>
     <Layer flex="1"><!-- row 2, col 2 --></Layer>
   </Layer>
@@ -186,14 +187,14 @@ All container layout patterns derive from two primitives:
 **Grid layout with consistent margins (RECOMMENDED TEMPLATE)** — the most common pattern for
 card grids, dashboards, and tile layouts. Key principles:
 
-1. Outer container: `layout="vertical"` + `alignment="stretch"` + `padding` + `gap`
-2. Each row: `layout="horizontal"` + `gap` — **no width** (stretch fills it from parent)
+1. Outer container: `layout="vertical"` + `padding` + `gap`
+2. Each row: `layout="horizontal"` + `gap` — **no width** (default stretch fills it from parent)
 3. Each cell: `flex="1"` + `height` — **no width** (flex children equally share row width)
 4. Background Rectangle: `left="0" right="0" top="0" bottom="0"` (auto-fills cell)
 
 ```xml
 <Layer left="0" right="0" top="0" bottom="0"
-       layout="vertical" gap="20" padding="30" alignment="stretch">
+       layout="vertical" gap="20" padding="30">
   <!-- Row 1: 3 equal cells -->
   <Layer layout="horizontal" gap="20">
     <Layer flex="1" height="200">
@@ -218,11 +219,11 @@ card grids, dashboards, and tile layouts. Key principles:
 </Layer>
 ```
 
-Why this works: `alignment="stretch"` on the vertical parent fills row widths → rows' flex
+Why this works: the default `stretch` alignment fills row widths → rows' flex
 cells (`flex="1"`) equally share the width → engine writes computed sizes back as their reference frame.
 **No math required** — only declare padding, gap, height.
 
-### Constraint Layout — Key Patterns
+### Constraint Positioning — Key Patterns
 
 **When to use opposite-pair constraints** (`left="0" right="0"` etc.): when the container's
 size is dynamic (layout-assigned by flex, stretch, or content measurement) and the element
@@ -450,7 +451,7 @@ When different geometry needs different painters, choose based on layout context
 </Layer>
 ```
 
-**With constraint layout** — wrap each constrained shape in its own Layer to isolate Fill scope.
+**With constraint positioning** — wrap each constrained shape in its own Layer to isolate Fill scope.
 
 > **Why separate Layers?** Without them, the second Fill applies to ALL preceding shapes in scope.
 > Child Layers inherit parent dimensions as their constraint reference frame while isolating painter scope.
@@ -540,9 +541,10 @@ dimensions are unnecessary.
 
 ### 6. Overlay Elements Inside Layout Containers
 
-When a parent Layer has `layout` set, child Layers participate in the layout flow by default.
-To exempt a child (e.g., a badge or tooltip), set `includeInLayout="false"` and position it
-with constraint attributes. The child remains visible but occupies no space in the flow.
+When a parent Layer has `layout` set, the layout engine controls child Layer positions —
+constraint attributes on child Layers are overridden. To exempt a child (e.g., a badge or
+tooltip), set `includeInLayout="false"` and position it with constraint attributes. The child
+remains visible but occupies no space in the flow.
 
 **Badge / notification dot** — positioned at a corner, independent of layout flow:
 
@@ -564,80 +566,3 @@ Key points: `includeInLayout="false"` children can use **any** constraint attrib
 (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`) regardless of parent layout mode.
 They are positioned relative to the parent's `width`×`height`.
 
-### 7. Child Layer Constraint Positioning
-
-When the parent Layer uses absolute layout (default), child Layers can use constraint
-attributes instead of `x`/`y` for more expressive positioning:
-
-```xml
-<Layer width="400" height="300">
-  <!-- Full-width header with 20px margins -->
-  <Layer left="20" right="20" top="0" height="60"><!-- header --></Layer>
-  <!-- Centered content area -->
-  <Layer centerX="0" top="80" width="300" height="160"><!-- content --></Layer>
-  <!-- Bottom-right action button -->
-  <Layer right="20" bottom="20" width="80" height="36"><!-- button --></Layer>
-</Layer>
-```
-
-### 8. Opposite-Pair Constraints in Content-Measured Containers
-
-Opposite-pair constraints (`left="0" right="0"`) inside a content-measured container
-create a circular dependency — child stretches to container size, but container measures
-from child. The engine resolves this with near-zero size, causing TextBox text to
-force-break per character (`boxWidth ≈ 0`).
-
-**Problem:**
-
-```xml
-<!-- Parent has no explicit width — measured from content -->
-<Layer layout="vertical">
-  <Layer height="60">
-    <TextBox left="0" right="0" top="0" bottom="0"
-             textAlign="center" paragraphAlign="middle">
-      <Text text="30" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
-      <Fill color="#FFF"/>
-      <!-- boxWidth ≈ 0 → "3" and "0" on separate lines -->
-    </TextBox>
-  </Layer>
-</Layer>
-```
-
-**Solution:**
-
-```xml
-<Layer height="60">
-  <Text text="30" fontFamily="Arial" fontStyle="Bold" fontSize="48" centerX="0" centerY="0"/>
-  <Fill color="#FFF"/>
-</Layer>
-```
-
-Opposite-pair constraints work correctly when the container has a known size (explicit
-`width`/`height` or layout-assigned by parent).
-
-### 9. Partial Roundness (e.g. Top-Round Bottom-Flat)
-
-Rectangle `roundness` applies to all four corners uniformly. For per-corner control (like
-a tab bar with only top corners rounded), mask with two overlapping Rectangles — one
-rounded, one square covering the corners you want flat:
-
-```xml
-<Layer left="0" right="0" bottom="0" height="83">
-  <Layer id="tabMask" visible="false">
-    <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="20"/>
-    <Fill color="#FFF"/>
-    <!-- Square rect covers bottom 20px, flattening bottom corners -->
-    <Rectangle left="0" right="0" top="20" bottom="0" size="1,1"/>
-    <Fill color="#FFF"/>
-  </Layer>
-  <Layer left="0" right="0" top="0" bottom="0" mask="@tabMask" maskType="contour">
-    <Rectangle left="0" right="0" top="0" bottom="0" size="1,1"/>
-    <Fill color="#FFFFFFD9"/>
-    <BackgroundBlurStyle blurX="20" blurY="20"/>
-  </Layer>
-</Layer>
-```
-
-The covering Rectangle's inset (`top="20"`) must be ≥ `roundness` to fully flatten those
-corners. Flip the constraint direction to flatten other edges instead (e.g. `bottom="20"`
-for top-flat).
