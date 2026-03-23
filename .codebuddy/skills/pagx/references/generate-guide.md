@@ -181,11 +181,31 @@ These constraints differ from CSS/SVG and must be respected during generation:
 
 ---
 
-## Step 4: Verify and Refine
+## Step 4: Render and Read Screenshot
+
+After building the complete PAGX file, **always** render it before presenting results to the
+user — never skip this step. Use `--scale 2` for sharper detail during verification:
+
+```bash
+pagx render --scale 2 input.pagx
+```
+
+Then **read the rendered screenshot** to visually inspect the output. This is the only
+reliable way to catch layout issues, misaligned elements, incorrect colors, or missing
+content. Proceed to Step 5 for systematic verification.
+
+---
+
+## Step 5: Verify and Refine
 
 After **every render**, follow this loop until the output matches the design intent.
 
-### 1. Measure
+### 1. Read Screenshot
+
+Render and **read the screenshot** — visual inspection catches issues that bounds data alone
+cannot reveal (wrong colors, overlapping elements, visual imbalance).
+
+### 2. Measure
 
 Run `pagx bounds` to get exact dimensions of every layer:
 
@@ -195,7 +215,7 @@ pagx bounds input.pagx
 
 Use `--id` or `--xpath` for targeted measurement (see `cli.md`).
 
-### 2. Check Layout
+### 3. Check Layout
 
 **Layout-managed content** — verify:
 - Container `layout` direction, `gap`, `padding` match design
@@ -205,7 +225,7 @@ Use `--id` or `--xpath` for targeted measurement (see `cli.md`).
 **Absolute-positioned content** — scan bounds for alignment, consistent gaps, and
 centering.
 
-### 3. Fix and Re-render
+### 4. Fix and Re-render
 
 - Layout issues → adjust layout/constraint attributes
 - Absolute positioning → adjust `left`/`top`
