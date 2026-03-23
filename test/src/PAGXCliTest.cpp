@@ -294,6 +294,19 @@ CLI_TEST(PAGXCliTest, Optimize_PathToRectangle) {
   EXPECT_TRUE(output.find("<Path") == std::string::npos);
 }
 
+// Path->Rectangle: skip conversion when Path has constraint attributes — Rectangle is stretchable
+// while Path is not, so constraint behavior (center vs stretch) would change.
+CLI_TEST(PAGXCliTest, Optimize_PathToRectangleSkipConstrained) {
+  auto inputPath = TestResourcePath("optimize_path_to_rect_constrained.pagx");
+  auto outputPath = TempDir() + "/rect_path_constrained_out.pagx";
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // Path has left="10" right="10" — must NOT be converted to Rectangle.
+  EXPECT_TRUE(output.find("<Path") != std::string::npos);
+  EXPECT_TRUE(output.find("<Rectangle") == std::string::npos);
+}
+
 // NOTE: Path->Ellipse detection via isOval() requires exact Bezier control points. The SVG path
 // string format used by PAGX (with default float precision) introduces rounding that prevents
 // isOval() from matching after an export->import round trip. The optimization still works for
@@ -427,6 +440,32 @@ CLI_TEST(PAGXCliTest, Optimize_LocalizeAlreadyAtOrigin) {
   auto output = ReadFile(outputPath);
   EXPECT_TRUE(output.find("x=\"100\"") != std::string::npos);
   EXPECT_TRUE(output.find("y=\"100\"") != std::string::npos);
+}
+
+// LocalizePathData: normalize PathData to origin and compensate with position.
+CLI_TEST(PAGXCliTest, Optimize_LocalizePathData) {
+  auto inputPath = TestResourcePath("optimize_localize_pathdata.pagx");
+  auto outputPath = TempDir() + "/localize_pathdata_out.pagx";
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // Original PathData "M 50 50 L 150 50 L 100 150 Z" should be normalized to origin
+  // with position offset (50, 50). The Layer has left/top constraints so #8 skips it,
+  // but #8b still normalizes the PathData independently.
+  EXPECT_TRUE(output.find("M0 0L100 0L50 100Z") != std::string::npos);
+  EXPECT_TRUE(output.find("position=\"50,50\"") != std::string::npos);
+}
+
+// LocalizePathData: pre-existing position should accumulate, not be overwritten.
+CLI_TEST(PAGXCliTest, Optimize_LocalizePathDataAccumulatePosition) {
+  auto inputPath = TestResourcePath("optimize_localize_pathdata_position.pagx");
+  auto outputPath = TempDir() + "/localize_pathdata_position_out.pagx";
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // Original position=(10,20) + PathData offset (50,50) = final position (60,70).
+  EXPECT_TRUE(output.find("M0 0L100 0L50 100Z") != std::string::npos);
+  EXPECT_TRUE(output.find("position=\"60,70\"") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Optimize_LocalizeNestedLayers) {
@@ -585,6 +624,31 @@ CLI_TEST(PAGXCliTest, Optimize_NoExtractConstrainedLayers) {
   auto output = ReadFile(outputPath);
   // Identical constrained Layers must not be extracted.
   EXPECT_TRUE(output.find("<Composition") == std::string::npos);
+}
+
+// ExtractCompositions: do not extract Layers that participate in parent container layout.
+CLI_TEST(PAGXCliTest, Optimize_NoExtractLayoutChildren) {
+  auto inputPath = TestResourcePath("optimize_no_extract_layout_children.pagx");
+  auto outputPath = TempDir() + "/no_extract_layout_children_out.pagx";
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // Identical children of a container-layout parent must not be extracted — the layout engine
+  // measures Layers without Composition using frame-based bounds, which differs from Composition
+  // bounds (content-based), so extracting would change the allocated space.
+  EXPECT_TRUE(output.find("<Composition") == std::string::npos);
+}
+
+// ExtractCompositions: children with includeInLayout="false" in a container-layout parent are
+// excluded from layout flow, so extracting them is safe — they behave like normal layers.
+CLI_TEST(PAGXCliTest, Optimize_ExtractExcludedLayoutChildren) {
+  auto inputPath = TestResourcePath("optimize_extract_excluded_layout_children.pagx");
+  auto outputPath = TempDir() + "/extract_excluded_layout_children_out.pagx";
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // includeInLayout="false" children should still be extracted into a Composition.
+  EXPECT_TRUE(output.find("<Composition") != std::string::npos);
 }
 
 // RemoveEmpty: preserve empty Layer in container layout (sized spacer).

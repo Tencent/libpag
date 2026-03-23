@@ -80,12 +80,13 @@ struct OptimizeReport {
   int fullCanvasClips = 0;
   int offCanvasLayers = 0;
   int coordinatesLocalized = 0;
+  int pathDataLocalized = 0;
   int compositionsExtracted = 0;
 
   int total() const {
     return emptyElements + deduplicatedPathData + deduplicatedGradients + mergedGroups +
            unreferencedResources + pathToRectangle + pathToEllipse + fullCanvasClips +
-           offCanvasLayers + coordinatesLocalized + compositionsExtracted;
+           offCanvasLayers + coordinatesLocalized + pathDataLocalized + compositionsExtracted;
   }
 
   void print() const {
@@ -125,6 +126,9 @@ struct OptimizeReport {
     if (coordinatesLocalized > 0) {
       std::cout << "  - localized " << coordinatesLocalized << " layer coordinates\n";
     }
+    if (pathDataLocalized > 0) {
+      std::cout << "  - localized " << pathDataLocalized << " PathData to origin\n";
+    }
     if (compositionsExtracted > 0) {
       std::cout << "  - extracted " << compositionsExtracted << " layers to compositions\n";
     }
@@ -147,6 +151,7 @@ static void PrintOptimizeUsage() {
             << "  6.  Remove full-canvas clip masks\n"
             << "  7.  Remove off-canvas invisible layers\n"
             << "  8.  Localize layer coordinates\n"
+            << "  8b. Localize PathData to origin\n"
             << "  9.  Extract duplicate layers to compositions\n"
             << "  10. Remove unreferenced resources\n"
             << "\n"
@@ -1143,6 +1148,12 @@ static void ReplacePathsWithPrimitives(PAGXDocument* document, int& rectCount, i
       if (path->data == nullptr) {
         continue;
       }
+      // Skip Paths with constraint attributes — Rectangle/Ellipse are stretchable while
+      // Path is not, so constraint behavior (center vs stretch) would change.
+      if (HasConstraintAttributes(path->left, path->right, path->top, path->bottom, path->centerX,
+                                  path->centerY)) {
+        continue;
+      }
       auto tgfxPath = ToTGFX(*path->data);
       tgfx::RRect rrect = {};
       tgfx::Rect rect = {};
@@ -1726,6 +1737,53 @@ static int LocalizeCoordinates(PAGXDocument* document) {
   return count;
 }
 
+// --- Optimization #8b: Localize PathData to origin ---
+
+static int LocalizePathData(PAGXDocument* document) {
+  int count = 0;
+  // Cache normalized PathData to reuse when multiple Paths share the same PathData
+  // (e.g., after DeduplicatePathData). All such Paths have the same bounds offset.
+  std::unordered_map<PathData*, PathData*> normalizedMap = {};
+  for (auto& node : document->nodes) {
+    std::vector<Element*>* elements = nullptr;
+    if (node->nodeType() == NodeType::Layer) {
+      elements = &static_cast<Layer*>(node.get())->contents;
+    } else if (node->nodeType() == NodeType::Group || node->nodeType() == NodeType::TextBox) {
+      elements = &static_cast<Group*>(node.get())->elements;
+    }
+    if (elements == nullptr) {
+      continue;
+    }
+    for (auto* element : *elements) {
+      if (element->nodeType() != NodeType::Path) {
+        continue;
+      }
+      auto* path = static_cast<Path*>(element);
+      if (path->data == nullptr || path->data->isEmpty()) {
+        continue;
+      }
+      auto bounds = path->data->getBounds();
+      if (std::abs(bounds.x) < 0.001f && std::abs(bounds.y) < 0.001f) {
+        continue;
+      }
+      auto it = normalizedMap.find(path->data);
+      if (it != normalizedMap.end()) {
+        path->data = it->second;
+      } else {
+        auto* original = path->data;
+        auto newData = document->makeNode<PathData>(original->id);
+        OffsetPathData(original, newData, bounds.x, bounds.y);
+        normalizedMap[original] = newData;
+        path->data = newData;
+      }
+      path->position.x += bounds.x;
+      path->position.y += bounds.y;
+      count++;
+    }
+  }
+  return count;
+}
+
 // --- Optimization #9: Extract compositions ---
 
 static size_t HashElement(const Element* element) {
@@ -1992,9 +2050,14 @@ static std::string GenerateUniqueId(PAGXDocument* document, const std::string& p
 }
 
 static void CollectCandidateLayers(Layer* layer,
-                                   std::unordered_map<size_t, std::vector<Layer*>>& hashGroups) {
-  if (!layer->contents.empty() && layer->composition == nullptr && layer->matrix.isIdentity() &&
-      layer->children.empty() && layer->styles.empty() && layer->filters.empty() &&
+                                   std::unordered_map<size_t, std::vector<Layer*>>& hashGroups,
+                                   bool parentHasContainerLayout) {
+  // Skip layers participating in a parent's container layout — extracting them into a
+  // fixed-size Composition changes how the layout engine measures and positions them.
+  bool skipDueToLayout = parentHasContainerLayout && layer->includeInLayout;
+  if (!skipDueToLayout && !layer->contents.empty() && layer->composition == nullptr &&
+      layer->matrix.isIdentity() && layer->children.empty() && layer->styles.empty() &&
+      layer->filters.empty() &&
       // Exclude layers with flex sizing — their dimensions are dynamically assigned by the parent
       // container layout, so a fixed-size Composition would not match the actual rendered size.
       layer->flex == 0.0f &&
@@ -2007,8 +2070,9 @@ static void CollectCandidateLayers(Layer* layer,
     auto hash = HashLayerStructure(layer);
     hashGroups[hash].push_back(layer);
   }
+  bool thisHasContainerLayout = layer->layout != LayoutMode::None;
   for (auto* child : layer->children) {
-    CollectCandidateLayers(child, hashGroups);
+    CollectCandidateLayers(child, hashGroups, thisHasContainerLayout);
   }
 }
 
@@ -2017,7 +2081,7 @@ static int ExtractCompositions(PAGXDocument* document) {
   std::unordered_map<size_t, std::vector<Layer*>> hashGroups = {};
 
   for (auto* layer : document->layers) {
-    CollectCandidateLayers(layer, hashGroups);
+    CollectCandidateLayers(layer, hashGroups, false);
   }
 
   // Step 2: Find groups with 2+ structurally identical layers.
@@ -2115,6 +2179,7 @@ static OptimizeReport OptimizeDocument(PAGXDocument* document) {
   report.fullCanvasClips = RemoveFullCanvasClipMasks(document, document->layers);
   report.offCanvasLayers = RemoveOffCanvasLayers(document);
   report.coordinatesLocalized = LocalizeCoordinates(document);
+  report.pathDataLocalized = LocalizePathData(document);
   report.compositionsExtracted = ExtractCompositions(document);
   report.unreferencedResources = RemoveUnreferencedResources(document);
   return report;
