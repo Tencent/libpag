@@ -45,7 +45,10 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
 #include "pagx/svg/SVGPathParser.h"
+#include "pagx/svg/SVGTextLayout.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/TextLayout.h"
@@ -1731,6 +1734,710 @@ PAGX_TEST(PAGXSVGTest, SVGExport_InnerShadowShadowOnly) {
 PAGX_TEST(PAGXSVGTest, SVGExport_ToFileInvalidPath) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   EXPECT_FALSE(pagx::SVGExporter::ToFile(*doc, "/nonexistent/dir/file.svg"));
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_DecodeUTF8_ASCII) {
+  const char* data = "A";
+  int32_t unichar = 0;
+  auto consumed = pagx::SVGDecodeUTF8Char(data, 1, &unichar);
+  EXPECT_EQ(consumed, 1u);
+  EXPECT_EQ(unichar, 'A');
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_DecodeUTF8_MultiByte) {
+  // U+4E2D '中' = 0xE4 0xB8 0xAD (3 bytes)
+  const char data[] = {'\xE4', '\xB8', '\xAD', '\0'};
+  int32_t unichar = 0;
+  auto consumed = pagx::SVGDecodeUTF8Char(data, 3, &unichar);
+  EXPECT_EQ(consumed, 3u);
+  EXPECT_EQ(unichar, 0x4E2D);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_DecodeUTF8_Empty) {
+  int32_t unichar = -1;
+  auto consumed = pagx::SVGDecodeUTF8Char("", 0, &unichar);
+  EXPECT_EQ(consumed, 0u);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_DecodeUTF8_Invalid) {
+  // 0xFF is not a valid UTF-8 leading byte
+  const char data[] = {'\xFF'};
+  int32_t unichar = 0;
+  auto consumed = pagx::SVGDecodeUTF8Char(data, 1, &unichar);
+  EXPECT_EQ(consumed, 0u);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_EstimateCharAdvance) {
+  float fontSize = 20.0f;
+  // CJK → full em-width
+  EXPECT_FLOAT_EQ(pagx::EstimateCharAdvance(0x4E2D, fontSize), fontSize);
+  // Space → 0.25em
+  EXPECT_FLOAT_EQ(pagx::EstimateCharAdvance(' ', fontSize), fontSize * 0.25f);
+  // Tab → 4em
+  EXPECT_FLOAT_EQ(pagx::EstimateCharAdvance('\t', fontSize), fontSize * 4.0f);
+  // Latin → 0.6em
+  EXPECT_FLOAT_EQ(pagx::EstimateCharAdvance('A', fontSize), fontSize * 0.6f);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_BreakTextIntoLines_SingleLine) {
+  std::vector<pagx::SVGCharInfo> chars = {
+      {'H', 0, 1, 12.0f}, {'i', 1, 1, 12.0f},
+  };
+  auto lines = pagx::BreakTextIntoLines(chars, 100);
+  EXPECT_EQ(lines.size(), 1u);
+  EXPECT_EQ(lines[0].charStart, 0u);
+  EXPECT_EQ(lines[0].charCount, 2u);
+  EXPECT_FLOAT_EQ(lines[0].width, 24.0f);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_BreakTextIntoLines_ExplicitNewline) {
+  std::vector<pagx::SVGCharInfo> chars = {
+      {'A', 0, 1, 10.0f}, {'\n', 1, 1, 0.0f}, {'B', 2, 1, 10.0f},
+  };
+  auto lines = pagx::BreakTextIntoLines(chars, 100);
+  EXPECT_EQ(lines.size(), 2u);
+  EXPECT_EQ(lines[0].charCount, 1u);
+  EXPECT_FLOAT_EQ(lines[0].width, 10.0f);
+  EXPECT_EQ(lines[1].charStart, 2u);
+  EXPECT_EQ(lines[1].charCount, 1u);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_BreakTextIntoLines_WordWrap) {
+  // "AB CD" with each char advance=10, boxWidth=35 → break after space
+  std::vector<pagx::SVGCharInfo> chars = {
+      {'A', 0, 1, 10.0f}, {'B', 1, 1, 10.0f}, {' ', 2, 1, 5.0f},
+      {'C', 3, 1, 10.0f}, {'D', 4, 1, 10.0f},
+  };
+  auto lines = pagx::BreakTextIntoLines(chars, 35);
+  EXPECT_GE(lines.size(), 2u);
+  EXPECT_GT(lines[0].charCount, 0u);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_BreakTextIntoLines_ForcedBreak) {
+  // Each char is 15px wide, boxWidth=20 → first char fits, second forces break
+  std::vector<pagx::SVGCharInfo> chars = {
+      {'X', 0, 1, 15.0f}, {'Y', 1, 1, 15.0f}, {'Z', 2, 1, 15.0f},
+  };
+  auto lines = pagx::BreakTextIntoLines(chars, 20);
+  EXPECT_GE(lines.size(), 2u);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_BreakTextIntoLines_BreakBetweenCJK) {
+  // CJK characters can break between each other
+  std::vector<pagx::SVGCharInfo> chars = {
+      {0x4E2D, 0, 3, 20.0f}, {0x6587, 3, 3, 20.0f}, {0x5B57, 6, 3, 20.0f},
+  };
+  auto lines = pagx::BreakTextIntoLines(chars, 45);
+  EXPECT_GE(lines.size(), 2u);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ExtractLineText) {
+  std::string fullText = "Hello World";
+  std::vector<pagx::SVGCharInfo> chars = {
+      {'H', 0, 1, 0}, {'e', 1, 1, 0}, {'l', 2, 1, 0}, {'l', 3, 1, 0}, {'o', 4, 1, 0},
+      {' ', 5, 1, 0}, {'W', 6, 1, 0}, {'o', 7, 1, 0}, {'r', 8, 1, 0}, {'l', 9, 1, 0},
+      {'d', 10, 1, 0},
+  };
+  pagx::SVGTextLine line = {6, 5, 0};
+  EXPECT_EQ(pagx::ExtractLineText(fullText, chars, line), "World");
+
+  pagx::SVGTextLine emptyLine = {0, 0, 0};
+  EXPECT_EQ(pagx::ExtractLineText(fullText, chars, emptyLine), "");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeTextLayout_MultiLine) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->position = {10, 10};
+  textBox->size = {100, 180};
+  textBox->wordWrap = true;
+  textBox->textAlign = pagx::TextAlign::Start;
+  textBox->paragraphAlign = pagx::ParagraphAlign::Near;
+
+  std::string content = "Hello World Test";
+  pagx::SVGTextLayoutParams params = {};
+  params.text = &content;
+  params.fontSize = 16.0f;
+  params.letterSpacing = 0.0f;
+  params.position = {0, 0};
+  params.textAnchor = pagx::TextAnchor::Start;
+  params.textBox = textBox;
+
+  auto result = pagx::ComputeTextLayout(params);
+  EXPECT_TRUE(result.isMultiLine);
+  EXPECT_GT(result.lines.size(), 0u);
+  EXPECT_GT(result.lineHeight, 0.0f);
+  EXPECT_FLOAT_EQ(result.x, 10.0f);
+  EXPECT_EQ(result.anchor, pagx::TextAnchor::Start);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeTextLayout_TextAlignCenter) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->position = {10, 10};
+  textBox->size = {200, 100};
+  textBox->wordWrap = true;
+  textBox->textAlign = pagx::TextAlign::Center;
+
+  std::string content = "Center";
+  pagx::SVGTextLayoutParams params = {};
+  params.text = &content;
+  params.fontSize = 16.0f;
+  params.letterSpacing = 0.0f;
+  params.position = {0, 0};
+  params.textAnchor = pagx::TextAnchor::Start;
+  params.textBox = textBox;
+
+  auto result = pagx::ComputeTextLayout(params);
+  EXPECT_FLOAT_EQ(result.x, 10.0f + 200.0f / 2.0f);
+  EXPECT_EQ(result.anchor, pagx::TextAnchor::Center);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeTextLayout_TextAlignEnd) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->position = {10, 10};
+  textBox->size = {200, 100};
+  textBox->wordWrap = true;
+  textBox->textAlign = pagx::TextAlign::End;
+
+  std::string content = "End";
+  pagx::SVGTextLayoutParams params = {};
+  params.text = &content;
+  params.fontSize = 16.0f;
+  params.letterSpacing = 0.0f;
+  params.position = {0, 0};
+  params.textAnchor = pagx::TextAnchor::Start;
+  params.textBox = textBox;
+
+  auto result = pagx::ComputeTextLayout(params);
+  EXPECT_FLOAT_EQ(result.x, 10.0f + 200.0f);
+  EXPECT_EQ(result.anchor, pagx::TextAnchor::End);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeTextLayout_ParagraphAlignMiddle) {
+  auto doc = pagx::PAGXDocument::Make(300, 300);
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->position = {10, 10};
+  textBox->size = {200, 200};
+  textBox->wordWrap = true;
+  textBox->paragraphAlign = pagx::ParagraphAlign::Middle;
+
+  std::string content = "Center vertically";
+  pagx::SVGTextLayoutParams params = {};
+  params.text = &content;
+  params.fontSize = 16.0f;
+  params.letterSpacing = 0.0f;
+  params.position = {0, 0};
+  params.textAnchor = pagx::TextAnchor::Start;
+  params.textBox = textBox;
+
+  auto result = pagx::ComputeTextLayout(params);
+  EXPECT_TRUE(result.isMultiLine);
+  EXPECT_GT(result.firstLineY, textBox->position.y);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeTextLayout_ParagraphAlignFar) {
+  auto doc = pagx::PAGXDocument::Make(300, 300);
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->position = {10, 10};
+  textBox->size = {200, 200};
+  textBox->wordWrap = true;
+  textBox->paragraphAlign = pagx::ParagraphAlign::Far;
+
+  std::string content = "Bottom aligned";
+  pagx::SVGTextLayoutParams params = {};
+  params.text = &content;
+  params.fontSize = 16.0f;
+  params.letterSpacing = 0.0f;
+  params.position = {0, 0};
+  params.textAnchor = pagx::TextAnchor::Start;
+  params.textBox = textBox;
+
+  auto result = pagx::ComputeTextLayout(params);
+  EXPECT_TRUE(result.isMultiLine);
+  EXPECT_GT(result.firstLineY, textBox->position.y + 100);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeTextLayout_CustomLineHeight) {
+  auto doc = pagx::PAGXDocument::Make(300, 300);
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->position = {10, 10};
+  textBox->size = {200, 200};
+  textBox->wordWrap = true;
+  textBox->lineHeight = 30.0f;
+
+  std::string content = "Custom line height";
+  pagx::SVGTextLayoutParams params = {};
+  params.text = &content;
+  params.fontSize = 16.0f;
+  params.letterSpacing = 0.0f;
+  params.position = {0, 0};
+  params.textAnchor = pagx::TextAnchor::Start;
+  params.textBox = textBox;
+
+  auto result = pagx::ComputeTextLayout(params);
+  EXPECT_FLOAT_EQ(result.lineHeight, 30.0f);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeTextLayout_SingleLineParagraphAlign) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->position = {10, 10};
+  textBox->size = {200, 100};
+  textBox->wordWrap = false;
+
+  std::string content = "Single line";
+  pagx::SVGTextLayoutParams params = {};
+  params.text = &content;
+  params.fontSize = 16.0f;
+  params.letterSpacing = 0.0f;
+  params.position = {50, 50};
+  params.textAnchor = pagx::TextAnchor::Start;
+  params.textBox = textBox;
+
+  // ParagraphAlign::Near (default)
+  textBox->paragraphAlign = pagx::ParagraphAlign::Near;
+  auto resultNear = pagx::ComputeTextLayout(params);
+  EXPECT_FALSE(resultNear.isMultiLine);
+  EXPECT_FLOAT_EQ(resultNear.y, textBox->position.y + 16.0f);
+
+  // ParagraphAlign::Middle
+  textBox->paragraphAlign = pagx::ParagraphAlign::Middle;
+  auto resultMid = pagx::ComputeTextLayout(params);
+  EXPECT_FLOAT_EQ(resultMid.y, textBox->position.y + textBox->size.height / 2 + 16.0f * 0.35f);
+
+  // ParagraphAlign::Far
+  textBox->paragraphAlign = pagx::ParagraphAlign::Far;
+  auto resultFar = pagx::ComputeTextLayout(params);
+  EXPECT_FLOAT_EQ(resultFar.y, textBox->position.y + textBox->size.height);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeTextLayout_NoTextBox) {
+  std::string content = "No box";
+  pagx::SVGTextLayoutParams params = {};
+  params.text = &content;
+  params.fontSize = 16.0f;
+  params.letterSpacing = 0.0f;
+  params.position = {30, 40};
+  params.textAnchor = pagx::TextAnchor::Center;
+  params.textBox = nullptr;
+
+  auto result = pagx::ComputeTextLayout(params);
+  EXPECT_FALSE(result.isMultiLine);
+  EXPECT_FLOAT_EQ(result.x, 30.0f);
+  EXPECT_FLOAT_EQ(result.y, 40.0f);
+  EXPECT_EQ(result.anchor, pagx::TextAnchor::Center);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeTextLayout_UTF8Content) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->position = {0, 0};
+  textBox->size = {100, 200};
+  textBox->wordWrap = true;
+
+  std::string content = "Hello\n世界";
+  pagx::SVGTextLayoutParams params = {};
+  params.text = &content;
+  params.fontSize = 16.0f;
+  params.letterSpacing = 2.0f;
+  params.position = {0, 0};
+  params.textAnchor = pagx::TextAnchor::Start;
+  params.textBox = textBox;
+
+  auto result = pagx::ComputeTextLayout(params);
+  EXPECT_TRUE(result.isMultiLine);
+  EXPECT_GE(result.lines.size(), 2u);
+  EXPECT_FALSE(result.chars.empty());
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeGlyphPaths_Basic) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+
+  auto pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(0, 0);
+  pathData->lineTo(500, 0);
+  pathData->lineTo(500, -700);
+  pathData->close();
+
+  auto glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = pathData;
+  glyph->advance = 600.0f;
+
+  auto font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  font->glyphs.push_back(glyph);
+
+  auto run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 20.0f;
+  run->glyphs = {1};  // glyphID 1 → index 0
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->glyphRuns.push_back(run);
+
+  auto result = pagx::ComputeGlyphPaths(*text, 10.0f, 50.0f);
+  EXPECT_EQ(result.size(), 1u);
+  EXPECT_EQ(result[0].pathData, pathData);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeGlyphPaths_SkipGlyphID0) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+
+  auto pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(0, 0);
+  pathData->lineTo(100, 0);
+  pathData->close();
+
+  auto glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = pathData;
+  glyph->advance = 500.0f;
+
+  auto font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  font->glyphs.push_back(glyph);
+
+  auto run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 16.0f;
+  run->glyphs = {0, 1};  // 0 = missing glyph, 1 = valid
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->glyphRuns.push_back(run);
+
+  auto result = pagx::ComputeGlyphPaths(*text, 0, 0);
+  EXPECT_EQ(result.size(), 1u);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeGlyphPaths_OutOfRangeGlyphID) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+
+  auto pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(0, 0);
+  pathData->lineTo(100, 0);
+  pathData->close();
+
+  auto glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = pathData;
+  glyph->advance = 500.0f;
+
+  auto font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  font->glyphs.push_back(glyph);
+
+  auto run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 16.0f;
+  run->glyphs = {99};  // out of range
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->glyphRuns.push_back(run);
+
+  auto result = pagx::ComputeGlyphPaths(*text, 0, 0);
+  EXPECT_EQ(result.size(), 0u);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeGlyphPaths_EmptyPath) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+
+  auto emptyPath = doc->makeNode<pagx::PathData>();  // empty path
+
+  auto glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = emptyPath;
+  glyph->advance = 500.0f;
+
+  auto font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  font->glyphs.push_back(glyph);
+
+  auto run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 16.0f;
+  run->glyphs = {1};
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->glyphRuns.push_back(run);
+
+  auto result = pagx::ComputeGlyphPaths(*text, 0, 0);
+  EXPECT_EQ(result.size(), 0u);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeGlyphPaths_NullFont) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+
+  auto run = doc->makeNode<pagx::GlyphRun>();
+  run->font = nullptr;
+  run->glyphs = {1};
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->glyphRuns.push_back(run);
+
+  auto result = pagx::ComputeGlyphPaths(*text, 0, 0);
+  EXPECT_EQ(result.size(), 0u);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeGlyphPaths_EmptyGlyphs) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+
+  auto font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+
+  auto run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->glyphs = {};
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->glyphRuns.push_back(run);
+
+  auto result = pagx::ComputeGlyphPaths(*text, 0, 0);
+  EXPECT_EQ(result.size(), 0u);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeGlyphPaths_WithPositions) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+
+  auto pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(0, 0);
+  pathData->lineTo(500, 0);
+  pathData->lineTo(500, -700);
+  pathData->close();
+
+  auto glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = pathData;
+  glyph->advance = 600.0f;
+
+  auto font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  font->glyphs.push_back(glyph);
+
+  auto run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 20.0f;
+  run->glyphs = {1};
+  run->positions = {{5.0f, 3.0f}};
+  run->xOffsets = {2.0f};
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->glyphRuns.push_back(run);
+
+  auto result = pagx::ComputeGlyphPaths(*text, 10.0f, 50.0f);
+  EXPECT_EQ(result.size(), 1u);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeGlyphPaths_XOffsetsOnly) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+
+  auto pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(0, 0);
+  pathData->lineTo(500, 0);
+  pathData->close();
+
+  auto glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = pathData;
+  glyph->advance = 600.0f;
+
+  auto font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  font->glyphs.push_back(glyph);
+
+  auto run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 20.0f;
+  run->glyphs = {1};
+  run->xOffsets = {5.0f};
+  // no positions
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->glyphRuns.push_back(run);
+
+  auto result = pagx::ComputeGlyphPaths(*text, 10.0f, 50.0f);
+  EXPECT_EQ(result.size(), 1u);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeGlyphPaths_WithRotation) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+
+  auto pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(0, 0);
+  pathData->lineTo(500, 0);
+  pathData->lineTo(500, -700);
+  pathData->close();
+
+  auto glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = pathData;
+  glyph->advance = 600.0f;
+
+  auto font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  font->glyphs.push_back(glyph);
+
+  auto run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 20.0f;
+  run->glyphs = {1};
+  run->rotations = {45.0f};
+  run->anchors = {{10.0f, 5.0f}};
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->glyphRuns.push_back(run);
+
+  auto result = pagx::ComputeGlyphPaths(*text, 0, 0);
+  EXPECT_EQ(result.size(), 1u);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeGlyphPaths_WithScale) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+
+  auto pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(0, 0);
+  pathData->lineTo(500, 0);
+  pathData->close();
+
+  auto glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = pathData;
+  glyph->advance = 600.0f;
+
+  auto font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  font->glyphs.push_back(glyph);
+
+  auto run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 20.0f;
+  run->glyphs = {1};
+  run->scales = {{2.0f, 0.5f}};
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->glyphRuns.push_back(run);
+
+  auto result = pagx::ComputeGlyphPaths(*text, 0, 0);
+  EXPECT_EQ(result.size(), 1u);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeGlyphPaths_WithSkew) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+
+  auto pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(0, 0);
+  pathData->lineTo(500, 0);
+  pathData->close();
+
+  auto glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = pathData;
+  glyph->advance = 600.0f;
+
+  auto font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  font->glyphs.push_back(glyph);
+
+  auto run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 20.0f;
+  run->glyphs = {1};
+  run->skews = {15.0f};
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->glyphRuns.push_back(run);
+
+  auto result = pagx::ComputeGlyphPaths(*text, 0, 0);
+  EXPECT_EQ(result.size(), 1u);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeGlyphPaths_CombinedTransforms) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+
+  auto pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(0, 0);
+  pathData->lineTo(500, 0);
+  pathData->lineTo(500, -700);
+  pathData->close();
+
+  auto glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = pathData;
+  glyph->advance = 600.0f;
+
+  auto font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  font->glyphs.push_back(glyph);
+
+  auto run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 24.0f;
+  run->glyphs = {1};
+  run->rotations = {30.0f};
+  run->scales = {{1.5f, 0.8f}};
+  run->skews = {10.0f};
+  run->anchors = {{5.0f, -3.0f}};
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->glyphRuns.push_back(run);
+
+  auto result = pagx::ComputeGlyphPaths(*text, 10.0f, 20.0f);
+  EXPECT_EQ(result.size(), 1u);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeGlyphPaths_MultipleGlyphs) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+
+  auto pathData1 = doc->makeNode<pagx::PathData>();
+  pathData1->moveTo(0, 0);
+  pathData1->lineTo(400, 0);
+  pathData1->lineTo(400, -600);
+  pathData1->close();
+
+  auto pathData2 = doc->makeNode<pagx::PathData>();
+  pathData2->moveTo(0, 0);
+  pathData2->lineTo(300, 0);
+  pathData2->lineTo(300, -500);
+  pathData2->close();
+
+  auto glyph1 = doc->makeNode<pagx::Glyph>();
+  glyph1->path = pathData1;
+  glyph1->advance = 500.0f;
+
+  auto glyph2 = doc->makeNode<pagx::Glyph>();
+  glyph2->path = pathData2;
+  glyph2->advance = 400.0f;
+
+  auto font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  font->glyphs.push_back(glyph1);
+  font->glyphs.push_back(glyph2);
+
+  auto run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 20.0f;
+  run->glyphs = {1, 2};  // Both valid glyphs
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->glyphRuns.push_back(run);
+
+  auto result = pagx::ComputeGlyphPaths(*text, 0, 0);
+  EXPECT_EQ(result.size(), 2u);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGTextLayout_ComputeGlyphPaths_NullGlyphPath) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+
+  auto glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = nullptr;
+  glyph->advance = 500.0f;
+
+  auto font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  font->glyphs.push_back(glyph);
+
+  auto run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 16.0f;
+  run->glyphs = {1};
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->glyphRuns.push_back(run);
+
+  auto result = pagx::ComputeGlyphPaths(*text, 0, 0);
+  EXPECT_EQ(result.size(), 0u);
 }
 
 }  // namespace pag
