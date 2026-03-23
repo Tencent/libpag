@@ -71,8 +71,7 @@ void PAGXView::onPreferredSizeChanged() {
   setSize(viewModel->getPreferredSize());
 }
 
-void PAGXView::sizeChangedDelayHandle() {
-  ContentView::sizeChangedDelayHandle();
+void PAGXView::onSizeChangedDelayHandled() {
   viewModel->markNeedsRender();
 }
 

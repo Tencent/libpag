@@ -38,14 +38,13 @@ class PAGXView : public ContentView {
 
   ContentViewModel* getViewModel() const override;
 
-  Q_SLOT void sizeChangedDelayHandle() override;
-
   void flush() const override;
   QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
 
  private:
   void initDrawable() override;
 
+  void onSizeChangedDelayHandled() override;
   Q_SLOT void onRequestSizeChanged();
   Q_SLOT void onPreferredSizeChanged();
 

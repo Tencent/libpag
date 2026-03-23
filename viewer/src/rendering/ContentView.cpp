@@ -55,6 +55,7 @@ void ContentView::initDrawable() {
 void ContentView::sizeChangedDelayHandle() {
   resizeTimer->stop();
   sizeChanged = true;
+  onSizeChangedDelayHandled();
   if (renderThread != nullptr) {
     QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
   }
