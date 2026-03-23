@@ -74,22 +74,34 @@ complex paths (>15 curve segments) are fragile. Prefer Rectangle/Ellipse for sta
 **Mixed**: Fill for backgrounds/large areas + Stroke for details/outlines. A common and
 effective combination.
 
-### Icon Design Guidelines
+### Icon Generation
 
-- **Foreground proportions**: Icon foreground should approximate a square bounding box (aspect
-  ratio within ~1.2:1). Elongated shapes (tall-thin pencils, wide-flat progress bars) feel
-  unbalanced at icon scale. When the natural shape is non-square, add supporting elements
-  (e.g., a paper sheet beneath a pencil) to fill the bounding square.
-- **Foreground containment**: Verify via `pagx bounds` that foreground fits within background
-  with adequate padding on all sides.
-- **Batch consistency**: When generating a set, all icons should have similar overall bounds.
-  An outlier breaks visual consistency.
-- **Over-detailing**: At small icon sizes, fine details (small dots, thin lines, tiny text
-  labels) may become indistinguishable noise. Evaluate whether each detail remains legible
-  at the target render size before including it.
-- **Path data from SVG**: Generate icons as SVG mentally, then copy the `d` value directly
-  into `<Path data="..."/>` — see §Leverage Familiar Concepts. Never hand-calculate path
-  coordinates.
+1. **Determine drawing size** from container and padding.
+   E.g., 48×48 container with 12px padding → draw in 24×24.
+2. **Draw directly in PAGX nodes at target size** — Ellipse for circles, Rectangle for
+   rects, Path for irregular curves. Path `data` is standard SVG path syntax (M/L/C/A/Z) —
+   write it the same way you would write an SVG `<path d="...">`. Combine node types freely
+   (e.g., person icon = Ellipse head + Path body arc). Never use Path when a primitive exists.
+3. **Center in container** — wrap in a Group with `centerX="0" centerY="0"`.
+
+```xml
+<!-- 48×48 container, 24×24 icon -->
+<Layer width="48" height="48">
+  <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+  <Fill color="#F0EAFF"/>
+  <Group centerX="0" centerY="0">
+    <Ellipse left="8" top="2" size="8,8"/>
+    <Path data="M 2,22 C 2,17 6,14 12,14 C 18,14 22,17 22,22"/>
+    <Stroke color="#7C5CFC" width="1.5" cap="round" join="round"/>
+  </Group>
+</Layer>
+```
+
+**Stroke vs Fill**: Outline icons (inactive) → `Stroke` with `cap="round" join="round"`,
+width 1.5–2px for 24×24. Filled icons (active) → `Fill` on closed paths.
+
+**Quality**: Keep foreground roughly square (~1.2:1 max). In a set, use the same drawing
+size, stroke width, and padding. Avoid fine details that become noise at small sizes.
 
 ### Layer Count
 

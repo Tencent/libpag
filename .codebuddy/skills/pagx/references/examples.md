@@ -72,7 +72,7 @@ to a `<div>` with `border-radius`, `background: white`, and `box-shadow`.
     <!-- Background -->
     <Ellipse left="0" top="0" right="0" bottom="0"/>
     <Fill color="#EFF6FF"/>
-    <!-- Foreground symbol -->
+    <!-- Foreground: 60×60 icon, centered in 180×180 container -->
     <Group centerX="0" centerY="0">
       <Path data="M 0,0 L 60,60 M 60,0 L 0,60"/>
       <Stroke color="#3B82F6" width="7" cap="round"/>
@@ -81,10 +81,9 @@ to a `<div>` with `border-radius`, `background: white`, and `box-shadow`.
 </pagx>
 ```
 
-**Pattern**: Common structure for icons, indicators, and badges — background shape + Fill
-directly on the Layer, foreground in a Group with its own painters. Like an HTML `<div>` with
-`background-color` and a child SVG icon. Generate the icon as SVG mentally, then copy the `d`
-value directly into Path `data`.
+**Pattern**: Background shape + Fill directly on the Layer, foreground in a centered Group.
+Draw the icon directly at its target size — use Ellipse/Rectangle for standard shapes,
+Path for irregular curves. See `design-patterns.md` §Icon Generation for the full workflow.
 
 ### Icon + Label Row
 
