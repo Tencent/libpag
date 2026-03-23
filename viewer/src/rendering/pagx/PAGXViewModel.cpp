@@ -94,6 +94,9 @@ QSizeF PAGXViewModel::getPreferredSize() const {
     return {0, 0};
   }
   auto screen = window->screen();
+  if (screen == nullptr) {
+    return {0, 0};
+  }
   QSize screenSize = screen->availableVirtualSize();
   qreal maxHeight = screenSize.height() * 0.8;
   qreal minHeight = window->minimumHeight();

@@ -116,9 +116,8 @@ void PAGRunTimeDataModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
   currentFrame = -1;
   lastUpdatedFrame = -1;
   chartDataModel.clearItems();
-  frameTimeMetricsVector.resize(totalFrame, {0, 0, 0});
-  frameTimeMetricsVector.squeeze();
   frameTimeMetricsVector.clear();
+  frameTimeMetricsVector.reserve(totalFrame);
   fileInfoModel.setPAGFile(pagFile);
   nodeStatsModel.setPAGXDocument(nullptr);
   updateFrameDisplayInfo(0, 0, 0);

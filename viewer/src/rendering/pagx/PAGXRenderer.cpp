@@ -52,8 +52,7 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
     return metrics;
   }
 
-  auto* drawable = this->drawable;
-  auto device = drawable->getDevice();
+  auto device = this->drawable->getDevice();
   if (device == nullptr) {
     return metrics;
   }
@@ -62,7 +61,7 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
     device->unlock();
     return metrics;
   }
-  auto surface = drawable->getSurface(context, false);
+  auto surface = this->drawable->getSurface(context, false);
   if (surface == nullptr) {
     device->unlock();
     return metrics;
@@ -98,7 +97,7 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
   metrics.imageDecodeTime = tgfx::Clock::Now() - imageStart;
 
   auto presentStart = tgfx::Clock::Now();
-  drawable->present(context);
+  this->drawable->present(context);
   metrics.presentTime = tgfx::Clock::Now() - presentStart;
 
   metrics.rendered = true;

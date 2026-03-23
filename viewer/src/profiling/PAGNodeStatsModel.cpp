@@ -130,43 +130,38 @@ int PAGNodeStatsModel::getCount() const {
 }
 
 void PAGNodeStatsModel::setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pagxDocument) {
+  beginResetModel();
   statItems.clear();
   totalCount = 0;
 
-  if (pagxDocument == nullptr) {
-    beginResetModel();
-    endResetModel();
-    Q_EMIT totalCountChanged();
-    Q_EMIT countChanged();
-    return;
+  if (pagxDocument != nullptr) {
+    // Count nodes by category
+    std::unordered_map<QString, int> categoryCounts;
+    for (const auto& node : pagxDocument->nodes) {
+      QString category = GetNodeCategory(node->nodeType());
+      categoryCounts[category]++;
+      totalCount++;
+    }
+
+    // Convert to vector and sort by count (descending)
+    std::vector<std::pair<QString, int>> sortedStats;
+    sortedStats.reserve(categoryCounts.size());
+    for (const auto& pair : categoryCounts) {
+      sortedStats.emplace_back(pair.first, pair.second);
+    }
+    std::sort(sortedStats.begin(), sortedStats.end(),
+              [](const auto& a, const auto& b) { return a.second > b.second; });
+
+    // Create stat items with colors
+    statItems.reserve(sortedStats.size());
+    size_t colorIndex = 0;
+    for (const auto& pair : sortedStats) {
+      QString color = NodeColors[colorIndex % NodeColors.size()];
+      statItems.emplace_back(pair.first, color, pair.second);
+      colorIndex++;
+    }
   }
 
-  // Count nodes by category
-  std::unordered_map<QString, int> categoryCounts;
-  for (const auto& node : pagxDocument->nodes) {
-    QString category = GetNodeCategory(node->nodeType());
-    categoryCounts[category]++;
-    totalCount++;
-  }
-
-  // Convert to vector and sort by count (descending)
-  std::vector<std::pair<QString, int>> sortedStats;
-  sortedStats.reserve(categoryCounts.size());
-  for (const auto& pair : categoryCounts) {
-    sortedStats.emplace_back(pair.first, pair.second);
-  }
-  std::sort(sortedStats.begin(), sortedStats.end(),
-            [](const auto& a, const auto& b) { return a.second > b.second; });
-
-  // Create stat items with colors
-  size_t colorIndex = 0;
-  for (const auto& pair : sortedStats) {
-    QString color = NodeColors[colorIndex % NodeColors.size()];
-    statItems.emplace_back(pair.first, color, pair.second);
-    colorIndex++;
-  }
-
-  beginResetModel();
   endResetModel();
   Q_EMIT totalCountChanged();
   Q_EMIT countChanged();
