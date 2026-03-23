@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "pagx/defines.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/types/MergePathMode.h"
 
@@ -27,7 +28,7 @@ namespace pagx {
  * MergePath is a path modifier that merges multiple paths using boolean operations. It can append,
  * add, subtract, intersect, or exclude paths from each other.
  */
-class MergePath : public Element {
+class RTTR_AUTO_REGISTER_CLASS MergePath : public Element {
  public:
   /**
    * The merge mode that determines how paths are combined. The default value is Append.
@@ -37,6 +38,8 @@ class MergePath : public Element {
   NodeType nodeType() const override {
     return NodeType::MergePath;
   }
+
+  RTTR_ENABLE(Element)
 
  private:
   MergePath() = default;

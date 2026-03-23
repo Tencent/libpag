@@ -18,12 +18,14 @@
 
 #pragma once
 
+#include "pagx/defines.h"
+
 namespace pagx {
 
 /**
  * Text overflow behavior when text exceeds the box boundaries.
  */
-enum class Overflow {
+enum class RTTR_AUTO_REGISTER_CLASS Overflow {
   /**
    * Text that exceeds the box boundaries is still rendered (default).
    */

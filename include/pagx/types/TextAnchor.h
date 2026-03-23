@@ -18,12 +18,14 @@
 
 #pragma once
 
+#include "pagx/defines.h"
+
 namespace pagx {
 
 /**
  * Text anchor alignment. Controls how text is positioned relative to its origin point.
  */
-enum class TextAnchor {
+enum class RTTR_AUTO_REGISTER_CLASS TextAnchor {
   /**
    * The text position represents the start of the text. No offset is applied.
    */

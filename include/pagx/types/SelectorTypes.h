@@ -18,12 +18,14 @@
 
 #pragma once
 
+#include "pagx/defines.h"
+
 namespace pagx {
 
 /**
  * The unit type for range selector values.
  */
-enum class SelectorUnit {
+enum class RTTR_AUTO_REGISTER_CLASS SelectorUnit {
   /**
    * Values are specified as character indices.
    */
@@ -37,7 +39,7 @@ enum class SelectorUnit {
 /**
  * The shape of the selection falloff curve.
  */
-enum class SelectorShape {
+enum class RTTR_AUTO_REGISTER_CLASS SelectorShape {
   /**
    * A square falloff with no transition.
    */
@@ -67,7 +69,7 @@ enum class SelectorShape {
 /**
  * The mode for combining multiple selectors.
  */
-enum class SelectorMode {
+enum class RTTR_AUTO_REGISTER_CLASS SelectorMode {
   /**
    * Add selector values together.
    */

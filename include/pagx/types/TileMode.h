@@ -18,12 +18,14 @@
 
 #pragma once
 
+#include "pagx/defines.h"
+
 namespace pagx {
 
 /**
  * Tile modes for patterns, gradients, and filters.
  */
-enum class TileMode {
+enum class RTTR_AUTO_REGISTER_CLASS TileMode {
   /**
    * Clamp to the edge color, extending the edge pixels outward.
    */

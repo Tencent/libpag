@@ -53,6 +53,7 @@ Item {
         id: displayComponent
 
         Row {
+            id: displayRow
             anchors.fill: parent
             Item {
                 width: viewDelegate.padding + (viewDelegate.depth * viewDelegate.indentation)
@@ -74,6 +75,7 @@ Item {
             }
 
             Text {
+                id: displayNameText
                 x: viewDelegate.padding + (viewDelegate.isTreeNode ? (viewDelegate.depth * viewDelegate.indentation + font.pixelSize) : 0)
                 height: viewDelegate.height
                 text: viewDelegate.name + " : "
@@ -87,16 +89,50 @@ Item {
             }
 
             Text {
+                id: displayValueText
+                width: displayRow.width - displayNameText.width - viewDelegate.padding - (viewDelegate.depth * viewDelegate.indentation) - 20
                 height: viewDelegate.height
-                text: viewDelegate.value.length > 20 ? viewDelegate.value.substr(0, 20) : viewDelegate.value
+                text: viewDelegate.value
                 font.pixelSize: 12
                 font.kerning: false
                 font.letterSpacing: 0.2
                 anchors.verticalCenter: parent.verticalCenter
                 verticalAlignment: Text.AlignVCenter
-                clip: true
-                textFormat: TextEdit.RichText
+                elide: Text.ElideRight
+                textFormat: Text.PlainText
                 color: viewDelegate.selected ? "#FFFFFF" : "#EEEEEE"
+
+                MouseArea {
+                    id: displayValueArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    acceptedButtons: Qt.NoButton
+                }
+
+                ToolTip {
+                    id: displayToolTip
+                    parent: displayValueText
+                    visible: displayValueArea.containsMouse && displayValueText.truncated
+                    delay: 500
+                    x: 0
+                    y: displayValueText.height + 2
+                    width: Math.min(tooltipText1.implicitWidth + 16, 280)
+
+                    contentItem: Text {
+                        id: tooltipText1
+                        text: viewDelegate.value
+                        font.pixelSize: 12
+                        color: "#EEEEEE"
+                        wrapMode: Text.Wrap
+                    }
+
+                    background: Rectangle {
+                        color: "#2D2D37"
+                        border.color: "#3485F6"
+                        border.width: 1
+                        radius: 4
+                    }
+                }
             }
         }
     }
@@ -105,6 +141,7 @@ Item {
         id: editComponent
 
         Row {
+            id: editRow
             anchors.fill: parent
             Item {
                 width: viewDelegate.padding + (viewDelegate.depth * viewDelegate.indentation)
@@ -142,16 +179,49 @@ Item {
 
             Text {
                 id: valueText
+                width: editRow.width - nameText.width - viewDelegate.padding - (viewDelegate.depth * viewDelegate.indentation) - 40
                 height: viewDelegate.height
-                text: viewDelegate.value.length > 20 ? viewDelegate.value.substr(0, 20) : viewDelegate.value
+                text: viewDelegate.value
                 font.pixelSize: 12
                 font.kerning: false
                 font.letterSpacing: 0.2
                 anchors.verticalCenter: parent.verticalCenter
                 verticalAlignment: Text.AlignVCenter
-                clip: true
-                textFormat: TextEdit.RichText
+                elide: Text.ElideRight
+                textFormat: Text.PlainText
                 color: viewDelegate.selected ? "#FFFFFF" : "#EEEEEE"
+
+                MouseArea {
+                    id: editValueArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    acceptedButtons: Qt.NoButton
+                }
+
+                ToolTip {
+                    id: editToolTip
+                    parent: valueText
+                    visible: editValueArea.containsMouse && valueText.truncated
+                    delay: 500
+                    x: 0
+                    y: valueText.height + 2
+                    width: Math.min(tooltipText2.implicitWidth + 16, 280)
+
+                    contentItem: Text {
+                        id: tooltipText2
+                        text: viewDelegate.value
+                        font.pixelSize: 12
+                        color: "#EEEEEE"
+                        wrapMode: Text.Wrap
+                    }
+
+                    background: Rectangle {
+                        color: "#2D2D37"
+                        border.color: "#3485F6"
+                        border.width: 1
+                        radius: 4
+                    }
+                }
             }
 
             ComboBox {

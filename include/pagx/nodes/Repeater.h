@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "pagx/defines.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/RepeaterOrder.h"
@@ -29,7 +30,7 @@ namespace pagx {
  * transformations. Each copy can have an incremental offset in position, rotation, scale, and
  * opacity.
  */
-class Repeater : public Element {
+class RTTR_AUTO_REGISTER_CLASS Repeater : public Element {
  public:
   /**
    * The number of copies to create. The default value is 3.
@@ -80,6 +81,8 @@ class Repeater : public Element {
   NodeType nodeType() const override {
     return NodeType::Repeater;
   }
+
+  RTTR_ENABLE(Element)
 
  private:
   Repeater() = default;

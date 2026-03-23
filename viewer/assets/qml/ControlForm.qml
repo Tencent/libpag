@@ -4,8 +4,9 @@ import "components"
 
 Item {
     id: form
-    required property var pagView
-    property bool hasPAGFile: (pagView && pagView.filePath !== "")
+    required property var contentView
+    property bool hasPAGFile: (contentView && contentView.viewModel.filePath !== "")
+    property bool hasAnimation: (contentView && contentView.viewModel.hasAnimation)
 
     property bool updateAvailable: false
 
@@ -49,7 +50,8 @@ Item {
         anchors.leftMargin: 0
         anchors.right: parent.right
         anchors.rightMargin: 0
-        enabled: hasPAGFile
+        visible: hasAnimation
+        enabled: hasPAGFile && hasAnimation
         background: Rectangle {
             x: progressSlider.leftPadding
             y: progressSlider.topPadding + progressSlider.availableHeight / 2 - height / 2
@@ -97,41 +99,46 @@ Item {
                 id: playButton
                 width: 48
                 height: 48
-                visible: true
-                enabled: hasPAGFile
+                enabled: hasPAGFile && hasAnimation
                 focusPolicy: Qt.NoFocus
                 flat: true
                 display: AbstractButton.IconOnly
-                opacity: pressed ? 1 : hovered ? 0.9 : 0.8
+                opacity: enabled ? (pressed ? 1 : hovered ? 0.9 : 0.8) : 0.3
                 background: Image {
-                    source: ((pagView && pagView.isPlaying) || form.lastPlayStatusIsPlaying) ? "qrc:/images/pause.png" : "qrc:/images/play.png"
+                    source: ((contentView && contentView.viewModel.isPlaying) || form.lastPlayStatusIsPlaying) ? "qrc:/images/pause.png" : "qrc:/images/play.png"
                 }
                 onClicked: {
-                    pagView.isPlaying = !pagView.isPlaying;
+                    if (contentView) {
+                        contentView.viewModel.isPlaying = !contentView.viewModel.isPlaying;
+                    }
                 }
             }
             Button {
                 id: previousButton
                 width: 24
                 height: 20
-                enabled: hasPAGFile
+                enabled: hasPAGFile && hasAnimation
                 focusPolicy: Qt.NoFocus
                 display: AbstractButton.IconOnly
                 flat: true
                 anchors.verticalCenter: parent.verticalCenter
-                opacity: pressed ? 1 : hovered ? 0.9 : 0.8
+                opacity: enabled ? (pressed ? 1 : hovered ? 0.9 : 0.8) : 0.3
                 background: Image {
                     source: "qrc:/images/previous.png"
                 }
                 onPressAndHold: {
-                    pagView.previousFrame();
+                    if (contentView) {
+                        contentView.viewModel.previousFrame();
+                    }
                     longPressPreTimer.start();
                 }
                 onReleased: {
                     longPressPreTimer.stop();
                 }
                 onClicked: {
-                    pagView.previousFrame();
+                    if (contentView) {
+                        contentView.viewModel.previousFrame();
+                    }
                 }
 
                 Timer {
@@ -140,7 +147,9 @@ Item {
                     repeat: true
                     running: false
                     onTriggered: {
-                        pagView.previousFrame();
+                        if (contentView) {
+                            contentView.viewModel.previousFrame();
+                        }
                     }
                 }
             }
@@ -148,24 +157,28 @@ Item {
                 id: nextButton
                 width: 24
                 height: 20
-                enabled: hasPAGFile
+                enabled: hasPAGFile && hasAnimation
                 focusPolicy: Qt.NoFocus
                 display: AbstractButton.IconOnly
                 flat: true
                 anchors.verticalCenter: parent.verticalCenter
-                opacity: pressed ? 1 : hovered ? 0.9 : 0.8
+                opacity: enabled ? (pressed ? 1 : hovered ? 0.9 : 0.8) : 0.3
                 background: Image {
                     source: "qrc:/images/next.png"
                 }
                 onPressAndHold: {
-                    pagView.nextFrame();
+                    if (contentView) {
+                        contentView.viewModel.nextFrame();
+                    }
                     longPressNextTimer.start();
                 }
                 onReleased: {
                     longPressNextTimer.stop();
                 }
                 onClicked: {
-                    pagView.nextFrame();
+                    if (contentView) {
+                        contentView.viewModel.nextFrame();
+                    }
                 }
 
                 Timer {
@@ -174,7 +187,9 @@ Item {
                     repeat: true
                     running: false
                     onTriggered: {
-                        pagView.nextFrame();
+                        if (contentView) {
+                            contentView.viewModel.nextFrame();
+                        }
                     }
                 }
             }

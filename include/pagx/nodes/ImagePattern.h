@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "pagx/defines.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/types/FilterMode.h"
 #include "pagx/types/Matrix.h"
@@ -31,7 +32,7 @@ class Image;
 /**
  * An image pattern color source that tiles an image to fill shapes.
  */
-class ImagePattern : public ColorSource {
+class RTTR_AUTO_REGISTER_CLASS ImagePattern : public ColorSource {
  public:
   /**
    * A reference to an image resource.
@@ -66,6 +67,8 @@ class ImagePattern : public ColorSource {
   NodeType nodeType() const override {
     return NodeType::ImagePattern;
   }
+
+  RTTR_ENABLE(ColorSource)
 
  private:
   ImagePattern() = default;

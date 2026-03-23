@@ -18,12 +18,14 @@
 
 #pragma once
 
+#include "pagx/defines.h"
+
 namespace pagx {
 
 /**
  * Path merge modes for boolean operations.
  */
-enum class MergePathMode {
+enum class RTTR_AUTO_REGISTER_CLASS MergePathMode {
   /**
    * Append all paths without any boolean operation.
    */

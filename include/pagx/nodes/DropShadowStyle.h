@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "pagx/defines.h"
 #include "pagx/nodes/LayerStyle.h"
 #include "pagx/types/Color.h"
 
@@ -26,7 +27,7 @@ namespace pagx {
 /**
  * A drop shadow layer style that renders a shadow behind the layer content.
  */
-class DropShadowStyle : public LayerStyle {
+class RTTR_AUTO_REGISTER_CLASS DropShadowStyle : public LayerStyle {
  public:
   /**
    * The horizontal offset of the shadow in pixels. The default value is 0.
@@ -61,6 +62,8 @@ class DropShadowStyle : public LayerStyle {
   NodeType nodeType() const override {
     return NodeType::DropShadowStyle;
   }
+
+  RTTR_ENABLE(LayerStyle)
 
  private:
   DropShadowStyle() = default;

@@ -20,10 +20,11 @@
 
 #include <optional>
 #include <vector>
+#include "pagx/defines.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/TextSelector.h"
-#include "pagx/types/Point.h"
 #include "pagx/types/Color.h"
+#include "pagx/types/Point.h"
 
 namespace pagx {
 
@@ -32,7 +33,7 @@ namespace pagx {
  * It applies transformations like position, rotation, scale, and color changes to selected ranges
  * of characters.
  */
-class TextModifier : public Element {
+class RTTR_AUTO_REGISTER_CLASS TextModifier : public Element {
  public:
   /**
    * The anchor point for transformations.
@@ -92,6 +93,8 @@ class TextModifier : public Element {
   NodeType nodeType() const override {
     return NodeType::TextModifier;
   }
+
+  RTTR_ENABLE(Element)
 
  private:
   TextModifier() = default;

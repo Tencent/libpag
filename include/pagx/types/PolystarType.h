@@ -18,12 +18,14 @@
 
 #pragma once
 
+#include "pagx/defines.h"
+
 namespace pagx {
 
 /**
  * Polystar shape types.
  */
-enum class PolystarType {
+enum class RTTR_AUTO_REGISTER_CLASS PolystarType {
   /**
    * A regular polygon with equal-length sides.
    */

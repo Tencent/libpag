@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "pagx/defines.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/types/TrimType.h"
 
@@ -27,7 +28,7 @@ namespace pagx {
  * TrimPath is a path modifier that trims paths to a specified range. It can be used to animate
  * path drawing or reveal effects by adjusting the start and end values.
  */
-class TrimPath : public Element {
+class RTTR_AUTO_REGISTER_CLASS TrimPath : public Element {
  public:
   /**
    * The starting point of the trim as a percentage of the path length, ranging from 0 to 1. The
@@ -58,6 +59,8 @@ class TrimPath : public Element {
   NodeType nodeType() const override {
     return NodeType::TrimPath;
   }
+
+  RTTR_ENABLE(Element)
 
  private:
   TrimPath() = default;

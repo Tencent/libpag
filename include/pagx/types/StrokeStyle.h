@@ -18,12 +18,14 @@
 
 #pragma once
 
+#include "pagx/defines.h"
+
 namespace pagx {
 
 /**
  * Line cap styles that define the shape at the endpoints of open paths.
  */
-enum class LineCap {
+enum class RTTR_AUTO_REGISTER_CLASS LineCap {
   /**
    * A flat cap that ends exactly at the path endpoint.
    */
@@ -41,7 +43,7 @@ enum class LineCap {
 /**
  * Line join styles that define the shape at the corners of paths.
  */
-enum class LineJoin {
+enum class RTTR_AUTO_REGISTER_CLASS LineJoin {
   /**
    * A sharp join that extends to a point.
    */
@@ -59,7 +61,7 @@ enum class LineJoin {
 /**
  * Stroke alignment relative to the path.
  */
-enum class StrokeAlign {
+enum class RTTR_AUTO_REGISTER_CLASS StrokeAlign {
   /**
    * Stroke is centered on the path.
    */

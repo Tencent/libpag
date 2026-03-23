@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "pagx/defines.h"
 #include "pagx/nodes/LayerFilter.h"
 #include "pagx/types/BlendMode.h"
 #include "pagx/types/Color.h"
@@ -27,7 +28,7 @@ namespace pagx {
 /**
  * A blend filter that blends a color with the layer content using a specified blend mode.
  */
-class BlendFilter : public LayerFilter {
+class RTTR_AUTO_REGISTER_CLASS BlendFilter : public LayerFilter {
  public:
   /**
    * The color to blend with the layer content.
@@ -42,6 +43,8 @@ class BlendFilter : public LayerFilter {
   NodeType nodeType() const override {
     return NodeType::BlendFilter;
   }
+
+  RTTR_ENABLE(LayerFilter)
 
  private:
   BlendFilter() = default;

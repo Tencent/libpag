@@ -149,8 +149,10 @@ QString PluginInstaller::getPluginInstallPath(const QString& pluginName) const {
   QString fullName = getPluginFullName(pluginName);
 
   if (pluginName == "H264EncoderTools") {
-    QString roaming = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    return roaming + "/H264EncoderTools/" + fullName;
+    // Install to ~/Library/Application Support/H264EncoderTools/ to match exporter's
+    // GetRoamingPath()
+    QString appSupport = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
+    return appSupport + "/H264EncoderTools/" + fullName;
   } else {
     return "/Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore/" + fullName;
   }

@@ -19,6 +19,7 @@
 #pragma once
 
 #include <vector>
+#include "pagx/defines.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Point.h"
 
@@ -30,7 +31,7 @@ class PathData;
 /**
  * Glyph defines a single glyph's rendering data. Either path or image must be specified, not both.
  */
-class Glyph : public Node {
+class RTTR_AUTO_REGISTER_CLASS Glyph : public Node {
  public:
   /**
    * Vector glyph outline data. Mutually exclusive with image.
@@ -57,6 +58,8 @@ class Glyph : public Node {
     return NodeType::Glyph;
   }
 
+  RTTR_ENABLE(Node)
+
  private:
   Glyph() = default;
 
@@ -68,7 +71,7 @@ class Glyph : public Node {
  * bitmaps). PAGX files embed glyph data for complete self-containment, ensuring cross-platform
  * rendering consistency.
  */
-class Font : public Node {
+class RTTR_AUTO_REGISTER_CLASS Font : public Node {
  public:
   /**
    * Units per em of the font design space. Rendering scale = fontSize / unitsPerEm.
@@ -85,6 +88,8 @@ class Font : public Node {
   NodeType nodeType() const override {
     return NodeType::Font;
   }
+
+  RTTR_ENABLE(Node)
 
  private:
   Font() = default;
