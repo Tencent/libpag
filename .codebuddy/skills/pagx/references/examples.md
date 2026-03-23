@@ -101,9 +101,8 @@ value directly into Path `data`.
 </pagx>
 ```
 
-**Pattern**: Simple two-element row uses constraint positioning directly — no container
-layout needed. Like positioning two inline elements with fixed offsets.
-`left="40"` = 8 padding + 24 icon + 8 gap.
+**Pattern**: Two-element row using constraint positioning — each element independently
+positioned with `left` + `centerY`. No container layout needed for simple fixed-offset pairs.
 
 ### Progress Bar
 
@@ -122,9 +121,9 @@ layout needed. Like positioning two inline elements with fixed offsets.
 </pagx>
 ```
 
-**Pattern**: Track uses `centerX/centerY` for centering; fill bar Group uses `centerY="0"`
-to center vertically within parent. Like an HTML `<progress>` element — two overlapping
-rounded rectangles (track + fill).
+**Pattern**: Like an HTML `<progress>` — two overlapping rounded rectangles (track + fill).
+Group isolates fill bar's painters from track's Fill. `centerY="0"` vertically centers
+within the parent Layer.
 
 ### Gradient Text
 
@@ -252,17 +251,35 @@ A card with vertical container layout, rich text header, and action buttons.
 
 **Pattern**: Key structural choices:
 
-- **Background directly on layout Layer**: VectorElements (Rectangle, Fill, etc.) don't
-  participate in container layout — write them directly on the same Layer that has `layout`.
-  `padding` controls the inset for child Layers while the background Rectangle stretches to
-  full bounds. DropShadowStyle goes at the end — it applies to the entire Layer content.
-- **Rich text**: Multiple Text segments with different styles in one TextBox — each wrapped
-  in a Group for painter scope isolation. Use `&#10;` for line breaks between segments.
-- **Equal-width buttons**: `flex="1"` children in horizontal container — buttons fill
-  both axes automatically (default stretch alignment).
+- **Background on layout Layer**: VectorElements don't participate in layout — write
+  Rectangle + Fill directly on the `layout` Layer. `padding` insets child Layers while
+  the background stretches to full bounds.
+- **Rich text**: Multiple styled Text segments in one TextBox, separated by `&#10;`.
+  Each segment after the first needs a Group for painter scope isolation.
+- **Equal-width buttons**: `flex="1"` in horizontal container = CSS `flex: 1` — fills
+  both axes (default stretch alignment).
 
-For a **flexible height** example — where some children have fixed height and others expand to
-fill remaining space — see `design-patterns.md` §Fixed + flex mix.
+For flexible height layouts, see `design-patterns.md` §Fixed + flex mix.
+
+### Input Field (InnerShadowStyle)
+
+```xml
+<pagx version="1.0" width="280" height="50">
+  <Layer centerX="0" centerY="0" width="260" height="40">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+    <Fill color="#FFF"/>
+    <Stroke color="#CBD5E1" width="1"/>
+    <InnerShadowStyle offsetY="2" blurX="4" blurY="4" color="#00000010"/>
+    <TextBox left="12" centerY="0">
+      <Text text="Enter your email..." fontFamily="Arial" fontSize="14"/>
+      <Fill color="#94A3B8"/>
+    </TextBox>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: InnerShadowStyle = CSS `box-shadow: inset` — adds subtle inner shadow for depth
+on form elements. Combined with Stroke border for the standard `<input>` look.
 
 ### Card Grid (Composition)
 
@@ -290,10 +307,9 @@ fill remaining space — see `design-patterns.md` §Fixed + flex mix.
 </pagx>
 ```
 
-**Pattern**: Composition = reusable component template, like a CSS class applied to multiple
-elements. Internal geometry uses stretch constraints (`inset: 0`) to fill bounds. Horizontal
-layout with `flex="1"` distributes instances evenly. See `optimize-guide.md` §Composition
-Resource Reuse for coordinate conversion and gradient handling.
+**Pattern**: Composition = reusable component (like a Web Component or React component) —
+define once, instantiate multiple times. Internal geometry uses stretch constraints
+(`inset: 0`) to fill bounds. `flex="1"` distributes instances evenly.
 
 ### Tab Bar (Partial Roundness)
 
@@ -304,39 +320,39 @@ Resource Reuse for coordinate conversion and gradient handling.
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F1F5F9"/>
     <Layer left="20" right="20" top="20" bottom="20">
-    <!-- Top-round shape: intersect rounded rect with straight rect to flatten bottom corners -->
-    <Rectangle left="0" right="0" top="0" bottom="-20" roundness="20"/>
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
-    <MergePath mode="intersect"/>
-    <Fill color="#FFF"/>
-    <!-- Tab items -->
-    <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" arrangement="spaceAround" alignment="center">
-      <Layer>
-        <Ellipse centerX="0" size="24,24"/>
-        <Fill color="#6366F1"/>
-        <TextBox centerX="0" top="26">
-          <Text text="Home" fontFamily="Arial" fontSize="10"/>
+      <!-- Top-round shape: intersect rounded rect with straight rect to flatten bottom corners -->
+      <Rectangle left="0" right="0" top="0" bottom="-20" roundness="20"/>
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <MergePath mode="intersect"/>
+      <Fill color="#FFF"/>
+      <!-- Tab items -->
+      <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" arrangement="spaceAround" alignment="center">
+        <Layer>
+          <Ellipse centerX="0" size="24,24"/>
           <Fill color="#6366F1"/>
-        </TextBox>
-      </Layer>
-      <Layer>
-        <Ellipse centerX="0" size="24,24"/>
-        <Fill color="#94A3B8"/>
-        <TextBox centerX="0" top="26">
-          <Text text="Search" fontFamily="Arial" fontSize="10"/>
+          <TextBox centerX="0" top="26">
+            <Text text="Home" fontFamily="Arial" fontSize="10"/>
+            <Fill color="#6366F1"/>
+          </TextBox>
+        </Layer>
+        <Layer>
+          <Ellipse centerX="0" size="24,24"/>
           <Fill color="#94A3B8"/>
-        </TextBox>
-      </Layer>
-      <Layer>
-        <Ellipse centerX="0" size="24,24"/>
-        <Fill color="#94A3B8"/>
-        <TextBox centerX="0" top="26">
-          <Text text="Profile" fontFamily="Arial" fontSize="10"/>
+          <TextBox centerX="0" top="26">
+            <Text text="Search" fontFamily="Arial" fontSize="10"/>
+            <Fill color="#94A3B8"/>
+          </TextBox>
+        </Layer>
+        <Layer>
+          <Ellipse centerX="0" size="24,24"/>
           <Fill color="#94A3B8"/>
-        </TextBox>
+          <TextBox centerX="0" top="26">
+            <Text text="Profile" fontFamily="Arial" fontSize="10"/>
+            <Fill color="#94A3B8"/>
+          </TextBox>
+        </Layer>
       </Layer>
-    </Layer>
-    <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000020"/>
+      <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000020"/>
     </Layer>
   </Layer>
 </pagx>
@@ -421,9 +437,9 @@ parameterization).
 </pagx>
 ```
 
-**Pattern**: Each data point becomes a coordinate in the Path `M`/`L` string. The area fill
-reuses the same points, appends lines down to the baseline, and closes with `Z`. Grid lines
-are a single multi-M Path.
+**Pattern**: Path `data` uses SVG `<path d>` syntax — generate data points as SVG coordinates.
+The area fill reuses the same points, appends lines to the baseline, and closes with `Z`.
+Grid lines are a single multi-M Path.
 
 ### Donut Chart (TrimPath)
 
@@ -494,8 +510,9 @@ are a single multi-M Path.
 </pagx>
 ```
 
-**Pattern**: Small gaps between segments (e.g., `end="0.38"` instead of `0.4`) create visual
-separation. Legend rows use constraint positioning (dot + label), vertical layout for row spacing.
+**Pattern**: Each segment needs its own Group for painter scope isolation (different Stroke
+colors). Small gaps between segments (e.g., `end="0.38"` instead of `0.4`) create visual
+separation. Legend uses vertical layout with constraint-positioned dot + label rows.
 
 **Gradient stroke variant**: for a ring progress indicator with gradient color, apply a
 LinearGradient directly inside the Stroke element:
@@ -585,15 +602,13 @@ additively. Keep blur radius minimal — cost scales with radius.
 <pagx version="1.0" width="400" height="300">
   <Layer width="400" height="300">
     <!-- Content behind the panel -->
-    <Layer left="0" right="0" top="0" bottom="0">
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
-      <Fill>
-        <LinearGradient startPoint="0,0" endPoint="400,300">
-          <ColorStop offset="0" color="#6366F1"/>
-          <ColorStop offset="1" color="#EC4899"/>
-        </LinearGradient>
-      </Fill>
-    </Layer>
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="400,300">
+        <ColorStop offset="0" color="#6366F1"/>
+        <ColorStop offset="1" color="#EC4899"/>
+      </LinearGradient>
+    </Fill>
     <!-- Frosted glass panel -->
     <Layer centerX="0" centerY="0" width="200" height="200">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
@@ -619,19 +634,17 @@ often combine Polystar with gradients and layer styles for depth.
 
 ```xml
 <pagx version="1.0" width="200" height="200">
-  <Layer width="200" height="200">
-    <Layer centerX="0" centerY="0" width="160" height="160">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="32"/>
-      <Ellipse right="10" top="10" size="60,60"/>
-      <MergePath mode="difference"/>
-      <Fill>
-        <LinearGradient startPoint="0,0" endPoint="160,160">
-          <ColorStop offset="0" color="#6366F1"/>
-          <ColorStop offset="1" color="#EC4899"/>
-        </LinearGradient>
-      </Fill>
-      <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#6366F160"/>
-    </Layer>
+  <Layer centerX="0" centerY="0" width="160" height="160">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="32"/>
+    <Ellipse right="10" top="10" size="60,60"/>
+    <MergePath mode="difference"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="160,160">
+        <ColorStop offset="0" color="#6366F1"/>
+        <ColorStop offset="1" color="#EC4899"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#6366F160"/>
   </Layer>
 </pagx>
 ```
@@ -644,18 +657,15 @@ separate Group (see `spec-essentials.md` §5).
 
 ```xml
 <pagx version="1.0" width="200" height="200">
-  <Layer width="200" height="200">
-    <!-- Root-level: constraints position the star -->
-    <Layer centerX="0" centerY="0" width="160" height="160">
-      <Polystar centerX="0" centerY="0" pointCount="5" outerRadius="80" innerRadius="35"/>
-      <Fill>
-        <RadialGradient radius="80">
-          <ColorStop offset="0" color="#FBBF24"/>
-          <ColorStop offset="1" color="#F59E0B"/>
-        </RadialGradient>
-      </Fill>
-      <DropShadowStyle offsetY="6" blurX="16" blurY="16" color="#F59E0B60"/>
-    </Layer>
+  <Layer centerX="0" centerY="0" width="160" height="160">
+    <Polystar centerX="0" centerY="0" pointCount="5" outerRadius="80" innerRadius="35"/>
+    <Fill>
+      <RadialGradient radius="80">
+        <ColorStop offset="0" color="#FBBF24"/>
+        <ColorStop offset="1" color="#F59E0B"/>
+      </RadialGradient>
+    </Fill>
+    <DropShadowStyle offsetY="6" blurX="16" blurY="16" color="#F59E0B60"/>
   </Layer>
 </pagx>
 ```
@@ -663,23 +673,3 @@ separate Group (see `spec-essentials.md` §5).
 **Pattern**: Polystar `rotation="0"` points the first vertex upward — no rotation needed.
 RadialGradient `center` defaults to `0,0` (aligns with Polystar origin); `radius` matches
 `outerRadius`.
-
-### Input Field (InnerShadowStyle)
-
-```xml
-<pagx version="1.0" width="280" height="50">
-  <Layer centerX="0" centerY="0" width="260" height="40">
-    <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
-    <Fill color="#FFF"/>
-    <Stroke color="#CBD5E1" width="1"/>
-    <InnerShadowStyle offsetY="2" blurX="4" blurY="4" color="#00000010"/>
-    <TextBox left="12" centerY="0">
-      <Text text="Enter your email..." fontFamily="Arial" fontSize="14"/>
-      <Fill color="#94A3B8"/>
-    </TextBox>
-  </Layer>
-</pagx>
-```
-
-**Pattern**: InnerShadowStyle = CSS `box-shadow: inset` — adds a subtle inner shadow to
-create depth on form elements. Combined with Stroke border for the standard input field look.
