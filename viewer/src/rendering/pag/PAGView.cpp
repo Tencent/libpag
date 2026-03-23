@@ -85,10 +85,9 @@ void PAGView::onPreferredSizeChanged() {
 }
 
 void PAGView::onIsPlayingChanged(bool isPlaying) {
-  if (isPlaying) {
-    std::lock_guard<std::mutex> lock(lastPlayTimeMutex);
-    lastPlayTime = tgfx::Clock::Now();
-  }
+  std::lock_guard<std::mutex> lock(lastPlayTimeMutex);
+  lastPlayTime = tgfx::Clock::Now();
+  (void)isPlaying;
 }
 
 void PAGView::onAudioTimeChanged(int64_t audioTime) {
