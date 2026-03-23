@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="1600" height="1200">
   <Layer name="Background" left="0" right="0" top="0" bottom="0">
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Rectangle left="0" top="0" right="0" bottom="0"/>
     <Fill color="@bgGradient"/>
   </Layer>
   <Layer name="GlowB" alpha="0.22">
@@ -14,8 +14,8 @@
     <Fill color="#10B981"/>
     <BlurFilter blurX="180" blurY="130"/>
   </Layer>
-  <Layer name="OrbitRing" left="800" top="530" alpha="0.18">
-<Ellipse left="-380" top="-380" size="760,760"/>
+  <Layer name="OrbitRing" alpha="0.18" left="800" top="530">
+    <Ellipse left="-380" top="-380" size="760,760"/>
     <Stroke color="#334155" width="1"/>
   </Layer>
   <Layer name="Grid" alpha="0.05">
@@ -26,18 +26,18 @@
     </Group>
     <Repeater copies="10" position="0,120"/>
   </Layer>
-  <Layer name="Core" left="800" top="530">
+  <Layer name="Core" width="326" height="326" centerX="0" centerY="-70">
     <Layer alpha="0.2">
-<Ellipse left="-160" top="-160" size="320,320"/>
+      <Ellipse centerX="0" centerY="0" size="320,320"/>
       <Fill color="#3B82F6"/>
       <BlurFilter blurX="80" blurY="80"/>
     </Layer>
     <Layer>
-<Ellipse left="-130" top="-130" size="260,260"/>
+      <Ellipse centerX="0" centerY="0" size="260,260"/>
       <Stroke color="#475569" width="2"/>
     </Layer>
     <Layer alpha="0.7">
-<Ellipse left="-155" top="-155" size="310,310"/>
+      <Ellipse centerX="0" centerY="0" size="310,310"/>
       <TrimPath end="0.77"/>
       <Stroke width="2.5" cap="round">
         <ConicGradient>
@@ -48,19 +48,25 @@
       </Stroke>
     </Layer>
     <Layer alpha="0.4">
-      <Path data="M 0 -155 L 0 -163 M 155 0 L 163 0 M 0 155 L 0 163 M -155 0 L -163 0"/>
+      <Path centerX="0" centerY="0" data="M 0 -155 L 0 -163 M 155 0 L 163 0 M 0 155 L 0 163 M -155 0 L -163 0"/>
       <Stroke color="#94A3B8" width="1.5" cap="round"/>
     </Layer>
-    <Layer top="-10">
-      <Text top="10" text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="52" textAnchor="center"/>
-      <Fill color="#FFF"/>
-      <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#06B6D440"/>
+    <Layer layout="vertical" gap="4" alignment="center" centerX="0" centerY="0">
+      <Layer>
+        <TextBox textAlign="center">
+          <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="52"/>
+          <Fill color="#FFF"/>
+        </TextBox>
+        <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#06B6D440"/>
+      </Layer>
+      <Layer>
+        <TextBox textAlign="center">
+          <Text text="Portable Animated Graphics XML" fontFamily="Arial" fontSize="14"/>
+          <Fill color="#94A3B8"/>
+        </TextBox>
+      </Layer>
     </Layer>
-    <Group top="42">
-      <Text text="Portable Animated Graphics XML" fontFamily="Arial" fontSize="14" textAnchor="center"/>
-      <Fill color="#94A3B8"/>
-    </Group>
-    <Group>
+    <Group centerX="0" centerY="0">
       <Text text="An XML-based markup language for describing animated vector graphics." fontFamily="Arial" fontSize="12"/>
       <TextPath path="M -141 0 A 141 141 0 0 0 141 0" forceAlignment="true"/>
       <Fill color="#64748B60"/>
@@ -112,15 +118,19 @@
         <Stroke color="#F43F5E" width="1.5" cap="round"/>
       </Group>
     </Layer>
-    <Layer left="-50" top="-20">
-      <Text text="Readable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-      <Fill color="#F43F5E"/>
-    </Layer>
-    <Layer left="-50" top="-7">
-      <TextBox width="220" height="0" lineHeight="22">
-        <Text text="Plain-text XML, easy to diff, debug, and AI-generate." fontFamily="Arial" fontSize="16"/>
-        <Fill color="#CBD5E1"/>
-      </TextBox>
+    <Layer layout="vertical" left="-50" top="-46">
+      <Layer>
+        <TextBox>
+          <Text text="Readable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+          <Fill color="#F43F5E"/>
+        </TextBox>
+      </Layer>
+      <Layer>
+        <TextBox width="220" lineHeight="22">
+          <Text text="Plain-text XML, easy to diff, debug, and AI-generate." fontFamily="Arial" fontSize="16"/>
+          <Fill color="#CBD5E1"/>
+        </TextBox>
+      </Layer>
     </Layer>
   </Layer>
   <Layer name="CardComprehensive" left="1319" top="466">
@@ -155,15 +165,19 @@
         <Fill color="#38BDF810"/>
       </Group>
     </Layer>
-    <Layer left="-50" top="-20">
-      <Text text="Comprehensive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-      <Fill color="#38BDF8"/>
-    </Layer>
-    <Layer left="-50" top="-7">
-      <TextBox width="220" height="0" lineHeight="22">
-        <Text text="Covers vectors, images, text, effects, and masks." fontFamily="Arial" fontSize="16"/>
-        <Fill color="#CBD5E1"/>
-      </TextBox>
+    <Layer layout="vertical" left="-50" top="-46">
+      <Layer>
+        <TextBox>
+          <Text text="Comprehensive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+          <Fill color="#38BDF8"/>
+        </TextBox>
+      </Layer>
+      <Layer>
+        <TextBox width="220" lineHeight="22">
+          <Text text="Covers vectors, images, text, effects, and masks." fontFamily="Arial" fontSize="16"/>
+          <Fill color="#CBD5E1"/>
+        </TextBox>
+      </Layer>
     </Layer>
   </Layer>
   <Layer name="CardExpressive" left="281" top="466">
@@ -209,15 +223,19 @@
         <Fill color="#A855F715"/>
       </Group>
     </Layer>
-    <Layer left="-50" top="-20">
-      <Text text="Expressive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-      <Fill color="#A855F7"/>
-    </Layer>
-    <Layer left="-50" top="-7">
-      <TextBox width="220" height="0" lineHeight="22">
-        <Text text="Compact structure for both static and animated content." fontFamily="Arial" fontSize="16"/>
-        <Fill color="#CBD5E1"/>
-      </TextBox>
+    <Layer layout="vertical" left="-50" top="-46">
+      <Layer>
+        <TextBox>
+          <Text text="Expressive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+          <Fill color="#A855F7"/>
+        </TextBox>
+      </Layer>
+      <Layer>
+        <TextBox width="220" lineHeight="22">
+          <Text text="Compact structure for both static and animated content." fontFamily="Arial" fontSize="16"/>
+          <Fill color="#CBD5E1"/>
+        </TextBox>
+      </Layer>
     </Layer>
   </Layer>
   <Layer name="CardInteroperable" left="499" top="870">
@@ -250,15 +268,19 @@
         <Stroke color="#10B981" width="1" dashes="3,3"/>
       </Group>
     </Layer>
-    <Layer left="-50" top="-20">
-      <Text text="Interoperable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-      <Fill color="#10B981"/>
-    </Layer>
-    <Layer left="-50" top="-7">
-      <TextBox width="220" height="0" lineHeight="22">
-        <Text text="Bridges AE, Figma, SVG, PDF, and more seamlessly." fontFamily="Arial" fontSize="16"/>
-        <Fill color="#CBD5E1"/>
-      </TextBox>
+    <Layer layout="vertical" left="-50" top="-46">
+      <Layer>
+        <TextBox>
+          <Text text="Interoperable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+          <Fill color="#10B981"/>
+        </TextBox>
+      </Layer>
+      <Layer>
+        <TextBox width="220" lineHeight="22">
+          <Text text="Bridges AE, Figma, SVG, PDF, and more seamlessly." fontFamily="Arial" fontSize="16"/>
+          <Fill color="#CBD5E1"/>
+        </TextBox>
+      </Layer>
     </Layer>
   </Layer>
   <Layer name="CardDeployable" left="1101" top="870">
@@ -296,15 +318,19 @@
         <Stroke color="#FB923C" width="2" cap="round" join="round"/>
       </Group>
     </Layer>
-    <Layer left="-50" top="-20">
-      <Text text="Deployable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-      <Fill color="#FBBF24"/>
-    </Layer>
-    <Layer left="-50" top="-7">
-      <TextBox width="220" height="0" lineHeight="22">
-        <Text text="One-click export to binary PAG with high performance." fontFamily="Arial" fontSize="16"/>
-        <Fill color="#CBD5E1"/>
-      </TextBox>
+    <Layer layout="vertical" left="-50" top="-46">
+      <Layer>
+        <TextBox>
+          <Text text="Deployable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+          <Fill color="#FBBF24"/>
+        </TextBox>
+      </Layer>
+      <Layer>
+        <TextBox width="220" lineHeight="22">
+          <Text text="One-click export to binary PAG with high performance." fontFamily="Arial" fontSize="16"/>
+          <Fill color="#CBD5E1"/>
+        </TextBox>
+      </Layer>
     </Layer>
   </Layer>
   <Layer name="Pipeline" left="800" top="1070">
@@ -324,10 +350,10 @@
       <Rectangle left="-60" top="-20" size="120,40" roundness="20"/>
       <Fill color="#6366F120"/>
       <Stroke color="#6366F160" width="1"/>
-      <Group top="5">
-        <Text text=".pagx" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
+      <TextBox left="-60" top="-20" width="120" height="40" textAlign="center" paragraphAlign="middle">
+        <Text text=".pagx" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#A78BFA"/>
-      </Group>
+      </TextBox>
     </Group>
     <Group left="-80">
       <Path data="@arrowRight"/>
@@ -337,10 +363,10 @@
       <Rectangle left="-50" top="-20" size="100,40" roundness="20"/>
       <Fill color="#EC489920"/>
       <Stroke color="#EC489960" width="1"/>
-      <Group top="5">
-        <Text text=".pag" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
+      <TextBox left="-50" top="-20" width="100" height="40" textAlign="center" paragraphAlign="middle">
+        <Text text=".pag" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#F472B6"/>
-      </Group>
+      </TextBox>
     </Group>
     <Group left="90">
       <Path data="@arrowRight"/>
@@ -350,15 +376,17 @@
       <Rectangle left="-70" top="-20" size="140,40" roundness="20"/>
       <Fill color="#34D39920"/>
       <Stroke color="#34D39960" width="1"/>
-      <Group top="5">
-        <Text text="Production" fontFamily="Arial" fontStyle="Bold" fontSize="16" textAnchor="center"/>
+      <TextBox left="-70" top="-20" width="140" height="40" textAlign="center" paragraphAlign="middle">
+        <Text text="Production" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
         <Fill color="#34D399"/>
-      </Group>
+      </TextBox>
     </Group>
   </Layer>
-  <Layer name="BottomTagline" left="800" top="1130">
-    <Text text="Design  -  Develop  -  Deploy" fontFamily="Arial" fontSize="16" textAnchor="center"/>
-    <Fill color="#64748B"/>
+  <Layer name="BottomTagline" top="1122" centerX="0">
+    <TextBox textAlign="center">
+      <Text text="Design  -  Develop  -  Deploy" fontFamily="Arial" fontSize="16"/>
+      <Fill color="#64748B"/>
+    </TextBox>
   </Layer>
   <Layer name="Corners" alpha="0.2">
     <Group>
