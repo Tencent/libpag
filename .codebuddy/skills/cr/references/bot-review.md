@@ -141,8 +141,10 @@ Verifier prompt), with the following bot-specific adjustments:
 
 In addition to the base reviewer prompt from `teams-review.md`:
 - **PR context**: `PR_BODY` content to understand the stated motivation. Verify
-  the implementation actually achieves what the author describes.
-- **Output format**: `[file:line] [A1/B2/C3] — [description] — [key lines]`
+  the implementation actually achieves what the author describes. If `PR_BODY` is
+  empty, skip motivation verification and focus on code-level review only.
+- **Output format** (overrides base format from `teams-review.md`):
+  `[file:line] [A1/B2/C3] — [description] — [key lines]`
   (include checklist item ID, e.g., A1, B2, C3)
 
 ### Verification completion signal
@@ -181,6 +183,12 @@ not worth reporting (e.g., pure style preferences, speculative optimizations).
 For each confirmed issue, determine the exact line number in the **new** file
 (right side of diff). Read the actual file in the PR branch to confirm — do not
 derive from diff hunk offsets alone.
+
+GitHub PR review API only accepts lines within a diff hunk (additions or
+unchanged context lines shown in the diff). If a confirmed issue targets a line
+that exists in the new file but falls outside any diff hunk, find the nearest
+line within the same file's diff hunks and reference the original location in
+the comment body. If no hunk exists for that file, add to `ORPHAN_ISSUES`.
 
 ### 3.4 Handle deleted lines
 
@@ -222,7 +230,7 @@ gh api repos/{OWNER_REPO}/pulls/{number}/reviews --input - <<'EOF'
       "path": "relative/file/path",
       "line": 42,
       "side": "RIGHT",
-      "body": "[A2] Description of the issue and suggested fix"
+      "body": "[A2] Description of the issue — suggested fix"
     },
     {
       "path": "relative/file/path",
@@ -275,10 +283,10 @@ If `ORPHAN_ISSUES` (from Phase 3.4) is not empty, post a **separate PR comment**
 listing these issues:
 
 ```bash
-gh pr comment {number} --body '### ⚠️ Issues on Deleted Lines
+gh pr comment {number} --body '### ⚠️ Issues Outside Diff Hunks
 
-The following issues were found but could not be attached to specific lines
-(the affected code was deleted in this PR):
+The following issues were found but could not be attached to specific diff lines
+(the affected code was deleted or falls outside diff hunks in this PR):
 
 1. [A2] `src/foo.cpp` (deleted line 42) — removed necessary null check
 2. [B1] `src/bar.cpp` (deleted line 88) — deleted error handling code
