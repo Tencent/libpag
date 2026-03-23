@@ -1235,4 +1235,133 @@ CLI_TEST(PAGXCliTest, Convert_PagxToSvg_ValidateSimple) {
   EXPECT_NE(output.find("</svg>"), std::string::npos);
 }
 
+CLI_TEST(PAGXCliTest, Convert_Help) {
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", "--help"});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_HelpShortFlag) {
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", "-h"});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_InvalidIndent) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto outputPath = TempDir() + "/ConvertSVG_InvalidIndent.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", "--indent", "abc", inputPath, outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_IndentOutOfRange) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto outputPath = TempDir() + "/ConvertSVG_IndentRange.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", "--indent", "20", inputPath, outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_NoConvertTextToPath) {
+  auto inputPath = TestResourcePath("render_text.pagx");
+  auto outputPath = TempDir() + "/ConvertSVG_NoTextToPath.svg";
+  auto ret = CallRun(pagx::cli::RunConvert,
+                     {"convert", "--no-convert-text-to-path", inputPath, outputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  EXPECT_NE(output.find("<svg"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Convert_TooManyArgs) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto outputPath = TempDir() + "/ConvertSVG_TooMany.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, outputPath, "extra_arg"});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_UnsupportedFormat) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto outputPath = TempDir() + "/ConvertSVG_Unsupported.out";
+  auto ret =
+      CallRun(pagx::cli::RunConvert, {"convert", "--format", "json", inputPath, outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_PagxToSvg_WriteFailure) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  std::string outputPath = "/nonexistent_dir/subdir/output.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+//==============================================================================
+// Convert tests — SVG to PAGX
+//==============================================================================
+
+CLI_TEST(PAGXCliTest, Convert_SvgToPagx_Basic) {
+  auto inputPagx = TestResourcePath("render_basic.pagx");
+  auto svgPath = TempDir() + "/ConvertRoundtrip.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPagx, svgPath});
+  EXPECT_EQ(ret, 0);
+
+  auto outputPagx = TempDir() + "/ConvertRoundtrip.pagx";
+  ret = CallRun(pagx::cli::RunConvert, {"convert", svgPath, outputPagx});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPagx));
+  auto output = ReadFile(outputPagx);
+  EXPECT_FALSE(output.empty());
+}
+
+CLI_TEST(PAGXCliTest, Convert_SvgToPagx_WithOptions) {
+  auto inputPagx = TestResourcePath("render_basic.pagx");
+  auto svgPath = TempDir() + "/ConvertSvgOptions.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPagx, svgPath});
+  EXPECT_EQ(ret, 0);
+
+  auto outputPagx = TempDir() + "/ConvertSvgOptions.pagx";
+  ret = CallRun(pagx::cli::RunConvert, {"convert", "--no-expand-use", "--flatten-transforms",
+                                        "--preserve-unknown", svgPath, outputPagx});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPagx));
+}
+
+CLI_TEST(PAGXCliTest, Convert_SvgToPagx_ForceFormat) {
+  auto inputPagx = TestResourcePath("render_basic.pagx");
+  auto svgPath = TempDir() + "/ConvertForcePagx.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPagx, svgPath});
+  EXPECT_EQ(ret, 0);
+
+  auto outputPagx = TempDir() + "/ConvertForcePagx.out";
+  ret = CallRun(pagx::cli::RunConvert, {"convert", "--format", "pagx", svgPath, outputPagx});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPagx);
+  EXPECT_FALSE(output.empty());
+}
+
+CLI_TEST(PAGXCliTest, Convert_ToPagx_UnsupportedInput) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto outputPath = TempDir() + "/ConvertPagx_Unsupported.pagx";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_SvgToPagx_InvalidSvg) {
+  auto invalidSvg = TempDir() + "/invalid_input.svg";
+  {
+    std::ofstream out(invalidSvg);
+    out << "this is not valid svg content";
+  }
+  auto outputPath = TempDir() + "/ConvertPagx_Invalid.pagx";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", invalidSvg, outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_SvgToPagx_WriteFailure) {
+  auto inputPagx = TestResourcePath("render_basic.pagx");
+  auto svgPath = TempDir() + "/ConvertWriteFail.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPagx, svgPath});
+  EXPECT_EQ(ret, 0);
+
+  std::string outputPath = "/nonexistent_dir/subdir/output.pagx";
+  ret = CallRun(pagx::cli::RunConvert, {"convert", svgPath, outputPath});
+  EXPECT_NE(ret, 0);
+}
+
 }  // namespace pag
