@@ -85,7 +85,7 @@ After all optimizations, verify the following:
   (`attributes.md`)
 - [ ] Painter scope isolation correct (`design-patterns.md` §1)
 - [ ] Text `textAnchor` not set when TextBox is present (`design-patterns.md` §Container Layout)
-  - [ ] All positioning uses constraint attributes (`left`/`top`/`centerX`/`centerY`)
+  - [ ] All Layer positioning uses container layout or constraint attributes (`left`/`top`/`centerX`/`centerY` for `includeInLayout="false"`)
 - [ ] Containers have explicit `width`/`height` where a specific design size is intended
   (not needed when measured or layout-assigned size is correct)
 - [ ] Internal coordinates relative to Layer origin (`design-patterns.md` §6 Origin-Based Internal Layout)

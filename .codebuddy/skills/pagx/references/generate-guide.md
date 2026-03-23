@@ -64,21 +64,76 @@ ProfileHeader (Layer)
 Extract repeated subtrees as `<Composition>` in Resources when the same structure appears
 at 2+ positions (differing only in position).
 
-### Layout Decisions (Top-Down)
+### Layout: Think in Flexbox
 
-For each container, **think in CSS Flexbox first** then translate to PAGX
-(see `design-patterns.md` §Leverage Familiar Concepts for the full mapping):
+**Layer arrangement = CSS Flexbox.** Build the entire Layer tree using container layout.
+Think in CSS Flexbox first, then translate to PAGX
+(see `design-patterns.md` §Leverage Familiar Concepts for the full mapping).
 
-1. **Container mode** — look at child Layers:
-   - Row → `layout="horizontal"` + `gap` + `padding` + `alignment`
-   - Column → `layout="vertical"` + `gap` + `padding` + `alignment`
-   - Overlapping / free-form → no container layout (default)
+For each Layer that contains child Layers, decide:
 
-2. **Internal positioning** — for VectorElements inside a Layer, use constraint attributes
-   (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`).
+1. **Direction** — how are child Layers arranged?
+   - Row → `layout="horizontal"`
+   - Column → `layout="vertical"`
 
-Apply recursively from root to leaf. See `design-patterns.md` §Container Layout for
-common patterns and examples.
+2. **Spacing and alignment** — add `gap`, `padding`, `alignment`, `arrangement` as needed.
+
+3. **Child sizing** — each child Layer gets one of:
+   - Fixed size → explicit `width`/`height`
+   - Proportional share → `flex="1"` (or other weight)
+   - Content-measured → no size attributes (shrink to fit)
+
+4. **Recurse** — repeat for each child Layer that contains sub-Layers.
+
+```xml
+<!-- Example: top-level Layer as vertical flex container -->
+<pagx version="1.0" width="393" height="852">
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical">
+    <Layer height="60"><!-- header --></Layer>
+    <Layer flex="1" layout="vertical" gap="16" padding="0,20,0,20">
+      <!-- content area: nested flex containers -->
+      <Layer height="200" layout="horizontal" gap="12">
+        <Layer flex="1"/>
+        <Layer flex="1"/>
+        <Layer flex="1"/>
+      </Layer>
+      <Layer height="40" layout="horizontal" gap="16" padding="20">
+        <Layer flex="1"/>
+        <Layer flex="1"/>
+      </Layer>
+    </Layer>
+    <Layer height="83"><!-- tab bar --></Layer>
+  </Layer>
+</pagx>
+```
+
+**Internal content** — VectorElements inside a Layer use constraint attributes
+(`left`/`right`/`top`/`bottom`/`centerX`/`centerY`) to position within the Layer's
+bounds. This is for content like background rectangles, centered text, and anchored
+icons — not for arranging child Layers.
+
+See `design-patterns.md` §Container Layout for common patterns and examples.
+
+### Overlay Elements
+
+For elements that float above the layout flow (badges, floating buttons, decorative
+overlays), use `includeInLayout="false"` + constraint positioning — the PAGX equivalent
+of CSS `position: absolute`:
+
+```xml
+<Layer layout="vertical" gap="8">
+  <Layer height="32"><!-- normal layout child --></Layer>
+  <Layer height="32"><!-- normal layout child --></Layer>
+  <!-- Badge: excluded from layout, positioned at top-right corner -->
+  <Layer right="-6" top="-6" includeInLayout="false">
+    <Ellipse size="12,12"/>
+    <Fill color="#EF4444"/>
+  </Layer>
+</Layer>
+```
+
+Use this pattern sparingly — only when an element must overlap or extend beyond its
+parent's bounds.
 
 ### Sizing Rules
 
@@ -207,18 +262,22 @@ Use `--id` or `--xpath` for targeted measurement (see `cli.md`).
 
 ### 3. Check Layout
 
-**Layout-managed content** — verify:
-- Container `layout` direction, `gap`, `padding` match design
-- `alignment` and `arrangement` produce correct distribution
-- Constraint attributes position elements correctly
+**Container layout** — verify:
+- Every Layer with child Layers uses `layout="horizontal"` or `layout="vertical"`
+- `gap`, `padding`, `alignment`, `arrangement` match the design
+- Child sizing (`flex`, explicit size, content-measured) produces correct proportions
 
-**Absolute-positioned content** — scan bounds for alignment, consistent gaps, and
-centering.
+**Internal content** — verify:
+- VectorElement constraint attributes position content correctly within each Layer
+- Background rectangles fill bounds (`left="0" right="0" top="0" bottom="0"`)
+- Text is centered or anchored as intended
+
+**Overlay elements** — verify `includeInLayout="false"` elements are positioned correctly.
 
 ### 4. Fix and Re-render
 
-- Layout issues → adjust layout/constraint attributes
-- Absolute positioning → adjust `left`/`top`
+- Misaligned child Layers → adjust container layout attributes (`gap`, `alignment`, `flex`)
+- Mispositioned content → adjust VectorElement constraint attributes
 
 After fixes, re-render and **read the screenshot** to confirm no new issues. Repeat until
 clean.

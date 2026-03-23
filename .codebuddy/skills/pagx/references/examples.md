@@ -293,7 +293,6 @@ on form elements. Combined with Stroke border for the standard `<input>` look.
     <Layer composition="@card" flex="1"/>
     <Layer composition="@card" flex="1"/>
   </Layer>
-
   <Resources>
     <Composition id="card" width="140" height="80">
       <Layer left="0" right="0" top="0" bottom="0">
@@ -374,21 +373,19 @@ use Group `rotation` to reposition the start point.
 
 ```xml
 <pagx version="1.0" width="300" height="200">
-  <Layer width="300" height="200">
-    <!-- Bars -->
-    <Layer left="30" right="20" top="30" bottom="20">
-      <Rectangle left="0" bottom="0" size="30,80" roundness="4"/>
-      <Rectangle left="50" bottom="0" size="30,130" roundness="4"/>
-      <Rectangle left="100" bottom="0" size="30,60" roundness="4"/>
-      <Rectangle left="150" bottom="0" size="30,110" roundness="4"/>
-      <Rectangle left="200" bottom="0" size="30,90" roundness="4"/>
-      <Fill color="#3B82F6"/>
-    </Layer>
-    <!-- Baseline -->
-    <Layer left="30" right="40" bottom="20" height="1">
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
-      <Fill color="#CBD5E1"/>
-    </Layer>
+  <!-- Bars -->
+  <Layer left="30" right="20" top="30" bottom="20">
+    <Rectangle left="0" bottom="0" size="30,80" roundness="4"/>
+    <Rectangle left="50" bottom="0" size="30,130" roundness="4"/>
+    <Rectangle left="100" bottom="0" size="30,60" roundness="4"/>
+    <Rectangle left="150" bottom="0" size="30,110" roundness="4"/>
+    <Rectangle left="200" bottom="0" size="30,90" roundness="4"/>
+    <Fill color="#3B82F6"/>
+  </Layer>
+  <!-- Baseline -->
+  <Layer left="30" right="40" bottom="20" height="1">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#CBD5E1"/>
   </Layer>
 </pagx>
 ```
@@ -401,37 +398,35 @@ parameterization).
 
 ```xml
 <pagx version="1.0" width="300" height="200">
-  <Layer width="300" height="200">
-    <!-- Chart area with margins -->
-    <Layer left="30" right="20" top="20" bottom="30">
-      <!-- Grid lines -->
-      <Path data="M 0,0 L 250,0 M 0,37 L 250,37 M 0,75 L 250,75 M 0,112 L 250,112 M 0,150 L 250,150"/>
-      <Stroke color="#F1F5F9" width="1"/>
-      <!-- Data line -->
-      <Group left="0" right="0" top="0" bottom="0">
-        <Path data="M 0,120 L 62,90 L 125,105 L 187,45 L 250,30"/>
-        <Stroke color="#3B82F6" width="2" cap="round" join="round"/>
-      </Group>
-      <!-- Fill area under line (same path, closed to bottom) -->
-      <Group left="0" right="0" top="0" bottom="0">
-        <Path data="M 0,120 L 62,90 L 125,105 L 187,45 L 250,30 L 250,150 L 0,150 Z"/>
-        <Fill color="#3B82F610"/>
-      </Group>
-      <!-- Data points -->
-      <Group left="0" right="0" top="0" bottom="0">
-        <Ellipse left="-3" top="117" size="6,6"/>
-        <Ellipse left="59" top="87" size="6,6"/>
-        <Ellipse left="122" top="102" size="6,6"/>
-        <Ellipse left="184" top="42" size="6,6"/>
-        <Ellipse left="247" top="27" size="6,6"/>
-        <Fill color="#3B82F6"/>
-      </Group>
-    </Layer>
-    <!-- Baseline -->
-    <Layer left="30" right="20" bottom="30" height="1">
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
-      <Fill color="#CBD5E1"/>
-    </Layer>
+  <!-- Chart area with margins -->
+  <Layer left="30" right="20" top="20" bottom="30">
+    <!-- Grid lines -->
+    <Path data="M 0,0 L 250,0 M 0,37 L 250,37 M 0,75 L 250,75 M 0,112 L 250,112 M 0,150 L 250,150"/>
+    <Stroke color="#F1F5F9" width="1"/>
+    <!-- Data line -->
+    <Group left="0" right="0" top="0" bottom="0">
+      <Path data="M 0,120 L 62,90 L 125,105 L 187,45 L 250,30"/>
+      <Stroke color="#3B82F6" width="2" cap="round" join="round"/>
+    </Group>
+    <!-- Fill area under line (same path, closed to bottom) -->
+    <Group left="0" right="0" top="0" bottom="0">
+      <Path data="M 0,120 L 62,90 L 125,105 L 187,45 L 250,30 L 250,150 L 0,150 Z"/>
+      <Fill color="#3B82F610"/>
+    </Group>
+    <!-- Data points -->
+    <Group left="0" right="0" top="0" bottom="0">
+      <Ellipse left="-3" top="117" size="6,6"/>
+      <Ellipse left="59" top="87" size="6,6"/>
+      <Ellipse left="122" top="102" size="6,6"/>
+      <Ellipse left="184" top="42" size="6,6"/>
+      <Ellipse left="247" top="27" size="6,6"/>
+      <Fill color="#3B82F6"/>
+    </Group>
+  </Layer>
+  <!-- Baseline -->
+  <Layer left="30" right="20" bottom="30" height="1">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#CBD5E1"/>
   </Layer>
 </pagx>
 ```
@@ -444,66 +439,64 @@ Grid lines are a single multi-M Path.
 
 ```xml
 <pagx version="1.0" width="340" height="200">
-  <Layer width="340" height="200">
-    <!-- Donut -->
-    <Layer left="20" top="20" width="160" height="160">
-      <!-- Segment 1: 40% (0 to 0.4) -->
-      <Ellipse centerX="0" centerY="0" size="130,130"/>
-      <TrimPath end="0.38"/>
-      <Stroke color="#3B82F6" width="18"/>
-      <!-- Segment 2: 30% (0.4 to 0.7) -->
-      <Group centerX="0" centerY="0">
-        <Ellipse size="130,130"/>
-        <TrimPath start="0.4" end="0.68"/>
-        <Stroke color="#10B981" width="18"/>
-      </Group>
-      <!-- Segment 3: 20% (0.7 to 0.9) -->
-      <Group centerX="0" centerY="0">
-        <Ellipse size="130,130"/>
-        <TrimPath start="0.7" end="0.88"/>
-        <Stroke color="#F59E0B" width="18"/>
-      </Group>
-      <!-- Segment 4: 10% (0.9 to 1.0) -->
-      <Group centerX="0" centerY="0">
-        <Ellipse size="130,130"/>
-        <TrimPath start="0.9" end="0.98"/>
-        <Stroke color="#EF4444" width="18"/>
-      </Group>
+  <!-- Donut -->
+  <Layer left="20" top="20" width="160" height="160">
+    <!-- Segment 1: 40% (0 to 0.4) -->
+    <Ellipse centerX="0" centerY="0" size="130,130"/>
+    <TrimPath end="0.38"/>
+    <Stroke color="#3B82F6" width="18"/>
+    <!-- Segment 2: 30% (0.4 to 0.7) -->
+    <Group centerX="0" centerY="0">
+      <Ellipse size="130,130"/>
+      <TrimPath start="0.4" end="0.68"/>
+      <Stroke color="#10B981" width="18"/>
+    </Group>
+    <!-- Segment 3: 20% (0.7 to 0.9) -->
+    <Group centerX="0" centerY="0">
+      <Ellipse size="130,130"/>
+      <TrimPath start="0.7" end="0.88"/>
+      <Stroke color="#F59E0B" width="18"/>
+    </Group>
+    <!-- Segment 4: 10% (0.9 to 1.0) -->
+    <Group centerX="0" centerY="0">
+      <Ellipse size="130,130"/>
+      <TrimPath start="0.9" end="0.98"/>
+      <Stroke color="#EF4444" width="18"/>
+    </Group>
+  </Layer>
+  <!-- Legend -->
+  <Layer left="200" top="40" width="120" height="120" layout="vertical" gap="12">
+    <Layer height="20">
+      <Ellipse left="0" centerY="0" size="10,10"/>
+      <Fill color="#3B82F6"/>
+      <TextBox left="18" centerY="0">
+        <Text text="Sales 40%" fontFamily="Arial" fontSize="12"/>
+        <Fill color="#334155"/>
+      </TextBox>
     </Layer>
-    <!-- Legend -->
-    <Layer left="200" top="40" width="120" height="120" layout="vertical" gap="12">
-      <Layer height="20">
-        <Ellipse left="0" centerY="0" size="10,10"/>
-        <Fill color="#3B82F6"/>
-        <TextBox left="18" centerY="0">
-          <Text text="Sales 40%" fontFamily="Arial" fontSize="12"/>
-          <Fill color="#334155"/>
-        </TextBox>
-      </Layer>
-      <Layer height="20">
-        <Ellipse left="0" centerY="0" size="10,10"/>
-        <Fill color="#10B981"/>
-        <TextBox left="18" centerY="0">
-          <Text text="Growth 30%" fontFamily="Arial" fontSize="12"/>
-          <Fill color="#334155"/>
-        </TextBox>
-      </Layer>
-      <Layer height="20">
-        <Ellipse left="0" centerY="0" size="10,10"/>
-        <Fill color="#F59E0B"/>
-        <TextBox left="18" centerY="0">
-          <Text text="Costs 20%" fontFamily="Arial" fontSize="12"/>
-          <Fill color="#334155"/>
-        </TextBox>
-      </Layer>
-      <Layer height="20">
-        <Ellipse left="0" centerY="0" size="10,10"/>
-        <Fill color="#EF4444"/>
-        <TextBox left="18" centerY="0">
-          <Text text="Other 10%" fontFamily="Arial" fontSize="12"/>
-          <Fill color="#334155"/>
-        </TextBox>
-      </Layer>
+    <Layer height="20">
+      <Ellipse left="0" centerY="0" size="10,10"/>
+      <Fill color="#10B981"/>
+      <TextBox left="18" centerY="0">
+        <Text text="Growth 30%" fontFamily="Arial" fontSize="12"/>
+        <Fill color="#334155"/>
+      </TextBox>
+    </Layer>
+    <Layer height="20">
+      <Ellipse left="0" centerY="0" size="10,10"/>
+      <Fill color="#F59E0B"/>
+      <TextBox left="18" centerY="0">
+        <Text text="Costs 20%" fontFamily="Arial" fontSize="12"/>
+        <Fill color="#334155"/>
+      </TextBox>
+    </Layer>
+    <Layer height="20">
+      <Ellipse left="0" centerY="0" size="10,10"/>
+      <Fill color="#EF4444"/>
+      <TextBox left="18" centerY="0">
+        <Text text="Other 10%" fontFamily="Arial" fontSize="12"/>
+        <Fill color="#334155"/>
+      </TextBox>
     </Layer>
   </Layer>
 </pagx>

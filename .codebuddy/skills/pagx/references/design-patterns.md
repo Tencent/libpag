@@ -170,39 +170,32 @@ Single-use gradient or path?
 
 See `spec-essentials.md` §3 Auto Layout for the core model and all rules.
 
-### Constraint Positioning Patterns
+### Container Layout (Layer Arrangement)
 
-See `spec-essentials.md` §3 Constraint Positioning for full rules. Common patterns:
+**Container layout is the primary way to arrange child Layers** — it maps directly to
+CSS Flexbox. Always design layouts using Flexbox thinking first, then translate to PAGX
+(see §Leverage Familiar Concepts for the attribute mapping).
 
 ```xml
-<!-- Single-edge: position by left/top -->
-<Rectangle left="20" top="20" size="100,60" roundness="8"/>
-
-<!-- Opposite-pair: stretch to fill container -->
-<Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
-
-<!-- Center: centered within parent -->
-<Ellipse centerX="0" centerY="0" size="40,40"/>
-
-<!-- Mixed: one edge + center on the other axis -->
-<TextBox right="16" centerY="0">
-  <Text text="$99" fontFamily="Arial" fontSize="20"/>
-  <Fill color="#10B981"/>
-</TextBox>
+<!-- Top-level Layer as vertical flex container -->
+<pagx version="1.0" width="393" height="852">
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical">
+    <Layer height="60"><!-- fixed header --></Layer>
+    <Layer flex="1" layout="vertical" gap="16" padding="0,20,0,20">
+      <!-- nested flex containers -->
+    </Layer>
+    <Layer height="83"><!-- fixed footer --></Layer>
+  </Layer>
+</pagx>
 ```
 
-### Container Layout
-
-PAGX container layout is a subset of CSS Flexbox — see §Leverage Familiar Concepts for
-the attribute mapping. **Design layouts using Flexbox thinking first**, then translate.
+**Never fall back to constraint positioning when the layout is expressible as nested flex
+containers.** Constraint positioning on Layers is for overlay elements
+(`includeInLayout="false"`) — not for arranging rows and columns of content.
 
 Not in PAGX: `margin` (use `gap` for uniform spacing between siblings, or nest containers
 with `padding` for per-element spacing), `flex-wrap` (no wrapping), `order`, `align-content`,
 `flex-shrink`, `flex-basis`.
-
-**Never fall back to absolute constraint positioning when the layout is expressible as
-nested flex containers.** Constraint positioning is for overlay elements and single-element
-placement — not for arranging rows and columns of content.
 
 See `spec-essentials.md` §3 Container Layout for core rules (three-state sizing, flex,
 alignment, layout participation). Below are common patterns.
@@ -260,9 +253,39 @@ child a different cross-axis alignment, wrap it in a nested container with its o
 </Layer>
 ```
 
-**Overlay elements**: Set `includeInLayout="false"` on a child Layer to exempt it from
-layout flow. It can then use any constraint attribute, positioned relative to the parent's
-size. See `examples.md` §Notification Badge for a complete example.
+**Overlay elements** (= CSS `position: absolute`): Set `includeInLayout="false"` on a
+child Layer to exempt it from layout flow. It can then use constraint attributes
+(`left`/`right`/`top`/`bottom`/`centerX`/`centerY`) to position relative to the parent's
+size. Use this for badges, floating buttons, and decorative overlays that must sit outside
+the normal flow. See `examples.md` §Notification Badge for a complete example.
+
+### Internal Content Positioning (VectorElements)
+
+VectorElements inside a Layer (Rectangle, Ellipse, Path, Text, TextBox, Group) use
+constraint attributes to position within the Layer's bounds. This is always active
+regardless of the parent Layer's `layout` mode.
+
+See `spec-essentials.md` §3 Constraint Positioning for full rules. Common patterns:
+
+```xml
+<!-- Background: stretch to fill Layer -->
+<Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+
+<!-- Centered text -->
+<TextBox centerX="0" centerY="0">
+  <Text text="Label" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+  <Fill color="#FFF"/>
+</TextBox>
+
+<!-- Anchored to right edge, vertically centered -->
+<TextBox right="16" centerY="0">
+  <Text text="$99" fontFamily="Arial" fontSize="20"/>
+  <Fill color="#10B981"/>
+</TextBox>
+
+<!-- Positioned by offset -->
+<Ellipse left="8" centerY="0" size="24,24"/>
+```
 
 #### TextBox Layout Patterns
 

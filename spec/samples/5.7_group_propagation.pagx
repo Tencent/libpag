@@ -2,17 +2,15 @@
 <!-- Demonstrates style propagation: Fill outside Groups applies to all shapes -->
 <pagx version="1.0" width="400" height="400">
   <Layer>
-    <Layer>
-      <Group>
-        <Rectangle left="60" top="120" size="160,160" roundness="24"/>
-        <Fill color="#F43F5E"/>
-      </Group>
-      <Group>
-        <Ellipse left="180" top="120" size="160,160"/>
-        <Fill color="#06B6D4"/>
-      </Group>
-      <!-- Semi-transparent overlay applied to both shapes -->
-      <Fill color="#8B5CF630"/>
-    </Layer>
+    <Group>
+      <Rectangle left="60" top="120" size="160,160" roundness="24"/>
+      <Fill color="#F43F5E"/>
+    </Group>
+    <Group>
+      <Ellipse left="180" top="120" size="160,160"/>
+      <Fill color="#06B6D4"/>
+    </Group>
+    <!-- Semi-transparent overlay applied to both shapes -->
+    <Fill color="#8B5CF630"/>
   </Layer>
 </pagx>

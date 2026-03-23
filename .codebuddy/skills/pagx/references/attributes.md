@@ -60,7 +60,9 @@ they **must not** be omitted.
 | `x` | float | 0 |
 | `y` | float | 0 |
 
-> Prefer constraint attributes (`left`/`top`) over `x`/`y` for positioning.
+> `x`/`y` is generally unused — container layout and constraint attributes cover all
+> positioning needs. Arrange child Layers with container layout; position VectorElements
+> and `includeInLayout="false"` overlays with constraint attributes.
 
 | `matrix` | Matrix | identity |
 | `matrix3D` | Matrix3D | — |
