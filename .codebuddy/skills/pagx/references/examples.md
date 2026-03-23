@@ -74,9 +74,7 @@ in its own Group for painter scope isolation, and use `left`/`top` constraints f
 ```xml
 <pagx version="1.0" width="340" height="240">
   <Layer width="340" height="240">
-    <!-- Background fills the entire canvas using constraint layout -->
-    <!-- Constraints (left="0" right="0" top="0" bottom="0") are derived automatically from parents -->
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Rectangle size="340,240"/>
     <Fill color="#F1F5F9"/>
     <!-- Card positioned with constraints: all sides have margins -->
     <Layer left="20" right="20" top="20" bottom="20">
@@ -88,8 +86,8 @@ in its own Group for painter scope isolation, and use `left`/`top` constraints f
 </pagx>
 ```
 
-**Pattern**: White cards need a non-white background to be visible. Card uses complete
-constraint layout (left, right, top, bottom) to scale with parent, not fixed height.
+**Pattern**: White cards need a non-white background to be visible. Background uses `size`
+(known container dimensions); card Layer uses opposite-pair constraints to scale with margins.
 
 ### Icon + Label Row
 
@@ -111,14 +109,14 @@ constraint layout (left, right, top, bottom) to scale with parent, not fixed hei
 **Pattern**: Simple two-element row uses constraint positioning directly — no container
 layout needed. `left="40"` = 8 padding + 24 icon + 8 gap.
 
-### Card with Internal Layout (Container Layout)
+### Card with Internal Layout
 
-A card with vertical container layout arranging title, value, and action buttons.
+A card with vertical container layout, rich text header, and action buttons.
 
 ```xml
-<pagx version="1.0" width="340" height="220">
-  <Layer width="340" height="220">
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+<pagx version="1.0" width="340" height="200">
+  <Layer width="340" height="200">
+    <Rectangle size="340,200"/>
     <Fill color="#F1F5F9"/>
     <!-- Card with internal vertical layout -->
     <Layer left="20" right="20" top="20" bottom="20"
@@ -129,18 +127,17 @@ A card with vertical container layout arranging title, value, and action buttons
         <Fill color="#FFF"/>
         <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000015"/>
       </Layer>
-      <!-- Title -->
-      <Layer height="20">
-        <TextBox centerY="0">
-          <Text text="Account Balance" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-          <Fill color="#1E293B"/>
-        </TextBox>
-      </Layer>
-      <!-- Value -->
-      <Layer height="36">
-        <TextBox centerY="0">
-          <Text text="$12,580" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
-          <Fill color="#1E293B"/>
+      <!-- Title + Value (rich text: different sizes and colors) -->
+      <Layer>
+        <TextBox>
+          <Group>
+            <Text text="Account Balance&#10;" fontFamily="Arial" fontSize="14"/>
+            <Fill color="#64748B"/>
+          </Group>
+          <Group>
+            <Text text="$12,580" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+            <Fill color="#1E293B"/>
+          </Group>
         </TextBox>
       </Layer>
       <!-- Action buttons: two equal-width buttons -->
@@ -170,6 +167,8 @@ A card with vertical container layout arranging title, value, and action buttons
 
 **Pattern**: Key structural choices:
 
+- **Rich text**: Multiple Text segments with different styles in one TextBox — each wrapped
+  in a Group for painter scope isolation. Use `&#10;` for line breaks between segments.
 - **Background as overlay**: `includeInLayout="false"` + stretch constraints keeps background
   out of layout flow while filling the card's computed size.
 - **Equal-width buttons**: `flex="1"` children in horizontal container with
@@ -178,7 +177,7 @@ A card with vertical container layout arranging title, value, and action buttons
 For a **flexible height** example — where some children have fixed height and others expand to
 fill remaining space — see Dashboard Layout below.
 
-### Dashboard Layout (Container Layout)
+### Dashboard Layout
 
 ```xml
 <pagx version="1.0" width="920" height="600">
@@ -193,7 +192,7 @@ fill remaining space — see Dashboard Layout below.
       </TextBox>
     </Layer>
     <!-- Content: 3 equal columns -->
-    <Layer flex="1" layout="horizontal" gap="16">
+    <Layer flex="1" layout="horizontal" gap="16" alignment="stretch">
       <Layer flex="1">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
         <Fill color="#FFF"/>
@@ -288,7 +287,7 @@ often combine Polystar with gradients and layer styles for depth.
 <pagx version="1.0" width="200" height="200">
   <Layer width="200" height="200">
     <Layer centerX="0" centerY="0" width="160" height="160">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="32"/>
+      <Rectangle size="160,160" roundness="32"/>
       <Ellipse right="10" top="10" size="60,60"/>
       <MergePath mode="difference"/>
       <Fill>
@@ -307,7 +306,7 @@ often combine Polystar with gradients and layer styles for depth.
 MergePath **clears all previously rendered Fill/Stroke** — isolate surviving content in a
 separate Group (see `spec-essentials.md` §4).
 
-### Star Badge (Polystar + RadialGradient)
+### Star Badge (Polystar)
 
 ```xml
 <pagx version="1.0" width="200" height="200">
@@ -336,10 +335,10 @@ RadialGradient `center` defaults to `0,0` (aligns with Polystar origin); `radius
 ```xml
 <pagx version="1.0" width="200" height="200">
   <Layer width="200" height="200">
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Rectangle size="200,200"/>
     <Fill color="#E2E8F0"/>
     <Layer centerX="0" centerY="0" width="140" height="140">
-      <Ellipse left="0" right="0" top="0" bottom="0"/>
+      <Ellipse size="140,140"/>
       <Fill color="#CBD5E1"/>
       <InnerShadowStyle offsetX="-5" offsetY="-5" blurX="10" blurY="10"
                          color="#00000040"/>
@@ -362,7 +361,7 @@ Chart construction relies on TrimPath for arc control and Repeater `rotation` fo
 patterns. **Key Ellipse knowledge**: Ellipse path starts at 12 o'clock and goes clockwise —
 use Group `rotation` to reposition the start point.
 
-### Circular Gauge (TrimPath + Repeater rotation)
+### Circular Gauge (TrimPath + Repeater)
 
 ```xml
 <pagx version="1.0" width="200" height="200">
@@ -428,7 +427,7 @@ to rotate around the arc center.
 one Fill via painter scope. Bars with different heights **cannot** use Repeater (no per-copy
 parameterization).
 
-### Line Chart (Path from Data Points)
+### Line Chart
 
 ```xml
 <pagx version="1.0" width="300" height="200">
@@ -473,7 +472,7 @@ parameterization).
 reuses the same points, appends lines down to the baseline, and closes with `Z`. Grid lines
 are a single multi-M Path.
 
-### Donut Chart (TrimPath + Legend)
+### Donut Chart (TrimPath)
 
 ```xml
 <pagx version="1.0" width="340" height="200">
@@ -574,17 +573,17 @@ LinearGradient directly inside the Stroke element:
 Decorative construction relies on blur effects for glow, Composition for content reuse,
 and BackgroundBlurStyle for frosted glass.
 
-### Glow Orbs (BlurFilter + blendMode)
+### Glow Orbs (BlurFilter)
 
 ```xml
 <pagx version="1.0" width="400" height="300">
   <Layer width="400" height="300">
     <!-- Dark background -->
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Rectangle size="400,300"/>
     <Fill color="#0F172A"/>
     <!-- Purple glow orb -->
     <Layer left="80" top="60" blendMode="screen">
-      <Ellipse left="0" right="0" top="0" bottom="0" size="200,200"/>
+      <Ellipse size="200,200"/>
       <Fill>
         <RadialGradient radius="100">
           <ColorStop offset="0" color="#8B5CF660"/>
@@ -611,13 +610,13 @@ and BackgroundBlurStyle for frosted glass.
 **Pattern**: RadialGradient fading to transparent + BlurFilter creates soft glows.
 `blendMode="screen"` brightens additively. Keep blur radius minimal — cost scales with radius.
 
-### Reusable Card Grid (Composition)
+### Card Grid (Composition)
 
 ```xml
 <pagx version="1.0" width="500" height="120">
   <Layer width="500" height="120">
     <!-- Light background to make white cards visible -->
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Rectangle size="500,120"/>
     <Fill color="#F1F5F9"/>
     <!-- Reference Composition instances with constraint positioning -->
     <Layer composition="@card" left="20" top="20"/>
@@ -628,7 +627,7 @@ and BackgroundBlurStyle for frosted glass.
   <Resources>
     <Composition id="card" width="130" height="80">
       <Layer width="130" height="80">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
+        <Rectangle size="130,80" roundness="10"/>
         <Fill color="#FFF"/>
         <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000020"/>
       </Layer>
@@ -658,7 +657,7 @@ stretch constraints to fill bounds (no manual center calculation). See `optimize
     </Layer>
     <!-- Frosted glass panel -->
     <Layer centerX="0" centerY="0" width="200" height="200">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Rectangle size="200,200" roundness="16"/>
       <Fill color="#FFFFFF30"/>
       <BackgroundBlurStyle blurX="20" blurY="20"/>
     </Layer>
