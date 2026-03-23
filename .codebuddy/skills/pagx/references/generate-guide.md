@@ -181,29 +181,19 @@ These constraints differ from CSS/SVG and must be respected during generation:
 
 ---
 
-## Step 4: Render and Read Screenshot
+## Step 4: Verify and Refine
 
-After building the complete PAGX file, **always** render it before presenting results to the
-user — never skip this step. Use `--scale 2` for sharper detail during verification:
+After building the complete PAGX file, **always** render and verify before presenting
+results — never skip this step.
+
+### 1. Render and Read Screenshot
 
 ```bash
 pagx render --scale 2 input.pagx
 ```
 
-Then **read the rendered screenshot** to visually inspect the output. This is the only
-reliable way to catch layout issues, misaligned elements, incorrect colors, or missing
-content. Proceed to Step 5 for systematic verification.
-
----
-
-## Step 5: Verify and Refine
-
-After **every render**, follow this loop until the output matches the design intent.
-
-### 1. Read Screenshot
-
-Render and **read the screenshot** — visual inspection catches issues that bounds data alone
-cannot reveal (wrong colors, overlapping elements, visual imbalance).
+Read the screenshot. Visual inspection catches issues that bounds data alone cannot reveal
+(wrong colors, overlapping elements, visual imbalance).
 
 ### 2. Measure
 

@@ -96,6 +96,9 @@ variants). Rendered images are verification artifacts — do not delete them, bu
 context includes auto-commit rules, do not include these image files (`.png`, `.webp`, `.jpg`)
 in the commit.
 
+**Scale convention**: Default `--scale 2`; if the document's longer edge exceeds 2048px,
+default to `--scale 1`. When the context explicitly specifies a scale value, use it as-is.
+
 ---
 
 ## pagx validate
