@@ -13,7 +13,7 @@ as defaults.
 
 Structural patterns for application interface elements. **Always prefer container layout and
 constraint positioning over absolute coordinates** — use container layout for arranging child
-Layers in rows or columns, and constraint layout for positioning elements within a Layer.
+Layers in rows or columns, and constraint positioning for positioning elements within a Layer.
 
 ### Divider
 

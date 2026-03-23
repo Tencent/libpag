@@ -75,6 +75,7 @@ For each Layer that contains child Layers, decide:
 1. **Direction** — how are child Layers arranged?
    - Row → `layout="horizontal"`
    - Column → `layout="vertical"`
+   - Overlapping / free-form → no layout (default)
 
 2. **Spacing and alignment** — add `gap`, `padding`, `alignment`, `arrangement` as needed.
 
@@ -263,7 +264,7 @@ Use `--id` or `--xpath` for targeted measurement (see `cli.md`).
 ### 3. Check Layout
 
 **Container layout** — verify:
-- Every Layer with child Layers uses `layout="horizontal"` or `layout="vertical"`
+- Layers with child Layers in rows/columns use `layout="horizontal"` or `layout="vertical"`
 - `gap`, `padding`, `alignment`, `arrangement` match the design
 - Child sizing (`flex`, explicit size, content-measured) produces correct proportions
 
