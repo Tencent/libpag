@@ -106,7 +106,7 @@ pagx
   current layer. Used by BackgroundBlurStyle. Controlled by `passThroughBackground`: when
   `false`, child layers lose access to the background.
 
-### Layer Child Element Order (recommended)
+### Layer Child Element Order
 
 Layer children should be written in this order for consistency:
 
@@ -114,6 +114,10 @@ Layer children should be written in this order for consistency:
 2. **Child Layers**: Nested `<Layer>` elements
 3. **LayerStyles**: DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle
 4. **LayerFilters**: BlurFilter, DropShadowFilter, etc.
+
+### Attribute Order
+
+Write `id`/`name`/`version` first, then sizing/constraint attributes (`width`, `height`, `left`, `right`, `top`, `bottom`, `centerX`, `centerY`, `flex`), then child layout attributes (`layout`, `gap`, `padding`, `alignment`, `arrangement`), then everything else.
 
 ### Layer Attributes (key ones)
 
