@@ -3,7 +3,7 @@
   <Layer name="outer">
     <Group>
       <Group>
-        <Rectangle center="100,100" size="50,50"/>
+        <Rectangle position="100,100" size="50,50"/>
         <Fill color="#FF0000"/>
       </Group>
     </Group>

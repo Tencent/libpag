@@ -4,9 +4,8 @@ description: >-
   Generates well-structured PAGX files from visual descriptions and optimizes existing
   ones for size and rendering performance. Use when user asks to create, write, or
   design PAGX content, optimize or simplify a .pagx file, review PAGX structure, run
-  pagx CLI commands (render, validate, format, optimize, bounds, font info/embed,
-  align, distribute), or look up PAGX element attributes and syntax.
-user-invocable: false
+  pagx CLI commands (render, validate, format, optimize, bounds, font info/embed), or
+  look up PAGX element attributes and syntax.
 ---
 
 # PAGX Skill
@@ -45,4 +44,4 @@ generation or optimization task.
 | `spec-essentials.md` | Node types, Layer rendering pipeline, painter scope, text system, masking, resources |
 | `design-patterns.md` | Structure decisions (Layer vs Group), text layout patterns, practical pitfall patterns |
 | `attributes.md` | Attribute defaults, enumerations, required attributes |
-| `cli.md` | CLI commands — `render`, `validate`, `optimize`, `format`, `bounds`, `font info`, `font embed`, `align`, `distribute` |
+| `cli.md` | CLI commands — `render`, `validate`, `optimize`, `format`, `bounds`, `font info`, `font embed` |

@@ -259,27 +259,28 @@ is sequential and forward-only.
 ### Rectangle
 
 ```xml
-<Rectangle center="100,50" size="200,100" roundness="10"/>
+<Rectangle position="100,50" size="200,100" roundness="10"/>
 ```
 
-- `center` (default 0,0), `size` (default 100,100), `roundness` (default 0), `reversed` (default false)
-- Bounds: left = center.x - width/2, top = center.y - height/2
+- `position` is the **center point** of the rectangle (default 0,0), `size` (default 100,100), `roundness` (default 0), `reversed` (default false)
+- Bounds: left = position.x - width/2, top = position.y - height/2
 - Roundness auto-limited to `min(roundness, width/2, height/2)`
 
 ### Ellipse
 
 ```xml
-<Ellipse center="100,50" size="200,100"/>
+<Ellipse position="100,50" size="200,100"/>
 ```
 
-- Same `center`/`size`/`reversed` as Rectangle, no roundness.
+- Same `position`/`size`/`reversed` as Rectangle (`position` = center point), no roundness.
 
 ### Polystar
 
 ```xml
-<Polystar center="0,0" type="star" pointCount="5" outerRadius="100" innerRadius="50"/>
+<Polystar position="0,0" type="star" pointCount="5" outerRadius="100" innerRadius="50"/>
 ```
 
+- `position` is the **center point** from which vertices radiate outward
 - `type`: `polygon` (outer only) or `star` (outer + inner alternating)
 - Supports fractional `pointCount` (incomplete last corner)
 
@@ -438,7 +439,7 @@ Multiple Text elements in one Group, each with independent Fill/Stroke, unified 
 ## 8. Repeater
 
 ```xml
-<Rectangle center="0,0" size="20,20"/>
+<Rectangle position="0,0" size="20,20"/>
 <Fill color="#F00"/>
 <Repeater copies="5" position="30,0" rotation="10" startAlpha="1" endAlpha="0.3"/>
 ```
@@ -467,7 +468,7 @@ Multiple Text elements in one Group, each with independent Fill/Stroke, unified 
 
 ```xml
 <Layer id="maskLayer" visible="false">
-  <Ellipse center="100,100" size="150,150"/>
+  <Ellipse position="100,100" size="150,150"/>
   <Fill color="#FFF"/>
 </Layer>
 <Layer mask="@maskLayer">

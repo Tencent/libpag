@@ -12,11 +12,11 @@
     </LinearGradient>
   </Resources>
   <Layer x="75" y="50">
-    <Rectangle center="0,0" size="100,50"/>
+    <Rectangle position="0,0" size="100,50"/>
     <Fill color="@grad1"/>
   </Layer>
   <Layer x="225" y="50">
-    <Rectangle center="0,0" size="100,50"/>
+    <Rectangle position="0,0" size="100,50"/>
     <Fill color="@grad2"/>
   </Layer>
 </pagx>

@@ -3,7 +3,7 @@
 <pagx version="1.0" width="400" height="400">
   <!-- Box 1 (top-left): horizontal justify + lineHeight -->
   <Layer>
-    <Rectangle center="104,104" size="180,180" roundness="6"/>
+    <Rectangle position="104,104" size="180,180" roundness="6"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
   </Layer>
   <Layer>
@@ -22,7 +22,7 @@
 
   <!-- Box 2 (top-right): horizontal textAlign center + paragraphAlign middle -->
   <Layer>
-    <Rectangle center="296,104" size="180,180" roundness="6"/>
+    <Rectangle position="296,104" size="180,180" roundness="6"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
   </Layer>
   <Layer>
@@ -41,7 +41,7 @@
 
   <!-- Box 3 (bottom-left): vertical writing -->
   <Layer>
-    <Rectangle center="104,296" size="180,180" roundness="6"/>
+    <Rectangle position="104,296" size="180,180" roundness="6"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
   </Layer>
   <Layer>
@@ -60,7 +60,7 @@
 
   <!-- Box 4 (bottom-right): vertical textAlign center + paragraphAlign middle -->
   <Layer>
-    <Rectangle center="296,296" size="180,180" roundness="6"/>
+    <Rectangle position="296,296" size="180,180" roundness="6"/>
     <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
   </Layer>
   <Layer>

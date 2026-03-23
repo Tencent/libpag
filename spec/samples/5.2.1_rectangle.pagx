@@ -3,7 +3,7 @@
 <pagx version="1.0" width="400" height="400">
   <!-- Sharp rectangle -->
   <Layer>
-    <Rectangle center="110,110" size="140,140"/>
+    <Rectangle position="110,110" size="140,140"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="140,140">
         <ColorStop offset="0" color="#F43F5E"/>
@@ -14,7 +14,7 @@
   </Layer>
   <!-- Medium rounded rectangle -->
   <Layer>
-    <Rectangle center="290,110" size="140,140" roundness="24"/>
+    <Rectangle position="290,110" size="140,140" roundness="24"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="140,140">
         <ColorStop offset="0" color="#8B5CF6"/>
@@ -25,7 +25,7 @@
   </Layer>
   <!-- Fully rounded rectangle (pill shape) -->
   <Layer>
-    <Rectangle center="110,290" size="140,140" roundness="70"/>
+    <Rectangle position="110,290" size="140,140" roundness="70"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="140,140">
         <ColorStop offset="0" color="#06B6D4"/>
@@ -36,7 +36,7 @@
   </Layer>
   <!-- Wide rectangle -->
   <Layer>
-    <Rectangle center="290,290" size="140,100" roundness="16"/>
+    <Rectangle position="290,290" size="140,100" roundness="16"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="140,100">
         <ColorStop offset="0" color="#10B981"/>

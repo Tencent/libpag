@@ -40,6 +40,12 @@ pagx render --format webp --scale 2 --background "#FFFFFF" input.pagx
 # Render a cropped region
 pagx render --crop 0,0,200,200 -o cropped.png input.pagx
 
+# Render only a specific layer by id
+pagx render --id badge -o badge.png input.pagx
+
+# Render only a specific layer by XPath
+pagx render --xpath "//Layer[@id='card']" -o card.png input.pagx
+
 # Optimize (validate + structural optimization + format)
 pagx optimize input.pagx
 
@@ -49,7 +55,10 @@ pagx optimize --dry-run input.pagx
 # Format with 4-space indentation
 pagx format --indent 4 input.pagx
 
-# Query bounds of a specific layer
+# Query bounds of a specific layer by id
+pagx bounds --id btn input.pagx
+
+# Query bounds of a specific layer by XPath
 pagx bounds --xpath "//Layer[@id='btn']" input.pagx
 
 # Query bounds relative to another layer, output as JSON
@@ -84,7 +93,9 @@ Render a PAGX file to an image.
 | `-o, --output <path>` | Output file path (default: input path with format extension) |
 | `--format png\|webp\|jpg` | Output format (default: `png`) |
 | `--scale <float>` | Scale factor (default: `1.0`) |
-| `--crop <x,y,w,h>` | Crop region in document coordinates |
+| `--id <id>` | Render only the Layer with the specified id |
+| `--xpath <expr>` | Render only the Layer matched by XPath expression |
+| `--crop <x,y,w,h>` | Crop region in document coordinates (relative to target Layer bounds when combined with `--id` or `--xpath`) |
 | `--quality <0-100>` | Encoding quality (default: `100`) |
 | `--background <color>` | Background color (`#RRGGBB` or `#RRGGBBAA`) |
 | `--font <path>` | Register a font file (repeatable) |
@@ -124,15 +135,17 @@ structure.
 
 ### `pagx bounds [options] <file.pagx>`
 
-Query the precise rendered bounds of Layer nodes.
+Query the precise rendered bounds of Layer nodes. Bounds are reported in global (canvas)
+coordinates by default.
 
 | Option | Description |
 |--------|-------------|
+| `--id <id>` | Select a Layer by its id attribute |
 | `--xpath <expr>` | Select nodes by XPath expression |
 | `--relative <xpath>` | Output bounds relative to another Layer |
 | `--json` | Output in JSON format |
 
-Without `--xpath`, outputs bounds for all layers.
+`--id` and `--xpath` are mutually exclusive. Without either, outputs bounds for all layers.
 
 ### `pagx font info [options]`
 

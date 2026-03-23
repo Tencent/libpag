@@ -5,7 +5,7 @@
   <!-- Box A: CJK auto word wrap -->
   <Layer x="50" y="50">
     <Group>
-      <Rectangle center="75,60" size="150,120"/>
+      <Rectangle position="75,60" size="150,120"/>
       <Stroke/>
     </Group>
     <Group>
@@ -18,7 +18,7 @@
   <!-- Box B: Overflow hidden -->
   <Layer x="220" y="50">
     <Group>
-      <Rectangle center="75,40" size="150,80"/>
+      <Rectangle position="75,40" size="150,80"/>
       <Stroke/>
     </Group>
     <Group>
@@ -31,7 +31,7 @@
   <!-- Box C: Justify alignment -->
   <Layer x="390" y="50">
     <Group>
-      <Rectangle center="75,40" size="150,80"/>
+      <Rectangle position="75,40" size="150,80"/>
       <Stroke/>
     </Group>
     <Group>
@@ -46,7 +46,7 @@
   <!-- Box D: Empty lines (\n at start + consecutive \n\n) -->
   <Layer x="50" y="200">
     <Group>
-      <Rectangle center="60,65" size="120,130"/>
+      <Rectangle position="60,65" size="120,130"/>
       <Stroke/>
     </Group>
     <Group>
@@ -59,7 +59,7 @@
   <!-- Box E: Rich text + end alignment -->
   <Layer x="190" y="200">
     <Group>
-      <Rectangle center="115,60" size="230,120"/>
+      <Rectangle position="115,60" size="230,120"/>
       <Stroke/>
     </Group>
     <Group>
@@ -80,7 +80,7 @@
   <!-- Box F: ParagraphAlign near -->
   <Layer x="50" y="360">
     <Group>
-      <Rectangle center="75,40" size="150,80"/>
+      <Rectangle position="75,40" size="150,80"/>
       <Stroke/>
     </Group>
     <Group>
@@ -93,7 +93,7 @@
   <!-- Box G: ParagraphAlign middle -->
   <Layer x="220" y="360">
     <Group>
-      <Rectangle center="75,40" size="150,80"/>
+      <Rectangle position="75,40" size="150,80"/>
       <Stroke/>
     </Group>
     <Group>
@@ -106,7 +106,7 @@
   <!-- Box H: ParagraphAlign far -->
   <Layer x="390" y="360">
     <Group>
-      <Rectangle center="75,40" size="150,80"/>
+      <Rectangle position="75,40" size="150,80"/>
       <Stroke/>
     </Group>
     <Group>
@@ -121,7 +121,7 @@
   <!-- Box I: Auto lineHeight, mixed font sizes -->
   <Layer x="50" y="470">
     <Group>
-      <Rectangle center="100,90" size="200,180"/>
+      <Rectangle position="100,90" size="200,180"/>
       <Stroke/>
     </Group>
     <Group>
@@ -144,7 +144,7 @@
   <!-- Box J: Fixed lineHeight=40, mixed font sizes -->
   <Layer x="270" y="470">
     <Group>
-      <Rectangle center="100,90" size="200,180"/>
+      <Rectangle position="100,90" size="200,180"/>
       <Stroke/>
     </Group>
     <Group>
@@ -167,7 +167,7 @@
   <!-- Box K: Fixed lineHeight=50, paragraphAlign far -->
   <Layer x="490" y="470">
     <Group>
-      <Rectangle center="75,80" size="150,160"/>
+      <Rectangle position="75,80" size="150,160"/>
       <Stroke/>
     </Group>
     <Group>
@@ -182,7 +182,7 @@
   <!-- Box L: 3-line mixed sizes, paragraphAlign far -->
   <Layer x="50" y="680">
     <Group>
-      <Rectangle center="75,90" size="150,180"/>
+      <Rectangle position="75,90" size="150,180"/>
       <Stroke/>
     </Group>
     <Group>
@@ -207,7 +207,7 @@
        The empty line height should use 40pt metrics, not 16pt. -->
   <Layer x="240" y="680">
     <Group>
-      <Rectangle center="100,90" size="200,180"/>
+      <Rectangle position="100,90" size="200,180"/>
       <Stroke/>
     </Group>
     <Group>
@@ -283,7 +283,7 @@
       <TextBox position="110,0" textAlign="center"/>
     </Group>
     <Group>
-      <Ellipse center="110,0" size="6,6"/>
+      <Ellipse position="110,0" size="6,6"/>
       <Fill color="#F00"/>
     </Group>
 
@@ -294,7 +294,7 @@
       <TextBox position="220,0" textAlign="end"/>
     </Group>
     <Group>
-      <Ellipse center="220,0" size="6,6"/>
+      <Ellipse position="220,0" size="6,6"/>
       <Fill color="#F00"/>
     </Group>
 
@@ -305,7 +305,7 @@
       <TextBox position="330,0"/>
     </Group>
     <Group>
-      <Ellipse center="330,0" size="6,6"/>
+      <Ellipse position="330,0" size="6,6"/>
       <Fill color="#F00"/>
     </Group>
 
@@ -316,7 +316,7 @@
       <TextBox position="440,0" paragraphAlign="middle"/>
     </Group>
     <Group>
-      <Ellipse center="440,0" size="6,6"/>
+      <Ellipse position="440,0" size="6,6"/>
       <Fill color="#F00"/>
     </Group>
 
@@ -327,7 +327,7 @@
       <TextBox position="550,0" paragraphAlign="far"/>
     </Group>
     <Group>
-      <Ellipse center="550,0" size="6,6"/>
+      <Ellipse position="550,0" size="6,6"/>
       <Fill color="#F00"/>
     </Group>
   </Layer>
