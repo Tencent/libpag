@@ -11,13 +11,50 @@ scratch when an equivalent exists:
 
 | Think in... | Translate to PAGX |
 |---|---|
-| CSS Flexbox (`flex-direction`, `flex`, `gap`, `align-items`, `justify-content`, `padding`) | Container layout (`layout`, `flex`, `gap`, `alignment`, `arrangement`, `padding`) — see §Container Layout. **Important**: `padding` only affects container layout children, not constraint positioning |
+| CSS Flexbox | Container layout — see detailed mapping below and §Container Layout |
 | SVG `<path d="...">` | `<Path data="..."/>` — identical syntax, copy `d` values directly |
 | CSS `box-shadow: offsetX offsetY blur color` | `<DropShadowStyle offsetX offsetY blurX blurY color/>` |
 | CSS `backdrop-filter: blur(N)` | `<BackgroundBlurStyle blurX="N" blurY="N"/>` |
+| CSS `overflow: hidden` (pixel-level clip) | `<Layer scrollRect="x,y,w,h">` — rectangular clip on any Layer. TextBox `overflow` is line-level, not pixel-level |
 | CSS `linear-gradient(angle, stops)` | `<LinearGradient startPoint endPoint>` — convert angle to coordinates on the geometry bounds |
 | CSS `radial-gradient(circle R at cx cy, stops)` | `<RadialGradient center="cx,cy" radius="R">` |
 | CSS `text-align`, `line-height`, `overflow` | TextBox `textAlign`, `lineHeight`, `overflow` — same names and semantics |
+
+### CSS Flexbox → PAGX Container Layout
+
+**Attribute mapping**:
+
+| CSS Flexbox | PAGX | Notes |
+|-------------|------|-------|
+| `flex-direction` | `layout` | `row` → `horizontal`, `column` → `vertical` (reverse variants not supported) |
+| `flex` / `flex-grow` | `flex` | Same name and semantics |
+| `gap` | `gap` | Same name and semantics |
+| `padding` | `padding` | Same name, same 1/2/4-value shorthand (`"20"`, `"10,20"`, `"10,20,10,20"`) |
+| `align-items` | `alignment` | See enum mapping below |
+| `justify-content` | `arrangement` | See enum mapping below |
+
+**Enum value mapping**:
+
+| CSS `flex-direction` | PAGX `layout` |
+|----------------------|---------------|
+| `row` | `horizontal` |
+| `column` | `vertical` |
+
+| CSS `align-items` | PAGX `alignment` |
+|--------------------|-------------------|
+| `stretch` | `stretch` (both are the default) |
+| `flex-start` | `start` |
+| `center` | `center` |
+| `flex-end` | `end` |
+
+| CSS `justify-content` | PAGX `arrangement` |
+|------------------------|---------------------|
+| `flex-start` | `start` (both are the default) |
+| `center` | `center` |
+| `flex-end` | `end` |
+| `space-between` | `spaceBetween` |
+| `space-evenly` | `spaceEvenly` |
+| `space-around` | `spaceAround` |
 
 ---
 
@@ -139,9 +176,9 @@ Constraint Positioning for full rules and the center sizing requirement.
 PAGX container layout is a subset of CSS Flexbox — see §Leverage Familiar Concepts for
 the attribute mapping. **Design layouts using Flexbox thinking first**, then translate.
 
-Not in PAGX: `margin` (use uniform `gap` or spacer Layers), `flex-wrap` (no wrapping).
-
-**Critical limitation**: `padding` only affects container layout (`layout="horizontal"` or `layout="vertical"`). It does **not** apply to constraint positioning. For content-measured containers using constraints (e.g., white cards with `left`/`right`/`top`/`bottom` sub-layers), use explicit sizing or rely on constraint positioning alone — `padding` will be ignored.
+Not in PAGX: `margin` (use `gap` for uniform spacing between siblings, or nest containers
+with `padding` for per-element spacing), `flex-wrap` (no wrapping), `order`, `align-content`,
+`flex-shrink`, `flex-basis`.
 
 **Never fall back to absolute constraint positioning when the layout is expressible as
 nested flex containers.** Constraint positioning is for overlay elements and single-element

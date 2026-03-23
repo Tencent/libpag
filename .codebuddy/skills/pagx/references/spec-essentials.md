@@ -300,7 +300,7 @@ Write `id`/`name`/`version` first, then constraint/sizing attributes (`left`, `r
 | `layout` | none | `none` (default), `horizontal`, or `vertical` — sets container layout mode for child Layers |
 | `gap` | 0 | Spacing between adjacent child Layers along the main axis |
 | `flex` | 0 | Flex weight for proportional sizing in container layout. 0 = content-measured (default); >0 = share remaining space by weight |
-| `padding` | 0 | Inner padding of the container: `"all"`, `"v,h"`, `"t,h,b"`, or `"t,r,b,l"` (CSS-compatible shorthand). **Only applies in container layout mode** (`layout` is set). Has no effect on constraint positioning |
+| `padding` | 0 | Inner padding: CSS-compatible shorthand — single value (`"20"`), two values (`"10,20"` for v,h), or four values (`"10,20,10,20"` for t,r,b,l) |
 | `alignment` | stretch | Cross-axis alignment of children: `start` / `center` / `end` / `stretch` |
 | `arrangement` | start | Main-axis distribution: `start` / `center` / `end` / `spaceBetween` / `spaceEvenly` / `spaceAround` |
 | `includeInLayout` | true | Whether to participate in parent's container layout |
@@ -381,11 +381,11 @@ Geometry Elements     Modifiers             Painters
 |---------------|---------|-------|
 | Shape modifiers (TrimPath, RoundCorner, MergePath) | Paths only | Triggers text-to-shape conversion |
 | Text modifiers (TextModifier, TextPath) | Glyph lists only | No effect on Paths |
+| Repeater | Both | Does not trigger text-to-shape |
 
 TextPath also supports **constraint-based positioning** (left, right, top, bottom, centerX, centerY)
 inherited from LayoutElement. When opposite-edge constraints are used, TextPath scales its path
 data proportionally (same as Path — scale-to-fit, not stretch).
-| Repeater | Both | Does not trigger text-to-shape |
 
 **Key scope implications**:
 - Shape modifiers trigger **text-to-shape conversion** if glyph lists are present — irreversible.
@@ -496,8 +496,8 @@ is sequential and forward-only.
 <Text left="10" top="10" text="Hello" fontFamily="Arial" fontSize="24"/>
 ```
 
-- Text is a content-only element — always wrap in TextBox for positioning and measurement. TextBox handles proper measurement and constraint positioning.
-- **Constraint attributes** (supported but rarely used directly): `left`, `right`, `top`, `bottom`, `centerX`, `centerY` — typically applied via parent TextBox instead. See §3 Constraint Positioning and §8 TextBox.
+- Text is a content-only element — wrap in TextBox for positioning and measurement. TextBox handles proper measurement and constraint positioning. Exception: when using TextPath, Text can appear without TextBox wrapper.
+- **Constraint attributes**: Text supports `left`, `right`, `top`, `bottom`, `centerX`, `centerY`, but prefer applying constraints to the parent TextBox instead of directly on Text.
 - `fauxBold` / `fauxItalic`: algorithmic bold / italic (default false).
 - **CDATA** for special characters: `<![CDATA[A < B]]>`.
 - `\n` in `text` attribute (as `&#10;`) triggers line breaks.

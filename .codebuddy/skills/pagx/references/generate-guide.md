@@ -88,23 +88,6 @@ precedence, `flex` is ignored). Prefer `arrangement` over empty flex spacer Laye
 
 See `spec-essentials.md` §3 Container Layout for complete three-state sizing rules.
 
-### Padding vs. Constraint Positioning
-
-This is a common confusion point:
-
-- **`padding` on a Layer** only applies when `layout="horizontal"` or `layout="vertical"` is set.
-  It pads the space between the container edge and its layout-managed child Layers.
-- **`left`/`right`/`top`/`bottom` constraints** on child Layers work independently of `padding`.
-  They always reference the parent container's bounds, with no padding adjustment.
-
-**Wrong approach**: Create a card without `layout`, then try to pad it using `left="20" right="20" top="20" bottom="20"` on a child Layer. The padding won't apply correctly if the parent's size is content-measured.
-
-**Correct approach**: 
-- If the parent Layer has explicit `width`/`height`, constraints work as expected.
-- If the parent Layer is content-measured (size comes from children), use `padding` on the parent **and set `layout`**, or adjust the entire parent's positioning, not individual child constraints.
-
-See `design-patterns.md` §Container Layout for when to use `padding` vs. constraint positioning.
-
 ### Origin-Based Positioning
 
 Children must start from (0,0) — the engine measures content-measured containers from (0,0)
@@ -148,8 +131,9 @@ For each block, construct the VectorElement tree following these principles.
 ### Text Positioning
 
 Text is a content-only element — it renders from the baseline, making direct positioning
-dependent on font metrics. Always wrap Text in TextBox, which handles measurement and
-provides accurate bounding box for constraint positioning.
+dependent on font metrics. Wrap Text in TextBox, which handles measurement and
+provides accurate bounding box for constraint positioning. Exception: when using TextPath,
+Text can appear without TextBox wrapper.
 
 ```xml
 <!-- Centered in container -->

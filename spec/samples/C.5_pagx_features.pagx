@@ -82,22 +82,22 @@
     <Path data="M 800 375 L 800 240 M 954 511 L 1119 466 M 903 646 L 989 790 M 697 646 L 611 790 M 646 511 L 481 466"/>
     <Stroke color="@accentLine" width="2" dashes="8,14"/>
   </Layer>
-  <Layer name="CardReadable" left="800" top="160">
-    <Rectangle left="-200" top="-80" size="400,160" roundness="20"/>
+  <Layer name="CardReadable" left="600" top="80" width="400" height="160">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="20"/>
     <Fill color="#1E293B80"/>
     <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetY="4" blurX="24" blurY="24" color="#00000060"/>
-    <Layer alpha="0.08">
-      <Path data="M -180 -80 L 180 -80"/>
+    <Layer left="0" right="0" top="0" bottom="0" alpha="0.08">
+      <Path left="20" top="0" data="M 0 0 L 360 0"/>
       <Stroke width="1">
-        <LinearGradient startPoint="-180,-80" endPoint="180,-80">
+        <LinearGradient startPoint="0,0" endPoint="360,0">
           <ColorStop offset="0" color="#F43F5E00"/>
           <ColorStop offset="0.5" color="#F43F5E"/>
           <ColorStop offset="1" color="#F43F5E00"/>
         </LinearGradient>
       </Stroke>
     </Layer>
-    <Layer left="-120">
+    <Layer left="80" centerY="0">
       <Group>
         <Path data="M -22 -32 L 6 -32 L 22 -16 L 22 36 L -22 36 Z"/>
         <Stroke color="#F43F5E" width="2" join="round"/>
@@ -116,7 +116,7 @@
         <Stroke color="#F43F5E" width="1.5" cap="round"/>
       </Group>
     </Layer>
-    <Layer layout="vertical" left="-50" top="-46">
+    <Layer layout="vertical" left="150" top="34">
       <Layer>
         <TextBox>
           <Text text="Readable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
@@ -131,22 +131,22 @@
       </Layer>
     </Layer>
   </Layer>
-  <Layer name="CardComprehensive" left="1319" top="466">
-    <Rectangle left="-200" top="-80" size="400,160" roundness="20"/>
+  <Layer name="CardComprehensive" left="1119" top="386" width="400" height="160">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="20"/>
     <Fill color="#1E293B80"/>
     <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetY="4" blurX="24" blurY="24" color="#00000060"/>
-    <Layer alpha="0.08">
-      <Path data="M -180 -80 L 180 -80"/>
+    <Layer left="0" right="0" top="0" bottom="0" alpha="0.08">
+      <Path left="20" top="0" data="M 0 0 L 360 0"/>
       <Stroke width="1">
-        <LinearGradient startPoint="-180,-80" endPoint="180,-80">
+        <LinearGradient startPoint="0,0" endPoint="360,0">
           <ColorStop offset="0" color="#38BDF800"/>
           <ColorStop offset="0.5" color="#38BDF8"/>
           <ColorStop offset="1" color="#38BDF800"/>
         </LinearGradient>
       </Stroke>
     </Layer>
-    <Layer left="-120" top="-2">
+    <Layer left="80" centerY="-2">
       <Group>
         <Rectangle left="-31" top="-34" size="52,32" roundness="6"/>
         <Stroke color="#38BDF8" width="2"/>
@@ -163,7 +163,7 @@
         <Fill color="#38BDF810"/>
       </Group>
     </Layer>
-    <Layer layout="vertical" left="-50" top="-46">
+    <Layer layout="vertical" left="150" top="34">
       <Layer>
         <TextBox>
           <Text text="Comprehensive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
@@ -178,22 +178,22 @@
       </Layer>
     </Layer>
   </Layer>
-  <Layer name="CardExpressive" left="281" top="466">
-    <Rectangle left="-200" top="-80" size="400,160" roundness="20"/>
+  <Layer name="CardExpressive" left="81" top="386" width="400" height="160">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="20"/>
     <Fill color="#1E293B80"/>
     <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetY="4" blurX="24" blurY="24" color="#00000060"/>
-    <Layer alpha="0.08">
-      <Path data="M -180 -80 L 180 -80"/>
+    <Layer left="0" right="0" top="0" bottom="0" alpha="0.08">
+      <Path left="20" top="0" data="M 0 0 L 360 0"/>
       <Stroke width="1">
-        <LinearGradient startPoint="-180,-80" endPoint="180,-80">
+        <LinearGradient startPoint="0,0" endPoint="360,0">
           <ColorStop offset="0" color="#A855F700"/>
           <ColorStop offset="0.5" color="#A855F7"/>
           <ColorStop offset="1" color="#A855F700"/>
         </LinearGradient>
       </Stroke>
     </Layer>
-    <Layer left="-110" top="-2">
+    <Layer left="90" centerY="-2">
       <Group>
         <Rectangle left="-38" top="-36" size="32,72" roundness="5"/>
         <Stroke color="#A855F7" width="2"/>
@@ -221,7 +221,7 @@
         <Fill color="#A855F715"/>
       </Group>
     </Layer>
-    <Layer layout="vertical" left="-50" top="-46">
+    <Layer layout="vertical" left="150" top="34">
       <Layer>
         <TextBox>
           <Text text="Expressive" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
@@ -236,22 +236,22 @@
       </Layer>
     </Layer>
   </Layer>
-  <Layer name="CardInteroperable" left="499" top="870">
-    <Rectangle left="-200" top="-80" size="400,160" roundness="20"/>
+  <Layer name="CardInteroperable" left="299" top="790" width="400" height="160">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="20"/>
     <Fill color="#1E293B80"/>
     <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetY="4" blurX="24" blurY="24" color="#00000060"/>
-    <Layer alpha="0.08">
-      <Path data="M -180 -80 L 180 -80"/>
+    <Layer left="0" right="0" top="0" bottom="0" alpha="0.08">
+      <Path left="20" top="0" data="M 0 0 L 360 0"/>
       <Stroke width="1">
-        <LinearGradient startPoint="-180,-80" endPoint="180,-80">
+        <LinearGradient startPoint="0,0" endPoint="360,0">
           <ColorStop offset="0" color="#10B98100"/>
           <ColorStop offset="0.5" color="#10B981"/>
           <ColorStop offset="1" color="#10B98100"/>
         </LinearGradient>
       </Stroke>
     </Layer>
-    <Layer left="-110">
+    <Layer left="90" centerY="0">
       <Group>
         <Ellipse left="-38" top="-20" size="40,40"/>
         <Ellipse left="-2" top="-20" size="40,40"/>
@@ -266,7 +266,7 @@
         <Stroke color="#10B981" width="1" dashes="3,3"/>
       </Group>
     </Layer>
-    <Layer layout="vertical" left="-50" top="-46">
+    <Layer layout="vertical" left="150" top="34">
       <Layer>
         <TextBox>
           <Text text="Interoperable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
@@ -281,22 +281,22 @@
       </Layer>
     </Layer>
   </Layer>
-  <Layer name="CardDeployable" left="1101" top="870">
-    <Rectangle left="-200" top="-80" size="400,160" roundness="20"/>
+  <Layer name="CardDeployable" left="901" top="790" width="400" height="160">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="20"/>
     <Fill color="#1E293B80"/>
     <Stroke color="#33415580" width="1"/>
     <DropShadowStyle offsetY="4" blurX="24" blurY="24" color="#00000060"/>
-    <Layer alpha="0.08">
-      <Path data="M -180 -80 L 180 -80"/>
+    <Layer left="0" right="0" top="0" bottom="0" alpha="0.08">
+      <Path left="20" top="0" data="M 0 0 L 360 0"/>
       <Stroke width="1">
-        <LinearGradient startPoint="-180,-80" endPoint="180,-80">
+        <LinearGradient startPoint="0,0" endPoint="360,0">
           <ColorStop offset="0" color="#FBBF2400"/>
           <ColorStop offset="0.5" color="#FBBF24"/>
           <ColorStop offset="1" color="#FBBF2400"/>
         </LinearGradient>
       </Stroke>
     </Layer>
-    <Layer left="-120" top="-2">
+    <Layer left="80" centerY="-2">
       <Group>
         <Path data="M 0 -40 C 10 -35 18 -20 18 0 L 18 22 L -18 22 L -18 0 C -18 -20 -10 -35 0 -40 Z"/>
         <Stroke color="#FBBF24" width="2" join="round"/>
@@ -316,7 +316,7 @@
         <Stroke color="#FB923C" width="2" cap="round" join="round"/>
       </Group>
     </Layer>
-    <Layer layout="vertical" left="-50" top="-46">
+    <Layer layout="vertical" left="150" top="34">
       <Layer>
         <TextBox>
           <Text text="Deployable" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
