@@ -32,6 +32,8 @@
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -45,8 +47,6 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
-#include "pagx/nodes/Font.h"
-#include "pagx/nodes/GlyphRun.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/svg/SVGTextLayout.h"
 #include "renderer/FontEmbedder.h"
@@ -1781,7 +1781,8 @@ PAGX_TEST(PAGXSVGTest, SVGTextLayout_EstimateCharAdvance) {
 
 PAGX_TEST(PAGXSVGTest, SVGTextLayout_BreakTextIntoLines_SingleLine) {
   std::vector<pagx::SVGCharInfo> chars = {
-      {'H', 0, 1, 12.0f}, {'i', 1, 1, 12.0f},
+      {'H', 0, 1, 12.0f},
+      {'i', 1, 1, 12.0f},
   };
   auto lines = pagx::BreakTextIntoLines(chars, 100);
   EXPECT_EQ(lines.size(), 1u);
@@ -1792,7 +1793,9 @@ PAGX_TEST(PAGXSVGTest, SVGTextLayout_BreakTextIntoLines_SingleLine) {
 
 PAGX_TEST(PAGXSVGTest, SVGTextLayout_BreakTextIntoLines_ExplicitNewline) {
   std::vector<pagx::SVGCharInfo> chars = {
-      {'A', 0, 1, 10.0f}, {'\n', 1, 1, 0.0f}, {'B', 2, 1, 10.0f},
+      {'A', 0, 1, 10.0f},
+      {'\n', 1, 1, 0.0f},
+      {'B', 2, 1, 10.0f},
   };
   auto lines = pagx::BreakTextIntoLines(chars, 100);
   EXPECT_EQ(lines.size(), 2u);
@@ -1816,7 +1819,9 @@ PAGX_TEST(PAGXSVGTest, SVGTextLayout_BreakTextIntoLines_WordWrap) {
 PAGX_TEST(PAGXSVGTest, SVGTextLayout_BreakTextIntoLines_ForcedBreak) {
   // Each char is 15px wide, boxWidth=20 → first char fits, second forces break
   std::vector<pagx::SVGCharInfo> chars = {
-      {'X', 0, 1, 15.0f}, {'Y', 1, 1, 15.0f}, {'Z', 2, 1, 15.0f},
+      {'X', 0, 1, 15.0f},
+      {'Y', 1, 1, 15.0f},
+      {'Z', 2, 1, 15.0f},
   };
   auto lines = pagx::BreakTextIntoLines(chars, 20);
   EXPECT_GE(lines.size(), 2u);
@@ -1825,7 +1830,9 @@ PAGX_TEST(PAGXSVGTest, SVGTextLayout_BreakTextIntoLines_ForcedBreak) {
 PAGX_TEST(PAGXSVGTest, SVGTextLayout_BreakTextIntoLines_BreakBetweenCJK) {
   // CJK characters can break between each other
   std::vector<pagx::SVGCharInfo> chars = {
-      {0x4E2D, 0, 3, 20.0f}, {0x6587, 3, 3, 20.0f}, {0x5B57, 6, 3, 20.0f},
+      {0x4E2D, 0, 3, 20.0f},
+      {0x6587, 3, 3, 20.0f},
+      {0x5B57, 6, 3, 20.0f},
   };
   auto lines = pagx::BreakTextIntoLines(chars, 45);
   EXPECT_GE(lines.size(), 2u);
@@ -1834,9 +1841,9 @@ PAGX_TEST(PAGXSVGTest, SVGTextLayout_BreakTextIntoLines_BreakBetweenCJK) {
 PAGX_TEST(PAGXSVGTest, SVGTextLayout_ExtractLineText) {
   std::string fullText = "Hello World";
   std::vector<pagx::SVGCharInfo> chars = {
-      {'H', 0, 1, 0}, {'e', 1, 1, 0}, {'l', 2, 1, 0}, {'l', 3, 1, 0}, {'o', 4, 1, 0},
-      {' ', 5, 1, 0}, {'W', 6, 1, 0}, {'o', 7, 1, 0}, {'r', 8, 1, 0}, {'l', 9, 1, 0},
-      {'d', 10, 1, 0},
+      {'H', 0, 1, 0}, {'e', 1, 1, 0}, {'l', 2, 1, 0},  {'l', 3, 1, 0},
+      {'o', 4, 1, 0}, {' ', 5, 1, 0}, {'W', 6, 1, 0},  {'o', 7, 1, 0},
+      {'r', 8, 1, 0}, {'l', 9, 1, 0}, {'d', 10, 1, 0},
   };
   pagx::SVGTextLine line = {6, 5, 0};
   EXPECT_EQ(pagx::ExtractLineText(fullText, chars, line), "World");

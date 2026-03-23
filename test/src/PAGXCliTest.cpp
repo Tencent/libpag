@@ -1279,8 +1279,7 @@ CLI_TEST(PAGXCliTest, Convert_TooManyArgs) {
 CLI_TEST(PAGXCliTest, Convert_UnsupportedFormat) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   auto outputPath = TempDir() + "/ConvertSVG_Unsupported.out";
-  auto ret =
-      CallRun(pagx::cli::RunConvert, {"convert", "--format", "json", inputPath, outputPath});
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", "--format", "json", inputPath, outputPath});
   EXPECT_NE(ret, 0);
 }
 
