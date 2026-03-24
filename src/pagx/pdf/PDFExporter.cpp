@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <map>
 #include <string>
@@ -59,6 +60,26 @@ using pag::FloatNearlyZero;
 // 4*(sqrt(2)-1)/3, optimal cubic Bezier approximation for quarter-circle arcs.
 static constexpr float kKappa = 0.5522847498f;
 
+// PDF does not support scientific notation (e.g., "1e-06") in numeric values.
+// The spec requires decimal digits with optional sign and decimal point only.
+static std::string PDFFloat(float value) {
+  if (std::abs(value) < 0.00001f) {
+    return "0";
+  }
+  char buf[64];
+  snprintf(buf, sizeof(buf), "%.6f", value);
+  auto len = strlen(buf);
+  if (memchr(buf, '.', len)) {
+    while (len > 0 && buf[len - 1] == '0') {
+      buf[--len] = '\0';
+    }
+    if (len > 0 && buf[len - 1] == '.') {
+      buf[--len] = '\0';
+    }
+  }
+  return std::string(buf);
+}
+
 //==============================================================================
 // PDFStream – builds PDF content stream operators
 //==============================================================================
@@ -72,7 +93,7 @@ class PDFStream {
     _buf += s;
   }
   void append(float v) {
-    _buf += FloatToString(v);
+    _buf += PDFFloat(v);
   }
   void space() {
     _buf += ' ';
@@ -408,8 +429,8 @@ class PDFResourceManager {
     }
 
     std::string name = "GS" + std::to_string(_gsCount++);
-    int objId = _store->add("<< /Type /ExtGState /ca " + FloatToString(fillAlpha) + " /CA " +
-                            FloatToString(strokeAlpha) + " >>");
+    int objId = _store->add("<< /Type /ExtGState /ca " + PDFFloat(fillAlpha) + " /CA " +
+                            PDFFloat(strokeAlpha) + " >>");
     _extGStates[name] = objId;
     _gsCache[key] = name;
     return name;
@@ -423,10 +444,10 @@ class PDFResourceManager {
 
     if (stops.size() == 2) {
       return _store->add(
-          "<< /FunctionType 2 /Domain [0 1] /C0 [" + FloatToString(stops[0]->color.red) + " " +
-          FloatToString(stops[0]->color.green) + " " + FloatToString(stops[0]->color.blue) +
-          "] /C1 [" + FloatToString(stops[1]->color.red) + " " +
-          FloatToString(stops[1]->color.green) + " " + FloatToString(stops[1]->color.blue) +
+          "<< /FunctionType 2 /Domain [0 1] /C0 [" + PDFFloat(stops[0]->color.red) + " " +
+          PDFFloat(stops[0]->color.green) + " " + PDFFloat(stops[0]->color.blue) +
+          "] /C1 [" + PDFFloat(stops[1]->color.red) + " " +
+          PDFFloat(stops[1]->color.green) + " " + PDFFloat(stops[1]->color.blue) +
           "] /N 1 >>");
     }
 
@@ -434,10 +455,10 @@ class PDFResourceManager {
     segFuncs.reserve(stops.size() - 1);
     for (size_t i = 0; i + 1 < stops.size(); i++) {
       segFuncs.push_back(_store->add(
-          "<< /FunctionType 2 /Domain [0 1] /C0 [" + FloatToString(stops[i]->color.red) + " " +
-          FloatToString(stops[i]->color.green) + " " + FloatToString(stops[i]->color.blue) +
-          "] /C1 [" + FloatToString(stops[i + 1]->color.red) + " " +
-          FloatToString(stops[i + 1]->color.green) + " " + FloatToString(stops[i + 1]->color.blue) +
+          "<< /FunctionType 2 /Domain [0 1] /C0 [" + PDFFloat(stops[i]->color.red) + " " +
+          PDFFloat(stops[i]->color.green) + " " + PDFFloat(stops[i]->color.blue) +
+          "] /C1 [" + PDFFloat(stops[i + 1]->color.red) + " " +
+          PDFFloat(stops[i + 1]->color.green) + " " + PDFFloat(stops[i + 1]->color.blue) +
           "] /N 1 >>"));
     }
 
@@ -455,7 +476,7 @@ class PDFResourceManager {
       if (i > 1) {
         bounds += " ";
       }
-      bounds += FloatToString(stops[i]->offset);
+      bounds += PDFFloat(stops[i]->offset);
     }
     bounds += "]";
 
@@ -473,8 +494,8 @@ class PDFResourceManager {
   }
 
   static std::string matrixString(const Matrix& m) {
-    return "[" + FloatToString(m.a) + " " + FloatToString(m.b) + " " + FloatToString(m.c) + " " +
-           FloatToString(m.d) + " " + FloatToString(m.tx) + " " + FloatToString(m.ty) + "]";
+    return "[" + PDFFloat(m.a) + " " + PDFFloat(m.b) + " " + PDFFloat(m.c) + " " +
+           PDFFloat(m.d) + " " + PDFFloat(m.tx) + " " + PDFFloat(m.ty) + "]";
   }
 
   // Creates a Type 2 (axial) shading wrapped in a Pattern, returns the pattern resource name.
@@ -489,8 +510,8 @@ class PDFResourceManager {
 
     int shadingId =
         _store->add("<< /ShadingType 2 /ColorSpace /DeviceRGB /Coords [" +
-                    FloatToString(grad->startPoint.x) + " " + FloatToString(grad->startPoint.y) +
-                    " " + FloatToString(grad->endPoint.x) + " " + FloatToString(grad->endPoint.y) +
+                    PDFFloat(grad->startPoint.x) + " " + PDFFloat(grad->startPoint.y) +
+                    " " + PDFFloat(grad->endPoint.x) + " " + PDFFloat(grad->endPoint.y) +
                     "] /Function " + std::to_string(funcId) + " 0 R /Extend [true true] >>");
 
     std::string matStr = matrixString(ctm * grad->matrix);
@@ -510,9 +531,9 @@ class PDFResourceManager {
 
     // Coords: [x0 y0 r0 x1 y1 r1] – start circle at center with r=0, end at full radius.
     int shadingId = _store->add(
-        "<< /ShadingType 3 /ColorSpace /DeviceRGB /Coords [" + FloatToString(grad->center.x) + " " +
-        FloatToString(grad->center.y) + " 0 " + FloatToString(grad->center.x) + " " +
-        FloatToString(grad->center.y) + " " + FloatToString(grad->radius) + "] /Function " +
+        "<< /ShadingType 3 /ColorSpace /DeviceRGB /Coords [" + PDFFloat(grad->center.x) + " " +
+        PDFFloat(grad->center.y) + " 0 " + PDFFloat(grad->center.x) + " " +
+        PDFFloat(grad->center.y) + " " + PDFFloat(grad->radius) + "] /Function " +
         std::to_string(funcId) + " 0 R /Extend [true true] >>");
 
     std::string matStr = matrixString(ctm * grad->matrix);
@@ -574,15 +595,15 @@ class PDFResourceManager {
     float yStep = clampY ? 16384.0f : height;
 
     // Content stream: draw the image inside the tile cell with Y-flip for PDF image coordinates.
-    std::string tileStream = "q " + FloatToString(width) + " 0 0 " + FloatToString(-height) +
-                             " 0 " + FloatToString(height) + " cm /" + xobjName + " Do Q";
+    std::string tileStream = "q " + PDFFloat(width) + " 0 0 " + PDFFloat(-height) +
+                             " 0 " + PDFFloat(height) + " cm /" + xobjName + " Do Q";
 
     std::string matStr = matrixString(ctm * pattern->matrix);
     std::string patDict =
         "<< /Type /Pattern /PatternType 1 /PaintType 1 /TilingType 1"
         " /BBox [0 0 " +
-        FloatToString(width) + " " + FloatToString(height) + "] /XStep " + FloatToString(xStep) +
-        " /YStep " + FloatToString(yStep) + " /Matrix " + matStr + " /Resources << /XObject << /" +
+        PDFFloat(width) + " " + PDFFloat(height) + "] /XStep " + PDFFloat(xStep) +
+        " /YStep " + PDFFloat(yStep) + " /Matrix " + matStr + " /Resources << /XObject << /" +
         xobjName + " " + std::to_string(xobjId) + " 0 R >> >> /Length " +
         std::to_string(tileStream.size()) + " >>\nstream\n" + tileStream + "\nendstream";
     int patId = _store->add(patDict);
@@ -1610,7 +1631,7 @@ std::string PDFExporter::ToPDF(const PAGXDocument& doc, const Options& options) 
   // Page object
   std::string resourceDict = resources.buildResourceDict();
   store.set(pageId, "<< /Type /Page /Parent " + std::to_string(pagesId) + " 0 R /MediaBox [0 0 " +
-                        FloatToString(doc.width) + " " + FloatToString(doc.height) +
+                        PDFFloat(doc.width) + " " + PDFFloat(doc.height) +
                         "] /Contents " + std::to_string(contentId) + " 0 R /Resources " +
                         resourceDict + " >>");
 
