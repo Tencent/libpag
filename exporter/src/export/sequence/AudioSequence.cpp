@@ -42,7 +42,8 @@ void CombineAudioMarkers(std::vector<pag::Composition*>& compositions) {
   }
 }
 
-static std::string EncodeAudioToMP4(int16_t* samples, int numSamples, int channels, int sampleRate) {
+static std::string EncodeAudioToMP4(int16_t* samples, int numSamples, int channels,
+                                    int sampleRate) {
   // Use a safe ASCII path in the temp folder to avoid encoding issues with non-ASCII characters
   // on Windows, where FFmpeg may not correctly handle UTF-8 paths.
   std::string mp4Path = JoinPaths(GetTempFolderPath(), ".pag_audio_temp.mp4");
