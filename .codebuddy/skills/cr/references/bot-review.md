@@ -115,6 +115,9 @@ git diff $MERGE_BASE pr-{number}
 
 If diff is empty → print "No changes to review." and stop.
 
+If diff exceeds 10000 lines → print "PR too large for automated review
+({N} lines). Please request a manual review." and stop with exit code 2.
+
 If diff exceeds 200 lines, first run `git diff --stat` for overview, then read
 per file using `git diff $MERGE_BASE pr-{number} -- {file}`.
 
@@ -134,8 +137,8 @@ See `teams-review.md` → Phase 1: Scope → Module partition.
 
 ## Phase 2: Review
 
-See `teams-review.md` → Phase 2: Review (Team setup, Verification pipeline,
-Verifier prompt), with the following bot-specific adjustments:
+See `teams-review.md` → Phase 2: Review (Team setup, Verification pipeline),
+with the following bot-specific adjustments:
 
 ### Reviewer prompt additions
 
@@ -147,16 +150,15 @@ In addition to the base reviewer prompt from `teams-review.md`:
   `[file:line] [A1/B2/C3] — [description] — [key lines]`
   (include checklist item ID, e.g., A1, B2, C3)
 
-### Verification completion signal
-
-After forwarding the last reviewer's report to the verifier, send a separate
-message stating: "All N reviewer reports have been forwarded. Please finalize
-your verdicts for all issues above." (Replace N with the actual reviewer count.)
-
 ### After review
 
-Close all agents → Phase 3. Unlike teams mode, bot mode does not retain reviewers
-as fixers since bot mode only comments and never applies fixes.
+Apply missing report detection per `teams-review.md` → After review: if a
+reviewer's system notification shows "completed" but no SendMessage report was
+received, send a follow-up message requesting its report before proceeding.
+
+Close all agents (send shutdown_request + TeamDelete) → Phase 3. Unlike teams
+mode, bot mode does not retain reviewers as fixers since it only comments and
+never applies fixes.
 
 ---
 
@@ -326,6 +328,9 @@ If the comment fails to post, skip silently — do not block the review workflow
 ---
 
 ## Phase 6: Clean up
+
+All agents were already shut down at the end of Phase 2. This phase only
+cleans up the temporary git branch:
 
 ```bash
 git branch -D pr-{number} 2>/dev/null || true
