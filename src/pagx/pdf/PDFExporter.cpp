@@ -385,28 +385,56 @@ static std::shared_ptr<tgfx::Data> GetImageData(const Image* image) {
   return nullptr;
 }
 
-static std::string GetJPEGData(const std::shared_ptr<tgfx::Data>& imageData, int* outWidth,
-                               int* outHeight) {
+struct PDFImageData {
+  std::string rgbBytes;
+  std::string alphaBytes;
+  int width = 0;
+  int height = 0;
+};
+
+static PDFImageData GetPDFImageData(const std::shared_ptr<tgfx::Data>& imageData) {
+  PDFImageData result;
   auto codec = tgfx::ImageCodec::MakeFrom(imageData);
   if (codec == nullptr) {
     return {};
   }
-  *outWidth = codec->width();
-  *outHeight = codec->height();
+  result.width = codec->width();
+  result.height = codec->height();
   if (IsJPEG(imageData->bytes(), imageData->size())) {
-    return {reinterpret_cast<const char*>(imageData->bytes()), imageData->size()};
+    result.rgbBytes = {reinterpret_cast<const char*>(imageData->bytes()), imageData->size()};
+    return result;
   }
-  auto info = tgfx::ImageInfo::Make(*outWidth, *outHeight, tgfx::ColorType::RGBA_8888);
+  auto info = tgfx::ImageInfo::Make(result.width, result.height, tgfx::ColorType::RGBA_8888,
+                                    tgfx::AlphaType::Unpremultiplied);
   std::vector<uint8_t> pixels(info.byteSize());
   if (!codec->readPixels(info, pixels.data())) {
     return {};
   }
+
+  auto pixelCount = static_cast<size_t>(result.width) * static_cast<size_t>(result.height);
+  bool hasTransparency = false;
+  for (size_t i = 0; i < pixelCount; i++) {
+    if (pixels[i * 4 + 3] != 255) {
+      hasTransparency = true;
+      break;
+    }
+  }
+
   tgfx::Pixmap pixmap(info, pixels.data());
   auto jpegData = tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::JPEG, 95);
   if (jpegData == nullptr) {
     return {};
   }
-  return {reinterpret_cast<const char*>(jpegData->bytes()), jpegData->size()};
+  result.rgbBytes = {reinterpret_cast<const char*>(jpegData->bytes()), jpegData->size()};
+
+  if (hasTransparency) {
+    result.alphaBytes.resize(pixelCount);
+    for (size_t i = 0; i < pixelCount; i++) {
+      result.alphaBytes[i] = static_cast<char>(pixels[i * 4 + 3]);
+    }
+  }
+
+  return result;
 }
 
 //==============================================================================
@@ -567,9 +595,22 @@ class PDFResourceManager {
         return {};
       }
 
-      std::string jpegBytes = GetJPEGData(imageData, &imageWidth, &imageHeight);
-      if (jpegBytes.empty()) {
+      auto pdfImage = GetPDFImageData(imageData);
+      if (pdfImage.rgbBytes.empty()) {
         return {};
+      }
+      imageWidth = pdfImage.width;
+      imageHeight = pdfImage.height;
+
+      std::string smaskRef;
+      if (!pdfImage.alphaBytes.empty()) {
+        int smaskId = _store->add(
+            "<< /Type /XObject /Subtype /Image /Width " + std::to_string(imageWidth) + " /Height " +
+            std::to_string(imageHeight) +
+            " /ColorSpace /DeviceGray /BitsPerComponent 8 /Length " +
+            std::to_string(pdfImage.alphaBytes.size()) + " >>\nstream\n" + pdfImage.alphaBytes +
+            "\nendstream");
+        smaskRef = " /SMask " + std::to_string(smaskId) + " 0 R";
       }
 
       xobjName = "Im" + std::to_string(_imgCount++);
@@ -577,8 +618,9 @@ class PDFResourceManager {
           "<< /Type /XObject /Subtype /Image /Width " + std::to_string(imageWidth) + " /Height " +
           std::to_string(imageHeight) +
           " /ColorSpace /DeviceRGB /BitsPerComponent 8"
-          " /Filter /DCTDecode /Length " +
-          std::to_string(jpegBytes.size()) + " >>\nstream\n" + jpegBytes + "\nendstream";
+          " /Filter /DCTDecode" +
+          smaskRef + " /Length " + std::to_string(pdfImage.rgbBytes.size()) + " >>\nstream\n" +
+          pdfImage.rgbBytes + "\nendstream";
       xobjId = _store->add(xobjDict);
       _xObjects[xobjName] = xobjId;
       _imageXObjectCache[pattern->image] = xobjName;
