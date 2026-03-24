@@ -462,9 +462,8 @@ static void LayoutLayer(Layer* layer, FontConfig* fontProvider) {
   }
 
   // Step 5: Apply constraint positioning to child Layers.
-  // Constraints on child Layers take effect when:
-  // - The parent has no container layout, or
-  // - The child has includeInLayout=false (opted out of container layout flow).
+  // Skip children whose positions are already determined by container layout
+  // (i.e., those participating in a Row/Column with includeInLayout=true).
   if (!layer->children.empty() && !std::isnan(layer->width) && !std::isnan(layer->height)) {
     for (auto* child : layer->children) {
       bool hasConstraints = !std::isnan(child->left) || !std::isnan(child->right) ||

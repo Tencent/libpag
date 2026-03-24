@@ -379,7 +379,6 @@
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="offset" type="xs:decimal" use="required"/>
     <xs:attribute name="color" type="ColorType" use="required"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- SolidColor: color attribute is preferred; red/green/blue/alpha/colorSpace are fallback -->
@@ -391,7 +390,6 @@
     <xs:attribute name="blue" type="xs:decimal" default="0"/>
     <xs:attribute name="alpha" type="xs:decimal" default="1"/>
     <xs:attribute name="colorSpace" type="ColorSpaceType" default="sRGB"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- LinearGradient -->
@@ -403,7 +401,6 @@
     <xs:attribute name="startPoint" type="PointType" default="0,0"/>
     <xs:attribute name="endPoint" type="PointType" use="required"/>
     <xs:attribute name="matrix" type="MatrixType"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- RadialGradient -->
@@ -415,7 +412,6 @@
     <xs:attribute name="center" type="PointType" default="0,0"/>
     <xs:attribute name="radius" type="xs:decimal" use="required"/>
     <xs:attribute name="matrix" type="MatrixType"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- ConicGradient -->
@@ -428,7 +424,6 @@
     <xs:attribute name="startAngle" type="xs:decimal" default="0"/>
     <xs:attribute name="endAngle" type="xs:decimal" default="360"/>
     <xs:attribute name="matrix" type="MatrixType"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- DiamondGradient -->
@@ -440,7 +435,6 @@
     <xs:attribute name="center" type="PointType" default="0,0"/>
     <xs:attribute name="radius" type="xs:decimal" use="required"/>
     <xs:attribute name="matrix" type="MatrixType"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- ImagePattern -->
@@ -452,7 +446,6 @@
     <xs:attribute name="filterMode" type="FilterModeType" default="linear"/>
     <xs:attribute name="mipmapMode" type="MipmapModeType" default="linear"/>
     <xs:attribute name="matrix" type="MatrixType"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- Color source group for inline use in Fill/Stroke -->
@@ -473,14 +466,12 @@
   <xs:complexType name="ImageType">
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="source" type="xs:string" use="required"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- PathData -->
   <xs:complexType name="PathDataType">
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="data" type="xs:string" use="required"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- Glyph -->
@@ -490,7 +481,6 @@
     <xs:attribute name="path" type="xs:string"/>
     <xs:attribute name="image" type="xs:string"/>
     <xs:attribute name="offset" type="PointType" default="0,0"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- Font -->
@@ -500,7 +490,6 @@
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="unitsPerEm" type="xs:integer" default="1000"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- ========================= GlyphRun ========================= -->
@@ -518,7 +507,6 @@
     <xs:attribute name="scales" type="PointListType"/>
     <xs:attribute name="rotations" type="FloatListType"/>
     <xs:attribute name="skews" type="FloatListType"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- ========================= Geometry Elements ========================= -->
@@ -531,7 +519,6 @@
     <xs:attribute name="roundness" type="xs:decimal" default="0"/>
     <xs:attribute name="reversed" type="BoolType" default="false"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- Ellipse -->
@@ -541,7 +528,6 @@
     <xs:attribute name="size" type="SizeType" default="100,100"/>
     <xs:attribute name="reversed" type="BoolType" default="false"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- Polystar -->
@@ -556,8 +542,9 @@
     <xs:attribute name="outerRoundness" type="xs:decimal" default="0"/>
     <xs:attribute name="innerRoundness" type="xs:decimal" default="0"/>
     <xs:attribute name="reversed" type="BoolType" default="false"/>
+    <xs:attribute name="size" type="SizeType"/>
+    <xs:attribute name="points" type="xs:decimal"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- Path -->
@@ -567,7 +554,6 @@
     <xs:attribute name="reversed" type="BoolType" default="false"/>
     <xs:attribute name="position" type="PointType" default="0,0"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- Text -->
@@ -585,8 +571,8 @@
     <xs:attribute name="fauxBold" type="BoolType" default="false"/>
     <xs:attribute name="fauxItalic" type="BoolType" default="false"/>
     <xs:attribute name="textAnchor" type="TextAnchorType" default="start"/>
+    <xs:attribute name="color" type="ColorType"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- ========================= Painters ========================= -->
@@ -602,7 +588,6 @@
     <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
     <xs:attribute name="fillRule" type="FillRuleType" default="winding"/>
     <xs:attribute name="placement" type="LayerPlacementType" default="background"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- Stroke -->
@@ -623,7 +608,6 @@
     <xs:attribute name="dashAdaptive" type="BoolType" default="false"/>
     <xs:attribute name="align" type="StrokeAlignType" default="center"/>
     <xs:attribute name="placement" type="LayerPlacementType" default="background"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- ========================= Shape Modifiers ========================= -->
@@ -635,21 +619,18 @@
     <xs:attribute name="end" type="xs:decimal" default="1"/>
     <xs:attribute name="offset" type="xs:decimal" default="0"/>
     <xs:attribute name="type" type="TrimTypeType" default="separate"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- RoundCorner -->
   <xs:complexType name="RoundCornerType">
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="radius" type="xs:decimal" default="10"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- MergePath -->
   <xs:complexType name="MergePathType">
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="mode" type="MergePathModeType" default="append"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- ========================= Text Modifiers ========================= -->
@@ -668,7 +649,6 @@
     <xs:attribute name="weight" type="xs:decimal" default="1"/>
     <xs:attribute name="randomOrder" type="BoolType" default="false"/>
     <xs:attribute name="randomSeed" type="xs:integer" default="0"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- TextModifier -->
@@ -687,7 +667,6 @@
     <xs:attribute name="fillColor" type="ColorType"/>
     <xs:attribute name="strokeColor" type="ColorType"/>
     <xs:attribute name="strokeWidth" type="xs:decimal"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- TextPath -->
@@ -702,7 +681,6 @@
     <xs:attribute name="reversed" type="BoolType" default="false"/>
     <xs:attribute name="forceAlignment" type="BoolType" default="false"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- TextBox -->
@@ -727,7 +705,6 @@
     <xs:attribute name="wordWrap" type="BoolType" default="true"/>
     <xs:attribute name="overflow" type="OverflowType" default="visible"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- Repeater -->
@@ -742,7 +719,6 @@
     <xs:attribute name="scale" type="PointType" default="1,1"/>
     <xs:attribute name="startAlpha" type="xs:decimal" default="1"/>
     <xs:attribute name="endAlpha" type="xs:decimal" default="1"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- ========================= Layer Styles ========================= -->
@@ -758,7 +734,6 @@
     <xs:attribute name="blurY" type="xs:decimal" default="0"/>
     <xs:attribute name="color" type="ColorType" default="#000000"/>
     <xs:attribute name="showBehindLayer" type="BoolType" default="true"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- BackgroundBlurStyle -->
@@ -769,7 +744,6 @@
     <xs:attribute name="blurX" type="xs:decimal" default="0"/>
     <xs:attribute name="blurY" type="xs:decimal" default="0"/>
     <xs:attribute name="tileMode" type="TileModeType" default="mirror"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- InnerShadowStyle -->
@@ -782,7 +756,6 @@
     <xs:attribute name="blurX" type="xs:decimal" default="0"/>
     <xs:attribute name="blurY" type="xs:decimal" default="0"/>
     <xs:attribute name="color" type="ColorType" default="#000000"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- ========================= Layer Filters ========================= -->
@@ -793,7 +766,6 @@
     <xs:attribute name="blurX" type="xs:decimal" default="0"/>
     <xs:attribute name="blurY" type="xs:decimal" default="0"/>
     <xs:attribute name="tileMode" type="TileModeType" default="decal"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- DropShadowFilter -->
@@ -805,7 +777,6 @@
     <xs:attribute name="blurY" type="xs:decimal" default="0"/>
     <xs:attribute name="color" type="ColorType" default="#000000"/>
     <xs:attribute name="shadowOnly" type="BoolType" default="false"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- InnerShadowFilter -->
@@ -817,7 +788,6 @@
     <xs:attribute name="blurY" type="xs:decimal" default="0"/>
     <xs:attribute name="color" type="ColorType" default="#000000"/>
     <xs:attribute name="shadowOnly" type="BoolType" default="false"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- BlendFilter -->
@@ -825,14 +795,12 @@
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="color" type="ColorType" use="required"/>
     <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- ColorMatrixFilter -->
   <xs:complexType name="ColorMatrixFilterType">
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="matrix" type="ColorMatrixType"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- ========================= VectorElement Group ========================= -->
@@ -881,7 +849,6 @@
     <xs:attribute name="width" type="xs:decimal"/>
     <xs:attribute name="height" type="xs:decimal"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- ========================= Layer ========================= -->
@@ -917,6 +884,7 @@
     <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
     <xs:attribute name="x" type="xs:decimal" default="0"/>
     <xs:attribute name="y" type="xs:decimal" default="0"/>
+    <xs:attribute name="rotation" type="xs:decimal" default="0"/>
     <xs:attribute name="matrix" type="MatrixType"/>
     <xs:attribute name="matrix3D" type="Matrix3DType"/>
     <xs:attribute name="preserve3D" type="BoolType" default="false"/>
@@ -938,7 +906,6 @@
     <xs:attribute name="arrangement" type="ArrangementType" default="start"/>
     <xs:attribute name="includeInLayout" type="BoolType" default="true"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- ========================= Composition ========================= -->
@@ -950,7 +917,6 @@
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="width" type="xs:decimal" use="required"/>
     <xs:attribute name="height" type="xs:decimal" use="required"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- ========================= Resources ========================= -->
@@ -969,7 +935,6 @@
       <xs:element name="Composition" type="CompositionType"/>
     </xs:choice>
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <!-- ========================= Root Element ========================= -->
@@ -984,7 +949,6 @@
     <xs:attribute name="version" type="xs:string" use="required"/>
     <xs:attribute name="width" type="xs:decimal" use="required"/>
     <xs:attribute name="height" type="xs:decimal" use="required"/>
-    <xs:anyAttribute namespace="##any" processContents="skip"/>
   </xs:complexType>
 
   <xs:element name="pagx" type="PagxType"/>
