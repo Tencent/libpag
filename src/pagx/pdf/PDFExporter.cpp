@@ -612,6 +612,29 @@ class PDFResourceManager {
     return patName;
   }
 
+  PDFObjectStore* store() const {
+    return _store;
+  }
+
+  std::string addSoftMaskExtGState(MaskType maskType, const std::string& formContent,
+                                   const std::string& formResourceDict, float bboxWidth,
+                                   float bboxHeight) {
+    std::string bbox = "[0 0 " + PDFFloat(bboxWidth) + " " + PDFFloat(bboxHeight) + "]";
+    int formId = _store->add(
+        "<< /Type /XObject /Subtype /Form /BBox " + bbox +
+        " /Group << /Type /Group /S /Transparency /CS /DeviceRGB >>"
+        " /Resources " +
+        formResourceDict + " /Length " + std::to_string(formContent.size()) +
+        " >>\nstream\n" + formContent + "\nendstream");
+
+    std::string smaskSubtype = (maskType == MaskType::Luminance) ? "/Luminosity" : "/Alpha";
+    std::string gsName = "GS" + std::to_string(_gsCount++);
+    int gsId = _store->add("<< /Type /ExtGState /SMask << /Type /Mask /S " + smaskSubtype +
+                           " /G " + std::to_string(formId) + " 0 R >> >>");
+    _extGStates[gsName] = gsId;
+    return gsName;
+  }
+
   void ensureDefaultFont() {
     if (_fontRegistered) {
       return;
@@ -878,9 +901,9 @@ static std::vector<PDFGlyphPath> ComputeGlyphPathsPDF(const Text& text, float te
 class PDFWriter {
  public:
   PDFWriter(PDFStream* stream, PDFResourceManager* resources, bool convertTextToPath,
-            const Matrix& pageMatrix)
+            const Matrix& pageMatrix, float docWidth, float docHeight)
       : _stream(stream), _resources(resources), _convertTextToPath(convertTextToPath),
-        _currentMatrix(pageMatrix) {
+        _currentMatrix(pageMatrix), _docWidth(docWidth), _docHeight(docHeight) {
   }
 
   void writeLayer(const Layer* layer);
@@ -890,6 +913,8 @@ class PDFWriter {
   PDFResourceManager* _resources;
   bool _convertTextToPath;
   Matrix _currentMatrix;
+  float _docWidth;
+  float _docHeight;
 
   void writeLayerContents(const Layer* layer, const Matrix& transform = {});
   void writeElements(const std::vector<Element*>& elements, const Matrix& transform = {});
@@ -919,6 +944,8 @@ class PDFWriter {
   void applyStrokeAttrs(const Stroke* stroke);
 
   void writeClipPath(const Layer* maskLayer, const Matrix& parentMatrix = {});
+  void writeSoftMask(const Layer* maskLayer, MaskType maskType);
+  void renderMaskLayerContent(const Layer* maskLayer);
 };
 
 //==============================================================================
@@ -1479,6 +1506,53 @@ void PDFWriter::writeClipPath(const Layer* maskLayer, const Matrix& parentMatrix
 }
 
 //==============================================================================
+// PDFWriter – soft mask (Alpha / Luminance)
+//==============================================================================
+
+void PDFWriter::renderMaskLayerContent(const Layer* maskLayer) {
+  Matrix layerMatrix = BuildLayerMatrixPDF(maskLayer);
+  bool needsGroup = !layerMatrix.isIdentity() || maskLayer->alpha < 1.0f;
+
+  if (needsGroup) {
+    _stream->save();
+    Matrix savedMatrix = _currentMatrix;
+    if (!layerMatrix.isIdentity()) {
+      _stream->concatMatrix(layerMatrix);
+      _currentMatrix = _currentMatrix * layerMatrix;
+    }
+    if (maskLayer->alpha < 1.0f) {
+      _stream->setExtGState(_resources->getExtGState(maskLayer->alpha, maskLayer->alpha));
+    }
+    writeLayerContents(maskLayer);
+    for (const auto* child : maskLayer->children) {
+      renderMaskLayerContent(child);
+    }
+    _currentMatrix = savedMatrix;
+    _stream->restore();
+  } else {
+    writeLayerContents(maskLayer);
+    for (const auto* child : maskLayer->children) {
+      renderMaskLayerContent(child);
+    }
+  }
+}
+
+void PDFWriter::writeSoftMask(const Layer* maskLayer, MaskType maskType) {
+  PDFStream maskStream;
+  PDFResourceManager maskResources(_resources->store());
+  PDFWriter maskWriter(&maskStream, &maskResources, _convertTextToPath, _currentMatrix, _docWidth,
+                       _docHeight);
+  maskWriter.renderMaskLayerContent(maskLayer);
+
+  std::string formContent = maskStream.release();
+  std::string formResourceDict = maskResources.buildResourceDict();
+
+  std::string gsName = _resources->addSoftMaskExtGState(maskType, formContent, formResourceDict,
+                                                        _docWidth, _docHeight);
+  _stream->setExtGState(gsName);
+}
+
+//==============================================================================
 // PDFWriter – element list and layer writing
 //==============================================================================
 
@@ -1567,14 +1641,18 @@ void PDFWriter::writeLayer(const Layer* layer) {
   }
 
   if (layer->mask != nullptr) {
-    FillRule clipRule = DetectMaskFillRule(layer->mask);
-    writeClipPath(layer->mask);
-    if (clipRule == FillRule::EvenOdd) {
-      _stream->clipEvenOdd();
+    if (layer->maskType == MaskType::Contour) {
+      FillRule clipRule = DetectMaskFillRule(layer->mask);
+      writeClipPath(layer->mask);
+      if (clipRule == FillRule::EvenOdd) {
+        _stream->clipEvenOdd();
+      } else {
+        _stream->clip();
+      }
+      _stream->endPath();
     } else {
-      _stream->clip();
+      writeSoftMask(layer->mask, layer->maskType);
     }
-    _stream->endPath();
   }
 
   writeLayerContents(layer);
@@ -1605,7 +1683,7 @@ std::string PDFExporter::ToPDF(const PAGXDocument& doc, const Options& options) 
   yFlip.tx = 0;
   yFlip.ty = doc.height;
 
-  PDFWriter writer(&stream, &resources, options.convertTextToPath, yFlip);
+  PDFWriter writer(&stream, &resources, options.convertTextToPath, yFlip, doc.width, doc.height);
 
   stream.save();
   stream.concatMatrix(yFlip);
