@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Forward resource reference (resource used before defined); two-pass parsing required -->
+<pagx version="1.0" width="200" height="200">
+  <!-- Use a resource before it's defined -->
+  <Layer>
+    <Rectangle center="100,100" size="150,150" roundness="16"/>
+    <Fill color="@forwardColor"/>
+  </Layer>
+  <Resources>
+    <SolidColor id="forwardColor" color="#8B5CF6"/>
+  </Resources>
+</pagx>

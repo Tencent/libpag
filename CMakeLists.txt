@@ -199,6 +199,10 @@ if (PAG_BUILD_PAGX)
         list(APPEND PAG_FILES src/pagx/svg/SVGImporter.cpp src/pagx/svg/SVGParserContext.h)
         list(APPEND PAG_FILES src/pagx/svg/SVGExporter.cpp src/pagx/svg/SVGTextLayout.cpp)
     endif ()
+
+    # HTML exporter
+    file(GLOB_RECURSE HTML_EXPORTER_SOURCES src/pagx/html/*.*)
+    list(APPEND PAG_FILES ${HTML_EXPORTER_SOURCES})
 endif ()
 file(GLOB COMMON_FILES src/platform/*.*)
 list(APPEND PAG_FILES ${COMMON_FILES})

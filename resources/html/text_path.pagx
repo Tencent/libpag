@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: TextPath → text along a bezier curve path; pre-computed glyph positions -->
+<pagx version="1.0" width="400" height="200">
+  <Resources>
+    <PathData id="arcPath" data="M 30,150 C 100,20 300,20 370,150"/>
+  </Resources>
+  <Layer>
+    <Text text="Text Along a Path" fontFamily="Arial" fontStyle="Bold" fontSize="24" position="0,0"/>
+    <TextPath path="@arcPath" perpendicular="true" firstMargin="10"/>
+    <Fill color="#3B82F6"/>
+  </Layer>
+</pagx>

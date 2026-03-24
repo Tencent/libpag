@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Layer matrix="a,b,c,d,tx,ty" → transform: matrix(a,b,c,d,tx,ty) -->
+<pagx version="1.0" width="200" height="200">
+  <!-- 45° rotation + translate -->
+  <Layer matrix="0.707,0.707,-0.707,0.707,100,20">
+    <Rectangle center="0,0" size="80,80"/>
+    <Fill color="#F59E0B"/>
+  </Layer>
+</pagx>

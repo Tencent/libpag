@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Multi-geometry accumulated by one painter (each painter renders ALL accumulated geometries) -->
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Rectangle center="60,100" size="80,80" roundness="8"/>
+    <Ellipse center="140,100" size="80,80"/>
+    <!-- This Fill renders both shapes above -->
+    <Fill color="#8B5CF6"/>
+    <!-- This Stroke also renders both shapes -->
+    <Stroke color="#FFFFFF" width="2"/>
+  </Layer>
+</pagx>

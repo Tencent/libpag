@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: RoundCorner modifier → convert sharp corners to bezier arcs -->
+<pagx version="1.0" width="200" height="200">
+  <!-- Triangle with rounded corners -->
+  <Layer>
+    <Polystar center="100,100" type="polygon" pointCount="3" outerRadius="80" rotation="-90"/>
+    <RoundCorner radius="15"/>
+    <Fill color="#8B5CF6"/>
+  </Layer>
+</pagx>

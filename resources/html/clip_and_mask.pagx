@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: scrollRect → clip-path:inset(); mask (alpha/luminance/contour) → CSS mask/clip-path -->
+<pagx version="1.0" width="300" height="300">
+  <!-- scrollRect clipping -->
+  <Layer scrollRect="20,20,120,120">
+    <Rectangle center="80,80" size="160,160" roundness="20"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="160,160">
+        <ColorStop offset="0" color="#3B82F6"/>
+        <ColorStop offset="1" color="#EC4899"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+  <!-- Alpha mask -->
+  <Layer id="alphaMask" visible="false">
+    <Ellipse center="75,75" size="130,130"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  <Layer mask="@alphaMask" maskType="alpha" x="150" y="0">
+    <Rectangle center="75,75" size="130,130"/>
+    <Fill color="#10B981"/>
+  </Layer>
+  <!-- Luminance mask -->
+  <Layer id="lumMask" visible="false">
+    <Ellipse center="75,75" size="130,130"/>
+    <Fill>
+      <RadialGradient center="75,75" radius="65">
+        <ColorStop offset="0" color="#FFFFFF"/>
+        <ColorStop offset="1" color="#000000"/>
+      </RadialGradient>
+    </Fill>
+  </Layer>
+  <Layer mask="@lumMask" maskType="luminance" x="0" y="150">
+    <Rectangle center="75,75" size="130,130"/>
+    <Fill color="#EF4444"/>
+  </Layer>
+  <!-- Contour mask → clipPath -->
+  <Layer id="contourMask" visible="false">
+    <Polystar center="75,75" type="star" pointCount="5" outerRadius="65" innerRadius="30" rotation="-90"/>
+    <Fill color="#FFF"/>
+  </Layer>
+  <Layer mask="@contourMask" maskType="contour" x="150" y="150">
+    <Rectangle center="75,75" size="130,130"/>
+    <Fill color="#F59E0B"/>
+  </Layer>
+</pagx>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Stroke dashAdaptive → pre-compute scaled dasharray; CSS/SVG have no direct equivalent -->
+<pagx version="1.0" width="300" height="200">
+  <!-- Normal dashes -->
+  <Layer>
+    <Ellipse center="75,100" size="100,100"/>
+    <Stroke color="#3B82F6" width="4" dashes="10,5" cap="round"/>
+  </Layer>
+  <!-- dashAdaptive=true: dashes are scaled to fit path evenly -->
+  <Layer>
+    <Ellipse center="225,100" size="100,100"/>
+    <Stroke color="#EF4444" width="4" dashes="10,5" dashAdaptive="true" cap="round"/>
+  </Layer>
+</pagx>

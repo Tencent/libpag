@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: MergePath all 5 modes: append, union, intersect, xor, difference; clears prior Fill/Stroke -->
+<pagx version="1.0" width="500" height="200">
+  <!-- Append: combine subpaths -->
+  <Layer>
+    <Rectangle center="50,100" size="60,60"/>
+    <Ellipse center="80,100" size="60,60"/>
+    <MergePath mode="append"/>
+    <Fill color="#3B82F6"/>
+  </Layer>
+  <!-- Union: boolean OR -->
+  <Layer>
+    <Rectangle center="160,100" size="60,60"/>
+    <Ellipse center="190,100" size="60,60"/>
+    <MergePath mode="union"/>
+    <Fill color="#10B981"/>
+  </Layer>
+  <!-- Intersect: boolean AND -->
+  <Layer>
+    <Rectangle center="270,100" size="60,60"/>
+    <Ellipse center="300,100" size="60,60"/>
+    <MergePath mode="intersect"/>
+    <Fill color="#F59E0B"/>
+  </Layer>
+  <!-- Xor: boolean XOR -->
+  <Layer>
+    <Rectangle center="380,100" size="60,60"/>
+    <Ellipse center="410,100" size="60,60"/>
+    <MergePath mode="xor"/>
+    <Fill color="#EF4444"/>
+  </Layer>
+  <!-- Difference: A minus B -->
+  <Layer>
+    <Rectangle center="490,100" size="60,60"/>
+    <Ellipse center="490,100" size="40,40"/>
+    <MergePath mode="difference"/>
+    <Fill color="#8B5CF6"/>
+  </Layer>
+</pagx>

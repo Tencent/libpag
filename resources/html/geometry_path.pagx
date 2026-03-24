@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Path with inline SVG data and @id resource reference, reversed -->
+<pagx version="1.0" width="300" height="200">
+  <Resources>
+    <PathData id="heart" data="M 150,30 C 120,-10 60,-10 30,30 C 0,70 0,120 75,170 L 150,200 L 225,170 C 300,120 300,70 270,30 C 240,-10 180,-10 150,30 Z"/>
+  </Resources>
+  <!-- Inline path data -->
+  <Layer>
+    <Path data="M 10,100 C 30,30 70,30 90,100 C 110,170 130,30 150,100"/>
+    <Stroke color="#3B82F6" width="4" cap="round"/>
+  </Layer>
+  <!-- Resource reference path -->
+  <Layer x="100" y="0">
+    <Path data="@heart"/>
+    <Fill color="#EF4444" alpha="0.8"/>
+  </Layer>
+</pagx>

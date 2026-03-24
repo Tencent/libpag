@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Empty document, defaults-only elements, zero-size shapes -->
+<pagx version="1.0" width="200" height="200">
+  <!-- Layer with all defaults (visible=true, alpha=1, blendMode=normal, etc.) -->
+  <Layer>
+    <Rectangle/>
+    <Fill/>
+  </Layer>
+  <!-- Zero-size ellipse -->
+  <Layer x="120" y="20">
+    <Ellipse center="0,0" size="0,0"/>
+    <Fill color="#EF4444"/>
+  </Layer>
+  <!-- Empty layer (no vector elements) -->
+  <Layer name="emptyLayer" x="50" y="50"/>
+</pagx>

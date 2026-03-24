@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Fill attributes: color, alpha, blendMode, fillRule(winding/evenOdd), placement(bg/fg) -->
+<pagx version="1.0" width="300" height="300">
+  <!-- Fill with alpha -->
+  <Layer>
+    <Rectangle center="75,75" size="100,100" roundness="12"/>
+    <Fill color="#3B82F6" alpha="0.5"/>
+  </Layer>
+  <!-- Fill with blendMode -->
+  <Layer>
+    <Rectangle center="75,75" size="80,80"/>
+    <Fill color="#EF4444" blendMode="multiply"/>
+  </Layer>
+  <!-- fillRule=evenOdd → SVG fill-rule="evenodd" (CSS cannot) -->
+  <Layer>
+    <Path data="M 200,30 L 260,130 L 140,130 Z M 200,50 L 240,120 L 160,120 Z"/>
+    <Fill color="#10B981" fillRule="evenOdd"/>
+  </Layer>
+  <!-- Placement: foreground (above child layers) -->
+  <Layer>
+    <Rectangle center="75,225" size="100,100" roundness="12"/>
+    <Fill color="#8B5CF680" placement="foreground"/>
+    <Layer>
+      <Ellipse center="75,75" size="60,60"/>
+      <Fill color="#F59E0B"/>
+    </Layer>
+  </Layer>
+  <!-- Child color source overrides color attribute -->
+  <Layer>
+    <Rectangle center="225,225" size="100,100" roundness="12"/>
+    <Fill color="#000000">
+      <SolidColor color="#EC4899"/>
+    </Fill>
+  </Layer>
+</pagx>

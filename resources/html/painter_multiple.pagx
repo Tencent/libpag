@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Multiple fills and strokes on accumulated geometry → overlay layers -->
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Rectangle center="100,100" size="140,140" roundness="20"/>
+    <!-- First fill (bottom layer) -->
+    <Fill color="#3B82F6"/>
+    <!-- Second fill overlays the first -->
+    <Fill color="#EF444480" blendMode="multiply"/>
+    <!-- Stroke on top -->
+    <Stroke color="#10B981" width="4"/>
+    <!-- Second stroke with different style -->
+    <Stroke color="#F59E0B" width="2" dashes="8,4"/>
+  </Layer>
+</pagx>

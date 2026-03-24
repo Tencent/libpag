@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: TextBox → div with text-align, paragraphAlign, writingMode, lineHeight, wordWrap, overflow, size -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Horizontal text box: textAlign=center, paragraphAlign=middle -->
+  <Layer>
+    <Text text="Centered in Box" fontFamily="Arial" fontSize="18" position="0,0"/>
+    <TextBox position="20,20" size="160,100" textAlign="center" paragraphAlign="middle"/>
+    <Fill color="#1F2937"/>
+  </Layer>
+  <!-- textAlign=justify + lineHeight -->
+  <Layer>
+    <Text text="This is a longer text that should wrap and be justified in the box." fontFamily="Arial" fontSize="14" position="0,0"/>
+    <TextBox position="200,20" size="180,100" textAlign="justify" lineHeight="22"/>
+    <Fill color="#3B82F6"/>
+  </Layer>
+  <!-- writingMode=vertical → writing-mode: vertical-rl -->
+  <Layer>
+    <Text text="竖排文字" fontFamily="Arial" fontSize="18" position="0,0"/>
+    <TextBox position="20,150" size="60,200" writingMode="vertical"/>
+    <Fill color="#8B5CF6"/>
+  </Layer>
+  <!-- overflow=hidden → clip; paragraphAlign=far -->
+  <Layer>
+    <Text text="This long text should be clipped by overflow hidden." fontFamily="Arial" fontSize="14" position="0,0"/>
+    <TextBox position="100,150" size="120,60" overflow="hidden" paragraphAlign="far"/>
+    <Fill color="#EF4444"/>
+  </Layer>
+  <!-- size=0,0 → auto dimensions -->
+  <Layer>
+    <Text text="Auto sized box" fontFamily="Arial" fontSize="16" position="0,0"/>
+    <TextBox position="100,240" size="0,0"/>
+    <Fill color="#10B981"/>
+  </Layer>
+  <!-- wordWrap=false -->
+  <Layer>
+    <Text text="No word wrap long text" fontFamily="Arial" fontSize="14" position="0,0"/>
+    <TextBox position="200,150" size="100,40" wordWrap="false"/>
+    <Fill color="#F59E0B"/>
+  </Layer>
+</pagx>

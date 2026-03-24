@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Ellipse → CSS div + border-radius:50%; center-point positioning -->
+<pagx version="1.0" width="300" height="200">
+  <!-- Circle: equal width/height -->
+  <Layer>
+    <Ellipse center="75,100" size="100,100"/>
+    <Fill color="#3B82F6"/>
+  </Layer>
+  <!-- Horizontal ellipse -->
+  <Layer>
+    <Ellipse center="200,70" size="140,80"/>
+    <Fill color="#10B981"/>
+  </Layer>
+  <!-- Vertical ellipse, reversed -->
+  <Layer>
+    <Ellipse center="200,160" size="80,60" reversed="true"/>
+    <Fill color="#EC4899"/>
+  </Layer>
+</pagx>

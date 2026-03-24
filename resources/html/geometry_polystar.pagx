@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Polystar → always SVG path; polygon/star types, roundness -->
+<pagx version="1.0" width="400" height="300">
+  <!-- Pentagon (polygon, 5 points, no roundness) -->
+  <Layer>
+    <Polystar center="80,80" type="polygon" pointCount="5" outerRadius="60" rotation="-90"/>
+    <Fill color="#3B82F6"/>
+  </Layer>
+  <!-- Star (5 points, outer/inner radius) -->
+  <Layer>
+    <Polystar center="220,80" type="star" pointCount="5" outerRadius="70" innerRadius="30" rotation="-90"/>
+    <Fill color="#EF4444"/>
+  </Layer>
+  <!-- Star with roundness on outer points -->
+  <Layer>
+    <Polystar center="360,80" type="star" pointCount="6" outerRadius="60" innerRadius="30" outerRoundness="0.5" rotation="0"/>
+    <Fill color="#10B981"/>
+  </Layer>
+  <!-- Triangle (polygon, 3 points) -->
+  <Layer>
+    <Polystar center="80,220" type="polygon" pointCount="3" outerRadius="60" rotation="-90"/>
+    <Fill color="#F59E0B"/>
+  </Layer>
+  <!-- Star with both inner and outer roundness -->
+  <Layer>
+    <Polystar center="220,220" type="star" pointCount="8" outerRadius="60" innerRadius="25" outerRoundness="0.3" innerRoundness="0.5"/>
+    <Fill color="#8B5CF6"/>
+  </Layer>
+  <!-- Fractional pointCount (5.5) -->
+  <Layer>
+    <Polystar center="360,220" type="star" pointCount="5.5" outerRadius="60" innerRadius="30" rotation="-90"/>
+    <Fill color="#EC4899"/>
+  </Layer>
+</pagx>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Repeater → N copies with transform/alpha interpolation; fractional copies, order, copies=0 -->
+<pagx version="1.0" width="400" height="300">
+  <!-- Basic repeater: 5 copies with position offset and alpha fade -->
+  <Layer>
+    <Rectangle center="30,60" size="40,40" roundness="8"/>
+    <Fill color="#3B82F6"/>
+    <Repeater copies="5" position="60,0" endAlpha="0.2" order="belowOriginal"/>
+  </Layer>
+  <!-- Repeater with rotation and scale -->
+  <Layer>
+    <Rectangle center="0,0" size="30,30"/>
+    <Fill color="#EF4444"/>
+    <Repeater copies="8" anchor="0,0" position="0,0" rotation="45" scale="0.9,0.9" offset="0"/>
+  </Layer>
+  <!-- Fractional copies: 3.5 → 4 copies, last at 50% opacity -->
+  <Layer>
+    <Ellipse center="30,200" size="30,30"/>
+    <Fill color="#10B981"/>
+    <Repeater copies="3.5" position="50,0"/>
+  </Layer>
+  <!-- Order: aboveOriginal → copy N-1 is topmost -->
+  <Layer>
+    <Rectangle center="280,200" size="40,40" roundness="4"/>
+    <Fill color="#F59E0B"/>
+    <Repeater copies="4" position="30,15" order="aboveOriginal" startAlpha="0.3" endAlpha="1"/>
+  </Layer>
+  <!-- copies=0 → clears all content -->
+  <Layer>
+    <Rectangle center="280,60" size="40,40"/>
+    <Fill color="#8B5CF6"/>
+    <Repeater copies="0"/>
+  </Layer>
+</pagx>

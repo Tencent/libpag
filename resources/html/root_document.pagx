@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: root <pagx> element → div.pagx-root with width/height/overflow:hidden -->
+<pagx version="1.0" width="200" height="150">
+  <Layer>
+    <Rectangle center="100,75" size="180,130" roundness="16"/>
+    <Fill color="#3B82F6"/>
+  </Layer>
+</pagx>

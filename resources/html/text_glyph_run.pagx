@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: GlyphRun → pre-laid-out SVG paths per glyph; xOffsets, positions, rotations, scales, skews -->
+<pagx version="1.0" width="400" height="200">
+  <Resources>
+    <Font id="font1" unitsPerEm="1000">
+      <Glyph id="gA" advance="600" path="M 50,800 L 300,0 L 550,800 Z M 175,500 L 425,500"/>
+      <Glyph id="gB" advance="600" path="M 100,0 L 100,800 L 400,800 C 550,800 550,500 400,500 L 100,500 M 100,0 L 400,0 C 550,0 550,400 400,400 L 100,400"/>
+    </Font>
+  </Resources>
+  <Layer>
+    <Text position="50,100">
+      <GlyphRun font="@font1" fontSize="48" glyphs="@gA,@gB" x="50" y="100" xOffsets="0,30"/>
+    </Text>
+    <Fill color="#1F2937"/>
+  </Layer>
+  <!-- GlyphRun with per-glyph rotations and scales -->
+  <Layer>
+    <Text position="200,100">
+      <GlyphRun font="@font1" fontSize="36" glyphs="@gA,@gB" x="200" y="100" rotations="15,-15" scales="1,1;1.2,1.2"/>
+    </Text>
+    <Fill color="#EF4444"/>
+  </Layer>
+</pagx>

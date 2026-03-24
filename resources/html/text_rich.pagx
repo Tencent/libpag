@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Rich text (multiple Text elements + independent Fill/Stroke + shared TextBox) -->
+<pagx version="1.0" width="300" height="200">
+  <Layer>
+    <!-- First text span: red -->
+    <Text text="Hello " fontFamily="Arial" fontStyle="Bold" fontSize="24" position="0,0"/>
+    <Fill color="#EF4444"/>
+    <!-- Second text span: blue italic -->
+    <Text text="Beautiful " fontFamily="Arial" fontStyle="Italic" fontSize="24" position="0,0"/>
+    <Fill color="#3B82F6"/>
+    <!-- Third text span: green -->
+    <Text text="World" fontFamily="Arial" fontStyle="Bold" fontSize="24" position="0,0"/>
+    <Fill color="#10B981"/>
+    <!-- Shared text box for layout -->
+    <TextBox position="20,40" size="260,120" textAlign="center" paragraphAlign="middle"/>
+  </Layer>
+</pagx>

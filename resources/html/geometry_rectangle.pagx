@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Rectangle center-point positioning, size, roundness, reversed; CSS div+border-radius path -->
+<pagx version="1.0" width="300" height="200">
+  <!-- Sharp rectangle: left=50-80/2=10, top=50-60/2=20 -->
+  <Layer>
+    <Rectangle center="50,50" size="80,60"/>
+    <Fill color="#3B82F6"/>
+  </Layer>
+  <!-- Rounded rectangle: roundness=16 → border-radius:16px -->
+  <Layer>
+    <Rectangle center="150,50" size="80,60" roundness="16"/>
+    <Fill color="#10B981"/>
+  </Layer>
+  <!-- Over-round: roundness=100 > min(80/2,60/2)=30 → clamped to 30 (pill) -->
+  <Layer>
+    <Rectangle center="250,50" size="80,60" roundness="100"/>
+    <Fill color="#F59E0B"/>
+  </Layer>
+  <!-- Reversed path direction -->
+  <Layer>
+    <Rectangle center="100,150" size="80,60" roundness="12" reversed="true"/>
+    <Fill color="#EF4444"/>
+  </Layer>
+  <!-- Large rectangle -->
+  <Layer>
+    <Rectangle center="230,150" size="120,80" roundness="8"/>
+    <Fill color="#8B5CF6"/>
+  </Layer>
+</pagx>

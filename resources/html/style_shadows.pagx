@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Layer styles: DropShadowStyle (uniform/asymmetric blur, showBehindLayer), InnerShadowStyle, BackgroundBlurStyle -->
+<pagx version="1.0" width="400" height="400">
+  <!-- DropShadowStyle: uniform blur → CSS drop-shadow/box-shadow -->
+  <Layer x="30" y="30">
+    <Rectangle center="60,60" size="100,100" roundness="16"/>
+    <Fill color="#3B82F6"/>
+    <DropShadowStyle offsetX="4" offsetY="8" blurX="16" blurY="16" color="#00000060"/>
+  </Layer>
+  <!-- DropShadowStyle: asymmetric blur → SVG feGaussianBlur -->
+  <Layer x="200" y="30">
+    <Rectangle center="60,60" size="100,100" roundness="16"/>
+    <Fill color="#10B981"/>
+    <DropShadowStyle offsetX="0" offsetY="8" blurX="40" blurY="8" color="#00000060"/>
+  </Layer>
+  <!-- DropShadowStyle: showBehindLayer=false → use feComposite out -->
+  <Layer x="30" y="200">
+    <Rectangle center="60,60" size="100,100" roundness="16"/>
+    <Fill color="#EF4444"/>
+    <DropShadowStyle offsetX="4" offsetY="8" blurX="20" blurY="20" color="#00000080" showBehindLayer="false"/>
+  </Layer>
+  <!-- InnerShadowStyle → box-shadow inset / SVG filter -->
+  <Layer x="200" y="200">
+    <Rectangle center="60,60" size="100,100" roundness="16"/>
+    <Fill color="#F59E0B"/>
+    <InnerShadowStyle offsetX="4" offsetY="4" blurX="12" blurY="12" color="#00000060"/>
+  </Layer>
+  <!-- BackgroundBlurStyle → backdrop-filter: blur() -->
+  <Layer x="115" y="115">
+    <Rectangle center="60,60" size="100,100" roundness="16"/>
+    <Fill color="#8B5CF630"/>
+    <BackgroundBlurStyle blurX="8" blurY="8"/>
+  </Layer>
+</pagx>

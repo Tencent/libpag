@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: DiamondGradient → CSS cannot represent, needs SVG filter fallback -->
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Rectangle center="100,100" size="180,180"/>
+    <Fill>
+      <DiamondGradient center="90,90" radius="80">
+        <ColorStop offset="0" color="#FFFFFF"/>
+        <ColorStop offset="0.5" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#1E1B4B"/>
+      </DiamondGradient>
+    </Fill>
+  </Layer>
+</pagx>

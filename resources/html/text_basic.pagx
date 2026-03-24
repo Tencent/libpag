@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Text element → HTML span; position.y=baseline, fontFamily, fontSize, letterSpacing, textAnchor, fauxBold/Italic -->
+<pagx version="1.0" width="400" height="300">
+  <!-- Basic text: textAnchor=start (default) -->
+  <Layer>
+    <Text text="Hello World" fontFamily="Arial" fontSize="24" position="20,40"/>
+    <Fill color="#1F2937"/>
+  </Layer>
+  <!-- textAnchor=center → translateX(-50%) -->
+  <Layer>
+    <Text text="Centered" fontFamily="Arial" fontSize="24" position="200,80" textAnchor="center"/>
+    <Fill color="#3B82F6"/>
+  </Layer>
+  <!-- textAnchor=end → translateX(-100%) -->
+  <Layer>
+    <Text text="Right Aligned" fontFamily="Arial" fontSize="24" position="380,120" textAnchor="end"/>
+    <Fill color="#10B981"/>
+  </Layer>
+  <!-- letterSpacing -->
+  <Layer>
+    <Text text="SPACED" fontFamily="Arial" fontSize="28" position="20,170" letterSpacing="8"/>
+    <Fill color="#8B5CF6"/>
+  </Layer>
+  <!-- fauxBold → -webkit-text-stroke: 0.02em -->
+  <Layer>
+    <Text text="Faux Bold" fontFamily="Arial" fontSize="28" position="20,210" fauxBold="true"/>
+    <Fill color="#EF4444"/>
+  </Layer>
+  <!-- fauxItalic → transform: skewX(-12deg) -->
+  <Layer>
+    <Text text="Faux Italic" fontFamily="Arial" fontSize="28" position="20,250" fauxItalic="true"/>
+    <Fill color="#F59E0B"/>
+  </Layer>
+  <!-- fontStyle -->
+  <Layer>
+    <Text text="Bold Italic" fontFamily="Arial" fontStyle="Bold Italic" fontSize="24" position="20,290"/>
+    <Fill color="#EC4899"/>
+  </Layer>
+</pagx>
