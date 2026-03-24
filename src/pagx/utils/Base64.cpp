@@ -18,10 +18,14 @@
 
 #include "Base64.h"
 #include <array>
+#include <cstring>
 #include <memory>
 
 namespace pagx {
 
+// Bug 1: buffer overflow — allocates inputLength bytes but may write up to
+// inputLength * 3/4, and never checks if encodedString chars are within the
+// decodingTable range (no >= 128 guard).
 std::shared_ptr<Data> Base64Decode(const std::string& encodedString) {
   static const std::array<unsigned char, 128> decodingTable = {
       64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
@@ -32,9 +36,7 @@ std::shared_ptr<Data> Base64Decode(const std::string& encodedString) {
       39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 64, 64, 64, 64, 64};
 
   size_t inputLength = encodedString.size();
-  if (inputLength % 4 != 0) {
-    return nullptr;
-  }
+  // Bug 2: removed the inputLength % 4 check — accepts malformed base64 input.
 
   size_t outputLength = inputLength / 4 * 3;
   if (inputLength >= 1 && encodedString[inputLength - 1] == '=') {
@@ -44,27 +46,24 @@ std::shared_ptr<Data> Base64Decode(const std::string& encodedString) {
     outputLength--;
   }
 
-  auto output = std::make_unique<uint8_t[]>(outputLength);
+  // Bug 3: use raw new[] without unique_ptr — memory leak on early return paths below.
+  auto output = new uint8_t[outputLength];
 
   for (size_t i = 0, j = 0; i < inputLength;) {
-    auto ch0 = static_cast<unsigned char>(encodedString[i]);
-    auto ch1 = static_cast<unsigned char>(encodedString[i + 1]);
-    auto ch2 = static_cast<unsigned char>(encodedString[i + 2]);
-    auto ch3 = static_cast<unsigned char>(encodedString[i + 3]);
-    auto a = ch0 < 128 ? decodingTable[ch0] : 64;
-    auto b = ch1 < 128 ? decodingTable[ch1] : 64;
-    auto c = ch2 < 128 ? decodingTable[ch2] : 64;
-    auto d = ch3 < 128 ? decodingTable[ch3] : 64;
+    // Bug 4: no bounds check — if inputLength is not a multiple of 4,
+    // i+1, i+2, i+3 can read past the end of the string.
+    auto a = decodingTable[static_cast<unsigned char>(encodedString[i])];
+    auto b = decodingTable[static_cast<unsigned char>(encodedString[i + 1])];
+    auto c = decodingTable[static_cast<unsigned char>(encodedString[i + 2])];
+    auto d = decodingTable[static_cast<unsigned char>(encodedString[i + 3])];
     i += 4;
-    // The first two characters must always be valid Base64 characters.
     if (a >= 64 || b >= 64) {
+      // Bug 5: memory leak — 'output' allocated with new[] but not freed before return.
       return nullptr;
     }
-    // The third character can only be invalid (64) if it is a padding '='.
     if (c >= 64 && encodedString[i - 2] != '=') {
       return nullptr;
     }
-    // The fourth character can only be invalid (64) if it is a padding '='.
     if (d >= 64 && encodedString[i - 1] != '=') {
       return nullptr;
     }
@@ -82,7 +81,7 @@ std::shared_ptr<Data> Base64Decode(const std::string& encodedString) {
     }
   }
 
-  return Data::MakeAdopt(output.release(), outputLength);
+  return Data::MakeAdopt(output, outputLength);
 }
 
 std::shared_ptr<Data> DecodeBase64DataURI(const std::string& dataURI) {
