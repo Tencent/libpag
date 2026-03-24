@@ -478,7 +478,10 @@ class PDFResourceManager {
   }
 
   // Creates a Type 2 (axial) shading wrapped in a Pattern, returns the pattern resource name.
-  std::string addLinearGradient(const LinearGradient* grad) {
+  // The ctm parameter is the accumulated CTM from page-level transforms (Y-flip, layer matrices,
+  // etc.) that must be baked into the pattern matrix, because PDF shading patterns are positioned
+  // relative to the initial user space and are not affected by the current graphics state CTM.
+  std::string addLinearGradient(const LinearGradient* grad, const Matrix& ctm) {
     int funcId = createGradientFunction(grad->colorStops);
     if (funcId < 0) {
       return {};
@@ -490,7 +493,7 @@ class PDFResourceManager {
                     " " + FloatToString(grad->endPoint.x) + " " + FloatToString(grad->endPoint.y) +
                     "] /Function " + std::to_string(funcId) + " 0 R /Extend [true true] >>");
 
-    std::string matStr = matrixString(grad->matrix);
+    std::string matStr = matrixString(ctm * grad->matrix);
     int patId = _store->add("<< /Type /Pattern /PatternType 2 /Shading " +
                             std::to_string(shadingId) + " 0 R /Matrix " + matStr + " >>");
     std::string patName = "P" + std::to_string(_patCount++);
@@ -499,7 +502,7 @@ class PDFResourceManager {
   }
 
   // Creates a Type 3 (radial) shading wrapped in a Pattern, returns the pattern resource name.
-  std::string addRadialGradient(const RadialGradient* grad) {
+  std::string addRadialGradient(const RadialGradient* grad, const Matrix& ctm) {
     int funcId = createGradientFunction(grad->colorStops);
     if (funcId < 0) {
       return {};
@@ -512,7 +515,7 @@ class PDFResourceManager {
         FloatToString(grad->center.y) + " " + FloatToString(grad->radius) + "] /Function " +
         std::to_string(funcId) + " 0 R /Extend [true true] >>");
 
-    std::string matStr = matrixString(grad->matrix);
+    std::string matStr = matrixString(ctm * grad->matrix);
     int patId = _store->add("<< /Type /Pattern /PatternType 2 /Shading " +
                             std::to_string(shadingId) + " 0 R /Matrix " + matStr + " >>");
     std::string patName = "P" + std::to_string(_patCount++);
@@ -521,7 +524,7 @@ class PDFResourceManager {
   }
 
   // Creates a Tiling Pattern (PatternType 1) that draws an image, returns the pattern resource name.
-  std::string addImagePattern(const ImagePattern* pattern) {
+  std::string addImagePattern(const ImagePattern* pattern, const Matrix& ctm) {
     if (!pattern->image) {
       return {};
     }
@@ -574,7 +577,7 @@ class PDFResourceManager {
     std::string tileStream = "q " + FloatToString(width) + " 0 0 " + FloatToString(-height) +
                              " 0 " + FloatToString(height) + " cm /" + xobjName + " Do Q";
 
-    std::string matStr = matrixString(pattern->matrix);
+    std::string matStr = matrixString(ctm * pattern->matrix);
     std::string patDict =
         "<< /Type /Pattern /PatternType 1 /PaintType 1 /TilingType 1"
         " /BBox [0 0 " +
@@ -853,8 +856,10 @@ static std::vector<PDFGlyphPath> ComputeGlyphPathsPDF(const Text& text, float te
 
 class PDFWriter {
  public:
-  PDFWriter(PDFStream* stream, PDFResourceManager* resources, bool convertTextToPath)
-      : _stream(stream), _resources(resources), _convertTextToPath(convertTextToPath) {
+  PDFWriter(PDFStream* stream, PDFResourceManager* resources, bool convertTextToPath,
+            const Matrix& pageMatrix)
+      : _stream(stream), _resources(resources), _convertTextToPath(convertTextToPath),
+        _currentMatrix(pageMatrix) {
   }
 
   void writeLayer(const Layer* layer);
@@ -863,6 +868,7 @@ class PDFWriter {
   PDFStream* _stream;
   PDFResourceManager* _resources;
   bool _convertTextToPath;
+  Matrix _currentMatrix;
 
   void writeLayerContents(const Layer* layer, const Matrix& transform = {});
   void writeElements(const std::vector<Element*>& elements, const Matrix& transform = {});
@@ -979,7 +985,7 @@ PDFWriter::ColorRef PDFWriter::resolveColorSource(const ColorSource* source) {
 
   if (source->nodeType() == NodeType::LinearGradient) {
     auto grad = static_cast<const LinearGradient*>(source);
-    std::string patName = _resources->addLinearGradient(grad);
+    std::string patName = _resources->addLinearGradient(grad, _currentMatrix);
     if (!patName.empty()) {
       return {ColorRefType::Pattern, 0, 0, 0, 1.0f, patName};
     }
@@ -987,7 +993,7 @@ PDFWriter::ColorRef PDFWriter::resolveColorSource(const ColorSource* source) {
 
   if (source->nodeType() == NodeType::RadialGradient) {
     auto grad = static_cast<const RadialGradient*>(source);
-    std::string patName = _resources->addRadialGradient(grad);
+    std::string patName = _resources->addRadialGradient(grad, _currentMatrix);
     if (!patName.empty()) {
       return {ColorRefType::Pattern, 0, 0, 0, 1.0f, patName};
     }
@@ -995,7 +1001,7 @@ PDFWriter::ColorRef PDFWriter::resolveColorSource(const ColorSource* source) {
 
   if (source->nodeType() == NodeType::ImagePattern) {
     auto pattern = static_cast<const ImagePattern*>(source);
-    std::string patName = _resources->addImagePattern(pattern);
+    std::string patName = _resources->addImagePattern(pattern, _currentMatrix);
     if (!patName.empty()) {
       return {ColorRefType::Pattern, 0, 0, 0, 1.0f, patName};
     }
@@ -1099,8 +1105,10 @@ void PDFWriter::writeRectangle(const Rectangle* rect, const PDFFillStrokeInfo& f
   float y = rect->position.y - rect->size.height / 2;
 
   _stream->save();
+  Matrix savedMatrix = _currentMatrix;
   if (!transform.isIdentity()) {
     _stream->concatMatrix(transform);
+    _currentMatrix = _currentMatrix * transform;
   }
 
   if (rect->roundness > 0) {
@@ -1111,6 +1119,7 @@ void PDFWriter::writeRectangle(const Rectangle* rect, const PDFFillStrokeInfo& f
 
   FillRule rule = fs.fill ? fs.fill->fillRule : FillRule::Winding;
   paintShape(fs, rule);
+  _currentMatrix = savedMatrix;
   _stream->restore();
 }
 
@@ -1120,14 +1129,17 @@ void PDFWriter::writeEllipse(const Ellipse* ellipse, const PDFFillStrokeInfo& fs
   float ry = ellipse->size.height / 2;
 
   _stream->save();
+  Matrix savedMatrix = _currentMatrix;
   if (!transform.isIdentity()) {
     _stream->concatMatrix(transform);
+    _currentMatrix = _currentMatrix * transform;
   }
 
   emitEllipsePath(ellipse->position.x, ellipse->position.y, rx, ry);
 
   FillRule rule = fs.fill ? fs.fill->fillRule : FillRule::Winding;
   paintShape(fs, rule);
+  _currentMatrix = savedMatrix;
   _stream->restore();
 }
 
@@ -1137,14 +1149,17 @@ void PDFWriter::writePath(const Path* path, const PDFFillStrokeInfo& fs, const M
   }
 
   _stream->save();
+  Matrix savedMatrix = _currentMatrix;
   if (!transform.isIdentity()) {
     _stream->concatMatrix(transform);
+    _currentMatrix = _currentMatrix * transform;
   }
 
   emitPathData(*path->data);
 
   FillRule rule = fs.fill ? fs.fill->fillRule : FillRule::Winding;
   paintShape(fs, rule);
+  _currentMatrix = savedMatrix;
   _stream->restore();
 }
 
@@ -1163,8 +1178,10 @@ void PDFWriter::writeTextAsPath(const Text* text, const PDFFillStrokeInfo& fs,
   }
 
   _stream->save();
+  Matrix savedMatrix = _currentMatrix;
   if (!transform.isIdentity()) {
     _stream->concatMatrix(transform);
+    _currentMatrix = _currentMatrix * transform;
   }
 
   // Set up colors/opacity once for all glyphs
@@ -1218,6 +1235,7 @@ void PDFWriter::writeTextAsPath(const Text* text, const PDFFillStrokeInfo& fs,
     _stream->restore();
   }
 
+  _currentMatrix = savedMatrix;
   _stream->restore();
 }
 
@@ -1230,8 +1248,10 @@ void PDFWriter::writeTextAsPDFText(const Text* text, const PDFFillStrokeInfo& fs
   _resources->ensureDefaultFont();
 
   _stream->save();
+  Matrix savedMatrix = _currentMatrix;
   if (!transform.isIdentity()) {
     _stream->concatMatrix(transform);
+    _currentMatrix = _currentMatrix * transform;
   }
 
   bool hasFill = fs.fill && fs.fill->color;
@@ -1261,6 +1281,7 @@ void PDFWriter::writeTextAsPDFText(const Text* text, const PDFFillStrokeInfo& fs
   _stream->showText(EscapePDFString(text->text));
   _stream->endText();
 
+  _currentMatrix = savedMatrix;
   _stream->restore();
 }
 
@@ -1469,13 +1490,16 @@ void PDFWriter::writeElements(const std::vector<Element*>& elements, const Matri
         bool hasAlpha = group->alpha < 1.0f;
         if (hasAlpha || !combined.isIdentity()) {
           _stream->save();
+          Matrix savedMatrix = _currentMatrix;
           if (!combined.isIdentity()) {
             _stream->concatMatrix(combined);
+            _currentMatrix = _currentMatrix * combined;
           }
           if (hasAlpha) {
             _stream->setExtGState(_resources->getExtGState(group->alpha, group->alpha));
           }
           writeElements(group->elements, {});
+          _currentMatrix = savedMatrix;
           _stream->restore();
         } else {
           writeElements(group->elements, combined);
@@ -1509,10 +1533,12 @@ void PDFWriter::writeLayer(const Layer* layer) {
   }
 
   _stream->save();
+  Matrix savedMatrix = _currentMatrix;
 
   Matrix layerMatrix = BuildLayerMatrixPDF(layer);
   if (!layerMatrix.isIdentity()) {
     _stream->concatMatrix(layerMatrix);
+    _currentMatrix = _currentMatrix * layerMatrix;
   }
 
   if (layer->alpha < 1.0f) {
@@ -1536,6 +1562,7 @@ void PDFWriter::writeLayer(const Layer* layer) {
     writeLayer(child);
   }
 
+  _currentMatrix = savedMatrix;
   _stream->restore();
 }
 
@@ -1548,10 +1575,7 @@ std::string PDFExporter::ToPDF(const PAGXDocument& doc, const Options& options) 
   PDFResourceManager resources(&store);
   PDFStream stream;
 
-  PDFWriter writer(&stream, &resources, options.convertTextToPath);
-
   // Apply page-level Y-flip so PAGX top-left origin maps to PDF bottom-left origin.
-  stream.save();
   Matrix yFlip = {};
   yFlip.a = 1;
   yFlip.b = 0;
@@ -1559,6 +1583,10 @@ std::string PDFExporter::ToPDF(const PAGXDocument& doc, const Options& options) 
   yFlip.d = -1;
   yFlip.tx = 0;
   yFlip.ty = doc.height;
+
+  PDFWriter writer(&stream, &resources, options.convertTextToPath, yFlip);
+
+  stream.save();
   stream.concatMatrix(yFlip);
 
   for (const auto* layer : doc.layers) {
