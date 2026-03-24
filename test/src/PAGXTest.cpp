@@ -532,7 +532,8 @@ PAGX_TEST(PAGXTest, FontGlyphRoundTrip) {
   SavePAGXFile(xml, "PAGXTest/font_glyph_roundtrip.pagx");
 }
 
-static void TestPAGXDirectory(tgfx::Context* context, const std::string& directory) {
+static void TestPAGXDirectory(tgfx::Context* context, const std::string& directory,
+                              const std::string& subdir = "") {
   std::vector<std::string> files = {};
   for (const auto& entry : std::filesystem::directory_iterator(directory)) {
     if (entry.path().extension() == ".pagx") {
@@ -543,6 +544,8 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
 
   pagx::TextLayout textLayout;
   textLayout.addFallbackTypefaces(GetFallbackTypefaces());
+
+  auto baselinePrefix = subdir.empty() ? std::string("PAGXTest/") : ("PAGXTest/" + subdir + "/");
 
   for (const auto& filePath : files) {
     auto baseName = std::filesystem::path(filePath).stem().string();
@@ -576,7 +579,7 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
     displayList.root()->addChild(layer);
     displayList.render(surface.get(), false);
 
-    EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/" + baseName)) << baseName;
+    EXPECT_TRUE(Baseline::Compare(surface, baselinePrefix + baseName)) << baseName;
   }
 }
 
@@ -1129,6 +1132,13 @@ PAGX_TEST(PAGXTest, ResourceCrossReferenceChain) {
   auto* image = doc->findNode<pagx::Image>("img1");
   ASSERT_TRUE(image != nullptr);
   EXPECT_EQ(font->glyphs[1]->image, image);
+}
+
+/**
+ * Test all HTML-related PAGX files in resources/html directory.
+ */
+PAGX_TEST(PAGXTest, HtmlFiles) {
+  TestPAGXDirectory(context, ProjectPath::Absolute("resources/html"), "html");
 }
 
 }  // namespace pag

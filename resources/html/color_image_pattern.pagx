@@ -2,7 +2,7 @@
 <!-- Tests: ImagePattern → CSS background-image; tile modes (repeat/mirror/clamp/decal), filterMode -->
 <pagx version="1.0" width="400" height="200">
   <Resources>
-    <Image id="img1" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFklEQVQYV2P8z8BQz0BFwMgwasCoAgBGWAgVwjJJWgAAAABJRU5ErkJggg=="/>
+    <Image id="img1" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAE0lEQVR4nGNgOJP2nyg8qpC+CgEGMdsllVhiLQAAAABJRU5ErkJggg=="/>
   </Resources>
   <!-- repeat/repeat → background-repeat: repeat -->
   <Layer>

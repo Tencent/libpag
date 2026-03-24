@@ -684,7 +684,6 @@ class TextLayoutContext {
         // translate(anchor) → translate(position)
         auto& buffer = builder.allocRunMatrix(font, count);
         memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
-        auto* matrices = reinterpret_cast<tgfx::Matrix*>(buffer.positions);
         float currentX = run->x;
         for (size_t i = 0; i < count; i++) {
           // Compute position
@@ -744,7 +743,16 @@ class TextLayoutContext {
           // 6. translate(position)
           matrix.preTranslate(posX, posY);
 
-          matrices[i] = matrix;
+          // Write the 6 affine components directly into the positions buffer.
+          // allocRunMatrix allocates 6 floats per glyph (scaleX, skewX, transX, skewY, scaleY,
+          // transY), NOT full Matrix objects.
+          auto* p = buffer.positions + i * 6;
+          p[0] = matrix.getScaleX();
+          p[1] = matrix.getSkewX();
+          p[2] = matrix.getTranslateX();
+          p[3] = matrix.getSkewY();
+          p[4] = matrix.getScaleY();
+          p[5] = matrix.getTranslateY();
         }
       } else if (!run->positions.empty() && run->positions.size() >= count) {
         // Point mode: each glyph has (x, y) offset combined with overall x/y
