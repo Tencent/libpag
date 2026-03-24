@@ -716,6 +716,23 @@ static Matrix BuildGroupMatrixPDF(const Group* group) {
   return m;
 }
 
+static FillRule DetectMaskFillRule(const Layer* maskLayer) {
+  for (const auto* element : maskLayer->contents) {
+    if (element->nodeType() == NodeType::Fill) {
+      auto rule = static_cast<const Fill*>(element)->fillRule;
+      if (rule == FillRule::EvenOdd) {
+        return FillRule::EvenOdd;
+      }
+    }
+  }
+  for (const auto* child : maskLayer->children) {
+    if (DetectMaskFillRule(child) == FillRule::EvenOdd) {
+      return FillRule::EvenOdd;
+    }
+  }
+  return FillRule::Winding;
+}
+
 static std::string EscapePDFString(const std::string& str) {
   std::string result;
   result.reserve(str.size() + 10);
@@ -1268,11 +1285,6 @@ void PDFWriter::writeClipPath(const Layer* maskLayer, const Matrix& parentMatrix
   Matrix layerMatrix = BuildLayerMatrixPDF(maskLayer);
   Matrix combined = parentMatrix * layerMatrix;
 
-  if (!combined.isIdentity()) {
-    _stream->concatMatrix(combined);
-  }
-
-  // Emit shapes from layer contents as clip paths
   for (const auto* element : maskLayer->contents) {
     auto type = element->nodeType();
     switch (type) {
@@ -1280,23 +1292,137 @@ void PDFWriter::writeClipPath(const Layer* maskLayer, const Matrix& parentMatrix
         auto rect = static_cast<const Rectangle*>(element);
         float x = rect->position.x - rect->size.width / 2;
         float y = rect->position.y - rect->size.height / 2;
+        float w = rect->size.width;
+        float h = rect->size.height;
         if (rect->roundness > 0) {
-          emitRoundedRectPath(x, y, rect->size.width, rect->size.height, rect->roundness);
+          float maxR = std::min(w, h) / 2.0f;
+          float r = std::min(rect->roundness, maxR);
+          float k = r * kKappa;
+          Point pts[] = {
+              combined.mapPoint({x + r, y}),
+              combined.mapPoint({x + w - r, y}),
+              combined.mapPoint({x + w - r + k, y}),
+              combined.mapPoint({x + w, y + r - k}),
+              combined.mapPoint({x + w, y + r}),
+              combined.mapPoint({x + w, y + h - r}),
+              combined.mapPoint({x + w, y + h - r + k}),
+              combined.mapPoint({x + w - r + k, y + h}),
+              combined.mapPoint({x + w - r, y + h}),
+              combined.mapPoint({x + r, y + h}),
+              combined.mapPoint({x + r - k, y + h}),
+              combined.mapPoint({x, y + h - r + k}),
+              combined.mapPoint({x, y + h - r}),
+              combined.mapPoint({x, y + r}),
+              combined.mapPoint({x, y + r - k}),
+              combined.mapPoint({x + r - k, y}),
+              combined.mapPoint({x + r, y}),
+          };
+          _stream->moveTo(pts[0].x, pts[0].y);
+          _stream->lineTo(pts[1].x, pts[1].y);
+          _stream->curveTo(pts[2].x, pts[2].y, pts[3].x, pts[3].y, pts[4].x, pts[4].y);
+          _stream->lineTo(pts[5].x, pts[5].y);
+          _stream->curveTo(pts[6].x, pts[6].y, pts[7].x, pts[7].y, pts[8].x, pts[8].y);
+          _stream->lineTo(pts[9].x, pts[9].y);
+          _stream->curveTo(pts[10].x, pts[10].y, pts[11].x, pts[11].y, pts[12].x, pts[12].y);
+          _stream->lineTo(pts[13].x, pts[13].y);
+          _stream->curveTo(pts[14].x, pts[14].y, pts[15].x, pts[15].y, pts[16].x, pts[16].y);
+          _stream->closePath();
+        } else if (combined.isIdentity()) {
+          _stream->rect(x, y, w, h);
         } else {
-          _stream->rect(x, y, rect->size.width, rect->size.height);
+          Point p0 = combined.mapPoint({x, y});
+          Point p1 = combined.mapPoint({x + w, y});
+          Point p2 = combined.mapPoint({x + w, y + h});
+          Point p3 = combined.mapPoint({x, y + h});
+          _stream->moveTo(p0.x, p0.y);
+          _stream->lineTo(p1.x, p1.y);
+          _stream->lineTo(p2.x, p2.y);
+          _stream->lineTo(p3.x, p3.y);
+          _stream->closePath();
         }
         break;
       }
       case NodeType::Ellipse: {
         auto ellipse = static_cast<const Ellipse*>(element);
-        emitEllipsePath(ellipse->position.x, ellipse->position.y, ellipse->size.width / 2,
-                        ellipse->size.height / 2);
+        float cx = ellipse->position.x;
+        float cy = ellipse->position.y;
+        float rx = ellipse->size.width / 2;
+        float ry = ellipse->size.height / 2;
+        float kx = rx * kKappa;
+        float ky = ry * kKappa;
+        Point pts[] = {
+            combined.mapPoint({cx + rx, cy}),
+            combined.mapPoint({cx + rx, cy + ky}),
+            combined.mapPoint({cx + kx, cy + ry}),
+            combined.mapPoint({cx, cy + ry}),
+            combined.mapPoint({cx - kx, cy + ry}),
+            combined.mapPoint({cx - rx, cy + ky}),
+            combined.mapPoint({cx - rx, cy}),
+            combined.mapPoint({cx - rx, cy - ky}),
+            combined.mapPoint({cx - kx, cy - ry}),
+            combined.mapPoint({cx, cy - ry}),
+            combined.mapPoint({cx + kx, cy - ry}),
+            combined.mapPoint({cx + rx, cy - ky}),
+            combined.mapPoint({cx + rx, cy}),
+        };
+        _stream->moveTo(pts[0].x, pts[0].y);
+        _stream->curveTo(pts[1].x, pts[1].y, pts[2].x, pts[2].y, pts[3].x, pts[3].y);
+        _stream->curveTo(pts[4].x, pts[4].y, pts[5].x, pts[5].y, pts[6].x, pts[6].y);
+        _stream->curveTo(pts[7].x, pts[7].y, pts[8].x, pts[8].y, pts[9].x, pts[9].y);
+        _stream->curveTo(pts[10].x, pts[10].y, pts[11].x, pts[11].y, pts[12].x, pts[12].y);
+        _stream->closePath();
         break;
       }
       case NodeType::Path: {
         auto path = static_cast<const Path*>(element);
         if (path->data && !path->data->isEmpty()) {
-          emitPathData(*path->data);
+          if (combined.isIdentity()) {
+            emitPathData(*path->data);
+          } else {
+            Point cur = {};
+            Point subpathStart = {};
+            path->data->forEach([this, &cur, &subpathStart, &combined](PathVerb verb,
+                                                                       const Point* pts) {
+              switch (verb) {
+                case PathVerb::Move: {
+                  Point p = combined.mapPoint(pts[0]);
+                  _stream->moveTo(p.x, p.y);
+                  cur = p;
+                  subpathStart = p;
+                  break;
+                }
+                case PathVerb::Line: {
+                  Point p = combined.mapPoint(pts[0]);
+                  _stream->lineTo(p.x, p.y);
+                  cur = p;
+                  break;
+                }
+                case PathVerb::Quad: {
+                  Point cp = combined.mapPoint(pts[0]);
+                  Point end = combined.mapPoint(pts[1]);
+                  float c1x = cur.x + 2.0f / 3.0f * (cp.x - cur.x);
+                  float c1y = cur.y + 2.0f / 3.0f * (cp.y - cur.y);
+                  float c2x = end.x + 2.0f / 3.0f * (cp.x - end.x);
+                  float c2y = end.y + 2.0f / 3.0f * (cp.y - end.y);
+                  _stream->curveTo(c1x, c1y, c2x, c2y, end.x, end.y);
+                  cur = end;
+                  break;
+                }
+                case PathVerb::Cubic: {
+                  Point cp1 = combined.mapPoint(pts[0]);
+                  Point cp2 = combined.mapPoint(pts[1]);
+                  Point end = combined.mapPoint(pts[2]);
+                  _stream->curveTo(cp1.x, cp1.y, cp2.x, cp2.y, end.x, end.y);
+                  cur = end;
+                  break;
+                }
+                case PathVerb::Close:
+                  _stream->closePath();
+                  cur = subpathStart;
+                  break;
+              }
+            });
+          }
         }
         break;
       }
@@ -1305,9 +1431,8 @@ void PDFWriter::writeClipPath(const Layer* maskLayer, const Matrix& parentMatrix
     }
   }
 
-  // Recurse into children
   for (const auto* child : maskLayer->children) {
-    writeClipPath(child, {});
+    writeClipPath(child, combined);
   }
 }
 
@@ -1394,10 +1519,14 @@ void PDFWriter::writeLayer(const Layer* layer) {
     _stream->setExtGState(_resources->getExtGState(layer->alpha, layer->alpha));
   }
 
-  // Apply contour masking as clip path
-  if (layer->mask != nullptr && layer->maskType == MaskType::Contour) {
+  if (layer->mask != nullptr) {
+    FillRule clipRule = DetectMaskFillRule(layer->mask);
     writeClipPath(layer->mask);
-    _stream->clip();
+    if (clipRule == FillRule::EvenOdd) {
+      _stream->clipEvenOdd();
+    } else {
+      _stream->clip();
+    }
     _stream->endPath();
   }
 
