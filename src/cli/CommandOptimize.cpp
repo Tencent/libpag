@@ -331,10 +331,12 @@ static void CollectLintHintsFromContents(const Layer* layer, std::vector<LintHin
         // First pass: scan all Repeaters at this level to compute the full product.
         // Repeater affects all sibling elements regardless of order.
         float localProduct = outerProduct;
+        int repeaterCount = 0;
         for (auto* element : elements) {
           if (element->nodeType() == NodeType::Repeater) {
             auto repeater = static_cast<const Repeater*>(element);
             localProduct *= repeater->copies;
+            repeaterCount++;
           }
         }
 
@@ -357,8 +359,9 @@ static void CollectLintHintsFromContents(const Layer* layer, std::vector<LintHin
                                          ") may cause performance issues"});
             }
 
-            // Nested Repeater: warn if total product > 500 and there is an outer Repeater
-            if (localProduct > 500.0f && outerProduct > 1.0f) {
+            // Multiple Repeaters: warn if total product > 500 and multiple Repeaters contribute
+            // (either from outer scope or multiple at this level).
+            if (localProduct > 500.0f && (outerProduct > 1.0f || repeaterCount > 1)) {
               auto name = layer->name.empty() ? layer->id : layer->name;
               hints.push_back({name, "Nested Repeater with product " +
                                          std::to_string(static_cast<int>(localProduct)) +
@@ -1152,11 +1155,19 @@ static bool CanUnwrapFirstChildGroup(const Group* group) {
                               group->centerY)) {
     return false;
   }
-  // Do not unwrap Groups containing Repeater — the Group defines the Repeater's scope boundary.
-  // Removing it would flatten the scope, changing the nesting relationship between Repeaters.
+  // Do not unwrap if any child uses constraint attributes that depend on the container's size
+  // (right, bottom, centerX, centerY). These require the Group as a reference frame.
+  // Note: left/top alone are absolute offsets and do not need a reference frame.
   for (auto* element : group->elements) {
-    if (element->nodeType() == NodeType::Repeater) {
-      return false;
+    auto type = element->nodeType();
+    if (type == NodeType::Rectangle || type == NodeType::Ellipse || type == NodeType::Polystar ||
+        type == NodeType::Path || type == NodeType::Text || type == NodeType::Group ||
+        type == NodeType::TextBox || type == NodeType::TextPath) {
+      auto layout = static_cast<const LayoutElement*>(element);
+      if (!std::isnan(layout->right) || !std::isnan(layout->bottom) ||
+          !std::isnan(layout->centerX) || !std::isnan(layout->centerY)) {
+        return false;
+      }
     }
   }
   return true;

@@ -69,7 +69,9 @@ void ConstraintLayout::ApplyElementConstraints(Element* element, float container
     }
   }
 
-  // Horizontal axis: centerX > (left + right) > left > right
+  // Horizontal axis: (left + right) > left > right > centerX
+  // Note: centerX and left/right are mutually exclusive due to validation rules, so this order
+  // represents the precedence when multiple edge constraints are partially specified.
   bool hasLeft = !std::isnan(constraints.left);
   bool hasRight = !std::isnan(constraints.right);
   bool hasCenterX = !std::isnan(constraints.centerX);
@@ -101,7 +103,9 @@ void ConstraintLayout::ApplyElementConstraints(Element* element, float container
     ElementTransform::TranslateX(element, tx);
   }
 
-  // Vertical axis: centerY > (top + bottom) > top > bottom
+  // Vertical axis: (top + bottom) > top > bottom > centerY
+  // Note: centerY and top/bottom are mutually exclusive due to validation rules, so this order
+  // represents the precedence when multiple edge constraints are partially specified.
   bool hasTop = !std::isnan(constraints.top);
   bool hasBottom = !std::isnan(constraints.bottom);
   bool hasCenterY = !std::isnan(constraints.centerY);

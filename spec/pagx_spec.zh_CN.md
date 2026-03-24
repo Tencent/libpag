@@ -1883,9 +1883,9 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 #### 6.5.6 文本框（TextBox）
 
-TextBox 是文本框排版器，对累积的 Text 元素应用排版。它根据自身的排版尺寸（`width`/`height`）和对齐设置重新排版所有字形位置，排版结果通过反向变换补偿写入每个 Text 元素的 GlyphRun 数据，因此 Text 自身的 position 和父级 Group 变换在渲染管线中仍然有效。首行使用行框模型定位：行框近端贴齐文本区域近端边缘，基线位于近端下方 `halfLeading + ascent` 处，其中 `halfLeading = (lineHeight - metricsHeight) / 2`，`metricsHeight = ascent + descent + leading`。遵循 CSS Writing Modes 的惯例，`lineHeight` 是逻辑属性，始终作用于行框的块轴方向尺寸。竖排模式下，它控制的是列宽而非行高。列间距为 `lineHeight`（中心到中心的距离）。当 `lineHeight` 为 0（自动）时，列宽根据字体 metrics 计算（ascent + descent + leading），与横排自动行高的算法一致。列从右往左排列。
+TextBox 是文本框排版器，对其内部的 Text 元素应用排版。它根据自身的排版尺寸（`width`/`height`）和对齐设置重新排版所有字形位置，排版结果通过反向变换补偿写入每个 Text 元素的 GlyphRun 数据，因此 Text 自身的 position 和父级 Group 变换在渲染管线中仍然有效。首行使用行框模型定位：行框近端贴齐文本区域近端边缘，基线位于近端下方 `halfLeading + ascent` 处，其中 `halfLeading = (lineHeight - metricsHeight) / 2`，`metricsHeight = ascent + descent + leading`。遵循 CSS Writing Modes 的惯例，`lineHeight` 是逻辑属性，始终作用于行框的块轴方向尺寸。竖排模式下，它控制的是列宽而非行高。列间距为 `lineHeight`（中心到中心的距离）。当 `lineHeight` 为 0（自动）时，列宽根据字体 metrics 计算（ascent + descent + leading），与横排自动行高的算法一致。列从右往左排列。
 
-TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被处理，不会在渲染树中实例化。如果累积的所有 Text 元素都已包含嵌入的 GlyphRun 数据，则排版阶段会跳过 TextBox。但即使已填写嵌入的 GlyphRun 数据和字体，仍建议保留 TextBox 节点，因为设计工具导入时需要读取其排版属性（`width`、`height`、`textAlign`、`paragraphAlign`、`lineHeight`、`wordWrap`、`overflow` 等）用于编辑展示。
+TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被处理，不会在渲染树中实例化。如果内部所有 Text 元素都已包含嵌入的 GlyphRun 数据，则排版阶段会跳过 TextBox。但即使已填写嵌入的 GlyphRun 数据和字体，仍建议保留 TextBox 节点，因为设计工具导入时需要读取其排版属性（`width`、`height`、`textAlign`、`paragraphAlign`、`lineHeight`、`wordWrap`、`overflow` 等）用于编辑展示。
 
 与其他修改器不同（如 TrimPath 对累积结果进行链式操作），TextBox 只影响 Text 元素的**初始排版**。它在修改器链开始之前确定字形位置，后续的 TextPath、TextModifier 等修改器在 TextBox 的排版结果基础上工作。TextBox 在节点顺序中的位置不影响这一行为。
 

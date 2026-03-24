@@ -671,9 +671,9 @@ CLI_TEST(PAGXCliTest, Optimize_UnwrapOffset) {
   auto output = ReadFile(outputPath);
   // The Group should be unwrapped.
   EXPECT_EQ(CountOccurrences(output, "<Group"), 0u);
-  // The Rectangle's left should be offset: 10 + 30 = 40, top: 10 + 20 = 30
-  // (after localization the layer x/y absorbs the offset, so check no Group remains).
-  EXPECT_TRUE(output.find("<Rectangle") != std::string::npos);
+  // The Rectangle's position should absorb the Group's offset: left = 10+30 = 40, top = 10+20 = 30.
+  EXPECT_TRUE(output.find("left=\"40\"") != std::string::npos);
+  EXPECT_TRUE(output.find("top=\"30\"") != std::string::npos);
 }
 
 // UnwrapFirstChildGroup: nested first-child Groups are recursively unwrapped.
@@ -699,15 +699,28 @@ CLI_TEST(PAGXCliTest, Optimize_UnwrapKeepTextBox) {
   EXPECT_TRUE(output.find("<TextBox") != std::string::npos);
 }
 
-// UnwrapFirstChildGroup: keep Group containing Repeater — Repeater scope boundary.
-CLI_TEST(PAGXCliTest, Optimize_UnwrapKeepRepeater) {
+// UnwrapFirstChildGroup: Group containing Repeater is still unwrapped as first child.
+CLI_TEST(PAGXCliTest, Optimize_UnwrapWithRepeater) {
   auto inputPath = TestResourcePath("optimize_unwrap_keep_repeater.pagx");
-  auto outputPath = TempDir() + "/unwrap_keep_repeater_out.pagx";
+  auto outputPath = TempDir() + "/unwrap_with_repeater_out.pagx";
   auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
-  // Group containing Repeater must be preserved — it defines the Repeater's scope.
-  EXPECT_EQ(CountOccurrences(output, "<Group"), 1u);
+  // First-child Group is unwrapped even if it contains a Repeater.
+  EXPECT_EQ(CountOccurrences(output, "<Group"), 0u);
+  // Both Repeaters should remain.
+  EXPECT_EQ(CountOccurrences(output, "<Repeater"), 2u);
+}
+
+// UnwrapFirstChildGroup: keep Group when child elements use constraint attributes.
+CLI_TEST(PAGXCliTest, Optimize_UnwrapKeepChildConstrained) {
+  auto inputPath = TestResourcePath("optimize_unwrap_keep_child_constrained.pagx");
+  auto outputPath = TempDir() + "/unwrap_keep_child_constrained_out.pagx";
+  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  // The outer Group is the constraint reference frame for the inner Group — must be preserved.
+  EXPECT_EQ(CountOccurrences(output, "<Group"), 2u);
 }
 
 // ExtractCompositions: do not extract Layers with flex > 0 (dynamic sizing).
