@@ -25,7 +25,7 @@
 #include "pagx/types/Matrix.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/TextAnchor.h"
-#include "pagx/utils/GlyphPathUtil.h"
+#include "pagx/utils/ExporterUtils.h"
 
 namespace pagx {
 

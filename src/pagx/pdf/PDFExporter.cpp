@@ -26,7 +26,6 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "base/utils/MathUtil.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Ellipse.h"
@@ -46,7 +45,7 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/types/Rect.h"
-#include "pagx/utils/GlyphPathUtil.h"
+#include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/StringParser.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
@@ -54,9 +53,6 @@
 #include "tgfx/core/Pixmap.h"
 
 namespace pagx {
-
-using pag::DegreesToRadians;
-using pag::FloatNearlyZero;
 
 // 4*(sqrt(2)-1)/3, optimal cubic Bezier approximation for quarter-circle arcs.
 static constexpr float kKappa = 0.5522847498f;
@@ -739,72 +735,7 @@ class PDFResourceManager {
 // Utility types and static helpers
 //==============================================================================
 
-struct PDFFillStrokeInfo {
-  const Fill* fill = nullptr;
-  const Stroke* stroke = nullptr;
-  const TextBox* textBox = nullptr;
-};
-
-static PDFFillStrokeInfo CollectFillStrokePDF(const std::vector<Element*>& contents) {
-  PDFFillStrokeInfo info = {};
-  for (const auto* element : contents) {
-    if (element->nodeType() == NodeType::Fill && !info.fill) {
-      info.fill = static_cast<const Fill*>(element);
-    } else if (element->nodeType() == NodeType::Stroke && !info.stroke) {
-      info.stroke = static_cast<const Stroke*>(element);
-    } else if (element->nodeType() == NodeType::TextBox && !info.textBox) {
-      info.textBox = static_cast<const TextBox*>(element);
-    }
-    if (info.fill && info.stroke && info.textBox) {
-      break;
-    }
-  }
-  return info;
-}
-
-static Matrix BuildLayerMatrixPDF(const Layer* layer) {
-  Matrix m = layer->matrix;
-  if (layer->x != 0.0f || layer->y != 0.0f) {
-    m = Matrix::Translate(layer->x, layer->y) * m;
-  }
-  return m;
-}
-
-static Matrix BuildGroupMatrixPDF(const Group* group) {
-  bool hasAnchor = !FloatNearlyZero(group->anchor.x) || !FloatNearlyZero(group->anchor.y);
-  bool hasPosition = !FloatNearlyZero(group->position.x) || !FloatNearlyZero(group->position.y);
-  bool hasRotation = !FloatNearlyZero(group->rotation);
-  bool hasScale =
-      !FloatNearlyZero(group->scale.x - 1.0f) || !FloatNearlyZero(group->scale.y - 1.0f);
-  bool hasSkew = !FloatNearlyZero(group->skew);
-
-  if (!hasAnchor && !hasPosition && !hasRotation && !hasScale && !hasSkew) {
-    return {};
-  }
-
-  Matrix m = {};
-  if (hasAnchor) {
-    m = Matrix::Translate(-group->anchor.x, -group->anchor.y);
-  }
-  if (hasScale) {
-    m = Matrix::Scale(group->scale.x, group->scale.y) * m;
-  }
-  if (hasSkew) {
-    m = Matrix::Rotate(group->skewAxis) * m;
-    Matrix shear = {};
-    shear.c = std::tan(DegreesToRadians(group->skew));
-    m = shear * m;
-    m = Matrix::Rotate(-group->skewAxis) * m;
-  }
-  if (hasRotation) {
-    m = Matrix::Rotate(group->rotation) * m;
-  }
-  if (hasPosition) {
-    m = Matrix::Translate(group->position.x, group->position.y) * m;
-  }
-
-  return m;
-}
+using PDFFillStrokeInfo = FillStrokeInfo;
 
 static FillRule DetectMaskFillRule(const Layer* maskLayer) {
   for (const auto* element : maskLayer->contents) {
@@ -1308,7 +1239,7 @@ void PDFWriter::writeText(const Text* text, const PDFFillStrokeInfo& fs, const M
 //==============================================================================
 
 void PDFWriter::writeClipPath(const Layer* maskLayer, const Matrix& parentMatrix) {
-  Matrix layerMatrix = BuildLayerMatrixPDF(maskLayer);
+  Matrix layerMatrix = BuildLayerMatrix(maskLayer);
   Matrix combined = parentMatrix * layerMatrix;
 
   for (const auto* element : maskLayer->contents) {
@@ -1467,7 +1398,7 @@ void PDFWriter::writeClipPath(const Layer* maskLayer, const Matrix& parentMatrix
 //==============================================================================
 
 void PDFWriter::renderMaskLayerContent(const Layer* maskLayer) {
-  Matrix layerMatrix = BuildLayerMatrixPDF(maskLayer);
+  Matrix layerMatrix = BuildLayerMatrix(maskLayer);
   bool needsGroup = !layerMatrix.isIdentity() || maskLayer->alpha < 1.0f;
 
   if (needsGroup) {
@@ -1514,7 +1445,7 @@ void PDFWriter::writeSoftMask(const Layer* maskLayer, MaskType maskType) {
 //==============================================================================
 
 void PDFWriter::writeElements(const std::vector<Element*>& elements, const Matrix& transform) {
-  auto fs = CollectFillStrokePDF(elements);
+  auto fs = CollectFillStroke(elements);
 
   for (const auto* element : elements) {
     auto type = element->nodeType();
@@ -1536,7 +1467,7 @@ void PDFWriter::writeElements(const std::vector<Element*>& elements, const Matri
         break;
       case NodeType::Group: {
         auto* group = static_cast<const Group*>(element);
-        Matrix groupMatrix = BuildGroupMatrixPDF(group);
+        Matrix groupMatrix = BuildGroupMatrix(group);
         Matrix combined = transform * groupMatrix;
 
         bool hasAlpha = group->alpha < 1.0f;
@@ -1587,7 +1518,7 @@ void PDFWriter::writeLayer(const Layer* layer) {
   _stream->save();
   Matrix savedMatrix = _currentMatrix;
 
-  Matrix layerMatrix = BuildLayerMatrixPDF(layer);
+  Matrix layerMatrix = BuildLayerMatrix(layer);
   if (!layerMatrix.isIdentity()) {
     _stream->concatMatrix(layerMatrix);
     _currentMatrix = _currentMatrix * layerMatrix;

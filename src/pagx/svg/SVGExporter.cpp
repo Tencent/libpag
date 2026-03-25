@@ -49,11 +49,11 @@
 #include "pagx/svg/SVGTextLayout.h"
 #include "pagx/types/Rect.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/StringParser.h"
 
 namespace pagx {
 
-using pag::DegreesToRadians;
 using pag::FloatNearlyZero;
 
 //==============================================================================
@@ -221,12 +221,6 @@ class SVGBuilder {
 // Utility types and static helpers
 //==============================================================================
 
-struct FillStrokeInfo {
-  const Fill* fill = nullptr;
-  const Stroke* stroke = nullptr;
-  const TextBox* textBox = nullptr;
-};
-
 // Returns only the RGB hex string (#RRGGBB). Alpha is handled separately via
 // fill-opacity/stroke-opacity attributes, following standard SVG practice.
 static std::string ColorToSVGString(const Color& color) {
@@ -359,76 +353,9 @@ static std::string GetImageHref(const Image* image) {
   return {};
 }
 
-static FillStrokeInfo CollectFillStroke(const std::vector<Element*>& contents) {
-  FillStrokeInfo info = {};
-  for (const auto* element : contents) {
-    if (element->nodeType() == NodeType::Fill && !info.fill) {
-      info.fill = static_cast<const Fill*>(element);
-    } else if (element->nodeType() == NodeType::Stroke && !info.stroke) {
-      info.stroke = static_cast<const Stroke*>(element);
-    } else if (element->nodeType() == NodeType::TextBox && !info.textBox) {
-      info.textBox = static_cast<const TextBox*>(element);
-    }
-    if (info.fill && info.stroke && info.textBox) {
-      break;
-    }
-  }
-  return info;
-}
-
-static Matrix BuildLayerMatrix(const Layer* layer) {
-  Matrix m = layer->matrix;
-  if (layer->x != 0.0f || layer->y != 0.0f) {
-    m = Matrix::Translate(layer->x, layer->y) * m;
-  }
-  return m;
-}
-
 static std::string BuildLayerTransform(const Layer* layer) {
   Matrix m = BuildLayerMatrix(layer);
   return MatrixToSVGTransform(m);
-}
-
-static Matrix BuildGroupMatrix(const Group* group) {
-  bool hasAnchor = !FloatNearlyZero(group->anchor.x) || !FloatNearlyZero(group->anchor.y);
-  bool hasPosition = !FloatNearlyZero(group->position.x) || !FloatNearlyZero(group->position.y);
-  bool hasRotation = !FloatNearlyZero(group->rotation);
-  bool hasScale =
-      !FloatNearlyZero(group->scale.x - 1.0f) || !FloatNearlyZero(group->scale.y - 1.0f);
-  bool hasSkew = !FloatNearlyZero(group->skew);
-
-  if (!hasAnchor && !hasPosition && !hasRotation && !hasScale && !hasSkew) {
-    return {};
-  }
-
-  // Transform order per PAGX spec:
-  // 1. translate(-anchor) → 2. scale → 3. skew → 4. rotate → 5. translate(position)
-  // Column-vector composition: M = T(pos) * R(rot) * Skew * S(scale) * T(-anchor)
-  Matrix m = {};
-
-  if (hasAnchor) {
-    m = Matrix::Translate(-group->anchor.x, -group->anchor.y);
-  }
-  if (hasScale) {
-    m = Matrix::Scale(group->scale.x, group->scale.y) * m;
-  }
-  if (hasSkew) {
-    // Skew per spec: R(skewAxis) → ShearX(tan(skew)) → R(-skewAxis)
-    // Column-vector: R(-skewAxis) * ShearX * R(skewAxis)
-    m = Matrix::Rotate(group->skewAxis) * m;
-    Matrix shear = {};
-    shear.c = std::tan(DegreesToRadians(group->skew));
-    m = shear * m;
-    m = Matrix::Rotate(-group->skewAxis) * m;
-  }
-  if (hasRotation) {
-    m = Matrix::Rotate(group->rotation) * m;
-  }
-  if (hasPosition) {
-    m = Matrix::Translate(group->position.x, group->position.y) * m;
-  }
-
-  return m;
 }
 
 //==============================================================================

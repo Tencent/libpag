@@ -19,6 +19,12 @@
 #pragma once
 
 #include <vector>
+#include "pagx/nodes/Element.h"
+#include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Group.h"
+#include "pagx/nodes/Layer.h"
+#include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/TextBox.h"
 #include "pagx/types/Matrix.h"
 
 namespace pagx {
@@ -26,10 +32,22 @@ namespace pagx {
 class PathData;
 class Text;
 
+struct FillStrokeInfo {
+  const Fill* fill = nullptr;
+  const Stroke* stroke = nullptr;
+  const TextBox* textBox = nullptr;
+};
+
 struct GlyphPath {
   Matrix transform;
   const PathData* pathData;
 };
+
+FillStrokeInfo CollectFillStroke(const std::vector<Element*>& contents);
+
+Matrix BuildLayerMatrix(const Layer* layer);
+
+Matrix BuildGroupMatrix(const Group* group);
 
 /**
  * Converts text glyph runs into a list of glyph paths with transform matrices.
