@@ -46,6 +46,7 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/types/Rect.h"
+#include "pagx/utils/GlyphPathUtil.h"
 #include "pagx/utils/StringParser.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
@@ -851,92 +852,6 @@ static std::string EscapePDFString(const std::string& str) {
 }
 
 //==============================================================================
-// PDFGlyphPath – glyph path data for text-to-path conversion
-//==============================================================================
-
-struct PDFGlyphPath {
-  Matrix transform;
-  const PathData* pathData;
-};
-
-static std::vector<PDFGlyphPath> ComputeGlyphPathsPDF(const Text& text, float textPosX,
-                                                      float textPosY) {
-  std::vector<PDFGlyphPath> result;
-  for (const auto* run : text.glyphRuns) {
-    if (!run->font || run->glyphs.empty()) {
-      continue;
-    }
-    float scale = run->fontSize / static_cast<float>(run->font->unitsPerEm);
-    float currentX = textPosX + run->x;
-    for (size_t i = 0; i < run->glyphs.size(); i++) {
-      uint16_t glyphID = run->glyphs[i];
-      if (glyphID == 0) {
-        continue;
-      }
-      auto glyphIndex = static_cast<size_t>(glyphID) - 1;
-      if (glyphIndex >= run->font->glyphs.size()) {
-        continue;
-      }
-      auto* glyph = run->font->glyphs[glyphIndex];
-      if (!glyph || !glyph->path || glyph->path->isEmpty()) {
-        continue;
-      }
-
-      float posX = 0;
-      float posY = 0;
-      if (i < run->positions.size()) {
-        posX = textPosX + run->x + run->positions[i].x;
-        posY = textPosY + run->y + run->positions[i].y;
-        if (i < run->xOffsets.size()) {
-          posX += run->xOffsets[i];
-        }
-      } else if (i < run->xOffsets.size()) {
-        posX = textPosX + run->x + run->xOffsets[i];
-        posY = textPosY + run->y;
-      } else {
-        posX = currentX;
-        posY = textPosY + run->y;
-      }
-      currentX += glyph->advance * scale;
-
-      Matrix glyphMatrix = Matrix::Translate(posX, posY) * Matrix::Scale(scale, scale);
-
-      bool hasRotation = i < run->rotations.size() && run->rotations[i] != 0;
-      bool hasGlyphScale =
-          i < run->scales.size() && (run->scales[i].x != 1 || run->scales[i].y != 1);
-      bool hasGlyphSkew = i < run->skews.size() && run->skews[i] != 0;
-
-      if (hasRotation || hasGlyphScale || hasGlyphSkew) {
-        float anchorX = glyph->advance * 0.5f;
-        float anchorY = 0;
-        if (i < run->anchors.size()) {
-          anchorX += run->anchors[i].x;
-          anchorY += run->anchors[i].y;
-        }
-
-        Matrix perGlyph = Matrix::Translate(-anchorX, -anchorY);
-        if (hasGlyphScale) {
-          perGlyph = Matrix::Scale(run->scales[i].x, run->scales[i].y) * perGlyph;
-        }
-        if (hasGlyphSkew) {
-          Matrix shear = {};
-          shear.c = std::tan(DegreesToRadians(run->skews[i]));
-          perGlyph = shear * perGlyph;
-        }
-        if (hasRotation) {
-          perGlyph = Matrix::Rotate(run->rotations[i]) * perGlyph;
-        }
-        perGlyph = Matrix::Translate(anchorX, anchorY) * perGlyph;
-        glyphMatrix = glyphMatrix * perGlyph;
-      }
-
-      result.push_back({glyphMatrix, glyph->path});
-    }
-  }
-  return result;
-}
-
-//==============================================================================
 // PDFWriter – converts PAGX nodes to PDF content stream operators
 //==============================================================================
 
@@ -1262,7 +1177,7 @@ void PDFWriter::writeTextAsPath(const Text* text, const PDFFillStrokeInfo& fs,
   float textPosX = text->position.x;
   float textPosY = text->position.y;
 
-  auto glyphPaths = ComputeGlyphPathsPDF(*text, textPosX, textPosY);
+  auto glyphPaths = ComputeGlyphPaths(*text, textPosX, textPosY);
   if (glyphPaths.empty()) {
     return;
   }
