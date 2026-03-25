@@ -275,6 +275,21 @@ static std::string Matrix3DToCSS(const Matrix3D& m) {
   return r;
 }
 
+static const char* BlendModeToMixBlendMode(BlendMode mode) {
+  auto svgStr = BlendModeToSVGString(mode);
+  if (svgStr) {
+    return svgStr;
+  }
+  if (mode == BlendMode::PlusLighter) {
+    return "plus-lighter";
+  }
+  if (mode == BlendMode::PlusDarker) {
+    // CSS has no direct equivalent for PlusDarker; approximate with darken.
+    return "darken";
+  }
+  return nullptr;
+}
+
 static std::string LayerTransformCSS(const Layer* layer) {
   if (!layer->matrix3D.isIdentity()) {
     return Matrix3DToCSS(layer->matrix3D);
@@ -891,6 +906,68 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha) 
     }
     return "url(#" + id + ")";
   }
+  if (src->nodeType() == NodeType::ImagePattern) {
+    auto p = static_cast<const ImagePattern*>(src);
+    if (!p->image) {
+      if (outAlpha) {
+        *outAlpha = 1.0f;
+      }
+      return "none";
+    }
+    std::string imgUrl = "url(" + GetImageSrc(p->image) + ")";
+    std::string repeatX = "no-repeat";
+    std::string repeatY = "no-repeat";
+    if (p->tileModeX == TileMode::Repeat || p->tileModeX == TileMode::Mirror) {
+      repeatX = "repeat";
+    }
+    if (p->tileModeY == TileMode::Repeat || p->tileModeY == TileMode::Mirror) {
+      repeatY = "repeat";
+    }
+    std::string bgRepeat = (repeatX == repeatY) ? repeatX : (repeatX + " " + repeatY);
+    std::string bgSize = "cover";
+    std::string bgPos;
+    if (!p->matrix.isIdentity()) {
+      float sx = std::sqrt(p->matrix.a * p->matrix.a + p->matrix.b * p->matrix.b);
+      float sy = std::sqrt(p->matrix.c * p->matrix.c + p->matrix.d * p->matrix.d);
+      if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
+        bgSize = FloatToString(sx * 100.0f) + "% " + FloatToString(sy * 100.0f) + "%";
+      }
+      if (!FloatNearlyZero(p->matrix.tx) || !FloatNearlyZero(p->matrix.ty)) {
+        bgPos = FloatToString(p->matrix.tx) + "px " + FloatToString(p->matrix.ty) + "px";
+      }
+    }
+    std::string cssStyle = "width:100%;height:100%;background-image:" + imgUrl +
+                           ";background-repeat:" + bgRepeat + ";background-size:" + bgSize;
+    if (!bgPos.empty()) {
+      cssStyle += ";background-position:" + bgPos;
+    }
+    if (p->filterMode == FilterMode::Nearest) {
+      cssStyle += ";image-rendering:pixelated";
+    }
+    std::string id = _ctx->nextId("ipat");
+    _defs->openTag("pattern");
+    _defs->addAttr("id", id);
+    _defs->addAttr("patternUnits", "userSpaceOnUse");
+    _defs->addAttr("x", "0");
+    _defs->addAttr("y", "0");
+    _defs->addAttr("width", "10000");
+    _defs->addAttr("height", "10000");
+    _defs->closeTagStart();
+    _defs->openTag("foreignObject");
+    _defs->addAttr("width", "10000");
+    _defs->addAttr("height", "10000");
+    _defs->closeTagStart();
+    _defs->openTag("div");
+    _defs->addAttr("xmlns", "http://www.w3.org/1999/xhtml");
+    _defs->addAttr("style", cssStyle);
+    _defs->closeTagSelfClosing();
+    _defs->closeTag();  // </foreignObject>
+    _defs->closeTag();  // </pattern>
+    if (outAlpha) {
+      *outAlpha = 1.0f;
+    }
+    return "url(#" + id + ")";
+  }
   if (outAlpha) {
     *outAlpha = 1.0f;
   }
@@ -1006,6 +1083,8 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
     switch (f->nodeType()) {
       case NodeType::BlurFilter: {
         auto b = static_cast<const BlurFilter*>(f);
+        // TODO: BlurFilter.tileMode is ignored. SVG feGaussianBlur has no equivalent of
+        // TileMode (Clamp/Repeat/Mirror/Decal); it always uses Decal-like behavior.
         _defs->openTag("feGaussianBlur");
         _defs->addAttr("in", "SourceGraphic");
         std::string sd = FloatToString(b->blurX);
@@ -1388,6 +1467,19 @@ bool HTMLWriter::canCSS(const std::vector<GeoInfo>& geos, const Fill* fill, cons
     if (fill->fillRule == FillRule::EvenOdd) {
       return false;
     }
+    // LinearGradient: CSS linear-gradient only expresses angle, not start/end positions.
+    // Fall back to SVG when the matrix has scale or translation that changes gradient geometry.
+    if (fill->color && fill->color->nodeType() == NodeType::LinearGradient) {
+      auto g = static_cast<const LinearGradient*>(fill->color);
+      if (!FloatNearlyZero(g->matrix.tx) || !FloatNearlyZero(g->matrix.ty)) {
+        return false;
+      }
+      float sx = std::sqrt(g->matrix.a * g->matrix.a + g->matrix.b * g->matrix.b);
+      float sy = std::sqrt(g->matrix.c * g->matrix.c + g->matrix.d * g->matrix.d);
+      if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
+        return false;
+      }
+    }
     // RadialGradient with rotation + non-uniform scale cannot be expressed in CSS
     if (fill->color && fill->color->nodeType() == NodeType::RadialGradient) {
       auto g = static_cast<const RadialGradient*>(fill->color);
@@ -1398,6 +1490,10 @@ bool HTMLWriter::canCSS(const std::vector<GeoInfo>& geos, const Fill* fill, cons
       if (hasRotation && nonUniformScale) {
         return false;
       }
+    }
+    // DiamondGradient has no CSS equivalent; SVG radialGradient with gradientTransform is closer.
+    if (fill->color && fill->color->nodeType() == NodeType::DiamondGradient) {
+      return false;
     }
   }
   return true;
@@ -1443,6 +1539,10 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
     if (ct == NodeType::LinearGradient || ct == NodeType::RadialGradient ||
         ct == NodeType::ConicGradient) {
       style += ";background:" + css;
+      float fillOpacity = ca * fill->alpha;
+      if (fillOpacity < 1.0f) {
+        alpha *= fillOpacity;
+      }
     } else if (ct == NodeType::ImagePattern) {
       auto p = static_cast<const ImagePattern*>(fill->color);
       style += ";background-image:" + css;
@@ -1476,8 +1576,13 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
         style += ";background-size:cover";
       }
       // Filter mode
+      // TODO: ImagePattern.mipmapMode is ignored. CSS/SVG has no direct control over mipmap
+      // sampling; browsers handle mipmap generation internally.
       if (p->filterMode == FilterMode::Nearest) {
         style += ";image-rendering:pixelated";
+      }
+      if (fill->alpha < 1.0f) {
+        alpha *= fill->alpha;
       }
     } else {
       float ea = ca * fill->alpha;
@@ -1490,12 +1595,10 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
     }
   }
   if (painterBlend != BlendMode::Normal) {
-    auto blendStr = BlendModeToSVGString(painterBlend);
+    auto blendStr = BlendModeToMixBlendMode(painterBlend);
     if (blendStr) {
       style += ";mix-blend-mode:";
       style += blendStr;
-    } else if (painterBlend == BlendMode::PlusLighter) {
-      style += ";mix-blend-mode:plus-lighter";
     }
   }
   if (alpha < 1.0f) {
@@ -1571,12 +1674,10 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   std::string svgStyle =
       "position:absolute;left:" + FloatToString(x0) + "px;top:" + FloatToString(y0) + "px";
   if (painterBlend != BlendMode::Normal) {
-    auto blendStr = BlendModeToSVGString(painterBlend);
+    auto blendStr = BlendModeToMixBlendMode(painterBlend);
     if (blendStr) {
       svgStyle += ";mix-blend-mode:";
       svgStyle += blendStr;
-    } else if (painterBlend == BlendMode::PlusLighter) {
-      svgStyle += ";mix-blend-mode:plus-lighter";
     }
   }
   if (alpha < 1.0f) {
@@ -1684,6 +1785,9 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
 
   // Compute TrimPath dasharray/dashoffset attributes using pathLength normalization.
   // With pathLength="1", start/end [0,1] can directly control stroke-dasharray.
+  // TODO: TrimPath.type is currently always treated as Separate (per-geometry trim). Continuous
+  // mode should treat all paths as one concatenated path and trim collectively, which requires
+  // pre-computing individual path lengths and distributing the trim range proportionally.
   bool hasTrimAttrs = trim != nullptr &&
                       (trim->start != 0.0f || trim->end != 1.0f || !FloatNearlyZero(trim->offset));
   auto applyTrimAttrs = [&](HTMLBuilder& builder) {
@@ -1890,12 +1994,10 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     std::string svgStyle =
         "position:absolute;left:" + FloatToString(x0) + "px;top:" + FloatToString(y0) + "px";
     if (painterBlend != BlendMode::Normal) {
-      auto blendStr = BlendModeToSVGString(painterBlend);
+      auto blendStr = BlendModeToMixBlendMode(painterBlend);
       if (blendStr) {
         svgStyle += ";mix-blend-mode:";
         svgStyle += blendStr;
-      } else if (painterBlend == BlendMode::PlusLighter) {
-        svgStyle += ";mix-blend-mode:plus-lighter";
       }
     }
     if (alpha < 1.0f) {
@@ -2013,17 +2115,36 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       style += ";font-style:italic";
     }
   }
-  if (text->fauxBold) {
+  if (text->fauxBold && !stroke) {
     style += ";-webkit-text-stroke:0.02em currentColor";
   }
-  if (fill && fill->color && fill->color->nodeType() == NodeType::SolidColor) {
-    auto sc = static_cast<const SolidColor*>(fill->color);
-    style += ";color:" + ColorToRGBA(sc->color, fill->alpha);
+  if (fill && fill->color) {
+    auto ct = fill->color->nodeType();
+    if (ct == NodeType::SolidColor) {
+      auto sc = static_cast<const SolidColor*>(fill->color);
+      style += ";color:" + ColorToRGBA(sc->color, fill->alpha);
+    } else {
+      float ca = 1.0f;
+      std::string css = colorToCSS(fill->color, &ca);
+      if (!css.empty()) {
+        style += ";background:" + css;
+        style += ";-webkit-background-clip:text;background-clip:text";
+        style += ";-webkit-text-fill-color:transparent";
+        if (fill->alpha < 1.0f) {
+          alpha *= fill->alpha;
+        }
+      }
+    }
+  }
+  if (stroke && stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
+    auto sc = static_cast<const SolidColor*>(stroke->color);
+    style += ";-webkit-text-stroke:" + FloatToString(stroke->width) + "px " +
+             ColorToRGBA(sc->color, stroke->alpha);
+    style += ";paint-order:stroke fill";
   }
   if (alpha < 1.0f) {
     style += ";opacity:" + FloatToString(alpha);
   }
-  (void)stroke;
   out.openTag("span");
   out.addAttr("style", style);
   out.closeTagWithText(text->text);
@@ -2335,13 +2456,15 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   }
 
   if (layer->blendMode != BlendMode::Normal) {
-    auto blendStr = BlendModeToSVGString(layer->blendMode);
+    auto blendStr = BlendModeToMixBlendMode(layer->blendMode);
     if (blendStr) {
       style += ";mix-blend-mode:";
       style += blendStr;
-    } else if (layer->blendMode == BlendMode::PlusLighter) {
-      style += ";mix-blend-mode:plus-lighter";
     }
+  }
+
+  if (!layer->passThroughBackground) {
+    style += ";isolation:isolate";
   }
 
   if (!layer->antiAlias) {
@@ -2360,6 +2483,9 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   }
 
   // Layer styles that produce filter effects
+  // TODO: LayerStyle.blendMode and LayerStyle.excludeChildEffects are not yet handled. CSS filter
+  // architecture applies all filters as a single property, making it impossible to set per-style
+  // blend modes or exclude child effects independently.
   for (auto* ls : layer->styles) {
     if (ls->nodeType() == NodeType::DropShadowStyle) {
       auto ds = static_cast<const DropShadowStyle*>(ls);
@@ -2548,6 +2674,8 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   out.closeTagStart();
 
   // Background blur styles
+  // TODO: BackgroundBlurStyle.tileMode is ignored. CSS backdrop-filter:blur() has no equivalent of
+  // TileMode; it always extends the blurred region to the element bounds.
   for (auto* ls : layer->styles) {
     if (ls->nodeType() == NodeType::BackgroundBlurStyle) {
       auto blur = static_cast<const BackgroundBlurStyle*>(ls);
