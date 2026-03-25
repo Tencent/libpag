@@ -98,11 +98,26 @@ void PAGAudioRender::onVolumeChange(float volume) {
 }
 
 void PAGAudioRender::onWriteData(std::shared_ptr<ByteData> data) {
-  if (!isPlaying) {
+  if (!isPlaying || data == nullptr) {
     return;
   }
-  if (audioOutput->bytesFree() >= static_cast<int64_t>(data->length())) {
-    audioDevice->write(reinterpret_cast<const char*>(data->data()), data->length());
+  auto dataPtr = reinterpret_cast<const char*>(data->data());
+  int64_t remaining = static_cast<int64_t>(data->length());
+  while (remaining > 0 && isPlaying) {
+    int64_t freeSpace = audioOutput->bytesFree();
+    if (freeSpace <= 0) {
+      int64_t waitTime = Utils::SampleLengthToTime(remaining, sampleRate, channels);
+      std::this_thread::sleep_for(std::chrono::microseconds(std::min(waitTime, static_cast<int64_t>(1000))));
+      continue;
+    }
+    int64_t toWrite = std::min(freeSpace, remaining);
+    int64_t written = audioDevice->write(dataPtr, toWrite);
+    if (written > 0) {
+      dataPtr += written;
+      remaining -= written;
+    } else {
+      std::this_thread::sleep_for(std::chrono::microseconds(500));
+    }
   }
 }
 
