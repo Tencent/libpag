@@ -57,6 +57,15 @@ namespace pagx {
 // 4*(sqrt(2)-1)/3, optimal cubic Bezier approximation for quarter-circle arcs.
 static constexpr float kKappa = 0.5522847498f;
 
+static bool HasNonOpaqueStops(const std::vector<ColorStop*>& stops) {
+  for (const auto* stop : stops) {
+    if (stop->color.alpha < 1.0f) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // PDF does not support scientific notation (e.g., "1e-06") in numeric values.
 // The spec requires decimal digits with optional sign and decimal point only.
 static std::string PDFFloat(float value) {
@@ -557,6 +566,57 @@ class PDFResourceManager {
                        bounds + " /Encode " + encode + " >>");
   }
 
+  int createAlphaGradientFunction(const std::vector<ColorStop*>& stops) {
+    if (stops.size() < 2) {
+      return -1;
+    }
+
+    if (stops.size() == 2) {
+      return _store->add("<< /FunctionType 2 /Domain [0 1] /C0 [" +
+                         PDFFloat(stops[0]->color.alpha) + "] /C1 [" +
+                         PDFFloat(stops[1]->color.alpha) + "] /N 1 >>");
+    }
+
+    std::vector<int> segFuncs;
+    segFuncs.reserve(stops.size() - 1);
+    for (size_t i = 0; i + 1 < stops.size(); i++) {
+      segFuncs.push_back(
+          _store->add("<< /FunctionType 2 /Domain [0 1] /C0 [" +
+                      PDFFloat(stops[i]->color.alpha) + "] /C1 [" +
+                      PDFFloat(stops[i + 1]->color.alpha) + "] /N 1 >>"));
+    }
+
+    std::string funcsArr = "[";
+    for (size_t i = 0; i < segFuncs.size(); i++) {
+      if (i > 0) {
+        funcsArr += " ";
+      }
+      funcsArr += std::to_string(segFuncs[i]) + " 0 R";
+    }
+    funcsArr += "]";
+
+    std::string bounds = "[";
+    for (size_t i = 1; i + 1 < stops.size(); i++) {
+      if (i > 1) {
+        bounds += " ";
+      }
+      bounds += PDFFloat(stops[i]->offset);
+    }
+    bounds += "]";
+
+    std::string encode = "[";
+    for (size_t i = 0; i < segFuncs.size(); i++) {
+      if (i > 0) {
+        encode += " ";
+      }
+      encode += "0 1";
+    }
+    encode += "]";
+
+    return _store->add("<< /FunctionType 3 /Domain [0 1] /Functions " + funcsArr + " /Bounds " +
+                       bounds + " /Encode " + encode + " >>");
+  }
+
   static std::string matrixString(const Matrix& m) {
     return "[" + PDFFloat(m.a) + " " + PDFFloat(m.b) + " " + PDFFloat(m.c) + " " + PDFFloat(m.d) +
            " " + PDFFloat(m.tx) + " " + PDFFloat(m.ty) + "]";
@@ -606,6 +666,67 @@ class PDFResourceManager {
     std::string patName = "P" + std::to_string(_patCount++);
     _patterns[patName] = patId;
     return patName;
+  }
+
+  std::string addGradientAlphaMask(int alphaShadingId, const Matrix& gradMatrix, float bboxWidth,
+                                   float bboxHeight) {
+    std::string shadingResName = "S0";
+    std::string formContent;
+    if (gradMatrix.isIdentity()) {
+      formContent = "/" + shadingResName + " sh\n";
+    } else {
+      formContent = PDFFloat(gradMatrix.a) + " " + PDFFloat(gradMatrix.b) + " " +
+                    PDFFloat(gradMatrix.c) + " " + PDFFloat(gradMatrix.d) + " " +
+                    PDFFloat(gradMatrix.tx) + " " + PDFFloat(gradMatrix.ty) + " cm\n/" +
+                    shadingResName + " sh\n";
+    }
+
+    std::string bbox = "[0 0 " + PDFFloat(bboxWidth) + " " + PDFFloat(bboxHeight) + "]";
+    int formId = _store->add(
+        "<< /Type /XObject /Subtype /Form /BBox " + bbox +
+        " /Group << /Type /Group /S /Transparency /CS /DeviceGray >>"
+        " /Resources << /Shading << /" +
+        shadingResName + " " + std::to_string(alphaShadingId) +
+        " 0 R >> >>"
+        " /Length " +
+        std::to_string(formContent.size()) + " >>\nstream\n" + formContent + "\nendstream");
+
+    std::string gsName = "GS" + std::to_string(_gsCount++);
+    int gsId = _store->add("<< /Type /ExtGState /SMask << /Type /Mask /S /Luminosity /G " +
+                           std::to_string(formId) + " 0 R >> >>");
+    _extGStates[gsName] = gsId;
+    return gsName;
+  }
+
+  std::string addLinearGradientAlphaMask(const std::vector<ColorStop*>& stops,
+                                         const Point& startPoint, const Point& endPoint,
+                                         const Matrix& gradMatrix, float bboxWidth,
+                                         float bboxHeight) {
+    int alphaFuncId = createAlphaGradientFunction(stops);
+    if (alphaFuncId < 0) {
+      return {};
+    }
+    int alphaShadingId =
+        _store->add("<< /ShadingType 2 /ColorSpace /DeviceGray /Coords [" +
+                    PDFFloat(startPoint.x) + " " + PDFFloat(startPoint.y) + " " +
+                    PDFFloat(endPoint.x) + " " + PDFFloat(endPoint.y) + "] /Function " +
+                    std::to_string(alphaFuncId) + " 0 R /Extend [true true] >>");
+    return addGradientAlphaMask(alphaShadingId, gradMatrix, bboxWidth, bboxHeight);
+  }
+
+  std::string addRadialGradientAlphaMask(const std::vector<ColorStop*>& stops, const Point& center,
+                                         float radius, const Matrix& gradMatrix, float bboxWidth,
+                                         float bboxHeight) {
+    int alphaFuncId = createAlphaGradientFunction(stops);
+    if (alphaFuncId < 0) {
+      return {};
+    }
+    int alphaShadingId =
+        _store->add("<< /ShadingType 3 /ColorSpace /DeviceGray /Coords [" +
+                    PDFFloat(center.x) + " " + PDFFloat(center.y) + " 0 " + PDFFloat(center.x) +
+                    " " + PDFFloat(center.y) + " " + PDFFloat(radius) + "] /Function " +
+                    std::to_string(alphaFuncId) + " 0 R /Extend [true true] >>");
+    return addGradientAlphaMask(alphaShadingId, gradMatrix, bboxWidth, bboxHeight);
   }
 
   // Creates a Tiling Pattern (PatternType 1) that draws an image, returns the pattern resource name.
@@ -869,6 +990,7 @@ class PDFWriter {
     float r = 0, g = 0, b = 0;
     float alpha = 1.0f;
     std::string patternName;
+    std::string softMaskGSName;
   };
 
   ColorRef resolveColorSource(const ColorSource* source);
@@ -1023,14 +1145,20 @@ PDFWriter::ColorRef PDFWriter::resolveColorSource(const ColorSource* source) {
   if (source->nodeType() == NodeType::SolidColor) {
     auto solid = static_cast<const SolidColor*>(source);
     return {ColorRefType::Solid, solid->color.red,   solid->color.green,
-            solid->color.blue,   solid->color.alpha, {}};
+            solid->color.blue,   solid->color.alpha, {},  {}};
   }
 
   if (source->nodeType() == NodeType::LinearGradient) {
     auto grad = static_cast<const LinearGradient*>(source);
     std::string patName = _resources->addLinearGradient(grad, _currentMatrix);
     if (!patName.empty()) {
-      return {ColorRefType::Pattern, 0, 0, 0, 1.0f, patName};
+      ColorRef ref = {ColorRefType::Pattern, 0, 0, 0, 1.0f, patName, {}};
+      if (HasNonOpaqueStops(grad->colorStops)) {
+        ref.softMaskGSName = _resources->addLinearGradientAlphaMask(
+            grad->colorStops, grad->startPoint, grad->endPoint, grad->matrix, _docWidth,
+            _docHeight);
+      }
+      return ref;
     }
   }
 
@@ -1038,7 +1166,12 @@ PDFWriter::ColorRef PDFWriter::resolveColorSource(const ColorSource* source) {
     auto grad = static_cast<const RadialGradient*>(source);
     std::string patName = _resources->addRadialGradient(grad, _currentMatrix);
     if (!patName.empty()) {
-      return {ColorRefType::Pattern, 0, 0, 0, 1.0f, patName};
+      ColorRef ref = {ColorRefType::Pattern, 0, 0, 0, 1.0f, patName, {}};
+      if (HasNonOpaqueStops(grad->colorStops)) {
+        ref.softMaskGSName = _resources->addRadialGradientAlphaMask(
+            grad->colorStops, grad->center, grad->radius, grad->matrix, _docWidth, _docHeight);
+      }
+      return ref;
     }
   }
 
@@ -1046,7 +1179,7 @@ PDFWriter::ColorRef PDFWriter::resolveColorSource(const ColorSource* source) {
     auto pattern = static_cast<const ImagePattern*>(source);
     std::string patName = _resources->addImagePattern(pattern, _currentMatrix);
     if (!patName.empty()) {
-      return {ColorRefType::Pattern, 0, 0, 0, 1.0f, patName};
+      return {ColorRefType::Pattern, 0, 0, 0, 1.0f, patName, {}};
     }
   }
 
@@ -1098,6 +1231,12 @@ PDFWriter::PaintState PDFWriter::applyFillStrokeColors(const FillStrokeInfo& fs)
   }
   if (state.hasStroke) {
     strokeRef = resolveColorSource(fs.stroke->color);
+  }
+
+  if (!fillRef.softMaskGSName.empty()) {
+    _stream->setExtGState(fillRef.softMaskGSName);
+  } else if (!strokeRef.softMaskGSName.empty()) {
+    _stream->setExtGState(strokeRef.softMaskGSName);
   }
 
   float fillAlpha = state.hasFill ? (fillRef.alpha * fs.fill->alpha) : 1.0f;
