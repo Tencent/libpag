@@ -18,6 +18,7 @@
 
 #include "pagx/utils/ExporterUtils.h"
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <fstream>
 #include "base/utils/MathUtil.h"
@@ -242,6 +243,51 @@ std::shared_ptr<tgfx::Data> GetImageData(const Image* image) {
     return tgfx::Data::MakeFromFile(image->filePath);
   }
   return nullptr;
+}
+
+bool HasNonASCII(const std::string& str) {
+  for (unsigned char c : str) {
+    if (c > 127) {
+      return true;
+    }
+  }
+  return false;
+}
+
+std::string UTF8ToUTF16BEHex(const std::string& utf8) {
+  std::string hex;
+  hex.reserve(utf8.size() * 6);
+  size_t i = 0;
+  while (i < utf8.size()) {
+    uint32_t cp = 0;
+    auto c = static_cast<unsigned char>(utf8[i]);
+    size_t bytes = 1;
+    if (c < 0x80) {
+      cp = c;
+    } else if (c < 0xE0) {
+      cp = c & 0x1Fu;
+      bytes = 2;
+    } else if (c < 0xF0) {
+      cp = c & 0x0Fu;
+      bytes = 3;
+    } else {
+      cp = c & 0x07u;
+      bytes = 4;
+    }
+    for (size_t j = 1; j < bytes && (i + j) < utf8.size(); j++) {
+      cp = (cp << 6) | (static_cast<unsigned char>(utf8[i + j]) & 0x3Fu);
+    }
+    i += bytes;
+    char buf[9];
+    if (cp <= 0xFFFF) {
+      snprintf(buf, sizeof(buf), "%04X", cp);
+    } else {
+      cp -= 0x10000;
+      snprintf(buf, sizeof(buf), "%04X%04X", 0xD800 + (cp >> 10), 0xDC00 + (cp & 0x3FF));
+    }
+    hex += buf;
+  }
+  return hex;
 }
 
 }  // namespace pagx

@@ -75,4 +75,8 @@ bool IsJPEG(const uint8_t* data, size_t size);
 
 std::shared_ptr<tgfx::Data> GetImageData(const Image* image);
 
+bool HasNonASCII(const std::string& str);
+
+std::string UTF8ToUTF16BEHex(const std::string& utf8);
+
 }  // namespace pagx

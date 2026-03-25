@@ -332,6 +332,9 @@ class PDFStream {
   void showText(const std::string& escaped) {
     _buf += "(" + escaped + ") Tj\n";
   }
+  void showTextHex(const std::string& hexStr) {
+    _buf += "<" + hexStr + "> Tj\n";
+  }
 
   const std::string& str() const {
     return _buf;
@@ -841,6 +844,26 @@ class PDFResourceManager {
     _fonts["F0"] = fontId;
   }
 
+  std::string ensureCIDFont() {
+    if (_cidFontRegistered) {
+      return _cidFontName;
+    }
+    _cidFontRegistered = true;
+
+    int cidFontId = _store->add(
+        "<< /Type /Font /Subtype /CIDFontType0 /BaseFont /STSong-Light"
+        " /CIDSystemInfo << /Registry (Adobe) /Ordering (GB1) /Supplement 2 >> >>");
+
+    _cidFontName = "F1";
+    int fontId = _store->add(
+        "<< /Type /Font /Subtype /Type0 /BaseFont /STSong-Light"
+        " /Encoding /UniGB-UCS2-H /DescendantFonts [" +
+        std::to_string(cidFontId) + " 0 R] >>");
+
+    _fonts[_cidFontName] = fontId;
+    return _cidFontName;
+  }
+
   static void appendResourceCategory(std::string& dict, const char* category,
                                      const std::map<std::string, int>& resources) {
     if (resources.empty()) {
@@ -883,6 +906,8 @@ class PDFResourceManager {
   int _patCount = 0;
   int _imgCount = 0;
   bool _fontRegistered = false;
+  bool _cidFontRegistered = false;
+  std::string _cidFontName;
 };
 
 //==============================================================================
@@ -1327,7 +1352,14 @@ void PDFWriter::writeTextAsPDFText(const Text* text, const FillStrokeInfo& fs,
     return;
   }
 
-  _resources->ensureDefaultFont();
+  bool nonASCII = HasNonASCII(text->text);
+  std::string fontName;
+  if (nonASCII) {
+    fontName = _resources->ensureCIDFont();
+  } else {
+    _resources->ensureDefaultFont();
+    fontName = "F0";
+  }
 
   ScopedTransform guard(_stream, _currentMatrix, transform);
 
@@ -1352,10 +1384,14 @@ void PDFWriter::writeTextAsPDFText(const Text* text, const FillStrokeInfo& fs,
   }
 
   _stream->beginText();
-  _stream->setFont("F0", text->fontSize);
+  _stream->setFont(fontName, text->fontSize);
   // Under the Y-flip page transform, text needs an inverted Y scale to render right-side up.
   _stream->setTextMatrix(1, 0, 0, -1, text->position.x, text->position.y);
-  _stream->showText(EscapePDFString(text->text));
+  if (nonASCII) {
+    _stream->showTextHex(UTF8ToUTF16BEHex(text->text));
+  } else {
+    _stream->showText(EscapePDFString(text->text));
+  }
   _stream->endText();
 }
 
