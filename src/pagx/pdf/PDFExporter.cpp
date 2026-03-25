@@ -77,6 +77,45 @@ static std::string PDFFloat(float value) {
   return std::string(buf);
 }
 
+static const char* BlendModeToPDFName(BlendMode mode) {
+  switch (mode) {
+    case BlendMode::Normal:
+      return "Normal";
+    case BlendMode::Multiply:
+      return "Multiply";
+    case BlendMode::Screen:
+      return "Screen";
+    case BlendMode::Overlay:
+      return "Overlay";
+    case BlendMode::Darken:
+      return "Darken";
+    case BlendMode::Lighten:
+      return "Lighten";
+    case BlendMode::ColorDodge:
+      return "ColorDodge";
+    case BlendMode::ColorBurn:
+      return "ColorBurn";
+    case BlendMode::HardLight:
+      return "HardLight";
+    case BlendMode::SoftLight:
+      return "SoftLight";
+    case BlendMode::Difference:
+      return "Difference";
+    case BlendMode::Exclusion:
+      return "Exclusion";
+    case BlendMode::Hue:
+      return "Hue";
+    case BlendMode::Saturation:
+      return "Saturation";
+    case BlendMode::Color:
+      return "Color";
+    case BlendMode::Luminosity:
+      return "Luminosity";
+    default:
+      return nullptr;
+  }
+}
+
 //==============================================================================
 // PDFStream – builds PDF content stream operators
 //==============================================================================
@@ -447,6 +486,22 @@ class PDFResourceManager {
     return name;
   }
 
+  std::string getBlendModeExtGState(BlendMode mode) {
+    auto it = _bmCache.find(mode);
+    if (it != _bmCache.end()) {
+      return it->second;
+    }
+    auto pdfName = BlendModeToPDFName(mode);
+    if (!pdfName) {
+      return {};
+    }
+    std::string name = "GS" + std::to_string(_gsCount++);
+    int objId = _store->add("<< /Type /ExtGState /BM /" + std::string(pdfName) + " >>");
+    _extGStates[name] = objId;
+    _bmCache[mode] = name;
+    return name;
+  }
+
   // Creates a Type 2 (exponential interpolation) or Type 3 (stitching) gradient function.
   int createGradientFunction(const std::vector<ColorStop*>& stops) {
     if (stops.size() < 2) {
@@ -700,6 +755,7 @@ class PDFResourceManager {
   std::map<std::string, int> _patterns = {};
   std::map<std::string, int> _fonts = {};
   std::unordered_map<uint32_t, std::string> _gsCache = {};
+  std::map<BlendMode, std::string> _bmCache = {};
 
   struct ImageCacheEntry {
     std::string xObjectName;
@@ -1392,7 +1448,8 @@ void PDFWriter::writeLayer(const Layer* layer) {
   }
 
   bool needsGroup = !layer->matrix.isIdentity() || layer->alpha < 1.0f || layer->mask != nullptr ||
-                    layer->x != 0.0f || layer->y != 0.0f;
+                    layer->x != 0.0f || layer->y != 0.0f ||
+                    layer->blendMode != BlendMode::Normal;
 
   if (!needsGroup) {
     writeLayerContents(layer);
@@ -1413,6 +1470,13 @@ void PDFWriter::writeLayer(const Layer* layer) {
 
   if (layer->alpha < 1.0f) {
     _stream->setExtGState(_resources->getExtGState(layer->alpha, layer->alpha));
+  }
+
+  if (layer->blendMode != BlendMode::Normal) {
+    auto gsName = _resources->getBlendModeExtGState(layer->blendMode);
+    if (!gsName.empty()) {
+      _stream->setExtGState(gsName);
+    }
   }
 
   if (layer->mask != nullptr) {
@@ -1483,9 +1547,12 @@ std::string PDFExporter::ToPDF(const PAGXDocument& doc, const Options& options) 
 
   // Page object
   std::string resourceDict = resources.buildResourceDict();
-  store.set(pageId, "<< /Type /Page /Parent " + std::to_string(pagesId) + " 0 R /MediaBox [0 0 " +
-                        PDFFloat(doc.width) + " " + PDFFloat(doc.height) + "] /Contents " +
-                        std::to_string(contentId) + " 0 R /Resources " + resourceDict + " >>");
+  store.set(pageId,
+            "<< /Type /Page /Parent " + std::to_string(pagesId) + " 0 R /MediaBox [0 0 " +
+                PDFFloat(doc.width) + " " + PDFFloat(doc.height) +
+                "] /Group << /Type /Group /S /Transparency /CS /DeviceRGB >>"
+                " /Contents " +
+                std::to_string(contentId) + " 0 R /Resources " + resourceDict + " >>");
 
   // Pages tree
   store.set(pagesId, "<< /Type /Pages /Kids [" + std::to_string(pageId) + " 0 R] /Count 1 >>");
