@@ -18,11 +18,16 @@
 
 #include "pagx/utils/ExporterUtils.h"
 #include <cmath>
+#include <cstring>
+#include <fstream>
 #include "base/utils/MathUtil.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
+#include "pagx/nodes/Image.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/utils/Base64.h"
+#include "tgfx/core/Data.h"
 
 namespace pagx {
 
@@ -164,6 +169,79 @@ std::vector<GlyphPath> ComputeGlyphPaths(const Text& text, float textPosX, float
     }
   }
   return result;
+}
+
+FillRule DetectMaskFillRule(const Layer* maskLayer) {
+  for (const auto* element : maskLayer->contents) {
+    if (element->nodeType() == NodeType::Fill) {
+      auto rule = static_cast<const Fill*>(element)->fillRule;
+      if (rule == FillRule::EvenOdd) {
+        return FillRule::EvenOdd;
+      }
+    }
+  }
+  for (const auto* child : maskLayer->children) {
+    if (DetectMaskFillRule(child) == FillRule::EvenOdd) {
+      return FillRule::EvenOdd;
+    }
+  }
+  return FillRule::Winding;
+}
+
+bool GetPNGDimensions(const uint8_t* data, size_t size, int* width, int* height) {
+  if (size < 24) {
+    return false;
+  }
+  static const uint8_t kPNGSignature[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+  if (memcmp(data, kPNGSignature, 8) != 0) {
+    return false;
+  }
+  *width = static_cast<int>((data[16] << 24) | (data[17] << 16) | (data[18] << 8) | data[19]);
+  *height = static_cast<int>((data[20] << 24) | (data[21] << 16) | (data[22] << 8) | data[23]);
+  return *width > 0 && *height > 0;
+}
+
+bool GetPNGDimensionsFromPath(const std::string& path, int* width, int* height) {
+  if (path.rfind("data:", 0) == 0) {
+    auto decoded = DecodeBase64DataURI(path);
+    if (!decoded) {
+      return false;
+    }
+    return GetPNGDimensions(decoded->bytes(), decoded->size(), width, height);
+  }
+  std::ifstream file(path, std::ios::binary);
+  if (!file) {
+    return false;
+  }
+  uint8_t header[24];
+  if (!file.read(reinterpret_cast<char*>(header), 24)) {
+    return false;
+  }
+  return GetPNGDimensions(header, 24, width, height);
+}
+
+bool GetImagePNGDimensions(const Image* image, int* width, int* height) {
+  if (image->data) {
+    return GetPNGDimensions(image->data->bytes(), image->data->size(), width, height);
+  }
+  if (!image->filePath.empty()) {
+    return GetPNGDimensionsFromPath(image->filePath, width, height);
+  }
+  return false;
+}
+
+bool IsJPEG(const uint8_t* data, size_t size) {
+  return size >= 2 && data[0] == 0xFF && data[1] == 0xD8;
+}
+
+std::shared_ptr<tgfx::Data> GetImageData(const Image* image) {
+  if (image->data) {
+    return tgfx::Data::MakeWithoutCopy(image->data->bytes(), image->data->size());
+  }
+  if (!image->filePath.empty()) {
+    return tgfx::Data::MakeFromFile(image->filePath);
+  }
+  return nullptr;
 }
 
 }  // namespace pagx

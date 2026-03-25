@@ -368,20 +368,6 @@ class PDFObjectStore {
 // Image data helpers
 //==============================================================================
 
-static bool IsJPEG(const uint8_t* data, size_t size) {
-  return size >= 2 && data[0] == 0xFF && data[1] == 0xD8;
-}
-
-static std::shared_ptr<tgfx::Data> GetImageData(const Image* image) {
-  if (image->data) {
-    return tgfx::Data::MakeWithoutCopy(image->data->bytes(), image->data->size());
-  }
-  if (!image->filePath.empty()) {
-    return tgfx::Data::MakeFromFile(image->filePath);
-  }
-  return nullptr;
-}
-
 struct PDFImageData {
   std::string rgbBytes;
   std::string alphaBytes;
@@ -736,23 +722,6 @@ class PDFResourceManager {
 //==============================================================================
 
 using PDFFillStrokeInfo = FillStrokeInfo;
-
-static FillRule DetectMaskFillRule(const Layer* maskLayer) {
-  for (const auto* element : maskLayer->contents) {
-    if (element->nodeType() == NodeType::Fill) {
-      auto rule = static_cast<const Fill*>(element)->fillRule;
-      if (rule == FillRule::EvenOdd) {
-        return FillRule::EvenOdd;
-      }
-    }
-  }
-  for (const auto* child : maskLayer->children) {
-    if (DetectMaskFillRule(child) == FillRule::EvenOdd) {
-      return FillRule::EvenOdd;
-    }
-  }
-  return FillRule::Winding;
-}
 
 static std::string EscapePDFString(const std::string& str) {
   std::string result;

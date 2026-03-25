@@ -301,48 +301,6 @@ static std::string MatrixToSVGTransform(const Matrix& matrix) {
   return result;
 }
 
-static bool GetPNGDimensions(const uint8_t* data, size_t size, int* width, int* height) {
-  if (size < 24) {
-    return false;
-  }
-  static const uint8_t kPNGSignature[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
-  if (memcmp(data, kPNGSignature, 8) != 0) {
-    return false;
-  }
-  *width = static_cast<int>((data[16] << 24) | (data[17] << 16) | (data[18] << 8) | data[19]);
-  *height = static_cast<int>((data[20] << 24) | (data[21] << 16) | (data[22] << 8) | data[23]);
-  return *width > 0 && *height > 0;
-}
-
-static bool GetPNGDimensionsFromPath(const std::string& path, int* width, int* height) {
-  if (path.rfind("data:", 0) == 0) {
-    auto decoded = DecodeBase64DataURI(path);
-    if (!decoded) {
-      return false;
-    }
-    return GetPNGDimensions(decoded->bytes(), decoded->size(), width, height);
-  }
-  std::ifstream file(path, std::ios::binary);
-  if (!file) {
-    return false;
-  }
-  uint8_t header[24];
-  if (!file.read(reinterpret_cast<char*>(header), 24)) {
-    return false;
-  }
-  return GetPNGDimensions(header, 24, width, height);
-}
-
-static bool GetImagePNGDimensions(const Image* image, int* width, int* height) {
-  if (image->data) {
-    return GetPNGDimensions(image->data->bytes(), image->data->size(), width, height);
-  }
-  if (!image->filePath.empty()) {
-    return GetPNGDimensionsFromPath(image->filePath, width, height);
-  }
-  return false;
-}
-
 static std::string GetImageHref(const Image* image) {
   if (image->data) {
     return "data:image/png;base64," + Base64Encode(image->data->bytes(), image->data->size());

@@ -18,6 +18,9 @@
 
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <string>
 #include <vector>
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/Fill.h"
@@ -27,8 +30,13 @@
 #include "pagx/nodes/TextBox.h"
 #include "pagx/types/Matrix.h"
 
+namespace tgfx {
+class Data;
+}
+
 namespace pagx {
 
+class Image;
 class PathData;
 class Text;
 
@@ -54,5 +62,17 @@ Matrix BuildGroupMatrix(const Group* group);
  * textPosX/textPosY are the base position for glyph placement.
  */
 std::vector<GlyphPath> ComputeGlyphPaths(const Text& text, float textPosX, float textPosY);
+
+FillRule DetectMaskFillRule(const Layer* maskLayer);
+
+bool GetPNGDimensions(const uint8_t* data, size_t size, int* width, int* height);
+
+bool GetPNGDimensionsFromPath(const std::string& path, int* width, int* height);
+
+bool GetImagePNGDimensions(const Image* image, int* width, int* height);
+
+bool IsJPEG(const uint8_t* data, size_t size);
+
+std::shared_ptr<tgfx::Data> GetImageData(const Image* image);
 
 }  // namespace pagx
