@@ -3,56 +3,56 @@
 <pagx version="1.0" width="500" height="300">
   <!-- BlurFilter: uniform → CSS filter:blur() -->
   <Layer x="10" y="10">
-    <Rectangle center="40,40" size="60,60" roundness="8"/>
+    <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#3B82F6"/>
     <BlurFilter blurX="4" blurY="4"/>
   </Layer>
   <!-- BlurFilter: asymmetric → SVG feGaussianBlur -->
   <Layer x="100" y="10">
-    <Rectangle center="40,40" size="60,60" roundness="8"/>
+    <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#3B82F6"/>
     <BlurFilter blurX="8" blurY="2"/>
   </Layer>
   <!-- DropShadowFilter → CSS filter:drop-shadow() -->
   <Layer x="190" y="10">
-    <Rectangle center="40,40" size="60,60" roundness="8"/>
+    <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#10B981"/>
     <DropShadowFilter offsetX="4" offsetY="4" blurX="8" blurY="8" color="#00000060"/>
   </Layer>
   <!-- DropShadowFilter: shadowOnly → SVG filter only -->
   <Layer x="280" y="10">
-    <Rectangle center="40,40" size="60,60" roundness="8"/>
+    <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#10B981"/>
     <DropShadowFilter offsetX="4" offsetY="8" blurX="12" blurY="12" color="#00000080" shadowOnly="true"/>
   </Layer>
   <!-- InnerShadowFilter → SVG filter -->
   <Layer x="370" y="10">
-    <Rectangle center="40,40" size="60,60" roundness="8"/>
+    <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#EF4444"/>
     <InnerShadowFilter offsetX="2" offsetY="2" blurX="6" blurY="6" color="#00000080"/>
   </Layer>
   <!-- BlendFilter → overlay colored div with mix-blend-mode -->
   <Layer x="10" y="120">
-    <Rectangle center="40,40" size="60,60" roundness="8"/>
+    <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#F59E0B"/>
     <BlendFilter color="#0000FF80" blendMode="overlay"/>
   </Layer>
   <!-- ColorMatrixFilter → SVG feColorMatrix -->
   <Layer x="100" y="120">
-    <Rectangle center="40,40" size="60,60" roundness="8"/>
+    <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#8B5CF6"/>
     <ColorMatrixFilter matrix="0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0,0,0,1,0"/>
   </Layer>
   <!-- Chained filters: blur + drop-shadow -->
   <Layer x="190" y="120">
-    <Rectangle center="40,40" size="60,60" roundness="8"/>
+    <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#EC4899"/>
     <BlurFilter blurX="2" blurY="2"/>
     <DropShadowFilter offsetX="4" offsetY="4" blurX="8" blurY="8" color="#00000060"/>
   </Layer>
   <!-- InnerShadowFilter: shadowOnly -->
   <Layer x="280" y="120">
-    <Rectangle center="40,40" size="60,60" roundness="8"/>
+    <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#06B6D4"/>
     <InnerShadowFilter offsetX="2" offsetY="2" blurX="8" blurY="8" color="#00000080" shadowOnly="true"/>
   </Layer>

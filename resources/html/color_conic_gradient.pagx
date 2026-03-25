@@ -3,7 +3,7 @@
 <pagx version="1.0" width="300" height="200">
   <!-- Full 360° conic: startAngle=0 → CSS from 90deg -->
   <Layer>
-    <Ellipse center="75,100" size="120,120"/>
+    <Ellipse position="75,100" size="120,120"/>
     <Fill>
       <ConicGradient center="60,60" startAngle="0" endAngle="360">
         <ColorStop offset="0" color="#EF4444"/>
@@ -15,7 +15,7 @@
   </Layer>
   <!-- Partial angle range: startAngle=45 endAngle=270 -->
   <Layer>
-    <Ellipse center="225,100" size="120,120"/>
+    <Ellipse position="225,100" size="120,120"/>
     <Fill>
       <ConicGradient center="60,60" startAngle="45" endAngle="270">
         <ColorStop offset="0" color="#F59E0B"/>

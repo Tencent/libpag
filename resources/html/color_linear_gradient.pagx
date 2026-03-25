@@ -3,7 +3,7 @@
 <pagx version="1.0" width="300" height="300">
   <!-- Diagonal gradient: atan2(200,200)×180/π+90=135° -->
   <Layer>
-    <Rectangle center="75,75" size="120,120" roundness="12"/>
+    <Rectangle position="75,75" size="120,120" roundness="12"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="120,120">
         <ColorStop offset="0" color="#3B82F6"/>
@@ -13,7 +13,7 @@
   </Layer>
   <!-- Horizontal gradient (0° → 90° CSS) with 3 stops -->
   <Layer>
-    <Rectangle center="225,75" size="120,120" roundness="12"/>
+    <Rectangle position="225,75" size="120,120" roundness="12"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="120,0">
         <ColorStop offset="0" color="#10B981"/>
@@ -24,7 +24,7 @@
   </Layer>
   <!-- Vertical gradient (90° → 180° CSS) -->
   <Layer>
-    <Rectangle center="75,225" size="120,120" roundness="12"/>
+    <Rectangle position="75,225" size="120,120" roundness="12"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="0,120">
         <ColorStop offset="0" color="#8B5CF6"/>
@@ -34,7 +34,7 @@
   </Layer>
   <!-- LinearGradient with matrix transform -->
   <Layer>
-    <Rectangle center="225,225" size="120,120" roundness="12"/>
+    <Rectangle position="225,225" size="120,120" roundness="12"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="100,0" matrix="0.707,-0.707,0.707,0.707,0,0">
         <ColorStop offset="0" color="#06B6D4"/>

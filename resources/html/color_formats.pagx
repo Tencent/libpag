@@ -6,36 +6,36 @@
   </Resources>
   <!-- #RGB short hex -->
   <Layer>
-    <Rectangle center="50,100" size="60,60"/>
+    <Rectangle position="50,100" size="60,60"/>
     <Fill color="#F00"/>
   </Layer>
   <!-- #RRGGBB standard hex -->
   <Layer>
-    <Rectangle center="120,100" size="60,60"/>
+    <Rectangle position="120,100" size="60,60"/>
     <Fill color="#3B82F6"/>
   </Layer>
   <!-- #RRGGBBAA hex with alpha -->
   <Layer>
-    <Rectangle center="190,100" size="60,60"/>
+    <Rectangle position="190,100" size="60,60"/>
     <Fill color="#EF444480"/>
   </Layer>
   <!-- srgb(r,g,b,a) float color -->
   <Layer>
-    <Rectangle center="260,100" size="60,60"/>
+    <Rectangle position="260,100" size="60,60"/>
     <Fill>
       <SolidColor color="srgb(0.06,0.72,0.51,0.9)"/>
     </Fill>
   </Layer>
   <!-- p3(r,g,b) Display P3 wide gamut -->
   <Layer>
-    <Rectangle center="330,100" size="60,60"/>
+    <Rectangle position="330,100" size="60,60"/>
     <Fill>
       <SolidColor color="p3(1,0.2,0.1)"/>
     </Fill>
   </Layer>
   <!-- @id resource reference -->
   <Layer>
-    <Ellipse center="50,170" size="60,30"/>
+    <Ellipse position="50,170" size="60,30"/>
     <Fill color="@resBrandColor"/>
   </Layer>
 </pagx>

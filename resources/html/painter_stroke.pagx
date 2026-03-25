@@ -3,12 +3,12 @@
 <pagx version="1.0" width="400" height="400">
   <!-- Basic stroke: cap=round, join=round -->
   <Layer>
-    <Rectangle center="80,80" size="100,100" roundness="12"/>
+    <Rectangle position="80,80" size="100,100" roundness="12"/>
     <Stroke color="#3B82F6" width="6" cap="round" join="round"/>
   </Layer>
   <!-- Dashed stroke with dashOffset -->
   <Layer>
-    <Ellipse center="220,80" size="100,100"/>
+    <Ellipse position="220,80" size="100,100"/>
     <Stroke color="#EF4444" width="4" dashes="12,6" dashOffset="4" cap="butt"/>
   </Layer>
   <!-- Cap styles: butt/round/square -->
@@ -39,19 +39,19 @@
   </Layer>
   <!-- StrokeAlign: center (default) -->
   <Layer>
-    <Rectangle center="80,260" size="80,80" roundness="8"/>
+    <Rectangle position="80,260" size="80,80" roundness="8"/>
     <Fill color="#E2E8F0"/>
     <Stroke color="#8B5CF6" width="8" align="center"/>
   </Layer>
   <!-- StrokeAlign: inside → double width + clip -->
   <Layer>
-    <Rectangle center="200,260" size="80,80" roundness="8"/>
+    <Rectangle position="200,260" size="80,80" roundness="8"/>
     <Fill color="#E2E8F0"/>
     <Stroke color="#8B5CF6" width="8" align="inside"/>
   </Layer>
   <!-- StrokeAlign: outside → double width + inverse mask -->
   <Layer>
-    <Rectangle center="320,260" size="80,80" roundness="8"/>
+    <Rectangle position="320,260" size="80,80" roundness="8"/>
     <Fill color="#E2E8F0"/>
     <Stroke color="#8B5CF6" width="8" align="outside"/>
   </Layer>

@@ -2,11 +2,11 @@
 <!-- Tests: Layer antiAlias=false → shape-rendering: crispEdges (SVG), no direct CSS equivalent -->
 <pagx version="1.0" width="200" height="200">
   <Layer antiAlias="false">
-    <Rectangle center="60,100" size="80,80"/>
+    <Rectangle position="60,100" size="80,80"/>
     <Fill color="#3B82F6"/>
   </Layer>
   <Layer antiAlias="true">
-    <Rectangle center="140,100" size="80,80"/>
+    <Rectangle position="140,100" size="80,80"/>
     <Fill color="#10B981"/>
   </Layer>
 </pagx>

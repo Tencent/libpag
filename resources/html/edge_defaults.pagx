@@ -8,7 +8,7 @@
   </Layer>
   <!-- Zero-size ellipse -->
   <Layer x="120" y="20">
-    <Ellipse center="0,0" size="0,0"/>
+    <Ellipse position="0,0" size="0,0"/>
     <Fill color="#EF4444"/>
   </Layer>
   <!-- Empty layer (no vector elements) -->

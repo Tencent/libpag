@@ -3,17 +3,17 @@
 <pagx version="1.0" width="300" height="200">
   <!-- Only x/y (no matrix/matrix3D) → translate(20,20) -->
   <Layer x="20" y="20">
-    <Rectangle center="40,40" size="60,60"/>
+    <Rectangle position="40,40" size="60,60"/>
     <Fill color="#3B82F6"/>
   </Layer>
   <!-- matrix overrides x/y → use matrix only -->
   <Layer x="999" y="999" matrix="1,0,0,1,120,20">
-    <Rectangle center="40,40" size="60,60"/>
+    <Rectangle position="40,40" size="60,60"/>
     <Fill color="#10B981"/>
   </Layer>
   <!-- matrix3D overrides both matrix and x/y → use matrix3D only -->
   <Layer x="999" y="999" matrix="999,0,0,999,999,999" matrix3D="1,0,0,0,0,1,0,0,0,0,1,0,220,20,0,1">
-    <Rectangle center="40,40" size="60,60"/>
+    <Rectangle position="40,40" size="60,60"/>
     <Fill color="#EF4444"/>
   </Layer>
 </pagx>

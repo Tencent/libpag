@@ -2,7 +2,7 @@
 <!-- Tests: DiamondGradient → CSS cannot represent, needs SVG filter fallback -->
 <pagx version="1.0" width="200" height="200">
   <Layer>
-    <Rectangle center="100,100" size="180,180"/>
+    <Rectangle position="100,100" size="180,180"/>
     <Fill>
       <DiamondGradient center="90,90" radius="80">
         <ColorStop offset="0" color="#FFFFFF"/>

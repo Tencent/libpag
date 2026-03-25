@@ -4,31 +4,31 @@
   <!-- Group with full transform chain -->
   <Layer>
     <Group anchor="50,50" position="100,100" rotation="30" scale="0.8,0.8" alpha="0.7">
-      <Rectangle center="50,50" size="80,80" roundness="8"/>
+      <Rectangle position="50,50" size="80,80" roundness="8"/>
       <Fill color="#3B82F6"/>
     </Group>
   </Layer>
   <!-- Scope isolation: inner Group's geometry doesn't leak -->
   <Layer>
     <Group position="200,50">
-      <Ellipse center="30,30" size="50,50"/>
+      <Ellipse position="30,30" size="50,50"/>
       <Fill color="#EF4444"/>
     </Group>
     <!-- This Fill should NOT include the Ellipse from the Group above (scope isolation) -->
-    <Rectangle center="250,150" size="60,60"/>
+    <Rectangle position="250,150" size="60,60"/>
     <Fill color="#10B981"/>
   </Layer>
   <!-- Group with skew -->
   <Layer>
     <Group anchor="40,40" position="80,220" skew="20" skewAxis="45" scale="1.2,1">
-      <Rectangle center="40,40" size="60,60"/>
+      <Rectangle position="40,40" size="60,60"/>
       <Fill color="#8B5CF6"/>
     </Group>
   </Layer>
   <!-- Geometry propagation: child Group's geometry propagates to parent -->
   <Layer>
     <Group position="200,200">
-      <Rectangle center="30,30" size="50,50"/>
+      <Rectangle position="30,30" size="50,50"/>
     </Group>
     <!-- This Fill renders the Rectangle from the Group above (geometry propagation) -->
     <Fill color="#F59E0B"/>

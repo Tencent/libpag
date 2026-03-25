@@ -2,7 +2,7 @@
 <!-- Tests: Layer matrix3D → transform: matrix3d(...), preserve3D → transform-style: preserve-3d -->
 <pagx version="1.0" width="200" height="200">
   <Layer matrix3D="0.966,0,0.259,0,0,1,0,0,-0.259,0,0.966,0,100,100,0,1" preserve3D="true">
-    <Rectangle center="0,0" size="120,120" roundness="12"/>
+    <Rectangle position="0,0" size="120,120" roundness="12"/>
     <Fill color="#EC4899"/>
   </Layer>
 </pagx>

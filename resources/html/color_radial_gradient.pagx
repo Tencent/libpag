@@ -3,7 +3,7 @@
 <pagx version="1.0" width="300" height="200">
   <!-- Simple radial gradient (circle) -->
   <Layer>
-    <Rectangle center="75,100" size="120,160"/>
+    <Rectangle position="75,100" size="120,160"/>
     <Fill>
       <RadialGradient center="60,80" radius="80">
         <ColorStop offset="0" color="#FFFFFF"/>
@@ -13,7 +13,7 @@
   </Layer>
   <!-- Radial gradient with matrix: circle → ellipse (non-uniform scale) -->
   <Layer>
-    <Rectangle center="225,100" size="120,160"/>
+    <Rectangle position="225,100" size="120,160"/>
     <Fill>
       <RadialGradient center="60,80" radius="60" matrix="1.5,0,0,1,0,0">
         <ColorStop offset="0" color="#FFFFFF"/>

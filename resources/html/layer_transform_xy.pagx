@@ -2,11 +2,11 @@
 <!-- Tests: Layer x/y → transform: translate(x, y) -->
 <pagx version="1.0" width="200" height="200">
   <Layer x="30" y="20">
-    <Rectangle center="50,50" size="80,80" roundness="8"/>
+    <Rectangle position="50,50" size="80,80" roundness="8"/>
     <Fill color="#10B981"/>
   </Layer>
   <Layer x="80" y="80">
-    <Rectangle center="50,50" size="80,80" roundness="8"/>
+    <Rectangle position="50,50" size="80,80" roundness="8"/>
     <Fill color="#8B5CF6"/>
   </Layer>
 </pagx>

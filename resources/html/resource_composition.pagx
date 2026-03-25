@@ -4,11 +4,11 @@
   <Resources>
     <Composition id="badge" width="100" height="100">
       <Layer>
-        <Ellipse center="50,50" size="90,90"/>
+        <Ellipse position="50,50" size="90,90"/>
         <Fill color="#3B82F6"/>
       </Layer>
       <Layer>
-        <Polystar center="50,50" type="star" pointCount="5" outerRadius="35" innerRadius="15" rotation="-90"/>
+        <Polystar position="50,50" type="star" pointCount="5" outerRadius="35" innerRadius="15" rotation="-90"/>
         <Fill color="#FFFFFF"/>
       </Layer>
     </Composition>

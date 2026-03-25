@@ -2,14 +2,14 @@
 <!-- Tests: Layer nested children, z-order (later layers on top) -->
 <pagx version="1.0" width="200" height="200">
   <Layer name="Parent" x="20" y="20">
-    <Rectangle center="80,80" size="140,140" roundness="16"/>
+    <Rectangle position="80,80" size="140,140" roundness="16"/>
     <Fill color="#E2E8F0"/>
     <Layer name="Child1" x="10" y="10">
-      <Rectangle center="30,30" size="50,50"/>
+      <Rectangle position="30,30" size="50,50"/>
       <Fill color="#3B82F6"/>
     </Layer>
     <Layer name="Child2" x="40" y="40">
-      <Rectangle center="30,30" size="50,50"/>
+      <Rectangle position="30,30" size="50,50"/>
       <Fill color="#EF4444"/>
     </Layer>
   </Layer>

@@ -3,26 +3,26 @@
 <pagx version="1.0" width="400" height="300">
   <!-- Separate mode: each shape trimmed independently -->
   <Layer>
-    <Ellipse center="100,75" size="120,120"/>
+    <Ellipse position="100,75" size="120,120"/>
     <TrimPath start="0" end="0.75" type="separate"/>
     <Stroke color="#3B82F6" width="6" cap="round"/>
   </Layer>
   <!-- Continuous mode: shapes treated as one path -->
   <Layer>
-    <Rectangle center="60,200" size="60,60"/>
-    <Ellipse center="140,200" size="60,60"/>
+    <Rectangle position="60,200" size="60,60"/>
+    <Ellipse position="140,200" size="60,60"/>
     <TrimPath start="0.1" end="0.8" type="continuous"/>
     <Stroke color="#10B981" width="4" cap="round"/>
   </Layer>
   <!-- start > end → wraps around (mirror+reverse) -->
   <Layer>
-    <Ellipse center="280,75" size="120,120"/>
+    <Ellipse position="280,75" size="120,120"/>
     <TrimPath start="0.7" end="0.3"/>
     <Stroke color="#EF4444" width="6" cap="round"/>
   </Layer>
   <!-- With offset (in degrees, 360=one period) -->
   <Layer>
-    <Ellipse center="280,200" size="120,120"/>
+    <Ellipse position="280,200" size="120,120"/>
     <TrimPath start="0" end="0.5" offset="90"/>
     <Stroke color="#F59E0B" width="6" cap="round"/>
   </Layer>

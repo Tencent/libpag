@@ -3,19 +3,19 @@
 <pagx version="1.0" width="300" height="200">
   <!-- groupOpacity=false: alpha applied independently to each child element -->
   <Layer alpha="0.5" groupOpacity="false">
-    <Rectangle center="50,100" size="80,80"/>
+    <Rectangle position="50,100" size="80,80"/>
     <Fill color="#EF4444"/>
     <Layer>
-      <Ellipse center="90,100" size="80,80"/>
+      <Ellipse position="90,100" size="80,80"/>
       <Fill color="#3B82F6"/>
     </Layer>
   </Layer>
   <!-- groupOpacity=true: content composited first, then alpha applied -->
   <Layer alpha="0.5" groupOpacity="true">
-    <Rectangle center="200,100" size="80,80"/>
+    <Rectangle position="200,100" size="80,80"/>
     <Fill color="#EF4444"/>
     <Layer>
-      <Ellipse center="240,100" size="80,80"/>
+      <Ellipse position="240,100" size="80,80"/>
       <Fill color="#3B82F6"/>
     </Layer>
   </Layer>

@@ -3,7 +3,7 @@
 <pagx version="1.0" width="200" height="200">
   <!-- Use a resource before it's defined -->
   <Layer>
-    <Rectangle center="100,100" size="150,150" roundness="16"/>
+    <Rectangle position="100,100" size="150,150" roundness="16"/>
     <Fill color="@forwardColor"/>
   </Layer>
   <Resources>

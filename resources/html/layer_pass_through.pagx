@@ -3,12 +3,12 @@
 <pagx version="1.0" width="200" height="200">
   <!-- passThroughBackground=true (default): background visible through layer content -->
   <Layer passThroughBackground="true" alpha="0.8">
-    <Rectangle center="60,100" size="80,80" roundness="8"/>
+    <Rectangle position="60,100" size="80,80" roundness="8"/>
     <Fill color="#3B82F680"/>
   </Layer>
   <!-- passThroughBackground=false: opaque composition -->
   <Layer passThroughBackground="false" alpha="0.8">
-    <Rectangle center="140,100" size="80,80" roundness="8"/>
+    <Rectangle position="140,100" size="80,80" roundness="8"/>
     <Fill color="#EF444480"/>
   </Layer>
 </pagx>

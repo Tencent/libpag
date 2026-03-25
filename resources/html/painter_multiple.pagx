@@ -2,7 +2,7 @@
 <!-- Tests: Multiple fills and strokes on accumulated geometry → overlay layers -->
 <pagx version="1.0" width="200" height="200">
   <Layer>
-    <Rectangle center="100,100" size="140,140" roundness="20"/>
+    <Rectangle position="100,100" size="140,140" roundness="20"/>
     <!-- First fill (bottom layer) -->
     <Fill color="#3B82F6"/>
     <!-- Second fill overlays the first -->

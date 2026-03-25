@@ -3,12 +3,12 @@
 <pagx version="1.0" width="300" height="300">
   <!-- Fill with alpha -->
   <Layer>
-    <Rectangle center="75,75" size="100,100" roundness="12"/>
+    <Rectangle position="75,75" size="100,100" roundness="12"/>
     <Fill color="#3B82F6" alpha="0.5"/>
   </Layer>
   <!-- Fill with blendMode -->
   <Layer>
-    <Rectangle center="75,75" size="80,80"/>
+    <Rectangle position="75,75" size="80,80"/>
     <Fill color="#EF4444" blendMode="multiply"/>
   </Layer>
   <!-- fillRule=evenOdd → SVG fill-rule="evenodd" (CSS cannot) -->
@@ -18,16 +18,16 @@
   </Layer>
   <!-- Placement: foreground (above child layers) -->
   <Layer>
-    <Rectangle center="75,225" size="100,100" roundness="12"/>
+    <Rectangle position="75,225" size="100,100" roundness="12"/>
     <Fill color="#8B5CF680" placement="foreground"/>
     <Layer>
-      <Ellipse center="75,75" size="60,60"/>
+      <Ellipse position="75,75" size="60,60"/>
       <Fill color="#F59E0B"/>
     </Layer>
   </Layer>
   <!-- Child color source overrides color attribute -->
   <Layer>
-    <Rectangle center="225,225" size="100,100" roundness="12"/>
+    <Rectangle position="225,225" size="100,100" roundness="12"/>
     <Fill color="#000000">
       <SolidColor color="#EC4899"/>
     </Fill>

@@ -6,28 +6,28 @@
   </Resources>
   <!-- repeat/repeat → background-repeat: repeat -->
   <Layer>
-    <Rectangle center="50,100" size="80,80"/>
+    <Rectangle position="50,100" size="80,80"/>
     <Fill>
       <ImagePattern image="@img1" tileModeX="repeat" tileModeY="repeat"/>
     </Fill>
   </Layer>
   <!-- repeat/clamp → repeat-x (clamp degrades to no-repeat on Y) -->
   <Layer>
-    <Rectangle center="150,100" size="80,80"/>
+    <Rectangle position="150,100" size="80,80"/>
     <Fill>
       <ImagePattern image="@img1" tileModeX="repeat" tileModeY="clamp"/>
     </Fill>
   </Layer>
   <!-- mirror → SVG pattern with 4 tiles -->
   <Layer>
-    <Rectangle center="250,100" size="80,80"/>
+    <Rectangle position="250,100" size="80,80"/>
     <Fill>
       <ImagePattern image="@img1" tileModeX="mirror" tileModeY="mirror"/>
     </Fill>
   </Layer>
   <!-- decal → no-repeat (transparent outside) -->
   <Layer>
-    <Rectangle center="350,100" size="80,80"/>
+    <Rectangle position="350,100" size="80,80"/>
     <Fill>
       <ImagePattern image="@img1" tileModeX="decal" tileModeY="decal" filterMode="nearest"/>
     </Fill>
