@@ -454,12 +454,11 @@ class PDFResourceManager {
     }
 
     if (stops.size() == 2) {
-      return _store->add(
-          "<< /FunctionType 2 /Domain [0 1] /C0 [" + PDFFloat(stops[0]->color.red) + " " +
-          PDFFloat(stops[0]->color.green) + " " + PDFFloat(stops[0]->color.blue) +
-          "] /C1 [" + PDFFloat(stops[1]->color.red) + " " +
-          PDFFloat(stops[1]->color.green) + " " + PDFFloat(stops[1]->color.blue) +
-          "] /N 1 >>");
+      return _store->add("<< /FunctionType 2 /Domain [0 1] /C0 [" + PDFFloat(stops[0]->color.red) +
+                         " " + PDFFloat(stops[0]->color.green) + " " +
+                         PDFFloat(stops[0]->color.blue) + "] /C1 [" +
+                         PDFFloat(stops[1]->color.red) + " " + PDFFloat(stops[1]->color.green) +
+                         " " + PDFFloat(stops[1]->color.blue) + "] /N 1 >>");
     }
 
     std::vector<int> segFuncs;
@@ -467,10 +466,9 @@ class PDFResourceManager {
     for (size_t i = 0; i + 1 < stops.size(); i++) {
       segFuncs.push_back(_store->add(
           "<< /FunctionType 2 /Domain [0 1] /C0 [" + PDFFloat(stops[i]->color.red) + " " +
-          PDFFloat(stops[i]->color.green) + " " + PDFFloat(stops[i]->color.blue) +
-          "] /C1 [" + PDFFloat(stops[i + 1]->color.red) + " " +
-          PDFFloat(stops[i + 1]->color.green) + " " + PDFFloat(stops[i + 1]->color.blue) +
-          "] /N 1 >>"));
+          PDFFloat(stops[i]->color.green) + " " + PDFFloat(stops[i]->color.blue) + "] /C1 [" +
+          PDFFloat(stops[i + 1]->color.red) + " " + PDFFloat(stops[i + 1]->color.green) + " " +
+          PDFFloat(stops[i + 1]->color.blue) + "] /N 1 >>"));
     }
 
     std::string funcsArr = "[";
@@ -505,8 +503,8 @@ class PDFResourceManager {
   }
 
   static std::string matrixString(const Matrix& m) {
-    return "[" + PDFFloat(m.a) + " " + PDFFloat(m.b) + " " + PDFFloat(m.c) + " " +
-           PDFFloat(m.d) + " " + PDFFloat(m.tx) + " " + PDFFloat(m.ty) + "]";
+    return "[" + PDFFloat(m.a) + " " + PDFFloat(m.b) + " " + PDFFloat(m.c) + " " + PDFFloat(m.d) +
+           " " + PDFFloat(m.tx) + " " + PDFFloat(m.ty) + "]";
   }
 
   // Creates a Type 2 (axial) shading wrapped in a Pattern, returns the pattern resource name.
@@ -521,9 +519,9 @@ class PDFResourceManager {
 
     int shadingId =
         _store->add("<< /ShadingType 2 /ColorSpace /DeviceRGB /Coords [" +
-                    PDFFloat(grad->startPoint.x) + " " + PDFFloat(grad->startPoint.y) +
-                    " " + PDFFloat(grad->endPoint.x) + " " + PDFFloat(grad->endPoint.y) +
-                    "] /Function " + std::to_string(funcId) + " 0 R /Extend [true true] >>");
+                    PDFFloat(grad->startPoint.x) + " " + PDFFloat(grad->startPoint.y) + " " +
+                    PDFFloat(grad->endPoint.x) + " " + PDFFloat(grad->endPoint.y) + "] /Function " +
+                    std::to_string(funcId) + " 0 R /Extend [true true] >>");
 
     std::string matStr = matrixString(ctm * grad->matrix);
     int patId = _store->add("<< /Type /Pattern /PatternType 2 /Shading " +
@@ -541,11 +539,11 @@ class PDFResourceManager {
     }
 
     // Coords: [x0 y0 r0 x1 y1 r1] – start circle at center with r=0, end at full radius.
-    int shadingId = _store->add(
-        "<< /ShadingType 3 /ColorSpace /DeviceRGB /Coords [" + PDFFloat(grad->center.x) + " " +
-        PDFFloat(grad->center.y) + " 0 " + PDFFloat(grad->center.x) + " " +
-        PDFFloat(grad->center.y) + " " + PDFFloat(grad->radius) + "] /Function " +
-        std::to_string(funcId) + " 0 R /Extend [true true] >>");
+    int shadingId = _store->add("<< /ShadingType 3 /ColorSpace /DeviceRGB /Coords [" +
+                                PDFFloat(grad->center.x) + " " + PDFFloat(grad->center.y) + " 0 " +
+                                PDFFloat(grad->center.x) + " " + PDFFloat(grad->center.y) + " " +
+                                PDFFloat(grad->radius) + "] /Function " + std::to_string(funcId) +
+                                " 0 R /Extend [true true] >>");
 
     std::string matStr = matrixString(ctm * grad->matrix);
     int patId = _store->add("<< /Type /Pattern /PatternType 2 /Shading " +
@@ -561,17 +559,17 @@ class PDFResourceManager {
       return {};
     }
 
-    auto cacheIt = _imageXObjectCache.find(pattern->image);
+    auto cacheIt = _imageCache.find(pattern->image);
     std::string xobjName = {};
     int xobjId = 0;
     int imageWidth = 0;
     int imageHeight = 0;
 
-    if (cacheIt != _imageXObjectCache.end()) {
-      xobjName = cacheIt->second;
-      xobjId = _xObjects[xobjName];
-      imageWidth = _imageWidthCache[pattern->image];
-      imageHeight = _imageHeightCache[pattern->image];
+    if (cacheIt != _imageCache.end()) {
+      xobjName = cacheIt->second.xObjectName;
+      xobjId = cacheIt->second.objectId;
+      imageWidth = cacheIt->second.width;
+      imageHeight = cacheIt->second.height;
     } else {
       auto imageData = GetImageData(pattern->image);
       if (!imageData) {
@@ -589,26 +587,22 @@ class PDFResourceManager {
       if (!pdfImage.alphaBytes.empty()) {
         int smaskId = _store->add(
             "<< /Type /XObject /Subtype /Image /Width " + std::to_string(imageWidth) + " /Height " +
-            std::to_string(imageHeight) +
-            " /ColorSpace /DeviceGray /BitsPerComponent 8 /Length " +
+            std::to_string(imageHeight) + " /ColorSpace /DeviceGray /BitsPerComponent 8 /Length " +
             std::to_string(pdfImage.alphaBytes.size()) + " >>\nstream\n" + pdfImage.alphaBytes +
             "\nendstream");
         smaskRef = " /SMask " + std::to_string(smaskId) + " 0 R";
       }
 
       xobjName = "Im" + std::to_string(_imgCount++);
-      std::string xobjDict =
-          "<< /Type /XObject /Subtype /Image /Width " + std::to_string(imageWidth) + " /Height " +
-          std::to_string(imageHeight) +
-          " /ColorSpace /DeviceRGB /BitsPerComponent 8"
-          " /Filter /DCTDecode" +
-          smaskRef + " /Length " + std::to_string(pdfImage.rgbBytes.size()) + " >>\nstream\n" +
-          pdfImage.rgbBytes + "\nendstream";
+      std::string xobjDict = "<< /Type /XObject /Subtype /Image /Width " +
+                             std::to_string(imageWidth) + " /Height " +
+                             std::to_string(imageHeight) +
+                             " /ColorSpace /DeviceRGB /BitsPerComponent 8"
+                             " /Filter /DCTDecode" +
+                             smaskRef + " /Length " + std::to_string(pdfImage.rgbBytes.size()) +
+                             " >>\nstream\n" + pdfImage.rgbBytes + "\nendstream";
       xobjId = _store->add(xobjDict);
-      _xObjects[xobjName] = xobjId;
-      _imageXObjectCache[pattern->image] = xobjName;
-      _imageWidthCache[pattern->image] = imageWidth;
-      _imageHeightCache[pattern->image] = imageHeight;
+      _imageCache[pattern->image] = {xobjName, xobjId, imageWidth, imageHeight};
     }
 
     auto width = static_cast<float>(imageWidth);
@@ -620,17 +614,17 @@ class PDFResourceManager {
     float yStep = clampY ? 16384.0f : height;
 
     // Content stream: draw the image inside the tile cell with Y-flip for PDF image coordinates.
-    std::string tileStream = "q " + PDFFloat(width) + " 0 0 " + PDFFloat(-height) +
-                             " 0 " + PDFFloat(height) + " cm /" + xobjName + " Do Q";
+    std::string tileStream = "q " + PDFFloat(width) + " 0 0 " + PDFFloat(-height) + " 0 " +
+                             PDFFloat(height) + " cm /" + xobjName + " Do Q";
 
     std::string matStr = matrixString(ctm * pattern->matrix);
     std::string patDict =
         "<< /Type /Pattern /PatternType 1 /PaintType 1 /TilingType 1"
         " /BBox [0 0 " +
-        PDFFloat(width) + " " + PDFFloat(height) + "] /XStep " + PDFFloat(xStep) +
-        " /YStep " + PDFFloat(yStep) + " /Matrix " + matStr + " /Resources << /XObject << /" +
-        xobjName + " " + std::to_string(xobjId) + " 0 R >> >> /Length " +
-        std::to_string(tileStream.size()) + " >>\nstream\n" + tileStream + "\nendstream";
+        PDFFloat(width) + " " + PDFFloat(height) + "] /XStep " + PDFFloat(xStep) + " /YStep " +
+        PDFFloat(yStep) + " /Matrix " + matStr + " /Resources << /XObject << /" + xobjName + " " +
+        std::to_string(xobjId) + " 0 R >> >> /Length " + std::to_string(tileStream.size()) +
+        " >>\nstream\n" + tileStream + "\nendstream";
     int patId = _store->add(patDict);
     std::string patName = "P" + std::to_string(_patCount++);
     _patterns[patName] = patId;
@@ -645,17 +639,16 @@ class PDFResourceManager {
                                    const std::string& formResourceDict, float bboxWidth,
                                    float bboxHeight) {
     std::string bbox = "[0 0 " + PDFFloat(bboxWidth) + " " + PDFFloat(bboxHeight) + "]";
-    int formId = _store->add(
-        "<< /Type /XObject /Subtype /Form /BBox " + bbox +
-        " /Group << /Type /Group /S /Transparency /CS /DeviceRGB >>"
-        " /Resources " +
-        formResourceDict + " /Length " + std::to_string(formContent.size()) +
-        " >>\nstream\n" + formContent + "\nendstream");
+    int formId = _store->add("<< /Type /XObject /Subtype /Form /BBox " + bbox +
+                             " /Group << /Type /Group /S /Transparency /CS /DeviceRGB >>"
+                             " /Resources " +
+                             formResourceDict + " /Length " + std::to_string(formContent.size()) +
+                             " >>\nstream\n" + formContent + "\nendstream");
 
     std::string smaskSubtype = (maskType == MaskType::Luminance) ? "/Luminosity" : "/Alpha";
     std::string gsName = "GS" + std::to_string(_gsCount++);
-    int gsId = _store->add("<< /Type /ExtGState /SMask << /Type /Mask /S " + smaskSubtype +
-                           " /G " + std::to_string(formId) + " 0 R >> >>");
+    int gsId = _store->add("<< /Type /ExtGState /SMask << /Type /Mask /S " + smaskSubtype + " /G " +
+                           std::to_string(formId) + " 0 R >> >>");
     _extGStates[gsName] = gsId;
     return gsName;
   }
@@ -706,11 +699,15 @@ class PDFResourceManager {
   std::map<std::string, int> _extGStates = {};
   std::map<std::string, int> _patterns = {};
   std::map<std::string, int> _fonts = {};
-  std::map<std::string, int> _xObjects = {};
   std::unordered_map<uint32_t, std::string> _gsCache = {};
-  std::map<const Image*, std::string> _imageXObjectCache = {};
-  std::map<const Image*, int> _imageWidthCache = {};
-  std::map<const Image*, int> _imageHeightCache = {};
+
+  struct ImageCacheEntry {
+    std::string xObjectName;
+    int objectId = 0;
+    int width = 0;
+    int height = 0;
+  };
+  std::map<const Image*, ImageCacheEntry> _imageCache = {};
   int _gsCount = 0;
   int _patCount = 0;
   int _imgCount = 0;
@@ -720,8 +717,6 @@ class PDFResourceManager {
 //==============================================================================
 // Utility types and static helpers
 //==============================================================================
-
-using PDFFillStrokeInfo = FillStrokeInfo;
 
 static std::string EscapePDFString(const std::string& str) {
   std::string result;
@@ -776,16 +771,18 @@ class PDFWriter {
   void writeLayerContents(const Layer* layer, const Matrix& transform = {});
   void writeElements(const std::vector<Element*>& elements, const Matrix& transform = {});
 
-  void writeRectangle(const Rectangle* rect, const PDFFillStrokeInfo& fs, const Matrix& transform);
-  void writeEllipse(const Ellipse* ellipse, const PDFFillStrokeInfo& fs, const Matrix& transform);
-  void writePath(const Path* path, const PDFFillStrokeInfo& fs, const Matrix& transform);
-  void writeText(const Text* text, const PDFFillStrokeInfo& fs, const Matrix& transform);
-  void writeTextAsPath(const Text* text, const PDFFillStrokeInfo& fs, const Matrix& transform);
-  void writeTextAsPDFText(const Text* text, const PDFFillStrokeInfo& fs, const Matrix& transform);
+  void writeRectangle(const Rectangle* rect, const FillStrokeInfo& fs, const Matrix& transform);
+  void writeEllipse(const Ellipse* ellipse, const FillStrokeInfo& fs, const Matrix& transform);
+  void writePath(const Path* path, const FillStrokeInfo& fs, const Matrix& transform);
+  void writeText(const Text* text, const FillStrokeInfo& fs, const Matrix& transform);
+  void writeTextAsPath(const Text* text, const FillStrokeInfo& fs, const Matrix& transform);
+  void writeTextAsPDFText(const Text* text, const FillStrokeInfo& fs, const Matrix& transform);
 
-  void emitPathData(const PathData& data);
-  void emitEllipsePath(float cx, float cy, float rx, float ry);
-  void emitRoundedRectPath(float x, float y, float w, float h, float r);
+  void emitPathData(const PathData& data, const Matrix& transform = {});
+  void emitEllipsePath(float cx, float cy, float rx, float ry, const Matrix& transform = {});
+  void emitRoundedRectPath(float x, float y, float w, float h, float r,
+                           const Matrix& transform = {});
+  void emitRectPath(float x, float y, float w, float h, const Matrix& transform = {});
 
   enum class ColorRefType { Solid, Pattern };
 
@@ -797,7 +794,15 @@ class PDFWriter {
   };
 
   ColorRef resolveColorSource(const ColorSource* source);
-  void paintShape(const PDFFillStrokeInfo& fs, FillRule fillRule = FillRule::Winding);
+
+  struct PaintState {
+    bool hasFill = false;
+    bool hasStroke = false;
+    bool isEvenOdd = false;
+  };
+
+  PaintState applyFillStrokeColors(const FillStrokeInfo& fs);
+  void paintShape(const FillStrokeInfo& fs, FillRule fillRule = FillRule::Winding);
   void applyStrokeAttrs(const Stroke* stroke);
 
   void writeClipPath(const Layer* maskLayer, const Matrix& parentMatrix = {});
@@ -809,67 +814,122 @@ class PDFWriter {
 // PDFWriter – path emission helpers
 //==============================================================================
 
-void PDFWriter::emitPathData(const PathData& data) {
+void PDFWriter::emitPathData(const PathData& data, const Matrix& transform) {
+  bool hasTransform = !transform.isIdentity();
   Point cur = {};
   Point subpathStart = {};
-  data.forEach([this, &cur, &subpathStart](PathVerb verb, const Point* pts) {
-    switch (verb) {
-      case PathVerb::Move:
-        _stream->moveTo(pts[0].x, pts[0].y);
-        cur = pts[0];
-        subpathStart = pts[0];
-        break;
-      case PathVerb::Line:
-        _stream->lineTo(pts[0].x, pts[0].y);
-        cur = pts[0];
-        break;
-      case PathVerb::Quad: {
-        // Promote Q(p0, cp, p1) to cubic: C(p0, p0+2/3*(cp-p0), p1+2/3*(cp-p1), p1)
-        float c1x = cur.x + 2.0f / 3.0f * (pts[0].x - cur.x);
-        float c1y = cur.y + 2.0f / 3.0f * (pts[0].y - cur.y);
-        float c2x = pts[1].x + 2.0f / 3.0f * (pts[0].x - pts[1].x);
-        float c2y = pts[1].y + 2.0f / 3.0f * (pts[0].y - pts[1].y);
-        _stream->curveTo(c1x, c1y, c2x, c2y, pts[1].x, pts[1].y);
-        cur = pts[1];
-        break;
-      }
-      case PathVerb::Cubic:
-        _stream->curveTo(pts[0].x, pts[0].y, pts[1].x, pts[1].y, pts[2].x, pts[2].y);
-        cur = pts[2];
-        break;
-      case PathVerb::Close:
-        _stream->closePath();
-        cur = subpathStart;
-        break;
-    }
-  });
+  data.forEach(
+      [this, &cur, &subpathStart, hasTransform, &transform](PathVerb verb, const Point* pts) {
+        switch (verb) {
+          case PathVerb::Move: {
+            Point p = hasTransform ? transform.mapPoint(pts[0]) : pts[0];
+            _stream->moveTo(p.x, p.y);
+            cur = p;
+            subpathStart = p;
+            break;
+          }
+          case PathVerb::Line: {
+            Point p = hasTransform ? transform.mapPoint(pts[0]) : pts[0];
+            _stream->lineTo(p.x, p.y);
+            cur = p;
+            break;
+          }
+          case PathVerb::Quad: {
+            Point cp = hasTransform ? transform.mapPoint(pts[0]) : pts[0];
+            Point end = hasTransform ? transform.mapPoint(pts[1]) : pts[1];
+            float c1x = cur.x + 2.0f / 3.0f * (cp.x - cur.x);
+            float c1y = cur.y + 2.0f / 3.0f * (cp.y - cur.y);
+            float c2x = end.x + 2.0f / 3.0f * (cp.x - end.x);
+            float c2y = end.y + 2.0f / 3.0f * (cp.y - end.y);
+            _stream->curveTo(c1x, c1y, c2x, c2y, end.x, end.y);
+            cur = end;
+            break;
+          }
+          case PathVerb::Cubic: {
+            Point cp1 = hasTransform ? transform.mapPoint(pts[0]) : pts[0];
+            Point cp2 = hasTransform ? transform.mapPoint(pts[1]) : pts[1];
+            Point end = hasTransform ? transform.mapPoint(pts[2]) : pts[2];
+            _stream->curveTo(cp1.x, cp1.y, cp2.x, cp2.y, end.x, end.y);
+            cur = end;
+            break;
+          }
+          case PathVerb::Close:
+            _stream->closePath();
+            cur = subpathStart;
+            break;
+        }
+      });
 }
 
-void PDFWriter::emitEllipsePath(float cx, float cy, float rx, float ry) {
+void PDFWriter::emitEllipsePath(float cx, float cy, float rx, float ry, const Matrix& transform) {
+  bool hasTransform = !transform.isIdentity();
   float kx = rx * kKappa;
   float ky = ry * kKappa;
-  _stream->moveTo(cx + rx, cy);
-  _stream->curveTo(cx + rx, cy + ky, cx + kx, cy + ry, cx, cy + ry);
-  _stream->curveTo(cx - kx, cy + ry, cx - rx, cy + ky, cx - rx, cy);
-  _stream->curveTo(cx - rx, cy - ky, cx - kx, cy - ry, cx, cy - ry);
-  _stream->curveTo(cx + kx, cy - ry, cx + rx, cy - ky, cx + rx, cy);
+  Point points[] = {
+      {cx + rx, cy},      {cx + rx, cy + ky}, {cx + kx, cy + ry}, {cx, cy + ry},
+      {cx - kx, cy + ry}, {cx - rx, cy + ky}, {cx - rx, cy},      {cx - rx, cy - ky},
+      {cx - kx, cy - ry}, {cx, cy - ry},      {cx + kx, cy - ry}, {cx + rx, cy - ky},
+      {cx + rx, cy},
+  };
+  if (hasTransform) {
+    for (auto& p : points) {
+      p = transform.mapPoint(p);
+    }
+  }
+  _stream->moveTo(points[0].x, points[0].y);
+  _stream->curveTo(points[1].x, points[1].y, points[2].x, points[2].y, points[3].x, points[3].y);
+  _stream->curveTo(points[4].x, points[4].y, points[5].x, points[5].y, points[6].x, points[6].y);
+  _stream->curveTo(points[7].x, points[7].y, points[8].x, points[8].y, points[9].x, points[9].y);
+  _stream->curveTo(points[10].x, points[10].y, points[11].x, points[11].y, points[12].x,
+                   points[12].y);
   _stream->closePath();
 }
 
-void PDFWriter::emitRoundedRectPath(float x, float y, float w, float h, float r) {
+void PDFWriter::emitRoundedRectPath(float x, float y, float w, float h, float r,
+                                    const Matrix& transform) {
+  bool hasTransform = !transform.isIdentity();
   float maxR = std::min(w, h) / 2.0f;
   r = std::min(r, maxR);
   float k = r * kKappa;
+  Point points[] = {
+      {x + r, y},         {x + w - r, y},     {x + w - r + k, y},     {x + w, y + r - k},
+      {x + w, y + r},     {x + w, y + h - r}, {x + w, y + h - r + k}, {x + w - r + k, y + h},
+      {x + w - r, y + h}, {x + r, y + h},     {x + r - k, y + h},     {x, y + h - r + k},
+      {x, y + h - r},     {x, y + r},         {x, y + r - k},         {x + r - k, y},
+      {x + r, y},
+  };
+  if (hasTransform) {
+    for (auto& p : points) {
+      p = transform.mapPoint(p);
+    }
+  }
+  _stream->moveTo(points[0].x, points[0].y);
+  _stream->lineTo(points[1].x, points[1].y);
+  _stream->curveTo(points[2].x, points[2].y, points[3].x, points[3].y, points[4].x, points[4].y);
+  _stream->lineTo(points[5].x, points[5].y);
+  _stream->curveTo(points[6].x, points[6].y, points[7].x, points[7].y, points[8].x, points[8].y);
+  _stream->lineTo(points[9].x, points[9].y);
+  _stream->curveTo(points[10].x, points[10].y, points[11].x, points[11].y, points[12].x,
+                   points[12].y);
+  _stream->lineTo(points[13].x, points[13].y);
+  _stream->curveTo(points[14].x, points[14].y, points[15].x, points[15].y, points[16].x,
+                   points[16].y);
+  _stream->closePath();
+}
 
-  _stream->moveTo(x + r, y);
-  _stream->lineTo(x + w - r, y);
-  _stream->curveTo(x + w - r + k, y, x + w, y + r - k, x + w, y + r);
-  _stream->lineTo(x + w, y + h - r);
-  _stream->curveTo(x + w, y + h - r + k, x + w - r + k, y + h, x + w - r, y + h);
-  _stream->lineTo(x + r, y + h);
-  _stream->curveTo(x + r - k, y + h, x, y + h - r + k, x, y + h - r);
-  _stream->lineTo(x, y + r);
-  _stream->curveTo(x, y + r - k, x + r - k, y, x + r, y);
+void PDFWriter::emitRectPath(float x, float y, float w, float h, const Matrix& transform) {
+  if (transform.isIdentity()) {
+    _stream->rect(x, y, w, h);
+    return;
+  }
+  Point p0 = transform.mapPoint({x, y});
+  Point p1 = transform.mapPoint({x + w, y});
+  Point p2 = transform.mapPoint({x + w, y + h});
+  Point p3 = transform.mapPoint({x, y + h});
+  _stream->moveTo(p0.x, p0.y);
+  _stream->lineTo(p1.x, p1.y);
+  _stream->lineTo(p2.x, p2.y);
+  _stream->lineTo(p3.x, p3.y);
   _stream->closePath();
 }
 
@@ -947,32 +1007,28 @@ void PDFWriter::applyStrokeAttrs(const Stroke* stroke) {
 // PDFWriter – shape painting (fill + stroke)
 //==============================================================================
 
-void PDFWriter::paintShape(const PDFFillStrokeInfo& fs, FillRule fillRule) {
-  bool hasFill = fs.fill && fs.fill->color;
-  bool hasStroke = fs.stroke && fs.stroke->color;
-  if (!hasFill && !hasStroke) {
-    _stream->endPath();
-    return;
-  }
+PDFWriter::PaintState PDFWriter::applyFillStrokeColors(const FillStrokeInfo& fs) {
+  PaintState state = {};
+  state.hasFill = fs.fill && fs.fill->color;
+  state.hasStroke = fs.stroke && fs.stroke->color;
+  state.isEvenOdd = fs.fill && (fs.fill->fillRule == FillRule::EvenOdd);
 
   ColorRef fillRef = {};
   ColorRef strokeRef = {};
-  if (hasFill) {
+  if (state.hasFill) {
     fillRef = resolveColorSource(fs.fill->color);
   }
-  if (hasStroke) {
+  if (state.hasStroke) {
     strokeRef = resolveColorSource(fs.stroke->color);
   }
 
-  // Apply opacity via ExtGState when needed
-  float fillAlpha = hasFill ? (fillRef.alpha * fs.fill->alpha) : 1.0f;
-  float strokeAlpha = hasStroke ? (strokeRef.alpha * fs.stroke->alpha) : 1.0f;
+  float fillAlpha = state.hasFill ? (fillRef.alpha * fs.fill->alpha) : 1.0f;
+  float strokeAlpha = state.hasStroke ? (strokeRef.alpha * fs.stroke->alpha) : 1.0f;
   if (fillAlpha < 1.0f || strokeAlpha < 1.0f) {
     _stream->setExtGState(_resources->getExtGState(fillAlpha, strokeAlpha));
   }
 
-  // Set stroke attributes before painting
-  if (hasStroke) {
+  if (state.hasStroke) {
     applyStrokeAttrs(fs.stroke);
     if (strokeRef.type == ColorRefType::Solid) {
       _stream->setStrokeRGB(strokeRef.r, strokeRef.g, strokeRef.b);
@@ -981,8 +1037,7 @@ void PDFWriter::paintShape(const PDFFillStrokeInfo& fs, FillRule fillRule) {
     }
   }
 
-  // Set fill color and paint
-  if (hasFill) {
+  if (state.hasFill) {
     if (fillRef.type == ColorRefType::Solid) {
       _stream->setFillRGB(fillRef.r, fillRef.g, fillRef.b);
     } else {
@@ -990,10 +1045,22 @@ void PDFWriter::paintShape(const PDFFillStrokeInfo& fs, FillRule fillRule) {
     }
   }
 
+  return state;
+}
+
+void PDFWriter::paintShape(const FillStrokeInfo& fs, FillRule fillRule) {
+  bool hasFill = fs.fill && fs.fill->color;
+  bool hasStroke = fs.stroke && fs.stroke->color;
+  if (!hasFill && !hasStroke) {
+    _stream->endPath();
+    return;
+  }
+
+  auto state = applyFillStrokeColors(fs);
   bool isEvenOdd = (fillRule == FillRule::EvenOdd);
-  if (hasFill && hasStroke) {
+  if (state.hasFill && state.hasStroke) {
     isEvenOdd ? _stream->fillEvenOddAndStroke() : _stream->fillAndStroke();
-  } else if (hasFill) {
+  } else if (state.hasFill) {
     isEvenOdd ? _stream->fillEvenOdd() : _stream->fill();
   } else {
     _stream->stroke();
@@ -1004,7 +1071,7 @@ void PDFWriter::paintShape(const PDFFillStrokeInfo& fs, FillRule fillRule) {
 // PDFWriter – shape elements
 //==============================================================================
 
-void PDFWriter::writeRectangle(const Rectangle* rect, const PDFFillStrokeInfo& fs,
+void PDFWriter::writeRectangle(const Rectangle* rect, const FillStrokeInfo& fs,
                                const Matrix& transform) {
   float x = rect->position.x - rect->size.width / 2;
   float y = rect->position.y - rect->size.height / 2;
@@ -1028,7 +1095,7 @@ void PDFWriter::writeRectangle(const Rectangle* rect, const PDFFillStrokeInfo& f
   _stream->restore();
 }
 
-void PDFWriter::writeEllipse(const Ellipse* ellipse, const PDFFillStrokeInfo& fs,
+void PDFWriter::writeEllipse(const Ellipse* ellipse, const FillStrokeInfo& fs,
                              const Matrix& transform) {
   float rx = ellipse->size.width / 2;
   float ry = ellipse->size.height / 2;
@@ -1048,7 +1115,7 @@ void PDFWriter::writeEllipse(const Ellipse* ellipse, const PDFFillStrokeInfo& fs
   _stream->restore();
 }
 
-void PDFWriter::writePath(const Path* path, const PDFFillStrokeInfo& fs, const Matrix& transform) {
+void PDFWriter::writePath(const Path* path, const FillStrokeInfo& fs, const Matrix& transform) {
   if (!path->data || path->data->isEmpty()) {
     return;
   }
@@ -1072,7 +1139,7 @@ void PDFWriter::writePath(const Path* path, const PDFFillStrokeInfo& fs, const M
 // PDFWriter – text elements
 //==============================================================================
 
-void PDFWriter::writeTextAsPath(const Text* text, const PDFFillStrokeInfo& fs,
+void PDFWriter::writeTextAsPath(const Text* text, const FillStrokeInfo& fs,
                                 const Matrix& transform) {
   float textPosX = text->position.x;
   float textPosY = text->position.y;
@@ -1089,52 +1156,17 @@ void PDFWriter::writeTextAsPath(const Text* text, const PDFFillStrokeInfo& fs,
     _currentMatrix = _currentMatrix * transform;
   }
 
-  // Set up colors/opacity once for all glyphs
-  bool hasFill = fs.fill && fs.fill->color;
-  bool hasStroke = fs.stroke && fs.stroke->color;
-  ColorRef fillRef = {};
-  ColorRef strokeRef = {};
-
-  if (hasFill) {
-    fillRef = resolveColorSource(fs.fill->color);
-  }
-  if (hasStroke) {
-    strokeRef = resolveColorSource(fs.stroke->color);
-  }
-
-  float fillAlpha = hasFill ? (fillRef.alpha * fs.fill->alpha) : 1.0f;
-  float strokeAlpha = hasStroke ? (strokeRef.alpha * fs.stroke->alpha) : 1.0f;
-  if (fillAlpha < 1.0f || strokeAlpha < 1.0f) {
-    _stream->setExtGState(_resources->getExtGState(fillAlpha, strokeAlpha));
-  }
-  if (hasFill) {
-    if (fillRef.type == ColorRefType::Solid) {
-      _stream->setFillRGB(fillRef.r, fillRef.g, fillRef.b);
-    } else {
-      _stream->setFillPattern(fillRef.patternName);
-    }
-  }
-  if (hasStroke) {
-    applyStrokeAttrs(fs.stroke);
-    if (strokeRef.type == ColorRefType::Solid) {
-      _stream->setStrokeRGB(strokeRef.r, strokeRef.g, strokeRef.b);
-    } else {
-      _stream->setStrokePattern(strokeRef.patternName);
-    }
-  }
-
-  FillRule rule = fs.fill ? fs.fill->fillRule : FillRule::Winding;
-  bool isEvenOdd = (rule == FillRule::EvenOdd);
+  auto state = applyFillStrokeColors(fs);
 
   for (const auto& gp : glyphPaths) {
     _stream->save();
     _stream->concatMatrix(gp.transform);
     emitPathData(*gp.pathData);
-    if (hasFill && hasStroke) {
-      isEvenOdd ? _stream->fillEvenOddAndStroke() : _stream->fillAndStroke();
-    } else if (hasFill) {
-      isEvenOdd ? _stream->fillEvenOdd() : _stream->fill();
-    } else if (hasStroke) {
+    if (state.hasFill && state.hasStroke) {
+      state.isEvenOdd ? _stream->fillEvenOddAndStroke() : _stream->fillAndStroke();
+    } else if (state.hasFill) {
+      state.isEvenOdd ? _stream->fillEvenOdd() : _stream->fill();
+    } else if (state.hasStroke) {
       _stream->stroke();
     }
     _stream->restore();
@@ -1144,7 +1176,7 @@ void PDFWriter::writeTextAsPath(const Text* text, const PDFFillStrokeInfo& fs,
   _stream->restore();
 }
 
-void PDFWriter::writeTextAsPDFText(const Text* text, const PDFFillStrokeInfo& fs,
+void PDFWriter::writeTextAsPDFText(const Text* text, const FillStrokeInfo& fs,
                                    const Matrix& transform) {
   if (text->text.empty()) {
     return;
@@ -1190,7 +1222,7 @@ void PDFWriter::writeTextAsPDFText(const Text* text, const PDFFillStrokeInfo& fs
   _stream->restore();
 }
 
-void PDFWriter::writeText(const Text* text, const PDFFillStrokeInfo& fs, const Matrix& transform) {
+void PDFWriter::writeText(const Text* text, const FillStrokeInfo& fs, const Matrix& transform) {
   if (text->text.empty()) {
     return;
   }
@@ -1218,137 +1250,24 @@ void PDFWriter::writeClipPath(const Layer* maskLayer, const Matrix& parentMatrix
         auto rect = static_cast<const Rectangle*>(element);
         float x = rect->position.x - rect->size.width / 2;
         float y = rect->position.y - rect->size.height / 2;
-        float w = rect->size.width;
-        float h = rect->size.height;
         if (rect->roundness > 0) {
-          float maxR = std::min(w, h) / 2.0f;
-          float r = std::min(rect->roundness, maxR);
-          float k = r * kKappa;
-          Point pts[] = {
-              combined.mapPoint({x + r, y}),
-              combined.mapPoint({x + w - r, y}),
-              combined.mapPoint({x + w - r + k, y}),
-              combined.mapPoint({x + w, y + r - k}),
-              combined.mapPoint({x + w, y + r}),
-              combined.mapPoint({x + w, y + h - r}),
-              combined.mapPoint({x + w, y + h - r + k}),
-              combined.mapPoint({x + w - r + k, y + h}),
-              combined.mapPoint({x + w - r, y + h}),
-              combined.mapPoint({x + r, y + h}),
-              combined.mapPoint({x + r - k, y + h}),
-              combined.mapPoint({x, y + h - r + k}),
-              combined.mapPoint({x, y + h - r}),
-              combined.mapPoint({x, y + r}),
-              combined.mapPoint({x, y + r - k}),
-              combined.mapPoint({x + r - k, y}),
-              combined.mapPoint({x + r, y}),
-          };
-          _stream->moveTo(pts[0].x, pts[0].y);
-          _stream->lineTo(pts[1].x, pts[1].y);
-          _stream->curveTo(pts[2].x, pts[2].y, pts[3].x, pts[3].y, pts[4].x, pts[4].y);
-          _stream->lineTo(pts[5].x, pts[5].y);
-          _stream->curveTo(pts[6].x, pts[6].y, pts[7].x, pts[7].y, pts[8].x, pts[8].y);
-          _stream->lineTo(pts[9].x, pts[9].y);
-          _stream->curveTo(pts[10].x, pts[10].y, pts[11].x, pts[11].y, pts[12].x, pts[12].y);
-          _stream->lineTo(pts[13].x, pts[13].y);
-          _stream->curveTo(pts[14].x, pts[14].y, pts[15].x, pts[15].y, pts[16].x, pts[16].y);
-          _stream->closePath();
-        } else if (combined.isIdentity()) {
-          _stream->rect(x, y, w, h);
+          emitRoundedRectPath(x, y, rect->size.width, rect->size.height, rect->roundness, combined);
         } else {
-          Point p0 = combined.mapPoint({x, y});
-          Point p1 = combined.mapPoint({x + w, y});
-          Point p2 = combined.mapPoint({x + w, y + h});
-          Point p3 = combined.mapPoint({x, y + h});
-          _stream->moveTo(p0.x, p0.y);
-          _stream->lineTo(p1.x, p1.y);
-          _stream->lineTo(p2.x, p2.y);
-          _stream->lineTo(p3.x, p3.y);
-          _stream->closePath();
+          emitRectPath(x, y, rect->size.width, rect->size.height, combined);
         }
         break;
       }
       case NodeType::Ellipse: {
         auto ellipse = static_cast<const Ellipse*>(element);
-        float cx = ellipse->position.x;
-        float cy = ellipse->position.y;
         float rx = ellipse->size.width / 2;
         float ry = ellipse->size.height / 2;
-        float kx = rx * kKappa;
-        float ky = ry * kKappa;
-        Point pts[] = {
-            combined.mapPoint({cx + rx, cy}),
-            combined.mapPoint({cx + rx, cy + ky}),
-            combined.mapPoint({cx + kx, cy + ry}),
-            combined.mapPoint({cx, cy + ry}),
-            combined.mapPoint({cx - kx, cy + ry}),
-            combined.mapPoint({cx - rx, cy + ky}),
-            combined.mapPoint({cx - rx, cy}),
-            combined.mapPoint({cx - rx, cy - ky}),
-            combined.mapPoint({cx - kx, cy - ry}),
-            combined.mapPoint({cx, cy - ry}),
-            combined.mapPoint({cx + kx, cy - ry}),
-            combined.mapPoint({cx + rx, cy - ky}),
-            combined.mapPoint({cx + rx, cy}),
-        };
-        _stream->moveTo(pts[0].x, pts[0].y);
-        _stream->curveTo(pts[1].x, pts[1].y, pts[2].x, pts[2].y, pts[3].x, pts[3].y);
-        _stream->curveTo(pts[4].x, pts[4].y, pts[5].x, pts[5].y, pts[6].x, pts[6].y);
-        _stream->curveTo(pts[7].x, pts[7].y, pts[8].x, pts[8].y, pts[9].x, pts[9].y);
-        _stream->curveTo(pts[10].x, pts[10].y, pts[11].x, pts[11].y, pts[12].x, pts[12].y);
-        _stream->closePath();
+        emitEllipsePath(ellipse->position.x, ellipse->position.y, rx, ry, combined);
         break;
       }
       case NodeType::Path: {
         auto path = static_cast<const Path*>(element);
         if (path->data && !path->data->isEmpty()) {
-          if (combined.isIdentity()) {
-            emitPathData(*path->data);
-          } else {
-            Point cur = {};
-            Point subpathStart = {};
-            path->data->forEach([this, &cur, &subpathStart, &combined](PathVerb verb,
-                                                                       const Point* pts) {
-              switch (verb) {
-                case PathVerb::Move: {
-                  Point p = combined.mapPoint(pts[0]);
-                  _stream->moveTo(p.x, p.y);
-                  cur = p;
-                  subpathStart = p;
-                  break;
-                }
-                case PathVerb::Line: {
-                  Point p = combined.mapPoint(pts[0]);
-                  _stream->lineTo(p.x, p.y);
-                  cur = p;
-                  break;
-                }
-                case PathVerb::Quad: {
-                  Point cp = combined.mapPoint(pts[0]);
-                  Point end = combined.mapPoint(pts[1]);
-                  float c1x = cur.x + 2.0f / 3.0f * (cp.x - cur.x);
-                  float c1y = cur.y + 2.0f / 3.0f * (cp.y - cur.y);
-                  float c2x = end.x + 2.0f / 3.0f * (cp.x - end.x);
-                  float c2y = end.y + 2.0f / 3.0f * (cp.y - end.y);
-                  _stream->curveTo(c1x, c1y, c2x, c2y, end.x, end.y);
-                  cur = end;
-                  break;
-                }
-                case PathVerb::Cubic: {
-                  Point cp1 = combined.mapPoint(pts[0]);
-                  Point cp2 = combined.mapPoint(pts[1]);
-                  Point end = combined.mapPoint(pts[2]);
-                  _stream->curveTo(cp1.x, cp1.y, cp2.x, cp2.y, end.x, end.y);
-                  cur = end;
-                  break;
-                }
-                case PathVerb::Close:
-                  _stream->closePath();
-                  cur = subpathStart;
-                  break;
-              }
-            });
-          }
+          emitPathData(*path->data, combined);
         }
         break;
       }
@@ -1369,10 +1288,10 @@ void PDFWriter::writeClipPath(const Layer* maskLayer, const Matrix& parentMatrix
 void PDFWriter::renderMaskLayerContent(const Layer* maskLayer) {
   Matrix layerMatrix = BuildLayerMatrix(maskLayer);
   bool needsGroup = !layerMatrix.isIdentity() || maskLayer->alpha < 1.0f;
+  Matrix savedMatrix = _currentMatrix;
 
   if (needsGroup) {
     _stream->save();
-    Matrix savedMatrix = _currentMatrix;
     if (!layerMatrix.isIdentity()) {
       _stream->concatMatrix(layerMatrix);
       _currentMatrix = _currentMatrix * layerMatrix;
@@ -1380,17 +1299,16 @@ void PDFWriter::renderMaskLayerContent(const Layer* maskLayer) {
     if (maskLayer->alpha < 1.0f) {
       _stream->setExtGState(_resources->getExtGState(maskLayer->alpha, maskLayer->alpha));
     }
-    writeLayerContents(maskLayer);
-    for (const auto* child : maskLayer->children) {
-      renderMaskLayerContent(child);
-    }
+  }
+
+  writeLayerContents(maskLayer);
+  for (const auto* child : maskLayer->children) {
+    renderMaskLayerContent(child);
+  }
+
+  if (needsGroup) {
     _currentMatrix = savedMatrix;
     _stream->restore();
-  } else {
-    writeLayerContents(maskLayer);
-    for (const auto* child : maskLayer->children) {
-      renderMaskLayerContent(child);
-    }
   }
 }
 
@@ -1566,9 +1484,8 @@ std::string PDFExporter::ToPDF(const PAGXDocument& doc, const Options& options) 
   // Page object
   std::string resourceDict = resources.buildResourceDict();
   store.set(pageId, "<< /Type /Page /Parent " + std::to_string(pagesId) + " 0 R /MediaBox [0 0 " +
-                        PDFFloat(doc.width) + " " + PDFFloat(doc.height) +
-                        "] /Contents " + std::to_string(contentId) + " 0 R /Resources " +
-                        resourceDict + " >>");
+                        PDFFloat(doc.width) + " " + PDFFloat(doc.height) + "] /Contents " +
+                        std::to_string(contentId) + " 0 R /Resources " + resourceDict + " >>");
 
   // Pages tree
   store.set(pagesId, "<< /Type /Pages /Kids [" + std::to_string(pageId) + " 0 R] /Count 1 >>");
