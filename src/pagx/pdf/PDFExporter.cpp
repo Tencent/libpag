@@ -663,23 +663,45 @@ class PDFResourceManager {
     auto width = static_cast<float>(imageWidth);
     auto height = static_cast<float>(imageHeight);
 
+    bool mirrorX = (pattern->tileModeX == TileMode::Mirror);
+    bool mirrorY = (pattern->tileModeY == TileMode::Mirror);
     bool clampX = (pattern->tileModeX == TileMode::Clamp || pattern->tileModeX == TileMode::Decal);
     bool clampY = (pattern->tileModeY == TileMode::Clamp || pattern->tileModeY == TileMode::Decal);
-    float xStep = clampX ? 16384.0f : width;
-    float yStep = clampY ? 16384.0f : height;
+    float tileWidth = mirrorX ? width * 2 : width;
+    float tileHeight = mirrorY ? height * 2 : height;
+    float xStep = clampX ? 16384.0f : tileWidth;
+    float yStep = clampY ? 16384.0f : tileHeight;
 
     // Content stream: draw the image inside the tile cell with Y-flip for PDF image coordinates.
-    std::string tileStream = "q " + PDFFloat(width) + " 0 0 " + PDFFloat(-height) + " 0 " +
-                             PDFFloat(height) + " cm /" + xobjName + " Do Q";
+    // For Mirror tile modes, draw mirrored copies to form a 2x tile that repeats seamlessly.
+    std::string w = PDFFloat(width);
+    std::string h = PDFFloat(height);
+    std::string negH = PDFFloat(-height);
+    std::string tileStream = "q " + w + " 0 0 " + negH + " 0 " + h + " cm /" + xobjName + " Do Q";
+    if (mirrorX) {
+      // Horizontally flipped copy at [width, 0].
+      tileStream += " q " + PDFFloat(-width) + " 0 0 " + negH + " " + PDFFloat(width * 2) + " " +
+                    h + " cm /" + xobjName + " Do Q";
+    }
+    if (mirrorY) {
+      // Vertically flipped copy at [0, height].
+      tileStream +=
+          " q " + w + " 0 0 " + PDFFloat(height) + " 0 " + h + " cm /" + xobjName + " Do Q";
+    }
+    if (mirrorX && mirrorY) {
+      // Both axes flipped copy at [width, height].
+      tileStream += " q " + PDFFloat(-width) + " 0 0 " + PDFFloat(height) + " " +
+                    PDFFloat(width * 2) + " " + h + " cm /" + xobjName + " Do Q";
+    }
 
     std::string matStr = matrixString(ctm * pattern->matrix);
     std::string patDict =
         "<< /Type /Pattern /PatternType 1 /PaintType 1 /TilingType 1"
         " /BBox [0 0 " +
-        PDFFloat(width) + " " + PDFFloat(height) + "] /XStep " + PDFFloat(xStep) + " /YStep " +
-        PDFFloat(yStep) + " /Matrix " + matStr + " /Resources << /XObject << /" + xobjName + " " +
-        std::to_string(xobjId) + " 0 R >> >> /Length " + std::to_string(tileStream.size()) +
-        " >>\nstream\n" + tileStream + "\nendstream";
+        PDFFloat(tileWidth) + " " + PDFFloat(tileHeight) + "] /XStep " + PDFFloat(xStep) +
+        " /YStep " + PDFFloat(yStep) + " /Matrix " + matStr + " /Resources << /XObject << /" +
+        xobjName + " " + std::to_string(xobjId) + " 0 R >> >> /Length " +
+        std::to_string(tileStream.size()) + " >>\nstream\n" + tileStream + "\nendstream";
     int patId = _store->add(patDict);
     std::string patName = "P" + std::to_string(_patCount++);
     _patterns[patName] = patId;
@@ -1448,8 +1470,7 @@ void PDFWriter::writeLayer(const Layer* layer) {
   }
 
   bool needsGroup = !layer->matrix.isIdentity() || layer->alpha < 1.0f || layer->mask != nullptr ||
-                    layer->x != 0.0f || layer->y != 0.0f ||
-                    layer->blendMode != BlendMode::Normal;
+                    layer->x != 0.0f || layer->y != 0.0f || layer->blendMode != BlendMode::Normal;
 
   if (!needsGroup) {
     writeLayerContents(layer);
@@ -1547,12 +1568,11 @@ std::string PDFExporter::ToPDF(const PAGXDocument& doc, const Options& options) 
 
   // Page object
   std::string resourceDict = resources.buildResourceDict();
-  store.set(pageId,
-            "<< /Type /Page /Parent " + std::to_string(pagesId) + " 0 R /MediaBox [0 0 " +
-                PDFFloat(doc.width) + " " + PDFFloat(doc.height) +
-                "] /Group << /Type /Group /S /Transparency /CS /DeviceRGB >>"
-                " /Contents " +
-                std::to_string(contentId) + " 0 R /Resources " + resourceDict + " >>");
+  store.set(pageId, "<< /Type /Page /Parent " + std::to_string(pagesId) + " 0 R /MediaBox [0 0 " +
+                        PDFFloat(doc.width) + " " + PDFFloat(doc.height) +
+                        "] /Group << /Type /Group /S /Transparency /CS /DeviceRGB >>"
+                        " /Contents " +
+                        std::to_string(contentId) + " 0 R /Resources " + resourceDict + " >>");
 
   // Pages tree
   store.set(pagesId, "<< /Type /Pages /Kids [" + std::to_string(pageId) + " 0 R] /Count 1 >>");
