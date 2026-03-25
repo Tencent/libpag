@@ -348,6 +348,33 @@ class PDFStream {
 };
 
 //==============================================================================
+// ScopedTransform – RAII guard for save/concatMatrix/restore pattern
+//==============================================================================
+
+class ScopedTransform {
+ public:
+  ScopedTransform(PDFStream* stream, Matrix& currentMatrix, const Matrix& transform)
+      : _stream(stream), _currentMatrix(currentMatrix), _savedMatrix(currentMatrix) {
+    _stream->save();
+    if (!transform.isIdentity()) {
+      _stream->concatMatrix(transform);
+      _currentMatrix = _currentMatrix * transform;
+    }
+  }
+  ~ScopedTransform() {
+    _currentMatrix = _savedMatrix;
+    _stream->restore();
+  }
+  ScopedTransform(const ScopedTransform&) = delete;
+  ScopedTransform& operator=(const ScopedTransform&) = delete;
+
+ private:
+  PDFStream* _stream;
+  Matrix& _currentMatrix;
+  Matrix _savedMatrix;
+};
+
+//==============================================================================
 // PDFObjectStore – manages numbered indirect objects
 //==============================================================================
 
@@ -511,30 +538,8 @@ class PDFResourceManager {
     return name;
   }
 
-  // Creates a Type 2 (exponential interpolation) or Type 3 (stitching) gradient function.
-  int createGradientFunction(const std::vector<ColorStop*>& stops) {
-    if (stops.size() < 2) {
-      return -1;
-    }
-
-    if (stops.size() == 2) {
-      return _store->add("<< /FunctionType 2 /Domain [0 1] /C0 [" + PDFFloat(stops[0]->color.red) +
-                         " " + PDFFloat(stops[0]->color.green) + " " +
-                         PDFFloat(stops[0]->color.blue) + "] /C1 [" +
-                         PDFFloat(stops[1]->color.red) + " " + PDFFloat(stops[1]->color.green) +
-                         " " + PDFFloat(stops[1]->color.blue) + "] /N 1 >>");
-    }
-
-    std::vector<int> segFuncs;
-    segFuncs.reserve(stops.size() - 1);
-    for (size_t i = 0; i + 1 < stops.size(); i++) {
-      segFuncs.push_back(_store->add(
-          "<< /FunctionType 2 /Domain [0 1] /C0 [" + PDFFloat(stops[i]->color.red) + " " +
-          PDFFloat(stops[i]->color.green) + " " + PDFFloat(stops[i]->color.blue) + "] /C1 [" +
-          PDFFloat(stops[i + 1]->color.red) + " " + PDFFloat(stops[i + 1]->color.green) + " " +
-          PDFFloat(stops[i + 1]->color.blue) + "] /N 1 >>"));
-    }
-
+  int buildStitchingFunction(const std::vector<int>& segFuncs,
+                             const std::vector<ColorStop*>& stops) {
     std::string funcsArr = "[";
     for (size_t i = 0; i < segFuncs.size(); i++) {
       if (i > 0) {
@@ -566,60 +571,50 @@ class PDFResourceManager {
                        bounds + " /Encode " + encode + " >>");
   }
 
-  int createAlphaGradientFunction(const std::vector<ColorStop*>& stops) {
+  template <typename ColorFormatter>
+  int createFunctionFromStops(const std::vector<ColorStop*>& stops,
+                              const ColorFormatter& format) {
     if (stops.size() < 2) {
       return -1;
     }
-
     if (stops.size() == 2) {
-      return _store->add("<< /FunctionType 2 /Domain [0 1] /C0 [" +
-                         PDFFloat(stops[0]->color.alpha) + "] /C1 [" +
-                         PDFFloat(stops[1]->color.alpha) + "] /N 1 >>");
+      return _store->add("<< /FunctionType 2 /Domain [0 1] /C0 [" + format(stops[0]) +
+                         "] /C1 [" + format(stops[1]) + "] /N 1 >>");
     }
-
     std::vector<int> segFuncs;
     segFuncs.reserve(stops.size() - 1);
     for (size_t i = 0; i + 1 < stops.size(); i++) {
-      segFuncs.push_back(
-          _store->add("<< /FunctionType 2 /Domain [0 1] /C0 [" +
-                      PDFFloat(stops[i]->color.alpha) + "] /C1 [" +
-                      PDFFloat(stops[i + 1]->color.alpha) + "] /N 1 >>"));
+      segFuncs.push_back(_store->add("<< /FunctionType 2 /Domain [0 1] /C0 [" +
+                                     format(stops[i]) + "] /C1 [" + format(stops[i + 1]) +
+                                     "] /N 1 >>"));
     }
+    return buildStitchingFunction(segFuncs, stops);
+  }
 
-    std::string funcsArr = "[";
-    for (size_t i = 0; i < segFuncs.size(); i++) {
-      if (i > 0) {
-        funcsArr += " ";
-      }
-      funcsArr += std::to_string(segFuncs[i]) + " 0 R";
-    }
-    funcsArr += "]";
+  int createGradientFunction(const std::vector<ColorStop*>& stops) {
+    return createFunctionFromStops(stops, [](const ColorStop* stop) {
+      return PDFFloat(stop->color.red) + " " + PDFFloat(stop->color.green) + " " +
+             PDFFloat(stop->color.blue);
+    });
+  }
 
-    std::string bounds = "[";
-    for (size_t i = 1; i + 1 < stops.size(); i++) {
-      if (i > 1) {
-        bounds += " ";
-      }
-      bounds += PDFFloat(stops[i]->offset);
-    }
-    bounds += "]";
-
-    std::string encode = "[";
-    for (size_t i = 0; i < segFuncs.size(); i++) {
-      if (i > 0) {
-        encode += " ";
-      }
-      encode += "0 1";
-    }
-    encode += "]";
-
-    return _store->add("<< /FunctionType 3 /Domain [0 1] /Functions " + funcsArr + " /Bounds " +
-                       bounds + " /Encode " + encode + " >>");
+  int createAlphaGradientFunction(const std::vector<ColorStop*>& stops) {
+    return createFunctionFromStops(
+        stops, [](const ColorStop* stop) { return PDFFloat(stop->color.alpha); });
   }
 
   static std::string matrixString(const Matrix& m) {
     return "[" + PDFFloat(m.a) + " " + PDFFloat(m.b) + " " + PDFFloat(m.c) + " " + PDFFloat(m.d) +
            " " + PDFFloat(m.tx) + " " + PDFFloat(m.ty) + "]";
+  }
+
+  std::string wrapShadingInPattern(int shadingId, const Matrix& patternMatrix) {
+    std::string matStr = matrixString(patternMatrix);
+    int patId = _store->add("<< /Type /Pattern /PatternType 2 /Shading " +
+                            std::to_string(shadingId) + " 0 R /Matrix " + matStr + " >>");
+    std::string patName = "P" + std::to_string(_patCount++);
+    _patterns[patName] = patId;
+    return patName;
   }
 
   // Creates a Type 2 (axial) shading wrapped in a Pattern, returns the pattern resource name.
@@ -631,19 +626,12 @@ class PDFResourceManager {
     if (funcId < 0) {
       return {};
     }
-
     int shadingId =
         _store->add("<< /ShadingType 2 /ColorSpace /DeviceRGB /Coords [" +
                     PDFFloat(grad->startPoint.x) + " " + PDFFloat(grad->startPoint.y) + " " +
                     PDFFloat(grad->endPoint.x) + " " + PDFFloat(grad->endPoint.y) + "] /Function " +
                     std::to_string(funcId) + " 0 R /Extend [true true] >>");
-
-    std::string matStr = matrixString(ctm * grad->matrix);
-    int patId = _store->add("<< /Type /Pattern /PatternType 2 /Shading " +
-                            std::to_string(shadingId) + " 0 R /Matrix " + matStr + " >>");
-    std::string patName = "P" + std::to_string(_patCount++);
-    _patterns[patName] = patId;
-    return patName;
+    return wrapShadingInPattern(shadingId, ctm * grad->matrix);
   }
 
   // Creates a Type 3 (radial) shading wrapped in a Pattern, returns the pattern resource name.
@@ -652,20 +640,12 @@ class PDFResourceManager {
     if (funcId < 0) {
       return {};
     }
-
-    // Coords: [x0 y0 r0 x1 y1 r1] – start circle at center with r=0, end at full radius.
     int shadingId = _store->add("<< /ShadingType 3 /ColorSpace /DeviceRGB /Coords [" +
                                 PDFFloat(grad->center.x) + " " + PDFFloat(grad->center.y) + " 0 " +
                                 PDFFloat(grad->center.x) + " " + PDFFloat(grad->center.y) + " " +
                                 PDFFloat(grad->radius) + "] /Function " + std::to_string(funcId) +
                                 " 0 R /Extend [true true] >>");
-
-    std::string matStr = matrixString(ctm * grad->matrix);
-    int patId = _store->add("<< /Type /Pattern /PatternType 2 /Shading " +
-                            std::to_string(shadingId) + " 0 R /Matrix " + matStr + " >>");
-    std::string patName = "P" + std::to_string(_patCount++);
-    _patterns[patName] = patId;
-    return patName;
+    return wrapShadingInPattern(shadingId, ctm * grad->matrix);
   }
 
   std::string addGradientAlphaMask(int alphaShadingId, const Matrix& gradMatrix, float bboxWidth,
@@ -861,33 +841,25 @@ class PDFResourceManager {
     _fonts["F0"] = fontId;
   }
 
+  static void appendResourceCategory(std::string& dict, const char* category,
+                                     const std::map<std::string, int>& resources) {
+    if (resources.empty()) {
+      return;
+    }
+    dict += "/";
+    dict += category;
+    dict += " << ";
+    for (const auto& [name, objId] : resources) {
+      dict += "/" + name + " " + std::to_string(objId) + " 0 R ";
+    }
+    dict += ">> ";
+  }
+
   std::string buildResourceDict() const {
     std::string dict = "<< ";
-
-    if (!_extGStates.empty()) {
-      dict += "/ExtGState << ";
-      for (const auto& [name, objId] : _extGStates) {
-        dict += "/" + name + " " + std::to_string(objId) + " 0 R ";
-      }
-      dict += ">> ";
-    }
-
-    if (!_patterns.empty()) {
-      dict += "/Pattern << ";
-      for (const auto& [name, objId] : _patterns) {
-        dict += "/" + name + " " + std::to_string(objId) + " 0 R ";
-      }
-      dict += ">> ";
-    }
-
-    if (!_fonts.empty()) {
-      dict += "/Font << ";
-      for (const auto& [name, objId] : _fonts) {
-        dict += "/" + name + " " + std::to_string(objId) + " 0 R ";
-      }
-      dict += ">> ";
-    }
-
+    appendResourceCategory(dict, "ExtGState", _extGStates);
+    appendResourceCategory(dict, "Pattern", _patterns);
+    appendResourceCategory(dict, "Font", _fonts);
     dict += ">>";
     return dict;
   }
@@ -1002,7 +974,7 @@ class PDFWriter {
   };
 
   PaintState applyFillStrokeColors(const FillStrokeInfo& fs);
-  void paintShape(const FillStrokeInfo& fs, FillRule fillRule = FillRule::Winding);
+  void paintShape(const FillStrokeInfo& fs);
   void applyStrokeAttrs(const Stroke* stroke);
 
   void writeClipPath(const Layer* maskLayer, const Matrix& parentMatrix = {});
@@ -1265,7 +1237,7 @@ PDFWriter::PaintState PDFWriter::applyFillStrokeColors(const FillStrokeInfo& fs)
   return state;
 }
 
-void PDFWriter::paintShape(const FillStrokeInfo& fs, FillRule fillRule) {
+void PDFWriter::paintShape(const FillStrokeInfo& fs) {
   bool hasFill = fs.fill && fs.fill->color;
   bool hasStroke = fs.stroke && fs.stroke->color;
   if (!hasFill && !hasStroke) {
@@ -1273,11 +1245,11 @@ void PDFWriter::paintShape(const FillStrokeInfo& fs, FillRule fillRule) {
     return;
   }
 
-  auto state = applyFillStrokeColors(fs);
-  bool isEvenOdd = (fillRule == FillRule::EvenOdd);
-  if (state.hasFill && state.hasStroke) {
+  applyFillStrokeColors(fs);
+  bool isEvenOdd = hasFill && (fs.fill->fillRule == FillRule::EvenOdd);
+  if (hasFill && hasStroke) {
     isEvenOdd ? _stream->fillEvenOddAndStroke() : _stream->fillAndStroke();
-  } else if (state.hasFill) {
+  } else if (hasFill) {
     isEvenOdd ? _stream->fillEvenOdd() : _stream->fill();
   } else {
     _stream->stroke();
@@ -1293,43 +1265,21 @@ void PDFWriter::writeRectangle(const Rectangle* rect, const FillStrokeInfo& fs,
   float x = rect->position.x - rect->size.width / 2;
   float y = rect->position.y - rect->size.height / 2;
 
-  _stream->save();
-  Matrix savedMatrix = _currentMatrix;
-  if (!transform.isIdentity()) {
-    _stream->concatMatrix(transform);
-    _currentMatrix = _currentMatrix * transform;
-  }
-
+  ScopedTransform guard(_stream, _currentMatrix, transform);
   if (rect->roundness > 0) {
     emitRoundedRectPath(x, y, rect->size.width, rect->size.height, rect->roundness);
   } else {
     _stream->rect(x, y, rect->size.width, rect->size.height);
   }
-
-  FillRule rule = fs.fill ? fs.fill->fillRule : FillRule::Winding;
-  paintShape(fs, rule);
-  _currentMatrix = savedMatrix;
-  _stream->restore();
+  paintShape(fs);
 }
 
 void PDFWriter::writeEllipse(const Ellipse* ellipse, const FillStrokeInfo& fs,
                              const Matrix& transform) {
-  float rx = ellipse->size.width / 2;
-  float ry = ellipse->size.height / 2;
-
-  _stream->save();
-  Matrix savedMatrix = _currentMatrix;
-  if (!transform.isIdentity()) {
-    _stream->concatMatrix(transform);
-    _currentMatrix = _currentMatrix * transform;
-  }
-
-  emitEllipsePath(ellipse->position.x, ellipse->position.y, rx, ry);
-
-  FillRule rule = fs.fill ? fs.fill->fillRule : FillRule::Winding;
-  paintShape(fs, rule);
-  _currentMatrix = savedMatrix;
-  _stream->restore();
+  ScopedTransform guard(_stream, _currentMatrix, transform);
+  emitEllipsePath(ellipse->position.x, ellipse->position.y, ellipse->size.width / 2,
+                  ellipse->size.height / 2);
+  paintShape(fs);
 }
 
 void PDFWriter::writePath(const Path* path, const FillStrokeInfo& fs, const Matrix& transform) {
@@ -1337,19 +1287,9 @@ void PDFWriter::writePath(const Path* path, const FillStrokeInfo& fs, const Matr
     return;
   }
 
-  _stream->save();
-  Matrix savedMatrix = _currentMatrix;
-  if (!transform.isIdentity()) {
-    _stream->concatMatrix(transform);
-    _currentMatrix = _currentMatrix * transform;
-  }
-
+  ScopedTransform guard(_stream, _currentMatrix, transform);
   emitPathData(*path->data);
-
-  FillRule rule = fs.fill ? fs.fill->fillRule : FillRule::Winding;
-  paintShape(fs, rule);
-  _currentMatrix = savedMatrix;
-  _stream->restore();
+  paintShape(fs);
 }
 
 //==============================================================================
@@ -1358,21 +1298,12 @@ void PDFWriter::writePath(const Path* path, const FillStrokeInfo& fs, const Matr
 
 void PDFWriter::writeTextAsPath(const Text* text, const FillStrokeInfo& fs,
                                 const Matrix& transform) {
-  float textPosX = text->position.x;
-  float textPosY = text->position.y;
-
-  auto glyphPaths = ComputeGlyphPaths(*text, textPosX, textPosY);
+  auto glyphPaths = ComputeGlyphPaths(*text, text->position.x, text->position.y);
   if (glyphPaths.empty()) {
     return;
   }
 
-  _stream->save();
-  Matrix savedMatrix = _currentMatrix;
-  if (!transform.isIdentity()) {
-    _stream->concatMatrix(transform);
-    _currentMatrix = _currentMatrix * transform;
-  }
-
+  ScopedTransform guard(_stream, _currentMatrix, transform);
   auto state = applyFillStrokeColors(fs);
 
   for (const auto& gp : glyphPaths) {
@@ -1388,9 +1319,6 @@ void PDFWriter::writeTextAsPath(const Text* text, const FillStrokeInfo& fs,
     }
     _stream->restore();
   }
-
-  _currentMatrix = savedMatrix;
-  _stream->restore();
 }
 
 void PDFWriter::writeTextAsPDFText(const Text* text, const FillStrokeInfo& fs,
@@ -1401,12 +1329,7 @@ void PDFWriter::writeTextAsPDFText(const Text* text, const FillStrokeInfo& fs,
 
   _resources->ensureDefaultFont();
 
-  _stream->save();
-  Matrix savedMatrix = _currentMatrix;
-  if (!transform.isIdentity()) {
-    _stream->concatMatrix(transform);
-    _currentMatrix = _currentMatrix * transform;
-  }
+  ScopedTransform guard(_stream, _currentMatrix, transform);
 
   bool hasFill = fs.fill && fs.fill->color;
   bool hasStroke = fs.stroke && fs.stroke->color;
@@ -1434,9 +1357,6 @@ void PDFWriter::writeTextAsPDFText(const Text* text, const FillStrokeInfo& fs,
   _stream->setTextMatrix(1, 0, 0, -1, text->position.x, text->position.y);
   _stream->showText(EscapePDFString(text->text));
   _stream->endText();
-
-  _currentMatrix = savedMatrix;
-  _stream->restore();
 }
 
 void PDFWriter::writeText(const Text* text, const FillStrokeInfo& fs, const Matrix& transform) {
