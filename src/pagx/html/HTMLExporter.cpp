@@ -459,6 +459,128 @@ static std::string EllipseToPathData(const Ellipse* e) {
          FloatToString(cy) + "Z";
 }
 
+static std::string ReversePathDataToSVGString(const PathData& pathData) {
+  // Split the path into contours, reverse each contour, then emit SVG string.
+  struct Segment {
+    PathVerb verb = PathVerb::Move;
+    // For Line: 1 point (endpoint). For Quad: 2 points (ctrl, end). For Cubic: 3 points.
+    std::vector<Point> points = {};
+  };
+  struct Contour {
+    Point startPoint = {};
+    std::vector<Segment> segments = {};
+    bool closed = false;
+  };
+
+  std::vector<Contour> contours = {};
+  Contour currentContour = {};
+  bool hasContour = false;
+
+  const auto& verbs = pathData.verbs();
+  const auto& points = pathData.points();
+  size_t pointIndex = 0;
+  for (auto verb : verbs) {
+    const Point* pts = points.data() + pointIndex;
+    switch (verb) {
+      case PathVerb::Move:
+        if (hasContour) {
+          contours.push_back(std::move(currentContour));
+          currentContour = {};
+        }
+        currentContour.startPoint = pts[0];
+        hasContour = true;
+        break;
+      case PathVerb::Line: {
+        Segment seg = {};
+        seg.verb = PathVerb::Line;
+        seg.points = {pts[0]};
+        currentContour.segments.push_back(std::move(seg));
+        break;
+      }
+      case PathVerb::Quad: {
+        Segment seg = {};
+        seg.verb = PathVerb::Quad;
+        seg.points = {pts[0], pts[1]};
+        currentContour.segments.push_back(std::move(seg));
+        break;
+      }
+      case PathVerb::Cubic: {
+        Segment seg = {};
+        seg.verb = PathVerb::Cubic;
+        seg.points = {pts[0], pts[1], pts[2]};
+        currentContour.segments.push_back(std::move(seg));
+        break;
+      }
+      case PathVerb::Close:
+        currentContour.closed = true;
+        break;
+    }
+    pointIndex += PathData::PointsPerVerb(verb);
+  }
+  if (hasContour) {
+    contours.push_back(std::move(currentContour));
+  }
+
+  // Build reversed SVG string
+  std::string result;
+  result.reserve(pathData.verbs().size() * 24);
+  for (auto& contour : contours) {
+    if (contour.segments.empty()) {
+      result +=
+          "M" + FloatToString(contour.startPoint.x) + " " + FloatToString(contour.startPoint.y);
+      if (contour.closed) {
+        result += "Z";
+      }
+      continue;
+    }
+    // The new start point is the last segment's endpoint
+    auto& lastSeg = contour.segments.back();
+    Point newStart = lastSeg.points.back();
+    result += "M" + FloatToString(newStart.x) + " " + FloatToString(newStart.y);
+
+    // Walk segments in reverse order
+    Point prevEnd = newStart;
+    for (int i = static_cast<int>(contour.segments.size()) - 1; i >= 0; i--) {
+      auto& seg = contour.segments[static_cast<size_t>(i)];
+      Point segStart = (i == 0) ? contour.startPoint
+                                : contour.segments[static_cast<size_t>(i - 1)].points.back();
+      switch (seg.verb) {
+        case PathVerb::Line:
+          result += "L" + FloatToString(segStart.x) + " " + FloatToString(segStart.y);
+          break;
+        case PathVerb::Quad:
+          // Quad: reverse control point stays the same, but endpoint becomes the previous start
+          result += "Q" + FloatToString(seg.points[0].x) + " " + FloatToString(seg.points[0].y) +
+                    " " + FloatToString(segStart.x) + " " + FloatToString(segStart.y);
+          break;
+        case PathVerb::Cubic:
+          // Cubic: swap control points (cp2 becomes cp1, cp1 becomes cp2)
+          result += "C" + FloatToString(seg.points[1].x) + " " + FloatToString(seg.points[1].y) +
+                    " " + FloatToString(seg.points[0].x) + " " + FloatToString(seg.points[0].y) +
+                    " " + FloatToString(segStart.x) + " " + FloatToString(segStart.y);
+          break;
+        default:
+          break;
+      }
+      prevEnd = segStart;
+    }
+    if (contour.closed) {
+      result += "Z";
+    }
+  }
+  return result;
+}
+
+static std::string GetPathSVGString(const Path* path) {
+  if (!path->data || path->data->isEmpty()) {
+    return {};
+  }
+  if (path->reversed) {
+    return ReversePathDataToSVGString(*path->data);
+  }
+  return PathDataToSVGString(*path->data);
+}
+
 class HTMLWriterContext {
  public:
   std::string nextId(const std::string& prefix) {
@@ -496,9 +618,10 @@ class HTMLWriter {
   void writeSVGGradientDef(const ColorSource* src, const std::string& id);
 
   // Rendering
-  void writeLayerContents(HTMLBuilder& out, const Layer* layer, float alpha, bool distribute);
+  void writeLayerContents(HTMLBuilder& out, const Layer* layer, float alpha, bool distribute,
+                          LayerPlacement targetPlacement);
   void writeElements(HTMLBuilder& out, const std::vector<Element*>& elements, float alpha,
-                     bool distribute);
+                     bool distribute, LayerPlacement targetPlacement);
   void renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                  const Stroke* stroke, float alpha, bool hasTrim, const TrimPath* trim,
                  bool hasMerge);
@@ -593,6 +716,18 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha) {
       // The caller will handle background-repeat/background-size/image-rendering separately
       return imgUrl;
     }
+    case NodeType::DiamondGradient: {
+      // Approximate diamond gradient with a radial gradient (visual difference expected)
+      auto g = static_cast<const DiamondGradient*>(src);
+      if (outAlpha) {
+        *outAlpha = 1.0f;
+      }
+      Point c = g->matrix.mapPoint(g->center);
+      float sx = std::sqrt(g->matrix.a * g->matrix.a + g->matrix.b * g->matrix.b);
+      float r = g->radius * sx;
+      return "radial-gradient(circle " + FloatToString(r) + "px at " + FloatToString(c.x) + "px " +
+             FloatToString(c.y) + "px," + CSSStops(g->colorStops) + ")";
+    }
     default:
       if (outAlpha) {
         *outAlpha = 1.0f;
@@ -618,6 +753,65 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha) 
   if (src->nodeType() == NodeType::LinearGradient || src->nodeType() == NodeType::RadialGradient) {
     std::string id = _ctx->nextId("grad");
     writeSVGGradientDef(src, id);
+    if (outAlpha) {
+      *outAlpha = 1.0f;
+    }
+    return "url(#" + id + ")";
+  }
+  if (src->nodeType() == NodeType::ConicGradient) {
+    // Use SVG pattern with foreignObject to embed CSS conic-gradient
+    auto g = static_cast<const ConicGradient*>(src);
+    std::string id = _ctx->nextId("cpat");
+    _defs->openTag("pattern");
+    _defs->addAttr("id", id);
+    _defs->addAttr("patternUnits", "objectBoundingBox");
+    _defs->addAttr("width", "1");
+    _defs->addAttr("height", "1");
+    _defs->closeTagStart();
+    _defs->openTag("foreignObject");
+    _defs->addAttr("width", "100%");
+    _defs->addAttr("height", "100%");
+    _defs->closeTagStart();
+    Point c = g->matrix.mapPoint(g->center);
+    float cssAng = g->startAngle + 90.0f;
+    std::string cssGrad = "conic-gradient(from " + FloatToString(cssAng) + "deg at " +
+                          FloatToString(c.x) + "px " + FloatToString(c.y) + "px," +
+                          CSSStops(g->colorStops) + ")";
+    _defs->openTag("div");
+    _defs->addAttr("xmlns", "http://www.w3.org/1999/xhtml");
+    _defs->addAttr("style", "width:100%;height:100%;background:" + cssGrad);
+    _defs->closeTagSelfClosing();
+    _defs->closeTag();  // </foreignObject>
+    _defs->closeTag();  // </pattern>
+    if (outAlpha) {
+      *outAlpha = 1.0f;
+    }
+    return "url(#" + id + ")";
+  }
+  if (src->nodeType() == NodeType::DiamondGradient) {
+    // Approximate diamond gradient with SVG radialGradient
+    auto g = static_cast<const DiamondGradient*>(src);
+    std::string id = _ctx->nextId("grad");
+    _defs->openTag("radialGradient");
+    _defs->addAttr("id", id);
+    _defs->addAttr("cx", FloatToString(g->center.x));
+    _defs->addAttr("cy", FloatToString(g->center.y));
+    _defs->addAttr("r", FloatToString(g->radius));
+    _defs->addAttr("gradientUnits", "userSpaceOnUse");
+    if (!g->matrix.isIdentity()) {
+      _defs->addAttr("gradientTransform", MatrixToCSS(g->matrix));
+    }
+    _defs->closeTagStart();
+    for (auto* stop : g->colorStops) {
+      _defs->openTag("stop");
+      _defs->addAttr("offset", FloatToString(stop->offset));
+      _defs->addAttr("stop-color", ColorToHex(stop->color));
+      if (stop->color.alpha < 1.0f) {
+        _defs->addAttr("stop-opacity", FloatToString(stop->color.alpha));
+      }
+      _defs->closeTagSelfClosing();
+    }
+    _defs->closeTag();
     if (outAlpha) {
       *outAlpha = 1.0f;
     }
@@ -692,6 +886,11 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
     if (t == NodeType::BlurFilter) {
       auto b = static_cast<const BlurFilter*>(f);
       if (b->blurX != b->blurY) {
+        needSVG = true;
+      }
+    } else if (t == NodeType::DropShadowFilter) {
+      auto s = static_cast<const DropShadowFilter*>(f);
+      if (s->blurX != s->blurY) {
         needSVG = true;
       }
     } else if (t == NodeType::InnerShadowFilter || t == NodeType::ColorMatrixFilter ||
@@ -935,9 +1134,10 @@ std::string HTMLWriter::writeMaskDef(const Layer* mask, MaskType type) {
       _defs->closeTagSelfClosing();
     } else if (e->nodeType() == NodeType::Path) {
       auto p = static_cast<const Path*>(e);
-      if (p->data && !p->data->isEmpty()) {
+      std::string d = GetPathSVGString(p);
+      if (!d.empty()) {
         _defs->openTag("path");
-        _defs->addAttr("d", PathDataToSVGString(*p->data));
+        _defs->addAttr("d", d);
         _defs->addAttr("fill", "white");
         _defs->closeTagSelfClosing();
       }
@@ -977,12 +1177,13 @@ void HTMLWriter::writeClipContent(HTMLBuilder& out, const Layer* layer, const Ma
   for (auto* e : layer->contents) {
     if (e->nodeType() == NodeType::Path) {
       auto p = static_cast<const Path*>(e);
-      if (p->data && !p->data->isEmpty()) {
+      std::string d = GetPathSVGString(p);
+      if (!d.empty()) {
         out.openTag("path");
         if (!tr.empty()) {
           out.addAttr("transform", tr);
         }
-        out.addAttr("d", PathDataToSVGString(*p->data));
+        out.addAttr("d", d);
         out.closeTagSelfClosing();
       }
     } else if (e->nodeType() == NodeType::Rectangle) {
@@ -1055,8 +1256,13 @@ void HTMLWriter::applySVGStroke(HTMLBuilder& out, const Stroke* stroke) {
   if (ea < 1.0f) {
     out.addAttr("stroke-opacity", FloatToString(ea));
   }
-  if (stroke->width != 1.0f) {
-    out.addAttr("stroke-width", FloatToString(stroke->width));
+  // Double stroke width for Inside/Outside alignment (used with clip-path)
+  float effectiveWidth = stroke->width;
+  if (stroke->align != StrokeAlign::Center) {
+    effectiveWidth *= 2.0f;
+  }
+  if (effectiveWidth != 1.0f) {
+    out.addAttr("stroke-width", FloatToString(effectiveWidth));
   }
   if (stroke->cap == LineCap::Round) {
     out.addAttr("stroke-linecap", "round");
@@ -1090,16 +1296,13 @@ void HTMLWriter::applySVGStroke(HTMLBuilder& out, const Stroke* stroke) {
 // HTMLWriter – geometry rendering
 //==============================================================================
 
-bool HTMLWriter::canCSS(const std::vector<GeoInfo>& geos, const Fill* fill, const Stroke* stroke,
-                        bool hasTrim, bool hasMerge) {
+bool HTMLWriter::canCSS(const std::vector<GeoInfo>& geos, const Fill* /*fill*/,
+                        const Stroke* stroke, bool hasTrim, bool hasMerge) {
   if (hasTrim || hasMerge || geos.size() != 1 || stroke) {
     return false;
   }
   auto t = geos[0].type;
   if (t != NodeType::Rectangle && t != NodeType::Ellipse) {
-    return false;
-  }
-  if (fill && fill->color && fill->color->nodeType() == NodeType::DiamondGradient) {
     return false;
   }
   return true;
@@ -1290,6 +1493,96 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   out.addAttr("style", svgStyle);
   out.closeTagStart();
 
+  // Handle stroke align Inside/Outside: double width + clipPath
+  bool needStrokeClip = stroke && stroke->align != StrokeAlign::Center;
+  std::string strokeClipId;
+  if (needStrokeClip) {
+    strokeClipId = _ctx->nextId("sclip");
+    out.openTag("defs");
+    out.closeTagStart();
+    out.openTag("clipPath");
+    out.addAttr("id", strokeClipId);
+    if (stroke->align == StrokeAlign::Outside) {
+      out.addAttr("clip-rule", "evenodd");
+    }
+    out.closeTagStart();
+    // For Outside stroke: add a large covering rect first, then the shape holes (evenodd)
+    if (stroke->align == StrokeAlign::Outside) {
+      out.openTag("rect");
+      out.addAttr("x", FloatToString(x0));
+      out.addAttr("y", FloatToString(y0));
+      out.addAttr("width", FloatToString(sw));
+      out.addAttr("height", FloatToString(sh));
+      out.closeTagSelfClosing();
+    }
+    // Write shape geometries as clip content
+    for (auto& g : geos) {
+      switch (g.type) {
+        case NodeType::Rectangle: {
+          auto r = static_cast<const Rectangle*>(g.element);
+          float cx = r->position.x - r->size.width / 2;
+          float cy = r->position.y - r->size.height / 2;
+          out.openTag("rect");
+          if (!FloatNearlyZero(cx)) {
+            out.addAttr("x", FloatToString(cx));
+          }
+          if (!FloatNearlyZero(cy)) {
+            out.addAttr("y", FloatToString(cy));
+          }
+          out.addAttr("width", FloatToString(r->size.width));
+          out.addAttr("height", FloatToString(r->size.height));
+          if (r->roundness > 0) {
+            out.addAttr("rx", FloatToString(r->roundness));
+          }
+          out.closeTagSelfClosing();
+          break;
+        }
+        case NodeType::Ellipse: {
+          auto e = static_cast<const Ellipse*>(g.element);
+          out.openTag("ellipse");
+          out.addAttr("cx", FloatToString(e->position.x));
+          out.addAttr("cy", FloatToString(e->position.y));
+          out.addAttr("rx", FloatToString(e->size.width / 2));
+          out.addAttr("ry", FloatToString(e->size.height / 2));
+          out.closeTagSelfClosing();
+          break;
+        }
+        case NodeType::Path: {
+          auto p = static_cast<const Path*>(g.element);
+          std::string clipD = GetPathSVGString(p);
+          if (!clipD.empty()) {
+            out.openTag("path");
+            out.addAttr("d", clipD);
+            out.closeTagSelfClosing();
+          }
+          break;
+        }
+        case NodeType::Polystar: {
+          auto ps = static_cast<const Polystar*>(g.element);
+          std::string clipD = BuildPolystarPath(ps);
+          if (!clipD.empty()) {
+            out.openTag("path");
+            out.addAttr("d", clipD);
+            out.closeTagSelfClosing();
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+    out.closeTag();  // </clipPath>
+    out.closeTag();  // </defs>
+  }
+
+  // For Outside stroke, wrap in a group with inverse clip (clip the fill area out).
+  // For Inside stroke, wrap in a group with clip-path (clip to shape interior).
+  if (needStrokeClip) {
+    out.openTag("g");
+    out.addAttr("clip-path", "url(#" + strokeClipId + ")");
+    out.closeTagStart();
+  }
+
   for (auto& g : geos) {
     switch (g.type) {
       case NodeType::Rectangle: {
@@ -1328,9 +1621,10 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
       }
       case NodeType::Path: {
         auto p = static_cast<const Path*>(g.element);
-        if (p->data && !p->data->isEmpty()) {
+        std::string d = GetPathSVGString(p);
+        if (!d.empty()) {
           out.openTag("path");
-          out.addAttr("d", PathDataToSVGString(*p->data));
+          out.addAttr("d", d);
           applySVGFill(out, fill);
           applySVGStroke(out, stroke);
           out.closeTagSelfClosing();
@@ -1352,6 +1646,9 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
       default:
         break;
     }
+  }
+  if (needStrokeClip) {
+    out.closeTag();  // </g> stroke clip group
   }
   out.closeTag();  // </svg>
 }
@@ -1382,9 +1679,7 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           break;
         case NodeType::Path: {
           auto p = static_cast<const Path*>(g.element);
-          if (p->data && !p->data->isEmpty()) {
-            mergedPath += PathDataToSVGString(*p->data);
-          }
+          mergedPath += GetPathSVGString(p);
           break;
         }
         case NodeType::Polystar:
@@ -1545,11 +1840,24 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     float ty = text->position.y - text->fontSize * 0.8f;
     style += "position:absolute;left:" + FloatToString(text->position.x) +
              "px;top:" + FloatToString(ty) + "px;white-space:pre";
+  }
+  // Build a combined transform string for textAnchor and fauxItalic
+  std::string textTransform;
+  if (!tb) {
     if (text->textAnchor == TextAnchor::Center) {
-      style += ";transform:translateX(-50%)";
+      textTransform += "translateX(-50%)";
     } else if (text->textAnchor == TextAnchor::End) {
-      style += ";transform:translateX(-100%)";
+      textTransform += "translateX(-100%)";
     }
+  }
+  if (text->fauxItalic) {
+    if (!textTransform.empty()) {
+      textTransform += ' ';
+    }
+    textTransform += "skewX(-12deg)";
+  }
+  if (!textTransform.empty()) {
+    style += ";transform:" + textTransform;
   }
   if (!text->fontFamily.empty()) {
     style += ";font-family:'" + text->fontFamily + "'";
@@ -1568,9 +1876,6 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
   }
   if (text->fauxBold) {
     style += ";-webkit-text-stroke:0.02em currentColor";
-  }
-  if (text->fauxItalic) {
-    style += ";transform:skewX(-12deg)";
   }
   if (fill && fill->color && fill->color->nodeType() == NodeType::SolidColor) {
     auto sc = static_cast<const SolidColor*>(fill->color);
@@ -1631,7 +1936,8 @@ void HTMLWriter::writeGroup(HTMLBuilder& out, const Group* group, float alpha, b
   out.addAttr("class", "pagx-group");
   out.addAttr("style", style);
   out.closeTagStart();
-  writeElements(out, group->elements, 1.0f, false);
+  writeElements(out, group->elements, 1.0f, false, LayerPlacement::Background);
+  writeElements(out, group->elements, 1.0f, false, LayerPlacement::Foreground);
   out.closeTag();
 }
 
@@ -1713,7 +2019,7 @@ void HTMLWriter::writeComposition(HTMLBuilder& out, const Composition* comp) {
 //==============================================================================
 
 void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& elements, float alpha,
-                               bool distribute) {
+                               bool distribute, LayerPlacement targetPlacement) {
   std::vector<GeoInfo> geos = {};
   const Fill* curFill = nullptr;
   const Stroke* curStroke = nullptr;
@@ -1758,14 +2064,22 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
       case NodeType::Text:
         geos.push_back({type, element});
         break;
-      case NodeType::Fill:
-        curFill = static_cast<const Fill*>(element);
-        paintGeos(curFill, curStroke);
+      case NodeType::Fill: {
+        auto fill = static_cast<const Fill*>(element);
+        curFill = fill;
+        if (fill->placement == targetPlacement) {
+          paintGeos(curFill, curStroke);
+        }
         break;
-      case NodeType::Stroke:
-        curStroke = static_cast<const Stroke*>(element);
-        paintGeos(curFill, curStroke);
+      }
+      case NodeType::Stroke: {
+        auto stroke = static_cast<const Stroke*>(element);
+        curStroke = stroke;
+        if (stroke->placement == targetPlacement) {
+          paintGeos(curFill, curStroke);
+        }
         break;
+      }
       case NodeType::TextBox:
         curTextBox = static_cast<const TextBox*>(element);
         break;
@@ -1802,8 +2116,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
 }
 
 void HTMLWriter::writeLayerContents(HTMLBuilder& out, const Layer* layer, float alpha,
-                                    bool distribute) {
-  writeElements(out, layer->contents, alpha, distribute);
+                                    bool distribute, LayerPlacement targetPlacement) {
+  writeElements(out, layer->contents, alpha, distribute, targetPlacement);
 }
 
 //==============================================================================
@@ -2067,7 +2381,25 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   }
 
   float contentAlpha = childDistribute ? layerAlpha : 1.0f;
-  writeLayerContents(out, layer, contentAlpha, childDistribute);
+
+  // Check if any Fill/Stroke has Foreground placement
+  bool hasForeground = false;
+  for (auto* e : layer->contents) {
+    if (e->nodeType() == NodeType::Fill) {
+      if (static_cast<const Fill*>(e)->placement == LayerPlacement::Foreground) {
+        hasForeground = true;
+        break;
+      }
+    } else if (e->nodeType() == NodeType::Stroke) {
+      if (static_cast<const Stroke*>(e)->placement == LayerPlacement::Foreground) {
+        hasForeground = true;
+        break;
+      }
+    }
+  }
+
+  // Render order: Background Content → Children → Foreground Content
+  writeLayerContents(out, layer, contentAlpha, childDistribute, LayerPlacement::Background);
 
   if (layer->composition) {
     writeComposition(out, layer->composition);
@@ -2075,6 +2407,10 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
 
   for (auto* child : layer->children) {
     writeLayer(out, child, contentAlpha, childDistribute);
+  }
+
+  if (hasForeground) {
+    writeLayerContents(out, layer, contentAlpha, childDistribute, LayerPlacement::Foreground);
   }
 
   if (needScrollRectWrapper) {
