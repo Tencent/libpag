@@ -207,6 +207,10 @@ class HTMLBuilder {
 //==============================================================================
 
 static std::string ColorToHex(const Color& color) {
+  if (color.colorSpace == ColorSpace::DisplayP3) {
+    return "color(display-p3 " + FloatToString(color.red) + " " + FloatToString(color.green) + " " +
+           FloatToString(color.blue) + ")";
+  }
   int r = std::clamp(static_cast<int>(std::round(color.red * 255.0f)), 0, 255);
   int g = std::clamp(static_cast<int>(std::round(color.green * 255.0f)), 0, 255);
   int b = std::clamp(static_cast<int>(std::round(color.blue * 255.0f)), 0, 255);
@@ -217,6 +221,10 @@ static std::string ColorToHex(const Color& color) {
 
 static std::string ColorToRGBA(const Color& color, float extra = 1.0f) {
   float a = color.alpha * extra;
+  if (color.colorSpace == ColorSpace::DisplayP3) {
+    return "color(display-p3 " + FloatToString(color.red) + " " + FloatToString(color.green) + " " +
+           FloatToString(color.blue) + " / " + FloatToString(a) + ")";
+  }
   if (a >= 1.0f) {
     return ColorToHex(color);
   }
@@ -323,27 +331,86 @@ static std::string BuildPolystarPath(const Polystar* ps) {
   bool isStar = ps->type == PolystarType::Star;
   int numPts = static_cast<int>(std::ceil(ps->pointCount));
   int total = isStar ? numPts * 2 : numPts;
-  std::string d;
-  d.reserve(static_cast<size_t>(total) * 24);
-  for (int i = 0; i < total; i++) {
+  bool hasRoundness = ps->outerRoundness > 0.0f || (isStar && ps->innerRoundness > 0.0f);
+
+  // Generate vertices
+  struct Vertex {
+    float x = 0;
+    float y = 0;
     float angle = 0;
     float radius = 0;
+    float roundness = 0;
+  };
+  std::vector<Vertex> vertices = {};
+  vertices.reserve(static_cast<size_t>(total));
+  for (int i = 0; i < total; i++) {
+    Vertex v = {};
     if (isStar) {
       bool outer = (i % 2 == 0);
       int pi = i / 2;
       float frac = static_cast<float>(pi) / ps->pointCount;
       float half = 0.5f / ps->pointCount;
-      angle = ps->rotation + (outer ? frac : frac + half) * 360.0f;
-      radius = outer ? ps->outerRadius : ps->innerRadius;
+      v.angle = ps->rotation + (outer ? frac : frac + half) * 360.0f;
+      v.radius = outer ? ps->outerRadius : ps->innerRadius;
+      v.roundness = outer ? ps->outerRoundness : ps->innerRoundness;
     } else {
-      angle = ps->rotation + static_cast<float>(i) / ps->pointCount * 360.0f;
-      radius = ps->outerRadius;
+      v.angle = ps->rotation + static_cast<float>(i) / ps->pointCount * 360.0f;
+      v.radius = ps->outerRadius;
+      v.roundness = ps->outerRoundness;
     }
-    float rad = DegreesToRadians(angle);
-    float px = ps->position.x + radius * std::cos(rad);
-    float py = ps->position.y + radius * std::sin(rad);
-    d += (i == 0 ? "M" : "L");
-    d += FloatToString(px) + ',' + FloatToString(py);
+    float rad = DegreesToRadians(v.angle);
+    v.x = ps->position.x + v.radius * std::cos(rad);
+    v.y = ps->position.y + v.radius * std::sin(rad);
+    vertices.push_back(v);
+  }
+
+  if (ps->reversed) {
+    std::reverse(vertices.begin(), vertices.end());
+  }
+
+  std::string d;
+  d.reserve(static_cast<size_t>(total) * 40);
+  for (int i = 0; i < total; i++) {
+    auto& v = vertices[static_cast<size_t>(i)];
+    if (i == 0) {
+      d += "M" + FloatToString(v.x) + "," + FloatToString(v.y);
+    } else if (hasRoundness) {
+      auto& prev = vertices[static_cast<size_t>(i - 1)];
+      float prevRound = prev.roundness;
+      float curRound = v.roundness;
+      if (prevRound > 0.0f || curRound > 0.0f) {
+        // Bezier control points for roundness
+        float dx = v.x - prev.x;
+        float dy = v.y - prev.y;
+        float cp1x = prev.x + dx * prevRound * 0.33f;
+        float cp1y = prev.y + dy * prevRound * 0.33f;
+        float cp2x = v.x - dx * curRound * 0.33f;
+        float cp2y = v.y - dy * curRound * 0.33f;
+        d += "C" + FloatToString(cp1x) + "," + FloatToString(cp1y) + " " + FloatToString(cp2x) +
+             "," + FloatToString(cp2y) + " " + FloatToString(v.x) + "," + FloatToString(v.y);
+      } else {
+        d += "L" + FloatToString(v.x) + "," + FloatToString(v.y);
+      }
+    } else {
+      d += "L" + FloatToString(v.x) + "," + FloatToString(v.y);
+    }
+  }
+  // Close path with roundness
+  if (hasRoundness && total > 1) {
+    auto& prev = vertices[static_cast<size_t>(total - 1)];
+    auto& v = vertices[0];
+    float prevRound = prev.roundness;
+    float curRound = v.roundness;
+    if (prevRound > 0.0f || curRound > 0.0f) {
+      float dx = v.x - prev.x;
+      float dy = v.y - prev.y;
+      float cp1x = prev.x + dx * prevRound * 0.33f;
+      float cp1y = prev.y + dy * prevRound * 0.33f;
+      float cp2x = v.x - dx * curRound * 0.33f;
+      float cp2y = v.y - dy * curRound * 0.33f;
+      d += "C" + FloatToString(cp1x) + "," + FloatToString(cp1y) + " " + FloatToString(cp2x) + "," +
+           FloatToString(cp2y) + " " + FloatToString(v.x) + "," + FloatToString(v.y);
+    }
   }
   d += 'Z';
   return d;
@@ -437,9 +504,10 @@ class HTMLWriter {
                  bool hasMerge);
   bool canCSS(const std::vector<GeoInfo>& geos, const Fill* fill, const Stroke* stroke,
               bool hasTrim, bool hasMerge);
-  void renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* fill, float alpha);
+  void renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* fill, float alpha,
+                    BlendMode painterBlend);
   void renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
-                 const Stroke* stroke, float alpha);
+                 const Stroke* stroke, float alpha, BlendMode painterBlend);
   void writeText(HTMLBuilder& out, const Text* text, const Fill* fill, const Stroke* stroke,
                  const TextBox* tb, float alpha);
   void writeGlyphRunSVG(HTMLBuilder& out, const Text* text, const Fill* fill, const Stroke* stroke,
@@ -520,7 +588,10 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha) {
       if (!p->image) {
         return "transparent";
       }
-      return "url(" + GetImageSrc(p->image) + ")";
+      std::string imgUrl = "url(" + GetImageSrc(p->image) + ")";
+      // Store tileMode/filterMode/matrix info in the CSS background shorthand
+      // The caller will handle background-repeat/background-size/image-rendering separately
+      return imgUrl;
     }
     default:
       if (outAlpha) {
@@ -1034,7 +1105,8 @@ bool HTMLWriter::canCSS(const std::vector<GeoInfo>& geos, const Fill* fill, cons
   return true;
 }
 
-void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* fill, float alpha) {
+void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* fill, float alpha,
+                              BlendMode painterBlend) {
   bool isRect = geo.type == NodeType::Rectangle;
   float left = 0, top = 0, w = 0, h = 0;
   float roundness = 0;
@@ -1074,7 +1146,41 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
         ct == NodeType::ConicGradient) {
       style += ";background:" + css;
     } else if (ct == NodeType::ImagePattern) {
-      style += ";background-image:" + css + ";background-size:cover";
+      auto p = static_cast<const ImagePattern*>(fill->color);
+      style += ";background-image:" + css;
+      // Tile modes
+      std::string repeatX = "no-repeat";
+      std::string repeatY = "no-repeat";
+      if (p->tileModeX == TileMode::Repeat || p->tileModeX == TileMode::Mirror) {
+        repeatX = "repeat";
+      }
+      if (p->tileModeY == TileMode::Repeat || p->tileModeY == TileMode::Mirror) {
+        repeatY = "repeat";
+      }
+      if (repeatX == repeatY) {
+        style += ";background-repeat:" + repeatX;
+      } else {
+        style += ";background-repeat:" + repeatX + " " + repeatY;
+      }
+      // Matrix transform → background-size and background-position
+      if (!p->matrix.isIdentity()) {
+        float sx = std::sqrt(p->matrix.a * p->matrix.a + p->matrix.b * p->matrix.b);
+        float sy = std::sqrt(p->matrix.c * p->matrix.c + p->matrix.d * p->matrix.d);
+        if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
+          style += ";background-size:" + FloatToString(sx * 100.0f) + "% " +
+                   FloatToString(sy * 100.0f) + "%";
+        }
+        if (!FloatNearlyZero(p->matrix.tx) || !FloatNearlyZero(p->matrix.ty)) {
+          style += ";background-position:" + FloatToString(p->matrix.tx) + "px " +
+                   FloatToString(p->matrix.ty) + "px";
+        }
+      } else {
+        style += ";background-size:cover";
+      }
+      // Filter mode
+      if (p->filterMode == FilterMode::Nearest) {
+        style += ";image-rendering:pixelated";
+      }
     } else {
       float ea = ca * fill->alpha;
       if (ea < 1.0f) {
@@ -1083,6 +1189,15 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
       } else {
         style += ";background-color:" + css;
       }
+    }
+  }
+  if (painterBlend != BlendMode::Normal) {
+    auto blendStr = BlendModeToSVGString(painterBlend);
+    if (blendStr) {
+      style += ";mix-blend-mode:";
+      style += blendStr;
+    } else if (painterBlend == BlendMode::PlusLighter) {
+      style += ";mix-blend-mode:plus-lighter";
     }
   }
   if (alpha < 1.0f) {
@@ -1095,7 +1210,7 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
 }
 
 void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
-                           const Stroke* stroke, float alpha) {
+                           const Stroke* stroke, float alpha, BlendMode painterBlend) {
   float pad = stroke ? stroke->width : 0.0f;
   float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
   for (auto& g : geos) {
@@ -1153,6 +1268,15 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
 
   std::string svgStyle =
       "position:absolute;left:" + FloatToString(x0) + "px;top:" + FloatToString(y0) + "px";
+  if (painterBlend != BlendMode::Normal) {
+    auto blendStr = BlendModeToSVGString(painterBlend);
+    if (blendStr) {
+      svgStyle += ";mix-blend-mode:";
+      svgStyle += blendStr;
+    } else if (painterBlend == BlendMode::PlusLighter) {
+      svgStyle += ";mix-blend-mode:plus-lighter";
+    }
+  }
   if (alpha < 1.0f) {
     svgStyle += ";opacity:" + FloatToString(alpha);
   }
@@ -1237,6 +1361,13 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
                            const TrimPath* /*trim*/, bool hasMerge) {
   if (geos.empty()) {
     return;
+  }
+  // Determine the painter blend mode (fill takes precedence, then stroke)
+  BlendMode painterBlend = BlendMode::Normal;
+  if (fill && fill->blendMode != BlendMode::Normal) {
+    painterBlend = fill->blendMode;
+  } else if (stroke && stroke->blendMode != BlendMode::Normal) {
+    painterBlend = stroke->blendMode;
   }
   if (hasMerge) {
     // Merge all geometries into a single <path> element
@@ -1324,6 +1455,15 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     }
     std::string svgStyle =
         "position:absolute;left:" + FloatToString(x0) + "px;top:" + FloatToString(y0) + "px";
+    if (painterBlend != BlendMode::Normal) {
+      auto blendStr = BlendModeToSVGString(painterBlend);
+      if (blendStr) {
+        svgStyle += ";mix-blend-mode:";
+        svgStyle += blendStr;
+      } else if (painterBlend == BlendMode::PlusLighter) {
+        svgStyle += ";mix-blend-mode:plus-lighter";
+      }
+    }
     if (alpha < 1.0f) {
       svgStyle += ";opacity:" + FloatToString(alpha);
     }
@@ -1344,9 +1484,9 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     return;
   }
   if (canCSS(geos, fill, stroke, hasTrim, false)) {
-    renderCSSDiv(out, geos[0], fill, alpha);
+    renderCSSDiv(out, geos[0], fill, alpha, painterBlend);
   } else {
-    renderSVG(out, geos, fill, stroke, alpha);
+    renderSVG(out, geos, fill, stroke, alpha, painterBlend);
   }
 }
 
@@ -1381,8 +1521,22 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     } else if (tb->textAlign == TextAlign::Justify) {
       style += ";text-align:justify";
     }
+    if (tb->paragraphAlign != ParagraphAlign::Near) {
+      style += ";display:flex;flex-direction:column";
+      if (tb->paragraphAlign == ParagraphAlign::Middle) {
+        style += ";justify-content:center";
+      } else if (tb->paragraphAlign == ParagraphAlign::Far) {
+        style += ";justify-content:flex-end";
+      }
+    }
+    if (tb->writingMode == WritingMode::Vertical) {
+      style += ";writing-mode:vertical-rl";
+    }
     if (tb->lineHeight > 0) {
       style += ";line-height:" + FloatToString(tb->lineHeight) + "px";
+    }
+    if (tb->wordWrap) {
+      style += ";word-wrap:break-word";
     }
     if (tb->overflow == Overflow::Hidden) {
       style += ";overflow:hidden";
@@ -1411,6 +1565,12 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     if (text->fontStyle.find("Italic") != std::string::npos) {
       style += ";font-style:italic";
     }
+  }
+  if (text->fauxBold) {
+    style += ";-webkit-text-stroke:0.02em currentColor";
+  }
+  if (text->fauxItalic) {
+    style += ";transform:skewX(-12deg)";
   }
   if (fill && fill->color && fill->color->nodeType() == NodeType::SolidColor) {
     auto sc = static_cast<const SolidColor*>(fill->color);
@@ -1533,8 +1693,18 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
 }
 
 void HTMLWriter::writeComposition(HTMLBuilder& out, const Composition* comp) {
+  bool needContainer = comp->width > 0 && comp->height > 0;
+  if (needContainer) {
+    out.openTag("div");
+    out.addAttr("style", "position:relative;width:" + FloatToString(comp->width) +
+                             "px;height:" + FloatToString(comp->height) + "px;overflow:hidden");
+    out.closeTagStart();
+  }
   for (auto* layer : comp->layers) {
     writeLayer(out, layer);
+  }
+  if (needContainer) {
+    out.closeTag();
   }
 }
 
@@ -1640,8 +1810,8 @@ void HTMLWriter::writeLayerContents(HTMLBuilder& out, const Layer* layer, float 
 // HTMLWriter – layer
 //==============================================================================
 
-void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float /*parentAlpha*/,
-                            bool /*distributeAlpha*/) {
+void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAlpha,
+                            bool distributeAlpha) {
   if (!layer->visible && layer->mask == nullptr) {
     out.openTag("div");
     out.addAttr("class", "pagx-layer");
@@ -1668,6 +1838,9 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float /*parent
 
   bool groupOp = layer->groupOpacity;
   float layerAlpha = layer->alpha;
+  if (distributeAlpha) {
+    layerAlpha *= parentAlpha;
+  }
   bool childDistribute = !groupOp && layerAlpha < 1.0f;
 
   if (groupOp && layerAlpha < 1.0f) {
@@ -1684,32 +1857,149 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float /*parent
     }
   }
 
-  if (layer->hasScrollRect) {
-    style += ";clip-path:inset(" + FloatToString(layer->scrollRect.y) + "px " +
-             FloatToString(layer->scrollRect.x) + "px)";
-    style += ";overflow:hidden";
-  }
+  // Collect all filter values into a single CSS filter property to avoid override
+  std::string filterValues;
 
-  // Filters
-  std::string filterCSS;
+  // Layer filters
   if (!layer->filters.empty()) {
-    filterCSS = writeFilterDefs(layer->filters);
+    std::string filterCSS = writeFilterDefs(layer->filters);
     if (!filterCSS.empty()) {
-      style += ";filter:" + filterCSS;
+      filterValues += filterCSS;
     }
   }
 
-  // Styles (drop shadow, etc.)
+  // Layer styles that produce filter effects
   for (auto* ls : layer->styles) {
     if (ls->nodeType() == NodeType::DropShadowStyle) {
       auto ds = static_cast<const DropShadowStyle*>(ls);
       if (ds->blurX == ds->blurY) {
-        style += ";filter:drop-shadow(" + FloatToString(ds->offsetX) + "px " +
-                 FloatToString(ds->offsetY) + "px " + FloatToString(ds->blurX) + "px " +
-                 ColorToRGBA(ds->color) + ")";
+        if (!filterValues.empty()) {
+          filterValues += ' ';
+        }
+        filterValues += "drop-shadow(" + FloatToString(ds->offsetX) + "px " +
+                        FloatToString(ds->offsetY) + "px " + FloatToString(ds->blurX) + "px " +
+                        ColorToRGBA(ds->color) + ")";
+      } else {
+        // Asymmetric blur: use SVG filter
+        std::string fid = _ctx->nextId("filter");
+        _defs->openTag("filter");
+        _defs->addAttr("id", fid);
+        _defs->addAttr("x", "-50%");
+        _defs->addAttr("y", "-50%");
+        _defs->addAttr("width", "200%");
+        _defs->addAttr("height", "200%");
+        _defs->addAttr("color-interpolation-filters", "sRGB");
+        _defs->closeTagStart();
+        _defs->openTag("feGaussianBlur");
+        _defs->addAttr("in", "SourceAlpha");
+        _defs->addAttr("stdDeviation", FloatToString(ds->blurX) + " " + FloatToString(ds->blurY));
+        _defs->addAttr("result", "blur");
+        _defs->closeTagSelfClosing();
+        _defs->openTag("feOffset");
+        _defs->addAttr("in", "blur");
+        if (!FloatNearlyZero(ds->offsetX)) {
+          _defs->addAttr("dx", FloatToString(ds->offsetX));
+        }
+        if (!FloatNearlyZero(ds->offsetY)) {
+          _defs->addAttr("dy", FloatToString(ds->offsetY));
+        }
+        _defs->addAttr("result", "off");
+        _defs->closeTagSelfClosing();
+        _defs->openTag("feColorMatrix");
+        _defs->addAttr("in", "off");
+        _defs->addAttr("type", "matrix");
+        _defs->addAttr("values", "0 0 0 0 " + FloatToString(ds->color.red) + " 0 0 0 0 " +
+                                     FloatToString(ds->color.green) + " 0 0 0 0 " +
+                                     FloatToString(ds->color.blue) + " 0 0 0 " +
+                                     FloatToString(ds->color.alpha) + " 0");
+        _defs->addAttr("result", "shadow");
+        _defs->closeTagSelfClosing();
+        _defs->openTag("feMerge");
+        _defs->closeTagStart();
+        _defs->openTag("feMergeNode");
+        _defs->addAttr("in", "shadow");
+        _defs->closeTagSelfClosing();
+        _defs->openTag("feMergeNode");
+        _defs->addAttr("in", "SourceGraphic");
+        _defs->closeTagSelfClosing();
+        _defs->closeTag();
+        _defs->closeTag();
+        if (!filterValues.empty()) {
+          filterValues += ' ';
+        }
+        filterValues += "url(#" + fid + ")";
       }
+    } else if (ls->nodeType() == NodeType::InnerShadowStyle) {
+      auto is = static_cast<const InnerShadowStyle*>(ls);
+      // InnerShadowStyle: use SVG filter (offset → invert → blur → clip to interior → colorize)
+      std::string fid = _ctx->nextId("filter");
+      _defs->openTag("filter");
+      _defs->addAttr("id", fid);
+      _defs->addAttr("x", "-50%");
+      _defs->addAttr("y", "-50%");
+      _defs->addAttr("width", "200%");
+      _defs->addAttr("height", "200%");
+      _defs->addAttr("color-interpolation-filters", "sRGB");
+      _defs->closeTagStart();
+      std::string sd = FloatToString(is->blurX);
+      if (is->blurX != is->blurY) {
+        sd += " " + FloatToString(is->blurY);
+      }
+      _defs->openTag("feGaussianBlur");
+      _defs->addAttr("in", "SourceAlpha");
+      _defs->addAttr("stdDeviation", sd);
+      _defs->addAttr("result", "iBlur");
+      _defs->closeTagSelfClosing();
+      _defs->openTag("feOffset");
+      _defs->addAttr("in", "iBlur");
+      if (!FloatNearlyZero(is->offsetX)) {
+        _defs->addAttr("dx", FloatToString(is->offsetX));
+      }
+      if (!FloatNearlyZero(is->offsetY)) {
+        _defs->addAttr("dy", FloatToString(is->offsetY));
+      }
+      _defs->addAttr("result", "iOff");
+      _defs->closeTagSelfClosing();
+      _defs->openTag("feComposite");
+      _defs->addAttr("in", "SourceAlpha");
+      _defs->addAttr("in2", "iOff");
+      _defs->addAttr("operator", "arithmetic");
+      _defs->addAttr("k2", "-1");
+      _defs->addAttr("k3", "1");
+      _defs->addAttr("result", "iComp");
+      _defs->closeTagSelfClosing();
+      _defs->openTag("feColorMatrix");
+      _defs->addAttr("in", "iComp");
+      _defs->addAttr("type", "matrix");
+      _defs->addAttr("values", "0 0 0 0 " + FloatToString(is->color.red) + " 0 0 0 0 " +
+                                   FloatToString(is->color.green) + " 0 0 0 0 " +
+                                   FloatToString(is->color.blue) + " 0 0 0 " +
+                                   FloatToString(is->color.alpha) + " 0");
+      _defs->addAttr("result", "iShadow");
+      _defs->closeTagSelfClosing();
+      _defs->openTag("feMerge");
+      _defs->closeTagStart();
+      _defs->openTag("feMergeNode");
+      _defs->addAttr("in", "SourceGraphic");
+      _defs->closeTagSelfClosing();
+      _defs->openTag("feMergeNode");
+      _defs->addAttr("in", "iShadow");
+      _defs->closeTagSelfClosing();
+      _defs->closeTag();
+      _defs->closeTag();
+      if (!filterValues.empty()) {
+        filterValues += ' ';
+      }
+      filterValues += "url(#" + fid + ")";
     }
   }
+
+  if (!filterValues.empty()) {
+    style += ";filter:" + filterValues;
+  }
+
+  // scrollRect: wrap content in a clipping container
+  bool needScrollRectWrapper = layer->hasScrollRect;
 
   // Mask
   if (layer->mask != nullptr) {
@@ -1762,6 +2052,20 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float /*parent
     }
   }
 
+  // scrollRect: create a clipping wrapper div with the visible area's size
+  if (needScrollRectWrapper) {
+    auto& sr = layer->scrollRect;
+    out.openTag("div");
+    out.addAttr("style", "position:absolute;left:" + FloatToString(sr.x) + "px;top:" +
+                             FloatToString(sr.y) + "px;width:" + FloatToString(sr.width) +
+                             "px;height:" + FloatToString(sr.height) + "px;overflow:hidden");
+    out.closeTagStart();
+    out.openTag("div");
+    out.addAttr("style", "position:relative;left:" + FloatToString(-sr.x) +
+                             "px;top:" + FloatToString(-sr.y) + "px");
+    out.closeTagStart();
+  }
+
   float contentAlpha = childDistribute ? layerAlpha : 1.0f;
   writeLayerContents(out, layer, contentAlpha, childDistribute);
 
@@ -1771,6 +2075,11 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float /*parent
 
   for (auto* child : layer->children) {
     writeLayer(out, child, contentAlpha, childDistribute);
+  }
+
+  if (needScrollRectWrapper) {
+    out.closeTag();  // inner offset div
+    out.closeTag();  // clip wrapper div
   }
 
   out.closeTag();
