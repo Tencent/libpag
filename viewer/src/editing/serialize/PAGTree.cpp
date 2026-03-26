@@ -18,7 +18,6 @@
 
 #include "PAGTree.h"
 #include "editing/serialize/PAGFileSerializer.h"
-#include "editing/serialize/PAGXDocumentSerializer.h"
 
 namespace pag {
 
@@ -44,9 +43,10 @@ void PAGTree::buildTree() {
     rootNode->setName("file");
     FileSerializer::Serialize(file, rootNode.get());
   } else if (pagxDocument != nullptr) {
+    // TODO: Implement PAGX document serialization
     rootNode = std::make_unique<PAGTreeNode>(nullptr);
     rootNode->setName("document");
-    PAGXDocumentSerializer::Serialize(pagxDocument, rootNode.get());
+    rootNode->setValue("PAGXDocument");
   }
 }
 
