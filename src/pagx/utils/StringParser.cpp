@@ -318,6 +318,9 @@ std::vector<float> ParseFloatList(const std::string& str) {
 }
 
 std::string FloatToString(float value) {
+  if (std::isnan(value) || std::isinf(value)) {
+    return "0";
+  }
   char buf[32] = {};
   snprintf(buf, sizeof(buf), "%g", value);
   return std::string(buf);

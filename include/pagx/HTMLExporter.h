@@ -43,13 +43,20 @@ class HTMLExporter {
   using Options = HTMLExportOptions;
 
   /**
-   * Exports a PAGXDocument to an HTML string.
+   * Exports a PAGXDocument to an HTML string. The output is a standalone HTML fragment containing
+   * CSS styles and SVG elements that visually reproduce the PAGX content in modern browsers.
+   * @param document The PAGX document to export.
+   * @param options Export options controlling output formatting.
+   * @return The generated HTML string, or an empty string if the document has no content.
    */
   static std::string ToHTML(const PAGXDocument& document, const Options& options = {});
 
   /**
-   * Exports a PAGXDocument to an HTML file.
-   * Returns true on success.
+   * Exports a PAGXDocument to an HTML file. Creates parent directories if they do not exist.
+   * @param document The PAGX document to export.
+   * @param filePath The output file path.
+   * @param options Export options controlling output formatting.
+   * @return True on success, false if the file could not be written.
    */
   static bool ToFile(const PAGXDocument& document, const std::string& filePath,
                      const Options& options = {});

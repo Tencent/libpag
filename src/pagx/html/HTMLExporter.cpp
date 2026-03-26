@@ -23,6 +23,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <unordered_set>
 #include <vector>
 #include "base/utils/MathUtil.h"
 #include "pagx/PAGXDocument.h"
@@ -153,7 +154,9 @@ class HTMLBuilder {
   int _spaces = 2;
 
   void indent() {
-    _buf.append(static_cast<size_t>(_level * _spaces), ' ');
+    if (_level > 0) {
+      _buf.append(static_cast<size_t>(_level * _spaces), ' ');
+    }
   }
 
   static std::string escapeAttr(const std::string& s) {
@@ -166,6 +169,9 @@ class HTMLBuilder {
           break;
         case '"':
           r += "&quot;";
+          break;
+        case '\'':
+          r += "&#39;";
           break;
         case '<':
           r += "&lt;";
@@ -206,14 +212,19 @@ class HTMLBuilder {
 // Static helpers
 //==============================================================================
 
+static void ColorToRGB(const Color& color, int& r, int& g, int& b) {
+  r = std::clamp(static_cast<int>(std::round(color.red * 255.0f)), 0, 255);
+  g = std::clamp(static_cast<int>(std::round(color.green * 255.0f)), 0, 255);
+  b = std::clamp(static_cast<int>(std::round(color.blue * 255.0f)), 0, 255);
+}
+
 static std::string ColorToHex(const Color& color) {
   if (color.colorSpace == ColorSpace::DisplayP3) {
     return "color(display-p3 " + FloatToString(color.red) + " " + FloatToString(color.green) + " " +
            FloatToString(color.blue) + ")";
   }
-  int r = std::clamp(static_cast<int>(std::round(color.red * 255.0f)), 0, 255);
-  int g = std::clamp(static_cast<int>(std::round(color.green * 255.0f)), 0, 255);
-  int b = std::clamp(static_cast<int>(std::round(color.blue * 255.0f)), 0, 255);
+  int r = 0, g = 0, b = 0;
+  ColorToRGB(color, r, g, b);
   char buf[8] = {};
   snprintf(buf, sizeof(buf), "#%02X%02X%02X", r, g, b);
   return buf;
@@ -222,9 +233,8 @@ static std::string ColorToHex(const Color& color) {
 // SVG attributes (stop-color, flood-color, fill, stroke) do not support the CSS color() function.
 // For DisplayP3 colors, approximate by treating the P3 channel values as sRGB.
 static std::string ColorToSVGHex(const Color& color) {
-  int r = std::clamp(static_cast<int>(std::round(color.red * 255.0f)), 0, 255);
-  int g = std::clamp(static_cast<int>(std::round(color.green * 255.0f)), 0, 255);
-  int b = std::clamp(static_cast<int>(std::round(color.blue * 255.0f)), 0, 255);
+  int r = 0, g = 0, b = 0;
+  ColorToRGB(color, r, g, b);
   char buf[8] = {};
   snprintf(buf, sizeof(buf), "#%02X%02X%02X", r, g, b);
   return buf;
@@ -239,9 +249,8 @@ static std::string ColorToRGBA(const Color& color, float extra = 1.0f) {
   if (a >= 1.0f) {
     return ColorToHex(color);
   }
-  int r = std::clamp(static_cast<int>(std::round(color.red * 255.0f)), 0, 255);
-  int g = std::clamp(static_cast<int>(std::round(color.green * 255.0f)), 0, 255);
-  int b = std::clamp(static_cast<int>(std::round(color.blue * 255.0f)), 0, 255);
+  int r = 0, g = 0, b = 0;
+  ColorToRGB(color, r, g, b);
   return "rgba(" + std::to_string(r) + "," + std::to_string(g) + "," + std::to_string(b) + "," +
          FloatToString(a) + ")";
 }
@@ -259,7 +268,19 @@ static const char* DetectImageMime(const uint8_t* bytes, size_t size) {
   if (size >= 4 && bytes[0] == 'G' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == '8') {
     return "image/gif";
   }
-  return "image/png";
+  return "application/octet-stream";
+}
+
+static std::string EscapeCSSUrl(const std::string& url) {
+  std::string r;
+  r.reserve(url.size());
+  for (char c : url) {
+    if (c == ')' || c == '(' || c == '\'' || c == '"' || c == ' ' || c == '\\') {
+      r += '\\';
+    }
+    r += c;
+  }
+  return r;
 }
 
 static std::string GetImageSrc(const Image* image) {
@@ -268,11 +289,19 @@ static std::string GetImageSrc(const Image* image) {
     return "data:" + std::string(mime) + ";base64," +
            Base64Encode(image->data->bytes(), image->data->size());
   }
-  return image->filePath;
+  return EscapeCSSUrl(image->filePath);
 }
 
 static std::string CSSStops(const std::vector<ColorStop*>& stops) {
+  if (stops.empty()) {
+    return "transparent,transparent";
+  }
+  if (stops.size() == 1) {
+    auto c = ColorToRGBA(stops[0]->color);
+    return c + "," + c;
+  }
   std::string r;
+  r.reserve(stops.size() * 32);
   for (size_t i = 0; i < stops.size(); i++) {
     if (i > 0) {
       r += ',';
@@ -375,6 +404,7 @@ static std::string BuildPolystarPath(const Polystar* ps) {
   bool isStar = ps->type == PolystarType::Star;
   int numPts = static_cast<int>(std::ceil(ps->pointCount));
   int total = isStar ? numPts * 2 : numPts;
+  float fractional = ps->pointCount - std::floor(ps->pointCount);
   bool hasRoundness = ps->outerRoundness > 0.0f || (isStar && ps->innerRoundness > 0.0f);
 
   // Generate vertices
@@ -397,10 +427,18 @@ static std::string BuildPolystarPath(const Polystar* ps) {
       v.angle = ps->rotation + (outer ? frac : frac + half) * 360.0f;
       v.radius = outer ? ps->outerRadius : ps->innerRadius;
       v.roundness = outer ? ps->outerRoundness : ps->innerRoundness;
+      // Scale last outer vertex radius by fractional part
+      if (fractional > 0.0f && pi == numPts - 1 && outer) {
+        v.radius *= fractional;
+      }
     } else {
       v.angle = ps->rotation + static_cast<float>(i) / ps->pointCount * 360.0f;
       v.radius = ps->outerRadius;
       v.roundness = ps->outerRoundness;
+      // Scale last vertex radius by fractional part
+      if (fractional > 0.0f && i == numPts - 1) {
+        v.radius *= fractional;
+      }
     }
     float rad = DegreesToRadians(v.angle);
     v.x = ps->position.x + v.radius * std::cos(rad);
@@ -423,7 +461,8 @@ static std::string BuildPolystarPath(const Polystar* ps) {
       float prevRound = prev.roundness;
       float curRound = v.roundness;
       if (prevRound > 0.0f || curRound > 0.0f) {
-        // Bezier control points for roundness
+        // 0.33 is the approximate Bezier tangent factor used by After Effects for polystar
+        // roundness, matching the native renderer behavior.
         float dx = v.x - prev.x;
         float dy = v.y - prev.y;
         float cp1x = prev.x + dx * prevRound * 0.33f;
@@ -649,6 +688,10 @@ static std::string GetPathSVGString(const Path* path) {
 
 class HTMLWriterContext {
  public:
+  float docWidth = 0;
+  float docHeight = 0;
+  std::unordered_set<const Composition*> visitedCompositions = {};
+
   std::string nextId(const std::string& prefix) {
     return prefix + std::to_string(_id++);
   }
@@ -706,6 +749,10 @@ class HTMLWriter {
   void writeRepeater(HTMLBuilder& out, const Repeater* rep, const std::vector<GeoInfo>& geos,
                      const Fill* fill, const Stroke* stroke, float alpha);
   void writeComposition(HTMLBuilder& out, const Composition* comp);
+  void paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
+                 const Stroke* stroke, const TextBox* textBox, float alpha, bool hasTrim,
+                 const TrimPath* curTrim, bool hasMerge);
+  void applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim);
 
   // Filter defs
   std::string writeFilterDefs(const std::vector<LayerFilter*>& filters);
@@ -744,9 +791,20 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha) {
       if (outAlpha) {
         *outAlpha = 1.0f;
       }
+      // CSS linear-gradient can only express angle, not start/end positions.
+      // If the matrix has scale or translation, fall back to SVG.
+      if (!g->matrix.isIdentity()) {
+        bool hasTranslation = !FloatNearlyZero(g->matrix.tx) || !FloatNearlyZero(g->matrix.ty);
+        float sx = std::sqrt(g->matrix.a * g->matrix.a + g->matrix.b * g->matrix.b);
+        float sy = std::sqrt(g->matrix.c * g->matrix.c + g->matrix.d * g->matrix.d);
+        bool hasScale = !FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f);
+        if (hasTranslation || hasScale) {
+          return {};
+        }
+      }
       Point s = g->matrix.mapPoint(g->startPoint);
       Point e = g->matrix.mapPoint(g->endPoint);
-      float ang = std::atan2(e.y - s.y, e.x - s.x) * 180.0f / 3.14159265358979f + 90.0f;
+      float ang = std::atan2(e.y - s.y, e.x - s.x) * 180.0f / static_cast<float>(M_PI) + 90.0f;
       return "linear-gradient(" + FloatToString(ang) + "deg," + CSSStops(g->colorStops) + ")";
     }
     case NodeType::RadialGradient: {
@@ -866,13 +924,13 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha) 
     _defs->addAttr("patternUnits", "userSpaceOnUse");
     _defs->addAttr("x", "0");
     _defs->addAttr("y", "0");
-    // Use a large enough area; the pattern tiles but the gradient is absolute-positioned
-    _defs->addAttr("width", "10000");
-    _defs->addAttr("height", "10000");
+    std::string patternSize = FloatToString(std::max({_ctx->docWidth, _ctx->docHeight, 10000.0f}));
+    _defs->addAttr("width", patternSize);
+    _defs->addAttr("height", patternSize);
     _defs->closeTagStart();
     _defs->openTag("foreignObject");
-    _defs->addAttr("width", "10000");
-    _defs->addAttr("height", "10000");
+    _defs->addAttr("width", patternSize);
+    _defs->addAttr("height", patternSize);
     _defs->closeTagStart();
     Point c = g->matrix.mapPoint(g->center);
     float cssStartAng = g->startAngle + 90.0f;
@@ -979,12 +1037,13 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha) 
     _defs->addAttr("patternUnits", "userSpaceOnUse");
     _defs->addAttr("x", "0");
     _defs->addAttr("y", "0");
-    _defs->addAttr("width", "10000");
-    _defs->addAttr("height", "10000");
+    std::string patternSize = FloatToString(std::max({_ctx->docWidth, _ctx->docHeight, 10000.0f}));
+    _defs->addAttr("width", patternSize);
+    _defs->addAttr("height", patternSize);
     _defs->closeTagStart();
     _defs->openTag("foreignObject");
-    _defs->addAttr("width", "10000");
-    _defs->addAttr("height", "10000");
+    _defs->addAttr("width", patternSize);
+    _defs->addAttr("height", patternSize);
     _defs->closeTagStart();
     _defs->openTag("div");
     _defs->addAttr("xmlns", "http://www.w3.org/1999/xhtml");
@@ -1020,7 +1079,7 @@ void HTMLWriter::writeSVGGradientDef(const ColorSource* src, const std::string& 
     for (auto* stop : g->colorStops) {
       _defs->openTag("stop");
       _defs->addAttr("offset", FloatToString(stop->offset));
-      _defs->addAttr("stop-color", ColorToHex(stop->color));
+      _defs->addAttr("stop-color", ColorToSVGHex(stop->color));
       if (stop->color.alpha < 1.0f) {
         _defs->addAttr("stop-opacity", FloatToString(stop->color.alpha));
       }
@@ -1042,7 +1101,7 @@ void HTMLWriter::writeSVGGradientDef(const ColorSource* src, const std::string& 
     for (auto* stop : g->colorStops) {
       _defs->openTag("stop");
       _defs->addAttr("offset", FloatToString(stop->offset));
-      _defs->addAttr("stop-color", ColorToHex(stop->color));
+      _defs->addAttr("stop-color", ColorToSVGHex(stop->color));
       if (stop->color.alpha < 1.0f) {
         _defs->addAttr("stop-opacity", FloatToString(stop->color.alpha));
       }
@@ -1105,8 +1164,8 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
   _defs->addAttr("color-interpolation-filters", "sRGB");
   _defs->closeTagStart();
   int si = 0;
-  std::vector<std::string> dropRes;
-  std::vector<std::string> innerRes;
+  std::vector<std::string> dropRes = {};
+  std::vector<std::string> innerRes = {};
   bool needSrc = false;
   for (auto* f : filters) {
     switch (f->nodeType()) {
@@ -1834,36 +1893,6 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   // TODO: TrimPath.type is currently always treated as Separate (per-geometry trim). Continuous
   // mode should treat all paths as one concatenated path and trim collectively, which requires
   // pre-computing individual path lengths and distributing the trim range proportionally.
-  bool hasTrimAttrs = trim != nullptr &&
-                      (trim->start != 0.0f || trim->end != 1.0f || !FloatNearlyZero(trim->offset));
-  auto applyTrimAttrs = [&](HTMLBuilder& builder) {
-    if (!hasTrimAttrs) {
-      return;
-    }
-    builder.addAttr("pathLength", "1");
-    float offsetFrac = trim->offset / 360.0f;
-    float s = std::fmod(trim->start + offsetFrac, 1.0f);
-    float e = std::fmod(trim->end + offsetFrac, 1.0f);
-    if (s < 0.0f) {
-      s += 1.0f;
-    }
-    if (e < 0.0f) {
-      e += 1.0f;
-    }
-    if (s <= e) {
-      float visible = e - s;
-      float gap = 1.0f - visible;
-      builder.addAttr("stroke-dasharray", FloatToString(visible) + " " + FloatToString(gap));
-      builder.addAttr("stroke-dashoffset", FloatToString(-s));
-    } else {
-      // Wrapping case: visible = [s,1] + [0,e] → two segments
-      float seg1 = 1.0f - s;
-      float seg2 = e;
-      float gap = s - e;
-      builder.addAttr("stroke-dasharray",
-                      FloatToString(seg2) + " " + FloatToString(gap) + " " + FloatToString(seg1));
-    }
-  };
 
   for (auto& g : geos) {
     switch (g.type) {
@@ -1884,9 +1913,9 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           out.addAttr("rx", FloatToString(r->roundness));
           out.addAttr("ry", FloatToString(r->roundness));
         }
-        applySVGFill(out, hasTrimAttrs ? nullptr : fill);
+        applySVGFill(out, trim ? nullptr : fill);
         applySVGStroke(out, stroke);
-        applyTrimAttrs(out);
+        applyTrimAttrs(out, trim);
         out.closeTagSelfClosing();
         break;
       }
@@ -1897,9 +1926,9 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         out.addAttr("cy", FloatToString(e->position.y));
         out.addAttr("rx", FloatToString(e->size.width / 2));
         out.addAttr("ry", FloatToString(e->size.height / 2));
-        applySVGFill(out, hasTrimAttrs ? nullptr : fill);
+        applySVGFill(out, trim ? nullptr : fill);
         applySVGStroke(out, stroke);
-        applyTrimAttrs(out);
+        applyTrimAttrs(out, trim);
         out.closeTagSelfClosing();
         break;
       }
@@ -1909,9 +1938,9 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         if (!d.empty()) {
           out.openTag("path");
           out.addAttr("d", d);
-          applySVGFill(out, hasTrimAttrs ? nullptr : fill);
+          applySVGFill(out, trim ? nullptr : fill);
           applySVGStroke(out, stroke);
-          applyTrimAttrs(out);
+          applyTrimAttrs(out, trim);
           out.closeTagSelfClosing();
         }
         break;
@@ -1922,9 +1951,9 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         if (!d.empty()) {
           out.openTag("path");
           out.addAttr("d", d);
-          applySVGFill(out, hasTrimAttrs ? nullptr : fill);
+          applySVGFill(out, trim ? nullptr : fill);
           applySVGStroke(out, stroke);
-          applyTrimAttrs(out);
+          applyTrimAttrs(out, trim);
           out.closeTagSelfClosing();
         }
         break;
@@ -2303,7 +2332,9 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
     if (!FloatNearlyZero(rep->anchor.x) || !FloatNearlyZero(rep->anchor.y)) {
       m = Matrix::Translate(rep->anchor.x, rep->anchor.y) * m;
     }
-    float np = n > 1 ? static_cast<float>(idx) / static_cast<float>(n - 1) : 0.0f;
+    float np = std::ceil(rep->copies) > 0
+                   ? (static_cast<float>(idx) + rep->offset) / std::ceil(rep->copies)
+                   : 0.0f;
     float ca = rep->startAlpha + (rep->endAlpha - rep->startAlpha) * np;
     if (idx == n - 1 && frac > 0 && frac < 1.0f) {
       ca *= frac;
@@ -2329,6 +2360,10 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
 }
 
 void HTMLWriter::writeComposition(HTMLBuilder& out, const Composition* comp) {
+  if (_ctx->visitedCompositions.count(comp)) {
+    return;
+  }
+  _ctx->visitedCompositions.insert(comp);
   bool needContainer = comp->width > 0 && comp->height > 0;
   if (needContainer) {
     out.openTag("div");
@@ -2342,11 +2377,71 @@ void HTMLWriter::writeComposition(HTMLBuilder& out, const Composition* comp) {
   if (needContainer) {
     out.closeTag();
   }
+  _ctx->visitedCompositions.erase(comp);
 }
 
 //==============================================================================
 // HTMLWriter – element processing
 //==============================================================================
+
+void HTMLWriter::applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim) {
+  if (!trim) {
+    return;
+  }
+  if (trim->start == 0.0f && trim->end == 1.0f && FloatNearlyZero(trim->offset)) {
+    return;
+  }
+  builder.addAttr("pathLength", "1");
+  float offsetFrac = trim->offset / 360.0f;
+  float s = std::fmod(trim->start + offsetFrac, 1.0f);
+  float e = std::fmod(trim->end + offsetFrac, 1.0f);
+  if (s < 0.0f) {
+    s += 1.0f;
+  }
+  if (e < 0.0f) {
+    e += 1.0f;
+  }
+  if (s <= e) {
+    float visible = e - s;
+    float gap = 1.0f - visible;
+    builder.addAttr("stroke-dasharray", FloatToString(visible) + " " + FloatToString(gap));
+    builder.addAttr("stroke-dashoffset", FloatToString(-s));
+  } else {
+    // Wrapping case: visible = [s,1] + [0,e] → two segments
+    float seg1 = 1.0f - s;
+    float seg2 = e;
+    float gap = s - e;
+    builder.addAttr("stroke-dasharray",
+                    FloatToString(seg2) + " " + FloatToString(gap) + " " + FloatToString(seg1));
+  }
+}
+
+void HTMLWriter::paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
+                           const Stroke* stroke, const TextBox* textBox, float alpha, bool hasTrim,
+                           const TrimPath* curTrim, bool hasMerge) {
+  if (geos.empty()) {
+    return;
+  }
+  bool hasText = false;
+  for (auto& g : geos) {
+    if (g.type == NodeType::Text) {
+      hasText = true;
+      break;
+    }
+  }
+  if (hasText) {
+    for (auto& g : geos) {
+      if (g.type == NodeType::Text) {
+        writeText(out, static_cast<const Text*>(g.element), fill, stroke, textBox, alpha);
+      } else {
+        std::vector<GeoInfo> single = {g};
+        renderGeo(out, single, fill, stroke, alpha, hasTrim, curTrim, hasMerge);
+      }
+    }
+  } else {
+    renderGeo(out, geos, fill, stroke, alpha, hasTrim, curTrim, hasMerge);
+  }
+}
 
 void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& elements, float alpha,
                                bool distribute, LayerPlacement targetPlacement) {
@@ -2357,32 +2452,6 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
   bool hasTrim = false;
   const TrimPath* curTrim = nullptr;
   bool hasMerge = false;
-
-  auto paintGeos = [&](const Fill* f, const Stroke* s) {
-    if (geos.empty()) {
-      return;
-    }
-    bool hasText = false;
-    for (auto& g : geos) {
-      if (g.type == NodeType::Text) {
-        hasText = true;
-        break;
-      }
-    }
-    float a = distribute ? alpha : 1.0f;
-    if (hasText) {
-      for (auto& g : geos) {
-        if (g.type == NodeType::Text) {
-          writeText(out, static_cast<const Text*>(g.element), f, s, curTextBox, a);
-        } else {
-          std::vector<GeoInfo> single = {g};
-          renderGeo(out, single, f, s, a, hasTrim, curTrim, hasMerge);
-        }
-      }
-    } else {
-      renderGeo(out, geos, f, s, a, hasTrim, curTrim, hasMerge);
-    }
-  };
 
   for (auto* element : elements) {
     auto type = element->nodeType();
@@ -2398,7 +2467,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         auto fill = static_cast<const Fill*>(element);
         curFill = fill;
         if (fill->placement == targetPlacement) {
-          paintGeos(curFill, curStroke);
+          float a = distribute ? alpha : 1.0f;
+          paintGeos(out, geos, curFill, nullptr, curTextBox, a, hasTrim, curTrim, hasMerge);
         }
         break;
       }
@@ -2406,7 +2476,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         auto stroke = static_cast<const Stroke*>(element);
         curStroke = stroke;
         if (stroke->placement == targetPlacement) {
-          paintGeos(curFill, curStroke);
+          float a = distribute ? alpha : 1.0f;
+          paintGeos(out, geos, nullptr, curStroke, curTextBox, a, hasTrim, curTrim, hasMerge);
         }
         break;
       }
@@ -2473,7 +2544,7 @@ void HTMLWriter::writeLayerContents(HTMLBuilder& out, const Layer* layer, float 
 
 void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAlpha,
                             bool distributeAlpha) {
-  if (!layer->visible && layer->mask == nullptr) {
+  if (!layer->visible) {
     out.openTag("div");
     out.addAttr("class", "pagx-layer");
     out.addAttr("style", "display:none");
@@ -2493,7 +2564,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     style += ";transform:" + transform;
   }
 
-  if (!layer->matrix3D.isIdentity() || layer->preserve3D) {
+  if (layer->preserve3D) {
     style += ";transform-style:preserve-3d";
   }
 
@@ -2620,7 +2691,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       }
     } else if (ls->nodeType() == NodeType::InnerShadowStyle) {
       auto is = static_cast<const InnerShadowStyle*>(ls);
-      // InnerShadowStyle: use SVG filter (offset → invert → blur → clip to interior → colorize)
+      // InnerShadowStyle: SVG filter (offset → invert → blur → clip to interior → colorize)
       std::string fid = _ctx->nextId("filter");
       _defs->openTag("filter");
       _defs->addAttr("id", fid);
@@ -2630,17 +2701,8 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       _defs->addAttr("height", "200%");
       _defs->addAttr("color-interpolation-filters", "sRGB");
       _defs->closeTagStart();
-      std::string sd = FloatToString(is->blurX);
-      if (is->blurX != is->blurY) {
-        sd += " " + FloatToString(is->blurY);
-      }
-      _defs->openTag("feGaussianBlur");
-      _defs->addAttr("in", "SourceAlpha");
-      _defs->addAttr("stdDeviation", sd);
-      _defs->addAttr("result", "iBlur");
-      _defs->closeTagSelfClosing();
       _defs->openTag("feOffset");
-      _defs->addAttr("in", "iBlur");
+      _defs->addAttr("in", "SourceAlpha");
       if (!FloatNearlyZero(is->offsetX)) {
         _defs->addAttr("dx", FloatToString(is->offsetX));
       }
@@ -2657,8 +2719,17 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       _defs->addAttr("k3", "1");
       _defs->addAttr("result", "iComp");
       _defs->closeTagSelfClosing();
-      _defs->openTag("feColorMatrix");
+      std::string sd = FloatToString(is->blurX);
+      if (is->blurX != is->blurY) {
+        sd += " " + FloatToString(is->blurY);
+      }
+      _defs->openTag("feGaussianBlur");
       _defs->addAttr("in", "iComp");
+      _defs->addAttr("stdDeviation", sd);
+      _defs->addAttr("result", "iBlur");
+      _defs->closeTagSelfClosing();
+      _defs->openTag("feColorMatrix");
+      _defs->addAttr("in", "iBlur");
       _defs->addAttr("type", "matrix");
       _defs->addAttr("values", "0 0 0 0 " + FloatToString(is->color.red) + " 0 0 0 0 " +
                                    FloatToString(is->color.green) + " 0 0 0 0 " +
@@ -2806,6 +2877,8 @@ std::string HTMLExporter::ToHTML(const PAGXDocument& doc, const Options& options
   HTMLBuilder html(options.indent);
   HTMLBuilder defs(options.indent, 2);
   HTMLWriterContext ctx;
+  ctx.docWidth = doc.width;
+  ctx.docHeight = doc.height;
   HTMLWriter writer(&defs, &ctx);
 
   // Root div
@@ -2849,8 +2922,12 @@ bool HTMLExporter::ToFile(const PAGXDocument& document, const std::string& fileP
     return false;
   }
   auto dirPath = std::filesystem::path(filePath).parent_path();
-  if (!std::filesystem::exists(dirPath)) {
-    std::filesystem::create_directories(dirPath);
+  if (!dirPath.empty() && !std::filesystem::exists(dirPath)) {
+    std::error_code ec = {};
+    std::filesystem::create_directories(dirPath, ec);
+    if (ec) {
+      return false;
+    }
   }
   std::ofstream file(filePath, std::ios::binary);
   if (!file) {
