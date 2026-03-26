@@ -1,21 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="400" height="400">
-  <Layer left="200" top="145">
-    <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="84" textAnchor="center"/>
-    <Fill>
-      <LinearGradient startPoint="-200,0" endPoint="80,0">
-        <ColorStop offset="0" color="#6366F1"/>
-        <ColorStop offset="0.5" color="#8B5CF6"/>
-        <ColorStop offset="1" color="#EC4899"/>
-      </LinearGradient>
-    </Fill>
-  </Layer>
-  <Layer left="200" top="230">
-    <Text text="Text Shape" fontFamily="Arial" fontSize="36" textAnchor="center"/>
-    <Fill color="#334155"/>
-  </Layer>
-  <Layer left="200" top="310">
-    <Text text="Beautiful Typography" fontFamily="Arial" fontSize="24" textAnchor="center"/>
-    <Fill color="#475569"/>
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="50" arrangement="spaceBetween" alignment="center">
+    <Layer>
+      <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="84"/>
+      <Fill>
+        <LinearGradient startPoint="60,0" endPoint="340,0">
+          <ColorStop offset="0" color="#6366F1"/>
+          <ColorStop offset="0.5" color="#8B5CF6"/>
+          <ColorStop offset="1" color="#EC4899"/>
+        </LinearGradient>
+      </Fill>
+    </Layer>
+    <Layer>
+      <Text text="Text Shape" fontFamily="Arial" fontSize="36"/>
+      <Fill color="#334155"/>
+    </Layer>
+    <Layer>
+      <Text text="Beautiful Typography" fontFamily="Arial" fontSize="24"/>
+      <Fill color="#475569"/>
+    </Layer>
   </Layer>
 </pagx>
