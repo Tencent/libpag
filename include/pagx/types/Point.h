@@ -18,14 +18,12 @@
 
 #pragma once
 
-#include "pagx/defines.h"
-
 namespace pagx {
 
 /**
  * A point with x and y coordinates.
  */
-struct RTTR_AUTO_REGISTER_CLASS Point {
+struct Point {
   /**
    * The x coordinate.
    */

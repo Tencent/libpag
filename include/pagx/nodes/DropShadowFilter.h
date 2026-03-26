@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "pagx/defines.h"
 #include "pagx/nodes/LayerFilter.h"
 #include "pagx/types/Color.h"
 
@@ -27,7 +26,7 @@ namespace pagx {
 /**
  * A drop shadow filter that renders a shadow behind the layer content.
  */
-class RTTR_AUTO_REGISTER_CLASS DropShadowFilter : public LayerFilter {
+class DropShadowFilter : public LayerFilter {
  public:
   /**
    * The horizontal offset of the shadow in pixels. The default value is 0.
@@ -62,8 +61,6 @@ class RTTR_AUTO_REGISTER_CLASS DropShadowFilter : public LayerFilter {
   NodeType nodeType() const override {
     return NodeType::DropShadowFilter;
   }
-
-  RTTR_ENABLE(LayerFilter)
 
  private:
   DropShadowFilter() = default;

@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "pagx/defines.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/PolystarType.h"
@@ -28,7 +27,7 @@ namespace pagx {
 /**
  * Polystar represents a polygon or star shape with configurable points, radii, and roundness.
  */
-class RTTR_AUTO_REGISTER_CLASS Polystar : public Element {
+class Polystar : public Element {
  public:
   /**
    * The position of the polystar center point.
@@ -79,8 +78,6 @@ class RTTR_AUTO_REGISTER_CLASS Polystar : public Element {
   NodeType nodeType() const override {
     return NodeType::Polystar;
   }
-
-  RTTR_ENABLE(Element)
 
  private:
   Polystar() = default;

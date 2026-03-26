@@ -64,21 +64,9 @@ void SerializeVariant(const rttr::variant& value, PAGTreeNode* node) {
   bool isWrapped = wrappedType != value.get_type();
   auto realValue = isWrapped ? value.extract_wrapped_value() : value;
 
-  // Check for nullptr in various ways
   if (value.can_convert<std::nullptr_t>()) {
     node->setValue("<null>");
     return;
-  }
-
-  // Check if it's a pointer type and the pointer is null
-  if (wrappedType.is_pointer()) {
-    void* ptr = nullptr;
-    if (value.convert(ptr) || realValue.convert(ptr)) {
-      if (ptr == nullptr) {
-        node->setValue("<null>");
-        return;
-      }
-    }
   }
 
   if (wrappedType.is_arithmetic()) {
@@ -109,11 +97,7 @@ void SerializeVariant(const rttr::variant& value, PAGTreeNode* node) {
     bool result = false;
     std::string str = value.to_string(&result);
     if (!result) {
-      // Try to provide a more meaningful representation for unknown types
-      str = wrappedType.get_name().to_string();
-      if (str.empty()) {
-        str = "<unknown>";
-      }
+      str = "{}";
     }
     node->setValue(str.c_str());
     return;

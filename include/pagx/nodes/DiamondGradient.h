@@ -19,7 +19,6 @@
 #pragma once
 
 #include <vector>
-#include "pagx/defines.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/types/Matrix.h"
@@ -30,7 +29,7 @@ namespace pagx {
 /**
  * A diamond gradient color source that produces a gradient in a diamond shape from the center.
  */
-class RTTR_AUTO_REGISTER_CLASS DiamondGradient : public ColorSource {
+class DiamondGradient : public ColorSource {
  public:
   /**
    * The center point of the gradient.
@@ -55,8 +54,6 @@ class RTTR_AUTO_REGISTER_CLASS DiamondGradient : public ColorSource {
   NodeType nodeType() const override {
     return NodeType::DiamondGradient;
   }
-
-  RTTR_ENABLE(ColorSource)
 
  private:
   DiamondGradient() = default;

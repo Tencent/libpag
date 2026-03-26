@@ -18,14 +18,12 @@
 
 #pragma once
 
-#include "pagx/defines.h"
-
 namespace pagx {
 
 /**
  * Placement of fill or stroke relative to other painters.
  */
-enum class RTTR_AUTO_REGISTER_CLASS LayerPlacement {
+enum class LayerPlacement {
   /**
    * Place behind other painters (rendered first).
    */

@@ -70,8 +70,8 @@ PAGTask* PAGTaskFactory::createTask(PAGTaskType taskType, const QString& outPath
   return task;
 }
 
-void PAGTaskFactory::setFilePath(const QString& filePath) {
-  pagFile = PAGFile::Load(std::string(filePath.toLocal8Bit()));
+void PAGTaskFactory::setFilePath(const std::string& filePath) {
+  pagFile = PAGFile::Load(filePath);
 }
 
 }  // namespace pag

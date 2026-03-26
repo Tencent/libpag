@@ -21,7 +21,6 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "pagx/defines.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Data.h"
@@ -33,7 +32,7 @@ namespace pagx {
  * It contains resources and layers. This is a pure data structure class.
  * Use PAGXImporter to load documents and PAGXExporter to save documents.
  */
-class RTTR_AUTO_REGISTER_CLASS PAGXDocument : public Node {
+class PAGXDocument : public Node {
  public:
   /**
    * Creates an empty document with the specified size.
@@ -99,7 +98,7 @@ class RTTR_AUTO_REGISTER_CLASS PAGXDocument : public Node {
   /**
    * All nodes in the document (owned by the document).
    */
-  std::vector<std::unique_ptr<Node>> RTTR_SKIP_REGISTER_PROPERTY nodes = {};
+  std::vector<std::unique_ptr<Node>> nodes = {};
 
   /**
    * Errors collected during parsing. Non-empty errors indicate structural issues in the source

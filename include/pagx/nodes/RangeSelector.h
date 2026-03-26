@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "pagx/defines.h"
 #include "pagx/nodes/TextSelector.h"
 #include "pagx/types/SelectorTypes.h"
 
@@ -29,7 +28,7 @@ namespace pagx {
  * provides flexible control over character selection through start/end positions, shapes, and
  * randomization.
  */
-class RTTR_AUTO_REGISTER_CLASS RangeSelector : public TextSelector {
+class RangeSelector : public TextSelector {
  public:
   /**
    * The starting position of the selection range, in units defined by the unit property.
@@ -91,8 +90,6 @@ class RTTR_AUTO_REGISTER_CLASS RangeSelector : public TextSelector {
   NodeType nodeType() const override {
     return NodeType::RangeSelector;
   }
-
-  RTTR_ENABLE(TextSelector)
 
  private:
   RangeSelector() = default;

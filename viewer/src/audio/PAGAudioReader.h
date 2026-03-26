@@ -35,7 +35,6 @@ class PAGAudioReader : public QThread {
   ~PAGAudioReader() override;
 
   bool isEmpty() const;
-  int64_t getDuration() const;
   void setComposition(std::shared_ptr<PAGComposition> newComposition);
   void setAudioRender(std::shared_ptr<PAGAudioRender> audioRender);
   std::shared_ptr<PAGAudioSample> readNextSample();

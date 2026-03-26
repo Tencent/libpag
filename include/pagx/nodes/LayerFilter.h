@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "pagx/defines.h"
 #include "pagx/nodes/Node.h"
 
 namespace pagx {
@@ -26,11 +25,9 @@ namespace pagx {
 /**
  * Base class for layer filters (BlurFilter, DropShadowFilter, InnerShadowFilter, BlendFilter, ColorMatrixFilter).
  */
-class RTTR_AUTO_REGISTER_CLASS LayerFilter : public Node {
+class LayerFilter : public Node {
  public:
   ~LayerFilter() override = default;
-
-  RTTR_ENABLE(Node)
 
  protected:
   LayerFilter() = default;

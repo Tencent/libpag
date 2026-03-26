@@ -18,14 +18,12 @@
 
 #pragma once
 
-#include "pagx/defines.h"
-
 namespace pagx {
 
 /**
  * Color space enumeration for color values.
  */
-enum class RTTR_AUTO_REGISTER_CLASS ColorSpace {
+enum class ColorSpace {
   /**
    * Standard RGB color space (sRGB). The most common color space for web and displays.
    * Component values are typically in [0, 1] range.

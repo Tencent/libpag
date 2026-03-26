@@ -18,14 +18,12 @@
 
 #pragma once
 
-#include "pagx/defines.h"
-
 namespace pagx {
 
 /**
  * Trim path types that control how multiple paths are trimmed.
  */
-enum class RTTR_AUTO_REGISTER_CLASS TrimType {
+enum class TrimType {
   /**
    * Trim each path individually within the group.
    */

@@ -18,14 +18,12 @@
 
 #pragma once
 
-#include "pagx/defines.h"
-
 namespace pagx {
 
 /**
  * Blend modes for compositing layers and colors.
  */
-enum class RTTR_AUTO_REGISTER_CLASS BlendMode {
+enum class BlendMode {
   /**
    * Normal blending, the source color replaces the destination.
    */

@@ -21,7 +21,6 @@
 #include <QAbstractItemModel>
 #include "editing/serialize/PAGTree.h"
 #include "pag/pag.h"
-#include "pagx/PAGXDocument.h"
 
 namespace pag {
 
@@ -51,7 +50,6 @@ class PAGTreeViewModel : public QAbstractItemModel {
   QHash<int, QByteArray> roleNames() const Q_DECL_OVERRIDE;
 
   Q_SLOT void setFile(std::shared_ptr<File> file);
-  Q_SLOT void setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> document);
 
  private:
   std::unique_ptr<PAGTree> fileTree = nullptr;

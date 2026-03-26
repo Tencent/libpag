@@ -19,7 +19,6 @@
 #pragma once
 
 #include <cmath>
-#include "pagx/defines.h"
 #include "pagx/types/Point.h"
 
 namespace pagx {
@@ -31,7 +30,7 @@ namespace pagx {
  *   | b  d  ty |
  *   | 0  0  1  |
  */
-struct RTTR_AUTO_REGISTER_CLASS Matrix {
+struct Matrix {
   /**
    * The horizontal scale factor (scaleX).
    */

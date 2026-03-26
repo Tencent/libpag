@@ -18,14 +18,12 @@
 
 #pragma once
 
-#include "pagx/defines.h"
-
 namespace pagx {
 
 /**
  * Path command types.
  */
-enum class RTTR_AUTO_REGISTER_CLASS PathVerb {
+enum class PathVerb {
   Move,   // 1 point: destination
   Line,   // 1 point: end point
   Quad,   // 2 points: control point, end point

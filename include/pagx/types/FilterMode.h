@@ -18,14 +18,12 @@
 
 #pragma once
 
-#include "pagx/defines.h"
-
 namespace pagx {
 
 /**
  * FilterMode defines how texture sampling is performed when a texture is minified or magnified.
  */
-enum class RTTR_AUTO_REGISTER_CLASS FilterMode {
+enum class FilterMode {
   /**
    * Single sample point (the nearest neighbor).
    */

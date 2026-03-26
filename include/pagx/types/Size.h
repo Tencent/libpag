@@ -18,14 +18,12 @@
 
 #pragma once
 
-#include "pagx/defines.h"
-
 namespace pagx {
 
 /**
  * A size with width and height.
  */
-struct RTTR_AUTO_REGISTER_CLASS Size {
+struct Size {
   /**
    * The width dimension.
    */

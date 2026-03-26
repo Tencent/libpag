@@ -18,14 +18,12 @@
 
 #pragma once
 
-#include "pagx/defines.h"
-
 namespace pagx {
 
 /**
  * Text writing mode (horizontal or vertical).
  */
-enum class RTTR_AUTO_REGISTER_CLASS WritingMode {
+enum class WritingMode {
   /**
    * Horizontal text layout. Lines flow from top to bottom. This is the default mode for most
    * languages.

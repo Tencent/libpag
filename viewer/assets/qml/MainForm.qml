@@ -7,10 +7,7 @@ import "components"
 SplitView {
     id: splitView
     required property int resizeHandleSize
-
-    property var contentView: contentViewLoader.item
-    property bool hasPAGFile: contentView && contentView.viewModel.filePath !== ""
-    property bool hasAnimation: contentView && contentView.viewModel.hasAnimation
+    property bool hasPAGFile: pagView.filePath !== ""
 
     property bool isBackgroundOn: false
 
@@ -30,7 +27,7 @@ SplitView {
 
     property int controlFormHeight: 76
 
-    property alias contentViewLoader: contentViewLoader
+    property alias pagView: pagView
 
     property alias dropArea: dropArea
 
@@ -39,11 +36,6 @@ SplitView {
     property alias rightItemLoader: rightItemLoader
 
     property alias controlForm: controlForm
-
-    property string currentViewType: "pag"
-
-    property string pendingFilePath: ""
-
     anchors.fill: parent
     orientation: Qt.Horizontal
     handle: Rectangle {
@@ -51,25 +43,6 @@ SplitView {
         implicitWidth: splitHandleWidth
         implicitHeight: splitHandleHeight
         color: "#000000"
-    }
-
-    function loadFile(filePath) {
-        let lowerPath = filePath.toLowerCase();
-        let newViewType = lowerPath.endsWith(".pagx") ? "pagx" : "pag";
-
-        if (currentViewType !== newViewType) {
-            pendingFilePath = filePath;
-            currentViewType = newViewType;
-            return true;
-        }
-
-        // Same view type - just load the file directly
-        if (contentViewLoader.status === Loader.Ready && contentView) {
-            return contentView.viewModel.loadFile(filePath);
-        }
-        // Loader not ready yet, queue the file for loading after initialization
-        pendingFilePath = filePath;
-        return true;
     }
 
     PAGRectangle {
@@ -94,48 +67,17 @@ SplitView {
             sourceSize.width: 32
             sourceSize.height: 32
         }
-
-        Loader {
-            id: contentViewLoader
+        PAGView {
+            id: pagView
             x: 0
             y: 0
             width: parent.width
             height: splitView.height - controlFormHeight
-
-            sourceComponent: currentViewType === "pagx" ? pagxViewComponent : pagViewComponent
-
-            onLoaded: {
-                pagWindow.notifyContentViewChanged(item);
-
-                if (pendingFilePath !== "") {
-                    let filePath = pendingFilePath;
-                    pendingFilePath = "";
-                    Qt.callLater(function () {
-                        if (item) {
-                            item.viewModel.loadFile(filePath);
-                        }
-                    });
-                }
-            }
-
-            Component {
-                id: pagViewComponent
-                PAGView {
-                    objectName: "contentView"
-                }
-            }
-
-            Component {
-                id: pagxViewComponent
-                PAGXView {
-                    objectName: "contentView"
-                }
-            }
+            objectName: "pagView"
         }
-
         ControlForm {
             id: controlForm
-            contentView: splitView.contentView
+            pagView: pagView
             height: controlFormHeight
             z: 1
             anchors.bottom: parent.bottom
@@ -154,9 +96,7 @@ SplitView {
             anchors.bottom: parent.bottom
             anchors.bottomMargin: controlFormHeight + 9
             onClicked: {
-                if (contentView) {
-                    contentView.viewModel.isPlaying = !contentView.viewModel.isPlaying;
-                }
+                pagView.isPlaying = !pagView.isPlaying;
             }
         }
         DropArea {
@@ -303,8 +243,8 @@ SplitView {
                                 Rectangle {
                                     id: textListContainer
                                     width: parent.width
-                                    height: isTextListOpen ? ((contentView ? contentView.viewModel.editableTextLayerCount : 0) * 40 + 44) : 32
-                                    visible: contentView && contentView.viewModel.editableTextLayerCount > 0
+                                    height: isTextListOpen ? (pagView.editableTextLayerCount * 40 + 44) : 32
+                                    visible: pagView.editableTextLayerCount > 0
                                     color: "#20202A"
 
                                     Row {
@@ -366,7 +306,7 @@ SplitView {
 
                                     TextListView {
                                         id: textListView
-                                        height: (contentView ? contentView.viewModel.editableTextLayerCount : 0) * 40
+                                        height: pagView.editableTextLayerCount * 40
                                         textHeight: 40
                                         textModel: textLayerModel
                                         visible: isTextListOpen && height > 0
@@ -385,8 +325,8 @@ SplitView {
                                 Rectangle {
                                     id: imageListContainer
                                     width: parent.width
-                                    height: isImageListOpen ? ((contentView ? contentView.viewModel.editableImageLayerCount : 0) * 60 + 44) : 32
-                                    visible: contentView && contentView.viewModel.editableImageLayerCount > 0
+                                    height: isImageListOpen ? (pagView.editableImageLayerCount * 60 + 44) : 32
+                                    visible: pagView.editableImageLayerCount > 0
                                     color: "#20202A"
 
                                     Row {
@@ -448,7 +388,7 @@ SplitView {
 
                                     ImageListView {
                                         id: imageListView
-                                        height: (contentView ? contentView.viewModel.editableImageLayerCount : 0) * 60
+                                        height: pagView.editableImageLayerCount * 60
                                         imageHeight: 60
                                         imageModel: imageLayerModel
                                         visible: isImageListOpen && height > 0
@@ -518,7 +458,7 @@ SplitView {
                 PAGRectangle {
                     id: performance
                     color: "#16161D"
-                    height: Math.min(profilerForm.contentHeight, parent.height - tabBar.height - 40)
+                    height: profilerForm.defaultHeight
                     clip: true
                     anchors.right: parent.right
                     anchors.rightMargin: 0
@@ -529,37 +469,9 @@ SplitView {
                     rightTopRadius: false
                     leftBottomRadius: false
 
-                    ScrollView {
+                    Profiler {
+                        id: profilerForm
                         anchors.fill: parent
-                        clip: true
-                        contentHeight: profilerForm.contentHeight
-                        contentWidth: width
-
-                        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-                        ScrollBar.vertical.policy: profilerForm.contentHeight > performance.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
-                        ScrollBar.vertical.background: Rectangle {
-                            color: "#00000000"
-                        }
-                        ScrollBar.vertical.contentItem: Rectangle {
-                            implicitWidth: 9
-                            implicitHeight: 100
-                            color: "#00000000"
-
-                            Rectangle {
-                                anchors.fill: parent
-                                radius: 4
-                                anchors.right: parent.right
-                                anchors.rightMargin: 2
-                                color: "#AA4B4B5A"
-                            }
-                        }
-
-                        Profiler {
-                            id: profilerForm
-                            width: performance.width
-                            height: contentHeight
-                            contentView: splitView.contentView
-                        }
                     }
                 }
             }

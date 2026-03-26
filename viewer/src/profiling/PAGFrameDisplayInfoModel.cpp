@@ -25,6 +25,10 @@ FrameDisplayInfo::FrameDisplayInfo(const QString& name, const QString& color, in
     : name(name), color(color), current(current), avg(avg), max(max) {
 }
 
+PAGFrameDisplayInfoModel::PAGFrameDisplayInfoModel() : QAbstractListModel(nullptr) {
+  diplayInfos.resize(3);
+}
+
 PAGFrameDisplayInfoModel::PAGFrameDisplayInfoModel(QObject* parent) : QAbstractListModel(parent) {
   diplayInfos.resize(3);
 }
@@ -62,28 +66,13 @@ int PAGFrameDisplayInfoModel::rowCount(const QModelIndex& parent) const {
 }
 
 void PAGFrameDisplayInfoModel::updateData(const FrameDisplayInfo& render,
-                                          const FrameDisplayInfo& imageDecode,
-                                          const FrameDisplayInfo& present) {
+                                          const FrameDisplayInfo& present,
+                                          const FrameDisplayInfo& imageDecode) {
 
   diplayInfos[0] = render;
   diplayInfos[1] = imageDecode;
   diplayInfos[2] = present;
   dataChanged(createIndex(0, 0), createIndex(static_cast<int>(diplayInfos.size()) - 1, 0));
-  Q_EMIT itemsChanged();
-}
-
-QVariantList PAGFrameDisplayInfoModel::getItems() const {
-  QVariantList list;
-  for (const auto& info : diplayInfos) {
-    QVariantMap item;
-    item["name"] = info.name;
-    item["colorCode"] = info.color;
-    item["current"] = QString::number(info.current);
-    item["avg"] = QString::number(info.avg);
-    item["max"] = QString::number(info.max);
-    list.append(item);
-  }
-  return list;
 }
 
 QHash<int, QByteArray> PAGFrameDisplayInfoModel::roleNames() const {

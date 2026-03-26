@@ -20,20 +20,17 @@
 
 #include "editing/serialize/PAGTreeNode.h"
 #include "pag/file.h"
-#include "pagx/PAGXDocument.h"
 
 namespace pag {
 
 class PAGTree {
  public:
   void setFile(std::shared_ptr<File> file);
-  void setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> document);
   PAGTreeNode* getRootNode();
   void buildTree();
 
  private:
   std::shared_ptr<File> file = nullptr;
-  std::shared_ptr<pagx::PAGXDocument> pagxDocument = nullptr;
   std::unique_ptr<PAGTreeNode> rootNode = nullptr;
 };
 

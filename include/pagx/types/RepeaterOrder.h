@@ -18,14 +18,12 @@
 
 #pragma once
 
-#include "pagx/defines.h"
-
 namespace pagx {
 
 /**
  * Repeater stacking order.
  */
-enum class RTTR_AUTO_REGISTER_CLASS RepeaterOrder {
+enum class RepeaterOrder {
   /**
    * Place copies below (behind) the original elements.
    */
