@@ -25,6 +25,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/SolidColor.h"
+#include "pagx/svg/SVGBlendMode.h"
 #include "pagx/svg/SVGParserContext.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/StringParser.h"
@@ -35,6 +36,7 @@ namespace pagx {
 using pag::DegreesToRadians;
 
 static constexpr float DEFAULT_FONT_SIZE = 16.0f;
+
 std::shared_ptr<PAGXDocument> SVGImporter::Parse(const std::string& filePath,
                                                  const Options& options) {
   SVGParserContext parser(options);
@@ -386,6 +388,11 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
   std::string opacity = getAttribute(element, "opacity");
   if (!opacity.empty()) {
     layer->alpha = strtof(opacity.c_str(), nullptr);
+  }
+
+  std::string mixBlendMode = getAttribute(element, "mix-blend-mode");
+  if (!mixBlendMode.empty()) {
+    layer->blendMode = SVGBlendModeFromString(mixBlendMode);
   }
 
   // Handle mask attribute.
@@ -1070,13 +1077,17 @@ ImagePattern* SVGParserContext::convertPattern(const std::shared_ptr<DOMNode>& e
       auto imageNode = registerImageResource(imageHref);
       pattern->image = imageNode;
 
+      std::string imageTransform = getAttribute(child, "transform");
+      Matrix imageMatrix =
+          imageTransform.empty() ? Matrix::Identity() : parseTransform(imageTransform);
+
       if (contentUnitsIsObjectBoundingBox) {
         // Image dimensions are 0-1 ratios, scale by shape bounds.
         pattern->matrix = Matrix::Translate(shapeBounds.x, shapeBounds.y) *
-                          Matrix::Scale(shapeBounds.width, shapeBounds.height);
+                          Matrix::Scale(shapeBounds.width, shapeBounds.height) * imageMatrix;
       } else {
         // Image dimensions are absolute, translate to shape bounds origin.
-        pattern->matrix = Matrix::Translate(shapeBounds.x, shapeBounds.y);
+        pattern->matrix = Matrix::Translate(shapeBounds.x, shapeBounds.y) * imageMatrix;
       }
     }
     child = child->getNextSibling();

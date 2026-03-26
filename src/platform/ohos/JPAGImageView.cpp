@@ -618,7 +618,7 @@ std::shared_ptr<PAGDecoder> JPAGImageView::getDecoder() {
 
 void JPAGImageView::invalidSize() {
   if (targetWindow && _window) {
-    targetWindow->invalidSize();
+    renderSurface = nullptr;
     OH_NativeWindow_NativeWindowHandleOpt(_window, GET_BUFFER_GEOMETRY, &_height, &_width);
   } else {
     _width = 0;
@@ -792,10 +792,10 @@ bool JPAGImageView::present(std::shared_ptr<tgfx::Image> image) {
   if (!context) {
     return false;
   }
-  auto surface = targetWindow->getSurface(context, true);
-  if (surface == nullptr) {
-    surface = targetWindow->getSurface(context, false);
+  if (renderSurface == nullptr) {
+    renderSurface = tgfx::Surface::MakeFrom(context, targetWindow);
   }
+  auto surface = renderSurface;
   if (!surface) {
     device->unlock();
     return false;
@@ -813,7 +813,6 @@ bool JPAGImageView::present(std::shared_ptr<tgfx::Image> image) {
   canvas->drawImage(image);
   canvas->restore();
   context->flushAndSubmit();
-  targetWindow->present(context);
   context->purgeResourcesNotUsedSince(std::chrono::steady_clock::now());
   device->unlock();
   return true;

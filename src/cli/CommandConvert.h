@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,31 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <map>
-#include <thread>
-#include <vector>
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunknown-warning-option"
-#pragma clang diagnostic ignored "-Wdeprecated-literal-operator"
-#include "nlohmann/json.hpp"
-#pragma clang diagnostic pop
-#include "pag/pag.h"
-#include "tgfx/core/Clock.h"
-#include "tgfx/core/Task.h"
-#include "utils/TestUtils.h"
+#pragma once
 
-namespace pag {
-using namespace tgfx;
-using nlohmann::json;
+namespace pagx::cli {
 
-/**
- * 用例描述: 校验加载混淆过的错误 PAG 文件是否会崩溃。
- */
-PAG_TEST(PAGFuzzTest, DecodeFiles) {
-  auto files = GetAllPAGFiles("resources/fuzz");
-  for (auto& file : files) {
-    auto pagFile = PAGFile::Load(file);
-    ASSERT_EQ(pagFile, nullptr);
-  }
-}
-}  // namespace pag
+int RunConvert(int argc, char* argv[]);
+
+}  // namespace pagx::cli
