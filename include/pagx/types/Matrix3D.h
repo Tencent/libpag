@@ -32,7 +32,7 @@ namespace pagx {
  *   | values[3]  values[7]  values[11]  values[15] |
  */
 struct RTTR_AUTO_REGISTER_CLASS Matrix3D {
-  float RTTR_SKIP_REGISTER_PROPERTY values[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+  float values[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 
   /**
    * Returns the matrix value at the given row and column.
