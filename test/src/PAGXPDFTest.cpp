@@ -577,11 +577,11 @@ PAGX_TEST(PAGXPDFTest, LayerBlendModes) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
 
   pagx::BlendMode modes[] = {
-      pagx::BlendMode::Multiply, pagx::BlendMode::Screen,    pagx::BlendMode::Overlay,
-      pagx::BlendMode::Darken,   pagx::BlendMode::Lighten,   pagx::BlendMode::ColorDodge,
-      pagx::BlendMode::ColorBurn,pagx::BlendMode::HardLight, pagx::BlendMode::SoftLight,
-      pagx::BlendMode::Difference,pagx::BlendMode::Exclusion,pagx::BlendMode::Hue,
-      pagx::BlendMode::Saturation,pagx::BlendMode::Color,    pagx::BlendMode::Luminosity,
+      pagx::BlendMode::Multiply,   pagx::BlendMode::Screen,    pagx::BlendMode::Overlay,
+      pagx::BlendMode::Darken,     pagx::BlendMode::Lighten,   pagx::BlendMode::ColorDodge,
+      pagx::BlendMode::ColorBurn,  pagx::BlendMode::HardLight, pagx::BlendMode::SoftLight,
+      pagx::BlendMode::Difference, pagx::BlendMode::Exclusion, pagx::BlendMode::Hue,
+      pagx::BlendMode::Saturation, pagx::BlendMode::Color,     pagx::BlendMode::Luminosity,
   };
 
   for (auto mode : modes) {

@@ -1376,9 +1376,8 @@ CLI_TEST(PAGXCliTest, Convert_SvgToPdf_WithImportOptions) {
   auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPagx, svgPath});
   ASSERT_EQ(ret, 0);
   auto outputPath = TempDir() + "/ConvertSvgToPdf_import_opts.pdf";
-  ret = CallRun(pagx::cli::RunConvert,
-                {"convert", "--no-expand-use", "--flatten-transforms", "--preserve-unknown",
-                 svgPath, outputPath});
+  ret = CallRun(pagx::cli::RunConvert, {"convert", "--no-expand-use", "--flatten-transforms",
+                                        "--preserve-unknown", svgPath, outputPath});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
   auto output = ReadFile(outputPath);
@@ -1461,9 +1460,8 @@ CLI_TEST(PAGXCliTest, Convert_SvgToPagx_WithImportOptions) {
   auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPagx, svgPath});
   ASSERT_EQ(ret, 0);
   auto outputPath = TempDir() + "/ConvertSvgToPagx_opts.pagx";
-  ret = CallRun(pagx::cli::RunConvert,
-                {"convert", "--no-expand-use", "--flatten-transforms", "--preserve-unknown",
-                 svgPath, outputPath});
+  ret = CallRun(pagx::cli::RunConvert, {"convert", "--no-expand-use", "--flatten-transforms",
+                                        "--preserve-unknown", svgPath, outputPath});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
 }
@@ -1507,15 +1505,13 @@ CLI_TEST(PAGXCliTest, Convert_SvgToPagx_ForceFormat) {
 
 CLI_TEST(PAGXCliTest, Convert_PagxToPdf_WriteFailure) {
   auto inputPath = TestResourcePath("render_basic.pagx");
-  auto ret =
-      CallRun(pagx::cli::RunConvert, {"convert", inputPath, "/nonexistent_dir/output.pdf"});
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, "/nonexistent_dir/output.pdf"});
   EXPECT_NE(ret, 0);
 }
 
 CLI_TEST(PAGXCliTest, Convert_PagxToSvg_WriteFailure) {
   auto inputPath = TestResourcePath("render_basic.pagx");
-  auto ret =
-      CallRun(pagx::cli::RunConvert, {"convert", inputPath, "/nonexistent_dir/output.svg"});
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, "/nonexistent_dir/output.svg"});
   EXPECT_NE(ret, 0);
 }
 
