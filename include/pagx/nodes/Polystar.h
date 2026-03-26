@@ -123,7 +123,7 @@ class Polystar : public Element, public LayoutNode {
         angle += angleStep;
       }
     }
-    return Rect::MakeXYWH(position.x + minX, position.y + minY, maxX - minX, maxY - minY);
+    return Rect::MakeXYWH(minX, minY, maxX - minX, maxY - minY);
   }
 
  protected:
