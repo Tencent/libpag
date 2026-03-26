@@ -29,6 +29,8 @@ struct AHardwareBuffer;
 struct OH_NativeBuffer;
 #elif defined(__APPLE__)
 struct __CVBuffer;
+#elif defined(_WIN32)
+struct ID3D11Texture2D;
 #endif
 
 namespace pag {
@@ -39,6 +41,8 @@ typedef AHardwareBuffer* HardwareBufferRef;
 typedef __CVBuffer* HardwareBufferRef;
 #elif defined(__OHOS__)
 typedef OH_NativeBuffer* HardwareBufferRef;
+#elif defined(_WIN32)
+typedef ID3D11Texture2D* HardwareBufferRef;
 #else
 typedef void* HardwareBufferRef;
 #endif
