@@ -219,6 +219,17 @@ static std::string ColorToHex(const Color& color) {
   return buf;
 }
 
+// SVG attributes (stop-color, flood-color, fill, stroke) do not support the CSS color() function.
+// For DisplayP3 colors, approximate by treating the P3 channel values as sRGB.
+static std::string ColorToSVGHex(const Color& color) {
+  int r = std::clamp(static_cast<int>(std::round(color.red * 255.0f)), 0, 255);
+  int g = std::clamp(static_cast<int>(std::round(color.green * 255.0f)), 0, 255);
+  int b = std::clamp(static_cast<int>(std::round(color.blue * 255.0f)), 0, 255);
+  char buf[8] = {};
+  snprintf(buf, sizeof(buf), "#%02X%02X%02X", r, g, b);
+  return buf;
+}
+
 static std::string ColorToRGBA(const Color& color, float extra = 1.0f) {
   float a = color.alpha * extra;
   if (color.colorSpace == ColorSpace::DisplayP3) {
@@ -235,9 +246,27 @@ static std::string ColorToRGBA(const Color& color, float extra = 1.0f) {
          FloatToString(a) + ")";
 }
 
+static const char* DetectImageMime(const uint8_t* bytes, size_t size) {
+  if (size >= 8 && bytes[0] == 0x89 && bytes[1] == 'P' && bytes[2] == 'N' && bytes[3] == 'G') {
+    return "image/png";
+  }
+  if (size >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF) {
+    return "image/jpeg";
+  }
+  if (size >= 4 && bytes[0] == 'R' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == 'F') {
+    return "image/webp";
+  }
+  if (size >= 4 && bytes[0] == 'G' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == '8') {
+    return "image/gif";
+  }
+  return "image/png";
+}
+
 static std::string GetImageSrc(const Image* image) {
   if (image->data) {
-    return "data:image/png;base64," + Base64Encode(image->data->bytes(), image->data->size());
+    auto mime = DetectImageMime(image->data->bytes(), image->data->size());
+    return "data:" + std::string(mime) + ";base64," +
+           Base64Encode(image->data->bytes(), image->data->size());
   }
   return image->filePath;
 }
@@ -817,7 +846,7 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha) 
     if (outAlpha) {
       *outAlpha = sc->color.alpha;
     }
-    return ColorToHex(sc->color);
+    return ColorToSVGHex(sc->color);
   }
   if (src->nodeType() == NodeType::LinearGradient || src->nodeType() == NodeType::RadialGradient) {
     std::string id = _ctx->nextId("grad");
@@ -894,7 +923,7 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha) 
     for (auto* stop : g->colorStops) {
       _defs->openTag("stop");
       _defs->addAttr("offset", FloatToString(stop->offset));
-      _defs->addAttr("stop-color", ColorToHex(stop->color));
+      _defs->addAttr("stop-color", ColorToSVGHex(stop->color));
       if (stop->color.alpha < 1.0f) {
         _defs->addAttr("stop-opacity", FloatToString(stop->color.alpha));
       }
@@ -1197,7 +1226,7 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
         auto bf = static_cast<const BlendFilter*>(f);
         std::string i = std::to_string(si++);
         _defs->openTag("feFlood");
-        _defs->addAttr("flood-color", ColorToHex(bf->color));
+        _defs->addAttr("flood-color", ColorToSVGHex(bf->color));
         if (bf->color.alpha < 1.0f) {
           _defs->addAttr("flood-opacity", FloatToString(bf->color.alpha));
         }
@@ -1206,7 +1235,7 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
         _defs->openTag("feBlend");
         _defs->addAttr("in", "SourceGraphic");
         _defs->addAttr("in2", "bFlood" + i);
-        auto ms = BlendModeToSVGString(bf->blendMode);
+        auto ms = BlendModeToMixBlendMode(bf->blendMode);
         if (ms) {
           _defs->addAttr("mode", ms);
         }
@@ -1247,6 +1276,10 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
 // HTMLWriter – mask / clip defs
 //==============================================================================
 
+// TODO: writeMaskDef only extracts geometry shapes and fills them with white. It does not process
+// Fill painters within the mask layer, so Luminance masks with gradient or alpha-varying fills will
+// lose their grayscale distribution. A proper implementation should apply the mask layer's Fill
+// color sources to the SVG mask shapes.
 std::string HTMLWriter::writeMaskDef(const Layer* mask, MaskType type) {
   std::string id = mask->id.empty() ? _ctx->nextId("mask") : mask->id;
   _defs->openTag("mask");
@@ -1370,6 +1403,17 @@ void HTMLWriter::writeClipContent(HTMLBuilder& out, const Layer* layer, const Ma
       out.addAttr("rx", FloatToString(el->size.width / 2));
       out.addAttr("ry", FloatToString(el->size.height / 2));
       out.closeTagSelfClosing();
+    } else if (e->nodeType() == NodeType::Polystar) {
+      auto ps = static_cast<const Polystar*>(e);
+      std::string d = BuildPolystarPath(ps);
+      if (!d.empty()) {
+        out.openTag("path");
+        if (!tr.empty()) {
+          out.addAttr("transform", tr);
+        }
+        out.addAttr("d", d);
+        out.closeTagSelfClosing();
+      }
     }
   }
   for (auto* child : layer->children) {
@@ -1584,7 +1628,7 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
       if (fill->alpha < 1.0f) {
         alpha *= fill->alpha;
       }
-    } else {
+    } else if (ct == NodeType::SolidColor) {
       float ea = ca * fill->alpha;
       if (ea < 1.0f) {
         auto sc = static_cast<const SolidColor*>(fill->color);
@@ -1592,6 +1636,8 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
       } else {
         style += ";background-color:" + css;
       }
+    } else {
+      style += ";background-color:" + css;
     }
   }
   if (painterBlend != BlendMode::Normal) {
@@ -1907,6 +1953,9 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     painterBlend = stroke->blendMode;
   }
   if (hasMerge) {
+    // TODO: TrimPath is not applied to merged paths. When both MergePath and TrimPath are present,
+    // the trim should be applied to the concatenated merged path, but this requires computing the
+    // total path length of the merged result.
     // Merge all geometries into a single <path> element
     std::string mergedPath;
     for (auto& g : geos) {
