@@ -383,9 +383,9 @@ Geometry Elements     Modifiers             Painters
 | Text modifiers (TextModifier, TextPath) | Glyph lists only | No effect on Paths |
 | Repeater | Both | Does not trigger text-to-shape |
 
-TextPath also supports **constraint-based positioning** (left, right, top, bottom, centerX, centerY)
-inherited from LayoutNode. When opposite-edge constraints are used, TextPath scales its path
-data proportionally (same as Path — scale-to-fit, not stretch).
+TextPath also supports **constraint-based positioning** (left, right, top, bottom, centerX, centerY).
+When opposite-edge constraints are used, TextPath scales its path data proportionally
+(same as Path — scale-to-fit, not stretch).
 
 **Key scope implications**:
 - Shape modifiers trigger **text-to-shape conversion** if glyph lists are present — irreversible.

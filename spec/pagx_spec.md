@@ -1387,7 +1387,7 @@ Text elements provide geometric shapes for text content. Unlike shape elements t
 | `letterSpacing` | float | 0 | Letter spacing |
 | `fauxBold` | bool | false | Faux bold (algorithmically bolded) |
 | `fauxItalic` | bool | false | Faux italic (algorithmically slanted) |
-| `baseline` | TextBaseline | lineBox | Baseline mode for vertical positioning. `lineBox`: position.y is the top of the line box; `alphabetic`: position.y is the alphabetic baseline |
+| `baseline` | TextBaseline | visualTop | Baseline mode for vertical positioning. `visualTop`: position.y is the top of the visual pixel bounds; `alphabetic`: position.y is the alphabetic baseline |
 | `textAnchor` | TextAnchor | start | Text anchor alignment relative to the origin (see below). Ignored when a TextBox controls the layout |
 | `left` | float | - | Distance from left edge to container's left edge (see §4.3) |
 | `right` | float | - | Distance from right edge to container's right edge (see §4.3) |
@@ -1433,7 +1433,7 @@ Controls how `position.y` is interpreted for vertical positioning.
 
 | Value | Description |
 |-------|-------------|
-| `lineBox` | `position.y` is the top of the line box. Text is offset downward by `halfLeading + ascent` from the position (default) |
+| `visualTop` | `position.y` is the top of the visual pixel bounds (default) |
 | `alphabetic` | `position.y` is the alphabetic baseline. Text is rendered directly at the baseline position |
 
 **Runtime Layout Rendering Flow**:
@@ -2246,7 +2246,7 @@ Layer / Group
 | **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
 | **TextAlign** | `start`, `center`, `end`, `justify` |
 | **TextAnchor** | `start`, `center`, `end` |
-| **TextBaseline** | `lineBox`, `alphabetic` |
+| **TextBaseline** | `visualTop`, `alphabetic` |
 | **ParagraphAlign** | `near`, `middle`, `far` |
 | **WritingMode** | `horizontal`, `vertical` |
 | **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |
@@ -2291,69 +2291,4 @@ An infographic / presentation slide introducing PAGX capabilities — center tit
 An illustrated alien planet scene with an astronaut, exotic flora, alien creatures, and atmospheric effects. Demonstrates complex scene composition with layered backgrounds, hand-drawn Path artwork, procedurally generated grass fields via long Path data, and rich gradient lighting.
 
 > [Sample](samples/C.6_space_explorer.pagx)
-
-
----
-
-## Appendix D. Implementation Architecture
-
-### D.1 LayoutNode Hierarchy
-
-The PAGX runtime implementation uses the following class hierarchy for elements that support constraint-based positioning:
-
-```
-Element (base class)
-├── LayoutNode (supports constraints)
-│   ├── Rectangle
-│   ├── Ellipse
-│   ├── Polystar
-│   ├── Path
-│   ├── Text
-│   └── Group
-│       └── TextBox
-├── TextPath (supports constraints, scale-to-fit)
-├── Fill
-├── Stroke
-├── TrimPath
-└── ... (other non-layout elements)
-```
-
-**LayoutNode** unifies constraint attribute management across all geometry elements and modifiers that participate in constraint positioning. This design provides:
-
-- Centralized constraint attribute declarations (left, right, top, bottom, centerX, centerY)
-- Unified constraint handling logic in the ConstraintLayout module
-- Consistent measurement and positioning behavior across element types
-
-### D.2 Unified Constraint Layout Module
-
-The `ConstraintLayout` module provides a single, consistent implementation of constraint positioning logic for both Element and Layer objects:
-
-- **ApplyElementConstraints()**: Applies constraints to content elements within a container
-- **ApplyLayerConstraints()**: Applies constraints to child Layers with measured dimensions
-- **ApplyElementsConstraints()**: Recursively processes hierarchical element structures
-
-This unified approach:
-- Eliminates logic duplication between Element and Layer constraint handling
-- Ensures constraint priority rules are consistently applied across all node types
-- Simplifies maintenance and future enhancements to constraint logic
-
-### D.3 Auto Layout Pipeline
-
-The auto layout process follows this sequence:
-
-1. **Clear Measurement Cache**: Reset cached dimensions for fresh calculation
-2. **Top-Level Constraint Application**: Apply constraints to root-level Layers
-3. **Hierarchical Layout**: For each Layer:
-   - Measure size (bottom-up) if not explicitly set
-   - Perform container layout (flex, gap, alignment) if layout mode is set
-   - Apply element constraints within this Layer
-   - Apply child Layer constraints
-   - Recursively layout child Layers
-4. **Pixel Snapping**: Round all coordinates to integer pixels
-
-This pipeline ensures:
-- Correct constraint priority and dependency resolution
-- Efficient measurement with caching
-- Proper handling of nested hierarchies
-- Pixel-perfect rendering output
 

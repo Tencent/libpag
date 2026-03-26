@@ -25,9 +25,9 @@ namespace pagx {
  */
 enum class TextBaseline {
   /**
-   * Default mode. position.y represents the top of the linebox (based on font metrics line height).
+   * Default mode. position.y represents the top of the visual pixel bounds.
    */
-  LineBox,
+  VisualTop,
   /**
    * position.y represents the alphabetic baseline. Used by SVG text elements.
    */

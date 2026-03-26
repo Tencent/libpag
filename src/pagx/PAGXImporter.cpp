@@ -828,7 +828,7 @@ static Text* parseText(const DOMNode* node, PAGXDocument* doc) {
   text->fauxBold = getBoolAttribute(node, "fauxBold", false, doc);
   text->fauxItalic = getBoolAttribute(node, "fauxItalic", false, doc);
   text->textAnchor = GET_ENUM(node, "textAnchor", "start", doc, TextAnchor);
-  text->baseline = GET_ENUM(node, "baseline", "lineBox", doc, TextBaseline);
+  text->baseline = GET_ENUM(node, "baseline", "visualTop", doc, TextBaseline);
 
   // Parse GlyphRun children for precomposition mode
   auto child = node->firstChild;
@@ -855,8 +855,8 @@ static Text* parseText(const DOMNode* node, PAGXDocument* doc) {
   text->centerY = getFloatAttributeOrNaN(node, "centerY", doc);
   validateAttributes(node,
                      {"id", "text", "position", "fontFamily", "fontStyle", "fontSize",
-                      "letterSpacing", "fauxBold", "fauxItalic", "textAnchor", "baseline", "color",
-                      "left", "right", "top", "bottom", "centerX", "centerY"},
+                      "letterSpacing", "fauxBold", "fauxItalic", "textAnchor", "baseline", "left",
+                      "right", "top", "bottom", "centerX", "centerY"},
                      doc);
   return text;
 }

@@ -590,7 +590,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       if (text->textAnchor != TextAnchor::Start) {
         xml.addAttribute("textAnchor", TextAnchorToString(text->textAnchor));
       }
-      if (text->baseline != TextBaseline::LineBox) {
+      if (text->baseline != TextBaseline::VisualTop) {
         xml.addAttribute("baseline", TextBaselineToString(text->baseline));
       }
       xml.addOptionalAttribute("left", text->left);

@@ -330,13 +330,11 @@ class LayerBuilderContext {
   }
 
   std::shared_ptr<tgfx::Text> convertText(const Text* node) {
-    // Read TextBlob that was created during applyLayout() in Text::setLayoutSize().
-    std::shared_ptr<tgfx::TextBlob> textBlob = node->textBlob;
-    std::vector<tgfx::Point> anchors = node->anchors;
+    auto textBlob = node->getTextBlob();
     if (textBlob == nullptr) {
       return nullptr;
     }
-    auto tgfxText = tgfx::Text::Make(textBlob, anchors);
+    auto tgfxText = tgfx::Text::Make(textBlob, node->getAnchors());
     if (tgfxText) {
       tgfxText->setPosition(tgfx::Point::Make(node->position.x, node->position.y));
     }

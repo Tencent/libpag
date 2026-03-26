@@ -2,7 +2,8 @@
 <pagx version="1.0" width="200" height="200">
   <Layer>
     <TextBox position="10,10" width="180" height="50">
-      <Text position="0,20" fontSize="18" color="#000000">Hello</Text>
+      <Text position="0,20" fontSize="18">Hello</Text>
+      <Fill color="#000000"/>
     </TextBox>
     <Rectangle left="10" top="80" size="180,80"/>
     <Fill color="#00FF00"/>

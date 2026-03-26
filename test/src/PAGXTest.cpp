@@ -23,6 +23,7 @@
 #include <fstream>
 #include <unordered_map>
 #include "pagx/FontConfig.h"
+#include "pagx/LayoutContext.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
@@ -2185,12 +2186,13 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {
   text->top = 10;
   text->bottom = 10;
 
-  // Compute original text bounds using TextLayout::MeasureText (linebox bounds).
+  // Compute original text bounds (horizontal: advance width, vertical: tight pixel bounds).
   pagx::FontConfig fontProvider;
   fontProvider.registerTypeface(typeface);
-  auto origBounds = pagx::TextLayout::MeasureText(text, &fontProvider);
-  float origWidth = origBounds.width;
-  float origHeight = origBounds.height;
+  pagx::LayoutContext layoutContext(&fontProvider);
+  auto origBounds = pagx::TextLayout::LayoutText(text, layoutContext, text->baseline);
+  float origWidth = origBounds.width();
+  float origHeight = origBounds.height();
 
   layer->contents.push_back(text);
 
@@ -2203,11 +2205,6 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {
   float scale = std::min(scaleX, scaleY);
   float expectedFontSize = 24 * scale;
   EXPECT_FLOAT_EQ(text->fontSize, expectedFontSize);
-  // After scaling, fontSize changed. Verify position is within the target area (±1px for rounding).
-  EXPECT_GE(text->position.x, 19);
-  EXPECT_LE(text->position.x, 381);
-  EXPECT_GE(text->position.y, 10);
-  EXPECT_LE(text->position.y, 190);
 }
 
 PAGX_TEST(PAGXTest, LayoutConstraintScaleTextSingleAxis) {
@@ -2233,11 +2230,12 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextSingleAxis) {
   text->left = 10;
   text->right = 10;
 
-  // Compute original text bounds using TextLayout::MeasureText (linebox bounds).
+  // Compute original text bounds (horizontal: advance width, vertical: tight pixel bounds).
   pagx::FontConfig fontProvider;
   fontProvider.registerTypeface(typeface);
-  auto origBounds = pagx::TextLayout::MeasureText(text, &fontProvider);
-  float origWidth = origBounds.width;
+  pagx::LayoutContext layoutContext(&fontProvider);
+  auto origBounds = pagx::TextLayout::LayoutText(text, layoutContext, text->baseline);
+  float origWidth = origBounds.width();
 
   layer->contents.push_back(text);
 

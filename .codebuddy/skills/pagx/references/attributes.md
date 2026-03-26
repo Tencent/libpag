@@ -405,7 +405,7 @@ Child element of gradient color sources (LinearGradient, RadialGradient, ConicGr
 | `fauxBold` | bool | false |
 | `fauxItalic` | bool | false |
 | `textAnchor` | TextAnchor | start |
-| `baseline` | TextBaseline | lineBox |
+| `baseline` | TextBaseline | visualTop |
 | `left` | float | — |
 | `right` | float | — |
 | `top` | float | — |
@@ -489,7 +489,7 @@ Opposite-pair constraints use scale-to-fit (same as Path). See §Constraint Attr
 
 ### Constraint Attributes (Geometry Elements, TextPath, TextBox, Groups, and Child Layers)
 
-These attributes position or stretch an element relative to its container (LayoutNode base class).
+These attributes position or stretch an element relative to its container.
 The container's size comes from explicit `width`/`height`, parent layout assignment, or
 content measurement (every container always has a size). `left`/`top` alone work without any
 container size dependency; `right`/`bottom`/`centerX`/`centerY` reference the container's size.
@@ -613,7 +613,7 @@ Path `data` uses SVG `<path d="...">` syntax exactly. Uppercase = absolute, lowe
 | **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
 | **TextAlign** | `start`, `center`, `end`, `justify` |
 | **TextAnchor** | `start`, `center`, `end` |
-| **TextBaseline** | `lineBox`, `alphabetic` |
+| **TextBaseline** | `visualTop`, `alphabetic` |
 | **ParagraphAlign** | `near`, `middle`, `far` |
 | **Overflow** | `visible`, `hidden` |
 | **WritingMode** | `horizontal`, `vertical` |

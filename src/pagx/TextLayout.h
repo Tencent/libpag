@@ -24,6 +24,8 @@
 #include "pagx/FontConfig.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/types/Rect.h"
+#include "pagx/types/TextBaseline.h"
+#include "tgfx/core/Rect.h"
 
 namespace pagx {
 
@@ -47,43 +49,26 @@ class TextLayout {
   static TextLayoutResult Layout(PAGXDocument* document, FontConfig* fontConfig = nullptr);
 
   /**
-   * Precisely measures the bounds of a Text element. Uses embedded GlyphRun data if available,
-   * otherwise constructs a TextBlob from the text content and font for accurate measurement.
-   * @param text The Text element to measure.
-   * @param fontConfig Optional font config for font matching.
-   * @return The bounding rectangle of the text.
-   */
-  static Rect MeasureText(const Text* text, FontConfig* fontConfig = nullptr);
-
-  /**
-   * Measures the content bounds of a TextBox by performing a full typesetting pass on its child
-   * Text elements. Uses the TextBox's width/height (NaN means no boundary) and alignment settings.
-   * Returns the tight bounds of the typeset result.
-   * @param textBox The TextBox to measure.
-   * @param fontConfig Optional font config for font matching.
-   * @return The tight bounding rectangle of the typeset text.
+   * Measures a TextBox element, returning linebox dimensions.
    */
   static Rect MeasureTextBox(const TextBox* textBox, FontConfig* fontConfig = nullptr);
 
   /**
    * Finds a typeface matching the given font family and style.
-   * @param fontFamily The font family name.
-   * @param fontStyle The font style name.
-   * @param fontConfig Optional font config. If nullptr, uses system font lookup.
-   * @return The matching typeface, or nullptr if not found.
    */
   static std::shared_ptr<tgfx::Typeface> FindTypeface(const std::string& fontFamily,
                                                       const std::string& fontStyle,
                                                       FontConfig* fontConfig = nullptr);
 
-  /** Measures a Text element using LayoutContext for font lookup. */
-  static Rect MeasureText(const Text* text, const LayoutContext& context);
-
   /** Measures a TextBox using LayoutContext for font lookup. */
   static Rect MeasureTextBox(const TextBox* textBox, const LayoutContext& context);
 
-  /** Builds TextBlob for a standalone Text element (not inside TextBox). */
-  static void LayoutText(Text* text, const LayoutContext& context);
+  /**
+   * Builds TextBlob for a standalone Text element. Returns the text bounds where horizontal extent
+   * uses advance width (0 to advance end) and vertical extent uses tight pixel bounds. The baseline
+   * parameter controls whether the TextBlob includes the visual-top-to-baseline y offset.
+   */
+  static tgfx::Rect LayoutText(Text* text, const LayoutContext& context, TextBaseline baseline);
 
   /** Performs text layout for all Text elements inside a TextBox. */
   static void LayoutTextBox(TextBox* textBox, const LayoutContext& context);

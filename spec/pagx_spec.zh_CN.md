@@ -1386,7 +1386,7 @@ y = position.y + outerRadius * sin(angle)
 | `letterSpacing` | float | 0 | 字间距 |
 | `fauxBold` | bool | false | 仿粗体效果 |
 | `fauxItalic` | bool | false | 仿斜体效果 |
-| `baseline` | TextBaseline | lineBox | 垂直定位基线模式。`lineBox`：position.y 是行框顶部；`alphabetic`：position.y 是字母基线 |
+| `baseline` | TextBaseline | visualTop | 垂直定位基线模式。`visualTop`：position.y 是视觉像素边界顶部；`alphabetic`：position.y 是字母基线 |
 | `textAnchor` | TextAnchor | start | 文本锚点对齐——控制文本相对原点的位置（见下方）。有 TextBox 排版时忽略 |
 | `left` | float | - | 左边缘到容器左边缘的距离（见 §4.3） |
 | `right` | float | - | 右边缘到容器右边缘的距离（见 §4.3） |
@@ -1432,7 +1432,7 @@ Line 3]]>
 
 | 值 | 说明 |
 |------|------|
-| `lineBox` | `position.y` 是行框顶部。文本从该位置向下偏移 `halfLeading + ascent`（默认值） |
+| `visualTop` | `position.y` 是视觉像素边界顶部（默认值） |
 | `alphabetic` | `position.y` 是字母基线。文本直接在基线位置渲染 |
 
 **运行时排版渲染流程**：
@@ -2241,7 +2241,7 @@ Layer / Group
 | **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
 | **TextAlign** | `start`, `center`, `end`, `justify` |
 | **TextAnchor** | `start`, `center`, `end` |
-| **TextBaseline** | `lineBox`, `alphabetic` |
+| **TextBaseline** | `visualTop`, `alphabetic` |
 | **ParagraphAlign** | `near`, `middle`, `far` |
 | **WritingMode** | `horizontal`, `vertical` |
 | **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |
@@ -2286,68 +2286,4 @@ Layer / Group
 一幅外星球探险插画，包含宇航员、奇异植物、外星生物和大气效果。展示了复杂场景合成、分层背景、手绘风格 Path 图形、通过超长 Path 数据程序化生成的草地纹理以及丰富的渐变光效。
 
 > [Sample](samples/C.6_space_explorer.pagx)
-
-
----
-
-## 附录 D. 实现架构
-
-### D.1 LayoutNode 类层次
-
-PAGX 运行时实现使用以下类层次结构来管理支持基于约束定位的元素：
-
-```
-Element（基类）
-├── LayoutNode（支持约束）
-│   ├── Rectangle
-│   ├── Ellipse
-│   ├── Polystar
-│   ├── Path
-│   ├── Text
-│   └── Group
-│       └── TextBox
-├── Fill
-├── Stroke
-├── TrimPath
-└── ...（其他非布局元素）
-```
-
-**LayoutNode** 统一了所有参与约束定位的几何元素和修饰符的约束属性管理。这种设计提供：
-
-- 集中式约束属性声明（left、right、top、bottom、centerX、centerY）
-- 统一的约束处理逻辑（ConstraintLayout 模块）
-- 跨元素类型的一致测量和定位行为
-
-### D.2 统一约束布局模块
-
-`ConstraintLayout` 模块为 Element 和 Layer 对象提供了单一、一致的约束定位逻辑实现：
-
-- **ApplyElementConstraints()**：对容器内的内容元素应用约束
-- **ApplyLayerConstraints()**：对子图层应用约束（带测量的维度）
-- **ApplyElementsConstraints()**：递归处理层级元素结构
-
-这种统一的方法：
-- 消除 Element 和 Layer 约束处理之间的逻辑重复
-- 确保约束优先级规则在所有节点类型中一致应用
-- 简化维护和对约束逻辑的未来增强
-
-### D.3 自动布局管道
-
-自动布局过程遵循以下步骤：
-
-1. **清除测量缓存**：为新计算重置缓存的尺寸
-2. **顶层约束应用**：对根级 Layer 应用约束
-3. **分层布局**：对每个 Layer：
-   - 测量大小（自下而上）如果没有显式设置
-   - 如果设置了布局模式，执行容器布局（flex、gap、alignment）
-   - 在该 Layer 内应用元素约束
-   - 应用子 Layer 约束
-   - 递归布局子 Layer
-4. **像素对齐**：将所有坐标舍入到整数像素
-
-这个管道确保：
-- 正确的约束优先级和依赖关系解析
-- 高效的缓存测量
-- 正确处理嵌套层次结构
-- 完美的像素级渲染输出
 

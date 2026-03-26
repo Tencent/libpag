@@ -217,7 +217,7 @@
               <Rectangle left="4" top="16" size="30,22" roundness="3"/>
               <Fill color="#1E2433"/>
             </Group>
-            <Group centerX="0" top="15">
+            <Group centerX="0" top="21">
               <Text text="17" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
               <Fill color="#EF4444"/>
             </Group>

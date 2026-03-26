@@ -293,7 +293,7 @@
 
   <xs:simpleType name="TextBaselineType">
     <xs:restriction base="xs:string">
-      <xs:enumeration value="lineBox"/>
+      <xs:enumeration value="visualTop"/>
       <xs:enumeration value="alphabetic"/>
     </xs:restriction>
   </xs:simpleType>
@@ -549,8 +549,6 @@
     <xs:attribute name="outerRoundness" type="xs:decimal" default="0"/>
     <xs:attribute name="innerRoundness" type="xs:decimal" default="0"/>
     <xs:attribute name="reversed" type="BoolType" default="false"/>
-    <xs:attribute name="size" type="SizeType"/>
-    <xs:attribute name="points" type="xs:decimal"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
   </xs:complexType>
 
@@ -578,8 +576,7 @@
     <xs:attribute name="fauxBold" type="BoolType" default="false"/>
     <xs:attribute name="fauxItalic" type="BoolType" default="false"/>
     <xs:attribute name="textAnchor" type="TextAnchorType" default="start"/>
-    <xs:attribute name="baseline" type="TextBaselineType" default="lineBox"/>
-    <xs:attribute name="color" type="ColorType"/>
+    <xs:attribute name="baseline" type="TextBaselineType" default="visualTop"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
   </xs:complexType>
 

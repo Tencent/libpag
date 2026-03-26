@@ -17,37 +17,33 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/nodes/Text.h"
-#include <cmath>
 #include "pagx/TextLayout.h"
 #include "pagx/layout/LayoutNode.h"
 
 namespace pagx {
 
 void Text::onMeasure(const LayoutContext& context) {
-  auto result = TextLayout::MeasureText(this, context);
-  preferredWidth = result.width;
-  preferredHeight = result.height;
+  textBounds = TextLayout::LayoutText(this, context, baseline);
+  preferredWidth = textBounds.width();
+  preferredHeight = textBounds.height();
 }
 
 void Text::setLayoutSize(const LayoutContext& context, float width, float height) {
   float scale = LayoutNode::ComputeUniformScale(preferredWidth, preferredHeight, width, height);
   if (scale != 1.0f) {
     fontSize = fontSize * scale;
+    textBounds = TextLayout::LayoutText(this, context, baseline);
   }
-  actualWidth = preferredWidth * scale;
-  actualHeight = preferredHeight * scale;
-  // Build TextBlob for standalone Text (not inside TextBox).
-  TextLayout::LayoutText(this, context);
+  actualWidth = textBounds.width();
+  actualHeight = textBounds.height();
 }
 
 void Text::setLayoutPosition(const LayoutContext&, float x, float y) {
-  if (!std::isnan(y)) {
-    position.y = std::round(y);
-  }
   if (!std::isnan(x)) {
-    position.x = std::round((textAnchor == TextAnchor::Start)    ? x
-                            : (textAnchor == TextAnchor::Center) ? x + actualWidth * 0.5f
-                                                                 : x + actualWidth);
+    position.x = x - textBounds.left;
+  }
+  if (!std::isnan(y)) {
+    position.y = y - textBounds.top;
   }
 }
 
