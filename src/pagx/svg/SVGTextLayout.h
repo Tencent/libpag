@@ -25,10 +25,10 @@
 #include "pagx/types/Matrix.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/TextAnchor.h"
+#include "pagx/utils/ExporterUtils.h"
 
 namespace pagx {
 
-class PathData;
 class Text;
 class TextBox;
 
@@ -102,18 +102,6 @@ struct SVGTextLayoutResult {
  */
 SVGTextLayoutResult ComputeTextLayout(const SVGTextLayoutParams& params);
 
-/**
- * A single glyph's path data with its computed transform matrix.
- */
-struct SVGGlyphPath {
-  Matrix transform;          // glyph's full transform matrix
-  const PathData* pathData;  // pointer to glyph's path (not owned)
-};
-
-/**
- * Converts text glyph runs into a list of glyph paths with transform matrices.
- * textPosX/textPosY are the TextBox-aligned base position (from ComputeTextLayout).
- */
-std::vector<SVGGlyphPath> ComputeGlyphPaths(const Text& text, float textPosX, float textPosY);
+using SVGGlyphPath = GlyphPath;
 
 }  // namespace pagx

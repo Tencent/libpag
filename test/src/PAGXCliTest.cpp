@@ -1235,4 +1235,293 @@ CLI_TEST(PAGXCliTest, Convert_PagxToSvg_ValidateSimple) {
   EXPECT_NE(output.find("</svg>"), std::string::npos);
 }
 
+//==============================================================================
+// Convert tests — PAGX to PDF
+//==============================================================================
+
+CLI_TEST(PAGXCliTest, Convert_PagxToPdf_Basic) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto outputPath = TempDir() + "/ConvertPDF_Basic.pdf";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+  EXPECT_GT(std::filesystem::file_size(outputPath), 0u);
+  auto output = ReadFile(outputPath);
+  EXPECT_NE(output.find("%PDF-"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Convert_PagxToPdf_Gradient) {
+  auto inputPath = TestResourcePath("render_gradient.pagx");
+  auto outputPath = TempDir() + "/ConvertPDF_Gradient.pdf";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+  auto output = ReadFile(outputPath);
+  EXPECT_NE(output.find("%PDF-"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Convert_PagxToPdf_Text) {
+  auto inputPath = TestResourcePath("render_text.pagx");
+  auto outputPath = TempDir() + "/ConvertPDF_Text.pdf";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+  auto output = ReadFile(outputPath);
+  EXPECT_NE(output.find("%PDF-"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Convert_PagxToPdf_NoConvertTextToPath) {
+  auto inputPath = TestResourcePath("render_text.pagx");
+  auto outputPath = TempDir() + "/ConvertPDF_NoTextPath.pdf";
+  auto ret = CallRun(pagx::cli::RunConvert,
+                     {"convert", "--no-convert-text-to-path", inputPath, outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+  auto output = ReadFile(outputPath);
+  EXPECT_NE(output.find("%PDF-"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Convert_PagxToPdf_ForceFormat) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto outputPath = TempDir() + "/ConvertPDF_ForceFormat.out";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", "--format", "pdf", inputPath, outputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  EXPECT_NE(output.find("%PDF-"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Convert_PagxToPdf_MissingFile) {
+  auto outputPath = TempDir() + "/ConvertPDF_Missing.pdf";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", "nonexistent.pagx", outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_PagxToPdf_InvalidFile) {
+  auto inputPath = TestResourcePath("validate_not_xml.pagx");
+  auto outputPath = TempDir() + "/ConvertPDF_Invalid.pdf";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_PagxToPdf_ValidateSimple) {
+  auto inputPath = TestResourcePath("validate_simple.pagx");
+  auto outputPath = TempDir() + "/ConvertPDF_ValidateSimple.pdf";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+  auto output = ReadFile(outputPath);
+  EXPECT_NE(output.find("%PDF-"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Convert_PagxToPdf_Scale) {
+  auto inputPath = TestResourcePath("render_scale.pagx");
+  auto outputPath = TempDir() + "/ConvertPDF_Scale.pdf";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+  auto output = ReadFile(outputPath);
+  EXPECT_NE(output.find("%PDF-"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Convert_PagxToPdf_Background) {
+  auto inputPath = TestResourcePath("render_background.pagx");
+  auto outputPath = TempDir() + "/ConvertPDF_Background.pdf";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+  auto output = ReadFile(outputPath);
+  EXPECT_NE(output.find("%PDF-"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Convert_PagxToPdf_LayerTarget) {
+  auto inputPath = TestResourcePath("render_layer_target.pagx");
+  auto outputPath = TempDir() + "/ConvertPDF_LayerTarget.pdf";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+  auto output = ReadFile(outputPath);
+  EXPECT_NE(output.find("%PDF-"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Convert_PagxToPdf_Crop) {
+  auto inputPath = TestResourcePath("render_crop.pagx");
+  auto outputPath = TempDir() + "/ConvertPDF_Crop.pdf";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+  auto output = ReadFile(outputPath);
+  EXPECT_NE(output.find("%PDF-"), std::string::npos);
+}
+
+//==============================================================================
+// Convert tests — SVG to PDF
+//==============================================================================
+
+CLI_TEST(PAGXCliTest, Convert_SvgToPdf) {
+  auto inputPagx = TestResourcePath("render_basic.pagx");
+  auto svgPath = TempDir() + "/ConvertSvgToPdf_intermediate.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPagx, svgPath});
+  ASSERT_EQ(ret, 0);
+  auto outputPath = TempDir() + "/ConvertSvgToPdf.pdf";
+  ret = CallRun(pagx::cli::RunConvert, {"convert", svgPath, outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+  auto output = ReadFile(outputPath);
+  EXPECT_NE(output.find("%PDF-"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Convert_SvgToPdf_WithImportOptions) {
+  auto inputPagx = TestResourcePath("render_basic.pagx");
+  auto svgPath = TempDir() + "/ConvertSvgToPdf_import_opts.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPagx, svgPath});
+  ASSERT_EQ(ret, 0);
+  auto outputPath = TempDir() + "/ConvertSvgToPdf_import_opts.pdf";
+  ret = CallRun(pagx::cli::RunConvert, {"convert", "--no-expand-use", "--flatten-transforms",
+                                        "--preserve-unknown", svgPath, outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+  auto output = ReadFile(outputPath);
+  EXPECT_NE(output.find("%PDF-"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Convert_SvgToPdf_MissingFile) {
+  auto outputPath = TempDir() + "/ConvertSvgToPdf_Missing.pdf";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", "nonexistent.svg", outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_UnsupportedInputToPdf) {
+  auto inputPath = CopyToTemp("render_basic.pagx", "unsupported_input.dat");
+  auto outputPath = TempDir() + "/ConvertPDF_UnsupportedInput.pdf";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+//==============================================================================
+// Convert tests — additional coverage
+//==============================================================================
+
+CLI_TEST(PAGXCliTest, Convert_Help) {
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", "--help"});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_HelpShort) {
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", "-h"});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_TooManyArgs) {
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", "a.pagx", "b.svg", "c.svg"});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_UnsupportedFormatFlag) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto outputPath = TempDir() + "/ConvertUnsupported.out";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", "--format", "bmp", inputPath, outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_InvalidIndent) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto outputPath = TempDir() + "/ConvertInvalidIndent.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", "--indent", "99", inputPath, outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_InvalidIndentNonNumeric) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto outputPath = TempDir() + "/ConvertInvalidIndentNaN.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", "--indent", "abc", inputPath, outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+//==============================================================================
+// Convert tests — SVG to PAGX
+//==============================================================================
+
+CLI_TEST(PAGXCliTest, Convert_SvgToPagx_Basic) {
+  auto inputPagx = TestResourcePath("render_basic.pagx");
+  auto svgPath = TempDir() + "/ConvertSvgToPagx_src.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPagx, svgPath});
+  ASSERT_EQ(ret, 0);
+  auto outputPath = TempDir() + "/ConvertSvgToPagx.pagx";
+  ret = CallRun(pagx::cli::RunConvert, {"convert", svgPath, outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+  auto output = ReadFile(outputPath);
+  EXPECT_NE(output.find("<pagx"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Convert_SvgToPagx_WithImportOptions) {
+  auto inputPagx = TestResourcePath("render_basic.pagx");
+  auto svgPath = TempDir() + "/ConvertSvgToPagx_opts_src.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPagx, svgPath});
+  ASSERT_EQ(ret, 0);
+  auto outputPath = TempDir() + "/ConvertSvgToPagx_opts.pagx";
+  ret = CallRun(pagx::cli::RunConvert, {"convert", "--no-expand-use", "--flatten-transforms",
+                                        "--preserve-unknown", svgPath, outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+}
+
+CLI_TEST(PAGXCliTest, Convert_SvgToPagx_MissingFile) {
+  auto outputPath = TempDir() + "/ConvertSvgToPagx_Missing.pagx";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", "nonexistent.svg", outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_UnsupportedInputToPagx) {
+  auto inputPath = CopyToTemp("render_basic.pagx", "unsupported_input_pagx.dat");
+  auto outputPath = TempDir() + "/ConvertPAGX_UnsupportedInput.pagx";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_PagxToPagx_Unsupported) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto outputPath = TempDir() + "/ConvertPagxToPagx.pagx";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_SvgToPagx_ForceFormat) {
+  auto inputPagx = TestResourcePath("render_basic.pagx");
+  auto svgPath = TempDir() + "/ConvertSvgToPagx_force_src.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPagx, svgPath});
+  ASSERT_EQ(ret, 0);
+  auto outputPath = TempDir() + "/ConvertSvgToPagx_force.out";
+  ret = CallRun(pagx::cli::RunConvert, {"convert", "--format", "pagx", svgPath, outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+  auto output = ReadFile(outputPath);
+  EXPECT_NE(output.find("<pagx"), std::string::npos);
+}
+
+//==============================================================================
+// Convert tests — write failure
+//==============================================================================
+
+CLI_TEST(PAGXCliTest, Convert_PagxToPdf_WriteFailure) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, "/nonexistent_dir/output.pdf"});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_PagxToSvg_WriteFailure) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPath, "/nonexistent_dir/output.svg"});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Convert_SvgToPagx_WriteFailure) {
+  auto inputPagx = TestResourcePath("render_basic.pagx");
+  auto svgPath = TempDir() + "/ConvertWriteFailure_src.svg";
+  auto ret = CallRun(pagx::cli::RunConvert, {"convert", inputPagx, svgPath});
+  ASSERT_EQ(ret, 0);
+  ret = CallRun(pagx::cli::RunConvert, {"convert", svgPath, "/nonexistent_dir/output.pagx"});
+  EXPECT_NE(ret, 0);
+}
+
 }  // namespace pag

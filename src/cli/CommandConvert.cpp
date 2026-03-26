@@ -23,6 +23,7 @@
 #include <vector>
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/PDFExporter.h"
 #include "pagx/SVGExporter.h"
 #include "pagx/SVGImporter.h"
 
@@ -40,12 +41,17 @@ struct SVGImportOptions {
   bool preserveUnknown = false;
 };
 
+struct PDFExportOpts {
+  bool noConvertTextToPath = false;
+};
+
 struct ConvertOptions {
   std::string inputFile = {};
   std::string outputFile = {};
   std::string outputFormat = {};
   SVGExportOptions svgExport = {};
   SVGImportOptions svgImport = {};
+  PDFExportOpts pdfExport = {};
 };
 
 static void PrintUsage() {
@@ -55,12 +61,15 @@ static void PrintUsage() {
             << "is inferred from file extensions (e.g. .pagx -> .svg or .svg -> .pagx).\n"
             << "\n"
             << "Options:\n"
-            << "  --format <format>            Override output format (svg, pagx)\n"
+            << "  --format <format>            Override output format (svg, pdf, pagx)\n"
             << "\n"
             << "SVG output options:\n"
             << "  --indent <n>              Indentation spaces (default: 2, valid range: 0-16)\n"
             << "  --no-xml-declaration      Omit the <?xml ...?> declaration\n"
-            << "  --no-convert-text-to-path Keep text as <text> elements instead of <path>\n"
+            << "  --no-convert-text-to-path Keep text as <text>/<text operators> instead of paths\n"
+            << "\n"
+            << "PDF output options:\n"
+            << "  --no-convert-text-to-path Keep text as PDF text operators instead of paths\n"
             << "\n"
             << "SVG input options:\n"
             << "  --no-expand-use           Do not expand <use> references\n"
@@ -69,9 +78,10 @@ static void PrintUsage() {
             << "\n"
             << "Examples:\n"
             << "  pagx convert input.pagx output.svg          # PAGX to SVG\n"
+            << "  pagx convert input.pagx output.pdf          # PAGX to PDF\n"
             << "  pagx convert input.svg output.pagx           # SVG to PAGX\n"
             << "  pagx convert --indent 4 input.pagx out.svg   # PAGX to SVG with 4-space indent\n"
-            << "  pagx convert --format svg input.pagx output       # specify SVG output format\n";
+            << "  pagx convert --format pdf input.pagx output  # specify PDF output format\n";
 }
 
 static std::string InferFormat(const std::string& path) {
@@ -80,6 +90,9 @@ static std::string InferFormat(const std::string& path) {
     auto ext = path.substr(dot + 1);
     if (ext == "svg") {
       return "svg";
+    }
+    if (ext == "pdf") {
+      return "pdf";
     }
     if (ext == "pagx") {
       return "pagx";
@@ -107,6 +120,7 @@ static int ParseOptions(int argc, char* argv[], ConvertOptions* options) {
       options->svgExport.noXmlDeclaration = true;
     } else if (arg == "--no-convert-text-to-path") {
       options->svgExport.noConvertTextToPath = true;
+      options->pdfExport.noConvertTextToPath = true;
     } else if (arg == "--no-expand-use") {
       options->svgImport.expandUse = false;
     } else if (arg == "--flatten-transforms") {
@@ -178,6 +192,46 @@ static int ConvertToSVG(const ConvertOptions& options) {
   return 0;
 }
 
+static int ConvertToPDF(const ConvertOptions& options) {
+  auto inputFormat = InferFormat(options.inputFile);
+  std::shared_ptr<PAGXDocument> document;
+
+  if (inputFormat == "pagx") {
+    document = PAGXImporter::FromFile(options.inputFile);
+  } else if (inputFormat == "svg") {
+    SVGImporter::Options svgOptions = {};
+    svgOptions.expandUseReferences = options.svgImport.expandUse;
+    svgOptions.flattenTransforms = options.svgImport.flattenTransforms;
+    svgOptions.preserveUnknownElements = options.svgImport.preserveUnknown;
+    document = SVGImporter::Parse(options.inputFile, svgOptions);
+  } else {
+    std::cerr << "pagx convert: error: unsupported input format for '" << options.inputFile
+              << "'\n";
+    return 1;
+  }
+
+  if (document == nullptr) {
+    std::cerr << "pagx convert: error: failed to load '" << options.inputFile << "'\n";
+    return 1;
+  }
+  if (!document->errors.empty()) {
+    for (auto& error : document->errors) {
+      std::cerr << "pagx convert: warning: " << error << "\n";
+    }
+  }
+
+  PDFExporter::Options pdfOptions = {};
+  pdfOptions.convertTextToPath = !options.pdfExport.noConvertTextToPath;
+
+  if (!PDFExporter::ToFile(*document, options.outputFile, pdfOptions)) {
+    std::cerr << "pagx convert: error: failed to write '" << options.outputFile << "'\n";
+    return 1;
+  }
+
+  std::cout << "pagx convert: wrote " << options.outputFile << "\n";
+  return 0;
+}
+
 static int ConvertToPAGX(const ConvertOptions& options) {
   auto inputFormat = InferFormat(options.inputFile);
   if (inputFormat != "svg") {
@@ -223,6 +277,9 @@ int RunConvert(int argc, char* argv[]) {
 
   if (options.outputFormat == "svg") {
     return ConvertToSVG(options);
+  }
+  if (options.outputFormat == "pdf") {
+    return ConvertToPDF(options);
   }
   if (options.outputFormat == "pagx") {
     return ConvertToPAGX(options);
