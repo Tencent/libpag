@@ -30,7 +30,9 @@
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
 #include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
@@ -41,10 +43,8 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/svg/SVGPathParser.h"
-#include "pagx/utils/ExporterUtils.h"
-#include "pagx/nodes/Font.h"
-#include "pagx/nodes/Image.h"
 #include "pagx/types/Data.h"
+#include "pagx/utils/ExporterUtils.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/TextLayout.h"
@@ -953,10 +953,10 @@ PAGX_TEST(PAGXSVGTest, GetPNGDimensions_Valid) {
   // Construct a minimal valid PNG header: 8-byte signature + IHDR chunk (4 len + 4 type + 8 data)
   uint8_t header[24] = {
       0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,  // PNG signature
-      0x00, 0x00, 0x00, 0x0D,                            // IHDR length (13)
-      0x49, 0x48, 0x44, 0x52,                            // "IHDR"
-      0x00, 0x00, 0x01, 0x00,                            // width = 256
-      0x00, 0x00, 0x00, 0x80                             // height = 128
+      0x00, 0x00, 0x00, 0x0D,                          // IHDR length (13)
+      0x49, 0x48, 0x44, 0x52,                          // "IHDR"
+      0x00, 0x00, 0x01, 0x00,                          // width = 256
+      0x00, 0x00, 0x00, 0x80                           // height = 128
   };
   int w = 0, h = 0;
   EXPECT_TRUE(pagx::GetPNGDimensions(header, 24, &w, &h));
@@ -979,11 +979,9 @@ PAGX_TEST(PAGXSVGTest, GetPNGDimensions_BadSignature) {
 
 PAGX_TEST(PAGXSVGTest, GetPNGDimensions_ZeroDimension) {
   uint8_t header[24] = {
-      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
-      0x00, 0x00, 0x00, 0x0D,
-      0x49, 0x48, 0x44, 0x52,
-      0x00, 0x00, 0x00, 0x00,  // width = 0
-      0x00, 0x00, 0x00, 0x80   // height = 128
+      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00,
+      0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x00,  // width = 0
+      0x00, 0x00, 0x00, 0x80                                       // height = 128
   };
   int w = 0, h = 0;
   EXPECT_FALSE(pagx::GetPNGDimensions(header, 24, &w, &h));
@@ -1008,11 +1006,9 @@ PAGX_TEST(PAGXSVGTest, GetImagePNGDimensions_WithData) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto image = doc->makeNode<pagx::Image>();
   uint8_t header[24] = {
-      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
-      0x00, 0x00, 0x00, 0x0D,
-      0x49, 0x48, 0x44, 0x52,
-      0x00, 0x00, 0x00, 0x64,  // width = 100
-      0x00, 0x00, 0x00, 0xC8   // height = 200
+      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00,
+      0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x64,  // width = 100
+      0x00, 0x00, 0x00, 0xC8                                       // height = 200
   };
   image->data = pagx::Data::MakeWithCopy(header, 24);
   int w = 0, h = 0;
