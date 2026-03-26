@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,12 +18,37 @@
 
 #pragma once
 
-#include "utils/AEHelper.h"
+#include <QOpenGLContext>
+#include <QQuickWindow>
+#include "rendering/ContentView.h"
+#include "rendering/pagx/PAGXViewModel.h"
 
-namespace exporter {
+namespace pag {
 
-void CombineAudioMarkers(std::vector<pag::Composition*>& compositions);
+class PAGXRenderer;
 
-void GetAudioSequence(const AEGP_ItemH& itemHandle, pag::Composition* composition);
+/**
+ * PAGXView is a view for rendering PAGX files.
+ */
+class PAGXView : public ContentView {
+  Q_OBJECT
+ public:
+  explicit PAGXView(QQuickItem* parent = nullptr);
+  ~PAGXView() override;
 
-}  // namespace exporter
+  ContentViewModel* getViewModel() const override;
+
+  Q_SLOT void flush() const override;
+  QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
+
+ private:
+  void initDrawable() override;
+
+  void onSizeChangedDelayHandled() override;
+  Q_SLOT void onRequestSizeChanged();
+  Q_SLOT void onPreferredSizeChanged();
+
+  std::unique_ptr<PAGXViewModel> viewModel = nullptr;
+};
+
+}  // namespace pag

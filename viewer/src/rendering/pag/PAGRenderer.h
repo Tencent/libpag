@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,12 +18,25 @@
 
 #pragma once
 
-#include "utils/AEHelper.h"
+#include "rendering/IContentRenderer.h"
+#include "rendering/pag/PAGViewModel.h"
 
-namespace exporter {
+namespace pag {
 
-void CombineAudioMarkers(std::vector<pag::Composition*>& compositions);
+/**
+ * Renderer implementation for PAG format content. Executes PAGPlayer flush and collects
+ * per-frame timing metrics.
+ */
+class PAGRenderer : public IContentRenderer {
+ public:
+  explicit PAGRenderer(PAGViewModel* viewModel);
 
-void GetAudioSequence(const AEGP_ItemH& itemHandle, pag::Composition* composition);
+  RenderMetrics flush() override;
+  void updateSize() override;
+  bool isReady() const override;
 
-}  // namespace exporter
+ private:
+  PAGViewModel* viewModel = nullptr;
+};
+
+}  // namespace pag

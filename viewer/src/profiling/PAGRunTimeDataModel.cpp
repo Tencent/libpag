@@ -53,6 +53,14 @@ const PAGFrameDisplayInfoModel* PAGRunTimeDataModel::getFrameDisplayInfoModel() 
   return &frameDisplayInfoModel;
 }
 
+const PAGNodeStatsModel* PAGRunTimeDataModel::getNodeStatsModel() const {
+  return &nodeStatsModel;
+}
+
+bool PAGRunTimeDataModel::hasFrameTimeline() const {
+  return frameModeEnabled;
+}
+
 void PAGRunTimeDataModel::setCurrentFrame(const QString& currentFrame) {
   if (this->currentFrame == currentFrame.toLongLong()) {
     return;
@@ -73,31 +81,84 @@ void PAGRunTimeDataModel::setChartDataSize(int chartDataSize) {
 
 void PAGRunTimeDataModel::updateData(int64_t currentFrame, int64_t renderTime, int64_t presentTime,
                                      int64_t imageDecodeTime) {
-  if (this->currentFrame == currentFrame) {
+  if (currentFrame < 0 || this->currentFrame == currentFrame) {
     return;
   }
   this->currentFrame = currentFrame;
-  if (currentFrame >= frameTimeMetricsVector.size()) {
-    frameTimeMetricsVector.push_back(FrameTimeMetrics(renderTime, presentTime, imageDecodeTime));
-  } else {
-    frameTimeMetricsVector[currentFrame] =
-        FrameTimeMetrics(renderTime, presentTime, imageDecodeTime);
+  while (frameTimeMetricsVector.size() <= currentFrame) {
+    frameTimeMetricsVector.push_back(FrameTimeMetrics(0, 0, 0));
   }
+  frameTimeMetricsVector[currentFrame] = FrameTimeMetrics(renderTime, presentTime, imageDecodeTime);
   updateFrameDisplayInfo(renderTime, presentTime, imageDecodeTime);
   updateChartData();
   Q_EMIT dataChanged();
 }
 
 void PAGRunTimeDataModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
+  if (pagFile == nullptr) {
+    frameModeEnabled = false;
+    totalFrame = 0;
+    currentFrame = -1;
+    lastUpdatedFrame = -1;
+    chartDataModel.clearItems();
+    frameTimeMetricsVector.clear();
+    fileInfoModel.setPAGFile(nullptr);
+    nodeStatsModel.setPAGXDocument(nullptr);
+    updateFrameDisplayInfo(0, 0, 0);
+    Q_EMIT fileInfoModelChanged();
+    Q_EMIT nodeStatsModelChanged();
+    Q_EMIT hasFrameTimelineChanged();
+    Q_EMIT dataChanged();
+    return;
+  }
+  frameModeEnabled = true;
   totalFrame = TimeToFrame(pagFile->duration(), pagFile->frameRate());
   currentFrame = -1;
+  lastUpdatedFrame = -1;
   chartDataModel.clearItems();
-  frameTimeMetricsVector.resize(totalFrame, {0, 0, 0});
-  frameTimeMetricsVector.squeeze();
   frameTimeMetricsVector.clear();
+  frameTimeMetricsVector.reserve(totalFrame);
   fileInfoModel.setPAGFile(pagFile);
+  nodeStatsModel.setPAGXDocument(nullptr);
   updateFrameDisplayInfo(0, 0, 0);
+  Q_EMIT fileInfoModelChanged();
+  Q_EMIT nodeStatsModelChanged();
+  Q_EMIT hasFrameTimelineChanged();
   Q_EMIT dataChanged();
+}
+
+void PAGRunTimeDataModel::setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pagxDocument) {
+  frameModeEnabled = false;
+  totalFrame = pagxDocument ? 1 : 0;
+  currentFrame = pagxDocument ? 0 : -1;
+  lastUpdatedFrame = -1;
+  chartDataModel.clearItems();
+  frameTimeMetricsVector.clear();
+  fileInfoModel.setPAGXDocument(pagxDocument);
+  nodeStatsModel.setPAGXDocument(pagxDocument);
+  updateFrameDisplayInfo(0, 0, 0);
+  Q_EMIT fileInfoModelChanged();
+  Q_EMIT nodeStatsModelChanged();
+  Q_EMIT hasFrameTimelineChanged();
+  Q_EMIT dataChanged();
+}
+
+void PAGRunTimeDataModel::updatePAGXRenderTime(int64_t renderTime, int64_t imageTime,
+                                               int64_t presentTime) {
+  FrameDisplayInfo renderInfo("Render", "#0096D8", renderTime, renderTime, renderTime);
+  FrameDisplayInfo presentInfo("Present", "#DDB259", presentTime, presentTime, presentTime);
+  FrameDisplayInfo imageDecodeInfo("Image", "#74AD59", imageTime, imageTime, imageTime);
+  frameDisplayInfoModel.updateData(renderInfo, imageDecodeInfo, presentInfo);
+  Q_EMIT frameDisplayInfoModelChanged();
+}
+
+void PAGRunTimeDataModel::updateMetrics(int64_t renderTime, int64_t presentTime,
+                                        int64_t imageDecodeTime, int64_t currentFrame) {
+  if (currentFrame == -1) {
+    updatePAGXRenderTime(renderTime, imageDecodeTime, presentTime);
+  } else {
+    updateData(currentFrame, renderTime, presentTime, imageDecodeTime);
+  }
 }
 
 void PAGRunTimeDataModel::updateChartData() {
@@ -108,39 +169,49 @@ void PAGRunTimeDataModel::updateChartData() {
     return;
   }
   double ratio = static_cast<double>(chartDataSize) / totalFrame;
-  auto startChartDataIndex = static_cast<int64_t>((currentFrame + 1) * ratio);
-  auto startIndex =
-      static_cast<int64_t>(std::floor(static_cast<double>(startChartDataIndex) / ratio));
-  auto endIndex =
-      static_cast<int64_t>(std::ceil(static_cast<double>((startChartDataIndex + 1)) / ratio));
-  if (endIndex < (startIndex + 1)) {
-    endIndex = startIndex + 1;
-  }
 
-  int64_t count = 0;
-  int64_t renderTime = 0;
-  int64_t presentTime = 0;
-  int64_t imageDecodeTime = 0;
-  for (int64_t i = startIndex; i < endIndex && i < frameTimeMetricsVector.size(); ++i) {
-    renderTime += frameTimeMetricsVector[i].renderTime;
-    presentTime += frameTimeMetricsVector[i].presentTime;
-    imageDecodeTime += frameTimeMetricsVector[i].imageDecodeTime;
-    count++;
-  }
+  int64_t startFrame = lastUpdatedFrame + 1;
+  int64_t endFrame = currentFrame;
 
-  if (count > 0) {
-    renderTime /= count;
-    presentTime /= count;
-    imageDecodeTime /= count;
-    int64_t endChartDataIndex = endIndex * ratio;
+  for (int64_t frame = startFrame; frame <= endFrame; ++frame) {
+    auto chartDataIndex = static_cast<int64_t>(frame * ratio);
+    auto frameStartIndex =
+        static_cast<int64_t>(std::floor(static_cast<double>(chartDataIndex) / ratio));
+    auto frameEndIndex =
+        static_cast<int64_t>(std::ceil(static_cast<double>((chartDataIndex + 1)) / ratio));
+    if (frameEndIndex < (frameStartIndex + 1)) {
+      frameEndIndex = frameStartIndex + 1;
+    }
+
+    int64_t count = 0;
+    int64_t renderTime = 0;
+    int64_t presentTime = 0;
+    int64_t imageDecodeTime = 0;
+    for (int64_t i = frameStartIndex; i < frameEndIndex && i < frameTimeMetricsVector.size(); ++i) {
+      renderTime += frameTimeMetricsVector[i].renderTime;
+      presentTime += frameTimeMetricsVector[i].presentTime;
+      imageDecodeTime += frameTimeMetricsVector[i].imageDecodeTime;
+      count++;
+    }
+
+    if (count > 0) {
+      renderTime /= count;
+      presentTime /= count;
+      imageDecodeTime /= count;
+    }
+
     PAGCharDataItem item;
     item.renderTime = renderTime;
     item.presentTime = presentTime;
     item.imageDecodeTime = imageDecodeTime;
-    for (int64_t i = startChartDataIndex; i < endChartDataIndex; ++i) {
+
+    int64_t endChartDataIndex = static_cast<int64_t>((frame + 1) * ratio);
+    for (int64_t i = chartDataIndex; i < endChartDataIndex; ++i) {
       chartDataModel.updateOrInsertItem(i, &item);
     }
   }
+
+  lastUpdatedFrame = currentFrame;
 }
 
 void PAGRunTimeDataModel::refreshChartDataModel() {
@@ -223,7 +294,7 @@ void PAGRunTimeDataModel::updateFrameDisplayInfo(int64_t renderTime, int64_t pre
   FrameDisplayInfo presentInfo("Present", "#DDB259", presentTime, presentAvg, presentMax);
   FrameDisplayInfo imageDecodeInfo("Image", "#74AD59", imageDecodeTime, imageDecodeAvg,
                                    imageDecodeMax);
-  frameDisplayInfoModel.updateData(renderInfo, presentInfo, imageDecodeInfo);
+  frameDisplayInfoModel.updateData(renderInfo, imageDecodeInfo, presentInfo);
 }
 
 }  // namespace pag

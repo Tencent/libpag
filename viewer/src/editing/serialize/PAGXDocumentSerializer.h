@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,12 +18,11 @@
 
 #pragma once
 
-#include "utils/AEHelper.h"
+#include "editing/serialize/PAGTreeNode.h"
+#include "pagx/PAGXDocument.h"
 
-namespace exporter {
+namespace pag::PAGXDocumentSerializer {
 
-void CombineAudioMarkers(std::vector<pag::Composition*>& compositions);
+void Serialize(const std::shared_ptr<pagx::PAGXDocument>& document, PAGTreeNode* node);
 
-void GetAudioSequence(const AEGP_ItemH& itemHandle, pag::Composition* composition);
-
-}  // namespace exporter
+}  // namespace pag::PAGXDocumentSerializer

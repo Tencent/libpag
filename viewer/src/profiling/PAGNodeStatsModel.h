@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -19,37 +19,45 @@
 #pragma once
 
 #include <QAbstractListModel>
-#include "pag/pag.h"
+#include <QString>
 #include "pagx/PAGXDocument.h"
 
 namespace pag {
-class PAGFileInfo {
+
+class PAGNodeStatItem {
  public:
-  explicit PAGFileInfo(const QString& name, const QString& value = "", const QString& unit = "");
+  PAGNodeStatItem(const QString& name = "", const QString& color = "", int count = 0);
 
   QString name = "";
-  QString value = "";
-  QString unit = "";
+  QString color = "";
+  int count = 0;
 };
 
-class PAGFileInfoModel : public QAbstractListModel {
+class PAGNodeStatsModel : public QAbstractListModel {
   Q_OBJECT
+  Q_PROPERTY(int totalCount READ getTotalCount NOTIFY totalCountChanged)
+  Q_PROPERTY(int count READ getCount NOTIFY countChanged)
  public:
-  enum class PAGFileInfoRoles { NameRole = Qt::UserRole + 1, ValueRole, UnitRole };
+  enum class PAGNodeStatsRoles { NameRole = Qt::UserRole + 1, ColorRole, CountRole };
 
-  PAGFileInfoModel();
-  explicit PAGFileInfoModel(QObject* parent);
+  explicit PAGNodeStatsModel(QObject* parent = nullptr);
 
   QVariant data(const QModelIndex& index, int role) const override;
   int rowCount(const QModelIndex& parent) const override;
-  void setPAGFile(std::shared_ptr<PAGFile> pagFile);
+  int getTotalCount() const;
+  int getCount() const;
+
   void setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pagxDocument);
+
+  Q_SIGNAL void totalCountChanged();
+  Q_SIGNAL void countChanged();
 
  protected:
   QHash<int, QByteArray> roleNames() const override;
 
  private:
-  std::vector<PAGFileInfo> fileInfos = {};
+  std::vector<PAGNodeStatItem> statItems = {};
+  int totalCount = 0;
 };
 
 }  // namespace pag

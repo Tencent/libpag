@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,33 +18,38 @@
 
 #pragma once
 
-#include <QObject>
-#include "PAGTask.h"
-#include "pag/pag.h"
+#include <QOpenGLContext>
+#include <QQuickWindow>
+#include <mutex>
+#include "rendering/ContentView.h"
+#include "rendering/pag/PAGViewModel.h"
 
 namespace pag {
 
-class PAGTaskFactory : public QObject {
+class PAGView : public ContentView {
   Q_OBJECT
  public:
-  Q_ENUMS(PAGTaskType)
+  explicit PAGView(QQuickItem* parent = nullptr);
+  ~PAGView() override;
 
-  enum class PAGTaskType {
-    PAGTaskType_None,
-    PAGTaskType_ExportPNG,
-    PAGTaskType_ExportAPNG,
-    PAGTaskType_Profiling,
-    PAGTaskType_Benchmark
-  };
+  ContentViewModel* getViewModel() const override;
 
-  Q_INVOKABLE PAGTask* createTask(PAGTaskType taskType, const QString& outPath,
-                                  const QVariantMap& extraParams = {});
+  Q_SLOT void flush() const override;
 
-  void setFilePath(const QString& filePath);
+  QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
 
  private:
-  PAGTask* task = nullptr;
-  std::shared_ptr<PAGFile> pagFile = nullptr;
+  void initDrawable() override;
+
+  Q_SLOT void onRequestSizeChanged();
+  Q_SLOT void onPreferredSizeChanged();
+  Q_SLOT void onAudioTimeChanged(int64_t audioTime);
+  Q_SLOT void onIsPlayingChanged(bool isPlaying);
+  Q_SLOT void onFileChanged(std::shared_ptr<pag::File> file);
+
+  std::mutex lastPlayTimeMutex = {};
+  int64_t lastPlayTime = 0;
+  std::unique_ptr<PAGViewModel> viewModel = nullptr;
 };
 
 }  // namespace pag
