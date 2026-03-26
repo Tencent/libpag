@@ -807,7 +807,12 @@ if (PAG_BUILD_TESTS)
     list(APPEND PAG_TEST_LIBS ${FFAVC_LIB})
     list(APPEND PAG_TEST_INCLUDES vendor/ffavc/include)
 
-    list(APPEND PAG_TEST_COMPILE_OPTIONS ${PAG_COMPILE_OPTIONS} -fno-access-control -Wno-deprecated-literal-operator)
+    list(APPEND PAG_TEST_COMPILE_OPTIONS ${PAG_COMPILE_OPTIONS} -fno-access-control)
+    include(CheckCXXCompilerFlag)
+    check_cxx_compiler_flag(-Wno-deprecated-literal-operator HAS_WNO_DEPRECATED_LITERAL_OPERATOR)
+    if (HAS_WNO_DEPRECATED_LITERAL_OPERATOR)
+        list(APPEND PAG_TEST_COMPILE_OPTIONS -Wno-deprecated-literal-operator)
+    endif ()
     list(APPEND PAG_TEST_DEFINES ${PAG_DEFINES})
 
     foreach (FILE_PATH ${PAG_TEST_FILES})
