@@ -19,7 +19,6 @@
 #pragma once
 
 #include <vector>
-#include "pagx/defines.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/types/Matrix.h"
@@ -30,7 +29,7 @@ namespace pagx {
 /**
  * A linear gradient color source that produces a gradient along a line between two points.
  */
-class RTTR_AUTO_REGISTER_CLASS LinearGradient : public ColorSource {
+class LinearGradient : public ColorSource {
  public:
   /**
    * The starting point of the gradient line.
@@ -55,8 +54,6 @@ class RTTR_AUTO_REGISTER_CLASS LinearGradient : public ColorSource {
   NodeType nodeType() const override {
     return NodeType::LinearGradient;
   }
-
-  RTTR_ENABLE(ColorSource)
 
  private:
   LinearGradient() = default;

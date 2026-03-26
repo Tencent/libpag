@@ -18,14 +18,12 @@
 
 #pragma once
 
-#include "pagx/defines.h"
-
 namespace pagx {
 
 /**
  * Mask types that define how a mask layer affects its target.
  */
-enum class RTTR_AUTO_REGISTER_CLASS MaskType {
+enum class MaskType {
   /**
    * Use the alpha channel of the mask to determine visibility.
    */

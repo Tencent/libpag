@@ -20,7 +20,6 @@
 
 #include <string>
 #include <vector>
-#include "pagx/defines.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/types/Point.h"
@@ -36,7 +35,7 @@ namespace pagx {
  * - Runtime shaping mode: Performs text shaping at runtime using the text content and font
  *   properties. Results may vary slightly across platforms due to font and shaping differences.
  */
-class RTTR_AUTO_REGISTER_CLASS Text : public Element {
+class Text : public Element {
  public:
   /**
    * The text content to render. Supports newline characters (\n) for line breaks, which use a
@@ -97,8 +96,6 @@ class RTTR_AUTO_REGISTER_CLASS Text : public Element {
   NodeType nodeType() const override {
     return NodeType::Text;
   }
-
-  RTTR_ENABLE(Element)
 
  private:
   Text() = default;

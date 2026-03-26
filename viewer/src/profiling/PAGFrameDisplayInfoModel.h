@@ -37,7 +37,6 @@ class FrameDisplayInfo {
 
 class PAGFrameDisplayInfoModel : public QAbstractListModel {
   Q_OBJECT
-  Q_PROPERTY(QVariantList items READ getItems NOTIFY itemsChanged)
  public:
   enum class PAGFrameDisplayInfoRoles {
     NameRole = Qt::UserRole + 1,
@@ -47,15 +46,13 @@ class PAGFrameDisplayInfoModel : public QAbstractListModel {
     MaxRole
   };
 
-  explicit PAGFrameDisplayInfoModel(QObject* parent = nullptr);
+  PAGFrameDisplayInfoModel();
+  explicit PAGFrameDisplayInfoModel(QObject* parent);
 
   QVariant data(const QModelIndex& index, int role) const override;
   int rowCount(const QModelIndex& parent) const override;
-  void updateData(const FrameDisplayInfo& render, const FrameDisplayInfo& imageDecode,
-                  const FrameDisplayInfo& present);
-  QVariantList getItems() const;
-
-  Q_SIGNAL void itemsChanged();
+  void updateData(const FrameDisplayInfo& render, const FrameDisplayInfo& present,
+                  const FrameDisplayInfo& imageDecode);
 
  protected:
   QHash<int, QByteArray> roleNames() const override;

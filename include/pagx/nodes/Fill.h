@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "pagx/defines.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/types/BlendMode.h"
@@ -32,7 +31,7 @@ namespace pagx {
  * The color is specified through a ColorSource node (SolidColor, LinearGradient, etc.) or
  * a reference to a defined color source (e.g., "@gradientId").
  */
-class RTTR_AUTO_REGISTER_CLASS Fill : public Element {
+class Fill : public Element {
  public:
   /**
    * The color source for this fill. Can be a SolidColor, LinearGradient, RadialGradient,
@@ -65,8 +64,6 @@ class RTTR_AUTO_REGISTER_CLASS Fill : public Element {
   NodeType nodeType() const override {
     return NodeType::Fill;
   }
-
-  RTTR_ENABLE(Element)
 
  private:
   Fill() = default;

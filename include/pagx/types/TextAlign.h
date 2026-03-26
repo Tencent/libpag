@@ -18,15 +18,13 @@
 
 #pragma once
 
-#include "pagx/defines.h"
-
 namespace pagx {
 
 /**
  * Text alignment along the inline direction. In horizontal mode, this controls horizontal alignment
  * within each line. In vertical mode, this controls vertical alignment within each column.
  */
-enum class RTTR_AUTO_REGISTER_CLASS TextAlign {
+enum class TextAlign {
   /**
    * Align text to the start of the inline direction.
    */

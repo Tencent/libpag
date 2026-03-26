@@ -19,7 +19,6 @@
 #pragma once
 
 #include <vector>
-#include "pagx/defines.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/types/Point.h"
 
@@ -30,7 +29,7 @@ namespace pagx {
  * shapes, painters, modifiers, and nested groups, allowing for hierarchical organization of
  * content.
  */
-class RTTR_AUTO_REGISTER_CLASS Group : public Element {
+class Group : public Element {
  public:
   /**
    * The anchor point for transformations.
@@ -75,8 +74,6 @@ class RTTR_AUTO_REGISTER_CLASS Group : public Element {
   NodeType nodeType() const override {
     return NodeType::Group;
   }
-
-  RTTR_ENABLE(Element)
 
  private:
   Group() = default;

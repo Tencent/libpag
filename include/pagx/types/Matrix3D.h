@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include "pagx/defines.h"
-
 namespace pagx {
 
 /**
@@ -31,8 +29,8 @@ namespace pagx {
  *   | values[2]  values[6]  values[10]  values[14] |
  *   | values[3]  values[7]  values[11]  values[15] |
  */
-struct RTTR_AUTO_REGISTER_CLASS Matrix3D {
-  float RTTR_SKIP_REGISTER_PROPERTY values[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+struct Matrix3D {
+  float values[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 
   /**
    * Returns the matrix value at the given row and column.

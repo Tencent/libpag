@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2026 Tencent. All rights reserved.
+//  Copyright (C) 2021 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,29 +18,24 @@
 
 #pragma once
 
-#include "platform/qt/GPUDrawable.h"
-#include "rendering/IContentRenderer.h"
-#include "rendering/pagx/PAGXViewModel.h"
+#include <QThread>
 
 namespace pag {
 
-/**
- * Renderer implementation for PAGX format content. Executes tgfx DisplayList rendering
- * and collects per-frame timing metrics.
- */
-class PAGXRenderer : public IContentRenderer {
+class PAGView;
+
+class PAGRenderThread : public QThread {
+  Q_OBJECT
  public:
-  explicit PAGXRenderer(PAGXViewModel* viewModel);
+  explicit PAGRenderThread(PAGView* pagView);
 
-  void setDrawable(GPUDrawable* drawable) override;
+  Q_SIGNAL void frameTimeMetricsReady(int64_t frame, int64_t renderTime, int64_t presentTime,
+                                      int64_t imageDecodeTime);
 
-  RenderMetrics flush() override;
-  void updateSize() override;
-  bool isReady() const override;
+  Q_SLOT void flush();
+  Q_SLOT void shutDown();
 
  private:
-  PAGXViewModel* viewModel = nullptr;
-  GPUDrawable* drawable = nullptr;
+  PAGView* pagView = nullptr;
 };
-
 }  // namespace pag

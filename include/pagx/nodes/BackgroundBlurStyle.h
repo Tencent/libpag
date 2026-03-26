@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "pagx/defines.h"
 #include "pagx/nodes/LayerStyle.h"
 #include "pagx/types/TileMode.h"
 
@@ -27,7 +26,7 @@ namespace pagx {
 /**
  * A background blur layer style that blurs the content behind the layer.
  */
-class RTTR_AUTO_REGISTER_CLASS BackgroundBlurStyle : public LayerStyle {
+class BackgroundBlurStyle : public LayerStyle {
  public:
   /**
    * The horizontal blur radius in pixels. The default value is 0.
@@ -47,8 +46,6 @@ class RTTR_AUTO_REGISTER_CLASS BackgroundBlurStyle : public LayerStyle {
   NodeType nodeType() const override {
     return NodeType::BackgroundBlurStyle;
   }
-
-  RTTR_ENABLE(LayerStyle)
 
  private:
   BackgroundBlurStyle() = default;

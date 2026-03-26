@@ -19,8 +19,6 @@
 #include "AudioSequence.h"
 #include <cstdio>
 #include "ffmovie/movie.h"
-#include "platform/PlatformHelper.h"
-#include "utils/FileHelper.h"
 #include "utils/PAGExportSession.h"
 #include "utils/PAGExportSessionManager.h"
 
@@ -42,11 +40,9 @@ void CombineAudioMarkers(std::vector<pag::Composition*>& compositions) {
   }
 }
 
-static std::string EncodeAudioToMP4(int16_t* samples, int numSamples, int channels,
-                                    int sampleRate) {
-  // Use a safe ASCII path in the temp folder to avoid encoding issues with non-ASCII characters
-  // on Windows, where FFmpeg may not correctly handle UTF-8 paths.
-  std::string mp4Path = JoinPaths(GetTempFolderPath(), ".pag_audio_temp.mp4");
+static std::string EncodeAudioToMP4(int16_t* samples, int numSamples, int channels, int sampleRate,
+                                    const std::string& outputPath) {
+  std::string mp4Path = outputPath + "_audio.mp4";
   ffmovie::AudioExportConfig audioConfig = {};
   audioConfig.sampleRate = sampleRate;
   audioConfig.channels = channels;
@@ -110,9 +106,16 @@ static std::string EncodeAudioToMP4(int16_t* samples, int numSamples, int channe
   return mp4Path;
 }
 
-void GetAudioSequence(const AEGP_ItemH& itemHandle, pag::Composition* composition) {
+void GetAudioSequence(const AEGP_ItemH& itemHandle, const std::string& outputPath,
+                      pag::Composition* composition) {
   const auto& Suites = GetSuites();
   const auto& PluginID = GetPluginID();
+  std::string path = outputPath;
+  const std::string pagExtension = ".pag";
+  if (path.size() > pagExtension.size() &&
+      path.compare(path.size() - pagExtension.size(), pagExtension.size(), pagExtension) == 0) {
+    path = path.substr(0, path.size() - pagExtension.size());
+  }
 
   AEGP_ItemFlags flags = 0;
   Suites->ItemSuite6()->AEGP_GetItemFlags(itemHandle, &flags);
@@ -146,13 +149,12 @@ void GetAudioSequence(const AEGP_ItemH& itemHandle, pag::Composition* compositio
       int offset = startSamples * soundFormat2.num_channelsL;
       std::string mp4Path = EncodeAudioToMP4(static_cast<int16_t*>(samples) + offset, numSamples,
                                              static_cast<int>(soundFormat2.num_channelsL),
-                                             static_cast<int>(soundFormat2.sample_rateF));
+                                             static_cast<int>(soundFormat2.sample_rateF), path);
 
       if (!mp4Path.empty()) {
         composition->audioBytes = pag::ByteData::FromPath(mp4Path).release();
         composition->audioStartTime = static_cast<pag::Frame>(
             (startSamples / soundFormat2.sample_rateF) * composition->frameRate);
-        DeleteFile(mp4Path);
       } else {
         PAGExportSessionManager::GetInstance()->recordWarning(AlertInfoType::AudioEncodeFail);
       }

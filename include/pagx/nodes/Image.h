@@ -20,9 +20,8 @@
 
 #include <memory>
 #include <string>
-#include "pagx/defines.h"
-#include "pagx/nodes/Node.h"
 #include "pagx/types/Data.h"
+#include "pagx/nodes/Node.h"
 
 namespace pagx {
 
@@ -30,7 +29,7 @@ namespace pagx {
  * Image represents an image resource that can be referenced by other nodes. The image source can
  * be a file path, a URL, or a base64-encoded data URI.
  */
-class RTTR_AUTO_REGISTER_CLASS Image : public Node {
+class Image : public Node {
  public:
   /**
    * Image binary data (decoded from base64).
@@ -45,8 +44,6 @@ class RTTR_AUTO_REGISTER_CLASS Image : public Node {
   NodeType nodeType() const override {
     return NodeType::Image;
   }
-
-  RTTR_ENABLE(Node)
 
  private:
   Image() = default;

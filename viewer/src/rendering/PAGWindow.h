@@ -21,15 +21,13 @@
 #include <QQmlApplicationEngine>
 #include <QString>
 #include <QTranslator>
-#include "ContentView.h"
+#include "PAGView.h"
 #include "PAGWindowHelper.h"
 #include "editing/PAGEditAttributeModel.h"
 #include "editing/PAGImageLayerModel.h"
 #include "editing/PAGImageProvider.h"
 #include "editing/PAGTextLayerModel.h"
 #include "editing/PAGTreeViewModel.h"
-#include "pag/PAGViewModel.h"
-#include "pagx/PAGXViewModel.h"
 #include "profiling/PAGBenchmarkModel.h"
 #include "profiling/PAGRunTimeDataModel.h"
 
@@ -43,7 +41,6 @@ class PAGWindow : public QObject {
 
   Q_SLOT void openFile(QString path);
   Q_SLOT void onPAGViewerDestroyed();
-  Q_INVOKABLE void notifyContentViewChanged(ContentView* newContentView);
 
   void open();
   QString getFilePath();
@@ -53,12 +50,9 @@ class PAGWindow : public QObject {
   static QList<PAGWindow*> AllWindows;
 
  private:
-  void connectContentViewSignals();
-  void disconnectContentViewSignals();
-
   QString filePath = "";
   QQuickWindow* window = nullptr;
-  ContentView* contentView = nullptr;
+  PAGView* pagView = nullptr;
   std::unique_ptr<QTranslator> translator = nullptr;
   std::unique_ptr<PAGWindowHelper> windowHelper = nullptr;
   std::unique_ptr<QQmlApplicationEngine> engine = nullptr;

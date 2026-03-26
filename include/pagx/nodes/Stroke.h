@@ -19,7 +19,6 @@
 #pragma once
 
 #include <vector>
-#include "pagx/defines.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/types/BlendMode.h"
@@ -34,7 +33,7 @@ namespace pagx {
  * The color is specified through a ColorSource node (SolidColor, LinearGradient, etc.) or
  * a reference to a defined color source (e.g., "@gradientId").
  */
-class RTTR_AUTO_REGISTER_CLASS Stroke : public Element {
+class Stroke : public Element {
  public:
   /**
    * The color source for this stroke. Can be a SolidColor, LinearGradient, RadialGradient,
@@ -103,8 +102,6 @@ class RTTR_AUTO_REGISTER_CLASS Stroke : public Element {
   NodeType nodeType() const override {
     return NodeType::Stroke;
   }
-
-  RTTR_ENABLE(Element)
 
  private:
   Stroke() = default;

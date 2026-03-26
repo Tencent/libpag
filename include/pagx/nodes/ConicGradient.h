@@ -19,7 +19,6 @@
 #pragma once
 
 #include <vector>
-#include "pagx/defines.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/types/Matrix.h"
@@ -30,7 +29,7 @@ namespace pagx {
 /**
  * A conic (sweep) gradient color source that produces a gradient sweeping around a center point.
  */
-class RTTR_AUTO_REGISTER_CLASS ConicGradient : public ColorSource {
+class ConicGradient : public ColorSource {
  public:
   /**
    * The center point of the gradient.
@@ -60,8 +59,6 @@ class RTTR_AUTO_REGISTER_CLASS ConicGradient : public ColorSource {
   NodeType nodeType() const override {
     return NodeType::ConicGradient;
   }
-
-  RTTR_ENABLE(ColorSource)
 
  private:
   ConicGradient() = default;

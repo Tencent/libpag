@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "pagx/defines.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/types/Color.h"
 
@@ -27,7 +26,7 @@ namespace pagx {
 /**
  * A solid color source for fills and strokes.
  */
-class RTTR_AUTO_REGISTER_CLASS SolidColor : public ColorSource {
+class SolidColor : public ColorSource {
  public:
   /**
    * The color value with RGBA components and color space.
@@ -37,8 +36,6 @@ class RTTR_AUTO_REGISTER_CLASS SolidColor : public ColorSource {
   NodeType nodeType() const override {
     return NodeType::SolidColor;
   }
-
-  RTTR_ENABLE(ColorSource)
 
  private:
   SolidColor() = default;

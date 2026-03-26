@@ -19,7 +19,6 @@
 #pragma once
 
 #include <array>
-#include "pagx/defines.h"
 #include "pagx/nodes/LayerFilter.h"
 
 namespace pagx {
@@ -28,7 +27,7 @@ namespace pagx {
  * A color matrix filter that transforms the layer colors using a 4x5 matrix.
  * The matrix is applied as: [R' G' B' A'] = [R G B A 1] * matrix
  */
-class RTTR_AUTO_REGISTER_CLASS ColorMatrixFilter : public LayerFilter {
+class ColorMatrixFilter : public LayerFilter {
  public:
   /**
    * The 4x5 color transformation matrix stored as a 20-element array in row-major order.
@@ -39,15 +38,12 @@ class RTTR_AUTO_REGISTER_CLASS ColorMatrixFilter : public LayerFilter {
    * The last element of each row is an additive offset (bias).
    * The default value is the identity matrix.
    */
-  std::array<float, 20> RTTR_SKIP_REGISTER_PROPERTY matrix = {
-      1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
-      0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
+  std::array<float, 20> matrix = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+                                  0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
 
   NodeType nodeType() const override {
     return NodeType::ColorMatrixFilter;
   }
-
-  RTTR_ENABLE(LayerFilter)
 
  private:
   ColorMatrixFilter() = default;

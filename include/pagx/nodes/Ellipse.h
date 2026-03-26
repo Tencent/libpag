@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "pagx/defines.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/Size.h"
@@ -28,7 +27,7 @@ namespace pagx {
 /**
  * Ellipse represents an ellipse shape defined by a center point and size.
  */
-class RTTR_AUTO_REGISTER_CLASS Ellipse : public Element {
+class Ellipse : public Element {
  public:
   /**
    * The position of the ellipse center point.
@@ -48,8 +47,6 @@ class RTTR_AUTO_REGISTER_CLASS Ellipse : public Element {
   NodeType nodeType() const override {
     return NodeType::Ellipse;
   }
-
-  RTTR_ENABLE(Element)
 
  private:
   Ellipse() = default;

@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "pagx/defines.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/types/Overflow.h"
 #include "pagx/types/ParagraphAlign.h"
@@ -39,7 +38,7 @@ namespace pagx {
  * Position and size define the text area. In vertical mode, the first column is positioned with
  * its right edge touching the right side, and columns flow from right to left.
  */
-class RTTR_AUTO_REGISTER_CLASS TextBox : public Element {
+class TextBox : public Element {
  public:
   /**
    * The top-left corner of the text area. The default value is (0, 0).
@@ -99,8 +98,6 @@ class RTTR_AUTO_REGISTER_CLASS TextBox : public Element {
   NodeType nodeType() const override {
     return NodeType::TextBox;
   }
-
-  RTTR_ENABLE(Element)
 
  private:
   TextBox() = default;

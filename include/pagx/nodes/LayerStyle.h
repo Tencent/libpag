@@ -18,16 +18,15 @@
 
 #pragma once
 
-#include "pagx/defines.h"
-#include "pagx/nodes/Node.h"
 #include "pagx/types/BlendMode.h"
+#include "pagx/nodes/Node.h"
 
 namespace pagx {
 
 /**
  * Base class for layer styles (DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle).
  */
-class RTTR_AUTO_REGISTER_CLASS LayerStyle : public Node {
+class LayerStyle : public Node {
  public:
   /**
    * The blend mode used when compositing the style. The default value is Normal.
@@ -40,8 +39,6 @@ class RTTR_AUTO_REGISTER_CLASS LayerStyle : public Node {
   bool excludeChildEffects = false;
 
   ~LayerStyle() override = default;
-
-  RTTR_ENABLE(Node)
 
  protected:
   LayerStyle() = default;

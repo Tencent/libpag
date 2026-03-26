@@ -17,19 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGTree.h"
+#include <QDebug>
 #include "editing/serialize/PAGFileSerializer.h"
-#include "editing/serialize/PAGXDocumentSerializer.h"
 
 namespace pag {
 
 void PAGTree::setFile(std::shared_ptr<File> file) {
   this->file = std::move(file);
-  this->pagxDocument = nullptr;
-}
-
-void PAGTree::setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> document) {
-  this->pagxDocument = std::move(document);
-  this->file = nullptr;
 }
 
 PAGTreeNode* PAGTree::getRootNode() {
@@ -37,17 +31,12 @@ PAGTreeNode* PAGTree::getRootNode() {
 }
 
 void PAGTree::buildTree() {
-  rootNode = nullptr;
-
-  if (file != nullptr) {
-    rootNode = std::make_unique<PAGTreeNode>(nullptr);
-    rootNode->setName("file");
-    FileSerializer::Serialize(file, rootNode.get());
-  } else if (pagxDocument != nullptr) {
-    rootNode = std::make_unique<PAGTreeNode>(nullptr);
-    rootNode->setName("document");
-    PAGXDocumentSerializer::Serialize(pagxDocument, rootNode.get());
+  if (file == nullptr) {
+    return;
   }
+  rootNode = std::make_unique<PAGTreeNode>(nullptr);
+  rootNode->setName("file");
+  FileSerializer::Serialize(file, rootNode.get());
 }
 
 }  // namespace pag

@@ -18,9 +18,8 @@
 
 #pragma once
 
-#include "pagx/defines.h"
-#include "pagx/nodes/Element.h"
 #include "pagx/nodes/PathData.h"
+#include "pagx/nodes/Element.h"
 
 namespace pagx {
 
@@ -28,7 +27,7 @@ namespace pagx {
  * Path represents a freeform shape defined by a PathData containing vertices, in-tangents, and
  * out-tangents.
  */
-class RTTR_AUTO_REGISTER_CLASS Path : public Element {
+class Path : public Element {
  public:
   /**
    * The path data containing vertices and control points.
@@ -43,8 +42,6 @@ class RTTR_AUTO_REGISTER_CLASS Path : public Element {
   NodeType nodeType() const override {
     return NodeType::Path;
   }
-
-  RTTR_ENABLE(Element)
 
  private:
   Path() = default;
