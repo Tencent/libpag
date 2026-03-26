@@ -19,9 +19,8 @@
 #include "LayerBuilder.h"
 #include <tuple>
 #include <unordered_map>
-#include "TextLayout.h"
 #include "ToTGFX.h"
-#include "pagx/Layout.h"
+#include "pagx/PAGXDocument.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -131,8 +130,7 @@ namespace {
 // Build context that maintains state during layer tree construction
 class LayerBuilderContext {
  public:
-  explicit LayerBuilderContext(const ShapedTextMap& shapedTextMap) : _shapedTextMap(shapedTextMap) {
-  }
+  LayerBuilderContext() = default;
 
   LayerBuildResult buildWithMap(const PAGXDocument& document) {
     auto root = build(document);
@@ -332,12 +330,13 @@ class LayerBuilderContext {
   }
 
   std::shared_ptr<tgfx::Text> convertText(const Text* node) {
-    auto it = _shapedTextMap.find(node);
-    if (it == _shapedTextMap.end() || it->second.textBlob == nullptr) {
+    // Read TextBlob that was created during applyLayout() in Text::setLayoutSize().
+    std::shared_ptr<tgfx::TextBlob> textBlob = node->textBlob;
+    std::vector<tgfx::Point> anchors = node->anchors;
+    if (textBlob == nullptr) {
       return nullptr;
     }
-    auto& shapedText = it->second;
-    auto tgfxText = tgfx::Text::Make(shapedText.textBlob, shapedText.anchors);
+    auto tgfxText = tgfx::Text::Make(textBlob, anchors);
     if (tgfxText) {
       tgfxText->setPosition(tgfx::Point::Make(node->position.x, node->position.y));
     }
@@ -827,7 +826,6 @@ class LayerBuilderContext {
     }
   }
 
-  const ShapedTextMap& _shapedTextMap;
   std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> _tgfxLayerByPagxLayer = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
@@ -842,12 +840,15 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, FontCon
     return nullptr;
   }
 
-  // Perform unified layout through Layout class
-  Layout layout(fontProvider);
-  layout.apply(document);
+  // Phase 1: Auto layout (constraint positioning, flex layout).
+  // This calls Text::setLayoutSize() which generates TextBlob via TextLayout::LayoutText().
+  if (fontProvider) {
+    document->setFontConfig(*fontProvider);
+  }
+  document->applyLayout();
 
-  // Build layer tree using shaped text from layout
-  LayerBuilderContext context(layout.shapedTextMap());
+  // Phase 2: Build layer tree using TextBlobs created during applyLayout.
+  LayerBuilderContext context;
   return context.build(*document);
 }
 
@@ -856,12 +857,15 @@ LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document, FontConfig* 
     return {};
   }
 
-  // Perform unified layout through Layout class
-  Layout layout(fontProvider);
-  layout.apply(document);
+  // Phase 1: Auto layout (constraint positioning, flex layout).
+  // This calls Text::setLayoutSize() which generates TextBlob via TextLayout::LayoutText().
+  if (fontProvider) {
+    document->setFontConfig(*fontProvider);
+  }
+  document->applyLayout();
 
-  // Build layer tree using shaped text from layout
-  LayerBuilderContext context(layout.shapedTextMap());
+  // Phase 2: Build layer tree using TextBlobs created during applyLayout.
+  LayerBuilderContext context;
   return context.buildWithMap(*document);
 }
 

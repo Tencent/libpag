@@ -16,23 +16,44 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "pagx/nodes/Path.h"
+#include <cmath>
+#include "pagx/layout/LayoutNode.h"
 
 namespace pagx {
 
-class PAGXDocument;
-class FontConfig;
+void Path::onMeasure(const LayoutContext&) {
+  if (data) {
+    auto bounds = data->getBounds();
+    preferredWidth = bounds.width;
+    preferredHeight = bounds.height;
+  }
+}
 
-/// Performs auto layout on a parsed PAGX document. This includes container layout (arranging child
-/// Layers within a parent Layer that has `layout` set) and constraint positioning (positioning
-/// elements within a Layer or Group that has layout dimensions).
-class AutoLayout {
- public:
-  /// Applies auto layout to all layers in the document. Called once after parsing, before rendering.
-  /// @param document The document to apply layout to.
-  /// @param fontProvider Optional font config for precise text measurement. If nullptr, falls back
-  ///                     to system fonts or returns empty bounds for Text elements.
-  static void Apply(PAGXDocument* document, FontConfig* fontProvider = nullptr);
-};
+void Path::setLayoutSize(const LayoutContext&, float width, float height) {
+  if (!data) {
+    return;
+  }
+  float scale = LayoutNode::ComputeUniformScale(preferredWidth, preferredHeight, width, height);
+  if (scale != 1.0f) {
+    data->scalePoints(scale);
+  }
+  auto bounds = data->getBounds();
+  actualWidth = bounds.width;
+  actualHeight = bounds.height;
+}
+
+void Path::setLayoutPosition(const LayoutContext&, float x, float y) {
+  if (!data) {
+    return;
+  }
+  auto bounds = data->getBounds();
+  if (!std::isnan(x)) {
+    position.x = x - bounds.x;
+  }
+  if (!std::isnan(y)) {
+    position.y = y - bounds.y;
+  }
+}
 
 }  // namespace pagx

@@ -19,6 +19,7 @@
 #include "TextLayout.h"
 #include <algorithm>
 #include <cmath>
+#include "LayoutContext.h"
 #include "base/utils/MathUtil.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Font.h"
@@ -440,7 +441,29 @@ class TextLayoutContext {
         break;
     }
 
-    // Build TextBlob with anchor offset applied to all x positions.
+    // Calculate baseline Y offset based on text baseline mode.
+    // In LineBox mode, position.y represents the top of the linebox, so the TextBlob baseline
+    // must be shifted down by (halfLeading + ascent). In Alphabetic mode, position.y is the
+    // alphabetic baseline directly, so baselineY stays at 0.
+    float baselineY = 0;
+    if (text->baseline == TextBaseline::LineBox) {
+      float maxAscent = 0;
+      float maxDescent = 0;
+      float maxFontLineHeight = 0;
+      for (auto& glyph : info.allGlyphs) {
+        if (glyph.unichar == '\n') {
+          continue;
+        }
+        maxAscent = std::max(maxAscent, fabsf(glyph.ascent));
+        maxDescent = std::max(maxDescent, glyph.descent);
+        maxFontLineHeight = std::max(maxFontLineHeight, glyph.fontLineHeight);
+      }
+      float metricsHeight = maxAscent + maxDescent;
+      float halfLeading = (maxFontLineHeight - metricsHeight) / 2;
+      baselineY = halfLeading + maxAscent;
+    }
+
+    // Build TextBlob with anchor offset and baseline Y applied.
     tgfx::TextBlobBuilder builder = {};
 
     for (auto& run : info.runs) {
@@ -450,10 +473,10 @@ class TextLayoutContext {
 
       if (run.canUseDefaultMode) {
         auto& buffer =
-            builder.allocRun(run.font, run.glyphIDs.size(), run.startX + anchorOffset, 0);
+            builder.allocRun(run.font, run.glyphIDs.size(), run.startX + anchorOffset, baselineY);
         memcpy(buffer.glyphs, run.glyphIDs.data(), run.glyphIDs.size() * sizeof(tgfx::GlyphID));
       } else {
-        auto& buffer = builder.allocRunPosH(run.font, run.glyphIDs.size(), 0);
+        auto& buffer = builder.allocRunPosH(run.font, run.glyphIDs.size(), baselineY);
         memcpy(buffer.glyphs, run.glyphIDs.data(), run.glyphIDs.size() * sizeof(tgfx::GlyphID));
         auto* positions = reinterpret_cast<float*>(buffer.positions);
         for (size_t j = 0; j < run.xPositions.size(); j++) {
@@ -498,8 +521,16 @@ class TextLayoutContext {
       line.width = glyph.xPosition + glyph.advance;
     }
 
-    // Default line height for text without TextBox: 1.2 × fontSize (per spec line 1091).
-    float defaultLineHeight = text->fontSize * 1.2f;
+    // Default line height: use font metrics (ascent + descent + leading), consistent with TextBox.
+    float defaultLineHeight = 0;
+    for (auto& glyph : info.allGlyphs) {
+      if (glyph.unichar != '\n') {
+        defaultLineHeight = std::max(defaultLineHeight, glyph.fontLineHeight);
+      }
+    }
+    if (defaultLineHeight <= 0) {
+      defaultLineHeight = text->fontSize;
+    }
 
     // Calculate baselines: first line baseline = ascent portion of first line,
     // subsequent lines advance by defaultLineHeight.
@@ -515,8 +546,15 @@ class TextLayoutContext {
       }
 
       if (firstContentLine) {
-        // First non-empty line: baseline at maxAscent (text starts from the top).
-        baselineY += line.maxAscent;
+        if (text->baseline == TextBaseline::LineBox) {
+          // LineBox mode: position.y = linebox top. Use half-leading model same as TextBox.
+          float metricsHeight = line.maxAscent + line.maxDescent;
+          float halfLeading = (defaultLineHeight - metricsHeight) / 2;
+          baselineY += halfLeading + line.maxAscent;
+        } else {
+          // Alphabetic mode: position.y = baseline.
+          baselineY += line.maxAscent;
+        }
         firstContentLine = false;
       }
 
@@ -2138,7 +2176,7 @@ Rect TextLayout::MeasureText(const Text* text, FontConfig* fontConfig) {
     return {};
   }
 
-  // If text has embedded GlyphRuns, create a temporary TextLayoutContext to measure
+  // If text has embedded GlyphRuns, measure from glyph data to get linebox bounds.
   if (!text->glyphRuns.empty()) {
     TextLayoutContext context(fontConfig, nullptr);
     auto shapedText = context.buildShapedTextFromEmbeddedGlyphRuns(text);
@@ -2149,23 +2187,31 @@ Rect TextLayout::MeasureText(const Text* text, FontConfig* fontConfig) {
     return {};
   }
 
-  // For text without embedded GlyphRuns, use TextBlob::MakeFrom for fast accurate measurement
+  // For text without embedded GlyphRuns, use shapeText to get linebox bounds
+  // (advance width sum + fontLineHeight), not tight bounds from textBlob->getBounds().
   auto typeface = FindTypeface(text->fontFamily, text->fontStyle, fontConfig);
   if (typeface == nullptr) {
     return {};
   }
 
-  tgfx::Font font(typeface, text->fontSize);
-  font.setFauxBold(text->fauxBold);
-  font.setFauxItalic(text->fauxItalic);
+  TextLayoutContext context(fontConfig, nullptr);
+  TextLayoutContext::ShapedInfo info = {};
+  info.text = const_cast<Text*>(text);
+  context.shapeText(const_cast<Text*>(text), info);
 
-  auto textBlob = tgfx::TextBlob::MakeFrom(text->text, font);
-  if (textBlob == nullptr) {
+  if (info.allGlyphs.empty()) {
     return {};
   }
 
-  auto bounds = textBlob->getBounds();
-  return Rect::MakeLTRB(bounds.left, bounds.top, bounds.right, bounds.bottom);
+  // Compute linebox bounds: width = advance width sum, height = max fontLineHeight.
+  float maxFontLineHeight = 0;
+  for (auto& glyph : info.allGlyphs) {
+    if (glyph.unichar == '\n') {
+      continue;
+    }
+    maxFontLineHeight = std::max(maxFontLineHeight, glyph.fontLineHeight);
+  }
+  return Rect::MakeXYWH(0, 0, info.totalWidth, maxFontLineHeight);
 }
 
 Rect TextLayout::MeasureTextBox(const TextBox* textBox, FontConfig* fontConfig) {
@@ -2216,6 +2262,53 @@ Rect TextLayout::MeasureTextBox(const TextBox* textBox, FontConfig* fontConfig) 
     totalHeight += line.maxLineHeight;
   }
   return Rect::MakeXYWH(0, 0, maxLineWidth, totalHeight);
+}
+
+Rect TextLayout::MeasureText(const Text* text, const LayoutContext& context) {
+  return MeasureText(text, context.getFontConfig());
+}
+
+Rect TextLayout::MeasureTextBox(const TextBox* textBox, const LayoutContext& context) {
+  return MeasureTextBox(textBox, context.getFontConfig());
+}
+
+void TextLayout::LayoutText(Text* text, const LayoutContext& context) {
+  if (text == nullptr) {
+    return;
+  }
+  TextLayoutContext layoutContext(context.getFontConfig(), nullptr);
+
+  // If text has embedded GlyphRuns, use buildShapedTextFromEmbeddedGlyphRuns directly.
+  if (!text->glyphRuns.empty()) {
+    auto shapedText = layoutContext.buildShapedTextFromEmbeddedGlyphRuns(text);
+    text->textBlob = shapedText.textBlob;
+    text->anchors = shapedText.anchors;
+  } else {
+    // Otherwise process with standard shaping.
+    layoutContext.processTextWithoutLayout(text);
+    auto it = layoutContext.result.find(text);
+    if (it != layoutContext.result.end()) {
+      text->textBlob = it->second.textBlob;
+      text->anchors = it->second.anchors;
+    }
+  }
+}
+
+void TextLayout::LayoutTextBox(TextBox* textBox, const LayoutContext& context) {
+  if (textBox == nullptr) {
+    return;
+  }
+  TextLayoutContext layoutContext(context.getFontConfig(), nullptr);
+  auto childText = layoutContext.processScope(textBox->elements);
+  if (!childText.empty()) {
+    layoutContext.processTextWithLayout(childText, textBox);
+  }
+  // Write TextBlobs back to child Text nodes.
+  for (auto& [textPtr, shapedText] : layoutContext.result) {
+    auto* mutableText = const_cast<Text*>(textPtr);
+    mutableText->textBlob = shapedText.textBlob;
+    mutableText->anchors = shapedText.anchors;
+  }
 }
 
 }  // namespace pagx

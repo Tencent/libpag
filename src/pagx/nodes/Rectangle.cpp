@@ -16,25 +16,34 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <functional>
-#include <utility>
+#include "pagx/nodes/Rectangle.h"
+#include <cmath>
 
 namespace pagx {
 
-class Layer;
+void Rectangle::onMeasure(const LayoutContext&) {
+  preferredWidth = size.width;
+  preferredHeight = size.height;
+}
 
-using MeasureFunc = std::function<std::pair<float, float>(const Layer*)>;
+void Rectangle::setLayoutSize(const LayoutContext&, float width, float height) {
+  if (!std::isnan(width)) {
+    size.width = std::round(width);
+  }
+  if (!std::isnan(height)) {
+    size.height = std::round(height);
+  }
+  actualWidth = size.width;
+  actualHeight = size.height;
+}
 
-/// Performs container layout on a Layer that has a layout mode set, arranging child Layers along
-/// the main axis with gap, padding, alignment, and arrangement.
-class ContainerLayout {
- public:
-  /// Arranges child Layers within the parent according to its layout mode and parameters.
-  /// @param parent The container Layer with layout mode set.
-  /// @param measureLayer Function to measure a Layer's size (width, height).
-  static void Apply(Layer* parent, const MeasureFunc& measureLayer);
-};
+void Rectangle::setLayoutPosition(const LayoutContext&, float x, float y) {
+  if (!std::isnan(x)) {
+    position.x = std::round(x + size.width * 0.5f);
+  }
+  if (!std::isnan(y)) {
+    position.y = std::round(y + size.height * 0.5f);
+  }
+}
 
 }  // namespace pagx

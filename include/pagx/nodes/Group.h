@@ -20,7 +20,8 @@
 
 #include <cmath>
 #include <vector>
-#include "pagx/nodes/LayoutElement.h"
+#include "pagx/layout/LayoutNode.h"
+#include "pagx/nodes/Element.h"
 #include "pagx/types/Point.h"
 
 namespace pagx {
@@ -30,7 +31,7 @@ namespace pagx {
  * shapes, painters, modifiers, and nested groups, allowing for hierarchical organization of
  * content.
  */
-class Group : public LayoutElement {
+class Group : public Element, public LayoutNode {
  public:
   /**
    * The anchor point for transformations.
@@ -90,6 +91,12 @@ class Group : public LayoutElement {
 
  protected:
   Group() = default;
+
+  void updateSize(const LayoutContext& context) override;
+  void onMeasure(const LayoutContext& context) override;
+  void setLayoutSize(const LayoutContext& context, float width, float height) override;
+  void setLayoutPosition(const LayoutContext& context, float x, float y) override;
+  void updateLayout(const LayoutContext& context) override;
 
   friend class PAGXDocument;
 };

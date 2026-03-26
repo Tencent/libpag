@@ -564,7 +564,7 @@ For child Layers, container layout and constraint positioning are **mutually exc
 
 These sources ensure that containers nearly always have a size available during layout calculations. Explicitly setting `width`/`height` is only necessary when a specific design size (different from the natural content size) is needed.
 
-Layout size itself has no direct rendering effect; it only passes size information downward for constraint positioning of child elements. Layout size and constraint calculations are performed in the element's local coordinate system. Transforms (via `matrix` attribute) are applied after layout calculations and do not participate in or affect layout.
+Layout size itself has no direct rendering effect; it only passes size information downward for constraint positioning of child elements. Layout size and constraint calculations are performed in the element's local coordinate system. Transforms (via `matrix`/`matrix3D` attributes) are applied after layout calculations and do not participate in or affect layout.
 
 ### 4.2 Container Layout
 
@@ -1118,7 +1118,7 @@ The `scrollRect` attribute defines the layer's visible region; content outside t
 
 #### 5.5.2 clipToBounds
 
-When `clipToBounds="true"`, the layer automatically clips its content to the layer's own bounds (`width` × `height`). This is equivalent to setting `scrollRect="0,0,width,height"` but works with auto-layout — the clipping region is determined after layout resolves the layer's dimensions. If the layer also has an explicit `scrollRect`, `scrollRect` takes priority and `clipToBounds` is ignored.
+When `clipToBounds="true"`, the layout engine writes `scrollRect="0,0,width,height"` to the layer during the layout phase, clipping its content to the layer's own bounds (`width` × `height`). This works with auto-layout — the clipping region is determined after layout resolves the layer's dimensions. If the layer also has an explicit `scrollRect`, `scrollRect` takes priority and `clipToBounds` is ignored.
 
 > [Sample](samples/4.5.3_clip_to_bounds.pagx)
 
@@ -1216,7 +1216,7 @@ Rectangles are defined from center point with uniform corner rounding support.
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `position` | Point | (center of bounding box) | Center point coordinate, computed from constraint attributes when set. When not set, defaults to `(size.width/2, size.height/2)`, placing the top-left corner at the origin. Prefer constraint attributes (`left`/`top`) for positioning |
-| `size` | Size | 100,100 | Dimensions "width,height" |
+| `size` | Size | 0,0 | Dimensions "width,height" |
 | `roundness` | float | 0 | Corner radius |
 | `reversed` | bool | false | Reverse path direction |
 | `left` | float | - | Distance from left edge to container's left edge (see §4.3) |
@@ -1255,7 +1255,7 @@ Ellipses are defined from center point.
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `position` | Point | (center of bounding box) | Center point coordinate, computed from constraint attributes when set. When not set, defaults to `(size.width/2, size.height/2)`, placing the top-left corner at the origin. Prefer constraint attributes (`left`/`top`) for positioning |
-| `size` | Size | 100,100 | Dimensions "width,height" |
+| `size` | Size | 0,0 | Dimensions "width,height" |
 | `reversed` | bool | false | Reverse path direction |
 | `left` | float | - | Distance from left edge to container's left edge (see §4.3) |
 | `right` | float | - | Distance from right edge to container's right edge (see §4.3) |
@@ -1387,6 +1387,7 @@ Text elements provide geometric shapes for text content. Unlike shape elements t
 | `letterSpacing` | float | 0 | Letter spacing |
 | `fauxBold` | bool | false | Faux bold (algorithmically bolded) |
 | `fauxItalic` | bool | false | Faux italic (algorithmically slanted) |
+| `baseline` | TextBaseline | lineBox | Baseline mode for vertical positioning. `lineBox`: position.y is the top of the line box; `alphabetic`: position.y is the alphabetic baseline |
 | `textAnchor` | TextAnchor | start | Text anchor alignment relative to the origin (see below). Ignored when a TextBox controls the layout |
 | `left` | float | - | Distance from left edge to container's left edge (see §4.3) |
 | `right` | float | - | Distance from right edge to container's right edge (see §4.3) |
@@ -1425,6 +1426,15 @@ Controls how text is positioned relative to its origin point.
 | `start` | The origin is at the start of the text. No offset is applied |
 | `center` | The origin is at the center of the text. Text is offset by half its width to center on the origin |
 | `end` | The origin is at the end of the text. Text is offset by its full width so it ends at the origin |
+
+**TextBaseline (Baseline Mode)**:
+
+Controls how `position.y` is interpreted for vertical positioning.
+
+| Value | Description |
+|-------|-------------|
+| `lineBox` | `position.y` is the top of the line box. Text is offset downward by `halfLeading + ascent` from the position (default) |
+| `alphabetic` | `position.y` is the alphabetic baseline. Text is rendered directly at the baseline position |
 
 **Runtime Layout Rendering Flow**:
 1. Find system font based on `fontFamily` and `fontStyle`; if unavailable, select fallback font according to runtime-configured fallback list
@@ -2236,6 +2246,7 @@ Layer / Group
 | **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
 | **TextAlign** | `start`, `center`, `end`, `justify` |
 | **TextAnchor** | `start`, `center`, `end` |
+| **TextBaseline** | `lineBox`, `alphabetic` |
 | **ParagraphAlign** | `near`, `middle`, `far` |
 | **WritingMode** | `horizontal`, `vertical` |
 | **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |
@@ -2286,13 +2297,13 @@ An illustrated alien planet scene with an astronaut, exotic flora, alien creatur
 
 ## Appendix D. Implementation Architecture
 
-### D.1 LayoutElement Hierarchy
+### D.1 LayoutNode Hierarchy
 
 The PAGX runtime implementation uses the following class hierarchy for elements that support constraint-based positioning:
 
 ```
 Element (base class)
-├── LayoutElement (supports constraints)
+├── LayoutNode (supports constraints)
 │   ├── Rectangle
 │   ├── Ellipse
 │   ├── Polystar
@@ -2307,7 +2318,7 @@ Element (base class)
 └── ... (other non-layout elements)
 ```
 
-**LayoutElement** unifies constraint attribute management across all geometry elements and modifiers that participate in constraint positioning. This design provides:
+**LayoutNode** unifies constraint attribute management across all geometry elements and modifiers that participate in constraint positioning. This design provides:
 
 - Centralized constraint attribute declarations (left, right, top, bottom, centerX, centerY)
 - Unified constraint handling logic in the ConstraintLayout module

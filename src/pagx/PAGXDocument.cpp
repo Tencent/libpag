@@ -17,9 +17,42 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXDocument.h"
+#include "LayoutContext.h"
+#include "pagx/layout/LayoutNode.h"
+#include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Image.h"
 
 namespace pagx {
+
+void PAGXDocument::setFontConfig(const FontConfig& config) {
+  fontConfig = config;
+  layoutApplied = false;
+}
+
+void PAGXDocument::applyLayout() {
+  if (layoutApplied) {
+    return;
+  }
+  LayoutContext context(&fontConfig);
+  // Composition layers are laid out first since they may be referenced by document layers.
+  for (auto& node : nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      auto* comp = static_cast<Composition*>(node.get());
+      layoutLayers(comp->layers, comp->width, comp->height, context);
+    }
+  }
+  layoutLayers(layers, width, height, context);
+  layoutApplied = true;
+}
+
+void PAGXDocument::layoutLayers(const std::vector<Layer*>& layers, float containerW,
+                                float containerH, const LayoutContext& context) {
+  for (auto* layer : layers) {
+    layer->updateSize(context);
+  }
+  std::vector<LayoutNode*> nodes(layers.begin(), layers.end());
+  LayoutNode::PerformConstraintLayout(nodes, containerW, containerH, context);
+}
 
 std::shared_ptr<PAGXDocument> PAGXDocument::Make(float docWidth, float docHeight) {
   auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());

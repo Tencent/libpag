@@ -373,7 +373,7 @@ When different geometry needs different painters, choose based on layout context
 
 Additional behaviors beyond what `spec-essentials.md` §8 Text System covers:
 
-- **Vertical baseline correction**: TextBox vertically centers text within each line
+- **Vertical baseline correction**: TextBox uses `lineBox` baseline mode by default, vertically centers text within each line
   automatically, which shifts text downward by approximately half a line height compared
   to bare Text at the same position. Adjust the container's `top` value to compensate.
 - `overflow="hidden"` discards **entire lines/columns**, not partial content. Unlike CSS

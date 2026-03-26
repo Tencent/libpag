@@ -384,7 +384,7 @@ Geometry Elements     Modifiers             Painters
 | Repeater | Both | Does not trigger text-to-shape |
 
 TextPath also supports **constraint-based positioning** (left, right, top, bottom, centerX, centerY)
-inherited from LayoutElement. When opposite-edge constraints are used, TextPath scales its path
+inherited from LayoutNode. When opposite-edge constraints are used, TextPath scales its path
 data proportionally (same as Path — scale-to-fit, not stretch).
 
 **Key scope implications**:
@@ -447,7 +447,7 @@ is sequential and forward-only.
 <Rectangle left="20" top="20" size="100,60" roundness="8"/>
 ```
 
-- `size` (default 100,100), `roundness` (default 0), `reversed` (default false)
+- `size` (default 0,0), `roundness` (default 0), `reversed` (default false)
 - `position` is the center point; defaults to center of bounding box when omitted
 - **Constraint attributes**: `left`, `right`, `top`, `bottom`, `centerX`, `centerY`, `width`, `height` — see §3 Constraint Positioning
 - **Positioning**: prefer constraint attributes over `position`
@@ -497,6 +497,7 @@ is sequential and forward-only.
 ```
 
 - Text supports constraint attributes (`left`, `right`, `top`, `bottom`, `centerX`, `centerY`) for positioning within the container. Prefer wrapping Text in TextBox — TextBox handles measurement and provides accurate bounding box. Exception: when using TextPath, Text can appear without TextBox wrapper.
+- `baseline`: `lineBox` (default) or `alphabetic`. In `lineBox` mode, position.y is the top of the line box; in `alphabetic` mode, position.y is the alphabetic baseline.
 - **Constraint attributes**: prefer applying constraints to the parent TextBox instead of directly on Text.
 - `fauxBold` / `fauxItalic`: algorithmic bold / italic (default false).
 - **CDATA** for special characters: `<![CDATA[A < B]]>`.
@@ -683,8 +684,9 @@ See `design-patterns.md` §Container Layout for examples and usage guidance.
 </Layer>
 ```
 
-Clips content to the layer's own bounds. Works with auto-layout — the clipping region is
-determined after layout resolves the layer's dimensions.
+Clips content to the layer's own bounds. The layout engine writes `scrollRect="0,0,width,height"`
+during the layout phase. Works with auto-layout — the clipping region is determined
+after layout resolves the layer's dimensions.
 
 For advanced cases requiring a custom clip region with offset (e.g. scroll views), use
 `scrollRect="x,y,w,h"` instead. `scrollRect` takes priority when both are set.

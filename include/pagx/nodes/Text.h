@@ -18,12 +18,17 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
-#include "pagx/nodes/LayoutElement.h"
+#include "pagx/layout/LayoutNode.h"
+#include "pagx/nodes/Element.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/TextAnchor.h"
+#include "pagx/types/TextBaseline.h"
+#include "tgfx/core/Point.h"
+#include "tgfx/core/TextBlob.h"
 
 namespace pagx {
 
@@ -35,7 +40,7 @@ namespace pagx {
  * - Runtime shaping mode: Performs text shaping at runtime using the text content and font
  *   properties. Results may vary slightly across platforms due to font and shaping differences.
  */
-class Text : public LayoutElement {
+class Text : public Element, public LayoutNode {
  public:
   /**
    * The text content to render. Supports newline characters (\n) for line breaks, which use a
@@ -93,9 +98,28 @@ class Text : public LayoutElement {
    */
   std::vector<GlyphRun*> glyphRuns = {};
 
+  // Internal rendering attribute, written by TextLayout during applyLayout.
+  // LayerBuilder reads this directly for rendering.
+  std::shared_ptr<tgfx::TextBlob> textBlob = nullptr;
+
+  // Per-glyph anchor offsets relative to default anchor (advance * 0.5, 0).
+  // Written by TextLayout, read by FontEmbedder for font embedding.
+  std::vector<tgfx::Point> anchors = {};
+
+  /**
+   * Specifies how position.y is interpreted. LineBox (default): position.y is the top of the
+   * linebox. Alphabetic: position.y is the alphabetic baseline.
+   */
+  TextBaseline baseline = TextBaseline::LineBox;
+
   NodeType nodeType() const override {
     return NodeType::Text;
   }
+
+ protected:
+  void onMeasure(const LayoutContext& context) override;
+  void setLayoutSize(const LayoutContext& context, float width, float height) override;
+  void setLayoutPosition(const LayoutContext& context, float x, float y) override;
 
  private:
   Text() = default;

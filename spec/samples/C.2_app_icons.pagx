@@ -51,10 +51,8 @@
           </Layer>
         </Layer>
         <Layer>
-          <TextBox>
-            <Text text="Home" fontFamily="Arial" fontSize="11"/>
-            <Fill color="#6B7280"/>
-          </TextBox>
+          <Text text="Home" fontFamily="Arial" fontSize="11"/>
+          <Fill color="#6B7280"/>
         </Layer>
       </Layer>
 
@@ -71,10 +69,8 @@
           </Layer>
         </Layer>
         <Layer>
-          <TextBox>
-            <Text text="Search" fontFamily="Arial" fontSize="11"/>
-            <Fill color="#6B7280"/>
-          </TextBox>
+          <Text text="Search" fontFamily="Arial" fontSize="11"/>
+          <Fill color="#6B7280"/>
         </Layer>
       </Layer>
 
@@ -95,10 +91,8 @@
           </Layer>
         </Layer>
         <Layer>
-          <TextBox>
-            <Text text="Bell" fontFamily="Arial" fontSize="11"/>
-            <Fill color="#6B7280"/>
-          </TextBox>
+          <Text text="Bell" fontFamily="Arial" fontSize="11"/>
+          <Fill color="#6B7280"/>
         </Layer>
       </Layer>
 
@@ -111,10 +105,8 @@
           </Layer>
         </Layer>
         <Layer>
-          <TextBox>
-            <Text text="Heart" fontFamily="Arial" fontSize="11"/>
-            <Fill color="#6B7280"/>
-          </TextBox>
+          <Text text="Heart" fontFamily="Arial" fontSize="11"/>
+          <Fill color="#6B7280"/>
         </Layer>
       </Layer>
     </Layer>
@@ -137,10 +129,8 @@
           </Layer>
         </Layer>
         <Layer>
-          <TextBox>
-            <Text text="Chat" fontFamily="Arial" fontSize="11"/>
-            <Fill color="#6B7280"/>
-          </TextBox>
+          <Text text="Chat" fontFamily="Arial" fontSize="11"/>
+          <Fill color="#6B7280"/>
         </Layer>
       </Layer>
 
@@ -162,10 +152,8 @@
           </Layer>
         </Layer>
         <Layer>
-          <TextBox>
-            <Text text="Camera" fontFamily="Arial" fontSize="11"/>
-            <Fill color="#6B7280"/>
-          </TextBox>
+          <Text text="Camera" fontFamily="Arial" fontSize="11"/>
+          <Fill color="#6B7280"/>
         </Layer>
       </Layer>
 
@@ -187,10 +175,8 @@
           </Layer>
         </Layer>
         <Layer>
-          <TextBox>
-            <Text text="Settings" fontFamily="Arial" fontSize="11"/>
-            <Fill color="#6B7280"/>
-          </TextBox>
+          <Text text="Settings" fontFamily="Arial" fontSize="11"/>
+          <Fill color="#6B7280"/>
         </Layer>
       </Layer>
 
@@ -211,10 +197,8 @@
           </Layer>
         </Layer>
         <Layer>
-          <TextBox>
-            <Text text="User" fontFamily="Arial" fontSize="11"/>
-            <Fill color="#6B7280"/>
-          </TextBox>
+          <Text text="User" fontFamily="Arial" fontSize="11"/>
+          <Fill color="#6B7280"/>
         </Layer>
       </Layer>
     </Layer>
@@ -233,17 +217,13 @@
               <Rectangle left="4" top="16" size="30,22" roundness="3"/>
               <Fill color="#1E2433"/>
             </Group>
-            <TextBox centerX="0" top="15">
-              <Text text="17" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
-              <Fill color="#EF4444"/>
-            </TextBox>
+            <Text text="17" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" top="15"/>
+            <Fill color="#EF4444"/>
           </Layer>
         </Layer>
         <Layer>
-          <TextBox>
-            <Text text="Calendar" fontFamily="Arial" fontSize="11"/>
-            <Fill color="#6B7280"/>
-          </TextBox>
+          <Text text="Calendar" fontFamily="Arial" fontSize="11"/>
+          <Fill color="#6B7280"/>
         </Layer>
       </Layer>
 
@@ -265,10 +245,8 @@
           </Layer>
         </Layer>
         <Layer>
-          <TextBox>
-            <Text text="Lock" fontFamily="Arial" fontSize="11"/>
-            <Fill color="#6B7280"/>
-          </TextBox>
+          <Text text="Lock" fontFamily="Arial" fontSize="11"/>
+          <Fill color="#6B7280"/>
         </Layer>
       </Layer>
 
@@ -286,10 +264,8 @@
           </Layer>
         </Layer>
         <Layer>
-          <TextBox>
-            <Text text="Music" fontFamily="Arial" fontSize="11"/>
-            <Fill color="#6B7280"/>
-          </TextBox>
+          <Text text="Music" fontFamily="Arial" fontSize="11"/>
+          <Fill color="#6B7280"/>
         </Layer>
       </Layer>
 
@@ -309,10 +285,8 @@
           </Layer>
         </Layer>
         <Layer>
-          <TextBox>
-            <Text text="Download" fontFamily="Arial" fontSize="11"/>
-            <Fill color="#6B7280"/>
-          </TextBox>
+          <Text text="Download" fontFamily="Arial" fontSize="11"/>
+          <Fill color="#6B7280"/>
         </Layer>
       </Layer>
     </Layer>

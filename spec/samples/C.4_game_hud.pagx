@@ -109,37 +109,27 @@
     </Layer>
     <Layer name="HealthText" left="-440" width="200" centerY="0" layout="vertical" alignment="end">
       <Layer>
-        <TextBox>
-          <Text text="100%" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-          <Fill color="#FFF"/>
-        </TextBox>
+        <Text text="100%" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+        <Fill color="#FFF"/>
       </Layer>
       <Layer>
-        <TextBox>
-          <Text text="STRUCTURAL INTEGRITY" fontFamily="Arial" fontSize="10"/>
-          <Fill color="#0088FF"/>
-        </TextBox>
+        <Text text="STRUCTURAL INTEGRITY" fontFamily="Arial" fontSize="10"/>
+        <Fill color="#0088FF"/>
       </Layer>
     </Layer>
   </Layer>
   <Layer name="SystemStats" left="50" top="48" layout="vertical">
     <Layer>
-      <TextBox>
-        <Text text="PWR: 88%" fontFamily="Arial" fontSize="12"/>
-        <Fill color="#00CCFF" alpha="0.7"/>
-      </TextBox>
+      <Text text="PWR: 88%" fontFamily="Arial" fontSize="12"/>
+      <Fill color="#00CCFF" alpha="0.7"/>
     </Layer>
     <Layer>
-      <TextBox>
-        <Text text="RADAR: ACT" fontFamily="Arial" fontSize="12"/>
-        <Fill color="#00CCFF" alpha="0.7"/>
-      </TextBox>
+      <Text text="RADAR: ACT" fontFamily="Arial" fontSize="12"/>
+      <Fill color="#00CCFF" alpha="0.7"/>
     </Layer>
     <Layer>
-      <TextBox>
-        <Text text="SHIELD: OK" fontFamily="Arial" fontSize="12"/>
-        <Fill color="#00CCFF" alpha="0.7"/>
-      </TextBox>
+      <Text text="SHIELD: OK" fontFamily="Arial" fontSize="12"/>
+      <Fill color="#00CCFF" alpha="0.7"/>
     </Layer>
   </Layer>
   <Layer name="RightSide" left="400" top="0" bottom="0">
@@ -160,16 +150,12 @@
     </Layer>
     <Layer name="EnergyText" left="240" centerY="0" layout="vertical">
       <Layer>
-        <TextBox>
-          <Text text="60%" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-          <Fill color="#FFF"/>
-        </TextBox>
+        <Text text="60%" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+        <Fill color="#FFF"/>
       </Layer>
       <Layer>
-        <TextBox>
-          <Text text="PLASMA RESERVES" fontFamily="Arial" fontSize="10"/>
-          <Fill color="#0088FF"/>
-        </TextBox>
+        <Text text="PLASMA RESERVES" fontFamily="Arial" fontSize="10"/>
+        <Fill color="#0088FF"/>
       </Layer>
     </Layer>
   </Layer>
@@ -182,16 +168,12 @@
     </Layer>
     <Layer name="WeaponInfo" centerX="0" centerY="0" layout="vertical" alignment="center">
       <Layer>
-        <TextBox>
-          <Text text="MK-IV RAILGUN" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
-          <Fill color="#FFF"/>
-        </TextBox>
+        <Text text="MK-IV RAILGUN" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+        <Fill color="#FFF"/>
       </Layer>
       <Layer>
-        <TextBox>
-          <Text text="[ BURST MODE ]" fontFamily="Arial" fontSize="12"/>
-          <Fill color="#FFAA00"/>
-        </TextBox>
+        <Text text="[ BURST MODE ]" fontFamily="Arial" fontSize="12"/>
+        <Fill color="#FFAA00"/>
       </Layer>
     </Layer>
     <Layer top="70">
@@ -235,11 +217,9 @@
     </Layer>
   </Layer>
   <Layer name="Objectives" centerX="0" top="36">
-    <TextBox>
-      <Text text="MISSION OBJECTIVES:  [ ] INFILTRATE BASE  [ ] HACK TERMINAL  [x] SECURE PERIMETER" fontFamily="Arial"
-            fontStyle="Bold" fontSize="12"/>
-      <Fill color="#FFF"/>
-    </TextBox>
+    <Text text="MISSION OBJECTIVES:  [ ] INFILTRATE BASE  [ ] HACK TERMINAL  [x] SECURE PERIMETER" fontFamily="Arial"
+          fontStyle="Bold" fontSize="12"/>
+    <Fill color="#FFF"/>
     <DropShadowStyle blurX="2" blurY="2" color="#000"/>
   </Layer>
   <Layer name="StatusIcons" left="706" top="70">

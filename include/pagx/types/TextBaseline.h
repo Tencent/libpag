@@ -18,47 +18,20 @@
 
 #pragma once
 
-#include "pagx/layout/LayoutNode.h"
-#include "pagx/nodes/Element.h"
-#include "pagx/nodes/PathData.h"
-#include "pagx/types/Point.h"
-
 namespace pagx {
 
 /**
- * Path represents a freeform shape defined by a PathData containing vertices, in-tangents, and
- * out-tangents.
+ * Specifies how a Text element's position.y is interpreted relative to the text content.
  */
-class Path : public Element, public LayoutNode {
- public:
+enum class TextBaseline {
   /**
-   * The path data containing vertices and control points.
+   * Default mode. position.y represents the top of the linebox (based on font metrics line height).
    */
-  PathData* data = nullptr;
-
+  LineBox,
   /**
-   * The position offset of the path coordinate system origin. The default value is (0, 0).
+   * position.y represents the alphabetic baseline. Used by SVG text elements.
    */
-  Point position = {};
-
-  /**
-   * Whether the path direction is reversed. The default value is false.
-   */
-  bool reversed = false;
-
-  NodeType nodeType() const override {
-    return NodeType::Path;
-  }
-
- protected:
-  void onMeasure(const LayoutContext& context) override;
-  void setLayoutSize(const LayoutContext& context, float width, float height) override;
-  void setLayoutPosition(const LayoutContext& context, float x, float y) override;
-
- private:
-  Path() = default;
-
-  friend class PAGXDocument;
+  Alphabetic
 };
 
 }  // namespace pagx

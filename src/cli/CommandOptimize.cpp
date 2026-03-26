@@ -1159,11 +1159,8 @@ static bool CanUnwrapFirstChildGroup(const Group* group) {
   // (right, bottom, centerX, centerY). These require the Group as a reference frame.
   // Note: left/top alone are absolute offsets and do not need a reference frame.
   for (auto* element : group->elements) {
-    auto type = element->nodeType();
-    if (type == NodeType::Rectangle || type == NodeType::Ellipse || type == NodeType::Polystar ||
-        type == NodeType::Path || type == NodeType::Text || type == NodeType::Group ||
-        type == NodeType::TextBox || type == NodeType::TextPath) {
-      auto layout = static_cast<const LayoutElement*>(element);
+    auto* layout = LayoutNode::AsLayoutNode(element);
+    if (layout != nullptr) {
       if (!std::isnan(layout->right) || !std::isnan(layout->bottom) ||
           !std::isnan(layout->centerX) || !std::isnan(layout->centerY)) {
         return false;
@@ -2231,9 +2228,9 @@ static int RemoveRedundantConstraintsFromLayer(Layer* layer) {
                                         layer->centerX, layer->centerY);
 }
 
-static int RemoveRedundantConstraintsFromElement(LayoutElement* element) {
-  return RemoveRedundantConstraintsFrom(element->left, element->right, element->top,
-                                        element->bottom, element->centerX, element->centerY);
+static int RemoveRedundantConstraintsFromElement(LayoutNode* node) {
+  return RemoveRedundantConstraintsFrom(node->left, node->right, node->top, node->bottom,
+                                        node->centerX, node->centerY);
 }
 
 static int RemoveRedundantConstraintsFromElements(const std::vector<Element*>& elements) {
@@ -2244,10 +2241,11 @@ static int RemoveRedundantConstraintsFromElements(const std::vector<Element*>& e
       auto group = static_cast<Group*>(element);
       count += RemoveRedundantConstraintsFromElements(group->elements);
       count += RemoveRedundantConstraintsFromElement(group);
-    } else if (type == NodeType::Rectangle || type == NodeType::Ellipse ||
-               type == NodeType::Polystar || type == NodeType::Path || type == NodeType::Text ||
-               type == NodeType::TextPath) {
-      count += RemoveRedundantConstraintsFromElement(static_cast<LayoutElement*>(element));
+    } else {
+      auto* node = LayoutNode::AsLayoutNode(element);
+      if (node) {
+        count += RemoveRedundantConstraintsFromElement(node);
+      }
     }
   }
   return count;

@@ -21,7 +21,7 @@
 #include <deque>
 #include <emscripten/bind.h>
 #include "LayerBuilder.h"
-#include "pagx/FontProvider.h"
+#include "pagx/FontConfig.h"
 #include "pagx/PAGXDocument.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"

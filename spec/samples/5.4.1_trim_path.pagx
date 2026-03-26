@@ -24,10 +24,8 @@
 
     <!-- Row 2: Separate mode label -->
     <Layer>
-      <TextBox>
-        <Text text="Separate (0.2–0.9)" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
-        <Fill color="#475569"/>
-      </TextBox>
+      <Text text="Separate (0.2–0.9)" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+      <Fill color="#475569"/>
     </Layer>
 
     <!-- Row 3: Continuous mode ellipses -->
@@ -52,10 +50,8 @@
 
     <!-- Row 4: Continuous mode label -->
     <Layer>
-      <TextBox>
-        <Text text="Continuous (0.2–0.9)" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
-        <Fill color="#475569"/>
-      </TextBox>
+      <Text text="Continuous (0.2–0.9)" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+      <Fill color="#475569"/>
     </Layer>
   </Layer>
 </pagx>

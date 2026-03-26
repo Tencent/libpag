@@ -18,7 +18,8 @@
 
 #pragma once
 
-#include "pagx/nodes/LayoutElement.h"
+#include "pagx/layout/LayoutNode.h"
+#include "pagx/nodes/Element.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/types/Point.h"
 
@@ -28,9 +29,9 @@ namespace pagx {
  * TextPath is a text modifier that places text along a path. It allows text to follow the contour
  * of a path shape. The path can be specified either inline or by referencing a PathData resource.
  * TextPath supports constraint-based positioning (left, right, top, bottom, centerX, centerY)
- * inherited from LayoutElement.
+ * inherited from LayoutNode.
  */
-class TextPath : public LayoutElement {
+class TextPath : public Element, public LayoutNode {
  public:
   /**
    * The path data that the text follows.
@@ -82,6 +83,11 @@ class TextPath : public LayoutElement {
   NodeType nodeType() const override {
     return NodeType::TextPath;
   }
+
+ protected:
+  void onMeasure(const LayoutContext& context) override;
+  void setLayoutSize(const LayoutContext& context, float width, float height) override;
+  void setLayoutPosition(const LayoutContext& context, float x, float y) override;
 
  private:
   TextPath() = default;

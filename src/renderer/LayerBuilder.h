@@ -20,7 +20,7 @@
 
 #include <memory>
 #include <unordered_map>
-#include "pagx/FontProvider.h"
+#include "pagx/FontConfig.h"
 #include "pagx/PAGXDocument.h"
 #include "tgfx/layers/Layer.h"
 

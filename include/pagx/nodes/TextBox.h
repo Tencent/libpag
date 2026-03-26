@@ -90,6 +90,12 @@ class TextBox : public Group {
     return NodeType::TextBox;
   }
 
+ protected:
+  void updateSize(const LayoutContext& context) override;
+  void onMeasure(const LayoutContext& context) override;
+  void setLayoutSize(const LayoutContext& context, float width, float height) override;
+  void updateLayout(const LayoutContext& context) override;
+
  private:
   TextBox() = default;
 

@@ -291,6 +291,13 @@
     </xs:restriction>
   </xs:simpleType>
 
+  <xs:simpleType name="TextBaselineType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="lineBox"/>
+      <xs:enumeration value="alphabetic"/>
+    </xs:restriction>
+  </xs:simpleType>
+
   <xs:simpleType name="ParagraphAlignType">
     <xs:restriction base="xs:string">
       <xs:enumeration value="near"/>
@@ -515,7 +522,7 @@
   <xs:complexType name="RectangleType">
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="position" type="PointType"/>
-    <xs:attribute name="size" type="SizeType" default="100,100"/>
+    <xs:attribute name="size" type="SizeType" default="0,0"/>
     <xs:attribute name="roundness" type="xs:decimal" default="0"/>
     <xs:attribute name="reversed" type="BoolType" default="false"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
@@ -525,7 +532,7 @@
   <xs:complexType name="EllipseType">
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="position" type="PointType"/>
-    <xs:attribute name="size" type="SizeType" default="100,100"/>
+    <xs:attribute name="size" type="SizeType" default="0,0"/>
     <xs:attribute name="reversed" type="BoolType" default="false"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
   </xs:complexType>
@@ -571,6 +578,7 @@
     <xs:attribute name="fauxBold" type="BoolType" default="false"/>
     <xs:attribute name="fauxItalic" type="BoolType" default="false"/>
     <xs:attribute name="textAnchor" type="TextAnchorType" default="start"/>
+    <xs:attribute name="baseline" type="TextBaselineType" default="lineBox"/>
     <xs:attribute name="color" type="ColorType"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
   </xs:complexType>

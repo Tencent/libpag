@@ -21,7 +21,8 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include "pagx/nodes/LayoutElement.h"
+#include "pagx/layout/LayoutNode.h"
+#include "pagx/nodes/Element.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/PolystarType.h"
 #include "pagx/types/Rect.h"
@@ -31,7 +32,7 @@ namespace pagx {
 /**
  * Polystar represents a polygon or star shape with configurable points, radii, and roundness.
  */
-class Polystar : public LayoutElement {
+class Polystar : public Element, public LayoutNode {
  public:
   /**
    * The center point of the polystar. When not explicitly set, defaults to the center of the
@@ -124,6 +125,11 @@ class Polystar : public LayoutElement {
     }
     return Rect::MakeXYWH(position.x + minX, position.y + minY, maxX - minX, maxY - minY);
   }
+
+ protected:
+  void onMeasure(const LayoutContext& context) override;
+  void setLayoutSize(const LayoutContext& context, float width, float height) override;
+  void setLayoutPosition(const LayoutContext& context, float x, float y) override;
 
  private:
   Polystar() = default;

@@ -102,6 +102,7 @@ class FontConfig {
 
  private:
   friend class TextLayoutContext;  // Allow TextLayoutContext to access fallbackTypefaces
+  friend class LayoutContext;      // Allow LayoutContext to access fallbackTypefaces
 
   struct FontKey {
     std::string family = {};

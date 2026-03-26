@@ -20,10 +20,8 @@
     <BlurFilter blurX="40" blurY="40"/>
   </Layer>
   <Layer name="Title" width="800">
-    <TextBox centerX="0">
-      <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="56"/>
-      <Fill color="@titleGradient"/>
-    </TextBox>
+    <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="56" centerX="0"/>
+    <Fill color="@titleGradient"/>
   </Layer>
   <Layer name="Subtitle">
     <Text text="Portable Animated Graphics XML" fontFamily="Arial" fontSize="14"/>
@@ -76,10 +74,10 @@
     <Rectangle size="120,36" roundness="18"/>
     <Fill color="@buttonGradient"/>
     <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#6366F180"/>
-    <TextBox centerX="0" centerY="0">
+    <Group centerX="0" centerY="0">
       <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
       <Fill color="#FFF"/>
-    </TextBox>
+    </Group>
   </Layer>
   <Layer name="Modifiers" top="325">
     <Path left="258" data="@wavePath"/>

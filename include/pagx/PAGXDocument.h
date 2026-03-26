@@ -21,11 +21,14 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "pagx/FontConfig.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Data.h"
 
 namespace pagx {
+
+class LayoutContext;
 
 /**
  * PAGXDocument is the root container for a PAGX document.
@@ -123,6 +126,13 @@ class PAGXDocument : public Node {
    */
   bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
 
+  /**
+   * Sets the font config for font matching during layout and text rendering.
+   * The config is copied internally. Resets the layout cache so the next
+   * applyLayout call will re-execute.
+   */
+  void setFontConfig(const FontConfig& fontConfig);
+
   NodeType nodeType() const override {
     return NodeType::Document;
   }
@@ -130,13 +140,20 @@ class PAGXDocument : public Node {
  private:
   PAGXDocument() = default;
 
+  void applyLayout();
+  static void layoutLayers(const std::vector<Layer*>& layers, float containerW, float containerH,
+                           const LayoutContext& context);
+
   void registerNode(Node* node, const std::string& id);
 
+  FontConfig fontConfig = {};
+  bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};
 
   friend class PAGXImporter;
   friend class PAGXExporter;
   friend class TextLayoutContext;
+  friend class LayerBuilder;
 };
 
 }  // namespace pagx

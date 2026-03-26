@@ -42,6 +42,7 @@
 #include "pagx/types/MipmapMode.h"
 #include "pagx/types/Padding.h"
 #include "pagx/types/TextAnchor.h"
+#include "pagx/types/TextBaseline.h"
 #include "pagx/types/TileMode.h"
 
 namespace pagx {
@@ -149,6 +150,9 @@ bool IsValidParagraphAlignString(const std::string& str);
 std::string TextAnchorToString(TextAnchor anchor);
 TextAnchor TextAnchorFromString(const std::string& str);
 bool IsValidTextAnchorString(const std::string& str);
+std::string TextBaselineToString(TextBaseline baseline);
+TextBaseline TextBaselineFromString(const std::string& str);
+bool IsValidTextBaselineString(const std::string& str);
 std::string WritingModeToString(WritingMode mode);
 WritingMode WritingModeFromString(const std::string& str);
 bool IsValidWritingModeString(const std::string& str);

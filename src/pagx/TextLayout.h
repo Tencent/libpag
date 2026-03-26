@@ -21,12 +21,13 @@
 #include <memory>
 #include <string>
 #include "ShapedText.h"
-#include "pagx/FontProvider.h"
+#include "pagx/FontConfig.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/types/Rect.h"
 
 namespace pagx {
 
+class LayoutContext;
 class TextBox;
 
 /**
@@ -74,6 +75,18 @@ class TextLayout {
   static std::shared_ptr<tgfx::Typeface> FindTypeface(const std::string& fontFamily,
                                                       const std::string& fontStyle,
                                                       FontConfig* fontConfig = nullptr);
+
+  /** Measures a Text element using LayoutContext for font lookup. */
+  static Rect MeasureText(const Text* text, const LayoutContext& context);
+
+  /** Measures a TextBox using LayoutContext for font lookup. */
+  static Rect MeasureTextBox(const TextBox* textBox, const LayoutContext& context);
+
+  /** Builds TextBlob for a standalone Text element (not inside TextBox). */
+  static void LayoutText(Text* text, const LayoutContext& context);
+
+  /** Performs text layout for all Text elements inside a TextBox. */
+  static void LayoutTextBox(TextBox* textBox, const LayoutContext& context);
 };
 
 }  // namespace pagx

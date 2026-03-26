@@ -21,6 +21,7 @@
 #include <cmath>
 #include <string>
 #include <vector>
+#include "pagx/layout/LayoutNode.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/LayerFilter.h"
 #include "pagx/nodes/LayerStyle.h"
@@ -43,7 +44,7 @@ class Composition;
  * Layer represents a layer node that can contain vector elements, layer styles, filters, and child
  * layers. It is the main building block for composing visual content in a PAGX document.
  */
-class Layer : public Node {
+class Layer : public Node, public LayoutNode {
  public:
   /**
    * The display name of the layer.
@@ -210,53 +211,20 @@ class Layer : public Node {
    */
   bool includeInLayout = true;
 
-  /**
-   * Distance from the left edge of the parent Layer. Takes effect when the parent has no container
-   * layout or when this layer has includeInLayout=false. NAN means not set.
-   */
-  float left = NAN;
-
-  /**
-   * Distance from the right edge of the parent Layer. Takes effect when the parent has no container
-   * layout or when this layer has includeInLayout=false. NAN means not set.
-   */
-  float right = NAN;
-
-  /**
-   * Distance from the top edge of the parent Layer. Takes effect when the parent has no container
-   * layout or when this layer has includeInLayout=false. NAN means not set.
-   */
-  float top = NAN;
-
-  /**
-   * Distance from the bottom edge of the parent Layer. Takes effect when the parent has no
-   * container layout or when this layer has includeInLayout=false. NAN means not set.
-   */
-  float bottom = NAN;
-
-  /**
-   * Horizontal offset from the center of the parent Layer. Takes effect when the parent has no
-   * container layout or when this layer has includeInLayout=false. NAN means not set.
-   */
-  float centerX = NAN;
-
-  /**
-   * Vertical offset from the center of the parent Layer. Takes effect when the parent has no
-   * container layout or when this layer has includeInLayout=false. NAN means not set.
-   */
-  float centerY = NAN;
-
-  // Layout measurement cache, managed by AutoLayout.
-  mutable bool measureCached = false;
-  mutable float cachedMeasuredWidth = 0;
-  mutable float cachedMeasuredHeight = 0;
-
   NodeType nodeType() const override {
     return NodeType::Layer;
   }
 
  private:
   Layer() = default;
+
+  void performContainerLayout(const LayoutContext& context);
+
+  void updateSize(const LayoutContext& context) override;
+  void onMeasure(const LayoutContext& context) override;
+  void setLayoutSize(const LayoutContext& context, float width, float height) override;
+  void setLayoutPosition(const LayoutContext& context, float x, float y) override;
+  void updateLayout(const LayoutContext& context) override;
 
   friend class PAGXDocument;
 };

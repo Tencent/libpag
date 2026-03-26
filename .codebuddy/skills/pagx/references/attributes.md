@@ -112,7 +112,7 @@ for top-level Layers inside it (same role as `<pagx>` dimensions for document-le
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `size` | Size | 100,100 |
+| `size` | Size | 0,0 |
 | `roundness` | float | 0 |
 | `reversed` | bool | false |
 | `position` | Point | (center of bounding box) |
@@ -131,7 +131,7 @@ See §Constraint Attributes below.
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `size` | Size | 100,100 |
+| `size` | Size | 0,0 |
 | `reversed` | bool | false |
 | `position` | Point | (center of bounding box) |
 | `left` | float | — |
@@ -405,6 +405,7 @@ Child element of gradient color sources (LinearGradient, RadialGradient, ConicGr
 | `fauxBold` | bool | false |
 | `fauxItalic` | bool | false |
 | `textAnchor` | TextAnchor | start |
+| `baseline` | TextBaseline | lineBox |
 | `left` | float | — |
 | `right` | float | — |
 | `top` | float | — |
@@ -488,7 +489,7 @@ Opposite-pair constraints use scale-to-fit (same as Path). See §Constraint Attr
 
 ### Constraint Attributes (Geometry Elements, TextPath, TextBox, Groups, and Child Layers)
 
-These attributes position or stretch an element relative to its container.
+These attributes position or stretch an element relative to its container (LayoutNode base class).
 The container's size comes from explicit `width`/`height`, parent layout assignment, or
 content measurement (every container always has a size). `left`/`top` alone work without any
 container size dependency; `right`/`bottom`/`centerX`/`centerY` reference the container's size.
@@ -612,6 +613,7 @@ Path `data` uses SVG `<path d="...">` syntax exactly. Uppercase = absolute, lowe
 | **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
 | **TextAlign** | `start`, `center`, `end`, `justify` |
 | **TextAnchor** | `start`, `center`, `end` |
+| **TextBaseline** | `lineBox`, `alphabetic` |
 | **ParagraphAlign** | `near`, `middle`, `far` |
 | **Overflow** | `visible`, `hidden` |
 | **WritingMode** | `horizontal`, `vertical` |
@@ -627,7 +629,7 @@ These defaults are counter-intuitive and commonly forgotten:
 |---------|-----------|---------|---------------------|
 | **Repeater** | `position` | `100,100` | Often assumed `0,0` |
 | **Repeater** | `copies` | `3` | Often assumed `1` |
-| **Rectangle/Ellipse** | `size` | `100,100` | May forget there is a default |
+| **Rectangle/Ellipse** | `size` | `0,0` | May forget there is a default |
 | **Polystar** | `type` | `star` | May assume `polygon` |
 | **Polystar** | `outerRadius` | `100` | May forget there is a default |
 | **Polystar** | `innerRadius` | `50` | May forget there is a default |

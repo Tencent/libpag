@@ -24,7 +24,7 @@
 #include <string>
 #include <vector>
 #include "SystemFonts.h"
-#include "pagx/FontProvider.h"
+#include "pagx/FontConfig.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx::cli {
