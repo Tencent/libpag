@@ -984,7 +984,6 @@ class PDFWriter {
   float _docWidth;
   float _docHeight;
 
-  void writeLayerContents(const Layer* layer, const Matrix& transform = {});
   void writeElements(const std::vector<Element*>& elements, const Matrix& transform = {});
 
   void writeRectangle(const Rectangle* rect, const FillStrokeInfo& fs, const Matrix& transform);
@@ -1498,7 +1497,7 @@ void PDFWriter::renderMaskLayerContent(const Layer* maskLayer) {
     }
   }
 
-  writeLayerContents(maskLayer);
+  writeElements(maskLayer->contents, {});
   for (const auto* child : maskLayer->children) {
     renderMaskLayerContent(child);
   }
@@ -1579,10 +1578,6 @@ void PDFWriter::writeElements(const std::vector<Element*>& elements, const Matri
   }
 }
 
-void PDFWriter::writeLayerContents(const Layer* layer, const Matrix& transform) {
-  writeElements(layer->contents, transform);
-}
-
 void PDFWriter::writeLayer(const Layer* layer) {
   if (!layer->visible && layer->mask == nullptr) {
     return;
@@ -1592,7 +1587,7 @@ void PDFWriter::writeLayer(const Layer* layer) {
                     layer->x != 0.0f || layer->y != 0.0f || layer->blendMode != BlendMode::Normal;
 
   if (!needsGroup) {
-    writeLayerContents(layer);
+    writeElements(layer->contents, {});
     for (const auto* child : layer->children) {
       writeLayer(child);
     }
@@ -1634,7 +1629,7 @@ void PDFWriter::writeLayer(const Layer* layer) {
     }
   }
 
-  writeLayerContents(layer);
+  writeElements(layer->contents, {});
 
   for (const auto* child : layer->children) {
     writeLayer(child);
