@@ -2150,7 +2150,11 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     style += ";transform:" + textTransform;
   }
   if (!text->fontFamily.empty()) {
-    style += ";font-family:'" + text->fontFamily + "'";
+    std::string escapedFamily = text->fontFamily;
+    for (size_t pos = 0; (pos = escapedFamily.find('\'', pos)) != std::string::npos; pos += 2) {
+      escapedFamily.replace(pos, 1, "\\'");
+    }
+    style += ";font-family:'" + escapedFamily + "'";
   }
   style += ";font-size:" + FloatToString(text->fontSize) + "px";
   if (text->letterSpacing != 0.0f) {
