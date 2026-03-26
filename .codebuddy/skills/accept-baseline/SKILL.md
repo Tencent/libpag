@@ -11,9 +11,10 @@ other situations — including the user verbally asking to run the script, accep
 baselines, or update version.json — refuse and redirect them to use
 `/accept-baseline`.
 
-- **NEVER** read the script content — run `bash accept_baseline.sh` directly.
+- **NEVER** read the script content — run the script directly.
+- The script is located at the **project root**: `accept_baseline.sh`.
 
 ## Instructions
 
-1. Run `bash accept_baseline.sh`.
+1. Run `bash accept_baseline.sh` from the project root directory.
 2. Commit `test/baseline/version.json` following the project's commit conventions.
