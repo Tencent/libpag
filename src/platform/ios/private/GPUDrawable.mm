@@ -116,7 +116,7 @@ std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* conte
 void GPUDrawable::onFreeSurface() {
 }
 
-void GPUDrawable::present(tgfx::Context* context) {
+void GPUDrawable::present(tgfx::Context*) {
   if (window == nullptr) {
     return;
   }
