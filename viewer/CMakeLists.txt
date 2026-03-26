@@ -176,9 +176,6 @@ execute_process(COMMAND bash -c "${CMAKE_CURRENT_SOURCE_DIR}/sync_deps.sh")
 if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/RttrAutoRegister${CMAKE_EXECUTABLE_SUFFIX}")
     set(RTTR_OUT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src/editing/rttr/PAGRttr.hpp")
     execute_process(COMMAND bash -c "chmod +x ${CMAKE_CURRENT_SOURCE_DIR}/tools/RttrAutoRegister${CMAKE_EXECUTABLE_SUFFIX} && ${CMAKE_CURRENT_SOURCE_DIR}/tools/RttrAutoRegister${CMAKE_EXECUTABLE_SUFFIX} -s ${CMAKE_CURRENT_SOURCE_DIR}/../include/pag -o ${RTTR_OUT_PATH} -m PAG_API -i ${CMAKE_CURRENT_SOURCE_DIR}/../include ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES}")
-
-    set(PAGX_RTTR_OUT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src/editing/rttr/PAGXRttr.hpp")
-    execute_process(COMMAND bash -c "${CMAKE_CURRENT_SOURCE_DIR}/tools/RttrAutoRegister${CMAKE_EXECUTABLE_SUFFIX} -s ${CMAKE_CURRENT_SOURCE_DIR}/../include/pagx -o ${PAGX_RTTR_OUT_PATH} -m PAGX_API -i ${CMAKE_CURRENT_SOURCE_DIR}/../include ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES}")
 endif()
 
 # collects pag include directories.
