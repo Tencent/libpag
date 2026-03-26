@@ -783,7 +783,7 @@ static Path* parsePath(const DOMNode* node, PAGXDocument* doc) {
     } else {
       // Inline path data
       path->data = doc->makeNode<PathData>();
-      path->data->setPathData(PathDataFromSVGString(dataAttr));
+      *path->data = PathDataFromSVGString(dataAttr);
     }
   }
   path->reversed = getBoolAttribute(node, "reversed", false, doc);
@@ -1056,7 +1056,7 @@ static TextPath* parseTextPath(const DOMNode* node, PAGXDocument* doc) {
     } else {
       // Inline path data
       textPath->path = doc->makeNode<PathData>();
-      textPath->path->setPathData(PathDataFromSVGString(pathAttr));
+      *textPath->path = PathDataFromSVGString(pathAttr);
     }
   }
   textPath->baselineOrigin = getPointAttribute(node, "baselineOrigin", {0, 0}, doc);
@@ -1404,7 +1404,7 @@ static PathData* parsePathData(const DOMNode* node, PAGXDocument* doc) {
   }
   auto data = getAttribute(node, "data");
   if (!data.empty()) {
-    pathData->setPathData(PathDataFromSVGString(data));
+    *pathData = PathDataFromSVGString(data);
   }
   validateAttributes(node, {"id", "data"}, doc);
   return pathData;
@@ -1477,7 +1477,7 @@ static Glyph* parseGlyph(const DOMNode* node, PAGXDocument* doc) {
       }
     } else {
       glyph->path = doc->makeNode<PathData>();
-      glyph->path->setPathData(PathDataFromSVGString(pathAttr));
+      *glyph->path = PathDataFromSVGString(pathAttr);
     }
   }
   auto imageAttr = getAttribute(node, "image");

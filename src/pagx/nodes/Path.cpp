@@ -19,6 +19,7 @@
 #include "pagx/nodes/Path.h"
 #include <cmath>
 #include "pagx/layout/LayoutNode.h"
+#include "pagx/types/Matrix.h"
 
 namespace pagx {
 
@@ -36,7 +37,7 @@ void Path::setLayoutSize(const LayoutContext&, float width, float height) {
   }
   float scale = LayoutNode::ComputeUniformScale(preferredWidth, preferredHeight, width, height);
   if (scale != 1.0f) {
-    data->scalePoints(scale);
+    data->transform(Matrix::Scale(scale, scale));
   }
   auto bounds = data->getBounds();
   actualWidth = bounds.width;

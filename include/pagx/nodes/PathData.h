@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 #include "pagx/nodes/Node.h"
+#include "pagx/types/Matrix.h"
 #include "pagx/types/PathVerb.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/Rect.h"
@@ -127,20 +128,15 @@ class PathData : public Node {
   static int PointsPerVerb(PathVerb verb);
 
   /**
-   * Copies only the path data (verbs and points) from another PathData, without affecting the Node
+   * Copies the path data (verbs and points) from another PathData, without affecting the Node
    * base class fields (id).
    */
-  void setPathData(const PathData& other);
+  PathData& operator=(const PathData& other);
 
   /**
-   * Scales all points uniformly by the given factor.
+   * Transforms all points by the given affine matrix.
    */
-  void scalePoints(float scale);
-
-  /**
-   * Translates all points by the given offset.
-   */
-  void translatePoints(float tx, float ty);
+  void transform(const Matrix& matrix);
 
   NodeType nodeType() const override {
     return NodeType::PathData;
@@ -148,6 +144,7 @@ class PathData : public Node {
 
  private:
   PathData() = default;
+  PathData(const PathData& other) = default;
 
   std::vector<PathVerb> _verbs = {};
   std::vector<Point> _points = {};

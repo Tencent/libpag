@@ -19,6 +19,7 @@
 #include "pagx/nodes/TextPath.h"
 #include <cmath>
 #include "pagx/layout/LayoutNode.h"
+#include "pagx/types/Matrix.h"
 
 namespace pagx {
 
@@ -36,7 +37,7 @@ void TextPath::setLayoutSize(const LayoutContext&, float width, float height) {
   }
   float scale = LayoutNode::ComputeUniformScale(preferredWidth, preferredHeight, width, height);
   if (scale != 1.0f) {
-    path->scalePoints(scale);
+    path->transform(Matrix::Scale(scale, scale));
     baselineOrigin.x *= scale;
     baselineOrigin.y *= scale;
   }
@@ -53,7 +54,7 @@ void TextPath::setLayoutPosition(const LayoutContext&, float x, float y) {
   float tx = std::isnan(x) ? 0 : x - bounds.x;
   float ty = std::isnan(y) ? 0 : y - bounds.y;
   if (tx != 0 || ty != 0) {
-    path->translatePoints(tx, ty);
+    path->transform(Matrix::Translate(tx, ty));
     baselineOrigin.x += tx;
     baselineOrigin.y += ty;
   }
