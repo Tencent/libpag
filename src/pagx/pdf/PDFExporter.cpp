@@ -1018,6 +1018,7 @@ class PDFWriter {
   };
 
   PaintState applyFillStrokeColors(const FillStrokeInfo& fs);
+  void emitPaintOp(const PaintState& state);
   void paintShape(const FillStrokeInfo& fs);
   void applyStrokeAttrs(const Stroke* stroke);
 
@@ -1288,6 +1289,16 @@ PDFWriter::PaintState PDFWriter::applyFillStrokeColors(const FillStrokeInfo& fs)
   return state;
 }
 
+void PDFWriter::emitPaintOp(const PaintState& state) {
+  if (state.hasFill && state.hasStroke) {
+    state.isEvenOdd ? _stream->fillEvenOddAndStroke() : _stream->fillAndStroke();
+  } else if (state.hasFill) {
+    state.isEvenOdd ? _stream->fillEvenOdd() : _stream->fill();
+  } else if (state.hasStroke) {
+    _stream->stroke();
+  }
+}
+
 void PDFWriter::paintShape(const FillStrokeInfo& fs) {
   if ((!fs.fill || !fs.fill->color) && (!fs.stroke || !fs.stroke->color)) {
     _stream->endPath();
@@ -1295,13 +1306,7 @@ void PDFWriter::paintShape(const FillStrokeInfo& fs) {
   }
 
   auto state = applyFillStrokeColors(fs);
-  if (state.hasFill && state.hasStroke) {
-    state.isEvenOdd ? _stream->fillEvenOddAndStroke() : _stream->fillAndStroke();
-  } else if (state.hasFill) {
-    state.isEvenOdd ? _stream->fillEvenOdd() : _stream->fill();
-  } else {
-    _stream->stroke();
-  }
+  emitPaintOp(state);
 }
 
 //==============================================================================
@@ -1358,13 +1363,7 @@ void PDFWriter::writeTextAsPath(const Text* text, const FillStrokeInfo& fs,
     _stream->save();
     _stream->concatMatrix(gp.transform);
     emitPathData(*gp.pathData);
-    if (state.hasFill && state.hasStroke) {
-      state.isEvenOdd ? _stream->fillEvenOddAndStroke() : _stream->fillAndStroke();
-    } else if (state.hasFill) {
-      state.isEvenOdd ? _stream->fillEvenOdd() : _stream->fill();
-    } else if (state.hasStroke) {
-      _stream->stroke();
-    }
+    emitPaintOp(state);
     _stream->restore();
   }
 }
