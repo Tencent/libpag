@@ -36,9 +36,6 @@ GPUDrawable::GPUDrawable(std::string canvasID) : canvasID(std::move(canvasID)) {
 void GPUDrawable::updateSize() {
   if (!canvasID.empty()) {
     emscripten_get_canvas_element_size(canvasID.c_str(), &_width, &_height);
-    if (window) {
-      window->invalidSize();
-    }
   }
 }
 
@@ -53,12 +50,12 @@ std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
 }
 
 std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* context) {
-  return window ? window->getSurface(context) : nullptr;
+  if (window == nullptr) {
+    return nullptr;
+  }
+  return tgfx::Surface::MakeFrom(context, window);
 }
 
 void GPUDrawable::onFreeSurface() {
-  if (window) {
-    window->freeSurface();
-  }
 }
 }  // namespace pag
