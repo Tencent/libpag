@@ -986,13 +986,12 @@ class PDFWriter {
 
   void writeElements(const std::vector<Element*>& elements, const Matrix& transform = {});
 
-  void writeRectangle(const Rectangle* rect, const FillStrokeInfo& fs, const Matrix& transform);
-  void writeEllipse(const Ellipse* ellipse, const FillStrokeInfo& fs, const Matrix& transform);
-  void writePath(const Path* path, const FillStrokeInfo& fs, const Matrix& transform);
+  void writeShape(const Element* element, const FillStrokeInfo& fs, const Matrix& transform);
   void writeText(const Text* text, const FillStrokeInfo& fs, const Matrix& transform);
   void writeTextAsPath(const Text* text, const FillStrokeInfo& fs, const Matrix& transform);
   void writeTextAsPDFText(const Text* text, const FillStrokeInfo& fs, const Matrix& transform);
 
+  void emitShapePath(const Element* element, const Matrix& transform = {});
   void emitPathData(const PathData& data, const Matrix& transform = {});
   void emitEllipsePath(float cx, float cy, float rx, float ry, const Matrix& transform = {});
   void emitRoundedRectPath(float x, float y, float w, float h, float r,
@@ -1310,38 +1309,55 @@ void PDFWriter::paintShape(const FillStrokeInfo& fs) {
 }
 
 //==============================================================================
+// PDFWriter – unified shape path emission
+//==============================================================================
+
+void PDFWriter::emitShapePath(const Element* element, const Matrix& transform) {
+  switch (element->nodeType()) {
+    case NodeType::Rectangle: {
+      auto rect = static_cast<const Rectangle*>(element);
+      float x = rect->position.x - rect->size.width / 2;
+      float y = rect->position.y - rect->size.height / 2;
+      if (rect->roundness > 0) {
+        emitRoundedRectPath(x, y, rect->size.width, rect->size.height, rect->roundness, transform);
+      } else {
+        emitRectPath(x, y, rect->size.width, rect->size.height, transform);
+      }
+      break;
+    }
+    case NodeType::Ellipse: {
+      auto ellipse = static_cast<const Ellipse*>(element);
+      emitEllipsePath(ellipse->position.x, ellipse->position.y, ellipse->size.width / 2,
+                      ellipse->size.height / 2, transform);
+      break;
+    }
+    case NodeType::Path: {
+      auto path = static_cast<const Path*>(element);
+      if (path->data && !path->data->isEmpty()) {
+        emitPathData(*path->data, transform);
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+//==============================================================================
 // PDFWriter – shape elements
 //==============================================================================
 
-void PDFWriter::writeRectangle(const Rectangle* rect, const FillStrokeInfo& fs,
-                               const Matrix& transform) {
-  float x = rect->position.x - rect->size.width / 2;
-  float y = rect->position.y - rect->size.height / 2;
-
-  ScopedTransform guard(_stream, _currentMatrix, transform);
-  if (rect->roundness > 0) {
-    emitRoundedRectPath(x, y, rect->size.width, rect->size.height, rect->roundness);
-  } else {
-    _stream->rect(x, y, rect->size.width, rect->size.height);
-  }
-  paintShape(fs);
-}
-
-void PDFWriter::writeEllipse(const Ellipse* ellipse, const FillStrokeInfo& fs,
-                             const Matrix& transform) {
-  ScopedTransform guard(_stream, _currentMatrix, transform);
-  emitEllipsePath(ellipse->position.x, ellipse->position.y, ellipse->size.width / 2,
-                  ellipse->size.height / 2);
-  paintShape(fs);
-}
-
-void PDFWriter::writePath(const Path* path, const FillStrokeInfo& fs, const Matrix& transform) {
-  if (!path->data || path->data->isEmpty()) {
-    return;
+void PDFWriter::writeShape(const Element* element, const FillStrokeInfo& fs,
+                           const Matrix& transform) {
+  if (element->nodeType() == NodeType::Path) {
+    auto path = static_cast<const Path*>(element);
+    if (!path->data || path->data->isEmpty()) {
+      return;
+    }
   }
 
   ScopedTransform guard(_stream, _currentMatrix, transform);
-  emitPathData(*path->data);
+  emitShapePath(element);
   paintShape(fs);
 }
 
@@ -1384,26 +1400,7 @@ void PDFWriter::writeTextAsPDFText(const Text* text, const FillStrokeInfo& fs,
   }
 
   ScopedTransform guard(_stream, _currentMatrix, transform);
-
-  bool hasFill = fs.fill && fs.fill->color;
-  bool hasStroke = fs.stroke && fs.stroke->color;
-  ColorRef fillRef = {};
-  if (hasFill) {
-    fillRef = resolveColorSource(fs.fill->color);
-    float fillAlpha = fillRef.alpha * fs.fill->alpha;
-    if (fillAlpha < 1.0f) {
-      _stream->setExtGState(_resources->getExtGState(fillAlpha, 1.0f));
-    }
-    if (fillRef.type == ColorRefType::Solid) {
-      _stream->setFillRGB(fillRef.r, fillRef.g, fillRef.b);
-    }
-  }
-  if (hasStroke) {
-    auto strokeRef = resolveColorSource(fs.stroke->color);
-    if (strokeRef.type == ColorRefType::Solid) {
-      _stream->setStrokeRGB(strokeRef.r, strokeRef.g, strokeRef.b);
-    }
-  }
+  applyFillStrokeColors(fs);
 
   _stream->beginText();
   _stream->setFont(fontName, text->fontSize);
@@ -1439,36 +1436,7 @@ void PDFWriter::writeClipPath(const Layer* maskLayer, const Matrix& parentMatrix
   Matrix combined = parentMatrix * layerMatrix;
 
   for (const auto* element : maskLayer->contents) {
-    auto type = element->nodeType();
-    switch (type) {
-      case NodeType::Rectangle: {
-        auto rect = static_cast<const Rectangle*>(element);
-        float x = rect->position.x - rect->size.width / 2;
-        float y = rect->position.y - rect->size.height / 2;
-        if (rect->roundness > 0) {
-          emitRoundedRectPath(x, y, rect->size.width, rect->size.height, rect->roundness, combined);
-        } else {
-          emitRectPath(x, y, rect->size.width, rect->size.height, combined);
-        }
-        break;
-      }
-      case NodeType::Ellipse: {
-        auto ellipse = static_cast<const Ellipse*>(element);
-        float rx = ellipse->size.width / 2;
-        float ry = ellipse->size.height / 2;
-        emitEllipsePath(ellipse->position.x, ellipse->position.y, rx, ry, combined);
-        break;
-      }
-      case NodeType::Path: {
-        auto path = static_cast<const Path*>(element);
-        if (path->data && !path->data->isEmpty()) {
-          emitPathData(*path->data, combined);
-        }
-        break;
-      }
-      default:
-        break;
-    }
+    emitShapePath(element, combined);
   }
 
   for (const auto* child : maskLayer->children) {
@@ -1536,13 +1504,9 @@ void PDFWriter::writeElements(const std::vector<Element*>& elements, const Matri
     }
     switch (type) {
       case NodeType::Rectangle:
-        writeRectangle(static_cast<const Rectangle*>(element), fs, transform);
-        break;
       case NodeType::Ellipse:
-        writeEllipse(static_cast<const Ellipse*>(element), fs, transform);
-        break;
       case NodeType::Path:
-        writePath(static_cast<const Path*>(element), fs, transform);
+        writeShape(element, fs, transform);
         break;
       case NodeType::Text:
         writeText(static_cast<const Text*>(element), fs, transform);
