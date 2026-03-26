@@ -17,7 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <base/utils/TimeUtil.h>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunknown-warning-option"
+#pragma clang diagnostic ignored "-Wdeprecated-literal-operator"
 #include "nlohmann/json.hpp"
+#pragma clang diagnostic pop
 #include "utils/TestUtils.h"
 
 namespace pag {
