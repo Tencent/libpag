@@ -807,7 +807,7 @@ if (PAG_BUILD_TESTS)
     list(APPEND PAG_TEST_LIBS ${FFAVC_LIB})
     list(APPEND PAG_TEST_INCLUDES vendor/ffavc/include)
 
-    list(APPEND PAG_TEST_COMPILE_OPTIONS ${PAG_COMPILE_OPTIONS} -fno-access-control)
+    list(APPEND PAG_TEST_COMPILE_OPTIONS ${PAG_COMPILE_OPTIONS} -fno-access-control -Wno-deprecated-literal-operator)
     list(APPEND PAG_TEST_DEFINES ${PAG_DEFINES})
 
     foreach (FILE_PATH ${PAG_TEST_FILES})

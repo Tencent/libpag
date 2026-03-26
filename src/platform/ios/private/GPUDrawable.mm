@@ -46,7 +46,7 @@ void GPUDrawable::tryCreateSurface() {
   if (window != nullptr) {
     auto device = window->getDevice();
     auto context = device->lockContext();
-    surface = window->getSurface(context);
+    surface = tgfx::Surface::MakeFrom(context, window);
     device->unlock();
   }
 }
@@ -64,9 +64,6 @@ void GPUDrawable::updateSize() {
   auto height = layer.bounds.size.height * layer.contentsScale;
   _width = static_cast<int>(roundf(width));
   _height = static_cast<int>(roundf(height));
-  if (window) {
-    window->invalidSize();
-  }
 }
 
 std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
@@ -89,7 +86,7 @@ std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* conte
   // https://github.com/Tencent/libpag/issues/1870
   // Creating a surface in a non-main thread may lead to a crash.
   if (NSThread.isMainThread) {
-    surface = window->getSurface(context);
+    surface = tgfx::Surface::MakeFrom(context, window);
     return surface;
   } else {
     bufferPreparing = true;
@@ -102,7 +99,7 @@ std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* conte
         [strongThis->layer release];
         return;
       }
-      strongThis->surface = strongThis->window->getSurface(context);
+      strongThis->surface = tgfx::Surface::MakeFrom(context, strongThis->window);
       strongThis->bufferPreparing = false;
       strongThis->window->getDevice()->unlock();
       if (strongThis->surface) {
@@ -117,31 +114,13 @@ std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* conte
 }
 
 void GPUDrawable::onFreeSurface() {
-  if (window) {
-    window->freeSurface();
-  }
 }
 
 void GPUDrawable::present(tgfx::Context* context) {
   if (window == nullptr) {
     return;
   }
-
-  if (NSThread.isMainThread) {
-    window->present(context);
-  } else {
-    auto strongThis = weakThis.lock();
-    [layer retain];
-    dispatch_async(dispatch_get_main_queue(), ^{
-      auto glContext = strongThis->window->getDevice()->lockContext();
-      if (glContext == nullptr) {
-        [strongThis->layer release];
-        return;
-      }
-      strongThis->window->present(glContext);
-      strongThis->window->getDevice()->unlock();
-      [strongThis->layer release];
-    });
-  }
+  // In the new tgfx architecture, Window::onPresent() is called automatically by
+  // DrawingBuffer::presentWindows() after command submission.
 }
 }  // namespace pag
