@@ -20,7 +20,6 @@
 #include <fstream>
 #include <iostream>
 #include <string>
-#include <vector>
 #include "cli/CliUtils.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/SVGImporter.h"
@@ -58,12 +57,9 @@ static void PrintUsage() {
 }
 
 static std::string InferFormat(const std::string& path) {
-  auto dot = path.rfind('.');
-  if (dot != std::string::npos) {
-    auto ext = path.substr(dot + 1);
-    if (ext == "svg") {
-      return "svg";
-    }
+  auto ext = GetFileExtension(path);
+  if (ext == "svg") {
+    return "svg";
   }
   return {};
 }

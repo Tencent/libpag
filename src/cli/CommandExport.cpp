@@ -19,7 +19,6 @@
 #include "cli/CommandExport.h"
 #include <iostream>
 #include <string>
-#include <vector>
 #include "cli/CliUtils.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/SVGExporter.h"
@@ -99,13 +98,8 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
     return 1;
   }
 
-  if (options->format.empty()) {
-    if (!options->outputFile.empty()) {
-      auto dot = options->outputFile.rfind('.');
-      if (dot != std::string::npos) {
-        options->format = options->outputFile.substr(dot + 1);
-      }
-    }
+  if (options->format.empty() && !options->outputFile.empty()) {
+    options->format = GetFileExtension(options->outputFile);
   }
   if (options->format.empty()) {
     options->format = "svg";

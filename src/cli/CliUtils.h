@@ -98,10 +98,21 @@ inline std::shared_ptr<tgfx::Typeface> ResolveFallbackTypeface(const std::string
 }
 
 /**
+ * Extracts the file extension from a path (without the dot), or returns an empty string if none.
+ */
+inline std::string GetFileExtension(const std::string& path) {
+  auto dot = path.rfind('.');
+  if (dot != std::string::npos) {
+    return path.substr(dot + 1);
+  }
+  return {};
+}
+
+/**
  * Replaces the file extension in a path with a new extension. If the path has no extension, appends
  * the new extension.
  */
- inline std::string ReplaceExtension(const std::string& path, const std::string& newExt) {
+inline std::string ReplaceExtension(const std::string& path, const std::string& newExt) {
   auto dot = path.rfind('.');
   if (dot != std::string::npos) {
     return path.substr(0, dot + 1) + newExt;
