@@ -68,6 +68,21 @@
 namespace pagx {
 
 //==============================================================================
+// Default node instances for reading default property values
+//==============================================================================
+
+static PAGXDocument& DefaultDoc() {
+  static auto doc = PAGXDocument::Make(0, 0);
+  return *doc;
+}
+
+template <typename T>
+static const T& Default() {
+  static const T* node = DefaultDoc().makeNode<T>();
+  return *node;
+}
+
+//==============================================================================
 // Forward declarations and utility functions
 //==============================================================================
 
@@ -304,16 +319,16 @@ static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
     return nullptr;
   }
   layer->name = getAttribute(node, "name");
-  layer->visible = getBoolAttribute(node, "visible", true, doc);
-  layer->alpha = getFloatAttribute(node, "alpha", 1, doc);
+  layer->visible = getBoolAttribute(node, "visible", Default<Layer>().visible, doc);
+  layer->alpha = getFloatAttribute(node, "alpha", Default<Layer>().alpha, doc);
   layer->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
-  layer->x = getFloatAttribute(node, "x", 0, doc);
-  layer->y = getFloatAttribute(node, "y", 0, doc);
+  layer->x = getFloatAttribute(node, "x", Default<Layer>().x, doc);
+  layer->y = getFloatAttribute(node, "y", Default<Layer>().y, doc);
   layer->width = getFloatAttributeOrNaN(node, "width", doc);
   layer->height = getFloatAttributeOrNaN(node, "height", doc);
   layer->layout = GET_ENUM(node, "layout", "none", doc, LayoutMode);
-  layer->gap = getFloatAttribute(node, "gap", 0, doc);
-  layer->flex = getFloatAttribute(node, "flex", 0, doc);
+  layer->gap = getFloatAttribute(node, "gap", Default<Layer>().gap, doc);
+  layer->flex = getFloatAttribute(node, "flex", Default<Layer>().flex, doc);
   auto paddingStr = getAttribute(node, "padding");
   if (!paddingStr.empty()) {
     auto paddingValues = ParseFloatList(paddingStr);
@@ -337,7 +352,8 @@ static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
     }
     layer->arrangement = ArrangementFromString(arrangementStr);
   }
-  layer->includeInLayout = getBoolAttribute(node, "includeInLayout", true, doc);
+  layer->includeInLayout =
+      getBoolAttribute(node, "includeInLayout", Default<Layer>().includeInLayout, doc);
   layer->left = getFloatAttributeOrNaN(node, "left", doc);
   layer->right = getFloatAttributeOrNaN(node, "right", doc);
   layer->top = getFloatAttributeOrNaN(node, "top", doc);
@@ -360,16 +376,17 @@ static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
       reportError(doc, node, "Invalid 'matrix3D' value (expected 16 numbers).");
     }
   }
-  layer->preserve3D = getBoolAttribute(node, "preserve3D", false, doc);
-  layer->antiAlias = getBoolAttribute(node, "antiAlias", true, doc);
-  layer->groupOpacity = getBoolAttribute(node, "groupOpacity", false, doc);
-  layer->passThroughBackground = getBoolAttribute(node, "passThroughBackground", true, doc);
+  layer->preserve3D = getBoolAttribute(node, "preserve3D", Default<Layer>().preserve3D, doc);
+  layer->antiAlias = getBoolAttribute(node, "antiAlias", Default<Layer>().antiAlias, doc);
+  layer->groupOpacity = getBoolAttribute(node, "groupOpacity", Default<Layer>().groupOpacity, doc);
+  layer->passThroughBackground =
+      getBoolAttribute(node, "passThroughBackground", Default<Layer>().passThroughBackground, doc);
   auto scrollRectStr = getAttribute(node, "scrollRect");
   if (!scrollRectStr.empty()) {
     layer->scrollRect = getRectAttribute(node, "scrollRect", {}, doc);
     layer->hasScrollRect = true;
   }
-  layer->clipToBounds = getBoolAttribute(node, "clipToBounds", false, doc);
+  layer->clipToBounds = getBoolAttribute(node, "clipToBounds", Default<Layer>().clipToBounds, doc);
 
   auto maskAttr = getAttribute(node, "mask");
   if (!maskAttr.empty() && maskAttr[0] == '@') {
@@ -629,12 +646,12 @@ static Rectangle* parseRectangle(const DOMNode* node, PAGXDocument* doc) {
   rect->size = getSizeAttribute(node, "size", {0, 0}, doc);
   auto* posAttr = node->findAttribute("position");
   if (posAttr && !posAttr->empty()) {
-    rect->position = getPointAttribute(node, "position", {0, 0}, doc);
+    rect->position = getPointAttribute(node, "position", Default<Rectangle>().position, doc);
   } else {
     rect->position = {rect->size.width * 0.5f, rect->size.height * 0.5f};
   }
-  rect->roundness = getFloatAttribute(node, "roundness", 0, doc);
-  rect->reversed = getBoolAttribute(node, "reversed", false, doc);
+  rect->roundness = getFloatAttribute(node, "roundness", Default<Rectangle>().roundness, doc);
+  rect->reversed = getBoolAttribute(node, "reversed", Default<Rectangle>().reversed, doc);
   rect->left = getFloatAttributeOrNaN(node, "left", doc);
   rect->right = getFloatAttributeOrNaN(node, "right", doc);
   rect->top = getFloatAttributeOrNaN(node, "top", doc);
@@ -652,11 +669,11 @@ static Ellipse* parseEllipse(const DOMNode* node, PAGXDocument* doc) {
   ellipse->size = getSizeAttribute(node, "size", {0, 0}, doc);
   auto* posAttr = node->findAttribute("position");
   if (posAttr && !posAttr->empty()) {
-    ellipse->position = getPointAttribute(node, "position", {0, 0}, doc);
+    ellipse->position = getPointAttribute(node, "position", Default<Ellipse>().position, doc);
   } else {
     ellipse->position = {ellipse->size.width * 0.5f, ellipse->size.height * 0.5f};
   }
-  ellipse->reversed = getBoolAttribute(node, "reversed", false, doc);
+  ellipse->reversed = getBoolAttribute(node, "reversed", Default<Ellipse>().reversed, doc);
   ellipse->left = getFloatAttributeOrNaN(node, "left", doc);
   ellipse->right = getFloatAttributeOrNaN(node, "right", doc);
   ellipse->top = getFloatAttributeOrNaN(node, "top", doc);
@@ -672,16 +689,20 @@ static Polystar* parsePolystar(const DOMNode* node, PAGXDocument* doc) {
     return nullptr;
   }
   polystar->type = GET_ENUM(node, "type", "star", doc, PolystarType);
-  polystar->pointCount = getFloatAttribute(node, "pointCount", 5, doc);
-  polystar->outerRadius = getFloatAttribute(node, "outerRadius", 100, doc);
-  polystar->innerRadius = getFloatAttribute(node, "innerRadius", 50, doc);
-  polystar->rotation = getFloatAttribute(node, "rotation", 0, doc);
-  polystar->outerRoundness = getFloatAttribute(node, "outerRoundness", 0, doc);
-  polystar->innerRoundness = getFloatAttribute(node, "innerRoundness", 0, doc);
-  polystar->reversed = getBoolAttribute(node, "reversed", false, doc);
+  polystar->pointCount = getFloatAttribute(node, "pointCount", Default<Polystar>().pointCount, doc);
+  polystar->outerRadius =
+      getFloatAttribute(node, "outerRadius", Default<Polystar>().outerRadius, doc);
+  polystar->innerRadius =
+      getFloatAttribute(node, "innerRadius", Default<Polystar>().innerRadius, doc);
+  polystar->rotation = getFloatAttribute(node, "rotation", Default<Polystar>().rotation, doc);
+  polystar->outerRoundness =
+      getFloatAttribute(node, "outerRoundness", Default<Polystar>().outerRoundness, doc);
+  polystar->innerRoundness =
+      getFloatAttribute(node, "innerRoundness", Default<Polystar>().innerRoundness, doc);
+  polystar->reversed = getBoolAttribute(node, "reversed", Default<Polystar>().reversed, doc);
   auto* posAttr = node->findAttribute("position");
   if (posAttr && !posAttr->empty()) {
-    polystar->position = getPointAttribute(node, "position", {0, 0}, doc);
+    polystar->position = getPointAttribute(node, "position", Default<Polystar>().position, doc);
   } else {
     auto bounds = polystar->computeBounds();
     polystar->position = {bounds.x + bounds.width * 0.5f, bounds.y + bounds.height * 0.5f};
@@ -714,8 +735,8 @@ static Path* parsePath(const DOMNode* node, PAGXDocument* doc) {
       *path->data = PathDataFromSVGString(dataAttr);
     }
   }
-  path->reversed = getBoolAttribute(node, "reversed", false, doc);
-  path->position = getPointAttribute(node, "position", {0, 0}, doc);
+  path->reversed = getBoolAttribute(node, "reversed", Default<Path>().reversed, doc);
+  path->position = getPointAttribute(node, "position", Default<Path>().position, doc);
   path->left = getFloatAttributeOrNaN(node, "left", doc);
   path->right = getFloatAttributeOrNaN(node, "right", doc);
   path->top = getFloatAttributeOrNaN(node, "top", doc);
@@ -744,13 +765,14 @@ static Text* parseText(const DOMNode* node, PAGXDocument* doc) {
       textChild = textChild->nextSibling;
     }
   }
-  text->position = getPointAttribute(node, "position", {0, 0}, doc);
+  text->position = getPointAttribute(node, "position", Default<Text>().position, doc);
   text->fontFamily = getAttribute(node, "fontFamily");
   text->fontStyle = getAttribute(node, "fontStyle");
-  text->fontSize = getFloatAttribute(node, "fontSize", 12, doc);
-  text->letterSpacing = getFloatAttribute(node, "letterSpacing", 0, doc);
-  text->fauxBold = getBoolAttribute(node, "fauxBold", false, doc);
-  text->fauxItalic = getBoolAttribute(node, "fauxItalic", false, doc);
+  text->fontSize = getFloatAttribute(node, "fontSize", Default<Text>().fontSize, doc);
+  text->letterSpacing =
+      getFloatAttribute(node, "letterSpacing", Default<Text>().letterSpacing, doc);
+  text->fauxBold = getBoolAttribute(node, "fauxBold", Default<Text>().fauxBold, doc);
+  text->fauxItalic = getBoolAttribute(node, "fauxItalic", Default<Text>().fauxItalic, doc);
   text->textAnchor = GET_ENUM(node, "textAnchor", "start", doc, TextAnchor);
   text->baseline = GET_ENUM(node, "baseline", "visualTop", doc, TextBaseline);
 
@@ -828,7 +850,7 @@ static Fill* parseFill(const DOMNode* node, PAGXDocument* doc) {
     return nullptr;
   }
   fill->color = parseColorAttr(getAttribute(node, "color"), doc, node);
-  fill->alpha = getFloatAttribute(node, "alpha", 1, doc);
+  fill->alpha = getFloatAttribute(node, "alpha", Default<Fill>().alpha, doc);
   fill->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
   fill->fillRule = GET_ENUM(node, "fillRule", "winding", doc, FillRule);
   fill->placement = GET_ENUM(node, "placement", "background", doc, LayerPlacement);
@@ -845,18 +867,19 @@ static Stroke* parseStroke(const DOMNode* node, PAGXDocument* doc) {
     return nullptr;
   }
   stroke->color = parseColorAttr(getAttribute(node, "color"), doc, node);
-  stroke->width = getFloatAttribute(node, "width", 1, doc);
-  stroke->alpha = getFloatAttribute(node, "alpha", 1, doc);
+  stroke->width = getFloatAttribute(node, "width", Default<Stroke>().width, doc);
+  stroke->alpha = getFloatAttribute(node, "alpha", Default<Stroke>().alpha, doc);
   stroke->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
   stroke->cap = GET_ENUM(node, "cap", "butt", doc, LineCap);
   stroke->join = GET_ENUM(node, "join", "miter", doc, LineJoin);
-  stroke->miterLimit = getFloatAttribute(node, "miterLimit", 4, doc);
+  stroke->miterLimit = getFloatAttribute(node, "miterLimit", Default<Stroke>().miterLimit, doc);
   auto dashesStr = getAttribute(node, "dashes");
   if (!dashesStr.empty()) {
     stroke->dashes = ParseFloatList(dashesStr);
   }
-  stroke->dashOffset = getFloatAttribute(node, "dashOffset", 0, doc);
-  stroke->dashAdaptive = getBoolAttribute(node, "dashAdaptive", false, doc);
+  stroke->dashOffset = getFloatAttribute(node, "dashOffset", Default<Stroke>().dashOffset, doc);
+  stroke->dashAdaptive =
+      getBoolAttribute(node, "dashAdaptive", Default<Stroke>().dashAdaptive, doc);
   stroke->align = GET_ENUM(node, "align", "center", doc, StrokeAlign);
   stroke->placement = GET_ENUM(node, "placement", "background", doc, LayerPlacement);
   auto childColor = parseChildColorSource(node, doc);
@@ -875,9 +898,9 @@ static TrimPath* parseTrimPath(const DOMNode* node, PAGXDocument* doc) {
   if (!trim) {
     return nullptr;
   }
-  trim->start = getFloatAttribute(node, "start", 0, doc);
-  trim->end = getFloatAttribute(node, "end", 1, doc);
-  trim->offset = getFloatAttribute(node, "offset", 0, doc);
+  trim->start = getFloatAttribute(node, "start", Default<TrimPath>().start, doc);
+  trim->end = getFloatAttribute(node, "end", Default<TrimPath>().end, doc);
+  trim->offset = getFloatAttribute(node, "offset", Default<TrimPath>().offset, doc);
   trim->type = GET_ENUM(node, "type", "separate", doc, TrimType);
   return trim;
 }
@@ -887,7 +910,7 @@ static RoundCorner* parseRoundCorner(const DOMNode* node, PAGXDocument* doc) {
   if (!round) {
     return nullptr;
   }
-  round->radius = getFloatAttribute(node, "radius", 10, doc);
+  round->radius = getFloatAttribute(node, "radius", Default<RoundCorner>().radius, doc);
   return round;
 }
 
@@ -905,13 +928,13 @@ static TextModifier* parseTextModifier(const DOMNode* node, PAGXDocument* doc) {
   if (!modifier) {
     return nullptr;
   }
-  modifier->anchor = getPointAttribute(node, "anchor", {0, 0}, doc);
-  modifier->position = getPointAttribute(node, "position", {0, 0}, doc);
-  modifier->rotation = getFloatAttribute(node, "rotation", 0, doc);
-  modifier->scale = getPointAttribute(node, "scale", {1, 1}, doc);
-  modifier->skew = getFloatAttribute(node, "skew", 0, doc);
-  modifier->skewAxis = getFloatAttribute(node, "skewAxis", 0, doc);
-  modifier->alpha = getFloatAttribute(node, "alpha", 1, doc);
+  modifier->anchor = getPointAttribute(node, "anchor", Default<TextModifier>().anchor, doc);
+  modifier->position = getPointAttribute(node, "position", Default<TextModifier>().position, doc);
+  modifier->rotation = getFloatAttribute(node, "rotation", Default<TextModifier>().rotation, doc);
+  modifier->scale = getPointAttribute(node, "scale", Default<TextModifier>().scale, doc);
+  modifier->skew = getFloatAttribute(node, "skew", Default<TextModifier>().skew, doc);
+  modifier->skewAxis = getFloatAttribute(node, "skewAxis", Default<TextModifier>().skewAxis, doc);
+  modifier->alpha = getFloatAttribute(node, "alpha", Default<TextModifier>().alpha, doc);
   auto fillColorAttr = getAttribute(node, "fillColor");
   if (!fillColorAttr.empty()) {
     modifier->fillColor = getColorAttribute(node, "fillColor", doc);
@@ -965,13 +988,18 @@ static TextPath* parseTextPath(const DOMNode* node, PAGXDocument* doc) {
       *textPath->path = PathDataFromSVGString(pathAttr);
     }
   }
-  textPath->baselineOrigin = getPointAttribute(node, "baselineOrigin", {0, 0}, doc);
-  textPath->baselineAngle = getFloatAttribute(node, "baselineAngle", 0, doc);
-  textPath->firstMargin = getFloatAttribute(node, "firstMargin", 0, doc);
-  textPath->lastMargin = getFloatAttribute(node, "lastMargin", 0, doc);
-  textPath->perpendicular = getBoolAttribute(node, "perpendicular", true, doc);
-  textPath->reversed = getBoolAttribute(node, "reversed", false, doc);
-  textPath->forceAlignment = getBoolAttribute(node, "forceAlignment", false, doc);
+  textPath->baselineOrigin =
+      getPointAttribute(node, "baselineOrigin", Default<TextPath>().baselineOrigin, doc);
+  textPath->baselineAngle =
+      getFloatAttribute(node, "baselineAngle", Default<TextPath>().baselineAngle, doc);
+  textPath->firstMargin =
+      getFloatAttribute(node, "firstMargin", Default<TextPath>().firstMargin, doc);
+  textPath->lastMargin = getFloatAttribute(node, "lastMargin", Default<TextPath>().lastMargin, doc);
+  textPath->perpendicular =
+      getBoolAttribute(node, "perpendicular", Default<TextPath>().perpendicular, doc);
+  textPath->reversed = getBoolAttribute(node, "reversed", Default<TextPath>().reversed, doc);
+  textPath->forceAlignment =
+      getBoolAttribute(node, "forceAlignment", Default<TextPath>().forceAlignment, doc);
   textPath->left = getFloatAttributeOrNaN(node, "left", doc);
   textPath->right = getFloatAttributeOrNaN(node, "right", doc);
   textPath->top = getFloatAttributeOrNaN(node, "top", doc);
@@ -987,21 +1015,21 @@ static TextBox* parseTextBox(const DOMNode* node, PAGXDocument* doc) {
     return nullptr;
   }
   // Group properties
-  textBox->anchor = getPointAttribute(node, "anchor", {0, 0}, doc);
-  textBox->position = getPointAttribute(node, "position", {0, 0}, doc);
-  textBox->rotation = getFloatAttribute(node, "rotation", 0, doc);
-  textBox->scale = getPointAttribute(node, "scale", {1, 1}, doc);
-  textBox->skew = getFloatAttribute(node, "skew", 0, doc);
-  textBox->skewAxis = getFloatAttribute(node, "skewAxis", 0, doc);
-  textBox->alpha = getFloatAttribute(node, "alpha", 1, doc);
+  textBox->anchor = getPointAttribute(node, "anchor", Default<TextBox>().anchor, doc);
+  textBox->position = getPointAttribute(node, "position", Default<TextBox>().position, doc);
+  textBox->rotation = getFloatAttribute(node, "rotation", Default<TextBox>().rotation, doc);
+  textBox->scale = getPointAttribute(node, "scale", Default<TextBox>().scale, doc);
+  textBox->skew = getFloatAttribute(node, "skew", Default<TextBox>().skew, doc);
+  textBox->skewAxis = getFloatAttribute(node, "skewAxis", Default<TextBox>().skewAxis, doc);
+  textBox->alpha = getFloatAttribute(node, "alpha", Default<TextBox>().alpha, doc);
   textBox->width = getFloatAttributeOrNaN(node, "width", doc);
   textBox->height = getFloatAttributeOrNaN(node, "height", doc);
   // TextBox typography properties
   textBox->textAlign = GET_ENUM(node, "textAlign", "start", doc, TextAlign);
   textBox->paragraphAlign = GET_ENUM(node, "paragraphAlign", "near", doc, ParagraphAlign);
   textBox->writingMode = GET_ENUM(node, "writingMode", "horizontal", doc, WritingMode);
-  textBox->lineHeight = getFloatAttribute(node, "lineHeight", 0, doc);
-  textBox->wordWrap = getBoolAttribute(node, "wordWrap", true, doc);
+  textBox->lineHeight = getFloatAttribute(node, "lineHeight", Default<TextBox>().lineHeight, doc);
+  textBox->wordWrap = getBoolAttribute(node, "wordWrap", Default<TextBox>().wordWrap, doc);
   textBox->overflow = GET_ENUM(node, "overflow", "visible", doc, Overflow);
   // Constraint properties
   textBox->left = getFloatAttributeOrNaN(node, "left", doc);
@@ -1037,15 +1065,15 @@ static Repeater* parseRepeater(const DOMNode* node, PAGXDocument* doc) {
   if (!repeater) {
     return nullptr;
   }
-  repeater->copies = getFloatAttribute(node, "copies", 3, doc);
-  repeater->offset = getFloatAttribute(node, "offset", 0, doc);
+  repeater->copies = getFloatAttribute(node, "copies", Default<Repeater>().copies, doc);
+  repeater->offset = getFloatAttribute(node, "offset", Default<Repeater>().offset, doc);
   repeater->order = GET_ENUM(node, "order", "belowOriginal", doc, RepeaterOrder);
-  repeater->anchor = getPointAttribute(node, "anchor", {0, 0}, doc);
-  repeater->position = getPointAttribute(node, "position", {100, 100}, doc);
-  repeater->rotation = getFloatAttribute(node, "rotation", 0, doc);
-  repeater->scale = getPointAttribute(node, "scale", {1, 1}, doc);
-  repeater->startAlpha = getFloatAttribute(node, "startAlpha", 1, doc);
-  repeater->endAlpha = getFloatAttribute(node, "endAlpha", 1, doc);
+  repeater->anchor = getPointAttribute(node, "anchor", Default<Repeater>().anchor, doc);
+  repeater->position = getPointAttribute(node, "position", Default<Repeater>().position, doc);
+  repeater->rotation = getFloatAttribute(node, "rotation", Default<Repeater>().rotation, doc);
+  repeater->scale = getPointAttribute(node, "scale", Default<Repeater>().scale, doc);
+  repeater->startAlpha = getFloatAttribute(node, "startAlpha", Default<Repeater>().startAlpha, doc);
+  repeater->endAlpha = getFloatAttribute(node, "endAlpha", Default<Repeater>().endAlpha, doc);
   return repeater;
 }
 
@@ -1054,13 +1082,13 @@ static Group* parseGroup(const DOMNode* node, PAGXDocument* doc) {
   if (!group) {
     return nullptr;
   }
-  group->anchor = getPointAttribute(node, "anchor", {0, 0}, doc);
-  group->position = getPointAttribute(node, "position", {0, 0}, doc);
-  group->rotation = getFloatAttribute(node, "rotation", 0, doc);
-  group->scale = getPointAttribute(node, "scale", {1, 1}, doc);
-  group->skew = getFloatAttribute(node, "skew", 0, doc);
-  group->skewAxis = getFloatAttribute(node, "skewAxis", 0, doc);
-  group->alpha = getFloatAttribute(node, "alpha", 1, doc);
+  group->anchor = getPointAttribute(node, "anchor", Default<Group>().anchor, doc);
+  group->position = getPointAttribute(node, "position", Default<Group>().position, doc);
+  group->rotation = getFloatAttribute(node, "rotation", Default<Group>().rotation, doc);
+  group->scale = getPointAttribute(node, "scale", Default<Group>().scale, doc);
+  group->skew = getFloatAttribute(node, "skew", Default<Group>().skew, doc);
+  group->skewAxis = getFloatAttribute(node, "skewAxis", Default<Group>().skewAxis, doc);
+  group->alpha = getFloatAttribute(node, "alpha", Default<Group>().alpha, doc);
   group->width = getFloatAttributeOrNaN(node, "width", doc);
   group->height = getFloatAttributeOrNaN(node, "height", doc);
   group->left = getFloatAttributeOrNaN(node, "left", doc);
@@ -1097,17 +1125,19 @@ static RangeSelector* parseRangeSelector(const DOMNode* node, PAGXDocument* doc)
   if (!selector) {
     return nullptr;
   }
-  selector->start = getFloatAttribute(node, "start", 0, doc);
-  selector->end = getFloatAttribute(node, "end", 1, doc);
-  selector->offset = getFloatAttribute(node, "offset", 0, doc);
+  selector->start = getFloatAttribute(node, "start", Default<RangeSelector>().start, doc);
+  selector->end = getFloatAttribute(node, "end", Default<RangeSelector>().end, doc);
+  selector->offset = getFloatAttribute(node, "offset", Default<RangeSelector>().offset, doc);
   selector->unit = GET_ENUM(node, "unit", "percentage", doc, SelectorUnit);
   selector->shape = GET_ENUM(node, "shape", "square", doc, SelectorShape);
-  selector->easeIn = getFloatAttribute(node, "easeIn", 0, doc);
-  selector->easeOut = getFloatAttribute(node, "easeOut", 0, doc);
+  selector->easeIn = getFloatAttribute(node, "easeIn", Default<RangeSelector>().easeIn, doc);
+  selector->easeOut = getFloatAttribute(node, "easeOut", Default<RangeSelector>().easeOut, doc);
   selector->mode = GET_ENUM(node, "mode", "add", doc, SelectorMode);
-  selector->weight = getFloatAttribute(node, "weight", 1, doc);
-  selector->randomOrder = getBoolAttribute(node, "randomOrder", false, doc);
-  selector->randomSeed = getIntAttribute(node, "randomSeed", 0, doc);
+  selector->weight = getFloatAttribute(node, "weight", Default<RangeSelector>().weight, doc);
+  selector->randomOrder =
+      getBoolAttribute(node, "randomOrder", Default<RangeSelector>().randomOrder, doc);
+  selector->randomSeed =
+      getIntAttribute(node, "randomSeed", Default<RangeSelector>().randomSeed, doc);
   return selector;
 }
 
@@ -1164,8 +1194,9 @@ static LinearGradient* parseLinearGradient(const DOMNode* node, PAGXDocument* do
   if (!gradient) {
     return nullptr;
   }
-  gradient->startPoint = getPointAttribute(node, "startPoint", {0, 0}, doc);
-  gradient->endPoint = getPointAttribute(node, "endPoint", {0, 0}, doc);
+  gradient->startPoint =
+      getPointAttribute(node, "startPoint", Default<LinearGradient>().startPoint, doc);
+  gradient->endPoint = getPointAttribute(node, "endPoint", Default<LinearGradient>().endPoint, doc);
   parseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
   return gradient;
 }
@@ -1175,8 +1206,8 @@ static RadialGradient* parseRadialGradient(const DOMNode* node, PAGXDocument* do
   if (!gradient) {
     return nullptr;
   }
-  gradient->center = getPointAttribute(node, "center", {0, 0}, doc);
-  gradient->radius = getFloatAttribute(node, "radius", 0, doc);
+  gradient->center = getPointAttribute(node, "center", Default<RadialGradient>().center, doc);
+  gradient->radius = getFloatAttribute(node, "radius", Default<RadialGradient>().radius, doc);
   parseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
   return gradient;
 }
@@ -1186,9 +1217,10 @@ static ConicGradient* parseConicGradient(const DOMNode* node, PAGXDocument* doc)
   if (!gradient) {
     return nullptr;
   }
-  gradient->center = getPointAttribute(node, "center", {0, 0}, doc);
-  gradient->startAngle = getFloatAttribute(node, "startAngle", 0, doc);
-  gradient->endAngle = getFloatAttribute(node, "endAngle", 360, doc);
+  gradient->center = getPointAttribute(node, "center", Default<ConicGradient>().center, doc);
+  gradient->startAngle =
+      getFloatAttribute(node, "startAngle", Default<ConicGradient>().startAngle, doc);
+  gradient->endAngle = getFloatAttribute(node, "endAngle", Default<ConicGradient>().endAngle, doc);
   parseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
   return gradient;
 }
@@ -1198,8 +1230,8 @@ static DiamondGradient* parseDiamondGradient(const DOMNode* node, PAGXDocument* 
   if (!gradient) {
     return nullptr;
   }
-  gradient->center = getPointAttribute(node, "center", {0, 0}, doc);
-  gradient->radius = getFloatAttribute(node, "radius", 0, doc);
+  gradient->center = getPointAttribute(node, "center", Default<DiamondGradient>().center, doc);
+  gradient->radius = getFloatAttribute(node, "radius", Default<DiamondGradient>().radius, doc);
   parseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
   return gradient;
 }
@@ -1243,7 +1275,7 @@ static ImagePattern* parseImagePattern(const DOMNode* node, PAGXDocument* doc) {
 
 static ColorStop* parseColorStop(const DOMNode* node, PAGXDocument* doc) {
   auto stop = makeNodeFromXML<ColorStop>(node, doc);
-  stop->offset = getFloatAttribute(node, "offset", 0, doc);
+  stop->offset = getFloatAttribute(node, "offset", Default<ColorStop>().offset, doc);
   auto colorStr = getAttribute(node, "color");
   if (!colorStr.empty()) {
     stop->color = getColorAttribute(node, "color", doc);
@@ -1287,8 +1319,8 @@ static Composition* parseComposition(const DOMNode* node, PAGXDocument* doc) {
   if (!comp) {
     return nullptr;
   }
-  comp->width = getFloatAttribute(node, "width", 0, doc);
-  comp->height = getFloatAttribute(node, "height", 0, doc);
+  comp->width = getFloatAttribute(node, "width", Default<Composition>().width, doc);
+  comp->height = getFloatAttribute(node, "height", Default<Composition>().height, doc);
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {
@@ -1313,7 +1345,7 @@ static Font* parseFont(const DOMNode* node, PAGXDocument* doc) {
   if (!font) {
     return nullptr;
   }
-  font->unitsPerEm = getIntAttribute(node, "unitsPerEm", 1000, doc);
+  font->unitsPerEm = getIntAttribute(node, "unitsPerEm", Default<Font>().unitsPerEm, doc);
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {
@@ -1372,9 +1404,9 @@ static Glyph* parseGlyph(const DOMNode* node, PAGXDocument* doc) {
   }
   auto offsetStr = getAttribute(node, "offset");
   if (!offsetStr.empty()) {
-    glyph->offset = getPointAttribute(node, "offset", {0, 0}, doc);
+    glyph->offset = getPointAttribute(node, "offset", Default<Glyph>().offset, doc);
   }
-  glyph->advance = getFloatAttribute(node, "advance", 0, doc);
+  glyph->advance = getFloatAttribute(node, "advance", Default<Glyph>().advance, doc);
   return glyph;
 }
 
@@ -1421,9 +1453,9 @@ static GlyphRun* parseGlyphRun(const DOMNode* node, PAGXDocument* doc) {
       reportError(doc, node, "Resource '" + fontAttr + "' not found for 'font' attribute.");
     }
   }
-  run->fontSize = getFloatAttribute(node, "fontSize", 12, doc);
-  run->x = getFloatAttribute(node, "x", 0, doc);
-  run->y = getFloatAttribute(node, "y", 0, doc);
+  run->fontSize = getFloatAttribute(node, "fontSize", Default<GlyphRun>().fontSize, doc);
+  run->x = getFloatAttribute(node, "x", Default<GlyphRun>().x, doc);
+  run->y = getFloatAttribute(node, "y", Default<GlyphRun>().y, doc);
 
   // Parse glyphs regardless of whether font is valid, to maintain data consistency.
   auto glyphsStr = getAttribute(node, "glyphs");
@@ -1499,12 +1531,13 @@ static GlyphRun* parseGlyphRun(const DOMNode* node, PAGXDocument* doc) {
 // Layer style parsing
 //==============================================================================
 
+template <typename T>
 static void parseShadowAttributes(const DOMNode* node, PAGXDocument* doc, float& offsetX,
                                   float& offsetY, float& blurX, float& blurY, Color& color) {
-  offsetX = getFloatAttribute(node, "offsetX", 0, doc);
-  offsetY = getFloatAttribute(node, "offsetY", 0, doc);
-  blurX = getFloatAttribute(node, "blurX", 0, doc);
-  blurY = getFloatAttribute(node, "blurY", 0, doc);
+  offsetX = getFloatAttribute(node, "offsetX", Default<T>().offsetX, doc);
+  offsetY = getFloatAttribute(node, "offsetY", Default<T>().offsetY, doc);
+  blurX = getFloatAttribute(node, "blurX", Default<T>().blurX, doc);
+  blurY = getFloatAttribute(node, "blurY", Default<T>().blurY, doc);
   auto colorStr = getAttribute(node, "color");
   if (!colorStr.empty()) {
     color = getColorAttribute(node, "color", doc);
@@ -1517,10 +1550,12 @@ static DropShadowStyle* parseDropShadowStyle(const DOMNode* node, PAGXDocument* 
     return nullptr;
   }
   style->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
-  style->excludeChildEffects = getBoolAttribute(node, "excludeChildEffects", false, doc);
-  parseShadowAttributes(node, doc, style->offsetX, style->offsetY, style->blurX, style->blurY,
-                        style->color);
-  style->showBehindLayer = getBoolAttribute(node, "showBehindLayer", true, doc);
+  style->excludeChildEffects = getBoolAttribute(
+      node, "excludeChildEffects", Default<DropShadowStyle>().excludeChildEffects, doc);
+  parseShadowAttributes<DropShadowStyle>(node, doc, style->offsetX, style->offsetY, style->blurX,
+                                         style->blurY, style->color);
+  style->showBehindLayer =
+      getBoolAttribute(node, "showBehindLayer", Default<DropShadowStyle>().showBehindLayer, doc);
   return style;
 }
 
@@ -1530,9 +1565,10 @@ static InnerShadowStyle* parseInnerShadowStyle(const DOMNode* node, PAGXDocument
     return nullptr;
   }
   style->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
-  style->excludeChildEffects = getBoolAttribute(node, "excludeChildEffects", false, doc);
-  parseShadowAttributes(node, doc, style->offsetX, style->offsetY, style->blurX, style->blurY,
-                        style->color);
+  style->excludeChildEffects = getBoolAttribute(
+      node, "excludeChildEffects", Default<InnerShadowStyle>().excludeChildEffects, doc);
+  parseShadowAttributes<InnerShadowStyle>(node, doc, style->offsetX, style->offsetY, style->blurX,
+                                          style->blurY, style->color);
   return style;
 }
 
@@ -1542,9 +1578,10 @@ static BackgroundBlurStyle* parseBackgroundBlurStyle(const DOMNode* node, PAGXDo
     return nullptr;
   }
   style->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
-  style->excludeChildEffects = getBoolAttribute(node, "excludeChildEffects", false, doc);
-  style->blurX = getFloatAttribute(node, "blurX", 0, doc);
-  style->blurY = getFloatAttribute(node, "blurY", 0, doc);
+  style->excludeChildEffects = getBoolAttribute(
+      node, "excludeChildEffects", Default<BackgroundBlurStyle>().excludeChildEffects, doc);
+  style->blurX = getFloatAttribute(node, "blurX", Default<BackgroundBlurStyle>().blurX, doc);
+  style->blurY = getFloatAttribute(node, "blurY", Default<BackgroundBlurStyle>().blurY, doc);
   style->tileMode = GET_ENUM(node, "tileMode", "mirror", doc, TileMode);
   return style;
 }
@@ -1558,8 +1595,8 @@ static BlurFilter* parseBlurFilter(const DOMNode* node, PAGXDocument* doc) {
   if (!filter) {
     return nullptr;
   }
-  filter->blurX = getFloatAttribute(node, "blurX", 0, doc);
-  filter->blurY = getFloatAttribute(node, "blurY", 0, doc);
+  filter->blurX = getFloatAttribute(node, "blurX", Default<BlurFilter>().blurX, doc);
+  filter->blurY = getFloatAttribute(node, "blurY", Default<BlurFilter>().blurY, doc);
   filter->tileMode = GET_ENUM(node, "tileMode", "decal", doc, TileMode);
   return filter;
 }
@@ -1569,9 +1606,10 @@ static DropShadowFilter* parseDropShadowFilter(const DOMNode* node, PAGXDocument
   if (!filter) {
     return nullptr;
   }
-  parseShadowAttributes(node, doc, filter->offsetX, filter->offsetY, filter->blurX, filter->blurY,
-                        filter->color);
-  filter->shadowOnly = getBoolAttribute(node, "shadowOnly", false, doc);
+  parseShadowAttributes<DropShadowFilter>(node, doc, filter->offsetX, filter->offsetY,
+                                          filter->blurX, filter->blurY, filter->color);
+  filter->shadowOnly =
+      getBoolAttribute(node, "shadowOnly", Default<DropShadowFilter>().shadowOnly, doc);
   return filter;
 }
 
@@ -1580,9 +1618,10 @@ static InnerShadowFilter* parseInnerShadowFilter(const DOMNode* node, PAGXDocume
   if (!filter) {
     return nullptr;
   }
-  parseShadowAttributes(node, doc, filter->offsetX, filter->offsetY, filter->blurX, filter->blurY,
-                        filter->color);
-  filter->shadowOnly = getBoolAttribute(node, "shadowOnly", false, doc);
+  parseShadowAttributes<InnerShadowFilter>(node, doc, filter->offsetX, filter->offsetY,
+                                           filter->blurX, filter->blurY, filter->color);
+  filter->shadowOnly =
+      getBoolAttribute(node, "shadowOnly", Default<InnerShadowFilter>().shadowOnly, doc);
   return filter;
 }
 

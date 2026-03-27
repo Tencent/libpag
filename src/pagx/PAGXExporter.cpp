@@ -61,6 +61,21 @@
 namespace pagx {
 
 //==============================================================================
+// Default node instances for reading default property values
+//==============================================================================
+
+static PAGXDocument& DefaultDoc() {
+  static auto doc = PAGXDocument::Make(0, 0);
+  return *doc;
+}
+
+template <typename T>
+static const T& Default() {
+  static const T* node = DefaultDoc().makeNode<T>();
+  return *node;
+}
+
+//==============================================================================
 // XMLBuilder - XML generation helper
 //==============================================================================
 
@@ -378,7 +393,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       auto grad = static_cast<const LinearGradient*>(node);
       xml.openElement("LinearGradient");
       xml.addAttribute("id", grad->id);
-      if (grad->startPoint.x != 0 || grad->startPoint.y != 0) {
+      if (grad->startPoint != Default<LinearGradient>().startPoint) {
         xml.addAttribute("startPoint", pointToString(grad->startPoint));
       }
       xml.addRequiredAttribute("endPoint", pointToString(grad->endPoint));
@@ -390,7 +405,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       auto grad = static_cast<const RadialGradient*>(node);
       xml.openElement("RadialGradient");
       xml.addAttribute("id", grad->id);
-      if (grad->center.x != 0 || grad->center.y != 0) {
+      if (grad->center != Default<RadialGradient>().center) {
         xml.addAttribute("center", pointToString(grad->center));
       }
       xml.addRequiredAttribute("radius", grad->radius);
@@ -402,11 +417,11 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       auto grad = static_cast<const ConicGradient*>(node);
       xml.openElement("ConicGradient");
       xml.addAttribute("id", grad->id);
-      if (grad->center.x != 0 || grad->center.y != 0) {
+      if (grad->center != Default<ConicGradient>().center) {
         xml.addAttribute("center", pointToString(grad->center));
       }
-      xml.addAttribute("startAngle", grad->startAngle);
-      xml.addAttribute("endAngle", grad->endAngle, 360.0f);
+      xml.addAttribute("startAngle", grad->startAngle, Default<ConicGradient>().startAngle);
+      xml.addAttribute("endAngle", grad->endAngle, Default<ConicGradient>().endAngle);
       writeCustomData(xml, node);
       writeGradientMatrixAndStops(xml, grad->matrix, grad->colorStops);
       break;
@@ -415,7 +430,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       auto grad = static_cast<const DiamondGradient*>(node);
       xml.openElement("DiamondGradient");
       xml.addAttribute("id", grad->id);
-      if (grad->center.x != 0 || grad->center.y != 0) {
+      if (grad->center != Default<DiamondGradient>().center) {
         xml.addAttribute("center", pointToString(grad->center));
       }
       xml.addRequiredAttribute("radius", grad->radius);
@@ -438,16 +453,16 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
           xml.addAttribute("image", pattern->image->filePath);
         }
       }
-      if (pattern->tileModeX != TileMode::Clamp) {
+      if (pattern->tileModeX != Default<ImagePattern>().tileModeX) {
         xml.addAttribute("tileModeX", TileModeToString(pattern->tileModeX));
       }
-      if (pattern->tileModeY != TileMode::Clamp) {
+      if (pattern->tileModeY != Default<ImagePattern>().tileModeY) {
         xml.addAttribute("tileModeY", TileModeToString(pattern->tileModeY));
       }
-      if (pattern->filterMode != FilterMode::Linear) {
+      if (pattern->filterMode != Default<ImagePattern>().filterMode) {
         xml.addAttribute("filterMode", FilterModeToString(pattern->filterMode));
       }
-      if (pattern->mipmapMode != MipmapMode::Linear) {
+      if (pattern->mipmapMode != Default<ImagePattern>().mipmapMode) {
         xml.addAttribute("mipmapMode", MipmapModeToString(pattern->mipmapMode));
       }
       if (!pattern->matrix.isIdentity()) {
@@ -479,8 +494,8 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       if (rect->size.width != 0 || rect->size.height != 0) {
         xml.addAttribute("size", sizeToString(rect->size));
       }
-      xml.addAttribute("roundness", rect->roundness);
-      xml.addAttribute("reversed", rect->reversed);
+      xml.addAttribute("roundness", rect->roundness, Default<Rectangle>().roundness);
+      xml.addAttribute("reversed", rect->reversed, Default<Rectangle>().reversed);
       xml.addOptionalAttribute("left", rect->left);
       xml.addOptionalAttribute("right", rect->right);
       xml.addOptionalAttribute("top", rect->top);
@@ -502,7 +517,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       if (ellipse->size.width != 0 || ellipse->size.height != 0) {
         xml.addAttribute("size", sizeToString(ellipse->size));
       }
-      xml.addAttribute("reversed", ellipse->reversed);
+      xml.addAttribute("reversed", ellipse->reversed, Default<Ellipse>().reversed);
       xml.addOptionalAttribute("left", ellipse->left);
       xml.addOptionalAttribute("right", ellipse->right);
       xml.addOptionalAttribute("top", ellipse->top);
@@ -527,13 +542,15 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
         xml.addAttribute("position", pointToString(polystar->position));
       }
       xml.addAttribute("type", PolystarTypeToString(polystar->type));
-      xml.addAttribute("pointCount", polystar->pointCount, 5.0f);
-      xml.addAttribute("outerRadius", polystar->outerRadius, 100.0f);
-      xml.addAttribute("innerRadius", polystar->innerRadius, 50.0f);
-      xml.addAttribute("rotation", polystar->rotation);
-      xml.addAttribute("outerRoundness", polystar->outerRoundness);
-      xml.addAttribute("innerRoundness", polystar->innerRoundness);
-      xml.addAttribute("reversed", polystar->reversed);
+      xml.addAttribute("pointCount", polystar->pointCount, Default<Polystar>().pointCount);
+      xml.addAttribute("outerRadius", polystar->outerRadius, Default<Polystar>().outerRadius);
+      xml.addAttribute("innerRadius", polystar->innerRadius, Default<Polystar>().innerRadius);
+      xml.addAttribute("rotation", polystar->rotation, Default<Polystar>().rotation);
+      xml.addAttribute("outerRoundness", polystar->outerRoundness,
+                       Default<Polystar>().outerRoundness);
+      xml.addAttribute("innerRoundness", polystar->innerRoundness,
+                       Default<Polystar>().innerRoundness);
+      xml.addAttribute("reversed", polystar->reversed, Default<Polystar>().reversed);
       xml.addOptionalAttribute("left", polystar->left);
       xml.addOptionalAttribute("right", polystar->right);
       xml.addOptionalAttribute("top", polystar->top);
@@ -554,7 +571,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
         // Inline the path data.
         xml.addAttribute("data", PathDataToSVGString(*path->data));
       }
-      xml.addAttribute("reversed", path->reversed);
+      xml.addAttribute("reversed", path->reversed, Default<Path>().reversed);
       if (!shouldSkipPosition(path->position, {0, 0}, path->left, path->right, path->centerX,
                               path->top, path->bottom, path->centerY)) {
         xml.addAttribute("position", pointToString(path->position));
@@ -583,14 +600,14 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       if (!text->fontStyle.empty()) {
         xml.addAttribute("fontStyle", text->fontStyle);
       }
-      xml.addAttribute("fontSize", text->fontSize, 12.0f);
-      xml.addAttribute("letterSpacing", text->letterSpacing);
-      xml.addAttribute("fauxBold", text->fauxBold);
-      xml.addAttribute("fauxItalic", text->fauxItalic);
-      if (text->textAnchor != TextAnchor::Start) {
+      xml.addAttribute("fontSize", text->fontSize, Default<Text>().fontSize);
+      xml.addAttribute("letterSpacing", text->letterSpacing, Default<Text>().letterSpacing);
+      xml.addAttribute("fauxBold", text->fauxBold, Default<Text>().fauxBold);
+      xml.addAttribute("fauxItalic", text->fauxItalic, Default<Text>().fauxItalic);
+      if (text->textAnchor != Default<Text>().textAnchor) {
         xml.addAttribute("textAnchor", TextAnchorToString(text->textAnchor));
       }
-      if (text->baseline != TextBaseline::VisualTop) {
+      if (text->baseline != Default<Text>().baseline) {
         xml.addAttribute("baseline", TextBaselineToString(text->baseline));
       }
       xml.addOptionalAttribute("left", text->left);
@@ -609,7 +626,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
           if (run->font != nullptr && !run->font->id.empty()) {
             xml.addAttribute("font", "@" + run->font->id);
           }
-          xml.addAttribute("fontSize", run->fontSize, 12.0f);
+          xml.addAttribute("fontSize", run->fontSize, Default<GlyphRun>().fontSize);
 
           // Write glyphs as comma-separated integers
           if (!run->glyphs.empty()) {
@@ -625,8 +642,8 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
           }
 
           // Write x/y overall offsets (only if non-zero)
-          xml.addAttribute("x", run->x, 0.0f);
-          xml.addAttribute("y", run->y, 0.0f);
+          xml.addAttribute("x", run->x, Default<GlyphRun>().x);
+          xml.addAttribute("y", run->y, Default<GlyphRun>().y);
 
           // Write xOffsets (comma-separated)
           if (!run->xOffsets.empty()) {
@@ -669,14 +686,14 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       auto fill = static_cast<const Fill*>(node);
       xml.openElement("Fill");
       bool needsInlineColorSource = writeColorAttribute(xml, fill->color);
-      xml.addAttribute("alpha", fill->alpha, 1.0f);
-      if (fill->blendMode != BlendMode::Normal) {
+      xml.addAttribute("alpha", fill->alpha, Default<Fill>().alpha);
+      if (fill->blendMode != Default<Fill>().blendMode) {
         xml.addAttribute("blendMode", BlendModeToString(fill->blendMode));
       }
-      if (fill->fillRule != FillRule::Winding) {
+      if (fill->fillRule != Default<Fill>().fillRule) {
         xml.addAttribute("fillRule", FillRuleToString(fill->fillRule));
       }
-      if (fill->placement != LayerPlacement::Background) {
+      if (fill->placement != Default<Fill>().placement) {
         xml.addAttribute("placement", LayerPlacementToString(fill->placement));
       }
       writeCustomData(xml, node);
@@ -693,27 +710,27 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       auto stroke = static_cast<const Stroke*>(node);
       xml.openElement("Stroke");
       bool needsInlineColorSource = writeColorAttribute(xml, stroke->color);
-      xml.addAttribute("width", stroke->width, 1.0f);
-      xml.addAttribute("alpha", stroke->alpha, 1.0f);
-      if (stroke->blendMode != BlendMode::Normal) {
+      xml.addAttribute("width", stroke->width, Default<Stroke>().width);
+      xml.addAttribute("alpha", stroke->alpha, Default<Stroke>().alpha);
+      if (stroke->blendMode != Default<Stroke>().blendMode) {
         xml.addAttribute("blendMode", BlendModeToString(stroke->blendMode));
       }
-      if (stroke->cap != LineCap::Butt) {
+      if (stroke->cap != Default<Stroke>().cap) {
         xml.addAttribute("cap", LineCapToString(stroke->cap));
       }
-      if (stroke->join != LineJoin::Miter) {
+      if (stroke->join != Default<Stroke>().join) {
         xml.addAttribute("join", LineJoinToString(stroke->join));
       }
-      xml.addAttribute("miterLimit", stroke->miterLimit, 4.0f);
+      xml.addAttribute("miterLimit", stroke->miterLimit, Default<Stroke>().miterLimit);
       if (!stroke->dashes.empty()) {
         xml.addAttribute("dashes", floatListToString(stroke->dashes));
       }
-      xml.addAttribute("dashOffset", stroke->dashOffset);
-      xml.addAttribute("dashAdaptive", stroke->dashAdaptive);
-      if (stroke->align != StrokeAlign::Center) {
+      xml.addAttribute("dashOffset", stroke->dashOffset, Default<Stroke>().dashOffset);
+      xml.addAttribute("dashAdaptive", stroke->dashAdaptive, Default<Stroke>().dashAdaptive);
+      if (stroke->align != Default<Stroke>().align) {
         xml.addAttribute("align", StrokeAlignToString(stroke->align));
       }
-      if (stroke->placement != LayerPlacement::Background) {
+      if (stroke->placement != Default<Stroke>().placement) {
         xml.addAttribute("placement", LayerPlacementToString(stroke->placement));
       }
       writeCustomData(xml, node);
@@ -729,10 +746,10 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::TrimPath: {
       auto trim = static_cast<const TrimPath*>(node);
       xml.openElement("TrimPath");
-      xml.addAttribute("start", trim->start);
-      xml.addAttribute("end", trim->end, 1.0f);
-      xml.addAttribute("offset", trim->offset);
-      if (trim->type != TrimType::Separate) {
+      xml.addAttribute("start", trim->start, Default<TrimPath>().start);
+      xml.addAttribute("end", trim->end, Default<TrimPath>().end);
+      xml.addAttribute("offset", trim->offset, Default<TrimPath>().offset);
+      if (trim->type != Default<TrimPath>().type) {
         xml.addAttribute("type", TrimTypeToString(trim->type));
       }
       writeCustomData(xml, node);
@@ -742,7 +759,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::RoundCorner: {
       auto round = static_cast<const RoundCorner*>(node);
       xml.openElement("RoundCorner");
-      xml.addAttribute("radius", round->radius, 10.0f);
+      xml.addAttribute("radius", round->radius, Default<RoundCorner>().radius);
       writeCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -750,7 +767,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::MergePath: {
       auto merge = static_cast<const MergePath*>(node);
       xml.openElement("MergePath");
-      if (merge->mode != MergePathMode::Append) {
+      if (merge->mode != Default<MergePath>().mode) {
         xml.addAttribute("mode", MergePathModeToString(merge->mode));
       }
       writeCustomData(xml, node);
@@ -760,19 +777,19 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::TextModifier: {
       auto modifier = static_cast<const TextModifier*>(node);
       xml.openElement("TextModifier");
-      if (modifier->anchor.x != 0 || modifier->anchor.y != 0) {
+      if (modifier->anchor != Default<TextModifier>().anchor) {
         xml.addAttribute("anchor", pointToString(modifier->anchor));
       }
-      if (modifier->position.x != 0 || modifier->position.y != 0) {
+      if (modifier->position != Default<TextModifier>().position) {
         xml.addAttribute("position", pointToString(modifier->position));
       }
-      xml.addAttribute("rotation", modifier->rotation);
-      if (modifier->scale.x != 1 || modifier->scale.y != 1) {
+      xml.addAttribute("rotation", modifier->rotation, Default<TextModifier>().rotation);
+      if (modifier->scale != Default<TextModifier>().scale) {
         xml.addAttribute("scale", pointToString(modifier->scale));
       }
-      xml.addAttribute("skew", modifier->skew);
-      xml.addAttribute("skewAxis", modifier->skewAxis);
-      xml.addAttribute("alpha", modifier->alpha, 1.0f);
+      xml.addAttribute("skew", modifier->skew, Default<TextModifier>().skew);
+      xml.addAttribute("skewAxis", modifier->skewAxis, Default<TextModifier>().skewAxis);
+      xml.addAttribute("alpha", modifier->alpha, Default<TextModifier>().alpha);
       if (modifier->fillColor.has_value()) {
         xml.addAttribute("fillColor", ColorToHexString(modifier->fillColor.value()));
       }
@@ -793,23 +810,25 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
           }
           auto rangeSelector = static_cast<const RangeSelector*>(selector);
           xml.openElement("RangeSelector");
-          xml.addAttribute("start", rangeSelector->start);
-          xml.addAttribute("end", rangeSelector->end, 1.0f);
-          xml.addAttribute("offset", rangeSelector->offset);
-          if (rangeSelector->unit != SelectorUnit::Percentage) {
+          xml.addAttribute("start", rangeSelector->start, Default<RangeSelector>().start);
+          xml.addAttribute("end", rangeSelector->end, Default<RangeSelector>().end);
+          xml.addAttribute("offset", rangeSelector->offset, Default<RangeSelector>().offset);
+          if (rangeSelector->unit != Default<RangeSelector>().unit) {
             xml.addAttribute("unit", SelectorUnitToString(rangeSelector->unit));
           }
-          if (rangeSelector->shape != SelectorShape::Square) {
+          if (rangeSelector->shape != Default<RangeSelector>().shape) {
             xml.addAttribute("shape", SelectorShapeToString(rangeSelector->shape));
           }
-          xml.addAttribute("easeIn", rangeSelector->easeIn);
-          xml.addAttribute("easeOut", rangeSelector->easeOut);
-          if (rangeSelector->mode != SelectorMode::Add) {
+          xml.addAttribute("easeIn", rangeSelector->easeIn, Default<RangeSelector>().easeIn);
+          xml.addAttribute("easeOut", rangeSelector->easeOut, Default<RangeSelector>().easeOut);
+          if (rangeSelector->mode != Default<RangeSelector>().mode) {
             xml.addAttribute("mode", SelectorModeToString(rangeSelector->mode));
           }
-          xml.addAttribute("weight", rangeSelector->weight, 1.0f);
-          xml.addAttribute("randomOrder", rangeSelector->randomOrder);
-          xml.addAttribute("randomSeed", rangeSelector->randomSeed);
+          xml.addAttribute("weight", rangeSelector->weight, Default<RangeSelector>().weight);
+          xml.addAttribute("randomOrder", rangeSelector->randomOrder,
+                           Default<RangeSelector>().randomOrder);
+          xml.addAttribute("randomSeed", rangeSelector->randomSeed,
+                           Default<RangeSelector>().randomSeed);
           writeCustomData(xml, rangeSelector);
           xml.closeElementSelfClosing();
         }
@@ -827,15 +846,16 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
         // Inline the path data.
         xml.addAttribute("path", PathDataToSVGString(*textPath->path));
       }
-      if (textPath->baselineOrigin.x != 0 || textPath->baselineOrigin.y != 0) {
+      if (textPath->baselineOrigin != Default<TextPath>().baselineOrigin) {
         xml.addAttribute("baselineOrigin", pointToString(textPath->baselineOrigin));
       }
-      xml.addAttribute("baselineAngle", textPath->baselineAngle);
-      xml.addAttribute("firstMargin", textPath->firstMargin);
-      xml.addAttribute("lastMargin", textPath->lastMargin);
-      xml.addAttribute("perpendicular", textPath->perpendicular, true);
-      xml.addAttribute("reversed", textPath->reversed);
-      xml.addAttribute("forceAlignment", textPath->forceAlignment);
+      xml.addAttribute("baselineAngle", textPath->baselineAngle, Default<TextPath>().baselineAngle);
+      xml.addAttribute("firstMargin", textPath->firstMargin, Default<TextPath>().firstMargin);
+      xml.addAttribute("lastMargin", textPath->lastMargin, Default<TextPath>().lastMargin);
+      xml.addAttribute("perpendicular", textPath->perpendicular, Default<TextPath>().perpendicular);
+      xml.addAttribute("reversed", textPath->reversed, Default<TextPath>().reversed);
+      xml.addAttribute("forceAlignment", textPath->forceAlignment,
+                       Default<TextPath>().forceAlignment);
       xml.addOptionalAttribute("left", textPath->left);
       xml.addOptionalAttribute("right", textPath->right);
       xml.addOptionalAttribute("top", textPath->top);
@@ -850,38 +870,38 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       auto textBox = static_cast<const TextBox*>(node);
       xml.openElement("TextBox");
       // Group properties
-      if (textBox->anchor.x != 0 || textBox->anchor.y != 0) {
+      if (textBox->anchor != Default<TextBox>().anchor) {
         xml.addAttribute("anchor", pointToString(textBox->anchor));
       }
       if (!shouldSkipPosition(textBox->position, {0, 0}, textBox->left, textBox->right,
                               textBox->centerX, textBox->top, textBox->bottom, textBox->centerY)) {
         xml.addAttribute("position", pointToString(textBox->position));
       }
-      xml.addAttribute("rotation", textBox->rotation);
-      if (textBox->scale.x != 1 || textBox->scale.y != 1) {
+      xml.addAttribute("rotation", textBox->rotation, Default<TextBox>().rotation);
+      if (textBox->scale != Default<TextBox>().scale) {
         xml.addAttribute("scale", pointToString(textBox->scale));
       }
-      xml.addAttribute("skew", textBox->skew);
-      xml.addAttribute("skewAxis", textBox->skewAxis);
-      xml.addAttribute("alpha", textBox->alpha, 1.0f);
+      xml.addAttribute("skew", textBox->skew, Default<TextBox>().skew);
+      xml.addAttribute("skewAxis", textBox->skewAxis, Default<TextBox>().skewAxis);
+      xml.addAttribute("alpha", textBox->alpha, Default<TextBox>().alpha);
       // Layout dimensions
       xml.addOptionalAttribute("width", textBox->width);
       xml.addOptionalAttribute("height", textBox->height);
       // TextBox typography properties
-      if (textBox->textAlign != TextAlign::Start) {
+      if (textBox->textAlign != Default<TextBox>().textAlign) {
         xml.addAttribute("textAlign", TextAlignToString(textBox->textAlign));
       }
-      if (textBox->paragraphAlign != ParagraphAlign::Near) {
+      if (textBox->paragraphAlign != Default<TextBox>().paragraphAlign) {
         xml.addAttribute("paragraphAlign", ParagraphAlignToString(textBox->paragraphAlign));
       }
-      if (textBox->writingMode != WritingMode::Horizontal) {
+      if (textBox->writingMode != Default<TextBox>().writingMode) {
         xml.addAttribute("writingMode", WritingModeToString(textBox->writingMode));
       }
-      xml.addAttribute("lineHeight", textBox->lineHeight, 0.0f);
-      if (!textBox->wordWrap) {
-        xml.addAttribute("wordWrap", textBox->wordWrap);
+      xml.addAttribute("lineHeight", textBox->lineHeight, Default<TextBox>().lineHeight);
+      if (textBox->wordWrap != Default<TextBox>().wordWrap) {
+        xml.addAttribute("wordWrap", textBox->wordWrap, Default<TextBox>().wordWrap);
       }
-      if (textBox->overflow != Overflow::Visible) {
+      if (textBox->overflow != Default<TextBox>().overflow) {
         xml.addAttribute("overflow", OverflowToString(textBox->overflow));
       }
       // Constraint properties
@@ -907,23 +927,23 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Repeater: {
       auto repeater = static_cast<const Repeater*>(node);
       xml.openElement("Repeater");
-      xml.addAttribute("copies", repeater->copies, 3.0f);
-      xml.addAttribute("offset", repeater->offset);
-      if (repeater->order != RepeaterOrder::BelowOriginal) {
+      xml.addAttribute("copies", repeater->copies, Default<Repeater>().copies);
+      xml.addAttribute("offset", repeater->offset, Default<Repeater>().offset);
+      if (repeater->order != Default<Repeater>().order) {
         xml.addAttribute("order", RepeaterOrderToString(repeater->order));
       }
-      if (repeater->anchor.x != 0 || repeater->anchor.y != 0) {
+      if (repeater->anchor != Default<Repeater>().anchor) {
         xml.addAttribute("anchor", pointToString(repeater->anchor));
       }
-      if (repeater->position.x != 100 || repeater->position.y != 100) {
+      if (repeater->position != Default<Repeater>().position) {
         xml.addAttribute("position", pointToString(repeater->position));
       }
-      xml.addAttribute("rotation", repeater->rotation);
-      if (repeater->scale.x != 1 || repeater->scale.y != 1) {
+      xml.addAttribute("rotation", repeater->rotation, Default<Repeater>().rotation);
+      if (repeater->scale != Default<Repeater>().scale) {
         xml.addAttribute("scale", pointToString(repeater->scale));
       }
-      xml.addAttribute("startAlpha", repeater->startAlpha, 1.0f);
-      xml.addAttribute("endAlpha", repeater->endAlpha, 1.0f);
+      xml.addAttribute("startAlpha", repeater->startAlpha, Default<Repeater>().startAlpha);
+      xml.addAttribute("endAlpha", repeater->endAlpha, Default<Repeater>().endAlpha);
       writeCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -931,20 +951,20 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Group: {
       auto group = static_cast<const Group*>(node);
       xml.openElement("Group");
-      if (group->anchor.x != 0 || group->anchor.y != 0) {
+      if (group->anchor != Default<Group>().anchor) {
         xml.addAttribute("anchor", pointToString(group->anchor));
       }
       if (!shouldSkipPosition(group->position, {0, 0}, group->left, group->right, group->centerX,
                               group->top, group->bottom, group->centerY)) {
         xml.addAttribute("position", pointToString(group->position));
       }
-      xml.addAttribute("rotation", group->rotation);
-      if (group->scale.x != 1 || group->scale.y != 1) {
+      xml.addAttribute("rotation", group->rotation, Default<Group>().rotation);
+      if (group->scale != Default<Group>().scale) {
         xml.addAttribute("scale", pointToString(group->scale));
       }
-      xml.addAttribute("skew", group->skew);
-      xml.addAttribute("skewAxis", group->skewAxis);
-      xml.addAttribute("alpha", group->alpha, 1.0f);
+      xml.addAttribute("skew", group->skew, Default<Group>().skew);
+      xml.addAttribute("skewAxis", group->skewAxis, Default<Group>().skewAxis);
+      xml.addAttribute("alpha", group->alpha, Default<Group>().alpha);
       xml.addOptionalAttribute("width", group->width);
       xml.addOptionalAttribute("height", group->height);
       xml.addOptionalAttribute("left", group->left);
@@ -988,13 +1008,15 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
     case NodeType::DropShadowStyle: {
       auto style = static_cast<const DropShadowStyle*>(node);
       xml.openElement("DropShadowStyle");
-      if (style->blendMode != BlendMode::Normal) {
+      if (style->blendMode != Default<DropShadowStyle>().blendMode) {
         xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
       }
-      xml.addAttribute("excludeChildEffects", style->excludeChildEffects, false);
+      xml.addAttribute("excludeChildEffects", style->excludeChildEffects,
+                       Default<DropShadowStyle>().excludeChildEffects);
       writeShadowAttributes(xml, style->offsetX, style->offsetY, style->blurX, style->blurY,
                             style->color);
-      xml.addAttribute("showBehindLayer", style->showBehindLayer, true);
+      xml.addAttribute("showBehindLayer", style->showBehindLayer,
+                       Default<DropShadowStyle>().showBehindLayer);
       writeCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -1002,10 +1024,11 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
     case NodeType::InnerShadowStyle: {
       auto style = static_cast<const InnerShadowStyle*>(node);
       xml.openElement("InnerShadowStyle");
-      if (style->blendMode != BlendMode::Normal) {
+      if (style->blendMode != Default<InnerShadowStyle>().blendMode) {
         xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
       }
-      xml.addAttribute("excludeChildEffects", style->excludeChildEffects, false);
+      xml.addAttribute("excludeChildEffects", style->excludeChildEffects,
+                       Default<InnerShadowStyle>().excludeChildEffects);
       writeShadowAttributes(xml, style->offsetX, style->offsetY, style->blurX, style->blurY,
                             style->color);
       writeCustomData(xml, node);
@@ -1015,13 +1038,14 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
     case NodeType::BackgroundBlurStyle: {
       auto style = static_cast<const BackgroundBlurStyle*>(node);
       xml.openElement("BackgroundBlurStyle");
-      if (style->blendMode != BlendMode::Normal) {
+      if (style->blendMode != Default<BackgroundBlurStyle>().blendMode) {
         xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
       }
-      xml.addAttribute("excludeChildEffects", style->excludeChildEffects, false);
-      xml.addAttribute("blurX", style->blurX);
-      xml.addAttribute("blurY", style->blurY);
-      if (style->tileMode != TileMode::Mirror) {
+      xml.addAttribute("excludeChildEffects", style->excludeChildEffects,
+                       Default<BackgroundBlurStyle>().excludeChildEffects);
+      xml.addAttribute("blurX", style->blurX, Default<BackgroundBlurStyle>().blurX);
+      xml.addAttribute("blurY", style->blurY, Default<BackgroundBlurStyle>().blurY);
+      if (style->tileMode != Default<BackgroundBlurStyle>().tileMode) {
         xml.addAttribute("tileMode", TileModeToString(style->tileMode));
       }
       writeCustomData(xml, node);
@@ -1044,7 +1068,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       xml.openElement("BlurFilter");
       xml.addRequiredAttribute("blurX", filter->blurX);
       xml.addRequiredAttribute("blurY", filter->blurY);
-      if (filter->tileMode != TileMode::Decal) {
+      if (filter->tileMode != Default<BlurFilter>().tileMode) {
         xml.addAttribute("tileMode", TileModeToString(filter->tileMode));
       }
       writeCustomData(xml, node);
@@ -1056,7 +1080,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       xml.openElement("DropShadowFilter");
       writeShadowAttributes(xml, filter->offsetX, filter->offsetY, filter->blurX, filter->blurY,
                             filter->color);
-      xml.addAttribute("shadowOnly", filter->shadowOnly);
+      xml.addAttribute("shadowOnly", filter->shadowOnly, Default<DropShadowFilter>().shadowOnly);
       writeCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -1066,7 +1090,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       xml.openElement("InnerShadowFilter");
       writeShadowAttributes(xml, filter->offsetX, filter->offsetY, filter->blurX, filter->blurY,
                             filter->color);
-      xml.addAttribute("shadowOnly", filter->shadowOnly);
+      xml.addAttribute("shadowOnly", filter->shadowOnly, Default<InnerShadowFilter>().shadowOnly);
       writeCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -1075,7 +1099,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       auto filter = static_cast<const BlendFilter*>(node);
       xml.openElement("BlendFilter");
       xml.addAttribute("color", ColorToHexString(filter->color, filter->color.alpha < 1.0f));
-      if (filter->blendMode != BlendMode::Normal) {
+      if (filter->blendMode != Default<BlendFilter>().blendMode) {
         xml.addAttribute("blendMode", BlendModeToString(filter->blendMode));
       }
       writeCustomData(xml, node);
@@ -1150,7 +1174,7 @@ static void writeResource(XMLBuilder& xml, const Node* node, const Options& opti
       auto font = static_cast<const Font*>(node);
       xml.openElement("Font");
       xml.addAttribute("id", font->id);
-      xml.addAttribute("unitsPerEm", font->unitsPerEm, 1000);
+      xml.addAttribute("unitsPerEm", font->unitsPerEm, Default<Font>().unitsPerEm);
       writeCustomData(xml, node);
       if (font->glyphs.empty()) {
         xml.closeElementSelfClosing();
@@ -1175,7 +1199,7 @@ static void writeResource(XMLBuilder& xml, const Node* node, const Options& opti
               xml.addAttribute("image", glyph->image->filePath);
             }
           }
-          if (glyph->offset.x != 0 || glyph->offset.y != 0) {
+          if (glyph->offset != Default<Glyph>().offset) {
             xml.addAttribute("offset", pointToString(glyph->offset));
           }
           xml.addRequiredAttribute("advance", glyph->advance);
@@ -1210,30 +1234,30 @@ static void writeLayer(XMLBuilder& xml, const Layer* node, const Options& option
     xml.addAttribute("id", node->id);
   }
   xml.addAttribute("name", node->name);
-  xml.addAttribute("visible", node->visible, true);
-  xml.addAttribute("alpha", node->alpha, 1.0f);
-  if (node->blendMode != BlendMode::Normal) {
+  xml.addAttribute("visible", node->visible, Default<Layer>().visible);
+  xml.addAttribute("alpha", node->alpha, Default<Layer>().alpha);
+  if (node->blendMode != Default<Layer>().blendMode) {
     xml.addAttribute("blendMode", BlendModeToString(node->blendMode));
   }
-  xml.addAttribute("x", node->x);
-  xml.addAttribute("y", node->y);
+  xml.addAttribute("x", node->x, Default<Layer>().x);
+  xml.addAttribute("y", node->y, Default<Layer>().y);
   xml.addOptionalAttribute("width", node->width);
   xml.addOptionalAttribute("height", node->height);
-  if (node->layout != LayoutMode::None) {
+  if (node->layout != Default<Layer>().layout) {
     xml.addAttribute("layout", LayoutModeToString(node->layout));
   }
-  xml.addAttribute("gap", node->gap);
-  xml.addAttribute("flex", node->flex);
+  xml.addAttribute("gap", node->gap, Default<Layer>().gap);
+  xml.addAttribute("flex", node->flex, Default<Layer>().flex);
   if (!node->padding.isZero()) {
     xml.addAttribute("padding", PaddingToString(node->padding));
   }
-  if (node->alignment != Alignment::Stretch) {
+  if (node->alignment != Default<Layer>().alignment) {
     xml.addAttribute("alignment", AlignmentToString(node->alignment));
   }
-  if (node->arrangement != Arrangement::Start) {
+  if (node->arrangement != Default<Layer>().arrangement) {
     xml.addAttribute("arrangement", ArrangementToString(node->arrangement));
   }
-  xml.addAttribute("includeInLayout", node->includeInLayout, true);
+  xml.addAttribute("includeInLayout", node->includeInLayout, Default<Layer>().includeInLayout);
   xml.addOptionalAttribute("left", node->left);
   xml.addOptionalAttribute("right", node->right);
   xml.addOptionalAttribute("top", node->top);
@@ -1246,20 +1270,21 @@ static void writeLayer(XMLBuilder& xml, const Layer* node, const Options& option
   if (!node->matrix3D.isIdentity()) {
     xml.addAttribute("matrix3D", floatListToString(node->matrix3D.values, 16));
   }
-  xml.addAttribute("preserve3D", node->preserve3D);
-  xml.addAttribute("antiAlias", node->antiAlias, true);
-  xml.addAttribute("groupOpacity", node->groupOpacity);
-  xml.addAttribute("passThroughBackground", node->passThroughBackground, true);
+  xml.addAttribute("preserve3D", node->preserve3D, Default<Layer>().preserve3D);
+  xml.addAttribute("antiAlias", node->antiAlias, Default<Layer>().antiAlias);
+  xml.addAttribute("groupOpacity", node->groupOpacity, Default<Layer>().groupOpacity);
+  xml.addAttribute("passThroughBackground", node->passThroughBackground,
+                   Default<Layer>().passThroughBackground);
   // Skip scrollRect when it was generated by clipToBounds during layout.
   // On re-import, clipToBounds will regenerate the correct scrollRect based on the new layout size.
   if (node->hasScrollRect && !node->clipToBounds) {
     xml.addAttribute("scrollRect", rectToString(node->scrollRect));
   }
-  xml.addAttribute("clipToBounds", node->clipToBounds);
+  xml.addAttribute("clipToBounds", node->clipToBounds, Default<Layer>().clipToBounds);
   if (node->mask != nullptr && !node->mask->id.empty()) {
     xml.addAttribute("mask", "@" + node->mask->id);
   }
-  if (node->maskType != MaskType::Alpha) {
+  if (node->maskType != Default<Layer>().maskType) {
     xml.addAttribute("maskType", MaskTypeToString(node->maskType));
   }
   if (node->composition != nullptr && !node->composition->id.empty()) {
