@@ -23,6 +23,8 @@
 #include "base/PAGTest.h"
 #include "pagx/HTMLExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "tgfx/core/ImageCodec.h"
+#include "utils/Baseline.h"
 #include "utils/ProjectPath.h"
 
 namespace pag {
@@ -466,6 +468,91 @@ CLI_TEST(PAGXHtmlTest, ExportToFile) {
   std::ifstream file(outPath);
   std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
   EXPECT_NE(content.find("pagx-root"), std::string::npos);
+}
+
+// =============================================================================
+// Screenshot comparison: HTML rendering vs PAGX native rendering
+// =============================================================================
+
+static bool NodeAvailable() {
+  return std::system("node --version > /dev/null 2>&1") == 0;
+}
+
+static bool TakeHtmlScreenshot(const std::string& htmlPath, const std::string& pngPath, int width,
+                               int height) {
+  auto scriptPath = ProjectPath::Absolute("test/screenshot.js");
+  auto cmd = "node " + scriptPath + " " + htmlPath + " " + pngPath + " " + std::to_string(width) +
+             " " + std::to_string(height) + " 2>&1";
+  return std::system(cmd.c_str()) == 0;
+}
+
+static std::string WrapHtmlDocument(const std::string& fragment, int width, int height) {
+  return "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"></head>\n"
+         "<body style=\"margin:0;padding:0;background:transparent;width:" +
+         std::to_string(width) + "px;height:" + std::to_string(height) + "px;overflow:hidden\">\n" +
+         fragment + "\n</body></html>";
+}
+
+CLI_TEST(PAGXHtmlTest, HtmlScreenshotCompare) {
+  if (!NodeAvailable()) {
+    GTEST_SKIP() << "Node.js not available, skipping HTML screenshot comparison";
+  }
+
+  auto files = GetHtmlTestFiles();
+  ASSERT_FALSE(files.empty()) << "No .pagx files found in resources/html/";
+
+  auto outDir = ProjectPath::Absolute("test/out/PAGXHtmlScreenshot");
+  std::filesystem::create_directories(outDir);
+
+  for (const auto& filePath : files) {
+    auto baseName = std::filesystem::path(filePath).stem().string();
+
+    auto doc = pagx::PAGXImporter::FromFile(filePath);
+    if (!doc) {
+      ADD_FAILURE() << "Failed to load: " << baseName;
+      continue;
+    }
+
+    int width = static_cast<int>(doc->width);
+    int height = static_cast<int>(doc->height);
+    if (width <= 0 || height <= 0) {
+      continue;
+    }
+
+    auto html = pagx::HTMLExporter::ToHTML(*doc);
+    if (html.empty()) {
+      ADD_FAILURE() << "Failed to export HTML: " << baseName;
+      continue;
+    }
+
+    auto fullHtml = WrapHtmlDocument(html, width, height);
+    auto htmlPath = outDir + "/" + baseName + ".html";
+    {
+      std::ofstream htmlFile(htmlPath, std::ios::binary);
+      htmlFile.write(fullHtml.data(), static_cast<std::streamsize>(fullHtml.size()));
+    }
+
+    auto pngPath = outDir + "/" + baseName + ".png";
+    if (!TakeHtmlScreenshot(htmlPath, pngPath, width, height)) {
+      ADD_FAILURE() << "Screenshot failed: " << baseName;
+      continue;
+    }
+
+    auto codec = tgfx::ImageCodec::MakeFrom(pngPath);
+    if (!codec) {
+      ADD_FAILURE() << "Failed to load screenshot PNG: " << baseName;
+      continue;
+    }
+
+    tgfx::Bitmap bitmap(codec->width(), codec->height(), false, false);
+    tgfx::Pixmap pixmap(bitmap);
+    if (!codec->readPixels(pixmap.info(), pixmap.writablePixels())) {
+      ADD_FAILURE() << "Failed to decode screenshot: " << baseName;
+      continue;
+    }
+
+    EXPECT_TRUE(Baseline::Compare(pixmap, "PAGXHtmlScreenshot/" + baseName)) << baseName;
+  }
 }
 
 }  // namespace pag
