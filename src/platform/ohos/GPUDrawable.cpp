@@ -44,9 +44,6 @@ GPUDrawable::~GPUDrawable() {
 
 void GPUDrawable::updateSize() {
   OH_NativeWindow_NativeWindowHandleOpt(nativeWindow, GET_BUFFER_GEOMETRY, &_height, &_width);
-  if (window) {
-    window->invalidSize();
-  }
 }
 
 std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
@@ -61,21 +58,22 @@ std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
 }
 
 std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* context) {
-  return window ? window->getSurface(context) : nullptr;
+  if (window == nullptr) {
+    return nullptr;
+  }
+  return tgfx::Surface::MakeFrom(context, window);
 }
 
 void GPUDrawable::onFreeSurface() {
-  if (window) {
-    window->freeSurface();
-  }
 }
 
-void GPUDrawable::present(tgfx::Context* context) {
+void GPUDrawable::present(tgfx::Context*) {
   if (window == nullptr) {
     return;
   }
   window->setPresentationTime(currentTimeStamp);
-  window->present(context);
+  // In the new tgfx architecture, Window::onPresent() is called automatically by
+  // DrawingBuffer::presentWindows() after command submission.
 }
 
 void GPUDrawable::setTimeStamp(int64_t timeStamp) {

@@ -22,6 +22,10 @@
 #include "pag/pag.h"
 #include "platform/ohos/XComponentHandler.h"
 #include "rendering/PAGAnimator.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Image.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Window.h"
 
 namespace pag {
@@ -123,6 +127,7 @@ class JPAGImageView : public PAGAnimator::Listener, public XComponentListener {
 
   NativeWindow* _window = nullptr;
   std::shared_ptr<tgfx::Window> targetWindow = nullptr;
+  std::shared_ptr<tgfx::Surface> renderSurface = nullptr;
 
   std::shared_ptr<tgfx::Image> currentImage = nullptr;
   tgfx::Bitmap currentBitmap;
