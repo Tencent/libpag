@@ -21,9 +21,9 @@
 #include <string>
 #include "cli/CommandBounds.h"
 #include "cli/CommandExport.h"
-#include "cli/CommandImport.h"
 #include "cli/CommandFont.h"
 #include "cli/CommandFormat.h"
+#include "cli/CommandImport.h"
 #include "cli/CommandOptimize.h"
 #include "cli/CommandRender.h"
 #include "cli/CommandValidator.h"
