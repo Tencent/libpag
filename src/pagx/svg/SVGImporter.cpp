@@ -345,47 +345,6 @@ void SVGParserContext::parseStyleElement(const std::shared_ptr<DOMNode>& styleNo
     pos = closeBracePos + 1;
   }
 }
-// Shorten the last segment of a path by pulling the endpoint back along its tangent direction.
-// This prevents the stroke cap from overlapping the marker at the endpoint.
-static void ShortenPathEnd(PathData* pathData, float distance) {
-  if (!pathData || pathData->points().size() < 2) {
-    return;
-  }
-  auto& points = const_cast<std::vector<Point>&>(pathData->points());
-  const auto& verbs = pathData->verbs();
-  // Don't shorten closed paths.
-  if (!verbs.empty() && verbs.back() == PathVerb::Close) {
-    return;
-  }
-  size_t lastIdx = points.size() - 1;
-  size_t prevIdx = lastIdx - 1;
-  float dx = points[lastIdx].x - points[prevIdx].x;
-  float dy = points[lastIdx].y - points[prevIdx].y;
-  float length = std::sqrt(dx * dx + dy * dy);
-  if (length < distance * 2) {
-    return;
-  }
-  float ratio = distance / length;
-  points[lastIdx].x -= dx * ratio;
-  points[lastIdx].y -= dy * ratio;
-}
-
-// Shorten the first segment of a path by advancing the start point along its tangent direction.
-static void ShortenPathStart(PathData* pathData, float distance) {
-  if (!pathData || pathData->points().size() < 2) {
-    return;
-  }
-  auto& points = const_cast<std::vector<Point>&>(pathData->points());
-  float dx = points[1].x - points[0].x;
-  float dy = points[1].y - points[0].y;
-  float length = std::sqrt(dx * dx + dy * dy);
-  if (length < distance * 2) {
-    return;
-  }
-  float ratio = distance / length;
-  points[0].x += dx * ratio;
-  points[0].y += dy * ratio;
-}
 
 Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
                                         const InheritedStyle& parentStyle, int depth) {
@@ -562,37 +521,6 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
   if (!markerStart.empty() || !markerMid.empty() || !markerEnd.empty()) {
     auto markerLayers = expandMarkers(element, inheritedStyle);
     if (!markerLayers.empty()) {
-      // Shorten the path endpoints slightly to prevent stroke butt cap from touching the marker
-      // triangle. Only half stroke-width is needed since the dashed stroke inheritance issue is
-      // already fixed in createMarkerLayer.
-      std::string swStr = getAttribute(element, "stroke-width");
-      if (swStr.empty()) {
-        swStr = inheritedStyle.strokeWidth;
-      }
-      float sw = swStr.empty() ? 1.0f : parseLength(swStr, _viewBoxWidth);
-
-      float shortenEnd = 0;
-      float shortenStart = 0;
-      if (!markerEnd.empty()) {
-        shortenEnd = sw * 0.5f;
-      }
-      if (!markerStart.empty()) {
-        shortenStart = sw * 0.5f;
-      }
-      for (auto* content : layer->contents) {
-        if (content->nodeType() == NodeType::Path) {
-          auto* pathNode = static_cast<Path*>(content);
-          if (pathNode->data) {
-            if (shortenEnd > 0) {
-              ShortenPathEnd(pathNode->data, shortenEnd);
-            }
-            if (shortenStart > 0) {
-              ShortenPathStart(pathNode->data, shortenStart);
-            }
-          }
-        }
-      }
-
       // Wrap the shape layer and marker layers in a group layer.
       auto wrapperLayer = _document->makeNode<Layer>();
       wrapperLayer->id = std::move(layer->id);
