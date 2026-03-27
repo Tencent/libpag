@@ -185,10 +185,11 @@ float LayoutNode::ComputeUniformScale(float contentW, float contentH, float targ
 }
 
 std::vector<LayoutNode*> LayoutNode::CollectLayoutNodes(const std::vector<Element*>& elements,
-                                                        bool skipText) {
+                                                        bool skipTextLayout) {
   std::vector<LayoutNode*> result = {};
   for (auto* element : elements) {
-    if (skipText && element->nodeType() == NodeType::Text) {
+    if (skipTextLayout &&
+        (element->nodeType() == NodeType::Text || element->nodeType() == NodeType::TextBox)) {
       continue;
     }
     auto* node = AsLayoutNode(element);

@@ -93,10 +93,11 @@ class LayoutNode {
 
   /**
    * Collects LayoutNode pointers from a list of elements. Skips elements that don't participate
-   * in layout. When skipText is true, Text elements are excluded (used by TextBox).
+   * in layout. When skipTextNodes is true, Text and TextBox elements are excluded because their
+   * positioning is handled by TextLayout instead of constraint layout.
    */
   static std::vector<LayoutNode*> CollectLayoutNodes(const std::vector<Element*>& elements,
-                                                     bool skipText);
+                                                     bool skipTextLayout);
 
   /**
    * Shared measurement: computes preferred size from child LayoutNodes.
