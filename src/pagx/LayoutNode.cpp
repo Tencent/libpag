@@ -26,7 +26,6 @@
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/Rectangle.h"
-#include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextPath.h"
@@ -211,23 +210,6 @@ void LayoutNode::MeasureChildNodes(const std::vector<Element*>& elements, float 
   float maxX = 0;
   float maxY = 0;
   for (auto* element : elements) {
-    if (element->nodeType() == NodeType::Stroke) {
-      auto* stroke = static_cast<Stroke*>(element);
-      float expansion = 0.0f;
-      switch (stroke->align) {
-        case StrokeAlign::Center:
-          expansion = stroke->width * 0.5f;
-          break;
-        case StrokeAlign::Outside:
-          expansion = stroke->width;
-          break;
-        case StrokeAlign::Inside:
-          break;
-      }
-      maxX += expansion;
-      maxY += expansion;
-      continue;
-    }
     auto* node = AsLayoutNode(element);
     if (node == nullptr || std::isnan(node->preferredWidth) || std::isnan(node->preferredHeight)) {
       continue;
