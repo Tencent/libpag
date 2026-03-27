@@ -615,7 +615,7 @@ LinearGradient directly inside the Stroke element:
     <TrimPath end="0.75" offset="-135"/>
     <Stroke color="#E2E8F0" width="10" cap="round"/>
     <!-- Value fill (67% of 270 degrees = 0.5 of full circle) -->
-    <Group centerX="0" centerY="0">
+    <Group centerX="0" centerY="0" width="140" height="140">
       <Ellipse size="140,140"/>
       <TrimPath end="0.5" offset="-135"/>
       <Stroke color="#3B82F6" width="12" cap="round"/>
