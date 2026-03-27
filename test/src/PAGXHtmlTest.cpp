@@ -551,7 +551,7 @@ CLI_TEST(PAGXHtmlTest, HtmlScreenshotCompare) {
       continue;
     }
 
-    EXPECT_TRUE(Baseline::Compare(pixmap, "PAGXHtmlScreenshot/" + baseName)) << baseName;
+    EXPECT_TRUE(Baseline::Compare(pixmap, "PAGXTest/html/" + baseName)) << baseName;
   }
 }
 
