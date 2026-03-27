@@ -39,17 +39,9 @@ void TextBox::onMeasure(const LayoutContext& context) {
     preferredHeight = height;
     return;
   }
-  float w = std::isnan(width) ? 0 : width;
-  float h = std::isnan(height) ? 0 : height;
   auto measured = TextLayout::MeasureTextBox(this, width, height, context);
-  if (std::isnan(width)) {
-    w = measured.width;
-  }
-  if (std::isnan(height)) {
-    h = measured.height;
-  }
-  preferredWidth = w;
-  preferredHeight = h;
+  preferredWidth = std::isnan(width) ? measured.width : width;
+  preferredHeight = std::isnan(height) ? measured.height : height;
 }
 
 void TextBox::setLayoutSize(const LayoutContext&, float width, float height) {

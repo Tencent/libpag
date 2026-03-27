@@ -353,16 +353,13 @@ class TextLayoutContext {
     }
 
     // VisualTop: rebuild with y offset so tight bounds top aligns to y=0.
-    if (baseline == TextBaseline::VisualTop) {
-      auto it = result.find(text);
-      if (it != result.end() && it->second.textBlob != nullptr) {
-        float tightTop = it->second.textBlob->getTightBounds().top;
-        if (tightTop != 0) {
-          if (hasNewline) {
-            buildTextBlobWithoutLayoutMultiLine(text, info, -tightTop);
-          } else {
-            buildTextBlobWithoutLayoutSingleLine(text, info, -tightTop);
-          }
+    if (baseline == TextBaseline::VisualTop && text->getTextBlob() != nullptr) {
+      float tightTop = text->getTextBlob()->getTightBounds().top;
+      if (tightTop != 0) {
+        if (hasNewline) {
+          buildTextBlobWithoutLayoutMultiLine(text, info, -tightTop);
+        } else {
+          buildTextBlobWithoutLayoutSingleLine(text, info, -tightTop);
         }
       }
     }
@@ -1278,7 +1275,7 @@ class TextLayoutContext {
 
     // Vertical alignment offset.
     float yOffset = 0;
-    if (boxHeight > 0) {
+    if (!std::isnan(boxHeight)) {
       switch (textBox->paragraphAlign) {
         case ParagraphAlign::Near:
           yOffset = 0;
@@ -1379,7 +1376,7 @@ class TextLayoutContext {
       relativeTop += line.maxLineHeight;
 
       // Skip lines that overflow below the box bottom.
-      if (overflowHidden && boxHeight > 0) {
+      if (overflowHidden && !std::isnan(boxHeight)) {
         float lineBottom = baselineY + line.maxDescent;
         if (lineBottom > boxBottom) {
           break;
@@ -1394,7 +1391,7 @@ class TextLayoutContext {
                             (textBox->textAlign == TextAlign::End && paragraphRTL);
       bool isEndAligned = (textBox->textAlign == TextAlign::End && !paragraphRTL) ||
                           (textBox->textAlign == TextAlign::Start && paragraphRTL);
-      if (boxWidth > 0) {
+      if (!std::isnan(boxWidth)) {
         if (isStartAligned) {
           // Left-aligned (LTR Start or RTL End): no offset.
         } else if (textBox->textAlign == TextAlign::Center) {
@@ -1833,7 +1830,7 @@ class TextLayoutContext {
     // Columns go right-to-left, so Near = right-aligned, Far = left-aligned.
     // xStart is where the right edge of the first column starts.
     float xStart = 0;
-    if (boxWidth > 0) {
+    if (!std::isnan(boxWidth)) {
       switch (textBox->paragraphAlign) {
         case ParagraphAlign::Near:
           xStart += boxWidth;
@@ -1880,7 +1877,7 @@ class TextLayoutContext {
       columnX -= allocatedWidth;
 
       // Skip columns that overflow beyond the left edge of the box.
-      if (overflowHidden && boxWidth > 0 && columnX < boxLeft) {
+      if (overflowHidden && !std::isnan(boxWidth) && columnX < boxLeft) {
         break;
       }
 
@@ -1891,7 +1888,7 @@ class TextLayoutContext {
       // Compute per-column vertical offset based on TextAlign.
       float inlineOffset = 0;
       float justifyGap = 0;
-      if (boxHeight > 0) {
+      if (!std::isnan(boxHeight)) {
         switch (textBox->textAlign) {
           case TextAlign::Start:
             break;
