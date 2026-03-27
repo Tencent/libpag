@@ -19,14 +19,11 @@
 #pragma once
 
 #include <memory>
-#include <unordered_map>
 #include <vector>
 #include "tgfx/core/Point.h"
 #include "tgfx/core/TextBlob.h"
 
 namespace pagx {
-
-class Text;
 
 /**
  * Shaped text data containing the TextBlob and per-glyph anchor offsets.
@@ -42,10 +39,5 @@ struct ShapedText {
    */
   std::vector<tgfx::Point> anchors = {};
 };
-
-/**
- * Mapping from Text nodes to their shaped text data.
- */
-using ShapedTextMap = std::unordered_map<const Text*, ShapedText>;
 
 }  // namespace pagx

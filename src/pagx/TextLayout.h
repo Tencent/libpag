@@ -28,6 +28,7 @@
 namespace pagx {
 
 class LayoutContext;
+struct ShapedText;
 class Text;
 class TextBox;
 
@@ -65,6 +66,9 @@ class TextLayout {
   /** Performs text layout for all Text elements inside a TextBox. */
   static void LayoutTextBox(TextBox* textBox, float boxWidth, float boxHeight,
                             const LayoutContext& context);
+
+  /** Writes shaped text data directly to the Text node. */
+  static void StoreShapedText(Text* text, ShapedText&& shapedText);
 };
 
 }  // namespace pagx

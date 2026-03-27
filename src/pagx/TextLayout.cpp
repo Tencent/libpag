@@ -240,15 +240,7 @@ class TextLayoutContext {
   }
 
   void storeShapedText(Text* text, ShapedText&& shapedText) {
-    if (text == nullptr || shapedText.textBlob == nullptr) {
-      return;
-    }
-    auto it = result.find(text);
-    if (it != result.end()) {
-      it->second = std::move(shapedText);
-    } else {
-      result.emplace(text, std::move(shapedText));
-    }
+    TextLayout::StoreShapedText(text, std::move(shapedText));
   }
 
   // Collects Text elements from a list of elements, recursing into Group but skipping TextBox.
@@ -259,6 +251,8 @@ class TextLayoutContext {
         outText.push_back(static_cast<Text*>(element));
       } else if (element->nodeType() == NodeType::Group) {
         collectTextElements(static_cast<Group*>(element)->elements, outText);
+      } else if (element->nodeType() == NodeType::TextBox) {
+        collectTextElements(static_cast<TextBox*>(element)->elements, outText);
       }
     }
   }
@@ -2065,7 +2059,6 @@ class TextLayoutContext {
   }
 
   FontConfig* fontConfig_ = nullptr;
-  ShapedTextMap result = {};
   std::unordered_map<const Font*, std::shared_ptr<tgfx::Typeface>> fontCache = {};
 };
 
@@ -2076,6 +2069,14 @@ std::shared_ptr<tgfx::Typeface> TextLayout::FindTypeface(const std::string& font
     return fontConfig->findTypeface(fontFamily, fontStyle);
   }
   return tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
+}
+
+void TextLayout::StoreShapedText(Text* text, ShapedText&& shapedText) {
+  if (text == nullptr || shapedText.textBlob == nullptr) {
+    return;
+  }
+  text->textBlob = std::move(shapedText.textBlob);
+  text->anchors = std::move(shapedText.anchors);
 }
 
 Rect TextLayout::MeasureTextBox(const TextBox* textBox, float boxWidth, float boxHeight,
@@ -2145,18 +2146,12 @@ tgfx::Rect TextLayout::LayoutText(Text* text, const LayoutContext& context, Text
   // Embedded fonts have pre-baked coordinates; baseline mode does not apply.
   if (!text->glyphRuns.empty()) {
     auto shapedText = layoutContext.buildShapedTextFromEmbeddedGlyphRuns(text);
-    text->textBlob = shapedText.textBlob;
-    text->anchors = shapedText.anchors;
+    StoreShapedText(text, std::move(shapedText));
     // Embedded fonts: use tight bounds for both axes (no advance width available).
     return text->textBlob ? text->textBlob->getTightBounds() : tgfx::Rect::MakeEmpty();
   }
   // Standard shaping path: build TextBlob with baseline offset baked in.
   float advanceWidth = layoutContext.processTextWithoutLayout(text, baseline);
-  auto it = layoutContext.result.find(text);
-  if (it != layoutContext.result.end()) {
-    text->textBlob = it->second.textBlob;
-    text->anchors = it->second.anchors;
-  }
   // Compute anchor offset so that bounds are relative to the text anchor point.
   float anchorOffset = 0;
   switch (text->textAnchor) {
@@ -2184,12 +2179,6 @@ void TextLayout::LayoutTextBox(TextBox* textBox, float boxWidth, float boxHeight
   TextLayoutContext::collectTextElements(textBox->elements, childText);
   if (!childText.empty()) {
     layoutContext.processTextWithLayout(childText, textBox, boxWidth, boxHeight);
-  }
-  // Write TextBlobs back to child Text nodes.
-  for (auto& [textPtr, shapedText] : layoutContext.result) {
-    auto* mutableText = const_cast<Text*>(textPtr);
-    mutableText->textBlob = shapedText.textBlob;
-    mutableText->anchors = shapedText.anchors;
   }
 }
 
