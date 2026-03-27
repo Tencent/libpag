@@ -37,14 +37,6 @@ class LayoutNode {
   float centerX = NAN;
   float centerY = NAN;
 
-  // Preferred size (written by onMeasure during updateSize, read-only after that).
-  float preferredWidth = NAN;
-  float preferredHeight = NAN;
-
-  // Actual layout size (written by setLayoutSize during layout phase).
-  float actualWidth = NAN;
-  float actualHeight = NAN;
-
   virtual ~LayoutNode() = default;
 
   /** Returns true if any constraint attribute is set. */
@@ -119,6 +111,27 @@ class LayoutNode {
   /** Writes preferredWidth/preferredHeight. Called by updateSize when not yet measured. */
   virtual void onMeasure(const LayoutContext&) {
   }
+
+ private:
+  // Preferred position and size (written by onMeasure during updateSize, read-only after that).
+  float preferredX = 0;
+  float preferredY = 0;
+  float preferredWidth = NAN;
+  float preferredHeight = NAN;
+
+  // Actual layout size (written by setLayoutSize during layout phase).
+  float actualWidth = NAN;
+  float actualHeight = NAN;
+
+  friend class Rectangle;
+  friend class Ellipse;
+  friend class Path;
+  friend class Polystar;
+  friend class Text;
+  friend class TextPath;
+  friend class TextBox;
+  friend class Group;
+  friend class Layer;
 };
 
 }  // namespace pagx

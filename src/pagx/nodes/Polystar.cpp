@@ -24,6 +24,8 @@ namespace pagx {
 
 void Polystar::onMeasure(const LayoutContext&) {
   auto bounds = computeBounds();
+  preferredX = bounds.x;
+  preferredY = bounds.y;
   preferredWidth = bounds.width;
   preferredHeight = bounds.height;
 }

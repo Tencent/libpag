@@ -24,6 +24,8 @@ namespace pagx {
 
 void Text::onMeasure(const LayoutContext& context) {
   textBounds = TextLayout::LayoutText(this, context, baseline);
+  preferredX = textBounds.left;
+  preferredY = textBounds.top;
   preferredWidth = textBounds.width();
   preferredHeight = textBounds.height();
 }

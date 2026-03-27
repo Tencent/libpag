@@ -26,6 +26,8 @@ namespace pagx {
 void Path::onMeasure(const LayoutContext&) {
   if (data) {
     auto bounds = data->getBounds();
+    preferredX = bounds.x;
+    preferredY = bounds.y;
     preferredWidth = bounds.width;
     preferredHeight = bounds.height;
   }
