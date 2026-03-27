@@ -562,23 +562,56 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
   if (!markerStart.empty() || !markerMid.empty() || !markerEnd.empty()) {
     auto markerLayers = expandMarkers(element, inheritedStyle);
     if (!markerLayers.empty()) {
-      // Shorten the path endpoints to prevent stroke cap from overlapping markers.
-      // Find the PathData in the layer's contents and retract endpoints by half stroke width.
-      std::string swStr = getAttribute(element, "stroke-width");
-      if (swStr.empty()) {
-        swStr = inheritedStyle.strokeWidth;
+      // Shorten the path endpoints to prevent stroke from overlapping markers.
+      // Use the marker's refX as the shorten distance since refX defines how far the marker
+      // extends behind the attachment point.
+      float shortenEnd = 0;
+      float shortenStart = 0;
+      if (!markerEnd.empty()) {
+        std::string endRefId = resolveUrl(markerEnd);
+        auto endIt = _defs.find(endRefId);
+        if (endIt != _defs.end() && endIt->second->name == "marker") {
+          float mw = parseLength(getAttribute(endIt->second, "markerWidth", "3"), _viewBoxWidth);
+          shortenEnd = parseLength(getAttribute(endIt->second, "refX", "0"), mw);
+          std::string unitsStr = getAttribute(endIt->second, "markerUnits", "strokeWidth");
+          if (unitsStr != "userSpaceOnUse") {
+            std::string swStr = getAttribute(element, "stroke-width");
+            if (swStr.empty()) {
+              swStr = inheritedStyle.strokeWidth;
+            }
+            float sw = swStr.empty() ? 1.0f : parseLength(swStr, _viewBoxWidth);
+            shortenEnd *= sw;
+          }
+        }
       }
-      float sw = swStr.empty() ? 1.0f : parseLength(swStr, _viewBoxWidth);
-      float shortenDist = sw * 0.5f;
+      if (!markerStart.empty()) {
+        std::string startRefId = resolveUrl(markerStart);
+        auto startIt = _defs.find(startRefId);
+        if (startIt != _defs.end() && startIt->second->name == "marker") {
+          float mw = parseLength(getAttribute(startIt->second, "markerWidth", "3"), _viewBoxWidth);
+          float refX = parseLength(getAttribute(startIt->second, "refX", "0"), mw);
+          float mwFull = mw;
+          shortenStart = mwFull - refX;
+          std::string unitsStr = getAttribute(startIt->second, "markerUnits", "strokeWidth");
+          if (unitsStr != "userSpaceOnUse") {
+            std::string swStr = getAttribute(element, "stroke-width");
+            if (swStr.empty()) {
+              swStr = inheritedStyle.strokeWidth;
+            }
+            float sw = swStr.empty() ? 1.0f : parseLength(swStr, _viewBoxWidth);
+            shortenStart *= sw;
+          }
+        }
+      }
       for (auto* content : layer->contents) {
         if (content->nodeType() == NodeType::Path) {
           auto* pathNode = static_cast<Path*>(content);
           if (pathNode->data) {
-            if (!markerEnd.empty()) {
-              ShortenPathEnd(pathNode->data, shortenDist);
+            if (shortenEnd > 0) {
+              ShortenPathEnd(pathNode->data, shortenEnd);
             }
-            if (!markerStart.empty()) {
-              ShortenPathStart(pathNode->data, shortenDist);
+            if (shortenStart > 0) {
+              ShortenPathStart(pathNode->data, shortenStart);
             }
           }
         }
