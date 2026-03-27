@@ -49,9 +49,6 @@ void GPUDrawable::updateSize() {
       _width = 0;
       _height = 0;
     }
-    if (window) {
-      window->invalidSize();
-    }
   }
 }
 
@@ -72,16 +69,17 @@ std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
 }
 
 std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* context) {
-  return window ? window->getSurface(context) : nullptr;
+  if (window == nullptr) {
+    return nullptr;
+  }
+  return tgfx::Surface::MakeFrom(context, window);
 }
 
 void GPUDrawable::onFreeSurface() {
-  if (window) {
-    window->freeSurface();
-  }
 }
 
-void GPUDrawable::present(tgfx::Context* context) {
-  window->present(context);
+void GPUDrawable::present(tgfx::Context*) {
+  // In the new tgfx architecture, Window::onPresent() is called automatically by
+  // DrawingBuffer::presentWindows() after command submission.
 }
 }  // namespace pag

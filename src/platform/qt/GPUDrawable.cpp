@@ -40,7 +40,6 @@ void GPUDrawable::updateSize() {
   auto pixelRatio = nativeWindow ? nativeWindow->devicePixelRatio() : 1.0f;
   _width = static_cast<int>(ceil(quickItem->width() * pixelRatio));
   _height = static_cast<int>(ceil(quickItem->height() * pixelRatio));
-  window->invalidSize();
 }
 
 std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
@@ -51,20 +50,22 @@ std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
 }
 
 std::shared_ptr<tgfx::Surface> GPUDrawable::getSurface(tgfx::Context* context, bool queryOnly) {
-  surface = window->getSurface(context, queryOnly);
+  if (!queryOnly && surface == nullptr) {
+    surface = tgfx::Surface::MakeFrom(context, window);
+  }
   return surface;
 }
 
 std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* context) {
-  return window->getSurface(context);
+  return tgfx::Surface::MakeFrom(context, window);
 }
 
 void GPUDrawable::onFreeSurface() {
-  window->freeSurface();
 }
 
-void GPUDrawable::present(tgfx::Context* context) {
-  window->present(context);
+void GPUDrawable::present(tgfx::Context*) {
+  // In the new tgfx architecture, Window::onPresent() is called automatically by
+  // DrawingBuffer::presentWindows() after command submission.
 }
 
 void GPUDrawable::moveToThread(QThread* targetThread) {

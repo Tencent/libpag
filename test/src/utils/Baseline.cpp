@@ -22,7 +22,11 @@
 #include <fstream>
 #include <iostream>
 #include "base/utils/USE.h"
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunknown-warning-option"
+#pragma clang diagnostic ignored "-Wdeprecated-literal-operator"
 #include "nlohmann/json.hpp"
+#pragma clang diagnostic pop
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Surface.h"
 #include "utils/TestDir.h"
