@@ -563,13 +563,14 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
     auto markerLayers = expandMarkers(element, inheritedStyle);
     if (!markerLayers.empty()) {
       // Shorten the path endpoints to prevent stroke from overlapping markers.
-      // Use refX plus half stroke-width to ensure the stroke edge clears the marker triangle.
+      // Use refX plus stroke-width to ensure the stroke fully clears the marker triangle,
+      // avoiding antialiasing artifacts where dashed stroke gaps meet triangle edges.
       std::string swStr = getAttribute(element, "stroke-width");
       if (swStr.empty()) {
         swStr = inheritedStyle.strokeWidth;
       }
       float sw = swStr.empty() ? 1.0f : parseLength(swStr, _viewBoxWidth);
-      float halfStroke = sw * 0.5f;
+      float strokeMargin = sw;
 
       float shortenEnd = 0;
       float shortenStart = 0;
@@ -581,7 +582,7 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
           float refX = parseLength(getAttribute(endIt->second, "refX", "0"), mw);
           std::string unitsStr = getAttribute(endIt->second, "markerUnits", "strokeWidth");
           shortenEnd = (unitsStr != "userSpaceOnUse") ? refX * sw : refX;
-          shortenEnd += halfStroke;
+          shortenEnd += strokeMargin;
         }
       }
       if (!markerStart.empty()) {
@@ -592,7 +593,7 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
           float refX = parseLength(getAttribute(startIt->second, "refX", "0"), mw);
           std::string unitsStr = getAttribute(startIt->second, "markerUnits", "strokeWidth");
           shortenStart = (unitsStr != "userSpaceOnUse") ? (mw - refX) * sw : (mw - refX);
-          shortenStart += halfStroke;
+          shortenStart += strokeMargin;
         }
       }
       for (auto* content : layer->contents) {
