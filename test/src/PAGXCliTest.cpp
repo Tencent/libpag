@@ -1405,29 +1405,26 @@ CLI_TEST(PAGXCliTest, Export_HelpShort) {
 
 CLI_TEST(PAGXCliTest, Export_InvalidIndent_NonNumeric) {
   auto inputPath = TestResourcePath("render_basic.pagx");
-  auto ret = CallRun(pagx::cli::RunExport,
-                     {"export", "--svg-indent", "abc", "--input", inputPath});
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--svg-indent", "abc", "--input", inputPath});
   EXPECT_NE(ret, 0);
 }
 
 CLI_TEST(PAGXCliTest, Export_InvalidIndent_OutOfRange) {
   auto inputPath = TestResourcePath("render_basic.pagx");
-  auto ret = CallRun(pagx::cli::RunExport,
-                     {"export", "--svg-indent", "20", "--input", inputPath});
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--svg-indent", "20", "--input", inputPath});
   EXPECT_NE(ret, 0);
 }
 
 CLI_TEST(PAGXCliTest, Export_InvalidIndent_Negative) {
   auto inputPath = TestResourcePath("render_basic.pagx");
-  auto ret = CallRun(pagx::cli::RunExport,
-                     {"export", "--svg-indent", "-1", "--input", inputPath});
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--svg-indent", "-1", "--input", inputPath});
   EXPECT_NE(ret, 0);
 }
 
 CLI_TEST(PAGXCliTest, Export_InvalidIndent_Partial) {
   auto inputPath = TestResourcePath("render_basic.pagx");
-  auto ret = CallRun(pagx::cli::RunExport,
-                     {"export", "--svg-indent", "4abc", "--input", inputPath});
+  auto ret =
+      CallRun(pagx::cli::RunExport, {"export", "--svg-indent", "4abc", "--input", inputPath});
   EXPECT_NE(ret, 0);
 }
 
@@ -1439,9 +1436,8 @@ CLI_TEST(PAGXCliTest, Export_UnexpectedArgument) {
 CLI_TEST(PAGXCliTest, Export_NoConvertTextToPath) {
   auto inputPath = TestResourcePath("render_text.pagx");
   auto outputPath = TempDir() + "/ExportSVG_NoConvertText.svg";
-  auto ret = CallRun(pagx::cli::RunExport,
-                     {"export", "--svg-no-convert-text-to-path", "--input", inputPath,
-                      "--output", outputPath});
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--svg-no-convert-text-to-path", "--input",
+                                            inputPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_NE(output.find("<svg"), std::string::npos);
@@ -1458,8 +1454,8 @@ CLI_TEST(PAGXCliTest, Export_DefaultOutput) {
 CLI_TEST(PAGXCliTest, Export_InferFormatFromOutputNoExt) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   auto outputPath = TempDir() + "/ExportInferNoExt";
-  auto ret = CallRun(pagx::cli::RunExport,
-                     {"export", "--input", inputPath, "--output", outputPath});
+  auto ret =
+      CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_NE(output.find("<svg"), std::string::npos);
@@ -1476,8 +1472,8 @@ CLI_TEST(PAGXCliTest, Export_DefaultOutputNoExtInput) {
 CLI_TEST(PAGXCliTest, Export_WriteFailure) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   auto outputPath = "/nonexistent_dir_xyz/output.svg";
-  auto ret = CallRun(pagx::cli::RunExport,
-                     {"export", "--input", inputPath, "--output", outputPath});
+  auto ret =
+      CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
   EXPECT_NE(ret, 0);
 }
 
@@ -1487,8 +1483,7 @@ CLI_TEST(PAGXCliTest, Import_WriteFailure) {
   auto ret = CallRun(pagx::cli::RunExport, {"export", "--input", pagxPath, "--output", svgPath});
   ASSERT_EQ(ret, 0);
   auto outputPath = "/nonexistent_dir_xyz/output.pagx";
-  ret = CallRun(pagx::cli::RunImport,
-                {"import", "--input", svgPath, "--output", outputPath});
+  ret = CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--output", outputPath});
   EXPECT_NE(ret, 0);
 }
 
