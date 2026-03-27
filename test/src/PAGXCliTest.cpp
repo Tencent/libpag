@@ -1364,4 +1364,143 @@ CLI_TEST(PAGXCliTest, Import_UnknownFormatInference) {
   EXPECT_NE(ret, 0);
 }
 
+CLI_TEST(PAGXCliTest, Import_Help) {
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--help"});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Import_HelpShort) {
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "-h"});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Import_SvgOptions) {
+  auto pagxPath = TestResourcePath("render_basic.pagx");
+  auto svgPath = TempDir() + "/ImportSVG_Options.svg";
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--input", pagxPath, "--output", svgPath});
+  ASSERT_EQ(ret, 0);
+  auto outputPath = TempDir() + "/ImportSVG_Options.pagx";
+  ret = CallRun(pagx::cli::RunImport,
+                {"import", "--svg-no-expand-use", "--svg-flatten-transforms",
+                 "--svg-preserve-unknown", "--input", svgPath, "--output", outputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  EXPECT_NE(output.find("<pagx"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Import_UnexpectedArgument) {
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "somefile.svg"});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Export_Help) {
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--help"});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Export_HelpShort) {
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "-h"});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Export_InvalidIndent_NonNumeric) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto ret = CallRun(pagx::cli::RunExport,
+                     {"export", "--svg-indent", "abc", "--input", inputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Export_InvalidIndent_OutOfRange) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto ret = CallRun(pagx::cli::RunExport,
+                     {"export", "--svg-indent", "20", "--input", inputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Export_InvalidIndent_Negative) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto ret = CallRun(pagx::cli::RunExport,
+                     {"export", "--svg-indent", "-1", "--input", inputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Export_InvalidIndent_Partial) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto ret = CallRun(pagx::cli::RunExport,
+                     {"export", "--svg-indent", "4abc", "--input", inputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Export_UnexpectedArgument) {
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "somefile.pagx"});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Export_NoConvertTextToPath) {
+  auto inputPath = TestResourcePath("render_text.pagx");
+  auto outputPath = TempDir() + "/ExportSVG_NoConvertText.svg";
+  auto ret = CallRun(pagx::cli::RunExport,
+                     {"export", "--svg-no-convert-text-to-path", "--input", inputPath,
+                      "--output", outputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  EXPECT_NE(output.find("<svg"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Export_DefaultOutput) {
+  auto inputPath = CopyToTemp("render_basic.pagx", "ExportDefault.pagx");
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--input", inputPath});
+  EXPECT_EQ(ret, 0);
+  auto defaultOutput = TempDir() + "/ExportDefault.svg";
+  EXPECT_TRUE(std::filesystem::exists(defaultOutput));
+}
+
+CLI_TEST(PAGXCliTest, Export_InferFormatFromOutputNoExt) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto outputPath = TempDir() + "/ExportInferNoExt";
+  auto ret = CallRun(pagx::cli::RunExport,
+                     {"export", "--input", inputPath, "--output", outputPath});
+  EXPECT_EQ(ret, 0);
+  auto output = ReadFile(outputPath);
+  EXPECT_NE(output.find("<svg"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Export_DefaultOutputNoExtInput) {
+  auto inputPath = CopyToTemp("render_basic.pagx", "ExportNoExt");
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--input", inputPath});
+  EXPECT_EQ(ret, 0);
+  auto defaultOutput = TempDir() + "/ExportNoExt.svg";
+  EXPECT_TRUE(std::filesystem::exists(defaultOutput));
+}
+
+CLI_TEST(PAGXCliTest, Export_WriteFailure) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto outputPath = "/nonexistent_dir_xyz/output.svg";
+  auto ret = CallRun(pagx::cli::RunExport,
+                     {"export", "--input", inputPath, "--output", outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Import_WriteFailure) {
+  auto pagxPath = TestResourcePath("render_basic.pagx");
+  auto svgPath = TempDir() + "/ImportSVG_WriteFail.svg";
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--input", pagxPath, "--output", svgPath});
+  ASSERT_EQ(ret, 0);
+  auto outputPath = "/nonexistent_dir_xyz/output.pagx";
+  ret = CallRun(pagx::cli::RunImport,
+                {"import", "--input", svgPath, "--output", outputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Import_DefaultOutputNoExtInput) {
+  auto pagxPath = TestResourcePath("render_basic.pagx");
+  auto svgPath = TempDir() + "/ImportNoExt";
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--input", pagxPath, "--output", svgPath});
+  ASSERT_EQ(ret, 0);
+  ret = CallRun(pagx::cli::RunImport, {"import", "--format", "svg", "--input", svgPath});
+  EXPECT_EQ(ret, 0);
+  auto defaultOutput = TempDir() + "/ImportNoExt.pagx";
+  EXPECT_TRUE(std::filesystem::exists(defaultOutput));
+}
+
 }  // namespace pag
