@@ -21,7 +21,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
-#include <initializer_list>
 #include <memory>
 #include <vector>
 #include "base/utils/Log.h"
@@ -186,26 +185,6 @@ static void parseCustomData(const DOMNode* xmlNode, Node* node) {
   }
 }
 
-static void validateAttributes(const DOMNode* node, std::initializer_list<const char*> knownAttrs,
-                               PAGXDocument* doc) {
-  for (const auto& attr : node->attributes) {
-    if (attr.name.length() > 5 && attr.name.compare(0, 5, "data-") == 0) {
-      continue;
-    }
-    bool known = false;
-    for (auto* name : knownAttrs) {
-      if (attr.name == name) {
-        known = true;
-        break;
-      }
-    }
-    if (!known) {
-      reportError(doc, node,
-                  "Unknown attribute '" + attr.name + "' on '" + node->name + "' element.");
-    }
-  }
-}
-
 template <typename T>
 static T* makeNodeFromXML(const DOMNode* xmlNode, PAGXDocument* doc) {
   auto id = getAttribute(xmlNode, "id");
@@ -281,7 +260,6 @@ static bool parseResource(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static void parseResources(const DOMNode* node, PAGXDocument* doc) {
-  validateAttributes(node, {"id"}, doc);
   // First pass: pre-register all resource IDs so that cross-references via '@id' resolve
   // regardless of XML declaration order.
   auto child = node->firstChild;
@@ -468,43 +446,6 @@ static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
                     " BlurFilter, DropShadowFilter, InnerShadowFilter,"
                     " BlendFilter, ColorMatrixFilter.");
   }
-
-  validateAttributes(node,
-                     {"id",
-                      "name",
-                      "visible",
-                      "alpha",
-                      "blendMode",
-                      "x",
-                      "y",
-                      "width",
-                      "height",
-                      "rotation",
-                      "layout",
-                      "gap",
-                      "flex",
-                      "padding",
-                      "alignment",
-                      "arrangement",
-                      "includeInLayout",
-                      "left",
-                      "right",
-                      "top",
-                      "bottom",
-                      "centerX",
-                      "centerY",
-                      "matrix",
-                      "matrix3D",
-                      "preserve3D",
-                      "antiAlias",
-                      "groupOpacity",
-                      "passThroughBackground",
-                      "scrollRect",
-                      "clipToBounds",
-                      "mask",
-                      "maskType",
-                      "composition"},
-                     doc);
 
   return layer;
 }
@@ -700,10 +641,6 @@ static Rectangle* parseRectangle(const DOMNode* node, PAGXDocument* doc) {
   rect->bottom = getFloatAttributeOrNaN(node, "bottom", doc);
   rect->centerX = getFloatAttributeOrNaN(node, "centerX", doc);
   rect->centerY = getFloatAttributeOrNaN(node, "centerY", doc);
-  validateAttributes(node,
-                     {"id", "position", "size", "roundness", "reversed", "left", "right", "top",
-                      "bottom", "centerX", "centerY"},
-                     doc);
   return rect;
 }
 
@@ -726,10 +663,6 @@ static Ellipse* parseEllipse(const DOMNode* node, PAGXDocument* doc) {
   ellipse->bottom = getFloatAttributeOrNaN(node, "bottom", doc);
   ellipse->centerX = getFloatAttributeOrNaN(node, "centerX", doc);
   ellipse->centerY = getFloatAttributeOrNaN(node, "centerY", doc);
-  validateAttributes(node,
-                     {"id", "position", "size", "reversed", "left", "right", "top", "bottom",
-                      "centerX", "centerY"},
-                     doc);
   return ellipse;
 }
 
@@ -759,11 +692,6 @@ static Polystar* parsePolystar(const DOMNode* node, PAGXDocument* doc) {
   polystar->bottom = getFloatAttributeOrNaN(node, "bottom", doc);
   polystar->centerX = getFloatAttributeOrNaN(node, "centerX", doc);
   polystar->centerY = getFloatAttributeOrNaN(node, "centerY", doc);
-  validateAttributes(node,
-                     {"id", "position", "type", "pointCount", "outerRadius", "innerRadius",
-                      "rotation", "outerRoundness", "innerRoundness", "reversed", "size", "points",
-                      "left", "right", "top", "bottom", "centerX", "centerY"},
-                     doc);
   return polystar;
 }
 
@@ -794,10 +722,6 @@ static Path* parsePath(const DOMNode* node, PAGXDocument* doc) {
   path->bottom = getFloatAttributeOrNaN(node, "bottom", doc);
   path->centerX = getFloatAttributeOrNaN(node, "centerX", doc);
   path->centerY = getFloatAttributeOrNaN(node, "centerY", doc);
-  validateAttributes(node,
-                     {"id", "data", "reversed", "position", "left", "right", "top", "bottom",
-                      "centerX", "centerY"},
-                     doc);
   return path;
 }
 
@@ -853,11 +777,6 @@ static Text* parseText(const DOMNode* node, PAGXDocument* doc) {
   text->bottom = getFloatAttributeOrNaN(node, "bottom", doc);
   text->centerX = getFloatAttributeOrNaN(node, "centerX", doc);
   text->centerY = getFloatAttributeOrNaN(node, "centerY", doc);
-  validateAttributes(node,
-                     {"id", "text", "position", "fontFamily", "fontStyle", "fontSize",
-                      "letterSpacing", "fauxBold", "fauxItalic", "textAnchor", "baseline", "left",
-                      "right", "top", "bottom", "centerX", "centerY"},
-                     doc);
   return text;
 }
 
@@ -917,7 +836,6 @@ static Fill* parseFill(const DOMNode* node, PAGXDocument* doc) {
   if (childColor) {
     fill->color = childColor;
   }
-  validateAttributes(node, {"id", "color", "alpha", "blendMode", "fillRule", "placement"}, doc);
   return fill;
 }
 
@@ -945,10 +863,6 @@ static Stroke* parseStroke(const DOMNode* node, PAGXDocument* doc) {
   if (childColor) {
     stroke->color = childColor;
   }
-  validateAttributes(node,
-                     {"id", "color", "width", "alpha", "blendMode", "cap", "join", "miterLimit",
-                      "dashes", "dashOffset", "dashAdaptive", "align", "placement"},
-                     doc);
   return stroke;
 }
 
@@ -965,7 +879,6 @@ static TrimPath* parseTrimPath(const DOMNode* node, PAGXDocument* doc) {
   trim->end = getFloatAttribute(node, "end", 1, doc);
   trim->offset = getFloatAttribute(node, "offset", 0, doc);
   trim->type = GET_ENUM(node, "type", "separate", doc, TrimType);
-  validateAttributes(node, {"id", "start", "end", "offset", "type"}, doc);
   return trim;
 }
 
@@ -975,7 +888,6 @@ static RoundCorner* parseRoundCorner(const DOMNode* node, PAGXDocument* doc) {
     return nullptr;
   }
   round->radius = getFloatAttribute(node, "radius", 10, doc);
-  validateAttributes(node, {"id", "radius"}, doc);
   return round;
 }
 
@@ -985,7 +897,6 @@ static MergePath* parseMergePath(const DOMNode* node, PAGXDocument* doc) {
     return nullptr;
   }
   merge->mode = GET_ENUM(node, "mode", "append", doc, MergePathMode);
-  validateAttributes(node, {"id", "mode"}, doc);
   return merge;
 }
 
@@ -1032,11 +943,6 @@ static TextModifier* parseTextModifier(const DOMNode* node, PAGXDocument* doc) {
     child = child->nextSibling;
   }
 
-  validateAttributes(node,
-                     {"id", "anchor", "position", "rotation", "scale", "skew", "skewAxis", "alpha",
-                      "fillColor", "strokeColor", "strokeWidth"},
-                     doc);
-
   return modifier;
 }
 
@@ -1072,11 +978,6 @@ static TextPath* parseTextPath(const DOMNode* node, PAGXDocument* doc) {
   textPath->bottom = getFloatAttributeOrNaN(node, "bottom", doc);
   textPath->centerX = getFloatAttributeOrNaN(node, "centerX", doc);
   textPath->centerY = getFloatAttributeOrNaN(node, "centerY", doc);
-  validateAttributes(node,
-                     {"id", "path", "baselineOrigin", "baselineAngle", "firstMargin", "lastMargin",
-                      "perpendicular", "reversed", "forceAlignment", "left", "right", "top",
-                      "bottom", "centerX", "centerY"},
-                     doc);
   return textPath;
 }
 
@@ -1128,12 +1029,6 @@ static TextBox* parseTextBox(const DOMNode* node, PAGXDocument* doc) {
     }
     child = child->nextSibling;
   }
-  validateAttributes(
-      node, {"id",          "anchor",     "position", "rotation", "scale",     "skew",
-             "skewAxis",    "alpha",      "width",    "height",   "textAlign", "paragraphAlign",
-             "writingMode", "lineHeight", "wordWrap", "overflow", "left",      "right",
-             "top",         "bottom",     "centerX",  "centerY"},
-      doc);
   return textBox;
 }
 
@@ -1151,10 +1046,6 @@ static Repeater* parseRepeater(const DOMNode* node, PAGXDocument* doc) {
   repeater->scale = getPointAttribute(node, "scale", {1, 1}, doc);
   repeater->startAlpha = getFloatAttribute(node, "startAlpha", 1, doc);
   repeater->endAlpha = getFloatAttribute(node, "endAlpha", 1, doc);
-  validateAttributes(node,
-                     {"id", "copies", "offset", "order", "anchor", "position", "rotation", "scale",
-                      "startAlpha", "endAlpha"},
-                     doc);
   return repeater;
 }
 
@@ -1198,11 +1089,6 @@ static Group* parseGroup(const DOMNode* node, PAGXDocument* doc) {
     child = child->nextSibling;
   }
 
-  validateAttributes(node,
-                     {"id", "anchor", "position", "rotation", "scale", "skew", "skewAxis", "alpha",
-                      "width", "height", "left", "right", "top", "bottom", "centerX", "centerY"},
-                     doc);
-
   return group;
 }
 
@@ -1222,10 +1108,6 @@ static RangeSelector* parseRangeSelector(const DOMNode* node, PAGXDocument* doc)
   selector->weight = getFloatAttribute(node, "weight", 1, doc);
   selector->randomOrder = getBoolAttribute(node, "randomOrder", false, doc);
   selector->randomSeed = getIntAttribute(node, "randomSeed", 0, doc);
-  validateAttributes(node,
-                     {"id", "start", "end", "offset", "unit", "shape", "easeIn", "easeOut", "mode",
-                      "weight", "randomOrder", "randomSeed"},
-                     doc);
   return selector;
 }
 
@@ -1249,7 +1131,6 @@ static SolidColor* parseSolidColor(const DOMNode* node, PAGXDocument* doc) {
     solid->color.alpha = getFloatAttribute(node, "alpha", 1, doc);
     solid->color.colorSpace = GET_ENUM(node, "colorSpace", "sRGB", doc, ColorSpace);
   }
-  validateAttributes(node, {"id", "color", "red", "green", "blue", "alpha", "colorSpace"}, doc);
   return solid;
 }
 
@@ -1286,7 +1167,6 @@ static LinearGradient* parseLinearGradient(const DOMNode* node, PAGXDocument* do
   gradient->startPoint = getPointAttribute(node, "startPoint", {0, 0}, doc);
   gradient->endPoint = getPointAttribute(node, "endPoint", {0, 0}, doc);
   parseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
-  validateAttributes(node, {"id", "startPoint", "endPoint", "matrix"}, doc);
   return gradient;
 }
 
@@ -1298,7 +1178,6 @@ static RadialGradient* parseRadialGradient(const DOMNode* node, PAGXDocument* do
   gradient->center = getPointAttribute(node, "center", {0, 0}, doc);
   gradient->radius = getFloatAttribute(node, "radius", 0, doc);
   parseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
-  validateAttributes(node, {"id", "center", "radius", "matrix"}, doc);
   return gradient;
 }
 
@@ -1311,7 +1190,6 @@ static ConicGradient* parseConicGradient(const DOMNode* node, PAGXDocument* doc)
   gradient->startAngle = getFloatAttribute(node, "startAngle", 0, doc);
   gradient->endAngle = getFloatAttribute(node, "endAngle", 360, doc);
   parseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
-  validateAttributes(node, {"id", "center", "startAngle", "endAngle", "matrix"}, doc);
   return gradient;
 }
 
@@ -1323,7 +1201,6 @@ static DiamondGradient* parseDiamondGradient(const DOMNode* node, PAGXDocument* 
   gradient->center = getPointAttribute(node, "center", {0, 0}, doc);
   gradient->radius = getFloatAttribute(node, "radius", 0, doc);
   parseGradientCommon(node, doc, gradient->matrix, gradient->colorStops);
-  validateAttributes(node, {"id", "center", "radius", "matrix"}, doc);
   return gradient;
 }
 
@@ -1361,8 +1238,6 @@ static ImagePattern* parseImagePattern(const DOMNode* node, PAGXDocument* doc) {
     }
     pattern->matrix = MatrixFromString(matrixStr);
   }
-  validateAttributes(
-      node, {"id", "image", "tileModeX", "tileModeY", "filterMode", "mipmapMode", "matrix"}, doc);
   return pattern;
 }
 
@@ -1373,7 +1248,6 @@ static ColorStop* parseColorStop(const DOMNode* node, PAGXDocument* doc) {
   if (!colorStr.empty()) {
     stop->color = getColorAttribute(node, "color", doc);
   }
-  validateAttributes(node, {"id", "offset", "color"}, doc);
   return stop;
 }
 
@@ -1393,7 +1267,6 @@ static Image* parseImage(const DOMNode* node, PAGXDocument* doc) {
   } else {
     image->filePath = source;
   }
-  validateAttributes(node, {"id", "source"}, doc);
   return image;
 }
 
@@ -1406,7 +1279,6 @@ static PathData* parsePathData(const DOMNode* node, PAGXDocument* doc) {
   if (!data.empty()) {
     *pathData = PathDataFromSVGString(data);
   }
-  validateAttributes(node, {"id", "data"}, doc);
   return pathData;
 }
 
@@ -1433,7 +1305,6 @@ static Composition* parseComposition(const DOMNode* node, PAGXDocument* doc) {
     }
     child = child->nextSibling;
   }
-  validateAttributes(node, {"id", "width", "height"}, doc);
   return comp;
 }
 
@@ -1458,7 +1329,6 @@ static Font* parseFont(const DOMNode* node, PAGXDocument* doc) {
     }
     child = child->nextSibling;
   }
-  validateAttributes(node, {"id", "unitsPerEm"}, doc);
   return font;
 }
 
@@ -1505,7 +1375,6 @@ static Glyph* parseGlyph(const DOMNode* node, PAGXDocument* doc) {
     glyph->offset = getPointAttribute(node, "offset", {0, 0}, doc);
   }
   glyph->advance = getFloatAttribute(node, "advance", 0, doc);
-  validateAttributes(node, {"id", "advance", "path", "image", "offset"}, doc);
   return glyph;
 }
 
@@ -1623,11 +1492,6 @@ static GlyphRun* parseGlyphRun(const DOMNode* node, PAGXDocument* doc) {
     run->skews = ParseFloatList(skewsStr);
   }
 
-  validateAttributes(node,
-                     {"id", "font", "fontSize", "glyphs", "x", "y", "xOffsets", "positions",
-                      "anchors", "scales", "rotations", "skews"},
-                     doc);
-
   return run;
 }
 
@@ -1657,10 +1521,6 @@ static DropShadowStyle* parseDropShadowStyle(const DOMNode* node, PAGXDocument* 
   parseShadowAttributes(node, doc, style->offsetX, style->offsetY, style->blurX, style->blurY,
                         style->color);
   style->showBehindLayer = getBoolAttribute(node, "showBehindLayer", true, doc);
-  validateAttributes(node,
-                     {"id", "blendMode", "excludeChildEffects", "offsetX", "offsetY", "blurX",
-                      "blurY", "color", "showBehindLayer"},
-                     doc);
   return style;
 }
 
@@ -1673,10 +1533,6 @@ static InnerShadowStyle* parseInnerShadowStyle(const DOMNode* node, PAGXDocument
   style->excludeChildEffects = getBoolAttribute(node, "excludeChildEffects", false, doc);
   parseShadowAttributes(node, doc, style->offsetX, style->offsetY, style->blurX, style->blurY,
                         style->color);
-  validateAttributes(
-      node,
-      {"id", "blendMode", "excludeChildEffects", "offsetX", "offsetY", "blurX", "blurY", "color"},
-      doc);
   return style;
 }
 
@@ -1690,8 +1546,6 @@ static BackgroundBlurStyle* parseBackgroundBlurStyle(const DOMNode* node, PAGXDo
   style->blurX = getFloatAttribute(node, "blurX", 0, doc);
   style->blurY = getFloatAttribute(node, "blurY", 0, doc);
   style->tileMode = GET_ENUM(node, "tileMode", "mirror", doc, TileMode);
-  validateAttributes(node, {"id", "blendMode", "excludeChildEffects", "blurX", "blurY", "tileMode"},
-                     doc);
   return style;
 }
 
@@ -1707,7 +1561,6 @@ static BlurFilter* parseBlurFilter(const DOMNode* node, PAGXDocument* doc) {
   filter->blurX = getFloatAttribute(node, "blurX", 0, doc);
   filter->blurY = getFloatAttribute(node, "blurY", 0, doc);
   filter->tileMode = GET_ENUM(node, "tileMode", "decal", doc, TileMode);
-  validateAttributes(node, {"id", "blurX", "blurY", "tileMode"}, doc);
   return filter;
 }
 
@@ -1719,8 +1572,6 @@ static DropShadowFilter* parseDropShadowFilter(const DOMNode* node, PAGXDocument
   parseShadowAttributes(node, doc, filter->offsetX, filter->offsetY, filter->blurX, filter->blurY,
                         filter->color);
   filter->shadowOnly = getBoolAttribute(node, "shadowOnly", false, doc);
-  validateAttributes(node, {"id", "offsetX", "offsetY", "blurX", "blurY", "color", "shadowOnly"},
-                     doc);
   return filter;
 }
 
@@ -1732,8 +1583,6 @@ static InnerShadowFilter* parseInnerShadowFilter(const DOMNode* node, PAGXDocume
   parseShadowAttributes(node, doc, filter->offsetX, filter->offsetY, filter->blurX, filter->blurY,
                         filter->color);
   filter->shadowOnly = getBoolAttribute(node, "shadowOnly", false, doc);
-  validateAttributes(node, {"id", "offsetX", "offsetY", "blurX", "blurY", "color", "shadowOnly"},
-                     doc);
   return filter;
 }
 
@@ -1747,7 +1596,6 @@ static BlendFilter* parseBlendFilter(const DOMNode* node, PAGXDocument* doc) {
     filter->color = getColorAttribute(node, "color", doc);
   }
   filter->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
-  validateAttributes(node, {"id", "color", "blendMode"}, doc);
   return filter;
 }
 
@@ -1766,7 +1614,6 @@ static ColorMatrixFilter* parseColorMatrixFilter(const DOMNode* node, PAGXDocume
       filter->matrix[i] = values[i];
     }
   }
-  validateAttributes(node, {"id", "matrix"}, doc);
   return filter;
 }
 
@@ -2171,7 +2018,6 @@ static void parseDocument(const DOMNode* root, PAGXDocument* doc) {
   doc->width = getFloatAttribute(root, "width", 0, doc);
   doc->height = getFloatAttribute(root, "height", 0, doc);
   parseCustomData(root, doc);
-  validateAttributes(root, {"version", "width", "height"}, doc);
 
   // First pass: Parse Resources.
   auto child = root->getFirstChild("Resources");
