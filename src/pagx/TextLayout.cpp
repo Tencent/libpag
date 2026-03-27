@@ -2246,9 +2246,21 @@ tgfx::Rect TextLayout::LayoutText(Text* text, const LayoutContext& context, Text
     text->textBlob = it->second.textBlob;
     text->anchors = it->second.anchors;
   }
-  // Horizontal: advance width (0 to advance end). Vertical: tight pixel bounds.
+  // Compute anchor offset so that bounds are relative to the text anchor point.
+  float anchorOffset = 0;
+  switch (text->textAnchor) {
+    case TextAnchor::Start:
+      break;
+    case TextAnchor::Center:
+      anchorOffset = -advanceWidth / 2;
+      break;
+    case TextAnchor::End:
+      anchorOffset = -advanceWidth;
+      break;
+  }
   auto tightBounds = text->textBlob ? text->textBlob->getTightBounds() : tgfx::Rect::MakeEmpty();
-  return tgfx::Rect::MakeLTRB(0, tightBounds.top, advanceWidth, tightBounds.bottom);
+  return tgfx::Rect::MakeLTRB(anchorOffset, tightBounds.top, anchorOffset + advanceWidth,
+                              tightBounds.bottom);
 }
 
 void TextLayout::LayoutTextBox(TextBox* textBox, const LayoutContext& context) {

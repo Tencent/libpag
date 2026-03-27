@@ -61,13 +61,13 @@ void TextBox::updateLayout(const LayoutContext& context) {
   // Skip Text elements: they are positioned by TextLayout, not constraint positioning.
   auto nodes = CollectLayoutNodes(elements, true);
   PerformConstraintLayout(nodes, actualWidth, actualHeight, context);
-  // When width/height are not explicitly set but actualWidth/actualHeight were determined by
-  // constraint layout (e.g. left+right), propagate them so TextLayout uses the correct box
-  // dimensions for word wrapping and alignment.
-  if (std::isnan(width) && !std::isnan(actualWidth)) {
+  // Propagate constraint-derived dimensions so TextLayout uses the correct box size for word
+  // wrapping and alignment. Constraint layout (e.g. left+right) may produce a larger actual size
+  // than the explicit width/height, which must take precedence for proper text reflow.
+  if (!std::isnan(actualWidth)) {
     width = actualWidth;
   }
-  if (std::isnan(height) && !std::isnan(actualHeight)) {
+  if (!std::isnan(actualHeight)) {
     height = actualHeight;
   }
   // Text elements are typeset by TextLayout after constraint positioning.
