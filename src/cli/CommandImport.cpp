@@ -56,14 +56,6 @@ static void PrintUsage() {
             << "  pagx import --format svg --input drawing.xml     # force SVG format\n";
 }
 
-static std::string InferFormat(const std::string& path) {
-  auto ext = GetFileExtension(path);
-  if (ext == "svg") {
-    return "svg";
-  }
-  return {};
-}
-
 static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
   int i = 1;
   while (i < argc) {
@@ -100,12 +92,7 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
   }
 
   if (options->format.empty()) {
-    options->format = InferFormat(options->inputFile);
-  }
-  if (options->format.empty()) {
-    std::cerr << "pagx import: error: cannot infer format from '" << options->inputFile
-              << "', use --format to specify\n";
-    return 1;
+    options->format = GetFileExtension(options->inputFile);
   }
 
   if (options->outputFile.empty()) {
