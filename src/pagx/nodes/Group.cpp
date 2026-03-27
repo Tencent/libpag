@@ -37,16 +37,16 @@ void Group::onMeasure(const LayoutContext&) {
 }
 
 void Group::setLayoutSize(const LayoutContext&, float width, float height) {
-  actualWidth = !std::isnan(width) ? std::round(width) : preferredWidth;
-  actualHeight = !std::isnan(height) ? std::round(height) : preferredHeight;
+  actualWidth = !std::isnan(width) ? width : preferredWidth;
+  actualHeight = !std::isnan(height) ? height : preferredHeight;
 }
 
 void Group::setLayoutPosition(const LayoutContext&, float x, float y) {
   if (!std::isnan(x)) {
-    position.x = std::round(x);
+    position.x = x;
   }
   if (!std::isnan(y)) {
-    position.y = std::round(y);
+    position.y = y;
   }
 }
 

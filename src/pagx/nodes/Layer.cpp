@@ -122,8 +122,8 @@ void Layer::onMeasure(const LayoutContext&) {
 }
 
 void Layer::setLayoutSize(const LayoutContext&, float width, float height) {
-  actualWidth = !std::isnan(width) ? std::round(width) : preferredWidth;
-  actualHeight = !std::isnan(height) ? std::round(height) : preferredHeight;
+  actualWidth = !std::isnan(width) ? width : preferredWidth;
+  actualHeight = !std::isnan(height) ? height : preferredHeight;
 
   if (clipToBounds && !hasScrollRect && !std::isnan(actualWidth) && !std::isnan(actualHeight)) {
     scrollRect = Rect::MakeXYWH(0, 0, actualWidth, actualHeight);
@@ -133,10 +133,10 @@ void Layer::setLayoutSize(const LayoutContext&, float width, float height) {
 
 void Layer::setLayoutPosition(const LayoutContext&, float x, float y) {
   if (!std::isnan(x)) {
-    this->x = std::round(x);
+    this->x = x;
   }
   if (!std::isnan(y)) {
-    this->y = std::round(y);
+    this->y = y;
   }
 }
 
@@ -318,12 +318,12 @@ void Layer::performContainerLayout(const LayoutContext& context) {
     // Set size via setLayoutSize (does not write back width/height user properties).
     float targetW = horizontal ? childMain : childCross;
     float targetH = horizontal ? childCross : childMain;
-    child->setLayoutSize(context, targetW, targetH);
+    child->setLayoutSize(context, std::round(targetW), std::round(targetH));
 
     // Set position via setLayoutPosition.
     float posX = horizontal ? mainOffset : crossPos;
     float posY = horizontal ? crossPos : mainOffset;
-    child->setLayoutPosition(context, posX, posY);
+    child->setLayoutPosition(context, std::round(posX), std::round(posY));
 
     // Recursively lay out child's children.
     child->updateLayout(context);

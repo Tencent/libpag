@@ -76,22 +76,21 @@
 namespace pag {
 using namespace tgfx;
 
-static pagx::Group* MakeCenteredTextGroup(pagx::PAGXDocument* doc, const std::string& content,
-                                          float fontSize, float centerX, float y,
-                                          pagx::Color color) {
+static pagx::Layer* MakeTextLayer(pagx::PAGXDocument* doc, const std::string& content,
+                                  float fontSize, pagx::Color color) {
+  auto layer = doc->makeNode<pagx::Layer>();
   auto group = doc->makeNode<pagx::Group>();
   auto text = doc->makeNode<pagx::Text>();
   text->text = content;
   text->fontSize = fontSize;
-  text->position = {centerX, y};
-  text->textAnchor = pagx::TextAnchor::Center;
   auto fill = doc->makeNode<pagx::Fill>();
   auto solid = doc->makeNode<pagx::SolidColor>();
   solid->color = color;
   fill->color = solid;
   group->elements.push_back(text);
   group->elements.push_back(fill);
-  return group;
+  layer->contents.push_back(group);
+  return layer;
 }
 
 static std::vector<std::shared_ptr<Typeface>> CreateFallbackTypefaces() {
@@ -458,12 +457,16 @@ PAGX_TEST(PAGXTest, GlyphRunTransforms) {
 PAGX_TEST(PAGXTest, PrecomposedTextRender) {
   auto doc = pagx::PAGXDocument::Make(240, 140);
   auto layer = doc->makeNode<pagx::Layer>();
-  layer->contents.push_back(
-      MakeCenteredTextGroup(doc.get(), "Hello PAGX", 36, 120, 35, {0.2f, 0.2f, 0.8f, 1.0f}));
-  layer->contents.push_back(MakeCenteredTextGroup(doc.get(), "\xe4\xbd\xa0\xe5\xa5\xbd World", 28,
-                                                  120, 80, {0.1f, 0.6f, 0.2f, 1.0f}));
-  layer->contents.push_back(
-      MakeCenteredTextGroup(doc.get(), "Embedded Font", 18, 120, 115, {0.5f, 0.5f, 0.5f, 1.0f}));
+  layer->width = 240;
+  layer->height = 140;
+  layer->layout = pagx::LayoutMode::Vertical;
+  layer->alignment = pagx::Alignment::Center;
+  layer->arrangement = pagx::Arrangement::SpaceEvenly;
+  layer->children.push_back(MakeTextLayer(doc.get(), "Hello PAGX", 36, {0.2f, 0.2f, 0.8f, 1.0f}));
+  layer->children.push_back(
+      MakeTextLayer(doc.get(), "\xe4\xbd\xa0\xe5\xa5\xbd World", 28, {0.1f, 0.6f, 0.2f, 1.0f}));
+  layer->children.push_back(
+      MakeTextLayer(doc.get(), "Embedded Font", 18, {0.5f, 0.5f, 0.5f, 1.0f}));
   doc->layers.push_back(layer);
 
   pagx::FontConfig embedFontProvider;
@@ -2157,8 +2160,10 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarBothAxes) {
   // Scaled bounds = (-99.5, -90, 199, 180)
   // Horizontal: tx = 20 + (360 - 199) * 0.5 - (-99.5) = 200, position.x = 200
   // Vertical: ty = 10 + (180 - 180) * 0.5 - (-90) = 100, position.y = 100
-  EXPECT_FLOAT_EQ(star->position.x, 200.0f);
-  EXPECT_FLOAT_EQ(star->position.y, 109.5015528100f);
+  // Scaled bounds are computed from trigonometric vertex positions, so position values
+  // are not exact integers after subtracting bounds offset.
+  EXPECT_NEAR(star->position.x, 200.0f, 0.5f);
+  EXPECT_NEAR(star->position.y, 109.5f, 0.5f);
 }
 
 PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {

@@ -28,10 +28,10 @@ void Ellipse::onMeasure(const LayoutContext&) {
 
 void Ellipse::setLayoutSize(const LayoutContext&, float width, float height) {
   if (!std::isnan(width)) {
-    size.width = std::round(width);
+    size.width = width;
   }
   if (!std::isnan(height)) {
-    size.height = std::round(height);
+    size.height = height;
   }
   actualWidth = size.width;
   actualHeight = size.height;
@@ -39,10 +39,10 @@ void Ellipse::setLayoutSize(const LayoutContext&, float width, float height) {
 
 void Ellipse::setLayoutPosition(const LayoutContext&, float x, float y) {
   if (!std::isnan(x)) {
-    position.x = std::round(x + size.width * 0.5f);
+    position.x = x + size.width * 0.5f;
   }
   if (!std::isnan(y)) {
-    position.y = std::round(y + size.height * 0.5f);
+    position.y = y + size.height * 0.5f;
   }
 }
 

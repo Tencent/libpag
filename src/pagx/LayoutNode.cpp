@@ -86,10 +86,10 @@ void LayoutNode::PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, 
     float targetW = NAN;
     float targetH = NAN;
     if (!std::isnan(child->left) && !std::isnan(child->right)) {
-      targetW = containerW - child->left - child->right;
+      targetW = std::round(containerW - child->left - child->right);
     }
     if (!std::isnan(child->top) && !std::isnan(child->bottom)) {
-      targetH = containerH - child->top - child->bottom;
+      targetH = std::round(containerH - child->top - child->bottom);
     }
     // Phase 2: write self rendering attributes and actualWidth/actualHeight.
     child->setLayoutSize(context, targetW, targetH);
@@ -98,7 +98,7 @@ void LayoutNode::PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, 
       auto pos = CalculateConstrainedPosition(containerW, containerH, child->actualWidth,
                                               child->actualHeight, *child);
       // Phase 4: write self position.
-      child->setLayoutPosition(context, pos.x, pos.y);
+      child->setLayoutPosition(context, std::round(pos.x), std::round(pos.y));
     }
     // Phase 5: recursively lay out children (containers only, leaf nodes no-op).
     child->updateLayout(context);

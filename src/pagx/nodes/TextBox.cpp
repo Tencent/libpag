@@ -53,8 +53,8 @@ void TextBox::onMeasure(const LayoutContext& context) {
 }
 
 void TextBox::setLayoutSize(const LayoutContext&, float width, float height) {
-  actualWidth = !std::isnan(width) ? std::round(width) : preferredWidth;
-  actualHeight = !std::isnan(height) ? std::round(height) : preferredHeight;
+  actualWidth = !std::isnan(width) ? width : preferredWidth;
+  actualHeight = !std::isnan(height) ? height : preferredHeight;
 }
 
 void TextBox::updateLayout(const LayoutContext& context) {
