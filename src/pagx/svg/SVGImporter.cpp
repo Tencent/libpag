@@ -843,11 +843,24 @@ Layer* SVGParserContext::createMarkerLayer(const std::string& markerId, const Ma
   auto markerLayer = _document->makeNode<Layer>();
   markerLayer->matrix = markerMatrix;
 
+  // Clear stroke-related inherited styles so marker children don't inherit the referencing
+  // element's stroke properties (e.g., dashed stroke would cause visual artifacts on marker
+  // triangles).
+  InheritedStyle markerStyle = inheritedStyle;
+  markerStyle.stroke = "none";
+  markerStyle.strokeWidth = {};
+  markerStyle.strokeDasharray = {};
+  markerStyle.strokeDashoffset = {};
+  markerStyle.strokeLinecap = {};
+  markerStyle.strokeLinejoin = {};
+  markerStyle.strokeMiterlimit = {};
+  markerStyle.strokeOpacity = {};
+
   // Convert the marker's children as layers.
   auto child = markerDef->getFirstChild();
   while (child) {
     if (child->type == DOMNodeType::Element) {
-      auto childLayer = convertToLayer(child, inheritedStyle);
+      auto childLayer = convertToLayer(child, markerStyle);
       if (childLayer) {
         markerLayer->children.push_back(childLayer);
       }
