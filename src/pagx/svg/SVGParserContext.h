@@ -48,6 +48,15 @@ namespace pagx {
 static constexpr int MAX_SVG_RECURSION_DEPTH = 128;
 
 /**
+ * Endpoint position and tangent angle for SVG marker placement.
+ */
+struct MarkerPoint {
+  float x = 0;
+  float y = 0;
+  float angle = 0;  // Tangent angle in radians.
+};
+
+/**
  * Type of shadow-only filter for determining how to handle element content.
  */
 enum class ShadowOnlyType {
@@ -178,6 +187,15 @@ class SVGParserContext {
   // Register a PathData resource and return its reference ID (e.g., "@path0").
   // This creates a new PathData resource in the document's resources list.
   std::string registerPathDataResource(PathData* pathData);
+
+  // Expand SVG marker references (marker-start/marker-mid/marker-end) into PAGX layers.
+  // Returns marker layers to be added as siblings of the shape layer.
+  std::vector<Layer*> expandMarkers(const std::shared_ptr<DOMNode>& element,
+                                    const InheritedStyle& inheritedStyle);
+
+  // Create a single marker layer at the given position and angle.
+  Layer* createMarkerLayer(const std::string& markerId, const MarkerPoint& point, float strokeWidth,
+                           const InheritedStyle& inheritedStyle);
 
   // Merge adjacent layers that have the same shape geometry.
   // This optimizes the output by combining Fill and Stroke for identical shapes into one Layer.

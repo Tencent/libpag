@@ -353,8 +353,8 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
   const auto& tag = element->name;
 
   if (tag == "defs" || tag == "linearGradient" || tag == "radialGradient" || tag == "pattern" ||
-      tag == "mask" || tag == "clipPath" || tag == "filter" || tag == "style" || tag == "title" ||
-      tag == "desc" || tag == "metadata") {
+      tag == "mask" || tag == "clipPath" || tag == "filter" || tag == "marker" || tag == "style" ||
+      tag == "title" || tag == "desc" || tag == "metadata") {
     return nullptr;
   }
 
@@ -513,8 +513,265 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
     convertChildren(element, layer->contents, inheritedStyle, shadowOnlyType);
   }
 
+  // Expand SVG marker references into additional child layers.
+  std::string markerStart = getAttribute(element, "marker-start");
+  std::string markerMid = getAttribute(element, "marker-mid");
+  std::string markerEnd = getAttribute(element, "marker-end");
+  if (!markerStart.empty() || !markerMid.empty() || !markerEnd.empty()) {
+    auto markerLayers = expandMarkers(element, inheritedStyle);
+    if (!markerLayers.empty()) {
+      // Wrap the shape layer and marker layers in a group layer.
+      auto wrapperLayer = _document->makeNode<Layer>();
+      wrapperLayer->id = std::move(layer->id);
+      wrapperLayer->matrix = layer->matrix;
+      wrapperLayer->alpha = layer->alpha;
+      wrapperLayer->blendMode = layer->blendMode;
+      wrapperLayer->mask = layer->mask;
+      wrapperLayer->maskType = layer->maskType;
+      wrapperLayer->filters = std::move(layer->filters);
+      wrapperLayer->styles = std::move(layer->styles);
+      layer->id.clear();
+      layer->matrix = Matrix::Identity();
+      layer->alpha = 1.0f;
+      layer->blendMode = BlendMode::Normal;
+      layer->mask = nullptr;
+      layer->filters.clear();
+      layer->styles.clear();
+      wrapperLayer->children.push_back(layer);
+      for (auto* markerLayer : markerLayers) {
+        wrapperLayer->children.push_back(markerLayer);
+      }
+      layer = wrapperLayer;
+    }
+  }
+
   return layer;
 }
+// Extract the start point and tangent angle from a path.
+static MarkerPoint GetPathStartPoint(const PathData* pathData) {
+  MarkerPoint result = {};
+  if (!pathData || pathData->verbs().empty()) {
+    return result;
+  }
+  const auto& verbs = pathData->verbs();
+  const auto& points = pathData->points();
+  if (points.empty()) {
+    return result;
+  }
+  result.x = points[0].x;
+  result.y = points[0].y;
+  // Compute tangent at start: direction from first point to next point.
+  if (verbs.size() >= 2 && points.size() >= 2) {
+    float dx = points[1].x - points[0].x;
+    float dy = points[1].y - points[0].y;
+    result.angle = std::atan2(dy, dx);
+  }
+  return result;
+}
+
+// Extract the end point and tangent angle from a path.
+static MarkerPoint GetPathEndPoint(const PathData* pathData) {
+  MarkerPoint result = {};
+  if (!pathData || pathData->verbs().empty()) {
+    return result;
+  }
+  const auto& verbs = pathData->verbs();
+  const auto& points = pathData->points();
+  if (points.empty()) {
+    return result;
+  }
+  // The end point is the last point in the path.
+  result.x = points.back().x;
+  result.y = points.back().y;
+  // Compute tangent at end: direction into the last point.
+  size_t lastVerb = verbs.size() - 1;
+  // Skip trailing Close verb.
+  if (verbs[lastVerb] == PathVerb::Close && lastVerb > 0) {
+    lastVerb--;
+  }
+  size_t pointCount = points.size();
+  if (pointCount >= 2) {
+    // For the tangent at end, use the direction from the second-to-last relevant point.
+    size_t endIdx = pointCount - 1;
+    size_t prevIdx = endIdx - 1;
+    // For cubic, the tangent comes from the last control point to the endpoint.
+    if (verbs[lastVerb] == PathVerb::Cubic && pointCount >= 4) {
+      prevIdx = endIdx - 1;  // Last control point of cubic.
+    } else if (verbs[lastVerb] == PathVerb::Quad && pointCount >= 3) {
+      prevIdx = endIdx - 1;  // Control point of quad.
+    }
+    float dx = points[endIdx].x - points[prevIdx].x;
+    float dy = points[endIdx].y - points[prevIdx].y;
+    result.angle = std::atan2(dy, dx);
+  }
+  return result;
+}
+
+// Extract mid points and tangent angles from a path (vertices between start and end).
+static std::vector<MarkerPoint> GetPathMidPoints(const PathData* pathData) {
+  std::vector<MarkerPoint> midPoints = {};
+  if (!pathData || pathData->verbs().size() < 3) {
+    return midPoints;
+  }
+  const auto& verbs = pathData->verbs();
+  const auto& points = pathData->points();
+  size_t pointIndex = 0;
+  size_t verbCount = verbs.size();
+  for (size_t i = 0; i < verbCount; i++) {
+    auto verb = verbs[i];
+    if (verb == PathVerb::Move) {
+      pointIndex += 1;
+    } else if (verb == PathVerb::Line) {
+      // Mid points are all line endpoints except the first move and the last segment.
+      if (i > 0 && i < verbCount - 1 && verbs[i + 1] != PathVerb::Close) {
+        MarkerPoint mp = {};
+        mp.x = points[pointIndex].x;
+        mp.y = points[pointIndex].y;
+        // Tangent: average of incoming and outgoing directions.
+        float inDx = points[pointIndex].x - points[pointIndex - 1].x;
+        float inDy = points[pointIndex].y - points[pointIndex - 1].y;
+        if (i + 1 < verbCount && pointIndex + 1 < points.size()) {
+          float outDx = points[pointIndex + 1].x - points[pointIndex].x;
+          float outDy = points[pointIndex + 1].y - points[pointIndex].y;
+          mp.angle = std::atan2(inDy + outDy, inDx + outDx);
+        } else {
+          mp.angle = std::atan2(inDy, inDx);
+        }
+        midPoints.push_back(mp);
+      }
+      pointIndex += 1;
+    } else if (verb == PathVerb::Quad) {
+      pointIndex += 2;
+    } else if (verb == PathVerb::Cubic) {
+      pointIndex += 3;
+    } else if (verb == PathVerb::Close) {
+      // No points consumed.
+    }
+  }
+  return midPoints;
+}
+
+std::vector<Layer*> SVGParserContext::expandMarkers(const std::shared_ptr<DOMNode>& element,
+                                                    const InheritedStyle& inheritedStyle) {
+  std::vector<Layer*> markerLayers = {};
+
+  // Resolve marker references.
+  std::string markerStartRef = resolveUrl(getAttribute(element, "marker-start"));
+  std::string markerMidRef = resolveUrl(getAttribute(element, "marker-mid"));
+  std::string markerEndRef = resolveUrl(getAttribute(element, "marker-end"));
+
+  // Get the path data from the element to extract endpoint positions.
+  auto shapeElement = convertElement(element);
+  PathData* pathData = nullptr;
+  if (shapeElement && shapeElement->nodeType() == NodeType::Path) {
+    pathData = static_cast<Path*>(shapeElement)->data;
+  }
+  if (!pathData) {
+    return markerLayers;
+  }
+
+  // Get the stroke width from the referencing element for markerUnits="strokeWidth".
+  std::string strokeWidthStr = getAttribute(element, "stroke-width");
+  if (strokeWidthStr.empty()) {
+    strokeWidthStr = inheritedStyle.strokeWidth;
+  }
+  float strokeWidth = strokeWidthStr.empty() ? 1.0f : parseLength(strokeWidthStr, _viewBoxWidth);
+
+  // Create marker-start layer.
+  if (!markerStartRef.empty()) {
+    auto startPoint = GetPathStartPoint(pathData);
+    auto* markerLayer = createMarkerLayer(markerStartRef, startPoint, strokeWidth, inheritedStyle);
+    if (markerLayer) {
+      markerLayers.push_back(markerLayer);
+    }
+  }
+
+  // Create marker-mid layers.
+  if (!markerMidRef.empty()) {
+    auto midPoints = GetPathMidPoints(pathData);
+    for (const auto& mp : midPoints) {
+      auto* markerLayer = createMarkerLayer(markerMidRef, mp, strokeWidth, inheritedStyle);
+      if (markerLayer) {
+        markerLayers.push_back(markerLayer);
+      }
+    }
+  }
+
+  // Create marker-end layer.
+  if (!markerEndRef.empty()) {
+    auto endPoint = GetPathEndPoint(pathData);
+    auto* markerLayer = createMarkerLayer(markerEndRef, endPoint, strokeWidth, inheritedStyle);
+    if (markerLayer) {
+      markerLayers.push_back(markerLayer);
+    }
+  }
+
+  return markerLayers;
+}
+
+Layer* SVGParserContext::createMarkerLayer(const std::string& markerId, const MarkerPoint& point,
+                                           float strokeWidth,
+                                           const InheritedStyle& inheritedStyle) {
+  auto markerIt = _defs.find(markerId);
+  if (markerIt == _defs.end()) {
+    return nullptr;
+  }
+  auto markerDef = markerIt->second;
+  if (markerDef->name != "marker") {
+    return nullptr;
+  }
+
+  float markerWidth = parseLength(getAttribute(markerDef, "markerWidth", "3"), _viewBoxWidth);
+  float markerHeight = parseLength(getAttribute(markerDef, "markerHeight", "3"), _viewBoxHeight);
+  float refX = parseLength(getAttribute(markerDef, "refX", "0"), markerWidth);
+  float refY = parseLength(getAttribute(markerDef, "refY", "0"), markerHeight);
+  std::string orientStr = getAttribute(markerDef, "orient", "0");
+  std::string markerUnitsStr = getAttribute(markerDef, "markerUnits", "strokeWidth");
+
+  float angle = 0;
+  if (orientStr == "auto" || orientStr == "auto-start-reverse") {
+    angle = point.angle;
+  } else {
+    angle = strtof(orientStr.c_str(), nullptr) * 3.14159265358979323846f / 180.0f;
+  }
+
+  float cosA = std::cos(angle);
+  float sinA = std::sin(angle);
+
+  // Build marker transform: translate(point) * rotate(angle) * scale * translate(-refX, -refY)
+  // For markerUnits="strokeWidth" (default), scale by strokeWidth.
+  float scale = (markerUnitsStr != "userSpaceOnUse") ? strokeWidth : 1.0f;
+
+  Matrix markerMatrix = {};
+  markerMatrix.a = cosA * scale;
+  markerMatrix.b = sinA * scale;
+  markerMatrix.c = -sinA * scale;
+  markerMatrix.d = cosA * scale;
+  markerMatrix.tx = point.x - (cosA * scale * refX - sinA * scale * refY);
+  markerMatrix.ty = point.y - (sinA * scale * refX + cosA * scale * refY);
+
+  auto markerLayer = _document->makeNode<Layer>();
+  markerLayer->matrix = markerMatrix;
+
+  // Convert the marker's children as layers.
+  auto child = markerDef->getFirstChild();
+  while (child) {
+    if (child->type == DOMNodeType::Element) {
+      auto childLayer = convertToLayer(child, inheritedStyle);
+      if (childLayer) {
+        markerLayer->children.push_back(childLayer);
+      }
+    }
+    child = child->getNextSibling();
+  }
+
+  if (markerLayer->children.empty() && markerLayer->contents.empty()) {
+    return nullptr;
+  }
+
+  return markerLayer;
+}
+
 void SVGParserContext::convertChildren(const std::shared_ptr<DOMNode>& element,
                                        std::vector<Element*>& contents,
                                        const InheritedStyle& inheritedStyle,
@@ -2562,8 +2819,8 @@ void SVGParserContext::collectAllIds(const std::shared_ptr<DOMNode>& node) {
     // Also collect referenceable elements (mask, clipPath, filter, etc.) to _defs,
     // even if they are defined inline (not inside <defs>).
     const auto& name = node->name;
-    if (name == "mask" || name == "clipPath" || name == "filter" || name == "linearGradient" ||
-        name == "radialGradient" || name == "pattern") {
+    if (name == "mask" || name == "clipPath" || name == "filter" || name == "marker" ||
+        name == "linearGradient" || name == "radialGradient" || name == "pattern") {
       _defs[id] = node;
     }
   }
