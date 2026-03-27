@@ -170,9 +170,10 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
       continue;
     }
 
-    // Step 2: Typeset text elements and embed fonts
-    auto layoutResult = pagx::TextLayout::Layout(doc.get(), &svgFontProvider);
-    pagx::FontEmbedder().embed(doc.get(), layoutResult.shapedTextMap, layoutResult.textOrder);
+    // Step 2: Layout and embed fonts
+    doc->setFontConfig(svgFontProvider);
+    doc->applyLayout();
+    pagx::FontEmbedder().embed(doc.get());
 
     // Step 3: Export to XML and save as PAGX file
     std::string xml = pagx::PAGXExporter::ToXML(*doc);
@@ -471,9 +472,9 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
 
   pagx::FontConfig embedFontProvider;
   embedFontProvider.addFallbackTypefaces(GetFallbackTypefaces());
-  auto layoutResult = pagx::TextLayout::Layout(doc.get(), &embedFontProvider);
-  ASSERT_FALSE(layoutResult.shapedTextMap.empty());
-  pagx::FontEmbedder().embed(doc.get(), layoutResult.shapedTextMap, layoutResult.textOrder);
+  doc->setFontConfig(embedFontProvider);
+  doc->applyLayout();
+  pagx::FontEmbedder().embed(doc.get());
 
   auto xml = pagx::PAGXExporter::ToXML(*doc);
   ASSERT_FALSE(xml.empty());

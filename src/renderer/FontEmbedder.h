@@ -18,14 +18,14 @@
 
 #pragma once
 
-#include "ShapedText.h"
 #include "pagx/PAGXDocument.h"
 
 namespace pagx {
 
 /**
- * FontEmbedder extracts glyph data from ShapedTextMap and embeds it into the PAGXDocument.
+ * FontEmbedder extracts glyph data from laid-out Text nodes and embeds it into the PAGXDocument.
  * It creates Font nodes with glyph paths/images and updates Text nodes with GlyphRun data.
+ * The document must have applyLayout() called before embedding.
  *
  * Font merging strategy:
  * - All vector glyphs (with path) are merged into a single Font node
@@ -36,20 +36,14 @@ class FontEmbedder {
   FontEmbedder() = default;
 
   /**
-   * Embeds font data from ShapedTextMap into the document.
-   *
-   * This method:
-   * 1. Iterates all TextBlobs in shapedTextMap, extracts glyph data (paths or images)
-   * 2. Merges glyphs into Font nodes (one for vector, one for bitmap)
-   * 3. Creates GlyphRun nodes for each Text, referencing the embedded fonts
+   * Embeds font data into the document by collecting TextBlobs from all Text nodes.
+   * The document must have had applyLayout() called first so that Text nodes contain valid
+   * TextBlob data.
    *
    * @param document The document to embed fonts into (modified in place).
-   * @param shapedTextMap The typesetting results containing Text -> ShapedText mappings.
-   * @param textOrder Stable Text iteration order from typesetting.
    * @return true if embedding succeeded, false otherwise.
    */
-  bool embed(PAGXDocument* document, const ShapedTextMap& shapedTextMap,
-             const std::vector<Text*>& textOrder);
+  bool embed(PAGXDocument* document);
 };
 
 }  // namespace pagx

@@ -20,9 +20,7 @@
 
 #include <memory>
 #include <string>
-#include "ShapedText.h"
 #include "pagx/FontConfig.h"
-#include "pagx/PAGXDocument.h"
 #include "pagx/types/Rect.h"
 #include "pagx/types/TextBaseline.h"
 #include "tgfx/core/Rect.h"
@@ -30,24 +28,16 @@
 namespace pagx {
 
 class LayoutContext;
+class Text;
 class TextBox;
 
 /**
- * TextLayout performs text layout on PAGXDocument, converting Text elements into positioned glyph
+ * TextLayout performs text shaping and layout, converting Text elements into positioned glyph
  * data (TextBlob). It handles font matching, fallback, text shaping, and layout (alignment, line
  * breaking, etc.).
  */
 class TextLayout {
  public:
-  /**
-   * Performs text layout for all Text nodes in the document.
-   * @param document The document containing Text elements to layout.
-   * @param fontConfig Optional font config for font matching. If nullptr, only system fonts
-   *                   are available.
-   * @return A TextLayoutResult containing shaped text data for each Text element.
-   */
-  static TextLayoutResult Layout(PAGXDocument* document, FontConfig* fontConfig = nullptr);
-
   /**
    * Measures a TextBox element, returning linebox dimensions.
    */

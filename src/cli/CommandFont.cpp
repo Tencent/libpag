@@ -27,7 +27,6 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "renderer/FontEmbedder.h"
-#include "renderer/TextLayout.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Typeface.h"
 
@@ -267,10 +266,11 @@ static int RunFontEmbed(int argc, char* argv[]) {
     fontProvider.addFallbackFont(loc.path, loc.ttcIndex, loc.fontFamily, loc.fontStyle);
   }
 
-  auto result = TextLayout::Layout(document.get(), &fontProvider);
+  document->setFontConfig(fontProvider);
+  document->applyLayout();
 
   FontEmbedder embedder = {};
-  if (!embedder.embed(document.get(), result.shapedTextMap, result.textOrder)) {
+  if (!embedder.embed(document.get())) {
     std::cerr << "pagx font embed: font embedding failed\n";
     return 1;
   }

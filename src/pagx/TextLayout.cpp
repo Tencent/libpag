@@ -20,8 +20,8 @@
 #include <algorithm>
 #include <cmath>
 #include "LayoutContext.h"
+#include "ShapedText.h"
 #include "base/utils/MathUtil.h"
-#include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
@@ -68,37 +68,10 @@ static size_t DecodeUTF8Char(const char* data, size_t remaining, int32_t* unicha
 // Build context that maintains state during text layout
 class TextLayoutContext {
  public:
-  TextLayoutContext(FontConfig* fontConfig, PAGXDocument* document)
-      : fontConfig_(fontConfig), document(document) {
+  TextLayoutContext(FontConfig* fontConfig) : fontConfig_(fontConfig) {
   }
 
   friend class TextLayout;
-
-  TextLayoutResult run() {
-    if (document == nullptr) {
-      return {};
-    }
-
-    // Process all layers
-    for (auto* layer : document->layers) {
-      processLayer(layer);
-    }
-
-    // Process compositions in nodes
-    for (auto& node : document->nodes) {
-      if (node->nodeType() == NodeType::Composition) {
-        auto* comp = static_cast<Composition*>(node.get());
-        for (auto* layer : comp->layers) {
-          processLayer(layer);
-        }
-      }
-    }
-
-    TextLayoutResult output = {};
-    output.shapedTextMap = std::move(result);
-    output.textOrder = std::move(textOrder);
-    return output;
-  }
 
  private:
   // A run of glyphs with the same font (for shaping).
@@ -275,74 +248,19 @@ class TextLayoutContext {
       it->second = std::move(shapedText);
     } else {
       result.emplace(text, std::move(shapedText));
-      textOrder.push_back(text);
     }
   }
 
-  void processLayer(Layer* layer) {
-    if (layer == nullptr) {
-      return;
-    }
-
-    auto remaining = processScope(layer->contents);
-    // Layer is the accumulation boundary. Process any remaining Text elements that were not
-    // handled by a TextBox with single-line layout.
-    for (auto* text : remaining) {
-      if (result.find(text) != result.end()) {
-        continue;
-      }
-      if (!text->glyphRuns.empty()) {
-        auto shapedText = buildShapedTextFromEmbeddedGlyphRuns(text);
-        storeShapedText(text, std::move(shapedText));
-      } else {
-        processTextWithoutLayout(text, text->baseline);
-      }
-    }
-
-    for (auto* child : layer->children) {
-      processLayer(child);
-    }
-  }
-
-  // Processes a scope of elements following the VectorElement accumulate-render model.
-  // Text elements accumulate in the scope. Child Group geometry propagates upward after the
-  // Group completes. Per spec, TextBox position in the node order does not affect its behavior:
-  // the last TextBox in the scope applies typography to all accumulated Text elements. Returns
-  // all accumulated Text elements for upward propagation to the parent scope (up to the Layer
-  // boundary).
-  std::vector<Text*> processScope(const std::vector<Element*>& elements) {
-    std::vector<Text*> allText = {};
-    const TextBox* textBox = nullptr;
-    float boxWidth = NAN;
-    float boxHeight = NAN;
+  // Collects Text elements from a list of elements, recursing into Group but skipping TextBox.
+  static void collectTextElements(const std::vector<Element*>& elements,
+                                  std::vector<Text*>& outText) {
     for (auto* element : elements) {
       if (element->nodeType() == NodeType::Text) {
-        allText.push_back(static_cast<Text*>(element));
+        outText.push_back(static_cast<Text*>(element));
       } else if (element->nodeType() == NodeType::Group) {
-        auto propagated = processScope(static_cast<Group*>(element)->elements);
-        allText.insert(allText.end(), propagated.begin(), propagated.end());
-      } else if (element->nodeType() == NodeType::TextBox) {
-        auto* tb = static_cast<TextBox*>(element);
-        if (!tb->elements.empty()) {
-          // Container mode: TextBox owns its children. Process them as an isolated scope.
-          auto childText = processScope(tb->elements);
-          if (!childText.empty()) {
-            float tbWidth = tb->width;
-            float tbHeight = tb->height;
-            processTextWithLayout(childText, tb, tbWidth, tbHeight);
-          }
-        } else {
-          // Legacy modifier mode: TextBox applies to accumulated Text in this scope.
-          textBox = tb;
-          boxWidth = tb->width;
-          boxHeight = tb->height;
-        }
+        collectTextElements(static_cast<Group*>(element)->elements, outText);
       }
     }
-    if (textBox != nullptr && !allText.empty()) {
-      processTextWithLayout(allText, textBox, boxWidth, boxHeight);
-    }
-    return allText;
   }
 
   // Checks whether all Text elements have pre-embedded GlyphRun data. If so, stores them directly
@@ -2150,16 +2068,9 @@ class TextLayoutContext {
   }
 
   FontConfig* fontConfig_ = nullptr;
-  PAGXDocument* document = nullptr;
   ShapedTextMap result = {};
-  std::vector<Text*> textOrder = {};
   std::unordered_map<const Font*, std::shared_ptr<tgfx::Typeface>> fontCache = {};
 };
-
-TextLayoutResult TextLayout::Layout(PAGXDocument* document, FontConfig* fontConfig) {
-  TextLayoutContext context(fontConfig, document);
-  return context.run();
-}
 
 std::shared_ptr<tgfx::Typeface> TextLayout::FindTypeface(const std::string& fontFamily,
                                                          const std::string& fontStyle,
@@ -2175,8 +2086,9 @@ Rect TextLayout::MeasureTextBox(const TextBox* textBox, float boxWidth, float bo
   if (textBox == nullptr || textBox->elements.empty()) {
     return {};
   }
-  TextLayoutContext context(fontConfig, nullptr);
-  auto childText = context.processScope(textBox->elements);
+  TextLayoutContext context(fontConfig);
+  std::vector<Text*> childText = {};
+  TextLayoutContext::collectTextElements(textBox->elements, childText);
   if (childText.empty()) {
     return {};
   }
@@ -2230,7 +2142,7 @@ tgfx::Rect TextLayout::LayoutText(Text* text, const LayoutContext& context, Text
   if (text == nullptr) {
     return tgfx::Rect::MakeEmpty();
   }
-  TextLayoutContext layoutContext(context.getFontConfig(), nullptr);
+  TextLayoutContext layoutContext(context.getFontConfig());
 
   // If text has embedded GlyphRuns, use buildShapedTextFromEmbeddedGlyphRuns directly.
   // Embedded fonts have pre-baked coordinates; baseline mode does not apply.
@@ -2270,8 +2182,9 @@ void TextLayout::LayoutTextBox(TextBox* textBox, float boxWidth, float boxHeight
   if (textBox == nullptr) {
     return;
   }
-  TextLayoutContext layoutContext(context.getFontConfig(), nullptr);
-  auto childText = layoutContext.processScope(textBox->elements);
+  TextLayoutContext layoutContext(context.getFontConfig());
+  std::vector<Text*> childText = {};
+  TextLayoutContext::collectTextElements(textBox->elements, childText);
   if (!childText.empty()) {
     layoutContext.processTextWithLayout(childText, textBox, boxWidth, boxHeight);
   }

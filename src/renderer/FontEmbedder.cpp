@@ -21,10 +21,13 @@
 #include <cmath>
 #include <unordered_map>
 #include "base/utils/MathUtil.h"
+#include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextBox.h"
 #include "pagx/types/Data.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/GlyphRun.h"
@@ -244,15 +247,52 @@ static GlyphType ClassifyGlyph(const tgfx::Font& font, tgfx::GlyphID glyphID) {
   return GlyphType::Spacing;
 }
 
-static const ShapedText* FindShapedText(const ShapedTextMap& shapedTextMap, const Text* text) {
-  if (text == nullptr) {
-    return nullptr;
+static void CollectTextFromElements(const std::vector<Element*>& elements,
+                                    std::vector<Text*>& outText) {
+  for (auto* element : elements) {
+    if (element == nullptr) {
+      continue;
+    }
+    switch (element->nodeType()) {
+      case NodeType::Text:
+        outText.push_back(static_cast<Text*>(element));
+        break;
+      case NodeType::Group:
+        CollectTextFromElements(static_cast<Group*>(element)->elements, outText);
+        break;
+      case NodeType::TextBox:
+        CollectTextFromElements(static_cast<TextBox*>(element)->elements, outText);
+        break;
+      default:
+        break;
+    }
   }
-  auto it = shapedTextMap.find(text);
-  if (it == shapedTextMap.end()) {
-    return nullptr;
+}
+
+static void CollectTextFromLayer(Layer* layer, std::vector<Text*>& outText) {
+  if (layer == nullptr) {
+    return;
   }
-  return &it->second;
+  CollectTextFromElements(layer->contents, outText);
+  for (auto* child : layer->children) {
+    CollectTextFromLayer(child, outText);
+  }
+}
+
+static std::vector<Text*> CollectAllText(PAGXDocument* document) {
+  std::vector<Text*> allText = {};
+  for (auto* layer : document->layers) {
+    CollectTextFromLayer(layer, allText);
+  }
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      auto* comp = static_cast<Composition*>(node.get());
+      for (auto* layer : comp->layers) {
+        CollectTextFromLayer(layer, allText);
+      }
+    }
+  }
+  return allText;
 }
 
 static bool CanUseDefaultMode(const tgfx::GlyphRun& run, const std::vector<size_t>& indices,
@@ -480,11 +520,11 @@ static void CollectSpacingGlyph(
   }
 }
 
-bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedTextMap,
-                         const std::vector<Text*>& textOrder) {
+bool FontEmbedder::embed(PAGXDocument* document) {
   if (document == nullptr) {
     return false;
   }
+  auto textOrder = CollectAllText(document);
 
   std::unordered_map<GlyphKey, GlyphType, GlyphKeyHash> glyphTypes = {};
   std::unordered_map<GlyphKey, float, GlyphKeyHash> maxFontSizes = {};
@@ -496,11 +536,11 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
   // For vector glyphs, CollectVectorGlyph internally tracks the maximum font size and re-collects
   // the path when a larger size is found, so no separate max-size pass is needed.
   for (auto* text : textOrder) {
-    auto shapedText = FindShapedText(shapedTextMap, text);
-    if (shapedText == nullptr || shapedText->textBlob == nullptr) {
+    auto textBlob = text->getTextBlob();
+    if (textBlob == nullptr) {
       continue;
     }
-    for (const auto& run : *shapedText->textBlob) {
+    for (const auto& run : *textBlob) {
       for (size_t i = 0; i < run.glyphCount; ++i) {
         tgfx::GlyphID glyphID = run.glyphs[i];
         GlyphKey key = {run.font.getTypeface().get(), glyphID};
@@ -542,14 +582,14 @@ bool FontEmbedder::embed(PAGXDocument* document, const ShapedTextMap& shapedText
 
   // Second pass: create GlyphRuns for each Text
   for (auto* text : textOrder) {
-    auto shapedText = FindShapedText(shapedTextMap, text);
-    if (shapedText == nullptr || shapedText->textBlob == nullptr) {
+    auto textBlob = text->getTextBlob();
+    if (textBlob == nullptr) {
       continue;
     }
 
     text->glyphRuns.clear();
 
-    for (const auto& run : *shapedText->textBlob) {
+    for (const auto& run : *textBlob) {
       if (run.glyphCount == 0) {
         continue;
       }
