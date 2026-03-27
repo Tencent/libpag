@@ -476,7 +476,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
                               rect->centerX, rect->top, rect->bottom, rect->centerY)) {
         xml.addAttribute("position", pointToString(rect->position));
       }
-      if (rect->size.width != 100 || rect->size.height != 100) {
+      if (rect->size.width != 0 || rect->size.height != 0) {
         xml.addAttribute("size", sizeToString(rect->size));
       }
       xml.addAttribute("roundness", rect->roundness);
@@ -499,7 +499,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
                               ellipse->centerX, ellipse->top, ellipse->bottom, ellipse->centerY)) {
         xml.addAttribute("position", pointToString(ellipse->position));
       }
-      if (ellipse->size.width != 100 || ellipse->size.height != 100) {
+      if (ellipse->size.width != 0 || ellipse->size.height != 0) {
         xml.addAttribute("size", sizeToString(ellipse->size));
       }
       xml.addAttribute("reversed", ellipse->reversed);

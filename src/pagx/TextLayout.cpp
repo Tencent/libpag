@@ -313,6 +313,8 @@ class TextLayoutContext {
   std::vector<Text*> processScope(const std::vector<Element*>& elements) {
     std::vector<Text*> allText = {};
     const TextBox* textBox = nullptr;
+    float boxWidth = NAN;
+    float boxHeight = NAN;
     for (auto* element : elements) {
       if (element->nodeType() == NodeType::Text) {
         allText.push_back(static_cast<Text*>(element));
@@ -325,16 +327,20 @@ class TextLayoutContext {
           // Container mode: TextBox owns its children. Process them as an isolated scope.
           auto childText = processScope(tb->elements);
           if (!childText.empty()) {
-            processTextWithLayout(childText, tb);
+            float tbWidth = tb->width;
+            float tbHeight = tb->height;
+            processTextWithLayout(childText, tb, tbWidth, tbHeight);
           }
         } else {
           // Legacy modifier mode: TextBox applies to accumulated Text in this scope.
           textBox = tb;
+          boxWidth = tb->width;
+          boxHeight = tb->height;
         }
       }
     }
     if (textBox != nullptr && !allText.empty()) {
-      processTextWithLayout(allText, textBox);
+      processTextWithLayout(allText, textBox, boxWidth, boxHeight);
     }
     return allText;
   }
@@ -354,7 +360,8 @@ class TextLayoutContext {
     return true;
   }
 
-  void processTextWithLayout(std::vector<Text*>& textElements, const TextBox* textBox) {
+  void processTextWithLayout(std::vector<Text*>& textElements, const TextBox* textBox,
+                             float boxWidth, float boxHeight) {
     if (tryUseEmbeddedGlyphRuns(textElements)) {
       return;
     }
@@ -391,11 +398,11 @@ class TextLayoutContext {
       return;
     }
     if (textBox->writingMode == WritingMode::Vertical) {
-      auto columns = layoutColumns(allGlyphs, textBox);
-      buildTextBlobVertical(textBox, columns);
+      auto columns = layoutColumns(allGlyphs, textBox, boxHeight);
+      buildTextBlobVertical(textBox, columns, boxWidth, boxHeight);
     } else {
-      auto lines = layoutLines(allGlyphs, textBox);
-      buildTextBlobWithLayout(textBox, lines, paragraphRTL);
+      auto lines = layoutLines(allGlyphs, textBox, boxWidth);
+      buildTextBlobWithLayout(textBox, lines, boxWidth, boxHeight, paragraphRTL);
     }
   }
 
@@ -1069,15 +1076,14 @@ class TextLayoutContext {
     info.totalWidth = currentX;
   }
 
-  std::vector<LineInfo> layoutLines(const std::vector<GlyphInfo>& allGlyphs,
-                                    const TextBox* textBox) {
+  std::vector<LineInfo> layoutLines(const std::vector<GlyphInfo>& allGlyphs, const TextBox* textBox,
+                                    float boxWidth) {
     std::vector<LineInfo> lines = {};
     lines.emplace_back();
     auto* currentLine = &lines.back();
     float currentLineWidth = 0;
     int lastBreakIndex = -1;
-    float boxWidth = std::isnan(textBox->width) ? 0 : textBox->width;
-    bool doWrap = textBox->wordWrap && boxWidth > 0;
+    bool doWrap = textBox->wordWrap && !std::isnan(boxWidth) && boxWidth > 0;
     // Tracks the fontLineHeight of the \n that created the current line.
     // Used as the fallback height for empty lines (e.g. consecutive \n\n).
     float pendingNewlineFontLineHeight = 0.0f;
@@ -1341,13 +1347,10 @@ class TextLayoutContext {
   }
 
   void buildTextBlobWithLayout(const TextBox* textBox, const std::vector<LineInfo>& lines,
-                               bool paragraphRTL = false) {
+                               float boxWidth, float boxHeight, bool paragraphRTL = false) {
     if (lines.empty()) {
       return;
     }
-
-    float boxWidth = std::isnan(textBox->width) ? 0 : textBox->width;
-    float boxHeight = std::isnan(textBox->height) ? 0 : textBox->height;
 
     // Calculate total height using line-box model: each line contributes its full lineHeight.
     float totalHeight = 0;
@@ -1668,7 +1671,7 @@ class TextLayoutContext {
   }
 
   std::vector<ColumnInfo> layoutColumns(const std::vector<GlyphInfo>& allGlyphs,
-                                        const TextBox* textBox) {
+                                        const TextBox* textBox, float boxHeight) {
     // Phase 1: Build VerticalGlyphInfo list with orientation, metrics, and break marks.
     // Consecutive rotated-group characters are collected into a single VerticalGlyphInfo.
     std::vector<VerticalGlyphInfo> vgList = {};
@@ -1721,8 +1724,7 @@ class TextLayoutContext {
     columns.emplace_back();
     auto* currentColumn = &columns.back();
     float currentColumnHeight = 0;
-    float boxHeight = std::isnan(textBox->height) ? 0 : textBox->height;
-    bool doWrap = textBox->wordWrap && boxHeight > 0;
+    bool doWrap = textBox->wordWrap && !std::isnan(boxHeight) && boxHeight > 0;
     int lastBreakIndex = -1;
     // Tracks the fontLineHeight of the \n that created the current column.
     // Used as the fallback width for empty columns (e.g. consecutive \n\n).
@@ -1897,13 +1899,11 @@ class TextLayoutContext {
   }
 #endif
 
-  void buildTextBlobVertical(const TextBox* textBox, const std::vector<ColumnInfo>& columns) {
+  void buildTextBlobVertical(const TextBox* textBox, const std::vector<ColumnInfo>& columns,
+                             float boxWidth, float boxHeight) {
     if (columns.empty()) {
       return;
     }
-
-    float boxWidth = std::isnan(textBox->width) ? 0 : textBox->width;
-    float boxHeight = std::isnan(textBox->height) ? 0 : textBox->height;
 
     // Calculate total width: all columns use maxColumnWidth (line-box model).
     float totalWidth = 0;
@@ -2170,7 +2170,8 @@ std::shared_ptr<tgfx::Typeface> TextLayout::FindTypeface(const std::string& font
   return tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
 }
 
-Rect TextLayout::MeasureTextBox(const TextBox* textBox, FontConfig* fontConfig) {
+Rect TextLayout::MeasureTextBox(const TextBox* textBox, float boxWidth, float boxHeight,
+                                FontConfig* fontConfig) {
   if (textBox == nullptr || textBox->elements.empty()) {
     return {};
   }
@@ -2201,7 +2202,7 @@ Rect TextLayout::MeasureTextBox(const TextBox* textBox, FontConfig* fontConfig) 
     return {};
   }
   if (isVertical) {
-    auto columns = context.layoutColumns(allGlyphs, textBox);
+    auto columns = context.layoutColumns(allGlyphs, textBox, boxHeight);
     float totalColumnWidth = 0;
     float maxColumnHeight = 0;
     for (auto& col : columns) {
@@ -2210,7 +2211,7 @@ Rect TextLayout::MeasureTextBox(const TextBox* textBox, FontConfig* fontConfig) 
     }
     return Rect::MakeXYWH(0, 0, totalColumnWidth, maxColumnHeight);
   }
-  auto lines = context.layoutLines(allGlyphs, textBox);
+  auto lines = context.layoutLines(allGlyphs, textBox, boxWidth);
   float maxLineWidth = 0;
   float totalHeight = 0;
   for (auto& line : lines) {
@@ -2220,8 +2221,9 @@ Rect TextLayout::MeasureTextBox(const TextBox* textBox, FontConfig* fontConfig) 
   return Rect::MakeXYWH(0, 0, maxLineWidth, totalHeight);
 }
 
-Rect TextLayout::MeasureTextBox(const TextBox* textBox, const LayoutContext& context) {
-  return MeasureTextBox(textBox, context.getFontConfig());
+Rect TextLayout::MeasureTextBox(const TextBox* textBox, float boxWidth, float boxHeight,
+                                const LayoutContext& context) {
+  return MeasureTextBox(textBox, boxWidth, boxHeight, context.getFontConfig());
 }
 
 tgfx::Rect TextLayout::LayoutText(Text* text, const LayoutContext& context, TextBaseline baseline) {
@@ -2263,14 +2265,15 @@ tgfx::Rect TextLayout::LayoutText(Text* text, const LayoutContext& context, Text
                               tightBounds.bottom);
 }
 
-void TextLayout::LayoutTextBox(TextBox* textBox, const LayoutContext& context) {
+void TextLayout::LayoutTextBox(TextBox* textBox, float boxWidth, float boxHeight,
+                               const LayoutContext& context) {
   if (textBox == nullptr) {
     return;
   }
   TextLayoutContext layoutContext(context.getFontConfig(), nullptr);
   auto childText = layoutContext.processScope(textBox->elements);
   if (!childText.empty()) {
-    layoutContext.processTextWithLayout(childText, textBox);
+    layoutContext.processTextWithLayout(childText, textBox, boxWidth, boxHeight);
   }
   // Write TextBlobs back to child Text nodes.
   for (auto& [textPtr, shapedText] : layoutContext.result) {

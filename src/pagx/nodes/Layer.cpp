@@ -124,7 +124,6 @@ void Layer::onMeasure(const LayoutContext&) {
 void Layer::setLayoutSize(const LayoutContext&, float width, float height) {
   actualWidth = !std::isnan(width) ? width : preferredWidth;
   actualHeight = !std::isnan(height) ? height : preferredHeight;
-
   if (clipToBounds && !hasScrollRect && !std::isnan(actualWidth) && !std::isnan(actualHeight)) {
     scrollRect = Rect::MakeXYWH(0, 0, actualWidth, actualHeight);
     hasScrollRect = true;

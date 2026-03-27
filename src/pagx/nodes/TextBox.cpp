@@ -41,7 +41,7 @@ void TextBox::onMeasure(const LayoutContext& context) {
   }
   float w = std::isnan(width) ? 0 : width;
   float h = std::isnan(height) ? 0 : height;
-  auto measured = TextLayout::MeasureTextBox(this, context);
+  auto measured = TextLayout::MeasureTextBox(this, width, height, context);
   if (std::isnan(width)) {
     w = measured.width;
   }
@@ -61,17 +61,8 @@ void TextBox::updateLayout(const LayoutContext& context) {
   // Skip Text elements: they are positioned by TextLayout, not constraint positioning.
   auto nodes = CollectLayoutNodes(elements, true);
   PerformConstraintLayout(nodes, actualWidth, actualHeight, context);
-  // Propagate constraint-derived dimensions so TextLayout uses the correct box size for word
-  // wrapping and alignment. Constraint layout (e.g. left+right) may produce a larger actual size
-  // than the explicit width/height, which must take precedence for proper text reflow.
-  if (!std::isnan(actualWidth)) {
-    width = actualWidth;
-  }
-  if (!std::isnan(actualHeight)) {
-    height = actualHeight;
-  }
   // Text elements are typeset by TextLayout after constraint positioning.
-  TextLayout::LayoutTextBox(this, context);
+  TextLayout::LayoutTextBox(this, actualWidth, actualHeight, context);
 }
 
 }  // namespace pagx

@@ -626,7 +626,7 @@ static Rectangle* parseRectangle(const DOMNode* node, PAGXDocument* doc) {
   if (!rect) {
     return nullptr;
   }
-  rect->size = getSizeAttribute(node, "size", {100, 100}, doc);
+  rect->size = getSizeAttribute(node, "size", {0, 0}, doc);
   auto* posAttr = node->findAttribute("position");
   if (posAttr && !posAttr->empty()) {
     rect->position = getPointAttribute(node, "position", {0, 0}, doc);
@@ -649,7 +649,7 @@ static Ellipse* parseEllipse(const DOMNode* node, PAGXDocument* doc) {
   if (!ellipse) {
     return nullptr;
   }
-  ellipse->size = getSizeAttribute(node, "size", {100, 100}, doc);
+  ellipse->size = getSizeAttribute(node, "size", {0, 0}, doc);
   auto* posAttr = node->findAttribute("position");
   if (posAttr && !posAttr->empty()) {
     ellipse->position = getPointAttribute(node, "position", {0, 0}, doc);

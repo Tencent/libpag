@@ -51,7 +51,8 @@ class TextLayout {
   /**
    * Measures a TextBox element, returning linebox dimensions.
    */
-  static Rect MeasureTextBox(const TextBox* textBox, FontConfig* fontConfig = nullptr);
+  static Rect MeasureTextBox(const TextBox* textBox, float boxWidth, float boxHeight,
+                             FontConfig* fontConfig = nullptr);
 
   /**
    * Finds a typeface matching the given font family and style.
@@ -61,7 +62,8 @@ class TextLayout {
                                                       FontConfig* fontConfig = nullptr);
 
   /** Measures a TextBox using LayoutContext for font lookup. */
-  static Rect MeasureTextBox(const TextBox* textBox, const LayoutContext& context);
+  static Rect MeasureTextBox(const TextBox* textBox, float boxWidth, float boxHeight,
+                             const LayoutContext& context);
 
   /**
    * Builds TextBlob for a standalone Text element. Returns the text bounds where horizontal extent
@@ -71,7 +73,8 @@ class TextLayout {
   static tgfx::Rect LayoutText(Text* text, const LayoutContext& context, TextBaseline baseline);
 
   /** Performs text layout for all Text elements inside a TextBox. */
-  static void LayoutTextBox(TextBox* textBox, const LayoutContext& context);
+  static void LayoutTextBox(TextBox* textBox, float boxWidth, float boxHeight,
+                            const LayoutContext& context);
 };
 
 }  // namespace pagx
