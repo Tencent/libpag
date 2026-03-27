@@ -20,6 +20,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include "cli/CliUtils.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/SVGExporter.h"
 
@@ -55,14 +56,6 @@ static void PrintUsage() {
             << "  pagx export --input icon.pagx --output out.svg   # PAGX to out.svg\n"
             << "  pagx export --format svg --input icon.pagx       # force SVG format\n"
             << "  pagx export --input icon.pagx --svg-indent 4     # 4-space indent\n";
-}
-
-static std::string ReplaceExtension(const std::string& path, const std::string& newExt) {
-  auto dot = path.rfind('.');
-  if (dot != std::string::npos) {
-    return path.substr(0, dot + 1) + newExt;
-  }
-  return path + "." + newExt;
 }
 
 static int ParseOptions(int argc, char* argv[], ExportOptions* options) {

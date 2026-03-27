@@ -97,6 +97,18 @@ inline std::shared_ptr<tgfx::Typeface> ResolveFallbackTypeface(const std::string
   return ResolveSystemTypeface(family, style);
 }
 
+/**
+ * Replaces the file extension in a path with a new extension. If the path has no extension, appends
+ * the new extension.
+ */
+ inline std::string ReplaceExtension(const std::string& path, const std::string& newExt) {
+  auto dot = path.rfind('.');
+  if (dot != std::string::npos) {
+    return path.substr(0, dot + 1) + newExt;
+  }
+  return path + "." + newExt;
+}
+
 inline std::string EscapeJson(const std::string& input) {
   std::string result = {};
   result.reserve(input.size() + 16);

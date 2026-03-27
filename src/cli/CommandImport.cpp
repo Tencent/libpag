@@ -21,6 +21,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include "cli/CliUtils.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/SVGImporter.h"
 
@@ -65,14 +66,6 @@ static std::string InferFormat(const std::string& path) {
     }
   }
   return {};
-}
-
-static std::string ReplaceExtension(const std::string& path, const std::string& newExt) {
-  auto dot = path.rfind('.');
-  if (dot != std::string::npos) {
-    return path.substr(0, dot + 1) + newExt;
-  }
-  return path + "." + newExt;
 }
 
 static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
