@@ -160,6 +160,18 @@ CLI_TEST(PAGXCliTest, Validate_MissingFile) {
   EXPECT_NE(ret, 0);
 }
 
+CLI_TEST(PAGXCliTest, Validate_NestedTextBox) {
+  auto path = TestResourcePath("validate_nested_textbox.pagx");
+  auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Validate_GroupInTextBox) {
+  auto path = TestResourcePath("validate_group_in_textbox.pagx");
+  auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
+  EXPECT_NE(ret, 0);
+}
+
 //==============================================================================
 // Optimize tests — RemoveEmptyNodes
 //==============================================================================

@@ -26,6 +26,8 @@
 #include "cli/CliUtils.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Group.h"
+#include "pagx/nodes/TextBox.h"
 #include "pagx_xsd.h"
 
 namespace pagx::cli {
@@ -134,6 +136,70 @@ static void CheckAutoLayoutPatterns(const PAGXDocument* doc, std::vector<Validat
   }
 }
 
+// Check for nested TextBox elements (TextBox inside TextBox or Group inside TextBox).
+// TextBox is a text layout container and should not contain other layout containers.
+static void CheckTextBoxNesting(const PAGXDocument* doc, std::vector<ValidationError>& errors) {
+  if (doc == nullptr) {
+    return;
+  }
+
+  std::function<void(const Element*, const TextBox*)> checkElement =
+      [&](const Element* element, const TextBox* parentTextBox) {
+        if (element == nullptr) {
+          return;
+        }
+
+        // Check if current element is a TextBox
+        if (element->nodeType() == NodeType::TextBox) {
+          auto* textBox = static_cast<const TextBox*>(element);
+          if (parentTextBox != nullptr) {
+            // TextBox nested inside another TextBox
+            ValidationError error = {};
+            error.line = 0;
+            error.message =
+                "TextBox should not be nested inside another TextBox. "
+                "This may lead to unexpected layout behavior.";
+            errors.push_back(std::move(error));
+          }
+
+          // Check children of this TextBox for nested containers
+          for (const auto* child : textBox->elements) {
+            if (child == nullptr) {
+              continue;
+            }
+
+            if (child->nodeType() == NodeType::Group && child->nodeType() != NodeType::TextBox) {
+              // Group inside TextBox (but not TextBox, which would be caught above)
+              ValidationError error = {};
+              error.line = 0;
+              error.message =
+                  "Group should not be nested directly inside TextBox. "
+                  "TextBox manages layout of Text elements; Groups may interfere with text "
+                  "positioning.";
+              errors.push_back(std::move(error));
+            }
+
+            checkElement(child, textBox);
+          }
+        } else if (element->nodeType() == NodeType::Group) {
+          // Regular Group, recurse with same parentTextBox context
+          auto* group = static_cast<const Group*>(element);
+          for (const auto* child : group->elements) {
+            checkElement(child, parentTextBox);
+          }
+        }
+      };
+
+  // Check all layers and their contents
+  for (const auto& layer : doc->layers) {
+    if (layer != nullptr) {
+      for (const auto* element : layer->contents) {
+        checkElement(element, nullptr);
+      }
+    }
+  }
+}
+
 static void PrintUsage() {
   std::cout << "Usage: pagx validate [options] <file.pagx>\n"
             << "\n"
@@ -215,6 +281,8 @@ std::vector<ValidationError> ValidateFile(const std::string& filePath) {
     }
     // Heuristic validation: check for common auto layout patterns
     CheckAutoLayoutPatterns(pagxDoc.get(), errors);
+    // Check for TextBox nesting issues
+    CheckTextBoxNesting(pagxDoc.get(), errors);
   }
 
   return errors;
