@@ -59,7 +59,6 @@
 #include "pagx/utils/StringParser.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
-#include "renderer/ShapedText.h"
 #include "renderer/TextLayout.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
