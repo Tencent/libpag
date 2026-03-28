@@ -111,7 +111,7 @@ or CSS `border-bottom: 1px solid`. Use `centerX="0"` to center horizontally with
 
 ```xml
 <pagx version="1.0" width="200" height="60">
-  <Layer centerX="0" centerY="0" layout="horizontal" padding="8,16">
+  <Layer centerX="0" centerY="0" layout="horizontal" padding="12,24">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="22"/>
     <Fill color="#3B82F6"/>
     <Group>
