@@ -232,9 +232,6 @@ Key rules:
     (2) empty space between (0,0) and the top-left of the nearest child is included in
     measured bounds. For correct measurement, position children starting from (0,0) —
     avoid negative coordinates and avoid leaving empty margins at the top-left corner.
-- **Center sizing requirement**: `centerX`/`centerY` reference the parent's center — the
-  parent must have a size that represents the intended design region (explicit `width`/`height`
-  or layout-assigned). Content-measured size reflects child extent, not the design region.
 - **Unset, not zero**: Constraint attributes default to unset (not zero).
 - **Overrides position**: Constraints override the element's `position` attribute on the
   constrained axis.
@@ -497,7 +494,7 @@ is sequential and forward-only.
 ```
 
 - Text supports constraint attributes (`left`, `right`, `top`, `bottom`, `centerX`, `centerY`) for positioning within the container. Prefer wrapping Text in TextBox — TextBox handles measurement and provides accurate bounding box. Exception: when using TextPath, Text can appear without TextBox wrapper.
-- `baseline`: `lineBox` (default) or `alphabetic`. In `lineBox` mode, position.y is the top of the line box; in `alphabetic` mode, position.y is the alphabetic baseline.
+- `baseline`: `visualTop` (default) or `alphabetic`. In `visualTop` mode, position.y is the top of the visual pixel bounds; in `alphabetic` mode, position.y is the alphabetic baseline.
 - **Constraint attributes**: prefer applying constraints to the parent TextBox instead of directly on Text.
 - `fauxBold` / `fauxItalic`: algorithmic bold / italic (default false).
 - **CDATA** for special characters: `<![CDATA[A < B]]>`.
