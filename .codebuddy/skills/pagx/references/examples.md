@@ -111,11 +111,11 @@ or CSS `border-bottom: 1px solid`. Use `centerX="0"` to center horizontally with
 
 ```xml
 <pagx version="1.0" width="200" height="60">
-  <Layer centerX="0" centerY="0" layout="horizontal" padding="12,24">
-    <Rectangle left="0" right="0" top="0" bottom="0" roundness="22"/>
+  <Layer centerX="0" centerY="0">
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="20"/>
     <Fill color="#3B82F6"/>
-    <Group>
-      <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+    <Group left="30" right="30" top="15" bottom="15">
+      <Text centerX="0" centerY="0" text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
       <Fill color="#FFF"/>
     </Group>
     <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#3B82F640"/>
@@ -123,10 +123,10 @@ or CSS `border-bottom: 1px solid`. Use `centerX="0"` to center horizontally with
 </pagx>
 ```
 
-**Pattern**: Content-driven button — `layout="horizontal"` with `padding` makes the Layer
-auto-size to fit text content. Text is wrapped in Group for painter scope isolation (the
-white Fill must not leak to the background Rectangle). Rectangle stretches to fill the final
-bounds via stretch constraints. DropShadowStyle = CSS `box-shadow`.
+**Pattern**: Content-driven button — Text with constraint margins (`left/right/top/bottom`)
+defines the button size, and the Layer auto-sizes to fit. Group isolates the white Fill from
+the background Rectangle (painter scope). Rectangle stretches to fill the final Layer bounds.
+DropShadowStyle = CSS `box-shadow`.
 
 ### Card with Shadow
 
@@ -232,19 +232,19 @@ Define the clip shape first, then apply ImagePattern as the fill.
   <Layer layout="vertical" gap="8" padding="12">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
     <Fill color="#FFF"/>
-    <Layer layout="horizontal" padding="8,12" alignment="center">
+    <Layer>
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
       <Fill color="#6366F1"/>
-      <Group>
-        <Text text="Messages" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+      <Group left="12" right="12" top="8" bottom="8">
+        <Text centerX="0" centerY="0" text="Messages" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
         <Fill color="#FFF"/>
       </Group>
     </Layer>
-    <Layer layout="horizontal" padding="8,12" alignment="center">
+    <Layer>
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
       <Fill color="#F1F5F9"/>
-      <Group>
-        <Text text="Settings" fontFamily="Arial" fontSize="13"/>
+      <Group left="12" right="12" top="8" bottom="8">
+        <Text centerX="0" centerY="0" text="Settings" fontFamily="Arial" fontSize="13"/>
         <Fill color="#334155"/>
       </Group>
     </Layer>
@@ -258,10 +258,10 @@ Define the clip shape first, then apply ImagePattern as the fill.
 </pagx>
 ```
 
-**Pattern**: Content-driven badge — each button auto-sizes via `layout="horizontal"` with
-`padding` instead of hardcoded `height`. `includeInLayout="false"` exempts the red dot from
-layout flow — like CSS `position: absolute`. Negative offsets place the dot outside the
-parent boundary.
+**Pattern**: Content-driven badge — each button auto-sizes via Text constraint margins
+(`left/right/top/bottom` on Group) instead of hardcoded `height`. `includeInLayout="false"`
+exempts the red dot from layout flow — like CSS `position: absolute`. Negative offsets place
+the dot outside the parent boundary.
 
 ### Card with Internal Layout
 
@@ -325,12 +325,12 @@ For flexible height layouts, see `design-patterns.md` §Fixed + flex mix.
 
 ```xml
 <pagx version="1.0" width="auto" height="auto">
-  <Layer centerX="0" centerY="0" layout="horizontal" padding="12">
+  <Layer centerX="0" centerY="0">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
     <Fill color="#FFF"/>
     <Stroke color="#CBD5E1" width="1"/>
     <InnerShadowStyle offsetY="2" blurX="4" blurY="4" color="#00000010"/>
-    <Group>
+    <Group left="12" right="12" top="12" bottom="12">
       <Text text="Enter your email..." fontFamily="Arial" fontSize="14"/>
       <Fill color="#94A3B8"/>
     </Group>
@@ -338,8 +338,8 @@ For flexible height layouts, see `design-patterns.md` §Fixed + flex mix.
 </pagx>
 ```
 
-**Pattern**: Content-driven input — `layout="horizontal"` with `padding` auto-sizes the
-container to fit text. Group isolates the placeholder Fill from the outer Stroke/Fill.
+**Pattern**: Content-driven input — Text constraint margins (`left/right/top/bottom` on Group)
+auto-size the Layer. Group isolates the placeholder Fill from the outer Stroke/Fill.
 InnerShadowStyle = CSS `box-shadow: inset`. Combined with Stroke border for the standard
 `<input>` look.
 
