@@ -97,8 +97,8 @@ Layers in rows or columns, and constraint positioning for positioning elements w
 
 ```xml
 <pagx version="1.0" width="300" height="20">
-  <Layer width="300" height="20">
-    <Rectangle centerX="0" centerY="0" size="260,1"/>
+  <Layer centerX="0" centerY="0">
+    <Rectangle size="260,1"/>
     <Fill color="#E2E8F0"/>
   </Layer>
 </pagx>
@@ -112,10 +112,10 @@ or CSS `border-bottom: 1px solid`. Use `centerX="0"` to center horizontally with
 ```xml
 <pagx version="1.0" width="200" height="60">
   <Layer centerX="0" centerY="0">
-    <Rectangle left="0" right="0" top="0" bottom="0" roundness="20"/>
+    <Rectangle left="0" right="0" top="0" bottom="0" roundness="22"/>
     <Fill color="#3B82F6"/>
-    <Group left="30" right="30" top="15" bottom="15">
-      <Text centerX="0" centerY="0" text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+    <Group centerX="0" centerY="0">
+      <Text left="30" right="30" top="15" bottom="15" text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
       <Fill color="#FFF"/>
     </Group>
     <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#3B82F640"/>
@@ -123,10 +123,10 @@ or CSS `border-bottom: 1px solid`. Use `centerX="0"` to center horizontally with
 </pagx>
 ```
 
-**Pattern**: Content-driven button — Text with constraint margins (`left/right/top/bottom`)
-defines the button size, and the Layer auto-sizes to fit. Group isolates the white Fill from
-the background Rectangle (painter scope). Rectangle stretches to fill the final Layer bounds.
-DropShadowStyle = CSS `box-shadow`.
+**Pattern**: Content-driven button — TextBox with constraint margins (`left/right/top/bottom`)
+defines the button size, and the Layer auto-sizes to fit. `textAlign="center"` +
+`paragraphAlign="middle"` centers text within the TextBox region. Rectangle stretches to fill
+the final Layer bounds. DropShadowStyle = CSS `box-shadow`.
 
 ### Card with Shadow
 
@@ -146,16 +146,16 @@ to a `<div>` with `border-radius`, `background: white`, and `box-shadow`.
 ### Icon + Label Row
 
 ```xml
-<pagx version="1.0" width="auto" height="auto">
+<pagx version="1.0" width="120" height="40">
   <Layer layout="horizontal" gap="8" alignment="center" padding="8">
-    <Layer width="24" height="24">
-      <Ellipse left="0" right="0" top="0" bottom="0"/>
+    <Layer>
+      <Ellipse size="24,24"/>
       <Fill color="#10B981"/>
     </Layer>
-    <Group>
+    <Layer>
       <Text text="Online" fontFamily="Arial" fontSize="14"/>
       <Fill color="#374151"/>
-    </Group>
+    </Layer>
   </Layer>
 </pagx>
 ```
@@ -168,13 +168,13 @@ isolation (Ellipse + Fill). Text is wrapped in Group for painter scope isolation
 
 ```xml
 <pagx version="1.0" width="260" height="30">
-  <Layer width="260" height="30">
+  <Layer centerX="0" centerY="0">
     <!-- Track -->
-    <Rectangle centerX="0" centerY="0" size="240,8" roundness="4"/>
+    <Rectangle size="240,8" roundness="4"/>
     <Fill color="#E2E8F0"/>
     <!-- Fill bar -->
-    <Group centerY="0">
-      <Rectangle left="10" size="168,8" roundness="4"/>
+    <Group>
+      <Rectangle size="168,8" roundness="4"/>
       <Fill color="#3B82F6"/>
     </Group>
   </Layer>
@@ -189,16 +189,14 @@ within the parent Layer.
 
 ```xml
 <pagx version="1.0" width="300" height="80">
-  <Layer width="300" height="80">
-    <Group centerX="0" centerY="0">
-      <Text text="Premium" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
-      <Fill>
-        <LinearGradient startPoint="0,0" endPoint="200,0">
-          <ColorStop offset="0" color="#6366F1"/>
-          <ColorStop offset="1" color="#EC4899"/>
-        </LinearGradient>
-      </Fill>
-    </Group>
+  <Layer centerX="0" centerY="0">
+    <Text text="Premium" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="200,0">
+        <ColorStop offset="0" color="#6366F1"/>
+        <ColorStop offset="1" color="#EC4899"/>
+      </LinearGradient>
+    </Fill>
   </Layer>
 </pagx>
 ```
@@ -211,10 +209,10 @@ relative to the Group's local origin. Group provides painter scope isolation.
 
 ```xml
 <pagx version="1.0" width="130" height="130">
-  <Layer width="130" height="130">
-    <Ellipse centerX="0" centerY="0" size="110,110"/>
+  <Layer centerX="0" centerY="0">
+    <Ellipse size="110,110"/>
     <Fill>
-      <ImagePattern image="avatar.jpg" matrix="1,0,0,1,10,10"/>
+      <ImagePattern image="avatar.jpg"/>
     </Fill>
     <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000040"/>
   </Layer>
@@ -228,23 +226,23 @@ Define the clip shape first, then apply ImagePattern as the fill.
 ### Notification Badge (includeInLayout)
 
 ```xml
-<pagx version="1.0" width="auto" height="auto">
+<pagx version="1.0" width="200" height="96">
   <Layer layout="vertical" gap="8" padding="12">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
     <Fill color="#FFF"/>
     <Layer>
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
       <Fill color="#6366F1"/>
-      <Group left="12" right="12" top="8" bottom="8">
-        <Text centerX="0" centerY="0" text="Messages" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+      <Group centerX="0" centerY="0">
+        <Text left="12" right="12" top="8" bottom="8" text="Messages" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
         <Fill color="#FFF"/>
       </Group>
     </Layer>
     <Layer>
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
       <Fill color="#F1F5F9"/>
-      <Group left="12" right="12" top="8" bottom="8">
-        <Text centerX="0" centerY="0" text="Settings" fontFamily="Arial" fontSize="13"/>
+      <Group centerX="0" centerY="0" >
+        <Text left="12" right="12" top="8" bottom="8" text="Settings" fontFamily="Arial" fontSize="13"/>
         <Fill color="#334155"/>
       </Group>
     </Layer>
@@ -324,7 +322,7 @@ For flexible height layouts, see `design-patterns.md` §Fixed + flex mix.
 ### Input Field (InnerShadowStyle)
 
 ```xml
-<pagx version="1.0" width="auto" height="auto">
+<pagx version="1.0" width="280" height="50">
   <Layer centerX="0" centerY="0">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
     <Fill color="#FFF"/>
