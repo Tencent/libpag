@@ -114,18 +114,19 @@ or CSS `border-bottom: 1px solid`. Use `centerX="0"` to center horizontally with
   <Layer centerX="0" centerY="0" layout="horizontal" padding="8,16">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="22"/>
     <Fill color="#3B82F6"/>
-    <TextBox textAlign="center">
+    <Group>
       <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
       <Fill color="#FFF"/>
-    </TextBox>
+    </Group>
     <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#3B82F640"/>
   </Layer>
 </pagx>
 ```
 
 **Pattern**: Content-driven button — `layout="horizontal"` with `padding` makes the Layer
-auto-size to fit text content. Rectangle stretches to fill the final bounds via stretch
-constraints. DropShadowStyle = CSS `box-shadow`.
+auto-size to fit text content. Text is wrapped in Group for painter scope isolation (the
+white Fill must not leak to the background Rectangle). Rectangle stretches to fill the final
+bounds via stretch constraints. DropShadowStyle = CSS `box-shadow`.
 
 ### Card with Shadow
 
@@ -151,17 +152,17 @@ to a `<div>` with `border-radius`, `background: white`, and `box-shadow`.
       <Ellipse left="0" right="0" top="0" bottom="0"/>
       <Fill color="#10B981"/>
     </Layer>
-    <TextBox>
+    <Group>
       <Text text="Online" fontFamily="Arial" fontSize="14"/>
       <Fill color="#374151"/>
-    </TextBox>
+    </Group>
   </Layer>
 </pagx>
 ```
 
 **Pattern**: Content-driven row — `layout="horizontal"` with `gap` and `alignment="center"`
 replaces per-element constraint positioning. The icon needs its own Layer for painter scope
-isolation (Ellipse + Fill). TextBox auto-measures its content width.
+isolation (Ellipse + Fill). Text is wrapped in Group for painter scope isolation.
 
 ### Progress Bar
 
@@ -189,7 +190,7 @@ within the parent Layer.
 ```xml
 <pagx version="1.0" width="300" height="80">
   <Layer width="300" height="80">
-    <TextBox centerX="0" centerY="0">
+    <Group centerX="0" centerY="0">
       <Text text="Premium" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
       <Fill>
         <LinearGradient startPoint="0,0" endPoint="200,0">
@@ -197,14 +198,14 @@ within the parent Layer.
           <ColorStop offset="1" color="#EC4899"/>
         </LinearGradient>
       </Fill>
-    </TextBox>
+    </Group>
   </Layer>
 </pagx>
 ```
 
 **Pattern**: LinearGradient inside Fill applies to text geometry — the PAGX equivalent of CSS
 `background: linear-gradient(...); -webkit-background-clip: text`. Gradient coordinates are
-relative to the TextBox's local origin.
+relative to the Group's local origin. Group provides painter scope isolation.
 
 ### Avatar with Circular Clip
 
@@ -234,18 +235,18 @@ Define the clip shape first, then apply ImagePattern as the fill.
     <Layer layout="horizontal" padding="8,12" alignment="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
       <Fill color="#6366F1"/>
-      <TextBox textAlign="center">
+      <Group>
         <Text text="Messages" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
         <Fill color="#FFF"/>
-      </TextBox>
+      </Group>
     </Layer>
     <Layer layout="horizontal" padding="8,12" alignment="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
       <Fill color="#F1F5F9"/>
-      <TextBox textAlign="center">
+      <Group>
         <Text text="Settings" fontFamily="Arial" fontSize="13"/>
         <Fill color="#334155"/>
-      </TextBox>
+      </Group>
     </Layer>
     <!-- Red dot: excluded from layout, positioned outside parent bounds -->
     <Layer right="-6" top="-6" includeInLayout="false">
@@ -288,19 +289,19 @@ A card with vertical container layout, rich text header, and action buttons.
       <Layer flex="1" layout="horizontal" alignment="center" arrangement="center">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
         <Fill color="#6366F1"/>
-        <TextBox textAlign="center">
+        <Group>
           <Text text="Send" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
           <Fill color="#FFF"/>
-        </TextBox>
+        </Group>
       </Layer>
       <Layer flex="1" layout="horizontal" alignment="center" arrangement="center">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
         <Fill color="#F1F5F9"/>
         <Stroke color="#CBD5E1" width="1" align="inside"/>
-        <TextBox textAlign="center">
+        <Group>
           <Text text="Request" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
           <Fill color="#1E293B"/>
-        </TextBox>
+        </Group>
       </Layer>
     </Layer>
     <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000015"/>
@@ -316,7 +317,7 @@ A card with vertical container layout, rich text header, and action buttons.
 - **Rich text**: Multiple styled Text segments in one TextBox, separated by `&#10;`.
   Each segment after the first needs a Group for painter scope isolation.
 - **Content-driven buttons**: Each button uses `layout="horizontal"` with `alignment="center"
-  arrangement="center"` to center its TextBox — no scattered `centerX/centerY`.
+  arrangement="center"` to center its Text Group — no scattered `centerX/centerY`.
 
 For flexible height layouts, see `design-patterns.md` §Fixed + flex mix.
 
@@ -329,17 +330,18 @@ For flexible height layouts, see `design-patterns.md` §Fixed + flex mix.
     <Fill color="#FFF"/>
     <Stroke color="#CBD5E1" width="1"/>
     <InnerShadowStyle offsetY="2" blurX="4" blurY="4" color="#00000010"/>
-    <TextBox>
+    <Group>
       <Text text="Enter your email..." fontFamily="Arial" fontSize="14"/>
       <Fill color="#94A3B8"/>
-    </TextBox>
+    </Group>
   </Layer>
 </pagx>
 ```
 
 **Pattern**: Content-driven input — `layout="horizontal"` with `padding` auto-sizes the
-container to fit text. InnerShadowStyle = CSS `box-shadow: inset`. Combined with Stroke
-border for the standard `<input>` look.
+container to fit text. Group isolates the placeholder Fill from the outer Stroke/Fill.
+InnerShadowStyle = CSS `box-shadow: inset`. Combined with Stroke border for the standard
+`<input>` look.
 
 ### Card Grid (Composition)
 
@@ -395,10 +397,8 @@ and `height` are required — they define the intrinsic size for flex allocation
               <Fill color="#6366F1"/>
             </Group>
           </Layer>
-          <TextBox textAlign="center">
-            <Text text="Home" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
-            <Fill color="#6366F1"/>
-          </TextBox>
+          <Text text="Home" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
+          <Fill color="#6366F1"/>
         </Layer>
         <!-- Search: stroke (inactive) -->
         <Layer layout="vertical" gap="2" alignment="center">
@@ -412,10 +412,8 @@ and `height` are required — they define the intrinsic size for flex allocation
               </Group>
             </Group>
           </Layer>
-          <TextBox textAlign="center">
-            <Text text="Search" fontFamily="Arial" fontSize="10"/>
-            <Fill color="#94A3B8"/>
-          </TextBox>
+          <Text text="Search" fontFamily="Arial" fontSize="10"/>
+          <Fill color="#94A3B8"/>
         </Layer>
         <!-- Profile: stroke (inactive) -->
         <Layer layout="vertical" gap="2" alignment="center">
@@ -429,10 +427,8 @@ and `height` are required — they define the intrinsic size for flex allocation
               </Group>
             </Group>
           </Layer>
-          <TextBox textAlign="center">
-            <Text text="Profile" fontFamily="Arial" fontSize="10"/>
-            <Fill color="#94A3B8"/>
-          </TextBox>
+          <Text text="Profile" fontFamily="Arial" fontSize="10"/>
+          <Fill color="#94A3B8"/>
         </Layer>
       </Layer>
       <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000020"/>
@@ -443,8 +439,8 @@ and `height` are required — they define the intrinsic size for flex allocation
 
 **Pattern**: Rectangle `roundness` applies to all four corners. To flatten specific corners,
 use `MergePath mode="intersect"` to clip a rounded rect with a straight-edged rect. Tab items
-use `arrangement="spaceAround"` for even distribution. Each tab's TextBox is a direct child of
-the vertical flex container (no wrapper Layer needed). Active tab uses Fill; inactive tabs use
+use `arrangement="spaceAround"` for even distribution. Each tab's Text + Fill are direct contents of
+the vertical flex container (no wrapper needed since no other paintable Element shares the scope). Active tab uses Fill; inactive tabs use
 Stroke — see §Icons and `design-patterns.md` §Icon Generation.
 
 ---
@@ -555,34 +551,34 @@ Grid lines are a single multi-M Path.
     <Layer height="20">
       <Ellipse left="0" centerY="0" size="10,10"/>
       <Fill color="#3B82F6"/>
-      <TextBox left="18" centerY="0">
+      <Group left="18" centerY="0">
         <Text text="Sales 40%" fontFamily="Arial" fontSize="12"/>
         <Fill color="#334155"/>
-      </TextBox>
+      </Group>
     </Layer>
     <Layer height="20">
       <Ellipse left="0" centerY="0" size="10,10"/>
       <Fill color="#10B981"/>
-      <TextBox left="18" centerY="0">
+      <Group left="18" centerY="0">
         <Text text="Growth 30%" fontFamily="Arial" fontSize="12"/>
         <Fill color="#334155"/>
-      </TextBox>
+      </Group>
     </Layer>
     <Layer height="20">
       <Ellipse left="0" centerY="0" size="10,10"/>
       <Fill color="#F59E0B"/>
-      <TextBox left="18" centerY="0">
+      <Group left="18" centerY="0">
         <Text text="Costs 20%" fontFamily="Arial" fontSize="12"/>
         <Fill color="#334155"/>
-      </TextBox>
+      </Group>
     </Layer>
     <Layer height="20">
       <Ellipse left="0" centerY="0" size="10,10"/>
       <Fill color="#EF4444"/>
-      <TextBox left="18" centerY="0">
+      <Group left="18" centerY="0">
         <Text text="Other 10%" fontFamily="Arial" fontSize="12"/>
         <Fill color="#334155"/>
-      </TextBox>
+      </Group>
     </Layer>
   </Layer>
 </pagx>
@@ -590,7 +586,9 @@ Grid lines are a single multi-M Path.
 
 **Pattern**: Each segment needs its own Group for painter scope isolation (different Stroke
 colors). Small gaps between segments (e.g., `end="0.38"` instead of `0.4`) create visual
-separation. Legend uses vertical layout with constraint-positioned dot + label rows.
+separation. Legend uses vertical layout with constraint-positioned dot + label rows. Each
+legend label uses a Group with `left` + `centerY` constraints for painter scope isolation
+(the label Fill must not leak to the Ellipse dot).
 
 **Gradient stroke variant**: for a ring progress indicator with gradient color, apply a
 LinearGradient directly inside the Stroke element:
@@ -626,10 +624,10 @@ LinearGradient directly inside the Stroke element:
       <Repeater copies="10" anchor="70,70" position="0,0" rotation="30" offset="7.5"/>
     </Group>
     <!-- Center percentage text -->
-    <TextBox centerX="0" centerY="0">
+    <Group centerX="0" centerY="0">
       <Text text="67%" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
       <Fill color="#1E293B"/>
-    </TextBox>
+    </Group>
   </Layer>
 </pagx>
 ```

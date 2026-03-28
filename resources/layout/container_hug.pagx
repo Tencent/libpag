@@ -2,8 +2,10 @@
 <!-- Container layout: HUG mode (no main-axis size, measured from children) -->
 <pagx version="1.0" width="820" height="500">
   <!-- Background -->
-  <Rectangle left="0" right="0" top="0" bottom="0"/>
-  <Fill color="#F8FAFC"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
 
   <Layer layout="vertical" gap="20" padding="30" alignment="start">
     <!-- Row 1: Three horizontal HUG layouts -->

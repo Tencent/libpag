@@ -3,8 +3,10 @@
 <!-- Fully automatic layout: containers are flexible (no width) — auto-equal distribution -->
 <pagx version="1.0" width="800" height="530">
   <!-- Background -->
-  <Rectangle left="0" right="0" top="0" bottom="0"/>
-  <Fill color="#F8FAFC"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
 
   <!-- Main vertical layout -->
   <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="30" padding="30">
@@ -14,10 +16,8 @@
 
       <!-- Container 1: Single-edge positioning -->
       <Layer flex="1" height="220">
-        <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        </Layer>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer left="0" right="0" top="0" bottom="0">
           <Polystar left="15" top="15" type="star" pointCount="5" outerRadius="30" innerRadius="12"/>
           <Fill color="#6366F1"/>
@@ -42,10 +42,8 @@
 
       <!-- Container 2: Dual-axis fit scaling (single 5-point star) -->
       <Layer flex="1" height="220">
-        <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        </Layer>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer left="0" right="0" top="0" bottom="0">
           <Polystar left="60" right="60" top="40" bottom="40" type="star" pointCount="5" outerRadius="100" innerRadius="38"/>
           <Fill>
@@ -64,10 +62,8 @@
 
       <!-- Container 3: Horizontal-only constraint (left+right), vertically centered -->
       <Layer flex="1" height="220">
-        <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        </Layer>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer left="0" right="0" top="0" bottom="0">
           <Polystar left="0" right="0" centerY="0" type="star" pointCount="5" outerRadius="100" innerRadius="38"/>
           <Fill>
@@ -81,10 +77,8 @@
 
       <!-- Container 4: Vertical-only constraint (top+bottom), horizontally centered -->
       <Layer flex="1" height="220">
-        <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        </Layer>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer left="0" right="0" top="0" bottom="0">
           <Polystar top="0" bottom="0" centerX="0" type="star" pointCount="5" outerRadius="100" innerRadius="38"/>
           <Fill>
@@ -98,10 +92,8 @@
 
       <!-- Container 5: All-edge constraint (left+right+top+bottom), fully fit -->
       <Layer width="355" height="220">
-        <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        </Layer>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer left="0" right="0" top="0" bottom="0">
           <Polystar left="0" right="0" top="0" bottom="0" type="star" pointCount="5" outerRadius="100" innerRadius="38"/>
           <Fill>

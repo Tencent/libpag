@@ -2,16 +2,15 @@
 <pagx version="1.0" width="800" height="600">
   <!-- ======== Decorations (not part of layout) ======== -->
   <Layer name="Decorations" includeInLayout="false" left="0" right="0" top="0" bottom="0">
-    <Layer name="Background" left="0" right="0" top="0" bottom="0">
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
-      <Fill>
-        <LinearGradient startPoint="0,0" endPoint="0,600">
-          <ColorStop offset="0" color="#0B1026"/>
-          <ColorStop offset="0.6" color="#0F1C3D"/>
-          <ColorStop offset="1" color="#1B1140"/>
-        </LinearGradient>
-      </Fill>
-    </Layer>
+    <!-- Background -->
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="0,600">
+        <ColorStop offset="0" color="#0B1026"/>
+        <ColorStop offset="0.6" color="#0F1C3D"/>
+        <ColorStop offset="1" color="#1B1140"/>
+      </LinearGradient>
+    </Fill>
     <Layer name="NebulaLeft">
       <Ellipse left="-20" top="70" size="360,300"/>
       <Fill>

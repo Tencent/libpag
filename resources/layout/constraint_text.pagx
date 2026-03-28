@@ -3,8 +3,10 @@
 <!-- Fully automatic layout: containers are flexible (no width) — auto-equal distribution -->
 <pagx version="1.0" width="800" height="520">
   <!-- Background -->
-  <Rectangle left="0" right="0" top="0" bottom="0"/>
-  <Fill color="#F8FAFC"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
 
   <!-- Main vertical layout -->
   <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">
@@ -14,10 +16,8 @@
 
       <!-- Container 1: Single-edge positioning -->
       <Layer flex="1" height="220">
-        <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        </Layer>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <!-- 1.1: left="25" top="25" -->
         <Layer left="0" right="0" top="0" bottom="0">
           <Text left="25" top="25" text="Left" fontFamily="Arial" fontStyle="Bold" fontSize="20" textAnchor="start"/>
@@ -108,10 +108,8 @@
 
       <!-- Container 3: Vertical-only scaling (top+bottom) -->
       <Layer flex="1" height="220">
-        <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        </Layer>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <!-- 3.1: top="20" bottom="20" centerX="0" -->
         <Layer left="0" right="0" top="0" bottom="0">
           <Text top="0" bottom="0" centerX="0" text="V" fontFamily="Arial" fontStyle="Bold" fontSize="200" textAnchor="center"/>
@@ -126,10 +124,8 @@
 
       <!-- Container 4: Dual-axis fit scaling - square container -->
       <Layer flex="1" height="220">
-        <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        </Layer>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <!-- 4.1: all edges, scales to fit minimum axis -->
         <Layer left="0" right="0" top="0" bottom="0">
           <Text left="0" right="0" centerY="0" text="Horizontal" fontFamily="Arial" fontStyle="Bold" fontSize="200" textAnchor="center"/>
@@ -144,10 +140,8 @@
 
       <!-- Container 5: Dual-axis fit in wide container -->
       <Layer flex="1" height="220">
-        <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        </Layer>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <!-- 5.1: fit in wide container (height is limiting axis) -->
         <Layer left="0" right="0" top="0" bottom="0">
           <Text left="30" right="30" top="20" bottom="20" text="Fit" fontFamily="Arial" fontStyle="Bold" fontSize="200" textAnchor="center"/>

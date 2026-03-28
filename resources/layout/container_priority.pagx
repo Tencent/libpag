@@ -2,8 +2,10 @@
 <!-- Container layout takes priority over constraints: constraints ignored in horizontal layout -->
 <pagx version="1.0" width="600" height="400">
   <!-- Background -->
-  <Rectangle size="600,400"/>
-  <Fill color="#F8FAFC"/>
+  <Layer>
+    <Rectangle size="600,400"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
 
   <!-- Main container: horizontal layout with centering overrides child constraints -->
   <Layer width="600" height="400" layout="horizontal" gap="20" padding="20" alignment="center" arrangement="center">

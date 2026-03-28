@@ -3,8 +3,10 @@
 <!-- Fully automatic layout: containers are flexible (no width) — auto-equal distribution -->
 <pagx version="1.0" width="800" height="590">
   <!-- Background -->
-  <Rectangle left="0" right="0" top="0" bottom="0"/>
-  <Fill color="#F8FAFC"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
 
   <!-- Main vertical layout, alignment=stretch -->
   <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">
@@ -14,10 +16,8 @@
 
       <!-- Container 1: Single-edge positioning -->
       <Layer flex="1" height="250">
-        <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        </Layer>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <!-- 1.1: left="20" top="20" (arrow shape) -->
         <Layer left="0" right="0" top="0" bottom="0">
           <Path left="20" top="20" data="M 0,20 L 50,20 L 50,0 L 80,30 L 50,60 L 50,40 L 0,40 Z"/>
@@ -37,10 +37,8 @@
 
       <!-- Container 2: Horizontal-only scaling (left+right) -->
       <Layer flex="1" height="250">
-        <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        </Layer>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <!-- 2.1: left="30" right="30" top="30" (horizontal scale, top position) -->
         <Layer left="0" right="0" top="0" bottom="0">
           <Path left="30" right="30" top="30" data="M 0,0 L 100,0 L 100,40 L 0,40 Z"/>
@@ -70,10 +68,8 @@
 
       <!-- Container 3: Vertical-only scaling (top+bottom) -->
       <Layer flex="1" height="250">
-        <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        </Layer>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <!-- 3.1: top="20" bottom="20" centerX="0" (vertical scale fills height with margins) -->
         <Layer left="0" right="0" top="0" bottom="0">
           <Path top="20" bottom="20" centerX="0" data="M 0,0 L 40,0 L 40,60 L 0,60 Z"/>
@@ -88,10 +84,8 @@
 
       <!-- Container 4: Dual-axis fit scaling -->
       <Layer flex="1" height="250">
-        <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        </Layer>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <!-- 4.1: asymmetric margins: top="20" bottom="60" (top tighter than bottom) -->
         <Layer left="0" right="0" top="0" bottom="0">
           <Path left="25" right="25" top="20" bottom="60" data="M 0,0 L 60,0 L 60,60 L 0,60 Z"/>
@@ -106,10 +100,8 @@
 
       <!-- Container 5: Dual-axis fit, wide and tall -->
       <Layer flex="1" height="250">
-        <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
-        </Layer>
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <!-- 5.1: asymmetric margins: top="60" bottom="20" (top wider than bottom) -->
         <Layer left="0" right="0" top="0" bottom="0">
           <Path left="30" right="30" top="60" bottom="20" data="M 0,0 L 100,0 L 100,50 L 0,50 Z"/>

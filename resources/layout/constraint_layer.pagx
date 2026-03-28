@@ -2,8 +2,10 @@
 <!-- Layer constraint layout in absolute mode: child Layers positioned by constraints within parent -->
 <pagx version="1.0" width="600" height="400">
   <!-- Background -->
-  <Rectangle left="0" right="0" top="0" bottom="0"/>
-  <Fill color="#F8FAFC"/>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
 
   <!-- Parent container with explicit size, default absolute layout -->
   <Layer width="600" height="400">
