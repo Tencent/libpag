@@ -111,10 +111,10 @@ or CSS `border-bottom: 1px solid`. Use `centerX="0"` to center horizontally with
 
 ```xml
 <pagx version="1.0" width="200" height="60">
-  <Layer centerX="0" centerY="0" width="160" height="44">
+  <Layer centerX="0" centerY="0" layout="horizontal" padding="8,16">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="22"/>
     <Fill color="#3B82F6"/>
-    <TextBox centerX="0" centerY="0">
+    <TextBox textAlign="center">
       <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
       <Fill color="#FFF"/>
     </TextBox>
@@ -123,9 +123,9 @@ or CSS `border-bottom: 1px solid`. Use `centerX="0"` to center horizontally with
 </pagx>
 ```
 
-**Pattern**: The universal button structure — rounded Rectangle background + centered TextBox
-label. Like `<button>` with `border-radius`, `background-color`, and centered text.
-DropShadowStyle = CSS `box-shadow`.
+**Pattern**: Content-driven button — `layout="horizontal"` with `padding` makes the Layer
+auto-size to fit text content. Rectangle stretches to fill the final bounds via stretch
+constraints. DropShadowStyle = CSS `box-shadow`.
 
 ### Card with Shadow
 
@@ -145,11 +145,13 @@ to a `<div>` with `border-radius`, `background: white`, and `box-shadow`.
 ### Icon + Label Row
 
 ```xml
-<pagx version="1.0" width="120" height="40">
-  <Layer width="120" height="40">
-    <Ellipse left="8" centerY="0" size="24,24"/>
-    <Fill color="#10B981"/>
-    <TextBox left="40" centerY="0">
+<pagx version="1.0" width="auto" height="auto">
+  <Layer layout="horizontal" gap="8" alignment="center" padding="8">
+    <Layer width="24" height="24">
+      <Ellipse left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#10B981"/>
+    </Layer>
+    <TextBox>
       <Text text="Online" fontFamily="Arial" fontSize="14"/>
       <Fill color="#374151"/>
     </TextBox>
@@ -157,8 +159,9 @@ to a `<div>` with `border-radius`, `background: white`, and `box-shadow`.
 </pagx>
 ```
 
-**Pattern**: Two-element row using constraint positioning — each element independently
-positioned with `left` + `centerY`. No container layout needed for simple fixed-offset pairs.
+**Pattern**: Content-driven row — `layout="horizontal"` with `gap` and `alignment="center"`
+replaces per-element constraint positioning. The icon needs its own Layer for painter scope
+isolation (Ellipse + Fill). TextBox auto-measures its content width.
 
 ### Progress Bar
 
@@ -177,7 +180,7 @@ positioned with `left` + `centerY`. No container layout needed for simple fixed-
 </pagx>
 ```
 
-**Pattern**: Like an HTML `<progress>` — two overlapping rounded rectangles (track + fill).
+**Pattern**: Two overlapping rounded rectangles (track + fill) — like an HTML `<progress>`.
 Group isolates fill bar's painters from track's Fill. `centerY="0"` vertically centers
 within the parent Layer.
 
@@ -224,22 +227,22 @@ Define the clip shape first, then apply ImagePattern as the fill.
 ### Notification Badge (includeInLayout)
 
 ```xml
-<pagx version="1.0" width="200" height="96">
-  <Layer centerX="0" centerY="0" width="176" height="72" layout="vertical" gap="8">
+<pagx version="1.0" width="auto" height="auto">
+  <Layer layout="vertical" gap="8" padding="12">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
     <Fill color="#FFF"/>
-    <Layer height="32">
+    <Layer layout="horizontal" padding="8,12" alignment="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
       <Fill color="#6366F1"/>
-      <TextBox centerX="0" centerY="0">
+      <TextBox textAlign="center">
         <Text text="Messages" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
         <Fill color="#FFF"/>
       </TextBox>
     </Layer>
-    <Layer height="32">
+    <Layer layout="horizontal" padding="8,12" alignment="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
       <Fill color="#F1F5F9"/>
-      <TextBox centerX="0" centerY="0">
+      <TextBox textAlign="center">
         <Text text="Settings" fontFamily="Arial" fontSize="13"/>
         <Fill color="#334155"/>
       </TextBox>
@@ -254,10 +257,10 @@ Define the clip shape first, then apply ImagePattern as the fill.
 </pagx>
 ```
 
-**Pattern**: `includeInLayout="false"` exempts the badge from the vertical layout flow —
-like CSS `position: absolute`, it overlays freely using constraint positioning relative to
-the parent Layer. Negative offsets (`right="-6" top="-6"`) place the dot outside the parent
-boundary (half the dot's diameter), centering it on the corner.
+**Pattern**: Content-driven badge — each button auto-sizes via `layout="horizontal"` with
+`padding` instead of hardcoded `height`. `includeInLayout="false"` exempts the red dot from
+layout flow — like CSS `position: absolute`. Negative offsets place the dot outside the
+parent boundary.
 
 ### Card with Internal Layout
 
@@ -265,7 +268,7 @@ A card with vertical container layout, rich text header, and action buttons.
 
 ```xml
 <pagx version="1.0" width="324" height="184">
-  <Layer centerX="0" centerY="0" width="300" height="160" layout="vertical" padding="16">
+  <Layer centerX="0" centerY="0" width="300" height="160" layout="vertical" padding="16" gap="12">
     <!-- Background: VectorElements don't participate in layout -->
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
     <Fill color="#FFF"/>
@@ -280,21 +283,21 @@ A card with vertical container layout, rich text header, and action buttons.
         </Group>
       </TextBox>
     </Layer>
-    <!-- Action buttons: two equal-width buttons -->
+    <!-- Action buttons: two equal-width buttons with flex distribution -->
     <Layer height="40" layout="horizontal" gap="16">
-      <Layer flex="1">
+      <Layer flex="1" layout="horizontal" alignment="center" arrangement="center">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
         <Fill color="#6366F1"/>
-        <TextBox centerX="0" centerY="0">
+        <TextBox textAlign="center">
           <Text text="Send" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
           <Fill color="#FFF"/>
         </TextBox>
       </Layer>
-      <Layer flex="1">
+      <Layer flex="1" layout="horizontal" alignment="center" arrangement="center">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
         <Fill color="#F1F5F9"/>
         <Stroke color="#CBD5E1" width="1" align="inside"/>
-        <TextBox centerX="0" centerY="0">
+        <TextBox textAlign="center">
           <Text text="Request" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
           <Fill color="#1E293B"/>
         </TextBox>
@@ -312,21 +315,21 @@ A card with vertical container layout, rich text header, and action buttons.
   the background stretches to full bounds.
 - **Rich text**: Multiple styled Text segments in one TextBox, separated by `&#10;`.
   Each segment after the first needs a Group for painter scope isolation.
-- **Equal-width buttons**: `flex="1"` in horizontal container = CSS `flex: 1` — fills
-  both axes (default stretch alignment).
+- **Content-driven buttons**: Each button uses `layout="horizontal"` with `alignment="center"
+  arrangement="center"` to center its TextBox — no scattered `centerX/centerY`.
 
 For flexible height layouts, see `design-patterns.md` §Fixed + flex mix.
 
 ### Input Field (InnerShadowStyle)
 
 ```xml
-<pagx version="1.0" width="280" height="50">
-  <Layer centerX="0" centerY="0" width="260" height="40">
+<pagx version="1.0" width="auto" height="auto">
+  <Layer centerX="0" centerY="0" layout="horizontal" padding="12">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
     <Fill color="#FFF"/>
     <Stroke color="#CBD5E1" width="1"/>
     <InnerShadowStyle offsetY="2" blurX="4" blurY="4" color="#00000010"/>
-    <TextBox left="12" centerY="0">
+    <TextBox>
       <Text text="Enter your email..." fontFamily="Arial" fontSize="14"/>
       <Fill color="#94A3B8"/>
     </TextBox>
@@ -334,8 +337,9 @@ For flexible height layouts, see `design-patterns.md` §Fixed + flex mix.
 </pagx>
 ```
 
-**Pattern**: InnerShadowStyle = CSS `box-shadow: inset` — adds subtle inner shadow for depth
-on form elements. Combined with Stroke border for the standard `<input>` look.
+**Pattern**: Content-driven input — `layout="horizontal"` with `padding` auto-sizes the
+container to fit text. InnerShadowStyle = CSS `box-shadow: inset`. Combined with Stroke
+border for the standard `<input>` look.
 
 ### Card Grid (Composition)
 
@@ -364,7 +368,8 @@ on form elements. Combined with Stroke border for the standard `<input>` look.
 
 **Pattern**: Composition = reusable component (like a Web Component or React component) —
 define once, instantiate multiple times. Internal geometry uses stretch constraints
-(`inset: 0`) to fill bounds. `flex="1"` distributes instances evenly.
+(`inset: 0`) to fill bounds. `flex="1"` distributes instances evenly. Composition `width`
+and `height` are required — they define the intrinsic size for flex allocation.
 
 ### Tab Bar (Partial Roundness)
 
@@ -390,12 +395,10 @@ define once, instantiate multiple times. Internal geometry uses stretch constrai
               <Fill color="#6366F1"/>
             </Group>
           </Layer>
-          <Layer>
-            <TextBox textAlign="center">
-              <Text text="Home" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
-              <Fill color="#6366F1"/>
-            </TextBox>
-          </Layer>
+          <TextBox textAlign="center">
+            <Text text="Home" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
+            <Fill color="#6366F1"/>
+          </TextBox>
         </Layer>
         <!-- Search: stroke (inactive) -->
         <Layer layout="vertical" gap="2" alignment="center">
@@ -409,12 +412,10 @@ define once, instantiate multiple times. Internal geometry uses stretch constrai
               </Group>
             </Group>
           </Layer>
-          <Layer>
-            <TextBox textAlign="center">
-              <Text text="Search" fontFamily="Arial" fontSize="10"/>
-              <Fill color="#94A3B8"/>
-            </TextBox>
-          </Layer>
+          <TextBox textAlign="center">
+            <Text text="Search" fontFamily="Arial" fontSize="10"/>
+            <Fill color="#94A3B8"/>
+          </TextBox>
         </Layer>
         <!-- Profile: stroke (inactive) -->
         <Layer layout="vertical" gap="2" alignment="center">
@@ -428,12 +429,10 @@ define once, instantiate multiple times. Internal geometry uses stretch constrai
               </Group>
             </Group>
           </Layer>
-          <Layer>
-            <TextBox textAlign="center">
-              <Text text="Profile" fontFamily="Arial" fontSize="10"/>
-              <Fill color="#94A3B8"/>
-            </TextBox>
-          </Layer>
+          <TextBox textAlign="center">
+            <Text text="Profile" fontFamily="Arial" fontSize="10"/>
+            <Fill color="#94A3B8"/>
+          </TextBox>
         </Layer>
       </Layer>
       <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000020"/>
@@ -442,11 +441,11 @@ define once, instantiate multiple times. Internal geometry uses stretch constrai
 </pagx>
 ```
 
-**Pattern**: Rectangle `roundness` applies to all four corners. CSS has `border-radius` per
-corner, but PAGX doesn't — to flatten specific corners, use `MergePath mode="intersect"` to
-clip a rounded rect with a straight-edged rect. Tab items use `arrangement="spaceAround"`
-(= CSS `justify-content: space-around`) for even distribution. Active tab uses Fill; inactive
-tabs use Stroke — see §Icons and `design-patterns.md` §Icon Generation.
+**Pattern**: Rectangle `roundness` applies to all four corners. To flatten specific corners,
+use `MergePath mode="intersect"` to clip a rounded rect with a straight-edged rect. Tab items
+use `arrangement="spaceAround"` for even distribution. Each tab's TextBox is a direct child of
+the vertical flex container (no wrapper Layer needed). Active tab uses Fill; inactive tabs use
+Stroke — see §Icons and `design-patterns.md` §Icon Generation.
 
 ---
 

@@ -1438,7 +1438,7 @@ Controls how `position.y` is interpreted for vertical positioning.
 
 **Runtime Layout Rendering Flow**:
 1. Find system font based on `fontFamily` and `fontStyle`; if unavailable, select fallback font according to runtime-configured fallback list
-2. Shape using `text` attribute (or CDATA child node); newlines trigger line breaks (default 1.2× font size line height, customizable via TextBox)
+2. Shape using `text` attribute (or CDATA child node); newlines trigger line breaks (default line height from font metrics: ascent + descent + leading, customizable via TextBox)
 3. Apply typography parameters: `fontSize`, `letterSpacing`
 4. Construct glyph list and accumulate to rendering context
 

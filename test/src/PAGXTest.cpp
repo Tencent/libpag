@@ -51,6 +51,7 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
+#include "pagx/nodes/TextPath.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Alignment.h"
 #include "pagx/types/Arrangement.h"
@@ -149,8 +150,8 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
   std::sort(svgFiles.begin(), svgFiles.end());
 
   // Create FontConfig for text layout
-  pagx::FontConfig svgFontProvider;
-  svgFontProvider.addFallbackTypefaces(GetFallbackTypefaces());
+  pagx::FontConfig svgFontConfig;
+  svgFontConfig.addFallbackTypefaces(GetFallbackTypefaces());
 
   for (const auto& svgPath : svgFiles) {
     std::string baseName = std::filesystem::path(svgPath).stem().string();
@@ -170,7 +171,7 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
     }
 
     // Step 2: Layout and embed fonts
-    doc->setFontConfig(svgFontProvider);
+    doc->setFontConfig(svgFontConfig);
     doc->applyLayout();
     pagx::FontEmbedder().embed(doc.get());
 
@@ -469,9 +470,9 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
       MakeTextLayer(doc.get(), "Embedded Font", 18, {0.5f, 0.5f, 0.5f, 1.0f}));
   doc->layers.push_back(layer);
 
-  pagx::FontConfig embedFontProvider;
-  embedFontProvider.addFallbackTypefaces(GetFallbackTypefaces());
-  doc->setFontConfig(embedFontProvider);
+  pagx::FontConfig embedFontConfig;
+  embedFontConfig.addFallbackTypefaces(GetFallbackTypefaces());
+  doc->setFontConfig(embedFontConfig);
   doc->applyLayout();
   pagx::FontEmbedder().embed(doc.get());
 
@@ -643,8 +644,8 @@ static void TestMarkdownExamples(tgfx::Context* context, const std::string& mark
                              outDir / "avatar.jpg",
                              std::filesystem::copy_options::overwrite_existing);
 
-  pagx::FontConfig fontProvider;
-  fontProvider.addFallbackTypefaces(GetFallbackTypefaces());
+  pagx::FontConfig fontConfig;
+  fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
 
   for (const auto& [name, xmlContent] : examples) {
     auto key = prefix + name;
@@ -665,7 +666,7 @@ static void TestMarkdownExamples(tgfx::Context* context, const std::string& mark
       ADD_FAILURE() << "Parse errors in " << key << ":" << errorLog;
     }
 
-    auto layer = pagx::LayerBuilder::Build(doc.get(), &fontProvider);
+    auto layer = pagx::LayerBuilder::Build(doc.get(), &fontConfig);
     if (!layer) {
       ADD_FAILURE() << "Failed to build layer for: " << key;
       continue;
@@ -695,8 +696,8 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
   }
   std::sort(files.begin(), files.end());
 
-  pagx::FontConfig fontProvider;
-  fontProvider.addFallbackTypefaces(GetFallbackTypefaces());
+  pagx::FontConfig fontConfig;
+  fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
 
   for (const auto& filePath : files) {
     auto key = prefix + std::filesystem::path(filePath).stem().string();
@@ -714,7 +715,7 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
       ADD_FAILURE() << "Parse errors in " << key << ":" << errorLog;
     }
 
-    auto layer = pagx::LayerBuilder::Build(doc.get(), &fontProvider);
+    auto layer = pagx::LayerBuilder::Build(doc.get(), &fontConfig);
     if (!layer) {
       ADD_FAILURE() << "Failed to build layer: " << filePath;
       continue;
@@ -2192,16 +2193,16 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {
   text->bottom = 10;
 
   // Compute original text bounds (horizontal: advance width, vertical: tight pixel bounds).
-  pagx::FontConfig fontProvider;
-  fontProvider.registerTypeface(typeface);
-  pagx::LayoutContext layoutContext(&fontProvider);
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  pagx::LayoutContext layoutContext(&fontConfig);
   auto origBounds = pagx::TextLayout::LayoutText(text, layoutContext, text->baseline);
   float origWidth = origBounds.width();
   float origHeight = origBounds.height();
 
   layer->contents.push_back(text);
 
-  doc->setFontConfig(fontProvider);
+  doc->setFontConfig(fontConfig);
   doc->applyLayout();
 
   // Proportional scaling: areaWidth = 360, areaHeight = 180
@@ -2236,15 +2237,15 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextSingleAxis) {
   text->right = 10;
 
   // Compute original text bounds (horizontal: advance width, vertical: tight pixel bounds).
-  pagx::FontConfig fontProvider;
-  fontProvider.registerTypeface(typeface);
-  pagx::LayoutContext layoutContext(&fontProvider);
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  pagx::LayoutContext layoutContext(&fontConfig);
   auto origBounds = pagx::TextLayout::LayoutText(text, layoutContext, text->baseline);
   float origWidth = origBounds.width();
 
   layer->contents.push_back(text);
 
-  doc->setFontConfig(fontProvider);
+  doc->setFontConfig(fontConfig);
   doc->applyLayout();
 
   // areaWidth = 380, scale = 380 / origWidth
@@ -4593,5 +4594,241 @@ PAGX_TEST(PAGXTest, DeepNestingConstraintPropagation) {
   EXPECT_FLOAT_EQ(outerGroup->position.x, 50);
   EXPECT_FLOAT_EQ(outerGroup->position.y, 50);
 }
+
+// =====================================================================================
+// Auto Layout - New Feature Tests (P1)
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutTextBaselineAlphabetic) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 400;
+  layer->height = 300;
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+  auto fontFamily = typeface->fontFamily();
+  auto fontStyle = typeface->fontStyle();
+
+  // Text with VisualTop baseline (default).
+  auto textVT = doc->makeNode<pagx::Text>();
+  textVT->text = "Hello";
+  textVT->fontFamily = fontFamily;
+  textVT->fontStyle = fontStyle;
+  textVT->fontSize = 48;
+  textVT->position = {50, 100};
+  textVT->baseline = pagx::TextBaseline::VisualTop;
+
+  // Text with Alphabetic baseline.
+  auto textAB = doc->makeNode<pagx::Text>();
+  textAB->text = "Hello";
+  textAB->fontFamily = fontFamily;
+  textAB->fontStyle = fontStyle;
+  textAB->fontSize = 48;
+  textAB->position = {200, 100};
+  textAB->baseline = pagx::TextBaseline::Alphabetic;
+
+  layer->contents = {textVT, textAB};
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  doc->setFontConfig(fontConfig);
+  doc->applyLayout();
+
+  // Both texts should have TextBlobs.
+  auto blobVT = textVT->getTextBlob();
+  auto blobAB = textAB->getTextBlob();
+  ASSERT_NE(blobVT, nullptr);
+  ASSERT_NE(blobAB, nullptr);
+
+  // VisualTop: TextBlob bounds.top should be near 0 (pixel top aligned to position.y).
+  auto boundsVT = blobVT->getTightBounds();
+  EXPECT_NEAR(boundsVT.top, 0, 1);
+
+  // Alphabetic: TextBlob bounds.top should be negative (ascender above baseline).
+  auto boundsAB = blobAB->getTightBounds();
+  EXPECT_LT(boundsAB.top, 0);
+}
+
+PAGX_TEST(PAGXTest, LayoutTextIndependentConstraint) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 400;
+  layer->height = 300;
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Test";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 30;
+  text->left = 50;
+  text->top = 40;
+  layer->contents.push_back(text);
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+
+  // Compute original bounds before layout.
+  pagx::LayoutContext layoutContext(&fontConfig);
+  auto origBounds = pagx::TextLayout::LayoutText(text, layoutContext, text->baseline);
+
+  doc->setFontConfig(fontConfig);
+  doc->applyLayout();
+
+  // No opposite-edge constraints, so fontSize should remain unchanged.
+  EXPECT_FLOAT_EQ(text->fontSize, 30);
+
+  // Position is set by constraint: position = constraintOffset - textBounds.left/top.
+  // With left=50: x = 50 - origBounds.left
+  // With top=40: y = 40 - origBounds.top
+  EXPECT_FLOAT_EQ(text->position.x, 50 - origBounds.left);
+  EXPECT_FLOAT_EQ(text->position.y, 40 - origBounds.top);
+}
+
+PAGX_TEST(PAGXTest, LayoutTextPathMeasurement) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 400;
+  layer->height = 300;
+
+  auto group = doc->makeNode<pagx::Group>();
+  // No explicit width/height: Group measures from children.
+
+  auto textPath = doc->makeNode<pagx::TextPath>();
+  textPath->path = doc->makeNode<pagx::PathData>();
+  textPath->path->moveTo(0, 0);
+  textPath->path->lineTo(200, 0);
+  textPath->path->lineTo(200, 100);
+  textPath->path->lineTo(0, 100);
+  textPath->path->close();
+
+  group->elements.push_back(textPath);
+  layer->contents.push_back(group);
+
+  doc->applyLayout();
+
+  // TextPath path bounds: 200x100.
+  EXPECT_FLOAT_EQ(textPath->preferredWidth, 200);
+  EXPECT_FLOAT_EQ(textPath->preferredHeight, 100);
+
+  // Group should have measured from TextPath bounds.
+  EXPECT_FLOAT_EQ(group->preferredWidth, 200);
+  EXPECT_FLOAT_EQ(group->preferredHeight, 100);
+  EXPECT_FLOAT_EQ(group->actualWidth, 200);
+  EXPECT_FLOAT_EQ(group->actualHeight, 100);
+}
+
+// =====================================================================================
+// Auto Layout - Edge Case Fixes (P2 continued)
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutConstraintScalePathSingleAxis) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 400;
+  layer->height = 300;
+
+  auto path = doc->makeNode<pagx::Path>();
+  path->data = doc->makeNode<pagx::PathData>();
+  path->data->moveTo(0, 0);
+  path->data->lineTo(100, 0);
+  path->data->lineTo(100, 80);
+  path->data->lineTo(0, 80);
+  path->data->close();
+  // Only horizontal constraint: left+right gives targetW=360, no targetH.
+  path->left = 20;
+  path->right = 20;
+  layer->contents.push_back(path);
+
+  doc->applyLayout();
+
+  // scale = 360 / 100 = 3.6
+  EXPECT_FLOAT_EQ(path->actualWidth, 360);
+  // Height should scale proportionally: 80 * 3.6 = 288.
+  EXPECT_FLOAT_EQ(path->actualHeight, 288);
+}
+
+PAGX_TEST(PAGXTest, LayoutTextScaledPositionAnchor) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 400;
+  layer->height = 200;
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "ABC";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 30;
+  text->textAnchor = pagx::TextAnchor::Center;
+  text->left = 50;
+  text->right = 50;
+  layer->contents.push_back(text);
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  doc->setFontConfig(fontConfig);
+  doc->applyLayout();
+
+  // Target width = 400 - 50 - 50 = 300.
+  // After scaling, text should be centered in the 300px area.
+  auto blob = text->getTextBlob();
+  ASSERT_NE(blob, nullptr);
+  // Verify the scaled text has a valid actual size.
+  EXPECT_GT(text->actualWidth, 0);
+  // fontSize should have been scaled (target 300px is different from original width).
+  EXPECT_NE(text->fontSize, 30);
+}
+
+// =====================================================================================
+// Auto Layout - Architectural Integrity (P3 continued)
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutTextInTextBoxSkipConstraint) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 400;
+  layer->height = 300;
+
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->width = 300;
+  textBox->height = 200;
+  textBox->left = 50;
+  textBox->top = 50;
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Inside TextBox";
+  text->fontSize = 20;
+  // Set constraints on Text inside TextBox — these should be ignored.
+  text->left = 10;
+  text->right = 10;
+  text->top = 5;
+  text->bottom = 5;
+  textBox->elements.push_back(text);
+  layer->contents.push_back(textBox);
+
+  doc->applyLayout();
+
+  // Text inside TextBox should NOT have fontSize scaled by constraints.
+  EXPECT_FLOAT_EQ(text->fontSize, 20);
+}
+
+// =====================================================================================
+// Variable naming cleanup
+// =====================================================================================
 
 }  // namespace pag

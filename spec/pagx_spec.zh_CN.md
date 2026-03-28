@@ -1437,7 +1437,7 @@ Line 3]]>
 
 **运行时排版渲染流程**：
 1. 根据 `fontFamily` 和 `fontStyle` 查找系统字体，不可用时按运行时配置的回退列表选择替代字体
-2. 使用 `text` 属性（或 CDATA 子节点）进行塑形，换行符触发换行（默认 1.2 倍字号行高，可通过 TextBox 自定义）
+2. 使用 `text` 属性（或 CDATA 子节点）进行塑形，换行符触发换行（默认行高取自字体指标：ascent + descent + leading，可通过 TextBox 自定义）
 3. 应用 `fontSize`、`letterSpacing` 等排版参数
 4. 构造字形列表累积到渲染上下文
 
