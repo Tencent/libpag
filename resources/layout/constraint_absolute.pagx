@@ -15,19 +15,19 @@
 
     <!-- Child 1: Participates in horizontal layout -->
     <Layer width="150" height="176">
-      <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
       <Fill color="#4ECDC4"/>
     </Layer>
 
     <!-- Child 2: Participates in horizontal layout -->
     <Layer width="150" height="176">
-      <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
       <Fill color="#45B7D1"/>
     </Layer>
 
     <!-- Overlay: Excluded from layout flow, red dot inside Child 2's bottom-right corner -->
     <Layer right="20" bottom="20" width="30" height="30" includeInLayout="false">
-      <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="15"/>
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="15"/>
       <Fill color="#FF6B6B"/>
     </Layer>
   </Layer>

@@ -17,7 +17,7 @@
       <!-- Container 1: Single-edge positioning -->
       <Layer flex="1" height="250">
         <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         </Layer>
         <!-- 1.1: left="20" top="20" (arrow shape) -->
@@ -40,7 +40,7 @@
       <!-- Container 2: Horizontal-only scaling (left+right) -->
       <Layer flex="1" height="250">
         <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         </Layer>
         <!-- 2.1: left="30" right="30" top="30" (horizontal scale, top position) -->
@@ -73,7 +73,7 @@
       <!-- Container 3: Vertical-only scaling (top+bottom) -->
       <Layer flex="1" height="250">
         <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         </Layer>
         <!-- 3.1: top="20" bottom="20" centerX="0" (vertical scale fills height with margins) -->
@@ -91,7 +91,7 @@
       <!-- Container 4: Dual-axis fit scaling -->
       <Layer flex="1" height="250">
         <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         </Layer>
         <!-- 4.1: asymmetric margins: top="20" bottom="60" (top tighter than bottom) -->
@@ -109,7 +109,7 @@
       <!-- Container 5: Dual-axis fit, wide and tall -->
       <Layer flex="1" height="250">
         <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         </Layer>
         <!-- 5.1: asymmetric margins: top="60" bottom="20" (top wider than bottom) -->

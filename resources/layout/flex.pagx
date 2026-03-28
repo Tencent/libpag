@@ -16,15 +16,15 @@
         <Fill color="#E6E6E6"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer flex="1" height="130">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#3366E6"/>
         </Layer>
         <Layer flex="1" height="130">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#E63333"/>
         </Layer>
         <Layer flex="1" height="130">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#33CC4D"/>
         </Layer>
       </Layer>
@@ -35,19 +35,19 @@
         <Fill color="#E6E6E6"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="60" height="60">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#3366E6"/>
         </Layer>
         <Layer width="60" height="100">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#E63333"/>
         </Layer>
         <Layer width="60" height="80">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#33CC4D"/>
         </Layer>
         <Layer width="60" height="40">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#F2D926"/>
         </Layer>
       </Layer>
@@ -62,22 +62,22 @@
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <!-- Fixed 80px -->
         <Layer width="80" height="130">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#3366E6"/>
         </Layer>
         <!-- Flex (no width) -->
         <Layer flex="1" height="130">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#E63333"/>
         </Layer>
         <!-- Fixed 80px -->
         <Layer width="80" height="130">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#33CC4D"/>
         </Layer>
         <!-- Flex (no width) -->
         <Layer flex="1" height="130">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#F2D926"/>
         </Layer>
       </Layer>
@@ -88,19 +88,19 @@
         <Fill color="#E6E6E6"/>
         <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         <Layer width="60" height="130">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#3366E6"/>
         </Layer>
         <Layer width="60" height="130">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#E63333"/>
         </Layer>
         <Layer width="60" height="130">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#33CC4D"/>
         </Layer>
         <Layer width="60" height="130">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="8"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
           <Fill color="#F2D926"/>
         </Layer>
       </Layer>

@@ -18,7 +18,7 @@
       <!-- Container 1: Single-edge and center positioning -->
       <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         </Layer>
         <!-- 1.1: left="20" top="20" -->
@@ -53,7 +53,7 @@
       <!-- Container 2: Horizontal stretch (left+right) with word wrapping -->
       <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         </Layer>
         <!-- 2.1: left="20" right="20" top="10" — widest box -->
@@ -93,7 +93,7 @@
       <!-- Container 3: Vertical stretch (top+bottom) -->
       <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         </Layer>
         <!-- 3.1: left="15" top="20" bottom="20" -->
@@ -110,7 +110,7 @@
       <!-- Container 4: Four-edge stretch -->
       <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         </Layer>
         <!-- 4.1: all edges stretch -->
@@ -127,7 +127,7 @@
       <!-- Container 5: Asymmetric stretch -->
       <Layer flex="1" height="200">
         <Layer left="0" right="0" top="0" bottom="0">
-          <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
           <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
         </Layer>
         <!-- 5.1: asymmetric margins -->

@@ -45,25 +45,25 @@
 
     <!-- Box 6: horizontal stretch between top-left and top-right boxes, centered on their Y midline -->
     <Layer left="120" right="120" top="35" height="30">
-      <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
       <Fill color="#F38181"/>
     </Layer>
 
     <!-- Box 7: horizontal stretch between bottom-left and bottom-right boxes, centered on their Y midline -->
     <Layer left="120" right="120" top="335" height="30">
-      <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
       <Fill color="#F38181"/>
     </Layer>
 
     <!-- Box 8: vertical stretch between top-left and bottom-left boxes, centered on their X midline -->
     <Layer left="45" top="100" bottom="100" width="30">
-      <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
       <Fill color="#AA96DA"/>
     </Layer>
 
     <!-- Box 9: vertical stretch between top-right and bottom-right boxes, centered on their X midline -->
     <Layer right="45" top="100" bottom="100" width="30">
-      <Rectangle left="0" right="0" top="0" bottom="0" size="1,1" roundness="4"/>
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
       <Fill color="#AA96DA"/>
     </Layer>
   </Layer>

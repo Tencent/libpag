@@ -3,7 +3,7 @@
   <Layer left="0" right="0" top="0" bottom="0">
     <Group>
       <Group centerX="0" centerY="0" width="100" height="80">
-        <Rectangle left="0" right="0" top="0" bottom="0" size="1,1"/>
+        <Rectangle left="0" right="0" top="0" bottom="0"/>
         <Fill color="#6366F1"/>
       </Group>
     </Group>
