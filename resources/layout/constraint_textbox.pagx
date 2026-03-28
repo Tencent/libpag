@@ -4,10 +4,8 @@
 <!-- Each TextBox has a matching dashed border to visualize its computed bounds -->
 <pagx version="1.0" width="820" height="480">
   <!-- Background -->
-  <Layer left="0" right="0" top="0" bottom="0">
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
-    <Fill color="#F8FAFC"/>
-  </Layer>
+  <Rectangle left="0" right="0" top="0" bottom="0"/>
+  <Fill color="#F8FAFC"/>
 
   <!-- Main vertical layout -->
   <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">

@@ -2,10 +2,8 @@
 <!-- Layer constraint with includeInLayout=false: overlay positioned by constraints -->
 <pagx version="1.0" width="336" height="200">
   <!-- Background -->
-  <Layer>
-    <Rectangle size="336,200"/>
-    <Fill color="#F8FAFC"/>
-  </Layer>
+  <Rectangle size="336,200"/>
+  <Fill color="#F8FAFC"/>
 
   <!-- Main container: Horizontal layout with 2 children + 1 overlay -->
   <Layer width="336" height="200" layout="horizontal" gap="12" padding="12">

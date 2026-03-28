@@ -2,10 +2,8 @@
 <!-- Container layout: compound scenarios -->
 <pagx version="1.0" width="840" height="520">
   <!-- Background -->
-  <Layer left="0" right="0" top="0" bottom="0">
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
-    <Fill color="#F8FAFC"/>
-  </Layer>
+  <Rectangle left="0" right="0" top="0" bottom="0"/>
+  <Fill color="#F8FAFC"/>
 
   <!-- Grid: 2 rows x 4 columns, uniform padding=30, gap=20 -->
   <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="20" padding="30">
