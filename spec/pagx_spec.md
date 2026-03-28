@@ -560,7 +560,7 @@ For child Layers, container layout and constraint positioning are **mutually exc
 **With constraint positioning** (no container layout or `includeInLayout="false"`):
 1. **Opposite-pair constraints** (`left`+`right` or `top`+`bottom`) derive size from parent container (e.g., `width = parent.width - left - right`), **always overriding** explicit size
 2. **Explicit declaration**: Directly setting `width`/`height` attributes
-3. **Content measurement**: The engine automatically computes size from content bounds. For Group, the measured value = the bottom-right extent of all internal elements relative to the local origin (0,0), ensuring the measurement result is independent of how elements are positioned inside
+3. **Content measurement**: When neither explicit size nor opposite-pair constraints are set, the engine automatically computes size from content bounds — the container grows to fit its content. For Group and Layer, the measured size spans from the local origin (0,0) to the bottom-right extent of all internal elements' content bounds (including constraint-contributed margins), ensuring the measurement result is independent of how elements are positioned inside. For Text, the measured size is the line-box bounds (advance width sum × font metrics line height). This content-driven sizing enables patterns like auto-width buttons (a Layer with `layout="horizontal"` + `padding` wrapping a Text element — the Layer automatically sizes to fit the text content plus padding)
 
 These sources ensure that containers nearly always have a size available during layout calculations. Explicitly setting `width`/`height` is only necessary when a specific design size (different from the natural content size) is needed.
 
@@ -690,7 +690,7 @@ Constraint attributes allow content nodes to declare positional relationships wi
 **Content Bounds**: "Edges" in constraints refer to the edges of an element's content bounds. The starting point differs by element type:
 
 - **Frame-aligned nodes** (Rectangle, Ellipse, TextBox, Group, Layer): content bounds are [0, width] × [0, height] in local coordinates — the logical frame. `left="0"` aligns the frame's left edge to the container.
-- **Pixel-aligned nodes** (Path, Text): content bounds are the actual rendered pixel boundary. `left="0"` shifts content so rendered pixels touch the container edge.
+- **Pixel-aligned nodes** (Path, Text, Polystar, TextPath): content bounds are the actual rendered pixel boundary. `left="0"` shifts content so rendered pixels touch the container edge. For Text, content bounds are the line-box bounds (advance width sum × font metrics line height), providing stable measurement independent of specific glyph shapes.
 
 Both ensure `left="0"` means "content aligns with container edge". For frame-aligned nodes this is the logical frame; for pixel-aligned nodes this is the rendered pixels.
 

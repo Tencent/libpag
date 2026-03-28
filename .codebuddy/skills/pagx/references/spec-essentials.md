@@ -92,13 +92,37 @@ pagx
 
 ### Layout Model
 
-PAGX layout follows a single recursive pattern at every level:
+PAGX layout follows a two-phase recursive pattern at every level:
 
-1. **Container has a deterministic size** — from one of three sources (highest priority first):
-   explicit `width`/`height`, parent layout-assigned, or measured from child content bounds
-   (measured bounds span from (0,0) to the bottom-right extent of children)
-2. **Children measure their content** — each child determines its own size from its content
-3. **Children position within the container** — using the container's size as reference frame
+**Phase 1 — Measure (bottom-up)**: Each node determines its own size. Leaf nodes measure
+from their content (e.g., Text measures line-box bounds: advance width × font metrics line
+height; Rectangle uses its `size`). Container nodes (Group, Layer) recursively measure
+children first, then compute their own size from the children's bounds. If a container has
+explicit `width`/`height`, those values are used directly without measuring children for
+that axis.
+
+**Phase 2 — Layout (top-down)**: The engine walks the tree from root to leaves. For each
+child, it computes the target size from constraints (opposite-pair constraints derive size),
+writes the final size, computes position from constraints, then recursively lays out the
+child's own children using the computed size as the container reference frame.
+
+This two-phase model ensures every container has a deterministic size before its children
+are positioned. The key enabler is **content-driven sizing**: when a container has no
+explicit `width`/`height`, it automatically grows to fit its content — measured from (0,0)
+to the bottom-right extent of all children's bounds (including constraint-contributed
+margins). This supports patterns like:
+
+- **Auto-width button**: `<Layer layout="horizontal" padding="8,16">` wrapping a Text
+  element — the Layer measures Text content and adds padding to determine its own size
+- **Content-hugging card**: A Layer without explicit size containing positioned elements —
+  the Layer shrinks to exactly fit its children
+- **Nested auto-sizing**: Multiple levels of containers without explicit sizes, each level
+  measuring from its children, propagating sizes upward
+
+Three sources determine a container's size (highest priority first):
+1. **Opposite-pair constraints** — derived from parent (`width = parent.width - left - right`)
+2. **Explicit `width`/`height`** — directly declared
+3. **Content measurement** — automatically computed from children's bounds
 
 Two positioning mechanisms are available:
 
@@ -108,10 +132,7 @@ Two positioning mechanisms are available:
   `alignment` to arrange child Layers; TextBox uses `textAlign` + `paragraphAlign` to
   arrange text lines
 
-This model applies identically at every nesting depth. A Layer positions its children
-(including TextBox) via constraints or layout; a TextBox positions its text lines via
-text alignment rules. Each level is the same pattern: deterministic container size →
-child measurement → positioning.
+This model applies identically at every nesting depth.
 
 ### Container Layout (between Layers)
 
@@ -222,8 +243,10 @@ Key rules:
   differ by element type:
   - **Frame-aligned** (Rectangle, Ellipse, TextBox, Group, Layer): bounds = [0, width] × [0,
     height] in local coordinates. `left="0"` aligns the logical frame's left edge to the container.
-  - **Pixel-aligned** (Path): bounds = actual rendered pixel boundary. `left="0"` shifts
-    content so rendered pixels touch the container's left edge.
+  - **Pixel-aligned** (Path, Text, Polystar, TextPath): bounds = actual rendered pixel boundary.
+    `left="0"` shifts content so rendered pixels touch the container's left edge. For Text,
+    bounds are the line-box bounds (advance width × font metrics line height), which provides
+    stable measurement independent of specific glyph shapes.
   - Both ensure `left="0"` means "content aligns with container edge" — the difference is whether
     "content" means logical frame or rendered pixels.
   - **Group/Layer measured bounds**: When Group or Layer has no explicit `width`/`height`, its
@@ -493,9 +516,10 @@ is sequential and forward-only.
 <Text left="10" top="10" text="Hello" fontFamily="Arial" fontSize="24"/>
 ```
 
-- Text supports constraint attributes (`left`, `right`, `top`, `bottom`, `centerX`, `centerY`) for positioning within the container. Prefer wrapping Text in TextBox — TextBox handles measurement and provides accurate bounding box. Exception: when using TextPath, Text can appear without TextBox wrapper.
+- Text supports constraint attributes (`left`, `right`, `top`, `bottom`, `centerX`, `centerY`) for positioning within the container.
+- **Content bounds**: Text measures as line-box bounds (advance width sum × font metrics line height). In `visualTop` mode, bounds top is the visual pixel top; in `alphabetic` mode, bounds include ascender above the baseline. This measurement participates in parent container auto-sizing — a Group or Layer without explicit size will grow to fit its Text children.
+- **Standalone Text**: Text can be used directly inside a Layer or Group without TextBox wrapping. This is ideal for single-line labels, buttons, and badges where multi-line layout is not needed. Use TextBox only when you need paragraph-level features (word wrapping, multi-line alignment, vertical writing mode).
 - `baseline`: `visualTop` (default) or `alphabetic`. In `visualTop` mode, position.y is the top of the visual pixel bounds; in `alphabetic` mode, position.y is the alphabetic baseline.
-- **Constraint attributes**: prefer applying constraints to the parent TextBox instead of directly on Text.
 - `fauxBold` / `fauxItalic`: algorithmic bold / italic (default false).
 - **CDATA** for special characters: `<![CDATA[A < B]]>`.
 - `\n` in `text` attribute (as `&#10;`) triggers line breaks.
