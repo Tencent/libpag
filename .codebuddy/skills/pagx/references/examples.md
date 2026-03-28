@@ -111,7 +111,7 @@ or CSS `border-bottom: 1px solid`. Use `centerX="0"` to center horizontally with
 
 ```xml
 <pagx version="1.0" width="200" height="60">
-  <Layer centerX="0" centerY="0" layout="horizontal" padding="16,8">
+  <Layer centerX="0" centerY="0" layout="horizontal" padding="8,16">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="22"/>
     <Fill color="#3B82F6"/>
     <TextBox textAlign="center">
@@ -231,8 +231,7 @@ Define the clip shape first, then apply ImagePattern as the fill.
   <Layer layout="vertical" gap="8" padding="12">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
     <Fill color="#FFF"/>
-    <!-- Message button: flex layout handles centering -->
-    <Layer layout="horizontal" padding="12,8" alignment="center">
+    <Layer layout="horizontal" padding="8,12" alignment="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
       <Fill color="#6366F1"/>
       <TextBox textAlign="center">
@@ -240,8 +239,7 @@ Define the clip shape first, then apply ImagePattern as the fill.
         <Fill color="#FFF"/>
       </TextBox>
     </Layer>
-    <!-- Settings button -->
-    <Layer layout="horizontal" padding="12,8" alignment="center">
+    <Layer layout="horizontal" padding="8,12" alignment="center">
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
       <Fill color="#F1F5F9"/>
       <TextBox textAlign="center">
