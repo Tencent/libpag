@@ -34,8 +34,9 @@ Icon patterns using the "Think in SVG, write in PAGX" approach. See `design-patt
 </pagx>
 ```
 
-**Pattern**: Ellipse for circles + Path for lines/arcs — most stroke icons combine these two.
-Group isolates each part's Stroke. Use `cap="round"` on endpoints, width 1.5–2px at 22×22.
+**Pattern**: Ellipse for rings + Path for lines — most stroke icons decompose into these two primitives.
+Group isolates the diagonal line's Stroke (different width/cap) from the ring's Stroke.
+`cap="round"` on open endpoints prevents flat cuts.
 
 ### Fill Icon (Solid / Active)
 
@@ -53,8 +54,9 @@ Group isolates each part's Stroke. Use `cap="round"` on endpoints, width 1.5–2
 </pagx>
 ```
 
-**Pattern**: Single closed Path with `Fill` — for irregular shapes that can't be built from
-Rectangle/Ellipse. Path `data` uses SVG `<path d>` syntax directly.
+**Pattern**: Single closed Path with `Fill` — for irregular shapes (heart, leaf, lightning)
+that can't decompose into Rectangle/Ellipse. Path `data` is standard SVG `<path d>` syntax,
+closed with `Z`.
 
 ### Mixed Icon (Stroke + Fill)
 
@@ -80,10 +82,11 @@ Rectangle/Ellipse. Path `data` uses SVG `<path d>` syntax directly.
 </pagx>
 ```
 
-**Pattern**: Stroke for outlines + Fill for solid areas in the same icon. Each rendering
-technique needs its own Group for painter scope isolation. All three icon examples above
-share the same structure: background Rectangle + Fill on the Layer, icon Group centered
-via `centerX="0" centerY="0"`. For circular backgrounds, replace Rectangle with Ellipse.
+**Pattern**: Stroke for outlines (arc) + Fill for solid areas (body, cutout) in one icon.
+Each part with different painters needs its own Group for scope isolation. **All three icon
+examples share the same structure**: background Rectangle + Fill on the Layer, icon content
+centered via `centerX="0" centerY="0"` on the outer Group. For circular backgrounds, replace
+Rectangle with Ellipse.
 
 ---
 
@@ -104,8 +107,9 @@ Layers in rows or columns, and constraint positioning for positioning elements w
 </pagx>
 ```
 
-**Pattern**: A 1px-tall Rectangle serves as a horizontal divider — equivalent to HTML `<hr>`
-or CSS `border-bottom: 1px solid`. Use `centerX="0"` to center horizontally with side margins.
+**Pattern**: A 1px-tall Rectangle — equivalent to HTML `<hr>`. Layer uses `centerX="0"
+centerY="0"` to center within the canvas, Rectangle's intrinsic `size` creates side margins
+automatically.
 
 ### Button
 
@@ -123,25 +127,10 @@ or CSS `border-bottom: 1px solid`. Use `centerX="0"` to center horizontally with
 </pagx>
 ```
 
-**Pattern**: Content-driven button — TextBox with constraint margins (`left/right/top/bottom`)
-defines the button size, and the Layer auto-sizes to fit. `textAlign="center"` +
-`paragraphAlign="middle"` centers text within the TextBox region. Rectangle stretches to fill
-the final Layer bounds. DropShadowStyle = CSS `box-shadow`.
-
-### Card with Shadow
-
-```xml
-<pagx version="1.0" width="340" height="240">
-  <Layer centerX="0" centerY="0" width="300" height="200">
-    <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
-    <Fill color="#FFF"/>
-    <DropShadowStyle offsetY="4" blurX="8" blurY="8" color="#00000020"/>
-  </Layer>
-</pagx>
-```
-
-**Pattern**: The simplest card — rounded Rectangle + white Fill + DropShadowStyle. Equivalent
-to a `<div>` with `border-radius`, `background: white`, and `box-shadow`.
+**Pattern**: Content-driven button — Text with constraint margins (`left/right/top/bottom`)
+defines the content area; Group uses `centerX/centerY` to center within the Layer. The Layer
+auto-sizes to fit the Group's measured bounds, and Rectangle stretches to fill via
+`left/right/top/bottom="0"`. DropShadowStyle = CSS `box-shadow`.
 
 ### Icon + Label Row
 
@@ -161,8 +150,9 @@ to a `<div>` with `border-radius`, `background: white`, and `box-shadow`.
 ```
 
 **Pattern**: Content-driven row — `layout="horizontal"` with `gap` and `alignment="center"`
-replaces per-element constraint positioning. The icon needs its own Layer for painter scope
-isolation (Ellipse + Fill). Text is wrapped in Group for painter scope isolation.
+replaces manual coordinate positioning. Each child is a Layer providing painter scope
+isolation — icon (Ellipse + Fill) and label (Text + Fill) each in their own Layer,
+sized by content.
 
 ### Progress Bar
 
@@ -181,9 +171,9 @@ isolation (Ellipse + Fill). Text is wrapped in Group for painter scope isolation
 </pagx>
 ```
 
-**Pattern**: Two overlapping rounded rectangles (track + fill) — like an HTML `<progress>`.
-Group isolates fill bar's painters from track's Fill. `centerY="0"` vertically centers
-within the parent Layer.
+**Pattern**: Two overlapping rounded Rectangles (track + fill bar) — like HTML `<progress>`.
+Group isolates the fill bar's Fill from the track's Fill. The outer Layer uses
+`centerX="0" centerY="0"` to center the whole bar in the canvas.
 
 ### Gradient Text
 
@@ -201,9 +191,10 @@ within the parent Layer.
 </pagx>
 ```
 
-**Pattern**: LinearGradient inside Fill applies to text geometry — the PAGX equivalent of CSS
-`background: linear-gradient(...); -webkit-background-clip: text`. Gradient coordinates are
-relative to the Group's local origin. Group provides painter scope isolation.
+**Pattern**: LinearGradient inside Fill applies to Text geometry — the PAGX equivalent of CSS
+`background: linear-gradient(...); -webkit-background-clip: text`. Gradient `startPoint` /
+`endPoint` coordinates are relative to the Text element's local origin. Text + Fill sit
+directly on the Layer (no Group needed when only one painter scope exists).
 
 ### Avatar with Circular Clip
 
@@ -219,17 +210,15 @@ relative to the Group's local origin. Group provides painter scope isolation.
 </pagx>
 ```
 
-**Pattern**: Images can be filled into any shape — Ellipse, Rectangle, Path, or even complex
-shapes built with MergePath. Like CSS `clip-path: circle()` on an `<img>`, but more versatile.
-Define the clip shape first, then apply ImagePattern as the fill.
+**Pattern**: ImagePattern fills the Ellipse shape — image is clipped to the geometry boundary,
+like CSS `clip-path: circle()` on an `<img>`. Works with any shape (Rectangle, Path, MergePath
+results). DropShadowStyle adds depth. Layer uses `centerX/centerY` for canvas centering.
 
 ### Notification Badge (includeInLayout)
 
 ```xml
 <pagx version="1.0" width="200" height="96">
-  <Layer layout="vertical" gap="8" padding="12">
-    <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
-    <Fill color="#FFF"/>
+  <Layer left="12" right="12" top="12" bottom="12" layout="vertical" gap="8">
     <Layer>
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
       <Fill color="#6366F1"/>
@@ -241,7 +230,7 @@ Define the clip shape first, then apply ImagePattern as the fill.
     <Layer>
       <Rectangle left="0" right="0" top="0" bottom="0" roundness="6"/>
       <Fill color="#F1F5F9"/>
-      <Group centerX="0" centerY="0" >
+      <Group centerX="0" centerY="0">
         <Text left="12" right="12" top="8" bottom="8" text="Settings" fontFamily="Arial" fontSize="13"/>
         <Fill color="#334155"/>
       </Group>
@@ -256,10 +245,12 @@ Define the clip shape first, then apply ImagePattern as the fill.
 </pagx>
 ```
 
-**Pattern**: Content-driven badge — each button auto-sizes via Text constraint margins
-(`left/right/top/bottom` on Group) instead of hardcoded `height`. `includeInLayout="false"`
-exempts the red dot from layout flow — like CSS `position: absolute`. Negative offsets place
-the dot outside the parent boundary.
+**Pattern**: Vertical layout container with content-driven buttons — each button's Text uses
+constraint margins (`left/right/top/bottom`) to define padding, Group uses `centerX/centerY`
+to center within the button Layer, making button height auto-sized from text content.
+`includeInLayout="false"` exempts the red dot from layout flow — like CSS `position: absolute`.
+Negative offsets (`right="-6" top="-6"`) place the dot outside the parent boundary.
+DropShadowStyle on the container applies to all buttons.
 
 ### Card with Internal Layout
 
@@ -272,23 +263,23 @@ A card with vertical container layout, rich text header, and action buttons.
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
     <Fill color="#FFF"/>
     <!-- Title + Value (rich text: flex="1" absorbs remaining space) -->
-    <Layer flex="1">
-      <TextBox>
+    <Layer flex="1" layout="vertical" gap="16">
+      <Layer>
         <Text text="Account Balance&#10;" fontFamily="Arial" fontSize="14"/>
         <Fill color="#64748B"/>
-        <Group>
-          <Text text="$12,580" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
-          <Fill color="#1E293B"/>
-        </Group>
-      </TextBox>
+      </Layer>
+      <Layer>
+        <Text text="$12,580" fontFamily="Arial" fontStyle="Bold" fontSize="28"/>
+        <Fill color="#1E293B"/>
+      </Layer>
     </Layer>
     <!-- Action buttons: two equal-width buttons with flex distribution -->
     <Layer height="40" layout="horizontal" gap="16">
       <Layer flex="1" layout="horizontal" alignment="center" arrangement="center">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
         <Fill color="#6366F1"/>
-        <Group>
-          <Text text="Send" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+        <Group centerX="0" centerY="0">
+          <Text left="16" right="16" top="16" bottom="16" text="Send" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
           <Fill color="#FFF"/>
         </Group>
       </Layer>
@@ -296,8 +287,8 @@ A card with vertical container layout, rich text header, and action buttons.
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
         <Fill color="#F1F5F9"/>
         <Stroke color="#CBD5E1" width="1" align="inside"/>
-        <Group>
-          <Text text="Request" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+        <Group centerX="0" centerY="0">
+          <Text left="16" right="16" top="16" bottom="16" text="Request" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
           <Fill color="#1E293B"/>
         </Group>
       </Layer>
@@ -312,10 +303,12 @@ A card with vertical container layout, rich text header, and action buttons.
 - **Background on layout Layer**: VectorElements don't participate in layout — write
   Rectangle + Fill directly on the `layout` Layer. `padding` insets child Layers while
   the background stretches to full bounds.
-- **Rich text**: Multiple styled Text segments in one TextBox, separated by `&#10;`.
-  Each segment after the first needs a Group for painter scope isolation.
+- **Flex absorbs space**: Title+Value area uses `flex="1"` to fill remaining height
+  after the fixed-height button row, separating content into individual Layers with
+  independent Fill colors.
 - **Content-driven buttons**: Each button uses `layout="horizontal"` with `alignment="center"
-  arrangement="center"` to center its Text Group — no scattered `centerX/centerY`.
+  arrangement="center"` to center its text Group. `flex="1"` on both buttons distributes
+  width equally.
 
 For flexible height layouts, see `design-patterns.md` §Fixed + flex mix.
 
@@ -323,23 +316,23 @@ For flexible height layouts, see `design-patterns.md` §Fixed + flex mix.
 
 ```xml
 <pagx version="1.0" width="280" height="50">
-  <Layer centerX="0" centerY="0">
+  <Layer centerX="0" centerY="0" width="260" height="40">
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
     <Fill color="#FFF"/>
     <Stroke color="#CBD5E1" width="1"/>
-    <InnerShadowStyle offsetY="2" blurX="4" blurY="4" color="#00000010"/>
-    <Group left="12" right="12" top="12" bottom="12">
+    <Group left="12" centerY="0">
       <Text text="Enter your email..." fontFamily="Arial" fontSize="14"/>
       <Fill color="#94A3B8"/>
     </Group>
+    <InnerShadowStyle offsetY="2" blurX="4" blurY="4" color="#00000010"/>
   </Layer>
 </pagx>
 ```
 
-**Pattern**: Content-driven input — Text constraint margins (`left/right/top/bottom` on Group)
-auto-size the Layer. Group isolates the placeholder Fill from the outer Stroke/Fill.
-InnerShadowStyle = CSS `box-shadow: inset`. Combined with Stroke border for the standard
-`<input>` look.
+**Pattern**: Fixed-size input field — Layer has explicit `width/height`. Group uses `left="12"
+centerY="0"` to left-align and vertically center the placeholder text. Group isolates the
+placeholder Fill from the outer Rectangle's Fill + Stroke. InnerShadowStyle = CSS
+`box-shadow: inset`, combined with Stroke border for the standard `<input>` look.
 
 ### Card Grid (Composition)
 
@@ -366,10 +359,11 @@ InnerShadowStyle = CSS `box-shadow: inset`. Combined with Stroke border for the 
 </pagx>
 ```
 
-**Pattern**: Composition = reusable component (like a Web Component or React component) —
-define once, instantiate multiple times. Internal geometry uses stretch constraints
-(`inset: 0`) to fill bounds. `flex="1"` distributes instances evenly. Composition `width`
-and `height` are required — they define the intrinsic size for flex allocation.
+**Pattern**: Composition = reusable component (like React component) — define once in
+`<Resources>`, instantiate via `composition="@id"`. Internal Layer uses `left/right/top/bottom="0"`
+to stretch-fill the Composition bounds. `flex="1"` on each instance distributes available width
+evenly. Composition `width`/`height` are required — they set the intrinsic size used by flex
+allocation.
 
 ### Tab Bar (Partial Roundness)
 
@@ -389,19 +383,19 @@ and `height` are required — they define the intrinsic size for flex allocation
       <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" arrangement="spaceAround" alignment="center">
         <!-- Home: filled (active) -->
         <Layer layout="vertical" gap="2" alignment="center">
-          <Layer width="24" height="24">
-            <Group centerX="0" centerY="0">
-              <Path data="M12 0L0 12L3 12L3 22L9 22L9 15L15 15L15 22L21 22L21 12L24 12Z"/>
-              <Fill color="#6366F1"/>
-            </Group>
+          <Layer height="24">
+            <Path centerY="0" data="M12 0L0 12L3 12L3 22L9 22L9 15L15 15L15 22L21 22L21 12L24 12Z"/>
+            <Fill color="#6366F1"/>
           </Layer>
-          <Text text="Home" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
-          <Fill color="#6366F1"/>
+          <Layer>
+            <Text text="Home" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
+            <Fill color="#6366F1"/>
+          </Layer>
         </Layer>
         <!-- Search: stroke (inactive) -->
         <Layer layout="vertical" gap="2" alignment="center">
-          <Layer width="24" height="24">
-            <Group centerX="0" centerY="0">
+          <Layer height="24">
+            <Group centerY="0">
               <Ellipse top="0" size="16,16"/>
               <Stroke color="#94A3B8" width="2"/>
               <Group>
@@ -410,13 +404,15 @@ and `height` are required — they define the intrinsic size for flex allocation
               </Group>
             </Group>
           </Layer>
-          <Text text="Search" fontFamily="Arial" fontSize="10"/>
-          <Fill color="#94A3B8"/>
+          <Layer>
+            <Text text="Search" fontFamily="Arial" fontSize="10"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
         </Layer>
         <!-- Profile: stroke (inactive) -->
         <Layer layout="vertical" gap="2" alignment="center">
-          <Layer width="24" height="24">
-            <Group centerX="0" centerY="0">
+          <Layer height="24">
+            <Group centerY="0">
               <Ellipse left="6" top="1" size="10,10"/>
               <Stroke color="#94A3B8" width="1.8"/>
               <Group>
@@ -425,8 +421,10 @@ and `height` are required — they define the intrinsic size for flex allocation
               </Group>
             </Group>
           </Layer>
-          <Text text="Profile" fontFamily="Arial" fontSize="10"/>
-          <Fill color="#94A3B8"/>
+          <Layer>
+            <Text text="Profile" fontFamily="Arial" fontSize="10"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
         </Layer>
       </Layer>
       <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#00000020"/>
@@ -435,11 +433,12 @@ and `height` are required — they define the intrinsic size for flex allocation
 </pagx>
 ```
 
-**Pattern**: Rectangle `roundness` applies to all four corners. To flatten specific corners,
-use `MergePath mode="intersect"` to clip a rounded rect with a straight-edged rect. Tab items
-use `arrangement="spaceAround"` for even distribution. Each tab's Text + Fill are direct contents of
-the vertical flex container (no wrapper needed since no other paintable Element shares the scope). Active tab uses Fill; inactive tabs use
-Stroke — see §Icons and `design-patterns.md` §Icon Generation.
+**Pattern**: Partial roundness — `MergePath mode="intersect"` clips a fully-rounded Rectangle
+with a straight-edged Rectangle to flatten bottom corners. The oversized rounded rect
+(`bottom="-20"`) extends below so only the top curves intersect. Tab items use
+`arrangement="spaceAround"` for even distribution. Each tab is a vertical layout
+(`layout="vertical" gap alignment="center"`) containing an icon Layer and a label Layer.
+Active tab uses Fill; inactive tabs use Stroke — see §Icons.
 
 ---
 
@@ -453,143 +452,169 @@ goes clockwise — use Group `rotation` to reposition the start point.
 
 ```xml
 <pagx version="1.0" width="300" height="200">
-  <!-- Bars -->
-  <Layer left="30" right="20" top="30" bottom="20">
-    <Rectangle left="0" bottom="0" size="30,80" roundness="4"/>
-    <Rectangle left="50" bottom="0" size="30,130" roundness="4"/>
-    <Rectangle left="100" bottom="0" size="30,60" roundness="4"/>
-    <Rectangle left="150" bottom="0" size="30,110" roundness="4"/>
-    <Rectangle left="200" bottom="0" size="30,90" roundness="4"/>
-    <Fill color="#3B82F6"/>
+  <!-- Bars: horizontal layout with bottom alignment -->
+  <Layer left="30" right="30" top="30" bottom="30" layout="horizontal" alignment="end" arrangement="spaceBetween">
+    <Layer>
+      <Rectangle size="30,80" roundness="4"/>
+      <Fill color="#3B82F6"/>
+    </Layer>
+    <Layer>
+      <Rectangle size="30,130" roundness="4"/>
+      <Fill color="#3B82F6"/>
+    </Layer>
+    <Layer>
+      <Rectangle size="30,60" roundness="4"/>
+      <Fill color="#3B82F6"/>
+    </Layer>
+    <Layer>
+      <Rectangle size="30,110" roundness="4"/>
+      <Fill color="#3B82F6"/>
+    </Layer>
+    <Layer>
+      <Rectangle size="30,90" roundness="4"/>
+      <Fill color="#3B82F6"/>
+    </Layer>
   </Layer>
   <!-- Baseline -->
-  <Layer left="30" right="40" bottom="20" height="1">
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+  <Layer left="30" right="30"  bottom="30" height="1">
+    <Rectangle left="0" right="0"  top="0" bottom="0"/>
     <Fill color="#CBD5E1"/>
   </Layer>
 </pagx>
 ```
 
-**Pattern**: Each bar uses `left` + `bottom="0"` to bottom-align. Multiple Rectangles share
-one Fill via painter scope. Bars with different heights **cannot** use Repeater (no per-copy
-parameterization).
+**Pattern**: Container layout arranges bars — `layout="horizontal"` + `alignment="end"` =
+CSS `align-items: flex-end`, bottom-aligning bars of different heights.
+`arrangement="spaceBetween"` evenly distributes bars across the width. Each bar is a Layer
+with a fixed-size Rectangle — different heights per bar **cannot** use Repeater (no per-copy
+parameterization). Baseline is a separate Layer with `height="1"` positioned via constraints.
 
 ### Line Chart
 
 ```xml
 <pagx version="1.0" width="300" height="200">
   <!-- Chart area with margins -->
-  <Layer left="30" right="20" top="20" bottom="30">
-    <!-- Grid lines -->
-    <Path data="M 0,0 L 250,0 M 0,37 L 250,37 M 0,75 L 250,75 M 0,112 L 250,112 M 0,150 L 250,150"/>
-    <Stroke color="#F1F5F9" width="1"/>
+  <Layer centerX="0" centerY="0">
+    <!-- Grid lines: 5 horizontal lines at 35px intervals -->
+    <Rectangle size="240,1"/>
+    <Fill color="#F1F5F9"/>
+    <Repeater copies="5" position="0,35"/>
     <!-- Data line -->
-    <Group left="0" right="0" top="0" bottom="0">
-      <Path data="M 0,120 L 62,90 L 125,105 L 187,45 L 250,30"/>
+    <Group>
+      <Path data="M 0,112 L 60,84 L 120,98 L 180,42 L 240,28"/>
       <Stroke color="#3B82F6" width="2" cap="round" join="round"/>
     </Group>
     <!-- Fill area under line (same path, closed to bottom) -->
-    <Group left="0" right="0" top="0" bottom="0">
-      <Path data="M 0,120 L 62,90 L 125,105 L 187,45 L 250,30 L 250,150 L 0,150 Z"/>
+    <Group>
+      <Path data="M 0,112 L 60,84 L 120,98 L 180,42 L 240,28 L 240,140 L 0,140 Z"/>
       <Fill color="#3B82F610"/>
     </Group>
     <!-- Data points -->
-    <Group left="0" right="0" top="0" bottom="0">
-      <Ellipse left="-3" top="117" size="6,6"/>
-      <Ellipse left="59" top="87" size="6,6"/>
-      <Ellipse left="122" top="102" size="6,6"/>
-      <Ellipse left="184" top="42" size="6,6"/>
-      <Ellipse left="247" top="27" size="6,6"/>
+    <Group>
+      <Ellipse left="-3" top="109" size="6,6"/>
+      <Ellipse left="57" top="81" size="6,6"/>
+      <Ellipse left="117" top="95" size="6,6"/>
+      <Ellipse left="177" top="39" size="6,6"/>
+      <Ellipse left="237" top="25" size="6,6"/>
       <Fill color="#3B82F6"/>
     </Group>
-  </Layer>
-  <!-- Baseline -->
-  <Layer left="30" right="20" bottom="30" height="1">
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
-    <Fill color="#CBD5E1"/>
   </Layer>
 </pagx>
 ```
 
-**Pattern**: Path `data` uses SVG `<path d>` syntax — generate data points as SVG coordinates.
-The area fill reuses the same points, appends lines to the baseline, and closes with `Z`.
-Grid lines are a single multi-M Path.
+**Pattern**: Grid lines use Repeater — `Rectangle size="240,1"` + `Repeater copies="5"
+position="0,35"` draws 5 horizontal lines at 35px intervals (Repeater copies geometry +
+painted Fill together). Data line is a Path with `M/L` commands for line vertices, stroked
+with `cap/join="round"`. Area fill reuses the same points, appends lines to the baseline,
+and closes with `Z` for a semi-transparent fill region. Data points are individual Ellipses
+sharing one Fill — offset by half their size (`-3`) to center on line coordinates.
 
 ### Donut Chart (TrimPath)
 
 ```xml
 <pagx version="1.0" width="340" height="200">
-  <!-- Donut -->
-  <Layer left="20" top="20" width="160" height="160">
-    <!-- Segment 1: 40% (0 to 0.4) -->
-    <Ellipse centerX="0" centerY="0" size="130,130"/>
-    <TrimPath end="0.38"/>
-    <Stroke color="#3B82F6" width="18"/>
-    <!-- Segment 2: 30% (0.4 to 0.7) -->
-    <Group centerX="0" centerY="0">
-      <Ellipse size="130,130"/>
-      <TrimPath start="0.4" end="0.68"/>
-      <Stroke color="#10B981" width="18"/>
-    </Group>
-    <!-- Segment 3: 20% (0.7 to 0.9) -->
-    <Group centerX="0" centerY="0">
-      <Ellipse size="130,130"/>
-      <TrimPath start="0.7" end="0.88"/>
-      <Stroke color="#F59E0B" width="18"/>
-    </Group>
-    <!-- Segment 4: 10% (0.9 to 1.0) -->
-    <Group centerX="0" centerY="0">
-      <Ellipse size="130,130"/>
-      <TrimPath start="0.9" end="0.98"/>
-      <Stroke color="#EF4444" width="18"/>
-    </Group>
-  </Layer>
-  <!-- Legend -->
-  <Layer left="200" top="40" width="120" height="120" layout="vertical" gap="12">
-    <Layer height="20">
-      <Ellipse left="0" centerY="0" size="10,10"/>
-      <Fill color="#3B82F6"/>
-      <Group left="18" centerY="0">
-        <Text text="Sales 40%" fontFamily="Arial" fontSize="12"/>
-        <Fill color="#334155"/>
+  <Layer width="340" height="200" layout="horizontal" gap="20" alignment="center" padding="20">
+    <!-- Donut -->
+    <Layer width="160" height="160">
+      <!-- Segment 1: 40% (0 to 0.4) -->
+      <Ellipse centerX="0" centerY="0" size="130,130"/>
+      <TrimPath end="0.38"/>
+      <Stroke color="#3B82F6" width="18"/>
+      <!-- Segment 2: 30% (0.4 to 0.7) -->
+      <Group centerX="0" centerY="0">
+        <Ellipse size="130,130"/>
+        <TrimPath start="0.4" end="0.68"/>
+        <Stroke color="#10B981" width="18"/>
+      </Group>
+      <!-- Segment 3: 20% (0.7 to 0.9) -->
+      <Group centerX="0" centerY="0">
+        <Ellipse size="130,130"/>
+        <TrimPath start="0.7" end="0.88"/>
+        <Stroke color="#F59E0B" width="18"/>
+      </Group>
+      <!-- Segment 4: 10% (0.9 to 1.0) -->
+      <Group centerX="0" centerY="0">
+        <Ellipse size="130,130"/>
+        <TrimPath start="0.9" end="0.98"/>
+        <Stroke color="#EF4444" width="18"/>
       </Group>
     </Layer>
-    <Layer height="20">
-      <Ellipse left="0" centerY="0" size="10,10"/>
-      <Fill color="#10B981"/>
-      <Group left="18" centerY="0">
-        <Text text="Growth 30%" fontFamily="Arial" fontSize="12"/>
-        <Fill color="#334155"/>
-      </Group>
-    </Layer>
-    <Layer height="20">
-      <Ellipse left="0" centerY="0" size="10,10"/>
-      <Fill color="#F59E0B"/>
-      <Group left="18" centerY="0">
-        <Text text="Costs 20%" fontFamily="Arial" fontSize="12"/>
-        <Fill color="#334155"/>
-      </Group>
-    </Layer>
-    <Layer height="20">
-      <Ellipse left="0" centerY="0" size="10,10"/>
-      <Fill color="#EF4444"/>
-      <Group left="18" centerY="0">
-        <Text text="Other 10%" fontFamily="Arial" fontSize="12"/>
-        <Fill color="#334155"/>
-      </Group>
+    <!-- Legend -->
+    <Layer layout="vertical" gap="12">
+      <Layer layout="horizontal" gap="8" alignment="center">
+        <Layer>
+          <Ellipse size="10,10"/>
+          <Fill color="#3B82F6"/>
+        </Layer>
+        <Layer>
+          <Text text="Sales 40%" fontFamily="Arial" fontSize="12"/>
+          <Fill color="#334155"/>
+        </Layer>
+      </Layer>
+      <Layer layout="horizontal" gap="8" alignment="center">
+        <Layer>
+          <Ellipse size="10,10"/>
+          <Fill color="#10B981"/>
+        </Layer>
+        <Layer>
+          <Text text="Growth 30%" fontFamily="Arial" fontSize="12"/>
+          <Fill color="#334155"/>
+        </Layer>
+      </Layer>
+      <Layer layout="horizontal" gap="8" alignment="center">
+        <Layer>
+          <Ellipse size="10,10"/>
+          <Fill color="#F59E0B"/>
+        </Layer>
+        <Layer>
+          <Text text="Costs 20%" fontFamily="Arial" fontSize="12"/>
+          <Fill color="#334155"/>
+        </Layer>
+      </Layer>
+      <Layer layout="horizontal" gap="8" alignment="center">
+        <Layer>
+          <Ellipse size="10,10"/>
+          <Fill color="#EF4444"/>
+        </Layer>
+        <Layer>
+          <Text text="Other 10%" fontFamily="Arial" fontSize="12"/>
+          <Fill color="#334155"/>
+        </Layer>
+      </Layer>
     </Layer>
   </Layer>
 </pagx>
 ```
 
-**Pattern**: Each segment needs its own Group for painter scope isolation (different Stroke
-colors). Small gaps between segments (e.g., `end="0.38"` instead of `0.4`) create visual
-separation. Legend uses vertical layout with constraint-positioned dot + label rows. Each
-legend label uses a Group with `left` + `centerY` constraints for painter scope isolation
-(the label Fill must not leak to the Ellipse dot).
+**Pattern**: Donut segments = Ellipse + TrimPath + thick Stroke, each in its own Group for
+painter isolation (different colors). TrimPath `start/end` values partition the circle
+(0–1 = full circumference); small gaps (e.g., `end="0.38"` not `0.4`) create visual
+separation. First segment sits directly on the Layer (no Group needed). Horizontal layout
+arranges donut + legend side by side with `alignment="center"`. Legend reuses the Icon +
+Label Row pattern.
 
-**Gradient stroke variant**: for a ring progress indicator with gradient color, apply a
-LinearGradient directly inside the Stroke element:
+**Gradient stroke variant**: for ring progress with gradient color, embed a LinearGradient
+directly inside the Stroke element:
 
 ```xml
 <Stroke width="10" cap="round">
@@ -604,19 +629,19 @@ LinearGradient directly inside the Stroke element:
 
 ```xml
 <pagx version="1.0" width="200" height="200">
-  <Layer width="200" height="200">
+  <Layer centerX="0" centerY="0">
     <!-- Background track: 270-degree arc with gap at bottom -->
-    <Ellipse centerX="0" centerY="0" size="140,140"/>
+    <Ellipse size="140,140"/>
     <TrimPath end="0.75" offset="-135"/>
     <Stroke color="#E2E8F0" width="10" cap="round"/>
     <!-- Value fill (67% of 270 degrees = 0.5 of full circle) -->
-    <Group centerX="0" centerY="0" width="140" height="140">
+    <Group>
       <Ellipse size="140,140"/>
       <TrimPath end="0.5" offset="-135"/>
       <Stroke color="#3B82F6" width="12" cap="round"/>
     </Group>
     <!-- Tick marks: 10 ticks spanning 270 degrees -->
-    <Group centerX="0" centerY="0" width="140" height="140">
+    <Group>
       <Rectangle left="69" top="6" size="2,8"/>
       <Fill color="#94A3B8"/>
       <Repeater copies="10" anchor="70,70" position="0,0" rotation="30" offset="7.5"/>
@@ -666,9 +691,10 @@ frosted glass.
 </pagx>
 ```
 
-**Pattern**: Solid semi-transparent Fill + BlurFilter on an Ellipse — the standard glow
-technique (same as CSS `filter: blur()` on a colored circle). `blendMode="screen"` brightens
-additively. Keep blur radius minimal — cost scales with radius.
+**Pattern**: Solid semi-transparent Fill + BlurFilter on Ellipse = soft glow (same as CSS
+`filter: blur()` on a colored circle). Each orb is a separate Layer with
+`blendMode="screen"` for additive brightening on dark backgrounds. Position orbs via
+`left/top` constraint offsets. Performance note: blur cost scales with radius.
 
 ### Frosted Panel (BackgroundBlurStyle)
 
@@ -684,8 +710,8 @@ additively. Keep blur radius minimal — cost scales with radius.
       </LinearGradient>
     </Fill>
     <!-- Frosted glass panel -->
-    <Layer centerX="0" centerY="0" width="200" height="200">
-      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+    <Layer centerX="0" centerY="0">
+      <Rectangle size="200,200" roundness="16"/>
       <Fill color="#FFFFFF30"/>
       <BackgroundBlurStyle blurX="20" blurY="20"/>
     </Layer>
@@ -694,45 +720,22 @@ additively. Keep blur radius minimal — cost scales with radius.
 ```
 
 **Pattern**: BackgroundBlurStyle = CSS `backdrop-filter: blur()`. Blurs everything rendered
-**below** this Layer, clipped by opaque content. Must have content below to blur — empty
-background produces no effect.
+**below** this Layer, clipped to the Layer's opaque content (here, the semi-transparent
+Rectangle). The frosted panel Layer uses `centerX/centerY` for centering. Must have
+visible content below to blur — empty background produces no effect.
 
 ---
 
 ## Logos & Badges
 
-Logo construction relies on MergePath boolean operations and precise Fill paths. Badges
-often combine Polystar with gradients and layer styles for depth.
-
-### Badge with Cutout (MergePath)
-
-```xml
-<pagx version="1.0" width="200" height="200">
-  <Layer centerX="0" centerY="0" width="160" height="160">
-    <Rectangle left="0" right="0" top="0" bottom="0" roundness="32"/>
-    <Ellipse right="10" top="10" size="60,60"/>
-    <MergePath mode="difference"/>
-    <Fill>
-      <LinearGradient startPoint="0,0" endPoint="160,160">
-        <ColorStop offset="0" color="#6366F1"/>
-        <ColorStop offset="1" color="#EC4899"/>
-      </LinearGradient>
-    </Fill>
-    <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#6366F160"/>
-  </Layer>
-</pagx>
-```
-
-**Pattern**: Place all boolean-participating geometry before MergePath, then painters after.
-MergePath **clears all previously rendered Fill/Stroke** — isolate surviving content in a
-separate Group (see `spec-essentials.md` §5).
+Badges often combine Polystar with gradients and layer styles for depth.
 
 ### Star Badge (Polystar)
 
 ```xml
 <pagx version="1.0" width="200" height="200">
-  <Layer centerX="0" centerY="0" width="160" height="160">
-    <Polystar centerX="0" centerY="0" pointCount="5" outerRadius="80" innerRadius="35"/>
+  <Layer centerX="0" centerY="0">
+    <Polystar pointCount="5" outerRadius="80" innerRadius="35"/>
     <Fill>
       <RadialGradient radius="80">
         <ColorStop offset="0" color="#FBBF24"/>
@@ -744,6 +747,8 @@ separate Group (see `spec-essentials.md` §5).
 </pagx>
 ```
 
-**Pattern**: Polystar `rotation="0"` points the first vertex upward — no rotation needed.
-RadialGradient `center` defaults to `0,0` (aligns with Polystar origin); `radius` matches
-`outerRadius`.
+**Pattern**: Polystar generates a star shape from `pointCount`, `outerRadius`, and
+`innerRadius` — no manual path coordinates needed. Default `rotation="0"` points the first
+vertex upward. RadialGradient `center` defaults to `0,0` (Polystar's origin); `radius`
+matches `outerRadius` for full coverage. DropShadowStyle with matching hue adds a colored
+glow effect. Layer uses `centerX/centerY` for canvas centering.
