@@ -71,6 +71,10 @@ void LayoutNode::updateSize(const LayoutContext& context) {
     return;
   }
   onMeasure(context);
+  // Snap measured sizes up to the nearest pixel to prevent content clipping when constraint
+  // layout rounds the derived container size. Matches the EUI setMeasuredSize() convention.
+  preferredWidth = std::ceil(preferredWidth);
+  preferredHeight = std::ceil(preferredHeight);
 }
 
 void LayoutNode::setLayoutSize(const LayoutContext&, float, float) {
@@ -85,10 +89,10 @@ void LayoutNode::PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, 
     float targetW = NAN;
     float targetH = NAN;
     if (!std::isnan(child->left) && !std::isnan(child->right)) {
-      targetW = std::ceil(containerW - child->left - child->right);
+      targetW = std::round(containerW - child->left - child->right);
     }
     if (!std::isnan(child->top) && !std::isnan(child->bottom)) {
-      targetH = std::ceil(containerH - child->top - child->bottom);
+      targetH = std::round(containerH - child->top - child->bottom);
     }
     // Phase 2: write self rendering attributes and actualWidth/actualHeight.
     child->setLayoutSize(context, targetW, targetH);
@@ -217,10 +221,8 @@ void LayoutNode::MeasureChildNodes(const std::vector<Element*>& elements, float 
     }
     float extX = node->hasConstraints() ? node->constraintExtentX() : node->preferredX;
     float extY = node->hasConstraints() ? node->constraintExtentY() : node->preferredY;
-    // Use ceil on preferredWidth/Height to prevent content clipping from round-down when the
-    // parent container derives its size from these values and constraint layout rounds targetW.
-    extX += std::ceil(node->preferredWidth);
-    extY += std::ceil(node->preferredHeight);
+    extX += node->preferredWidth;
+    extY += node->preferredHeight;
     maxX = std::max(maxX, extX);
     maxY = std::max(maxY, extY);
   }

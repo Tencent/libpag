@@ -28,6 +28,7 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/SVGImporter.h"
+#include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
@@ -2095,11 +2096,11 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarHorizontal) {
 
   // Polystar bounds (computed from precise vertex positions, not simplified square):
   // For Star with pointCount=5, rotation=0, width ≈ 2.0 * outerRadius, height ≈ 1.809 * outerRadius
-  // bounds.width ≈ 57.06, area width = 400 - 50 - 50 = 300
-  // scale = 300 / 57.06 ≈ 5.259
-  EXPECT_FLOAT_EQ(star->outerRadius, 157.7193336357f);
-  EXPECT_FLOAT_EQ(star->innerRadius, 78.8596668179f);
-  EXPECT_FLOAT_EQ(star->position.x, 200.0f);
+  // bounds.width ≈ 57.06 → ceil → 58, area width = 400 - 50 - 50 = 300
+  // scale = 300 / 58 ≈ 5.172
+  EXPECT_FLOAT_EQ(star->outerRadius, 155.17241f);
+  EXPECT_FLOAT_EQ(star->innerRadius, 77.586205f);
+  EXPECT_NEAR(star->position.x, 200.0f, 0.5f);
 }
 
 PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarVertical) {
@@ -2122,12 +2123,12 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarVertical) {
   doc->applyLayout();
 
   // Polystar bounds (computed from precise vertex positions):
-  // bounds.height ≈ 1.809 * outerRadius ≈ 45.225
+  // bounds.height ≈ 1.809 * outerRadius ≈ 45.225 → ceil → 46
   // area height = 200 - 20 - 20 = 160
-  // scale = 160 / 45.225 ≈ 3.538
-  EXPECT_FLOAT_EQ(star->outerRadius, 88.4458247200f);
-  EXPECT_FLOAT_EQ(star->innerRadius, 35.3783298880f);
-  EXPECT_FLOAT_EQ(star->position.y, 108.4458247200f);
+  // scale = 160 / 46 ≈ 3.478
+  EXPECT_FLOAT_EQ(star->outerRadius, 86.95652f);
+  EXPECT_FLOAT_EQ(star->innerRadius, 34.782608f);
+  EXPECT_NEAR(star->position.y, 108.0f, 0.5f);
 }
 
 PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarBothAxes) {
@@ -2152,12 +2153,12 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarBothAxes) {
   doc->applyLayout();
 
   // Polystar bounds (computed from precise vertex positions):
-  // bounds.width ≈ 38.042, bounds.height ≈ 36.180
+  // bounds.width ≈ 38.042 → ceil → 39, bounds.height ≈ 36.180 → ceil → 37
   // areaWidth = 360, areaHeight = 180
-  // scaleX = 360 / 38.042 ≈ 9.463, scaleY = 180 / 36.180 ≈ 4.975
-  // scale = min(9.463, 4.975) ≈ 4.975
-  EXPECT_FLOAT_EQ(star->outerRadius, 99.5015528100f);
-  EXPECT_FLOAT_EQ(star->innerRadius, 49.7507764050f);
+  // scaleX = 360 / 39 ≈ 9.231, scaleY = 180 / 37 ≈ 4.865
+  // scale = min(9.231, 4.865) ≈ 4.865
+  EXPECT_FLOAT_EQ(star->outerRadius, 97.297295f);
+  EXPECT_FLOAT_EQ(star->innerRadius, 48.648647f);
   // Scaled bounds = (-99.5, -90, 199, 180)
   // Horizontal: tx = 20 + (360 - 199) * 0.5 - (-99.5) = 200, position.x = 200
   // Vertical: ty = 10 + (180 - 180) * 0.5 - (-90) = 100, position.y = 100
@@ -2196,9 +2197,11 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {
   pagx::FontConfig fontConfig;
   fontConfig.registerTypeface(typeface);
   pagx::LayoutContext layoutContext(&fontConfig);
-  auto origBounds = pagx::TextLayout::LayoutText(text, layoutContext, text->baseline);
-  float origWidth = origBounds.width();
-  float origHeight = origBounds.height();
+  pagx::TextLayoutParams params = {};
+  params.baseline = text->baseline;
+  auto origBounds = pagx::TextLayout::Layout({text}, params, layoutContext);
+  float origWidth = origBounds.width;
+  float origHeight = origBounds.height;
 
   layer->contents.push_back(text);
 
@@ -2206,8 +2209,9 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {
   doc->applyLayout();
 
   // Proportional scaling: areaWidth = 360, areaHeight = 180
-  float scaleX = 360 / origWidth;
-  float scaleY = 180 / origHeight;
+  // preferredWidth/Height are ceil'd before scaling.
+  float scaleX = 360 / std::ceil(origWidth);
+  float scaleY = 180 / std::ceil(origHeight);
   float scale = std::min(scaleX, scaleY);
   float expectedFontSize = 24 * scale;
   EXPECT_FLOAT_EQ(text->fontSize, expectedFontSize);
@@ -2240,16 +2244,18 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextSingleAxis) {
   pagx::FontConfig fontConfig;
   fontConfig.registerTypeface(typeface);
   pagx::LayoutContext layoutContext(&fontConfig);
-  auto origBounds = pagx::TextLayout::LayoutText(text, layoutContext, text->baseline);
-  float origWidth = origBounds.width();
+  pagx::TextLayoutParams params = {};
+  params.baseline = text->baseline;
+  auto origBounds = pagx::TextLayout::Layout({text}, params, layoutContext);
+  float origWidth = origBounds.width;
 
   layer->contents.push_back(text);
 
   doc->setFontConfig(fontConfig);
   doc->applyLayout();
 
-  // areaWidth = 380, scale = 380 / origWidth
-  float expectedFontSize = 50 * 380 / origWidth;
+  // areaWidth = 380, scale = 380 / ceil(origWidth)
+  float expectedFontSize = 50 * 380 / std::ceil(origWidth);
   EXPECT_FLOAT_EQ(text->fontSize, expectedFontSize);
 }
 
@@ -2296,9 +2302,9 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleExactFit) {
   star->outerRadius = 50;
   star->innerRadius = 25;
   star->position = {0, 0};
-  // Polystar bounds: bounds.width ≈ 95.106
+  // Polystar bounds: bounds.width ≈ 95.106 → ceil → 96
   // areaWidth = 400 - 150 - 150 = 100
-  // scale = 100 / 95.106 ≈ 1.0515 (not 1.0, so scaling applies)
+  // scale = 100 / 96 ≈ 1.0417 (not 1.0, so scaling applies)
   star->left = 150;
   star->right = 150;
 
@@ -2306,10 +2312,10 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleExactFit) {
 
   doc->applyLayout();
 
-  // scale ≈ 1.0515
-  EXPECT_FLOAT_EQ(star->outerRadius, 52.5731112119f);
-  EXPECT_FLOAT_EQ(star->innerRadius, 26.2865556060f);
-  EXPECT_FLOAT_EQ(star->position.x, 200.0f);
+  // scale ≈ 1.0417
+  EXPECT_FLOAT_EQ(star->outerRadius, 52.083332f);
+  EXPECT_FLOAT_EQ(star->innerRadius, 26.041666f);
+  EXPECT_NEAR(star->position.x, 200.0f, 0.5f);
 }
 
 PAGX_TEST(PAGXTest, LayoutConstraintScalePath) {
@@ -4612,14 +4618,14 @@ PAGX_TEST(PAGXTest, LayoutTextBaselineAlphabetic) {
   auto fontFamily = typeface->fontFamily();
   auto fontStyle = typeface->fontStyle();
 
-  // Text with VisualTop baseline (default).
-  auto textVT = doc->makeNode<pagx::Text>();
-  textVT->text = "Hello";
-  textVT->fontFamily = fontFamily;
-  textVT->fontStyle = fontStyle;
-  textVT->fontSize = 48;
-  textVT->position = {50, 100};
-  textVT->baseline = pagx::TextBaseline::VisualTop;
+  // Text with LineBox baseline (default).
+  auto textLB = doc->makeNode<pagx::Text>();
+  textLB->text = "Hello";
+  textLB->fontFamily = fontFamily;
+  textLB->fontStyle = fontStyle;
+  textLB->fontSize = 48;
+  textLB->position = {50, 100};
+  textLB->baseline = pagx::TextBaseline::LineBox;
 
   // Text with Alphabetic baseline.
   auto textAB = doc->makeNode<pagx::Text>();
@@ -4630,7 +4636,7 @@ PAGX_TEST(PAGXTest, LayoutTextBaselineAlphabetic) {
   textAB->position = {200, 100};
   textAB->baseline = pagx::TextBaseline::Alphabetic;
 
-  layer->contents = {textVT, textAB};
+  layer->contents = {textLB, textAB};
 
   pagx::FontConfig fontConfig;
   fontConfig.registerTypeface(typeface);
@@ -4638,14 +4644,14 @@ PAGX_TEST(PAGXTest, LayoutTextBaselineAlphabetic) {
   doc->applyLayout();
 
   // Both texts should have TextBlobs.
-  auto blobVT = textVT->getTextBlob();
+  auto blobLB = textLB->getTextBlob();
   auto blobAB = textAB->getTextBlob();
-  ASSERT_NE(blobVT, nullptr);
+  ASSERT_NE(blobLB, nullptr);
   ASSERT_NE(blobAB, nullptr);
 
-  // VisualTop: TextBlob bounds.top should be near 0 (pixel top aligned to position.y).
-  auto boundsVT = blobVT->getTightBounds();
-  EXPECT_NEAR(boundsVT.top, 0, 1);
+  // LineBox: TextBlob bounds include half-leading offset from linebox top.
+  auto boundsLB = blobLB->getTightBounds();
+  EXPECT_NEAR(boundsLB.top, 0, 1);
 
   // Alphabetic: TextBlob bounds.top should be negative (ascender above baseline).
   auto boundsAB = blobAB->getTightBounds();
@@ -4677,7 +4683,9 @@ PAGX_TEST(PAGXTest, LayoutTextIndependentConstraint) {
 
   // Compute original bounds before layout.
   pagx::LayoutContext layoutContext(&fontConfig);
-  auto origBounds = pagx::TextLayout::LayoutText(text, layoutContext, text->baseline);
+  pagx::TextLayoutParams params = {};
+  params.baseline = text->baseline;
+  auto origBounds = pagx::TextLayout::Layout({text}, params, layoutContext);
 
   doc->setFontConfig(fontConfig);
   doc->applyLayout();
@@ -4685,11 +4693,11 @@ PAGX_TEST(PAGXTest, LayoutTextIndependentConstraint) {
   // No opposite-edge constraints, so fontSize should remain unchanged.
   EXPECT_FLOAT_EQ(text->fontSize, 30);
 
-  // Position is set by constraint: position = constraintOffset - textBounds.left/top.
-  // With left=50: x = 50 - origBounds.left
-  // With top=40: y = 40 - origBounds.top
-  EXPECT_FLOAT_EQ(text->position.x, 50 - origBounds.left);
-  EXPECT_FLOAT_EQ(text->position.y, 40 - origBounds.top);
+  // Position is set by constraint: position = constraintOffset - textBounds.x/y.
+  // With left=50: x = 50 - origBounds.x
+  // With top=40: y = 40 - origBounds.y
+  EXPECT_FLOAT_EQ(text->position.x, 50 - origBounds.x);
+  EXPECT_FLOAT_EQ(text->position.y, 40 - origBounds.y);
 }
 
 PAGX_TEST(PAGXTest, LayoutTextPathMeasurement) {
