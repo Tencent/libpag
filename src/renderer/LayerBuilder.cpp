@@ -839,7 +839,7 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, FontCon
   }
 
   // Phase 1: Auto layout (constraint positioning, flex layout).
-  // This calls Text::setLayoutSize() which generates TextBlob via TextLayout::LayoutText().
+  // This calls Text::setLayoutSize() which generates TextBlob via TextLayout::Layout().
   if (fontProvider) {
     document->setFontConfig(*fontProvider);
   }
@@ -856,7 +856,7 @@ LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document, FontConfig* 
   }
 
   // Phase 1: Auto layout (constraint positioning, flex layout).
-  // This calls Text::setLayoutSize() which generates TextBlob via TextLayout::LayoutText().
+  // This calls Text::setLayoutSize() which generates TextBlob via TextLayout::Layout().
   if (fontProvider) {
     document->setFontConfig(*fontProvider);
   }

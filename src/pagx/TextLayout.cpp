@@ -258,26 +258,7 @@ class TextLayoutContext {
     }
   }
 
-  // Checks whether all Text elements have pre-embedded GlyphRun data. If so, stores them directly
-  // and returns true. Otherwise returns false, indicating that re-typesetting is needed.
-  bool tryUseEmbeddedGlyphRuns(const std::vector<Text*>& textElements) {
-    for (auto* text : textElements) {
-      if (text->glyphRuns.empty()) {
-        return false;
-      }
-    }
-    for (auto* text : textElements) {
-      auto shapedText = buildShapedTextFromEmbeddedGlyphRuns(text);
-      storeShapedText(text, std::move(shapedText));
-    }
-    return true;
-  }
-
   Rect processTextWithLayout(std::vector<Text*>& textElements, const TextLayoutParams& params) {
-    if (tryUseEmbeddedGlyphRuns(textElements)) {
-      return {};
-    }
-
     // Shape each Text and concatenate all glyphs for unified layout within the TextBox.
     std::vector<GlyphInfo> allGlyphs = {};
     size_t estimatedGlyphCount = 0;
