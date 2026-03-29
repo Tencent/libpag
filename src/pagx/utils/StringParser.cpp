@@ -200,8 +200,7 @@ DEFINE_ENUM_CONVERSION(ParagraphAlign, ParagraphAlign::Near, {ParagraphAlign::Ne
 DEFINE_ENUM_CONVERSION(TextAnchor, TextAnchor::Start, {TextAnchor::Start, "start"},
                        {TextAnchor::Center, "center"}, {TextAnchor::End, "end"})
 
-DEFINE_ENUM_CONVERSION(TextBaseline, TextBaseline::VisualTop,
-                       {TextBaseline::VisualTop, "visualTop"},
+DEFINE_ENUM_CONVERSION(TextBaseline, TextBaseline::LineBox, {TextBaseline::LineBox, "lineBox"},
                        {TextBaseline::Alphabetic, "alphabetic"})
 
 DEFINE_ENUM_CONVERSION(WritingMode, WritingMode::Horizontal,

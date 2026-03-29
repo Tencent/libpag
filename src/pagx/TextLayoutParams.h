@@ -18,22 +18,31 @@
 
 #pragma once
 
+#include <cmath>
+#include "pagx/types/Overflow.h"
+#include "pagx/types/ParagraphAlign.h"
+#include "pagx/types/TextAlign.h"
+#include "pagx/types/TextBaseline.h"
+#include "pagx/types/WritingMode.h"
+
 namespace pagx {
 
 /**
- * Specifies how a Text element's position.y is interpreted relative to the text content.
+ * Parameters controlling text measurement and layout. Extracted from TextBox attributes so that
+ * both standalone Text and TextBox can share the same layout code path. For standalone Text, use
+ * default values (boxWidth/boxHeight = NaN disables word wrapping). For TextBox, populate from
+ * TextBox attributes.
  */
-enum class TextBaseline {
-  /**
-   * Default mode. position.y represents the top of the linebox (based on font metrics line
-   * height). Text measurement returns linebox bounds, ensuring consistent baseline alignment
-   * across multiple Text elements with different font sizes.
-   */
-  LineBox,
-  /**
-   * position.y represents the alphabetic baseline. Used by SVG text elements.
-   */
-  Alphabetic
+struct TextLayoutParams {
+  float boxWidth = NAN;
+  float boxHeight = NAN;
+  TextAlign textAlign = TextAlign::Start;
+  ParagraphAlign paragraphAlign = ParagraphAlign::Near;
+  WritingMode writingMode = WritingMode::Horizontal;
+  float lineHeight = 0.0f;
+  bool wordWrap = true;
+  Overflow overflow = Overflow::Visible;
+  TextBaseline baseline = TextBaseline::LineBox;
 };
 
 }  // namespace pagx

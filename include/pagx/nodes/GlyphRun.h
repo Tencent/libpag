@@ -22,6 +22,7 @@
 #include <vector>
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Point.h"
+#include "pagx/types/Rect.h"
 
 namespace pagx {
 
@@ -94,6 +95,13 @@ class GlyphRun : public Node {
    * Skewing is applied around the anchor point.
    */
   std::vector<float> skews = {};
+
+  /**
+   * The linebox bounds of this GlyphRun in rendering coordinates. Computed during font embedding
+   * from font metrics (advance width sum × font line height). Used for layout measurement when
+   * the original font data is no longer available.
+   */
+  Rect bounds = {};
 
   NodeType nodeType() const override {
     return NodeType::GlyphRun;

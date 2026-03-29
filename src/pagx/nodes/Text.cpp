@@ -18,34 +18,39 @@
 
 #include "pagx/nodes/Text.h"
 #include "pagx/TextLayout.h"
+#include "pagx/TextLayoutParams.h"
 #include "pagx/layout/LayoutNode.h"
 
 namespace pagx {
 
 void Text::onMeasure(const LayoutContext& context) {
-  textBounds = TextLayout::LayoutText(this, context, baseline);
-  preferredX = textBounds.left;
-  preferredY = textBounds.top;
-  preferredWidth = textBounds.width();
-  preferredHeight = textBounds.height();
+  TextLayoutParams params = {};
+  params.baseline = baseline;
+  textBounds = TextLayout::Layout({this}, params, context);
+  preferredX = textBounds.x;
+  preferredY = textBounds.y;
+  preferredWidth = textBounds.width;
+  preferredHeight = textBounds.height;
 }
 
 void Text::setLayoutSize(const LayoutContext& context, float width, float height) {
   float scale = LayoutNode::ComputeUniformScale(preferredWidth, preferredHeight, width, height);
   if (scale != 1.0f) {
     fontSize = fontSize * scale;
-    textBounds = TextLayout::LayoutText(this, context, baseline);
+    TextLayoutParams params = {};
+    params.baseline = baseline;
+    textBounds = TextLayout::Layout({this}, params, context);
   }
-  actualWidth = textBounds.width();
-  actualHeight = textBounds.height();
+  actualWidth = textBounds.width;
+  actualHeight = textBounds.height;
 }
 
 void Text::setLayoutPosition(const LayoutContext&, float x, float y) {
   if (!std::isnan(x)) {
-    position.x = x - textBounds.left;
+    position.x = x - textBounds.x;
   }
   if (!std::isnan(y)) {
-    position.y = y - textBounds.top;
+    position.y = y - textBounds.y;
   }
 }
 

@@ -517,9 +517,9 @@ is sequential and forward-only.
 ```
 
 - Text supports constraint attributes (`left`, `right`, `top`, `bottom`, `centerX`, `centerY`) for positioning within the container.
-- **Content bounds**: Text measures as line-box bounds (advance width sum × font metrics line height). In `visualTop` mode, bounds top is the visual pixel top; in `alphabetic` mode, bounds include ascender above the baseline. This measurement participates in parent container auto-sizing — a Group or Layer without explicit size will grow to fit its Text children.
+- **Content bounds**: Text measures as line-box bounds (advance width sum × font metrics line height). In `lineBox` mode, bounds top is the linebox top; in `alphabetic` mode, bounds include ascender above the baseline. This measurement participates in parent container auto-sizing — a Group or Layer without explicit size will grow to fit its Text children.
 - **Standalone Text**: Text can be used directly inside a Layer or Group without TextBox wrapping. This is ideal for single-line labels, buttons, and badges where multi-line layout is not needed. Use TextBox only when you need paragraph-level features (word wrapping, multi-line alignment, vertical writing mode).
-- `baseline`: `visualTop` (default) or `alphabetic`. In `visualTop` mode, position.y is the top of the visual pixel bounds; in `alphabetic` mode, position.y is the alphabetic baseline.
+- `baseline`: `lineBox` (default) or `alphabetic`. In `lineBox` mode, position.y is the linebox top; in `alphabetic` mode, position.y is the alphabetic baseline.
 - `fauxBold` / `fauxItalic`: algorithmic bold / italic (default false).
 - **CDATA** for special characters: `<![CDATA[A < B]]>`.
 - `\n` in `text` attribute (as `&#10;`) triggers line breaks.

@@ -293,7 +293,7 @@
 
   <xs:simpleType name="TextBaselineType">
     <xs:restriction base="xs:string">
-      <xs:enumeration value="visualTop"/>
+      <xs:enumeration value="lineBox"/>
       <xs:enumeration value="alphabetic"/>
     </xs:restriction>
   </xs:simpleType>
@@ -514,6 +514,7 @@
     <xs:attribute name="scales" type="PointListType"/>
     <xs:attribute name="rotations" type="FloatListType"/>
     <xs:attribute name="skews" type="FloatListType"/>
+    <xs:attribute name="bounds" type="FloatListType"/>
   </xs:complexType>
 
   <!-- ========================= Geometry Elements ========================= -->
@@ -576,7 +577,7 @@
     <xs:attribute name="fauxBold" type="BoolType" default="false"/>
     <xs:attribute name="fauxItalic" type="BoolType" default="false"/>
     <xs:attribute name="textAnchor" type="TextAnchorType" default="start"/>
-    <xs:attribute name="baseline" type="TextBaselineType" default="visualTop"/>
+    <xs:attribute name="baseline" type="TextBaselineType" default="lineBox"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
   </xs:complexType>
 

@@ -675,6 +675,13 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
             xml.addRequiredAttribute("skews", floatListToString(run->skews));
           }
 
+          // Write linebox bounds (x,y,w,h)
+          if (run->bounds.width > 0 || run->bounds.height > 0) {
+            float boundsValues[] = {run->bounds.x, run->bounds.y, run->bounds.width,
+                                    run->bounds.height};
+            xml.addRequiredAttribute("bounds", floatListToString(boundsValues, 4));
+          }
+
           writeCustomData(xml, run);
           xml.closeElementSelfClosing();
         }

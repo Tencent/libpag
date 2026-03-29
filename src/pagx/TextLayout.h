@@ -20,30 +20,55 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 #include "pagx/FontConfig.h"
 #include "pagx/types/Rect.h"
-#include "pagx/types/TextBaseline.h"
-#include "tgfx/core/Rect.h"
 
 namespace pagx {
 
+class Element;
 class LayoutContext;
 struct ShapedText;
+struct TextLayoutParams;
 class Text;
-class TextBox;
 
 /**
  * TextLayout performs text shaping and layout, converting Text elements into positioned glyph
  * data (TextBlob). It handles font matching, fallback, text shaping, and layout (alignment, line
- * breaking, etc.).
+ * breaking, etc.). Both standalone Text and TextBox share the same code path through
+ * TextLayoutParams — a standalone Text is treated as a single-element TextBox with NaN box
+ * dimensions.
  */
 class TextLayout {
  public:
   /**
-   * Measures a TextBox element, returning linebox dimensions.
+   * Measures text elements and returns linebox bounds. For standalone Text, pass a single-element
+   * vector with default TextLayoutParams. For TextBox, pass all child Text elements with params
+   * from TextBox attributes. When all Text elements have embedded GlyphRuns with bounds, the
+   * bounds are read directly without font shaping.
    */
-  static Rect MeasureTextBox(const TextBox* textBox, float boxWidth, float boxHeight,
-                             FontConfig* fontConfig = nullptr);
+  static Rect Measure(const std::vector<Text*>& textElements, const TextLayoutParams& params,
+                      FontConfig* fontConfig = nullptr);
+
+  /**
+   * Measures text elements using LayoutContext for font lookup.
+   */
+  static Rect Measure(const std::vector<Text*>& textElements, const TextLayoutParams& params,
+                      const LayoutContext& context);
+
+  /**
+   * Performs text layout and returns linebox bounds. Shapes text, computes line/column breaks,
+   * builds TextBlob for each Text element. The baseline parameter in TextLayoutParams controls
+   * the y-offset model (LineBox vs Alphabetic).
+   */
+  static Rect Layout(const std::vector<Text*>& textElements, const TextLayoutParams& params,
+                     const LayoutContext& context);
+
+  /**
+   * Collects all Text elements from an element list (including nested Groups).
+   */
+  static void CollectTextElements(const std::vector<Element*>& elements,
+                                  std::vector<Text*>& outText);
 
   /**
    * Finds a typeface matching the given font family and style.
@@ -51,21 +76,6 @@ class TextLayout {
   static std::shared_ptr<tgfx::Typeface> FindTypeface(const std::string& fontFamily,
                                                       const std::string& fontStyle,
                                                       FontConfig* fontConfig = nullptr);
-
-  /** Measures a TextBox using LayoutContext for font lookup. */
-  static Rect MeasureTextBox(const TextBox* textBox, float boxWidth, float boxHeight,
-                             const LayoutContext& context);
-
-  /**
-   * Builds TextBlob for a standalone Text element. Returns the text bounds where horizontal extent
-   * uses advance width (0 to advance end) and vertical extent uses tight pixel bounds. The baseline
-   * parameter controls whether the TextBlob includes the visual-top-to-baseline y offset.
-   */
-  static tgfx::Rect LayoutText(Text* text, const LayoutContext& context, TextBaseline baseline);
-
-  /** Performs text layout for all Text elements inside a TextBox. */
-  static void LayoutTextBox(TextBox* textBox, float boxWidth, float boxHeight,
-                            const LayoutContext& context);
 
   /** Writes shaped text data directly to the Text node. */
   static void StoreShapedText(Text* text, ShapedText&& shapedText);

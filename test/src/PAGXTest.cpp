@@ -4649,9 +4649,10 @@ PAGX_TEST(PAGXTest, LayoutTextBaselineAlphabetic) {
   ASSERT_NE(blobLB, nullptr);
   ASSERT_NE(blobAB, nullptr);
 
-  // LineBox: TextBlob bounds include half-leading offset from linebox top.
+  // LineBox: TextBlob bounds.top should be positive (half-leading pushes glyphs down from
+  // linebox top, so the tight bounds top is above 0 relative to position.y = linebox top).
   auto boundsLB = blobLB->getTightBounds();
-  EXPECT_NEAR(boundsLB.top, 0, 1);
+  EXPECT_GT(boundsLB.top, 0);
 
   // Alphabetic: TextBlob bounds.top should be negative (ascender above baseline).
   auto boundsAB = blobAB->getTightBounds();

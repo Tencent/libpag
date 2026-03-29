@@ -21,6 +21,7 @@
 #include <cmath>
 #include "LayoutContext.h"
 #include "ShapedText.h"
+#include "TextLayoutParams.h"
 #include "base/utils/MathUtil.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
@@ -272,10 +273,9 @@ class TextLayoutContext {
     return true;
   }
 
-  void processTextWithLayout(std::vector<Text*>& textElements, const TextBox* textBox,
-                             float boxWidth, float boxHeight) {
+  Rect processTextWithLayout(std::vector<Text*>& textElements, const TextLayoutParams& params) {
     if (tryUseEmbeddedGlyphRuns(textElements)) {
-      return;
+      return {};
     }
 
     // Shape each Text and concatenate all glyphs for unified layout within the TextBox.
@@ -292,7 +292,7 @@ class TextLayoutContext {
       ShapedInfo info = {};
       info.text = text;
       if (!text->text.empty()) {
-        shapeText(text, info, textBox->writingMode == WritingMode::Vertical);
+        shapeText(text, info, params.writingMode == WritingMode::Vertical);
         if (!directionResolved) {
           paragraphRTL = info.paragraphRTL;
           directionResolved = true;
@@ -307,220 +307,28 @@ class TextLayoutContext {
       totalWidth += info.totalWidth;
     }
     if (allGlyphs.empty()) {
-      return;
+      return {};
     }
-    if (textBox->writingMode == WritingMode::Vertical) {
-      auto columns = layoutColumns(allGlyphs, textBox, boxHeight);
-      buildTextBlobVertical(textBox, columns, boxWidth, boxHeight);
+    if (params.writingMode == WritingMode::Vertical) {
+      auto columns = layoutColumns(allGlyphs, params);
+      buildTextBlobVertical(params, columns);
+      float totalColumnWidth = 0;
+      float maxColumnHeight = 0;
+      for (auto& col : columns) {
+        totalColumnWidth += col.maxColumnWidth;
+        maxColumnHeight = std::max(maxColumnHeight, col.height);
+      }
+      return Rect::MakeXYWH(0, 0, totalColumnWidth, maxColumnHeight);
     } else {
-      auto lines = layoutLines(allGlyphs, textBox, boxWidth);
-      buildTextBlobWithLayout(textBox, lines, boxWidth, boxHeight, paragraphRTL);
-    }
-  }
-
-  float processTextWithoutLayout(Text* text, TextBaseline baseline) {
-    ShapedInfo info = {};
-    info.text = text;
-
-    if (!text->text.empty()) {
-      shapeText(text, info);
-    }
-
-    if (info.runs.empty()) {
-      return 0;
-    }
-
-    // Check if the text contains any newlines that require multi-line layout.
-    bool hasNewline = false;
-    for (auto& glyph : info.allGlyphs) {
-      if (glyph.unichar == '\n') {
-        hasNewline = true;
-        break;
+      auto lines = layoutLines(allGlyphs, params);
+      buildTextBlobWithLayout(params, lines, paragraphRTL);
+      float maxLineWidth = 0;
+      float totalHeight = 0;
+      for (auto& line : lines) {
+        maxLineWidth = std::max(maxLineWidth, line.width);
+        totalHeight += line.maxLineHeight;
       }
-    }
-
-    // First pass: build TextBlob at origin (alphabetic baseline).
-    if (hasNewline) {
-      buildTextBlobWithoutLayoutMultiLine(text, info, 0);
-    } else {
-      buildTextBlobWithoutLayoutSingleLine(text, info, 0);
-    }
-
-    // VisualTop: rebuild with y offset so tight bounds top aligns to y=0.
-    if (baseline == TextBaseline::VisualTop && text->getTextBlob() != nullptr) {
-      float tightTop = text->getTextBlob()->getTightBounds().top;
-      if (tightTop != 0) {
-        if (hasNewline) {
-          buildTextBlobWithoutLayoutMultiLine(text, info, -tightTop);
-        } else {
-          buildTextBlobWithoutLayoutSingleLine(text, info, -tightTop);
-        }
-      }
-    }
-
-    return info.totalWidth;
-  }
-
-  static Rect ComputeTextMetrics(const ShapedInfo& info) {
-    float maxFontLineHeight = 0;
-    for (auto& glyph : info.allGlyphs) {
-      if (glyph.unichar == '\n') {
-        continue;
-      }
-      maxFontLineHeight = std::max(maxFontLineHeight, glyph.fontLineHeight);
-    }
-    return Rect::MakeXYWH(0, 0, info.totalWidth, maxFontLineHeight);
-  }
-
-  void buildTextBlobWithoutLayoutSingleLine(Text* text, const ShapedInfo& info, float baselineY) {
-    // Calculate text anchor offset based on total text width.
-    float anchorOffset = 0;
-    switch (text->textAnchor) {
-      case TextAnchor::Start:
-        break;
-      case TextAnchor::Center:
-        anchorOffset = -info.totalWidth / 2;
-        break;
-      case TextAnchor::End:
-        anchorOffset = -info.totalWidth;
-        break;
-    }
-
-    tgfx::TextBlobBuilder builder = {};
-
-    for (auto& run : info.runs) {
-      if (run.glyphIDs.empty()) {
-        continue;
-      }
-
-      if (run.canUseDefaultMode) {
-        auto& buffer =
-            builder.allocRun(run.font, run.glyphIDs.size(), run.startX + anchorOffset, baselineY);
-        memcpy(buffer.glyphs, run.glyphIDs.data(), run.glyphIDs.size() * sizeof(tgfx::GlyphID));
-      } else {
-        auto& buffer = builder.allocRunPosH(run.font, run.glyphIDs.size(), baselineY);
-        memcpy(buffer.glyphs, run.glyphIDs.data(), run.glyphIDs.size() * sizeof(tgfx::GlyphID));
-        auto* positions = reinterpret_cast<float*>(buffer.positions);
-        for (size_t j = 0; j < run.xPositions.size(); j++) {
-          positions[j] = run.xPositions[j] + anchorOffset;
-        }
-      }
-    }
-
-    auto textBlob = builder.build();
-    if (textBlob != nullptr) {
-      ShapedText shapedText = {};
-      shapedText.textBlob = textBlob;
-      storeShapedText(text, std::move(shapedText));
-    }
-  }
-
-  void buildTextBlobWithoutLayoutMultiLine(Text* text, const ShapedInfo& info,
-                                           float firstLineBaselineY) {
-    // Split allGlyphs into lines by '\n'.
-    struct SimpleLine {
-      std::vector<const GlyphInfo*> glyphs = {};
-      float width = 0;
-      float maxAscent = 0;
-      float maxDescent = 0;
-    };
-    std::vector<SimpleLine> lines = {};
-    lines.emplace_back();
-
-    for (auto& glyph : info.allGlyphs) {
-      if (glyph.unichar == '\n') {
-        lines.emplace_back();
-        continue;
-      }
-      auto& line = lines.back();
-      line.glyphs.push_back(&glyph);
-      float absAscent = fabsf(glyph.ascent);
-      if (absAscent > line.maxAscent) {
-        line.maxAscent = absAscent;
-      }
-      if (glyph.descent > line.maxDescent) {
-        line.maxDescent = glyph.descent;
-      }
-      line.width = glyph.xPosition + glyph.advance;
-    }
-
-    // Default line height: use font metrics (ascent + descent + leading), consistent with TextBox.
-    float defaultLineHeight = 0;
-    for (auto& glyph : info.allGlyphs) {
-      if (glyph.unichar != '\n') {
-        defaultLineHeight = std::max(defaultLineHeight, glyph.fontLineHeight);
-      }
-    }
-    if (defaultLineHeight <= 0) {
-      defaultLineHeight = text->fontSize;
-    }
-
-    // Calculate baselines: first line baseline = ascent portion of first line,
-    // subsequent lines advance by defaultLineHeight.
-    float baselineY = 0;
-    bool firstContentLine = true;
-    tgfx::TextBlobBuilder builder = {};
-
-    for (size_t lineIdx = 0; lineIdx < lines.size(); lineIdx++) {
-      auto& line = lines[lineIdx];
-      if (line.glyphs.empty()) {
-        baselineY += defaultLineHeight;
-        continue;
-      }
-
-      if (firstContentLine) {
-        baselineY = firstLineBaselineY;
-        firstContentLine = false;
-      }
-
-      // Calculate text anchor offset for this line independently.
-      float anchorOffset = 0;
-      switch (text->textAnchor) {
-        case TextAnchor::Start:
-          break;
-        case TextAnchor::Center:
-          anchorOffset = -line.width / 2;
-          break;
-        case TextAnchor::End:
-          anchorOffset = -line.width;
-          break;
-      }
-
-      // Group consecutive glyphs by font into runs for efficient TextBlob building.
-      size_t glyphIdx = 0;
-      while (glyphIdx < line.glyphs.size()) {
-        auto* startGlyph = line.glyphs[glyphIdx];
-        auto currentFont = startGlyph->font;
-        auto currentTypefaceID = currentFont.getTypeface()->uniqueID();
-        size_t runStart = glyphIdx;
-
-        // Collect consecutive glyphs with the same typeface.
-        while (glyphIdx < line.glyphs.size()) {
-          auto glyphTypefaceID = line.glyphs[glyphIdx]->font.getTypeface()->uniqueID();
-          if (glyphTypefaceID != currentTypefaceID) {
-            break;
-          }
-          glyphIdx++;
-        }
-
-        size_t runLength = glyphIdx - runStart;
-        auto& buffer = builder.allocRunPos(currentFont, runLength);
-        for (size_t j = 0; j < runLength; j++) {
-          auto* g = line.glyphs[runStart + j];
-          buffer.glyphs[j] = g->glyphID;
-          auto* positions = reinterpret_cast<tgfx::Point*>(buffer.positions);
-          positions[j] = {g->xPosition + anchorOffset, baselineY};
-        }
-      }
-
-      baselineY += defaultLineHeight;
-    }
-
-    auto textBlob = builder.build();
-    if (textBlob != nullptr) {
-      ShapedText shapedText = {};
-      shapedText.textBlob = textBlob;
-      storeShapedText(text, std::move(shapedText));
+      return Rect::MakeXYWH(0, 0, maxLineWidth, totalHeight);
     }
   }
 
@@ -985,14 +793,14 @@ class TextLayoutContext {
     info.totalWidth = currentX;
   }
 
-  std::vector<LineInfo> layoutLines(const std::vector<GlyphInfo>& allGlyphs, const TextBox* textBox,
-                                    float boxWidth) {
+  std::vector<LineInfo> layoutLines(const std::vector<GlyphInfo>& allGlyphs,
+                                    const TextLayoutParams& params) {
     std::vector<LineInfo> lines = {};
     lines.emplace_back();
     auto* currentLine = &lines.back();
     float currentLineWidth = 0;
     int lastBreakIndex = -1;
-    bool doWrap = textBox->wordWrap && !std::isnan(boxWidth) && boxWidth > 0;
+    bool doWrap = params.wordWrap && !std::isnan(params.boxWidth) && params.boxWidth > 0;
     // Tracks the fontLineHeight of the \n that created the current line.
     // Used as the fallback height for empty lines (e.g. consecutive \n\n).
     float pendingNewlineFontLineHeight = 0.0f;
@@ -1001,7 +809,7 @@ class TextLayoutContext {
       auto& glyph = allGlyphs[i];
 
       if (glyph.unichar == '\n') {
-        FinishLine(currentLine, textBox->lineHeight, pendingNewlineFontLineHeight);
+        FinishLine(currentLine, params.lineHeight, pendingNewlineFontLineHeight);
         lines.emplace_back();
         currentLine = &lines.back();
         currentLineWidth = 0;
@@ -1014,7 +822,7 @@ class TextLayoutContext {
       float glyphEndX = currentLineWidth + glyph.advance;
 
       // Auto-wrap check
-      if (doWrap && !currentLine->glyphs.empty() && glyphEndX > boxWidth) {
+      if (doWrap && !currentLine->glyphs.empty() && glyphEndX > params.boxWidth) {
         if (lastBreakIndex >= 0) {
           // Split at break point: move glyphs after lastBreakIndex to new line
           std::vector<GlyphInfo> overflow(currentLine->glyphs.begin() + lastBreakIndex + 1,
@@ -1025,7 +833,7 @@ class TextLayoutContext {
                  LineBreaker::IsWhitespace(currentLine->glyphs.back().unichar)) {
             currentLine->glyphs.pop_back();
           }
-          FinishLine(currentLine, textBox->lineHeight, 0.0f);
+          FinishLine(currentLine, params.lineHeight, 0.0f);
           lines.emplace_back();
           currentLine = &lines.back();
           // Skip leading whitespace in overflow
@@ -1084,7 +892,7 @@ class TextLayoutContext {
         } else {
           // No break point found - force break before current glyph
           if (!currentLine->glyphs.empty()) {
-            FinishLine(currentLine, textBox->lineHeight, 0.0f);
+            FinishLine(currentLine, params.lineHeight, 0.0f);
             lines.emplace_back();
             currentLine = &lines.back();
           }
@@ -1119,7 +927,7 @@ class TextLayoutContext {
       }
     }
 
-    FinishLine(currentLine, textBox->lineHeight, pendingNewlineFontLineHeight);
+    FinishLine(currentLine, params.lineHeight, pendingNewlineFontLineHeight);
 
 #ifdef PAG_BUILD_PAGX
     // Apply punctuation squash to all lines.
@@ -1255,8 +1063,8 @@ class TextLayoutContext {
     }
   }
 
-  void buildTextBlobWithLayout(const TextBox* textBox, const std::vector<LineInfo>& lines,
-                               float boxWidth, float boxHeight, bool paragraphRTL = false) {
+  void buildTextBlobWithLayout(const TextLayoutParams& params, const std::vector<LineInfo>& lines,
+                               bool paragraphRTL = false) {
     if (lines.empty()) {
       return;
     }
@@ -1269,20 +1077,20 @@ class TextLayoutContext {
 
     // Vertical alignment offset.
     float yOffset = 0;
-    if (!std::isnan(boxHeight)) {
-      switch (textBox->paragraphAlign) {
+    if (!std::isnan(params.boxHeight)) {
+      switch (params.paragraphAlign) {
         case ParagraphAlign::Near:
           yOffset = 0;
           break;
         case ParagraphAlign::Middle:
-          yOffset = (boxHeight - totalHeight) / 2;
+          yOffset = (params.boxHeight - totalHeight) / 2;
           break;
         case ParagraphAlign::Far:
-          yOffset = boxHeight - totalHeight;
+          yOffset = params.boxHeight - totalHeight;
           break;
       }
     } else {
-      switch (textBox->paragraphAlign) {
+      switch (params.paragraphAlign) {
         case ParagraphAlign::Near:
           yOffset = 0;
           break;
@@ -1295,6 +1103,18 @@ class TextLayoutContext {
       }
     }
 
+    // Standalone Text + Alphabetic baseline: shift so position.y = alphabetic baseline (first line).
+    // In the linebox model, the baseline is at halfLeading + ascent from the linebox top.
+    // Alphabetic mode subtracts this offset so position.y directly represents the baseline.
+    bool standalone = std::isnan(params.boxWidth);
+    if (standalone && params.baseline == TextBaseline::Alphabetic && !lines.empty()) {
+      auto& firstLine = lines[0];
+      if (firstLine.metricsHeight > 0) {
+        float halfLeading = (firstLine.maxLineHeight - firstLine.metricsHeight) / 2;
+        yOffset -= (halfLeading + firstLine.maxAscent) * firstLine.roundingRatio;
+      }
+    }
+
     // Collect positioned glyphs grouped by source Text element.
     struct PositionedGlyph {
       tgfx::GlyphID glyphID = 0;
@@ -1304,9 +1124,9 @@ class TextLayoutContext {
     };
     std::unordered_map<Text*, std::vector<PositionedGlyph>> textGlyphs = {};
 
-    bool overflowHidden = textBox->overflow == Overflow::Hidden;
-    float boxBottom = boxHeight;
-    // Use relative coordinates for baseline calculation, then add textBox position at the end.
+    bool overflowHidden = params.overflow == Overflow::Hidden;
+    float boxBottom = params.boxHeight;
+    // Use relative coordinates for baseline calculation, then add params position at the end.
     float relativeTop = 0;
     float baselineY = 0;
     // Track the previous line's relative baseline for the equal-spacing model used by subsequent
@@ -1318,8 +1138,8 @@ class TextLayoutContext {
     // last line is anchored at the box bottom and preceding lines are spaced by lineHeight. This
     // ensures correct baseline positions when lines have different heights (mixed font sizes).
     std::vector<float> precomputedBaselines = {};
-    if ((textBox->paragraphAlign == ParagraphAlign::Far ||
-         textBox->paragraphAlign == ParagraphAlign::Middle) &&
+    if ((params.paragraphAlign == ParagraphAlign::Far ||
+         params.paragraphAlign == ParagraphAlign::Middle) &&
         lines.size() > 1) {
       precomputedBaselines.resize(lines.size(), 0);
       // Start from the last content line.
@@ -1353,7 +1173,7 @@ class TextLayoutContext {
         // Bottom/Center alignment: use pre-computed baselines anchored from the last line.
         relativeBaseline = precomputedBaselines[lineIdx];
         baselineY = roundf(relativeBaseline + yOffset);
-      } else if (hasPrevBaseline && textBox->lineHeight > 0) {
+      } else if (hasPrevBaseline && params.lineHeight > 0) {
         // Fixed line height, subsequent lines: baseline = prevBaseline + lineHeight.
         // This produces equal baseline-to-baseline spacing matching Figma's behavior where
         // subsequent lines have their leading added above rather than split above and below.
@@ -1370,7 +1190,7 @@ class TextLayoutContext {
       relativeTop += line.maxLineHeight;
 
       // Skip lines that overflow below the box bottom.
-      if (overflowHidden && !std::isnan(boxHeight)) {
+      if (overflowHidden && !std::isnan(params.boxHeight)) {
         float lineBottom = baselineY + line.maxDescent;
         if (lineBottom > boxBottom) {
           break;
@@ -1381,18 +1201,18 @@ class TextLayoutContext {
       // left-aligned.
       float xOffset = 0;
       float justifyExtraPerGap = 0;
-      bool isStartAligned = (textBox->textAlign == TextAlign::Start && !paragraphRTL) ||
-                            (textBox->textAlign == TextAlign::End && paragraphRTL);
-      bool isEndAligned = (textBox->textAlign == TextAlign::End && !paragraphRTL) ||
-                          (textBox->textAlign == TextAlign::Start && paragraphRTL);
-      if (!std::isnan(boxWidth)) {
+      bool isStartAligned = (params.textAlign == TextAlign::Start && !paragraphRTL) ||
+                            (params.textAlign == TextAlign::End && paragraphRTL);
+      bool isEndAligned = (params.textAlign == TextAlign::End && !paragraphRTL) ||
+                          (params.textAlign == TextAlign::Start && paragraphRTL);
+      if (!std::isnan(params.boxWidth)) {
         if (isStartAligned) {
           // Left-aligned (LTR Start or RTL End): no offset.
-        } else if (textBox->textAlign == TextAlign::Center) {
-          xOffset += (boxWidth - line.width) / 2;
+        } else if (params.textAlign == TextAlign::Center) {
+          xOffset += (params.boxWidth - line.width) / 2;
         } else if (isEndAligned) {
-          xOffset += boxWidth - line.width;
-        } else if (textBox->textAlign == TextAlign::Justify) {
+          xOffset += params.boxWidth - line.width;
+        } else if (params.textAlign == TextAlign::Justify) {
           // Justify: distribute extra space at word boundaries. Last line uses Start alignment.
           // Note: under PAG_BUILD_PAGX, gap counting is deferred until after L2 BiDi reorder
           // so that it operates on the same visual glyph order used during gap application.
@@ -1406,17 +1226,17 @@ class TextLayoutContext {
               }
             }
             if (gapCount > 0) {
-              justifyExtraPerGap = (boxWidth - line.width) / static_cast<float>(gapCount);
+              justifyExtraPerGap = (params.boxWidth - line.width) / static_cast<float>(gapCount);
             }
 #endif
           } else if (paragraphRTL) {
-            xOffset += boxWidth - line.width;
+            xOffset += params.boxWidth - line.width;
           }
         }
       } else {
         if (isStartAligned) {
           // No offset.
-        } else if (textBox->textAlign == TextAlign::Center) {
+        } else if (params.textAlign == TextAlign::Center) {
           xOffset -= line.width / 2;
         } else if (isEndAligned) {
           xOffset -= line.width;
@@ -1461,7 +1281,7 @@ class TextLayoutContext {
       }
       // Compute justify gap count on visual-order glyphs so that counting and application use
       // the same adjacency pairs. This avoids mismatch when BiDi L2 reorder changes neighbors.
-      if (textBox->textAlign == TextAlign::Justify && lineIdx < lines.size() - 1 &&
+      if (params.textAlign == TextAlign::Justify && lineIdx < lines.size() - 1 &&
           line.glyphs.size() > 1) {
         int gapCount = 0;
         for (size_t i = 0; i + 1 < visualGlyphs.size(); i++) {
@@ -1470,7 +1290,7 @@ class TextLayoutContext {
           }
         }
         if (gapCount > 0) {
-          justifyExtraPerGap = (boxWidth - line.width) / static_cast<float>(gapCount);
+          justifyExtraPerGap = (params.boxWidth - line.width) / static_cast<float>(gapCount);
         }
       }
       for (size_t gi = 0; gi < visualGlyphs.size(); gi++) {
@@ -1507,8 +1327,11 @@ class TextLayoutContext {
         continue;
       }
 
-      float compensateX = text->position.x;
-      float compensateY = text->position.y;
+      // Standalone Text (no TextBox): position is applied directly by LayerBuilder, no compensation.
+      // TextBox scenario: subtract text->position since LayerBuilder adds it back.
+      bool standalone = std::isnan(params.boxWidth);
+      float compensateX = standalone ? 0 : text->position.x;
+      float compensateY = standalone ? 0 : text->position.y;
 
       tgfx::TextBlobBuilder builder = {};
       // Group consecutive glyphs with the same font into runs.
@@ -1580,7 +1403,7 @@ class TextLayoutContext {
   }
 
   std::vector<ColumnInfo> layoutColumns(const std::vector<GlyphInfo>& allGlyphs,
-                                        const TextBox* textBox, float boxHeight) {
+                                        const TextLayoutParams& params) {
     // Phase 1: Build VerticalGlyphInfo list with orientation, metrics, and break marks.
     // Consecutive rotated-group characters are collected into a single VerticalGlyphInfo.
     std::vector<VerticalGlyphInfo> vgList = {};
@@ -1633,7 +1456,7 @@ class TextLayoutContext {
     columns.emplace_back();
     auto* currentColumn = &columns.back();
     float currentColumnHeight = 0;
-    bool doWrap = textBox->wordWrap && !std::isnan(boxHeight) && boxHeight > 0;
+    bool doWrap = params.wordWrap && !std::isnan(params.boxHeight) && params.boxHeight > 0;
     int lastBreakIndex = -1;
     // Tracks the fontLineHeight of the \n that created the current column.
     // Used as the fallback width for empty columns (e.g. consecutive \n\n).
@@ -1649,7 +1472,7 @@ class TextLayoutContext {
                LineBreaker::IsWhitespace(currentColumn->glyphs.back().glyphs.front().unichar)) {
           currentColumn->glyphs.pop_back();
         }
-        FinishColumn(currentColumn, textBox->lineHeight, pendingNewlineFontLineHeight);
+        FinishColumn(currentColumn, params.lineHeight, pendingNewlineFontLineHeight);
         columns.emplace_back();
         currentColumn = &columns.back();
         currentColumnHeight = 0;
@@ -1662,7 +1485,8 @@ class TextLayoutContext {
         lastBreakIndex = static_cast<int>(currentColumn->glyphs.size());
       }
 
-      if (doWrap && !currentColumn->glyphs.empty() && currentColumnHeight + vg.height > boxHeight) {
+      if (doWrap && !currentColumn->glyphs.empty() &&
+          currentColumnHeight + vg.height > params.boxHeight) {
         if (lastBreakIndex >= 0) {
           std::vector<VerticalGlyphInfo> overflow(currentColumn->glyphs.begin() + lastBreakIndex,
                                                   currentColumn->glyphs.end());
@@ -1673,7 +1497,7 @@ class TextLayoutContext {
                  LineBreaker::IsWhitespace(currentColumn->glyphs.back().glyphs.front().unichar)) {
             currentColumn->glyphs.pop_back();
           }
-          FinishColumn(currentColumn, textBox->lineHeight, 0.0f);
+          FinishColumn(currentColumn, params.lineHeight, 0.0f);
           columns.emplace_back();
           currentColumn = &columns.back();
           // Skip leading whitespace in overflow.
@@ -1701,7 +1525,7 @@ class TextLayoutContext {
           }
         } else {
           RemoveTrailingLetterSpacing(currentColumn->glyphs);
-          FinishColumn(currentColumn, textBox->lineHeight, 0.0f);
+          FinishColumn(currentColumn, params.lineHeight, 0.0f);
           columns.emplace_back();
           currentColumn = &columns.back();
           currentColumnHeight = 0;
@@ -1718,7 +1542,7 @@ class TextLayoutContext {
 
     RemoveTrailingLetterSpacing(currentColumn->glyphs);
 
-    FinishColumn(currentColumn, textBox->lineHeight, pendingNewlineFontLineHeight);
+    FinishColumn(currentColumn, params.lineHeight, pendingNewlineFontLineHeight);
 
 #ifdef PAG_BUILD_PAGX
     // Apply punctuation squash to all columns.
@@ -1808,8 +1632,8 @@ class TextLayoutContext {
   }
 #endif
 
-  void buildTextBlobVertical(const TextBox* textBox, const std::vector<ColumnInfo>& columns,
-                             float boxWidth, float boxHeight) {
+  void buildTextBlobVertical(const TextLayoutParams& params,
+                             const std::vector<ColumnInfo>& columns) {
     if (columns.empty()) {
       return;
     }
@@ -1824,21 +1648,21 @@ class TextLayoutContext {
     // Columns go right-to-left, so Near = right-aligned, Far = left-aligned.
     // xStart is where the right edge of the first column starts.
     float xStart = 0;
-    if (!std::isnan(boxWidth)) {
-      switch (textBox->paragraphAlign) {
+    if (!std::isnan(params.boxWidth)) {
+      switch (params.paragraphAlign) {
         case ParagraphAlign::Near:
-          xStart += boxWidth;
+          xStart += params.boxWidth;
           break;
         case ParagraphAlign::Middle:
-          xStart += (boxWidth + totalWidth) / 2;
+          xStart += (params.boxWidth + totalWidth) / 2;
           break;
         case ParagraphAlign::Far:
           xStart += totalWidth;
           break;
       }
     } else {
-      // boxWidth is 0: no boundary, align relative to position.
-      switch (textBox->paragraphAlign) {
+      // boxWidth is NaN: no boundary, align relative to position.
+      switch (params.paragraphAlign) {
         case ParagraphAlign::Near:
           xStart += totalWidth;
           break;
@@ -1860,7 +1684,7 @@ class TextLayoutContext {
     };
     std::unordered_map<Text*, std::vector<VerticalPositionedGlyph>> textGlyphs = {};
 
-    bool overflowHidden = textBox->overflow == Overflow::Hidden;
+    bool overflowHidden = params.overflow == Overflow::Hidden;
     float boxLeft = 0;
     float columnX = xStart;
 
@@ -1871,7 +1695,7 @@ class TextLayoutContext {
       columnX -= allocatedWidth;
 
       // Skip columns that overflow beyond the left edge of the box.
-      if (overflowHidden && !std::isnan(boxWidth) && columnX < boxLeft) {
+      if (overflowHidden && !std::isnan(params.boxWidth) && columnX < boxLeft) {
         break;
       }
 
@@ -1882,15 +1706,15 @@ class TextLayoutContext {
       // Compute per-column vertical offset based on TextAlign.
       float inlineOffset = 0;
       float justifyGap = 0;
-      if (!std::isnan(boxHeight)) {
-        switch (textBox->textAlign) {
+      if (!std::isnan(params.boxHeight)) {
+        switch (params.textAlign) {
           case TextAlign::Start:
             break;
           case TextAlign::Center:
-            inlineOffset = (boxHeight - column.height) / 2;
+            inlineOffset = (params.boxHeight - column.height) / 2;
             break;
           case TextAlign::End:
-            inlineOffset = boxHeight - column.height;
+            inlineOffset = params.boxHeight - column.height;
             break;
           case TextAlign::Justify: {
             // Justify: distribute extra space evenly at word boundaries. Last column uses Start.
@@ -1902,7 +1726,7 @@ class TextLayoutContext {
                 }
               }
               if (breakCount > 0) {
-                float extraSpace = boxHeight - column.height;
+                float extraSpace = params.boxHeight - column.height;
                 justifyGap = extraSpace / static_cast<float>(breakCount);
               }
             }
@@ -1910,7 +1734,7 @@ class TextLayoutContext {
           }
         }
       } else {
-        switch (textBox->textAlign) {
+        switch (params.textAlign) {
           case TextAlign::Start:
             break;
           case TextAlign::Center:
@@ -2004,8 +1828,11 @@ class TextLayoutContext {
         continue;
       }
 
-      float compensateX = text->position.x;
-      float compensateY = text->position.y;
+      // Standalone Text (no TextBox): position is applied directly by LayerBuilder, no compensation.
+      // TextBox scenario: subtract text->position since LayerBuilder adds it back.
+      bool standalone = std::isnan(params.boxWidth);
+      float compensateX = standalone ? 0 : text->position.x;
+      float compensateY = standalone ? 0 : text->position.y;
 
       tgfx::TextBlobBuilder builder = {};
 
@@ -2079,22 +1906,71 @@ void TextLayout::StoreShapedText(Text* text, ShapedText&& shapedText) {
   text->anchors = std::move(shapedText.anchors);
 }
 
-Rect TextLayout::MeasureTextBox(const TextBox* textBox, float boxWidth, float boxHeight,
-                                FontConfig* fontConfig) {
-  if (textBox == nullptr || textBox->elements.empty()) {
+void TextLayout::CollectTextElements(const std::vector<Element*>& elements,
+                                     std::vector<Text*>& outText) {
+  for (auto* element : elements) {
+    if (element->nodeType() == NodeType::Text) {
+      outText.push_back(static_cast<Text*>(element));
+    } else if (element->nodeType() == NodeType::Group) {
+      CollectTextElements(static_cast<Group*>(element)->elements, outText);
+    } else if (element->nodeType() == NodeType::TextBox) {
+      CollectTextElements(static_cast<TextBox*>(element)->elements, outText);
+    }
+  }
+}
+
+static Rect ComputeEmbeddedTextBounds(const Text* text) {
+  Rect result = {};
+  for (auto* glyphRun : text->glyphRuns) {
+    if (glyphRun->bounds.width <= 0 && glyphRun->bounds.height <= 0) {
+      if (text->getTextBlob()) {
+        auto tight = text->getTextBlob()->getTightBounds();
+        return Rect::MakeXYWH(tight.left, tight.top, tight.width(), tight.height());
+      }
+      return {};
+    }
+    // Simple merge: union of all GlyphRun bounds
+    if (result.width <= 0 && result.height <= 0) {
+      result = glyphRun->bounds;
+    } else {
+      result.width += glyphRun->bounds.width;
+      result.height = std::max(result.height, glyphRun->bounds.height);
+    }
+  }
+  return result;
+}
+
+Rect TextLayout::Measure(const std::vector<Text*>& textElements, const TextLayoutParams& params,
+                         FontConfig* fontConfig) {
+  if (textElements.empty()) {
     return {};
+  }
+  // Check if all Text elements have embedded GlyphRuns with bounds.
+  bool allEmbedded = true;
+  for (auto* text : textElements) {
+    if (text->glyphRuns.empty()) {
+      allEmbedded = false;
+      break;
+    }
+  }
+  if (allEmbedded) {
+    Rect totalBounds = {};
+    for (auto* text : textElements) {
+      auto textBounds = ComputeEmbeddedTextBounds(text);
+      if (totalBounds.width <= 0 && totalBounds.height <= 0) {
+        totalBounds = textBounds;
+      } else {
+        totalBounds.width += textBounds.width;
+        totalBounds.height = std::max(totalBounds.height, textBounds.height);
+      }
+    }
+    return totalBounds;
   }
   TextLayoutContext context(fontConfig);
-  std::vector<Text*> childText = {};
-  TextLayoutContext::collectTextElements(textBox->elements, childText);
-  if (childText.empty()) {
-    return {};
-  }
-  // Shape and concatenate all glyphs (same as processTextWithLayout).
+  bool isVertical = params.writingMode == WritingMode::Vertical;
   std::vector<TextLayoutContext::GlyphInfo> allGlyphs = {};
   float totalWidth = 0;
-  bool isVertical = textBox->writingMode == WritingMode::Vertical;
-  for (auto* text : childText) {
+  for (auto* text : textElements) {
     TextLayoutContext::ShapedInfo info = {};
     info.text = text;
     if (!text->text.empty()) {
@@ -2112,7 +1988,7 @@ Rect TextLayout::MeasureTextBox(const TextBox* textBox, float boxWidth, float bo
     return {};
   }
   if (isVertical) {
-    auto columns = context.layoutColumns(allGlyphs, textBox, boxHeight);
+    auto columns = context.layoutColumns(allGlyphs, params);
     float totalColumnWidth = 0;
     float maxColumnHeight = 0;
     for (auto& col : columns) {
@@ -2121,7 +1997,7 @@ Rect TextLayout::MeasureTextBox(const TextBox* textBox, float boxWidth, float bo
     }
     return Rect::MakeXYWH(0, 0, totalColumnWidth, maxColumnHeight);
   }
-  auto lines = context.layoutLines(allGlyphs, textBox, boxWidth);
+  auto lines = context.layoutLines(allGlyphs, params);
   float maxLineWidth = 0;
   float totalHeight = 0;
   for (auto& line : lines) {
@@ -2131,55 +2007,43 @@ Rect TextLayout::MeasureTextBox(const TextBox* textBox, float boxWidth, float bo
   return Rect::MakeXYWH(0, 0, maxLineWidth, totalHeight);
 }
 
-Rect TextLayout::MeasureTextBox(const TextBox* textBox, float boxWidth, float boxHeight,
-                                const LayoutContext& context) {
-  return MeasureTextBox(textBox, boxWidth, boxHeight, context.getFontConfig());
+Rect TextLayout::Measure(const std::vector<Text*>& textElements, const TextLayoutParams& params,
+                         const LayoutContext& context) {
+  return Measure(textElements, params, context.getFontConfig());
 }
 
-tgfx::Rect TextLayout::LayoutText(Text* text, const LayoutContext& context, TextBaseline baseline) {
-  if (text == nullptr) {
-    return tgfx::Rect::MakeEmpty();
+Rect TextLayout::Layout(const std::vector<Text*>& textElements, const TextLayoutParams& params,
+                        const LayoutContext& context) {
+  if (textElements.empty()) {
+    return {};
   }
   TextLayoutContext layoutContext(context.getFontConfig());
-
-  // If text has embedded GlyphRuns, use buildShapedTextFromEmbeddedGlyphRuns directly.
-  // Embedded fonts have pre-baked coordinates; baseline mode does not apply.
-  if (!text->glyphRuns.empty()) {
-    auto shapedText = layoutContext.buildShapedTextFromEmbeddedGlyphRuns(text);
-    StoreShapedText(text, std::move(shapedText));
-    // Embedded fonts: use tight bounds for both axes (no advance width available).
-    return text->textBlob ? text->textBlob->getTightBounds() : tgfx::Rect::MakeEmpty();
-  }
-  // Standard shaping path: build TextBlob with baseline offset baked in.
-  float advanceWidth = layoutContext.processTextWithoutLayout(text, baseline);
-  // Compute anchor offset so that bounds are relative to the text anchor point.
-  float anchorOffset = 0;
-  switch (text->textAnchor) {
-    case TextAnchor::Start:
+  // Check if all Text have embedded GlyphRuns.
+  bool allEmbedded = true;
+  for (auto* text : textElements) {
+    if (text->glyphRuns.empty()) {
+      allEmbedded = false;
       break;
-    case TextAnchor::Center:
-      anchorOffset = -advanceWidth / 2;
-      break;
-    case TextAnchor::End:
-      anchorOffset = -advanceWidth;
-      break;
+    }
   }
-  auto tightBounds = text->textBlob ? text->textBlob->getTightBounds() : tgfx::Rect::MakeEmpty();
-  return tgfx::Rect::MakeLTRB(anchorOffset, tightBounds.top, anchorOffset + advanceWidth,
-                              tightBounds.bottom);
-}
-
-void TextLayout::LayoutTextBox(TextBox* textBox, float boxWidth, float boxHeight,
-                               const LayoutContext& context) {
-  if (textBox == nullptr) {
-    return;
+  if (allEmbedded) {
+    Rect totalBounds = {};
+    for (auto* text : textElements) {
+      auto shaped = layoutContext.buildShapedTextFromEmbeddedGlyphRuns(text);
+      StoreShapedText(text, std::move(shaped));
+      auto textBounds = ComputeEmbeddedTextBounds(text);
+      if (totalBounds.width <= 0 && totalBounds.height <= 0) {
+        totalBounds = textBounds;
+      } else {
+        totalBounds.width += textBounds.width;
+        totalBounds.height = std::max(totalBounds.height, textBounds.height);
+      }
+    }
+    return totalBounds;
   }
-  TextLayoutContext layoutContext(context.getFontConfig());
-  std::vector<Text*> childText = {};
-  TextLayoutContext::collectTextElements(textBox->elements, childText);
-  if (!childText.empty()) {
-    layoutContext.processTextWithLayout(childText, textBox, boxWidth, boxHeight);
-  }
+  // Cast away const for internal processing (processTextWithLayout takes non-const vector).
+  auto mutableElements = textElements;
+  return layoutContext.processTextWithLayout(mutableElements, params);
 }
 
 }  // namespace pagx

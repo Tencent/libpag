@@ -774,7 +774,7 @@ static Text* parseText(const DOMNode* node, PAGXDocument* doc) {
   text->fauxBold = getBoolAttribute(node, "fauxBold", Default<Text>().fauxBold, doc);
   text->fauxItalic = getBoolAttribute(node, "fauxItalic", Default<Text>().fauxItalic, doc);
   text->textAnchor = GET_ENUM(node, "textAnchor", "start", doc, TextAnchor);
-  text->baseline = GET_ENUM(node, "baseline", "visualTop", doc, TextBaseline);
+  text->baseline = GET_ENUM(node, "baseline", "lineBox", doc, TextBaseline);
 
   // Parse GlyphRun children for precomposition mode
   auto child = node->firstChild;
@@ -1522,6 +1522,15 @@ static GlyphRun* parseGlyphRun(const DOMNode* node, PAGXDocument* doc) {
   auto skewsStr = getAttribute(node, "skews");
   if (!skewsStr.empty()) {
     run->skews = ParseFloatList(skewsStr);
+  }
+
+  // Parse linebox bounds (x,y,w,h)
+  auto boundsStr = getAttribute(node, "bounds");
+  if (!boundsStr.empty()) {
+    auto values = ParseFloatList(boundsStr);
+    if (values.size() >= 4) {
+      run->bounds = Rect::MakeXYWH(values[0], values[1], values[2], values[3]);
+    }
   }
 
   return run;

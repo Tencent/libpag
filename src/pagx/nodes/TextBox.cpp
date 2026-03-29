@@ -19,9 +19,24 @@
 #include "pagx/nodes/TextBox.h"
 #include <cmath>
 #include "pagx/TextLayout.h"
+#include "pagx/TextLayoutParams.h"
 #include "pagx/layout/LayoutNode.h"
 
 namespace pagx {
+
+static TextLayoutParams MakeTextLayoutParams(const TextBox* textBox, float boxWidth,
+                                             float boxHeight) {
+  TextLayoutParams params = {};
+  params.boxWidth = boxWidth;
+  params.boxHeight = boxHeight;
+  params.textAlign = textBox->textAlign;
+  params.paragraphAlign = textBox->paragraphAlign;
+  params.writingMode = textBox->writingMode;
+  params.lineHeight = textBox->lineHeight;
+  params.wordWrap = textBox->wordWrap;
+  params.overflow = textBox->overflow;
+  return params;
+}
 
 void TextBox::updateSize(const LayoutContext& context) {
   for (auto* child : elements) {
@@ -39,7 +54,10 @@ void TextBox::onMeasure(const LayoutContext& context) {
     preferredHeight = height;
     return;
   }
-  auto measured = TextLayout::MeasureTextBox(this, width, height, context);
+  auto params = MakeTextLayoutParams(this, width, height);
+  std::vector<Text*> childText = {};
+  TextLayout::CollectTextElements(elements, childText);
+  auto measured = TextLayout::Measure(childText, params, context);
   preferredWidth = std::isnan(width) ? measured.width : width;
   preferredHeight = std::isnan(height) ? measured.height : height;
 }
@@ -54,7 +72,10 @@ void TextBox::updateLayout(const LayoutContext& context) {
   auto nodes = CollectLayoutNodes(elements, true);
   PerformConstraintLayout(nodes, actualWidth, actualHeight, context);
   // Text elements are typeset by TextLayout after constraint positioning.
-  TextLayout::LayoutTextBox(this, actualWidth, actualHeight, context);
+  auto params = MakeTextLayoutParams(this, actualWidth, actualHeight);
+  std::vector<Text*> childText = {};
+  TextLayout::CollectTextElements(elements, childText);
+  TextLayout::Layout(childText, params, context);
 }
 
 }  // namespace pagx

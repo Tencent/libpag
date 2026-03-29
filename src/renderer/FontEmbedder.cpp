@@ -343,6 +343,27 @@ static bool CanUseDefaultMode(const tgfx::GlyphRun& run, const std::vector<size_
   return true;
 }
 
+static void ComputeGlyphRunBounds(
+    GlyphRun* glyphRun, const tgfx::GlyphRun& run, const std::vector<size_t>& indices, Font* font,
+    const std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash>& glyphMapping, float fontSize) {
+  float scale = fontSize / static_cast<float>(font->unitsPerEm);
+  float totalAdvance = 0;
+  auto* typeface = run.font.getTypeface().get();
+  for (size_t i : indices) {
+    GlyphKey key = {typeface, run.glyphs[i]};
+    auto it = glyphMapping.find(key);
+    if (it != glyphMapping.end()) {
+      auto mappedID = it->second;
+      if (mappedID > 0 && static_cast<size_t>(mappedID) <= font->glyphs.size()) {
+        totalAdvance += font->glyphs[mappedID - 1]->advance * scale;
+      }
+    }
+  }
+  auto metrics = run.font.getMetrics();
+  float fontLineHeight = std::abs(metrics.ascent) + metrics.descent + metrics.leading;
+  glyphRun->bounds = Rect::MakeXYWH(0, 0, totalAdvance, fontLineHeight);
+}
+
 static GlyphRun* CreateGlyphRunForIndices(
     PAGXDocument* document, const tgfx::GlyphRun& run, const std::vector<size_t>& indices,
     Font* font, const std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash>& glyphMapping,
@@ -369,6 +390,7 @@ static GlyphRun* CreateGlyphRunForIndices(
   if (CanUseDefaultMode(run, indices, font, glyphMapping, fontSize, &offsetX, &offsetY)) {
     glyphRun->x = offsetX;
     glyphRun->y = offsetY;
+    ComputeGlyphRunBounds(glyphRun, run, indices, font, glyphMapping, fontSize);
     return glyphRun;
   }
 
@@ -480,9 +502,9 @@ static GlyphRun* CreateGlyphRunForIndices(
       break;
   }
 
+  ComputeGlyphRunBounds(glyphRun, run, indices, font, glyphMapping, fontSize);
   return glyphRun;
 }
-
 static void CollectSpacingGlyph(
     PAGXDocument* document, const tgfx::Font& font, tgfx::GlyphID glyphID,
     std::unordered_map<const tgfx::Typeface*, BitmapFontBuilder>& bitmapBuilders,

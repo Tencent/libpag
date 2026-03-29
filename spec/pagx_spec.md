@@ -1387,7 +1387,7 @@ Text elements provide geometric shapes for text content. Unlike shape elements t
 | `letterSpacing` | float | 0 | Letter spacing |
 | `fauxBold` | bool | false | Faux bold (algorithmically bolded) |
 | `fauxItalic` | bool | false | Faux italic (algorithmically slanted) |
-| `baseline` | TextBaseline | visualTop | Baseline mode for vertical positioning. `visualTop`: position.y is the top of the visual pixel bounds; `alphabetic`: position.y is the alphabetic baseline |
+| `baseline` | TextBaseline | lineBox | Baseline mode for vertical positioning. `lineBox`: position.y is the linebox top (based on font metrics line height); `alphabetic`: position.y is the alphabetic baseline |
 | `textAnchor` | TextAnchor | start | Text anchor alignment relative to the origin (see below). Ignored when a TextBox controls the layout |
 | `left` | float | - | Distance from left edge to container's left edge (see §4.3) |
 | `right` | float | - | Distance from right edge to container's right edge (see §4.3) |
@@ -1433,7 +1433,7 @@ Controls how `position.y` is interpreted for vertical positioning.
 
 | Value | Description |
 |-------|-------------|
-| `visualTop` | `position.y` is the top of the visual pixel bounds (default) |
+| `lineBox` | `position.y` is the linebox top (based on font metrics line height) (default) |
 | `alphabetic` | `position.y` is the alphabetic baseline. Text is rendered directly at the baseline position |
 
 **Runtime Layout Rendering Flow**:
@@ -1463,6 +1463,7 @@ GlyphRun defines pre-layout data for a group of glyphs, each GlyphRun independen
 | `scales` | string | - | Per-glyph scale (sx,sy), semicolon-separated. Scaling is applied around the anchor point. Default 1,1 |
 | `rotations` | string | - | Per-glyph rotation angle (degrees), comma-separated. Rotation is applied around the anchor point. Default 0 |
 | `skews` | string | - | Per-glyph skew angle (degrees), comma-separated. Skewing is applied around the anchor point. Default 0 |
+| `bounds` | string | - | Linebox bounds (x,y,w,h) computed during font embedding. Used for layout measurement when original font metrics are unavailable |
 
 All attributes are optional and can be combined. When an attribute array is shorter than the glyph count, missing values use defaults.
 
@@ -2246,7 +2247,7 @@ Layer / Group
 | **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
 | **TextAlign** | `start`, `center`, `end`, `justify` |
 | **TextAnchor** | `start`, `center`, `end` |
-| **TextBaseline** | `visualTop`, `alphabetic` |
+| **TextBaseline** | `lineBox`, `alphabetic` |
 | **ParagraphAlign** | `near`, `middle`, `far` |
 | **WritingMode** | `horizontal`, `vertical` |
 | **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |

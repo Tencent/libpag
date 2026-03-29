@@ -405,7 +405,7 @@ Child element of gradient color sources (LinearGradient, RadialGradient, ConicGr
 | `fauxBold` | bool | false |
 | `fauxItalic` | bool | false |
 | `textAnchor` | TextAnchor | start |
-| `baseline` | TextBaseline | visualTop |
+| `baseline` | TextBaseline | lineBox |
 | `left` | float | — |
 | `right` | float | — |
 | `top` | float | — |
@@ -432,6 +432,7 @@ See §Constraint Attributes below.
 | `scales` | string | - |
 | `rotations` | string | - |
 | `skews` | string | - |
+| `bounds` | string | — |
 
 ### TextModifier
 
@@ -613,7 +614,7 @@ Path `data` uses SVG `<path d="...">` syntax exactly. Uppercase = absolute, lowe
 | **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
 | **TextAlign** | `start`, `center`, `end`, `justify` |
 | **TextAnchor** | `start`, `center`, `end` |
-| **TextBaseline** | `visualTop`, `alphabetic` |
+| **TextBaseline** | `lineBox`, `alphabetic` |
 | **ParagraphAlign** | `near`, `middle`, `far` |
 | **Overflow** | `visible`, `hidden` |
 | **WritingMode** | `horizontal`, `vertical` |
