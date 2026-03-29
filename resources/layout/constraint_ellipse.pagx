@@ -16,8 +16,10 @@
 
       <!-- Container 1: Single-edge and center positioning -->
       <Layer flex="1" height="260">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
         <!-- 1.1: left="20" top="20" -->
         <Layer left="0" right="0" top="0" bottom="0">
           <Ellipse left="20" top="20" size="60,60"/>
@@ -47,8 +49,10 @@
 
       <!-- Container 2: Horizontal stretch (left+right) -->
       <Layer flex="1" height="260">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
         <!-- 2.1: left="25" right="25" top="30" -->
         <Layer left="0" right="0" top="0" bottom="0">
           <Ellipse left="25" right="25" top="30" size="1,50"/>
@@ -88,8 +92,10 @@
 
       <!-- Container 3: Vertical stretch (top+bottom) -->
       <Layer flex="1" height="260">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
         <!-- 3.1: left="20" top="25" bottom="25" -->
         <Layer left="0" right="0" top="0" bottom="0">
           <Ellipse left="20" top="25" bottom="25" size="55,1"/>
@@ -114,8 +120,10 @@
 
       <!-- Container 4: Four-edge stretch -->
       <Layer flex="1" height="260">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Ellipse left="25" right="25" top="25" bottom="25" size="1,1"/>
           <Fill>
@@ -129,8 +137,10 @@
 
       <!-- Container 5: Asymmetric stretch -->
       <Layer flex="1" height="260">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Ellipse left="20" right="50" top="30" bottom="60" size="1,1"/>
           <Fill>

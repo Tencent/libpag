@@ -17,39 +17,43 @@
       <!-- Container 1: Single-edge and center positioning -->
       <Layer flex="1" height="260">
         <!-- Border -->
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
         <!-- 1.1: left="15" top="15" -->
-        <Group>
+        <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="15" top="15" size="60,60" roundness="10"/>
           <Fill color="#6366F1"/>
-        </Group>
+        </Layer>
         <!-- 1.2: right="15" top="15" -->
-        <Group>
+        <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle right="15" top="15" size="60,60" roundness="10"/>
           <Fill color="#F43F5E"/>
-        </Group>
+        </Layer>
         <!-- 1.3: centerX="0" centerY="0" -->
-        <Group>
+        <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle centerX="0" centerY="0" size="80,60" roundness="10"/>
           <Fill color="#10B981"/>
-        </Group>
+        </Layer>
         <!-- 1.4: left="15" bottom="15" -->
-        <Group>
+        <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="15" bottom="15" size="60,60" roundness="10"/>
           <Fill color="#F59E0B"/>
-        </Group>
+        </Layer>
         <!-- 1.5: right="15" bottom="15" -->
-        <Group>
+        <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle right="15" bottom="15" size="60,60" roundness="10"/>
           <Fill color="#06B6D4"/>
-        </Group>
+        </Layer>
       </Layer>
 
       <!-- Container 2: Horizontal stretch (left+right) -->
       <Layer flex="1" height="260">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
         <!-- 2.1: left="20" right="20" top="20" -->
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="20" right="20" top="20" size="1,50" roundness="8"/>
@@ -89,8 +93,10 @@
 
       <!-- Container 3: Vertical stretch (top+bottom) -->
       <Layer flex="1" height="260">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
         <!-- 3.1: left="15" top="20" bottom="20" -->
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="15" top="20" bottom="20" size="50,1" roundness="8"/>
@@ -115,8 +121,10 @@
 
       <!-- Container 4: Four-edge stretch -->
       <Layer flex="1" height="260">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="20" right="20" top="20" bottom="20" size="1,1" roundness="12"/>
           <Fill>
@@ -130,8 +138,10 @@
 
       <!-- Container 5: Asymmetric stretch -->
       <Layer flex="1" height="260">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Rectangle left="15" right="40" top="25" bottom="50" size="1,1" roundness="12"/>
           <Fill>

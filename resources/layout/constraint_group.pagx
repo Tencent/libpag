@@ -17,8 +17,10 @@
     <Layer flex="1" layout="horizontal" gap="20">
       <!-- Container 1 -->
       <Layer flex="1" height="200">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Group centerX="0" centerY="0" width="135" height="120">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
@@ -34,8 +36,10 @@
 
       <!-- Container 2 -->
       <Layer flex="1" height="200">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Group left="20" right="20" top="40" height="120">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
@@ -51,8 +55,10 @@
 
       <!-- Container 3 -->
       <Layer flex="1" height="200">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Group left="20" top="20" bottom="20" width="135">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
@@ -68,8 +74,10 @@
 
       <!-- Container 4 -->
       <Layer flex="1" height="200">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Group left="20" right="20" top="20" bottom="20">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
@@ -88,8 +96,10 @@
     <Layer flex="1" layout="horizontal" gap="20">
       <!-- Container 5 -->
       <Layer flex="1" height="200">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Group left="20" right="20" top="20" bottom="20">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
@@ -108,8 +118,10 @@
 
       <!-- Container 6 -->
       <Layer flex="1" height="200">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Group centerX="0" centerY="0" width="200" height="160">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
@@ -125,8 +137,10 @@
 
       <!-- Container 7 -->
       <Layer flex="1" height="200">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Group>
             <Group centerX="0" centerY="0" width="200" height="160">
@@ -147,8 +161,10 @@
     <Layer flex="1" layout="horizontal" gap="20">
       <!-- Container 8 -->
       <Layer flex="1" height="200">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Group left="20" right="20" top="20" bottom="20">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
@@ -163,8 +179,10 @@
 
       <!-- Container 9 -->
       <Layer flex="1" height="200">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Group left="20" right="20" top="20" bottom="20">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
@@ -193,8 +211,10 @@
 
       <!-- Container 10 -->
       <Layer flex="1" height="200">
-        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
-        <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        <Layer left="0" right="0" top="0" bottom="0">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+          <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+        </Layer>
         <Layer left="0" right="0" top="0" bottom="0">
           <Group left="20" right="20" top="20" bottom="20">
             <Rectangle left="0" right="0" top="0" bottom="0" roundness="10"/>
