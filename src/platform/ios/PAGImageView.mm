@@ -379,15 +379,19 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   CGRect oldBounds = self.bounds;
   [super setBounds:bounds];
   self.viewSize = CGSizeMake(bounds.size.width, bounds.size.height);
+  BOOL shouldUpdateAnimator = NO;
   if (oldBounds.size.width != bounds.size.width || oldBounds.size.height != bounds.size.height) {
-    std::lock_guard<std::mutex> autoLock(imageViewLock);
-    if (pagComposition || filePath) {
-      [self reset];
-      [self updatePAGDecoder];
-      if (oldBounds.size.width == 0 || oldBounds.size.height == 0) {
-        [animator update];
+    {
+      std::lock_guard<std::mutex> autoLock(imageViewLock);
+      if (pagComposition || filePath) {
+        [self reset];
+        [self updatePAGDecoder];
+        shouldUpdateAnimator = (oldBounds.size.width == 0 || oldBounds.size.height == 0);
       }
     }
+  }
+  if (shouldUpdateAnimator) {
+    [animator update];
   }
 }
 
@@ -395,15 +399,19 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   CGRect oldRect = self.frame;
   [super setFrame:frame];
   self.viewSize = CGSizeMake(frame.size.width, frame.size.height);
+  BOOL shouldUpdateAnimator = NO;
   if (oldRect.size.width != frame.size.width || oldRect.size.height != frame.size.height) {
-    std::lock_guard<std::mutex> autoLock(imageViewLock);
-    if (pagComposition || filePath) {
-      [self reset];
-      [self updatePAGDecoder];
-      if (oldRect.size.width == 0 || oldRect.size.height == 0) {
-        [animator update];
+    {
+      std::lock_guard<std::mutex> autoLock(imageViewLock);
+      if (pagComposition || filePath) {
+        [self reset];
+        [self updatePAGDecoder];
+        shouldUpdateAnimator = (oldRect.size.width == 0 || oldRect.size.height == 0);
       }
     }
+  }
+  if (shouldUpdateAnimator) {
+    [animator update];
   }
 }
 
