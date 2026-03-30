@@ -108,7 +108,7 @@ Use Layers purposefully — each should serve a clear structural or visual role:
 
 ```
 Is this a direct child of <pagx> or <Composition>?
-  → YES: Must be Layer (Groups cause a parse error)
+  → YES: Must be Layer (only Layer allowed — Group, geometry, painters all cause parse errors)
 
 Does this need styles, filters, mask, blendMode, composition, or clipToBounds?
   → YES: Must be Layer

@@ -80,7 +80,7 @@ Check for issues that automated optimization cannot fix:
 
 After all optimizations, verify the following:
 
-- [ ] All `<pagx>`/`<Composition>` direct children are `<Layer>` — not Group
+- [ ] All `<pagx>`/`<Composition>` direct children are `<Layer>` (or `<Resources>` for `<pagx>`) — no Group, geometry, or painters at root level
 - [ ] All required attributes present; no redundant default-value attributes
   (`attributes.md`)
 - [ ] Painter scope isolation correct (`design-patterns.md` §1)
