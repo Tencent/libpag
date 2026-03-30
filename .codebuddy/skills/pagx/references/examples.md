@@ -119,7 +119,7 @@ automatically.
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="22"/>
     <Fill color="#3B82F6"/>
     <Group centerX="0" centerY="0">
-      <Text left="30" right="30" top="15" bottom="15" text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+      <Text left="40" right="40" top="12" bottom="12" text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
       <Fill color="#FFF"/>
     </Group>
     <DropShadowStyle offsetY="2" blurX="6" blurY="6" color="#3B82F640"/>
@@ -254,7 +254,7 @@ DropShadowStyle on the container applies to all buttons.
 
 ### Card with Internal Layout
 
-A card with vertical container layout, rich text header, and action buttons.
+A card with vertical container layout, text header, and action buttons.
 
 ```xml
 <pagx version="1.0" width="324" height="184">
@@ -262,8 +262,8 @@ A card with vertical container layout, rich text header, and action buttons.
     <!-- Background: VectorElements don't participate in layout -->
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
     <Fill color="#FFF"/>
-    <!-- Title + Value (rich text: flex="1" absorbs remaining space) -->
-    <Layer flex="1" layout="vertical" gap="16">
+    <!-- Title + Value: flex="1" absorbs remaining space -->
+    <Layer flex="1" layout="vertical">
       <Layer>
         <Text text="Account Balance&#10;" fontFamily="Arial" fontSize="14"/>
         <Fill color="#64748B"/>
