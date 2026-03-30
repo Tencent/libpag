@@ -267,6 +267,7 @@ static int RunFontEmbed(int argc, char* argv[]) {
   }
 
   document->setFontConfig(fontProvider);
+  FontEmbedder::ClearEmbeddedGlyphRuns(document.get());
   document->applyLayout();
 
   FontEmbedder embedder = {};

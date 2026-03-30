@@ -27,10 +27,24 @@
 #include "pagx/types/Point.h"
 #include "pagx/types/TextAnchor.h"
 #include "pagx/types/TextBaseline.h"
+#include "tgfx/core/Font.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/TextBlob.h"
 
 namespace pagx {
+
+/**
+ * A run of positioned glyphs with the same font, produced by the text layout engine.
+ * Coordinates are in the layout coordinate system: TextBox coordinates for TextBox children,
+ * Text local coordinates for standalone Text. GlyphIDs reference the original (source) font.
+ */
+struct TextLayoutGlyphRun {
+  tgfx::Font font = {};
+  std::vector<tgfx::GlyphID> glyphs = {};
+  std::vector<tgfx::Point> positions = {};
+  std::vector<float> rotations = {};
+  std::vector<tgfx::Point> scales = {};
+};
 
 /**
  * Text is a geometry element that produces a glyph list after text shaping, which accumulates into
@@ -118,6 +132,21 @@ class Text : public Element, public LayoutNode {
     return anchors;
   }
 
+  /**
+   * Returns the linebox bounds computed by TextLayout. For TextBox children, this is in TextBox
+   * coordinate system. For standalone Text, this is in Text local coordinates.
+   */
+  Rect getTextBounds() const {
+    return textBounds;
+  }
+
+  /**
+   * Returns the layout glyph runs from runtime text shaping. Empty if using embedded GlyphRuns.
+   */
+  const std::vector<TextLayoutGlyphRun>& getLayoutRuns() const {
+    return layoutRuns;
+  }
+
   NodeType nodeType() const override {
     return NodeType::Text;
   }
@@ -134,6 +163,10 @@ class Text : public Element, public LayoutNode {
   std::shared_ptr<tgfx::TextBlob> textBlob = nullptr;
   std::vector<tgfx::Point> anchors = {};
   Rect textBounds = {};
+  // Layout glyph runs in layout coordinate system (source font). Written by TextLayout during
+  // applyLayout for runtime rendering. GlyphRunRenderer converts these to TextBlob in
+  // LayerBuilder. Empty when loaded from embedded GlyphRuns (use glyphRuns instead).
+  std::vector<TextLayoutGlyphRun> layoutRuns = {};
 
   friend class PAGXDocument;
   friend class TextLayout;

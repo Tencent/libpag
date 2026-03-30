@@ -20,7 +20,7 @@
     <BlurFilter blurX="40" blurY="40"/>
   </Layer>
   <Layer name="Title" width="800">
-    <Text top="20" centerX="0" text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="56"/>
+    <Text centerX="0" text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="56"/>
     <Fill color="@titleGradient"/>
   </Layer>
   <Layer name="Subtitle">

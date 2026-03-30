@@ -21,6 +21,7 @@
 #include <unordered_map>
 #include "ToTGFX.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/TextLayout.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -273,10 +274,8 @@ class LayerBuilderContext {
       case NodeType::TextBox: {
         auto* textBox = static_cast<const TextBox*>(node);
         if (textBox->elements.empty()) {
-          // TextBox without children: layout modifier consumed by TextLayout.
           return nullptr;
         }
-        // TextBox with children: render as a Group.
         return convertGroup(textBox);
       }
       default:

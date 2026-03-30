@@ -23,22 +23,14 @@
 #include "ShapedText.h"
 #include "TextLayoutParams.h"
 #include "base/utils/MathUtil.h"
-#include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
-#include "pagx/nodes/Image.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
-#include "pagx/utils/Base64.h"
 #include "renderer/LineBreaker.h"
 #include "renderer/PunctuationSquash.h"
-#include "renderer/ToTGFX.h"
 #include "renderer/VerticalTextUtils.h"
-#include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Font.h"
-#include "tgfx/core/ImageCodec.h"
-#include "tgfx/core/Path.h"
 #include "tgfx/core/TextBlob.h"
-#include "tgfx/core/TextBlobBuilder.h"
 #include "tgfx/core/UTF.h"
 #ifdef PAG_USE_HARFBUZZ
 #include "renderer/HarfBuzzShaper.h"
@@ -99,15 +91,6 @@ class TextLayoutContext {
   friend class TextLayout;
 
  private:
-  // A run of glyphs with the same font (for shaping).
-  struct ShapedGlyphRun {
-    tgfx::Font font = {};
-    std::vector<tgfx::GlyphID> glyphIDs = {};
-    std::vector<float> xPositions = {};
-    float startX = 0;
-    bool canUseDefaultMode = true;
-  };
-
   // Single glyph information for multi-line layout.
   struct GlyphInfo {
     tgfx::GlyphID glyphID = 0;
@@ -158,7 +141,6 @@ class TextLayoutContext {
   // Shaped text information for a single Text element.
   struct ShapedInfo {
     Text* text = nullptr;
-    std::vector<ShapedGlyphRun> runs = {};
     float totalWidth = 0;
     std::vector<GlyphInfo> allGlyphs = {};
     bool paragraphRTL = false;
@@ -262,10 +244,6 @@ class TextLayoutContext {
     gi.fontLineHeight = std::max(0.0f, fabsf(metrics.ascent) + metrics.descent + metrics.leading);
     gi.sourceText = text;
     return gi;
-  }
-
-  void storeShapedText(Text* text, ShapedText&& shapedText) {
-    TextLayout::StoreShapedText(text, std::move(shapedText));
   }
 
   static void collectTextElementsWithMatrices(const std::vector<Element*>& elements,
@@ -378,215 +356,9 @@ class TextLayoutContext {
       }
       result.bounds = Rect::MakeXYWH(anchorX, 0, maxLineWidth, totalHeight);
     }
+    // Build layoutGlyphRuns from positioned glyph data, grouping consecutive same-font glyphs.
+    BuildLayoutGlyphRuns(result);
     return result;
-  }
-
-  ShapedText buildShapedTextFromEmbeddedGlyphRuns(const Text* text) {
-    ShapedText shapedText = {};
-    tgfx::TextBlobBuilder builder = {};
-
-    for (const auto& run : text->glyphRuns) {
-      if (run->glyphs.empty()) {
-        continue;
-      }
-
-      auto typeface = buildTypefaceFromFont(run->font);
-      if (typeface == nullptr) {
-        continue;
-      }
-
-      // Calculate font size based on fontSize and unitsPerEm
-      // Rendering scale = fontSize / unitsPerEm
-      int unitsPerEm = (run->font != nullptr) ? run->font->unitsPerEm : 1;
-      if (unitsPerEm <= 0) {
-        unitsPerEm = 1;
-      }
-      float fontSizeForTypeface = run->fontSize / static_cast<float>(unitsPerEm);
-      tgfx::Font font(typeface, fontSizeForTypeface);
-      font.setFauxBold(text->fauxBold);
-      font.setFauxItalic(text->fauxItalic);
-      size_t count = run->glyphs.size();
-
-      // Collect anchors for each glyph in this run
-      if (!run->anchors.empty()) {
-        for (size_t i = 0; i < count; i++) {
-          if (i < run->anchors.size()) {
-            shapedText.anchors.push_back(tgfx::Point::Make(run->anchors[i].x, run->anchors[i].y));
-          } else {
-            shapedText.anchors.push_back(tgfx::Point::Zero());
-          }
-        }
-      }
-
-      bool hasTransforms = !run->scales.empty() || !run->rotations.empty() || !run->skews.empty();
-
-      if (hasTransforms) {
-        // Matrix mode: build a full affine transform per glyph.
-        // Transform order (per spec): translate(-anchor) → scale → skew → rotate →
-        // translate(anchor) → translate(position)
-        auto& buffer = builder.allocRunMatrix(font, count);
-        memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
-        auto* matrices = reinterpret_cast<tgfx::Matrix*>(buffer.positions);
-        float currentX = run->x;
-        for (size_t i = 0; i < count; i++) {
-          // Compute position
-          float posX = 0;
-          float posY = 0;
-          if (i < run->positions.size()) {
-            posX = run->x + run->positions[i].x;
-            posY = run->y + run->positions[i].y;
-            if (i < run->xOffsets.size()) {
-              posX += run->xOffsets[i];
-            }
-          } else if (i < run->xOffsets.size()) {
-            posX = run->x + run->xOffsets[i];
-            posY = run->y;
-          } else {
-            posX = currentX;
-            posY = run->y;
-            currentX += font.getAdvance(run->glyphs[i]);
-          }
-
-          // Get per-glyph transform values (default to identity values)
-          float sx = (i < run->scales.size()) ? run->scales[i].x : 1.0f;
-          float sy = (i < run->scales.size()) ? run->scales[i].y : 1.0f;
-          float rotation = (i < run->rotations.size()) ? run->rotations[i] : 0.0f;
-          float skew = (i < run->skews.size()) ? run->skews[i] : 0.0f;
-
-          // Compute anchor: default anchor is (advance * 0.5, 0), plus offset from anchors array
-          float anchorX = font.getAdvance(run->glyphs[i]) * 0.5f;
-          float anchorY = 0.0f;
-          if (i < run->anchors.size()) {
-            anchorX += run->anchors[i].x;
-            anchorY += run->anchors[i].y;
-          }
-
-          // Build the transform matrix
-          auto matrix = tgfx::Matrix::I();
-
-          // 1. translate(-anchor)
-          matrix.preTranslate(-anchorX, -anchorY);
-          // 2. scale
-          if (sx != 1.0f || sy != 1.0f) {
-            matrix.preScale(sx, sy);
-          }
-          // 3. skew (along vertical axis)
-          if (skew != 0.0f) {
-            float skewRadians = skew * static_cast<float>(M_PI) / 180.0f;
-            auto skewMatrix = tgfx::Matrix::I();
-            skewMatrix.setSkewX(-std::tan(skewRadians));
-            matrix.preConcat(skewMatrix);
-          }
-          // 4. rotate
-          if (rotation != 0.0f) {
-            matrix.preRotate(rotation);
-          }
-          // 5. translate(anchor)
-          matrix.preTranslate(anchorX, anchorY);
-          // 6. translate(position)
-          matrix.preTranslate(posX, posY);
-
-          matrices[i] = matrix;
-        }
-      } else if (!run->positions.empty() && run->positions.size() >= count) {
-        // Point mode: each glyph has (x, y) offset combined with overall x/y
-        auto& buffer = builder.allocRunPos(font, count);
-        memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
-        auto* positions = reinterpret_cast<tgfx::Point*>(buffer.positions);
-        for (size_t i = 0; i < count; i++) {
-          float posX = run->x + run->positions[i].x;
-          float posY = run->y + run->positions[i].y;
-          if (i < run->xOffsets.size()) {
-            posX += run->xOffsets[i];
-          }
-          positions[i] = tgfx::Point::Make(posX, posY);
-        }
-      } else if (!run->xOffsets.empty() && run->xOffsets.size() >= count) {
-        // Horizontal mode: x offsets + shared y
-        auto& buffer = builder.allocRunPosH(font, count, run->y);
-        memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
-        for (size_t i = 0; i < count; i++) {
-          buffer.positions[i] = run->x + run->xOffsets[i];
-        }
-      } else {
-        // Default mode: use font's advance values to position glyphs
-        auto& buffer = builder.allocRun(font, count, run->x, run->y);
-        memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
-        // No positions to fill - tgfx will compute from font advances
-      }
-    }
-
-    shapedText.textBlob = builder.build();
-    return shapedText;
-  }
-
-  std::shared_ptr<tgfx::Typeface> buildTypefaceFromFont(const Font* fontNode) {
-    if (fontNode == nullptr || fontNode->glyphs.empty()) {
-      return nullptr;
-    }
-
-    auto it = fontCache.find(fontNode);
-    if (it != fontCache.end()) {
-      return it->second;
-    }
-
-    // Determine if font is path-based or image-based
-    bool hasPath = false;
-    bool hasImage = false;
-    for (const auto& glyph : fontNode->glyphs) {
-      if (glyph->path != nullptr) {
-        hasPath = true;
-      }
-      if (glyph->image != nullptr) {
-        hasImage = true;
-      }
-    }
-
-    std::shared_ptr<tgfx::Typeface> typeface = nullptr;
-    if (hasPath && !hasImage) {
-      tgfx::PathTypefaceBuilder builder;
-      for (const auto& glyph : fontNode->glyphs) {
-        if (glyph->path != nullptr) {
-          auto path = ToTGFX(*glyph->path);
-          if (glyph->offset.x != 0 || glyph->offset.y != 0) {
-            path.transform(tgfx::Matrix::MakeTrans(glyph->offset.x, glyph->offset.y));
-          }
-          builder.addGlyph(path, glyph->advance);
-        } else {
-          // Invisible spacing glyph (e.g. space): add with empty path to preserve advance width.
-          builder.addGlyph(tgfx::Path(), glyph->advance);
-        }
-      }
-      typeface = builder.detach();
-    } else if (hasImage && !hasPath) {
-      tgfx::ImageTypefaceBuilder builder;
-      for (const auto& glyph : fontNode->glyphs) {
-        if (glyph->image != nullptr) {
-          std::shared_ptr<tgfx::ImageCodec> codec = nullptr;
-          auto imageNode = glyph->image;
-          if (imageNode->data != nullptr) {
-            codec = tgfx::ImageCodec::MakeFrom(ToTGFXData(imageNode->data));
-          } else if (imageNode->filePath.find("data:") == 0) {
-            auto data = DecodeBase64DataURI(imageNode->filePath);
-            if (data) {
-              codec = tgfx::ImageCodec::MakeFrom(ToTGFXData(data));
-            }
-          } else if (!imageNode->filePath.empty()) {
-            codec = tgfx::ImageCodec::MakeFrom(imageNode->filePath);
-          }
-
-          if (codec) {
-            builder.addGlyph(codec, ToTGFX(glyph->offset), glyph->advance);
-          }
-        }
-      }
-      typeface = builder.detach();
-    }
-
-    if (typeface) {
-      fontCache[fontNode] = typeface;
-    }
-    return typeface;
   }
 
   void shapeText(Text* text, ShapedInfo& info, bool vertical = false) {
@@ -634,7 +406,6 @@ class TextLayoutContext {
     SplitTextSegments(content, 0, content.size(), 0, segments);
 #endif
 
-    ShapedGlyphRun* currentRun = nullptr;
     std::shared_ptr<tgfx::Typeface> currentTypeface = nullptr;
     float tabWidth = text->fontSize * 4;
 
@@ -681,18 +452,8 @@ class TextLayoutContext {
 
         auto glyphTypeface = sg.font.getTypeface();
         if (currentTypeface == nullptr || glyphTypeface != currentTypeface) {
-          info.runs.emplace_back();
-          currentRun = &info.runs.back();
-          currentRun->font = sg.font;
           currentTypeface = glyphTypeface;
-          currentRun->startX = currentX;
-          currentRun->canUseDefaultMode = false;
-          currentRun->glyphIDs.reserve(shapedGlyphs.size());
-          currentRun->xPositions.reserve(shapedGlyphs.size());
         }
-
-        currentRun->xPositions.push_back(currentX + sg.xOffset);
-        currentRun->glyphIDs.push_back(sg.glyphID);
 
         auto metrics = sg.font.getMetrics();
         // Decode the unichar at this cluster position for line breaking and other logic.
@@ -733,8 +494,6 @@ class TextLayoutContext {
     // Fallback font cache: built on demand as fallback typefaces are loaded during glyph lookup.
     std::unordered_map<tgfx::Typeface*, tgfx::Font> fallbackFontCache = {};
 
-    // Current run being built
-    ShapedGlyphRun* currentRun = nullptr;
     std::shared_ptr<tgfx::Typeface> currentTypeface = nullptr;
 
     size_t i = 0;
@@ -802,20 +561,8 @@ class TextLayoutContext {
 
       // Start new run if typeface changed
       if (currentTypeface != glyphTypeface) {
-        info.runs.emplace_back();
-        currentRun = &info.runs.back();
-        currentRun->font = glyphFont;
         currentTypeface = glyphTypeface;
-        currentRun->startX = currentX;
-        currentRun->canUseDefaultMode = !hasLetterSpacing;
-        // Reserve using remaining character count estimate (assuming average 2 bytes per char).
-        auto remaining = (content.size() - i + charLen) / 2 + 1;
-        currentRun->glyphIDs.reserve(remaining);
-        currentRun->xPositions.reserve(remaining);
       }
-
-      currentRun->xPositions.push_back(currentX);
-      currentRun->glyphIDs.push_back(glyphID);
 
       auto metrics = glyphFont.getMetrics();
       GlyphInfo gi = {};
@@ -1112,6 +859,80 @@ class TextLayoutContext {
     }
   }
 
+  // Build TextLayoutGlyphRun lists from positioned glyph data, grouping consecutive same-font
+  // glyphs into runs. This produces the canonical layout output format used by FontEmbedder and
+  // GlyphRunRenderer.
+  static void BuildLayoutGlyphRuns(TextLayoutResult& result) {
+    // Horizontal glyphs: group by (sourceText, font) runs.
+    for (auto& [text, glyphs] : result.horizontalGlyphs) {
+      if (glyphs.empty()) {
+        continue;
+      }
+      auto& runs = result.layoutGlyphRuns[text];
+      size_t runStart = 0;
+      while (runStart < glyphs.size()) {
+        auto& runFont = glyphs[runStart].font;
+        size_t runEnd = runStart + 1;
+        while (runEnd < glyphs.size() && glyphs[runEnd].font == runFont) {
+          runEnd++;
+        }
+        TextLayoutGlyphRun run = {};
+        run.font = runFont;
+        size_t count = runEnd - runStart;
+        run.glyphs.reserve(count);
+        run.positions.reserve(count);
+        for (size_t i = runStart; i < runEnd; i++) {
+          run.glyphs.push_back(glyphs[i].glyphID);
+          run.positions.push_back(tgfx::Point::Make(glyphs[i].x, glyphs[i].y));
+        }
+        runs.push_back(std::move(run));
+        runStart = runEnd;
+      }
+    }
+    // Vertical glyphs: group by (sourceText, font, useRSXform) runs.
+    for (auto& [text, glyphs] : result.verticalGlyphs) {
+      if (glyphs.empty()) {
+        continue;
+      }
+      auto& runs = result.layoutGlyphRuns[text];
+      size_t runStart = 0;
+      while (runStart < glyphs.size()) {
+        auto& runFont = glyphs[runStart].font;
+        bool runUseRSXform = glyphs[runStart].useRSXform;
+        size_t runEnd = runStart + 1;
+        while (runEnd < glyphs.size() && glyphs[runEnd].font == runFont &&
+               glyphs[runEnd].useRSXform == runUseRSXform) {
+          runEnd++;
+        }
+        TextLayoutGlyphRun run = {};
+        run.font = runFont;
+        size_t count = runEnd - runStart;
+        run.glyphs.reserve(count);
+        run.positions.reserve(count);
+        if (runUseRSXform) {
+          run.rotations.reserve(count);
+          run.scales.reserve(count);
+        }
+        for (size_t i = runStart; i < runEnd; i++) {
+          run.glyphs.push_back(glyphs[i].glyphID);
+          if (runUseRSXform) {
+            auto& xform = glyphs[i].xform;
+            run.positions.push_back(tgfx::Point::Make(xform.tx, xform.ty));
+            // Decompose RSXform: scale = hypot(scos, ssin), rotation = atan2(ssin, scos)
+            float scale = std::hypot(xform.scos, xform.ssin);
+            float rotation = std::atan2(xform.ssin, xform.scos) * 180.0f / static_cast<float>(M_PI);
+            run.rotations.push_back(rotation);
+            run.scales.push_back(tgfx::Point::Make(scale, scale));
+          } else {
+            run.positions.push_back(glyphs[i].position);
+          }
+        }
+        runs.push_back(std::move(run));
+        runStart = runEnd;
+      }
+    }
+  }
+
   void buildTextBlobWithLayout(const TextLayoutParams& params, const std::vector<LineInfo>& lines,
                                TextLayoutResult& result, bool paragraphRTL = false) {
     if (lines.empty()) {
@@ -1347,6 +1168,22 @@ class TextLayoutContext {
         pg.x = g.xPosition + xOffset + justifyOffset + g.xOffset;
         pg.y = baselineY - g.yOffset;
         result.horizontalGlyphs[g.sourceText].push_back(pg);
+        // Update per-Text linebox bounds in layout coordinate system.
+        float glyphRight = pg.x + g.advance;
+        float lineTop = relativeTop - line.maxLineHeight + yOffset;
+        float lineBottom = relativeTop + yOffset;
+        auto it = result.perTextBounds.find(g.sourceText);
+        if (it == result.perTextBounds.end()) {
+          result.perTextBounds[g.sourceText] =
+              Rect::MakeXYWH(pg.x, lineTop, g.advance, lineBottom - lineTop);
+        } else {
+          auto& tb = it->second;
+          float left = std::min(tb.x, pg.x);
+          float top = std::min(tb.y, lineTop);
+          float right = std::max(tb.x + tb.width, glyphRight);
+          float bottom = std::max(tb.y + tb.height, lineBottom);
+          tb = Rect::MakeXYWH(left, top, right - left, bottom - top);
+        }
       }
     }
   }
@@ -1782,6 +1619,23 @@ class TextLayoutContext {
 #endif
 
         currentY += vg.height;
+        // Update per-Text linebox bounds in layout coordinate system for vertical layout.
+        auto* sourceText = vg.glyphs.front().sourceText;
+        if (sourceText != nullptr) {
+          float glyphTop = currentY - vg.height;
+          auto it = result.perTextBounds.find(sourceText);
+          if (it == result.perTextBounds.end()) {
+            result.perTextBounds[sourceText] =
+                Rect::MakeXYWH(columnX, glyphTop, allocatedWidth, vg.height);
+          } else {
+            auto& tb = it->second;
+            float left = std::min(tb.x, columnX);
+            float top = std::min(tb.y, glyphTop);
+            float right = std::max(tb.x + tb.width, columnX + allocatedWidth);
+            float bottom = std::max(tb.y + tb.height, currentY);
+            tb = Rect::MakeXYWH(left, top, right - left, bottom - top);
+          }
+        }
         if (justifyGap != 0 && glyphIdx + 1 < column.glyphs.size() &&
             column.glyphs[glyphIdx + 1].canBreakBefore) {
           currentY += justifyGap;
@@ -1796,93 +1650,22 @@ class TextLayoutContext {
   }
 
   FontConfig* fontConfig_ = nullptr;
-  std::unordered_map<const Font*, std::shared_ptr<tgfx::Typeface>> fontCache = {};
 };
 
-ShapedText TextLayoutResult::makeTextBlob(Text* text, const tgfx::Matrix& inverseMatrix) const {
-  ShapedText shapedText = {};
-
-  // Try horizontal glyphs first.
-  auto hIt = horizontalGlyphs.find(text);
-  if (hIt != horizontalGlyphs.end() && !hIt->second.empty()) {
-    auto& glyphs = hIt->second;
-    tgfx::TextBlobBuilder builder = {};
-    size_t runStart = 0;
-    while (runStart < glyphs.size()) {
-      auto& runFont = glyphs[runStart].font;
-      size_t runEnd = runStart + 1;
-      while (runEnd < glyphs.size() && glyphs[runEnd].font == runFont) {
-        runEnd++;
-      }
-      size_t count = runEnd - runStart;
-      auto& buffer = builder.allocRunPos(runFont, count);
-      auto* positions = reinterpret_cast<tgfx::Point*>(buffer.positions);
-      for (size_t j = 0; j < count; j++) {
-        buffer.glyphs[j] = glyphs[runStart + j].glyphID;
-        auto srcPoint = tgfx::Point::Make(glyphs[runStart + j].x, glyphs[runStart + j].y);
-        inverseMatrix.mapPoints(&srcPoint, 1);
-        positions[j] = srcPoint;
-      }
-      runStart = runEnd;
-    }
-    shapedText.textBlob = builder.build();
-    return shapedText;
+Rect TextLayoutResult::getTextBounds(Text* text) const {
+  auto it = perTextBounds.find(text);
+  if (it != perTextBounds.end()) {
+    return it->second;
   }
+  return {};
+}
 
-  // Try vertical glyphs.
-  auto vIt = verticalGlyphs.find(text);
-  if (vIt != verticalGlyphs.end() && !vIt->second.empty()) {
-    auto& glyphs = vIt->second;
-    tgfx::TextBlobBuilder builder = {};
-    size_t runStart = 0;
-    while (runStart < glyphs.size()) {
-      auto& runFont = glyphs[runStart].font;
-      bool runUseRSXform = glyphs[runStart].useRSXform;
-      size_t runEnd = runStart + 1;
-      while (runEnd < glyphs.size() && glyphs[runEnd].font == runFont &&
-             glyphs[runEnd].useRSXform == runUseRSXform) {
-        runEnd++;
-      }
-      size_t count = runEnd - runStart;
-      if (runUseRSXform) {
-        auto& buffer = builder.allocRunRSXform(runFont, count);
-        auto* xforms = reinterpret_cast<tgfx::RSXform*>(buffer.positions);
-        for (size_t j = 0; j < count; j++) {
-          buffer.glyphs[j] = glyphs[runStart + j].glyphID;
-          auto xform = glyphs[runStart + j].xform;
-          // Transform the translation part of RSXform by the inverse matrix.
-          auto pt = tgfx::Point::Make(xform.tx, xform.ty);
-          inverseMatrix.mapPoints(&pt, 1);
-          xform.tx = pt.x;
-          xform.ty = pt.y;
-          // For scale/rotation in RSXform, compose with inverse matrix's linear part.
-          // RSXform: scos, ssin represent scale*cos(angle), scale*sin(angle).
-          float a = inverseMatrix.getScaleX();
-          float b = inverseMatrix.getSkewX();
-          float c = inverseMatrix.getSkewY();
-          float d = inverseMatrix.getScaleY();
-          float newScos = xform.scos * a + xform.ssin * c;
-          float newSsin = xform.scos * b + xform.ssin * d;
-          xform.scos = newScos;
-          xform.ssin = newSsin;
-          xforms[j] = xform;
-        }
-      } else {
-        auto& buffer = builder.allocRunPos(runFont, count);
-        auto* positions = reinterpret_cast<tgfx::Point*>(buffer.positions);
-        for (size_t j = 0; j < count; j++) {
-          buffer.glyphs[j] = glyphs[runStart + j].glyphID;
-          auto srcPoint = glyphs[runStart + j].position;
-          inverseMatrix.mapPoints(&srcPoint, 1);
-          positions[j] = srcPoint;
-        }
-      }
-      runStart = runEnd;
-    }
-    shapedText.textBlob = builder.build();
+const std::vector<TextLayoutGlyphRun>* TextLayoutResult::getGlyphRuns(Text* text) const {
+  auto it = layoutGlyphRuns.find(text);
+  if (it != layoutGlyphRuns.end()) {
+    return &it->second;
   }
-
-  return shapedText;
+  return nullptr;
 }
 
 std::shared_ptr<tgfx::Typeface> TextLayout::FindTypeface(const std::string& fontFamily,
@@ -1900,6 +1683,20 @@ void TextLayout::StoreShapedText(Text* text, ShapedText&& shapedText) {
   }
   text->textBlob = std::move(shapedText.textBlob);
   text->anchors = std::move(shapedText.anchors);
+}
+
+void TextLayout::StoreTextBounds(Text* text, const Rect& bounds) {
+  if (text == nullptr) {
+    return;
+  }
+  text->textBounds = bounds;
+}
+
+void TextLayout::StoreLayoutRuns(Text* text, std::vector<TextLayoutGlyphRun>&& runs) {
+  if (text == nullptr) {
+    return;
+  }
+  text->layoutRuns = std::move(runs);
 }
 
 void TextLayout::CollectTextElements(const std::vector<Element*>& elements,
@@ -1932,34 +1729,43 @@ static bool AllHaveEmbeddedGlyphRuns(const std::vector<Text*>& textElements) {
 }
 
 static Rect ComputeEmbeddedTextBounds(const Text* text) {
-  Rect result = {};
+  // The linebox bounds are stored on the first GlyphRun (written by FontEmbedder from layout
+  // results). Only the first GlyphRun carries the bounds to avoid double-counting when a Text
+  // has multiple GlyphRuns (e.g. vector + bitmap font splits).
   for (auto* glyphRun : text->glyphRuns) {
-    if (glyphRun->bounds.width <= 0 && glyphRun->bounds.height <= 0) {
-      if (text->getTextBlob()) {
-        auto tight = text->getTextBlob()->getTightBounds();
-        return Rect::MakeXYWH(tight.left, tight.top, tight.width(), tight.height());
-      }
-      return {};
-    }
-    if (result.width <= 0 && result.height <= 0) {
-      result = glyphRun->bounds;
-    } else {
-      result.width += glyphRun->bounds.width;
-      result.height = std::max(result.height, glyphRun->bounds.height);
+    if (glyphRun->bounds.width > 0 || glyphRun->bounds.height > 0) {
+      return glyphRun->bounds;
     }
   }
-  return result;
+  // Fallback: try to compute bounds from the TextBlob if available.
+  if (text->getTextBlob()) {
+    auto tight = text->getTextBlob()->getTightBounds();
+    return Rect::MakeXYWH(tight.left, tight.top, tight.width(), tight.height());
+  }
+  return {};
+}
+
+static Rect RectUnion(const Rect& a, const Rect& b) {
+  float left = std::min(a.x, b.x);
+  float top = std::min(a.y, b.y);
+  float right = std::max(a.x + a.width, b.x + b.width);
+  float bottom = std::max(a.y + a.height, b.y + b.height);
+  return Rect::MakeXYWH(left, top, right - left, bottom - top);
 }
 
 static Rect MergeEmbeddedBounds(const std::vector<Text*>& textElements) {
   Rect totalBounds = {};
+  bool hasAny = false;
   for (auto* text : textElements) {
     auto textBounds = ComputeEmbeddedTextBounds(text);
-    if (totalBounds.width <= 0 && totalBounds.height <= 0) {
+    if (textBounds.width <= 0 && textBounds.height <= 0) {
+      continue;
+    }
+    if (!hasAny) {
       totalBounds = textBounds;
+      hasAny = true;
     } else {
-      totalBounds.width += textBounds.width;
-      totalBounds.height = std::max(totalBounds.height, textBounds.height);
+      totalBounds = RectUnion(totalBounds, textBounds);
     }
   }
   return totalBounds;
@@ -1991,11 +1797,9 @@ TextLayoutResult TextLayout::Layout(const std::vector<Text*>& textElements,
   }
   TextLayoutContext layoutContext(context.getFontConfig());
   if (AllHaveEmbeddedGlyphRuns(textElements)) {
+    // Embedded path: only compute bounds. TextBlob generation is deferred to the caller
+    // (TextBox::updateLayout or LayerBuilder) which applies the inverse matrix.
     TextLayoutResult result = {};
-    for (auto* text : textElements) {
-      auto shaped = layoutContext.buildShapedTextFromEmbeddedGlyphRuns(text);
-      StoreShapedText(text, std::move(shaped));
-    }
     result.bounds = MergeEmbeddedBounds(textElements);
     return result;
   }

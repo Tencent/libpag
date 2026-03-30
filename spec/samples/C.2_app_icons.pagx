@@ -42,7 +42,7 @@
   <Layer name="IconGrid" width="640" height="520" layout="vertical" padding="50" arrangement="spaceBetween">
     <!-- Row 1 -->
     <Layer layout="horizontal" arrangement="spaceBetween">
-      <Layer name="Home" layout="vertical" gap="14" alignment="center">
+      <Layer name="Home" layout="vertical" gap="10"  alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
@@ -51,12 +51,12 @@
           </Layer>
         </Layer>
         <Layer>
-          <Text text="Home" fontFamily="Arial" gap="12"/>
+          <Text text="Home" fontFamily="Arial" fontSize="12"/>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
 
-      <Layer name="Search" layout="vertical" gap="14" alignment="center">
+      <Layer name="Search" layout="vertical" gap="10"  alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
@@ -69,12 +69,12 @@
           </Layer>
         </Layer>
         <Layer>
-          <Text text="Search" fontFamily="Arial" gap="12"/>
+          <Text text="Search" fontFamily="Arial" fontSize="12"/>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
 
-      <Layer name="Bell" layout="vertical" gap="14" alignment="center">
+      <Layer name="Bell" layout="vertical" gap="10"  alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
@@ -91,12 +91,12 @@
           </Layer>
         </Layer>
         <Layer>
-          <Text text="Bell" fontFamily="Arial" gap="12"/>
+          <Text text="Bell" fontFamily="Arial" fontSize="12"/>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
 
-      <Layer name="Heart" layout="vertical" gap="14" alignment="center">
+      <Layer name="Heart" layout="vertical" gap="10"  alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
@@ -105,7 +105,7 @@
           </Layer>
         </Layer>
         <Layer>
-          <Text text="Heart" fontFamily="Arial" gap="12"/>
+          <Text text="Heart" fontFamily="Arial" fontSize="12"/>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
@@ -113,7 +113,7 @@
 
     <!-- Row 2 -->
     <Layer layout="horizontal" arrangement="spaceBetween">
-      <Layer name="Chat" layout="vertical" gap="14" alignment="center">
+      <Layer name="Chat" layout="vertical" gap="10"  alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
@@ -129,12 +129,12 @@
           </Layer>
         </Layer>
         <Layer>
-          <Text text="Chat" fontFamily="Arial" gap="12"/>
+          <Text text="Chat" fontFamily="Arial" fontSize="12"/>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
 
-      <Layer name="Camera" layout="vertical" gap="14" alignment="center">
+      <Layer name="Camera" layout="vertical" gap="10"  alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
@@ -152,12 +152,12 @@
           </Layer>
         </Layer>
         <Layer>
-          <Text text="Camera" fontFamily="Arial" gap="12"/>
+          <Text text="Camera" fontFamily="Arial" fontSize="12"/>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
 
-      <Layer name="Settings" layout="vertical" gap="14" alignment="center">
+      <Layer name="Settings" layout="vertical" gap="10"  alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
@@ -175,12 +175,12 @@
           </Layer>
         </Layer>
         <Layer>
-          <Text text="Settings" fontFamily="Arial" gap="12"/>
+          <Text text="Settings" fontFamily="Arial" fontSize="12"/>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
 
-      <Layer name="User" layout="vertical" gap="14" alignment="center">
+      <Layer name="User" layout="vertical" gap="10"  alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
@@ -197,7 +197,7 @@
           </Layer>
         </Layer>
         <Layer>
-          <Text text="User" fontFamily="Arial" gap="12"/>
+          <Text text="User" fontFamily="Arial" fontSize="12"/>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
@@ -205,7 +205,7 @@
 
     <!-- Row 3 -->
     <Layer layout="horizontal" arrangement="spaceBetween">
-      <Layer name="Calendar" layout="vertical" gap="14" alignment="center">
+      <Layer name="Calendar" layout="vertical" gap="10"  alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
@@ -217,19 +217,19 @@
               <Rectangle left="4" top="16" size="30,22" roundness="3"/>
               <Fill color="#1E2433"/>
             </Group>
-            <Group centerX="0" top="21">
+            <Group centerX="0" top="15">
               <Text text="17" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
               <Fill color="#EF4444"/>
             </Group>
           </Layer>
         </Layer>
         <Layer>
-          <Text text="Calendar" fontFamily="Arial" gap="12"/>
+          <Text text="Calendar" fontFamily="Arial" fontSize="12"/>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
 
-      <Layer name="Lock" layout="vertical" gap="14" alignment="center">
+      <Layer name="Lock" layout="vertical" gap="10"  alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
@@ -247,12 +247,12 @@
           </Layer>
         </Layer>
         <Layer>
-          <Text text="Lock" fontFamily="Arial" gap="12"/>
+          <Text text="Lock" fontFamily="Arial" fontSize="12"/>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
 
-      <Layer name="Music" layout="vertical" gap="14" alignment="center">
+      <Layer name="Music" layout="vertical" gap="10"  alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
@@ -266,12 +266,12 @@
           </Layer>
         </Layer>
         <Layer>
-          <Text text="Music" fontFamily="Arial" gap="12"/>
+          <Text text="Music" fontFamily="Arial" fontSize="12"/>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
 
-      <Layer name="Download" layout="vertical" gap="14" alignment="center">
+      <Layer name="Download" layout="vertical" gap="10"  alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
@@ -287,7 +287,7 @@
           </Layer>
         </Layer>
         <Layer>
-          <Text text="Download" fontFamily="Arial" gap="12"/>
+          <Text text="Download" fontFamily="Arial" fontSize="12"/>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>

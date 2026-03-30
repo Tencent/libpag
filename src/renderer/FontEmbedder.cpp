@@ -20,7 +20,6 @@
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
-#include "base/utils/MathUtil.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
@@ -30,14 +29,10 @@
 #include "pagx/nodes/TextBox.h"
 #include "pagx/types/Data.h"
 #include "tgfx/core/Bitmap.h"
-#include "tgfx/core/GlyphRun.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Path.h"
 
 namespace pagx {
-
-using pag::FloatNearlyEqual;
-using pag::RadiansToDegrees;
 
 static constexpr int VectorFontUnitsPerEm = 1000;
 
@@ -295,216 +290,47 @@ static std::vector<Text*> CollectAllText(PAGXDocument* document) {
   return allText;
 }
 
-static bool CanUseDefaultMode(const tgfx::GlyphRun& run, const std::vector<size_t>& indices,
-                              Font* font,
-                              const std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash>& map,
-                              float fontSize, float* outOffsetX, float* outOffsetY) {
-  if (run.positioning != tgfx::GlyphPositioning::Horizontal &&
-      run.positioning != tgfx::GlyphPositioning::Default) {
-    return false;
-  }
-  if (run.positioning == tgfx::GlyphPositioning::Default) {
-    // Default mode doesn't have explicit positions, so we can't extract startX from positions.
-    // This case is already Default mode, just pass through.
-    *outOffsetX = 0;
-    *outOffsetY = run.offsetY;
-    return true;
-  }
-  if (indices.empty()) {
-    return false;
-  }
-  if (font->unitsPerEm <= 0) {
-    return false;
-  }
-  float scale = fontSize / static_cast<float>(font->unitsPerEm);
-  // Use first glyph's x position as the starting point
-  float startX = run.positions[indices[0]];
-  float expectedX = startX;
-  auto* typeface = run.font.getTypeface().get();
-  for (size_t i : indices) {
-    float actualX = run.positions[i];
-    if (!FloatNearlyEqual(actualX, expectedX)) {
-      return false;
-    }
-    GlyphKey key = {typeface, run.glyphs[i]};
-    auto it = map.find(key);
-    if (it == map.end() || it->second == 0) {
-      return false;
-    }
-    tgfx::GlyphID mappedID = it->second;
-    if (mappedID > font->glyphs.size()) {
-      return false;
-    }
-    float advance = font->glyphs[mappedID - 1]->advance * scale;
-    expectedX += advance;
-  }
-  *outOffsetX = startX;
-  *outOffsetY = run.offsetY;
-  return true;
-}
-
-static void ComputeGlyphRunBounds(
-    GlyphRun* glyphRun, const tgfx::GlyphRun& run, const std::vector<size_t>& indices, Font* font,
-    const std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash>& glyphMapping, float fontSize) {
-  float scale = fontSize / static_cast<float>(font->unitsPerEm);
-  float totalAdvance = 0;
-  auto* typeface = run.font.getTypeface().get();
-  for (size_t i : indices) {
-    GlyphKey key = {typeface, run.glyphs[i]};
-    auto it = glyphMapping.find(key);
-    if (it != glyphMapping.end()) {
-      auto mappedID = it->second;
-      if (mappedID > 0 && static_cast<size_t>(mappedID) <= font->glyphs.size()) {
-        totalAdvance += font->glyphs[mappedID - 1]->advance * scale;
-      }
-    }
-  }
-  auto metrics = run.font.getMetrics();
-  float fontLineHeight = std::abs(metrics.ascent) + metrics.descent + metrics.leading;
-  glyphRun->bounds = Rect::MakeXYWH(0, 0, totalAdvance, fontLineHeight);
-}
-
-static GlyphRun* CreateGlyphRunForIndices(
-    PAGXDocument* document, const tgfx::GlyphRun& run, const std::vector<size_t>& indices,
-    Font* font, const std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash>& glyphMapping,
-    float fontSize) {
+static GlyphRun* CreateGlyphRunFromLayoutRun(
+    PAGXDocument* document, const TextLayoutGlyphRun& tlRun, const tgfx::Typeface* typeface,
+    const std::vector<size_t>& indices, Font* embeddedFont, float fontSize,
+    const std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash>& glyphMapping) {
   auto glyphRun = document->makeNode<GlyphRun>();
-  glyphRun->font = font;
+  glyphRun->font = embeddedFont;
   glyphRun->fontSize = fontSize;
-
-  auto* typeface = run.font.getTypeface().get();
   glyphRun->glyphs.reserve(indices.size());
-  for (size_t i : indices) {
-    GlyphKey key = {typeface, run.glyphs[i]};
+  for (auto idx : indices) {
+    GlyphKey key = {typeface, tlRun.glyphs[idx]};
     auto it = glyphMapping.find(key);
-    if (it != glyphMapping.end()) {
-      glyphRun->glyphs.push_back(it->second);
-    } else {
-      glyphRun->glyphs.push_back(0);
+    glyphRun->glyphs.push_back(it != glyphMapping.end() ? it->second : 0);
+  }
+  bool hasTransforms = !tlRun.rotations.empty() || !tlRun.scales.empty();
+  glyphRun->positions.reserve(indices.size());
+  for (auto idx : indices) {
+    if (idx < tlRun.positions.size()) {
+      glyphRun->positions.push_back({tlRun.positions[idx].x, tlRun.positions[idx].y});
     }
   }
-
-  // Try to use Default mode if positions match advance-based layout
-  float offsetX = 0.0f;
-  float offsetY = 0.0f;
-  if (CanUseDefaultMode(run, indices, font, glyphMapping, fontSize, &offsetX, &offsetY)) {
-    glyphRun->x = offsetX;
-    glyphRun->y = offsetY;
-    ComputeGlyphRunBounds(glyphRun, run, indices, font, glyphMapping, fontSize);
-    return glyphRun;
-  }
-
-  switch (run.positioning) {
-    case tgfx::GlyphPositioning::Horizontal: {
-      glyphRun->y = run.offsetY;
-      glyphRun->xOffsets.reserve(indices.size());
-      for (size_t i : indices) {
-        glyphRun->xOffsets.push_back(run.positions[i]);
-      }
-      break;
-    }
-    case tgfx::GlyphPositioning::Point: {
-      auto* points = reinterpret_cast<const tgfx::Point*>(run.positions);
-      glyphRun->positions.reserve(indices.size());
-      for (size_t i : indices) {
-        glyphRun->positions.push_back({points[i].x, points[i].y});
-      }
-      break;
-    }
-    case tgfx::GlyphPositioning::RSXform: {
-      // Decompose RSXform into position, scale, and rotation
-      auto* xforms = reinterpret_cast<const tgfx::RSXform*>(run.positions);
-      glyphRun->positions.reserve(indices.size());
+  if (hasTransforms) {
+    if (!tlRun.scales.empty()) {
       glyphRun->scales.reserve(indices.size());
-      glyphRun->rotations.reserve(indices.size());
-      bool hasNonDefaultScale = false;
-      bool hasNonDefaultRotation = false;
-
-      for (size_t idx = 0; idx < indices.size(); idx++) {
-        size_t i = indices[idx];
-        const auto& xform = xforms[i];
-        float scale = std::hypot(xform.scos, xform.ssin);
-        float rotation = RadiansToDegrees(std::atan2(xform.ssin, xform.scos));
-        glyphRun->positions.push_back({xform.tx, xform.ty});
-        glyphRun->scales.push_back({scale, scale});
-        glyphRun->rotations.push_back(rotation);
-        if (!FloatNearlyEqual(scale, 1.0f)) {
-          hasNonDefaultScale = true;
-        }
-        if (!FloatNearlyEqual(rotation, 0.0f)) {
-          hasNonDefaultRotation = true;
+      for (auto idx : indices) {
+        if (idx < tlRun.scales.size()) {
+          glyphRun->scales.push_back({tlRun.scales[idx].x, tlRun.scales[idx].y});
         }
       }
-      if (!hasNonDefaultScale) {
-        glyphRun->scales.clear();
-      }
-      if (!hasNonDefaultRotation) {
-        glyphRun->rotations.clear();
-      }
-      break;
     }
-    case tgfx::GlyphPositioning::Matrix: {
-      // Decompose full matrix into position, scale, rotation, skew
-      auto* matrices = reinterpret_cast<const float*>(run.positions);
-      glyphRun->positions.reserve(indices.size());
-      glyphRun->scales.reserve(indices.size());
+    if (!tlRun.rotations.empty()) {
       glyphRun->rotations.reserve(indices.size());
-      glyphRun->skews.reserve(indices.size());
-      bool hasNonDefaultScale = false;
-      bool hasNonDefaultRotation = false;
-      bool hasNonDefaultSkew = false;
-
-      for (size_t idx = 0; idx < indices.size(); idx++) {
-        size_t i = indices[idx];
-        float a = matrices[i * 6 + 0];
-        float b = matrices[i * 6 + 1];
-        float c = matrices[i * 6 + 2];
-        float d = matrices[i * 6 + 3];
-        float tx = matrices[i * 6 + 4];
-        float ty = matrices[i * 6 + 5];
-
-        float scaleX = std::sqrt(a * a + b * b);
-        float scaleY = std::sqrt(c * c + d * d);
-        float rotation = RadiansToDegrees(std::atan2(b, a));
-
-        float dotProduct = a * c + b * d;
-        float skew = 0.0f;
-        if (scaleX > 0.001f && scaleY > 0.001f) {
-          skew = RadiansToDegrees(std::atan2(dotProduct, scaleX * scaleY));
-        }
-
-        glyphRun->positions.push_back({tx, ty});
-        glyphRun->scales.push_back({scaleX, scaleY});
-        glyphRun->rotations.push_back(rotation);
-        glyphRun->skews.push_back(skew);
-        if (!FloatNearlyEqual(scaleX, 1.0f) || !FloatNearlyEqual(scaleY, 1.0f)) {
-          hasNonDefaultScale = true;
-        }
-        if (!FloatNearlyEqual(rotation, 0.0f)) {
-          hasNonDefaultRotation = true;
-        }
-        if (!FloatNearlyEqual(skew, 0.0f)) {
-          hasNonDefaultSkew = true;
+      for (auto idx : indices) {
+        if (idx < tlRun.rotations.size()) {
+          glyphRun->rotations.push_back(tlRun.rotations[idx]);
         }
       }
-      if (!hasNonDefaultScale) {
-        glyphRun->scales.clear();
-      }
-      if (!hasNonDefaultRotation) {
-        glyphRun->rotations.clear();
-      }
-      if (!hasNonDefaultSkew) {
-        glyphRun->skews.clear();
-      }
-      break;
     }
-    default:
-      break;
   }
-
-  ComputeGlyphRunBounds(glyphRun, run, indices, font, glyphMapping, fontSize);
   return glyphRun;
 }
+
 static void CollectSpacingGlyph(
     PAGXDocument* document, const tgfx::Font& font, tgfx::GlyphID glyphID,
     std::unordered_map<const tgfx::Typeface*, BitmapFontBuilder>& bitmapBuilders,
@@ -542,6 +368,16 @@ static void CollectSpacingGlyph(
   }
 }
 
+void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
+  if (document == nullptr) {
+    return;
+  }
+  auto textOrder = CollectAllText(document);
+  for (auto* text : textOrder) {
+    text->glyphRuns.clear();
+  }
+}
+
 bool FontEmbedder::embed(PAGXDocument* document) {
   if (document == nullptr) {
     return false;
@@ -554,34 +390,35 @@ bool FontEmbedder::embed(PAGXDocument* document) {
   std::unordered_map<const tgfx::Typeface*, BitmapFontBuilder> bitmapBuilders = {};
   std::vector<const tgfx::Typeface*> bitmapTypefaces = {};
 
-  // First pass: classify all glyphs and collect vector/bitmap/spacing glyph data in one iteration.
-  // For vector glyphs, CollectVectorGlyph internally tracks the maximum font size and re-collects
-  // the path when a larger size is found, so no separate max-size pass is needed.
+  // First pass: classify all glyphs and collect vector/bitmap/spacing glyph data.
+  // Uses TextLayoutGlyphRun (runtime layout) when available, falls back to TextBlob.
   for (auto* text : textOrder) {
-    auto textBlob = text->getTextBlob();
-    if (textBlob == nullptr) {
-      continue;
-    }
-    for (const auto& run : *textBlob) {
-      for (size_t i = 0; i < run.glyphCount; ++i) {
-        tgfx::GlyphID glyphID = run.glyphs[i];
-        GlyphKey key = {run.font.getTypeface().get(), glyphID};
-        auto& type = glyphTypes[key];
-        if (type == GlyphType::Unknown) {
-          type = ClassifyGlyph(run.font, glyphID);
+    auto& layoutRuns = text->getLayoutRuns();
+    if (!layoutRuns.empty()) {
+      for (auto& tlRun : layoutRuns) {
+        auto* typeface = tlRun.font.getTypeface().get();
+        if (typeface == nullptr) {
+          continue;
         }
-        switch (type) {
-          case GlyphType::Vector:
-            CollectVectorGlyph(document, run.font, glyphID, maxFontSizes, vectorBuilder);
-            break;
-          case GlyphType::Bitmap:
-            CollectBitmapGlyph(document, run.font, glyphID, bitmapBuilders, &bitmapTypefaces);
-            break;
-          case GlyphType::Spacing:
-            CollectSpacingGlyph(document, run.font, glyphID, bitmapBuilders, vectorBuilder);
-            break;
-          default:
-            break;
+        for (auto glyphID : tlRun.glyphs) {
+          GlyphKey key = {typeface, glyphID};
+          auto& type = glyphTypes[key];
+          if (type == GlyphType::Unknown) {
+            type = ClassifyGlyph(tlRun.font, glyphID);
+          }
+          switch (type) {
+            case GlyphType::Vector:
+              CollectVectorGlyph(document, tlRun.font, glyphID, maxFontSizes, vectorBuilder);
+              break;
+            case GlyphType::Bitmap:
+              CollectBitmapGlyph(document, tlRun.font, glyphID, bitmapBuilders, &bitmapTypefaces);
+              break;
+            case GlyphType::Spacing:
+              CollectSpacingGlyph(document, tlRun.font, glyphID, bitmapBuilders, vectorBuilder);
+              break;
+            default:
+              break;
+          }
         }
       }
     }
@@ -602,59 +439,61 @@ bool FontEmbedder::embed(PAGXDocument* document) {
     }
   }
 
-  // Second pass: create GlyphRuns for each Text
+  // Second pass: create pagx::GlyphRuns for each Text.
+  // Uses TextLayoutGlyphRun when available (direct mapping), falls back to TextBlob path.
   for (auto* text : textOrder) {
-    auto textBlob = text->getTextBlob();
-    if (textBlob == nullptr) {
-      continue;
-    }
-
     text->glyphRuns.clear();
+    auto textBounds = text->getTextBounds();
+    auto& layoutRuns = text->getLayoutRuns();
 
-    for (const auto& run : *textBlob) {
-      if (run.glyphCount == 0) {
-        continue;
-      }
+    if (!layoutRuns.empty()) {
+      // New path: create GlyphRuns directly from TextLayoutGlyphRun.
+      for (auto& tlRun : layoutRuns) {
+        if (tlRun.glyphs.empty()) {
+          continue;
+        }
+        auto* typeface = tlRun.font.getTypeface().get();
+        if (typeface == nullptr) {
+          continue;
+        }
+        float fontSize = tlRun.font.getSize();
 
-      auto* typeface = run.font.getTypeface().get();
-      float fontSize = run.font.getSize();
-
-      std::vector<size_t> vectorIndices = {};
-      std::vector<size_t> bitmapIndices = {};
-
-      for (size_t i = 0; i < run.glyphCount; ++i) {
-        tgfx::GlyphID glyphID = run.glyphs[i];
-        GlyphKey key = {typeface, glyphID};
-
-        if (vectorBuilder.glyphMapping.count(key) > 0) {
-          vectorIndices.push_back(i);
-        } else {
-          auto builderIt = bitmapBuilders.find(typeface);
-          if (builderIt != bitmapBuilders.end() && builderIt->second.glyphMapping.count(key) > 0) {
-            bitmapIndices.push_back(i);
+        // Split glyphs by font type (vector vs bitmap).
+        std::vector<size_t> vectorIndices;
+        std::vector<size_t> bitmapIndices;
+        for (size_t i = 0; i < tlRun.glyphs.size(); i++) {
+          GlyphKey key = {typeface, tlRun.glyphs[i]};
+          if (vectorBuilder.glyphMapping.count(key) > 0) {
+            vectorIndices.push_back(i);
+          } else {
+            auto builderIt = bitmapBuilders.find(typeface);
+            if (builderIt != bitmapBuilders.end() &&
+                builderIt->second.glyphMapping.count(key) > 0) {
+              bitmapIndices.push_back(i);
+            }
           }
         }
-      }
 
-      if (!vectorIndices.empty() && vectorBuilder.font != nullptr) {
-        auto glyphRun = CreateGlyphRunForIndices(document, run, vectorIndices, vectorBuilder.font,
-                                                 vectorBuilder.glyphMapping, fontSize);
-        if (glyphRun != nullptr) {
+        if (!vectorIndices.empty() && vectorBuilder.font != nullptr) {
+          auto glyphRun =
+              CreateGlyphRunFromLayoutRun(document, tlRun, typeface, vectorIndices,
+                                          vectorBuilder.font, fontSize, vectorBuilder.glyphMapping);
           text->glyphRuns.push_back(glyphRun);
         }
-      }
-
-      if (!bitmapIndices.empty()) {
-        auto builderIt = bitmapBuilders.find(typeface);
-        if (builderIt != bitmapBuilders.end() && builderIt->second.font != nullptr) {
-          auto glyphRun =
-              CreateGlyphRunForIndices(document, run, bitmapIndices, builderIt->second.font,
-                                       builderIt->second.glyphMapping, fontSize);
-          if (glyphRun != nullptr) {
+        if (!bitmapIndices.empty()) {
+          auto builderIt = bitmapBuilders.find(typeface);
+          if (builderIt != bitmapBuilders.end() && builderIt->second.font != nullptr) {
+            auto glyphRun = CreateGlyphRunFromLayoutRun(document, tlRun, typeface, bitmapIndices,
+                                                        builderIt->second.font, fontSize,
+                                                        builderIt->second.glyphMapping);
             text->glyphRuns.push_back(glyphRun);
           }
         }
       }
+    }
+
+    if (!text->glyphRuns.empty() && (textBounds.width > 0 || textBounds.height > 0)) {
+      text->glyphRuns.front()->bounds = textBounds;
     }
   }
 

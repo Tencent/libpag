@@ -18,9 +18,13 @@
 
 #include "pagx/nodes/TextBox.h"
 #include <cmath>
+#include "pagx/LayoutContext.h"
+#include "pagx/ShapedText.h"
 #include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
 #include "pagx/layout/LayoutNode.h"
+#include "renderer/GlyphRunRenderer.h"
+#include "tgfx/core/Matrix.h"
 
 namespace pagx {
 
@@ -68,14 +72,33 @@ void TextBox::setLayoutSize(const LayoutContext&, float width, float height) {
 }
 
 void TextBox::updateLayout(const LayoutContext& context) {
-  // Skip Text elements: they are positioned by TextLayout, not constraint positioning.
   auto nodes = CollectLayoutNodes(elements, true);
   PerformConstraintLayout(nodes, actualWidth, actualHeight, context);
-  // Text elements are typeset by TextLayout after constraint positioning.
   auto params = MakeTextLayoutParams(this, actualWidth, actualHeight);
   std::vector<Text*> childText = {};
-  TextLayout::CollectTextElements(elements, childText);
-  TextLayout::Layout(childText, params, context);
+  std::vector<tgfx::Matrix> matrices = {};
+  TextLayout::CollectTextElements(elements, childText, matrices);
+  auto result = TextLayout::Layout(childText, params, context);
+  for (size_t i = 0; i < childText.size(); i++) {
+    TextLayout::StoreTextBounds(childText[i], result.getTextBounds(childText[i]));
+    auto* runs = result.getGlyphRuns(childText[i]);
+    if (runs) {
+      TextLayout::StoreLayoutRuns(childText[i], std::vector<TextLayoutGlyphRun>(*runs));
+    }
+    tgfx::Matrix inverse = {};
+    if (!matrices[i].invert(&inverse)) {
+      continue;
+    }
+    if (runs && !runs->empty()) {
+      // Runtime layout path: generate TextBlob from layout glyph runs.
+      auto shaped = GlyphRunRenderer::BuildTextBlobFromLayoutRuns(*runs, inverse);
+      TextLayout::StoreShapedText(childText[i], std::move(shaped));
+    } else if (!childText[i]->glyphRuns.empty()) {
+      // Embedded path: generate TextBlob from pagx::GlyphRun with inverse matrix.
+      auto shaped = GlyphRunRenderer::BuildTextBlob(childText[i], inverse);
+      TextLayout::StoreShapedText(childText[i], std::move(shaped));
+    }
+  }
 }
 
 }  // namespace pagx

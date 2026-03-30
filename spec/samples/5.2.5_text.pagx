@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="400" height="400">
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="80" arrangement="spaceBetween" alignment="center">
+  <Layer left="0" right="0" top="40" layout="vertical" gap="35" alignment="center">
     <Layer>
       <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="84"/>
       <Fill>

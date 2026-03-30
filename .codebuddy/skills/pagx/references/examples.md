@@ -265,7 +265,7 @@ A card with vertical container layout, text header, and action buttons.
     <!-- Title + Value: flex="1" absorbs remaining space -->
     <Layer flex="1" layout="vertical">
       <Layer>
-        <Text text="Account Balance&#10;" fontFamily="Arial" fontSize="14"/>
+        <Text text="Account Balance" fontFamily="Arial" fontSize="14"/>
         <Fill color="#64748B"/>
       </Layer>
       <Layer>

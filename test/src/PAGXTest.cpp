@@ -5019,4 +5019,240 @@ PAGX_TEST(PAGXTest, LayoutTextBoxNestedGroupTransform) {
   EXPECT_LT(bounds.top, 0);
 }
 
+/**
+ * Test case: TextLayoutGlyphRun data integrity after layout.
+ * Verifies that layout produces non-empty glyph runs with correct glyph count and positions.
+ */
+PAGX_TEST(PAGXTest, TextLayoutGlyphRunIntegrity) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 200;
+  layer->height = 100;
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Hello";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 24;
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  layer->contents = {text, fill};
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  doc->setFontConfig(fontConfig);
+  doc->applyLayout();
+
+  auto& layoutRuns = text->getLayoutRuns();
+  ASSERT_FALSE(layoutRuns.empty());
+
+  size_t totalGlyphs = 0;
+  for (auto& run : layoutRuns) {
+    EXPECT_NE(run.font.getTypeface(), nullptr);
+    EXPECT_FALSE(run.glyphs.empty());
+    EXPECT_EQ(run.positions.size(), run.glyphs.size());
+    totalGlyphs += run.glyphs.size();
+  }
+  EXPECT_GE(totalGlyphs, 5u);
+}
+
+/**
+ * Test case: TextBox child Text produces layout runs with correct count.
+ */
+PAGX_TEST(PAGXTest, TextBoxLayoutGlyphRunIntegrity) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 300;
+  layer->height = 200;
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->width = 200;
+  textBox->height = 100;
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Box text";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 20;
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  textBox->elements = {text, fill};
+  layer->contents = {textBox};
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  doc->setFontConfig(fontConfig);
+  doc->applyLayout();
+
+  auto& layoutRuns = text->getLayoutRuns();
+  ASSERT_FALSE(layoutRuns.empty());
+  size_t totalGlyphs = 0;
+  for (auto& run : layoutRuns) {
+    EXPECT_EQ(run.positions.size(), run.glyphs.size());
+    totalGlyphs += run.glyphs.size();
+  }
+  EXPECT_GE(totalGlyphs, 8u);
+}
+
+/**
+ * Test case: FontEmbedder re-embedding after ClearEmbeddedGlyphRuns.
+ * Embeds fonts, clears, re-embeds, and verifies the result is consistent.
+ */
+PAGX_TEST(PAGXTest, FontEmbedderReEmbed) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 200;
+  layer->height = 100;
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Embed";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 24;
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  layer->contents = {text, fill};
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  doc->setFontConfig(fontConfig);
+  doc->applyLayout();
+  pagx::FontEmbedder().embed(doc.get());
+
+  ASSERT_FALSE(text->glyphRuns.empty());
+  size_t firstGlyphCount = text->glyphRuns[0]->glyphs.size();
+  auto firstGlyphs = text->glyphRuns[0]->glyphs;
+
+  // Re-embed: clear existing glyphs, re-layout, re-embed.
+  pagx::FontEmbedder::ClearEmbeddedGlyphRuns(doc.get());
+  EXPECT_TRUE(text->glyphRuns.empty());
+
+  doc->applyLayout();
+  pagx::FontEmbedder().embed(doc.get());
+
+  ASSERT_FALSE(text->glyphRuns.empty());
+  // Glyph count and IDs should match after re-embedding.
+  EXPECT_EQ(text->glyphRuns[0]->glyphs.size(), firstGlyphCount);
+  EXPECT_EQ(text->glyphRuns[0]->glyphs, firstGlyphs);
+}
+
+/**
+ * Test case: Vertical text layout produces TextLayoutGlyphRun with rotations.
+ */
+PAGX_TEST(PAGXTest, VerticalTextLayoutGlyphRun) {
+  auto doc = pagx::PAGXDocument::Make(200, 300);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 200;
+  layer->height = 300;
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->width = 100;
+  textBox->height = 250;
+  textBox->writingMode = pagx::WritingMode::Vertical;
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "ABC";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 30;
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  textBox->elements = {text, fill};
+  layer->contents = {textBox};
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  doc->setFontConfig(fontConfig);
+  doc->applyLayout();
+
+  auto& layoutRuns = text->getLayoutRuns();
+  ASSERT_FALSE(layoutRuns.empty());
+
+  // Vertical Latin text should have per-glyph rotations (90-degree rotation for sideways glyphs).
+  bool hasRotations = false;
+  for (auto& run : layoutRuns) {
+    if (!run.rotations.empty()) {
+      hasRotations = true;
+    }
+  }
+  EXPECT_TRUE(hasRotations);
+
+  // Verify TextBlob was generated.
+  auto blob = text->getTextBlob();
+  EXPECT_NE(blob, nullptr);
+}
+
+/**
+ * Test case: textBounds is set correctly for standalone Text and TextBox child Text.
+ */
+PAGX_TEST(PAGXTest, TextBoundsDirectValidation) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 400;
+  layer->height = 300;
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+
+  // Standalone Text.
+  auto standalone = doc->makeNode<pagx::Text>();
+  standalone->text = "Stand";
+  standalone->fontFamily = typeface->fontFamily();
+  standalone->fontStyle = typeface->fontStyle();
+  standalone->fontSize = 24;
+
+  auto fill1 = doc->makeNode<pagx::Fill>();
+
+  // TextBox child Text.
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->width = 200;
+  textBox->height = 100;
+  auto boxText = doc->makeNode<pagx::Text>();
+  boxText->text = "InBox";
+  boxText->fontFamily = typeface->fontFamily();
+  boxText->fontStyle = typeface->fontStyle();
+  boxText->fontSize = 24;
+  auto fill2 = doc->makeNode<pagx::Fill>();
+  textBox->elements = {boxText, fill2};
+
+  layer->contents = {standalone, fill1, textBox};
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  doc->setFontConfig(fontConfig);
+  doc->applyLayout();
+
+  // Standalone Text: textBounds should have positive width and height.
+  auto standaloneBounds = standalone->getTextBounds();
+  EXPECT_GT(standaloneBounds.width, 0);
+  EXPECT_GT(standaloneBounds.height, 0);
+
+  // TextBox child Text: textBounds should also have positive dimensions.
+  auto boxTextBounds = boxText->getTextBounds();
+  EXPECT_GT(boxTextBounds.width, 0);
+  EXPECT_GT(boxTextBounds.height, 0);
+}
+
 }  // namespace pag

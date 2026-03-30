@@ -103,7 +103,7 @@
       <TrimPath end="0.85"/>
       <DropShadowStyle blurX="5" blurY="5" color="#FF000040"/>
     </Layer>
-    <Layer name="HealthText" left="-440" width="200" centerY="0" layout="vertical" gap="10" alignment="end">
+    <Layer name="HealthText" left="-440" width="200" centerY="0" layout="vertical" alignment="end">
       <Layer>
         <Text text="100%" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
         <Fill color="#FFF"/>
@@ -114,7 +114,7 @@
       </Layer>
     </Layer>
   </Layer>
-  <Layer name="SystemStats" left="50" top="48" layout="vertical" gap="10">
+  <Layer name="SystemStats" left="50" top="48" layout="vertical">
     <Layer>
       <Text text="PWR: 88%" fontFamily="Arial" fontSize="12"/>
       <Fill color="#00CCFF" alpha="0.7"/>
@@ -144,7 +144,7 @@
       <TrimPath end="0.6"/>
       <DropShadowStyle blurX="5" blurY="5" color="#00FFFF40"/>
     </Layer>
-    <Layer name="EnergyText" left="240" centerY="0" layout="vertical" gap="10">
+    <Layer name="EnergyText" left="240" centerY="0" layout="vertical">
       <Layer>
         <Text text="60%" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
         <Fill color="#FFF"/>
@@ -162,7 +162,7 @@
       <Stroke color="#0066AA" width="2"/>
       <DropShadowStyle blurX="15" blurY="15" color="#000"/>
     </Layer>
-    <Layer name="WeaponInfo" centerX="0" centerY="0" layout="vertical" alignment="center" gap="10">
+    <Layer name="WeaponInfo" centerX="0" centerY="0" layout="vertical" alignment="center">
       <Layer>
         <Text text="MK-IV RAILGUN" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
         <Fill color="#FFF"/>
@@ -212,7 +212,7 @@
       <Fill color="#FFF"/>
     </Layer>
   </Layer>
-  <Layer name="Objectives" centerX="0" top="40">
+  <Layer name="Objectives" centerX="0" top="36">
     <Text text="MISSION OBJECTIVES:  [ ] INFILTRATE BASE  [ ] HACK TERMINAL  [x] SECURE PERIMETER" fontFamily="Arial"
           fontStyle="Bold" fontSize="12"/>
     <Fill color="#FFF"/>

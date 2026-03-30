@@ -17,16 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/nodes/Text.h"
+#include "pagx/ShapedText.h"
 #include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
 #include "pagx/layout/LayoutNode.h"
+#include "renderer/GlyphRunRenderer.h"
 
 namespace pagx {
 
 static TextLayoutParams MakeStandaloneParams(const Text* text) {
   TextLayoutParams params = {};
   params.baseline = text->baseline;
-  // Map textAnchor to textAlign so the unified layout path applies the correct horizontal offset.
   switch (text->textAnchor) {
     case TextAnchor::Start:
       params.textAlign = TextAlign::Start;
@@ -41,9 +42,28 @@ static TextLayoutParams MakeStandaloneParams(const Text* text) {
   return params;
 }
 
+static void StoreTextBlobFromLayoutResult(Text* text, TextLayoutResult& result) {
+  auto* runs = result.getGlyphRuns(text);
+  if (runs && !runs->empty()) {
+    // Runtime layout: use GlyphRunRenderer with identity matrix (standalone = local coordinates).
+    auto shaped = GlyphRunRenderer::BuildTextBlobFromLayoutRuns(*runs, tgfx::Matrix::I());
+    TextLayout::StoreShapedText(text, std::move(shaped));
+  } else if (!text->glyphRuns.empty()) {
+    // Embedded path: use GlyphRunRenderer from pagx::GlyphRun with identity matrix.
+    auto shaped = GlyphRunRenderer::BuildTextBlob(text, tgfx::Matrix::I());
+    TextLayout::StoreShapedText(text, std::move(shaped));
+  }
+}
+
 void Text::onMeasure(const LayoutContext& context) {
   auto params = MakeStandaloneParams(this);
-  textBounds = TextLayout::Layout({this}, params, context);
+  auto result = TextLayout::Layout({this}, params, context);
+  auto* runs = result.getGlyphRuns(this);
+  if (runs) {
+    TextLayout::StoreLayoutRuns(this, std::vector<TextLayoutGlyphRun>(*runs));
+  }
+  StoreTextBlobFromLayoutResult(this, result);
+  textBounds = result.bounds;
   preferredX = textBounds.x;
   preferredY = textBounds.y;
   preferredWidth = textBounds.width;
@@ -55,7 +75,13 @@ void Text::setLayoutSize(const LayoutContext& context, float width, float height
   if (scale != 1.0f) {
     fontSize = fontSize * scale;
     auto params = MakeStandaloneParams(this);
-    textBounds = TextLayout::Layout({this}, params, context);
+    auto result = TextLayout::Layout({this}, params, context);
+    auto* runs = result.getGlyphRuns(this);
+    if (runs) {
+      TextLayout::StoreLayoutRuns(this, std::vector<TextLayoutGlyphRun>(*runs));
+    }
+    StoreTextBlobFromLayoutResult(this, result);
+    textBounds = result.bounds;
   }
   actualWidth = textBounds.width;
   actualHeight = textBounds.height;

@@ -36,12 +36,16 @@ class FontEmbedder {
   FontEmbedder() = default;
 
   /**
-   * Embeds font data into the document by collecting TextBlobs from all Text nodes.
+   * Clears existing embedded GlyphRuns from all Text nodes in the document. Call this before
+   * applyLayout() when re-embedding a file that already has embedded fonts, so that layout
+   * performs runtime shaping instead of using stale embedded data.
+   */
+  static void ClearEmbeddedGlyphRuns(PAGXDocument* document);
+
+  /**
+   * Embeds font data into the document by collecting layout glyph runs from all Text nodes.
    * The document must have had applyLayout() called first so that Text nodes contain valid
-   * TextBlob data.
-   *
-   * @param document The document to embed fonts into (modified in place).
-   * @return true if embedding succeeded, false otherwise.
+   * layout run data.
    */
   bool embed(PAGXDocument* document);
 };

@@ -20,9 +20,15 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include "pagx/FontConfig.h"
+#include "pagx/nodes/Text.h"
 #include "pagx/types/Rect.h"
+#include "tgfx/core/Font.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Point.h"
+#include "tgfx/core/RSXform.h"
 
 namespace pagx {
 
@@ -30,14 +36,54 @@ class Element;
 class LayoutContext;
 struct ShapedText;
 struct TextLayoutParams;
-class Text;
+class TextLayoutContext;
+
+struct PositionedGlyph {
+  tgfx::GlyphID glyphID = 0;
+  tgfx::Font font = {};
+  float x = 0;
+  float y = 0;
+};
+
+struct VerticalPositionedGlyph {
+  tgfx::GlyphID glyphID = 0;
+  tgfx::Font font = {};
+  bool useRSXform = false;
+  tgfx::Point position = {};
+  tgfx::RSXform xform = {};
+};
+
+class TextLayoutResult {
+ public:
+  Rect bounds = {};
+
+  /**
+   * Returns the linebox bounds for a specific Text element in the layout coordinate system.
+   * For TextBox layouts, this is in TextBox coordinates (before inverse matrix transform).
+   * For standalone Text, this is in Text local coordinates.
+   */
+  Rect getTextBounds(Text* text) const;
+
+  /**
+   * Returns the layout glyph runs for a specific Text element. Runs are in layout coordinate
+   * system and grouped by font. GlyphIDs reference the original (source) font.
+   */
+  const std::vector<TextLayoutGlyphRun>* getGlyphRuns(Text* text) const;
+
+ private:
+  std::unordered_map<Text*, std::vector<PositionedGlyph>> horizontalGlyphs = {};
+  std::unordered_map<Text*, std::vector<VerticalPositionedGlyph>> verticalGlyphs = {};
+  std::unordered_map<Text*, Rect> perTextBounds = {};
+  std::unordered_map<Text*, std::vector<TextLayoutGlyphRun>> layoutGlyphRuns = {};
+  friend class TextLayoutContext;
+};
 
 /**
  * TextLayout performs text shaping and layout, converting Text elements into positioned glyph
- * data (TextBlob). It handles font matching, fallback, text shaping, and layout (alignment, line
- * breaking, etc.). Both standalone Text and TextBox share the same code path through
- * TextLayoutParams — a standalone Text is treated as a single-element TextBox with NaN box
- * dimensions.
+ * runs (TextLayoutGlyphRun). It handles font matching, fallback, text shaping, and layout
+ * (alignment, line breaking, etc.). Both standalone Text and TextBox share the same code path
+ * through TextLayoutParams — a standalone Text is treated as a single-element TextBox with NaN
+ * box dimensions. GlyphRunRenderer converts layout results to TextBlob at render time.
  */
 class TextLayout {
  public:
@@ -57,18 +103,25 @@ class TextLayout {
                       const LayoutContext& context);
 
   /**
-   * Performs text layout and returns linebox bounds. Shapes text, computes line/column breaks,
-   * builds TextBlob for each Text element. The baseline parameter in TextLayoutParams controls
-   * the y-offset model (LineBox vs Alphabetic).
+   * Performs text layout and returns TextLayoutResult with bounds and positioned glyph runs.
+   * Shapes text, computes line/column breaks, but does not build TextBlob. The caller uses
+   * GlyphRunRenderer to convert layout glyph runs to TextBlob with the appropriate inverse matrix.
    */
-  static Rect Layout(const std::vector<Text*>& textElements, const TextLayoutParams& params,
-                     const LayoutContext& context);
+  static TextLayoutResult Layout(const std::vector<Text*>& textElements,
+                                 const TextLayoutParams& params, const LayoutContext& context);
 
   /**
    * Collects all Text elements from an element list (including nested Groups).
    */
   static void CollectTextElements(const std::vector<Element*>& elements,
                                   std::vector<Text*>& outText);
+
+  /**
+   * Collects all Text elements along with their accumulated transformation matrices from root.
+   */
+  static void CollectTextElements(const std::vector<Element*>& elements,
+                                  std::vector<Text*>& outText,
+                                  std::vector<tgfx::Matrix>& outMatrices);
 
   /**
    * Finds a typeface matching the given font family and style.
@@ -79,6 +132,12 @@ class TextLayout {
 
   /** Writes shaped text data directly to the Text node. */
   static void StoreShapedText(Text* text, ShapedText&& shapedText);
+
+  /** Writes linebox bounds to the Text node (in layout coordinate system). */
+  static void StoreTextBounds(Text* text, const Rect& bounds);
+
+  /** Writes layout glyph runs to the Text node (in layout coordinate system, source font). */
+  static void StoreLayoutRuns(Text* text, std::vector<TextLayoutGlyphRun>&& runs);
 };
 
 }  // namespace pagx
