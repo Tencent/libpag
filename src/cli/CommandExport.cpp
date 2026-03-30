@@ -35,26 +35,27 @@ struct ExportOptions {
 };
 
 static void PrintUsage() {
-  std::cout << "Usage: pagx export [options]\n"
-            << "\n"
-            << "Export a PAGX file to another format.\n"
-            << "\n"
-            << "Options:\n"
-            << "  --input <file>              Input PAGX file (required)\n"
-            << "  --output <file>             Output file (default: <input>.<format>)\n"
-            << "  --format <format>           Force output format (svg)\n"
-            << "\n"
-            << "SVG options:\n"
-            << "  --svg-indent <n>            Indentation spaces (default: 2, valid range: 0-16)\n"
-            << "  --svg-no-xml-declaration    Omit the <?xml ...?> declaration\n"
-            << "  --svg-no-convert-text-to-path\n"
-            << "                              Keep text as <text> elements instead of <path>\n"
-            << "\n"
-            << "Examples:\n"
-            << "  pagx export --input icon.pagx                    # PAGX to icon.svg\n"
-            << "  pagx export --input icon.pagx --output out.svg   # PAGX to out.svg\n"
-            << "  pagx export --format svg --input icon.pagx       # force SVG format\n"
-            << "  pagx export --input icon.pagx --svg-indent 4     # 4-space indent\n";
+  std::cout
+      << "Usage: pagx export [options]\n"
+      << "\n"
+      << "Export a PAGX file to another format.\n"
+      << "\n"
+      << "Options:\n"
+      << "  --input <file>              Input PAGX file (required)\n"
+      << "  --output <file>             Output file (default: <input>.<format>)\n"
+      << "  --format <format>           Output format (svg; inferred from --output extension)\n"
+      << "\n"
+      << "SVG options:\n"
+      << "  --svg-indent <n>            Indentation spaces (default: 2, valid range: 0-16)\n"
+      << "  --svg-no-xml-declaration    Omit the <?xml ...?> declaration\n"
+      << "  --svg-no-convert-text-to-path\n"
+      << "                              Keep text as <text> elements instead of <path>\n"
+      << "\n"
+      << "Examples:\n"
+      << "  pagx export --input icon.pagx                    # PAGX to icon.svg\n"
+      << "  pagx export --input icon.pagx --output out.svg   # PAGX to out.svg\n"
+      << "  pagx export --format svg --input icon.pagx       # force SVG output format\n"
+      << "  pagx export --input icon.pagx --svg-indent 4     # 4-space indent\n";
 }
 
 static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
@@ -102,7 +103,9 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
     options->format = GetFileExtension(options->outputFile);
   }
   if (options->format.empty()) {
-    options->format = "svg";
+    std::cerr << "pagx export: error: cannot infer output format, use --format or specify an "
+                 "output file with a known extension\n";
+    return 1;
   }
 
   if (options->outputFile.empty()) {

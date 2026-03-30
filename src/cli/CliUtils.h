@@ -98,12 +98,17 @@ inline std::shared_ptr<tgfx::Typeface> ResolveFallbackTypeface(const std::string
 }
 
 /**
- * Extracts the file extension from a path (without the dot), or returns an empty string if none.
+ * Extracts the file extension from a path (without the dot) in lowercase, or returns an empty
+ * string if none.
  */
 inline std::string GetFileExtension(const std::string& path) {
   auto dot = path.rfind('.');
   if (dot != std::string::npos) {
-    return path.substr(dot + 1);
+    auto ext = path.substr(dot + 1);
+    for (auto& ch : ext) {
+      ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+    }
+    return ext;
   }
   return {};
 }

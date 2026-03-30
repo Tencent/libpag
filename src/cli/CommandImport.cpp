@@ -53,7 +53,8 @@ static void PrintUsage() {
             << "Examples:\n"
             << "  pagx import --input icon.svg                     # SVG to icon.pagx\n"
             << "  pagx import --input icon.svg --output out.pagx   # SVG to out.pagx\n"
-            << "  pagx import --format svg --input drawing.xml     # force SVG format\n";
+            << "  pagx import --format svg --input drawing.xml     # force treating drawing.xml as "
+               "SVG format\n";
 }
 
 static int ParseOptions(int argc, char* argv[], ImportOptions* options) {

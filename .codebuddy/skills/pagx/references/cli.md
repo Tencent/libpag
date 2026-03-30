@@ -229,7 +229,7 @@ but do not prevent conversion.
 ```bash
 pagx import --input icon.svg                     # SVG to icon.pagx
 pagx import --input icon.svg --output out.pagx   # SVG to out.pagx
-pagx import --format svg --input drawing.xml     # force SVG format
+pagx import --format svg --input drawing.xml     # force treating drawing.xml as SVG format
 ```
 
 | Option | Description |
@@ -249,12 +249,13 @@ an error and exits 1.
 ## pagx export
 
 Export a PAGX file to another format (e.g. SVG). The output format is inferred from the
-output file extension, or defaults to SVG if no output is specified.
+output file extension. If neither `--format` nor a recognizable output extension is provided,
+the command reports an error.
 
 ```bash
 pagx export --input icon.pagx                    # PAGX to icon.svg
 pagx export --input icon.pagx --output out.svg   # PAGX to out.svg
-pagx export --format svg --input icon.pagx       # force SVG format
+pagx export --format svg --input icon.pagx       # force SVG output format
 pagx export --input icon.pagx --svg-indent 4     # 4-space indent
 ```
 
@@ -262,7 +263,7 @@ pagx export --input icon.pagx --svg-indent 4     # 4-space indent
 |--------|-------------|
 | `--input <file>` | Input PAGX file (required) |
 | `--output <file>` | Output file (default: `<input>.<format>`) |
-| `--format <format>` | Force output format (`svg`; default: inferred from output extension or `svg`) |
+| `--format <format>` | Output format (`svg`; inferred from output extension). Required if output has no extension |
 | `--svg-indent <n>` | Indentation spaces (default: 2, valid range: 0–16) |
 | `--svg-no-xml-declaration` | Omit the `<?xml ...?>` declaration |
 | `--svg-no-convert-text-to-path` | Keep text as `<text>` elements instead of `<path>` |

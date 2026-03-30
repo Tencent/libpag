@@ -1213,6 +1213,12 @@ CLI_TEST(PAGXCliTest, Export_MissingInput) {
   EXPECT_NE(ret, 0);
 }
 
+CLI_TEST(PAGXCliTest, Export_MissingFormat) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--input", inputPath});
+  EXPECT_NE(ret, 0);
+}
+
 CLI_TEST(PAGXCliTest, Export_UnsupportedFormat) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   auto ret = CallRun(pagx::cli::RunExport, {"export", "--format", "xyz", "--input", inputPath});
@@ -1433,7 +1439,7 @@ CLI_TEST(PAGXCliTest, Export_NoConvertTextToPath) {
 
 CLI_TEST(PAGXCliTest, Export_DefaultOutput) {
   auto inputPath = CopyToTemp("render_basic.pagx", "ExportDefault.pagx");
-  auto ret = CallRun(pagx::cli::RunExport, {"export", "--input", inputPath});
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--format", "svg", "--input", inputPath});
   EXPECT_EQ(ret, 0);
   auto defaultOutput = TempDir() + "/ExportDefault.svg";
   EXPECT_TRUE(std::filesystem::exists(defaultOutput));
@@ -1444,17 +1450,13 @@ CLI_TEST(PAGXCliTest, Export_InferFormatFromOutputNoExt) {
   auto outputPath = TempDir() + "/ExportInferNoExt";
   auto ret =
       CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_NE(output.find("<svg"), std::string::npos);
+  EXPECT_NE(ret, 0);
 }
 
 CLI_TEST(PAGXCliTest, Export_DefaultOutputNoExtInput) {
   auto inputPath = CopyToTemp("render_basic.pagx", "ExportNoExt");
   auto ret = CallRun(pagx::cli::RunExport, {"export", "--input", inputPath});
-  EXPECT_EQ(ret, 0);
-  auto defaultOutput = TempDir() + "/ExportNoExt.svg";
-  EXPECT_TRUE(std::filesystem::exists(defaultOutput));
+  EXPECT_NE(ret, 0);
 }
 
 CLI_TEST(PAGXCliTest, Export_WriteFailure) {
@@ -1473,7 +1475,7 @@ CLI_TEST(PAGXCliTest, Import_WriteFailure) {
 }
 
 CLI_TEST(PAGXCliTest, Import_DefaultOutputNoExtInput) {
-  auto svgPath = ExportToSVG("render_basic.pagx", "ImportNoExt");
+  auto svgPath = ExportToSVG("render_basic.pagx", "ImportNoExt", {"--format", "svg"});
   auto ret = CallRun(pagx::cli::RunImport, {"import", "--format", "svg", "--input", svgPath});
   EXPECT_EQ(ret, 0);
   auto defaultOutput = TempDir() + "/ImportNoExt.pagx";
