@@ -2138,45 +2138,56 @@ This appendix describes node categorization and nesting rules.
 
 ### A.1 Node Categories
 
-| Category | Nodes |
-|----------|-------|
-| **Containers** | `pagx`, `Resources`, `Layer`, `Group` |
-| **Resources** | `Image`, `PathData`, `Composition`, `Font`, `Glyph` |
-| **Color Sources** | `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ImagePattern`, `ColorStop` |
-| **Layer Styles** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle` |
-| **Layer Filters** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter` |
-| **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` |
-| **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `TextBox`, `Repeater` |
-| **Painters** | `Fill`, `Stroke` |
+| Category | Nodes | Description |
+|----------|-------|-------------|
+| **Document Root** | `pagx` | Entry point of the document. Direct children: `<Layer>`, `<Resources>` only. |
+| **Content Containers** | `Layer`, `Group`, `TextBox` | Accept VectorElements, child Layers, styles, and filters. These are the only elements that can contain geometry. |
+| **Resource Container** | `Resources` | Holds reusable definitions: Image, PathData, Composition, Font, etc. |
+| **Resource Types** | `Image`, `PathData`, `Composition`, `Font`, `Glyph` | Reusable assets stored in `<Resources>`. |
+| **Color Sources** | `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ImagePattern`, `ColorStop` | Color definitions used by painters. |
+| **Layer Styles** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle` | Visual effects applied to Layer content. |
+| **Layer Filters** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter` | Post-processing effects applied to composited Layer. |
+| **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` | Drawable shapes and text. Must be inside Layer/Group. |
+| **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `TextBox`, `Repeater` | Transform or combine geometry and text. |
+| **Painters** | `Fill`, `Stroke` | Apply color/gradient to geometry. Must be inside Layer/Group. |
 
 ### A.2 Document Containment
 
+The root element `<pagx>` **only accepts `<Layer>` and `<Resources>` as direct children**. Geometry elements, painters, and other elements must be nested inside a `<Layer>`.
+
 ```
-pagx
-├── Resources
-│   ├── Image
-│   ├── PathData
-│   ├── SolidColor
-│   ├── LinearGradient → ColorStop*
-│   ├── RadialGradient → ColorStop*
-│   ├── ConicGradient → ColorStop*
-│   ├── DiamondGradient → ColorStop*
-│   ├── ImagePattern
-│   ├── Font → Glyph*
-│   └── Composition → Layer*
+pagx (required attributes: version, width, height)
+├── Layer*                      ← Direct children MUST be Layer
+│   ├── VectorElement* (see A.3)
+│   ├── DropShadowStyle*
+│   ├── InnerShadowStyle*
+│   ├── BackgroundBlurStyle*
+│   ├── BlurFilter*
+│   ├── DropShadowFilter*
+│   ├── InnerShadowFilter*
+│   ├── BlendFilter*
+│   ├── ColorMatrixFilter*
+│   └── Layer* (child layers, recursive)
 │
-└── Layer*
-    ├── VectorElement* (see A.3)
-    ├── DropShadowStyle*
-    ├── InnerShadowStyle*
-    ├── BackgroundBlurStyle*
-    ├── BlurFilter*
-    ├── DropShadowFilter*
-    ├── InnerShadowFilter*
-    ├── BlendFilter*
-    ├── ColorMatrixFilter*
-    └── Layer* (child layers)
+└── Resources (optional, reusable definitions)
+    ├── Image
+    ├── PathData
+    ├── SolidColor
+    ├── LinearGradient → ColorStop*
+    ├── RadialGradient → ColorStop*
+    ├── ConicGradient → ColorStop*
+    ├── DiamondGradient → ColorStop*
+    ├── ImagePattern
+    ├── Font → Glyph*
+    └── Composition → Layer*    ← Composition root children also MUST be Layer
 ```
+
+**Key rules**:
+- `<pagx>` direct children: **only `<Layer>` and `<Resources>`**
+- VectorElements (Rectangle, Ellipse, Path, Text, etc.) **must be inside `<Layer>` or `<Group>`**
+- Painters (Fill, Stroke) **must be inside `<Layer>` or `<Group>`**
+- `<Group>` or geometry as direct child of `<pagx>` causes a parse error
+- `<Composition>` root children follow the same rule: only `<Layer>` allowed
 
 ### A.3 VectorElement Containment
 

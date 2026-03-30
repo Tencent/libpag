@@ -2133,45 +2133,56 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 
 ### A.1 节点分类
 
-| 分类 | 节点 |
-|------|------|
-| **容器** | `pagx`, `Resources`, `Layer`, `Group` |
-| **资源** | `Image`, `PathData`, `Composition`, `Font`, `Glyph` |
-| **颜色源** | `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ImagePattern`, `ColorStop` |
-| **图层样式** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle` |
-| **图层滤镜** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter` |
-| **几何元素** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` |
-| **修改器** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `TextBox`, `Repeater` |
-| **绘制器** | `Fill`, `Stroke` |
+| 分类 | 节点 | 说明 |
+|------|------|------|
+| **文档根节点** | `pagx` | 文档入口。直接子节点仅限：`<Layer>`、`<Resources>`。 |
+| **内容容器** | `Layer`, `Group`, `TextBox` | 接纳 VectorElement、子 Layer、样式和滤镜。这些是仅有的可包含几何图形的元素。 |
+| **资源容器** | `Resources` | 存放可复用定义：Image、PathData、Composition、Font 等。 |
+| **资源类型** | `Image`, `PathData`, `Composition`, `Font`, `Glyph` | 存储在 `<Resources>` 中的可复用资源。 |
+| **颜色源** | `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ImagePattern`, `ColorStop` | 绘制器使用的颜色定义。 |
+| **图层样式** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle` | 应用于图层内容的视觉效果。 |
+| **图层滤镜** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter` | 应用于合成图层的后期处理效果。 |
+| **几何元素** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` | 可绘制的形状和文本。必须在 Layer/Group 内。 |
+| **修改器** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `TextBox`, `Repeater` | 变换或组合几何图形和文本。 |
+| **绘制器** | `Fill`, `Stroke` | 对几何图形应用颜色/渐变。必须在 Layer/Group 内。 |
 
 ### A.2 文档包含关系
 
+根节点 `<pagx>` **仅接受 `<Layer>` 和 `<Resources>` 作为直接子节点**。几何元素、绘制器等其他元素必须嵌套在 `<Layer>` 内。
+
 ```
-pagx
-├── Resources
-│   ├── Image
-│   ├── PathData
-│   ├── SolidColor
-│   ├── LinearGradient → ColorStop*
-│   ├── RadialGradient → ColorStop*
-│   ├── ConicGradient → ColorStop*
-│   ├── DiamondGradient → ColorStop*
-│   ├── ImagePattern
-│   ├── Font → Glyph*
-│   └── Composition → Layer*
+pagx（必需属性：version、width、height）
+├── Layer*                      ← 直接子节点仅能是 Layer
+│   ├── VectorElement*（见 A.3）
+│   ├── DropShadowStyle*
+│   ├── InnerShadowStyle*
+│   ├── BackgroundBlurStyle*
+│   ├── BlurFilter*
+│   ├── DropShadowFilter*
+│   ├── InnerShadowFilter*
+│   ├── BlendFilter*
+│   ├── ColorMatrixFilter*
+│   └── Layer*（子图层，递归）
 │
-└── Layer*
-    ├── VectorElement*（见 A.3）
-    ├── DropShadowStyle*
-    ├── InnerShadowStyle*
-    ├── BackgroundBlurStyle*
-    ├── BlurFilter*
-    ├── DropShadowFilter*
-    ├── InnerShadowFilter*
-    ├── BlendFilter*
-    ├── ColorMatrixFilter*
-    └── Layer*（子图层）
+└── Resources（可选，可复用定义）
+    ├── Image
+    ├── PathData
+    ├── SolidColor
+    ├── LinearGradient → ColorStop*
+    ├── RadialGradient → ColorStop*
+    ├── ConicGradient → ColorStop*
+    ├── DiamondGradient → ColorStop*
+    ├── ImagePattern
+    ├── Font → Glyph*
+    └── Composition → Layer*    ← Composition 的根节点子级也仅能是 Layer
 ```
+
+**关键规则**：
+- `<pagx>` 直接子节点：**仅 `<Layer>` 和 `<Resources>`**
+- VectorElement（Rectangle、Ellipse、Path、Text 等）**必须在 `<Layer>` 或 `<Group>` 内**
+- 绘制器（Fill、Stroke）**必须在 `<Layer>` 或 `<Group>` 内**
+- `<Group>` 或几何元素作为 `<pagx>` 直接子节点会导致解析错误
+- `<Composition>` 的根节点子级遵循相同规则：仅允许 `<Layer>`
 
 ### A.3 VectorElement 包含关系
 

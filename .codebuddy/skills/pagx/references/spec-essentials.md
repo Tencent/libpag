@@ -34,7 +34,9 @@ For the full specification, see [PAGX Spec (online)](https://pag.io/pagx/latest/
 ```
 
 - `version`, `width`, `height` are **required**.
-- Direct children of `<pagx>` and `<Composition>` **MUST** be `<Layer>`. Groups at root level cause a parse error.
+- **`<pagx>` direct children: ONLY `<Layer>` and `<Resources>`** — no other elements allowed.
+  - VectorElements (Rectangle, Fill, etc.) must be nested inside `<Layer>`
+  - `<Composition>` has the same rule — top-level children must be `<Layer>` only
 - Layers render in document order: earlier = below, later = above.
 - `<Resources>` may appear anywhere; parsers support forward references.
 
@@ -58,7 +60,9 @@ Color syntax follows **CSS Color Level 4** conventions: HEX and `srgb()` match C
 
 | Category | Nodes |
 |----------|-------|
-| **Containers** | `pagx`, `Resources`, `Layer`, `Group`, `TextBox` |
+| **Document Root** | `pagx` |
+| **Content Containers** | `Layer`, `Group`, `TextBox` |
+| **Resource Container** | `Resources` |
 | **Resources** | `Image`, `PathData`, `Composition`, `Font`, `Glyph` |
 | **Color Sources** | `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ImagePattern`, `ColorStop` |
 | **Layer Styles** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle` |
@@ -67,24 +71,34 @@ Color syntax follows **CSS Color Level 4** conventions: HEX and `srgb()` match C
 | **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `Repeater` |
 | **Painters** | `Fill`, `Stroke` |
 
+**Key distinction**:
+- **Document Root** (`pagx`): Entry point. Direct children must be `<Layer>` or `<Resources>` only.
+- **Content Containers** (`Layer`, `Group`, `TextBox`): Can contain VectorElements and child Layers. These are the only elements that accept geometry.
+- **Resource Container** (`Resources`): Holds reusable definitions. Direct child types are strictly defined (Image, PathData, etc.)
+
 ### Document Containment Hierarchy
 
 ```
-pagx
-├── Layer*
+pagx (required: version, width, height)
+├── Layer*                         ← direct children MUST be Layer
 │   ├── VectorElements* (geometry, modifiers, painters, Groups, TextBox)
 │   ├── LayerStyles* (DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle)
 │   ├── LayerFilters* (BlurFilter, DropShadowFilter, ...)
 │   └── Layer* (child layers, recursive)
 │
-└── Resources
+└── Resources (optional, reusable definitions)
     ├── Image, PathData, SolidColor
     ├── LinearGradient → ColorStop*
     ├── RadialGradient/ConicGradient/DiamondGradient → ColorStop*
     ├── ImagePattern
     ├── Font → Glyph*
-    └── Composition → Layer*
+    └── Composition → Layer*           ← Composition also uses Layer as root children
 ```
+
+**Critical rule**: `<pagx>` **only accepts `<Layer>` and `<Resources>` as direct children**.
+- Geometry elements (Rectangle, Ellipse, Path, etc.) **must be inside a `<Layer>`**
+- Painters (Fill, Stroke) **must be inside a `<Layer>`**
+- `<Group>` as a direct child of `<pagx>` causes a parse error
 
 ---
 
