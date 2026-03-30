@@ -309,7 +309,23 @@ class TextLayoutContext {
         maxLineWidth = std::max(maxLineWidth, line.width);
         totalHeight += line.maxLineHeight;
       }
-      return Rect::MakeXYWH(0, 0, maxLineWidth, totalHeight);
+      // For standalone Text (no box), compute anchor offset so bounds reflect the text origin.
+      float anchorX = 0;
+      if (std::isnan(params.boxWidth)) {
+        switch (params.textAlign) {
+          case TextAlign::Start:
+            break;
+          case TextAlign::Center:
+            anchorX = -maxLineWidth / 2;
+            break;
+          case TextAlign::End:
+            anchorX = -maxLineWidth;
+            break;
+          default:
+            break;
+        }
+      }
+      return Rect::MakeXYWH(anchorX, 0, maxLineWidth, totalHeight);
     }
   }
 
