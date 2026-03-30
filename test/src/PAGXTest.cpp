@@ -2200,8 +2200,8 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {
   pagx::TextLayoutParams params = {};
   params.baseline = text->baseline;
   auto origBounds = pagx::TextLayout::Layout({text}, params, layoutContext);
-  float origWidth = origBounds.width;
-  float origHeight = origBounds.height;
+  float origWidth = origBounds.bounds.width;
+  float origHeight = origBounds.bounds.height;
 
   layer->contents.push_back(text);
 
@@ -2247,7 +2247,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextSingleAxis) {
   pagx::TextLayoutParams params = {};
   params.baseline = text->baseline;
   auto origBounds = pagx::TextLayout::Layout({text}, params, layoutContext);
-  float origWidth = origBounds.width;
+  float origWidth = origBounds.bounds.width;
 
   layer->contents.push_back(text);
 
@@ -4695,10 +4695,10 @@ PAGX_TEST(PAGXTest, LayoutTextIndependentConstraint) {
   EXPECT_FLOAT_EQ(text->fontSize, 30);
 
   // Position is set by constraint: position = constraintOffset - textBounds.x/y.
-  // With left=50: x = 50 - origBounds.x
-  // With top=40: y = 40 - origBounds.y
-  EXPECT_FLOAT_EQ(text->position.x, 50 - origBounds.x);
-  EXPECT_FLOAT_EQ(text->position.y, 40 - origBounds.y);
+  // With left=50: x = 50 - origBounds.bounds.x
+  // With top=40: y = 40 - origBounds.bounds.y
+  EXPECT_FLOAT_EQ(text->position.x, 50 - origBounds.bounds.x);
+  EXPECT_FLOAT_EQ(text->position.y, 40 - origBounds.bounds.y);
 }
 
 PAGX_TEST(PAGXTest, LayoutTextPathMeasurement) {
@@ -4839,5 +4839,184 @@ PAGX_TEST(PAGXTest, LayoutTextInTextBoxSkipConstraint) {
 // =====================================================================================
 // Variable naming cleanup
 // =====================================================================================
+
+// =====================================================================================
+// TextBox Group Transform Inverse Compensation
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, LayoutTextBoxGroupPosition) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 400;
+  layer->height = 300;
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->width = 200;
+  textBox->height = 100;
+
+  auto group = doc->makeNode<pagx::Group>();
+  group->position = {50, 30};
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Hello";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 24;
+
+  auto fill = doc->makeNode<pagx::Fill>();
+
+  group->elements = {text, fill};
+  textBox->elements = {group};
+  layer->contents = {textBox};
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  doc->setFontConfig(fontConfig);
+  doc->applyLayout();
+
+  auto blob = text->getTextBlob();
+  ASSERT_NE(blob, nullptr);
+
+  // The layout engine places text at box-absolute position, then applies inverse of
+  // Group(position=50,30) * Text(position=0,0) = translate(50,30).
+  // So TextBlob coordinates should be shifted back by (-50, -30) from box-absolute position.
+  auto bounds = blob->getTightBounds();
+  EXPECT_LT(bounds.left, 0);
+  EXPECT_LT(bounds.top, 0);
+}
+
+PAGX_TEST(PAGXTest, LayoutTextBoxGroupScale) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 400;
+  layer->height = 300;
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->width = 200;
+  textBox->height = 100;
+
+  auto group = doc->makeNode<pagx::Group>();
+  group->scale = {2, 2};
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "AB";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 24;
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  group->elements = {text, fill};
+  textBox->elements = {group};
+  layer->contents = {textBox};
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  doc->setFontConfig(fontConfig);
+  doc->applyLayout();
+
+  auto blob = text->getTextBlob();
+  ASSERT_NE(blob, nullptr);
+
+  // Group scale=2 means inverse scale=0.5.
+  // TextBlob coordinates should be half of the box-absolute positions.
+  auto bounds = blob->getTightBounds();
+  EXPECT_GT(bounds.right, 0);
+  EXPECT_LT(bounds.right, 100);
+}
+
+PAGX_TEST(PAGXTest, LayoutTextAnchorCenterRegression) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 400;
+  layer->height = 200;
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Center";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 32;
+  text->position = {200, 100};
+  text->textAnchor = pagx::TextAnchor::Center;
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  layer->contents = {text, fill};
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  doc->setFontConfig(fontConfig);
+  doc->applyLayout();
+
+  auto blob = text->getTextBlob();
+  ASSERT_NE(blob, nullptr);
+
+  // With Center anchor, TextBlob should be centered around x=0 in Text's local space.
+  auto bounds = blob->getTightBounds();
+  EXPECT_LT(bounds.left, 0);
+  EXPECT_GT(bounds.right, 0);
+  EXPECT_NEAR(bounds.left + bounds.right, 0, bounds.right * 0.3f);
+}
+
+PAGX_TEST(PAGXTest, LayoutTextBoxNestedGroupTransform) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 400;
+  layer->height = 300;
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->width = 300;
+  textBox->height = 200;
+
+  auto outerGroup = doc->makeNode<pagx::Group>();
+  outerGroup->position = {20, 10};
+
+  auto innerGroup = doc->makeNode<pagx::Group>();
+  innerGroup->position = {30, 20};
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Nested";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 24;
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  innerGroup->elements = {text, fill};
+  outerGroup->elements = {innerGroup};
+  textBox->elements = {outerGroup};
+  layer->contents = {textBox};
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  doc->setFontConfig(fontConfig);
+  doc->applyLayout();
+
+  auto blob = text->getTextBlob();
+  ASSERT_NE(blob, nullptr);
+
+  // Combined offset: outerGroup(20,10) + innerGroup(30,20) = (50,30).
+  // TextBlob should be shifted back by (-50,-30) from box-absolute position.
+  auto bounds = blob->getTightBounds();
+  EXPECT_LT(bounds.left, 0);
+  EXPECT_LT(bounds.top, 0);
+}
 
 }  // namespace pag
