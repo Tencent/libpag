@@ -9,7 +9,7 @@ The `pagx` binary is provided by the `pagx` npm package. Before running any comm
 ensure it is installed and meets the minimum version:
 
 ```bash
-PAGX_MIN="0.1.3"
+PAGX_MIN="0.1.6"
 if ! command -v pagx &>/dev/null; then
   npm install -g @libpag/pagx
 elif [ "$(printf '%s\n' "$PAGX_MIN" "$(pagx -v | awk '{print $2}')" | sort -V | head -1)" != "$PAGX_MIN" ]; then
@@ -217,3 +217,35 @@ pagx font embed --file a.ttf --fallback "PingFang SC" --fallback b.otf input.pag
 `"PingFang SC"` or `"Arial,Bold"`). All fonts added via `--fallback` are also registered
 automatically. Fallback fonts are tried in order when a character is not found in the
 primary font. System fallback fonts are always appended after user-specified fallbacks.
+
+---
+
+## pagx convert
+
+Convert between PAGX and other formats. The conversion direction is inferred from file
+extensions (e.g., `.pagx` → `.svg` or `.svg` → `.pagx`). Loads the input, converts the
+document, and writes the result. Import warnings are printed but do not prevent conversion.
+
+```bash
+pagx convert input.pagx output.svg                   # PAGX to SVG
+pagx convert input.svg output.pagx                   # SVG to PAGX
+pagx convert --indent 4 input.pagx output.svg        # PAGX to SVG with 4-space indent
+pagx convert --no-xml-declaration input.pagx out.svg
+pagx convert --no-convert-text-to-path input.pagx out.svg  # keep <text> elements
+pagx convert --format svg input.pagx output               # specify SVG output format
+pagx convert --no-expand-use input.svg output.pagx   # SVG to PAGX without expanding <use>
+```
+
+| Option | Description |
+|--------|-------------|
+| `--format <format>` | Override output format (`svg`, `pagx`; default: inferred from output extension) |
+| `--indent <n>` | SVG indentation spaces (default: 2, valid range: 0–16) |
+| `--no-xml-declaration` | Omit the `<?xml ...?>` declaration (SVG output only) |
+| `--no-convert-text-to-path` | Keep text as `<text>` elements instead of converting to `<path>` (SVG output only) |
+| `--no-expand-use` | Do not expand `<use>` references (SVG input only) |
+| `--flatten-transforms` | Flatten nested transforms into single matrices (SVG input only) |
+| `--preserve-unknown` | Preserve unsupported SVG elements as Unknown nodes (SVG input only) |
+
+The command takes two positional arguments: `<input>` and `<output>`. Use `--format` when the
+output extension does not make the format unambiguous. On success the command prints
+`pagx convert: wrote <path>` and exits 0; on failure it prints an error and exits 1.

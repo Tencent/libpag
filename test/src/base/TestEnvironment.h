@@ -20,7 +20,11 @@
 
 #include <mutex>
 #include "gtest/gtest.h"
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunknown-warning-option"
+#pragma clang diagnostic ignored "-Wdeprecated-literal-operator"
 #include "nlohmann/json.hpp"
+#pragma clang diagnostic pop
 
 namespace pag {
 class TestEnvironment : public testing::Environment {

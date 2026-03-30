@@ -107,17 +107,13 @@ bool PAGAnimator::isSync() {
 }
 
 void PAGAnimator::setSync(bool value) {
-  locker.lock();
+  std::unique_lock<std::mutex> lock(locker);
   if (_isSync == value) {
-    locker.unlock();
     return;
   }
   _isSync = value;
-  auto tempTask = task;
-  task = nullptr;
-  locker.unlock();
-  if (tempTask) {
-    tempTask->wait();
+  if (task) {
+    extractAndWaitTask(lock);
   }
 }
 
@@ -127,17 +123,19 @@ int64_t PAGAnimator::duration() {
 }
 
 void PAGAnimator::setDuration(int64_t duration) {
-  std::lock_guard<std::mutex> autoLock(locker);
+  std::unique_lock<std::mutex> lock(locker);
   if (_duration == duration) {
     return;
   }
   _duration = duration;
-  if (_isRunning) {
-    if (_duration > 0) {
-      startAnimation();
-    } else {
-      cancelAnimation();
-    }
+  if (!_isRunning) {
+    return;
+  }
+  if (_duration > 0) {
+    startAnimation();
+  } else {
+    cancelAnimation();
+    extractAndWaitTask(lock);
   }
 }
 
@@ -193,14 +191,13 @@ void PAGAnimator::start() {
 }
 
 void PAGAnimator::cancel() {
-  {
-    std::lock_guard<std::mutex> autoLock(locker);
-    if (!_isRunning) {
-      return;
-    }
-    _isRunning = false;
-    cancelAnimation();
+  std::unique_lock<std::mutex> lock(locker);
+  if (!_isRunning) {
+    return;
   }
+  _isRunning = false;
+  cancelAnimation();
+  extractAndWaitTask(lock);
   auto listener = weakListener.lock();
   if (listener) {
     listener->onAnimationCancel(this);
@@ -209,6 +206,36 @@ void PAGAnimator::cancel() {
 
 void PAGAnimator::update() {
   doUpdate(false);
+}
+
+bool PAGAnimator::isTaskRunning() const {
+  if (task == nullptr) {
+    return false;
+  }
+  auto status = task->status();
+  return status != tgfx::TaskStatus::Finished && status != tgfx::TaskStatus::Canceled;
+}
+
+void PAGAnimator::extractAndWaitTask(std::unique_lock<std::mutex>& lock) {
+  auto pendingTask = std::move(task);
+  task = nullptr;
+  lock.unlock();
+  if (pendingTask) {
+    pendingTask->wait();
+  }
+}
+
+void PAGAnimator::flushAsync(bool setStartTime) {
+  std::lock_guard<std::mutex> autoLock(locker);
+  if (!_isRunning) {
+    return;
+  }
+  task = tgfx::Task::Run([weakThis = weakThis, setStartTime]() {
+    auto animator = weakThis.lock();
+    if (animator) {
+      animator->onFlush(setStartTime);
+    }
+  });
 }
 
 void PAGAnimator::advance() {
@@ -234,7 +261,7 @@ void PAGAnimator::advance() {
 }
 
 std::vector<int> PAGAnimator::doAdvance() {
-  std::lock_guard<std::mutex> autoLock(locker);
+  std::unique_lock<std::mutex> lock(locker);
   if (!_isRunning || _duration <= 0) {
     return {};
   }
@@ -253,48 +280,43 @@ std::vector<int> PAGAnimator::doAdvance() {
     }
     _progress = ClampProgress(fraction);
   }
-  std::vector<int> events = {};
   auto count = static_cast<int>(playTime / _duration);
-  if (_repeatCount > 0 && count >= _repeatCount) {
-    // Set the playedCount to 0 to allow the animation to be played again.
-    playedCount = 0;
-    isEnded = true;
-    _isRunning = false;
-    cancelAnimation();
-    events.push_back(AnimationTypeUpdate);
-    events.push_back(AnimationTypeEnd);
-  } else {
+  if (!(_repeatCount > 0 && count >= _repeatCount)) {
     if (count > playedCount) {
       playedCount = count;
-      events.push_back(AnimationTypeRepeat);
+      return {AnimationTypeRepeat, AnimationTypeUpdate};
     }
-    events.push_back(AnimationTypeUpdate);
+    return {AnimationTypeUpdate};
   }
-  return events;
+  // Set the playedCount to 0 to allow the animation to be played again.
+  playedCount = 0;
+  isEnded = true;
+  _isRunning = false;
+  cancelAnimation();
+  extractAndWaitTask(lock);
+  return {AnimationTypeUpdate, AnimationTypeEnd};
 }
 
 void PAGAnimator::doUpdate(bool setStartTime) {
-  locker.lock();
-  if (task != nullptr && task->status() == tgfx::TaskStatus::Executing) {
-    locker.unlock();
-    return;
+  bool isSync = false;
+  bool isRunning = false;
+  {
+    std::lock_guard<std::mutex> autoLock(locker);
+    if (isTaskRunning()) {
+      return;
+    }
+    isSync = _isSync;
+    isRunning = _isRunning;
   }
-  auto isSync = _isSync;
-  locker.unlock();
   auto listener = weakListener.lock();
   if (listener) {
     listener->onAnimationWillUpdate(this);
   }
-  if (isSync) {
+  if (isSync || !isRunning) {
     onFlush(setStartTime);
-  } else {
-    task = tgfx::Task::Run([weakThis = weakThis, setStartTime]() {
-      auto animator = weakThis.lock();
-      if (animator) {
-        animator->onFlush(setStartTime);
-      }
-    });
+    return;
   }
+  flushAsync(setStartTime);
 }
 
 void PAGAnimator::onFlush(bool setStartTime) {
