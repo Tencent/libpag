@@ -391,6 +391,8 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     }
   }
   if (shouldUpdateAnimator) {
+    // update -> onAnimationFlush -> flush() may re-enter imageViewLock, so it must happen
+    // after the decoder reset path has fully released the lock.
     [animator update];
   }
 }
@@ -411,6 +413,8 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     }
   }
   if (shouldUpdateAnimator) {
+    // update -> onAnimationFlush -> flush() may re-enter imageViewLock, so it must happen
+    // after the decoder reset path has fully released the lock.
     [animator update];
   }
 }
