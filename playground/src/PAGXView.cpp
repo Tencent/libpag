@@ -162,13 +162,13 @@ void PAGXView::updateSize() {
   if (window == nullptr) {
     return;
   }
-  window->invalidSize();
+  surface = nullptr;
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
     return;
   }
-  auto surface = window->getSurface(context);
+  surface = tgfx::Surface::MakeFrom(context, window);
   if (surface == nullptr) {
     device->unlock();
     return;
@@ -244,7 +244,9 @@ void PAGXView::draw() {
   if (context == nullptr) {
     return;
   }
-  auto surface = window->getSurface(context);
+  if (surface == nullptr) {
+    surface = tgfx::Surface::MakeFrom(context, window);
+  }
   if (surface == nullptr) {
     device->unlock();
     return;
@@ -271,13 +273,11 @@ void PAGXView::draw() {
     presentImmediately = false;
     if (recording) {
       context->submit(std::move(recording));
-      window->present(context);
     }
   } else {
     std::swap(lastRecording, recording);
     if (recording) {
       context->submit(std::move(recording));
-      window->present(context);
     }
   }
   device->unlock();
