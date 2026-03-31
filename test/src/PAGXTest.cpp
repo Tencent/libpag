@@ -47,6 +47,7 @@
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
@@ -463,7 +464,7 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
   layer->height = 140;
   layer->layout = pagx::LayoutMode::Vertical;
   layer->alignment = pagx::Alignment::Center;
-  layer->arrangement = pagx::Arrangement::Center;
+  layer->arrangement = pagx::Arrangement::SpaceEvenly;
   layer->children.push_back(MakeTextLayer(doc.get(), "Hello PAGX", 36, {0.2f, 0.2f, 0.8f, 1.0f}));
   layer->children.push_back(
       MakeTextLayer(doc.get(), "\xe4\xbd\xa0\xe5\xa5\xbd World", 28, {0.1f, 0.6f, 0.2f, 1.0f}));
@@ -5307,6 +5308,329 @@ PAGX_TEST(PAGXTest, TextBoundsDirectValidation) {
   auto boxTextBounds = boxText->getTextBounds();
   EXPECT_GT(boxTextBounds.width, 0);
   EXPECT_GT(boxTextBounds.height, 0);
+}
+
+// =====================================================================================
+// Auto Layout - Repeater Measurement
+// =====================================================================================
+
+PAGX_TEST(PAGXTest, RepeaterBasicMeasurement) {
+  // Repeater with position offset should expand the Group's measured size.
+  auto doc = pagx::PAGXDocument::Make(800, 600);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 800;
+  layer->height = 600;
+
+  auto group = doc->makeNode<pagx::Group>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {100, 100};
+  auto repeater = doc->makeNode<pagx::Repeater>();
+  repeater->copies = 3;
+  repeater->position = {50, 50};
+  repeater->scale = {1, 1};
+  repeater->offset = 0;
+
+  group->elements = {rect, repeater};
+  layer->contents = {group};
+  doc->applyLayout();
+
+  // 3 copies: progress 0, 1, 2 → positions (0,0), (50,50), (100,100)
+  // Source 100x100 at each position → union: (0,0)-(200,200)
+  EXPECT_FLOAT_EQ(group->preferredWidth, 200);
+  EXPECT_FLOAT_EQ(group->preferredHeight, 200);
+}
+
+PAGX_TEST(PAGXTest, RepeaterScaledMeasurement) {
+  // Repeater with scale should expand the measured size exponentially.
+  auto doc = pagx::PAGXDocument::Make(800, 600);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 800;
+  layer->height = 600;
+
+  auto group = doc->makeNode<pagx::Group>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {100, 100};
+  auto repeater = doc->makeNode<pagx::Repeater>();
+  repeater->copies = 2;
+  repeater->position = {0, 0};
+  repeater->scale = {2, 2};
+
+  group->elements = {rect, repeater};
+  layer->contents = {group};
+  doc->applyLayout();
+
+  // 2 copies: progress 0 (scale 1x) → 100x100, progress 1 (scale 2x) → 200x200
+  // Union: (0,0)-(200,200)
+  EXPECT_FLOAT_EQ(group->preferredWidth, 200);
+  EXPECT_FLOAT_EQ(group->preferredHeight, 200);
+}
+
+PAGX_TEST(PAGXTest, RepeaterWithOffset) {
+  // Offset shifts the progress for each copy, changing the transform.
+  auto doc = pagx::PAGXDocument::Make(800, 600);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 800;
+  layer->height = 600;
+
+  auto group = doc->makeNode<pagx::Group>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {100, 100};
+  auto repeater = doc->makeNode<pagx::Repeater>();
+  repeater->copies = 2;
+  repeater->position = {50, 0};
+  repeater->scale = {1, 1};
+  repeater->offset = 1;
+
+  group->elements = {rect, repeater};
+  layer->contents = {group};
+  doc->applyLayout();
+
+  // 2 copies: progress 0+1=1 -> pos (50,0), progress 1+1=2 -> pos (100,0)
+  // Transformed: (50,0)-(150,100) and (100,0)-(200,100)
+  // totalBounds = (50,0)-(200,100), width=150, height=100
+  // maxX = max(rect's 100, 150) = 150
+  EXPECT_FLOAT_EQ(group->preferredWidth, 150);
+  EXPECT_FLOAT_EQ(group->preferredHeight, 100);
+}
+
+PAGX_TEST(PAGXTest, RepeaterMultipleSourceElements) {
+  // Repeater should act on the union bounds of all preceding LayoutNodes.
+  auto doc = pagx::PAGXDocument::Make(800, 600);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 800;
+  layer->height = 600;
+
+  auto group = doc->makeNode<pagx::Group>();
+  auto rect1 = doc->makeNode<pagx::Rectangle>();
+  rect1->size = {100, 50};
+  auto rect2 = doc->makeNode<pagx::Rectangle>();
+  rect2->size = {200, 100};
+  auto repeater = doc->makeNode<pagx::Repeater>();
+  repeater->copies = 2;
+  repeater->position = {0, 100};
+  repeater->scale = {1, 1};
+
+  group->elements = {rect1, rect2, repeater};
+  layer->contents = {group};
+  doc->applyLayout();
+
+  // rect1: extX=100, extY=50. rect2: extX=200, extY=100.
+  // sourceBounds = (0,0)-(200,100)
+  // 2 copies: progress 0 -> (0,0)-(200,100), progress 1 -> (0,100)-(200,200)
+  // Total: (0,0)-(200,200)
+  EXPECT_FLOAT_EQ(group->preferredWidth, 200);
+  EXPECT_FLOAT_EQ(group->preferredHeight, 200);
+}
+
+PAGX_TEST(PAGXTest, RepeaterZeroCopies) {
+  // Repeater with copies=0 should not affect measurement.
+  auto doc = pagx::PAGXDocument::Make(800, 600);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 800;
+  layer->height = 600;
+
+  auto group = doc->makeNode<pagx::Group>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {100, 100};
+  auto repeater = doc->makeNode<pagx::Repeater>();
+  repeater->copies = 0;
+
+  group->elements = {rect, repeater};
+  layer->contents = {group};
+  doc->applyLayout();
+
+  // copies=0 means Repeater is skipped. Group measures only the Rectangle.
+  EXPECT_FLOAT_EQ(group->preferredWidth, 100);
+  EXPECT_FLOAT_EQ(group->preferredHeight, 100);
+}
+
+PAGX_TEST(PAGXTest, RepeaterNoSourceLayoutNode) {
+  // Repeater with no preceding LayoutNode should be skipped.
+  auto doc = pagx::PAGXDocument::Make(800, 600);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 800;
+  layer->height = 600;
+
+  auto group = doc->makeNode<pagx::Group>();
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto repeater = doc->makeNode<pagx::Repeater>();
+  repeater->copies = 3;
+  repeater->position = {50, 50};
+
+  group->elements = {fill, repeater};
+  layer->contents = {group};
+  doc->applyLayout();
+
+  // No LayoutNode before Repeater, so sourceBounds is empty.
+  // Group has no measurable children.
+  EXPECT_FLOAT_EQ(group->preferredWidth, 0);
+  EXPECT_FLOAT_EQ(group->preferredHeight, 0);
+}
+
+PAGX_TEST(PAGXTest, RepeaterNegativeCopies) {
+  // copies < 0 is a no-op in tgfx, should not affect measurement.
+  auto doc = pagx::PAGXDocument::Make(800, 600);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 800;
+  layer->height = 600;
+
+  auto group = doc->makeNode<pagx::Group>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {100, 100};
+  auto repeater = doc->makeNode<pagx::Repeater>();
+  repeater->copies = -1;
+  repeater->position = {50, 50};
+
+  group->elements = {rect, repeater};
+  layer->contents = {group};
+  doc->applyLayout();
+
+  EXPECT_FLOAT_EQ(group->preferredWidth, 100);
+  EXPECT_FLOAT_EQ(group->preferredHeight, 100);
+}
+
+PAGX_TEST(PAGXTest, RepeaterFractionalCopies) {
+  // Fractional copies: ceil(2.5) = 3 copies. Measurement should cover all 3.
+  auto doc = pagx::PAGXDocument::Make(800, 600);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 800;
+  layer->height = 600;
+
+  auto group = doc->makeNode<pagx::Group>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {100, 100};
+  auto repeater = doc->makeNode<pagx::Repeater>();
+  repeater->copies = 2.5f;
+  repeater->position = {50, 0};
+  repeater->scale = {1, 1};
+
+  group->elements = {rect, repeater};
+  layer->contents = {group};
+  doc->applyLayout();
+
+  // ceil(2.5) = 3 copies. progress: 0, 1, 2 -> positions: (0,0), (50,0), (100,0)
+  // Union: (0,0)-(200,100)
+  EXPECT_FLOAT_EQ(group->preferredWidth, 200);
+  EXPECT_FLOAT_EQ(group->preferredHeight, 100);
+}
+
+PAGX_TEST(PAGXTest, RepeaterSingleCopy) {
+  // copies=1 means one copy at progress=0, which is the identity transform.
+  auto doc = pagx::PAGXDocument::Make(800, 600);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 800;
+  layer->height = 600;
+
+  auto group = doc->makeNode<pagx::Group>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {100, 100};
+  auto repeater = doc->makeNode<pagx::Repeater>();
+  repeater->copies = 1;
+  repeater->position = {200, 200};
+
+  group->elements = {rect, repeater};
+  layer->contents = {group};
+  doc->applyLayout();
+
+  // 1 copy at progress=0 -> identity matrix -> same as source bounds.
+  EXPECT_FLOAT_EQ(group->preferredWidth, 100);
+  EXPECT_FLOAT_EQ(group->preferredHeight, 100);
+}
+
+PAGX_TEST(PAGXTest, RepeaterWithRotation) {
+  // Rotation should expand the bounding box.
+  auto doc = pagx::PAGXDocument::Make(800, 600);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 800;
+  layer->height = 600;
+
+  auto group = doc->makeNode<pagx::Group>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {100, 100};
+  auto repeater = doc->makeNode<pagx::Repeater>();
+  repeater->copies = 2;
+  repeater->position = {0, 0};
+  repeater->scale = {1, 1};
+  repeater->rotation = 45;
+
+  group->elements = {rect, repeater};
+  layer->contents = {group};
+  doc->applyLayout();
+
+  // Copy 0: progress=0, identity -> (0,0)-(100,100)
+  // Copy 1: progress=1, 45-degree rotation around origin
+  // A 100x100 rect rotated 45 degrees has bounding box ~141x141
+  EXPECT_GT(group->preferredWidth, 100);
+  EXPECT_GT(group->preferredHeight, 100);
+}
+
+PAGX_TEST(PAGXTest, RepeaterWithAnchor) {
+  // Non-zero anchor shifts the rotation/scale center.
+  auto doc = pagx::PAGXDocument::Make(800, 600);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 800;
+  layer->height = 600;
+
+  auto group = doc->makeNode<pagx::Group>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {100, 100};
+  auto repeater = doc->makeNode<pagx::Repeater>();
+  repeater->copies = 2;
+  repeater->position = {0, 0};
+  repeater->scale = {2, 2};
+  repeater->anchor = {50, 50};
+
+  group->elements = {rect, repeater};
+  layer->contents = {group};
+  doc->applyLayout();
+
+  // Copy 0: progress=0, identity -> (0,0)-(100,100)
+  // Copy 1: progress=1, scale 2x around anchor (50,50)
+  // Scaled rect: (50-50*2, 50-50*2) to (50+50*2, 50+50*2) = (-50,-50)-(150,150)
+  // Union: (-50,-50)-(150,150) -> but Rect uses left/top/right/bottom
+  // mapRect handles this correctly. Width should be > 100.
+  EXPECT_GT(group->preferredWidth, 100);
+  EXPECT_GT(group->preferredHeight, 100);
+}
+
+PAGX_TEST(PAGXTest, RepeaterFollowedByLayoutNode) {
+  // A LayoutNode after Repeater should still contribute to the Group size.
+  auto doc = pagx::PAGXDocument::Make(800, 600);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 800;
+  layer->height = 600;
+
+  auto group = doc->makeNode<pagx::Group>();
+  auto rect1 = doc->makeNode<pagx::Rectangle>();
+  rect1->size = {100, 100};
+  auto repeater = doc->makeNode<pagx::Repeater>();
+  repeater->copies = 2;
+  repeater->position = {50, 0};
+  repeater->scale = {1, 1};
+  auto rect2 = doc->makeNode<pagx::Rectangle>();
+  rect2->size = {500, 50};
+
+  group->elements = {rect1, repeater, rect2};
+  layer->contents = {group};
+  doc->applyLayout();
+
+  // Repeater: (0,0)-(100,100) + (50,0)-(150,100) = (0,0)-(150,100)
+  // rect2: (0,0)-(500,50) expands width to 500
+  // Final: max(150,500)=500, max(100,50)=100
+  EXPECT_FLOAT_EQ(group->preferredWidth, 500);
+  EXPECT_FLOAT_EQ(group->preferredHeight, 100);
 }
 
 }  // namespace pag
