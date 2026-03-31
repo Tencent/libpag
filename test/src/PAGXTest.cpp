@@ -464,7 +464,7 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
   layer->height = 140;
   layer->layout = pagx::LayoutMode::Vertical;
   layer->alignment = pagx::Alignment::Center;
-  layer->arrangement = pagx::Arrangement::SpaceEvenly;
+  layer->arrangement = pagx::Arrangement::Center;
   layer->children.push_back(MakeTextLayer(doc.get(), "Hello PAGX", 36, {0.2f, 0.2f, 0.8f, 1.0f}));
   layer->children.push_back(
       MakeTextLayer(doc.get(), "\xe4\xbd\xa0\xe5\xa5\xbd World", 28, {0.1f, 0.6f, 0.2f, 1.0f}));
