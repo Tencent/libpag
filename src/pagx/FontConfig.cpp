@@ -111,9 +111,7 @@ std::shared_ptr<tgfx::Typeface> FontConfig::findTypeface(const std::string& font
       }
       int priority = StylePriority(pair.first.style);
       bool preferred = (bestTypeface == nullptr) || (priority < bestPriority) ||
-                       (priority == bestPriority && pair.first.style < bestStyle) ||
-                       (priority == bestPriority && pair.first.style == bestStyle &&
-                        pair.first.family < bestFamily);
+                       (priority == bestPriority && pair.first.style < bestStyle);
       if (preferred) {
         bestTypeface = pair.second;
         bestPriority = priority;
