@@ -116,7 +116,7 @@
         </Layer>
         <!-- 3.1: top="20" bottom="20" centerX="0" -->
         <Layer left="0" right="0" top="0" bottom="0">
-          <Text top="0" bottom="0" centerX="0" text="V" fontFamily="Arial" fontStyle="Bold" fontSize="200" textAnchor="center"/>
+          <Text top="0" bottom="0" centerX="0" text="Ǘy" fontFamily="Arial" fontStyle="Bold" fontSize="200" textAnchor="center"/>
           <Fill>
             <LinearGradient startPoint="0,0" endPoint="0,180">
               <ColorStop offset="0" color="#FBBF24"/>

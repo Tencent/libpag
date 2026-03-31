@@ -29,6 +29,7 @@
 #include "tgfx/core/Font.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/RSXform.h"
 #include "tgfx/core/TextBlobBuilder.h"
 
 namespace pagx {

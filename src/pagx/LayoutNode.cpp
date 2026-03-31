@@ -26,12 +26,9 @@
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/Rectangle.h"
-#include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextPath.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Rect.h"
 
 namespace pagx {
 
@@ -207,16 +204,6 @@ std::vector<LayoutNode*> LayoutNode::CollectLayoutNodes(const std::vector<Elemen
   return result;
 }
 
-static tgfx::Matrix ComputeRepeaterMatrix(const Repeater* repeater, float progress) {
-  auto matrix = tgfx::Matrix::I();
-  matrix.postTranslate(-repeater->anchor.x, -repeater->anchor.y);
-  matrix.postScale(std::pow(repeater->scale.x, progress), std::pow(repeater->scale.y, progress));
-  matrix.postRotate(repeater->rotation * progress);
-  matrix.postTranslate(repeater->position.x * progress, repeater->position.y * progress);
-  matrix.postTranslate(repeater->anchor.x, repeater->anchor.y);
-  return matrix;
-}
-
 void LayoutNode::MeasureChildNodes(const std::vector<Element*>& elements, float explicitWidth,
                                    float explicitHeight, float& outWidth, float& outHeight) {
   if (!std::isnan(explicitWidth) && !std::isnan(explicitHeight)) {
@@ -227,37 +214,17 @@ void LayoutNode::MeasureChildNodes(const std::vector<Element*>& elements, float 
 
   float maxX = 0;
   float maxY = 0;
-  // Accumulates the union bounds of all preceding LayoutNodes for Repeater to act upon.
-  auto sourceBounds = tgfx::Rect::MakeEmpty();
   for (auto* element : elements) {
     auto* node = AsLayoutNode(element);
-    if (node != nullptr && !std::isnan(node->preferredWidth) &&
-        !std::isnan(node->preferredHeight)) {
-      float extX = node->hasConstraints() ? node->constraintExtentX() : node->preferredX;
-      float extY = node->hasConstraints() ? node->constraintExtentY() : node->preferredY;
-      extX += node->preferredWidth;
-      extY += node->preferredHeight;
-      maxX = std::max(maxX, extX);
-      maxY = std::max(maxY, extY);
-      sourceBounds.join(tgfx::Rect::MakeWH(extX, extY));
-    } else if (element->nodeType() == NodeType::Repeater && !sourceBounds.isEmpty()) {
-      auto repeater = static_cast<Repeater*>(element);
-      auto copies = repeater->copies;
-      if (copies <= 0.0f) {
-        continue;
-      }
-      auto maxCount = static_cast<int>(std::ceil(copies));
-      auto totalBounds = tgfx::Rect::MakeEmpty();
-      for (int i = 0; i < maxCount; i++) {
-        auto progress = static_cast<float>(i) + repeater->offset;
-        auto matrix = ComputeRepeaterMatrix(repeater, progress);
-        auto transformed = matrix.mapRect(sourceBounds);
-        totalBounds.join(transformed);
-      }
-      maxX = std::max(maxX, totalBounds.right);
-      maxY = std::max(maxY, totalBounds.bottom);
-      sourceBounds = totalBounds;
+    if (node == nullptr || std::isnan(node->preferredWidth) || std::isnan(node->preferredHeight)) {
+      continue;
     }
+    float extX = node->hasConstraints() ? node->constraintExtentX() : node->preferredX;
+    float extY = node->hasConstraints() ? node->constraintExtentY() : node->preferredY;
+    extX += node->preferredWidth;
+    extY += node->preferredHeight;
+    maxX = std::max(maxX, extX);
+    maxY = std::max(maxY, extY);
   }
 
   float prevW = std::isnan(outWidth) ? 0 : outWidth;
