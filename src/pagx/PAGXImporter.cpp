@@ -24,6 +24,7 @@
 #include <memory>
 #include <vector>
 #include "base/utils/Log.h"
+#include "pagx/PAGXDefaults.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -66,21 +67,6 @@
 #include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
-
-//==============================================================================
-// Default node instances for reading default property values
-//==============================================================================
-
-static PAGXDocument& DefaultDoc() {
-  static auto doc = PAGXDocument::Make(0, 0);
-  return *doc;
-}
-
-template <typename T>
-static const T& Default() {
-  static const T* node = DefaultDoc().makeNode<T>();
-  return *node;
-}
 
 //==============================================================================
 // Forward declarations and utility functions

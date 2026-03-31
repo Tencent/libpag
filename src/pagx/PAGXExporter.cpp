@@ -19,6 +19,7 @@
 #include "pagx/PAGXExporter.h"
 #include <cmath>
 #include <cstdio>
+#include "pagx/PAGXDefaults.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
@@ -59,21 +60,6 @@
 #include "pagx/utils/StringParser.h"
 
 namespace pagx {
-
-//==============================================================================
-// Default node instances for reading default property values
-//==============================================================================
-
-static PAGXDocument& DefaultDoc() {
-  static auto doc = PAGXDocument::Make(0, 0);
-  return *doc;
-}
-
-template <typename T>
-static const T& Default() {
-  static const T* node = DefaultDoc().makeNode<T>();
-  return *node;
-}
 
 //==============================================================================
 // XMLBuilder - XML generation helper
