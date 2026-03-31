@@ -19,6 +19,7 @@
 #include "pagx/SVGExporter.h"
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <string>
 #include <vector>
