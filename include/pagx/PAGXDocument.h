@@ -133,14 +133,19 @@ class PAGXDocument : public Node {
    */
   void setFontConfig(const FontConfig& fontConfig);
 
+  /**
+   * Executes auto layout on the document, positioning layers according to their layout constraints.
+   * Must be called after setFontConfig() and before rendering or font embedding. Skips execution if
+   * the layout is already up to date.
+   */
+  void applyLayout();
+
   NodeType nodeType() const override {
     return NodeType::Document;
   }
 
  private:
   PAGXDocument() = default;
-
-  void applyLayout();
   static void layoutLayers(const std::vector<Layer*>& layers, float containerW, float containerH,
                            const LayoutContext& context);
 
