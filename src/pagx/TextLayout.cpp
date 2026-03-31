@@ -1007,8 +1007,7 @@ class TextLayoutContext {
             (totalHeight - lastLine.maxLineHeight + halfLeading + lastLine.maxAscent) *
             lastLine.roundingRatio;
       } else {
-        lastRelBaseline = (totalHeight - lastLine.maxLineHeight + lastLine.maxLineHeight) *
-                          lastLine.roundingRatio;
+        lastRelBaseline = totalHeight * lastLine.roundingRatio;
       }
       precomputedBaselines[lastIdx] = lastRelBaseline;
       // Walk upward: each preceding line's baseline = next line's baseline - next line's lineHeight
