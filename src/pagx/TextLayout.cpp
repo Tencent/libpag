@@ -261,7 +261,7 @@ class TextLayoutContext {
                  element->nodeType() == NodeType::TextBox) {
         auto* group = static_cast<Group*>(element);
         auto groupMatrix = parentMatrix;
-        groupMatrix.postConcat(ComputeGroupMatrix(group));
+        groupMatrix.preConcat(ComputeGroupMatrix(group));
         collectTextElementsWithMatrices(group->elements, outText, outMatrices, groupMatrix);
       }
     }

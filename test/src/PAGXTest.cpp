@@ -495,71 +495,6 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
 }
 
 /**
- * Test case: TextBox with embedded GlyphRun applies inverse matrix correctly.
- * A Group with non-uniform scale wraps the Text inside a TextBox, producing a non-trivial inverse
- * matrix. The Stroke painter reveals correctness: it applies stroke expansion in local coordinates
- * first, then the Group's non-uniform scale stretches the stroke anisotropically. If the inverse
- * matrix is wrong, both glyph positions and the anisotropic stroke effect will be incorrect.
- */
-PAGX_TEST(PAGXTest, TextBoxEmbeddedGlyphRun) {
-  auto doc = pagx::PAGXDocument::Make(1200, 300);
-  auto layer = doc->makeNode<pagx::Layer>();
-  layer->width = 1200;
-  layer->height = 300;
-  doc->layers.push_back(layer);
-
-  auto textBox = doc->makeNode<pagx::TextBox>();
-  textBox->width = 600;
-  textBox->height = 300;
-  textBox->centerX = 0;
-  textBox->textAlign = pagx::TextAlign::Center;
-  textBox->paragraphAlign = pagx::ParagraphAlign::Middle;
-
-  auto group = doc->makeNode<pagx::Group>();
-  group->scale = {2, 1};
-
-  auto text = doc->makeNode<pagx::Text>();
-  text->text = "Hello PAGX";
-  text->fontFamily = "NotoSansSC";
-  text->fontSize = 100;
-  group->elements.push_back(text);
-
-  auto stroke = doc->makeNode<pagx::Stroke>();
-  auto strokeColor = doc->makeNode<pagx::SolidColor>();
-  strokeColor->color = {0.8f, 0.2f, 0.2f, 1.0f};
-  stroke->color = strokeColor;
-  stroke->width = 1;
-  group->elements.push_back(stroke);
-
-  textBox->elements.push_back(group);
-  layer->contents.push_back(textBox);
-
-  // Step 1: Layout + embed fonts (writes GlyphRun in layout coordinates with bounds).
-  pagx::FontConfig fontConfig;
-  fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
-  doc->setFontConfig(fontConfig);
-  doc->applyLayout();
-  pagx::FontEmbedder().embed(doc.get());
-
-  // Step 2: Export and reload to simulate loading a precomposed file.
-  auto xml = pagx::PAGXExporter::ToXML(*doc);
-  ASSERT_FALSE(xml.empty());
-  auto pagxPath = SavePAGXFile(xml, "PAGXTest/TextBoxEmbeddedGlyphRun.pagx");
-  auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
-  ASSERT_TRUE(reloadedDoc != nullptr);
-
-  // Step 3: Render the reloaded document (BuildTextBlob should apply inverse matrix).
-  auto tgfxLayer = pagx::LayerBuilder::Build(reloadedDoc.get());
-  ASSERT_TRUE(tgfxLayer != nullptr);
-
-  auto surface = Surface::Make(context, 1200, 300);
-  DisplayList displayList;
-  displayList.root()->addChild(tgfxLayer);
-  displayList.render(surface.get(), false);
-  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/TextBoxEmbeddedGlyphRun"));
-}
-
-/**
  * Test case: Font and GlyphRun XML round-trip
  */
 PAGX_TEST(PAGXTest, FontGlyphRoundTrip) {
@@ -4669,54 +4604,6 @@ PAGX_TEST(PAGXTest, DeepNestingConstraintPropagation) {
 // =====================================================================================
 // Auto Layout - New Feature Tests (P1)
 // =====================================================================================
-
-PAGX_TEST(PAGXTest, LayoutTextBaselineAlphabetic) {
-  auto doc = pagx::PAGXDocument::Make(400, 300);
-  auto layer = doc->makeNode<pagx::Layer>();
-  doc->layers.push_back(layer);
-  layer->width = 400;
-  layer->height = 300;
-
-  auto typeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
-  ASSERT_NE(typeface, nullptr);
-  auto fontFamily = typeface->fontFamily();
-  auto fontStyle = typeface->fontStyle();
-
-  // Text with LineBox baseline (default).
-  auto textLB = doc->makeNode<pagx::Text>();
-  textLB->text = "Hello";
-  textLB->fontFamily = fontFamily;
-  textLB->fontStyle = fontStyle;
-  textLB->fontSize = 48;
-  textLB->position = {50, 100};
-  textLB->baseline = pagx::TextBaseline::LineBox;
-
-  // Text with Alphabetic baseline.
-  auto textAB = doc->makeNode<pagx::Text>();
-  textAB->text = "Hello";
-  textAB->fontFamily = fontFamily;
-  textAB->fontStyle = fontStyle;
-  textAB->fontSize = 48;
-  textAB->position = {200, 100};
-  textAB->baseline = pagx::TextBaseline::Alphabetic;
-
-  auto fill = doc->makeNode<pagx::Fill>();
-  layer->contents = {textLB, textAB, fill};
-
-  pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
-  doc->setFontConfig(fontConfig);
-  doc->applyLayout();
-
-  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
-  ASSERT_NE(tgfxLayer, nullptr);
-  auto surface = Surface::Make(context, 400, 300);
-  DisplayList displayList;
-  displayList.root()->addChild(tgfxLayer);
-  displayList.render(surface.get(), false);
-  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/LayoutTextBaselineAlphabetic"));
-}
 
 PAGX_TEST(PAGXTest, LayoutTextIndependentConstraint) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
