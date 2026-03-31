@@ -396,7 +396,7 @@ allocation.
         <!-- Search: stroke (inactive) -->
         <Layer layout="vertical" gap="2" alignment="center">
           <Layer height="24">
-            <Ellipse top="0" centerY="0" size="16,16"/>
+            <Ellipse top="0" size="16,16"/>
             <Stroke color="#94A3B8" width="2"/>
             <Group>
               <Path data="M14 14L20 20"/>
@@ -411,7 +411,7 @@ allocation.
         <!-- Profile: stroke (inactive) -->
         <Layer layout="vertical" gap="2" alignment="center">
           <Layer height="24">
-            <Ellipse left="6" top="1" centerY="0" size="10,10"/>
+            <Ellipse left="6" top="1" size="10,10"/>
             <Stroke color="#94A3B8" width="1.8"/>
             <Group>
               <Path data="M1 22C1 17 5 13 11 13C17 13 21 17 21 22"/>
