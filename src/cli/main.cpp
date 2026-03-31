@@ -20,9 +20,10 @@
 #include <iostream>
 #include <string>
 #include "cli/CommandBounds.h"
-#include "cli/CommandConvert.h"
+#include "cli/CommandExport.h"
 #include "cli/CommandFont.h"
 #include "cli/CommandFormat.h"
+#include "cli/CommandImport.h"
 #include "cli/CommandOptimize.h"
 #include "cli/CommandRender.h"
 #include "cli/CommandValidator.h"
@@ -43,7 +44,8 @@ static void PrintUsage() {
             << "  font       Query font metrics or embed fonts into a PAGX file\n"
             << "  format     Format a PAGX file (indentation and attribute ordering)\n"
             << "  optimize   Validate, optimize, and format a PAGX file in one step\n"
-            << "  convert    Convert between PAGX and other formats (e.g. SVG)\n"
+            << "  import     Import from another format (e.g. SVG) to PAGX\n"
+            << "  export     Export a PAGX file to another format (e.g. SVG)\n"
             << "\n"
             << "Options:\n"
             << "  --help, -h       Show help\n"
@@ -86,8 +88,11 @@ int main(int argc, char* argv[]) {
   if (command == "optimize") {
     return pagx::cli::RunOptimize(argc - 1, argv + 1);
   }
-  if (command == "convert") {
-    return pagx::cli::RunConvert(argc - 1, argv + 1);
+  if (command == "import") {
+    return pagx::cli::RunImport(argc - 1, argv + 1);
+  }
+  if (command == "export") {
+    return pagx::cli::RunExport(argc - 1, argv + 1);
   }
 
   std::cerr << "pagx: unknown command '" << command << "'\n";
