@@ -84,9 +84,10 @@ closed with `Z`.
 
 **Pattern**: Stroke for outlines (arc) + Fill for solid areas (body, cutout) in one icon.
 Each part with different painters needs its own Group for scope isolation. **All three icon
-examples share the same structure**: background Rectangle + Fill on the Layer, icon content
-centered via `centerX="0" centerY="0"` on the outer Group. For circular backgrounds, replace
-Rectangle with Ellipse.
+examples share the same structure**: background Rectangle + Fill as the first content on the
+Layer, then a Group for the icon content (needed because the background Rectangle + Fill
+precede it in the same scope). The outer Group uses `centerX="0" centerY="0"` to center
+the icon within the Layer. For circular backgrounds, replace Rectangle with Ellipse.
 
 ---
 
@@ -395,13 +396,11 @@ allocation.
         <!-- Search: stroke (inactive) -->
         <Layer layout="vertical" gap="2" alignment="center">
           <Layer height="24">
-            <Group centerY="0">
-              <Ellipse top="0" size="16,16"/>
-              <Stroke color="#94A3B8" width="2"/>
-              <Group>
-                <Path data="M14 14L20 20"/>
-                <Stroke color="#94A3B8" width="2.5" cap="round"/>
-              </Group>
+            <Ellipse top="0" size="16,16"/>
+            <Stroke color="#94A3B8" width="2"/>
+            <Group>
+              <Path data="M14 14L20 20"/>
+              <Stroke color="#94A3B8" width="2.5" cap="round"/>
             </Group>
           </Layer>
           <Layer>
@@ -412,13 +411,11 @@ allocation.
         <!-- Profile: stroke (inactive) -->
         <Layer layout="vertical" gap="2" alignment="center">
           <Layer height="24">
-            <Group centerY="0">
-              <Ellipse left="6" top="1" size="10,10"/>
-              <Stroke color="#94A3B8" width="1.8"/>
-              <Group>
-                <Path data="M1 22C1 17 5 13 11 13C17 13 21 17 21 22"/>
-                <Stroke color="#94A3B8" width="1.8" cap="round"/>
-              </Group>
+            <Ellipse left="6" top="1" size="10,10"/>
+            <Stroke color="#94A3B8" width="1.8"/>
+            <Group>
+              <Path data="M1 22C1 17 5 13 11 13C17 13 21 17 21 22"/>
+              <Stroke color="#94A3B8" width="1.8" cap="round"/>
             </Group>
           </Layer>
           <Layer>
@@ -438,7 +435,10 @@ with a straight-edged Rectangle to flatten bottom corners. The oversized rounded
 (`bottom="-20"`) extends below so only the top curves intersect. Tab items use
 `arrangement="spaceAround"` for even distribution. Each tab is a vertical layout
 (`layout="vertical" gap alignment="center"`) containing an icon Layer and a label Layer.
-Active tab uses Fill; inactive tabs use Stroke — see §Icons.
+Active tab uses Fill; inactive tabs use Stroke — see §Icons. Note that the icon content
+(Ellipse, Path, etc.) is placed directly on the icon Layer without an outer Group because
+it is the first content in its scope. Inner Groups are only added where different Strokes
+need isolation (e.g., ring vs. diagonal line in the Search icon).
 
 ---
 

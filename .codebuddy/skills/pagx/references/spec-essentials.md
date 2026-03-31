@@ -538,6 +538,7 @@ is sequential and forward-only.
 - **CDATA** for special characters: `<![CDATA[A < B]]>`.
 - `\n` in `text` attribute (as `&#10;`) triggers line breaks.
 - Two rendering modes: **runtime layout** (system fonts) and **pre-layout** (GlyphRun with embedded fonts).
+- **GlyphRun coordinate system**: positions use the **layout coordinate system** — for Text inside TextBox, relative to TextBox origin; for standalone Text, relative to Text origin. The renderer applies the inverse transform at render time.
 
 ---
 

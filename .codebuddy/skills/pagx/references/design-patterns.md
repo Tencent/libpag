@@ -83,7 +83,8 @@ effective combination.
 2. **Think in SVG, write in PAGX** — mentally compose the icon as SVG elements (`<circle>`,
    `<rect>`, `<path>` with `stroke`/`fill`), then translate each to its PAGX equivalent using
    the mapping table above. Path `data` is standard SVG `<path d>` syntax — copy directly.
-3. **Center in container** — wrap in a Group with `centerX="0" centerY="0"`.
+3. **Center in container** — use constraint attributes (`centerX="0" centerY="0"`) on the
+   geometry element itself, or on a Group if one is already needed for painter scope isolation.
 
 **Rendering approach**: Prefer Stroke (outline) by default. Use Fill only when the design
 explicitly requires solid icons (e.g., active tab state). Mixed (stroke + fill) for complex
@@ -96,7 +97,7 @@ size, stroke width, and padding. Avoid fine details that become noise at small s
 
 Use Layers purposefully — each should serve a clear structural or visual role:
 
-- Use Groups for internal structure when no Layer-exclusive features are needed
+- Only add Groups when subsequent content needs painter scope isolation from earlier content
 - Add a Layer when styles, filters, mask, blendMode, or container layout is needed
 - With constraint positioning, each shape needing independent Fill/Stroke requires its own Layer
   (see §1 Painter Scope Isolation)
@@ -126,8 +127,9 @@ Are there sibling Layers that are parts of the same visual component
   → YES: Wrap in a parent Layer — parts must not be independent siblings.
          See generate-guide.md §Step 2 for the component-tree principle.
 
-Is this a sub-element within a block (e.g., icon inside a button)?
-  → YES: Use Group
+Does this content come after earlier geometry+painters in the same scope?
+  → YES: Wrap in Group for painter scope isolation
+  → NO (first content in scope): No wrapper needed — place geometry directly
 ```
 
 ### MergePath vs Mask
@@ -333,16 +335,21 @@ For required attributes see `attributes.md`; for coordinate localization see
 
 ### 1. Painter Scope Isolation
 
-When different geometry needs different painters, choose based on layout context.
-**The first geometry+painters in a scope (Layer, Group, or TextBox) never need a Group wrapper**
-— only subsequent elements need isolation to avoid inheriting accumulated geometry.
+Group's sole purpose is to start a **new isolated scope** for painter accumulation.
+Only add a Group when subsequent content needs a fresh scope — the first content in any
+scope (Layer, Group, or TextBox) is already isolated because nothing precedes it.
 
-**Without layout or constraints** — use Groups to isolate painters:
+**Decision rule**: Does this content come after earlier geometry+painters in the same scope?
+- **YES** → wrap in a Group to isolate from the accumulated geometry above.
+- **NO** (it's the first content) → no Group needed. Place geometry and painters directly,
+  use constraint attributes on the geometry element itself for positioning.
 
 ```xml
-<Layer>
-  <Rectangle size="100,100"/>
+<Layer width="200" height="200">
+  <!-- First content: no Group needed. Constraints go on the geometry directly. -->
+  <Rectangle left="0" right="0" top="0" bottom="0"/>
   <Fill color="#F00"/>
+  <!-- Second content: needs Group to isolate from Rectangle above -->
   <Group>
     <Ellipse left="35" top="35" size="30,30"/>
     <Stroke color="#000" width="1"/>
@@ -400,14 +407,15 @@ When only one Path needs a shape modifier, isolate it in its own Group:
 
 ### 4. Fill + Stroke on Same Geometry
 
-Declare geometry once with both painters in one Group — painters do not clear geometry:
+Declare geometry once with both painters — painters do not clear geometry. When this is
+the first content in a scope, no Group wrapper is needed:
 
 ```xml
-<Group>
+<Layer>
   <Rectangle size="100,40" roundness="8"/>
   <Fill color="#E2E8F0"/>
   <Stroke color="#94A3B8" width="1"/>
-</Group>
+</Layer>
 ```
 
 ### 5. Container Size for Constraints

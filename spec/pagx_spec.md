@@ -1450,6 +1450,8 @@ Controls how `position.y` is interpreted for vertical positioning.
 
 GlyphRun defines pre-layout data for a group of glyphs, each GlyphRun independently referencing one font resource.
 
+**Coordinate System**: GlyphRun positions (`x`, `y`, `xOffsets`, `positions`) use the **layout coordinate system** — for Text inside a TextBox, coordinates are relative to the TextBox origin; for standalone Text, coordinates are relative to the Text's own origin. During rendering, the engine applies the appropriate inverse transform to convert layout coordinates back to Text-local coordinates.
+
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `font` | idref | (required) | Font resource reference `@id` |

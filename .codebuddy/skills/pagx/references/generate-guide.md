@@ -162,26 +162,27 @@ For each block, construct the VectorElement tree following these principles.
 
 1. Place geometry elements (Rectangle, Ellipse, Path, Text, etc.)
 2. Add painters (Fill, Stroke) — they render all geometry accumulated in the current scope
-3. Wrap sub-elements in **Groups** when they need different painters
+3. The first geometry+painters in a scope need no wrapper. For subsequent content that needs
+   different painters, start a new **Group** to isolate it from accumulated geometry above
 4. With constraint positioning, constrained shapes needing different painters must each be in a
    separate **Layer** — see `design-patterns.md` §1 Painter Scope Isolation
 
 **Painter efficiency** — share scope when possible:
 
 ```xml
-<!-- Same fill on paired elements → one Group -->
-<Group>
+<!-- Two Ellipses sharing one Fill — no Group needed if this is the first content -->
+<Layer>
   <Ellipse left="-6.5" top="-6" size="5,6"/>
   <Ellipse left="1.5" top="-6" size="5,6"/>
   <Fill color="#E0E7FF"/>
-</Group>
+</Layer>
 
-<!-- Fill + Stroke on same geometry → one Group, geometry declared once -->
-<Group>
+<!-- Fill + Stroke on same geometry — no Group needed if this is the first content -->
+<Layer>
   <Ellipse size="80,20"/>
   <Fill color="#1F1240"/>
   <Stroke color="#8B5CF625" width="1.5"/>
-</Group>
+</Layer>
 ```
 
 ### Text Positioning
