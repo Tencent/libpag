@@ -530,7 +530,7 @@ class TextLayoutContext {
       tgfx::Font glyphFont = primaryFont;
       std::shared_ptr<tgfx::Typeface> glyphTypeface = primaryTypeface;
 
-      if (glyphID == 0) {
+      if (glyphID == 0 && fontConfig_ != nullptr) {
         auto& fbHolders = fontConfig_->fallbackTypefaces;
         for (auto& holder : fbHolders) {
           auto fallback = holder.getTypeface();
