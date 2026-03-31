@@ -87,8 +87,8 @@ class Polystar : public Element, public LayoutNode {
 
   /**
    * Computes the tight bounding box of the polystar by iterating over all vertices.
-   * This is used for rendering only — layout uses the frame-aligned bounds
-   * (outerRadius × 2, outerRadius × 2) instead.
+   * Unlike using outerRadius as a square, this accounts for the actual vertex positions
+   * determined by pointCount, rotation, and innerRadius (for star type).
    */
   Rect computeBounds() const {
     auto numPoints = static_cast<int>(ceilf(pointCount));

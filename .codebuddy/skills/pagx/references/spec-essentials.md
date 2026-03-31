@@ -256,8 +256,7 @@ Key rules:
 - **Content Bounds**: Constraint "edges" refer to an element's content bounds edges. Bounds
   differ by element type:
   - **Frame-aligned** (Rectangle, Ellipse, TextBox, Group, Layer): bounds = [0, width] × [0,
-    height] in local coordinates. For Polystar, the frame is [0, outerRadius×2] × [0, outerRadius×2].
-    `left="0"` aligns the logical frame's left edge to the container.
+    height] in local coordinates. `left="0"` aligns the logical frame's left edge to the container.
   - **Pixel-aligned** (Path, Text, Polystar, TextPath): bounds = actual rendered pixel boundary.
     `left="0"` shifts content so rendered pixels touch the container's left edge. For Text,
     bounds are the line-box bounds (advance width × font metrics line height), which provides
@@ -592,10 +591,8 @@ plus its own text layout properties. TextBox can contain child elements just lik
 
 ```xml
 <TextBox left="50" top="50" width="300" height="200" textAlign="center" paragraphAlign="near">
-  <Group>
-    <Text text="Title&#10;" fontFamily="Arial" fontSize="24"/>
-    <Fill color="#000"/>
-  </Group>
+  <Text text="Title&#10;" fontFamily="Arial" fontSize="24"/>
+  <Fill color="#000"/>
   <Group>
     <Text text="Body" fontFamily="Arial" fontSize="16"/>
     <Fill color="#666"/>
