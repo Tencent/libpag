@@ -197,9 +197,8 @@ static int ExportToHTML(const ExportOptions& options) {
   }
 
   if (framework.empty()) {
-    std::cerr << "pagx export: error: cannot infer HTML framework, use --html-framework "
-                 "(native/react/vue) or specify an output file with .html/.jsx/.vue extension\n";
-    return 1;
+    // Default to native when format is html and no framework is specified
+    framework = "native";
   }
 
   if (framework == "native") {

@@ -1105,13 +1105,22 @@ static float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t gl
       glyphPos += 1.0f;
     }
   }
-  // Check if within range
+  // Normalize to [0,1] range for both modes
+  if (selector->unit == SelectorUnit::Index) {
+    // In Index mode, glyphPos is already (glyphIndex - offset). Normalize to [0,1].
+    glyphPos = glyphPos / static_cast<float>(totalGlyphs);
+    // Wrap around
+    glyphPos = std::fmod(glyphPos, 1.0f);
+    if (glyphPos < 0) {
+      glyphPos += 1.0f;
+    }
+  }
+  // Check if within range (start/end always in [0,1] after normalization)
   float start = selector->start;
   float end = selector->end;
   if (selector->unit == SelectorUnit::Index) {
     start = start / static_cast<float>(totalGlyphs);
     end = end / static_cast<float>(totalGlyphs);
-    glyphPos = static_cast<float>(glyphIndex) / static_cast<float>(totalGlyphs);
   }
   if (glyphPos < start || glyphPos > end) {
     return 0.0f;
@@ -1538,7 +1547,8 @@ class HTMLWriter {
                  const TrimPath* curTrim, bool hasMerge, MergePathMode mergeMode);
   void applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim);
   void applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* trim,
-                                const std::vector<GeoInfo>& geos, size_t geoIndex);
+                                const std::vector<float>& pathLengths, float totalLength,
+                                size_t geoIndex);
   float computeGeoPathLength(const GeoInfo& geo);
 
   // Filter defs
@@ -1624,6 +1634,16 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha) {
       auto g = static_cast<const ConicGradient*>(src);
       if (outAlpha) {
         *outAlpha = 1.0f;
+      }
+      // CSS conic-gradient does not support gradient transforms. Fall back to SVG when
+      // the matrix contains rotation, scale, or skew (non-identity, non-pure-translation).
+      if (!g->matrix.isIdentity()) {
+        bool isPureTranslation = FloatNearlyZero(g->matrix.a - 1.0f) &&
+                                 FloatNearlyZero(g->matrix.b) && FloatNearlyZero(g->matrix.c) &&
+                                 FloatNearlyZero(g->matrix.d - 1.0f);
+        if (!isPureTranslation) {
+          return {};
+        }
       }
       Point c = g->matrix.mapPoint(g->center);
       float cssStartAng = g->startAngle + 90.0f;
@@ -2721,7 +2741,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   // Compute TrimPath parameters
   bool isContinuousTrim = trim && trim->type == TrimType::Continuous;
   std::vector<float> pathLengths = {};
-  [[maybe_unused]] float totalPathLength = 0.0f;
+  float totalPathLength = 0.0f;
   if (isContinuousTrim) {
     // Compute path lengths for all geometries
     for (auto& g : geos) {
@@ -2740,7 +2760,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
       applySVGFill(out, trim ? nullptr : fill);
       if (isContinuousTrim) {
         applySVGStroke(out, stroke, computeGeoPathLength(g));
-        applyTrimAttrsContinuous(out, trim, geos, geoIdx);
+        applyTrimAttrsContinuous(out, trim, pathLengths, totalPathLength, geoIdx);
       } else {
         applySVGStroke(out, stroke);
         applyTrimAttrs(out, trim);
@@ -2769,7 +2789,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         applySVGFill(out, trim ? nullptr : fill);
         if (isContinuousTrim) {
           applySVGStroke(out, stroke, computeGeoPathLength(g));
-          applyTrimAttrsContinuous(out, trim, geos, geoIdx);
+          applyTrimAttrsContinuous(out, trim, pathLengths, totalPathLength, geoIdx);
         } else {
           applySVGStroke(out, stroke);
           applyTrimAttrs(out, trim);
@@ -2787,7 +2807,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         applySVGFill(out, trim ? nullptr : fill);
         if (isContinuousTrim) {
           applySVGStroke(out, stroke, computeGeoPathLength(g));
-          applyTrimAttrsContinuous(out, trim, geos, geoIdx);
+          applyTrimAttrsContinuous(out, trim, pathLengths, totalPathLength, geoIdx);
         } else {
           applySVGStroke(out, stroke);
           applyTrimAttrs(out, trim);
@@ -2804,7 +2824,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           applySVGFill(out, trim ? nullptr : fill);
           if (isContinuousTrim) {
             applySVGStroke(out, stroke, computeGeoPathLength(g));
-            applyTrimAttrsContinuous(out, trim, geos, geoIdx);
+            applyTrimAttrsContinuous(out, trim, pathLengths, totalPathLength, geoIdx);
           } else {
             applySVGStroke(out, stroke);
             applyTrimAttrs(out, trim);
@@ -2822,7 +2842,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           applySVGFill(out, trim ? nullptr : fill);
           if (isContinuousTrim) {
             applySVGStroke(out, stroke, computeGeoPathLength(g));
-            applyTrimAttrsContinuous(out, trim, geos, geoIdx);
+            applyTrimAttrsContinuous(out, trim, pathLengths, totalPathLength, geoIdx);
           } else {
             applySVGStroke(out, stroke);
             applyTrimAttrs(out, trim);
@@ -3487,6 +3507,22 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           }
           if (stroke) {
             applySVGStroke(out, stroke);
+            // Apply strokeColor override
+            if (modifier->strokeColor.has_value() && absF > 0) {
+              Color sc = modifier->strokeColor.value();
+              float blendFactor = sc.alpha * absF;
+              if (blendFactor > 0) {
+                out.addAttr("stroke", ColorToSVGHex(sc));
+                out.addAttr("stroke-opacity", FloatToString(blendFactor));
+              }
+            }
+            // Apply strokeWidth override
+            if (modifier->strokeWidth.has_value() && absF > 0) {
+              float origWidth = stroke->width;
+              float modWidth = modifier->strokeWidth.value();
+              float finalWidth = origWidth + (modWidth - origWidth) * absF;
+              out.addAttr("stroke-width", FloatToString(finalWidth));
+            }
           }
           out.closeTagSelfClosing();
           out.closeTag();  // </g>
@@ -3500,7 +3536,14 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
       std::string containerStyle = "position:absolute;left:" + FloatToString(text->position.x) +
                                    "px;top:" + FloatToString(ty) + "px";
       if (!text->fontFamily.empty()) {
-        containerStyle += ";font-family:'" + text->fontFamily + "'";
+        std::string escapedFamilyM = text->fontFamily;
+        for (size_t p = 0; p < escapedFamilyM.size(); p++) {
+          if (escapedFamilyM[p] == '\'') {
+            escapedFamilyM.replace(p, 1, "\\'");
+            p++;
+          }
+        }
+        containerStyle += ";font-family:'" + escapedFamilyM + "'";
       }
       containerStyle += ";font-size:" + FloatToString(text->fontSize) + "px";
       if (alpha < 1.0f) {
@@ -3521,27 +3564,40 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         float absF = std::abs(f);
         std::string charStr(p, len);
         std::string charStyle = "display:inline-block";
-        // Build transform
+        // Build transform (CSS reads right-to-left):
+        // translate(position*f) translate(anchor*f) rotate(rot*f) skew scale translate(-anchor*f)
         std::string transform;
-        // Position offset
+        // 6. Position offset
         if (!FloatNearlyZero(modifier->position.x * f) ||
             !FloatNearlyZero(modifier->position.y * f)) {
           transform += "translate(" + FloatToString(modifier->position.x * f) + "px," +
                        FloatToString(modifier->position.y * f) + "px) ";
         }
-        // Rotation
+        // 5. Translate back to anchor
+        float anchorX = modifier->anchor.x * f;
+        float anchorY = modifier->anchor.y * f;
+        if (!FloatNearlyZero(anchorX) || !FloatNearlyZero(anchorY)) {
+          transform +=
+              "translate(" + FloatToString(anchorX) + "px," + FloatToString(anchorY) + "px) ";
+        }
+        // 4. Rotation
         if (!FloatNearlyZero(modifier->rotation * f)) {
           transform += "rotate(" + FloatToString(modifier->rotation * f) + "deg) ";
         }
-        // Scale
+        // 2. Scale
         float sx = 1.0f + (modifier->scale.x - 1.0f) * absF;
         float sy = 1.0f + (modifier->scale.y - 1.0f) * absF;
         if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
           transform += "scale(" + FloatToString(sx) + "," + FloatToString(sy) + ") ";
         }
-        // Skew
+        // 3. Skew
         if (!FloatNearlyZero(modifier->skew * absF)) {
           transform += "skewX(" + FloatToString(modifier->skew * absF) + "deg) ";
+        }
+        // 1. Translate to anchor origin
+        if (!FloatNearlyZero(anchorX) || !FloatNearlyZero(anchorY)) {
+          transform +=
+              "translate(" + FloatToString(-anchorX) + "px," + FloatToString(-anchorY) + "px) ";
         }
         if (!transform.empty()) {
           charStyle += ";transform:" + transform;
@@ -3719,7 +3775,14 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
                                 "px;top:" + FloatToString(pos.y - text->fontSize * 0.8f) + "px";
         charStyle += ";display:inline-block";
         if (!text->fontFamily.empty()) {
-          charStyle += ";font-family:'" + text->fontFamily + "'";
+          std::string escapedFamilyTP = text->fontFamily;
+          for (size_t p = 0; p < escapedFamilyTP.size(); p++) {
+            if (escapedFamilyTP[p] == '\'') {
+              escapedFamilyTP.replace(p, 1, "\\'");
+              p++;
+            }
+          }
+          charStyle += ";font-family:'" + escapedFamilyTP + "'";
         }
         charStyle += ";font-size:" + FloatToString(text->fontSize) + "px";
         // Transform for rotation and centering
@@ -3950,18 +4013,11 @@ float HTMLWriter::computeGeoPathLength(const GeoInfo& geo) {
 }
 
 void HTMLWriter::applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* trim,
-                                          const std::vector<GeoInfo>& geos, size_t geoIndex) {
+                                          const std::vector<float>& pathLengths, float totalLength,
+                                          size_t geoIndex) {
   if (!trim || trim->type != TrimType::Continuous) {
     applyTrimAttrs(builder, trim);
     return;
-  }
-  // Calculate cumulative path lengths
-  std::vector<float> pathLengths = {};
-  float totalLength = 0.0f;
-  for (auto& g : geos) {
-    float len = computeGeoPathLength(g);
-    pathLengths.push_back(len);
-    totalLength += len;
   }
   if (totalLength <= 0.0f || geoIndex >= pathLengths.size()) {
     return;
@@ -4441,12 +4497,64 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         shadowStyle += ";mix-blend-mode:";
         shadowStyle += blendStr;
       }
-      shadowStyle += ";filter:drop-shadow(" + FloatToString(ds->offsetX) + "px " +
-                     FloatToString(ds->offsetY) + "px " + FloatToString(ds->blurX) + "px " +
-                     ColorToRGBA(ds->color) + ")";
-      out.openTag("div");
-      out.addAttr("style", shadowStyle);
-      out.closeTagSelfClosing();
+      bool isUniformBlur = FloatNearlyZero(ds->blurX - ds->blurY);
+      if (isUniformBlur && ds->showBehindLayer) {
+        // Simple case: CSS drop-shadow
+        shadowStyle += ";filter:drop-shadow(" + FloatToString(ds->offsetX) + "px " +
+                       FloatToString(ds->offsetY) + "px " + FloatToString(ds->blurX) + "px " +
+                       ColorToRGBA(ds->color) + ")";
+        out.openTag("div");
+        out.addAttr("style", shadowStyle);
+        out.closeTagSelfClosing();
+      } else {
+        // Complex case: SVG filter for anisotropic blur or showBehindLayer=false
+        std::string filterId = _ctx->nextId("dsblend");
+        _defs->openTag("filter");
+        _defs->addAttr("id", filterId);
+        _defs->addAttr("x", "-50%");
+        _defs->addAttr("y", "-50%");
+        _defs->addAttr("width", "200%");
+        _defs->addAttr("height", "200%");
+        _defs->closeTagStart();
+        _defs->openTag("feGaussianBlur");
+        _defs->addAttr("in", "SourceGraphic");
+        _defs->addAttr("stdDeviation",
+                       FloatToString(ds->blurX / 2) + " " + FloatToString(ds->blurY / 2));
+        _defs->addAttr("result", "blur");
+        _defs->closeTagSelfClosing();
+        _defs->openTag("feOffset");
+        _defs->addAttr("in", "blur");
+        _defs->addAttr("dx", FloatToString(ds->offsetX));
+        _defs->addAttr("dy", FloatToString(ds->offsetY));
+        _defs->addAttr("result", "offsetBlur");
+        _defs->closeTagSelfClosing();
+        _defs->openTag("feFlood");
+        _defs->addAttr("flood-color", ColorToSVGHex(ds->color));
+        if (ds->color.alpha < 1.0f) {
+          _defs->addAttr("flood-opacity", FloatToString(ds->color.alpha));
+        }
+        _defs->addAttr("result", "color");
+        _defs->closeTagSelfClosing();
+        _defs->openTag("feComposite");
+        _defs->addAttr("in", "color");
+        _defs->addAttr("in2", "offsetBlur");
+        _defs->addAttr("operator", "in");
+        _defs->addAttr("result", "shadow");
+        _defs->closeTagSelfClosing();
+        if (!ds->showBehindLayer) {
+          _defs->openTag("feComposite");
+          _defs->addAttr("in", "shadow");
+          _defs->addAttr("in2", "SourceGraphic");
+          _defs->addAttr("operator", "out");
+          _defs->addAttr("result", "shadow");
+          _defs->closeTagSelfClosing();
+        }
+        _defs->closeTag();  // </filter>
+        shadowStyle += ";filter:url(#" + filterId + ")";
+        out.openTag("div");
+        out.addAttr("style", shadowStyle);
+        out.closeTagSelfClosing();
+      }
     } else if (styleType == NodeType::BackgroundBlurStyle) {
       auto blur = static_cast<const BackgroundBlurStyle*>(ls);
       float avg = (blur->blurX + blur->blurY) / 2.0f;
