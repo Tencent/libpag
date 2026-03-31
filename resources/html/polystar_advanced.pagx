@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Polystar edge cases: fractional pointCount (5.5), innerRoundness/outerRoundness,
+     reversed="true", polygon with roundness -->
+<pagx version="1.0" width="400" height="200">
+  <!-- Fractional pointCount: 5.5 creates an incomplete last point -->
+  <Layer>
+    <Polystar position="60,80" type="star" pointCount="5.5" outerRadius="50" innerRadius="22" rotation="-90"/>
+    <Fill color="#3B82F6"/>
+  </Layer>
+  <!-- Full inner + outer roundness: creates a flower-like shape -->
+  <Layer>
+    <Polystar position="170,80" type="star" pointCount="8" outerRadius="50" innerRadius="25" outerRoundness="0.7" innerRoundness="0.8" rotation="0"/>
+    <Fill color="#EC4899"/>
+  </Layer>
+  <!-- Reversed star: opposite winding direction -->
+  <Layer>
+    <Polystar position="280,80" type="star" pointCount="6" outerRadius="50" innerRadius="28" rotation="-90" reversed="true"/>
+    <Fill color="#10B981"/>
+  </Layer>
+  <!-- Polygon with roundness: creates a soft rounded polygon -->
+  <Layer>
+    <Polystar position="370,80" type="polygon" pointCount="6" outerRadius="45" outerRoundness="0.6" rotation="-90"/>
+    <Fill color="#F59E0B"/>
+  </Layer>
+  <!-- Fractional pointCount on polygon: 3.7 triangle with partial edge -->
+  <Layer>
+    <Polystar position="60,170" type="polygon" pointCount="3.7" outerRadius="30" rotation="-90"/>
+    <Fill color="#8B5CF6"/>
+  </Layer>
+  <!-- Star with very high roundness: nearly circular -->
+  <Layer>
+    <Polystar position="150,170" type="star" pointCount="5" outerRadius="30" innerRadius="15" outerRoundness="1" innerRoundness="1" rotation="-90"/>
+    <Fill color="#EF4444"/>
+  </Layer>
+  <!-- Reversed polygon -->
+  <Layer>
+    <Polystar position="240,170" type="polygon" pointCount="5" outerRadius="30" rotation="-90" reversed="true"/>
+    <Fill color="#06B6D4"/>
+  </Layer>
+  <!-- Low fractional star: 2.3 points -->
+  <Layer>
+    <Polystar position="330,170" type="star" pointCount="2.3" outerRadius="30" innerRadius="12" rotation="-90"/>
+    <Fill color="#D946EF"/>
+  </Layer>
+</pagx>

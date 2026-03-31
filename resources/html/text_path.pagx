@@ -1,12 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: TextPath → text along a bezier curve path; pre-computed glyph positions -->
+<!-- Tests: TextPath — text along curves with various configurations:
+     simple arc, perpendicular=false, multiple paths, firstMargin/lastMargin -->
 <pagx version="1.0" width="400" height="200">
   <Resources>
     <PathData id="arcPath" data="M 30,150 C 100,20 300,20 370,150"/>
+    <PathData id="straightLine" data="M 30,180 L 370,180"/>
   </Resources>
+  <!-- Text along bezier curve (perpendicular=true, default) -->
   <Layer>
     <Text text="Text Along a Path" fontFamily="Arial" fontStyle="Bold" fontSize="24" position="0,0"/>
     <TextPath path="@arcPath" perpendicular="true" firstMargin="10"/>
     <Fill color="#3B82F6"/>
+  </Layer>
+  <!-- Same path, perpendicular=false: glyphs stay upright -->
+  <Layer>
+    <Text text="Upright Glyphs" fontFamily="Arial" fontSize="16" position="0,0"/>
+    <TextPath path="@arcPath" perpendicular="false" firstMargin="80" lastMargin="80"/>
+    <Fill color="#EF444480"/>
+  </Layer>
+  <!-- Text on straight line with margins -->
+  <Layer>
+    <Text text="Straight Path" fontFamily="Arial" fontSize="14" position="0,0"/>
+    <TextPath path="@straightLine" firstMargin="20" lastMargin="20"/>
+    <Fill color="#10B981"/>
+  </Layer>
+  <!-- S-curve path defined inline -->
+  <Layer>
+    <Text text="S-CURVE" fontFamily="Arial" fontStyle="Bold" fontSize="18" position="0,0"/>
+    <TextPath path="M 30,100 C 100,40 150,160 220,100 C 290,40 340,160 370,100"/>
+    <Fill color="#8B5CF6"/>
   </Layer>
 </pagx>

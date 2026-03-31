@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: TextPath advanced attributes: baselineOrigin, baselineAngle, lastMargin,
+     reversed="true", forceAlignment="true", perpendicular="false" -->
+<pagx version="1.0" width="400" height="300">
+  <Resources>
+    <!-- Wide arc for top banner -->
+    <PathData id="bannerArc" data="M 20,120 C 80,10 320,10 380,120"/>
+    <!-- Circle path for badge ring -->
+    <PathData id="circlePath" data="M 200,210 A 60,60 0 1,1 199.99,210 Z"/>
+    <!-- Wavy path for bottom text -->
+    <PathData id="wavyPath" data="M 20,280 Q 100,240 200,280 Q 300,320 380,280"/>
+  </Resources>
+  <!-- Banner text with baselineOrigin and baselineAngle -->
+  <Layer>
+    <Text text="DECORATIVE BANNER" fontFamily="Arial" fontStyle="Bold" fontSize="20" position="200,20"/>
+    <TextPath path="@bannerArc" baselineOrigin="200,20" baselineAngle="0" firstMargin="5" lastMargin="5"/>
+    <Fill color="#3B82F6"/>
+  </Layer>
+  <!-- Circular badge: reversed text on outer ring -->
+  <Layer>
+    <Text text="CIRCULAR BADGE TEXT" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="200,210"/>
+    <TextPath path="@circlePath" reversed="true" firstMargin="10" lastMargin="10"/>
+    <Fill color="#EF4444"/>
+  </Layer>
+  <!-- Badge center circle -->
+  <Layer>
+    <Ellipse position="200,210" size="80,80"/>
+    <Fill color="#F59E0B"/>
+  </Layer>
+  <Layer>
+    <Ellipse position="200,210" size="70,70"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  <!-- Force alignment: text stretched to fill path -->
+  <Layer>
+    <Text text="FORCE ALIGN" fontFamily="Arial" fontStyle="Bold" fontSize="18" position="0,0"/>
+    <TextPath path="@wavyPath" forceAlignment="true"/>
+    <Fill color="#10B981"/>
+  </Layer>
+  <!-- Perpendicular=false: glyphs stay upright -->
+  <Layer>
+    <Text text="UPRIGHT" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="0,0"/>
+    <TextPath path="@bannerArc" perpendicular="false" firstMargin="60" lastMargin="60"/>
+    <Fill color="#8B5CF680"/>
+  </Layer>
+  <!-- lastMargin test: text inset from path end -->
+  <Layer>
+    <Text text="MARGINS" fontFamily="Arial" fontSize="14" position="0,0"/>
+    <TextPath path="M 20,160 L 380,160" firstMargin="30" lastMargin="80"/>
+    <Fill color="#EC4899"/>
+  </Layer>
+</pagx>

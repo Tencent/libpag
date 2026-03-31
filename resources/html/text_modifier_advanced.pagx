@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: TextModifier advanced attributes (anchor, skew, skewAxis, strokeColor, strokeWidth)
+     and RangeSelector modes (subtract, intersect, min, max, difference), unit="index", randomOrder, randomSeed -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Anchor offset: shifts rotation pivot to top of glyph -->
+  <Layer>
+    <Text text="ANCHOR" fontFamily="Arial" fontStyle="Bold" fontSize="36" position="200,50" textAnchor="center"/>
+    <TextModifier anchor="0,-18" rotation="15">
+      <RangeSelector start="0" end="1" shape="rampUp"/>
+    </TextModifier>
+    <Fill color="#3B82F6"/>
+  </Layer>
+  <!-- Skew + skewAxis: italic-like slant along custom axis -->
+  <Layer>
+    <Text text="SKEWED" fontFamily="Arial" fontStyle="Bold" fontSize="36" position="200,110" textAnchor="center"/>
+    <TextModifier skew="25" skewAxis="90">
+      <RangeSelector start="0" end="1" shape="triangle"/>
+    </TextModifier>
+    <Fill color="#10B981"/>
+  </Layer>
+  <!-- StrokeColor + strokeWidth override -->
+  <Layer>
+    <Text text="STROKE" fontFamily="Arial" fontStyle="Bold" fontSize="40" position="200,170" textAnchor="center"/>
+    <TextModifier strokeColor="#EF4444" strokeWidth="2">
+      <RangeSelector start="0" end="1" shape="square"/>
+    </TextModifier>
+    <Fill color="#F59E0B"/>
+    <Stroke color="#00000000" width="2"/>
+  </Layer>
+  <!-- RangeSelector unit="index" with mode="subtract" -->
+  <Layer>
+    <Text text="SUBTRACT" fontFamily="Arial" fontStyle="Bold" fontSize="30" position="200,230" textAnchor="center"/>
+    <TextModifier fillColor="#EC4899" position="0,-8">
+      <RangeSelector start="0" end="1" shape="square" mode="add"/>
+      <RangeSelector start="2" end="5" unit="index" shape="square" mode="subtract"/>
+    </TextModifier>
+    <Fill color="#8B5CF6"/>
+  </Layer>
+  <!-- RangeSelector mode="intersect" -->
+  <Layer>
+    <Text text="INTERSECT" fontFamily="Arial" fontStyle="Bold" fontSize="28" position="200,278" textAnchor="center"/>
+    <TextModifier position="0,-10" fillColor="#3B82F6">
+      <RangeSelector start="0" end="0.7" shape="rampUp" mode="add"/>
+      <RangeSelector start="0.3" end="1" shape="rampDown" mode="intersect"/>
+    </TextModifier>
+    <Fill color="#E2E8F0"/>
+  </Layer>
+  <!-- RangeSelector mode="min" and mode="max" -->
+  <Layer>
+    <Text text="MIN MAX" fontFamily="Arial" fontStyle="Bold" fontSize="30" position="110,330" textAnchor="center"/>
+    <TextModifier scale="1.4,1.4" fillColor="#F59E0B">
+      <RangeSelector start="0" end="1" shape="rampUp" mode="add"/>
+      <RangeSelector start="0" end="1" shape="rampDown" mode="min"/>
+    </TextModifier>
+    <Fill color="#1F2937"/>
+  </Layer>
+  <Layer>
+    <Text text="DIFF" fontFamily="Arial" fontStyle="Bold" fontSize="30" position="310,330" textAnchor="center"/>
+    <TextModifier fillColor="#10B981">
+      <RangeSelector start="0" end="1" shape="rampUp" mode="add"/>
+      <RangeSelector start="0" end="1" shape="rampDown" mode="difference"/>
+    </TextModifier>
+    <Fill color="#1F2937"/>
+  </Layer>
+  <!-- RangeSelector randomOrder + randomSeed -->
+  <Layer>
+    <Text text="RANDOM" fontFamily="Arial" fontStyle="Bold" fontSize="32" position="200,385" textAnchor="center"/>
+    <TextModifier position="0,-12" rotation="10" fillColor="#EC4899">
+      <RangeSelector start="0" end="0.6" shape="square" randomOrder="true" randomSeed="42"/>
+    </TextModifier>
+    <Fill color="#8B5CF6"/>
+  </Layer>
+</pagx>

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Display P3 wide gamut colors: p3(r,g,b) and p3(r,g,b,a) formats,
+     comparison between sRGB and P3 colors -->
+<pagx version="1.0" width="300" height="200">
+  <!-- Row 1: P3 vibrant colors that exceed sRGB gamut -->
+  <!-- P3 vivid red (more saturated than sRGB can express) -->
+  <Layer>
+    <Rectangle position="50,50" size="60,60" roundness="8"/>
+    <Fill>
+      <SolidColor color="p3(1.0, 0.0, 0.0)"/>
+    </Fill>
+  </Layer>
+  <!-- P3 vivid green -->
+  <Layer>
+    <Rectangle position="120,50" size="60,60" roundness="8"/>
+    <Fill>
+      <SolidColor color="p3(0.0, 1.0, 0.0)"/>
+    </Fill>
+  </Layer>
+  <!-- P3 vivid blue -->
+  <Layer>
+    <Rectangle position="190,50" size="60,60" roundness="8"/>
+    <Fill>
+      <SolidColor color="p3(0.0, 0.0, 1.0)"/>
+    </Fill>
+  </Layer>
+  <!-- P3 with alpha -->
+  <Layer>
+    <Rectangle position="260,50" size="60,60" roundness="8"/>
+    <Fill>
+      <SolidColor color="p3(1.0, 0.3, 0.0, 0.7)"/>
+    </Fill>
+  </Layer>
+  <!-- Row 2: sRGB equivalents for comparison -->
+  <!-- sRGB red -->
+  <Layer>
+    <Rectangle position="50,130" size="60,60" roundness="8"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+  <!-- sRGB green -->
+  <Layer>
+    <Rectangle position="120,130" size="60,60" roundness="8"/>
+    <Fill color="#00FF00"/>
+  </Layer>
+  <!-- sRGB blue -->
+  <Layer>
+    <Rectangle position="190,130" size="60,60" roundness="8"/>
+    <Fill color="#0000FF"/>
+  </Layer>
+  <!-- sRGB float format for comparison -->
+  <Layer>
+    <Rectangle position="260,130" size="60,60" roundness="8"/>
+    <Fill>
+      <SolidColor color="srgb(1.0, 0.3, 0.0, 0.7)"/>
+    </Fill>
+  </Layer>
+  <!-- P3 gradient: wide gamut gradient across top -->
+  <Layer>
+    <Rectangle position="150,10" size="280,10" roundness="4"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="280,0">
+        <ColorStop offset="0" color="p3(1.0, 0.0, 0.5)"/>
+        <ColorStop offset="0.5" color="p3(0.0, 1.0, 0.3)"/>
+        <ColorStop offset="1" color="p3(0.2, 0.1, 1.0)"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+  <!-- Labels -->
+  <Layer>
+    <Text text="P3" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="12,50" textAnchor="start"/>
+    <Fill color="#64748B"/>
+  </Layer>
+  <Layer>
+    <Text text="sRGB" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="12,130" textAnchor="start"/>
+    <Fill color="#64748B"/>
+  </Layer>
+</pagx>

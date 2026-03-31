@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: data-* custom attributes on various elements, id and name attributes -->
+<pagx version="1.0" width="300" height="200">
+  <!-- Card background with data attributes -->
+  <Layer name="cardBackground" data-figma-id="1:42" data-exported-by="PAGExporter" data-category="ui-card">
+    <Rectangle position="150,100" size="280,180" roundness="12" data-role="container"/>
+    <Fill color="#F8FAFC"/>
+    <Stroke color="#E2E8F0" width="1"/>
+  </Layer>
+  <!-- Header bar with id and data attributes -->
+  <Layer id="headerBar" name="Header" data-section="header" y="10">
+    <Rectangle position="150,20" size="260,30" roundness="6"/>
+    <Fill color="#3B82F6"/>
+  </Layer>
+  <!-- Title text with data attributes -->
+  <Layer name="titleText" data-content-type="heading" data-priority="high" y="5">
+    <Text text="Card Title" fontFamily="Arial" fontStyle="Bold" fontSize="14" position="150,25" textAnchor="center" data-editable="true"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  <!-- Body content with multiple data attributes -->
+  <Layer name="bodyContent" data-section="body" data-index="0">
+    <Text text="Description text with custom data attributes on multiple element types." fontFamily="Arial" fontSize="11" position="30,55"/>
+    <TextBox position="20,50" size="260,40" textAlign="start" lineHeight="16"/>
+    <Fill color="#64748B"/>
+  </Layer>
+  <!-- Icon placeholder with data attributes -->
+  <Layer id="iconSlot" name="icon" data-icon-name="star" data-size="small">
+    <Polystar position="50,130" type="star" pointCount="5" outerRadius="15" innerRadius="7" rotation="-90" data-decorative="true"/>
+    <Fill color="#F59E0B"/>
+  </Layer>
+  <!-- Action button -->
+  <Layer name="actionButton" data-action="submit" data-variant="primary">
+    <Rectangle position="220,130" size="80,28" roundness="6"/>
+    <Fill color="#10B981"/>
+  </Layer>
+  <Layer data-action="submit-label">
+    <Text text="Action" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="220,135" textAnchor="center"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  <!-- Footer divider with data attribute -->
+  <Layer name="divider" data-role="separator">
+    <Path data="M 20,160 L 280,160"/>
+    <Stroke color="#E2E8F0" width="1"/>
+  </Layer>
+  <!-- Footer text -->
+  <Layer name="footerText" data-section="footer" data-timestamp="2026-01-01">
+    <Text text="Footer info" fontFamily="Arial" fontSize="10" position="150,178" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+</pagx>

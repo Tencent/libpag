@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Composition with width/height coordinate system, multiple references to same composition,
+     different transforms on each instance -->
+<pagx version="1.0" width="400" height="200">
+  <Resources>
+    <!-- Reusable icon component: a colored circle with an inner diamond -->
+    <Composition id="icon" width="60" height="60">
+      <Layer>
+        <Ellipse position="30,30" size="56,56"/>
+        <Fill>
+          <RadialGradient center="30,30" radius="28">
+            <ColorStop offset="0" color="#60A5FA"/>
+            <ColorStop offset="1" color="#3B82F6"/>
+          </RadialGradient>
+        </Fill>
+      </Layer>
+      <Layer>
+        <Path data="M 30,10 L 50,30 L 30,50 L 10,30 Z"/>
+        <Fill color="#FFFFFF"/>
+      </Layer>
+    </Composition>
+    <!-- Reusable badge: rounded rectangle with star -->
+    <Composition id="badge" width="50" height="50">
+      <Layer>
+        <Rectangle position="25,25" size="46,46" roundness="8"/>
+        <Fill color="#10B981"/>
+      </Layer>
+      <Layer>
+        <Polystar position="25,25" type="star" pointCount="5" outerRadius="16" innerRadius="8" rotation="-90"/>
+        <Fill color="#FFFFFF"/>
+      </Layer>
+    </Composition>
+  </Resources>
+  <!-- Row of icon instances with different positions -->
+  <Layer x="20" y="20" composition="@icon"/>
+  <Layer x="100" y="20" composition="@icon"/>
+  <Layer x="180" y="20" composition="@icon" alpha="0.6"/>
+  <Layer x="260" y="20" composition="@icon" matrix="0.8,0,0,0.8,0,0"/>
+  <!-- Row of badge instances -->
+  <Layer x="20" y="110" composition="@badge"/>
+  <Layer x="90" y="110" composition="@badge"/>
+  <Layer x="160" y="110" composition="@badge" alpha="0.7"/>
+  <!-- Badge with rotation via matrix -->
+  <Layer x="230" y="110" composition="@badge" matrix="0.707,0.707,-0.707,0.707,0,0"/>
+  <!-- Larger scaled badge -->
+  <Layer x="310" y="100" composition="@badge" matrix="1.4,0,0,1.4,0,0"/>
+</pagx>

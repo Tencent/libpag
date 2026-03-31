@@ -1,16 +1,79 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: Empty document, defaults-only elements, zero-size shapes -->
-<pagx version="1.0" width="200" height="200">
-  <!-- Layer with all defaults (visible=true, alpha=1, blendMode=normal, etc.) -->
+<!-- Tests: Default values and edge cases for various elements — Rectangle, Ellipse, Fill, Stroke,
+     ConicGradient defaults, empty layer, zero-size shapes, minimal attributes -->
+<pagx version="1.0" width="300" height="300">
+  <!-- Layer with all defaults: visible=true, alpha=1, blendMode=normal -->
+  <!-- Rectangle with defaults: position=0,0, size=100,100, roundness=0 -->
+  <!-- Fill with defaults: color=#000000, alpha=1, fillRule=winding -->
   <Layer>
     <Rectangle/>
     <Fill/>
   </Layer>
-  <!-- Zero-size ellipse -->
-  <Layer x="120" y="20">
-    <Ellipse position="0,0" size="0,0"/>
+  <!-- Ellipse with defaults: position=0,0, size=100,100 -->
+  <Layer x="110" y="0">
+    <Ellipse/>
+    <Fill color="#3B82F6"/>
+  </Layer>
+  <!-- Stroke with all defaults: color=#000000, width=1, cap=butt, join=miter, miterLimit=4, align=center -->
+  <Layer x="220" y="0">
+    <Rectangle position="40,40" size="60,60"/>
+    <Stroke/>
+  </Layer>
+  <!-- Zero-size ellipse: no visible output -->
+  <Layer x="10" y="120">
+    <Ellipse position="20,20" size="0,0"/>
     <Fill color="#EF4444"/>
   </Layer>
-  <!-- Empty layer (no vector elements) -->
-  <Layer name="emptyLayer" x="50" y="50"/>
+  <!-- Zero-size rectangle: no visible output -->
+  <Layer x="70" y="120">
+    <Rectangle position="20,20" size="0,0"/>
+    <Fill color="#10B981"/>
+  </Layer>
+  <!-- ConicGradient with defaults: center=0,0, startAngle=0, endAngle=360 -->
+  <Layer x="110" y="110">
+    <Ellipse position="40,40" size="70,70"/>
+    <Fill>
+      <ConicGradient>
+        <ColorStop offset="0" color="#3B82F6"/>
+        <ColorStop offset="0.5" color="#EC4899"/>
+        <ColorStop offset="1" color="#3B82F6"/>
+      </ConicGradient>
+    </Fill>
+  </Layer>
+  <!-- Polystar with defaults: type=star, pointCount=5, outerRadius=100, innerRadius=50 -->
+  <Layer x="200" y="110">
+    <Polystar/>
+    <Fill color="#F59E0B40"/>
+    <Stroke color="#F59E0B" width="1"/>
+  </Layer>
+  <!-- Empty layer: no vector elements -->
+  <Layer name="emptyLayer" x="50" y="200"/>
+  <!-- Fill with fillRule=evenOdd on overlapping paths -->
+  <Layer x="10" y="220">
+    <Rectangle position="30,30" size="50,50"/>
+    <Rectangle position="50,50" size="50,50"/>
+    <MergePath mode="append"/>
+    <Fill color="#8B5CF680" fillRule="evenOdd"/>
+  </Layer>
+  <!-- Text with minimal attributes (all defaults) -->
+  <Layer x="120" y="230">
+    <Text text="Default text" fontSize="12"/>
+    <Fill color="#64748B"/>
+  </Layer>
+  <!-- TrimPath with defaults: start=0, end=1, offset=0, type=separate (no visible change) -->
+  <Layer x="120" y="260">
+    <Ellipse position="30,15" size="50,25"/>
+    <TrimPath/>
+    <Stroke color="#06B6D4" width="2"/>
+  </Layer>
+  <!-- RadialGradient with defaults: center=0,0 -->
+  <Layer x="220" y="220">
+    <Rectangle position="30,30" size="50,50" roundness="8"/>
+    <Fill>
+      <RadialGradient center="0,0" radius="50">
+        <ColorStop offset="0" color="#FFFFFF"/>
+        <ColorStop offset="1" color="#8B5CF6"/>
+      </RadialGradient>
+    </Fill>
+  </Layer>
 </pagx>
