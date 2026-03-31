@@ -495,6 +495,60 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
 }
 
 /**
+ * Test case: TextBox with embedded GlyphRun applies inverse matrix correctly.
+ * Verifies that embedded GlyphRun positions (in layout coordinates) are properly
+ * transformed by the inverse matrix when rendered inside a TextBox.
+ */
+PAGX_TEST(PAGXTest, TextBoxEmbeddedGlyphRun) {
+  // Create a document where Text is inside a TextBox (not standalone).
+  // The Text has a non-zero position inside the TextBox, so the inverse matrix is non-trivial.
+  auto doc = pagx::PAGXDocument::Make(300, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->width = 300;
+  layer->height = 100;
+  doc->layers.push_back(layer);
+
+  auto textBox = doc->makeNode<pagx::TextBox>();
+  textBox->width = 300;
+  textBox->height = 100;
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Hello PAGX";
+  text->fontFamily = "NotoSansSC";
+  text->fontSize = 30;
+  textBox->elements.push_back(text);
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solidColor = doc->makeNode<pagx::SolidColor>();
+  solidColor->color = {0.2f, 0.2f, 0.8f, 1.0f};
+  fill->color = solidColor;
+  textBox->elements.push_back(fill);
+  layer->contents.push_back(textBox);
+
+  // Step 1: Layout + embed fonts (writes GlyphRun in layout coordinates with bounds).
+  pagx::FontConfig fontConfig;
+  fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
+  doc->setFontConfig(fontConfig);
+  doc->applyLayout();
+  pagx::FontEmbedder().embed(doc.get());
+
+  // Step 2: Export and reload to simulate loading a precomposed file.
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+  auto pagxPath = SavePAGXFile(xml, "PAGXTest/TextBoxEmbeddedGlyphRun.pagx");
+  auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_TRUE(reloadedDoc != nullptr);
+
+  // Step 3: Render the reloaded document (BuildTextBlob should apply inverse matrix).
+  auto tgfxLayer = pagx::LayerBuilder::Build(reloadedDoc.get());
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, 300, 100);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/TextBoxEmbeddedGlyphRun"));
+}
+
+/**
  * Test case: Font and GlyphRun XML round-trip
  */
 PAGX_TEST(PAGXTest, FontGlyphRoundTrip) {

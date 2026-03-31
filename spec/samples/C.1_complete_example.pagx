@@ -142,7 +142,7 @@
   </Layer>
   <Layer left="400" top="500">
     <Text fontFamily="Arial" fontSize="18">
-      <GlyphRun font="@iconFont" glyphs="1,2,3" y="0" xOffsets="0,28,56"/>
+      <GlyphRun font="@iconFont" glyphs="1,2,3" y="0" xOffsets="0,28,56" bounds="0,0,80,18"/>
     </Text>
     <Fill color="#64748B"/>
   </Layer>
