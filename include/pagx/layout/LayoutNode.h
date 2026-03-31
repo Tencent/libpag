@@ -29,12 +29,36 @@ class LayoutContext;
 
 class LayoutNode {
  public:
-  // Constraint attributes (user input, not modified during layout).
+  /**
+   * Offset in pixels from the left edge of the parent container. NaN means not set.
+   */
   float left = NAN;
+
+  /**
+   * Offset in pixels from the right edge of the parent container. NaN means not set.
+   */
   float right = NAN;
+
+  /**
+   * Offset in pixels from the top edge of the parent container. NaN means not set.
+   */
   float top = NAN;
+
+  /**
+   * Offset in pixels from the bottom edge of the parent container. NaN means not set.
+   */
   float bottom = NAN;
+
+  /**
+   * Horizontal offset in pixels from the center of the parent container. Positive values shift
+   * right. NaN means not set. Takes priority over left/right when set.
+   */
   float centerX = NAN;
+
+  /**
+   * Vertical offset in pixels from the center of the parent container. Positive values shift
+   * down. NaN means not set. Takes priority over top/bottom when set.
+   */
   float centerY = NAN;
 
   virtual ~LayoutNode() = default;
