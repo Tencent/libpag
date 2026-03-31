@@ -471,6 +471,95 @@ CLI_TEST(PAGXHtmlTest, ExportToFile) {
 }
 
 // =============================================================================
+// React JSX output
+// =============================================================================
+
+CLI_TEST(PAGXHtmlTest, ReactJSXOutput) {
+  auto doc =
+      pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/html/root_document.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+
+  pagx::HTMLExportOptions opts = {};
+  opts.framework = pagx::HTMLFramework::React;
+  opts.componentName = "TestComponent";
+  auto jsx = pagx::HTMLExporter::ToHTML(*doc, opts);
+  ASSERT_FALSE(jsx.empty());
+
+  EXPECT_NE(jsx.find("export default function TestComponent()"), std::string::npos)
+      << "React output should have export default function";
+  EXPECT_NE(jsx.find("return ("), std::string::npos) << "React output should have return statement";
+  EXPECT_NE(jsx.find("className=\"pagx-root\""), std::string::npos)
+      << "React output should use className instead of class";
+  EXPECT_NE(jsx.find("style={"), std::string::npos)
+      << "React output should have style object syntax";
+  EXPECT_EQ(jsx.find("class=\""), std::string::npos)
+      << "React output should not have class attribute";
+  EXPECT_EQ(jsx.find("style=\""), std::string::npos)
+      << "React output should not have style string attribute";
+
+  SaveFile(jsx, "PAGXHtmlTest/react_output.jsx");
+}
+
+CLI_TEST(PAGXHtmlTest, ReactJSXStyleConversion) {
+  auto doc = pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/html/layer_alpha.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+
+  pagx::HTMLExportOptions opts = {};
+  opts.framework = pagx::HTMLFramework::React;
+  auto jsx = pagx::HTMLExporter::ToHTML(*doc, opts);
+  ASSERT_FALSE(jsx.empty());
+
+  EXPECT_NE(jsx.find("opacity: 0.3"), std::string::npos)
+      << "Numeric values should not be quoted in React style object";
+
+  SaveFile(jsx, "PAGXHtmlTest/react_style_conversion.jsx");
+}
+
+// =============================================================================
+// Vue SFC output
+// =============================================================================
+
+CLI_TEST(PAGXHtmlTest, VueSFCOutput) {
+  auto doc =
+      pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/html/root_document.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+
+  pagx::HTMLExportOptions opts = {};
+  opts.framework = pagx::HTMLFramework::Vue;
+  auto vue = pagx::HTMLExporter::ToHTML(*doc, opts);
+  ASSERT_FALSE(vue.empty());
+
+  EXPECT_NE(vue.find("<template>"), std::string::npos) << "Vue output should have <template> tag";
+  EXPECT_NE(vue.find("</template>"), std::string::npos)
+      << "Vue output should have closing </template> tag";
+  EXPECT_NE(vue.find("<script setup>"), std::string::npos)
+      << "Vue output should have <script setup> tag";
+  EXPECT_NE(vue.find("class=\"pagx-root\""), std::string::npos)
+      << "Vue output should keep class attribute";
+  EXPECT_NE(vue.find(":style=\"{"), std::string::npos)
+      << "Vue output should have :style binding syntax";
+  EXPECT_EQ(vue.find(" style=\""), std::string::npos)
+      << "Vue output should not have static style attribute";
+
+  SaveFile(vue, "PAGXHtmlTest/vue_output.vue");
+}
+
+CLI_TEST(PAGXHtmlTest, VueSFCStyleConversion) {
+  auto doc = pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/html/layer_alpha.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+
+  pagx::HTMLExportOptions opts = {};
+  opts.framework = pagx::HTMLFramework::Vue;
+  auto vue = pagx::HTMLExporter::ToHTML(*doc, opts);
+  ASSERT_FALSE(vue.empty());
+
+  EXPECT_NE(vue.find("opacity: 0.3"), std::string::npos)
+      << "Numeric values should not be quoted in Vue style object";
+
+  SaveFile(vue, "PAGXHtmlTest/vue_style_conversion.vue");
+}
+
+// =============================================================================
 // Screenshot comparison: HTML rendering vs PAGX native rendering
 // =============================================================================
 

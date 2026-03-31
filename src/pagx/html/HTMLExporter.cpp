@@ -22,6 +22,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <numeric>
 #include <random>
 #include <string>
@@ -4629,6 +4630,12 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
 // Main export function
 //==============================================================================
 
+// Forward declarations for serializers (implementations below)
+static std::string SerializeToReactJSX(const std::string& nativeHTML,
+                                       const HTMLExportOptions& options);
+static std::string SerializeToVueSFC(const std::string& nativeHTML,
+                                     const HTMLExportOptions& options);
+
 std::string HTMLExporter::ToHTML(const PAGXDocument& doc, const Options& options) {
   HTMLBuilder html(options.indent);
   HTMLBuilder defs(options.indent, 2);
@@ -4668,7 +4675,18 @@ std::string HTMLExporter::ToHTML(const PAGXDocument& doc, const Options& options
   html.addRawContent(body.release());
   html.closeTag();  // </div>
 
-  return html.release();
+  std::string nativeHTML = html.release();
+
+  // Apply framework-specific transformation
+  switch (options.framework) {
+    case HTMLFramework::React:
+      return SerializeToReactJSX(nativeHTML, options);
+    case HTMLFramework::Vue:
+      return SerializeToVueSFC(nativeHTML, options);
+    case HTMLFramework::Native:
+    default:
+      return nativeHTML;
+  }
 }
 
 bool HTMLExporter::ToFile(const PAGXDocument& document, const std::string& filePath,
@@ -4691,6 +4709,354 @@ bool HTMLExporter::ToFile(const PAGXDocument& document, const std::string& fileP
   }
   file.write(html.data(), static_cast<std::streamsize>(html.size()));
   return file.good();
+}
+
+//==============================================================================
+// Framework Serializers
+//==============================================================================
+
+static std::string KebabToCamelCase(const std::string& kebab) {
+  std::string result;
+  result.reserve(kebab.size());
+  bool capitalizeNext = false;
+  bool isVendorPrefix = !kebab.empty() && kebab[0] == '-';
+
+  for (size_t i = 0; i < kebab.size(); i++) {
+    char c = kebab[i];
+    if (c == '-') {
+      capitalizeNext = true;
+      continue;
+    }
+    if (capitalizeNext) {
+      result += static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+      capitalizeNext = false;
+    } else {
+      result += c;
+    }
+  }
+
+  if (isVendorPrefix && !result.empty()) {
+    result[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(result[0])));
+  }
+
+  return result;
+}
+
+static bool IsNumericValue(const std::string& value) {
+  if (value.empty()) {
+    return false;
+  }
+  size_t i = 0;
+  bool hasDot = false;
+  bool hasDigit = false;
+
+  if (value[i] == '-' || value[i] == '+') {
+    i++;
+  }
+
+  while (i < value.size()) {
+    char c = value[i];
+    if (c >= '0' && c <= '9') {
+      hasDigit = true;
+      i++;
+    } else if (c == '.' && !hasDot) {
+      hasDot = true;
+      i++;
+    } else {
+      return false;
+    }
+  }
+  return hasDigit;
+}
+
+static std::string StyleStringToJSXObject(const std::string& styleStr) {
+  if (styleStr.empty()) {
+    return "{}";
+  }
+
+  std::string result = "{";
+  size_t pos = 0;
+  bool first = true;
+
+  while (pos < styleStr.size()) {
+    size_t semicolonPos = styleStr.find(';', pos);
+    if (semicolonPos == std::string::npos) {
+      semicolonPos = styleStr.size();
+    }
+
+    std::string pair = styleStr.substr(pos, semicolonPos - pos);
+    pos = semicolonPos + 1;
+
+    if (pair.empty()) {
+      continue;
+    }
+
+    auto colonPos = pair.find(':');
+    if (colonPos == std::string::npos) {
+      continue;
+    }
+
+    std::string key = pair.substr(0, colonPos);
+    std::string value = pair.substr(colonPos + 1);
+
+    while (!key.empty() && key[0] == ' ') {
+      key = key.substr(1);
+    }
+    while (!key.empty() && key.back() == ' ') {
+      key.pop_back();
+    }
+    while (!value.empty() && value[0] == ' ') {
+      value = value.substr(1);
+    }
+    while (!value.empty() && value.back() == ' ') {
+      value.pop_back();
+    }
+
+    if (key.empty()) {
+      continue;
+    }
+
+    if (!first) {
+      result += ", ";
+    }
+    first = false;
+
+    std::string camelKey = KebabToCamelCase(key);
+    result += camelKey + ": ";
+
+    if (IsNumericValue(value)) {
+      result += value;
+    } else {
+      result += "\"" + value + "\"";
+    }
+  }
+
+  result += "}";
+  return result;
+}
+
+static std::string StyleStringToVueObject(const std::string& styleStr) {
+  if (styleStr.empty()) {
+    return "{}";
+  }
+
+  std::string result = "{";
+  size_t pos = 0;
+  bool first = true;
+
+  while (pos < styleStr.size()) {
+    size_t semicolonPos = styleStr.find(';', pos);
+    if (semicolonPos == std::string::npos) {
+      semicolonPos = styleStr.size();
+    }
+
+    std::string pair = styleStr.substr(pos, semicolonPos - pos);
+    pos = semicolonPos + 1;
+
+    if (pair.empty()) {
+      continue;
+    }
+
+    auto colonPos = pair.find(':');
+    if (colonPos == std::string::npos) {
+      continue;
+    }
+
+    std::string key = pair.substr(0, colonPos);
+    std::string value = pair.substr(colonPos + 1);
+
+    while (!key.empty() && key[0] == ' ') {
+      key = key.substr(1);
+    }
+    while (!key.empty() && key.back() == ' ') {
+      key.pop_back();
+    }
+    while (!value.empty() && value[0] == ' ') {
+      value = value.substr(1);
+    }
+    while (!value.empty() && value.back() == ' ') {
+      value.pop_back();
+    }
+
+    if (key.empty()) {
+      continue;
+    }
+
+    if (!first) {
+      result += ", ";
+    }
+    first = false;
+
+    std::string camelKey = KebabToCamelCase(key);
+    result += camelKey + ": ";
+
+    if (IsNumericValue(value)) {
+      result += value;
+    } else {
+      result += "'" + value + "'";
+    }
+  }
+
+  result += "}";
+  return result;
+}
+
+static std::string TransformStyleAttributes(const std::string& html, bool useDoubleQuotes) {
+  std::string result;
+  result.reserve(html.size() * 2);
+  size_t pos = 0;
+
+  while (pos < html.size()) {
+    size_t stylePos = html.find("style=\"", pos);
+    if (stylePos == std::string::npos) {
+      result += html.substr(pos);
+      break;
+    }
+
+    result += html.substr(pos, stylePos - pos);
+
+    size_t valueStart = stylePos + 7;
+    size_t valueEnd = html.find('"', valueStart);
+    if (valueEnd == std::string::npos) {
+      result += html.substr(stylePos);
+      break;
+    }
+
+    std::string styleValue = html.substr(valueStart, valueEnd - valueStart);
+    std::string styleObj =
+        useDoubleQuotes ? StyleStringToJSXObject(styleValue) : StyleStringToVueObject(styleValue);
+
+    if (useDoubleQuotes) {
+      result += "style={" + styleObj + "}";
+    } else {
+      result += ":style=\"" + styleObj + "\"";
+    }
+
+    pos = valueEnd + 1;
+  }
+
+  return result;
+}
+
+static std::string ReplaceClassWithClassName(const std::string& html) {
+  std::string result;
+  result.reserve(html.size());
+  size_t pos = 0;
+
+  while (pos < html.size()) {
+    size_t classPos = html.find("class=\"", pos);
+    if (classPos == std::string::npos) {
+      result += html.substr(pos);
+      break;
+    }
+
+    if (classPos > 0) {
+      char prevChar = html[classPos - 1];
+      if (prevChar != ' ' && prevChar != '\n' && prevChar != '\t' && prevChar != '<') {
+        result += html.substr(pos, classPos - pos + 6);
+        pos = classPos + 6;
+        continue;
+      }
+    }
+
+    result += html.substr(pos, classPos - pos);
+    result += "className=\"";
+    pos = classPos + 7;
+  }
+
+  return result;
+}
+
+static std::string ReplaceHTMLComments(const std::string& html) {
+  std::string result;
+  result.reserve(html.size());
+  size_t pos = 0;
+
+  while (pos < html.size()) {
+    size_t commentStart = html.find("<!--", pos);
+    if (commentStart == std::string::npos) {
+      result += html.substr(pos);
+      break;
+    }
+
+    result += html.substr(pos, commentStart - pos);
+
+    size_t commentEnd = html.find("-->", commentStart);
+    if (commentEnd == std::string::npos) {
+      result += html.substr(commentStart);
+      break;
+    }
+
+    std::string commentContent = html.substr(commentStart + 4, commentEnd - commentStart - 4);
+    result += "{/*" + commentContent + "*/}";
+    pos = commentEnd + 3;
+  }
+
+  return result;
+}
+
+static std::string SerializeToReactJSX(const std::string& nativeHTML,
+                                       const HTMLExportOptions& options) {
+  std::string jsx = nativeHTML;
+
+  jsx = ReplaceClassWithClassName(jsx);
+  jsx = ReplaceHTMLComments(jsx);
+  jsx = TransformStyleAttributes(jsx, true);
+
+  std::string indentStr(static_cast<size_t>(options.indent * 2), ' ');
+  std::string singleIndent(static_cast<size_t>(options.indent), ' ');
+
+  std::string result;
+  result.reserve(jsx.size() + 200);
+  result += "export default function " + options.componentName + "() {\n";
+  result += singleIndent + "return (\n";
+
+  size_t lineStart = 0;
+  while (lineStart < jsx.size()) {
+    size_t lineEnd = jsx.find('\n', lineStart);
+    if (lineEnd == std::string::npos) {
+      lineEnd = jsx.size();
+    }
+
+    std::string line = jsx.substr(lineStart, lineEnd - lineStart);
+    result += indentStr + line + "\n";
+    lineStart = lineEnd + 1;
+  }
+
+  result += singleIndent + ");\n";
+  result += "}\n";
+
+  return result;
+}
+
+static std::string SerializeToVueSFC(const std::string& nativeHTML,
+                                     const HTMLExportOptions& options) {
+  std::string vue = TransformStyleAttributes(nativeHTML, false);
+
+  std::string singleIndent(static_cast<size_t>(options.indent), ' ');
+
+  std::string result;
+  result.reserve(vue.size() + 200);
+  result += "<template>\n";
+
+  size_t lineStart = 0;
+  while (lineStart < vue.size()) {
+    size_t lineEnd = vue.find('\n', lineStart);
+    if (lineEnd == std::string::npos) {
+      lineEnd = vue.size();
+    }
+
+    std::string line = vue.substr(lineStart, lineEnd - lineStart);
+    result += singleIndent + line + "\n";
+    lineStart = lineEnd + 1;
+  }
+
+  result += "</template>\n\n";
+  result += "<script setup>\n";
+  result += "// Generated by PAGX HTMLExporter\n";
+  result += "</script>\n";
+
+  return result;
 }
 
 }  // namespace pagx

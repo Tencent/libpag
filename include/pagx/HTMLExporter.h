@@ -24,6 +24,15 @@
 namespace pagx {
 
 /**
+ * Output framework for HTML export.
+ */
+enum class HTMLFramework {
+  Native,  // Standard HTML output
+  React,   // React JSX output
+  Vue,     // Vue 3 SFC output
+};
+
+/**
  * Export options for HTMLExporter.
  */
 struct HTMLExportOptions {
@@ -31,6 +40,17 @@ struct HTMLExportOptions {
    * Indentation spaces for the output HTML. The default value is 2.
    */
   int indent = 2;
+
+  /**
+   * Output framework format. The default is Native HTML.
+   */
+  HTMLFramework framework = HTMLFramework::Native;
+
+  /**
+   * Component name for React/Vue output. The default is "PagxComponent".
+   * This option is only used when framework is React or Vue.
+   */
+  std::string componentName = "PagxComponent";
 };
 
 /**
