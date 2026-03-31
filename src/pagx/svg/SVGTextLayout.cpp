@@ -151,7 +151,8 @@ std::vector<SVGTextLine> BreakTextIntoLines(const std::vector<SVGCharInfo>& char
 
 std::string ExtractLineText(const std::string& fullText, const std::vector<SVGCharInfo>& chars,
                             const SVGTextLine& line) {
-  if (line.charCount == 0) {
+  if (line.charCount == 0 || line.charStart >= chars.size() ||
+      line.charStart + line.charCount > chars.size()) {
     return "";
   }
   size_t byteStart = chars[line.charStart].byteOffset;
