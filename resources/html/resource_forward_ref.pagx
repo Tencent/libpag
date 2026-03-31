@@ -1,12 +1,90 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: Forward resource reference (resource used before defined); two-pass parsing required -->
-<pagx version="1.0" width="200" height="200">
-  <!-- Use a resource before it's defined -->
+<!-- Tests: Forward resource reference (resource used before defined); two-pass parsing required.
+     Resources are referenced by layers that appear before the Resources block in document order. -->
+<pagx version="1.0" width="300" height="240">
+  <!-- Background using a forward-referenced gradient (defined below in Resources) -->
   <Layer>
-    <Rectangle position="100,100" size="150,150" roundness="16"/>
-    <Fill color="@forwardColor"/>
+    <Rectangle position="150,120" size="300,240"/>
+    <Fill color="@bgGrad"/>
   </Layer>
+
+  <!-- Title using forward-referenced solid color -->
+  <Layer>
+    <Text text="Forward Reference" fontFamily="Arial" fontStyle="Bold" fontSize="18" position="150,30" textAnchor="center"/>
+    <Fill color="@titleColor"/>
+  </Layer>
+
+  <!-- Subtitle -->
+  <Layer>
+    <Text text="Resources defined after usage" fontFamily="Arial" fontSize="10" position="150,50" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card 1: uses forward-referenced color -->
+  <Layer>
+    <Rectangle position="80,115" size="120,100" roundness="12"/>
+    <Fill color="@cardPurple"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#8B5CF630"/>
+  </Layer>
+  <Layer>
+    <Ellipse position="80,100" size="30,30"/>
+    <Fill color="#FFFFFF30"/>
+  </Layer>
+  <Layer>
+    <Text text="Color" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="80,127" textAnchor="center"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  <Layer>
+    <Text text="@cardPurple" fontFamily="Arial" fontSize="9" position="80,143" textAnchor="center"/>
+    <Fill color="#FFFFFFAA"/>
+  </Layer>
+
+  <!-- Card 2: uses forward-referenced gradient -->
+  <Layer>
+    <Rectangle position="220,115" size="120,100" roundness="12"/>
+    <Fill color="@cardGrad"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#3B82F630"/>
+  </Layer>
+  <Layer>
+    <Polystar position="220,100" type="star" pointCount="5" outerRadius="15" innerRadius="7" rotation="-90"/>
+    <Fill color="#FFFFFF30"/>
+  </Layer>
+  <Layer>
+    <Text text="Gradient" fontFamily="Arial" fontStyle="Bold" fontSize="12" position="220,127" textAnchor="center"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  <Layer>
+    <Text text="@cardGrad" fontFamily="Arial" fontSize="9" position="220,143" textAnchor="center"/>
+    <Fill color="#FFFFFFAA"/>
+  </Layer>
+
+  <!-- Footer -->
+  <Layer>
+    <Path data="M 30,190 L 270,190"/>
+    <Stroke color="#E2E8F0" width="1"/>
+  </Layer>
+  <Layer>
+    <Text text="All @id references resolve to Resources block below" fontFamily="Arial" fontSize="9" position="150,208" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Arrow pointing down to Resources -->
+  <Layer>
+    <Path data="M 150,216 L 150,228 M 146,224 L 150,228 L 154,224"/>
+    <Stroke color="#94A3B8" width="1" cap="round" join="round"/>
+  </Layer>
+
+  <!-- Resources defined AFTER all usage — tests forward reference resolution -->
   <Resources>
-    <SolidColor id="forwardColor" color="#8B5CF6"/>
+    <SolidColor id="titleColor" color="#1E293B"/>
+    <SolidColor id="cardPurple" color="#8B5CF6"/>
+    <LinearGradient id="cardGrad" startPoint="0,0" endPoint="120,100">
+      <ColorStop offset="0" color="#3B82F6"/>
+      <ColorStop offset="1" color="#10B981"/>
+    </LinearGradient>
+    <LinearGradient id="bgGrad" startPoint="0,0" endPoint="300,240">
+      <ColorStop offset="0" color="#F8FAFC"/>
+      <ColorStop offset="1" color="#EFF6FF"/>
+    </LinearGradient>
   </Resources>
 </pagx>

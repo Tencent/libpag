@@ -1,8 +1,72 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: root <pagx> element → div.pagx-root with width/height/overflow:hidden -->
-<pagx version="1.0" width="200" height="150">
+<!-- Tests: root <pagx> element → div.pagx-root with width/height/overflow:hidden;
+     demonstrates canvas dimensions, clipping at boundaries, and basic layer rendering -->
+<pagx version="1.0" width="300" height="200">
+  <Resources>
+    <LinearGradient id="bgGrad" startPoint="0,0" endPoint="300,200">
+      <ColorStop offset="0" color="#EFF6FF"/>
+      <ColorStop offset="1" color="#DBEAFE"/>
+    </LinearGradient>
+  </Resources>
+
+  <!-- Background with subtle gradient -->
   <Layer>
-    <Rectangle position="100,75" size="180,130" roundness="16"/>
+    <Rectangle position="150,100" size="300,200"/>
+    <Fill color="@bgGrad"/>
+  </Layer>
+
+  <!-- Decorative corner accent top-left -->
+  <Layer alpha="0.15">
+    <Ellipse position="0,0" size="120,120"/>
     <Fill color="#3B82F6"/>
+  </Layer>
+
+  <!-- Decorative corner accent bottom-right -->
+  <Layer alpha="0.1">
+    <Ellipse position="300,200" size="100,100"/>
+    <Fill color="#8B5CF6"/>
+  </Layer>
+
+  <!-- Main card -->
+  <Layer>
+    <Rectangle position="150,95" size="240,120" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Hello, PAGX!" fontFamily="Arial" fontStyle="Bold" fontSize="24" position="150,80" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+
+  <!-- Subtitle -->
+  <Layer>
+    <Text text="Root Document Test" fontFamily="Arial" fontSize="12" position="150,105" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- Canvas size indicator -->
+  <Layer>
+    <Text text="Canvas: 300 x 200" fontFamily="Arial" fontSize="10" position="150,128" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Border to show canvas edge -->
+  <Layer>
+    <Rectangle position="150,100" size="298,198" roundness="0"/>
+    <Stroke color="#CBD5E1" width="1" dashes="4,4"/>
+  </Layer>
+
+  <!-- Clipping test: element intentionally extends beyond canvas -->
+  <Layer>
+    <Rectangle position="290,190" size="60,60" roundness="8"/>
+    <Fill color="#F59E0B40"/>
+  </Layer>
+
+  <!-- Footer -->
+  <Layer>
+    <Text text="Content beyond canvas edges is clipped" fontFamily="Arial" fontSize="9" position="150,175" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
   </Layer>
 </pagx>

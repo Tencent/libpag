@@ -91,8 +91,8 @@ CLI_TEST(PAGXHtmlTest, RootDocument) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/root_document.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("pagx-root"), std::string::npos);
-  EXPECT_NE(html.find("width:200px"), std::string::npos);
-  EXPECT_NE(html.find("height:150px"), std::string::npos);
+  EXPECT_NE(html.find("width:300px"), std::string::npos);
+  EXPECT_NE(html.find("height:200px"), std::string::npos);
   EXPECT_NE(html.find("overflow:hidden"), std::string::npos);
   EXPECT_NE(html.find("position:relative"), std::string::npos);
   EXPECT_NE(html.find("data-pagx-version"), std::string::npos);
@@ -118,8 +118,8 @@ CLI_TEST(PAGXHtmlTest, LayerAlpha) {
 CLI_TEST(PAGXHtmlTest, LayerTransformXY) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/layer_transform_xy.pagx"));
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("translate(30px,20px)"), std::string::npos);
-  EXPECT_NE(html.find("translate(80px,80px)"), std::string::npos);
+  EXPECT_NE(html.find("translate(30px,50px)"), std::string::npos);
+  EXPECT_NE(html.find("translate(120px,50px)"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, LayerTransformMatrix) {

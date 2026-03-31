@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Integration showcase — infographic combining TextBox with paragraphAlign/textAlign,
+     TextPath along curved banner, rich text (multi-color Text in one TextBox), Composition reuse,
+     MergePath union, ImagePattern fill, Mask with gradient fade, InnerShadowStyle,
+     Fill placement="foreground" -->
+<pagx version="1.0" width="400" height="500">
+  <Resources>
+    <!-- Inline tiny pattern image (4x4 checkerboard as data URI) -->
+    <Image id="patternImg" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAEklEQVQIW2P4z8DwHwyBAgMALaYE/aDpKzYAAAAASUVORK5CYII="/>
+    <ImagePattern id="checkerPattern" image="@patternImg" tileModeX="repeat" tileModeY="repeat" matrix="3,0,0,3,0,0"/>
+
+    <!-- Banner curve path -->
+    <PathData id="bannerCurve" data="M 50,60 Q 200,20 350,60"/>
+
+    <!-- Reusable icon composition: circle with checkmark -->
+    <Composition id="checkIcon" width="24" height="24">
+      <Layer>
+        <Ellipse position="12,12" size="24,24"/>
+        <Fill color="#4ECDC4"/>
+      </Layer>
+      <Layer>
+        <Path data="M 7,12 L 10,16 L 17,8"/>
+        <Stroke color="#FFFFFF" width="2" cap="round" join="round"/>
+      </Layer>
+    </Composition>
+
+    <!-- Alpha mask gradient for fade effect -->
+    <LinearGradient id="fadeMask" startPoint="0,400" endPoint="0,500">
+      <ColorStop offset="0" color="#FFFFFF"/>
+      <ColorStop offset="1" color="#FFFFFF00"/>
+    </LinearGradient>
+
+    <!-- Section background gradients -->
+    <LinearGradient id="headerGrad" startPoint="0,0" endPoint="400,0">
+      <ColorStop offset="0" color="#2C3E50"/>
+      <ColorStop offset="1" color="#34495E"/>
+    </LinearGradient>
+    <LinearGradient id="coralGrad" startPoint="0,0" endPoint="0,80">
+      <ColorStop offset="0" color="#FF6B6B"/>
+      <ColorStop offset="1" color="#EE5A24"/>
+    </LinearGradient>
+  </Resources>
+
+  <!-- Background -->
+  <Layer>
+    <Rectangle position="200,250" size="400,500"/>
+    <Fill color="#F8F9FA"/>
+  </Layer>
+
+  <!-- Header bar -->
+  <Layer>
+    <Rectangle position="200,40" size="400,80"/>
+    <Fill color="@headerGrad"/>
+  </Layer>
+
+  <!-- TextPath: curved banner title -->
+  <Layer>
+    <Text text="FEATURE SHOWCASE" fontFamily="Arial" fontStyle="Bold" fontSize="18" position="0,0" textAnchor="center"/>
+    <TextPath path="@bannerCurve" baselineOrigin="0,0" perpendicular="true" forceAlignment="true"/>
+    <Fill color="#FFE66D"/>
+  </Layer>
+
+  <!-- Subtitle in header -->
+  <Layer>
+    <Text text="Everything you need to know" fontFamily="Arial" fontSize="11" position="200,72" textAnchor="center"/>
+    <Fill color="#BDC3C7"/>
+  </Layer>
+
+  <!-- Section 1: Pattern-filled decorative strip -->
+  <Layer>
+    <Rectangle position="200,95" size="360,6" roundness="3"/>
+    <Fill color="@checkerPattern"/>
+  </Layer>
+
+  <!-- Section 2: Rich text block with TextBox and multi-color fills -->
+  <Layer>
+    <Group>
+      <Text text="Modern " fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
+      <Fill color="#FF6B6B"/>
+    </Group>
+    <Group>
+      <Text text="Infographic " fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
+      <Fill color="#4ECDC4"/>
+    </Group>
+    <Group>
+      <Text text="Design" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
+      <Fill color="#FFE66D"/>
+    </Group>
+    <TextBox position="20,108" size="360,30" textAlign="center"/>
+  </Layer>
+
+  <!-- Section description with paragraphAlign -->
+  <Layer>
+    <Text text="Combining multiple PAGX features into a cohesive visual layout with rich typography and icons." fontFamily="Arial" fontSize="11" position="0,0"/>
+    <TextBox position="40,145" size="320,40" textAlign="center" paragraphAlign="near" lineHeight="16"/>
+    <Fill color="#7F8C8D"/>
+  </Layer>
+
+  <!-- Feature row 1 with composition icon instance -->
+  <Layer>
+    <Rectangle position="200,210" size="340,50" roundness="10"/>
+    <Fill color="#FFFFFF"/>
+    <InnerShadowStyle offsetX="0" offsetY="2" blurX="6" blurY="6" color="#00000010"/>
+  </Layer>
+  <Layer composition="@checkIcon" x="48" y="196"/>
+  <Layer>
+    <Text text="Vector Graphics" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="80,207"/>
+    <Fill color="#2C3E50"/>
+  </Layer>
+  <Layer>
+    <Text text="Shapes, paths, gradients, and patterns" fontFamily="Arial" fontSize="10" position="80,223"/>
+    <Fill color="#95A5A6"/>
+  </Layer>
+
+  <!-- Feature row 2 with composition icon instance -->
+  <Layer>
+    <Rectangle position="200,270" size="340,50" roundness="10"/>
+    <Fill color="#FFFFFF"/>
+    <InnerShadowStyle offsetX="0" offsetY="2" blurX="6" blurY="6" color="#00000010"/>
+  </Layer>
+  <Layer composition="@checkIcon" x="48" y="256"/>
+  <Layer>
+    <Text text="Text Layout" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="80,267"/>
+    <Fill color="#2C3E50"/>
+  </Layer>
+  <Layer>
+    <Text text="Rich text, text path, and text boxes" fontFamily="Arial" fontSize="10" position="80,283"/>
+    <Fill color="#95A5A6"/>
+  </Layer>
+
+  <!-- Feature row 3 with composition icon instance -->
+  <Layer>
+    <Rectangle position="200,330" size="340,50" roundness="10"/>
+    <Fill color="#FFFFFF"/>
+    <InnerShadowStyle offsetX="0" offsetY="2" blurX="6" blurY="6" color="#00000010"/>
+  </Layer>
+  <Layer composition="@checkIcon" x="48" y="316"/>
+  <Layer>
+    <Text text="Visual Effects" fontFamily="Arial" fontStyle="Bold" fontSize="13" position="80,327"/>
+    <Fill color="#2C3E50"/>
+  </Layer>
+  <Layer>
+    <Text text="Shadows, masks, blurs, and blend modes" fontFamily="Arial" fontSize="10" position="80,343"/>
+    <Fill color="#95A5A6"/>
+  </Layer>
+
+  <!-- MergePath union: combined icon shape (plus sign from two rectangles) -->
+  <Layer x="340" y="197">
+    <Rectangle position="0,0" size="16,6"/>
+    <Rectangle position="0,0" size="6,16"/>
+    <MergePath mode="union"/>
+    <RoundCorner radius="2"/>
+    <Fill color="#FF6B6B"/>
+  </Layer>
+  <Layer x="340" y="257">
+    <Rectangle position="0,0" size="16,6"/>
+    <Rectangle position="0,0" size="6,16"/>
+    <MergePath mode="union"/>
+    <RoundCorner radius="2"/>
+    <Fill color="#4ECDC4"/>
+  </Layer>
+  <Layer x="340" y="317">
+    <Rectangle position="0,0" size="16,6"/>
+    <Rectangle position="0,0" size="6,16"/>
+    <MergePath mode="union"/>
+    <RoundCorner radius="2"/>
+    <Fill color="#FFE66D"/>
+  </Layer>
+
+  <!-- Bottom section with foreground fill overlay -->
+  <Layer>
+    <Rectangle position="200,410" size="340,60" roundness="12"/>
+    <Fill color="@coralGrad"/>
+    <!-- Foreground pattern overlay on top of child layers -->
+    <Fill color="#FFFFFF08" placement="foreground"/>
+  </Layer>
+  <Layer>
+    <Text text="Get Started Today" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="200,407" textAnchor="center"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  <Layer>
+    <Text text="Build amazing visuals with PAGX" fontFamily="Arial" fontSize="11" position="200,427" textAnchor="center"/>
+    <Fill color="#FFFFFFCC"/>
+  </Layer>
+
+  <!-- Fade mask at bottom edge -->
+  <Layer id="fadeMaskLayer">
+    <Rectangle position="200,480" size="400,40"/>
+    <Fill color="@fadeMask"/>
+  </Layer>
+  <Layer mask="@fadeMaskLayer">
+    <Rectangle position="200,480" size="400,40"/>
+    <Fill color="#F8F9FA"/>
+  </Layer>
+
+  <!-- Footer text -->
+  <Layer>
+    <Text text="PAGX v1.0" fontFamily="Arial" fontSize="9" position="200,492" textAnchor="center"/>
+    <Fill color="#BDC3C7"/>
+  </Layer>
+</pagx>

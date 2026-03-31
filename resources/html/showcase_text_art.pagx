@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Integration showcase — text-focused art combining TextModifier with anchor/skew/rotation/scale/fillColor,
+     TextPath along circle, fauxBold/fauxItalic, TextBox writingMode="vertical", GlyphRun with per-glyph transforms,
+     Stroke on text, RadialGradient fill on text, multiple RangeSelector, letterSpacing -->
+<pagx version="1.0" width="400" height="300">
+  <Resources>
+    <!-- Circle path for TextPath -->
+    <PathData id="circlePath" data="M 200,130 A 70,70 0 1,1 199.99,130"/>
+
+    <!-- Radial gradient for large display text -->
+    <RadialGradient id="textRadial" center="200,200" radius="180">
+      <ColorStop offset="0" color="#FF6B6B"/>
+      <ColorStop offset="0.5" color="#C084FC"/>
+      <ColorStop offset="1" color="#3B82F6"/>
+    </RadialGradient>
+
+    <!-- Background gradient -->
+    <LinearGradient id="bgGrad" startPoint="0,0" endPoint="400,300">
+      <ColorStop offset="0" color="#0F172A"/>
+      <ColorStop offset="1" color="#1E1040"/>
+    </LinearGradient>
+
+    <!-- Embedded minimal font for GlyphRun demo -->
+    <Font id="demoFont" unitsPerEm="100">
+      <!-- A -->
+      <Glyph advance="70" path="M 10 80 L 35 10 L 60 80 M 20 55 L 50 55"/>
+      <!-- B -->
+      <Glyph advance="65" path="M 15 10 L 15 80 L 40 80 C 60 80 60 50 40 48 L 15 48 M 15 10 L 38 10 C 55 10 55 48 38 48"/>
+      <!-- C -->
+      <Glyph advance="65" path="M 55 20 C 40 5 15 10 15 45 C 15 80 40 85 55 70"/>
+    </Font>
+  </Resources>
+
+  <!-- Background -->
+  <Layer>
+    <Rectangle position="200,150" size="400,300"/>
+    <Fill color="@bgGrad"/>
+  </Layer>
+
+  <!-- Decorative grid dots -->
+  <Layer alpha="0.1">
+    <Ellipse position="40,40" size="4,4"/>
+    <Repeater copies="5" offset="0" position="80,0" rotation="0"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  <Layer alpha="0.1">
+    <Ellipse position="40,120" size="4,4"/>
+    <Repeater copies="5" offset="0" position="80,0" rotation="0"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  <Layer alpha="0.1">
+    <Ellipse position="40,200" size="4,4"/>
+    <Repeater copies="5" offset="0" position="80,0" rotation="0"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+
+  <!-- Large display text "TYPE" with gradient fill and text outline -->
+  <Layer>
+    <Text text="TYPE" fontFamily="Arial" fontStyle="Bold" fontSize="72" position="200,220" textAnchor="center" letterSpacing="8"/>
+    <Fill color="@textRadial"/>
+    <Stroke color="#FFFFFF30" width="2"/>
+  </Layer>
+
+  <!-- TextPath: text along circle -->
+  <Layer>
+    <Text text="CREATIVE TYPOGRAPHY POSTER" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="0,0" letterSpacing="3"/>
+    <TextPath path="@circlePath" baselineOrigin="0,0" perpendicular="true" forceAlignment="true"/>
+    <Fill color="#C084FC"/>
+  </Layer>
+
+  <!-- TextModifier demo: wave text with skew and multi-selector -->
+  <Layer>
+    <Text text="DESIGN" fontFamily="Arial" fontStyle="Bold" fontSize="24" position="200,270" textAnchor="center"/>
+    <TextModifier position="0,-4" skew="15" rotation="5" fillColor="#FFE66D">
+      <RangeSelector start="0" end="1" shape="triangle" weight="1"/>
+      <RangeSelector start="0.3" end="0.7" shape="smooth" mode="add" weight="0.5"/>
+    </TextModifier>
+    <Fill color="#FF6B6B"/>
+  </Layer>
+
+  <!-- Vertical text on the right side -->
+  <Layer>
+    <Text text="ART" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+    <TextBox position="360,60" size="30,120" writingMode="vertical" textAlign="center" paragraphAlign="middle"/>
+    <Fill color="#4ECDC4"/>
+  </Layer>
+
+  <!-- FauxBold + FauxItalic text -->
+  <Layer>
+    <Text text="Bold" fontFamily="Arial" fontSize="14" position="30,282" fauxBold="true"/>
+    <Fill color="#F59E0B"/>
+  </Layer>
+  <Layer>
+    <Text text="Italic" fontFamily="Arial" fontSize="14" position="84,282" fauxItalic="true"/>
+    <Fill color="#10B981"/>
+  </Layer>
+
+  <!-- GlyphRun demo: "ABC" with per-glyph rotation and scale -->
+  <Layer>
+    <Text text="ABC" fontFamily="Arial" fontSize="28">
+      <GlyphRun font="@demoFont" fontSize="28" glyphs="1,2,3"
+                 xOffsets="0,25,50"
+                 rotations="10,-5,15"
+                 scales="1.2,1.2;0.9,0.9;1.1,1.1"
+                 x="24" y="40"/>
+    </Text>
+    <Fill color="#E879F9"/>
+    <Stroke color="#FFFFFF20" width="1"/>
+  </Layer>
+
+  <!-- TextModifier with scale and anchor offset -->
+  <Layer>
+    <Text text="SCALE" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="316,282" textAnchor="center" letterSpacing="2"/>
+    <TextModifier anchor="0,8" scale="1.3,1.3">
+      <RangeSelector start="0" end="1" shape="rampUp"/>
+    </TextModifier>
+    <Fill color="#3B82F6"/>
+  </Layer>
+
+  <!-- Small decorative accent line -->
+  <Layer>
+    <Path data="M 30,295 L 370,295"/>
+    <Stroke color="#FFFFFF15" width="1"/>
+  </Layer>
+</pagx>
