@@ -258,7 +258,7 @@ A card with vertical container layout, text header, and action buttons.
 
 ```xml
 <pagx version="1.0" width="324" height="184">
-  <Layer centerX="0" centerY="0" width="300" height="160" layout="vertical" padding="16" gap="12">
+  <Layer centerX="0" centerY="0" width="300" height="160" layout="vertical" padding="16">
     <!-- Background: VectorElements don't participate in layout -->
     <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
     <Fill color="#FFF"/>
@@ -734,8 +734,8 @@ Badges often combine Polystar with gradients and layer styles for depth.
 
 ```xml
 <pagx version="1.0" width="200" height="200">
-  <Layer centerX="0" centerY="0">
-    <Polystar pointCount="5" outerRadius="80" innerRadius="35"/>
+  <Layer width="200" height="200">
+    <Polystar centerX="0" centerY="0" pointCount="5" outerRadius="80" innerRadius="35"/>
     <Fill>
       <RadialGradient radius="80">
         <ColorStop offset="0" color="#FBBF24"/>

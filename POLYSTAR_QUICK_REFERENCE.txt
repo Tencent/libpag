@@ -1,0 +1,202 @@
+================================================================================
+POLYSTAR GIT HISTORY - QUICK REFERENCE CARD
+================================================================================
+
+SEARCH RESULTS:
+- Total commits found: 13
+- Core changes analyzed: 7
+- Time range: 2026-01-21 to 2026-03-30
+
+================================================================================
+KEY COMMITS (in chronological order)
+================================================================================
+
+1. b756a676f (2026-01-21)
+   Fix Polystar attribute name: polystarType -> type
+   - Renamed property in PAGX spec
+   
+2. c3d40c62b (2026-03-13)
+   Rename center attribute to position for Rectangle, Ellipse, and Polystar
+   - Large refactor: 207.2 KB, unified API naming
+   - Impact: center -> position attribute rename
+   
+3. bdcd3abd9 (2026-03-26)
+   Fix Polystar computeBounds to exclude position offset
+   - Key change: bounds calculation no longer includes position
+   - Separates geometry from positioning concerns
+   
+4. 06326c595 (2026-03-27)
+   Add preferredX/Y to LayoutNode for bounds origin tracking
+   - Layout infrastructure: tracks origin point of bounds
+   - Impact: Polystar, Path, Text all updated to set preferredX/Y
+   
+5. eb6b8b814 (2026-03-27)
+   Remove unused attributes from XSD and PAGXImporter validation
+   - Removed: Polystar 'size' and 'points' attributes
+   - Also cleaned up Text 'color' attribute
+   
+6. 3e2276112 (2026-03-29) ⭐ CORE REFACTOR
+   Change Polystar from pixel-aligned to frame-aligned bounds
+   - Key change: position default (bounding box center) -> (outerRadius, outerRadius)
+   - Reclassified Polystar: pixel-aligned -> frame-aligned
+   - Simplified bounds: arbitrary -> outerRadius×2 × outerRadius×2
+   - Test expectations changed: scale factors simplified
+   
+7. 2208a0c60 (2026-03-30) ⭐ FULL REVERT
+   Revert Polystar frame-aligned bounds change
+   - Rolls back ALL changes from commit 3e2276112
+   - Returns to pixel-aligned classification
+   - Position default back to bounding box center
+   - Reason: Unknown (compatibility? precision? performance?)
+
+================================================================================
+POSITION DEFAULT VALUE: THE CORE ISSUE
+================================================================================
+
+CURRENT (pixel-aligned):
+  position 默认值 = computeBounds().center()  [dynamic calculation]
+
+TRIED BUT REVERTED (frame-aligned):
+  position 默认值 = (outerRadius, outerRadius)  [fixed rule]
+
+TRADE-OFF:
+  Dynamic:  More accurate but complex
+  Fixed:    Simpler but less flexible
+
+================================================================================
+KEY FILE CHANGES
+================================================================================
+
+Code Files:
+  - include/pagx/nodes/Polystar.h
+  - src/pagx/nodes/Polystar.cpp
+  - include/pagx/layout/LayoutNode.h
+  - src/pagx/LayoutNode.cpp
+
+Test Files:
+  - test/src/PAGXTest.cpp
+    (Constraint scaling test cases updated/reverted multiple times)
+
+Documentation:
+  - spec/pagx_spec.md
+  - spec/pagx_spec.zh_CN.md
+  - .codebuddy/skills/pagx/references/
+
+Import/Export:
+  - src/pagx/PAGXImporter.cpp
+
+================================================================================
+CONSTRAINT SCALING EXAMPLE
+================================================================================
+
+For 5-point star with outerRadius=30, innerRadius=15:
+
+Scenario: Horizontal constraint (left=50, right=50, available=300)
+
+Pixel-aligned (current):
+  bounds.width ≈ 57.06
+  scale ≈ 5.172
+  outerRadius ≈ 155.17
+
+Frame-aligned (reverted):
+  preferredWidth = 60
+  scale = 5.0
+  outerRadius = 150
+
+================================================================================
+CURRENT STATUS (after 2026-03-30 revert)
+================================================================================
+
+✅ Confirmed:
+  - Polystar: pixel-aligned classification
+  - Position default: bounding box center (dynamic)
+  - Bounds: based on actual vertex positions
+  - Infrastructure: preferredX/Y available
+
+⚠️  Areas for improvement:
+  - Dynamic calculation algorithm for position default
+  - Balance between pixel-aligned and frame-aligned
+  - Precision issues in constraint scaling
+
+================================================================================
+GENERATED DOCUMENTATION
+================================================================================
+
+All files located at: /Users/dom/Documents/Program/Tencent/libpag/
+
+1. POLYSTAR_RESEARCH_INDEX.md (250 lines)
+   - Quick overview and navigation guide
+   - Links to detailed docs
+   - Problem analysis and future directions
+
+2. POLYSTAR_HISTORY_ANALYSIS.md (266 lines)
+   - Timeline overview
+   - Summary of core changes
+   - Design decision analysis
+   - Affected files list
+
+3. POLYSTAR_COMMITS_DETAILED.md (417 lines)
+   - Detailed analysis for each commit
+   - Code comparisons and diffs
+   - Test case changes
+   - Concept comparison tables
+
+4. POLYSTAR_QUICK_REFERENCE.txt (this file)
+   - Quick lookup reference
+   - Commit hashes and dates
+   - Key changes summary
+
+================================================================================
+HOW TO USE THESE DOCUMENTS
+================================================================================
+
+Quick overview:
+  → Read POLYSTAR_RESEARCH_INDEX.md
+
+Understand the refactor:
+  → Read POLYSTAR_HISTORY_ANALYSIS.md
+
+Learn implementation details:
+  → Read POLYSTAR_COMMITS_DETAILED.md (commits 6-7)
+
+Find specific info:
+  → Use POLYSTAR_QUICK_REFERENCE.txt (this file)
+
+View actual code changes:
+  git show 3e2276112    # frame-aligned change
+  git show 2208a0c60    # revert
+
+================================================================================
+TECHNICAL NOTES
+================================================================================
+
+Key insight: The revert suggests the frame-aligned approach had issues:
+  - Compatibility with existing code
+  - Precision with different Polystar configurations
+  - Performance concerns
+  - Specification conflicts
+
+The preferredX/Y infrastructure remains in place, suggesting:
+  - Future improvements are still possible
+  - May revisit frame-aligned approach
+  - Foundation for pixel-to-frame transition when ready
+
+================================================================================
+COMMIT HASH REFERENCE TABLE
+================================================================================
+
+Purpose                          Hash
+-------------------------------- --------
+Property naming (polystarType)   b756a676f
+API unification (center)         c3d40c62b
+computeBounds fix                bdcd3abd9
+preferredX/Y infrastructure      06326c595
+Remove unused attributes         eb6b8b814
+Frame-aligned refactor           3e2276112
+Revert to pixel-aligned          2208a0c60
+
+================================================================================
+END OF QUICK REFERENCE
+================================================================================
+Generated: 2026-03-31
+Last updated: See POLYSTAR_RESEARCH_INDEX.md for update log

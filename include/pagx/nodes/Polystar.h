@@ -35,8 +35,8 @@ namespace pagx {
 class Polystar : public Element, public LayoutNode {
  public:
   /**
-   * The center point of the polystar. When not explicitly set, defaults to the center of the
-   * bounding box so that the top-left corner aligns with the origin (0, 0).
+   * The center point of the polystar. When not explicitly set, defaults to
+   * (outerRadius, outerRadius) so that the top-left corner aligns with the origin (0, 0).
    */
   Point position = {};
 
@@ -87,8 +87,8 @@ class Polystar : public Element, public LayoutNode {
 
   /**
    * Computes the tight bounding box of the polystar by iterating over all vertices.
-   * Unlike using outerRadius as a square, this accounts for the actual vertex positions
-   * determined by pointCount, rotation, and innerRadius (for star type).
+   * This is used for rendering only — layout uses the frame-aligned bounds
+   * (outerRadius × 2, outerRadius × 2) instead.
    */
   Rect computeBounds() const {
     auto numPoints = static_cast<int>(ceilf(pointCount));

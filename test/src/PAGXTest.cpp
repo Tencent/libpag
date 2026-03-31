@@ -2094,12 +2094,11 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarHorizontal) {
 
   doc->applyLayout();
 
-  // Polystar bounds (computed from precise vertex positions, not simplified square):
-  // For Star with pointCount=5, rotation=0, width ≈ 2.0 * outerRadius, height ≈ 1.809 * outerRadius
-  // bounds.width ≈ 57.06 → ceil → 58, area width = 400 - 50 - 50 = 300
-  // scale = 300 / 58 ≈ 5.172
-  EXPECT_FLOAT_EQ(star->outerRadius, 155.17241f);
-  EXPECT_FLOAT_EQ(star->innerRadius, 77.586205f);
+  // Frame-aligned bounds: preferredWidth = outerRadius * 2 = 60
+  // area width = 400 - 50 - 50 = 300
+  // scale = 300 / 60 = 5.0
+  EXPECT_FLOAT_EQ(star->outerRadius, 150.0f);
+  EXPECT_FLOAT_EQ(star->innerRadius, 75.0f);
   EXPECT_NEAR(star->position.x, 200.0f, 0.5f);
 }
 
@@ -2122,13 +2121,12 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarVertical) {
 
   doc->applyLayout();
 
-  // Polystar bounds (computed from precise vertex positions):
-  // bounds.height ≈ 1.809 * outerRadius ≈ 45.225 → ceil → 46
+  // Frame-aligned bounds: preferredHeight = outerRadius * 2 = 50
   // area height = 200 - 20 - 20 = 160
-  // scale = 160 / 46 ≈ 3.478
-  EXPECT_FLOAT_EQ(star->outerRadius, 86.95652f);
-  EXPECT_FLOAT_EQ(star->innerRadius, 34.782608f);
-  EXPECT_NEAR(star->position.y, 108.0f, 0.5f);
+  // scale = 160 / 50 = 3.2
+  EXPECT_FLOAT_EQ(star->outerRadius, 80.0f);
+  EXPECT_FLOAT_EQ(star->innerRadius, 32.0f);
+  EXPECT_NEAR(star->position.y, 100.0f, 0.5f);
 }
 
 PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarBothAxes) {
@@ -2152,20 +2150,17 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarBothAxes) {
 
   doc->applyLayout();
 
-  // Polystar bounds (computed from precise vertex positions):
-  // bounds.width ≈ 38.042 → ceil → 39, bounds.height ≈ 36.180 → ceil → 37
+  // Frame-aligned bounds: preferredWidth = 40, preferredHeight = 40
   // areaWidth = 360, areaHeight = 180
-  // scaleX = 360 / 39 ≈ 9.231, scaleY = 180 / 37 ≈ 4.865
-  // scale = min(9.231, 4.865) ≈ 4.865
-  EXPECT_FLOAT_EQ(star->outerRadius, 97.297295f);
-  EXPECT_FLOAT_EQ(star->innerRadius, 48.648647f);
-  // Scaled bounds = (-99.5, -90, 199, 180)
-  // Horizontal: tx = 20 + (360 - 199) * 0.5 - (-99.5) = 200, position.x = 200
-  // Vertical: ty = 10 + (180 - 180) * 0.5 - (-90) = 100, position.y = 100
-  // Scaled bounds are computed from trigonometric vertex positions, so position values
-  // are not exact integers after subtracting bounds offset.
+  // scaleX = 360 / 40 = 9, scaleY = 180 / 40 = 4.5
+  // scale = min(9, 4.5) = 4.5
+  EXPECT_FLOAT_EQ(star->outerRadius, 90.0f);
+  EXPECT_FLOAT_EQ(star->innerRadius, 45.0f);
+  // actualW = 180, actualH = 180
+  // x = 20 + (360 - 180) * 0.5 = 110, position.x = 110 + 90 = 200
+  // y = 10 + (180 - 180) * 0.5 = 10, position.y = 10 + 90 = 100
   EXPECT_NEAR(star->position.x, 200.0f, 0.5f);
-  EXPECT_NEAR(star->position.y, 109.5f, 0.5f);
+  EXPECT_NEAR(star->position.y, 100.0f, 0.5f);
 }
 
 PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {
@@ -2302,9 +2297,6 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleExactFit) {
   star->outerRadius = 50;
   star->innerRadius = 25;
   star->position = {0, 0};
-  // Polystar bounds: bounds.width ≈ 95.106 → ceil → 96
-  // areaWidth = 400 - 150 - 150 = 100
-  // scale = 100 / 96 ≈ 1.0417 (not 1.0, so scaling applies)
   star->left = 150;
   star->right = 150;
 
@@ -2312,9 +2304,11 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleExactFit) {
 
   doc->applyLayout();
 
-  // scale ≈ 1.0417
-  EXPECT_FLOAT_EQ(star->outerRadius, 52.083332f);
-  EXPECT_FLOAT_EQ(star->innerRadius, 26.041666f);
+  // Frame-aligned bounds: preferredWidth = outerRadius * 2 = 100
+  // areaWidth = 400 - 150 - 150 = 100
+  // scale = 100 / 100 = 1.0 (exact fit, no scaling)
+  EXPECT_FLOAT_EQ(star->outerRadius, 50.0f);
+  EXPECT_FLOAT_EQ(star->innerRadius, 25.0f);
   EXPECT_NEAR(star->position.x, 200.0f, 0.5f);
 }
 

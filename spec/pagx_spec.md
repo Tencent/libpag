@@ -689,8 +689,8 @@ Constraint attributes allow content nodes to declare positional relationships wi
 
 **Content Bounds**: "Edges" in constraints refer to the edges of an element's content bounds. The starting point differs by element type:
 
-- **Frame-aligned nodes** (Rectangle, Ellipse, TextBox, Group, Layer): content bounds are [0, width] × [0, height] in local coordinates — the logical frame. `left="0"` aligns the frame's left edge to the container.
-- **Pixel-aligned nodes** (Path, Text, Polystar, TextPath): content bounds are the actual rendered pixel boundary. `left="0"` shifts content so rendered pixels touch the container edge. For Text, content bounds are the line-box bounds (advance width sum × font metrics line height), providing stable measurement independent of specific glyph shapes.
+- **Frame-aligned nodes** (Rectangle, Ellipse, Polystar, TextBox, Group, Layer): content bounds are [0, width] × [0, height] in local coordinates — the logical frame. For Polystar, the frame is [0, outerRadius×2] × [0, outerRadius×2]. `left="0"` aligns the frame's left edge to the container.
+- **Pixel-aligned nodes** (Path, Text, TextPath): content bounds are the actual rendered pixel boundary. `left="0"` shifts content so rendered pixels touch the container edge. For Text, content bounds are the line-box bounds (advance width sum × font metrics line height), providing stable measurement independent of specific glyph shapes.
 
 Both ensure `left="0"` means "content aligns with container edge". For frame-aligned nodes this is the logical frame; for pixel-aligned nodes this is the rendered pixels.
 
@@ -702,7 +702,7 @@ All content nodes have a `position` attribute representing the element's anchor 
 |---------|----------------|-------------|
 | Rectangle | Geometric center | When not set, defaults to `(size.width/2, size.height/2)`, placing the top-left corner at the origin |
 | Ellipse | Geometric center | Same as Rectangle |
-| Polystar | Geometric center | When not set, defaults to the center of the computed bounding box |
+| Polystar | Geometric center | When not set, defaults to `(outerRadius, outerRadius)`, placing the top-left corner at the origin |
 | Path | Coordinate origin | `position="0,0"` means path data coordinates are used directly |
 | TextPath | Coordinate origin | Same as Path; constraint positioning shifts the path coordinate origin |
 | Text | Determined by `textAnchor` | `start`: baseline start; `center`: horizontal midpoint; `end`: end |
@@ -733,7 +733,7 @@ Setting both `left` + `right` (or `top` + `bottom`) defines a target area (conta
 | TextBox | Stretch typesetting area | Modify `width` and `height` to fill the target area, changing text layout bounds |
 | Group | Derive layout dimensions | Align to the target area and set layout dimensions; children re-layout according to the new size, no effect on rendering |
 | Child Layer | Derive dimensions or position | Always derive dimensions from parent (`width = parent.width - left - right`), overriding any explicit `width`/`height` |
-| Polystar, Path, Text, TextPath | Scale to fit | Single-axis: scale to exactly fill that axis, other axis scales proportionally; both-axis: use the smaller scale factor (fit mode), center along the longer axis |
+| Polystar, Path, Text, TextPath | Scale to fit | Single-axis: scale to exactly fill that axis, other axis scales proportionally; both-axis: use the smaller scale factor (fit mode), center along the longer axis. Polystar uses its frame bounds (outerRadius×2 × outerRadius×2) for scaling calculations |
 
 **Stretch** (Rectangle, Ellipse, TextBox):
 
@@ -1288,7 +1288,7 @@ Supports both regular polygon and star modes.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `position` | Point | (center of bounding box) | Center point coordinate, computed from constraint attributes when set. When not set, defaults to the center of the computed bounding box, placing the top-left corner at the origin. Prefer constraint attributes (`left`/`top`) for positioning |
+| `position` | Point | (outerRadius, outerRadius) | Center point coordinate, computed from constraint attributes when set. When not set, defaults to `(outerRadius, outerRadius)`, placing the top-left corner at the origin. Prefer constraint attributes (`left`/`top`) for positioning |
 | `type` | PolystarType | star | Type (see below) |
 | `pointCount` | float | 5 | Number of points (supports decimals) |
 | `outerRadius` | float | 100 | Outer radius |

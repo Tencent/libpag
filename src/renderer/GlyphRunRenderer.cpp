@@ -255,36 +255,71 @@ ShapedText GlyphRunRenderer::BuildTextBlobFromLayoutRuns(
     bool hasTransforms = !run.rotations.empty() || !run.scales.empty();
 
     if (hasTransforms) {
-      // Vertical rotated glyphs: build affine matrix from position + rotation + scale, then apply
-      // inverse matrix. allocRunMatrix uses 6 floats per glyph: [a, b, tx, c, d, ty].
-      auto& buffer = builder.allocRunMatrix(run.font, count);
-      for (size_t i = 0; i < count; i++) {
-        buffer.glyphs[i] = run.glyphs[i];
+      // Check if we can use RSXform mode: no skew, uniform scale, and simple inverse matrix.
+      bool useRSXformMode = false;
+      if (inverseMatrix == tgfx::Matrix::I() && run.glyphs.size() > 0) {
+        // Verify that all glyphs have simple scale (sx == sy) and no complex skew transforms.
+        useRSXformMode = true;
+        for (size_t i = 0; i < count; i++) {
+          float sx = (i < run.scales.size()) ? run.scales[i].x : 1.0f;
+          float sy = (i < run.scales.size()) ? run.scales[i].y : 1.0f;
+          if (std::abs(sx - sy) > 1e-6f) {  // Non-uniform scale, fall back to Matrix mode
+            useRSXformMode = false;
+            break;
+          }
+        }
       }
-      for (size_t i = 0; i < count; i++) {
-        float rotation = (i < run.rotations.size()) ? run.rotations[i] : 0.0f;
-        float sx = (i < run.scales.size()) ? run.scales[i].x : 1.0f;
-        float sy = (i < run.scales.size()) ? run.scales[i].y : 1.0f;
-        float posX = (i < run.positions.size()) ? run.positions[i].x : 0.0f;
-        float posY = (i < run.positions.size()) ? run.positions[i].y : 0.0f;
 
-        auto matrix = tgfx::Matrix::I();
-        if (sx != 1.0f || sy != 1.0f) {
-          matrix.preScale(sx, sy);
+      if (useRSXformMode) {
+        // RSXform mode: reconstruct RSXform from rotation, scale, and position.
+        auto& buffer = builder.allocRunRSXform(run.font, count);
+        for (size_t i = 0; i < count; i++) {
+          buffer.glyphs[i] = run.glyphs[i];
         }
-        if (rotation != 0.0f) {
-          matrix.preRotate(rotation);
+        auto* xforms = reinterpret_cast<tgfx::RSXform*>(buffer.positions);
+        for (size_t i = 0; i < count; i++) {
+          float rotation = (i < run.rotations.size()) ? run.rotations[i] : 0.0f;
+          float scale = (i < run.scales.size()) ? run.scales[i].x : 1.0f;
+          float posX = (i < run.positions.size()) ? run.positions[i].x : 0.0f;
+          float posY = (i < run.positions.size()) ? run.positions[i].y : 0.0f;
+
+          float rotationRad = rotation * static_cast<float>(M_PI) / 180.0f;
+          float scos = scale * std::cos(rotationRad);
+          float ssin = scale * std::sin(rotationRad);
+          xforms[i] = tgfx::RSXform::Make(scos, ssin, posX, posY);
         }
-        matrix.preTranslate(posX, posY);
-        matrix.preConcat(inverseMatrix);
-        // Write 6-float affine matrix: [scaleX, skewX, transX, skewY, scaleY, transY]
-        size_t offset = i * 6;
-        buffer.positions[offset + 0] = matrix.getScaleX();
-        buffer.positions[offset + 1] = matrix.getSkewX();
-        buffer.positions[offset + 2] = matrix.getTranslateX();
-        buffer.positions[offset + 3] = matrix.getSkewY();
-        buffer.positions[offset + 4] = matrix.getScaleY();
-        buffer.positions[offset + 5] = matrix.getTranslateY();
+      } else {
+        // Matrix mode: build full affine matrix from position + rotation + scale.
+        // allocRunMatrix uses 6 floats per glyph: [a, b, tx, c, d, ty].
+        auto& buffer = builder.allocRunMatrix(run.font, count);
+        for (size_t i = 0; i < count; i++) {
+          buffer.glyphs[i] = run.glyphs[i];
+        }
+        for (size_t i = 0; i < count; i++) {
+          float rotation = (i < run.rotations.size()) ? run.rotations[i] : 0.0f;
+          float sx = (i < run.scales.size()) ? run.scales[i].x : 1.0f;
+          float sy = (i < run.scales.size()) ? run.scales[i].y : 1.0f;
+          float posX = (i < run.positions.size()) ? run.positions[i].x : 0.0f;
+          float posY = (i < run.positions.size()) ? run.positions[i].y : 0.0f;
+
+          auto matrix = tgfx::Matrix::I();
+          if (sx != 1.0f || sy != 1.0f) {
+            matrix.preScale(sx, sy);
+          }
+          if (rotation != 0.0f) {
+            matrix.preRotate(rotation);
+          }
+          matrix.preTranslate(posX, posY);
+          matrix.preConcat(inverseMatrix);
+          // Write 6-float affine matrix: [scaleX, skewX, transX, skewY, scaleY, transY]
+          size_t offset = i * 6;
+          buffer.positions[offset + 0] = matrix.getScaleX();
+          buffer.positions[offset + 1] = matrix.getSkewX();
+          buffer.positions[offset + 2] = matrix.getTranslateX();
+          buffer.positions[offset + 3] = matrix.getSkewY();
+          buffer.positions[offset + 4] = matrix.getScaleY();
+          buffer.positions[offset + 5] = matrix.getTranslateY();
+        }
       }
     } else {
       // Horizontal / upright vertical glyphs: simple Point mode with inverse matrix.
