@@ -21,7 +21,6 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/types/Data.h"
 #include "tgfx/core/Data.h"
-#include "tgfx/core/Surface.h"
 #include "tgfx/core/Typeface.h"
 
 using namespace emscripten;
@@ -168,7 +167,7 @@ void PAGXView::updateSize() {
   if (context == nullptr) {
     return;
   }
-  auto surface = tgfx::Surface::MakeFrom(context, window);
+  surface = tgfx::Surface::MakeFrom(context, window);
   if (surface == nullptr) {
     device->unlock();
     return;
@@ -244,7 +243,9 @@ void PAGXView::draw() {
   if (context == nullptr) {
     return;
   }
-  auto surface = tgfx::Surface::MakeFrom(context, window);
+  if (surface == nullptr) {
+    surface = tgfx::Surface::MakeFrom(context, window);
+  }
   if (surface == nullptr) {
     device->unlock();
     return;
