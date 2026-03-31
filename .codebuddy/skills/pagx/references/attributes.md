@@ -155,7 +155,7 @@ Positioning: prefer constraint attributes over `position`. See §Constraint Attr
 | `outerRoundness` | float | 0 |
 | `innerRoundness` | float | 0 |
 | `reversed` | bool | false |
-| `position` | Point | (center of bounding box) |
+| `position` | Point | (outerRadius, outerRadius) |
 | `left` | float | — |
 | `right` | float | — |
 | `top` | float | — |
