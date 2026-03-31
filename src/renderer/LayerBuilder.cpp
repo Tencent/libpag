@@ -21,6 +21,7 @@
 #include <unordered_map>
 #include "ToTGFX.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/ShapedText.h"
 #include "pagx/TextLayout.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
@@ -66,6 +67,7 @@
 #include "pagx/types/SelectorTypes.h"
 #include "pagx/types/TileMode.h"
 #include "pagx/utils/Base64.h"
+#include "renderer/GlyphRunRenderer.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Data.h"
@@ -237,6 +239,37 @@ class LayerBuilderContext {
     return layer;
   }
 
+  // Generate TextBlob for a Text node using GlyphRunRenderer with the given inverse matrix.
+  // For standalone Text (not inside TextBox), inverseMatrix is Identity.
+  // For TextBox children, inverseMatrix cancels the cumulative Group transforms.
+  static void prepareTextBlob(Text* text, const tgfx::Matrix& inverseMatrix) {
+    if (!text->getLayoutRuns().empty()) {
+      auto shaped =
+          GlyphRunRenderer::BuildTextBlobFromLayoutRuns(text->getLayoutRuns(), inverseMatrix);
+      TextLayout::StoreShapedText(text, std::move(shaped));
+    } else if (!text->glyphRuns.empty()) {
+      auto shaped = GlyphRunRenderer::BuildTextBlob(text, inverseMatrix);
+      TextLayout::StoreShapedText(text, std::move(shaped));
+    }
+  }
+
+  // Prepare TextBlobs for all Text children of a TextBox by applying inverse matrices.
+  // This must happen at render time (not layout time) so that tgfx's StrokePainter can
+  // detect the Group transform via geometry->matrix changes between apply() and draw().
+  void prepareTextBoxTextBlobs(const TextBox* textBox) {
+    std::vector<Text*> childText;
+    std::vector<tgfx::Matrix> matrices;
+    TextLayout::CollectTextElements(textBox->elements, childText, matrices);
+
+    for (size_t i = 0; i < childText.size(); i++) {
+      tgfx::Matrix inverse = {};
+      if (!matrices[i].invert(&inverse)) {
+        continue;
+      }
+      prepareTextBlob(childText[i], inverse);
+    }
+  }
+
   std::shared_ptr<tgfx::VectorElement> convertVectorElement(const Element* node) {
     if (!node) {
       return nullptr;
@@ -276,6 +309,7 @@ class LayerBuilderContext {
         if (textBox->elements.empty()) {
           return nullptr;
         }
+        prepareTextBoxTextBlobs(textBox);
         return convertGroup(textBox);
       }
       default:
@@ -330,6 +364,10 @@ class LayerBuilderContext {
 
   std::shared_ptr<tgfx::Text> convertText(const Text* node) {
     auto textBlob = node->getTextBlob();
+    if (textBlob == nullptr) {
+      prepareTextBlob(const_cast<Text*>(node), tgfx::Matrix::I());
+      textBlob = node->getTextBlob();
+    }
     if (textBlob == nullptr) {
       return nullptr;
     }

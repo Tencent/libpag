@@ -1731,11 +1731,6 @@ static Rect ComputeEmbeddedTextBounds(const Text* text) {
       return glyphRun->bounds;
     }
   }
-  // Fallback: try to compute bounds from the TextBlob if available.
-  if (text->getTextBlob()) {
-    auto tight = text->getTextBlob()->getTightBounds();
-    return Rect::MakeXYWH(tight.left, tight.top, tight.width(), tight.height());
-  }
   return {};
 }
 

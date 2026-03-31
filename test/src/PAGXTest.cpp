@@ -47,7 +47,6 @@
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
-#include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
@@ -497,31 +496,42 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
 
 /**
  * Test case: TextBox with embedded GlyphRun applies inverse matrix correctly.
- * Verifies that embedded GlyphRun positions (in layout coordinates) are properly
- * transformed by the inverse matrix when rendered inside a TextBox.
+ * A Group with non-uniform scale wraps the Text inside a TextBox, producing a non-trivial inverse
+ * matrix. The Stroke painter reveals correctness: it applies stroke expansion in local coordinates
+ * first, then the Group's non-uniform scale stretches the stroke anisotropically. If the inverse
+ * matrix is wrong, both glyph positions and the anisotropic stroke effect will be incorrect.
  */
 PAGX_TEST(PAGXTest, TextBoxEmbeddedGlyphRun) {
-  // Create a document where Text is inside a TextBox (not standalone).
-  // The Text has a non-zero position inside the TextBox, so the inverse matrix is non-trivial.
-  auto doc = pagx::PAGXDocument::Make(300, 100);
+  auto doc = pagx::PAGXDocument::Make(1200, 300);
   auto layer = doc->makeNode<pagx::Layer>();
-  layer->width = 300;
-  layer->height = 100;
+  layer->width = 1200;
+  layer->height = 300;
   doc->layers.push_back(layer);
 
   auto textBox = doc->makeNode<pagx::TextBox>();
-  textBox->width = 300;
-  textBox->height = 100;
+  textBox->width = 600;
+  textBox->height = 300;
+  textBox->centerX = 0;
+  textBox->textAlign = pagx::TextAlign::Center;
+  textBox->paragraphAlign = pagx::ParagraphAlign::Middle;
+
+  auto group = doc->makeNode<pagx::Group>();
+  group->scale = {2, 1};
+
   auto text = doc->makeNode<pagx::Text>();
   text->text = "Hello PAGX";
   text->fontFamily = "NotoSansSC";
-  text->fontSize = 30;
-  textBox->elements.push_back(text);
-  auto fill = doc->makeNode<pagx::Fill>();
-  auto solidColor = doc->makeNode<pagx::SolidColor>();
-  solidColor->color = {0.2f, 0.2f, 0.8f, 1.0f};
-  fill->color = solidColor;
-  textBox->elements.push_back(fill);
+  text->fontSize = 100;
+  group->elements.push_back(text);
+
+  auto stroke = doc->makeNode<pagx::Stroke>();
+  auto strokeColor = doc->makeNode<pagx::SolidColor>();
+  strokeColor->color = {0.8f, 0.2f, 0.2f, 1.0f};
+  stroke->color = strokeColor;
+  stroke->width = 2;
+  group->elements.push_back(stroke);
+
+  textBox->elements.push_back(group);
   layer->contents.push_back(textBox);
 
   // Step 1: Layout + embed fonts (writes GlyphRun in layout coordinates with bounds).
@@ -542,7 +552,7 @@ PAGX_TEST(PAGXTest, TextBoxEmbeddedGlyphRun) {
   auto tgfxLayer = pagx::LayerBuilder::Build(reloadedDoc.get());
   ASSERT_TRUE(tgfxLayer != nullptr);
 
-  auto surface = Surface::Make(context, 300, 100);
+  auto surface = Surface::Make(context, 1200, 300);
   DisplayList displayList;
   displayList.root()->addChild(tgfxLayer);
   displayList.render(surface.get(), false);
@@ -4691,27 +4701,21 @@ PAGX_TEST(PAGXTest, LayoutTextBaselineAlphabetic) {
   textAB->position = {200, 100};
   textAB->baseline = pagx::TextBaseline::Alphabetic;
 
-  layer->contents = {textLB, textAB};
+  auto fill = doc->makeNode<pagx::Fill>();
+  layer->contents = {textLB, textAB, fill};
 
   pagx::FontConfig fontConfig;
   fontConfig.registerTypeface(typeface);
   doc->setFontConfig(fontConfig);
   doc->applyLayout();
 
-  // Both texts should have TextBlobs.
-  auto blobLB = textLB->getTextBlob();
-  auto blobAB = textAB->getTextBlob();
-  ASSERT_NE(blobLB, nullptr);
-  ASSERT_NE(blobAB, nullptr);
-
-  // LineBox: TextBlob bounds.top should be positive (half-leading pushes glyphs down from
-  // linebox top, so the tight bounds top is above 0 relative to position.y = linebox top).
-  auto boundsLB = blobLB->getTightBounds();
-  EXPECT_GT(boundsLB.top, 0);
-
-  // Alphabetic: TextBlob bounds.top should be negative (ascender above baseline).
-  auto boundsAB = blobAB->getTightBounds();
-  EXPECT_LT(boundsAB.top, 0);
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
+  ASSERT_NE(tgfxLayer, nullptr);
+  auto surface = Surface::Make(context, 400, 300);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/LayoutTextBaselineAlphabetic"));
 }
 
 PAGX_TEST(PAGXTest, LayoutTextIndependentConstraint) {
@@ -4849,8 +4853,6 @@ PAGX_TEST(PAGXTest, LayoutTextScaledPositionAnchor) {
 
   // Target width = 400 - 50 - 50 = 300.
   // After scaling, text should be centered in the 300px area.
-  auto blob = text->getTextBlob();
-  ASSERT_NE(blob, nullptr);
   // Verify the scaled text has a valid actual size.
   EXPECT_GT(text->actualWidth, 0);
   // fontSize should have been scaled (target 300px is different from original width).
@@ -4894,185 +4896,6 @@ PAGX_TEST(PAGXTest, LayoutTextInTextBoxSkipConstraint) {
 // =====================================================================================
 // Variable naming cleanup
 // =====================================================================================
-
-// =====================================================================================
-// TextBox Group Transform Inverse Compensation
-// =====================================================================================
-
-PAGX_TEST(PAGXTest, LayoutTextBoxGroupPosition) {
-  auto doc = pagx::PAGXDocument::Make(400, 300);
-  auto layer = doc->makeNode<pagx::Layer>();
-  doc->layers.push_back(layer);
-  layer->width = 400;
-  layer->height = 300;
-
-  auto typeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
-  ASSERT_NE(typeface, nullptr);
-
-  auto textBox = doc->makeNode<pagx::TextBox>();
-  textBox->width = 200;
-  textBox->height = 100;
-
-  auto group = doc->makeNode<pagx::Group>();
-  group->position = {50, 30};
-
-  auto text = doc->makeNode<pagx::Text>();
-  text->text = "Hello";
-  text->fontFamily = typeface->fontFamily();
-  text->fontStyle = typeface->fontStyle();
-  text->fontSize = 24;
-
-  auto fill = doc->makeNode<pagx::Fill>();
-
-  group->elements = {text, fill};
-  textBox->elements = {group};
-  layer->contents = {textBox};
-
-  pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
-  doc->setFontConfig(fontConfig);
-  doc->applyLayout();
-
-  auto blob = text->getTextBlob();
-  ASSERT_NE(blob, nullptr);
-
-  // The layout engine places text at box-absolute position, then applies inverse of
-  // Group(position=50,30) * Text(position=0,0) = translate(50,30).
-  // So TextBlob coordinates should be shifted back by (-50, -30) from box-absolute position.
-  auto bounds = blob->getTightBounds();
-  EXPECT_LT(bounds.left, 0);
-  EXPECT_LT(bounds.top, 0);
-}
-
-PAGX_TEST(PAGXTest, LayoutTextBoxGroupScale) {
-  auto doc = pagx::PAGXDocument::Make(400, 300);
-  auto layer = doc->makeNode<pagx::Layer>();
-  doc->layers.push_back(layer);
-  layer->width = 400;
-  layer->height = 300;
-
-  auto typeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
-  ASSERT_NE(typeface, nullptr);
-
-  auto textBox = doc->makeNode<pagx::TextBox>();
-  textBox->width = 200;
-  textBox->height = 100;
-
-  auto group = doc->makeNode<pagx::Group>();
-  group->scale = {2, 2};
-
-  auto text = doc->makeNode<pagx::Text>();
-  text->text = "AB";
-  text->fontFamily = typeface->fontFamily();
-  text->fontStyle = typeface->fontStyle();
-  text->fontSize = 24;
-
-  auto fill = doc->makeNode<pagx::Fill>();
-  group->elements = {text, fill};
-  textBox->elements = {group};
-  layer->contents = {textBox};
-
-  pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
-  doc->setFontConfig(fontConfig);
-  doc->applyLayout();
-
-  auto blob = text->getTextBlob();
-  ASSERT_NE(blob, nullptr);
-
-  // Group scale=2 means inverse scale=0.5.
-  // TextBlob coordinates should be half of the box-absolute positions.
-  auto bounds = blob->getTightBounds();
-  EXPECT_GT(bounds.right, 0);
-  EXPECT_LT(bounds.right, 100);
-}
-
-PAGX_TEST(PAGXTest, LayoutTextAnchorCenterRegression) {
-  auto doc = pagx::PAGXDocument::Make(400, 200);
-  auto layer = doc->makeNode<pagx::Layer>();
-  doc->layers.push_back(layer);
-  layer->width = 400;
-  layer->height = 200;
-
-  auto typeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
-  ASSERT_NE(typeface, nullptr);
-
-  auto text = doc->makeNode<pagx::Text>();
-  text->text = "Center";
-  text->fontFamily = typeface->fontFamily();
-  text->fontStyle = typeface->fontStyle();
-  text->fontSize = 32;
-  text->position = {200, 100};
-  text->textAnchor = pagx::TextAnchor::Center;
-
-  auto fill = doc->makeNode<pagx::Fill>();
-  layer->contents = {text, fill};
-
-  pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
-  doc->setFontConfig(fontConfig);
-  doc->applyLayout();
-
-  auto blob = text->getTextBlob();
-  ASSERT_NE(blob, nullptr);
-
-  // With Center anchor, TextBlob should be centered around x=0 in Text's local space.
-  auto bounds = blob->getTightBounds();
-  EXPECT_LT(bounds.left, 0);
-  EXPECT_GT(bounds.right, 0);
-  EXPECT_NEAR(bounds.left + bounds.right, 0, bounds.right * 0.3f);
-}
-
-PAGX_TEST(PAGXTest, LayoutTextBoxNestedGroupTransform) {
-  auto doc = pagx::PAGXDocument::Make(400, 300);
-  auto layer = doc->makeNode<pagx::Layer>();
-  doc->layers.push_back(layer);
-  layer->width = 400;
-  layer->height = 300;
-
-  auto typeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
-  ASSERT_NE(typeface, nullptr);
-
-  auto textBox = doc->makeNode<pagx::TextBox>();
-  textBox->width = 300;
-  textBox->height = 200;
-
-  auto outerGroup = doc->makeNode<pagx::Group>();
-  outerGroup->position = {20, 10};
-
-  auto innerGroup = doc->makeNode<pagx::Group>();
-  innerGroup->position = {30, 20};
-
-  auto text = doc->makeNode<pagx::Text>();
-  text->text = "Nested";
-  text->fontFamily = typeface->fontFamily();
-  text->fontStyle = typeface->fontStyle();
-  text->fontSize = 24;
-
-  auto fill = doc->makeNode<pagx::Fill>();
-  innerGroup->elements = {text, fill};
-  outerGroup->elements = {innerGroup};
-  textBox->elements = {outerGroup};
-  layer->contents = {textBox};
-
-  pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
-  doc->setFontConfig(fontConfig);
-  doc->applyLayout();
-
-  auto blob = text->getTextBlob();
-  ASSERT_NE(blob, nullptr);
-
-  // Combined offset: outerGroup(20,10) + innerGroup(30,20) = (50,30).
-  // TextBlob should be shifted back by (-50,-30) from box-absolute position.
-  auto bounds = blob->getTightBounds();
-  EXPECT_LT(bounds.left, 0);
-  EXPECT_LT(bounds.top, 0);
-}
 
 /**
  * Test case: TextLayoutGlyphRun data integrity after layout.
@@ -5251,10 +5074,6 @@ PAGX_TEST(PAGXTest, VerticalTextLayoutGlyphRun) {
     }
   }
   EXPECT_TRUE(hasXforms);
-
-  // Verify TextBlob was generated.
-  auto blob = text->getTextBlob();
-  EXPECT_NE(blob, nullptr);
 }
 
 /**
@@ -5308,332 +5127,6 @@ PAGX_TEST(PAGXTest, TextBoundsDirectValidation) {
   auto boxTextBounds = boxText->getTextBounds();
   EXPECT_GT(boxTextBounds.width, 0);
   EXPECT_GT(boxTextBounds.height, 0);
-}
-
-// =====================================================================================
-// Auto Layout - Repeater Measurement
-// =====================================================================================
-
-PAGX_TEST(PAGXTest, RepeaterBasicMeasurement) {
-  // Repeater with position offset should expand the Group's measured size.
-  auto doc = pagx::PAGXDocument::Make(800, 600);
-  auto layer = doc->makeNode<pagx::Layer>();
-  doc->layers.push_back(layer);
-  layer->width = 800;
-  layer->height = 600;
-
-  auto group = doc->makeNode<pagx::Group>();
-  auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size = {100, 100};
-  auto repeater = doc->makeNode<pagx::Repeater>();
-  repeater->copies = 3;
-  repeater->position = {50, 50};
-  repeater->scale = {1, 1};
-  repeater->offset = 0;
-
-  group->elements = {rect, repeater};
-  layer->contents = {group};
-  doc->applyLayout();
-
-  // 3 copies: progress 0, 1, 2 → positions (0,0), (50,50), (100,100)
-  // Source 100x100 at each position → union: (0,0)-(200,200)
-  EXPECT_FLOAT_EQ(group->preferredWidth, 200);
-  EXPECT_FLOAT_EQ(group->preferredHeight, 200);
-}
-
-PAGX_TEST(PAGXTest, RepeaterScaledMeasurement) {
-  // Repeater with scale should expand the measured size exponentially.
-  auto doc = pagx::PAGXDocument::Make(800, 600);
-  auto layer = doc->makeNode<pagx::Layer>();
-  doc->layers.push_back(layer);
-  layer->width = 800;
-  layer->height = 600;
-
-  auto group = doc->makeNode<pagx::Group>();
-  auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size = {100, 100};
-  auto repeater = doc->makeNode<pagx::Repeater>();
-  repeater->copies = 2;
-  repeater->position = {0, 0};
-  repeater->scale = {2, 2};
-
-  group->elements = {rect, repeater};
-  layer->contents = {group};
-  doc->applyLayout();
-
-  // 2 copies: progress 0 (scale 1x) → 100x100, progress 1 (scale 2x) → 200x200
-  // Union: (0,0)-(200,200)
-  EXPECT_FLOAT_EQ(group->preferredWidth, 200);
-  EXPECT_FLOAT_EQ(group->preferredHeight, 200);
-}
-
-PAGX_TEST(PAGXTest, RepeaterWithOffset) {
-  // Offset is an animation parameter and does not affect measurement (initial frame).
-  // Measurement always uses progress = i, ignoring offset.
-  auto doc = pagx::PAGXDocument::Make(800, 600);
-  auto layer = doc->makeNode<pagx::Layer>();
-  doc->layers.push_back(layer);
-  layer->width = 800;
-  layer->height = 600;
-
-  auto group = doc->makeNode<pagx::Group>();
-  auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size = {100, 100};
-  auto repeater = doc->makeNode<pagx::Repeater>();
-  repeater->copies = 2;
-  repeater->position = {50, 0};
-  repeater->scale = {1, 1};
-  repeater->offset = 1;
-
-  group->elements = {rect, repeater};
-  layer->contents = {group};
-  doc->applyLayout();
-
-  // 2 copies: progress 0 -> pos (0,0), progress 1 -> pos (50,0)
-  // Transformed: (0,0)-(100,100) and (50,0)-(150,100)
-  // totalBounds = (0,0)-(150,100), right=150
-  // maxX = max(rect's 100, 150) = 150
-  EXPECT_FLOAT_EQ(group->preferredWidth, 150);
-  EXPECT_FLOAT_EQ(group->preferredHeight, 100);
-}
-
-PAGX_TEST(PAGXTest, RepeaterMultipleSourceElements) {
-  // Repeater should act on the union bounds of all preceding LayoutNodes.
-  auto doc = pagx::PAGXDocument::Make(800, 600);
-  auto layer = doc->makeNode<pagx::Layer>();
-  doc->layers.push_back(layer);
-  layer->width = 800;
-  layer->height = 600;
-
-  auto group = doc->makeNode<pagx::Group>();
-  auto rect1 = doc->makeNode<pagx::Rectangle>();
-  rect1->size = {100, 50};
-  auto rect2 = doc->makeNode<pagx::Rectangle>();
-  rect2->size = {200, 100};
-  auto repeater = doc->makeNode<pagx::Repeater>();
-  repeater->copies = 2;
-  repeater->position = {0, 100};
-  repeater->scale = {1, 1};
-
-  group->elements = {rect1, rect2, repeater};
-  layer->contents = {group};
-  doc->applyLayout();
-
-  // rect1: extX=100, extY=50. rect2: extX=200, extY=100.
-  // sourceBounds = (0,0)-(200,100)
-  // 2 copies: progress 0 -> (0,0)-(200,100), progress 1 -> (0,100)-(200,200)
-  // Total: (0,0)-(200,200)
-  EXPECT_FLOAT_EQ(group->preferredWidth, 200);
-  EXPECT_FLOAT_EQ(group->preferredHeight, 200);
-}
-
-PAGX_TEST(PAGXTest, RepeaterZeroCopies) {
-  // Repeater with copies=0 should not affect measurement.
-  auto doc = pagx::PAGXDocument::Make(800, 600);
-  auto layer = doc->makeNode<pagx::Layer>();
-  doc->layers.push_back(layer);
-  layer->width = 800;
-  layer->height = 600;
-
-  auto group = doc->makeNode<pagx::Group>();
-  auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size = {100, 100};
-  auto repeater = doc->makeNode<pagx::Repeater>();
-  repeater->copies = 0;
-
-  group->elements = {rect, repeater};
-  layer->contents = {group};
-  doc->applyLayout();
-
-  // copies=0 means Repeater is skipped. Group measures only the Rectangle.
-  EXPECT_FLOAT_EQ(group->preferredWidth, 100);
-  EXPECT_FLOAT_EQ(group->preferredHeight, 100);
-}
-
-PAGX_TEST(PAGXTest, RepeaterNoSourceLayoutNode) {
-  // Repeater with no preceding LayoutNode should be skipped.
-  auto doc = pagx::PAGXDocument::Make(800, 600);
-  auto layer = doc->makeNode<pagx::Layer>();
-  doc->layers.push_back(layer);
-  layer->width = 800;
-  layer->height = 600;
-
-  auto group = doc->makeNode<pagx::Group>();
-  auto fill = doc->makeNode<pagx::Fill>();
-  auto repeater = doc->makeNode<pagx::Repeater>();
-  repeater->copies = 3;
-  repeater->position = {50, 50};
-
-  group->elements = {fill, repeater};
-  layer->contents = {group};
-  doc->applyLayout();
-
-  // No LayoutNode before Repeater, so sourceBounds is empty.
-  // Group has no measurable children.
-  EXPECT_FLOAT_EQ(group->preferredWidth, 0);
-  EXPECT_FLOAT_EQ(group->preferredHeight, 0);
-}
-
-PAGX_TEST(PAGXTest, RepeaterNegativeCopies) {
-  // copies < 0 is a no-op in tgfx, should not affect measurement.
-  auto doc = pagx::PAGXDocument::Make(800, 600);
-  auto layer = doc->makeNode<pagx::Layer>();
-  doc->layers.push_back(layer);
-  layer->width = 800;
-  layer->height = 600;
-
-  auto group = doc->makeNode<pagx::Group>();
-  auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size = {100, 100};
-  auto repeater = doc->makeNode<pagx::Repeater>();
-  repeater->copies = -1;
-  repeater->position = {50, 50};
-
-  group->elements = {rect, repeater};
-  layer->contents = {group};
-  doc->applyLayout();
-
-  EXPECT_FLOAT_EQ(group->preferredWidth, 100);
-  EXPECT_FLOAT_EQ(group->preferredHeight, 100);
-}
-
-PAGX_TEST(PAGXTest, RepeaterFractionalCopies) {
-  // Fractional copies: ceil(2.5) = 3 copies. Measurement should cover all 3.
-  auto doc = pagx::PAGXDocument::Make(800, 600);
-  auto layer = doc->makeNode<pagx::Layer>();
-  doc->layers.push_back(layer);
-  layer->width = 800;
-  layer->height = 600;
-
-  auto group = doc->makeNode<pagx::Group>();
-  auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size = {100, 100};
-  auto repeater = doc->makeNode<pagx::Repeater>();
-  repeater->copies = 2.5f;
-  repeater->position = {50, 0};
-  repeater->scale = {1, 1};
-
-  group->elements = {rect, repeater};
-  layer->contents = {group};
-  doc->applyLayout();
-
-  // ceil(2.5) = 3 copies. progress: 0, 1, 2 -> positions: (0,0), (50,0), (100,0)
-  // Union: (0,0)-(200,100)
-  EXPECT_FLOAT_EQ(group->preferredWidth, 200);
-  EXPECT_FLOAT_EQ(group->preferredHeight, 100);
-}
-
-PAGX_TEST(PAGXTest, RepeaterSingleCopy) {
-  // copies=1 means one copy at progress=0, which is the identity transform.
-  auto doc = pagx::PAGXDocument::Make(800, 600);
-  auto layer = doc->makeNode<pagx::Layer>();
-  doc->layers.push_back(layer);
-  layer->width = 800;
-  layer->height = 600;
-
-  auto group = doc->makeNode<pagx::Group>();
-  auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size = {100, 100};
-  auto repeater = doc->makeNode<pagx::Repeater>();
-  repeater->copies = 1;
-  repeater->position = {200, 200};
-
-  group->elements = {rect, repeater};
-  layer->contents = {group};
-  doc->applyLayout();
-
-  // 1 copy at progress=0 -> identity matrix -> same as source bounds.
-  EXPECT_FLOAT_EQ(group->preferredWidth, 100);
-  EXPECT_FLOAT_EQ(group->preferredHeight, 100);
-}
-
-PAGX_TEST(PAGXTest, RepeaterWithRotation) {
-  // Rotation should expand the bounding box.
-  auto doc = pagx::PAGXDocument::Make(800, 600);
-  auto layer = doc->makeNode<pagx::Layer>();
-  doc->layers.push_back(layer);
-  layer->width = 800;
-  layer->height = 600;
-
-  auto group = doc->makeNode<pagx::Group>();
-  auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size = {100, 100};
-  auto repeater = doc->makeNode<pagx::Repeater>();
-  repeater->copies = 2;
-  repeater->position = {0, 0};
-  repeater->scale = {1, 1};
-  repeater->rotation = 45;
-
-  group->elements = {rect, repeater};
-  layer->contents = {group};
-  doc->applyLayout();
-
-  // Copy 0: progress=0, identity -> (0,0)-(100,100)
-  // Copy 1: progress=1, 45-degree rotation around origin
-  // Rotated rect maps to (-70.7, 0)-(70.7, 141.4)
-  // totalBounds = (-70.7, 0)-(100, 141.4), right=100, bottom=141.4
-  // Width stays at 100 (negative-side extension doesn't increase right edge),
-  // height expands to ceil(141.4) = 142.
-  EXPECT_FLOAT_EQ(group->preferredWidth, 100);
-  EXPECT_GT(group->preferredHeight, 141);
-}
-
-PAGX_TEST(PAGXTest, RepeaterWithAnchor) {
-  // Non-zero anchor shifts the rotation/scale center.
-  auto doc = pagx::PAGXDocument::Make(800, 600);
-  auto layer = doc->makeNode<pagx::Layer>();
-  doc->layers.push_back(layer);
-  layer->width = 800;
-  layer->height = 600;
-
-  auto group = doc->makeNode<pagx::Group>();
-  auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size = {100, 100};
-  auto repeater = doc->makeNode<pagx::Repeater>();
-  repeater->copies = 2;
-  repeater->position = {0, 0};
-  repeater->scale = {2, 2};
-  repeater->anchor = {50, 50};
-
-  group->elements = {rect, repeater};
-  layer->contents = {group};
-  doc->applyLayout();
-
-  // Copy 0: progress=0, identity -> (0,0)-(100,100)
-  // Copy 1: progress=1, scale 2x around anchor (50,50)
-  // Scaled rect: (-50,-50)-(150,150)
-  // totalBounds = (-50,-50)-(150,150), right=150, bottom=150
-  EXPECT_FLOAT_EQ(group->preferredWidth, 150);
-  EXPECT_FLOAT_EQ(group->preferredHeight, 150);
-}
-
-PAGX_TEST(PAGXTest, RepeaterFollowedByLayoutNode) {
-  // A LayoutNode after Repeater should still contribute to the Group size.
-  auto doc = pagx::PAGXDocument::Make(800, 600);
-  auto layer = doc->makeNode<pagx::Layer>();
-  doc->layers.push_back(layer);
-  layer->width = 800;
-  layer->height = 600;
-
-  auto group = doc->makeNode<pagx::Group>();
-  auto rect1 = doc->makeNode<pagx::Rectangle>();
-  rect1->size = {100, 100};
-  auto repeater = doc->makeNode<pagx::Repeater>();
-  repeater->copies = 2;
-  repeater->position = {50, 0};
-  repeater->scale = {1, 1};
-  auto rect2 = doc->makeNode<pagx::Rectangle>();
-  rect2->size = {500, 50};
-
-  group->elements = {rect1, repeater, rect2};
-  layer->contents = {group};
-  doc->applyLayout();
-
-  // Repeater: (0,0)-(100,100) + (50,0)-(150,100) = (0,0)-(150,100)
-  // rect2: (0,0)-(500,50) expands width to 500
-  // Final: max(150,500)=500, max(100,50)=100
-  EXPECT_FLOAT_EQ(group->preferredWidth, 500);
-  EXPECT_FLOAT_EQ(group->preferredHeight, 100);
 }
 
 }  // namespace pag

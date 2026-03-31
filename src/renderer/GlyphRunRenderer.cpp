@@ -34,6 +34,68 @@
 
 namespace pagx {
 
+// Returns true if the matrix can be represented as an RSXform (uniform scale + rotation +
+// translation), i.e. the matrix has the form [scos, -ssin, tx; ssin, scos, ty; 0, 0, 1].
+static bool IsRSXformCompatible(const tgfx::Matrix& matrix) {
+  return matrix.getScaleX() == matrix.getScaleY() && matrix.getSkewX() == -matrix.getSkewY();
+}
+
+// Positioning modes for TextBlob runs, ordered from most compact to most general.
+enum class GlyphPositionMode { Point, RSXform, Matrix };
+
+// Returns the minimum positioning mode that can represent the given matrix.
+static GlyphPositionMode ClassifyMatrix(const tgfx::Matrix& matrix) {
+  if (matrix.isTranslate()) {
+    return GlyphPositionMode::Point;
+  }
+  if (IsRSXformCompatible(matrix)) {
+    return GlyphPositionMode::RSXform;
+  }
+  return GlyphPositionMode::Matrix;
+}
+
+// Promotes the mode to the more general of the two.
+static GlyphPositionMode PromoteMode(GlyphPositionMode a, GlyphPositionMode b) {
+  return a > b ? a : b;
+}
+
+static void WriteRunWithMode(tgfx::TextBlobBuilder& builder, const tgfx::Font& font,
+                             const GlyphRun* run, const std::vector<tgfx::Matrix>& glyphMatrices,
+                             GlyphPositionMode mode) {
+  size_t count = run->glyphs.size();
+  if (mode == GlyphPositionMode::Matrix) {
+    auto& buffer = builder.allocRunMatrix(font, count);
+    memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
+    for (size_t i = 0; i < count; i++) {
+      auto& m = glyphMatrices[i];
+      size_t offset = i * 6;
+      buffer.positions[offset + 0] = m.getScaleX();
+      buffer.positions[offset + 1] = m.getSkewX();
+      buffer.positions[offset + 2] = m.getTranslateX();
+      buffer.positions[offset + 3] = m.getSkewY();
+      buffer.positions[offset + 4] = m.getScaleY();
+      buffer.positions[offset + 5] = m.getTranslateY();
+    }
+  } else if (mode == GlyphPositionMode::RSXform) {
+    auto& buffer = builder.allocRunRSXform(font, count);
+    memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
+    auto* xforms = reinterpret_cast<tgfx::RSXform*>(buffer.positions);
+    for (size_t i = 0; i < count; i++) {
+      auto& m = glyphMatrices[i];
+      xforms[i] =
+          tgfx::RSXform::Make(m.getScaleX(), m.getSkewY(), m.getTranslateX(), m.getTranslateY());
+    }
+  } else {
+    auto& buffer = builder.allocRunPos(font, count);
+    memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
+    auto* positions = reinterpret_cast<tgfx::Point*>(buffer.positions);
+    for (size_t i = 0; i < count; i++) {
+      positions[i] =
+          tgfx::Point::Make(glyphMatrices[i].getTranslateX(), glyphMatrices[i].getTranslateY());
+    }
+  }
+}
+
 std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(const Font* fontNode) {
   if (fontNode == nullptr || fontNode->glyphs.empty()) {
     return nullptr;
@@ -127,32 +189,29 @@ ShapedText GlyphRunRenderer::BuildTextBlob(const Text* text, const tgfx::Matrix&
       }
     }
 
+    // Step 1: Compute the final matrix for each glyph (source transform × inverseMatrix).
     bool hasTransforms = !run->scales.empty() || !run->rotations.empty() || !run->skews.empty();
-
-    if (hasTransforms) {
-      // Matrix mode: build a full affine transform per glyph, then apply inverse matrix.
-      // allocRunMatrix uses 6 floats per glyph: [scaleX, skewX, transX, skewY, scaleY, transY].
-      auto& buffer = builder.allocRunMatrix(font, count);
-      memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
-      float currentX = run->x;
-      for (size_t i = 0; i < count; i++) {
-        float posX = 0;
-        float posY = 0;
-        if (i < run->positions.size()) {
-          posX = run->x + run->positions[i].x;
-          posY = run->y + run->positions[i].y;
-          if (i < run->xOffsets.size()) {
-            posX += run->xOffsets[i];
-          }
-        } else if (i < run->xOffsets.size()) {
-          posX = run->x + run->xOffsets[i];
-          posY = run->y;
-        } else {
-          posX = currentX;
-          posY = run->y;
-          currentX += font.getAdvance(run->glyphs[i]);
+    std::vector<tgfx::Matrix> glyphMatrices(count);
+    float currentX = run->x;
+    for (size_t i = 0; i < count; i++) {
+      float posX = 0;
+      float posY = 0;
+      if (i < run->positions.size()) {
+        posX = run->x + run->positions[i].x;
+        posY = run->y + run->positions[i].y;
+        if (i < run->xOffsets.size()) {
+          posX += run->xOffsets[i];
         }
+      } else if (i < run->xOffsets.size()) {
+        posX = run->x + run->xOffsets[i];
+        posY = run->y;
+      } else {
+        posX = currentX;
+        posY = run->y;
+        currentX += font.getAdvance(run->glyphs[i]);
+      }
 
+      if (hasTransforms) {
         float sx = (i < run->scales.size()) ? run->scales[i].x : 1.0f;
         float sy = (i < run->scales.size()) ? run->scales[i].y : 1.0f;
         float rotation = (i < run->rotations.size()) ? run->rotations[i] : 0.0f;
@@ -181,59 +240,68 @@ ShapedText GlyphRunRenderer::BuildTextBlob(const Text* text, const tgfx::Matrix&
         }
         matrix.preTranslate(anchorX, anchorY);
         matrix.preTranslate(posX, posY);
-        matrix.preConcat(inverseMatrix);
-
-        // Write 6-float affine matrix
-        size_t offset = i * 6;
-        buffer.positions[offset + 0] = matrix.getScaleX();
-        buffer.positions[offset + 1] = matrix.getSkewX();
-        buffer.positions[offset + 2] = matrix.getTranslateX();
-        buffer.positions[offset + 3] = matrix.getSkewY();
-        buffer.positions[offset + 4] = matrix.getScaleY();
-        buffer.positions[offset + 5] = matrix.getTranslateY();
-      }
-    } else if (!run->positions.empty() && run->positions.size() >= count) {
-      // Point mode: apply inverse matrix to each position.
-      auto& buffer = builder.allocRunPos(font, count);
-      memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
-      auto* positions = reinterpret_cast<tgfx::Point*>(buffer.positions);
-      for (size_t i = 0; i < count; i++) {
-        float posX = run->x + run->positions[i].x;
-        float posY = run->y + run->positions[i].y;
-        if (i < run->xOffsets.size()) {
-          posX += run->xOffsets[i];
-        }
-        auto pt = tgfx::Point::Make(posX, posY);
-        inverseMatrix.mapPoints(&pt, 1);
-        positions[i] = pt;
-      }
-    } else if (!run->xOffsets.empty() && run->xOffsets.size() >= count) {
-      // Horizontal mode: convert to Point mode for inverse matrix application.
-      auto& buffer = builder.allocRunPos(font, count);
-      memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
-      auto* positions = reinterpret_cast<tgfx::Point*>(buffer.positions);
-      for (size_t i = 0; i < count; i++) {
-        auto pt = tgfx::Point::Make(run->x + run->xOffsets[i], run->y);
-        inverseMatrix.mapPoints(&pt, 1);
-        positions[i] = pt;
-      }
-    } else {
-      // Default mode: compute positions from font advances, then apply inverse matrix.
-      auto& buffer = builder.allocRunPos(font, count);
-      memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
-      auto* positions = reinterpret_cast<tgfx::Point*>(buffer.positions);
-      float currentX = run->x;
-      for (size_t i = 0; i < count; i++) {
-        auto pt = tgfx::Point::Make(currentX, run->y);
-        inverseMatrix.mapPoints(&pt, 1);
-        positions[i] = pt;
-        currentX += font.getAdvance(run->glyphs[i]);
+        matrix.postConcat(inverseMatrix);
+        glyphMatrices[i] = matrix;
+      } else {
+        auto matrix = tgfx::Matrix::MakeTrans(posX, posY);
+        matrix.postConcat(inverseMatrix);
+        glyphMatrices[i] = matrix;
       }
     }
+
+    // Step 2: Classify all glyph matrices to find the most compact positioning mode.
+    auto mode = GlyphPositionMode::Point;
+    for (size_t i = 0; i < count; i++) {
+      mode = PromoteMode(mode, ClassifyMatrix(glyphMatrices[i]));
+      if (mode == GlyphPositionMode::Matrix) {
+        break;
+      }
+    }
+
+    // Step 3: Write glyphs into the TextBlob with the determined mode.
+    WriteRunWithMode(builder, font, run, glyphMatrices, mode);
   }
 
   shapedText.textBlob = builder.build();
   return shapedText;
+}
+
+static void WriteLayoutRunWithMode(tgfx::TextBlobBuilder& builder, const tgfx::Font& font,
+                                   const std::vector<tgfx::GlyphID>& glyphs,
+                                   const std::vector<tgfx::Matrix>& glyphMatrices,
+                                   GlyphPositionMode mode) {
+  size_t count = glyphs.size();
+  if (mode == GlyphPositionMode::Matrix) {
+    auto& buffer = builder.allocRunMatrix(font, count);
+    memcpy(buffer.glyphs, glyphs.data(), count * sizeof(tgfx::GlyphID));
+    for (size_t i = 0; i < count; i++) {
+      auto& m = glyphMatrices[i];
+      size_t offset = i * 6;
+      buffer.positions[offset + 0] = m.getScaleX();
+      buffer.positions[offset + 1] = m.getSkewX();
+      buffer.positions[offset + 2] = m.getTranslateX();
+      buffer.positions[offset + 3] = m.getSkewY();
+      buffer.positions[offset + 4] = m.getScaleY();
+      buffer.positions[offset + 5] = m.getTranslateY();
+    }
+  } else if (mode == GlyphPositionMode::RSXform) {
+    auto& buffer = builder.allocRunRSXform(font, count);
+    memcpy(buffer.glyphs, glyphs.data(), count * sizeof(tgfx::GlyphID));
+    auto* xforms = reinterpret_cast<tgfx::RSXform*>(buffer.positions);
+    for (size_t i = 0; i < count; i++) {
+      auto& m = glyphMatrices[i];
+      xforms[i] =
+          tgfx::RSXform::Make(m.getScaleX(), m.getSkewY(), m.getTranslateX(), m.getTranslateY());
+    }
+  } else {
+    auto& buffer = builder.allocRunPos(font, count);
+    memcpy(buffer.glyphs, glyphs.data(), count * sizeof(tgfx::GlyphID));
+    auto* positions = reinterpret_cast<tgfx::Point*>(buffer.positions);
+    for (size_t i = 0; i < count; i++) {
+      positions[i] =
+          tgfx::Point::Make(glyphMatrices[i].getTranslateX(), glyphMatrices[i].getTranslateY());
+    }
+  }
 }
 
 ShapedText GlyphRunRenderer::BuildTextBlobFromLayoutRuns(
@@ -245,39 +313,38 @@ ShapedText GlyphRunRenderer::BuildTextBlobFromLayoutRuns(
     if (run.glyphs.empty() || run.font.getTypeface() == nullptr) {
       continue;
     }
-    // Ensure positions match glyphs count; skip malformed runs.
     if (run.positions.size() < run.glyphs.size()) {
       continue;
     }
     size_t count = run.glyphs.size();
-    bool hasXforms = !run.xforms.empty();
+    bool hasXforms = !run.xforms.empty() && run.xforms.size() >= count;
 
-    if (hasXforms) {
-      // RSXform mode: apply inverse matrix to RSXform translation only.
-      auto& buffer = builder.allocRunRSXform(run.font, count);
-      for (size_t i = 0; i < count; i++) {
-        buffer.glyphs[i] = run.glyphs[i];
+    // Step 1: Compute the final matrix for each glyph.
+    std::vector<tgfx::Matrix> glyphMatrices(count);
+    for (size_t i = 0; i < count; i++) {
+      tgfx::Matrix matrix;
+      if (hasXforms) {
+        auto& xf = run.xforms[i];
+        matrix.setAll(xf.scos, -xf.ssin, xf.tx, xf.ssin, xf.scos, xf.ty);
+      } else {
+        auto& pos = run.positions[i];
+        matrix = tgfx::Matrix::MakeTrans(pos.x, pos.y);
       }
-      auto* xforms = reinterpret_cast<tgfx::RSXform*>(buffer.positions);
-      for (size_t i = 0; i < count; i++) {
-        auto xf = run.xforms[i];
-        auto pt = tgfx::Point::Make(xf.tx, xf.ty);
-        inverseMatrix.mapPoints(&pt, 1);
-        xforms[i] = tgfx::RSXform::Make(xf.scos, xf.ssin, pt.x, pt.y);
-      }
-    } else {
-      // Horizontal / upright vertical glyphs: simple Point mode with inverse matrix.
-      auto& buffer = builder.allocRunPos(run.font, count);
-      for (size_t i = 0; i < count; i++) {
-        buffer.glyphs[i] = run.glyphs[i];
-      }
-      auto* positions = reinterpret_cast<tgfx::Point*>(buffer.positions);
-      for (size_t i = 0; i < count; i++) {
-        auto pt = (i < run.positions.size()) ? run.positions[i] : tgfx::Point::Zero();
-        inverseMatrix.mapPoints(&pt, 1);
-        positions[i] = pt;
+      matrix.postConcat(inverseMatrix);
+      glyphMatrices[i] = matrix;
+    }
+
+    // Step 2: Classify all glyph matrices to find the most compact positioning mode.
+    auto mode = GlyphPositionMode::Point;
+    for (size_t i = 0; i < count; i++) {
+      mode = PromoteMode(mode, ClassifyMatrix(glyphMatrices[i]));
+      if (mode == GlyphPositionMode::Matrix) {
+        break;
       }
     }
+
+    // Step 3: Write glyphs into the TextBlob with the determined mode.
+    WriteLayoutRunWithMode(builder, run.font, run.glyphs, glyphMatrices, mode);
   }
 
   shapedText.textBlob = builder.build();
