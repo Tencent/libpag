@@ -40,9 +40,25 @@ namespace pagx {
  * Text local coordinates for standalone Text. GlyphIDs reference the original (source) font.
  */
 struct TextLayoutGlyphRun {
+  /**
+   * The font used for rendering these glyphs.
+   */
   tgfx::Font font = {};
+
+  /**
+   * Glyph IDs resolved from the text content using the font.
+   */
   std::vector<tgfx::GlyphID> glyphs = {};
+
+  /**
+   * Per-glyph positions in layout coordinates. Used when glyphs have simple translations.
+   */
   std::vector<tgfx::Point> positions = {};
+
+  /**
+   * Per-glyph RSXform transforms. Used when glyphs require rotation or scaling (e.g., vertical
+   * text).
+   */
   std::vector<tgfx::RSXform> xforms = {};
 };
 
