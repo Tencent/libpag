@@ -85,7 +85,7 @@ static size_t DecodeUTF8Char(const char* data, size_t remaining, int32_t* unicha
 // Build context that maintains state during text layout
 class TextLayoutContext {
  public:
-  TextLayoutContext(FontConfig* fontConfig) : fontConfig_(fontConfig) {
+  explicit TextLayoutContext(FontConfig* fontConfig) : fontConfig_(fontConfig) {
   }
 
   friend class TextLayout;
