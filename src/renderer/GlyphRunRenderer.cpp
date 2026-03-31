@@ -59,13 +59,13 @@ static GlyphPositionMode PromoteMode(GlyphPositionMode a, GlyphPositionMode b) {
   return a > b ? a : b;
 }
 
-static void WriteRunWithMode(tgfx::TextBlobBuilder& builder, const tgfx::Font& font,
-                             const GlyphRun* run, const std::vector<tgfx::Matrix>& glyphMatrices,
-                             GlyphPositionMode mode) {
-  size_t count = run->glyphs.size();
+static void WriteGlyphsWithMode(tgfx::TextBlobBuilder& builder, const tgfx::Font& font,
+                                const tgfx::GlyphID* glyphs, size_t count,
+                                const std::vector<tgfx::Matrix>& glyphMatrices,
+                                GlyphPositionMode mode) {
   if (mode == GlyphPositionMode::Matrix) {
     auto& buffer = builder.allocRunMatrix(font, count);
-    memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
+    memcpy(buffer.glyphs, glyphs, count * sizeof(tgfx::GlyphID));
     for (size_t i = 0; i < count; i++) {
       auto& m = glyphMatrices[i];
       size_t offset = i * 6;
@@ -78,7 +78,7 @@ static void WriteRunWithMode(tgfx::TextBlobBuilder& builder, const tgfx::Font& f
     }
   } else if (mode == GlyphPositionMode::RSXform) {
     auto& buffer = builder.allocRunRSXform(font, count);
-    memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
+    memcpy(buffer.glyphs, glyphs, count * sizeof(tgfx::GlyphID));
     auto* xforms = reinterpret_cast<tgfx::RSXform*>(buffer.positions);
     for (size_t i = 0; i < count; i++) {
       auto& m = glyphMatrices[i];
@@ -87,7 +87,7 @@ static void WriteRunWithMode(tgfx::TextBlobBuilder& builder, const tgfx::Font& f
     }
   } else {
     auto& buffer = builder.allocRunPos(font, count);
-    memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
+    memcpy(buffer.glyphs, glyphs, count * sizeof(tgfx::GlyphID));
     auto* positions = reinterpret_cast<tgfx::Point*>(buffer.positions);
     for (size_t i = 0; i < count; i++) {
       positions[i] =
@@ -259,49 +259,11 @@ ShapedText GlyphRunRenderer::BuildTextBlob(const Text* text, const tgfx::Matrix&
     }
 
     // Step 3: Write glyphs into the TextBlob with the determined mode.
-    WriteRunWithMode(builder, font, run, glyphMatrices, mode);
+    WriteGlyphsWithMode(builder, font, run->glyphs.data(), count, glyphMatrices, mode);
   }
 
   shapedText.textBlob = builder.build();
   return shapedText;
-}
-
-static void WriteLayoutRunWithMode(tgfx::TextBlobBuilder& builder, const tgfx::Font& font,
-                                   const std::vector<tgfx::GlyphID>& glyphs,
-                                   const std::vector<tgfx::Matrix>& glyphMatrices,
-                                   GlyphPositionMode mode) {
-  size_t count = glyphs.size();
-  if (mode == GlyphPositionMode::Matrix) {
-    auto& buffer = builder.allocRunMatrix(font, count);
-    memcpy(buffer.glyphs, glyphs.data(), count * sizeof(tgfx::GlyphID));
-    for (size_t i = 0; i < count; i++) {
-      auto& m = glyphMatrices[i];
-      size_t offset = i * 6;
-      buffer.positions[offset + 0] = m.getScaleX();
-      buffer.positions[offset + 1] = m.getSkewX();
-      buffer.positions[offset + 2] = m.getTranslateX();
-      buffer.positions[offset + 3] = m.getSkewY();
-      buffer.positions[offset + 4] = m.getScaleY();
-      buffer.positions[offset + 5] = m.getTranslateY();
-    }
-  } else if (mode == GlyphPositionMode::RSXform) {
-    auto& buffer = builder.allocRunRSXform(font, count);
-    memcpy(buffer.glyphs, glyphs.data(), count * sizeof(tgfx::GlyphID));
-    auto* xforms = reinterpret_cast<tgfx::RSXform*>(buffer.positions);
-    for (size_t i = 0; i < count; i++) {
-      auto& m = glyphMatrices[i];
-      xforms[i] =
-          tgfx::RSXform::Make(m.getScaleX(), m.getSkewY(), m.getTranslateX(), m.getTranslateY());
-    }
-  } else {
-    auto& buffer = builder.allocRunPos(font, count);
-    memcpy(buffer.glyphs, glyphs.data(), count * sizeof(tgfx::GlyphID));
-    auto* positions = reinterpret_cast<tgfx::Point*>(buffer.positions);
-    for (size_t i = 0; i < count; i++) {
-      positions[i] =
-          tgfx::Point::Make(glyphMatrices[i].getTranslateX(), glyphMatrices[i].getTranslateY());
-    }
-  }
 }
 
 ShapedText GlyphRunRenderer::BuildTextBlobFromLayoutRuns(
@@ -344,7 +306,7 @@ ShapedText GlyphRunRenderer::BuildTextBlobFromLayoutRuns(
     }
 
     // Step 3: Write glyphs into the TextBlob with the determined mode.
-    WriteLayoutRunWithMode(builder, run.font, run.glyphs, glyphMatrices, mode);
+    WriteGlyphsWithMode(builder, run.font, run.glyphs.data(), count, glyphMatrices, mode);
   }
 
   shapedText.textBlob = builder.build();
