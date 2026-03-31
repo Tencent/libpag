@@ -28,6 +28,7 @@
 #include "pagx/types/TextAnchor.h"
 #include "pagx/types/TextBaseline.h"
 #include "tgfx/core/Font.h"
+#include "tgfx/core/RSXform.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/TextBlob.h"
 
@@ -42,8 +43,7 @@ struct TextLayoutGlyphRun {
   tgfx::Font font = {};
   std::vector<tgfx::GlyphID> glyphs = {};
   std::vector<tgfx::Point> positions = {};
-  std::vector<float> rotations = {};
-  std::vector<tgfx::Point> scales = {};
+  std::vector<tgfx::RSXform> xforms = {};
 };
 
 /**

@@ -303,7 +303,7 @@ static GlyphRun* CreateGlyphRunFromLayoutRun(
     auto it = glyphMapping.find(key);
     glyphRun->glyphs.push_back(it != glyphMapping.end() ? it->second : 0);
   }
-  bool hasTransforms = !tlRun.rotations.empty() || !tlRun.scales.empty();
+  bool hasTransforms = !tlRun.xforms.empty();
   glyphRun->positions.reserve(indices.size());
   for (auto idx : indices) {
     if (idx < tlRun.positions.size()) {
@@ -311,20 +311,15 @@ static GlyphRun* CreateGlyphRunFromLayoutRun(
     }
   }
   if (hasTransforms) {
-    if (!tlRun.scales.empty()) {
-      glyphRun->scales.reserve(indices.size());
-      for (auto idx : indices) {
-        if (idx < tlRun.scales.size()) {
-          glyphRun->scales.push_back({tlRun.scales[idx].x, tlRun.scales[idx].y});
-        }
-      }
-    }
-    if (!tlRun.rotations.empty()) {
-      glyphRun->rotations.reserve(indices.size());
-      for (auto idx : indices) {
-        if (idx < tlRun.rotations.size()) {
-          glyphRun->rotations.push_back(tlRun.rotations[idx]);
-        }
+    glyphRun->scales.reserve(indices.size());
+    glyphRun->rotations.reserve(indices.size());
+    for (auto idx : indices) {
+      if (idx < tlRun.xforms.size()) {
+        auto& xf = tlRun.xforms[idx];
+        float scale = std::hypot(xf.scos, xf.ssin);
+        float rotation = std::atan2(xf.ssin, xf.scos) * 180.0f / static_cast<float>(M_PI);
+        glyphRun->scales.push_back({scale, scale});
+        glyphRun->rotations.push_back(rotation);
       }
     }
   }

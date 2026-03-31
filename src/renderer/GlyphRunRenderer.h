@@ -19,7 +19,6 @@
 #pragma once
 
 #include <memory>
-#include <unordered_map>
 #include <vector>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Typeface.h"

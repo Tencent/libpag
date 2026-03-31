@@ -910,19 +910,13 @@ class TextLayoutContext {
         run.glyphs.reserve(count);
         run.positions.reserve(count);
         if (runUseRSXform) {
-          run.rotations.reserve(count);
-          run.scales.reserve(count);
+          run.xforms.reserve(count);
         }
         for (size_t i = runStart; i < runEnd; i++) {
           run.glyphs.push_back(glyphs[i].glyphID);
           if (runUseRSXform) {
-            auto& xform = glyphs[i].xform;
-            run.positions.push_back(tgfx::Point::Make(xform.tx, xform.ty));
-            // Decompose RSXform: scale = hypot(scos, ssin), rotation = atan2(ssin, scos)
-            float scale = std::hypot(xform.scos, xform.ssin);
-            float rotation = std::atan2(xform.ssin, xform.scos) * 180.0f / static_cast<float>(M_PI);
-            run.rotations.push_back(rotation);
-            run.scales.push_back(tgfx::Point::Make(scale, scale));
+            run.positions.push_back(tgfx::Point::Make(glyphs[i].xform.tx, glyphs[i].xform.ty));
+            run.xforms.push_back(glyphs[i].xform);
           } else {
             run.positions.push_back(glyphs[i].position);
           }

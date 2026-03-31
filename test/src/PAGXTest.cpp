@@ -5182,14 +5182,14 @@ PAGX_TEST(PAGXTest, VerticalTextLayoutGlyphRun) {
   auto& layoutRuns = text->getLayoutRuns();
   ASSERT_FALSE(layoutRuns.empty());
 
-  // Vertical Latin text should have per-glyph rotations (90-degree rotation for sideways glyphs).
-  bool hasRotations = false;
+  // Vertical Latin text should have per-glyph xforms (rotation for sideways glyphs).
+  bool hasXforms = false;
   for (auto& run : layoutRuns) {
-    if (!run.rotations.empty()) {
-      hasRotations = true;
+    if (!run.xforms.empty()) {
+      hasXforms = true;
     }
   }
-  EXPECT_TRUE(hasRotations);
+  EXPECT_TRUE(hasXforms);
 
   // Verify TextBlob was generated.
   auto blob = text->getTextBlob();
