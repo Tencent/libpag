@@ -273,9 +273,8 @@ std::vector<ValidationError> ValidateFile(const std::string& filePath) {
           auto lineStr = errorStr.substr(5, colonPos - 5);
           char* endPtr = nullptr;
           long lineNum = strtol(lineStr.c_str(), &endPtr, 10);
-          error.line = (endPtr != lineStr.c_str() && *endPtr == '\0')
-                           ? static_cast<int>(lineNum)
-                           : 0;
+          error.line =
+              (endPtr != lineStr.c_str() && *endPtr == '\0') ? static_cast<int>(lineNum) : 0;
           error.message = errorStr.substr(colonPos + 2);  // skip ": "
         } else {
           error.message = errorStr;
