@@ -19,6 +19,7 @@
 #include "cli/CommandValidator.h"
 #include <libxml/parser.h>
 #include <libxml/xmlschemas.h>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <string>
@@ -269,7 +270,12 @@ std::vector<ValidationError> ValidateFile(const std::string& filePath) {
       if (errorStr.compare(0, 5, "line ") == 0) {
         auto colonPos = errorStr.find(':', 5);
         if (colonPos != std::string::npos) {
-          error.line = std::stoi(errorStr.substr(5, colonPos - 5));
+          auto lineStr = errorStr.substr(5, colonPos - 5);
+          char* endPtr = nullptr;
+          long lineNum = strtol(lineStr.c_str(), &endPtr, 10);
+          error.line = (endPtr != lineStr.c_str() && *endPtr == '\0')
+                           ? static_cast<int>(lineNum)
+                           : 0;
           error.message = errorStr.substr(colonPos + 2);  // skip ": "
         } else {
           error.message = errorStr;
