@@ -336,7 +336,6 @@ class TextLayoutContext {
         maxLineWidth = std::max(maxLineWidth, line.width);
         totalHeight += line.maxLineHeight;
       }
-      // Compute anchor offset so bounds reflect the text origin based on textAlign.
       // Compute anchor offset for standalone Text (no explicit box) so bounds reflect
       // the text origin based on textAlign. When boxWidth is set, bounds start at (0,0).
       float anchorX = 0;
