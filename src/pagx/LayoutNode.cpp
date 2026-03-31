@@ -254,8 +254,8 @@ void LayoutNode::MeasureChildNodes(const std::vector<Element*>& elements, float 
         auto transformed = matrix.mapRect(sourceBounds);
         totalBounds.join(transformed);
       }
-      maxX = std::max(maxX, totalBounds.width());
-      maxY = std::max(maxY, totalBounds.height());
+      maxX = std::max(maxX, totalBounds.right);
+      maxY = std::max(maxY, totalBounds.bottom);
       sourceBounds = totalBounds;
     }
   }

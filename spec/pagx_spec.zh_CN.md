@@ -1449,8 +1449,6 @@ Line 3]]>
 
 GlyphRun 定义一组字形的预排版数据，每个 GlyphRun 独立引用一个字体资源。
 
-**坐标系**：GlyphRun 的位置属性（`x`、`y`、`xOffsets`、`positions`）使用**排版坐标系** —— 对于 TextBox 内的 Text，坐标相对于 TextBox 原点；对于独立 Text，坐标相对于 Text 自身原点。渲染时，引擎会应用相应的逆变换将排版坐标转换回 Text 本地坐标。
-
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `font` | idref | (必填) | 引用 Font 资源 `@id` |
