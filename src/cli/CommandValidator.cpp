@@ -168,8 +168,8 @@ static void CheckTextBoxNesting(const PAGXDocument* doc, std::vector<ValidationE
               continue;
             }
 
-            if (child->nodeType() == NodeType::Group && child->nodeType() != NodeType::TextBox) {
-              // Group inside TextBox (but not TextBox, which would be caught above)
+            if (child->nodeType() == NodeType::Group) {
+              // Group inside TextBox (TextBox is caught by the outer branch above)
               ValidationError error = {};
               error.line = 0;
               error.message =
