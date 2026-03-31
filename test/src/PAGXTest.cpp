@@ -528,7 +528,7 @@ PAGX_TEST(PAGXTest, TextBoxEmbeddedGlyphRun) {
   auto strokeColor = doc->makeNode<pagx::SolidColor>();
   strokeColor->color = {0.8f, 0.2f, 0.2f, 1.0f};
   stroke->color = strokeColor;
-  stroke->width = 2;
+  stroke->width = 1;
   group->elements.push_back(stroke);
 
   textBox->elements.push_back(group);
