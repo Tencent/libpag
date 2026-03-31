@@ -18,9 +18,6 @@
 
 #pragma once
 
-#include <algorithm>
-#include <cmath>
-#include <limits>
 #include "pagx/layout/LayoutNode.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/types/Point.h"
@@ -90,41 +87,7 @@ class Polystar : public Element, public LayoutNode {
    * Unlike using outerRadius as a square, this accounts for the actual vertex positions
    * determined by pointCount, rotation, and innerRadius (for star type).
    */
-  Rect computeBounds() const {
-    auto numPoints = static_cast<int>(ceilf(pointCount));
-    float startAngle = (rotation - 90.0f) * static_cast<float>(M_PI) / 180.0f;
-    float minX = std::numeric_limits<float>::max();
-    float minY = std::numeric_limits<float>::max();
-    float maxX = std::numeric_limits<float>::lowest();
-    float maxY = std::numeric_limits<float>::lowest();
-    if (type == PolystarType::Star) {
-      float angleStep = static_cast<float>(M_PI) / pointCount;
-      float angle = startAngle;
-      for (int i = 0; i < numPoints * 2; i++) {
-        float radius = (i % 2 == 0) ? outerRadius : innerRadius;
-        float vx = radius * cosf(angle);
-        float vy = radius * sinf(angle);
-        minX = std::min(minX, vx);
-        minY = std::min(minY, vy);
-        maxX = std::max(maxX, vx);
-        maxY = std::max(maxY, vy);
-        angle += angleStep;
-      }
-    } else {
-      float angleStep = 2.0f * static_cast<float>(M_PI) / static_cast<float>(numPoints);
-      float angle = startAngle;
-      for (int i = 0; i < numPoints; i++) {
-        float vx = outerRadius * cosf(angle);
-        float vy = outerRadius * sinf(angle);
-        minX = std::min(minX, vx);
-        minY = std::min(minY, vy);
-        maxX = std::max(maxX, vx);
-        maxY = std::max(maxY, vy);
-        angle += angleStep;
-      }
-    }
-    return Rect::MakeXYWH(minX, minY, maxX - minX, maxY - minY);
-  }
+  Rect computeBounds() const;
 
  protected:
   void onMeasure(const LayoutContext& context) override;
