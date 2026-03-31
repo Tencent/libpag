@@ -162,6 +162,7 @@ void PAGXView::updateSize() {
   if (window == nullptr) {
     return;
   }
+  surface = nullptr;
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
