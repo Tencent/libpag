@@ -209,6 +209,11 @@ static int ConvertToPAGX(const ConvertOptions& options) {
     return 1;
   }
   out << xml;
+  out.close();
+  if (out.fail()) {
+    std::cerr << "pagx convert: error: failed to write '" << options.outputFile << "'\n";
+    return 1;
+  }
 
   std::cout << "pagx convert: wrote " << options.outputFile << "\n";
   return 0;
