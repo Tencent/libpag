@@ -88,10 +88,7 @@ std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(const Fo
     typeface = builder.detach();
   }
 
-  if (typeface) {
-    return typeface;
-  }
-  return nullptr;
+  return typeface;
 }
 
 ShapedText GlyphRunRenderer::BuildTextBlob(const Text* text, const tgfx::Matrix& inverseMatrix) {
