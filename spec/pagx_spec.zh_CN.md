@@ -702,7 +702,7 @@ PAGX 文档采用层级结构组织内容：
 |------|---------|------|
 | Rectangle | 几何中心 | 未设置时默认为 `(size.width/2, size.height/2)`，使左上角对齐原点 |
 | Ellipse | 几何中心 | 同 Rectangle |
-| Polystar | 几何中心 | 未设置时默认为 `(outerRadius, outerRadius)`，使左上角对齐原点 |
+| Polystar | 几何中心 | 未设置时默认为 `(-bounds.x, -bounds.y)`，使像素左上角对齐原点 |
 | Path | 坐标系原点 | `position="0,0"` 时路径数据坐标直接作为绘制坐标 |
 | Text | 由 `textAnchor` 决定 | `start`：基线起点；`center`：水平中点；`end`：末尾 |
 | TextBox | 左上角 | `position="0,0"` 时文本区域从原点开始 |
@@ -732,7 +732,7 @@ centerX=C:  tx = (W/2 + C) - B.centerX
 | TextBox | 拉伸排版区域 | 修改 `size` 填满目标区域，改变文字排版范围 |
 | Group | 推导布局尺寸 | 对齐目标区域并设置布局尺寸，内部子元素按新尺寸重新布局，不影响渲染 |
 | 子 Layer | 推导尺寸 | 始终从父容器推导该维度的尺寸（`width = 父.width - left - right`），覆盖显式 `width`/`height` |
-| Polystar、Path、Text | 等比缩放适配 | 单轴对边约束时紧贴该轴边界等比缩放；双轴对边约束时取两轴中较小的缩放因子（fit 模式），在较长轴方向居中。Polystar 使用其框边界（outerRadius×2 × outerRadius×2）进行缩放计算 |
+| Polystar、Path、Text | 等比缩放适配 | 单轴对边约束时紧贴该轴边界等比缩放；双轴对边约束时取两轴中较小的缩放因子（fit 模式），在较长轴方向居中 |
 
 **拉伸**（Rectangle、Ellipse、TextBox）：
 
@@ -1287,7 +1287,7 @@ boundingRect.bottom = position.y + size.height / 2
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `position` | Point | (outerRadius, outerRadius) | 中心点坐标，设置约束属性时由约束系统自动计算。未设置时默认为 `(outerRadius, outerRadius)`，使左上角对齐原点。推荐使用约束属性（`left`/`top`）进行定位 |
+| `position` | Point | (-bounds.x, -bounds.y) | 中心点坐标，设置约束属性时由约束系统自动计算。未设置时默认为像素边界框原点的负值，使像素左上角对齐原点。推荐使用约束属性（`left`/`top`）进行定位 |
 | `type` | PolystarType | star | 类型（见下方） |
 | `pointCount` | float | 5 | 顶点数（支持小数） |
 | `outerRadius` | float | 100 | 外半径 |

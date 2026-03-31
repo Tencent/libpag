@@ -35,8 +35,8 @@ namespace pagx {
 class Polystar : public Element, public LayoutNode {
  public:
   /**
-   * The center point of the polystar. When not explicitly set, defaults to
-   * (outerRadius, outerRadius) so that the top-left corner aligns with the origin (0, 0).
+   * The center point of the polystar. When not explicitly set, defaults to the negative of the
+   * bounding box origin so that the top-left pixel aligns with the origin (0, 0).
    */
   Point position = {};
 

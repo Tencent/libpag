@@ -702,7 +702,7 @@ All content nodes have a `position` attribute representing the element's anchor 
 |---------|----------------|-------------|
 | Rectangle | Geometric center | When not set, defaults to `(size.width/2, size.height/2)`, placing the top-left corner at the origin |
 | Ellipse | Geometric center | Same as Rectangle |
-| Polystar | Geometric center | When not set, defaults to `(outerRadius, outerRadius)`, placing the top-left corner at the origin |
+| Polystar | Geometric center | When not set, defaults to `(-bounds.x, -bounds.y)` of the computed bounding box, placing the top-left pixel at the origin |
 | Path | Coordinate origin | `position="0,0"` means path data coordinates are used directly |
 | TextPath | Coordinate origin | Same as Path; constraint positioning shifts the path coordinate origin |
 | Text | Determined by `textAnchor` | `start`: baseline start; `center`: horizontal midpoint; `end`: end |
@@ -1288,7 +1288,7 @@ Supports both regular polygon and star modes.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `position` | Point | (outerRadius, outerRadius) | Center point coordinate, computed from constraint attributes when set. When not set, defaults to `(outerRadius, outerRadius)`, placing the top-left corner at the origin. Prefer constraint attributes (`left`/`top`) for positioning |
+| `position` | Point | (-bounds.x, -bounds.y) | Center point coordinate, computed from constraint attributes when set. When not set, defaults to the negative of the bounding box origin, placing the top-left pixel at the origin. Prefer constraint attributes (`left`/`top`) for positioning |
 | `type` | PolystarType | star | Type (see below) |
 | `pointCount` | float | 5 | Number of points (supports decimals) |
 | `outerRadius` | float | 100 | Outer radius |

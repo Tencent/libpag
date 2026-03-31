@@ -225,7 +225,7 @@ capability — it is not a layout mode. Supported elements:
 | Element Type | Behavior | Details |
 |--------------|----------|--------|
 | Rectangle, Ellipse, TextBox | **STRETCH** | Resize to fill target area |
-| Path | **SCALE TO FIT** | Single-axis: scale to exactly fill, other axis proportional; Both-axis: use smaller scale factor (fit mode), center on longer axis. Polystar uses frame bounds (outerRadius×2 × outerRadius×2) |
+| Path, Polystar | **SCALE TO FIT** | Single-axis: scale to exactly fill, other axis proportional; Both-axis: use smaller scale factor (fit mode), center on longer axis |
 | TextPath | **SCALE TO FIT** | Same as Path — scales path data proportionally |
 | Group | **DERIVE SIZE** | Align to target area; set layout size for child constraint reference |
 | Child Layer | **ALWAYS OVERRIDE** | Opposite-pair constraints always override: `width = parent.width - left - right`, `x = left` |
@@ -255,9 +255,10 @@ Key rules:
   3. Content measurement (automatic from child element bounds)
 - **Content Bounds**: Constraint "edges" refer to an element's content bounds edges. Bounds
   differ by element type:
-  - **Frame-aligned** (Rectangle, Ellipse, Polystar, TextBox, Group, Layer): bounds = [0, width] × [0,
-    height] in local coordinates. `left="0"` aligns the logical frame's left edge to the container.
-  - **Pixel-aligned** (Path, Text, TextPath): bounds = actual rendered pixel boundary.
+  - **Frame-aligned** (Rectangle, Ellipse, TextBox, Group, Layer): bounds = [0, width] × [0,
+    height] in local coordinates. For Polystar, the frame is [0, outerRadius×2] × [0, outerRadius×2].
+    `left="0"` aligns the logical frame's left edge to the container.
+  - **Pixel-aligned** (Path, Text, Polystar, TextPath): bounds = actual rendered pixel boundary.
     `left="0"` shifts content so rendered pixels touch the container's left edge. For Text,
     bounds are the line-box bounds (advance width × font metrics line height), which provides
     stable measurement independent of specific glyph shapes.
@@ -506,7 +507,7 @@ is sequential and forward-only.
 <Polystar left="50" top="50" type="star" pointCount="5" outerRadius="40" innerRadius="20"/>
 ```
 
-- `position` is the center point; defaults to `(outerRadius, outerRadius)` when omitted
+- `position` is the center point; defaults to `(-bounds.x, -bounds.y)` when omitted, aligning the top-left pixel to the origin
 - **Constraint attributes**: `left`, `right`, `top`, `bottom`, `centerX`, `centerY`, `width`, `height` — see §3 Constraint Positioning
 - **Positioning**: prefer constraint attributes over `position`
 - `type`: `polygon` (outer only) or `star` (outer + inner alternating)

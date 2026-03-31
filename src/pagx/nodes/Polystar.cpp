@@ -23,26 +23,31 @@
 namespace pagx {
 
 void Polystar::onMeasure(const LayoutContext&) {
-  preferredWidth = outerRadius * 2;
-  preferredHeight = outerRadius * 2;
+  auto bounds = computeBounds();
+  preferredX = bounds.x;
+  preferredY = bounds.y;
+  preferredWidth = bounds.width;
+  preferredHeight = bounds.height;
 }
 
 void Polystar::setLayoutSize(const LayoutContext&, float width, float height) {
-  float scale = LayoutNode::ComputeUniformScale(outerRadius * 2, outerRadius * 2, width, height);
+  float scale = LayoutNode::ComputeUniformScale(preferredWidth, preferredHeight, width, height);
   if (scale != 1.0f) {
     outerRadius = outerRadius * scale;
     innerRadius = innerRadius * scale;
   }
-  actualWidth = outerRadius * 2;
-  actualHeight = outerRadius * 2;
+  auto bounds = computeBounds();
+  actualWidth = bounds.width;
+  actualHeight = bounds.height;
 }
 
 void Polystar::setLayoutPosition(const LayoutContext&, float x, float y) {
+  auto bounds = computeBounds();
   if (!std::isnan(x)) {
-    position.x = x + actualWidth * 0.5f;
+    position.x = x - bounds.x;
   }
   if (!std::isnan(y)) {
-    position.y = y + actualHeight * 0.5f;
+    position.y = y - bounds.y;
   }
 }
 
