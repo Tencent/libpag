@@ -22,6 +22,8 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <numeric>
+#include <random>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -52,6 +54,7 @@
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
+#include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
@@ -65,7 +68,10 @@
 #include "pagx/svg/SVGBlendMode.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/svg/SVGTextLayout.h"
+#include "pagx/types/MergePathMode.h"
 #include "pagx/types/Rect.h"
+#include "pagx/types/SelectorTypes.h"
+#include "pagx/types/TrimType.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/StringParser.h"
 
@@ -503,6 +509,750 @@ static std::string BuildPolystarPath(const Polystar* ps) {
 // HTMLWriterContext
 //==============================================================================
 
+// Kappa value for 90-degree bezier arc approximation: 4 * (sqrt(2) - 1) / 3
+static constexpr float kBezierKappa = 0.5522847498307936f;
+
+// Compute signed area of a path to determine winding direction.
+// Positive = clockwise, negative = counter-clockwise.
+static float ComputePathSignedArea(const PathData& pathData) {
+  float area = 0.0f;
+  Point startPoint = {};
+  Point currentPoint = {};
+  pathData.forEach([&](PathVerb verb, const Point* pts) {
+    switch (verb) {
+      case PathVerb::Move:
+        startPoint = pts[0];
+        currentPoint = pts[0];
+        break;
+      case PathVerb::Line:
+        area += (currentPoint.x * pts[0].y - pts[0].x * currentPoint.y);
+        currentPoint = pts[0];
+        break;
+      case PathVerb::Quad:
+        // Approximate quadratic bezier as line to endpoint
+        area += (currentPoint.x * pts[1].y - pts[1].x * currentPoint.y);
+        currentPoint = pts[1];
+        break;
+      case PathVerb::Cubic:
+        // Approximate cubic bezier as line to endpoint
+        area += (currentPoint.x * pts[2].y - pts[2].x * currentPoint.y);
+        currentPoint = pts[2];
+        break;
+      case PathVerb::Close:
+        area += (currentPoint.x * startPoint.y - startPoint.x * currentPoint.y);
+        currentPoint = startPoint;
+        break;
+    }
+  });
+  return area / 2.0f;
+}
+
+// Check if path is clockwise (positive area)
+static bool IsPathClockwise(const PathData& pathData) {
+  return ComputePathSignedArea(pathData) > 0;
+}
+
+// Compute the arc length of a cubic bezier curve using recursive subdivision.
+static float ComputeCubicBezierLength(Point p0, Point p1, Point p2, Point p3, int depth = 0) {
+  if (depth > 8) {
+    // Max recursion depth reached, approximate with chord length
+    float dx = p3.x - p0.x;
+    float dy = p3.y - p0.y;
+    return std::sqrt(dx * dx + dy * dy);
+  }
+  // Chord length
+  float chordDx = p3.x - p0.x;
+  float chordDy = p3.y - p0.y;
+  float chordLen = std::sqrt(chordDx * chordDx + chordDy * chordDy);
+  // Control polygon length
+  float d01x = p1.x - p0.x, d01y = p1.y - p0.y;
+  float d12x = p2.x - p1.x, d12y = p2.y - p1.y;
+  float d23x = p3.x - p2.x, d23y = p3.y - p2.y;
+  float polyLen = std::sqrt(d01x * d01x + d01y * d01y) + std::sqrt(d12x * d12x + d12y * d12y) +
+                  std::sqrt(d23x * d23x + d23y * d23y);
+  // If close enough, use average
+  if (polyLen - chordLen < 0.01f) {
+    return (polyLen + chordLen) / 2.0f;
+  }
+  // Subdivide using de Casteljau
+  Point m01 = {(p0.x + p1.x) / 2, (p0.y + p1.y) / 2};
+  Point m12 = {(p1.x + p2.x) / 2, (p1.y + p2.y) / 2};
+  Point m23 = {(p2.x + p3.x) / 2, (p2.y + p3.y) / 2};
+  Point m012 = {(m01.x + m12.x) / 2, (m01.y + m12.y) / 2};
+  Point m123 = {(m12.x + m23.x) / 2, (m12.y + m23.y) / 2};
+  Point mid = {(m012.x + m123.x) / 2, (m012.y + m123.y) / 2};
+  return ComputeCubicBezierLength(p0, m01, m012, mid, depth + 1) +
+         ComputeCubicBezierLength(mid, m123, m23, p3, depth + 1);
+}
+
+// Compute the arc length of a quadratic bezier curve (convert to cubic)
+static float ComputeQuadBezierLength(Point p0, Point p1, Point p2) {
+  // Convert quadratic to cubic
+  Point c1 = {p0.x + 2.0f / 3.0f * (p1.x - p0.x), p0.y + 2.0f / 3.0f * (p1.y - p0.y)};
+  Point c2 = {p2.x + 2.0f / 3.0f * (p1.x - p2.x), p2.y + 2.0f / 3.0f * (p1.y - p2.y)};
+  return ComputeCubicBezierLength(p0, c1, c2, p2);
+}
+
+// Compute total arc length of a PathData
+static float ComputePathLength(const PathData& pathData) {
+  float length = 0.0f;
+  Point startPoint = {};
+  Point currentPoint = {};
+  pathData.forEach([&](PathVerb verb, const Point* pts) {
+    switch (verb) {
+      case PathVerb::Move:
+        startPoint = pts[0];
+        currentPoint = pts[0];
+        break;
+      case PathVerb::Line: {
+        float dx = pts[0].x - currentPoint.x;
+        float dy = pts[0].y - currentPoint.y;
+        length += std::sqrt(dx * dx + dy * dy);
+        currentPoint = pts[0];
+        break;
+      }
+      case PathVerb::Quad:
+        length += ComputeQuadBezierLength(currentPoint, pts[0], pts[1]);
+        currentPoint = pts[1];
+        break;
+      case PathVerb::Cubic:
+        length += ComputeCubicBezierLength(currentPoint, pts[0], pts[1], pts[2]);
+        currentPoint = pts[2];
+        break;
+      case PathVerb::Close: {
+        float dx = startPoint.x - currentPoint.x;
+        float dy = startPoint.y - currentPoint.y;
+        length += std::sqrt(dx * dx + dy * dy);
+        currentPoint = startPoint;
+        break;
+      }
+    }
+  });
+  return length;
+}
+
+// Apply RoundCorner modifier to a PathData, returning a new PathData with rounded corners.
+static PathData ApplyRoundCorner(const PathData& pathData, float radius) {
+  if (radius <= 0 || pathData.isEmpty()) {
+    return pathData;
+  }
+  // Parse path into contours
+  struct Vertex {
+    Point point = {};
+    bool isSmooth = false;  // true if vertex has control points (not a sharp corner)
+  };
+  struct Contour {
+    std::vector<Vertex> vertices = {};
+    bool closed = false;
+  };
+  std::vector<Contour> contours = {};
+  Contour currentContour = {};
+  Point currentPoint = {};
+  Point lastControlPoint = {};
+  bool hasLastControl = false;
+
+  pathData.forEach([&](PathVerb verb, const Point* pts) {
+    switch (verb) {
+      case PathVerb::Move:
+        if (!currentContour.vertices.empty()) {
+          contours.push_back(std::move(currentContour));
+          currentContour = {};
+        }
+        currentContour.vertices.push_back({pts[0], false});
+        currentPoint = pts[0];
+        hasLastControl = false;
+        break;
+      case PathVerb::Line:
+        currentContour.vertices.push_back({pts[0], false});
+        currentPoint = pts[0];
+        hasLastControl = false;
+        break;
+      case PathVerb::Quad:
+        // Quadratic curve: mark as smooth vertex
+        currentContour.vertices.push_back({pts[1], true});
+        currentPoint = pts[1];
+        lastControlPoint = pts[0];
+        hasLastControl = true;
+        break;
+      case PathVerb::Cubic:
+        // Cubic curve: mark as smooth vertex
+        currentContour.vertices.push_back({pts[2], true});
+        currentPoint = pts[2];
+        lastControlPoint = pts[1];
+        hasLastControl = true;
+        break;
+      case PathVerb::Close:
+        currentContour.closed = true;
+        if (!currentContour.vertices.empty()) {
+          contours.push_back(std::move(currentContour));
+          currentContour = {};
+        }
+        break;
+    }
+    (void)lastControlPoint;
+    (void)hasLastControl;
+  });
+  if (!currentContour.vertices.empty()) {
+    contours.push_back(std::move(currentContour));
+  }
+
+  // Build new PathData with rounded corners
+  PathData result = PathDataFromSVGString("");
+  for (auto& contour : contours) {
+    if (contour.vertices.size() < 2) {
+      if (contour.vertices.size() == 1) {
+        result.moveTo(contour.vertices[0].point.x, contour.vertices[0].point.y);
+      }
+      continue;
+    }
+    size_t n = contour.vertices.size();
+    bool firstPoint = true;
+    for (size_t i = 0; i < n; i++) {
+      auto& curr = contour.vertices[i];
+      // Skip smooth vertices (already have curves)
+      if (curr.isSmooth) {
+        if (firstPoint) {
+          result.moveTo(curr.point.x, curr.point.y);
+          firstPoint = false;
+        } else {
+          result.lineTo(curr.point.x, curr.point.y);
+        }
+        continue;
+      }
+      // Get previous and next vertices for sharp corner detection
+      bool hasPrev = (i > 0) || contour.closed;
+      bool hasNext = (i < n - 1) || contour.closed;
+      if (!hasPrev || !hasNext) {
+        // Endpoint, no rounding
+        if (firstPoint) {
+          result.moveTo(curr.point.x, curr.point.y);
+          firstPoint = false;
+        } else {
+          result.lineTo(curr.point.x, curr.point.y);
+        }
+        continue;
+      }
+      size_t prevIdx = (i == 0) ? (n - 1) : (i - 1);
+      size_t nextIdx = (i == n - 1) ? 0 : (i + 1);
+      auto& prev = contour.vertices[prevIdx];
+      auto& next = contour.vertices[nextIdx];
+      // Compute edge vectors
+      float dx1 = curr.point.x - prev.point.x;
+      float dy1 = curr.point.y - prev.point.y;
+      float dx2 = next.point.x - curr.point.x;
+      float dy2 = next.point.y - curr.point.y;
+      float len1 = std::sqrt(dx1 * dx1 + dy1 * dy1);
+      float len2 = std::sqrt(dx2 * dx2 + dy2 * dy2);
+      if (len1 < 0.001f || len2 < 0.001f) {
+        if (firstPoint) {
+          result.moveTo(curr.point.x, curr.point.y);
+          firstPoint = false;
+        } else {
+          result.lineTo(curr.point.x, curr.point.y);
+        }
+        continue;
+      }
+      // Effective radius limited by half of adjacent edge lengths
+      float effectiveRadius = std::min({radius, len1 / 2.0f, len2 / 2.0f});
+      // Compute P1 (on incoming edge) and P2 (on outgoing edge)
+      float t1 = effectiveRadius / len1;
+      float t2 = effectiveRadius / len2;
+      Point p1 = {curr.point.x - dx1 * t1, curr.point.y - dy1 * t1};
+      Point p2 = {curr.point.x + dx2 * t2, curr.point.y + dy2 * t2};
+      // Compute control points using kappa
+      Point cp1 = {p1.x + (curr.point.x - p1.x) * kBezierKappa,
+                   p1.y + (curr.point.y - p1.y) * kBezierKappa};
+      Point cp2 = {p2.x + (curr.point.x - p2.x) * kBezierKappa,
+                   p2.y + (curr.point.y - p2.y) * kBezierKappa};
+      if (firstPoint) {
+        result.moveTo(p1.x, p1.y);
+        firstPoint = false;
+      } else {
+        result.lineTo(p1.x, p1.y);
+      }
+      result.cubicTo(cp1.x, cp1.y, cp2.x, cp2.y, p2.x, p2.y);
+    }
+    if (contour.closed) {
+      result.close();
+    }
+  }
+  return result;
+}
+
+// Reverse a PathData (reverse the winding direction)
+static PathData ReversePathData(const PathData& pathData) {
+  if (pathData.isEmpty()) {
+    return pathData;
+  }
+  // Split into contours
+  struct Segment {
+    PathVerb verb = PathVerb::Move;
+    std::vector<Point> points = {};
+  };
+  struct Contour {
+    Point startPoint = {};
+    std::vector<Segment> segments = {};
+    bool closed = false;
+  };
+  std::vector<Contour> contours = {};
+  Contour currentContour = {};
+  bool hasContour = false;
+
+  pathData.forEach([&](PathVerb verb, const Point* pts) {
+    switch (verb) {
+      case PathVerb::Move:
+        if (hasContour) {
+          contours.push_back(std::move(currentContour));
+          currentContour = {};
+        }
+        currentContour.startPoint = pts[0];
+        hasContour = true;
+        break;
+      case PathVerb::Line: {
+        Segment seg = {PathVerb::Line, {pts[0]}};
+        currentContour.segments.push_back(std::move(seg));
+        break;
+      }
+      case PathVerb::Quad: {
+        Segment seg = {PathVerb::Quad, {pts[0], pts[1]}};
+        currentContour.segments.push_back(std::move(seg));
+        break;
+      }
+      case PathVerb::Cubic: {
+        Segment seg = {PathVerb::Cubic, {pts[0], pts[1], pts[2]}};
+        currentContour.segments.push_back(std::move(seg));
+        break;
+      }
+      case PathVerb::Close:
+        currentContour.closed = true;
+        break;
+    }
+  });
+  if (hasContour) {
+    contours.push_back(std::move(currentContour));
+  }
+
+  // Build reversed PathData
+  PathData result = PathDataFromSVGString("");
+  for (auto& contour : contours) {
+    if (contour.segments.empty()) {
+      result.moveTo(contour.startPoint.x, contour.startPoint.y);
+      if (contour.closed) {
+        result.close();
+      }
+      continue;
+    }
+    // New start point is the last segment's endpoint
+    auto& lastSeg = contour.segments.back();
+    Point newStart = lastSeg.points.back();
+    result.moveTo(newStart.x, newStart.y);
+
+    // Walk segments in reverse order
+    for (int i = static_cast<int>(contour.segments.size()) - 1; i >= 0; i--) {
+      auto& seg = contour.segments[static_cast<size_t>(i)];
+      Point segStart = (i == 0) ? contour.startPoint
+                                : contour.segments[static_cast<size_t>(i - 1)].points.back();
+      switch (seg.verb) {
+        case PathVerb::Line:
+          result.lineTo(segStart.x, segStart.y);
+          break;
+        case PathVerb::Quad:
+          // Quadratic: control point stays, endpoint becomes previous start
+          result.quadTo(seg.points[0].x, seg.points[0].y, segStart.x, segStart.y);
+          break;
+        case PathVerb::Cubic:
+          // Cubic: swap control points
+          result.cubicTo(seg.points[1].x, seg.points[1].y, seg.points[0].x, seg.points[0].y,
+                         segStart.x, segStart.y);
+          break;
+        default:
+          break;
+      }
+    }
+    if (contour.closed) {
+      result.close();
+    }
+  }
+  return result;
+}
+
+// Convert geometry to PathData
+static PathData GeoToPathData(const Element* element, NodeType type) {
+  PathData pathData = PathDataFromSVGString("");
+  switch (type) {
+    case NodeType::Rectangle: {
+      auto r = static_cast<const Rectangle*>(element);
+      float x = r->position.x - r->size.width / 2;
+      float y = r->position.y - r->size.height / 2;
+      float w = r->size.width;
+      float h = r->size.height;
+      if (r->roundness <= 0) {
+        pathData.moveTo(x, y);
+        if (r->reversed) {
+          pathData.lineTo(x, y + h);
+          pathData.lineTo(x + w, y + h);
+          pathData.lineTo(x + w, y);
+        } else {
+          pathData.lineTo(x + w, y);
+          pathData.lineTo(x + w, y + h);
+          pathData.lineTo(x, y + h);
+        }
+        pathData.close();
+      } else {
+        float rn = std::min(r->roundness, std::min(w / 2, h / 2));
+        // Rounded rect with bezier arcs at corners
+        pathData.moveTo(x + rn, y);
+        if (r->reversed) {
+          // Counter-clockwise
+          pathData.cubicTo(x + rn * (1 - kBezierKappa), y, x, y + rn * (1 - kBezierKappa), x,
+                           y + rn);
+          pathData.lineTo(x, y + h - rn);
+          pathData.cubicTo(x, y + h - rn * (1 - kBezierKappa), x + rn * (1 - kBezierKappa), y + h,
+                           x + rn, y + h);
+          pathData.lineTo(x + w - rn, y + h);
+          pathData.cubicTo(x + w - rn * (1 - kBezierKappa), y + h, x + w,
+                           y + h - rn * (1 - kBezierKappa), x + w, y + h - rn);
+          pathData.lineTo(x + w, y + rn);
+          pathData.cubicTo(x + w, y + rn * (1 - kBezierKappa), x + w - rn * (1 - kBezierKappa), y,
+                           x + w - rn, y);
+        } else {
+          // Clockwise
+          pathData.lineTo(x + w - rn, y);
+          pathData.cubicTo(x + w - rn * (1 - kBezierKappa), y, x + w, y + rn * (1 - kBezierKappa),
+                           x + w, y + rn);
+          pathData.lineTo(x + w, y + h - rn);
+          pathData.cubicTo(x + w, y + h - rn * (1 - kBezierKappa), x + w - rn * (1 - kBezierKappa),
+                           y + h, x + w - rn, y + h);
+          pathData.lineTo(x + rn, y + h);
+          pathData.cubicTo(x + rn * (1 - kBezierKappa), y + h, x, y + h - rn * (1 - kBezierKappa),
+                           x, y + h - rn);
+          pathData.lineTo(x, y + rn);
+          pathData.cubicTo(x, y + rn * (1 - kBezierKappa), x + rn * (1 - kBezierKappa), y, x + rn,
+                           y);
+        }
+        pathData.close();
+      }
+      break;
+    }
+    case NodeType::Ellipse: {
+      auto e = static_cast<const Ellipse*>(element);
+      float cx = e->position.x;
+      float cy = e->position.y;
+      float rx = e->size.width / 2;
+      float ry = e->size.height / 2;
+      // Ellipse approximated with 4 cubic bezier curves
+      float kx = rx * kBezierKappa;
+      float ky = ry * kBezierKappa;
+      pathData.moveTo(cx - rx, cy);
+      if (e->reversed) {
+        pathData.cubicTo(cx - rx, cy + ky, cx - kx, cy + ry, cx, cy + ry);
+        pathData.cubicTo(cx + kx, cy + ry, cx + rx, cy + ky, cx + rx, cy);
+        pathData.cubicTo(cx + rx, cy - ky, cx + kx, cy - ry, cx, cy - ry);
+        pathData.cubicTo(cx - kx, cy - ry, cx - rx, cy - ky, cx - rx, cy);
+      } else {
+        pathData.cubicTo(cx - rx, cy - ky, cx - kx, cy - ry, cx, cy - ry);
+        pathData.cubicTo(cx + kx, cy - ry, cx + rx, cy - ky, cx + rx, cy);
+        pathData.cubicTo(cx + rx, cy + ky, cx + kx, cy + ry, cx, cy + ry);
+        pathData.cubicTo(cx - kx, cy + ry, cx - rx, cy + ky, cx - rx, cy);
+      }
+      pathData.close();
+      break;
+    }
+    case NodeType::Path: {
+      auto p = static_cast<const Path*>(element);
+      if (p->data) {
+        if (p->reversed) {
+          pathData = ReversePathData(*p->data);
+        } else {
+          pathData.setPathData(*p->data);
+        }
+      }
+      break;
+    }
+    case NodeType::Polystar: {
+      // Use existing BuildPolystarPath and parse it back
+      auto ps = static_cast<const Polystar*>(element);
+      std::string d = BuildPolystarPath(ps);
+      if (!d.empty()) {
+        pathData = PathDataFromSVGString(d);
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  return pathData;
+}
+
+// RangeSelector shape functions
+static float SelectorShapeSquare(float) {
+  return 1.0f;
+}
+
+static float SelectorShapeRampUp(float t) {
+  return t;
+}
+
+static float SelectorShapeRampDown(float t) {
+  return 1.0f - t;
+}
+
+static float SelectorShapeTriangle(float t) {
+  return t < 0.5f ? 2.0f * t : 2.0f * (1.0f - t);
+}
+
+static float SelectorShapeRound(float t) {
+  return std::sin(t * static_cast<float>(M_PI));
+}
+
+static float SelectorShapeSmooth(float t) {
+  return 0.5f - 0.5f * std::cos(t * static_cast<float>(M_PI));
+}
+
+// Get shape function by SelectorShape enum
+static float ApplySelectorShape(SelectorShape shape, float t) {
+  switch (shape) {
+    case SelectorShape::Square:
+      return SelectorShapeSquare(t);
+    case SelectorShape::RampUp:
+      return SelectorShapeRampUp(t);
+    case SelectorShape::RampDown:
+      return SelectorShapeRampDown(t);
+    case SelectorShape::Triangle:
+      return SelectorShapeTriangle(t);
+    case SelectorShape::Round:
+      return SelectorShapeRound(t);
+    case SelectorShape::Smooth:
+      return SelectorShapeSmooth(t);
+    default:
+      return 1.0f;
+  }
+}
+
+// Combine selector values using SelectorMode
+static float CombineSelectorValues(SelectorMode mode, float a, float b) {
+  switch (mode) {
+    case SelectorMode::Add:
+      return a + b;
+    case SelectorMode::Subtract:
+      return b >= 0 ? a * (1.0f - b) : a * (-1.0f - b);
+    case SelectorMode::Intersect:
+      return a * b;
+    case SelectorMode::Min:
+      return std::min(a, b);
+    case SelectorMode::Max:
+      return std::max(a, b);
+    case SelectorMode::Difference:
+      return std::abs(a - b);
+    default:
+      return a + b;
+  }
+}
+
+// Compute factor for a single glyph from a RangeSelector
+static float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphIndex,
+                                        size_t totalGlyphs) {
+  if (totalGlyphs == 0) {
+    return 0.0f;
+  }
+  // Normalize glyph position to [0, 1]
+  float glyphPos = 0.0f;
+  if (selector->unit == SelectorUnit::Percentage) {
+    glyphPos = static_cast<float>(glyphIndex) / static_cast<float>(totalGlyphs);
+  } else {
+    // Index mode: start/end are direct indices
+    glyphPos = static_cast<float>(glyphIndex);
+  }
+  // Apply offset
+  float offset = selector->offset;
+  if (selector->unit == SelectorUnit::Percentage) {
+    glyphPos -= offset;
+  } else {
+    glyphPos -= offset;
+  }
+  // Wrap around
+  if (selector->unit == SelectorUnit::Percentage) {
+    glyphPos = std::fmod(glyphPos, 1.0f);
+    if (glyphPos < 0) {
+      glyphPos += 1.0f;
+    }
+  }
+  // Check if within range
+  float start = selector->start;
+  float end = selector->end;
+  if (selector->unit == SelectorUnit::Index) {
+    start = start / static_cast<float>(totalGlyphs);
+    end = end / static_cast<float>(totalGlyphs);
+    glyphPos = static_cast<float>(glyphIndex) / static_cast<float>(totalGlyphs);
+  }
+  if (glyphPos < start || glyphPos > end) {
+    return 0.0f;
+  }
+  // Compute normalized position within range
+  float rangeSize = end - start;
+  if (rangeSize <= 0) {
+    return 1.0f;
+  }
+  float t = (glyphPos - start) / rangeSize;
+  // Apply shape
+  float rawInfluence = ApplySelectorShape(selector->shape, t);
+  // Apply ease in/out
+  if (selector->easeIn > 0 && t < 0.5f) {
+    float easeT = t * 2.0f;
+    rawInfluence *= 1.0f - (1.0f - easeT) * selector->easeIn;
+  }
+  if (selector->easeOut > 0 && t > 0.5f) {
+    float easeT = (t - 0.5f) * 2.0f;
+    rawInfluence *= 1.0f - easeT * selector->easeOut;
+  }
+  return rawInfluence * selector->weight;
+}
+
+// Arc-length LUT for TextPath
+struct ArcLengthLUT {
+  std::vector<float> arcLengths = {};  // cumulative arc length at each sample
+  std::vector<Point> positions = {};   // position at each sample
+  std::vector<float> tangents = {};    // tangent angle at each sample (radians)
+  float totalLength = 0.0f;
+};
+
+// Build arc-length LUT from PathData
+static ArcLengthLUT BuildArcLengthLUT(const PathData& pathData, int samplesPerSegment = 16) {
+  ArcLengthLUT lut = {};
+  lut.arcLengths.push_back(0.0f);
+  Point startPoint = {};
+  Point currentPoint = {};
+  float cumLength = 0.0f;
+
+  pathData.forEach([&](PathVerb verb, const Point* pts) {
+    switch (verb) {
+      case PathVerb::Move:
+        startPoint = pts[0];
+        currentPoint = pts[0];
+        lut.positions.push_back(currentPoint);
+        lut.tangents.push_back(0.0f);
+        break;
+      case PathVerb::Line: {
+        float dx = pts[0].x - currentPoint.x;
+        float dy = pts[0].y - currentPoint.y;
+        float segLen = std::sqrt(dx * dx + dy * dy);
+        float angle = std::atan2(dy, dx);
+        for (int i = 1; i <= samplesPerSegment; i++) {
+          float t = static_cast<float>(i) / samplesPerSegment;
+          Point p = {currentPoint.x + dx * t, currentPoint.y + dy * t};
+          cumLength += segLen / samplesPerSegment;
+          lut.arcLengths.push_back(cumLength);
+          lut.positions.push_back(p);
+          lut.tangents.push_back(angle);
+        }
+        currentPoint = pts[0];
+        break;
+      }
+      case PathVerb::Quad: {
+        Point p0 = currentPoint;
+        Point p1 = pts[0];
+        Point p2 = pts[1];
+        for (int i = 1; i <= samplesPerSegment; i++) {
+          float t = static_cast<float>(i) / samplesPerSegment;
+          float u = 1.0f - t;
+          Point p = {u * u * p0.x + 2 * u * t * p1.x + t * t * p2.x,
+                     u * u * p0.y + 2 * u * t * p1.y + t * t * p2.y};
+          // Tangent: derivative of quadratic bezier
+          Point tan = {2 * (1 - t) * (p1.x - p0.x) + 2 * t * (p2.x - p1.x),
+                       2 * (1 - t) * (p1.y - p0.y) + 2 * t * (p2.y - p1.y)};
+          float angle = std::atan2(tan.y, tan.x);
+          float dx = p.x - lut.positions.back().x;
+          float dy = p.y - lut.positions.back().y;
+          cumLength += std::sqrt(dx * dx + dy * dy);
+          lut.arcLengths.push_back(cumLength);
+          lut.positions.push_back(p);
+          lut.tangents.push_back(angle);
+        }
+        currentPoint = pts[1];
+        break;
+      }
+      case PathVerb::Cubic: {
+        Point p0 = currentPoint;
+        Point p1 = pts[0];
+        Point p2 = pts[1];
+        Point p3 = pts[2];
+        for (int i = 1; i <= samplesPerSegment; i++) {
+          float t = static_cast<float>(i) / samplesPerSegment;
+          float u = 1.0f - t;
+          Point p = {
+              u * u * u * p0.x + 3 * u * u * t * p1.x + 3 * u * t * t * p2.x + t * t * t * p3.x,
+              u * u * u * p0.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t * t * t * p3.y};
+          // Tangent: derivative of cubic bezier
+          Point tan = {
+              3 * u * u * (p1.x - p0.x) + 6 * u * t * (p2.x - p1.x) + 3 * t * t * (p3.x - p2.x),
+              3 * u * u * (p1.y - p0.y) + 6 * u * t * (p2.y - p1.y) + 3 * t * t * (p3.y - p2.y)};
+          float angle = std::atan2(tan.y, tan.x);
+          float dx = p.x - lut.positions.back().x;
+          float dy = p.y - lut.positions.back().y;
+          cumLength += std::sqrt(dx * dx + dy * dy);
+          lut.arcLengths.push_back(cumLength);
+          lut.positions.push_back(p);
+          lut.tangents.push_back(angle);
+        }
+        currentPoint = pts[2];
+        break;
+      }
+      case PathVerb::Close: {
+        float dx = startPoint.x - currentPoint.x;
+        float dy = startPoint.y - currentPoint.y;
+        float segLen = std::sqrt(dx * dx + dy * dy);
+        if (segLen > 0.001f) {
+          float angle = std::atan2(dy, dx);
+          for (int i = 1; i <= samplesPerSegment; i++) {
+            float t = static_cast<float>(i) / samplesPerSegment;
+            Point p = {currentPoint.x + dx * t, currentPoint.y + dy * t};
+            cumLength += segLen / samplesPerSegment;
+            lut.arcLengths.push_back(cumLength);
+            lut.positions.push_back(p);
+            lut.tangents.push_back(angle);
+          }
+        }
+        currentPoint = startPoint;
+        break;
+      }
+    }
+  });
+  lut.totalLength = cumLength;
+  return lut;
+}
+
+// Sample position and tangent at a given arc length from LUT
+static void SampleArcLengthLUT(const ArcLengthLUT& lut, float arcLength, Point* outPos,
+                               float* outTangent) {
+  if (lut.arcLengths.empty()) {
+    *outPos = {};
+    *outTangent = 0;
+    return;
+  }
+  // Clamp to valid range
+  arcLength = std::max(0.0f, std::min(arcLength, lut.totalLength));
+  // Binary search for the segment
+  auto it = std::lower_bound(lut.arcLengths.begin(), lut.arcLengths.end(), arcLength);
+  size_t idx = static_cast<size_t>(std::distance(lut.arcLengths.begin(), it));
+  if (idx >= lut.positions.size()) {
+    idx = lut.positions.size() - 1;
+  }
+  if (idx == 0) {
+    *outPos = lut.positions[0];
+    *outTangent = lut.tangents[0];
+    return;
+  }
+  // Linear interpolation between samples
+  float prevLen = lut.arcLengths[idx - 1];
+  float nextLen = lut.arcLengths[idx];
+  float segLen = nextLen - prevLen;
+  float t = (segLen > 0.001f) ? (arcLength - prevLen) / segLen : 0.0f;
+  Point prevPos = lut.positions[idx - 1];
+  Point nextPos = lut.positions[idx];
+  *outPos = {prevPos.x + (nextPos.x - prevPos.x) * t, prevPos.y + (nextPos.y - prevPos.y) * t};
+  *outTangent = lut.tangents[idx];
+}
+
 static std::string RectToPathData(const Rectangle* r) {
   float x = r->position.x - r->size.width / 2;
   float y = r->position.y - r->size.height / 2;
@@ -719,6 +1469,7 @@ class HTMLWriter {
   struct GeoInfo {
     NodeType type = NodeType::Rectangle;
     const Element* element = nullptr;
+    std::string modifiedPathData = {};  // Used when RoundCorner modifier is applied
   };
 
   // Color source conversions
@@ -733,16 +1484,21 @@ class HTMLWriter {
                      bool distribute, LayerPlacement targetPlacement);
   void renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                  const Stroke* stroke, float alpha, bool hasTrim, const TrimPath* trim,
-                 bool hasMerge);
+                 bool hasMerge, MergePathMode mergeMode = MergePathMode::Append);
   bool canCSS(const std::vector<GeoInfo>& geos, const Fill* fill, const Stroke* stroke,
               bool hasTrim, bool hasMerge);
   void renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* fill, float alpha,
                     BlendMode painterBlend);
   void renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                  const Stroke* stroke, float alpha, BlendMode painterBlend,
-                 const TrimPath* trim = nullptr);
+                 const TrimPath* trim = nullptr, MergePathMode mergeMode = MergePathMode::Append);
   void writeText(HTMLBuilder& out, const Text* text, const Fill* fill, const Stroke* stroke,
                  const TextBox* tb, float alpha);
+  void writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>& geos,
+                         const TextModifier* modifier, const Fill* fill, const Stroke* stroke,
+                         const TextBox* tb, float alpha);
+  void writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const TextPath* textPath,
+                     const Fill* fill, const Stroke* stroke, const TextBox* tb, float alpha);
   void writeGlyphRunSVG(HTMLBuilder& out, const Text* text, const Fill* fill, const Stroke* stroke,
                         float alpha);
   void writeGroup(HTMLBuilder& out, const Group* group, float alpha, bool distribute);
@@ -751,8 +1507,12 @@ class HTMLWriter {
   void writeComposition(HTMLBuilder& out, const Composition* comp);
   void paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                  const Stroke* stroke, const TextBox* textBox, float alpha, bool hasTrim,
-                 const TrimPath* curTrim, bool hasMerge);
+                 const TrimPath* curTrim, bool hasMerge, MergePathMode mergeMode);
   void applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim);
+  void applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* trim,
+                                const std::vector<GeoInfo>& geos, size_t geoIndex);
+  float computeGeoPathLength(const GeoInfo& geo);
+  void applySVGStrokeWithLength(HTMLBuilder& out, const Stroke* stroke, float pathLength);
 
   // Filter defs
   std::string writeFilterDefs(const std::vector<LayerFilter*>& filters);
@@ -1335,10 +2095,6 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
 // HTMLWriter – mask / clip defs
 //==============================================================================
 
-// TODO: writeMaskDef only extracts geometry shapes and fills them with white. It does not process
-// Fill painters within the mask layer, so Luminance masks with gradient or alpha-varying fills will
-// lose their grayscale distribution. A proper implementation should apply the mask layer's Fill
-// color sources to the SVG mask shapes.
 std::string HTMLWriter::writeMaskDef(const Layer* mask, MaskType type) {
   std::string id = mask->id.empty() ? _ctx->nextId("mask") : mask->id;
   _defs->openTag("mask");
@@ -1349,7 +2105,29 @@ std::string HTMLWriter::writeMaskDef(const Layer* mask, MaskType type) {
   _defs->closeTagStart();
   _defs->openTag("g");
   _defs->closeTagStart();
+
+  // For luminance masks, we need to preserve the fill colors from the mask layer's elements.
+  // First, scan for Fill painters in the mask layer to get the color source.
+  const Fill* maskFill = nullptr;
   for (auto* e : mask->contents) {
+    if (e->nodeType() == NodeType::Fill) {
+      maskFill = static_cast<const Fill*>(e);
+      break;  // Use the first fill found
+    }
+  }
+
+  // Determine if we should use the fill color (for luminance) or white (for alpha/default)
+  bool useFillColor = (type == MaskType::Luminance && maskFill != nullptr && maskFill->color);
+
+  for (auto* e : mask->contents) {
+    std::string fillAttr = "white";
+    float fillOpacity = 1.0f;
+
+    if (useFillColor) {
+      fillAttr = colorToSVGFill(maskFill->color, &fillOpacity);
+      fillOpacity *= maskFill->alpha;
+    }
+
     if (e->nodeType() == NodeType::Rectangle) {
       auto rect = static_cast<const Rectangle*>(e);
       _defs->openTag("rect");
@@ -1366,7 +2144,10 @@ std::string HTMLWriter::writeMaskDef(const Layer* mask, MaskType type) {
       if (rect->roundness > 0) {
         _defs->addAttr("rx", FloatToString(rect->roundness));
       }
-      _defs->addAttr("fill", "white");
+      _defs->addAttr("fill", fillAttr);
+      if (fillOpacity < 1.0f) {
+        _defs->addAttr("fill-opacity", FloatToString(fillOpacity));
+      }
       _defs->closeTagSelfClosing();
     } else if (e->nodeType() == NodeType::Ellipse) {
       auto el = static_cast<const Ellipse*>(e);
@@ -1375,7 +2156,10 @@ std::string HTMLWriter::writeMaskDef(const Layer* mask, MaskType type) {
       _defs->addAttr("cy", FloatToString(el->position.y));
       _defs->addAttr("rx", FloatToString(el->size.width / 2));
       _defs->addAttr("ry", FloatToString(el->size.height / 2));
-      _defs->addAttr("fill", "white");
+      _defs->addAttr("fill", fillAttr);
+      if (fillOpacity < 1.0f) {
+        _defs->addAttr("fill-opacity", FloatToString(fillOpacity));
+      }
       _defs->closeTagSelfClosing();
     } else if (e->nodeType() == NodeType::Path) {
       auto p = static_cast<const Path*>(e);
@@ -1383,7 +2167,10 @@ std::string HTMLWriter::writeMaskDef(const Layer* mask, MaskType type) {
       if (!d.empty()) {
         _defs->openTag("path");
         _defs->addAttr("d", d);
-        _defs->addAttr("fill", "white");
+        _defs->addAttr("fill", fillAttr);
+        if (fillOpacity < 1.0f) {
+          _defs->addAttr("fill-opacity", FloatToString(fillOpacity));
+        }
         _defs->closeTagSelfClosing();
       }
     } else if (e->nodeType() == NodeType::Polystar) {
@@ -1392,7 +2179,10 @@ std::string HTMLWriter::writeMaskDef(const Layer* mask, MaskType type) {
       if (!d.empty()) {
         _defs->openTag("path");
         _defs->addAttr("d", d);
-        _defs->addAttr("fill", "white");
+        _defs->addAttr("fill", fillAttr);
+        if (fillOpacity < 1.0f) {
+          _defs->addAttr("fill-opacity", FloatToString(fillOpacity));
+        }
         _defs->closeTagSelfClosing();
       }
     }
@@ -1717,7 +2507,7 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
 
 void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                            const Stroke* stroke, float alpha, BlendMode painterBlend,
-                           const TrimPath* trim) {
+                           const TrimPath* trim, MergePathMode) {
   float pad = 0.0f;
   if (stroke) {
     pad = (stroke->align != StrokeAlign::Center) ? stroke->width * 2.0f : stroke->width;
@@ -1888,13 +2678,36 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     out.closeTagStart();
   }
 
-  // Compute TrimPath dasharray/dashoffset attributes using pathLength normalization.
-  // With pathLength="1", start/end [0,1] can directly control stroke-dasharray.
-  // TODO: TrimPath.type is currently always treated as Separate (per-geometry trim). Continuous
-  // mode should treat all paths as one concatenated path and trim collectively, which requires
-  // pre-computing individual path lengths and distributing the trim range proportionally.
+  // Compute TrimPath parameters
+  bool isContinuousTrim = trim && trim->type == TrimType::Continuous;
+  std::vector<float> pathLengths = {};
+  [[maybe_unused]] float totalPathLength = 0.0f;
+  if (isContinuousTrim) {
+    // Compute path lengths for all geometries
+    for (auto& g : geos) {
+      float len = computeGeoPathLength(g);
+      pathLengths.push_back(len);
+      totalPathLength += len;
+    }
+  }
 
-  for (auto& g : geos) {
+  for (size_t geoIdx = 0; geoIdx < geos.size(); geoIdx++) {
+    auto& g = geos[geoIdx];
+    // Use modifiedPathData if available (set by RoundCorner modifier)
+    if (!g.modifiedPathData.empty()) {
+      out.openTag("path");
+      out.addAttr("d", g.modifiedPathData);
+      applySVGFill(out, trim ? nullptr : fill);
+      if (isContinuousTrim) {
+        applySVGStrokeWithLength(out, stroke, computeGeoPathLength(g));
+        applyTrimAttrsContinuous(out, trim, geos, geoIdx);
+      } else {
+        applySVGStroke(out, stroke);
+        applyTrimAttrs(out, trim);
+      }
+      out.closeTagSelfClosing();
+      continue;
+    }
     switch (g.type) {
       case NodeType::Rectangle: {
         auto r = static_cast<const Rectangle*>(g.element);
@@ -1914,8 +2727,13 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           out.addAttr("ry", FloatToString(r->roundness));
         }
         applySVGFill(out, trim ? nullptr : fill);
-        applySVGStroke(out, stroke);
-        applyTrimAttrs(out, trim);
+        if (isContinuousTrim) {
+          applySVGStrokeWithLength(out, stroke, computeGeoPathLength(g));
+          applyTrimAttrsContinuous(out, trim, geos, geoIdx);
+        } else {
+          applySVGStroke(out, stroke);
+          applyTrimAttrs(out, trim);
+        }
         out.closeTagSelfClosing();
         break;
       }
@@ -1927,8 +2745,13 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         out.addAttr("rx", FloatToString(e->size.width / 2));
         out.addAttr("ry", FloatToString(e->size.height / 2));
         applySVGFill(out, trim ? nullptr : fill);
-        applySVGStroke(out, stroke);
-        applyTrimAttrs(out, trim);
+        if (isContinuousTrim) {
+          applySVGStrokeWithLength(out, stroke, computeGeoPathLength(g));
+          applyTrimAttrsContinuous(out, trim, geos, geoIdx);
+        } else {
+          applySVGStroke(out, stroke);
+          applyTrimAttrs(out, trim);
+        }
         out.closeTagSelfClosing();
         break;
       }
@@ -1939,8 +2762,13 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           out.openTag("path");
           out.addAttr("d", d);
           applySVGFill(out, trim ? nullptr : fill);
-          applySVGStroke(out, stroke);
-          applyTrimAttrs(out, trim);
+          if (isContinuousTrim) {
+            applySVGStrokeWithLength(out, stroke, computeGeoPathLength(g));
+            applyTrimAttrsContinuous(out, trim, geos, geoIdx);
+          } else {
+            applySVGStroke(out, stroke);
+            applyTrimAttrs(out, trim);
+          }
           out.closeTagSelfClosing();
         }
         break;
@@ -1952,8 +2780,13 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           out.openTag("path");
           out.addAttr("d", d);
           applySVGFill(out, trim ? nullptr : fill);
-          applySVGStroke(out, stroke);
-          applyTrimAttrs(out, trim);
+          if (isContinuousTrim) {
+            applySVGStrokeWithLength(out, stroke, computeGeoPathLength(g));
+            applyTrimAttrsContinuous(out, trim, geos, geoIdx);
+          } else {
+            applySVGStroke(out, stroke);
+            applyTrimAttrs(out, trim);
+          }
           out.closeTagSelfClosing();
         }
         break;
@@ -1970,7 +2803,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
 
 void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                            const Stroke* stroke, float alpha, bool hasTrim, const TrimPath* trim,
-                           bool hasMerge) {
+                           bool hasMerge, MergePathMode mergeMode) {
   if (geos.empty()) {
     return;
   }
@@ -1982,36 +2815,231 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     painterBlend = stroke->blendMode;
   }
   if (hasMerge) {
-    // TODO: TrimPath is not applied to merged paths. When both MergePath and TrimPath are present,
-    // the trim should be applied to the concatenated merged path, but this requires computing the
-    // total path length of the merged result.
-    // Merge all geometries into a single <path> element
+    // Handle different MergePath modes
     std::string mergedPath;
-    for (auto& g : geos) {
-      switch (g.type) {
-        case NodeType::Rectangle:
-          mergedPath += RectToPathData(static_cast<const Rectangle*>(g.element));
-          break;
-        case NodeType::Ellipse:
-          mergedPath += EllipseToPathData(static_cast<const Ellipse*>(g.element));
-          break;
-        case NodeType::Path: {
-          auto p = static_cast<const Path*>(g.element);
-          mergedPath += GetPathSVGString(p);
-          break;
+    std::string fillRule = "nonzero";
+    bool needClipPath = (mergeMode == MergePathMode::Intersect);
+
+    if (needClipPath) {
+      // Intersect mode: use nested clipPaths
+      // The first path is the base shape, subsequent paths are used as clip-paths
+      float pad = 0.0f;
+      if (stroke) {
+        pad = (stroke->align != StrokeAlign::Center) ? stroke->width * 2.0f : stroke->width;
+      }
+      float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
+      for (auto& g : geos) {
+        float gx = 0, gy = 0, gw = 0, gh = 0;
+        switch (g.type) {
+          case NodeType::Rectangle: {
+            auto r = static_cast<const Rectangle*>(g.element);
+            gx = r->position.x - r->size.width / 2;
+            gy = r->position.y - r->size.height / 2;
+            gw = r->size.width;
+            gh = r->size.height;
+            break;
+          }
+          case NodeType::Ellipse: {
+            auto e = static_cast<const Ellipse*>(g.element);
+            gx = e->position.x - e->size.width / 2;
+            gy = e->position.y - e->size.height / 2;
+            gw = e->size.width;
+            gh = e->size.height;
+            break;
+          }
+          case NodeType::Path: {
+            auto p = static_cast<const Path*>(g.element);
+            if (p->data && !p->data->isEmpty()) {
+              Rect b = p->data->getBounds();
+              gx = b.x;
+              gy = b.y;
+              gw = b.width;
+              gh = b.height;
+            }
+            break;
+          }
+          case NodeType::Polystar: {
+            auto ps = static_cast<const Polystar*>(g.element);
+            float r = std::max(ps->outerRadius, ps->innerRadius);
+            gx = ps->position.x - r;
+            gy = ps->position.y - r;
+            gw = r * 2;
+            gh = r * 2;
+            break;
+          }
+          default:
+            break;
         }
-        case NodeType::Polystar:
-          mergedPath += BuildPolystarPath(static_cast<const Polystar*>(g.element));
+        x0 = std::min(x0, gx - pad);
+        y0 = std::min(y0, gy - pad);
+        x1 = std::max(x1, gx + gw + pad);
+        y1 = std::max(y1, gy + gh + pad);
+      }
+      float sw = x1 - x0;
+      float sh = y1 - y0;
+      if (sw <= 0 || sh <= 0) {
+        return;
+      }
+      std::string svgStyle =
+          "position:absolute;left:" + FloatToString(x0) + "px;top:" + FloatToString(y0) + "px";
+      if (painterBlend != BlendMode::Normal) {
+        auto blendStr = BlendModeToMixBlendMode(painterBlend);
+        if (blendStr) {
+          svgStyle += ";mix-blend-mode:";
+          svgStyle += blendStr;
+        }
+      }
+      if (alpha < 1.0f) {
+        svgStyle += ";opacity:" + FloatToString(alpha);
+      }
+      out.openTag("svg");
+      out.addAttr("xmlns", "http://www.w3.org/2000/svg");
+      out.addAttr("width", FloatToString(sw));
+      out.addAttr("height", FloatToString(sh));
+      out.addAttr("viewBox", FloatToString(x0) + " " + FloatToString(y0) + " " + FloatToString(sw) +
+                                 " " + FloatToString(sh));
+      out.addAttr("style", svgStyle);
+      out.closeTagStart();
+
+      // Create clip-paths for each subsequent geometry
+      if (geos.size() > 1) {
+        out.openTag("defs");
+        out.closeTagStart();
+        for (size_t i = 1; i < geos.size(); i++) {
+          std::string clipId = _ctx->nextId("mpclip");
+          out.openTag("clipPath");
+          out.addAttr("id", clipId);
+          out.closeTagStart();
+          auto& g = geos[i];
+          std::string pathD;
+          if (!g.modifiedPathData.empty()) {
+            pathD = g.modifiedPathData;
+          } else {
+            switch (g.type) {
+              case NodeType::Rectangle:
+                pathD = RectToPathData(static_cast<const Rectangle*>(g.element));
+                break;
+              case NodeType::Ellipse:
+                pathD = EllipseToPathData(static_cast<const Ellipse*>(g.element));
+                break;
+              case NodeType::Path:
+                pathD = GetPathSVGString(static_cast<const Path*>(g.element));
+                break;
+              case NodeType::Polystar:
+                pathD = BuildPolystarPath(static_cast<const Polystar*>(g.element));
+                break;
+              default:
+                break;
+            }
+          }
+          if (!pathD.empty()) {
+            out.openTag("path");
+            out.addAttr("d", pathD);
+            out.closeTagSelfClosing();
+          }
+          out.closeTag();  // </clipPath>
+        }
+        out.closeTag();  // </defs>
+      }
+
+      // Render the first path with nested clip-paths
+      auto& firstGeo = geos[0];
+      std::string firstPathD;
+      if (!firstGeo.modifiedPathData.empty()) {
+        firstPathD = firstGeo.modifiedPathData;
+      } else {
+        switch (firstGeo.type) {
+          case NodeType::Rectangle:
+            firstPathD = RectToPathData(static_cast<const Rectangle*>(firstGeo.element));
+            break;
+          case NodeType::Ellipse:
+            firstPathD = EllipseToPathData(static_cast<const Ellipse*>(firstGeo.element));
+            break;
+          case NodeType::Path:
+            firstPathD = GetPathSVGString(static_cast<const Path*>(firstGeo.element));
+            break;
+          case NodeType::Polystar:
+            firstPathD = BuildPolystarPath(static_cast<const Polystar*>(firstGeo.element));
+            break;
+          default:
+            break;
+        }
+      }
+      if (!firstPathD.empty()) {
+        // Apply clip-paths in nested groups
+        std::vector<std::string> clipIds = {};
+        for (size_t i = 1; i < geos.size(); i++) {
+          clipIds.push_back(_ctx->nextId("mpclip") + std::to_string(i - 1));
+        }
+        // Open groups with clip-paths (in reverse order for proper nesting)
+        for (size_t i = geos.size() - 1; i >= 1; i--) {
+          out.openTag("g");
+          out.addAttr("clip-path", "url(#mpclip" + std::to_string(i - 1) + ")");
+          out.closeTagStart();
+        }
+        out.openTag("path");
+        out.addAttr("d", firstPathD);
+        applySVGFill(out, fill);
+        applySVGStroke(out, stroke);
+        out.closeTagSelfClosing();
+        // Close all the clip groups
+        for (size_t i = 1; i < geos.size(); i++) {
+          out.closeTag();
+        }
+      }
+      out.closeTag();  // </svg>
+      return;
+    }
+
+    // Handle Union, Xor, Difference, and Append modes
+    for (size_t i = 0; i < geos.size(); i++) {
+      auto& g = geos[i];
+      PathData pathData = PathDataFromSVGString("");
+      if (!g.modifiedPathData.empty()) {
+        pathData = PathDataFromSVGString(g.modifiedPathData);
+      } else {
+        pathData = GeoToPathData(g.element, g.type);
+      }
+      bool needReverse = false;
+      switch (mergeMode) {
+        case MergePathMode::Union:
+          // All paths should be clockwise for union with nonzero fill-rule
+          if (!IsPathClockwise(pathData)) {
+            needReverse = true;
+          }
+          fillRule = "nonzero";
           break;
+        case MergePathMode::Xor:
+          // Just concatenate paths, evenodd rule produces XOR effect
+          fillRule = "evenodd";
+          break;
+        case MergePathMode::Difference:
+          // First path clockwise, rest counter-clockwise
+          if (i == 0) {
+            if (!IsPathClockwise(pathData)) {
+              needReverse = true;
+            }
+          } else {
+            if (IsPathClockwise(pathData)) {
+              needReverse = true;
+            }
+          }
+          fillRule = "nonzero";
+          break;
+        case MergePathMode::Append:
         default:
+          // Just concatenate, no direction change
           break;
       }
+      if (needReverse) {
+        pathData = ReversePathData(pathData);
+      }
+      mergedPath += PathDataToSVGString(pathData);
     }
     if (mergedPath.empty()) {
       return;
     }
-    std::vector<GeoInfo> merged = {{NodeType::Path, nullptr}};
-    // Use inline SVG with the merged path
+    // Compute bounding box
     float pad = 0.0f;
     if (stroke) {
       pad = (stroke->align != StrokeAlign::Center) ? stroke->width * 2.0f : stroke->width;
@@ -2091,6 +3119,9 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     out.closeTagStart();
     out.openTag("path");
     out.addAttr("d", mergedPath);
+    if (fillRule != "nonzero") {
+      out.addAttr("fill-rule", fillRule);
+    }
     applySVGFill(out, fill);
     applySVGStroke(out, stroke);
     out.closeTagSelfClosing();
@@ -2100,7 +3131,7 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   if (canCSS(geos, fill, stroke, hasTrim, false)) {
     renderCSSDiv(out, geos[0], fill, alpha, painterBlend);
   } else {
-    renderSVG(out, geos, fill, stroke, alpha, painterBlend, trim);
+    renderSVG(out, geos, fill, stroke, alpha, painterBlend, trim, mergeMode);
   }
 }
 
@@ -2260,6 +3291,426 @@ void HTMLWriter::writeGlyphRunSVG(HTMLBuilder& out, const Text* text, const Fill
   out.closeTag();  // </svg>
 }
 
+void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>& geos,
+                                   const TextModifier* modifier, const Fill* fill,
+                                   const Stroke* stroke, const TextBox* /*tb*/, float alpha) {
+  // Find Text elements in geos
+  for (auto& g : geos) {
+    if (g.type != NodeType::Text) {
+      continue;
+    }
+    auto text = static_cast<const Text*>(g.element);
+    // Compute factor for each glyph using the TextModifier's selectors
+    size_t totalGlyphs = 0;
+    if (!text->glyphRuns.empty()) {
+      for (auto* run : text->glyphRuns) {
+        totalGlyphs += run->glyphs.size();
+      }
+    } else {
+      // Runtime text: count UTF-8 characters
+      const char* p = text->text.c_str();
+      while (*p) {
+        int32_t ch = 0;
+        size_t len = SVGDecodeUTF8Char(p, text->text.size() - (p - text->text.c_str()), &ch);
+        if (len == 0) {
+          break;
+        }
+        totalGlyphs++;
+        p += len;
+      }
+    }
+    if (totalGlyphs == 0) {
+      continue;
+    }
+    // Compute factors for all glyphs
+    std::vector<float> factors(totalGlyphs, 0.0f);
+    for (size_t i = 0; i < totalGlyphs; i++) {
+      float combinedFactor = 0.0f;
+      bool firstSelector = true;
+      for (auto* selector : modifier->selectors) {
+        if (selector->nodeType() == NodeType::RangeSelector) {
+          auto rs = static_cast<const RangeSelector*>(selector);
+          float selectorFactor = ComputeRangeSelectorFactor(rs, i, totalGlyphs);
+          if (firstSelector) {
+            combinedFactor = selectorFactor;
+            firstSelector = false;
+          } else {
+            combinedFactor = CombineSelectorValues(rs->mode, combinedFactor, selectorFactor);
+          }
+        }
+      }
+      factors[i] = std::clamp(combinedFactor, -1.0f, 1.0f);
+    }
+
+    if (!text->glyphRuns.empty()) {
+      // GlyphRun: render each glyph with modified transforms
+      std::string svgStyle = "position:absolute;left:0;top:0;overflow:visible";
+      if (alpha < 1.0f) {
+        svgStyle += ";opacity:" + FloatToString(alpha);
+      }
+      out.openTag("svg");
+      out.addAttr("xmlns", "http://www.w3.org/2000/svg");
+      out.addAttr("style", svgStyle);
+      out.closeTagStart();
+      size_t glyphIdx = 0;
+      for (auto* run : text->glyphRuns) {
+        if (!run->font) {
+          continue;
+        }
+        float scale = run->fontSize / run->font->unitsPerEm;
+        for (size_t i = 0; i < run->glyphs.size(); i++) {
+          uint16_t glyphId = run->glyphs[i];
+          if (glyphId == 0) {
+            glyphIdx++;
+            continue;
+          }
+          auto* glyph = (glyphId > 0 && glyphId <= run->font->glyphs.size())
+                            ? run->font->glyphs[glyphId - 1]
+                            : nullptr;
+          if (!glyph || !glyph->path) {
+            glyphIdx++;
+            continue;
+          }
+          float f = (glyphIdx < factors.size()) ? factors[glyphIdx] : 0.0f;
+          float absF = std::abs(f);
+          // Compute glyph position
+          float gx = run->x;
+          float gy = run->y;
+          if (i < run->xOffsets.size()) {
+            gx += run->xOffsets[i];
+          }
+          if (i < run->positions.size()) {
+            gx += run->positions[i].x;
+            gy += run->positions[i].y;
+          }
+          // Default anchor is (advance * 0.5, 0)
+          float anchorX = glyph->advance * 0.5f * scale;
+          float anchorY = 0;
+          if (i < run->anchors.size()) {
+            anchorX += run->anchors[i].x * scale;
+            anchorY += run->anchors[i].y * scale;
+          }
+          // Build transform with modifier applied
+          // Order: translate(-anchor*f) → scale(1+(s-1)*f) → skew → rotate(rot*f) → translate(anchor*f) → translate(pos*f)
+          Matrix m = Matrix::Scale(scale, scale);
+          // Apply modifier transforms scaled by factor
+          // 1. Translate to anchor
+          float modAnchorX = anchorX + modifier->anchor.x * absF;
+          float modAnchorY = anchorY + modifier->anchor.y * absF;
+          m = Matrix::Translate(-modAnchorX, -modAnchorY) * m;
+          // 2. Scale
+          float sx = 1.0f + (modifier->scale.x - 1.0f) * absF;
+          float sy = 1.0f + (modifier->scale.y - 1.0f) * absF;
+          m = Matrix::Scale(sx, sy) * m;
+          // 3. Skew
+          if (!FloatNearlyZero(modifier->skew)) {
+            m = Matrix::Rotate(modifier->skewAxis * absF) * m;
+            Matrix shear = {};
+            shear.c = std::tan(DegreesToRadians(modifier->skew * absF));
+            m = shear * m;
+            m = Matrix::Rotate(-modifier->skewAxis * absF) * m;
+          }
+          // 4. Rotate
+          if (!FloatNearlyZero(modifier->rotation)) {
+            m = Matrix::Rotate(modifier->rotation * f) * m;
+          }
+          // 5. Translate back from anchor
+          m = Matrix::Translate(modAnchorX, modAnchorY) * m;
+          // 6. Position offset
+          m = Matrix::Translate(modifier->position.x * f, modifier->position.y * f) * m;
+          // 7. Glyph position
+          m = Matrix::Translate(gx, gy) * m;
+          // Compute alpha
+          float glyphAlpha = 1.0f;
+          if (modifier->alpha < 1.0f) {
+            glyphAlpha = std::max(0.0f, 1.0f + (modifier->alpha - 1.0f) * absF);
+          }
+          out.openTag("g");
+          out.addAttr("transform", MatrixToCSS(m));
+          if (glyphAlpha < 1.0f) {
+            out.addAttr("opacity", FloatToString(glyphAlpha));
+          }
+          out.closeTagStart();
+          out.openTag("path");
+          out.addAttr("d", PathDataToSVGString(*glyph->path));
+          // Apply fill/stroke with potential color override
+          if (fill) {
+            if (modifier->fillColor.has_value() && absF > 0.0f) {
+              Color blended = modifier->fillColor.value();
+              out.addAttr("fill", ColorToSVGHex(blended));
+              float fa = blended.alpha * absF;
+              if (fa < 1.0f) {
+                out.addAttr("fill-opacity", FloatToString(fa));
+              }
+            } else {
+              applySVGFill(out, fill);
+            }
+          } else {
+            out.addAttr("fill", "none");
+          }
+          if (stroke) {
+            applySVGStroke(out, stroke);
+          }
+          out.closeTagSelfClosing();
+          out.closeTag();  // </g>
+          glyphIdx++;
+        }
+      }
+      out.closeTag();  // </svg>
+    } else {
+      // Runtime text: split into per-character spans
+      float ty = text->position.y - text->fontSize * 0.8f;
+      std::string containerStyle = "position:absolute;left:" + FloatToString(text->position.x) +
+                                   "px;top:" + FloatToString(ty) + "px";
+      if (!text->fontFamily.empty()) {
+        containerStyle += ";font-family:'" + text->fontFamily + "'";
+      }
+      containerStyle += ";font-size:" + FloatToString(text->fontSize) + "px";
+      if (alpha < 1.0f) {
+        containerStyle += ";opacity:" + FloatToString(alpha);
+      }
+      out.openTag("div");
+      out.addAttr("style", containerStyle);
+      out.closeTagStart();
+      const char* p = text->text.c_str();
+      size_t charIdx = 0;
+      while (*p) {
+        int32_t ch = 0;
+        size_t len = SVGDecodeUTF8Char(p, text->text.size() - (p - text->text.c_str()), &ch);
+        if (len == 0) {
+          break;
+        }
+        float f = (charIdx < factors.size()) ? factors[charIdx] : 0.0f;
+        float absF = std::abs(f);
+        std::string charStr(p, len);
+        std::string charStyle = "display:inline-block";
+        // Build transform
+        std::string transform;
+        // Position offset
+        if (!FloatNearlyZero(modifier->position.x * f) ||
+            !FloatNearlyZero(modifier->position.y * f)) {
+          transform += "translate(" + FloatToString(modifier->position.x * f) + "px," +
+                       FloatToString(modifier->position.y * f) + "px) ";
+        }
+        // Rotation
+        if (!FloatNearlyZero(modifier->rotation * f)) {
+          transform += "rotate(" + FloatToString(modifier->rotation * f) + "deg) ";
+        }
+        // Scale
+        float sx = 1.0f + (modifier->scale.x - 1.0f) * absF;
+        float sy = 1.0f + (modifier->scale.y - 1.0f) * absF;
+        if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
+          transform += "scale(" + FloatToString(sx) + "," + FloatToString(sy) + ") ";
+        }
+        // Skew
+        if (!FloatNearlyZero(modifier->skew * absF)) {
+          transform += "skewX(" + FloatToString(modifier->skew * absF) + "deg) ";
+        }
+        if (!transform.empty()) {
+          charStyle += ";transform:" + transform;
+        }
+        // Alpha
+        if (modifier->alpha < 1.0f) {
+          float charAlpha = std::max(0.0f, 1.0f + (modifier->alpha - 1.0f) * absF);
+          charStyle += ";opacity:" + FloatToString(charAlpha);
+        }
+        // Color
+        if (fill && fill->color && fill->color->nodeType() == NodeType::SolidColor) {
+          auto sc = static_cast<const SolidColor*>(fill->color);
+          if (modifier->fillColor.has_value() && absF > 0.0f) {
+            charStyle += ";color:" + ColorToRGBA(modifier->fillColor.value());
+          } else {
+            charStyle += ";color:" + ColorToRGBA(sc->color, fill->alpha);
+          }
+        }
+        out.openTag("span");
+        out.addAttr("style", charStyle);
+        out.closeTagWithText(charStr);
+        p += len;
+        charIdx++;
+      }
+      out.closeTag();  // </div>
+    }
+  }
+}
+
+void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geos,
+                               const TextPath* textPath, const Fill* fill, const Stroke* stroke,
+                               const TextBox*, float alpha) {
+  if (!textPath->path || textPath->path->isEmpty()) {
+    return;
+  }
+  // Build arc-length LUT
+  PathData pathData = *textPath->path;
+  if (textPath->reversed) {
+    pathData = ReversePathData(pathData);
+  }
+  ArcLengthLUT lut = BuildArcLengthLUT(pathData);
+  if (lut.totalLength <= 0) {
+    return;
+  }
+  float effectiveLength = lut.totalLength - textPath->firstMargin - textPath->lastMargin;
+  if (effectiveLength <= 0) {
+    return;
+  }
+
+  for (auto& g : geos) {
+    if (g.type != NodeType::Text) {
+      continue;
+    }
+    auto text = static_cast<const Text*>(g.element);
+    if (!text->glyphRuns.empty()) {
+      // GlyphRun: position each glyph along the path
+      std::string svgStyle = "position:absolute;left:0;top:0;overflow:visible";
+      if (alpha < 1.0f) {
+        svgStyle += ";opacity:" + FloatToString(alpha);
+      }
+      out.openTag("svg");
+      out.addAttr("xmlns", "http://www.w3.org/2000/svg");
+      out.addAttr("style", svgStyle);
+      out.closeTagStart();
+      out.openTag("g");
+      applySVGFill(out, fill);
+      applySVGStroke(out, stroke);
+      out.closeTagStart();
+      // Compute total text width for forceAlignment
+      float totalAdvance = 0.0f;
+      for (auto* run : text->glyphRuns) {
+        if (!run->font) {
+          continue;
+        }
+        float scale = run->fontSize / run->font->unitsPerEm;
+        for (size_t i = 0; i < run->glyphs.size(); i++) {
+          uint16_t glyphId = run->glyphs[i];
+          if (glyphId == 0) {
+            continue;
+          }
+          auto* glyph = (glyphId > 0 && glyphId <= run->font->glyphs.size())
+                            ? run->font->glyphs[glyphId - 1]
+                            : nullptr;
+          if (glyph) {
+            totalAdvance += glyph->advance * scale;
+          }
+        }
+      }
+      float spacingScale =
+          textPath->forceAlignment && totalAdvance > 0 ? effectiveLength / totalAdvance : 1.0f;
+      float currentArcPos = textPath->firstMargin;
+      for (auto* run : text->glyphRuns) {
+        if (!run->font) {
+          continue;
+        }
+        float scale = run->fontSize / run->font->unitsPerEm;
+        for (size_t i = 0; i < run->glyphs.size(); i++) {
+          uint16_t glyphId = run->glyphs[i];
+          if (glyphId == 0) {
+            continue;
+          }
+          auto* glyph = (glyphId > 0 && glyphId <= run->font->glyphs.size())
+                            ? run->font->glyphs[glyphId - 1]
+                            : nullptr;
+          if (!glyph || !glyph->path) {
+            continue;
+          }
+          float glyphAdvance = glyph->advance * scale * spacingScale;
+          // Position at center of glyph
+          float glyphCenterArc = currentArcPos + glyphAdvance / 2.0f;
+          Point pos = {};
+          float tangent = 0;
+          SampleArcLengthLUT(lut, glyphCenterArc, &pos, &tangent);
+          // Get original glyph y offset
+          float yOffset = 0;
+          if (i < run->positions.size()) {
+            yOffset = run->positions[i].y;
+          }
+          // Apply perpendicular offset
+          float normalAngle = tangent + static_cast<float>(M_PI) / 2.0f;
+          pos.x += yOffset * std::cos(normalAngle);
+          pos.y += yOffset * std::sin(normalAngle);
+          // Build transform
+          Matrix m = Matrix::Scale(scale, scale);
+          // Center the glyph
+          m = Matrix::Translate(-glyph->advance / 2.0f, 0) * m;
+          // Rotate to align with path tangent
+          if (textPath->perpendicular) {
+            float angleDeg = tangent * 180.0f / static_cast<float>(M_PI);
+            m = Matrix::Rotate(angleDeg) * m;
+          }
+          // Move to position on path
+          m = Matrix::Translate(pos.x, pos.y) * m;
+          out.openTag("path");
+          out.addAttr("transform", MatrixToCSS(m));
+          out.addAttr("d", PathDataToSVGString(*glyph->path));
+          out.closeTagSelfClosing();
+          currentArcPos += glyphAdvance;
+        }
+      }
+      out.closeTag();  // </g>
+      out.closeTag();  // </svg>
+    } else {
+      // Runtime text: position each character along the path
+      // Estimate total text width
+      float totalWidth = 0.0f;
+      const char* p = text->text.c_str();
+      while (*p) {
+        int32_t ch = 0;
+        size_t len = SVGDecodeUTF8Char(p, text->text.size() - (p - text->text.c_str()), &ch);
+        if (len == 0) {
+          break;
+        }
+        totalWidth += EstimateCharAdvance(ch, text->fontSize);
+        p += len;
+      }
+      float spacingScale =
+          textPath->forceAlignment && totalWidth > 0 ? effectiveLength / totalWidth : 1.0f;
+      // Render each character
+      float currentArcPos = textPath->firstMargin;
+      p = text->text.c_str();
+      while (*p) {
+        int32_t ch = 0;
+        size_t len = SVGDecodeUTF8Char(p, text->text.size() - (p - text->text.c_str()), &ch);
+        if (len == 0) {
+          break;
+        }
+        float charWidth = EstimateCharAdvance(ch, text->fontSize) * spacingScale;
+        float charCenterArc = currentArcPos + charWidth / 2.0f;
+        Point pos = {};
+        float tangent = 0;
+        SampleArcLengthLUT(lut, charCenterArc, &pos, &tangent);
+        std::string charStr(p, len);
+        std::string charStyle = "position:absolute;left:" + FloatToString(pos.x) +
+                                "px;top:" + FloatToString(pos.y - text->fontSize * 0.8f) + "px";
+        charStyle += ";display:inline-block";
+        if (!text->fontFamily.empty()) {
+          charStyle += ";font-family:'" + text->fontFamily + "'";
+        }
+        charStyle += ";font-size:" + FloatToString(text->fontSize) + "px";
+        // Transform for rotation and centering
+        std::string transform;
+        transform += "translateX(-50%)";
+        if (textPath->perpendicular) {
+          float angleDeg = tangent * 180.0f / static_cast<float>(M_PI);
+          transform += " rotate(" + FloatToString(angleDeg) + "deg)";
+        }
+        charStyle += ";transform:" + transform;
+        charStyle += ";transform-origin:center center";
+        if (fill && fill->color && fill->color->nodeType() == NodeType::SolidColor) {
+          auto sc = static_cast<const SolidColor*>(fill->color);
+          charStyle += ";color:" + ColorToRGBA(sc->color, fill->alpha);
+        }
+        if (alpha < 1.0f) {
+          charStyle += ";opacity:" + FloatToString(alpha);
+        }
+        out.openTag("span");
+        out.addAttr("style", charStyle);
+        out.closeTagWithText(charStr);
+        currentArcPos += charWidth;
+        p += len;
+      }
+    }
+  }
+}
+
 //==============================================================================
 // HTMLWriter – group & repeater
 //==============================================================================
@@ -2416,9 +3867,174 @@ void HTMLWriter::applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim) {
   }
 }
 
+float HTMLWriter::computeGeoPathLength(const GeoInfo& geo) {
+  if (!geo.modifiedPathData.empty()) {
+    PathData pathData = PathDataFromSVGString(geo.modifiedPathData);
+    return ComputePathLength(pathData);
+  }
+  switch (geo.type) {
+    case NodeType::Rectangle: {
+      auto r = static_cast<const Rectangle*>(geo.element);
+      if (r->roundness <= 0) {
+        return 2 * (r->size.width + r->size.height);
+      }
+      // Approximate with arc length
+      float rn = std::min(r->roundness, std::min(r->size.width / 2, r->size.height / 2));
+      float straightLen = 2 * (r->size.width + r->size.height - 4 * rn);
+      float arcLen = 2 * static_cast<float>(M_PI) * rn;
+      return straightLen + arcLen;
+    }
+    case NodeType::Ellipse: {
+      auto e = static_cast<const Ellipse*>(geo.element);
+      float rx = e->size.width / 2;
+      float ry = e->size.height / 2;
+      // Ramanujan's ellipse perimeter approximation
+      float h = ((rx - ry) * (rx - ry)) / ((rx + ry) * (rx + ry));
+      return static_cast<float>(M_PI) * (rx + ry) * (1 + 3 * h / (10 + std::sqrt(4 - 3 * h)));
+    }
+    case NodeType::Path: {
+      auto p = static_cast<const Path*>(geo.element);
+      if (p->data) {
+        return ComputePathLength(*p->data);
+      }
+      return 0;
+    }
+    case NodeType::Polystar: {
+      std::string d = BuildPolystarPath(static_cast<const Polystar*>(geo.element));
+      if (!d.empty()) {
+        PathData pathData = PathDataFromSVGString(d);
+        return ComputePathLength(pathData);
+      }
+      return 0;
+    }
+    default:
+      return 0;
+  }
+}
+
+void HTMLWriter::applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* trim,
+                                          const std::vector<GeoInfo>& geos, size_t geoIndex) {
+  if (!trim || trim->type != TrimType::Continuous) {
+    applyTrimAttrs(builder, trim);
+    return;
+  }
+  // Calculate cumulative path lengths
+  std::vector<float> pathLengths = {};
+  float totalLength = 0.0f;
+  for (auto& g : geos) {
+    float len = computeGeoPathLength(g);
+    pathLengths.push_back(len);
+    totalLength += len;
+  }
+  if (totalLength <= 0.0f || geoIndex >= pathLengths.size()) {
+    return;
+  }
+  // Compute cumulative start position for this geometry
+  float cumStart = 0.0f;
+  for (size_t i = 0; i < geoIndex; i++) {
+    cumStart += pathLengths[i];
+  }
+  float thisLength = pathLengths[geoIndex];
+  float cumEnd = cumStart + thisLength;
+  // Normalize to [0, 1]
+  float normStart = cumStart / totalLength;
+  float normEnd = cumEnd / totalLength;
+  // Apply global trim with offset
+  float offsetFrac = trim->offset / 360.0f;
+  float globalStart = std::fmod(trim->start + offsetFrac, 1.0f);
+  float globalEnd = std::fmod(trim->end + offsetFrac, 1.0f);
+  if (globalStart < 0.0f) {
+    globalStart += 1.0f;
+  }
+  if (globalEnd < 0.0f) {
+    globalEnd += 1.0f;
+  }
+  // Intersect global trim range with this geometry's range
+  float localStart = std::max(globalStart, normStart);
+  float localEnd = std::min(globalEnd, normEnd);
+  if (localStart >= localEnd) {
+    // No visible portion for this geometry
+    builder.addAttr("stroke-dasharray", "0");
+    return;
+  }
+  // Map back to local [0, 1] range for this geometry
+  float localNormStart = (localStart - normStart) / (normEnd - normStart);
+  float localNormEnd = (localEnd - normStart) / (normEnd - normStart);
+  builder.addAttr("pathLength", "1");
+  float visible = localNormEnd - localNormStart;
+  float gap = 1.0f - visible;
+  builder.addAttr("stroke-dasharray", FloatToString(visible) + " " + FloatToString(gap));
+  builder.addAttr("stroke-dashoffset", FloatToString(-localNormStart));
+}
+
+void HTMLWriter::applySVGStrokeWithLength(HTMLBuilder& out, const Stroke* stroke,
+                                          float pathLength) {
+  if (!stroke) {
+    return;
+  }
+  float alpha = 1.0f;
+  std::string s = colorToSVGFill(stroke->color, &alpha);
+  out.addAttr("stroke", s);
+  float ea = alpha * stroke->alpha;
+  if (ea < 1.0f) {
+    out.addAttr("stroke-opacity", FloatToString(ea));
+  }
+  // Double stroke width for Inside/Outside alignment (used with clip-path)
+  float effectiveWidth = stroke->width;
+  if (stroke->align != StrokeAlign::Center) {
+    effectiveWidth *= 2.0f;
+  }
+  if (effectiveWidth != 1.0f) {
+    out.addAttr("stroke-width", FloatToString(effectiveWidth));
+  }
+  if (stroke->cap == LineCap::Round) {
+    out.addAttr("stroke-linecap", "round");
+  } else if (stroke->cap == LineCap::Square) {
+    out.addAttr("stroke-linecap", "square");
+  }
+  if (stroke->join == LineJoin::Round) {
+    out.addAttr("stroke-linejoin", "round");
+  } else if (stroke->join == LineJoin::Bevel) {
+    out.addAttr("stroke-linejoin", "bevel");
+  }
+  if (stroke->join == LineJoin::Miter && stroke->miterLimit != 4.0f) {
+    out.addAttr("stroke-miterlimit", FloatToString(stroke->miterLimit));
+  }
+  if (!stroke->dashes.empty()) {
+    // Apply dashAdaptive if enabled
+    std::vector<float> dashValues = stroke->dashes;
+    if (stroke->dashAdaptive && pathLength > 0) {
+      float patternLength = 0.0f;
+      for (float d : stroke->dashes) {
+        patternLength += d;
+      }
+      if (patternLength > 0) {
+        int n = static_cast<int>(std::round(pathLength / patternLength));
+        if (n > 0) {
+          float scaleFactor = pathLength / (static_cast<float>(n) * patternLength);
+          for (size_t i = 0; i < dashValues.size(); i++) {
+            dashValues[i] = stroke->dashes[i] * scaleFactor;
+          }
+        }
+      }
+    }
+    std::string d;
+    for (size_t i = 0; i < dashValues.size(); i++) {
+      if (i > 0) {
+        d += ',';
+      }
+      d += FloatToString(dashValues[i]);
+    }
+    out.addAttr("stroke-dasharray", d);
+  }
+  if (stroke->dashOffset != 0.0f) {
+    out.addAttr("stroke-dashoffset", FloatToString(stroke->dashOffset));
+  }
+}
+
 void HTMLWriter::paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                            const Stroke* stroke, const TextBox* textBox, float alpha, bool hasTrim,
-                           const TrimPath* curTrim, bool hasMerge) {
+                           const TrimPath* curTrim, bool hasMerge, MergePathMode mergeMode) {
   if (geos.empty()) {
     return;
   }
@@ -2435,11 +4051,11 @@ void HTMLWriter::paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         writeText(out, static_cast<const Text*>(g.element), fill, stroke, textBox, alpha);
       } else {
         std::vector<GeoInfo> single = {g};
-        renderGeo(out, single, fill, stroke, alpha, hasTrim, curTrim, hasMerge);
+        renderGeo(out, single, fill, stroke, alpha, hasTrim, curTrim, hasMerge, mergeMode);
       }
     }
   } else {
-    renderGeo(out, geos, fill, stroke, alpha, hasTrim, curTrim, hasMerge);
+    renderGeo(out, geos, fill, stroke, alpha, hasTrim, curTrim, hasMerge, mergeMode);
   }
 }
 
@@ -2452,6 +4068,10 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
   bool hasTrim = false;
   const TrimPath* curTrim = nullptr;
   bool hasMerge = false;
+  MergePathMode mergeMode = MergePathMode::Append;
+  float roundCornerRadius = 0.0f;
+  const TextModifier* curTextModifier = nullptr;
+  const TextPath* curTextPath = nullptr;
 
   for (auto* element : elements) {
     auto type = element->nodeType();
@@ -2461,14 +4081,22 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
       case NodeType::Path:
       case NodeType::Polystar:
       case NodeType::Text:
-        geos.push_back({type, element});
+        geos.push_back({type, element, {}});
         break;
       case NodeType::Fill: {
         auto fill = static_cast<const Fill*>(element);
         curFill = fill;
         if (fill->placement == targetPlacement) {
           float a = distribute ? alpha : 1.0f;
-          paintGeos(out, geos, curFill, nullptr, curTextBox, a, hasTrim, curTrim, hasMerge);
+          // Handle TextModifier or TextPath if present
+          if (curTextModifier && !geos.empty()) {
+            writeTextModifier(out, geos, curTextModifier, curFill, nullptr, curTextBox, a);
+          } else if (curTextPath && !geos.empty()) {
+            writeTextPath(out, geos, curTextPath, curFill, nullptr, curTextBox, a);
+          } else {
+            paintGeos(out, geos, curFill, nullptr, curTextBox, a, hasTrim, curTrim, hasMerge,
+                      mergeMode);
+          }
         }
         break;
       }
@@ -2477,7 +4105,15 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         curStroke = stroke;
         if (stroke->placement == targetPlacement) {
           float a = distribute ? alpha : 1.0f;
-          paintGeos(out, geos, nullptr, curStroke, curTextBox, a, hasTrim, curTrim, hasMerge);
+          // Handle TextModifier or TextPath if present
+          if (curTextModifier && !geos.empty()) {
+            writeTextModifier(out, geos, curTextModifier, nullptr, curStroke, curTextBox, a);
+          } else if (curTextPath && !geos.empty()) {
+            writeTextPath(out, geos, curTextPath, nullptr, curStroke, curTextBox, a);
+          } else {
+            paintGeos(out, geos, nullptr, curStroke, curTextBox, a, hasTrim, curTrim, hasMerge,
+                      mergeMode);
+          }
         }
         break;
       }
@@ -2488,30 +4124,36 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         hasTrim = true;
         curTrim = static_cast<const TrimPath*>(element);
         break;
-      case NodeType::RoundCorner:
-        // TODO: RoundCorner modifier is not yet implemented. It should replace sharp vertices with
-        // bezier curve arcs, with radius limited to half of adjacent edge lengths (spec §9.2).
-        // Currently the modifier is detected but has no effect on the output path data.
+      case NodeType::RoundCorner: {
+        auto rc = static_cast<const RoundCorner*>(element);
+        roundCornerRadius = rc->radius;
+        // Apply RoundCorner to all accumulated geometries
+        if (roundCornerRadius > 0) {
+          for (auto& g : geos) {
+            if (g.type == NodeType::Rectangle || g.type == NodeType::Ellipse ||
+                g.type == NodeType::Path || g.type == NodeType::Polystar) {
+              PathData pathData = GeoToPathData(g.element, g.type);
+              PathData rounded = ApplyRoundCorner(pathData, roundCornerRadius);
+              g.modifiedPathData = PathDataToSVGString(rounded);
+            }
+          }
+        }
         break;
+      }
       case NodeType::MergePath: {
         auto mp = static_cast<const MergePath*>(element);
-        // TODO: Non-Append modes (Union/Intersect/Xor/Difference) require path boolean operations
-        // which are not available in pure SVG/CSS. Currently only Append mode is supported.
-        (void)mp;
         hasMerge = true;
+        mergeMode = mp->mode;
         // Per spec §9.3, MergePath clears previously accumulated Fill/Stroke
         curFill = nullptr;
         curStroke = nullptr;
         break;
       }
       case NodeType::TextModifier:
-        // TODO: TextModifier (per-character animation with RangeSelector) is not yet implemented.
-        // Each glyph needs independent transform and style override based on selector factors
-        // (spec §10.4).
+        curTextModifier = static_cast<const TextModifier*>(element);
         break;
       case NodeType::TextPath:
-        // TODO: TextPath (text along a curve) is not yet implemented. Requires pre-computing
-        // per-glyph positions along the path using arc-length parameterization (spec §10.5).
+        curTextPath = static_cast<const TextPath*>(element);
         break;
       case NodeType::Group:
         writeGroup(out, static_cast<const Group*>(element), alpha, distribute);
@@ -2525,6 +4167,10 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         hasTrim = false;
         curTrim = nullptr;
         hasMerge = false;
+        mergeMode = MergePathMode::Append;
+        roundCornerRadius = 0.0f;
+        curTextModifier = nullptr;
+        curTextPath = nullptr;
         break;
       }
       default:
@@ -2606,14 +4252,20 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     }
   }
 
+  // Track styles that need to be rendered as independent divs (when they have blendMode != Normal)
+  std::vector<std::pair<NodeType, const LayerStyle*>> belowStyles = {};
+  std::vector<std::pair<NodeType, const LayerStyle*>> aboveStyles = {};
+
   // Layer styles that produce filter effects
-  // TODO: LayerStyle.blendMode and LayerStyle.excludeChildEffects are not yet handled. CSS filter
-  // architecture applies all filters as a single property, making it impossible to set per-style
-  // blend modes or exclude child effects independently.
   for (auto* ls : layer->styles) {
+    bool hasBlendMode = ls->blendMode != BlendMode::Normal;
+
     if (ls->nodeType() == NodeType::DropShadowStyle) {
       auto ds = static_cast<const DropShadowStyle*>(ls);
-      if (ds->blurX == ds->blurY && ds->showBehindLayer) {
+      if (hasBlendMode) {
+        // Store for separate rendering with mix-blend-mode
+        belowStyles.push_back({NodeType::DropShadowStyle, ls});
+      } else if (ds->blurX == ds->blurY && ds->showBehindLayer) {
         if (!filterValues.empty()) {
           filterValues += ' ';
         }
@@ -2691,66 +4343,76 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       }
     } else if (ls->nodeType() == NodeType::InnerShadowStyle) {
       auto is = static_cast<const InnerShadowStyle*>(ls);
-      // InnerShadowStyle: SVG filter (offset → invert → blur → clip to interior → colorize)
-      std::string fid = _ctx->nextId("filter");
-      _defs->openTag("filter");
-      _defs->addAttr("id", fid);
-      _defs->addAttr("x", "-50%");
-      _defs->addAttr("y", "-50%");
-      _defs->addAttr("width", "200%");
-      _defs->addAttr("height", "200%");
-      _defs->addAttr("color-interpolation-filters", "sRGB");
-      _defs->closeTagStart();
-      _defs->openTag("feOffset");
-      _defs->addAttr("in", "SourceAlpha");
-      if (!FloatNearlyZero(is->offsetX)) {
-        _defs->addAttr("dx", FloatToString(is->offsetX));
+      if (hasBlendMode) {
+        // Store for separate rendering with mix-blend-mode
+        aboveStyles.push_back({NodeType::InnerShadowStyle, ls});
+      } else {
+        // InnerShadowStyle: SVG filter (offset → invert → blur → clip to interior → colorize)
+        std::string fid = _ctx->nextId("filter");
+        _defs->openTag("filter");
+        _defs->addAttr("id", fid);
+        _defs->addAttr("x", "-50%");
+        _defs->addAttr("y", "-50%");
+        _defs->addAttr("width", "200%");
+        _defs->addAttr("height", "200%");
+        _defs->addAttr("color-interpolation-filters", "sRGB");
+        _defs->closeTagStart();
+        _defs->openTag("feOffset");
+        _defs->addAttr("in", "SourceAlpha");
+        if (!FloatNearlyZero(is->offsetX)) {
+          _defs->addAttr("dx", FloatToString(is->offsetX));
+        }
+        if (!FloatNearlyZero(is->offsetY)) {
+          _defs->addAttr("dy", FloatToString(is->offsetY));
+        }
+        _defs->addAttr("result", "iOff");
+        _defs->closeTagSelfClosing();
+        _defs->openTag("feComposite");
+        _defs->addAttr("in", "SourceAlpha");
+        _defs->addAttr("in2", "iOff");
+        _defs->addAttr("operator", "arithmetic");
+        _defs->addAttr("k2", "-1");
+        _defs->addAttr("k3", "1");
+        _defs->addAttr("result", "iComp");
+        _defs->closeTagSelfClosing();
+        std::string sd = FloatToString(is->blurX);
+        if (is->blurX != is->blurY) {
+          sd += " " + FloatToString(is->blurY);
+        }
+        _defs->openTag("feGaussianBlur");
+        _defs->addAttr("in", "iComp");
+        _defs->addAttr("stdDeviation", sd);
+        _defs->addAttr("result", "iBlur");
+        _defs->closeTagSelfClosing();
+        _defs->openTag("feColorMatrix");
+        _defs->addAttr("in", "iBlur");
+        _defs->addAttr("type", "matrix");
+        _defs->addAttr("values", "0 0 0 0 " + FloatToString(is->color.red) + " 0 0 0 0 " +
+                                     FloatToString(is->color.green) + " 0 0 0 0 " +
+                                     FloatToString(is->color.blue) + " 0 0 0 " +
+                                     FloatToString(is->color.alpha) + " 0");
+        _defs->addAttr("result", "iShadow");
+        _defs->closeTagSelfClosing();
+        _defs->openTag("feMerge");
+        _defs->closeTagStart();
+        _defs->openTag("feMergeNode");
+        _defs->addAttr("in", "SourceGraphic");
+        _defs->closeTagSelfClosing();
+        _defs->openTag("feMergeNode");
+        _defs->addAttr("in", "iShadow");
+        _defs->closeTagSelfClosing();
+        _defs->closeTag();
+        _defs->closeTag();
+        if (!filterValues.empty()) {
+          filterValues += ' ';
+        }
+        filterValues += "url(#" + fid + ")";
       }
-      if (!FloatNearlyZero(is->offsetY)) {
-        _defs->addAttr("dy", FloatToString(is->offsetY));
+    } else if (ls->nodeType() == NodeType::BackgroundBlurStyle) {
+      if (hasBlendMode) {
+        belowStyles.push_back({NodeType::BackgroundBlurStyle, ls});
       }
-      _defs->addAttr("result", "iOff");
-      _defs->closeTagSelfClosing();
-      _defs->openTag("feComposite");
-      _defs->addAttr("in", "SourceAlpha");
-      _defs->addAttr("in2", "iOff");
-      _defs->addAttr("operator", "arithmetic");
-      _defs->addAttr("k2", "-1");
-      _defs->addAttr("k3", "1");
-      _defs->addAttr("result", "iComp");
-      _defs->closeTagSelfClosing();
-      std::string sd = FloatToString(is->blurX);
-      if (is->blurX != is->blurY) {
-        sd += " " + FloatToString(is->blurY);
-      }
-      _defs->openTag("feGaussianBlur");
-      _defs->addAttr("in", "iComp");
-      _defs->addAttr("stdDeviation", sd);
-      _defs->addAttr("result", "iBlur");
-      _defs->closeTagSelfClosing();
-      _defs->openTag("feColorMatrix");
-      _defs->addAttr("in", "iBlur");
-      _defs->addAttr("type", "matrix");
-      _defs->addAttr("values", "0 0 0 0 " + FloatToString(is->color.red) + " 0 0 0 0 " +
-                                   FloatToString(is->color.green) + " 0 0 0 0 " +
-                                   FloatToString(is->color.blue) + " 0 0 0 " +
-                                   FloatToString(is->color.alpha) + " 0");
-      _defs->addAttr("result", "iShadow");
-      _defs->closeTagSelfClosing();
-      _defs->openTag("feMerge");
-      _defs->closeTagStart();
-      _defs->openTag("feMergeNode");
-      _defs->addAttr("in", "SourceGraphic");
-      _defs->closeTagSelfClosing();
-      _defs->openTag("feMergeNode");
-      _defs->addAttr("in", "iShadow");
-      _defs->closeTagSelfClosing();
-      _defs->closeTag();
-      _defs->closeTag();
-      if (!filterValues.empty()) {
-        filterValues += ' ';
-      }
-      filterValues += "url(#" + fid + ")";
+      // BackgroundBlurStyle without blendMode is handled later in the rendering order
     }
   }
 
@@ -2797,11 +4459,43 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
 
   out.closeTagStart();
 
-  // Background blur styles
-  // TODO: BackgroundBlurStyle.tileMode is ignored. CSS backdrop-filter:blur() has no equivalent of
-  // TileMode; it always extends the blurred region to the element bounds.
+  // Render styles with blendMode that need to be below content (DropShadow, BackgroundBlur)
+  for (auto& [styleType, ls] : belowStyles) {
+    auto blendStr = BlendModeToMixBlendMode(ls->blendMode);
+    if (styleType == NodeType::DropShadowStyle) {
+      auto ds = static_cast<const DropShadowStyle*>(ls);
+      std::string shadowStyle = "position:absolute;inset:0";
+      if (blendStr) {
+        shadowStyle += ";mix-blend-mode:";
+        shadowStyle += blendStr;
+      }
+      shadowStyle += ";filter:drop-shadow(" + FloatToString(ds->offsetX) + "px " +
+                     FloatToString(ds->offsetY) + "px " + FloatToString(ds->blurX) + "px " +
+                     ColorToRGBA(ds->color) + ")";
+      out.openTag("div");
+      out.addAttr("style", shadowStyle);
+      out.closeTagSelfClosing();
+    } else if (styleType == NodeType::BackgroundBlurStyle) {
+      auto blur = static_cast<const BackgroundBlurStyle*>(ls);
+      float avg = (blur->blurX + blur->blurY) / 2.0f;
+      if (avg > 0) {
+        std::string blurStyle = "position:absolute;inset:0;backdrop-filter:blur(" +
+                                FloatToString(avg) + "px);-webkit-backdrop-filter:blur(" +
+                                FloatToString(avg) + "px)";
+        if (blendStr) {
+          blurStyle += ";mix-blend-mode:";
+          blurStyle += blendStr;
+        }
+        out.openTag("div");
+        out.addAttr("style", blurStyle);
+        out.closeTagSelfClosing();
+      }
+    }
+  }
+
+  // Background blur styles (without blendMode)
   for (auto* ls : layer->styles) {
-    if (ls->nodeType() == NodeType::BackgroundBlurStyle) {
+    if (ls->nodeType() == NodeType::BackgroundBlurStyle && ls->blendMode == BlendMode::Normal) {
       auto blur = static_cast<const BackgroundBlurStyle*>(ls);
       float avg = (blur->blurX + blur->blurY) / 2.0f;
       if (avg > 0) {
@@ -2859,6 +4553,68 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
 
   if (hasForeground) {
     writeLayerContents(out, layer, contentAlpha, childDistribute, LayerPlacement::Foreground);
+  }
+
+  // Render styles with blendMode that need to be above content (InnerShadow)
+  for (auto& [styleType, ls] : aboveStyles) {
+    auto blendStr = BlendModeToMixBlendMode(ls->blendMode);
+    if (styleType == NodeType::InnerShadowStyle) {
+      auto is = static_cast<const InnerShadowStyle*>(ls);
+      // Create an SVG filter for inner shadow and apply it in a div with mix-blend-mode
+      std::string fid = _ctx->nextId("isf");
+      _defs->openTag("filter");
+      _defs->addAttr("id", fid);
+      _defs->addAttr("x", "-50%");
+      _defs->addAttr("y", "-50%");
+      _defs->addAttr("width", "200%");
+      _defs->addAttr("height", "200%");
+      _defs->addAttr("color-interpolation-filters", "sRGB");
+      _defs->closeTagStart();
+      _defs->openTag("feOffset");
+      _defs->addAttr("in", "SourceAlpha");
+      if (!FloatNearlyZero(is->offsetX)) {
+        _defs->addAttr("dx", FloatToString(is->offsetX));
+      }
+      if (!FloatNearlyZero(is->offsetY)) {
+        _defs->addAttr("dy", FloatToString(is->offsetY));
+      }
+      _defs->addAttr("result", "iOff");
+      _defs->closeTagSelfClosing();
+      _defs->openTag("feComposite");
+      _defs->addAttr("in", "SourceAlpha");
+      _defs->addAttr("in2", "iOff");
+      _defs->addAttr("operator", "arithmetic");
+      _defs->addAttr("k2", "-1");
+      _defs->addAttr("k3", "1");
+      _defs->addAttr("result", "iComp");
+      _defs->closeTagSelfClosing();
+      std::string sd = FloatToString(is->blurX);
+      if (is->blurX != is->blurY) {
+        sd += " " + FloatToString(is->blurY);
+      }
+      _defs->openTag("feGaussianBlur");
+      _defs->addAttr("in", "iComp");
+      _defs->addAttr("stdDeviation", sd);
+      _defs->addAttr("result", "iBlur");
+      _defs->closeTagSelfClosing();
+      _defs->openTag("feColorMatrix");
+      _defs->addAttr("in", "iBlur");
+      _defs->addAttr("type", "matrix");
+      _defs->addAttr("values", "0 0 0 0 " + FloatToString(is->color.red) + " 0 0 0 0 " +
+                                   FloatToString(is->color.green) + " 0 0 0 0 " +
+                                   FloatToString(is->color.blue) + " 0 0 0 " +
+                                   FloatToString(is->color.alpha) + " 0");
+      _defs->closeTagSelfClosing();
+      _defs->closeTag();
+      std::string shadowStyle = "position:absolute;inset:0;filter:url(#" + fid + ")";
+      if (blendStr) {
+        shadowStyle += ";mix-blend-mode:";
+        shadowStyle += blendStr;
+      }
+      out.openTag("div");
+      out.addAttr("style", shadowStyle);
+      out.closeTagSelfClosing();
+    }
   }
 
   if (needScrollRectWrapper) {
