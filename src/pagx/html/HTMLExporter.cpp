@@ -637,141 +637,168 @@ static PathData ApplyRoundCorner(const PathData& pathData, float radius) {
   if (radius <= 0 || pathData.isEmpty()) {
     return pathData;
   }
-  // Parse path into contours
-  struct Vertex {
-    Point point = {};
-    bool isSmooth = false;  // true if vertex has control points (not a sharp corner)
+  // Parse path into contours, preserving curve segments
+  struct Segment {
+    PathVerb verb = PathVerb::Line;
+    Point endPoint = {};
+    Point ctrl1 = {};  // Quad: control point; Cubic: first control point
+    Point ctrl2 = {};  // Cubic: second control point
   };
   struct Contour {
-    std::vector<Vertex> vertices = {};
+    Point startPoint = {};
+    std::vector<Segment> segments = {};
     bool closed = false;
   };
   std::vector<Contour> contours = {};
   Contour currentContour = {};
-  Point currentPoint = {};
-  Point lastControlPoint = {};
-  bool hasLastControl = false;
+  bool hasContour = false;
 
   pathData.forEach([&](PathVerb verb, const Point* pts) {
     switch (verb) {
       case PathVerb::Move:
-        if (!currentContour.vertices.empty()) {
+        if (hasContour) {
           contours.push_back(std::move(currentContour));
           currentContour = {};
         }
-        currentContour.vertices.push_back({pts[0], false});
-        currentPoint = pts[0];
-        hasLastControl = false;
+        currentContour.startPoint = pts[0];
+        hasContour = true;
         break;
-      case PathVerb::Line:
-        currentContour.vertices.push_back({pts[0], false});
-        currentPoint = pts[0];
-        hasLastControl = false;
+      case PathVerb::Line: {
+        Segment seg = {};
+        seg.verb = PathVerb::Line;
+        seg.endPoint = pts[0];
+        currentContour.segments.push_back(seg);
         break;
-      case PathVerb::Quad:
-        // Quadratic curve: mark as smooth vertex
-        currentContour.vertices.push_back({pts[1], true});
-        currentPoint = pts[1];
-        lastControlPoint = pts[0];
-        hasLastControl = true;
+      }
+      case PathVerb::Quad: {
+        Segment seg = {};
+        seg.verb = PathVerb::Quad;
+        seg.ctrl1 = pts[0];
+        seg.endPoint = pts[1];
+        currentContour.segments.push_back(seg);
         break;
-      case PathVerb::Cubic:
-        // Cubic curve: mark as smooth vertex
-        currentContour.vertices.push_back({pts[2], true});
-        currentPoint = pts[2];
-        lastControlPoint = pts[1];
-        hasLastControl = true;
+      }
+      case PathVerb::Cubic: {
+        Segment seg = {};
+        seg.verb = PathVerb::Cubic;
+        seg.ctrl1 = pts[0];
+        seg.ctrl2 = pts[1];
+        seg.endPoint = pts[2];
+        currentContour.segments.push_back(seg);
         break;
+      }
       case PathVerb::Close:
         currentContour.closed = true;
-        if (!currentContour.vertices.empty()) {
-          contours.push_back(std::move(currentContour));
-          currentContour = {};
-        }
         break;
     }
-    (void)lastControlPoint;
-    (void)hasLastControl;
   });
-  if (!currentContour.vertices.empty()) {
+  if (hasContour) {
     contours.push_back(std::move(currentContour));
   }
 
-  // Build new PathData with rounded corners
+  // Build new PathData with rounded corners.
+  // Only Line-to-Line junctions are considered sharp corners and get rounded.
+  // Curve segments (Quad/Cubic) are preserved as-is.
   PathData result = PathDataFromSVGString("");
   for (auto& contour : contours) {
-    if (contour.vertices.size() < 2) {
-      if (contour.vertices.size() == 1) {
-        result.moveTo(contour.vertices[0].point.x, contour.vertices[0].point.y);
+    if (contour.segments.empty()) {
+      result.moveTo(contour.startPoint.x, contour.startPoint.y);
+      if (contour.closed) {
+        result.close();
       }
       continue;
     }
-    size_t n = contour.vertices.size();
-    bool firstPoint = true;
+    size_t n = contour.segments.size();
+    bool firstOutput = true;
+
     for (size_t i = 0; i < n; i++) {
-      auto& curr = contour.vertices[i];
-      // Skip smooth vertices (already have curves)
-      if (curr.isSmooth) {
-        if (firstPoint) {
-          result.moveTo(curr.point.x, curr.point.y);
-          firstPoint = false;
-        } else {
-          result.lineTo(curr.point.x, curr.point.y);
+      auto& seg = contour.segments[i];
+      // Get the start point of this segment
+      Point segStart = (i == 0) ? contour.startPoint : contour.segments[i - 1].endPoint;
+
+      // Only round a junction if both the incoming and outgoing segments are lines
+      bool incomingIsLine = (i == 0) ? true : (contour.segments[i - 1].verb == PathVerb::Line);
+      bool outgoingIsLine = (seg.verb == PathVerb::Line);
+
+      if (!incomingIsLine || !outgoingIsLine) {
+        // Not a line-to-line junction: output the segment as-is
+        if (firstOutput) {
+          result.moveTo(segStart.x, segStart.y);
+          firstOutput = false;
+        }
+        if (seg.verb == PathVerb::Line) {
+          result.lineTo(seg.endPoint.x, seg.endPoint.y);
+        } else if (seg.verb == PathVerb::Quad) {
+          result.quadTo(seg.ctrl1.x, seg.ctrl1.y, seg.endPoint.x, seg.endPoint.y);
+        } else if (seg.verb == PathVerb::Cubic) {
+          result.cubicTo(seg.ctrl1.x, seg.ctrl1.y, seg.ctrl2.x, seg.ctrl2.y, seg.endPoint.x,
+                         seg.endPoint.y);
         }
         continue;
       }
-      // Get previous and next vertices for sharp corner detection
+
+      // Both incoming and outgoing are lines: check if we can round the start vertex
+      // The "start vertex" of this segment is the junction point
+      Point vertex = segStart;
+      // Get previous segment's start point
       bool hasPrev = (i > 0) || contour.closed;
-      bool hasNext = (i < n - 1) || contour.closed;
-      if (!hasPrev || !hasNext) {
-        // Endpoint, no rounding
-        if (firstPoint) {
-          result.moveTo(curr.point.x, curr.point.y);
-          firstPoint = false;
-        } else {
-          result.lineTo(curr.point.x, curr.point.y);
+      if (!hasPrev) {
+        // First segment, no preceding edge to round
+        if (firstOutput) {
+          result.moveTo(vertex.x, vertex.y);
+          firstOutput = false;
         }
+        result.lineTo(seg.endPoint.x, seg.endPoint.y);
         continue;
       }
-      size_t prevIdx = (i == 0) ? (n - 1) : (i - 1);
-      size_t nextIdx = (i == n - 1) ? 0 : (i + 1);
-      auto& prev = contour.vertices[prevIdx];
-      auto& next = contour.vertices[nextIdx];
+
+      Point prevStart = {};
+      if (i > 0) {
+        prevStart = (i >= 2) ? contour.segments[i - 2].endPoint : contour.startPoint;
+      } else {
+        // i==0 and closed: previous is the last segment
+        prevStart = (n >= 2) ? contour.segments[n - 2].endPoint : contour.startPoint;
+      }
+
       // Compute edge vectors
-      float dx1 = curr.point.x - prev.point.x;
-      float dy1 = curr.point.y - prev.point.y;
-      float dx2 = next.point.x - curr.point.x;
-      float dy2 = next.point.y - curr.point.y;
+      float dx1 = vertex.x - prevStart.x;
+      float dy1 = vertex.y - prevStart.y;
+      float dx2 = seg.endPoint.x - vertex.x;
+      float dy2 = seg.endPoint.y - vertex.y;
       float len1 = std::sqrt(dx1 * dx1 + dy1 * dy1);
       float len2 = std::sqrt(dx2 * dx2 + dy2 * dy2);
+
       if (len1 < 0.001f || len2 < 0.001f) {
-        if (firstPoint) {
-          result.moveTo(curr.point.x, curr.point.y);
-          firstPoint = false;
-        } else {
-          result.lineTo(curr.point.x, curr.point.y);
+        if (firstOutput) {
+          result.moveTo(vertex.x, vertex.y);
+          firstOutput = false;
         }
+        result.lineTo(seg.endPoint.x, seg.endPoint.y);
         continue;
       }
-      // Effective radius limited by half of adjacent edge lengths
+
       float effectiveRadius = std::min({radius, len1 / 2.0f, len2 / 2.0f});
-      // Compute P1 (on incoming edge) and P2 (on outgoing edge)
       float t1 = effectiveRadius / len1;
       float t2 = effectiveRadius / len2;
-      Point p1 = {curr.point.x - dx1 * t1, curr.point.y - dy1 * t1};
-      Point p2 = {curr.point.x + dx2 * t2, curr.point.y + dy2 * t2};
-      // Compute control points using kappa
-      Point cp1 = {p1.x + (curr.point.x - p1.x) * kBezierKappa,
-                   p1.y + (curr.point.y - p1.y) * kBezierKappa};
-      Point cp2 = {p2.x + (curr.point.x - p2.x) * kBezierKappa,
-                   p2.y + (curr.point.y - p2.y) * kBezierKappa};
-      if (firstPoint) {
+      Point p1 = {vertex.x - dx1 * t1, vertex.y - dy1 * t1};
+      Point p2 = {vertex.x + dx2 * t2, vertex.y + dy2 * t2};
+      Point cp1 = {p1.x + (vertex.x - p1.x) * kBezierKappa,
+                   p1.y + (vertex.y - p1.y) * kBezierKappa};
+      Point cp2 = {p2.x + (vertex.x - p2.x) * kBezierKappa,
+                   p2.y + (vertex.y - p2.y) * kBezierKappa};
+
+      if (firstOutput) {
         result.moveTo(p1.x, p1.y);
-        firstPoint = false;
+        firstOutput = false;
       } else {
         result.lineTo(p1.x, p1.y);
       }
       result.cubicTo(cp1.x, cp1.y, cp2.x, cp2.y, p2.x, p2.y);
+      // The line from p2 to seg.endPoint will be handled by the next iteration's lineTo
+      // or we output it now if this is the last segment
+      if (i == n - 1 && !contour.closed) {
+        result.lineTo(seg.endPoint.x, seg.endPoint.y);
+      }
     }
     if (contour.closed) {
       result.close();
@@ -1513,7 +1540,6 @@ class HTMLWriter {
   void applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* trim,
                                 const std::vector<GeoInfo>& geos, size_t geoIndex);
   float computeGeoPathLength(const GeoInfo& geo);
-  void applySVGStrokeWithLength(HTMLBuilder& out, const Stroke* stroke, float pathLength);
 
   // Filter defs
   std::string writeFilterDefs(const std::vector<LayerFilter*>& filters);
@@ -1525,7 +1551,7 @@ class HTMLWriter {
 
   // SVG fill/stroke attributes
   void applySVGFill(HTMLBuilder& out, const Fill* fill);
-  void applySVGStroke(HTMLBuilder& out, const Stroke* stroke);
+  void applySVGStroke(HTMLBuilder& out, const Stroke* stroke, float pathLength = 0.0f);
 };
 
 //==============================================================================
@@ -2292,7 +2318,7 @@ void HTMLWriter::applySVGFill(HTMLBuilder& out, const Fill* fill) {
   }
 }
 
-void HTMLWriter::applySVGStroke(HTMLBuilder& out, const Stroke* stroke) {
+void HTMLWriter::applySVGStroke(HTMLBuilder& out, const Stroke* stroke, float pathLength) {
   if (!stroke) {
     return;
   }
@@ -2325,16 +2351,29 @@ void HTMLWriter::applySVGStroke(HTMLBuilder& out, const Stroke* stroke) {
     out.addAttr("stroke-miterlimit", FloatToString(stroke->miterLimit));
   }
   if (!stroke->dashes.empty()) {
-    // TODO: When stroke->dashAdaptive is true, dash intervals should be scaled so that dash
-    // segments have equal-length distribution along the path. This requires pre-computing path
-    // length and adjusting each dash/gap value proportionally. Currently only the raw dash values
-    // are output.
+    // When dashAdaptive is true, scale dash intervals to fit whole number of pattern cycles.
+    std::vector<float> dashValues = stroke->dashes;
+    if (stroke->dashAdaptive && pathLength > 0) {
+      float patternLength = 0.0f;
+      for (float dv : stroke->dashes) {
+        patternLength += dv;
+      }
+      if (patternLength > 0) {
+        int n = static_cast<int>(std::round(pathLength / patternLength));
+        if (n > 0) {
+          float scaleFactor = pathLength / (static_cast<float>(n) * patternLength);
+          for (size_t j = 0; j < dashValues.size(); j++) {
+            dashValues[j] = stroke->dashes[j] * scaleFactor;
+          }
+        }
+      }
+    }
     std::string d;
-    for (size_t i = 0; i < stroke->dashes.size(); i++) {
+    for (size_t i = 0; i < dashValues.size(); i++) {
       if (i > 0) {
         d += ',';
       }
-      d += FloatToString(stroke->dashes[i]);
+      d += FloatToString(dashValues[i]);
     }
     out.addAttr("stroke-dasharray", d);
   }
@@ -2700,7 +2739,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
       out.addAttr("d", g.modifiedPathData);
       applySVGFill(out, trim ? nullptr : fill);
       if (isContinuousTrim) {
-        applySVGStrokeWithLength(out, stroke, computeGeoPathLength(g));
+        applySVGStroke(out, stroke, computeGeoPathLength(g));
         applyTrimAttrsContinuous(out, trim, geos, geoIdx);
       } else {
         applySVGStroke(out, stroke);
@@ -2729,7 +2768,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         }
         applySVGFill(out, trim ? nullptr : fill);
         if (isContinuousTrim) {
-          applySVGStrokeWithLength(out, stroke, computeGeoPathLength(g));
+          applySVGStroke(out, stroke, computeGeoPathLength(g));
           applyTrimAttrsContinuous(out, trim, geos, geoIdx);
         } else {
           applySVGStroke(out, stroke);
@@ -2747,7 +2786,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         out.addAttr("ry", FloatToString(e->size.height / 2));
         applySVGFill(out, trim ? nullptr : fill);
         if (isContinuousTrim) {
-          applySVGStrokeWithLength(out, stroke, computeGeoPathLength(g));
+          applySVGStroke(out, stroke, computeGeoPathLength(g));
           applyTrimAttrsContinuous(out, trim, geos, geoIdx);
         } else {
           applySVGStroke(out, stroke);
@@ -2764,7 +2803,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           out.addAttr("d", d);
           applySVGFill(out, trim ? nullptr : fill);
           if (isContinuousTrim) {
-            applySVGStrokeWithLength(out, stroke, computeGeoPathLength(g));
+            applySVGStroke(out, stroke, computeGeoPathLength(g));
             applyTrimAttrsContinuous(out, trim, geos, geoIdx);
           } else {
             applySVGStroke(out, stroke);
@@ -2782,7 +2821,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           out.addAttr("d", d);
           applySVGFill(out, trim ? nullptr : fill);
           if (isContinuousTrim) {
-            applySVGStrokeWithLength(out, stroke, computeGeoPathLength(g));
+            applySVGStroke(out, stroke, computeGeoPathLength(g));
             applyTrimAttrsContinuous(out, trim, geos, geoIdx);
           } else {
             applySVGStroke(out, stroke);
@@ -2902,12 +2941,14 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
       out.addAttr("style", svgStyle);
       out.closeTagStart();
 
-      // Create clip-paths for each subsequent geometry
+      // Create clip-paths for each subsequent geometry, storing IDs for later reference
+      std::vector<std::string> clipIds = {};
       if (geos.size() > 1) {
         out.openTag("defs");
         out.closeTagStart();
         for (size_t i = 1; i < geos.size(); i++) {
           std::string clipId = _ctx->nextId("mpclip");
+          clipIds.push_back(clipId);
           out.openTag("clipPath");
           out.addAttr("id", clipId);
           out.closeTagStart();
@@ -2967,15 +3008,10 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         }
       }
       if (!firstPathD.empty()) {
-        // Apply clip-paths in nested groups
-        std::vector<std::string> clipIds = {};
-        for (size_t i = 1; i < geos.size(); i++) {
-          clipIds.push_back(_ctx->nextId("mpclip") + std::to_string(i - 1));
-        }
         // Open groups with clip-paths (in reverse order for proper nesting)
-        for (size_t i = geos.size() - 1; i >= 1; i--) {
+        for (size_t i = clipIds.size(); i >= 1; i--) {
           out.openTag("g");
-          out.addAttr("clip-path", "url(#mpclip" + std::to_string(i - 1) + ")");
+          out.addAttr("clip-path", "url(#" + clipIds[i - 1] + ")");
           out.closeTagStart();
         }
         out.openTag("path");
@@ -3968,71 +4004,6 @@ void HTMLWriter::applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* 
   builder.addAttr("stroke-dashoffset", FloatToString(-localNormStart));
 }
 
-void HTMLWriter::applySVGStrokeWithLength(HTMLBuilder& out, const Stroke* stroke,
-                                          float pathLength) {
-  if (!stroke) {
-    return;
-  }
-  float alpha = 1.0f;
-  std::string s = colorToSVGFill(stroke->color, &alpha);
-  out.addAttr("stroke", s);
-  float ea = alpha * stroke->alpha;
-  if (ea < 1.0f) {
-    out.addAttr("stroke-opacity", FloatToString(ea));
-  }
-  // Double stroke width for Inside/Outside alignment (used with clip-path)
-  float effectiveWidth = stroke->width;
-  if (stroke->align != StrokeAlign::Center) {
-    effectiveWidth *= 2.0f;
-  }
-  if (effectiveWidth != 1.0f) {
-    out.addAttr("stroke-width", FloatToString(effectiveWidth));
-  }
-  if (stroke->cap == LineCap::Round) {
-    out.addAttr("stroke-linecap", "round");
-  } else if (stroke->cap == LineCap::Square) {
-    out.addAttr("stroke-linecap", "square");
-  }
-  if (stroke->join == LineJoin::Round) {
-    out.addAttr("stroke-linejoin", "round");
-  } else if (stroke->join == LineJoin::Bevel) {
-    out.addAttr("stroke-linejoin", "bevel");
-  }
-  if (stroke->join == LineJoin::Miter && stroke->miterLimit != 4.0f) {
-    out.addAttr("stroke-miterlimit", FloatToString(stroke->miterLimit));
-  }
-  if (!stroke->dashes.empty()) {
-    // Apply dashAdaptive if enabled
-    std::vector<float> dashValues = stroke->dashes;
-    if (stroke->dashAdaptive && pathLength > 0) {
-      float patternLength = 0.0f;
-      for (float d : stroke->dashes) {
-        patternLength += d;
-      }
-      if (patternLength > 0) {
-        int n = static_cast<int>(std::round(pathLength / patternLength));
-        if (n > 0) {
-          float scaleFactor = pathLength / (static_cast<float>(n) * patternLength);
-          for (size_t i = 0; i < dashValues.size(); i++) {
-            dashValues[i] = stroke->dashes[i] * scaleFactor;
-          }
-        }
-      }
-    }
-    std::string d;
-    for (size_t i = 0; i < dashValues.size(); i++) {
-      if (i > 0) {
-        d += ',';
-      }
-      d += FloatToString(dashValues[i]);
-    }
-    out.addAttr("stroke-dasharray", d);
-  }
-  if (stroke->dashOffset != 0.0f) {
-    out.addAttr("stroke-dashoffset", FloatToString(stroke->dashOffset));
-  }
-}
-
 void HTMLWriter::paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                            const Stroke* stroke, const TextBox* textBox, float alpha, bool hasTrim,
                            const TrimPath* curTrim, bool hasMerge, MergePathMode mergeMode) {
@@ -4827,7 +4798,15 @@ static std::string StyleStringToJSXObject(const std::string& styleStr) {
     if (IsNumericValue(value)) {
       result += value;
     } else {
-      result += "\"" + value + "\"";
+      // Escape double quotes in value for JSX style object
+      std::string escaped = value;
+      for (size_t p = 0; p < escaped.size(); p++) {
+        if (escaped[p] == '"') {
+          escaped.replace(p, 1, "\\\"");
+          p++;
+        }
+      }
+      result += "\"" + escaped + "\"";
     }
   }
 
@@ -4893,7 +4872,15 @@ static std::string StyleStringToVueObject(const std::string& styleStr) {
     if (IsNumericValue(value)) {
       result += value;
     } else {
-      result += "'" + value + "'";
+      // Escape single quotes in value for Vue style object
+      std::string escaped = value;
+      for (size_t p = 0; p < escaped.size(); p++) {
+        if (escaped[p] == '\'') {
+          escaped.replace(p, 1, "\\\'");
+          p++;
+        }
+      }
+      result += "'" + escaped + "'";
     }
   }
 
