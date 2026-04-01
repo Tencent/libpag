@@ -1829,26 +1829,29 @@ static int LocalizeCoordinates(PAGXDocument* document) {
 
 // --- Optimization #8b: Localize PathData to origin ---
 
+static void CollectPaths(const std::vector<Element*>& elements, std::vector<Path*>& paths) {
+  for (auto* element : elements) {
+    if (element->nodeType() == NodeType::Path) {
+      paths.push_back(static_cast<Path*>(element));
+    } else if (element->nodeType() == NodeType::Group || element->nodeType() == NodeType::TextBox) {
+      CollectPaths(static_cast<Group*>(element)->elements, paths);
+    }
+  }
+}
+
 static int LocalizePathData(PAGXDocument* document) {
   int count = 0;
   // Cache normalized PathData to reuse when multiple Paths share the same PathData
   // (e.g., after DeduplicatePathData). All such Paths have the same bounds offset.
   std::unordered_map<PathData*, PathData*> normalizedMap = {};
   for (auto& node : document->nodes) {
-    std::vector<Element*>* elements = nullptr;
+    std::vector<Path*> paths = {};
     if (node->nodeType() == NodeType::Layer) {
-      elements = &static_cast<Layer*>(node.get())->contents;
+      CollectPaths(static_cast<Layer*>(node.get())->contents, paths);
     } else if (node->nodeType() == NodeType::Group || node->nodeType() == NodeType::TextBox) {
-      elements = &static_cast<Group*>(node.get())->elements;
+      CollectPaths(static_cast<Group*>(node.get())->elements, paths);
     }
-    if (elements == nullptr) {
-      continue;
-    }
-    for (auto* element : *elements) {
-      if (element->nodeType() != NodeType::Path) {
-        continue;
-      }
-      auto* path = static_cast<Path*>(element);
+    for (auto* path : paths) {
       if (path->data == nullptr || path->data->isEmpty()) {
         continue;
       }
