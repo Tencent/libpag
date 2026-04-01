@@ -322,8 +322,12 @@ static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
     auto count = paddingValues.size();
     if (count != 1 && count != 2 && count != 4) {
       reportError(doc, node, "Invalid value '" + paddingStr + "' for 'padding' attribute.");
+    } else if (count == 1) {
+      layer->padding = {paddingValues[0], paddingValues[0], paddingValues[0], paddingValues[0]};
+    } else if (count == 2) {
+      layer->padding = {paddingValues[0], paddingValues[1], paddingValues[0], paddingValues[1]};
     } else {
-      layer->padding = PaddingFromString(paddingStr);
+      layer->padding = {paddingValues[0], paddingValues[1], paddingValues[2], paddingValues[3]};
     }
   }
   auto alignmentStr = getAttribute(node, "alignment");
@@ -352,8 +356,9 @@ static Layer* parseLayer(const DOMNode* node, PAGXDocument* doc) {
   if (!matrixStr.empty()) {
     if (ParseFloatList(matrixStr).size() < 6) {
       reportError(doc, node, "Invalid value '" + matrixStr + "' for 'matrix' attribute.");
+    } else {
+      layer->matrix = MatrixFromString(matrixStr);
     }
-    layer->matrix = MatrixFromString(matrixStr);
   }
   auto matrix3DStr = getAttribute(node, "matrix3D");
   if (!matrix3DStr.empty()) {
@@ -1158,8 +1163,9 @@ static void parseGradientCommon(const DOMNode* node, PAGXDocument* doc, Matrix& 
   if (!matrixStr.empty()) {
     if (ParseFloatList(matrixStr).size() < 6) {
       reportError(doc, node, "Invalid value '" + matrixStr + "' for 'matrix' attribute.");
+    } else {
+      matrix = MatrixFromString(matrixStr);
     }
-    matrix = MatrixFromString(matrixStr);
   }
   auto child = node->firstChild;
   while (child) {
@@ -1255,8 +1261,9 @@ static ImagePattern* parseImagePattern(const DOMNode* node, PAGXDocument* doc) {
   if (!matrixStr.empty()) {
     if (ParseFloatList(matrixStr).size() < 6) {
       reportError(doc, node, "Invalid value '" + matrixStr + "' for 'matrix' attribute.");
+    } else {
+      pattern->matrix = MatrixFromString(matrixStr);
     }
-    pattern->matrix = MatrixFromString(matrixStr);
   }
   return pattern;
 }
