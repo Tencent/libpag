@@ -114,6 +114,7 @@ static EnumType getEnumAttribute(const DOMNode* node, const char* name,
   if (!isValid(str)) {
     reportError(doc, node,
                 "Invalid value '" + str + "' for '" + std::string(name) + "' attribute.");
+    return fromString(defaultStr);
   }
   return fromString(str);
 }
