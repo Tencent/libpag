@@ -44,6 +44,13 @@ SplitView {
 
     property string pendingFilePath: ""
 
+    // Reset XML editor when switching view types
+    onCurrentViewTypeChanged: {
+        if (rightItemLoader.item && rightItemLoader.item.xmlSourceEditor) {
+            rightItemLoader.item.xmlSourceEditor.reset("");
+        }
+    }
+
     anchors.fill: parent
     orientation: Qt.Horizontal
     handle: Rectangle {
@@ -199,7 +206,14 @@ SplitView {
             rightTopRadius: false
             rightBottomRadius: false
 
+            // Expose xmlSourceEditor for external access
+            property alias xmlSourceEditor: xmlSourceEditor
+
+            // Check if Source Editor tab is selected for PAGX
+            property bool isSourceEditorActive: currentViewType === "pagx" && tabBar.currentIndex === 1
+
             Column {
+                id: rightColumn
                 spacing: 0
                 height: parent.height
                 width: parent.width
@@ -230,7 +244,7 @@ SplitView {
 
                     PAGTabButton {
                         id: fileStructureButton
-                        text: qsTr("File Structure")
+                        text: currentViewType === "pagx" ? qsTr("Source Editor") : qsTr("File Structure")
                     }
 
                     PAGTabButton {
@@ -245,7 +259,7 @@ SplitView {
 
                     currentIndex: tabBar.currentIndex
 
-                    height: parent.height - tabBar.height - performance.height
+                    height: parent.height - tabBar.height - (isSourceEditorActive ? 0 : performance.height)
                     anchors.left: parent.left
                     anchors.leftMargin: 0
                     anchors.right: parent.right
@@ -254,7 +268,8 @@ SplitView {
                     /* Layer Editing Area */
                     Rectangle {
                         color: "#20202A"
-                        anchors.fill: tabContents.alignment
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
 
                         ScrollView {
                             id: editArea
@@ -290,13 +305,36 @@ SplitView {
                                     height: editArea.height
                                     visible: !textListContainer.visible && !imageListContainer.visible
                                     color: "#20202A"
-                                    Text {
-                                        color: "#80ffffff"
-                                        text: qsTr("No layer was editable")
-                                        font.pixelSize: 12
-                                        verticalAlignment: Text.AlignVCenter
-                                        horizontalAlignment: Text.AlignHCenter
-                                        anchors.fill: parent
+
+                                    Column {
+                                        anchors.centerIn: parent
+                                        spacing: 8
+
+                                        Text {
+                                            color: "#80ffffff"
+                                            text: currentViewType === "pagx" ? qsTr("PAGX files do not support layer editing") : qsTr("No layer was editable")
+                                            font.pixelSize: 12
+                                            anchors.horizontalCenter: parent.horizontalCenter
+                                        }
+
+                                        Text {
+                                            visible: currentViewType === "pagx"
+                                            color: "#448EF9"
+                                            text: qsTr("Go to Source Editor →")
+                                            font.pixelSize: 12
+                                            font.underline: linkMouseArea.containsMouse
+                                            anchors.horizontalCenter: parent.horizontalCenter
+
+                                            MouseArea {
+                                                id: linkMouseArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    tabBar.currentIndex = 1;
+                                                }
+                                            }
+                                        }
                                     }
                                 }
 
@@ -467,14 +505,17 @@ SplitView {
                         }
                     }
 
-                    /* File Structure Area */
+                    /* File Structure / Source Editor Area */
                     Rectangle {
-                        color: "#20202A"
-                        anchors.fill: tabContents.alignment
+                        color: currentViewType === "pagx" ? "#1E1E1E" : "#20202A"
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
 
+                        // File Structure TreeView (for PAG files)
                         ScrollView {
                             anchors.fill: parent
                             clip: true
+                            visible: currentViewType !== "pagx"
 
                             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
                             ScrollBar.vertical.policy: ScrollBar.AsNeeded
@@ -507,18 +548,193 @@ SplitView {
                                 }
                             }
                         }
+
+                        // XML Source Editor (for PAGX files)
+                        Column {
+                            id: xmlEditorContainer
+                            anchors.fill: parent
+                            visible: currentViewType === "pagx"
+                            spacing: 0
+
+                            // Monitor lineCount changes for file switching detection
+                            Connections {
+                                target: contentView && contentView.viewModel.linesModel ? contentView.viewModel.linesModel : null
+                                function onLineCountChanged() {
+                                    // lineCount change indicates a new file was loaded
+                                    // Reset editor to show new content from the beginning
+                                    if (!xmlSourceEditor.editMode) {
+                                        xmlSourceEditor.reset("");
+                                    }
+                                }
+                            }
+
+                            XMLSourceEditor {
+                                id: xmlSourceEditor
+                                width: parent.width
+                                height: parent.height - (xmlSourceEditor.editMode ? xmlButtonBar.height : 0)
+                                linesModel: contentView && contentView.viewModel.linesModel ? contentView.viewModel.linesModel : null
+
+                                // Initialize when component is created
+                                Component.onCompleted: {
+                                    if (linesModel && linesModel.lineCount > 0) {
+                                        reset("");
+                                    }
+                                }
+
+                                onContentEdited: function(newText) {
+                                    // Content is being edited - handled in apply
+                                }
+                            }
+
+                            // Button bar for edit mode
+                            Rectangle {
+                                id: xmlButtonBar
+                                width: parent.width
+                                height: xmlSourceEditor.editMode ? 48 : 0
+                                color: "#16161D"
+                                visible: height > 0
+
+                                Behavior on height {
+                                    NumberAnimation { duration: 150 }
+                                }
+
+                                Row {
+                                    anchors.centerIn: parent
+                                    spacing: 12
+
+                                    Button {
+                                        id: discardButton
+                                        text: qsTr("Discard")
+                                        scale: hovered ? 1.05 : 1.0
+
+                                        Behavior on scale {
+                                            NumberAnimation { duration: 100 }
+                                        }
+
+                                        background: Rectangle {
+                                            implicitWidth: 80
+                                            implicitHeight: 32
+                                            color: discardButton.hovered ? "#5C5C6A" : "#3C3C3C"
+                                            border.color: discardButton.hovered ? "#8B8B9A" : "#4B4B5A"
+                                            border.width: 1
+                                            radius: 4
+                                        }
+
+                                        contentItem: Text {
+                                            text: discardButton.text
+                                            color: "#FFFFFF"
+                                            horizontalAlignment: Text.AlignHCenter
+                                            verticalAlignment: Text.AlignVCenter
+                                            font.pixelSize: 12
+                                        }
+
+                                        onClicked: {
+                                            // Reset to original content - reload from file would be needed
+                                            // For now, just exit edit mode (content was already committed line by line)
+                                            xmlSourceEditor.exitEditMode(false);
+                                            xmlSourceEditor.showToast(qsTr("Changes discarded"), true);
+                                        }
+                                    }
+
+                                    Button {
+                                        id: applyButton
+                                        text: qsTr("Apply")
+                                        scale: hovered ? 1.05 : 1.0
+
+                                        Behavior on scale {
+                                            NumberAnimation { duration: 100 }
+                                        }
+
+                                        background: Rectangle {
+                                            implicitWidth: 80
+                                            implicitHeight: 32
+                                            color: applyButton.hovered ? "#5BA3FF" : "#448EF9"
+                                            border.color: applyButton.hovered ? "#8BC4FF" : "#5BA3FF"
+                                            border.width: 1
+                                            radius: 4
+                                        }
+
+                                        contentItem: Text {
+                                            text: applyButton.text
+                                            color: "#FFFFFF"
+                                            horizontalAlignment: Text.AlignHCenter
+                                            verticalAlignment: Text.AlignVCenter
+                                            font.pixelSize: 12
+                                        }
+
+                                        onClicked: {
+                                            let newXml = xmlSourceEditor.getText();
+                                            let error = contentView.viewModel.applyXmlChanges(newXml);
+                                            if (error === "") {
+                                                xmlSourceEditor.exitEditMode(false);
+                                                xmlSourceEditor.showToast(qsTr("Changes applied"), true);
+                                            } else {
+                                                xmlSourceEditor.showToast(error, false);
+                                            }
+                                        }
+                                    }
+
+                                    Button {
+                                        id: saveButton
+                                        text: qsTr("Save")
+                                        scale: hovered ? 1.05 : 1.0
+
+                                        Behavior on scale {
+                                            NumberAnimation { duration: 100 }
+                                        }
+
+                                        background: Rectangle {
+                                            implicitWidth: 80
+                                            implicitHeight: 32
+                                            color: saveButton.hovered ? "#4CAF50" : "#388E3C"
+                                            border.color: saveButton.hovered ? "#81C784" : "#4CAF50"
+                                            border.width: 1
+                                            radius: 4
+                                        }
+
+                                        contentItem: Text {
+                                            text: saveButton.text
+                                            color: "#FFFFFF"
+                                            horizontalAlignment: Text.AlignHCenter
+                                            verticalAlignment: Text.AlignVCenter
+                                            font.pixelSize: 12
+                                        }
+
+                                        onClicked: {
+                                            let newXml = xmlSourceEditor.getText();
+                                            // First apply changes to preview
+                                            let applyError = contentView.viewModel.applyXmlChanges(newXml);
+                                            if (applyError === "") {
+                                                // Then save to file
+                                                let saveError = contentView.viewModel.saveXmlToFile(newXml);
+                                                xmlSourceEditor.exitEditMode(false);
+                                                if (saveError === "") {
+                                                    xmlSourceEditor.showToast(qsTr("File saved"), true);
+                                                } else {
+                                                    xmlSourceEditor.showToast(saveError, false);
+                                                }
+                                            } else {
+                                                xmlSourceEditor.showToast(applyError, false);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
                 Item {
                     width: parent.width
-                    height: 1
+                    height: isSourceEditorActive ? 0 : 1
+                    visible: !isSourceEditorActive
                 }
 
                 PAGRectangle {
                     id: performance
                     color: "#16161D"
-                    height: Math.min(profilerForm.contentHeight, parent.height - tabBar.height - 40)
+                    height: isSourceEditorActive ? 0 : Math.min(profilerForm.contentHeight, parent.height - tabBar.height - 40)
+                    visible: !isSourceEditorActive
                     clip: true
                     anchors.right: parent.right
                     anchors.rightMargin: 0

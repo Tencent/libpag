@@ -33,6 +33,9 @@ PAGXView::PAGXView(QQuickItem* parent) : ContentView(parent) {
       std::make_unique<RenderThread>(this, std::make_unique<PAGXRenderer>(viewModel.get()));
   connect(renderThread.get(), &RenderThread::rendered, this, &PAGXView::update,
           Qt::QueuedConnection);
+  // Connect render completion to ViewModel for deferred XmlLinesModel updates
+  connect(renderThread.get(), &RenderThread::rendered, viewModel.get(),
+          &PAGXViewModel::onRenderCompleted, Qt::QueuedConnection);
   renderThread->moveToThread(renderThread.get());
 }
 

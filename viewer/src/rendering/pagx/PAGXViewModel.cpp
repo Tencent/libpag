@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "rendering/pagx/PAGXViewModel.h"
+#include <QFile>
 #include <QQuickWindow>
 #include "pag/pag.h"
 #include "pagx/PAGXImporter.h"
@@ -25,6 +26,7 @@
 namespace pag {
 
 PAGXViewModel::PAGXViewModel(QObject* parent) : ContentViewModel(parent) {
+  xmlLinesModel = new XmlLinesModel(this);
 }
 
 int PAGXViewModel::getWidth() const {
@@ -208,6 +210,10 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
   auto newDisplayList = std::make_shared<tgfx::DisplayList>();
   newDisplayList->root()->addChild(newContentLayer);
 
+  // Store XML content for later update to XmlLinesModel
+  auto xmlString = QString::fromUtf8(reinterpret_cast<const char*>(byteData->data()),
+                                     static_cast<qsizetype>(byteData->length()));
+
   {
     std::lock_guard<std::mutex> lock(renderMutex);
     clearContent();
@@ -229,9 +235,15 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
   Q_EMIT editableTextLayerCountChanged(0);
   Q_EMIT editableImageLayerCountChanged(0);
   Q_EMIT contentSizeChanged();
+
   // pagxDocumentChanged is connected with Qt::QueuedConnection, so tree building
   // happens asynchronously and won't block the render.
   Q_EMIT pagxDocumentChanged(pagxDocument);
+
+  // Save XML content for deferred update. The actual XmlLinesModel::setContent()
+  // will be called from onRenderCompleted() after the first render finishes.
+  // This avoids race conditions between ListView updates and texture presentation.
+  pendingXmlContent = xmlString;
 
   return true;
 }
@@ -277,6 +289,72 @@ void PAGXViewModel::updateAnimationState() {
   progress = 0.0;
   progressPerFrame = 1.0;
   isPlaying_ = false;
+}
+
+XmlLinesModel* PAGXViewModel::linesModel() const {
+  return xmlLinesModel;
+}
+
+QString PAGXViewModel::applyXmlChanges(const QString& newXml) {
+  auto xmlBytes = newXml.toUtf8();
+  auto document = pagx::PAGXImporter::FromXML(reinterpret_cast<const uint8_t*>(xmlBytes.data()),
+                                              static_cast<size_t>(xmlBytes.length()));
+  if (document == nullptr) {
+    return tr("Failed to parse XML: invalid syntax or structure");
+  }
+
+  auto newContentLayer = pagx::LayerBuilder::Build(document.get());
+  if (newContentLayer == nullptr) {
+    return tr("Failed to build layer from XML document");
+  }
+
+  auto newDisplayList = std::make_shared<tgfx::DisplayList>();
+  newDisplayList->root()->addChild(newContentLayer);
+
+  {
+    std::lock_guard<std::mutex> lock(renderMutex);
+    pagxDocument = document;
+    pagxWidth = static_cast<int>(document->width);
+    pagxHeight = static_cast<int>(document->height);
+    pagxContentLayer = newContentLayer;
+    displayList = std::move(newDisplayList);
+    needsRender = true;
+  }
+
+  Q_EMIT widthChanged(pagxWidth);
+  Q_EMIT heightChanged(pagxHeight);
+  Q_EMIT contentSizeChanged();
+  Q_EMIT pagxDocumentChanged(pagxDocument);
+  Q_EMIT requestFlush();
+
+  return {};  // Empty string means success
+}
+
+QString PAGXViewModel::saveXmlToFile(const QString& xml) {
+  if (currentFilePath.empty()) {
+    return tr("No file path specified");
+  }
+  QFile file(QString::fromLocal8Bit(currentFilePath.data()));
+  if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+    return tr("Failed to open file for writing: %1").arg(file.errorString());
+  }
+  auto xmlBytes = xml.toUtf8();
+  qint64 bytesWritten = file.write(xmlBytes);
+  if (bytesWritten != xmlBytes.length()) {
+    return tr("Failed to write all data to file");
+  }
+  file.close();
+
+  return {};  // Empty string means success
+}
+
+void PAGXViewModel::onRenderCompleted() {
+  if (pendingXmlContent.isEmpty()) {
+    return;
+  }
+  auto xmlContent = std::move(pendingXmlContent);
+  pendingXmlContent.clear();
+  xmlLinesModel->setContent(xmlContent);
 }
 
 }  // namespace pag

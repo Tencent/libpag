@@ -21,6 +21,7 @@
 #include <mutex>
 #include "pagx/PAGXDocument.h"
 #include "rendering/ContentViewModel.h"
+#include "rendering/pagx/XmlLinesModel.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
 
@@ -34,6 +35,7 @@ namespace pag {
  */
 class PAGXViewModel : public ContentViewModel {
   Q_OBJECT
+  Q_PROPERTY(XmlLinesModel* linesModel READ linesModel CONSTANT)
  public:
   explicit PAGXViewModel(QObject* parent = nullptr);
 
@@ -64,6 +66,10 @@ class PAGXViewModel : public ContentViewModel {
   Q_INVOKABLE void nextFrame() override;
   Q_INVOKABLE void previousFrame() override;
 
+  XmlLinesModel* linesModel() const;
+  Q_INVOKABLE QString applyXmlChanges(const QString& newXml);
+  Q_INVOKABLE QString saveXmlToFile(const QString& xml);
+
   struct RenderState {
     std::shared_ptr<tgfx::DisplayList> displayList;
     std::shared_ptr<tgfx::Layer> contentLayer;
@@ -80,6 +86,12 @@ class PAGXViewModel : public ContentViewModel {
 
   Q_SIGNAL void pagxDocumentChanged(std::shared_ptr<pagx::PAGXDocument> pagxDocument);
 
+  /**
+   * Called by PAGXView when the render thread completes a render.
+   * This is used to defer XmlLinesModel updates until the first render is done.
+   */
+  Q_SLOT void onRenderCompleted();
+
  private:
   void clearContent();
   void updateAnimationState();
@@ -93,6 +105,8 @@ class PAGXViewModel : public ContentViewModel {
   int pagxWidth = 0;
   int pagxHeight = 0;
   std::string currentFilePath = {};
+  XmlLinesModel* xmlLinesModel = nullptr;
+  QString pendingXmlContent = {};
   int64_t totalFrames = 1;
   float frameRate = 0.0f;
   double progress = 0.0;

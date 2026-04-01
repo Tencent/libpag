@@ -122,34 +122,87 @@
 <context>
     <name>MainForm</name>
     <message>
-        <location filename="../qml/MainForm.qml" line="175"/>
+        <location filename="../qml/MainForm.qml" line="182"/>
         <source>Click the menu or drag-drop here to open a PAG file</source>
         <translation>点击菜单，或拖放到这里打开一个PAG文件</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="228"/>
+        <location filename="../qml/MainForm.qml" line="242"/>
         <source>Edit Layer</source>
         <translation>图层编辑</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="233"/>
+        <location filename="../qml/MainForm.qml" line="247"/>
         <source>File Structure</source>
         <translation>文件结构</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="295"/>
+        <location filename="../qml/MainForm.qml" line="247"/>
+        <source>Source Editor</source>
+        <translation>源码编辑</translation>
+    </message>
+    <message>
+        <location filename="../qml/MainForm.qml" line="315"/>
         <source>No layer was editable</source>
         <translation>没有可以编辑的图层</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="359"/>
+        <location filename="../qml/MainForm.qml" line="315"/>
+        <source>PAGX files do not support layer editing</source>
+        <translation>PAGX 文件不支持图层编辑</translation>
+    </message>
+    <message>
+        <location filename="../qml/MainForm.qml" line="323"/>
+        <source>Go to Source Editor →</source>
+        <translation>前往源码编辑 →</translation>
+    </message>
+    <message>
+        <location filename="../qml/MainForm.qml" line="397"/>
         <source>Edit Text</source>
         <translation>文本编辑</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="441"/>
+        <location filename="../qml/MainForm.qml" line="479"/>
         <source>Edit Image</source>
         <translation>图片编辑</translation>
+    </message>
+    <message>
+        <location filename="../qml/MainForm.qml" line="607"/>
+        <source>Discard</source>
+        <translation>放弃</translation>
+    </message>
+    <message>
+        <location filename="../qml/MainForm.qml" line="641"/>
+        <source>Apply</source>
+        <translation>应用</translation>
+    </message>
+    <message>
+        <location filename="../qml/MainForm.qml" line="679"/>
+        <source>Save</source>
+        <translation type="unfinished">保存</translation>
+    </message>
+    <message>
+        <location filename="../qml/MainForm.qml" line="635"/>
+        <source>Changes discarded</source>
+        <translation>修改已放弃</translation>
+    </message>
+    <message>
+        <location filename="../qml/MainForm.qml" line="670"/>
+        <source>Changes applied</source>
+        <translation>修改已应用</translation>
+    </message>
+    <message>
+        <source>Failed to apply changes</source>
+        <translation type="vanished">应用修改失败</translation>
+    </message>
+    <message>
+        <location filename="../qml/MainForm.qml" line="712"/>
+        <source>File saved</source>
+        <translation>文件已保存</translation>
+    </message>
+    <message>
+        <source>Failed to save file</source>
+        <translation type="vanished">保存文件失败</translation>
     </message>
 </context>
 <context>
@@ -531,6 +584,47 @@
         <location filename="../qml/TextListView.qml" line="109"/>
         <source>Edit</source>
         <translation>编辑</translation>
+    </message>
+</context>
+<context>
+    <name>XMLSourceEditor</name>
+    <message>
+        <location filename="../qml/XMLSourceEditor.qml" line="406"/>
+        <source>Double-click to edit</source>
+        <translation>双击编辑</translation>
+    </message>
+    <message>
+        <location filename="../qml/XMLSourceEditor.qml" line="437"/>
+        <source>Editing line %1 (Enter=next, Esc=exit)</source>
+        <translation>正在编辑第 %1 行（Enter=下一行，Esc=退出）</translation>
+    </message>
+</context>
+<context>
+    <name>pag::PAGXViewModel</name>
+    <message>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="303"/>
+        <source>Failed to parse XML: invalid syntax or structure</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="308"/>
+        <source>Failed to build layer from XML document</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="335"/>
+        <source>No file path specified</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="339"/>
+        <source>Failed to open file for writing: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="344"/>
+        <source>Failed to write all data to file</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>

@@ -107,7 +107,8 @@ void PAGAudioRender::onWriteData(std::shared_ptr<ByteData> data) {
     int64_t freeSpace = audioOutput->bytesFree();
     if (freeSpace <= 0) {
       int64_t waitTime = Utils::SampleLengthToTime(remaining, sampleRate, channels);
-      std::this_thread::sleep_for(std::chrono::microseconds(std::min(waitTime, static_cast<int64_t>(1000))));
+      std::this_thread::sleep_for(
+          std::chrono::microseconds(std::min(waitTime, static_cast<int64_t>(1000))));
       continue;
     }
     int64_t toWrite = std::min(freeSpace, remaining);
