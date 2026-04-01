@@ -318,12 +318,21 @@ issues into a single commit).
 
 ### Verify fixes (coordinator)
 
-Wait for all fixers. Before running build + test, the coordinator reads each
-fixer's commit diff and verifies:
+Wait for all fixers. Before running build + test, the coordinator performs:
+
+**Commit audit**: compare the commit hashes reported by each fixer against the
+actual git log since the fix phase started. Any unreported commits by fixer
+agents are unauthorized — review their diffs and revert if they fall outside
+the assigned scope.
+
+**Diff review**: for each reported fixer commit, read the diff and verify:
 1. The fix correctly addresses the original issue
 2. No new issues introduced (naming inconsistencies, missing updates in
    surrounding code, logic errors)
-3. Fix scope matches the issue — no unintended changes
+3. Fix scope matches the assigned issue — no changes to unassigned files or
+   unrelated logic. Pay special attention to fixes that change numeric signs,
+   algorithm directions, or cross-module behavior — these require independent
+   semantic verification, not just diff-level review
 
 If a problem is found, send the fixer a correction request with specific
 details (max 1 retry). If the retry fails or the fixer is unavailable,
