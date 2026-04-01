@@ -22,13 +22,13 @@
 
 namespace pagx {
 
-static PAGXDocument& DefaultDoc() {
+inline PAGXDocument& DefaultDoc() {
   static auto doc = PAGXDocument::Make(0, 0);
   return *doc;
 }
 
 template <typename T>
-static const T& Default() {
+inline const T& Default() {
   static const T* node = DefaultDoc().makeNode<T>();
   return *node;
 }
