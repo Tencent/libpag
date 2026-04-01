@@ -175,24 +175,17 @@ For each issue you receive:
    context that makes this a non-issue (e.g., invariants guaranteed by callers, platform
    constraints, intentional design)? Does the code actually behave as the reviewer
    claims? Look for the strongest counter-argument you can find.
+   - For cross-module "inconsistency" claims: read the type definitions at both
+     locations — different libraries may use different conventions (coordinate systems,
+     sign conventions) that make surface-level differences correct. REJECT if the
+     reviewer's evidence is limited to "these two snippets look different" without
+     confirming both operate under the same conventions.
 3. Output for each issue:
    - Verdict: REJECT or CONFIRM
    - Reasoning: for REJECT, state the concrete counter-argument. For CONFIRM, briefly
      note what you checked and why no valid counter-argument exists.
 
-Cross-module verification (CRITICAL):
-When an issue claims two code locations are "inconsistent" or "asymmetric", you MUST
-independently verify whether the inconsistency is real or intentional:
-- Read the type/class definitions at both locations. Different libraries (e.g., project
-  Matrix vs third-party Matrix) may use different conventions (coordinate systems, sign
-  conventions, row-major vs column-major) that make surface-level differences correct.
-- Check whether the two code paths target different output systems (e.g., SVG export vs
-  GPU rendering). Differences may be required by the respective standards.
-- If the reviewer's evidence is limited to "these two snippets look different", REJECT
-  unless you can confirm they operate in the same semantic context with the same
-  conventions. State which definitions you checked.
-
-General constraints:
+Important constraints:
 - Your counter-arguments must be grounded in real evidence from the code. Do not
   fabricate hypothetical defenses or invent caller guarantees that are not visible in
   the codebase.
@@ -318,21 +311,12 @@ issues into a single commit).
 
 ### Verify fixes (coordinator)
 
-Wait for all fixers. Before running build + test, the coordinator performs:
-
-**Commit audit**: compare the commit hashes reported by each fixer against the
-actual git log since the fix phase started. Any unreported commits by fixer
-agents are unauthorized — review their diffs and revert if they fall outside
-the assigned scope.
-
-**Diff review**: for each reported fixer commit, read the diff and verify:
+Wait for all fixers. Before running build + test, the coordinator reads each
+fixer's commit diff and verifies:
 1. The fix correctly addresses the original issue
 2. No new issues introduced (naming inconsistencies, missing updates in
    surrounding code, logic errors)
-3. Fix scope matches the assigned issue — no changes to unassigned files or
-   unrelated logic. Pay special attention to fixes that change numeric signs,
-   algorithm directions, or cross-module behavior — these require independent
-   semantic verification, not just diff-level review
+3. Fix scope matches the issue — no unintended changes
 
 If a problem is found, send the fixer a correction request with specific
 details (max 1 retry). If the retry fails or the fixer is unavailable,
