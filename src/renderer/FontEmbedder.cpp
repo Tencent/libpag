@@ -386,7 +386,7 @@ bool FontEmbedder::embed(PAGXDocument* document) {
   std::vector<const tgfx::Typeface*> bitmapTypefaces = {};
 
   // First pass: classify all glyphs and collect vector/bitmap/spacing glyph data.
-  // Uses TextLayoutGlyphRun (runtime layout) when available, falls back to TextBlob.
+  // Uses TextLayoutGlyphRun populated by applyLayout(). Text nodes without layoutRuns are skipped.
   for (auto* text : textOrder) {
     auto& layoutRuns = text->getLayoutRuns();
     if (!layoutRuns.empty()) {
@@ -435,7 +435,7 @@ bool FontEmbedder::embed(PAGXDocument* document) {
   }
 
   // Second pass: create pagx::GlyphRuns for each Text.
-  // Uses TextLayoutGlyphRun when available (direct mapping), falls back to TextBlob path.
+  // Uses TextLayoutGlyphRun (direct mapping). Text nodes without layoutRuns produce no GlyphRuns.
   for (auto* text : textOrder) {
     text->glyphRuns.clear();
     auto textBounds = text->getTextBounds();
