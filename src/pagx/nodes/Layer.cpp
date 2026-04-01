@@ -102,18 +102,16 @@ void Layer::onMeasure(const LayoutContext&) {
   measuredH = std::max(measuredH, contentsH);
 
   // Measure from non-flex child Layers (skip children excluded from layout).
-  for (auto* child : children) {
-    if (!child->includeInLayout) {
-      continue;
+  if (layout == LayoutMode::None) {
+    for (auto* child : children) {
+      if (!child->includeInLayout) {
+        continue;
+      }
+      float cx = child->preferredWidth + child->constraintExtentX();
+      float cy = child->preferredHeight + child->constraintExtentY();
+      measuredW = std::max(measuredW, cx);
+      measuredH = std::max(measuredH, cy);
     }
-    bool inFlexFlow = (layout != LayoutMode::None);
-    if (inFlexFlow) {
-      continue;
-    }
-    float cx = child->preferredWidth + child->constraintExtentX();
-    float cy = child->preferredHeight + child->constraintExtentY();
-    measuredW = std::max(measuredW, cx);
-    measuredH = std::max(measuredH, cy);
   }
 
   // Use explicit value if set, otherwise use measured value.
