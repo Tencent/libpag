@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "rendering/pagx/XmlLinesModel.h"
-#include <QDebug>
-#include <QElapsedTimer>
 #include "rendering/pagx/XmlSyntaxHighlighter.h"
 
 namespace pag {
@@ -73,18 +71,12 @@ qreal XmlLinesModel::maxLineWidth() const {
 }
 
 void XmlLinesModel::setContent(const QString& xmlContent) {
-  QElapsedTimer timer;
-  timer.start();
-
   beginResetModel();
 
   fullText = xmlContent;
 
   // Split by newlines, preserving empty lines
-  qint64 splitStart = timer.elapsed();
   const auto lineList = xmlContent.split('\n');
-  qDebug() << "[XmlLinesModel] split into" << lineList.size() << "lines, took"
-           << (timer.elapsed() - splitStart) << "ms";
 
   // Release memory if new content is significantly smaller (less than half the previous capacity)
   // This prevents memory bloat when switching from large files to small files
@@ -107,10 +99,6 @@ void XmlLinesModel::setContent(const QString& xmlContent) {
   _maxLineWidth = static_cast<qreal>(maxLength) * CharWidth;
 
   endResetModel();
-
-  qDebug() << "[XmlLinesModel] setContent total:" << timer.elapsed() << "ms for"
-           << xmlContent.size() << "bytes," << lines.size()
-           << "lines, maxLineWidth:" << _maxLineWidth;
 
   Q_EMIT lineCountChanged();
   Q_EMIT plainTextChanged();

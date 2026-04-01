@@ -16,7 +16,6 @@ Rectangle {
 
     // Reset the editor state (called on file switch)
     function reset(newText) {
-        console.log("[XMLSourceEditor] reset called: newText.length =", newText ? newText.length : "undefined");
         exitEditMode(false);  // Exit without saving
         if (newText !== undefined) {
             text = newText;
@@ -29,8 +28,6 @@ Rectangle {
         if (lineIndex < 0 || !linesModel || lineIndex >= linesModel.lineCount) {
             return;
         }
-
-        console.log("[XMLSourceEditor] enterEditModeForLine:", lineIndex);
 
         // If already editing another line, save it first
         if (editingLineIndex >= 0 && editingLineIndex !== lineIndex) {
@@ -49,10 +46,7 @@ Rectangle {
         if (editingLineIndex < 0 || !linesModel) {
             return;
         }
-
         // The delegate will handle the actual commit via setLineText
-        // This function just updates state
-        console.log("[XMLSourceEditor] commitCurrentLine:", editingLineIndex);
     }
 
     // Move to next line for editing
