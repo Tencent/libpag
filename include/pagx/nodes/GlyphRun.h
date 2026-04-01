@@ -97,12 +97,9 @@ class GlyphRun : public Node {
   std::vector<float> skews = {};
 
   /**
-   * The linebox bounds of this GlyphRun in layout coordinates. For TextBox children, this is in
-   * TextBox coordinates (before inverse transform). For standalone Text, this is in Text local
-   * coordinates. Computed by TextLayout during layout and stored on the first GlyphRun by
-   * FontEmbedder. Used for measurement when the original font data is no longer available (e.g.
-   * when loading precomposed files). Only the first GlyphRun of each Text carries bounds to avoid
-   * double-counting when a Text has multiple GlyphRuns (e.g. vector + bitmap font splits).
+   * The bounding rectangle of this text block in its parent coordinate space. For TextBox children,
+   * this is in TextBox coordinates; for standalone Text, this is in Text local coordinates. Only the
+   * first GlyphRun of each Text element carries the bounds for the entire text block.
    */
   Rect bounds = {};
 
