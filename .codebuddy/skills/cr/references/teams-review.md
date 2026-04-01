@@ -180,7 +180,19 @@ For each issue you receive:
    - Reasoning: for REJECT, state the concrete counter-argument. For CONFIRM, briefly
      note what you checked and why no valid counter-argument exists.
 
-Important constraints:
+Cross-module verification (CRITICAL):
+When an issue claims two code locations are "inconsistent" or "asymmetric", you MUST
+independently verify whether the inconsistency is real or intentional:
+- Read the type/class definitions at both locations. Different libraries (e.g., project
+  Matrix vs third-party Matrix) may use different conventions (coordinate systems, sign
+  conventions, row-major vs column-major) that make surface-level differences correct.
+- Check whether the two code paths target different output systems (e.g., SVG export vs
+  GPU rendering). Differences may be required by the respective standards.
+- If the reviewer's evidence is limited to "these two snippets look different", REJECT
+  unless you can confirm they operate in the same semantic context with the same
+  conventions. State which definitions you checked.
+
+General constraints:
 - Your counter-arguments must be grounded in real evidence from the code. Do not
   fabricate hypothetical defenses or invent caller guarantees that are not visible in
   the codebase.
