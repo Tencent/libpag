@@ -77,6 +77,11 @@ class ContentView : public QQuickItem {
   std::unique_ptr<RenderThread> renderThread = nullptr;
   std::unique_ptr<QTimer> resizeTimer = nullptr;
   std::atomic_bool sizeChanged = false;
+  // Timestamp until which geometryChange() should skip starting the resize timer.
+  // This is set by subclasses when they handle size changes immediately
+  // (e.g., during file loading) to prevent the 400ms delayed updateSize()
+  // from causing the rendered image to disappear due to race conditions.
+  qint64 skipResizeTimerUntil = 0;
 };
 
 }  // namespace pag

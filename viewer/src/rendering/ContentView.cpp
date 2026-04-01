@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ContentView.h"
+#include <QDateTime>
 #include <QQuickWindow>
 #include <QSGImageNode>
 #include "RenderThread.h"
@@ -66,7 +67,17 @@ void ContentView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeo
     return;
   }
   QQuickItem::geometryChange(newGeometry, oldGeometry);
-  resizeTimer->start(400);
+  // Skip starting the timer if:
+  // 1. We're within the skip window (subclass handled size change immediately)
+  // 2. sizeChanged is already true (a size change is pending)
+  // This prevents redundant updateSize() calls that invalidate the surface.
+  auto now = QDateTime::currentMSecsSinceEpoch();
+  if (now < skipResizeTimerUntil) {
+    return;
+  }
+  if (!sizeChanged) {
+    resizeTimer->start(400);
+  }
 }
 
 RenderThread* ContentView::getRenderThread() const {
