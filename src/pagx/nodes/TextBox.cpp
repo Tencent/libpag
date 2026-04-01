@@ -39,16 +39,6 @@ static TextLayoutParams MakeTextLayoutParams(const TextBox* textBox, float boxWi
   return params;
 }
 
-void TextBox::updateSize(const LayoutContext& context) {
-  for (auto* child : elements) {
-    auto* node = LayoutNode::AsLayoutNode(child);
-    if (node) {
-      node->updateSize(context);
-    }
-  }
-  LayoutNode::updateSize(context);
-}
-
 void TextBox::onMeasure(const LayoutContext& context) {
   if (!std::isnan(width) && !std::isnan(height)) {
     preferredWidth = width;

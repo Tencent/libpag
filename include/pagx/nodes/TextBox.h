@@ -91,7 +91,6 @@ class TextBox : public Group {
   }
 
  protected:
-  void updateSize(const LayoutContext& context) override;
   void onMeasure(const LayoutContext& context) override;
   void setLayoutSize(const LayoutContext& context, float width, float height) override;
   void updateLayout(const LayoutContext& context) override;
