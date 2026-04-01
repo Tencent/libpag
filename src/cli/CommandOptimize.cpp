@@ -204,16 +204,22 @@ static bool IsEmptyLayer(const Layer* layer) {
          layer->styles.empty() && layer->filters.empty();
 }
 
+static bool IsEmptyLayerForLayout(const Layer* layer, bool insideContainerLayout) {
+  if (insideContainerLayout && layer->includeInLayout) {
+    return false;
+  }
+  return IsEmptyLayer(layer);
+}
+
 static int RemoveEmptyLayers(std::vector<Layer*>& layers, bool insideContainerLayout) {
   auto originalSize = static_cast<int>(layers.size());
-  layers.erase(std::remove_if(layers.begin(), layers.end(),
-                              [insideContainerLayout](const Layer* layer) {
-                                if (insideContainerLayout && layer->includeInLayout) {
-                                  return false;
-                                }
-                                return IsEmptyLayer(layer);
-                              }),
-               layers.end());
+  auto writeIt = layers.begin();
+  for (auto readIt = layers.begin(); readIt != layers.end(); ++readIt) {
+    if (!IsEmptyLayerForLayout(*readIt, insideContainerLayout)) {
+      *writeIt++ = *readIt;
+    }
+  }
+  layers.erase(writeIt, layers.end());
   return originalSize - static_cast<int>(layers.size());
 }
 
