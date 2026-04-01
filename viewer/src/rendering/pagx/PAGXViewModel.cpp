@@ -19,6 +19,7 @@
 #include "rendering/pagx/PAGXViewModel.h"
 #include <QFile>
 #include <QQuickWindow>
+#include <cmath>
 #include "pag/pag.h"
 #include "pagx/PAGXImporter.h"
 #include "renderer/LayerBuilder.h"
@@ -174,7 +175,7 @@ void PAGXViewModel::setIsPlaying(bool isPlaying) {
 }
 
 void PAGXViewModel::setProgress(double newProgress) {
-  if (progress == newProgress) {
+  if (std::abs(progress - newProgress) < 1e-9) {
     return;
   }
   progress = newProgress;

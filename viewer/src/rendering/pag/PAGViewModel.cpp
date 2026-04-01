@@ -206,7 +206,7 @@ void PAGViewModel::setShowVideoFrames(bool isShow) {
 }
 
 void PAGViewModel::setProgress(double progress) {
-  if (this->progress == progress) {
+  if (std::abs(this->progress - progress) < 1e-9) {
     return;
   }
   setProgressInternal(progress, true);
