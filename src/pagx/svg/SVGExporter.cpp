@@ -19,6 +19,7 @@
 #include "pagx/SVGExporter.h"
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -320,21 +321,15 @@ static bool GetPNGDimensions(const uint8_t* data, size_t size, int* width, int* 
   return *width > 0 && *height > 0;
 }
 
-static bool GetImagePNGDimensions(const Image* image, int* width, int* height) {
-  if (image->data) {
-    return GetPNGDimensions(image->data->bytes(), image->data->size(), width, height);
-  }
-  if (image->filePath.empty()) {
-    return false;
-  }
-  if (image->filePath.rfind("data:", 0) == 0) {
-    auto decoded = DecodeBase64DataURI(image->filePath);
+static bool GetPNGDimensionsFromPath(const std::string& path, int* width, int* height) {
+  if (path.rfind("data:", 0) == 0) {
+    auto decoded = DecodeBase64DataURI(path);
     if (!decoded) {
       return false;
     }
     return GetPNGDimensions(decoded->bytes(), decoded->size(), width, height);
   }
-  std::ifstream file(image->filePath, std::ios::binary);
+  std::ifstream file(path, std::ios::binary);
   if (!file) {
     return false;
   }
@@ -343,6 +338,16 @@ static bool GetImagePNGDimensions(const Image* image, int* width, int* height) {
     return false;
   }
   return GetPNGDimensions(header, 24, width, height);
+}
+
+static bool GetImagePNGDimensions(const Image* image, int* width, int* height) {
+  if (image->data) {
+    return GetPNGDimensions(image->data->bytes(), image->data->size(), width, height);
+  }
+  if (!image->filePath.empty()) {
+    return GetPNGDimensionsFromPath(image->filePath, width, height);
+  }
+  return false;
 }
 
 static std::string GetImageHref(const Image* image) {
