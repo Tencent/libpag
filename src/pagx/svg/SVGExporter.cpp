@@ -413,7 +413,7 @@ static Matrix BuildGroupMatrix(const Group* group) {
     // Column-vector: R(-skewAxis) * ShearX * R(skewAxis)
     m = Matrix::Rotate(group->skewAxis) * m;
     Matrix shear = {};
-    shear.c = -std::tan(DegreesToRadians(group->skew));
+    shear.c = std::tan(DegreesToRadians(group->skew));
     m = shear * m;
     m = Matrix::Rotate(-group->skewAxis) * m;
   }

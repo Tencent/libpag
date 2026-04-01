@@ -733,4 +733,38 @@ PAGX_TEST(PAGXSVGTest, SVGExport_LayerPosition) {
   SaveFile(svg, "PAGXSVGTest/svg_export_layer_position.svg");
 }
 
+/**
+ * Test SVG export of a Group with skew transform produces correct matrix direction.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_GroupSkew) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto group = doc->makeNode<pagx::Group>();
+  group->skew = 30;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {80, 60};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.2f, 0.6f, 0.8f, 1.0f};
+  fill->color = solid;
+  group->elements.push_back(rect);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // The SVG matrix for a pure skewX(30°) is matrix(1, 0, tan(30°), 1, 0, 0).
+  // tan(30°) ≈ 0.5774, so the third component (skewX) must be positive.
+  auto matrixPos = svg.find("matrix(");
+  ASSERT_NE(matrixPos, std::string::npos);
+  auto matrixEnd = svg.find(")", matrixPos);
+  auto matrixStr = svg.substr(matrixPos + 7, matrixEnd - matrixPos - 7);
+  // Parse matrix(a,b,c,d,e,f) — c is the third value.
+  float a = 0, b = 0, c = 0, d = 0;
+  sscanf(matrixStr.c_str(), "%f,%f,%f,%f", &a, &b, &c, &d);
+  // skewX component (c) must be positive for positive skew angle.
+  EXPECT_NEAR(c, std::tan(30 * static_cast<float>(M_PI) / 180), 0.001f);
+  SaveFile(svg, "PAGXSVGTest/svg_export_group_skew.svg");
+}
+
 }  // namespace pag
