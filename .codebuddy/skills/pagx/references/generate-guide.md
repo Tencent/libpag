@@ -19,7 +19,7 @@ Read as needed:
 | Reference | Content |
 |-----------|---------|
 | `attributes.md` | Attribute defaults, enumerations, required attributes |
-| `cli.md` | CLI tool usage — `render`, `bounds`, `font info` commands |
+| `cli.md` | CLI tool usage — `render`, `layout`, `bounds`, `font info` commands |
 
 ---
 
@@ -152,6 +152,44 @@ measured bounds.
 
 See `design-patterns.md` §6 Origin-Based Internal Layout for coordinate localization details.
 
+### Incremental Build Strategy
+
+For designs with multiple sections (e.g., a screen with header, content area, and footer),
+**do not write the entire PAGX file in one pass**. Build incrementally — confirm each stage
+is structurally correct before adding the next, so errors never cascade:
+
+**Stage 1 — Skeleton**: Write the `<pagx>` root and top-level section Layers with only
+layout attributes (`layout`, `gap`, `padding`, `flex`, `alignment`, `arrangement`). No
+content yet — each Layer is an empty container. Write the file, then run the verification
+loop (Step 4) to confirm dimensions and arrangement are correct.
+
+```xml
+<!-- Stage 1: skeleton only -->
+<pagx version="1.0" width="393" height="852">
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical">
+    <Layer height="60"/>          <!-- header -->
+    <Layer flex="1" layout="vertical" gap="16" padding="0,20,0,20">
+      <Layer height="200" layout="horizontal" gap="12"/> <!-- card row -->
+      <Layer flex="1"/>                                   <!-- content area -->
+    </Layer>
+    <Layer height="83"/>          <!-- tab bar -->
+  </Layer>
+</pagx>
+```
+
+**Stage 2 — Per-module content**: Pick one section at a time. Add its internal content
+(background Rectangles, Text, icons, child Layers). After each module, run the verification
+loop again. If `pagx layout --check` reports problems, fix them before moving to the next
+module.
+
+**Stage 3 — Polish and cross-check**: After all modules are filled, run a final full
+verification (`pagx layout --check` on the whole file + `pagx render`) to catch any
+cross-module issues (overlapping sections, inconsistent spacing).
+
+This strategy mirrors the "skeleton → content → verify" workflow used by design tools —
+it prevents the most common failure mode where a top-level layout error (wrong `flex`,
+missing `layout` attribute) silently breaks every nested element.
+
 ---
 
 ## Step 3: Build Content
@@ -240,47 +278,94 @@ These constraints differ from CSS/SVG and must be respected during generation:
 
 ## Step 4: Verify and Refine
 
-After building the complete PAGX file, **always** render and verify before presenting
-results — never skip this step.
+After building each stage (skeleton, each module, final), **always** run the verification
+loop before proceeding. Never skip this step — it is the primary mechanism for catching
+layout errors early.
 
-### 1. Render and Read Screenshot
+### Verification Loop
+
+Repeat this loop until `pagx layout --check` exits clean (exit code 0) **and** the
+screenshot matches the design intent:
+
+#### 1. Detect layout problems
+
+```bash
+pagx layout --check input.pagx
+```
+
+This detects four categories of problems:
+- **Overlapping siblings** — sibling elements whose bounds intersect
+- **Clipped content** — elements outside parent bounds when `clipToBounds` is set
+- **Zero-size** — elements with zero width or height (invisible)
+- **Excluded from layout flow** — `includeInLayout="false"` inside an auto-layout parent
+
+Exit code 1 = problems found (output shows each problem with node labels and bounds).
+Exit code 0 = no problems.
+
+To check a specific section during incremental build, scope with `--id` or `--xpath`:
+
+```bash
+pagx layout --check --id "header" input.pagx
+pagx layout --check --xpath "//Layer[@layout]" input.pagx
+```
+
+#### 2. Fix problems
+
+Use the structured problem output to identify and fix the root cause:
+
+| Problem | Typical Root Cause | Fix |
+|---------|-------------------|-----|
+| **Overlapping siblings** | Missing `layout` on parent; wrong `flex` distribution; duplicate `left`/`top` values | Add `layout="horizontal"/"vertical"` to parent; adjust `flex` weights or explicit sizes; use container layout instead of manual positioning |
+| **Zero-size Layer** | Content-measured Layer with no content yet; `flex` child in a container that has no main-axis size | Add content, or set explicit `width`/`height`, or ensure parent has a main-axis size for flex to distribute |
+| **Zero-size element** | Rectangle/Ellipse with `size="0,0"`; opposite-pair constraints (`left`+`right`) in a zero-width container | Set explicit `size`; fix parent container dimensions |
+| **Clipped content** | Child positioned outside parent bounds with `clipToBounds="true"` | Adjust child constraints; enlarge parent; or remove `clipToBounds` if clipping is unintended |
+| **Excluded from layout** | `includeInLayout="false"` without constraint attributes (element becomes invisible/misplaced) | Add constraint positioning (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`), or remove `includeInLayout="false"` if the element should participate in layout flow |
+
+#### 3. Inspect layout tree
+
+After fixing, inspect the resolved layout tree to confirm dimensions and positions:
+
+```bash
+pagx layout input.pagx                  # full tree
+pagx layout --id "cardRow" input.pagx    # scoped to one section
+```
+
+Verify:
+- Container layout: child Layer bounds show correct positions with expected gap spacing
+- Flex distribution: flex children have proportional widths/heights
+- Internal content: VectorElement bounds are within their parent Layer bounds
+- Constraint positioning: `centerX="0"` elements are centered, `left="0" right="0"` elements
+  span full width
+
+#### 4. Render and visual check
 
 ```bash
 pagx render --scale 2 input.pagx
 ```
 
-Read the screenshot. Visual inspection catches issues that bounds data alone cannot reveal
-(wrong colors, overlapping elements, visual imbalance).
+Read the screenshot. Visual inspection catches issues that layout data alone cannot:
+wrong colors, visual imbalance, text overflow, gradient direction errors.
 
-### 2. Measure
-
-Run `pagx bounds` to get exact dimensions of every layer:
+To render a specific section in isolation:
 
 ```bash
-pagx bounds input.pagx
+pagx render --scale 2 --id "header" input.pagx
 ```
 
-Use `--id` or `--xpath` for targeted measurement (see `cli.md`).
+#### 5. Repeat
 
-### 3. Check Layout
+If any problems remain, return to step 2. Continue until `--check` exits 0 and the
+screenshot is correct.
 
-**Container layout** — verify:
-- Layers with child Layers in rows/columns use `layout="horizontal"` or `layout="vertical"`
-- `gap`, `padding`, `alignment`, `arrangement` match the design
-- Child sizing (`flex`, explicit size, content-measured) produces correct proportions
+### Incremental Verification
 
-**Internal content** — verify:
-- VectorElement constraint attributes position content correctly within each Layer
-- Background rectangles fill bounds (`left="0" right="0" top="0" bottom="0"`)
-- Text is centered or anchored as intended
+During incremental build (Step 2 §Incremental Build Strategy), run the verification loop
+at each stage:
 
-**Overlay elements** — verify `includeInLayout="false"` elements are positioned correctly.
-
-### 4. Fix and Re-render
-
-- Misaligned child Layers → adjust container layout attributes (`gap`, `alignment`, `flex`)
-- Mispositioned content → adjust VectorElement constraint attributes
-
-After fixes, re-render and **read the screenshot** to confirm no new issues. Repeat until
-clean.
+1. **After skeleton**: `pagx layout --check` — confirms top-level structure has no
+   overlaps, zero-size sections, or missing layout attributes. Fix before adding content.
+2. **After each module**: `pagx layout --check --id "moduleId"` — scoped check on the
+   module just filled. Catches internal content issues without re-checking the whole file.
+3. **Final pass**: `pagx layout --check` + `pagx render --scale 2` — full verification
+   of the complete file.
 

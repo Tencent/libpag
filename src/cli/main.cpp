@@ -24,6 +24,7 @@
 #include "cli/CommandFont.h"
 #include "cli/CommandFormat.h"
 #include "cli/CommandImport.h"
+#include "cli/CommandLayoutCheck.h"
 #include "cli/CommandOptimize.h"
 #include "cli/CommandRender.h"
 #include "cli/CommandValidator.h"
@@ -38,14 +39,15 @@ static void PrintUsage() {
             << "Usage: pagx <command> [options] <file>\n"
             << "\n"
             << "Commands:\n"
-            << "  validate   Validate PAGX structure against the specification\n"
-            << "  render     Render PAGX to an image file (supports crop and scale)\n"
-            << "  bounds     Query the precise bounds of a node or layer\n"
-            << "  font       Query font metrics or embed fonts into a PAGX file\n"
-            << "  format     Format a PAGX file (indentation and attribute ordering)\n"
-            << "  optimize   Validate, optimize, and format a PAGX file in one step\n"
-            << "  import     Import from another format (e.g. SVG) to PAGX\n"
-            << "  export     Export a PAGX file to another format (e.g. SVG)\n"
+            << "  validate       Validate PAGX structure against the specification\n"
+            << "  render         Render PAGX to an image file (supports crop and scale)\n"
+            << "  bounds         Query the precise bounds of a node or layer\n"
+            << "  layout         Check layout structure and detect layout problems\n"
+            << "  font           Query font metrics or embed fonts into a PAGX file\n"
+            << "  format         Format a PAGX file (indentation and attribute ordering)\n"
+            << "  optimize       Validate, optimize, and format a PAGX file in one step\n"
+            << "  import         Import from another format (e.g. SVG) to PAGX\n"
+            << "  export         Export a PAGX file to another format (e.g. SVG)\n"
             << "\n"
             << "Options:\n"
             << "  --help, -h       Show help\n"
@@ -78,6 +80,9 @@ int main(int argc, char* argv[]) {
   }
   if (command == "bounds") {
     return pagx::cli::RunBounds(argc - 1, argv + 1);
+  }
+  if (command == "layout") {
+    return pagx::cli::RunLayout(argc - 1, argv + 1);
   }
   if (command == "font") {
     return pagx::cli::RunFont(argc - 1, argv + 1);

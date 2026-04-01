@@ -33,16 +33,18 @@ void Rectangle::setLayoutSize(const LayoutContext&, float width, float height) {
   if (!std::isnan(height)) {
     size.height = height;
   }
-  actualWidth = size.width;
-  actualHeight = size.height;
+  layoutWidth = size.width;
+  layoutHeight = size.height;
 }
 
 void Rectangle::setLayoutPosition(const LayoutContext&, float x, float y) {
   if (!std::isnan(x)) {
     position.x = x + size.width * 0.5f;
+    layoutX = x;
   }
   if (!std::isnan(y)) {
     position.y = y + size.height * 0.5f;
+    layoutY = y;
   }
 }
 

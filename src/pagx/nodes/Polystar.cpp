@@ -24,7 +24,7 @@
 
 namespace pagx {
 
-Rect Polystar::computeBounds() const {
+Rect Polystar::getContentBounds() const {
   auto numPoints = static_cast<int>(ceilf(pointCount));
   if (numPoints <= 0) {
     return Rect::MakeXYWH(0, 0, 0, 0);
@@ -64,7 +64,7 @@ Rect Polystar::computeBounds() const {
 }
 
 void Polystar::onMeasure(const LayoutContext&) {
-  auto bounds = computeBounds();
+  auto bounds = getContentBounds();
   preferredX = bounds.x;
   preferredY = bounds.y;
   preferredWidth = bounds.width;
@@ -77,18 +77,20 @@ void Polystar::setLayoutSize(const LayoutContext&, float width, float height) {
     outerRadius = outerRadius * scale;
     innerRadius = innerRadius * scale;
   }
-  auto bounds = computeBounds();
-  actualWidth = bounds.width;
-  actualHeight = bounds.height;
+  auto bounds = getContentBounds();
+  layoutWidth = bounds.width;
+  layoutHeight = bounds.height;
 }
 
 void Polystar::setLayoutPosition(const LayoutContext&, float x, float y) {
-  auto bounds = computeBounds();
+  auto bounds = getContentBounds();
   if (!std::isnan(x)) {
     position.x = x - bounds.x;
+    layoutX = x;
   }
   if (!std::isnan(y)) {
     position.y = y - bounds.y;
+    layoutY = y;
   }
 }
 

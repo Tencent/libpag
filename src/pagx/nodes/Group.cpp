@@ -37,22 +37,24 @@ void Group::onMeasure(const LayoutContext&) {
 }
 
 void Group::setLayoutSize(const LayoutContext&, float width, float height) {
-  actualWidth = !std::isnan(width) ? width : preferredWidth;
-  actualHeight = !std::isnan(height) ? height : preferredHeight;
+  layoutWidth = !std::isnan(width) ? width : preferredWidth;
+  layoutHeight = !std::isnan(height) ? height : preferredHeight;
 }
 
 void Group::setLayoutPosition(const LayoutContext&, float x, float y) {
   if (!std::isnan(x)) {
     position.x = x;
+    layoutX = x;
   }
   if (!std::isnan(y)) {
     position.y = y;
+    layoutY = y;
   }
 }
 
 void Group::updateLayout(const LayoutContext& context) {
   auto nodes = CollectLayoutNodes(elements, false);
-  PerformConstraintLayout(nodes, actualWidth, actualHeight, context);
+  PerformConstraintLayout(nodes, layoutWidth, layoutHeight, context);
 }
 
 }  // namespace pagx

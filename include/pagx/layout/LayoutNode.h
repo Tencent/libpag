@@ -66,6 +66,12 @@ class LayoutNode {
   /** Returns true if any constraint attribute is set. */
   bool hasConstraints() const;
 
+  /**
+   * Returns the layout-resolved bounds of this node in its parent's coordinate space.
+   * Only valid after applyLayout() has been called. Before layout, returns an empty Rect.
+   */
+  Rect layoutBounds() const;
+
   /** Returns the horizontal extent contributed by constraints for parent measurement. */
   float constraintExtentX() const;
 
@@ -79,16 +85,16 @@ class LayoutNode {
   virtual void updateSize(const LayoutContext& context);
 
   /**
-   * Writes self rendering attributes and actualWidth/actualHeight. Does not touch children.
+   * Writes self rendering attributes and layoutWidth/layoutHeight. Does not touch children.
    */
   virtual void setLayoutSize(const LayoutContext& context, float width, float height);
 
-  /** Writes self position. */
+  /** Writes self position and layoutX/layoutY. */
   virtual void setLayoutPosition(const LayoutContext&, float, float) {
   }
 
   /**
-   * Lays out children using actualWidth/actualHeight as container size.
+   * Lays out children using layoutWidth/layoutHeight as container size.
    * Only container nodes (Group/TextBox/Layer) override this.
    */
   virtual void updateLayout(const LayoutContext&) {
@@ -106,8 +112,8 @@ class LayoutNode {
   static LayoutNode* AsLayoutNode(Element* element);
 
   /** Computes position from container size, actual size, and constraints. */
-  static Rect CalculateConstrainedPosition(float containerW, float containerH, float actualW,
-                                           float actualH, const LayoutNode& node);
+  static Rect CalculateConstrainedPosition(float containerW, float containerH, float layoutW,
+                                           float layoutH, const LayoutNode& node);
 
   /**
    * Computes a uniform scale factor to fit content into target size. Only non-NAN axes contribute.
@@ -144,9 +150,11 @@ class LayoutNode {
   float preferredWidth = NAN;
   float preferredHeight = NAN;
 
-  // Actual layout size (written by setLayoutSize during layout phase).
-  float actualWidth = NAN;
-  float actualHeight = NAN;
+  // Layout-resolved position and size (written during layout phase, readable via layoutBounds()).
+  float layoutX = NAN;
+  float layoutY = NAN;
+  float layoutWidth = NAN;
+  float layoutHeight = NAN;
 
   friend class Rectangle;
   friend class Ellipse;

@@ -42,8 +42,8 @@ void Path::setLayoutSize(const LayoutContext&, float width, float height) {
     data->transform(Matrix::Scale(scale, scale));
   }
   auto bounds = data->getBounds();
-  actualWidth = bounds.width;
-  actualHeight = bounds.height;
+  layoutWidth = bounds.width;
+  layoutHeight = bounds.height;
 }
 
 void Path::setLayoutPosition(const LayoutContext&, float x, float y) {
@@ -53,9 +53,11 @@ void Path::setLayoutPosition(const LayoutContext&, float x, float y) {
   auto bounds = data->getBounds();
   if (!std::isnan(x)) {
     position.x = x - bounds.x;
+    layoutX = x;
   }
   if (!std::isnan(y)) {
     position.y = y - bounds.y;
+    layoutY = y;
   }
 }
 

@@ -44,8 +44,8 @@ void TextPath::setLayoutSize(const LayoutContext&, float width, float height) {
     baselineOrigin.y *= scale;
   }
   auto bounds = path->getBounds();
-  actualWidth = bounds.width;
-  actualHeight = bounds.height;
+  layoutWidth = bounds.width;
+  layoutHeight = bounds.height;
 }
 
 void TextPath::setLayoutPosition(const LayoutContext&, float x, float y) {
@@ -59,6 +59,12 @@ void TextPath::setLayoutPosition(const LayoutContext&, float x, float y) {
     path->transform(Matrix::Translate(tx, ty));
     baselineOrigin.x += tx;
     baselineOrigin.y += ty;
+  }
+  if (!std::isnan(x)) {
+    layoutX = x;
+  }
+  if (!std::isnan(y)) {
+    layoutY = y;
   }
 }
 

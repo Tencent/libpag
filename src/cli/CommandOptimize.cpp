@@ -1540,20 +1540,20 @@ static bool ComputeShapeBounds(const std::vector<Element*>& contents, float& min
       hasGeometry = true;
     } else if (type == NodeType::Polystar) {
       auto polystar = static_cast<const Polystar*>(element);
-      float r = polystar->outerRadius;
-      minX = std::min(minX, polystar->position.x - r);
-      minY = std::min(minY, polystar->position.y - r);
-      maxX = std::max(maxX, polystar->position.x + r);
-      maxY = std::max(maxY, polystar->position.y + r);
+      auto bounds = polystar->getContentBounds();
+      minX = std::min(minX, bounds.x + polystar->position.x);
+      minY = std::min(minY, bounds.y + polystar->position.y);
+      maxX = std::max(maxX, bounds.x + polystar->position.x + bounds.width);
+      maxY = std::max(maxY, bounds.y + polystar->position.y + bounds.height);
       hasGeometry = true;
     } else if (type == NodeType::Path) {
       auto path = static_cast<const Path*>(element);
       if (path->data != nullptr && !path->data->isEmpty()) {
         auto bounds = path->data->getBounds();
-        minX = std::min(minX, bounds.x);
-        minY = std::min(minY, bounds.y);
-        maxX = std::max(maxX, bounds.x + bounds.width);
-        maxY = std::max(maxY, bounds.y + bounds.height);
+        minX = std::min(minX, bounds.x + path->position.x);
+        minY = std::min(minY, bounds.y + path->position.y);
+        maxX = std::max(maxX, bounds.x + path->position.x + bounds.width);
+        maxY = std::max(maxY, bounds.y + path->position.y + bounds.height);
         hasGeometry = true;
       }
     }

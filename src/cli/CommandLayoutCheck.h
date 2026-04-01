@@ -16,36 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/nodes/Ellipse.h"
-#include <cmath>
+#pragma once
 
-namespace pagx {
+namespace pagx::cli {
 
-void Ellipse::onMeasure(const LayoutContext&) {
-  preferredWidth = size.width;
-  preferredHeight = size.height;
-}
+/**
+ * Check layout structure and detect layout problems in PAGX files.
+ *
+ * Detects four categories of layout problems:
+ * 1. Overlapping sibling elements
+ * 2. Content clipped by parent bounds (clipToBounds)
+ * 3. Elements excluded from layout flow inside auto-layout parents (includeInLayout=false)
+ * 4. Zero-size (invisible) elements
+ *
+ * Returns non-zero exit code when layout problems are detected.
+ */
+int RunLayout(int argc, char* argv[]);
 
-void Ellipse::setLayoutSize(const LayoutContext&, float width, float height) {
-  if (!std::isnan(width)) {
-    size.width = width;
-  }
-  if (!std::isnan(height)) {
-    size.height = height;
-  }
-  layoutWidth = size.width;
-  layoutHeight = size.height;
-}
-
-void Ellipse::setLayoutPosition(const LayoutContext&, float x, float y) {
-  if (!std::isnan(x)) {
-    position.x = x + size.width * 0.5f;
-    layoutX = x;
-  }
-  if (!std::isnan(y)) {
-    position.y = y + size.height * 0.5f;
-    layoutY = y;
-  }
-}
-
-}  // namespace pagx
+}  // namespace pagx::cli

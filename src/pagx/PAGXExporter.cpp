@@ -517,7 +517,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Polystar: {
       auto polystar = static_cast<const Polystar*>(node);
       xml.openElement("Polystar");
-      auto polyBounds = polystar->computeBounds();
+      auto polyBounds = polystar->getContentBounds();
       Point polyDefaultPos = {-polyBounds.x, -polyBounds.y};
       if (!shouldSkipPosition(polystar->position, polyDefaultPos, polystar->left, polystar->right,
                               polystar->centerX, polystar->top, polystar->bottom,

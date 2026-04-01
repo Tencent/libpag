@@ -66,16 +66,18 @@ void Text::setLayoutSize(const LayoutContext& context, float width, float height
     }
     textBounds = result.bounds;
   }
-  actualWidth = textBounds.width;
-  actualHeight = textBounds.height;
+  layoutWidth = textBounds.width;
+  layoutHeight = textBounds.height;
 }
 
 void Text::setLayoutPosition(const LayoutContext&, float x, float y) {
   if (!std::isnan(x)) {
     position.x = x - textBounds.x;
+    layoutX = x;
   }
   if (!std::isnan(y)) {
     position.y = y - textBounds.y;
+    layoutY = y;
   }
 }
 

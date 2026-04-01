@@ -697,7 +697,7 @@ static Polystar* parsePolystar(const DOMNode* node, PAGXDocument* doc) {
   if (posAttr && !posAttr->empty()) {
     polystar->position = getPointAttribute(node, "position", Default<Polystar>().position, doc);
   } else {
-    auto bounds = polystar->computeBounds();
+    auto bounds = polystar->getContentBounds();
     polystar->position = {-bounds.x, -bounds.y};
   }
   polystar->left = getFloatAttributeOrNaN(node, "left", doc);

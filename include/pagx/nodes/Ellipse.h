@@ -21,6 +21,7 @@
 #include "pagx/layout/LayoutNode.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/types/Point.h"
+#include "pagx/types/Rect.h"
 #include "pagx/types/Size.h"
 
 namespace pagx {

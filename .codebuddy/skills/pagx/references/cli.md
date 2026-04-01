@@ -135,6 +135,96 @@ pagx format --indent 4 input.pagx       # 4-space indent (default: 2)
 
 ---
 
+## pagx layout
+
+Display the layout structure of a PAGX file. By default outputs the full layout tree with
+resolved bounds for all Layers and their internal elements (Rectangle, Ellipse, Path, Polystar,
+Text, TextPath, Group, TextBox). With `--check`, detects layout problems and returns non-zero
+exit code when issues are found.
+
+Bounds coordinates are relative to the document origin by default. When `--id` or `--xpath` is
+used, bounds are relative to the target Layer's origin (the target Layer itself starts at 0,0).
+
+```bash
+pagx layout input.pagx                                      # full layout tree
+pagx layout --json input.pagx                                # JSON format
+pagx layout --id "card" input.pagx                           # scope to a Layer by id
+pagx layout --xpath "//Layer[@id='header']" input.pagx       # scope to Layers by XPath
+pagx layout --check input.pagx                               # detect problems
+pagx layout --check --json input.pagx                        # problems in JSON
+```
+
+| Option | Description |
+|--------|-------------|
+| `--id <id>` | Limit scope to the Layer with the specified `id` attribute |
+| `--xpath <expr>` | Limit scope to Layers matched by XPath expression |
+| `--check` | Detect layout problems; only output nodes with problems; return non-zero exit code if issues found |
+| `--json` | Output in JSON format |
+
+`--id` and `--xpath` are mutually exclusive.
+
+### Default mode (no --check)
+
+Outputs the complete layout tree showing every Layer and element with their resolved bounds.
+No problem detection is performed. Always returns exit code 0.
+
+```
+Layer#container
+  bounds: x=0 y=0 w=400 h=300
+  layoutMode: HORIZONTAL
+  Rectangle[0]
+    bounds: x=0 y=0 w=400 h=300
+  Layer#sidebar
+    bounds: x=20 y=20 w=120 h=260
+  Layer#content
+    bounds: x=160 y=20 w=220 h=260
+```
+
+### Check mode (--check)
+
+Detects four categories of layout problems:
+
+1. **Overlapping siblings** — sibling elements whose bounds intersect
+2. **Clipped content** — elements outside parent bounds when `clipToBounds` is set
+3. **Excluded from layout flow** — elements with `includeInLayout="false"` inside an auto-layout parent
+4. **Zero-size** — elements with zero width or height (invisible)
+
+Only nodes with problems (and their ancestor chain) are output. Returns exit code 1 if any
+problems are found, 0 otherwise.
+
+```
+Layer#container
+  bounds: x=0 y=0 w=400 h=300
+  Layer#box1
+    bounds: x=50 y=50 w=200 h=150
+    problems:
+      - overlaps with Layer#box2
+  Layer#box2
+    bounds: x=150 y=100 w=200 h=150
+    problems:
+      - overlaps with Layer#box1
+```
+
+### JSON output
+
+Both default and check modes support `--json`. The output is a JSON array of node objects:
+
+```json
+[{"label":"Layer#card","bounds":{"x":0,"y":0,"width":300,"height":200},"layoutMode":"VERTICAL","children":[...]}]
+```
+
+Each node contains: `label` (node identifier), `bounds` (`x`, `y`, `width`, `height`), and
+optionally `clipToBounds`, `layoutMode`, `layoutPositioning`, `problems` (check mode only),
+and `children`.
+
+### Node labels
+
+Labels identify nodes in the output and problem messages:
+- **Layer**: `Layer#id` (when id is set) or `Layer[index]` (positional)
+- **Elements**: `Rectangle#id`, `Ellipse[0]`, `TextBox#title`, `Path[2]`, etc.
+
+---
+
 ## pagx bounds
 
 Query precise rendered bounds of Layer nodes. Supports `--id` for quick lookup by id attribute

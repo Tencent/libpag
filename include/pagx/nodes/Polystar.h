@@ -87,7 +87,7 @@ class Polystar : public Element, public LayoutNode {
    * Unlike using outerRadius as a square, this accounts for the actual vertex positions
    * determined by pointCount, rotation, and innerRadius (for star type).
    */
-  Rect computeBounds() const;
+  Rect getContentBounds() const;
 
  protected:
   void onMeasure(const LayoutContext& context) override;

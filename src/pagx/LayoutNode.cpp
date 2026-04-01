@@ -37,6 +37,16 @@ bool LayoutNode::hasConstraints() const {
          !std::isnan(centerX) || !std::isnan(centerY);
 }
 
+Rect LayoutNode::layoutBounds() const {
+  float x = std::isnan(layoutX) ? preferredX : layoutX;
+  float y = std::isnan(layoutY) ? preferredY : layoutY;
+  float w =
+      std::isnan(layoutWidth) ? (std::isnan(preferredWidth) ? 0 : preferredWidth) : layoutWidth;
+  float h =
+      std::isnan(layoutHeight) ? (std::isnan(preferredHeight) ? 0 : preferredHeight) : layoutHeight;
+  return Rect::MakeXYWH(x, y, w, h);
+}
+
 float LayoutNode::constraintExtentX() const {
   if (!std::isnan(centerX)) {
     return std::abs(centerX) * 2;
@@ -79,7 +89,7 @@ void LayoutNode::updateSize(const LayoutContext& context) {
 
 void LayoutNode::setLayoutSize(const LayoutContext&, float, float) {
   // Default implementation: no rendering attributes to write.
-  // actualWidth/actualHeight remain NAN (leaf nodes without specific behavior).
+  // layoutWidth/layoutHeight remain NAN (leaf nodes without specific behavior).
 }
 
 void LayoutNode::PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, float containerW,
@@ -94,13 +104,13 @@ void LayoutNode::PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, 
     if (!std::isnan(child->top) && !std::isnan(child->bottom)) {
       targetH = std::ceil(containerH - child->top - child->bottom);
     }
-    // Phase 2: write self rendering attributes and actualWidth/actualHeight.
+    // Phase 2: write self rendering attributes and layoutWidth/layoutHeight.
     child->setLayoutSize(context, targetW, targetH);
-    // Phase 3: compute position from actualWidth/actualHeight.
+    // Phase 3: compute position from layoutWidth/layoutHeight.
     if (child->hasConstraints()) {
-      auto pos = CalculateConstrainedPosition(containerW, containerH, child->actualWidth,
-                                              child->actualHeight, *child);
-      // Phase 4: write self position.
+      auto pos = CalculateConstrainedPosition(containerW, containerH, child->layoutWidth,
+                                              child->layoutHeight, *child);
+      // Phase 4: write self position and layoutX/layoutY.
       child->setLayoutPosition(context, std::round(pos.x), std::round(pos.y));
     }
     // Phase 5: recursively lay out children (containers only, leaf nodes no-op).
@@ -134,8 +144,8 @@ LayoutNode* LayoutNode::AsLayoutNode(Element* element) {
   }
 }
 
-Rect LayoutNode::CalculateConstrainedPosition(float containerW, float containerH, float actualW,
-                                              float actualH, const LayoutNode& node) {
+Rect LayoutNode::CalculateConstrainedPosition(float containerW, float containerH, float layoutW,
+                                              float layoutH, const LayoutNode& node) {
   float x = NAN;
   float y = NAN;
 
@@ -145,13 +155,13 @@ Rect LayoutNode::CalculateConstrainedPosition(float containerW, float containerH
   bool hasCenterX = !std::isnan(node.centerX);
 
   if (hasCenterX) {
-    x = (containerW - actualW) * 0.5f + node.centerX;
+    x = (containerW - layoutW) * 0.5f + node.centerX;
   } else if (hasLeft && hasRight) {
-    x = node.left + (containerW - node.left - node.right - actualW) * 0.5f;
+    x = node.left + (containerW - node.left - node.right - layoutW) * 0.5f;
   } else if (hasLeft) {
     x = node.left;
   } else if (hasRight) {
-    x = containerW - actualW - node.right;
+    x = containerW - layoutW - node.right;
   }
 
   // Vertical axis: centerY > (top+bottom) > top > bottom
@@ -160,16 +170,16 @@ Rect LayoutNode::CalculateConstrainedPosition(float containerW, float containerH
   bool hasCenterY = !std::isnan(node.centerY);
 
   if (hasCenterY) {
-    y = (containerH - actualH) * 0.5f + node.centerY;
+    y = (containerH - layoutH) * 0.5f + node.centerY;
   } else if (hasTop && hasBottom) {
-    y = node.top + (containerH - node.top - node.bottom - actualH) * 0.5f;
+    y = node.top + (containerH - node.top - node.bottom - layoutH) * 0.5f;
   } else if (hasTop) {
     y = node.top;
   } else if (hasBottom) {
-    y = containerH - actualH - node.bottom;
+    y = containerH - layoutH - node.bottom;
   }
 
-  return Rect::MakeXYWH(x, y, actualW, actualH);
+  return Rect::MakeXYWH(x, y, layoutW, layoutH);
 }
 
 float LayoutNode::ComputeUniformScale(float contentW, float contentH, float targetW,

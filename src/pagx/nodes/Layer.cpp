@@ -44,6 +44,8 @@ void Layer::updateSize(const LayoutContext& context) {
 }
 
 void Layer::onMeasure(const LayoutContext&) {
+  preferredX = x;
+  preferredY = y;
   // If both dimensions are explicit, use them directly.
   if (!std::isnan(width) && !std::isnan(height)) {
     preferredWidth = width;
@@ -120,10 +122,10 @@ void Layer::onMeasure(const LayoutContext&) {
 }
 
 void Layer::setLayoutSize(const LayoutContext&, float width, float height) {
-  actualWidth = !std::isnan(width) ? width : preferredWidth;
-  actualHeight = !std::isnan(height) ? height : preferredHeight;
-  if (clipToBounds && !hasScrollRect && !std::isnan(actualWidth) && !std::isnan(actualHeight)) {
-    scrollRect = Rect::MakeXYWH(0, 0, actualWidth, actualHeight);
+  layoutWidth = !std::isnan(width) ? width : preferredWidth;
+  layoutHeight = !std::isnan(height) ? height : preferredHeight;
+  if (clipToBounds && !hasScrollRect && !std::isnan(layoutWidth) && !std::isnan(layoutHeight)) {
+    scrollRect = Rect::MakeXYWH(0, 0, layoutWidth, layoutHeight);
     hasScrollRect = true;
   }
 }
@@ -131,9 +133,11 @@ void Layer::setLayoutSize(const LayoutContext&, float width, float height) {
 void Layer::setLayoutPosition(const LayoutContext&, float x, float y) {
   if (!std::isnan(x)) {
     this->x = x;
+    layoutX = x;
   }
   if (!std::isnan(y)) {
     this->y = y;
+    layoutY = y;
   }
 }
 
@@ -151,14 +155,14 @@ void Layer::updateLayout(const LayoutContext& context) {
       nodes.push_back(child);
     }
   }
-  LayoutNode::PerformConstraintLayout(nodes, actualWidth, actualHeight, context);
+  LayoutNode::PerformConstraintLayout(nodes, layoutWidth, layoutHeight, context);
 }
 
 void Layer::performContainerLayout(const LayoutContext& context) {
   bool horizontal = (layout == LayoutMode::Horizontal);
 
-  float containerMainSize = horizontal ? actualWidth : actualHeight;
-  float containerCrossSize = horizontal ? actualHeight : actualWidth;
+  float containerMainSize = horizontal ? layoutWidth : layoutHeight;
+  float containerCrossSize = horizontal ? layoutHeight : layoutWidth;
 
   float paddingMainStart = horizontal ? padding.left : padding.top;
   float paddingMainEnd = horizontal ? padding.right : padding.bottom;

@@ -54,14 +54,14 @@ void TextBox::onMeasure(const LayoutContext& context) {
 }
 
 void TextBox::setLayoutSize(const LayoutContext&, float width, float height) {
-  actualWidth = !std::isnan(width) ? width : preferredWidth;
-  actualHeight = !std::isnan(height) ? height : preferredHeight;
+  layoutWidth = !std::isnan(width) ? width : preferredWidth;
+  layoutHeight = !std::isnan(height) ? height : preferredHeight;
 }
 
 void TextBox::updateLayout(const LayoutContext& context) {
   auto nodes = CollectLayoutNodes(elements, true);
-  PerformConstraintLayout(nodes, actualWidth, actualHeight, context);
-  auto params = MakeTextLayoutParams(this, actualWidth, actualHeight);
+  PerformConstraintLayout(nodes, layoutWidth, layoutHeight, context);
+  auto params = MakeTextLayoutParams(this, layoutWidth, layoutHeight);
   std::vector<Text*> childText = {};
   TextLayout::CollectTextElements(elements, childText);
   auto result = TextLayout::Layout(childText, params, context);

@@ -17,7 +17,7 @@ Read as needed:
 | Reference | Content |
 |-----------|---------|
 | `attributes.md` | Attribute defaults, enumerations, required attributes |
-| `cli.md` | CLI tool usage — `optimize`, `render`, `validate`, `bounds` commands |
+| `cli.md` | CLI tool usage — `optimize`, `render`, `layout`, `validate`, `bounds` commands |
 
 ---
 
@@ -92,8 +92,9 @@ After all optimizations, verify the following:
 - [ ] `<Resources>` placed after all Layers; all `@id` references resolve
 - [ ] Repeater copies reasonable (~200 single, ~500 nested product)
 - [ ] Visual stacking order preserved (see **Stacking Order** below)
+- [ ] `pagx layout --check` reports no problems (overlapping, zero-size, clipped, excluded)
 - [ ] Rendered screenshot matches expected design (layout, alignment, consistent spacing)
-  (use the Verification and Correction Loop in `generate-guide.md` for the full methodology)
+  (see `generate-guide.md` §Step 4 for the full verification loop)
 
 > **Stacking order caveat**: see §Stacking Order and the All-or-Nothing Rule below.
 

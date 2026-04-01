@@ -28,6 +28,7 @@
 #include "cli/CommandFont.h"
 #include "cli/CommandFormat.h"
 #include "cli/CommandImport.h"
+#include "cli/CommandLayoutCheck.h"
 #include "cli/CommandOptimize.h"
 #include "cli/CommandRender.h"
 #include "cli/CommandValidator.h"
@@ -1847,6 +1848,150 @@ CLI_TEST(PAGXCliTest, Import_DefaultOutputNoExtInput) {
   EXPECT_EQ(ret, 0);
   auto defaultOutput = TempDir() + "/ImportNoExt.pagx";
   EXPECT_TRUE(std::filesystem::exists(defaultOutput));
+}
+
+//==============================================================================
+// LayoutCheck tests
+//==============================================================================
+
+CLI_TEST(PAGXCliTest, LayoutCheck_Help) {
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--help"});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_MissingFile) {
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "nonexistent.pagx"});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_MissingInput) {
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout"});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_UnknownOption) {
+  auto path = TestResourcePath("layout_check_clean.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--bogus", path});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_Clean) {
+  auto path = TestResourcePath("layout_check_clean.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", path});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_CleanJson) {
+  auto path = TestResourcePath("layout_check_clean.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--json", path});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_CleanProblemsOnly) {
+  auto path = TestResourcePath("layout_check_clean.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_Overlap) {
+  auto path = TestResourcePath("layout_check_overlap.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", path});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_Clipped) {
+  auto path = TestResourcePath("layout_check_clipped.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  // In global mode, overflow Layer should show absolute coordinates (x=150 y=150).
+  EXPECT_TRUE(output.find("x=150 y=150 w=100 h=100") != std::string::npos);
+  // Default mode does not output problems.
+  EXPECT_TRUE(output.find("clipped by parent") == std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_Absolute) {
+  auto path = TestResourcePath("layout_check_absolute.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", path});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_ZeroSize) {
+  auto path = TestResourcePath("layout_check_zero_size.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", path});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_IdNode) {
+  auto path = TestResourcePath("layout_check_overlap.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--id", "parent", path});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_IdNodeRelativeCoords) {
+  auto path = TestResourcePath("layout_check_clipped.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--id", "overflow", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  // The overflow Layer is at x=150 y=150 in the document, but when targeted via --id
+  // its bounds should start from (0,0) as the coordinate origin.
+  EXPECT_TRUE(output.find("x=0 y=0 w=100 h=100") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_IdNodeNotFound) {
+  auto path = TestResourcePath("layout_check_overlap.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--id", "nonexistent_id", path});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_XPath) {
+  auto path = TestResourcePath("layout_check_overlap.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--xpath", "//Layer[@id='parent']", path});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_CheckJson) {
+  auto path = TestResourcePath("layout_check_overlap.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", "--json", path});
+  EXPECT_EQ(ret, 1);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_CheckClean) {
+  auto path = TestResourcePath("layout_check_clean.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_CheckOverlap) {
+  auto path = TestResourcePath("layout_check_overlap.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("overlaps with") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_Elements) {
+  auto path = TestResourcePath("layout_check_elements.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", path});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_ElementsJson) {
+  auto path = TestResourcePath("layout_check_elements.pagx");
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--json", path});
+  EXPECT_EQ(ret, 0);
 }
 
 }  // namespace pag

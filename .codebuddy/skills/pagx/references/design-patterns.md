@@ -325,6 +325,30 @@ segment sits directly in the TextBox; subsequent segments use Groups for painter
 </TextBox>
 ```
 
+### Layout Verification
+
+After building or modifying layouts, use `pagx layout` to inspect resolved bounds and
+`pagx layout --check` to detect structural problems. This is essential during incremental
+build — see `generate-guide.md` §Step 4 for the full verification loop.
+
+`--check` detects four problem categories. Each maps to a layout pattern fix:
+
+| Problem | Design Pattern Fix |
+|---------|-------------------|
+| **Overlapping siblings** | Use container layout (`layout`/`gap`) instead of manual positioning; adjust `flex` weights so children fit within parent |
+| **Zero-size** | Ensure flex children have a parent with main-axis size; add content or explicit `width`/`height` to content-measured Layers |
+| **Clipped content** | Enlarge parent, adjust child constraints, or remove `clipToBounds` if clipping is unintended |
+| **Excluded from layout** | Add constraint attributes to `includeInLayout="false"` elements, or remove the attribute if they should be in flow |
+
+Scoped checks for individual sections during incremental build:
+
+```bash
+pagx layout --check --id "header" input.pagx      # check one section
+pagx layout --id "cardRow" input.pagx              # inspect resolved bounds
+```
+
+See `cli.md` §pagx layout for full command reference.
+
 ---
 
 ## Key Implementation Patterns

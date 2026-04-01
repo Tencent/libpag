@@ -4,7 +4,7 @@ description: >-
   PAGX (.pagx) file handler. MUST invoke for ANY task involving PAGX format or
   ".pagx" files — including create, edit, optimize, review, debug, or query syntax.
   Also invoke when user runs pagx CLI commands (render, validate, format, optimize,
-  bounds, font info/embed, convert) or asks about PAGX elements, attributes, or layout.
+  bounds, layout, font info/embed, convert) or asks about PAGX elements, attributes, or layout.
 ---
 
 # PAGX Skill
@@ -42,4 +42,4 @@ generation or optimization task.
 | `references/spec-essentials.md` | Node types, Layer rendering pipeline, auto layout (container layout + constraint positioning), painter scope, text system, masking, resources |
 | `references/design-patterns.md` | Structure decisions (Layer vs Group), layout patterns (container layout, constraint positioning, Layer constraints), text layout, practical pitfall patterns |
 | `references/attributes.md` | Attribute defaults, enumerations, required attributes |
-| `references/cli.md` | CLI commands — `render`, `validate`, `optimize`, `format`, `bounds`, `font info`, `font embed`, `convert` |
+| `references/cli.md` | CLI commands — `render`, `validate`, `optimize`, `format`, `bounds`, `layout`, `font info`, `font embed`, `import`, `export` |
