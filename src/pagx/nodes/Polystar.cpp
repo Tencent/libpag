@@ -26,6 +26,9 @@ namespace pagx {
 
 Rect Polystar::computeBounds() const {
   auto numPoints = static_cast<int>(ceilf(pointCount));
+  if (numPoints <= 0) {
+    return Rect::MakeXYWH(0, 0, 0, 0);
+  }
   float startAngle = (rotation - 90.0f) * static_cast<float>(M_PI) / 180.0f;
   float minX = std::numeric_limits<float>::max();
   float minY = std::numeric_limits<float>::max();
