@@ -135,8 +135,8 @@ class PAGXDocument : public Node {
 
   /**
    * Executes auto layout on the document, positioning layers according to their layout constraints.
-   * Must be called after setFontConfig() and before rendering or font embedding. Skips execution if
-   * the layout is already up to date.
+   * Call setFontConfig() first if text elements need font resolution. Must be called before
+   * rendering or font embedding. Skips execution if the layout is already up to date.
    */
   void applyLayout();
 

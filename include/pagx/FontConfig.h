@@ -62,7 +62,7 @@ class TypefaceHolder {
  *   4. First fallback typeface
  *   5. System font lookup
  * This decouples font configuration from text layout and layout computation,
- * allowing multiple components (AutoLayout, TextLayout, LayerBuilder) to share the same font
+ * allowing multiple components (LayoutContext, TextLayout, LayerBuilder) to share the same font
  * registry.
  */
 class FontConfig {
