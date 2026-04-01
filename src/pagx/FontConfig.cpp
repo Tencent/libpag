@@ -104,7 +104,6 @@ std::shared_ptr<tgfx::Typeface> FontConfig::findTypeface(const std::string& font
     std::shared_ptr<tgfx::Typeface> bestTypeface = nullptr;
     int bestPriority = 4;
     std::string bestStyle = {};
-    std::string bestFamily = {};
     for (const auto& pair : registeredTypefaces) {
       if (pair.first.family != fontFamily) {
         continue;
@@ -116,7 +115,6 @@ std::shared_ptr<tgfx::Typeface> FontConfig::findTypeface(const std::string& font
         bestTypeface = pair.second;
         bestPriority = priority;
         bestStyle = pair.first.style;
-        bestFamily = pair.first.family;
       }
     }
     if (bestTypeface != nullptr) {
