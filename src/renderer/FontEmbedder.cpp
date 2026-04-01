@@ -322,6 +322,22 @@ static GlyphRun* CreateGlyphRunFromLayoutRun(
         glyphRun->rotations.push_back(rotation);
       }
     }
+    bool hasNonDefaultScale = false;
+    bool hasNonDefaultRotation = false;
+    for (size_t i = 0; i < glyphRun->scales.size(); i++) {
+      if (glyphRun->scales[i].x != 1.0f || glyphRun->scales[i].y != 1.0f) {
+        hasNonDefaultScale = true;
+      }
+      if (glyphRun->rotations[i] != 0.0f) {
+        hasNonDefaultRotation = true;
+      }
+    }
+    if (!hasNonDefaultScale) {
+      glyphRun->scales.clear();
+    }
+    if (!hasNonDefaultRotation) {
+      glyphRun->rotations.clear();
+    }
   }
   return glyphRun;
 }
