@@ -666,4 +666,111 @@ CLI_TEST(PAGXHtmlTest, HtmlScreenshotCompare) {
   }
 }
 
+// =============================================================================
+// Framework semantic consistency: verify Native/React/Vue produce equivalent output
+// =============================================================================
+
+CLI_TEST(PAGXHtmlTest, FrameworkSemanticConsistency) {
+  std::vector<std::string> testFiles = {
+      "root_document.pagx",         "layer_alpha.pagx",   "geometry_rectangle.pagx",
+      "color_linear_gradient.pagx", "style_shadows.pagx", "text_modifier.pagx",
+  };
+
+  for (const auto& fileName : testFiles) {
+    auto filePath = ProjectPath::Absolute("resources/pagx_to_html/" + fileName);
+    auto baseName = std::filesystem::path(fileName).stem().string();
+
+    auto doc = pagx::PAGXImporter::FromFile(filePath);
+    ASSERT_TRUE(doc != nullptr) << "Failed to load: " << baseName;
+
+    // Generate all three formats
+    auto nativeHtml = pagx::HTMLExporter::ToHTML(*doc);
+    ASSERT_FALSE(nativeHtml.empty()) << baseName;
+
+    pagx::HTMLExportOptions reactOpts = {};
+    reactOpts.framework = pagx::HTMLFramework::React;
+    auto reactJsx = pagx::HTMLExporter::ToHTML(*doc, reactOpts);
+    ASSERT_FALSE(reactJsx.empty()) << baseName;
+
+    pagx::HTMLExportOptions vueOpts = {};
+    vueOpts.framework = pagx::HTMLFramework::Vue;
+    auto vueSfc = pagx::HTMLExporter::ToHTML(*doc, vueOpts);
+    ASSERT_FALSE(vueSfc.empty()) << baseName;
+
+    // React: className used, no raw class= or style=
+    EXPECT_EQ(reactJsx.find("class=\""), std::string::npos)
+        << baseName << ": React should not have class=";
+    EXPECT_NE(reactJsx.find("className=\""), std::string::npos)
+        << baseName << ": React should use className";
+    EXPECT_EQ(reactJsx.find("style=\""), std::string::npos)
+        << baseName << ": React should not have style string";
+    EXPECT_NE(reactJsx.find("style={{"), std::string::npos)
+        << baseName << ": React should have style object";
+
+    // Vue: class kept, style uses :style binding
+    EXPECT_EQ(vueSfc.find("className=\""), std::string::npos)
+        << baseName << ": Vue should not have className";
+    EXPECT_EQ(vueSfc.find(" style=\""), std::string::npos)
+        << baseName << ": Vue should not have static style";
+    EXPECT_NE(vueSfc.find(":style=\"{"), std::string::npos)
+        << baseName << ": Vue should have :style binding";
+
+    // fontFamily not truncated by HTML entity (the critical bug we fixed)
+    if (nativeHtml.find("font-family") != std::string::npos) {
+      EXPECT_NE(reactJsx.find("fontFamily: \"'"), std::string::npos)
+          << baseName << ": React fontFamily should have quoted font name";
+      EXPECT_NE(vueSfc.find("fontFamily: '"), std::string::npos)
+          << baseName << ": Vue fontFamily should have quoted font name";
+      EXPECT_EQ(reactJsx.find("fontFamily: \"&#39"), std::string::npos)
+          << baseName << ": React fontFamily must not contain HTML entities";
+      EXPECT_EQ(vueSfc.find("fontFamily: '&#39"), std::string::npos)
+          << baseName << ": Vue fontFamily must not contain HTML entities";
+    }
+
+    // Numeric values are unquoted
+    if (nativeHtml.find("opacity:") != std::string::npos) {
+      EXPECT_EQ(reactJsx.find("opacity: \""), std::string::npos)
+          << baseName << ": React opacity should be unquoted number";
+      EXPECT_EQ(vueSfc.find("opacity: '"), std::string::npos)
+          << baseName << ": Vue opacity should be unquoted number";
+    }
+
+    // Vendor prefixes correctly camelCased
+    if (nativeHtml.find("-webkit-backdrop-filter") != std::string::npos) {
+      EXPECT_NE(reactJsx.find("WebkitBackdropFilter"), std::string::npos)
+          << baseName << ": React should camelCase -webkit- prefix";
+      EXPECT_NE(vueSfc.find("WebkitBackdropFilter"), std::string::npos)
+          << baseName << ": Vue should camelCase -webkit- prefix";
+    }
+
+    // CSS functions survive conversion
+    if (nativeHtml.find("linear-gradient") != std::string::npos) {
+      EXPECT_NE(reactJsx.find("linear-gradient"), std::string::npos)
+          << baseName << ": React should preserve linear-gradient";
+      EXPECT_NE(vueSfc.find("linear-gradient"), std::string::npos)
+          << baseName << ": Vue should preserve linear-gradient";
+    }
+    if (nativeHtml.find("drop-shadow") != std::string::npos) {
+      EXPECT_NE(reactJsx.find("drop-shadow"), std::string::npos)
+          << baseName << ": React should preserve drop-shadow";
+      EXPECT_NE(vueSfc.find("drop-shadow"), std::string::npos)
+          << baseName << ": Vue should preserve drop-shadow";
+    }
+
+    // SVG element count identical across all three formats
+    size_t nativeSvg = 0, reactSvg = 0, vueSvg = 0;
+    for (size_t p = 0; (p = nativeHtml.find("<svg ", p)) != std::string::npos; p++) {
+      nativeSvg++;
+    }
+    for (size_t p = 0; (p = reactJsx.find("<svg ", p)) != std::string::npos; p++) {
+      reactSvg++;
+    }
+    for (size_t p = 0; (p = vueSfc.find("<svg ", p)) != std::string::npos; p++) {
+      vueSvg++;
+    }
+    EXPECT_EQ(nativeSvg, reactSvg) << baseName << ": SVG count Native vs React";
+    EXPECT_EQ(nativeSvg, vueSvg) << baseName << ": SVG count Native vs Vue";
+  }
+}
+
 }  // namespace pag
