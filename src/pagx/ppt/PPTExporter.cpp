@@ -437,9 +437,7 @@ static const char* MatchPresetDash(const std::vector<float>& dashes, float strok
   if (dashes.empty() || strokeWidth <= 0) {
     return nullptr;
   }
-  auto ratio = [&](size_t i) -> float {
-    return (i < dashes.size()) ? dashes[i] / strokeWidth : 0;
-  };
+  auto ratio = [&](size_t i) -> float { return (i < dashes.size()) ? dashes[i] / strokeWidth : 0; };
   size_t n = dashes.size();
   if (n == 2) {
     float dr = ratio(0);
@@ -713,28 +711,25 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
           } else {
             out.sc();
           }
-          int imgW = 0;
-          int imgH = 0;
-          bool hasDimensions = GetImageDimensions(pattern->image, &imgW, &imgH);
-          bool hasTransform =
-              hasDimensions && !shapeBounds.isEmpty() && !pattern->matrix.isIdentity();
-          if (hasTransform) {
+          if (!shapeBounds.isEmpty() && !pattern->matrix.isIdentity()) {
             const auto& M = pattern->matrix;
-            float imageDocW = static_cast<float>(imgW) * M.a;
-            float imageDocH = static_cast<float>(imgH) * M.d;
-            float srcL = (shapeBounds.x - M.tx) / imageDocW;
-            float srcT = (shapeBounds.y - M.ty) / imageDocH;
-            float srcR = 1.0f - (shapeBounds.x + shapeBounds.width - M.tx) / imageDocW;
-            float srcB = 1.0f - (shapeBounds.y + shapeBounds.height - M.ty) / imageDocH;
-            int l = static_cast<int>(std::round(srcL * 100000.0f));
-            int t = static_cast<int>(std::round(srcT * 100000.0f));
-            int r = static_cast<int>(std::round(srcR * 100000.0f));
-            int b = static_cast<int>(std::round(srcB * 100000.0f));
-            out.open("a:srcRect").a("l", l).a("t", t).a("r", r).a("b", b).sc();
+            int sx = static_cast<int>(std::round(M.a * 100000.0f));
+            int sy = static_cast<int>(std::round(M.d * 100000.0f));
+            auto tx = PxToEMU(M.tx - shapeBounds.x);
+            auto ty = PxToEMU(M.ty - shapeBounds.y);
+            out.open("a:tile")
+                .a("tx", tx)
+                .a("ty", ty)
+                .a("sx", sx)
+                .a("sy", sy)
+                .a("flip", "none")
+                .a("algn", "tl")
+                .sc();
+          } else {
+            out.open("a:stretch").gt();
+            out.open("a:fillRect").sc();
+            out.end();  // a:stretch
           }
-          out.open("a:stretch").gt();
-          out.open("a:fillRect").sc();
-          out.end();  // a:stretch
           out.end();  // a:blipFill
           break;
         }
