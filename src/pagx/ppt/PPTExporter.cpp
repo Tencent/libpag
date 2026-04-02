@@ -678,7 +678,7 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
       Point ep = grad->matrix.mapPoint(grad->endPoint);
       float dx = ep.x - sp.x;
       float dy = ep.y - sp.y;
-      float angleDeg = std::atan2(dx, dy) * 180.0f / 3.14159265358979323846f;
+      float angleDeg = std::atan2(dy, dx) * 180.0f / 3.14159265358979323846f;
       int ang = AngleToPPT(angleDeg);
 
       out.open("a:gradFill").gt();
