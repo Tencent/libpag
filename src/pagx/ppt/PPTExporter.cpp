@@ -207,6 +207,13 @@ static int FontSizeToPPT(float px) {
   return std::max(100, static_cast<int>(std::round(px * 75.0)));
 }
 
+static std::string StripQuotes(const std::string& s) {
+  if (s.size() >= 2 && s.front() == '"' && s.back() == '"') {
+    return s.substr(1, s.size() - 2);
+  }
+  return s;
+}
+
 //==============================================================================
 // XMLBuilder – compact XML string builder
 //==============================================================================
@@ -232,7 +239,22 @@ class XMLBuilder {
     _buf += ' ';
     _buf += name;
     _buf += "=\"";
-    _buf += val;
+    for (const char* p = val; *p; ++p) {
+      switch (*p) {
+        case '"':
+          _buf += "&quot;";
+          break;
+        case '&':
+          _buf += "&amp;";
+          break;
+        case '<':
+          _buf += "&lt;";
+          break;
+        default:
+          _buf += *p;
+          break;
+      }
+    }
     _buf += '"';
     return *this;
   }
@@ -950,8 +972,9 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
     }
 
     if (!text->fontFamily.empty()) {
-      out.open("a:latin").a("typeface", text->fontFamily).sc();
-      out.open("a:ea").a("typeface", text->fontFamily).sc();
+      auto typeface = StripQuotes(text->fontFamily);
+      out.open("a:latin").a("typeface", typeface).sc();
+      out.open("a:ea").a("typeface", typeface).sc();
     }
 
     out.end();  // a:rPr
