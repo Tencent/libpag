@@ -1,14 +1,56 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Stroke dashAdaptive → pre-compute scaled dasharray; CSS/SVG have no direct equivalent -->
-<pagx version="1.0" width="300" height="200">
+<pagx version="1.0" width="380" height="260">
+  <!-- Background -->
+  <Layer>
+    <Rectangle position="190,130" size="380,260"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Dash Adaptive Stroke" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="190,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="Normal dashes vs evenly distributed dashes" fontFamily="Arial" fontSize="10" position="190,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="190,150" size="340,170" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
+  <!-- Divider -->
+  <Layer>
+    <Path data="M 190,68 L 190,228"/>
+    <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+  </Layer>
+
+  <!-- Normal dashes label -->
+  <Layer>
+    <Text text="dashAdaptive=false" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="95,72" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- Normal dashes -->
   <Layer>
-    <Ellipse position="75,100" size="100,100"/>
+    <Ellipse position="95,150" size="110,110"/>
     <Stroke color="#3B82F6" width="4" dashes="10,5" cap="round"/>
   </Layer>
+
+  <!-- Adaptive dashes label -->
+  <Layer>
+    <Text text="dashAdaptive=true" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="285,72" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- dashAdaptive=true: dashes are scaled to fit path evenly -->
   <Layer>
-    <Ellipse position="225,100" size="100,100"/>
+    <Ellipse position="285,150" size="110,110"/>
     <Stroke color="#EF4444" width="4" dashes="10,5" dashAdaptive="true" cap="round"/>
   </Layer>
 </pagx>

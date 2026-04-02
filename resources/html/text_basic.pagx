@@ -1,39 +1,80 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Text element → HTML span; position.y=baseline, fontFamily, fontSize, letterSpacing, textAnchor, fauxBold/Italic -->
-<pagx version="1.0" width="400" height="300">
+<pagx version="1.0" width="400" height="360">
+  <!-- Background -->
+  <Layer>
+    <Rectangle position="200,180" size="400,360"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Text Basics" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="200,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="Anchors, spacing, faux styles, and font styles" fontFamily="Arial" fontSize="10" position="200,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="200,200" size="360,275" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
   <!-- Basic text: textAnchor=start (default) -->
   <Layer>
-    <Text text="Hello World" fontFamily="Arial" fontSize="24" position="20,40"/>
+    <Text text="Hello World" fontFamily="Arial" fontSize="24" position="30,82"/>
     <Fill color="#1F2937"/>
   </Layer>
-  <!-- textAnchor=center → translateX(-50%) -->
   <Layer>
-    <Text text="Centered" fontFamily="Arial" fontSize="24" position="200,80" textAnchor="center"/>
+    <Text text="start" fontFamily="Arial" fontSize="8" position="30,96"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- textAnchor=center -->
+  <Layer>
+    <Text text="Centered" fontFamily="Arial" fontSize="24" position="200,122" textAnchor="center"/>
     <Fill color="#3B82F6"/>
   </Layer>
-  <!-- textAnchor=end → translateX(-100%) -->
   <Layer>
-    <Text text="Right Aligned" fontFamily="Arial" fontSize="24" position="380,120" textAnchor="end"/>
+    <Text text="center" fontFamily="Arial" fontSize="8" position="200,136" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- textAnchor=end -->
+  <Layer>
+    <Text text="Right Aligned" fontFamily="Arial" fontSize="24" position="370,162" textAnchor="end"/>
     <Fill color="#10B981"/>
   </Layer>
+  <Layer>
+    <Text text="end" fontFamily="Arial" fontSize="8" position="370,176" textAnchor="end"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
   <!-- letterSpacing -->
   <Layer>
-    <Text text="SPACED" fontFamily="Arial" fontSize="28" position="20,170" letterSpacing="8"/>
+    <Text text="SPACED" fontFamily="Arial" fontSize="28" position="30,215" letterSpacing="8"/>
     <Fill color="#8B5CF6"/>
   </Layer>
-  <!-- fauxBold → -webkit-text-stroke: 0.02em -->
+
+  <!-- fauxBold -->
   <Layer>
-    <Text text="Faux Bold" fontFamily="Arial" fontSize="28" position="20,210" fauxBold="true"/>
+    <Text text="Faux Bold" fontFamily="Arial" fontSize="28" position="30,252" fauxBold="true"/>
     <Fill color="#EF4444"/>
   </Layer>
-  <!-- fauxItalic → transform: skewX(-12deg) -->
+
+  <!-- fauxItalic -->
   <Layer>
-    <Text text="Faux Italic" fontFamily="Arial" fontSize="28" position="20,250" fauxItalic="true"/>
+    <Text text="Faux Italic" fontFamily="Arial" fontSize="28" position="30,290" fauxItalic="true"/>
     <Fill color="#F59E0B"/>
   </Layer>
-  <!-- fontStyle -->
+
+  <!-- fontStyle Bold Italic -->
   <Layer>
-    <Text text="Bold Italic" fontFamily="Arial" fontStyle="Bold Italic" fontSize="24" position="20,290"/>
+    <Text text="Bold Italic" fontFamily="Arial" fontStyle="Bold Italic" fontSize="24" position="30,328"/>
     <Fill color="#EC4899"/>
   </Layer>
 </pagx>

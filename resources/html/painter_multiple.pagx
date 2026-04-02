@@ -1,8 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Multiple fills and strokes on accumulated geometry → overlay layers -->
-<pagx version="1.0" width="200" height="200">
+<pagx version="1.0" width="300" height="280">
+  <!-- Background -->
   <Layer>
-    <Rectangle position="100,100" size="140,140" roundness="20"/>
+    <Rectangle position="150,140" size="300,280"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Multiple Painters" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="150,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="Stacked fills and strokes on one shape" fontFamily="Arial" fontSize="10" position="150,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="150,162" size="260,190" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
+  <!-- Shape with multiple fills and strokes -->
+  <Layer>
+    <Rectangle position="150,155" size="160,160" roundness="20"/>
     <!-- First fill (bottom layer) -->
     <Fill color="#3B82F6"/>
     <!-- Second fill overlays the first -->
@@ -11,5 +35,15 @@
     <Stroke color="#10B981" width="4"/>
     <!-- Second stroke with different style -->
     <Stroke color="#F59E0B" width="2" dashes="8,4"/>
+  </Layer>
+
+  <!-- Legend -->
+  <Layer>
+    <Text text="Fill #1 (blue) + Fill #2 (red multiply)" fontFamily="Arial" fontSize="8" position="150,248" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+  <Layer>
+    <Text text="Stroke #1 (green) + Stroke #2 (orange dashed)" fontFamily="Arial" fontSize="8" position="150,260" textAnchor="center"/>
+    <Fill color="#64748B"/>
   </Layer>
 </pagx>

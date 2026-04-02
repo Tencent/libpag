@@ -1,41 +1,96 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: SolidColor in all formats: #RGB, #RRGGBB, #RRGGBBAA, srgb(), p3(), @id reference -->
-<pagx version="1.0" width="400" height="200">
+<pagx version="1.0" width="400" height="280">
   <Resources>
     <SolidColor id="resBrandColor" color="#8B5CF6"/>
   </Resources>
+
+  <!-- Background -->
+  <Layer>
+    <Rectangle position="200,140" size="400,280"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Color Formats" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="200,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="All supported color syntax variations" fontFamily="Arial" fontSize="10" position="200,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="200,155" size="360,180" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
+  <!-- Row 1: Hex formats -->
   <!-- #RGB short hex -->
   <Layer>
-    <Rectangle position="50,100" size="60,60"/>
+    <Rectangle position="60,100" size="50,50" roundness="8"/>
     <Fill color="#F00"/>
   </Layer>
+  <Layer>
+    <Text text="#RGB" fontFamily="Arial" fontSize="9" position="60,133" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- #RRGGBB standard hex -->
   <Layer>
-    <Rectangle position="120,100" size="60,60"/>
+    <Rectangle position="130,100" size="50,50" roundness="8"/>
     <Fill color="#3B82F6"/>
   </Layer>
+  <Layer>
+    <Text text="#RRGGBB" fontFamily="Arial" fontSize="9" position="130,133" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- #RRGGBBAA hex with alpha -->
   <Layer>
-    <Rectangle position="190,100" size="60,60"/>
+    <Rectangle position="200,100" size="50,50" roundness="8"/>
     <Fill color="#EF444480"/>
   </Layer>
+  <Layer>
+    <Text text="#RRGGBBAA" fontFamily="Arial" fontSize="9" position="200,133" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- srgb(r,g,b,a) float color -->
   <Layer>
-    <Rectangle position="260,100" size="60,60"/>
+    <Rectangle position="270,100" size="50,50" roundness="8"/>
     <Fill>
       <SolidColor color="srgb(0.06,0.72,0.51,0.9)"/>
     </Fill>
   </Layer>
+  <Layer>
+    <Text text="srgb()" fontFamily="Arial" fontSize="9" position="270,133" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- Row 2: P3 and resource reference -->
   <!-- p3(r,g,b) Display P3 wide gamut -->
   <Layer>
-    <Rectangle position="330,100" size="60,60"/>
+    <Rectangle position="130,180" size="50,50" roundness="8"/>
     <Fill>
       <SolidColor color="p3(1,0.2,0.1)"/>
     </Fill>
   </Layer>
+  <Layer>
+    <Text text="p3()" fontFamily="Arial" fontSize="9" position="130,213" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- @id resource reference -->
   <Layer>
-    <Ellipse position="50,170" size="60,30"/>
+    <Ellipse position="270,180" size="50,50"/>
     <Fill color="@resBrandColor"/>
+  </Layer>
+  <Layer>
+    <Text text="@id ref" fontFamily="Arial" fontSize="9" position="270,213" textAnchor="center"/>
+    <Fill color="#64748B"/>
   </Layer>
 </pagx>

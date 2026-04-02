@@ -1,51 +1,119 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Polystar edge cases: fractional pointCount (5.5), innerRoundness/outerRoundness,
      reversed="true", polygon with roundness -->
-<pagx version="1.0" width="400" height="200">
-  <!-- Fractional pointCount: 5.5 creates an incomplete last point -->
+<pagx version="1.0" width="440" height="340">
+  <!-- Background -->
   <Layer>
-    <Polystar position="60,80" type="star" pointCount="5.5" outerRadius="50" innerRadius="22" rotation="-90"/>
+    <Rectangle position="220,170" size="440,340"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Polystar Advanced" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="220,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="Fractional points, roundness, reversed, and edge cases" fontFamily="Arial" fontSize="10" position="220,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="220,192" size="400,250" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
+  <!-- Fractional pointCount: 5.5 -->
+  <Layer>
+    <Polystar position="65,118" type="star" pointCount="5.5" outerRadius="45" innerRadius="20" rotation="-90"/>
     <Fill color="#3B82F6"/>
   </Layer>
-  <!-- Full inner + outer roundness: creates a flower-like shape -->
   <Layer>
-    <Polystar position="170,80" type="star" pointCount="8" outerRadius="50" innerRadius="25" outerRoundness="0.7" innerRoundness="0.8" rotation="0"/>
+    <Text text="5.5 pts" fontFamily="Arial" fontSize="8" position="65,173" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- Full inner + outer roundness -->
+  <Layer>
+    <Polystar position="175,118" type="star" pointCount="8" outerRadius="45" innerRadius="22" outerRoundness="0.7" innerRoundness="0.8" rotation="0"/>
     <Fill color="#EC4899"/>
   </Layer>
-  <!-- Reversed star: opposite winding direction -->
   <Layer>
-    <Polystar position="280,80" type="star" pointCount="6" outerRadius="50" innerRadius="28" rotation="-90" reversed="true"/>
+    <Text text="Flower" fontFamily="Arial" fontSize="8" position="175,173" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- Reversed star -->
+  <Layer>
+    <Polystar position="285,118" type="star" pointCount="6" outerRadius="45" innerRadius="25" rotation="-90" reversed="true"/>
     <Fill color="#10B981"/>
   </Layer>
-  <!-- Polygon with roundness: creates a soft rounded polygon -->
   <Layer>
-    <Polystar position="370,80" type="polygon" pointCount="6" outerRadius="45" outerRoundness="0.6" rotation="-90"/>
+    <Text text="Reversed" fontFamily="Arial" fontSize="8" position="285,173" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- Polygon with roundness -->
+  <Layer>
+    <Polystar position="385,118" type="polygon" pointCount="6" outerRadius="40" outerRoundness="0.6" rotation="-90"/>
     <Fill color="#F59E0B"/>
   </Layer>
-  <!-- Fractional pointCount on polygon: 3.7 triangle with partial edge -->
   <Layer>
-    <Polystar position="60,170" type="polygon" pointCount="3.7" outerRadius="30" rotation="-90"/>
+    <Text text="Soft Hex" fontFamily="Arial" fontSize="8" position="385,173" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- Row 2 -->
+  <!-- Fractional polygon: 3.7 -->
+  <Layer>
+    <Polystar position="65,238" type="polygon" pointCount="3.7" outerRadius="28" rotation="-90"/>
     <Fill color="#8B5CF6"/>
   </Layer>
-  <!-- Star with very high roundness: nearly circular -->
   <Layer>
-    <Polystar position="150,170" type="star" pointCount="5" outerRadius="30" innerRadius="15" outerRoundness="1" innerRoundness="1" rotation="-90"/>
+    <Text text="3.7 polygon" fontFamily="Arial" fontSize="8" position="65,275" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- High roundness star -->
+  <Layer>
+    <Polystar position="175,238" type="star" pointCount="5" outerRadius="28" innerRadius="14" outerRoundness="1" innerRoundness="1" rotation="-90"/>
     <Fill color="#EF4444"/>
   </Layer>
+  <Layer>
+    <Text text="Max round" fontFamily="Arial" fontSize="8" position="175,275" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- Reversed polygon -->
   <Layer>
-    <Polystar position="240,170" type="polygon" pointCount="5" outerRadius="30" rotation="-90" reversed="true"/>
+    <Polystar position="285,238" type="polygon" pointCount="5" outerRadius="28" rotation="-90" reversed="true"/>
     <Fill color="#06B6D4"/>
   </Layer>
+  <Layer>
+    <Text text="Rev polygon" fontFamily="Arial" fontSize="8" position="285,275" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- Low fractional star: 2.3 points -->
   <Layer>
-    <Polystar position="330,170" type="star" pointCount="2.3" outerRadius="30" innerRadius="12" rotation="-90"/>
+    <Polystar position="385,238" type="star" pointCount="2.3" outerRadius="28" innerRadius="12" rotation="-90"/>
     <Fill color="#D946EF"/>
   </Layer>
-  <!-- Fractional pointCount + non-zero roundness combined: 5.5 points with rounded tips -->
   <Layer>
-    <Polystar position="200,130" type="star" pointCount="5.5" outerRadius="35" innerRadius="18" outerRoundness="0.7" innerRoundness="0.5" rotation="-90"/>
+    <Text text="2.3 pts" fontFamily="Arial" fontSize="8" position="385,275" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- Center: Fractional + roundness combined -->
+  <Layer>
+    <Polystar position="220,205" type="star" pointCount="5.5" outerRadius="32" innerRadius="16" outerRoundness="0.7" innerRoundness="0.5" rotation="-90"/>
     <Fill color="#F43F5E"/>
     <Stroke color="#BE123C" width="1.5"/>
+  </Layer>
+  <Layer>
+    <Text text="Combined" fontFamily="Arial" fontSize="8" position="220,248" textAnchor="center"/>
+    <Fill color="#64748B"/>
   </Layer>
 </pagx>

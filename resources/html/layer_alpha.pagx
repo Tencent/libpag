@@ -1,12 +1,46 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Layer alpha → opacity -->
-<pagx version="1.0" width="200" height="200">
+<pagx version="1.0" width="300" height="260">
+  <!-- Background -->
+  <Layer>
+    <Rectangle position="150,130" size="300,260"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Layer Alpha" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="150,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="Opacity blending on overlapping layers" fontFamily="Arial" fontSize="10" position="150,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="150,148" size="260,170" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
+  <!-- Alpha=0.3 red -->
   <Layer alpha="0.3">
-    <Rectangle position="80,80" size="120,120"/>
+    <Rectangle position="115,140" size="120,120" roundness="8"/>
     <Fill color="#EF4444"/>
   </Layer>
+  <Layer>
+    <Text text="alpha=0.3" fontFamily="Arial" fontSize="9" position="80,210" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- Alpha=0.7 blue -->
   <Layer alpha="0.7">
-    <Rectangle position="120,120" size="120,120"/>
+    <Rectangle position="185,140" size="120,120" roundness="8"/>
     <Fill color="#3B82F6"/>
+  </Layer>
+  <Layer>
+    <Text text="alpha=0.7" fontFamily="Arial" fontSize="9" position="220,210" textAnchor="center"/>
+    <Fill color="#64748B"/>
   </Layer>
 </pagx>

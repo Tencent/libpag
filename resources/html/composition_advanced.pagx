@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Composition with width/height coordinate system, multiple references to same composition,
      different transforms on each instance -->
-<pagx version="1.0" width="400" height="200">
+<pagx version="1.0" width="400" height="260">
   <Resources>
     <!-- Reusable icon component: a colored circle with an inner diamond -->
     <Composition id="icon" width="60" height="60">
@@ -31,17 +31,42 @@
       </Layer>
     </Composition>
   </Resources>
+
+  <!-- Background -->
+  <Layer>
+    <Rectangle position="200,130" size="400,260"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Advanced Composition" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="200,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="Multiple instances with different transforms" fontFamily="Arial" fontSize="10" position="200,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="200,152" size="360,175" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
   <!-- Row of icon instances with different positions -->
-  <Layer x="20" y="20" composition="@icon"/>
-  <Layer x="100" y="20" composition="@icon"/>
-  <Layer x="180" y="20" composition="@icon" alpha="0.6"/>
-  <Layer x="260" y="20" composition="@icon" matrix="0.8,0,0,0.8,0,0"/>
+  <Layer x="30" y="68" composition="@icon"/>
+  <Layer x="110" y="68" composition="@icon"/>
+  <Layer x="190" y="68" composition="@icon" alpha="0.6"/>
+  <Layer x="270" y="68" composition="@icon" matrix="0.8,0,0,0.8,0,0"/>
+
   <!-- Row of badge instances -->
-  <Layer x="20" y="110" composition="@badge"/>
-  <Layer x="90" y="110" composition="@badge"/>
-  <Layer x="160" y="110" composition="@badge" alpha="0.7"/>
+  <Layer x="30" y="148" composition="@badge"/>
+  <Layer x="100" y="148" composition="@badge"/>
+  <Layer x="170" y="148" composition="@badge" alpha="0.7"/>
   <!-- Badge with rotation via matrix -->
-  <Layer x="230" y="110" composition="@badge" matrix="0.707,0.707,-0.707,0.707,0,0"/>
+  <Layer x="240" y="148" composition="@badge" matrix="0.707,0.707,-0.707,0.707,0,0"/>
   <!-- Larger scaled badge -->
-  <Layer x="310" y="100" composition="@badge" matrix="1.4,0,0,1.4,0,0"/>
+  <Layer x="310" y="138" composition="@badge" matrix="1.4,0,0,1.4,0,0"/>
 </pagx>

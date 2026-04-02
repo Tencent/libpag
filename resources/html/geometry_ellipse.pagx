@@ -1,19 +1,56 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Ellipse → CSS div + border-radius:50%; center-point positioning -->
-<pagx version="1.0" width="300" height="200">
+<pagx version="1.0" width="360" height="250">
+  <!-- Background -->
+  <Layer>
+    <Rectangle position="180,125" size="360,250"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Ellipse Geometry" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="180,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="Circle, horizontal, and reversed ellipse" fontFamily="Arial" fontSize="10" position="180,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="180,145" size="320,160" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
   <!-- Circle: equal width/height -->
   <Layer>
-    <Ellipse position="75,100" size="100,100"/>
+    <Ellipse position="80,130" size="100,100"/>
     <Fill color="#3B82F6"/>
   </Layer>
+  <Layer>
+    <Text text="Circle" fontFamily="Arial" fontSize="9" position="80,190" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- Horizontal ellipse -->
   <Layer>
-    <Ellipse position="200,70" size="140,80"/>
+    <Ellipse position="210,120" size="140,80"/>
     <Fill color="#10B981"/>
   </Layer>
+  <Layer>
+    <Text text="Horizontal" fontFamily="Arial" fontSize="9" position="210,170" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- Vertical ellipse, reversed -->
   <Layer>
-    <Ellipse position="200,160" size="80,60" reversed="true"/>
+    <Ellipse position="310,140" size="60,90" reversed="true"/>
     <Fill color="#EC4899"/>
+  </Layer>
+  <Layer>
+    <Text text="Reversed" fontFamily="Arial" fontSize="9" position="310,195" textAnchor="center"/>
+    <Fill color="#64748B"/>
   </Layer>
 </pagx>

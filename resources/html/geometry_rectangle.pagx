@@ -1,29 +1,76 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Rectangle center-point positioning, size, roundness, reversed; CSS div+border-radius path -->
-<pagx version="1.0" width="300" height="200">
-  <!-- Sharp rectangle: left=50-80/2=10, top=50-60/2=20 -->
+<pagx version="1.0" width="400" height="280">
+  <!-- Background -->
   <Layer>
-    <Rectangle position="50,50" size="80,60"/>
+    <Rectangle position="200,140" size="400,280"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Rectangle Geometry" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="200,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="Sharp, rounded, pill, reversed, and large" fontFamily="Arial" fontSize="10" position="200,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="200,160" size="360,180" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
+  <!-- Sharp rectangle -->
+  <Layer>
+    <Rectangle position="60,115" size="80,60"/>
     <Fill color="#3B82F6"/>
   </Layer>
-  <!-- Rounded rectangle: roundness=16 → border-radius:16px -->
   <Layer>
-    <Rectangle position="150,50" size="80,60" roundness="16"/>
+    <Text text="Sharp" fontFamily="Arial" fontSize="9" position="60,155" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- Rounded rectangle: roundness=16 -->
+  <Layer>
+    <Rectangle position="160,115" size="80,60" roundness="16"/>
     <Fill color="#10B981"/>
   </Layer>
-  <!-- Over-round: roundness=100 > min(80/2,60/2)=30 → clamped to 30 (pill) -->
   <Layer>
-    <Rectangle position="250,50" size="80,60" roundness="100"/>
+    <Text text="Rounded" fontFamily="Arial" fontSize="9" position="160,155" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- Over-round: roundness=100 → clamped to pill -->
+  <Layer>
+    <Rectangle position="260,115" size="80,60" roundness="100"/>
     <Fill color="#F59E0B"/>
   </Layer>
+  <Layer>
+    <Text text="Pill" fontFamily="Arial" fontSize="9" position="260,155" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- Reversed path direction -->
   <Layer>
-    <Rectangle position="100,150" size="80,60" roundness="12" reversed="true"/>
+    <Rectangle position="120,210" size="80,60" roundness="12" reversed="true"/>
     <Fill color="#EF4444"/>
   </Layer>
+  <Layer>
+    <Text text="Reversed" fontFamily="Arial" fontSize="9" position="120,250" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- Large rectangle -->
   <Layer>
-    <Rectangle position="230,150" size="120,80" roundness="8"/>
+    <Rectangle position="270,210" size="120,60" roundness="8"/>
     <Fill color="#8B5CF6"/>
+  </Layer>
+  <Layer>
+    <Text text="Large" fontFamily="Arial" fontSize="9" position="270,250" textAnchor="center"/>
+    <Fill color="#64748B"/>
   </Layer>
 </pagx>

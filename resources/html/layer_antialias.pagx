@@ -1,12 +1,46 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Layer antiAlias=false → shape-rendering: crispEdges (SVG), no direct CSS equivalent -->
-<pagx version="1.0" width="200" height="200">
+<pagx version="1.0" width="300" height="250">
+  <!-- Background -->
+  <Layer>
+    <Rectangle position="150,125" size="300,250"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Anti-Aliasing" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="150,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="antiAlias=false vs antiAlias=true" fontFamily="Arial" fontSize="10" position="150,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="150,145" size="260,160" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
+  <!-- antiAlias=false: crisp edges -->
   <Layer antiAlias="false">
-    <Rectangle position="60,100" size="80,80"/>
+    <Rectangle position="85,140" size="90,90" roundness="8"/>
     <Fill color="#3B82F6"/>
   </Layer>
+  <Layer>
+    <Text text="Crisp Edges" fontFamily="Arial" fontSize="9" position="85,195" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- antiAlias=true: smooth edges -->
   <Layer antiAlias="true">
-    <Rectangle position="140,100" size="80,80"/>
+    <Rectangle position="215,140" size="90,90" roundness="8"/>
     <Fill color="#10B981"/>
+  </Layer>
+  <Layer>
+    <Text text="Smooth Edges" fontFamily="Arial" fontSize="9" position="215,195" textAnchor="center"/>
+    <Fill color="#64748B"/>
   </Layer>
 </pagx>

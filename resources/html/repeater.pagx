@@ -1,34 +1,81 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Repeater → N copies with transform/alpha interpolation; fractional copies, order, copies=0 -->
-<pagx version="1.0" width="400" height="300">
+<pagx version="1.0" width="420" height="320">
+  <!-- Background -->
+  <Layer>
+    <Rectangle position="210,160" size="420,320"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Repeater" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="210,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="Transform interpolation, fractional copies, and order" fontFamily="Arial" fontSize="10" position="210,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="210,180" size="380,230" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
   <!-- Basic repeater: 5 copies with position offset and alpha fade -->
   <Layer>
-    <Rectangle position="30,60" size="40,40" roundness="8"/>
+    <Rectangle position="35,95" size="40,40" roundness="8"/>
     <Fill color="#3B82F6"/>
     <Repeater copies="5" position="60,0" endAlpha="0.2" order="belowOriginal"/>
   </Layer>
-  <!-- Repeater with rotation and scale -->
   <Layer>
-    <Rectangle position="0,0" size="30,30"/>
+    <Text text="5 copies, alpha fade" fontFamily="Arial" fontSize="8" position="170,130" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- Repeater with rotation and scale -->
+  <Layer x="5" y="145">
+    <Rectangle position="0,0" size="25,25" roundness="3"/>
     <Fill color="#EF4444"/>
     <Repeater copies="8" anchor="0,0" position="0,0" rotation="45" scale="0.9,0.9" offset="0"/>
   </Layer>
-  <!-- Fractional copies: 3.5 → 4 copies, last at 50% opacity -->
   <Layer>
-    <Ellipse position="30,200" size="30,30"/>
+    <Text text="Rotation + scale" fontFamily="Arial" fontSize="8" position="20,215" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- Fractional copies: 3.5 → last at 50% opacity -->
+  <Layer>
+    <Ellipse position="155,180" size="28,28"/>
     <Fill color="#10B981"/>
-    <Repeater copies="3.5" position="50,0"/>
+    <Repeater copies="3.5" position="40,0"/>
   </Layer>
-  <!-- Order: aboveOriginal → copy N-1 is topmost -->
   <Layer>
-    <Rectangle position="280,200" size="40,40" roundness="4"/>
-    <Fill color="#F59E0B"/>
-    <Repeater copies="4" position="30,15" order="aboveOriginal" startAlpha="0.3" endAlpha="1"/>
+    <Text text="Fractional 3.5" fontFamily="Arial" fontSize="8" position="210,208" textAnchor="center"/>
+    <Fill color="#64748B"/>
   </Layer>
+
+  <!-- Order: aboveOriginal -->
+  <Layer>
+    <Rectangle position="280,240" size="35,35" roundness="4"/>
+    <Fill color="#F59E0B"/>
+    <Repeater copies="4" position="25,12" order="aboveOriginal" startAlpha="0.3" endAlpha="1"/>
+  </Layer>
+  <Layer>
+    <Text text="aboveOriginal" fontFamily="Arial" fontSize="8" position="330,290" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- copies=0 → clears all content -->
   <Layer>
-    <Rectangle position="280,60" size="40,40"/>
+    <Rectangle position="100,260" size="35,35"/>
     <Fill color="#8B5CF6"/>
     <Repeater copies="0"/>
+  </Layer>
+  <Layer>
+    <Text text="copies=0 (empty)" fontFamily="Arial" fontSize="8" position="110,290" textAnchor="center"/>
+    <Fill color="#64748B"/>
   </Layer>
 </pagx>

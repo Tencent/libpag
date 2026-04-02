@@ -1,6 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Rich text (multiple Text elements in Group + independent Fill colors + shared TextBox) -->
-<pagx version="1.0" width="300" height="200">
+<pagx version="1.0" width="340" height="240">
+  <!-- Background -->
+  <Layer>
+    <Rectangle position="170,120" size="340,240"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Rich Text" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="170,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="Multi-color spans with shared TextBox" fontFamily="Arial" fontSize="10" position="170,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="170,140" size="300,155" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
   <Layer>
     <!-- First text span: red bold -->
     <Group>
@@ -29,6 +52,6 @@
       <Fill color="#F59E0B"/>
     </Group>
     <!-- Shared text box for layout -->
-    <TextBox position="20,40" size="260,120" textAlign="center" paragraphAlign="middle"/>
+    <TextBox position="30,78" size="280,120" textAlign="center" paragraphAlign="middle"/>
   </Layer>
 </pagx>

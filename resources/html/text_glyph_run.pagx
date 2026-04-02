@@ -1,23 +1,56 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: GlyphRun with pre-laid-out font paths; xOffsets, rotations, scales -->
-<pagx version="1.0" width="400" height="200">
+<pagx version="1.0" width="400" height="280">
   <Resources>
     <Font id="font1" unitsPerEm="1000">
       <Glyph id="gA" advance="600" path="M 50,-800 L 300,0 L 550,-800 Z M 175,-300 L 425,-300"/>
       <Glyph id="gB" advance="600" path="M 100,0 L 100,-800 L 400,-800 C 550,-800 550,-500 400,-500 L 100,-500 M 100,0 L 400,0 C 550,0 550,-300 400,-300 L 100,-300"/>
     </Font>
   </Resources>
+
+  <!-- Background -->
+  <Layer>
+    <Rectangle position="200,140" size="400,280"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Glyph Run" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="200,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="Custom font glyphs with per-glyph transforms" fontFamily="Arial" fontSize="10" position="200,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="200,162" size="360,190" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
   <!-- Layer 1: GlyphRun with xOffsets (horizontal positioning) -->
   <Layer>
+    <Text text="xOffsets positioning" fontFamily="Arial" fontSize="10" position="30,76"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+  <Layer>
     <Text>
-      <GlyphRun font="@font1" fontSize="48" glyphs="1,2" x="20" y="60" xOffsets="0,30"/>
+      <GlyphRun font="@font1" fontSize="48" glyphs="1,2" x="40" y="128" xOffsets="0,30"/>
     </Text>
     <Fill color="#1F2937"/>
   </Layer>
-  <!-- Layer 2: GlyphRun with per-glyph rotations and scales (matrix positioning) -->
+
+  <!-- Layer 2: GlyphRun with per-glyph rotations and scales -->
+  <Layer>
+    <Text text="rotations + scales" fontFamily="Arial" fontSize="10" position="30,170"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
   <Layer>
     <Text>
-      <GlyphRun font="@font1" fontSize="36" glyphs="1,2" x="20" y="150" rotations="15,-15" scales="1,1;1.2,1.2"/>
+      <GlyphRun font="@font1" fontSize="36" glyphs="1,2" x="40" y="218" rotations="15,-15" scales="1,1;1.2,1.2"/>
     </Text>
     <Fill color="#EF4444"/>
   </Layer>

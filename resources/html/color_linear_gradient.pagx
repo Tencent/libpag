@@ -1,9 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: LinearGradient → CSS linear-gradient; angle calculation, multi-stop, with matrix -->
-<pagx version="1.0" width="300" height="300">
-  <!-- Diagonal gradient: atan2(200,200)×180/π+90=135° -->
+<pagx version="1.0" width="360" height="360">
+  <!-- Background -->
   <Layer>
-    <Rectangle position="75,75" size="120,120" roundness="12"/>
+    <Rectangle position="180,180" size="360,360"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Linear Gradient" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="180,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="Diagonal, horizontal, vertical, and matrix transform" fontFamily="Arial" fontSize="10" position="180,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="180,200" size="320,270" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
+  <!-- Diagonal gradient -->
+  <Layer>
+    <Rectangle position="100,115" size="120,120" roundness="12"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="120,120">
         <ColorStop offset="0" color="#3B82F6"/>
@@ -11,9 +34,14 @@
       </LinearGradient>
     </Fill>
   </Layer>
-  <!-- Horizontal gradient (0° → 90° CSS) with 3 stops -->
   <Layer>
-    <Rectangle position="225,75" size="120,120" roundness="12"/>
+    <Text text="Diagonal" fontFamily="Arial" fontSize="9" position="100,185" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- Horizontal gradient with 3 stops -->
+  <Layer>
+    <Rectangle position="260,115" size="120,120" roundness="12"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="120,0">
         <ColorStop offset="0" color="#10B981"/>
@@ -22,9 +50,14 @@
       </LinearGradient>
     </Fill>
   </Layer>
-  <!-- Vertical gradient (90° → 180° CSS) -->
   <Layer>
-    <Rectangle position="75,225" size="120,120" roundness="12"/>
+    <Text text="Horizontal" fontFamily="Arial" fontSize="9" position="260,185" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- Vertical gradient -->
+  <Layer>
+    <Rectangle position="100,260" size="120,120" roundness="12"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="0,120">
         <ColorStop offset="0" color="#8B5CF6"/>
@@ -32,14 +65,23 @@
       </LinearGradient>
     </Fill>
   </Layer>
+  <Layer>
+    <Text text="Vertical" fontFamily="Arial" fontSize="9" position="100,330" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- LinearGradient with matrix transform -->
   <Layer>
-    <Rectangle position="225,225" size="120,120" roundness="12"/>
+    <Rectangle position="260,260" size="120,120" roundness="12"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="100,0" matrix="0.707,-0.707,0.707,0.707,0,0">
         <ColorStop offset="0" color="#06B6D4"/>
         <ColorStop offset="1" color="#3B82F6"/>
       </LinearGradient>
     </Fill>
+  </Layer>
+  <Layer>
+    <Text text="Matrix" fontFamily="Arial" fontSize="9" position="260,330" textAnchor="center"/>
+    <Fill color="#64748B"/>
   </Layer>
 </pagx>

@@ -1,59 +1,128 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Layer filters: BlurFilter (uniform/asymmetric), DropShadowFilter (normal/shadowOnly), InnerShadowFilter, BlendFilter, ColorMatrixFilter -->
-<pagx version="1.0" width="500" height="300">
-  <!-- BlurFilter: uniform → CSS filter:blur() -->
-  <Layer x="10" y="10">
+<pagx version="1.0" width="500" height="340">
+  <!-- Background -->
+  <Layer>
+    <Rectangle position="250,170" size="500,340"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Layer Filters" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="250,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="Blur, DropShadow, InnerShadow, Blend, ColorMatrix" fontFamily="Arial" fontSize="10" position="250,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="250,190" size="460,250" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
+  <!-- Row 1 -->
+  <!-- BlurFilter: uniform -->
+  <Layer x="20" y="52">
     <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#3B82F6"/>
     <BlurFilter blurX="4" blurY="4"/>
   </Layer>
-  <!-- BlurFilter: asymmetric → SVG feGaussianBlur -->
-  <Layer x="100" y="10">
+  <Layer>
+    <Text text="Blur" fontFamily="Arial" fontSize="8" position="60,155" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- BlurFilter: asymmetric -->
+  <Layer x="110" y="52">
     <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#3B82F6"/>
     <BlurFilter blurX="8" blurY="2"/>
   </Layer>
-  <!-- DropShadowFilter → CSS filter:drop-shadow() -->
-  <Layer x="190" y="10">
+  <Layer>
+    <Text text="Asymmetric" fontFamily="Arial" fontSize="8" position="150,155" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- DropShadowFilter -->
+  <Layer x="200" y="52">
     <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#10B981"/>
     <DropShadowFilter offsetX="4" offsetY="4" blurX="8" blurY="8" color="#00000060"/>
   </Layer>
-  <!-- DropShadowFilter: shadowOnly → SVG filter only -->
-  <Layer x="280" y="10">
+  <Layer>
+    <Text text="DropShadow" fontFamily="Arial" fontSize="8" position="240,155" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- DropShadowFilter: shadowOnly -->
+  <Layer x="290" y="52">
     <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#10B981"/>
     <DropShadowFilter offsetX="4" offsetY="8" blurX="12" blurY="12" color="#00000080" shadowOnly="true"/>
   </Layer>
-  <!-- InnerShadowFilter → SVG filter -->
-  <Layer x="370" y="10">
+  <Layer>
+    <Text text="ShadowOnly" fontFamily="Arial" fontSize="8" position="330,155" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- InnerShadowFilter -->
+  <Layer x="380" y="52">
     <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#EF4444"/>
     <InnerShadowFilter offsetX="2" offsetY="2" blurX="6" blurY="6" color="#00000080"/>
   </Layer>
-  <!-- BlendFilter → overlay colored div with mix-blend-mode -->
-  <Layer x="10" y="120">
+  <Layer>
+    <Text text="InnerShadow" fontFamily="Arial" fontSize="8" position="420,155" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- Row 2 -->
+  <!-- BlendFilter -->
+  <Layer x="20" y="168">
     <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#F59E0B"/>
     <BlendFilter color="#0000FF80" blendMode="overlay"/>
   </Layer>
-  <!-- ColorMatrixFilter → SVG feColorMatrix -->
-  <Layer x="100" y="120">
+  <Layer>
+    <Text text="BlendFilter" fontFamily="Arial" fontSize="8" position="60,270" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- ColorMatrixFilter -->
+  <Layer x="110" y="168">
     <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#8B5CF6"/>
     <ColorMatrixFilter matrix="0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0,0,0,1,0"/>
   </Layer>
+  <Layer>
+    <Text text="Grayscale" fontFamily="Arial" fontSize="8" position="150,270" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- Chained filters: blur + drop-shadow -->
-  <Layer x="190" y="120">
+  <Layer x="200" y="168">
     <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#EC4899"/>
     <BlurFilter blurX="2" blurY="2"/>
     <DropShadowFilter offsetX="4" offsetY="4" blurX="8" blurY="8" color="#00000060"/>
   </Layer>
+  <Layer>
+    <Text text="Chained" fontFamily="Arial" fontSize="8" position="240,270" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- InnerShadowFilter: shadowOnly -->
-  <Layer x="280" y="120">
+  <Layer x="290" y="168">
     <Rectangle position="40,40" size="60,60" roundness="8"/>
     <Fill color="#06B6D4"/>
     <InnerShadowFilter offsetX="2" offsetY="2" blurX="8" blurY="8" color="#00000080" shadowOnly="true"/>
+  </Layer>
+  <Layer>
+    <Text text="Inner Only" fontFamily="Arial" fontSize="8" position="330,270" textAnchor="center"/>
+    <Fill color="#64748B"/>
   </Layer>
 </pagx>

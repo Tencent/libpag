@@ -1,35 +1,78 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Fill attributes: color, alpha, blendMode, fillRule(winding/evenOdd), placement(bg/fg) -->
-<pagx version="1.0" width="300" height="300">
+<pagx version="1.0" width="400" height="380">
+  <!-- Background -->
+  <Layer>
+    <Rectangle position="200,190" size="400,380"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Fill Attributes" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="200,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="Alpha, blendMode, fillRule, placement, color source" fontFamily="Arial" fontSize="10" position="200,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="200,210" size="360,290" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
   <!-- Fill with alpha -->
   <Layer>
-    <Rectangle position="75,75" size="100,100" roundness="12"/>
+    <Rectangle position="80,105" size="100,100" roundness="12"/>
     <Fill color="#3B82F6" alpha="0.5"/>
   </Layer>
+  <Layer>
+    <Text text="alpha=0.5" fontFamily="Arial" fontSize="9" position="80,165" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- Fill with blendMode -->
   <Layer>
-    <Rectangle position="75,75" size="80,80"/>
+    <Rectangle position="80,105" size="80,80"/>
     <Fill color="#EF4444" blendMode="multiply"/>
   </Layer>
-  <!-- fillRule=evenOdd → SVG fill-rule="evenodd" (CSS cannot) -->
+
+  <!-- fillRule=evenOdd -->
   <Layer>
-    <Path data="M 200,30 L 260,130 L 140,130 Z M 200,50 L 240,120 L 160,120 Z"/>
+    <Path data="M 260,65 L 320,165 L 200,165 Z M 260,85 L 300,155 L 220,155 Z"/>
     <Fill color="#10B981" fillRule="evenOdd"/>
   </Layer>
-  <!-- Placement: foreground (above child layers) -->
   <Layer>
-    <Rectangle position="75,225" size="100,100" roundness="12"/>
+    <Text text="fillRule=evenOdd" fontFamily="Arial" fontSize="9" position="260,178" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- Placement: foreground -->
+  <Layer>
+    <Rectangle position="100,260" size="100,100" roundness="12"/>
     <Fill color="#8B5CF680" placement="foreground"/>
     <Layer>
-      <Ellipse position="75,75" size="60,60"/>
+      <Ellipse position="100,260" size="60,60"/>
       <Fill color="#F59E0B"/>
     </Layer>
   </Layer>
+  <Layer>
+    <Text text="foreground" fontFamily="Arial" fontSize="9" position="100,320" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- Child color source overrides color attribute -->
   <Layer>
-    <Rectangle position="225,225" size="100,100" roundness="12"/>
+    <Rectangle position="280,260" size="100,100" roundness="12"/>
     <Fill color="#000000">
       <SolidColor color="#EC4899"/>
     </Fill>
+  </Layer>
+  <Layer>
+    <Text text="child override" fontFamily="Arial" fontSize="9" position="280,320" textAnchor="center"/>
+    <Fill color="#64748B"/>
   </Layer>
 </pagx>

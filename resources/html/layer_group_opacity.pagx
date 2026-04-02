@@ -1,21 +1,63 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: groupOpacity=false → alpha distributed to children; groupOpacity=true → alpha on parent -->
-<pagx version="1.0" width="300" height="200">
+<pagx version="1.0" width="380" height="260">
+  <!-- Background -->
+  <Layer>
+    <Rectangle position="190,130" size="380,260"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Group Opacity" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="190,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="Per-child vs composited alpha" fontFamily="Arial" fontSize="10" position="190,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="190,150" size="340,170" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
+  <!-- Divider -->
+  <Layer>
+    <Path data="M 190,70 L 190,230"/>
+    <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+  </Layer>
+
+  <!-- groupOpacity=false label -->
+  <Layer>
+    <Text text="groupOpacity=false" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="95,68" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- groupOpacity=false: alpha applied independently to each child element -->
   <Layer alpha="0.5" groupOpacity="false">
-    <Rectangle position="50,100" size="80,80"/>
+    <Rectangle position="70,140" size="80,80" roundness="8"/>
     <Fill color="#EF4444"/>
     <Layer>
-      <Ellipse position="90,100" size="80,80"/>
+      <Ellipse position="110,140" size="80,80"/>
       <Fill color="#3B82F6"/>
     </Layer>
   </Layer>
+
+  <!-- groupOpacity=true label -->
+  <Layer>
+    <Text text="groupOpacity=true" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="285,68" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- groupOpacity=true: content composited first, then alpha applied -->
   <Layer alpha="0.5" groupOpacity="true">
-    <Rectangle position="200,100" size="80,80"/>
+    <Rectangle position="260,140" size="80,80" roundness="8"/>
     <Fill color="#EF4444"/>
     <Layer>
-      <Ellipse position="240,100" size="80,80"/>
+      <Ellipse position="300,140" size="80,80"/>
       <Fill color="#3B82F6"/>
     </Layer>
   </Layer>

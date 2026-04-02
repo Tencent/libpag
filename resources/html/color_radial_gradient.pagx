@@ -1,24 +1,56 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: RadialGradient → CSS radial-gradient; with/without matrix (ellipse/rotated) -->
-<pagx version="1.0" width="300" height="200">
+<pagx version="1.0" width="380" height="260">
+  <!-- Background -->
+  <Layer>
+    <Rectangle position="190,130" size="380,260"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Radial Gradient" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="190,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="Simple circle vs matrix-transformed ellipse" fontFamily="Arial" fontSize="10" position="190,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="190,152" size="340,170" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
   <!-- Simple radial gradient (circle) -->
   <Layer>
-    <Rectangle position="75,100" size="120,160"/>
+    <Rectangle position="105,145" size="120,140" roundness="8"/>
     <Fill>
-      <RadialGradient center="60,80" radius="80">
+      <RadialGradient center="60,70" radius="80">
         <ColorStop offset="0" color="#FFFFFF"/>
         <ColorStop offset="1" color="#3B82F6"/>
       </RadialGradient>
     </Fill>
   </Layer>
-  <!-- Radial gradient with matrix: circle → ellipse (non-uniform scale) -->
   <Layer>
-    <Rectangle position="225,100" size="120,160"/>
+    <Text text="Circle" fontFamily="Arial" fontSize="9" position="105,225" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- Radial gradient with matrix: circle → ellipse -->
+  <Layer>
+    <Rectangle position="275,145" size="120,140" roundness="8"/>
     <Fill>
-      <RadialGradient center="60,80" radius="60" matrix="1.5,0,0,1,0,0">
+      <RadialGradient center="60,70" radius="60" matrix="1.5,0,0,1,0,0">
         <ColorStop offset="0" color="#FFFFFF"/>
         <ColorStop offset="1" color="#EF4444"/>
       </RadialGradient>
     </Fill>
+  </Layer>
+  <Layer>
+    <Text text="Ellipse (matrix)" fontFamily="Arial" fontSize="9" position="275,225" textAnchor="center"/>
+    <Fill color="#64748B"/>
   </Layer>
 </pagx>

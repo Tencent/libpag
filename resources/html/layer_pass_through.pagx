@@ -1,14 +1,62 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: passThroughBackground attribute; auto-disabled when non-normal blend/filter/3D -->
-<pagx version="1.0" width="200" height="200">
-  <!-- passThroughBackground=true (default): background visible through layer content -->
+<pagx version="1.0" width="340" height="260">
+  <!-- Background -->
+  <Layer>
+    <Rectangle position="170,130" size="340,260"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Pass-Through Background" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="170,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="Background transparency vs opaque compositing" fontFamily="Arial" fontSize="10" position="170,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="170,150" size="300,170" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
+  <!-- Divider -->
+  <Layer>
+    <Path data="M 170,70 L 170,230"/>
+    <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+  </Layer>
+
+  <!-- Reference pattern behind both -->
+  <Layer alpha="0.3">
+    <Ellipse position="85,145" size="80,80"/>
+    <Fill color="#F59E0B"/>
+  </Layer>
+  <Layer alpha="0.3">
+    <Ellipse position="255,145" size="80,80"/>
+    <Fill color="#F59E0B"/>
+  </Layer>
+
+  <!-- passThroughBackground=true -->
+  <Layer>
+    <Text text="passThrough=true" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="85,78" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
   <Layer passThroughBackground="true" alpha="0.8">
-    <Rectangle position="60,100" size="80,80" roundness="8"/>
+    <Rectangle position="85,145" size="100,100" roundness="8"/>
     <Fill color="#3B82F680"/>
   </Layer>
-  <!-- passThroughBackground=false: opaque composition -->
+
+  <!-- passThroughBackground=false -->
+  <Layer>
+    <Text text="passThrough=false" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="255,78" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
   <Layer passThroughBackground="false" alpha="0.8">
-    <Rectangle position="140,100" size="80,80" roundness="8"/>
+    <Rectangle position="255,145" size="100,100" roundness="8"/>
     <Fill color="#EF444480"/>
   </Layer>
 </pagx>

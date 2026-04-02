@@ -1,9 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: ConicGradient → CSS conic-gradient; angle convention (PAGX 0°=right, CSS 0°=up → +90°) -->
-<pagx version="1.0" width="300" height="200">
-  <!-- Full 360° conic: startAngle=0 → CSS from 90deg -->
+<pagx version="1.0" width="360" height="260">
+  <!-- Background -->
   <Layer>
-    <Ellipse position="75,100" size="120,120"/>
+    <Rectangle position="180,130" size="360,260"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Conic Gradient" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="180,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="Full 360-degree and partial angle range" fontFamily="Arial" fontSize="10" position="180,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="180,152" size="320,170" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
+  <!-- Full 360° conic -->
+  <Layer>
+    <Ellipse position="105,148" size="120,120"/>
     <Fill>
       <ConicGradient center="60,60" startAngle="0" endAngle="360">
         <ColorStop offset="0" color="#EF4444"/>
@@ -13,14 +36,23 @@
       </ConicGradient>
     </Fill>
   </Layer>
+  <Layer>
+    <Text text="Full 360" fontFamily="Arial" fontSize="9" position="105,220" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- Partial angle range: startAngle=45 endAngle=270 -->
   <Layer>
-    <Ellipse position="225,100" size="120,120"/>
+    <Ellipse position="265,148" size="120,120"/>
     <Fill>
       <ConicGradient center="60,60" startAngle="45" endAngle="270">
         <ColorStop offset="0" color="#F59E0B"/>
         <ColorStop offset="1" color="#8B5CF6"/>
       </ConicGradient>
     </Fill>
+  </Layer>
+  <Layer>
+    <Text text="Partial (45-270)" fontFamily="Arial" fontSize="9" position="265,220" textAnchor="center"/>
+    <Fill color="#64748B"/>
   </Layer>
 </pagx>

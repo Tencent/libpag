@@ -1,9 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Layer matrix="a,b,c,d,tx,ty" → transform: matrix(a,b,c,d,tx,ty) -->
-<pagx version="1.0" width="200" height="200">
+<pagx version="1.0" width="300" height="250">
+  <!-- Background -->
+  <Layer>
+    <Rectangle position="150,125" size="300,250"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Matrix Transform" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="150,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="45-degree rotation via 2D matrix" fontFamily="Arial" fontSize="10" position="150,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="150,145" size="260,160" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
   <!-- 45° rotation + translate -->
-  <Layer matrix="0.707,0.707,-0.707,0.707,100,20">
-    <Rectangle position="0,0" size="80,80"/>
+  <Layer matrix="0.707,0.707,-0.707,0.707,100,80">
+    <Rectangle position="0,0" size="80,80" roundness="8"/>
     <Fill color="#F59E0B"/>
+  </Layer>
+
+  <!-- Reference outline showing original position -->
+  <Layer alpha="0.2">
+    <Rectangle position="140,140" size="80,80" roundness="8"/>
+    <Stroke color="#94A3B8" width="1" dashes="4,3"/>
+  </Layer>
+  <Layer>
+    <Text text="Original position" fontFamily="Arial" fontSize="8" position="140,190" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
   </Layer>
 </pagx>

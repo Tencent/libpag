@@ -1,29 +1,71 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: TrimPath separate/continuous, start/end/offset, edge cases (start>end, wrap-around) -->
-<pagx version="1.0" width="400" height="300">
+<pagx version="1.0" width="440" height="340">
+  <!-- Background -->
+  <Layer>
+    <Rectangle position="220,170" size="440,340"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Trim Path" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="220,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="Separate, continuous, wrap-around, and offset" fontFamily="Arial" fontSize="10" position="220,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="220,192" size="400,250" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
   <!-- Separate mode: each shape trimmed independently -->
   <Layer>
-    <Ellipse position="100,75" size="120,120"/>
+    <Ellipse position="110,130" size="110,110"/>
     <TrimPath start="0" end="0.75" type="separate"/>
     <Stroke color="#3B82F6" width="6" cap="round"/>
   </Layer>
-  <!-- Continuous mode: shapes treated as one path -->
   <Layer>
-    <Rectangle position="60,200" size="60,60"/>
-    <Ellipse position="140,200" size="60,60"/>
-    <TrimPath start="0.1" end="0.8" type="continuous"/>
-    <Stroke color="#10B981" width="4" cap="round"/>
+    <Text text="Separate 75%" fontFamily="Arial" fontSize="8" position="110,198" textAnchor="center"/>
+    <Fill color="#64748B"/>
   </Layer>
-  <!-- start > end → wraps around (mirror+reverse) -->
+
+  <!-- start > end → wraps around -->
   <Layer>
-    <Ellipse position="280,75" size="120,120"/>
+    <Ellipse position="290,130" size="110,110"/>
     <TrimPath start="0.7" end="0.3"/>
     <Stroke color="#EF4444" width="6" cap="round"/>
   </Layer>
-  <!-- With offset (in degrees, 360=one period) -->
   <Layer>
-    <Ellipse position="280,200" size="120,120"/>
+    <Text text="Wrap-around" fontFamily="Arial" fontSize="8" position="290,198" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- Continuous mode: shapes treated as one path -->
+  <Layer>
+    <Rectangle position="75,265" size="55,55"/>
+    <Ellipse position="150,265" size="55,55"/>
+    <TrimPath start="0.1" end="0.8" type="continuous"/>
+    <Stroke color="#10B981" width="4" cap="round"/>
+  </Layer>
+  <Layer>
+    <Text text="Continuous" fontFamily="Arial" fontSize="8" position="115,305" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- With offset (in degrees) -->
+  <Layer>
+    <Ellipse position="310,265" size="80,80"/>
     <TrimPath start="0" end="0.5" offset="90"/>
     <Stroke color="#F59E0B" width="6" cap="round"/>
+  </Layer>
+  <Layer>
+    <Text text="Offset 90deg" fontFamily="Arial" fontSize="8" position="310,305" textAnchor="center"/>
+    <Fill color="#64748B"/>
   </Layer>
 </pagx>

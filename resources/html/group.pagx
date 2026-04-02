@@ -1,36 +1,78 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Group → div.pagx-group with anchor/position/rotation/scale/skew/alpha; scope isolation; geometry propagation -->
-<pagx version="1.0" width="300" height="300">
+<pagx version="1.0" width="400" height="350">
+  <!-- Background -->
+  <Layer>
+    <Rectangle position="200,175" size="400,350"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Title -->
+  <Layer>
+    <Text text="Group Transform" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="200,24" textAnchor="center"/>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Layer>
+    <Text text="Anchor, rotation, scale, skew, scope isolation" fontFamily="Arial" fontSize="10" position="200,40" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Card -->
+  <Layer>
+    <Rectangle position="200,195" size="360,260" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+  </Layer>
+
   <!-- Group with full transform chain -->
   <Layer>
-    <Group anchor="50,50" position="100,100" rotation="30" scale="0.8,0.8" alpha="0.7">
+    <Group anchor="50,50" position="100,110" rotation="30" scale="0.8,0.8" alpha="0.7">
       <Rectangle position="50,50" size="80,80" roundness="8"/>
       <Fill color="#3B82F6"/>
     </Group>
   </Layer>
+  <Layer>
+    <Text text="Rotate+Scale" fontFamily="Arial" fontSize="9" position="100,175" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- Scope isolation: inner Group's geometry doesn't leak -->
   <Layer>
-    <Group position="200,50">
+    <Group position="200,60">
       <Ellipse position="30,30" size="50,50"/>
       <Fill color="#EF4444"/>
     </Group>
     <!-- This Fill should NOT include the Ellipse from the Group above (scope isolation) -->
-    <Rectangle position="250,150" size="60,60"/>
+    <Rectangle position="250,160" size="60,60"/>
     <Fill color="#10B981"/>
   </Layer>
+  <Layer>
+    <Text text="Scope Isolation" fontFamily="Arial" fontSize="9" position="260,200" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- Group with skew -->
   <Layer>
-    <Group anchor="40,40" position="80,220" skew="20" skewAxis="45" scale="1.2,1">
+    <Group anchor="40,40" position="80,240" skew="20" skewAxis="45" scale="1.2,1">
       <Rectangle position="40,40" size="60,60"/>
       <Fill color="#8B5CF6"/>
     </Group>
   </Layer>
+  <Layer>
+    <Text text="Skew" fontFamily="Arial" fontSize="9" position="90,300" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
   <!-- Geometry propagation: child Group's geometry propagates to parent -->
   <Layer>
-    <Group position="200,200">
+    <Group position="250,230">
       <Rectangle position="30,30" size="50,50"/>
     </Group>
     <!-- This Fill renders the Rectangle from the Group above (geometry propagation) -->
     <Fill color="#F59E0B"/>
+  </Layer>
+  <Layer>
+    <Text text="Propagation" fontFamily="Arial" fontSize="9" position="280,300" textAnchor="center"/>
+    <Fill color="#64748B"/>
   </Layer>
 </pagx>

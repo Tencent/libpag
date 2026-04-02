@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: GlyphRun advanced — positions (per-glyph x,y offsets), anchors (per-glyph anchor offsets),
+     skews (per-glyph skew angles), bitmap Glyph (image + offset attributes) -->
+<pagx version="1.0" width="400" height="300">
+  <Resources>
+    <!-- Vector font for positions/anchors/skews testing -->
+    <Font id="vecFont" unitsPerEm="1000">
+      <!-- H -->
+      <Glyph advance="600" path="M 80,0 L 80,-700 M 520,0 L 520,-700 M 80,-350 L 520,-350"/>
+      <!-- E -->
+      <Glyph advance="550" path="M 80,0 L 80,-700 L 470,-700 M 80,-350 L 400,-350 M 80,0 L 470,0"/>
+      <!-- L -->
+      <Glyph advance="500" path="M 80,0 L 80,-700 M 80,0 L 420,0"/>
+    </Font>
+
+    <!-- Bitmap font for Glyph.image and Glyph.offset testing -->
+    <Font id="bmpFont" unitsPerEm="100">
+      <!-- Bitmap glyph with image (4x4 colored square) and offset -->
+      <Glyph advance="110" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAEklEQVQI12P4z8DwHwyBAgMALaYE/aDpKzYAAAAASUVORK5CYII=" offset="0,-5"/>
+      <!-- Bitmap glyph with image only (no offset) -->
+      <Glyph advance="110" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAA4MjmpAAAAEUlEQVQI12Ng+M/AwAAGYAIAE/gB/eDX+84AAAAASUVORK5CYII="/>
+    </Font>
+  </Resources>
+
+  <!-- GlyphRun with positions (per-glyph x,y offsets via semicolon-separated pairs) -->
+  <Layer>
+    <Text text="HEL">
+      <GlyphRun font="@vecFont" fontSize="48" glyphs="1,2,3" x="20" y="60" positions="0,0;5,-10;10,5"/>
+    </Text>
+    <Fill color="#3B82F6"/>
+    <Stroke color="#1D4ED8" width="2"/>
+  </Layer>
+
+  <!-- GlyphRun with anchors (shifts rotation/scale pivot point per glyph) -->
+  <Layer>
+    <Text text="HEL">
+      <GlyphRun font="@vecFont" fontSize="48" glyphs="1,2,3" x="200" y="60" anchors="0,0;5,-12;-5,8" rotations="10,-10,15"/>
+    </Text>
+    <Fill color="#10B981"/>
+  </Layer>
+
+  <!-- GlyphRun with skews (per-glyph skew angles) -->
+  <Layer>
+    <Text text="HEL">
+      <GlyphRun font="@vecFont" fontSize="48" glyphs="1,2,3" x="20" y="150" skews="15,-10,20"/>
+    </Text>
+    <Fill color="#8B5CF6"/>
+  </Layer>
+
+  <!-- GlyphRun with combined positions + anchors + skews + scales + rotations -->
+  <Layer>
+    <Text text="HEL">
+      <GlyphRun font="@vecFont" fontSize="36" glyphs="1,2,3" x="200" y="150"
+                 positions="0,0;8,-6;-4,8"
+                 anchors="0,-10;5,0;-5,5"
+                 skews="10,-5,15"
+                 scales="1.1,1.1;0.9,1.2;1,0.8"
+                 rotations="5,-8,12"/>
+    </Text>
+    <Fill color="#EC4899"/>
+  </Layer>
+
+  <!-- Bitmap glyph rendering (Glyph.image + Glyph.offset) -->
+  <Layer>
+    <Text text="AB">
+      <GlyphRun font="@bmpFont" fontSize="80" glyphs="1,2" x="20" y="250"/>
+    </Text>
+    <Fill color="#F59E0B"/>
+  </Layer>
+
+  <!-- Labels -->
+  <Layer>
+    <Text text="positions" fontFamily="Arial" fontSize="10" position="20,80"/>
+    <Fill color="#64748B"/>
+  </Layer>
+  <Layer>
+    <Text text="anchors+rot" fontFamily="Arial" fontSize="10" position="200,80"/>
+    <Fill color="#64748B"/>
+  </Layer>
+  <Layer>
+    <Text text="skews" fontFamily="Arial" fontSize="10" position="20,170"/>
+    <Fill color="#64748B"/>
+  </Layer>
+  <Layer>
+    <Text text="all combined" fontFamily="Arial" fontSize="10" position="200,170"/>
+    <Fill color="#64748B"/>
+  </Layer>
+  <Layer>
+    <Text text="bitmap glyphs (image+offset)" fontFamily="Arial" fontSize="10" position="20,270"/>
+    <Fill color="#64748B"/>
+  </Layer>
+</pagx>
