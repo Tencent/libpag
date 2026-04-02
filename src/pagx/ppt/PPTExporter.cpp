@@ -430,6 +430,40 @@ static std::shared_ptr<tgfx::Data> RenderMaskedLayer(
 }
 
 //==============================================================================
+// Dash pattern → OOXML preset dash mapping
+//==============================================================================
+
+static const char* MatchPresetDash(const std::vector<float>& dashes, float strokeWidth) {
+  if (dashes.empty() || strokeWidth <= 0) {
+    return nullptr;
+  }
+  auto ratio = [&](size_t i) -> float {
+    return (i < dashes.size()) ? dashes[i] / strokeWidth : 0;
+  };
+  size_t n = dashes.size();
+  if (n == 2) {
+    float dr = ratio(0);
+    float sr = ratio(1);
+    if (dr <= 1.5f) {
+      return (sr <= 2.0f) ? "sysDot" : "dot";
+    }
+    if (dr <= 4.5f) {
+      return (sr <= 2.0f) ? "sysDash" : "dash";
+    }
+    return "lgDash";
+  }
+  if (n == 4) {
+    float dr = ratio(0);
+    return (dr > 4.5f) ? "lgDashDot" : "dashDot";
+  }
+  if (n == 6) {
+    float dr = ratio(0);
+    return (dr > 4.5f) ? "lgDashDotDot" : "sysDashDotDot";
+  }
+  return nullptr;
+}
+
+//==============================================================================
 // PPTWriter – converts PAGX nodes to PPTX XML
 //==============================================================================
 
@@ -750,18 +784,23 @@ void PPTWriter::writeStroke(XMLBuilder& out, const Stroke* stroke, float alpha) 
   }
 
   if (!stroke->dashes.empty()) {
-    out.open("a:custDash").gt();
     float sw = (stroke->width > 0) ? stroke->width : 1.0f;
-    for (size_t i = 0; i + 1 < stroke->dashes.size(); i += 2) {
-      int d = std::max(0, static_cast<int>(std::round(stroke->dashes[i] / sw * 100000.0)));
-      int sp = std::max(0, static_cast<int>(std::round(stroke->dashes[i + 1] / sw * 100000.0)));
-      out.open("a:ds").a("d", d).a("sp", sp).sc();
+    const char* preset = MatchPresetDash(stroke->dashes, sw);
+    if (preset) {
+      out.open("a:prstDash").a("val", preset).sc();
+    } else {
+      out.open("a:custDash").gt();
+      for (size_t i = 0; i + 1 < stroke->dashes.size(); i += 2) {
+        int d = std::max(1, static_cast<int>(std::round(stroke->dashes[i] / sw * 100000.0)));
+        int sp = std::max(1, static_cast<int>(std::round(stroke->dashes[i + 1] / sw * 100000.0)));
+        out.open("a:ds").a("d", d).a("sp", sp).sc();
+      }
+      if (stroke->dashes.size() % 2 != 0) {
+        int d = std::max(1, static_cast<int>(std::round(stroke->dashes.back() / sw * 100000.0)));
+        out.open("a:ds").a("d", d).a("sp", d).sc();
+      }
+      out.end();  // a:custDash
     }
-    if (stroke->dashes.size() % 2 != 0) {
-      int d = std::max(0, static_cast<int>(std::round(stroke->dashes.back() / sw * 100000.0)));
-      out.open("a:ds").a("d", d).a("sp", d).sc();
-    }
-    out.end();  // a:custDash
   }
 
   if (stroke->join == LineJoin::Round) {
