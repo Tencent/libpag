@@ -231,6 +231,42 @@ bool GetImagePNGDimensions(const Image* image, int* width, int* height) {
   return false;
 }
 
+bool GetJPEGDimensions(const uint8_t* data, size_t size, int* width, int* height) {
+  if (size < 2 || data[0] != 0xFF || data[1] != 0xD8) {
+    return false;
+  }
+  size_t offset = 2;
+  while (offset + 4 < size) {
+    if (data[offset] != 0xFF) {
+      return false;
+    }
+    uint8_t marker = data[offset + 1];
+    if (marker == 0xD9 || marker == 0xDA) {
+      break;
+    }
+    auto segmentLength = static_cast<size_t>((data[offset + 2] << 8) | data[offset + 3]) + 2;
+    // SOF0..SOF3 markers contain image dimensions.
+    if (marker >= 0xC0 && marker <= 0xC3 && offset + 9 < size) {
+      *height = static_cast<int>((data[offset + 5] << 8) | data[offset + 6]);
+      *width = static_cast<int>((data[offset + 7] << 8) | data[offset + 8]);
+      return *width > 0 && *height > 0;
+    }
+    offset += segmentLength;
+  }
+  return false;
+}
+
+bool GetImageDimensions(const Image* image, int* width, int* height) {
+  if (GetImagePNGDimensions(image, width, height)) {
+    return true;
+  }
+  auto data = GetImageData(image);
+  if (data && data->size() > 0) {
+    return GetJPEGDimensions(data->bytes(), data->size(), width, height);
+  }
+  return false;
+}
+
 bool IsJPEG(const uint8_t* data, size_t size) {
   return size >= 2 && data[0] == 0xFF && data[1] == 0xD8;
 }

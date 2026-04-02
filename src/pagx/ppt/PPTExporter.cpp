@@ -476,8 +476,9 @@ class PPTWriter {
                     int64_t extCX, int64_t extCY);
 
   // Fill / stroke / effects
-  void writeFill(XMLBuilder& out, const Fill* fill, float alpha);
-  void writeColorSource(XMLBuilder& out, const ColorSource* source, float alpha);
+  void writeFill(XMLBuilder& out, const Fill* fill, float alpha, const Rect& shapeBounds = {});
+  void writeColorSource(XMLBuilder& out, const ColorSource* source, float alpha,
+                        const Rect& shapeBounds = {});
   void writeGradientStops(XMLBuilder& out, const std::vector<ColorStop*>& stops);
   void writeStroke(XMLBuilder& out, const Stroke* stroke, float alpha);
   void writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& filters);
@@ -616,7 +617,8 @@ void PPTWriter::writeGradientStops(XMLBuilder& out, const std::vector<ColorStop*
   out.end();  // a:gsLst
 }
 
-void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, float alpha) {
+void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, float alpha,
+                                 const Rect& shapeBounds) {
   if (!source) {
     out.open("a:noFill").sc();
     return;
@@ -669,7 +671,33 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
         std::string relId = _ctx->addImage(pattern->image);
         if (!relId.empty()) {
           out.open("a:blipFill").gt();
-          out.open("a:blip").a("r:embed", relId).sc();
+          out.open("a:blip").a("r:embed", relId);
+          if (alpha < 1.0f) {
+            out.gt();
+            out.open("a:alphaModFix").a("amt", AlphaToPct(alpha)).sc();
+            out.end();  // a:blip
+          } else {
+            out.sc();
+          }
+          int imgW = 0;
+          int imgH = 0;
+          bool hasDimensions = GetImageDimensions(pattern->image, &imgW, &imgH);
+          bool hasTransform =
+              hasDimensions && !shapeBounds.isEmpty() && !pattern->matrix.isIdentity();
+          if (hasTransform) {
+            const auto& M = pattern->matrix;
+            float imageDocW = static_cast<float>(imgW) * M.a;
+            float imageDocH = static_cast<float>(imgH) * M.d;
+            float srcL = (shapeBounds.x - M.tx) / imageDocW;
+            float srcT = (shapeBounds.y - M.ty) / imageDocH;
+            float srcR = 1.0f - (shapeBounds.x + shapeBounds.width - M.tx) / imageDocW;
+            float srcB = 1.0f - (shapeBounds.y + shapeBounds.height - M.ty) / imageDocH;
+            int l = static_cast<int>(std::round(srcL * 100000.0f));
+            int t = static_cast<int>(std::round(srcT * 100000.0f));
+            int r = static_cast<int>(std::round(srcR * 100000.0f));
+            int b = static_cast<int>(std::round(srcB * 100000.0f));
+            out.open("a:srcRect").a("l", l).a("t", t).a("r", r).a("b", b).sc();
+          }
           out.open("a:stretch").gt();
           out.open("a:fillRect").sc();
           out.end();  // a:stretch
@@ -688,13 +716,13 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
 
 // ── Fill / stroke ──────────────────────────────────────────────────────────
 
-void PPTWriter::writeFill(XMLBuilder& out, const Fill* fill, float alpha) {
+void PPTWriter::writeFill(XMLBuilder& out, const Fill* fill, float alpha, const Rect& shapeBounds) {
   if (!fill || !fill->color) {
     out.open("a:noFill").sc();
     return;
   }
   float effectiveAlpha = fill->alpha * alpha;
-  writeColorSource(out, fill->color, effectiveAlpha);
+  writeColorSource(out, fill->color, effectiveAlpha, shapeBounds);
 }
 
 void PPTWriter::writeStroke(XMLBuilder& out, const Stroke* stroke, float alpha) {
@@ -887,7 +915,7 @@ void PPTWriter::writeRectangle(XMLBuilder& out, const Rectangle* rect, const Fil
     out.end();
   }
 
-  writeFill(out, fs.fill, alpha);
+  writeFill(out, fs.fill, alpha, Rect::MakeXYWH(x, y, rect->size.width, rect->size.height));
   writeStroke(out, fs.stroke, alpha);
   writeEffects(out, filters);
   endShape(out);
@@ -907,7 +935,7 @@ void PPTWriter::writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const Fill
   out.open("a:avLst").sc();
   out.end();
 
-  writeFill(out, fs.fill, alpha);
+  writeFill(out, fs.fill, alpha, Rect::MakeXYWH(x, y, ellipse->size.width, ellipse->size.height));
   writeStroke(out, fs.stroke, alpha);
   writeEffects(out, filters);
   endShape(out);
@@ -935,7 +963,7 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
 
   writeCustomGeom(out, path->data, adjustedX, adjustedY, adjustedW, adjustedH);
 
-  writeFill(out, fs.fill, alpha);
+  writeFill(out, fs.fill, alpha, Rect::MakeXYWH(adjustedX, adjustedY, adjustedW, adjustedH));
   writeStroke(out, fs.stroke, alpha);
   writeEffects(out, filters);
   endShape(out);
