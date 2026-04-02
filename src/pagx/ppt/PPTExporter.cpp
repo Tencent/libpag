@@ -415,8 +415,7 @@ class PPTWriter {
   void writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& filters);
 
   // Custom geometry from PathData
-  void writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY,
-                       FillRule fillRule = FillRule::Winding);
+  void writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY);
 
   // Transform decomposition
   struct Xform {
@@ -689,8 +688,7 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
 
 // ── Custom geometry ────────────────────────────────────────────────────────
 
-void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY,
-                                FillRule fillRule) {
+void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY) {
   out.open("a:custGeom").gt();
   out.open("a:avLst").sc();
   out.open("a:gdLst").sc();
@@ -703,8 +701,7 @@ void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofs
   int64_t ph = std::max(int64_t(1), PxToEMU(bounds.height));
 
   out.open("a:pathLst").gt();
-  const char* fillAttr = (fillRule == FillRule::EvenOdd) ? "none" : "norm";
-  out.open("a:path").a("w", pw).a("h", ph).a("fill", fillAttr).gt();
+  out.open("a:path").a("w", pw).a("h", ph).a("fill", "norm").gt();
 
   data->forEach([&](PathVerb verb, const Point* pts) {
     switch (verb) {
@@ -816,8 +813,7 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   auto xf = decomposeXform(bounds.x, bounds.y, bounds.width, bounds.height, m);
   beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
 
-  FillRule rule = fs.fill ? fs.fill->fillRule : FillRule::Winding;
-  writeCustomGeom(out, path->data, bounds.x, bounds.y, rule);
+  writeCustomGeom(out, path->data, bounds.x, bounds.y);
 
   writeFill(out, fs.fill, alpha);
   writeStroke(out, fs.stroke, alpha);
