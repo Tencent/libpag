@@ -4996,6 +4996,40 @@ static std::string StyleStringToVueObject(const std::string& styleStr) {
   return result;
 }
 
+// Decode HTML entities back to raw characters before style parsing.
+// This is necessary because escapeAttr() encodes quotes (&#39; &quot;) which
+// contain semicolons that would be misinterpreted as CSS property separators.
+static std::string DecodeHTMLEntities(const std::string& str) {
+  std::string result;
+  result.reserve(str.size());
+  size_t i = 0;
+  while (i < str.size()) {
+    if (str[i] == '&') {
+      if (str.compare(i, 5, "&#39;") == 0) {
+        result += '\'';
+        i += 5;
+      } else if (str.compare(i, 6, "&quot;") == 0) {
+        result += '"';
+        i += 6;
+      } else if (str.compare(i, 5, "&amp;") == 0) {
+        result += '&';
+        i += 5;
+      } else if (str.compare(i, 4, "&lt;") == 0) {
+        result += '<';
+        i += 4;
+      } else if (str.compare(i, 4, "&gt;") == 0) {
+        result += '>';
+        i += 4;
+      } else {
+        result += str[i++];
+      }
+    } else {
+      result += str[i++];
+    }
+  }
+  return result;
+}
+
 static std::string TransformStyleAttributes(const std::string& html, bool useDoubleQuotes) {
   std::string result;
   result.reserve(html.size() * 2);
@@ -5017,7 +5051,7 @@ static std::string TransformStyleAttributes(const std::string& html, bool useDou
       break;
     }
 
-    std::string styleValue = html.substr(valueStart, valueEnd - valueStart);
+    std::string styleValue = DecodeHTMLEntities(html.substr(valueStart, valueEnd - valueStart));
     std::string styleObj =
         useDoubleQuotes ? StyleStringToJSXObject(styleValue) : StyleStringToVueObject(styleValue);
 
