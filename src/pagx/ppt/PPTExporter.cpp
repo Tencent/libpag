@@ -26,7 +26,6 @@
 #include <unordered_map>
 #include <vector>
 #include "base/utils/MathUtil.h"
-#include "tgfx/core/Data.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -51,6 +50,13 @@
 #include "pagx/types/Rect.h"
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/StringParser.h"
+#include "renderer/LayerBuilder.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Data.h"
+#include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/Pixmap.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/layers/DisplayList.h"
 
 namespace pagx {
 
@@ -321,6 +327,7 @@ class XMLBuilder {
 
 struct ImageEntry {
   const Image* image = nullptr;
+  std::shared_ptr<tgfx::Data> rawData = nullptr;
   std::string relId;
   std::string mediaPath;
   bool isJPEG = false;
@@ -346,8 +353,16 @@ class PPTWriterContext {
     bool jpeg = IsJPEG(data->bytes(), data->size());
     std::string ext = jpeg ? "jpeg" : "png";
     std::string mediaPath = "ppt/media/image" + std::to_string(idx) + "." + ext;
-    _images.push_back({image, relId, mediaPath, jpeg});
+    _images.push_back({image, nullptr, relId, mediaPath, jpeg});
     _imageMap[image] = relId;
+    return relId;
+  }
+
+  std::string addRawImage(std::shared_ptr<tgfx::Data> pngData) {
+    int idx = static_cast<int>(_images.size()) + 1;
+    std::string relId = "rId" + std::to_string(_nextRelId++);
+    std::string mediaPath = "ppt/media/image" + std::to_string(idx) + ".png";
+    _images.push_back({nullptr, std::move(pngData), relId, mediaPath, false});
     return relId;
   }
 
@@ -371,13 +386,57 @@ class PPTWriterContext {
 };
 
 //==============================================================================
+// RenderMaskedLayer – rasterize a masked layer to PNG via tgfx pipeline
+//==============================================================================
+
+static std::shared_ptr<tgfx::Data> RenderMaskedLayer(
+    const std::shared_ptr<tgfx::Layer>& root, const std::shared_ptr<tgfx::Layer>& targetLayer) {
+  auto globalBounds = targetLayer->getBounds(root.get(), true);
+  int width = static_cast<int>(ceilf(globalBounds.width()));
+  int height = static_cast<int>(ceilf(globalBounds.height()));
+  if (width <= 0 || height <= 0) {
+    return nullptr;
+  }
+  auto device = tgfx::GLDevice::Make();
+  if (device == nullptr) {
+    return nullptr;
+  }
+  auto context = device->lockContext();
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto surface = tgfx::Surface::Make(context, width, height);
+  if (surface == nullptr) {
+    device->unlock();
+    return nullptr;
+  }
+  auto canvas = surface->getCanvas();
+  canvas->translate(-globalBounds.left, -globalBounds.top);
+  canvas->concat(targetLayer->getRelativeMatrix(root.get()));
+  targetLayer->draw(canvas);
+
+  tgfx::Bitmap bitmap(width, height, false, false);
+  if (bitmap.isEmpty()) {
+    device->unlock();
+    return nullptr;
+  }
+  tgfx::Pixmap pixmap(bitmap);
+  bool readSuccess = surface->readPixels(pixmap.info(), pixmap.writablePixels());
+  device->unlock();
+  if (!readSuccess) {
+    return nullptr;
+  }
+  return tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::PNG, 100);
+}
+
+//==============================================================================
 // PPTWriter – converts PAGX nodes to PPTX XML
 //==============================================================================
 
 class PPTWriter {
  public:
-  PPTWriter(PPTWriterContext* ctx, bool convertTextToPath)
-      : _ctx(ctx), _convertTextToPath(convertTextToPath) {
+  PPTWriter(PPTWriterContext* ctx, const PAGXDocument* doc, bool convertTextToPath)
+      : _ctx(ctx), _doc(doc), _convertTextToPath(convertTextToPath) {
   }
 
   void writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& parentMatrix = {},
@@ -385,7 +444,12 @@ class PPTWriter {
 
  private:
   PPTWriterContext* _ctx;
+  const PAGXDocument* _doc;
   bool _convertTextToPath;
+  LayerBuildResult _buildResult = {};
+  bool _buildResultReady = false;
+
+  const LayerBuildResult& ensureBuildResult();
 
   void writeElements(XMLBuilder& out, const std::vector<Element*>& elements,
                      const Matrix& transform, float alpha,
@@ -407,6 +471,10 @@ class PPTWriter {
                   int64_t extCY, int rot = 0);
   void endShape(XMLBuilder& out);
 
+  // Rasterized image as p:pic element
+  void writePicture(XMLBuilder& out, const std::string& relId, int64_t offX, int64_t offY,
+                    int64_t extCX, int64_t extCY);
+
   // Fill / stroke / effects
   void writeFill(XMLBuilder& out, const Fill* fill, float alpha);
   void writeColorSource(XMLBuilder& out, const ColorSource* source, float alpha);
@@ -415,8 +483,8 @@ class PPTWriter {
   void writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& filters);
 
   // Custom geometry from PathData
-  void writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY,
-                       float boundsW, float boundsH);
+  void writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY, float boundsW,
+                       float boundsH);
 
   // Transform decomposition
   struct Xform {
@@ -481,6 +549,51 @@ void PPTWriter::beginShape(XMLBuilder& out, const char* name, int64_t offX, int6
 void PPTWriter::endShape(XMLBuilder& out) {
   out.end();  // p:spPr
   out.end();  // p:sp
+}
+
+// ── Lazy build result ───────────────────────────────────────────────────────
+
+const LayerBuildResult& PPTWriter::ensureBuildResult() {
+  if (!_buildResultReady) {
+    _buildResult = LayerBuilder::BuildWithMap(const_cast<PAGXDocument*>(_doc));
+    _buildResultReady = true;
+  }
+  return _buildResult;
+}
+
+// ── Rasterized picture ──────────────────────────────────────────────────────
+
+void PPTWriter::writePicture(XMLBuilder& out, const std::string& relId, int64_t offX, int64_t offY,
+                             int64_t extCX, int64_t extCY) {
+  int id = _ctx->nextShapeId();
+  out.open("p:pic").gt();
+
+  out.open("p:nvPicPr").gt();
+  out.open("p:cNvPr").a("id", id).a("name", "MaskedImage").sc();
+  out.open("p:cNvPicPr").gt();
+  out.open("a:picLocks").a("noChangeAspect", "1").sc();
+  out.end();  // p:cNvPicPr
+  out.open("p:nvPr").sc();
+  out.end();  // p:nvPicPr
+
+  out.open("p:blipFill").gt();
+  out.open("a:blip").a("r:embed", relId).sc();
+  out.open("a:stretch").gt();
+  out.open("a:fillRect").sc();
+  out.end();  // a:stretch
+  out.end();  // p:blipFill
+
+  out.open("p:spPr").gt();
+  out.open("a:xfrm").gt();
+  out.open("a:off").a("x", offX).a("y", offY).sc();
+  out.open("a:ext").a("cx", extCX).a("cy", extCY).sc();
+  out.end();  // a:xfrm
+  out.open("a:prstGeom").a("prst", "rect").gt();
+  out.open("a:avLst").sc();
+  out.end();  // a:prstGeom
+  out.end();  // p:spPr
+
+  out.end();  // p:pic
 }
 
 // ── Color source / gradient ────────────────────────────────────────────────
@@ -801,8 +914,7 @@ void PPTWriter::writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const Fill
 }
 
 void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInfo& fs,
-                          const Matrix& m, float alpha,
-                          const std::vector<LayerFilter*>& filters) {
+                          const Matrix& m, float alpha, const std::vector<LayerFilter*>& filters) {
   if (!path->data || path->data->isEmpty()) {
     return;
   }
@@ -847,9 +959,8 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
     }
 
     Matrix combinedMatrix = m * gp.transform;
-    auto xf =
-        decomposeXform(localBounds.x, localBounds.y, localBounds.width, localBounds.height,
-                       combinedMatrix);
+    auto xf = decomposeXform(localBounds.x, localBounds.y, localBounds.width, localBounds.height,
+                             combinedMatrix);
     beginShape(out, "Glyph", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
     writeCustomGeom(out, gp.pathData, localBounds.x, localBounds.y, localBounds.width,
                     localBounds.height);
@@ -877,8 +988,7 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
     posX = fs.textBox->position.x;
     posY = fs.textBox->position.y;
     estWidth = fs.textBox->size.width;
-    estHeight = (fs.textBox->size.height > 0) ? fs.textBox->size.height
-                                              : text->fontSize * 1.4f;
+    estHeight = (fs.textBox->size.height > 0) ? fs.textBox->size.height : text->fontSize * 1.4f;
   }
 
   auto xf = decomposeXform(posX, posY, estWidth, estHeight, m);
@@ -925,8 +1035,8 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   size_t pos = 0;
   while (pos <= remaining.size()) {
     size_t nl = remaining.find('\n', pos);
-    std::string line = (nl == std::string::npos) ? remaining.substr(pos)
-                                                  : remaining.substr(pos, nl - pos);
+    std::string line =
+        (nl == std::string::npos) ? remaining.substr(pos) : remaining.substr(pos, nl - pos);
     out.open("a:p").gt();
 
     const char* algn = nullptr;
@@ -1053,6 +1163,25 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& pa
   Matrix layerMatrix = parentMatrix * BuildLayerMatrix(layer);
   float layerAlpha = parentAlpha * layer->alpha;
 
+  if (layer->mask != nullptr) {
+    auto& buildResult = ensureBuildResult();
+    auto it = buildResult.layerMap.find(layer);
+    if (it != buildResult.layerMap.end()) {
+      auto tgfxLayer = it->second;
+      auto pngData = RenderMaskedLayer(buildResult.root, tgfxLayer);
+      if (pngData) {
+        auto bounds = tgfxLayer->getBounds(buildResult.root.get(), true);
+        auto offX = PxToEMU(bounds.left);
+        auto offY = PxToEMU(bounds.top);
+        auto extCX = std::max(int64_t(1), PxToEMU(bounds.width()));
+        auto extCY = std::max(int64_t(1), PxToEMU(bounds.height()));
+        auto relId = _ctx->addRawImage(std::move(pngData));
+        writePicture(out, relId, offX, offY, extCX, extCY);
+      }
+    }
+    return;
+  }
+
   writeElements(out, layer->contents, layerMatrix, layerAlpha, layer->filters);
 
   for (const auto* child : layer->children) {
@@ -1111,8 +1240,7 @@ static std::string GeneratePresentation(float w, float h) {
        "xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">";
   s += "<p:sldMasterIdLst><p:sldMasterId id=\"2147483648\" r:id=\"rId1\"/></p:sldMasterIdLst>";
   s += "<p:sldIdLst><p:sldId id=\"256\" r:id=\"rId2\"/></p:sldIdLst>";
-  s += "<p:sldSz cx=\"" + I64(PxToEMU(w)) + "\" cy=\"" + I64(PxToEMU(h)) +
-       "\" type=\"custom\"/>";
+  s += "<p:sldSz cx=\"" + I64(PxToEMU(w)) + "\" cy=\"" + I64(PxToEMU(h)) + "\" type=\"custom\"/>";
   s += "<p:notesSz cx=\"" + I64(PxToEMU(w)) + "\" cy=\"" + I64(PxToEMU(h)) + "\"/>";
   s += "</p:presentation>";
   return s;
@@ -1141,9 +1269,11 @@ static std::string GenerateSlideRels(const PPTWriterContext& ctx) {
        "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout\" "
        "Target=\"../slideLayouts/slideLayout1.xml\"/>";
   for (const auto& img : ctx.images()) {
-    s += "<Relationship Id=\"" + img.relId + "\" "
+    s += "<Relationship Id=\"" + img.relId +
+         "\" "
          "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" "
-         "Target=\"../" + img.mediaPath.substr(4) + "\"/>";
+         "Target=\"../" +
+         img.mediaPath.substr(4) + "\"/>";
   }
   s += "</Relationships>";
   return s;
@@ -1255,7 +1385,7 @@ static std::string GenerateTheme() {
 bool PPTExporter::ToFile(const PAGXDocument& doc, const std::string& filePath,
                          const Options& options) {
   PPTWriterContext context;
-  PPTWriter writer(&context, options.convertTextToPath);
+  PPTWriter writer(&context, &doc, options.convertTextToPath);
 
   // Build slide body content
   XMLBuilder body(16384);
@@ -1267,9 +1397,10 @@ bool PPTExporter::ToFile(const PAGXDocument& doc, const std::string& filePath,
   // Assemble slide XML
   std::string slide;
   slide += "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
-  slide += "<p:sld xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" "
-           "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" "
-           "xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">";
+  slide +=
+      "<p:sld xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" "
+      "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" "
+      "xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">";
   slide += "<p:cSld><p:spTree>";
   slide += "<p:nvGrpSpPr><p:cNvPr id=\"1\" name=\"\"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>";
   slide += "<p:grpSpPr/>";
@@ -1293,9 +1424,13 @@ bool PPTExporter::ToFile(const PAGXDocument& doc, const std::string& filePath,
   zip.addFile("ppt/theme/theme1.xml", GenerateTheme());
 
   for (const auto& img : context.images()) {
-    auto data = GetImageData(img.image);
-    if (data && data->size() > 0) {
-      zip.addFile(img.mediaPath, data->bytes(), data->size());
+    if (img.rawData && img.rawData->size() > 0) {
+      zip.addFile(img.mediaPath, img.rawData->bytes(), img.rawData->size());
+    } else if (img.image) {
+      auto data = GetImageData(img.image);
+      if (data && data->size() > 0) {
+        zip.addFile(img.mediaPath, data->bytes(), data->size());
+      }
     }
   }
 
