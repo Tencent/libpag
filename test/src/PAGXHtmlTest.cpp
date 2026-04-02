@@ -590,7 +590,7 @@ CLI_TEST(PAGXHtmlTest, HtmlScreenshotCompare) {
   auto files = GetHtmlTestFiles();
   ASSERT_FALSE(files.empty()) << "No .pagx files found in resources/pagx_to_html/";
 
-  auto outDir = ProjectPath::Absolute("test/out/PAGXHtmlScreenshot");
+  auto outDir = ProjectPath::Absolute("test/out/PAGXHtmlTest");
   std::filesystem::create_directories(outDir);
 
   for (const auto& filePath : files) {
