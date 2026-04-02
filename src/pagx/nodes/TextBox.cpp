@@ -39,7 +39,7 @@ static TextLayoutParams MakeTextLayoutParams(const TextBox* textBox, float boxWi
   return params;
 }
 
-void TextBox::onMeasure(const LayoutContext& context) {
+void TextBox::onMeasure(LayoutContext* context) {
   if (!std::isnan(width) && !std::isnan(height)) {
     preferredWidth = width;
     preferredHeight = height;
@@ -48,17 +48,17 @@ void TextBox::onMeasure(const LayoutContext& context) {
   auto params = MakeTextLayoutParams(this, width, height);
   std::vector<Text*> childText = {};
   TextLayout::CollectTextElements(elements, childText);
-  auto measured = TextLayout::Measure(childText, params, context);
-  preferredWidth = std::isnan(width) ? measured.width : width;
-  preferredHeight = std::isnan(height) ? measured.height : height;
+  auto result = TextLayout::Layout(childText, params, context);
+  preferredWidth = std::isnan(width) ? result.bounds.width : width;
+  preferredHeight = std::isnan(height) ? result.bounds.height : height;
 }
 
-void TextBox::setLayoutSize(const LayoutContext&, float width, float height) {
+void TextBox::setLayoutSize(LayoutContext*, float width, float height) {
   layoutWidth = !std::isnan(width) ? width : preferredWidth;
   layoutHeight = !std::isnan(height) ? height : preferredHeight;
 }
 
-void TextBox::updateLayout(const LayoutContext& context) {
+void TextBox::updateLayout(LayoutContext* context) {
   auto nodes = CollectLayoutNodes(elements, true);
   PerformConstraintLayout(nodes, layoutWidth, layoutHeight, context);
   auto params = MakeTextLayoutParams(this, layoutWidth, layoutHeight);
@@ -66,11 +66,8 @@ void TextBox::updateLayout(const LayoutContext& context) {
   TextLayout::CollectTextElements(elements, childText);
   auto result = TextLayout::Layout(childText, params, context);
   for (size_t i = 0; i < childText.size(); i++) {
-    TextLayout::StoreTextBounds(childText[i], result.getTextBounds(childText[i]));
-    auto* runs = result.getGlyphRuns(childText[i]);
-    if (runs) {
-      TextLayout::StoreLayoutRuns(childText[i], std::vector<TextLayoutGlyphRun>(*runs));
-    }
+    childText[i]->textBounds = result.getTextBounds(childText[i]);
+    childText[i]->layoutRuns = result.extractLayoutRuns(childText[i]);
   }
 }
 

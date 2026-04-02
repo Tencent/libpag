@@ -26,6 +26,8 @@
 
 namespace pagx {
 
+class LayoutContext;
+
 struct ShapedGlyph {
   tgfx::GlyphID glyphID = 0;
   uint32_t cluster = 0;
@@ -39,12 +41,13 @@ struct ShapedGlyph {
 class HarfBuzzShaper {
  public:
   /**
-   * Shapes the given UTF-8 text using the primary font and optional fallback fonts. Returns shaped
-   * glyphs with positioning info. Glyphs with glyphID=0 could not be shaped by any font.
+   * Shapes the given UTF-8 text using the primary font and a LayoutContext for character-level
+   * fallback. Returns shaped glyphs with positioning info. Glyphs with glyphID=0 could not be
+   * shaped by any font.
    */
   static std::vector<ShapedGlyph> Shape(const std::string& text, const tgfx::Font& primaryFont,
-                                        const std::vector<tgfx::Font>& fallbackFonts = {},
-                                        bool vertical = false, bool rtl = false);
+                                        LayoutContext& layoutContext, bool vertical = false,
+                                        bool rtl = false);
 
   /**
    * Purges internal HarfBuzz font caches.

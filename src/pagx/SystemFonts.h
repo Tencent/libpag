@@ -21,7 +21,7 @@
 #include <string>
 #include <vector>
 
-namespace pagx::cli {
+namespace pagx {
 
 /**
  * Describes a font location for deferred loading. Stores enough information to create a Typeface
@@ -49,4 +49,4 @@ class SystemFonts {
   static std::vector<FontLocation> FallbackTypefaces();
 };
 
-}  // namespace pagx::cli
+}  // namespace pagx

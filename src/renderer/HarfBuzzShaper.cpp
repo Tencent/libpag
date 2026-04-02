@@ -23,8 +23,10 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <unordered_map>
 #include "UTF8Utils.h"
 #include "hb.h"
+#include "pagx/LayoutContext.h"
 
 namespace pagx {
 
@@ -245,11 +247,13 @@ static hb_script_t ResolveScript(int32_t codepoint, hb_script_t lastScript) {
 // Performs combined font + script itemization. Each character is assigned the best available font
 // and an effective script. Adjacent characters sharing both font and script are merged into runs.
 static std::vector<ShapingRun> ItemizeRuns(const std::string& text, const tgfx::Font& primaryFont,
-                                           const std::vector<tgfx::Font>& fallbackFonts) {
+                                           LayoutContext& layoutContext) {
   std::vector<ShapingRun> runs;
   size_t pos = 0;
   const tgfx::Font* lastFont = nullptr;
   hb_script_t lastScript = HB_SCRIPT_COMMON;
+  auto primaryTypeface = primaryFont.getTypeface();
+  std::unordered_map<const tgfx::Typeface*, tgfx::Font> fallbackFontCache = {};
 
   while (pos < text.size()) {
     int32_t codepoint = 0;
@@ -264,11 +268,16 @@ static std::vector<ShapingRun> ItemizeRuns(const std::string& text, const tgfx::
     if (primaryFont.getGlyphID(codepoint) != 0) {
       bestFont = &primaryFont;
     } else {
-      for (const auto& fallback : fallbackFonts) {
-        if (fallback.getGlyphID(codepoint) != 0) {
-          bestFont = &fallback;
-          break;
+      auto fallbackTypeface = layoutContext.fallbackTypeface(codepoint, primaryTypeface.get());
+      if (fallbackTypeface != nullptr) {
+        auto it = fallbackFontCache.find(fallbackTypeface.get());
+        if (it == fallbackFontCache.end()) {
+          tgfx::Font f(fallbackTypeface, primaryFont.getSize());
+          f.setFauxBold(primaryFont.isFauxBold());
+          f.setFauxItalic(primaryFont.isFauxItalic());
+          it = fallbackFontCache.emplace(fallbackTypeface.get(), std::move(f)).first;
         }
+        bestFont = &it->second;
       }
     }
 
@@ -301,14 +310,14 @@ static std::vector<ShapingRun> ItemizeRuns(const std::string& text, const tgfx::
 
 std::vector<ShapedGlyph> HarfBuzzShaper::Shape(const std::string& text,
                                                const tgfx::Font& primaryFont,
-                                               const std::vector<tgfx::Font>& fallbackFonts,
-                                               bool vertical, bool rtl) {
+                                               LayoutContext& layoutContext, bool vertical,
+                                               bool rtl) {
   if (text.empty()) {
     return {};
   }
 
   // Phase 1: Combined font + script itemization.
-  auto shapingRuns = ItemizeRuns(text, primaryFont, fallbackFonts);
+  auto shapingRuns = ItemizeRuns(text, primaryFont, layoutContext);
   if (shapingRuns.empty()) {
     return {};
   }

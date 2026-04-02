@@ -1961,7 +1961,8 @@ CLI_TEST(PAGXCliTest, LayoutCheck_XPath) {
 CLI_TEST(PAGXCliTest, LayoutCheck_CheckJson) {
   auto path = TestResourcePath("layout_check_overlap.pagx");
   auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", "--json", path});
-  EXPECT_EQ(ret, 1);
+  // Manual-positioned Layers without container layout no longer trigger overlap warnings.
+  EXPECT_EQ(ret, 0);
 }
 
 CLI_TEST(PAGXCliTest, LayoutCheck_CheckClean) {
@@ -1978,8 +1979,9 @@ CLI_TEST(PAGXCliTest, LayoutCheck_CheckOverlap) {
   auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
   std::cout.rdbuf(old);
   auto output = oss.str();
-  EXPECT_EQ(ret, 1);
-  EXPECT_TRUE(output.find("overlaps with") != std::string::npos);
+  // Manual-positioned Layers without container layout no longer trigger overlap warnings.
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("overlaps with") == std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, LayoutCheck_Elements) {
@@ -1992,6 +1994,66 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ElementsJson) {
   auto path = TestResourcePath("layout_check_elements.pagx");
   auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--json", path});
   EXPECT_EQ(ret, 0);
+}
+
+// Background Rectangle on a layout Layer should not trigger overlap warnings with child Layers.
+CLI_TEST(PAGXCliTest, LayoutCheck_BackgroundNoOverlap) {
+  auto path = TestResourcePath("layout_check_background.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("overlaps with") == std::string::npos);
+}
+
+// Manual-positioned Layers without container layout should not trigger overlap warnings.
+CLI_TEST(PAGXCliTest, LayoutCheck_ManualPositionNoOverlap) {
+  auto path = TestResourcePath("layout_check_layout_overlap.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("overlaps with") == std::string::npos);
+}
+
+// Text with system fonts should be measured correctly via font fallback (not zero-size).
+CLI_TEST(PAGXCliTest, LayoutCheck_TextFontFallback) {
+  auto path = TestResourcePath("layout_check_text_fallback.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("zero size") == std::string::npos);
+}
+
+// Horizontal and vertical line Paths (single-axis zero) should not trigger zero-size warnings.
+// Only a degenerate point Path (both axes zero) should be flagged.
+CLI_TEST(PAGXCliTest, LayoutCheck_PathZeroSize) {
+  auto path = TestResourcePath("layout_check_path_zero.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  // The point Path should trigger zero-size.
+  EXPECT_EQ(ret, 1);
+  // Only one zero-size problem (the degenerate point), not three.
+  auto pos = output.find("zero size");
+  EXPECT_TRUE(pos != std::string::npos);
+  // Verify no second occurrence.
+  if (pos != std::string::npos) {
+    EXPECT_TRUE(output.find("zero size", pos + 1) == std::string::npos);
+  }
 }
 
 }  // namespace pag

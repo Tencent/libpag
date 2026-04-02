@@ -21,12 +21,12 @@
 
 namespace pagx {
 
-void Ellipse::onMeasure(const LayoutContext&) {
+void Ellipse::onMeasure(LayoutContext*) {
   preferredWidth = size.width;
   preferredHeight = size.height;
 }
 
-void Ellipse::setLayoutSize(const LayoutContext&, float width, float height) {
+void Ellipse::setLayoutSize(LayoutContext*, float width, float height) {
   if (!std::isnan(width)) {
     size.width = width;
   }
@@ -37,7 +37,7 @@ void Ellipse::setLayoutSize(const LayoutContext&, float width, float height) {
   layoutHeight = size.height;
 }
 
-void Ellipse::setLayoutPosition(const LayoutContext&, float x, float y) {
+void Ellipse::setLayoutPosition(LayoutContext*, float x, float y) {
   if (!std::isnan(x)) {
     position.x = x + size.width * 0.5f;
     layoutX = x;

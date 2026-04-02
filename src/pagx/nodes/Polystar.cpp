@@ -63,7 +63,7 @@ Rect Polystar::getContentBounds() const {
   return Rect::MakeXYWH(minX, minY, maxX - minX, maxY - minY);
 }
 
-void Polystar::onMeasure(const LayoutContext&) {
+void Polystar::onMeasure(LayoutContext*) {
   auto bounds = getContentBounds();
   preferredX = bounds.x;
   preferredY = bounds.y;
@@ -71,7 +71,7 @@ void Polystar::onMeasure(const LayoutContext&) {
   preferredHeight = bounds.height;
 }
 
-void Polystar::setLayoutSize(const LayoutContext&, float width, float height) {
+void Polystar::setLayoutSize(LayoutContext*, float width, float height) {
   float scale = LayoutNode::ComputeUniformScale(preferredWidth, preferredHeight, width, height);
   if (scale != 1.0f) {
     outerRadius = outerRadius * scale;
@@ -82,7 +82,7 @@ void Polystar::setLayoutSize(const LayoutContext&, float width, float height) {
   layoutHeight = bounds.height;
 }
 
-void Polystar::setLayoutPosition(const LayoutContext&, float x, float y) {
+void Polystar::setLayoutPosition(LayoutContext*, float x, float y) {
   auto bounds = getContentBounds();
   if (!std::isnan(x)) {
     position.x = x - bounds.x;

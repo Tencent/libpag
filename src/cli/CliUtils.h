@@ -23,8 +23,8 @@
 #include <cstdio>
 #include <string>
 #include <vector>
-#include "SystemFonts.h"
 #include "pagx/FontConfig.h"
+#include "pagx/SystemFonts.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx::cli {
@@ -60,17 +60,6 @@ static inline std::shared_ptr<tgfx::Typeface> ResolveSystemTypeface(const std::s
     }
   }
   return nullptr;
-}
-
-/**
- * Adds system fallback fonts to the given FontConfig as deferred entries. Fonts are loaded on
- * demand during text shaping, not upfront.
- */
-inline void SetupSystemFallbackFonts(FontConfig& fontProvider) {
-  auto locations = SystemFonts::FallbackTypefaces();
-  for (const auto& loc : locations) {
-    fontProvider.addFallbackFont(loc.path, loc.ttcIndex, loc.fontFamily, loc.fontStyle);
-  }
 }
 
 /**

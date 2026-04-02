@@ -2199,7 +2199,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {
   pagx::LayoutContext layoutContext(&fontConfig);
   pagx::TextLayoutParams params = {};
   params.baseline = text->baseline;
-  auto origBounds = pagx::TextLayout::Layout({text}, params, layoutContext);
+  auto origBounds = pagx::TextLayout::Layout({text}, params, &layoutContext);
   float origWidth = origBounds.bounds.width;
   float origHeight = origBounds.bounds.height;
 
@@ -2246,7 +2246,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextSingleAxis) {
   pagx::LayoutContext layoutContext(&fontConfig);
   pagx::TextLayoutParams params = {};
   params.baseline = text->baseline;
-  auto origBounds = pagx::TextLayout::Layout({text}, params, layoutContext);
+  auto origBounds = pagx::TextLayout::Layout({text}, params, &layoutContext);
   float origWidth = origBounds.bounds.width;
 
   layer->contents.push_back(text);
@@ -2257,37 +2257,6 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextSingleAxis) {
   // areaWidth = 380, scale = 380 / ceil(origWidth)
   float expectedFontSize = 50 * 380 / std::ceil(origWidth);
   EXPECT_FLOAT_EQ(text->fontSize, expectedFontSize);
-}
-
-PAGX_TEST(PAGXTest, LayoutConstraintScaleTextSkipWithTextBox) {
-  auto doc = pagx::PAGXDocument::Make(400, 200);
-  auto layer = doc->makeNode<pagx::Layer>();
-  doc->layers.push_back(layer);
-
-  layer->width = 400;
-  layer->height = 200;
-
-  auto textBox = doc->makeNode<pagx::TextBox>();
-  textBox->width = 200;
-  textBox->height = 100;
-  textBox->position = {100, 50};
-
-  auto text = doc->makeNode<pagx::Text>();
-  text->text = "Hello";
-  text->fontSize = 24;
-  text->position = {0, 0};
-  text->left = 20;
-  text->right = 20;
-  text->top = 10;
-  text->bottom = 10;
-
-  layer->contents = {textBox, text};
-
-  doc->applyLayout();
-
-  // TextBox exists in the same scope, so Text should skip scaling.
-  // fontSize remains unchanged.
-  EXPECT_FLOAT_EQ(text->fontSize, 24.0f);
 }
 
 PAGX_TEST(PAGXTest, LayoutConstraintScaleExactFit) {
@@ -4632,7 +4601,7 @@ PAGX_TEST(PAGXTest, LayoutTextIndependentConstraint) {
   pagx::LayoutContext layoutContext(&fontConfig);
   pagx::TextLayoutParams params = {};
   params.baseline = text->baseline;
-  auto origBounds = pagx::TextLayout::Layout({text}, params, layoutContext);
+  auto origBounds = pagx::TextLayout::Layout({text}, params, &layoutContext);
 
   doc->setFontConfig(fontConfig);
   doc->applyLayout();

@@ -93,11 +93,11 @@ class Group : public Element, public LayoutNode {
  protected:
   Group() = default;
 
-  void updateSize(const LayoutContext& context) override;
-  void onMeasure(const LayoutContext& context) override;
-  void setLayoutSize(const LayoutContext& context, float width, float height) override;
-  void setLayoutPosition(const LayoutContext& context, float x, float y) override;
-  void updateLayout(const LayoutContext& context) override;
+  void updateSize(LayoutContext* context) override;
+  void onMeasure(LayoutContext* context) override;
+  void setLayoutSize(LayoutContext* context, float width, float height) override;
+  void setLayoutPosition(LayoutContext* context, float x, float y) override;
+  void updateLayout(LayoutContext* context) override;
 
   friend class PAGXDocument;
 };

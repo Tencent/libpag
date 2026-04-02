@@ -22,7 +22,7 @@
 
 namespace pagx {
 
-void Group::updateSize(const LayoutContext& context) {
+void Group::updateSize(LayoutContext* context) {
   for (auto* child : elements) {
     auto* node = LayoutNode::AsLayoutNode(child);
     if (node) {
@@ -32,16 +32,16 @@ void Group::updateSize(const LayoutContext& context) {
   LayoutNode::updateSize(context);
 }
 
-void Group::onMeasure(const LayoutContext&) {
+void Group::onMeasure(LayoutContext*) {
   MeasureChildNodes(elements, width, height, preferredWidth, preferredHeight);
 }
 
-void Group::setLayoutSize(const LayoutContext&, float width, float height) {
+void Group::setLayoutSize(LayoutContext*, float width, float height) {
   layoutWidth = !std::isnan(width) ? width : preferredWidth;
   layoutHeight = !std::isnan(height) ? height : preferredHeight;
 }
 
-void Group::setLayoutPosition(const LayoutContext&, float x, float y) {
+void Group::setLayoutPosition(LayoutContext*, float x, float y) {
   if (!std::isnan(x)) {
     position.x = x;
     layoutX = x;
@@ -52,7 +52,7 @@ void Group::setLayoutPosition(const LayoutContext&, float x, float y) {
   }
 }
 
-void Group::updateLayout(const LayoutContext& context) {
+void Group::updateLayout(LayoutContext* context) {
   auto nodes = CollectLayoutNodes(elements, false);
   PerformConstraintLayout(nodes, layoutWidth, layoutHeight, context);
 }

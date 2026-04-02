@@ -21,15 +21,15 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "pagx/FontConfig.h"
 
 namespace tgfx {
-class Font;
 class Typeface;
-}  // namespace tgfx
+}
 
 namespace pagx {
 
-class FontConfig;
+class SystemFonts;
 
 /**
  * Internal layout context that provides font lookup capabilities during the layout phase.
@@ -39,21 +39,26 @@ class LayoutContext {
  public:
   explicit LayoutContext(FontConfig* fontConfig);
 
-  /** Finds a typeface matching the given family and style (5-level fallback strategy). */
+  // Finds a typeface for the given family/style. Searches user-registered fonts first,
+  // then falls back to system font lookup via MakeFromName.
   std::shared_ptr<tgfx::Typeface> findTypeface(const std::string& fontFamily,
-                                               const std::string& fontStyle) const;
+                                               const std::string& fontStyle);
 
-  /** Builds a list of fallback fonts for character-level fallback during text shaping. */
-  std::vector<tgfx::Font> getFallbackFonts(float fontSize, bool fauxBold, bool fauxItalic,
-                                           const tgfx::Typeface* primaryTypeface) const;
+  // Finds a fallback typeface that contains the given codepoint. Searches user fallback
+  // fonts first, then system fallback fonts. Typefaces are created on demand.
+  std::shared_ptr<tgfx::Typeface> fallbackTypeface(int32_t codepoint,
+                                                   const tgfx::Typeface* primaryTypeface);
 
-  /** Returns the underlying FontConfig pointer. */
   FontConfig* getFontConfig() const {
     return fontConfig;
   }
 
  private:
+  void ensureSystemFallbacks();
+
   FontConfig* fontConfig = nullptr;
+  std::vector<TypefaceHolder> systemFallbacks = {};
+  bool systemFallbacksLoaded = false;
 };
 
 }  // namespace pagx

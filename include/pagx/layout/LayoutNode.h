@@ -82,22 +82,22 @@ class LayoutNode {
    * Phase 1 (bottom-up): measures this node. Container nodes override to recurse children first,
    * then call LayoutNode::updateSize. Leaf nodes use the base implementation directly.
    */
-  virtual void updateSize(const LayoutContext& context);
+  virtual void updateSize(LayoutContext* context);
 
   /**
    * Writes self rendering attributes and layoutWidth/layoutHeight. Does not touch children.
    */
-  virtual void setLayoutSize(const LayoutContext& context, float width, float height);
+  virtual void setLayoutSize(LayoutContext* context, float width, float height);
 
   /** Writes self position and layoutX/layoutY. */
-  virtual void setLayoutPosition(const LayoutContext&, float, float) {
+  virtual void setLayoutPosition(LayoutContext*, float, float) {
   }
 
   /**
    * Lays out children using layoutWidth/layoutHeight as container size.
    * Only container nodes (Group/TextBox/Layer) override this.
    */
-  virtual void updateLayout(const LayoutContext&) {
+  virtual void updateLayout(LayoutContext*) {
   }
 
   /**
@@ -105,7 +105,7 @@ class LayoutNode {
    * calls setLayoutSize + setLayoutPosition + updateLayout.
    */
   static void PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, float containerW,
-                                      float containerH, const LayoutContext& context);
+                                      float containerH, LayoutContext* context);
 
   /** Casts an Element to LayoutNode if the element participates in layout. Returns nullptr
    * otherwise. */
@@ -123,8 +123,8 @@ class LayoutNode {
 
   /**
    * Collects LayoutNode pointers from a list of elements. Skips elements that don't participate
-   * in layout. When skipTextLayout is true, Text and TextBox elements are excluded because their
-   * positioning is handled by TextLayout instead of constraint layout.
+   * in layout. When skipTextLayout is true, Text and TextBox elements are excluded — used by
+   * TextBox::updateLayout to skip its own Text children whose positioning is handled by TextLayout.
    */
   static std::vector<LayoutNode*> CollectLayoutNodes(const std::vector<Element*>& elements,
                                                      bool skipTextLayout);
@@ -140,7 +140,7 @@ class LayoutNode {
   LayoutNode() = default;
 
   /** Writes preferredWidth/preferredHeight. Called by updateSize when not yet measured. */
-  virtual void onMeasure(const LayoutContext&) {
+  virtual void onMeasure(LayoutContext*) {
   }
 
  private:

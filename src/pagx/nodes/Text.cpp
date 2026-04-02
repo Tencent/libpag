@@ -40,13 +40,10 @@ static TextLayoutParams MakeStandaloneParams(const Text* text) {
   return params;
 }
 
-void Text::onMeasure(const LayoutContext& context) {
+void Text::onMeasure(LayoutContext* context) {
   auto params = MakeStandaloneParams(this);
   auto result = TextLayout::Layout({this}, params, context);
-  auto* runs = result.getGlyphRuns(this);
-  if (runs) {
-    TextLayout::StoreLayoutRuns(this, std::vector<TextLayoutGlyphRun>(*runs));
-  }
+  layoutRuns = result.extractLayoutRuns(this);
   textBounds = result.bounds;
   preferredX = textBounds.x;
   preferredY = textBounds.y;
@@ -54,23 +51,20 @@ void Text::onMeasure(const LayoutContext& context) {
   preferredHeight = textBounds.height;
 }
 
-void Text::setLayoutSize(const LayoutContext& context, float width, float height) {
+void Text::setLayoutSize(LayoutContext* context, float width, float height) {
   float scale = LayoutNode::ComputeUniformScale(preferredWidth, preferredHeight, width, height);
   if (scale != 1.0f) {
     fontSize = fontSize * scale;
     auto params = MakeStandaloneParams(this);
     auto result = TextLayout::Layout({this}, params, context);
-    auto* runs = result.getGlyphRuns(this);
-    if (runs) {
-      TextLayout::StoreLayoutRuns(this, std::vector<TextLayoutGlyphRun>(*runs));
-    }
+    layoutRuns = result.extractLayoutRuns(this);
     textBounds = result.bounds;
   }
   layoutWidth = textBounds.width;
   layoutHeight = textBounds.height;
 }
 
-void Text::setLayoutPosition(const LayoutContext&, float x, float y) {
+void Text::setLayoutPosition(LayoutContext*, float x, float y) {
   if (!std::isnan(x)) {
     position.x = x - textBounds.x;
     layoutX = x;

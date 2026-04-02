@@ -30,7 +30,7 @@
 
 namespace pagx {
 
-void Layer::updateSize(const LayoutContext& context) {
+void Layer::updateSize(LayoutContext* context) {
   for (auto* element : contents) {
     auto* node = LayoutNode::AsLayoutNode(element);
     if (node) {
@@ -43,7 +43,7 @@ void Layer::updateSize(const LayoutContext& context) {
   LayoutNode::updateSize(context);
 }
 
-void Layer::onMeasure(const LayoutContext&) {
+void Layer::onMeasure(LayoutContext*) {
   preferredX = x;
   preferredY = y;
   // If both dimensions are explicit, use them directly.
@@ -121,7 +121,7 @@ void Layer::onMeasure(const LayoutContext&) {
   preferredHeight = !std::isnan(height) ? height : measuredH;
 }
 
-void Layer::setLayoutSize(const LayoutContext&, float width, float height) {
+void Layer::setLayoutSize(LayoutContext*, float width, float height) {
   layoutWidth = !std::isnan(width) ? width : preferredWidth;
   layoutHeight = !std::isnan(height) ? height : preferredHeight;
   if (clipToBounds && !hasScrollRect && !std::isnan(layoutWidth) && !std::isnan(layoutHeight)) {
@@ -130,7 +130,7 @@ void Layer::setLayoutSize(const LayoutContext&, float width, float height) {
   }
 }
 
-void Layer::setLayoutPosition(const LayoutContext&, float x, float y) {
+void Layer::setLayoutPosition(LayoutContext*, float x, float y) {
   if (!std::isnan(x)) {
     this->x = x;
     layoutX = x;
@@ -141,7 +141,7 @@ void Layer::setLayoutPosition(const LayoutContext&, float x, float y) {
   }
 }
 
-void Layer::updateLayout(const LayoutContext& context) {
+void Layer::updateLayout(LayoutContext* context) {
   // Flex container layout: arrange flex children.
   if (layout != LayoutMode::None && !children.empty()) {
     performContainerLayout(context);
@@ -158,7 +158,7 @@ void Layer::updateLayout(const LayoutContext& context) {
   LayoutNode::PerformConstraintLayout(nodes, layoutWidth, layoutHeight, context);
 }
 
-void Layer::performContainerLayout(const LayoutContext& context) {
+void Layer::performContainerLayout(LayoutContext* context) {
   bool horizontal = (layout == LayoutMode::Horizontal);
 
   float containerMainSize = horizontal ? layoutWidth : layoutHeight;

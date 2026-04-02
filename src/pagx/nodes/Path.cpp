@@ -23,7 +23,7 @@
 
 namespace pagx {
 
-void Path::onMeasure(const LayoutContext&) {
+void Path::onMeasure(LayoutContext*) {
   if (data) {
     auto bounds = data->getBounds();
     preferredX = bounds.x;
@@ -33,7 +33,7 @@ void Path::onMeasure(const LayoutContext&) {
   }
 }
 
-void Path::setLayoutSize(const LayoutContext&, float width, float height) {
+void Path::setLayoutSize(LayoutContext*, float width, float height) {
   if (!data) {
     return;
   }
@@ -46,7 +46,7 @@ void Path::setLayoutSize(const LayoutContext&, float width, float height) {
   layoutHeight = bounds.height;
 }
 
-void Path::setLayoutPosition(const LayoutContext&, float x, float y) {
+void Path::setLayoutPosition(LayoutContext*, float x, float y) {
   if (!data) {
     return;
   }

@@ -55,15 +55,9 @@ class TypefaceHolder {
 
 /**
  * FontConfig manages registered and fallback typefaces for font lookup.
- * Provides a unified font discovery mechanism with a 5-level fallback strategy:
- *   1. Exact match in registered typefaces (family + style)
- *   2. Family-name match in registered typefaces (prefer "Regular" style)
- *   3. Family-name match in fallback typefaces
- *   4. First fallback typeface
- *   5. System font lookup
  * This decouples font configuration from text layout and layout computation,
  * allowing multiple components (LayoutContext, TextLayout, LayerBuilder) to share the same font
- * registry.
+ * registry. Font lookup is performed by LayoutContext using the data stored here.
  */
 class FontConfig {
  public:
@@ -92,17 +86,8 @@ class FontConfig {
   void addFallbackFont(const std::string& path, int ttcIndex, const std::string& fontFamily,
                        const std::string& fontStyle);
 
-  /**
-   * Finds and returns a typeface matching the requested family and style.
-   * Uses the 5-level fallback strategy described above.
-   * Returns nullptr if not found (including system font lookup failure).
-   */
-  std::shared_ptr<tgfx::Typeface> findTypeface(const std::string& fontFamily,
-                                               const std::string& fontStyle);
-
  private:
-  friend class TextLayoutContext;  // Allow TextLayoutContext to access fallbackTypefaces
-  friend class LayoutContext;      // Allow LayoutContext to access fallbackTypefaces
+  friend class LayoutContext;  // Allow LayoutContext to access registeredTypefaces and fallbackTypefaces
 
   struct FontKey {
     std::string family = {};

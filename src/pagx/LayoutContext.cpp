@@ -17,45 +17,113 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayoutContext.h"
-#include "pagx/FontConfig.h"
-#include "tgfx/core/Font.h"
+#include "SystemFonts.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
+
+static int StylePriority(const std::string& style) {
+  if (style == "Regular") {
+    return 0;
+  }
+  if (style == "Medium") {
+    return 1;
+  }
+  if (style == "Normal") {
+    return 2;
+  }
+  return 3;
+}
 
 LayoutContext::LayoutContext(FontConfig* fontConfig) : fontConfig(fontConfig) {
 }
 
 std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& fontFamily,
-                                                            const std::string& fontStyle) const {
-  if (fontConfig != nullptr) {
-    return fontConfig->findTypeface(fontFamily, fontStyle);
+                                                            const std::string& fontStyle) {
+  if (fontConfig == nullptr) {
+    if (!fontFamily.empty()) {
+      return tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
+    }
+    return nullptr;
   }
+
+  // Stage 1: Exact match in registered typefaces
+  if (!fontFamily.empty()) {
+    FontConfig::FontKey key = {};
+    key.family = fontFamily;
+    key.style = fontStyle.empty() ? "Regular" : fontStyle;
+    auto it = fontConfig->registeredTypefaces.find(key);
+    if (it != fontConfig->registeredTypefaces.end()) {
+      return it->second;
+    }
+
+    // Stage 2: Family-name match in registered typefaces (prefer Regular style)
+    std::shared_ptr<tgfx::Typeface> bestTypeface = nullptr;
+    int bestPriority = 4;
+    std::string bestStyle = {};
+    for (const auto& pair : fontConfig->registeredTypefaces) {
+      if (pair.first.family != fontFamily) {
+        continue;
+      }
+      int priority = StylePriority(pair.first.style);
+      bool preferred = (bestTypeface == nullptr) || (priority < bestPriority) ||
+                       (priority == bestPriority && pair.first.style < bestStyle);
+      if (preferred) {
+        bestTypeface = pair.second;
+        bestPriority = priority;
+        bestStyle = pair.first.style;
+      }
+    }
+    if (bestTypeface != nullptr) {
+      return bestTypeface;
+    }
+  }
+
+  // Stage 3: System font lookup via MakeFromName
   if (!fontFamily.empty()) {
     return tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
   }
+
   return nullptr;
 }
 
-std::vector<tgfx::Font> LayoutContext::getFallbackFonts(
-    float fontSize, bool fauxBold, bool fauxItalic, const tgfx::Typeface* primaryTypeface) const {
-  std::vector<tgfx::Font> fonts = {};
-  if (fontConfig == nullptr) {
-    return fonts;
+std::shared_ptr<tgfx::Typeface> LayoutContext::fallbackTypeface(
+    int32_t codepoint, const tgfx::Typeface* primaryTypeface) {
+  if (fontConfig != nullptr) {
+    // Search user-registered fallback fonts first.
+    for (auto& holder : fontConfig->fallbackTypefaces) {
+      auto typeface = holder.getTypeface();
+      if (typeface == nullptr || typeface.get() == primaryTypeface) {
+        continue;
+      }
+      if (typeface->getGlyphID(codepoint) != 0) {
+        return typeface;
+      }
+    }
   }
-  for (auto& holder : fontConfig->fallbackTypefaces) {
+  // Search system fallback fonts.
+  ensureSystemFallbacks();
+  for (auto& holder : systemFallbacks) {
     auto typeface = holder.getTypeface();
     if (typeface == nullptr || typeface.get() == primaryTypeface) {
       continue;
     }
-    tgfx::Font font = {};
-    font.setTypeface(typeface);
-    font.setSize(fontSize);
-    font.setFauxBold(fauxBold);
-    font.setFauxItalic(fauxItalic);
-    fonts.push_back(font);
+    if (typeface->getGlyphID(codepoint) != 0) {
+      return typeface;
+    }
   }
-  return fonts;
+  return nullptr;
+}
+
+void LayoutContext::ensureSystemFallbacks() {
+  if (systemFallbacksLoaded) {
+    return;
+  }
+  systemFallbacksLoaded = true;
+  auto locations = SystemFonts::FallbackTypefaces();
+  for (auto& loc : locations) {
+    systemFallbacks.emplace_back(loc.path, loc.ttcIndex, loc.fontFamily, loc.fontStyle);
+  }
 }
 
 }  // namespace pagx

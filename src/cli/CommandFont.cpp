@@ -261,10 +261,6 @@ static int RunFontEmbed(int argc, char* argv[]) {
   if (!fallbackTypefaces.empty()) {
     fontProvider.addFallbackTypefaces(std::move(fallbackTypefaces));
   }
-  auto systemFallbacks = SystemFonts::FallbackTypefaces();
-  for (const auto& loc : systemFallbacks) {
-    fontProvider.addFallbackFont(loc.path, loc.ttcIndex, loc.fontFamily, loc.fontStyle);
-  }
 
   document->setFontConfig(fontProvider);
   FontEmbedder::ClearEmbeddedGlyphRuns(document.get());

@@ -147,7 +147,7 @@ class PAGXDocument : public Node {
  private:
   PAGXDocument() = default;
   static void layoutLayers(const std::vector<Layer*>& layers, float containerW, float containerH,
-                           const LayoutContext& context);
+                           LayoutContext* context);
 
   void registerNode(Node* node, const std::string& id);
 

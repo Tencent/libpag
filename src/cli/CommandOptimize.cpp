@@ -1414,7 +1414,6 @@ static int RemoveOffCanvasChildren(
 
 static int RemoveOffCanvasLayers(PAGXDocument* document) {
   FontConfig fontProvider = {};
-  SetupSystemFallbackFonts(fontProvider);
   auto result = LayerBuilder::BuildWithMap(document, &fontProvider);
   if (result.root == nullptr) {
     return 0;

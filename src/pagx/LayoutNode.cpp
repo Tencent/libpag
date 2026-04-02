@@ -75,7 +75,7 @@ float LayoutNode::constraintExtentY() const {
   return extent;
 }
 
-void LayoutNode::updateSize(const LayoutContext& context) {
+void LayoutNode::updateSize(LayoutContext* context) {
   // If both preferred dimensions are already measured, skip onMeasure.
   if (!std::isnan(preferredWidth) && !std::isnan(preferredHeight)) {
     return;
@@ -87,13 +87,13 @@ void LayoutNode::updateSize(const LayoutContext& context) {
   preferredHeight = std::ceil(preferredHeight);
 }
 
-void LayoutNode::setLayoutSize(const LayoutContext&, float, float) {
+void LayoutNode::setLayoutSize(LayoutContext*, float, float) {
   // Default implementation: no rendering attributes to write.
   // layoutWidth/layoutHeight remain NAN (leaf nodes without specific behavior).
 }
 
 void LayoutNode::PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, float containerW,
-                                         float containerH, const LayoutContext& context) {
+                                         float containerH, LayoutContext* context) {
   for (auto* child : nodes) {
     // Phase 1: compute target size from opposite-edge constraints.
     float targetW = NAN;

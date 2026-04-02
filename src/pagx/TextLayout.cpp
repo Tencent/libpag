@@ -85,7 +85,7 @@ static size_t DecodeUTF8Char(const char* data, size_t remaining, int32_t* unicha
 // Build context that maintains state during text layout
 class TextLayoutContext {
  public:
-  explicit TextLayoutContext(FontConfig* fontConfig) : fontConfig_(fontConfig) {
+  explicit TextLayoutContext(LayoutContext* context) : layoutContext_(context) {
   }
 
   friend class TextLayout;
@@ -363,7 +363,14 @@ class TextLayoutContext {
   void shapeText(Text* text, ShapedInfo& info, bool vertical = false) {
     auto primaryTypeface = findTypeface(text->fontFamily, text->fontStyle);
     if (primaryTypeface == nullptr) {
-      return;
+      // Try to get a usable typeface from fallback for HarfBuzz to work with.
+      if (layoutContext_ != nullptr) {
+        // Use a common codepoint to find any available fallback typeface.
+        primaryTypeface = layoutContext_->fallbackTypeface('A', nullptr);
+      }
+      if (primaryTypeface == nullptr) {
+        return;
+      }
     }
 
     tgfx::Font primaryFont(primaryTypeface, text->fontSize);
@@ -374,22 +381,6 @@ class TextLayoutContext {
     bool hasLetterSpacing = !FloatNearlyEqual(text->letterSpacing, 0.0f);
 
 #ifdef PAG_USE_HARFBUZZ
-    // Build fallback fonts list for HarfBuzz shaping.
-    std::vector<tgfx::Font> fallbackFonts = {};
-    auto* fp = fontConfig_;
-    if (fp != nullptr) {
-      auto& holders = fp->fallbackTypefaces;
-      fallbackFonts.reserve(holders.size());
-      for (auto& holder : holders) {
-        auto fallback = holder.getTypeface();
-        if (fallback != nullptr && fallback != primaryTypeface) {
-          tgfx::Font fallbackFont(fallback, text->fontSize);
-          fallbackFont.setFauxBold(text->fauxBold);
-          fallbackFont.setFauxItalic(text->fauxItalic);
-          fallbackFonts.push_back(std::move(fallbackFont));
-        }
-      }
-    }
 
     // Collect newline and tab positions, then shape non-special segments.
     std::vector<TextSegment> segments = {};
@@ -431,7 +422,7 @@ class TextLayoutContext {
       rtl = seg.bidiLevel & 1;
 #endif
       auto shapedGlyphs =
-          HarfBuzzShaper::Shape(substring, primaryFont, fallbackFonts, vertical, rtl);
+          HarfBuzzShaper::Shape(substring, primaryFont, *layoutContext_, vertical, rtl);
 
 #ifdef PAG_BUILD_PAGX
       // HarfBuzz returns RTL glyphs in visual order (left-to-right). Sort them by cluster
@@ -491,7 +482,7 @@ class TextLayoutContext {
     // Non-HarfBuzz path: original per-character glyph lookup.
 
     // Fallback font cache: built on demand as fallback typefaces are loaded during glyph lookup.
-    std::unordered_map<tgfx::Typeface*, tgfx::Font> fallbackFontCache = {};
+    std::unordered_map<const tgfx::Typeface*, tgfx::Font> fallbackFontCache = {};
 
     std::shared_ptr<tgfx::Typeface> currentTypeface = nullptr;
 
@@ -529,13 +520,9 @@ class TextLayoutContext {
       tgfx::Font glyphFont = primaryFont;
       std::shared_ptr<tgfx::Typeface> glyphTypeface = primaryTypeface;
 
-      if (glyphID == 0 && fontConfig_ != nullptr) {
-        auto& fbHolders = fontConfig_->fallbackTypefaces;
-        for (auto& holder : fbHolders) {
-          auto fallback = holder.getTypeface();
-          if (fallback == nullptr || fallback == primaryTypeface) {
-            continue;
-          }
+      if (glyphID == 0 && layoutContext_ != nullptr) {
+        auto fallback = layoutContext_->fallbackTypeface(unichar, primaryTypeface.get());
+        if (fallback != nullptr) {
           auto it = fallbackFontCache.find(fallback.get());
           if (it == fallbackFontCache.end()) {
             tgfx::Font f(fallback, text->fontSize);
@@ -547,7 +534,6 @@ class TextLayoutContext {
           if (glyphID != 0) {
             glyphFont = it->second;
             glyphTypeface = fallback;
-            break;
           }
         }
       }
@@ -1638,10 +1624,10 @@ class TextLayoutContext {
 
   std::shared_ptr<tgfx::Typeface> findTypeface(const std::string& fontFamily,
                                                const std::string& fontStyle) {
-    return TextLayout::FindTypeface(fontFamily, fontStyle, fontConfig_);
+    return layoutContext_->findTypeface(fontFamily, fontStyle);
   }
 
-  FontConfig* fontConfig_ = nullptr;
+  LayoutContext* layoutContext_ = nullptr;
 };
 
 Rect TextLayoutResult::getTextBounds(Text* text) const {
@@ -1660,13 +1646,14 @@ const std::vector<TextLayoutGlyphRun>* TextLayoutResult::getGlyphRuns(Text* text
   return nullptr;
 }
 
-std::shared_ptr<tgfx::Typeface> TextLayout::FindTypeface(const std::string& fontFamily,
-                                                         const std::string& fontStyle,
-                                                         FontConfig* fontConfig) {
-  if (fontConfig != nullptr) {
-    return fontConfig->findTypeface(fontFamily, fontStyle);
+std::vector<TextLayoutGlyphRun> TextLayoutResult::extractLayoutRuns(Text* text) {
+  auto it = layoutGlyphRuns.find(text);
+  if (it != layoutGlyphRuns.end()) {
+    auto runs = std::move(it->second);
+    layoutGlyphRuns.erase(it);
+    return runs;
   }
-  return tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
+  return {};
 }
 
 void TextLayout::StoreShapedText(Text* text, ShapedText&& shapedText) {
@@ -1675,20 +1662,6 @@ void TextLayout::StoreShapedText(Text* text, ShapedText&& shapedText) {
   }
   text->textBlob = std::move(shapedText.textBlob);
   text->anchors = std::move(shapedText.anchors);
-}
-
-void TextLayout::StoreTextBounds(Text* text, const Rect& bounds) {
-  if (text == nullptr) {
-    return;
-  }
-  text->textBounds = bounds;
-}
-
-void TextLayout::StoreLayoutRuns(Text* text, std::vector<TextLayoutGlyphRun>&& runs) {
-  if (text == nullptr) {
-    return;
-  }
-  text->layoutRuns = std::move(runs);
 }
 
 void TextLayout::CollectTextElements(const std::vector<Element*>& elements,
@@ -1758,31 +1731,12 @@ static Rect MergeEmbeddedBounds(const std::vector<Text*>& textElements) {
   return totalBounds;
 }
 
-Rect TextLayout::Measure(const std::vector<Text*>& textElements, const TextLayoutParams& params,
-                         FontConfig* fontConfig) {
-  if (textElements.empty()) {
-    return {};
-  }
-  if (AllHaveEmbeddedGlyphRuns(textElements)) {
-    return MergeEmbeddedBounds(textElements);
-  }
-  TextLayoutContext context(fontConfig);
-  auto mutableElements = textElements;
-  auto result = context.processTextWithLayout(mutableElements, params);
-  return result.bounds;
-}
-
-Rect TextLayout::Measure(const std::vector<Text*>& textElements, const TextLayoutParams& params,
-                         const LayoutContext& context) {
-  return Measure(textElements, params, context.getFontConfig());
-}
-
 TextLayoutResult TextLayout::Layout(const std::vector<Text*>& textElements,
-                                    const TextLayoutParams& params, const LayoutContext& context) {
+                                    const TextLayoutParams& params, LayoutContext* context) {
   if (textElements.empty()) {
     return {};
   }
-  TextLayoutContext layoutContext(context.getFontConfig());
+  TextLayoutContext layoutContext(context);
   if (AllHaveEmbeddedGlyphRuns(textElements)) {
     // Embedded path: only compute bounds. TextBlob generation is deferred to the caller
     // (TextBox::updateLayout or LayerBuilder) which applies the inverse matrix.
@@ -1790,7 +1744,6 @@ TextLayoutResult TextLayout::Layout(const std::vector<Text*>& textElements,
     result.bounds = MergeEmbeddedBounds(textElements);
     return result;
   }
-  // Cast away const for internal processing (processTextWithLayout takes non-const vector).
   auto mutableElements = textElements;
   return layoutContext.processTextWithLayout(mutableElements, params);
 }

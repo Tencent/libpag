@@ -168,9 +168,9 @@ class Text : public Element, public LayoutNode {
   }
 
  protected:
-  void onMeasure(const LayoutContext& context) override;
-  void setLayoutSize(const LayoutContext& context, float width, float height) override;
-  void setLayoutPosition(const LayoutContext& context, float x, float y) override;
+  void onMeasure(LayoutContext* context) override;
+  void setLayoutSize(LayoutContext* context, float width, float height) override;
+  void setLayoutPosition(LayoutContext* context, float x, float y) override;
 
  private:
   Text() = default;
@@ -185,6 +185,7 @@ class Text : public Element, public LayoutNode {
   std::vector<TextLayoutGlyphRun> layoutRuns = {};
 
   friend class PAGXDocument;
+  friend class TextBox;
   friend class TextLayout;
 };
 

@@ -24,7 +24,7 @@
 #include <CoreText/CoreText.h>
 #include <set>
 
-namespace pagx::cli {
+namespace pagx {
 
 static std::string StringFromCFString(CFStringRef cfString) {
   if (cfString == nullptr) {
@@ -160,7 +160,7 @@ std::vector<FontLocation> SystemFonts::FallbackTypefaces() {
   return fallbacks;
 }
 
-}  // namespace pagx::cli
+}  // namespace pagx
 
 #elif defined(_WIN32)
 
@@ -169,7 +169,7 @@ std::vector<FontLocation> SystemFonts::FallbackTypefaces() {
 
 #pragma comment(lib, "dwrite.lib")
 
-namespace pagx::cli {
+namespace pagx {
 
 template <class T>
 static void SafeRelease(T** ppT) {
@@ -262,7 +262,7 @@ std::vector<FontLocation> SystemFonts::FallbackTypefaces() {
   return fallbacks;
 }
 
-}  // namespace pagx::cli
+}  // namespace pagx
 
 #elif defined(__linux__)
 
@@ -271,7 +271,7 @@ std::vector<FontLocation> SystemFonts::FallbackTypefaces() {
 #include <set>
 #include <string>
 
-namespace pagx::cli {
+namespace pagx {
 
 std::vector<FontLocation> SystemFonts::FallbackTypefaces() {
   FcPattern* pattern = FcPatternCreate();
@@ -336,16 +336,16 @@ std::vector<FontLocation> SystemFonts::FallbackTypefaces() {
   return fallbacks;
 }
 
-}  // namespace pagx::cli
+}  // namespace pagx
 
 #else
 
-namespace pagx::cli {
+namespace pagx {
 
 std::vector<FontLocation> SystemFonts::FallbackTypefaces() {
   return {};
 }
 
-}  // namespace pagx::cli
+}  // namespace pagx
 
 #endif

@@ -21,12 +21,12 @@
 
 namespace pagx {
 
-void Rectangle::onMeasure(const LayoutContext&) {
+void Rectangle::onMeasure(LayoutContext*) {
   preferredWidth = size.width;
   preferredHeight = size.height;
 }
 
-void Rectangle::setLayoutSize(const LayoutContext&, float width, float height) {
+void Rectangle::setLayoutSize(LayoutContext*, float width, float height) {
   if (!std::isnan(width)) {
     size.width = width;
   }
@@ -37,7 +37,7 @@ void Rectangle::setLayoutSize(const LayoutContext&, float width, float height) {
   layoutHeight = size.height;
 }
 
-void Rectangle::setLayoutPosition(const LayoutContext&, float x, float y) {
+void Rectangle::setLayoutPosition(LayoutContext*, float x, float y) {
   if (!std::isnan(x)) {
     position.x = x + size.width * 0.5f;
     layoutX = x;

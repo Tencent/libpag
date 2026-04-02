@@ -268,10 +268,6 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
   if (!fallbackTypefaces.empty()) {
     fontProvider.addFallbackTypefaces(std::move(fallbackTypefaces));
   }
-  auto systemFallbacks = SystemFonts::FallbackTypefaces();
-  for (const auto& loc : systemFallbacks) {
-    fontProvider.addFallbackFont(loc.path, loc.ttcIndex, loc.fontFamily, loc.fontStyle);
-  }
   bool hasTarget = !options.id.empty() || !options.xpath.empty();
   std::shared_ptr<tgfx::Layer> rootLayer = nullptr;
   std::shared_ptr<tgfx::Layer> targetTgfxLayer = nullptr;

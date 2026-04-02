@@ -29,6 +29,7 @@
 #include "pagx/layout/LayoutNode.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/Node.h"
 
 namespace pagx::cli {
 
@@ -70,9 +71,10 @@ static bool RectsOverlap(const LCRect& a, const LCRect& b) {
 }
 
 static bool IsFullyContained(const LCRect& parent, const LCRect& child) {
-  return child.x >= parent.x && child.y >= parent.y &&
-         child.x + child.width <= parent.x + parent.width &&
-         child.y + child.height <= parent.y + parent.height;
+  static constexpr float TOLERANCE = 0.5f;
+  return (child.x + TOLERANCE) >= parent.x && (child.y + TOLERANCE) >= parent.y &&
+         (child.x + child.width) <= (parent.x + parent.width + TOLERANCE) &&
+         (child.y + child.height) <= (parent.y + parent.height + TOLERANCE);
 }
 
 // ============================================================================
@@ -131,32 +133,61 @@ static void DetectZeroSize(CheckNode* node, bool check) {
   }
 }
 
-static void DetectProblems(const LCRect& parentBounds, bool parentClipToBounds,
-                           const std::vector<std::shared_ptr<CheckNode>>& children,
-                           const std::string& parentLayoutMode) {
-  for (size_t i = 0; i < children.size(); ++i) {
-    for (size_t j = i + 1; j < children.size(); ++j) {
-      if (RectsOverlap(children[i]->bounds, children[j]->bounds)) {
-        children[i]->problems.push_back("overlaps with " + children[j]->label);
-        children[j]->problems.push_back("overlaps with " + children[i]->label);
+static void DetectElementZeroSize(CheckNode* node, bool check, NodeType type) {
+  if (!check) {
+    return;
+  }
+  // Path and TextPath legitimately have a single zero axis (e.g. horizontal/vertical lines).
+  bool isZero = (type == NodeType::Path || type == NodeType::TextPath)
+                    ? (node->bounds.width == 0 && node->bounds.height == 0)
+                    : (node->bounds.width == 0 || node->bounds.height == 0);
+  if (isZero) {
+    std::ostringstream oss;
+    oss << "zero size (width: " << static_cast<int>(node->bounds.width)
+        << ", height: " << static_cast<int>(node->bounds.height) << "); node will be invisible";
+    node->problems.push_back(oss.str());
+  }
+}
+
+static void DetectOverlap(const std::vector<std::shared_ptr<CheckNode>>& layoutChildren,
+                          const std::string& parentLayoutMode) {
+  if (parentLayoutMode.empty()) {
+    return;
+  }
+  for (size_t i = 0; i < layoutChildren.size(); ++i) {
+    if (layoutChildren[i]->layoutPositioning == "ABSOLUTE") {
+      continue;
+    }
+    for (size_t j = i + 1; j < layoutChildren.size(); ++j) {
+      if (layoutChildren[j]->layoutPositioning == "ABSOLUTE") {
+        continue;
+      }
+      if (RectsOverlap(layoutChildren[i]->bounds, layoutChildren[j]->bounds)) {
+        layoutChildren[i]->problems.push_back("overlaps with " + layoutChildren[j]->label);
+        layoutChildren[j]->problems.push_back("overlaps with " + layoutChildren[i]->label);
       }
     }
   }
+}
 
-  if (parentClipToBounds) {
-    for (const auto& child : children) {
-      if (!IsFullyContained(parentBounds, child->bounds)) {
-        child->problems.push_back("clipped by parent (outside parent bounds)");
-      }
+static void DetectClippedContent(const LCRect& parentBounds,
+                                 const std::vector<std::shared_ptr<CheckNode>>& children) {
+  for (const auto& child : children) {
+    if (!IsFullyContained(parentBounds, child->bounds)) {
+      child->problems.push_back("clipped by parent (outside parent bounds)");
     }
   }
+}
 
-  if (!parentLayoutMode.empty()) {
-    for (const auto& child : children) {
-      if (child->layoutPositioning == "ABSOLUTE") {
-        child->problems.push_back("excluded from layout flow inside auto-layout parent (layout: " +
-                                  parentLayoutMode + "); includeInLayout is false");
-      }
+static void DetectExcludedFromLayout(const std::vector<std::shared_ptr<CheckNode>>& children,
+                                     const std::string& parentLayoutMode) {
+  if (parentLayoutMode.empty()) {
+    return;
+  }
+  for (const auto& child : children) {
+    if (child->layoutPositioning == "ABSOLUTE") {
+      child->problems.push_back("excluded from layout flow inside auto-layout parent (layout: " +
+                                parentLayoutMode + "); includeInLayout is false");
     }
   }
 }
@@ -182,7 +213,7 @@ static void BuildElementNodes(const std::vector<Element*>& elements,
     auto node = std::make_shared<CheckNode>();
     node->label = MakeLabel(NodeTypeName(element->nodeType()), element->id, i);
     node->bounds = {parentX + bounds.x, parentY + bounds.y, bounds.width, bounds.height};
-    DetectZeroSize(node.get(), check);
+    DetectElementZeroSize(node.get(), check, element->nodeType());
 
     if (element->nodeType() == NodeType::Group || element->nodeType() == NodeType::TextBox) {
       auto* group = static_cast<const Group*>(element);
@@ -190,9 +221,6 @@ static void BuildElementNodes(const std::vector<Element*>& elements,
         std::vector<std::shared_ptr<CheckNode>> groupChildren;
         BuildElementNodes(group->elements, groupChildren, node->bounds.x, node->bounds.y, check);
         if (!groupChildren.empty()) {
-          if (check) {
-            DetectProblems(node->bounds, false, groupChildren, "");
-          }
           node->children = std::move(groupChildren);
         }
       }
@@ -232,24 +260,34 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
 
   DetectZeroSize(node.get(), check);
 
-  std::vector<std::shared_ptr<CheckNode>> childNodes;
+  std::vector<std::shared_ptr<CheckNode>> elementNodes;
+  std::vector<std::shared_ptr<CheckNode>> childLayerNodes;
 
   if (!layer->contents.empty()) {
-    BuildElementNodes(layer->contents, childNodes, node->bounds.x, node->bounds.y, check);
+    BuildElementNodes(layer->contents, elementNodes, node->bounds.x, node->bounds.y, check);
   }
 
   for (int i = 0; i < static_cast<int>(layer->children.size()); ++i) {
     auto childNode = BuildLayoutTree(layer->children[i], node->bounds.x, node->bounds.y, i, check);
     if (childNode) {
-      childNodes.push_back(childNode);
+      childLayerNodes.push_back(childNode);
     }
   }
 
-  if (!childNodes.empty()) {
-    if (check) {
-      DetectProblems(node->bounds, layer->clipToBounds, childNodes, node->layoutMode);
+  if (check) {
+    DetectOverlap(childLayerNodes, node->layoutMode);
+    if (layer->clipToBounds) {
+      DetectClippedContent(node->bounds, childLayerNodes);
     }
-    node->children = std::move(childNodes);
+    DetectExcludedFromLayout(childLayerNodes, node->layoutMode);
+  }
+
+  std::vector<std::shared_ptr<CheckNode>> allChildren;
+  allChildren.reserve(elementNodes.size() + childLayerNodes.size());
+  allChildren.insert(allChildren.end(), elementNodes.begin(), elementNodes.end());
+  allChildren.insert(allChildren.end(), childLayerNodes.begin(), childLayerNodes.end());
+  if (!allChildren.empty()) {
+    node->children = std::move(allChildren);
   }
 
   return node;
@@ -518,12 +556,6 @@ int RunLayout(int argc, char* argv[]) {
     if (node) {
       results.push_back(node);
     }
-  }
-
-  // Detect overlapping among top-level siblings (only when checking all root layers).
-  if (opts.check && opts.id.empty() && opts.xpath.empty() && results.size() > 1) {
-    LCRect docBounds = {0, 0, document->width, document->height};
-    DetectProblems(docBounds, false, results, "");
   }
 
   int problemCount = opts.check ? CountProblems(results) : 0;

@@ -38,15 +38,15 @@ void PAGXDocument::applyLayout() {
   for (auto& node : nodes) {
     if (node->nodeType() == NodeType::Composition) {
       auto* comp = static_cast<Composition*>(node.get());
-      layoutLayers(comp->layers, comp->width, comp->height, context);
+      layoutLayers(comp->layers, comp->width, comp->height, &context);
     }
   }
-  layoutLayers(layers, width, height, context);
+  layoutLayers(layers, width, height, &context);
   layoutApplied = true;
 }
 
 void PAGXDocument::layoutLayers(const std::vector<Layer*>& layers, float containerW,
-                                float containerH, const LayoutContext& context) {
+                                float containerH, LayoutContext* context) {
   for (auto* layer : layers) {
     layer->updateSize(context);
   }
