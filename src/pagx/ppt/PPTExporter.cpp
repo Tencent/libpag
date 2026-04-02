@@ -1,0 +1,1277 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include "pagx/PPTExporter.h"
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <cstring>
+#include <fstream>
+#include <string>
+#include <unordered_map>
+#include <vector>
+#include "base/utils/MathUtil.h"
+#include "tgfx/core/Data.h"
+#include "pagx/PAGXDocument.h"
+#include "pagx/nodes/BlendFilter.h"
+#include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/ColorMatrixFilter.h"
+#include "pagx/nodes/ColorStop.h"
+#include "pagx/nodes/DropShadowFilter.h"
+#include "pagx/nodes/Ellipse.h"
+#include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/InnerShadowFilter.h"
+#include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/Path.h"
+#include "pagx/nodes/PathData.h"
+#include "pagx/nodes/RadialGradient.h"
+#include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextBox.h"
+#include "pagx/types/Rect.h"
+#include "pagx/utils/ExporterUtils.h"
+#include "pagx/utils/StringParser.h"
+
+namespace pagx {
+
+using pag::FloatNearlyZero;
+
+//==============================================================================
+// CRC32 + ZipWriter – minimal store-only ZIP file writer
+//==============================================================================
+
+static uint32_t ComputeCRC32(const uint8_t* data, size_t size) {
+  static uint32_t table[256] = {};
+  static bool initialized = false;
+  if (!initialized) {
+    for (uint32_t i = 0; i < 256; i++) {
+      uint32_t crc = i;
+      for (int j = 0; j < 8; j++) {
+        crc = (crc >> 1) ^ (crc & 1 ? 0xEDB88320u : 0u);
+      }
+      table[i] = crc;
+    }
+    initialized = true;
+  }
+  uint32_t crc = 0xFFFFFFFF;
+  for (size_t i = 0; i < size; i++) {
+    crc = (crc >> 8) ^ table[(crc ^ data[i]) & 0xFF];
+  }
+  return ~crc;
+}
+
+class ZipWriter {
+ public:
+  void addFile(const std::string& path, const std::string& content) {
+    auto* ptr = reinterpret_cast<const uint8_t*>(content.data());
+    _entries.push_back({path, {ptr, ptr + content.size()}, ComputeCRC32(ptr, content.size())});
+  }
+
+  void addFile(const std::string& path, const uint8_t* data, size_t size) {
+    _entries.push_back({path, {data, data + size}, ComputeCRC32(data, size)});
+  }
+
+  bool writeToFile(const std::string& filePath) const {
+    std::ofstream f(filePath, std::ios::binary);
+    if (!f) {
+      return false;
+    }
+    std::vector<uint32_t> offsets;
+    for (const auto& e : _entries) {
+      offsets.push_back(static_cast<uint32_t>(f.tellp()));
+      auto sz = static_cast<uint32_t>(e.data.size());
+      auto nameLen = static_cast<uint16_t>(e.path.size());
+      w32(f, 0x04034b50);
+      w16(f, 20);
+      w16(f, 0);
+      w16(f, 0);
+      w16(f, 0);
+      w16(f, 0);
+      w32(f, e.crc);
+      w32(f, sz);
+      w32(f, sz);
+      w16(f, nameLen);
+      w16(f, 0);
+      f.write(e.path.data(), nameLen);
+      f.write(reinterpret_cast<const char*>(e.data.data()), sz);
+    }
+    auto cdOff = static_cast<uint32_t>(f.tellp());
+    for (size_t i = 0; i < _entries.size(); i++) {
+      const auto& e = _entries[i];
+      auto sz = static_cast<uint32_t>(e.data.size());
+      auto nameLen = static_cast<uint16_t>(e.path.size());
+      w32(f, 0x02014b50);
+      w16(f, 20);
+      w16(f, 20);
+      w16(f, 0);
+      w16(f, 0);
+      w16(f, 0);
+      w16(f, 0);
+      w32(f, e.crc);
+      w32(f, sz);
+      w32(f, sz);
+      w16(f, nameLen);
+      w16(f, 0);
+      w16(f, 0);
+      w16(f, 0);
+      w16(f, 0);
+      w32(f, 0);
+      w32(f, offsets[i]);
+      f.write(e.path.data(), nameLen);
+    }
+    auto cdSize = static_cast<uint32_t>(f.tellp()) - cdOff;
+    auto count = static_cast<uint16_t>(_entries.size());
+    w32(f, 0x06054b50);
+    w16(f, 0);
+    w16(f, 0);
+    w16(f, count);
+    w16(f, count);
+    w32(f, cdSize);
+    w32(f, cdOff);
+    w16(f, 0);
+    return f.good();
+  }
+
+ private:
+  struct Entry {
+    std::string path;
+    std::vector<uint8_t> data;
+    uint32_t crc = 0;
+  };
+  std::vector<Entry> _entries;
+
+  static void w16(std::ofstream& f, uint16_t v) {
+    char b[2] = {static_cast<char>(v & 0xFF), static_cast<char>((v >> 8) & 0xFF)};
+    f.write(b, 2);
+  }
+  static void w32(std::ofstream& f, uint32_t v) {
+    char b[4] = {static_cast<char>(v & 0xFF), static_cast<char>((v >> 8) & 0xFF),
+                 static_cast<char>((v >> 16) & 0xFF), static_cast<char>((v >> 24) & 0xFF)};
+    f.write(b, 4);
+  }
+};
+
+//==============================================================================
+// Coordinate / color / angle helpers
+//==============================================================================
+
+static constexpr double kEMUPerPx = 9525.0;
+
+static int64_t PxToEMU(float px) {
+  return static_cast<int64_t>(std::round(static_cast<double>(px) * kEMUPerPx));
+}
+
+static std::string I64(int64_t v) {
+  return std::to_string(v);
+}
+
+static std::string ColorToHex6(const Color& c) {
+  char buf[7];
+  snprintf(buf, sizeof(buf), "%02X%02X%02X",
+           std::clamp(static_cast<int>(std::round(c.red * 255.0f)), 0, 255),
+           std::clamp(static_cast<int>(std::round(c.green * 255.0f)), 0, 255),
+           std::clamp(static_cast<int>(std::round(c.blue * 255.0f)), 0, 255));
+  return buf;
+}
+
+static int AlphaToPct(float alpha) {
+  return std::clamp(static_cast<int>(std::round(alpha * 100000.0f)), 0, 100000);
+}
+
+static int AngleToPPT(float degrees) {
+  int v = static_cast<int>(std::round(degrees * 60000.0));
+  return ((v % 21600000) + 21600000) % 21600000;
+}
+
+static int FontSizeToPPT(float px) {
+  return std::max(100, static_cast<int>(std::round(px * 75.0)));
+}
+
+//==============================================================================
+// XMLBuilder – compact XML string builder
+//==============================================================================
+
+class XMLBuilder {
+ public:
+  explicit XMLBuilder(size_t reserve = 4096) {
+    _buf.reserve(reserve);
+  }
+
+  void decl() {
+    _buf += "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
+  }
+
+  XMLBuilder& open(const char* tag) {
+    _buf += '<';
+    _buf += tag;
+    _tags.push_back(tag);
+    return *this;
+  }
+
+  XMLBuilder& a(const char* name, const char* val) {
+    _buf += ' ';
+    _buf += name;
+    _buf += "=\"";
+    _buf += val;
+    _buf += '"';
+    return *this;
+  }
+
+  XMLBuilder& a(const char* name, const std::string& val) {
+    return a(name, val.c_str());
+  }
+
+  XMLBuilder& a(const char* name, int64_t val) {
+    return a(name, std::to_string(val).c_str());
+  }
+
+  void gt() {
+    _buf += '>';
+  }
+
+  void sc() {
+    _buf += "/>";
+    _tags.pop_back();
+  }
+
+  void end() {
+    _buf += "</";
+    _buf += _tags.back();
+    _buf += '>';
+    _tags.pop_back();
+  }
+
+  void text(const std::string& t) {
+    for (char c : t) {
+      switch (c) {
+        case '&':
+          _buf += "&amp;";
+          break;
+        case '<':
+          _buf += "&lt;";
+          break;
+        case '>':
+          _buf += "&gt;";
+          break;
+        default:
+          _buf += c;
+          break;
+      }
+    }
+  }
+
+  void raw(const std::string& s) {
+    _buf += s;
+  }
+
+  std::string release() {
+    return std::move(_buf);
+  }
+
+ private:
+  std::string _buf;
+  std::vector<const char*> _tags;
+};
+
+//==============================================================================
+// PPTWriterContext – image tracking and ID generation
+//==============================================================================
+
+struct ImageEntry {
+  const Image* image = nullptr;
+  std::string relId;
+  std::string mediaPath;
+  bool isJPEG = false;
+};
+
+class PPTWriterContext {
+ public:
+  int nextShapeId() {
+    return _shapeId++;
+  }
+
+  std::string addImage(const Image* image) {
+    auto it = _imageMap.find(image);
+    if (it != _imageMap.end()) {
+      return it->second;
+    }
+    auto data = GetImageData(image);
+    if (!data || data->size() == 0) {
+      return {};
+    }
+    int idx = static_cast<int>(_images.size()) + 1;
+    std::string relId = "rId" + std::to_string(_nextRelId++);
+    bool jpeg = IsJPEG(data->bytes(), data->size());
+    std::string ext = jpeg ? "jpeg" : "png";
+    std::string mediaPath = "ppt/media/image" + std::to_string(idx) + "." + ext;
+    _images.push_back({image, relId, mediaPath, jpeg});
+    _imageMap[image] = relId;
+    return relId;
+  }
+
+  const std::vector<ImageEntry>& images() const {
+    return _images;
+  }
+
+  bool hasJPEG() const {
+    return std::any_of(_images.begin(), _images.end(), [](const auto& e) { return e.isJPEG; });
+  }
+
+  bool hasPNG() const {
+    return std::any_of(_images.begin(), _images.end(), [](const auto& e) { return !e.isJPEG; });
+  }
+
+ private:
+  int _shapeId = 2;
+  int _nextRelId = 2;
+  std::vector<ImageEntry> _images;
+  std::unordered_map<const Image*, std::string> _imageMap;
+};
+
+//==============================================================================
+// PPTWriter – converts PAGX nodes to PPTX XML
+//==============================================================================
+
+class PPTWriter {
+ public:
+  PPTWriter(PPTWriterContext* ctx, bool convertTextToPath)
+      : _ctx(ctx), _convertTextToPath(convertTextToPath) {
+  }
+
+  void writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& parentMatrix = {},
+                  float parentAlpha = 1.0f);
+
+ private:
+  PPTWriterContext* _ctx;
+  bool _convertTextToPath;
+
+  void writeElements(XMLBuilder& out, const std::vector<Element*>& elements,
+                     const Matrix& transform, float alpha,
+                     const std::vector<LayerFilter*>& filters);
+
+  void writeRectangle(XMLBuilder& out, const Rectangle* rect, const FillStrokeInfo& fs,
+                      const Matrix& m, float alpha, const std::vector<LayerFilter*>& filters);
+  void writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const FillStrokeInfo& fs,
+                    const Matrix& m, float alpha, const std::vector<LayerFilter*>& filters);
+  void writePath(XMLBuilder& out, const Path* path, const FillStrokeInfo& fs, const Matrix& m,
+                 float alpha, const std::vector<LayerFilter*>& filters);
+  void writeTextAsPath(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs, const Matrix& m,
+                       float alpha, const std::vector<LayerFilter*>& filters);
+  void writeNativeText(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs, const Matrix& m,
+                       float alpha, const std::vector<LayerFilter*>& filters);
+
+  // Shape envelope helpers
+  void beginShape(XMLBuilder& out, const char* name, int64_t offX, int64_t offY, int64_t extCX,
+                  int64_t extCY, int rot = 0);
+  void endShape(XMLBuilder& out);
+
+  // Fill / stroke / effects
+  void writeFill(XMLBuilder& out, const Fill* fill, float alpha);
+  void writeColorSource(XMLBuilder& out, const ColorSource* source, float alpha);
+  void writeGradientStops(XMLBuilder& out, const std::vector<ColorStop*>& stops);
+  void writeStroke(XMLBuilder& out, const Stroke* stroke, float alpha);
+  void writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& filters);
+
+  // Custom geometry from PathData
+  void writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY,
+                       FillRule fillRule = FillRule::Winding);
+
+  // Transform decomposition
+  struct Xform {
+    int64_t offX, offY, extCX, extCY;
+    int rotation;
+  };
+  static Xform decomposeXform(float localX, float localY, float localW, float localH,
+                              const Matrix& m);
+};
+
+// ── Transform decomposition ────────────────────────────────────────────────
+
+PPTWriter::Xform PPTWriter::decomposeXform(float localX, float localY, float localW, float localH,
+                                           const Matrix& m) {
+  float cx = localX + localW / 2.0f;
+  float cy = localY + localH / 2.0f;
+  float tcx = m.a * cx + m.c * cy + m.tx;
+  float tcy = m.b * cx + m.d * cy + m.ty;
+
+  float sx = std::sqrt(m.a * m.a + m.b * m.b);
+  float det = m.a * m.d - m.b * m.c;
+  float sy = (sx > 0) ? std::abs(det) / sx : 0;
+
+  float tw = localW * sx;
+  float th = localH * sy;
+
+  float theta = std::atan2(m.b, m.a) * 180.0f / 3.14159265358979323846f;
+
+  Xform xf;
+  xf.offX = PxToEMU(tcx - tw / 2.0f);
+  xf.offY = PxToEMU(tcy - th / 2.0f);
+  xf.extCX = std::max(int64_t(1), PxToEMU(tw));
+  xf.extCY = std::max(int64_t(1), PxToEMU(th));
+  xf.rotation = FloatNearlyZero(theta) ? 0 : AngleToPPT(theta);
+  return xf;
+}
+
+// ── Shape envelope ─────────────────────────────────────────────────────────
+
+void PPTWriter::beginShape(XMLBuilder& out, const char* name, int64_t offX, int64_t offY,
+                           int64_t extCX, int64_t extCY, int rot) {
+  int id = _ctx->nextShapeId();
+  out.open("p:sp").gt();
+
+  out.open("p:nvSpPr").gt();
+  out.open("p:cNvPr").a("id", id).a("name", name).sc();
+  out.open("p:cNvSpPr").sc();
+  out.open("p:nvPr").sc();
+  out.end();  // p:nvSpPr
+
+  out.open("p:spPr").gt();
+  if (rot != 0) {
+    out.open("a:xfrm").a("rot", rot).gt();
+  } else {
+    out.open("a:xfrm").gt();
+  }
+  out.open("a:off").a("x", offX).a("y", offY).sc();
+  out.open("a:ext").a("cx", extCX).a("cy", extCY).sc();
+  out.end();  // a:xfrm
+}
+
+void PPTWriter::endShape(XMLBuilder& out) {
+  out.end();  // p:spPr
+  out.end();  // p:sp
+}
+
+// ── Color source / gradient ────────────────────────────────────────────────
+
+void PPTWriter::writeGradientStops(XMLBuilder& out, const std::vector<ColorStop*>& stops) {
+  out.open("a:gsLst").gt();
+  for (const auto* stop : stops) {
+    int pos = std::clamp(static_cast<int>(std::round(stop->offset * 100000.0f)), 0, 100000);
+    out.open("a:gs").a("pos", pos).gt();
+    out.open("a:srgbClr").a("val", ColorToHex6(stop->color));
+    if (stop->color.alpha < 1.0f) {
+      out.gt();
+      out.open("a:alpha").a("val", AlphaToPct(stop->color.alpha)).sc();
+      out.end();  // a:srgbClr
+    } else {
+      out.sc();
+    }
+    out.end();  // a:gs
+  }
+  out.end();  // a:gsLst
+}
+
+void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, float alpha) {
+  if (!source) {
+    out.open("a:noFill").sc();
+    return;
+  }
+
+  switch (source->nodeType()) {
+    case NodeType::SolidColor: {
+      auto* solid = static_cast<const SolidColor*>(source);
+      float effectiveAlpha = solid->color.alpha * alpha;
+      out.open("a:solidFill").gt();
+      out.open("a:srgbClr").a("val", ColorToHex6(solid->color));
+      if (effectiveAlpha < 1.0f) {
+        out.gt();
+        out.open("a:alpha").a("val", AlphaToPct(effectiveAlpha)).sc();
+        out.end();
+      } else {
+        out.sc();
+      }
+      out.end();  // a:solidFill
+      break;
+    }
+    case NodeType::LinearGradient: {
+      auto* grad = static_cast<const LinearGradient*>(source);
+      Point sp = grad->matrix.mapPoint(grad->startPoint);
+      Point ep = grad->matrix.mapPoint(grad->endPoint);
+      float dx = ep.x - sp.x;
+      float dy = ep.y - sp.y;
+      float angleDeg = std::atan2(dx, dy) * 180.0f / 3.14159265358979323846f;
+      int ang = AngleToPPT(angleDeg);
+
+      out.open("a:gradFill").gt();
+      writeGradientStops(out, grad->colorStops);
+      out.open("a:lin").a("ang", ang).a("scaled", "1").sc();
+      out.end();  // a:gradFill
+      break;
+    }
+    case NodeType::RadialGradient: {
+      auto* grad = static_cast<const RadialGradient*>(source);
+      out.open("a:gradFill").gt();
+      writeGradientStops(out, grad->colorStops);
+      out.open("a:path").a("path", "circle").gt();
+      out.open("a:fillToRect").a("l", 50000).a("t", 50000).a("r", 50000).a("b", 50000).sc();
+      out.end();  // a:path
+      out.end();  // a:gradFill
+      break;
+    }
+    case NodeType::ImagePattern: {
+      auto* pattern = static_cast<const ImagePattern*>(source);
+      if (pattern->image) {
+        std::string relId = _ctx->addImage(pattern->image);
+        if (!relId.empty()) {
+          out.open("a:blipFill").gt();
+          out.open("a:blip").a("r:embed", relId).sc();
+          out.open("a:stretch").gt();
+          out.open("a:fillRect").sc();
+          out.end();  // a:stretch
+          out.end();  // a:blipFill
+          break;
+        }
+      }
+      out.open("a:noFill").sc();
+      break;
+    }
+    default:
+      out.open("a:noFill").sc();
+      break;
+  }
+}
+
+// ── Fill / stroke ──────────────────────────────────────────────────────────
+
+void PPTWriter::writeFill(XMLBuilder& out, const Fill* fill, float alpha) {
+  if (!fill || !fill->color) {
+    out.open("a:noFill").sc();
+    return;
+  }
+  float effectiveAlpha = fill->alpha * alpha;
+  writeColorSource(out, fill->color, effectiveAlpha);
+}
+
+void PPTWriter::writeStroke(XMLBuilder& out, const Stroke* stroke, float alpha) {
+  if (!stroke) {
+    out.open("a:ln").gt();
+    out.open("a:noFill").sc();
+    out.end();
+    return;
+  }
+
+  int64_t w = PxToEMU(stroke->width);
+  out.open("a:ln").a("w", w);
+  if (stroke->cap == LineCap::Round) {
+    out.a("cap", "rnd");
+  } else if (stroke->cap == LineCap::Square) {
+    out.a("cap", "sq");
+  }
+  out.gt();
+
+  float effectiveAlpha = stroke->alpha * alpha;
+  if (stroke->color) {
+    writeColorSource(out, stroke->color, effectiveAlpha);
+  } else {
+    out.open("a:noFill").sc();
+  }
+
+  if (!stroke->dashes.empty()) {
+    out.open("a:custDash").gt();
+    float sw = (stroke->width > 0) ? stroke->width : 1.0f;
+    for (size_t i = 0; i + 1 < stroke->dashes.size(); i += 2) {
+      int d = std::max(0, static_cast<int>(std::round(stroke->dashes[i] / sw * 100000.0)));
+      int sp = std::max(0, static_cast<int>(std::round(stroke->dashes[i + 1] / sw * 100000.0)));
+      out.open("a:ds").a("d", d).a("sp", sp).sc();
+    }
+    if (stroke->dashes.size() % 2 != 0) {
+      int d = std::max(0, static_cast<int>(std::round(stroke->dashes.back() / sw * 100000.0)));
+      out.open("a:ds").a("d", d).a("sp", d).sc();
+    }
+    out.end();  // a:custDash
+  }
+
+  if (stroke->join == LineJoin::Round) {
+    out.open("a:round").sc();
+  } else if (stroke->join == LineJoin::Bevel) {
+    out.open("a:bevel").sc();
+  } else {
+    int lim = static_cast<int>(std::round(stroke->miterLimit * 100000.0f));
+    out.open("a:miter").a("lim", lim).sc();
+  }
+
+  out.end();  // a:ln
+}
+
+// ── Effects (shadow) ───────────────────────────────────────────────────────
+
+void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& filters) {
+  bool hasShadow = false;
+  for (const auto* f : filters) {
+    if (f->nodeType() == NodeType::DropShadowFilter ||
+        f->nodeType() == NodeType::InnerShadowFilter) {
+      hasShadow = true;
+      break;
+    }
+  }
+  if (!hasShadow) {
+    return;
+  }
+
+  out.open("a:effectLst").gt();
+  for (const auto* f : filters) {
+    if (f->nodeType() == NodeType::DropShadowFilter) {
+      auto* s = static_cast<const DropShadowFilter*>(f);
+      float blur = (s->blurX + s->blurY) / 2.0f;
+      float dist = std::sqrt(s->offsetX * s->offsetX + s->offsetY * s->offsetY);
+      float dir = std::atan2(s->offsetY, s->offsetX) * 180.0f / 3.14159265358979323846f;
+      out.open("a:outerShdw")
+          .a("blurRad", PxToEMU(blur))
+          .a("dist", PxToEMU(dist))
+          .a("dir", AngleToPPT(dir + 90.0f))
+          .a("algn", "ctr")
+          .a("rotWithShape", "0")
+          .gt();
+      out.open("a:srgbClr").a("val", ColorToHex6(s->color)).gt();
+      out.open("a:alpha").a("val", AlphaToPct(s->color.alpha)).sc();
+      out.end();  // a:srgbClr
+      out.end();  // a:outerShdw
+    } else if (f->nodeType() == NodeType::InnerShadowFilter) {
+      auto* s = static_cast<const InnerShadowFilter*>(f);
+      float blur = (s->blurX + s->blurY) / 2.0f;
+      float dist = std::sqrt(s->offsetX * s->offsetX + s->offsetY * s->offsetY);
+      float dir = std::atan2(s->offsetY, s->offsetX) * 180.0f / 3.14159265358979323846f;
+      out.open("a:innerShdw")
+          .a("blurRad", PxToEMU(blur))
+          .a("dist", PxToEMU(dist))
+          .a("dir", AngleToPPT(dir + 90.0f))
+          .gt();
+      out.open("a:srgbClr").a("val", ColorToHex6(s->color)).gt();
+      out.open("a:alpha").a("val", AlphaToPct(s->color.alpha)).sc();
+      out.end();  // a:srgbClr
+      out.end();  // a:innerShdw
+    }
+  }
+  out.end();  // a:effectLst
+}
+
+// ── Custom geometry ────────────────────────────────────────────────────────
+
+void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY,
+                                FillRule fillRule) {
+  out.open("a:custGeom").gt();
+  out.open("a:avLst").sc();
+  out.open("a:gdLst").sc();
+  out.open("a:ahLst").sc();
+  out.open("a:cxnLst").sc();
+  out.open("a:rect").a("l", "0").a("t", "0").a("r", "r").a("b", "b").sc();
+
+  Rect bounds = const_cast<PathData*>(data)->getBounds();
+  int64_t pw = std::max(int64_t(1), PxToEMU(bounds.width));
+  int64_t ph = std::max(int64_t(1), PxToEMU(bounds.height));
+
+  out.open("a:pathLst").gt();
+  const char* fillAttr = (fillRule == FillRule::EvenOdd) ? "none" : "norm";
+  out.open("a:path").a("w", pw).a("h", ph).a("fill", fillAttr).gt();
+
+  data->forEach([&](PathVerb verb, const Point* pts) {
+    switch (verb) {
+      case PathVerb::Move: {
+        int64_t x = PxToEMU(pts[0].x - ofsX);
+        int64_t y = PxToEMU(pts[0].y - ofsY);
+        out.open("a:moveTo").gt();
+        out.open("a:pt").a("x", x).a("y", y).sc();
+        out.end();
+        break;
+      }
+      case PathVerb::Line: {
+        int64_t x = PxToEMU(pts[0].x - ofsX);
+        int64_t y = PxToEMU(pts[0].y - ofsY);
+        out.open("a:lnTo").gt();
+        out.open("a:pt").a("x", x).a("y", y).sc();
+        out.end();
+        break;
+      }
+      case PathVerb::Quad: {
+        out.open("a:quadBezTo").gt();
+        out.open("a:pt").a("x", PxToEMU(pts[0].x - ofsX)).a("y", PxToEMU(pts[0].y - ofsY)).sc();
+        out.open("a:pt").a("x", PxToEMU(pts[1].x - ofsX)).a("y", PxToEMU(pts[1].y - ofsY)).sc();
+        out.end();
+        break;
+      }
+      case PathVerb::Cubic: {
+        out.open("a:cubicBezTo").gt();
+        out.open("a:pt").a("x", PxToEMU(pts[0].x - ofsX)).a("y", PxToEMU(pts[0].y - ofsY)).sc();
+        out.open("a:pt").a("x", PxToEMU(pts[1].x - ofsX)).a("y", PxToEMU(pts[1].y - ofsY)).sc();
+        out.open("a:pt").a("x", PxToEMU(pts[2].x - ofsX)).a("y", PxToEMU(pts[2].y - ofsY)).sc();
+        out.end();
+        break;
+      }
+      case PathVerb::Close:
+        out.open("a:close").sc();
+        break;
+    }
+  });
+
+  out.end();  // a:path
+  out.end();  // a:pathLst
+  out.end();  // a:custGeom
+}
+
+// ── Shape writers ──────────────────────────────────────────────────────────
+
+void PPTWriter::writeRectangle(XMLBuilder& out, const Rectangle* rect, const FillStrokeInfo& fs,
+                               const Matrix& m, float alpha,
+                               const std::vector<LayerFilter*>& filters) {
+  float x = rect->position.x - rect->size.width / 2.0f;
+  float y = rect->position.y - rect->size.height / 2.0f;
+  auto xf = decomposeXform(x, y, rect->size.width, rect->size.height, m);
+  beginShape(out, "Rectangle", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
+
+  if (rect->roundness > 0) {
+    float minSide = std::min(rect->size.width, rect->size.height);
+    int adj = (minSide > 0)
+                  ? std::clamp(static_cast<int>(rect->roundness * 100000.0f / minSide), 0, 50000)
+                  : 0;
+    out.open("a:prstGeom").a("prst", "roundRect").gt();
+    out.open("a:avLst").gt();
+    out.open("a:gd").a("name", "adj").a("fmla", "val " + std::to_string(adj)).sc();
+    out.end();  // a:avLst
+    out.end();  // a:prstGeom
+  } else {
+    out.open("a:prstGeom").a("prst", "rect").gt();
+    out.open("a:avLst").sc();
+    out.end();
+  }
+
+  writeFill(out, fs.fill, alpha);
+  writeStroke(out, fs.stroke, alpha);
+  writeEffects(out, filters);
+  endShape(out);
+}
+
+void PPTWriter::writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const FillStrokeInfo& fs,
+                             const Matrix& m, float alpha,
+                             const std::vector<LayerFilter*>& filters) {
+  float rx = ellipse->size.width / 2.0f;
+  float ry = ellipse->size.height / 2.0f;
+  float x = ellipse->position.x - rx;
+  float y = ellipse->position.y - ry;
+  auto xf = decomposeXform(x, y, ellipse->size.width, ellipse->size.height, m);
+  beginShape(out, "Ellipse", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
+
+  out.open("a:prstGeom").a("prst", "ellipse").gt();
+  out.open("a:avLst").sc();
+  out.end();
+
+  writeFill(out, fs.fill, alpha);
+  writeStroke(out, fs.stroke, alpha);
+  writeEffects(out, filters);
+  endShape(out);
+}
+
+void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInfo& fs,
+                          const Matrix& m, float alpha,
+                          const std::vector<LayerFilter*>& filters) {
+  if (!path->data || path->data->isEmpty()) {
+    return;
+  }
+  Rect bounds = const_cast<PathData*>(path->data)->getBounds();
+  if (bounds.isEmpty()) {
+    return;
+  }
+
+  auto xf = decomposeXform(bounds.x, bounds.y, bounds.width, bounds.height, m);
+  beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
+
+  FillRule rule = fs.fill ? fs.fill->fillRule : FillRule::Winding;
+  writeCustomGeom(out, path->data, bounds.x, bounds.y, rule);
+
+  writeFill(out, fs.fill, alpha);
+  writeStroke(out, fs.stroke, alpha);
+  writeEffects(out, filters);
+  endShape(out);
+}
+
+void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs,
+                                const Matrix& m, float alpha,
+                                const std::vector<LayerFilter*>& /*filters*/) {
+  auto glyphPaths = ComputeGlyphPaths(*text, text->position.x, text->position.y);
+  if (glyphPaths.empty()) {
+    return;
+  }
+
+  for (const auto& gp : glyphPaths) {
+    if (!gp.pathData || gp.pathData->isEmpty()) {
+      continue;
+    }
+    Rect localBounds = const_cast<PathData*>(gp.pathData)->getBounds();
+    if (localBounds.isEmpty()) {
+      continue;
+    }
+
+    Matrix combinedMatrix = m * gp.transform;
+    auto xf =
+        decomposeXform(localBounds.x, localBounds.y, localBounds.width, localBounds.height,
+                       combinedMatrix);
+    beginShape(out, "Glyph", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
+    writeCustomGeom(out, gp.pathData, localBounds.x, localBounds.y);
+    writeFill(out, fs.fill, alpha);
+    out.open("a:ln").gt();
+    out.open("a:noFill").sc();
+    out.end();
+    endShape(out);
+  }
+}
+
+void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs,
+                                const Matrix& m, float alpha,
+                                const std::vector<LayerFilter*>& filters) {
+  if (text->text.empty()) {
+    return;
+  }
+
+  float estWidth = static_cast<float>(text->text.size()) * text->fontSize * 0.6f;
+  float estHeight = text->fontSize * 1.4f;
+  float posX = text->position.x;
+  float posY = text->position.y - text->fontSize * 0.85f;
+
+  if (fs.textBox && fs.textBox->size.width > 0) {
+    posX = fs.textBox->position.x;
+    posY = fs.textBox->position.y;
+    estWidth = fs.textBox->size.width;
+    estHeight = (fs.textBox->size.height > 0) ? fs.textBox->size.height
+                                              : text->fontSize * 1.4f;
+  }
+
+  auto xf = decomposeXform(posX, posY, estWidth, estHeight, m);
+
+  int id = _ctx->nextShapeId();
+  out.open("p:sp").gt();
+  out.open("p:nvSpPr").gt();
+  out.open("p:cNvPr").a("id", id).a("name", "TextBox").sc();
+  out.open("p:cNvSpPr").a("txBox", "1").sc();
+  out.open("p:nvPr").sc();
+  out.end();  // p:nvSpPr
+
+  out.open("p:spPr").gt();
+  out.open("a:xfrm");
+  if (xf.rotation != 0) {
+    out.a("rot", xf.rotation);
+  }
+  out.gt();
+  out.open("a:off").a("x", xf.offX).a("y", xf.offY).sc();
+  out.open("a:ext").a("cx", xf.extCX).a("cy", xf.extCY).sc();
+  out.end();  // a:xfrm
+  out.open("a:prstGeom").a("prst", "rect").gt();
+  out.open("a:avLst").sc();
+  out.end();
+  out.open("a:noFill").sc();
+  out.open("a:ln").gt();
+  out.open("a:noFill").sc();
+  out.end();
+  writeEffects(out, filters);
+  out.end();  // p:spPr
+
+  out.open("p:txBody").gt();
+  out.open("a:bodyPr")
+      .a("wrap", "square")
+      .a("lIns", "0")
+      .a("tIns", "0")
+      .a("rIns", "0")
+      .a("bIns", "0")
+      .sc();
+  out.open("a:lstStyle").sc();
+
+  // Split text by newlines into paragraphs
+  std::string remaining = text->text;
+  size_t pos = 0;
+  while (pos <= remaining.size()) {
+    size_t nl = remaining.find('\n', pos);
+    std::string line = (nl == std::string::npos) ? remaining.substr(pos)
+                                                  : remaining.substr(pos, nl - pos);
+    out.open("a:p").gt();
+
+    const char* algn = nullptr;
+    if (text->textAnchor == TextAnchor::Center) {
+      algn = "ctr";
+    } else if (text->textAnchor == TextAnchor::End) {
+      algn = "r";
+    }
+    if (fs.textBox) {
+      if (fs.textBox->textAlign == TextAlign::Center) {
+        algn = "ctr";
+      } else if (fs.textBox->textAlign == TextAlign::End) {
+        algn = "r";
+      }
+    }
+    if (algn) {
+      out.open("a:pPr").a("algn", algn).sc();
+    }
+
+    out.open("a:r").gt();
+    out.open("a:rPr").a("lang", "en-US").a("sz", FontSizeToPPT(text->fontSize));
+    bool hasBold = text->fontStyle.find("Bold") != std::string::npos;
+    bool hasItalic = text->fontStyle.find("Italic") != std::string::npos;
+    if (hasBold) {
+      out.a("b", "1");
+    }
+    if (hasItalic) {
+      out.a("i", "1");
+    }
+    if (text->letterSpacing != 0.0f) {
+      out.a("spc", static_cast<int64_t>(std::round(text->letterSpacing * 75.0)));
+    }
+    out.gt();
+
+    if (fs.fill && fs.fill->color && fs.fill->color->nodeType() == NodeType::SolidColor) {
+      auto* solid = static_cast<const SolidColor*>(fs.fill->color);
+      float ea = solid->color.alpha * fs.fill->alpha * alpha;
+      out.open("a:solidFill").gt();
+      out.open("a:srgbClr").a("val", ColorToHex6(solid->color));
+      if (ea < 1.0f) {
+        out.gt();
+        out.open("a:alpha").a("val", AlphaToPct(ea)).sc();
+        out.end();
+      } else {
+        out.sc();
+      }
+      out.end();  // a:solidFill
+    }
+
+    if (!text->fontFamily.empty()) {
+      out.open("a:latin").a("typeface", text->fontFamily).sc();
+      out.open("a:ea").a("typeface", text->fontFamily).sc();
+    }
+
+    out.end();  // a:rPr
+    out.open("a:t").gt();
+    out.text(line);
+    out.end();  // a:t
+    out.end();  // a:r
+    out.end();  // a:p
+
+    if (nl == std::string::npos) {
+      break;
+    }
+    pos = nl + 1;
+  }
+
+  out.end();  // p:txBody
+  out.end();  // p:sp
+}
+
+// ── Element / layer traversal ──────────────────────────────────────────────
+
+void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elements,
+                              const Matrix& transform, float alpha,
+                              const std::vector<LayerFilter*>& filters) {
+  auto fs = CollectFillStroke(elements);
+
+  for (const auto* element : elements) {
+    auto type = element->nodeType();
+    if (type == NodeType::Fill || type == NodeType::Stroke || type == NodeType::TextBox) {
+      continue;
+    }
+    switch (type) {
+      case NodeType::Rectangle:
+        writeRectangle(out, static_cast<const Rectangle*>(element), fs, transform, alpha, filters);
+        break;
+      case NodeType::Ellipse:
+        writeEllipse(out, static_cast<const Ellipse*>(element), fs, transform, alpha, filters);
+        break;
+      case NodeType::Path:
+        writePath(out, static_cast<const Path*>(element), fs, transform, alpha, filters);
+        break;
+      case NodeType::Text: {
+        auto* text = static_cast<const Text*>(element);
+        if (_convertTextToPath && !text->glyphRuns.empty()) {
+          writeTextAsPath(out, text, fs, transform, alpha, filters);
+        } else {
+          writeNativeText(out, text, fs, transform, alpha, filters);
+        }
+        break;
+      }
+      case NodeType::Group: {
+        auto* group = static_cast<const Group*>(element);
+        Matrix groupMatrix = BuildGroupMatrix(group);
+        Matrix combined = transform * groupMatrix;
+        float groupAlpha = alpha * group->alpha;
+        writeElements(out, group->elements, combined, groupAlpha, filters);
+        break;
+      }
+      default:
+        break;
+    }
+  }
+}
+
+void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer, const Matrix& parentMatrix,
+                           float parentAlpha) {
+  if (!layer->visible && layer->mask == nullptr) {
+    return;
+  }
+
+  Matrix layerMatrix = parentMatrix * BuildLayerMatrix(layer);
+  float layerAlpha = parentAlpha * layer->alpha;
+
+  writeElements(out, layer->contents, layerMatrix, layerAlpha, layer->filters);
+
+  for (const auto* child : layer->children) {
+    writeLayer(out, child, layerMatrix, layerAlpha);
+  }
+}
+
+//==============================================================================
+// Boilerplate PPTX XML generators
+//==============================================================================
+
+static std::string GenerateContentTypes(const PPTWriterContext& ctx) {
+  std::string s;
+  s += "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
+  s += "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">";
+  s += "<Default Extension=\"xml\" ContentType=\"application/xml\"/>";
+  s += "<Default Extension=\"rels\" "
+       "ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>";
+  if (ctx.hasPNG()) {
+    s += "<Default Extension=\"png\" ContentType=\"image/png\"/>";
+  }
+  if (ctx.hasJPEG()) {
+    s += "<Default Extension=\"jpeg\" ContentType=\"image/jpeg\"/>";
+  }
+  s += "<Override PartName=\"/ppt/presentation.xml\" "
+       "ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.presentation."
+       "main+xml\"/>";
+  s += "<Override PartName=\"/ppt/slides/slide1.xml\" "
+       "ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.slide+xml\"/>";
+  s += "<Override PartName=\"/ppt/slideMasters/slideMaster1.xml\" "
+       "ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.slideMaster+"
+       "xml\"/>";
+  s += "<Override PartName=\"/ppt/slideLayouts/slideLayout1.xml\" "
+       "ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.slideLayout+"
+       "xml\"/>";
+  s += "<Override PartName=\"/ppt/theme/theme1.xml\" "
+       "ContentType=\"application/vnd.openxmlformats-officedocument.theme+xml\"/>";
+  s += "</Types>";
+  return s;
+}
+
+static std::string GenerateRootRels() {
+  return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+         "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
+         "<Relationship Id=\"rId1\" "
+         "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
+         "officeDocument\" Target=\"ppt/presentation.xml\"/>"
+         "</Relationships>";
+}
+
+static std::string GeneratePresentation(float w, float h) {
+  std::string s;
+  s += "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
+  s += "<p:presentation xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" "
+       "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" "
+       "xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">";
+  s += "<p:sldMasterIdLst><p:sldMasterId id=\"2147483648\" r:id=\"rId1\"/></p:sldMasterIdLst>";
+  s += "<p:sldIdLst><p:sldId id=\"256\" r:id=\"rId2\"/></p:sldIdLst>";
+  s += "<p:sldSz cx=\"" + I64(PxToEMU(w)) + "\" cy=\"" + I64(PxToEMU(h)) +
+       "\" type=\"custom\"/>";
+  s += "<p:notesSz cx=\"" + I64(PxToEMU(w)) + "\" cy=\"" + I64(PxToEMU(h)) + "\"/>";
+  s += "</p:presentation>";
+  return s;
+}
+
+static std::string GeneratePresentationRels() {
+  return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+         "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
+         "<Relationship Id=\"rId1\" "
+         "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster\" "
+         "Target=\"slideMasters/slideMaster1.xml\"/>"
+         "<Relationship Id=\"rId2\" "
+         "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide\" "
+         "Target=\"slides/slide1.xml\"/>"
+         "<Relationship Id=\"rId3\" "
+         "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme\" "
+         "Target=\"theme/theme1.xml\"/>"
+         "</Relationships>";
+}
+
+static std::string GenerateSlideRels(const PPTWriterContext& ctx) {
+  std::string s;
+  s += "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
+  s += "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">";
+  s += "<Relationship Id=\"rId1\" "
+       "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout\" "
+       "Target=\"../slideLayouts/slideLayout1.xml\"/>";
+  for (const auto& img : ctx.images()) {
+    s += "<Relationship Id=\"" + img.relId + "\" "
+         "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" "
+         "Target=\"../" + img.mediaPath.substr(4) + "\"/>";
+  }
+  s += "</Relationships>";
+  return s;
+}
+
+static std::string GenerateSlideMaster() {
+  return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+         "<p:sldMaster xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" "
+         "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" "
+         "xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">"
+         "<p:cSld><p:bg><p:bgPr>"
+         "<a:solidFill><a:schemeClr val=\"bg1\"/></a:solidFill>"
+         "<a:effectLst/></p:bgPr></p:bg>"
+         "<p:spTree><p:nvGrpSpPr><p:cNvPr id=\"1\" name=\"\"/>"
+         "<p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree>"
+         "</p:cSld>"
+         "<p:clrMap bg1=\"lt1\" tx1=\"dk1\" bg2=\"lt2\" tx2=\"dk2\" "
+         "accent1=\"accent1\" accent2=\"accent2\" accent3=\"accent3\" "
+         "accent4=\"accent4\" accent5=\"accent5\" accent6=\"accent6\" "
+         "hlink=\"hlink\" folHlink=\"folHlink\"/>"
+         "<p:sldLayoutIdLst>"
+         "<p:sldLayoutId id=\"2147483649\" r:id=\"rId1\"/>"
+         "</p:sldLayoutIdLst>"
+         "</p:sldMaster>";
+}
+
+static std::string GenerateSlideMasterRels() {
+  return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+         "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
+         "<Relationship Id=\"rId1\" "
+         "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout\" "
+         "Target=\"../slideLayouts/slideLayout1.xml\"/>"
+         "<Relationship Id=\"rId2\" "
+         "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme\" "
+         "Target=\"../theme/theme1.xml\"/>"
+         "</Relationships>";
+}
+
+static std::string GenerateSlideLayout() {
+  return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+         "<p:sldLayout xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" "
+         "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" "
+         "xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\" "
+         "type=\"blank\" preserve=\"1\">"
+         "<p:cSld name=\"Blank\"><p:spTree>"
+         "<p:nvGrpSpPr><p:cNvPr id=\"1\" name=\"\"/>"
+         "<p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>"
+         "</p:spTree></p:cSld>"
+         "<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>"
+         "</p:sldLayout>";
+}
+
+static std::string GenerateSlideLayoutRels() {
+  return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+         "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
+         "<Relationship Id=\"rId1\" "
+         "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster\" "
+         "Target=\"../slideMasters/slideMaster1.xml\"/>"
+         "</Relationships>";
+}
+
+static std::string GenerateTheme() {
+  return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+         "<a:theme xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" name=\"PAGX\">"
+         "<a:themeElements>"
+         "<a:clrScheme name=\"PAGX\">"
+         "<a:dk1><a:srgbClr val=\"000000\"/></a:dk1>"
+         "<a:lt1><a:srgbClr val=\"FFFFFF\"/></a:lt1>"
+         "<a:dk2><a:srgbClr val=\"44546A\"/></a:dk2>"
+         "<a:lt2><a:srgbClr val=\"E7E6E6\"/></a:lt2>"
+         "<a:accent1><a:srgbClr val=\"4472C4\"/></a:accent1>"
+         "<a:accent2><a:srgbClr val=\"ED7D31\"/></a:accent2>"
+         "<a:accent3><a:srgbClr val=\"A5A5A5\"/></a:accent3>"
+         "<a:accent4><a:srgbClr val=\"FFC000\"/></a:accent4>"
+         "<a:accent5><a:srgbClr val=\"5B9BD5\"/></a:accent5>"
+         "<a:accent6><a:srgbClr val=\"70AD47\"/></a:accent6>"
+         "<a:hlink><a:srgbClr val=\"0563C1\"/></a:hlink>"
+         "<a:folHlink><a:srgbClr val=\"954F72\"/></a:folHlink>"
+         "</a:clrScheme>"
+         "<a:fontScheme name=\"PAGX\">"
+         "<a:majorFont><a:latin typeface=\"Calibri\"/><a:ea typeface=\"\"/>"
+         "<a:cs typeface=\"\"/></a:majorFont>"
+         "<a:minorFont><a:latin typeface=\"Calibri\"/><a:ea typeface=\"\"/>"
+         "<a:cs typeface=\"\"/></a:minorFont>"
+         "</a:fontScheme>"
+         "<a:fmtScheme name=\"PAGX\">"
+         "<a:fillStyleLst><a:solidFill><a:schemeClr val=\"phClr\"/></a:solidFill>"
+         "<a:solidFill><a:schemeClr val=\"phClr\"/></a:solidFill>"
+         "<a:solidFill><a:schemeClr val=\"phClr\"/></a:solidFill></a:fillStyleLst>"
+         "<a:lnStyleLst><a:ln w=\"6350\"><a:solidFill><a:schemeClr val=\"phClr\"/>"
+         "</a:solidFill></a:ln><a:ln w=\"12700\"><a:solidFill><a:schemeClr val=\"phClr\"/>"
+         "</a:solidFill></a:ln><a:ln w=\"19050\"><a:solidFill><a:schemeClr val=\"phClr\"/>"
+         "</a:solidFill></a:ln></a:lnStyleLst>"
+         "<a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle>"
+         "<a:effectStyle><a:effectLst/></a:effectStyle>"
+         "<a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst>"
+         "<a:bgFillStyleLst><a:solidFill><a:schemeClr val=\"phClr\"/></a:solidFill>"
+         "<a:solidFill><a:schemeClr val=\"phClr\"/></a:solidFill>"
+         "<a:solidFill><a:schemeClr val=\"phClr\"/></a:solidFill></a:bgFillStyleLst>"
+         "</a:fmtScheme>"
+         "</a:themeElements>"
+         "</a:theme>";
+}
+
+//==============================================================================
+// PPTExporter::ToFile
+//==============================================================================
+
+bool PPTExporter::ToFile(const PAGXDocument& doc, const std::string& filePath,
+                         const Options& options) {
+  PPTWriterContext context;
+  PPTWriter writer(&context, options.convertTextToPath);
+
+  // Build slide body content
+  XMLBuilder body(16384);
+  for (const auto* layer : doc.layers) {
+    writer.writeLayer(body, layer);
+  }
+  std::string bodyContent = body.release();
+
+  // Assemble slide XML
+  std::string slide;
+  slide += "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
+  slide += "<p:sld xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" "
+           "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" "
+           "xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">";
+  slide += "<p:cSld><p:spTree>";
+  slide += "<p:nvGrpSpPr><p:cNvPr id=\"1\" name=\"\"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>";
+  slide += "<p:grpSpPr/>";
+  slide += bodyContent;
+  slide += "</p:spTree></p:cSld>";
+  slide += "<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>";
+  slide += "</p:sld>";
+
+  // Write ZIP
+  ZipWriter zip;
+  zip.addFile("[Content_Types].xml", GenerateContentTypes(context));
+  zip.addFile("_rels/.rels", GenerateRootRels());
+  zip.addFile("ppt/presentation.xml", GeneratePresentation(doc.width, doc.height));
+  zip.addFile("ppt/_rels/presentation.xml.rels", GeneratePresentationRels());
+  zip.addFile("ppt/slides/slide1.xml", slide);
+  zip.addFile("ppt/slides/_rels/slide1.xml.rels", GenerateSlideRels(context));
+  zip.addFile("ppt/slideMasters/slideMaster1.xml", GenerateSlideMaster());
+  zip.addFile("ppt/slideMasters/_rels/slideMaster1.xml.rels", GenerateSlideMasterRels());
+  zip.addFile("ppt/slideLayouts/slideLayout1.xml", GenerateSlideLayout());
+  zip.addFile("ppt/slideLayouts/_rels/slideLayout1.xml.rels", GenerateSlideLayoutRels());
+  zip.addFile("ppt/theme/theme1.xml", GenerateTheme());
+
+  for (const auto& img : context.images()) {
+    auto data = GetImageData(img.image);
+    if (data && data->size() > 0) {
+      zip.addFile(img.mediaPath, data->bytes(), data->size());
+    }
+  }
+
+  return zip.writeToFile(filePath);
+}
+
+}  // namespace pagx

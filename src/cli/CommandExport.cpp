@@ -21,6 +21,7 @@
 #include <string>
 #include "cli/CliUtils.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/PPTExporter.h"
 #include "pagx/SVGExporter.h"
 
 namespace pagx::cli {
@@ -32,6 +33,7 @@ struct ExportOptions {
   int svgIndent = 2;
   bool svgNoXmlDeclaration = false;
   bool svgNoConvertTextToPath = false;
+  bool pptNoConvertTextToPath = false;
 };
 
 static void PrintUsage() {
@@ -43,7 +45,7 @@ static void PrintUsage() {
       << "Options:\n"
       << "  --input <file>              Input PAGX file (required)\n"
       << "  --output <file>             Output file (default: <input>.<format>)\n"
-      << "  --format <format>           Output format (svg; inferred from --output extension)\n"
+      << "  --format <format>           Output format (svg, pptx; inferred from --output extension)\n"
       << "\n"
       << "SVG options:\n"
       << "  --svg-indent <n>            Indentation spaces (default: 2, valid range: 0-16)\n"
@@ -51,10 +53,16 @@ static void PrintUsage() {
       << "  --svg-no-convert-text-to-path\n"
       << "                              Keep text as <text> elements instead of <path>\n"
       << "\n"
+      << "PPT options:\n"
+      << "  --ppt-no-convert-text-to-path\n"
+      << "                              Keep text as native PPTX text runs instead of paths\n"
+      << "\n"
       << "Examples:\n"
       << "  pagx export --input icon.pagx                    # PAGX to icon.svg\n"
       << "  pagx export --input icon.pagx --output out.svg   # PAGX to out.svg\n"
+      << "  pagx export --input icon.pagx --output out.pptx  # PAGX to out.pptx\n"
       << "  pagx export --format svg --input icon.pagx       # force SVG output format\n"
+      << "  pagx export --format pptx --input icon.pagx      # force PPTX output format\n"
       << "  pagx export --input icon.pagx --svg-indent 4     # 4-space indent\n";
 }
 
@@ -80,6 +88,8 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->svgNoXmlDeclaration = true;
     } else if (arg == "--svg-no-convert-text-to-path") {
       options->svgNoConvertTextToPath = true;
+    } else if (arg == "--ppt-no-convert-text-to-path") {
+      options->pptNoConvertTextToPath = true;
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();
       return -1;
@@ -141,6 +151,30 @@ static int ExportToSVG(const ExportOptions& options) {
   return 0;
 }
 
+static int ExportToPPT(const ExportOptions& options) {
+  auto document = PAGXImporter::FromFile(options.inputFile);
+  if (document == nullptr) {
+    std::cerr << "pagx export: error: failed to load '" << options.inputFile << "'\n";
+    return 1;
+  }
+  if (!document->errors.empty()) {
+    for (auto& error : document->errors) {
+      std::cerr << "pagx export: warning: " << error << "\n";
+    }
+  }
+
+  PPTExporter::Options pptOptions = {};
+  pptOptions.convertTextToPath = !options.pptNoConvertTextToPath;
+
+  if (!PPTExporter::ToFile(*document, options.outputFile, pptOptions)) {
+    std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";
+    return 1;
+  }
+
+  std::cout << "pagx export: wrote " << options.outputFile << "\n";
+  return 0;
+}
+
 int RunExport(int argc, char* argv[]) {
   ExportOptions options = {};
   auto parseResult = ParseOptions(argc, argv, &options);
@@ -150,6 +184,9 @@ int RunExport(int argc, char* argv[]) {
 
   if (options.format == "svg") {
     return ExportToSVG(options);
+  }
+  if (options.format == "pptx") {
+    return ExportToPPT(options);
   }
 
   std::cerr << "pagx export: error: unsupported format '" << options.format << "'\n";
