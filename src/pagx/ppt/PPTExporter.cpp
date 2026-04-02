@@ -714,44 +714,73 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
           int imgW = 0;
           int imgH = 0;
           bool hasDimensions = GetImageDimensions(pattern->image, &imgW, &imgH);
-          bool hasTransform =
-              hasDimensions && !shapeBounds.isEmpty() && !pattern->matrix.isIdentity();
-          if (hasTransform) {
+          bool needsTiling =
+              (pattern->tileModeX == TileMode::Repeat || pattern->tileModeX == TileMode::Mirror ||
+               pattern->tileModeY == TileMode::Repeat || pattern->tileModeY == TileMode::Mirror);
+          if (needsTiling && hasDimensions && !shapeBounds.isEmpty()) {
             const auto& M = pattern->matrix;
-            float imageDocW = static_cast<float>(imgW) * M.a;
-            float imageDocH = static_cast<float>(imgH) * M.d;
-            float visL = std::max(shapeBounds.x, M.tx);
-            float visT = std::max(shapeBounds.y, M.ty);
-            float visR = std::min(shapeBounds.x + shapeBounds.width, M.tx + imageDocW);
-            float visB = std::min(shapeBounds.y + shapeBounds.height, M.ty + imageDocH);
-            if (visR > visL && visB > visT) {
-              int srcL = static_cast<int>(std::round((visL - M.tx) / imageDocW * 100000.0f));
-              int srcT = static_cast<int>(std::round((visT - M.ty) / imageDocH * 100000.0f));
-              int srcR =
-                  static_cast<int>(std::round((M.tx + imageDocW - visR) / imageDocW * 100000.0f));
-              int srcB =
-                  static_cast<int>(std::round((M.ty + imageDocH - visB) / imageDocH * 100000.0f));
-              out.open("a:srcRect").a("l", srcL).a("t", srcT).a("r", srcR).a("b", srcB).sc();
-              int fillL = static_cast<int>(
-                  std::round((visL - shapeBounds.x) / shapeBounds.width * 100000.0f));
-              int fillT = static_cast<int>(
-                  std::round((visT - shapeBounds.y) / shapeBounds.height * 100000.0f));
-              int fillR = static_cast<int>(std::round((shapeBounds.x + shapeBounds.width - visR) /
-                                                      shapeBounds.width * 100000.0f));
-              int fillB = static_cast<int>(std::round((shapeBounds.y + shapeBounds.height - visB) /
-                                                      shapeBounds.height * 100000.0f));
-              out.open("a:stretch").gt();
-              out.open("a:fillRect").a("l", fillL).a("t", fillT).a("r", fillR).a("b", fillB).sc();
-              out.end();  // a:stretch
+            auto sx = static_cast<int>(std::round(static_cast<double>(M.a) * 100000.0));
+            auto sy = static_cast<int>(std::round(static_cast<double>(M.d) * 100000.0));
+            auto tx = PxToEMU(M.tx - shapeBounds.x);
+            auto ty = PxToEMU(M.ty - shapeBounds.y);
+            bool flipX = (pattern->tileModeX == TileMode::Mirror);
+            bool flipY = (pattern->tileModeY == TileMode::Mirror);
+            const char* flip = "none";
+            if (flipX && flipY) {
+              flip = "xy";
+            } else if (flipX) {
+              flip = "x";
+            } else if (flipY) {
+              flip = "y";
+            }
+            out.open("a:tile")
+                .a("tx", tx)
+                .a("ty", ty)
+                .a("sx", sx)
+                .a("sy", sy)
+                .a("flip", flip)
+                .a("algn", "tl")
+                .sc();
+          } else {
+            bool hasTransform =
+                hasDimensions && !shapeBounds.isEmpty() && !pattern->matrix.isIdentity();
+            if (hasTransform) {
+              const auto& M = pattern->matrix;
+              float imageDocW = static_cast<float>(imgW) * M.a;
+              float imageDocH = static_cast<float>(imgH) * M.d;
+              float visL = std::max(shapeBounds.x, M.tx);
+              float visT = std::max(shapeBounds.y, M.ty);
+              float visR = std::min(shapeBounds.x + shapeBounds.width, M.tx + imageDocW);
+              float visB = std::min(shapeBounds.y + shapeBounds.height, M.ty + imageDocH);
+              if (visR > visL && visB > visT) {
+                int srcL = static_cast<int>(std::round((visL - M.tx) / imageDocW * 100000.0f));
+                int srcT = static_cast<int>(std::round((visT - M.ty) / imageDocH * 100000.0f));
+                int srcR =
+                    static_cast<int>(std::round((M.tx + imageDocW - visR) / imageDocW * 100000.0f));
+                int srcB =
+                    static_cast<int>(std::round((M.ty + imageDocH - visB) / imageDocH * 100000.0f));
+                out.open("a:srcRect").a("l", srcL).a("t", srcT).a("r", srcR).a("b", srcB).sc();
+                int fillL = static_cast<int>(
+                    std::round((visL - shapeBounds.x) / shapeBounds.width * 100000.0f));
+                int fillT = static_cast<int>(
+                    std::round((visT - shapeBounds.y) / shapeBounds.height * 100000.0f));
+                int fillR = static_cast<int>(std::round((shapeBounds.x + shapeBounds.width - visR) /
+                                                        shapeBounds.width * 100000.0f));
+                int fillB = static_cast<int>(std::round(
+                    (shapeBounds.y + shapeBounds.height - visB) / shapeBounds.height * 100000.0f));
+                out.open("a:stretch").gt();
+                out.open("a:fillRect").a("l", fillL).a("t", fillT).a("r", fillR).a("b", fillB).sc();
+                out.end();  // a:stretch
+              } else {
+                out.open("a:stretch").gt();
+                out.open("a:fillRect").sc();
+                out.end();  // a:stretch
+              }
             } else {
               out.open("a:stretch").gt();
               out.open("a:fillRect").sc();
               out.end();  // a:stretch
             }
-          } else {
-            out.open("a:stretch").gt();
-            out.open("a:fillRect").sc();
-            out.end();  // a:stretch
           }
           out.end();  // a:blipFill
           break;
