@@ -415,7 +415,8 @@ class PPTWriter {
   void writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& filters);
 
   // Custom geometry from PathData
-  void writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY);
+  void writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY,
+                       float boundsW, float boundsH);
 
   // Transform decomposition
   struct Xform {
@@ -688,7 +689,8 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
 
 // ── Custom geometry ────────────────────────────────────────────────────────
 
-void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY) {
+void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY,
+                                float boundsW, float boundsH) {
   out.open("a:custGeom").gt();
   out.open("a:avLst").sc();
   out.open("a:gdLst").sc();
@@ -696,9 +698,8 @@ void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofs
   out.open("a:cxnLst").sc();
   out.open("a:rect").a("l", "0").a("t", "0").a("r", "r").a("b", "b").sc();
 
-  Rect bounds = const_cast<PathData*>(data)->getBounds();
-  int64_t pw = std::max(int64_t(1), PxToEMU(bounds.width));
-  int64_t ph = std::max(int64_t(1), PxToEMU(bounds.height));
+  int64_t pw = std::max(int64_t(1), PxToEMU(boundsW));
+  int64_t ph = std::max(int64_t(1), PxToEMU(boundsH));
 
   out.open("a:pathLst").gt();
   out.open("a:path").a("w", pw).a("h", ph).a("fill", "norm").gt();
@@ -806,14 +807,21 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
     return;
   }
   Rect bounds = const_cast<PathData*>(path->data)->getBounds();
-  if (bounds.isEmpty()) {
+  if (bounds.width <= 0 && bounds.height <= 0) {
     return;
   }
 
-  auto xf = decomposeXform(bounds.x, bounds.y, bounds.width, bounds.height, m);
+  float strokePad = (fs.stroke && fs.stroke->width > 0) ? fs.stroke->width : 0;
+  float minDim = std::max(1.0f, strokePad);
+  float adjustedW = std::max(bounds.width, minDim);
+  float adjustedH = std::max(bounds.height, minDim);
+  float adjustedX = bounds.x - (adjustedW - bounds.width) / 2.0f;
+  float adjustedY = bounds.y - (adjustedH - bounds.height) / 2.0f;
+
+  auto xf = decomposeXform(adjustedX, adjustedY, adjustedW, adjustedH, m);
   beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
 
-  writeCustomGeom(out, path->data, bounds.x, bounds.y);
+  writeCustomGeom(out, path->data, adjustedX, adjustedY, adjustedW, adjustedH);
 
   writeFill(out, fs.fill, alpha);
   writeStroke(out, fs.stroke, alpha);
@@ -843,7 +851,8 @@ void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStr
         decomposeXform(localBounds.x, localBounds.y, localBounds.width, localBounds.height,
                        combinedMatrix);
     beginShape(out, "Glyph", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
-    writeCustomGeom(out, gp.pathData, localBounds.x, localBounds.y);
+    writeCustomGeom(out, gp.pathData, localBounds.x, localBounds.y, localBounds.width,
+                    localBounds.height);
     writeFill(out, fs.fill, alpha);
     out.open("a:ln").gt();
     out.open("a:noFill").sc();
