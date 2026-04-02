@@ -15,9 +15,9 @@
     <!-- Bitmap font for Glyph.image and Glyph.offset testing -->
     <Font id="bmpFont" unitsPerEm="100">
       <!-- Bitmap glyph with image and offset: GlyphID=1 -->
-      <Glyph id="gBmp1" advance="110" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAEklEQVQI12P4z8DwHwyBAgMALaYE/aDpKzYAAAAASUVORK5CYII=" offset="0,-5"/>
+      <Glyph id="gBmp1" advance="110" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAFUlEQVR4nGN84zHzPwMSYELmECcAALhBAtSu4mlgAAAAAElFTkSuQmCC" offset="0,-5"/>
       <!-- Bitmap glyph with image only: GlyphID=2 -->
-      <Glyph id="gBmp2" advance="110" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAA4MjmpAAAAEUlEQVQI12Ng+M/AwAAGYAIAE/gB/eDX+84AAAAASUVORK5CYII="/>
+      <Glyph id="gBmp2" advance="110" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAFUlEQVR4nGO0bvr2nwEJMCFziBMAALB/ArpuFzvFAAAAAElFTkSuQmCC"/>
     </Font>
   </Resources>
 

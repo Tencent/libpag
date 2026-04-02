@@ -3,7 +3,7 @@
      TextBox.textAlign="end", RangeSelector.offset (non-zero), TextPath.baselineAngle (non-zero) -->
 <pagx version="1.0" width="400" height="400">
   <Resources>
-    <Image id="tinyImg" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAEklEQVQI12P4z8DwHwyBAgMALaYE/aDpKzYAAAAASUVORK5CYII="/>
+    <Image id="tinyImg" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAFUlEQVR4nGP8Oo/7PwMSYELmECcAAKy6AqWSorM1AAAAAElFTkSuQmCC"/>
     <PathData id="wavePath" data="M 20,50 C 80,10 120,90 180,50 C 240,10 280,90 360,50"/>
   </Resources>
 

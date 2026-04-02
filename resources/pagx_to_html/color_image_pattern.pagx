@@ -3,7 +3,7 @@
 <pagx version="1.0" width="400" height="200">
   <Resources>
     <!-- 8x8 red/white checkerboard pattern for clearly visible tiling -->
-    <Image id="checker" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAJklEQVQI12P4z8BQDwQMYMrAwACkmBiAFBMaFxkwQFUyMNRDKQD03Q0JGYbtpgAAAABJRU5ErkJggg=="/>
+    <Image id="checker" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAGUlEQVR4nGO4o6b2HwRw0Qz4JEE0w7AwAQBB48RhdF1gGQAAAABJRU5ErkJggg=="/>
   </Resources>
 
   <!-- Labels -->
