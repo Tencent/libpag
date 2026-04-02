@@ -711,20 +711,43 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
           } else {
             out.sc();
           }
-          if (!shapeBounds.isEmpty() && !pattern->matrix.isIdentity()) {
+          int imgW = 0;
+          int imgH = 0;
+          bool hasDimensions = GetImageDimensions(pattern->image, &imgW, &imgH);
+          bool hasTransform =
+              hasDimensions && !shapeBounds.isEmpty() && !pattern->matrix.isIdentity();
+          if (hasTransform) {
             const auto& M = pattern->matrix;
-            int sx = static_cast<int>(std::round(M.a * 100000.0f));
-            int sy = static_cast<int>(std::round(M.d * 100000.0f));
-            auto tx = PxToEMU(M.tx - shapeBounds.x);
-            auto ty = PxToEMU(M.ty - shapeBounds.y);
-            out.open("a:tile")
-                .a("tx", tx)
-                .a("ty", ty)
-                .a("sx", sx)
-                .a("sy", sy)
-                .a("flip", "none")
-                .a("algn", "tl")
-                .sc();
+            float imageDocW = static_cast<float>(imgW) * M.a;
+            float imageDocH = static_cast<float>(imgH) * M.d;
+            float visL = std::max(shapeBounds.x, M.tx);
+            float visT = std::max(shapeBounds.y, M.ty);
+            float visR = std::min(shapeBounds.x + shapeBounds.width, M.tx + imageDocW);
+            float visB = std::min(shapeBounds.y + shapeBounds.height, M.ty + imageDocH);
+            if (visR > visL && visB > visT) {
+              int srcL = static_cast<int>(std::round((visL - M.tx) / imageDocW * 100000.0f));
+              int srcT = static_cast<int>(std::round((visT - M.ty) / imageDocH * 100000.0f));
+              int srcR =
+                  static_cast<int>(std::round((M.tx + imageDocW - visR) / imageDocW * 100000.0f));
+              int srcB =
+                  static_cast<int>(std::round((M.ty + imageDocH - visB) / imageDocH * 100000.0f));
+              out.open("a:srcRect").a("l", srcL).a("t", srcT).a("r", srcR).a("b", srcB).sc();
+              int fillL = static_cast<int>(
+                  std::round((visL - shapeBounds.x) / shapeBounds.width * 100000.0f));
+              int fillT = static_cast<int>(
+                  std::round((visT - shapeBounds.y) / shapeBounds.height * 100000.0f));
+              int fillR = static_cast<int>(std::round((shapeBounds.x + shapeBounds.width - visR) /
+                                                      shapeBounds.width * 100000.0f));
+              int fillB = static_cast<int>(std::round((shapeBounds.y + shapeBounds.height - visB) /
+                                                      shapeBounds.height * 100000.0f));
+              out.open("a:stretch").gt();
+              out.open("a:fillRect").a("l", fillL).a("t", fillT).a("r", fillR).a("b", fillB).sc();
+              out.end();  // a:stretch
+            } else {
+              out.open("a:stretch").gt();
+              out.open("a:fillRect").sc();
+              out.end();  // a:stretch
+            }
           } else {
             out.open("a:stretch").gt();
             out.open("a:fillRect").sc();
