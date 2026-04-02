@@ -1,16 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: Rich text (multiple Text elements + independent Fill/Stroke + shared TextBox) -->
+<!-- Tests: Rich text (multiple Text elements in Group + independent Fill colors + shared TextBox) -->
 <pagx version="1.0" width="300" height="200">
   <Layer>
-    <!-- First text span: red -->
-    <Text text="Hello " fontFamily="Arial" fontStyle="Bold" fontSize="24" position="0,0"/>
-    <Fill color="#EF4444"/>
+    <!-- First text span: red bold -->
+    <Group>
+      <Text text="Hello " fontFamily="Arial" fontStyle="Bold" fontSize="24" position="0,0"/>
+      <Fill color="#EF4444"/>
+    </Group>
     <!-- Second text span: blue italic -->
-    <Text text="Beautiful " fontFamily="Arial" fontStyle="Italic" fontSize="24" position="0,0"/>
-    <Fill color="#3B82F6"/>
-    <!-- Third text span: green -->
-    <Text text="World" fontFamily="Arial" fontStyle="Bold" fontSize="24" position="0,0"/>
-    <Fill color="#10B981"/>
+    <Group>
+      <Text text="Beautiful " fontFamily="Arial" fontStyle="Italic" fontSize="24" position="0,0"/>
+      <Fill color="#3B82F6"/>
+    </Group>
+    <!-- Third text span: green bold -->
+    <Group>
+      <Text text="World!" fontFamily="Arial" fontStyle="Bold" fontSize="24" position="0,0"/>
+      <Fill color="#10B981"/>
+    </Group>
+    <!-- Fourth text span: purple with stroke -->
+    <Group>
+      <Text text=" Mixed " fontFamily="Arial" fontStyle="Bold" fontSize="20" position="0,0"/>
+      <Fill color="#8B5CF6"/>
+      <Stroke color="#6D28D9" width="0.5"/>
+    </Group>
+    <!-- Fifth text span: orange -->
+    <Group>
+      <Text text="Styles" fontFamily="Arial" fontStyle="Bold Italic" fontSize="20" position="0,0"/>
+      <Fill color="#F59E0B"/>
+    </Group>
     <!-- Shared text box for layout -->
     <TextBox position="20,40" size="260,120" textAlign="center" paragraphAlign="middle"/>
   </Layer>

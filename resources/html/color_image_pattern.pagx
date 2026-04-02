@@ -2,34 +2,89 @@
 <!-- Tests: ImagePattern → CSS background-image; tile modes (repeat/mirror/clamp/decal), filterMode -->
 <pagx version="1.0" width="400" height="200">
   <Resources>
-    <Image id="img1" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAE0lEQVR4nGNgOJP2nyg8qpC+CgEGMdsllVhiLQAAAABJRU5ErkJggg=="/>
+    <!-- 8x8 red/white checkerboard pattern for clearly visible tiling -->
+    <Image id="checker" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAJklEQVQI12P4z8BQDwQMYMrAwACkmBiAFBMaFxkwQFUyMNRDKQD03Q0JGYbtpgAAAABJRU5ErkJggg=="/>
   </Resources>
-  <!-- repeat/repeat → background-repeat: repeat -->
+
+  <!-- Labels -->
   <Layer>
-    <Rectangle position="50,100" size="80,80"/>
-    <Fill>
-      <ImagePattern image="@img1" tileModeX="repeat" tileModeY="repeat"/>
-    </Fill>
+    <Text text="repeat" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="50,20" textAnchor="center"/>
+    <Fill color="#64748B"/>
   </Layer>
-  <!-- repeat/clamp → repeat-x (clamp degrades to no-repeat on Y) -->
   <Layer>
-    <Rectangle position="150,100" size="80,80"/>
-    <Fill>
-      <ImagePattern image="@img1" tileModeX="repeat" tileModeY="clamp"/>
-    </Fill>
+    <Text text="mirror" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="150,20" textAnchor="center"/>
+    <Fill color="#64748B"/>
   </Layer>
-  <!-- mirror → SVG pattern with 4 tiles -->
   <Layer>
-    <Rectangle position="250,100" size="80,80"/>
-    <Fill>
-      <ImagePattern image="@img1" tileModeX="mirror" tileModeY="mirror"/>
-    </Fill>
+    <Text text="clamp" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="250,20" textAnchor="center"/>
+    <Fill color="#64748B"/>
   </Layer>
-  <!-- decal → no-repeat (transparent outside) -->
   <Layer>
-    <Rectangle position="350,100" size="80,80"/>
+    <Text text="decal" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="350,20" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- repeat/repeat → tiling checkerboard -->
+  <Layer>
+    <Rectangle position="50,80" size="80,80"/>
     <Fill>
-      <ImagePattern image="@img1" tileModeX="decal" tileModeY="decal" filterMode="nearest"/>
+      <ImagePattern image="@checker" tileModeX="repeat" tileModeY="repeat"/>
     </Fill>
+    <Stroke color="#CBD5E1" width="1"/>
+  </Layer>
+
+  <!-- mirror/mirror → reflected checkerboard tiles -->
+  <Layer>
+    <Rectangle position="150,80" size="80,80"/>
+    <Fill>
+      <ImagePattern image="@checker" tileModeX="mirror" tileModeY="mirror"/>
+    </Fill>
+    <Stroke color="#CBD5E1" width="1"/>
+  </Layer>
+
+  <!-- clamp/clamp → edge pixels stretched -->
+  <Layer>
+    <Rectangle position="250,80" size="80,80"/>
+    <Fill>
+      <ImagePattern image="@checker" tileModeX="clamp" tileModeY="clamp"/>
+    </Fill>
+    <Stroke color="#CBD5E1" width="1"/>
+  </Layer>
+
+  <!-- decal/decal → transparent outside image bounds -->
+  <Layer>
+    <Rectangle position="350,80" size="80,80"/>
+    <Fill>
+      <ImagePattern image="@checker" tileModeX="decal" tileModeY="decal"/>
+    </Fill>
+    <Stroke color="#CBD5E1" width="1"/>
+  </Layer>
+
+  <!-- Second row: filterMode comparison -->
+  <Layer>
+    <Text text="filterMode=linear" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="120,140" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+  <Layer>
+    <Text text="filterMode=nearest" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="280,140" textAnchor="center"/>
+    <Fill color="#64748B"/>
+  </Layer>
+
+  <!-- linear filter (smooth/blurry upscale) -->
+  <Layer>
+    <Rectangle position="120,175" size="80,50"/>
+    <Fill>
+      <ImagePattern image="@checker" tileModeX="repeat" tileModeY="repeat" filterMode="linear"/>
+    </Fill>
+    <Stroke color="#CBD5E1" width="1"/>
+  </Layer>
+
+  <!-- nearest filter (pixelated/crisp upscale) -->
+  <Layer>
+    <Rectangle position="280,175" size="80,50"/>
+    <Fill>
+      <ImagePattern image="@checker" tileModeX="repeat" tileModeY="repeat" filterMode="nearest"/>
+    </Fill>
+    <Stroke color="#CBD5E1" width="1"/>
   </Layer>
 </pagx>

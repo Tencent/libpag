@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Stroke advanced — blendMode="multiply", miterLimit="2", dashAdaptive true vs false -->
+<pagx version="1.0" width="400" height="200">
+
+  <!-- === Row 1: blendMode="multiply" on overlapping strokes === -->
+  <Layer>
+    <Text text="blendMode=multiply" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="65,16" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+  <!-- Two overlapping thick stroked circles with multiply blend -->
+  <Layer>
+    <Ellipse position="50,70" size="60,60"/>
+    <Stroke color="#EF4444" width="8" blendMode="multiply"/>
+  </Layer>
+  <Layer>
+    <Ellipse position="80,70" size="60,60"/>
+    <Stroke color="#3B82F6" width="8" blendMode="multiply"/>
+  </Layer>
+
+  <!-- === Row 1 col 2: miterLimit="2" vs default === -->
+  <Layer>
+    <Text text="miterLimit=2" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="180,16" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+  <Layer>
+    <Text text="default (4)" fontFamily="Arial" fontSize="9" position="155,28"/>
+    <Fill color="#64748B"/>
+  </Layer>
+  <!-- Sharp zigzag with default miterLimit=4 -->
+  <Layer>
+    <Path data="M 140,55 L 155,85 L 170,55 L 185,85"/>
+    <Stroke color="#8B5CF6" width="4" join="miter" miterLimit="4"/>
+  </Layer>
+  <Layer>
+    <Text text="miter=2" fontFamily="Arial" fontSize="9" position="195,28"/>
+    <Fill color="#64748B"/>
+  </Layer>
+  <!-- Same zigzag with miterLimit=2 — sharp corners get beveled -->
+  <Layer>
+    <Path data="M 185,55 L 200,85 L 215,55 L 230,85"/>
+    <Stroke color="#EC4899" width="4" join="miter" miterLimit="2"/>
+  </Layer>
+
+  <!-- === Row 2: dashAdaptive comparison === -->
+  <Layer>
+    <Text text="dashAdaptive=false" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="90,110" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+  <Layer>
+    <Text text="dashAdaptive=true" fontFamily="Arial" fontStyle="Bold" fontSize="10" position="310,110" textAnchor="center"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+
+  <!-- Curved path with dashAdaptive=false (default) -->
+  <Layer>
+    <Path data="M 20,150 C 60,120 120,180 180,140"/>
+    <Stroke color="#10B981" width="3" cap="round" dashes="12,8" dashAdaptive="false"/>
+  </Layer>
+  <!-- Same curved path with dashAdaptive=true — dashes evenly distributed -->
+  <Layer>
+    <Path data="M 220,150 C 260,120 320,180 380,140"/>
+    <Stroke color="#F59E0B" width="3" cap="round" dashes="12,8" dashAdaptive="true"/>
+  </Layer>
+
+  <!-- Reference: straight path comparison -->
+  <Layer>
+    <Path data="M 20,175 L 180,175"/>
+    <Stroke color="#10B981" width="2" cap="round" dashes="12,8" dashAdaptive="false"/>
+  </Layer>
+  <Layer>
+    <Path data="M 220,175 L 380,175"/>
+    <Stroke color="#F59E0B" width="2" cap="round" dashes="12,8" dashAdaptive="true"/>
+  </Layer>
+
+  <!-- Divider between dash columns -->
+  <Layer>
+    <Path data="M 200,105 L 200,190"/>
+    <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+  </Layer>
+</pagx>

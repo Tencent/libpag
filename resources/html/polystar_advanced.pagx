@@ -42,4 +42,10 @@
     <Polystar position="330,170" type="star" pointCount="2.3" outerRadius="30" innerRadius="12" rotation="-90"/>
     <Fill color="#D946EF"/>
   </Layer>
+  <!-- Fractional pointCount + non-zero roundness combined: 5.5 points with rounded tips -->
+  <Layer>
+    <Polystar position="200,130" type="star" pointCount="5.5" outerRadius="35" innerRadius="18" outerRoundness="0.7" innerRoundness="0.5" rotation="-90"/>
+    <Fill color="#F43F5E"/>
+    <Stroke color="#BE123C" width="1.5"/>
+  </Layer>
 </pagx>

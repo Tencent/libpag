@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: RangeSelector advanced — unit="index", easeIn/easeOut, randomOrder+randomSeed, shape="round" -->
+<pagx version="1.0" width="400" height="300">
+  <Resources>
+    <LinearGradient id="titleGrad" startPoint="0,0" endPoint="400,0">
+      <ColorStop offset="0" color="#8B5CF6"/>
+      <ColorStop offset="1" color="#06B6D4"/>
+    </LinearGradient>
+  </Resources>
+
+  <!-- Header -->
+  <Layer>
+    <Text text="Selector Effects" fontFamily="Arial" fontStyle="Bold" fontSize="16" position="200,24" textAnchor="center"/>
+    <Fill color="@titleGrad"/>
+  </Layer>
+
+  <!-- 1. unit="index" with start/end as glyph indices -->
+  <Layer>
+    <Text text="unit=index" fontFamily="Arial" fontSize="10" position="20,48"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+  <Layer>
+    <Text text="INDEX SELECT" fontFamily="Arial" fontStyle="Bold" fontSize="28" position="200,78" textAnchor="center"/>
+    <TextModifier position="0,-12" fillColor="#EC4899">
+      <RangeSelector start="2" end="7" unit="index" shape="square"/>
+    </TextModifier>
+    <Fill color="#334155"/>
+  </Layer>
+
+  <!-- 2. easeIn and easeOut (non-zero) -->
+  <Layer>
+    <Text text="easeIn=0.8 easeOut=0.8" fontFamily="Arial" fontSize="10" position="20,108"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+  <Layer>
+    <Text text="EASED MOTION" fontFamily="Arial" fontStyle="Bold" fontSize="28" position="200,138" textAnchor="center"/>
+    <TextModifier position="0,-16" scale="1.3,1.3">
+      <RangeSelector start="0" end="1" shape="triangle" easeIn="0.8" easeOut="0.8"/>
+    </TextModifier>
+    <Fill color="#3B82F6"/>
+  </Layer>
+
+  <!-- 3. randomOrder="true" with randomSeed="42" -->
+  <Layer>
+    <Text text="randomOrder + seed=42" fontFamily="Arial" fontSize="10" position="20,168"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+  <Layer>
+    <Text text="RANDOM ORDER" fontFamily="Arial" fontStyle="Bold" fontSize="28" position="200,198" textAnchor="center"/>
+    <TextModifier position="0,-10" fillColor="#F59E0B" alpha="0.4">
+      <RangeSelector start="0" end="0.5" shape="square" randomOrder="true" randomSeed="42"/>
+    </TextModifier>
+    <Fill color="#10B981"/>
+  </Layer>
+
+  <!-- 4. shape="round" (sinusoidal shape function) -->
+  <Layer>
+    <Text text="shape=round" fontFamily="Arial" fontSize="10" position="20,228"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+  <Layer>
+    <Text text="ROUND SHAPE" fontFamily="Arial" fontStyle="Bold" fontSize="28" position="200,258" textAnchor="center"/>
+    <TextModifier position="0,-14" rotation="15">
+      <RangeSelector start="0" end="1" shape="round"/>
+    </TextModifier>
+    <Fill color="#8B5CF6"/>
+  </Layer>
+
+  <!-- 5. Combined: index + round + easing + random for complex effect -->
+  <Layer>
+    <Text text="combined" fontFamily="Arial" fontSize="10" position="20,280"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+  <Layer>
+    <Text text="COMBINED" fontFamily="Arial" fontStyle="Bold" fontSize="24" position="200,296" textAnchor="center"/>
+    <TextModifier scale="1.4,1.4" fillColor="#EC4899">
+      <RangeSelector start="1" end="5" unit="index" shape="round" easeIn="0.5" easeOut="0.5" randomOrder="true" randomSeed="7"/>
+    </TextModifier>
+    <Fill color="#06B6D4"/>
+  </Layer>
+</pagx>

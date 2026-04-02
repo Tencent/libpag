@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Text features — letterSpacing, fauxBold, fauxItalic, CDATA multiline, TextBox overflow="visible" -->
+<pagx version="1.0" width="400" height="300">
+  <Resources>
+    <LinearGradient id="headerGrad" startPoint="0,0" endPoint="400,0">
+      <ColorStop offset="0" color="#6366F1"/>
+      <ColorStop offset="1" color="#EC4899"/>
+    </LinearGradient>
+  </Resources>
+
+  <!-- Header label -->
+  <Layer>
+    <Text text="Typography Specimen" fontFamily="Arial" fontStyle="Bold" fontSize="18" position="200,28" textAnchor="center"/>
+    <Fill color="@headerGrad"/>
+  </Layer>
+
+  <!-- Divider -->
+  <Layer>
+    <Path data="M 20,40 L 380,40"/>
+    <Stroke color="#E2E8F0" width="1"/>
+  </Layer>
+
+  <!-- 1. letterSpacing="8" -->
+  <Layer>
+    <Text text="letterSpacing" fontFamily="Arial" fontSize="10" position="20,58"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+  <Layer>
+    <Text text="SPACED OUT" fontFamily="Arial" fontStyle="Bold" fontSize="22" position="20,84" letterSpacing="8"/>
+    <Fill color="#3B82F6"/>
+  </Layer>
+
+  <!-- 2. fauxBold="true" -->
+  <Layer>
+    <Text text="fauxBold" fontFamily="Arial" fontSize="10" position="20,108"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+  <Layer>
+    <Text text="Faux Bold Text" fontFamily="Arial" fontSize="20" position="20,132" fauxBold="true"/>
+    <Fill color="#8B5CF6"/>
+  </Layer>
+
+  <!-- 3. fauxItalic="true" -->
+  <Layer>
+    <Text text="fauxItalic" fontFamily="Arial" fontSize="10" position="220,108"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+  <Layer>
+    <Text text="Faux Italic Text" fontFamily="Arial" fontSize="20" position="220,132" fauxItalic="true"/>
+    <Fill color="#EC4899"/>
+  </Layer>
+
+  <!-- 4. CDATA multiline content -->
+  <Layer>
+    <Text text="CDATA multiline" fontFamily="Arial" fontSize="10" position="20,158"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+  <Layer>
+    <Text fontFamily="Arial" fontSize="16" position="20,178">
+<![CDATA[Line 1
+Line 2
+Line 3]]>
+    </Text>
+    <Fill color="#10B981"/>
+  </Layer>
+
+  <!-- 5. TextBox with overflow="visible" — text extends beyond box boundary -->
+  <Layer>
+    <Text text="overflow=visible" fontFamily="Arial" fontSize="10" position="220,158"/>
+    <Fill color="#94A3B8"/>
+  </Layer>
+  <!-- Visible box boundary (dashed) -->
+  <Layer>
+    <Rectangle position="300,220" size="140,50"/>
+    <Stroke color="#F59E0B" width="1" dashes="4,3"/>
+  </Layer>
+  <!-- Text overflows the small box -->
+  <Layer>
+    <Text text="This text overflows the small box and remains visible beyond its boundaries." fontFamily="Arial" fontSize="14" position="0,0"/>
+    <TextBox position="230,195" size="140,50" overflow="visible" wordWrap="true"/>
+    <Fill color="#F59E0B"/>
+  </Layer>
+</pagx>
