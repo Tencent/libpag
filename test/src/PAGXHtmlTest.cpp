@@ -53,7 +53,7 @@ static std::string LoadAndConvert(const std::string& pagxPath,
 
 static std::vector<std::string> GetHtmlTestFiles() {
   std::vector<std::string> files = {};
-  auto dir = ProjectPath::Absolute("resources/html");
+  auto dir = ProjectPath::Absolute("resources/pagx_to_html");
   if (!std::filesystem::exists(dir)) {
     return files;
   }
@@ -67,12 +67,12 @@ static std::vector<std::string> GetHtmlTestFiles() {
 }
 
 // =============================================================================
-// Batch test: ensure every .pagx file in resources/html/ converts successfully
+// Batch test: ensure every .pagx file in resources/pagx_to_html/ converts successfully
 // =============================================================================
 
 CLI_TEST(PAGXHtmlTest, BatchConvertAll) {
   auto files = GetHtmlTestFiles();
-  ASSERT_FALSE(files.empty()) << "No .pagx files found in resources/html/";
+  ASSERT_FALSE(files.empty()) << "No .pagx files found in resources/pagx_to_html/";
   for (const auto& filePath : files) {
     auto baseName = std::filesystem::path(filePath).stem().string();
     auto html = LoadAndConvert(filePath);
@@ -88,7 +88,7 @@ CLI_TEST(PAGXHtmlTest, BatchConvertAll) {
 // =============================================================================
 
 CLI_TEST(PAGXHtmlTest, RootDocument) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/root_document.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("pagx-root"), std::string::npos);
   EXPECT_NE(html.find("width:300px"), std::string::npos);
@@ -103,40 +103,40 @@ CLI_TEST(PAGXHtmlTest, RootDocument) {
 // =============================================================================
 
 CLI_TEST(PAGXHtmlTest, LayerVisibility) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/layer_visibility.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_visibility.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("display:none"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, LayerAlpha) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/layer_alpha.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_alpha.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("opacity:0.3"), std::string::npos);
   EXPECT_NE(html.find("opacity:0.7"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, LayerTransformXY) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/layer_transform_xy.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_transform_xy.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("translate(30px,50px)"), std::string::npos);
   EXPECT_NE(html.find("translate(120px,50px)"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, LayerTransformMatrix) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/layer_transform_matrix.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_transform_matrix.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("matrix("), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, LayerTransformMatrix3D) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/layer_transform_matrix3d.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_transform_matrix3d.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("matrix3d("), std::string::npos);
   EXPECT_NE(html.find("transform-style:preserve-3d"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, LayerTransformPriority) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/layer_transform_priority.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_transform_priority.pagx"));
   ASSERT_FALSE(html.empty());
   // The first layer should use translate (no matrix/matrix3D)
   EXPECT_NE(html.find("translate(40px,78px)"), std::string::npos);
@@ -147,7 +147,7 @@ CLI_TEST(PAGXHtmlTest, LayerTransformPriority) {
 }
 
 CLI_TEST(PAGXHtmlTest, LayerBlendModes) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/layer_blend_modes.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_blend_modes.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("mix-blend-mode:multiply"), std::string::npos);
   EXPECT_NE(html.find("mix-blend-mode:screen"), std::string::npos);
@@ -168,7 +168,7 @@ CLI_TEST(PAGXHtmlTest, LayerBlendModes) {
 }
 
 CLI_TEST(PAGXHtmlTest, LayerGroupOpacity) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/layer_group_opacity.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_group_opacity.pagx"));
   ASSERT_FALSE(html.empty());
   // groupOpacity=true: opacity on the parent div
   // groupOpacity=false: opacity distributed to children
@@ -176,7 +176,7 @@ CLI_TEST(PAGXHtmlTest, LayerGroupOpacity) {
 }
 
 CLI_TEST(PAGXHtmlTest, LayerNesting) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/layer_nesting.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_nesting.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("pagx-layer"), std::string::npos);
 }
@@ -186,7 +186,7 @@ CLI_TEST(PAGXHtmlTest, LayerNesting) {
 // =============================================================================
 
 CLI_TEST(PAGXHtmlTest, GeometryRectangle) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/geometry_rectangle.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/geometry_rectangle.pagx"));
   ASSERT_FALSE(html.empty());
   // CSS path: div with border-radius
   EXPECT_NE(html.find("border-radius"), std::string::npos);
@@ -195,20 +195,20 @@ CLI_TEST(PAGXHtmlTest, GeometryRectangle) {
 }
 
 CLI_TEST(PAGXHtmlTest, GeometryEllipse) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/geometry_ellipse.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/geometry_ellipse.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("border-radius:50%"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, GeometryPolystar) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/geometry_polystar.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/geometry_polystar.pagx"));
   ASSERT_FALSE(html.empty());
   // Polystar always uses SVG path
   EXPECT_NE(html.find("<path"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, GeometryPath) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/geometry_path.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/geometry_path.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("<path"), std::string::npos);
 }
@@ -218,39 +218,39 @@ CLI_TEST(PAGXHtmlTest, GeometryPath) {
 // =============================================================================
 
 CLI_TEST(PAGXHtmlTest, ColorFormats) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/color_formats.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/color_formats.pagx"));
   ASSERT_FALSE(html.empty());
   // Should contain hex color values
   EXPECT_NE(html.find("#3B82F6"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, ColorLinearGradient) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/color_linear_gradient.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/color_linear_gradient.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("linear-gradient"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, ColorRadialGradient) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/color_radial_gradient.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/color_radial_gradient.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("radial-gradient"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, ColorConicGradient) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/color_conic_gradient.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/color_conic_gradient.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("conic-gradient"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, ColorDiamondGradient) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/color_diamond_gradient.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/color_diamond_gradient.pagx"));
   ASSERT_FALSE(html.empty());
   // DiamondGradient has no CSS equivalent — should use SVG filter fallback
   EXPECT_NE(html.find("<svg"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, ColorImagePattern) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/color_image_pattern.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/color_image_pattern.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("background-image"), std::string::npos);
 }
@@ -260,27 +260,27 @@ CLI_TEST(PAGXHtmlTest, ColorImagePattern) {
 // =============================================================================
 
 CLI_TEST(PAGXHtmlTest, PainterFill) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/painter_fill.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/painter_fill.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("background"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, PainterStroke) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/painter_stroke.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/painter_stroke.pagx"));
   ASSERT_FALSE(html.empty());
   // Stroke uses SVG
   EXPECT_NE(html.find("stroke"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, PainterMultiple) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/painter_multiple.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/painter_multiple.pagx"));
   ASSERT_FALSE(html.empty());
   // Multiple painters generate overlay elements
 }
 
 CLI_TEST(PAGXHtmlTest, PainterAccumulatedGeometry) {
   auto html =
-      LoadAndConvert(ProjectPath::Absolute("resources/html/painter_accumulated_geometry.pagx"));
+      LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/painter_accumulated_geometry.pagx"));
   ASSERT_FALSE(html.empty());
 }
 
@@ -289,20 +289,20 @@ CLI_TEST(PAGXHtmlTest, PainterAccumulatedGeometry) {
 // =============================================================================
 
 CLI_TEST(PAGXHtmlTest, ModifierTrimPath) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/modifier_trim_path.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/modifier_trim_path.pagx"));
   ASSERT_FALSE(html.empty());
   // TrimPath forces SVG rendering
   EXPECT_NE(html.find("<svg"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, ModifierRoundCorner) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/modifier_round_corner.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/modifier_round_corner.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("<path"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, ModifierMergePath) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/modifier_merge_path.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/modifier_merge_path.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("<path"), std::string::npos);
 }
@@ -312,7 +312,7 @@ CLI_TEST(PAGXHtmlTest, ModifierMergePath) {
 // =============================================================================
 
 CLI_TEST(PAGXHtmlTest, TextBasic) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/text_basic.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/text_basic.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("Hello World"), std::string::npos);
   EXPECT_NE(html.find("font-family"), std::string::npos);
@@ -320,30 +320,30 @@ CLI_TEST(PAGXHtmlTest, TextBasic) {
 }
 
 CLI_TEST(PAGXHtmlTest, TextBox) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/text_box.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/text_box.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("text-align"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, TextModifier) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/text_modifier.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/text_modifier.pagx"));
   ASSERT_FALSE(html.empty());
 }
 
 CLI_TEST(PAGXHtmlTest, TextPath) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/text_path.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/text_path.pagx"));
   ASSERT_FALSE(html.empty());
 }
 
 CLI_TEST(PAGXHtmlTest, TextGlyphRun) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/text_glyph_run.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/text_glyph_run.pagx"));
   ASSERT_FALSE(html.empty());
   // GlyphRun produces SVG paths per glyph
   EXPECT_NE(html.find("<path"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, TextRich) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/text_rich.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/text_rich.pagx"));
   ASSERT_FALSE(html.empty());
 }
 
@@ -352,7 +352,7 @@ CLI_TEST(PAGXHtmlTest, TextRich) {
 // =============================================================================
 
 CLI_TEST(PAGXHtmlTest, Repeater) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/repeater.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/repeater.pagx"));
   ASSERT_FALSE(html.empty());
 }
 
@@ -361,7 +361,7 @@ CLI_TEST(PAGXHtmlTest, Repeater) {
 // =============================================================================
 
 CLI_TEST(PAGXHtmlTest, Group) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/group.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/group.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("pagx-group"), std::string::npos);
 }
@@ -371,7 +371,7 @@ CLI_TEST(PAGXHtmlTest, Group) {
 // =============================================================================
 
 CLI_TEST(PAGXHtmlTest, ClipAndMask) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/clip_and_mask.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/clip_and_mask.pagx"));
   ASSERT_FALSE(html.empty());
   // scrollRect → clip-path or clip
   // mask → CSS mask or SVG mask/clipPath
@@ -382,7 +382,7 @@ CLI_TEST(PAGXHtmlTest, ClipAndMask) {
 // =============================================================================
 
 CLI_TEST(PAGXHtmlTest, StyleShadows) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/style_shadows.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/style_shadows.pagx"));
   ASSERT_FALSE(html.empty());
   // Drop shadow → drop-shadow / box-shadow / SVG filter
   // Inner shadow → box-shadow inset / SVG filter
@@ -394,7 +394,7 @@ CLI_TEST(PAGXHtmlTest, StyleShadows) {
 // =============================================================================
 
 CLI_TEST(PAGXHtmlTest, FilterAll) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/filter_all.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/filter_all.pagx"));
   ASSERT_FALSE(html.empty());
   // Uniform blur → filter:blur()
   // Asymmetric blur → SVG feGaussianBlur
@@ -407,30 +407,30 @@ CLI_TEST(PAGXHtmlTest, FilterAll) {
 // =============================================================================
 
 CLI_TEST(PAGXHtmlTest, EdgeDefaults) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/edge_defaults.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/edge_defaults.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("pagx-root"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, ResourceComposition) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/resource_composition.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/resource_composition.pagx"));
   ASSERT_FALSE(html.empty());
 }
 
 CLI_TEST(PAGXHtmlTest, ResourceForwardRef) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/resource_forward_ref.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/resource_forward_ref.pagx"));
   ASSERT_FALSE(html.empty());
   // Forward reference resolved: should contain the referenced color
   EXPECT_NE(html.find("#8B5CF6"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, StrokeDashAdaptive) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/stroke_dash_adaptive.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/stroke_dash_adaptive.pagx"));
   ASSERT_FALSE(html.empty());
 }
 
 CLI_TEST(PAGXHtmlTest, LayerPassThrough) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/html/layer_pass_through.pagx"));
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_pass_through.pagx"));
   ASSERT_FALSE(html.empty());
 }
 
@@ -440,7 +440,7 @@ CLI_TEST(PAGXHtmlTest, LayerPassThrough) {
 
 CLI_TEST(PAGXHtmlTest, ExportOptions_Indent) {
   auto doc =
-      pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/html/root_document.pagx"));
+      pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
   ASSERT_TRUE(doc != nullptr);
 
   pagx::HTMLExportOptions opts = {};
@@ -453,7 +453,7 @@ CLI_TEST(PAGXHtmlTest, ExportOptions_Indent) {
 
 CLI_TEST(PAGXHtmlTest, ExportToFile) {
   auto doc =
-      pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/html/root_document.pagx"));
+      pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
   ASSERT_TRUE(doc != nullptr);
 
   auto outPath = ProjectPath::Absolute("test/out/PAGXHtmlTest/export_to_file.html");
@@ -476,7 +476,7 @@ CLI_TEST(PAGXHtmlTest, ExportToFile) {
 
 CLI_TEST(PAGXHtmlTest, ReactJSXOutput) {
   auto doc =
-      pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/html/root_document.pagx"));
+      pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
   ASSERT_TRUE(doc != nullptr);
 
   pagx::HTMLExportOptions opts = {};
@@ -501,7 +501,7 @@ CLI_TEST(PAGXHtmlTest, ReactJSXOutput) {
 }
 
 CLI_TEST(PAGXHtmlTest, ReactJSXStyleConversion) {
-  auto doc = pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/html/layer_alpha.pagx"));
+  auto doc = pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/pagx_to_html/layer_alpha.pagx"));
   ASSERT_TRUE(doc != nullptr);
 
   pagx::HTMLExportOptions opts = {};
@@ -521,7 +521,7 @@ CLI_TEST(PAGXHtmlTest, ReactJSXStyleConversion) {
 
 CLI_TEST(PAGXHtmlTest, VueSFCOutput) {
   auto doc =
-      pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/html/root_document.pagx"));
+      pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
   ASSERT_TRUE(doc != nullptr);
 
   pagx::HTMLExportOptions opts = {};
@@ -545,7 +545,7 @@ CLI_TEST(PAGXHtmlTest, VueSFCOutput) {
 }
 
 CLI_TEST(PAGXHtmlTest, VueSFCStyleConversion) {
-  auto doc = pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/html/layer_alpha.pagx"));
+  auto doc = pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/pagx_to_html/layer_alpha.pagx"));
   ASSERT_TRUE(doc != nullptr);
 
   pagx::HTMLExportOptions opts = {};
@@ -588,7 +588,7 @@ CLI_TEST(PAGXHtmlTest, HtmlScreenshotCompare) {
   }
 
   auto files = GetHtmlTestFiles();
-  ASSERT_FALSE(files.empty()) << "No .pagx files found in resources/html/";
+  ASSERT_FALSE(files.empty()) << "No .pagx files found in resources/pagx_to_html/";
 
   auto outDir = ProjectPath::Absolute("test/out/PAGXHtmlScreenshot");
   std::filesystem::create_directories(outDir);

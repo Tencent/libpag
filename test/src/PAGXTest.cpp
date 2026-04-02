@@ -1135,10 +1135,10 @@ PAGX_TEST(PAGXTest, ResourceCrossReferenceChain) {
 }
 
 /**
- * Test all HTML-related PAGX files in resources/html directory.
+ * Test all HTML-related PAGX files in resources/pagx_to_html directory.
  */
 PAGX_TEST(PAGXTest, HtmlFiles) {
-  TestPAGXDirectory(context, ProjectPath::Absolute("resources/html"), "html");
+  TestPAGXDirectory(context, ProjectPath::Absolute("resources/pagx_to_html"), "html");
 }
 
 }  // namespace pag
