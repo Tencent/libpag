@@ -51,7 +51,9 @@ static void PrintUsage() {
             << "\n"
             << "Options:\n"
             << "  --help, -h       Show help\n"
-            << "  --version, -v    Show version\n";
+            << "  --version, -v    Show version\n"
+            << "\n"
+            << "Run 'pagx <command> --help' for detailed options and usage of each command.\n";
 }
 
 int main(int argc, char* argv[]) {
