@@ -71,7 +71,8 @@ struct LayoutOptions {
   std::string inputFile;
   std::string id;
   std::string xpath;
-  bool check = false;
+  int depth = 0;
+  bool problemsOnly = false;
 };
 
 // ============================================================================
@@ -308,7 +309,8 @@ static void DetectClippedContent(const LCRect& parentBounds,
 
 static void BuildElementNodes(const std::vector<Element*>& elements,
                               std::vector<std::shared_ptr<CheckNode>>& out, float parentX,
-                              float parentY, const TextBox* parentTextBox, bool check) {
+                              float parentY, const TextBox* parentTextBox, bool check, int maxDepth,
+                              int currentDepth) {
   for (int i = 0; i < static_cast<int>(elements.size()); ++i) {
     auto* element = elements[i];
     auto* layoutNode = pagx::LayoutNode::AsLayoutNode(element);
@@ -343,7 +345,7 @@ static void BuildElementNodes(const std::vector<Element*>& elements,
       if (!group->elements.empty()) {
         std::vector<std::shared_ptr<CheckNode>> groupChildren;
         BuildElementNodes(group->elements, groupChildren, node->bounds.x, node->bounds.y,
-                          nextParentTextBox, check);
+                          nextParentTextBox, check, maxDepth, currentDepth);
         if (!groupChildren.empty()) {
           node->children = std::move(groupChildren);
         }
@@ -363,7 +365,8 @@ static void BuildElementNodes(const std::vector<Element*>& elements,
 // ============================================================================
 
 static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float parentX, float parentY,
-                                                  int indexInParent, bool check,
+                                                  int indexInParent, bool check, int maxDepth,
+                                                  int currentDepth = 0,
                                                   const Layer* parentLayer = nullptr) {
   if (layer == nullptr) {
     return nullptr;
@@ -396,8 +399,8 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
   std::vector<std::shared_ptr<CheckNode>> childLayerNodes;
 
   if (!layer->contents.empty()) {
-    BuildElementNodes(layer->contents, elementNodes, node->bounds.x, node->bounds.y, nullptr,
-                      check);
+    BuildElementNodes(layer->contents, elementNodes, node->bounds.x, node->bounds.y, nullptr, check,
+                      maxDepth, currentDepth);
     // Check content origin offset for content-measured Layer containers.
     // A Layer's size is content-measured when both width and height are unset AND not engine-
     // assigned. Skip if: opposite-pair constraints derive both axes, or flex assigns main-axis
@@ -413,11 +416,13 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
     }
   }
 
-  for (int i = 0; i < static_cast<int>(layer->children.size()); ++i) {
-    auto childNode =
-        BuildLayoutTree(layer->children[i], node->bounds.x, node->bounds.y, i, check, layer);
-    if (childNode) {
-      childLayerNodes.push_back(childNode);
+  if (maxDepth <= 0 || currentDepth < maxDepth) {
+    for (int i = 0; i < static_cast<int>(layer->children.size()); ++i) {
+      auto childNode = BuildLayoutTree(layer->children[i], node->bounds.x, node->bounds.y, i, check,
+                                       maxDepth, currentDepth + 1, layer);
+      if (childNode) {
+        childLayerNodes.push_back(childNode);
+      }
     }
   }
 
@@ -644,14 +649,16 @@ static void PrintNodeXml(std::ostream& os, const CheckNode& node, int indent) {
 static void PrintUsage() {
   std::cout << "Usage: pagx layout [options] <file.pagx>\n"
             << "\n"
-            << "Display layout structure of a PAGX file in XML format. By default outputs the\n"
-            << "full layout tree with bounds for all Layers and elements. With --check, detects\n"
-            << "layout problems and returns non-zero exit code when issues are found.\n"
+            << "Display layout structure of a PAGX file in XML format. Outputs the full\n"
+            << "layout tree with bounds and detected problems for all Layers and elements.\n"
+            << "With --problems-only, outputs only nodes with problems and returns non-zero\n"
+            << "exit code when issues are found.\n"
             << "\n"
             << "Options:\n"
             << "  --id <id>             Limit scope to the Layer with the specified id\n"
             << "  --xpath <expr>        Limit scope to Layers matched by XPath expression\n"
-            << "  --check               Detect layout problems (returns non-zero if found)\n"
+            << "  --depth <n>           Limit Layer nesting depth (0 or negative = unlimited)\n"
+            << "  --problems-only       Only output nodes with problems (non-zero exit if found)\n"
             << "  -h, --help            Show this help message\n";
 }
 
@@ -669,8 +676,14 @@ static int ParseOptions(int argc, char* argv[], LayoutOptions* opts) {
         return 1;
       }
       opts->xpath = argv[++i];
-    } else if (strcmp(argv[i], "--check") == 0) {
-      opts->check = true;
+    } else if (strcmp(argv[i], "--depth") == 0) {
+      if (i + 1 >= argc) {
+        std::cerr << "pagx layout: --depth requires an argument\n";
+        return 1;
+      }
+      opts->depth = atoi(argv[++i]);
+    } else if (strcmp(argv[i], "--problems-only") == 0) {
+      opts->problemsOnly = true;
     } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
       PrintUsage();
       return -1;
@@ -748,22 +761,22 @@ int RunLayout(int argc, char* argv[]) {
     auto lb = targetLayers[i]->layoutBounds();
     float originX = scopedQuery ? -lb.x : 0;
     float originY = scopedQuery ? -lb.y : 0;
-    auto node = BuildLayoutTree(targetLayers[i], originX, originY, i, opts.check);
+    auto node = BuildLayoutTree(targetLayers[i], originX, originY, i, true, opts.depth);
     if (node) {
       results.push_back(node);
     }
   }
 
-  int problemCount = opts.check ? CountProblems(results) : 0;
+  int problemCount = CountProblems(results);
 
-  if (opts.check) {
+  if (opts.problemsOnly) {
     results = FilterProblematicNodes(results);
   }
 
   // Output XML.
   bool hasTargetScope = !opts.id.empty() || !opts.xpath.empty();
   std::cout << "<layout>\n";
-  bool emptyCheck = results.empty() && opts.check;
+  bool emptyCheck = results.empty() && opts.problemsOnly;
   if (!hasTargetScope && !emptyCheck) {
     auto docWidth = static_cast<int>(document->width);
     auto docHeight = static_cast<int>(document->height);
@@ -781,7 +794,7 @@ int RunLayout(int argc, char* argv[]) {
   }
   std::cout << "</layout>\n";
 
-  return problemCount > 0 ? 1 : 0;
+  return (opts.problemsOnly && problemCount > 0) ? 1 : 0;
 }
 
 }  // namespace pagx::cli

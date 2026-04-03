@@ -186,11 +186,11 @@ loop (Step 4) to confirm dimensions and arrangement are correct.
 
 **Stage 2 — Per-module content**: Pick one section at a time. Add its internal content
 (background Rectangles, Text, icons, child Layers). After each module, run the verification
-loop again. If `pagx layout --check` reports problems, fix them before moving to the next
+loop again. If `pagx layout --problems-only` reports problems, fix them before moving to the next
 module.
 
 **Stage 3 — Polish and cross-check**: After all modules are filled, run a final full
-verification (`pagx layout --check` on the whole file + `pagx render`) to catch any
+verification (`pagx layout --problems-only` on the whole file + `pagx render`) to catch any
 cross-module issues (overlapping sections, inconsistent spacing).
 
 This strategy mirrors the "skeleton → content → verify" workflow used by design tools —
@@ -291,13 +291,13 @@ layout errors early.
 
 ### Verification Loop
 
-Repeat this loop until `pagx layout --check` exits clean (exit code 0) **and** the
+Repeat this loop until `pagx layout --problems-only` exits clean (exit code 0) **and** the
 screenshot matches the design intent:
 
 #### 1. Detect layout problems
 
 ```bash
-pagx layout --check input.pagx
+pagx layout --problems-only input.pagx
 ```
 
 This detects six categories of problems:
@@ -314,8 +314,8 @@ Exit code 0 = no problems.
 To check a specific section during incremental build, scope with `--id` or `--xpath`:
 
 ```bash
-pagx layout --check --id "header" input.pagx
-pagx layout --check --xpath "//Layer[@layout]" input.pagx
+pagx layout --problems-only --id "header" input.pagx
+pagx layout --problems-only --xpath "//Layer[@layout]" input.pagx
 ```
 
 #### 2. Fix problems
@@ -354,7 +354,7 @@ Verify:
 pagx render --scale 2 input.pagx
 ```
 
-Read the screenshot carefully. Visual inspection catches issues that `--check` cannot detect:
+Read the screenshot carefully. Visual inspection catches issues that automated detection cannot:
 - **Alignment and spacing** — elements visually misaligned, uneven gaps, asymmetric padding
 - **Text** — wrong font, truncated or overflowing text, invisible text (missing Fill)
 - **Colors and gradients** — wrong colors, gradient direction off, unintended transparency
@@ -369,8 +369,8 @@ pagx render --scale 2 --id "header" input.pagx
 
 #### 5. Diagnose visual issues with layout data
 
-When the screenshot reveals a problem but `--check` reports no issues, use `pagx layout`
-(without `--check`) to inspect the resolved bounds of the suspect node:
+When the screenshot reveals a visual issue but no `<Problem>` nodes are reported, use
+`pagx layout` to inspect the resolved bounds of the suspect node:
 
 ```bash
 pagx layout --id "cardRow" input.pagx
@@ -388,7 +388,7 @@ Fix the identified issue, then re-render to confirm.
 
 #### 6. Repeat
 
-If any problems remain, return to step 1. Continue until `--check` exits 0 and the
+If any problems remain, return to step 1. Continue until `--problems-only` exits 0 and the
 screenshot is correct.
 
 ### Incremental Verification
@@ -396,10 +396,10 @@ screenshot is correct.
 During incremental build (Step 2 §Incremental Build Strategy), run the verification loop
 at each stage:
 
-1. **After skeleton**: `pagx layout --check` — confirms top-level structure has no
+1. **After skeleton**: `pagx layout --problems-only` — confirms top-level structure has no
    overlaps, zero-size sections, or missing layout attributes. Fix before adding content.
-2. **After each module**: `pagx layout --check --id "moduleId"` — scoped check on the
+2. **After each module**: `pagx layout --problems-only --id "moduleId"` — scoped check on the
    module just filled. Catches internal content issues without re-checking the whole file.
-3. **Final pass**: `pagx layout --check` + `pagx render --scale 2` — full verification
+3. **Final pass**: `pagx layout --problems-only` + `pagx render --scale 2` — full verification
    of the complete file.
 

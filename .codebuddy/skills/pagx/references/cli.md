@@ -137,35 +137,37 @@ pagx format --indent 4 input.pagx       # 4-space indent (default: 2)
 
 ## pagx layout
 
-Display the layout structure of a PAGX file in XML format. By default outputs the full
-layout tree with resolved bounds and layout attributes for all Layers and their internal
+Display the layout structure of a PAGX file in XML format. Outputs the full layout tree with
+resolved bounds, layout attributes, and detected problems for all Layers and their internal
 elements (Rectangle, Ellipse, Path, Polystar, Text, TextPath, Group, TextBox). With
-`--check`, detects layout problems and returns non-zero exit code when issues are found.
+`--problems-only`, outputs only nodes with problems and returns non-zero exit code.
 
 Output is wrapped in a `<layout>` root element. Without `--id`/`--xpath`, a `<pagx>` element
 with document dimensions contains the layer tree. With `--id`/`--xpath`, target Layers appear
 directly inside `<layout>` with bounds relative to their own origin (starting at 0,0).
 
 ```bash
-pagx layout input.pagx                                      # full layout tree
+pagx layout input.pagx                                      # full layout tree + problems
 pagx layout --id "card" input.pagx                           # scope to a Layer by id
 pagx layout --xpath "//Layer[@id='header']" input.pagx       # scope to Layers by XPath
-pagx layout --check input.pagx                               # detect problems
+pagx layout --depth 1 input.pagx                             # only one level of child Layers
+pagx layout --problems-only input.pagx                       # only nodes with problems
 ```
 
 | Option | Description |
 |--------|-------------|
 | `--id <id>` | Limit scope to the Layer with the specified `id` attribute |
 | `--xpath <expr>` | Limit scope to Layers matched by XPath expression |
-| `--check` | Detect layout problems; only output nodes with problems; return non-zero exit code if issues found |
+| `--depth <n>` | Limit Layer nesting depth (0 or negative = unlimited, default: unlimited) |
+| `--problems-only` | Only output nodes with problems; return non-zero exit code if issues found |
 
 `--id` and `--xpath` are mutually exclusive.
 
-### Default mode (no --check)
+### Default mode
 
-Outputs the complete layout tree showing every Layer and element with their resolved bounds
-and layout attributes (only non-default values). No problem detection is performed. Always
-returns exit code 0.
+Outputs the complete layout tree showing every Layer and element with their resolved bounds,
+layout attributes (only non-default values), and any detected problems as `<Problem>` child
+elements. Always returns exit code 0.
 
 ```xml
 <layout>
@@ -189,7 +191,12 @@ returns exit code 0.
 Layer attributes output when non-default: `layout`, `gap`, `flex`, `padding`, `alignment`,
 `arrangement`, `includeInLayout="false"`, `clipToBounds="true"`.
 
-### Check mode (--check)
+### Problems-only mode (--problems-only)
+
+Same problem detection as default mode, but only nodes with problems (and their ancestor
+chain) are output. Clean sibling nodes before a problematic node are replaced with empty
+`<Layer/>` placeholders to preserve index counting. Returns exit code 1 if any problems are
+found, 0 otherwise.
 
 Detects six categories of layout problems:
 
@@ -199,11 +206,6 @@ Detects six categories of layout problems:
 4. **Flex in content-measured parent** — `flex` child in a container layout parent that has no explicit main-axis size
 5. **Content origin offset** — unconstrained children in a content-measured container do not start at (0, 0), causing inaccurate container measurement
 6. **Constraints ignored by layout** — constraint attributes on a child Layer participating in container layout flow (silently ignored)
-
-Only nodes with problems (and their ancestor chain) are output. Clean sibling nodes before
-a problematic node are replaced with empty `<Layer/>` placeholders to preserve index counting.
-Problems appear as `<Problem>` child elements before other children. Returns exit code 1 if
-any problems are found, 0 otherwise.
 
 ```xml
 <layout>

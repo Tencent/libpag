@@ -92,7 +92,7 @@ After all optimizations, verify the following:
 - [ ] `<Resources>` placed after all Layers; all `@id` references resolve
 - [ ] Repeater copies reasonable (~200 single, ~500 nested product)
 - [ ] Visual stacking order preserved (see **Stacking Order** below)
-- [ ] `pagx layout --check` reports no problems (overlapping, zero-size, clipped)
+- [ ] `pagx layout --problems-only` reports no problems (overlapping, zero-size, clipped, etc.)
 - [ ] Rendered screenshot matches expected design (layout, alignment, consistent spacing)
   (see `generate-guide.md` §Step 4 for the full verification loop)
 

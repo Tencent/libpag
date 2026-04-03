@@ -328,10 +328,11 @@ segment sits directly in the TextBox; subsequent segments use Groups for painter
 ### Layout Verification
 
 After building or modifying layouts, use `pagx layout` to inspect resolved bounds and
-`pagx layout --check` to detect structural problems. This is essential during incremental
-build — see `generate-guide.md` §Step 4 for the full verification loop.
+detected problems. Use `pagx layout --problems-only` to see only nodes with issues. This
+is essential during incremental build — see `generate-guide.md` §Step 4 for the full
+verification loop.
 
-`--check` detects six problem categories. Each maps to a layout pattern fix:
+`pagx layout` detects six problem categories. Each maps to a layout pattern fix:
 
 | Problem | Design Pattern Fix |
 |---------|-------------------|
@@ -345,8 +346,8 @@ build — see `generate-guide.md` §Step 4 for the full verification loop.
 Scoped checks for individual sections during incremental build:
 
 ```bash
-pagx layout --check --id "header" input.pagx      # check one section
-pagx layout --id "cardRow" input.pagx              # inspect resolved bounds
+pagx layout --problems-only --id "header" input.pagx  # only problems in one section
+pagx layout --id "cardRow" input.pagx                  # full tree + problems for one section
 ```
 
 See `cli.md` §pagx layout for full command reference.

@@ -1877,7 +1877,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_CleanXml) {
 
 CLI_TEST(PAGXCliTest, LayoutCheck_CleanProblemsOnly) {
   auto path = TestResourcePath("layout_check_clean.pagx");
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   EXPECT_EQ(ret, 0);
 }
 
@@ -1898,8 +1898,8 @@ CLI_TEST(PAGXCliTest, LayoutCheck_Clipped) {
   EXPECT_EQ(ret, 0);
   // In global mode, overflow Layer should show absolute coordinates.
   EXPECT_TRUE(output.find("bounds=\"150,150,100,100\"") != std::string::npos);
-  // Default mode does not output problems.
-  EXPECT_TRUE(output.find("outside parent bounds") == std::string::npos);
+  // Default mode now includes problem detection.
+  EXPECT_TRUE(output.find("outside parent bounds") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, LayoutCheck_Absolute) {
@@ -1948,14 +1948,14 @@ CLI_TEST(PAGXCliTest, LayoutCheck_XPath) {
 
 CLI_TEST(PAGXCliTest, LayoutCheck_CheckXml) {
   auto path = TestResourcePath("layout_check_overlap.pagx");
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   // Manual-positioned Layers without container layout no longer trigger overlap warnings.
   EXPECT_EQ(ret, 0);
 }
 
 CLI_TEST(PAGXCliTest, LayoutCheck_CheckClean) {
   auto path = TestResourcePath("layout_check_clean.pagx");
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   EXPECT_EQ(ret, 0);
 }
 
@@ -1964,7 +1964,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_CheckOverlap) {
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   std::cout.rdbuf(old);
   auto output = oss.str();
   // Manual-positioned Layers without container layout no longer trigger overlap warnings.
@@ -1989,7 +1989,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_Placeholder) {
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   std::cout.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -2012,7 +2012,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_BackgroundNoOverlap) {
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   std::cout.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -2025,7 +2025,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ManualPositionNoOverlap) {
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   std::cout.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -2038,7 +2038,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_TextFontFallback) {
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   std::cout.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -2052,7 +2052,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_PathZeroSize) {
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   std::cout.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -2065,7 +2065,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffset) {
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   std::cout.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -2079,7 +2079,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetNeg) {
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   std::cout.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -2092,7 +2092,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentAtOrigin) {
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   std::cout.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -2105,7 +2105,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetExplicitSize) {
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   std::cout.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -2119,7 +2119,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetConstrained) {
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   std::cout.rdbuf(old);
   auto output = oss.str();
   // The unconstrained Path starts at (50, 50), but the check only looks at unconstrained children.
@@ -2134,7 +2134,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetFlex) {
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   std::cout.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -2147,7 +2147,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetGroup) {
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   std::cout.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -2160,7 +2160,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_FlexNoParentSize) {
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   std::cout.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -2173,7 +2173,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_FlexWithParentSize) {
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   std::cout.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -2187,7 +2187,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_FlexNested) {
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   std::cout.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -2201,7 +2201,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_FlexConstraintParent) {
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   std::cout.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
@@ -2216,7 +2216,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_FlexConstraintZeroParent) {
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   std::cout.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
@@ -2231,11 +2231,47 @@ CLI_TEST(PAGXCliTest, LayoutCheck_FlexHorizontal) {
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
   std::cout.rdbuf(old);
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
   EXPECT_TRUE(output.find("parent has no main-axis size") != std::string::npos);
+}
+
+// --depth limits Layer nesting depth. depth=1 shows root + direct child Layers but not
+// grandchild Layers. Elements inside each shown Layer are always included.
+CLI_TEST(PAGXCliTest, LayoutCheck_Depth) {
+  auto path = TestResourcePath("layout_check_depth.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--depth", "1", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  // Root and direct child Layers should be present.
+  EXPECT_TRUE(output.find("id=\"root\"") != std::string::npos);
+  EXPECT_TRUE(output.find("id=\"child1\"") != std::string::npos);
+  EXPECT_TRUE(output.find("id=\"child2\"") != std::string::npos);
+  // Grandchild Layers should NOT be present (depth exceeded).
+  EXPECT_TRUE(output.find("id=\"grandchild1\"") == std::string::npos);
+  EXPECT_TRUE(output.find("id=\"grandchild2\"") == std::string::npos);
+}
+
+// --depth 0 means unlimited (same as no --depth).
+CLI_TEST(PAGXCliTest, LayoutCheck_DepthZero) {
+  auto path = TestResourcePath("layout_check_depth.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--depth", "0", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  // All nodes should be present with unlimited depth.
+  EXPECT_TRUE(output.find("id=\"root\"") != std::string::npos);
+  EXPECT_TRUE(output.find("id=\"grandchild1\"") != std::string::npos);
+  EXPECT_TRUE(output.find("id=\"grandchild2\"") != std::string::npos);
 }
 
 }  // namespace pag
