@@ -517,7 +517,7 @@ class PPTWriter {
 
   // Custom geometry from PathData
   void writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY, float boundsW,
-                       float boundsH);
+                       float boundsH, FillRule fillRule = FillRule::Winding);
 
   // Transform decomposition
   struct Xform {
@@ -917,7 +917,7 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
 // ── Custom geometry ────────────────────────────────────────────────────────
 
 void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofsX, float ofsY,
-                                float boundsW, float boundsH) {
+                                float boundsW, float boundsH, FillRule fillRule) {
   out.open("a:custGeom").gt();
   out.open("a:avLst").sc();
   out.open("a:gdLst").sc();
@@ -928,47 +928,153 @@ void PPTWriter::writeCustomGeom(XMLBuilder& out, const PathData* data, float ofs
   int64_t pw = std::max(int64_t(1), PxToEMU(boundsW));
   int64_t ph = std::max(int64_t(1), PxToEMU(boundsH));
 
+  auto emitPt = [&](const char* tag, float x, float y) {
+    out.open(tag).gt();
+    out.open("a:pt").a("x", PxToEMU(x - ofsX)).a("y", PxToEMU(y - ofsY)).sc();
+    out.end();
+  };
+
+  auto emitPt2 = [&](const char* tag, float x0, float y0, float x1, float y1) {
+    out.open(tag).gt();
+    out.open("a:pt").a("x", PxToEMU(x0 - ofsX)).a("y", PxToEMU(y0 - ofsY)).sc();
+    out.open("a:pt").a("x", PxToEMU(x1 - ofsX)).a("y", PxToEMU(y1 - ofsY)).sc();
+    out.end();
+  };
+
+  auto emitPt3 = [&](float x0, float y0, float x1, float y1, float x2, float y2) {
+    out.open("a:cubicBezTo").gt();
+    out.open("a:pt").a("x", PxToEMU(x0 - ofsX)).a("y", PxToEMU(y0 - ofsY)).sc();
+    out.open("a:pt").a("x", PxToEMU(x1 - ofsX)).a("y", PxToEMU(y1 - ofsY)).sc();
+    out.open("a:pt").a("x", PxToEMU(x2 - ofsX)).a("y", PxToEMU(y2 - ofsY)).sc();
+    out.end();
+  };
+
   out.open("a:pathLst").gt();
   out.open("a:path").a("w", pw).a("h", ph).a("fill", "norm").gt();
 
-  data->forEach([&](PathVerb verb, const Point* pts) {
-    switch (verb) {
-      case PathVerb::Move: {
-        int64_t x = PxToEMU(pts[0].x - ofsX);
-        int64_t y = PxToEMU(pts[0].y - ofsY);
-        out.open("a:moveTo").gt();
-        out.open("a:pt").a("x", x).a("y", y).sc();
-        out.end();
-        break;
+  if (fillRule == FillRule::EvenOdd) {
+    // PowerPoint uses the non-zero winding rule. To emulate even-odd, reverse
+    // the winding direction of every other closed contour so that nested regions
+    // cancel out to winding number 0, producing holes.
+    struct Seg {
+      PathVerb verb;
+      Point pts[3];
+    };
+    struct Contour {
+      Point start;
+      std::vector<Seg> segs;
+      bool closed;
+    };
+
+    std::vector<Contour> contours;
+    data->forEach([&](PathVerb verb, const Point* pts) {
+      if (verb == PathVerb::Move) {
+        Contour c;
+        c.start = pts[0];
+        c.closed = false;
+        contours.push_back(std::move(c));
+      } else if (!contours.empty()) {
+        if (verb == PathVerb::Close) {
+          contours.back().closed = true;
+        } else {
+          Seg seg;
+          seg.verb = verb;
+          int ptCount = PathData::PointsPerVerb(verb);
+          for (int i = 0; i < ptCount; i++) {
+            seg.pts[i] = pts[i];
+          }
+          contours.back().segs.push_back(seg);
+        }
       }
-      case PathVerb::Line: {
-        int64_t x = PxToEMU(pts[0].x - ofsX);
-        int64_t y = PxToEMU(pts[0].y - ofsY);
-        out.open("a:lnTo").gt();
-        out.open("a:pt").a("x", x).a("y", y).sc();
-        out.end();
-        break;
+    });
+
+    auto segEndpoint = [](const Seg& s) -> Point {
+      if (s.verb == PathVerb::Quad) return s.pts[1];
+      if (s.verb == PathVerb::Cubic) return s.pts[2];
+      return s.pts[0];
+    };
+
+    // Reverse winding of every other closed contour
+    for (size_t ci = 1; ci < contours.size(); ci += 2) {
+      auto& c = contours[ci];
+      if (!c.closed || c.segs.size() < 2) {
+        continue;
       }
-      case PathVerb::Quad: {
-        out.open("a:quadBezTo").gt();
-        out.open("a:pt").a("x", PxToEMU(pts[0].x - ofsX)).a("y", PxToEMU(pts[0].y - ofsY)).sc();
-        out.open("a:pt").a("x", PxToEMU(pts[1].x - ofsX)).a("y", PxToEMU(pts[1].y - ofsY)).sc();
-        out.end();
-        break;
+      size_t n = c.segs.size();
+      std::vector<Seg> rev;
+      rev.reserve(n);
+
+      // The implicit close edge (V[N]→V[0]) becomes an explicit Line(V[N])
+      Seg closeSeg;
+      closeSeg.verb = PathVerb::Line;
+      closeSeg.pts[0] = segEndpoint(c.segs[n - 1]);
+      rev.push_back(closeSeg);
+
+      // Reverse segments S[N-1]..S[1]; Close replaces reversed S[0]
+      for (int i = static_cast<int>(n) - 1; i >= 1; i--) {
+        Point dest = segEndpoint(c.segs[i - 1]);
+        const auto& s = c.segs[i];
+        Seg rs;
+        if (s.verb == PathVerb::Cubic) {
+          rs.verb = PathVerb::Cubic;
+          rs.pts[0] = s.pts[1];
+          rs.pts[1] = s.pts[0];
+          rs.pts[2] = dest;
+        } else if (s.verb == PathVerb::Quad) {
+          rs.verb = PathVerb::Quad;
+          rs.pts[0] = s.pts[0];
+          rs.pts[1] = dest;
+        } else {
+          rs.verb = PathVerb::Line;
+          rs.pts[0] = dest;
+        }
+        rev.push_back(rs);
       }
-      case PathVerb::Cubic: {
-        out.open("a:cubicBezTo").gt();
-        out.open("a:pt").a("x", PxToEMU(pts[0].x - ofsX)).a("y", PxToEMU(pts[0].y - ofsY)).sc();
-        out.open("a:pt").a("x", PxToEMU(pts[1].x - ofsX)).a("y", PxToEMU(pts[1].y - ofsY)).sc();
-        out.open("a:pt").a("x", PxToEMU(pts[2].x - ofsX)).a("y", PxToEMU(pts[2].y - ofsY)).sc();
-        out.end();
-        break;
-      }
-      case PathVerb::Close:
-        out.open("a:close").sc();
-        break;
+      c.segs = std::move(rev);
     }
-  });
+
+    for (const auto& c : contours) {
+      emitPt("a:moveTo", c.start.x, c.start.y);
+      for (const auto& s : c.segs) {
+        switch (s.verb) {
+          case PathVerb::Line:
+            emitPt("a:lnTo", s.pts[0].x, s.pts[0].y);
+            break;
+          case PathVerb::Quad:
+            emitPt2("a:quadBezTo", s.pts[0].x, s.pts[0].y, s.pts[1].x, s.pts[1].y);
+            break;
+          case PathVerb::Cubic:
+            emitPt3(s.pts[0].x, s.pts[0].y, s.pts[1].x, s.pts[1].y, s.pts[2].x, s.pts[2].y);
+            break;
+          default:
+            break;
+        }
+      }
+      if (c.closed) {
+        out.open("a:close").sc();
+      }
+    }
+  } else {
+    data->forEach([&](PathVerb verb, const Point* pts) {
+      switch (verb) {
+        case PathVerb::Move:
+          emitPt("a:moveTo", pts[0].x, pts[0].y);
+          break;
+        case PathVerb::Line:
+          emitPt("a:lnTo", pts[0].x, pts[0].y);
+          break;
+        case PathVerb::Quad:
+          emitPt2("a:quadBezTo", pts[0].x, pts[0].y, pts[1].x, pts[1].y);
+          break;
+        case PathVerb::Cubic:
+          emitPt3(pts[0].x, pts[0].y, pts[1].x, pts[1].y, pts[2].x, pts[2].y);
+          break;
+        case PathVerb::Close:
+          out.open("a:close").sc();
+          break;
+      }
+    });
+  }
 
   out.end();  // a:path
   out.end();  // a:pathLst
@@ -1047,7 +1153,8 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   auto xf = decomposeXform(adjustedX, adjustedY, adjustedW, adjustedH, m);
   beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
 
-  writeCustomGeom(out, path->data, adjustedX, adjustedY, adjustedW, adjustedH);
+  FillRule fillRule = (fs.fill) ? fs.fill->fillRule : FillRule::Winding;
+  writeCustomGeom(out, path->data, adjustedX, adjustedY, adjustedW, adjustedH, fillRule);
 
   writeFill(out, fs.fill, alpha, Rect::MakeXYWH(adjustedX, adjustedY, adjustedW, adjustedH));
   writeStroke(out, fs.stroke, alpha);
