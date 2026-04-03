@@ -29,6 +29,7 @@
 #include "pagx/layout/LayoutNode.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/TextBox.h"
 
 namespace pagx::cli {
 
@@ -125,8 +126,44 @@ static void DetectZeroSize(CheckNode* node, bool check) {
   if (node->bounds.width == 0 || node->bounds.height == 0) {
     std::ostringstream oss;
     oss << "zero size (width: " << static_cast<int>(node->bounds.width)
-        << ", height: " << static_cast<int>(node->bounds.height) << "); node will be invisible";
+        << ", height: " << static_cast<int>(node->bounds.height) << "), will be invisible";
     node->problems.push_back(oss.str());
+  }
+}
+
+static void DetectConstraintConflicts(const Layer* layer,
+                                      const std::vector<std::shared_ptr<CheckNode>>& childNodes,
+                                      bool check) {
+  if (!check || layer == nullptr || layer->layout == LayoutMode::None) {
+    return;
+  }
+
+  // Constraint attributes on a child Layer are only effective when the parent has no container
+  // layout or the child has includeInLayout="false". When a child participates in container
+  // layout flow (includeInLayout=true, parent has container layout), constraints are silently
+  // ignored — this is almost always unintentional.
+  for (size_t idx = 0; idx < layer->children.size() && idx < childNodes.size(); ++idx) {
+    auto* child = layer->children[idx];
+    if (child == nullptr || !child->includeInLayout) {
+      continue;
+    }
+    bool hasConstraints =
+        (!std::isnan(child->left) || !std::isnan(child->right) || !std::isnan(child->centerX) ||
+         !std::isnan(child->top) || !std::isnan(child->bottom) || !std::isnan(child->centerY));
+    if (hasConstraints) {
+      std::string attrs;
+      if (!std::isnan(child->left)) attrs += "left ";
+      if (!std::isnan(child->right)) attrs += "right ";
+      if (!std::isnan(child->centerX)) attrs += "centerX ";
+      if (!std::isnan(child->top)) attrs += "top ";
+      if (!std::isnan(child->bottom)) attrs += "bottom ";
+      if (!std::isnan(child->centerY)) attrs += "centerY ";
+      if (!attrs.empty() && attrs.back() == ' ') {
+        attrs.pop_back();
+      }
+      childNodes[idx]->problems.push_back("constraints (" + attrs +
+                                          ") ignored by parent container layout");
+    }
   }
 }
 
@@ -165,7 +202,7 @@ static void DetectClippedContent(const LCRect& parentBounds,
                                  const std::vector<std::shared_ptr<CheckNode>>& children) {
   for (const auto& child : children) {
     if (!IsFullyContained(parentBounds, child->bounds)) {
-      child->problems.push_back("clipped by parent (outside parent bounds)");
+      child->problems.push_back("outside parent bounds, clipped");
     }
   }
 }
@@ -176,7 +213,7 @@ static void DetectClippedContent(const LCRect& parentBounds,
 
 static void BuildElementNodes(const std::vector<Element*>& elements,
                               std::vector<std::shared_ptr<CheckNode>>& out, float parentX,
-                              float parentY, bool check) {
+                              float parentY, const TextBox* parentTextBox, bool check) {
   for (int i = 0; i < static_cast<int>(elements.size()); ++i) {
     auto* element = elements[i];
     auto* layoutNode = pagx::LayoutNode::AsLayoutNode(element);
@@ -194,9 +231,24 @@ static void BuildElementNodes(const std::vector<Element*>& elements,
 
     if (element->nodeType() == NodeType::Group || element->nodeType() == NodeType::TextBox) {
       auto* group = static_cast<const Group*>(element);
+      const TextBox* nextParentTextBox = parentTextBox;
+      if (element->nodeType() == NodeType::TextBox) {
+        auto* textBox = static_cast<const TextBox*>(element);
+        if (check && parentTextBox != nullptr) {
+          std::ostringstream oss;
+          oss << "nested TextBox, layout overridden by outer TextBox";
+          if (!parentTextBox->id.empty()) {
+            oss << " (id='" << parentTextBox->id << "')";
+          }
+          node->problems.push_back(oss.str());
+        }
+        nextParentTextBox = textBox;
+      }
+
       if (!group->elements.empty()) {
         std::vector<std::shared_ptr<CheckNode>> groupChildren;
-        BuildElementNodes(group->elements, groupChildren, node->bounds.x, node->bounds.y, check);
+        BuildElementNodes(group->elements, groupChildren, node->bounds.x, node->bounds.y,
+                          nextParentTextBox, check);
         if (!groupChildren.empty()) {
           node->children = std::move(groupChildren);
         }
@@ -244,7 +296,8 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
   std::vector<std::shared_ptr<CheckNode>> childLayerNodes;
 
   if (!layer->contents.empty()) {
-    BuildElementNodes(layer->contents, elementNodes, node->bounds.x, node->bounds.y, check);
+    BuildElementNodes(layer->contents, elementNodes, node->bounds.x, node->bounds.y, nullptr,
+                      check);
   }
 
   for (int i = 0; i < static_cast<int>(layer->children.size()); ++i) {
@@ -255,6 +308,7 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
   }
 
   if (check) {
+    DetectConstraintConflicts(layer, childLayerNodes, check);
     DetectOverlap(childLayerNodes, node->attrs.layoutMode);
     if (layer->clipToBounds) {
       DetectClippedContent(node->bounds, childLayerNodes);

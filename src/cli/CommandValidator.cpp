@@ -27,9 +27,6 @@
 #include "cli/CliUtils.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXImporter.h"
-#include "pagx/nodes/Composition.h"
-#include "pagx/nodes/Group.h"
-#include "pagx/nodes/TextBox.h"
 #include "pagx_xsd.h"
 
 namespace pagx::cli {
@@ -81,162 +78,6 @@ static void PrintErrorsJson(const std::vector<ValidationError>& errors, const st
   }
   std::cout << "]\n";
   std::cout << "}\n";
-}
-
-// Heuristic checks for auto layout patterns.
-// Only flags cases where constraint attributes are provably ignored by the layout engine.
-
-static void CheckLayerConstraints(const Layer* layer, std::vector<ValidationError>& errors) {
-  if (layer == nullptr) {
-    return;
-  }
-
-  // Check: Container layout with child constraints (provably ignored).
-  // Constraint attributes on a child Layer are only effective when the parent has no container
-  // layout or the child has includeInLayout="false". When a child participates in container
-  // layout flow (includeInLayout=true, parent has container layout), constraints are silently
-  // ignored — this is almost always unintentional.
-  if (layer->layout != LayoutMode::None) {
-    for (const auto& child : layer->children) {
-      if (child == nullptr || !child->includeInLayout) {
-        continue;  // includeInLayout="false" children CAN use constraints
-      }
-      bool hasConstraints =
-          (!std::isnan(child->left) || !std::isnan(child->right) || !std::isnan(child->centerX) ||
-           !std::isnan(child->top) || !std::isnan(child->bottom) || !std::isnan(child->centerY));
-      if (hasConstraints) {
-        std::string attrs = {};
-        if (!std::isnan(child->left)) attrs += "left ";
-        if (!std::isnan(child->right)) attrs += "right ";
-        if (!std::isnan(child->centerX)) attrs += "centerX ";
-        if (!std::isnan(child->top)) attrs += "top ";
-        if (!std::isnan(child->bottom)) attrs += "bottom ";
-        if (!std::isnan(child->centerY)) attrs += "centerY ";
-        std::string nodeInfo = {};
-        if (!child->id.empty()) {
-          nodeInfo = " (id='" + child->id + "')";
-        } else if (!child->name.empty()) {
-          nodeInfo = " (name='" + child->name + "')";
-        }
-        ValidationError error = {};
-        error.line = 0;
-        error.message = "Constraint attributes (" + attrs + ") on child Layer" + nodeInfo +
-                        " will be ignored because the parent uses container "
-                        "layout. Use 'padding'/'gap' on the parent, or set "
-                        "includeInLayout='false' on the child to enable constraints.";
-        errors.push_back(std::move(error));
-      }
-    }
-  }
-
-  // Recursively check children
-  for (const auto& child : layer->children) {
-    CheckLayerConstraints(child, errors);
-  }
-}
-
-static void CheckAutoLayoutPatterns(const PAGXDocument* doc, std::vector<ValidationError>& errors) {
-  if (doc == nullptr || doc->layers.empty()) {
-    return;
-  }
-
-  for (const auto& layer : doc->layers) {
-    CheckLayerConstraints(layer, errors);
-  }
-  for (const auto& node : doc->nodes) {
-    if (node && node->nodeType() == NodeType::Composition) {
-      auto* comp = static_cast<const Composition*>(node.get());
-      for (const auto& layer : comp->layers) {
-        CheckLayerConstraints(layer, errors);
-      }
-    }
-  }
-}
-
-// Check for nested TextBox elements (TextBox inside TextBox or Group inside TextBox).
-// TextBox is a text layout container and should not contain other layout containers.
-
-static void CheckTextBoxElement(const Element* element, const TextBox* parentTextBox,
-                                std::vector<ValidationError>& errors) {
-  if (element == nullptr) {
-    return;
-  }
-
-  // Check if current element is a TextBox
-  if (element->nodeType() == NodeType::TextBox) {
-    auto* textBox = static_cast<const TextBox*>(element);
-    if (parentTextBox != nullptr) {
-      // TextBox nested inside another TextBox
-      std::string nodeInfo = {};
-      if (!element->id.empty()) {
-        nodeInfo = " (id='" + element->id + "')";
-      }
-      ValidationError error = {};
-      error.line = 0;
-      error.message = "TextBox" + nodeInfo +
-                      " should not be nested inside another TextBox. "
-                      "This may lead to unexpected layout behavior.";
-      errors.push_back(std::move(error));
-    }
-
-    // Check children of this TextBox for nested containers
-    for (const auto* child : textBox->elements) {
-      if (child == nullptr) {
-        continue;
-      }
-
-      if (child->nodeType() == NodeType::Group) {
-        // Group inside TextBox (TextBox is caught by the outer branch above)
-        std::string nodeInfo = {};
-        if (!child->id.empty()) {
-          nodeInfo = " (id='" + child->id + "')";
-        }
-        ValidationError error = {};
-        error.line = 0;
-        error.message = "Group" + nodeInfo +
-                        " should not be nested directly inside TextBox. "
-                        "TextBox manages layout of Text elements; Groups may interfere with text "
-                        "positioning.";
-        errors.push_back(std::move(error));
-      }
-
-      CheckTextBoxElement(child, textBox, errors);
-    }
-  } else if (element->nodeType() == NodeType::Group) {
-    // Regular Group, recurse with same parentTextBox context
-    auto* group = static_cast<const Group*>(element);
-    for (const auto* child : group->elements) {
-      CheckTextBoxElement(child, parentTextBox, errors);
-    }
-  }
-}
-
-static void CheckTextBoxNesting(const PAGXDocument* doc, std::vector<ValidationError>& errors) {
-  if (doc == nullptr) {
-    return;
-  }
-
-  // Check all layers and their contents
-  for (const auto& layer : doc->layers) {
-    if (layer != nullptr) {
-      for (const auto* element : layer->contents) {
-        CheckTextBoxElement(element, nullptr, errors);
-      }
-    }
-  }
-  // Check layers inside Compositions
-  for (const auto& node : doc->nodes) {
-    if (node && node->nodeType() == NodeType::Composition) {
-      auto* comp = static_cast<const Composition*>(node.get());
-      for (const auto& layer : comp->layers) {
-        if (layer != nullptr) {
-          for (const auto* element : layer->contents) {
-            CheckTextBoxElement(element, nullptr, errors);
-          }
-        }
-      }
-    }
-  }
 }
 
 static void PrintUsage() {
@@ -322,10 +163,6 @@ std::vector<ValidationError> ValidateFile(const std::string& filePath) {
       }
       errors.push_back(std::move(error));
     }
-    // Heuristic validation: check for common auto layout patterns
-    CheckAutoLayoutPatterns(pagxDoc.get(), errors);
-    // Check for TextBox nesting issues
-    CheckTextBoxNesting(pagxDoc.get(), errors);
   }
 
   return errors;

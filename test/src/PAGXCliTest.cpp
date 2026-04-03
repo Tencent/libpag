@@ -175,18 +175,6 @@ CLI_TEST(PAGXCliTest, Validate_MissingFile) {
   EXPECT_NE(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, Validate_NestedTextBox) {
-  auto path = TestResourcePath("validate_nested_textbox.pagx");
-  auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
-  EXPECT_NE(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, Validate_GroupInTextBox) {
-  auto path = TestResourcePath("validate_group_in_textbox.pagx");
-  auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
-  EXPECT_NE(ret, 0);
-}
-
 //==============================================================================
 // Optimize tests — RemoveEmptyNodes
 //==============================================================================
@@ -1911,7 +1899,7 @@ CLI_TEST(PAGXCliTest, LayoutCheck_Clipped) {
   // In global mode, overflow Layer should show absolute coordinates.
   EXPECT_TRUE(output.find("bounds=\"150,150,100,100\"") != std::string::npos);
   // Default mode does not output problems.
-  EXPECT_TRUE(output.find("clipped by parent") == std::string::npos);
+  EXPECT_TRUE(output.find("outside parent bounds") == std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, LayoutCheck_Absolute) {
