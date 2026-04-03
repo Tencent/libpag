@@ -116,7 +116,14 @@ class HTMLBuilder {
   }
 
   void closeTagSelfClosing() {
-    _buf += "/>\n";
+    auto& tag = _tags.back();
+    if (std::strcmp(tag, "div") == 0 || std::strcmp(tag, "span") == 0) {
+      _buf += "></";
+      _buf += tag;
+      _buf += ">\n";
+    } else {
+      _buf += "/>\n";
+    }
     _tags.pop_back();
   }
 
@@ -1144,11 +1151,13 @@ static float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t gl
   } else {
     glyphPos -= offset;
   }
-  // Wrap around
+  // Wrap around (only when offset pushes the position outside [0,1])
   if (selector->unit == SelectorUnit::Percentage) {
-    glyphPos = std::fmod(glyphPos, 1.0f);
-    if (glyphPos < 0) {
-      glyphPos += 1.0f;
+    if (glyphPos < 0.0f || glyphPos > 1.0f) {
+      glyphPos = std::fmod(glyphPos, 1.0f);
+      if (glyphPos < 0) {
+        glyphPos += 1.0f;
+      }
     }
   }
   // Normalize to [0,1] range for both modes
@@ -3595,8 +3604,9 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
     } else {
       // Runtime text: split into per-character spans
       float ty = text->position.y - text->fontSize * 0.8f;
-      std::string containerStyle = "position:absolute;left:" + FloatToString(text->position.x) +
-                                   "px;top:" + FloatToString(ty) + "px";
+      std::string containerStyle = "position:absolute;white-space:nowrap;left:" +
+                                   FloatToString(text->position.x) + "px;top:" +
+                                   FloatToString(ty) + "px";
       // Apply textAnchor
       if (text->textAnchor == TextAnchor::Center) {
         containerStyle += ";transform:translateX(-50%)";
@@ -3961,7 +3971,7 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
     float ea = ca * alpha;
     if (!m.isIdentity() || ea < 1.0f) {
       out.openTag("div");
-      std::string s = "position:relative";
+      std::string s = "position:absolute";
       if (!m.isIdentity()) {
         s += ";transform:" + MatrixToCSS(m);
       }
@@ -4707,8 +4717,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   if (needScrollRectWrapper) {
     auto& sr = layer->scrollRect;
     out.openTag("div");
-    out.addAttr("style", "position:absolute;left:" + FloatToString(sr.x) + "px;top:" +
-                             FloatToString(sr.y) + "px;width:" + FloatToString(sr.width) +
+    out.addAttr("style", "position:absolute;left:0px;top:0px;width:" + FloatToString(sr.width) +
                              "px;height:" + FloatToString(sr.height) + "px;overflow:hidden");
     out.closeTagStart();
     out.openTag("div");
