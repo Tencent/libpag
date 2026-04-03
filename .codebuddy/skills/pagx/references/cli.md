@@ -191,11 +191,14 @@ Layer attributes output when non-default: `layout`, `gap`, `flex`, `padding`, `a
 
 ### Check mode (--check)
 
-Detects three categories of layout problems:
+Detects six categories of layout problems:
 
 1. **Overlapping siblings** — sibling Layers whose bounds intersect inside an auto-layout parent
 2. **Clipped content** — elements outside parent bounds when `clipToBounds` is set
-3. **Zero-size** — elements with zero width or height (invisible)
+3. **Zero-size** — elements with zero width or height (invisible), with cause analysis (e.g., flex child in a parent with no main-axis size)
+4. **Flex in content-measured parent** — `flex` child in a container layout parent that has no explicit main-axis size
+5. **Content origin offset** — unconstrained children in a content-measured container do not start at (0, 0), causing inaccurate container measurement
+6. **Constraints ignored by layout** — constraint attributes on a child Layer participating in container layout flow (silently ignored)
 
 Only nodes with problems (and their ancestor chain) are output. Clean sibling nodes before
 a problematic node are replaced with empty `<Layer/>` placeholders to preserve index counting.

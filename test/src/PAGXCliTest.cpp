@@ -2059,4 +2059,166 @@ CLI_TEST(PAGXCliTest, LayoutCheck_PathZeroSize) {
   EXPECT_TRUE(output.find("zero size") == std::string::npos);
 }
 
+// Content origin offset: unconstrained Path starts at (50, 50), not (0, 0).
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffset) {
+  auto path = TestResourcePath("layout_check_content_offset.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("children start at (50, 50), not (0, 0)") != std::string::npos);
+  EXPECT_TRUE(output.find("container measurement inaccurate") != std::string::npos);
+}
+
+// Content origin offset with negative coordinates.
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetNeg) {
+  auto path = TestResourcePath("layout_check_content_offset_neg.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("children start at (-20, 0), not (0, 0)") != std::string::npos);
+}
+
+// Content at origin (0, 0) — no offset problem.
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentAtOrigin) {
+  auto path = TestResourcePath("layout_check_content_at_origin.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
+}
+
+// Content origin offset not reported when Layer has explicit width/height.
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetExplicitSize) {
+  auto path = TestResourcePath("layout_check_content_offset_explicit_size.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
+}
+
+// Content origin offset: constrained children are excluded, but unconstrained Path still offsets.
+// Here a constrained Group at (0,0) covers the origin, so the container measurement is accurate.
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetConstrained) {
+  auto path = TestResourcePath("layout_check_content_offset_constrained.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  // The unconstrained Path starts at (50, 50), but the check only looks at unconstrained children.
+  // Path is unconstrained and starts at (50, 50), so offset is reported.
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("container measurement inaccurate") != std::string::npos);
+}
+
+// Content origin offset not reported when Layer is a flex child (engine assigns size).
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetFlex) {
+  auto path = TestResourcePath("layout_check_content_offset_flex.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("container measurement inaccurate") == std::string::npos);
+}
+
+// Content origin offset detected inside a Group (not just Layer).
+CLI_TEST(PAGXCliTest, LayoutCheck_ContentOriginOffsetGroup) {
+  auto path = TestResourcePath("layout_check_content_offset_group.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("children start at (20, 20), not (0, 0)") != std::string::npos);
+}
+
+// Flex child in content-measured parent (no main-axis size to distribute).
+CLI_TEST(PAGXCliTest, LayoutCheck_FlexNoParentSize) {
+  auto path = TestResourcePath("layout_check_flex_no_parent_size.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("flex child, parent has no main-axis size") != std::string::npos);
+}
+
+// Flex child with explicit parent size — no problem.
+CLI_TEST(PAGXCliTest, LayoutCheck_FlexWithParentSize) {
+  auto path = TestResourcePath("layout_check_flex_with_parent_size.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("flex child") == std::string::npos);
+  EXPECT_TRUE(output.find("no space to distribute") == std::string::npos);
+}
+
+// Nested flex: parent gets main-axis size from grandparent — no false positive.
+CLI_TEST(PAGXCliTest, LayoutCheck_FlexNested) {
+  auto path = TestResourcePath("layout_check_flex_nested.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("flex child") == std::string::npos);
+  EXPECT_TRUE(output.find("no space to distribute") == std::string::npos);
+}
+
+// Flex child — parent derives main-axis size from opposite-pair constraints.
+CLI_TEST(PAGXCliTest, LayoutCheck_FlexConstraintParent) {
+  auto path = TestResourcePath("layout_check_flex_constraint_parent.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("flex child") == std::string::npos);
+}
+
+// Flex in horizontal layout with content-measured parent — same problem, different axis.
+CLI_TEST(PAGXCliTest, LayoutCheck_FlexHorizontal) {
+  auto path = TestResourcePath("layout_check_flex_horizontal.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--check", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("parent has no main-axis size") != std::string::npos);
+}
+
 }  // namespace pag

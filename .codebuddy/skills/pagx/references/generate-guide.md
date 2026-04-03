@@ -300,10 +300,13 @@ screenshot matches the design intent:
 pagx layout --check input.pagx
 ```
 
-This detects three categories of problems:
+This detects six categories of problems:
 - **Overlapping siblings** — sibling Layers whose bounds intersect inside an auto-layout parent
 - **Clipped content** — elements outside parent bounds when `clipToBounds` is set
-- **Zero-size** — elements with zero width or height (invisible)
+- **Zero-size** — elements with zero width or height (invisible), with cause analysis when applicable (e.g., `flex child, parent has no main-axis size to distribute`)
+- **Flex in content-measured parent** — `flex` child in a container layout parent that has no explicit main-axis size, so there is no space to distribute
+- **Content origin offset** — unconstrained children in a content-measured container do not start at (0, 0), causing inaccurate container measurement
+- **Constraints ignored by layout** — constraint attributes on a child Layer that participates in container layout flow (silently ignored by the engine)
 
 Exit code 1 = problems found (output shows `<Problem>` nodes with descriptions).
 Exit code 0 = no problems.
@@ -325,6 +328,9 @@ Use the structured problem output to identify and fix the root cause:
 | **Zero-size Layer** | Content-measured Layer with no content yet; `flex` child in a container that has no main-axis size | Add content, or set explicit `width`/`height`, or ensure parent has a main-axis size for flex to distribute |
 | **Zero-size element** | Rectangle/Ellipse with `size="0,0"`; opposite-pair constraints (`left`+`right`) in a zero-width container | Set explicit `size`; fix parent container dimensions |
 | **Clipped content** | Child positioned outside parent bounds with `clipToBounds="true"` | Adjust child constraints; enlarge parent; or remove `clipToBounds` if clipping is unintended |
+| **Flex in content-measured parent** | Parent has `layout` but no explicit main-axis `width`/`height`; child has `flex` > 0 | Set explicit main-axis size on the parent Layer, or use opposite-pair constraints to derive it |
+| **Content origin offset** | Unconstrained Path/Polystar/Text children start at a non-zero position inside a content-measured Group or Layer | Localize coordinates: subtract offset from internal positions, set container `left`/`top` to the original offset (see `design-patterns.md` §6 Origin-Based Internal Layout) |
+| **Constraints ignored** | Child Layer has `left`/`right`/`top`/`bottom`/`centerX`/`centerY` but is in container layout flow (`includeInLayout` default true) | Remove constraints (use `gap`/`alignment`/`arrangement` instead), or set `includeInLayout="false"` if an overlay is intended |
 
 #### 3. Inspect layout tree
 

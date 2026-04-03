@@ -18,6 +18,7 @@
 
 #include "cli/CommandLayoutCheck.h"
 #include <libxml/parser.h>
+#include <cfloat>
 #include <cmath>
 #include <cstring>
 #include <iostream>
@@ -119,16 +120,27 @@ static const char* NodeTypeName(NodeType type) {
 // Problem Detection
 // ============================================================================
 
-static void DetectZeroSize(CheckNode* node, bool check) {
+static void DetectZeroSize(CheckNode* node, bool check, const Layer* layer = nullptr,
+                           const Layer* parentLayer = nullptr) {
   if (!check) {
     return;
   }
-  if (node->bounds.width == 0 || node->bounds.height == 0) {
-    std::ostringstream oss;
-    oss << "zero size (width: " << static_cast<int>(node->bounds.width)
-        << ", height: " << static_cast<int>(node->bounds.height) << "), will be invisible";
-    node->problems.push_back(oss.str());
+  if (node->bounds.width != 0 && node->bounds.height != 0) {
+    return;
   }
+  std::ostringstream oss;
+  oss << "zero size (" << static_cast<int>(node->bounds.width) << "x"
+      << static_cast<int>(node->bounds.height) << ")";
+  // Analyze cause for Layer nodes.
+  if (layer != nullptr && parentLayer != nullptr && layer->flex > 0 &&
+      parentLayer->layout != LayoutMode::None) {
+    bool horizontal = parentLayer->layout == LayoutMode::Horizontal;
+    float parentExplicitMain = horizontal ? parentLayer->width : parentLayer->height;
+    if (std::isnan(parentExplicitMain)) {
+      oss << ": flex child, parent has no main-axis size to distribute";
+    }
+  }
+  node->problems.push_back(oss.str());
 }
 
 static void DetectConstraintConflicts(const Layer* layer,
@@ -175,6 +187,86 @@ static std::string NodeLabel(const CheckNode& node) {
     return node.tagName + "[" + std::to_string(node.index) + "]";
   }
   return node.tagName;
+}
+
+static void DetectFlexInContentMeasuredParent(
+    const Layer* parentLayer, const std::vector<std::shared_ptr<CheckNode>>& childNodes,
+    bool check) {
+  if (!check || parentLayer == nullptr || parentLayer->layout == LayoutMode::None) {
+    return;
+  }
+  bool horizontal = parentLayer->layout == LayoutMode::Horizontal;
+  float parentExplicitMain = horizontal ? parentLayer->width : parentLayer->height;
+  // If the parent has an explicit main-axis size, flex distribution works fine.
+  if (!std::isnan(parentExplicitMain)) {
+    return;
+  }
+  // Also check if parent has opposite-pair constraints that derive the main-axis size.
+  if (horizontal && !std::isnan(parentLayer->left) && !std::isnan(parentLayer->right)) {
+    return;
+  }
+  if (!horizontal && !std::isnan(parentLayer->top) && !std::isnan(parentLayer->bottom)) {
+    return;
+  }
+  const char* axis = horizontal ? "width" : "height";
+  for (size_t idx = 0; idx < parentLayer->children.size() && idx < childNodes.size(); ++idx) {
+    auto* child = parentLayer->children[idx];
+    if (child == nullptr || !child->includeInLayout || child->flex <= 0) {
+      continue;
+    }
+    float explicitMain = horizontal ? child->width : child->height;
+    if (!std::isnan(explicitMain)) {
+      continue;  // Has explicit size, flex is ignored.
+    }
+    // Skip if the child is already zero-size — the zero-size cause analysis covers this case.
+    if (childNodes[idx]->bounds.width == 0 || childNodes[idx]->bounds.height == 0) {
+      continue;
+    }
+    // Skip if the flex child actually received a non-zero main-axis size from the layout engine.
+    // This happens when the parent's main-axis size is derived from a grandparent (e.g., flex or
+    // stretch from the parent's own parent), even though the parent has no explicit size attribute.
+    float childResolvedMain = horizontal ? childNodes[idx]->bounds.width : childNodes[idx]->bounds.height;
+    if (childResolvedMain > 0) {
+      continue;
+    }
+    std::ostringstream oss;
+    oss << "flex child in content-measured parent (no " << axis << "): no space to distribute";
+    childNodes[idx]->problems.push_back(oss.str());
+  }
+}
+
+static void DetectContentOriginOffset(const std::vector<Element*>& elements,
+                                      CheckNode* container) {
+  // Find the minimum x and y of unconstrained children relative to the container origin.
+  float minX = FLT_MAX;
+  float minY = FLT_MAX;
+  bool hasUnconstrained = false;
+  for (auto* element : elements) {
+    auto* layoutNode = LayoutNode::AsLayoutNode(element);
+    if (layoutNode == nullptr) {
+      continue;
+    }
+    if (layoutNode->hasConstraints()) {
+      continue;
+    }
+    auto bounds = layoutNode->layoutBounds();
+    minX = std::min(minX, bounds.x);
+    minY = std::min(minY, bounds.y);
+    hasUnconstrained = true;
+  }
+  if (!hasUnconstrained) {
+    return;
+  }
+  static constexpr float TOLERANCE = 0.5f;
+  bool xOff = std::abs(minX) > TOLERANCE;
+  bool yOff = std::abs(minY) > TOLERANCE;
+  if (!xOff && !yOff) {
+    return;
+  }
+  std::ostringstream oss;
+  oss << "children start at (" << static_cast<int>(minX) << ", " << static_cast<int>(minY)
+      << "), not (0, 0): container measurement inaccurate";
+  container->problems.push_back(oss.str());
 }
 
 static void DetectOverlap(const std::vector<std::shared_ptr<CheckNode>>& layoutChildren,
@@ -252,6 +344,10 @@ static void BuildElementNodes(const std::vector<Element*>& elements,
         if (!groupChildren.empty()) {
           node->children = std::move(groupChildren);
         }
+        // Check content origin offset for content-measured Group/TextBox containers.
+        if (check && std::isnan(group->width) && std::isnan(group->height)) {
+          DetectContentOriginOffset(group->elements, node.get());
+        }
       }
     }
 
@@ -264,7 +360,8 @@ static void BuildElementNodes(const std::vector<Element*>& elements,
 // ============================================================================
 
 static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float parentX, float parentY,
-                                                  int indexInParent, bool check) {
+                                                  int indexInParent, bool check,
+                                                  const Layer* parentLayer = nullptr) {
   if (layer == nullptr) {
     return nullptr;
   }
@@ -290,7 +387,7 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
   node->attrs.includeInLayout = layer->includeInLayout;
   node->attrs.clipToBounds = layer->clipToBounds;
 
-  DetectZeroSize(node.get(), check);
+  DetectZeroSize(node.get(), check, layer, parentLayer);
 
   std::vector<std::shared_ptr<CheckNode>> elementNodes;
   std::vector<std::shared_ptr<CheckNode>> childLayerNodes;
@@ -298,10 +395,24 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
   if (!layer->contents.empty()) {
     BuildElementNodes(layer->contents, elementNodes, node->bounds.x, node->bounds.y, nullptr,
                       check);
+    // Check content origin offset for content-measured Layer containers.
+    // A Layer's size is content-measured when both width and height are unset AND not engine-
+    // assigned. Skip if: opposite-pair constraints derive both axes, or flex assigns main-axis
+    // (with default stretch assigning cross-axis, both axes are covered).
+    if (check && std::isnan(layer->width) && std::isnan(layer->height)) {
+      bool sizeFromConstraints = (!std::isnan(layer->left) && !std::isnan(layer->right)) &&
+                                 (!std::isnan(layer->top) && !std::isnan(layer->bottom));
+      bool sizeFromFlex = layer->flex > 0 && parentLayer != nullptr &&
+                          parentLayer->layout != LayoutMode::None && layer->includeInLayout;
+      if (!sizeFromConstraints && !sizeFromFlex) {
+        DetectContentOriginOffset(layer->contents, node.get());
+      }
+    }
   }
 
   for (int i = 0; i < static_cast<int>(layer->children.size()); ++i) {
-    auto childNode = BuildLayoutTree(layer->children[i], node->bounds.x, node->bounds.y, i, check);
+    auto childNode =
+        BuildLayoutTree(layer->children[i], node->bounds.x, node->bounds.y, i, check, layer);
     if (childNode) {
       childLayerNodes.push_back(childNode);
     }
@@ -309,6 +420,7 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
 
   if (check) {
     DetectConstraintConflicts(layer, childLayerNodes, check);
+    DetectFlexInContentMeasuredParent(layer, childLayerNodes, check);
     DetectOverlap(childLayerNodes, node->attrs.layoutMode);
     if (layer->clipToBounds) {
       DetectClippedContent(node->bounds, childLayerNodes);

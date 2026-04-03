@@ -1,0 +1,8 @@
+<pagx version="1.0" width="200" height="200">
+  <Layer centerX="0" centerY="0">
+    <Group>
+      <Path data="M 20 20 L 80 20 L 80 60 L 20 60 Z"/>
+      <Fill color="#F00"/>
+    </Group>
+  </Layer>
+</pagx>
