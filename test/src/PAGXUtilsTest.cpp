@@ -203,7 +203,7 @@ PAGX_TEST(PAGXUtilsTest, BuildGroupMatrix_AnchorPositionScaleRotation) {
   group->rotation = 45.0f;
   auto m = pagx::BuildGroupMatrix(group);
   EXPECT_FLOAT_EQ(m.tx, 100.0f);
-  EXPECT_FLOAT_EQ(m.ty, 100.0f);
+  EXPECT_FLOAT_EQ(m.ty, 100.0f - 20.0f * std::sqrt(2.0f));
   EXPECT_FALSE(m.isIdentity());
 }
 
