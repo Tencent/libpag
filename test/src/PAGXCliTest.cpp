@@ -817,6 +817,42 @@ CLI_TEST(PAGXCliTest, Lint_DowngradeableLayer) {
                           "to Groups") != std::string::npos);
 }
 
+CLI_TEST(PAGXCliTest, Lint_IncludeInLayoutNoParent) {
+  auto inputPath = TestResourcePath("lint_include_in_layout_no_parent.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("includeInLayout=false has no effect") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_FlexNoParentLayout) {
+  auto inputPath = TestResourcePath("lint_flex_no_parent_layout.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("flex has no effect") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_FullCanvasClipMask) {
+  auto inputPath = TestResourcePath("lint_full_canvas_clip.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("full-canvas clip mask") != std::string::npos);
+}
+
 //==============================================================================
 // Export tests — PAGX to SVG
 //==============================================================================

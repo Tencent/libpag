@@ -250,40 +250,27 @@ static int CountEmptyNodes(const PAGXDocument* document) {
 // --- Pass 7: Full canvas clip mask detection ---
 
 static bool IsFullCanvasClipMask(const Layer* maskLayer, float canvasWidth, float canvasHeight) {
-  if (!maskLayer->visible) {
-    return false;
-  }
   if (maskLayer->x != 0 || maskLayer->y != 0) {
     return false;
   }
   if (!maskLayer->matrix.isIdentity()) {
     return false;
   }
-  if (maskLayer->contents.size() != 1) {
+  // Find the first Rectangle in the mask layer's contents.
+  const Rectangle* rect = nullptr;
+  for (auto* element : maskLayer->contents) {
+    if (element->nodeType() == NodeType::Rectangle) {
+      rect = static_cast<const Rectangle*>(element);
+      break;
+    }
+  }
+  if (rect == nullptr) {
     return false;
   }
-  auto element = maskLayer->contents[0];
-  if (element->nodeType() != NodeType::Rectangle) {
-    return false;
-  }
-  auto rect = static_cast<const Rectangle*>(element);
   auto left = rect->position.x - rect->size.width * 0.5f;
   auto top = rect->position.y - rect->size.height * 0.5f;
   return left <= 0 && top <= 0 && rect->size.width >= canvasWidth &&
          rect->size.height >= canvasHeight;
-}
-
-static void CollectMaskReferences(const std::vector<Layer*>& layers,
-                                  std::unordered_set<const Layer*>& maskedLayers) {
-  for (auto* layer : layers) {
-    if (layer->mask != nullptr) {
-      maskedLayers.insert(layer->mask);
-    }
-    if (layer->composition != nullptr) {
-      CollectMaskReferences(layer->composition->layers, maskedLayers);
-    }
-    CollectMaskReferences(layer->children, maskedLayers);
-  }
 }
 
 static int CountFullCanvasClipMasks(const PAGXDocument* document) {
@@ -291,13 +278,10 @@ static int CountFullCanvasClipMasks(const PAGXDocument* document) {
   float canvasWidth = document->width;
   float canvasHeight = document->height;
 
-  std::unordered_set<const Layer*> maskedLayers = {};
-  CollectMaskReferences(document->layers, maskedLayers);
-
   std::function<void(const std::vector<Layer*>&)> checkLayers =
       [&](const std::vector<Layer*>& layers) {
         for (auto* layer : layers) {
-          if (layer->mask != nullptr && maskedLayers.find(layer->mask) == maskedLayers.end() &&
+          if (layer->mask != nullptr &&
               IsFullCanvasClipMask(layer->mask, canvasWidth, canvasHeight)) {
             count++;
           }
@@ -710,8 +694,24 @@ static bool IsMaskASimpleRectangle(const Layer* mask) {
 }
 
 static void CollectLintHints(const Layer* layer, std::vector<LintDiagnostic>& diagnostics,
-                             bool isRoot) {
+                             bool isRoot, bool parentHasLayout) {
   auto name = layer->name.empty() ? layer->id : layer->name;
+
+  // Check: includeInLayout=false has no effect when parent has no container layout.
+  if (!isRoot && !parentHasLayout && !layer->includeInLayout) {
+    LintDiagnostic diag = {};
+    diag.category = "warning";
+    diag.message = name + ": includeInLayout=false has no effect, parent has no container layout";
+    diagnostics.push_back(std::move(diag));
+  }
+
+  // Check: flex has no effect when parent has no container layout.
+  if (!isRoot && !parentHasLayout && layer->flex > 0) {
+    LintDiagnostic diag = {};
+    diag.category = "warning";
+    diag.message = name + ": flex has no effect, parent has no container layout";
+    diagnostics.push_back(std::move(diag));
+  }
 
   if (!isRoot && !layer->children.empty() && layer->layout == LayoutMode::None) {
     bool allDowngradable = true;
@@ -753,21 +753,22 @@ static void CollectLintHints(const Layer* layer, std::vector<LintDiagnostic>& di
     diagnostics.push_back(std::move(diag));
   }
 
+  bool hasLayout = layer->layout != LayoutMode::None;
   for (auto* child : layer->children) {
-    CollectLintHints(child, diagnostics, false);
+    CollectLintHints(child, diagnostics, false, hasLayout);
   }
 }
 
 static void CollectAllLintHints(const PAGXDocument* document,
                                 std::vector<LintDiagnostic>& diagnostics) {
   for (auto* layer : document->layers) {
-    CollectLintHints(layer, diagnostics, true);
+    CollectLintHints(layer, diagnostics, true, false);
   }
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Composition) {
       auto comp = static_cast<const Composition*>(node.get());
       for (auto* layer : comp->layers) {
-        CollectLintHints(layer, diagnostics, true);
+        CollectLintHints(layer, diagnostics, true, false);
       }
     }
   }
