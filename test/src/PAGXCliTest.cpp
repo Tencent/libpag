@@ -29,9 +29,8 @@
 #include "cli/CommandFormat.h"
 #include "cli/CommandImport.h"
 #include "cli/CommandLayoutCheck.h"
-#include "cli/CommandOptimize.h"
+#include "cli/CommandLint.h"
 #include "cli/CommandRender.h"
-#include "cli/CommandValidator.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -107,16 +106,6 @@ static int CallRun(int (*fn)(int, char*[]), std::vector<std::string> args) {
   return fn(static_cast<int>(argv.size()), argv.data());
 }
 
-static size_t CountOccurrences(const std::string& text, const std::string& pattern) {
-  size_t count = 0;
-  size_t pos = 0;
-  while ((pos = text.find(pattern, pos)) != std::string::npos) {
-    count++;
-    pos++;
-  }
-  return count;
-}
-
 static std::string ExportToSVG(const std::string& pagxResourceName, const std::string& svgTempName,
                                std::vector<std::string> extraExportArgs = {}) {
   auto pagxPath = TestResourcePath(pagxResourceName);
@@ -130,714 +119,6 @@ static std::string ExportToSVG(const std::string& pagxResourceName, const std::s
   return svgPath;
 }
 
-//==============================================================================
-// Validate tests
-//==============================================================================
-
-CLI_TEST(PAGXCliTest, Validate_ValidFile) {
-  auto path = TestResourcePath("validate_simple.pagx");
-  auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
-  EXPECT_EQ(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, Validate_MissingAttribute) {
-  auto path = TestResourcePath("validate_missing_attr.pagx");
-  auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
-  EXPECT_NE(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, Validate_NonXmlFile) {
-  auto path = TestResourcePath("validate_not_xml.pagx");
-  auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
-  EXPECT_NE(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, Validate_MalformedXml) {
-  auto path = TestResourcePath("validate_malformed.pagx");
-  auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
-  EXPECT_NE(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, Validate_InvalidRootElement) {
-  auto path = TestResourcePath("validate_wrong_root.pagx");
-  auto ret = CallRun(pagx::cli::RunValidate, {"validate", path});
-  EXPECT_NE(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, Validate_JsonFormat) {
-  auto path = TestResourcePath("validate_simple.pagx");
-  auto ret = CallRun(pagx::cli::RunValidate, {"validate", "--json", path});
-  EXPECT_EQ(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, Validate_MissingFile) {
-  auto ret = CallRun(pagx::cli::RunValidate, {"validate", "nonexistent_file.pagx"});
-  EXPECT_NE(ret, 0);
-}
-
-//==============================================================================
-// Optimize tests — RemoveEmptyNodes
-//==============================================================================
-
-CLI_TEST(PAGXCliTest, Optimize_RemoveEmptyElements) {
-  auto inputPath = TestResourcePath("optimize_remove_empty.pagx");
-  auto outputPath = TempDir() + "/empty_elements_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("\"empty\"") == std::string::npos);
-  EXPECT_TRUE(output.find("width=\"0\"") == std::string::npos);
-  EXPECT_TRUE(output.find("\"visible\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_RemoveEmptyGroup) {
-  auto inputPath = TestResourcePath("optimize_remove_empty_group.pagx");
-  auto outputPath = TempDir() + "/empty_group_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("<Group") == std::string::npos);
-  EXPECT_TRUE(output.find("\"main\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_KeepLayerWithComposition) {
-  auto inputPath = TestResourcePath("optimize_keep_comp_layer.pagx");
-  auto outputPath = TempDir() + "/keep_comp_layer_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("\"ref\"") != std::string::npos);
-  EXPECT_TRUE(output.find("composition=\"@comp1\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_KeepFlexSpacer) {
-  auto inputPath = TestResourcePath("optimize_keep_flex_spacer.pagx");
-  auto outputPath = TempDir() + "/keep_flex_spacer_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Flex spacer with flex="1" should be preserved even though it has no content.
-  EXPECT_TRUE(output.find("flex_spacer") != std::string::npos);
-  EXPECT_TRUE(output.find("flex=\"1\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_OmitStartPointZero) {
-  auto inputPath = TestResourcePath("optimize_keep_startpoint.pagx");
-  auto outputPath = TempDir() + "/keep_startpoint_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // LinearGradient with startPoint="0,0" should be omitted (default value).
-  EXPECT_TRUE(output.find("startPoint") == std::string::npos);
-  EXPECT_TRUE(output.find("endPoint=") != std::string::npos);
-  // Optimized file should still pass validation.
-  ret = CallRun(pagx::cli::RunValidate, {"validate", outputPath});
-  EXPECT_EQ(ret, 0);
-}
-
-//==============================================================================
-// Optimize tests — DeduplicatePathData
-//==============================================================================
-
-CLI_TEST(PAGXCliTest, Optimize_DeduplicateMultiplePaths) {
-  auto inputPath = TestResourcePath("optimize_dedup_multi_path.pagx");
-  auto outputPath = TempDir() + "/dup_multi_path_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_EQ(CountOccurrences(output, "<PathData"), 1u);
-}
-
-//==============================================================================
-// Optimize tests — DeduplicateColorSources
-//==============================================================================
-
-CLI_TEST(PAGXCliTest, Optimize_DeduplicateGradient) {
-  auto inputPath = TestResourcePath("optimize_dedup_linear_gradient.pagx");
-  auto outputPath = TempDir() + "/dup_gradient_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_EQ(CountOccurrences(output, "<LinearGradient"), 1u);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_DeduplicateRadialGradient) {
-  auto inputPath = TestResourcePath("optimize_dedup_radial_gradient.pagx");
-  auto outputPath = TempDir() + "/dup_radial_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_EQ(CountOccurrences(output, "<RadialGradient"), 1u);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_NoDeduplicateDifferentGradients) {
-  auto inputPath = TestResourcePath("optimize_no_dedup_diff_gradient.pagx");
-  auto outputPath = TempDir() + "/no_dup_gradient_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_EQ(CountOccurrences(output, "<LinearGradient"), 1u);
-  EXPECT_EQ(CountOccurrences(output, "<RadialGradient"), 1u);
-}
-
-//==============================================================================
-// Optimize tests — RemoveUnreferencedResources
-//==============================================================================
-
-CLI_TEST(PAGXCliTest, Optimize_UnreferencedResources) {
-  auto inputPath = TestResourcePath("optimize_unref_resources.pagx");
-  auto outputPath = TempDir() + "/unref_resources_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("orphanPath") == std::string::npos);
-  EXPECT_TRUE(output.find("unusedGrad") == std::string::npos);
-  EXPECT_TRUE(output.find("\"grad\"") != std::string::npos);
-  EXPECT_EQ(CountOccurrences(output, "<LinearGradient"), 1u);
-}
-
-//==============================================================================
-// Optimize tests — ReplacePathsWithPrimitives
-//==============================================================================
-
-CLI_TEST(PAGXCliTest, Optimize_PathToRectangle) {
-  auto inputPath = TestResourcePath("optimize_path_to_rect.pagx");
-  auto outputPath = TempDir() + "/rect_path_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("<Rectangle") != std::string::npos);
-  EXPECT_TRUE(output.find("<Path") == std::string::npos);
-}
-
-// Path->Rectangle: skip conversion when Path has constraint attributes — Rectangle is stretchable
-// while Path is not, so constraint behavior (center vs stretch) would change.
-CLI_TEST(PAGXCliTest, Optimize_PathToRectangleSkipConstrained) {
-  auto inputPath = TestResourcePath("optimize_path_to_rect_constrained.pagx");
-  auto outputPath = TempDir() + "/rect_path_constrained_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Path has left="10" right="10" — must NOT be converted to Rectangle.
-  EXPECT_TRUE(output.find("<Path") != std::string::npos);
-  EXPECT_TRUE(output.find("<Rectangle") == std::string::npos);
-}
-
-// NOTE: Path->Ellipse detection via isOval() requires exact Bezier control points. The SVG path
-// string format used by PAGX (with default float precision) introduces rounding that prevents
-// isOval() from matching after an export->import round trip. The optimization still works for
-// Path data constructed programmatically with full float precision (e.g., from non-PAGX sources).
-// A Path->Ellipse test is omitted here due to this inherent limitation.
-
-CLI_TEST(PAGXCliTest, Optimize_PathKeepIrregular) {
-  auto inputPath = TestResourcePath("optimize_path_keep_irregular.pagx");
-  auto outputPath = TempDir() + "/irregular_path_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("<Path") != std::string::npos ||
-              output.find("<PathData") != std::string::npos);
-  EXPECT_TRUE(output.find("<Rectangle") == std::string::npos);
-  EXPECT_TRUE(output.find("<Ellipse") == std::string::npos);
-}
-
-//==============================================================================
-// Optimize tests — RemoveFullCanvasClipMasks
-//==============================================================================
-
-// NOTE: Partial clip mask retention test is omitted because mask="@id" references are not
-// preserved through the PAGX import/export round trip in the current Exporter implementation.
-
-CLI_TEST(PAGXCliTest, Optimize_RemoveFullCanvasClips) {
-  auto inputPath = TestResourcePath("optimize_fullcanvas_clips.pagx");
-  auto outputPath = TempDir() + "/fullcanvas_clips_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("mask=") == std::string::npos);
-}
-
-//==============================================================================
-// Optimize tests — RemoveOffCanvasLayers
-//==============================================================================
-
-CLI_TEST(PAGXCliTest, Optimize_RemoveOffCanvasRight) {
-  auto inputPath = TestResourcePath("optimize_offcanvas_right.pagx");
-  auto outputPath = TempDir() + "/offcanvas_right_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("\"visible\"") != std::string::npos);
-  EXPECT_TRUE(output.find("\"offscreen\"") == std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_KeepPartiallyVisible) {
-  auto inputPath = TestResourcePath("optimize_partial_visible.pagx");
-  auto outputPath = TempDir() + "/partial_visible_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("\"partial\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_KeepInvisibleLayer) {
-  auto inputPath = TestResourcePath("optimize_invisible_layer.pagx");
-  auto outputPath = TempDir() + "/invisible_layer_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("\"hidden\"") != std::string::npos);
-}
-
-//==============================================================================
-// Optimize tests — LocalizeCoordinates
-//==============================================================================
-
-CLI_TEST(PAGXCliTest, Optimize_LocalizeRectangle) {
-  auto inputPath = TestResourcePath("optimize_localize_rect.pagx");
-  auto outputPath = TempDir() + "/localize_rect_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Input already uses constraint-based positioning (left/top), so no localization is needed.
-  // Verify that left/top are preserved correctly.
-  EXPECT_TRUE(output.find("left=\"150\"") != std::string::npos);
-  EXPECT_TRUE(output.find("top=\"250\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_LocalizeEllipse) {
-  auto inputPath = TestResourcePath("optimize_localize_ellipse.pagx");
-  auto outputPath = TempDir() + "/localize_ellipse_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Input already uses constraint-based positioning (left/top), so no localization is needed.
-  EXPECT_TRUE(output.find("left=\"110\"") != std::string::npos);
-  EXPECT_TRUE(output.find("top=\"210\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_LocalizePolystar) {
-  auto inputPath = TestResourcePath("optimize_localize_polystar.pagx");
-  auto outputPath = TempDir() + "/localize_polystar_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Input already uses constraint-based positioning (left/top), so no localization is needed.
-  EXPECT_TRUE(output.find("left=\"260\"") != std::string::npos);
-  EXPECT_TRUE(output.find("top=\"160\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_LocalizeTextBox) {
-  auto inputPath = TestResourcePath("optimize_localize_textbox.pagx");
-  auto outputPath = TempDir() + "/localize_textbox_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("x=\"100\"") != std::string::npos);
-  EXPECT_TRUE(output.find("y=\"150\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_LocalizeSkipMatrix) {
-  auto inputPath = TestResourcePath("optimize_localize_skip_matrix.pagx");
-  auto outputPath = TempDir() + "/localize_matrix_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Input already uses constraint-based positioning (left/top), so no localization is needed.
-  EXPECT_TRUE(output.find("left=\"150\"") != std::string::npos);
-  EXPECT_TRUE(output.find("top=\"150\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_LocalizeAlreadyAtOrigin) {
-  auto inputPath = TestResourcePath("optimize_localize_at_origin.pagx");
-  auto outputPath = TempDir() + "/localize_origin_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("x=\"100\"") != std::string::npos);
-  EXPECT_TRUE(output.find("y=\"100\"") != std::string::npos);
-}
-
-// LocalizePathData: normalize PathData to origin and compensate with position.
-CLI_TEST(PAGXCliTest, Optimize_LocalizePathData) {
-  auto inputPath = TestResourcePath("optimize_localize_pathdata.pagx");
-  auto outputPath = TempDir() + "/localize_pathdata_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Original PathData "M 50 50 L 150 50 L 100 150 Z" should be normalized to origin
-  // with position offset (50, 50). The Layer has left/top constraints so #8 skips it,
-  // but #8b still normalizes the PathData independently.
-  EXPECT_TRUE(output.find("M0 0L100 0L50 100Z") != std::string::npos);
-  EXPECT_TRUE(output.find("position=\"50,50\"") != std::string::npos);
-}
-
-// LocalizePathData: pre-existing position should accumulate, not be overwritten.
-CLI_TEST(PAGXCliTest, Optimize_LocalizePathDataAccumulatePosition) {
-  auto inputPath = TestResourcePath("optimize_localize_pathdata_position.pagx");
-  auto outputPath = TempDir() + "/localize_pathdata_position_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Original position=(10,20) + PathData offset (50,50) = final position (60,70).
-  EXPECT_TRUE(output.find("M0 0L100 0L50 100Z") != std::string::npos);
-  EXPECT_TRUE(output.find("position=\"60,70\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_LocalizeNestedLayers) {
-  auto inputPath = TestResourcePath("optimize_localize_nested.pagx");
-  auto outputPath = TempDir() + "/localize_nested_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("\"parent\"") != std::string::npos);
-  EXPECT_TRUE(output.find("\"child\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_LocalizeMultipleElements) {
-  auto inputPath = TestResourcePath("optimize_localize_multi_elements.pagx");
-  auto outputPath = TempDir() + "/localize_multi_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-}
-
-//==============================================================================
-// Optimize tests — ExtractCompositions
-//==============================================================================
-
-CLI_TEST(PAGXCliTest, Optimize_ExtractFourPlusLayers) {
-  auto inputPath = TestResourcePath("optimize_extract_four_layers.pagx");
-  auto outputPath = TempDir() + "/extract_four_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_EQ(CountOccurrences(output, "<Composition"), 1u);
-  EXPECT_EQ(CountOccurrences(output, "composition=\"@"), 4u);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_NoExtractDifferentContent) {
-  auto inputPath = TestResourcePath("optimize_no_extract_diff_content.pagx");
-  auto outputPath = TempDir() + "/no_extract_diff_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("<Composition") == std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_NoExtractMatrixLayer) {
-  auto inputPath = TestResourcePath("optimize_no_extract_matrix.pagx");
-  auto outputPath = TempDir() + "/no_extract_matrix_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("<Composition") == std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_NoExtractSingleLayer) {
-  auto inputPath = TestResourcePath("optimize_no_extract_single.pagx");
-  auto outputPath = TempDir() + "/no_extract_single_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("<Composition") == std::string::npos);
-}
-
-//==============================================================================
-// Optimize tests — Layout-aware constraint safety
-//==============================================================================
-
-// Localize: skip when Layer itself has constraint attributes (left/top etc.)
-// Modifying x/y on a constrained Layer would be overwritten by the layout engine.
-CLI_TEST(PAGXCliTest, Optimize_LocalizeSkipLayerConstraints) {
-  auto inputPath = TestResourcePath("optimize_localize_skip_constraints.pagx");
-  auto outputPath = TempDir() + "/localize_skip_constraints_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Layer has left="50" top="30" — localization must be skipped entirely.
-  // Internal Rectangle uses left/top constraints which should be preserved unchanged.
-  EXPECT_TRUE(output.find("left=\"70\"") != std::string::npos);
-  EXPECT_TRUE(output.find("top=\"60\"") != std::string::npos);
-  EXPECT_TRUE(output.find("left=\"50\"") != std::string::npos);
-}
-
-// Localize: skip when contents have Text with constraint attributes.
-CLI_TEST(PAGXCliTest, Optimize_LocalizeSkipTextConstraint) {
-  auto inputPath = TestResourcePath("optimize_localize_skip_text_constraint.pagx");
-  auto outputPath = TempDir() + "/localize_skip_text_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Text has centerX="0" centerY="0" — localization must be skipped.
-  EXPECT_TRUE(output.find("centerX=\"0\"") != std::string::npos);
-  EXPECT_TRUE(output.find("centerY=\"0\"") != std::string::npos);
-}
-
-// Localize: skip when contents have Group with constraint attributes.
-CLI_TEST(PAGXCliTest, Optimize_LocalizeSkipGroupConstraint) {
-  auto inputPath = TestResourcePath("optimize_localize_skip_group_constraint.pagx");
-  auto outputPath = TempDir() + "/localize_skip_group_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Group has left="20" right="20" — localization must be skipped.
-  EXPECT_TRUE(output.find("left=\"20\"") != std::string::npos);
-  EXPECT_TRUE(output.find("right=\"20\"") != std::string::npos);
-}
-
-// Localize: skip when contents have Path with constraint attributes.
-CLI_TEST(PAGXCliTest, Optimize_LocalizeSkipPathConstraint) {
-  auto inputPath = TestResourcePath("optimize_localize_skip_path_constraint.pagx");
-  auto outputPath = TempDir() + "/localize_skip_path_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Path has left="10" right="10" — localization must be skipped.
-  EXPECT_TRUE(output.find("left=\"10\"") != std::string::npos);
-  EXPECT_TRUE(output.find("right=\"10\"") != std::string::npos);
-}
-
-// MergeGroups: do not merge Groups that have constraint attributes.
-CLI_TEST(PAGXCliTest, Optimize_NoMergeConstrainedGroups) {
-  auto inputPath = TestResourcePath("optimize_no_merge_constrained_groups.pagx");
-  auto outputPath = TempDir() + "/no_merge_constrained_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Two Groups with different constraints must remain separate (2 Groups, 2 Fills).
-  EXPECT_EQ(CountOccurrences(output, "<Group"), 2u);
-  EXPECT_EQ(CountOccurrences(output, "<Fill"), 2u);
-}
-
-// MergeGroups: do not merge Groups that have explicit layout size (width/height).
-CLI_TEST(PAGXCliTest, Optimize_NoMergeSizedGroups) {
-  auto inputPath = TestResourcePath("optimize_no_merge_sized_groups.pagx");
-  auto outputPath = TempDir() + "/no_merge_sized_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Two Groups with different width/height must remain separate.
-  EXPECT_EQ(CountOccurrences(output, "<Group"), 2u);
-}
-
-// UnwrapFirstChildGroup: basic unwrap — first-child Group with no transform is removed.
-CLI_TEST(PAGXCliTest, Optimize_UnwrapBasic) {
-  auto inputPath = TestResourcePath("optimize_unwrap_basic.pagx");
-  auto outputPath = TempDir() + "/unwrap_basic_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // The first-child Group should be unwrapped, leaving no Group element.
-  EXPECT_EQ(CountOccurrences(output, "<Group"), 0u);
-  // The Rectangle and Fill from inside the Group should remain.
-  EXPECT_EQ(CountOccurrences(output, "<Rectangle"), 2u);
-  EXPECT_EQ(CountOccurrences(output, "<Fill"), 2u);
-}
-
-// UnwrapFirstChildGroup: keep Group with alpha != 1.
-CLI_TEST(PAGXCliTest, Optimize_UnwrapKeepAlpha) {
-  auto inputPath = TestResourcePath("optimize_unwrap_keep_alpha.pagx");
-  auto outputPath = TempDir() + "/unwrap_keep_alpha_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Group with alpha should be preserved.
-  EXPECT_EQ(CountOccurrences(output, "<Group"), 1u);
-}
-
-// UnwrapFirstChildGroup: keep Group with rotation.
-CLI_TEST(PAGXCliTest, Optimize_UnwrapKeepTransform) {
-  auto inputPath = TestResourcePath("optimize_unwrap_keep_transform.pagx");
-  auto outputPath = TempDir() + "/unwrap_keep_transform_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Group with rotation should be preserved.
-  EXPECT_EQ(CountOccurrences(output, "<Group"), 1u);
-}
-
-// UnwrapFirstChildGroup: keep Group with constraint attributes.
-CLI_TEST(PAGXCliTest, Optimize_UnwrapKeepConstrained) {
-  auto inputPath = TestResourcePath("optimize_unwrap_keep_constrained.pagx");
-  auto outputPath = TempDir() + "/unwrap_keep_constrained_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Group with constraint attributes should be preserved.
-  EXPECT_EQ(CountOccurrences(output, "<Group"), 1u);
-}
-
-// UnwrapFirstChildGroup: keep Group with explicit width/height.
-CLI_TEST(PAGXCliTest, Optimize_UnwrapKeepSized) {
-  auto inputPath = TestResourcePath("optimize_unwrap_keep_sized.pagx");
-  auto outputPath = TempDir() + "/unwrap_keep_sized_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Group with explicit size should be preserved.
-  EXPECT_EQ(CountOccurrences(output, "<Group"), 1u);
-}
-
-// UnwrapFirstChildGroup: offset is transferred to children.
-CLI_TEST(PAGXCliTest, Optimize_UnwrapOffset) {
-  auto inputPath = TestResourcePath("optimize_unwrap_offset.pagx");
-  auto outputPath = TempDir() + "/unwrap_offset_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // The Group should be unwrapped.
-  EXPECT_EQ(CountOccurrences(output, "<Group"), 0u);
-  // The Rectangle's position should absorb the Group's offset: left = 10+30 = 40, top = 10+20 = 30.
-  EXPECT_TRUE(output.find("left=\"40\"") != std::string::npos);
-  EXPECT_TRUE(output.find("top=\"30\"") != std::string::npos);
-}
-
-// UnwrapFirstChildGroup: nested first-child Groups are recursively unwrapped.
-CLI_TEST(PAGXCliTest, Optimize_UnwrapNested) {
-  auto inputPath = TestResourcePath("optimize_unwrap_nested.pagx");
-  auto outputPath = TempDir() + "/unwrap_nested_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Both nested first-child Groups should be unwrapped.
-  EXPECT_EQ(CountOccurrences(output, "<Group"), 0u);
-  EXPECT_EQ(CountOccurrences(output, "<Rectangle"), 2u);
-}
-
-// UnwrapFirstChildGroup: TextBox as first child is not unwrapped.
-CLI_TEST(PAGXCliTest, Optimize_UnwrapKeepTextBox) {
-  auto inputPath = TestResourcePath("optimize_unwrap_keep_textbox.pagx");
-  auto outputPath = TempDir() + "/unwrap_keep_textbox_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // TextBox must not be unwrapped — it has layout semantics.
-  EXPECT_TRUE(output.find("<TextBox") != std::string::npos);
-}
-
-// UnwrapFirstChildGroup: Group containing Repeater is still unwrapped as first child.
-CLI_TEST(PAGXCliTest, Optimize_UnwrapWithRepeater) {
-  auto inputPath = TestResourcePath("optimize_unwrap_keep_repeater.pagx");
-  auto outputPath = TempDir() + "/unwrap_with_repeater_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // First-child Group is unwrapped even if it contains a Repeater.
-  EXPECT_EQ(CountOccurrences(output, "<Group"), 0u);
-  // Both Repeaters should remain.
-  EXPECT_EQ(CountOccurrences(output, "<Repeater"), 2u);
-}
-
-// UnwrapFirstChildGroup: keep Group when child elements use constraint attributes.
-CLI_TEST(PAGXCliTest, Optimize_UnwrapKeepChildConstrained) {
-  auto inputPath = TestResourcePath("optimize_unwrap_keep_child_constrained.pagx");
-  auto outputPath = TempDir() + "/unwrap_keep_child_constrained_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // The outer Group is the constraint reference frame for the inner Group — must be preserved.
-  EXPECT_EQ(CountOccurrences(output, "<Group"), 2u);
-}
-
-// ExtractCompositions: do not extract Layers with flex > 0 (dynamic sizing).
-CLI_TEST(PAGXCliTest, Optimize_NoExtractFlexLayers) {
-  auto inputPath = TestResourcePath("optimize_no_extract_flex_layers.pagx");
-  auto outputPath = TempDir() + "/no_extract_flex_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Identical flex Layers must not be extracted — their size is dynamic.
-  EXPECT_TRUE(output.find("<Composition") == std::string::npos);
-}
-
-// ExtractCompositions: do not extract Layers with constraint attributes.
-CLI_TEST(PAGXCliTest, Optimize_NoExtractConstrainedLayers) {
-  auto inputPath = TestResourcePath("optimize_no_extract_constrained_layers.pagx");
-  auto outputPath = TempDir() + "/no_extract_constrained_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Identical constrained Layers must not be extracted.
-  EXPECT_TRUE(output.find("<Composition") == std::string::npos);
-}
-
-// ExtractCompositions: do not extract Layers that participate in parent container layout.
-CLI_TEST(PAGXCliTest, Optimize_NoExtractLayoutChildren) {
-  auto inputPath = TestResourcePath("optimize_no_extract_layout_children.pagx");
-  auto outputPath = TempDir() + "/no_extract_layout_children_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Identical children of a container-layout parent must not be extracted — the layout engine
-  // measures Layers without Composition using frame-based bounds, which differs from Composition
-  // bounds (content-based), so extracting would change the allocated space.
-  EXPECT_TRUE(output.find("<Composition") == std::string::npos);
-}
-
-// ExtractCompositions: children with includeInLayout="false" in a container-layout parent are
-// excluded from layout flow, so extracting them is safe — they behave like normal layers.
-CLI_TEST(PAGXCliTest, Optimize_ExtractExcludedLayoutChildren) {
-  auto inputPath = TestResourcePath("optimize_extract_excluded_layout_children.pagx");
-  auto outputPath = TempDir() + "/extract_excluded_layout_children_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // includeInLayout="false" children should still be extracted into a Composition.
-  EXPECT_TRUE(output.find("<Composition") != std::string::npos);
-}
-
-// RemoveEmpty: preserve empty Layer in container layout (sized spacer).
-CLI_TEST(PAGXCliTest, Optimize_KeepLayoutEmptyLayer) {
-  auto inputPath = TestResourcePath("optimize_keep_layout_empty.pagx");
-  auto outputPath = TempDir() + "/keep_layout_empty_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // The empty middle Layer (width="100" height="100") must be preserved as a layout spacer.
-  EXPECT_EQ(CountOccurrences(output, "<Layer"), 4u);
-}
-
-// RemoveOffCanvas: preserve off-canvas Layers participating in container layout.
-CLI_TEST(PAGXCliTest, Optimize_KeepOffCanvasLayoutLayer) {
-  auto inputPath = TestResourcePath("optimize_keep_offcanvas_layout.pagx");
-  auto outputPath = TempDir() + "/keep_offcanvas_layout_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // The third Layer is off-canvas (x > 200) but participates in horizontal layout.
-  // It must be preserved to maintain correct layout for visible siblings.
-  EXPECT_EQ(CountOccurrences(output, "<Layer"), 4u);
-}
-
-// Localize: skip child Layers whose x/y is managed by parent container layout.
-CLI_TEST(PAGXCliTest, Optimize_LocalizeSkipLayoutChild) {
-  auto inputPath = TestResourcePath("optimize_localize_skip_layout_child.pagx");
-  auto outputPath = TempDir() + "/localize_skip_layout_child_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  // Child Layers in horizontal layout — their position is computed by the layout engine.
-  // Localization must not modify their positions. Original constraint values should be preserved.
-  EXPECT_TRUE(output.find("left=\"10\"") != std::string::npos);
-  EXPECT_TRUE(output.find("top=\"20\"") != std::string::npos);
-  EXPECT_TRUE(output.find("left=\"20\"") != std::string::npos);
-  EXPECT_TRUE(output.find("top=\"10\"") != std::string::npos);
-}
-
-//==============================================================================
-// Optimize tests — DryRun, general, and error handling
-//==============================================================================
-
-CLI_TEST(PAGXCliTest, Optimize_PreserveNewline) {
-  auto inputPath = TestResourcePath("optimize_preserve_newline.pagx");
-  auto outputPath = TempDir() + "/preserve_newline_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
-  EXPECT_TRUE(output.find("&#10;") != std::string::npos);
-  EXPECT_TRUE(output.find("Hello&#10;World") != std::string::npos);
-}
-
 CLI_TEST(PAGXCliTest, Format_PreserveNewline) {
   auto inputPath = TestResourcePath("optimize_preserve_newline.pagx");
   auto outputPath = TempDir() + "/format_newline_out.pagx";
@@ -846,52 +127,6 @@ CLI_TEST(PAGXCliTest, Format_PreserveNewline) {
   auto output = ReadFile(outputPath);
   EXPECT_TRUE(output.find("&#10;") != std::string::npos);
   EXPECT_TRUE(output.find("Hello&#10;World") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_DryRun) {
-  auto inputPath = CopyToTemp("validate_simple.pagx", "dryrun.pagx");
-  auto originalContent = ReadFile(inputPath);
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
-  EXPECT_EQ(ret, 0);
-  auto afterContent = ReadFile(inputPath);
-  EXPECT_EQ(originalContent, afterContent);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_DryRunWithChanges) {
-  auto inputPath = CopyToTemp("optimize_remove_empty.pagx", "dryrun_changes.pagx");
-  auto originalContent = ReadFile(inputPath);
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
-  EXPECT_EQ(ret, 0);
-  auto afterContent = ReadFile(inputPath);
-  EXPECT_EQ(originalContent, afterContent);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_NoOptimizationsNeeded) {
-  auto inputPath = TestResourcePath("validate_simple.pagx");
-  auto outputPath = TempDir() + "/already_optimal_out.pagx";
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", outputPath, inputPath});
-  EXPECT_EQ(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_InPlaceOverwrite) {
-  auto inputPath = CopyToTemp("optimize_inplace.pagx", "inplace.pagx");
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", inputPath});
-  EXPECT_EQ(ret, 0);
-  auto output = ReadFile(inputPath);
-  EXPECT_TRUE(output.find("\"empty\"") == std::string::npos);
-  EXPECT_TRUE(output.find("\"main\"") != std::string::npos);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_InvalidPagx) {
-  auto inputPath = TestResourcePath("validate_not_xml.pagx");
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", inputPath});
-  EXPECT_NE(ret, 0);
-}
-
-CLI_TEST(PAGXCliTest, Optimize_UnknownOption) {
-  auto inputPath = TestResourcePath("validate_simple.pagx");
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--unknown", inputPath});
-  EXPECT_NE(ret, 0);
 }
 
 //==============================================================================
@@ -1262,68 +497,6 @@ CLI_TEST(PAGXCliTest, Render_XPathNoMatch) {
 }
 
 //==============================================================================
-// Optimize render consistency — Verify optimization preserves visual output
-//==============================================================================
-
-static void TestOptimizeAndRender(const std::string& testName, const std::string& inputFile) {
-  auto inputPath = TestResourcePath(inputFile);
-  auto optimizedPath = TempDir() + "/" + testName + "_optimized.pagx";
-
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "-o", optimizedPath, inputPath});
-  ASSERT_EQ(ret, 0) << "Failed to optimize file";
-
-  auto baselineKey = "PAGXCliTest/" + testName;
-  EXPECT_TRUE(RenderAndCompare({"render", inputPath}, baselineKey + "_original"))
-      << "Original rendering mismatch for " << testName;
-  EXPECT_TRUE(RenderAndCompare({"render", optimizedPath}, baselineKey + "_optimized"))
-      << "Optimized rendering mismatch for " << testName;
-}
-
-CLI_TEST(PAGXCliTest, OptimizeRender_EmptyElements) {
-  TestOptimizeAndRender("OptimizeEmptyElements", "optimize_empty_elements.pagx");
-}
-
-CLI_TEST(PAGXCliTest, OptimizeRender_DedupPath) {
-  TestOptimizeAndRender("OptimizeDedupPath", "optimize_dedup_path.pagx");
-}
-
-CLI_TEST(PAGXCliTest, OptimizeRender_DedupGradient) {
-  TestOptimizeAndRender("OptimizeDedupGradient", "optimize_dedup_gradient.pagx");
-}
-
-CLI_TEST(PAGXCliTest, OptimizeRender_PathToPrimitive) {
-  TestOptimizeAndRender("OptimizePathToPrimitive", "optimize_path_to_primitive.pagx");
-}
-
-CLI_TEST(PAGXCliTest, OptimizeRender_FullCanvasClip) {
-  TestOptimizeAndRender("OptimizeFullCanvasClip", "optimize_full_canvas_clip.pagx");
-}
-
-CLI_TEST(PAGXCliTest, OptimizeRender_OffCanvas) {
-  TestOptimizeAndRender("OptimizeOffCanvas", "optimize_off_canvas.pagx");
-}
-
-CLI_TEST(PAGXCliTest, OptimizeRender_LocalizeCoords) {
-  TestOptimizeAndRender("OptimizeLocalizeCoords", "optimize_localize_coords.pagx");
-}
-
-CLI_TEST(PAGXCliTest, OptimizeRender_Unreferenced) {
-  TestOptimizeAndRender("OptimizeUnreferenced", "optimize_unreferenced.pagx");
-}
-
-CLI_TEST(PAGXCliTest, OptimizeRender_ExtractComposition) {
-  TestOptimizeAndRender("OptimizeExtractComposition", "optimize_extract_composition.pagx");
-}
-
-CLI_TEST(PAGXCliTest, OptimizeRender_Comprehensive) {
-  TestOptimizeAndRender("OptimizeComprehensive", "optimize_comprehensive.pagx");
-}
-
-CLI_TEST(PAGXCliTest, OptimizeRender_UnwrapGroup) {
-  TestOptimizeAndRender("OptimizeUnwrapGroup", "optimize_unwrap_render.pagx");
-}
-
-//==============================================================================
 // Font tests
 //==============================================================================
 
@@ -1360,129 +533,150 @@ CLI_TEST(PAGXCliTest, Font_UnknownSubcommand) {
 }
 
 //==============================================================================
-// Lint hints tests
+// Lint tests
 //==============================================================================
 
 CLI_TEST(PAGXCliTest, Lint_C6_HighRepeaterCopies) {
   auto inputPath = TestResourcePath("lint_c6_high_repeater.pagx");
-  std::string output;
-  std::streambuf* old = std::cout.rdbuf();
+  std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
-  std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
-  std::cout.rdbuf(old);
-  output = oss.str();
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
-  EXPECT_TRUE(output.find("HighCopies") != std::string::npos);
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("Repeater with high copies count") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_C6_NestedRepeaterProduct) {
   auto inputPath = TestResourcePath("lint_c6_nested_repeater.pagx");
-  std::string output;
-  std::streambuf* old = std::cout.rdbuf();
+  std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
-  std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
-  std::cout.rdbuf(old);
-  output = oss.str();
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
-  EXPECT_TRUE(output.find("NestedRepeaters") != std::string::npos);
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("Nested Repeater with product") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_C7_HighBlurRadius) {
   auto inputPath = TestResourcePath("lint_c7_high_blur.pagx");
-  std::string output;
-  std::streambuf* old = std::cout.rdbuf();
+  std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
-  std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
-  std::cout.rdbuf(old);
-  output = oss.str();
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
-  EXPECT_TRUE(output.find("HighBlur") != std::string::npos);
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("blur radius") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_C8_StrokeAlignmentInRepeater) {
   auto inputPath = TestResourcePath("lint_c8_stroke_align.pagx");
-  std::string output;
-  std::streambuf* old = std::cout.rdbuf();
+  std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
-  std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
-  std::cout.rdbuf(old);
-  output = oss.str();
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
-  EXPECT_TRUE(output.find("StrokeAlign") != std::string::npos);
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("Stroke with non-center alignment") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_C9_DashedStrokeInRepeater) {
   auto inputPath = TestResourcePath("lint_c9_dashed_stroke.pagx");
-  std::string output;
-  std::streambuf* old = std::cout.rdbuf();
+  std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
-  std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
-  std::cout.rdbuf(old);
-  output = oss.str();
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
-  EXPECT_TRUE(output.find("DashedStroke") != std::string::npos);
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("Dashed Stroke within Repeater scope") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_C10_ComplexPath) {
   auto inputPath = TestResourcePath("lint_c10_complex_path.pagx");
-  std::string output;
-  std::streambuf* old = std::cout.rdbuf();
+  std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
-  std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
-  std::cout.rdbuf(old);
-  output = oss.str();
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
-  EXPECT_TRUE(output.find("ComplexPath") != std::string::npos);
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("Path with high complexity") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_C11_LowOpacityHighCost) {
   auto inputPath = TestResourcePath("lint_c11_low_opacity.pagx");
-  std::string output;
-  std::streambuf* old = std::cout.rdbuf();
+  std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
-  std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
-  std::cout.rdbuf(old);
-  output = oss.str();
-  EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
-  EXPECT_TRUE(output.find("LowOpacity") != std::string::npos);
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("Low opacity") != std::string::npos);
   EXPECT_TRUE(output.find("high-cost elements") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Lint_C13_SimpleRectangleMask) {
   auto inputPath = TestResourcePath("lint_c13_simple_rect_mask.pagx");
-  std::string output;
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("rectangular mask") != std::string::npos);
+  EXPECT_TRUE(output.find("clipToBounds") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_ValidFile) {
+  auto inputPath = TestResourcePath("validate_simple.pagx");
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Lint_InvalidXml) {
+  auto inputPath = TestResourcePath("validate_not_xml.pagx");
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Lint_MissingFile) {
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", "nonexistent_file.pagx"});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Lint_JsonOutput) {
+  auto inputPath = TestResourcePath("validate_simple.pagx");
   std::streambuf* old = std::cout.rdbuf();
   std::ostringstream oss;
   std::cout.rdbuf(oss.rdbuf());
-  auto ret = CallRun(pagx::cli::RunOptimize, {"optimize", "--dry-run", inputPath});
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", "--json", inputPath});
   std::cout.rdbuf(old);
-  output = oss.str();
+  auto output = oss.str();
   EXPECT_EQ(ret, 0);
-  EXPECT_TRUE(output.find("lint hint") != std::string::npos);
-  EXPECT_TRUE(output.find("MaskedContent") != std::string::npos);
-  EXPECT_TRUE(output.find("rectangular mask") != std::string::npos);
-  EXPECT_TRUE(output.find("clipToBounds") != std::string::npos);
+  EXPECT_TRUE(output.find("\"ok\": true") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_Help) {
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", "--help"});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Lint_UnknownOption) {
+  auto inputPath = TestResourcePath("validate_simple.pagx");
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", "--unknown", inputPath});
+  EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Lint_MissingInput) {
+  auto ret = CallRun(pagx::cli::RunLint, {"lint"});
+  EXPECT_NE(ret, 0);
 }
 
 //==============================================================================
@@ -1650,8 +844,6 @@ CLI_TEST(PAGXCliTest, Import_SvgToPagx_RoundTrip) {
   auto svgPath = ExportToSVG("validate_simple.pagx", "ImportSVG_RoundTrip.svg");
   auto outputPath = TempDir() + "/ImportSVG_RoundTrip.pagx";
   auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--output", outputPath});
-  EXPECT_EQ(ret, 0);
-  ret = CallRun(pagx::cli::RunValidate, {"validate", outputPath});
   EXPECT_EQ(ret, 0);
 }
 

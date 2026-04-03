@@ -26,9 +26,7 @@
 #include "cli/CommandImport.h"
 #include "cli/CommandLayoutCheck.h"
 #include "cli/CommandLint.h"
-#include "cli/CommandOptimize.h"
 #include "cli/CommandRender.h"
-#include "cli/CommandValidator.h"
 
 #ifndef PAGX_CLI_VERSION
 #define PAGX_CLI_VERSION "0.0.0-dev"
@@ -40,13 +38,12 @@ static void PrintUsage() {
             << "Usage: pagx <command> [options] <file>\n"
             << "\n"
             << "Commands:\n"
-            << "  validate       Check XML structure against the PAGX specification schema\n"
+            << "  lint           Check for errors, structural issues, and optimization hints\n"
             << "  layout         Display layout tree with bounds and detected layout problems\n"
             << "  render         Render PAGX to an image file (supports crop and scale)\n"
             << "  bounds         Query rendered pixel bounds of layers (for crop regions)\n"
             << "  font           Query font metrics or embed fonts into a PAGX file\n"
             << "  format         Format a PAGX file (indentation and attribute ordering)\n"
-            << "  optimize       Validate, optimize, and format a PAGX file in one step\n"
             << "  import         Import from another format (e.g. SVG) to PAGX\n"
             << "  export         Export a PAGX file to another format (e.g. SVG)\n"
             << "\n"
@@ -75,8 +72,11 @@ int main(int argc, char* argv[]) {
     return 0;
   }
 
-  if (command == "validate") {
-    return pagx::cli::RunValidate(argc - 1, argv + 1);
+  if (command == "lint") {
+    return pagx::cli::RunLint(argc - 1, argv + 1);
+  }
+  if (command == "layout") {
+    return pagx::cli::RunLayout(argc - 1, argv + 1);
   }
   if (command == "render") {
     return pagx::cli::RunRender(argc - 1, argv + 1);
@@ -84,20 +84,11 @@ int main(int argc, char* argv[]) {
   if (command == "bounds") {
     return pagx::cli::RunBounds(argc - 1, argv + 1);
   }
-  if (command == "layout") {
-    return pagx::cli::RunLayout(argc - 1, argv + 1);
-  }
   if (command == "font") {
     return pagx::cli::RunFont(argc - 1, argv + 1);
   }
   if (command == "format") {
     return pagx::cli::RunFormat(argc - 1, argv + 1);
-  }
-  if (command == "optimize") {
-    return pagx::cli::RunOptimize(argc - 1, argv + 1);
-  }
-  if (command == "lint") {
-    return pagx::cli::RunLint(argc - 1, argv + 1);
   }
   if (command == "import") {
     return pagx::cli::RunImport(argc - 1, argv + 1);

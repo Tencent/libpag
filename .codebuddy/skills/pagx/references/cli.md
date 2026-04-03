@@ -21,25 +21,55 @@ Run this check before the first `pagx` invocation in each session.
 
 ---
 
-## pagx optimize
+## pagx lint
 
-Validates, optimizes, and formats a PAGX file in one step. First validates the input against
-the specification schema — aborts with errors if invalid. Then applies structural optimizations:
-empty element removal, PathData/gradient dedup, unreferenced resource removal,
-Path→Rectangle/Ellipse replacement, full-canvas clip mask removal, off-canvas layer removal,
-coordinate localization, and Composition extraction. The exporter also handles default value
-omission, number normalization, transform simplification, Resources ordering, and consistent
-formatting.
+Check a PAGX file for errors, structural issues, and optimization hints. Combines XSD schema
+validation, semantic checks, structural analysis, and performance suggestions in one command.
+Does not modify the input file.
 
 ```bash
-pagx optimize -o output.pagx input.pagx
-pagx optimize --dry-run input.pagx       # preview only
+pagx lint input.pagx
+pagx lint --json input.pagx
 ```
 
 | Option | Description |
 |--------|-------------|
-| `-o, --output <path>` | Output file path (default: overwrite input) |
-| `--dry-run` | Print report without writing output |
+| `--json` | Output in JSON format |
+
+Text output: `filename:line: message` or `filename: message` (when no line number is available).
+JSON output includes `file`, `ok`, and `diagnostics` array with `line`, `category`, and
+`message` fields. Categories: `error` (schema/semantic), `warning` (structural issues),
+`info` (optimization hints).
+
+Returns non-zero exit code when errors or warnings are found.
+
+### What it checks
+
+**Errors** — XML schema violations and semantic conflicts (e.g., invalid attribute values,
+conflicting constraint combinations).
+
+**Warnings** — Structural issues that are likely unintentional:
+- Empty Layers (no contents, children, or composition)
+- Empty Groups (no child elements)
+- Zero-width Strokes (width <= 0)
+- Full-canvas clip masks (covering entire canvas, no clipping effect)
+- Unreferenced resources (PathData, gradients, fonts defined but never used)
+
+**Hints** — Performance and optimization suggestions:
+- Repeater with high copies count
+- High blur radius on filters and styles
+- Non-center-aligned Stroke in Repeater scope
+- Dashed Stroke in Repeater scope
+- Complex Paths (high verb count)
+- Low opacity with high-cost elements
+- Rectangular masks replaceable with clipToBounds
+- Layers that could be downgraded to Groups
+- Duplicate PathData or gradient resources
+- Mergeable adjacent Groups
+- Redundant first-child Groups
+- Paths replaceable with Rectangle/Ellipse
+- Localizable coordinates and PathData
+- Extractable duplicate Layers as Compositions
 
 ---
 
@@ -101,31 +131,10 @@ default to `--scale 1`. When the context explicitly specifies a scale value, use
 
 ---
 
-## pagx validate
-
-Validate a PAGX file against the specification schema — checks XML structure, required
-attributes, valid attribute values, and element nesting rules. This is a **static** check
-on the source XML; it does not run the layout engine. For runtime layout issues (overlapping
-elements, zero-size, content origin offset, etc.), use `pagx layout` instead.
-
-Note: `pagx optimize` already includes validation as its first step — use this command only
-when you need a standalone schema check without running optimizations.
-
-```bash
-pagx validate input.pagx
-pagx validate --json input.pagx
-```
-
-Text output: `filename:line: error message`. JSON output includes `file`, `valid`, and `errors`
-array with `line` and `message` fields.
-
----
-
 ## pagx format
 
 Pretty-print a PAGX file with consistent indentation and attribute ordering. Does not modify
-values or structure. Note: `pagx optimize` already formats its output — use this command only
-when you want to reformat without applying optimizations.
+values or structure.
 
 ```bash
 pagx format -o output.pagx input.pagx
@@ -202,7 +211,7 @@ chain) are output. Clean sibling nodes before a problematic node are replaced wi
 `<Layer/>` placeholders to preserve index counting. Returns exit code 1 if any problems are
 found, 0 otherwise.
 
-Detects six categories of layout problems:
+Detects nine categories of layout problems:
 
 1. **Overlapping siblings** — sibling Layers whose bounds intersect inside an auto-layout parent
 2. **Clipped content** — elements outside parent bounds when `clipToBounds` is set
@@ -210,6 +219,9 @@ Detects six categories of layout problems:
 4. **Flex in content-measured parent** — `flex` child in a container layout parent that has no explicit main-axis size
 5. **Content origin offset** — unconstrained children in a content-measured container do not start at (0, 0), causing inaccurate container measurement
 6. **Constraints ignored by layout** — constraint attributes on a child Layer participating in container layout flow (silently ignored)
+7. **Off-canvas** — top-level Layers completely outside the canvas bounds
+8. **Redundant constraints (override)** — constraint attributes overridden by centerX/centerY
+9. **Redundant constraints (default)** — left=0 or top=0 with no opposite constraint (equivalent to default)
 
 ```xml
 <layout>

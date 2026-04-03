@@ -297,8 +297,7 @@ static int CountFullCanvasClipMasks(const PAGXDocument* document) {
   std::function<void(const std::vector<Layer*>&)> checkLayers =
       [&](const std::vector<Layer*>& layers) {
         for (auto* layer : layers) {
-          if (layer->mask != nullptr &&
-              maskedLayers.find(layer->mask) == maskedLayers.end() &&
+          if (layer->mask != nullptr && maskedLayers.find(layer->mask) == maskedLayers.end() &&
               IsFullCanvasClipMask(layer->mask, canvasWidth, canvasHeight)) {
             count++;
           }

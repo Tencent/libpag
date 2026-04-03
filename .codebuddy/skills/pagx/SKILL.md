@@ -3,8 +3,8 @@ name: pagx
 description: >-
   PAGX (.pagx) file handler. MUST invoke for ANY task involving PAGX format or
   ".pagx" files — including create, edit, optimize, review, debug, or query syntax.
-  Also invoke when user runs pagx CLI commands (render, validate, format, optimize,
-  bounds, layout, font info/embed, import/export) or asks about PAGX elements, attributes, or layout.
+  Also invoke when user runs pagx CLI commands (render, lint, format, layout,
+  bounds, font info/embed, import/export) or asks about PAGX elements, attributes, or layout.
 ---
 
 # PAGX Skill
@@ -23,17 +23,10 @@ reference image, or design spec.
 incremental construction, text layout, coordinate handling, common pitfalls, and a
 screenshot-based verification loop. Scene-specific examples are indexed inside.
 
-### Optimize — `references/optimize-guide.md`
-
-**When**: User asks to optimize, simplify, or review an existing PAGX file.
-
-**What it provides**: Automated optimization via `pagx optimize`, manual structure and
-performance review patterns, and a final verification checklist.
-
 ## Reference Lookup
 
 **When**: User asks about PAGX syntax, attributes, node behavior, or CLI usage — not a
-generation or optimization task.
+generation task.
 
 **Where to look**:
 
@@ -42,4 +35,4 @@ generation or optimization task.
 | `references/spec-essentials.md` | Node types, Layer rendering pipeline, auto layout (container layout + constraint positioning), painter scope, text system, masking, resources |
 | `references/design-patterns.md` | Structure decisions (Layer vs Group), layout patterns (container layout, constraint positioning, Layer constraints), text layout, practical pitfall patterns |
 | `references/attributes.md` | Attribute defaults, enumerations, required attributes |
-| `references/cli.md` | CLI commands — `render`, `validate`, `optimize`, `format`, `bounds`, `layout`, `font info`, `font embed`, `import`, `export` |
+| `references/cli.md` | CLI commands — `render`, `lint`, `format`, `layout`, `bounds`, `font info`, `font embed`, `import`, `export` |

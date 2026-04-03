@@ -294,6 +294,46 @@ static void DetectOverlap(const std::vector<std::shared_ptr<CheckNode>>& layoutC
   }
 }
 
+static void DetectRedundantConstraints(const Layer* layer, CheckNode* node, bool check) {
+  if (!check || layer == nullptr) {
+    return;
+  }
+
+  // Rule A: centerX overrides left and right.
+  if (!std::isnan(layer->centerX)) {
+    if (!std::isnan(layer->left) && !std::isnan(layer->right)) {
+      node->problems.push_back("left/right ignored, overridden by centerX");
+    } else if (!std::isnan(layer->left)) {
+      node->problems.push_back("left ignored, overridden by centerX");
+    } else if (!std::isnan(layer->right)) {
+      node->problems.push_back("right ignored, overridden by centerX");
+    }
+  }
+
+  // Rule A: centerY overrides top and bottom.
+  if (!std::isnan(layer->centerY)) {
+    if (!std::isnan(layer->top) && !std::isnan(layer->bottom)) {
+      node->problems.push_back("top/bottom ignored, overridden by centerY");
+    } else if (!std::isnan(layer->top)) {
+      node->problems.push_back("top ignored, overridden by centerY");
+    } else if (!std::isnan(layer->bottom)) {
+      node->problems.push_back("bottom ignored, overridden by centerY");
+    }
+  }
+
+  // Rule B: left=0 with no right/centerX is equivalent to default x=0.
+  if (!std::isnan(layer->left) && layer->left == 0.0f && std::isnan(layer->right) &&
+      std::isnan(layer->centerX)) {
+    node->problems.push_back("left=0 with no opposite constraint is equivalent to default");
+  }
+
+  // Rule B: top=0 with no bottom/centerY is equivalent to default y=0.
+  if (!std::isnan(layer->top) && layer->top == 0.0f && std::isnan(layer->bottom) &&
+      std::isnan(layer->centerY)) {
+    node->problems.push_back("top=0 with no opposite constraint is equivalent to default");
+  }
+}
+
 static void DetectClippedContent(const LCRect& parentBounds,
                                  const std::vector<std::shared_ptr<CheckNode>>& children) {
   for (const auto& child : children) {
@@ -394,6 +434,7 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
   node->attrs.clipToBounds = layer->clipToBounds;
 
   DetectZeroSize(node.get(), check, layer, parentLayer);
+  DetectRedundantConstraints(layer, node.get(), check);
 
   std::vector<std::shared_ptr<CheckNode>> elementNodes;
   std::vector<std::shared_ptr<CheckNode>> childLayerNodes;
@@ -444,6 +485,23 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
   }
 
   return node;
+}
+
+static void DetectOffCanvas(const std::vector<std::shared_ptr<CheckNode>>& topNodes,
+                            float canvasWidth, float canvasHeight) {
+  LCRect canvas = {0, 0, canvasWidth, canvasHeight};
+  for (const auto& node : topNodes) {
+    if (node->bounds.width <= 0 || node->bounds.height <= 0) {
+      continue;  // already reported as zero-size
+    }
+    bool intersects = node->bounds.x < canvas.x + canvas.width &&
+                      node->bounds.x + node->bounds.width > canvas.x &&
+                      node->bounds.y < canvas.y + canvas.height &&
+                      node->bounds.y + node->bounds.height > canvas.y;
+    if (!intersects) {
+      node->problems.push_back("completely off-canvas, not visible");
+    }
+  }
 }
 
 // ============================================================================
@@ -768,6 +826,12 @@ int RunLayout(int argc, char* argv[]) {
   }
 
   int problemCount = CountProblems(results);
+
+  // Detect off-canvas layers (only for full-document scope, not scoped queries).
+  if (!scopedQuery) {
+    DetectOffCanvas(results, document->width, document->height);
+    problemCount = CountProblems(results);
+  }
 
   if (opts.problemsOnly) {
     results = FilterProblematicNodes(results);

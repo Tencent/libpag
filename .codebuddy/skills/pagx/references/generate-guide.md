@@ -19,7 +19,7 @@ Read as needed:
 | Reference | Content |
 |-----------|---------|
 | `attributes.md` | Attribute defaults, enumerations, required attributes |
-| `cli.md` | CLI tool usage — all commands (`render`, `layout`, `bounds`, `validate`, etc.) |
+| `cli.md` | CLI tool usage — all commands (`render`, `layout`, `bounds`, `lint`, etc.) |
 
 ---
 
