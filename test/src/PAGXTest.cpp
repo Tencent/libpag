@@ -1141,4 +1141,101 @@ PAGX_TEST(PAGXTest, HtmlFiles) {
   TestPAGXDirectory(context, ProjectPath::Absolute("resources/pagx_to_html"), "html");
 }
 
+/**
+ * Generate a side-by-side comparison page: PAGX native rendering vs HTML rendering.
+ * Run: PAGFullTest --gtest_filter=PAGXTest.GenerateComparisonPage
+ * Then: open test/out/PAGXHtmlTest/comparison.html
+ */
+PAGX_TEST(PAGXTest, GenerateComparisonPage) {
+  auto directory = ProjectPath::Absolute("resources/pagx_to_html");
+  auto outDir = ProjectPath::Absolute("test/out/PAGXHtmlTest");
+  std::filesystem::create_directories(outDir);
+
+  std::vector<std::string> files;
+  for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+    if (entry.path().extension() == ".pagx") {
+      files.push_back(entry.path().string());
+    }
+  }
+  std::sort(files.begin(), files.end());
+  ASSERT_FALSE(files.empty());
+
+  pagx::TextLayout textLayout;
+  textLayout.addFallbackTypefaces(GetFallbackTypefaces());
+
+  // Build comparison page
+  std::string page = R"(<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<title>PAGX vs HTML Rendering Comparison</title>
+<style>
+body{font-family:-apple-system,Arial,sans-serif;background:#f1f5f9;margin:0;padding:20px}
+h1{text-align:center;color:#1e293b;margin-bottom:4px}
+.sub{text-align:center;color:#94a3b8;font-size:14px;margin-bottom:24px}
+.card{background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:20px;overflow:hidden}
+.hd{padding:12px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between}
+.hd h3{margin:0;font-size:14px;color:#334155}
+.sz{font-size:11px;padding:2px 8px;border-radius:10px;background:#dcfce7;color:#166534}
+.cmp{display:flex}
+.cmp>div{flex:1;padding:12px;text-align:center}
+.cmp>div:first-child{border-right:1px solid #e2e8f0}
+.cmp label{display:block;font-size:11px;color:#94a3b8;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.cmp img{max-width:100%;height:auto;border:1px solid #e2e8f0;border-radius:4px;background:repeating-conic-gradient(#f0f0f0 0% 25%,white 0% 50%) 50%/16px 16px}
+</style></head><body>
+<h1>PAGX vs HTML Rendering Comparison</h1>
+<p class="sub">Left: PAGX native rendering &nbsp;|&nbsp; Right: HTML rendering in browser</p>
+)";
+
+  int count = 0;
+  for (const auto& filePath : files) {
+    auto baseName = std::filesystem::path(filePath).stem().string();
+    auto doc = pagx::PAGXImporter::FromFile(filePath);
+    if (!doc || doc->width <= 0 || doc->height <= 0) {
+      continue;
+    }
+    int w = static_cast<int>(doc->width);
+    int h = static_cast<int>(doc->height);
+
+    // Render PAGX native
+    auto nativePng = outDir + "/" + baseName + "_pagx.png";
+    auto layer = pagx::LayerBuilder::Build(doc.get(), &textLayout);
+    if (layer) {
+      auto surface = tgfx::Surface::Make(context, w, h);
+      if (surface) {
+        tgfx::DisplayList displayList;
+        displayList.root()->addChild(layer);
+        displayList.render(surface.get(), false);
+        tgfx::Bitmap bitmap(w, h, false, false);
+        tgfx::Pixmap pixmap(bitmap);
+        surface->readPixels(pixmap.info(), pixmap.writablePixels());
+        auto data = tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::PNG, 100);
+        if (data) {
+          std::ofstream f(nativePng, std::ios::binary);
+          f.write(reinterpret_cast<const char*>(data->data()),
+                  static_cast<std::streamsize>(data->size()));
+        }
+      }
+    }
+
+    auto htmlPng = baseName + ".png";
+    page += "<div class=\"card\" id=\"" + baseName + "\">\n";
+    page += "  <div class=\"hd\"><h3>" + baseName + "</h3><span class=\"sz\">" + std::to_string(w) +
+            "x" + std::to_string(h) + "</span></div>\n";
+    page += "  <div class=\"cmp\">\n";
+    page += "    <div><label>PAGX Native</label><img src=\"" + baseName + "_pagx.png\" width=\"" +
+            std::to_string(w) + "\"></div>\n";
+    page += "    <div><label>HTML (Browser)</label><img src=\"" + htmlPng + "\" width=\"" +
+            std::to_string(w) + "\"></div>\n";
+    page += "  </div>\n</div>\n";
+    count++;
+  }
+
+  page += "<p class=\"sub\">" + std::to_string(count) + " files compared</p></body></html>";
+
+  auto pagePath = outDir + "/comparison.html";
+  std::ofstream f(pagePath, std::ios::binary);
+  f.write(page.data(), static_cast<std::streamsize>(page.size()));
+  std::cout << "\nComparison page: " << pagePath << std::endl;
+  std::cout << "Open: open \"" << pagePath << "\"" << std::endl;
+}
+
 }  // namespace pag
