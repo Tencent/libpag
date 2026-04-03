@@ -228,7 +228,8 @@ static void DetectFlexInContentMeasuredParent(
     // Skip if the flex child actually received a non-zero main-axis size from the layout engine.
     // This happens when the parent's main-axis size is derived from a grandparent (e.g., flex or
     // stretch from the parent's own parent), even though the parent has no explicit size attribute.
-    float childResolvedMain = horizontal ? childNodes[idx]->bounds.width : childNodes[idx]->bounds.height;
+    float childResolvedMain =
+        horizontal ? childNodes[idx]->bounds.width : childNodes[idx]->bounds.height;
     if (childResolvedMain > 0) {
       continue;
     }
@@ -238,8 +239,7 @@ static void DetectFlexInContentMeasuredParent(
   }
 }
 
-static void DetectContentOriginOffset(const std::vector<Element*>& elements,
-                                      CheckNode* container) {
+static void DetectContentOriginOffset(const std::vector<Element*>& elements, CheckNode* container) {
   // Find the minimum x and y of unconstrained children relative to the container origin.
   float minX = FLT_MAX;
   float minY = FLT_MAX;

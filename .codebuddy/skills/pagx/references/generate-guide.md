@@ -354,8 +354,12 @@ Verify:
 pagx render --scale 2 input.pagx
 ```
 
-Read the screenshot. Visual inspection catches issues that layout data alone cannot:
-wrong colors, visual imbalance, text overflow, gradient direction errors.
+Read the screenshot carefully. Visual inspection catches issues that `--check` cannot detect:
+- **Alignment and spacing** — elements visually misaligned, uneven gaps, asymmetric padding
+- **Text** — wrong font, truncated or overflowing text, invisible text (missing Fill)
+- **Colors and gradients** — wrong colors, gradient direction off, unintended transparency
+- **Visual balance** — disproportionate sections, elements too close or too far apart
+- **Content correctness** — missing elements, wrong stacking order, icon rendering errors
 
 To render a specific section in isolation:
 
@@ -363,9 +367,28 @@ To render a specific section in isolation:
 pagx render --scale 2 --id "header" input.pagx
 ```
 
-#### 5. Repeat
+#### 5. Diagnose visual issues with layout data
 
-If any problems remain, return to step 2. Continue until `--check` exits 0 and the
+When the screenshot reveals a problem but `--check` reports no issues, use `pagx layout`
+(without `--check`) to inspect the resolved bounds of the suspect node:
+
+```bash
+pagx layout --id "cardRow" input.pagx
+```
+
+This outputs every child's exact position and size. Compare the bounds values against
+the design intent to identify the mismatch:
+- Element at an unexpected position → wrong constraint attribute or missing container layout
+- Element wider/narrower than expected → wrong `flex` weight, missing `width`, or content
+  measurement including empty margin (see §Content origin offset)
+- Two elements at the same position → missing `gap` or `layout` on parent
+- Element outside parent bounds → constraint offset exceeding parent size
+
+Fix the identified issue, then re-render to confirm.
+
+#### 6. Repeat
+
+If any problems remain, return to step 1. Continue until `--check` exits 0 and the
 screenshot is correct.
 
 ### Incremental Verification
