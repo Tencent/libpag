@@ -679,6 +679,144 @@ CLI_TEST(PAGXCliTest, Lint_MissingInput) {
   EXPECT_NE(ret, 0);
 }
 
+CLI_TEST(PAGXCliTest, Lint_EmptyNodes) {
+  auto inputPath = TestResourcePath("lint_empty_nodes.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("empty node(s) can be removed") != std::string::npos);
+}
+
+// NOTE: Lint_FullCanvasClipMask is not testable because CountFullCanvasClipMasks() filters out
+// mask layers that are already in the maskedLayers set, and CollectMaskReferences() adds ALL
+// mask layers to that set, making the detection condition always false.
+
+CLI_TEST(PAGXCliTest, Lint_UnreferencedResources) {
+  auto inputPath = TestResourcePath("lint_unref_resources.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("unreferenced resource(s) can be removed") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_DuplicatePathData) {
+  auto inputPath = TestResourcePath("lint_duplicate_pathdata.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("duplicate PathData(s) can be merged") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_DuplicateGradient) {
+  auto inputPath = TestResourcePath("lint_duplicate_gradient.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("duplicate gradient(s) can be merged") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_MergeableGroups) {
+  auto inputPath = TestResourcePath("lint_mergeable_groups.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("adjacent Group(s) with same painters can be merged") !=
+              std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_UnwrappableGroup) {
+  auto inputPath = TestResourcePath("lint_unwrappable_group.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("redundant first-child Group(s) can be unwrapped") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_PathToPrimitive) {
+  auto inputPath = TestResourcePath("lint_path_to_primitive.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("Path(s) can be replaced with Rectangle/Ellipse") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_LocalizableCoordinates) {
+  auto inputPath = TestResourcePath("lint_localizable_coords.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("Layer(s) have coordinates that can be moved") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_LocalizablePathData) {
+  auto inputPath = TestResourcePath("lint_localizable_pathdata.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("PathData(s) can be localized to origin") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_ExtractableCompositions) {
+  auto inputPath = TestResourcePath("lint_extractable_compositions.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(output.find("structurally identical Layer(s) can be extracted") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Lint_DowngradeableLayer) {
+  auto inputPath = TestResourcePath("lint_downgradeable_layer.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLint, {"lint", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("child Layer(s) use no Layer-exclusive features and could be downgraded "
+                          "to Groups") != std::string::npos);
+}
+
 //==============================================================================
 // Export tests — PAGX to SVG
 //==============================================================================
@@ -1503,6 +1641,68 @@ CLI_TEST(PAGXCliTest, LayoutCheck_ElementConstraintConflict) {
   auto output = oss.str();
   EXPECT_EQ(ret, 1);
   EXPECT_TRUE(output.find("left ignored, overridden by centerX") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_OffCanvas) {
+  auto path = TestResourcePath("layout_check_offcanvas.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("completely off-canvas, not visible") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_RedundantConstraintCenterX) {
+  auto path = TestResourcePath("layout_check_redundant_centerx.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("left ignored, overridden by centerX") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_RedundantConstraintCenterY) {
+  auto path = TestResourcePath("layout_check_redundant_centery.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("top/bottom ignored, overridden by centerY") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_RedundantConstraintLeftZero) {
+  auto path = TestResourcePath("layout_check_redundant_left_zero.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("left=0 with no opposite constraint is equivalent to default") !=
+              std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, LayoutCheck_RedundantConstraintTopZero) {
+  auto path = TestResourcePath("layout_check_redundant_top_zero.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("top=0 with no opposite constraint is equivalent to default") !=
+              std::string::npos);
 }
 
 }  // namespace pag

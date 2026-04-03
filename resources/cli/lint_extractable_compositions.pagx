@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test file for lint: 4 structurally identical top-level Layers -->
+<pagx version="1.0" width="400" height="400">
+  <Layer name="copy1">
+    <Rectangle size="80,80"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+  <Layer name="copy2">
+    <Rectangle size="80,80"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+  <Layer name="copy3">
+    <Rectangle size="80,80"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+  <Layer name="copy4">
+    <Rectangle size="80,80"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+</pagx>
