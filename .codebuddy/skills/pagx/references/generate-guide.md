@@ -343,13 +343,34 @@ Run verification after each module.
 - **YES** → wrap in a Group
 - **NO** (first content) → no Group needed, place directly
 
+**Group positioning rule**: Group is both an isolation container **and** a positioning unit.
+After wrapping content in a Group, always ask: "Where should this Group sit in its parent?"
+- Needs centering → add `centerX="0" centerY="0"` on the **Group**, not on inner elements
+- Needs edge alignment → add `left`/`top`/`right`/`bottom` on the Group
+- Stays at parent origin (0,0) → no constraint needed (but verify this is intentional)
+
+Common mistake: placing `centerX`/`centerY` on the Path/Ellipse inside the Group instead
+of on the Group itself. Inner element constraints position the element within the Group's
+bounds, not within the parent Layer — the element centers inside the Group, but the Group
+itself stays at (0,0).
+
 ```xml
-<!-- ✅ Correct: Group isolates second content from first -->
+<!-- ✅ Correct: Group isolates scope AND positions content at center -->
 <Layer width="200" height="200">
   <Rectangle left="0" right="0" top="0" bottom="0"/>
   <Fill color="#F00"/>
-  <Group>
-    <Ellipse left="35" top="35" size="30,30"/>
+  <Group centerX="0" centerY="0">
+    <Ellipse size="30,30"/>
+    <Stroke color="#000" width="1"/>
+  </Group>
+</Layer>
+
+<!-- ❌ Wrong: centerX/centerY on inner Ellipse instead of Group -->
+<Layer width="200" height="200">
+  <Rectangle left="0" right="0" top="0" bottom="0"/>
+  <Fill color="#F00"/>
+  <Group>  <!-- no positioning — stuck at (0,0) -->
+    <Ellipse centerX="0" centerY="0" size="30,30"/>  <!-- centers within Group, not Layer -->
     <Stroke color="#000" width="1"/>
   </Group>
 </Layer>
