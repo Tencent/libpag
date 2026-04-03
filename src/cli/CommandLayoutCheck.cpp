@@ -568,7 +568,7 @@ int RunLayout(int argc, char* argv[]) {
   if (!hasTargetScope) {
     auto docWidth = static_cast<int>(document->width);
     auto docHeight = static_cast<int>(document->height);
-    std::cout << "<pagx width=\"" << docWidth << "\" height=\"" << docHeight << "\">\n";
+    std::cout << "  <pagx width=\"" << docWidth << "\" height=\"" << docHeight << "\">\n";
   }
   if (results.empty() && opts.check) {
     std::string pad = hasTargetScope ? "  " : "    ";
@@ -579,7 +579,7 @@ int RunLayout(int argc, char* argv[]) {
     PrintNodeXml(std::cout, *node, contentIndent);
   }
   if (!hasTargetScope) {
-    std::cout << "</pagx>\n";
+    std::cout << "  </pagx>\n";
   }
   std::cout << "</layout>\n";
 
