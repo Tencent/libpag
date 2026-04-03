@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="400" height="400">
-  <Layer name="constrained" left="50" top="30">
-    <Rectangle left="70" top="60" size="60,40"/>
-    <Fill color="#FF0000"/>
-  </Layer>
-</pagx>

@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="400" height="400">
-  <Layer name="star">
-    <Polystar left="260" top="160" outerRadius="40" pointCount="5"/>
-    <Fill color="#FFFF00"/>
-  </Layer>
-</pagx>

@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="400" height="400">
-  <Layer name="centered" left="100" top="100">
-<Rectangle left="-25" top="-25" size="50,50"/>
-    <Fill color="#FF0000"/>
-  </Layer>
-</pagx>

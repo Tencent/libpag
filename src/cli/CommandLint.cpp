@@ -76,7 +76,7 @@ struct LintDiagnostic {
   std::string message = {};
 };
 
-// --- XSD validation (from CommandValidator) ---
+// --- XSD validation ---
 
 #if LIBXML_VERSION >= 21200
 static void CollectStructuredError(void* context, const xmlError* xmlError) {

@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="200">
-  <Layer>
-    <Group position="30,20">
-      <Rectangle left="10" top="10" size="80,80"/>
-      <Fill color="#FF0000"/>
-    </Group>
-  </Layer>
-</pagx>

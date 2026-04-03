@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="400" height="300">
-  <Layer name="group_constrained" width="400" height="300">
-    <Group left="20" right="20" top="20" bottom="20">
-      <Rectangle size="100,50"/>
-      <Fill color="#0000FF"/>
-    </Group>
-  </Layer>
-</pagx>

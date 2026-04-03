@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="400" height="400">
-  <Layer name="circle">
-    <Ellipse left="110" top="210" size="80,80"/>
-    <Fill color="#00FF00"/>
-  </Layer>
-</pagx>

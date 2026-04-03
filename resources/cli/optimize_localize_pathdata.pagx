@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="400" height="300">
-  <Layer name="constrained_layer" width="400" height="300" left="0" top="0">
-    <Path data="M 50 50 L 150 50 L 100 150 Z"/>
-    <Fill color="#0000FF"/>
-  </Layer>
-</pagx>
