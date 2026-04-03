@@ -369,8 +369,8 @@ pagx render --scale 2 --id "header" input.pagx
 
 #### 5. Diagnose visual issues with layout data
 
-When the screenshot reveals a visual issue but no `<Problem>` nodes are reported, use
-`pagx layout` to inspect the resolved bounds of the suspect node:
+When the screenshot reveals a visual issue not caught by automated `<Problem>` detection,
+inspect the resolved bounds of the suspect node to diagnose manually:
 
 ```bash
 pagx layout --id "cardRow" input.pagx
