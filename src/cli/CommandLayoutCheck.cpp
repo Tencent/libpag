@@ -136,7 +136,10 @@ static void DetectZeroSize(CheckNode* node, bool check, const Layer* layer = nul
       parentLayer->layout != LayoutMode::None) {
     bool horizontal = parentLayer->layout == LayoutMode::Horizontal;
     float parentExplicitMain = horizontal ? parentLayer->width : parentLayer->height;
-    if (std::isnan(parentExplicitMain)) {
+    bool parentMainFromConstraints =
+        horizontal ? (!std::isnan(parentLayer->left) && !std::isnan(parentLayer->right))
+                   : (!std::isnan(parentLayer->top) && !std::isnan(parentLayer->bottom));
+    if (std::isnan(parentExplicitMain) && !parentMainFromConstraints) {
       oss << ": flex child, parent has no main-axis size to distribute";
     }
   }
