@@ -179,18 +179,6 @@ static void DetectClippedContent(const LCRect& parentBounds,
   }
 }
 
-static void DetectExcludedFromLayout(const std::vector<std::shared_ptr<CheckNode>>& children,
-                                     const std::string& parentLayoutMode) {
-  if (parentLayoutMode.empty()) {
-    return;
-  }
-  for (const auto& child : children) {
-    if (child->layoutPositioning == "ABSOLUTE") {
-      child->problems.push_back("excluded from layout flow inside auto-layout parent (layout: " +
-                                parentLayoutMode + "); includeInLayout is false");
-    }
-  }
-}
 
 // ============================================================================
 // Element Tree Building
@@ -279,7 +267,6 @@ static std::shared_ptr<CheckNode> BuildLayoutTree(const Layer* layer, float pare
     if (layer->clipToBounds) {
       DetectClippedContent(node->bounds, childLayerNodes);
     }
-    DetectExcludedFromLayout(childLayerNodes, node->layoutMode);
   }
 
   std::vector<std::shared_ptr<CheckNode>> allChildren;
