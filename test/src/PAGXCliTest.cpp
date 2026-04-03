@@ -1466,4 +1466,43 @@ CLI_TEST(PAGXCliTest, LayoutCheck_DepthZero) {
   EXPECT_TRUE(output.find("id=\"grandchild2\"") != std::string::npos);
 }
 
+// Container overflow: children total main-axis size exceeds parent available space.
+CLI_TEST(PAGXCliTest, LayoutCheck_ContainerOverflow) {
+  auto path = TestResourcePath("layout_check_container_overflow.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("children overflow") != std::string::npos);
+}
+
+// Negative constraint-derived size: left+right exceeds parent width.
+CLI_TEST(PAGXCliTest, LayoutCheck_NegativeConstraintSize) {
+  auto path = TestResourcePath("layout_check_negative_constraint.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("negative derived size") != std::string::npos);
+}
+
+// Element constraint conflict: centerX overrides left on a VectorElement.
+CLI_TEST(PAGXCliTest, LayoutCheck_ElementConstraintConflict) {
+  auto path = TestResourcePath("layout_check_element_constraint_conflict.pagx");
+  std::streambuf* old = std::cout.rdbuf();
+  std::ostringstream oss;
+  std::cout.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunLayout, {"layout", "--problems-only", path});
+  std::cout.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_EQ(ret, 1);
+  EXPECT_TRUE(output.find("left ignored, overridden by centerX") != std::string::npos);
+}
+
 }  // namespace pag
