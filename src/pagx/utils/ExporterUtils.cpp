@@ -267,6 +267,85 @@ bool GetImageDimensions(const Image* image, int* width, int* height) {
   return false;
 }
 
+static bool GetPNGDPI(const uint8_t* data, size_t size, float* dpiX, float* dpiY) {
+  static const uint8_t kPNGSignature[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+  if (size < 8 || memcmp(data, kPNGSignature, 8) != 0) {
+    return false;
+  }
+  size_t offset = 8;
+  while (offset + 12 <= size) {
+    auto chunkLen = static_cast<uint32_t>((data[offset] << 24) | (data[offset + 1] << 16) |
+                                          (data[offset + 2] << 8) | data[offset + 3]);
+    if (memcmp(data + offset + 4, "pHYs", 4) == 0) {
+      if (chunkLen == 9 && offset + 8 + 9 <= size) {
+        const uint8_t* d = data + offset + 8;
+        auto ppuX = static_cast<uint32_t>((d[0] << 24) | (d[1] << 16) | (d[2] << 8) | d[3]);
+        auto ppuY = static_cast<uint32_t>((d[4] << 24) | (d[5] << 16) | (d[6] << 8) | d[7]);
+        uint8_t unit = d[8];
+        if (unit == 1 && ppuX > 0 && ppuY > 0) {
+          *dpiX = static_cast<float>(ppuX) * 0.0254f;
+          *dpiY = static_cast<float>(ppuY) * 0.0254f;
+          return true;
+        }
+      }
+      return false;
+    }
+    if (memcmp(data + offset + 4, "IDAT", 4) == 0) {
+      break;
+    }
+    offset += 12 + chunkLen;
+  }
+  return false;
+}
+
+static bool GetJPEGDPI(const uint8_t* data, size_t size, float* dpiX, float* dpiY) {
+  if (size < 2 || data[0] != 0xFF || data[1] != 0xD8) {
+    return false;
+  }
+  size_t offset = 2;
+  while (offset + 4 < size) {
+    if (data[offset] != 0xFF) {
+      return false;
+    }
+    uint8_t marker = data[offset + 1];
+    if (marker == 0xD9 || marker == 0xDA) {
+      break;
+    }
+    auto segLen = static_cast<uint16_t>((data[offset + 2] << 8) | data[offset + 3]);
+    if (marker == 0xE0 && segLen >= 16 && offset + 2 + segLen <= size) {
+      if (memcmp(data + offset + 4, "JFIF\0", 5) == 0) {
+        uint8_t units = data[offset + 11];
+        auto xDensity = static_cast<uint16_t>((data[offset + 12] << 8) | data[offset + 13]);
+        auto yDensity = static_cast<uint16_t>((data[offset + 14] << 8) | data[offset + 15]);
+        if (xDensity > 0 && yDensity > 0) {
+          if (units == 1) {
+            *dpiX = static_cast<float>(xDensity);
+            *dpiY = static_cast<float>(yDensity);
+            return true;
+          } else if (units == 2) {
+            *dpiX = static_cast<float>(xDensity) * 2.54f;
+            *dpiY = static_cast<float>(yDensity) * 2.54f;
+            return true;
+          }
+        }
+      }
+    }
+    offset += 2 + segLen;
+  }
+  return false;
+}
+
+bool GetImageDPI(const Image* image, float* dpiX, float* dpiY) {
+  auto data = GetImageData(image);
+  if (!data || data->size() == 0) {
+    return false;
+  }
+  if (GetPNGDPI(data->bytes(), data->size(), dpiX, dpiY)) {
+    return true;
+  }
+  return GetJPEGDPI(data->bytes(), data->size(), dpiX, dpiY);
+}
+
 bool IsJPEG(const uint8_t* data, size_t size) {
   return size >= 2 && data[0] == 0xFF && data[1] == 0xD8;
 }

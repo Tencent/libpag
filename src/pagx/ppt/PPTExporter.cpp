@@ -829,8 +829,13 @@ void PPTWriter::writeColorSource(XMLBuilder& out, const ColorSource* source, flo
                pattern->tileModeY == TileMode::Repeat || pattern->tileModeY == TileMode::Mirror);
           if (needsTiling && hasDimensions && !shapeBounds.isEmpty()) {
             const auto& M = pattern->matrix;
-            auto sx = static_cast<int>(std::round(static_cast<double>(M.a) * 100000.0));
-            auto sy = static_cast<int>(std::round(static_cast<double>(M.d) * 100000.0));
+            float imgDpiX = 72.0f;
+            float imgDpiY = 72.0f;
+            GetImageDPI(pattern->image, &imgDpiX, &imgDpiY);
+            double dpiCorrX = static_cast<double>(imgDpiX) / 96.0;
+            double dpiCorrY = static_cast<double>(imgDpiY) / 96.0;
+            auto sx = static_cast<int>(std::round(M.a * dpiCorrX * 100000.0));
+            auto sy = static_cast<int>(std::round(M.d * dpiCorrY * 100000.0));
             auto tx = PxToEMU(M.tx - shapeBounds.x);
             auto ty = PxToEMU(M.ty - shapeBounds.y);
             bool flipX = (pattern->tileModeX == TileMode::Mirror);
