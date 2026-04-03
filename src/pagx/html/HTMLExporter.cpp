@@ -1600,7 +1600,7 @@ class HTMLWriter {
   void paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                  const Stroke* stroke, const TextBox* textBox, float alpha, bool hasTrim,
                  const TrimPath* curTrim, bool hasMerge, MergePathMode mergeMode);
-  void applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim);
+  void applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim, bool isEllipse = false);
   void applyTrimAttrsContinuous(HTMLBuilder& builder, const TrimPath* trim,
                                 const std::vector<float>& pathLengths, float totalLength,
                                 size_t geoIndex);
@@ -2906,7 +2906,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           applyTrimAttrsContinuous(out, trim, pathLengths, totalPathLength, geoIdx);
         } else {
           applySVGStroke(out, stroke);
-          applyTrimAttrs(out, trim);
+          applyTrimAttrs(out, trim, true);
         }
         out.closeTagSelfClosing();
         break;
@@ -4042,7 +4042,7 @@ void HTMLWriter::writeComposition(HTMLBuilder& out, const Composition* comp) {
 // HTMLWriter – element processing
 //==============================================================================
 
-void HTMLWriter::applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim) {
+void HTMLWriter::applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim, bool isEllipse) {
   if (!trim) {
     return;
   }
@@ -4050,7 +4050,10 @@ void HTMLWriter::applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim) {
     return;
   }
   builder.addAttr("pathLength", "1");
-  float offsetFrac = trim->offset / 360.0f;
+  // SVG ellipse paths start at 3 o'clock (rightmost point), while PAGX
+  // starts at 12 o'clock (top). Apply -0.25 offset for ellipse geometries.
+  float ellipseAdj = isEllipse ? -0.25f : 0.0f;
+  float offsetFrac = trim->offset / 360.0f + ellipseAdj;
   float s = std::fmod(trim->start + offsetFrac, 1.0f);
   float e = std::fmod(trim->end + offsetFrac, 1.0f);
   if (s < 0.0f) {
@@ -4342,7 +4345,28 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
       }
       case NodeType::Repeater: {
         auto rep = static_cast<const Repeater*>(element);
-        writeRepeater(out, rep, geos, curFill, curStroke, distribute ? alpha : 1.0f);
+        // Look ahead for Fill/Stroke that follow the Repeater in the element list.
+        const Fill* repFill = curFill;
+        const Stroke* repStroke = curStroke;
+        if (!repFill || !repStroke) {
+          for (auto* e : elements) {
+            if (e == element) {
+              continue;  // Skip elements before the Repeater (already processed).
+            }
+            if (e->nodeType() == NodeType::Fill && !repFill) {
+              auto f = static_cast<const Fill*>(e);
+              if (f->placement == targetPlacement) {
+                repFill = f;
+              }
+            } else if (e->nodeType() == NodeType::Stroke && !repStroke) {
+              auto s = static_cast<const Stroke*>(e);
+              if (s->placement == targetPlacement) {
+                repStroke = s;
+              }
+            }
+          }
+        }
+        writeRepeater(out, rep, geos, repFill, repStroke, distribute ? alpha : 1.0f);
         geos.clear();
         curFill = nullptr;
         curStroke = nullptr;
