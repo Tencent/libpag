@@ -2,7 +2,7 @@
 
 Complete attribute defaults and enumeration values extracted from the PAGX specification
 (attribute tables in the main spec and Appendix B). Use this for quick lookup during
-generation and optimization.
+generation.
 
 ---
 
@@ -416,23 +416,6 @@ Child element of gradient color sources (LinearGradient, RadialGradient, ConicGr
 Positioning: prefer constraint attributes (`left`/`top`/`right`/`bottom`/`centerX`/`centerY`)
 over `position`. When constraints are set, `position` is computed automatically.
 See §Constraint Attributes below.
-
-### GlyphRun
-
-| Attribute | Type | Default |
-|-----------|------|---------|
-| `font` | idref | (required) |
-| `fontSize` | float | 12 |
-| `glyphs` | string | (required) |
-| `x` | float | 0 |
-| `y` | float | 0 |
-| `xOffsets` | string | - |
-| `positions` | string | - |
-| `anchors` | string | - |
-| `scales` | string | - |
-| `rotations` | string | - |
-| `skews` | string | - |
-| `bounds` | string | — |
 
 ### TextModifier
 

@@ -182,28 +182,6 @@ For each Layer that contains child Layers, decide:
 </Layer>
 ```
 
-**Full screen skeleton example**:
-
-```xml
-<pagx version="1.0" width="393" height="852">
-  <Layer id="screen" left="0" right="0" top="0" bottom="0" layout="vertical">
-    <Layer id="header" height="60"/>
-    <Layer id="content" flex="1" layout="vertical" gap="16" padding="0,20,0,20">
-      <Layer id="cardRow" height="200" layout="horizontal" gap="12">
-        <Layer flex="1"/>
-        <Layer flex="1"/>
-        <Layer flex="1"/>
-      </Layer>
-      <Layer height="40" layout="horizontal" gap="16" padding="20">
-        <Layer flex="1"/>
-        <Layer flex="1"/>
-      </Layer>
-    </Layer>
-    <Layer id="tabBar" height="83"/>
-  </Layer>
-</pagx>
-```
-
 See `spec-essentials.md` §3 Container Layout for complete three-state sizing rules,
 flex distribution, stretch alignment, and pixel grid alignment.
 
@@ -323,8 +301,7 @@ When wrapping content into a new container Layer, **localize coordinates**:
 ```
 
 **Which coordinates to localize**: constraint attributes, `size`, Path `data` coordinates.
-Gradient coordinates are relative to the geometry element's local origin — they stay
-unchanged when the container moves.
+Gradient coordinates are geometry-relative and stay unchanged when the container moves.
 
 ### Incremental Build Strategy
 
@@ -443,21 +420,8 @@ complex icons. See `examples.md` §Icons for complete examples.
 ### Text Positioning
 
 Text renders from the baseline, making bounding box dependent on font metrics. Prefer
-wrapping Text in TextBox for accurate constraint positioning. Exception: TextPath.
-
-```xml
-<!-- Centered -->
-<TextBox centerX="0" centerY="0">
-  <Text text="30" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
-  <Fill color="#FFF"/>
-</TextBox>
-
-<!-- Left-aligned, vertically centered -->
-<TextBox left="16" centerY="0">
-  <Text text="Label" fontFamily="Arial" fontSize="14"/>
-  <Fill color="#333"/>
-</TextBox>
-```
+wrapping Text in TextBox for accurate constraint positioning (see §Internal Content
+Positioning for examples). Exception: TextPath.
 
 **TextBox behaviors**:
 - TextBox vertically centers text within each line automatically (lineBox baseline mode)

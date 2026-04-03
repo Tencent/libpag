@@ -454,25 +454,16 @@ Fill and Stroke effects** in the current scope. Only the merged path remains.
 - Group creates an **isolated** accumulation scope.
 - Painters inside a Group only see geometry accumulated inside that Group.
 - After the Group completes, its geometry **propagates upward** to the parent scope.
-- Sibling Groups cannot see each other's geometry.
+- Sibling Groups cannot see each other’s geometry.
 - **Layer is the accumulation boundary** — geometry does not cross Layer boundaries.
-
-**Propagation detail**: when a child Group completes, its accumulated geometry (Paths and
-glyph lists) is appended to the parent scope. A painter **after** the Group in the parent can
-render the Group's geometry. But sibling Groups appearing **before** cannot see it — processing
-is sequential and forward-only.
-
-### Group Transform Order
-
-1. translate(-anchor)
-2. scale(scale)
-3. skew(skew along skewAxis)
-4. rotate(rotation)
-5. translate(position)
 
 ---
 
 ## 6. Geometry Elements
+
+All geometry elements support constraint attributes (`left`, `right`, `top`, `bottom`,
+`centerX`, `centerY`) for positioning within the container — see §3 Constraint Positioning.
+Prefer constraint attributes over `position`.
 
 ### Rectangle
 
@@ -483,8 +474,6 @@ is sequential and forward-only.
 
 - `size` (default 0,0), `roundness` (default 0), `reversed` (default false)
 - `position` is the center point; defaults to center of bounding box when omitted
-- **Constraint attributes**: `left`, `right`, `top`, `bottom`, `centerX`, `centerY`, `width`, `height` — see §3 Constraint Positioning
-- **Positioning**: prefer constraint attributes over `position`
 - Roundness auto-limited to `min(roundness, width/2, height/2)`
 
 ### Ellipse
@@ -496,8 +485,6 @@ is sequential and forward-only.
 
 - Same attributes as Rectangle, no roundness
 - `position` is the center point; defaults to center of bounding box when omitted
-- **Constraint attributes**: `left`, `right`, `top`, `bottom`, `centerX`, `centerY`, `width`, `height` — see §3 Constraint Positioning
-- **Positioning**: prefer constraint attributes over `position`
 
 ### Polystar
 
@@ -507,8 +494,6 @@ is sequential and forward-only.
 ```
 
 - `position` is the center point; defaults to `(-bounds.x, -bounds.y)` when omitted, aligning the top-left pixel to the origin
-- **Constraint attributes**: `left`, `right`, `top`, `bottom`, `centerX`, `centerY`, `width`, `height` — see §3 Constraint Positioning
-- **Positioning**: prefer constraint attributes over `position`
 - `type`: `polygon` (outer only) or `star` (outer + inner alternating)
 - Supports fractional `pointCount` (incomplete last corner)
 
@@ -521,7 +506,6 @@ is sequential and forward-only.
 ```
 
 - Path data follows **SVG `<path d="...">`** syntax exactly — same commands (M, L, H, V, C, S, Q, T, A, Z), same semantics. Both absolute (uppercase) and relative (lowercase) supported.
-- **Constraint attributes**: `left`, `right`, `top`, `bottom`, `centerX`, `centerY`, `width`, `height` — see §3 Constraint Positioning
 
 ### Text
 
@@ -530,7 +514,7 @@ is sequential and forward-only.
 <Text left="10" top="10" text="Hello" fontFamily="Arial" fontSize="24"/>
 ```
 
-- Text supports constraint attributes (`left`, `right`, `top`, `bottom`, `centerX`, `centerY`) for positioning within the container.
+- Text supports constraint attributes for positioning within the container.
 - **Content bounds**: Text measures as line-box bounds (advance width sum × font metrics line height). In `lineBox` mode, bounds top is the linebox top; in `alphabetic` mode, bounds include ascender above the baseline. This measurement participates in parent container auto-sizing — a Group or Layer without explicit size will grow to fit its Text children.
 - **Standalone Text**: Text can be used directly inside a Layer or Group without TextBox wrapping. This is ideal for single-line labels, buttons, and badges where multi-line layout is not needed. Use TextBox only when you need paragraph-level features (word wrapping, multi-line alignment, vertical writing mode).
 - `baseline`: `lineBox` (default) or `alphabetic`. In `lineBox` mode, position.y is the linebox top; in `alphabetic` mode, position.y is the alphabetic baseline.
@@ -538,7 +522,6 @@ is sequential and forward-only.
 - **CDATA** for special characters: `<![CDATA[A < B]]>`.
 - `\n` in `text` attribute (as `&#10;`) triggers line breaks.
 - Two rendering modes: **runtime layout** (system fonts) and **pre-layout** (GlyphRun with embedded fonts).
-- **GlyphRun coordinate system**: positions use the **layout coordinate system** — for Text inside TextBox, relative to TextBox origin; for standalone Text, relative to Text origin. The renderer applies the inverse transform at render time.
 
 ---
 
@@ -637,31 +620,19 @@ plus its own text layout properties. TextBox can contain child elements just lik
 
 ### TextModifier + RangeSelector
 
-```xml
-<TextModifier position="0,-10" rotation="15" scale="1.2,1.2">
-  <RangeSelector start="0" end="0.5" shape="rampUp"/>
-</TextModifier>
-```
-
-- Applies per-glyph transforms weighted by selector influence.
-- Transform order: translate(-anchor) → scale → skew → rotate → translate(anchor) → translate(position), each × factor.
+Applies per-glyph transforms (position, rotation, scale, alpha) weighted by a RangeSelector.
+Used for text animation effects. See `attributes.md` for full attribute lists.
 
 ### Text-to-Shape Conversion
 
-When Text encounters a **shape modifier** (TrimPath, RoundCorner, MergePath):
-
-1. **Trigger**: any shape modifier in the same scope as accumulated Text.
-2. **Merge**: all glyphs of each Text merge into a **single Path** (not one Path per glyph).
-3. **Emoji loss**: emoji glyphs cannot convert to outlines — **silently discarded**.
-4. **Irreversible**: once converted, subsequent text modifiers (TextModifier, TextPath)
-   have no effect.
-
+Shape modifiers (TrimPath, RoundCorner, MergePath) in the same scope as Text trigger
+irreversible conversion of glyphs to Paths. Emoji glyphs are silently discarded.
 If you need both shape modifiers and text effects on the same text, use separate Groups.
 
-### Rich Text Pattern
+### Rich Text
 
-Multiple Text elements in one TextBox, each with independent Fill/Stroke.
-See `generate-guide.md` §Internal Content Positioning for examples and usage guidance.
+Multiple Text elements in one TextBox with independent Fill/Stroke.
+See `generate-guide.md` §Internal Content Positioning for examples.
 
 ---
 

@@ -34,8 +34,7 @@ Icon patterns using the "Think in SVG, write in PAGX" approach. See `generate-gu
 </pagx>
 ```
 
-**Pattern**: Ellipse for rings + Path for lines — most stroke icons decompose into these two primitives.
-Group isolates the diagonal line's Stroke (different width/cap) from the ring's Stroke.
+**Pattern**: Ellipse for rings + Path for lines. Group isolates different Stroke widths.
 `cap="round"` on open endpoints prevents flat cuts.
 
 ### Fill Icon (Solid / Active)
@@ -54,8 +53,7 @@ Group isolates the diagonal line's Stroke (different width/cap) from the ring's 
 </pagx>
 ```
 
-**Pattern**: Single closed Path with `Fill` — for irregular shapes (heart, leaf, lightning)
-that can't decompose into Rectangle/Ellipse. Path `data` is standard SVG `<path d>` syntax,
+**Pattern**: Single closed Path with `Fill` for irregular shapes. Path `data` is SVG syntax,
 closed with `Z`.
 
 ### Mixed Icon (Stroke + Fill)
@@ -82,12 +80,9 @@ closed with `Z`.
 </pagx>
 ```
 
-**Pattern**: Stroke for outlines (arc) + Fill for solid areas (body, cutout) in one icon.
-Each part with different painters needs its own Group for scope isolation. **All three icon
-examples share the same structure**: background Rectangle + Fill as the first content on the
-Layer, then a Group for the icon content (needed because the background Rectangle + Fill
-precede it in the same scope). The outer Group uses `centerX="0" centerY="0"` to center
-the icon within the Layer. For circular backgrounds, replace Rectangle with Ellipse.
+**Pattern**: Stroke for outlines + Fill for solid areas. Each part with different painters
+needs its own Group. **All icon examples share**: background Rectangle + Fill first, then
+a centered Group (`centerX/centerY`) for the icon content.
 
 ---
 
@@ -128,10 +123,8 @@ automatically.
 </pagx>
 ```
 
-**Pattern**: Content-driven button — Text with constraint margins (`left/right/top/bottom`)
-defines the content area; Group uses `centerX/centerY` to center within the Layer. The Layer
-auto-sizes to fit the Group's measured bounds, and Rectangle stretches to fill via
-`left/right/top/bottom="0"`. DropShadowStyle = CSS `box-shadow`.
+**Pattern**: Content-driven button — Text constraints define padding, Group `centerX/centerY`
+centers within Layer. Layer auto-sizes, Rectangle stretches via `left/right/top/bottom="0"`.
 
 ### Icon + Label Row
 
@@ -150,10 +143,8 @@ auto-sizes to fit the Group's measured bounds, and Rectangle stretches to fill v
 </pagx>
 ```
 
-**Pattern**: Content-driven row — `layout="horizontal"` with `gap` and `alignment="center"`
-replaces manual coordinate positioning. Each child is a Layer providing painter scope
-isolation — icon (Ellipse + Fill) and label (Text + Fill) each in their own Layer,
-sized by content.
+**Pattern**: `layout="horizontal"` + `gap` + `alignment="center"` for row arrangement.
+Each child Layer provides painter scope isolation.
 
 ### Progress Bar
 
@@ -246,12 +237,8 @@ results). DropShadowStyle adds depth. Layer uses `centerX/centerY` for canvas ce
 </pagx>
 ```
 
-**Pattern**: Vertical layout container with content-driven buttons — each button's Text uses
-constraint margins (`left/right/top/bottom`) to define padding, Group uses `centerX/centerY`
-to center within the button Layer, making button height auto-sized from text content.
-`includeInLayout="false"` exempts the red dot from layout flow — like CSS `position: absolute`.
-Negative offsets (`right="-6" top="-6"`) place the dot outside the parent boundary.
-DropShadowStyle on the container applies to all buttons.
+**Pattern**: Content-driven buttons with constraint margins for padding. `includeInLayout="false"`
+exempts the red dot. Negative offsets place it outside parent bounds.
 
 ### Card with Internal Layout
 
@@ -299,19 +286,10 @@ A card with vertical container layout, text header, and action buttons.
 </pagx>
 ```
 
-**Pattern**: Key structural choices:
-
-- **Background on layout Layer**: VectorElements don't participate in layout — write
-  Rectangle + Fill directly on the `layout` Layer. `padding` insets child Layers while
-  the background stretches to full bounds.
-- **Flex absorbs space**: Title+Value area uses `flex="1"` to fill remaining height
-  after the fixed-height button row, separating content into individual Layers with
-  independent Fill colors.
-- **Content-driven buttons**: Each button uses `layout="horizontal"` with `alignment="center"
-  arrangement="center"` to center its text Group. `flex="1"` on both buttons distributes
-  width equally.
-
-For flexible height layouts, see `generate-guide.md` §Layout: Think in Flexbox.
+**Pattern**:
+- Background Rectangle + Fill on `layout` Layer (VectorElements skip layout)
+- `flex="1"` absorbs remaining height after fixed-height button row
+- Two `flex="1"` buttons distribute width equally
 
 ### Input Field (InnerShadowStyle)
 
@@ -430,15 +408,9 @@ allocation.
 </pagx>
 ```
 
-**Pattern**: Partial roundness — `MergePath mode="intersect"` clips a fully-rounded Rectangle
-with a straight-edged Rectangle to flatten bottom corners. The oversized rounded rect
-(`bottom="-20"`) extends below so only the top curves intersect. Tab items use
-`arrangement="spaceAround"` for even distribution. Each tab is a vertical layout
-(`layout="vertical" gap alignment="center"`) containing an icon Layer and a label Layer.
-Active tab uses Fill; inactive tabs use Stroke — see §Icons. Note that the icon content
-(Ellipse, Path, etc.) is placed directly on the icon Layer without an outer Group because
-it is the first content in its scope. Inner Groups are only added where different Strokes
-need isolation (e.g., ring vs. diagonal line in the Search icon).
+**Pattern**: `MergePath mode="intersect"` clips rounded rect with straight rect for
+partial roundness. `arrangement="spaceAround"` distributes tabs. Each tab is a vertical
+layout with icon + label Layers. Active = Fill, inactive = Stroke.
 
 ---
 
@@ -483,11 +455,9 @@ goes clockwise — use Group `rotation` to reposition the start point.
 </pagx>
 ```
 
-**Pattern**: Container layout arranges bars — `layout="horizontal"` + `alignment="end"` =
-CSS `align-items: flex-end`, bottom-aligning bars of different heights.
-`arrangement="spaceBetween"` evenly distributes bars across the width. Each bar is a Layer
-with a fixed-size Rectangle — different heights per bar **cannot** use Repeater (no per-copy
-parameterization). Baseline is a separate Layer with `height="1"` positioned via constraints.
+**Pattern**: `layout="horizontal"` + `alignment="end"` bottom-aligns bars.
+`arrangement="spaceBetween"` distributes across width. Different heights per bar cannot
+use Repeater.
 
 ### Line Chart
 
@@ -522,12 +492,9 @@ parameterization). Baseline is a separate Layer with `height="1"` positioned via
 </pagx>
 ```
 
-**Pattern**: Grid lines use Repeater — `Rectangle size="240,1"` + `Repeater copies="5"
-position="0,35"` draws 5 horizontal lines at 35px intervals (Repeater copies geometry +
-painted Fill together). Data line is a Path with `M/L` commands for line vertices, stroked
-with `cap/join="round"`. Area fill reuses the same points, appends lines to the baseline,
-and closes with `Z` for a semi-transparent fill region. Data points are individual Ellipses
-sharing one Fill — offset by half their size (`-3`) to center on line coordinates.
+**Pattern**: Repeater for grid lines (`copies="5" position="0,35"`). Path with `M/L` for
+data line (stroked), closed variant for area fill. Data points = individual Ellipses sharing
+one Fill.
 
 ### Donut Chart (TrimPath)
 
@@ -606,12 +573,9 @@ sharing one Fill — offset by half their size (`-3`) to center on line coordina
 </pagx>
 ```
 
-**Pattern**: Donut segments = Ellipse + TrimPath + thick Stroke, each in its own Group for
-painter isolation (different colors). TrimPath `start/end` values partition the circle
-(0–1 = full circumference); small gaps (e.g., `end="0.38"` not `0.4`) create visual
-separation. First segment sits directly on the Layer (no Group needed). Horizontal layout
-arranges donut + legend side by side with `alignment="center"`. Legend reuses the Icon +
-Label Row pattern.
+**Pattern**: Donut = Ellipse + TrimPath + thick Stroke per segment. `start/end` partition
+the circle (0–1). Small gaps (e.g., `end="0.38"` not `0.4`) for visual separation.
+Horizontal layout arranges donut + legend.
 
 **Gradient stroke variant**: for ring progress with gradient color, embed a LinearGradient
 directly inside the Stroke element:
