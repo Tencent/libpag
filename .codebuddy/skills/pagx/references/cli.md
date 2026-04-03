@@ -169,11 +169,40 @@ returns exit code 0.
 
 ```xml
 <layout>
-<pagx width="400" height="300">
-    <Layer id="container" bounds="0,0,400,300" layout="horizontal" gap="20" padding="20">
-      <Rectangle bounds="0,0,400,300"/>
-      <Layer id="sidebar" bounds="20,20,120,260"/>
-      <Layer id="content" bounds="160,20,220,260" flex="1"/>
+<pagx width="393" height="852">
+    <Layer id="screen" bounds="0,0,393,852" layout="vertical">
+      <Layer id="header" bounds="0,0,393,60">
+        <Rectangle bounds="0,0,393,60"/>
+      </Layer>
+      <Layer id="content" bounds="0,60,393,709" layout="vertical" gap="16" padding="0,20,0,20" flex="1">
+        <Layer id="cardRow" bounds="20,60,353,200" layout="horizontal" gap="12">
+          <Layer bounds="20,60,109,200" flex="1">
+            <Rectangle bounds="20,60,109,200"/>
+          </Layer>
+          <Layer bounds="141,60,110,200" flex="1">
+            <Rectangle bounds="141,60,110,200"/>
+          </Layer>
+          <Layer bounds="263,60,110,200" flex="1">
+            <Rectangle bounds="263,60,110,200"/>
+          </Layer>
+        </Layer>
+        <Layer id="body" bounds="20,276,353,493" flex="1"/>
+      </Layer>
+      <Layer id="tabBar" bounds="0,769,393,83">
+        <Rectangle bounds="0,769,393,83"/>
+        <Layer bounds="0,769,393,83" layout="horizontal" arrangement="spaceAround" alignment="center">
+          <Layer bounds="42,780,44,61" layout="vertical" gap="2" alignment="center">
+            <Layer bounds="52,780,24,24">
+              <Path bounds="52,780,24,24"/>
+            </Layer>
+            <Layer bounds="42,806,44,11">
+              <TextBox bounds="42,806,44,11">
+                <Text bounds="42,806,44,11"/>
+              </TextBox>
+            </Layer>
+          </Layer>
+        </Layer>
+      </Layer>
     </Layer>
 </pagx>
 </layout>
